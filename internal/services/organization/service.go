@@ -1,0 +1,106 @@
+package internal_organization_service
+
+import (
+	"context"
+	"strings"
+
+	internal_gorm "github.com/lexatic/web-backend/internal/gorm"
+	internal_services "github.com/lexatic/web-backend/internal/services"
+	"github.com/lexatic/web-backend/pkg/commons"
+	"github.com/lexatic/web-backend/pkg/connectors"
+	"github.com/lexatic/web-backend/pkg/types"
+)
+
+func NewOrganizationService(logger commons.Logger, postgres connectors.PostgresConnector) internal_services.OrganizationService {
+	return &organizationService{
+		logger:   logger,
+		postgres: postgres,
+	}
+}
+
+type organizationService struct {
+	logger   commons.Logger
+	postgres connectors.PostgresConnector
+}
+
+func (oS *organizationService) Create(ctx context.Context, auth types.Principle, name string, size string, industry string) (*internal_gorm.Organization, error) {
+	db := oS.postgres.DB(ctx)
+	org := &internal_gorm.Organization{
+		Name:      name,
+		Industry:  industry,
+		Size:      size,
+		CreatedBy: auth.GetUserInfo().Id,
+	}
+	tx := db.Save(org)
+	if err := tx.Error; err != nil {
+		return nil, err
+	} else {
+		return org, nil
+	}
+}
+
+func (oS *organizationService) Get(ctx context.Context, organizationId uint64) (*internal_gorm.Organization, error) {
+	db := oS.postgres.DB(ctx)
+	var ct internal_gorm.Organization
+	tx := db.Last(&ct, "id = ?", organizationId)
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+	return &ct, nil
+}
+
+func (oS *organizationService) Update(ctx context.Context, auth types.Principle, organizationId uint64, name *string, industry *string, email *string) (*internal_gorm.Organization, error) {
+	db := oS.postgres.DB(ctx)
+	org := &internal_gorm.Organization{
+		UpdatedBy: auth.GetUserInfo().Id,
+	}
+
+	if name != nil {
+		org.Name = *name
+	}
+	if industry != nil {
+		org.Industry = *industry
+	}
+	if email != nil {
+		org.Contact = *email
+	}
+	tx := db.Where("id = ? ", organizationId).Updates(org)
+	if err := tx.Error; err != nil {
+		return nil, err
+	} else {
+		return org, nil
+	}
+}
+
+func (oS *organizationService) InviteUserToOrg(ctx context.Context, userId uint64, role string, auth types.Principle) (*internal_gorm.UserOrganizationRole, error) {
+	db := oS.postgres.DB(ctx)
+	var org internal_gorm.Organization
+	tx := db.First(&org, "id = ?", auth.GetOrganizationRole().OrganizationId)
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+
+	orgRole := &internal_gorm.UserOrganizationRole{
+		UserAuthId:     userId,
+		Role:           strings.ToLower(role),
+		OrganizationId: auth.GetOrganizationRole().OrganizationId,
+		Status:         "invited",
+		CreatedBy:      auth.GetUserInfo().Id,
+		UpdatedBy:      auth.GetUserInfo().Id,
+	}
+
+	if err := db.Save(orgRole).Error; err != nil {
+		return nil, err
+	}
+	return orgRole, nil
+}
+
+func (oS *organizationService) GetRoles(ctx context.Context, organizationId uint64) ([]*internal_gorm.UserOrganizationRole, error) {
+	db := oS.postgres.DB(ctx)
+	var roles []*internal_gorm.UserOrganizationRole
+	if err := db.Where("organization_id = ? and status = ?", organizationId, "active").Find(&roles).Error; err != nil {
+		return nil, err
+	}
+
+	return roles, nil
+}
