@@ -80,7 +80,7 @@ func main() {
 	// if application json
 	rpcFilteredListener := cmuxListener.Match(cmux.HTTP1HeaderField("Content-Type", "application/json"))
 	http2GRPCFilteredListener := cmuxListener.Match(cmux.HTTP2())
-	grpcFilteredListener := cmuxListener.Match(cmux.HTTP2())
+	grpcFilteredListener := cmuxListener.Match(cmux.Any())
 
 	group, ctx := errgroup.WithContext(ctx)
 	group.Go(func() error {
