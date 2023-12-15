@@ -219,6 +219,13 @@ func (webAuthApi *webAuthRPCApi) RegisterUser(c *gin.Context) {
 }
 
 // all grpc handler
+/*
+	Authneitcate handle for grpc request
+	- user.email
+	- user.password
+
+	signin -> request to authenticate with valid email and password
+*/
 func (wAuthApi *webAuthGRPCApi) Authenticate(c context.Context, irRequest *web_api.AuthenticateRequest) (*web_api.AuthenticateResponse, error) {
 	wAuthApi.logger.Debugf("Authenticate from grpc with requestPayload %v, %v", irRequest, c)
 
@@ -236,11 +243,30 @@ func (wAuthApi *webAuthGRPCApi) Authenticate(c context.Context, irRequest *web_a
 			}}, nil
 	}
 
+	/**
+	As we support multiple state of user to register
+	only active user will able to signin to the rapida account
+	*/
+	if aUser.GetUserInfo().Status != "active" {
+		wAuthApi.logger.Errorf("unable to process authentication because of status of the user status %v", aUser.GetUserInfo().Status)
+		return &web_api.AuthenticateResponse{
+			Code:    401,
+			Success: false,
+			Error: &web_api.AuthenticationError{
+				ErrorCode:    400,
+				ErrorMessage: "illegal user status",
+				HumanMessage: "Your account is not activated yet. please activate before signin.",
+			}}, nil
+	}
 	auth := &web_api.Authentication{}
 	types.Cast(aUser.PlainAuthPrinciple(), auth)
 	return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
 }
 
+/*
+Register or activate a user to authenticate into the rapida platform
+will be streamlining the code for better managing and expalining later
+*/
 func (wAuthApi *webAuthGRPCApi) RegisterUser(c context.Context, irRequest *web_api.RegisterUserRequest) (*web_api.AuthenticateResponse, error) {
 	wAuthApi.logger.Debugf("RegisterUser from grpc with requestPayload %v, %v", irRequest, c)
 	cUser, err := wAuthApi.userService.Get(c, irRequest.Email)
@@ -249,7 +275,14 @@ func (wAuthApi *webAuthGRPCApi) RegisterUser(c context.Context, irRequest *web_a
 		aUser, err := wAuthApi.userService.Create(c, irRequest.Name, irRequest.Email, irRequest.Password, "active", &source)
 		if err != nil {
 			wAuthApi.logger.Errorf("creation user failed with err %v", err)
-			return nil, err
+			return &web_api.AuthenticateResponse{
+				Code:    400,
+				Success: false,
+				Error: &web_api.AuthenticationError{
+					ErrorCode:    400,
+					ErrorMessage: err.Error(),
+					HumanMessage: "Unable to create an account, please check and try again.",
+				}}, nil
 		}
 		_, err = wAuthApi.integrationClient.WelcomeEmail(c, aUser.GetUserInfo().Id, aUser.GetUserInfo().Name, aUser.GetUserInfo().Email)
 		if err != nil {
@@ -261,40 +294,94 @@ func (wAuthApi *webAuthGRPCApi) RegisterUser(c context.Context, irRequest *web_a
 		return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
 	}
 
+	// already have an active account
+	if cUser.Status == "active" {
+		wAuthApi.logger.Errorf("user is already having account and trying to signup")
+		return &web_api.AuthenticateResponse{
+			Code:    401,
+			Success: false,
+			Error: &web_api.AuthenticationError{
+				ErrorCode:    400,
+				ErrorMessage: "illegal user status",
+				HumanMessage: "Your email is already associated with an existing account, try signin.",
+			}}, nil
+
+	}
 	// if it's invited user then
 	if cUser.Status == "invited" {
-
 		_, err := wAuthApi.userService.UpdatePassword(c, cUser.Id, irRequest.Password)
 		if err != nil {
-			wAuthApi.logger.Debugf("Error while updaing password for user %v", err)
-			return nil, err
+			wAuthApi.logger.Errorf("Error while updaing password for user %v", err)
+			return &web_api.AuthenticateResponse{
+				Code:    401,
+				Success: false,
+				Error: &web_api.AuthenticationError{
+					ErrorCode:    400,
+					ErrorMessage: err.Error(),
+					HumanMessage: "Unable to activate your account, please try again later.",
+				}}, nil
 		}
 		// activate org
 		if err = wAuthApi.userService.ActivateAllOrganizationRole(c, cUser.Id); err != nil {
-			wAuthApi.logger.Debugf("Error while registering user %v", err)
-			return nil, err
+			wAuthApi.logger.Errorf("Error while registering user %v", err)
+			return &web_api.AuthenticateResponse{
+				Code:    401,
+				Success: false,
+				Error: &web_api.AuthenticationError{
+					ErrorCode:    400,
+					ErrorMessage: err.Error(),
+					HumanMessage: "Unable to activate your account, please try again later.",
+				}}, nil
 		}
 		// activate project
 		if err := wAuthApi.userService.ActivateAllProjectRoles(c, cUser.Id); err != nil {
-			wAuthApi.logger.Debugf("Error while registering user %v", err)
-			return nil, err
+			wAuthApi.logger.Errorf("Error while registering user %v", err)
+			return &web_api.AuthenticateResponse{
+				Code:    401,
+				Success: false,
+				Error: &web_api.AuthenticationError{
+					ErrorCode:    400,
+					ErrorMessage: err.Error(),
+					HumanMessage: "Unable to activate your account, please try again later.",
+				}}, nil
 		}
 
 		// activate user
 		aUser, err := wAuthApi.userService.Activate(c, cUser.Id, irRequest.Name, nil)
 		if err != nil {
-			wAuthApi.logger.Debugf("Error while registering user %v", err)
-			return nil, err
+			wAuthApi.logger.Errorf("Error while registering user %v", err)
+			return &web_api.AuthenticateResponse{
+				Code:    401,
+				Success: false,
+				Error: &web_api.AuthenticationError{
+					ErrorCode:    400,
+					ErrorMessage: err.Error(),
+					HumanMessage: "Unable to activate your account, please try again later.",
+				}}, nil
 		}
 
-		wAuthApi.logger.Debugf("Error while updaing password for user %v", cUser)
-
 		auth := &web_api.Authentication{}
-		types.Cast(aUser.PlainAuthPrinciple(), auth)
+		err = types.Cast(aUser.PlainAuthPrinciple(), auth)
+		if err != nil {
+			wAuthApi.logger.Errorf("Error while unmarshelling user error %v", err)
+			return &web_api.AuthenticateResponse{
+				Code:    401,
+				Success: false,
+				Error: &web_api.AuthenticationError{
+					ErrorCode:    400,
+					ErrorMessage: err.Error(),
+					HumanMessage: "Unable to activate your account, please try again later.",
+				}}, nil
+
+		}
 		return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
 	}
 
-	return &web_api.AuthenticateResponse{Code: 400, Success: false}, err
+	return &web_api.AuthenticateResponse{Code: 400, Success: false, Error: &web_api.AuthenticationError{
+		ErrorCode:    400,
+		ErrorMessage: "illegal state of data",
+		HumanMessage: "We are facing issue with account creation, please try again in sometime",
+	}}, err
 }
 
 func (wAuthApi *webAuthGRPCApi) ForgotPassword(c context.Context, irRequest *web_api.ForgotPasswordRequest) (*web_api.BaseResponse, error) {

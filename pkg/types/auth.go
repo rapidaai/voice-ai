@@ -44,9 +44,10 @@ type AuthToken struct {
 }
 
 type UserInfo struct {
-	Id    uint64
-	Name  string
-	Email string
+	Id     uint64
+	Name   string
+	Email  string
+	Status string
 }
 
 type ProjectRole struct {
