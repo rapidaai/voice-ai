@@ -36,6 +36,10 @@ func (aP *authPrinciple) GetOrganizationRole() *types.OrganizaitonRole {
 }
 
 func (aP *authPrinciple) GetProjectRoles() []*types.ProjectRole {
+	if aP.userProjectRoles == nil {
+		return nil
+	}
+
 	if aP.userProjectRoles != nil && len(*aP.userProjectRoles) == 0 {
 		return nil
 	}
