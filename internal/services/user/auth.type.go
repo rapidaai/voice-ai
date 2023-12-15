@@ -23,7 +23,8 @@ func (aP *authPrinciple) GetAuthToken() *types.AuthToken {
 }
 
 func (aP *authPrinciple) GetOrganizationRole() *types.OrganizaitonRole {
-	if aP.userOrgRole == nil {
+	// do not return empty object
+	if aP.userOrgRole == nil || (*aP.userOrgRole) == (internal_gorm.UserOrganizationRole{}) {
 		return nil
 	}
 	return &types.OrganizaitonRole{
@@ -66,12 +67,8 @@ func (ap *authPrinciple) PlainAuthPrinciple() types.PlainAuthPrinciple {
 		User:  *ap.GetUserInfo(),
 		Token: *ap.GetAuthToken(),
 	}
-	if ap.userOrgRole != nil {
-		alt.OrganizationRole = *ap.GetOrganizationRole()
-	}
-	if ap.userProjectRoles != nil {
-		alt.ProjectRoles = ap.GetProjectRoles()
-	}
+	alt.OrganizationRole = ap.GetOrganizationRole()
+	alt.ProjectRoles = ap.GetProjectRoles()
 	return alt
 
 }

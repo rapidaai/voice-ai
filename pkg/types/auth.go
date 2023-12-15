@@ -15,10 +15,10 @@ type Authenticator interface {
 }
 
 type PlainAuthPrinciple struct {
-	User             UserInfo         `json:"user"`
-	Token            AuthToken        `json:"token"`
-	OrganizationRole OrganizaitonRole `json:"organizationRole"`
-	ProjectRoles     []*ProjectRole   `json:"projectRoles"`
+	User             UserInfo          `json:"user"`
+	Token            AuthToken         `json:"token"`
+	OrganizationRole *OrganizaitonRole `json:"organizationRole"`
+	ProjectRoles     []*ProjectRole    `json:"projectRoles"`
 }
 
 type Principle interface {
