@@ -425,7 +425,7 @@ func (wAuthApi *webAuthGRPCApi) ForgotPassword(c context.Context, irRequest *web
 			}}, nil
 	}
 	// userId uint64, name, email,
-	resetPasswordUrl := fmt.Sprintf("https://rapida.ai/auth/change-password?token=%s", token.Token)
+	resetPasswordUrl := fmt.Sprintf("https://rapida.ai/auth/change-password/%s", token.Token)
 	_, err = wAuthApi.integrationClient.ResetPasswordEmail(c, aUser.Id,
 		aUser.Name, aUser.Email,
 		resetPasswordUrl)

@@ -54,9 +54,10 @@ func (aP *authPrinciple) GetProjectRoles() []*types.ProjectRole {
 
 func (aP *authPrinciple) GetUserInfo() *types.UserInfo {
 	return &types.UserInfo{
-		Id:    aP.user.Id,
-		Name:  aP.user.Name,
-		Email: aP.user.Email,
+		Id:     aP.user.Id,
+		Name:   aP.user.Name,
+		Email:  aP.user.Email,
+		Status: aP.user.Status,
 	}
 }
 
