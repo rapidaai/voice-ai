@@ -225,7 +225,15 @@ func (wAuthApi *webAuthGRPCApi) Authenticate(c context.Context, irRequest *web_a
 	aUser, err := wAuthApi.userService.Authenticate(c, irRequest.Email, irRequest.Password)
 	if err != nil {
 		wAuthApi.logger.Errorf("unable to process authentication %v", err)
-		return &web_api.AuthenticateResponse{Code: 401, Success: false}, err
+		wAuthApi.logger.Debugf("authentication request failed for user %s", irRequest.Email)
+		return &web_api.AuthenticateResponse{
+			Code:    401,
+			Success: false,
+			Error: &web_api.AuthenticationError{
+				ErrorCode:    401,
+				ErrorMessage: err.Error(),
+				HumanMessage: "Please provide valid credentials to signin into account.",
+			}}, nil
 	}
 
 	auth := &web_api.Authentication{}

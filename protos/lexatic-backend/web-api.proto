@@ -58,12 +58,18 @@ message Authentication {
     
 }
 
+message AuthenticationError{
+    uint64 errorCode = 1 [jstype = JS_STRING];
+    string errorMessage = 2;
+    string humanMessage = 3;
+}
 
 
 message AuthenticateResponse {
     int32 code = 1;
     bool success = 2;
-    Authentication data = 3;
+    optional Authentication data = 3;
+    optional AuthenticationError error = 4;
 }
 
 message ForgotPasswordRequest {

@@ -58,7 +58,7 @@ CREATE TABLE user_auths (
   updated_date timestamp without time zone,
   created_by bigint NOT NULL,
   updated_by bigint NOT NULL,
-  source character varying(50) DEFAULT 'direct'::character varying NOT NULL,
+  source character varying(50) DEFAULT 'direct'::character varying NOT NULL
 );
 
 CREATE TABLE user_auth_tokens (
@@ -128,5 +128,3 @@ CREATE INDEX IF NOT EXISTS ua_idx_email ON user_auths(email);
 CREATE INDEX IF NOT EXISTS up_idx_auth_id ON user_auth_tokens(user_auth_id);
 
 CREATE INDEX IF NOT EXISTS ur_idx_auth_id ON user_roles(user_auth_id);
-
-ALTER TABLE user_auths ADD COLUMN source character varying(50) DEFAULT 'direct'::character varying NOT NULL;
