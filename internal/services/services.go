@@ -47,9 +47,6 @@ type OrganizationService interface {
 	Create(ctx context.Context, auth types.Principle, name string, size string, industry string) (*internal_gorm.Organization, error)
 	Get(ctx context.Context, organizationId uint64) (*internal_gorm.Organization, error)
 	Update(ctx context.Context, auth types.Principle, organizationId uint64, name *string, industry *string, email *string) (*internal_gorm.Organization, error)
-	// Activate(ctx context.Context, userId uint64) (*internal_gorm.UserOrganizationRole, error)
-	// InviteUserToOrg(ctx context.Context, userId uint64, role string, auth types.Principle) (*internal_gorm.UserOrganizationRole, error)
-	//GetRoles(ctx context.Context, organizationId uint64) ([]*internal_gorm.UserOrganizationRole, error)
 }
 
 type VaultService interface {
