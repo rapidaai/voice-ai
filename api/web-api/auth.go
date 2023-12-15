@@ -384,31 +384,96 @@ func (wAuthApi *webAuthGRPCApi) RegisterUser(c context.Context, irRequest *web_a
 	}}, err
 }
 
-func (wAuthApi *webAuthGRPCApi) ForgotPassword(c context.Context, irRequest *web_api.ForgotPasswordRequest) (*web_api.BaseResponse, error) {
+func (wAuthApi *webAuthGRPCApi) ForgotPassword(c context.Context, irRequest *web_api.ForgotPasswordRequest) (*web_api.ForgotPasswordResponse, error) {
 	wAuthApi.logger.Debugf("ForgotPassword from grpc with requestPayload %v, %v", irRequest.String(), c)
 
 	aUser, err := wAuthApi.userService.Get(c, irRequest.GetEmail())
 	if err != nil {
-		return nil, err
+		wAuthApi.logger.Errorf("getting email for forgot password for user %v failed %v", irRequest.GetEmail(), err)
+		return &web_api.ForgotPasswordResponse{
+			Code:    400,
+			Success: false,
+			Error: &web_api.AuthenticationError{
+				ErrorCode:    400,
+				ErrorMessage: err.Error(),
+				HumanMessage: "Your email is not associated with rapida.ai account, please check and try again",
+			}}, nil
 	}
 
-	_, err = wAuthApi.userService.CreateToken(c, aUser.Id)
+	if aUser.Status != "active" {
+		wAuthApi.logger.Errorf("user is changing password for not activated user  %v", aUser.Email)
+		return &web_api.ForgotPasswordResponse{
+			Code:    401,
+			Success: false,
+			Error: &web_api.AuthenticationError{
+				ErrorCode:    400,
+				ErrorMessage: "illegal user status",
+				HumanMessage: "Your account is not activated yet. please activate before signin.",
+			}}, nil
+	}
+
+	token, err := wAuthApi.userService.CreatePasswordToken(c, aUser.Id)
 	if err != nil {
-		return nil, err
+		wAuthApi.logger.Errorf("unable to create password token for user %v failed %v", irRequest.GetEmail(), err)
+		return &web_api.ForgotPasswordResponse{
+			Code:    400,
+			Success: false,
+			Error: &web_api.AuthenticationError{
+				ErrorCode:    400,
+				ErrorMessage: err.Error(),
+				HumanMessage: "Unable to create reset password token, please try again in sometime.",
+			}}, nil
+	}
+	// userId uint64, name, email,
+	resetPasswordUrl := fmt.Sprintf("https://rapida.ai/auth/change-password?token=%s", token.Token)
+	_, err = wAuthApi.integrationClient.ResetPasswordEmail(c, aUser.Id,
+		aUser.Name, aUser.Email,
+		resetPasswordUrl)
+	wAuthApi.logger.Debugf("reset password link created %v", resetPasswordUrl)
+	if err != nil {
+		wAuthApi.logger.Errorf("sending forgot password email failed with err %v", err)
 	}
 
-	return &web_api.BaseResponse{
+	return &web_api.ForgotPasswordResponse{
 		Code:    200,
 		Success: true,
 	}, nil
 
 }
 
-func (wAuthApi *webAuthGRPCApi) ChangePassword(c context.Context, irRequest *web_api.ChangePasswordRequest) (*web_api.BaseResponse, error) {
+func (wAuthApi *webAuthGRPCApi) CreatePassword(c context.Context, irRequest *web_api.CreatePasswordRequest) (*web_api.CreatePasswordResponse, error) {
 	wAuthApi.logger.Debugf("ChangePassword from grpc with requestPayload %v, %v", irRequest, c)
 	// CreateToken(ctx context.Context, userId uint64) (*internal_gorm.UserAuthToken, error)
 	// wAuthApi.userService.Get(c, irRe)
-	return nil, nil
+	token, err := wAuthApi.userService.GetToken(c, "password-token", irRequest.GetToken())
+	if err != nil {
+		wAuthApi.logger.Errorf("unable to verify password token for user %v failed %v", irRequest.GetToken(), err)
+		return &web_api.CreatePasswordResponse{
+			Code:    400,
+			Success: false,
+			Error: &web_api.AuthenticationError{
+				ErrorCode:    400,
+				ErrorMessage: err.Error(),
+				HumanMessage: "Unable to verify reset password token, please try again in sometime.",
+			}}, nil
+	}
+
+	_, err = wAuthApi.userService.UpdatePassword(c, token.UserAuthId, irRequest.Password)
+	if err != nil {
+		wAuthApi.logger.Errorf("unable to change password for user failed %v", err)
+		return &web_api.CreatePasswordResponse{
+			Code:    400,
+			Success: false,
+			Error: &web_api.AuthenticationError{
+				ErrorCode:    400,
+				ErrorMessage: err.Error(),
+				HumanMessage: "Unable to create reset password token, please try again in sometime.",
+			}}, nil
+	}
+	return &web_api.CreatePasswordResponse{
+		Code:    200,
+		Success: true,
+	}, nil
 
 }
 

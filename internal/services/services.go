@@ -17,7 +17,7 @@ type UserService interface {
 	UpdatePassword(ctx context.Context, userId uint64, password string) (*internal_gorm.UserAuth, error)
 	GetToken(ctx context.Context, tokenType string, token string) (*internal_gorm.UserAuthToken, error)
 	Create(ctx context.Context, name string, email string, password string, staus string, source *string) (types.Principle, error)
-	CreateToken(ctx context.Context, userId uint64) (*internal_gorm.UserAuthToken, error)
+	CreatePasswordToken(ctx context.Context, userId uint64) (*internal_gorm.UserAuthToken, error)
 	//
 	CreateOrganizationRole(ctx context.Context, auth types.Principle, role string, userId uint64, orgnizationId uint64, status string) (*internal_gorm.UserOrganizationRole, error)
 	CreateProjectRole(ctx context.Context, auth types.Principle, userId uint64, role string, projectId uint64, status string) (*internal_gorm.UserProjectRole, error)

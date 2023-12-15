@@ -161,7 +161,7 @@ func (aS *userService) CreateNewAuthToken(ctx context.Context, userId uint64) (*
 	return ct, nil
 }
 
-func (aS *userService) CreateToken(ctx context.Context, userId uint64) (*internal_gorm.UserAuthToken, error) {
+func (aS *userService) CreatePasswordToken(ctx context.Context, userId uint64) (*internal_gorm.UserAuthToken, error) {
 	db := aS.postgres.DB(ctx)
 	ct := &internal_gorm.UserAuthToken{
 		UserAuthId: userId,
