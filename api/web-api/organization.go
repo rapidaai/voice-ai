@@ -158,8 +158,8 @@ func (orgG *webOrganizationGRPCApi) CreateOrganization(c context.Context, irRequ
 			}}, nil
 	}
 
-	var org *web_api.Organization
-	var orgRole *web_api.OrganizationRole
+	org := &web_api.Organization{}
+	orgRole := &web_api.OrganizationRole{}
 	err = types.Cast(aOrg, org)
 	if err != nil {
 		orgG.logger.Errorf("unable to cast organization to proto org err %v", err)
@@ -241,15 +241,15 @@ func (orgG *webOrganizationGRPCApi) GetOrganization(c context.Context, irRequest
 			}}, nil
 	}
 
-	var org *web_api.Organization
-	var orgRole *web_api.OrganizationRole
+	org := &web_api.Organization{}
+	orgRole := &web_api.OrganizationRole{}
 	err = types.Cast(aOrg, org)
 	if err != nil {
 		orgG.logger.Errorf("unable to cast organization to proto org err %v", err)
 	}
 	err = types.Cast(aRole, orgRole)
 	if err != nil {
-		orgG.logger.Errorf("unable to cast organization to proto org err %v", err)
+		orgG.logger.Errorf("unable to cast organization role to proto org role err %v", err)
 	}
 	return &web_api.GetOrganizationResponse{
 		Code:    200,
