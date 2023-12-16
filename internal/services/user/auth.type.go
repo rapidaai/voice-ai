@@ -23,7 +23,8 @@ func (aP *authPrinciple) GetAuthToken() *types.AuthToken {
 }
 
 func (aP *authPrinciple) GetOrganizationRole() *types.OrganizaitonRole {
-	if aP.userOrgRole == nil {
+	// do not return empty object
+	if aP.userOrgRole == nil || (*aP.userOrgRole) == (internal_gorm.UserOrganizationRole{}) {
 		return nil
 	}
 	return &types.OrganizaitonRole{
@@ -35,6 +36,10 @@ func (aP *authPrinciple) GetOrganizationRole() *types.OrganizaitonRole {
 }
 
 func (aP *authPrinciple) GetProjectRoles() []*types.ProjectRole {
+	if aP.userProjectRoles == nil {
+		return nil
+	}
+
 	if aP.userProjectRoles != nil && len(*aP.userProjectRoles) == 0 {
 		return nil
 	}
@@ -54,9 +59,10 @@ func (aP *authPrinciple) GetProjectRoles() []*types.ProjectRole {
 
 func (aP *authPrinciple) GetUserInfo() *types.UserInfo {
 	return &types.UserInfo{
-		Id:    aP.user.Id,
-		Name:  aP.user.Name,
-		Email: aP.user.Email,
+		Id:     aP.user.Id,
+		Name:   aP.user.Name,
+		Email:  aP.user.Email,
+		Status: aP.user.Status,
 	}
 }
 
@@ -65,12 +71,8 @@ func (ap *authPrinciple) PlainAuthPrinciple() types.PlainAuthPrinciple {
 		User:  *ap.GetUserInfo(),
 		Token: *ap.GetAuthToken(),
 	}
-	if ap.userOrgRole != nil {
-		alt.OrganizationRole = *ap.GetOrganizationRole()
-	}
-	if ap.userProjectRoles != nil {
-		alt.ProjectRoles = ap.GetProjectRoles()
-	}
+	alt.OrganizationRole = ap.GetOrganizationRole()
+	alt.ProjectRoles = ap.GetProjectRoles()
 	return alt
 
 }

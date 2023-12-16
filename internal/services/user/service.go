@@ -40,7 +40,7 @@ func NewAuthenticator(logger commons.Logger, postgres connectors.PostgresConnect
 func (aS *userService) Authenticate(ctx context.Context, email string, password string) (types.Principle, error) {
 	db := aS.postgres.DB(ctx)
 	var aUser internal_gorm.UserAuth
-	tx := db.First(&aUser, "email = ? AND password = ? and status = ?", strings.ToLower(email), ciphers.Hash(password), "active")
+	tx := db.First(&aUser, "email = ? AND password = ?", strings.ToLower(email), ciphers.Hash(password))
 	if tx.Error != nil {
 		aS.logger.Errorf("exception in DB transaction %v", tx.Error)
 		return nil, tx.Error
@@ -106,7 +106,7 @@ func (aS *userService) Get(ctx context.Context, email string) (*internal_gorm.Us
 	var aUser internal_gorm.UserAuth
 	tx := db.First(&aUser, "email = ?", strings.ToLower(email))
 	if tx.Error != nil {
-		aS.logger.Debugf("unable to find the user %s", email)
+		aS.logger.Errorf("unable to find the user %s", email)
 		return nil, tx.Error
 	}
 	return &aUser, nil
@@ -161,7 +161,7 @@ func (aS *userService) CreateNewAuthToken(ctx context.Context, userId uint64) (*
 	return ct, nil
 }
 
-func (aS *userService) CreateToken(ctx context.Context, userId uint64) (*internal_gorm.UserAuthToken, error) {
+func (aS *userService) CreatePasswordToken(ctx context.Context, userId uint64) (*internal_gorm.UserAuthToken, error) {
 	db := aS.postgres.DB(ctx)
 	ct := &internal_gorm.UserAuthToken{
 		UserAuthId: userId,

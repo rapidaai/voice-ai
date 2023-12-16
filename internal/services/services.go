@@ -17,7 +17,7 @@ type UserService interface {
 	UpdatePassword(ctx context.Context, userId uint64, password string) (*internal_gorm.UserAuth, error)
 	GetToken(ctx context.Context, tokenType string, token string) (*internal_gorm.UserAuthToken, error)
 	Create(ctx context.Context, name string, email string, password string, staus string, source *string) (types.Principle, error)
-	CreateToken(ctx context.Context, userId uint64) (*internal_gorm.UserAuthToken, error)
+	CreatePasswordToken(ctx context.Context, userId uint64) (*internal_gorm.UserAuthToken, error)
 	//
 	CreateOrganizationRole(ctx context.Context, auth types.Principle, role string, userId uint64, orgnizationId uint64, status string) (*internal_gorm.UserOrganizationRole, error)
 	CreateProjectRole(ctx context.Context, auth types.Principle, userId uint64, role string, projectId uint64, status string) (*internal_gorm.UserProjectRole, error)
@@ -47,9 +47,6 @@ type OrganizationService interface {
 	Create(ctx context.Context, auth types.Principle, name string, size string, industry string) (*internal_gorm.Organization, error)
 	Get(ctx context.Context, organizationId uint64) (*internal_gorm.Organization, error)
 	Update(ctx context.Context, auth types.Principle, organizationId uint64, name *string, industry *string, email *string) (*internal_gorm.Organization, error)
-	// Activate(ctx context.Context, userId uint64) (*internal_gorm.UserOrganizationRole, error)
-	// InviteUserToOrg(ctx context.Context, userId uint64, role string, auth types.Principle) (*internal_gorm.UserOrganizationRole, error)
-	//GetRoles(ctx context.Context, organizationId uint64) ([]*internal_gorm.UserOrganizationRole, error)
 }
 
 type VaultService interface {
