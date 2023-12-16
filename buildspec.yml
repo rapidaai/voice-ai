@@ -9,18 +9,19 @@ phases:
   install:
     commands:
       - echo "add deploy key"
-      - eval "$(ssh-agent -s)"
-      - ssh-add <(echo "$DEPLOY_KEY" | base64 -d)
-      - echo "disable strict host key check"
       - mkdir -p ~/.ssh
+      - echo "$DEPLOY_KEY" | base64 -d > ~/.ssh/id_rsa
+      - chmod 600 ~/.ssh/id_rsa
+      - eval "$(ssh-agent -s)"
+      - echo "disable strict host key check"
       - touch ~/.ssh/config
       - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
-      - git submodule update --init --recursive
-      - echo "updateing submodule"
     runtime-versions:
       golang: 1.20
   pre_build:
     commands:
+      - git submodule update --init --recursive
+      - echo "updating submodule"
       - export PB_REL=https://github.com/protocolbuffers/protobuf/releases
       - curl -LO $PB_REL/download/v3.20.0/protoc-3.20.0-linux-x86_64.zip
       - unzip protoc-3.20.0-linux-x86_64.zip -d $HOME/protobuf
