@@ -1,5 +1,7 @@
 version: 0.2
 env:
+  parameter-store:
+    DEPLOY_KEY: "DEPLOY_KEY"
   variables:
     GO_PROJECT_MODULE: "github.com/lexatic/web-backend/protos/lexatic-backend"
     OUT_DIR: "/protos/lexatic-backend/"
