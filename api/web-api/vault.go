@@ -68,10 +68,22 @@ func (wVault *webVaultGRPCApi) CreateProviderCredential(ctx context.Context, irR
 	vlt, err := wVault.vaultService.Create(ctx, iAuth, iAuth.GetOrganizationRole().OrganizationId, irRequest.GetProviderId(), irRequest.GetKeyName(), irRequest.GetProviderKey())
 	if err != nil {
 		wVault.logger.Errorf("vaultService.Create from grpc with err %v", err)
-		return nil, err
+		return &web_api.CreateProviderCredentialResponse{
+			Code:    400,
+			Success: false,
+			Error: &web_api.VaultError{
+				ErrorCode:    400,
+				ErrorMessage: err.Error(),
+				HumanMessage: "Unable to create provider credential, please try again",
+			}}, nil
 	}
+
 	out := web_api.ProviderCredential{}
-	types.Cast(vlt, &out)
+	err = types.Cast(vlt, &out)
+	if err != nil {
+		wVault.logger.Errorf("unable to cast the provider credentials to proto %v", err)
+	}
+
 	return &web_api.CreateProviderCredentialResponse{
 		Success: true,
 		Code:    200,
@@ -91,7 +103,14 @@ func (wVault *webVaultGRPCApi) DeleteProviderCredential(c context.Context, irReq
 	_, err := wVault.vaultService.Delete(c, iAuth, irRequest.GetProviderKeyId())
 	if err != nil {
 		wVault.logger.Errorf("vaultService.Delete from grpc with err %v", err)
-		return nil, err
+		return &web_api.DeleteProviderCredentialResponse{
+			Code:    400,
+			Success: false,
+			Error: &web_api.VaultError{
+				ErrorCode:    400,
+				ErrorMessage: err.Error(),
+				HumanMessage: "Unable to delete provider credential, please try again",
+			}}, nil
 	}
 	return &web_api.DeleteProviderCredentialResponse{
 		Success: true,
@@ -110,7 +129,14 @@ func (wVault *webVaultGRPCApi) GetAllProviderCredential(c context.Context, irReq
 	vlts, err := wVault.vaultService.GetAll(c, iAuth, iAuth.GetOrganizationRole().OrganizationId)
 	if err != nil {
 		wVault.logger.Errorf("vaultService.GetAll from grpc with err %v", err)
-		return nil, err
+		return &web_api.GetAllProviderCredentialResponse{
+			Code:    400,
+			Success: false,
+			Error: &web_api.VaultError{
+				ErrorCode:    400,
+				ErrorMessage: err.Error(),
+				HumanMessage: "Unable to get provider credentials, please try again",
+			}}, nil
 	}
 
 	out := make([]*web_api.ProviderCredential, len(*vlts))
@@ -124,7 +150,7 @@ func (wVault *webVaultGRPCApi) GetAllProviderCredential(c context.Context, irReq
 			Status:         cred.Status,
 			CreatedDate:    timestamppb.New(cred.CreatedDate),
 		}
-		if irRequest.GetMask() == true {
+		if irRequest.GetMask() {
 			val.Key = maskCred(val.Key)
 		}
 		out[idx] = val
@@ -138,7 +164,7 @@ func (wVault *webVaultGRPCApi) GetAllProviderCredential(c context.Context, irReq
 	}
 
 	for _, c := range out {
-		if val, ok := pmap[c.ProviderId]; ok == true {
+		if val, ok := pmap[c.ProviderId]; ok {
 			c.Provider = val.Name
 			c.Image = val.Image
 		}
@@ -165,11 +191,22 @@ func maskCred(key string) string {
 	buffer.WriteString(last)
 	return buffer.String()
 }
+
+/*
+this is not good idea as these apis are opened to public
+*/
 func (wVault *webVaultGRPCApi) GetProviderCredential(ctx context.Context, request *web_api.GetProviderCredentialRequest) (*web_api.GetProviderCredentialResponse, error) {
 	wVault.logger.Debugf("GetProviderCredential from grpc with requestPayload %v, %v", request, ctx)
 	vlt, err := wVault.vaultService.Get(ctx, request.GetOrganizationId(), request.GetProviderId())
 	if err != nil {
-		return nil, err
+		return &web_api.GetProviderCredentialResponse{
+			Code:    400,
+			Success: false,
+			Error: &web_api.VaultError{
+				ErrorCode:    400,
+				ErrorMessage: err.Error(),
+				HumanMessage: "Unable to get provider credential, please try again",
+			}}, nil
 	}
 
 	return &web_api.GetProviderCredentialResponse{
@@ -189,14 +226,27 @@ func (wVault *webVaultGRPCApi) UpdateVaultCredentials(ctx context.Context, reque
 		return nil, errors.New("unauthenticated request")
 	}
 
-	_, err := wVault.vaultService.Update(ctx, iAuth, request.Id, request.ProviderId, request.GetKey(), request.GetName())
+	_credential, err := wVault.vaultService.Update(ctx, iAuth, request.Id, request.ProviderId, request.GetKey(), request.GetName())
 	if err != nil {
 		wVault.logger.Errorf("vaultService.Delete from grpc with err %v", err)
-		return nil, err
+		return &web_api.UpdateVaultCredentialResponse{
+			Code:    400,
+			Success: false,
+			Error: &web_api.VaultError{
+				ErrorCode:    400,
+				ErrorMessage: err.Error(),
+				HumanMessage: "Unable to update provider credential, please try again",
+			}}, nil
+	}
+
+	out := web_api.ProviderCredential{}
+	err = types.Cast(_credential, &out)
+	if err != nil {
+		wVault.logger.Errorf("unable to cast the provider credentials to proto %v", err)
 	}
 	return &web_api.UpdateVaultCredentialResponse{
 		Success: true,
 		Code:    200,
-		Data:    &web_api.ProviderCredential{},
+		Data:    &out,
 	}, nil
 }

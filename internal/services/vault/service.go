@@ -90,7 +90,7 @@ func (vS *vaultService) Get(ctx context.Context, organizationId uint64, provider
 	db := vS.postgres.DB(ctx)
 	var vault internal_gorm.Vault
 	if err := db.Where("organization_id = ? and status = ? and provider_id = ?", organizationId, "active", providerId).Find(&vault).Error; err != nil {
-		vS.logger.Debugf("Priting error here %v", err)
+		vS.logger.Errorf("get credential error  %v", err)
 		return nil, err
 	}
 	return &vault, nil
