@@ -344,11 +344,9 @@ func (aS *userService) UpdateUser(ctx context.Context, auth types.Principle, use
 	user := &internal_gorm.UserAuth{
 		UpdatedBy: auth.GetUserInfo().Id,
 	}
-
 	if name != nil {
 		user.Name = *name
 	}
-
 	tx := db.Where("id = ? and status = ?", userId, "active").Updates(user)
 	if err := tx.Error; err != nil {
 		aS.logger.Errorf("exception in DB transaction %v", err)

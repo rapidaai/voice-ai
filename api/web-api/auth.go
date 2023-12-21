@@ -595,13 +595,29 @@ func (wAuthApi *webAuthApi) RegisterSocialUser(c context.Context, inf *OpenID) (
 	if err != nil {
 		aUser, err := wAuthApi.userService.Create(c, inf.Name, inf.Email, inf.Token, "active", &inf.Source)
 		if err != nil {
-			wAuthApi.logger.Errorf("creation user failed with err %v", err)
-			return nil, err
+			return &web_api.AuthenticateResponse{
+				Code:    400,
+				Success: false,
+				Error: &web_api.AuthenticationError{
+					ErrorCode:    400,
+					ErrorMessage: err.Error(),
+					HumanMessage: "Unable to create the user, please try again in sometime.",
+				}}, nil
 		}
+		//
+
 		// (ctx context.Context, userId uint64, id string, token string, source string, verified bool) (*internal_gorm.UserSocial, error)
 		_, err = wAuthApi.userService.CreateSocial(c, aUser.GetUserInfo().Id, inf.Id, inf.Token, inf.Source, inf.Verified)
 		if err != nil {
 			wAuthApi.logger.Debugf("failed to persist the user social information %v", err)
+			return &web_api.AuthenticateResponse{
+				Code:    400,
+				Success: false,
+				Error: &web_api.AuthenticationError{
+					ErrorCode:    400,
+					ErrorMessage: err.Error(),
+					HumanMessage: "Unable to create the user, please try again in sometime.",
+				}}, nil
 		}
 
 		_, err = wAuthApi.integrationClient.WelcomeEmail(c, aUser.GetUserInfo().Id, aUser.GetUserInfo().Name, aUser.GetUserInfo().Email)
@@ -616,14 +632,56 @@ func (wAuthApi *webAuthApi) RegisterSocialUser(c context.Context, inf *OpenID) (
 
 	// if it's invited user then
 	if cUser.Status == "invited" {
+
+		// activate org
+		if err = wAuthApi.userService.ActivateAllOrganizationRole(c, cUser.Id); err != nil {
+			wAuthApi.logger.Errorf("Error while registering user %v", err)
+			return &web_api.AuthenticateResponse{
+				Code:    401,
+				Success: false,
+				Error: &web_api.AuthenticationError{
+					ErrorCode:    400,
+					ErrorMessage: err.Error(),
+					HumanMessage: "Unable to activate your account, please try again later.",
+				}}, nil
+		}
+		// activate project
+		if err := wAuthApi.userService.ActivateAllProjectRoles(c, cUser.Id); err != nil {
+			wAuthApi.logger.Errorf("Error while registering user %v", err)
+			return &web_api.AuthenticateResponse{
+				Code:    401,
+				Success: false,
+				Error: &web_api.AuthenticationError{
+					ErrorCode:    400,
+					ErrorMessage: err.Error(),
+					HumanMessage: "Unable to activate your account, please try again later.",
+				}}, nil
+		}
+
 		aUser, err := wAuthApi.userService.Activate(c, cUser.Id, inf.Name, &inf.Source)
 		if err != nil {
 			wAuthApi.logger.Debugf("failed to activate the user")
+			return &web_api.AuthenticateResponse{
+				Code:    400,
+				Success: false,
+				Error: &web_api.AuthenticationError{
+					ErrorCode:    400,
+					ErrorMessage: err.Error(),
+					HumanMessage: "Failed to activate the user, please check with your organization admin.",
+				}}, nil
 		}
 
 		_, err = wAuthApi.userService.CreateSocial(c, aUser.GetUserInfo().Id, inf.Id, inf.Token, inf.Source, inf.Verified)
 		if err != nil {
 			wAuthApi.logger.Debugf("failed to persist the user social information")
+			return &web_api.AuthenticateResponse{
+				Code:    400,
+				Success: false,
+				Error: &web_api.AuthenticationError{
+					ErrorCode:    400,
+					ErrorMessage: err.Error(),
+					HumanMessage: "Failed to activate the user, please check with your organization admin.",
+				}}, nil
 		}
 
 		auth := &web_api.Authentication{}
@@ -636,8 +694,14 @@ func (wAuthApi *webAuthApi) RegisterSocialUser(c context.Context, inf *OpenID) (
 		// check
 		currentSocial, err := wAuthApi.userService.GetSocial(c, cUser.Id)
 		if err != nil {
-			wAuthApi.logger.Debugf("failed to get social information for a user %v", err)
-			return nil, errors.New("user has signed with other method in past")
+			return &web_api.AuthenticateResponse{
+				Code:    400,
+				Success: false,
+				Error: &web_api.AuthenticationError{
+					ErrorCode:    400,
+					ErrorMessage: err.Error(),
+					HumanMessage: "You have already sign up with other source. please retry with existing source.",
+				}}, nil
 		}
 		if currentSocial.Social == inf.Source {
 			aUser, err := wAuthApi.userService.AuthPrinciple(c, cUser.Id)
