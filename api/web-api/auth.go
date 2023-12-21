@@ -159,7 +159,6 @@ func (webAuthApi *webAuthRPCApi) RegisterUser(c *gin.Context) {
 
 	// if it's invited user then
 	if cUser.Status == "invited" {
-
 		// password need to fix
 		_, err := webAuthApi.userService.UpdatePassword(c, cUser.Id, irRequest.Password)
 		if err != nil {

@@ -55,6 +55,8 @@ type VaultService interface {
 	GetAll(ctx context.Context, auth types.Principle, organizationId uint64) (*[]internal_gorm.Vault, error)
 	Get(ctx context.Context, organizationId uint64, providerId uint64) (*internal_gorm.Vault, error)
 	Update(ctx context.Context, auth types.Principle, vaultId uint64, providerId uint64, value string, name string) (*internal_gorm.Vault, error)
+	// do not make it habbit
+	CreateAllDefaultKeys(ctx context.Context, organizationId uint64) ([]*internal_gorm.Vault, error)
 }
 
 type ProjectService interface {

@@ -11,6 +11,7 @@ import (
 	internal_services "github.com/lexatic/web-backend/internal/services"
 	internal_organization_service "github.com/lexatic/web-backend/internal/services/organization"
 	internal_user_service "github.com/lexatic/web-backend/internal/services/user"
+	internal_vault_service "github.com/lexatic/web-backend/internal/services/vault"
 	commons "github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"
 	"github.com/lexatic/web-backend/pkg/types"
@@ -23,6 +24,7 @@ type webOrganizationApi struct {
 	postgres            connectors.PostgresConnector
 	organizationService internal_services.OrganizationService
 	userService         internal_services.UserService
+	vaultService        internal_services.VaultService
 	projectService      internal_services.ProjectService
 }
 
@@ -55,6 +57,7 @@ func NewOrganizationGRPC(config *config.AppConfig, logger commons.Logger, postgr
 			organizationService: internal_organization_service.NewOrganizationService(logger, postgres),
 			userService:         internal_user_service.NewUserService(logger, postgres),
 			projectService:      internal_project_service.NewProjectService(logger, postgres),
+			vaultService:        internal_vault_service.NewVaultService(logger, postgres),
 		},
 	}
 }
@@ -156,6 +159,15 @@ func (orgG *webOrganizationGRPCApi) CreateOrganization(c context.Context, irRequ
 				ErrorMessage: err.Error(),
 				HumanMessage: "Unable to assign role for your organization.",
 			}}, nil
+	}
+
+	// only for limited time
+
+	// Create all the default vault
+	//
+	_, err = orgG.vaultService.CreateAllDefaultKeys(c, aOrg.Id)
+	if err != nil {
+		orgG.logger.Errorf("unable to create default keys for organization err %v", err)
 	}
 
 	org := &web_api.Organization{}

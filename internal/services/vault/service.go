@@ -95,3 +95,55 @@ func (vS *vaultService) Get(ctx context.Context, organizationId uint64, provider
 	}
 	return &vault, nil
 }
+
+func (vS *vaultService) CreateAllDefaultKeys(ctx context.Context, organizationId uint64) ([]*internal_gorm.Vault, error) {
+	db := vS.postgres.DB(ctx)
+	vlts := make([]*internal_gorm.Vault, 0)
+
+	vlts = append(vlts,
+		&internal_gorm.Vault{
+			Name:           "default-anthropic-01",
+			ProviderId:     1987967168347635712,
+			Key:            "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",
+			CreatedBy:      99,
+			OrganizationId: organizationId,
+		})
+	vlts = append(vlts,
+		&internal_gorm.Vault{
+			Name:           "default-replicate-01",
+			ProviderId:     1987967168431521792,
+			Key:            "r8_FvPKVcfvtL3NifEKEUvi7q2uEpNYUsm3MUpMN",
+			CreatedBy:      99,
+			OrganizationId: organizationId,
+		})
+	vlts = append(vlts,
+		&internal_gorm.Vault{
+			Name:           "default-cohere-01",
+			ProviderId:     1987967168435716096,
+			Key:            "nHuteTe84dihnImlgpwiD7Tk9cmAHP1qxHocstf5",
+			CreatedBy:      99,
+			OrganizationId: organizationId,
+		})
+	vlts = append(vlts,
+		&internal_gorm.Vault{
+			Name:           "default-openai-01",
+			ProviderId:     1987967168452493312,
+			Key:            "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",
+			CreatedBy:      99,
+			OrganizationId: organizationId,
+		})
+
+	vlts = append(vlts, &internal_gorm.Vault{
+		Name:           "default-google-01",
+		ProviderId:     198796716894742118,
+		Key:            "AIzaSyBI19ykmjj-wsA_hR3rt-UrPkFtwQQ3hhY",
+		CreatedBy:      99,
+		OrganizationId: organizationId,
+	})
+	tx := db.Save(vlts)
+	if err := tx.Error; err != nil {
+		vS.logger.Debugf("unable to insert for default keys of provider %v", err)
+		return nil, err
+	}
+	return vlts, nil
+}
