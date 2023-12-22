@@ -691,27 +691,28 @@ func (wAuthApi *webAuthApi) RegisterSocialUser(c context.Context, inf *OpenID) (
 	// it might be social login
 	if cUser.Status == "active" {
 		// check
-		currentSocial, err := wAuthApi.userService.GetSocial(c, cUser.Id)
+		_, err := wAuthApi.userService.GetSocial(c, cUser.Id)
 		if err != nil {
-			return &web_api.AuthenticateResponse{
-				Code:    400,
-				Success: false,
-				Error: &web_api.AuthenticationError{
-					ErrorCode:    400,
-					ErrorMessage: err.Error(),
-					HumanMessage: "You have already sign up with other source. please retry with existing source.",
-				}}, nil
-		}
-		if currentSocial.Social == inf.Source {
-			aUser, err := wAuthApi.userService.AuthPrinciple(c, cUser.Id)
+			_, err = wAuthApi.userService.CreateSocial(c, cUser.Id, inf.Id, inf.Token, inf.Source, inf.Verified)
 			if err != nil {
-				wAuthApi.logger.Debugf("failed to get auth principle %v", err)
-				return nil, err
+				return &web_api.AuthenticateResponse{
+					Code:    400,
+					Success: false,
+					Error: &web_api.AuthenticationError{
+						ErrorCode:    400,
+						ErrorMessage: err.Error(),
+						HumanMessage: "Unable to persist the social informaiton, please try again later.",
+					}}, nil
 			}
-			auth := &web_api.Authentication{}
-			types.Cast(aUser.PlainAuthPrinciple(), auth)
-			return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
 		}
+		aUser, err := wAuthApi.userService.AuthPrinciple(c, cUser.Id)
+		if err != nil {
+			wAuthApi.logger.Debugf("failed to get auth principle %v", err)
+			return nil, err
+		}
+		auth := &web_api.Authentication{}
+		types.Cast(aUser.PlainAuthPrinciple(), auth)
+		return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
 	}
 
 	return nil, errors.New("you are already registered, please use the existing method to signin")
