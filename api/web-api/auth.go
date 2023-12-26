@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -912,7 +913,7 @@ func (wAuthApi *webAuthGRPCApi) GetUsers(c context.Context, irRequest *web_api.G
 			Name:        member.Member.Name,
 			Id:          member.Member.Id,
 			Email:       member.Member.Email,
-			CreatedDate: timestamppb.New(member.Member.CreatedDate),
+			CreatedDate: timestamppb.New(time.Time(member.Member.CreatedDate)),
 			OrganizationRole: &web_api.OrganizationRole{
 				Id:               iAuth.GetOrganizationRole().Id,
 				OrganizationId:   iAuth.GetOrganizationRole().OrganizationId,
