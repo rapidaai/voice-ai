@@ -14,4 +14,6 @@ type IntegrationServiceClient interface {
 	WelcomeEmail(c context.Context, userId uint64, name, email string) (*_api.WelcomeEmailResponse, error)
 	ResetPasswordEmail(c context.Context, userId uint64, name, email, resetPasswordLink string) (*_api.ResetPasswordEmailResponse, error)
 	InviteMemberEmail(c context.Context, userId uint64, name, email, organizationName, projectName, inviterName string) (*_api.InviteMemeberEmailResponse, error)
+
+	GetAuditLog(c context.Context, organizationId, projectId uint64, page, pageSize uint32) (*_api.GetAuditLogResponse, error)
 }

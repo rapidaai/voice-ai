@@ -12,9 +12,10 @@ import (
 )
 
 type integrationServiceClient struct {
-	cfg            *config.AppConfig
-	logger         commons.Logger
-	sendgridClient integration_api.SendgridServiceClient
+	cfg                *config.AppConfig
+	logger             commons.Logger
+	sendgridClient     integration_api.SendgridServiceClient
+	auditLoggingClient integration_api.AuditLoggingServiceClient
 }
 
 func NewIntegrationServiceClientGRPC(config *config.AppConfig, logger commons.Logger) internal_clients.IntegrationServiceClient {
@@ -25,9 +26,10 @@ func NewIntegrationServiceClientGRPC(config *config.AppConfig, logger commons.Lo
 		logger.Fatalf("Unable to create connection %v", err)
 	}
 	return &integrationServiceClient{
-		cfg:            config,
-		logger:         logger,
-		sendgridClient: integration_api.NewSendgridServiceClient(conn),
+		cfg:                config,
+		logger:             logger,
+		sendgridClient:     integration_api.NewSendgridServiceClient(conn),
+		auditLoggingClient: integration_api.NewAuditLoggingServiceClient(conn),
 	}
 }
 
@@ -46,6 +48,21 @@ func (client *integrationServiceClient) WelcomeEmail(c context.Context, userId u
 	}
 	return res, nil
 
+}
+
+func (client *integrationServiceClient) GetAuditLog(c context.Context, organizationId, projectId uint64, page, pageSize uint32) (*integration_api.GetAuditLogResponse, error) {
+	client.logger.Debugf("Calling to get audit log with org and project")
+	res, err := client.auditLoggingClient.GetAuditLog(c, &integration_api.GetAuditLogRequest{
+		OrganizationId: organizationId,
+		ProjectId:      projectId,
+		Page:           page,
+		PageSize:       pageSize,
+	})
+	if err != nil {
+		client.logger.Errorf("error while getting audit log error %v", err)
+		return nil, err
+	}
+	return res, nil
 }
 
 func (client *integrationServiceClient) ResetPasswordEmail(c context.Context, userId uint64, name, email, resetPasswordLink string) (*integration_api.ResetPasswordEmailResponse, error) {

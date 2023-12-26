@@ -15,7 +15,6 @@ import (
 	"github.com/lexatic/web-backend/pkg/connectors"
 	"github.com/lexatic/web-backend/pkg/types"
 	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type webVaultApi struct {
@@ -140,20 +139,9 @@ func (wVault *webVaultGRPCApi) GetAllProviderCredential(c context.Context, irReq
 	}
 
 	out := make([]*web_api.ProviderCredential, len(*vlts))
-	for idx, cred := range *vlts {
-		val := &web_api.ProviderCredential{
-			Id:             cred.Id,
-			ProviderId:     cred.ProviderId,
-			OrganizationId: cred.OrganizationId,
-			Name:           cred.Name,
-			Key:            cred.Key,
-			Status:         cred.Status,
-			CreatedDate:    timestamppb.New(cred.CreatedDate),
-		}
-		if irRequest.GetMask() {
-			val.Key = maskCred(val.Key)
-		}
-		out[idx] = val
+	err = types.Cast(vlts, &out)
+	if err != nil {
+		wVault.logger.Errorf("unable to cast vault object to proto %v", err)
 	}
 
 	pmap := make(map[uint64]*web_api.Provider)
@@ -167,6 +155,9 @@ func (wVault *webVaultGRPCApi) GetAllProviderCredential(c context.Context, irReq
 		if val, ok := pmap[c.ProviderId]; ok {
 			c.Provider = val.Name
 			c.Image = val.Image
+		}
+		if irRequest.GetMask() {
+			c.Key = maskCred(c.Key)
 		}
 	}
 
@@ -209,10 +200,14 @@ func (wVault *webVaultGRPCApi) GetProviderCredential(ctx context.Context, reques
 			}}, nil
 	}
 
+	out := web_api.ProviderCredential{}
+	err = types.Cast(vlt, &out)
+	if err != nil {
+		wVault.logger.Errorf("unable to cast vault object to proto %v", err)
+	}
+
 	return &web_api.GetProviderCredentialResponse{
-		Key:     vlt.Key,
-		Name:    vlt.Name,
-		Id:      vlt.Id,
+		Data:    &out,
 		Success: true,
 		Code:    200,
 	}, nil
