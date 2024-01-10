@@ -5,6 +5,7 @@ import (
 
 	internal_gorm "github.com/lexatic/web-backend/internal/gorm"
 	internal_services "github.com/lexatic/web-backend/internal/services"
+	"github.com/lexatic/web-backend/pkg/ciphers"
 	"github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"
 	gorm_models "github.com/lexatic/web-backend/pkg/models/gorm"
@@ -83,11 +84,52 @@ func (pS *projectService) Get(ctx context.Context, auth types.Principle, project
 
 func (pS *projectService) Archive(ctx context.Context, auth types.Principle, projectId uint64) (*internal_gorm.Project, error) {
 	db := pS.postgres.DB(ctx)
-	ct := &internal_gorm.Project{Status: "inactive", UpdatedBy: auth.GetUserInfo().Id}
+	ct := &internal_gorm.Project{Status: "archive", UpdatedBy: auth.GetUserInfo().Id}
 	tx := db.Where("id=?", projectId).Updates(&ct)
 	if tx.Error != nil {
-		pS.logger.Debugf("unable to find any project %v", projectId)
+		pS.logger.Debugf("unable to update the project %v", projectId)
 		return nil, tx.Error
 	}
 	return ct, nil
+}
+
+func (pS *projectService) CreateCredential(ctx context.Context, auth types.Principle, name string, projectId, organizationId uint64) (*internal_gorm.ProjectCredential, error) {
+	db := pS.postgres.DB(ctx)
+	key := ciphers.Token("rpx_")
+	prc := &internal_gorm.ProjectCredential{
+		ProjectId:      projectId,
+		OrganizationId: organizationId,
+		Name:           name,
+		Key:            key,
+		Status:         "active",
+		CreatedBy:      auth.GetUserInfo().Id,
+	}
+	tx := db.Save(prc)
+	if err := tx.Error; err != nil {
+		return nil, err
+	}
+	return prc, nil
+}
+
+func (pS *projectService) ArchiveCredential(ctx context.Context, auth types.Principle, credentialId, projectId, organizationId uint64) (*internal_gorm.ProjectCredential, error) {
+	db := pS.postgres.DB(ctx)
+	ct := &internal_gorm.ProjectCredential{Status: "archive", UpdatedBy: auth.GetUserInfo().Id}
+	tx := db.Where("id=? AND project_id = ? AND organization_id = ?", credentialId, projectId, organizationId).Updates(&ct)
+	if tx.Error != nil {
+		pS.logger.Debugf("unable to update project credentials %v", credentialId)
+		return nil, tx.Error
+	}
+	return ct, nil
+}
+
+func (pS *projectService) GetAllCredential(ctx context.Context, auth types.Principle, projectId, organizationId uint64) (*[]internal_gorm.ProjectCredential, error) {
+	db := pS.postgres.DB(ctx)
+	var pcs []internal_gorm.ProjectCredential
+	tx := db.Where("project_id = ? AND organization_id = ? AND status = ? ", projectId, organizationId, "active").Find(&pcs)
+	if tx.Error != nil {
+		pS.logger.Debugf("unable to find any project %v", organizationId)
+		return nil, tx.Error
+	}
+	return &pcs, nil
+
 }

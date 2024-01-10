@@ -374,3 +374,71 @@ func (wProjectApi *webProjectGRPCApi) ArchiveProject(c context.Context, irReques
 		Id:      irRequest.Id,
 	}, nil
 }
+
+func (wProjectApi *webProjectGRPCApi) CreateProjectCredential(c context.Context, irRequest *web_api.CreateProjectCredentialRequest) (*web_api.CreateProjectCredentialResponse, error) {
+	auth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
+	if !isAuthenticated {
+		wProjectApi.logger.Errorf("CreateProjectCredential from grpc with unauthenticated request")
+		return nil, errors.New("unauthenticated request")
+	}
+
+	// name, key string, projectId, organizationId uint64
+	pc, err := wProjectApi.projectService.CreateCredential(c, auth, irRequest.GetName(), irRequest.GetProjectId(), auth.GetOrganizationRole().OrganizationId)
+	if err != nil {
+		return &web_api.CreateProjectCredentialResponse{
+			Code:    400,
+			Success: false,
+			Error: &web_api.ProjectError{
+				ErrorCode:    400,
+				ErrorMessage: err.Error(),
+				HumanMessage: "Unable to create the project credential, please try again in sometime.",
+			}}, nil
+	}
+
+	out := &web_api.ProjectCredential{}
+	err = types.Cast(pc, &out)
+	if err != nil {
+		wProjectApi.logger.Errorf("unable to cast project credential to proto object %v", err)
+	}
+
+	return &web_api.CreateProjectCredentialResponse{
+		Code:    200,
+		Success: true,
+		Data:    out,
+	}, nil
+
+}
+
+func (wProjectApi *webProjectGRPCApi) GetAllProjectCredential(c context.Context, irRequest *web_api.GetAllProjectCredentialRequest) (*web_api.GetAllProjectCredentialResponse, error) {
+	auth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
+	if !isAuthenticated {
+		wProjectApi.logger.Errorf("CreateProjectCredential from grpc with unauthenticated request")
+		return nil, errors.New("unauthenticated request")
+	}
+
+	// name, key string, projectId, organizationId uint64
+	allProjectCredentail, err := wProjectApi.projectService.GetAllCredential(c, auth, irRequest.GetProjectId(), auth.GetOrganizationRole().OrganizationId)
+	if err != nil {
+		return &web_api.GetAllProjectCredentialResponse{
+			Code:    400,
+			Success: false,
+			Error: &web_api.ProjectError{
+				ErrorCode:    400,
+				ErrorMessage: err.Error(),
+				HumanMessage: "Unable to get all the projects, please try again in sometime.",
+			}}, nil
+	}
+
+	out := []*web_api.ProjectCredential{}
+	err = types.Cast(allProjectCredentail, &out)
+	if err != nil {
+		wProjectApi.logger.Errorf("unable to cast project credential to proto object %v", err)
+	}
+
+	return &web_api.GetAllProjectCredentialResponse{
+		Code:    200,
+		Success: true,
+		Data:    out,
+	}, nil
+
+}
