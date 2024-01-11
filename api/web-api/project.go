@@ -339,7 +339,7 @@ func (wProjectApi *webProjectGRPCApi) AddUsersToProject(ctx context.Context, irR
 		org, err := wProjectApi.userService.GetOrganizationRole(ctx, eUser.Id)
 		if err == nil {
 			if org.GetOrganizationId() != auth.GetOrganizationRole().OrganizationId {
-				return nil, errors.New("user is already part of the another organizations.")
+				return nil, errors.New("user is already part of the another organizations")
 			}
 			return wProjectApi.AddUserToProject(ctx, auth, eUser.Email, eUser.Id, eUser.Status, irRequest.Role, irRequest.ProjectIds)
 		}
@@ -417,7 +417,7 @@ func (wProjectApi *webProjectGRPCApi) GetAllProjectCredential(c context.Context,
 	}
 
 	// name, key string, projectId, organizationId uint64
-	allProjectCredentail, err := wProjectApi.projectService.GetAllCredential(c, auth, irRequest.GetProjectId(), auth.GetOrganizationRole().OrganizationId)
+	allProjectCredential, err := wProjectApi.projectService.GetAllCredential(c, auth, irRequest.GetProjectId(), auth.GetOrganizationRole().OrganizationId)
 	if err != nil {
 		return &web_api.GetAllProjectCredentialResponse{
 			Code:    400,
@@ -425,12 +425,12 @@ func (wProjectApi *webProjectGRPCApi) GetAllProjectCredential(c context.Context,
 			Error: &web_api.ProjectError{
 				ErrorCode:    400,
 				ErrorMessage: err.Error(),
-				HumanMessage: "Unable to get all the projects, please try again in sometime.",
+				HumanMessage: "Unable to get all the project credentials, please try again in sometime.",
 			}}, nil
 	}
 
 	out := []*web_api.ProjectCredential{}
-	err = types.Cast(allProjectCredentail, &out)
+	err = types.Cast(allProjectCredential, &out)
 	if err != nil {
 		wProjectApi.logger.Errorf("unable to cast project credential to proto object %v", err)
 	}
