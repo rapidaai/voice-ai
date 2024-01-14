@@ -19,6 +19,8 @@ type AppConfig struct {
 	PostgresConfig  configs.PostgresConfig `mapstructure:"postgres" validate:"required"`
 	ProviderHost    string                 `mapstructure:"provider_host" validate:"required"`
 	IntegrationHost string                 `mapstructure:"integration_host" validate:"required"`
+	EndpointHost    string                 `mapstructure:"endpoint_host" validate:"required"`
+	WebhookHost     string                 `mapstructure:"webhook_host" validate:"required"`
 
 	GoogleClientId     string `mapstructure:"google_client_id" validate:"required"`
 	GoogleClientSecret string `mapstructure:"google_client_secret" validate:"required"`

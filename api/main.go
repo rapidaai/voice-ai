@@ -79,12 +79,12 @@ func main() {
 
 	// if application json
 	http2GRPCFilteredListener := cmuxListener.Match(cmux.HTTP2())
-	grpcFilteredListener := cmuxListener.Match(
-		cmux.HTTP1HeaderField("Content-type", "application/grpc-web+proto"),
-		cmux.HTTP1HeaderField("x-grpc-web", "1"))
-	rpcFilteredListener := cmuxListener.Match(cmux.Any())
-	// rpcFilteredListener := cmuxListener.Match(cmux.HTTP2())
-	// grpcFilteredListener := cmuxListener.Match(cmux.Any())
+	// grpcFilteredListener := cmuxListener.Match(
+	// 	cmux.HTTP1HeaderField("Content-type", "application/grpc-web+proto"),
+	// 	cmux.HTTP1HeaderField("x-grpc-web", "1"))
+	// rpcFilteredListener := cmuxListener.Match(cmux.Any())
+	rpcFilteredListener := cmuxListener.Match(cmux.HTTP2())
+	grpcFilteredListener := cmuxListener.Match(cmux.Any())
 
 	group, ctx := errgroup.WithContext(ctx)
 	group.Go(func() error {
@@ -211,6 +211,8 @@ func (g *AppRunner) AllRouters() {
 	g.ProjectApiRoute()
 	g.LeadApiRoute()
 	g.ActivityApiRoute()
+	g.EndpointApiRoute()
+	g.WebhookApiRoute()
 
 }
 
@@ -262,6 +264,14 @@ func (g *AppRunner) LeadApiRoute() {
 
 func (g *AppRunner) ActivityApiRoute() {
 	web_api.RegisterActivityServiceServer(g.S, webApi.NewActivityGRPC(g.Cfg, g.Logger, g.Postgres))
+}
+
+func (g *AppRunner) EndpointApiRoute() {
+	web_api.RegisterEndpointReaderServiceServer(g.S, webApi.NewEndpointGRPC(g.Cfg, g.Logger, g.Postgres))
+}
+
+func (g *AppRunner) WebhookApiRoute() {
+	web_api.RegisterWebhookManagerServiceServer(g.S, webApi.NewWebhookGRPC(g.Cfg, g.Logger, g.Postgres))
 }
 
 func (g *AppRunner) HealthCheckRoutes() {
