@@ -128,3 +128,18 @@ CREATE INDEX IF NOT EXISTS ua_idx_email ON user_auths(email);
 CREATE INDEX IF NOT EXISTS up_idx_auth_id ON user_auth_tokens(user_auth_id);
 
 CREATE INDEX IF NOT EXISTS ur_idx_auth_id ON user_roles(user_auth_id);
+
+
+
+CREATE TABLE project_credentials (
+	id bigint NOT NULL PRIMARY KEY,
+	organization_id bigint NOT NULL,
+	project_id bigint NOT NULL,
+	name character varying(200) NOT NULL, 
+	key character varying(400) NOT NULL,
+	created_date timestamp without time zone DEFAULT now() NOT NULL,
+	updated_date timestamp without time zone,
+	status character varying(50) DEFAULT 'active'::character varying NOT NULL,
+	created_by bigint NOT NULL,
+	updated_by bigint NOT NULL
+ );
