@@ -33,12 +33,13 @@ func NewEndpointServiceClientGRPC(config *config.AppConfig, logger commons.Logge
 func (client *endpointServiceClient) GetAllEndpoint(c context.Context, projectId, organizationId uint64, page, pageSize uint32) (*endpoint_api.GetAllEndpointResponse, error) {
 	res, err := client.endpointClient.GetAllEndpoint(c, &endpoint_api.GetAllEndpointRequest{
 		ProjectId:      projectId,
-		OrganziationId: organizationId,
+		OrganizationId: organizationId,
 	})
 	if err != nil {
 		client.logger.Errorf("error while calling to get all endpoint %v", err)
 		return nil, err
 	}
+	client.logger.Debugf("got response for get all endpoint %+v", res)
 	return res, nil
 }
 
@@ -47,11 +48,12 @@ func (client *endpointServiceClient) GetEndpoint(c context.Context, endpointId u
 		// should be endpoint id
 		Id:             endpointId,
 		ProjectId:      projectId,
-		OrganziationId: organizationId,
+		OrganizationId: organizationId,
 	})
 	if err != nil {
 		client.logger.Debugf("error while calling to get all endpoint %v", err)
 		return nil, err
 	}
+	client.logger.Debugf("got response for get endpoint %+v", res)
 	return res, nil
 }
