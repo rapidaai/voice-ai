@@ -83,7 +83,6 @@ func (client *webhookServiceClient) GetWebhook(c context.Context, id, projectId,
 }
 
 func (client *webhookServiceClient) GetAllWebhook(c context.Context, projectId, organizationId uint64, page, pageSize uint32) (*webhook_api.GetAllWebhookResponse, error) {
-	client.logger.Debugf("getting all webhook")
 	res, err := client.webhookClient.GetAllWebhook(c, &webhook_api.GetAllWebhookRequest{
 		ProjectId: projectId, OrganizationId: organizationId, Page: page, PageSize: pageSize,
 	})
