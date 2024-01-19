@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	internal_clients "github.com/lexatic/web-backend/internal/clients"
-	endpoint_client "github.com/lexatic/web-backend/internal/clients/endpoint"
+	clients "github.com/lexatic/web-backend/pkg/clients"
+	endpoint_client "github.com/lexatic/web-backend/pkg/clients/endpoint"
 	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 
 	config "github.com/lexatic/web-backend/config"
@@ -18,7 +18,7 @@ type webEndpointApi struct {
 	cfg            *config.AppConfig
 	logger         commons.Logger
 	postgres       connectors.PostgresConnector
-	endpointClient internal_clients.EndpointServiceClient
+	endpointClient clients.EndpointServiceClient
 }
 
 type webEndpointGRPCApi struct {

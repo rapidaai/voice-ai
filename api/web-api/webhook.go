@@ -5,8 +5,8 @@ import (
 	"errors"
 
 	config "github.com/lexatic/web-backend/config"
-	internal_clients "github.com/lexatic/web-backend/internal/clients"
-	webhook_client "github.com/lexatic/web-backend/internal/clients/webhook"
+	clients "github.com/lexatic/web-backend/pkg/clients"
+	webhook_client "github.com/lexatic/web-backend/pkg/clients/webhook"
 	commons "github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"
 	"github.com/lexatic/web-backend/pkg/types"
@@ -17,7 +17,7 @@ type webWebhookApi struct {
 	cfg           *config.AppConfig
 	logger        commons.Logger
 	postgres      connectors.PostgresConnector
-	webhookClient internal_clients.WebhookServiceClient
+	webhookClient clients.WebhookServiceClient
 }
 
 type webWebhookGRPCApi struct {

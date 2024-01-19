@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 
-	internal_clients "github.com/lexatic/web-backend/internal/clients"
-	integration_client "github.com/lexatic/web-backend/internal/clients/integration"
 	internal_services "github.com/lexatic/web-backend/internal/services"
 	internal_vault_service "github.com/lexatic/web-backend/internal/services/vault"
+	clients "github.com/lexatic/web-backend/pkg/clients"
+	integration_client "github.com/lexatic/web-backend/pkg/clients/integration"
 	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 
 	config "github.com/lexatic/web-backend/config"
@@ -20,7 +20,7 @@ type webActivityApi struct {
 	cfg               *config.AppConfig
 	logger            commons.Logger
 	postgres          connectors.PostgresConnector
-	integrationClient internal_clients.IntegrationServiceClient
+	integrationClient clients.IntegrationServiceClient
 	vaultService      internal_services.VaultService
 }
 

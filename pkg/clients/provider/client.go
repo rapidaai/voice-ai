@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/lexatic/web-backend/config"
-	internal_clients "github.com/lexatic/web-backend/internal/clients"
+	clients "github.com/lexatic/web-backend/pkg/clients"
 	"github.com/lexatic/web-backend/pkg/commons"
 	provider_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 	"google.golang.org/grpc"
@@ -17,7 +17,7 @@ type providerServiceClient struct {
 	providerClient provider_api.ProviderServiceClient
 }
 
-func NewProviderServiceClientGRPC(config *config.AppConfig, logger commons.Logger) internal_clients.ProviderServiceClient {
+func NewProviderServiceClientGRPC(config *config.AppConfig, logger commons.Logger) clients.ProviderServiceClient {
 	logger.Debugf("conntecting to provider client with %s", config.ProviderHost)
 	conn, err := grpc.Dial(config.ProviderHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {

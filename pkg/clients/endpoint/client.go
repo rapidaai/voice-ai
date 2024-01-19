@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/lexatic/web-backend/config"
-	internal_clients "github.com/lexatic/web-backend/internal/clients"
+	clients "github.com/lexatic/web-backend/pkg/clients"
 	"github.com/lexatic/web-backend/pkg/commons"
 	endpoint_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 	"google.golang.org/grpc"
@@ -17,7 +17,7 @@ type endpointServiceClient struct {
 	endpointClient endpoint_api.EndpointReaderServiceClient
 }
 
-func NewEndpointServiceClientGRPC(config *config.AppConfig, logger commons.Logger) internal_clients.EndpointServiceClient {
+func NewEndpointServiceClientGRPC(config *config.AppConfig, logger commons.Logger) clients.EndpointServiceClient {
 	logger.Debugf("conntecting to endpoint client with %s", config.EndpointHost)
 	conn, err := grpc.Dial(config.EndpointHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {

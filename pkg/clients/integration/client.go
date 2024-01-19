@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/lexatic/web-backend/config"
-	internal_clients "github.com/lexatic/web-backend/internal/clients"
+	clients "github.com/lexatic/web-backend/pkg/clients"
 	"github.com/lexatic/web-backend/pkg/commons"
 	integration_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 	"google.golang.org/grpc"
@@ -18,7 +18,7 @@ type integrationServiceClient struct {
 	auditLoggingClient integration_api.AuditLoggingServiceClient
 }
 
-func NewIntegrationServiceClientGRPC(config *config.AppConfig, logger commons.Logger) internal_clients.IntegrationServiceClient {
+func NewIntegrationServiceClientGRPC(config *config.AppConfig, logger commons.Logger) clients.IntegrationServiceClient {
 
 	logger.Debugf("conntecting to integration client with %s", config.IntegrationHost)
 	conn, err := grpc.Dial(config.IntegrationHost, grpc.WithTransportCredentials(insecure.NewCredentials()))

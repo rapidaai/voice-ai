@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	config "github.com/lexatic/web-backend/config"
-	internal_clients "github.com/lexatic/web-backend/internal/clients"
-	provider_client "github.com/lexatic/web-backend/internal/clients/provider"
 	internal_services "github.com/lexatic/web-backend/internal/services"
 	internal_vault_service "github.com/lexatic/web-backend/internal/services/vault"
+	clients "github.com/lexatic/web-backend/pkg/clients"
+	provider_client "github.com/lexatic/web-backend/pkg/clients/provider"
 	commons "github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"
 	"github.com/lexatic/web-backend/pkg/types"
@@ -22,7 +22,7 @@ type webVaultApi struct {
 	logger         commons.Logger
 	postgres       connectors.PostgresConnector
 	vaultService   internal_services.VaultService
-	providerClient internal_clients.ProviderServiceClient
+	providerClient clients.ProviderServiceClient
 }
 
 type webVaultRPCApi struct {
