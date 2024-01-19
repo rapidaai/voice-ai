@@ -11,8 +11,6 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	internal_clients "github.com/lexatic/web-backend/internal/clients"
-	integration_client "github.com/lexatic/web-backend/internal/clients/integration"
 	internal_organization_service "github.com/lexatic/web-backend/internal/services/organization"
 	internal_project_service "github.com/lexatic/web-backend/internal/services/project"
 
@@ -20,6 +18,8 @@ import (
 	config "github.com/lexatic/web-backend/config"
 	internal_services "github.com/lexatic/web-backend/internal/services"
 	internal_user_service "github.com/lexatic/web-backend/internal/services/user"
+	clients "github.com/lexatic/web-backend/pkg/clients"
+	integration_client "github.com/lexatic/web-backend/pkg/clients/integration"
 	commons "github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"
 	"github.com/lexatic/web-backend/pkg/types"
@@ -37,7 +37,7 @@ type webAuthApi struct {
 	userService         internal_services.UserService
 	organizationService internal_services.OrganizationService
 	projectService      internal_services.ProjectService
-	integrationClient   internal_clients.IntegrationServiceClient
+	integrationClient   clients.IntegrationServiceClient
 	googleOauthConfig   oauth2.Config
 	linkedinOauthConfig oauth2.Config
 	githubOauthConfig   oauth2.Config

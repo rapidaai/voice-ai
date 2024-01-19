@@ -8,10 +8,10 @@ import (
 
 	internal_gorm "github.com/lexatic/web-backend/internal/gorm"
 
-	internal_clients "github.com/lexatic/web-backend/internal/clients"
-	integration_client "github.com/lexatic/web-backend/internal/clients/integration"
 	internal_organization_service "github.com/lexatic/web-backend/internal/services/organization"
 	internal_user_service "github.com/lexatic/web-backend/internal/services/user"
+	clients "github.com/lexatic/web-backend/pkg/clients"
+	integration_client "github.com/lexatic/web-backend/pkg/clients/integration"
 
 	config "github.com/lexatic/web-backend/config"
 	internal_services "github.com/lexatic/web-backend/internal/services"
@@ -28,7 +28,7 @@ type webProjectApi struct {
 	cfg                 *config.AppConfig
 	logger              commons.Logger
 	projectService      internal_services.ProjectService
-	integrationClient   internal_clients.IntegrationServiceClient
+	integrationClient   clients.IntegrationServiceClient
 	userService         internal_services.UserService
 	organizationService internal_services.OrganizationService
 }

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/lexatic/web-backend/config"
-	internal_clients "github.com/lexatic/web-backend/internal/clients"
+	clients "github.com/lexatic/web-backend/pkg/clients"
 	"github.com/lexatic/web-backend/pkg/commons"
 	webhook_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 	"google.golang.org/grpc"
@@ -17,7 +17,7 @@ type webhookServiceClient struct {
 	webhookClient webhook_api.WebhookManagerServiceClient
 }
 
-func NewWebhookServiceClientGRPC(config *config.AppConfig, logger commons.Logger) internal_clients.WebhookServiceClient {
+func NewWebhookServiceClientGRPC(config *config.AppConfig, logger commons.Logger) clients.WebhookServiceClient {
 
 	logger.Debugf("conntecting to webhook client with %s", config.WebhookHost)
 	conn, err := grpc.Dial(config.WebhookHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
