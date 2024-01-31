@@ -30,10 +30,12 @@ func NewEndpointServiceClientGRPC(config *config.AppConfig, logger commons.Logge
 	}
 }
 
-func (client *endpointServiceClient) GetAllEndpoint(c context.Context, projectId, organizationId uint64, page, pageSize uint32) (*endpoint_api.GetAllEndpointResponse, error) {
+func (client *endpointServiceClient) GetAllEndpoint(c context.Context, projectId, organizationId uint64, criterias []*endpoint_api.Criteria, paginate *endpoint_api.Paginate) (*endpoint_api.GetAllEndpointResponse, error) {
 	res, err := client.endpointClient.GetAllEndpoint(c, &endpoint_api.GetAllEndpointRequest{
 		ProjectId:      projectId,
 		OrganizationId: organizationId,
+		Paginate:       paginate,
+		Criterias:      criterias,
 	})
 	if err != nil {
 		client.logger.Errorf("error while calling to get all endpoint %v", err)

@@ -21,7 +21,6 @@ import (
 	"github.com/lexatic/web-backend/pkg/connectors"
 	"github.com/lexatic/web-backend/pkg/types"
 	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 type webProjectApi struct {
@@ -78,7 +77,7 @@ func (wProjectApi *webProjectGRPCApi) CreateProject(ctx context.Context, irReque
 		return &web_api.CreateProjectResponse{
 			Code:    400,
 			Success: false,
-			Error: &web_api.ProjectError{
+			Error: &web_api.Error{
 				ErrorCode:    400,
 				ErrorMessage: "You cannot create a project when you are not part of any organization.",
 				HumanMessage: "Please create organization before creating a project.",
@@ -91,7 +90,7 @@ func (wProjectApi *webProjectGRPCApi) CreateProject(ctx context.Context, irReque
 		return &web_api.CreateProjectResponse{
 			Code:    400,
 			Success: false,
-			Error: &web_api.ProjectError{
+			Error: &web_api.Error{
 				ErrorCode:    400,
 				ErrorMessage: err.Error(),
 				HumanMessage: "Unable to create project for your organization, please try again in sometime.",
@@ -104,7 +103,7 @@ func (wProjectApi *webProjectGRPCApi) CreateProject(ctx context.Context, irReque
 		return &web_api.CreateProjectResponse{
 			Code:    400,
 			Success: false,
-			Error: &web_api.ProjectError{
+			Error: &web_api.Error{
 				ErrorCode:    400,
 				ErrorMessage: err.Error(),
 				HumanMessage: "Unable to create project role for you, please try again in sometime.",
@@ -139,7 +138,7 @@ func (wProjectApi *webProjectGRPCApi) UpdateProject(ctx context.Context, irReque
 		return &web_api.UpdateProjectResponse{
 			Code:    400,
 			Success: false,
-			Error: &web_api.ProjectError{
+			Error: &web_api.Error{
 				ErrorCode:    400,
 				ErrorMessage: "You cannot update a project when you are not part of any organization.",
 				HumanMessage: "Please create organization before updating a project.",
@@ -152,7 +151,7 @@ func (wProjectApi *webProjectGRPCApi) UpdateProject(ctx context.Context, irReque
 		return &web_api.UpdateProjectResponse{
 			Code:    400,
 			Success: false,
-			Error: &web_api.ProjectError{
+			Error: &web_api.Error{
 				ErrorCode:    400,
 				ErrorMessage: err.Error(),
 				HumanMessage: "Unable to update the project, please try again in sometime.",
@@ -170,7 +169,7 @@ func (wProjectApi *webProjectGRPCApi) UpdateProject(ctx context.Context, irReque
 		Data:    &ot,
 	}, nil
 }
-func (wProjectApi *webProjectGRPCApi) GetAllProject(ctx context.Context, irRequest *emptypb.Empty) (*web_api.GetAllProjectResponse, error) {
+func (wProjectApi *webProjectGRPCApi) GetAllProject(ctx context.Context, irRequest *web_api.GetAllProjectRequest) (*web_api.GetAllProjectResponse, error) {
 	wProjectApi.logger.Debugf("GetAllProject from grpc with requestPayload %v, %v", irRequest, ctx)
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
 	if !isAuthenticated {
@@ -184,20 +183,21 @@ func (wProjectApi *webProjectGRPCApi) GetAllProject(ctx context.Context, irReque
 		return &web_api.GetAllProjectResponse{
 			Code:    400,
 			Success: false,
-			Error: &web_api.ProjectError{
+			Error: &web_api.Error{
 				ErrorCode:    400,
 				ErrorMessage: "You are not part of any active organization.",
 				HumanMessage: "Please create organization and try again.",
 			}}, nil
 	}
 
-	prjs, err := wProjectApi.projectService.GetAll(ctx, iAuth, currentOrgRole.OrganizationId)
+	cnt, prjs, err := wProjectApi.projectService.GetAll(ctx, iAuth,
+		currentOrgRole.OrganizationId, irRequest.GetCriterias(), irRequest.GetPaginate())
 	if err != nil {
 		wProjectApi.logger.Errorf("projectService.GetAll from grpc with err %v", err)
 		return &web_api.GetAllProjectResponse{
 			Code:    400,
 			Success: false,
-			Error: &web_api.ProjectError{
+			Error: &web_api.Error{
 				ErrorCode:    400,
 				ErrorMessage: err.Error(),
 				HumanMessage: "Unable to get the projects, please try again in sometime.",
@@ -217,7 +217,7 @@ func (wProjectApi *webProjectGRPCApi) GetAllProject(ctx context.Context, irReque
 			continue
 		}
 		for _, upr := range *_m {
-			prj.Members = append(prj.Members, &web_api.ProjectMember{
+			prj.Members = append(prj.Members, &web_api.User{
 				Role:  upr.Role,
 				Id:    upr.UserAuthId,
 				Name:  upr.Member.Name,
@@ -227,6 +227,10 @@ func (wProjectApi *webProjectGRPCApi) GetAllProject(ctx context.Context, irReque
 
 	}
 	return &web_api.GetAllProjectResponse{
+		Paginated: &web_api.Paginated{
+			TotalItem:   uint32(cnt),
+			CurrentPage: irRequest.GetPaginate().GetPage(),
+		},
 		Success: true,
 		Code:    200,
 		Data:    out,
@@ -250,19 +254,15 @@ func (wProjectApi *webProjectGRPCApi) GetProject(ctx context.Context, irRequest 
 	ot := web_api.Project{}
 	types.Cast(prj, &ot)
 	var projectMemebers *[]internal_gorm.UserProjectRole
-	if irRequest.GetGetInActive() {
-		projectMemebers, err = wProjectApi.userService.GetAllProjectMembers(ctx, prj.Id)
-	} else {
-		projectMemebers, err = wProjectApi.userService.GetAllActiveProjectMember(ctx, prj.Id)
-	}
+	projectMemebers, err = wProjectApi.userService.GetAllActiveProjectMember(ctx, prj.Id)
 	if err != nil {
 		wProjectApi.logger.Errorf("userService.GetAllProjectMember from grpc with err %v", err)
 		return nil, err
 	}
 
-	projectMembers := make([]*web_api.ProjectMember, len(*projectMemebers))
+	projectMembers := make([]*web_api.User, len(*projectMemebers))
 	for idx, upr := range *projectMemebers {
-		projectMembers[idx] = &web_api.ProjectMember{
+		projectMembers[idx] = &web_api.User{
 			Role:  upr.Role,
 			Id:    upr.UserAuthId,
 			Name:  upr.Member.Name,
@@ -388,7 +388,7 @@ func (wProjectApi *webProjectGRPCApi) CreateProjectCredential(c context.Context,
 		return &web_api.CreateProjectCredentialResponse{
 			Code:    400,
 			Success: false,
-			Error: &web_api.ProjectError{
+			Error: &web_api.Error{
 				ErrorCode:    400,
 				ErrorMessage: err.Error(),
 				HumanMessage: "Unable to create the project credential, please try again in sometime.",
@@ -417,12 +417,17 @@ func (wProjectApi *webProjectGRPCApi) GetAllProjectCredential(c context.Context,
 	}
 
 	// name, key string, projectId, organizationId uint64
-	allProjectCredential, err := wProjectApi.projectService.GetAllCredential(c, auth, irRequest.GetProjectId(), auth.GetOrganizationRole().OrganizationId)
+	cnt, allProjectCredential, err := wProjectApi.projectService.
+		GetAllCredential(
+			c, auth,
+			irRequest.GetProjectId(),
+			auth.GetOrganizationRole().OrganizationId,
+			irRequest.GetCriterias(), irRequest.GetPaginate())
 	if err != nil {
 		return &web_api.GetAllProjectCredentialResponse{
 			Code:    400,
 			Success: false,
-			Error: &web_api.ProjectError{
+			Error: &web_api.Error{
 				ErrorCode:    400,
 				ErrorMessage: err.Error(),
 				HumanMessage: "Unable to get all the project credentials, please try again in sometime.",
@@ -436,6 +441,10 @@ func (wProjectApi *webProjectGRPCApi) GetAllProjectCredential(c context.Context,
 	}
 
 	return &web_api.GetAllProjectCredentialResponse{
+		Paginated: &web_api.Paginated{
+			TotalItem:   uint32(cnt),
+			CurrentPage: irRequest.GetPaginate().GetPage(),
+		},
 		Code:    200,
 		Success: true,
 		Data:    out,

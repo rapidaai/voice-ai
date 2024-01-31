@@ -70,7 +70,7 @@ func (wVault *webVaultGRPCApi) CreateProviderCredential(ctx context.Context, irR
 		return &web_api.CreateProviderCredentialResponse{
 			Code:    400,
 			Success: false,
-			Error: &web_api.VaultError{
+			Error: &web_api.Error{
 				ErrorCode:    400,
 				ErrorMessage: err.Error(),
 				HumanMessage: "Unable to create provider credential, please try again",
@@ -105,7 +105,7 @@ func (wVault *webVaultGRPCApi) DeleteProviderCredential(c context.Context, irReq
 		return &web_api.DeleteProviderCredentialResponse{
 			Code:    400,
 			Success: false,
-			Error: &web_api.VaultError{
+			Error: &web_api.Error{
 				ErrorCode:    400,
 				ErrorMessage: err.Error(),
 				HumanMessage: "Unable to delete provider credential, please try again",
@@ -125,13 +125,13 @@ func (wVault *webVaultGRPCApi) GetAllProviderCredential(c context.Context, irReq
 		wVault.logger.Errorf("GetAllProviderCredential from grpc with unauthenticated request")
 		return nil, errors.New("unauthenticated request")
 	}
-	vlts, err := wVault.vaultService.GetAll(c, iAuth, iAuth.GetOrganizationRole().OrganizationId)
+	cnt, vlts, err := wVault.vaultService.GetAll(c, iAuth, iAuth.GetOrganizationRole().OrganizationId, irRequest.GetCriterias(), irRequest.GetPaginate())
 	if err != nil {
 		wVault.logger.Errorf("vaultService.GetAll from grpc with err %v", err)
 		return &web_api.GetAllProviderCredentialResponse{
 			Code:    400,
 			Success: false,
-			Error: &web_api.VaultError{
+			Error: &web_api.Error{
 				ErrorCode:    400,
 				ErrorMessage: err.Error(),
 				HumanMessage: "Unable to get provider credentials, please try again",
@@ -162,6 +162,10 @@ func (wVault *webVaultGRPCApi) GetAllProviderCredential(c context.Context, irReq
 	}
 
 	return &web_api.GetAllProviderCredentialResponse{
+		Paginated: &web_api.Paginated{
+			TotalItem:   uint32(cnt),
+			CurrentPage: irRequest.GetPaginate().GetPage(),
+		},
 		Success: true,
 		Code:    200,
 		Data:    out,
@@ -193,7 +197,7 @@ func (wVault *webVaultGRPCApi) GetProviderCredential(ctx context.Context, reques
 		return &web_api.GetProviderCredentialResponse{
 			Code:    400,
 			Success: false,
-			Error: &web_api.VaultError{
+			Error: &web_api.Error{
 				ErrorCode:    400,
 				ErrorMessage: err.Error(),
 				HumanMessage: "Unable to get provider credential, please try again",
@@ -227,7 +231,7 @@ func (wVault *webVaultGRPCApi) UpdateVaultCredentials(ctx context.Context, reque
 		return &web_api.UpdateVaultCredentialResponse{
 			Code:    400,
 			Success: false,
-			Error: &web_api.VaultError{
+			Error: &web_api.Error{
 				ErrorCode:    400,
 				ErrorMessage: err.Error(),
 				HumanMessage: "Unable to update provider credential, please try again",

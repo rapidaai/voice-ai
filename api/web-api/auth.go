@@ -9,10 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"google.golang.org/protobuf/types/known/timestamppb"
-
 	internal_organization_service "github.com/lexatic/web-backend/internal/services/organization"
 	internal_project_service "github.com/lexatic/web-backend/internal/services/project"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/gin-gonic/gin"
 	config "github.com/lexatic/web-backend/config"
@@ -518,7 +517,7 @@ func (wAuthApi *webAuthApi) GetUser(c context.Context, irRequest *web_api.GetUse
 		return nil, err
 	}
 
-	aUser := &web_api.UserInfo{}
+	aUser := &web_api.User{}
 	types.Cast(user, aUser)
 	return &web_api.GetUserResponse{Code: 200, Success: true, Data: aUser}, nil
 
@@ -540,7 +539,7 @@ func (wAuthApi *webAuthApi) UpdateUser(c context.Context, irRequest *web_api.Upd
 		return nil, err
 	}
 
-	aUser := &web_api.UserInfo{}
+	aUser := &web_api.User{}
 	types.Cast(user, aUser)
 	return &web_api.UpdateUserResponse{Code: 200, Success: true, Data: aUser}, nil
 }
@@ -894,17 +893,28 @@ func (wAuthApi *webAuthGRPCApi) GithubUserInfo(c context.Context, state string, 
 	}, nil
 }
 
-func (wAuthApi *webAuthGRPCApi) GetUsers(c context.Context, irRequest *web_api.GetUsersRequest) (*web_api.GetUsersResponse, error) {
+func (wAuthApi *webAuthGRPCApi) GetAllUser(c context.Context, irRequest *web_api.GetAllUserRequest) (*web_api.GetAllUserResponse, error) {
 	wAuthApi.logger.Debugf("GetUsers from grpc with requestPayload %v, %v", irRequest, c)
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
 	if !isAuthenticated {
 		return nil, errors.New("unauthenticated request")
 	}
 
-	allMembers, err := wAuthApi.userService.GetAllOrganizationMember(c, iAuth.GetOrganizationRole().OrganizationId)
+	cnt, allMembers, err := wAuthApi.userService.GetAllOrganizationMember(c,
+		iAuth.GetOrganizationRole().OrganizationId,
+		irRequest.GetCriterias(),
+		irRequest.GetPaginate(),
+	)
 	if err != nil {
 		wAuthApi.logger.Errorf("getUsers from grpc with requestPayload %v, %v", irRequest, c)
-		return nil, err
+		return &web_api.GetAllUserResponse{
+			Code:    400,
+			Success: false,
+			Error: &web_api.Error{
+				ErrorCode:    400,
+				ErrorMessage: err.Error(),
+				HumanMessage: "Unable to get all the users for the organization, please try again in sometime.",
+			}}, nil
 	}
 
 	out := make([]*web_api.User, len(*allMembers))
@@ -913,19 +923,17 @@ func (wAuthApi *webAuthGRPCApi) GetUsers(c context.Context, irRequest *web_api.G
 			Name:        member.Member.Name,
 			Id:          member.Member.Id,
 			Email:       member.Member.Email,
+			Role:        member.Role,
 			CreatedDate: timestamppb.New(time.Time(member.Member.CreatedDate)),
-			OrganizationRole: &web_api.OrganizationRole{
-				Id:               iAuth.GetOrganizationRole().Id,
-				OrganizationId:   iAuth.GetOrganizationRole().OrganizationId,
-				OrganizationName: iAuth.GetOrganizationRole().OrganizationName,
-				Role:             member.Role,
-			},
 		}
 	}
-	return &web_api.GetUsersResponse{
-		Code:       200,
-		Success:    true,
-		Users:      out,
-		TotalCount: uint64(len(*allMembers)),
+	return &web_api.GetAllUserResponse{
+		Code:    200,
+		Success: true,
+		Data:    out,
+		Paginated: &web_api.Paginated{
+			TotalItem:   uint32(cnt),
+			CurrentPage: irRequest.GetPaginate().GetPage(),
+		},
 	}, nil
 }

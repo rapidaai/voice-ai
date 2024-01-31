@@ -5,6 +5,7 @@ import (
 
 	internal_gorm "github.com/lexatic/web-backend/internal/gorm"
 	"github.com/lexatic/web-backend/pkg/types"
+	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 )
 
 type UserService interface {
@@ -25,22 +26,23 @@ type UserService interface {
 	//
 	ActivateAllProjectRoles(ctx context.Context, userId uint64) error
 	ActivateAllOrganizationRole(ctx context.Context, userId uint64) error
-	GetAllOrganizationMember(ctx context.Context, organizationId uint64) (*[]internal_gorm.UserOrganizationRole, error)
+	GetAllOrganizationMember(ctx context.Context, organizationId uint64, criterias []*web_api.Criteria, paginate *web_api.Paginate) (int64, *[]internal_gorm.UserOrganizationRole, error)
+
 	GetProjectRole(ctx context.Context, userId uint64, projectId uint64) (*internal_gorm.UserProjectRole, error)
 	GetOrganizationRole(ctx context.Context, userId uint64) (*internal_gorm.UserOrganizationRole, error)
 	//
 	Activate(ctx context.Context, Id uint64, name string, source *string) (types.Principle, error)
-	GetAllUsers(ctx context.Context, uIds []uint64) ([]*internal_gorm.UserAuth, error)
+	// GetAllUser(ctx context.Context, uIds []uint64, criterias []*web_api.Criteria, paginate *web_api.Paginate) (int64, []*internal_gorm.UserAuth, error)
 
 	CreateSocial(ctx context.Context, userId uint64, id string, token string, source string, verified bool) (*internal_gorm.UserSocial, error)
 	GetSocial(ctx context.Context, userId uint64) (*internal_gorm.UserSocial, error)
-	GetUsers(ctx context.Context, uIds []uint64, limit uint32, offset uint32) ([]*internal_gorm.UserAuth, error)
+	// GetUsers(ctx context.Context, uIds []uint64, limit uint32, offset uint32) ([]*internal_gorm.UserAuth, error)
 
 	// GetOrInviteUser(ctx context.Context, email string, organizationId uint64) (*internal_gorm.UserAuth, error)
 	GetAllActiveProjectMember(ctx context.Context, projectId uint64) (*[]internal_gorm.UserProjectRole, error)
 	GetAllUserRolesForOrg(ctx context.Context, organizationId uint64) ([]*internal_gorm.UserOrganizationRole, error)
 	GetProjectRolesForUsers(ctx context.Context, pIds []uint64, uIds []uint64) ([]*internal_gorm.UserProjectRole, error)
-	GetAllProjectMembers(ctx context.Context, projectId uint64) (*[]internal_gorm.UserProjectRole, error)
+	// GetAllProjectMembers(ctx context.Context, projectId uint64) (*[]internal_gorm.UserProjectRole, error)
 }
 
 type OrganizationService interface {
@@ -52,7 +54,7 @@ type OrganizationService interface {
 type VaultService interface {
 	Create(ctx context.Context, auth types.Principle, organizationId uint64, providerId uint64, keyName string, key string) (*internal_gorm.Vault, error)
 	Delete(ctx context.Context, auth types.Principle, vaultId uint64) (*internal_gorm.Vault, error)
-	GetAll(ctx context.Context, auth types.Principle, organizationId uint64) (*[]internal_gorm.Vault, error)
+	GetAll(ctx context.Context, auth types.Principle, organizationId uint64, criterias []*web_api.Criteria, paginate *web_api.Paginate) (int64, *[]internal_gorm.Vault, error)
 	Get(ctx context.Context, organizationId uint64, providerId uint64) (*internal_gorm.Vault, error)
 	Update(ctx context.Context, auth types.Principle, vaultId uint64, providerId uint64, value string, name string) (*internal_gorm.Vault, error)
 	// do not make it habbit
@@ -63,12 +65,12 @@ type ProjectService interface {
 	Create(ctx context.Context, auth types.Principle, organizationId uint64, name string, description string) (*internal_gorm.Project, error)
 	Update(ctx context.Context, auth types.Principle, projectId uint64, name *string, description *string) (*internal_gorm.Project, error)
 	Get(ctx context.Context, auth types.Principle, projectId uint64) (*internal_gorm.Project, error)
-	GetAll(ctx context.Context, auth types.Principle, organizationId uint64) (*[]internal_gorm.Project, error)
+	GetAll(ctx context.Context, auth types.Principle, organizationId uint64, criterias []*web_api.Criteria, paginate *web_api.Paginate) (int64, *[]internal_gorm.Project, error)
 	Archive(ctx context.Context, auth types.Principle, projectId uint64) (*internal_gorm.Project, error)
 
 	CreateCredential(ctx context.Context, auth types.Principle, name string, projectId, organizationId uint64) (*internal_gorm.ProjectCredential, error)
 	ArchiveCredential(ctx context.Context, auth types.Principle, credentialId, projectId, organizationId uint64) (*internal_gorm.ProjectCredential, error)
-	GetAllCredential(ctx context.Context, auth types.Principle, projectId, organizationId uint64) (*[]internal_gorm.ProjectCredential, error)
+	GetAllCredential(ctx context.Context, auth types.Principle, projectId, organizationId uint64, criterias []*web_api.Criteria, paginate *web_api.Paginate) (int64, *[]internal_gorm.ProjectCredential, error)
 }
 
 type LeadService interface {

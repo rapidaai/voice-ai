@@ -49,7 +49,7 @@ func (wActivity *webActivityGRPCApi) GetActivities(c context.Context, irRequest 
 	}
 
 	// check if he is already part of current organization
-	adt, err := wActivity.integrationClient.GetAuditLog(c, iAuth.GetOrganizationRole().OrganizationId, irRequest.GetProjectId(), irRequest.GetPage(), irRequest.GetPageSize())
+	adt, err := wActivity.integrationClient.GetAuditLog(c, iAuth.GetOrganizationRole().OrganizationId, irRequest.GetProjectId(), irRequest.GetCriterias(), irRequest.GetPaginate())
 	if err != nil {
 		return &web_api.GetActivityResponse{
 			Code:    500,
@@ -66,9 +66,10 @@ func (wActivity *webActivityGRPCApi) GetActivities(c context.Context, irRequest 
 			wActivity.logger.Debugf("unable to cast the object with error %v", err)
 		}
 		return &web_api.GetActivityResponse{
-			Code:    200,
-			Success: true,
-			Data:    out,
+			Code:      200,
+			Success:   true,
+			Paginated: adt.GetPaginated(),
+			Data:      out,
 		}, nil
 	}
 	wActivity.logger.Debugf("Got response from integration service %+v", adt)

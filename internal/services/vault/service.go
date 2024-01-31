@@ -2,6 +2,7 @@ package internal_vault_service
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	internal_gorm "github.com/lexatic/web-backend/internal/gorm"
@@ -10,6 +11,8 @@ import (
 	"github.com/lexatic/web-backend/pkg/connectors"
 	gorm_models "github.com/lexatic/web-backend/pkg/models/gorm"
 	"github.com/lexatic/web-backend/pkg/types"
+	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
+	"gorm.io/gorm/clause"
 )
 
 type vaultService struct {
@@ -75,15 +78,36 @@ func (vS *vaultService) Update(ctx context.Context, auth types.Principle, vaultI
 	return vlt, nil
 }
 
-func (vS *vaultService) GetAll(ctx context.Context, auth types.Principle, organizationId uint64) (*[]internal_gorm.Vault, error) {
+func (vS *vaultService) GetAll(ctx context.Context, auth types.Principle, organizationId uint64, criterias []*web_api.Criteria, paginate *web_api.Paginate) (int64, *[]internal_gorm.Vault, error) {
 	db := vS.postgres.DB(ctx)
 	var vaults []internal_gorm.Vault
-	tx := db.Where("organization_id = ? AND status = ?", organizationId, "active").Find(&vaults)
+	var cnt int64
+
+	qry := db.Model(internal_gorm.Vault{})
+	qry.
+		Where("organization_id = ? AND status = ?", organizationId, "active")
+	for _, ct := range criterias {
+		qry.Where(fmt.Sprintf("%s = ?", ct.GetKey()), ct.GetValue())
+	}
+	tx := qry.
+		Scopes(gorm_models.
+			Paginate(gorm_models.
+				NewPaginated(
+					int(paginate.GetPage()),
+					int(paginate.GetPageSize()),
+					&cnt,
+					qry))).
+		Order(clause.OrderByColumn{
+			Column: clause.Column{Name: "created_date"},
+			Desc:   true,
+		}).Find(&vaults)
+
 	if tx.Error != nil {
 		vS.logger.Debugf("unable to find any vault %s", organizationId)
-		return nil, tx.Error
+		return cnt, nil, tx.Error
 	}
-	return &vaults, nil
+
+	return cnt, &vaults, nil
 }
 
 func (vS *vaultService) Get(ctx context.Context, organizationId uint64, providerId uint64) (*internal_gorm.Vault, error) {

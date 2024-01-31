@@ -50,13 +50,13 @@ func (client *integrationServiceClient) WelcomeEmail(c context.Context, userId u
 
 }
 
-func (client *integrationServiceClient) GetAuditLog(c context.Context, organizationId, projectId uint64, page, pageSize uint32) (*integration_api.GetAuditLogResponse, error) {
+func (client *integrationServiceClient) GetAuditLog(c context.Context, organizationId, projectId uint64, criterias []*integration_api.Criteria, paginate *integration_api.Paginate) (*integration_api.GetAuditLogResponse, error) {
 	client.logger.Debugf("Calling to get audit log with org and project")
 	res, err := client.auditLoggingClient.GetAuditLog(c, &integration_api.GetAuditLogRequest{
 		OrganizationId: organizationId,
 		ProjectId:      projectId,
-		Page:           page,
-		PageSize:       pageSize,
+		Criterias:      criterias,
+		Paginate:       paginate,
 	})
 	if err != nil {
 		client.logger.Errorf("error while getting audit log error %v", err)

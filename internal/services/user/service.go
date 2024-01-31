@@ -2,6 +2,7 @@ package internal_user_service
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -10,7 +11,9 @@ import (
 	"github.com/lexatic/web-backend/pkg/ciphers"
 	"github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"
+	gorm_models "github.com/lexatic/web-backend/pkg/models/gorm"
 	"github.com/lexatic/web-backend/pkg/types"
+	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 	"gorm.io/gorm/clause"
 )
 
@@ -356,17 +359,6 @@ func (aS *userService) UpdateUser(ctx context.Context, auth types.Principle, use
 	}
 }
 
-func (aS *userService) GetAllUsers(ctx context.Context, uIds []uint64) ([]*internal_gorm.UserAuth, error) {
-	db := aS.postgres.DB(ctx)
-
-	var users []*internal_gorm.UserAuth
-	if err := db.Where("id in ? and status = ? ", uIds, "active").Find(&users).Error; err != nil {
-		aS.logger.Errorf("exception in DB transaction %v", err)
-		return nil, err
-	}
-	return users, nil
-}
-
 func (as *userService) CreateSocial(ctx context.Context, userId uint64, id string, token string, source string, verified bool) (*internal_gorm.UserSocial, error) {
 	db := as.postgres.DB(ctx)
 	ct := &internal_gorm.UserSocial{
@@ -414,9 +406,8 @@ func (aS *userService) UpdatePassword(ctx context.Context, userId uint64, passwo
 	if err := tx.Error; err != nil {
 		aS.logger.Errorf("exception in DB transaction %v", err)
 		return nil, err
-	} else {
-		return user, nil
 	}
+	return user, nil
 }
 
 func (aS *userService) ActivateAllProjectRoles(ctx context.Context, userId uint64) error {
@@ -438,9 +429,8 @@ func (aS *userService) ActivateAllOrganizationRole(ctx context.Context, userId u
 	if err := tx.Error; err != nil {
 		aS.logger.Errorf("exception in DB transaction %v", err)
 		return err
-	} else {
-		return nil
 	}
+	return nil
 }
 
 func (aS *userService) GetAllActiveProjectMember(ctx context.Context, projectId uint64) (*[]internal_gorm.UserProjectRole, error) {
@@ -450,21 +440,39 @@ func (aS *userService) GetAllActiveProjectMember(ctx context.Context, projectId 
 	if err := tx.Error; err != nil {
 		aS.logger.Errorf("exception in DB transaction %v", err)
 		return &rt, err
-	} else {
-		return &rt, nil
 	}
+	return &rt, nil
 }
 
-func (aS *userService) GetAllOrganizationMember(ctx context.Context, organizationId uint64) (*[]internal_gorm.UserOrganizationRole, error) {
+func (aS *userService) GetAllOrganizationMember(ctx context.Context, organizationId uint64, criterias []*web_api.Criteria, paginate *web_api.Paginate) (int64, *[]internal_gorm.UserOrganizationRole, error) {
 	db := aS.postgres.DB(ctx)
 	var rt []internal_gorm.UserOrganizationRole
-	tx := db.Preload("Member").Where("organization_id = ? AND status = ?", organizationId, "active").Find(&rt)
+	var cnt int64
+
+	qry := db.Model(internal_gorm.UserOrganizationRole{}).Preload("Member").
+		Where("organization_id = ? AND status = ?", organizationId, "active")
+	for _, ct := range criterias {
+		qry.Where(fmt.Sprintf("%s = ?", ct.GetKey()), ct.GetValue())
+	}
+	tx := qry.
+		Scopes(gorm_models.
+			Paginate(gorm_models.
+				NewPaginated(
+					int(paginate.GetPage()),
+					int(paginate.GetPageSize()),
+					&cnt,
+					qry))).
+		Order(clause.OrderByColumn{
+			Column: clause.Column{Name: "created_date"},
+			Desc:   true,
+		}).
+		Find(&rt)
+
 	if err := tx.Error; err != nil {
 		aS.logger.Errorf("exception in DB transaction %v", err)
-		return &rt, err
-	} else {
-		return &rt, nil
+		return cnt, &rt, err
 	}
+	return cnt, &rt, nil
 }
 
 func (uS *userService) GetAllUserRolesForOrg(ctx context.Context, organizationId uint64) ([]*internal_gorm.UserOrganizationRole, error) {
@@ -484,16 +492,4 @@ func (aS *userService) GetProjectRolesForUsers(ctx context.Context, pIds []uint6
 		return nil, err
 	}
 	return pr, nil
-}
-
-func (aS *userService) GetAllProjectMembers(ctx context.Context, projectId uint64) (*[]internal_gorm.UserProjectRole, error) {
-	db := aS.postgres.DB(ctx)
-	var rt []internal_gorm.UserProjectRole
-	tx := db.Preload("Member").Where("project_id = ?", projectId).Find(&rt)
-	if err := tx.Error; err != nil {
-		aS.logger.Errorf("exception in DB transaction %v", err)
-		return &rt, err
-	} else {
-		return &rt, nil
-	}
 }

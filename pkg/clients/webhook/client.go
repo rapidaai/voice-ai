@@ -82,9 +82,11 @@ func (client *webhookServiceClient) GetWebhook(c context.Context, id, projectId,
 
 }
 
-func (client *webhookServiceClient) GetAllWebhook(c context.Context, projectId, organizationId uint64, page, pageSize uint32) (*webhook_api.GetAllWebhookResponse, error) {
+func (client *webhookServiceClient) GetAllWebhook(c context.Context, projectId, organizationId uint64, criterias []*webhook_api.Criteria, paginate *webhook_api.Paginate) (*webhook_api.GetAllWebhookResponse, error) {
 	res, err := client.webhookClient.GetAllWebhook(c, &webhook_api.GetAllWebhookRequest{
-		ProjectId: projectId, OrganizationId: organizationId, Page: page, PageSize: pageSize,
+		ProjectId: projectId, OrganizationId: organizationId,
+		Paginate:  paginate,
+		Criterias: criterias,
 	})
 	if err != nil {
 		client.logger.Errorf("unable to get all the webhook error %v", err)

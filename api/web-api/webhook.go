@@ -70,7 +70,7 @@ func (webhookGrpc *webWebhookGRPCApi) GetAllWebhook(ctx context.Context, iReques
 		webhookGrpc.logger.Errorf("unauthenticated request for get actvities")
 		return nil, errors.New("unauthenticated request")
 	}
-	return webhookGrpc.webhookClient.GetAllWebhook(ctx, iRequest.GetProjectId(), iAuth.GetOrganizationRole().OrganizationId, iRequest.GetPage(), iRequest.GetPageSize())
+	return webhookGrpc.webhookClient.GetAllWebhook(ctx, iRequest.GetProjectId(), iAuth.GetOrganizationRole().OrganizationId, iRequest.GetCriterias(), iRequest.GetPaginate())
 }
 
 // GetWebhook implements lexatic_backend.WebhookManagerServiceServer.

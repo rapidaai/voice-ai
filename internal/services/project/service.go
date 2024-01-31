@@ -2,6 +2,7 @@ package internal_project_service
 
 import (
 	"context"
+	"fmt"
 
 	internal_gorm "github.com/lexatic/web-backend/internal/gorm"
 	internal_services "github.com/lexatic/web-backend/internal/services"
@@ -10,6 +11,8 @@ import (
 	"github.com/lexatic/web-backend/pkg/connectors"
 	gorm_models "github.com/lexatic/web-backend/pkg/models/gorm"
 	"github.com/lexatic/web-backend/pkg/types"
+	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
+	"gorm.io/gorm/clause"
 )
 
 type projectService struct {
@@ -60,15 +63,34 @@ func (pS *projectService) Update(ctx context.Context, auth types.Principle, proj
 	return project, nil
 }
 
-func (pS *projectService) GetAll(ctx context.Context, auth types.Principle, organizationId uint64) (*[]internal_gorm.Project, error) {
+func (pS *projectService) GetAll(ctx context.Context, auth types.Principle, organizationId uint64, criterias []*web_api.Criteria, paginate *web_api.Paginate) (int64, *[]internal_gorm.Project, error) {
 	db := pS.postgres.DB(ctx)
 	var projects []internal_gorm.Project
-	tx := db.Where("organization_id = ? AND status = ? ", organizationId, "active").Find(&projects)
+	var cnt int64
+	qry := db.Model(internal_gorm.Project{}).
+		Where("organization_id = ? AND status = ? ", organizationId, "active")
+	for _, ct := range criterias {
+		qry.Where(fmt.Sprintf("%s = ?", ct.GetKey()), ct.GetValue())
+	}
+	tx := qry.
+		Scopes(gorm_models.
+			Paginate(gorm_models.
+				NewPaginated(
+					int(paginate.GetPage()),
+					int(paginate.GetPageSize()),
+					&cnt,
+					qry))).
+		Order(clause.OrderByColumn{
+			Column: clause.Column{Name: "created_date"},
+			Desc:   true,
+		}).
+		Find(&projects)
 	if tx.Error != nil {
 		pS.logger.Debugf("unable to find any project %v", organizationId)
-		return nil, tx.Error
+		return cnt, nil, tx.Error
 	}
-	return &projects, nil
+
+	return cnt, &projects, nil
 }
 
 func (pS *projectService) Get(ctx context.Context, auth types.Principle, projectId uint64) (*internal_gorm.Project, error) {
@@ -122,14 +144,33 @@ func (pS *projectService) ArchiveCredential(ctx context.Context, auth types.Prin
 	return ct, nil
 }
 
-func (pS *projectService) GetAllCredential(ctx context.Context, auth types.Principle, projectId, organizationId uint64) (*[]internal_gorm.ProjectCredential, error) {
+func (pS *projectService) GetAllCredential(ctx context.Context, auth types.Principle, projectId, organizationId uint64, criterias []*web_api.Criteria, paginate *web_api.Paginate) (int64, *[]internal_gorm.ProjectCredential, error) {
 	db := pS.postgres.DB(ctx)
 	var pcs []internal_gorm.ProjectCredential
-	tx := db.Where("project_id = ? AND organization_id = ? AND status = ? ", projectId, organizationId, "active").Find(&pcs)
+	var cnt int64
+	qry := db.Model(internal_gorm.ProjectCredential{}).
+		Where("project_id = ? AND organization_id = ? AND status = ? ", projectId, organizationId, "active")
+	for _, ct := range criterias {
+		qry.Where(fmt.Sprintf("%s = ?", ct.GetKey()), ct.GetValue())
+	}
+	tx := qry.
+		Scopes(gorm_models.
+			Paginate(gorm_models.
+				NewPaginated(
+					int(paginate.GetPage()),
+					int(paginate.GetPageSize()),
+					&cnt,
+					qry))).
+		Order(clause.OrderByColumn{
+			Column: clause.Column{Name: "created_date"},
+			Desc:   true,
+		}).
+		Find(&pcs)
 	if tx.Error != nil {
 		pS.logger.Debugf("unable to find any project %v", organizationId)
-		return nil, tx.Error
+		return cnt, nil, tx.Error
 	}
-	return &pcs, nil
+
+	return cnt, &pcs, nil
 
 }
