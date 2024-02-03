@@ -164,6 +164,23 @@ func (vS *vaultService) CreateAllDefaultKeys(ctx context.Context, organizationId
 		CreatedBy:      99,
 		OrganizationId: organizationId,
 	})
+
+	vlts = append(vlts, &internal_gorm.Vault{
+		Name:           "default-mistral-01",
+		ProviderId:     198796716894742119,
+		Key:            "pskpIUoGzlLvzuxczSpLaJpxuFhZiWzy",
+		CreatedBy:      99,
+		OrganizationId: organizationId,
+	})
+
+	vlts = append(vlts, &internal_gorm.Vault{
+		Name:           "default-huggingface-01",
+		ProviderId:     198796716894742118,
+		Key:            "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",
+		CreatedBy:      99,
+		OrganizationId: organizationId,
+	})
+
 	tx := db.Save(vlts)
 	if err := tx.Error; err != nil {
 		vS.logger.Debugf("unable to insert for default keys of provider %v", err)

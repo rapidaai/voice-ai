@@ -59,3 +59,16 @@ func (client *endpointServiceClient) GetEndpoint(c context.Context, endpointId u
 	client.logger.Debugf("got response for get endpoint %+v", res)
 	return res, nil
 }
+
+func (client *endpointServiceClient) CreateEndpoint(c context.Context, endpointRequest *endpoint_api.CreateEndpointRequest, projectId, organizationId, userId uint64) (*endpoint_api.EndpointProviderModelResponse, error) {
+	endpointRequest.GetEndpoint().OrganizationId = organizationId
+	endpointRequest.GetEndpoint().ProjectId = projectId
+	endpointRequest.CreatedBy = userId
+	res, err := client.endpointClient.CreateEndpoint(c, endpointRequest)
+	if err != nil {
+		client.logger.Debugf("error while calling to get all endpoint %v", err)
+		return nil, err
+	}
+	client.logger.Debugf("got response for get endpoint %+v", res)
+	return res, nil
+}
