@@ -66,3 +66,14 @@ func (endpoint *webEndpointGRPCApi) CreateEndpoint(c context.Context, iRequest *
 	}
 	return endpoint.endpointClient.CreateEndpoint(c, iRequest, iRequest.GetEndpoint().GetProjectId(), iAuth.GetOrganizationRole().OrganizationId, iAuth.GetUserInfo().Id)
 }
+
+func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointFromTestcase(ctx context.Context, iRequest *web_api.CreateEndpointFromTestcaseRequest) (*web_api.EndpointProviderModelResponse, error) {
+	endpointGRPCApi.logger.Debugf("Create endpoint from grpc with requestPayload %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		endpointGRPCApi.logger.Errorf("unauthenticated request for get actvities")
+		return nil, errors.New("unauthenticated request")
+	}
+	principle := iAuth.PlainAuthPrinciple()
+	return endpointGRPCApi.endpointClient.CreateEndpointFromTestcase(ctx, iRequest, &principle)
+}
