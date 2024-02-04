@@ -175,7 +175,7 @@ func (vS *vaultService) CreateAllDefaultKeys(ctx context.Context, organizationId
 
 	vlts = append(vlts, &internal_gorm.Vault{
 		Name:           "default-huggingface-01",
-		ProviderId:     198796716894742118,
+		ProviderId:     198796716894742120,
 		Key:            "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",
 		CreatedBy:      99,
 		OrganizationId: organizationId,
