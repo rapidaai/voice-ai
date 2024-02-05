@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"math"
 
 	"github.com/lexatic/web-backend/config"
 	clients "github.com/lexatic/web-backend/pkg/clients"
@@ -19,9 +20,18 @@ type integrationServiceClient struct {
 }
 
 func NewIntegrationServiceClientGRPC(config *config.AppConfig, logger commons.Logger) clients.IntegrationServiceClient {
-
 	logger.Debugf("conntecting to integration client with %s", config.IntegrationHost)
-	conn, err := grpc.Dial(config.IntegrationHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+	grpcOpts := []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(math.MaxInt64),
+			grpc.MaxCallSendMsgSize(math.MaxInt64),
+		),
+	}
+	conn, err := grpc.Dial(config.IntegrationHost,
+		grpcOpts...)
+
 	if err != nil {
 		logger.Fatalf("Unable to create connection %v", err)
 	}
