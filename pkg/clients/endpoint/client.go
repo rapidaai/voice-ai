@@ -2,13 +2,17 @@ package integration
 
 import (
 	"context"
+	"fmt"
 
+	metadata_helper "github.com/grpc-ecosystem/go-grpc-middleware/v2/metadata"
 	"github.com/lexatic/web-backend/config"
 	clients "github.com/lexatic/web-backend/pkg/clients"
 	"github.com/lexatic/web-backend/pkg/commons"
+	"github.com/lexatic/web-backend/pkg/types"
 	endpoint_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 type endpointServiceClient struct {
@@ -71,4 +75,11 @@ func (client *endpointServiceClient) CreateEndpoint(c context.Context, endpointR
 	}
 	client.logger.Debugf("got response for get endpoint %+v", res)
 	return res, nil
+}
+
+func (client *endpointServiceClient) CreateEndpointFromTestcase(c context.Context, iRequest *endpoint_api.CreateEndpointFromTestcaseRequest, principle *types.PlainAuthPrinciple) (*endpoint_api.EndpointProviderModelResponse, error) {
+	projectId := metadata_helper.ExtractIncoming(c).Get("X-Auth-P-Id")
+	md := metadata.New(map[string]string{"Authorization": principle.Token.Token, "X-Auth-Id": fmt.Sprintf("%v", principle.User.Id), "X-Auth-P-Id": projectId})
+	iRequest.OrganizationId = principle.OrganizationRole.OrganizationId
+	return client.endpointClient.CreateEndpointFromTestcase(metadata.NewOutgoingContext(c, md), iRequest)
 }
