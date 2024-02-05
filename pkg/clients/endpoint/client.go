@@ -80,5 +80,6 @@ func (client *endpointServiceClient) CreateEndpoint(c context.Context, endpointR
 func (client *endpointServiceClient) CreateEndpointFromTestcase(c context.Context, iRequest *endpoint_api.CreateEndpointFromTestcaseRequest, principle *types.PlainAuthPrinciple) (*endpoint_api.EndpointProviderModelResponse, error) {
 	projectId := metadata_helper.ExtractIncoming(c).Get("X-Auth-P-Id")
 	md := metadata.New(map[string]string{"Authorization": principle.Token.Token, "X-Auth-Id": fmt.Sprintf("%v", principle.User.Id), "X-Auth-P-Id": projectId})
+	iRequest.OrganizationId = principle.OrganizationRole.OrganizationId
 	return client.endpointClient.CreateEndpointFromTestcase(metadata.NewOutgoingContext(c, md), iRequest)
 }
