@@ -28,7 +28,7 @@ type webActivityGRPCApi struct {
 	webActivityApi
 }
 
-func NewActivityGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) web_api.ActivityServiceServer {
+func NewActivityGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) web_api.AuditLoggingServiceServer {
 	return &webActivityGRPCApi{
 		webActivityApi{
 			cfg:               config,
@@ -40,7 +40,7 @@ func NewActivityGRPC(config *config.AppConfig, logger commons.Logger, postgres c
 	}
 }
 
-func (wActivity *webActivityGRPCApi) GetActivities(c context.Context, irRequest *web_api.GetActivityRequest) (*web_api.GetActivityResponse, error) {
+func (wActivity *webActivityGRPCApi) GetAuditLog(c context.Context, irRequest *web_api.GetAuditLogRequest) (*web_api.GetAuditLogResponse, error) {
 	wActivity.logger.Debugf("GetActivities from grpc with requestPayload %v, %v", irRequest, c)
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
 	if !isAuthenticated {
@@ -49,32 +49,17 @@ func (wActivity *webActivityGRPCApi) GetActivities(c context.Context, irRequest 
 	}
 
 	// check if he is already part of current organization
-	adt, err := wActivity.integrationClient.GetAuditLog(c, iAuth.GetOrganizationRole().OrganizationId, irRequest.GetProjectId(), irRequest.GetCriterias(), irRequest.GetPaginate())
-	if err != nil {
-		return &web_api.GetActivityResponse{
-			Code:    500,
-			Success: false,
-		}, nil
+	return wActivity.integrationClient.GetAuditLog(c, iAuth.GetOrganizationRole().OrganizationId, irRequest.GetProjectId(), irRequest.GetId())
+}
+
+func (wActivity *webActivityGRPCApi) GetAllAuditLog(c context.Context, irRequest *web_api.GetAllAuditLogRequest) (*web_api.GetAllAuditLogResponse, error) {
+	wActivity.logger.Debugf("GetActivities from grpc with requestPayload %v, %v", irRequest, c)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
+	if !isAuthenticated {
+		wActivity.logger.Errorf("unauthenticated request for get actvities")
+		return nil, errors.New("unauthenticated request")
 	}
 
-	if adt.GetSuccess() {
-		// later will inject all the params from db
-		wActivity.logger.Debugf("response from %v", adt.GetData())
-		var out []*web_api.Activity
-		err := types.Cast(adt.GetData(), &out)
-		if err != nil {
-			wActivity.logger.Debugf("unable to cast the object with error %v", err)
-		}
-		return &web_api.GetActivityResponse{
-			Code:      200,
-			Success:   true,
-			Paginated: adt.GetPaginated(),
-			Data:      out,
-		}, nil
-	}
-	wActivity.logger.Debugf("Got response from integration service %+v", adt)
-	return &web_api.GetActivityResponse{
-		Code:    200,
-		Success: false,
-	}, nil
+	// check if he is already part of current organization
+	return wActivity.integrationClient.GetAllAuditLog(c, iAuth.GetOrganizationRole().OrganizationId, irRequest.GetProjectId(), irRequest.GetCriterias(), irRequest.GetPaginate())
 }

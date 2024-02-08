@@ -263,7 +263,7 @@ func (g *AppRunner) LeadApiRoute() {
 }
 
 func (g *AppRunner) ActivityApiRoute() {
-	web_api.RegisterActivityServiceServer(g.S, webApi.NewActivityGRPC(g.Cfg, g.Logger, g.Postgres))
+	web_api.RegisterAuditLoggingServiceServer(g.S, webApi.NewActivityGRPC(g.Cfg, g.Logger, g.Postgres))
 }
 
 func (g *AppRunner) EndpointApiRoute() {

@@ -3,6 +3,7 @@ package internal_clients
 import (
 	"context"
 
+	clients_pogos "github.com/lexatic/web-backend/pkg/clients/pogos"
 	"github.com/lexatic/web-backend/pkg/types"
 	_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 )
@@ -15,7 +16,11 @@ type IntegrationServiceClient interface {
 	WelcomeEmail(c context.Context, userId uint64, name, email string) (*_api.WelcomeEmailResponse, error)
 	ResetPasswordEmail(c context.Context, userId uint64, name, email, resetPasswordLink string) (*_api.ResetPasswordEmailResponse, error)
 	InviteMemberEmail(c context.Context, userId uint64, name, email, organizationName, projectName, inviterName string) (*_api.InviteMemeberEmailResponse, error)
-	GetAuditLog(c context.Context, organizationId, projectId uint64, criterias []*_api.Criteria, paginate *_api.Paginate) (*_api.GetAuditLogResponse, error)
+	GetAuditLog(c context.Context, organizationId, projectId, auditId uint64) (*_api.GetAuditLogResponse, error)
+	Converse(c context.Context, request *clients_pogos.RequestData[[]*clients_pogos.Interaction]) (*_api.ChatResponse, error)
+	Prompt(c context.Context, request *clients_pogos.RequestData[string]) (*_api.GenerateResponse, error)
+	GenerateTextToImage(c context.Context, request *clients_pogos.RequestData[string]) (*_api.GenerateTextToImageResponse, error)
+	GetAllAuditLog(c context.Context, organizationId, projectId uint64, criterias []*_api.Criteria, paginate *_api.Paginate) (*_api.GetAllAuditLogResponse, error)
 }
 
 type EndpointServiceClient interface {

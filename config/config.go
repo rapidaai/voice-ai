@@ -22,6 +22,8 @@ type AppConfig struct {
 	EndpointHost    string                 `mapstructure:"endpoint_host" validate:"required"`
 	WebhookHost     string                 `mapstructure:"webhook_host" validate:"required"`
 
+	AssetStoreConfig AssetStoreConfig `mapstructure:"asset_store" validate:"required"`
+
 	GoogleClientId     string `mapstructure:"google_client_id" validate:"required"`
 	GoogleClientSecret string `mapstructure:"google_client_secret" validate:"required"`
 
