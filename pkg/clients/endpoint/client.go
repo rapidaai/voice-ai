@@ -25,7 +25,7 @@ func NewEndpointServiceClientGRPC(config *config.AppConfig, logger commons.Logge
 	logger.Debugf("conntecting to endpoint client with %s", config.EndpointHost)
 	conn, err := grpc.Dial(config.EndpointHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		logger.Fatalf("Unable to create connection %v", err)
+		logger.Errorf("Unable to create connection %v", err)
 	}
 	return &endpointServiceClient{
 		cfg:            config,
@@ -45,7 +45,6 @@ func (client *endpointServiceClient) GetAllEndpoint(c context.Context, projectId
 		client.logger.Errorf("error while calling to get all endpoint %v", err)
 		return nil, err
 	}
-	client.logger.Debugf("got response for get all endpoint %+v", res)
 	return res, nil
 }
 
@@ -57,27 +56,25 @@ func (client *endpointServiceClient) GetEndpoint(c context.Context, endpointId u
 		OrganizationId: organizationId,
 	})
 	if err != nil {
-		client.logger.Debugf("error while calling to get all endpoint %v", err)
+		client.logger.Errorf("error while calling to get all endpoint %v", err)
 		return nil, err
 	}
-	client.logger.Debugf("got response for get endpoint %+v", res)
 	return res, nil
 }
 
-func (client *endpointServiceClient) CreateEndpoint(c context.Context, endpointRequest *endpoint_api.CreateEndpointRequest, projectId, organizationId, userId uint64) (*endpoint_api.EndpointProviderModelResponse, error) {
+func (client *endpointServiceClient) CreateEndpoint(c context.Context, endpointRequest *endpoint_api.CreateEndpointRequest, projectId, organizationId, userId uint64) (*endpoint_api.CreateEndpointProviderModelResponse, error) {
 	endpointRequest.GetEndpoint().OrganizationId = organizationId
 	endpointRequest.GetEndpoint().ProjectId = projectId
 	endpointRequest.EndpointAttributes.CreatedBy = userId
 	res, err := client.endpointClient.CreateEndpoint(c, endpointRequest)
 	if err != nil {
-		client.logger.Debugf("error while calling to get all endpoint %v", err)
+		client.logger.Errorf("error while calling to get all endpoint %v", err)
 		return nil, err
 	}
-	client.logger.Debugf("got response for get endpoint %+v", res)
 	return res, nil
 }
 
-func (client *endpointServiceClient) CreateEndpointFromTestcase(c context.Context, iRequest *endpoint_api.CreateEndpointFromTestcaseRequest, principle *types.PlainAuthPrinciple) (*endpoint_api.EndpointProviderModelResponse, error) {
+func (client *endpointServiceClient) CreateEndpointFromTestcase(c context.Context, iRequest *endpoint_api.CreateEndpointFromTestcaseRequest, principle *types.PlainAuthPrinciple) (*endpoint_api.CreateEndpointProviderModelResponse, error) {
 	projectId := metadata_helper.ExtractIncoming(c).Get("X-Auth-P-Id")
 	md := metadata.New(map[string]string{"Authorization": principle.Token.Token, "X-Auth-Id": fmt.Sprintf("%v", principle.User.Id), "X-Auth-P-Id": projectId})
 	iRequest.OrganizationId = principle.OrganizationRole.OrganizationId

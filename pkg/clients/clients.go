@@ -26,8 +26,8 @@ type IntegrationServiceClient interface {
 type EndpointServiceClient interface {
 	GetAllEndpoint(c context.Context, projectId, organizationId uint64, criterias []*_api.Criteria, paginate *_api.Paginate) (*_api.GetAllEndpointResponse, error)
 	GetEndpoint(c context.Context, endpointId uint64, projectId, organizationId uint64) (*_api.GetEndpointResponse, error)
-	CreateEndpoint(c context.Context, endpointRequest *_api.CreateEndpointRequest, projectId, organizationId, userId uint64) (*_api.EndpointProviderModelResponse, error)
-	CreateEndpointFromTestcase(c context.Context, iRequest *_api.CreateEndpointFromTestcaseRequest, principle *types.PlainAuthPrinciple) (*_api.EndpointProviderModelResponse, error)
+	CreateEndpoint(c context.Context, endpointRequest *_api.CreateEndpointRequest, projectId, organizationId, userId uint64) (*_api.CreateEndpointProviderModelResponse, error)
+	CreateEndpointFromTestcase(c context.Context, iRequest *_api.CreateEndpointFromTestcaseRequest, principle *types.PlainAuthPrinciple) (*_api.CreateEndpointProviderModelResponse, error)
 }
 
 type WebhookServiceClient interface {
