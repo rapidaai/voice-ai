@@ -96,3 +96,18 @@ func (client *endpointServiceClient) GetAllEndpointProviderModel(c context.Conte
 	}
 	return res, nil
 }
+
+func (client *endpointServiceClient) UpdateEndpointVersion(c context.Context, endpointId, endpointProviderModelId, updatedBy, projectId, organizationId uint64) (*endpoint_api.UpdateEndpointVersionResponse, error) {
+	res, err := client.endpointClient.UpdateEndpointVersion(c, &endpoint_api.UpdateEndpointVersionRequest{
+		EndpointId:              endpointId,
+		EndpointProviderModelId: endpointProviderModelId,
+		UpdatedBy:               updatedBy,
+		ProjectId:               projectId,
+		OrganizationId:          organizationId,
+	})
+	if err != nil {
+		client.logger.Errorf("error while calling to get all endpoint %v", err)
+		return nil, err
+	}
+	return res, nil
+}

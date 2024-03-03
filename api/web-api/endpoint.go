@@ -81,3 +81,13 @@ func (endpointGRPCApi *webEndpointGRPCApi) GetAllEndpointProviderModel(ctx conte
 	}
 	return endpointGRPCApi.endpointClient.GetAllEndpointProviderModel(ctx, iRequest.GetEndpointId(), iRequest.GetProjectId(), iAuth.GetOrganizationRole().OrganizationId, iRequest.GetCriterias(), iRequest.GetPaginate())
 }
+
+func (endpointGRPCApi *webEndpointGRPCApi) UpdateEndpointVersion(ctx context.Context, iRequest *web_api.UpdateEndpointVersionRequest) (*web_api.UpdateEndpointVersionResponse, error) {
+	endpointGRPCApi.logger.Debugf("Update endpoint from grpc with requestPayload %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		endpointGRPCApi.logger.Errorf("unauthenticated request for get actvities")
+		return nil, errors.New("unauthenticated request")
+	}
+	return endpointGRPCApi.endpointClient.UpdateEndpointVersion(ctx, iRequest.GetEndpointId(), iRequest.GetEndpointProviderModelId(), iAuth.GetUserInfo().Id, iRequest.GetProjectId(), iAuth.GetOrganizationRole().OrganizationId)
+}
