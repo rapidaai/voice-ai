@@ -3,11 +3,10 @@ package clients_response_processors
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/lexatic/web-backend/config"
-	clients "github.com/lexatic/web-backend/pkg/clients"
+	"github.com/lexatic/web-backend/pkg/clients"
 	integration_service_client "github.com/lexatic/web-backend/pkg/clients/integration"
 	clients_pogos "github.com/lexatic/web-backend/pkg/clients/pogos"
 	"github.com/lexatic/web-backend/pkg/commons"
@@ -24,8 +23,18 @@ func NewTextResponseProcessor(cfg *config.AppConfig, lgr commons.Logger) Respons
 	return &textResponseProcessor{logger: lgr, cfg: cfg, integrationClient: integration_service_client.NewIntegrationServiceClientGRPC(cfg, lgr)}
 }
 
+func (trp *textResponseProcessor) PreProcess(ctx context.Context, cr *clients_pogos.RequestData[string]) {
+	// pre processing the request incase of additional requirement
+
+}
+
+func (trp *textResponseProcessor) PostProcess(ctx context.Context, cr *clients_pogos.RequestData[string]) {
+	// post processing the request incase of addition response modification
+}
+
 func (trp *textResponseProcessor) Process(ctx context.Context, cr *clients_pogos.RequestData[string]) *clients_pogos.PromptResponse {
 	if res, err := trp.integrationClient.Prompt(ctx, cr); err != nil {
+		trp.logger.Errorf("error while processing the text llm request %v", err)
 		return &clients_pogos.PromptResponse{
 			Status:       "FAILURE",
 			Response:     err.Error(),
@@ -47,16 +56,40 @@ func (trp *textResponseProcessor) unmarshalTextResponse(res *integration_api.Gen
 		return trp.unmarshalReplicateText(res)
 	case "google":
 		return trp.unmarshalGoogleText(res)
+	case "togetherai":
+		return trp.unmarshalTogetherAIText(res)
 	default:
 		return trp.unmarshalOpenAiText(res)
 	}
 }
+
+func (trp *textResponseProcessor) unmarshalTogetherAIText(res *integration_api.GenerateResponse) *clients_pogos.PromptResponse {
+	if res.Success {
+		togetherAiRes := clients_pogos.TogetherAIResponse[clients_pogos.TogetherAITextChoice]{}
+		err := json.Unmarshal([]byte(*res.Response), &togetherAiRes)
+		if err != nil {
+			trp.logger.Errorf("error %v", err)
+		}
+		return &clients_pogos.PromptResponse{
+			Status:    "SUCCESS",
+			Response:  togetherAiRes.Choices[len(togetherAiRes.Choices)-1].Text,
+			RequestId: res.RequestId,
+		}
+	} else {
+		return &clients_pogos.PromptResponse{
+			Status:    "FAILURE",
+			Response:  res.ErrorMessage,
+			RequestId: res.RequestId,
+		}
+	}
+}
+
 func (trp *textResponseProcessor) unmarshalCohereText(res *integration_api.GenerateResponse) *clients_pogos.PromptResponse {
 	if res.Success {
 		cohereResp := clients_pogos.CohereGenerationResponse{}
 		err := json.Unmarshal([]byte(*res.Response), &cohereResp)
 		if err != nil {
-			fmt.Printf("%v", err)
+			trp.logger.Errorf("error %v", err)
 		}
 		return &clients_pogos.PromptResponse{
 			Status:    "SUCCESS",
@@ -76,7 +109,7 @@ func (trp *textResponseProcessor) unmarshalOpenAiText(res *integration_api.Gener
 		openAiRes := clients_pogos.OpenAIResponse{}
 		err := json.Unmarshal([]byte(*res.Response), &openAiRes)
 		if err != nil {
-			fmt.Printf("%v", err)
+			trp.logger.Errorf("error %v", err)
 		}
 		return &clients_pogos.PromptResponse{
 			Status:       "SUCCESS",
@@ -98,7 +131,7 @@ func (trp *textResponseProcessor) unmarshalAnthropicText(res *integration_api.Ge
 		ath := clients_pogos.AnthropicPromptResponse{}
 		err := json.Unmarshal([]byte(*res.Response), &ath)
 		if err != nil {
-			fmt.Printf("%v", err)
+			trp.logger.Errorf("error %v", err)
 		}
 		return &clients_pogos.PromptResponse{
 			Status: "SUCCESS",
@@ -119,7 +152,7 @@ func (trp *textResponseProcessor) unmarshalReplicateText(res *integration_api.Ge
 		rpt := clients_pogos.ReplicateResponse{}
 		err := json.Unmarshal([]byte(*res.Response), &rpt)
 		if err != nil {
-			fmt.Printf("%v", err)
+			trp.logger.Errorf("error %v", err)
 		}
 		return &clients_pogos.PromptResponse{
 			Status:       "SUCCESS",
@@ -142,13 +175,19 @@ func (trp *textResponseProcessor) unmarshalGoogleText(resp *integration_api.Gene
 		err := json.Unmarshal([]byte(*resp.Response), &googleResponse)
 		candidates := googleResponse.Candidates
 		if err != nil {
-			fmt.Printf("%v", err)
+			trp.logger.Errorf("error %v", err)
 		}
+
+		response := " "
+		if candidates[0].FinishReason == "STOP" {
+			response = candidates[0].Content.Parts[len(candidates[0].Content.Parts)-1].Text
+		}
+
 		return &clients_pogos.PromptResponse{
 			RequestId:    resp.RequestId,
 			Status:       "SUCCESS",
 			ResponseRole: candidates[0].Content.Role,
-			Response:     candidates[0].Content.Parts[len(candidates[0].Content.Parts)-1].Text,
+			Response:     response,
 		}
 	} else {
 		return &clients_pogos.PromptResponse{

@@ -3,6 +3,7 @@ package web_api
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	internal_services "github.com/lexatic/web-backend/internal/services"
 	internal_vault_service "github.com/lexatic/web-backend/internal/services/vault"
@@ -62,4 +63,8 @@ func (wActivity *webActivityGRPCApi) GetAllAuditLog(c context.Context, irRequest
 
 	// check if he is already part of current organization
 	return wActivity.integrationClient.GetAllAuditLog(c, iAuth.GetOrganizationRole().OrganizationId, irRequest.GetProjectId(), irRequest.GetCriterias(), irRequest.GetPaginate())
+}
+
+func (wActivity *webActivityGRPCApi) CreateMetadata(c context.Context, irRequest *web_api.CreateMetadataRequest) (*web_api.CreateMetadataResponse, error) {
+	return nil, fmt.Errorf("unimplimented method")
 }

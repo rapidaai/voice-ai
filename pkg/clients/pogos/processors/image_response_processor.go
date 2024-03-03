@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"sync"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -17,11 +16,13 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/lexatic/web-backend/config"
 	"github.com/lexatic/web-backend/pkg/ciphers"
-	clients "github.com/lexatic/web-backend/pkg/clients"
+	"github.com/lexatic/web-backend/pkg/clients"
 	integration_service_client "github.com/lexatic/web-backend/pkg/clients/integration"
 	clients_pogos "github.com/lexatic/web-backend/pkg/clients/pogos"
 	"github.com/lexatic/web-backend/pkg/commons"
+	provider_models "github.com/lexatic/web-backend/pkg/providers"
 	integration_api "github.com/lexatic/web-backend/protos/lexatic-backend"
+	"golang.org/x/sync/errgroup"
 )
 
 type imageResponseProcessor struct {
@@ -29,6 +30,12 @@ type imageResponseProcessor struct {
 	logger            commons.Logger
 	s3Client          *s3.S3
 	integrationClient clients.IntegrationServiceClient
+}
+
+type uploadRef struct {
+	Key       string
+	ImageType string
+	Data      string
 }
 
 func NewImageResponseProcessor(cfg *config.AppConfig, lgr commons.Logger) ResponseProcessor[string] {
@@ -58,27 +65,42 @@ func NewImageResponseProcessor(cfg *config.AppConfig, lgr commons.Logger) Respon
 
 func (irp *imageResponseProcessor) Process(ctx context.Context, cr *clients_pogos.RequestData[string]) *clients_pogos.PromptResponse {
 	if res, err := irp.integrationClient.GenerateTextToImage(ctx, cr); err != nil {
-		irp.logger.Info("Unable to launch req %v", err)
+		irp.logger.Errorf("error while processing the image llm request %v", err)
 		return &clients_pogos.PromptResponse{
 			Status:       "FAILURE",
 			Response:     err.Error(),
 			ResponseRole: "assitant",
 		}
 	} else {
-		return irp.unmarshalGenerateTextToImageResponse(res, cr.ProviderName)
+		return irp.unmarshalGenerateTextToImageResponse(ctx, res, cr)
 	}
 }
 
-func (irp *imageResponseProcessor) unmarshalGenerateTextToImageResponse(res *integration_api.GenerateTextToImageResponse, provider string) *clients_pogos.PromptResponse {
-	switch providerName := strings.ToLower(provider); providerName {
+func (irp *imageResponseProcessor) unmarshalGenerateTextToImageResponse(ctx context.Context, res *integration_api.GenerateTextToImageResponse, cr *clients_pogos.RequestData[string]) *clients_pogos.PromptResponse {
+	if !res.Success {
+		return &clients_pogos.PromptResponse{
+			Status:       "FAILURE",
+			Response:     res.ErrorMessage,
+			ResponseRole: "assitant",
+			RequestId:    res.RequestId,
+		}
+	}
+
+	switch providerName := strings.ToLower(cr.ProviderName); providerName {
 	case "openai":
-		return irp.unmarshalOpenAiImage(res)
+		return irp.unmarshalOpenAiImage(ctx, res)
+	case "stabilityai":
+		return irp.unmarshalStabilityAiImage(ctx, res)
+	case "togetherai":
+		return irp.unmarshalTogetherAiImage(ctx, res)
+	case "deepinfra":
+		return irp.unmarshalDeepInfraImage(ctx, res, cr)
 	default:
-		return irp.unmarshalOpenAiImage(res)
+		return irp.unmarshalOpenAiImage(ctx, res)
 	}
 }
 
-func (irp *imageResponseProcessor) uploadReference(key string, imageType string, image string) error {
+func (irp *imageResponseProcessor) uploadReference(ctx context.Context, key, imageType, image string) error {
 	// key := fmt.Sprintf("%d/%d/response.png", experimentId, requestId)
 	switch imageType {
 	case "url":
@@ -98,7 +120,7 @@ func (irp *imageResponseProcessor) uploadReference(key string, imageType string,
 			return err
 		}
 		// Upload image data to S3
-		_, err = irp.s3Client.PutObject(&s3.PutObjectInput{
+		_, err = irp.s3Client.PutObjectWithContext(ctx, &s3.PutObjectInput{
 			Bucket: aws.String(irp.cfg.AssetStoreConfig.AssetUploadBucket),
 			Key:    aws.String(key),
 			Body:   bytes.NewReader(imageData),
@@ -115,7 +137,7 @@ func (irp *imageResponseProcessor) uploadReference(key string, imageType string,
 			return err
 		}
 		// Upload decoded image data to S3
-		_, err = irp.s3Client.PutObject(&s3.PutObjectInput{
+		_, err = irp.s3Client.PutObjectWithContext(ctx, &s3.PutObjectInput{
 			Bucket: aws.String(irp.cfg.AssetStoreConfig.AssetUploadBucket),
 			Key:    aws.String(key),
 			Body:   bytes.NewReader(decoded),
@@ -131,7 +153,208 @@ func (irp *imageResponseProcessor) uploadReference(key string, imageType string,
 	return nil
 }
 
-func (irp *imageResponseProcessor) unmarshalOpenAiImage(res *integration_api.GenerateTextToImageResponse) *clients_pogos.PromptResponse {
+func generateDeepInfraImageRefs(res *integration_api.GenerateTextToImageResponse, cr *clients_pogos.RequestData[string]) ([]*uploadRef, error) {
+	// Add utility for deep infra later , to determine what to response format to use
+	if provider_models.IsDeepInfraV2ImageModel(cr.ProviderModelName) {
+		deepInfraRes := clients_pogos.DeepInfraImageResponse{}
+		err := json.Unmarshal([]byte(*res.Response), &deepInfraRes)
+		if err != nil {
+			return nil, err
+		}
+		refs := make([]*uploadRef, len(deepInfraRes.Output))
+		for i, output := range deepInfraRes.Output {
+			key := fmt.Sprintf("output/image/%d_%s.png", res.RequestId, ciphers.RandomHash("img_"))
+			refs[i] = &uploadRef{
+				Key:       key,
+				ImageType: "url",
+				Data:      output,
+			}
+		}
+		return refs, nil
+	}
+
+	deepInfraLegacyRes := clients_pogos.DeepInfraImageLegacyResponse{}
+	err := json.Unmarshal([]byte(*res.Response), &deepInfraLegacyRes)
+	if err != nil {
+		return nil, err
+	}
+	refs := make([]*uploadRef, len(deepInfraLegacyRes.Images))
+	for i, image := range deepInfraLegacyRes.Images {
+		key := fmt.Sprintf("output/image/%d_%s.png", res.RequestId, ciphers.RandomHash("img_"))
+		refs[i] = &uploadRef{
+			Key:       key,
+			ImageType: "base64",
+			Data:      strings.Replace(image, "data:image/png;base64,", "", 1),
+		}
+	}
+	return refs, nil
+}
+
+func (irp *imageResponseProcessor) unmarshalDeepInfraImage(ctx context.Context, res *integration_api.GenerateTextToImageResponse, cr *clients_pogos.RequestData[string]) *clients_pogos.PromptResponse {
+	refs, err := generateDeepInfraImageRefs(res, cr)
+	if err != nil {
+		irp.logger.Errorf("unmarshalDeepInfraImage error %v", err)
+		return &clients_pogos.PromptResponse{
+			Status:       "FAILURE",
+			Response:     err.Error(),
+			ResponseRole: "assistant",
+		}
+	}
+	responses, err := irp.uploadReferences(ctx, refs)
+	if err != nil {
+		irp.logger.Errorf("unable to upload responses error %v", err)
+		return &clients_pogos.PromptResponse{
+			Status:       "FAILURE",
+			Response:     err.Error(),
+			ResponseRole: "assitant",
+		}
+	}
+
+	jsonString, err := json.Marshal(responses)
+	if err != nil {
+		irp.logger.Errorf("unmarshalDeepInfraImage error %v", err)
+		return &clients_pogos.PromptResponse{
+			Status:       "FAILURE",
+			Response:     err.Error(),
+			ResponseRole: "assistant",
+		}
+	}
+
+	return &clients_pogos.PromptResponse{
+		Status:       "SUCCESS",
+		ResponseRole: "system",
+		Response:     string(jsonString),
+		RequestId:    res.RequestId,
+	}
+}
+
+func (irp *imageResponseProcessor) unmarshalTogetherAiImage(ctx context.Context, res *integration_api.GenerateTextToImageResponse) *clients_pogos.PromptResponse {
+	// already checked for success
+	togetherAIRes := clients_pogos.TogetherAIResponse[clients_pogos.TogetherAiImageChoice]{}
+	err := json.Unmarshal([]byte(*res.Response), &togetherAIRes)
+	if err != nil {
+		irp.logger.Errorf("unmarshalTogetherAiImage error %v", err)
+		return &clients_pogos.PromptResponse{
+			Status:       "FAILURE",
+			Response:     err.Error(),
+			ResponseRole: "assistant",
+		}
+	}
+	refs := make([]*uploadRef, len(togetherAIRes.Choices))
+	for i, choice := range togetherAIRes.Choices {
+		key := fmt.Sprintf("output/image/%d_%s.png", res.RequestId, ciphers.RandomHash("img_"))
+		refs[i] = &uploadRef{
+			Key:       key,
+			ImageType: "base64",
+			Data:      choice.ImageBase64,
+		}
+	}
+	responses, err := irp.uploadReferences(ctx, refs)
+	if err != nil {
+		irp.logger.Errorf("unable to upload responses error %v", err)
+		return &clients_pogos.PromptResponse{
+			Status:       "FAILURE",
+			Response:     err.Error(),
+			ResponseRole: "assitant",
+		}
+	}
+
+	jsonString, err := json.Marshal(responses)
+	if err != nil {
+		irp.logger.Errorf("unmarshalTogetherAiImage error %v", err)
+		return &clients_pogos.PromptResponse{
+			Status:       "FAILURE",
+			Response:     err.Error(),
+			ResponseRole: "assistant",
+		}
+	}
+
+	return &clients_pogos.PromptResponse{
+		Status:       "SUCCESS",
+		ResponseRole: "system",
+		Response:     string(jsonString),
+		RequestId:    res.RequestId,
+	}
+}
+
+func (irp *imageResponseProcessor) unmarshalStabilityAiImage(ctx context.Context, res *integration_api.GenerateTextToImageResponse) *clients_pogos.PromptResponse {
+	if res.Success {
+		stabilityRes := clients_pogos.StabilityAIImageResponse{}
+		err := json.Unmarshal([]byte(*res.Response), &stabilityRes)
+		if err != nil {
+			irp.logger.Errorf("unmarshalStabilityAiImage error %v", err)
+			return &clients_pogos.PromptResponse{
+				Status:       "FAILURE",
+				Response:     err.Error(),
+				ResponseRole: "assistant",
+			}
+		}
+		refs := make([]*uploadRef, len(stabilityRes.Artifacts))
+		for i, artifact := range stabilityRes.Artifacts {
+			key := fmt.Sprintf("output/image/%d_%s.png", res.RequestId, ciphers.RandomHash("img_"))
+			refs[i] = &uploadRef{
+				Key:       key,
+				ImageType: "base64",
+				Data:      artifact.Base64,
+			}
+		}
+		responses, err := irp.uploadReferences(ctx, refs)
+
+		if err != nil {
+			irp.logger.Errorf("unable to upload responses error %v", err)
+			return &clients_pogos.PromptResponse{
+				Status:       "FAILURE",
+				Response:     err.Error(),
+				ResponseRole: "assitant",
+			}
+		}
+
+		jsonString, err := json.Marshal(responses)
+		if err != nil {
+			irp.logger.Errorf("unmarshalStabilityAiImage error %v", err)
+			return &clients_pogos.PromptResponse{
+				Status:       "FAILURE",
+				Response:     err.Error(),
+				ResponseRole: "assistant",
+			}
+		}
+
+		return &clients_pogos.PromptResponse{
+			Status:       "SUCCESS",
+			ResponseRole: "system",
+			Response:     string(jsonString),
+			RequestId:    res.RequestId,
+		}
+	} else {
+		return &clients_pogos.PromptResponse{
+			Status:       "FAILURE",
+			Response:     res.ErrorMessage,
+			ResponseRole: "assitant",
+			RequestId:    res.RequestId,
+		}
+	}
+}
+
+func (irp *imageResponseProcessor) uploadReferences(ctx context.Context, refs []*uploadRef) ([]string, error) {
+	group, qctx := errgroup.WithContext(ctx)
+	responses := make([]string, len(refs))
+
+	for i, ref := range refs {
+		func(k, imageType, iD string, index int) {
+			group.Go(func() error {
+				err := irp.uploadReference(qctx, k, imageType, iD)
+				responses[index] = k
+				return err
+			})
+		}(ref.Key, ref.ImageType, ref.Data, i)
+	}
+	if err := group.Wait(); err != nil {
+		return nil, err
+	}
+	return responses, nil
+}
+
+func (irp *imageResponseProcessor) unmarshalOpenAiImage(ctx context.Context, res *integration_api.GenerateTextToImageResponse) *clients_pogos.PromptResponse {
 	if res.Success {
 		openAiRes := clients_pogos.OpenAIImageResponse{}
 		err := json.Unmarshal([]byte(*res.Response), &openAiRes)
@@ -143,28 +366,35 @@ func (irp *imageResponseProcessor) unmarshalOpenAiImage(res *integration_api.Gen
 				ResponseRole: "assitant",
 			}
 		}
-		responses := make([]string, 0)
-		var wg sync.WaitGroup
-		for _, img := range openAiRes.Data {
+
+		refs := make([]*uploadRef, len(openAiRes.Data))
+		for i, img := range openAiRes.Data {
 			key := fmt.Sprintf("output/image/%d_%s.png", res.RequestId, ciphers.RandomHash("img_"))
-			irp.logger.Debugf("uploading assets to s3 %v", key)
-			wg.Add(1)
 			if bs64, url := img.B64Json, img.Url; bs64 != nil {
-				go func(k, imageType string, iD string) {
-					defer wg.Done()
-					// Fetch the URL.
-					irp.uploadReference(k, imageType, iD)
-				}(key, "base64", *bs64)
+				refs[i] = &uploadRef{
+					Key:       key,
+					ImageType: "base64",
+					Data:      *bs64,
+				}
 			} else {
-				go func(k, imageType string, iD string) {
-					defer wg.Done()
-					// Fetch the URL.
-					irp.uploadReference(k, imageType, iD)
-				}(key, "url", *url)
+				refs[i] = &uploadRef{
+					Key:       key,
+					ImageType: "url",
+					Data:      *url,
+				}
 			}
-			responses = append(responses, key)
 		}
-		// Wait for all HTTP fetches to complete.
+
+		responses, err := irp.uploadReferences(ctx, refs)
+
+		if err != nil {
+			irp.logger.Errorf("unmarshalOpenAiImage error %v", err)
+			return &clients_pogos.PromptResponse{
+				Status:       "FAILURE",
+				Response:     err.Error(),
+				ResponseRole: "assitant",
+			}
+		}
 
 		jsonString, err := json.Marshal(responses)
 		if err != nil {
@@ -186,7 +416,7 @@ func (irp *imageResponseProcessor) unmarshalOpenAiImage(res *integration_api.Gen
 	} else {
 		return &clients_pogos.PromptResponse{
 			Status:       "FAILURE",
-			Response:     *res.Response,
+			Response:     res.ErrorMessage,
 			ResponseRole: "assitant",
 			RequestId:    res.RequestId,
 		}

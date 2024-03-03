@@ -80,3 +80,19 @@ func (client *endpointServiceClient) CreateEndpointFromTestcase(c context.Contex
 	iRequest.OrganizationId = principle.OrganizationRole.OrganizationId
 	return client.endpointClient.CreateEndpointFromTestcase(metadata.NewOutgoingContext(c, md), iRequest)
 }
+
+func (client *endpointServiceClient) GetAllEndpointProviderModel(c context.Context, endpointId, projectId, organizationId uint64, criterias []*endpoint_api.Criteria, paginate *endpoint_api.Paginate) (*endpoint_api.GetAllEndpointProviderModelResponse, error) {
+	res, err := client.endpointClient.GetAllEndpointProviderModel(c, &endpoint_api.GetAllEndpointProviderModelRequest{
+		// should be endpoint id
+		Criterias:      criterias,
+		Paginate:       paginate,
+		EndpointId:     endpointId,
+		ProjectId:      projectId,
+		OrganizationId: organizationId,
+	})
+	if err != nil {
+		client.logger.Errorf("error while calling to get all provider models %v", err)
+		return nil, err
+	}
+	return res, nil
+}

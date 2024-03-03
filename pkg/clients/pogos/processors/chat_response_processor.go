@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/lexatic/web-backend/config"
-	clients "github.com/lexatic/web-backend/pkg/clients"
+	"github.com/lexatic/web-backend/pkg/clients"
 	integration_service_client "github.com/lexatic/web-backend/pkg/clients/integration"
 	clients_pogos "github.com/lexatic/web-backend/pkg/clients/pogos"
 	"github.com/lexatic/web-backend/pkg/commons"
@@ -26,6 +26,7 @@ func NewChatResponseProcessor(cfg *config.AppConfig, lgr commons.Logger) Respons
 
 func (crp *chatResponseProcessor) Process(ctx context.Context, cr *clients_pogos.RequestData[[]*clients_pogos.Interaction]) *clients_pogos.PromptResponse {
 	if res, err := crp.integrationClient.Converse(ctx, cr); err != nil {
+		crp.logger.Errorf("error while processing the chat llm request %v", err)
 		return &clients_pogos.PromptResponse{
 			Status:       "FAILURE",
 			Response:     err.Error(),
@@ -47,6 +48,8 @@ func (crp *chatResponseProcessor) unmarshalChatResponse(res *integration_api.Cha
 		return crp.unmarshalReplicateChat(res)
 	case "google":
 		return crp.unmarshalGoogleChat(res)
+	case "togetherai":
+		return crp.unmarshalTogetherAiChat(res)
 	default:
 		return crp.unmarshalOpenAiChat(res)
 	}
@@ -78,6 +81,29 @@ func (crp *chatResponseProcessor) unmarshalOpenAiChat(res *integration_api.ChatR
 		}
 	}
 }
+
+func (crp *chatResponseProcessor) unmarshalTogetherAiChat(res *integration_api.ChatResponse) *clients_pogos.PromptResponse {
+	if res.Success {
+		openAiRes := clients_pogos.OpenAIResponse{}
+		err := json.Unmarshal([]byte(*res.Response), &openAiRes)
+		if err != nil {
+			fmt.Printf("%v", err)
+		}
+		return &clients_pogos.PromptResponse{
+			Status:       "SUCCESS",
+			ResponseRole: openAiRes.Choices[len(openAiRes.Choices)-1].Message.Role,
+			Response:     openAiRes.Choices[len(openAiRes.Choices)-1].Message.Content,
+			RequestId:    res.RequestId,
+		}
+	} else {
+		return &clients_pogos.PromptResponse{
+			Status:    "FAILURE",
+			Response:  *res.ErrorMessage,
+			RequestId: res.RequestId,
+		}
+	}
+}
+
 func (crp *chatResponseProcessor) unmarshalAnthropicChat(resp *integration_api.ChatResponse) *clients_pogos.PromptResponse {
 
 	if resp.Success {

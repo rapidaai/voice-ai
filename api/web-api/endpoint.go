@@ -3,6 +3,7 @@ package web_api
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	clients "github.com/lexatic/web-backend/pkg/clients"
 	endpoint_client "github.com/lexatic/web-backend/pkg/clients/endpoint"
@@ -68,12 +69,15 @@ func (endpoint *webEndpointGRPCApi) CreateEndpoint(c context.Context, iRequest *
 }
 
 func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointFromTestcase(ctx context.Context, iRequest *web_api.CreateEndpointFromTestcaseRequest) (*web_api.CreateEndpointProviderModelResponse, error) {
+	return nil, fmt.Errorf("not implimentated")
+}
+
+func (endpointGRPCApi *webEndpointGRPCApi) GetAllEndpointProviderModel(ctx context.Context, iRequest *web_api.GetAllEndpointProviderModelRequest) (*web_api.GetAllEndpointProviderModelResponse, error) {
 	endpointGRPCApi.logger.Debugf("Create endpoint from grpc with requestPayload %v, %v", iRequest, ctx)
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
 	if !isAuthenticated {
 		endpointGRPCApi.logger.Errorf("unauthenticated request for get actvities")
 		return nil, errors.New("unauthenticated request")
 	}
-	principle := iAuth.PlainAuthPrinciple()
-	return endpointGRPCApi.endpointClient.CreateEndpointFromTestcase(ctx, iRequest, &principle)
+	return endpointGRPCApi.endpointClient.GetAllEndpointProviderModel(ctx, iRequest.GetEndpointId(), iRequest.GetProjectId(), iAuth.GetOrganizationRole().OrganizationId, iRequest.GetCriterias(), iRequest.GetPaginate())
 }
