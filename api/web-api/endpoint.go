@@ -53,9 +53,8 @@ func (endpoint *webEndpointGRPCApi) GetAllEndpoint(c context.Context, iRequest *
 		endpoint.logger.Errorf("unauthenticated request for get actvities")
 		return nil, errors.New("unauthenticated request")
 	}
-	principle := iAuth.PlainAuthPrinciple()
 
-	return endpoint.endpointClient.GetAllEndpoint(c, iRequest.GetProjectId(), &principle, iRequest.GetCriterias(), iRequest.GetPaginate())
+	return endpoint.endpointClient.GetAllEndpoint(c, iRequest.GetProjectId(), iAuth.GetOrganizationRole().OrganizationId, iRequest.GetCriterias(), iRequest.GetPaginate())
 }
 
 func (endpoint *webEndpointGRPCApi) CreateEndpoint(c context.Context, iRequest *web_api.CreateEndpointRequest) (*web_api.CreateEndpointProviderModelResponse, error) {
@@ -88,9 +87,8 @@ func (endpointGRPCApi *webEndpointGRPCApi) GetAllEndpointProviderModel(ctx conte
 		endpointGRPCApi.logger.Errorf("unauthenticated request for get actvities")
 		return nil, errors.New("unauthenticated request")
 	}
-	principle := iAuth.PlainAuthPrinciple()
 
-	return endpointGRPCApi.endpointClient.GetAllEndpointProviderModel(ctx, iRequest.GetEndpointId(), iRequest.GetProjectId(), &principle, iRequest.GetCriterias(), iRequest.GetPaginate())
+	return endpointGRPCApi.endpointClient.GetAllEndpointProviderModel(ctx, iRequest.GetEndpointId(), iRequest.GetProjectId(), iAuth.GetOrganizationRole().OrganizationId, iRequest.GetCriterias(), iRequest.GetPaginate())
 }
 
 func (endpointGRPCApi *webEndpointGRPCApi) UpdateEndpointVersion(ctx context.Context, iRequest *web_api.UpdateEndpointVersionRequest) (*web_api.UpdateEndpointVersionResponse, error) {

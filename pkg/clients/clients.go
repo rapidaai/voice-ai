@@ -24,8 +24,8 @@ type IntegrationServiceClient interface {
 }
 
 type EndpointServiceClient interface {
-	GetAllEndpoint(c context.Context, projectId uint64, principle *types.PlainAuthPrinciple, criterias []*_api.Criteria, paginate *_api.Paginate) (*_api.GetAllEndpointResponse, error)
-	GetAllEndpointProviderModel(c context.Context, endpointId, projectId uint64, principle *types.PlainAuthPrinciple, criterias []*_api.Criteria, paginate *_api.Paginate) (*_api.GetAllEndpointProviderModelResponse, error)
+	GetAllEndpoint(c context.Context, projectId, organizationId uint64, criterias []*_api.Criteria, paginate *_api.Paginate) (*_api.GetAllEndpointResponse, error)
+	GetAllEndpointProviderModel(c context.Context, endpointId, projectId, organizationId uint64, criterias []*_api.Criteria, paginate *_api.Paginate) (*_api.GetAllEndpointProviderModelResponse, error)
 	GetEndpoint(c context.Context, endpointId uint64, projectId, organizationId uint64) (*_api.GetEndpointResponse, error)
 	UpdateEndpointVersion(c context.Context, endpointId, endpointProviderModelId, updatedBy, projectId, organizationId uint64) (*_api.UpdateEndpointVersionResponse, error)
 	CreateEndpoint(c context.Context, endpointRequest *_api.CreateEndpointRequest, projectId, organizationId, userId uint64) (*_api.CreateEndpointProviderModelResponse, error)
