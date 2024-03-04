@@ -99,3 +99,13 @@ func (endpointGRPCApi *webEndpointGRPCApi) UpdateEndpointVersion(ctx context.Con
 	}
 	return endpointGRPCApi.endpointClient.UpdateEndpointVersion(ctx, iRequest.GetEndpointId(), iRequest.GetEndpointProviderModelId(), iAuth.GetUserInfo().Id, iRequest.GetProjectId(), iAuth.GetOrganizationRole().OrganizationId)
 }
+
+func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointProviderModel(ctx context.Context, iRequest *web_api.CreateEndpointRequest) (*web_api.CreateEndpointProviderModelResponse, error) {
+	endpointGRPCApi.logger.Debugf("Create endpoint provider model request %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		endpointGRPCApi.logger.Errorf("unauthenticated request to create endpoint provider model")
+		return nil, errors.New("unauthenticated request")
+	}
+	return endpointGRPCApi.endpointClient.CreateEndpointProviderModel(ctx, iRequest, iRequest.GetEndpoint().GetProjectId(), iAuth.GetOrganizationRole().OrganizationId, iAuth.GetUserInfo().Id)
+}
