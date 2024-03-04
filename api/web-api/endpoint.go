@@ -3,7 +3,6 @@ package web_api
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	clients "github.com/lexatic/web-backend/pkg/clients"
 	endpoint_client "github.com/lexatic/web-backend/pkg/clients/endpoint"
@@ -68,8 +67,17 @@ func (endpoint *webEndpointGRPCApi) CreateEndpoint(c context.Context, iRequest *
 	return endpoint.endpointClient.CreateEndpoint(c, iRequest, iRequest.GetEndpoint().GetProjectId(), iAuth.GetOrganizationRole().OrganizationId, iAuth.GetUserInfo().Id)
 }
 
-func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointFromTestcase(ctx context.Context, iRequest *web_api.CreateEndpointFromTestcaseRequest) (*web_api.CreateEndpointProviderModelResponse, error) {
-	return nil, fmt.Errorf("not implimentated")
+func (endpoint *webEndpointGRPCApi) CreateEndpointFromTestcase(c context.Context, iRequest *web_api.CreateEndpointFromTestcaseRequest) (*web_api.CreateEndpointProviderModelResponse, error) {
+	endpoint.logger.Debugf("Create endpoint from test case grpc with requestPayload %v, %v", iRequest, c)
+
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
+	if !isAuthenticated {
+		endpoint.logger.Errorf("unauthenticated request for creating endpoint")
+		return nil, errors.New("unauthenticated request")
+	}
+	principle := iAuth.PlainAuthPrinciple()
+
+	return endpoint.endpointClient.CreateEndpointFromTestcase(c, iRequest, &principle)
 }
 
 func (endpointGRPCApi *webEndpointGRPCApi) GetAllEndpointProviderModel(ctx context.Context, iRequest *web_api.GetAllEndpointProviderModelRequest) (*web_api.GetAllEndpointProviderModelResponse, error) {

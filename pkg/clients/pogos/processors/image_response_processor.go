@@ -16,7 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/lexatic/web-backend/config"
 	"github.com/lexatic/web-backend/pkg/ciphers"
-	"github.com/lexatic/web-backend/pkg/clients"
+	clients "github.com/lexatic/web-backend/pkg/clients"
 	integration_service_client "github.com/lexatic/web-backend/pkg/clients/integration"
 	clients_pogos "github.com/lexatic/web-backend/pkg/clients/pogos"
 	"github.com/lexatic/web-backend/pkg/commons"
