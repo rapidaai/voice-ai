@@ -34,10 +34,11 @@ func NewEndpointServiceClientGRPC(config *config.AppConfig, logger commons.Logge
 	}
 }
 
-func (client *endpointServiceClient) GetAllEndpoint(c context.Context, projectId, organizationId uint64, criterias []*endpoint_api.Criteria, paginate *endpoint_api.Paginate) (*endpoint_api.GetAllEndpointResponse, error) {
-	res, err := client.endpointClient.GetAllEndpoint(c, &endpoint_api.GetAllEndpointRequest{
+func (client *endpointServiceClient) GetAllEndpoint(c context.Context, projectId uint64, principle *types.PlainAuthPrinciple, criterias []*endpoint_api.Criteria, paginate *endpoint_api.Paginate) (*endpoint_api.GetAllEndpointResponse, error) {
+	md := metadata.New(map[string]string{"Authorization": principle.Token.Token, "X-Auth-Id": fmt.Sprintf("%v", principle.User.Id), "X-Auth-P-Id": fmt.Sprintf("%v", projectId)})
+	res, err := client.endpointClient.GetAllEndpoint(metadata.NewOutgoingContext(c, md), &endpoint_api.GetAllEndpointRequest{
 		ProjectId:      projectId,
-		OrganizationId: organizationId,
+		OrganizationId: principle.OrganizationRole.OrganizationId,
 		Paginate:       paginate,
 		Criterias:      criterias,
 	})
@@ -81,14 +82,16 @@ func (client *endpointServiceClient) CreateEndpointFromTestcase(c context.Contex
 	return client.endpointClient.CreateEndpointFromTestcase(metadata.NewOutgoingContext(c, md), iRequest)
 }
 
-func (client *endpointServiceClient) GetAllEndpointProviderModel(c context.Context, endpointId, projectId, organizationId uint64, criterias []*endpoint_api.Criteria, paginate *endpoint_api.Paginate) (*endpoint_api.GetAllEndpointProviderModelResponse, error) {
-	res, err := client.endpointClient.GetAllEndpointProviderModel(c, &endpoint_api.GetAllEndpointProviderModelRequest{
+func (client *endpointServiceClient) GetAllEndpointProviderModel(c context.Context, endpointId, projectId uint64, principle *types.PlainAuthPrinciple, criterias []*endpoint_api.Criteria, paginate *endpoint_api.Paginate) (*endpoint_api.GetAllEndpointProviderModelResponse, error) {
+	md := metadata.New(map[string]string{"Authorization": principle.Token.Token, "X-Auth-Id": fmt.Sprintf("%v", principle.User.Id), "X-Auth-P-Id": fmt.Sprintf("%v", projectId)})
+
+	res, err := client.endpointClient.GetAllEndpointProviderModel(metadata.NewOutgoingContext(c, md), &endpoint_api.GetAllEndpointProviderModelRequest{
 		// should be endpoint id
 		Criterias:      criterias,
 		Paginate:       paginate,
 		EndpointId:     endpointId,
 		ProjectId:      projectId,
-		OrganizationId: organizationId,
+		OrganizationId: principle.OrganizationRole.OrganizationId,
 	})
 	if err != nil {
 		client.logger.Errorf("error while calling to get all provider models %v", err)
