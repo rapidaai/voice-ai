@@ -82,6 +82,7 @@ func (client *endpointServiceClient) CreateEndpointFromTestcase(c context.Contex
 }
 
 func (client *endpointServiceClient) GetAllEndpointProviderModel(c context.Context, endpointId, projectId, organizationId uint64, criterias []*endpoint_api.Criteria, paginate *endpoint_api.Paginate) (*endpoint_api.GetAllEndpointProviderModelResponse, error) {
+
 	res, err := client.endpointClient.GetAllEndpointProviderModel(c, &endpoint_api.GetAllEndpointProviderModelRequest{
 		// should be endpoint id
 		Criterias:      criterias,
@@ -105,6 +106,18 @@ func (client *endpointServiceClient) UpdateEndpointVersion(c context.Context, en
 		ProjectId:               projectId,
 		OrganizationId:          organizationId,
 	})
+	if err != nil {
+		client.logger.Errorf("error while calling to get all endpoint %v", err)
+		return nil, err
+	}
+	return res, nil
+}
+
+func (client *endpointServiceClient) CreateEndpointProviderModel(c context.Context, endpointRequest *endpoint_api.CreateEndpointRequest, projectId uint64, organizationId uint64, userId uint64) (*endpoint_api.CreateEndpointProviderModelResponse, error) {
+	endpointRequest.GetEndpoint().OrganizationId = organizationId
+	endpointRequest.GetEndpoint().ProjectId = projectId
+	endpointRequest.EndpointAttributes.CreatedBy = userId
+	res, err := client.endpointClient.CreateEndpointProviderModel(c, endpointRequest)
 	if err != nil {
 		client.logger.Errorf("error while calling to get all endpoint %v", err)
 		return nil, err
