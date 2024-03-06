@@ -43,3 +43,7 @@ type WebhookServiceClient interface {
 	GetAllWebhook(ctx context.Context, organizationId, projectId uint64, criterias []*_api.Criteria, paginate *_api.Paginate) (*_api.GetAllWebhookResponse, error)
 	GetWebhook(c context.Context, webhookId uint64, projectId, organizationId uint64) (*_api.GetWebhookResponse, error)
 }
+
+type TestingServiceClient interface {
+	GetTestSuite(c context.Context, testsuiteId uint64) (*_api.GetTestSuiteResponse, error)
+}
