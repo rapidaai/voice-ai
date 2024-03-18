@@ -44,8 +44,9 @@ func AuthenticationMiddleware(resolver types.Authenticator, logger commons.Logge
 func UnaryServerInterceptor(resolver types.Authenticator, logger commons.Logger) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 
-		authToken := metadata.ExtractIncoming(ctx).Get("Authorization")
-		authId := metadata.ExtractIncoming(ctx).Get("X-Auth-Id")
+		authToken := metadata.ExtractIncoming(ctx).Get(types.AUTHORIZATION_KEY)
+		authId := metadata.ExtractIncoming(ctx).Get(types.AUTH_KEY)
+		projectId := metadata.ExtractIncoming(ctx).Get(types.PROJECT_KEY)
 		logger.Debugf("recieved authentication information %v and %v", authId, authToken)
 		if authToken == "" {
 			return handler(ctx, req)
@@ -60,7 +61,20 @@ func UnaryServerInterceptor(resolver types.Authenticator, logger commons.Logger)
 			logger.Errorf("unable to resolve auth token and id")
 			return handler(ctx, req)
 		}
+
+		pId, err := strconv.ParseUint(projectId, 0, 64)
+		if err != nil {
+			logger.Errorf("there is project id but not able to resolve")
+			return handler(context.WithValue(ctx, types.CTX_, auth), req)
+		}
+		err = auth.SwitchProject(pId)
+		if err != nil {
+			logger.Errorf("there is project id but not found in the list of user project")
+			return handler(context.WithValue(ctx, types.CTX_, auth), req)
+		}
+
 		return handler(context.WithValue(ctx, types.CTX_, auth), req)
+
 	}
 }
 
@@ -96,5 +110,54 @@ func StreamServerInterceptor(resolver types.Authenticator, logger commons.Logger
 		wrapped := middleware.WrapServerStream(stream)
 		wrapped.WrappedContext = context.WithValue(ctx, types.CTX_, auth)
 		return handler(srv, wrapped)
+	}
+}
+
+func ProjectAuthenticatorUnaryServerInterceptor(resolver types.ClaimAuthenticator[*types.ProjectScope], logger commons.Logger) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+
+		apiKey := metadata.ExtractIncoming(ctx).Get(types.PROJECT_SCOPE_KEY)
+		logger.Debugf("recieved authentication information for api key %v", apiKey)
+		if apiKey == "" {
+			return handler(ctx, req)
+		}
+		auth, err := resolver.Claim(ctx, apiKey)
+		if err != nil {
+			logger.Errorf("unable to resolve given api key for project")
+			return handler(ctx, req)
+		}
+		return handler(context.WithValue(ctx, types.CTX_, auth), req)
+	}
+}
+
+func OrganizationAuthenticatorUnaryServerInterceptor(resolver types.ClaimAuthenticator[*types.OrganizationScope], logger commons.Logger) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		apiKey := metadata.ExtractIncoming(ctx).Get(types.ORG_SCOPE_KEY)
+		logger.Debugf("recieved authentication information for api key %v", apiKey)
+		if apiKey == "" {
+			return handler(ctx, req)
+		}
+		auth, err := resolver.Claim(ctx, apiKey)
+		if err != nil {
+			logger.Errorf("unable to resolve given api key for project")
+			return handler(ctx, req)
+		}
+		return handler(context.WithValue(ctx, types.CTX_, auth), req)
+	}
+}
+
+func ServiceAuthenticatorUnaryServerInterceptor(resolver types.ClaimAuthenticator[*types.ServiceScope], logger commons.Logger) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		apiKey := metadata.ExtractIncoming(ctx).Get(types.SERVICE_SCOPE_KEY)
+		logger.Debugf("recieved authentication information for internal-service-key %v", apiKey)
+		if apiKey == "" {
+			return handler(ctx, req)
+		}
+		auth, err := resolver.Claim(ctx, apiKey)
+		if err != nil {
+			logger.Errorf("unable to resolve given internal-service-key")
+			return handler(ctx, req)
+		}
+		return handler(context.WithValue(ctx, types.CTX_, auth), req)
 	}
 }

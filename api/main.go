@@ -34,6 +34,7 @@ type AppRunner struct {
 	Cfg       *config.AppConfig
 	Logger    commons.Logger
 	Postgres  connectors.PostgresConnector
+	Redis     connectors.RedisConnector
 	Closeable []func(context.Context) error
 }
 
@@ -79,12 +80,12 @@ func main() {
 
 	// if application json
 	http2GRPCFilteredListener := cmuxListener.Match(cmux.HTTP2())
-	grpcFilteredListener := cmuxListener.Match(
-		cmux.HTTP1HeaderField("Content-type", "application/grpc-web+proto"),
-		cmux.HTTP1HeaderField("x-grpc-web", "1"))
-	rpcFilteredListener := cmuxListener.Match(cmux.Any())
-	// rpcFilteredListener := cmuxListener.Match(cmux.HTTP2())
-	// grpcFilteredListener := cmuxListener.Match(cmux.Any())
+	// grpcFilteredListener := cmuxListener.Match(
+	// 	cmux.HTTP1HeaderField("Content-type", "application/grpc-web+proto"),
+	// 	cmux.HTTP1HeaderField("x-grpc-web", "1"))
+	// rpcFilteredListener := cmuxListener.Match(cmux.Any())
+	rpcFilteredListener := cmuxListener.Match(cmux.HTTP2())
+	grpcFilteredListener := cmuxListener.Match(cmux.Any())
 
 	group, ctx := errgroup.WithContext(ctx)
 	group.Go(func() error {
@@ -146,9 +147,10 @@ func (app *AppRunner) Logging() {
 }
 
 func (g *AppRunner) AllConnectors() {
-
 	postgres := connectors.NewPostgresConnector(&g.Cfg.PostgresConfig, g.Logger)
+	redis := connectors.NewRedisConnector(&g.Cfg.RedisConfig, g.Logger)
 	g.Postgres = postgres
+	g.Redis = redis
 }
 
 // initialize the config of application using viper and return loaded appconfig to be used in
@@ -183,8 +185,13 @@ func (app *AppRunner) Init(ctx context.Context) error {
 		app.Logger.Error("error while connecting to postgres.", err)
 		return err
 	}
+	err = app.Redis.Connect(ctx)
+	if err != nil {
+		app.Logger.Error("error while connecting to redis.", err)
+		return err
+	}
 	app.Closeable = append(app.Closeable, app.Postgres.Disconnect)
-
+	app.Closeable = append(app.Closeable, app.Redis.Disconnect)
 	return nil
 }
 
@@ -247,31 +254,31 @@ func (g *AppRunner) OauthApiRoute() {
 }
 
 func (g *AppRunner) VaultApiRoute() {
-	web_api.RegisterVaultServiceServer(g.S, webApi.NewVaultGRPC(g.Cfg, g.Logger, g.Postgres))
+	web_api.RegisterVaultServiceServer(g.S, webApi.NewVaultGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
 }
 
 func (g *AppRunner) OrganizationApiRoute() {
-	web_api.RegisterOrganizationServiceServer(g.S, webApi.NewOrganizationGRPC(g.Cfg, g.Logger, g.Postgres))
+	web_api.RegisterOrganizationServiceServer(g.S, webApi.NewOrganizationGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
 }
 
 func (g *AppRunner) ProjectApiRoute() {
-	web_api.RegisterProjectServiceServer(g.S, webApi.NewProjectGRPC(g.Cfg, g.Logger, g.Postgres))
+	web_api.RegisterProjectServiceServer(g.S, webApi.NewProjectGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
 }
 
 func (g *AppRunner) LeadApiRoute() {
-	web_api.RegisterLeadServiceServer(g.S, webApi.NewLeadGRPC(g.Cfg, g.Logger, g.Postgres))
+	web_api.RegisterLeadServiceServer(g.S, webApi.NewLeadGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
 }
 
 func (g *AppRunner) ActivityApiRoute() {
-	web_api.RegisterAuditLoggingServiceServer(g.S, webApi.NewActivityGRPC(g.Cfg, g.Logger, g.Postgres))
+	web_api.RegisterAuditLoggingServiceServer(g.S, webApi.NewActivityGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
 }
 
 func (g *AppRunner) EndpointApiRoute() {
-	web_api.RegisterEndpointReaderServiceServer(g.S, webApi.NewEndpointGRPC(g.Cfg, g.Logger, g.Postgres))
+	web_api.RegisterEndpointServiceServer(g.S, webApi.NewEndpointGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
 }
 
 func (g *AppRunner) WebhookApiRoute() {
-	web_api.RegisterWebhookManagerServiceServer(g.S, webApi.NewWebhookGRPC(g.Cfg, g.Logger, g.Postgres))
+	web_api.RegisterWebhookManagerServiceServer(g.S, webApi.NewWebhookGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
 }
 
 func (g *AppRunner) HealthCheckRoutes() {

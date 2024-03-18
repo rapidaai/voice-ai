@@ -12,6 +12,7 @@ import (
 	internal_user_service "github.com/lexatic/web-backend/internal/services/user"
 	clients "github.com/lexatic/web-backend/pkg/clients"
 	integration_client "github.com/lexatic/web-backend/pkg/clients/integration"
+	"github.com/lexatic/web-backend/pkg/utils"
 
 	config "github.com/lexatic/web-backend/config"
 	internal_services "github.com/lexatic/web-backend/internal/services"
@@ -26,6 +27,8 @@ import (
 type webProjectApi struct {
 	cfg                 *config.AppConfig
 	logger              commons.Logger
+	redis               connectors.RedisConnector
+	postgres            connectors.PostgresConnector
 	projectService      internal_services.ProjectService
 	integrationClient   clients.IntegrationServiceClient
 	userService         internal_services.UserService
@@ -40,22 +43,26 @@ type webProjectGRPCApi struct {
 	webProjectApi
 }
 
-func NewProjectRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) *webProjectRPCApi {
+func NewProjectRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) *webProjectRPCApi {
 	return &webProjectRPCApi{
 		webProjectApi{
 			cfg:               config,
 			logger:            logger,
+			postgres:          postgres,
+			redis:             redis,
 			projectService:    internal_project_service.NewProjectService(logger, postgres),
 			integrationClient: integration_client.NewIntegrationServiceClientGRPC(config, logger),
 		},
 	}
 }
 
-func NewProjectGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) web_api.ProjectServiceServer {
+func NewProjectGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) web_api.ProjectServiceServer {
 	return &webProjectGRPCApi{
 		webProjectApi{
 			cfg:                 config,
 			logger:              logger,
+			postgres:            postgres,
+			redis:               redis,
 			projectService:      internal_project_service.NewProjectService(logger, postgres),
 			userService:         internal_user_service.NewUserService(logger, postgres),
 			integrationClient:   integration_client.NewIntegrationServiceClientGRPC(config, logger),
@@ -74,50 +81,29 @@ func (wProjectApi *webProjectGRPCApi) CreateProject(ctx context.Context, irReque
 	currentOrgRole := iAuth.GetOrganizationRole()
 	if currentOrgRole == nil {
 		wProjectApi.logger.Errorf("current org is not null, you can't create multiple organization at same time.")
-		return &web_api.CreateProjectResponse{
-			Code:    400,
-			Success: false,
-			Error: &web_api.Error{
-				ErrorCode:    400,
-				ErrorMessage: "You cannot create a project when you are not part of any organization.",
-				HumanMessage: "Please create organization before creating a project.",
-			}}, nil
+		return utils.Error[web_api.CreateProjectResponse]("You cannot create a project when you are not part of any organization.", "Please create organization before creating a project."), nil
 	}
 
 	prj, err := wProjectApi.projectService.Create(ctx, iAuth, iAuth.GetOrganizationRole().OrganizationId, irRequest.GetProjectName(), irRequest.GetProjectDescription())
 	if err != nil {
 		wProjectApi.logger.Errorf("projectService.Create from grpc with err %v", err)
-		return &web_api.CreateProjectResponse{
-			Code:    400,
-			Success: false,
-			Error: &web_api.Error{
-				ErrorCode:    400,
-				ErrorMessage: err.Error(),
-				HumanMessage: "Unable to create project for your organization, please try again in sometime.",
-			}}, nil
+		return utils.Error[web_api.CreateProjectResponse](err.Error(), "Unable to create project for your organization, please try again in sometime."), nil
 	}
 
 	_, err = wProjectApi.userService.CreateProjectRole(ctx, iAuth, iAuth.GetUserInfo().Id, "admin", prj.Id, "active")
 	if err != nil {
 		wProjectApi.logger.Errorf("userService.CreateProjectRole from grpc with err %v", err)
-		return &web_api.CreateProjectResponse{
-			Code:    400,
-			Success: false,
-			Error: &web_api.Error{
-				ErrorCode:    400,
-				ErrorMessage: err.Error(),
-				HumanMessage: "Unable to create project role for you, please try again in sometime.",
-			}}, nil
+		return utils.Error[web_api.CreateProjectResponse](err.Error(), "Unable to create project role for you, please try again in sometime."), nil
 	}
-	ot := web_api.Project{}
-	err = types.Cast(prj, &ot)
+	ot := &web_api.Project{}
+	err = types.Cast(prj, ot)
 	if err != nil {
 		wProjectApi.logger.Errorf("unable to cast project to proto object %v", err)
 	}
 	return &web_api.CreateProjectResponse{
 		Success: true,
 		Code:    200,
-		Data:    &ot,
+		Data:    ot,
 	}, nil
 }
 
@@ -135,27 +121,15 @@ func (wProjectApi *webProjectGRPCApi) UpdateProject(ctx context.Context, irReque
 	currentOrgRole := iAuth.GetOrganizationRole()
 	if currentOrgRole == nil {
 		wProjectApi.logger.Errorf("current org is not null, you can't create multiple organization at same time.")
-		return &web_api.UpdateProjectResponse{
-			Code:    400,
-			Success: false,
-			Error: &web_api.Error{
-				ErrorCode:    400,
-				ErrorMessage: "You cannot update a project when you are not part of any organization.",
-				HumanMessage: "Please create organization before updating a project.",
-			}}, nil
+		return utils.Error[web_api.UpdateProjectResponse]("You cannot update a project when you are not part of any organization.", "Please create organization before updating a project."), nil
+
 	}
 
 	prj, err := wProjectApi.projectService.Update(ctx, iAuth, irRequest.GetProjectId(), irRequest.ProjectName, irRequest.ProjectDescription)
 	if err != nil {
 		wProjectApi.logger.Errorf("projectService.Update from grpc with err %v", err)
-		return &web_api.UpdateProjectResponse{
-			Code:    400,
-			Success: false,
-			Error: &web_api.Error{
-				ErrorCode:    400,
-				ErrorMessage: err.Error(),
-				HumanMessage: "Unable to update the project, please try again in sometime.",
-			}}, nil
+		return utils.Error[web_api.UpdateProjectResponse](err.Error(),
+			"Unable to update the project, please try again in sometime."), nil
 	}
 
 	ot := web_api.Project{}
@@ -180,28 +154,21 @@ func (wProjectApi *webProjectGRPCApi) GetAllProject(ctx context.Context, irReque
 	currentOrgRole := iAuth.GetOrganizationRole()
 	if currentOrgRole == nil {
 		wProjectApi.logger.Errorf("current org is not null, you can't create multiple organization at same time.")
-		return &web_api.GetAllProjectResponse{
-			Code:    400,
-			Success: false,
-			Error: &web_api.Error{
-				ErrorCode:    400,
-				ErrorMessage: "You are not part of any active organization.",
-				HumanMessage: "Please create organization and try again.",
-			}}, nil
+		return utils.Error[web_api.GetAllProjectResponse](
+			"You are not part of any active organization.",
+			"Please create organization and try again.",
+		), nil
 	}
 
 	cnt, prjs, err := wProjectApi.projectService.GetAll(ctx, iAuth,
 		currentOrgRole.OrganizationId, irRequest.GetCriterias(), irRequest.GetPaginate())
 	if err != nil {
 		wProjectApi.logger.Errorf("projectService.GetAll from grpc with err %v", err)
-		return &web_api.GetAllProjectResponse{
-			Code:    400,
-			Success: false,
-			Error: &web_api.Error{
-				ErrorCode:    400,
-				ErrorMessage: err.Error(),
-				HumanMessage: "Unable to get the projects, please try again in sometime.",
-			}}, nil
+		return utils.Error[web_api.GetAllProjectResponse](
+			err.Error(),
+			"Unable to get the projects, please try again in sometime.",
+		), nil
+
 	}
 
 	out := []*web_api.Project{}
@@ -244,11 +211,21 @@ func (wProjectApi *webProjectGRPCApi) GetProject(ctx context.Context, irRequest 
 		wProjectApi.logger.Errorf("GetProject from grpc with unauthenticated request")
 		return nil, errors.New("unauthenticated request")
 	}
+	if irRequest.GetProjectId() == 0 {
+		return utils.Error[web_api.GetProjectResponse](
+			"ProjectId is not getting passed",
+			"Please select the project to see the details.",
+		), nil
+
+	}
 
 	prj, err := wProjectApi.projectService.Get(ctx, iAuth, irRequest.GetProjectId())
 	if err != nil {
 		wProjectApi.logger.Errorf("projectService.Get from grpc with err %v", err)
-		return nil, err
+		return utils.Error[web_api.GetProjectResponse](
+			err.Error(),
+			"Please select the project to see the details.",
+		), nil
 	}
 
 	ot := web_api.Project{}
@@ -326,27 +303,39 @@ func (wProjectApi *webProjectGRPCApi) AddUsersToProject(ctx context.Context, irR
 		eUser, err := wProjectApi.userService.Create(ctx, "awaited active", irRequest.Email, ciphers.RandomHash("rpd_"), "invited", &source)
 		if err != nil {
 			wProjectApi.logger.Errorf("unable to create user for invite err %v", err)
-			return nil, err
+			return utils.Error[web_api.AddUsersToProjectResponse](
+				err.Error(),
+				"Unable to create user for invite err.",
+			), nil
 		}
 		// , role string, userId uint64, orgnizationId uint64, status string
 		_, err = wProjectApi.userService.CreateOrganizationRole(ctx, auth, irRequest.Role, eUser.GetUserInfo().Id, auth.GetOrganizationRole().OrganizationId, "invited")
 		if err != nil {
 			wProjectApi.logger.Errorf("unable to create organization role err %v", err)
-			return nil, err
+			return utils.Error[web_api.AddUsersToProjectResponse](
+				err.Error(),
+				"Unable to create organization role user for invite err.",
+			), nil
 		}
 		return wProjectApi.AddUserToProject(ctx, auth, eUser.GetUserInfo().Email, eUser.GetUserInfo().Id, "invited", irRequest.Role, irRequest.ProjectIds)
 	} else {
 		org, err := wProjectApi.userService.GetOrganizationRole(ctx, eUser.Id)
 		if err == nil {
 			if org.GetOrganizationId() != auth.GetOrganizationRole().OrganizationId {
-				return nil, errors.New("user is already part of the another organizations")
+				return utils.Error[web_api.AddUsersToProjectResponse](
+					err.Error(),
+					"User is already part of the another organizations, please contact us.",
+				), nil
 			}
 			return wProjectApi.AddUserToProject(ctx, auth, eUser.Email, eUser.Id, eUser.Status, irRequest.Role, irRequest.ProjectIds)
 		}
 		_, err = wProjectApi.userService.CreateOrganizationRole(ctx, auth, irRequest.Role, eUser.Id, auth.GetOrganizationRole().OrganizationId, eUser.Status)
 		if err != nil {
 			wProjectApi.logger.Errorf("unable to create organization role err %v", err)
-			return nil, err
+			return utils.Error[web_api.AddUsersToProjectResponse](
+				err.Error(),
+				"Unable to create organization role user for invite err.",
+			), nil
 		}
 		return wProjectApi.AddUserToProject(ctx, auth, eUser.Email, eUser.Id, eUser.Status, irRequest.Role, irRequest.ProjectIds)
 	}
@@ -385,14 +374,11 @@ func (wProjectApi *webProjectGRPCApi) CreateProjectCredential(c context.Context,
 	// name, key string, projectId, organizationId uint64
 	pc, err := wProjectApi.projectService.CreateCredential(c, auth, irRequest.GetName(), irRequest.GetProjectId(), auth.GetOrganizationRole().OrganizationId)
 	if err != nil {
-		return &web_api.CreateProjectCredentialResponse{
-			Code:    400,
-			Success: false,
-			Error: &web_api.Error{
-				ErrorCode:    400,
-				ErrorMessage: err.Error(),
-				HumanMessage: "Unable to create the project credential, please try again in sometime.",
-			}}, nil
+		return utils.Error[web_api.CreateProjectCredentialResponse](
+			err.Error(),
+			"Unable to create the project credential, please try again in sometime.",
+		), nil
+
 	}
 
 	out := &web_api.ProjectCredential{}
@@ -424,14 +410,11 @@ func (wProjectApi *webProjectGRPCApi) GetAllProjectCredential(c context.Context,
 			auth.GetOrganizationRole().OrganizationId,
 			irRequest.GetCriterias(), irRequest.GetPaginate())
 	if err != nil {
-		return &web_api.GetAllProjectCredentialResponse{
-			Code:    400,
-			Success: false,
-			Error: &web_api.Error{
-				ErrorCode:    400,
-				ErrorMessage: err.Error(),
-				HumanMessage: "Unable to get all the project credentials, please try again in sometime.",
-			}}, nil
+		return utils.Error[web_api.GetAllProjectCredentialResponse](
+			err.Error(),
+			"Unable to get all the project credentials, please try again in sometime.",
+		), nil
+
 	}
 
 	out := []*web_api.ProjectCredential{}

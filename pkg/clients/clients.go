@@ -1,10 +1,9 @@
-package internal_clients
+package clients
 
 import (
 	"context"
 
 	clients_pogos "github.com/lexatic/web-backend/pkg/clients/pogos"
-	"github.com/lexatic/web-backend/pkg/types"
 	_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 )
 
@@ -21,16 +20,6 @@ type IntegrationServiceClient interface {
 	Prompt(c context.Context, request *clients_pogos.RequestData[string]) (*_api.GenerateResponse, error)
 	GenerateTextToImage(c context.Context, request *clients_pogos.RequestData[string]) (*_api.GenerateTextToImageResponse, error)
 	GetAllAuditLog(c context.Context, organizationId, projectId uint64, criterias []*_api.Criteria, paginate *_api.Paginate) (*_api.GetAllAuditLogResponse, error)
-}
-
-type EndpointServiceClient interface {
-	GetAllEndpoint(c context.Context, projectId, organizationId uint64, criterias []*_api.Criteria, paginate *_api.Paginate) (*_api.GetAllEndpointResponse, error)
-	GetAllEndpointProviderModel(c context.Context, endpointId, projectId, organizationId uint64, criterias []*_api.Criteria, paginate *_api.Paginate) (*_api.GetAllEndpointProviderModelResponse, error)
-	GetEndpoint(c context.Context, endpointId uint64, projectId, organizationId uint64) (*_api.GetEndpointResponse, error)
-	UpdateEndpointVersion(c context.Context, endpointId, endpointProviderModelId, updatedBy, projectId, organizationId uint64) (*_api.UpdateEndpointVersionResponse, error)
-	CreateEndpoint(c context.Context, endpointRequest *_api.CreateEndpointRequest, projectId, organizationId, userId uint64) (*_api.CreateEndpointProviderModelResponse, error)
-	CreateEndpointFromTestcase(c context.Context, iRequest *_api.CreateEndpointFromTestcaseRequest, principle *types.PlainAuthPrinciple) (*_api.CreateEndpointProviderModelResponse, error)
-	CreateEndpointProviderModel(c context.Context, endpointRequest *_api.CreateEndpointRequest, projectId, organizationId, userId uint64) (*_api.CreateEndpointProviderModelResponse, error)
 }
 
 type WebhookServiceClient interface {

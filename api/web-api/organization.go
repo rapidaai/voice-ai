@@ -22,6 +22,7 @@ type webOrganizationApi struct {
 	cfg                 *config.AppConfig
 	logger              commons.Logger
 	postgres            connectors.PostgresConnector
+	redis               connectors.RedisConnector
 	organizationService internal_services.OrganizationService
 	userService         internal_services.UserService
 	vaultService        internal_services.VaultService
@@ -36,24 +37,31 @@ type webOrganizationGRPCApi struct {
 	webOrganizationApi
 }
 
-func NewOrganizationRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) *webOrganizationRPCApi {
+func NewOrganizationRPC(config *config.AppConfig, logger commons.Logger,
+	postgres connectors.PostgresConnector,
+	redis connectors.RedisConnector,
+) *webOrganizationRPCApi {
 	return &webOrganizationRPCApi{
 		webOrganizationApi{
 			cfg:                 config,
 			logger:              logger,
 			postgres:            postgres,
+			redis:               redis,
 			organizationService: internal_organization_service.NewOrganizationService(logger, postgres),
 			userService:         internal_user_service.NewUserService(logger, postgres),
 		},
 	}
 }
 
-func NewOrganizationGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) web_api.OrganizationServiceServer {
+func NewOrganizationGRPC(config *config.AppConfig, logger commons.Logger,
+	postgres connectors.PostgresConnector,
+	redis connectors.RedisConnector) web_api.OrganizationServiceServer {
 	return &webOrganizationGRPCApi{
 		webOrganizationApi{
 			cfg:                 config,
 			logger:              logger,
 			postgres:            postgres,
+			redis:               redis,
 			organizationService: internal_organization_service.NewOrganizationService(logger, postgres),
 			userService:         internal_user_service.NewUserService(logger, postgres),
 			projectService:      internal_project_service.NewProjectService(logger, postgres),

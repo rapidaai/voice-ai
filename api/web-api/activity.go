@@ -21,6 +21,7 @@ type webActivityApi struct {
 	cfg               *config.AppConfig
 	logger            commons.Logger
 	postgres          connectors.PostgresConnector
+	redis             connectors.RedisConnector
 	integrationClient clients.IntegrationServiceClient
 	vaultService      internal_services.VaultService
 }
@@ -29,12 +30,13 @@ type webActivityGRPCApi struct {
 	webActivityApi
 }
 
-func NewActivityGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) web_api.AuditLoggingServiceServer {
+func NewActivityGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) web_api.AuditLoggingServiceServer {
 	return &webActivityGRPCApi{
 		webActivityApi{
 			cfg:               config,
 			logger:            logger,
 			postgres:          postgres,
+			redis:             redis,
 			integrationClient: integration_client.NewIntegrationServiceClientGRPC(config, logger),
 			vaultService:      internal_vault_service.NewVaultService(logger, postgres),
 		},

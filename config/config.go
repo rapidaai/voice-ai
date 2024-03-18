@@ -14,9 +14,11 @@ type AppConfig struct {
 	Name            string                 `mapstructure:"service_name" validate:"required"`
 	Version         string                 `mapstructure:"version" validate:"required"`
 	Host            string                 `mapstructure:"host" validate:"required"`
+	Secret          string                 `mapstructure:"secret" validate:"required"`
 	Port            int                    `mapstructure:"port" validate:"required"`
 	LogLevel        string                 `mapstructure:"log_level" validate:"required"`
 	PostgresConfig  configs.PostgresConfig `mapstructure:"postgres" validate:"required"`
+	RedisConfig     configs.RedisConfig    `mapstructure:"redis" validate:"required"`
 	ProviderHost    string                 `mapstructure:"provider_host" validate:"required"`
 	IntegrationHost string                 `mapstructure:"integration_host" validate:"required"`
 	EndpointHost    string                 `mapstructure:"endpoint_host" validate:"required"`
