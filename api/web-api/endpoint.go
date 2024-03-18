@@ -182,21 +182,45 @@ func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointProviderModel(ctx conte
 }
 
 // CreateEndpointCacheConfiguration implements lexatic_backend.EndpointServiceServer.
-func (*webEndpointGRPCApi) CreateEndpointCacheConfiguration(context.Context, *web_api.CreateEndpointCacheConfigurationRequest) (*web_api.BaseResponse, error) {
-	panic("unimplemented")
+func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointCacheConfiguration(ctx context.Context, iRequest *web_api.CreateEndpointCacheConfigurationRequest) (*web_api.BaseResponse, error) {
+	endpointGRPCApi.logger.Debugf("Create endpoint provider model request %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		endpointGRPCApi.logger.Errorf("unauthenticated request to create endpoint caching configuration")
+		return nil, errors.New("unauthenticated request")
+	}
+	return endpointGRPCApi.endpointClient.CreateEndpointCacheConfiguration(ctx, iAuth, iRequest)
 }
 
 // CreateEndpointRetryConfiguration implements lexatic_backend.EndpointServiceServer.
-func (*webEndpointGRPCApi) CreateEndpointRetryConfiguration(context.Context, *web_api.CreateEndpointRetryConfigurationRequest) (*web_api.BaseResponse, error) {
-	panic("unimplemented")
+func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointRetryConfiguration(ctx context.Context, iRequest *web_api.CreateEndpointRetryConfigurationRequest) (*web_api.BaseResponse, error) {
+	endpointGRPCApi.logger.Debugf("Create endpoint provider model request %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		endpointGRPCApi.logger.Errorf("unauthenticated request to create endpoint retry configuration")
+		return nil, errors.New("unauthenticated request")
+	}
+	return endpointGRPCApi.endpointClient.CreateEndpointRetryConfiguration(ctx, iAuth, iRequest)
 }
 
 // CreateEndpointTag implements lexatic_backend.EndpointServiceServer.
-func (*webEndpointGRPCApi) CreateEndpointTag(context.Context, *web_api.CreateEndpointTagRequest) (*web_api.BaseResponse, error) {
-	panic("unimplemented")
+func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointTag(ctx context.Context, iRequest *web_api.CreateEndpointTagRequest) (*web_api.BaseResponse, error) {
+	endpointGRPCApi.logger.Debugf("Create endpoint provider model request %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		endpointGRPCApi.logger.Errorf("unauthenticated request to create endpoint tag")
+		return nil, errors.New("unauthenticated request")
+	}
+	return endpointGRPCApi.endpointClient.CreateEndpointTag(ctx, iAuth, iRequest)
 }
 
 // ForkEndpoint implements lexatic_backend.EndpointServiceServer.
-func (*webEndpointGRPCApi) ForkEndpoint(context.Context, *web_api.ForkEndpointRequest) (*web_api.BaseResponse, error) {
-	panic("unimplemented")
+func (endpointGRPCApi *webEndpointGRPCApi) ForkEndpoint(ctx context.Context, iRequest *web_api.ForkEndpointRequest) (*web_api.BaseResponse, error) {
+	endpointGRPCApi.logger.Debugf("Create endpoint provider model request %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		endpointGRPCApi.logger.Errorf("unauthenticated request to fork endpoint")
+		return nil, errors.New("unauthenticated request")
+	}
+	return endpointGRPCApi.endpointClient.ForkEndpoint(ctx, iAuth, iRequest)
 }
