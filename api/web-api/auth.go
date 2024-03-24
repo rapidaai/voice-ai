@@ -17,11 +17,11 @@ import (
 	config "github.com/lexatic/web-backend/config"
 	internal_services "github.com/lexatic/web-backend/internal/services"
 	internal_user_service "github.com/lexatic/web-backend/internal/services/user"
-	clients "github.com/lexatic/web-backend/pkg/clients"
 	integration_client "github.com/lexatic/web-backend/pkg/clients/integration"
 	commons "github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"
 	"github.com/lexatic/web-backend/pkg/types"
+	"github.com/lexatic/web-backend/pkg/utils"
 	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
@@ -36,7 +36,7 @@ type webAuthApi struct {
 	userService         internal_services.UserService
 	organizationService internal_services.OrganizationService
 	projectService      internal_services.ProjectService
-	integrationClient   clients.IntegrationServiceClient
+	integrationClient   integration_client.IntegrationServiceClient
 	googleOauthConfig   oauth2.Config
 	linkedinOauthConfig oauth2.Config
 	githubOauthConfig   oauth2.Config
@@ -258,7 +258,7 @@ func (wAuthApi *webAuthGRPCApi) Authenticate(c context.Context, irRequest *web_a
 			}}, nil
 	}
 	auth := &web_api.Authentication{}
-	types.Cast(aUser.PlainAuthPrinciple(), auth)
+	utils.Cast(aUser.PlainAuthPrinciple(), auth)
 	return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
 }
 
@@ -289,7 +289,7 @@ func (wAuthApi *webAuthGRPCApi) RegisterUser(c context.Context, irRequest *web_a
 		}
 
 		auth := &web_api.Authentication{}
-		types.Cast(aUser.PlainAuthPrinciple(), auth)
+		utils.Cast(aUser.PlainAuthPrinciple(), auth)
 		return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
 	}
 
@@ -360,7 +360,7 @@ func (wAuthApi *webAuthGRPCApi) RegisterUser(c context.Context, irRequest *web_a
 		}
 
 		auth := &web_api.Authentication{}
-		err = types.Cast(aUser.PlainAuthPrinciple(), auth)
+		err = utils.Cast(aUser.PlainAuthPrinciple(), auth)
 		if err != nil {
 			wAuthApi.logger.Errorf("Error while unmarshelling user error %v", err)
 			return &web_api.AuthenticateResponse{
@@ -488,7 +488,7 @@ func (wAuthApi *webAuthGRPCApi) Authorize(c context.Context, irRequest *web_api.
 		return nil, err
 	}
 	auth := &web_api.Authentication{}
-	types.Cast(aUser.PlainAuthPrinciple(), auth)
+	utils.Cast(aUser.PlainAuthPrinciple(), auth)
 	return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
 }
 
@@ -500,7 +500,7 @@ func (wAuthApi *webAuthApi) VerifyToken(c context.Context, irRequest *web_api.Ve
 	}
 
 	aToken := &web_api.Token{}
-	types.Cast(token, aToken)
+	utils.Cast(token, aToken)
 	return &web_api.VerifyTokenResponse{Code: 200, Success: true, Data: aToken}, nil
 
 }
@@ -518,7 +518,7 @@ func (wAuthApi *webAuthApi) GetUser(c context.Context, irRequest *web_api.GetUse
 	}
 
 	aUser := &web_api.User{}
-	types.Cast(user, aUser)
+	utils.Cast(user, aUser)
 	return &web_api.GetUserResponse{Code: 200, Success: true, Data: aUser}, nil
 
 }
@@ -540,7 +540,7 @@ func (wAuthApi *webAuthApi) UpdateUser(c context.Context, irRequest *web_api.Upd
 	}
 
 	aUser := &web_api.User{}
-	types.Cast(user, aUser)
+	utils.Cast(user, aUser)
 	return &web_api.UpdateUserResponse{Code: 200, Success: true, Data: aUser}, nil
 }
 
@@ -625,7 +625,7 @@ func (wAuthApi *webAuthApi) RegisterSocialUser(c context.Context, inf *OpenID) (
 		}
 
 		auth := &web_api.Authentication{}
-		types.Cast(aUser.PlainAuthPrinciple(), auth)
+		utils.Cast(aUser.PlainAuthPrinciple(), auth)
 		return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
 	}
 
@@ -684,7 +684,7 @@ func (wAuthApi *webAuthApi) RegisterSocialUser(c context.Context, inf *OpenID) (
 		}
 
 		auth := &web_api.Authentication{}
-		types.Cast(aUser.PlainAuthPrinciple(), auth)
+		utils.Cast(aUser.PlainAuthPrinciple(), auth)
 		return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
 	}
 
@@ -711,7 +711,7 @@ func (wAuthApi *webAuthApi) RegisterSocialUser(c context.Context, inf *OpenID) (
 			return nil, err
 		}
 		auth := &web_api.Authentication{}
-		types.Cast(aUser.PlainAuthPrinciple(), auth)
+		utils.Cast(aUser.PlainAuthPrinciple(), auth)
 		return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
 	}
 

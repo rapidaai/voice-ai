@@ -7,7 +7,6 @@ import (
 
 	internal_services "github.com/lexatic/web-backend/internal/services"
 	internal_vault_service "github.com/lexatic/web-backend/internal/services/vault"
-	clients "github.com/lexatic/web-backend/pkg/clients"
 	integration_client "github.com/lexatic/web-backend/pkg/clients/integration"
 	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 
@@ -22,7 +21,7 @@ type webActivityApi struct {
 	logger            commons.Logger
 	postgres          connectors.PostgresConnector
 	redis             connectors.RedisConnector
-	integrationClient clients.IntegrationServiceClient
+	integrationClient integration_client.IntegrationServiceClient
 	vaultService      internal_services.VaultService
 }
 

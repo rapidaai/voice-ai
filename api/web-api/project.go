@@ -10,7 +10,6 @@ import (
 
 	internal_organization_service "github.com/lexatic/web-backend/internal/services/organization"
 	internal_user_service "github.com/lexatic/web-backend/internal/services/user"
-	clients "github.com/lexatic/web-backend/pkg/clients"
 	integration_client "github.com/lexatic/web-backend/pkg/clients/integration"
 	"github.com/lexatic/web-backend/pkg/utils"
 
@@ -30,7 +29,7 @@ type webProjectApi struct {
 	redis               connectors.RedisConnector
 	postgres            connectors.PostgresConnector
 	projectService      internal_services.ProjectService
-	integrationClient   clients.IntegrationServiceClient
+	integrationClient   integration_client.IntegrationServiceClient
 	userService         internal_services.UserService
 	organizationService internal_services.OrganizationService
 }
@@ -101,7 +100,7 @@ func (wProjectApi *webProjectGRPCApi) CreateProject(ctx context.Context, irReque
 			err, "Unable to create project role for you, please try again in sometime")
 	}
 	ot := &web_api.Project{}
-	err = types.Cast(prj, ot)
+	err = utils.Cast(prj, ot)
 	if err != nil {
 		wProjectApi.logger.Errorf("unable to cast project to proto object %v", err)
 	}
@@ -136,7 +135,7 @@ func (wProjectApi *webProjectGRPCApi) UpdateProject(ctx context.Context, irReque
 	}
 
 	ot := &web_api.Project{}
-	err = types.Cast(prj, ot)
+	err = utils.Cast(prj, ot)
 	if err != nil {
 		wProjectApi.logger.Errorf("unable to cast project to proto object %v", err)
 	}
@@ -173,7 +172,7 @@ func (wProjectApi *webProjectGRPCApi) GetAllProject(ctx context.Context, irReque
 	}
 
 	out := []*web_api.Project{}
-	err = types.Cast(prjs, &out)
+	err = utils.Cast(prjs, &out)
 	if err != nil {
 		wProjectApi.logger.Errorf("unable to cast project to proto object %v", err)
 	}
@@ -223,7 +222,7 @@ func (wProjectApi *webProjectGRPCApi) GetProject(ctx context.Context, irRequest 
 	}
 
 	ot := &web_api.Project{}
-	types.Cast(prj, ot)
+	utils.Cast(prj, ot)
 	var projectMemebers *[]internal_gorm.UserProjectRole
 	projectMemebers, err = wProjectApi.userService.GetAllActiveProjectMember(ctx, prj.Id)
 	if err != nil {
@@ -367,7 +366,7 @@ func (wProjectApi *webProjectGRPCApi) CreateProjectCredential(c context.Context,
 	}
 
 	out := &web_api.ProjectCredential{}
-	err = types.Cast(pc, &out)
+	err = utils.Cast(pc, &out)
 	if err != nil {
 		wProjectApi.logger.Errorf("unable to cast project credential to proto object %v", err)
 	}
@@ -399,7 +398,7 @@ func (wProjectApi *webProjectGRPCApi) GetAllProjectCredential(c context.Context,
 	}
 
 	out := []*web_api.ProjectCredential{}
-	err = types.Cast(allProjectCredential, &out)
+	err = utils.Cast(allProjectCredential, &out)
 	if err != nil {
 		wProjectApi.logger.Errorf("unable to cast project credential to proto object %v", err)
 	}

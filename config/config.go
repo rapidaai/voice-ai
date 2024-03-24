@@ -11,19 +11,22 @@ import (
 
 // Application config structure
 type AppConfig struct {
-	Name            string                 `mapstructure:"service_name" validate:"required"`
-	Version         string                 `mapstructure:"version" validate:"required"`
-	Host            string                 `mapstructure:"host" validate:"required"`
-	Secret          string                 `mapstructure:"secret" validate:"required"`
-	Port            int                    `mapstructure:"port" validate:"required"`
-	LogLevel        string                 `mapstructure:"log_level" validate:"required"`
-	PostgresConfig  configs.PostgresConfig `mapstructure:"postgres" validate:"required"`
-	RedisConfig     configs.RedisConfig    `mapstructure:"redis" validate:"required"`
-	ProviderHost    string                 `mapstructure:"provider_host" validate:"required"`
-	IntegrationHost string                 `mapstructure:"integration_host" validate:"required"`
-	EndpointHost    string                 `mapstructure:"endpoint_host" validate:"required"`
-	WebhookHost     string                 `mapstructure:"webhook_host" validate:"required"`
-	ExperimentHost  string                 `mapstructure:"experiment_host" validate:"required"`
+	Name           string                 `mapstructure:"service_name" validate:"required"`
+	Version        string                 `mapstructure:"version" validate:"required"`
+	Host           string                 `mapstructure:"host" validate:"required"`
+	Secret         string                 `mapstructure:"secret" validate:"required"`
+	Port           int                    `mapstructure:"port" validate:"required"`
+	LogLevel       string                 `mapstructure:"log_level" validate:"required"`
+	PostgresConfig configs.PostgresConfig `mapstructure:"postgres" validate:"required"`
+	RedisConfig    configs.RedisConfig    `mapstructure:"redis" validate:"required"`
+
+	// all the host
+	ProviderHost    string `mapstructure:"provider_host" validate:"required"`
+	IntegrationHost string `mapstructure:"integration_host" validate:"required"`
+	EndpointHost    string `mapstructure:"endpoint_host" validate:"required"`
+	WebhookHost     string `mapstructure:"webhook_host" validate:"required"`
+	VaultHost       string `mapstructure:"vault_host" validate:"required"`
+	ExperimentHost  string `mapstructure:"experiment_host" validate:"required"`
 
 	AssetStoreConfig AssetStoreConfig `mapstructure:"asset_store" validate:"required"`
 

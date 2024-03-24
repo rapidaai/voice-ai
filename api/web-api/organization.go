@@ -15,6 +15,7 @@ import (
 	commons "github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"
 	"github.com/lexatic/web-backend/pkg/types"
+	"github.com/lexatic/web-backend/pkg/utils"
 	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 )
 
@@ -180,11 +181,11 @@ func (orgG *webOrganizationGRPCApi) CreateOrganization(c context.Context, irRequ
 
 	org := &web_api.Organization{}
 	orgRole := &web_api.OrganizationRole{}
-	err = types.Cast(aOrg, org)
+	err = utils.Cast(aOrg, org)
 	if err != nil {
 		orgG.logger.Errorf("unable to cast organization to proto org err %v", err)
 	}
-	err = types.Cast(aRole, orgRole)
+	err = utils.Cast(aRole, orgRole)
 	if err != nil {
 		orgG.logger.Errorf("unable to cast organization to proto org err %v", err)
 	}
@@ -263,11 +264,11 @@ func (orgG *webOrganizationGRPCApi) GetOrganization(c context.Context, irRequest
 
 	org := &web_api.Organization{}
 	orgRole := &web_api.OrganizationRole{}
-	err = types.Cast(aOrg, org)
+	err = utils.Cast(aOrg, org)
 	if err != nil {
 		orgG.logger.Errorf("unable to cast organization to proto org err %v", err)
 	}
-	err = types.Cast(aRole, orgRole)
+	err = utils.Cast(aRole, orgRole)
 	if err != nil {
 		orgG.logger.Errorf("unable to cast organization role to proto org role err %v", err)
 	}

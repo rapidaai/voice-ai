@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	config "github.com/lexatic/web-backend/config"
-	clients "github.com/lexatic/web-backend/pkg/clients"
 	webhook_client "github.com/lexatic/web-backend/pkg/clients/webhook"
 	commons "github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"
@@ -18,7 +17,7 @@ type webWebhookApi struct {
 	logger        commons.Logger
 	redis         connectors.RedisConnector
 	postgres      connectors.PostgresConnector
-	webhookClient clients.WebhookServiceClient
+	webhookClient webhook_client.WebhookServiceClient
 }
 
 type webWebhookGRPCApi struct {

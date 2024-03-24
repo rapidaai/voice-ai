@@ -80,7 +80,7 @@ func (wVault *webVaultGRPCApi) CreateProviderCredential(ctx context.Context, irR
 	}
 
 	out := &web_api.ProviderCredential{}
-	err = types.Cast(vlt, out)
+	err = utils.Cast(vlt, out)
 	if err != nil {
 		wVault.logger.Errorf("unable to cast the provider credentials to proto %v", err)
 	}
@@ -128,7 +128,7 @@ func (wVault *webVaultGRPCApi) GetAllProviderCredential(c context.Context, irReq
 	}
 
 	out := make([]*web_api.ProviderCredential, len(*vlts))
-	err = types.Cast(vlts, &out)
+	err = utils.Cast(vlts, &out)
 	if err != nil {
 		wVault.logger.Errorf("unable to cast vault object to proto %v", err)
 	}
@@ -185,7 +185,7 @@ func (wVault *webVaultGRPCApi) GetProviderCredential(ctx context.Context, reques
 		)
 	}
 	out := &web_api.ProviderCredential{}
-	err = types.Cast(vlt, out)
+	err = utils.Cast(vlt, out)
 	if err != nil {
 		wVault.logger.Errorf("unable to cast vault object to proto %v", err)
 	}
@@ -209,7 +209,7 @@ func (wVault *webVaultGRPCApi) UpdateVaultCredentials(ctx context.Context, reque
 		)
 	}
 	out := &web_api.ProviderCredential{}
-	err = types.Cast(_credential, out)
+	err = utils.Cast(_credential, out)
 	if err != nil {
 		wVault.logger.Errorf("unable to cast the provider credentials to proto %v", err)
 	}

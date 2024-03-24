@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	clients "github.com/lexatic/web-backend/pkg/clients"
 	endpoint_client "github.com/lexatic/web-backend/pkg/clients/endpoint"
 	testing_client "github.com/lexatic/web-backend/pkg/clients/testing"
+	"github.com/lexatic/web-backend/pkg/utils"
 	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 
 	config "github.com/lexatic/web-backend/config"
@@ -16,12 +16,13 @@ import (
 )
 
 type webEndpointApi struct {
+	WebApi
 	cfg            *config.AppConfig
 	logger         commons.Logger
 	postgres       connectors.PostgresConnector
 	redis          connectors.RedisConnector
 	endpointClient endpoint_client.EndpointServiceClient
-	testingClient  clients.TestingServiceClient
+	testingClient  testing_client.TestingServiceClient
 }
 
 type webEndpointGRPCApi struct {
@@ -31,12 +32,13 @@ type webEndpointGRPCApi struct {
 func NewEndpointGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) web_api.EndpointServiceServer {
 	return &webEndpointGRPCApi{
 		webEndpointApi{
+			WebApi:         NewWebApi(config, logger, postgres, redis),
 			cfg:            config,
 			logger:         logger,
 			postgres:       postgres,
 			redis:          redis,
 			endpointClient: endpoint_client.NewEndpointServiceClientGRPC(config, logger, redis),
-			testingClient:  testing_client.NewTestingServiceClientGRPC(config, logger),
+			testingClient:  testing_client.NewTestingServiceClientGRPC(config, logger, redis),
 		},
 	}
 }
@@ -48,7 +50,20 @@ func (endpoint *webEndpointGRPCApi) GetEndpoint(c context.Context, iRequest *web
 		endpoint.logger.Errorf("unauthenticated request for get actvities")
 		return nil, errors.New("unauthenticated request")
 	}
-	return endpoint.endpointClient.GetEndpoint(c, iAuth, iRequest.GetId())
+	_endpoint, err := endpoint.endpointClient.GetEndpoint(c, iAuth, iRequest.GetId())
+	if err != nil {
+		return utils.Error[web_api.GetEndpointResponse](
+			err,
+			"Unable to get your endpoint, please try again in sometime.")
+	}
+
+	if _endpoint.EndpointProviderModel != nil {
+		_endpoint.EndpointProviderModel.CreatedUser = endpoint.GetUser(c, iAuth, _endpoint.EndpointProviderModel.GetCreatedBy())
+		_endpoint.EndpointProviderModel.ProviderModel = endpoint.GetProviderModel(c, iAuth, _endpoint.EndpointProviderModel.GetProviderModelId())
+	}
+
+	return utils.Success[web_api.GetEndpointResponse, *web_api.Endpoint](_endpoint)
+
 }
 
 func (endpoint *webEndpointGRPCApi) GetAllEndpoint(c context.Context, iRequest *web_api.GetAllEndpointRequest) (*web_api.GetAllEndpointResponse, error) {
@@ -59,10 +74,25 @@ func (endpoint *webEndpointGRPCApi) GetAllEndpoint(c context.Context, iRequest *
 		return nil, errors.New("unauthenticated request")
 	}
 
-	return endpoint.endpointClient.GetAllEndpoint(c, iAuth, iRequest.GetCriterias(), iRequest.GetPaginate())
+	_page, _endpoint, err := endpoint.endpointClient.GetAllEndpoint(c, iAuth, iRequest.GetCriterias(), iRequest.GetPaginate())
+	if err != nil {
+		return utils.Error[web_api.GetAllEndpointResponse](
+			err,
+			"Unable to get your endpoint, please try again in sometime.")
+	}
+
+	for _, _ep := range _endpoint {
+		if _ep.GetEndpointProviderModel() != nil {
+			_ep.EndpointProviderModel.CreatedUser = endpoint.GetUser(c, iAuth, _ep.EndpointProviderModel.GetCreatedBy())
+			_ep.EndpointProviderModel.ProviderModel = endpoint.GetProviderModel(c, iAuth, _ep.EndpointProviderModel.GetProviderModelId())
+		}
+	}
+	return utils.PaginatedSuccess[web_api.GetAllEndpointResponse, []*web_api.Endpoint](
+		_page.GetTotalItem(), _page.GetCurrentPage(),
+		_endpoint)
 }
 
-func (endpoint *webEndpointGRPCApi) CreateEndpoint(c context.Context, iRequest *web_api.CreateEndpointRequest) (*web_api.CreateEndpointProviderModelResponse, error) {
+func (endpoint *webEndpointGRPCApi) CreateEndpoint(c context.Context, iRequest *web_api.CreateEndpointRequest) (*web_api.CreateEndpointResponse, error) {
 	endpoint.logger.Debugf("Create endpoint from grpc with requestPayload %v, %v", iRequest, c)
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
 	if !isAuthenticated {
@@ -171,7 +201,7 @@ func (endpointGRPCApi *webEndpointGRPCApi) UpdateEndpointVersion(ctx context.Con
 	return endpointGRPCApi.endpointClient.UpdateEndpointVersion(ctx, iAuth, iRequest.GetEndpointId(), iRequest.GetEndpointProviderModelId())
 }
 
-func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointProviderModel(ctx context.Context, iRequest *web_api.CreateEndpointRequest) (*web_api.CreateEndpointProviderModelResponse, error) {
+func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointProviderModel(ctx context.Context, iRequest *web_api.CreateEndpointProviderModelRequest) (*web_api.CreateEndpointProviderModelResponse, error) {
 	endpointGRPCApi.logger.Debugf("Create endpoint provider model request %v, %v", iRequest, ctx)
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
 	if !isAuthenticated {
@@ -182,7 +212,7 @@ func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointProviderModel(ctx conte
 }
 
 // CreateEndpointCacheConfiguration implements lexatic_backend.EndpointServiceServer.
-func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointCacheConfiguration(ctx context.Context, iRequest *web_api.CreateEndpointCacheConfigurationRequest) (*web_api.BaseResponse, error) {
+func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointCacheConfiguration(ctx context.Context, iRequest *web_api.CreateEndpointCacheConfigurationRequest) (*web_api.CreateEndpointCacheConfigurationResponse, error) {
 	endpointGRPCApi.logger.Debugf("Create endpoint provider model request %v, %v", iRequest, ctx)
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
 	if !isAuthenticated {
@@ -193,7 +223,7 @@ func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointCacheConfiguration(ctx 
 }
 
 // CreateEndpointRetryConfiguration implements lexatic_backend.EndpointServiceServer.
-func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointRetryConfiguration(ctx context.Context, iRequest *web_api.CreateEndpointRetryConfigurationRequest) (*web_api.BaseResponse, error) {
+func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointRetryConfiguration(ctx context.Context, iRequest *web_api.CreateEndpointRetryConfigurationRequest) (*web_api.CreateEndpointRetryConfigurationResponse, error) {
 	endpointGRPCApi.logger.Debugf("Create endpoint provider model request %v, %v", iRequest, ctx)
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
 	if !isAuthenticated {
@@ -204,7 +234,7 @@ func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointRetryConfiguration(ctx 
 }
 
 // CreateEndpointTag implements lexatic_backend.EndpointServiceServer.
-func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointTag(ctx context.Context, iRequest *web_api.CreateEndpointTagRequest) (*web_api.BaseResponse, error) {
+func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointTag(ctx context.Context, iRequest *web_api.CreateEndpointTagRequest) (*web_api.CreateEndpointTagResponse, error) {
 	endpointGRPCApi.logger.Debugf("Create endpoint provider model request %v, %v", iRequest, ctx)
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
 	if !isAuthenticated {
