@@ -66,6 +66,38 @@ func (endpoint *webEndpointGRPCApi) GetEndpoint(c context.Context, iRequest *web
 
 }
 
+/*
+ */
+
+func (endpoint *webEndpointGRPCApi) GetAllPublicEndpoint(c context.Context, iRequest *web_api.GetAllEndpointRequest) (*web_api.GetAllEndpointResponse, error) {
+	endpoint.logger.Debugf("GetAllEndpoint from grpc with requestPayload %v, %v", iRequest, c)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
+	if !isAuthenticated {
+		endpoint.logger.Errorf("unauthenticated request for get actvities")
+		return nil, errors.New("unauthenticated request")
+	}
+
+	_page, _endpoint, err := endpoint.endpointClient.GetAllEndpoint(c, iAuth, iRequest.GetCriterias(), iRequest.GetPaginate())
+	if err != nil {
+		return utils.Error[web_api.GetAllEndpointResponse](
+			err,
+			"Unable to get your endpoint, please try again in sometime.")
+	}
+
+	for _, _ep := range _endpoint {
+		if _ep.GetEndpointProviderModel() != nil {
+			_ep.EndpointProviderModel.CreatedUser = endpoint.GetUser(c, iAuth, _ep.EndpointProviderModel.GetCreatedBy())
+			_ep.EndpointProviderModel.ProviderModel = endpoint.GetProviderModel(c, iAuth, _ep.EndpointProviderModel.GetProviderModelId())
+		}
+		_ep.Organization = endpoint.GetOrganization(c, iAuth, _ep.GetOrganizationId())
+	}
+	return utils.PaginatedSuccess[web_api.GetAllEndpointResponse, []*web_api.Endpoint](
+		_page.GetTotalItem(), _page.GetCurrentPage(),
+		_endpoint)
+}
+
+/*
+ */
 func (endpoint *webEndpointGRPCApi) GetAllEndpoint(c context.Context, iRequest *web_api.GetAllEndpointRequest) (*web_api.GetAllEndpointResponse, error) {
 	endpoint.logger.Debugf("GetAllEndpoint from grpc with requestPayload %v, %v", iRequest, c)
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
