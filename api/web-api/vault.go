@@ -177,19 +177,25 @@ this is not good idea as these apis are opened to public
 */
 func (wVault *webVaultGRPCApi) GetProviderCredential(ctx context.Context, request *web_api.GetProviderCredentialRequest) (*web_api.GetProviderCredentialResponse, error) {
 	wVault.logger.Debugf("GetProviderCredential from grpc with requestPayload %v, %v", request, ctx)
-	vlt, err := wVault.vaultService.Get(ctx, request.GetOrganizationId(), request.GetProviderId())
+	iAuth, isAuthenticated := types.GetClaimPrincipleGRPC[*types.ServiceScope](ctx)
+	if !isAuthenticated {
+		wVault.logger.Errorf("GetAllProviderCredential from grpc with unauthenticated request")
+		return nil, errors.New("unauthenticated request")
+	}
+	vlt, err := wVault.vaultService.Get(ctx, iAuth, request.GetProviderId())
 	if err != nil {
 		return utils.Error[web_api.GetProviderCredentialResponse](
 			err,
 			"Unable to get provider credential, please try again",
 		)
 	}
-	out := &web_api.ProviderCredential{}
-	err = utils.Cast(vlt, out)
+	wVault.logger.Debugf("returing few things like %+v", vlt)
+	var out web_api.ProviderCredential
+	err = utils.Cast(vlt, &out)
 	if err != nil {
 		wVault.logger.Errorf("unable to cast vault object to proto %v", err)
 	}
-	return utils.Success[web_api.GetProviderCredentialResponse, *web_api.ProviderCredential](out)
+	return utils.Success[web_api.GetProviderCredentialResponse, *web_api.ProviderCredential](&out)
 }
 
 func (wVault *webVaultGRPCApi) UpdateVaultCredentials(ctx context.Context, request *web_api.UpdateVaultCredentialsRequest) (*web_api.UpdateVaultCredentialResponse, error) {

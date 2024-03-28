@@ -18,6 +18,7 @@ import (
 	webApi "github.com/lexatic/web-backend/api/web-api"
 	config "github.com/lexatic/web-backend/config"
 	internal_user_service "github.com/lexatic/web-backend/internal/services/user"
+	"github.com/lexatic/web-backend/pkg/authenticators"
 	commons "github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"
 	middlewares "github.com/lexatic/web-backend/pkg/middlewares"
@@ -55,8 +56,14 @@ func main() {
 	appRunner.AllConnectors()
 	// init
 	appRunner.S = grpc.NewServer(
-		grpc.StreamInterceptor(middlewares.StreamServerInterceptor(internal_user_service.NewAuthenticator(appRunner.Logger, appRunner.Postgres), appRunner.Logger)),
-		grpc.UnaryInterceptor(middlewares.UnaryServerInterceptor(internal_user_service.NewAuthenticator(appRunner.Logger, appRunner.Postgres), appRunner.Logger)),
+
+		grpc.ChainUnaryInterceptor(
+			middlewares.UnaryServerInterceptor(internal_user_service.NewAuthenticator(appRunner.Logger, appRunner.Postgres), appRunner.Logger),
+			middlewares.ServiceAuthenticatorUnaryServerInterceptor(
+				authenticators.NewServiceAuthenticator(appRunner.Cfg, appRunner.Logger, appRunner.Postgres),
+				appRunner.Logger,
+			),
+		),
 	)
 	err = appRunner.Init(ctx)
 

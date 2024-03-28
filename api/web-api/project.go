@@ -199,11 +199,12 @@ func (wProjectApi *webProjectGRPCApi) GetAllProject(ctx context.Context, irReque
 
 func (wProjectApi *webProjectGRPCApi) GetProject(ctx context.Context, irRequest *web_api.GetProjectRequest) (*web_api.GetProjectResponse, error) {
 	wProjectApi.logger.Debugf("GetProject from grpc with requestPayload %v, %v", irRequest, ctx)
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	iAuth, isAuthenticated := types.GetClaimPrincipleGRPC[*types.ServiceScope](ctx)
 	if !isAuthenticated {
 		wProjectApi.logger.Errorf("GetProject from grpc with unauthenticated request")
 		return nil, errors.New("unauthenticated request")
 	}
+
 	if irRequest.GetProjectId() == 0 {
 		return utils.Error[web_api.GetProjectResponse](
 			errors.New("projectid is not getting passed"),
