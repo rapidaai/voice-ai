@@ -63,7 +63,7 @@ func (pS *projectService) Update(ctx context.Context, auth types.Principle, proj
 	return project, nil
 }
 
-func (pS *projectService) GetAll(ctx context.Context, auth types.Principle, organizationId uint64, criterias []*web_api.Criteria, paginate *web_api.Paginate) (int64, *[]internal_gorm.Project, error) {
+func (pS *projectService) GetAll(ctx context.Context, auth types.SimplePrinciple, organizationId uint64, criterias []*web_api.Criteria, paginate *web_api.Paginate) (int64, *[]internal_gorm.Project, error) {
 	db := pS.postgres.DB(ctx)
 	var projects []internal_gorm.Project
 	var cnt int64
@@ -93,7 +93,7 @@ func (pS *projectService) GetAll(ctx context.Context, auth types.Principle, orga
 	return cnt, &projects, nil
 }
 
-func (pS *projectService) Get(ctx context.Context, auth types.Principle, projectId uint64) (*internal_gorm.Project, error) {
+func (pS *projectService) Get(ctx context.Context, auth types.SimplePrinciple, projectId uint64) (*internal_gorm.Project, error) {
 	db := pS.postgres.DB(ctx)
 	var project internal_gorm.Project
 	tx := db.Where("id = ? AND status = ? ", projectId, "active").First(&project)

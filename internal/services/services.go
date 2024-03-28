@@ -55,7 +55,7 @@ type VaultService interface {
 	Create(ctx context.Context, auth types.Principle, organizationId uint64, providerId uint64, keyName string, key string) (*internal_gorm.Vault, error)
 	Delete(ctx context.Context, auth types.Principle, vaultId uint64) (*internal_gorm.Vault, error)
 	GetAll(ctx context.Context, auth types.Principle, organizationId uint64, criterias []*web_api.Criteria, paginate *web_api.Paginate) (int64, *[]internal_gorm.Vault, error)
-	Get(ctx context.Context, organizationId uint64, providerId uint64) (*internal_gorm.Vault, error)
+	Get(ctx context.Context, auth types.SimplePrinciple, providerId uint64) (*internal_gorm.Vault, error)
 	Update(ctx context.Context, auth types.Principle, vaultId uint64, providerId uint64, value string, name string) (*internal_gorm.Vault, error)
 	// do not make it habbit
 	CreateAllDefaultKeys(ctx context.Context, organizationId uint64) ([]*internal_gorm.Vault, error)
@@ -64,8 +64,8 @@ type VaultService interface {
 type ProjectService interface {
 	Create(ctx context.Context, auth types.Principle, organizationId uint64, name string, description string) (*internal_gorm.Project, error)
 	Update(ctx context.Context, auth types.Principle, projectId uint64, name *string, description *string) (*internal_gorm.Project, error)
-	Get(ctx context.Context, auth types.Principle, projectId uint64) (*internal_gorm.Project, error)
-	GetAll(ctx context.Context, auth types.Principle, organizationId uint64, criterias []*web_api.Criteria, paginate *web_api.Paginate) (int64, *[]internal_gorm.Project, error)
+	Get(ctx context.Context, auth types.SimplePrinciple, projectId uint64) (*internal_gorm.Project, error)
+	GetAll(ctx context.Context, auth types.SimplePrinciple, organizationId uint64, criterias []*web_api.Criteria, paginate *web_api.Paginate) (int64, *[]internal_gorm.Project, error)
 	Archive(ctx context.Context, auth types.Principle, projectId uint64) (*internal_gorm.Project, error)
 
 	CreateCredential(ctx context.Context, auth types.Principle, name string, projectId, organizationId uint64) (*internal_gorm.ProjectCredential, error)

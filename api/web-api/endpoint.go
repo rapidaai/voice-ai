@@ -50,7 +50,7 @@ func (endpoint *webEndpointGRPCApi) GetEndpoint(c context.Context, iRequest *web
 		endpoint.logger.Errorf("unauthenticated request for get actvities")
 		return nil, errors.New("unauthenticated request")
 	}
-	_endpoint, err := endpoint.endpointClient.GetEndpoint(c, iAuth, iRequest.GetId())
+	_endpoint, err := endpoint.endpointClient.GetEndpoint(c, iAuth, iRequest)
 	if err != nil {
 		return utils.Error[web_api.GetEndpointResponse](
 			err,
