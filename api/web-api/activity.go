@@ -17,12 +17,12 @@ import (
 )
 
 type webActivityApi struct {
-	cfg               *config.AppConfig
-	logger            commons.Logger
-	postgres          connectors.PostgresConnector
-	redis             connectors.RedisConnector
-	integrationClient integration_client.IntegrationServiceClient
-	vaultService      internal_services.VaultService
+	cfg          *config.AppConfig
+	logger       commons.Logger
+	postgres     connectors.PostgresConnector
+	redis        connectors.RedisConnector
+	auditClient  integration_client.AuditServiceClient
+	vaultService internal_services.VaultService
 }
 
 type webActivityGRPCApi struct {
@@ -32,12 +32,12 @@ type webActivityGRPCApi struct {
 func NewActivityGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) web_api.AuditLoggingServiceServer {
 	return &webActivityGRPCApi{
 		webActivityApi{
-			cfg:               config,
-			logger:            logger,
-			postgres:          postgres,
-			redis:             redis,
-			integrationClient: integration_client.NewIntegrationServiceClientGRPC(config, logger),
-			vaultService:      internal_vault_service.NewVaultService(logger, postgres),
+			cfg:          config,
+			logger:       logger,
+			postgres:     postgres,
+			redis:        redis,
+			auditClient:  integration_client.NewAuditServiceClient(config, logger, redis),
+			vaultService: internal_vault_service.NewVaultService(logger, postgres),
 		},
 	}
 }
@@ -51,7 +51,7 @@ func (wActivity *webActivityGRPCApi) GetAuditLog(c context.Context, irRequest *w
 	}
 
 	// check if he is already part of current organization
-	return wActivity.integrationClient.GetAuditLog(c, iAuth.GetOrganizationRole().OrganizationId, irRequest.GetProjectId(), irRequest.GetId())
+	return wActivity.auditClient.GetAuditLog(c, iAuth, irRequest.GetId())
 }
 
 func (wActivity *webActivityGRPCApi) GetAllAuditLog(c context.Context, irRequest *web_api.GetAllAuditLogRequest) (*web_api.GetAllAuditLogResponse, error) {
@@ -63,7 +63,7 @@ func (wActivity *webActivityGRPCApi) GetAllAuditLog(c context.Context, irRequest
 	}
 
 	// check if he is already part of current organization
-	return wActivity.integrationClient.GetAllAuditLog(c, iAuth.GetOrganizationRole().OrganizationId, irRequest.GetProjectId(), irRequest.GetCriterias(), irRequest.GetPaginate())
+	return wActivity.auditClient.GetAllAuditLog(c, iAuth, irRequest.GetCriterias(), irRequest.GetPaginate())
 }
 
 func (wActivity *webActivityGRPCApi) CreateMetadata(c context.Context, irRequest *web_api.CreateMetadataRequest) (*web_api.CreateMetadataResponse, error) {

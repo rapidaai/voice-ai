@@ -29,7 +29,7 @@ type webProjectApi struct {
 	redis               connectors.RedisConnector
 	postgres            connectors.PostgresConnector
 	projectService      internal_services.ProjectService
-	integrationClient   integration_client.IntegrationServiceClient
+	sendgridClient      integration_client.SendgridServiceClient
 	userService         internal_services.UserService
 	organizationService internal_services.OrganizationService
 }
@@ -45,12 +45,12 @@ type webProjectGRPCApi struct {
 func NewProjectRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) *webProjectRPCApi {
 	return &webProjectRPCApi{
 		webProjectApi{
-			cfg:               config,
-			logger:            logger,
-			postgres:          postgres,
-			redis:             redis,
-			projectService:    internal_project_service.NewProjectService(logger, postgres),
-			integrationClient: integration_client.NewIntegrationServiceClientGRPC(config, logger),
+			cfg:            config,
+			logger:         logger,
+			postgres:       postgres,
+			redis:          redis,
+			projectService: internal_project_service.NewProjectService(logger, postgres),
+			sendgridClient: integration_client.NewSendgridServiceClientGRPC(config, logger),
 		},
 	}
 }
@@ -64,7 +64,7 @@ func NewProjectGRPC(config *config.AppConfig, logger commons.Logger, postgres co
 			redis:               redis,
 			projectService:      internal_project_service.NewProjectService(logger, postgres),
 			userService:         internal_user_service.NewUserService(logger, postgres),
-			integrationClient:   integration_client.NewIntegrationServiceClientGRPC(config, logger),
+			sendgridClient:      integration_client.NewSendgridServiceClientGRPC(config, logger),
 			organizationService: internal_organization_service.NewOrganizationService(logger, postgres),
 		},
 	}
@@ -268,7 +268,7 @@ func (wProjectApi *webProjectGRPCApi) AddUserToProject(ctx context.Context, auth
 	wg.Wait()
 
 	// sending email
-	_, err := wProjectApi.integrationClient.InviteMemberEmail(ctx, auth.GetUserInfo().Id, "", email, auth.GetOrganizationRole().OrganizationName, strings.Join(projectNames[:], ","), auth.GetUserInfo().Name)
+	_, err := wProjectApi.sendgridClient.InviteMemberEmail(ctx, auth.GetUserInfo().Id, "", email, auth.GetOrganizationRole().OrganizationName, strings.Join(projectNames[:], ","), auth.GetUserInfo().Name)
 	if err != nil {
 		wProjectApi.logger.Errorf("error while sending invite email %v", err)
 	}
