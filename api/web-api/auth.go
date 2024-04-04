@@ -17,11 +17,11 @@ import (
 	config "github.com/lexatic/web-backend/config"
 	internal_services "github.com/lexatic/web-backend/internal/services"
 	internal_user_service "github.com/lexatic/web-backend/internal/services/user"
-	clients "github.com/lexatic/web-backend/pkg/clients"
 	integration_client "github.com/lexatic/web-backend/pkg/clients/integration"
 	commons "github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"
 	"github.com/lexatic/web-backend/pkg/types"
+	"github.com/lexatic/web-backend/pkg/utils"
 	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
@@ -36,7 +36,7 @@ type webAuthApi struct {
 	userService         internal_services.UserService
 	organizationService internal_services.OrganizationService
 	projectService      internal_services.ProjectService
-	integrationClient   clients.IntegrationServiceClient
+	sendgridClient      integration_client.SendgridServiceClient
 	googleOauthConfig   oauth2.Config
 	linkedinOauthConfig oauth2.Config
 	githubOauthConfig   oauth2.Config
@@ -57,7 +57,7 @@ func NewAuthRPC(config *config.AppConfig, logger commons.Logger, postgres connec
 			logger:              logger,
 			postgres:            postgres,
 			userService:         internal_user_service.NewUserService(logger, postgres),
-			integrationClient:   integration_client.NewIntegrationServiceClientGRPC(config, logger),
+			sendgridClient:      integration_client.NewSendgridServiceClientGRPC(config, logger),
 			googleOauthConfig:   GoogleOAuth(config),
 			linkedinOauthConfig: LinkedinOAuth(config),
 			githubOauthConfig:   GithubOAuth(config),
@@ -74,7 +74,7 @@ func NewAuthGRPC(config *config.AppConfig, logger commons.Logger, postgres conne
 			userService:         internal_user_service.NewUserService(logger, postgres),
 			organizationService: internal_organization_service.NewOrganizationService(logger, postgres),
 			projectService:      internal_project_service.NewProjectService(logger, postgres),
-			integrationClient:   integration_client.NewIntegrationServiceClientGRPC(config, logger),
+			sendgridClient:      integration_client.NewSendgridServiceClientGRPC(config, logger),
 			googleOauthConfig:   GoogleOAuth(config),
 			linkedinOauthConfig: LinkedinOAuth(config),
 			githubOauthConfig:   GithubOAuth(config),
@@ -143,7 +143,7 @@ func (webAuthApi *webAuthRPCApi) RegisterUser(c *gin.Context) {
 			return
 		}
 
-		_, err = webAuthApi.integrationClient.WelcomeEmail(c, aUser.GetUserInfo().Id, aUser.GetUserInfo().Name, aUser.GetUserInfo().Email)
+		_, err = webAuthApi.sendgridClient.WelcomeEmail(c, aUser.GetUserInfo().Id, aUser.GetUserInfo().Name, aUser.GetUserInfo().Email)
 		if err != nil {
 			webAuthApi.logger.Errorf("sending welcome email failed with err %v", err)
 		}
@@ -258,7 +258,7 @@ func (wAuthApi *webAuthGRPCApi) Authenticate(c context.Context, irRequest *web_a
 			}}, nil
 	}
 	auth := &web_api.Authentication{}
-	types.Cast(aUser.PlainAuthPrinciple(), auth)
+	utils.Cast(aUser.PlainAuthPrinciple(), auth)
 	return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
 }
 
@@ -283,13 +283,13 @@ func (wAuthApi *webAuthGRPCApi) RegisterUser(c context.Context, irRequest *web_a
 					HumanMessage: "Unable to create an account, please check and try again.",
 				}}, nil
 		}
-		_, err = wAuthApi.integrationClient.WelcomeEmail(c, aUser.GetUserInfo().Id, aUser.GetUserInfo().Name, aUser.GetUserInfo().Email)
+		_, err = wAuthApi.sendgridClient.WelcomeEmail(c, aUser.GetUserInfo().Id, aUser.GetUserInfo().Name, aUser.GetUserInfo().Email)
 		if err != nil {
 			wAuthApi.logger.Errorf("sending welcome email failed with err %v", err)
 		}
 
 		auth := &web_api.Authentication{}
-		types.Cast(aUser.PlainAuthPrinciple(), auth)
+		utils.Cast(aUser.PlainAuthPrinciple(), auth)
 		return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
 	}
 
@@ -360,7 +360,7 @@ func (wAuthApi *webAuthGRPCApi) RegisterUser(c context.Context, irRequest *web_a
 		}
 
 		auth := &web_api.Authentication{}
-		err = types.Cast(aUser.PlainAuthPrinciple(), auth)
+		err = utils.Cast(aUser.PlainAuthPrinciple(), auth)
 		if err != nil {
 			wAuthApi.logger.Errorf("Error while unmarshelling user error %v", err)
 			return &web_api.AuthenticateResponse{
@@ -425,7 +425,7 @@ func (wAuthApi *webAuthGRPCApi) ForgotPassword(c context.Context, irRequest *web
 	}
 	// userId uint64, name, email,
 	resetPasswordUrl := fmt.Sprintf("https://rapida.ai/auth/change-password/%s", token.Token)
-	_, err = wAuthApi.integrationClient.ResetPasswordEmail(c, aUser.Id,
+	_, err = wAuthApi.sendgridClient.ResetPasswordEmail(c, aUser.Id,
 		aUser.Name, aUser.Email,
 		resetPasswordUrl)
 	wAuthApi.logger.Debugf("reset password link created %v", resetPasswordUrl)
@@ -488,7 +488,7 @@ func (wAuthApi *webAuthGRPCApi) Authorize(c context.Context, irRequest *web_api.
 		return nil, err
 	}
 	auth := &web_api.Authentication{}
-	types.Cast(aUser.PlainAuthPrinciple(), auth)
+	utils.Cast(aUser.PlainAuthPrinciple(), auth)
 	return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
 }
 
@@ -500,7 +500,7 @@ func (wAuthApi *webAuthApi) VerifyToken(c context.Context, irRequest *web_api.Ve
 	}
 
 	aToken := &web_api.Token{}
-	types.Cast(token, aToken)
+	utils.Cast(token, aToken)
 	return &web_api.VerifyTokenResponse{Code: 200, Success: true, Data: aToken}, nil
 
 }
@@ -518,7 +518,7 @@ func (wAuthApi *webAuthApi) GetUser(c context.Context, irRequest *web_api.GetUse
 	}
 
 	aUser := &web_api.User{}
-	types.Cast(user, aUser)
+	utils.Cast(user, aUser)
 	return &web_api.GetUserResponse{Code: 200, Success: true, Data: aUser}, nil
 
 }
@@ -540,7 +540,7 @@ func (wAuthApi *webAuthApi) UpdateUser(c context.Context, irRequest *web_api.Upd
 	}
 
 	aUser := &web_api.User{}
-	types.Cast(user, aUser)
+	utils.Cast(user, aUser)
 	return &web_api.UpdateUserResponse{Code: 200, Success: true, Data: aUser}, nil
 }
 
@@ -619,13 +619,13 @@ func (wAuthApi *webAuthApi) RegisterSocialUser(c context.Context, inf *OpenID) (
 				}}, nil
 		}
 
-		_, err = wAuthApi.integrationClient.WelcomeEmail(c, aUser.GetUserInfo().Id, aUser.GetUserInfo().Name, aUser.GetUserInfo().Email)
+		_, err = wAuthApi.sendgridClient.WelcomeEmail(c, aUser.GetUserInfo().Id, aUser.GetUserInfo().Name, aUser.GetUserInfo().Email)
 		if err != nil {
 			wAuthApi.logger.Errorf("sending welcome email failed with err %v", err)
 		}
 
 		auth := &web_api.Authentication{}
-		types.Cast(aUser.PlainAuthPrinciple(), auth)
+		utils.Cast(aUser.PlainAuthPrinciple(), auth)
 		return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
 	}
 
@@ -684,7 +684,7 @@ func (wAuthApi *webAuthApi) RegisterSocialUser(c context.Context, inf *OpenID) (
 		}
 
 		auth := &web_api.Authentication{}
-		types.Cast(aUser.PlainAuthPrinciple(), auth)
+		utils.Cast(aUser.PlainAuthPrinciple(), auth)
 		return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
 	}
 
@@ -711,7 +711,7 @@ func (wAuthApi *webAuthApi) RegisterSocialUser(c context.Context, inf *OpenID) (
 			return nil, err
 		}
 		auth := &web_api.Authentication{}
-		types.Cast(aUser.PlainAuthPrinciple(), auth)
+		utils.Cast(aUser.PlainAuthPrinciple(), auth)
 		return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
 	}
 

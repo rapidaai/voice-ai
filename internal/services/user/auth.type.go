@@ -1,15 +1,19 @@
 package internal_user_service
 
 import (
+	"errors"
+
 	internal_gorm "github.com/lexatic/web-backend/internal/gorm"
 	"github.com/lexatic/web-backend/pkg/types"
+	"github.com/lexatic/web-backend/pkg/utils"
 )
 
 type authPrinciple struct {
-	user             *internal_gorm.UserAuth
-	userAuthToken    *internal_gorm.UserAuthToken
-	userOrgRole      *internal_gorm.UserOrganizationRole
-	userProjectRoles *[]internal_gorm.UserProjectRole
+	user               *internal_gorm.UserAuth
+	userAuthToken      *internal_gorm.UserAuthToken
+	userOrgRole        *internal_gorm.UserOrganizationRole
+	userProjectRoles   *[]internal_gorm.UserProjectRole
+	currentProjectRole *types.ProjectRole
 }
 
 func (aP *authPrinciple) GetAuthToken() *types.AuthToken {
@@ -75,4 +79,54 @@ func (ap *authPrinciple) PlainAuthPrinciple() types.PlainAuthPrinciple {
 	alt.ProjectRoles = ap.GetProjectRoles()
 	return alt
 
+}
+
+func (aP *authPrinciple) SwitchProject(projectId uint64) error {
+	prj := aP.GetProjectRoles()
+	idx := utils.IndexFunc(prj, func(pRole *types.ProjectRole) bool {
+		return pRole.ProjectId == projectId
+	})
+	if idx == -1 {
+		return errors.New("illegal project id for user")
+	}
+	aP.currentProjectRole = prj[idx]
+	return nil
+}
+
+func (aP *authPrinciple) GetUserId() *uint64 {
+	return &aP.user.Id
+}
+
+func (aP *authPrinciple) GetCurrentOrganizationId() *uint64 {
+	return &aP.GetOrganizationRole().OrganizationId
+}
+
+func (aP *authPrinciple) GetCurrentProjectId() *uint64 {
+	if aP.currentProjectRole == nil {
+		return nil
+	}
+	return &aP.currentProjectRole.ProjectId
+}
+
+func (aP *authPrinciple) GetCurrentProjectRole() *types.ProjectRole {
+	panic("illegal of calling current project role when not selected")
+}
+
+// has an user
+func (aP *authPrinciple) HasUser() bool {
+	return aP.GetUserId() != nil
+}
+
+// has an org
+func (aP *authPrinciple) HasOrganization() bool {
+	return aP.GetCurrentOrganizationId() != nil
+}
+
+// has an project
+func (aP *authPrinciple) HasProject() bool {
+	return aP.GetCurrentProjectId() != nil
+}
+
+func (aP *authPrinciple) IsAuthenticated() bool {
+	return aP.HasOrganization() && aP.HasUser()
 }

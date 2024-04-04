@@ -110,12 +110,13 @@ func (vS *vaultService) GetAll(ctx context.Context, auth types.Principle, organi
 	return cnt, &vaults, nil
 }
 
-func (vS *vaultService) Get(ctx context.Context, organizationId uint64, providerId uint64) (*internal_gorm.Vault, error) {
+func (vS *vaultService) Get(ctx context.Context, auth types.SimplePrinciple, providerId uint64) (*internal_gorm.Vault, error) {
 	db := vS.postgres.DB(ctx)
 	var vault internal_gorm.Vault
-	if err := db.Where("organization_id = ? and status = ? and provider_id = ?", organizationId, "active", providerId).Find(&vault).Error; err != nil {
-		vS.logger.Errorf("get credential error  %v", err)
-		return nil, err
+	tx := db.Where("organization_id = ? and status = ? and provider_id = ?", *auth.GetCurrentOrganizationId(), "active", providerId).First(&vault)
+	if tx.Error != nil {
+		vS.logger.Errorf("get credential error  %v", tx.Error)
+		return nil, tx.Error
 	}
 	return &vault, nil
 }
