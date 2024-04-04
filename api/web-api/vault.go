@@ -9,11 +9,11 @@ import (
 	config "github.com/lexatic/web-backend/config"
 	internal_services "github.com/lexatic/web-backend/internal/services"
 	internal_vault_service "github.com/lexatic/web-backend/internal/services/vault"
-	clients "github.com/lexatic/web-backend/pkg/clients"
 	provider_client "github.com/lexatic/web-backend/pkg/clients/provider"
 	commons "github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"
 	"github.com/lexatic/web-backend/pkg/types"
+	"github.com/lexatic/web-backend/pkg/utils"
 	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 )
 
@@ -21,8 +21,9 @@ type webVaultApi struct {
 	cfg            *config.AppConfig
 	logger         commons.Logger
 	postgres       connectors.PostgresConnector
+	redis          connectors.RedisConnector
 	vaultService   internal_services.VaultService
-	providerClient clients.ProviderServiceClient
+	providerClient provider_client.ProviderServiceClient
 }
 
 type webVaultRPCApi struct {
@@ -33,26 +34,27 @@ type webVaultGRPCApi struct {
 	webVaultApi
 }
 
-func NewVaultRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) *webVaultRPCApi {
+func NewVaultRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) *webVaultRPCApi {
 	return &webVaultRPCApi{
 		webVaultApi{
 			cfg:            config,
 			logger:         logger,
 			postgres:       postgres,
 			vaultService:   internal_vault_service.NewVaultService(logger, postgres),
-			providerClient: provider_client.NewProviderServiceClientGRPC(config, logger),
+			providerClient: provider_client.NewProviderServiceClientGRPC(config, logger, redis),
 		},
 	}
 }
 
-func NewVaultGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) web_api.VaultServiceServer {
+func NewVaultGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) web_api.VaultServiceServer {
 	return &webVaultGRPCApi{
 		webVaultApi{
 			cfg:            config,
 			logger:         logger,
 			postgres:       postgres,
+			redis:          redis,
 			vaultService:   internal_vault_service.NewVaultService(logger, postgres),
-			providerClient: provider_client.NewProviderServiceClientGRPC(config, logger),
+			providerClient: provider_client.NewProviderServiceClientGRPC(config, logger, redis),
 		},
 	}
 }
@@ -77,18 +79,12 @@ func (wVault *webVaultGRPCApi) CreateProviderCredential(ctx context.Context, irR
 			}}, nil
 	}
 
-	out := web_api.ProviderCredential{}
-	err = types.Cast(vlt, &out)
+	out := &web_api.ProviderCredential{}
+	err = utils.Cast(vlt, out)
 	if err != nil {
 		wVault.logger.Errorf("unable to cast the provider credentials to proto %v", err)
 	}
-
-	return &web_api.CreateProviderCredentialResponse{
-		Success: true,
-		Code:    200,
-		Data:    &out,
-	}, nil
-
+	return utils.Success[web_api.CreateProviderCredentialResponse, *web_api.ProviderCredential](out)
 }
 
 func (wVault *webVaultGRPCApi) DeleteProviderCredential(c context.Context, irRequest *web_api.DeleteProviderCredentialRequest) (*web_api.DeleteProviderCredentialResponse, error) {
@@ -111,11 +107,8 @@ func (wVault *webVaultGRPCApi) DeleteProviderCredential(c context.Context, irReq
 				HumanMessage: "Unable to delete provider credential, please try again",
 			}}, nil
 	}
-	return &web_api.DeleteProviderCredentialResponse{
-		Success: true,
-		Code:    200,
-		Id:      irRequest.ProviderKeyId,
-	}, nil
+
+	return utils.Success[web_api.DeleteProviderCredentialResponse, uint64](irRequest.ProviderKeyId)
 }
 
 func (wVault *webVaultGRPCApi) GetAllProviderCredential(c context.Context, irRequest *web_api.GetAllProviderCredentialRequest) (*web_api.GetAllProviderCredentialResponse, error) {
@@ -128,25 +121,21 @@ func (wVault *webVaultGRPCApi) GetAllProviderCredential(c context.Context, irReq
 	cnt, vlts, err := wVault.vaultService.GetAll(c, iAuth, iAuth.GetOrganizationRole().OrganizationId, irRequest.GetCriterias(), irRequest.GetPaginate())
 	if err != nil {
 		wVault.logger.Errorf("vaultService.GetAll from grpc with err %v", err)
-		return &web_api.GetAllProviderCredentialResponse{
-			Code:    400,
-			Success: false,
-			Error: &web_api.Error{
-				ErrorCode:    400,
-				ErrorMessage: err.Error(),
-				HumanMessage: "Unable to get provider credentials, please try again",
-			}}, nil
+		return utils.Error[web_api.GetAllProviderCredentialResponse](
+			err,
+			"Unable to get provider credentials, please try again",
+		)
 	}
 
 	out := make([]*web_api.ProviderCredential, len(*vlts))
-	err = types.Cast(vlts, &out)
+	err = utils.Cast(vlts, &out)
 	if err != nil {
 		wVault.logger.Errorf("unable to cast vault object to proto %v", err)
 	}
 
 	pmap := make(map[uint64]*web_api.Provider)
 	if p, err := wVault.providerClient.GetAllProviders(c); err == nil {
-		for _, provider := range p.GetData() {
+		for _, provider := range p {
 			pmap[provider.GetId()] = provider
 		}
 	}
@@ -161,15 +150,11 @@ func (wVault *webVaultGRPCApi) GetAllProviderCredential(c context.Context, irReq
 		}
 	}
 
-	return &web_api.GetAllProviderCredentialResponse{
-		Paginated: &web_api.Paginated{
-			TotalItem:   uint32(cnt),
-			CurrentPage: irRequest.GetPaginate().GetPage(),
-		},
-		Success: true,
-		Code:    200,
-		Data:    out,
-	}, nil
+	return utils.PaginatedSuccess[web_api.GetAllProviderCredentialResponse, []*web_api.ProviderCredential](
+		uint32(cnt),
+		irRequest.GetPaginate().GetPage(),
+		out)
+
 }
 
 func maskCred(key string) string {
@@ -192,29 +177,25 @@ this is not good idea as these apis are opened to public
 */
 func (wVault *webVaultGRPCApi) GetProviderCredential(ctx context.Context, request *web_api.GetProviderCredentialRequest) (*web_api.GetProviderCredentialResponse, error) {
 	wVault.logger.Debugf("GetProviderCredential from grpc with requestPayload %v, %v", request, ctx)
-	vlt, err := wVault.vaultService.Get(ctx, request.GetOrganizationId(), request.GetProviderId())
-	if err != nil {
-		return &web_api.GetProviderCredentialResponse{
-			Code:    400,
-			Success: false,
-			Error: &web_api.Error{
-				ErrorCode:    400,
-				ErrorMessage: err.Error(),
-				HumanMessage: "Unable to get provider credential, please try again",
-			}}, nil
+	iAuth, isAuthenticated := types.GetClaimPrincipleGRPC[*types.ServiceScope](ctx)
+	if !isAuthenticated {
+		wVault.logger.Errorf("GetAllProviderCredential from grpc with unauthenticated request")
+		return nil, errors.New("unauthenticated request")
 	}
-
-	out := web_api.ProviderCredential{}
-	err = types.Cast(vlt, &out)
+	vlt, err := wVault.vaultService.Get(ctx, iAuth, request.GetProviderId())
+	if err != nil {
+		return utils.Error[web_api.GetProviderCredentialResponse](
+			err,
+			"Unable to get provider credential, please try again",
+		)
+	}
+	wVault.logger.Debugf("returing few things like %+v", vlt)
+	var out web_api.ProviderCredential
+	err = utils.Cast(vlt, &out)
 	if err != nil {
 		wVault.logger.Errorf("unable to cast vault object to proto %v", err)
 	}
-
-	return &web_api.GetProviderCredentialResponse{
-		Data:    &out,
-		Success: true,
-		Code:    200,
-	}, nil
+	return utils.Success[web_api.GetProviderCredentialResponse, *web_api.ProviderCredential](&out)
 }
 
 func (wVault *webVaultGRPCApi) UpdateVaultCredentials(ctx context.Context, request *web_api.UpdateVaultCredentialsRequest) (*web_api.UpdateVaultCredentialResponse, error) {
@@ -227,25 +208,17 @@ func (wVault *webVaultGRPCApi) UpdateVaultCredentials(ctx context.Context, reque
 
 	_credential, err := wVault.vaultService.Update(ctx, iAuth, request.Id, request.ProviderId, request.GetKey(), request.GetName())
 	if err != nil {
-		wVault.logger.Errorf("vaultService.Delete from grpc with err %v", err)
-		return &web_api.UpdateVaultCredentialResponse{
-			Code:    400,
-			Success: false,
-			Error: &web_api.Error{
-				ErrorCode:    400,
-				ErrorMessage: err.Error(),
-				HumanMessage: "Unable to update provider credential, please try again",
-			}}, nil
+		wVault.logger.Errorf("vaultService.UpdateVaultCredentials from grpc with err %v", err)
+		return utils.Error[web_api.UpdateVaultCredentialResponse](
+			err,
+			"Unable to update provider credential, please try again",
+		)
 	}
-
-	out := web_api.ProviderCredential{}
-	err = types.Cast(_credential, &out)
+	out := &web_api.ProviderCredential{}
+	err = utils.Cast(_credential, out)
 	if err != nil {
 		wVault.logger.Errorf("unable to cast the provider credentials to proto %v", err)
 	}
-	return &web_api.UpdateVaultCredentialResponse{
-		Success: true,
-		Code:    200,
-		Data:    &out,
-	}, nil
+	return utils.Success[web_api.UpdateVaultCredentialResponse, *web_api.ProviderCredential](out)
+
 }

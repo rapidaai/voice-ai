@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	config "github.com/lexatic/web-backend/config"
-	clients "github.com/lexatic/web-backend/pkg/clients"
 	webhook_client "github.com/lexatic/web-backend/pkg/clients/webhook"
 	commons "github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"
@@ -16,8 +15,9 @@ import (
 type webWebhookApi struct {
 	cfg           *config.AppConfig
 	logger        commons.Logger
+	redis         connectors.RedisConnector
 	postgres      connectors.PostgresConnector
-	webhookClient clients.WebhookServiceClient
+	webhookClient webhook_client.WebhookServiceClient
 }
 
 type webWebhookGRPCApi struct {
@@ -85,12 +85,16 @@ func (webhookGrpc *webWebhookGRPCApi) GetWebhook(ctx context.Context, iRequest *
 	return webhookGrpc.webhookClient.GetWebhook(ctx, iRequest.GetId(), iRequest.GetProjectId(), iAuth.GetOrganizationRole().OrganizationId)
 }
 
-func NewWebhookGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) web_api.WebhookManagerServiceServer {
+func NewWebhookGRPC(config *config.AppConfig, logger commons.Logger,
+	postgres connectors.PostgresConnector,
+	redis connectors.RedisConnector,
+) web_api.WebhookManagerServiceServer {
 	return &webWebhookGRPCApi{
 		webWebhookApi{
 			cfg:           config,
 			logger:        logger,
 			postgres:      postgres,
+			redis:         redis,
 			webhookClient: webhook_client.NewWebhookServiceClientGRPC(config, logger),
 		},
 	}

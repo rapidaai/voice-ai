@@ -1,3 +1,6 @@
 [submodule "protos/lexatic-backend"]
 	path = protos/lexatic-backend
 	url = git@github.com:lexatic/internal-bridge.git
+[submodule "pkg"]
+	path = pkg
+	url = git@github.com:rapidaai/go-service-sdk.git

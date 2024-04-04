@@ -15,6 +15,7 @@ type webLeadApi struct {
 	cfg         *config.AppConfig
 	logger      commons.Logger
 	postgres    connectors.PostgresConnector
+	redis       connectors.RedisConnector
 	leadService internal_services.LeadService
 }
 
@@ -26,23 +27,26 @@ type webLeadGRPCApi struct {
 	webLeadApi
 }
 
-func NewLeadRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) *webLeadRPCApi {
+func NewLeadRPC(config *config.AppConfig, logger commons.Logger,
+	postgres connectors.PostgresConnector, redis connectors.RedisConnector) *webLeadRPCApi {
 	return &webLeadRPCApi{
 		webLeadApi{
 			cfg:         config,
 			logger:      logger,
 			postgres:    postgres,
+			redis:       redis,
 			leadService: internal_lead_service.NewLeadService(logger, postgres),
 		},
 	}
 }
 
-func NewLeadGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) web_api.LeadServiceServer {
+func NewLeadGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) web_api.LeadServiceServer {
 	return &webLeadGRPCApi{
 		webLeadApi{
 			cfg:         config,
 			logger:      logger,
 			postgres:    postgres,
+			redis:       redis,
 			leadService: internal_lead_service.NewLeadService(logger, postgres),
 		},
 	}

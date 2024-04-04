@@ -15,6 +15,7 @@ import (
 	commons "github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"
 	"github.com/lexatic/web-backend/pkg/types"
+	"github.com/lexatic/web-backend/pkg/utils"
 	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 )
 
@@ -22,6 +23,7 @@ type webOrganizationApi struct {
 	cfg                 *config.AppConfig
 	logger              commons.Logger
 	postgres            connectors.PostgresConnector
+	redis               connectors.RedisConnector
 	organizationService internal_services.OrganizationService
 	userService         internal_services.UserService
 	vaultService        internal_services.VaultService
@@ -36,24 +38,31 @@ type webOrganizationGRPCApi struct {
 	webOrganizationApi
 }
 
-func NewOrganizationRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) *webOrganizationRPCApi {
+func NewOrganizationRPC(config *config.AppConfig, logger commons.Logger,
+	postgres connectors.PostgresConnector,
+	redis connectors.RedisConnector,
+) *webOrganizationRPCApi {
 	return &webOrganizationRPCApi{
 		webOrganizationApi{
 			cfg:                 config,
 			logger:              logger,
 			postgres:            postgres,
+			redis:               redis,
 			organizationService: internal_organization_service.NewOrganizationService(logger, postgres),
 			userService:         internal_user_service.NewUserService(logger, postgres),
 		},
 	}
 }
 
-func NewOrganizationGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) web_api.OrganizationServiceServer {
+func NewOrganizationGRPC(config *config.AppConfig, logger commons.Logger,
+	postgres connectors.PostgresConnector,
+	redis connectors.RedisConnector) web_api.OrganizationServiceServer {
 	return &webOrganizationGRPCApi{
 		webOrganizationApi{
 			cfg:                 config,
 			logger:              logger,
 			postgres:            postgres,
+			redis:               redis,
 			organizationService: internal_organization_service.NewOrganizationService(logger, postgres),
 			userService:         internal_user_service.NewUserService(logger, postgres),
 			projectService:      internal_project_service.NewProjectService(logger, postgres),
@@ -172,11 +181,11 @@ func (orgG *webOrganizationGRPCApi) CreateOrganization(c context.Context, irRequ
 
 	org := &web_api.Organization{}
 	orgRole := &web_api.OrganizationRole{}
-	err = types.Cast(aOrg, org)
+	err = utils.Cast(aOrg, org)
 	if err != nil {
 		orgG.logger.Errorf("unable to cast organization to proto org err %v", err)
 	}
-	err = types.Cast(aRole, orgRole)
+	err = utils.Cast(aRole, orgRole)
 	if err != nil {
 		orgG.logger.Errorf("unable to cast organization to proto org err %v", err)
 	}
@@ -255,11 +264,11 @@ func (orgG *webOrganizationGRPCApi) GetOrganization(c context.Context, irRequest
 
 	org := &web_api.Organization{}
 	orgRole := &web_api.OrganizationRole{}
-	err = types.Cast(aOrg, org)
+	err = utils.Cast(aOrg, org)
 	if err != nil {
 		orgG.logger.Errorf("unable to cast organization to proto org err %v", err)
 	}
-	err = types.Cast(aRole, orgRole)
+	err = utils.Cast(aRole, orgRole)
 	if err != nil {
 		orgG.logger.Errorf("unable to cast organization role to proto org role err %v", err)
 	}
