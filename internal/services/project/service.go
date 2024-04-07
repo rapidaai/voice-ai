@@ -3,6 +3,7 @@ package internal_project_service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	internal_gorm "github.com/lexatic/web-backend/internal/gorm"
 	internal_services "github.com/lexatic/web-backend/internal/services"
@@ -25,6 +26,29 @@ func NewProjectService(logger commons.Logger, postgres connectors.PostgresConnec
 		logger:   logger,
 		postgres: postgres,
 	}
+}
+
+func NewProjectAuthenticator(logger commons.Logger, postgres connectors.PostgresConnector) types.ClaimAuthenticator[*types.ProjectScope] {
+	return &projectService{
+		logger:   logger,
+		postgres: postgres,
+	}
+}
+
+// Claim implements types.ClaimAuthenticator.
+func (p *projectService) Claim(ctx context.Context, claimToken string) (*types.PlainClaimPrinciple[*types.ProjectScope], error) {
+	start := time.Now()
+	db := p.postgres.DB(ctx)
+	var prjScope *types.ProjectScope
+	tx := db.Table("project_credentials").Order("created_date DESC").Where("key = ?", claimToken).First(&prjScope)
+	if tx.Error != nil {
+		p.logger.Errorf("Authentication error, illegal key request %v", tx.Error)
+		return nil, tx.Error
+	}
+	p.logger.Debugf("Benchmarking: projectAuthenticator.Claim time taken %v and value %+v", time.Since(start), prjScope)
+	return &types.PlainClaimPrinciple[*types.ProjectScope]{
+		Info: prjScope,
+	}, nil
 }
 
 func (pS *projectService) Create(ctx context.Context, auth types.Principle, organizationId uint64, name string, description string) (*internal_gorm.Project, error) {

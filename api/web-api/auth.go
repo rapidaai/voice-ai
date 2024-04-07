@@ -492,6 +492,28 @@ func (wAuthApi *webAuthGRPCApi) Authorize(c context.Context, irRequest *web_api.
 	return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
 }
 
+func (wAuthApi *webAuthGRPCApi) ScopeAuthorize(c context.Context, irRequest *web_api.ScopeAuthorizeRequest) (*web_api.ScopedAuthenticationResponse, error) {
+	wAuthApi.logger.Debugf("Authorize from grpc with requestPayload %v, %v", irRequest, c)
+	if irRequest.GetScope() == "project" {
+		iAuth, isAuthenticated := types.GetClaimPrincipleGRPC[*types.ProjectScope](c)
+		if !isAuthenticated {
+			return nil, errors.New("unauthenticated request")
+		}
+		auth := &web_api.ScopedAuthentication{}
+		utils.Cast(iAuth, auth)
+		return &web_api.ScopedAuthenticationResponse{Code: 200, Success: true, Data: auth}, nil
+	}
+
+	iAuth, isAuthenticated := types.GetClaimPrincipleGRPC[*types.OrganizationScope](c)
+	if !isAuthenticated {
+		return nil, errors.New("unauthenticated request")
+	}
+	auth := &web_api.ScopedAuthentication{}
+	utils.Cast(iAuth, auth)
+	return &web_api.ScopedAuthenticationResponse{Code: 200, Success: true, Data: auth}, nil
+
+}
+
 func (wAuthApi *webAuthApi) VerifyToken(c context.Context, irRequest *web_api.VerifyTokenRequest) (*web_api.VerifyTokenResponse, error) {
 	wAuthApi.logger.Debugf("VerifyToken from grpc with requestPayload %v, %v", irRequest, c)
 	token, err := wAuthApi.userService.GetToken(c, irRequest.GetTokenType(), irRequest.GetToken())

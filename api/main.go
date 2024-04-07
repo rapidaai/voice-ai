@@ -17,6 +17,7 @@ import (
 	healthCheckApi "github.com/lexatic/web-backend/api/health-check-api"
 	webApi "github.com/lexatic/web-backend/api/web-api"
 	config "github.com/lexatic/web-backend/config"
+	internal_project_service "github.com/lexatic/web-backend/internal/services/project"
 	internal_user_service "github.com/lexatic/web-backend/internal/services/user"
 	"github.com/lexatic/web-backend/pkg/authenticators"
 	commons "github.com/lexatic/web-backend/pkg/commons"
@@ -56,9 +57,13 @@ func main() {
 	appRunner.AllConnectors()
 	// init
 	appRunner.S = grpc.NewServer(
-
 		grpc.ChainUnaryInterceptor(
 			middlewares.UnaryServerInterceptor(internal_user_service.NewAuthenticator(appRunner.Logger, appRunner.Postgres), appRunner.Logger),
+
+			middlewares.ProjectAuthenticatorUnaryServerInterceptor(
+				internal_project_service.NewProjectAuthenticator(appRunner.Logger, appRunner.Postgres),
+				appRunner.Logger,
+			),
 			middlewares.ServiceAuthenticatorUnaryServerInterceptor(
 				authenticators.NewServiceAuthenticator(appRunner.Cfg, appRunner.Logger, appRunner.Postgres),
 				appRunner.Logger,
@@ -227,6 +232,7 @@ func (g *AppRunner) AllRouters() {
 	g.ActivityApiRoute()
 	g.EndpointApiRoute()
 	g.WebhookApiRoute()
+	g.InvokeApiRoute()
 
 }
 
@@ -262,6 +268,10 @@ func (g *AppRunner) OauthApiRoute() {
 
 func (g *AppRunner) VaultApiRoute() {
 	web_api.RegisterVaultServiceServer(g.S, webApi.NewVaultGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
+}
+
+func (g *AppRunner) InvokeApiRoute() {
+	web_api.RegisterDeploymentServer(g.S, webApi.NewInvokeGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
 }
 
 func (g *AppRunner) OrganizationApiRoute() {

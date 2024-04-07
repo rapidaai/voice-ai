@@ -77,7 +77,7 @@ func (endpoint *webEndpointGRPCApi) GetAllPublicEndpoint(c context.Context, iReq
 		return nil, errors.New("unauthenticated request")
 	}
 
-	_page, _endpoint, err := endpoint.endpointClient.GetAllEndpoint(c, iAuth, iRequest.GetCriterias(), iRequest.GetPaginate())
+	_page, _endpoint, err := endpoint.endpointClient.GetAllPublicEndpoint(c, iAuth, iRequest.GetCriterias(), iRequest.GetPaginate())
 	if err != nil {
 		return utils.Error[web_api.GetAllEndpointResponse](
 			err,
@@ -278,6 +278,16 @@ func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointTag(ctx context.Context
 
 // ForkEndpoint implements lexatic_backend.EndpointServiceServer.
 func (endpointGRPCApi *webEndpointGRPCApi) ForkEndpoint(ctx context.Context, iRequest *web_api.ForkEndpointRequest) (*web_api.BaseResponse, error) {
+	endpointGRPCApi.logger.Debugf("Create endpoint provider model request %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		endpointGRPCApi.logger.Errorf("unauthenticated request to fork endpoint")
+		return nil, errors.New("unauthenticated request")
+	}
+	return endpointGRPCApi.endpointClient.ForkEndpoint(ctx, iAuth, iRequest)
+}
+
+func (endpointGRPCApi *webEndpointGRPCApi) Invoke(ctx context.Context, iRequest *web_api.ForkEndpointRequest) (*web_api.BaseResponse, error) {
 	endpointGRPCApi.logger.Debugf("Create endpoint provider model request %v, %v", iRequest, ctx)
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
 	if !isAuthenticated {
