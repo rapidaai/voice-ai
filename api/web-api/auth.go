@@ -671,6 +671,18 @@ func (wAuthApi *webAuthApi) RegisterSocialUser(c context.Context, inf *OpenID) (
 		// return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
 	}
 
+	if cUser.Status == "waitlist" {
+		return &web_api.AuthenticateResponse{
+			Code:    401,
+			Success: false,
+			Error: &web_api.AuthenticationError{
+				ErrorCode:    400,
+				ErrorMessage: "illegal user status",
+				HumanMessage: "Thank you for registering! Your account is currently in the waitlist. We'll be reaching out to you soon to get started. Stay tuned!",
+			}}, nil
+
+	}
+
 	// if it's invited user then
 	if cUser.Status == "invited" {
 
