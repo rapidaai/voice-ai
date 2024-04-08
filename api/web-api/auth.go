@@ -132,7 +132,7 @@ func (webAuthApi *webAuthRPCApi) RegisterUser(c *gin.Context) {
 	cUser, err := webAuthApi.userService.Get(c, irRequest.Email)
 	if err != nil {
 		webAuthApi.logger.Debug("registering new user into the system.")
-		aUser, err := webAuthApi.userService.Create(c, irRequest.Name, irRequest.Email, irRequest.Password, "active", &source)
+		aUser, err := webAuthApi.userService.Create(c, irRequest.Name, irRequest.Email, irRequest.Password, "waitlist", &source)
 		if err != nil {
 			webAuthApi.logger.Errorf("registering new user failed with err %v", err)
 			c.JSON(500, commons.Response{
@@ -271,7 +271,7 @@ func (wAuthApi *webAuthGRPCApi) RegisterUser(c context.Context, irRequest *web_a
 	cUser, err := wAuthApi.userService.Get(c, irRequest.Email)
 	source := "direct"
 	if err != nil {
-		aUser, err := wAuthApi.userService.Create(c, irRequest.Name, irRequest.Email, irRequest.Password, "active", &source)
+		aUser, err := wAuthApi.userService.Create(c, irRequest.Name, irRequest.Email, irRequest.Password, "waitlist", &source)
 		if err != nil {
 			wAuthApi.logger.Errorf("creation user failed with err %v", err)
 			return &web_api.AuthenticateResponse{
@@ -288,9 +288,19 @@ func (wAuthApi *webAuthGRPCApi) RegisterUser(c context.Context, irRequest *web_a
 			wAuthApi.logger.Errorf("sending welcome email failed with err %v", err)
 		}
 
-		auth := &web_api.Authentication{}
-		utils.Cast(aUser.PlainAuthPrinciple(), auth)
-		return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
+		// this is temp as we don't allow user to register
+		return &web_api.AuthenticateResponse{
+			Code:    401,
+			Success: false,
+			Error: &web_api.AuthenticationError{
+				ErrorCode:    400,
+				ErrorMessage: "illegal user status",
+				HumanMessage: "Thank you for registering! Your account is currently in the waitlist. We'll be reaching out to you soon to get started. Stay tuned!",
+			}}, nil
+
+		// auth := &web_api.Authentication{}
+		// utils.Cast(aUser.PlainAuthPrinciple(), auth)
+		// return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
 	}
 
 	// already have an active account
@@ -614,7 +624,7 @@ type OpenID struct {
 func (wAuthApi *webAuthApi) RegisterSocialUser(c context.Context, inf *OpenID) (*web_api.AuthenticateResponse, error) {
 	cUser, err := wAuthApi.userService.Get(c, inf.Email)
 	if err != nil {
-		aUser, err := wAuthApi.userService.Create(c, inf.Name, inf.Email, inf.Token, "active", &inf.Source)
+		aUser, err := wAuthApi.userService.Create(c, inf.Name, inf.Email, inf.Token, "waitlist", &inf.Source)
 		if err != nil {
 			return &web_api.AuthenticateResponse{
 				Code:    400,
@@ -646,9 +656,19 @@ func (wAuthApi *webAuthApi) RegisterSocialUser(c context.Context, inf *OpenID) (
 			wAuthApi.logger.Errorf("sending welcome email failed with err %v", err)
 		}
 
-		auth := &web_api.Authentication{}
-		utils.Cast(aUser.PlainAuthPrinciple(), auth)
-		return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
+		// this is temprory as we don;t allow user to singup
+		return &web_api.AuthenticateResponse{
+			Code:    401,
+			Success: false,
+			Error: &web_api.AuthenticationError{
+				ErrorCode:    400,
+				ErrorMessage: "illegal user status",
+				HumanMessage: "Thank you for registering! Your account is currently in the waitlist. We'll be reaching out to you soon to get started. Stay tuned!",
+			}}, nil
+
+		// auth := &web_api.Authentication{}
+		// utils.Cast(aUser.PlainAuthPrinciple(), auth)
+		// return &web_api.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
 	}
 
 	// if it's invited user then
