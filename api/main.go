@@ -233,6 +233,7 @@ func (g *AppRunner) AllRouters() {
 	g.EndpointApiRoute()
 	g.WebhookApiRoute()
 	g.InvokeApiRoute()
+	g.WorkflowApiRoute()
 
 }
 
@@ -296,6 +297,10 @@ func (g *AppRunner) EndpointApiRoute() {
 
 func (g *AppRunner) WebhookApiRoute() {
 	web_api.RegisterWebhookManagerServiceServer(g.S, webApi.NewWebhookGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
+}
+
+func (g *AppRunner) WorkflowApiRoute() {
+	web_api.RegisterWorkflowServiceServer(g.S, webApi.NewWorkflowGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
 }
 
 func (g *AppRunner) HealthCheckRoutes() {
