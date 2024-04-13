@@ -86,8 +86,14 @@ func (workflow *webWorkflowGRPCApi) GetAllWorkflow(c context.Context, iRequest *
 }
 
 // CreateWorkflow implements lexatic_backend.WorkflowServiceServer.
-func (*webWorkflowGRPCApi) CreateWorkflow(context.Context, *web_api.CreateWorkflowRequest) (*web_api.GetWorkflowResponse, error) {
-	panic("unimplemented")
+func (workflow *webWorkflowGRPCApi) CreateWorkflow(ctx context.Context, iRequest *web_api.CreateWorkflowRequest) (*web_api.GetWorkflowResponse, error) {
+	workflow.logger.Debugf("Create workflow request with args %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		workflow.logger.Errorf("unauthenticated request to create workflow")
+		return utils.AuthenticateError[web_api.GetWorkflowResponse]()
+	}
+	return workflow.workflowClient.CreateWorkflow(ctx, iAuth, iRequest)
 }
 
 // CreateEndpointTag implements lexatic_backend.EndpointServiceServer.

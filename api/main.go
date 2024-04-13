@@ -91,11 +91,9 @@ func main() {
 	cmuxListener := cmux.New(listener)
 
 	// if application json
+	rpcFilteredListener := cmuxListener.Match(cmux.HTTP1HeaderField("Content-Type", "application/json"))
 	http2GRPCFilteredListener := cmuxListener.Match(cmux.HTTP2())
-	grpcFilteredListener := cmuxListener.Match(
-		cmux.HTTP1HeaderField("Content-type", "application/grpc-web+proto"),
-		cmux.HTTP1HeaderField("x-grpc-web", "1"))
-	rpcFilteredListener := cmuxListener.Match(cmux.Any())
+	grpcFilteredListener := cmuxListener.Match(cmux.Any())
 	// rpcFilteredListener := cmuxListener.Match(cmux.HTTP2())
 	// grpcFilteredListener := cmuxListener.Match(cmux.Any())
 
@@ -234,6 +232,7 @@ func (g *AppRunner) AllRouters() {
 	g.WebhookApiRoute()
 	g.InvokeApiRoute()
 	g.WorkflowApiRoute()
+	g.ExecutorApiRoute()
 
 }
 
@@ -301,6 +300,10 @@ func (g *AppRunner) WebhookApiRoute() {
 
 func (g *AppRunner) WorkflowApiRoute() {
 	web_api.RegisterWorkflowServiceServer(g.S, webApi.NewWorkflowGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
+}
+
+func (g *AppRunner) ExecutorApiRoute() {
+	web_api.RegisterExecutorServiceServer(g.S, webApi.NewExecutorGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
 }
 
 func (g *AppRunner) HealthCheckRoutes() {
