@@ -3,7 +3,7 @@ package web_api
 import (
 	"context"
 
-	executor_client "github.com/lexatic/web-backend/pkg/clients/executor"
+	executor_client "github.com/lexatic/web-backend/pkg/clients/workflow"
 	"github.com/lexatic/web-backend/pkg/types"
 	"github.com/lexatic/web-backend/pkg/utils"
 	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
