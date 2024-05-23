@@ -339,8 +339,8 @@ func (g *AppRunner) RecoveryMiddleware() {
 func (g *AppRunner) CorsMiddleware() {
 	g.Logger.Info("Added Default Cors middleware to the application.")
 	g.E.Use(cors.New(cors.Config{
-		// AllowAllOrigins:  true,
-		AllowOrigins:     []string{".*"},
+		AllowAllOrigins: true,
+		// AllowOrigins:     []string{".*"},
 		AllowMethods:     []string{"GET", "PUT", "POST", "DELETE", "PATCH", "OPTIONS"},
 		AllowHeaders:     []string{"Content-Type", "Content-Length", "Accept-Encoding", "Authorization", "Cache-Control", "Access-Control-Allow-Origin", "X-Grpc-Web"},
 		ExposeHeaders:    []string{"Content-Length"},
