@@ -27,7 +27,6 @@ import (
 	"github.com/soheilhy/cmux"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 )
 
 // wrapper for gin engine
@@ -72,7 +71,6 @@ func main() {
 		),
 	)
 
-	reflection.Register(appRunner.S)
 	err = appRunner.Init(ctx)
 
 	if err != nil {
@@ -94,9 +92,11 @@ func main() {
 	cmuxListener := cmux.New(listener)
 
 	// if application json
-	rpcFilteredListener := cmuxListener.Match(cmux.HTTP1HeaderField("Content-Type", "application/json"))
 	http2GRPCFilteredListener := cmuxListener.Match(cmux.HTTP2())
-	grpcFilteredListener := cmuxListener.Match(cmux.Any())
+	grpcFilteredListener := cmuxListener.Match(
+		cmux.HTTP1HeaderField("Content-type", "application/grpc-web+proto"),
+		cmux.HTTP1HeaderField("x-grpc-web", "1"))
+	rpcFilteredListener := cmuxListener.Match(cmux.Any())
 	// rpcFilteredListener := cmuxListener.Match(cmux.HTTP2())
 	// grpcFilteredListener := cmuxListener.Match(cmux.Any())
 
