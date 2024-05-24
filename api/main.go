@@ -70,6 +70,7 @@ func main() {
 			),
 		),
 	)
+
 	err = appRunner.Init(ctx)
 
 	if err != nil {
@@ -234,6 +235,7 @@ func (g *AppRunner) AllRouters() {
 	g.WebhookApiRoute()
 	g.InvokeApiRoute()
 	g.WorkflowApiRoute()
+	g.ExecutorApiRoute()
 
 }
 
@@ -301,6 +303,10 @@ func (g *AppRunner) WebhookApiRoute() {
 
 func (g *AppRunner) WorkflowApiRoute() {
 	web_api.RegisterWorkflowServiceServer(g.S, webApi.NewWorkflowGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
+}
+
+func (g *AppRunner) ExecutorApiRoute() {
+	web_api.RegisterExecutorServiceServer(g.S, webApi.NewExecutorGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
 }
 
 func (g *AppRunner) HealthCheckRoutes() {
