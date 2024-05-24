@@ -236,6 +236,8 @@ func (g *AppRunner) AllRouters() {
 	g.InvokeApiRoute()
 	g.WorkflowApiRoute()
 	g.ExecutorApiRoute()
+	g.KnowledgeApiRoute()
+	g.AssistantApiRoute()
 
 }
 
@@ -307,6 +309,12 @@ func (g *AppRunner) WorkflowApiRoute() {
 
 func (g *AppRunner) ExecutorApiRoute() {
 	web_api.RegisterExecutorServiceServer(g.S, webApi.NewExecutorGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
+}
+func (g *AppRunner) KnowledgeApiRoute() {
+	web_api.RegisterKnowledgeServiceServer(g.S, webApi.NewKnowledgeGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
+}
+func (g *AppRunner) AssistantApiRoute() {
+	web_api.RegisterAssistantServiceServer(g.S, webApi.NewAssistantGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
 }
 
 func (g *AppRunner) HealthCheckRoutes() {
