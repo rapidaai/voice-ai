@@ -27,6 +27,8 @@ type webKnowledgeGRPCApi struct {
 	webKnowledgeApi
 }
 
+// CreateKnowledgeDocument implements lexatic_backend.KnowledgeServiceServer.
+
 func NewKnowledgeGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) web_api.KnowledgeServiceServer {
 	return &webKnowledgeGRPCApi{
 		webKnowledgeApi{
@@ -109,4 +111,25 @@ func (knowledgeGRPCApi *webKnowledgeGRPCApi) CreateKnowledgeTag(ctx context.Cont
 		return nil, errors.New("unauthenticated request")
 	}
 	return knowledgeGRPCApi.knowledgeClient.CreateKnowledgeTag(ctx, iAuth, iRequest)
+}
+
+func (knowledgeGRPCApi *webKnowledgeGRPCApi) CreateKnowledgeDocument(ctx context.Context, iRequest *web_api.CreateKnowledgeDocumentRequest) (*web_api.CreateKnowledgeDocumentResponse, error) {
+	knowledgeGRPCApi.logger.Debugf("Create knowledge document request %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		knowledgeGRPCApi.logger.Errorf("unauthenticated request to create knowledge document")
+		return nil, errors.New("unauthenticated request")
+	}
+	return knowledgeGRPCApi.knowledgeClient.CreateKnowledgeDocument(ctx, iAuth, iRequest)
+}
+
+// GetAllKnowledgeDocument implements lexatic_backend.KnowledgeServiceServer.
+func (knowledgeGRPCApi *webKnowledgeGRPCApi) GetAllKnowledgeDocument(ctx context.Context, iRequest *web_api.GetAllKnowledgeDocumentRequest) (*web_api.GetAllKnowledgeDocumentResponse, error) {
+	knowledgeGRPCApi.logger.Debugf("Get all knowledge document request %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		knowledgeGRPCApi.logger.Errorf("unauthenticated request to get all knowledge document")
+		return nil, errors.New("unauthenticated request")
+	}
+	return knowledgeGRPCApi.knowledgeClient.GetAllKnowledgeDocument(ctx, iAuth, iRequest)
 }
