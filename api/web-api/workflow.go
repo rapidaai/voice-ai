@@ -116,3 +116,14 @@ func (workflow *webWorkflowGRPCApi) UpdateWorkflow(ctx context.Context, iRequest
 	}
 	return workflow.workflowClient.UpdateWorkflow(ctx, iAuth, iRequest)
 }
+
+// PublishWorkflowVersion implements lexatic_backend.WorkflowServiceServer.
+func (workflow *webWorkflowGRPCApi) PublishWorkflowVersion(ctx context.Context, iRequest *web_api.PublishWorkflowVersionRequest) (*web_api.GetWorkflowResponse, error) {
+	workflow.logger.Debugf("Publish workflow request %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		workflow.logger.Errorf("unauthenticated request to create endpoint tag")
+		return utils.AuthenticateError[web_api.GetWorkflowResponse]()
+	}
+	return workflow.workflowClient.PublishWorkflowVersion(ctx, iAuth, iRequest)
+}
