@@ -21,8 +21,8 @@ phases:
   pre_build:
     commands:
       - export PB_REL=https://github.com/protocolbuffers/protobuf/releases
-      - curl -LO $PB_REL/download/v3.27.0/protoc-3.27.0-linux-x86_64.zip
-      - unzip protoc-3.27.0-linux-x86_64.zip -d $HOME/protobuf
+      - curl -LO $PB_REL/download/v27.0/protoc-27.0-linux-x86_64.zip
+      - unzip protoc-27.0-linux-x86_64.zip -d $HOME/protobuf
       - ln -s $HOME/protobuf/bin/protoc /usr/local/bin/protoc
       - go get -u google.golang.org/protobuf/cmd/protoc-gen-go
       - go install google.golang.org/protobuf/cmd/protoc-gen-go
