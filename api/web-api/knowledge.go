@@ -27,6 +27,17 @@ type webKnowledgeGRPCApi struct {
 	webKnowledgeApi
 }
 
+// GetAllKnowledgeDocumentSegment implements lexatic_backend.KnowledgeServiceServer.
+func (knowledge *webKnowledgeGRPCApi) GetAllKnowledgeDocumentSegment(c context.Context, iRequest *web_api.GetAllKnowledgeDocumentSegmentRequest) (*web_api.GetAllKnowledgeDocumentSegmentResponse, error) {
+	knowledge.logger.Debugf("GetAllKnowledgeDocumentSegment from grpc with requestPayload %v, %v", iRequest, c)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
+	if !isAuthenticated {
+		knowledge.logger.Errorf("unauthenticated request for get actvities")
+		return nil, errors.New("unauthenticated request")
+	}
+	return knowledge.knowledgeClient.GetAllKnowledgeDocumentSegment(c, iAuth, iRequest)
+}
+
 // CreateKnowledgeDocument implements lexatic_backend.KnowledgeServiceServer.
 
 func NewKnowledgeGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) web_api.KnowledgeServiceServer {
