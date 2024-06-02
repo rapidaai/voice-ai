@@ -69,6 +69,8 @@ func main() {
 				appRunner.Logger,
 			),
 		),
+		grpc.MaxRecvMsgSize(commons.MaxRecvMsgSize), // 10 MB
+		grpc.MaxSendMsgSize(commons.MaxSendMsgSize), // 10 MB
 	)
 
 	err = appRunner.Init(ctx)
