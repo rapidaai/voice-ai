@@ -125,7 +125,7 @@ func (knowledgeGRPCApi *webKnowledgeGRPCApi) CreateKnowledgeTag(ctx context.Cont
 }
 
 func (knowledgeGRPCApi *webKnowledgeGRPCApi) CreateKnowledgeDocument(ctx context.Context, iRequest *web_api.CreateKnowledgeDocumentRequest) (*web_api.CreateKnowledgeDocumentResponse, error) {
-	knowledgeGRPCApi.logger.Debugf("Create knowledge document request %v, %v", iRequest, ctx)
+	knowledgeGRPCApi.logger.Debugf("Create knowledge document request")
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
 	if !isAuthenticated {
 		knowledgeGRPCApi.logger.Errorf("unauthenticated request to create knowledge document")
