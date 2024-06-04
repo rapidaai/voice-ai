@@ -63,7 +63,7 @@ func (wActivity *webActivityGRPCApi) GetAllAuditLog(c context.Context, irRequest
 	}
 
 	// check if he is already part of current organization
-	return wActivity.auditClient.GetAllAuditLog(c, iAuth, irRequest.GetCriterias(), irRequest.GetPaginate())
+	return wActivity.auditClient.GetAllAuditLog(c, iAuth, irRequest)
 }
 
 func (wActivity *webActivityGRPCApi) CreateMetadata(c context.Context, irRequest *web_api.CreateMetadataRequest) (*web_api.CreateMetadataResponse, error) {
