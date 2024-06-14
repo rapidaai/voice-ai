@@ -16,11 +16,12 @@ import (
 
 type webAssistantApi struct {
 	WebApi
-	cfg             *config.AppConfig
-	logger          commons.Logger
-	postgres        connectors.PostgresConnector
-	redis           connectors.RedisConnector
-	assistantClient assistant_client.AssistantServiceClient
+	cfg                          *config.AppConfig
+	logger                       commons.Logger
+	postgres                     connectors.PostgresConnector
+	redis                        connectors.RedisConnector
+	assistantClient              assistant_client.AssistantServiceClient
+	assistantConversactionClient assistant_client.AssistantConversactionServiceClient
 }
 
 type webAssistantGRPCApi struct {
@@ -51,6 +52,85 @@ func NewAssistantGRPC(config *config.AppConfig, logger commons.Logger, postgres 
 		},
 	}
 }
+
+func NewAssistantConversactionGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) web_api.AssistantConversactionServiceServer {
+	return &webAssistantGRPCApi{
+		webAssistantApi{
+			WebApi:                       NewWebApi(config, logger, postgres, redis),
+			cfg:                          config,
+			logger:                       logger,
+			postgres:                     postgres,
+			redis:                        redis,
+			assistantConversactionClient: assistant_client.NewAssistantConversactionServiceClientGRPC(config, logger, redis),
+		},
+	}
+}
+
+//
+//
+
+// GetAllConversactionMessage implements lexatic_backend.AssistantConversactionServiceServer.
+func (assistant *webAssistantGRPCApi) GetAllConversactionMessage(ctx context.Context, iRequest *web_api.GetAllConversactionMessageRequest) (*web_api.GetAllConversactionMessageResponse, error) {
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		assistant.logger.Errorf("unauthenticated request for get actvities")
+		return nil, errors.New("unauthenticated request")
+	}
+
+	_page, _assistant, err := assistant.assistantConversactionClient.GetAllConversactionMessage(ctx, iAuth, iRequest.GetAssistantId(), iRequest.GetAssistantConversactionId(), iRequest.GetCriterias(), iRequest.GetPaginate())
+	if err != nil {
+		return utils.Error[web_api.GetAllConversactionMessageResponse](
+			err,
+			"Unable to get your assistant, please try again in sometime.")
+	}
+
+	return utils.PaginatedSuccess[web_api.GetAllConversactionMessageResponse, []*web_api.AssistantConversactionMessage](
+		_page.GetTotalItem(), _page.GetCurrentPage(),
+		_assistant)
+
+}
+
+// CreateAssistantMessage implements lexatic_backend.AssistantConversactionServiceServer.
+func (assistant *webAssistantGRPCApi) CreateAssistantMessage(c context.Context, iRequest *web_api.CreateAssistantMessageRequest) (*web_api.CreateAssistantMessageResponse, error) {
+	assistant.logger.Debugf("Create assistant from grpc with requestPayload %v, %v", iRequest, c)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
+	if !isAuthenticated {
+		assistant.logger.Errorf("unauthenticated request for get actvities")
+		return nil, errors.New("unauthenticated request")
+	}
+
+	return assistant.assistantConversactionClient.CreateAssistantMessage(c, iAuth, iRequest)
+}
+
+// GetAllAssistantConversaction implements lexatic_backend.AssistantConversactionServiceServer.
+func (assistant *webAssistantGRPCApi) GetAllAssistantConversaction(c context.Context, iRequest *web_api.GetAllAssistantConversactionRequest) (*web_api.GetAllAssistantConversactionResponse, error) {
+	assistant.logger.Debugf("GetAllAssistant from grpc with requestPayload %v, %v", iRequest, c)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
+	if !isAuthenticated {
+		assistant.logger.Errorf("unauthenticated request for get actvities")
+		return nil, errors.New("unauthenticated request")
+	}
+
+	_page, _assistantConvo, err := assistant.assistantConversactionClient.GetAllAssistantConversaction(c, iAuth,
+		iRequest.GetAssistantId(),
+		iRequest.GetCriterias(), iRequest.GetPaginate())
+	if err != nil {
+		return utils.Error[web_api.GetAllAssistantConversactionResponse](
+			err,
+			"Unable to get your assistant, please try again in sometime.")
+	}
+
+	for _, _ep := range _assistantConvo {
+		_ep.User = assistant.GetUser(c, iAuth, _ep.GetUserId())
+	}
+	return utils.PaginatedSuccess[web_api.GetAllAssistantConversactionResponse, []*web_api.AssistantConversaction](
+		_page.GetTotalItem(), _page.GetCurrentPage(),
+		_assistantConvo)
+}
+
+//
+//
+//
 
 func (assistant *webAssistantGRPCApi) GetAssistant(c context.Context, iRequest *web_api.GetAssistantRequest) (*web_api.GetAssistantResponse, error) {
 	assistant.logger.Debugf("GetAssistant from grpc with requestPayload %v, %v", iRequest, c)
