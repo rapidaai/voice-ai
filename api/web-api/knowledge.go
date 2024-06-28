@@ -114,7 +114,7 @@ func (knowledge *webKnowledgeGRPCApi) CreateKnowledge(c context.Context, iReques
 }
 
 // CreateKnowledgeTag implements lexatic_backend.KnowledgeServiceServer.
-func (knowledgeGRPCApi *webKnowledgeGRPCApi) CreateKnowledgeTag(ctx context.Context, iRequest *web_api.CreateKnowledgeTagRequest) (*web_api.CreateKnowledgeTagResponse, error) {
+func (knowledgeGRPCApi *webKnowledgeGRPCApi) CreateKnowledgeTag(ctx context.Context, iRequest *web_api.CreateKnowledgeTagRequest) (*web_api.GetKnowledgeResponse, error) {
 	knowledgeGRPCApi.logger.Debugf("Create knowledge provider model request %v, %v", iRequest, ctx)
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
 	if !isAuthenticated {
@@ -122,6 +122,16 @@ func (knowledgeGRPCApi *webKnowledgeGRPCApi) CreateKnowledgeTag(ctx context.Cont
 		return nil, errors.New("unauthenticated request")
 	}
 	return knowledgeGRPCApi.knowledgeClient.CreateKnowledgeTag(ctx, iAuth, iRequest)
+}
+
+func (knowledgeGRPCApi *webKnowledgeGRPCApi) UpdateKnowledgeDetail(ctx context.Context, iRequest *web_api.UpdateKnowledgeDetailRequest) (*web_api.GetKnowledgeResponse, error) {
+	knowledgeGRPCApi.logger.Debugf("Create knowledge provider model request %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		knowledgeGRPCApi.logger.Errorf("unauthenticated request to create knowledge tag")
+		return nil, errors.New("unauthenticated request")
+	}
+	return knowledgeGRPCApi.knowledgeClient.UpdateKnowledgeDetail(ctx, iAuth, iRequest)
 }
 
 func (knowledgeGRPCApi *webKnowledgeGRPCApi) CreateKnowledgeDocument(ctx context.Context, iRequest *web_api.CreateKnowledgeDocumentRequest) (*web_api.CreateKnowledgeDocumentResponse, error) {

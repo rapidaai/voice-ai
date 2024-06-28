@@ -29,7 +29,7 @@ type webAssistantGRPCApi struct {
 }
 
 // CreateAssistantKnowledgeConfiguration implements lexatic_backend.AssistantServiceServer.
-func (assistant *webAssistantGRPCApi) CreateAssistantKnowledgeConfiguration(c context.Context, iRequest *web_api.CreateAssistantKnowledgeConfigurationRequest) (*web_api.CreateAssistantKnowledgeConfigurationResponse, error) {
+func (assistant *webAssistantGRPCApi) CreateAssistantKnowledgeConfiguration(c context.Context, iRequest *web_api.CreateAssistantKnowledgeConfigurationRequest) (*web_api.GetAssistantResponse, error) {
 	assistant.logger.Debugf("GetAssistant from grpc with requestPayload %v, %v", iRequest, c)
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
 	if !isAuthenticated {
@@ -204,7 +204,20 @@ func (assistantGRPCApi *webAssistantGRPCApi) GetAllAssistantProviderModel(ctx co
 		return nil, errors.New("unauthenticated request")
 	}
 
-	return assistantGRPCApi.assistantClient.GetAllAssistantProviderModel(ctx, iAuth, iRequest.GetAssistantId(), iRequest.GetCriterias(), iRequest.GetPaginate())
+	_page, _assistant, err := assistantGRPCApi.assistantClient.GetAllAssistantProviderModel(ctx, iAuth, iRequest.GetAssistantId(), iRequest.GetCriterias(), iRequest.GetPaginate())
+	if err != nil {
+		return utils.Error[web_api.GetAllAssistantProviderModelResponse](
+			err,
+			"Unable to get your assistant provider models, please try again in sometime.")
+	}
+
+	for _, _ep := range _assistant {
+		_ep.CreatedUser = assistantGRPCApi.GetUser(ctx, iAuth, _ep.GetCreatedBy())
+		_ep.ProviderModel = assistantGRPCApi.GetProviderModel(ctx, iAuth, _ep.GetProviderModelId())
+	}
+	return utils.PaginatedSuccess[web_api.GetAllAssistantProviderModelResponse, []*web_api.AssistantProviderModel](
+		_page.GetTotalItem(), _page.GetCurrentPage(),
+		_assistant)
 }
 
 func (assistantGRPCApi *webAssistantGRPCApi) UpdateAssistantVersion(ctx context.Context, iRequest *web_api.UpdateAssistantVersionRequest) (*web_api.UpdateAssistantVersionResponse, error) {
@@ -228,7 +241,7 @@ func (assistantGRPCApi *webAssistantGRPCApi) CreateAssistantProviderModel(ctx co
 }
 
 // CreateAssistantTag implements lexatic_backend.AssistantServiceServer.
-func (assistantGRPCApi *webAssistantGRPCApi) CreateAssistantTag(ctx context.Context, iRequest *web_api.CreateAssistantTagRequest) (*web_api.CreateAssistantTagResponse, error) {
+func (assistantGRPCApi *webAssistantGRPCApi) CreateAssistantTag(ctx context.Context, iRequest *web_api.CreateAssistantTagRequest) (*web_api.GetAssistantResponse, error) {
 	assistantGRPCApi.logger.Debugf("Create assistant provider model request %v, %v", iRequest, ctx)
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
 	if !isAuthenticated {
@@ -236,4 +249,24 @@ func (assistantGRPCApi *webAssistantGRPCApi) CreateAssistantTag(ctx context.Cont
 		return nil, errors.New("unauthenticated request")
 	}
 	return assistantGRPCApi.assistantClient.CreateAssistantTag(ctx, iAuth, iRequest)
+}
+
+func (assistantGRPCApi *webAssistantGRPCApi) UpdateAssistantDetail(ctx context.Context, iRequest *web_api.UpdateAssistantDetailRequest) (*web_api.GetAssistantResponse, error) {
+	assistantGRPCApi.logger.Debugf("update assistant request %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		assistantGRPCApi.logger.Errorf("unauthenticated request to create assistant tag")
+		return nil, errors.New("unauthenticated request")
+	}
+	return assistantGRPCApi.assistantClient.UpdateAssistantDetail(ctx, iAuth, iRequest)
+}
+
+func (assistantGRPCApi *webAssistantGRPCApi) UpdateAssistantOpeningStatement(ctx context.Context, iRequest *web_api.UpdateAssistantOpeningStatementRequest) (*web_api.GetAssistantResponse, error) {
+	assistantGRPCApi.logger.Debugf("update assistant request %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		assistantGRPCApi.logger.Errorf("unauthenticated request to create assistant tag")
+		return nil, errors.New("unauthenticated request")
+	}
+	return assistantGRPCApi.assistantClient.UpdateAssistantOpeningStatement(ctx, iAuth, iRequest)
 }

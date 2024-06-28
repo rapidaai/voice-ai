@@ -3,6 +3,7 @@ package web_api
 import (
 	"context"
 	"errors"
+	"strconv"
 
 	endpoint_client "github.com/lexatic/web-backend/pkg/clients/endpoint"
 	testing_client "github.com/lexatic/web-backend/pkg/clients/testing"
@@ -69,7 +70,7 @@ func (endpoint *webEndpointGRPCApi) GetEndpoint(c context.Context, iRequest *web
 /*
  */
 
-func (endpoint *webEndpointGRPCApi) GetAllPublicEndpoint(c context.Context, iRequest *web_api.GetAllEndpointRequest) (*web_api.GetAllEndpointResponse, error) {
+func (endpoint *webEndpointGRPCApi) GetAllDeployment(c context.Context, iRequest *web_api.GetAllDeploymentRequest) (*web_api.GetAllDeploymentResponse, error) {
 	endpoint.logger.Debugf("GetAllEndpoint from grpc with requestPayload %v, %v", iRequest, c)
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
 	if !isAuthenticated {
@@ -77,23 +78,20 @@ func (endpoint *webEndpointGRPCApi) GetAllPublicEndpoint(c context.Context, iReq
 		return nil, errors.New("unauthenticated request")
 	}
 
-	_page, _endpoint, err := endpoint.endpointClient.GetAllPublicEndpoint(c, iAuth, iRequest.GetCriterias(), iRequest.GetPaginate())
+	_page, _deployments, err := endpoint.endpointClient.GetAllDeployment(c, iAuth, iRequest.GetCriterias(), iRequest.GetPaginate())
 	if err != nil {
-		return utils.Error[web_api.GetAllEndpointResponse](
+		return utils.Error[web_api.GetAllDeploymentResponse](
 			err,
-			"Unable to get your endpoint, please try again in sometime.")
+			"Unable to get deployments, please try again in sometime.")
 	}
 
-	for _, _ep := range _endpoint {
-		if _ep.GetEndpointProviderModel() != nil {
-			_ep.EndpointProviderModel.CreatedUser = endpoint.GetUser(c, iAuth, _ep.EndpointProviderModel.GetCreatedBy())
-			_ep.EndpointProviderModel.ProviderModel = endpoint.GetProviderModel(c, iAuth, _ep.EndpointProviderModel.GetProviderModelId())
-		}
-		_ep.Organization = endpoint.GetOrganization(c, iAuth, _ep.GetOrganizationId())
+	for _, _ep := range _deployments {
+		orgId, _ := strconv.ParseUint(_ep.GetOrganizationId(), 10, 64)
+		_ep.Organization = endpoint.GetOrganization(c, iAuth, orgId)
 	}
-	return utils.PaginatedSuccess[web_api.GetAllEndpointResponse, []*web_api.Endpoint](
+	return utils.PaginatedSuccess[web_api.GetAllDeploymentResponse, []*web_api.SearchableDeployment](
 		_page.GetTotalItem(), _page.GetCurrentPage(),
-		_endpoint)
+		_deployments)
 }
 
 /*
@@ -142,7 +140,20 @@ func (endpointGRPCApi *webEndpointGRPCApi) GetAllEndpointProviderModel(ctx conte
 		return nil, errors.New("unauthenticated request")
 	}
 
-	return endpointGRPCApi.endpointClient.GetAllEndpointProviderModel(ctx, iAuth, iRequest.GetEndpointId(), iRequest.GetCriterias(), iRequest.GetPaginate())
+	_page, _endpoints, err := endpointGRPCApi.endpointClient.GetAllEndpointProviderModel(ctx, iAuth, iRequest.GetEndpointId(), iRequest.GetCriterias(), iRequest.GetPaginate())
+	if err != nil {
+		return utils.Error[web_api.GetAllEndpointProviderModelResponse](
+			err,
+			"Unable to get your endpoint provider models, please try again in sometime.")
+	}
+
+	for _, _ep := range _endpoints {
+		_ep.CreatedUser = endpointGRPCApi.GetUser(ctx, iAuth, _ep.GetCreatedBy())
+		_ep.ProviderModel = endpointGRPCApi.GetProviderModel(ctx, iAuth, _ep.GetProviderModelId())
+	}
+	return utils.PaginatedSuccess[web_api.GetAllEndpointProviderModelResponse, []*web_api.EndpointProviderModel](
+		_page.GetTotalItem(), _page.GetCurrentPage(),
+		_endpoints)
 }
 
 func (endpointGRPCApi *webEndpointGRPCApi) UpdateEndpointVersion(ctx context.Context, iRequest *web_api.UpdateEndpointVersionRequest) (*web_api.UpdateEndpointVersionResponse, error) {
@@ -188,7 +199,7 @@ func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointRetryConfiguration(ctx 
 }
 
 // CreateEndpointTag implements lexatic_backend.EndpointServiceServer.
-func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointTag(ctx context.Context, iRequest *web_api.CreateEndpointTagRequest) (*web_api.CreateEndpointTagResponse, error) {
+func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointTag(ctx context.Context, iRequest *web_api.CreateEndpointTagRequest) (*web_api.GetEndpointResponse, error) {
 	endpointGRPCApi.logger.Debugf("Create endpoint provider model request %v, %v", iRequest, ctx)
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
 	if !isAuthenticated {
@@ -196,6 +207,15 @@ func (endpointGRPCApi *webEndpointGRPCApi) CreateEndpointTag(ctx context.Context
 		return nil, errors.New("unauthenticated request")
 	}
 	return endpointGRPCApi.endpointClient.CreateEndpointTag(ctx, iAuth, iRequest)
+}
+func (endpointGRPCApi *webEndpointGRPCApi) UpdateEndpointDetail(ctx context.Context, iRequest *web_api.UpdateEndpointDetailRequest) (*web_api.GetEndpointResponse, error) {
+	endpointGRPCApi.logger.Debugf("update endpoint details request %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		endpointGRPCApi.logger.Errorf("unauthenticated request to create endpoint tag")
+		return nil, errors.New("unauthenticated request")
+	}
+	return endpointGRPCApi.endpointClient.UpdateEndpointDetail(ctx, iAuth, iRequest)
 }
 
 // ForkEndpoint implements lexatic_backend.EndpointServiceServer.

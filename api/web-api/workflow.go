@@ -97,24 +97,24 @@ func (workflow *webWorkflowGRPCApi) CreateWorkflow(ctx context.Context, iRequest
 }
 
 // CreateEndpointTag implements lexatic_backend.EndpointServiceServer.
-func (workflow *webWorkflowGRPCApi) CreateWorkflowTag(ctx context.Context, iRequest *web_api.CreateWorkflowTagRequest) (*web_api.CreateWorkflowTagResponse, error) {
-	workflow.logger.Debugf("Create endpoint provider model request %v, %v", iRequest, ctx)
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
-	if !isAuthenticated {
-		workflow.logger.Errorf("unauthenticated request to create endpoint tag")
-		return utils.AuthenticateError[web_api.CreateWorkflowTagResponse]()
-	}
-	return workflow.workflowClient.CreateWorkflowTag(ctx, iAuth, iRequest)
-}
-
-func (workflow *webWorkflowGRPCApi) UpdateWorkflow(ctx context.Context, iRequest *web_api.UpdateWorkflowRequest) (*web_api.GetWorkflowResponse, error) {
+func (workflow *webWorkflowGRPCApi) CreateWorkflowTag(ctx context.Context, iRequest *web_api.CreateWorkflowTagRequest) (*web_api.GetWorkflowResponse, error) {
 	workflow.logger.Debugf("Create endpoint provider model request %v, %v", iRequest, ctx)
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
 	if !isAuthenticated {
 		workflow.logger.Errorf("unauthenticated request to create endpoint tag")
 		return utils.AuthenticateError[web_api.GetWorkflowResponse]()
 	}
-	return workflow.workflowClient.UpdateWorkflow(ctx, iAuth, iRequest)
+	return workflow.workflowClient.CreateWorkflowTag(ctx, iAuth, iRequest)
+}
+
+func (workflow *webWorkflowGRPCApi) UpdateWorkflowDetail(ctx context.Context, iRequest *web_api.UpdateWorkflowDetailRequest) (*web_api.GetWorkflowResponse, error) {
+	workflow.logger.Debugf("Create endpoint provider model request %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		workflow.logger.Errorf("unauthenticated request to create endpoint tag")
+		return utils.AuthenticateError[web_api.GetWorkflowResponse]()
+	}
+	return workflow.workflowClient.UpdateWorkflowDetail(ctx, iAuth, iRequest)
 }
 
 // PublishWorkflowVersion implements lexatic_backend.WorkflowServiceServer.
