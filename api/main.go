@@ -57,9 +57,11 @@ func main() {
 	appRunner.AllConnectors()
 	// init
 	appRunner.S = grpc.NewServer(
+		grpc.ChainStreamInterceptor(
+			middlewares.StreamServerInterceptor(internal_user_service.NewAuthenticator(appRunner.Logger, appRunner.Postgres), appRunner.Logger),
+		),
 		grpc.ChainUnaryInterceptor(
 			middlewares.UnaryServerInterceptor(internal_user_service.NewAuthenticator(appRunner.Logger, appRunner.Postgres), appRunner.Logger),
-
 			middlewares.ProjectAuthenticatorUnaryServerInterceptor(
 				internal_project_service.NewProjectAuthenticator(appRunner.Logger, appRunner.Postgres),
 				appRunner.Logger,
@@ -95,12 +97,12 @@ func main() {
 
 	// if application json
 	http2GRPCFilteredListener := cmuxListener.Match(cmux.HTTP2())
-	grpcFilteredListener := cmuxListener.Match(
-		cmux.HTTP1HeaderField("Content-type", "application/grpc-web+proto"),
-		cmux.HTTP1HeaderField("x-grpc-web", "1"))
-	rpcFilteredListener := cmuxListener.Match(cmux.Any())
-	// rpcFilteredListener := cmuxListener.Match(cmux.HTTP2())
-	// grpcFilteredListener := cmuxListener.Match(cmux.Any())
+	// grpcFilteredListener := cmuxListener.Match(
+	// 	cmux.HTTP1HeaderField("Content-type", "application/grpc-web+proto"),
+	// 	cmux.HTTP1HeaderField("x-grpc-web", "1"))
+	// rpcFilteredListener := cmuxListener.Match(cmux.Any())
+	rpcFilteredListener := cmuxListener.Match(cmux.HTTP2())
+	grpcFilteredListener := cmuxListener.Match(cmux.Any())
 
 	group, ctx := errgroup.WithContext(ctx)
 	group.Go(func() error {

@@ -3,6 +3,7 @@ package web_api
 import (
 	"context"
 	"errors"
+	"io"
 
 	assistant_client "github.com/lexatic/web-backend/pkg/clients/workflow"
 	"github.com/lexatic/web-backend/pkg/utils"
@@ -90,17 +91,60 @@ func (assistant *webAssistantGRPCApi) GetAllConversactionMessage(ctx context.Con
 
 }
 
-// CreateAssistantMessage implements lexatic_backend.AssistantConversactionServiceServer.
-func (assistant *webAssistantGRPCApi) CreateAssistantMessage(c context.Context, iRequest *web_api.CreateAssistantMessageRequest) (*web_api.CreateAssistantMessageResponse, error) {
-	assistant.logger.Debugf("Create assistant from grpc with requestPayload %v, %v", iRequest, c)
+func (assistant *webAssistantGRPCApi) CreateAssistantMessage(cer *web_api.CreateAssistantMessageRequest, stream web_api.AssistantConversactionService_CreateAssistantMessageServer) error {
+	c := stream.Context()
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
 	if !isAuthenticated {
 		assistant.logger.Errorf("unauthenticated request for get actvities")
-		return nil, errors.New("unauthenticated request")
+		return errors.New("unauthenticated request")
+	}
+	out, err := assistant.assistantConversactionClient.CreateAssistantMessage(c, iAuth, cer)
+	if err != nil {
+		return err
 	}
 
-	return assistant.assistantConversactionClient.CreateAssistantMessage(c, iAuth, iRequest)
+	// Channel to handle errors from the upstream stream
+	errCh := make(chan error, 1)
+	go func() {
+		defer close(errCh)
+		for {
+			st, recvErr := out.Recv()
+			if recvErr == io.EOF {
+				return // End of upstream stream
+			}
+			if recvErr != nil {
+				errCh <- recvErr
+				return
+			}
+			// Forward message to downstream stream
+			if err := stream.Send(st); err != nil {
+				errCh <- err
+				return
+			}
+		}
+	}()
+
+	// Wait for any errors from the upstream stream or the context cancellation
+	select {
+	case err := <-errCh:
+		return err
+	case <-c.Done():
+		return c.Err()
+	}
+
 }
+
+// CreateAssistantMessage implements lexatic_backend.AssistantConversactionServiceServer.
+// func (assistant *webAssistantGRPCApi) CreateAssistantMessage(c context.Context, iRequest *web_api.CreateAssistantMessageRequest) (web_api.AssistantConversactionService_CreateAssistantMessageClient, error) {
+// 	assistant.logger.Debugf("Create assistant from grpc with requestPayload %v, %v", iRequest, c)
+// 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
+// 	if !isAuthenticated {
+// 		assistant.logger.Errorf("unauthenticated request for get actvities")
+// 		return nil, errors.New("unauthenticated request")
+// 	}
+
+// 	return assistant.assistantConversactionClient.CreateAssistantMessage(c, iAuth, iRequest)
+// }
 
 // GetAllAssistantConversaction implements lexatic_backend.AssistantConversactionServiceServer.
 func (assistant *webAssistantGRPCApi) GetAllAssistantConversaction(c context.Context, iRequest *web_api.GetAllAssistantConversactionRequest) (*web_api.GetAllAssistantConversactionResponse, error) {
