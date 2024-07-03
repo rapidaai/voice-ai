@@ -17,7 +17,7 @@ phases:
       - touch ~/.ssh/config
       - echo "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
     runtime-versions:
-      golang: 1.20
+      golang: 1.21
   pre_build:
     commands:
       - export PB_REL=https://github.com/protocolbuffers/protobuf/releases
