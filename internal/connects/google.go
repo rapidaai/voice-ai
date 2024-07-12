@@ -43,7 +43,7 @@ func NewGoogleAuthenticationConnect(cfg *config.AppConfig, logger commons.Logger
 	}
 }
 
-func NewGoogleDriveConnec(cfg *config.AppConfig, logger commons.Logger) GoogleConnect {
+func NewGoogleDriveConnect(cfg *config.AppConfig, logger commons.Logger) GoogleConnect {
 	return GoogleConnect{
 		googleOauthConfig: oauth2.Config{
 			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), GOOGLE_AUTHENTICATION_URL),

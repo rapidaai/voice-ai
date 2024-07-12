@@ -58,15 +58,15 @@ func NewConnectRPC(config *config.AppConfig, logger commons.Logger, postgres con
 			cfg:                config,
 			logger:             logger,
 			postgres:           postgres,
-			githubCodeConnect:  internal_connects.NewGithubConnect(config, logger),
-			gitlabCodeConnect:  internal_connects.NewGitlabConnect(config, logger),
-			googleDriveConnect: internal_connects.NewGoogleConnect(config, logger),
-			confluenceConnect:  internal_connects.NewAtlassianConnect(config, logger, internal_connects.CONFLUENCE_SCOPE[:]),
-			notionConnect:      internal_connects.NewNotionConnect(config, logger),
+			githubCodeConnect:  internal_connects.NewGithubCodeConnect(config, logger),
+			gitlabCodeConnect:  internal_connects.NewGitlabCodeConnect(config, logger),
+			googleDriveConnect: internal_connects.NewGoogleDriveConnect(config, logger),
+			confluenceConnect:  internal_connects.NewConfluenceConnect(config, logger),
+			notionConnect:      internal_connects.NewNotionWorkplaceConnect(config, logger),
 
 			//
-			microsoftSlideshareConnect: internal_connects.NewMicrosoftConnect(config, logger),
-			microsoftOnedriveConnect:   internal_connects.NewMicrosoftConnect(config, logger),
+			microsoftSlideshareConnect: internal_connects.NewMicrosoftSharepointConnect(config, logger),
+			microsoftOnedriveConnect:   internal_connects.NewMicrosoftOnedriveConnect(config, logger),
 		},
 	}
 }
@@ -74,16 +74,18 @@ func NewConnectRPC(config *config.AppConfig, logger commons.Logger, postgres con
 func NewConnectGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) web_api.ConnectServiceServer {
 	return &webConnectGRPCApi{
 		webConnectApi{
-			cfg:                        config,
-			logger:                     logger,
-			postgres:                   postgres,
-			gitlabCodeConnect:          internal_connects.NewGitlabConnect(config, logger),
-			githubCodeConnect:          internal_connects.NewGithubConnect(config, logger),
-			googleDriveConnect:         internal_connects.NewGoogleConnect(config, logger),
-			confluenceConnect:          internal_connects.NewAtlassianConnect(config, logger, internal_connects.CONFLUENCE_SCOPE[:]),
-			notionConnect:              internal_connects.NewNotionConnect(config, logger),
-			microsoftSlideshareConnect: internal_connects.NewMicrosoftConnect(config, logger),
-			microsoftOnedriveConnect:   internal_connects.NewMicrosoftConnect(config, logger),
+			cfg:                config,
+			logger:             logger,
+			postgres:           postgres,
+			githubCodeConnect:  internal_connects.NewGithubCodeConnect(config, logger),
+			gitlabCodeConnect:  internal_connects.NewGitlabCodeConnect(config, logger),
+			googleDriveConnect: internal_connects.NewGoogleDriveConnect(config, logger),
+			confluenceConnect:  internal_connects.NewConfluenceConnect(config, logger),
+			notionConnect:      internal_connects.NewNotionWorkplaceConnect(config, logger),
+
+			//
+			microsoftSlideshareConnect: internal_connects.NewMicrosoftSharepointConnect(config, logger),
+			microsoftOnedriveConnect:   internal_connects.NewMicrosoftOnedriveConnect(config, logger),
 		},
 	}
 }

@@ -17,13 +17,34 @@ type LinkedinConnect struct {
 	linkedinOauthConfig oauth2.Config
 }
 
-func NewLinkedinConnect(cfg *config.AppConfig, logger commons.Logger) LinkedinConnect {
+var (
+	LINKEDIN_AUTHENTICATION_URL   = "/auth/signin"
+	LINKEDIN_AUTHENTICATION_SCOPE = []string{"openid", "profile", "email"}
+
+	LINKEDIN_ACTION_CONNECT = "/action/linkedin"
+	LINKEDIN_ACTION_SCOPE   = []string{"openid", "profile", "email"}
+)
+
+func NewLinkedinAuthenticationConnect(cfg *config.AppConfig, logger commons.Logger) LinkedinConnect {
 	return LinkedinConnect{
 		linkedinOauthConfig: oauth2.Config{
-			RedirectURL:  "https://www.rapida.ai/auth/signin",
+			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), LINKEDIN_AUTHENTICATION_URL),
 			ClientID:     cfg.LinkedinClientId,
 			ClientSecret: cfg.LinkedinClientSecret,
-			Scopes:       []string{"openid", "profile", "email"},
+			Scopes:       LINKEDIN_AUTHENTICATION_SCOPE,
+			Endpoint:     linkedin.Endpoint,
+		},
+		logger: logger,
+	}
+}
+
+func NewLinkedinActionConnect(cfg *config.AppConfig, logger commons.Logger) LinkedinConnect {
+	return LinkedinConnect{
+		linkedinOauthConfig: oauth2.Config{
+			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), LINKEDIN_ACTION_CONNECT),
+			ClientID:     cfg.LinkedinClientId,
+			ClientSecret: cfg.LinkedinClientSecret,
+			Scopes:       LINKEDIN_ACTION_SCOPE,
 			Endpoint:     linkedin.Endpoint,
 		},
 		logger: logger,
@@ -35,8 +56,8 @@ func NewLinkedinConnect(cfg *config.AppConfig, logger commons.Logger) LinkedinCo
 Linkedin oauth
 */
 
-func (wAuthApi *LinkedinConnect) AuthCodeURL() string {
-	return wAuthApi.linkedinOauthConfig.AuthCodeURL("linkedin")
+func (wAuthApi *LinkedinConnect) AuthCodeURL(state string) string {
+	return wAuthApi.linkedinOauthConfig.AuthCodeURL(state)
 }
 
 func (wAuthApi *LinkedinConnect) LinkedinUserInfo(c context.Context, state string, code string) (*OpenID, error) {

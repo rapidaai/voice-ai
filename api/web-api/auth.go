@@ -54,9 +54,9 @@ func NewAuthRPC(config *config.AppConfig, logger commons.Logger, postgres connec
 			postgres:        postgres,
 			userService:     internal_user_service.NewUserService(logger, postgres),
 			sendgridClient:  integration_client.NewSendgridServiceClientGRPC(config, logger),
-			githubConnect:   internal_connects.NewGithubConnect(config, logger),
-			linkedinConnect: internal_connects.NewLinkedinConnect(config, logger),
-			googleConnect:   internal_connects.NewGoogleConnect(config, logger),
+			githubConnect:   internal_connects.NewGithubAuthenticationConnect(config, logger),
+			linkedinConnect: internal_connects.NewLinkedinAuthenticationConnect(config, logger),
+			googleConnect:   internal_connects.NewGoogleAuthenticationConnect(config, logger),
 		},
 	}
 }
@@ -71,9 +71,9 @@ func NewAuthGRPC(config *config.AppConfig, logger commons.Logger, postgres conne
 			organizationService: internal_organization_service.NewOrganizationService(logger, postgres),
 			projectService:      internal_project_service.NewProjectService(logger, postgres),
 			sendgridClient:      integration_client.NewSendgridServiceClientGRPC(config, logger),
-			githubConnect:       internal_connects.NewGithubConnect(config, logger),
-			linkedinConnect:     internal_connects.NewLinkedinConnect(config, logger),
-			googleConnect:       internal_connects.NewGoogleConnect(config, logger),
+			githubConnect:       internal_connects.NewGithubAuthenticationConnect(config, logger),
+			linkedinConnect:     internal_connects.NewLinkedinAuthenticationConnect(config, logger),
+			googleConnect:       internal_connects.NewGoogleAuthenticationConnect(config, logger),
 		},
 	}
 }
@@ -735,7 +735,7 @@ Github
 */
 
 func (wAuthApi *webAuthRPCApi) Github(c *gin.Context) {
-	url := wAuthApi.githubConnect.AuthCodeURL()
+	url := wAuthApi.githubConnect.AuthCodeURL("github")
 	wAuthApi.logger.Debugf("url generated %v", url)
 	c.Redirect(http.StatusTemporaryRedirect, url)
 	return
@@ -752,7 +752,7 @@ func (wAuthApi *webAuthGRPCApi) Github(c context.Context, irRequest *web_api.Soc
 }
 
 func (wAuthApi *webAuthRPCApi) Linkedin(c *gin.Context) {
-	url := wAuthApi.linkedinConnect.AuthCodeURL()
+	url := wAuthApi.linkedinConnect.AuthCodeURL("linkedin")
 	wAuthApi.logger.Debugf("generated redirect url for linkedin %v", url)
 	c.Redirect(http.StatusTemporaryRedirect, url)
 	return
@@ -769,7 +769,7 @@ func (wAuthApi *webAuthGRPCApi) Linkedin(c context.Context, irRequest *web_api.S
 }
 
 func (wAuthApi *webAuthRPCApi) Google(c *gin.Context) {
-	url := wAuthApi.googleConnect.AuthCodeURL()
+	url := wAuthApi.googleConnect.AuthCodeURL("google")
 	c.Redirect(http.StatusTemporaryRedirect, url)
 	return
 }

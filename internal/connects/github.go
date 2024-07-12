@@ -21,20 +21,20 @@ var (
 	GITHUB_AUTHENTICATION_SCOPE = []string{"user"}
 	GITHUB_AUTHENTICATION_URL   = "/auth/signin"
 
-	GITHUB_CODE_SCOPE  = []string{}
-	GTHUB_CODE_CONNECT = "/connect/github"
+	GITHUB_CODE_SCOPE   = []string{}
+	GITHUB_CODE_CONNECT = "/connect/github"
 
-	GITHUB_ACTION_SCOPE  = []string{}
-	GTHUB_ACTION_CONNECT = "/action/github"
+	GITHUB_ACTION_SCOPE   = []string{}
+	GITHUB_ACTION_CONNECT = "/action/github"
 )
 
-func NewGithubConnect(cfg *config.AppConfig, logger commons.Logger) GithubConnect {
+func NewGithubAuthenticationConnect(cfg *config.AppConfig, logger commons.Logger) GithubConnect {
 	return GithubConnect{
 		githubOauthConfig: oauth2.Config{
-			RedirectURL:  "https://www.rapida.ai/auth/signin",
+			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), GITHUB_AUTHENTICATION_URL),
 			ClientID:     cfg.GithubClientId,
 			ClientSecret: cfg.GithubClientSecret,
-			Scopes:       []string{"user"},
+			Scopes:       GITHUB_AUTHENTICATION_SCOPE,
 			Endpoint:     github.Endpoint,
 		},
 		logger: logger,
@@ -44,10 +44,10 @@ func NewGithubConnect(cfg *config.AppConfig, logger commons.Logger) GithubConnec
 func NewGithubCodeConnect(cfg *config.AppConfig, logger commons.Logger) GithubConnect {
 	return GithubConnect{
 		githubOauthConfig: oauth2.Config{
-			RedirectURL:  "https://www.rapida.ai/auth/signin",
+			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), GITHUB_CODE_CONNECT),
 			ClientID:     cfg.GithubClientId,
 			ClientSecret: cfg.GithubClientSecret,
-			Scopes:       []string{"user"},
+			Scopes:       GITHUB_CODE_SCOPE,
 			Endpoint:     github.Endpoint,
 		},
 		logger: logger,
@@ -56,10 +56,10 @@ func NewGithubCodeConnect(cfg *config.AppConfig, logger commons.Logger) GithubCo
 func NewGithubActionConnect(cfg *config.AppConfig, logger commons.Logger) GithubConnect {
 	return GithubConnect{
 		githubOauthConfig: oauth2.Config{
-			RedirectURL:  "https://www.rapida.ai/auth/signin",
+			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), GITHUB_ACTION_CONNECT),
 			ClientID:     cfg.GithubClientId,
 			ClientSecret: cfg.GithubClientSecret,
-			Scopes:       []string{"user"},
+			Scopes:       GITHUB_ACTION_SCOPE,
 			Endpoint:     github.Endpoint,
 		},
 		logger: logger,

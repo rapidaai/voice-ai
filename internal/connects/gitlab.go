@@ -1,25 +1,63 @@
 package internal_connects
 
 import (
+	"fmt"
+
 	"github.com/lexatic/web-backend/config"
 	"github.com/lexatic/web-backend/pkg/commons"
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/linkedin"
+	"golang.org/x/oauth2/gitlab"
 )
 
 type GitlabConnect struct {
-	logger              commons.Logger
-	linkedinOauthConfig oauth2.Config
+	logger            commons.Logger
+	gitlabOauthConfig oauth2.Config
 }
 
-func NewGitlabConnect(cfg *config.AppConfig, logger commons.Logger) GitlabConnect {
+var (
+	GITLAB_AUTHENTICATION_SCOPE = []string{"user"}
+	GITLAB_AUTHENTICATION_URL   = "/auth/signin"
+
+	GITLAB_CODE_SCOPE   = []string{}
+	GITLAB_CODE_CONNECT = "/connect/gitlab"
+
+	GITLAB_ACTION_SCOPE   = []string{}
+	GITLAB_ACTION_CONNECT = "/action/gitlab"
+)
+
+func NewGitlabAuthenticationConnect(cfg *config.AppConfig, logger commons.Logger) GitlabConnect {
 	return GitlabConnect{
-		linkedinOauthConfig: oauth2.Config{
-			RedirectURL:  "https://www.rapida.ai/auth/signin",
+		gitlabOauthConfig: oauth2.Config{
+			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), GITLAB_AUTHENTICATION_URL),
 			ClientID:     cfg.GitlabClientId,
 			ClientSecret: cfg.GitlabClientSecret,
-			Scopes:       []string{"openid", "profile", "email"},
-			Endpoint:     linkedin.Endpoint,
+			Scopes:       GITLAB_AUTHENTICATION_SCOPE,
+			Endpoint:     gitlab.Endpoint,
+		},
+		logger: logger,
+	}
+}
+
+func NewGitlabCodeConnect(cfg *config.AppConfig, logger commons.Logger) GitlabConnect {
+	return GitlabConnect{
+		gitlabOauthConfig: oauth2.Config{
+			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), GITLAB_CODE_CONNECT),
+			ClientID:     cfg.GitlabClientId,
+			ClientSecret: cfg.GitlabClientSecret,
+			Scopes:       GITLAB_CODE_SCOPE,
+			Endpoint:     gitlab.Endpoint,
+		},
+		logger: logger,
+	}
+}
+func NewGitlabActionConnect(cfg *config.AppConfig, logger commons.Logger) GitlabConnect {
+	return GitlabConnect{
+		gitlabOauthConfig: oauth2.Config{
+			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), GITLAB_ACTION_CONNECT),
+			ClientID:     cfg.GitlabClientId,
+			ClientSecret: cfg.GitlabClientSecret,
+			Scopes:       GITLAB_ACTION_SCOPE,
+			Endpoint:     gitlab.Endpoint,
 		},
 		logger: logger,
 	}
