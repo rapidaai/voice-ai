@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -14,6 +15,7 @@ type AppConfig struct {
 	Name           string                 `mapstructure:"service_name" validate:"required"`
 	Version        string                 `mapstructure:"version" validate:"required"`
 	Host           string                 `mapstructure:"host" validate:"required"`
+	Env            string                 `mapstructure:"env" validate:"required"`
 	Secret         string                 `mapstructure:"secret" validate:"required"`
 	Port           int                    `mapstructure:"port" validate:"required"`
 	LogLevel       string                 `mapstructure:"log_level" validate:"required"`
@@ -39,6 +41,30 @@ type AppConfig struct {
 
 	GithubClientId     string `mapstructure:"github_client_id" validate:"required"`
 	GithubClientSecret string `mapstructure:"github_client_secret" validate:"required"`
+
+	NotionClientId     string `mapstructure:"notion_client_id" validate:"required"`
+	NotionClientSecret string `mapstructure:"notion_client_id" validate:"required"`
+
+	MicrosoftClientId     string `mapstructure:"microsoft_client_id" validate:"required"`
+	MicrosoftClientSecret string `mapstructure:"microsoft_client_id" validate:"required"`
+
+	AtlassianClientId     string `mapstructure:"atlassian_client_id" validate:"required"`
+	AtlassianClientSecret string `mapstructure:"atlassian_client_id" validate:"required"`
+
+	GitlabClientId     string `mapstructure:"gitlab_client_id" validate:"required"`
+	GitlabClientSecret string `mapstructure:"gitlab_client_id" validate:"required"`
+}
+
+func (cfg *AppConfig) IsDevelopment() bool {
+	return cfg.Env != "production"
+}
+
+func (cfg *AppConfig) BaseUrl() (baseUrl string) {
+	baseUrl = "https://www.rapida.ai"
+	if cfg.IsDevelopment() {
+		baseUrl = fmt.Sprintf("http://%s:%d", cfg.Host, cfg.Port)
+	}
+	return
 }
 
 // reading config and intializing configs for application

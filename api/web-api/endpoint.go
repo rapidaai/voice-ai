@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	endpoint_client "github.com/lexatic/web-backend/pkg/clients/endpoint"
-	testing_client "github.com/lexatic/web-backend/pkg/clients/testing"
 	"github.com/lexatic/web-backend/pkg/utils"
 	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 
@@ -23,7 +22,6 @@ type webEndpointApi struct {
 	postgres       connectors.PostgresConnector
 	redis          connectors.RedisConnector
 	endpointClient endpoint_client.EndpointServiceClient
-	testingClient  testing_client.TestingServiceClient
 }
 
 type webEndpointGRPCApi struct {
@@ -39,7 +37,6 @@ func NewEndpointGRPC(config *config.AppConfig, logger commons.Logger, postgres c
 			postgres:       postgres,
 			redis:          redis,
 			endpointClient: endpoint_client.NewEndpointServiceClientGRPC(config, logger, redis),
-			testingClient:  testing_client.NewTestingServiceClientGRPC(config, logger, redis),
 		},
 	}
 }
