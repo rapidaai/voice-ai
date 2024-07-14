@@ -16,8 +16,8 @@ type NotionConnect struct {
 var (
 
 	// MICROSOFT_DRIVE_STATE       = "connect/"
-	NOTION_WORKPLACE_SCOPE   = []string{"email", "profile"}
-	NOTION_WORKPLACE_CONNECT = "/connect/one-drive"
+	NOTION_WORKPLACE_SCOPE   = []string{}
+	NOTION_WORKPLACE_CONNECT = "/connect-knowledge/notion"
 )
 
 func NewNotionWorkplaceConnect(cfg *config.AppConfig, logger commons.Logger) NotionConnect {
@@ -28,11 +28,15 @@ func NewNotionWorkplaceConnect(cfg *config.AppConfig, logger commons.Logger) Not
 			ClientSecret: cfg.NotionClientSecret,
 			Scopes:       NOTION_WORKPLACE_SCOPE,
 			Endpoint: oauth2.Endpoint{
-				AuthURL:   "https://auth.atlassian.com/authorize",
-				TokenURL:  "https://auth.atlassian.com/oauth/token",
+				AuthURL:   "https://api.notion.com/v1/oauth/authorize",
+				TokenURL:  "https://api.notion.com/v1/oauth/token",
 				AuthStyle: oauth2.AuthStyleInParams,
 			},
 		},
 		logger: logger,
 	}
+}
+
+func (notionConnect *NotionConnect) AuthCodeURL(state string) string {
+	return notionConnect.notionOauthConfig.AuthCodeURL(state)
 }

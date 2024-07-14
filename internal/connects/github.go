@@ -19,13 +19,13 @@ type GithubConnect struct {
 
 var (
 	GITHUB_AUTHENTICATION_SCOPE = []string{"user"}
-	GITHUB_AUTHENTICATION_URL   = "/auth/signin"
+	GITHUB_AUTHENTICATION_URL   = "/connect-common/github" //"/auth/signin"
 
 	GITHUB_CODE_SCOPE   = []string{}
-	GITHUB_CODE_CONNECT = "/connect/github"
+	GITHUB_CODE_CONNECT = "/connect-common/github"
 
 	GITHUB_ACTION_SCOPE   = []string{}
-	GITHUB_ACTION_CONNECT = "/action/github"
+	GITHUB_ACTION_CONNECT = "/connect-common/github"
 )
 
 func NewGithubAuthenticationConnect(cfg *config.AppConfig, logger commons.Logger) GithubConnect {

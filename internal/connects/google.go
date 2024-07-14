@@ -23,11 +23,20 @@ var (
 	GOOGLE_AUTHENTICATION_URL   = "/auth/signin"
 
 	// GOOGLE_DRIVE_STATE       = "connect/"
-	GOOGLE_DRIVE_SCOPE       = []string{"email", "profile"}
-	GOOGLE_DRIVE_CONNECT_URL = "/connect/google-drive"
+	GOOGLE_DRIVE_SCOPE = []string{
+		"https://www.googleapis.com/auth/drive",
+		"https://www.googleapis.com/auth/drive.readonly",
+		"https://www.googleapis.com/auth/drive.file",
+		"https://www.googleapis.com/auth/drive.metadata.readonly",
+	}
+	GOOGLE_DRIVE_CONNECT_URL = "/connect-knowledge/google-drive"
 
-	GOOGLE_GMAIL_SCOPE       = []string{"email", "profile"}
-	GOOGLE_GMAIL_CONNECT_URL = "/action/gmail"
+	GOOGLE_GMAIL_SCOPE = []string{
+		"https://www.googleapis.com/auth/gmail.readonly",
+		"https://www.googleapis.com/auth/gmail.compose",
+		"https://www.googleapis.com/auth/gmail.send",
+	}
+	GOOGLE_GMAIL_CONNECT_URL = "/connect-action/gmail"
 )
 
 func NewGoogleAuthenticationConnect(cfg *config.AppConfig, logger commons.Logger) GoogleConnect {
@@ -46,7 +55,7 @@ func NewGoogleAuthenticationConnect(cfg *config.AppConfig, logger commons.Logger
 func NewGoogleDriveConnect(cfg *config.AppConfig, logger commons.Logger) GoogleConnect {
 	return GoogleConnect{
 		googleOauthConfig: oauth2.Config{
-			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), GOOGLE_AUTHENTICATION_URL),
+			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), GOOGLE_DRIVE_CONNECT_URL),
 			ClientID:     cfg.GoogleClientId,
 			ClientSecret: cfg.GoogleClientSecret,
 			Scopes:       GOOGLE_DRIVE_SCOPE,

@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"log"
 	"os"
 
@@ -62,7 +61,7 @@ func (cfg *AppConfig) IsDevelopment() bool {
 func (cfg *AppConfig) BaseUrl() (baseUrl string) {
 	baseUrl = "https://www.rapida.ai"
 	if cfg.IsDevelopment() {
-		baseUrl = fmt.Sprintf("http://%s:%d", cfg.Host, cfg.Port)
+		baseUrl = "http://localhost:3000"
 	}
 	return
 }

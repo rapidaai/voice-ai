@@ -1,10 +1,8 @@
 package web_api
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"strings"
 
 	config "github.com/lexatic/web-backend/config"
 	internal_services "github.com/lexatic/web-backend/internal/services"
@@ -66,7 +64,7 @@ func (wVault *webVaultGRPCApi) CreateProviderCredential(ctx context.Context, irR
 		wVault.logger.Errorf("CreateProviderCredential from grpc with unauthenticated request")
 		return nil, errors.New("unauthenticated request")
 	}
-	vlt, err := wVault.vaultService.Create(ctx, iAuth, iAuth.GetOrganizationRole().OrganizationId, irRequest.GetProviderId(), irRequest.GetKeyName(), irRequest.GetProviderKey())
+	vlt, err := wVault.vaultService.CreateOrganizationProviderCredential(ctx, iAuth, irRequest.GetProviderId(), irRequest.GetName(), irRequest.GetCredential().AsMap())
 	if err != nil {
 		wVault.logger.Errorf("vaultService.Create from grpc with err %v", err)
 		return &web_api.CreateProviderCredentialResponse{
@@ -79,12 +77,12 @@ func (wVault *webVaultGRPCApi) CreateProviderCredential(ctx context.Context, irR
 			}}, nil
 	}
 
-	out := &web_api.ProviderCredential{}
+	out := &web_api.VaultCredential{}
 	err = utils.Cast(vlt, out)
 	if err != nil {
 		wVault.logger.Errorf("unable to cast the provider credentials to proto %v", err)
 	}
-	return utils.Success[web_api.CreateProviderCredentialResponse, *web_api.ProviderCredential](out)
+	return utils.Success[web_api.CreateProviderCredentialResponse, *web_api.VaultCredential](out)
 }
 
 func (wVault *webVaultGRPCApi) DeleteProviderCredential(c context.Context, irRequest *web_api.DeleteProviderCredentialRequest) (*web_api.DeleteProviderCredentialResponse, error) {
@@ -111,65 +109,36 @@ func (wVault *webVaultGRPCApi) DeleteProviderCredential(c context.Context, irReq
 	return utils.Success[web_api.DeleteProviderCredentialResponse, uint64](irRequest.ProviderKeyId)
 }
 
-func (wVault *webVaultGRPCApi) GetAllProviderCredential(c context.Context, irRequest *web_api.GetAllProviderCredentialRequest) (*web_api.GetAllProviderCredentialResponse, error) {
-	wVault.logger.Debugf("GetAllProviderCredential from grpc with requestPayload %v, %v", irRequest, c)
+func (wVault *webVaultGRPCApi) GetAllOrganizationCredential(c context.Context, irRequest *web_api.GetAllOrganizationCredentialRequest) (*web_api.GetAllOrganizationCredentialResponse, error) {
+	wVault.logger.Debugf("GetAllOrganizationCredential from grpc with requestPayload %v, %v", irRequest, c)
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
 	if !isAuthenticated {
-		wVault.logger.Errorf("GetAllProviderCredential from grpc with unauthenticated request")
+		wVault.logger.Errorf("GetAllOrganizationCredential from grpc with unauthenticated request")
 		return nil, errors.New("unauthenticated request")
 	}
-	cnt, vlts, err := wVault.vaultService.GetAll(c, iAuth, iAuth.GetOrganizationRole().OrganizationId, irRequest.GetCriterias(), irRequest.GetPaginate())
+	cnt, vlts, err := wVault.vaultService.GetAllOrganizationCredential(c, iAuth, irRequest.GetCriterias(), irRequest.GetPaginate())
 	if err != nil {
 		wVault.logger.Errorf("vaultService.GetAll from grpc with err %v", err)
-		return utils.Error[web_api.GetAllProviderCredentialResponse](
+		return utils.Error[web_api.GetAllOrganizationCredentialResponse](
 			err,
 			"Unable to get provider credentials, please try again",
 		)
 	}
 
-	out := make([]*web_api.ProviderCredential, len(*vlts))
+	out := make([]*web_api.VaultCredential, len(*vlts))
 	err = utils.Cast(vlts, &out)
 	if err != nil {
 		wVault.logger.Errorf("unable to cast vault object to proto %v", err)
 	}
 
-	pmap := make(map[uint64]*web_api.Provider)
-	if p, err := wVault.providerClient.GetAllProviders(c); err == nil {
-		for _, provider := range p {
-			pmap[provider.GetId()] = provider
-		}
-	}
-
 	for _, c := range out {
-		if val, ok := pmap[c.ProviderId]; ok {
-			c.Provider = val.Name
-			c.Image = val.Image
-		}
-		if irRequest.GetMask() {
-			c.Key = maskCred(c.Key)
-		}
+		c.Value = nil
 	}
-
-	return utils.PaginatedSuccess[web_api.GetAllProviderCredentialResponse, []*web_api.ProviderCredential](
+	return utils.PaginatedSuccess[web_api.GetAllOrganizationCredentialResponse, []*web_api.VaultCredential](
 		uint32(cnt),
 		irRequest.GetPaginate().GetPage(),
 		out)
 
-}
-
-func maskCred(key string) string {
-	var buffer bytes.Buffer
-	l := len(key)
-	first := key[:2]
-	buffer.WriteString(first)
-	last := key[l-2:]
-	if l-4 > 0 {
-		buffer.WriteString(strings.Repeat("*", l-4))
-	} else {
-		buffer.WriteString(strings.Repeat("*", 1))
-	}
-	buffer.WriteString(last)
-	return buffer.String()
 }
 
 /*
@@ -182,7 +151,7 @@ func (wVault *webVaultGRPCApi) GetProviderCredential(ctx context.Context, reques
 		wVault.logger.Errorf("GetAllProviderCredential from grpc with unauthenticated request")
 		return nil, errors.New("unauthenticated request")
 	}
-	vlt, err := wVault.vaultService.Get(ctx, iAuth, request.GetProviderId())
+	vlt, err := wVault.vaultService.GetProviderCredential(ctx, iAuth, request.GetProviderId())
 	if err != nil {
 		return utils.Error[web_api.GetProviderCredentialResponse](
 			err,
@@ -190,35 +159,10 @@ func (wVault *webVaultGRPCApi) GetProviderCredential(ctx context.Context, reques
 		)
 	}
 	wVault.logger.Debugf("returing few things like %+v", vlt)
-	var out web_api.ProviderCredential
+	var out web_api.VaultCredential
 	err = utils.Cast(vlt, &out)
 	if err != nil {
 		wVault.logger.Errorf("unable to cast vault object to proto %v", err)
 	}
-	return utils.Success[web_api.GetProviderCredentialResponse, *web_api.ProviderCredential](&out)
-}
-
-func (wVault *webVaultGRPCApi) UpdateVaultCredentials(ctx context.Context, request *web_api.UpdateVaultCredentialsRequest) (*web_api.UpdateVaultCredentialResponse, error) {
-	wVault.logger.Debugf("UpdateVaultCredentials from grpc with requestPayload %v, %v", request, ctx)
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
-	if !isAuthenticated {
-		wVault.logger.Errorf("DeleteProviderCredential from grpc with unauthenticated request")
-		return nil, errors.New("unauthenticated request")
-	}
-
-	_credential, err := wVault.vaultService.Update(ctx, iAuth, request.Id, request.ProviderId, request.GetKey(), request.GetName())
-	if err != nil {
-		wVault.logger.Errorf("vaultService.UpdateVaultCredentials from grpc with err %v", err)
-		return utils.Error[web_api.UpdateVaultCredentialResponse](
-			err,
-			"Unable to update provider credential, please try again",
-		)
-	}
-	out := &web_api.ProviderCredential{}
-	err = utils.Cast(_credential, out)
-	if err != nil {
-		wVault.logger.Errorf("unable to cast the provider credentials to proto %v", err)
-	}
-	return utils.Success[web_api.UpdateVaultCredentialResponse, *web_api.ProviderCredential](out)
-
+	return utils.Success[web_api.GetProviderCredentialResponse, *web_api.VaultCredential](&out)
 }

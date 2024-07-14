@@ -174,7 +174,7 @@ func (orgG *webOrganizationGRPCApi) CreateOrganization(c context.Context, irRequ
 
 	// Create all the default vault
 	//
-	_, err = orgG.vaultService.CreateAllDefaultKeys(c, aOrg.Id)
+	_, err = orgG.vaultService.CreateRapidaProviderCredential(c, aOrg.Id)
 	if err != nil {
 		orgG.logger.Errorf("unable to create default keys for organization err %v", err)
 	}

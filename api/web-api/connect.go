@@ -24,7 +24,7 @@ type webConnectApi struct {
 	googleDriveConnect internal_connects.GoogleConnect
 
 	// microsft
-	microsoftSlideshareConnect internal_connects.MicrosoftConnect
+	microsoftSharepointConnect internal_connects.MicrosoftConnect
 	microsoftOnedriveConnect   internal_connects.MicrosoftConnect
 
 	// notion
@@ -65,7 +65,7 @@ func NewConnectRPC(config *config.AppConfig, logger commons.Logger, postgres con
 			notionConnect:      internal_connects.NewNotionWorkplaceConnect(config, logger),
 
 			//
-			microsoftSlideshareConnect: internal_connects.NewMicrosoftSharepointConnect(config, logger),
+			microsoftSharepointConnect: internal_connects.NewMicrosoftSharepointConnect(config, logger),
 			microsoftOnedriveConnect:   internal_connects.NewMicrosoftOnedriveConnect(config, logger),
 		},
 	}
@@ -84,7 +84,7 @@ func NewConnectGRPC(config *config.AppConfig, logger commons.Logger, postgres co
 			notionConnect:      internal_connects.NewNotionWorkplaceConnect(config, logger),
 
 			//
-			microsoftSlideshareConnect: internal_connects.NewMicrosoftSharepointConnect(config, logger),
+			microsoftSharepointConnect: internal_connects.NewMicrosoftSharepointConnect(config, logger),
 			microsoftOnedriveConnect:   internal_connects.NewMicrosoftOnedriveConnect(config, logger),
 		},
 	}
@@ -117,8 +117,8 @@ func (connectApi *webConnectRPCApi) GithubCodeConnect(c *gin.Context) {
 	if !ok {
 		state = "connect-application"
 	}
-	url := connectApi.confluenceConnect.AuthCodeURL(state)
-	connectApi.logger.Debugf("url generated for confluence connect %v", url)
+	url := connectApi.githubCodeConnect.AuthCodeURL(state)
+	connectApi.logger.Debugf("url generated for github connect %v", url)
 	c.Redirect(http.StatusTemporaryRedirect, url)
 	return
 }
@@ -128,19 +128,19 @@ func (connectApi *webConnectRPCApi) GitlabCodeConnect(c *gin.Context) {
 	if !ok {
 		state = "connect-application"
 	}
-	url := connectApi.confluenceConnect.AuthCodeURL(state)
-	connectApi.logger.Debugf("url generated for confluence connect %v", url)
+	url := connectApi.gitlabCodeConnect.AuthCodeURL(state)
+	connectApi.logger.Debugf("url generated for gitlab connect %v", url)
 	c.Redirect(http.StatusTemporaryRedirect, url)
 	return
 }
 
-func (connectApi *webConnectRPCApi) MicrosoftSlideshareConnect(c *gin.Context) {
+func (connectApi *webConnectRPCApi) MicrosoftSharepointConnect(c *gin.Context) {
 	state, ok := c.GetQuery("state")
 	if !ok {
 		state = "connect-application"
 	}
-	url := connectApi.confluenceConnect.AuthCodeURL(state)
-	connectApi.logger.Debugf("url generated for confluence connect %v", url)
+	url := connectApi.microsoftSharepointConnect.AuthCodeURL(state)
+	connectApi.logger.Debugf("url generated for sharepoint connect %v", url)
 	c.Redirect(http.StatusTemporaryRedirect, url)
 	return
 }
@@ -150,8 +150,19 @@ func (connectApi *webConnectRPCApi) MicrosoftOnedriveConnect(c *gin.Context) {
 	if !ok {
 		state = "connect-application"
 	}
-	url := connectApi.confluenceConnect.AuthCodeURL(state)
-	connectApi.logger.Debugf("url generated for confluence connect %v", url)
+	url := connectApi.microsoftOnedriveConnect.AuthCodeURL(state)
+	connectApi.logger.Debugf("url generated for microsoft onedrive connect %v", url)
+	c.Redirect(http.StatusTemporaryRedirect, url)
+	return
+}
+
+func (connectApi *webConnectApi) NotionConnect(c *gin.Context) {
+	state, ok := c.GetQuery("state")
+	if !ok {
+		state = "connect-application"
+	}
+	url := connectApi.notionConnect.AuthCodeURL(state)
+	connectApi.logger.Debugf("url generated for notion connect %v", url)
 	c.Redirect(http.StatusTemporaryRedirect, url)
 	return
 }

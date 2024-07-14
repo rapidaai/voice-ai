@@ -18,8 +18,8 @@ var (
 	GITLAB_AUTHENTICATION_SCOPE = []string{"user"}
 	GITLAB_AUTHENTICATION_URL   = "/auth/signin"
 
-	GITLAB_CODE_SCOPE   = []string{}
-	GITLAB_CODE_CONNECT = "/connect/gitlab"
+	GITLAB_CODE_SCOPE   = []string{"repo"}
+	GITLAB_CODE_CONNECT = "/connect-knowledge/gitlab"
 
 	GITLAB_ACTION_SCOPE   = []string{}
 	GITLAB_ACTION_CONNECT = "/action/gitlab"
@@ -61,4 +61,8 @@ func NewGitlabActionConnect(cfg *config.AppConfig, logger commons.Logger) Gitlab
 		},
 		logger: logger,
 	}
+}
+
+func (gitlabConnect *GitlabConnect) AuthCodeURL(state string) string {
+	return gitlabConnect.gitlabOauthConfig.AuthCodeURL(state)
 }

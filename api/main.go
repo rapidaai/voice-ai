@@ -97,12 +97,12 @@ func main() {
 
 	// if application json
 	http2GRPCFilteredListener := cmuxListener.Match(cmux.HTTP2())
-	grpcFilteredListener := cmuxListener.Match(
-		cmux.HTTP1HeaderField("Content-type", "application/grpc-web+proto"),
-		cmux.HTTP1HeaderField("x-grpc-web", "1"))
-	rpcFilteredListener := cmuxListener.Match(cmux.Any())
-	// rpcFilteredListener := cmuxListener.Match(cmux.HTTP2())
-	// grpcFilteredListener := cmuxListener.Match(cmux.Any())
+	// grpcFilteredListener := cmuxListener.Match(
+	// 	cmux.HTTP1HeaderField("Content-type", "application/grpc-web+proto"),
+	// 	cmux.HTTP1HeaderField("x-grpc-web", "1"))
+	// rpcFilteredListener := cmuxListener.Match(cmux.Any())
+	rpcFilteredListener := cmuxListener.Match(cmux.HTTP2())
+	grpcFilteredListener := cmuxListener.Match(cmux.Any())
 
 	group, ctx := errgroup.WithContext(ctx)
 	group.Go(func() error {
@@ -324,14 +324,17 @@ func (g *AppRunner) KnowledgeConnectApiRoute() {
 	apiv1 := g.E.Group("/connect-knowledge")
 	connectApi := webApi.NewConnectRPC(g.Cfg, g.Logger, g.Postgres)
 	{
+		// working
+		apiv1.GET("/notion/", connectApi.NotionConnect)
+
 		apiv1.GET("/confluence/", connectApi.ConfluenceConnect)
 		apiv1.GET("/google-drive/", connectApi.GoogleDriveConnect)
 		//
 		apiv1.GET("/github/", connectApi.GithubCodeConnect)
 		apiv1.GET("/gitlab/", connectApi.GitlabCodeConnect)
 
-		apiv1.GET("/one-drive/", connectApi.MicrosoftOnedriveConnect)
-		apiv1.GET("/slide-share/", connectApi.MicrosoftSlideshareConnect)
+		apiv1.GET("/microsoft-onedrive/", connectApi.MicrosoftOnedriveConnect)
+		apiv1.GET("/sharepoint/", connectApi.MicrosoftSharepointConnect)
 	}
 }
 

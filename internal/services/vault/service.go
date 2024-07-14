@@ -3,13 +3,13 @@ package internal_vault_service
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	internal_gorm "github.com/lexatic/web-backend/internal/gorm"
 	internal_services "github.com/lexatic/web-backend/internal/services"
 	"github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"
 	gorm_models "github.com/lexatic/web-backend/pkg/models/gorm"
+	gorm_types "github.com/lexatic/web-backend/pkg/models/gorm/types"
 	"github.com/lexatic/web-backend/pkg/types"
 	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 	"gorm.io/gorm/clause"
@@ -27,65 +27,84 @@ func NewVaultService(logger commons.Logger, postgres connectors.PostgresConnecto
 	}
 }
 
-func (vS *vaultService) Create(ctx context.Context, auth types.Principle, organizationId uint64, providerId uint64, keyName string, key string) (*internal_gorm.Vault, error) {
-	db := vS.postgres.DB(ctx)
+func (vS *vaultService) CreateOrganizationToolCredential(ctx context.Context,
+	auth types.Principle,
+	toolId uint64,
+	name string, credential map[string]interface{}) (*internal_gorm.Vault, error) {
+	return vS.createCredential(ctx, *auth.GetUserId(), name, credential, gorm_types.VAULT_TYPE_TOOL,
+		toolId, gorm_types.VAULT_LEVEL_ORGANIZATION, *auth.GetCurrentOrganizationId())
+}
+
+func (vS *vaultService) CreateOrganizationProviderCredential(ctx context.Context,
+	auth types.Principle,
+	providerId uint64,
+	name string, credential map[string]interface{}) (*internal_gorm.Vault, error) {
+	return vS.createCredential(ctx, *auth.GetUserId(), name, credential, gorm_types.VAULT_TYPE_PROVIDER,
+		providerId, gorm_types.VAULT_LEVEL_ORGANIZATION, *auth.GetCurrentOrganizationId())
+
+}
+
+func (vS *vaultService) CreateUserToolCredential(ctx context.Context,
+	auth types.Principle,
+	toolId uint64,
+	name string,
+	credential map[string]interface{},
+) (*internal_gorm.Vault, error) {
+	return vS.createCredential(ctx, *auth.GetUserId(), name,
+		credential,
+		gorm_types.VAULT_TYPE_TOOL,
+		toolId,
+		gorm_types.VAULT_LEVEL_USER,
+		*auth.GetUserId())
+}
+
+func (vs *vaultService) createCredential(ctx context.Context,
+	userId uint64,
+	name string,
+	credential map[string]interface{},
+	vaultType gorm_types.VaultType,
+	vaultTypeId uint64, level gorm_types.VaultLevel, levelId uint64) (*internal_gorm.Vault, error) {
+	db := vs.postgres.DB(ctx)
 	vlt := &internal_gorm.Vault{
-		Name:           keyName,
-		ProviderId:     providerId,
-		Key:            key,
-		CreatedBy:      auth.GetUserInfo().Id,
-		OrganizationId: organizationId,
+		Name:         name,
+		VaultType:    vaultType,
+		VaultTypeId:  vaultTypeId,
+		Value:        credential,
+		CreatedBy:    userId,
+		VaultLevel:   level,
+		VaultLevelId: levelId,
 	}
+
 	tx := db.Save(vlt)
 	if err := tx.Error; err != nil {
+		vs.logger.Debugf("unable to create organization credentials for tool %v", err)
 		return nil, err
 	}
 	return vlt, nil
-
 }
+
 func (vS *vaultService) Delete(ctx context.Context, auth types.Principle, vaultId uint64) (*internal_gorm.Vault, error) {
 	db := vS.postgres.DB(ctx)
 	vlt := &internal_gorm.Vault{
-		Audited:   gorm_models.Audited{Id: vaultId},
 		Status:    "deleted",
-		UpdatedBy: auth.GetUserInfo().Id,
+		UpdatedBy: *auth.GetUserId(),
 	}
-	tx := db.Save(vlt)
+	tx := db.Where("id = ? and vault_level = ? AND vault_level_id = ?", vaultId, gorm_types.VAULT_LEVEL_ORGANIZATION, *auth.GetCurrentOrganizationId()).Clauses(clause.Returning{}).Updates(vlt)
 	if err := tx.Error; err != nil {
+		vS.logger.Debugf("unable to delete vault %v")
 		return nil, err
 	}
 	return vlt, nil
 }
 
-func (vS *vaultService) Update(ctx context.Context, auth types.Principle, vaultId uint64, providerId uint64, value string, name string) (*internal_gorm.Vault, error) {
-	db := vS.postgres.DB(ctx)
-	vlt := &internal_gorm.Vault{
-		Audited: gorm_models.Audited{
-			Id: vaultId,
-		},
-		UpdatedBy:  auth.GetUserInfo().Id,
-		Name:       name,
-		ProviderId: providerId,
-	}
-	updates := map[string]interface{}{"updated_by": auth.GetUserInfo().Id, "name": name, "provider_id": providerId}
-	if strings.TrimSpace(value) != "" {
-		updates["key"] = value
-	}
-	tx := db.Model(&vlt).Updates(updates)
-	if err := tx.Error; err != nil {
-		return nil, err
-	}
-	return vlt, nil
-}
-
-func (vS *vaultService) GetAll(ctx context.Context, auth types.Principle, organizationId uint64, criterias []*web_api.Criteria, paginate *web_api.Paginate) (int64, *[]internal_gorm.Vault, error) {
+func (vS *vaultService) GetAllOrganizationCredential(ctx context.Context, auth types.Principle, criterias []*web_api.Criteria, paginate *web_api.Paginate) (int64, *[]internal_gorm.Vault, error) {
 	db := vS.postgres.DB(ctx)
 	var vaults []internal_gorm.Vault
 	var cnt int64
 
 	qry := db.Model(internal_gorm.Vault{})
 	qry.
-		Where("organization_id = ? AND status = ?", organizationId, "active")
+		Where("vault_level = ? AND vault_level_id = ? AND status = ?", gorm_types.VAULT_LEVEL_ORGANIZATION, *auth.GetCurrentOrganizationId(), "active")
 	for _, ct := range criterias {
 		qry.Where(fmt.Sprintf("%s = ?", ct.GetKey()), ct.GetValue())
 	}
@@ -103,17 +122,28 @@ func (vS *vaultService) GetAll(ctx context.Context, auth types.Principle, organi
 		}).Find(&vaults)
 
 	if tx.Error != nil {
-		vS.logger.Debugf("unable to find any vault %s", organizationId)
+		vS.logger.Debugf("unable to find any vault %v", *auth.GetCurrentOrganizationId())
 		return cnt, nil, tx.Error
 	}
 
 	return cnt, &vaults, nil
 }
 
-func (vS *vaultService) Get(ctx context.Context, auth types.SimplePrinciple, providerId uint64) (*internal_gorm.Vault, error) {
+// gorm_types.VAULT_TYPE_PROVIDER,
+// rapidaProviderId,
+func (vS *vaultService) GetProviderCredential(ctx context.Context,
+	auth types.SimplePrinciple,
+	providerId uint64) (*internal_gorm.Vault, error) {
 	db := vS.postgres.DB(ctx)
 	var vault internal_gorm.Vault
-	tx := db.Where("organization_id = ? and status = ? and provider_id = ?", *auth.GetCurrentOrganizationId(), "active", providerId).First(&vault)
+
+	tx := db.Where("status = ? and vault_type = ? and vault_type_id = ? and vault_level = ? and vault_level_id = ?",
+		"active",
+		string(gorm_types.VAULT_TYPE_PROVIDER),
+		providerId,
+		string(gorm_types.VAULT_LEVEL_ORGANIZATION),
+		*auth.GetCurrentOrganizationId(),
+	).First(&vault)
 	if tx.Error != nil {
 		vS.logger.Errorf("get credential error  %v", tx.Error)
 		return nil, tx.Error
@@ -121,71 +151,40 @@ func (vS *vaultService) Get(ctx context.Context, auth types.SimplePrinciple, pro
 	return &vault, nil
 }
 
-func (vS *vaultService) CreateAllDefaultKeys(ctx context.Context, organizationId uint64) ([]*internal_gorm.Vault, error) {
-	db := vS.postgres.DB(ctx)
-	vlts := make([]*internal_gorm.Vault, 0)
+func (vS *vaultService) CreateRapidaProviderCredential(ctx context.Context,
+	organizationId uint64) (*internal_gorm.Vault, error) {
 
-	vlts = append(vlts,
-		&internal_gorm.Vault{
-			Name:           "default-anthropic-01",
-			ProviderId:     1987967168347635712,
-			Key:            "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",
-			CreatedBy:      99,
-			OrganizationId: organizationId,
-		})
-	vlts = append(vlts,
-		&internal_gorm.Vault{
-			Name:           "default-replicate-01",
-			ProviderId:     1987967168431521792,
-			Key:            "r8_FvPKVcfvtL3NifEKEUvi7q2uEpNYUsm3MUpMN",
-			CreatedBy:      99,
-			OrganizationId: organizationId,
-		})
-	vlts = append(vlts,
-		&internal_gorm.Vault{
-			Name:           "default-cohere-01",
-			ProviderId:     1987967168435716096,
-			Key:            "nHuteTe84dihnImlgpwiD7Tk9cmAHP1qxHocstf5",
-			CreatedBy:      99,
-			OrganizationId: organizationId,
-		})
-	vlts = append(vlts,
-		&internal_gorm.Vault{
-			Name:           "default-openai-01",
-			ProviderId:     1987967168452493312,
-			Key:            "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",
-			CreatedBy:      99,
-			OrganizationId: organizationId,
-		})
-
-	vlts = append(vlts, &internal_gorm.Vault{
-		Name:           "default-google-01",
-		ProviderId:     198796716894742118,
-		Key:            "AIzaSyBI19ykmjj-wsA_hR3rt-UrPkFtwQQ3hhY",
-		CreatedBy:      99,
-		OrganizationId: organizationId,
-	})
-
-	vlts = append(vlts, &internal_gorm.Vault{
-		Name:           "default-mistral-01",
-		ProviderId:     198796716894742119,
-		Key:            "pskpIUoGzlLvzuxczSpLaJpxuFhZiWzy",
-		CreatedBy:      99,
-		OrganizationId: organizationId,
-	})
-
-	vlts = append(vlts, &internal_gorm.Vault{
-		Name:           "default-huggingface-01",
-		ProviderId:     198796716894742120,
-		Key:            "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",
-		CreatedBy:      99,
-		OrganizationId: organizationId,
-	})
-
-	tx := db.Save(vlts)
-	if err := tx.Error; err != nil {
-		vS.logger.Debugf("unable to insert for default keys of provider %v", err)
-		return nil, err
-	}
-	return vlts, nil
+	rapidaProviderId := uint64(8298870085084815298)
+	return vS.createCredential(
+		ctx,
+		99,
+		"default-rapida-credentials",
+		map[string]interface{}{
+			"1987967168347635712": map[string]string{
+				"key": "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",
+			},
+			"198796716894742120": map[string]string{
+				"key": "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",
+			},
+			"198796716894742119": map[string]string{
+				"key": "pskpIUoGzlLvzuxczSpLaJpxuFhZiWzy",
+			},
+			"198796716894742118": map[string]string{
+				"key": "AIzaSyBI19ykmjj-wsA_hR3rt-UrPkFtwQQ3hhY",
+			},
+			"1987967168452493312": map[string]string{
+				"key": "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",
+			},
+			"1987967168435716096": map[string]string{
+				"key": "nHuteTe84dihnImlgpwiD7Tk9cmAHP1qxHocstf5",
+			},
+			"1987967168431521792": map[string]string{
+				"key": "r8_FvPKVcfvtL3NifEKEUvi7q2uEpNYUsm3MUpMN",
+			},
+		},
+		gorm_types.VAULT_TYPE_PROVIDER,
+		rapidaProviderId,
+		gorm_types.VAULT_LEVEL_ORGANIZATION,
+		organizationId,
+	)
 }

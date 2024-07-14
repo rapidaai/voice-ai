@@ -14,17 +14,14 @@ type AtlassianConnect struct {
 }
 
 var (
-	CONFLUENCE_CONNECT_URL = "/connect/confluence"
+	CONFLUENCE_CONNECT_URL = "/connect-common/atlassian"
 	CONFLUENCE_SCOPE       = [...]string{
-		"write:confluence-content",
-		"write:confluence-file", "readonly:content.attachment:confluence",
-		"write:confluence-groups",
 		"search:confluence",
 		"read:confluence-content.summary",
 		"read:confluence-content.all"}
 
 	JIRA_SCOPE       = [...]string{}
-	JIRA_CONNECT_URL = "/action/jira"
+	JIRA_CONNECT_URL = "/connect-common/atlassian"
 )
 
 func NewConfluenceConnect(cfg *config.AppConfig, logger commons.Logger) AtlassianConnect {
