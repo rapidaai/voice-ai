@@ -27,7 +27,7 @@ type Vault struct {
 	VaultLevelId uint64                `json:"vaultLevelId" gorm:"type:bigint;size:40;not null"`
 
 	Name      string                  `json:"name" gorm:"type:string;size:200;not null"`
-	Value     gorm_types.InterfaceMap `json:"credential" gorm:"type:string;size:50;not null;default:active"`
+	Value     gorm_types.InterfaceMap `json:"value" gorm:"type:string;size:50;not null;default:active"`
 	Status    string                  `json:"status" gorm:"type:string;size:50;not null;default:active"`
 	CreatedBy uint64                  `json:"createdBy" gorm:"type:bigint;size:200;not null"`
 	UpdatedBy uint64                  `json:"updatedBy" gorm:"type:bigint;size:200;not null"`
