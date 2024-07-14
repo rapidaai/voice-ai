@@ -2,13 +2,13 @@ package web_api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
+	internal_connects "github.com/lexatic/web-backend/internal/connects"
 	internal_organization_service "github.com/lexatic/web-backend/internal/services/organization"
 	internal_project_service "github.com/lexatic/web-backend/internal/services/project"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -23,10 +23,6 @@ import (
 	"github.com/lexatic/web-backend/pkg/types"
 	"github.com/lexatic/web-backend/pkg/utils"
 	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/github"
-	"golang.org/x/oauth2/google"
-	"golang.org/x/oauth2/linkedin"
 )
 
 type webAuthApi struct {
@@ -37,9 +33,9 @@ type webAuthApi struct {
 	organizationService internal_services.OrganizationService
 	projectService      internal_services.ProjectService
 	sendgridClient      integration_client.SendgridServiceClient
-	googleOauthConfig   oauth2.Config
-	linkedinOauthConfig oauth2.Config
-	githubOauthConfig   oauth2.Config
+	githubConnect       internal_connects.GithubConnect
+	linkedinConnect     internal_connects.LinkedinConnect
+	googleConnect       internal_connects.GoogleConnect
 }
 
 type webAuthRPCApi struct {
@@ -53,14 +49,14 @@ type webAuthGRPCApi struct {
 func NewAuthRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) *webAuthRPCApi {
 	return &webAuthRPCApi{
 		webAuthApi{
-			cfg:                 config,
-			logger:              logger,
-			postgres:            postgres,
-			userService:         internal_user_service.NewUserService(logger, postgres),
-			sendgridClient:      integration_client.NewSendgridServiceClientGRPC(config, logger),
-			googleOauthConfig:   GoogleOAuth(config),
-			linkedinOauthConfig: LinkedinOAuth(config),
-			githubOauthConfig:   GithubOAuth(config),
+			cfg:             config,
+			logger:          logger,
+			postgres:        postgres,
+			userService:     internal_user_service.NewUserService(logger, postgres),
+			sendgridClient:  integration_client.NewSendgridServiceClientGRPC(config, logger),
+			githubConnect:   internal_connects.NewGithubAuthenticationConnect(config, logger),
+			linkedinConnect: internal_connects.NewLinkedinAuthenticationConnect(config, logger),
+			googleConnect:   internal_connects.NewGoogleAuthenticationConnect(config, logger),
 		},
 	}
 }
@@ -75,9 +71,9 @@ func NewAuthGRPC(config *config.AppConfig, logger commons.Logger, postgres conne
 			organizationService: internal_organization_service.NewOrganizationService(logger, postgres),
 			projectService:      internal_project_service.NewProjectService(logger, postgres),
 			sendgridClient:      integration_client.NewSendgridServiceClientGRPC(config, logger),
-			googleOauthConfig:   GoogleOAuth(config),
-			linkedinOauthConfig: LinkedinOAuth(config),
-			githubOauthConfig:   GithubOAuth(config),
+			githubConnect:       internal_connects.NewGithubAuthenticationConnect(config, logger),
+			linkedinConnect:     internal_connects.NewLinkedinAuthenticationConnect(config, logger),
+			googleConnect:       internal_connects.NewGoogleAuthenticationConnect(config, logger),
 		},
 	}
 }
@@ -581,47 +577,8 @@ Oauth implimentation block that will help us quickly login and sign up in our sy
 
 **/
 
-func GithubOAuth(cfg *config.AppConfig) oauth2.Config {
-	return oauth2.Config{
-		RedirectURL:  "https://www.rapida.ai/auth/signin",
-		ClientID:     cfg.GithubClientId,
-		ClientSecret: cfg.GithubClientSecret,
-		Scopes:       []string{"user"},
-		Endpoint:     github.Endpoint,
-	}
-}
-
-func LinkedinOAuth(cfg *config.AppConfig) oauth2.Config {
-	return oauth2.Config{
-		RedirectURL:  "https://www.rapida.ai/auth/signin",
-		ClientID:     cfg.LinkedinClientId,
-		ClientSecret: cfg.LinkedinClientSecret,
-		Scopes:       []string{"openid", "profile", "email"},
-		Endpoint:     linkedin.Endpoint,
-	}
-}
-
-func GoogleOAuth(cfg *config.AppConfig) oauth2.Config {
-	return oauth2.Config{
-		RedirectURL:  "https://www.rapida.ai/auth/signin",
-		ClientID:     cfg.GoogleClientId,
-		ClientSecret: cfg.GoogleClientSecret,
-		Scopes:       []string{"email", "profile"},
-		Endpoint:     google.Endpoint,
-	}
-}
-
-type OpenID struct {
-	Email    string `json:"email"`
-	Name     string `json:"name"`
-	Verified bool   `json:"verified_email"`
-	Id       string `json:"id"`
-	Source   string `json:"source"`
-	Token    string `json:"token"`
-}
-
 // common way to create social user
-func (wAuthApi *webAuthApi) RegisterSocialUser(c context.Context, inf *OpenID) (*web_api.AuthenticateResponse, error) {
+func (wAuthApi *webAuthApi) RegisterSocialUser(c context.Context, inf *internal_connects.OpenID) (*web_api.AuthenticateResponse, error) {
 	cUser, err := wAuthApi.userService.Get(c, inf.Email)
 	if err != nil {
 		aUser, err := wAuthApi.userService.Create(c, inf.Name, inf.Email, inf.Token, "waitlist", &inf.Source)
@@ -772,67 +729,36 @@ func (wAuthApi *webAuthApi) RegisterSocialUser(c context.Context, inf *OpenID) (
 	return nil, errors.New("you are already registered, please use the existing method to signin")
 }
 
-/*
-*
+/**
 
-Google implimentation
+Github
 */
 
-func (wAuthApi *webAuthRPCApi) Google(c *gin.Context) {
-	url := wAuthApi.googleOauthConfig.AuthCodeURL("google")
+func (wAuthApi *webAuthRPCApi) Github(c *gin.Context) {
+	url := wAuthApi.githubConnect.AuthCodeURL("github")
+	wAuthApi.logger.Debugf("url generated %v", url)
 	c.Redirect(http.StatusTemporaryRedirect, url)
 	return
 }
-func (wAuthApi *webAuthGRPCApi) Google(c context.Context, irRequest *web_api.SocialAuthenticationRequest) (*web_api.AuthenticateResponse, error) {
-	inf, err := wAuthApi.GoogleUserInfo(c, irRequest.State, irRequest.Code)
-	wAuthApi.logger.Debugf("google authenticator respose %v", inf)
+
+func (wAuthApi *webAuthGRPCApi) Github(c context.Context, irRequest *web_api.SocialAuthenticationRequest) (*web_api.AuthenticateResponse, error) {
+	inf, err := wAuthApi.githubConnect.GithubUserInfo(c, irRequest.State, irRequest.Code)
+	wAuthApi.logger.Debugf("github authenticator respose %v", inf)
 	if err != nil {
-		wAuthApi.logger.Errorf("google authentication response %v", err)
+		wAuthApi.logger.Errorf("github authentication response %v", err)
 		return nil, err
 	}
 	return wAuthApi.RegisterSocialUser(c, inf)
 }
-func (wAuthApi *webAuthGRPCApi) GoogleUserInfo(c context.Context, state string, code string) (*OpenID, error) {
-	if state != "google" {
-		wAuthApi.logger.Errorf("illegal oauth request as auth state is not matching %s %s", "google", state)
-		return nil, fmt.Errorf("invalid oauth state")
-	}
-	token, err := wAuthApi.googleOauthConfig.Exchange(c, code)
-	if err != nil {
-		wAuthApi.logger.Errorf("google authentication exchange failed %v", err)
-		return nil, fmt.Errorf("code exchange failed: %s", err.Error())
-	}
-	response, err := http.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token=" + token.AccessToken)
-	if err != nil {
-		wAuthApi.logger.Errorf("unable to get userinfo using the access token %v", err)
-		return nil, fmt.Errorf("failed getting user info: %s", err.Error())
-	}
-	defer response.Body.Close()
-
-	var content OpenID
-	err = json.NewDecoder(response.Body).Decode(&content)
-	content.Source = "google"
-	content.Token = token.AccessToken
-	if err != nil {
-		wAuthApi.logger.Errorf("unable to decode the response body of the user info %v", err)
-		return nil, fmt.Errorf("failed reading response body: %s", err.Error())
-	}
-	return &content, nil
-}
-
-/**
-
-Linkedin oauth
-*/
 
 func (wAuthApi *webAuthRPCApi) Linkedin(c *gin.Context) {
-	url := wAuthApi.linkedinOauthConfig.AuthCodeURL("linkedin")
+	url := wAuthApi.linkedinConnect.AuthCodeURL("linkedin")
 	wAuthApi.logger.Debugf("generated redirect url for linkedin %v", url)
 	c.Redirect(http.StatusTemporaryRedirect, url)
 	return
 }
 func (wAuthApi *webAuthGRPCApi) Linkedin(c context.Context, irRequest *web_api.SocialAuthenticationRequest) (*web_api.AuthenticateResponse, error) {
-	inf, err := wAuthApi.LinkedinUserInfo(c, irRequest.State, irRequest.Code)
+	inf, err := wAuthApi.linkedinConnect.LinkedinUserInfo(c, irRequest.State, irRequest.Code)
 	wAuthApi.logger.Debugf("linkedin authenticator respose %v", inf)
 	if err != nil {
 		wAuthApi.logger.Errorf("google authentication response %v", err)
@@ -841,110 +767,21 @@ func (wAuthApi *webAuthGRPCApi) Linkedin(c context.Context, irRequest *web_api.S
 
 	return wAuthApi.RegisterSocialUser(c, inf)
 }
-func (wAuthApi *webAuthGRPCApi) LinkedinUserInfo(c context.Context, state string, code string) (*OpenID, error) {
-	if state != "linkedin" {
-		wAuthApi.logger.Errorf("illegal oauth request as auth state is not matching %s %s", "linkedin", state)
-		return nil, fmt.Errorf("invalid oauth state")
-	}
 
-	token, err := wAuthApi.linkedinOauthConfig.Exchange(c, code)
-	if err != nil {
-		wAuthApi.logger.Errorf("unable to exchange the token from linkedin %v", err)
-		return nil, err
-	}
-
-	client := wAuthApi.linkedinOauthConfig.Client(c, token)
-	req, err := http.NewRequest("GET", "https://api.linkedin.com/v2/userinfo", nil)
-	if err != nil {
-		wAuthApi.logger.Errorf("error while creating request %v", err)
-		return nil, err
-	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
-	response, err := client.Do(req)
-	if err != nil {
-		wAuthApi.logger.Errorf("error while getting user from linkedin %v", err)
-		return nil, err
-	}
-
-	defer response.Body.Close()
-	// // {"email":"p_srivastav@outlook.com","email_verified":true,"family_name":"Srivastav","given_name":"Prashant","locale":{"country":"US","language":"en"},"name":"Prashant Srivastav","picture":"https://media.licdn.com/dms/image/C5603AQGslsdJ_ZIoMA/profile-displayphoto-shrink_100_100/0/1659118454695?e=1706745600\u0026v=beta\u0026t=8NmYbyO4c6gd3Y1MQjs4LZ3cmh6tYU9zc9Ghlg3FAQ0","sub":"XyBk2_14Uj"}
-	var content map[string]interface{}
-	err = json.NewDecoder(response.Body).Decode(&content)
-	if err != nil {
-		wAuthApi.logger.Errorf("unable to decode %v", err)
-		return nil, err
-	}
-	return &OpenID{
-		Token: token.AccessToken, Source: "linkedin",
-		Email:    content["email"].(string),
-		Verified: content["email_verified"].(bool),
-		Name:     content["name"].(string),
-		Id:       content["sub"].(string),
-	}, nil
-}
-
-/**
-
-Github
-*/
-
-func (wAuthApi *webAuthRPCApi) Github(c *gin.Context) {
-	url := wAuthApi.githubOauthConfig.AuthCodeURL("github")
-	wAuthApi.logger.Debugf("url generated %v", url)
+func (wAuthApi *webAuthRPCApi) Google(c *gin.Context) {
+	url := wAuthApi.googleConnect.AuthCodeURL("google")
 	c.Redirect(http.StatusTemporaryRedirect, url)
 	return
 }
-
-func (wAuthApi *webAuthGRPCApi) Github(c context.Context, irRequest *web_api.SocialAuthenticationRequest) (*web_api.AuthenticateResponse, error) {
-	inf, err := wAuthApi.GithubUserInfo(c, irRequest.State, irRequest.Code)
-	wAuthApi.logger.Debugf("github authenticator respose %v", inf)
+func (wAuthApi *webAuthGRPCApi) Google(c context.Context, irRequest *web_api.SocialAuthenticationRequest) (*web_api.AuthenticateResponse, error) {
+	inf, err := wAuthApi.googleConnect.GoogleUserInfo(c, irRequest.State, irRequest.Code)
+	wAuthApi.logger.Debugf("google authenticator respose %v", inf)
 	if err != nil {
-		wAuthApi.logger.Errorf("github authentication response %v", err)
+		wAuthApi.logger.Errorf("google authentication response %v", err)
 		return nil, err
 	}
-
 	return wAuthApi.RegisterSocialUser(c, inf)
-}
 
-func (wAuthApi *webAuthGRPCApi) GithubUserInfo(c context.Context, state string, code string) (*OpenID, error) {
-	if state != "github" {
-		wAuthApi.logger.Errorf("illegal oauth request as auth state is not matching %s %s", "github", state)
-		return nil, fmt.Errorf("invalid oauth state")
-	}
-
-	token, err := wAuthApi.githubOauthConfig.Exchange(c, code)
-	if err != nil {
-		wAuthApi.logger.Errorf("unable to exchange the token from github %v", err)
-		return nil, err
-	}
-
-	oauthClient := wAuthApi.githubOauthConfig.Client(c, token)
-	req, err := http.NewRequest("POST", "https://api.github.com/user", nil)
-	if err != nil {
-		wAuthApi.logger.Errorf("error while creating request %v", err)
-		return nil, err
-	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
-	response, err := oauthClient.Do(req)
-	if err != nil {
-		wAuthApi.logger.Errorf("error while getting user from linkedin %v", err)
-		return nil, err
-	}
-
-	defer response.Body.Close()
-	var content map[string]interface{}
-	err = json.NewDecoder(response.Body).Decode(&content)
-	if err != nil {
-		wAuthApi.logger.Errorf("unable to decode %v", err)
-		return nil, err
-	}
-	return &OpenID{
-		Token: token.AccessToken, Source: "github",
-		Email:    content["email"].(string),
-		Verified: true,
-		Name:     content["name"].(string),
-		Id:       fmt.Sprintf("%f", content["id"].(float64)),
-	}, nil
 }
 
 func (wAuthApi *webAuthGRPCApi) GetAllUser(c context.Context, irRequest *web_api.GetAllUserRequest) (*web_api.GetAllUserResponse, error) {

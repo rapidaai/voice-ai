@@ -51,16 +51,6 @@ type OrganizationService interface {
 	Update(ctx context.Context, auth types.Principle, organizationId uint64, name *string, industry *string, email *string) (*internal_gorm.Organization, error)
 }
 
-type VaultService interface {
-	Create(ctx context.Context, auth types.Principle, organizationId uint64, providerId uint64, keyName string, key string) (*internal_gorm.Vault, error)
-	Delete(ctx context.Context, auth types.Principle, vaultId uint64) (*internal_gorm.Vault, error)
-	GetAll(ctx context.Context, auth types.Principle, organizationId uint64, criterias []*web_api.Criteria, paginate *web_api.Paginate) (int64, *[]internal_gorm.Vault, error)
-	Get(ctx context.Context, auth types.SimplePrinciple, providerId uint64) (*internal_gorm.Vault, error)
-	Update(ctx context.Context, auth types.Principle, vaultId uint64, providerId uint64, value string, name string) (*internal_gorm.Vault, error)
-	// do not make it habbit
-	CreateAllDefaultKeys(ctx context.Context, organizationId uint64) ([]*internal_gorm.Vault, error)
-}
-
 type ProjectService interface {
 	Create(ctx context.Context, auth types.Principle, organizationId uint64, name string, description string) (*internal_gorm.Project, error)
 	Update(ctx context.Context, auth types.Principle, projectId uint64, name *string, description *string) (*internal_gorm.Project, error)
@@ -75,4 +65,31 @@ type ProjectService interface {
 
 type LeadService interface {
 	Create(ctx context.Context, email string) (*internal_gorm.Lead, error)
+}
+
+type VaultService interface {
+	CreateOrganizationToolCredential(ctx context.Context,
+		auth types.Principle,
+		toolId uint64,
+		name string, credential map[string]interface{}) (*internal_gorm.Vault, error)
+
+	//
+	CreateOrganizationProviderCredential(ctx context.Context,
+		auth types.Principle,
+		providerId uint64,
+		name string, credential map[string]interface{}) (*internal_gorm.Vault, error)
+
+	//
+	CreateUserToolCredential(ctx context.Context,
+		auth types.Principle,
+		toolId uint64,
+		name string,
+		credential map[string]interface{},
+	) (*internal_gorm.Vault, error)
+	//
+
+	Delete(ctx context.Context, auth types.Principle, vaultId uint64) (*internal_gorm.Vault, error)
+	GetAllOrganizationCredential(ctx context.Context, auth types.Principle, criterias []*web_api.Criteria, paginate *web_api.Paginate) (int64, *[]internal_gorm.Vault, error)
+	GetProviderCredential(ctx context.Context, auth types.SimplePrinciple, providerId uint64) (*internal_gorm.Vault, error)
+	CreateRapidaProviderCredential(ctx context.Context, organizationId uint64) (*internal_gorm.Vault, error)
 }

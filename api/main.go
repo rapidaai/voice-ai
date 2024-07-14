@@ -236,12 +236,12 @@ func (g *AppRunner) AllRouters() {
 	g.LeadApiRoute()
 	g.ActivityApiRoute()
 	g.EndpointApiRoute()
-	g.WebhookApiRoute()
 	g.InvokeApiRoute()
 	g.WorkflowApiRoute()
 	g.ExecutorApiRoute()
 	g.KnowledgeApiRoute()
 	g.AssistantApiRoute()
+	g.KnowledgeConnectApiRoute()
 
 }
 
@@ -303,10 +303,6 @@ func (g *AppRunner) EndpointApiRoute() {
 	web_api.RegisterEndpointServiceServer(g.S, webApi.NewEndpointGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
 }
 
-func (g *AppRunner) WebhookApiRoute() {
-	web_api.RegisterWebhookManagerServiceServer(g.S, webApi.NewWebhookGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
-}
-
 func (g *AppRunner) WorkflowApiRoute() {
 	web_api.RegisterWorkflowServiceServer(g.S, webApi.NewWorkflowGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
 }
@@ -320,6 +316,26 @@ func (g *AppRunner) KnowledgeApiRoute() {
 func (g *AppRunner) AssistantApiRoute() {
 	web_api.RegisterAssistantServiceServer(g.S, webApi.NewAssistantGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
 	web_api.RegisterAssistantConversactionServiceServer(g.S, webApi.NewAssistantConversactionGRPC(g.Cfg, g.Logger, g.Postgres, g.Redis))
+}
+
+func (g *AppRunner) KnowledgeConnectApiRoute() {
+	web_api.RegisterConnectServiceServer(g.S, webApi.NewConnectGRPC(g.Cfg, g.Logger, g.Postgres))
+	g.Logger.Info("Internal HealthCheckRoutes and Connectors added to engine.")
+	apiv1 := g.E.Group("/connect-knowledge")
+	connectApi := webApi.NewConnectRPC(g.Cfg, g.Logger, g.Postgres)
+	{
+		// working
+		apiv1.GET("/notion/", connectApi.NotionConnect)
+
+		apiv1.GET("/confluence/", connectApi.ConfluenceConnect)
+		apiv1.GET("/google-drive/", connectApi.GoogleDriveConnect)
+		//
+		apiv1.GET("/github/", connectApi.GithubCodeConnect)
+		apiv1.GET("/gitlab/", connectApi.GitlabCodeConnect)
+
+		apiv1.GET("/microsoft-onedrive/", connectApi.MicrosoftOnedriveConnect)
+		apiv1.GET("/sharepoint/", connectApi.MicrosoftSharepointConnect)
+	}
 }
 
 func (g *AppRunner) HealthCheckRoutes() {
