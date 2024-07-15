@@ -163,6 +163,9 @@ func (vS *vaultService) CreateRapidaProviderCredential(ctx context.Context,
 			"1987967168347635712": map[string]string{
 				"key": "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",
 			},
+			"5212367370329048775": map[string]string{
+				"key": "pa-f2E7NuNmZrC9ADFKE6KjnyZgxUH8_xliK3C0CAKVG00",
+			},
 			"198796716894742120": map[string]string{
 				"key": "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",
 			},
