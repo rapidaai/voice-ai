@@ -12,7 +12,7 @@ import (
 // Application config structure
 type AppConfig struct {
 	Name           string                 `mapstructure:"service_name" validate:"required"`
-	Version        string                 `mapstructure:"version" validate:"required"`
+	Version        string                 `mapstructure:"version"`
 	Host           string                 `mapstructure:"host" validate:"required"`
 	Env            string                 `mapstructure:"env" validate:"required"`
 	Secret         string                 `mapstructure:"secret" validate:"required"`
@@ -30,7 +30,7 @@ type AppConfig struct {
 	WebHost         string `mapstructure:"web_host" validate:"required"`
 	ExperimentHost  string `mapstructure:"experiment_host" validate:"required"`
 
-	AssetStoreConfig AssetStoreConfig `mapstructure:"asset_store" validate:"required"`
+	AssetStoreConfig configs.AssetStoreConfig `mapstructure:"asset_store" validate:"required"`
 
 	GoogleClientId     string `mapstructure:"google_client_id" validate:"required"`
 	GoogleClientSecret string `mapstructure:"google_client_secret" validate:"required"`
@@ -42,16 +42,22 @@ type AppConfig struct {
 	GithubClientSecret string `mapstructure:"github_client_secret" validate:"required"`
 
 	NotionClientId     string `mapstructure:"notion_client_id" validate:"required"`
-	NotionClientSecret string `mapstructure:"notion_client_id" validate:"required"`
+	NotionClientSecret string `mapstructure:"notion_client_secret" validate:"required"`
 
 	MicrosoftClientId     string `mapstructure:"microsoft_client_id" validate:"required"`
-	MicrosoftClientSecret string `mapstructure:"microsoft_client_id" validate:"required"`
+	MicrosoftClientSecret string `mapstructure:"microsoft_client_secret" validate:"required"`
 
 	AtlassianClientId     string `mapstructure:"atlassian_client_id" validate:"required"`
-	AtlassianClientSecret string `mapstructure:"atlassian_client_id" validate:"required"`
+	AtlassianClientSecret string `mapstructure:"atlassian_client_secret" validate:"required"`
 
 	GitlabClientId     string `mapstructure:"gitlab_client_id" validate:"required"`
-	GitlabClientSecret string `mapstructure:"gitlab_client_id" validate:"required"`
+	GitlabClientSecret string `mapstructure:"gitlab_client_secret" validate:"required"`
+
+	SlackAppId              string `mapstructure:"slack_app_id" validate:"required"`
+	SlackClientId           string `mapstructure:"slack_client_id" validate:"required"`
+	SlackClientSecret       string `mapstructure:"slack_client_secret" validate:"required"`
+	SlackSigningSecret      string `mapstructure:"slack_signing_secret" validate:"required"`
+	SlackVerificationSecret string `mapstructure:"slack_verification_secret" validate:"required"`
 }
 
 func (cfg *AppConfig) IsDevelopment() bool {
@@ -85,44 +91,11 @@ func InitConfig() (*viper.Viper, error) {
 	}
 
 	//
-	setDefault(vConfig)
 	if err = vConfig.ReadInConfig(); err != nil && !os.IsNotExist(err) {
 		log.Printf("Reading from env varaibles.")
 	}
 
 	return vConfig, nil
-}
-
-func setDefault(v *viper.Viper) {
-	// setting all default values
-	// keeping watch on https://github.com/spf13/viper/issues/188
-
-	v.SetDefault("SERVICE_NAME", "go-service-template")
-	v.SetDefault("VERSION", "0.0.1")
-	v.SetDefault("HOST", "0.0.0.0")
-	v.SetDefault("PORT", 9090)
-	v.SetDefault("LOG_LEVEL", "debug")
-	v.SetDefault("PROVIDER_HOST", "")
-	v.SetDefault("INTEGRATION_HOST", "")
-	//
-
-	v.SetDefault("POSTGRES__HOST", "localhost")
-	v.SetDefault("POSTGRES__PORT", 5432)
-	v.SetDefault("POSTGRES__DB_NAME", "<>")
-	v.SetDefault("POSTGRES__AUTH__USER", "<>")
-	v.SetDefault("POSTGRES__AUTH__PASSWORD", "<>")
-	v.SetDefault("POSTGRES__MAX_OPEN_CONNECTION", 10)
-	v.SetDefault("POSTGRES__MAX_IDEAL_CONNECTION", 10)
-	v.SetDefault("POSTGRES__SSL_MODE", "disable")
-
-	// oauth credentials
-	v.SetDefault("GITHUB_CLIENT_ID", "1b39b8c6caf9337f7473")
-	v.SetDefault("GITHUB_CLIENT_SECRET", "7bd6ed9412ae57406e19ebd1248384ba7fb86e0d")
-	v.SetDefault("GOOGLE_CLIENT_ID", "269014990564-e42nboqc22jem4p3pta1s5oveml975m8.apps.googleusercontent.com")
-	v.SetDefault("GOOGLE_CLIENT_SECRET", "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")
-	v.SetDefault("LINKEDIN_CLIENT_ID", "86ytrlc3k8p3f4")
-	v.SetDefault("LINKEDIN_CLIENT_SECRET", "Jvlt9jnMXY1ov4Xr")
-
 }
 
 // Getting application config from viper

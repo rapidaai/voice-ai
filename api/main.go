@@ -336,6 +336,14 @@ func (g *AppRunner) KnowledgeConnectApiRoute() {
 		apiv1.GET("/microsoft-onedrive/", connectApi.MicrosoftOnedriveConnect)
 		apiv1.GET("/sharepoint/", connectApi.MicrosoftSharepointConnect)
 	}
+
+	actionApiv1 := g.E.Group("/connect-action")
+	{
+		actionApiv1.GET("/gmail/", connectApi.GmailActionConnect)
+		actionApiv1.GET("/jira/", connectApi.JiraActionConnect)
+		actionApiv1.GET("/slack/", connectApi.SlackActionConnect)
+	}
+	// connect-action/slack
 }
 
 func (g *AppRunner) HealthCheckRoutes() {

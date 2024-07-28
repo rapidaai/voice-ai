@@ -46,6 +46,10 @@ type webAuthGRPCApi struct {
 	webAuthApi
 }
 
+var (
+	GOOGLE_STATE = "google"
+)
+
 func NewAuthRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) *webAuthRPCApi {
 	return &webAuthRPCApi{
 		webAuthApi{
@@ -54,9 +58,9 @@ func NewAuthRPC(config *config.AppConfig, logger commons.Logger, postgres connec
 			postgres:        postgres,
 			userService:     internal_user_service.NewUserService(logger, postgres),
 			sendgridClient:  integration_client.NewSendgridServiceClientGRPC(config, logger),
-			githubConnect:   internal_connects.NewGithubAuthenticationConnect(config, logger),
-			linkedinConnect: internal_connects.NewLinkedinAuthenticationConnect(config, logger),
-			googleConnect:   internal_connects.NewGoogleAuthenticationConnect(config, logger),
+			githubConnect:   internal_connects.NewGithubAuthenticationConnect(config, logger, postgres),
+			linkedinConnect: internal_connects.NewLinkedinAuthenticationConnect(config, logger, postgres),
+			googleConnect:   internal_connects.NewGoogleAuthenticationConnect(config, logger, postgres),
 		},
 	}
 }
@@ -71,9 +75,9 @@ func NewAuthGRPC(config *config.AppConfig, logger commons.Logger, postgres conne
 			organizationService: internal_organization_service.NewOrganizationService(logger, postgres),
 			projectService:      internal_project_service.NewProjectService(logger, postgres),
 			sendgridClient:      integration_client.NewSendgridServiceClientGRPC(config, logger),
-			githubConnect:       internal_connects.NewGithubAuthenticationConnect(config, logger),
-			linkedinConnect:     internal_connects.NewLinkedinAuthenticationConnect(config, logger),
-			googleConnect:       internal_connects.NewGoogleAuthenticationConnect(config, logger),
+			githubConnect:       internal_connects.NewGithubAuthenticationConnect(config, logger, postgres),
+			linkedinConnect:     internal_connects.NewLinkedinAuthenticationConnect(config, logger, postgres),
+			googleConnect:       internal_connects.NewGoogleAuthenticationConnect(config, logger, postgres),
 		},
 	}
 }
@@ -768,13 +772,18 @@ func (wAuthApi *webAuthGRPCApi) Linkedin(c context.Context, irRequest *web_api.S
 	return wAuthApi.RegisterSocialUser(c, inf)
 }
 
+// Google
 func (wAuthApi *webAuthRPCApi) Google(c *gin.Context) {
-	url := wAuthApi.googleConnect.AuthCodeURL("google")
+	url := wAuthApi.googleConnect.AuthCodeURL(GOOGLE_STATE)
 	c.Redirect(http.StatusTemporaryRedirect, url)
 	return
 }
 func (wAuthApi *webAuthGRPCApi) Google(c context.Context, irRequest *web_api.SocialAuthenticationRequest) (*web_api.AuthenticateResponse, error) {
-	inf, err := wAuthApi.googleConnect.GoogleUserInfo(c, irRequest.State, irRequest.Code)
+	if GOOGLE_STATE == irRequest.State {
+		wAuthApi.logger.Errorf("illegal oauth request as auth state is not matching %s %s", GOOGLE_STATE, irRequest.State)
+		return nil, fmt.Errorf("invalid oauth state")
+	}
+	inf, err := wAuthApi.googleConnect.GoogleUserInfo(c, irRequest.Code)
 	wAuthApi.logger.Debugf("google authenticator respose %v", inf)
 	if err != nil {
 		wAuthApi.logger.Errorf("google authentication response %v", err)

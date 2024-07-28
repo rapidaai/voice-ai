@@ -8,11 +8,13 @@ import (
 
 	"github.com/lexatic/web-backend/config"
 	"github.com/lexatic/web-backend/pkg/commons"
+	"github.com/lexatic/web-backend/pkg/connectors"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
 )
 
 type GithubConnect struct {
+	ExternalConnect
 	logger            commons.Logger
 	githubOauthConfig oauth2.Config
 }
@@ -28,8 +30,10 @@ var (
 	GITHUB_ACTION_CONNECT = "/connect-common/github"
 )
 
-func NewGithubAuthenticationConnect(cfg *config.AppConfig, logger commons.Logger) GithubConnect {
+func NewGithubAuthenticationConnect(cfg *config.AppConfig, logger commons.Logger,
+	postgres connectors.PostgresConnector) GithubConnect {
 	return GithubConnect{
+		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		githubOauthConfig: oauth2.Config{
 			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), GITHUB_AUTHENTICATION_URL),
 			ClientID:     cfg.GithubClientId,
@@ -41,8 +45,9 @@ func NewGithubAuthenticationConnect(cfg *config.AppConfig, logger commons.Logger
 	}
 }
 
-func NewGithubCodeConnect(cfg *config.AppConfig, logger commons.Logger) GithubConnect {
+func NewGithubCodeConnect(cfg *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) GithubConnect {
 	return GithubConnect{
+		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		githubOauthConfig: oauth2.Config{
 			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), GITHUB_CODE_CONNECT),
 			ClientID:     cfg.GithubClientId,
@@ -53,8 +58,9 @@ func NewGithubCodeConnect(cfg *config.AppConfig, logger commons.Logger) GithubCo
 		logger: logger,
 	}
 }
-func NewGithubActionConnect(cfg *config.AppConfig, logger commons.Logger) GithubConnect {
+func NewGithubActionConnect(cfg *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) GithubConnect {
 	return GithubConnect{
+		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		githubOauthConfig: oauth2.Config{
 			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), GITHUB_ACTION_CONNECT),
 			ClientID:     cfg.GithubClientId,
@@ -110,4 +116,8 @@ func (wAuthApi *GithubConnect) GithubUserInfo(c context.Context, state string, c
 		Name:     content["name"].(string),
 		Id:       fmt.Sprintf("%f", content["id"].(float64)),
 	}, nil
+}
+
+func (wAuthApi *GithubConnect) Token(c context.Context, code string) (*oauth2.Token, error) {
+	return wAuthApi.githubOauthConfig.Exchange(c, code)
 }

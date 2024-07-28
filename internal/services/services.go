@@ -92,4 +92,11 @@ type VaultService interface {
 	GetAllOrganizationCredential(ctx context.Context, auth types.Principle, criterias []*web_api.Criteria, paginate *web_api.Paginate) (int64, *[]internal_gorm.Vault, error)
 	GetProviderCredential(ctx context.Context, auth types.SimplePrinciple, providerId uint64) (*internal_gorm.Vault, error)
 	CreateRapidaProviderCredential(ctx context.Context, organizationId uint64) (*internal_gorm.Vault, error)
+
+	GetToolCredential(ctx context.Context,
+		auth types.SimplePrinciple,
+		toolId uint64) (*internal_gorm.Vault, error)
+	GetUserToolCredential(ctx context.Context,
+		auth types.SimplePrinciple,
+		toolId uint64) (*internal_gorm.Vault, error)
 }

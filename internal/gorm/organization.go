@@ -53,3 +53,13 @@ type ProjectCredential struct {
 	CreatedBy      uint64 `json:"createdBy" gorm:"type:bigint;size:200;not null"`
 	UpdatedBy      uint64 `json:"updatedBy" gorm:"type:bigint;size:200;not null"`
 }
+
+type OAuthExternalConnect struct {
+	gorm_model.Audited
+	Identifier  string                `json:"identifier" gorm:"type:string;size:200;not null"`
+	ToolConnect string                `json:"toolConnect" gorm:"type:string;size:200;not null"`
+	ToolId      uint64                `json:"toolId" gorm:"type:bigint;size:20;not null"`
+	LinkerId    uint64                `json:"linkerId" gorm:"type:bigint;size:20;not null"`
+	Linker      gorm_types.VaultLevel `json:"linker" gorm:"type:string;size:200;not null"`
+	RedirectTo  string                `json:"redirectTo" gorm:"type:string;size:200;not null"`
+}

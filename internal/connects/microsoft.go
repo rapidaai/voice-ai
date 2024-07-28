@@ -1,18 +1,27 @@
 package internal_connects
 
 import (
+	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"log"
+	"net/http"
+	"net/url"
+	"time"
 
-	"github.com/google/uuid"
+	"github.com/go-resty/resty/v2"
 	"github.com/lexatic/web-backend/config"
 	"github.com/lexatic/web-backend/pkg/commons"
+	"github.com/lexatic/web-backend/pkg/connectors"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/microsoft"
 )
 
 type MicrosoftConnect struct {
+	ExternalConnect
 	logger               commons.Logger
 	microsoftOauthConfig oauth2.Config
 }
@@ -28,6 +37,7 @@ var (
 	MICROSOFT_ONEDRIVE_SCOPE = []string{
 		"Files.Read",
 		"Files.Read.All",
+		"offline_access",
 		"Files.ReadWrite",
 		"Files.ReadWrite.All",
 	}
@@ -37,6 +47,7 @@ var (
 		"Sites.Read",
 		"Sites.Read.All",
 		"Files.ReadWrite",
+		"offline_access",
 		"Sites.ReadWrite.All",
 		"Files.Read",
 		"Files.Read.All",
@@ -46,37 +57,37 @@ var (
 	MICROSOFT_SHAREPOINT_CONNECT = "/connect-knowledge/share-point"
 )
 
-func NewMicrosoftAuthenticationConnect(cfg *config.AppConfig, logger commons.Logger) MicrosoftConnect {
+func NewMicrosoftAuthenticationConnect(cfg *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) MicrosoftConnect {
 	return MicrosoftConnect{
+		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		microsoftOauthConfig: oauth2.Config{
 			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), MICROSOFT_AUTHENTICATION_URL),
 			ClientID:     cfg.MicrosoftClientId,
 			ClientSecret: cfg.MicrosoftClientSecret,
 			Scopes:       MICROSOFT_AUTHENTICATION_SCOPE,
-			Endpoint:     microsoft.LiveConnectEndpoint,
+			Endpoint:     microsoft.AzureADEndpoint("common"),
 		},
 		logger: logger,
 	}
 }
 
-func NewMicrosoftSharepointConnect(cfg *config.AppConfig, logger commons.Logger) MicrosoftConnect {
+func NewMicrosoftSharepointConnect(cfg *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) MicrosoftConnect {
 	return MicrosoftConnect{
+		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		microsoftOauthConfig: oauth2.Config{
 			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), MICROSOFT_SHAREPOINT_CONNECT),
 			ClientID:     cfg.MicrosoftClientId,
 			ClientSecret: cfg.MicrosoftClientSecret,
 			Scopes:       MICROSOFT_SHAREPOINT_SCOPE,
-			Endpoint: oauth2.Endpoint{
-				AuthURL:  "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-				TokenURL: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-			},
+			Endpoint:     microsoft.AzureADEndpoint("common"),
 		},
 		logger: logger,
 	}
 }
 
-func NewMicrosoftOnedriveConnect(cfg *config.AppConfig, logger commons.Logger) MicrosoftConnect {
+func NewMicrosoftOnedriveConnect(cfg *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) MicrosoftConnect {
 	return MicrosoftConnect{
+		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		microsoftOauthConfig: oauth2.Config{
 			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), MICROSOFT_ONEDRIVE_CONNECT),
 			ClientID:     cfg.MicrosoftClientId,
@@ -88,8 +99,7 @@ func NewMicrosoftOnedriveConnect(cfg *config.AppConfig, logger commons.Logger) M
 	}
 }
 
-func (microsoft *MicrosoftConnect) codeVerifier() string {
-	verifier := uuid.New().String()
+func (microsoft *MicrosoftConnect) codeVerifier(verifier string) string {
 	return base64.RawURLEncoding.EncodeToString([]byte(verifier))
 }
 
@@ -101,6 +111,237 @@ func (microsoft *MicrosoftConnect) codeChallenge(verifier string) string {
 }
 
 func (microsoft *MicrosoftConnect) AuthCodeURL(state string) string {
-	codeChallenge := microsoft.codeChallenge(microsoft.codeVerifier())
+	codeChallenge := microsoft.codeChallenge(microsoft.codeVerifier(state))
 	return microsoft.microsoftOauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.SetAuthURLParam("code_challenge", codeChallenge), oauth2.SetAuthURLParam("code_challenge_method", "S256"))
+}
+
+func (microsoft *MicrosoftConnect) Token(c context.Context, code string, state string) (*oauth2.Token, error) {
+	microsoft.log.Debugf("requesting to get token from microsoft %v", code)
+	req, err := http.NewRequest("POST", microsoft.microsoftOauthConfig.Endpoint.TokenURL, bytes.NewBufferString(url.Values{
+		"client_id":     {microsoft.microsoftOauthConfig.ClientID},
+		"grant_type":    {"authorization_code"},
+		"code":          {code},
+		"redirect_uri":  {microsoft.microsoftOauthConfig.RedirectURL},
+		"code_verifier": {microsoft.codeVerifier(state)},
+	}.Encode()))
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	if err != nil {
+		microsoft.logger.Errorf("unable to build token request for microsoft %v", err)
+		return nil, err
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		microsoft.logger.Errorf("error while creating request %v", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var content oauth2.Token
+	err = json.NewDecoder(resp.Body).Decode(&content)
+	if err != nil {
+		microsoft.logger.Errorf("unable to decode the response body of the token %v", err)
+		return nil, fmt.Errorf("failed reading response body: %s", err.Error())
+	}
+
+	return &content, nil
+
+}
+
+type Folder struct {
+	ChildCount int `json:"childCount"`
+}
+
+type File struct {
+	MimeType string `json:"mimeType"`
+}
+
+// Define data structures for parsing API responses
+type OneDriveFile struct {
+	ID       string    `json:"id"`
+	Name     string    `json:"name"`
+	Size     int64     `json:"size"`
+	Parent   string    `json:"parent"`
+	Folder   *Folder   `json:"folder,omitempty"`
+	File     *File     `json:"file,omitempty"`
+	Created  time.Time `json:"createdDateTime"`
+	Modified time.Time `json:"lastModifiedDateTime"`
+	MimeType string    `json:"mimeType"`
+}
+
+type OneDriveFiles struct {
+	Value []*OneDriveFile `json:"value"`
+}
+
+func (microsft *MicrosoftConnect) OneDriveFiles(ctx context.Context,
+	token *oauth2.Token,
+	q *string,
+	pageToken *string) (*OneDriveFiles, error) {
+	client := microsft.microsoftOauthConfig.Client(ctx, token)
+	restyClient := resty.NewWithClient(client)
+	// Example: Fetch files in the root folder of OneDrive
+	rootFolderID := "root" // "root" for the root folder, or a specific folder ID
+	val, err := microsft.onedriveFetchAllFilesAndFolders(restyClient, rootFolderID, rootFolderID)
+	if err != nil {
+		microsft.log.Errorf("failed to get all the files and folder in given one drive")
+		return nil, err
+	}
+	return &OneDriveFiles{Value: val}, nil
+}
+
+// One drive implimentation
+func (microsft *MicrosoftConnect) onedriveFetchAllFilesAndFolders(client *resty.Client, folderID, parent string) ([]*OneDriveFile, error) {
+	var allFiles []*OneDriveFile
+
+	files, err := microsft.onedriveFetchFilesInFolder(client, folderID)
+	if err != nil {
+		microsft.log.Errorf("failed to fetch files in folder %v", err)
+		return nil, err
+	}
+
+	for _, file := range files.Value {
+		file.Parent = parent
+		if file.Folder != nil {
+			file.MimeType = "application/folder"
+			allFiles = append(allFiles, file)
+
+			// this is folder
+			// If the item is a folder, recursively fetch its contents
+			subFiles, err := microsft.onedriveFetchAllFilesAndFolders(client, file.ID, fmt.Sprintf("%s/%s", parent, file.Name))
+			if err != nil {
+				microsft.log.Errorf("failed to get recursively the files in subfolder %v", err)
+				return nil, err
+			}
+			allFiles = append(allFiles, subFiles...)
+		}
+
+		if file.File != nil {
+			file.MimeType = file.File.MimeType
+			allFiles = append(allFiles, file)
+		}
+	}
+
+	return allFiles, nil
+}
+
+func (microsft *MicrosoftConnect) onedriveFetchFilesInFolder(client *resty.Client, folderID string) (*OneDriveFiles, error) {
+	var files OneDriveFiles
+
+	// OneDrive API URL for retrieving files in a specific folder
+	apiURL := fmt.Sprintf("https://graph.microsoft.com/v1.0/me/drive/items/%s/children", folderID)
+
+	_, err := client.R().
+		SetHeader("Accept", "application/json").
+		SetHeader("Content-Type", "application/json").
+		SetResult(&files).
+		Get(apiURL)
+
+	if err != nil {
+		microsft.log.Errorf("api call to one drive failed, err = %v", err)
+		return nil, fmt.Errorf("error fetching files: %v", err)
+	}
+	return &files, nil
+}
+
+// Define data structures for parsing API responses
+type SharePointFile struct {
+	ID       string    `json:"id"`
+	Name     string    `json:"name"`
+	Size     int64     `json:"size"`
+	Folder   *Folder   `json:"folder,omitempty"`
+	File     *File     `json:"file,omitempty"`
+	Created  time.Time `json:"createdDateTime"`
+	Modified time.Time `json:"lastModifiedDateTime"`
+}
+
+type SharePointFiles struct {
+	Value    []*SharePointFile `json:"value"`
+	NextLink string            `json:"@odata.nextLink"`
+	Count    int               `json:"@odata.count"`
+}
+
+type SharePointSite struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+func (microsft *MicrosoftConnect) SharePointFiles(ctx context.Context,
+	token *oauth2.Token,
+	q *string,
+	pageToken *string) (*SharePointFiles, error) {
+	client := microsft.microsoftOauthConfig.Client(ctx, token)
+	restyClient := resty.NewWithClient(client)
+
+	// Fetch the default site ID dynamically
+	siteID, err := microsft.sharepointFetchDefaultSiteID(restyClient)
+	if err != nil {
+		log.Fatalf("Error fetching site ID: %v", err)
+	}
+
+	// Example: Fetch all files and folders in SharePoint
+	rootFolderID := "root" // "root" for the root folder, or a specific folder ID
+	return microsft.sharepointFetchAllFilesAndFolders(restyClient, siteID, rootFolderID)
+}
+
+func (microsft *MicrosoftConnect) sharepointFetchDefaultSiteID(client *resty.Client) (string, error) {
+	var site SharePointSite
+
+	// SharePoint API URL for retrieving the default site ID
+	apiURL := "https://graph.microsoft.com/v1.0/sites/root"
+
+	_, err := client.R().
+		SetHeader("Accept", "application/json").
+		SetHeader("Content-Type", "application/json").
+		SetResult(&site).
+		Get(apiURL)
+
+	if err != nil {
+		return "", fmt.Errorf("error fetching default site ID: %v", err)
+	}
+
+	return site.ID, nil
+}
+
+func (microsft *MicrosoftConnect) sharepointFetchAllFilesAndFolders(client *resty.Client, siteID, folderID string) (*SharePointFiles, error) {
+	// var allFiles []*SharePointFile
+
+	return microsft.sharepointFetchAllFilesAndFolders(client, siteID, folderID)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// for _, file := range files.Value {
+	// 	allFiles = append(allFiles, file)
+	// 	if file.Folder != nil {
+	// 		// If the item is a folder, recursively fetch its contents
+	// 		subFiles, err := microsft.sharepointFetchAllFilesAndFolders(client, siteID, file.ID)
+	// 		if err != nil {
+	// 			return nil, err
+	// 		}
+	// 		allFiles = append(allFiles, subFiles...)
+	// 	}
+	// }
+
+	// return allFiles, nil
+}
+
+func (microsft *MicrosoftConnect) sharepointFetchFilesInFolder(client *resty.Client, siteID, folderID string) (*SharePointFiles, error) {
+	var files SharePointFiles
+
+	// SharePoint API URL for retrieving files in a specific folder
+	apiURL := fmt.Sprintf("https://graph.microsoft.com/v1.0/sites/%s/drive/items/%s/children", siteID, folderID)
+
+	_, err := client.R().
+		SetHeader("Accept", "application/json").
+		SetHeader("Content-Type", "application/json").
+		SetResult(&files).
+		Get(apiURL)
+
+	if err != nil {
+		return nil, fmt.Errorf("error fetching files: %v", err)
+	}
+
+	return &files, nil
 }

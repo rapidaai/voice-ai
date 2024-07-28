@@ -8,6 +8,7 @@ import (
 
 	"github.com/lexatic/web-backend/config"
 	"github.com/lexatic/web-backend/pkg/commons"
+	"github.com/lexatic/web-backend/pkg/connectors"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/linkedin"
 )
@@ -25,7 +26,7 @@ var (
 	LINKEDIN_ACTION_SCOPE   = []string{"openid", "profile", "email"}
 )
 
-func NewLinkedinAuthenticationConnect(cfg *config.AppConfig, logger commons.Logger) LinkedinConnect {
+func NewLinkedinAuthenticationConnect(cfg *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) LinkedinConnect {
 	return LinkedinConnect{
 		linkedinOauthConfig: oauth2.Config{
 			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), LINKEDIN_AUTHENTICATION_URL),

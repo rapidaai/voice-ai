@@ -29,3 +29,18 @@ CREATE INDEX idx_vault_type ON vaults(vault_type);
 CREATE INDEX idx_vault_type_id ON vaults(vault_type_id);
 CREATE INDEX idx_vault_level ON vaults(vault_level);
 CREATE INDEX idx_vault_level_id ON vaults(vault_level_id);
+
+CREATE TABLE o_auth_external_connects (
+    id BIGINT PRIMARY KEY,
+    created_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    identifier VARCHAR(200) NOT NULL,
+    tool_connect VARCHAR(200) NOT NULL,
+    tool_id BIGINT NOT NULL,
+    linker VARCHAR(200) NOT NULL,
+    linker_id BIGINT NOT NULL,
+    redirect_to VARCHAR(200) NOT NULL
+);
+
+CREATE INDEX idx_o_auth_external_connects ON o_auth_external_connects(identifier);
+CREATE INDEX linker_id_o_auth_external_connects ON o_auth_external_connects(linker_id);

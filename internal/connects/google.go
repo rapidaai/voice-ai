@@ -8,11 +8,15 @@ import (
 
 	"github.com/lexatic/web-backend/config"
 	"github.com/lexatic/web-backend/pkg/commons"
+	"github.com/lexatic/web-backend/pkg/connectors"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"google.golang.org/api/drive/v2"
+	"google.golang.org/api/option"
 )
 
 type GoogleConnect struct {
+	ExternalConnect
 	logger            commons.Logger
 	googleOauthConfig oauth2.Config
 }
@@ -39,8 +43,9 @@ var (
 	GOOGLE_GMAIL_CONNECT_URL = "/connect-action/gmail"
 )
 
-func NewGoogleAuthenticationConnect(cfg *config.AppConfig, logger commons.Logger) GoogleConnect {
+func NewGoogleAuthenticationConnect(cfg *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) GoogleConnect {
 	return GoogleConnect{
+		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		googleOauthConfig: oauth2.Config{
 			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), GOOGLE_AUTHENTICATION_URL),
 			ClientID:     cfg.GoogleClientId,
@@ -52,8 +57,9 @@ func NewGoogleAuthenticationConnect(cfg *config.AppConfig, logger commons.Logger
 	}
 }
 
-func NewGoogleDriveConnect(cfg *config.AppConfig, logger commons.Logger) GoogleConnect {
+func NewGoogleDriveConnect(cfg *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) GoogleConnect {
 	return GoogleConnect{
+		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		googleOauthConfig: oauth2.Config{
 			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), GOOGLE_DRIVE_CONNECT_URL),
 			ClientID:     cfg.GoogleClientId,
@@ -65,8 +71,9 @@ func NewGoogleDriveConnect(cfg *config.AppConfig, logger commons.Logger) GoogleC
 	}
 }
 
-func NewGmailConnect(cfg *config.AppConfig, logger commons.Logger) GoogleConnect {
+func NewGmailConnect(cfg *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) GoogleConnect {
 	return GoogleConnect{
+		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		googleOauthConfig: oauth2.Config{
 			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), GOOGLE_GMAIL_CONNECT_URL),
 			ClientID:     cfg.GoogleClientId,
@@ -88,12 +95,12 @@ Google implimentation
 func (wAuthApi *GoogleConnect) AuthCodeURL(state string) string {
 	return wAuthApi.googleOauthConfig.AuthCodeURL(state)
 }
-func (wAuthApi *GoogleConnect) GoogleUserInfo(c context.Context, state string, code string) (*OpenID, error) {
-	if state != "google" {
-		wAuthApi.logger.Errorf("illegal oauth request as auth state is not matching %s %s", "google", state)
-		return nil, fmt.Errorf("invalid oauth state")
-	}
-	token, err := wAuthApi.googleOauthConfig.Exchange(c, code)
+
+func (wAuthApi *GoogleConnect) Token(c context.Context, code string) (*oauth2.Token, error) {
+	return wAuthApi.googleOauthConfig.Exchange(c, code)
+}
+func (wAuthApi *GoogleConnect) GoogleUserInfo(c context.Context, code string) (*OpenID, error) {
+	token, err := wAuthApi.Token(c, code)
 	if err != nil {
 		wAuthApi.logger.Errorf("google authentication exchange failed %v", err)
 		return nil, fmt.Errorf("code exchange failed: %s", err.Error())
@@ -114,4 +121,69 @@ func (wAuthApi *GoogleConnect) GoogleUserInfo(c context.Context, state string, c
 		return nil, fmt.Errorf("failed reading response body: %s", err.Error())
 	}
 	return &content, nil
+}
+
+type GoogleFile struct {
+	Id       string `json:"id"`
+	Title    string `json:"title"`
+	Folder   string `json:"folder"`
+	FileSize int64  `json:"fileSize,omitempty,string"`
+	MimeType string `json:"mimeType"`
+}
+type GoogleDriveFiles struct {
+	Items         []*GoogleFile `json:"items,omitempty"`
+	NextPageToken string        `json:"nextPageToken,omitempty"`
+}
+
+// "google"
+func (wAuthApi *GoogleConnect) GoogleDriveFiles(ctx context.Context,
+	token *oauth2.Token,
+	q *string,
+	pageToken *string) (*GoogleDriveFiles, error) {
+	driveClient := wAuthApi.googleOauthConfig.Client(ctx, token)
+	googleDrive, err := drive.NewService(ctx, option.WithHTTPClient(driveClient))
+	if err != nil {
+		return nil, err
+	}
+
+	driveRequest := googleDrive.Files.List()
+	if pageToken != nil {
+		driveRequest = driveRequest.PageToken(*pageToken)
+	}
+	if q != nil {
+		// Q("mimeType='application/vnd.google-apps.folder'").
+		driveRequest = driveRequest.Q(*q)
+	}
+	driveRequest = driveRequest.
+		Fields("nextPageToken", "items(id,fileSize,mimeType,modifiedDate,originalFilename,title,downloadUrl,fileExtension,parents)")
+
+	fls, err := driveRequest.Do()
+	if err != nil {
+		return nil, err
+	}
+
+	var gdf GoogleDriveFiles
+	for _, fl := range fls.Items {
+		gdf.Items = append(gdf.Items, &GoogleFile{
+			Id:       fl.Id,
+			Title:    fl.Title,
+			Folder:   wAuthApi.GetFolderName(googleDrive, fl.Parents),
+			FileSize: fl.FileSize,
+			MimeType: fl.MimeType,
+		})
+	}
+	gdf.NextPageToken = fls.NextPageToken
+	return &gdf, nil
+}
+
+func (wAuthApi *GoogleConnect) GetFolderName(srv *drive.Service, parents []*drive.ParentReference) string {
+	if len(parents) == 0 {
+		return "Root"
+	}
+	parentID := parents[0]
+	parent, err := srv.Files.Get(parentID.Id).Fields("title").Do()
+	if err != nil {
+		return "Unknown"
+	}
+	return parent.Title
 }

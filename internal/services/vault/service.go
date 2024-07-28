@@ -143,7 +143,47 @@ func (vS *vaultService) GetProviderCredential(ctx context.Context,
 		providerId,
 		string(gorm_types.VAULT_LEVEL_ORGANIZATION),
 		*auth.GetCurrentOrganizationId(),
-	).First(&vault)
+	).Last(&vault)
+	if tx.Error != nil {
+		vS.logger.Errorf("get credential error  %v", tx.Error)
+		return nil, tx.Error
+	}
+	return &vault, nil
+}
+
+func (vS *vaultService) GetToolCredential(ctx context.Context,
+	auth types.SimplePrinciple,
+	toolId uint64) (*internal_gorm.Vault, error) {
+	db := vS.postgres.DB(ctx)
+	var vault internal_gorm.Vault
+
+	tx := db.Where("status = ? and vault_type = ? and vault_type_id = ? and vault_level = ? and vault_level_id = ?",
+		"active",
+		string(gorm_types.VAULT_TYPE_TOOL),
+		toolId,
+		string(gorm_types.VAULT_LEVEL_ORGANIZATION),
+		*auth.GetCurrentOrganizationId(),
+	).Last(&vault)
+	if tx.Error != nil {
+		vS.logger.Errorf("get credential error  %v", tx.Error)
+		return nil, tx.Error
+	}
+	return &vault, nil
+}
+
+func (vS *vaultService) GetUserToolCredential(ctx context.Context,
+	auth types.SimplePrinciple,
+	toolId uint64) (*internal_gorm.Vault, error) {
+	db := vS.postgres.DB(ctx)
+	var vault internal_gorm.Vault
+
+	tx := db.Where("status = ? and vault_type = ? and vault_type_id = ? and vault_level = ? and vault_level_id = ?",
+		"active",
+		string(gorm_types.VAULT_TYPE_TOOL),
+		toolId,
+		string(gorm_types.VAULT_LEVEL_USER),
+		*auth.GetUserId(),
+	).Last(&vault)
 	if tx.Error != nil {
 		vS.logger.Errorf("get credential error  %v", tx.Error)
 		return nil, tx.Error
