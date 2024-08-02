@@ -1,14 +1,12 @@
 package internal_connects
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"net/url"
 	"time"
 
@@ -115,39 +113,58 @@ func (microsoft *MicrosoftConnect) AuthCodeURL(state string) string {
 	return microsoft.microsoftOauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.SetAuthURLParam("code_challenge", codeChallenge), oauth2.SetAuthURLParam("code_challenge_method", "S256"))
 }
 
+type MicrosoftTokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	TokenType    string `json:"token_type"`
+	RefreshToken string `json:"refresh_token"`
+	Expiry       int64  `json:"expires_in"`
+}
+
 func (microsoft *MicrosoftConnect) Token(c context.Context, code string, state string) (*oauth2.Token, error) {
 	microsoft.log.Debugf("requesting to get token from microsoft %v", code)
-	req, err := http.NewRequest("POST", microsoft.microsoftOauthConfig.Endpoint.TokenURL, bytes.NewBufferString(url.Values{
+	client := resty.New()
+
+	// Build the request body
+	data := url.Values{
 		"client_id":     {microsoft.microsoftOauthConfig.ClientID},
 		"grant_type":    {"authorization_code"},
 		"code":          {code},
 		"redirect_uri":  {microsoft.microsoftOauthConfig.RedirectURL},
 		"code_verifier": {microsoft.codeVerifier(state)},
-	}.Encode()))
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	}
+
+	// Send the POST request
+	resp, err := client.R().
+		SetHeader("Content-Type", "application/x-www-form-urlencoded").
+		SetBody(data.Encode()).
+		Post(microsoft.microsoftOauthConfig.Endpoint.TokenURL)
 
 	if err != nil {
-		microsoft.logger.Errorf("unable to build token request for microsoft %v", err)
+		log.Printf("Error while creating request: %v", err)
 		return nil, err
 	}
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		microsoft.logger.Errorf("error while creating request %v", err)
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var content oauth2.Token
-	err = json.NewDecoder(resp.Body).Decode(&content)
-	if err != nil {
-		microsoft.logger.Errorf("unable to decode the response body of the token %v", err)
-		return nil, fmt.Errorf("failed reading response body: %s", err.Error())
+	if resp.IsError() {
+		log.Printf("Error response: %s", resp.String())
+		return nil, fmt.Errorf("failed to fetch token: %s", resp.Status())
 	}
 
-	return &content, nil
+	var tokenResponse MicrosoftTokenResponse
+	err = json.Unmarshal(resp.Body(), &tokenResponse)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode token response: %v", err)
+	}
 
+	expiryDuration := time.Duration(tokenResponse.Expiry) * time.Second
+
+	token := &oauth2.Token{
+		AccessToken:  tokenResponse.AccessToken,
+		TokenType:    tokenResponse.TokenType,
+		RefreshToken: tokenResponse.RefreshToken,
+		Expiry:       time.Now().Add(expiryDuration),
+	}
+
+	return token, nil
 }
 
 type Folder struct {

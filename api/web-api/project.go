@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"strings"
-	"sync"
 
 	internal_gorm "github.com/lexatic/web-backend/internal/gorm"
 
@@ -248,31 +247,31 @@ func (wProjectApi *webProjectGRPCApi) GetProject(ctx context.Context, irRequest 
 
 func (wProjectApi *webProjectGRPCApi) AddUserToProject(ctx context.Context, auth types.Principle, email string, userId uint64, status, role string, projectIds []uint64) (*web_api.AddUsersToProjectResponse, error) {
 	projectNames := make([]string, len(projectIds))
-	projectOut := make([]*web_api.Project, len(projectIds))
+	projectOut := make([]*internal_gorm.Project, len(projectIds))
 
-	wg := sync.WaitGroup{}
-	for idx, pId := range projectIds {
-		wg.Add(1)
-		go func(auth types.Principle, projectId, userId uint64, status, role string, index int) {
-			defer wg.Done()
-			p, err := wProjectApi.GetProject(ctx, &web_api.GetProjectRequest{ProjectId: projectId})
-			if err != nil {
-				return
-			}
-
-			projectOut[index] = p.GetData()
-			projectNames = append(projectNames, p.GetData().Name)
-		}(auth, pId, userId, status, role, idx)
-		wProjectApi.userService.CreateProjectRole(ctx, auth, userId, role, pId, status)
+	for _, projectId := range projectIds {
+		p, err := wProjectApi.projectService.Get(ctx, auth, projectId)
+		if err != nil {
+			wProjectApi.logger.Debugf("inviting a user without having  a project %v", err)
+			continue
+		}
+		wProjectApi.userService.CreateProjectRole(ctx, auth, userId, role, projectId, status)
+		projectOut = append(projectOut, p)
+		projectNames = append(projectNames, p.Name)
 	}
-	wg.Wait()
 
 	// sending email
-	_, err := wProjectApi.sendgridClient.InviteMemberEmail(ctx, auth.GetUserInfo().Id, "", email, auth.GetOrganizationRole().OrganizationName, strings.Join(projectNames[:], ","), auth.GetUserInfo().Name)
+	_, err := wProjectApi.sendgridClient.InviteMemberEmail(ctx, *auth.GetUserId(), "", email, auth.GetOrganizationRole().OrganizationName, strings.Join(projectNames[:], ","), auth.GetUserInfo().Name)
 	if err != nil {
 		wProjectApi.logger.Errorf("error while sending invite email %v", err)
 	}
-	return utils.Success[web_api.AddUsersToProjectResponse, []*web_api.Project](projectOut)
+
+	out := []*web_api.Project{}
+	err = utils.Cast(projectOut, &out)
+	if err != nil {
+		wProjectApi.logger.Errorf("unable to cast project credential to proto object %v", err)
+	}
+	return utils.Success[web_api.AddUsersToProjectResponse, []*web_api.Project](out)
 
 }
 
@@ -317,7 +316,7 @@ func (wProjectApi *webProjectGRPCApi) AddUsersToProject(ctx context.Context, irR
 			}
 			return wProjectApi.AddUserToProject(ctx, auth, eUser.Email, eUser.Id, eUser.Status, irRequest.Role, irRequest.ProjectIds)
 		}
-		_, err = wProjectApi.userService.CreateOrganizationRole(ctx, auth, irRequest.Role, eUser.Id, auth.GetOrganizationRole().OrganizationId, eUser.Status)
+		_, err = wProjectApi.userService.CreateOrganizationRole(ctx, auth, irRequest.GetRole(), eUser.Id, auth.GetOrganizationRole().OrganizationId, eUser.Status)
 		if err != nil {
 			wProjectApi.logger.Errorf("unable to create organization role err %v", err)
 			return utils.Error[web_api.AddUsersToProjectResponse](

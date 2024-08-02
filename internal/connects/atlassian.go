@@ -5,7 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
+	"net/url"
+	"time"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/lexatic/web-backend/config"
@@ -22,9 +23,14 @@ type AtlassianConnect struct {
 
 var (
 	CONFLUENCE_CONNECT_URL = "/connect-common/atlassian"
-	CONFLUENCE_SCOPE       = [...]string{
+
+	CONFLUENCE_SCOPE = []string{
+		"offline_access",
 		"search:confluence",
 		"read:space:confluence",
+		"read:confluence-props",
+		"read:confluence-space.summary",
+		"read:confluence-content.permission",
 		"read:confluence-content.summary",
 		"read:confluence-content.all"}
 
@@ -39,11 +45,10 @@ func NewConfluenceConnect(cfg *config.AppConfig, logger commons.Logger, postgres
 			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), CONFLUENCE_CONNECT_URL),
 			ClientID:     cfg.AtlassianClientId,
 			ClientSecret: cfg.AtlassianClientSecret,
-			Scopes:       CONFLUENCE_SCOPE[:],
+			Scopes:       CONFLUENCE_SCOPE,
 			Endpoint: oauth2.Endpoint{
-				AuthURL:   "https://auth.atlassian.com/authorize",
-				TokenURL:  "https://auth.atlassian.com/oauth/token",
-				AuthStyle: oauth2.AuthStyleInParams,
+				AuthURL:  "https://auth.atlassian.com/authorize",
+				TokenURL: "https://auth.atlassian.com/oauth/token",
 			},
 		},
 		logger: logger,
@@ -59,9 +64,8 @@ func NewJiraConnect(cfg *config.AppConfig, logger commons.Logger, postgres conne
 			ClientSecret: cfg.AtlassianClientSecret,
 			Scopes:       JIRA_SCOPE[:],
 			Endpoint: oauth2.Endpoint{
-				AuthURL:   "https://auth.atlassian.com/authorize",
-				TokenURL:  "https://auth.atlassian.com/oauth/token",
-				AuthStyle: oauth2.AuthStyleInParams,
+				AuthURL:  "https://auth.atlassian.com/authorize",
+				TokenURL: "https://auth.atlassian.com/oauth/token",
 			},
 		},
 		logger: logger,
@@ -71,11 +75,57 @@ func NewJiraConnect(cfg *config.AppConfig, logger commons.Logger, postgres conne
 // https://auth.atlassian.com/authorize?audience=api.atlassian.com&client_id=Et8qcoSIpSs1h1MMoRgU0rgbU9vftbCo&scope=write%3Aconfluence-content%20write%3Aconfluence-file%20readonly%3Acontent.attachment%3Aconfluence%20write%3Aconfluence-groups%20search%3Aconfluence%20read%3Aconfluence-content.summary%20read%3Aconfluence-content.all&redirect_uri=https%3A%2F%2Frapida.ai%2Fconnect%2Fatlassian&state=${YOUR_USER_BOUND_VALUE}&response_type=code&prompt=consent
 
 func (atlassianConnect *AtlassianConnect) AuthCodeURL(state string) string {
-	return atlassianConnect.atlassianOauthConfig.AuthCodeURL(state)
+	return atlassianConnect.atlassianOauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline)
+}
+
+type AtlassianTokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	TokenType    string `json:"token_type"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int64  `json:"expires_in"`
+	Scope        string `json:"scope"`
 }
 
 func (atlassianConnect *AtlassianConnect) Token(c context.Context, code string) (*oauth2.Token, error) {
-	return atlassianConnect.atlassianOauthConfig.Exchange(c, code)
+
+	data := url.Values{}
+	data.Set("client_id", atlassianConnect.atlassianOauthConfig.ClientID)
+	data.Set("client_secret", atlassianConnect.atlassianOauthConfig.ClientSecret)
+	data.Set("grant_type", "authorization_code")
+	data.Set("code", code)
+	data.Set("redirect_uri", atlassianConnect.atlassianOauthConfig.RedirectURL)
+
+	resp, err := atlassianConnect.NewHttpClient().R().
+		SetHeader("Content-Type", "application/x-www-form-urlencoded").
+		SetFormDataFromValues(data).
+		Post(atlassianConnect.atlassianOauthConfig.Endpoint.TokenURL)
+
+	if err != nil {
+		atlassianConnect.log.Errorf("Error while creating request: %v", err)
+		return nil, err
+	}
+
+	if resp.IsError() {
+		atlassianConnect.log.Errorf("Error response: %s", resp.String())
+		return nil, fmt.Errorf("failed to get token: %s", resp.Status())
+	}
+
+	var tokenResponse AtlassianTokenResponse
+	err = json.Unmarshal(resp.Body(), &tokenResponse)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode token response: %v", err)
+	}
+
+	atlassianConnect.log.Debugf("retuned atlasian token %+v", tokenResponse)
+
+	token := &oauth2.Token{
+		AccessToken:  tokenResponse.AccessToken,
+		TokenType:    tokenResponse.TokenType,
+		RefreshToken: tokenResponse.RefreshToken,
+		Expiry:       time.Now().Add(time.Duration(tokenResponse.ExpiresIn) * time.Second),
+	}
+
+	return token, nil
 }
 
 // give all the pages in side. a space
@@ -85,13 +135,20 @@ func (atlassianConnect *AtlassianConnect) ConfluencePages(ctx context.Context,
 	pageToken *string) (*ConfluencePages, error) {
 
 	client := atlassianConnect.atlassianOauthConfig.Client(ctx, token)
-	restyClient := resty.NewWithClient(client)
+	restyClient := atlassianConnect.GetClient(client)
+	restyClient.SetDebug(true)
 
 	resourceUrl, err := atlassianConnect.fetchConfluenceBaseURL(restyClient)
 	if err != nil {
 		atlassianConnect.log.Errorf("Unable to get resource url from confluence +%v", err)
 		return nil, err
 	}
+
+	atlassianConnect.log.Debugf("requested all the confluence pages extracted base url %v", resourceUrl)
+
+	// restyClient.SetAuthToken(token.AccessToken)
+	restyClient.SetHeader("Accept", "application/json")
+	restyClient.SetHeader("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
 	spaces, err := atlassianConnect.fetchSpaces(restyClient, resourceUrl)
 	if err != nil {
 		atlassianConnect.log.Errorf("Error fetching spaces: %v", err)
@@ -166,24 +223,26 @@ func (atlassianConnect *AtlassianConnect) fetchConfluenceBaseURL(client *resty.C
 }
 
 func (atlassianConnect *AtlassianConnect) fetchSpaces(client *resty.Client, baseURL string) ([]ConfluenceSpace, error) {
+	var spaceResp ConfluenceSpaceResponse
+
 	resp, err := client.R().
-		SetQueryParams(map[string]string{
-			"limit": "100",
-		}).
-		Get(fmt.Sprintf("%s/rest/api/space", baseURL))
+		Get(fmt.Sprintf("%s/wiki/rest/api/space", baseURL))
 
 	if err != nil {
-		return nil, fmt.Errorf("error fetching spaces: %v", err)
+		atlassianConnect.log.Errorf("Error while creating request: %v", err)
+		return nil, err
 	}
 
-	if resp.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("unexpected response code: %d", resp.StatusCode())
+	if resp.IsError() {
+		atlassianConnect.log.Errorf("Error response: %s", resp.String())
+		return nil, fmt.Errorf("failed to get all spaces: %s", resp.Status())
 	}
 
-	var spaceResp ConfluenceSpaceResponse
-	if err := json.Unmarshal(resp.Body(), &spaceResp); err != nil {
-		return nil, fmt.Errorf("error unmarshaling space response: %v", err)
+	err = json.Unmarshal(resp.Body(), &spaceResp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode token response: %v", err)
 	}
+
 	return spaceResp.Results, nil
 }
 
@@ -192,10 +251,10 @@ func (atlassianConnect *AtlassianConnect) fetchPages(client *resty.Client, baseU
 	_, err := client.R().
 		SetQueryParams(map[string]string{
 			"spaceKey": spaceKey,
-			"limit":    "50", // Set the number of items per page
+			"limit":    "100", // Set the number of items per page
 		}).
 		SetResult(&pages).
-		Get(fmt.Sprintf("%s/rest/api/content", baseURL))
+		Get(fmt.Sprintf("%s/wiki/rest/api/content", baseURL))
 
 	if err != nil {
 		return nil, fmt.Errorf("error fetching pages: %v", err)

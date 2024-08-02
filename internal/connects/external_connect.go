@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/google/uuid"
 	"github.com/lexatic/web-backend/config"
 	internal_gorm "github.com/lexatic/web-backend/internal/gorm"
@@ -94,11 +96,29 @@ func (ec *ExternalConnect) ToToken(value map[string]interface{}) (*oauth2.Token,
 	if expiryStr, ok := value["expiry"].(string); ok {
 		expiry, err := time.Parse(time.RFC3339, expiryStr)
 		if err != nil {
+			ec.log.Errorf("not able to parse expire time: %v time = %v", err, expiryStr)
 			return nil, connect, fmt.Errorf("error parsing expiry time: %v", err)
 		}
 		token.Expiry = expiry
 	}
 
+	ec.log.Debugf("to_token returning the respo. s, keep in mind that expire is something need to be very precies %+v", token)
 	// Construct and return the token
 	return &token, connect, nil
+}
+
+func (ec *ExternalConnect) NewHttpClient() *resty.Client {
+	return ec.GetClient(nil)
+}
+
+func (ec *ExternalConnect) GetClient(hc *http.Client) *resty.Client {
+	ct := resty.New()
+	if hc != nil {
+		ct = resty.NewWithClient(hc)
+	}
+
+	if ec.cfg.IsDevelopment() {
+		ct.SetDebug(true)
+	}
+	return ct
 }

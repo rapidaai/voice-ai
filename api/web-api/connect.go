@@ -545,6 +545,13 @@ func (connectApi *webConnectGRPCApi) GetConnectorFiles(ctx context.Context,
 			return utils.Error[web_api.GetConnectorFilesResponse](err, "Unable to get files ")
 		}
 		return utils.Success[web_api.GetConnectorFilesResponse](fls.Value)
+	case KN_GITHUB_CODE:
+		fls, err := connectApi.githubCodeConnect.Repositories(ctx, token, q, pageToken)
+		if err != nil {
+			connectApi.logger.Errorf("unable to get tool credentials %v", err)
+			return utils.Error[web_api.GetConnectorFilesResponse](err, "Unable to get files ")
+		}
+		return utils.Success[web_api.GetConnectorFilesResponse](fls)
 	default:
 		return utils.AuthenticateError[web_api.GetConnectorFilesResponse]()
 	}

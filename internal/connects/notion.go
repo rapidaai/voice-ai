@@ -2,8 +2,8 @@ package internal_connects
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/lexatic/web-backend/config"
@@ -43,100 +43,164 @@ func NewNotionWorkplaceConnect(cfg *config.AppConfig, logger commons.Logger, pos
 	}
 }
 
-func (notionConnect *NotionConnect) Token(c context.Context, code string) (*oauth2.Token, error) {
-	return notionConnect.notionOauthConfig.Exchange(c, code)
+type NotionTokenResponse struct {
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	BotId       string `json:"bot_id"`
+	Owner       struct {
+		Id   string `json:"id"`
+		Type string `json:"type"`
+		Name string `json:"name"`
+	} `json:"owner"`
+	WorkspaceName string `json:"workspace_name"`
+	WorkspaceIcon string `json:"workspace_icon"`
+	WorkspaceId   string `json:"workspace_id"`
 }
+
+func (notionConnect *NotionConnect) Token(c context.Context, code string) (*oauth2.Token, error) {
+	resp, err := notionConnect.NewHttpClient().R().
+		SetBasicAuth(notionConnect.notionOauthConfig.ClientID, notionConnect.notionOauthConfig.ClientSecret).
+		SetHeader("Content-Type", "application/json").
+		SetBody(map[string]interface{}{
+			"grant_type":   "authorization_code",
+			"code":         code,
+			"redirect_uri": notionConnect.notionOauthConfig.RedirectURL,
+		}).
+		Post(notionConnect.notionOauthConfig.Endpoint.TokenURL)
+	if err != nil {
+		notionConnect.log.Errorf("Error while creating request: %v", err)
+		return nil, err
+	}
+
+	if resp.IsError() {
+		notionConnect.log.Errorf("Error response: %s", resp.String())
+		return nil, fmt.Errorf("failed to get token: %s", resp.Status())
+	}
+
+	var tokenResponse NotionTokenResponse
+	err = json.Unmarshal(resp.Body(), &tokenResponse)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode token response: %v", err)
+	}
+
+	notionConnect.log.Debugf("retuned atlasian token %+v", tokenResponse)
+
+	token := &oauth2.Token{
+		AccessToken: tokenResponse.AccessToken,
+		TokenType:   tokenResponse.TokenType,
+	}
+
+	return token, nil
+}
+
+// func (notionConnect *NotionConnect) Token(c context.Context, code string) (*oauth2.Token, error) {
+// 	return notionConnect.notionOauthConfig.Exchange(c, code)
+// }
 
 func (notionConnect *NotionConnect) AuthCodeURL(state string) string {
 	notionConnect.log.Debugf("generating code url from notion with state = %v", state)
 	return notionConnect.notionOauthConfig.AuthCodeURL(state)
 }
 
-// Define data structures for parsing API responses
-type NotionPage struct {
-	ID          string       `json:"id"`
-	Title       string       `json:"title"`
-	URL         string       `json:"url"`
-	NotionSpace *NotionSpace `json:"space"`
-}
-
-type NotionPages struct {
-	Results       []*NotionPage `json:"results,omitempty"`
-	NextPageToken string        `json:"next_cursor,omitempty"`
-}
-
-type NotionSpace struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	URL  string `json:"url"`
-}
-
-type NotionSpaces struct {
-	Results []*NotionSpace `json:"results,omitempty"`
-}
-
 // give all the pages in side. a space
 func (notionConnect *NotionConnect) NotionPages(ctx context.Context,
 	token *oauth2.Token,
 	q *string,
-	pageToken *string) (*NotionPages, error) {
+	pageToken *string) (*NotionSearchResult, error) {
+
 	client := notionConnect.notionOauthConfig.Client(context.Background(), token)
-	restyClient := resty.NewWithClient(client)
+	restyClient := notionConnect.GetClient(client)
 
 	// Fetch Notion spaces
-	spaces, err := notionConnect.fetchSpaces(restyClient)
+	spaces, err := notionConnect.fetchAllContent(restyClient)
 	if err != nil {
-		log.Fatalf("Error fetching spaces: %v", err)
+		notionConnect.log.Errorf("Error fetching spaces: %v", err)
+		return nil, err
 	}
 
-	cfp := &NotionPages{}
-	for _, space := range spaces.Results {
-		fmt.Printf("Space ID: %s, Space Name: %s, Space URL: %s\n", space.ID, space.Name, space.URL)
-		// Fetch pages for each space
-		pages, err := notionConnect.fetchPages(restyClient, space.ID)
-		if err != nil {
-			log.Fatalf("Error fetching pages for space %s: %v", space.ID, err)
-		}
-		for _, page := range pages.Results {
-			// fmt.Printf("Page ID: %s, Page Title: %s, Page URL: %s\n", page.ID, page.Title, page.URL)
-			page.NotionSpace = space
-			cfp.Results = append(cfp.Results, page)
-		}
-	}
-	return cfp, nil
-}
-func (notionConnect *NotionConnect) fetchSpaces(client *resty.Client) (*NotionSpaces, error) {
-	var spaces NotionSpaces
-
-	// Example Notion API URL for retrieving spaces (workspaces)
-	apiURL := "https://api.notion.com/v1/users/{user_id}/workspaces"
-
-	_, err := client.R().
-		SetHeader("Accept", "application/json").
-		SetHeader("Content-Type", "application/json").
-		SetResult(&spaces).
-		Get(apiURL)
-
-	if err != nil {
-		return nil, fmt.Errorf("error fetching spaces: %v", err)
-	}
-
-	return &spaces, nil
+	return spaces, nil
 }
 
-func (notionConnect *NotionConnect) fetchPages(client *resty.Client, spaceID string) (*NotionPages, error) {
-	var pages NotionPages
+// Define the structure for rich text objects
+type NotionRichText struct {
+	Type      string     `json:"type"`
+	Text      NotionText `json:"text"`
+	PlainText string     `json:"plain_text"`
+	Href      string     `json:"href"`
+}
 
-	apiURL := fmt.Sprintf("https://api.notion.com/v1/databases/%s/query", spaceID)
-	_, err := client.R().
-		SetHeader("Accept", "application/json").
+type NotionText struct {
+	Content string      `json:"content"`
+	Link    interface{} `json:"link"`
+}
+
+type NotionSearchResult struct {
+	Object     string         `json:"object"`
+	Results    []NotionResult `json:"results"`
+	NextCursor string         `json:"next_cursor"`
+	HasMore    bool           `json:"has_more"`
+}
+
+type NotionResult struct {
+	Object         string                 `json:"object"`
+	ID             string                 `json:"id"`
+	CreatedTime    string                 `json:"created_time"`
+	LastEditedTime string                 `json:"last_edited_time"`
+	Properties     map[string]interface{} `json:"properties"`
+	Title          []NotionRichText       `json:"title"`
+	URL            string                 `json:"url"`
+	TitleStr       string                 `json:"title_str"`
+}
+
+func (notionConnect *NotionConnect) fetchAllContent(client *resty.Client) (*NotionSearchResult, error) {
+	var databases NotionSearchResult
+	apiURL := "https://api.notion.com/v1/search"
+	resp, err := client.R().
 		SetHeader("Content-Type", "application/json").
-		SetResult(&pages).
+		SetHeader("Notion-Version", "2022-06-28").
+		SetBody(map[string]interface{}{
+			"sort": map[string]string{
+				"direction": "descending",
+				"timestamp": "last_edited_time",
+			}}).
+		SetResult(&databases).
 		Post(apiURL)
-
 	if err != nil {
-		return nil, fmt.Errorf("error fetching pages: %v", err)
+		notionConnect.log.Errorf("Error fetching database: %v", err)
+		return nil, fmt.Errorf("error fetching databases: %v", err)
+	}
+	if resp.IsError() {
+		notionConnect.log.Errorf("Error fetching database: %v", err)
+		return nil, fmt.Errorf("failed to fetch databases: %s", resp.Status())
 	}
 
-	return &pages, nil
+	for i := range databases.Results {
+		if databases.Results[i].Object == "page" {
+			if titleProperty, ok := databases.Results[i].Properties["title"].(map[string]interface{}); ok {
+				if titleArray, ok := titleProperty["title"].([]interface{}); ok {
+					title := ""
+					for _, t := range titleArray {
+						if text, ok := t.(map[string]interface{}); ok {
+							title += text["plain_text"].(string)
+						}
+					}
+
+					databases.Results[i].TitleStr = title
+				}
+			}
+			continue
+		}
+		databases.Results[i].TitleStr = notionConnect.getTitleString(databases.Results[i].Title)
+	}
+
+	return &databases, nil
+}
+
+func (notionConnect *NotionConnect) getTitleString(titleRichText []NotionRichText) string {
+	notionConnect.log.Debugf("Giving you the text title form %+v", titleRichText)
+	var title string
+	for _, text := range titleRichText {
+		title += text.PlainText
+	}
+	return title
 }

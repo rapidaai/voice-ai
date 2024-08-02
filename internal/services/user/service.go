@@ -449,7 +449,8 @@ func (aS *userService) GetAllOrganizationMember(ctx context.Context, organizatio
 	var rt []internal_gorm.UserOrganizationRole
 	var cnt int64
 
-	qry := db.Model(internal_gorm.UserOrganizationRole{}).Preload("Member").
+	qry := db.Model(internal_gorm.UserOrganizationRole{}).
+		Preload("Member", "status = ?", "active").
 		Where("organization_id = ? AND status = ?", organizationId, "active")
 	for _, ct := range criterias {
 		qry.Where(fmt.Sprintf("%s = ?", ct.GetKey()), ct.GetValue())
