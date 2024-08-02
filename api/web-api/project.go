@@ -287,7 +287,16 @@ func (wProjectApi *webProjectGRPCApi) AddUsersToProject(ctx context.Context, irR
 	if err != nil {
 		// create a user
 		source := "invited-by-other"
-		eUser, err := wProjectApi.userService.Create(ctx, "awaited active", irRequest.Email, ciphers.RandomHash("rpd_"), "invited", &source)
+		username := irRequest.GetEmail()
+		parts := strings.Split(irRequest.GetEmail(), "@")
+		if len(parts) != 2 {
+			return utils.Error[web_api.AddUsersToProjectResponse](
+				err,
+				"The provided email is not valid, please check the email and retry.",
+			)
+		}
+		username = parts[0]
+		eUser, err := wProjectApi.userService.Create(ctx, username, irRequest.GetEmail(), ciphers.RandomHash("rpd_"), "invited", &source)
 		if err != nil {
 			wProjectApi.logger.Errorf("unable to create user for invite err %v", err)
 			return utils.Error[web_api.AddUsersToProjectResponse](
@@ -296,7 +305,7 @@ func (wProjectApi *webProjectGRPCApi) AddUsersToProject(ctx context.Context, irR
 			)
 		}
 		// , role string, userId uint64, orgnizationId uint64, status string
-		_, err = wProjectApi.userService.CreateOrganizationRole(ctx, auth, irRequest.Role, eUser.GetUserInfo().Id, auth.GetOrganizationRole().OrganizationId, "invited")
+		_, err = wProjectApi.userService.CreateOrganizationRole(ctx, auth, irRequest.GetRole(), eUser.GetUserInfo().Id, auth.GetOrganizationRole().OrganizationId, "invited")
 		if err != nil {
 			wProjectApi.logger.Errorf("unable to create organization role err %v", err)
 			return utils.Error[web_api.AddUsersToProjectResponse](

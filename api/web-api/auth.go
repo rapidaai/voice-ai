@@ -824,6 +824,7 @@ func (wAuthApi *webAuthGRPCApi) GetAllUser(c context.Context, irRequest *web_api
 			Id:          member.Member.Id,
 			Email:       member.Member.Email,
 			Role:        member.Role,
+			Status:      member.Member.Status,
 			CreatedDate: timestamppb.New(time.Time(member.Member.CreatedDate)),
 		}
 	}
