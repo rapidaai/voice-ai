@@ -7,6 +7,7 @@ import (
 	config "github.com/lexatic/web-backend/config"
 	internal_services "github.com/lexatic/web-backend/internal/services"
 	internal_vault_service "github.com/lexatic/web-backend/internal/services/vault"
+	integration_client "github.com/lexatic/web-backend/pkg/clients/integration"
 	provider_client "github.com/lexatic/web-backend/pkg/clients/provider"
 	commons "github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"
@@ -16,12 +17,13 @@ import (
 )
 
 type webVaultApi struct {
-	cfg            *config.AppConfig
-	logger         commons.Logger
-	postgres       connectors.PostgresConnector
-	redis          connectors.RedisConnector
-	vaultService   internal_services.VaultService
-	providerClient provider_client.ProviderServiceClient
+	cfg               *config.AppConfig
+	logger            commons.Logger
+	postgres          connectors.PostgresConnector
+	redis             connectors.RedisConnector
+	vaultService      internal_services.VaultService
+	providerClient    provider_client.ProviderServiceClient
+	integrationClient integration_client.IntegrationServiceClient
 }
 
 type webVaultRPCApi struct {
@@ -35,11 +37,12 @@ type webVaultGRPCApi struct {
 func NewVaultRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) *webVaultRPCApi {
 	return &webVaultRPCApi{
 		webVaultApi{
-			cfg:            config,
-			logger:         logger,
-			postgres:       postgres,
-			vaultService:   internal_vault_service.NewVaultService(logger, postgres),
-			providerClient: provider_client.NewProviderServiceClientGRPC(config, logger, redis),
+			cfg:               config,
+			logger:            logger,
+			postgres:          postgres,
+			vaultService:      internal_vault_service.NewVaultService(logger, postgres),
+			providerClient:    provider_client.NewProviderServiceClientGRPC(config, logger, redis),
+			integrationClient: integration_client.NewIntegrationServiceClientGRPC(config, logger, redis),
 		},
 	}
 }
@@ -47,12 +50,13 @@ func NewVaultRPC(config *config.AppConfig, logger commons.Logger, postgres conne
 func NewVaultGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) web_api.VaultServiceServer {
 	return &webVaultGRPCApi{
 		webVaultApi{
-			cfg:            config,
-			logger:         logger,
-			postgres:       postgres,
-			redis:          redis,
-			vaultService:   internal_vault_service.NewVaultService(logger, postgres),
-			providerClient: provider_client.NewProviderServiceClientGRPC(config, logger, redis),
+			cfg:               config,
+			logger:            logger,
+			postgres:          postgres,
+			redis:             redis,
+			vaultService:      internal_vault_service.NewVaultService(logger, postgres),
+			providerClient:    provider_client.NewProviderServiceClientGRPC(config, logger, redis),
+			integrationClient: integration_client.NewIntegrationServiceClientGRPC(config, logger, redis),
 		},
 	}
 }
@@ -64,17 +68,34 @@ func (wVault *webVaultGRPCApi) CreateProviderCredential(ctx context.Context, irR
 		wVault.logger.Errorf("CreateProviderCredential from grpc with unauthenticated request")
 		return nil, errors.New("unauthenticated request")
 	}
+	// first verify the credentials if not verified then return to user and say its not good credentials
+
+	verified, err := wVault.integrationClient.VerifyCredential(ctx, iAuth,
+		irRequest.GetProviderName(),
+		&web_api.Credential{
+			Id:    1,
+			Value: irRequest.GetCredential(),
+		})
+
+	if err != nil {
+		wVault.logger.Errorf("verification of the credentials failed with err %v", err)
+		return utils.Error[web_api.CreateProviderCredentialResponse](
+			err,
+			"Unable to verify the credentials, please check the credential and try again.")
+	}
+
+	if !verified.GetSuccess() {
+		wVault.logger.Errorf("verification of the credentials failed wile processing")
+		return utils.Error[web_api.CreateProviderCredentialResponse](
+			errors.New("unable to verify credentials"),
+			"Unable to verify the credentials, please check the credential and try again.")
+	}
 	vlt, err := wVault.vaultService.CreateOrganizationProviderCredential(ctx, iAuth, irRequest.GetProviderId(), irRequest.GetName(), irRequest.GetCredential().AsMap())
 	if err != nil {
 		wVault.logger.Errorf("vaultService.Create from grpc with err %v", err)
-		return &web_api.CreateProviderCredentialResponse{
-			Code:    400,
-			Success: false,
-			Error: &web_api.Error{
-				ErrorCode:    400,
-				ErrorMessage: err.Error(),
-				HumanMessage: "Unable to create provider credential, please try again",
-			}}, nil
+		return utils.Error[web_api.CreateProviderCredentialResponse](
+			err,
+			"Unable to create provider credential, please try again")
 	}
 
 	out := &web_api.VaultCredential{}
@@ -82,7 +103,7 @@ func (wVault *webVaultGRPCApi) CreateProviderCredential(ctx context.Context, irR
 	if err != nil {
 		wVault.logger.Errorf("unable to cast the provider credentials to proto %v", err)
 	}
-	return utils.Success[web_api.CreateProviderCredentialResponse, *web_api.VaultCredential](out)
+	return utils.Success[web_api.CreateProviderCredentialResponse](out)
 }
 
 func (wVault *webVaultGRPCApi) DeleteProviderCredential(c context.Context, irRequest *web_api.DeleteProviderCredentialRequest) (*web_api.DeleteProviderCredentialResponse, error) {

@@ -75,7 +75,7 @@ type VaultService interface {
 
 	//
 	CreateOrganizationProviderCredential(ctx context.Context,
-		auth types.Principle,
+		auth types.SimplePrinciple,
 		providerId uint64,
 		name string, credential map[string]interface{}) (*internal_gorm.Vault, error)
 
