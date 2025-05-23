@@ -1,8 +1,0 @@
-DROP TABLE IF EXISTS organizations;
-DROP TABLE IF EXISTS projects;
-DROP TABLE IF EXISTS user_auths;
-DROP TABLE IF EXISTS user_auth_tokens;
-DROP TABLE IF EXISTS user_roles;
-DROP TABLE IF EXISTS vaults;
-DROP TABLE IF EXISTS leads;
-DROP TABLE IF EXISTS user_socials;

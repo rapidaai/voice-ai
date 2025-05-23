@@ -5,16 +5,16 @@ import (
 	"errors"
 	"strings"
 
-	internal_gorm "github.com/lexatic/web-backend/internal/gorm"
+	internal_gorm "github.com/lexatic/web-backend/api/web-api/internal/gorm"
 
-	internal_organization_service "github.com/lexatic/web-backend/internal/services/organization"
-	internal_user_service "github.com/lexatic/web-backend/internal/services/user"
+	internal_organization_service "github.com/lexatic/web-backend/api/web-api/internal/services/organization"
+	internal_user_service "github.com/lexatic/web-backend/api/web-api/internal/services/user"
 	integration_client "github.com/lexatic/web-backend/pkg/clients/integration"
 	"github.com/lexatic/web-backend/pkg/utils"
 
+	internal_services "github.com/lexatic/web-backend/api/web-api/internal/services"
+	internal_project_service "github.com/lexatic/web-backend/api/web-api/internal/services/project"
 	config "github.com/lexatic/web-backend/config"
-	internal_services "github.com/lexatic/web-backend/internal/services"
-	internal_project_service "github.com/lexatic/web-backend/internal/services/project"
 	"github.com/lexatic/web-backend/pkg/ciphers"
 	commons "github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"

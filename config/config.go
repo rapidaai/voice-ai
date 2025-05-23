@@ -22,17 +22,18 @@ type AppConfig struct {
 	RedisConfig    configs.RedisConfig    `mapstructure:"redis" validate:"required"`
 
 	// all the host
-	ProviderHost    string `mapstructure:"provider_host" validate:"required"`
-	IntegrationHost string `mapstructure:"integration_host" validate:"required"`
-	EndpointHost    string `mapstructure:"endpoint_host" validate:"required"`
-	WorkflowHost    string `mapstructure:"workflow_host" validate:"required"`
-	WebhookHost     string `mapstructure:"webhook_host" validate:"required"`
-	WebHost         string `mapstructure:"web_host" validate:"required"`
-	DocumentHost    string `mapstructure:"document_host" validate:"required"`
-	ExperimentHost  string `mapstructure:"experiment_host" validate:"required"`
-
+	ProviderHost     string                   `mapstructure:"provider_host" validate:"required"`
+	IntegrationHost  string                   `mapstructure:"integration_host" validate:"required"`
+	EndpointHost     string                   `mapstructure:"endpoint_host" validate:"required"`
+	WorkflowHost     string                   `mapstructure:"workflow_host" validate:"required"`
+	WebhookHost      string                   `mapstructure:"webhook_host" validate:"required"`
+	WebHost          string                   `mapstructure:"web_host" validate:"required"`
+	DocumentHost     string                   `mapstructure:"document_host" validate:"required"`
+	ExperimentHost   string                   `mapstructure:"experiment_host" validate:"required"`
 	AssetStoreConfig configs.AssetStoreConfig `mapstructure:"asset_store" validate:"required"`
+}
 
+type OAuthConfig struct {
 	GoogleClientId     string `mapstructure:"google_client_id" validate:"required"`
 	GoogleClientSecret string `mapstructure:"google_client_secret" validate:"required"`
 
@@ -62,6 +63,11 @@ type AppConfig struct {
 
 	HubspotClientId     string `mapstructure:"hubspot_client_id" validate:"required"`
 	HubspotClientSecret string `mapstructure:"hubspot_client_secret" validate:"required"`
+}
+
+type WebAppConfig struct {
+	AppConfig   `mapstructure:",squash"`
+	OAuthConfig `mapstructure:",squash"`
 }
 
 func (cfg *AppConfig) IsDevelopment() bool {
@@ -94,7 +100,6 @@ func InitConfig() (*viper.Viper, error) {
 		log.Printf("Error while reading the config")
 	}
 
-	//
 	if err = vConfig.ReadInConfig(); err != nil && !os.IsNotExist(err) {
 		log.Printf("Reading from env varaibles.")
 	}
@@ -103,8 +108,8 @@ func InitConfig() (*viper.Viper, error) {
 }
 
 // Getting application config from viper
-func GetApplicationConfig(v *viper.Viper) (*AppConfig, error) {
-	var config AppConfig
+func GetApplicationConfig(v *viper.Viper) (*WebAppConfig, error) {
+	var config WebAppConfig
 	err := v.Unmarshal(&config)
 	if err != nil {
 		log.Printf("%+v\n", err)

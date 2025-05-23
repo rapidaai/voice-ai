@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 
+	internal_connects "github.com/lexatic/web-backend/api/web-api/internal/connects"
+	internal_services "github.com/lexatic/web-backend/api/web-api/internal/services"
+	internal_vault_service "github.com/lexatic/web-backend/api/web-api/internal/services/vault"
 	config "github.com/lexatic/web-backend/config"
-	internal_connects "github.com/lexatic/web-backend/internal/connects"
-	internal_services "github.com/lexatic/web-backend/internal/services"
-	internal_vault_service "github.com/lexatic/web-backend/internal/services/vault"
 	integration_client "github.com/lexatic/web-backend/pkg/clients/integration"
 	provider_client "github.com/lexatic/web-backend/pkg/clients/provider"
 	commons "github.com/lexatic/web-backend/pkg/commons"
@@ -37,7 +37,7 @@ type webVaultGRPCApi struct {
 	webVaultApi
 }
 
-func NewVaultRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) *webVaultRPCApi {
+func NewVaultRPC(config *config.AppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) *webVaultRPCApi {
 	return &webVaultRPCApi{
 		webVaultApi{
 			cfg:               config,
@@ -46,12 +46,12 @@ func NewVaultRPC(config *config.AppConfig, logger commons.Logger, postgres conne
 			vaultService:      internal_vault_service.NewVaultService(logger, postgres),
 			providerClient:    provider_client.NewProviderServiceClientGRPC(config, logger, redis),
 			integrationClient: integration_client.NewIntegrationServiceClientGRPC(config, logger, redis),
-			hubspotConnect:    internal_connects.NewHubspotConnect(config, logger, postgres),
+			hubspotConnect:    internal_connects.NewHubspotConnect(config, oauthCfg, logger, postgres),
 		},
 	}
 }
 
-func NewVaultGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) web_api.VaultServiceServer {
+func NewVaultGRPC(config *config.AppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) web_api.VaultServiceServer {
 	return &webVaultGRPCApi{
 		webVaultApi{
 			cfg:               config,
@@ -61,7 +61,7 @@ func NewVaultGRPC(config *config.AppConfig, logger commons.Logger, postgres conn
 			vaultService:      internal_vault_service.NewVaultService(logger, postgres),
 			providerClient:    provider_client.NewProviderServiceClientGRPC(config, logger, redis),
 			integrationClient: integration_client.NewIntegrationServiceClientGRPC(config, logger, redis),
-			hubspotConnect:    internal_connects.NewHubspotConnect(config, logger, postgres),
+			hubspotConnect:    internal_connects.NewHubspotConnect(config, oauthCfg, logger, postgres),
 		},
 	}
 }
@@ -71,7 +71,7 @@ func (wVault *webVaultGRPCApi) CreateProviderCredential(ctx context.Context, irR
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
 	if !isAuthenticated {
 		wVault.logger.Errorf("CreateProviderCredential from grpc with unauthenticated request")
-		return nil, errors.New("unauthenticated request")
+		return utils.AuthenticateError[web_api.CreateProviderCredentialResponse]()
 	}
 	// first verify the credentials if not verified then return to user and say its not good credentials
 
@@ -116,7 +116,7 @@ func (wVault *webVaultGRPCApi) DeleteProviderCredential(c context.Context, irReq
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
 	if !isAuthenticated {
 		wVault.logger.Errorf("DeleteProviderCredential from grpc with unauthenticated request")
-		return nil, errors.New("unauthenticated request")
+		return utils.AuthenticateError[web_api.DeleteProviderCredentialResponse]()
 	}
 
 	_, err := wVault.vaultService.Delete(c, iAuth, irRequest.GetProviderKeyId())
@@ -140,7 +140,7 @@ func (wVault *webVaultGRPCApi) GetAllOrganizationCredential(c context.Context, i
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
 	if !isAuthenticated {
 		wVault.logger.Errorf("GetAllOrganizationCredential from grpc with unauthenticated request")
-		return nil, errors.New("unauthenticated request")
+		return utils.AuthenticateError[web_api.GetAllOrganizationCredentialResponse]()
 	}
 	cnt, vlts, err := wVault.vaultService.GetAllOrganizationCredential(c, iAuth, irRequest.GetCriterias(), irRequest.GetPaginate())
 	if err != nil {
@@ -175,7 +175,7 @@ func (wVault *webVaultGRPCApi) GetProviderCredential(ctx context.Context, reques
 	iAuth, isAuthenticated := types.GetClaimPrincipleGRPC[*types.ServiceScope](ctx)
 	if !isAuthenticated {
 		wVault.logger.Errorf("GetAllProviderCredential from grpc with unauthenticated request")
-		return nil, errors.New("unauthenticated request")
+		return utils.AuthenticateError[web_api.GetProviderCredentialResponse]()
 	}
 	vlt, err := wVault.vaultService.GetProviderCredential(ctx, iAuth, request.GetProviderId())
 	if err != nil {
@@ -200,7 +200,7 @@ func (wVault *webVaultGRPCApi) CreateToolCredential(
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
 	if !isAuthenticated {
 		wVault.logger.Errorf("CreateToolCredentialRequest from grpc with unauthenticated request")
-		return nil, errors.New("unauthenticated request")
+		return utils.AuthenticateError[web_api.CreateToolCredentialResponse]()
 	}
 	// first verify the credentials if not verified then return to user and say its not good credentials
 
@@ -228,7 +228,7 @@ func (wVault *webVaultGRPCApi) GetOauth2VaultCredential(ctx context.Context, req
 	iAuth, isAuthenticated := types.GetClaimPrincipleGRPC[*types.ServiceScope](ctx)
 	if !isAuthenticated {
 		wVault.logger.Errorf("GetAllProviderCredential from grpc with unauthenticated request")
-		return nil, errors.New("unauthenticated request")
+		return utils.AuthenticateError[web_api.GetOauth2VaultCredentialResponse]()
 	}
 	vlt, err := wVault.vaultService.GetToolCredential(
 		ctx, iAuth, request.GetProviderId())

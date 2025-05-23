@@ -1,0 +1,300 @@
+- id: 6707073499618514490
+  tool_id: 828163119872980643
+  provider:
+      id: 828163119872980643
+      name: Confluence
+      description: Collaborative workspace with templates, integration with Jira, and advanced search.
+      image: https://cdn-01.rapida.ai/partners/tools/confluence-icon.svg
+  name: Confluence
+  feature: 
+    - connection
+    - data.knowledge
+  connect_configuration:
+    connect_url: "/connect-knowledge/confluence"
+    connect_type: "oauth2"
+  actor: organization
+  
+
+- id: 7495655409923484312
+  tool_id: 8962189241232892279
+  provider:
+    id: 8962189241232892279
+    name: Notion
+    description: Flexible workspace, database functionality, rich media support, collaboration tools.
+    image: https://cdn-01.rapida.ai/partners/tools/notion-icon.svg
+  name: Notion
+  feature: 
+    - connection
+    - data.knowledge
+  connect_configuration:
+    connect_url: "/connect-knowledge/notion"
+    connect_type: "oauth2"
+  actor: organization
+  
+
+- id: 108256124526990120
+  tool_id: 1152680016786286407
+  provider:
+    id: 1152680016786286407
+    name: SharePoint
+    description: Document management, intranet capabilities, integration with Office 365, collaboration tools.
+    image: https://cdn-01.rapida.ai/partners/tools/sharepoint-icon.svg
+  name: SharePoint
+  feature: 
+    - connection
+    - data.knowledge
+  connect_configuration:
+    connect_url: "/connect-knowledge/sharepoint"
+    connect_type: "oauth2"
+  actor: organization
+  
+
+- id: 8823385524451656974
+  tool_id: 7126162197231234774
+  provider:
+    id: 7126162197231234774
+    name: Google Drive
+    description: Cloud storage service with real-time collaboration, sharing capabilities, and integration with Google Workspace tools.
+    image: https://cdn-01.rapida.ai/partners/tools/google-drive-icon.svg
+  name: Google Drive
+  feature: 
+    - connection
+    - data.knowledge
+  connect_configuration:
+    connect_url: "/connect-knowledge/google-drive"
+    connect_type: "oauth2"
+  actor: organization
+  
+
+- id: 4212966234201291937
+  tool_id: 4373891332059251235
+  provider:
+    id: 4373891332059251235
+    name: GitHub
+    description: Web-based platform for version control using Git, with additional collaboration features.
+    image: https://cdn-01.rapida.ai/partners/tools/github-icon.svg
+  name: GitHub
+  feature: 
+    - connection
+    - data.knowledge
+  connect_configuration:
+    connect_url: "/connect-knowledge/github"
+    connect_type: "oauth2"
+  actor: organization
+  
+
+- id: 1625913474537396311
+  tool_id: 6032054350093361929
+  provider:
+    id: 6032054350093361929
+    name: Microsoft OneDrive
+    description: Cloud storage service for file hosting and synchronization from Microsoft.
+    image: https://cdn-01.rapida.ai/partners/tools/one-drive-icon.svg
+  name: Microsoft OneDrive
+  feature: 
+    - connection
+    - data.knowledge
+  connect_configuration:
+    connect_url: "/connect-knowledge/microsoft-onedrive"
+    connect_type: "oauth2"
+  actor: organization
+  
+
+
+- id: 8991313707572817836
+  tool_id: 412702929018243296
+  provider:
+    id: 412702929018243296
+    name: Slack
+    description: Collaboration hub that connects people with the information they need.
+    image: https://cdn-01.rapida.ai/partners/tools/slack-icon.svg
+  name: Slack
+  feature: 
+    - connection
+    - action.send_message
+  connect_configuration:
+    connect_url: "/connect-action/slack"
+    connect_type: "oauth2"
+  actor: user
+  description: "Retrieve messages from Slack channels or DMs"
+
+- id: 8408986260124700428
+  tool_id: 7646645603519189352
+  provider:
+    id: 7646645603519189352
+    name: HubSpot
+    description: CRM platform for marketing, sales, and customer service. Provides tools for inbound marketing, sales automation, and analytics.
+    image: https://cdn-01.rapida.ai/partners/tools/hubspot-icon.png
+  name: HubSpot
+  feature: 
+    - connection
+  connect_configuration:
+    connect_url: "/connect-crm/hubspot"
+    connect_type: "oauth2"
+  actor: organization
+  
+
+- id: 8408986260124700429
+  tool_id: 7646645603519189353
+  provider: 
+    id: 7646645603519189353
+    name: Vonage
+    description: Cloud communication platform that provides voice, messaging, and video solutions for businesses.
+    image: https://cdn-01.rapida.ai/partners/vonage.jpeg
+  name: Vonage
+  feature: 
+    - connection
+  connect_configuration:
+    connect_url: "/connect-communication/vonage"
+    connect_type: "oauth2"
+  actor: organization
+  
+
+- id: 8408986260124700430
+  tool_id: 7646645603519189354
+  provider:
+    id: 7646645603519189354
+    name: Exotel
+    description: Cloud telephony platform offering voice and messaging services for businesses.
+    image: https://cdn-01.rapida.ai/partners/exotel.jpeg
+  name: Exotel
+  feature: 
+    - connection
+  connect_configuration:
+    connect_url: "/connect-communication/exotel"
+    connect_type: "oauth2"
+  actor: organization
+  
+
+- id: 7675709218821439431
+  tool_id: 2625553142046091699
+  provider:
+    id: 2625553142046091699
+    name: Freshdesk
+    description: Integrated with ticketing system, AI-driven insights, customizable knowledge base, multilingual support.
+    image: https://cdn-01.rapida.ai/partners/freshdesk.png
+  name: Freshsales
+  feature: 
+    - connection
+  connect_configuration:
+    form_input: ""
+    connect_type: "form"
+  actor: organization
+  description: "Connection to manage all the request to freshsales"
+
+- id: 7180679278431284956
+  tool_id: 6581214267333847816
+  provider:
+    id: 6581214267333847816
+    name: Zendesk
+    description: Self-service customer support platform enterprises.
+    image: https://cdn-01.rapida.ai/partners/zendesk.jpg
+  name: Zendesk
+  feature: 
+    - connection
+  connect_configuration:
+    form_input: ""
+    connect_type: "form"
+  actor: organization
+  description: "Connection to manage all the request to Zendesk"
+
+- id: 4413247467425994582
+  tool_id: 7835356314600149384
+  provider:
+    id: 7835356314600149384
+    name: Twilio
+    description: Cloud communications platform for building SMS, voice, and messaging applications
+    image: https://cdn-01.rapida.ai/partners/tools/twilio-icon.svg
+  name: Twilio
+  feature: 
+    - connection
+    - action.call
+    - action.whatsapp
+    - action.sms
+  connect_configuration:
+    form_input: >
+      [{"name": "messaging_service_sid", "type": "string", "label": "Messaging Service SID"},
+       {"name": "phone_number", "type": "string", "label": "Phone Number"}]
+    connect_type: "form"
+  actor: organization
+  description: "Setup and manage Twilio messaging service for SMS communication."
+
+- id: 8408986260124700432
+  tool_id: 7646645603519189356
+  provider:
+    id: 7646645603519189356
+    name: Microsoft Dynamics 365
+    description: Integrated CRM and ERP platform for customer relationship management and business operations.
+    image: https://cdn-01.rapida.ai/partners/tools/dynamics365-icon.webp
+  name: Microsoft Dynamics 365
+  feature: 
+    - connection
+  connect_configuration:
+    connect_url: "/connect-crm/dynamics365"
+    connect_type: "oauth2"
+  actor: organization
+  
+
+- id: 8408986260124700442
+  tool_id: 7646645603519189366
+  provider:
+    id: 7646645603519189366
+    name: Zoho CRM
+    description: Cloud-based CRM with tools for sales, marketing, and customer support.
+    image: https://cdn-01.rapida.ai/partners/tools/zoho-icon.png
+  name: Zoho CRM
+  feature: 
+    - connection
+  connect_configuration:
+    connect_url: "/connect-crm/zoho"
+    connect_type: "oauth2"
+  actor: organization
+  
+
+- id: 8408986260124700443
+  tool_id: 7646645603519189367
+  provider:
+    id: 7646645603519189367
+    name: Salesforce
+    description: Leading CRM platform offering solutions for sales, service, marketing, and analytics.
+    image: https://cdn-01.rapida.ai/partners/tools/salesforce-icon.png
+  name: Salesforce
+  feature: 
+    - connection
+  connect_configuration:
+    connect_url: "/connect-crm/salesforce"
+    connect_type: "oauth2"
+  actor: organization
+  
+
+- id: 8408986260124700444
+  tool_id: 7646645603519189368
+  provider:
+    id: 7646645603519189368
+    name: Pipedrive
+    description: Sales CRM and pipeline management tool for small and medium-sized businesses.
+    image: https://cdn-01.rapida.ai/partners/tools/pipedrive-icon.png
+  name: Pipedrive
+  feature: 
+    - connection
+  connect_configuration:
+    connect_url: "/connect-crm/pipedrive"
+    connect_type: "oauth2"
+  actor: organization
+  
+
+- id: 8408986260124700445
+  tool_id: 7646645603519189369
+  provider:
+    id: 7646645603519189369
+    name: LeadSquared
+    description: CRM for sales execution and marketing automation tailored for businesses of all sizes.
+    image: https://cdn-01.rapida.ai/partners/tools/leadsquared-icon.png
+  name: LeadSquared
+  feature: 
+    - connection
+  connect_configuration:
+    connect_url: "/connect-crm/leadsquared"
+    connect_type: "oauth2"
+  actor: organization
+  

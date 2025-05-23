@@ -8,12 +8,12 @@ import (
 )
 
 type healthCheckApi struct {
-	cfg      *config.AppConfig
+	cfg      *config.WebAppConfig
 	postgres connectors.Connector
 	logger   commons.Logger
 }
 
-func New(config *config.AppConfig, logger commons.Logger,
+func New(config *config.WebAppConfig, logger commons.Logger,
 	postgres connectors.Connector) *healthCheckApi {
 	return &healthCheckApi{
 		cfg:      config,

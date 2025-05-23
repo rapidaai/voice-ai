@@ -29,41 +29,41 @@ type webAssistantGRPCApi struct {
 }
 
 // GetAllAssistantSkill implements lexatic_backend.AssistantServiceServer.
-func (assistant *webAssistantGRPCApi) GetAllAssistantSkill(c context.Context, iRequest *web_api.GetAllAssistantSkillRequest) (*web_api.GetAllAssistantSkillResponse, error) {
-	assistant.logger.Debugf("GetAllAssistantSkill from grpc with requestPayload %v, %v", iRequest, c)
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
-	if !isAuthenticated {
-		assistant.logger.Errorf("unauthenticated request for get all assistant skill")
-		return exceptions.AuthenticationError[web_api.GetAllAssistantSkillResponse]()
-	}
+// func (assistant *webAssistantGRPCApi) GetAllAssistantSkill(c context.Context, iRequest *web_api.GetAllAssistantSkillRequest) (*web_api.GetAllAssistantSkillResponse, error) {
+// 	assistant.logger.Debugf("GetAllAssistantSkill from grpc with requestPayload %v, %v", iRequest, c)
+// 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
+// 	if !isAuthenticated {
+// 		assistant.logger.Errorf("unauthenticated request for get all assistant skill")
+// 		return exceptions.AuthenticationError[web_api.GetAllAssistantSkillResponse]()
+// 	}
 
-	_page, _assistant, err := assistant.assistantClient.GetAllAssistantSkill(c, iAuth, iRequest.GetCriterias(), iRequest.GetPaginate())
-	if err != nil {
-		return exceptions.InternalServerError[web_api.GetAllAssistantSkillResponse](err, "Unable to get all the assistant messages")
-	}
+// 	_page, _assistant, err := assistant.assistantClient.GetAllAssistantSkill(c, iAuth, iRequest.GetCriterias(), iRequest.GetPaginate())
+// 	if err != nil {
+// 		return exceptions.InternalServerError[web_api.GetAllAssistantSkillResponse](err, "Unable to get all the assistant messages")
+// 	}
 
-	return utils.PaginatedSuccess[web_api.GetAllAssistantSkillResponse, []*web_api.AssistantSkill](
-		_page.GetTotalItem(), _page.GetCurrentPage(),
-		_assistant)
-}
+// 	return utils.PaginatedSuccess[web_api.GetAllAssistantSkillResponse, []*web_api.AssistantSkill](
+// 		_page.GetTotalItem(), _page.GetCurrentPage(),
+// 		_assistant)
+// }
 
 // GetAssistantSkill implements lexatic_backend.AssistantServiceServer.
-func (assistant *webAssistantGRPCApi) GetAssistantSkill(c context.Context, iRequest *web_api.GetAssistantSkillRequest) (*web_api.GetAssistantSkillResponse, error) {
-	assistant.logger.Debugf("GetAssistantSkill from grpc with requestPayload %v, %v", iRequest, c)
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
-	if !isAuthenticated {
-		assistant.logger.Errorf("unauthenticated request for get assistant skill")
-		return exceptions.AuthenticationError[web_api.GetAssistantSkillResponse]()
-	}
-	skill, err := assistant.assistantClient.GetAssistantSkill(c, iAuth, iRequest)
-	if err != nil {
-		return utils.Error[web_api.GetAssistantSkillResponse](
-			err,
-			"Unable to get your assistant skill, please try again in sometime.")
-	}
+// func (assistant *webAssistantGRPCApi) GetAssistantSkill(c context.Context, iRequest *web_api.GetAssistantSkillRequest) (*web_api.GetAssistantSkillResponse, error) {
+// 	assistant.logger.Debugf("GetAssistantSkill from grpc with requestPayload %v, %v", iRequest, c)
+// 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
+// 	if !isAuthenticated {
+// 		assistant.logger.Errorf("unauthenticated request for get assistant skill")
+// 		return exceptions.AuthenticationError[web_api.GetAssistantSkillResponse]()
+// 	}
+// 	skill, err := assistant.assistantClient.GetAssistantSkill(c, iAuth, iRequest)
+// 	if err != nil {
+// 		return utils.Error[web_api.GetAssistantSkillResponse](
+// 			err,
+// 			"Unable to get your assistant skill, please try again in sometime.")
+// 	}
 
-	return utils.Success[web_api.GetAssistantSkillResponse, *web_api.AssistantSkill](skill)
-}
+// 	return utils.Success[web_api.GetAssistantSkillResponse, *web_api.AssistantSkill](skill)
+// }
 
 // GetAllAssistantSession implements lexatic_backend.AssistantServiceServer.
 func (assistant *webAssistantGRPCApi) GetAllAssistantConversation(c context.Context, iRequest *web_api.GetAllAssistantConversationRequest) (*web_api.GetAllAssistantConversationResponse, error) {
@@ -213,7 +213,7 @@ func (assistant *webAssistantGRPCApi) GetAllAssistant(c context.Context, iReques
 		_assistant)
 }
 
-func (assistant *webAssistantGRPCApi) GetAllAssistantEmbeddedSkill(c context.Context, iRequest *web_api.GetAllAssistantEmbeddedSkillRequest) (*web_api.GetAllAssistantEmbeddedSkillResponse, error) {
+func (assistant *webAssistantGRPCApi) GetAllAssistantTool(c context.Context, iRequest *web_api.GetAllAssistantToolRequest) (*web_api.GetAllAssistantToolResponse, error) {
 	assistant.logger.Debugf("GetAllAssistantEmbeddedSkill from grpc with requestPayload %v, %v", iRequest, c)
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
 	if !isAuthenticated {
@@ -221,14 +221,14 @@ func (assistant *webAssistantGRPCApi) GetAllAssistantEmbeddedSkill(c context.Con
 		return nil, errors.New("unauthenticated request")
 	}
 
-	_page, _assistant, err := assistant.assistantClient.GetAllAssistantEmbeddedSkill(c, iAuth, iRequest.GetAssistantId(), iRequest.GetCriterias(), iRequest.GetPaginate())
+	_page, _assistant, err := assistant.assistantClient.GetAllAssistantTool(c, iAuth, iRequest.GetAssistantId(), iRequest.GetCriterias(), iRequest.GetPaginate())
 	if err != nil {
-		return utils.Error[web_api.GetAllAssistantEmbeddedSkillResponse](
+		return utils.Error[web_api.GetAllAssistantToolResponse](
 			err,
 			"Unable to get your assistant, please try again in sometime.")
 	}
 
-	return utils.PaginatedSuccess[web_api.GetAllAssistantEmbeddedSkillResponse, []*web_api.AssistantEmbeddedSkill](
+	return utils.PaginatedSuccess[web_api.GetAllAssistantToolResponse, []*web_api.AssistantTool](
 		_page.GetTotalItem(), _page.GetCurrentPage(),
 		_assistant)
 }

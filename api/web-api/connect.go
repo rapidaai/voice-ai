@@ -7,10 +7,10 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	internal_connects "github.com/lexatic/web-backend/api/web-api/internal/connects"
+	internal_services "github.com/lexatic/web-backend/api/web-api/internal/services"
+	internal_vault_service "github.com/lexatic/web-backend/api/web-api/internal/services/vault"
 	config "github.com/lexatic/web-backend/config"
-	internal_connects "github.com/lexatic/web-backend/internal/connects"
-	internal_services "github.com/lexatic/web-backend/internal/services"
-	internal_vault_service "github.com/lexatic/web-backend/internal/services/vault"
 	commons "github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"
 	gorm_types "github.com/lexatic/web-backend/pkg/models/gorm/types"
@@ -330,56 +330,57 @@ func (wConnectApi *webConnectGRPCApi) ActionConnect(ctx context.Context, acr *we
 	}, nil
 }
 
-func NewConnectRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) *webConnectRPCApi {
+func NewConnectRPC(config *config.AppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) *webConnectRPCApi {
 	return &webConnectRPCApi{
 		webConnectApi{
 			cfg:                config,
 			logger:             logger,
 			postgres:           postgres,
-			githubCodeConnect:  internal_connects.NewGithubCodeConnect(config, logger, postgres),
-			gitlabCodeConnect:  internal_connects.NewGitlabCodeConnect(config, logger, postgres),
-			googleDriveConnect: internal_connects.NewGoogleDriveConnect(config, logger, postgres),
-			confluenceConnect:  internal_connects.NewConfluenceConnect(config, logger, postgres),
-			notionConnect:      internal_connects.NewNotionWorkplaceConnect(config, logger, postgres),
+			githubCodeConnect:  internal_connects.NewGithubCodeConnect(config, oauthCfg, logger, postgres),
+			gitlabCodeConnect:  internal_connects.NewGitlabCodeConnect(config, oauthCfg, logger, postgres),
+			googleDriveConnect: internal_connects.NewGoogleDriveConnect(config, oauthCfg, logger, postgres),
+			confluenceConnect:  internal_connects.NewConfluenceConnect(config, oauthCfg, logger, postgres),
+			notionConnect:      internal_connects.NewNotionWorkplaceConnect(config, oauthCfg, logger, postgres),
 
 			//
-			microsoftSharepointConnect: internal_connects.NewMicrosoftSharepointConnect(config, logger, postgres),
-			microsoftOnedriveConnect:   internal_connects.NewMicrosoftOnedriveConnect(config, logger, postgres),
+			microsoftSharepointConnect: internal_connects.NewMicrosoftSharepointConnect(config, oauthCfg, logger, postgres),
+			microsoftOnedriveConnect:   internal_connects.NewMicrosoftOnedriveConnect(config, oauthCfg, logger, postgres),
 			//
 			vaultService: internal_vault_service.NewVaultService(logger, postgres),
 
-			slackConnect: internal_connects.NewSlackActionConnect(config, logger, postgres),
-			jiraConnect:  internal_connects.NewJiraConnect(config, logger, postgres),
-			gmailConnect: internal_connects.NewGmailConnect(config, logger, postgres),
-
-			hubspotConnect: internal_connects.NewHubspotConnect(config, logger, postgres),
+			slackConnect:   internal_connects.NewSlackActionConnect(config, oauthCfg, logger, postgres),
+			jiraConnect:    internal_connects.NewJiraConnect(config, oauthCfg, logger, postgres),
+			gmailConnect:   internal_connects.NewGmailConnect(config, oauthCfg, logger, postgres),
+			hubspotConnect: internal_connects.NewHubspotConnect(config, oauthCfg, logger, postgres),
 		},
 	}
 }
 
-func NewConnectGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) web_api.ConnectServiceServer {
+func NewConnectGRPC(config *config.AppConfig,
+	oauthCfg *config.OAuthConfig,
+	logger commons.Logger, postgres connectors.PostgresConnector) web_api.ConnectServiceServer {
 	return &webConnectGRPCApi{
 		webConnectApi{
 			cfg:                config,
 			logger:             logger,
 			postgres:           postgres,
-			githubCodeConnect:  internal_connects.NewGithubCodeConnect(config, logger, postgres),
-			gitlabCodeConnect:  internal_connects.NewGitlabCodeConnect(config, logger, postgres),
-			googleDriveConnect: internal_connects.NewGoogleDriveConnect(config, logger, postgres),
-			confluenceConnect:  internal_connects.NewConfluenceConnect(config, logger, postgres),
-			notionConnect:      internal_connects.NewNotionWorkplaceConnect(config, logger, postgres),
+			githubCodeConnect:  internal_connects.NewGithubCodeConnect(config, oauthCfg, logger, postgres),
+			gitlabCodeConnect:  internal_connects.NewGitlabCodeConnect(config, oauthCfg, logger, postgres),
+			googleDriveConnect: internal_connects.NewGoogleDriveConnect(config, oauthCfg, logger, postgres),
+			confluenceConnect:  internal_connects.NewConfluenceConnect(config, oauthCfg, logger, postgres),
+			notionConnect:      internal_connects.NewNotionWorkplaceConnect(config, oauthCfg, logger, postgres),
 
 			//
-			microsoftSharepointConnect: internal_connects.NewMicrosoftSharepointConnect(config, logger, postgres),
-			microsoftOnedriveConnect:   internal_connects.NewMicrosoftOnedriveConnect(config, logger, postgres),
+			microsoftSharepointConnect: internal_connects.NewMicrosoftSharepointConnect(config, oauthCfg, logger, postgres),
+			microsoftOnedriveConnect:   internal_connects.NewMicrosoftOnedriveConnect(config, oauthCfg, logger, postgres),
 			//
 			vaultService: internal_vault_service.NewVaultService(logger, postgres),
 
-			slackConnect: internal_connects.NewSlackActionConnect(config, logger, postgres),
-			jiraConnect:  internal_connects.NewJiraConnect(config, logger, postgres),
-			gmailConnect: internal_connects.NewGmailConnect(config, logger, postgres),
+			slackConnect: internal_connects.NewSlackActionConnect(config, oauthCfg, logger, postgres),
+			jiraConnect:  internal_connects.NewJiraConnect(config, oauthCfg, logger, postgres),
+			gmailConnect: internal_connects.NewGmailConnect(config, oauthCfg, logger, postgres),
 
-			hubspotConnect: internal_connects.NewHubspotConnect(config, logger, postgres),
+			hubspotConnect: internal_connects.NewHubspotConnect(config, oauthCfg, logger, postgres),
 		},
 	}
 }

@@ -8,15 +8,15 @@ import (
 	"strings"
 	"time"
 
-	internal_connects "github.com/lexatic/web-backend/internal/connects"
-	internal_organization_service "github.com/lexatic/web-backend/internal/services/organization"
-	internal_project_service "github.com/lexatic/web-backend/internal/services/project"
+	internal_connects "github.com/lexatic/web-backend/api/web-api/internal/connects"
+	internal_organization_service "github.com/lexatic/web-backend/api/web-api/internal/services/organization"
+	internal_project_service "github.com/lexatic/web-backend/api/web-api/internal/services/project"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/gin-gonic/gin"
+	internal_services "github.com/lexatic/web-backend/api/web-api/internal/services"
+	internal_user_service "github.com/lexatic/web-backend/api/web-api/internal/services/user"
 	config "github.com/lexatic/web-backend/config"
-	internal_services "github.com/lexatic/web-backend/internal/services"
-	internal_user_service "github.com/lexatic/web-backend/internal/services/user"
 	integration_client "github.com/lexatic/web-backend/pkg/clients/integration"
 	commons "github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"
@@ -50,7 +50,7 @@ var (
 	GOOGLE_STATE = "google"
 )
 
-func NewAuthRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) *webAuthRPCApi {
+func NewAuthRPC(config *config.AppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) *webAuthRPCApi {
 	return &webAuthRPCApi{
 		webAuthApi{
 			cfg:             config,
@@ -58,14 +58,14 @@ func NewAuthRPC(config *config.AppConfig, logger commons.Logger, postgres connec
 			postgres:        postgres,
 			userService:     internal_user_service.NewUserService(logger, postgres),
 			sendgridClient:  integration_client.NewSendgridServiceClientGRPC(config, logger),
-			githubConnect:   internal_connects.NewGithubAuthenticationConnect(config, logger, postgres),
-			linkedinConnect: internal_connects.NewLinkedinAuthenticationConnect(config, logger, postgres),
-			googleConnect:   internal_connects.NewGoogleAuthenticationConnect(config, logger, postgres),
+			githubConnect:   internal_connects.NewGithubAuthenticationConnect(config, oauthCfg, logger, postgres),
+			linkedinConnect: internal_connects.NewLinkedinAuthenticationConnect(config, oauthCfg, logger, postgres),
+			googleConnect:   internal_connects.NewGoogleAuthenticationConnect(config, oauthCfg, logger, postgres),
 		},
 	}
 }
 
-func NewAuthGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) web_api.AuthenticationServiceServer {
+func NewAuthGRPC(config *config.AppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) web_api.AuthenticationServiceServer {
 	return &webAuthGRPCApi{
 		webAuthApi{
 			cfg:                 config,
@@ -75,9 +75,9 @@ func NewAuthGRPC(config *config.AppConfig, logger commons.Logger, postgres conne
 			organizationService: internal_organization_service.NewOrganizationService(logger, postgres),
 			projectService:      internal_project_service.NewProjectService(logger, postgres),
 			sendgridClient:      integration_client.NewSendgridServiceClientGRPC(config, logger),
-			githubConnect:       internal_connects.NewGithubAuthenticationConnect(config, logger, postgres),
-			linkedinConnect:     internal_connects.NewLinkedinAuthenticationConnect(config, logger, postgres),
-			googleConnect:       internal_connects.NewGoogleAuthenticationConnect(config, logger, postgres),
+			githubConnect:       internal_connects.NewGithubAuthenticationConnect(config, oauthCfg, logger, postgres),
+			linkedinConnect:     internal_connects.NewLinkedinAuthenticationConnect(config, oauthCfg, logger, postgres),
+			googleConnect:       internal_connects.NewGoogleAuthenticationConnect(config, oauthCfg, logger, postgres),
 		},
 	}
 }

@@ -3,10 +3,10 @@ package web_api
 import (
 	"context"
 
+	internal_services "github.com/lexatic/web-backend/api/web-api/internal/services"
+	internal_organization_service "github.com/lexatic/web-backend/api/web-api/internal/services/organization"
+	internal_user_service "github.com/lexatic/web-backend/api/web-api/internal/services/user"
 	config "github.com/lexatic/web-backend/config"
-	internal_services "github.com/lexatic/web-backend/internal/services"
-	internal_organization_service "github.com/lexatic/web-backend/internal/services/organization"
-	internal_user_service "github.com/lexatic/web-backend/internal/services/user"
 	provider_client "github.com/lexatic/web-backend/pkg/clients/provider"
 	commons "github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"

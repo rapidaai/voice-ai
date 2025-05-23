@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	internal_services "github.com/lexatic/web-backend/internal/services"
-	internal_vault_service "github.com/lexatic/web-backend/internal/services/vault"
+	internal_services "github.com/lexatic/web-backend/api/web-api/internal/services"
+	internal_vault_service "github.com/lexatic/web-backend/api/web-api/internal/services/vault"
 	integration_client "github.com/lexatic/web-backend/pkg/clients/integration"
 	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 

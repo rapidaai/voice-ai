@@ -32,7 +32,7 @@ phases:
       - git submodule update --init --recursive
       - echo "updating submodule"
       - go mod download
-      - sh scripts/grpc-server.sh
+      - sh bin/grpc-server.sh
       - GOOS=linux GOARCH=amd64 go build -o web-api.0.0.1 api/main.go
       - cp codedeploy/env.production ./env
 artifacts:
