@@ -13,6 +13,7 @@ import (
 )
 
 type webProviderApi struct {
+	WebApi
 	cfg             *config.AppConfig
 	logger          commons.Logger
 	postgres        connectors.PostgresConnector
@@ -31,6 +32,7 @@ type webProviderGRPCApi struct {
 func NewProviderGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) web_api.ProviderServiceServer {
 	return &webProviderGRPCApi{
 		webProviderApi{
+			WebApi:          NewWebApi(config, logger, postgres, redis),
 			cfg:             config,
 			logger:          logger,
 			postgres:        postgres,
