@@ -154,3 +154,23 @@ func (knowledgeGRPCApi *webKnowledgeGRPCApi) GetAllKnowledgeDocument(ctx context
 	}
 	return knowledgeGRPCApi.knowledgeClient.GetAllKnowledgeDocument(ctx, iAuth, iRequest)
 }
+
+// GetAllKnowledgeDocument implements lexatic_backend.KnowledgeServiceServer.
+func (knowledgeGRPCApi *webKnowledgeGRPCApi) DeleteKnowledgeDocumentSegment(ctx context.Context, iRequest *web_api.DeleteKnowledgeDocumentSegmentRequest) (*web_api.BaseResponse, error) {
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		knowledgeGRPCApi.logger.Errorf("unauthenticated request to delete knowledge document segment")
+		return nil, errors.New("unauthenticated request")
+	}
+	return knowledgeGRPCApi.knowledgeClient.DeleteKnowledgeDocumentSegment(ctx, iAuth, iRequest)
+}
+
+// GetAllKnowledgeDocument implements lexatic_backend.KnowledgeServiceServer.
+func (knowledgeGRPCApi *webKnowledgeGRPCApi) UpdateKnowledgeDocumentSegment(ctx context.Context, iRequest *web_api.UpdateKnowledgeDocumentSegmentRequest) (*web_api.BaseResponse, error) {
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		knowledgeGRPCApi.logger.Errorf("unauthenticated request to update knowledge document segment")
+		return nil, errors.New("unauthenticated request")
+	}
+	return knowledgeGRPCApi.knowledgeClient.UpdateKnowledgeDocumentSegment(ctx, iAuth, iRequest)
+}
