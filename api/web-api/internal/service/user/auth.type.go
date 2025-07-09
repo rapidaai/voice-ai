@@ -155,3 +155,11 @@ func (aP *authPrinciple) HasProject() bool {
 func (aP *authPrinciple) IsAuthenticated() bool {
 	return aP.HasOrganization() && aP.HasUser()
 }
+
+func (aP *authPrinciple) GetCurrentToken() string {
+	tk := aP.GetAuthToken()
+	if tk != nil {
+		return tk.Token
+	}
+	return ""
+}

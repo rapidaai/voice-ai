@@ -269,3 +269,88 @@ func (assistantGRPCApi *webAssistantGRPCApi) UpdateAssistantDetail(ctx context.C
 	}
 	return assistantGRPCApi.assistantClient.UpdateAssistantDetail(ctx, iAuth, iRequest)
 }
+
+// CreateAssistantWebhook implements lexatic_backend.AssistantServiceServer.
+func (assistantGRPCApi *webAssistantGRPCApi) CreateAssistantWebhook(ctx context.Context, iRequest *web_api.CreateAssistantWebhookRequest) (*web_api.CreateAssistantWebhookResponse, error) {
+	assistantGRPCApi.logger.Debugf("update assistant request %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		assistantGRPCApi.logger.Errorf("unauthenticated request to create assistant tag")
+		return nil, errors.New("unauthenticated request")
+	}
+	return assistantGRPCApi.assistantClient.CreateAssistantWebhook(ctx, iAuth, iRequest)
+
+}
+
+func (assistantGRPCApi *webAssistantGRPCApi) UpdateAssistantWebhook(ctx context.Context, iRequest *web_api.UpdateAssistantWebhookRequest) (*web_api.UpdateAssistantWebhookResponse, error) {
+	assistantGRPCApi.logger.Debugf("update assistant request %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		assistantGRPCApi.logger.Errorf("unauthenticated request to Update assistant tag")
+		return nil, errors.New("unauthenticated request")
+	}
+	return assistantGRPCApi.assistantClient.UpdateAssistantWebhook(ctx, iAuth, iRequest)
+
+}
+
+// GetAllAssistantWebhook implements lexatic_backend.AssistantServiceServer.
+func (assistantGRPCApi *webAssistantGRPCApi) GetAllAssistantWebhook(ctx context.Context, iRequest *web_api.GetAllAssistantWebhookRequest) (*web_api.GetAllAssistantWebhookResponse, error) {
+	assistantGRPCApi.logger.Debugf("update assistant request %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		assistantGRPCApi.logger.Errorf("unauthenticated request to create assistant tag")
+		return nil, errors.New("unauthenticated request")
+	}
+
+	page, tls, err := assistantGRPCApi.assistantClient.GetAllAssistantWebhook(ctx, iAuth, iRequest.GetAssistantId(), iRequest.GetCriterias(), iRequest.GetPaginate())
+	if err != nil {
+		return utils.Error[web_api.GetAllAssistantWebhookResponse](
+			err,
+			"Unable to get all the webhooks, please try again later.",
+		)
+	}
+	return utils.PaginatedSuccess[web_api.GetAllAssistantWebhookResponse, []*web_api.AssistantWebhook](
+		page.GetTotalItem(), page.GetCurrentPage(),
+		tls)
+}
+
+// GetAllAssistantWebhookLog implements lexatic_backend.AssistantServiceServer.
+func (assistantGRPCApi *webAssistantGRPCApi) GetAllAssistantWebhookLog(ctx context.Context, iRequest *web_api.GetAllAssistantWebhookLogRequest) (*web_api.GetAllAssistantWebhookLogResponse, error) {
+	assistantGRPCApi.logger.Debugf("update assistant request %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		assistantGRPCApi.logger.Errorf("unauthenticated request to create assistant tag")
+		return nil, errors.New("unauthenticated request")
+	}
+
+	page, tls, err := assistantGRPCApi.assistantClient.GetAllAssistantWebhookLog(ctx, iAuth, iRequest.GetAssistantId(), iRequest.GetCriterias(), iRequest.GetPaginate())
+	if err != nil {
+		return utils.Error[web_api.GetAllAssistantWebhookLogResponse](
+			err,
+			"Unable to get all the webhook logs, please try again later.",
+		)
+	}
+
+	return utils.PaginatedSuccess[web_api.GetAllAssistantWebhookLogResponse, []*web_api.AssistantWebhookLog](
+		page.GetTotalItem(), page.GetCurrentPage(),
+		tls)
+
+}
+
+// GetAssistantWebhook implements lexatic_backend.AssistantServiceServer.
+func (assistantGRPCApi *webAssistantGRPCApi) GetAssistantWebhook(ctx context.Context, iRequest *web_api.GetAssistantWebhookRequest) (*web_api.GetAssistantWebhookResponse, error) {
+	assistantGRPCApi.logger.Debugf("update assistant request %v, %v", iRequest, ctx)
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		assistantGRPCApi.logger.Errorf("unauthenticated request to create assistant tag")
+		return nil, errors.New("unauthenticated request")
+	}
+
+	wk, err := assistantGRPCApi.assistantClient.GetAssistantWebhook(ctx, iAuth, iRequest)
+	if err != nil {
+		return utils.Error[web_api.GetAssistantWebhookResponse](
+			err,
+			"Unable to get webhook, please try again in sometime.")
+	}
+	return utils.Success[web_api.GetAssistantWebhookResponse, *web_api.AssistantWebhook](wk)
+}

@@ -72,7 +72,7 @@ func NewOrganizationGRPC(config *config.AppConfig, logger commons.Logger,
 }
 
 func (orgR *webOrganizationRPCApi) CreateOrganization(c *gin.Context) {
-	auth, isAuthenticated := types.GetAuthPrinciple(c)
+	auth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
 	if !isAuthenticated {
 		c.JSON(401, "illegal request.")
 		return

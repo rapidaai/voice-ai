@@ -241,8 +241,6 @@ func (g *AppRunner) AllRouters() {
 	g.ActivityApiRoute()
 	g.EndpointApiRoute()
 	g.InvokeApiRoute()
-	g.WorkflowApiRoute()
-	g.ExecutorApiRoute()
 	g.KnowledgeApiRoute()
 	g.AssistantApiRoute()
 	g.DocumentApiRoute()
@@ -306,13 +304,6 @@ func (g *AppRunner) EndpointApiRoute() {
 	web_api.RegisterEndpointServiceServer(g.S, webApi.NewEndpointGRPC(&g.Cfg.AppConfig, g.Logger, g.Postgres, g.Redis))
 }
 
-func (g *AppRunner) WorkflowApiRoute() {
-	web_api.RegisterWorkflowServiceServer(g.S, webApi.NewWorkflowGRPC(&g.Cfg.AppConfig, g.Logger, g.Postgres, g.Redis))
-}
-
-func (g *AppRunner) ExecutorApiRoute() {
-	web_api.RegisterExecutorServiceServer(g.S, webApi.NewExecutorGRPC(&g.Cfg.AppConfig, g.Logger, g.Postgres, g.Redis))
-}
 func (g *AppRunner) KnowledgeApiRoute() {
 	web_api.RegisterKnowledgeServiceServer(g.S, webApi.NewKnowledgeGRPC(&g.Cfg.AppConfig, g.Logger, g.Postgres, g.Redis))
 }
