@@ -28,6 +28,19 @@ type webAssistantGRPCApi struct {
 	webAssistantApi
 }
 
+func NewAssistantGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) web_api.AssistantServiceServer {
+	return &webAssistantGRPCApi{
+		webAssistantApi{
+			WebApi:          NewWebApi(config, logger, postgres, redis),
+			cfg:             config,
+			logger:          logger,
+			postgres:        postgres,
+			redis:           redis,
+			assistantClient: assistant_client.NewAssistantServiceClientGRPC(config, logger, redis),
+		},
+	}
+}
+
 func (assistant *webAssistantGRPCApi) GetAllAssistantConversation(c context.Context, iRequest *web_api.GetAllAssistantConversationRequest) (*web_api.GetAllAssistantConversationResponse, error) {
 	assistant.logger.Debugf("GetAllAssistantConversation from grpc with requestPayload %v, %v", iRequest, c)
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
@@ -101,19 +114,6 @@ func (assistant *webAssistantGRPCApi) GetAllMessage(c context.Context, iRequest 
 }
 
 // CreateAssistantKnowledgeConfiguration implements lexatic_backend.AssistantServiceServer.
-
-func NewAssistantGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) web_api.AssistantServiceServer {
-	return &webAssistantGRPCApi{
-		webAssistantApi{
-			WebApi:          NewWebApi(config, logger, postgres, redis),
-			cfg:             config,
-			logger:          logger,
-			postgres:        postgres,
-			redis:           redis,
-			assistantClient: assistant_client.NewAssistantServiceClientGRPC(config, logger, redis),
-		},
-	}
-}
 
 //
 //
@@ -515,7 +515,7 @@ func (assistantGRPCApi *webAssistantGRPCApi) DeleteAssistantAnalysis(ctx context
 func (assistantGRPCApi *webAssistantGRPCApi) GetAllAssistantAnalysis(ctx context.Context, iRequest *web_api.GetAllAssistantAnalysisRequest) (*web_api.GetAllAssistantAnalysisResponse, error) {
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
 	if !isAuthenticated {
-		assistantGRPCApi.logger.Errorf("unauthenticated request to create assistant tag")
+		assistantGRPCApi.logger.Errorf("unauthenticated request to GetAllAssistantAnalysis")
 		return nil, errors.New("unauthenticated request")
 	}
 
@@ -536,9 +536,26 @@ func (assistantGRPCApi *webAssistantGRPCApi) GetAllAssistantAnalysis(ctx context
 func (assistantGRPCApi *webAssistantGRPCApi) GetAssistantAnalysis(ctx context.Context, iRequest *web_api.GetAssistantAnalysisRequest) (*web_api.GetAssistantAnalysisResponse, error) {
 	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
 	if !isAuthenticated {
-		assistantGRPCApi.logger.Errorf("unauthenticated request to create assistant tag")
+		assistantGRPCApi.logger.Errorf("unauthenticated request to GetAssistantAnalysis")
 		return nil, errors.New("unauthenticated request")
 	}
-
 	return assistantGRPCApi.assistantClient.GetAssistantAnalysis(ctx, iAuth, iRequest)
+}
+
+func (assistantGRPCApi *webAssistantGRPCApi) GetAssistantToolLog(ctx context.Context, iRequest *web_api.GetAssistantToolLogRequest) (*web_api.GetAssistantToolLogResponse, error) {
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		assistantGRPCApi.logger.Errorf("unauthenticated request to GetAssistantToolLog")
+		return nil, errors.New("unauthenticated request")
+	}
+	return assistantGRPCApi.assistantClient.GetAssistantToolLog(ctx, iAuth, iRequest)
+}
+
+func (assistantGRPCApi *webAssistantGRPCApi) GetAllAssistantToolLog(ctx context.Context, iRequest *web_api.GetAllAssistantToolLogRequest) (*web_api.GetAllAssistantToolLogResponse, error) {
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		assistantGRPCApi.logger.Errorf("unauthenticated request to GetAllAssistantToolLog")
+		return nil, errors.New("unauthenticated request")
+	}
+	return assistantGRPCApi.assistantClient.GetAllAssistantToolLog(ctx, iAuth, iRequest)
 }

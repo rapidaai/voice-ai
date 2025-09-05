@@ -27,19 +27,6 @@ type webKnowledgeGRPCApi struct {
 	webKnowledgeApi
 }
 
-// GetAllKnowledgeDocumentSegment implements lexatic_backend.KnowledgeServiceServer.
-func (knowledge *webKnowledgeGRPCApi) GetAllKnowledgeDocumentSegment(c context.Context, iRequest *web_api.GetAllKnowledgeDocumentSegmentRequest) (*web_api.GetAllKnowledgeDocumentSegmentResponse, error) {
-	knowledge.logger.Debugf("GetAllKnowledgeDocumentSegment from grpc with requestPayload %v, %v", iRequest, c)
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	if !isAuthenticated {
-		knowledge.logger.Errorf("unauthenticated request for get actvities")
-		return nil, errors.New("unauthenticated request")
-	}
-	return knowledge.knowledgeClient.GetAllKnowledgeDocumentSegment(c, iAuth, iRequest)
-}
-
-// CreateKnowledgeDocument implements lexatic_backend.KnowledgeServiceServer.
-
 func NewKnowledgeGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, redis connectors.RedisConnector) web_api.KnowledgeServiceServer {
 	return &webKnowledgeGRPCApi{
 		webKnowledgeApi{
@@ -51,6 +38,17 @@ func NewKnowledgeGRPC(config *config.AppConfig, logger commons.Logger, postgres 
 			knowledgeClient: knowledge_client.NewKnowledgeServiceClientGRPC(config, logger, redis),
 		},
 	}
+}
+
+// GetAllKnowledgeDocumentSegment implements lexatic_backend.KnowledgeServiceServer.
+func (knowledge *webKnowledgeGRPCApi) GetAllKnowledgeDocumentSegment(c context.Context, iRequest *web_api.GetAllKnowledgeDocumentSegmentRequest) (*web_api.GetAllKnowledgeDocumentSegmentResponse, error) {
+	knowledge.logger.Debugf("GetAllKnowledgeDocumentSegment from grpc with requestPayload %v, %v", iRequest, c)
+	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
+	if !isAuthenticated {
+		knowledge.logger.Errorf("unauthenticated request for get actvities")
+		return nil, errors.New("unauthenticated request")
+	}
+	return knowledge.knowledgeClient.GetAllKnowledgeDocumentSegment(c, iAuth, iRequest)
 }
 
 func (knowledge *webKnowledgeGRPCApi) GetKnowledge(c context.Context, iRequest *web_api.GetKnowledgeRequest) (*web_api.GetKnowledgeResponse, error) {
@@ -170,4 +168,21 @@ func (knowledgeGRPCApi *webKnowledgeGRPCApi) UpdateKnowledgeDocumentSegment(ctx 
 		return nil, errors.New("unauthenticated request")
 	}
 	return knowledgeGRPCApi.knowledgeClient.UpdateKnowledgeDocumentSegment(ctx, iAuth, iRequest)
+}
+
+func (knowledgeGRPCApi *webKnowledgeGRPCApi) GetAllKnowledgeLog(ctx context.Context, iRequest *web_api.GetAllKnowledgeLogRequest) (*web_api.GetAllKnowledgeLogResponse, error) {
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		knowledgeGRPCApi.logger.Errorf("unauthenticated request to GetAllKnowledgeLog")
+		return nil, errors.New("unauthenticated request")
+	}
+	return knowledgeGRPCApi.knowledgeClient.GetAllKnowledgeLog(ctx, iAuth, iRequest)
+}
+func (knowledgeGRPCApi *webKnowledgeGRPCApi) GetKnowledgeLog(ctx context.Context, iRequest *web_api.GetKnowledgeLogRequest) (*web_api.GetKnowledgeLogResponse, error) {
+	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
+	if !isAuthenticated {
+		knowledgeGRPCApi.logger.Errorf("unauthenticated request to GetKnowledgeLog")
+		return nil, errors.New("unauthenticated request")
+	}
+	return knowledgeGRPCApi.knowledgeClient.GetKnowledgeLog(ctx, iAuth, iRequest)
 }
