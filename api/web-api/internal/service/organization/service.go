@@ -7,7 +7,9 @@ import (
 	internal_services "github.com/lexatic/web-backend/api/web-api/internal/service"
 	"github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"
+	gorm_models "github.com/lexatic/web-backend/pkg/models/gorm"
 	"github.com/lexatic/web-backend/pkg/types"
+	type_enums "github.com/lexatic/web-backend/pkg/types/enums"
 )
 
 func NewOrganizationService(logger commons.Logger, postgres connectors.PostgresConnector) internal_services.OrganizationService {
@@ -25,10 +27,13 @@ type organizationService struct {
 func (oS *organizationService) Create(ctx context.Context, auth types.Principle, name string, size string, industry string) (*internal_entity.Organization, error) {
 	db := oS.postgres.DB(ctx)
 	org := &internal_entity.Organization{
-		Name:      name,
-		Industry:  industry,
-		Size:      size,
-		CreatedBy: auth.GetUserInfo().Id,
+		Name:     name,
+		Industry: industry,
+		Size:     size,
+		Mutable: gorm_models.Mutable{
+			Status:    type_enums.RECORD_ACTIVE,
+			CreatedBy: auth.GetUserInfo().Id,
+		},
 	}
 	tx := db.Save(org)
 	if err := tx.Error; err != nil {
@@ -51,7 +56,10 @@ func (oS *organizationService) Get(ctx context.Context, organizationId uint64) (
 func (oS *organizationService) Update(ctx context.Context, auth types.Principle, organizationId uint64, name *string, industry *string, email *string) (*internal_entity.Organization, error) {
 	db := oS.postgres.DB(ctx)
 	org := &internal_entity.Organization{
-		UpdatedBy: auth.GetUserInfo().Id,
+		Mutable: gorm_models.Mutable{
+			Status:    type_enums.RECORD_ACTIVE,
+			UpdatedBy: auth.GetUserInfo().Id,
+		},
 	}
 
 	if name != nil {

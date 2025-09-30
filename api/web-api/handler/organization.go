@@ -15,6 +15,7 @@ import (
 	commons "github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"
 	"github.com/lexatic/web-backend/pkg/types"
+	type_enums "github.com/lexatic/web-backend/pkg/types/enums"
 	"github.com/lexatic/web-backend/pkg/utils"
 	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 )
@@ -101,7 +102,7 @@ func (orgR *webOrganizationRPCApi) CreateOrganization(c *gin.Context) {
 		return
 	}
 
-	oRole, err := orgR.userService.CreateOrganizationRole(c, auth, "owner", auth.GetUserInfo().Id, aOrg.Id, "active")
+	oRole, err := orgR.userService.CreateOrganizationRole(c, auth, "owner", auth.GetUserInfo().Id, aOrg.Id, type_enums.RECORD_ACTIVE)
 	if err != nil {
 		c.JSON(500, commons.Response{
 			Code:    500,
@@ -157,7 +158,7 @@ func (orgG *webOrganizationGRPCApi) CreateOrganization(c context.Context, irRequ
 	}
 
 	// creation of organization role
-	aRole, err := orgG.userService.CreateOrganizationRole(c, iAuth, "owner", iAuth.GetUserInfo().Id, aOrg.Id, "active")
+	aRole, err := orgG.userService.CreateOrganizationRole(c, iAuth, "owner", iAuth.GetUserInfo().Id, aOrg.Id, type_enums.RECORD_ACTIVE)
 	if err != nil {
 		orgG.logger.Errorf("CreateOrganizationRole from grpc with erro %v", err)
 		return &web_api.CreateOrganizationResponse{

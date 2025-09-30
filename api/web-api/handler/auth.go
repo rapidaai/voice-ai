@@ -21,6 +21,7 @@ import (
 	commons "github.com/lexatic/web-backend/pkg/commons"
 	"github.com/lexatic/web-backend/pkg/connectors"
 	"github.com/lexatic/web-backend/pkg/types"
+	type_enums "github.com/lexatic/web-backend/pkg/types/enums"
 	"github.com/lexatic/web-backend/pkg/utils"
 	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 )
@@ -132,7 +133,7 @@ func (webAuthApi *webAuthRPCApi) RegisterUser(c *gin.Context) {
 	cUser, err := webAuthApi.userService.Get(c, irRequest.Email)
 	if err != nil {
 		webAuthApi.logger.Debug("registering new user into the system.")
-		aUser, err := webAuthApi.userService.Create(c, irRequest.Name, irRequest.Email, irRequest.Password, "waitlist", &source)
+		aUser, err := webAuthApi.userService.Create(c, irRequest.Name, irRequest.Email, irRequest.Password, type_enums.RECORD_ACTIVE, &source)
 		if err != nil {
 			webAuthApi.logger.Errorf("registering new user failed with err %v", err)
 			c.JSON(500, commons.Response{
@@ -246,7 +247,7 @@ func (wAuthApi *webAuthGRPCApi) Authenticate(c context.Context, irRequest *web_a
 	As we support multiple state of user to register
 	only active user will able to signin to the rapida account
 	*/
-	if aUser.GetUserInfo().Status != "active" {
+	if aUser.GetUserInfo().Status != string(type_enums.RECORD_ACTIVE) {
 		wAuthApi.logger.Errorf("unable to process authentication because of status of the user status %v", aUser.GetUserInfo().Status)
 		return &web_api.AuthenticateResponse{
 			Code:    401,
@@ -271,7 +272,7 @@ func (wAuthApi *webAuthGRPCApi) RegisterUser(c context.Context, irRequest *web_a
 	cUser, err := wAuthApi.userService.Get(c, irRequest.Email)
 	source := "direct"
 	if err != nil {
-		aUser, err := wAuthApi.userService.Create(c, irRequest.Name, irRequest.Email, irRequest.Password, "waitlist", &source)
+		aUser, err := wAuthApi.userService.Create(c, irRequest.Name, irRequest.Email, irRequest.Password, type_enums.RECORD_ACTIVE, &source)
 		if err != nil {
 			wAuthApi.logger.Errorf("creation user failed with err %v", err)
 			return &web_api.AuthenticateResponse{
@@ -304,7 +305,7 @@ func (wAuthApi *webAuthGRPCApi) RegisterUser(c context.Context, irRequest *web_a
 	}
 
 	// already have an active account
-	if cUser.Status == "active" {
+	if cUser.Status == type_enums.RECORD_ACTIVE {
 		wAuthApi.logger.Errorf("user is already having account and trying to signup")
 		return &web_api.AuthenticateResponse{
 			Code:    401,
@@ -409,7 +410,7 @@ func (wAuthApi *webAuthGRPCApi) ForgotPassword(c context.Context, irRequest *web
 			}}, nil
 	}
 
-	if aUser.Status != "active" {
+	if aUser.Status != type_enums.RECORD_ACTIVE {
 		wAuthApi.logger.Errorf("user is changing password for not activated user  %v", aUser.Email)
 		return &web_api.ForgotPasswordResponse{
 			Code:    401,
@@ -704,7 +705,7 @@ func (wAuthApi *webAuthApi) RegisterSocialUser(c context.Context, inf *internal_
 	}
 
 	// it might be social login
-	if cUser.Status == "active" {
+	if cUser.Status == type_enums.RECORD_ACTIVE {
 		// check
 		_, err := wAuthApi.userService.GetSocial(c, cUser.Id)
 		if err != nil {
@@ -824,7 +825,7 @@ func (wAuthApi *webAuthGRPCApi) GetAllUser(c context.Context, irRequest *web_api
 			Id:          member.Member.Id,
 			Email:       member.Member.Email,
 			Role:        member.Role,
-			Status:      member.Member.Status,
+			Status:      member.Member.Mutable.Status.String(),
 			CreatedDate: timestamppb.New(time.Time(member.Member.CreatedDate)),
 		}
 	}

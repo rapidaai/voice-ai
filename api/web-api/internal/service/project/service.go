@@ -12,6 +12,7 @@ import (
 	"github.com/lexatic/web-backend/pkg/connectors"
 	gorm_models "github.com/lexatic/web-backend/pkg/models/gorm"
 	"github.com/lexatic/web-backend/pkg/types"
+	type_enums "github.com/lexatic/web-backend/pkg/types/enums"
 	web_api "github.com/lexatic/web-backend/protos/lexatic-backend"
 	"gorm.io/gorm/clause"
 )
@@ -58,7 +59,9 @@ func (pS *projectService) Create(ctx context.Context, auth types.Principle, orga
 		Name:           name,
 		OrganizationId: organizationId,
 		Description:    description,
-		CreatedBy:      auth.GetUserInfo().Id,
+		Mutable: gorm_models.Mutable{
+			CreatedBy: auth.GetUserInfo().Id,
+		},
 	}
 	tx := db.Save(project)
 	if err := tx.Error; err != nil {
@@ -93,7 +96,7 @@ func (pS *projectService) GetAll(ctx context.Context, auth types.SimplePrinciple
 	var projects []internal_entity.Project
 	var cnt int64
 	qry := db.Model(internal_entity.Project{}).
-		Where("organization_id = ? AND status = ? ", organizationId, "active")
+		Where("organization_id = ? AND status = ? ", organizationId, type_enums.RECORD_ACTIVE)
 	for _, ct := range criterias {
 		qry.Where(fmt.Sprintf("%s = ?", ct.GetKey()), ct.GetValue())
 	}
@@ -121,7 +124,7 @@ func (pS *projectService) GetAll(ctx context.Context, auth types.SimplePrinciple
 func (pS *projectService) Get(ctx context.Context, auth types.SimplePrinciple, projectId uint64) (*internal_entity.Project, error) {
 	db := pS.postgres.DB(ctx)
 	var project internal_entity.Project
-	tx := db.Where("id = ? AND status = ? ", projectId, "active").First(&project)
+	tx := db.Where("id = ? AND status = ? ", projectId, type_enums.RECORD_ACTIVE).First(&project)
 	if tx.Error != nil {
 		pS.logger.Debugf("unable to find any project %v", projectId)
 		return nil, tx.Error
@@ -131,7 +134,12 @@ func (pS *projectService) Get(ctx context.Context, auth types.SimplePrinciple, p
 
 func (pS *projectService) Archive(ctx context.Context, auth types.Principle, projectId uint64) (*internal_entity.Project, error) {
 	db := pS.postgres.DB(ctx)
-	ct := &internal_entity.Project{Status: "archive", UpdatedBy: auth.GetUserInfo().Id}
+	ct := &internal_entity.Project{
+		Mutable: gorm_models.Mutable{
+			Status:    type_enums.RECORD_ARCHIEVE,
+			UpdatedBy: auth.GetUserInfo().Id,
+		},
+	}
 	tx := db.Where("id=?", projectId).Updates(&ct)
 	if tx.Error != nil {
 		pS.logger.Debugf("unable to update the project %v", projectId)
@@ -148,8 +156,10 @@ func (pS *projectService) CreateCredential(ctx context.Context, auth types.Princ
 		OrganizationId: organizationId,
 		Name:           name,
 		Key:            key,
-		Status:         "active",
-		CreatedBy:      auth.GetUserInfo().Id,
+		Mutable: gorm_models.Mutable{
+			Status:    type_enums.RECORD_ACTIVE,
+			CreatedBy: auth.GetUserInfo().Id,
+		},
 	}
 	tx := db.Save(prc)
 	if err := tx.Error; err != nil {
@@ -160,7 +170,12 @@ func (pS *projectService) CreateCredential(ctx context.Context, auth types.Princ
 
 func (pS *projectService) ArchiveCredential(ctx context.Context, auth types.Principle, credentialId, projectId, organizationId uint64) (*internal_entity.ProjectCredential, error) {
 	db := pS.postgres.DB(ctx)
-	ct := &internal_entity.ProjectCredential{Status: "archive", UpdatedBy: auth.GetUserInfo().Id}
+	ct := &internal_entity.ProjectCredential{
+		Mutable: gorm_models.Mutable{
+			Status:    type_enums.RECORD_ARCHIEVE,
+			UpdatedBy: auth.GetUserInfo().Id,
+		},
+	}
 	tx := db.Where("id=? AND project_id = ? AND organization_id = ?", credentialId, projectId, organizationId).Updates(&ct)
 	if tx.Error != nil {
 		pS.logger.Debugf("unable to update project credentials %v", credentialId)
@@ -176,7 +191,7 @@ func (pS *projectService) GetAllCredential(ctx context.Context, auth types.Princ
 	qry := db.
 		Model(internal_entity.ProjectCredential{}).
 		Preload("CreatedUser").
-		Where("project_id = ? AND organization_id = ? AND status = ? ", projectId, organizationId, "active")
+		Where("project_id = ? AND organization_id = ? AND status = ? ", projectId, organizationId, type_enums.RECORD_ACTIVE)
 	for _, ct := range criterias {
 		qry.Where(fmt.Sprintf("%s = ?", ct.GetKey()), ct.GetValue())
 	}

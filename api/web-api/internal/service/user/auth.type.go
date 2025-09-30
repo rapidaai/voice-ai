@@ -86,7 +86,7 @@ func (aP *authPrinciple) GetUserInfo() *types.UserInfo {
 		Id:     aP.user.Id,
 		Name:   aP.user.Name,
 		Email:  aP.user.Email,
-		Status: aP.user.Status,
+		Status: aP.user.Status.String(),
 	}
 }
 

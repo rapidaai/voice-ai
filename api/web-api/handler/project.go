@@ -10,6 +10,7 @@ import (
 	internal_organization_service "github.com/lexatic/web-backend/api/web-api/internal/service/organization"
 	internal_user_service "github.com/lexatic/web-backend/api/web-api/internal/service/user"
 	integration_client "github.com/lexatic/web-backend/pkg/clients/integration"
+	type_enums "github.com/lexatic/web-backend/pkg/types/enums"
 	"github.com/lexatic/web-backend/pkg/utils"
 
 	internal_service "github.com/lexatic/web-backend/api/web-api/internal/service"
@@ -92,7 +93,7 @@ func (wProjectApi *webProjectGRPCApi) CreateProject(ctx context.Context, irReque
 			"Unable to create project for your organization, please try again in sometime")
 	}
 
-	_, err = wProjectApi.userService.CreateProjectRole(ctx, iAuth, iAuth.GetUserInfo().Id, "admin", prj.Id, "active")
+	_, err = wProjectApi.userService.CreateProjectRole(ctx, iAuth, iAuth.GetUserInfo().Id, "admin", prj.Id, type_enums.RECORD_ACTIVE)
 	if err != nil {
 		wProjectApi.logger.Errorf("userService.CreateProjectRole from grpc with err %v", err)
 		return utils.Error[web_api.CreateProjectResponse](
@@ -244,7 +245,7 @@ func (wProjectApi *webProjectGRPCApi) GetProject(ctx context.Context, irRequest 
 
 }
 
-func (wProjectApi *webProjectGRPCApi) AddUserToProject(ctx context.Context, auth types.Principle, email string, userId uint64, status, role string, projectIds []uint64) (*web_api.AddUsersToProjectResponse, error) {
+func (wProjectApi *webProjectGRPCApi) AddUserToProject(ctx context.Context, auth types.Principle, email string, userId uint64, status type_enums.RecordState, role string, projectIds []uint64) (*web_api.AddUsersToProjectResponse, error) {
 	projectNames := make([]string, len(projectIds))
 	projectOut := make([]*internal_entity.Project, len(projectIds))
 
