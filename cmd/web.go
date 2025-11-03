@@ -246,6 +246,7 @@ func (g *AppRunner) AllRouters() {
 	g.DocumentApiRoute()
 	g.ProviderApiRoute()
 	g.KnowledgeConnectApiRoute()
+	g.LeadApiRoute()
 
 }
 
@@ -317,6 +318,10 @@ func (g *AppRunner) DocumentApiRoute() {
 
 func (g *AppRunner) ProviderApiRoute() {
 	web_api.RegisterProviderServiceServer(g.S, webApi.NewProviderGRPC(&g.Cfg.AppConfig, g.Logger, g.Postgres, g.Redis))
+}
+
+func (g *AppRunner) LeadApiRoute() {
+	web_api.RegisterLeadGeneratorServiceServer(g.S, webApi.NewLeadGRPC(&g.Cfg.AppConfig, g.Logger, g.Postgres, g.Redis))
 }
 
 func (g *AppRunner) KnowledgeConnectApiRoute() {

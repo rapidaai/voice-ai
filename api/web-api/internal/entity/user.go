@@ -12,10 +12,7 @@ type UserAuth struct {
 	Name     string `json:"name" gorm:"type:string;size:200;not null"`
 	Email    string `json:"email" gorm:"type:string;size:200;not null;index:ua_idx_email"`
 	Password string `json:"password" gorm:"type:string;size:200;not null"`
-	// Status    string `json:"status" gorm:"type:string;size:50;not null;default:active"`
-	Source string `json:"source" gorm:"type:string;size:50;not null;default:direct"`
-	// CreatedBy uint64 `json:"created_by" gorm:"type:bigint;size:20;not null"`
-	// UpdatedBy uint64 `json:"updated_by" gorm:"type:bigint;size:20;"`
+	Source   string `json:"source" gorm:"type:string;size:50;not null;default:direct"`
 }
 
 type UserSocial struct {
@@ -52,9 +49,6 @@ type UserFeaturePermission struct {
 	// knowledges
 	Feature   string `json:"feature" gorm:"type:string;size:200;not null"`
 	IsEnabled bool   `json:"is_enabled" gorm:"type:bool;not null"`
-	// CreatedBy uint64 `json:"created_by" gorm:"type:bigint;size:20;not null"`
-	// UpdatedBy uint64 `json:"updated_by" gorm:"type:bigint;size:20;"`
-	// Status    string `json:"status" gorm:"type:string;size:50;not null;default:active"`
 }
 
 type UserAuthToken struct {
@@ -64,9 +58,6 @@ type UserAuthToken struct {
 	TokenType  string    `json:"token_type" gorm:"type:string;size:100;not null;"`
 	Token      string    `json:"token" gorm:"type:string;size:200;not null"`
 	ExpireAt   time.Time `json:"expire_at" gorm:"type:timestamp;not null;<-:create"`
-	// CreatedBy  uint64    `json:"created_by" gorm:"type:bigint;size:20;not null"`
-	// UpdatedBy  uint64    `json:"updated_by" gorm:"type:bigint;size:20;"`
-	// Status     string    `json:"status" gorm:"type:string;size:50;not null;default:active"`
 }
 
 func (uat *UserAuthToken) GetId() uint64 {
@@ -88,28 +79,22 @@ func (uat *UserAuthToken) IsExpired() bool {
 type UserOrganizationRole struct {
 	gorm_model.Audited
 	gorm_model.Mutable
-	UserAuthId     uint64 `json:"user_auth_id" gorm:"type:bigint;size:20;not null;index:ur_idx_auth_id"`
-	OrganizationId uint64 `json:"organization_id" gorm:"type:bigint;size:20;not null"`
-	Role           string `json:"role" gorm:"type:string;size:200;not null;"`
-	// CreatedBy      uint64       `json:"created_by" gorm:"type:bigint;size:20;not null"`
-	// UpdatedBy      uint64       `json:"updated_by" gorm:"type:bigint;size:20;"`
-	// Status         string       `json:"status" gorm:"type:string;size:50;not null;default:active"`
-	Organization Organization `gorm:"foreignKey:OrganizationId"`
-	Member       UserAuth     `gorm:"foreignKey:UserAuthId"`
+	UserAuthId     uint64       `json:"user_auth_id" gorm:"type:bigint;size:20;not null;index:ur_idx_auth_id"`
+	OrganizationId uint64       `json:"organization_id" gorm:"type:bigint;size:20;not null"`
+	Role           string       `json:"role" gorm:"type:string;size:200;not null;"`
+	Organization   Organization `gorm:"foreignKey:OrganizationId"`
+	Member         UserAuth     `gorm:"foreignKey:UserAuthId"`
 }
 
 type UserProjectRole struct {
 	gorm_model.Audited
 	gorm_model.Mutable
 
-	UserAuthId uint64 `json:"user_auth_id" gorm:"type:bigint;size:20;not null;index:ur_idx_auth_id"`
-	ProjectId  uint64 `json:"project_id" gorm:"type:bigint;size:20;not null"`
-	Role       string `json:"role" gorm:"type:string;size:200;not null;"`
-	// CreatedBy  uint64   `json:"created_by" gorm:"type:bigint;size:20;not null"`
-	// UpdatedBy  uint64   `json:"updated_by" gorm:"type:bigint;size:20"`
-	// Status     string   `json:"status" gorm:"type:string;size:50;not null;default:active"`
-	Project Project  `gorm:"foreignKey:ProjectId"`
-	Member  UserAuth `gorm:"foreignKey:UserAuthId"`
+	UserAuthId uint64   `json:"user_auth_id" gorm:"type:bigint;size:20;not null;index:ur_idx_auth_id"`
+	ProjectId  uint64   `json:"project_id" gorm:"type:bigint;size:20;not null"`
+	Role       string   `json:"role" gorm:"type:string;size:200;not null;"`
+	Project    Project  `gorm:"foreignKey:ProjectId"`
+	Member     UserAuth `gorm:"foreignKey:UserAuthId"`
 }
 
 func (uor *UserOrganizationRole) GetId() uint64 {

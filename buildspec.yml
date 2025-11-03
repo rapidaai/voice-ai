@@ -4,7 +4,7 @@ env:
     DEPLOY_KEY: "DEPLOY_KEY"
   variables:
     GO_PROJECT_MODULE: "github.com/rapidaai/protos"
-    OUT_DIR: "/protos/lexatic-backend/"
+    OUT_DIR: "/protos/"
 phases:
   install:
     commands:
@@ -32,7 +32,7 @@ phases:
       - git submodule update --init --recursive
       - echo "updating submodule"
       - go mod download
-      - sh bin/grpc-server.sh
+      - sh bin/artifacts-generate.sh
       - GOOS=linux GOARCH=amd64 go build -o web-api.0.0.1 cmd/web.go
       - cp codedeploy/env.production ./env
 artifacts:

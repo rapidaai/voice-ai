@@ -1,2 +1,0 @@
-aws s3api get-object --bucket  lomotif-datalake-prod --key data_science/ai_model_files/internal_recommendation/version_1.0/asset_user_model_v_1_0_cpu.model  assets/staging/models/asset_user_model_v_1_0_cpu.model
-aws s3api get-object --bucket  lomotif-datalake-prod --key data_science/ai_model_files/internal_recommendation/version_1.0/cold_start_model_v_1_0_cpu.model  assets/staging/models/cold_start_model_v_1_0_cpu.model
