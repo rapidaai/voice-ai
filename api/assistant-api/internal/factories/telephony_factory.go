@@ -3,7 +3,7 @@ package internal_factories
 import (
 	"errors"
 
-	internal_telephony "github.com/rapidaai/api/internal/telephony"
+	internal_telephony "github.com/rapidaai/api/assistant-api/internal/telephony"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	lexatic_backend "github.com/rapidaai/protos"

@@ -1,7 +1,7 @@
 package internal_assistant_gorm
 
 import (
-	internal_knowledge_gorm "github.com/rapidaai/api/internal/gorm/knowledges"
+	internal_knowledge_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/knowledges"
 	gorm_model "github.com/rapidaai/pkg/models/gorm"
 	gorm_types "github.com/rapidaai/pkg/models/gorm/types"
 )

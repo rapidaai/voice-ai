@@ -3,11 +3,11 @@ package assistant_talk_api
 import (
 	"errors"
 
-	internal_adapter_request_streamers "github.com/rapidaai/api/internal/adapters/requests/streamers"
-	internal_factories "github.com/rapidaai/api/internal/factories"
-	internal_services "github.com/rapidaai/api/internal/services"
-	internal_assistant_service "github.com/rapidaai/api/internal/services/assistant"
-	"github.com/rapidaai/config"
+	"github.com/rapidaai/api/assistant-api/config"
+	internal_adapter_request_streamers "github.com/rapidaai/api/assistant-api/internal/adapters/requests/streamers"
+	internal_factories "github.com/rapidaai/api/assistant-api/internal/factories"
+	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	internal_assistant_service "github.com/rapidaai/api/assistant-api/internal/services/assistant"
 	web_client "github.com/rapidaai/pkg/clients/web"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
@@ -19,7 +19,7 @@ import (
 )
 
 type ConversationApi struct {
-	cfg        *config.AppConfig
+	cfg        *config.AssistantConfig
 	logger     commons.Logger
 	postgres   connectors.PostgresConnector
 	redis      connectors.RedisConnector
@@ -35,7 +35,7 @@ type ConversationGrpcApi struct {
 	ConversationApi
 }
 
-func NewConversationGRPCApi(config *config.AppConfig, logger commons.Logger,
+func NewConversationGRPCApi(config *config.AssistantConfig, logger commons.Logger,
 	postgres connectors.PostgresConnector,
 	redis connectors.RedisConnector,
 	opensearch connectors.OpenSearchConnector,
@@ -56,7 +56,7 @@ func NewConversationGRPCApi(config *config.AppConfig, logger commons.Logger,
 	}
 }
 
-func NewConversationApi(config *config.AppConfig, logger commons.Logger,
+func NewConversationApi(config *config.AssistantConfig, logger commons.Logger,
 	postgres connectors.PostgresConnector,
 	redis connectors.RedisConnector,
 	opensearch connectors.OpenSearchConnector,

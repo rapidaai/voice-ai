@@ -7,9 +7,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	internal_adapter_request_streamers "github.com/rapidaai/api/internal/adapters/requests/streamers"
-	internal_factories "github.com/rapidaai/api/internal/factories"
-	internal_services "github.com/rapidaai/api/internal/services"
+	internal_adapter_request_streamers "github.com/rapidaai/api/assistant-api/internal/adapters/requests/streamers"
+	internal_factories "github.com/rapidaai/api/assistant-api/internal/factories"
+	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"

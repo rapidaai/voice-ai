@@ -3,7 +3,7 @@ package internal_adapter_request_generic
 import (
 	"context"
 
-	internal_adapter_telemetry "github.com/rapidaai/api/internal/telemetry"
+	internal_adapter_telemetry "github.com/rapidaai/api/assistant-api/internal/telemetry"
 	"github.com/rapidaai/pkg/utils"
 	lexatic_backend "github.com/rapidaai/protos"
 )

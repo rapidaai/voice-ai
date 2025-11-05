@@ -3,9 +3,9 @@ package internal_analyzers
 import (
 	"context"
 
-	internal_voices "github.com/rapidaai/api/internal/voices"
-	internal_voice_rnnoise "github.com/rapidaai/api/internal/voices/rnnoise"
-	voice_silero_vad "github.com/rapidaai/api/internal/voices/silero_vad"
+	internal_voices "github.com/rapidaai/api/assistant-api/internal/voices"
+	internal_voice_rnnoise "github.com/rapidaai/api/assistant-api/internal/voices/rnnoise"
+	voice_silero_vad "github.com/rapidaai/api/assistant-api/internal/voices/silero_vad"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 )

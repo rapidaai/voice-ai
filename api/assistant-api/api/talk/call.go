@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	internal_factories "github.com/rapidaai/api/internal/factories"
-	internal_services "github.com/rapidaai/api/internal/services"
+	internal_factories "github.com/rapidaai/api/assistant-api/internal/factories"
+	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"

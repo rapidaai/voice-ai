@@ -3,8 +3,8 @@ package internal_services
 import (
 	"context"
 
-	internal_conversation_gorm "github.com/rapidaai/api/internal/gorm/conversations"
-	internal_message_gorm "github.com/rapidaai/api/internal/gorm/messages"
+	internal_conversation_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/conversations"
+	internal_message_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/messages"
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"

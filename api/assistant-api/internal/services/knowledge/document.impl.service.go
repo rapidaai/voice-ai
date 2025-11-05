@@ -10,9 +10,9 @@ import (
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
-	internal_knowledge_gorm "github.com/rapidaai/api/internal/gorm/knowledges"
-	internal_services "github.com/rapidaai/api/internal/services"
-	"github.com/rapidaai/config"
+	"github.com/rapidaai/api/assistant-api/config"
+	internal_knowledge_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/knowledges"
+	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	"github.com/rapidaai/pkg/ciphers"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
@@ -27,7 +27,7 @@ import (
 )
 
 type knowledgeDocumentService struct {
-	config     *config.AppConfig
+	config     *config.AssistantConfig
 	logger     commons.Logger
 	postgres   connectors.PostgresConnector
 	opensearch connectors.OpenSearchConnector
@@ -38,7 +38,7 @@ var (
 	KNOWLEDGE_DOCUMENT_PREFIX = "knowledge-document__"
 )
 
-func NewKnowledgeDocumentService(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, opensearch connectors.OpenSearchConnector) internal_services.KnowledgeDocumentService {
+func NewKnowledgeDocumentService(config *config.AssistantConfig, logger commons.Logger, postgres connectors.PostgresConnector, opensearch connectors.OpenSearchConnector) internal_services.KnowledgeDocumentService {
 	return &knowledgeDocumentService{
 		config:     config,
 		logger:     logger,

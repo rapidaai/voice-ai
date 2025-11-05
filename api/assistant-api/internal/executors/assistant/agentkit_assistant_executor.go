@@ -7,9 +7,9 @@ import (
 	"math"
 	"time"
 
-	internal_adapter_requests "github.com/rapidaai/api/internal/adapters/requests"
-	internal_executors "github.com/rapidaai/api/internal/executors"
-	internal_adapter_telemetry "github.com/rapidaai/api/internal/telemetry"
+	internal_adapter_requests "github.com/rapidaai/api/assistant-api/internal/adapters/requests"
+	internal_executors "github.com/rapidaai/api/assistant-api/internal/executors"
+	internal_adapter_telemetry "github.com/rapidaai/api/assistant-api/internal/telemetry"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"

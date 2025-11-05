@@ -6,7 +6,7 @@ package internal_services
 import (
 	"context"
 
-	internal_assistant_gorm "github.com/rapidaai/api/internal/gorm/assistants"
+	internal_assistant_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/assistants"
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	workflow_api "github.com/rapidaai/protos"

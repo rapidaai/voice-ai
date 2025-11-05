@@ -1,9 +1,9 @@
 package knowledge_api
 
 import (
-	internal_services "github.com/rapidaai/api/internal/services"
-	internal_knowledge_service "github.com/rapidaai/api/internal/services/knowledge"
-	"github.com/rapidaai/config"
+	"github.com/rapidaai/api/assistant-api/config"
+	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	internal_knowledge_service "github.com/rapidaai/api/assistant-api/internal/services/knowledge"
 	document_client "github.com/rapidaai/pkg/clients/document"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
@@ -12,7 +12,7 @@ import (
 )
 
 type knowledgeApi struct {
-	cfg                      *config.AppConfig
+	cfg                      *config.AssistantConfig
 	logger                   commons.Logger
 	postgres                 connectors.PostgresConnector
 	redis                    connectors.RedisConnector
@@ -25,7 +25,7 @@ type knowledgeGrpcApi struct {
 	knowledgeApi
 }
 
-func NewKnowledgeGRPCApi(config *config.AppConfig, logger commons.Logger,
+func NewKnowledgeGRPCApi(config *config.AssistantConfig, logger commons.Logger,
 	postgres connectors.PostgresConnector,
 	redis connectors.RedisConnector,
 	opensearch connectors.OpenSearchConnector,

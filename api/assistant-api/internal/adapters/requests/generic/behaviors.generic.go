@@ -5,8 +5,8 @@ import (
 	"errors"
 	"strings"
 
-	internal_adapter_request_customizers "github.com/rapidaai/api/internal/adapters/requests/customizers"
-	internal_assistant_gorm "github.com/rapidaai/api/internal/gorm/assistants"
+	internal_adapter_request_customizers "github.com/rapidaai/api/assistant-api/internal/adapters/requests/customizers"
+	internal_assistant_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/assistants"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	lexatic_backend "github.com/rapidaai/protos"

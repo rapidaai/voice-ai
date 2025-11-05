@@ -5,11 +5,11 @@ import (
 	"sync"
 	"time"
 
-	internal_adapter_transformer_factories "github.com/rapidaai/api/internal/factories/transformers"
-	internal_synthesizers "github.com/rapidaai/api/internal/synthesizes"
-	internal_adapter_telemetry "github.com/rapidaai/api/internal/telemetry"
-	internal_transcribes "github.com/rapidaai/api/internal/transcribers"
-	internal_transformers "github.com/rapidaai/api/internal/transformers"
+	internal_adapter_transformer_factories "github.com/rapidaai/api/assistant-api/internal/factories/transformers"
+	internal_synthesizers "github.com/rapidaai/api/assistant-api/internal/synthesizes"
+	internal_adapter_telemetry "github.com/rapidaai/api/assistant-api/internal/telemetry"
+	internal_transcribes "github.com/rapidaai/api/assistant-api/internal/transcribers"
+	internal_transformers "github.com/rapidaai/api/assistant-api/internal/transformers"
 	"github.com/rapidaai/pkg/utils"
 )
 

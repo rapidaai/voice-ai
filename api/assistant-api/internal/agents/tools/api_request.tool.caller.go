@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	internal_adapter_requests "github.com/rapidaai/api/internal/adapters/requests"
-	internal_assistant_gorm "github.com/rapidaai/api/internal/gorm/assistants"
+	internal_adapter_requests "github.com/rapidaai/api/assistant-api/internal/adapters/requests"
+	internal_assistant_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/assistants"
 	"github.com/rapidaai/pkg/clients/rest"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"

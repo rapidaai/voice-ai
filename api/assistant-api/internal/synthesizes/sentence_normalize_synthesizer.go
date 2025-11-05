@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	internal_normalizers "github.com/rapidaai/api/internal/synthesizes/normalizers"
+	internal_normalizers "github.com/rapidaai/api/assistant-api/internal/synthesizes/normalizers"
 	"github.com/rapidaai/pkg/commons"
 )
 

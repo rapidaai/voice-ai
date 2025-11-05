@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	internal_conversation_gorm "github.com/rapidaai/api/internal/gorm/conversations"
-	internal_services "github.com/rapidaai/api/internal/services"
+	internal_conversation_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/conversations"
+	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"

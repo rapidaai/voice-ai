@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	internal_adapter_requests "github.com/rapidaai/api/internal/adapters/requests"
-	internal_assistant_gorm "github.com/rapidaai/api/internal/gorm/assistants"
-	internal_knowledge_gorm "github.com/rapidaai/api/internal/gorm/knowledges"
+	internal_adapter_requests "github.com/rapidaai/api/assistant-api/internal/adapters/requests"
+	internal_assistant_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/assistants"
+	internal_knowledge_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/knowledges"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"

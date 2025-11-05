@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	internal_assistant_gorm "github.com/rapidaai/api/internal/gorm/assistants"
-	internal_services "github.com/rapidaai/api/internal/services"
-	"github.com/rapidaai/config"
+	"github.com/rapidaai/api/assistant-api/config"
+	internal_assistant_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/assistants"
+	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
@@ -20,10 +20,10 @@ import (
 type assistantDeploymentService struct {
 	logger   commons.Logger
 	postgres connectors.PostgresConnector
-	cfg      *config.AppConfig
+	cfg      *config.AssistantConfig
 }
 
-func NewAssistantDeploymentService(cfg *config.AppConfig,
+func NewAssistantDeploymentService(cfg *config.AssistantConfig,
 	logger commons.Logger,
 	postgres connectors.PostgresConnector) internal_services.AssistantDeploymentService {
 	return &assistantDeploymentService{

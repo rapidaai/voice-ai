@@ -1,19 +1,19 @@
 package assistant_api
 
 import (
-	internal_services "github.com/rapidaai/api/internal/services"
-	internal_assistant_service "github.com/rapidaai/api/internal/services/assistant"
-	internal_knowledge_service "github.com/rapidaai/api/internal/services/knowledge"
-	"github.com/rapidaai/config"
+	"github.com/rapidaai/api/assistant-api/config"
+	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	internal_assistant_service "github.com/rapidaai/api/assistant-api/internal/services/assistant"
+	internal_knowledge_service "github.com/rapidaai/api/assistant-api/internal/services/knowledge"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/storages"
 	storage_files "github.com/rapidaai/pkg/storages/file-storage"
-	assistant_api "github.com/rapidaai/protos"
+	protos "github.com/rapidaai/protos"
 )
 
 type assistantApi struct {
-	cfg                       *config.AppConfig
+	cfg                       *config.AssistantConfig
 	logger                    commons.Logger
 	postgres                  connectors.PostgresConnector
 	redis                     connectors.RedisConnector
@@ -34,13 +34,13 @@ type assistantGrpcApi struct {
 	assistantApi
 }
 
-func NewAssistantGRPCApi(config *config.AppConfig, logger commons.Logger,
+func NewAssistantGRPCApi(config *config.AssistantConfig, logger commons.Logger,
 	postgres connectors.PostgresConnector,
 	redis connectors.RedisConnector,
 	opensearch connectors.OpenSearchConnector,
 	vectordb connectors.VectorConnector,
 
-) assistant_api.AssistantServiceServer {
+) protos.AssistantServiceServer {
 	return &assistantGrpcApi{
 		assistantApi{
 			cfg:                      config,

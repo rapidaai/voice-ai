@@ -1,42 +1,25 @@
-package health_check_api
+package endpoint_health_api
 
 import (
 	"github.com/gin-gonic/gin"
-	config "github.com/rapidaai/config"
+	"github.com/rapidaai/api/assistant-api/config"
 	commons "github.com/rapidaai/pkg/commons"
 	connectors "github.com/rapidaai/pkg/connectors"
 )
 
 type healthCheckApi struct {
-	cfg      *config.AppConfig
+	cfg      *config.AssistantConfig
 	postgres connectors.Connector
 	logger   commons.Logger
 }
 
-func New(config *config.AppConfig, logger commons.Logger,
+func New(config *config.AssistantConfig, logger commons.Logger,
 	postgres connectors.Connector) *healthCheckApi {
 	return &healthCheckApi{
 		cfg:      config,
 		logger:   logger,
 		postgres: postgres,
 	}
-}
-
-// @Router /v1/readiness [get]
-// @Summary Readiness of service state of connections and other dependencies
-// @Produce json
-// @Success 200 {object} app.Response
-// @Failure 500 {object} app.Response
-func (hcApi *healthCheckApi) Readiness(c *gin.Context) {
-
-	c.JSON(200, commons.Response{
-		Code:    200,
-		Success: true,
-		Data: map[string]bool{
-			hcApi.postgres.Name(): hcApi.postgres.IsConnected(c),
-		},
-	})
-
 }
 
 // @Router /v1/healthz [get]

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	internal_adapter_request_customizers "github.com/rapidaai/api/internal/adapters/requests/customizers"
-	internal_analyzers "github.com/rapidaai/api/internal/analyzers"
+	internal_adapter_request_customizers "github.com/rapidaai/api/assistant-api/internal/adapters/requests/customizers"
+	internal_analyzers "github.com/rapidaai/api/assistant-api/internal/analyzers"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"

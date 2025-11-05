@@ -8,12 +8,12 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	internal_telemetry "github.com/rapidaai/api/internal/telemetry"
+	telemetry "github.com/rapidaai/api/assistant-api/internal/telemetry"
 	"github.com/rapidaai/config"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/types"
-	assistant_api "github.com/rapidaai/protos"
+	protos "github.com/rapidaai/protos"
 )
 
 type opensearchExporter struct {
@@ -27,7 +27,7 @@ func NewOpensearchAssistantTraceExporter(
 	logger commons.Logger,
 	config *config.AppConfig,
 	opensearchConnector connectors.OpenSearchConnector,
-) internal_telemetry.VoiceAgentTraceExporter {
+) telemetry.VoiceAgentTraceExporter {
 	return &opensearchExporter{
 		logger:              logger,
 		config:              config,
@@ -36,14 +36,14 @@ func NewOpensearchAssistantTraceExporter(
 	}
 }
 
-// Persist implements internal_telemetry.Exporter.
+// Persist implements telemetry.Exporter.
 func (ose *opensearchExporter) Export(
 	ctx context.Context,
 	iauth types.SimplePrinciple,
-	options internal_telemetry.ExportOption,
-	stages []*internal_telemetry.Telemetry) error {
+	options telemetry.ExportOption,
+	stages []*telemetry.Telemetry) error {
 	switch opts := options.(type) {
-	case *internal_telemetry.VoiceAgentExportOption:
+	case *telemetry.VoiceAgentExportOption:
 		var bulkRequestBody strings.Builder
 		for _, doc := range stages {
 
@@ -80,10 +80,10 @@ func (ose *opensearchExporter) Export(
 func (ose *opensearchExporter) Get(
 	ctx context.Context,
 	iauth types.SimplePrinciple,
-	criterias []*assistant_api.Criteria,
-	paginate *assistant_api.Paginate) (int64, []*internal_telemetry.Telemetry, error) {
+	criterias []*protos.Criteria,
+	paginate *protos.Paginate) (int64, []*telemetry.Telemetry, error) {
 	var (
-		deployments []*internal_telemetry.Telemetry
+		deployments []*telemetry.Telemetry
 	)
 	query := map[string]interface{}{
 		"bool": map[string]interface{}{
@@ -150,7 +150,7 @@ func (ose *opensearchExporter) Get(
 	}
 	// Handle hits
 	for _, hit := range resp.Hits.Hits {
-		var deployment internal_telemetry.Telemetry
+		var deployment telemetry.Telemetry
 		source := hit["_source"]
 		sourceBytes, _ := json.Marshal(source)
 		json.Unmarshal(sourceBytes, &deployment)

@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	internal_services "github.com/rapidaai/api/internal/services"
+	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	"github.com/rapidaai/pkg/exceptions"
 	gorm_types "github.com/rapidaai/pkg/models/gorm/types"
 	"github.com/rapidaai/pkg/types"

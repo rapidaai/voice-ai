@@ -1,8 +1,8 @@
 package workflow_routers
 
 import (
-	knowledgeApi "github.com/rapidaai/api/assistant-api/knowledge"
-	"github.com/rapidaai/config"
+	knowledgeApi "github.com/rapidaai/api/assistant-api/api/knowledge"
+	"github.com/rapidaai/api/assistant-api/config"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	workflow_api "github.com/rapidaai/protos"
@@ -10,7 +10,7 @@ import (
 )
 
 func KnowledgeApiRoute(
-	Cfg *config.AppConfig,
+	Cfg *config.AssistantConfig,
 	S *grpc.Server,
 	Logger commons.Logger,
 	Postgres connectors.PostgresConnector,
@@ -27,7 +27,7 @@ func KnowledgeApiRoute(
 }
 
 func DocumentApiRoute(
-	Cfg *config.AppConfig,
+	Cfg *config.AssistantConfig,
 	S *grpc.Server,
 	Logger commons.Logger,
 	Postgres connectors.PostgresConnector,

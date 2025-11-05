@@ -3,8 +3,8 @@ package internal_analyzer_factories
 import (
 	"errors"
 
-	internal_analyzers "github.com/rapidaai/api/internal/analyzers"
-	internal_voices "github.com/rapidaai/api/internal/voices"
+	internal_analyzers "github.com/rapidaai/api/assistant-api/internal/analyzers"
+	internal_voices "github.com/rapidaai/api/assistant-api/internal/voices"
 	"github.com/rapidaai/pkg/commons"
 )
 

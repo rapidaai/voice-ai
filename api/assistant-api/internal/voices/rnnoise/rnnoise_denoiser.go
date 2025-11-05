@@ -1,6 +1,6 @@
 package internal_voice_rnnoise
 
-import voices "github.com/rapidaai/api/internal/voices"
+import voices "github.com/rapidaai/api/assistant-api/internal/voices"
 
 type rnnoiseDenoiser struct {
 	state *DenoiseState

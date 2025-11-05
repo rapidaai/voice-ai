@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	internal_voices "github.com/rapidaai/api/internal/voices"
+	internal_voices "github.com/rapidaai/api/assistant-api/internal/voices"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	lexatic_backend "github.com/rapidaai/protos"

@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	internal_assistant_gorm "github.com/rapidaai/api/internal/gorm/assistants"
-	internal_services "github.com/rapidaai/api/internal/services"
-	"github.com/rapidaai/config"
+	"github.com/rapidaai/api/assistant-api/config"
+	internal_assistant_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/assistants"
+	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
@@ -25,10 +25,10 @@ type assistantService struct {
 	logger     commons.Logger
 	postgres   connectors.PostgresConnector
 	opensearch connectors.OpenSearchConnector
-	cfg        *config.AppConfig
+	cfg        *config.AssistantConfig
 }
 
-func NewAssistantService(cfg *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector, opensearch connectors.OpenSearchConnector) internal_services.AssistantService {
+func NewAssistantService(cfg *config.AssistantConfig, logger commons.Logger, postgres connectors.PostgresConnector, opensearch connectors.OpenSearchConnector) internal_services.AssistantService {
 	return &assistantService{
 		logger:     logger,
 		postgres:   postgres,

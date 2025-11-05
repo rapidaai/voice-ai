@@ -13,7 +13,7 @@ import (
 	"runtime"
 	"unsafe"
 
-	voices "github.com/rapidaai/api/internal/voices"
+	voices "github.com/rapidaai/api/assistant-api/internal/voices"
 	"github.com/rapidaai/pkg/commons"
 )
 

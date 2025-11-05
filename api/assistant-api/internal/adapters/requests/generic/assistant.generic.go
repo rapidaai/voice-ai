@@ -3,10 +3,10 @@ package internal_adapter_request_generic
 import (
 	"errors"
 
-	internal_adapter_requests "github.com/rapidaai/api/internal/adapters/requests"
-	internal_assistant_gorm "github.com/rapidaai/api/internal/gorm/assistants"
-	internal_conversation_gorm "github.com/rapidaai/api/internal/gorm/conversations"
-	internal_services "github.com/rapidaai/api/internal/services"
+	internal_adapter_requests "github.com/rapidaai/api/assistant-api/internal/adapters/requests"
+	internal_assistant_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/assistants"
+	internal_conversation_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/conversations"
+	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 )

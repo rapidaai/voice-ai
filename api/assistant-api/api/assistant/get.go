@@ -5,8 +5,8 @@ import (
 	"errors"
 	"sync"
 
-	internal_services "github.com/rapidaai/api/internal/services"
-	internal_assistant_telemetry_exporters "github.com/rapidaai/api/internal/telemetry/assistant/exporters"
+	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	internal_assistant_telemetry_exporters "github.com/rapidaai/api/assistant-api/internal/telemetry/assistant/exporters"
 	"github.com/rapidaai/pkg/exceptions"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
@@ -725,7 +725,7 @@ func (assistantApi *assistantGrpcApi) GetAllAssistantTelemetry(ctx context.Conte
 
 	otelExporter := internal_assistant_telemetry_exporters.NewOpensearchAssistantTraceExporter(
 		assistantApi.logger,
-		assistantApi.cfg,
+		&assistantApi.cfg.AppConfig,
 		assistantApi.opensearch,
 	)
 	cnt, ot, err := otelExporter.Get(ctx, iAuth, request.Criterias, request.Paginate)

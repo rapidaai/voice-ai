@@ -3,7 +3,7 @@ package internal_assistant_telemetry_exporters
 import (
 	"time"
 
-	internal_adapter_telemetry "github.com/rapidaai/api/internal/telemetry"
+	internal_adapter_telemetry "github.com/rapidaai/api/assistant-api/internal/telemetry"
 	gorm_model "github.com/rapidaai/pkg/models/gorm"
 	gorm_types "github.com/rapidaai/pkg/models/gorm/types"
 )

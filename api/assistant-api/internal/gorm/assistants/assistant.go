@@ -1,7 +1,7 @@
 package internal_assistant_gorm
 
 import (
-	internal_conversation_gorm "github.com/rapidaai/api/internal/gorm/conversations"
+	internal_conversation_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/conversations"
 	gorm_model "github.com/rapidaai/pkg/models/gorm"
 	gorm_types "github.com/rapidaai/pkg/models/gorm/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"

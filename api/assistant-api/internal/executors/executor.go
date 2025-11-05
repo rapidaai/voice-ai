@@ -3,7 +3,7 @@ package internal_executors
 import (
 	"context"
 
-	internal_adapter_requests "github.com/rapidaai/api/internal/adapters/requests"
+	internal_adapter_requests "github.com/rapidaai/api/assistant-api/internal/adapters/requests"
 	"github.com/rapidaai/pkg/types"
 	lexatic_backend "github.com/rapidaai/protos"
 )

@@ -12,7 +12,7 @@ import (
 
 	openai "github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
-	internal_transformers "github.com/rapidaai/api/internal/transformers"
+	internal_transformers "github.com/rapidaai/api/assistant-api/internal/transformers"
 	"github.com/rapidaai/pkg/commons"
 )
 

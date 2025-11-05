@@ -1,7 +1,7 @@
 package internal_capturer_factories
 
 import (
-	internal_capturers "github.com/rapidaai/api/internal/capturers"
+	internal_capturers "github.com/rapidaai/api/assistant-api/internal/capturers"
 	"github.com/rapidaai/pkg/commons"
 )
 

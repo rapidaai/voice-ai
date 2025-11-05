@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	internal_assistant_gorm "github.com/rapidaai/api/internal/gorm/assistants"
+	internal_assistant_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/assistants"
 	endpoint_client_builders "github.com/rapidaai/pkg/clients/endpoint/builders"
 	"github.com/rapidaai/pkg/clients/rest"
 	"github.com/rapidaai/pkg/types"

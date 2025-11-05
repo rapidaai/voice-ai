@@ -14,7 +14,7 @@ import (
 
 	"github.com/deepgram/deepgram-go-sdk/v3/pkg/client/interfaces"
 	client "github.com/deepgram/deepgram-go-sdk/v3/pkg/client/speak"
-	internal_transformers "github.com/rapidaai/api/internal/transformers"
+	internal_transformers "github.com/rapidaai/api/assistant-api/internal/transformers"
 	"github.com/rapidaai/pkg/commons"
 	lexatic_backend "github.com/rapidaai/protos"
 )

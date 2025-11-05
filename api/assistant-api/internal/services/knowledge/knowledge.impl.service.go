@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	internal_knowledge_gorm "github.com/rapidaai/api/internal/gorm/knowledges"
-	internal_services "github.com/rapidaai/api/internal/services"
+	internal_knowledge_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/knowledges"
+	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	"github.com/rapidaai/config"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"

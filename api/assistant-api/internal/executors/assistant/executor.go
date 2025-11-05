@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	internal_adapter_requests "github.com/rapidaai/api/internal/adapters/requests"
-	internal_executors "github.com/rapidaai/api/internal/executors"
+	internal_adapter_requests "github.com/rapidaai/api/assistant-api/internal/adapters/requests"
+	internal_executors "github.com/rapidaai/api/assistant-api/internal/executors"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"

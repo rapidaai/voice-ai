@@ -10,7 +10,7 @@ package internal_transformers
 import (
 	"context"
 
-	internal_voices "github.com/rapidaai/api/internal/voices"
+	internal_voices "github.com/rapidaai/api/assistant-api/internal/voices"
 	"github.com/rapidaai/pkg/utils"
 )
 

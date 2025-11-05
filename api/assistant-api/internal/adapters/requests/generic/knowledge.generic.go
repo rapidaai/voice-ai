@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	internal_adapter_requests "github.com/rapidaai/api/internal/adapters/requests"
-	internal_agent_embeddings "github.com/rapidaai/api/internal/agents/embeddings"
-	internal_knowledge_gorm "github.com/rapidaai/api/internal/gorm/knowledges"
+	internal_adapter_requests "github.com/rapidaai/api/assistant-api/internal/adapters/requests"
+	internal_agent_embeddings "github.com/rapidaai/api/assistant-api/internal/agents/embeddings"
+	internal_knowledge_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/knowledges"
 	"github.com/rapidaai/pkg/connectors"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"

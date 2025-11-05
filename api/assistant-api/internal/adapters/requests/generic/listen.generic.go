@@ -8,12 +8,12 @@ import (
 	"sync"
 	"time"
 
-	internal_analyzers "github.com/rapidaai/api/internal/analyzers"
-	internal_analyzer_factories "github.com/rapidaai/api/internal/factories/analyzers"
-	internal_adapter_transformer_factories "github.com/rapidaai/api/internal/factories/transformers"
-	internal_assistant_gorm "github.com/rapidaai/api/internal/gorm/assistants"
-	internal_telemetry "github.com/rapidaai/api/internal/telemetry"
-	internal_transformers "github.com/rapidaai/api/internal/transformers"
+	internal_analyzers "github.com/rapidaai/api/assistant-api/internal/analyzers"
+	internal_analyzer_factories "github.com/rapidaai/api/assistant-api/internal/factories/analyzers"
+	internal_adapter_transformer_factories "github.com/rapidaai/api/assistant-api/internal/factories/transformers"
+	internal_assistant_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/assistants"
+	internal_telemetry "github.com/rapidaai/api/assistant-api/internal/telemetry"
+	internal_transformers "github.com/rapidaai/api/assistant-api/internal/transformers"
 	"github.com/rapidaai/pkg/utils"
 )
 

@@ -7,8 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	internal_adapter_request_streamers "github.com/rapidaai/api/internal/adapters/requests/streamers"
-	internal_factories "github.com/rapidaai/api/internal/factories"
+	internal_adapter_request_streamers "github.com/rapidaai/api/assistant-api/internal/adapters/requests/streamers"
+	internal_factories "github.com/rapidaai/api/assistant-api/internal/factories"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	lexatic_backend "github.com/rapidaai/protos"

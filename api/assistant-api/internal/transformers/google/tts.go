@@ -15,7 +15,7 @@ import (
 
 	texttospeech "cloud.google.com/go/texttospeech/apiv1"
 	"cloud.google.com/go/texttospeech/apiv1/texttospeechpb"
-	internal_transformers "github.com/rapidaai/api/internal/transformers"
+	internal_transformers "github.com/rapidaai/api/assistant-api/internal/transformers"
 	"github.com/rapidaai/pkg/commons"
 	lexatic_backend "github.com/rapidaai/protos"
 )

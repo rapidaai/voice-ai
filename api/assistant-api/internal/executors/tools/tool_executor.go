@@ -7,12 +7,12 @@ import (
 	"sync"
 	"time"
 
-	internal_requests "github.com/rapidaai/api/internal/adapters/requests"
-	internal_agent_tools "github.com/rapidaai/api/internal/agents/tools"
-	internal_executors "github.com/rapidaai/api/internal/executors"
-	internal_adapter_telemetry "github.com/rapidaai/api/internal/telemetry"
+	internal_requests "github.com/rapidaai/api/assistant-api/internal/adapters/requests"
+	internal_agent_tools "github.com/rapidaai/api/assistant-api/internal/agents/tools"
+	internal_executors "github.com/rapidaai/api/assistant-api/internal/executors"
+	internal_adapter_telemetry "github.com/rapidaai/api/assistant-api/internal/telemetry"
 
-	internal_tool_factories "github.com/rapidaai/api/internal/factories/tools"
+	internal_tool_factories "github.com/rapidaai/api/assistant-api/internal/factories/tools"
 	lexatic_backend "github.com/rapidaai/protos"
 
 	"github.com/rapidaai/pkg/commons"

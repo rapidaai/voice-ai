@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	internal_telemetry "github.com/rapidaai/api/internal/telemetry"
+	internal_telemetry "github.com/rapidaai/api/assistant-api/internal/telemetry"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"

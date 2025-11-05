@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"strings"
 
-	internal_voices "github.com/rapidaai/api/internal/voices"
+	internal_voices "github.com/rapidaai/api/assistant-api/internal/voices"
 	commons "github.com/rapidaai/pkg/commons"
 	utils "github.com/rapidaai/pkg/utils"
 

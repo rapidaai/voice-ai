@@ -3,7 +3,7 @@ package internal_services
 import (
 	"context"
 
-	internal_knowledge_gorm "github.com/rapidaai/api/internal/gorm/knowledges"
+	internal_knowledge_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/knowledges"
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	workflow_api "github.com/rapidaai/protos"

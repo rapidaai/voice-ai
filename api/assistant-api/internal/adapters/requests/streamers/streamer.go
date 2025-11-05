@@ -3,7 +3,7 @@ package internal_adapter_request_streamers
 import (
 	"context"
 
-	internal_voices "github.com/rapidaai/api/internal/voices"
+	internal_voices "github.com/rapidaai/api/assistant-api/internal/voices"
 	lexatic_backend "github.com/rapidaai/protos"
 )
 

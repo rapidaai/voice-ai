@@ -3,10 +3,10 @@ package internal_adapter_requests
 import (
 	"context"
 
-	internal_assistant_gorm "github.com/rapidaai/api/internal/gorm/assistants"
-	internal_conversation_gorm "github.com/rapidaai/api/internal/gorm/conversations"
-	internal_knowledge_gorm "github.com/rapidaai/api/internal/gorm/knowledges"
-	internal_adapter_tracing "github.com/rapidaai/api/internal/telemetry"
+	internal_assistant_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/assistants"
+	internal_conversation_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/conversations"
+	internal_knowledge_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/knowledges"
+	internal_adapter_tracing "github.com/rapidaai/api/assistant-api/internal/telemetry"
 	endpoint_client "github.com/rapidaai/pkg/clients/endpoint"
 	integration_client "github.com/rapidaai/pkg/clients/integration"
 	web_client "github.com/rapidaai/pkg/clients/web"

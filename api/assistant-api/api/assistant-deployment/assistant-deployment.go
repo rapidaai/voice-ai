@@ -1,9 +1,9 @@
 package assistant_deployment_api
 
 import (
-	internal_services "github.com/rapidaai/api/internal/services"
-	internal_assistant_service "github.com/rapidaai/api/internal/services/assistant"
-	"github.com/rapidaai/config"
+	"github.com/rapidaai/api/assistant-api/config"
+	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	internal_assistant_service "github.com/rapidaai/api/assistant-api/internal/services/assistant"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/storages"
@@ -13,7 +13,7 @@ import (
 )
 
 type assistantDeploymentApi struct {
-	cfg               *config.AppConfig
+	cfg               *config.AssistantConfig
 	logger            commons.Logger
 	postgres          connectors.PostgresConnector
 	deploymentService internal_services.AssistantDeploymentService
@@ -24,7 +24,7 @@ type assistantDeploymentGrpcApi struct {
 	assistantDeploymentApi
 }
 
-func NewAssistantDeploymentGRPCApi(config *config.AppConfig, logger commons.Logger,
+func NewAssistantDeploymentGRPCApi(config *config.AssistantConfig, logger commons.Logger,
 	postgres connectors.PostgresConnector,
 ) assistant_api.AssistantDeploymentServiceServer {
 	return &assistantDeploymentGrpcApi{

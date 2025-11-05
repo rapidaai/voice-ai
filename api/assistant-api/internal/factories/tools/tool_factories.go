@@ -3,9 +3,9 @@ package internal_tool_factories
 import (
 	"errors"
 
-	internal_adapter_requests "github.com/rapidaai/api/internal/adapters/requests"
-	internal_agent_tools "github.com/rapidaai/api/internal/agents/tools"
-	internal_assistant_gorm "github.com/rapidaai/api/internal/gorm/assistants"
+	internal_adapter_requests "github.com/rapidaai/api/assistant-api/internal/adapters/requests"
+	internal_agent_tools "github.com/rapidaai/api/assistant-api/internal/agents/tools"
+	internal_assistant_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/assistants"
 	"github.com/rapidaai/pkg/commons"
 )
 

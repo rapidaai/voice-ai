@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	internal_message_gorm "github.com/rapidaai/api/internal/gorm/messages"
-	internal_services "github.com/rapidaai/api/internal/services"
+	internal_message_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/messages"
+	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"

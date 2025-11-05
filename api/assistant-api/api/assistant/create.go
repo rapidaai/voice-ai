@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	internal_assistant_gorm "github.com/rapidaai/api/internal/gorm/assistants"
-	internal_services "github.com/rapidaai/api/internal/services"
+	internal_assistant_gorm "github.com/rapidaai/api/assistant-api/internal/gorm/assistants"
+	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	"github.com/rapidaai/pkg/exceptions"
 	gorm_types "github.com/rapidaai/pkg/models/gorm/types"
 	"github.com/rapidaai/pkg/types"
