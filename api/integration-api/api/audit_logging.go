@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	config "github.com/rapidaai/config"
+	config "github.com/rapidaai/api/integration-api/config"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/types"
@@ -21,7 +21,7 @@ type auditLoggingGRPCApi struct {
 	auditLoggingApi
 }
 
-func NewAuditLoggingGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) integration_api.AuditLoggingServiceServer {
+func NewAuditLoggingGRPC(config *config.IntegrationConfig, logger commons.Logger, postgres connectors.PostgresConnector) integration_api.AuditLoggingServiceServer {
 	return &auditLoggingGRPCApi{
 		auditLoggingApi{
 			integrationApi: NewInegrationApi(config, logger, postgres),

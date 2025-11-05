@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
-	config "github.com/rapidaai/config"
-	internal_callers "github.com/rapidaai/internal/callers"
-	internal_mistral_callers "github.com/rapidaai/internal/callers/mistral"
+	config "github.com/rapidaai/api/integration-api/config"
+	internal_callers "github.com/rapidaai/api/integration-api/internal/caller"
+	internal_mistral_callers "github.com/rapidaai/api/integration-api/internal/caller/mistral"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	integration_api "github.com/rapidaai/protos"
@@ -34,7 +34,7 @@ func (mistral *mistralIntegrationGRPCApi) Embedding(c context.Context, irRequest
 	return mistral.integrationApi.Embedding(c, irRequest, "MISTRAL", internal_mistral_callers.NewEmbeddingCaller(mistral.logger, irRequest.GetCredential()))
 }
 
-func NewMistralRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) *mistralIntegrationRPCApi {
+func NewMistralRPC(config *config.IntegrationConfig, logger commons.Logger, postgres connectors.PostgresConnector) *mistralIntegrationRPCApi {
 	return &mistralIntegrationRPCApi{
 		mistralIntegrationApi{
 			integrationApi: NewInegrationApi(config, logger, postgres),
@@ -42,7 +42,7 @@ func NewMistralRPC(config *config.AppConfig, logger commons.Logger, postgres con
 	}
 }
 
-func NewMistralGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) integration_api.MistralServiceServer {
+func NewMistralGRPC(config *config.IntegrationConfig, logger commons.Logger, postgres connectors.PostgresConnector) integration_api.MistralServiceServer {
 	return &mistralIntegrationGRPCApi{
 		mistralIntegrationApi{
 			integrationApi: NewInegrationApi(config, logger, postgres),

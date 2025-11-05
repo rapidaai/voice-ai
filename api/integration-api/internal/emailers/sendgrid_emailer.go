@@ -3,7 +3,7 @@ package internal_emailers
 import (
 	"context"
 
-	"github.com/rapidaai/config"
+	"github.com/rapidaai/api/integration-api/config"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
@@ -11,11 +11,11 @@ import (
 
 type sendgridEmailer struct {
 	logger commons.Logger
-	cfg    *config.AppConfig
+	cfg    *config.IntegrationConfig
 	client *sendgrid.Client
 }
 
-func NewSendgridEmailer(logger commons.Logger, cfg *config.AppConfig) Emailer {
+func NewSendgridEmailer(logger commons.Logger, cfg *config.IntegrationConfig) Emailer {
 	return &sendgridEmailer{
 		logger: logger,
 		cfg:    cfg,

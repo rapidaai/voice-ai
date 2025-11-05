@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
-	config "github.com/rapidaai/config"
-	internal_callers "github.com/rapidaai/internal/callers"
-	internal_replicate_callers "github.com/rapidaai/internal/callers/replicate"
+	config "github.com/rapidaai/api/integration-api/config"
+	internal_callers "github.com/rapidaai/api/integration-api/internal/caller"
+	internal_replicate_callers "github.com/rapidaai/api/integration-api/internal/caller/replicate"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	integration_api "github.com/rapidaai/protos"
@@ -29,7 +29,7 @@ func (*replicateIntegrationGRPCApi) StreamChat(*integration_api.ChatRequest, int
 	panic("unimplemented")
 }
 
-func NewReplicateRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) *replicateIntegrationRPCApi {
+func NewReplicateRPC(config *config.IntegrationConfig, logger commons.Logger, postgres connectors.PostgresConnector) *replicateIntegrationRPCApi {
 	return &replicateIntegrationRPCApi{
 		replicateIntegrationApi{
 			integrationApi: NewInegrationApi(config, logger, postgres),
@@ -37,7 +37,7 @@ func NewReplicateRPC(config *config.AppConfig, logger commons.Logger, postgres c
 	}
 }
 
-func NewReplicateGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) integration_api.ReplicateServiceServer {
+func NewReplicateGRPC(config *config.IntegrationConfig, logger commons.Logger, postgres connectors.PostgresConnector) integration_api.ReplicateServiceServer {
 	return &replicateIntegrationGRPCApi{
 		replicateIntegrationApi{
 			integrationApi: NewInegrationApi(config, logger, postgres),

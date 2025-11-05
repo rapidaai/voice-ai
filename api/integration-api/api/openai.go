@@ -3,9 +3,9 @@ package integration_api
 import (
 	"context"
 
-	config "github.com/rapidaai/config"
-	internal_callers "github.com/rapidaai/internal/callers"
-	internal_openai_callers "github.com/rapidaai/internal/callers/openai"
+	config "github.com/rapidaai/api/integration-api/config"
+	internal_callers "github.com/rapidaai/api/integration-api/internal/caller"
+	internal_openai_callers "github.com/rapidaai/api/integration-api/internal/caller/openai"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	integration_api "github.com/rapidaai/protos"
@@ -23,7 +23,7 @@ type openaiIntegrationGRPCApi struct {
 	openaiIntegrationApi
 }
 
-func NewOpenAiRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) *openaiIntegrationRPCApi {
+func NewOpenAiRPC(config *config.IntegrationConfig, logger commons.Logger, postgres connectors.PostgresConnector) *openaiIntegrationRPCApi {
 	return &openaiIntegrationRPCApi{
 		openaiIntegrationApi{
 			integrationApi: NewInegrationApi(config, logger, postgres),
@@ -31,7 +31,7 @@ func NewOpenAiRPC(config *config.AppConfig, logger commons.Logger, postgres conn
 	}
 }
 
-func NewOpenAiGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) integration_api.OpenAiServiceServer {
+func NewOpenAiGRPC(config *config.IntegrationConfig, logger commons.Logger, postgres connectors.PostgresConnector) integration_api.OpenAiServiceServer {
 	return &openaiIntegrationGRPCApi{
 		openaiIntegrationApi{
 			integrationApi: NewInegrationApi(config, logger, postgres),

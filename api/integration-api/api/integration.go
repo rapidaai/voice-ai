@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	config "github.com/rapidaai/config"
-	internal_services "github.com/rapidaai/internal/services"
-	internal_audit_service "github.com/rapidaai/internal/services/audit"
+	config "github.com/rapidaai/api/integration-api/config"
+	internal_services "github.com/rapidaai/api/integration-api/internal/service"
+	internal_audit_service "github.com/rapidaai/api/integration-api/internal/service/audit"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_generator "github.com/rapidaai/pkg/models/gorm/generators"
@@ -19,13 +19,13 @@ import (
 )
 
 type integrationApi struct {
-	cfg          *config.AppConfig
+	cfg          *config.IntegrationConfig
 	logger       commons.Logger
 	storage      storages.Storage
 	auditService internal_services.AuditService
 }
 
-func NewInegrationApi(cfg *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) integrationApi {
+func NewInegrationApi(cfg *config.IntegrationConfig, logger commons.Logger, postgres connectors.PostgresConnector) integrationApi {
 	return integrationApi{cfg: cfg, logger: logger,
 		storage:      storage_files.NewStorage(cfg.AssetStoreConfig, logger),
 		auditService: internal_audit_service.NewAuditService(logger, postgres)}

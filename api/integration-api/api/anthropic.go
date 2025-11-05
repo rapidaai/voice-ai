@@ -4,13 +4,11 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
-	config "github.com/rapidaai/config"
-	internal_callers "github.com/rapidaai/internal/callers"
-	internal_anthropic_callers "github.com/rapidaai/internal/callers/anthropic"
-
+	config "github.com/rapidaai/api/integration-api/config"
+	internal_callers "github.com/rapidaai/api/integration-api/internal/caller"
+	internal_anthropic_callers "github.com/rapidaai/api/integration-api/internal/caller/anthropic"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-
 	protos "github.com/rapidaai/protos"
 )
 
@@ -39,7 +37,7 @@ func (anthropic *anthropicIntegrationGRPCApi) StreamChat(irRequest *protos.ChatR
 	)
 }
 
-func NewAnthropicRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) *anthropicIntegrationRPCApi {
+func NewAnthropicRPC(config *config.IntegrationConfig, logger commons.Logger, postgres connectors.PostgresConnector) *anthropicIntegrationRPCApi {
 	return &anthropicIntegrationRPCApi{
 		anthropicIntegrationApi{
 			integrationApi: NewInegrationApi(config, logger, postgres),
@@ -47,7 +45,7 @@ func NewAnthropicRPC(config *config.AppConfig, logger commons.Logger, postgres c
 	}
 }
 
-func NewAnthropicGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) protos.AnthropicServiceServer {
+func NewAnthropicGRPC(config *config.IntegrationConfig, logger commons.Logger, postgres connectors.PostgresConnector) protos.AnthropicServiceServer {
 	return &anthropicIntegrationGRPCApi{
 		anthropicIntegrationApi{
 			integrationApi: NewInegrationApi(config, logger, postgres),

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	internal_gorm "github.com/rapidaai/internal/gorm"
-	internal_services "github.com/rapidaai/internal/services"
+	internal_gorm "github.com/rapidaai/api/integration-api/internal/entity"
+	internal_services "github.com/rapidaai/api/integration-api/internal/service"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"

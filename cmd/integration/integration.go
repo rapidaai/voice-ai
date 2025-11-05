@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-
-	// "google.golang.org/grpc/reflection"
 	"log"
 	"net"
 	"net/http"
@@ -16,8 +14,8 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
-	integration_routers "github.com/rapidaai/api/routers"
-	config "github.com/rapidaai/config"
+	config "github.com/rapidaai/api/integration-api/config"
+	integration_routers "github.com/rapidaai/api/integration-api/router"
 	"github.com/rapidaai/pkg/authenticators"
 	web_client "github.com/rapidaai/pkg/clients/web"
 	commons "github.com/rapidaai/pkg/commons"
@@ -32,7 +30,7 @@ import (
 type AppRunner struct {
 	E         *gin.Engine
 	S         *grpc.Server
-	Cfg       *config.AppConfig
+	Cfg       *config.IntegrationConfig
 	Logger    commons.Logger
 	Postgres  connectors.PostgresConnector
 	Redis     connectors.RedisConnector
@@ -61,24 +59,24 @@ func main() {
 		grpc.ChainUnaryInterceptor(
 			middlewares.NewRequestLoggerUnaryServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewServiceAuthenticatorUnaryServerMiddleware(
-				authenticators.NewServiceAuthenticator(appRunner.Cfg, appRunner.Logger, appRunner.Postgres),
+				authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Postgres),
 				appRunner.Logger,
 			),
 			middlewares.NewProjectAuthenticatorUnaryServerMiddleware(
-				authenticators.NewProjectAuthenticator(appRunner.Cfg, appRunner.Logger,
-					web_client.NewAuthenticator(appRunner.Cfg, appRunner.Logger, appRunner.Redis)),
+				authenticators.NewProjectAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger,
+					web_client.NewAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)),
 				appRunner.Logger,
 			),
 		),
 		grpc.ChainStreamInterceptor(
 			middlewares.NewRequestLoggerStreamServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewServiceAuthenticatorStreamServerMiddleware(
-				authenticators.NewServiceAuthenticator(appRunner.Cfg, appRunner.Logger, appRunner.Postgres),
+				authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Postgres),
 				appRunner.Logger,
 			),
 			middlewares.NewProjectAuthenticatorStreamServerMiddleware(
-				authenticators.NewProjectAuthenticator(appRunner.Cfg, appRunner.Logger,
-					web_client.NewAuthenticator(appRunner.Cfg, appRunner.Logger, appRunner.Redis)),
+				authenticators.NewProjectAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger,
+					web_client.NewAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)),
 				appRunner.Logger,
 			),
 		),

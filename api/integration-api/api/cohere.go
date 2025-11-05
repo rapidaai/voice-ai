@@ -3,9 +3,9 @@ package integration_api
 import (
 	"context"
 
-	config "github.com/rapidaai/config"
-	internal_callers "github.com/rapidaai/internal/callers"
-	internal_cohere_callers "github.com/rapidaai/internal/callers/cohere"
+	config "github.com/rapidaai/api/integration-api/config"
+	internal_callers "github.com/rapidaai/api/integration-api/internal/caller"
+	internal_cohere_callers "github.com/rapidaai/api/integration-api/internal/caller/cohere"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	integration_api "github.com/rapidaai/protos"
@@ -36,7 +36,7 @@ func (cohere *cohereIntegrationGRPCApi) StreamChat(irRequest *integration_api.Ch
 	)
 }
 
-func NewCohereRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) *cohereIntegrationRPCApi {
+func NewCohereRPC(config *config.IntegrationConfig, logger commons.Logger, postgres connectors.PostgresConnector) *cohereIntegrationRPCApi {
 	return &cohereIntegrationRPCApi{
 		cohereIntegrationApi{
 			integrationApi: NewInegrationApi(config, logger, postgres),
@@ -44,7 +44,7 @@ func NewCohereRPC(config *config.AppConfig, logger commons.Logger, postgres conn
 	}
 }
 
-func NewCohereGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) integration_api.CohereServiceServer {
+func NewCohereGRPC(config *config.IntegrationConfig, logger commons.Logger, postgres connectors.PostgresConnector) integration_api.CohereServiceServer {
 	return &cohereIntegrationGRPCApi{
 		cohereIntegrationApi{
 			integrationApi: NewInegrationApi(config, logger, postgres),

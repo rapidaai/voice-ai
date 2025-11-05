@@ -3,9 +3,9 @@ package integration_api
 import (
 	"context"
 
-	config "github.com/rapidaai/config"
-	internal_callers "github.com/rapidaai/internal/callers"
-	internal_azure_callers "github.com/rapidaai/internal/callers/azure"
+	config "github.com/rapidaai/api/integration-api/config"
+	internal_callers "github.com/rapidaai/api/integration-api/internal/caller"
+	internal_azure_callers "github.com/rapidaai/api/integration-api/internal/caller/azure"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	integration_api "github.com/rapidaai/protos"
@@ -35,7 +35,7 @@ func (az *azureIntegrationGRPCApi) StreamChat(irRequest *integration_api.ChatReq
 	)
 }
 
-func NewAzureRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) *azureIntegrationRPCApi {
+func NewAzureRPC(config *config.IntegrationConfig, logger commons.Logger, postgres connectors.PostgresConnector) *azureIntegrationRPCApi {
 	return &azureIntegrationRPCApi{
 		azureIntegrationApi{
 			integrationApi: NewInegrationApi(config, logger, postgres),
@@ -43,7 +43,7 @@ func NewAzureRPC(config *config.AppConfig, logger commons.Logger, postgres conne
 	}
 }
 
-func NewAzureGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) integration_api.AzureServiceServer {
+func NewAzureGRPC(config *config.IntegrationConfig, logger commons.Logger, postgres connectors.PostgresConnector) integration_api.AzureServiceServer {
 	return &azureIntegrationGRPCApi{
 		azureIntegrationApi{
 			integrationApi: NewInegrationApi(config, logger, postgres),

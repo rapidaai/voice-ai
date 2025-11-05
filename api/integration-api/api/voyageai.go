@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 
-	config "github.com/rapidaai/config"
-	callers "github.com/rapidaai/internal/callers"
-	internal_callers "github.com/rapidaai/internal/callers"
-	internal_voyageai_callers "github.com/rapidaai/internal/callers/voyageai"
+	config "github.com/rapidaai/api/integration-api/config"
+	callers "github.com/rapidaai/api/integration-api/internal/caller"
+	internal_callers "github.com/rapidaai/api/integration-api/internal/caller"
+	internal_voyageai_callers "github.com/rapidaai/api/integration-api/internal/caller/voyageai"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/types"
@@ -28,7 +28,7 @@ type voyageaiIntegrationGRPCApi struct {
 	voyageaiIntegrationApi
 }
 
-func NewVoyageAiRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) *voyageaiIntegrationRPCApi {
+func NewVoyageAiRPC(config *config.IntegrationConfig, logger commons.Logger, postgres connectors.PostgresConnector) *voyageaiIntegrationRPCApi {
 	return &voyageaiIntegrationRPCApi{
 		voyageaiIntegrationApi{
 			integrationApi: NewInegrationApi(config, logger, postgres),
@@ -36,7 +36,7 @@ func NewVoyageAiRPC(config *config.AppConfig, logger commons.Logger, postgres co
 	}
 }
 
-func NewVoyageAiGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) integration_api.VoyageAiServiceServer {
+func NewVoyageAiGRPC(config *config.IntegrationConfig, logger commons.Logger, postgres connectors.PostgresConnector) integration_api.VoyageAiServiceServer {
 	return &voyageaiIntegrationGRPCApi{
 		voyageaiIntegrationApi{
 			integrationApi: NewInegrationApi(config, logger, postgres),

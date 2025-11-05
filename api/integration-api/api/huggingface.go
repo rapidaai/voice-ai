@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
-	config "github.com/rapidaai/config"
-	internal_callers "github.com/rapidaai/internal/callers"
-	internal_huggingface_callers "github.com/rapidaai/internal/callers/huggingface"
+	config "github.com/rapidaai/api/integration-api/config"
+	internal_callers "github.com/rapidaai/api/integration-api/internal/caller"
+	internal_huggingface_callers "github.com/rapidaai/api/integration-api/internal/caller/huggingface"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	integration_api "github.com/rapidaai/protos"
@@ -34,7 +34,7 @@ func (huggingf *huggingfaceIntegrationGRPCApi) Embedding(c context.Context, irRe
 	)
 }
 
-func NewHuggingfaceRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) *huggingfaceIntegrationRPCApi {
+func NewHuggingfaceRPC(config *config.IntegrationConfig, logger commons.Logger, postgres connectors.PostgresConnector) *huggingfaceIntegrationRPCApi {
 	return &huggingfaceIntegrationRPCApi{
 		huggingfaceIntegrationApi{
 			integrationApi: NewInegrationApi(config, logger, postgres),
@@ -42,7 +42,7 @@ func NewHuggingfaceRPC(config *config.AppConfig, logger commons.Logger, postgres
 	}
 }
 
-func NewHuggingfaceGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) integration_api.HuggingfaceServiceServer {
+func NewHuggingfaceGRPC(config *config.IntegrationConfig, logger commons.Logger, postgres connectors.PostgresConnector) integration_api.HuggingfaceServiceServer {
 	return &huggingfaceIntegrationGRPCApi{
 		huggingfaceIntegrationApi{
 			integrationApi: NewInegrationApi(config, logger, postgres),

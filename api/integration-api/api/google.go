@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
-	config "github.com/rapidaai/config"
-	internal_callers "github.com/rapidaai/internal/callers"
-	internal_google_callers "github.com/rapidaai/internal/callers/google"
+	config "github.com/rapidaai/api/integration-api/config"
+	internal_callers "github.com/rapidaai/api/integration-api/internal/caller"
+	internal_google_callers "github.com/rapidaai/api/integration-api/internal/caller/google"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	integration_api "github.com/rapidaai/protos"
@@ -34,7 +34,7 @@ func (googAi *googleIntegrationGRPCApi) Embedding(c context.Context, irRequest *
 	)
 }
 
-func NewGoogleRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) *googleIntegrationRPCApi {
+func NewGoogleRPC(config *config.IntegrationConfig, logger commons.Logger, postgres connectors.PostgresConnector) *googleIntegrationRPCApi {
 	return &googleIntegrationRPCApi{
 		googleIntegrationApi{
 			integrationApi: NewInegrationApi(config, logger, postgres),
@@ -42,7 +42,7 @@ func NewGoogleRPC(config *config.AppConfig, logger commons.Logger, postgres conn
 	}
 }
 
-func NewGoogleGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) integration_api.GoogleServiceServer {
+func NewGoogleGRPC(config *config.IntegrationConfig, logger commons.Logger, postgres connectors.PostgresConnector) integration_api.GoogleServiceServer {
 	return &googleIntegrationGRPCApi{
 		googleIntegrationApi{
 			integrationApi: NewInegrationApi(config, logger, postgres),

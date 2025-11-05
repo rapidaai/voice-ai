@@ -4,15 +4,15 @@ import (
 	"context"
 	"fmt"
 
-	config "github.com/rapidaai/config"
-	internal_emailers "github.com/rapidaai/internal/emailers"
+	config "github.com/rapidaai/api/integration-api/config"
+	internal_emailers "github.com/rapidaai/api/integration-api/internal/emailers"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	integration_api "github.com/rapidaai/protos"
 )
 
 type sendgridIntegrationApi struct {
-	cfg     *config.AppConfig
+	cfg     *config.IntegrationConfig
 	logger  commons.Logger
 	emailer internal_emailers.Emailer
 }
@@ -31,7 +31,7 @@ var (
 	inviteUserTemplateId    = "d-4e99105f827443718202631bf0887743"
 )
 
-func NewSendgridRPC(config *config.AppConfig, logger commons.Logger) *sendgridIntegrationRPCApi {
+func NewSendgridRPC(config *config.IntegrationConfig, logger commons.Logger) *sendgridIntegrationRPCApi {
 	return &sendgridIntegrationRPCApi{
 		sendgridIntegrationApi{
 			cfg:     config,
@@ -41,7 +41,7 @@ func NewSendgridRPC(config *config.AppConfig, logger commons.Logger) *sendgridIn
 	}
 }
 
-func NewSendgridGRPC(config *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) integration_api.SendgridServiceServer {
+func NewSendgridGRPC(config *config.IntegrationConfig, logger commons.Logger, postgres connectors.PostgresConnector) integration_api.SendgridServiceServer {
 	return &sendgridIntegrationGRPCApi{
 		sendgridIntegrationApi{
 			cfg:     config,

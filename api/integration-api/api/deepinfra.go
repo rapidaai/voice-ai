@@ -6,8 +6,8 @@ package integration_api
 // 	"fmt"
 // 	"time"
 
-// 	config "github.com/rapidaai/config"
-// 	callers "github.com/rapidaai/internal/callers"
+// 	config "github.com/rapidaai/api/integration-api/config"
+// 	callers "github.com/rapidaai/api/integration-api/internal/caller"
 // 	commons "github.com/rapidaai/pkg/commons"
 // 	"github.com/rapidaai/pkg/connectors"
 // 	provider_models "github.com/rapidaai/pkg/providers"
@@ -29,7 +29,7 @@ package integration_api
 // 	deepInfraIntegrationApi
 // }
 
-// func NewDeepInfraRPCApi(config *config.AppConfig, logger commons.Logger, caller callers.Caller, postgres connectors.PostgresConnector) *deepInfraIntegrationRPCApi {
+// func NewDeepInfraRPCApi(config *config.IntegrationConfig, logger commons.Logger, caller callers.Caller, postgres connectors.PostgresConnector) *deepInfraIntegrationRPCApi {
 // 	return &deepInfraIntegrationRPCApi{
 // 		deepInfraIntegrationApi{
 // 			integrationApi: NewInegrationApi(config, logger, postgres),
@@ -38,7 +38,7 @@ package integration_api
 // 	}
 // }
 
-// func NewDeepInfraGRPC(config *config.AppConfig, logger commons.Logger, caller callers.Caller, postgres connectors.PostgresConnector) integration_api.DeepInfraServiceServer {
+// func NewDeepInfraGRPC(config *config.IntegrationConfig, logger commons.Logger, caller callers.Caller, postgres connectors.PostgresConnector) integration_api.DeepInfraServiceServer {
 // 	return &deepInfraIntegrationGRPCApi{
 // 		deepInfraIntegrationApi{
 // 			integrationApi: NewInegrationApi(config, logger, postgres),
