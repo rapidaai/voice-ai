@@ -93,41 +93,41 @@ services:
       - api-network
 
     healthcheck:
-      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9001/readiness/" ]
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--method=GET", "http://localhost:9001/readiness/" ]
       interval: 30s
       timeout: 3s
       retries: 3
 
   # Assistant API Service
-  assistant-api:
-    build:
-      context: .
-      dockerfile: docker/assistant-api/Dockerfile
-    container_name: assistant-api
-    ports:
-      - "9007:9007"
-    env_file:
-      - ./docker/assistant-api/.assistant.env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      opensearch:
-        condition: service_healthy
+  # assistant-api:
+  #   build:
+  #     context: .
+  #     dockerfile: docker/assistant-api/Dockerfile
+  #   container_name: assistant-api
+  #   ports:
+  #     - "9007:9007"
+  #   env_file:
+  #     - ./docker/assistant-api/.assistant.env
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #     opensearch:
+  #       condition: service_healthy
 
-    volumes:
-      - ./docker/assistant-api/.assistant.env:/opt/apps/env/.assistant.env:ro
-      - assets_volume:/opt/apps/assets
+  #   volumes:
+  #     - ./docker/assistant-api/.assistant.env:/opt/apps/env/.assistant.env:ro
+  #     - assets_volume:/opt/apps/assets
 
-    networks:
-      - api-network
+  #   networks:
+  #     - api-network
 
-    healthcheck:
-      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9007/readiness/" ]
-      interval: 30s
-      timeout: 3s
-      retries: 3
+  #   healthcheck:
+  #     test: [ "CMD", "wget", "--no-verbose", "--tries=1", "http://localhost:9007/readiness/" ]
+  #     interval: 30s
+  #     timeout: 3s
+  #     retries: 3
 
   # Integration API Service
   integration-api:
@@ -153,7 +153,7 @@ services:
       - api-network
 
     healthcheck:
-      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9004/readiness/" ]
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "http://localhost:9004/readiness/" ]
       interval: 30s
       timeout: 3s
       retries: 3
@@ -182,7 +182,29 @@ services:
       - api-network
 
     healthcheck:
-      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9005/readiness/" ]
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--method=GET",  "http://localhost:9005/readiness/" ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  ui:
+    build:
+      context: .
+      dockerfile: docker/ui/Dockerfile
+    container_name: web-ui
+    ports:
+      - "3000:3000"
+    depends_on:
+      - web-api
+    #   - assistant-api
+      - integration-api
+      - endpoint-api
+    volumes:
+      - assets_volume:/usr/share/nginx/html/assets
+    networks:
+      - api-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "http://localhost:3000/"]
       interval: 30s
       timeout: 3s
       retries: 3
