@@ -68,8 +68,6 @@ CREATE TABLE public.endpoint_log_metrics (
     endpoint_log_id bigint NOT NULL
 );
 
-ame: endpoint_log_options; Type: TABLE; Schema: public; Owner: prashant.srivastav
---
 
 CREATE TABLE public.endpoint_log_options (
     id bigint NOT NULL,
@@ -197,89 +195,56 @@ ALTER TABLE ONLY public.endpoint_audits
     ADD CONSTRAINT endpoint_audits_pkey PRIMARY KEY (id);
 
 
---
--- Name: endpoint_cachings endpoint_cachings_pkey; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
---
 
 ALTER TABLE ONLY public.endpoint_cachings
     ADD CONSTRAINT endpoint_cachings_pkey PRIMARY KEY (id);
 
 
---
--- Name: endpoint_log_arguments endpoint_log_arguments_pkey; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
---
 
 ALTER TABLE ONLY public.endpoint_log_arguments
     ADD CONSTRAINT endpoint_log_arguments_pkey PRIMARY KEY (id);
 
 
---
--- Name: endpoint_log_metadata endpoint_log_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
---
 
 ALTER TABLE ONLY public.endpoint_log_metadata
     ADD CONSTRAINT endpoint_log_metadata_pkey PRIMARY KEY (id);
 
 
---
--- Name: endpoint_log_metrics endpoint_log_metrics_pkey; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
---
 
 ALTER TABLE ONLY public.endpoint_log_metrics
     ADD CONSTRAINT endpoint_log_metrics_pkey PRIMARY KEY (id);
 
 
---
--- Name: endpoint_log_options endpoint_log_options_pkey; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
---
 
 ALTER TABLE ONLY public.endpoint_log_options
     ADD CONSTRAINT endpoint_log_options_pkey PRIMARY KEY (id);
 
 
---
--- Name: endpoint_logs endpoint_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
---
 
 ALTER TABLE ONLY public.endpoint_logs
     ADD CONSTRAINT endpoint_logs_pkey PRIMARY KEY (id);
 
 
---
--- Name: endpoint_provider_model_options endpoint_provider_model_options_pkey; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
---
 
 ALTER TABLE ONLY public.endpoint_provider_model_options
     ADD CONSTRAINT endpoint_provider_model_options_pkey PRIMARY KEY (id);
 
 
---
--- Name: endpoint_retries endpoint_retries_pkey; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
---
 
 ALTER TABLE ONLY public.endpoint_retries
     ADD CONSTRAINT endpoint_retries_pkey PRIMARY KEY (id);
 
 
---
--- Name: endpoint_tags endpoint_tags_pkey; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
---
 
 ALTER TABLE ONLY public.endpoint_tags
     ADD CONSTRAINT endpoint_tags_pkey PRIMARY KEY (id);
 
 
---
--- Name: endpoint_token_audits endpoint_token_audits_pkey; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
---
 
 ALTER TABLE ONLY public.endpoint_token_audits
     ADD CONSTRAINT endpoint_token_audits_pkey PRIMARY KEY (id);
 
 
---
--- Name: endpoints endpoints_pkey; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
---
 
 ALTER TABLE ONLY public.endpoints
     ADD CONSTRAINT endpoints_pkey PRIMARY KEY (id);
@@ -290,68 +255,41 @@ ALTER TABLE ONLY public.endpoint_log_metadata
     ADD CONSTRAINT uk_endpoint_log_id UNIQUE (key, endpoint_log_id);
 
 
---
--- Name: endpoint_log_arguments uk_endpoint_log_id_mtd; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
---
 
 ALTER TABLE ONLY public.endpoint_log_arguments
     ADD CONSTRAINT uk_endpoint_log_id_mtd UNIQUE (name, endpoint_log_id);
 
 
---
--- Name: endpoint_log_metrics uk_endpoint_log_id_mtrs; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
---
 
 ALTER TABLE ONLY public.endpoint_log_metrics
     ADD CONSTRAINT uk_endpoint_log_id_mtrs UNIQUE (name, endpoint_log_id);
 
 
---
--- Name: endpoint_log_options uk_endpoint_log_id_opts; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
---
 
 ALTER TABLE ONLY public.endpoint_log_options
     ADD CONSTRAINT uk_endpoint_log_id_opts UNIQUE (key, endpoint_log_id);
 
 
---
--- Name: endpoint_provider_model_options uk_endpoint_provider_model_id; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
---
 
 ALTER TABLE ONLY public.endpoint_provider_model_options
     ADD CONSTRAINT uk_endpoint_provider_model_id UNIQUE (key, endpoint_provider_model_id);
 
 
---
--- Name: idx_endpoint_cachings; Type: INDEX; Schema: public; Owner: prashant.srivastav
---
 
 CREATE UNIQUE INDEX idx_endpoint_cachings ON public.endpoint_cachings USING btree (endpoint_id);
 
 
---
--- Name: idx_endpoint_retries; Type: INDEX; Schema: public; Owner: prashant.srivastav
---
 
 CREATE UNIQUE INDEX idx_endpoint_retries ON public.endpoint_retries USING btree (endpoint_id, retry_type);
 
 
---
--- Name: idx_endpoint_tags; Type: INDEX; Schema: public; Owner: prashant.srivastav
---
 
 CREATE UNIQUE INDEX idx_endpoint_tags ON public.endpoint_tags USING btree (endpoint_id);
 
 
---
--- Name: iea_idx_ea_id; Type: INDEX; Schema: public; Owner: prashant.srivastav
---
 
 CREATE INDEX iea_idx_ea_id ON public.endpoint_token_audits USING btree (endpoint_audit_id);
 
 
---
--- Name: iea_idx_ep_id_epm_id; Type: INDEX; Schema: public; Owner: prashant.srivastav
---
 
 CREATE INDEX iea_idx_ep_id_epm_id ON public.endpoint_audits USING btree (endpoint_id, endpoint_provider_model_id);

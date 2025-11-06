@@ -36,12 +36,7 @@ logs:
 logs-web:
 	cd docker && docker-compose logs -f web-api
 
-# web
-logs-integration:
-	cd docker && docker-compose logs -f integration-api
 
-logs-ui:
-	cd docker && docker-compose logs -f web-ui
 
 logs-endpoint:
 	cd docker && docker-compose logs -f endpoint-api
@@ -49,8 +44,6 @@ logs-endpoint:
 logs-assistant:
 	cd docker && docker-compose logs -f assistant-api
 
-logs-integration:
-	cd docker && docker-compose logs -f integration-api
 
 logs-db:
 	cd docker && docker-compose logs -f postgres
@@ -74,6 +67,34 @@ shell-web:
 
 db-web:
 	cd docker && docker-compose exec postgres psql -U rapida_user -d web_api
+
+
+# for ui
+up-integration:
+	cd docker && docker-compose up -d integration-api
+
+down-integration:
+	cd docker && docker-compose down integration-api
+
+rebuild-integration:
+	cd docker && docker-compose build --no-cache integration-api
+
+logs-integration:
+	cd docker && docker-compose logs -f integration-api
+
+# for ui
+up-ui:
+	cd docker && docker-compose up -d ui
+
+down-ui:
+	cd docker && docker-compose down ui
+
+rebuild-ui:
+	cd docker && docker-compose build --no-cache ui
+
+logs-ui:
+	cd docker && docker-compose logs -f ui
+
 
 # Development helpers
 dev-up:

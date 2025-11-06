@@ -53,7 +53,7 @@ RUN chown -R rapida-app:rapida-app /var/log/go-app
 USER rapida-app
 
 # Expose port
-EXPOSE 9001
+EXPOSE 9004
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
