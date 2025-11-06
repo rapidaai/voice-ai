@@ -1,13 +1,2 @@
-DROP TABLE IF EXISTS leads CASCADE;
-DROP TABLE IF EXISTS o_auth_external_connects CASCADE;
-DROP TABLE IF EXISTS organizations CASCADE;
-DROP TABLE IF EXISTS project_credentials CASCADE;
-DROP TABLE IF EXISTS projects CASCADE;
-DROP TABLE IF EXISTS user_auth_tokens CASCADE;
-DROP TABLE IF EXISTS user_auths CASCADE;
-DROP TABLE IF EXISTS user_feature_permissions CASCADE;
-DROP TABLE IF EXISTS user_organization_roles CASCADE;
-DROP TABLE IF EXISTS user_project_roles CASCADE;
-DROP TABLE IF EXISTS user_roles CASCADE;
-DROP TABLE IF EXISTS user_socials CASCADE;
-DROP TABLE IF EXISTS vaults CASCADE;
+DROP TABLE IF EXISTS external_audit_metadata CASCADE;
+DROP TABLE IF EXISTS integration_external_audits CASCADE;

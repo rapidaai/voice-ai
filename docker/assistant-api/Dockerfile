@@ -3,10 +3,10 @@ FROM --platform=linux/amd64 golang:1.24-alpine AS builder
 
 WORKDIR /app
 
-RUN apk add --no-cache gcc g++ make libtool autoconf automake curl git wget bash tar
+RUN apk add gcc make libtool autoconf automake curl git wget bash tar
 
 # Install necessary Alpine build dependencies for CGO
-RUN apk add --no-cache build-base g++ libc6-compat musl-dev
+RUN apk add build-base g++ libc6-compat musl-dev
 
 
 # Copy go mod files from root
@@ -15,37 +15,32 @@ COPY go.mod go.sum ./
 # Download dependencies
 RUN go mod download
 
-# Install
-# Install Protobuf and Protobuf-related tools
+# Install Protobuf and related tools
 RUN wget -q https://github.com/protocolbuffers/protobuf/releases/download/v3.20.0/protoc-3.20.0-linux-x86_64.zip && \
     unzip protoc-3.20.0-linux-x86_64.zip -d /usr/local && \
     go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.0 && \
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
 
 # Install ONNX Runtime
-RUN wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.16.0/onnxruntime-linux-x64-1.16.0.tgz && \
+RUN wget https://github.com/microsoft/onnxruntime/releases/download/v1.16.0/onnxruntime-linux-x64-1.16.0.tgz && \
     mkdir -p /opt/onnxruntime && \
-    tar -xzf onnxruntime-linux-x64-1.16.0.tgz -C /opt/onnxruntime --strip-components=1 && \
-    export CGO_CFLAGS="-I/opt/onnxruntime/include" && \
-    export CGO_LDFLAGS="-L/opt/onnxruntime/lib -lonnxruntime" && \
-    export LD_LIBRARY_PATH="/opt/onnxruntime/lib:$LD_LIBRARY_PATH"
+    tar -xzf onnxruntime-linux-x64-1.16.0.tgz -C /opt/onnxruntime --strip-components=1
 
 # Install RNNoise
 RUN git clone https://github.com/xiph/rnnoise.git && \
     cd rnnoise && \
-    ./autogen.sh && ./configure --prefix=/usr/local && make && make install && \
-    export CGO_CFLAGS="$CGO_CFLAGS -I/usr/local/include" && \
-    export CGO_LDFLAGS="$CGO_LDFLAGS -L/usr/local/lib -lrnnoise" && \
-    export LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"
+    ./autogen.sh && ./configure --prefix=/usr/local && make && make install
 
 # Install Azure Speech SDK
-RUN wget -q -O SpeechSDK-Linux.tar.gz https://aka.ms/csspeech/linuxbinary && \
+RUN wget -O SpeechSDK-Linux.tar.gz https://aka.ms/csspeech/linuxbinary && \
     mkdir -p /opt/azure-speech-sdk && \
     tar --strip 1 -xzf SpeechSDK-Linux.tar.gz -C /opt/azure-speech-sdk && \
-    sed -i '/Speech_SegmentationMaximumTimeMs = 9004/d' /opt/azure-speech-sdk/include/c_api/speechapi_c_property_bag.h && \
-    export CGO_CFLAGS="$CGO_CFLAGS -I/opt/azure-speech-sdk/include/c_api" && \
-    export CGO_LDFLAGS="$CGO_LDFLAGS -L/opt/azure-speech-sdk/lib/x64 -lMicrosoft.CognitiveServices.Speech.core"
+    sed -i '/Speech_SegmentationMaximumTimeMs = 9004/d' /opt/azure-speech-sdk/include/c_api/speechapi_c_property_bag.h
 
+# Export CGO_CFLAGS and CGO_LDFLAGS to include the correct paths
+ENV CGO_CFLAGS="-I/opt/onnxruntime/include -I/usr/local/include -I/opt/azure-speech-sdk/include/c_api"
+ENV CGO_LDFLAGS="-L/opt/onnxruntime/lib -lonnxruntime -L/usr/local/lib -lrnnoise -L/opt/azure-speech-sdk/lib/x64 -lMicrosoft.CognitiveServices.Speech.core"
+ENV LD_LIBRARY_PATH="/opt/onnxruntime/lib:/usr/local/lib:/opt/azure-speech-sdk/lib/x64"
 
 
 # Copy all necessary directories (from root context)
@@ -97,6 +92,7 @@ USER rapida-app
 
 # Set environment variable for library paths
 ENV LD_LIBRARY_PATH="/usr/local/lib:/opt/onnxruntime/lib:/opt/azure-speech-sdk/lib/x64"
+
 
 # Expose port
 EXPOSE 9001
