@@ -2,10 +2,7 @@ package internal_endpoint_service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"log"
-	"strings"
 	"time"
 
 	"github.com/rapidaai/api/endpoint-api/config"
@@ -109,114 +106,6 @@ func (eService *endpointService) UpdateEndpointVersion(ctx context.Context,
 	return ed, nil
 }
 
-// func (eService *endpointService) IndexEndpoint(ctx context.Context, auth types.SimplePrinciple, endpointId uint64) {
-// 	go func(_auth types.SimplePrinciple, _endpointId uint64) {
-
-// 		ctx := context.Background()
-// 		endpoint, err := eService.Get(ctx, _auth, _endpointId, nil, NewDefaultGetEndpointOption())
-// 		if err != nil {
-// 			eService.logger.Errorf("unable to get endpoint for indexing the data")
-// 			return
-// 		}
-// 		documentIndex := &endpoint_grpc_api.SearchableDeployment{
-// 			Id:                fmt.Sprintf("%d", endpoint.Id),
-// 			Status:            endpoint.Status.String(),
-// 			Visibility:        *endpoint.Visibility,
-// 			Type:              "endpoint",
-// 			ProjectId:         fmt.Sprintf("%d", endpoint.ProjectId),
-// 			OrganizationId:    fmt.Sprintf("%d", endpoint.OrganizationId),
-// 			Name:              endpoint.Name,
-// 			Description:       *endpoint.Description,
-// 			ModelProviderId:   endpoint.EndpointProviderModel.ModelProviderId,
-// 			ModelProviderName: endpoint.EndpointProviderModel.ModelProviderName,
-// 			CreatedDate:       timestamppb.New(time.Time(endpoint.Audited.CreatedDate)),
-// 			UpdatedDate:       timestamppb.New(time.Time(endpoint.Audited.UpdatedDate)),
-// 			Tag:               endpoint.EndpointTag.Tag,
-// 		}
-
-// 		opensearchAssistantObject, err := json.Marshal(documentIndex)
-// 		if err != nil {
-// 			eService.logger.Errorf("unable to create endpoint with error %+v", err)
-// 			return
-// 		}
-// 		err = eService.opensearch.Persist(ctx, commons.EndpointIndex(eService.cfg.IsDevelopment()), fmt.Sprintf("endpoint_%d", _endpointId), string(opensearchAssistantObject))
-// 		if err != nil {
-// 			eService.logger.Errorf("unable to create endpoint with error %+v", err)
-// 		}
-// 	}(auth, endpointId)
-// }
-
-func (eService *endpointService) GetAllPublic(ctx context.Context, auth types.SimplePrinciple, criterias []*endpoint_grpc_api.Criteria, paginate *endpoint_grpc_api.Paginate) (int64, []*endpoint_grpc_api.SearchableDeployment, error) {
-	var (
-		deployments []*endpoint_grpc_api.SearchableDeployment
-	)
-	query := map[string]interface{}{
-		"bool": map[string]interface{}{
-			"must": []interface{}{
-				map[string]interface{}{
-					"match": map[string]interface{}{
-						"visibility": "public",
-					},
-				},
-			},
-		},
-	}
-
-	for _, ct := range criterias {
-		if ct.GetLogic() == "oneOf" {
-			values := strings.Split(ct.GetValue(), ",")
-			shouldQueries := make([]interface{}, len(values))
-			for i, v := range values {
-				shouldQueries[i] = map[string]interface{}{
-					"term": map[string]interface{}{
-						ct.GetKey(): v,
-					},
-				}
-			}
-			query["bool"].(map[string]interface{})["must"] = append(query["bool"].(map[string]interface{})["must"].([]interface{}), map[string]interface{}{
-				"bool": map[string]interface{}{
-					"should": shouldQueries,
-				},
-			})
-		} else {
-			query["bool"].(map[string]interface{})["must"] = append(query["bool"].(map[string]interface{})["must"].([]interface{}), map[string]interface{}{
-				ct.GetLogic(): map[string]interface{}{
-					ct.GetKey(): ct.GetValue(),
-				},
-			})
-		}
-	}
-
-	searchBody := map[string]interface{}{
-		"query": query,
-		"from":  (paginate.GetPage() - 1) * paginate.GetPageSize(),
-		"size":  paginate.GetPageSize(),
-	}
-
-	searchBodyJSON, err := json.Marshal(searchBody)
-	if err != nil {
-		log.Fatalf("Error marshaling search body: %s", err)
-	}
-
-	resp := eService.opensearch.SearchWithCount(ctx, []string{
-		commons.EndpointIndex(eService.cfg.IsDevelopment()),
-		commons.AssistantIndex(eService.cfg.IsDevelopment())}, string(searchBodyJSON))
-	if resp.Err != nil {
-		eService.logger.Errorf("unable to get results from the given opensearch index %+v", resp.Err)
-		return 0, nil, resp.Err
-	}
-	// Handle hits
-	for _, hit := range resp.Hits.Hits {
-		var deployment endpoint_grpc_api.SearchableDeployment
-		source := hit["_source"]
-		sourceBytes, _ := json.Marshal(source)
-		json.Unmarshal(sourceBytes, &deployment)
-		deployments = append(deployments, &deployment)
-	}
-
-	// Total hits
-	return int64(resp.Hits.Total), deployments, nil
-}
 func (eService *endpointService) GetAll(ctx context.Context, auth types.SimplePrinciple, criterias []*endpoint_grpc_api.Criteria, paginate *endpoint_grpc_api.Paginate) (int64, []*internal_gorm.Endpoint, error) {
 	db := eService.postgres.DB(ctx)
 	var (

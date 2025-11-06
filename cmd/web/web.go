@@ -18,7 +18,7 @@ import (
 	healthCheckApi "github.com/rapidaai/api/web-api/api/health"
 	webProxyApi "github.com/rapidaai/api/web-api/api/proxy"
 	web_authenticators "github.com/rapidaai/api/web-api/authenticator"
-	config "github.com/rapidaai/api/web-api/config"
+	"github.com/rapidaai/api/web-api/config"
 	"github.com/rapidaai/pkg/authenticators"
 	commons "github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
@@ -55,6 +55,13 @@ func main() {
 
 	// adding all connectors
 	appRunner.AllConnectors()
+
+	// Migration if needed to run
+	if err := appRunner.Migrate(); err != nil {
+		appRunner.Logger.Errorf("Warning: Migration failed: %v", err)
+		panic(err)
+	}
+
 	// init
 	appRunner.S = grpc.NewServer(
 		grpc.ChainStreamInterceptor(
@@ -80,9 +87,7 @@ func main() {
 		grpc.MaxRecvMsgSize(commons.MaxRecvMsgSize), // 10 MB
 		grpc.MaxSendMsgSize(commons.MaxSendMsgSize), // 10 MB
 	)
-
 	err = appRunner.Init(ctx)
-
 	if err != nil {
 		panic(err)
 	}

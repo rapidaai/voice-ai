@@ -1,55 +1,70 @@
-#! /usr/bin/make -f
-# Go related variables.
+.PHONY: help up down build logs clean restart ps
 
-GOBASE := $(shell pwd)
-GOBIN := $(GOBASE)/bin
+help:
+	@echo "Web-API Service Management"
+	@echo "=========================="
+	@echo "make up              - Start web-api with PostgreSQL and Redis"
+	@echo "make down            - Stop all services"
+	@echo "make build           - Build web-api image"
+	@echo "make rebuild         - Rebuild web-api image (no cache)"
+	@echo "make logs            - View all service logs"
+	@echo "make logs-api        - View web-api logs only"
+	@echo "make logs-db         - View PostgreSQL logs"
+	@echo "make logs-redis      - View Redis logs"
+	@echo "make clean           - Stop and remove all containers, volumes"
+	@echo "make restart         - Restart all services"
+	@echo "make ps              - Show running containers"
+	@echo "make shell           - Open web-api container shell"
+	@echo "make db-web        - Open PostgreSQL shell"
 
-.PHONY: migrateup
-.PHONY: migratedown
+up:
+	cd docker && docker-compose up -d
 
-
-# Go files.
-GOFMT_FILES?=$$(find . -name '*.go' | grep -v vendor)
-
-# Common commands.
-all: fmt test
-development: precommit-install githooks-install
-
-# only to setup development machine
-githooks-install:
-	@echo "  >  Setting up githooks."
-	@chmod +x ./githooks/commit-msg
-	@chmod +x ./githooks/gitmessage.txt
-	@chmod +x ./scripts/git-commit-hook-setup.sh
-	sh ./scripts/git-commit-hook-setup.sh
-
-
-precommit-install:
-	@echo "  >  Installing precommit."
-	@wget -O ./bin/pre-commit https://github.com/pre-commit/pre-commit/releases/download/v2.20.0/pre-commit-2.20.0.pyz
-	@chmod +x ./bin/pre-commit
-	@echo "  > Installing precommit hooks."
-	@echo ./bin/pre-commit install
-	./bin/pre-commit install
-
-gofmt:
-	gofmt -s -w ${GOFMT_FILES}
-
-run:
-	go run ./api/main.go
+down:
+	cd docker && docker-compose down
 
 build:
-	GOOS=linux GOARCH=amd64 go build -o lexatic-backend ./api/main.go
+	cd docker && docker-compose build web-api
 
-test:
-	@echo "  >  Running unit tests."
-	GOBIN=$(GOBIN) go test -cover -race -coverprofile=coverage.txt -covermode=atomic -v ./...
+rebuild:
+	cd docker && docker-compose build --no-cache web-api
 
-migrateup:
-	migrate -path sql/migration -database "postgresql://trifacta:secret@localhost:5432/lexatic?sslmode=disable" -verbose up
+logs:
+	cd docker && docker-compose logs -f
 
-migratedown:
-	migrate -path sql/migration -database "postgresql://trifacta:secret@localhost:5432/lexatic?sslmode=disable" -verbose down
-# protoc -Iprotos --go_opt=module="github.com/rapidaai/protos" --go_out=./protos/lexatic-backend/ --go-grpc_opt=module="github.com/rapidaai/protos" --go-grpc_out=require_unimplemented_servers=false:./protos/lexatic-backend/ protos/lexatic-backend/*.proto
+logs-api:
+	cd docker && docker-compose logs -f web-api
 
-# --go-grpc_out=require_unimplemented_servers=false:.
+logs-db:
+	cd docker && docker-compose logs -f postgres
+
+logs-redis:
+	cd docker && docker-compose logs -f redis
+
+clean:
+	cd docker && docker-compose down -v
+
+restart:
+	cd docker && docker-compose restart
+
+ps:
+	cd docker && docker-compose ps
+
+shell-web:
+	cd docker && docker-compose exec web-api sh
+
+db-web:
+	cd docker && docker-compose exec postgres psql -U rapida_user -d web_api
+
+# Development helpers
+dev-up:
+	@echo "Starting development environment..."
+	make up
+	@echo "Services are running!"
+	@echo "Web-API: http://localhost:9001"
+	@echo "PostgreSQL: localhost:5432"
+	@echo "Redis: localhost:6379"
+
+dev-logs:
+	@echo "Following logs... (Ctrl+C to stop)"
+	make logs

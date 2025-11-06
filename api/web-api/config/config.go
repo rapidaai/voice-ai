@@ -1,4 +1,4 @@
-package web_config
+package config
 
 import (
 	"log"

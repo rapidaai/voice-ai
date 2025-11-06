@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: web-api-postgres
+    environment:
+      POSTGRES_USER: rapida_user
+      POSTGRES_PASSWORD: rapida_db_password
+      POSTGRES_DB: web_api
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - web-api-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U rapida_user -d web_api" ]
+      interval: 5s
+      timeout: 10s
+      retries: 3
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: web-api-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - web-api-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Web API Service
+  web-api:
+    build:
+      context: ./
+      dockerfile: docker/web-api/Dockerfile
+    container_name: web-api
+    ports:
+      - "9001:9001"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    volumes:
+      - ./docker/web-api/:/opt/apps/env/
+      - assets_volume:/opt/apps/assets
+
+    networks:
+      - web-api-network
+
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9001/readiness/" ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  assets_volume:
+    driver: local
+
+networks:
+  web-api-network:
+    driver: bridge

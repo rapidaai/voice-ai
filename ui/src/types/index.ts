@@ -1,4 +1,3 @@
-import { DiscoverDeploymentType } from './type.discover-deployment';
 import { UserType } from './types.user';
 import { RapidaType } from './types.rapida';
 import { PaginatedType } from './types.paginated';
@@ -26,7 +25,6 @@ import {
 export type {
   AssistantType,
   AssistantTypeProperty,
-  DiscoverDeploymentType,
   UserType,
   RapidaType,
   PaginatedType,

@@ -1,5 +1,4 @@
 import { useCredential } from './use-credential';
-import { useDiscoverDeploymentPageStore } from './use-discover-deployment-page-store';
 import { useUserPageStore } from './use-user-page-store';
 import { useEndpointPageStore } from './use-endpoint-page-store';
 import { useEndpointProviderModelPageStore } from './use-endpoint-provider-model-page-store';
@@ -9,7 +8,6 @@ import { useAssistantProviderPageStore } from './use-assistant-provider-page-sto
 
 export {
   useCredential,
-  useDiscoverDeploymentPageStore,
   useUserPageStore,
   useEndpointPageStore,
   useEndpointProviderModelPageStore,

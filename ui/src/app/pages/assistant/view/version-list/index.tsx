@@ -137,7 +137,7 @@ export function Version(props: VersionProps) {
                           apm.getAssistantprovidermodel()?.getId()
                         }
                         className={cn(
-                          'shrink-0 rounded-[2px] h-7 text-sm font-medium px-2 bg-blue-500/10 !border-blue-500/40',
+                          'shrink-0 rounded-[2px] h-7 text-sm font-medium px-2 bg-blue-500/10 !border-blue-500/40 border-[0.1px]',
                         )}
                         onClick={() => {
                           deployRevision(
@@ -214,7 +214,7 @@ export function Version(props: VersionProps) {
                           apm.getAssistantprovideragentkit()?.getId()
                         }
                         className={cn(
-                          'shrink-0 rounded-[2px] h-7 text-sm font-medium px-2  bg-blue-500/10 !border-blue-500/40',
+                          'shrink-0 rounded-[2px] h-7 text-sm font-medium px-2  bg-blue-500/10 !border-blue-500/40 border-[0.1px]',
                         )}
                         onClick={() => {
                           deployRevision(
@@ -294,7 +294,7 @@ export function Version(props: VersionProps) {
                           apm.getAssistantproviderwebsocket()?.getId()
                         }
                         className={cn(
-                          'shrink-0 rounded-[2px] h-7 text-sm font-medium px-2  bg-blue-500/10 !border-blue-500/40',
+                          'shrink-0 rounded-[2px] h-7 text-sm font-medium px-2  bg-blue-500/10 !border-blue-500/40 border-[0.1px]',
                         )}
                         onClick={() => {
                           deployRevision(

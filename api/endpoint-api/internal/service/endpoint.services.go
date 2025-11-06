@@ -34,10 +34,6 @@ type EndpointService interface {
 		auth types.SimplePrinciple,
 		criterias []*endpoint_grpc_api.Criteria, paginate *endpoint_grpc_api.Paginate) (int64, []*internal_gorm.Endpoint, error)
 
-	GetAllPublic(ctx context.Context,
-		auth types.SimplePrinciple,
-		criterias []*endpoint_grpc_api.Criteria, paginate *endpoint_grpc_api.Paginate) (int64, []*endpoint_grpc_api.SearchableDeployment, error)
-
 	GetAllEndpointProviderModel(ctx context.Context,
 		auth types.SimplePrinciple,
 		endpointId uint64, criterias []*endpoint_grpc_api.Criteria, paginate *endpoint_grpc_api.Paginate) (int64, []*internal_gorm.EndpointProviderModel, error)
