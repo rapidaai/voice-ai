@@ -25,10 +25,17 @@ FROM alpine:latest
 
 RUN apk --no-cache add ca-certificates wget netcat-openbsd
 
+# Create rapida-app user
+RUN addgroup -g 1000 rapida-app && \
+    adduser -D -u 1000 -G rapida-app rapida-app
+
 WORKDIR /opt/apps
 
-# Copy compiled binary
+# Copy compiled binary from builder
 COPY --from=builder /app/web-api .
+
+# Copy migrations directory
+COPY api/web-api/migrations/ ./api/web-api/migrations/
 
 # Copy environment file from docker/web-api
 COPY docker/web-api/.web.env ./env/.web.env
@@ -36,6 +43,14 @@ COPY docker/web-api/.web.env ./env/.web.env
 
 # Create directory for assets
 RUN mkdir -p /opt/apps/assets
+RUN mkdir -p /var/log/go-app
+
+# Change ownership to rapida-app user
+RUN chown -R rapida-app:rapida-app /opt/apps
+RUN chown -R rapida-app:rapida-app /var/log/go-app
+
+# Switch to rapida-app user
+USER rapida-app
 
 # Expose port
 EXPOSE 9001

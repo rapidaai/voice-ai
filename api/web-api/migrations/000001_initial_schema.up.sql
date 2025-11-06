@@ -1,43 +1,7 @@
---
--- PostgreSQL database dump
---
 
--- Dumped from database version 16.4 (Postgres.app)
--- Dumped by pg_dump version 16.4 (Postgres.app)
-
-SET statement_timeout = 0;
-SET lock_timeout = 0;
-SET idle_in_transaction_session_timeout = 0;
-SET client_encoding = 'UTF8';
-SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
-SET check_function_bodies = false;
-SET xmloption = content;
-SET client_min_messages = warning;
-SET row_security = off;
 
 --
--- Name: generate_id(); Type: FUNCTION; Schema: public; Owner: prashant.srivastav
---
-
-CREATE FUNCTION public.generate_id() RETURNS bigint
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    RETURN (random() * 2147483648)::int8 * 4294967296
-           + (random() * 4294967296)::int8;
-END;
-$$;
-
-
-ALTER FUNCTION public.generate_id() OWNER TO "prashant.srivastav";
-
-SET default_tablespace = '';
-
-SET default_table_access_method = heap;
-
---
--- Name: leads; Type: TABLE; Schema: public; Owner: prashant.srivastav
+-- Name: leads; Type: TABLE;
 --
 
 CREATE TABLE public.leads (
@@ -51,10 +15,9 @@ CREATE TABLE public.leads (
 );
 
 
-ALTER TABLE public.leads OWNER TO "prashant.srivastav";
 
 --
--- Name: o_auth_external_connects; Type: TABLE; Schema: public; Owner: prashant.srivastav
+-- Name: o_auth_external_connects; Type: TABLE;
 --
 
 CREATE TABLE public.o_auth_external_connects (
@@ -70,10 +33,9 @@ CREATE TABLE public.o_auth_external_connects (
 );
 
 
-ALTER TABLE public.o_auth_external_connects OWNER TO "prashant.srivastav";
 
 --
--- Name: organizations; Type: TABLE; Schema: public; Owner: prashant.srivastav
+-- Name: organizations; Type: TABLE;
 --
 
 CREATE TABLE public.organizations (
@@ -91,10 +53,9 @@ CREATE TABLE public.organizations (
 );
 
 
-ALTER TABLE public.organizations OWNER TO "prashant.srivastav";
 
 --
--- Name: project_credentials; Type: TABLE; Schema: public; Owner: prashant.srivastav
+-- Name: project_credentials; Type: TABLE;
 --
 
 CREATE TABLE public.project_credentials (
@@ -111,10 +72,9 @@ CREATE TABLE public.project_credentials (
 );
 
 
-ALTER TABLE public.project_credentials OWNER TO "prashant.srivastav";
 
 --
--- Name: projects; Type: TABLE; Schema: public; Owner: prashant.srivastav
+-- Name: projects; Type: TABLE;
 --
 
 CREATE TABLE public.projects (
@@ -130,10 +90,9 @@ CREATE TABLE public.projects (
 );
 
 
-ALTER TABLE public.projects OWNER TO "prashant.srivastav";
 
 --
--- Name: user_auth_tokens; Type: TABLE; Schema: public; Owner: prashant.srivastav
+-- Name: user_auth_tokens; Type: TABLE;
 --
 
 CREATE TABLE public.user_auth_tokens (
@@ -150,10 +109,9 @@ CREATE TABLE public.user_auth_tokens (
 );
 
 
-ALTER TABLE public.user_auth_tokens OWNER TO "prashant.srivastav";
 
 --
--- Name: user_auths; Type: TABLE; Schema: public; Owner: prashant.srivastav
+-- Name: user_auths; Type: TABLE;
 --
 
 CREATE TABLE public.user_auths (
@@ -170,10 +128,9 @@ CREATE TABLE public.user_auths (
 );
 
 
-ALTER TABLE public.user_auths OWNER TO "prashant.srivastav";
 
 --
--- Name: user_feature_permissions; Type: TABLE; Schema: public; Owner: prashant.srivastav
+-- Name: user_feature_permissions; Type: TABLE;
 --
 
 CREATE TABLE public.user_feature_permissions (
@@ -189,10 +146,9 @@ CREATE TABLE public.user_feature_permissions (
 );
 
 
-ALTER TABLE public.user_feature_permissions OWNER TO "prashant.srivastav";
 
 --
--- Name: user_organization_roles; Type: TABLE; Schema: public; Owner: prashant.srivastav
+-- Name: user_organization_roles; Type: TABLE;
 --
 
 CREATE TABLE public.user_organization_roles (
@@ -208,10 +164,9 @@ CREATE TABLE public.user_organization_roles (
 );
 
 
-ALTER TABLE public.user_organization_roles OWNER TO "prashant.srivastav";
 
 --
--- Name: user_project_roles; Type: TABLE; Schema: public; Owner: prashant.srivastav
+-- Name: user_project_roles; Type: TABLE;
 --
 
 CREATE TABLE public.user_project_roles (
@@ -227,10 +182,9 @@ CREATE TABLE public.user_project_roles (
 );
 
 
-ALTER TABLE public.user_project_roles OWNER TO "prashant.srivastav";
 
 --
--- Name: user_roles; Type: TABLE; Schema: public; Owner: prashant.srivastav
+-- Name: user_roles; Type: TABLE;
 --
 
 CREATE TABLE public.user_roles (
@@ -246,10 +200,9 @@ CREATE TABLE public.user_roles (
 );
 
 
-ALTER TABLE public.user_roles OWNER TO "prashant.srivastav";
 
 --
--- Name: user_socials; Type: TABLE; Schema: public; Owner: prashant.srivastav
+-- Name: user_socials; Type: TABLE;
 --
 
 CREATE TABLE public.user_socials (
@@ -265,10 +218,9 @@ CREATE TABLE public.user_socials (
 );
 
 
-ALTER TABLE public.user_socials OWNER TO "prashant.srivastav";
 
 --
--- Name: vaults; Type: TABLE; Schema: public; Owner: prashant.srivastav
+-- Name: vaults; Type: TABLE;
 --
 
 CREATE TABLE public.vaults (
@@ -287,10 +239,9 @@ CREATE TABLE public.vaults (
 );
 
 
-ALTER TABLE public.vaults OWNER TO "prashant.srivastav";
 
 --
--- Name: leads leads_pkey; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
+-- Name: leads leads_pkey; Type: CONSTRAINT;
 --
 
 ALTER TABLE ONLY public.leads
@@ -298,7 +249,7 @@ ALTER TABLE ONLY public.leads
 
 
 --
--- Name: o_auth_external_connects o_auth_external_connects_pkey; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
+-- Name: o_auth_external_connects o_auth_external_connects_pkey; Type: CONSTRAINT;
 --
 
 ALTER TABLE ONLY public.o_auth_external_connects
@@ -306,7 +257,7 @@ ALTER TABLE ONLY public.o_auth_external_connects
 
 
 --
--- Name: organizations organizations_pkey; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
+-- Name: organizations organizations_pkey; Type: CONSTRAINT;
 --
 
 ALTER TABLE ONLY public.organizations
@@ -315,7 +266,7 @@ ALTER TABLE ONLY public.organizations
 
 
 --
--- Name: user_auth_tokens user_auth_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
+-- Name: user_auth_tokens user_auth_tokens_pkey; Type: CONSTRAINT;
 --
 
 ALTER TABLE ONLY public.user_auth_tokens
@@ -323,7 +274,7 @@ ALTER TABLE ONLY public.user_auth_tokens
 
 
 --
--- Name: user_auths user_auths_email_key; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
+-- Name: user_auths user_auths_email_key; Type: CONSTRAINT;
 --
 
 ALTER TABLE ONLY public.user_auths
@@ -331,7 +282,7 @@ ALTER TABLE ONLY public.user_auths
 
 
 --
--- Name: user_auths user_auths_pkey; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
+-- Name: user_auths user_auths_pkey; Type: CONSTRAINT;
 --
 
 ALTER TABLE ONLY public.user_auths
@@ -339,7 +290,7 @@ ALTER TABLE ONLY public.user_auths
 
 
 --
--- Name: user_organization_roles user_organization_roles_pkey; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
+-- Name: user_organization_roles user_organization_roles_pkey; Type: CONSTRAINT;
 --
 
 ALTER TABLE ONLY public.user_organization_roles
@@ -347,7 +298,7 @@ ALTER TABLE ONLY public.user_organization_roles
 
 
 --
--- Name: user_project_roles user_project_roles_pkey; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
+-- Name: user_project_roles user_project_roles_pkey; Type: CONSTRAINT;
 --
 
 ALTER TABLE ONLY public.user_project_roles
@@ -355,7 +306,7 @@ ALTER TABLE ONLY public.user_project_roles
 
 
 --
--- Name: user_roles user_roles_pkey; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
+-- Name: user_roles user_roles_pkey; Type: CONSTRAINT;
 --
 
 ALTER TABLE ONLY public.user_roles
@@ -363,7 +314,7 @@ ALTER TABLE ONLY public.user_roles
 
 
 --
--- Name: user_socials user_socials_pkey; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
+-- Name: user_socials user_socials_pkey; Type: CONSTRAINT;
 --
 
 ALTER TABLE ONLY public.user_socials
@@ -371,7 +322,7 @@ ALTER TABLE ONLY public.user_socials
 
 
 --
--- Name: vaults vaults_pkey; Type: CONSTRAINT; Schema: public; Owner: prashant.srivastav
+-- Name: vaults vaults_pkey; Type: CONSTRAINT;
 --
 
 ALTER TABLE ONLY public.vaults
@@ -381,77 +332,77 @@ ALTER TABLE ONLY public.vaults
 
 
 --
--- Name: idx_projects_id; Type: INDEX; Schema: public; Owner: prashant.srivastav
+-- Name: idx_projects_id; Type: INDEX;
 --
 
 CREATE INDEX idx_projects_id ON public.projects USING btree (id);
 
 
 --
--- Name: idx_projects_organization_id_status; Type: INDEX; Schema: public; Owner: prashant.srivastav
+-- Name: idx_projects_organization_id_status; Type: INDEX;
 --
 
 CREATE INDEX idx_projects_organization_id_status ON public.projects USING btree (organization_id, status);
 
 
 --
--- Name: idx_user_project_roles_project_id; Type: INDEX; Schema: public; Owner: prashant.srivastav
+-- Name: idx_user_project_roles_project_id; Type: INDEX;
 --
 
 CREATE INDEX idx_user_project_roles_project_id ON public.user_project_roles USING btree (project_id);
 
 
 --
--- Name: idx_user_project_roles_user_auth_id_status; Type: INDEX; Schema: public; Owner: prashant.srivastav
+-- Name: idx_user_project_roles_user_auth_id_status; Type: INDEX;
 --
 
 CREATE INDEX idx_user_project_roles_user_auth_id_status ON public.user_project_roles USING btree (user_auth_id, status);
 
 
 --
--- Name: idx_vault_level; Type: INDEX; Schema: public; Owner: prashant.srivastav
+-- Name: idx_vault_level; Type: INDEX;
 --
 
 CREATE INDEX idx_vault_level ON public.vaults USING btree (vault_level);
 
 
 --
--- Name: idx_vault_level_id; Type: INDEX; Schema: public; Owner: prashant.srivastav
+-- Name: idx_vault_level_id; Type: INDEX;
 --
 
 CREATE INDEX idx_vault_level_id ON public.vaults USING btree (vault_level_id);
 
 
 --
--- Name: idx_vault_type; Type: INDEX; Schema: public; Owner: prashant.srivastav
+-- Name: idx_vault_type; Type: INDEX;
 --
 
 CREATE INDEX idx_vault_type ON public.vaults USING btree (vault_type);
 
 
 --
--- Name: idx_vault_type_id; Type: INDEX; Schema: public; Owner: prashant.srivastav
+-- Name: idx_vault_type_id; Type: INDEX;
 --
 
 CREATE INDEX idx_vault_type_id ON public.vaults USING btree (vault_type_id);
 
 
 --
--- Name: ua_idx_email; Type: INDEX; Schema: public; Owner: prashant.srivastav
+-- Name: ua_idx_email; Type: INDEX;
 --
 
 CREATE INDEX ua_idx_email ON public.user_auths USING btree (email);
 
 
 --
--- Name: up_idx_auth_id; Type: INDEX; Schema: public; Owner: prashant.srivastav
+-- Name: up_idx_auth_id; Type: INDEX;
 --
 
 CREATE INDEX up_idx_auth_id ON public.user_auth_tokens USING btree (user_auth_id);
 
 
 --
--- Name: ur_idx_auth_id; Type: INDEX; Schema: public; Owner: prashant.srivastav
+-- Name: ur_idx_auth_id; Type: INDEX;
 --
 
 CREATE INDEX ur_idx_auth_id ON public.user_roles USING btree (user_auth_id);

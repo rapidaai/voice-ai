@@ -13,6 +13,9 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	webApi "github.com/rapidaai/api/web-api/api"
 	healthCheckApi "github.com/rapidaai/api/web-api/api/health"
@@ -409,4 +412,44 @@ func (g *AppRunner) CorsMiddleware() {
 func (g *AppRunner) RequestLoggerMiddleware() {
 	g.Logger.Info("Adding request middleware to the applicaiton.")
 	g.E.Use(middlewares.NewRequestLoggerMiddleware(g.Cfg.Name, g.Logger))
+}
+
+func (app *AppRunner) Migrate() error {
+	dsn := fmt.Sprintf(
+		"postgres://%s:%s@%s:%d/%s?sslmode=%s",
+		app.Cfg.PostgresConfig.Auth.User,
+		app.Cfg.PostgresConfig.Auth.Password,
+		app.Cfg.PostgresConfig.Host,
+		app.Cfg.PostgresConfig.Port,
+		app.Cfg.PostgresConfig.DBName,
+		app.Cfg.PostgresConfig.SslMode,
+	)
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current working directory: %w", err)
+	}
+	migrationsPath := fmt.Sprintf("file://%s/api/web-api/migrations", currentDir)
+	app.Logger.Infof("Running migrations with database: %s", app.Cfg.PostgresConfig.DBName)
+	m, err := migrate.New(migrationsPath, dsn)
+	if err != nil {
+		return fmt.Errorf("migration init failed: %w", err)
+	}
+	defer m.Close()
+
+	// Check if database is in a dirty state
+	version, dirty, _ := m.Version()
+	if dirty {
+		app.Logger.Warnf("Database is in a dirty state at version: %d. Forcing cleanup.", version)
+		// Force to last known good version
+		if err := m.Force(int(version)); err != nil {
+			return fmt.Errorf("failed to force migration version: %w", err)
+		}
+	}
+
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return fmt.Errorf("migration failed: %w", err)
+	}
+
+	app.Logger.Infof("Migrations completed successfully")
+	return nil
 }

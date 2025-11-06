@@ -42,7 +42,7 @@ logs-redis:
 	cd docker && docker-compose logs -f redis
 
 clean:
-	cd docker && docker-compose down -v
+	cd docker && docker-compose down -v && docker system prune -a --volumes
 
 restart:
 	cd docker && docker-compose restart
