@@ -36,6 +36,13 @@ logs:
 logs-web:
 	cd docker && docker-compose logs -f web-api
 
+# web
+logs-integration:
+	cd docker && docker-compose logs -f integration-api
+
+logs-ui:
+	cd docker && docker-compose logs -f web-ui
+
 logs-endpoint:
 	cd docker && docker-compose logs -f endpoint-api
 
