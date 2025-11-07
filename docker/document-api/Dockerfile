@@ -18,8 +18,6 @@ WORKDIR $APP_HOME/
 RUN chown rapida-app:rapida-app $APP_HOME
 
 
-# https://news.ycombinator.com/item?id=23366924
-# set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 

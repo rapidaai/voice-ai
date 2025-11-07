@@ -81,7 +81,7 @@ services:
       - integration-api
       - endpoint-api
     volumes:
-      - assets_volume:/usr/share/nginx/html/assets
+      - /opt/apps/assets:/usr/share/nginx/html/assets
     networks:
       - api-network
     healthcheck:
@@ -107,7 +107,7 @@ services:
         condition: service_healthy
     volumes:
       - ./docker/web-api/.web.env:/opt/apps/env/.web.env:ro
-      - assets_volume:/opt/apps/assets
+      - /opt/apps/assets:/opt/apps/assets
 
     networks:
       - api-network
@@ -138,7 +138,7 @@ services:
 
     volumes:
       - ./docker/assistant-api/.assistant.env:/opt/apps/env/.assistant.env:ro
-      - assets_volume:/opt/apps/assets
+      - /opt/apps/assets:/opt/apps/assets
 
     networks:
       - api-network
@@ -167,7 +167,7 @@ services:
 
     volumes:
       - ./docker/integration-api/.integration.env:/opt/apps/env/.integration.env:ro
-      - assets_volume:/opt/apps/assets
+      - /opt/apps/assets:/opt/apps/assets
 
     networks:
       - api-network
@@ -196,7 +196,7 @@ services:
 
     volumes:
       - ./docker/endpoint-api/.endpoint.env:/opt/apps/env/.endpoint.env:ro
-      - assets_volume:/opt/apps/assets
+      - /opt/apps/assets:/opt/apps/assets
 
     networks:
       - api-network
@@ -207,14 +207,36 @@ services:
       timeout: 3s
       retries: 3
 
+document-api:
+    build:
+      context: .
+      dockerfile: docker/document-api/Dockerfile
+    container_name: document-api
+    ports:
+      - "9010:9010"
+    env_file:
+      - ./docker/document-api/config.yaml
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    volumes:
+      - ./docker/document-api/config.yaml:/opt/apps/config.yaml:ro
+      - /opt/apps/assets:/opt/apps/assets
+
+    networks:
+      - api-network
+
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--method=GET", "-O", "/dev/null",   "http://localhost:9010/readiness/" ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
  
-volumes:
-  redis_data:
-    driver: local
-  opensearch_data:
-    driver: local
-  assets_volume:
-    driver: local
+
 
 networks:
   api-network:
