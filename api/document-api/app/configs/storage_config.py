@@ -11,6 +11,7 @@ either express or implied. See the License for the specific language governing p
 and limitations under the License.
 
 """
+
 from typing import Optional
 
 from pydantic import Field
@@ -23,6 +24,7 @@ from app.configs.auth.aws_auth import AWSAuth
 class AssetStoreConfig(ExternalDatasourceModel):
     storage_type: Optional[str]
     storage_path_prefix: Optional[str]
-    auth: Optional[AWSAuth] = Field(description="auth information for storage config")
-
-    model_config = SettingsConfigDict(env_file_encoding="utf-8", extra='ignore')
+    auth: Optional[AWSAuth] = Field(
+        default=None, description="auth information for storage config"
+    )
+    model_config = SettingsConfigDict(env_file_encoding="utf-8", extra="ignore")

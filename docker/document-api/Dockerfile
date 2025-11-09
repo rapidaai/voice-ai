@@ -48,7 +48,8 @@ USER rapida-app
 
 # Copy app code
 COPY --chown=rapida-app:rapida-app api/document-api/app ./app
+COPY --chown=rapida-app:rapida-app docker/document-api/config.yaml ./config.yaml
 
 EXPOSE 9010
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "9010"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9010"]

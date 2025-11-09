@@ -14,6 +14,8 @@ and limitations under the License.
 
 from typing import Optional, Union
 
+from pydantic import Field
+
 from app.configs import ExternalDatasourceModel
 from app.configs.auth.aws_auth import AWSAuth
 from app.configs.auth.basic_auth import BasicAuth
@@ -31,7 +33,9 @@ class ElasticSearchConfig(ExternalDatasourceModel):
     port: Optional[int]
 
     # authentication of elastic search node
-    auth: Optional[Union[BasicAuth, AWSAuth]]
+    auth: Optional[Union[BasicAuth, AWSAuth]] = Field(
+        default=None, description="auth information for elastic search config"
+    )
 
     # default schema is https can be override from env
     scheme: str = "https"
