@@ -3,18 +3,18 @@ version: 0.0
 os: linux
 
 files:
-  - source: env
+  - source: env.production
     destination: /opt/app/backend-app/artifacts/integration-api/
   - source: integration-api.0.0.1
     destination: /opt/app/backend-app/artifacts/integration-api/
 
 hooks:
   ApplicationStop:
-    - location: codedeploy/ApplicationStop.sh
+    - location: scripts/ApplicationStop.sh
       timeout: 180
   ValidateService:
-    - location: codedeploy/ValidateService.sh
+    - location: scripts/ValidateService.sh
       timeout: 180
   ApplicationStart:
-    - location: codedeploy/ApplicationStart.sh
+    - location: scripts/ApplicationStart.sh
       timeout: 180

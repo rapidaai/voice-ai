@@ -34,14 +34,16 @@ phases:
       - go mod download
       - sh bin/generate-artifacts.sh
       - GOOS=linux GOARCH=amd64 go build -o integration-api.0.0.1 cmd/integration.go
-      - cp codedeploy/env.production ./env
+      - cp aws/integration-api/appspec.yml ./appspec.yml
+      - cp aws/integration-api/env/env.production ./env.production
+      - cp -r aws/integration-api/scripts scripts
 
 artifacts:
   files:
     - integration-api.0.0.1
     - appspec.yml
-    - env
-    - codedeploy/*
+    - env.production
+    - scripts/*
 cache:
   paths:
     - "/go/pkg/**/*"
