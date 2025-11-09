@@ -3,7 +3,7 @@ version: 0.0
 os: linux
 
 files:
-  - source: env
+  - source: env.production
     destination: /opt/app/backend-app/artifacts/web-api/
   - source: web-api.0.0.1
     destination: /opt/app/backend-app/artifacts/web-api/
