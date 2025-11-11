@@ -1,0 +1,44 @@
+syntax = "proto3";
+package integration_api;
+option go_package = "github.com/lexatic/web-backend/protos/lexatic-backend";
+
+message Contact {
+  string email = 1;
+  string name = 2;
+}
+message WelcomeEmailRequest {
+  uint64 userId = 1;
+  Contact to = 2;
+}
+message WelcomeEmailResponse {
+  int32 code = 1;
+  bool success = 2;
+}
+message ResetPasswordEmailRequest {
+  uint64 userId = 1;
+  Contact to = 2;
+  string resetPasswordLink = 3;
+}
+message ResetPasswordEmailResponse {
+  int32 code = 1;
+  bool success = 2;
+}
+message InviteMemeberEmailRequest {
+  uint64 userId = 1;
+  Contact to = 2;
+  string organizationName = 3;
+  string projectName = 4;
+  string inviterName = 5;
+}
+message InviteMemeberEmailResponse {
+  int32 code = 1;
+  bool success = 2;
+}
+
+service SendgridService {
+  rpc WelcomeEmail(WelcomeEmailRequest) returns (WelcomeEmailResponse);
+  rpc ResetPasswordEmail(ResetPasswordEmailRequest)
+      returns (ResetPasswordEmailResponse);
+  rpc InviteMemberEmail(InviteMemeberEmailRequest)
+      returns (InviteMemeberEmailResponse);
+}

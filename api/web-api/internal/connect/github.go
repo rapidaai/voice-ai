@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/mitchellh/mapstructure"
-	"github.com/rapidaai/config"
+	config "github.com/rapidaai/api/web-api/config"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"golang.org/x/oauth2"
@@ -35,7 +35,7 @@ var (
 	GITHUB_ACTION_CONNECT = "/connect-common/github"
 )
 
-func NewGithubAuthenticationConnect(cfg *config.AppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger,
+func NewGithubAuthenticationConnect(cfg *config.WebAppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger,
 	postgres connectors.PostgresConnector) GithubConnect {
 	return GithubConnect{
 		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
@@ -50,7 +50,7 @@ func NewGithubAuthenticationConnect(cfg *config.AppConfig, oauthCfg *config.OAut
 	}
 }
 
-func NewGithubCodeConnect(cfg *config.AppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) GithubConnect {
+func NewGithubCodeConnect(cfg *config.WebAppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) GithubConnect {
 	return GithubConnect{
 		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		githubOauthConfig: oauth2.Config{
@@ -63,7 +63,7 @@ func NewGithubCodeConnect(cfg *config.AppConfig, oauthCfg *config.OAuthConfig, l
 		logger: logger,
 	}
 }
-func NewGithubActionConnect(cfg *config.AppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) GithubConnect {
+func NewGithubActionConnect(cfg *config.WebAppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) GithubConnect {
 	return GithubConnect{
 		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		githubOauthConfig: oauth2.Config{

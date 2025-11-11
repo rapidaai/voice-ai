@@ -1,0 +1,80 @@
+syntax = "proto3";
+package vault_api;
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+option go_package = "github.com/lexatic/web-backend/protos/lexatic-backend";
+import "common.proto";
+
+message VaultCredential {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  string name = 2;
+  google.protobuf.Struct value = 3;
+  string status = 4;
+
+  string vaultLevel = 5;
+  uint64 vaultLevelId = 6 [ jstype = JS_STRING ];
+
+  string vaultType = 7;
+  uint64 vaultTypeId = 8 [ jstype = JS_STRING ];
+
+  google.protobuf.Timestamp createdDate = 9;
+  google.protobuf.Timestamp updatedDate = 11;
+  google.protobuf.Timestamp lastUsedDate = 10;
+}
+
+message CreateProviderCredentialRequest {
+  uint64 providerId = 1 [ jstype = JS_STRING ];
+  google.protobuf.Struct credential = 2;
+  string name = 3;
+  string providerName = 4;
+}
+
+message CreateToolCredentialRequest {
+  uint64 toolId = 1 [ jstype = JS_STRING ];
+  google.protobuf.Struct credential = 2;
+  string name = 3;
+  string toolName = 4;
+}
+
+message DeleteCredentialRequest { uint64 vaultId = 1 [ jstype = JS_STRING ]; }
+
+message GetAllOrganizationCredentialRequest {
+  Paginate paginate = 1;
+  repeated Criteria criterias = 2;
+}
+
+message GetAllOrganizationCredentialResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated VaultCredential data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+
+message GetProviderCredentialRequest {
+  uint64 providerId = 3 [ jstype = JS_STRING ];
+  uint64 organizationId = 4 [ jstype = JS_STRING ];
+}
+
+message GetCredentialResponse {
+  int32 code = 1;
+  bool success = 2;
+  VaultCredential data = 3;
+  Error error = 4;
+}
+
+message GetCredentialRequest { uint64 vaultId = 1 [ jstype = JS_STRING ]; }
+
+service VaultService {
+  rpc CreateProviderCredential(CreateProviderCredentialRequest)
+      returns (GetCredentialResponse);
+  rpc CreateToolCredential(CreateToolCredentialRequest)
+      returns (GetCredentialResponse);
+  rpc GetAllOrganizationCredential(GetAllOrganizationCredentialRequest)
+      returns (GetAllOrganizationCredentialResponse);
+  rpc DeleteCredential(DeleteCredentialRequest) returns (GetCredentialResponse);
+  rpc GetProviderCredential(GetProviderCredentialRequest)
+      returns (GetCredentialResponse);
+  rpc GetCredential(GetCredentialRequest) returns (GetCredentialResponse);
+  rpc GetOauth2Credential(GetCredentialRequest) returns (GetCredentialResponse);
+}

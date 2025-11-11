@@ -1,0 +1,34 @@
+# .gitmessage.txt sample
+# please follow the format on commit
+#
+# <type>: <subject> { required }
+#
+# <body> { optional }
+#
+# <footer> { optional }
+#
+# example
+# refactor: swiftlint integration
+#
+# 1. chore(AppDelegate.swift) replace Firebase API key
+# 2. feat(ViewController.swift, VideoPlayer.swift) add support to play video
+# 3. refactor(Utility.swift) rename calculate method to sumTwoNumbers
+# 4. fix(Channel.swift) fix incorrect type for user id when parsing json
+#
+# Close issue XXX
+#
+# <Type>
+# chore: 	minor changes
+# feat: 	new feature
+# refactor: refactor logic or architecture
+# fix: 		bug fix
+# test: 	add test case or adjust test case
+#
+# <Subject>
+# Brif describe things about this change
+#
+# <Body>
+# deep specific detail about this change
+#
+# <Footer>
+# use this when this commit relate to some issue or bug ticket

@@ -1,0 +1,77 @@
+syntax = "proto3";
+package assistant_api;
+option go_package = "github.com/lexatic/web-backend/protos/lexatic-backend";
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+
+//
+
+message AssistantAnalysis {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  string name = 2;
+  string description = 3;
+  uint64 endpointId = 4 [ jstype = JS_STRING ];
+  string endpointVersion = 5;
+  map<string, string> endpointParameters = 7;
+  uint64 assistantId = 10 [ jstype = JS_STRING ];
+  string status = 12;
+  uint64 createdBy = 13 [ jstype = JS_STRING ];
+  User createdUser = 14;
+  uint64 updatedBy = 15 [ jstype = JS_STRING ];
+  User updatedUser = 16;
+  google.protobuf.Timestamp createdDate = 17;
+  google.protobuf.Timestamp updatedDate = 18;
+  uint32 executionPriority = 20;
+}
+
+message CreateAssistantAnalysisRequest {
+  string name = 2;
+  string description = 3;
+  uint64 endpointId = 4 [ jstype = JS_STRING ];
+  string endpointVersion = 5;
+  map<string, string> endpointParameters = 7;
+  uint64 assistantId = 10 [ jstype = JS_STRING ];
+  uint32 executionPriority = 20;
+}
+
+message UpdateAssistantAnalysisRequest {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  string name = 2;
+  string description = 3;
+  uint64 endpointId = 4 [ jstype = JS_STRING ];
+  string endpointVersion = 5;
+  map<string, string> endpointParameters = 7;
+  uint64 assistantId = 10 [ jstype = JS_STRING ];
+  uint32 executionPriority = 20;
+}
+
+message GetAssistantAnalysisRequest {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 assistantId = 2 [ jstype = JS_STRING ];
+}
+
+message DeleteAssistantAnalysisRequest {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 assistantId = 2 [ jstype = JS_STRING ];
+}
+
+message GetAssistantAnalysisResponse {
+  int32 code = 1;
+  bool success = 2;
+  AssistantAnalysis data = 3;
+  Error error = 4;
+}
+
+message GetAllAssistantAnalysisRequest {
+  uint64 assistantId = 1 [ jstype = JS_STRING ];
+  Paginate paginate = 2;
+  repeated Criteria criterias = 3;
+}
+
+message GetAllAssistantAnalysisResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated AssistantAnalysis data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}

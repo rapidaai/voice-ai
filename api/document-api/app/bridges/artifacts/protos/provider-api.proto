@@ -1,0 +1,57 @@
+syntax = "proto3";
+package provider_api;
+option go_package = "github.com/lexatic/web-backend/protos/lexatic-backend";
+import "common.proto";
+
+// message GetAllModelRequest { repeated Criteria criterias = 1; }
+// message GetAllModelResponse {
+//   int32 code = 1;
+//   bool success = 2;
+// }
+// message GetModelRequest { uint64 modelId = 1 [ jstype = JS_STRING ]; }
+// message GetModelResponse {
+//   int32 code = 1;
+//   bool success = 2;
+// }
+
+message GetAllModelProviderRequest {
+  Paginate paginate = 1;
+  repeated Criteria criterias = 2;
+}
+message GetAllModelProviderResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated Provider data = 3;
+}
+
+message ToolProvider {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  string name = 2;
+  string description = 3;
+  string image = 4;
+  repeated string feature = 5;
+  map<string, string> connectConfiguration = 6;
+}
+
+message GetAllToolProviderRequest {
+  Paginate paginate = 1;
+  repeated Criteria criterias = 2;
+}
+
+message GetAllToolProviderResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated ToolProvider data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+
+service ProviderService {
+  rpc GetAllToolProvider(GetAllToolProviderRequest)
+      returns (GetAllToolProviderResponse);
+  rpc GetAllModelProvider(GetAllModelProviderRequest)
+      returns (GetAllModelProviderResponse);
+
+  //   rpc GetModel(GetModelRequest) returns (GetModelResponse);
+  //   rpc GetAllModel(GetAllModelRequest) returns (GetAllModelResponse);
+}

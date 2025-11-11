@@ -1,0 +1,79 @@
+syntax = "proto3";
+package assistant_api;
+option go_package = "github.com/lexatic/web-backend/protos/lexatic-backend";
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+
+//
+message AssistantKnowledge {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 knowledgeId = 2 [ jstype = JS_STRING ];
+  bool rerankerEnable = 3;
+  uint32 topK = 6;
+  float scoreThreshold = 7;
+  Knowledge knowledge = 8;
+  string retrievalMethod = 9;
+  uint64 rerankerModelProviderId = 10 [ jstype = JS_STRING ];
+  string rerankerModelProviderName = 11;
+  repeated Metadata assistantKnowledgeRerankerOptions = 12;
+
+  google.protobuf.Timestamp createdDate = 13;
+  google.protobuf.Timestamp updatedDate = 14;
+  string status = 15;
+}
+
+message CreateAssistantKnowledgeRequest {
+  uint64 knowledgeId = 1 [ jstype = JS_STRING ];
+  uint64 assistantId = 2 [ jstype = JS_STRING ];
+  uint64 rerankerModelProviderId = 3 [ jstype = JS_STRING ];
+  string rerankerModelProviderName = 4;
+  repeated Metadata assistantKnowledgeRerankerOptions = 5;
+  uint32 topK = 6;
+  float scoreThreshold = 7;
+  string retrievalMethod = 8;
+  bool rerankerEnable = 9;
+}
+
+message UpdateAssistantKnowledgeRequest {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 knowledgeId = 2 [ jstype = JS_STRING ];
+  uint64 assistantId = 3 [ jstype = JS_STRING ];
+  uint64 rerankerModelProviderId = 4 [ jstype = JS_STRING ];
+  string rerankerModelProviderName = 5;
+  repeated Metadata assistantKnowledgeRerankerOptions = 6;
+  float scoreThreshold = 7;
+  uint32 topK = 8;
+  string retrievalMethod = 9;
+  bool rerankerEnable = 10;
+}
+
+message GetAssistantKnowledgeRequest {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 assistantId = 2 [ jstype = JS_STRING ];
+}
+
+message DeleteAssistantKnowledgeRequest {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 assistantId = 2 [ jstype = JS_STRING ];
+}
+
+message GetAssistantKnowledgeResponse {
+  int32 code = 1;
+  bool success = 2;
+  AssistantKnowledge data = 3;
+  Error error = 4;
+}
+
+message GetAllAssistantKnowledgeRequest {
+  uint64 assistantId = 1 [ jstype = JS_STRING ];
+  Paginate paginate = 2;
+  repeated Criteria criterias = 3;
+}
+
+message GetAllAssistantKnowledgeResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated AssistantKnowledge data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}

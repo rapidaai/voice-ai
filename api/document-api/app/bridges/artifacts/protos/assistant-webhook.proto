@@ -1,0 +1,137 @@
+syntax = "proto3";
+package assistant_api;
+option go_package = "github.com/lexatic/web-backend/protos/lexatic-backend";
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+import "google/protobuf/struct.proto";
+//
+
+message AssistantWebhook {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  repeated string assistantEvents = 2;
+  string description = 3;
+  string httpMethod = 4;
+  string httpUrl = 5;
+  map<string, string> httpHeaders = 6;
+  map<string, string> httpBody = 7;
+  uint32 timeoutSecond = 19;
+  uint32 executionPriority = 20;
+  repeated string retryStatusCodes = 8;
+  uint32 retryCount = 9;
+  uint64 assistantId = 10 [ jstype = JS_STRING ];
+  string status = 12;
+  uint64 createdBy = 13 [ jstype = JS_STRING ];
+  User createdUser = 14;
+  uint64 updatedBy = 15 [ jstype = JS_STRING ];
+  User updatedUser = 16;
+  google.protobuf.Timestamp createdDate = 17;
+  google.protobuf.Timestamp updatedDate = 18;
+}
+
+message AssistantWebhookLog {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 webhookId = 2 [ jstype = JS_STRING ];
+  google.protobuf.Struct request = 3;
+  google.protobuf.Struct response = 4;
+  string status = 5;
+  google.protobuf.Timestamp createdDate = 6;
+  google.protobuf.Timestamp updatedDate = 7;
+  uint64 assistantId = 8 [ jstype = JS_STRING ];
+  uint64 projectId = 9 [ jstype = JS_STRING ];
+  uint64 organizationId = 10 [ jstype = JS_STRING ];
+  uint64 conversationId = 11 [ jstype = JS_STRING ];
+  string assetPrefix = 12;
+  string event = 13;
+  uint64 responseStatus = 14 [ jstype = JS_STRING ];
+  uint64 timeTaken = 15 [ jstype = JS_STRING ];
+  uint32 retryCount = 16;
+  string httpMethod = 17;
+  string httpUrl = 18;
+}
+
+message CreateAssistantWebhookRequest {
+  repeated string assistantEvents = 2;
+  string description = 3;
+  string httpMethod = 4;
+  string httpUrl = 5;
+  map<string, string> httpHeaders = 6;
+  map<string, string> httpBody = 11;
+  uint32 timeoutSecond = 7;
+  repeated string retryStatusCodes = 8;
+  uint32 maxRetryCount = 9;
+  uint64 assistantId = 10 [ jstype = JS_STRING ];
+  uint32 executionPriority = 20;
+}
+
+message UpdateAssistantWebhookRequest {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  repeated string assistantEvents = 2;
+  string description = 3;
+  string httpMethod = 4;
+  string httpUrl = 5;
+  map<string, string> httpHeaders = 6;
+  map<string, string> httpBody = 11;
+  uint32 timeoutSecond = 7;
+  repeated string retryStatusCodes = 8;
+  uint32 maxRetryCount = 9;
+  uint64 assistantId = 10 [ jstype = JS_STRING ];
+  uint32 executionPriority = 20;
+}
+
+message GetAssistantWebhookRequest {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 assistantId = 2 [ jstype = JS_STRING ];
+}
+
+message DeleteAssistantWebhookRequest {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 assistantId = 2 [ jstype = JS_STRING ];
+}
+
+message GetAssistantWebhookResponse {
+  int32 code = 1;
+  bool success = 2;
+  AssistantWebhook data = 3;
+  Error error = 4;
+}
+
+message GetAllAssistantWebhookRequest {
+  uint64 webhookId = 1 [ jstype = JS_STRING ];
+  uint64 assistantId = 4 [ jstype = JS_STRING ];
+  Paginate paginate = 2;
+  repeated Criteria criterias = 3;
+}
+message GetAllAssistantWebhookResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated AssistantWebhook data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+
+message GetAllAssistantWebhookLogRequest {
+  uint64 projectId = 2 [ jstype = JS_STRING ];
+  Paginate paginate = 3;
+  repeated Criteria criterias = 4;
+  Ordering order = 5;
+}
+
+message GetAssistantWebhookLogRequest {
+  uint64 projectId = 2 [ jstype = JS_STRING ];
+  uint64 id = 3 [ jstype = JS_STRING ];
+}
+
+message GetAssistantWebhookLogResponse {
+  int32 code = 1;
+  bool success = 2;
+  AssistantWebhookLog data = 3;
+  Error error = 4;
+}
+
+message GetAllAssistantWebhookLogResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated AssistantWebhookLog data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}

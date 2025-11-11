@@ -9,8 +9,8 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/google/uuid"
+	config "github.com/rapidaai/api/web-api/config"
 	internal_entity "github.com/rapidaai/api/web-api/internal/entity"
-	"github.com/rapidaai/config"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_types "github.com/rapidaai/pkg/models/gorm/types"
@@ -24,12 +24,12 @@ type ExternalConnectToken interface {
 }
 
 type ExternalConnect struct {
-	cfg      *config.AppConfig
+	cfg      *config.WebAppConfig
 	log      commons.Logger
 	postgres connectors.PostgresConnector
 }
 
-func NewExternalConnect(cfg *config.AppConfig, logger commons.Logger, postgres connectors.PostgresConnector) ExternalConnect {
+func NewExternalConnect(cfg *config.WebAppConfig, logger commons.Logger, postgres connectors.PostgresConnector) ExternalConnect {
 	return ExternalConnect{
 		cfg:      cfg,
 		log:      logger,

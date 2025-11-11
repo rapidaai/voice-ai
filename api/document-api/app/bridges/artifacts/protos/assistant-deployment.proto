@@ -1,0 +1,237 @@
+syntax = "proto3";
+package assistant_api;
+option go_package = "github.com/lexatic/web-backend/protos/lexatic-backend";
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+
+message DeploymentAudioProvider {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  string audioProvider = 2;
+  repeated Metadata audioOptions = 3;
+  uint64 audioProviderId = 4 [ jstype = JS_STRING ];
+  string status = 5;
+  string audioType = 6;
+}
+
+message AssistantDeploymentCapturer {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 assistantDeploymentId = 2 [ jstype = JS_STRING ];
+  string capturerType = 3;
+  uint64 capturerProviderId = 4 [ jstype = JS_STRING ];
+  string capturerProvider = 5;
+  repeated Metadata capturerOptions = 6;
+  string status = 7;
+}
+
+message AssistantWebpluginDeployment {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 assistantId = 5 [ jstype = JS_STRING ];
+  string name = 6;
+  string role = 7;
+  string tone = 8;
+  string experties = 9;
+  optional string greeting = 10;
+  optional string mistake = 11;
+  optional string ending = 12;
+
+  DeploymentAudioProvider inputAudio = 13;
+  DeploymentAudioProvider outputAudio = 14;
+  repeated AssistantDeploymentCapturer capturers = 17;
+
+  oneof icon {
+    string url = 15;
+    Content raw = 16;
+  }
+
+  repeated string suggestion = 20;
+  bool helpCenterEnabled = 21;
+  bool productCatalogEnabled = 22;
+  bool articleCatalogEnabled = 23;
+  bool uploadFileEnabled = 24;
+
+  google.protobuf.Timestamp createdDate = 26;
+  google.protobuf.Timestamp updatedDate = 27;
+  string status = 28;
+}
+
+message AssistantPhoneDeployment {
+  uint64 id = 1 [ jstype = JS_STRING ];
+
+  uint64 assistantId = 5 [ jstype = JS_STRING ];
+  string name = 6;
+  string role = 7;
+  string tone = 8;
+  string experties = 9;
+  optional string greeting = 10;
+  optional string mistake = 11;
+  optional string ending = 12;
+
+  DeploymentAudioProvider inputAudio = 13;
+  DeploymentAudioProvider outputAudio = 14;
+
+  string phoneProviderName = 15;
+  uint64 phoneProviderId = 16 [ jstype = JS_STRING ];
+  repeated Metadata phoneOptions = 17;
+  repeated AssistantDeploymentCapturer capturers = 18;
+
+  google.protobuf.Timestamp createdDate = 26;
+  google.protobuf.Timestamp updatedDate = 27;
+  string status = 28;
+}
+
+message AssistantWhatsappDeployment {
+  uint64 id = 1 [ jstype = JS_STRING ];
+
+  uint64 assistantId = 5 [ jstype = JS_STRING ];
+  string name = 6;
+  string role = 7;
+  string tone = 8;
+  string experties = 9;
+  optional string greeting = 10;
+  optional string mistake = 11;
+  optional string ending = 12;
+
+  string whatsappProviderName = 15;
+  uint64 whatsappProviderId = 16 [ jstype = JS_STRING ];
+  repeated Metadata whatsappOptions = 17;
+
+  google.protobuf.Timestamp createdDate = 26;
+  google.protobuf.Timestamp updatedDate = 27;
+  string status = 28;
+}
+
+message AssistantDebuggerDeployment {
+  uint64 id = 1 [ jstype = JS_STRING ];
+
+  uint64 assistantId = 5 [ jstype = JS_STRING ];
+  string name = 6;
+  string role = 7;
+  string tone = 8;
+  string experties = 9;
+  optional string greeting = 10;
+  optional string mistake = 11;
+  optional string ending = 12;
+
+  DeploymentAudioProvider inputAudio = 13;
+  DeploymentAudioProvider outputAudio = 14;
+  repeated AssistantDeploymentCapturer capturers = 18;
+
+  oneof icon {
+    string url = 15;
+    Content raw = 16;
+  }
+
+  repeated string suggestion = 20;
+  google.protobuf.Timestamp createdDate = 26;
+  google.protobuf.Timestamp updatedDate = 27;
+  string status = 28;
+}
+
+message AssistantApiDeployment {
+  uint64 id = 1 [ jstype = JS_STRING ];
+
+  uint64 assistantId = 5 [ jstype = JS_STRING ];
+  string name = 6;
+  string role = 7;
+  string tone = 8;
+  string experties = 9;
+  optional string greeting = 10;
+  optional string mistake = 11;
+  optional string ending = 12;
+  DeploymentAudioProvider inputAudio = 13;
+  DeploymentAudioProvider outputAudio = 14;
+  repeated AssistantDeploymentCapturer capturers = 15;
+
+  google.protobuf.Timestamp createdDate = 26;
+  google.protobuf.Timestamp updatedDate = 27;
+  string status = 28;
+}
+
+message CreateAssistantApiDeploymentRequest {
+  AssistantApiDeployment deployment = 1;
+}
+
+message AssistantApiDeploymentResponse {
+  int32 code = 1;
+  bool success = 2;
+  AssistantApiDeployment data = 3;
+  Error error = 4;
+}
+
+message CreateAssistantPhoneDeploymentRequest {
+  AssistantPhoneDeployment deployment = 1;
+}
+
+message AssistantPhoneDeploymentResponse {
+  int32 code = 1;
+  bool success = 2;
+  AssistantPhoneDeployment data = 3;
+  Error error = 4;
+}
+
+message CreateAssistantWhatsappDeploymentRequest {
+  AssistantWhatsappDeployment deployment = 1;
+}
+
+message AssistantWhatsappDeploymentResponse {
+  int32 code = 1;
+  bool success = 2;
+  AssistantWhatsappDeployment data = 3;
+  Error error = 4;
+}
+
+message CreateAssistantDebuggerDeploymentRequest {
+  AssistantDebuggerDeployment deployment = 1;
+}
+
+message AssistantDebuggerDeploymentResponse {
+  int32 code = 1;
+  bool success = 2;
+  AssistantDebuggerDeployment data = 3;
+  Error error = 4;
+}
+
+message CreateAssistantWebpluginDeploymentRequest {
+  AssistantWebpluginDeployment deployment = 1;
+}
+
+message AssistantWebpluginDeploymentResponse {
+  int32 code = 1;
+  bool success = 2;
+  AssistantWebpluginDeployment data = 3;
+  Error error = 4;
+}
+
+message GetAssistantDeploymentRequest {
+  uint64 assistantId = 1 [ jstype = JS_STRING ];
+}
+
+service AssistantDeploymentService {
+  rpc CreateAssistantApiDeployment(CreateAssistantApiDeploymentRequest)
+      returns (AssistantApiDeploymentResponse);
+  rpc GetAssistantApiDeployment(GetAssistantDeploymentRequest)
+      returns (AssistantApiDeploymentResponse);
+
+  rpc CreateAssistantWebpluginDeployment(
+      CreateAssistantWebpluginDeploymentRequest)
+      returns (AssistantWebpluginDeploymentResponse);
+  rpc GetAssistantWebpluginDeployment(GetAssistantDeploymentRequest)
+      returns (AssistantWebpluginDeploymentResponse);
+
+  rpc CreateAssistantDebuggerDeployment(
+      CreateAssistantDebuggerDeploymentRequest)
+      returns (AssistantDebuggerDeploymentResponse);
+  rpc GetAssistantDebuggerDeployment(GetAssistantDeploymentRequest)
+      returns (AssistantDebuggerDeploymentResponse);
+
+  rpc CreateAssistantWhatsappDeployment(
+      CreateAssistantWhatsappDeploymentRequest)
+      returns (AssistantWhatsappDeploymentResponse);
+  rpc GetAssistantWhatsappDeployment(GetAssistantDeploymentRequest)
+      returns (AssistantWhatsappDeploymentResponse);
+
+  rpc CreateAssistantPhoneDeployment(CreateAssistantPhoneDeploymentRequest)
+      returns (AssistantPhoneDeploymentResponse);
+  rpc GetAssistantPhoneDeployment(GetAssistantDeploymentRequest)
+      returns (AssistantPhoneDeploymentResponse);
+}

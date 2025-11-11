@@ -1,0 +1,134 @@
+service_name: "Knowledge API"
+host: "0.0.0.0"
+port: 9010
+
+authentication_config:
+  strict: false
+  # type: "token"
+  type: "jwt"
+  config:
+    # auth_host: "localhost:9001"
+    secret_key: "rpd_pks"
+
+
+
+elastic_search:
+  host: "search-rapida-search-01-5k7cwwoptncgdagfvbqer7j3g4.aos.ap-south-1.on.aws" 
+  port: 443                        
+  auth:
+    user: "rapida_username"        
+    password: "BigBang_rapida_2023"     
+  scheme: "https"                   
+  max_connection: 5
+  index_prefix: "prod__"
+
+postgres:
+  host: "workflow-db-01.cupzaqgguizt.ap-south-1.rds.amazonaws.com"
+  port: 5432
+  auth:
+    password: "BigBang_rapida_2023"
+    user: "postgres"
+  db: "workflow_db"
+  max_connection: 1
+  ideal_connection: 1
+
+
+internal_service:
+  web_host: "web-01.ap-01.internal.rapida.ai:9001"
+  integration_host: "integration-01.ap-01.internal.rapida.ai:9004"
+  provider_host: "web-01.ap-01.internal.rapida.ai:9001"
+  experiment_host: "experiment-01.ap-01.internal.rapida.ai:9003"
+  endpoint_host: "endpoint-01.ap-01.internal.rapida.ai:9005"
+  webhook_host: "webhook-01.ap-01.internal.rapida.ai:9006"
+  workflow_host: "workflow-01.ap-01.internal.rapida.ai:9007"
+
+storage:
+  # storage_type: "local"
+  # storage_path_prefix: "/opt/apps/assets"
+  storage_type: "s3"
+  storage_path_prefix: "workflow-assets-01"
+  auth:
+    region: "ap-south-1"
+    access_key_id: "AKIAWFZCROPHVZP62OX6"
+    secret_access_key: "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"
+
+celery:
+  broker: "redis://localhost:6379/0"
+  backend: "redis://localhost:6379/0"
+
+knowledge_extractor_config:
+#  chunking_technique:
+#    chunker: app.core.chunkers.statistical_chunker.StatisticalChunker
+#    options:
+#      encoder: "app.core.encoders.openai_encoder.OpenaiEncoder"
+#      options:
+#        model_name: "text-embedding-3-large"
+#        api_key: "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"
+#      splitter: "app.core.splitter.sentence_splitter.SpacySentenceSplitter"
+#      threshold_adjustment: 0.01
+#      dynamic_threshold: true
+#      window_size: 5
+#      min_split_tokens: 100
+#      max_split_tokens: 700
+#      split_tokens_tolerance: 10
+#      plot_chunks: false
+#      enable_statistics: false
+  transformers:
+    - transformer: app.core.transformers.entity_document_transformer.EntityDocumentTransformer
+      stage: "post"
+      options:
+        entity_extractor: app.core.rag.extractor.entities.spacy_entity_extractor.SpacyEntityExtractor
+        options:
+          entities: ["organizations","dates","products","events","people","times","quantities"]
+  file_extensions:
+  - extension: '.xlsx'
+    extractor: app.core.rag.extractor.documents.excel_extractor.ExcelExtractor
+  - extension: '.xls'
+    extractor: app.core.rag.extractor.documents.excel_extractor.ExcelExtractor
+  - extension: '.docx'
+    extractor: app.core.rag.extractor.documents.word_extractor.WordExtractor
+  - extension: '.pdf'
+    extractor: app.core.rag.extractor.documents.unstructured.unstructured_pdf_extractor.UnstructuredPDFExtractor
+#    extractor: app.core.rag.extractor.documents.openparse.openparse_pdf_extractor.OpenparsePDFExtractor
+#    extractor: app.core.rag.extractor.documents.unstructured.unstructured_pdf_extractor.UnstructuredPDFExtractor
+#    extractor: app.core.rag.extractor.documents.pdf_extractor.PdfExtractor
+  - extension: '.md'
+    extractor: app.core.rag.extractor.documents.markdown_extractor.MarkdownExtractor
+    options:
+      autodetect_encoding: true
+  - extension: '.markdown'
+    extractor: app.core.rag.extractor.documents.markdown_extractor.MarkdownExtractor
+    options:
+      autodetect_encoding: true
+  - extension: '.htm'
+    extractor: app.core.rag.extractor.documents.html_extractor.HtmlExtractor
+  - extension: '.html'
+    extractor: app.core.rag.extractor.documents.html_extractor.HtmlExtractor
+  - extension: '.csv'
+    extractor: app.core.rag.extractor.documents.csv_extractor.CSVExtractor
+    options:
+      autodetect_encoding: true
+  - extension: '.doc'
+    extractor: app.core.rag.extractor.documents.unstructured.unstructured_doc_extractor.UnstructuredWordExtractor
+  - extension: '.ppt'
+    extractor: app.core.rag.extractor.documents.pptx_extractor.PowerPointExtractor
+  - extension: '.pptx'
+    extractor: app.core.rag.extractor.documents.pptx_extractor.PowerPointExtractor
+  - extension: '.msg'
+    extractor: app.core.rag.extractor.documents.unstructured.unstructured_msg_extractor.UnstructuredMsgExtractor
+    options:
+      autodetect_encoding: true
+      api_url: https://rapidaai-8ry58hkr.api.unstructuredapp.io
+      api_key: OnNIS6LqeSJSxLhb8meqBcFktDZ7pi
+  - extension: '.eml'
+    extractor: app.core.rag.extractor.documents.unstructured.unstructured_email_extractor.UnstructuredEmailExtractor
+    options: 
+      api_url: https://rapidaai-8ry58hkr.api.unstructuredapp.io
+      api_key: OnNIS6LqeSJSxLhb8meqBcFktDZ7pi
+      autodetect_encoding: true
+  - extension: '*'
+    extractor: app.core.rag.extractor.documents.unstructured.unstructured_text_extractor.UnstructuredTextExtractor
+    options: 
+      api_url: https://rapidaai-8ry58hkr.api.unstructuredapp.io
+      api_key: OnNIS6LqeSJSxLhb8meqBcFktDZ7pi
+      autodetect_encoding: true

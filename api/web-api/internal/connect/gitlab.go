@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rapidaai/config"
+	config "github.com/rapidaai/api/web-api/config"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"golang.org/x/oauth2"
@@ -33,7 +33,7 @@ var (
 
 func NewGitlabAuthenticationConnect(cfg *config.WebAppConfig, logger commons.Logger, postgres connectors.PostgresConnector) GitlabConnect {
 	return GitlabConnect{
-		ExternalConnect: NewExternalConnect(&cfg.AppConfig, logger, postgres),
+		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		gitlabOauthConfig: oauth2.Config{
 			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), GITLAB_AUTHENTICATION_URL),
 			ClientID:     cfg.GitlabClientId,
@@ -45,7 +45,7 @@ func NewGitlabAuthenticationConnect(cfg *config.WebAppConfig, logger commons.Log
 	}
 }
 
-func NewGitlabCodeConnect(cfg *config.AppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) GitlabConnect {
+func NewGitlabCodeConnect(cfg *config.WebAppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) GitlabConnect {
 	return GitlabConnect{
 		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		gitlabOauthConfig: oauth2.Config{
@@ -58,7 +58,7 @@ func NewGitlabCodeConnect(cfg *config.AppConfig, oauthCfg *config.OAuthConfig, l
 		logger: logger,
 	}
 }
-func NewGitlabActionConnect(cfg *config.AppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) GitlabConnect {
+func NewGitlabActionConnect(cfg *config.WebAppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) GitlabConnect {
 	return GitlabConnect{
 		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		gitlabOauthConfig: oauth2.Config{

@@ -1,0 +1,373 @@
+syntax = "proto3";
+package web_api;
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+
+option go_package = "github.com/lexatic/web-backend/protos/lexatic-backend";
+
+message AuthenticateRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message RegisterUserRequest {
+  string email = 1;
+  string password = 2;
+  string name = 3;
+}
+
+message Token {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  string token = 2;
+  string tokenType = 3;
+  bool isExpired = 4;
+}
+
+message OrganizationRole {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 organizationId = 2 [ jstype = JS_STRING ];
+  string role = 3;
+  string organizationName = 4;
+}
+
+message ProjectRole {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 projectId = 2 [ jstype = JS_STRING ];
+  string role = 3;
+  string projectName = 4;
+}
+
+message FeaturePermission {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  string feature = 2;
+  bool isEnable = 3;
+}
+
+message Authentication {
+  User user = 1;
+  Token token = 2;
+  optional OrganizationRole organizationRole = 3;
+  repeated ProjectRole projectRoles = 4;
+  repeated FeaturePermission featurePermissions = 5;
+}
+
+message ScopedAuthentication {
+  uint64 userId = 1;
+  uint64 organizationId = 2;
+  uint64 projectId = 3;
+  string status = 4;
+}
+
+message AuthenticationError {
+  uint64 errorCode = 1 [ jstype = JS_STRING ];
+  string errorMessage = 2;
+  string humanMessage = 3;
+}
+
+message AuthenticateResponse {
+  int32 code = 1;
+  bool success = 2;
+  optional Authentication data = 3;
+  optional AuthenticationError error = 4;
+}
+
+message ForgotPasswordRequest { string email = 1; }
+
+message ForgotPasswordResponse {
+  int32 code = 1;
+  bool success = 2;
+  optional AuthenticationError error = 3;
+}
+
+// message ChangePasswordRequest{
+//     string oldPassword = 1;
+//     string password = 2;
+// }
+
+message CreatePasswordRequest {
+  string token = 1;
+  string password = 2;
+}
+
+message CreatePasswordResponse {
+  int32 code = 1;
+  bool success = 2;
+  optional AuthenticationError error = 3;
+}
+
+message VerifyTokenRequest {
+  string tokenType = 1;
+  string token = 2;
+}
+
+message VerifyTokenResponse {
+  int32 code = 1;
+  bool success = 2;
+  Token data = 3;
+}
+message AuthorizeRequest {}
+message ScopeAuthorizeRequest { string scope = 1; }
+message ScopedAuthenticationResponse {
+  int32 code = 1;
+  bool success = 2;
+  ScopedAuthentication data = 3;
+  optional AuthenticationError error = 4;
+}
+
+message GetUserRequest {}
+message GetUserResponse {
+  int32 code = 1;
+  bool success = 2;
+  User data = 3;
+}
+
+message UpdateUserRequest {
+  optional string email = 1;
+  optional string name = 2;
+}
+message UpdateUserResponse {
+  int32 code = 1;
+  bool success = 2;
+  User data = 3;
+}
+
+message SocialAuthenticationRequest {
+  string state = 1;
+  string code = 2;
+}
+message GetAllUserRequest {
+  Paginate paginate = 1;
+  repeated Criteria criterias = 2;
+}
+
+message GetAllUserResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated User data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+
+service AuthenticationService {
+  rpc Authenticate(AuthenticateRequest) returns (AuthenticateResponse);
+  rpc RegisterUser(RegisterUserRequest) returns (AuthenticateResponse);
+  rpc Authorize(AuthorizeRequest) returns (AuthenticateResponse);
+  rpc ScopeAuthorize(ScopeAuthorizeRequest)
+      returns (ScopedAuthenticationResponse);
+
+  //
+  rpc VerifyToken(VerifyTokenRequest) returns (VerifyTokenResponse);
+  rpc ForgotPassword(ForgotPasswordRequest) returns (ForgotPasswordResponse);
+  rpc CreatePassword(CreatePasswordRequest) returns (CreatePasswordResponse);
+
+  //
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
+  rpc GetAllUser(GetAllUserRequest) returns (GetAllUserResponse);
+
+  rpc Linkedin(SocialAuthenticationRequest) returns (AuthenticateResponse);
+  rpc Google(SocialAuthenticationRequest) returns (AuthenticateResponse);
+  rpc Github(SocialAuthenticationRequest) returns (AuthenticateResponse);
+}
+
+//
+//  Organization service
+//
+
+message OrganizationError {
+  uint64 errorCode = 1 [ jstype = JS_STRING ];
+  string errorMessage = 2;
+  string humanMessage = 3;
+}
+
+message CreateOrganizationRequest {
+  string organizationName = 1;
+  string organizationSize = 2;
+  string organizationIndustry = 3;
+  optional string organizationContact = 4;
+}
+
+message UpdateOrganizationRequest {
+  uint64 organizationId = 1 [ jstype = JS_STRING ];
+  optional string organizationName = 2;
+  optional string organizationIndustry = 3;
+  optional string organizationContact = 4;
+}
+
+message GetOrganizationRequest {}
+
+message GetOrganizationResponse {
+  int32 code = 1;
+  bool success = 2;
+  Organization data = 3;
+  OrganizationRole role = 4;
+  OrganizationError error = 5;
+}
+
+message CreateOrganizationResponse {
+  int32 code = 1;
+  bool success = 2;
+  Organization data = 3;
+  OrganizationRole role = 4;
+  OrganizationError error = 5;
+}
+
+message UpdateOrganizationResponse {
+  int32 code = 1;
+  bool success = 2;
+  OrganizationError error = 5;
+}
+
+message UpdateBillingInformationRequest {
+  enum BillingInterval {
+    Annually = 0;
+    Monthly = 1;
+  }
+  string paymentMethod = 1;
+  BillingInterval billingInterval = 2;
+  string taxInformation = 3;
+  string address = 4;
+  string email = 5;
+}
+
+service OrganizationService {
+  rpc CreateOrganization(CreateOrganizationRequest)
+      returns (CreateOrganizationResponse);
+  rpc GetOrganization(GetOrganizationRequest) returns (GetOrganizationResponse);
+  rpc UpdateOrganization(UpdateOrganizationRequest)
+      returns (UpdateOrganizationResponse);
+  rpc UpdateBillingInformation(UpdateBillingInformationRequest)
+      returns (BaseResponse);
+}
+
+message Project {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  string name = 2;
+  string description = 3;
+  repeated User members = 4;
+  string status = 5;
+  google.protobuf.Timestamp createdDate = 6;
+}
+
+message CreateProjectRequest {
+  string projectName = 1;
+  optional string projectDescription = 2;
+}
+
+message CreateProjectResponse {
+  int32 code = 1;
+  bool success = 2;
+  Project data = 3;
+  Error error = 4;
+}
+
+message UpdateProjectRequest {
+  uint64 projectId = 1 [ jstype = JS_STRING ];
+  optional string projectName = 2;
+  optional string projectDescription = 3;
+}
+message UpdateProjectResponse {
+  int32 code = 1;
+  bool success = 2;
+  Project data = 3;
+  Error error = 4;
+}
+
+message GetProjectRequest { uint64 projectId = 1 [ jstype = JS_STRING ]; }
+
+message GetProjectResponse {
+  int32 code = 1;
+  bool success = 2;
+  Project data = 3;
+  Error error = 4;
+}
+
+message GetAllProjectRequest {
+  Paginate paginate = 1;
+  repeated Criteria criterias = 2;
+}
+
+message GetAllProjectResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated Project data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+
+message AddUsersToProjectRequest {
+  string email = 1;
+  string role = 2;
+  repeated uint64 projectIds = 3 [ jstype = JS_STRING ];
+}
+
+message ArchiveProjectRequest { uint64 id = 1 [ jstype = JS_STRING ]; }
+
+message ArchiveProjectResponse {
+  int32 code = 1;
+  bool success = 2;
+  uint64 id = 3 [ jstype = JS_STRING ];
+  Error error = 4;
+}
+
+message AddUsersToProjectResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated Project data = 3;
+  Error error = 4;
+}
+
+message ProjectCredential {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 projectId = 2 [ jstype = JS_STRING ];
+  uint64 organizationId = 3 [ jstype = JS_STRING ];
+  string name = 4;
+  string key = 5;
+  string status = 6;
+  uint64 createdBy = 7 [ jstype = JS_STRING ];
+  uint64 updatedBy = 8 [ jstype = JS_STRING ];
+  google.protobuf.Timestamp createdDate = 9;
+  google.protobuf.Timestamp updatedDate = 10;
+
+  User createdUser = 11;
+}
+
+message CreateProjectCredentialRequest {
+  uint64 projectId = 1 [ jstype = JS_STRING ];
+  string name = 2;
+}
+
+message GetAllProjectCredentialRequest {
+  Paginate paginate = 1;
+  repeated Criteria criterias = 2;
+  uint64 projectId = 3 [ jstype = JS_STRING ];
+}
+
+message CreateProjectCredentialResponse {
+  int32 code = 1;
+  bool success = 2;
+  ProjectCredential data = 3;
+  Error error = 4;
+}
+
+message GetAllProjectCredentialResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated ProjectCredential data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+
+service ProjectService {
+  rpc CreateProject(CreateProjectRequest) returns (CreateProjectResponse);
+  rpc UpdateProject(UpdateProjectRequest) returns (UpdateProjectResponse);
+  rpc GetProject(GetProjectRequest) returns (GetProjectResponse);
+  rpc GetAllProject(GetAllProjectRequest) returns (GetAllProjectResponse);
+  rpc AddUsersToProject(AddUsersToProjectRequest)
+      returns (AddUsersToProjectResponse);
+  rpc ArchiveProject(ArchiveProjectRequest) returns (ArchiveProjectResponse);
+  rpc CreateProjectCredential(CreateProjectCredentialRequest)
+      returns (CreateProjectCredentialResponse);
+  rpc GetAllProjectCredential(GetAllProjectCredentialRequest)
+      returns (GetAllProjectCredentialResponse);
+}

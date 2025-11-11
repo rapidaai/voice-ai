@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/rapidaai/config"
+	config "github.com/rapidaai/api/web-api/config"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"golang.org/x/oauth2"
@@ -57,7 +57,7 @@ var (
 
 func NewMicrosoftAuthenticationConnect(cfg *config.WebAppConfig, logger commons.Logger, postgres connectors.PostgresConnector) MicrosoftConnect {
 	return MicrosoftConnect{
-		ExternalConnect: NewExternalConnect(&cfg.AppConfig, logger, postgres),
+		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		microsoftOauthConfig: oauth2.Config{
 			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), MICROSOFT_AUTHENTICATION_URL),
 			ClientID:     cfg.MicrosoftClientId,
@@ -69,7 +69,7 @@ func NewMicrosoftAuthenticationConnect(cfg *config.WebAppConfig, logger commons.
 	}
 }
 
-func NewMicrosoftSharepointConnect(cfg *config.AppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) MicrosoftConnect {
+func NewMicrosoftSharepointConnect(cfg *config.WebAppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) MicrosoftConnect {
 	return MicrosoftConnect{
 		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		microsoftOauthConfig: oauth2.Config{
@@ -83,7 +83,7 @@ func NewMicrosoftSharepointConnect(cfg *config.AppConfig, oauthCfg *config.OAuth
 	}
 }
 
-func NewMicrosoftOnedriveConnect(cfg *config.AppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) MicrosoftConnect {
+func NewMicrosoftOnedriveConnect(cfg *config.WebAppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) MicrosoftConnect {
 	return MicrosoftConnect{
 		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		microsoftOauthConfig: oauth2.Config{

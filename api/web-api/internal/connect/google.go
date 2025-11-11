@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/rapidaai/config"
+	config "github.com/rapidaai/api/web-api/config"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"golang.org/x/oauth2"
@@ -45,7 +45,7 @@ var (
 	GOOGLE_GMAIL_CONNECT_URL = "/connect-action/gmail"
 )
 
-func NewGoogleAuthenticationConnect(cfg *config.AppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) GoogleConnect {
+func NewGoogleAuthenticationConnect(cfg *config.WebAppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) GoogleConnect {
 	return GoogleConnect{
 		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		googleOauthConfig: oauth2.Config{
@@ -59,7 +59,7 @@ func NewGoogleAuthenticationConnect(cfg *config.AppConfig, oauthCfg *config.OAut
 	}
 }
 
-func NewGoogleDriveConnect(cfg *config.AppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) GoogleConnect {
+func NewGoogleDriveConnect(cfg *config.WebAppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) GoogleConnect {
 	return GoogleConnect{
 		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		googleOauthConfig: oauth2.Config{
@@ -73,7 +73,7 @@ func NewGoogleDriveConnect(cfg *config.AppConfig, oauthCfg *config.OAuthConfig, 
 	}
 }
 
-func NewGmailConnect(cfg *config.AppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) GoogleConnect {
+func NewGmailConnect(cfg *config.WebAppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) GoogleConnect {
 	return GoogleConnect{
 		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		googleOauthConfig: oauth2.Config{

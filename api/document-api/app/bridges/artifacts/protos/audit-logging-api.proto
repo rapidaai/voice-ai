@@ -1,0 +1,73 @@
+syntax = "proto3";
+package integration_api;
+option go_package = "github.com/lexatic/web-backend/protos/lexatic-backend";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+
+//
+// Auditing and response
+//
+//
+message AuditLog {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  string integrationName = 2;
+  string assetPrefix = 3;
+  int64 responseStatus = 4;
+  int64 timeTaken = 5;
+  string status = 6;
+  uint64 projectId = 7 [ jstype = JS_STRING ];
+  uint64 organizationId = 8 [ jstype = JS_STRING ];
+  uint64 credentialId = 9 [ jstype = JS_STRING ];
+  repeated Metadata externalAuditMetadatas = 10;
+  google.protobuf.Timestamp createdDate = 11;
+  google.protobuf.Timestamp updatedDate = 12;
+  google.protobuf.Struct request = 13;
+  google.protobuf.Struct response = 14;
+  repeated Metric metrics = 15;
+}
+message GetAllAuditLogRequest {
+  Paginate paginate = 1;
+  repeated Criteria criterias = 2;
+  uint64 projectId = 3 [ jstype = JS_STRING ];
+  uint64 organizationId = 4 [ jstype = JS_STRING ];
+}
+
+message GetAllAuditLogResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated AuditLog data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+
+message GetAuditLogRequest {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 projectId = 3 [ jstype = JS_STRING ];
+  uint64 organizationId = 4 [ jstype = JS_STRING ];
+}
+
+message GetAuditLogResponse {
+  int32 code = 1;
+  bool success = 2;
+  AuditLog data = 3;
+  Error error = 4;
+}
+
+message CreateMetadataRequest {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  map<string, string> additionalData = 2;
+}
+
+message CreateMetadataResponse {
+  int32 code = 1;
+  bool success = 2;
+  AuditLog data = 3;
+  Error error = 4;
+}
+
+service AuditLoggingService {
+  rpc GetAllAuditLog(GetAllAuditLogRequest) returns (GetAllAuditLogResponse);
+  rpc GetAuditLog(GetAuditLogRequest) returns (GetAuditLogResponse);
+  rpc CreateMetadata(CreateMetadataRequest) returns (CreateMetadataResponse);
+}

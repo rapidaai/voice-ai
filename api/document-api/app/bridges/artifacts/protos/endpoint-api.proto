@@ -1,0 +1,295 @@
+syntax = "proto3";
+package endpoint_api;
+option go_package = "github.com/lexatic/web-backend/protos/lexatic-backend";
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+
+message EndpointAttribute {
+  string source = 1;
+  uint64 sourceIdentifier = 2 [ jstype = JS_STRING ];
+  string visibility = 4;
+  string language = 6;
+  string name = 7;
+  string description = 8;
+}
+
+//
+// attributes that help to create
+message EndpointProviderModelAttribute {
+  string description = 1;
+  TextChatCompletePrompt chatCompletePrompt = 2;
+  uint64 modelProviderId = 6 [ jstype = JS_STRING ];
+  string modelProviderName = 7;
+  repeated Metadata endpointModelOptions = 8;
+}
+
+message CreateEndpointRequest {
+  EndpointProviderModelAttribute endpointProviderModelAttribute = 1;
+  EndpointAttribute endpointAttribute = 2;
+  EndpointRetryConfiguration retryConfiguration = 3;
+  EndpointCacheConfiguration cacheConfiguration = 4;
+  repeated string tags = 5;
+}
+
+message CreateEndpointResponse {
+  int32 code = 1;
+  bool success = 2;
+  Endpoint data = 3;
+  Error error = 4;
+}
+
+message EndpointProviderModel {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  TextChatCompletePrompt chatCompletePrompt = 2;
+
+  uint64 modelProviderId = 3 [ jstype = JS_STRING ];
+  string modelProviderName = 4;
+  repeated Metadata endpointModelOptions = 5;
+
+  string status = 12;
+  uint64 createdBy = 13 [ jstype = JS_STRING ];
+  User createdUser = 14;
+  uint64 updatedBy = 15 [ jstype = JS_STRING ];
+  User updatedUser = 16;
+  google.protobuf.Timestamp createdDate = 17;
+  google.protobuf.Timestamp updatedDate = 18;
+
+  uint64 endpointId = 19 [ jstype = JS_STRING ];
+  string description = 20;
+}
+
+message AggregatedEndpointAnalytics {
+  uint64 count = 1 [ jstype = JS_STRING ];
+  float totalInputCost = 2;
+  float totalOutputCost = 3;
+  uint64 totalToken = 4 [ jstype = JS_STRING ];
+  uint64 successCount = 5 [ jstype = JS_STRING ];
+  uint64 errorCount = 6 [ jstype = JS_STRING ];
+  float p50Latency = 7;
+  float p99Latency = 8;
+  google.protobuf.Timestamp lastActivity = 9;
+}
+
+message Endpoint {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  string status = 2;
+  string visibility = 3;
+  string source = 4;
+  uint64 sourceIdentifier = 5 [ jstype = JS_STRING ];
+  uint64 projectId = 7 [ jstype = JS_STRING ];
+  uint64 organizationId = 8 [ jstype = JS_STRING ];
+  uint64 endpointProviderModelId = 9 [ jstype = JS_STRING ];
+  EndpointProviderModel endpointProviderModel = 10;
+  // endpoint analytics
+  AggregatedEndpointAnalytics endpointAnalytics = 11;
+
+  EndpointRetryConfiguration endpointRetry = 12;
+  EndpointCacheConfiguration endpointCaching = 13;
+  Tag endpointTag = 14;
+  string language = 16;
+  Organization organization = 17;
+  string name = 18;
+  string description = 19;
+
+  google.protobuf.Timestamp createdDate = 20;
+  google.protobuf.Timestamp updatedDate = 21;
+
+  uint64 createdBy = 22 [ jstype = JS_STRING ];
+  User createdUser = 23;
+  uint64 updatedBy = 24 [ jstype = JS_STRING ];
+  User updatedUser = 25;
+}
+
+message CreateEndpointProviderModelRequest {
+  uint64 endpointId = 1 [ jstype = JS_STRING ];
+  EndpointProviderModelAttribute endpointProviderModelAttribute = 2;
+}
+
+message CreateEndpointProviderModelResponse {
+  int32 code = 1;
+  bool success = 2;
+  EndpointProviderModel data = 3;
+  Error error = 4;
+}
+
+// get request
+message GetEndpointRequest {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  optional uint64 endpointProviderModelId = 4 [ jstype = JS_STRING ];
+}
+message GetEndpointResponse {
+  int32 code = 1;
+  bool success = 2;
+  Endpoint data = 3;
+  Error error = 4;
+}
+
+message GetAllEndpointRequest {
+  Paginate paginate = 1;
+  repeated Criteria criterias = 2;
+}
+
+message GetAllEndpointResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated Endpoint data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+
+message GetAllEndpointProviderModelRequest {
+  Paginate paginate = 1;
+  repeated Criteria criterias = 2;
+  uint64 endpointId = 5 [ jstype = JS_STRING ];
+}
+
+message GetAllEndpointProviderModelResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated EndpointProviderModel data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+
+message UpdateEndpointVersionRequest {
+  uint64 endpointId = 1 [ jstype = JS_STRING ];
+  uint64 endpointProviderModelId = 2 [ jstype = JS_STRING ];
+}
+
+message UpdateEndpointVersionResponse {
+  int32 code = 1;
+  bool success = 2;
+  Endpoint data = 3;
+  Error error = 4;
+}
+
+message EndpointRetryConfiguration {
+  string retryType = 2;
+  uint64 maxAttempts = 3 [ jstype = JS_STRING ];
+  uint64 delaySeconds = 4 [ jstype = JS_STRING ];
+  bool exponentialBackoff = 5;
+  repeated string retryables = 6;
+  uint64 createdBy = 8 [ jstype = JS_STRING ];
+  uint64 updatedBy = 9 [ jstype = JS_STRING ];
+}
+
+message EndpointCacheConfiguration {
+  string cacheType = 2;
+  uint64 expiryInterval = 3 [ jstype = JS_STRING ];
+  float matchThreshold = 4;
+  uint64 createdBy = 5 [ jstype = JS_STRING ];
+  uint64 updatedBy = 6 [ jstype = JS_STRING ];
+}
+message CreateEndpointRetryConfigurationRequest {
+  uint64 endpointId = 1 [ jstype = JS_STRING ];
+  EndpointRetryConfiguration data = 2;
+}
+
+message CreateEndpointRetryConfigurationResponse {
+  int32 code = 1;
+  bool success = 2;
+  EndpointRetryConfiguration data = 3;
+  Error error = 4;
+}
+
+message CreateEndpointCacheConfigurationRequest {
+  uint64 endpointId = 1 [ jstype = JS_STRING ];
+  EndpointCacheConfiguration data = 2;
+}
+
+message CreateEndpointCacheConfigurationResponse {
+  int32 code = 1;
+  bool success = 2;
+  EndpointCacheConfiguration data = 3;
+  Error error = 4;
+}
+
+message CreateEndpointTagRequest {
+  uint64 endpointId = 1 [ jstype = JS_STRING ];
+  repeated string tags = 2;
+}
+
+message ForkEndpointRequest {
+  uint64 endpointId = 1 [ jstype = JS_STRING ];
+  uint64 endpointProviderId = 3 [ jstype = JS_STRING ];
+}
+
+message UpdateEndpointDetailRequest {
+  uint64 endpointId = 1 [ jstype = JS_STRING ];
+  string name = 2;
+  string description = 3;
+}
+
+message EndpointLog {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 endpointId = 2 [ jstype = JS_STRING ];
+  string source = 3;
+  string status = 15;
+
+  uint64 projectId = 16 [ jstype = JS_STRING ];
+  uint64 organizationId = 17 [ jstype = JS_STRING ];
+  uint64 endpointProviderModelId = 19 [ jstype = JS_STRING ];
+
+  uint64 timeTaken = 25 [ jstype = JS_STRING ];
+  google.protobuf.Timestamp createdDate = 26;
+  google.protobuf.Timestamp updatedDate = 27;
+
+  repeated Metric metrics = 30;
+  repeated Metadata metadata = 32;
+  repeated Argument arguments = 31;
+  repeated Metadata options = 33;
+}
+
+message GetAllEndpointLogRequest {
+  Paginate paginate = 1;
+  repeated Criteria criterias = 2;
+  uint64 endpointId = 3 [ jstype = JS_STRING ];
+}
+message GetAllEndpointLogResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated EndpointLog data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+message GetEndpointLogRequest {
+  uint64 endpointId = 1 [ jstype = JS_STRING ];
+  uint64 id = 2 [ jstype = JS_STRING ];
+}
+message GetEndpointLogResponse {
+  int32 code = 1;
+  bool success = 2;
+  EndpointLog data = 3;
+  Error error = 4;
+}
+
+service EndpointService {
+  rpc GetEndpoint(GetEndpointRequest) returns (GetEndpointResponse);
+  rpc GetAllEndpoint(GetAllEndpointRequest) returns (GetAllEndpointResponse);
+
+  rpc GetAllEndpointProviderModel(GetAllEndpointProviderModelRequest)
+      returns (GetAllEndpointProviderModelResponse);
+
+  rpc UpdateEndpointVersion(UpdateEndpointVersionRequest)
+      returns (UpdateEndpointVersionResponse);
+
+  //
+  rpc CreateEndpoint(CreateEndpointRequest) returns (CreateEndpointResponse);
+  rpc CreateEndpointProviderModel(CreateEndpointProviderModelRequest)
+      returns (CreateEndpointProviderModelResponse);
+
+  //   next gen
+  rpc CreateEndpointCacheConfiguration(CreateEndpointCacheConfigurationRequest)
+      returns (CreateEndpointCacheConfigurationResponse);
+  rpc CreateEndpointRetryConfiguration(CreateEndpointRetryConfigurationRequest)
+      returns (CreateEndpointRetryConfigurationResponse);
+  rpc CreateEndpointTag(CreateEndpointTagRequest) returns (GetEndpointResponse);
+  rpc ForkEndpoint(ForkEndpointRequest) returns (BaseResponse);
+
+  rpc UpdateEndpointDetail(UpdateEndpointDetailRequest)
+      returns (GetEndpointResponse);
+
+  rpc GetAllEndpointLog(GetAllEndpointLogRequest)
+      returns (GetAllEndpointLogResponse);
+  rpc GetEndpointLog(GetEndpointLogRequest) returns (GetEndpointLogResponse);
+}

@@ -1,0 +1,52 @@
+syntax = "proto3";
+package marketplace_api;
+option go_package = "github.com/lexatic/web-backend/protos/lexatic-backend";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+import "common.proto";
+
+message GetAllDeploymentRequest {
+  Paginate paginate = 1;
+  repeated Criteria criterias = 2;
+}
+
+message SearchableDeployment {
+  string id = 1;
+  string status = 2;
+  string visibility = 3;
+
+  string type = 4;
+  string projectId = 7;
+  string organizationId = 8;
+  repeated string tag = 14;
+
+  //
+  string language = 16;
+  Organization organization = 17;
+
+  //
+  string name = 18;
+  string description = 19;
+
+  google.protobuf.Timestamp createdDate = 20;
+  google.protobuf.Timestamp updatedDate = 21;
+
+  google.protobuf.Struct appAppearance = 24;
+  google.protobuf.Struct webAppearance = 25;
+
+  uint64 modelProviderId = 26 [ jstype = JS_STRING ];
+  string modelProviderName = 27;
+  repeated Metadata modelOptions = 12;
+}
+
+message GetAllDeploymentResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated SearchableDeployment data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+service MarketplaceService {
+  rpc GetAllDeployment(GetAllDeploymentRequest)
+      returns (GetAllDeploymentResponse);
+}

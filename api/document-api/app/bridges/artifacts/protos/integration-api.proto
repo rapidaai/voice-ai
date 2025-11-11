@@ -1,0 +1,253 @@
+syntax = "proto3";
+package integration_api;
+option go_package = "github.com/lexatic/web-backend/protos/lexatic-backend";
+import "common.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/any.proto";
+
+message Credential {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  google.protobuf.Struct value = 2;
+}
+
+message ToolDefinition {
+  // type of tool call
+  string type = 1;
+
+  //   defnition for tool call
+  optional FunctionDefinition functionDefinition = 2;
+}
+
+message FunctionDefinition {
+  // REQUIRED; The name of the function to be called.
+  string name = 1;
+
+  // A description of what the function does. The model will use this
+  // description when selecting the function and interpreting its parameters.
+  string description = 2;
+
+  // REQUIRED; The function definition details for the function tool.
+  FunctionParameter parameters = 3;
+}
+
+message FunctionParameter {
+
+  // list of required parameter for function call
+  repeated string required = 1;
+
+  //   type should be object
+  string type = 2;
+
+  //   parameters
+  map<string, FunctionParameterProperty> properties = 3;
+}
+
+message FunctionParameterProperty {
+  // type of parameters could be enum, bool etc
+  string type = 1;
+  //   a valid defnition
+  string description = 2;
+
+  repeated string enum = 3;
+  // what if it is an array
+  FunctionParameter items = 4;
+}
+
+//
+//  Embedding request and response
+//
+
+message Embedding {
+  int32 index = 1;
+  repeated double embedding = 2;
+  string base64 = 3;
+}
+
+message EmbeddingRequest {
+  Credential credential = 1;
+  map<int32, string> content = 4;
+  map<string, google.protobuf.Any> modelParameters = 5;
+  map<string, string> additionalData = 6;
+}
+
+message EmbeddingResponse {
+  int32 code = 1;
+  bool success = 2;
+  uint64 requestId = 3;
+  repeated Embedding data = 4;
+  optional Error error = 5;
+  repeated Metric metrics = 6;
+}
+
+//
+// Reranking request and response
+//
+
+message Reranking {
+  int32 index = 1;
+  Content content = 2;
+  double RelevanceScore = 3;
+}
+
+message RerankingRequest {
+  Credential credential = 1;
+  string query = 4;
+  map<int32, Content> content = 5;
+  map<string, google.protobuf.Any> modelParameters = 6;
+  map<string, string> additionalData = 7;
+}
+
+message RerankingResponse {
+  int32 code = 1;
+  bool success = 2;
+  uint64 requestId = 3;
+  repeated Reranking data = 4;
+  Error error = 5;
+  repeated Metric metrics = 6;
+}
+
+//
+//
+//
+message ChatResponse {
+  int32 code = 1;
+  bool success = 2;
+  uint64 requestId = 3;
+  optional Message data = 4;
+  optional Error error = 6;
+  repeated Metric metrics = 7;
+  string finishReason = 8;
+}
+message ChatRequest {
+  Credential credential = 1;
+  repeated Message conversations = 4;
+  map<string, string> additionalData = 5;
+  map<string, google.protobuf.Any> modelParameters = 6;
+  repeated ToolDefinition toolDefinitions = 7;
+}
+
+message VerifyCredentialRequest { Credential credential = 1; }
+message VerifyCredentialResponse {
+  int32 code = 1;
+  bool success = 2;
+  uint64 requestId = 3;
+  optional string response = 4;
+  string errorMessage = 5;
+}
+
+//
+//
+//
+message Moderation {
+  string name = 1;
+  string value = 2;
+}
+
+message GetModerationRequest {
+  Credential credential = 1;
+  string model = 2;
+  string version = 3;
+  Content content = 4;
+  map<string, string> additionalData = 5;
+  map<string, google.protobuf.Any> modelParameters = 6;
+}
+
+message GetModerationResponse {
+  int32 code = 1;
+  bool success = 2;
+  uint64 requestId = 3;
+  repeated Moderation data = 4;
+  Error error = 5;
+  repeated Metric metrics = 6;
+}
+
+service BedrockService {
+  rpc Embedding(EmbeddingRequest) returns (EmbeddingResponse);
+  rpc Chat(ChatRequest) returns (ChatResponse);
+  rpc VerifyCredential(VerifyCredentialRequest)
+      returns (VerifyCredentialResponse);
+}
+
+service OpenAiService {
+  rpc Embedding(EmbeddingRequest) returns (EmbeddingResponse);
+  rpc Chat(ChatRequest) returns (ChatResponse);
+  rpc StreamChat(ChatRequest) returns (stream ChatResponse);
+  rpc VerifyCredential(VerifyCredentialRequest)
+      returns (VerifyCredentialResponse);
+  rpc GetModeration(GetModerationRequest) returns (GetModerationResponse);
+}
+
+service AzureService {
+  rpc Embedding(EmbeddingRequest) returns (EmbeddingResponse);
+  rpc Chat(ChatRequest) returns (ChatResponse);
+  rpc StreamChat(ChatRequest) returns (stream ChatResponse);
+  rpc VerifyCredential(VerifyCredentialRequest)
+      returns (VerifyCredentialResponse);
+  rpc GetModeration(GetModerationRequest) returns (GetModerationResponse);
+}
+
+service GoogleService {
+  rpc Embedding(EmbeddingRequest) returns (EmbeddingResponse);
+  rpc Chat(ChatRequest) returns (ChatResponse);
+  rpc StreamChat(ChatRequest) returns (stream ChatResponse);
+  rpc VerifyCredential(VerifyCredentialRequest)
+      returns (VerifyCredentialResponse);
+}
+
+service ReplicateService {
+  rpc Chat(ChatRequest) returns (ChatResponse);
+  rpc StreamChat(ChatRequest) returns (stream ChatResponse);
+  rpc VerifyCredential(VerifyCredentialRequest)
+      returns (VerifyCredentialResponse);
+}
+service AnthropicService {
+  rpc Chat(ChatRequest) returns (ChatResponse);
+  rpc StreamChat(ChatRequest) returns (stream ChatResponse);
+  rpc VerifyCredential(VerifyCredentialRequest)
+      returns (VerifyCredentialResponse);
+}
+
+service CohereService {
+  rpc Embedding(EmbeddingRequest) returns (EmbeddingResponse);
+  rpc Reranking(RerankingRequest) returns (RerankingResponse);
+  rpc Chat(ChatRequest) returns (ChatResponse);
+  rpc StreamChat(ChatRequest) returns (stream ChatResponse);
+  rpc VerifyCredential(VerifyCredentialRequest)
+      returns (VerifyCredentialResponse);
+}
+
+service HuggingfaceService {
+  rpc Chat(ChatRequest) returns (ChatResponse);
+  rpc VerifyCredential(VerifyCredentialRequest)
+      returns (VerifyCredentialResponse);
+}
+
+service MistralService {
+  rpc Chat(ChatRequest) returns (ChatResponse);
+  rpc StreamChat(ChatRequest) returns (stream ChatResponse);
+  rpc VerifyCredential(VerifyCredentialRequest)
+      returns (VerifyCredentialResponse);
+}
+
+service StabilityAiService {
+  rpc VerifyCredential(VerifyCredentialRequest)
+      returns (VerifyCredentialResponse);
+}
+
+service TogetherAiService {
+  rpc Chat(ChatRequest) returns (ChatResponse);
+  rpc VerifyCredential(VerifyCredentialRequest)
+      returns (VerifyCredentialResponse);
+}
+
+service DeepInfraService {
+  rpc VerifyCredential(VerifyCredentialRequest)
+      returns (VerifyCredentialResponse);
+}
+
+service VoyageAiService {
+  rpc Embedding(EmbeddingRequest) returns (EmbeddingResponse);
+  rpc Reranking(RerankingRequest) returns (RerankingResponse);
+  rpc VerifyCredential(VerifyCredentialRequest)
+      returns (VerifyCredentialResponse);
+}

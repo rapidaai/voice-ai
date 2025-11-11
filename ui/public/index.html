@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="manifest" href="/favicon_io/site.webmanifest" />
+    <!-- Touch Icons - iOS and Android 2.1+ 152x152 pixels in size. -->
+    <link
+      rel="apple-touch-icon-precomposed"
+      href="favicon_io/apple-touch-icon.png"
+    />
+
+    <!-- Firefox, Chrome, Safari, IE 11+ and Opera. 96x96 pixels in size. -->
+    <link rel="icon" href="/favicon_io/favicon.ico" />
+    <link
+      rel="icon"
+      href="/favicon_io/favicon-16x16.png"
+      sizes="16x16"
+      type="image/png"
+    />
+    <link
+      rel="icon"
+      href="/favicon_io/favicon-32x32.png"
+      sizes="32x32"
+      type="image/png"
+    />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!--  -->
+    <!--
+      manifest.json provides metadata used when your web app is installed on a
+      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
+    -->
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+
+    <!--
+      Notice the use of %PUBLIC_URL% in the tags above.
+      It will be replaced with the URL of the `public` folder during the build.
+      Only files inside the `public` folder can be referenced from the HTML.
+
+      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
+      work correctly both with client-side routing and a non-root public URL.
+      Learn how to configure a non-root public URL by running `npm run build`.
+    -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&display=swap"
+      rel="stylesheet"
+    />
+
+    <title>RapidaAI App</title>
+    <!-- Google Tag Manager -->
+    <script>
+      (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
+        var f = d.getElementsByTagName(s)[0],
+          j = d.createElement(s),
+          dl = l != 'dataLayer' ? '&l=' + l : '';
+        j.async = true;
+        j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl;
+        f.parentNode.insertBefore(j, f);
+      })(window, document, 'script', 'dataLayer', 'GTM-M8W6J9HH');
+    </script>
+    <script>
+      function initApollo() {
+        var n = Math.random().toString(36).substring(7),
+          o = document.createElement('script');
+        (o.src =
+          'https://assets.apollo.io/micro/website-tracker/tracker.iife.js?nocache=' +
+          n),
+          (o.async = !0),
+          (o.defer = !0),
+          (o.onload = function () {
+            window.trackingFunctions.onLoad({
+              appId: '68b6fe07d09f0a000da6c4f7',
+            });
+          }),
+          document.head.appendChild(o);
+      }
+      initApollo();
+    </script>
+    <!-- End Google Tag Manager -->
+  </head>
+  <body
+    class="dark:bg-gray-900 text-gray-800 dark:text-gray-400 antialiased dark:border-gray-700"
+  >
+    <!-- Google Tag Manager (noscript) -->
+    <noscript
+      ><iframe
+        src="https://www.googletagmanager.com/ns.html?id=GTM-M8W6J9HH"
+        height="0"
+        width="0"
+        style="display: none; visibility: hidden"
+      ></iframe
+    ></noscript>
+    <!-- End Google Tag Manager (noscript) -->
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+
+    <!--
+      This HTML file is a template.
+      If you open it directly in the browser, you will see an empty page.
+
+      You can add webfonts, meta tags, or analytics to this file.
+      The build step will place the bundled scripts into the <body> tag.
+
+      To begin the development, run `npm start` or `yarn start`.
+      To create a production bundle, use `npm run build` or `yarn build`.
+    -->
+    <!-- <script>
+      window.chatbotConfig = {
+        assistant_id: '2139446511778398208',
+        token:
+          'fe0727dd45acf2efce0752c4ff0783f232e559575bbfca059365333f2df2819a',
+        user: {
+          id: 'rapida-string',
+          name: 'guest',
+        },
+      };
+    </script> -->
+    <!-- <script
+      src="https://cdn-01.rapida.ai/public/scripts/app.min.js"
+      defer
+    ></script> -->
+  </body>
+</html>

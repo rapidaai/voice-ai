@@ -1,0 +1,23 @@
+# RapidaAI
+
+## Overview
+[Welcome to Rapida documentation](https://doc.rapida.ai/): This page serves as an introduction to the Rapida documentation, providing users with essential information on how to navigate and utilize the resources available.
+
+## Blog
+[Rapida](https://blog.rapida.ai/): The official blog of Rapida, featuring updates, insights, and articles related to the application and its features.
+
+## Home
+[rapida.ai: Home](https://www.rapida.ai/): The main homepage of Rapida, offering an overview of the application, its functionalities, and access to various resources.
+
+## User Accounts
+[Signin to your account](https://www.rapida.ai/auth/signin): A page dedicated to the login process for existing users, detailing the steps to access their accounts securely.
+
+[Signing up to your account](https://www.rapida.ai/auth/signup): This page outlines the registration process for new users, including the necessary steps to create an account and start using Rapida.
+
+## News and Updates
+[News](https://blog.rapida.ai/tag/news/): A section that provides the latest news and updates regarding Rapida, including feature releases and important announcements.
+## Legal Information
+[Terms of Service](https://www.rapida.ai/static/terms-conditions): The legal agreement that outlines the terms and conditions for using the Rapida application and services.
+[Privacy Policy](https://www.rapida.ai/static/privacy-policy): This document explains how Rapida collects, uses, and protects user data, ensuring compliance with privacy regulations.
+## Contributors
+[Prashant Srivastav](https://blog.rapida.ai/author/prashant-srivastav/): A contributor to the Rapida project, providing insights and expertise in the development and documentation of the application.

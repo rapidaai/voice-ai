@@ -1,0 +1,84 @@
+version: 0.2
+env:
+  parameter-store:
+    DEPLOY_KEY: "DEPLOY_KEY"
+  variables:
+    GO_PROJECT_MODULE: "github.com/rapidaai/protos"
+    OUT_DIR: "/protos/rapidaai/"
+phases:
+  install:
+    commands:
+      - echo "add deploy key"
+      - mkdir -p ~/.ssh
+      - echo "$DEPLOY_KEY" | base64 -d > ~/.ssh/id_rsa
+      - chmod 600 ~/.ssh/id_rsa
+      - eval "$(ssh-agent -s)"
+      - echo "disable strict host key check"
+      - touch ~/.ssh/config
+      - echo "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+      - yum install -y gcc make autoconf automake libtool
+    runtime-versions:
+      golang: 1.21
+  pre_build:
+    commands:
+      - export PB_REL=https://github.com/protocolbuffers/protobuf/releases
+      - curl -LO $PB_REL/download/v3.20.0/protoc-3.20.0-linux-x86_64.zip
+      - unzip protoc-3.20.0-linux-x86_64.zip -d $HOME/protobuf
+      - ln -s $HOME/protobuf/bin/protoc /usr/local/bin/protoc
+      - go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.0
+      - go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
+
+      # Download and install ONNX Runtime
+      - wget https://github.com/microsoft/onnxruntime/releases/download/v1.16.0/onnxruntime-linux-x64-1.16.0.tgz
+      - mkdir -p /opt/onnxruntime
+      - tar -xzf onnxruntime-linux-x64-1.16.0.tgz -C /opt/onnxruntime --strip-components=1
+
+      # Set environment variables for ONNX Runtime (export only once)
+      - export CGO_CFLAGS="-I/opt/onnxruntime/include"
+      - export CGO_LDFLAGS="-L/opt/onnxruntime/lib -lonnxruntime"
+      - export LD_LIBRARY_PATH="/opt/onnxruntime/lib:$LD_LIBRARY_PATH"
+
+      # Clone and build RNNoise
+      - git clone https://github.com/xiph/rnnoise.git
+      - cd rnnoise
+      - ./autogen.sh
+      - ./configure --prefix=/usr/local
+      - make
+      - sudo make install # Ensure installation is done with proper permissions
+
+      # Append RNNoise-specific flags to the environment variables
+      - export CGO_CFLAGS="$CGO_CFLAGS -I/usr/local/include" # Append RNNoise include path
+      - export CGO_LDFLAGS="$CGO_LDFLAGS -L/usr/local/lib -lrnnoise" # Append RNNoise library path
+      - export LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH" # Append RNNoise library path
+
+      # for azure sdk
+      - wget -O SpeechSDK-Linux.tar.gz https://aka.ms/csspeech/linuxbinary
+      - mkdir -p /opt/azure-speech-sdk
+      - tar --strip 1 -xzf SpeechSDK-Linux.tar.gz -C /opt/azure-speech-sdk
+      # this is temp fixes as Speech_SegmentationMaximumTimeMs is decleared twice check the azure sdk did there is work around
+      - sed -i '/Speech_SegmentationMaximumTimeMs = 9004/d'  /opt/azure-speech-sdk/include/c_api/speechapi_c_property_bag.h
+      - export CGO_CFLAGS="$CGO_CFLAGS -I/opt/azure-speech-sdk/include/c_api"
+      - export CGO_LDFLAGS="$CGO_LDFLAGS -L/opt/azure-speech-sdk/lib/x64 -lMicrosoft.CognitiveServices.Speech.core"
+      # Return to the previous directory
+      - cd -
+
+  build:
+    commands:
+      - git submodule update --init --recursive
+      - echo "Checking out submodule at specific commit"
+      - go mod download
+      - sh bin/artifacts-generate.sh
+      - GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -o assistant-api.0.0.1 cmd/assistant/assistant.go
+      - cp aws/assistant-api/appspec.yml ./appspec.yml
+      - cp aws/assistant-api/env/env.production ./env.production
+      - cp -r aws/assistant-api/scripts scripts
+artifacts:
+  files:
+    - assistant-api.0.0.1
+    - appspec.yml
+    - env.production
+    - scripts/*
+cache:
+  paths:
+    - "/go/pkg/**/*"
+    - "/go/pkg/**.*"

@@ -1,0 +1,11 @@
+appId: ai.rapida.talk
+productName: Rapida copilot
+directories:
+  output: dist
+files:
+  - '**/*'
+mac:
+  category: your.app.category
+  icon: build/icon.icns
+win:
+  icon: build/icon.ico

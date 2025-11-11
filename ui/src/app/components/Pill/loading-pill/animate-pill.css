@@ -1,0 +1,62 @@
+/* Demo only */
+body {
+    background: #111;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+
+
+.card .inner {
+
+    background: #222;
+}
+
+.card h3 {
+    margin-bottom: 15px;
+}
+
+.example-1,
+.example-2 {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.example-2 .inner {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+}
+
+@keyframes rotate {
+    from {
+        transform: rotate(0);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.example-2 .inner {
+    margin: 2px;
+}
+
+.example-2::before {
+    content: "";
+    display: block;
+    background: linear-gradient(90deg,
+            rgba(255, 255, 255, 0) 0%,
+            rgba(102, 102, 102, 0.75) 50%,
+            rgba(255, 255, 255, 0) 100%);
+    height: 300px;
+    width: 100px;
+    transform: translate(0);
+    position: absolute;
+    animation: rotate 5s linear forwards infinite;
+    z-index: 0;
+    top: 50%;
+    transform-origin: top center;
+}

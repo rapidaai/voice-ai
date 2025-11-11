@@ -1,0 +1,56 @@
+syntax = "proto3";
+package endpoint_api;
+option go_package = "github.com/lexatic/web-backend/protos/lexatic-backend";
+import "google/protobuf/struct.proto";
+import "google/protobuf/any.proto";
+import "common.proto";
+
+message EndpointDefinition {
+  uint64 endpointId = 1 [ jstype = JS_STRING ];
+  string version = 2;
+}
+
+message InvokeRequest {
+  EndpointDefinition endpoint = 1;
+  map<string, google.protobuf.Any> args = 5;
+  map<string, google.protobuf.Any> metadata = 6;
+  map<string, google.protobuf.Any> options = 7;
+}
+
+message InvokeResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated Content data = 3;
+  optional Error error = 4;
+
+  uint64 requestId = 5;
+  uint64 timeTaken = 6;
+  repeated Metric metrics = 7;
+  google.protobuf.Struct meta = 8;
+}
+
+message UpdateRequest {
+  uint64 requestId = 1 [ jstype = JS_STRING ];
+  google.protobuf.Struct metadata = 2;
+}
+
+message UpdateResponse {
+  int32 code = 1;
+  bool success = 2;
+  optional Error error = 3;
+}
+
+message ProbeRequest { uint64 requestId = 1 [ jstype = JS_STRING ]; }
+
+message ProbeResponse {
+  int32 code = 1;
+  bool success = 2;
+  google.protobuf.Struct data = 3;
+  optional Error error = 4;
+}
+
+service Deployment {
+  rpc Invoke(InvokeRequest) returns (InvokeResponse);
+  rpc Update(UpdateRequest) returns (UpdateResponse);
+  rpc Probe(ProbeRequest) returns (ProbeResponse);
+}

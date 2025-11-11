@@ -1,0 +1,295 @@
+syntax = "proto3";
+package assistant_api;
+option go_package = "github.com/lexatic/web-backend/protos/lexatic-backend";
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+import "assistant-deployment.proto";
+import "assistant-tool.proto";
+import "assistant-analysis.proto";
+import "assistant-webhook.proto";
+import "assistant-knowledge.proto";
+
+message Assistant {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  string status = 2;
+  string visibility = 3;
+  string source = 4;
+  uint64 sourceIdentifier = 5 [ jstype = JS_STRING ];
+  repeated AssistantTool assistantTools = 6;
+
+  //
+  uint64 projectId = 7 [ jstype = JS_STRING ];
+  uint64 organizationId = 8 [ jstype = JS_STRING ];
+  uint64 assistantProviderModelId = 9 [ jstype = JS_STRING ];
+  AssistantProviderModel assistantProviderModel = 10;
+
+  string name = 11;
+  string description = 12;
+
+  Tag assistantTag = 14;
+  string language = 16;
+  Organization organization = 17;
+
+  uint64 createdBy = 22 [ jstype = JS_STRING ];
+  User createdUser = 23;
+  uint64 updatedBy = 24 [ jstype = JS_STRING ];
+  User updatedUser = 25;
+
+  google.protobuf.Timestamp createdDate = 26;
+  google.protobuf.Timestamp updatedDate = 27;
+
+  AssistantDebuggerDeployment debuggerDeployment = 30;
+  AssistantPhoneDeployment phoneDeployment = 31;
+  AssistantWhatsappDeployment whatsappDeployment = 32;
+  AssistantWebpluginDeployment webPluginDeployment = 33;
+  AssistantApiDeployment apiDeployment = 34;
+  //
+  repeated AssistantConversation assistantConversations = 35;
+  repeated AssistantWebhook assistantWebhooks = 36;
+}
+
+message AssistantProviderModel {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  TextChatCompletePrompt template = 2;
+  string description = 3;
+  //
+  uint64 modelProviderId = 6 [ jstype = JS_STRING ];
+  string modelProviderName = 7;
+  repeated Metadata assistantModelOptions = 9;
+
+  string status = 12;
+  uint64 createdBy = 13 [ jstype = JS_STRING ];
+  User createdUser = 14;
+  uint64 updatedBy = 15 [ jstype = JS_STRING ];
+  User updatedUser = 16;
+  google.protobuf.Timestamp createdDate = 17;
+  google.protobuf.Timestamp updatedDate = 18;
+}
+
+message CreateAssistantRequest {
+  CreateAssistantProviderModelRequest assistantProviderModel = 1;
+  repeated CreateAssistantKnowledgeRequest assistantKnowledges = 2;
+  repeated CreateAssistantToolRequest assistantTools = 3;
+  string description = 4;
+  string visibility = 5;
+  string language = 6;
+  string source = 7;
+  uint64 sourceIdentifier = 8 [ jstype = JS_STRING ];
+  repeated string tags = 9;
+  string name = 10;
+}
+
+message CreateAssistantProviderModelRequest {
+  uint64 assistantId = 1 [ jstype = JS_STRING ];
+  string description = 2;
+  TextChatCompletePrompt template = 3;
+  uint64 modelProviderId = 6 [ jstype = JS_STRING ];
+  string modelProviderName = 7;
+  repeated Metadata assistantModelOptions = 8;
+}
+
+message GetAssistantProviderModelResponse {
+  int32 code = 1;
+  bool success = 2;
+  AssistantProviderModel data = 3;
+  Error error = 4;
+}
+
+message CreateAssistantTagRequest {
+  uint64 assistantId = 1 [ jstype = JS_STRING ];
+  repeated string tags = 2;
+}
+
+// get request
+message GetAssistantRequest {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  optional uint64 assistantProviderModelId = 4 [ jstype = JS_STRING ];
+}
+message DeleteAssistantRequest { uint64 id = 1 [ jstype = JS_STRING ]; }
+message GetAssistantResponse {
+  int32 code = 1;
+  bool success = 2;
+  Assistant data = 3;
+  Error error = 4;
+}
+
+message GetAllAssistantRequest {
+  Paginate paginate = 1;
+  repeated Criteria criterias = 2;
+}
+
+message GetAllAssistantResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated Assistant data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+
+message GetAllAssistantProviderModelRequest {
+  Paginate paginate = 1;
+  repeated Criteria criterias = 2;
+  uint64 assistantId = 5 [ jstype = JS_STRING ];
+}
+
+message GetAllAssistantProviderModelResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated AssistantProviderModel data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+
+message GetAllAssistantMessageRequest {
+  Paginate paginate = 1;
+  repeated Criteria criterias = 2;
+  uint64 assistantId = 3 [ jstype = JS_STRING ];
+  Ordering order = 5;
+  repeated FieldSelector selectors = 6;
+}
+
+message GetAllAssistantMessageResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated AssistantConversationMessage data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+
+message GetAllMessageRequest {
+  Paginate paginate = 1;
+  repeated Criteria criterias = 2;
+  Ordering order = 5;
+  repeated FieldSelector selectors = 6;
+}
+
+message GetAllMessageResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated AssistantConversationMessage data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+
+message UpdateAssistantVersionRequest {
+  uint64 assistantId = 1 [ jstype = JS_STRING ];
+  uint64 assistantProviderModelId = 2 [ jstype = JS_STRING ];
+}
+
+message UpdateAssistantDetailRequest {
+  uint64 assistantId = 1 [ jstype = JS_STRING ];
+  string name = 2;
+  string description = 3;
+}
+
+message GetAllAssistantUserConversationRequest {
+  uint64 assistantId = 1 [ jstype = JS_STRING ];
+  Paginate paginate = 2;
+  repeated Criteria criterias = 3;
+  Source source = 7;
+}
+
+message GetAllAssistantUserConversationResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated AssistantConversation data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+
+message GetAssistantConversationRequest {
+  uint64 assistantId = 1 [ jstype = JS_STRING ];
+  uint64 conversationId = 2 [ jstype = JS_STRING ];
+  Paginate paginate = 3;
+  repeated Criteria criterias = 4;
+  repeated FieldSelector selectors = 5;
+}
+message GetAssistantConversationResponse {
+  int32 code = 1;
+  bool success = 2;
+  AssistantConversation data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+
+service AssistantService {
+  rpc GetAssistant(GetAssistantRequest) returns (GetAssistantResponse);
+  rpc GetAllAssistant(GetAllAssistantRequest) returns (GetAllAssistantResponse);
+  rpc CreateAssistant(CreateAssistantRequest) returns (GetAssistantResponse);
+  rpc DeleteAssistant(DeleteAssistantRequest) returns (GetAssistantResponse);
+
+  rpc GetAllAssistantProviderModel(GetAllAssistantProviderModelRequest)
+      returns (GetAllAssistantProviderModelResponse);
+  rpc CreateAssistantProviderModel(CreateAssistantProviderModelRequest)
+      returns (GetAssistantProviderModelResponse);
+
+  rpc CreateAssistantTag(CreateAssistantTagRequest)
+      returns (GetAssistantResponse);
+  rpc UpdateAssistantVersion(UpdateAssistantVersionRequest)
+      returns (GetAssistantResponse);
+  rpc UpdateAssistantDetail(UpdateAssistantDetailRequest)
+      returns (GetAssistantResponse);
+
+  rpc GetAllAssistantMessage(GetAllAssistantMessageRequest)
+      returns (GetAllAssistantMessageResponse);
+  rpc GetAllConversationMessage(GetAllConversationMessageRequest)
+      returns (GetAllConversationMessageResponse);
+  rpc GetAllMessage(GetAllMessageRequest) returns (GetAllMessageResponse);
+
+  rpc GetAllAssistantConversation(GetAllAssistantConversationRequest)
+      returns (GetAllAssistantConversationResponse);
+  rpc GetAssistantConversation(GetAssistantConversationRequest)
+      returns (GetAssistantConversationResponse);
+
+  //   webhook log
+  rpc GetAssistantWebhookLog(GetAssistantWebhookLogRequest)
+      returns (GetAssistantWebhookLogResponse);
+  rpc GetAllAssistantWebhookLog(GetAllAssistantWebhookLogRequest)
+      returns (GetAllAssistantWebhookLogResponse);
+  rpc GetAllAssistantWebhook(GetAllAssistantWebhookRequest)
+      returns (GetAllAssistantWebhookResponse);
+  rpc GetAssistantWebhook(GetAssistantWebhookRequest)
+      returns (GetAssistantWebhookResponse);
+  rpc CreateAssistantWebhook(CreateAssistantWebhookRequest)
+      returns (GetAssistantWebhookResponse);
+  rpc UpdateAssistantWebhook(UpdateAssistantWebhookRequest)
+      returns (GetAssistantWebhookResponse);
+  rpc DeleteAssistantWebhook(DeleteAssistantWebhookRequest)
+      returns (GetAssistantWebhookResponse);
+
+  //   analysis
+  rpc GetAssistantAnalysis(GetAssistantAnalysisRequest)
+      returns (GetAssistantAnalysisResponse);
+  rpc UpdateAssistantAnalysis(UpdateAssistantAnalysisRequest)
+      returns (GetAssistantAnalysisResponse);
+  rpc CreateAssistantAnalysis(CreateAssistantAnalysisRequest)
+      returns (GetAssistantAnalysisResponse);
+  rpc DeleteAssistantAnalysis(DeleteAssistantAnalysisRequest)
+      returns (GetAssistantAnalysisResponse);
+  rpc GetAllAssistantAnalysis(GetAllAssistantAnalysisRequest)
+      returns (GetAllAssistantAnalysisResponse);
+
+  // assistant tool
+  rpc CreateAssistantTool(CreateAssistantToolRequest)
+      returns (GetAssistantToolResponse);
+  rpc GetAssistantTool(GetAssistantToolRequest)
+      returns (GetAssistantToolResponse);
+  rpc GetAllAssistantTool(GetAllAssistantToolRequest)
+      returns (GetAllAssistantToolResponse);
+  rpc DeleteAssistantTool(DeleteAssistantToolRequest)
+      returns (GetAssistantToolResponse);
+  rpc UpdateAssistantTool(UpdateAssistantToolRequest)
+      returns (GetAssistantToolResponse);
+
+  //   //   next gen
+  rpc CreateAssistantKnowledge(CreateAssistantKnowledgeRequest)
+      returns (GetAssistantKnowledgeResponse);
+  rpc GetAssistantKnowledge(GetAssistantKnowledgeRequest)
+      returns (GetAssistantKnowledgeResponse);
+  rpc GetAllAssistantKnowledge(GetAllAssistantKnowledgeRequest)
+      returns (GetAllAssistantKnowledgeResponse);
+  rpc DeleteAssistantKnowledge(DeleteAssistantKnowledgeRequest)
+      returns (GetAssistantKnowledgeResponse);
+  rpc UpdateAssistantKnowledge(UpdateAssistantKnowledgeRequest)
+      returns (GetAssistantKnowledgeResponse);
+}

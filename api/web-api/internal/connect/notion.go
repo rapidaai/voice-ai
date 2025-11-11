@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/rapidaai/config"
+	config "github.com/rapidaai/api/web-api/config"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"golang.org/x/oauth2"
@@ -26,7 +26,7 @@ var (
 	NOTION_WORKPLACE_CONNECT = "/connect-knowledge/notion"
 )
 
-func NewNotionWorkplaceConnect(cfg *config.AppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) NotionConnect {
+func NewNotionWorkplaceConnect(cfg *config.WebAppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) NotionConnect {
 	return NotionConnect{
 		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		notionOauthConfig: oauth2.Config{

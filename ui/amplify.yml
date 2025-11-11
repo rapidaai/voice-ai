@@ -1,0 +1,23 @@
+version: 1
+applications:
+  - frontend:
+      phases:
+        preBuild:
+          commands:
+            - export NODE_ENV="production"
+            - yarn install
+        build:
+          commands:
+            - export PATH="$PATH:./node_modules/.bin"
+            - yarn run build
+
+      artifacts:
+        baseDirectory: build
+        files:
+          - '**/*'
+          - '/images/**/*'
+          - '/images/providers/*'
+      cache:
+        paths:
+          - node_modules/**/*
+    appRoot: ui

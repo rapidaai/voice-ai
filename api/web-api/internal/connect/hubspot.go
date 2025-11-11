@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rapidaai/config"
+	config "github.com/rapidaai/api/web-api/config"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"golang.org/x/oauth2"
@@ -25,7 +25,7 @@ var (
 	HUBSPOT_CONNECT = "/connect-crm/hubspot"
 )
 
-func NewHubspotConnect(cfg *config.AppConfig, oAuthcfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) HubspotConnect {
+func NewHubspotConnect(cfg *config.WebAppConfig, oAuthcfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) HubspotConnect {
 	return HubspotConnect{
 		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		hubspotOauthConfig: oauth2.Config{

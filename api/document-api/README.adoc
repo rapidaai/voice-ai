@@ -1,0 +1,83 @@
+= Knowledge Api
+
+Apis enables running few apis provide search capabilities to the lomotif client(Android, IOS).
+Created to deprecate the main_api (top_search) monolith code.
+
+1. Started with top_search apis that serve the search on discover page.
+
+2. Added another capabilities to deprecated Music api music search (Get used while creating new lomotif from mobile clients.)
+
+
+sh bin/setup-development.sh
+
+----
+
+== Configure the service
+
+[source,bash,indent=0]
+----
+
+SERVICE_NAME="Knowledge Api"
+PORT=3001
+
+LOG_LEVEL=debug
+
+TOKEN_AUTH__ENABLE=True
+
+
+
+REDIS__HOST=<Main Redis Connection>
+REDIS__PORT=<Main Redis Port>
+
+
+ELASTIC_SEARCH__HOST=<ES Host>
+ELASTIC_SEARCH__PORT=9243
+ELASTIC_SEARCH__AUTH__USER=<Basic Auth for ES>
+ELASTIC_SEARCH__AUTH__PASSWORD=<Basic Auth for ES>
+
+----
+
+== Let's run the app
+For running the app with in development env.
+[source,python,indent=0]
+----
+// running the app
+pipenv run dev
+
+//testing the app
+pipenv run test
+----
+
+
+== Other utility
+Some utility commands.
+[source,python,indent=0]
+----
+dev = "uvicorn app.main:APP --reload  --log-level=debug"
+lint = "invoke lint"
+test = "invoke test"
+git = "invoke git"
+requirements = "invoke requirements"
+// running the app
+pipenv run dev
+
+//testing the app
+pipenv run test
+
+//runing lint
+pipenv run lint
+
+//generating git commit style
+pipenv run git
+
+//generating the requirements files
+// it will generate
+// -requirments.txt and requirment-dev.txt
+pipenv run requirements
+
+----
+
+#Notes
+
+- default venv will be created at `{user_home_dir}/share/virtualenvs/your-service-name-{random-str}`
+you can set env to create the venv in your project_root_folder as well by setting `PIPENV_VENV_IN_PROJECT=true`.

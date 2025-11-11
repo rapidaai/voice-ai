@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/rapidaai/config"
+	config "github.com/rapidaai/api/web-api/config"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"golang.org/x/oauth2"
@@ -24,7 +24,7 @@ var (
 	SLACK_SEND_MESSAGE_CONNECT = "/connect-action/slack"
 )
 
-func NewSlackActionConnect(cfg *config.AppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) SlackConnect {
+func NewSlackActionConnect(cfg *config.WebAppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) SlackConnect {
 	return SlackConnect{
 		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		slackOauthConfig: oauth2.Config{

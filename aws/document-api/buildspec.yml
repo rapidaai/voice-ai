@@ -1,0 +1,63 @@
+version: 0.2
+env:
+  parameter-store:
+    DEPLOY_KEY: "DEPLOY_KEY"
+  variables:
+    PYTHON_VERSION: "3.12"
+    OUT_DIR: document-api/build/
+phases:
+  install:
+    commands:
+      - echo "add deploy key"
+      - mkdir -p ~/.ssh
+      - echo "$DEPLOY_KEY" | base64 -d > ~/.ssh/id_rsa
+      - chmod 600 ~/.ssh/id_rsa
+      - eval "$(ssh-agent -s)"
+      - echo "disable strict host key check"
+      - touch ~/.ssh/config
+      - echo "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+      - echo "Installing system dependencies"
+      - apt-get update -y
+      - apt-get install -y poppler-utils
+      - apt-get install -y libreoffice
+      - apt-get install -y libheif-dev libjpeg-dev zlib1g-dev  # Required dependencies for pillow_heif
+      - echo "Upgrading pip, setuptools, and wheel"
+      - python -m pip install --upgrade pip setuptools wheel  # Upgrade pip and build tools
+    runtime-versions:
+      python: $PYTHON_VERSION
+  pre_build:
+    commands:
+      - export PB_REL=https://github.com/protocolbuffers/protobuf/releases
+      - curl -LO $PB_REL/download/v3.20.0/protoc-3.20.0-linux-x86_64.zip
+      - unzip protoc-3.20.0-linux-x86_64.zip -d $HOME/protobuf
+      - ln -s $HOME/protobuf/bin/protoc /usr/local/bin/protoc
+
+  build:
+    commands:
+      - echo "Updating submodule"
+      - git submodule update --init --recursive
+      - echo "Installing Python dependencies"
+      - python -m pip install --upgrade pip
+      - pip install protobuf==6.30.0
+      - pip install grpcio==1.72.1
+      - pip install grpcio-tools==1.72.1
+      - echo "Generating artifacts"
+      - chmod +x bin/generate-artifacts.sh
+      - ./bin/generate-artifacts.sh
+      - cp codedeploy/config.yaml ./config.yaml
+  post_build:
+    commands:
+      - echo "Collecting build artifacts"
+      - mkdir -p $OUT_DIR
+      - mv app/* $OUT_DIR
+artifacts:
+  files:
+    - $OUT_DIR/**/*
+    - appspec.yml
+    - requirements.txt
+    - config.yaml  # If applicable
+    - codedeploy/*
+    - bin/*
+cache:
+  paths:
+    - "/root/.cache/pip"

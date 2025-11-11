@@ -1,0 +1,13 @@
+DROP TABLE IF EXISTS endpoint_audits CASCADE;
+DROP TABLE IF EXISTS endpoint_cachings CASCADE;
+DROP TABLE IF EXISTS endpoint_log_arguments CASCADE;
+DROP TABLE IF EXISTS endpoint_log_metadata CASCADE;
+DROP TABLE IF EXISTS endpoint_log_metrics CASCADE;
+DROP TABLE IF EXISTS endpoint_log_options CASCADE;
+DROP TABLE IF EXISTS endpoint_logs CASCADE;
+DROP TABLE IF EXISTS endpoint_provider_model_options CASCADE;
+DROP TABLE IF EXISTS endpoint_provider_models CASCADE;
+DROP TABLE IF EXISTS endpoint_retries CASCADE;
+DROP TABLE IF EXISTS endpoint_tags CASCADE;
+DROP TABLE IF EXISTS endpoint_token_audits CASCADE;
+DROP TABLE IF EXISTS endpoints CASCADE;

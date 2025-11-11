@@ -1,0 +1,72 @@
+syntax = "proto3";
+package connect_api;
+option go_package = "github.com/lexatic/web-backend/protos/lexatic-backend";
+import "google/protobuf/struct.proto";
+import "common.proto";
+
+message KnowledgeConnectRequest {
+  string state = 1;
+  string code = 2;
+  string scope = 3;
+  string connect = 4;
+}
+message KnowledgeConnectResponse {
+  int32 code = 1;
+  bool success = 2;
+  uint64 toolId = 3 [ jstype = JS_STRING ];
+  string redirectTo = 4;
+  Error error = 5;
+}
+
+message GeneralConnectRequest {
+  string state = 1;
+  string code = 2;
+  string scope = 3;
+  string connect = 4;
+}
+message GeneralConnectResponse {
+  int32 code = 1;
+  bool success = 2;
+  uint64 toolId = 3 [ jstype = JS_STRING ];
+  string redirectTo = 4;
+  Error error = 5;
+}
+
+message ActionConnectRequest {
+  string state = 1;
+  string code = 2;
+  string scope = 3;
+  string connect = 4;
+}
+message ActionConnectResponse {
+  int32 code = 1;
+  bool success = 2;
+  uint64 toolId = 3 [ jstype = JS_STRING ];
+  string redirectTo = 4;
+  Error error = 5;
+}
+
+message GetConnectorFilesRequest {
+  Paginate paginate = 1;
+  repeated Criteria criterias = 2;
+  uint64 toolId = 3 [ jstype = JS_STRING ];
+}
+
+message GetConnectorFilesResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated google.protobuf.Struct data = 3;
+  Paginated paginated = 4;
+  Error error = 5;
+  map<string, string> args = 6;
+}
+
+service ConnectService {
+  rpc KnowledgeConnect(KnowledgeConnectRequest)
+      returns (KnowledgeConnectResponse);
+  rpc GeneralConnect(GeneralConnectRequest) returns (GeneralConnectResponse);
+  rpc ActionConnect(ActionConnectRequest) returns (ActionConnectResponse);
+
+  rpc GetConnectorFiles(GetConnectorFilesRequest)
+      returns (GetConnectorFilesResponse);
+}

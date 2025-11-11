@@ -1,0 +1,487 @@
+@import 'tailwindcss';
+@import 'flatpickr/dist/flatpickr.min.css' layer(utilities);
+@import './externals/flatpickr.css' layer(utilities);
+@plugin '@tailwindcss/typography';
+@source '../../node_modules/react-tailwindcss-datepicker/dist/index.esm.{js,ts}';
+
+@custom-variant dark {
+    @media (prefers-color-scheme: dark) {
+        &:not(.light *) {
+            @slot;
+        }
+    }
+
+    &:is(.dark *) {
+        @slot;
+    }
+}
+
+body {
+    font-family: "IBM Plex Sans";
+}
+
+@theme {
+    --font-weight-medium: 450;
+    --font-weight-semibold: 500;
+    --font-weight-bold: 700;
+    --color-primary: #1e40af;
+    --color-secondary: #f4ede4;
+    --color-light-background: #f4f4f4;
+    --color-primary-dark: #4a154b;
+    --color-custom-gray: rgba(31, 31, 31, 0.1);
+    --color-custom-pink: rgba(200, 153, 241, 0.1);
+    --color-custom-blue: rgba(159, 194, 238, 0.1);
+
+    --color-gray-50: #fcfcfc;
+    --color-gray-100: #f8f8f8;
+    --color-gray-200: #eaeaea;
+    --color-gray-300: #d6d6d6;
+    --color-gray-400: #b0b0b0;
+    --color-gray-500: #808080;
+    --color-gray-600: #666666;
+    --color-gray-700: #4d4d4d;
+    --color-gray-800: #333333;
+    --color-gray-900: #1a1a1a;
+    --color-gray-950: #0d0d0d;
+
+    --color-slate-50: #fcfcfc;
+    --color-slate-100: #f8f8f8;
+    --color-slate-200: #eaeaea;
+    --color-slate-300: #d6d6d6;
+    --color-slate-400: #b0b0b0;
+    --color-slate-500: #808080;
+    --color-slate-600: #666666;
+    --color-slate-700: #4d4d4d;
+    --color-slate-800: #333333;
+    --color-slate-900: #1a1a1a;
+    --color-slate-950: #0d0d0d;
+
+    --background-image-gradient-1: linear-gradient(1deg,
+            var(--tw-gradient-stops));
+
+    --gradient-color-stop-positions-33: 33%;
+
+    --animate-none: none;
+    --animate-slide-up: slideUp 0.5s ease-out;
+    --animate-border-rotate: borderRotate 2s linear infinite;
+    --animate-spin: spin 1s linear infinite;
+    --animate-ping: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+    --animate-pulse: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    --animate-pulse1s: pulse1sLarge 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    --animate-bounce: bounce 1s infinite;
+    --animate-ripple: ripple2 2s infinite cubic-bezier(0.23, 1, 0.32, 1);
+    --animate-spin3s: spin 3s linear infinite;
+    --animate-ripple-custom2s: ripple 2s infinite ease-in-out;
+    --animate-ripple-custom3s: ripple 3s infinite ease-in-out;
+    --animate-ripple-custom: ripple 4s infinite ease-in-out;
+    --animate-bounce-custom: bounceCustom 1s infinite;
+    --animate-rotate: rotate 10s linear infinite;
+    --animate-infinite-scroll: infinite-scroll 25s linear infinite;
+    --animate-spin-slow: spin 10s linear infinite;
+    --animate-text-slide: text-slide 12.5s cubic-bezier(0.83, 0, 0.17, 1) infinite;
+    --animate-text-slide-2: text-slide-2 5s cubic-bezier(0.83, 0, 0.17, 1) infinite;
+    --animate-text-slide-3: text-slide-3 7.5s cubic-bezier(0.83, 0, 0.17, 1) infinite;
+    --animate-text-slide-4: text-slide-4 10s cubic-bezier(0.83, 0, 0.17, 1) infinite;
+    --animate-text-slide-5: text-slide-5 12.5s cubic-bezier(0.83, 0, 0.17, 1) infinite;
+    --animate-text-slide-6: text-slide-6 15s cubic-bezier(0.83, 0, 0.17, 1) infinite;
+    --animate-text-slide-7: text-slide-7 17.5s cubic-bezier(0.83, 0, 0.17, 1) infinite;
+    --animate-text-slide-8: text-slide-8 20s cubic-bezier(0.83, 0, 0.17, 1) infinite;
+
+
+
+    @keyframes slideUp {
+        0% {
+            transform: translateY(0);
+        }
+
+        100% {
+            transform: translateY(-100%);
+        }
+    }
+
+    @keyframes borderRotate {
+
+        0%,
+        100% {
+            --border-angle: 0deg;
+        }
+
+        50% {
+            --border-angle: 180deg;
+        }
+
+        100% {
+            --border-angle: 360deg;
+        }
+    }
+
+    @keyframes pulse1sLarge {
+
+        0%,
+        100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        50% {
+            opacity: 0.5;
+            transform: scale(1.2);
+        }
+    }
+
+    @keyframes ripple2 {
+        0% {
+            transform: scale(0);
+            opacity: 0.8;
+        }
+
+        100% {
+            transform: scale(3);
+            opacity: 0;
+        }
+    }
+
+    @keyframes ripple {
+        0% {
+            transform: scale(1);
+        }
+
+        50% {
+            transform: scale(1.3);
+        }
+
+        100% {
+            transform: scale(1);
+        }
+    }
+
+    @keyframes rotate {
+        0% {
+            transform: rotate(0deg) scale(10);
+        }
+
+        100% {
+            transform: rotate(-360deg) scale(10);
+        }
+    }
+
+    @keyframes infinite-scroll {
+        from {
+            transform: translateX(0);
+        }
+
+        to {
+            transform: translateX(-100%);
+        }
+    }
+
+    @keyframes text-slide-2 {
+
+        0%,
+        40% {
+            transform: translateY(0%);
+        }
+
+        50%,
+        90% {
+            transform: translateY(-33.33%);
+        }
+
+        100% {
+            transform: translateY(-66.66%);
+        }
+    }
+
+    @keyframes text-slide-3 {
+
+        0%,
+        26.66% {
+            transform: translateY(0%);
+        }
+
+        33.33%,
+        60% {
+            transform: translateY(-25%);
+        }
+
+        66.66%,
+        93.33% {
+            transform: translateY(-50%);
+        }
+
+        100% {
+            transform: translateY(-75%);
+        }
+    }
+
+    @keyframes text-slide-4 {
+
+        0%,
+        20% {
+            transform: translateY(0%);
+        }
+
+        25%,
+        45% {
+            transform: translateY(-20%);
+        }
+
+        50%,
+        70% {
+            transform: translateY(-40%);
+        }
+
+        75%,
+        95% {
+            transform: translateY(-60%);
+        }
+
+        100% {
+            transform: translateY(-80%);
+        }
+    }
+
+    @keyframes text-slide-5 {
+
+        0%,
+        16% {
+            transform: translateY(0%);
+        }
+
+        20%,
+        36% {
+            transform: translateY(-16.66%);
+        }
+
+        40%,
+        56% {
+            transform: translateY(-33.33%);
+        }
+
+        60%,
+        76% {
+            transform: translateY(-50%);
+        }
+
+        80%,
+        96% {
+            transform: translateY(-66.66%);
+        }
+
+        100% {
+            transform: translateY(-83.33%);
+        }
+    }
+
+    @keyframes text-slide-6 {
+
+        0%,
+        13.33% {
+            transform: translateY(0%);
+        }
+
+        16.66%,
+        30% {
+            transform: translateY(-14.28%);
+        }
+
+        33.33%,
+        46.66% {
+            transform: translateY(-28.57%);
+        }
+
+        50%,
+        63.33% {
+            transform: translateY(-42.85%);
+        }
+
+        66.66%,
+        80% {
+            transform: translateY(-57.14%);
+        }
+
+        83.33%,
+        96.66% {
+            transform: translateY(-71.42%);
+        }
+
+        100% {
+            transform: translateY(-85.71%);
+        }
+    }
+
+    @keyframes text-slide-7 {
+
+        0%,
+        11.43% {
+            transform: translateY(0%);
+        }
+
+        14.28%,
+        25.71% {
+            transform: translateY(-12.5%);
+        }
+
+        28.57%,
+        40% {
+            transform: translateY(-25%);
+        }
+
+        42.85%,
+        54.28% {
+            transform: translateY(-37.5%);
+        }
+
+        57.14%,
+        68.57% {
+            transform: translateY(-50%);
+        }
+
+        71.42%,
+        82.85% {
+            transform: translateY(-62.5%);
+        }
+
+        85.71%,
+        97.14% {
+            transform: translateY(-75%);
+        }
+
+        100% {
+            transform: translateY(-87.5%);
+        }
+    }
+
+    @keyframes text-slide-8 {
+
+        0%,
+        10% {
+            transform: translateY(0%);
+        }
+
+        12.5%,
+        22.5% {
+            transform: translateY(-11.11%);
+        }
+
+        25%,
+        35% {
+            transform: translateY(-22.22%);
+        }
+
+        37.5%,
+        47.5% {
+            transform: translateY(-33.33%);
+        }
+
+        50%,
+        60% {
+            transform: translateY(-44.44%);
+        }
+
+        62.5%,
+        72.5% {
+            transform: translateY(-55.55%);
+        }
+
+        75%,
+        85% {
+            transform: translateY(-66.66%);
+        }
+
+        87.5%,
+        97.5% {
+            transform: translateY(-77.77%);
+        }
+
+        100% {
+            transform: translateY(-88.88%);
+        }
+    }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+
+    *,
+    ::after,
+    ::before,
+    ::backdrop,
+    ::file-selector-button {
+        border-color: var(--color-gray-200, currentcolor);
+    }
+}
+
+@layer base {
+
+    *,
+    ::before,
+    ::after {
+        @apply dark:border-slate-700/70;
+    }
+
+    .text-muted {
+        @apply text-gray-500 dark:text-gray-400/80;
+    }
+
+    .form-label {
+        font-size: 0.87rem !important;
+        line-height: 1.75 !important;
+        font-weight: 500 !important;
+    }
+
+    .form-input {
+        font-size: 0.95rem !important;
+        line-height: 1.75 !important;
+    }
+
+    .form-input::-webkit-input-placeholder {
+        font-size: 0.95rem !important;
+        line-height: 1.75 !important;
+    }
+
+    .form-input::-webkit-select-placeholder {
+        font-size: 0.95rem !important;
+        line-height: 1.75 !important;
+    }
+
+    .button {
+        font-size: 0.90rem;
+    }
+
+    .button-lg {
+        font-size: 0.94rem;
+        padding: .375rem 1rem;
+    }
+
+    input[type='number']::-webkit-inner-spin-button,
+    input[type='number']::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+
+    .no-scrollbar {
+        -ms-overflow-style: none;
+        /* IE and Edge */
+        scrollbar-width: none;
+        /* Firefox */
+    }
+
+}
+
+@property --border-angle {
+    inherits: false;
+    initial-value: 0deg;
+    syntax: '<angle>';
+}

@@ -1,0 +1,73 @@
+# Python cache / compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pydc
+*.pdb
+*.egg-info/
+*.egg
+*.manifest
+*.spec
+
+# Virtual environments
+env/
+venv/
+ENV/
+.venv/
+.Python
+
+# Build and distribution directories
+build/
+dist/
+wheels/
+*.egg-info/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# Test and coverage
+.coverage
+.tox/
+.nox/
+.pytest_cache/
+htmlcov/
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints
+
+# IDE / Editor files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Environment / secrets
+.env
+*.env
+*.pem
+*.key
+
+# Docker / Git
+.dockerignore
+.git
+.gitignore
+.gitmodules
+
+# C extensions
+*.so
+
+# Other runtime artifacts
+instance/
+.mypy_cache/
+__pypackages__/
+.cache/

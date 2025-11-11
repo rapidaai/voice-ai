@@ -1,0 +1,220 @@
+syntax = "proto3";
+package knowledge_api;
+option go_package = "github.com/lexatic/web-backend/protos/lexatic-backend";
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+import "google/protobuf/struct.proto";
+
+message CreateKnowledgeRequest {
+  string name = 1;
+  string description = 2;
+  repeated string tags = 4;
+  string visibility = 5;
+  uint64 embeddingModelProviderId = 6 [ jstype = JS_STRING ];
+  string embeddingModelProviderName = 7;
+  repeated Metadata knowledgeEmbeddingModelOptions = 8;
+}
+
+message CreateKnowledgeResponse {
+  int32 code = 1;
+  bool success = 2;
+  Knowledge data = 3;
+  Error error = 4;
+}
+
+message GetAllKnowledgeRequest {
+  Paginate paginate = 1;
+  repeated Criteria criterias = 2;
+}
+message GetAllKnowledgeResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated Knowledge data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+
+message GetKnowledgeRequest { uint64 id = 1 [ jstype = JS_STRING ]; }
+message GetKnowledgeResponse {
+  int32 code = 1;
+  bool success = 2;
+  Knowledge data = 3;
+  Error error = 4;
+}
+
+message CreateKnowledgeTagRequest {
+  uint64 knowledgeId = 1 [ jstype = JS_STRING ];
+  repeated string tags = 2;
+}
+
+message KnowledgeDocument {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 knowledgeId = 2 [ jstype = JS_STRING ];
+  string language = 3;
+  string name = 4;
+  string description = 5;
+
+  google.protobuf.Struct documentSource = 6;
+  string documentType = 7;
+  uint64 documentSize = 8;
+  string documentPath = 9;
+
+  string indexStatus = 10;
+  uint64 retrievalCount = 12;
+  uint64 tokenCount = 13;
+  uint64 wordCount = 14;
+
+  string DisplayStatus = 19;
+
+  string status = 21;
+  uint64 createdBy = 22 [ jstype = JS_STRING ];
+  User createdUser = 23;
+  uint64 updatedBy = 24 [ jstype = JS_STRING ];
+  User updatedUser = 25;
+
+  google.protobuf.Timestamp createdDate = 26;
+  google.protobuf.Timestamp updatedDate = 27;
+}
+
+message GetAllKnowledgeDocumentRequest {
+  uint64 knowledgeId = 1 [ jstype = JS_STRING ];
+  Paginate paginate = 2;
+  repeated Criteria criterias = 3;
+}
+
+message GetAllKnowledgeDocumentResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated KnowledgeDocument data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+
+message CreateKnowledgeDocumentRequest {
+  enum PRE_PROCESS {
+    AUTOMATIC = 0;
+    CUSTOM = 1;
+  }
+
+  enum DOCUMENT_SOURCE {
+    DOCUMENT_SOURCE_MANUAL = 0;
+    DOCUMENT_SOURCE_TOOL = 1;
+  }
+
+  uint64 knowledgeId = 1 [ jstype = JS_STRING ];
+  DOCUMENT_SOURCE documentSource = 2;
+  string dataSource = 3;
+  repeated Content contents = 5;
+  PRE_PROCESS preProcess = 6;
+  string separator = 7;
+  uint32 maxChunkSize = 8;
+  uint32 chunkOverlap = 9;
+
+  string name = 10;
+  string description = 11;
+  string documentStructure = 12;
+}
+
+message CreateKnowledgeDocumentResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated KnowledgeDocument data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+
+message KnowledgeDocumentSegment {
+  string index = 1;
+  string document_hash = 19;
+  string document_id = 20;
+  string text = 21;
+
+  message Metadata {
+    string document_hash = 1;
+    string document_id = 2;
+    uint64 knowledge_document_id = 3 [ jstype = JS_STRING ];
+    uint64 knowledge_id = 4 [ jstype = JS_STRING ];
+    uint64 project_id = 5 [ jstype = JS_STRING ];
+    uint64 organization_id = 6 [ jstype = JS_STRING ];
+    string document_name = 7;
+  }
+  Metadata metadata = 22;
+
+  message Entities {
+    repeated string organizations = 1;
+    repeated string dates = 2;
+    repeated string products = 3;
+    repeated string events = 4;
+    repeated string people = 5;
+    repeated string times = 6;
+    repeated string quantities = 7;
+    repeated string locations = 8;
+    repeated string industries = 9;
+  }
+  Entities entities = 23;
+}
+message GetAllKnowledgeDocumentSegmentRequest {
+  uint64 knowledgeId = 1 [ jstype = JS_STRING ];
+  Paginate paginate = 3;
+  repeated Criteria criterias = 4;
+}
+
+message GetAllKnowledgeDocumentSegmentResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated KnowledgeDocumentSegment data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+
+message UpdateKnowledgeDetailRequest {
+  uint64 knowledgeId = 1 [ jstype = JS_STRING ];
+  string name = 2;
+  string description = 3;
+}
+
+message UpdateKnowledgeDocumentSegmentRequest {
+  //
+  repeated string organizations = 1;
+  repeated string dates = 2;
+  repeated string products = 3;
+  repeated string events = 4;
+  repeated string people = 5;
+  repeated string times = 6;
+  repeated string quantities = 7;
+  repeated string locations = 8;
+  repeated string industries = 9;
+
+  //
+  string documentName = 10;
+  string documentId = 11;
+  string index = 12;
+}
+
+message DeleteKnowledgeDocumentSegmentRequest {
+  string documentId = 1;
+  string index = 2;
+  string reason = 3;
+}
+
+service KnowledgeService {
+  rpc GetKnowledge(GetKnowledgeRequest) returns (GetKnowledgeResponse);
+  rpc GetAllKnowledge(GetAllKnowledgeRequest) returns (GetAllKnowledgeResponse);
+  rpc CreateKnowledge(CreateKnowledgeRequest) returns (CreateKnowledgeResponse);
+  rpc CreateKnowledgeTag(CreateKnowledgeTagRequest)
+      returns (GetKnowledgeResponse);
+  rpc CreateKnowledgeDocument(CreateKnowledgeDocumentRequest)
+      returns (CreateKnowledgeDocumentResponse);
+  rpc GetAllKnowledgeDocument(GetAllKnowledgeDocumentRequest)
+      returns (GetAllKnowledgeDocumentResponse);
+  rpc GetAllKnowledgeDocumentSegment(GetAllKnowledgeDocumentSegmentRequest)
+      returns (GetAllKnowledgeDocumentSegmentResponse);
+  rpc UpdateKnowledgeDetail(UpdateKnowledgeDetailRequest)
+      returns (GetKnowledgeResponse);
+
+  //
+  rpc UpdateKnowledgeDocumentSegment(UpdateKnowledgeDocumentSegmentRequest)
+      returns (BaseResponse);
+  rpc DeleteKnowledgeDocumentSegment(DeleteKnowledgeDocumentSegmentRequest)
+      returns (BaseResponse);
+}

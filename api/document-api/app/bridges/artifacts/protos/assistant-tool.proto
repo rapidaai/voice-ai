@@ -1,0 +1,70 @@
+syntax = "proto3";
+package assistant_api;
+option go_package = "github.com/lexatic/web-backend/protos/lexatic-backend";
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+import "google/protobuf/struct.proto";
+//
+message AssistantTool {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 assistantId = 2 [ jstype = JS_STRING ];
+  string name = 3;
+  string description = 4;
+  google.protobuf.Struct fields = 5;
+  string executionMethod = 6;
+  repeated Metadata executionOptions = 7;
+
+  string status = 25;
+  google.protobuf.Timestamp createdDate = 26;
+  google.protobuf.Timestamp updatedDate = 27;
+}
+
+message CreateAssistantToolRequest {
+  uint64 assistantId = 1 [ jstype = JS_STRING ];
+  string name = 3;
+  string description = 4;
+  google.protobuf.Struct fields = 5;
+  string executionMethod = 6;
+  repeated Metadata executionOptions = 7;
+}
+
+message UpdateAssistantToolRequest {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 assistantId = 2 [ jstype = JS_STRING ];
+  string name = 3;
+  string description = 4;
+  google.protobuf.Struct fields = 5;
+  string executionMethod = 6;
+  repeated Metadata executionOptions = 7;
+}
+
+message GetAssistantToolRequest {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 assistantId = 2 [ jstype = JS_STRING ];
+}
+
+message DeleteAssistantToolRequest {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 assistantId = 2 [ jstype = JS_STRING ];
+}
+
+message GetAssistantToolResponse {
+  int32 code = 1;
+  bool success = 2;
+  AssistantTool data = 3;
+  Error error = 4;
+}
+
+message GetAllAssistantToolRequest {
+  uint64 assistantId = 1 [ jstype = JS_STRING ];
+  Paginate paginate = 2;
+  repeated Criteria criterias = 3;
+}
+
+message GetAllAssistantToolResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated AssistantTool data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}

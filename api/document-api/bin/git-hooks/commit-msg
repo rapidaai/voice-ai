@@ -1,0 +1,128 @@
+# commit-msg sample
+#!/usr/bin/env bash
+
+### Valid Type
+DEFAULT_VALID_COMMIT_TYPES=()
+DEFAULT_VALID_COMMIT_TYPES+=("chore")
+DEFAULT_VALID_COMMIT_TYPES+=("feat")
+DEFAULT_VALID_COMMIT_TYPES+=("refactor")
+DEFAULT_VALID_COMMIT_TYPES+=("fix")
+DEFAULT_VALID_COMMIT_TYPES+=("test")
+###
+
+INPUT_FILE=$1
+COMMENT_PATTERN="^#+.*$"
+
+TYPE_LINE_START_PATTERN="^# <Type>$"
+SEPARATION_PATTERN="^#$"
+
+COMMIT_MSG=""
+VALID_COMMIT_TYPES=()
+VALID_COMMIT_TYPES_DESC=()
+
+#Ignore comment line and get title message '<type>: <subject>
+while read line; do
+	# get commit title
+	if ! [[ "$line" =~ $COMMENT_PATTERN ]] && [ -z "$COMMIT_MSG" ]; then
+		COMMIT_MSG=$line
+	fi
+
+	# get type
+	if [[ "$line" =~ $TYPE_LINE_START_PATTERN ]]; then
+		TYPE_REGEX="^[a-z0-9]{1,}$"
+		while read line; do
+			if [[ "$line" =~ $SEPARATION_PATTERN ]]; then
+				break
+			fi
+			VALID_COMMIT_TYPES_DESC+=("$line")
+			type=${line%%:*}
+			type=${type:2}
+			if [[ "$type" =~ $TYPE_REGEX ]]; then
+				VALID_COMMIT_TYPES+=("$type")
+			fi
+
+		done
+	fi
+
+done < $INPUT_FILE
+
+if [[ ${#VALID_COMMIT_TYPES[@]} == 0 ]]; then
+	echo "Use Default vaild type."
+	VALID_COMMIT_TYPES+=("${DEFAULT_VALID_COMMIT_TYPES[@]}")
+	VALID_COMMIT_TYPES_DESC+=("${DEFAULT_VALID_COMMIT_TYPES[@]}")
+fi
+
+# Empty commit
+if [ -z "$COMMIT_MSG" ]; then
+	echo "Error: commit message can not be empty."
+	echo "Please follow the commit format."
+	echo ""
+	echo "<type>: <subject>  {required}"
+	echo "<body>  {optional}"
+	echo "<footer>  {optional}"
+	exit 1
+fi
+
+# =====================
+# === Check format ====
+# =====================
+
+farmat_error_log() {
+	echo "Error: commit message format does not match."
+	echo "Please follow the commit format."
+	echo ""
+	echo "<type>: <subject>  {required}"
+	echo "<body>  {optional}"
+	echo "<footer>  {optional}"
+	echo ""
+	echo "# Notice: the character ':' followed by A space character."
+	echo ""
+	type_error_log
+}
+
+type_error_log() {
+	echo "Error: <Type> invalid."
+	echo "Please follow the commit type."
+	echo ""
+	echo "<Type>"
+	for i in "${VALID_COMMIT_TYPES_DESC[@]}"; do
+		echo $i
+	done
+}
+
+# title format: <type>: <subject>
+TITLE_PATTERN="^[a-z0-9]{1,}:[ ]{1}[^ ]{1,}.*$"
+# Merge format: Merge branch '{branch_name}' into {branch_name}
+MERGE_PATTERN="^Merge branch \'.+\' into .+$"
+
+if [[ "$COMMIT_MSG" =~ $MERGE_PATTERN ]]; then
+	# format success
+	echo "Merge commit succeed!"
+	exit 0
+
+elif [[ "$COMMIT_MSG" =~ $TITLE_PATTERN ]]; then
+	echo "Format is valid!"
+
+else
+	farmat_error_log
+	exit 1
+fi
+
+# prefix type
+TYPE_STRING=${COMMIT_MSG%%:*}
+TYPE_CHECK_PASS=false
+
+for i in "${VALID_COMMIT_TYPES[@]}"; do
+	if [[ $TYPE_STRING == $i ]]; then
+		TYPE_CHECK_PASS=true
+		break
+	fi
+done
+
+if ! $TYPE_CHECK_PASS; then
+	type_error_log
+	exit 1
+fi
+
+echo "<Type> check success!!"
+exit 0

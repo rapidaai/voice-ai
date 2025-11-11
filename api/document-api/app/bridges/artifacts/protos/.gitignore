@@ -1,0 +1,11 @@
+*_pb_service.d.ts
+*_pb_service.js
+*_pb.d.ts
+*pb.js
+*.pb.go
+*pb.go
+*.ts
+*.py
+*.pyi
+
+__pycache__

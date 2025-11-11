@@ -1,0 +1,19 @@
+syntax = "proto3";
+package document_api;
+option go_package = "github.com/lexatic/web-backend/protos/lexatic-backend";
+
+message IndexKnowledgeDocumentRequest {
+  uint64 knowledgeId = 1 [ jstype = JS_STRING ];
+  repeated uint64 knowledgeDocumentId = 2 [ jstype = JS_STRING ];
+  string indexType = 3;
+}
+
+message IndexKnowledgeDocumentResponse {
+  int32 code = 1;
+  bool success = 2;
+}
+
+service DocumentService {
+  rpc IndexKnowledgeDocument(IndexKnowledgeDocumentRequest)
+      returns (IndexKnowledgeDocumentResponse);
+}

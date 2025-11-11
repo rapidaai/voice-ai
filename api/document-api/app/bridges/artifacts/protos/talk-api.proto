@@ -1,0 +1,149 @@
+syntax = "proto3";
+package talk_api;
+option go_package = "github.com/lexatic/web-backend/protos/lexatic-backend";
+option java_package = "ai.rapida.sdk.artifacts";
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+
+message AssistantDefinition {
+  uint64 assistantId = 1 [ jstype = JS_STRING ];
+  string version = 2;
+}
+
+message AssistantMessagingRequest {
+  AssistantDefinition assistant = 2;
+  Message message = 3;
+  optional uint64 assistantConversationId = 4 [ jstype = JS_STRING ];
+  map<string, google.protobuf.Any> metadata = 6;
+  Source source = 7;
+  map<string, google.protobuf.Any> args = 10;
+  map<string, google.protobuf.Any> options = 11;
+}
+
+message AssistantConversationConfiguration {
+  uint64 assistantConversationId = 1 [ jstype = JS_STRING ];
+  AssistantDefinition assistant = 2;
+  google.protobuf.Timestamp time = 3;
+}
+
+message AssistantConversationInterruption {
+  enum InterruptionType {
+    INTERRUPTION_TYPE_UNSPECIFIED = 0;
+    INTERRUPTION_TYPE_VAD = 1;
+    INTERRUPTION_TYPE_WORD = 2;
+  }
+
+  string id = 1;
+  InterruptionType type = 2;
+  google.protobuf.Timestamp time = 3;
+}
+
+message AssistantConversationUserMessage {
+  Message message = 1;
+  string id = 2;
+  bool completed = 3;
+  google.protobuf.Timestamp time = 4;
+}
+
+message AssistantConversationAssistantMessage {
+  Message message = 1;
+  string id = 2;
+  bool completed = 3;
+  google.protobuf.Timestamp time = 4;
+}
+
+message AssistantMessagingResponse {
+  int32 code = 1;
+  bool success = 2;
+  Error error = 4;
+  oneof data {
+
+    // when it get configured
+    AssistantConversationConfiguration configuration = 9;
+
+    // when interrupt
+    AssistantConversationInterruption interruption = 10;
+
+    // only user message
+    AssistantConversationUserMessage user = 11;
+
+    //
+    AssistantConversationAssistantMessage assistant = 12;
+
+    // when complete
+    AssistantConversationMessage message = 13;
+  }
+}
+
+message CreateMessageMetricRequest {
+  uint64 assistantId = 1 [ jstype = JS_STRING ];
+  uint64 assistantConversationId = 2 [ jstype = JS_STRING ];
+  string messageId = 3;
+  repeated Metric metrics = 4;
+}
+
+message CreateMessageMetricResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated Metric data = 3;
+  Error error = 4;
+}
+
+message CreateConversationMetricRequest {
+  uint64 assistantId = 1 [ jstype = JS_STRING ];
+  uint64 assistantConversationId = 2 [ jstype = JS_STRING ];
+  repeated Metric metrics = 3;
+}
+
+message CreateConversationMetricResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated Metric data = 3;
+  Error error = 4;
+}
+
+message CreatePhoneCallRequest {
+  AssistantDefinition assistant = 1;
+  map<string, google.protobuf.Any> metadata = 3;
+  map<string, google.protobuf.Any> args = 4;
+  map<string, google.protobuf.Any> options = 5;
+  string fromNumber = 6;
+  string toNumber = 7;
+}
+
+message CreatePhoneCallResponse {
+  int32 code = 1;
+  bool success = 2;
+  AssistantConversation data = 3;
+  Error error = 4;
+}
+
+message CreateBulkPhoneCallRequest {
+  repeated CreatePhoneCallRequest phoneCalls = 6;
+}
+
+message CreateBulkPhoneCallResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated AssistantConversation data = 3;
+  Error error = 4;
+}
+
+service TalkService {
+  rpc AssistantTalk(stream AssistantMessagingRequest)
+      returns (stream AssistantMessagingResponse);
+  rpc GetAllAssistantConversation(GetAllAssistantConversationRequest)
+      returns (GetAllAssistantConversationResponse);
+  rpc GetAllConversationMessage(GetAllConversationMessageRequest)
+      returns (GetAllConversationMessageResponse);
+  rpc CreateMessageMetric(CreateMessageMetricRequest)
+      returns (CreateMessageMetricResponse);
+  rpc CreateConversationMetric(CreateConversationMetricRequest)
+      returns (CreateConversationMetricResponse);
+
+  //
+  rpc CreatePhoneCall(CreatePhoneCallRequest) returns (CreatePhoneCallResponse);
+  rpc CreateBulkPhoneCall(CreateBulkPhoneCallRequest)
+      returns (CreateBulkPhoneCallResponse);
+}

@@ -24,8 +24,6 @@ type UserSocial struct {
 	Token      string `json:"token" gorm:"type:string;size:500;not null"`
 }
 
-// make sure you have only smaller case email in the database
-
 func (ua *UserAuth) GetId() uint64 {
 	return ua.Id
 }

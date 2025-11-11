@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/rapidaai/config"
+	config "github.com/rapidaai/api/web-api/config"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"golang.org/x/oauth2"
@@ -28,7 +28,7 @@ var (
 	LINKEDIN_ACTION_SCOPE   = []string{"openid", "profile", "email"}
 )
 
-func NewLinkedinAuthenticationConnect(cfg *config.AppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) LinkedinConnect {
+func NewLinkedinAuthenticationConnect(cfg *config.WebAppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger, postgres connectors.PostgresConnector) LinkedinConnect {
 	return LinkedinConnect{
 		ExternalConnect: NewExternalConnect(cfg, logger, postgres),
 		linkedinOauthConfig: oauth2.Config{
@@ -46,7 +46,7 @@ func NewLinkedinAuthenticationConnect(cfg *config.AppConfig, oauthCfg *config.OA
 	}
 }
 
-func NewLinkedinActionConnect(cfg *config.AppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger) LinkedinConnect {
+func NewLinkedinActionConnect(cfg *config.WebAppConfig, oauthCfg *config.OAuthConfig, logger commons.Logger) LinkedinConnect {
 	return LinkedinConnect{
 		linkedinOauthConfig: oauth2.Config{
 			RedirectURL:  fmt.Sprintf("%s%s", cfg.BaseUrl(), LINKEDIN_ACTION_CONNECT),

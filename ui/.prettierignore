@@ -1,0 +1,5 @@
+build/
+node_modules/
+package-lock.json
+yarn.lock
+/src/app/clients/protos/

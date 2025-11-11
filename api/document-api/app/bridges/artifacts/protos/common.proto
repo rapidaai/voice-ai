@@ -1,0 +1,286 @@
+syntax = "proto3";
+option go_package = "github.com/lexatic/web-backend/protos/lexatic-backend";
+option java_package = "ai.rapida.sdk.artifacts";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+message FieldSelector { string field = 1; }
+
+message Criteria {
+  string key = 1;
+  string value = 2;
+  string logic = 3;
+}
+
+message Error {
+  uint64 errorCode = 1 [ jstype = JS_STRING ];
+  string errorMessage = 2;
+  string humanMessage = 3;
+}
+
+message Paginate {
+  uint32 page = 1;
+  uint32 pageSize = 2;
+}
+
+message Paginated {
+  uint32 currentPage = 1;
+  uint32 totalItem = 2;
+}
+
+message Ordering {
+  string column = 1;
+  string order = 2;
+}
+
+message User {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  string name = 2;
+  string email = 3;
+  string role = 4;
+  google.protobuf.Timestamp createdDate = 6;
+  string status = 5;
+}
+
+message BaseResponse {
+  int32 code = 1;
+  bool success = 2;
+  map<string, string> data = 3;
+  Error error = 4;
+}
+
+message Metadata {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  string key = 2;
+  string value = 3;
+}
+
+message Argument {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  string name = 2;
+  string value = 3;
+}
+
+message Variable {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  string name = 2;
+  string type = 3;
+  optional string defaultValue = 4;
+}
+
+message Provider {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  string name = 2;
+  string description = 3;
+  string humanName = 4;
+  string image = 5;
+  string website = 6;
+  string status = 7;
+  repeated Variable connectConfiguration = 9;
+}
+
+message Tag {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  repeated string tag = 2;
+}
+
+message Organization {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  string name = 2;
+  string description = 3;
+  string industry = 4;
+  string contact = 5;
+  string size = 6;
+}
+
+message Metric {
+  string name = 1;
+  string value = 2;
+  string description = 3;
+}
+
+message Content {
+  string name = 1;
+  // audio, image, video, text etc
+  string contentType = 2;
+  //  from raw string to url all can be
+  string contentFormat = 3;
+  //   actual content
+  bytes content = 4;
+  // future
+  google.protobuf.Struct meta = 5;
+}
+
+message Message {
+  // role for the message
+  string role = 1;
+  // contents
+  repeated Content contents = 2;
+  // tool call
+  repeated ToolCall toolCalls = 3;
+}
+
+message ToolCall {
+  // tool call id
+  string id = 1;
+
+  //
+  string type = 2;
+
+  //   tool call is function than the function and their parameter
+  optional FunctionCall function = 3;
+}
+
+message FunctionCall {
+  // name of function call
+  string name = 1;
+  //   argument that is string and that can be passed
+  string arguments = 2;
+  //   //   structure argument
+  //   google.protobuf.Struct args = 3;
+}
+
+message Knowledge {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  string name = 2;
+  string description = 3;
+  string visibility = 4;
+  string language = 5;
+
+  uint64 embeddingModelProviderId = 6 [ jstype = JS_STRING ];
+  string embeddingModelProviderName = 7;
+  repeated Metadata knowledgeEmbeddingModelOptions = 8;
+
+  //
+  string status = 12;
+  uint64 createdBy = 13 [ jstype = JS_STRING ];
+  User createdUser = 14;
+  uint64 updatedBy = 15 [ jstype = JS_STRING ];
+  User updatedUser = 16;
+  google.protobuf.Timestamp createdDate = 17;
+  google.protobuf.Timestamp updatedDate = 18;
+
+  //
+  uint64 organizationId = 19 [ jstype = JS_STRING ];
+  uint64 projectId = 20 [ jstype = JS_STRING ];
+  Organization organization = 21;
+  Tag knowledgeTag = 22;
+  uint32 documentCount = 23;
+  uint32 tokenCount = 24;
+  uint32 wordCount = 25;
+}
+
+enum Source {
+  WEB_PLUGIN = 0;
+  DEBUGGER = 1;
+  SDK = 2;
+  PHONE_CALL = 3;
+  WHATSAPP = 4;
+}
+
+// Define message for TextPrompt
+message TextPrompt {
+  string role = 1;
+  string content = 2;
+}
+
+message TextChatCompletePrompt {
+  repeated TextPrompt prompt = 1;
+  repeated Variable promptVariables = 2;
+}
+
+message AssistantMessageStage {
+  string stage = 1;
+  map<string, string> additionalData = 2;
+  uint64 timetaken = 3;
+  string lifecycleId = 4;
+  google.protobuf.Timestamp startTimestamp = 5;
+  google.protobuf.Timestamp endTimestamp = 6;
+}
+
+message AssistantConversationMessage {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  string messageId = 3;
+  uint64 assistantConversationId = 2 [ jstype = JS_STRING ];
+  Message request = 5;
+  Message response = 7;
+  string source = 9;
+  repeated Metric metrics = 10;
+  string status = 11;
+  uint64 createdBy = 12 [ jstype = JS_STRING ];
+  uint64 updatedBy = 13 [ jstype = JS_STRING ];
+  repeated string suggestedQuestions = 14;
+  repeated AssistantMessageStage stages = 15;
+
+  google.protobuf.Timestamp createdDate = 26;
+  google.protobuf.Timestamp updatedDate = 27;
+
+  uint64 assistantId = 28 [ jstype = JS_STRING ];
+  uint64 assistantProviderModelId = 29 [ jstype = JS_STRING ];
+  repeated Metadata metadata = 31;
+}
+
+message AssistantConversationContext {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  google.protobuf.Struct metadata = 3;
+  google.protobuf.Struct result = 4;
+  google.protobuf.Struct query = 5;
+}
+
+message AssistantConversation {
+  uint64 id = 1 [ jstype = JS_STRING ];
+  uint64 userId = 2 [ jstype = JS_STRING ];
+  uint64 assistantId = 3 [ jstype = JS_STRING ];
+  string name = 4;
+  uint64 projectId = 5 [ jstype = JS_STRING ];
+  uint64 organizationId = 6 [ jstype = JS_STRING ];
+  string source = 7;
+  uint64 createdBy = 8 [ jstype = JS_STRING ];
+  uint64 updatedBy = 9 [ jstype = JS_STRING ];
+  User user = 10;
+  uint64 assistantProviderModelId = 12 [ jstype = JS_STRING ];
+  repeated AssistantConversationMessage assistantConversationMessage = 13;
+  string identifier = 14;
+  string status = 15;
+  google.protobuf.Timestamp createdDate = 26;
+  google.protobuf.Timestamp updatedDate = 27;
+  repeated AssistantConversationContext contexts = 28;
+
+  //   a conversation metrics and other analytical markers
+  repeated Metric metrics = 30;
+  repeated Metadata metadata = 32;
+  repeated Argument arguments = 31;
+  repeated Metadata options = 33;
+}
+
+message GetAllAssistantConversationRequest {
+  uint64 assistantId = 1 [ jstype = JS_STRING ];
+  Paginate paginate = 2;
+  repeated Criteria criterias = 3;
+  Source source = 7;
+}
+
+message GetAllAssistantConversationResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated AssistantConversation data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}
+
+message GetAllConversationMessageRequest {
+  uint64 assistantId = 1 [ jstype = JS_STRING ];
+  uint64 assistantConversationId = 2 [ jstype = JS_STRING ];
+  Paginate paginate = 3;
+  repeated Criteria criterias = 4;
+  Ordering order = 5;
+  Source source = 7;
+}
+
+message GetAllConversationMessageResponse {
+  int32 code = 1;
+  bool success = 2;
+  repeated AssistantConversationMessage data = 3;
+  Error error = 4;
+  Paginated paginated = 5;
+}

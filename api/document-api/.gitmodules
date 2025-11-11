@@ -1,0 +1,3 @@
+[submodule "app/bridges/artifacts/protos"]
+	path = app/bridges/artifacts/protos
+	url = git@github.com:lexatic/internal-bridge.git
