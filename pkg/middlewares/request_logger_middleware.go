@@ -23,7 +23,7 @@ func NewRequestLoggerMiddleware(serviceName string, logger commons.Logger) gin.H
 	return func(c *gin.Context) {
 		start := time.Now()
 		c.Next()
-		logger.Infof("%s %s [status:%v request:%dms]", c.Request.Method, c.Request.URL, c.Writer.Status(), time.Since(start).Milliseconds())
+		logger.Info("%s %s [status:%v request:%dms]", c.Request.Method, c.Request.URL, c.Writer.Status(), time.Since(start).Milliseconds())
 	}
 
 }

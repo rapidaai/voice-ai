@@ -46,7 +46,7 @@ type AssistantDeploymentAudio struct {
 	gorm_model.Audited
 	gorm_model.Mutable
 	AssistantDeploymentId uint64                            `json:"assistantDeploymentId"`
-	AudioType             string                            `json:"audioType" gorm:"type:string;size:50;not null;"`
+	AudioType             string                            `json:"audioType" gorm:"type:string;size:50;not null;index:idx_audio_type"`
 	AudioProvider         string                            `json:"audioProvider" gorm:"type:string;size:50;not null;"`
 	AudioOptions          []*AssistantDeploymentAudioOption `json:"audioOptions"  gorm:"foreignKey:AssistantDeploymentAudioId"`
 }

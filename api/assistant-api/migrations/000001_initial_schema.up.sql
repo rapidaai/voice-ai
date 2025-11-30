@@ -928,6 +928,24 @@ ALTER COLUMN greeting DROP NOT NULL;
 ALTER TABLE assistant_phone_deployments
 ALTER COLUMN mistake DROP NOT NULL;
 
+-- Audio Options
+CREATE INDEX idx_audio_options_deployment_audio_id
+    ON assistant_deployment_audio_options (assistant_deployment_audio_id);
+
+-- Audios (input/output)
+CREATE INDEX idx_audios_deployment_audio_type
+    ON assistant_deployment_audios (assistant_deployment_id, audio_type);
+
+-- Telephony Options
+CREATE INDEX idx_telephony_options_deployment_id
+    ON assistant_deployment_telephony_options (assistant_deployment_telephony_id);
+
+-- Phone deployments (ORDER BY + LIMIT)
+CREATE INDEX idx_phone_deployments_assistant_created_id
+    ON assistant_phone_deployments (assistant_id, created_date DESC, id DESC);
+
+
+
 
 
 -- only for migration do not commit it

@@ -10,6 +10,7 @@ import (
 	configs "github.com/rapidaai/pkg/configs"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type PostgresConnector interface {
@@ -42,7 +43,10 @@ func (psql *postgresConnector) connectionString() string {
 
 func (psql *postgresConnector) Connect(ctx context.Context) error {
 	psql.logger.Debugf("Creating postgres client for postgres  %s", psql.connectionString())
-	db, err := gorm.Open(postgres.Open(psql.connectionString()), &gorm.Config{})
+	// lgr := logger.Default
+	db, err := gorm.Open(postgres.Open(psql.connectionString()), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
 	if err != nil {
 		psql.logger.Errorf("Failed to open postgres connection %s.", err)
 		return err

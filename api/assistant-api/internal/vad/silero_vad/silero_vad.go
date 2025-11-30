@@ -1,6 +1,10 @@
 package internal_silero_vad
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
+
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_vad "github.com/rapidaai/api/assistant-api/internal/vad"
 	"github.com/rapidaai/pkg/commons"
@@ -19,9 +23,24 @@ type SileroVAD struct {
 }
 
 // NewSileroVAD creates a new SileroVAD
-func NewSileroVAD(logger commons.Logger, inputAudio *internal_audio.AudioConfig, callback internal_vad.VADCallback, options utils.Option) (internal_vad.Vad, error) {
+func NewSileroVAD(logger commons.Logger,
+	inputAudio *internal_audio.AudioConfig,
+	callback internal_vad.VADCallback, options utils.Option) (internal_vad.Vad, error) {
+
+	envModelPath := os.Getenv("SILERO_MODEL_PATH")
+	if envModelPath == "" {
+		_, path, _, _ := runtime.Caller(0)
+		envModelPath = filepath.Join(filepath.Dir(path), "models/silero_vad_20251001.onnx")
+	}
+	vadAudioConfig := internal_audio.NewLinear16khzMonoAudioConfig()
+	threshold := 0.5
+	if thr, err := options.GetFloat64("microphone.vad.threshold"); err == nil {
+		threshold = thr
+	}
 	config := speech.DetectorConfig{
-		Threshold: 0.5,
+		ModelPath:  envModelPath,
+		SampleRate: vadAudioConfig.SampleRate,
+		Threshold:  float32(threshold),
 	}
 	detector, err := speech.NewDetector(config)
 	if err != nil {
@@ -30,7 +49,8 @@ func NewSileroVAD(logger commons.Logger, inputAudio *internal_audio.AudioConfig,
 	return &SileroVAD{
 		detector:    detector,
 		inputConfig: inputAudio,
-		vadConfig:   internal_audio.NewLinear16khzMonoAudioConfig(),
+		vadConfig:   vadAudioConfig,
+		onActivity:  callback,
 		logger:      logger,
 	}, nil
 }

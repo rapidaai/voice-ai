@@ -188,12 +188,12 @@ func (io *GenericRequestor) OutputAudio(
 	}
 	// //
 	if contextId != inputMessage.GetId() {
-		io.logger.Warnf("testing: context id mismatched %+v current %v", contextId, inputMessage.GetId())
+		// io.logger.Warnf("testing: context id mismatched %+v current %v", contextId, inputMessage.GetId())
 		return nil
 	}
 
 	if err := io.messaging.Transition(internal_adapter_request_customizers.AgentSpeaking); err != nil {
-		io.logger.Warnf("testing: illegal transition to speaking")
+		// io.logger.Warnf("testing: illegal transition to speaking")
 		return nil
 	}
 
