@@ -13,7 +13,6 @@ COPY ui/.babel-plugin-macrosrc.js ./
 COPY ui/.dockerignore ./
 COPY ui/.editorconfig ./
 COPY ui/.env.production ./
-COPY ui/.eslintignore ./
 COPY ui/.eslintrc.js ./
 COPY ui/.gitattributes ./
 COPY ui/.gitignore ./
@@ -23,15 +22,11 @@ COPY ui/.pre-commit-config.yaml ./
 COPY ui/.prettierignore ./
 COPY ui/.prettierrc ./
 COPY ui/.stylelintrc ./
-COPY ui/amplify.yml ./
 COPY ui/commitlint.config.js ./
 COPY ui/craco.config.js ./
-COPY ui/electron-builder.yml ./
 COPY ui/package.json ./
 COPY ui/postcss.config.js ./
-COPY ui/template.json ./
 COPY ui/tsconfig.json ./
-COPY ui/tsconfig.paths.json ./
 COPY ui/yarn.lock ./
 
 # RUN yarn install --frozen-lockfile

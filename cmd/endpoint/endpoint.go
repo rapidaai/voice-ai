@@ -309,12 +309,13 @@ func (g *AppRunner) RequestLoggerMiddleware() {
 	g.E.Use(middlewares.NewRequestLoggerMiddleware(g.Cfg.Name, g.Logger))
 }
 func (app *AppRunner) Migrate() error {
-	withMigration := flag.Bool("with-migration", false, "Run migration when provided, eg: -with-migration")
+	withMigration := flag.Bool("skip-migration", false, "Run migration when provided, eg: -skip-migration")
 	flag.Parse()
-	if withMigration == nil || *withMigration == false {
-		app.Logger.Infof("Skipping the migration, if not you need to check the argument -with-migration")
+	if withMigration != nil {
+		app.Logger.Infof("Skipping the migration, if not you need to check the argument -skip-migration")
 		return nil
 	}
+
 	dsn := fmt.Sprintf(
 		"postgres://%s:%s@%s:%d/%s?sslmode=%s",
 		app.Cfg.PostgresConfig.Auth.User,

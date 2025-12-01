@@ -342,12 +342,13 @@ func (g *AppRunner) RequestLoggerMiddleware() {
 
 }
 func (app *AppRunner) Migrate() error {
-	withMigration := flag.Bool("with-migration", false, "Run migration when provided, eg: -with-migration")
+	withMigration := flag.Bool("skip-migration", false, "Run migration when provided, eg: -skip-migration")
 	flag.Parse()
-	if withMigration == nil || *withMigration == false {
-		app.Logger.Infof("Skipping the migration, if not you need to check the argument -with-migration")
+	if withMigration != nil {
+		app.Logger.Infof("Skipping the migration, if not you need to check the argument -skip-migration")
 		return nil
 	}
+
 	dsn := fmt.Sprintf(
 		"postgres://%s:%s@%s:%d/%s?sslmode=%s",
 		app.Cfg.PostgresConfig.Auth.User,
@@ -362,10 +363,6 @@ func (app *AppRunner) Migrate() error {
 		return fmt.Errorf("failed to get current working directory: %w", err)
 	}
 	migrationsPath := fmt.Sprintf("file://%s/api/assistant-api/migrations", currentDir)
-
-	app.Logger.Infof("Looking for migration files at path: %s", migrationsPath)
-	app.Logger.Infof("Using DSN for migration: %s", dsn)
-
 	m, err := migrate.New(migrationsPath, dsn)
 	if err != nil {
 		return fmt.Errorf("migration initialization failed: %w", err)
@@ -392,8 +389,6 @@ func (app *AppRunner) Migrate() error {
 		app.Logger.Infof("Migration state forced to clean. You can restart migration.")
 		return nil
 	}
-
-	// Perform database migration
 	if err := m.Up(); err != nil {
 		if err == migrate.ErrNoChange {
 			app.Logger.Infof("No migration changes detected.")

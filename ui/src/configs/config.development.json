@@ -13,18 +13,18 @@
                 "enable": true,
                 "providers": {
                     "password": true,
-                    "google": true,
-                    "linkedin": true,
-                    "github": true
+                    "google": false,
+                    "linkedin": false,
+                    "github": false
                 }
             },
             "signUp": {
                 "enable": true,
                 "providers": {
                     "password": true,
-                    "google": true,
-                    "linkedin": true,
-                    "github": true
+                    "google": false,
+                    "linkedin": false,
+                    "github": false
                 }
             }
         }

@@ -65,7 +65,7 @@ help:
 	@echo "  make shell-web           - Open web-api container shell"
 	@echo "  make shell-integration   - Open integration-api container shell"
 	@echo "  make shell-endpoint      - Open endpoint-api container shell"
-	@echo "  make db-shell            - Open PostgreSQL shell"
+	@echo "  make shell-db           - Open PostgreSQL shell"
 	@echo ""
 	@echo "MAINTENANCE:"
 	@echo "  make clean               - Stop and remove containers, volumes, images"
@@ -409,7 +409,7 @@ shell-integration:
 shell-endpoint:
 	$(COMPOSE) exec endpoint-api sh
 
-db-shell:
+shell-db:
 	$(COMPOSE) exec postgres psql -U rapida_user -d web_db
 
 # Legacy alias
