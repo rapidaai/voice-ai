@@ -3,6 +3,7 @@
   <source media="(prefers-color-scheme: light)" srcset="https://github.com/rapidaai/voice-ai/blob/87ff2937e086162acb5f5fad8c01e3f1f582b87b/.github/banner-01.png">
   <img style="width:100%;" src="https://github.com/rapidaai/voice-ai/blob/87ff2937e086162acb5f5fad8c01e3f1f582b87b/.github/banner-01.png" alt="Banner">
 </picture>
+
 # Rapida: End-to-End Voice Orchestration Platform
 
 [Rapida](https://rapida.ai) is an open-source platform for designing, building, and deploying voice agents at scale.  
@@ -42,29 +43,43 @@ Rapida is written in **Go**, using the highly optimized [gRPC](https://github.co
 
 ## Architecture Overview
 
-          ┌──────────────────────┐
-          │      Your Apps       │
-          │  (Backend / Tools)   │
-          └──────────┬───────────┘
-                     │
-             gRPC / Webhooks
-                     │
-    ┌────────────────▼─────────────────┐
-    │            RAPIDA                │
-    │   Voice Orchestration Engine     │
-    │                                  │
-    │  • Audio Streaming               │
-    │  • LLM Orchestration             │
-    │  • Tool Execution                │
-    │  • State Management              │
-    │  • Observability                 │
-    └────────────────┬─────────────────┘
-                     │
-            Audio/Telephony Providers
-                     │
-    ┌────────────────▼────────────────┐
-    │    PSTN / SIP / WebRTC / etc    │
-    └─────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                          CHANNELS                           │
+│     Phone • Web • WhatsApp • SIP • WebRTC • Others          │
+└───────────────────────────────┬─────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      RAPIDA ORCHESTRATOR                    │
+│   Routing • State • Tooling • Observability • Messaging     │
+└───────────────┬───────────────────────────────┬─────────────┘
+                │                               │
+                │                               │
+                ▼                               ▼
+     ┌─────────────────────┐          ┌──────────────────────┐
+     │  Audio Preprocess   │          │        STT           │
+     │ • VAD               │          │  Speech-to-Text      │
+     │ • Noise Reduction   │<--------→│  (ASR Engine)        │
+     │ • End-of-Speech     │          └──────────┬───────────┘
+     └──────────┬──────────┘                     │
+                │                                ▼
+                │                     ┌────────────────────────┐
+                │                     │          LLM           │
+                │                     │ Reasoning • Tools •    │
+                │                     │  Memory • Policies     │
+                │                     └───────────┬────────────┘
+                │                                 │
+                │                                 ▼
+                │                     ┌────────────────────────┐
+                │                     │          TTS           │
+                └────────────────────→│   Text-to-Speech       │
+                                      └───────────┬────────────┘
+                                                  │
+                                                  ▼
+                                   ┌────────────────────────────────────┐
+                                   │             USER OUTPUT            │
+                                   │      Audio Stream / Response       │
+                                   └────────────────────────────────────┘
 
 ## Documentation & Guides
 
