@@ -8,24 +8,26 @@ package internal_transformer_google
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	speech "cloud.google.com/go/speech/apiv1"
 	"cloud.google.com/go/speech/apiv1/speechpb"
 	internal_transformer "github.com/rapidaai/api/assistant-api/internal/transformer"
 	"github.com/rapidaai/pkg/commons"
-	protos "github.com/rapidaai/protos"
+	"github.com/rapidaai/protos"
 )
 
 type googleSpeechToText struct {
-	logger             commons.Logger
-	client             *speech.Client
-	stream             speechpb.Speech_StreamingRecognizeClient
-	providerOptions    GoogleOption
-	transformerOptions *internal_transformer.SpeechToTextInitializeOptions
-	ctx                context.Context
-	cancel             context.CancelFunc
+	*googleOption
+	mu      sync.Mutex // Ensures thread-safe operations.
+	logger  commons.Logger
+	client  *speech.Client
+	stream  speechpb.Speech_StreamingRecognizeClient
+	options *internal_transformer.SpeechToTextInitializeOptions
+	ctx     context.Context
 }
 
 // Name implements internal_transformer.SpeechToTextTransformer.
@@ -33,31 +35,12 @@ func (g *googleSpeechToText) Name() string {
 	return "google-speech-to-text"
 }
 
-func (g *googleSpeechToText) Initialize() error {
-	g.logger.Debugf("got all speech to text options %+v", g.providerOptions.SpeechToTextOptions())
-	err := g.stream.Send(&speechpb.StreamingRecognizeRequest{
-		StreamingRequest: &speechpb.StreamingRecognizeRequest_StreamingConfig{
-			StreamingConfig: g.providerOptions.SpeechToTextOptions(),
-		},
-	})
-	if err != nil {
-		return err
-	}
-	// Launch callback listener
-	go g.SpeechToTextCallback(g.ctx)
-	return nil
-}
-
-func (g *googleSpeechToText) Close(ctx context.Context) error {
-	if g.cancel != nil {
-		g.cancel()
-	}
-	return g.client.Close()
-}
-
 // Transform implements internal_transformer.SpeechToTextTransformer.
-func (g *googleSpeechToText) Transform(c context.Context, byf []byte, opts *internal_transformer.SpeechToTextOption) error {
-	return g.stream.Send(&speechpb.StreamingRecognizeRequest{
+func (google *googleSpeechToText) Transform(c context.Context, byf []byte, opts *internal_transformer.SpeechToTextOption) error {
+	google.mu.Lock()
+	defer google.mu.Unlock()
+
+	return google.stream.Send(&speechpb.StreamingRecognizeRequest{
 		StreamingRequest: &speechpb.StreamingRecognizeRequest_AudioContent{
 			AudioContent: byf,
 		},
@@ -69,28 +52,30 @@ func (g *googleSpeechToText) SpeechToTextCallback(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			g.logger.Infof("Google STT: context cancelled, stopping response listener")
+			g.logger.Infof("google-stt: context cancelled, stopping response listener")
 			return
 		default:
 			resp, err := g.stream.Recv()
 			if err == io.EOF {
-				g.logger.Infof("Google STT: stream ended (EOF)")
+				g.logger.Infof("google-stt: stream ended (EOF)")
 				return
 			}
 			if err != nil {
-				g.logger.Errorf("Google STT: recv error: %v", err)
+				g.logger.Errorf("google-stt: recv error: %v", err)
 				return
 			}
 			if resp == nil {
-				g.logger.Warnf("Google STT: received nil response")
+				g.logger.Warnf("google-stt: received nil response")
 				return
 			}
 			if resp.Error != nil {
 				switch resp.Error.Code {
 				case 3, 11:
-					g.logger.Warnf("Google STT: stream duration limit reached (code=%d): %s", resp.Error.Code, resp.Error.Message)
+					// reconnect
+					g.Initialize()
+					g.logger.Warnf("google-stt: stream duration limit reached (code=%d): %s", resp.Error.Code, resp.Error.Message)
 				default:
-					g.logger.Errorf("Google STT: recognition error: code=%d message=%s", resp.Error.Code, resp.Error.Message)
+					g.logger.Errorf("google-stt: recognition error: code=%d message=%s", resp.Error.Code, resp.Error.Message)
 				}
 				return
 			}
@@ -99,8 +84,8 @@ func (g *googleSpeechToText) SpeechToTextCallback(ctx context.Context) {
 					continue
 				}
 				alt := result.Alternatives[0]
-				if g.transformerOptions.OnTranscript != nil {
-					g.transformerOptions.OnTranscript(
+				if g.options.OnTranscript != nil {
+					g.options.OnTranscript(
 						alt.GetTranscript(),
 						float64(alt.GetConfidence()),
 						result.GetLanguageCode(),
@@ -118,37 +103,74 @@ func NewGoogleSpeechToText(
 	opts *internal_transformer.SpeechToTextInitializeOptions,
 ) (internal_transformer.SpeechToTextTransformer, error) {
 	start := time.Now()
-	cOptions, err := NewGoogleOption(logger, credential, opts.AudioConfig, opts.ModelOptions)
+	googleOption, err := NewGoogleOption(logger, credential, opts.AudioConfig, opts.ModelOptions)
 	if err != nil {
-		logger.Errorf("intializing google failed %+v", err)
+		logger.Errorf("google-stt: Error while GoogleOption err: %v", err)
 		return nil, err
 	}
-
-	//
 	client, err := speech.NewClient(ctx,
-		cOptions.GetClientOptions()...,
+		googleOption.GetClientOptions()...,
 	)
-	if err != nil {
-		logger.Errorf("error creating Google STT client: %+v", err)
-		return nil, err
-	}
 
-	stream, err := client.StreamingRecognize(ctx)
 	if err != nil {
-		logger.Errorf("error creating Google STT stream: %+v", err)
+		logger.Errorf("google-stt: Error creating Google client: %v", err)
 		return nil, err
 	}
 
 	// Context for callback management
-	sttCtx, cancel := context.WithCancel(ctx)
 	logger.Benchmark("google.NewGoogleSpeechToText", time.Since(start))
 	return &googleSpeechToText{
-		logger:             logger,
-		client:             client,
-		stream:             stream,
-		providerOptions:    cOptions,
-		transformerOptions: opts,
-		ctx:                sttCtx,
-		cancel:             cancel,
+		ctx:          ctx,
+		logger:       logger,
+		client:       client,
+		googleOption: googleOption,
+		options:      opts,
 	}, nil
+}
+
+func (google *googleSpeechToText) Initialize() error {
+	google.mu.Lock()
+	defer google.mu.Unlock()
+
+	stream, err := google.client.StreamingRecognize(google.ctx)
+	if err != nil {
+		google.logger.Errorf("google-stt: error creating google-stt stream: %v", err)
+		return err
+	}
+	google.stream = stream
+	err = google.stream.Send(&speechpb.StreamingRecognizeRequest{
+		StreamingRequest: &speechpb.StreamingRecognizeRequest_StreamingConfig{
+			StreamingConfig: google.SpeechToTextOptions(),
+		},
+	})
+	if err != nil {
+		return err
+	}
+	// Launch callback listener
+	go google.SpeechToTextCallback(google.ctx)
+	return nil
+}
+
+func (g *googleSpeechToText) Close(ctx context.Context) error {
+	var combinedErr error
+	if g.stream != nil {
+		// Attempt to close the streaming client.
+		err := g.stream.CloseSend()
+		if err != nil {
+			// Log the error if closure fails.
+			combinedErr = fmt.Errorf("error closing StreamClient: %v", err)
+			g.logger.Errorf(combinedErr.Error())
+		}
+	}
+
+	if g.client != nil {
+		// Attempt to close the client.
+		err := g.client.Close()
+		if err != nil {
+			// Log the error if closure fails.
+			combinedErr = fmt.Errorf("error closing Client: %v", err)
+			g.logger.Errorf(combinedErr.Error())
+		}
+	}
+	return combinedErr
 }

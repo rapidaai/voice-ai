@@ -123,6 +123,7 @@ export function CustomValueDropdown(props: CustomValueDropdownProps<any>) {
                 {props.searchable && (
                   <div className="px-3 py-3 sticky top-0 bg-light-background dark:bg-gray-900 z-10  border-b">
                     <SearchIconInput
+                      className="bg-white dark:bg-gray-950"
                       wrapperClassName="w-full!"
                       onChange={props.onSearching}
                     />
@@ -161,6 +162,7 @@ export function CustomValueDropdown(props: CustomValueDropdownProps<any>) {
                     <FormLabel>Or enter custom voice ID</FormLabel>
                     <div className="flex">
                       <Input
+                        className="bg-white dark:bg-gray-950"
                         placeholder="Custom value"
                         value={customInput}
                         onChange={e => setCustomInput(e.target.value)}

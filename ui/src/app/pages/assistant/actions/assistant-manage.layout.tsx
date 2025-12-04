@@ -30,7 +30,7 @@ export const AssistantManageLayout: FC<HTMLAttributes<HTMLDivElement>> = () => {
         >
           <ul className="p-1 space-y-1">
             <li>
-              <SideTabLink to="deployment/" className="h-11">
+              <SideTabLink to="deployment" className="h-11">
                 <Package className="w-4 h-4 mr-2" strokeWidth={1.5} />{' '}
                 Deployment
               </SideTabLink>

@@ -77,7 +77,7 @@ func (r *recorder) Interrupt() error {
 	if r.interruptionTime != nil {
 		elapsed := interruptTime.Sub(*r.interruptionTime)
 		if elapsed <= 100*time.Millisecond && elapsed >= 50*time.Millisecond {
-			r.logger.Info("Interrupt ignored. Too soon after the previous interruption: ", elapsed)
+			// r.logger.Info("Interrupt ignored. Too soon after the previous interruption: ", elapsed)
 			// Update interruption time regardless of ignoring
 			r.interruptionTime = &interruptTime
 			return nil
@@ -86,7 +86,7 @@ func (r *recorder) Interrupt() error {
 
 	// Update interruption time
 	r.interruptionTime = &interruptTime
-	r.logger.Info("User interruption detected at ", interruptTime)
+	// r.logger.Info("User interruption detected at ", interruptTime)
 
 	// Remove system audio chunks that would "play" after interruption
 	r.removeInterruptedSystemAudio(interruptTime)
@@ -115,7 +115,7 @@ func (r *recorder) removeInterruptedSystemAudio(interruptTime time.Time) {
 	silencedCount := 0
 	modifiedCount := 0
 
-	r.logger.Info("Processing interruption at", interruptTime)
+	// r.logger.Info("Processing interruption at", interruptTime)
 	adjustedInterruptTime := interruptTime
 
 	for i := range r.audioChunks {
@@ -170,7 +170,7 @@ func (r *recorder) removeInterruptedSystemAudio(interruptTime time.Time) {
 		}
 	}
 
-	// r.logger.Info(fmt.Sprintf("Interruption processed: silenced %d chunks, modified %d chunks", silencedCount, modifiedCount))
+	r.logger.Info(fmt.Sprintf("Interruption processed: silenced %d chunks, modified %d chunks", silencedCount, modifiedCount))
 }
 
 func (r *recorder) createSilentAudioData(byteLength int) []byte {
@@ -251,7 +251,7 @@ func (r *recorder) Persist() ([]byte, error) {
 	defer r.mu.Unlock()
 
 	if len(r.audioChunks) == 0 {
-		r.logger.Info("No audio chunks to persist")
+		// r.logger.Info("No audio chunks to persist")
 		return nil, fmt.Errorf("empty chunk of audio")
 	}
 
@@ -280,7 +280,7 @@ func (r *recorder) Persist() ([]byte, error) {
 		return nil, err
 	}
 
-	r.logger.Info(fmt.Sprintf("Persisted audio with %d chunks", len(r.audioChunks)))
+	// r.logger.Info(fmt.Sprintf("Persisted audio with %d chunks", len(r.audioChunks)))
 	return wavData, nil
 }
 

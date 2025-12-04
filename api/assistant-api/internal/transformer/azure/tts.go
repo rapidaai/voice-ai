@@ -8,6 +8,7 @@ package internal_transformer_azure
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/Microsoft/cognitive-services-speech-sdk-go/audio"
@@ -18,14 +19,13 @@ import (
 )
 
 type azureTextToSpeech struct {
-	contextId   string
+	*azureOption
 	mu          sync.Mutex
+	contextId   string
 	logger      commons.Logger
 	audioConfig *audio.AudioConfig
 	client      *speech.SpeechSynthesizer
-
-	providerOption    AzureOption
-	transformerOption *internal_transformer.TextToSpeechInitializeOptions
+	options     *internal_transformer.TextToSpeechInitializeOptions
 }
 
 func NewAzureTextToSpeech(
@@ -33,18 +33,17 @@ func NewAzureTextToSpeech(
 	logger commons.Logger,
 	credential *protos.VaultCredential,
 	iOption *internal_transformer.TextToSpeechInitializeOptions) (internal_transformer.TextToSpeechTransformer, error) {
-	providerOption, err := NewAzureOption(logger, credential,
+	azureOption, err := NewAzureOption(logger, credential,
 		iOption.AudioConfig,
 		iOption.ModelOptions)
 	if err != nil {
-		logger.Errorf("Unable to initilize azure option", err)
+		logger.Errorf("azure-tts: Unable to initilize azure option", err)
 		return nil, err
 	}
-
 	return &azureTextToSpeech{
-		logger:            logger,
-		providerOption:    providerOption,
-		transformerOption: iOption,
+		azureOption: azureOption,
+		logger:      logger,
+		options:     iOption,
 	}, nil
 }
 
@@ -53,29 +52,37 @@ func (azure *azureTextToSpeech) Name() string {
 }
 
 func (azure *azureTextToSpeech) Close(ctx context.Context) error {
-	azure.client.Close()
-	azure.audioConfig.Close()
+	if azure.client != nil {
+		azure.client.Close()
+	}
+	if azure.audioConfig != nil {
+		azure.audioConfig.Close()
+	}
 	return nil
 }
 
 func (azure *azureTextToSpeech) Initialize() (err error) {
 	stream, err := audio.CreatePullAudioOutputStream()
 	if err != nil {
-		return err
+		azure.logger.Errorf("azure-tts: failed to create audio stream:", err)
+		return fmt.Errorf("azure-tts: failed to create audio stream: %w", err)
 	}
 	azure.audioConfig, err = audio.NewAudioConfigFromStreamOutput(stream)
 	if err != nil {
-		return err
+		azure.logger.Errorf("azure-tts: failed to create audio config:", err)
+		return fmt.Errorf("azure-tts: failed to create audio config: %w", err)
 	}
 
-	speechConfig, err := azure.providerOption.TextToSpeechOption()
+	speechConfig, err := azure.TextToSpeechOption()
 	if err != nil {
-		return err
+		azure.logger.Errorf("azure-tts: failed to get speech configuration:", err)
+		return fmt.Errorf("azure-tts: failed to get speech configuration: %w", err)
 	}
 
 	azure.client, err = speech.NewSpeechSynthesizerFromConfig(speechConfig, azure.audioConfig)
 	if err != nil {
-		return err
+		azure.logger.Errorf("azure-tts: failed to initialize speech synthesizer:", err)
+		return fmt.Errorf("azure-tts: failed to initialize speech synthesizer: %w", err)
 	}
 	azure.client.SynthesisStarted(azure.OnStart)
 	azure.client.Synthesizing(azure.OnSpeech)
@@ -86,27 +93,31 @@ func (azure *azureTextToSpeech) Initialize() (err error) {
 
 func (azure *azureTextToSpeech) Transform(ctx context.Context, text string, opts *internal_transformer.TextToSpeechOption) error {
 	azure.mu.Lock()
+	defer azure.mu.Unlock()
 	azure.contextId = opts.ContextId
-	azure.mu.Unlock()
-	azure.logger.Infof("azure-tts: speak %s with context id = %s and completed = %t", text, opts.ContextId, opts.IsComplete)
+	if azure.client == nil {
+		return fmt.Errorf("azure-tts: you are calling transform without initilize")
+	}
+
 	res := <-azure.client.SpeakTextAsync(text)
 	if res.Error != nil {
 		return res.Error
 	}
 	return nil
 }
+
 func (azCallback *azureTextToSpeech) OnStart(event speech.SpeechSynthesisEventArgs) {
 	defer event.Close()
 }
 
 func (azCallback *azureTextToSpeech) OnSpeech(event speech.SpeechSynthesisEventArgs) {
 	defer event.Close()
-	azCallback.transformerOption.OnSpeech(azCallback.contextId, event.Result.AudioData)
+	azCallback.options.OnSpeech(azCallback.contextId, event.Result.AudioData)
 }
 
 func (azCallback *azureTextToSpeech) OnComplete(event speech.SpeechSynthesisEventArgs) {
 	defer event.Close()
-	azCallback.transformerOption.OnComplete(azCallback.contextId)
+	azCallback.options.OnComplete(azCallback.contextId)
 }
 
 func (azCallback *azureTextToSpeech) OnCancel(event speech.SpeechSynthesisEventArgs) {
