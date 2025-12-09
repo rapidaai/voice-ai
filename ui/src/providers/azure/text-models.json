@@ -1,0 +1,33 @@
+[
+    {
+        "id": "azure/gpt-4o",
+        "name": "gpt-4o",
+        "description": "GPT-4 from OpenAI has broad general knowledge and domain expertise allowing it to follow complex instructions in natural language and solve difficult problems accurately.",
+        "category": "text"
+    },
+    {
+        "id": "azure/gpt-4o-mini",
+        "name": "gpt-4o-mini",
+        "description": "GPT-4o mini enable developers to build applications that fetch data or take actions with external systems, and improved long-context performance compared to GPT-3.5 Turbo.",
+        "category": "text"
+    },
+    {
+        "id": "azure/gpt-4.1-nano",
+        "name": "gpt-4.1-nano",
+        "description": "GPT-4.1 nano is a compact and efficient version of GPT-4, offering improved performance and reduced resource requirements for various natural language processing tasks.",
+        "human_name": "gpt-4.1-nano",
+        "category": "text"
+    },
+    {
+        "id": "azure/gpt-5-nano",
+        "name": "gpt-5-nano",
+        "description": "GPT-5 Nano is a compact version of GPT-5, tailored for lightweight natural language tasks with efficient resource consumption.",
+        "category": "text"
+    },
+    {
+        "id": "azure/gpt-5-mini",
+        "name": "gpt-5-mini",
+        "description": "GPT-5 Mini is a smaller version of GPT-5, designed for applications requiring enhanced speed and long-context capabilities.",
+        "category": "text"
+    }
+]

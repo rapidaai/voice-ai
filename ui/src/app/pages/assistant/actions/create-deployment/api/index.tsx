@@ -38,6 +38,7 @@ import {
 } from '@/app/components/providers/text-to-speech/provider';
 import { PageActionButtonBlock } from '@/app/components/blocks/page-action-button-block';
 import { connectionConfig } from '@/configs';
+import { useConfirmDialog } from '@/app/pages/assistant/actions/hooks/use-confirmation';
 
 /**
  *
@@ -68,7 +69,7 @@ const ConfigureAssistantApiDeployment: FC<{ assistantId: string }> = ({
   const { loading, showLoader, hideLoader } = useRapidaStore();
   const { authId, projectId, token } = useCurrentCredential();
   const [errorMessage, setErrorMessage] = useState('');
-
+  const { showDialog, ConfirmDialogComponent } = useConfirmDialog({});
   /**
    * if voice is enabled
    */
@@ -190,12 +191,11 @@ const ConfigureAssistantApiDeployment: FC<{ assistantId: string }> = ({
         return;
       }
 
-      if (
-        !ValidateSpeechToTextIfInvalid(
-          audioInputConfig.provider,
-          audioInputConfig.parameters,
-        )
-      ) {
+      let error = ValidateSpeechToTextIfInvalid(
+        audioInputConfig.provider,
+        audioInputConfig.parameters,
+      );
+      if (error) {
         hideLoader();
         setErrorMessage('Please provide a valid speech to text options.');
         return;
@@ -210,12 +210,11 @@ const ConfigureAssistantApiDeployment: FC<{ assistantId: string }> = ({
         return;
       }
 
-      if (
-        !ValidateTextToSpeechIfInvalid(
-          audioOutputConfig.provider,
-          audioOutputConfig.parameters,
-        )
-      ) {
+      let error = ValidateTextToSpeechIfInvalid(
+        audioOutputConfig.provider,
+        audioOutputConfig.parameters,
+      );
+      if (error) {
         hideLoader();
         setErrorMessage('Please provide a valid text to speech options.');
         return;
@@ -289,47 +288,52 @@ const ConfigureAssistantApiDeployment: FC<{ assistantId: string }> = ({
   };
 
   return (
-    <form
-      onSubmit={handleDeployApi}
-      method="POST"
-      className="relative flex flex-col flex-1 "
-    >
-      <div className="overflow-auto flex flex-col flex-1 pb-20">
-        <ConfigureExperience
-          experienceConfig={experienceConfig}
-          setExperienceConfig={setExperienceConfig}
-        />
+    <>
+      <ConfirmDialogComponent />
+      <form
+        onSubmit={handleDeployApi}
+        method="POST"
+        className="relative flex flex-col flex-1 bg-white dark:bg-gray-900"
+      >
+        <div className="overflow-auto flex flex-col flex-1 pb-20">
+          <ConfigureExperience
+            experienceConfig={experienceConfig}
+            setExperienceConfig={setExperienceConfig}
+          />
 
-        <ConfigureAudioInputProvider
-          voiceInputEnable={voiceInputEnable}
-          onChangeVoiceInputEnable={setVoiceInputEnable}
-          audioInputConfig={audioInputConfig}
-          setAudioInputConfig={setAudioInputConfig}
-        />
-        <ConfigureAudioOutputProvider
-          voiceOutputEnable={voiceOutputEnable}
-          onChangeVoiceOutputEnable={setVoiceOutputEnable}
-          audioOutputConfig={audioOutputConfig}
-          setAudioOutputConfig={setAudioOutputConfig}
-        />
-      </div>
-      <PageActionButtonBlock errorMessage={errorMessage}>
-        <ICancelButton
-          className="px-4 rounded-[2px]"
-          onClick={() => {
-            goToDeploymentAssistant(assistantId);
-          }}
-        >
-          Cancel
-        </ICancelButton>
-        <IBlueBGArrowButton
-          type="submit"
-          className="px-4 rounded-[2px]"
-          isLoading={loading}
-        >
-          Deploy Api
-        </IBlueBGArrowButton>
-      </PageActionButtonBlock>
-    </form>
+          <ConfigureAudioInputProvider
+            voiceInputEnable={voiceInputEnable}
+            onChangeVoiceInputEnable={setVoiceInputEnable}
+            audioInputConfig={audioInputConfig}
+            setAudioInputConfig={setAudioInputConfig}
+          />
+          <ConfigureAudioOutputProvider
+            voiceOutputEnable={voiceOutputEnable}
+            onChangeVoiceOutputEnable={setVoiceOutputEnable}
+            audioOutputConfig={audioOutputConfig}
+            setAudioOutputConfig={setAudioOutputConfig}
+          />
+        </div>
+        <PageActionButtonBlock errorMessage={errorMessage}>
+          <ICancelButton
+            className="px-4 rounded-[2px]"
+            onClick={() => {
+              showDialog(() => {
+                goToDeploymentAssistant(assistantId);
+              });
+            }}
+          >
+            Cancel
+          </ICancelButton>
+          <IBlueBGArrowButton
+            type="submit"
+            className="px-4 rounded-[2px]"
+            isLoading={loading}
+          >
+            Deploy Api
+          </IBlueBGArrowButton>
+        </PageActionButtonBlock>
+      </form>
+    </>
   );
 };

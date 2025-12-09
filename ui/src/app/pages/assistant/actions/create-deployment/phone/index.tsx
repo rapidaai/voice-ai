@@ -210,12 +210,11 @@ const ConfigureAssistantCallDeployment: FC<{ assistantId: string }> = ({
       return;
     }
 
-    if (
-      !ValidateTelephonyOptions(
-        telephonyConfig.provider,
-        telephonyConfig.parameters,
-      )
-    ) {
+    let error = ValidateTelephonyOptions(
+      telephonyConfig.provider,
+      telephonyConfig.parameters,
+    );
+    if (!error) {
       hideLoader();
       setErrorMessage(
         'Please provide a valid telephony providers for phone call.',
@@ -237,14 +236,13 @@ const ConfigureAssistantCallDeployment: FC<{ assistantId: string }> = ({
       return;
     }
 
-    if (
-      !ValidateSpeechToTextIfInvalid(
-        audioInputConfig.provider,
-        audioInputConfig.parameters,
-      )
-    ) {
+    let sttError = ValidateSpeechToTextIfInvalid(
+      audioInputConfig.provider,
+      audioInputConfig.parameters,
+    );
+    if (sttError) {
       hideLoader();
-      setErrorMessage('Please provide a valid speech to text options.');
+      setErrorMessage(sttError);
       return;
     }
 
@@ -265,14 +263,13 @@ const ConfigureAssistantCallDeployment: FC<{ assistantId: string }> = ({
       return;
     }
 
-    if (
-      !ValidateTextToSpeechIfInvalid(
-        audioOutputConfig.provider,
-        audioOutputConfig.parameters,
-      )
-    ) {
+    let ttsErr = ValidateTextToSpeechIfInvalid(
+      audioOutputConfig.provider,
+      audioOutputConfig.parameters,
+    );
+    if (ttsErr) {
       hideLoader();
-      setErrorMessage('Please provide a valid text to speech  options.');
+      setErrorMessage(ttsErr);
       return;
     }
 
@@ -353,7 +350,7 @@ const ConfigureAssistantCallDeployment: FC<{ assistantId: string }> = ({
     <form
       onSubmit={handleDeployPhone}
       method="POST"
-      className="relative flex flex-col flex-1"
+      className="relative flex flex-col flex-1 bg-white dark:bg-gray-900"
     >
       <div className="overflow-auto flex flex-col flex-1 pb-20">
         <TelephonyProvider

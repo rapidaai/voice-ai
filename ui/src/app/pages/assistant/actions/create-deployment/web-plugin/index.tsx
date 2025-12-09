@@ -223,14 +223,13 @@ const ConfigureAssistantWebDeployment: FC<{ assistantId: string }> = ({
           return;
         }
 
-        if (
-          !ValidateSpeechToTextIfInvalid(
-            audioInputConfig.provider,
-            audioInputConfig.parameters,
-          )
-        ) {
+        let err = ValidateSpeechToTextIfInvalid(
+          audioInputConfig.provider,
+          audioInputConfig.parameters,
+        );
+        if (err) {
           hideLoader();
-          setErrorMessage('Please provide a valid speech to text options.');
+          setErrorMessage(err);
           return;
         }
       }
@@ -245,15 +244,13 @@ const ConfigureAssistantWebDeployment: FC<{ assistantId: string }> = ({
           );
           return;
         }
-
-        if (
-          !ValidateTextToSpeechIfInvalid(
-            audioOutputConfig.provider,
-            audioOutputConfig.parameters,
-          )
-        ) {
+        let error = ValidateTextToSpeechIfInvalid(
+          audioOutputConfig.provider,
+          audioOutputConfig.parameters,
+        );
+        if (error) {
           hideLoader();
-          setErrorMessage('Please provide a valid text to speech options.');
+          setErrorMessage(error);
           return;
         }
       }
@@ -333,7 +330,7 @@ const ConfigureAssistantWebDeployment: FC<{ assistantId: string }> = ({
   return (
     <form
       onSubmit={handleDeployWebPlugin}
-      className="relative flex flex-col flex-1"
+      className="relative flex flex-col flex-1 bg-white dark:bg-gray-900"
       method="POST"
     >
       <AssistantWebwidgetDeploymentDialog

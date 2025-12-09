@@ -235,7 +235,9 @@ export const GetOpenAIDefaultOptions = (current: Metadata[]): Metadata[] => {
   ];
 };
 
-export const ValidateOpenAIOptions = (options: Metadata[]): boolean => {
+export const ValidateOpenAIOptions = (
+  options: Metadata[],
+): string | undefined => {
   const credentialID = options.find(
     opt => opt.getKey() === 'rapida.credential_id',
   );
@@ -244,7 +246,7 @@ export const ValidateOpenAIOptions = (options: Metadata[]): boolean => {
     !credentialID.getValue() ||
     credentialID.getValue().length === 0
   ) {
-    return false;
+    return 'Please select valid credential for text to speech.';
   }
   // Validate language
   const languageOption = options.find(opt => opt.getKey() === 'speak.language');
@@ -252,7 +254,7 @@ export const ValidateOpenAIOptions = (options: Metadata[]): boolean => {
     !languageOption ||
     !OPENAI_LANGUAGES.some(lang => lang.code === languageOption.getValue())
   ) {
-    return false;
+    return 'Please select valid language option for text to speech.';
   }
 
   // Validate voice
@@ -261,7 +263,7 @@ export const ValidateOpenAIOptions = (options: Metadata[]): boolean => {
     !voiceOption ||
     !OPENAI_VOICES.some(voice => voice.id === voiceOption.getValue())
   ) {
-    return false;
+    return 'Please select valid voice for text to speech.';
   }
 
   // Validate model
@@ -270,8 +272,8 @@ export const ValidateOpenAIOptions = (options: Metadata[]): boolean => {
     !modelOption ||
     !OPENAI_MODELS.some(model => model.id === modelOption.getValue())
   ) {
-    return false;
+    return 'Please select valid model for text to speech.';
   }
 
-  return true;
+  return undefined;
 };

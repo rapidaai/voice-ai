@@ -1,3 +1,9 @@
+/**
+ * Rapida – Open Source Voice AI Orchestration Platform
+ * Copyright (C) 2023-2025 Prashant Srivastav <prashant@rapida.ai>
+ * Licensed under a modified GPL-2.0. See the LICENSE file for details.
+ */
+
 import { SetMetadata } from '@/utils/metadata';
 import { Metadata } from '@rapidaai/react';
 
@@ -25,7 +31,9 @@ export const GetGoogleDefaultOptions = (current: Metadata[]): Metadata[] => {
   ];
 };
 
-export const ValidateGoogleOptions = (options: Metadata[]): boolean => {
+export const ValidateGoogleOptions = (
+  options: Metadata[],
+): string | undefined => {
   const credentialID = options.find(
     opt => opt.getKey() === 'rapida.credential_id',
   );
@@ -34,12 +42,12 @@ export const ValidateGoogleOptions = (options: Metadata[]): boolean => {
     !credentialID.getValue() ||
     credentialID.getValue().length === 0
   ) {
-    return false;
+    return 'Please select valid google credential for text to speech.';
   }
   const voiceID = options.find(opt => opt.getKey() === 'speak.voice.id');
   if (!voiceID || !voiceID.getValue() || voiceID.getValue().length === 0) {
-    return false;
+    return 'Please select valid voice for text to speech.';
   }
 
-  return true;
+  return undefined;
 };

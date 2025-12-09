@@ -22,7 +22,9 @@ export const GetDeepgramDefaultOptions = (current: Metadata[]): Metadata[] => {
   ];
 };
 
-export const ValidateDeepgramOptions = (options: Metadata[]): boolean => {
+export const ValidateDeepgramOptions = (
+  options: Metadata[],
+): string | undefined => {
   const credentialID = options.find(
     opt => opt.getKey() === 'rapida.credential_id',
   );
@@ -31,11 +33,11 @@ export const ValidateDeepgramOptions = (options: Metadata[]): boolean => {
     !credentialID.getValue() ||
     credentialID.getValue().length === 0
   ) {
-    return false;
+    return 'Please select valid credential for text to speech.';
   }
   const voiceID = options.find(opt => opt.getKey() === 'speak.voice.id');
   if (!voiceID || !voiceID.getValue() || voiceID.getValue().length === 0) {
-    return false;
+    return 'Please select valid voice for text to speech.';
   }
-  return true;
+  return undefined;
 };

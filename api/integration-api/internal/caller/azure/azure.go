@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/openai/openai-go"
-	azure_openai "github.com/openai/openai-go/azure"
+	"github.com/openai/openai-go/option"
 	internal_callers "github.com/rapidaai/api/integration-api/internal/caller"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
@@ -19,12 +19,11 @@ type AzureAi struct {
 }
 
 var (
-	DEFUALT_URL           = "https://api.openai.com/v1"
-	API_URL               = "url"
-	API_KEY               = "key"
-	AZ_ENDPOINT_KEY       = "endpoint"
-	AZ_SUBSCRIPTION_KEY   = "subscription_key"
-	azureOpenAIAPIVersion = "2024-08-01-preview"
+	DEFUALT_URL         = "https://api.openai.com/v1"
+	API_URL             = "url"
+	API_KEY             = "key"
+	AZ_ENDPOINT_KEY     = "endpoint"
+	AZ_SUBSCRIPTION_KEY = "subscription_key"
 )
 
 const (
@@ -62,12 +61,12 @@ func (az *AzureAi) GetClient() (*openai.Client, error) {
 		ux = DEFUALT_URL
 		az.logger.Debugf("Using default client connection url")
 	}
+
 	client := openai.NewClient(
-		azure_openai.WithEndpoint(ux.(string), azureOpenAIAPIVersion),
-		azure_openai.WithAPIKey(cx.(string)),
+		option.WithBaseURL(ux.(string)),
+		option.WithAPIKey(cx.(string)),
 	)
 	return &client, nil
-	// return azopenai.NewClientWithKeyCredential(ux.(string), keyCredential, nil)
 }
 
 func (az *AzureAi) GetComplitionUsages(usages openai.CompletionUsage) types.Metrics {

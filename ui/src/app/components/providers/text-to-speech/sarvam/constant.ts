@@ -30,7 +30,9 @@ export const GetSarvamDefaultOptions = (current: Metadata[]): Metadata[] => {
   ];
 };
 
-export const ValidateSarvamOptions = (options: Metadata[]): boolean => {
+export const ValidateSarvamOptions = (
+  options: Metadata[],
+): string | undefined => {
   const credentialID = options.find(
     opt => opt.getKey() === 'rapida.credential_id',
   );
@@ -39,12 +41,12 @@ export const ValidateSarvamOptions = (options: Metadata[]): boolean => {
     !credentialID.getValue() ||
     credentialID.getValue().length === 0
   ) {
-    return false;
+    return 'Please select a valid credential for text to speech.';
   }
 
   const voiceID = options.find(opt => opt.getKey() === 'speak.voice.id');
   if (!voiceID || !voiceID.getValue() || voiceID.getValue().length === 0) {
-    return false;
+    return 'Please select a valid voice for text to speech.';
   }
 
   const validations = [
@@ -52,16 +54,22 @@ export const ValidateSarvamOptions = (options: Metadata[]): boolean => {
       key: 'speak.language',
       validator: SARVAM_LANGUAGE(),
       field: 'language_id',
+      errorMessage: 'Please select a valid language for text to speech.',
     },
     {
       key: 'speak.model',
       validator: SARVAM_TEXT_TO_SPEECH_MODEL(),
       field: 'model_id',
+      errorMessage: 'Please select a valid model for text to speech.',
     },
   ];
 
-  return validations.every(({ key, validator, field }) => {
+  for (const { key, validator, field, errorMessage } of validations) {
     const option = options.find(opt => opt.getKey() === key);
-    return option && validator.some(item => item[field] === option.getValue());
-  });
+    if (!option || !validator.some(item => item[field] === option.getValue())) {
+      return errorMessage;
+    }
+  }
+
+  return undefined;
 };

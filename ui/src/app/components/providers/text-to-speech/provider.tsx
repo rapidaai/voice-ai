@@ -1,3 +1,8 @@
+/**
+ * Rapida – Open Source Voice AI Orchestration Platform
+ * Copyright (C) 2023-2025 Prashant Srivastav <prashant@rapida.ai>
+ * Licensed under a modified GPL-2.0. See the LICENSE file for details.
+ */
 import { Metadata } from '@rapidaai/react';
 import { FC } from 'react';
 import {
@@ -36,6 +41,7 @@ import {
   ValidatePlayHTOptions,
 } from '@/app/components/providers/text-to-speech/playht';
 import { ProviderComponentProps } from '@/app/components/providers';
+import { SENTENCE_BOUNDRIES } from '../../../../providers/index';
 import {
   ConfigureSarvamTextToSpeech,
   GetSarvamDefaultOptions,
@@ -52,20 +58,7 @@ export const GetDefaultSpeakerConfig = (
   const defaultConfig = [
     {
       key: 'speaker.sentence.boundaries',
-      value: [
-        ' .',
-        '!',
-        '?',
-        '|',
-        ';',
-        ':',
-        '…',
-        '。',
-        '．',
-        '।',
-        '۔',
-        '--',
-      ].join('<|||>'),
+      value: SENTENCE_BOUNDRIES.join('<|||>'),
     },
     {
       key: 'speaker.conjunction.boundaries',
@@ -123,7 +116,7 @@ export const GetDefaultTextToSpeechIfInvalid = (
 export const ValidateTextToSpeechIfInvalid = (
   provider: string,
   parameters: Metadata[],
-): boolean => {
+): string | undefined => {
   switch (provider) {
     case 'google':
     case 'google-cloud':
@@ -143,7 +136,7 @@ export const ValidateTextToSpeechIfInvalid = (
     case 'sarvamai':
       return ValidateSarvamOptions(parameters);
     default:
-      return false;
+      return undefined;
   }
 };
 

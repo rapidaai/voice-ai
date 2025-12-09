@@ -68,8 +68,7 @@ const ConfigureAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
   /**
    * global naviagtion
    */
-  const { goToDeploymentAssistant, goToAssistantPreview } =
-    useGlobalNavigation();
+  const { goToDeploymentAssistant } = useGlobalNavigation();
 
   /**
    * global loading
@@ -225,15 +224,13 @@ const ConfigureAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
         );
         return;
       }
-
-      if (
-        !ValidateTextToSpeechIfInvalid(
-          audioOutputConfig.provider,
-          audioOutputConfig.parameters,
-        )
-      ) {
+      let error = ValidateTextToSpeechIfInvalid(
+        audioOutputConfig.provider,
+        audioOutputConfig.parameters,
+      );
+      if (error) {
         hideLoader();
-        setErrorMessage('Please provide a valid text to speech options.');
+        setErrorMessage(error);
         return;
       }
     }
@@ -315,7 +312,7 @@ const ConfigureAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
       <form
         onSubmit={handleDeployDebugger}
         method="POST"
-        className="relative flex flex-col flex-1 mx-auto"
+        className="relative flex flex-col flex-1 bg-white dark:bg-gray-900"
       >
         <div className="overflow-auto flex flex-col flex-1 pb-20">
           <ConfigureExperience

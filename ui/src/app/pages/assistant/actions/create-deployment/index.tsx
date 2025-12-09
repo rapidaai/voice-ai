@@ -38,15 +38,12 @@ import {
 import toast from 'react-hot-toast/headless';
 import { connectionConfig } from '@/configs';
 import { ProviderPill } from '@/app/components/pill/provider-model-pill';
-import { AnimatePresence, motion } from 'framer-motion';
 import { PlusIcon } from '@/app/components/Icon/plus';
 import { Popover } from '@/app/components/popover';
 import { ActionableEmptyMessage } from '@/app/components/container/message/actionable-empty-message';
 import { toHumanReadableDateTime } from '@/utils/date';
 import { InputHelper } from '@/app/components/input-helper';
-import { CodeHighlighting } from '@/app/components/code-highlighting';
 import { useRapidaStore } from '@/hooks';
-import { cn } from '@/utils';
 import { AssistantPhoneCallDeploymentDialog } from '@/app/components/base/modal/assistant-phone-call-deployment-modal';
 import { AssistantDebugDeploymentDialog } from '@/app/components/base/modal/assistant-debug-deployment-modal';
 import { AssistantWebWidgetlDeploymentDialog } from '@/app/components/base/modal/assistant-web-widget-deployment-modal';
@@ -125,7 +122,6 @@ export const ConfigureAssistantDeploymentPage = () => {
   const [isPhoneExpanded, setIsPhoneExpanded] = useState(false);
 
   const [isWidgetExpanded, setIsWidgetExpanded] = useState(false);
-  const [isWidgetCodeExpanded, setIsWidgetCodeExpanded] = useState(false);
   const [createDeploymentPopover, setCreateDeploymentPopover] = useState(false);
   const [actionCreateDeploymentPopover, setActionCreateDeploymentPopover] =
     useState(false);

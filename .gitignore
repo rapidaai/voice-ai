@@ -2,3 +2,4 @@
 *.onnx
 .DS_Store
 .venv/
+license-check-and-add.json

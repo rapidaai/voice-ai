@@ -54,25 +54,27 @@ export const VoiceAgent: FC<{
     <div className="h-dvh flex p-8 text-sm/6 w-full">
       <div className="relative overflow-hidden h-full mx-auto w-2/3 dark:bg-gray-950/50 border rounded-[2px]">
         {!assistant?.getDebuggerdeployment()?.hasInputaudio() && (
-          <YellowNoticeBlock className="absolute top-0 left-0 right-0 flex items-center justify-between">
-            <Info className="shrink-0 w-4 h-4" />
-            <div className="ms-3 text-sm font-medium">
-              Voice functionality is currently disabled. Please enable it to
-              enjoy a voice experience with your assistant.
-            </div>
-            <a
-              target="_blank"
-              href={`/deployment/assistant/${assistant?.getId()}/manage/deployment/debugger`}
-              className="h-7 flex items-center font-medium hover:underline ml-auto text-yellow-600"
-              rel="noreferrer"
-            >
-              Enable voice
-              <ExternalLink
-                className="shrink-0 w-4 h-4 ml-1.5"
-                strokeWidth={1.5}
-              />
-            </a>
-          </YellowNoticeBlock>
+          <div className="bg-white dark:bg-gray-950 z-10 absolute top-0 left-0 right-0 ">
+            <YellowNoticeBlock className="flex items-center justify-between">
+              <Info className="shrink-0 w-4 h-4" />
+              <div className="ms-3 text-sm font-medium">
+                Voice functionality is currently disabled. Please enable it to
+                enjoy a voice experience with your assistant.
+              </div>
+              <a
+                target="_blank"
+                href={`/deployment/assistant/${assistant?.getId()}/manage/deployment/debugger`}
+                className="h-7 flex items-center font-medium hover:underline ml-auto text-yellow-600"
+                rel="noreferrer"
+              >
+                Enable voice
+                <ExternalLink
+                  className="shrink-0 w-4 h-4 ml-1.5"
+                  strokeWidth={1.5}
+                />
+              </a>
+            </YellowNoticeBlock>
+          </div>
         )}
         <div className="h-full flex flex-row flex-nowrap items-stretch">
           <div className="flex flex-col grow min-w-0 flex-1">

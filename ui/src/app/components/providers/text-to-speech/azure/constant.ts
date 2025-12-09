@@ -1,3 +1,7 @@
+/**
+ * Copyright (C) 2023-2025 Prashant Srivastav <prashant@rapida.ai>
+ * Licensed under a modified GPL-2.0. See LICENSE file for details.
+ */
 import { AZURE_LANGUAGE } from '@/providers';
 import { SetMetadata } from '@/utils/metadata';
 import { Metadata } from '@rapidaai/react';
@@ -28,7 +32,12 @@ export const GetAzureDefaultOptions = (current: Metadata[]): Metadata[] => {
   ];
 };
 
-export const ValidateAzureOptions = (options: Metadata[]): boolean => {
+/**
+ * validation azure options
+ */
+export const ValidateAzureOptions = (
+  options: Metadata[],
+): string | undefined => {
   const credentialID = options.find(
     opt => opt.getKey() === 'rapida.credential_id',
   );
@@ -37,7 +46,7 @@ export const ValidateAzureOptions = (options: Metadata[]): boolean => {
     !credentialID.getValue() ||
     credentialID.getValue().length === 0
   ) {
-    return false;
+    return 'Please select valid azure credential for text to speech.';
   }
 
   // Validate language
@@ -46,14 +55,14 @@ export const ValidateAzureOptions = (options: Metadata[]): boolean => {
     !languageOption ||
     !AZURE_LANGUAGE().some(lang => lang.code === languageOption.getValue())
   ) {
-    return false;
+    return 'Please select valid language for text to speech.';
   }
 
   // Validate voice
   const voiceOption = options.find(opt => opt.getKey() === 'speak.voice.id');
   if (!voiceOption) {
-    return false;
+    return 'Please select valid voice for text to speech.';
   }
 
-  return true;
+  return undefined;
 };

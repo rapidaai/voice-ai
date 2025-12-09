@@ -766,7 +766,9 @@ export const GetPlayHTDefaultOptions = (current: Metadata[]): Metadata[] => {
   ];
 };
 
-export const ValidatePlayHTOptions = (options: Metadata[]): boolean => {
+export const ValidatePlayHTOptions = (
+  options: Metadata[],
+): string | undefined => {
   const credentialID = options.find(
     opt => opt.getKey() === 'rapida.credential_id',
   );
@@ -775,7 +777,7 @@ export const ValidatePlayHTOptions = (options: Metadata[]): boolean => {
     !credentialID.getValue() ||
     credentialID.getValue().length === 0
   ) {
-    return false;
+    return 'Please select valid credential for text to speech.';
   }
 
   // Validate language
@@ -784,7 +786,7 @@ export const ValidatePlayHTOptions = (options: Metadata[]): boolean => {
     !languageOption ||
     !PLAYHT_LANGUAGE.some(lang => lang.code === languageOption.getValue())
   ) {
-    return false;
+    return 'Please select valid language option for text to speech.';
   }
 
   // Validate voice
@@ -793,7 +795,7 @@ export const ValidatePlayHTOptions = (options: Metadata[]): boolean => {
     !voiceOption ||
     !PLAYHT_VOICES.some(voice => voice.id === voiceOption.getValue())
   ) {
-    return false;
+    return 'Please select valid voice for text to speech.';
   }
 
   // Validate model
@@ -802,8 +804,8 @@ export const ValidatePlayHTOptions = (options: Metadata[]): boolean => {
     !modelOption ||
     !PLAYHT_MODELS.some(model => model.id === modelOption.getValue())
   ) {
-    return false;
+    return 'Please select valid model for text to speech.';
   }
 
-  return true;
+  return undefined;
 };

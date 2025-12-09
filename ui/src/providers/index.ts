@@ -149,6 +149,10 @@ export const AZURE_LANGUAGE = () => {
   return require('./azure/languages.json');
 };
 
+export const AZURE_TEXT_MODEL = () => {
+  return require('./azure/text-models.json');
+};
+
 /**
  *
  * @returns

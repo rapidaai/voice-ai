@@ -1,47 +1,6 @@
 import { Metadata } from '@rapidaai/react';
 import { SetMetadata } from '@/utils/metadata';
-
-export const AZURE_TEXT_MODEL = [
-  {
-    id: 'azure/gpt-4o',
-    created_date: '2024-09-04 02:33:51.481301',
-    updated_date: null,
-    provider_id: '198796716894742122',
-    name: 'gpt-4o',
-    description:
-      'GPT-4 from OpenAI has broad general knowledge and domain expertise allowing it to follow complex instructions in natural language and solve difficult problems accurately.',
-    human_name: 'OpenAI',
-    category: 'text',
-    status: 'ACTIVE',
-    owner: 'rapida',
-  },
-  {
-    id: 'azure/gpt-4o-mini',
-    created_date: '2024-11-22 12:57:51.100805',
-    updated_date: '2024-11-22 12:57:51.100805',
-    provider_id: '198796716894742122',
-    name: 'gpt-4o-mini',
-    description:
-      'GPT-4o mini enable developers to build applications that fetch data or take actions with external systems, and improved long-context performance compared to GPT-3.5 Turbo.',
-    human_name: 'gpt-4o-mini',
-    category: 'text',
-    status: 'ACTIVE',
-    owner: 'rapida',
-  },
-  {
-    id: 'azure/gpt-4.1-nano',
-    created_date: '2024-11-22 13:00:00.000000',
-    updated_date: '2024-11-22 13:00:00.000000',
-    provider_id: '198796716894742123',
-    name: 'gpt-4.1-nano',
-    description:
-      'GPT-4.1 nano is a compact and efficient version of GPT-4, offering improved performance and reduced resource requirements for various natural language processing tasks.',
-    human_name: 'gpt-4.1-nano',
-    category: 'text',
-    status: 'ACTIVE',
-    owner: 'rapida',
-  },
-];
+import { AZURE_TEXT_MODEL } from '@/providers';
 
 export const GetAzureTextProviderDefaultOptions = (
   current: Metadata[],
@@ -72,17 +31,17 @@ export const GetAzureTextProviderDefaultOptions = (
     if (metadata) mtds.push(metadata);
   };
 
-  addMetadata('model.id', AZURE_TEXT_MODEL[0].id, value =>
-    AZURE_TEXT_MODEL.some(model => model.id === value),
+  addMetadata('model.id', AZURE_TEXT_MODEL()[0].id, value =>
+    AZURE_TEXT_MODEL().some(model => model.id === value),
   );
 
   // Add validation for model.name
-  addMetadata('model.name', AZURE_TEXT_MODEL[0].name, value =>
-    AZURE_TEXT_MODEL.some(model => model.name === value),
+  addMetadata('model.name', AZURE_TEXT_MODEL()[0].name, value =>
+    AZURE_TEXT_MODEL().some(model => model.name === value),
   );
-  addMetadata('model.frequency_penalty', '0');
-  addMetadata('model.temperature', '0.7');
-  addMetadata('model.top_p', '1');
+  addMetadata('model.frequency_penalty');
+  addMetadata('model.temperature');
+  addMetadata('model.top_p');
   addMetadata('model.presence_penalty');
   addMetadata('model.max_completion_tokens', '2048');
   addMetadata('model.response_format');
@@ -90,7 +49,7 @@ export const GetAzureTextProviderDefaultOptions = (
   addMetadata('model.tool_choice');
   addMetadata('model.user');
   addMetadata('model.metadata');
-  addMetadata('rapida.credential_id', '');
+  addMetadata('rapida.credential_id');
   return mtds.filter(m => keysToKeep.includes(m.getKey()));
 };
 export const ValidateAzureTextProviderDefaultOptions = (
@@ -109,7 +68,7 @@ export const ValidateAzureTextProviderDefaultOptions = (
   const modelIdOption = options.find(opt => opt.getKey() === 'model.id');
   if (
     !modelIdOption ||
-    !AZURE_TEXT_MODEL.some(model => model.id === modelIdOption.getValue())
+    !AZURE_TEXT_MODEL().some(model => model.id === modelIdOption.getValue())
   ) {
     return 'Please check and select valid model from dropdown.';
   }
@@ -133,21 +92,20 @@ export const ValidateAzureTextProviderDefaultOptions = (
     opt => opt.getKey() === 'model.temperature',
   );
   if (
-    !temperatureOption ||
-    isNaN(parseFloat(temperatureOption.getValue())) ||
-    parseFloat(temperatureOption.getValue()) < 0 ||
-    parseFloat(temperatureOption.getValue()) > 1
+    temperatureOption &&
+    (isNaN(parseFloat(temperatureOption.getValue())) ||
+      parseFloat(temperatureOption.getValue()) < 0 ||
+      parseFloat(temperatureOption.getValue()) > 1)
   ) {
-    console.log('Invalid or missing model.temperature');
     return 'Please check and provide a correct value for temperature any decimal value between 0 to 1';
   }
 
   const topPOption = options.find(opt => opt.getKey() === 'model.top_p');
   if (
-    !topPOption ||
-    isNaN(parseFloat(topPOption.getValue())) ||
-    parseFloat(topPOption.getValue()) < 0 ||
-    parseFloat(topPOption.getValue()) > 1
+    topPOption &&
+    (isNaN(parseFloat(topPOption.getValue())) ||
+      parseFloat(topPOption.getValue()) < 0 ||
+      parseFloat(topPOption.getValue()) > 1)
   ) {
     console.log('Invalid or missing model.top_p');
     return 'Please check and provide a correct value for top_p any decimal value between 0 to 1';
