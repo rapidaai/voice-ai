@@ -74,7 +74,6 @@ services:
     container_name: nginx
     ports:
       - "8080:8080"
-      - "3000:3000"
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ui_build:/usr/share/nginx/html:ro
@@ -93,14 +92,12 @@ services:
       context: .
       dockerfile: docker/ui/Dockerfile
     container_name: ui
-    volumes:
-      - ui_build:/usr/share/nginx/html
+    ports:
+      - "3000:3000"
     depends_on:
       - web-api
       - integration-api
       - endpoint-api
-    networks:
-      - api-network
 
   # Web API Service
   web-api:

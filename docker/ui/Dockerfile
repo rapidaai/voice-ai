@@ -1,14 +1,14 @@
 # Build stage
 FROM node:22-alpine AS builder
-
 WORKDIR /app
-
 RUN apk add --no-cache curl
 
-# Copy package files and install deps
+# Copy package files and install dependencies
 COPY ui/package.json ui/yarn.lock ./
+RUN yarn install --frozen-lockfile --cache-folder .yarn-cache && \
+    rm -rf .yarn-cache
 
-# Copy only source code
+# Copy all necessary source files
 COPY ui/.babel-plugin-macrosrc.js ./
 COPY ui/.dockerignore ./
 COPY ui/.editorconfig ./
@@ -29,23 +29,12 @@ COPY ui/postcss.config.js ./
 COPY ui/tsconfig.json ./
 COPY ui/yarn.lock ./
 
-# RUN yarn install --frozen-lockfile
-RUN yarn install --frozen-lockfile --cache-folder .yarn-cache && \
-    rm -rf .yarn-cache
+# Copy directories for public and source files
+COPY ui/public ./public
+COPY ui/src ./src
 
-# Copy directories
-COPY ui/public/ ./public
-COPY ui/src/ ./src
+# Expose the port to serve the app
+EXPOSE 3000
 
-
-# Build the React app
-RUN yarn build:docker
-
-# Final stage - Alpine (just holds the build)
-FROM alpine:latest
-
-# Copy built files from builder
-COPY --from=builder /app/build /build
-
-# Keep container running
-CMD cp -r /build/* /usr/share/nginx/html/ 2>/dev/null; tail -f /dev/null
+# Run React development server
+CMD ["yarn", "start"]

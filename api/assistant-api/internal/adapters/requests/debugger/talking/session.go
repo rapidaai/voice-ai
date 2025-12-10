@@ -279,22 +279,18 @@ func (talking *debuggerTalking) OnCreateSession(
 	})
 
 	wg.Wait()
+	err = talking.Greeting(ctx)
+	if err != nil {
+		talking.logger.Errorf("unable to greet user with error %+v", err)
+	}
 	talking.
 		AssistantExecutor().
 		Connect(ctx, talking.Assistant().Id, talking.Conversation().Id)
-
-		//
 	err = talking.OnBeginConversation()
 	if err != nil {
 		talking.logger.Errorf("unable to call hook for begin conversation with error %+v", err)
 	}
 
-	// Add delay before greeting
-
-	err = talking.Greeting(ctx)
-	if err != nil {
-		talking.logger.Errorf("unable to greet user with error %+v", err)
-	}
 	return nil
 }
 
@@ -432,15 +428,13 @@ func (talking *debuggerTalking) OnResumeSession(
 	})
 	wg.Wait()
 
-	talking.
-		AssistantExecutor().
-		Connect(ctx, talking.Assistant().Id, talking.Conversation().Id)
-	talking.OnResumeConversation()
-
-	// greet at the end
 	err = talking.Greeting(ctx)
 	if err != nil {
 		talking.logger.Errorf("unable to greet user with error %+v", err)
 	}
+	talking.
+		AssistantExecutor().
+		Connect(ctx, talking.Assistant().Id, talking.Conversation().Id)
+	talking.OnResumeConversation()
 	return nil
 }
