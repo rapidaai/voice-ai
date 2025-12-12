@@ -39,8 +39,8 @@ export const VoiceAgent: FC<{
 
   useEffect(() => {
     showLoader('block');
-    voiceAgentContextValue
-      .getAssistant()
+    let ci = new VI(connectConfig, agentConfig, agentCallback);
+    ci.getAssistant()
       .then(ex => {
         hideLoader();
         if (ex.getSuccess()) {
@@ -48,7 +48,7 @@ export const VoiceAgent: FC<{
         }
       })
       .catch();
-  }, [voiceAgentContextValue]);
+  }, []);
 
   return (
     <div className="h-dvh flex p-8 text-sm/6 w-full">

@@ -84,7 +84,6 @@ func (g *googleSpeechToText) SpeechToTextCallback(ctx context.Context) {
 			// 	}
 			// 	return
 			// }
-			g.logger.Debugf("google-stt: result received: isFinal=%v", resp.String())
 
 			for _, result := range resp.Results {
 				if len(result.Alternatives) == 0 {

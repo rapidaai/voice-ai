@@ -128,10 +128,10 @@ func (io *GenericRequestor) Input(message *protos.AssistantConversationUserMessa
 
 func (io *GenericRequestor) InputAudio(ctx context.Context, in []byte) error {
 	io.messaging.SwitchMode(type_enums.AudioMode)
-	v, _ := io.ListenAudio(ctx, in)
-	utils.Go(context.Background(), func() {
-		io.recorder.User(v)
-	})
+	_, _ = io.ListenAudio(ctx, in)
+	// utils.Go(context.Background(), func() {
+	// 	io.recorder.User(v)
+	// })
 	return nil
 }
 

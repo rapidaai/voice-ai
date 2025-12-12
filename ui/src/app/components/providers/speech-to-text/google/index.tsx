@@ -6,7 +6,6 @@ import { Input } from '@/app/components/form/input';
 import { Slider } from '@/app/components/form/slider';
 import { InputHelper } from '@/app/components/input-helper';
 import { GOOGLE_SPEECH_TO_TEXT_MODEL } from '@/providers/index';
-import { useEffect } from 'react';
 
 export {
   GetGoogleDefaultOptions,

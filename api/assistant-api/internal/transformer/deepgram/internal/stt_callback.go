@@ -7,8 +7,6 @@
 package internal_transformer_deepgram_internal
 
 import (
-	"encoding/json"
-
 	msginterfaces "github.com/deepgram/deepgram-go-sdk/v3/pkg/api/listen/v1/websocket/interfaces"
 	"github.com/rapidaai/pkg/commons"
 )
@@ -46,13 +44,6 @@ func (d *deepgramSttCallback) Open(or *msginterfaces.OpenResponse) error {
 
 // Handle incoming transcription messages from Deepgram
 func (d *deepgramSttCallback) Message(mr *msginterfaces.MessageResponse) error {
-	jsonBytes, err := json.Marshal(mr)
-	if err != nil {
-		d.logger.Errorf("Failed to serialize JSON for MessageResponse: %v", err)
-	} else {
-		d.logger.Debugf("Complete JSON Message: %s", string(jsonBytes))
-	}
-
 	for _, alternative := range mr.Channel.Alternatives {
 		if alternative.Transcript != "" {
 			d.onTranscript(

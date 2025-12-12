@@ -15,7 +15,7 @@ import (
 	utils "github.com/rapidaai/pkg/utils"
 
 	interfaces "github.com/deepgram/deepgram-go-sdk/v3/pkg/client/interfaces"
-	"github.com/rapidaai/protos"
+	protos "github.com/rapidaai/protos"
 )
 
 func (dg *deepgramOption) GetEncoding() string {
@@ -63,7 +63,7 @@ func (dgOpt *deepgramOption) SpeechToTextOptions() *interfaces.LiveTranscription
 	opts := &interfaces.LiveTranscriptionOptions{
 		Model:          "nova",
 		Language:       "en-US",
-		Channels:       0,
+		Channels:       1,
 		SmartFormat:    true,
 		InterimResults: true,
 		FillerWords:    true,

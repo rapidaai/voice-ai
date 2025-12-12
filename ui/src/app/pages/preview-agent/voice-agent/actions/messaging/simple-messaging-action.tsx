@@ -119,7 +119,7 @@ export const SimpleMessagingAction: FC<SimpleMessagingAcitonProps> = ({
         />
 
         <div className="absolute rounded-b-lg right-2 bottom-2 my-auto w-fit">
-          {isValid || !assistant?.getDebuggerdeployment()?.hasInputaudio() ? (
+          {isValid ? (
             <button
               type="submit"
               className="inline-flex shrink-0 justify-center items-center h-8 w-8 text-white bg-primary hover:bg-primary focus:z-10 focus:outline-hidden focus:bg-primary"

@@ -1564,14 +1564,6 @@
   dependencies:
     tslib "^2.4.0"
 
-"@grpc/grpc-js@1.12.5":
-  version "1.12.5"
-  resolved "https://registry.yarnpkg.com/@grpc/grpc-js/-/grpc-js-1.12.5.tgz#0064a28fe9b1ec54ac27e1c9bf70720aa01285e8"
-  integrity sha512-d3iiHxdpg5+ZcJ6jnDSOT8Z0O0VMVGy34jAnYLUX8yd36b1qn8f1TwOA/Lc7TsOh03IkPJ38eGI5qD2EjNkoEA==
-  dependencies:
-    "@grpc/proto-loader" "^0.7.13"
-    "@js-sdsl/ordered-map" "^4.4.2"
-
 "@grpc/grpc-js@^1.13.4":
   version "1.14.1"
   resolved "https://registry.yarnpkg.com/@grpc/grpc-js/-/grpc-js-1.14.1.tgz#b2d1c83e6dbd0dfbfacc01c7b7009dec2526318d"
@@ -1584,16 +1576,6 @@
   version "0.7.13"
   resolved "https://registry.yarnpkg.com/@grpc/proto-loader/-/proto-loader-0.7.13.tgz#f6a44b2b7c9f7b609f5748c6eac2d420e37670cf"
   integrity sha512-AiXO/bfe9bmxBjxxtYxFAXGZvMaN5s8kO+jBHAJCON8rJoB5YS/D6X7ZNc6XQkuHNmyl4CYaMI1fJ/Gn27RGGw==
-  dependencies:
-    lodash.camelcase "^4.3.0"
-    long "^5.0.0"
-    protobufjs "^7.2.5"
-    yargs "^17.7.2"
-
-"@grpc/proto-loader@^0.7.13":
-  version "0.7.15"
-  resolved "https://registry.yarnpkg.com/@grpc/proto-loader/-/proto-loader-0.7.15.tgz#4cdfbf35a35461fc843abe8b9e2c0770b5095e60"
-  integrity sha512-tMXdRCfYVixjuFK+Hk0Q1s38gV9zDiDJfWL3h1rv4Qc39oILCu1TRTDt7+fGUI8K4G1Fj125Hx/ru3azECWTyQ==
   dependencies:
     lodash.camelcase "^4.3.0"
     long "^5.0.0"
@@ -2394,10 +2376,10 @@
     uuid "^10.0.0"
     zustand "^4.5.5"
 
-"@rapidaai/react@1.1.46":
-  version "1.1.46"
-  resolved "https://registry.yarnpkg.com/@rapidaai/react/-/react-1.1.46.tgz#3662f1ca9de737b5cf4e284859c0d19e9f41c79f"
-  integrity sha512-dM1xvoQbrlq2Y1yVaNmAvPj4hljDPlNom09YsU8adw/22hfQFc7fguUkhEOdWkwe2Hy/Y3pLF9DytQXV0x43xg==
+"@rapidaai/react@1.1.47":
+  version "1.1.47"
+  resolved "https://registry.yarnpkg.com/@rapidaai/react/-/react-1.1.47.tgz#cc72b0e4db3062ecb31a38be8260afb82fdd6f87"
+  integrity sha512-fKzcqIHmRysS2j4/GgBH+eg0ljJQUFsbb81Aplw7MRBLS0qkqW+kk2IRSaCJT7TkupVnK4T4wDvKOKyavjarrw==
   dependencies:
     "@emotion/is-prop-valid" "^1.3.1"
     "@grpc/grpc-js" "^1.13.4"

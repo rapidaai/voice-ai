@@ -352,6 +352,7 @@ func (listening *GenericRequestor) ListenAudio(
 	in []byte,
 ) ([]byte, error) {
 	out := in
+
 	if listening.denoiser != nil {
 		dnOut, _, err := listening.denoiser.Denoise(ctx, in)
 		if err != nil {
