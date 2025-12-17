@@ -1,4 +1,3 @@
-import { TeamIcon } from '@/app/components/Icon/Team';
 import { SidebarIconWrapper } from '@/app/components/navigation/sidebar/sidebar-icon-wrapper';
 import { SidebarLabel } from '@/app/components/navigation/sidebar/sidebar-label';
 import { SidebarSimpleListItem } from '@/app/components/navigation/sidebar/sidebar-simple-list-item';

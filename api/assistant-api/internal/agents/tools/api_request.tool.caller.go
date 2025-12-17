@@ -56,7 +56,8 @@ func (afkTool *apiRequestToolCaller) Call(
 	v, err := output.ToMap()
 	if err != nil {
 		return map[string]interface{}{
-			"result": output.ToString(),
+			"request":  body,
+			"response": output.ToString(),
 		}, metrics
 	}
 	return v, metrics
