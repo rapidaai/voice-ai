@@ -272,3 +272,7 @@ A commercial license is available for enterprise use, which allows:
 - Closed-source usage
 - Private modifications
 Contact sales@rapida.ai for details.
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=rapidaai/voice-ai&type=Date)](https://star-history.com/#rapidaai/voice-ai&Date)
