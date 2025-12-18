@@ -1,3 +1,9 @@
+// Copyright (c) Rapida
+// Author: Prashant <prashant@rapida.ai>
+//
+// Licensed under the Rapida internal use license.
+// This file is part of Rapida's proprietary software.
+// Unauthorized copying, modification, or redistribution is strictly prohibited.
 package internal_adapter_request_generic
 
 import (
@@ -142,34 +148,27 @@ func (io *GenericRequestor) InputText(ctx context.Context, msg string) error {
 
 	// mark it interrupted
 	io.messaging.Transition(internal_adapter_request_customizers.Interrupted)
-
 	//
 	interim := io.messaging.Create(type_enums.UserActor, msg)
-
-	// notify the user message
-	io.
-		Notify(
-			ctx,
-			&protos.AssistantConversationUserMessage{
-				Time:      timestamppb.Now(),
-				Id:        interim.GetId(),
-				Completed: false,
-				Message: &protos.AssistantConversationUserMessage_Text{
-					Text: &protos.AssistantConversationMessageTextContent{
-						Content: interim.String(),
-					},
-				},
+	if err := io.Notify(ctx, &protos.AssistantConversationUserMessage{
+		Id:        interim.GetId(),
+		Completed: false,
+		Message: &protos.AssistantConversationUserMessage_Text{
+			Text: &protos.AssistantConversationMessageTextContent{
+				Content: interim.String(),
 			},
-		)
-
-	return io.
-		ListenText(
-			ctx,
-			&internal_end_of_speech.UserEndOfSpeechInput{
-				Message: interim.String(),
-				Time:    time.Now(),
-			},
-		)
+		},
+		Time: timestamppb.Now(),
+	}); err != nil {
+		io.logger.Tracef(ctx, "error while notifying the text input from user: %w", err)
+	}
+	return io.ListenText(
+		ctx,
+		&internal_end_of_speech.UserEndOfSpeechInput{
+			Message: interim.String(),
+			Time:    time.Now(),
+		},
+	)
 }
 
 // END Input
@@ -221,68 +220,48 @@ func (io *GenericRequestor) Output(
 	msg *types.Message,
 	completed bool,
 ) error {
-	inputMessage, err := io.messaging.GetMessage(type_enums.UserActor)
-	if err != nil {
-		io.logger.Debug("illegal output, as there is no input specified")
-		return err
-	}
-	// //
-	if contextId != inputMessage.GetId() {
-		// io.logger.Warnf("testing: context id mismatched %+v current %v", contextId, inputMessage.GetId())
-		return nil
-	}
-
 	aMsg := msg.String()
 	if len(msg.ToolCalls) > 0 {
 		aMsg = " "
 	}
-
 	if err := io.messaging.Transition(internal_adapter_request_customizers.AgentSpeaking); err != nil {
-		// io.logger.Warnf("Can't notify the assistant think as user is speaking")
 		return nil
 	}
-
-	io.
-		Notify(
-			ctx,
-			&protos.AssistantConversationAssistantMessage{
-				Time:      timestamppb.Now(),
-				Id:        contextId,
-				Completed: completed,
-				Message: &protos.AssistantConversationAssistantMessage_Text{
-					Text: &protos.AssistantConversationMessageTextContent{
-						Content: msg.String(),
-					},
+	if err := io.Notify(
+		ctx,
+		&protos.AssistantConversationAssistantMessage{
+			Time:      timestamppb.Now(),
+			Id:        contextId,
+			Completed: completed,
+			Message: &protos.AssistantConversationAssistantMessage_Text{
+				Text: &protos.AssistantConversationMessageTextContent{
+					Content: aMsg,
 				},
 			},
-		)
+		},
+	); err != nil {
+		io.logger.Tracef(ctx, "error while outputing chunk to the user: %w", err)
+	}
 	if completed {
 		if io.messaging.GetMode().Audio() {
 			io.FinishSpeaking(contextId)
 		}
-		io.
-			Notify(
-				ctx,
-				&protos.AssistantConversationMessage{
-					MessageId:               contextId,
-					AssistantId:             io.assistant.Id,
-					AssistantConversationId: io.assistantConversation.Id,
-					Request:                 inputMessage.ToProto(),
-					Response:                msg.ToProto(),
-				},
-			)
-
-		//
+		io.Notify(
+			ctx,
+			&protos.AssistantConversationMessage{
+				MessageId:               contextId,
+				AssistantId:             io.assistant.Id,
+				AssistantConversationId: io.assistantConversation.Id,
+				// Request:                 inputMessxage.ToProto(),
+				Response: msg.ToProto(),
+			},
+		)
 		io.messaging.Transition(internal_adapter_request_customizers.AgentCompleted)
 		return nil
 	}
 
 	if io.messaging.GetMode().Audio() {
-		err := io.Speak(
-			contextId,
-			aMsg,
-		)
-		if err != nil {
+		if err := io.Speak(contextId, aMsg); err != nil {
 			io.logger.Errorf("unable to speak for the user, please check the config error = %+v", err)
 		}
 	}

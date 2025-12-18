@@ -1,4 +1,4 @@
-package internal_executors
+package internal_agent_tool
 
 import (
 	"context"
@@ -7,65 +7,6 @@ import (
 	"github.com/rapidaai/pkg/types"
 	protos "github.com/rapidaai/protos"
 )
-
-/*
-AssistantExecutor and its related interfaces define the contract for executing
-assistant-related actions in the system. These interfaces are crucial for
-implementing various modes of interaction with the assistant, such as text-based
-chat and voice communication.
-
-AssistantMessageExecutor handles text-based chat interactions. It defines a Chat
-method that processes messaging requests and returns any errors encountered during
-the chat process.
-
-AssistantTalkExecutor is responsible for voice-based interactions. Its Talk method
-takes care of processing talking requests and handles any errors that may occur
-during the voice interaction.
-
-AssistantExecutor combines both text and voice capabilities, allowing for a more
-versatile assistant that can handle multiple modes of communication. By embedding
-both AssistantMessageExecutor and AssistantTalkExecutor, it ensures that any
-implementing type can handle both chat and talk functionalities.
-
-These interfaces provide a clean separation of concerns and allow for easy
-extension of the assistant's capabilities in the future. They also promote
-loose coupling between the assistant's implementation and the rest of the system,
-making it easier to maintain and evolve the codebase over time.
-*/
-
-type AssistantExecutor interface {
-
-	// init after creation to intilize all fields
-	Init(
-		ctx context.Context,
-		communication internal_adapter_requests.Communication,
-	) error
-
-	// called when connection established
-	Connect(
-		ctx context.Context,
-		assistantId uint64,
-		assistantConversationId uint64,
-	) error
-
-	// name
-	Name() string
-
-	// conversation
-	Talk(
-		ctx context.Context,
-		messageid string,
-		msg *types.Message,
-		communcation internal_adapter_requests.Communication,
-	) error
-
-	// disconnect
-	Disconnect(
-		ctx context.Context,
-		assistantId uint64,
-		assistantConversationId uint64,
-	) error
-}
 
 /**
  * ToolExecutor is an interface that defines methods for executing tools and retrieving function definitions.
@@ -79,7 +20,7 @@ type ToolExecutor interface {
 	// init tool executor
 	//  get all the tools that is required for the assistant and intialize or do the dirty work that
 	// optimize the execution or etc
-	Init(
+	Initialize(
 		ctx context.Context,
 		communication internal_adapter_requests.Communication,
 	) error

@@ -13,7 +13,7 @@ import (
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
-	protos "github.com/rapidaai/protos"
+	"github.com/rapidaai/protos"
 )
 
 type InternalCaller interface {
@@ -90,6 +90,9 @@ type Communication interface {
 
 	// current assistant
 	Assistant() *internal_assistant_entity.Assistant
+
+	// deployment behavior
+	GetBehavior() (*internal_assistant_entity.AssistantDeploymentBehavior, error)
 
 	// current conversation
 	Conversation() *internal_conversation_gorm.AssistantConversation

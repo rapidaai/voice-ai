@@ -1,9 +1,14 @@
+// Copyright (c) Rapida
+// Author: Prashant <prashant@rapida.ai>
+//
+// Licensed under the Rapida internal use license.
+// This file is part of Rapida's proprietary software.
+// Unauthorized copying, modification, or redistribution is strictly prohibited.
 package internal_adapter_request_generic
 
 import (
 	"context"
 
-	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
@@ -13,95 +18,50 @@ import (
 *  Generation of text from the executors
 *  default executor or remote executor
  */
-func (talking *GenericRequestor) OnGenerationComplete(
-	ctx context.Context,
-	messageid string,
-	ouput *types.Message,
-	metrics []*types.Metric) error {
-	//
-	err := talking.Output(ctx, messageid, ouput, true)
-	if err != nil {
+func (talking *GenericRequestor) OnGenerationComplete(ctx context.Context, messageid string, ouput *types.Message, metrics []*types.Metric) error {
+	if err := talking.Output(ctx, messageid, ouput, true); err != nil {
 		talking.logger.Errorf("unable to output text for the message %s", messageid)
 	}
-
-	bCtx := talking.Context()
-	utils.Go(bCtx, func() {
-		err := talking.OnUpdateMessage(
-			talking.Context(),
-			messageid,
-			ouput,
-			type_enums.RECORD_COMPLETE)
-		if err != nil {
+	utils.Go(talking.Context(), func() {
+		if err := talking.OnUpdateMessage(talking.Context(), messageid, ouput, type_enums.RECORD_COMPLETE); err != nil {
 			talking.logger.Errorf("Error in OnUpdateMessage: %v", err)
 		}
-
 		if ouput.Meta != nil {
-			talking.OnMessageMetadata(bCtx, messageid, ouput.Meta)
+			talking.OnMessageMetadata(talking.Context(), messageid, ouput.Meta)
 		}
 
 	})
-	utils.Go(bCtx, func() {
-		if err := talking.OnMessageMetric(bCtx, messageid, metrics); err != nil {
-			talking.logger.Errorf("Error in OnUpdateMessage: %v", err)
+	utils.Go(talking.Context(), func() {
+		// if there are metrics generated from the generation, we need to log them
+		if len(metrics) > 0 {
+			if err := talking.OnMessageMetric(talking.Context(), messageid, metrics); err != nil {
+				talking.logger.Errorf("Error in OnUpdateMessage: %v", err)
+			}
 		}
 	})
 	return nil
 }
 
 /**/
-func (talking *GenericRequestor) OnGeneration(
-	ctx context.Context,
-	messageid string,
-	out *types.Message) error {
-
-	return talking.Output(
-		ctx,
-		messageid,
-		out,
-		false)
+func (talking *GenericRequestor) OnGeneration(ctx context.Context, messageid string, out *types.Message) error {
+	return talking.Output(ctx, messageid, out, false)
 }
 
-func (talking *GenericRequestor) Execute(
-	ctx context.Context,
-	messageid string, in *types.Message) error {
+func (talking *GenericRequestor) Execute(ctx context.Context, messageid string, in *types.Message) error {
 	in = talking.OnRecieveMessage(in)
 	utils.Go(ctx, func() {
-		talking.OnCreateMessage(
-			ctx,
-			messageid,
-			in,
-		)
+		if err := talking.OnCreateMessage(ctx, messageid, in); err != nil {
+			talking.logger.Errorf("Error in OnCreateMessage: %v", err)
+		}
 	})
 	utils.Go(ctx, func() {
-		talking.OnMessageMetadata(
-			ctx,
-			messageid,
-			in.Meta,
-		)
+		if err := talking.OnMessageMetadata(ctx, messageid, in.Meta); err != nil {
+			talking.logger.Errorf("Error in OnMessageMetadata: %v", err)
+		}
 	})
-	err := talking.assistantExecutor.Talk(ctx, messageid, in, talking)
-	if err != nil {
-		msg, err := talking.GetBehavior()
-		if err != nil {
-			talking.logger.Warnf("no on error message setup for assistant.")
-			return nil
-		}
-		if msg.Mistake != nil {
-			return talking.Output(ctx, messageid, &types.Message{
-				Role: "assistant",
-				Contents: []*types.Content{{
-					ContentType:   commons.TEXT_CONTENT.String(),
-					ContentFormat: commons.TEXT_CONTENT_FORMAT_RAW.String(),
-					Content:       []byte(*msg.Mistake),
-				}}}, true)
-		}
-		return talking.Output(ctx, messageid, &types.Message{
-			Role: "assistant",
-			Contents: []*types.Content{{
-				ContentType:   commons.TEXT_CONTENT.String(),
-				ContentFormat: commons.TEXT_CONTENT_FORMAT_RAW.String(),
-				Content:       []byte("Oops! It looks like something went wrong. Let me look into that for you right away. I really appreciate your patience—hang tight while I get this sorted!"),
-			}}}, true)
+	if err := talking.assistantExecutor.Talk(ctx, messageid, in, talking); err != nil {
+		talking.OnError(ctx, messageid)
+		return nil
 	}
 	return nil
 }

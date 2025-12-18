@@ -1,9 +1,14 @@
+// Copyright (c) Rapida
+// Author: Prashant <prashant@rapida.ai>
+//
+// Licensed under the Rapida internal use license.
+// This file is part of Rapida's proprietary software.
+// Unauthorized copying, modification, or redistribution is strictly prohibited.
 package internal_adapter_request_generic
 
 import (
 	"errors"
 
-	internal_adapter_requests "github.com/rapidaai/api/assistant-api/internal/adapters/requests"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_conversation_gorm "github.com/rapidaai/api/assistant-api/internal/entity/conversations"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
@@ -76,11 +81,7 @@ func (gr *GenericRequestor) GetAssistant(
 	auth types.SimplePrinciple,
 	assistantId uint64,
 	version string) (*internal_assistant_entity.Assistant, error) {
-	versionId, err := internal_adapter_requests.GetVersionDefinition(version)
-	if err != nil {
-		gr.logger.Errorf("GenericRequestor.GetAssistant: error while getting assistant. %v", err)
-		return nil, err
-	}
+	versionId := utils.GetVersionDefinition(version)
 	assistantOpts := &internal_services.GetAssistantOption{
 		InjectTag: false,
 		//

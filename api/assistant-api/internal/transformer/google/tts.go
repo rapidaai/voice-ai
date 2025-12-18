@@ -2,7 +2,7 @@
 // Author: Prashant <prashant@rapida.ai>
 //
 // Licensed under the Rapida internal use license.
-// This file is part of Rapida's proprietary software and is not open source.
+// This file is part of Rapida's proprietary software.
 // Unauthorized copying, modification, or redistribution is strictly prohibited.
 package internal_transformer_google
 
@@ -113,14 +113,14 @@ func (google *googleTextToSpeech) Initialize() error {
 	}
 	google.streamClient = stream
 	// Send the initial configuration request.
-	err = stream.Send(&req)
-	if err != nil {
+	if err = stream.Send(&req); err != nil {
 		// Log errors in sending initialization request.
 		google.logger.Errorf("error while intiializing google text to speech")
 		return err
 	}
 	// Launch callback goroutine for processing streaming responses.
 	go google.textToSpeechCallback(google.ctx)
+	google.logger.Debugf("google-tts: connection established")
 	return nil
 }
 
@@ -148,8 +148,7 @@ func (google *googleTextToSpeech) Transform(ctx context.Context, in string, opts
 		},
 	}
 	// Send synthesis request to the streaming client.
-	err := google.streamClient.Send(&req)
-	if err != nil {
+	if err := google.streamClient.Send(&req); err != nil {
 		// Log any errors during synthesis.
 		google.logger.Errorf("unable to Synthesize text %v", err)
 	}

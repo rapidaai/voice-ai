@@ -1,4 +1,4 @@
-package internal_assistant_executors
+package internal_agent_executor
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"time"
 
 	internal_adapter_requests "github.com/rapidaai/api/assistant-api/internal/adapters/requests"
-	internal_executors "github.com/rapidaai/api/assistant-api/internal/executors"
 	internal_adapter_telemetry "github.com/rapidaai/api/assistant-api/internal/telemetry"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
@@ -28,8 +27,8 @@ type agentkitExecutor struct {
 	talker   grpc.BidiStreamingClient[protos.AgentTalkRequest, protos.AgentTalkResponse]
 }
 
-// Init implements internal_executors.AssistantExecutor.
-func (executor *agentkitExecutor) Init(ctx context.Context, communication internal_adapter_requests.Communication) error {
+// Init implements AssistantExecutor.
+func (executor *agentkitExecutor) Initialize(ctx context.Context, communication internal_adapter_requests.Communication) error {
 	ctx, span, _ := communication.Tracer().StartSpan(
 		ctx,
 		utils.AssistantAgentConnectStage,
@@ -94,11 +93,23 @@ func (executor *agentkitExecutor) Init(ctx context.Context, communication intern
 			executor.logger.Errorf("Error in TalkListener: %v", err)
 		}
 	})
-	// Persist WebSocket connection
+
+	if executor.talker != nil {
+		executor.talker.Send(&protos.AgentTalkRequest{
+			Request: &protos.AgentTalkRequest_Configuration{
+				Configuration: &protos.AssistantConversationConfiguration{
+					AssistantConversationId: communication.Conversation().Id,
+					Assistant: &protos.AssistantDefinition{
+						AssistantId: communication.Assistant().Id,
+					},
+				},
+			},
+		})
+	}
 	return nil
 }
 
-// Name implements internal_executors.AssistantExecutor.
+// Name implements AssistantExecutor.
 func (a *agentkitExecutor) Name() string {
 	return "agentkit"
 }
@@ -157,7 +168,7 @@ func (executor *agentkitExecutor) TalkListener(ctx context.Context, communicatio
 	return nil
 }
 
-// Talk implements internal_executors.AssistantExecutor.
+// Talk implements AssistantExecutor.
 func (executor *agentkitExecutor) Talk(ctx context.Context, messageid string, msg *types.Message, communcation internal_adapter_requests.Communication) error {
 	executor.logger.Debugf("sending communication request")
 	if executor.talker != nil {
@@ -179,31 +190,9 @@ func (executor *agentkitExecutor) Talk(ctx context.Context, messageid string, ms
 	return nil
 }
 
-func (executor *agentkitExecutor) Connect(
+func (executor *agentkitExecutor) Close(
 	ctx context.Context,
-	assistantId uint64,
-	assistantConversationId uint64,
-) error {
-	executor.logger.Debugf("sending connect request")
-	if executor.talker != nil {
-		executor.talker.Send(&protos.AgentTalkRequest{
-			Request: &protos.AgentTalkRequest_Configuration{
-				Configuration: &protos.AssistantConversationConfiguration{
-					AssistantConversationId: assistantConversationId,
-					Assistant: &protos.AssistantDefinition{
-						AssistantId: assistantId,
-					},
-				},
-			},
-		})
-	}
-	return nil
-}
-
-func (executor *agentkitExecutor) Disconnect(
-	ctx context.Context,
-	assistantId uint64,
-	assistantConversationId uint64,
+	communication internal_adapter_requests.Communication,
 ) error {
 	if executor.talker != nil {
 		executor.logger.Debugf("calling disconnect to agentkit")
@@ -223,7 +212,7 @@ func (executor *agentkitExecutor) Disconnect(
 
 func NewAgentKitAssistantExecutor(
 	logger commons.Logger,
-) internal_executors.AssistantExecutor {
+) AssistantExecutor {
 	return &agentkitExecutor{
 		logger: logger,
 	}

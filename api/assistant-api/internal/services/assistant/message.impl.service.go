@@ -273,6 +273,8 @@ func (conversationService *assistantConversationService) UpdateConversationMessa
 	start := time.Now()
 	db := conversationService.postgres.DB(ctx)
 	conversation := &internal_message_gorm.AssistantConversationMessage{
+		AssistantConversationId: assistantConversationId,
+		MessageId:               assistantConversationMessageId,
 		Mutable: gorm_models.Mutable{
 			Status: status,
 		},
@@ -281,10 +283,13 @@ func (conversationService *assistantConversationService) UpdateConversationMessa
 		conversation.UpdatedBy = *auth.GetUserId()
 	}
 	conversation.SetResponse(message)
-	tx := db.Where("message_id = ? AND assistant_conversation_id = ? ",
-		assistantConversationMessageId,
-		assistantConversationId).
-		Updates(conversation)
+	tx := db.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "message_id"}, {Name: "assistant_conversation_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"response",
+			"updated_by", "updated_date"}),
+	}).Create(&conversation)
+	// Where("message_id = ? AND assistant_conversation_id = ? ", assistantConversationMessageId, assistantConversationId).Updates(conversation)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.UpdateConversationMessage", time.Since(start))
 		conversationService.logger.Errorf("error while updating conversation message %v", tx.Error)

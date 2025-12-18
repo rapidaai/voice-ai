@@ -1,11 +1,10 @@
-package internal_assistant_executors
+package internal_agent_executor
 
 import (
 	"context"
 	"errors"
 
 	internal_adapter_requests "github.com/rapidaai/api/assistant-api/internal/adapters/requests"
-	internal_executors "github.com/rapidaai/api/assistant-api/internal/executors"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
@@ -13,11 +12,11 @@ import (
 
 type assistantExecutor struct {
 	logger   commons.Logger
-	executor internal_executors.AssistantExecutor
+	executor AssistantExecutor
 }
 
 // Init implements internal_executors.AssistantExecutor.
-func (a *assistantExecutor) Init(ctx context.Context, communication internal_adapter_requests.Communication) error {
+func (a *assistantExecutor) Initialize(ctx context.Context, communication internal_adapter_requests.Communication) error {
 	switch communication.Assistant().AssistantProvider {
 	case type_enums.AGENTKIT:
 		a.executor = NewAgentKitAssistantExecutor(a.logger)
@@ -28,7 +27,7 @@ func (a *assistantExecutor) Init(ctx context.Context, communication internal_ada
 	default:
 		return errors.New("illegal assistant executor")
 	}
-	return a.executor.Init(ctx, communication)
+	return a.executor.Initialize(ctx, communication)
 }
 
 // Name implements internal_executors.AssistantExecutor.
@@ -41,25 +40,16 @@ func (a *assistantExecutor) Talk(ctx context.Context, messageid string, msg *typ
 	return a.executor.Talk(ctx, messageid, msg, communcation)
 }
 
-func (a *assistantExecutor) Connect(
+func (a *assistantExecutor) Close(
 	ctx context.Context,
-	assistantId uint64,
-	assistantConversationId uint64,
+	communcation internal_adapter_requests.Communication,
 ) error {
-	return a.executor.Connect(ctx, assistantId, assistantConversationId)
-}
-
-func (a *assistantExecutor) Disconnect(
-	ctx context.Context,
-	assistantId uint64,
-	assistantConversationId uint64,
-) error {
-	return a.executor.Disconnect(ctx, assistantId, assistantConversationId)
+	return a.executor.Close(ctx, communcation)
 }
 
 func NewAssistantExecutor(
 	logger commons.Logger,
-) internal_executors.AssistantExecutor {
+) AssistantExecutor {
 	return &assistantExecutor{
 		logger: logger,
 	}

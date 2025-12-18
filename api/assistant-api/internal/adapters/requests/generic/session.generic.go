@@ -1,3 +1,9 @@
+// Copyright (c) Rapida
+// Author: Prashant <prashant@rapida.ai>
+//
+// Licensed under the Rapida internal use license.
+// This file is part of Rapida's proprietary software.
+// Unauthorized copying, modification, or redistribution is strictly prohibited.
 package internal_adapter_request_generic
 
 import (
@@ -86,10 +92,9 @@ func (talking *GenericRequestor) Disconnect() {
 			AssistantConversationId:  talking.assistantConversation.Id,
 		},
 	)
-	talking.assistantExecutor.Disconnect(
+	talking.assistantExecutor.Close(
 		ctx,
-		talking.assistant.Id,
-		talking.assistantConversation.Id,
+		talking,
 	)
 	talking.logger.Benchmark("talking.OnEndSession", time.Since(start))
 }
@@ -180,54 +185,16 @@ func (talking *GenericRequestor) OnCreateSession(
 		return err
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	// establish listener
-	utils.Go(ctx, func() {
-		defer wg.Done()
-		err := talking.ConnectListener(ctx, audioInConfig, audioOutConfig)
-		if err != nil {
-			talking.logger.Tracef(ctx, "unable to init analyzer %+v", err)
-		}
-	})
-
-	wg.Add(1)
-	utils.Go(ctx, func() {
-		defer wg.Done()
-		err := talking.ConnectSpeaker(ctx, audioInConfig, audioOutConfig)
-		if err != nil {
-			talking.logger.Tracef(ctx, "unable to connect speaker %+v", err)
-		}
-
-	})
-
-	wg.Add(1)
-	utils.Go(ctx, func() {
-		defer wg.Done()
-		err := talking.recorder.
-			Init(audioInConfig, audioOutConfig)
-		if err != nil {
-			talking.logger.Tracef(ctx, "unable to init recorder %+v", err)
-		}
-	})
-
-	// do the conversation
-	conversation, err := talking.
-		BeginConversation(
-			talking.Auth(),
-			assistant,
-			type_enums.DIRECTION_INBOUND,
-			identifier,
-			customization.GetArgs(),
-			customization.GetMetadata(),
-			customization.GetOptions())
+	//
+	//
+	conversation, err := talking.BeginConversation(talking.Auth(), assistant, type_enums.DIRECTION_INBOUND, identifier, customization.GetArgs(), customization.GetMetadata(), customization.GetOptions())
 	if err != nil {
 		talking.logger.Errorf("unable to begin convsersation %+v", err)
 		return err
 	}
-	err = talking.
-		Notify(
-			ctx,
+
+	utils.Go(talking.Context(), func() {
+		if err := talking.Notify(ctx,
 			&protos.AssistantConversationConfiguration{
 				AssistantConversationId: conversation.Id,
 				Assistant: &protos.AssistantDefinition{
@@ -236,41 +203,67 @@ func (talking *GenericRequestor) OnCreateSession(
 				},
 				Time: timestamppb.Now(),
 			},
-		)
-	if err != nil {
-		talking.logger.Errorf("Error sending configuration: %v\n", err)
-	}
+		); err != nil {
+			talking.logger.Errorf("Error sending configuration: %v\n", err)
+		}
+	})
+
+	// cold start problem
+	var wg sync.WaitGroup
 
 	wg.Add(1)
-	utils.Go(ctx, func() {
+	utils.Go(talking.Context(), func() {
 		defer wg.Done()
-		talking.logger.Debugf("talking.OnStartSession.executor.Init")
-		talking.
-			assistantExecutor.
-			Init(
-				ctx,
-				talking,
-			)
+		if err := talking.ConnectSpeaker(talking.Context(), audioInConfig, audioOutConfig); err != nil {
+			talking.logger.Tracef(ctx, "unable to connect speaker %+v", err)
+		}
+		// fire greeting after connect
+		if err := talking.OnGreet(ctx); err != nil {
+			talking.logger.Errorf("unable to greet user with error %+v", err)
+		}
+
+	})
+
+	wg.Add(1)
+	// establish listener
+	utils.Go(talking.Context(), func() {
+		defer wg.Done()
+		if err := talking.ConnectListener(talking.Context(), audioInConfig, audioOutConfig); err != nil {
+			talking.logger.Tracef(ctx, "unable to init analyzer %+v", err)
+		}
+	})
+
+	// do the conversation
+	wg.Add(1)
+	utils.Go(talking.Context(), func() {
+		defer wg.Done()
+		if err := talking.assistantExecutor.Initialize(talking.Context(), talking); err != nil {
+			talking.logger.Tracef(ctx, "unable to init executor %+v", err)
+		}
 	})
 
 	wg.Add(1)
 	utils.Go(talking.Context(), func() {
 		defer wg.Done()
-		talking.AddMetrics(
-			talking.Auth(),
-			&types.Metric{
-				Name:        type_enums.STATUS.String(),
-				Value:       type_enums.RECORD_IN_PROGRESS.String(),
-				Description: "Status of the given conversation",
-			})
+		if err := talking.recorder.Initialize(audioInConfig, audioOutConfig); err != nil {
+			talking.logger.Tracef(ctx, "unable to init recorder %+v", err)
+		}
 	})
 
 	wg.Add(1)
 	utils.Go(talking.Context(), func() {
 		defer wg.Done()
-		client := types.
-			GetClientInfoFromGrpcContext(ctx)
-		if client != nil {
+		talking.AddMetrics(talking.Auth(), &types.Metric{
+			Name:        type_enums.STATUS.String(),
+			Value:       type_enums.RECORD_IN_PROGRESS.String(),
+			Description: "Status of the given conversation",
+		})
+	})
+
+	wg.Add(1)
+	utils.Go(talking.Context(), func() {
+		defer wg.Done()
+		if client := types.GetClientInfoFromGrpcContext(ctx); client != nil {
 			clj, _ := client.ToJson()
 			talking.SetMetadata(talking.Auth(), map[string]interface{}{
 				"talk.client_information": clj,
@@ -278,16 +271,9 @@ func (talking *GenericRequestor) OnCreateSession(
 		}
 	})
 
+	//
 	wg.Wait()
-	err = talking.Greeting(ctx)
-	if err != nil {
-		talking.logger.Errorf("unable to greet user with error %+v", err)
-	}
-	talking.
-		assistantExecutor.
-		Connect(ctx, talking.assistant.Id, talking.assistantConversation.Id)
-	err = talking.OnBeginConversation()
-	if err != nil {
+	if err := talking.OnBeginConversation(); err != nil {
 		talking.logger.Errorf("unable to call hook for begin conversation with error %+v", err)
 	}
 
@@ -356,7 +342,7 @@ func (talking *GenericRequestor) OnResumeSession(
 	wg.Add(1)
 	utils.Go(talking.Context(), func() {
 		defer wg.Done()
-		err := talking.recorder.Init(
+		err := talking.recorder.Initialize(
 			audioInConfig,
 			audioOutConfig,
 		)
@@ -409,7 +395,7 @@ func (talking *GenericRequestor) OnResumeSession(
 		talking.logger.Debugf("talking.OnStartSession.executor.Init")
 		talking.
 			assistantExecutor.
-			Init(
+			Initialize(
 				ctx,
 				talking,
 			)
@@ -428,14 +414,6 @@ func (talking *GenericRequestor) OnResumeSession(
 	})
 	wg.Wait()
 
-	err = talking.Greeting(ctx)
-	if err != nil {
-		talking.logger.Errorf("unable to greet user with error %+v", err)
-	}
-
-	talking.
-		assistantExecutor.
-		Connect(ctx, talking.assistant.Id, talking.assistantConversation.Id)
 	talking.OnResumeConversation()
 	return nil
 }

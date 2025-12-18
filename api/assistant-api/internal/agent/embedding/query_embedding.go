@@ -1,4 +1,4 @@
-package internal_agent_embeddings
+package internal_agent_embedding
 
 import (
 	"context"

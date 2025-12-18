@@ -1,4 +1,4 @@
-package internal_assistant_executors
+package internal_agent_executor
 
 import (
 	"context"
@@ -8,8 +8,8 @@ import (
 	"time"
 
 	internal_adapter_requests "github.com/rapidaai/api/assistant-api/internal/adapters/requests"
-	internal_executors "github.com/rapidaai/api/assistant-api/internal/executors"
-	internal_tool_executors "github.com/rapidaai/api/assistant-api/internal/executors/tools"
+	internal_agent_tool "github.com/rapidaai/api/assistant-api/internal/agent/tool"
+	internal_executors "github.com/rapidaai/api/assistant-api/internal/agent/tool"
 	internal_adapter_telemetry "github.com/rapidaai/api/assistant-api/internal/telemetry"
 	integration_client_builders "github.com/rapidaai/pkg/clients/integration/builders"
 	"github.com/rapidaai/pkg/commons"
@@ -29,11 +29,11 @@ type modelAssistantExecutor struct {
 
 func NewModelAssistantExecutor(
 	logger commons.Logger,
-) internal_executors.AssistantExecutor {
+) AssistantExecutor {
 	return &modelAssistantExecutor{
 		logger:       logger,
 		inputBuilder: integration_client_builders.NewChatInputBuilder(logger),
-		toolExecutor: internal_tool_executors.NewToolExecutor(logger),
+		toolExecutor: internal_agent_tool.NewToolExecutor(logger),
 		history:      make([]*protos.Message, 0),
 	}
 
@@ -43,48 +43,57 @@ func (executor *modelAssistantExecutor) Name() string {
 	return "model"
 }
 
-func (a *modelAssistantExecutor) Connect(
-	ctx context.Context,
-	assistantId uint64,
-	assistantConversationId uint64,
-) error {
-	return nil
-}
-
-func (a *modelAssistantExecutor) Disconnect(
-	ctx context.Context,
-	assistantId uint64,
-	assistantConversationId uint64,
-) error {
-	return nil
-}
-
-func (executor *modelAssistantExecutor) Init(
+func (executor *modelAssistantExecutor) Initialize(
 	ctx context.Context,
 	communication internal_adapter_requests.Communication,
 ) error {
 	start := time.Now()
-	ctx, span, _ := communication.Tracer().StartSpan(
-		ctx,
-		utils.AssistantAgentConnectStage,
-		internal_adapter_telemetry.KV{
-			K: "executor",
-			V: internal_adapter_telemetry.StringValue(executor.Name()),
-		},
-	)
+	ctx, span, _ := communication.
+		Tracer().
+		StartSpan(
+			ctx,
+			utils.AssistantAgentConnectStage,
+			internal_adapter_telemetry.KV{
+				K: "executor",
+				V: internal_adapter_telemetry.StringValue(executor.Name()),
+			},
+		)
 	defer span.EndSpan(ctx, utils.AssistantAgentConnectStage)
 	g, ctx := errgroup.WithContext(ctx)
 	var providerCredential *protos.VaultCredential
 
+	// g.Go(func() error {
+	// 	behavior, err := communication.GetBehavior()
+	// 	if err != nil {
+	// 		executor.logger.Errorf("error while fetching deployment behavior: %v", err)
+	// 		return nil
+	// 	}
+
+	// 	if behavior.Greeting == nil {
+	// 		executor.logger.Errorf("error while fetching deployment behavior: %v", err)
+	// 		return nil
+	// 	}
+	// 	greetingCnt := executor.templateParser.Parse(*behavior.Greeting, communication.GetArgs())
+	// 	if strings.TrimSpace(greetingCnt) == "" {
+	// 		executor.logger.Warnf("empty greeting message, could be space in the table or argument contains space")
+	// 		return nil
+	// 	}
+	// 	greetings := types.NewMessage(
+	// 		"assistant", &types.Content{
+	// 			ContentType:   commons.TEXT_CONTENT.String(),
+	// 			ContentFormat: commons.TEXT_CONTENT_FORMAT_RAW.String(),
+	// 			Content:       []byte(greetingCnt),
+	// 		},
+	// 	)
+	// 	communication.OnGeneration(ctx, greetings.Id, greetings)
+	// 	communication.OnGenerationComplete(ctx, greetings.Id, greetings, nil)
+	// 	executor.history = append(executor.history, greetings.ToProto())
+
+	// 	return nil
+	// })
 	// Goroutine to get the provider credential
 	g.Go(func() error {
-		var err error
-		credentialId, err := communication.
-			Assistant().
-			AssistantProviderModel.
-			GetOptions().
-			GetUint64("rapida.credential_id")
-
+		credentialId, err := communication.Assistant().AssistantProviderModel.GetOptions().GetUint64("rapida.credential_id")
 		if err != nil {
 			executor.logger.Errorf("Error while getting provider model credential ID: %v", err)
 			return fmt.Errorf("failed to get credential ID: %w", err)
@@ -107,17 +116,19 @@ func (executor *modelAssistantExecutor) Init(
 	})
 
 	g.Go(func() error {
-		executor.history = communication.
-			GetConversationLogs()
-		span.AddAttributes(ctx, internal_adapter_telemetry.KV{
-			K: "history_length", V: internal_adapter_telemetry.IntValue(len(executor.history)),
-		})
+		executor.history = append(executor.history, communication.GetConversationLogs()...)
+		span.AddAttributes(
+			ctx,
+			internal_adapter_telemetry.KV{
+				K: "history_length", V: internal_adapter_telemetry.IntValue(len(executor.history)),
+			},
+		)
 		return nil
 
 	})
 	// Goroutine to initialize tool executor
 	g.Go(func() error {
-		err := executor.toolExecutor.Init(ctx, communication)
+		err := executor.toolExecutor.Initialize(ctx, communication)
 		if err != nil {
 			executor.logger.Errorf("Error initializing tool executor: %v", err)
 			return fmt.Errorf("failed to initialize tool executor: %w", err)
@@ -195,7 +206,8 @@ func (executor *modelAssistantExecutor) chat(
 				histories...), in.ToProto())...,
 		)
 
-	res, err := communication.IntegrationCaller().
+	res, err := communication.
+		IntegrationCaller().
 		StreamChat(
 			ctx,
 			communication.
@@ -289,10 +301,17 @@ func (executor *modelAssistantExecutor) Talk(
 		internal_adapter_telemetry.MessageKV(messageid))
 	defer span.EndSpan(ctx, utils.AssistantAgentTextGenerationStage)
 	return executor.chat(
-		communication.Context(),
+		ctx,
 		messageid,
 		communication,
 		msg,
 		executor.history...)
 
+}
+
+func (a *modelAssistantExecutor) Close(
+	ctx context.Context,
+	communication internal_adapter_requests.Communication,
+) error {
+	return nil
 }

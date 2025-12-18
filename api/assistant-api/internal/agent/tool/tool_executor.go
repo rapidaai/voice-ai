@@ -1,4 +1,4 @@
-package internal_tool_executors
+package internal_agent_tool
 
 import (
 	"context"
@@ -8,12 +8,11 @@ import (
 	"time"
 
 	internal_requests "github.com/rapidaai/api/assistant-api/internal/adapters/requests"
-	internal_agent_tools "github.com/rapidaai/api/assistant-api/internal/agents/tools"
-	internal_executors "github.com/rapidaai/api/assistant-api/internal/executors"
+	internal_agent_tools "github.com/rapidaai/api/assistant-api/internal/agent/tool/local"
 	internal_adapter_telemetry "github.com/rapidaai/api/assistant-api/internal/telemetry"
 
 	internal_tool_factory "github.com/rapidaai/api/assistant-api/internal/factory/tool"
-	protos "github.com/rapidaai/protos"
+	"github.com/rapidaai/protos"
 
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
@@ -29,7 +28,7 @@ type toolExecutor struct {
 
 func NewToolExecutor(
 	logger commons.Logger,
-) internal_executors.ToolExecutor {
+) ToolExecutor {
 	return &toolExecutor{
 		logger:                 logger,
 		tools:                  make(map[string]internal_agent_tools.ToolCaller, 0),
@@ -37,7 +36,7 @@ func NewToolExecutor(
 	}
 }
 
-func (executor *toolExecutor) Init(
+func (executor *toolExecutor) Initialize(
 	ctx context.Context,
 	communication internal_requests.Communication,
 ) error {

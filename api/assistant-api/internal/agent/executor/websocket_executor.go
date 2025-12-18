@@ -1,4 +1,4 @@
-package internal_assistant_executors
+package internal_agent_executor
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 
 	"github.com/gorilla/websocket"
 	internal_adapter_requests "github.com/rapidaai/api/assistant-api/internal/adapters/requests"
-	internal_executors "github.com/rapidaai/api/assistant-api/internal/executors"
 	internal_adapter_telemetry "github.com/rapidaai/api/assistant-api/internal/telemetry"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
@@ -22,7 +21,7 @@ type websocketExecutor struct {
 }
 
 // Init implements internal_executors.AssistantExecutor.
-func (executor *websocketExecutor) Init(ctx context.Context,
+func (executor *websocketExecutor) Initialize(ctx context.Context,
 	communication internal_adapter_requests.Communication) error {
 	ctx, span, _ := communication.Tracer().StartSpan(
 		ctx,
@@ -89,25 +88,16 @@ func (a *websocketExecutor) Talk(ctx context.Context, messageid string, msg *typ
 	panic("unimplemented")
 }
 
-func (a *websocketExecutor) Connect(
+func (a *websocketExecutor) Close(
 	ctx context.Context,
-	assistantId uint64,
-	assistantConversationId uint64,
-) error {
-	return nil
-}
-
-func (a *websocketExecutor) Disconnect(
-	ctx context.Context,
-	assistantId uint64,
-	assistantConversationId uint64,
+	communication internal_adapter_requests.Communication,
 ) error {
 	return nil
 }
 
 func NewWebsocketAssistantExecutor(
 	logger commons.Logger,
-) internal_executors.AssistantExecutor {
+) AssistantExecutor {
 	return &websocketExecutor{
 		logger: logger,
 	}

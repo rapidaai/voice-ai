@@ -1,4 +1,4 @@
-package internal_agent_tools
+package internal_agent_local_tool
 
 import (
 	"context"

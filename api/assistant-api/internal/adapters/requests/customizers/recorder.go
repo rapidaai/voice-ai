@@ -22,7 +22,7 @@ type AudioChunk struct {
 }
 
 type Recorder interface {
-	Init(userAudioConfig, systemAudioConfig *internal_audio.AudioConfig) error
+	Initialize(userAudioConfig, systemAudioConfig *internal_audio.AudioConfig) error
 	User(in []byte) error
 	Interrupt() error
 	System(out []byte) error
@@ -47,7 +47,7 @@ func NewRecorder(logger commons.Logger) Recorder {
 	}
 }
 
-func (r *recorder) Init(userConfig, systemConfig *internal_audio.AudioConfig) error {
+func (r *recorder) Initialize(userConfig, systemConfig *internal_audio.AudioConfig) error {
 	r.userConfig = userConfig
 	r.systemConfig = systemConfig
 	return nil

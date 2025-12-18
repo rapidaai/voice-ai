@@ -1,3 +1,9 @@
+// Copyright (c) Rapida
+// Author: Prashant <prashant@rapida.ai>
+//
+// Licensed under the Rapida internal use license.
+// This file is part of Rapida's proprietary software.
+// Unauthorized copying, modification, or redistribution is strictly prohibited.
 package internal_adapter_request_generic
 
 import (

@@ -89,8 +89,8 @@ func (dg *deepgramTTS) Initialize() error {
 		dg.logger.Errorf("deepgram-tts: unable to connect to deepgram service")
 		return fmt.Errorf("deepgram-tts: connection failed")
 	}
-	dg.logger.Debugf("deepgram-tts: connection established")
 	dg.client = client
+	dg.logger.Debugf("deepgram-tts: connection established")
 	return nil
 }
 

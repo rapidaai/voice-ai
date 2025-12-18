@@ -1,3 +1,9 @@
+// Copyright (c) Rapida
+// Author: Prashant <prashant@rapida.ai>
+//
+// Licensed under the Rapida internal use license.
+// This file is part of Rapida's proprietary software.
+// Unauthorized copying, modification, or redistribution is strictly prohibited.
 package internal_adapter_request_generic
 
 import (
@@ -10,15 +16,14 @@ import (
 	internal_assistant_telemetry "github.com/rapidaai/api/assistant-api/internal/telemetry/assistant"
 	internal_assistant_telemetry_exporters "github.com/rapidaai/api/assistant-api/internal/telemetry/assistant/exporters"
 
-	internal_agent_embeddings "github.com/rapidaai/api/assistant-api/internal/agents/embeddings"
-	internal_agent_rerankers "github.com/rapidaai/api/assistant-api/internal/agents/rerankers"
+	internal_agent_embeddings "github.com/rapidaai/api/assistant-api/internal/agent/embedding"
+	internal_assistant_executors "github.com/rapidaai/api/assistant-api/internal/agent/executor"
+	internal_agent_rerankers "github.com/rapidaai/api/assistant-api/internal/agent/reranker"
 	internal_denoiser "github.com/rapidaai/api/assistant-api/internal/denoiser"
 	internal_end_of_speech "github.com/rapidaai/api/assistant-api/internal/end_of_speech"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_conversation_gorm "github.com/rapidaai/api/assistant-api/internal/entity/conversations"
 	internal_knowledge_gorm "github.com/rapidaai/api/assistant-api/internal/entity/knowledges"
-	internal_executors "github.com/rapidaai/api/assistant-api/internal/executors"
-	internal_assistant_executors "github.com/rapidaai/api/assistant-api/internal/executors/assistant"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	internal_assistant_service "github.com/rapidaai/api/assistant-api/internal/services/assistant"
 	internal_knowledge_service "github.com/rapidaai/api/assistant-api/internal/services/knowledge"
@@ -91,7 +96,7 @@ type GenericRequestor struct {
 	templateParser parsers.StringTemplateParser
 
 	// executor
-	assistantExecutor internal_executors.AssistantExecutor
+	assistantExecutor internal_assistant_executors.AssistantExecutor
 	// states
 	assistant             *internal_assistant_entity.Assistant
 	assistantConversation *internal_conversation_gorm.AssistantConversation
@@ -127,6 +132,7 @@ func NewGenericRequestor(
 		conversationService:  internal_assistant_service.NewAssistantConversationService(logger, postgres, storage),
 		webhookService:       internal_assistant_service.NewAssistantWebhookService(logger, postgres, storage),
 		assistantToolService: internal_assistant_service.NewAssistantToolService(logger, postgres, storage),
+		templateParser:       parsers.NewPongo2StringTemplateParser(logger),
 		//
 
 		opensearch:    opensearch,
@@ -148,7 +154,6 @@ func NewGenericRequestor(
 
 		recorder:          internal_adapter_request_customizers.NewRecorder(logger),
 		messaging:         internal_adapter_request_customizers.NewMessaging(logger),
-		templateParser:    parsers.NewPongo2StringTemplateParser(logger),
 		assistantExecutor: internal_assistant_executors.NewAssistantExecutor(logger),
 
 		// will change
@@ -227,27 +232,9 @@ func (deb *GenericRequestor) OnUpdateMessage(
 	messageId string,
 	message *types.Message,
 	status type_enums.RecordState) error {
-	start := time.Now()
-	spanMetadata := map[string]interface{}{
-		"execute": "sequential",
-	}
-	// appending response
 	deb.histories = append(deb.histories, message)
-
-	_, err := deb.conversationService.
-		UpdateConversationMessage(
-			ctx,
-			deb.Auth(),
-			deb.Conversation().Id,
-			messageId,
-			message,
-			status,
-		)
-	deb.logger.Benchmark("GenericRequestor.OnUpdateMessage", time.Since(start))
-	if err != nil {
+	if _, err := deb.conversationService.UpdateConversationMessage(ctx, deb.Auth(), deb.Conversation().Id, messageId, message, status); err != nil {
 		deb.logger.Errorf("error updating conversation message: %v", err)
-		spanMetadata["status"] = "error"
-		spanMetadata["error"] = err.Error()
 		return err
 	}
 	return nil
@@ -257,19 +244,8 @@ func (deb *GenericRequestor) OnMessageMetric(
 	ctx context.Context,
 	messageId string,
 	metrics []*types.Metric) error {
-	_, err := deb.
-		conversationService.
-		ApplyMessageMetrics(
-			ctx,
-			deb.
-				Auth(),
-			deb.
-				Conversation().Id,
-			messageId,
-			metrics,
-		)
-
-	if err != nil {
+	if _, err := deb.
+		conversationService.ApplyMessageMetrics(ctx, deb.Auth(), deb.Conversation().Id, messageId, metrics); err != nil {
 		deb.logger.Errorf("error updating metrics for message: %v", err)
 		return err
 	}
@@ -281,14 +257,7 @@ func (deb *GenericRequestor) OnMessageMetadata(
 	messageId string,
 	metadata map[string]interface{}) error {
 	start := time.Now()
-	_, err := deb.conversationService.
-		ApplyMessageMetadata(
-			ctx,
-			deb.Auth(),
-			deb.assistantConversation.Id,
-			messageId,
-			metadata,
-		)
+	_, err := deb.conversationService.ApplyMessageMetadata(ctx, deb.Auth(), deb.assistantConversation.Id, messageId, metadata)
 
 	if err != nil {
 		deb.logger.Errorf("error updating metadata for message: %v", err)
@@ -310,21 +279,14 @@ func (gr *GenericRequestor) GetAssistantConversation(
 ) (*internal_conversation_gorm.AssistantConversation, error) {
 	start := time.Now()
 	defer gr.logger.Benchmark("GenericRequestor.GetAssistantConversation", time.Since(start))
-	return gr.conversationService.
-		GetConversation(
-			gr.Context(),
-			auth,
-			identifier,
-			assistantId,
-			assistantConversationId,
-			&internal_services.
-				GetConversationOption{
-				InjectContext:  true,
-				InjectArgument: true,
-				InjectMetadata: true,
-				InjectOption:   true,
-				InjectMetric:   false},
-		)
+	return gr.conversationService.GetConversation(gr.Context(), auth, identifier, assistantId, assistantConversationId, &internal_services.
+		GetConversationOption{
+		InjectContext:  true,
+		InjectArgument: true,
+		InjectMetadata: true,
+		InjectOption:   true,
+		InjectMetric:   false},
+	)
 }
 
 func (gr *GenericRequestor) CreateAssistantConversation(
@@ -337,15 +299,7 @@ func (gr *GenericRequestor) CreateAssistantConversation(
 	metadata map[string]interface{},
 	options map[string]interface{},
 ) (*internal_conversation_gorm.AssistantConversation, error) {
-	conversation, err := gr.conversationService.CreateConversation(
-		gr.Context(),
-		auth,
-		identifier,
-		assistantId,
-		assistantProviderModelId,
-		direction,
-		gr.Source(),
-	)
+	conversation, err := gr.conversationService.CreateConversation(gr.Context(), auth, identifier, assistantId, assistantProviderModelId, direction, gr.Source())
 	if err != nil {
 		return conversation, err
 	}
@@ -368,26 +322,15 @@ func (gr *GenericRequestor) CreateAssistantConversation(
 func (gr *GenericRequestor) CreateConversationArgument(auth types.SimplePrinciple,
 	assistantId,
 	assistantConversationId uint64, args map[string]interface{}) ([]*internal_conversation_gorm.AssistantConversationArgument, error) {
-	return gr.conversationService.ApplyConversationArgument(gr.Context(),
-		auth,
-		assistantId,
-		assistantConversationId,
-		args)
+	return gr.conversationService.ApplyConversationArgument(gr.Context(), auth, assistantId, assistantConversationId, args)
 }
 
 func (gr *GenericRequestor) CreateConversationMetadata(auth types.SimplePrinciple, assistantId, assistantConversationId uint64, metadata map[string]interface{}) ([]*internal_conversation_gorm.AssistantConversationMetadata, error) {
-	return gr.conversationService.ApplyConversationMetadata(gr.Context(),
-		auth,
-		assistantId,
-		assistantConversationId,
-		types.NewMetadataList(metadata))
+	return gr.conversationService.ApplyConversationMetadata(gr.Context(), auth, assistantId, assistantConversationId, types.NewMetadataList(metadata))
 }
 
 func (gr *GenericRequestor) CreateConversationOption(auth types.SimplePrinciple, assistantId, assistantConversationId uint64, opts map[string]interface{}) ([]*internal_conversation_gorm.AssistantConversationOption, error) {
-	return gr.conversationService.ApplyConversationOption(gr.Context(),
-		auth, assistantId,
-		assistantConversationId,
-		opts)
+	return gr.conversationService.ApplyConversationOption(gr.Context(), auth, assistantId, assistantConversationId, opts)
 }
 
 func (talking *GenericRequestor) BeginConversation(
@@ -401,24 +344,13 @@ func (talking *GenericRequestor) BeginConversation(
 	talking.args = argument
 	talking.options = options
 	talking.metadata = metadata
-	conversation, err := talking.
-		CreateAssistantConversation(
-			auth,
-			assistant.Id,
-			assistant.AssistantProviderId,
-			identifier,
-			direction,
-			argument,
-			metadata,
-			options,
-		)
+	conversation, err := talking.CreateAssistantConversation(auth, assistant.Id, assistant.AssistantProviderId, identifier, direction, argument, metadata, options)
 	if err != nil {
 		talking.logger.Errorf("unable to initialize assistant %+v", err)
 		return nil, err
 	}
 	talking.assistantConversation = conversation
 	talking.logger.Benchmark("talking.BeginConversation", time.Since(start))
-
 	return conversation, err
 }
 
@@ -451,24 +383,20 @@ func (talking *GenericRequestor) ResumeConversation(
 }
 
 func (talking *GenericRequestor) IntegrationCaller() integration_client.IntegrationServiceClient {
-	return talking.
-		integrationClient
+	return talking.integrationClient
 
 }
 
 func (talking *GenericRequestor) VaultCaller() web_client.VaultClient {
-	return talking.
-		vaultClient
+	return talking.vaultClient
 }
 
 func (talking *GenericRequestor) DeploymentCaller() endpoint_client.DeploymentServiceClient {
-	return talking.
-		deploymentClient
+	return talking.deploymentClient
 }
 
 func (talking *GenericRequestor) GetKnowledge(knowledgeId uint64) (*internal_knowledge_gorm.Knowledge, error) {
-	return talking.knowledgeService.
-		Get(talking.ctx, talking.auth, knowledgeId)
+	return talking.knowledgeService.Get(talking.ctx, talking.auth, knowledgeId)
 }
 
 func (gr *GenericRequestor) GetArgs() map[string]interface{} {
@@ -486,23 +414,17 @@ func (dm *GenericRequestor) GetHistories() []*types.Message {
 func (gr *GenericRequestor) CreateConversationRecording(
 	body []byte,
 ) error {
-	_, err := gr.conversationService.CreateConversationRecording(
-		gr.ctx,
-		gr.auth,
-		gr.assistant.Id,
-		gr.assistantConversation.Id,
-		body)
-	if err != nil {
+	if _, err := gr.conversationService.CreateConversationRecording(gr.ctx, gr.auth, gr.assistant.Id, gr.assistantConversation.Id, body); err != nil {
 		gr.logger.Errorf("unable to create recording for the conversation id %d with error : %v", err)
 		return err
 	}
-	return err
+	return nil
 }
 
 func (gr *GenericRequestor) Recorder() internal_adapter_request_customizers.Recorder {
 	return gr.recorder
 }
 
-func (gr *GenericRequestor) AssistantExecutor() internal_executors.AssistantExecutor {
+func (gr *GenericRequestor) AssistantExecutor() internal_assistant_executors.AssistantExecutor {
 	return gr.assistantExecutor
 }

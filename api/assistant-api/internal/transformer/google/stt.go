@@ -144,19 +144,18 @@ func (google *googleSpeechToText) Initialize() error {
 		return err
 	}
 	google.stream = stream
-	err = google.stream.Send(&speechpb.StreamingRecognizeRequest{
+	if err := google.stream.Send(&speechpb.StreamingRecognizeRequest{
 		Recognizer: google.GetRecognizer(),
 		StreamingRequest: &speechpb.StreamingRecognizeRequest_StreamingConfig{
 			StreamingConfig: google.SpeechToTextOptions(),
 		},
-	})
-	google.logger.Errorf("google-stt: error creating google-stt stream: %+v", google.SpeechToTextOptions())
-	if err != nil {
+	}); err != nil {
 		google.logger.Errorf("google-stt: error creating google-stt stream: %v", err)
 		return err
 	}
 	// Launch callback listener
 	go google.SpeechToTextCallback(google.ctx)
+	google.logger.Debugf("google-stt: connection established")
 	return nil
 }
 

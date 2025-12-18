@@ -1,37 +1,11 @@
-package internal_agent_tools
+package internal_agent_local_tool
 
 import (
-	"context"
-
-	internal_adapter_requests "github.com/rapidaai/api/assistant-api/internal/adapters/requests"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	protos "github.com/rapidaai/protos"
 )
-
-type ToolCaller interface {
-	// tool call id
-	Id() uint64
-
-	//
-	Name() string
-
-	//
-	Definition() (*protos.FunctionDefinition, error)
-
-	//
-	ExecutionMethod() string
-
-	//
-	Call(
-		ctx context.Context,
-		messageId string,
-		args string,
-		communication internal_adapter_requests.Communication,
-	) (map[string]interface{}, []*types.Metric)
-}
 
 type toolCaller struct {
 	logger      commons.Logger

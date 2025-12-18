@@ -13,7 +13,7 @@ type AssistantConversationMessage struct {
 	AssistantConversationId  uint64                  `json:"assistantConversationId" gorm:"type:bigint;not null"`
 	AssistantId              uint64                  `json:"assistantId" gorm:"type:bigint;not null"`
 	AssistantProviderModelId uint64                  `json:"assistantProviderModelId" gorm:"type:bigint;not null"`
-	Request                  gorm_types.InterfaceMap `json:"request" gorm:"type:jsonb;not null"`
+	Request                  gorm_types.InterfaceMap `json:"request" gorm:"type:jsonb"`
 	Response                 gorm_types.InterfaceMap `json:"response" gorm:"type:jsonb"`
 	Source                   string                  `json:"source" gorm:"type:string;size:50;not null"`
 

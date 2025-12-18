@@ -80,10 +80,11 @@ type AssistantDeployment struct {
 
 type AssistantDeploymentBehavior struct {
 	AssistantDeployment
-	Greeting *string `json:"greeting" gorm:"type:string;size:50;not null;"`
-	Mistake  *string `json:"mistake" gorm:"type:string;size:50;not null;"`
+	Greeting             *string `json:"greeting" gorm:"type:string;size:50;not null;"`
+	CanInterruptGreeting bool    `json:"canInterruptGreeting" gorm:"type:bool;not null;"`
 
-	IdealTimeout        *uint64 `json:"IdealTimeout"`
+	Mistake             *string `json:"mistake" gorm:"type:string;size:50;not null;"`
+	IdealTimeout        *uint64 `json:"idealTimeout"`
 	IdealTimeoutMessage *string `json:"idealTimeoutMessage" gorm:"type:string;size:50;not null;"`
 	MaxSessionDuration  *uint64 `json:"maxSessionDuration"`
 }
