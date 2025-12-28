@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -78,13 +77,13 @@ const (
 )
 
 func (co *cartesiaOption) GetEncoding() string {
-	switch co.audioConfig.Format {
-	case internal_audio.Linear16:
+	switch co.audioConfig.GetAudioFormat() {
+	case protos.AudioConfig_LINEAR16:
 		return "pcm_s16le"
-	case internal_audio.MuLaw8:
+	case protos.AudioConfig_MuLaw8:
 		return "pcm_mulaw"
 	default:
-		fmt.Printf("Warning: Invalid encoding option '%s'. Using default (linear16).", co.audioConfig.Format)
+		fmt.Printf("Warning: Invalid encoding option '%s'. Using default (linear16).", co.audioConfig.GetAudioFormat())
 		return "pcm_s16le"
 	}
 }
@@ -93,12 +92,12 @@ type cartesiaOption struct {
 	key         string
 	mdlOpts     utils.Option
 	logger      commons.Logger
-	audioConfig *internal_audio.AudioConfig
+	audioConfig *protos.AudioConfig
 }
 
 func NewCartesiaOption(logger commons.Logger,
 	vltC *protos.VaultCredential,
-	audioConfig *internal_audio.AudioConfig,
+	audioConfig *protos.AudioConfig,
 	opts utils.Option) (*cartesiaOption, error) {
 	cx, ok := vltC.GetValue().AsMap()["key"]
 	if !ok {
@@ -125,7 +124,7 @@ func (co *cartesiaOption) GetTextToSpeechInput(
 		OutputFormat: TextToSpeechOutputFormat{
 			Container:  "raw",
 			Encoding:   co.GetEncoding(),
-			SampleRate: co.audioConfig.SampleRate,
+			SampleRate: int(co.audioConfig.GetSampleRate()),
 		},
 		Transcript:    transcript,
 		AddTimestamps: false,

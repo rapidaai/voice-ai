@@ -25,7 +25,10 @@ const (
 // AgentActionClient is the client API for AgentAction service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// agent action
 type AgentActionClient interface {
+	// for agent action
 	Action(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AssistantActionRequest, AssistantActionResponse], error)
 }
 
@@ -53,7 +56,10 @@ type AgentAction_ActionClient = grpc.BidiStreamingClient[AssistantActionRequest,
 // AgentActionServer is the server API for AgentAction service.
 // All implementations should embed UnimplementedAgentActionServer
 // for forward compatibility.
+//
+// agent action
 type AgentActionServer interface {
+	// for agent action
 	Action(grpc.BidiStreamingServer[AssistantActionRequest, AssistantActionResponse]) error
 }
 
@@ -119,7 +125,10 @@ const (
 // AgentTalkClient is the client API for AgentTalk service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// for extenal integration around grpc for agentkit call
 type AgentTalkClient interface {
+	// bi stream of agentkit action
 	Talk(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AgentTalkRequest, AgentTalkResponse], error)
 }
 
@@ -147,7 +156,10 @@ type AgentTalk_TalkClient = grpc.BidiStreamingClient[AgentTalkRequest, AgentTalk
 // AgentTalkServer is the server API for AgentTalk service.
 // All implementations should embed UnimplementedAgentTalkServer
 // for forward compatibility.
+//
+// for extenal integration around grpc for agentkit call
 type AgentTalkServer interface {
+	// bi stream of agentkit action
 	Talk(grpc.BidiStreamingServer[AgentTalkRequest, AgentTalkResponse]) error
 }
 

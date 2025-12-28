@@ -1,76 +1,40 @@
-// Copyright (c) Rapida
-// Author: Prashant <prashant@rapida.ai>
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
 //
-// Licensed under the Rapida internal use license.
-// This file is part of Rapida's proprietary software.
-// Unauthorized copying, modification, or redistribution is strictly prohibited.
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package internal_audio
 
-type AudioFormat int
+import "github.com/rapidaai/protos"
 
-const (
-	Linear16 AudioFormat = iota
-	MuLaw8
-)
-
-func (af AudioFormat) Name() string {
-	switch af {
-	case Linear16:
-		return "Linear16"
-	case MuLaw8:
-		return "MuLaw8"
-	default:
-		return "Unknown"
+func NewMulaw8khzMonoAudioConfig() *protos.AudioConfig {
+	return &protos.AudioConfig{
+		SampleRate:  8000,
+		AudioFormat: protos.AudioConfig_MuLaw8,
+		Channels:    1,
 	}
 }
 
-// AudioConfig holds audio configuration
-type AudioConfig struct {
-	SampleRate int
-	Format     AudioFormat
-	Channels   int // typically 1 for mono, 2 for stereo
-}
-
-func (ac *AudioConfig) GetSampleRate() int {
-	return ac.SampleRate
-}
-
-func (ac *AudioConfig) GetFormat() string {
-	return ac.Format.Name()
-}
-
-func (ac *AudioConfig) IsMono() bool {
-	return ac.Channels == 1
-}
-
-func NewMulaw8khzMonoAudioConfig() *AudioConfig {
-	return &AudioConfig{
-		SampleRate: 8000,
-		Format:     MuLaw8,
-		Channels:   1,
+func NewLinear24khzMonoAudioConfig() *protos.AudioConfig {
+	return &protos.AudioConfig{
+		SampleRate:  24000,
+		AudioFormat: protos.AudioConfig_LINEAR16,
+		Channels:    1,
 	}
 }
 
-func NewLinear24khzMonoAudioConfig() *AudioConfig {
-	return &AudioConfig{
-		SampleRate: 24000,
-		Format:     Linear16,
-		Channels:   1,
+func NewLinear16khzMonoAudioConfig() *protos.AudioConfig {
+	return &protos.AudioConfig{
+		SampleRate:  16000,
+		AudioFormat: protos.AudioConfig_LINEAR16,
+		Channels:    1,
 	}
 }
 
-func NewLinear16khzMonoAudioConfig() *AudioConfig {
-	return &AudioConfig{
-		SampleRate: 16000,
-		Format:     Linear16,
-		Channels:   1,
-	}
-}
-
-func NewLinear8khzMonoAudioConfig() *AudioConfig {
-	return &AudioConfig{
-		SampleRate: 8000,
-		Format:     Linear16,
-		Channels:   1,
+func NewLinear8khzMonoAudioConfig() *protos.AudioConfig {
+	return &protos.AudioConfig{
+		SampleRate:  8000,
+		AudioFormat: protos.AudioConfig_LINEAR16,
+		Channels:    1,
 	}
 }

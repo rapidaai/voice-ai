@@ -1,3 +1,8 @@
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
+//
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package internal_knowledge_gorm
 
 import (
@@ -12,9 +17,6 @@ type Knowledge struct {
 	Name        string `json:"name" gorm:"type:string"`
 	Description string `json:"description" gorm:"type:string"`
 	Visibility  string `json:"visibility" gorm:"type:string;default:private"`
-
-	// EmbeddingProviderModelId uint64 `json:"embeddingProviderModelId" gorm:"type:bigint;size:20; not null"`
-	// EmbeddingProviderId      uint64 `json:"embeddingProviderId" gorm:"type:bigint;size:20; not null"`
 
 	ProjectId      uint64 `json:"projectId" gorm:"type:bigint;size:20;not null"`
 	OrganizationId uint64 `json:"organizationId" gorm:"type:bigint;size:20;not null"`

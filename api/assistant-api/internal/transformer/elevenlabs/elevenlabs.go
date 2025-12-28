@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"net/url"
 
-	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -21,10 +20,10 @@ const (
 )
 
 func (elabs *elevenLabsOption) GetEncoding() string {
-	switch elabs.audioConfig.Format {
-	case internal_audio.Linear16:
+	switch elabs.audioConfig.GetAudioFormat() {
+	case protos.AudioConfig_LINEAR16:
 		return "pcm_16000"
-	case internal_audio.MuLaw8:
+	case protos.AudioConfig_MuLaw8:
 		return "ulaw_8000"
 	default:
 		elabs.logger.Debugf("Warning: Invalid encoding mdlOpts. Using default (linear16).")
@@ -36,11 +35,11 @@ type elevenLabsOption struct {
 	key         string
 	logger      commons.Logger
 	mdlOpts     utils.Option
-	audioConfig *internal_audio.AudioConfig
+	audioConfig *protos.AudioConfig
 }
 
 func NewElevenLabsOption(logger commons.Logger, vaultCredential *protos.VaultCredential,
-	audioConfig *internal_audio.AudioConfig,
+	audioConfig *protos.AudioConfig,
 	opts utils.Option) (*elevenLabsOption, error) {
 	cx, ok := vaultCredential.GetValue().AsMap()["key"]
 	if !ok {

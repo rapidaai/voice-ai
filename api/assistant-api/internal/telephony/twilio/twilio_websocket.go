@@ -10,9 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_streamers "github.com/rapidaai/api/assistant-api/internal/streamers"
-	internal_text "github.com/rapidaai/api/assistant-api/internal/text"
 	"github.com/rapidaai/pkg/commons"
 	protos "github.com/rapidaai/protos"
 )
@@ -196,11 +194,11 @@ func (tws *twilioWebsocketStreamer) Send(response *protos.AssistantMessagingResp
 		if err != nil {
 			tws.logger.Errorf("Error sending clear command:", err)
 		}
-	case *protos.AssistantMessagingResponse_DisconnectAction:
-		tws.logger.Debugf("ending call action")
-		err := tws.conn.Close()
-		if err != nil {
-			tws.logger.Errorf("Error disconnecting command:", err)
+	case *protos.AssistantMessagingResponse_Action:
+		if data.Action.GetAction() == protos.AssistantConversationAction_END_CONVERSATION {
+			if err := tws.conn.Close(); err != nil {
+				tws.logger.Errorf("Error disconnecting command:", err)
+			}
 		}
 	}
 	return nil
@@ -253,18 +251,6 @@ func (tws *twilioWebsocketStreamer) captureStreamSid(streamSid string) {
 		tws.streamSid = streamSid
 		tws.logger.Debug("Captured Twilio streamSid", "streamSid", tws.streamSid)
 	}
-}
-func (extl *twilioWebsocketStreamer) Config() *internal_streamers.StreamAttribute {
-	return internal_streamers.NewStreamAttribute(
-		internal_streamers.NewStreamConfig(internal_audio.NewMulaw8khzMonoAudioConfig(),
-			&internal_text.TextConfig{
-				Charset: "UTF-8",
-			},
-		), internal_streamers.NewStreamConfig(internal_audio.NewMulaw8khzMonoAudioConfig(),
-			&internal_text.TextConfig{
-				Charset: "UTF-8",
-			},
-		))
 }
 
 func (tpc *twilioWebsocketStreamer) Streamer(c *gin.Context, connection *websocket.Conn, assistantID uint64, assistantVersion string, assistantConversationID uint64) internal_streamers.Streamer {

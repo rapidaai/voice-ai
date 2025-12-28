@@ -9,9 +9,7 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
-	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_streamers "github.com/rapidaai/api/assistant-api/internal/streamers"
-	internal_text "github.com/rapidaai/api/assistant-api/internal/text"
 	"github.com/rapidaai/pkg/commons"
 	protos "github.com/rapidaai/protos"
 )
@@ -190,11 +188,11 @@ func (vng *vonageWebsocketStreamer) Send(response *protos.AssistantMessagingResp
 		if err != nil {
 			vng.logger.Errorf("Error sending clear command:", err)
 		}
-	case *protos.AssistantMessagingResponse_DisconnectAction:
-		vng.logger.Debugf("ending call action")
-		err := vng.conn.Close()
-		if err != nil {
-			vng.logger.Errorf("Error disconnecting command:", err)
+	case *protos.AssistantMessagingResponse_Action:
+		if data.Action.GetAction() == protos.AssistantConversationAction_END_CONVERSATION {
+			if err := vng.conn.Close(); err != nil {
+				vng.logger.Errorf("Error disconnecting command:", err)
+			}
 		}
 	}
 	return nil
@@ -213,17 +211,4 @@ func (vng *vonageWebsocketStreamer) handleWebSocketError(err error) error {
 	vng.cancelFunc()
 	vng.conn = nil
 	return io.EOF
-}
-
-func (extl *vonageWebsocketStreamer) Config() *internal_streamers.StreamAttribute {
-	return internal_streamers.NewStreamAttribute(
-		internal_streamers.NewStreamConfig(internal_audio.NewLinear16khzMonoAudioConfig(),
-			&internal_text.TextConfig{
-				Charset: "UTF-8",
-			},
-		), internal_streamers.NewStreamConfig(internal_audio.NewLinear16khzMonoAudioConfig(),
-			&internal_text.TextConfig{
-				Charset: "UTF-8",
-			},
-		))
 }

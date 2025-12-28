@@ -1,9 +1,8 @@
-// Copyright (c) Rapida
-// Author: Prashant <prashant@rapida.ai>
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
 //
-// Licensed under the Rapida internal use license.
-// This file is part of Rapida's proprietary software.
-// Unauthorized copying, modification, or redistribution is strictly prohibited.
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package internal_transformer_google
 
 import (
@@ -104,7 +103,6 @@ func (google *googleTextToSpeech) Initialize() error {
 		return err
 	}
 
-	google.logger.Debugf("got %v", google.TextToSpeechOptions())
 	req := texttospeechpb.StreamingSynthesizeRequest{
 		StreamingRequest: &texttospeechpb.
 			StreamingSynthesizeRequest_StreamingConfig{

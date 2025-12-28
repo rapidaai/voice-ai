@@ -1,11 +1,14 @@
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
+//
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package internal_grpc
 
 import (
 	"context"
 
-	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_streamers "github.com/rapidaai/api/assistant-api/internal/streamers"
-	internal_text "github.com/rapidaai/api/assistant-api/internal/text"
 	"github.com/rapidaai/protos"
 	"google.golang.org/grpc"
 )
@@ -33,17 +36,4 @@ func (uds *unidirectionalStreamer) Recv() (*protos.AssistantMessagingRequest, er
 // It returns an error if the send operation fails.
 func (uds *unidirectionalStreamer) Send(out *protos.AssistantMessagingResponse) error {
 	return uds.server.Send(out)
-}
-
-func (extl *unidirectionalStreamer) Config() *internal_streamers.StreamAttribute {
-	return internal_streamers.NewStreamAttribute(
-		internal_streamers.NewStreamConfig(internal_audio.NewLinear16khzMonoAudioConfig(),
-			&internal_text.TextConfig{
-				Charset: "UTF-8",
-			},
-		), internal_streamers.NewStreamConfig(internal_audio.NewLinear16khzMonoAudioConfig(),
-			&internal_text.TextConfig{
-				Charset: "UTF-8",
-			},
-		))
 }

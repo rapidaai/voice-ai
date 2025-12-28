@@ -1,9 +1,8 @@
-// Copyright (c) Rapida
-// Author: Prashant <prashant@rapida.ai>
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
 //
-// Licensed under the Rapida internal use license.
-// This file is part of Rapida's proprietary software.
-// Unauthorized copying, modification, or redistribution is strictly prohibited.
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package internal_adapter_request_talking_phone
 
 import (
@@ -96,6 +95,8 @@ func (talking *phoneTalking) Talk(
 				}
 			}
 		case *protos.AssistantMessagingRequest_Configuration:
+			talking.logger.Debugf("connection changed for assistant")
+			initialized = false
 			if err := talking.Connect(ctx, auth, identifier, msg.Configuration); err != nil {
 				talking.logger.Errorf("unexpected error while connect assistant, might be problem in configuration %+v", err)
 				return fmt.Errorf("talking.Connect error: %w", err)

@@ -191,7 +191,6 @@ func (wVault *webVaultGRPCApi) GetCredential(ctx context.Context, request *proto
 			"Unable to get vault credential, please try again",
 		)
 	}
-	wVault.logger.Debugf("returing few things like %+v", vlt)
 	var out protos.VaultCredential
 	err = utils.Cast(vlt, &out)
 	if err != nil {

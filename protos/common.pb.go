@@ -78,6 +78,110 @@ func (Source) EnumDescriptor() ([]byte, []int) {
 	return file_common_proto_rawDescGZIP(), []int{0}
 }
 
+type AudioConfig_AudioFormat int32
+
+const (
+	AudioConfig_LINEAR16 AudioConfig_AudioFormat = 0
+	AudioConfig_MuLaw8   AudioConfig_AudioFormat = 1
+)
+
+// Enum value maps for AudioConfig_AudioFormat.
+var (
+	AudioConfig_AudioFormat_name = map[int32]string{
+		0: "LINEAR16",
+		1: "MuLaw8",
+	}
+	AudioConfig_AudioFormat_value = map[string]int32{
+		"LINEAR16": 0,
+		"MuLaw8":   1,
+	}
+)
+
+func (x AudioConfig_AudioFormat) Enum() *AudioConfig_AudioFormat {
+	p := new(AudioConfig_AudioFormat)
+	*p = x
+	return p
+}
+
+func (x AudioConfig_AudioFormat) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AudioConfig_AudioFormat) Descriptor() protoreflect.EnumDescriptor {
+	return file_common_proto_enumTypes[1].Descriptor()
+}
+
+func (AudioConfig_AudioFormat) Type() protoreflect.EnumType {
+	return &file_common_proto_enumTypes[1]
+}
+
+func (x AudioConfig_AudioFormat) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AudioConfig_AudioFormat.Descriptor instead.
+func (AudioConfig_AudioFormat) EnumDescriptor() ([]byte, []int) {
+	return file_common_proto_rawDescGZIP(), []int{35, 0}
+}
+
+type AssistantConversationAction_ActionType int32
+
+const (
+	AssistantConversationAction_ACTION_UNSPECIFIED  AssistantConversationAction_ActionType = 0 // Default unspecified value
+	AssistantConversationAction_KNOWLEDGE_RETRIEVAL AssistantConversationAction_ActionType = 1 // Knowledge Retrieval action
+	AssistantConversationAction_API_REQUEST         AssistantConversationAction_ActionType = 2 // API request action
+	AssistantConversationAction_ENDPOINT_CALL       AssistantConversationAction_ActionType = 3 // Endpoint (LLM Call) action
+	AssistantConversationAction_PUT_ON_HOLD         AssistantConversationAction_ActionType = 4 // Put on hold action
+	AssistantConversationAction_END_CONVERSATION    AssistantConversationAction_ActionType = 5 // End of conversation action
+)
+
+// Enum value maps for AssistantConversationAction_ActionType.
+var (
+	AssistantConversationAction_ActionType_name = map[int32]string{
+		0: "ACTION_UNSPECIFIED",
+		1: "KNOWLEDGE_RETRIEVAL",
+		2: "API_REQUEST",
+		3: "ENDPOINT_CALL",
+		4: "PUT_ON_HOLD",
+		5: "END_CONVERSATION",
+	}
+	AssistantConversationAction_ActionType_value = map[string]int32{
+		"ACTION_UNSPECIFIED":  0,
+		"KNOWLEDGE_RETRIEVAL": 1,
+		"API_REQUEST":         2,
+		"ENDPOINT_CALL":       3,
+		"PUT_ON_HOLD":         4,
+		"END_CONVERSATION":    5,
+	}
+)
+
+func (x AssistantConversationAction_ActionType) Enum() *AssistantConversationAction_ActionType {
+	p := new(AssistantConversationAction_ActionType)
+	*p = x
+	return p
+}
+
+func (x AssistantConversationAction_ActionType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AssistantConversationAction_ActionType) Descriptor() protoreflect.EnumDescriptor {
+	return file_common_proto_enumTypes[2].Descriptor()
+}
+
+func (AssistantConversationAction_ActionType) Type() protoreflect.EnumType {
+	return &file_common_proto_enumTypes[2]
+}
+
+func (x AssistantConversationAction_ActionType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AssistantConversationAction_ActionType.Descriptor instead.
+func (AssistantConversationAction_ActionType) EnumDescriptor() ([]byte, []int) {
+	return file_common_proto_rawDescGZIP(), []int{37, 0}
+}
+
 type AssistantConversationInterruption_InterruptionType int32
 
 const (
@@ -111,11 +215,11 @@ func (x AssistantConversationInterruption_InterruptionType) String() string {
 }
 
 func (AssistantConversationInterruption_InterruptionType) Descriptor() protoreflect.EnumDescriptor {
-	return file_common_proto_enumTypes[1].Descriptor()
+	return file_common_proto_enumTypes[3].Descriptor()
 }
 
 func (AssistantConversationInterruption_InterruptionType) Type() protoreflect.EnumType {
-	return &file_common_proto_enumTypes[1]
+	return &file_common_proto_enumTypes[3]
 }
 
 func (x AssistantConversationInterruption_InterruptionType) Number() protoreflect.EnumNumber {
@@ -124,7 +228,7 @@ func (x AssistantConversationInterruption_InterruptionType) Number() protoreflec
 
 // Deprecated: Use AssistantConversationInterruption_InterruptionType.Descriptor instead.
 func (AssistantConversationInterruption_InterruptionType) EnumDescriptor() ([]byte, []int) {
-	return file_common_proto_rawDescGZIP(), []int{41, 0}
+	return file_common_proto_rawDescGZIP(), []int{38, 0}
 }
 
 type FieldSelector struct {
@@ -2700,9 +2804,11 @@ type AssistantConversationConfiguration struct {
 	AssistantConversationId uint64                 `protobuf:"varint,1,opt,name=assistantConversationId,proto3" json:"assistantConversationId,omitempty"`
 	Assistant               *AssistantDefinition   `protobuf:"bytes,2,opt,name=assistant,proto3" json:"assistant,omitempty"`
 	Time                    *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=time,proto3" json:"time,omitempty"`
-	Metadata map[string]*anypb.Any `protobuf:"bytes,4,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	Args     map[string]*anypb.Any `protobuf:"bytes,5,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	Options  map[string]*anypb.Any `protobuf:"bytes,6,rep,name=options,proto3" json:"options,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Metadata     map[string]*anypb.Any `protobuf:"bytes,4,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Args         map[string]*anypb.Any `protobuf:"bytes,5,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Options      map[string]*anypb.Any `protobuf:"bytes,6,rep,name=options,proto3" json:"options,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	InputConfig  *StreamConfig         `protobuf:"bytes,7,opt,name=inputConfig,proto3" json:"inputConfig,omitempty"`
+	OutputConfig *StreamConfig         `protobuf:"bytes,8,opt,name=outputConfig,proto3" json:"outputConfig,omitempty"`
 }
 
 func (x *AssistantConversationConfiguration) Reset() {
@@ -2779,17 +2885,30 @@ func (x *AssistantConversationConfiguration) GetOptions() map[string]*anypb.Any 
 	return nil
 }
 
-// buildin action
-type AssistantConversationDisconnectAction struct {
+func (x *AssistantConversationConfiguration) GetInputConfig() *StreamConfig {
+	if x != nil {
+		return x.InputConfig
+	}
+	return nil
+}
+
+func (x *AssistantConversationConfiguration) GetOutputConfig() *StreamConfig {
+	if x != nil {
+		return x.OutputConfig
+	}
+	return nil
+}
+
+type AssistantConversationError struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Reason string `protobuf:"bytes,1,opt,name=reason,proto3" json:"reason,omitempty"`
+	Error *Error `protobuf:"bytes,1,opt,name=error,proto3" json:"error,omitempty"`
 }
 
-func (x *AssistantConversationDisconnectAction) Reset() {
-	*x = AssistantConversationDisconnectAction{}
+func (x *AssistantConversationError) Reset() {
+	*x = AssistantConversationError{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_common_proto_msgTypes[33]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2797,13 +2916,13 @@ func (x *AssistantConversationDisconnectAction) Reset() {
 	}
 }
 
-func (x *AssistantConversationDisconnectAction) String() string {
+func (x *AssistantConversationError) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*AssistantConversationDisconnectAction) ProtoMessage() {}
+func (*AssistantConversationError) ProtoMessage() {}
 
-func (x *AssistantConversationDisconnectAction) ProtoReflect() protoreflect.Message {
+func (x *AssistantConversationError) ProtoReflect() protoreflect.Message {
 	mi := &file_common_proto_msgTypes[33]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2815,28 +2934,29 @@ func (x *AssistantConversationDisconnectAction) ProtoReflect() protoreflect.Mess
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AssistantConversationDisconnectAction.ProtoReflect.Descriptor instead.
-func (*AssistantConversationDisconnectAction) Descriptor() ([]byte, []int) {
+// Deprecated: Use AssistantConversationError.ProtoReflect.Descriptor instead.
+func (*AssistantConversationError) Descriptor() ([]byte, []int) {
 	return file_common_proto_rawDescGZIP(), []int{33}
 }
 
-func (x *AssistantConversationDisconnectAction) GetReason() string {
+func (x *AssistantConversationError) GetError() *Error {
 	if x != nil {
-		return x.Reason
+		return x.Error
 	}
-	return ""
+	return nil
 }
 
-type AssistantConverstationHoldAction struct {
+type StreamConfig struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	HoldTime uint64 `protobuf:"varint,1,opt,name=holdTime,proto3" json:"holdTime,omitempty"`
+	Audio *AudioConfig `protobuf:"bytes,1,opt,name=audio,proto3" json:"audio,omitempty"`
+	Text  *TextConfig  `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
 }
 
-func (x *AssistantConverstationHoldAction) Reset() {
-	*x = AssistantConverstationHoldAction{}
+func (x *StreamConfig) Reset() {
+	*x = StreamConfig{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_common_proto_msgTypes[34]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2844,13 +2964,13 @@ func (x *AssistantConverstationHoldAction) Reset() {
 	}
 }
 
-func (x *AssistantConverstationHoldAction) String() string {
+func (x *StreamConfig) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*AssistantConverstationHoldAction) ProtoMessage() {}
+func (*StreamConfig) ProtoMessage() {}
 
-func (x *AssistantConverstationHoldAction) ProtoReflect() protoreflect.Message {
+func (x *StreamConfig) ProtoReflect() protoreflect.Message {
 	mi := &file_common_proto_msgTypes[34]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2862,28 +2982,38 @@ func (x *AssistantConverstationHoldAction) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AssistantConverstationHoldAction.ProtoReflect.Descriptor instead.
-func (*AssistantConverstationHoldAction) Descriptor() ([]byte, []int) {
+// Deprecated: Use StreamConfig.ProtoReflect.Descriptor instead.
+func (*StreamConfig) Descriptor() ([]byte, []int) {
 	return file_common_proto_rawDescGZIP(), []int{34}
 }
 
-func (x *AssistantConverstationHoldAction) GetHoldTime() uint64 {
+func (x *StreamConfig) GetAudio() *AudioConfig {
 	if x != nil {
-		return x.HoldTime
+		return x.Audio
 	}
-	return 0
+	return nil
 }
 
-type AssistantConverstationKnowledgeRetrievalAction struct {
+func (x *StreamConfig) GetText() *TextConfig {
+	if x != nil {
+		return x.Text
+	}
+	return nil
+}
+
+// audio config
+type AudioConfig struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Query string `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
+	SampleRate  uint32                  `protobuf:"varint,1,opt,name=sampleRate,proto3" json:"sampleRate,omitempty"`
+	AudioFormat AudioConfig_AudioFormat `protobuf:"varint,2,opt,name=audioFormat,proto3,enum=AudioConfig_AudioFormat" json:"audioFormat,omitempty"`
+	Channels    uint32                  `protobuf:"varint,3,opt,name=channels,proto3" json:"channels,omitempty"`
 }
 
-func (x *AssistantConverstationKnowledgeRetrievalAction) Reset() {
-	*x = AssistantConverstationKnowledgeRetrievalAction{}
+func (x *AudioConfig) Reset() {
+	*x = AudioConfig{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_common_proto_msgTypes[35]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2891,13 +3021,13 @@ func (x *AssistantConverstationKnowledgeRetrievalAction) Reset() {
 	}
 }
 
-func (x *AssistantConverstationKnowledgeRetrievalAction) String() string {
+func (x *AudioConfig) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*AssistantConverstationKnowledgeRetrievalAction) ProtoMessage() {}
+func (*AudioConfig) ProtoMessage() {}
 
-func (x *AssistantConverstationKnowledgeRetrievalAction) ProtoReflect() protoreflect.Message {
+func (x *AudioConfig) ProtoReflect() protoreflect.Message {
 	mi := &file_common_proto_msgTypes[35]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2909,26 +3039,43 @@ func (x *AssistantConverstationKnowledgeRetrievalAction) ProtoReflect() protoref
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AssistantConverstationKnowledgeRetrievalAction.ProtoReflect.Descriptor instead.
-func (*AssistantConverstationKnowledgeRetrievalAction) Descriptor() ([]byte, []int) {
+// Deprecated: Use AudioConfig.ProtoReflect.Descriptor instead.
+func (*AudioConfig) Descriptor() ([]byte, []int) {
 	return file_common_proto_rawDescGZIP(), []int{35}
 }
 
-func (x *AssistantConverstationKnowledgeRetrievalAction) GetQuery() string {
+func (x *AudioConfig) GetSampleRate() uint32 {
 	if x != nil {
-		return x.Query
+		return x.SampleRate
 	}
-	return ""
+	return 0
 }
 
-type AssistantConverstationApiRequestAction struct {
+func (x *AudioConfig) GetAudioFormat() AudioConfig_AudioFormat {
+	if x != nil {
+		return x.AudioFormat
+	}
+	return AudioConfig_LINEAR16
+}
+
+func (x *AudioConfig) GetChannels() uint32 {
+	if x != nil {
+		return x.Channels
+	}
+	return 0
+}
+
+// text config
+type TextConfig struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
+
+	Charset string `protobuf:"bytes,1,opt,name=charset,proto3" json:"charset,omitempty"`
 }
 
-func (x *AssistantConverstationApiRequestAction) Reset() {
-	*x = AssistantConverstationApiRequestAction{}
+func (x *TextConfig) Reset() {
+	*x = TextConfig{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_common_proto_msgTypes[36]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2936,13 +3083,13 @@ func (x *AssistantConverstationApiRequestAction) Reset() {
 	}
 }
 
-func (x *AssistantConverstationApiRequestAction) String() string {
+func (x *TextConfig) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*AssistantConverstationApiRequestAction) ProtoMessage() {}
+func (*TextConfig) ProtoMessage() {}
 
-func (x *AssistantConverstationApiRequestAction) ProtoReflect() protoreflect.Message {
+func (x *TextConfig) ProtoReflect() protoreflect.Message {
 	mi := &file_common_proto_msgTypes[36]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2954,19 +3101,31 @@ func (x *AssistantConverstationApiRequestAction) ProtoReflect() protoreflect.Mes
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AssistantConverstationApiRequestAction.ProtoReflect.Descriptor instead.
-func (*AssistantConverstationApiRequestAction) Descriptor() ([]byte, []int) {
+// Deprecated: Use TextConfig.ProtoReflect.Descriptor instead.
+func (*TextConfig) Descriptor() ([]byte, []int) {
 	return file_common_proto_rawDescGZIP(), []int{36}
 }
 
-type AssistantConverstationEndpointAction struct {
+func (x *TextConfig) GetCharset() string {
+	if x != nil {
+		return x.Charset
+	}
+	return ""
+}
+
+// buildin action
+type AssistantConversationAction struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
+
+	Name   string                                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Action AssistantConversationAction_ActionType `protobuf:"varint,2,opt,name=action,proto3,enum=AssistantConversationAction_ActionType" json:"action,omitempty"`
+	Args   map[string]*anypb.Any                  `protobuf:"bytes,3,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
-func (x *AssistantConverstationEndpointAction) Reset() {
-	*x = AssistantConverstationEndpointAction{}
+func (x *AssistantConversationAction) Reset() {
+	*x = AssistantConversationAction{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_common_proto_msgTypes[37]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2974,13 +3133,13 @@ func (x *AssistantConverstationEndpointAction) Reset() {
 	}
 }
 
-func (x *AssistantConverstationEndpointAction) String() string {
+func (x *AssistantConversationAction) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*AssistantConverstationEndpointAction) ProtoMessage() {}
+func (*AssistantConversationAction) ProtoMessage() {}
 
-func (x *AssistantConverstationEndpointAction) ProtoReflect() protoreflect.Message {
+func (x *AssistantConversationAction) ProtoReflect() protoreflect.Message {
 	mi := &file_common_proto_msgTypes[37]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2992,123 +3151,30 @@ func (x *AssistantConverstationEndpointAction) ProtoReflect() protoreflect.Messa
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AssistantConverstationEndpointAction.ProtoReflect.Descriptor instead.
-func (*AssistantConverstationEndpointAction) Descriptor() ([]byte, []int) {
+// Deprecated: Use AssistantConversationAction.ProtoReflect.Descriptor instead.
+func (*AssistantConversationAction) Descriptor() ([]byte, []int) {
 	return file_common_proto_rawDescGZIP(), []int{37}
 }
 
-type AssistantConversationDeviationAction struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-}
-
-func (x *AssistantConversationDeviationAction) Reset() {
-	*x = AssistantConversationDeviationAction{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_common_proto_msgTypes[38]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
+func (x *AssistantConversationAction) GetName() string {
+	if x != nil {
+		return x.Name
 	}
+	return ""
 }
 
-func (x *AssistantConversationDeviationAction) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AssistantConversationDeviationAction) ProtoMessage() {}
-
-func (x *AssistantConversationDeviationAction) ProtoReflect() protoreflect.Message {
-	mi := &file_common_proto_msgTypes[38]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
+func (x *AssistantConversationAction) GetAction() AssistantConversationAction_ActionType {
+	if x != nil {
+		return x.Action
 	}
-	return mi.MessageOf(x)
+	return AssistantConversationAction_ACTION_UNSPECIFIED
 }
 
-// Deprecated: Use AssistantConversationDeviationAction.ProtoReflect.Descriptor instead.
-func (*AssistantConversationDeviationAction) Descriptor() ([]byte, []int) {
-	return file_common_proto_rawDescGZIP(), []int{38}
-}
-
-type AssistantConversationAssistantTransferAction struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-}
-
-func (x *AssistantConversationAssistantTransferAction) Reset() {
-	*x = AssistantConversationAssistantTransferAction{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_common_proto_msgTypes[39]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
+func (x *AssistantConversationAction) GetArgs() map[string]*anypb.Any {
+	if x != nil {
+		return x.Args
 	}
-}
-
-func (x *AssistantConversationAssistantTransferAction) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AssistantConversationAssistantTransferAction) ProtoMessage() {}
-
-func (x *AssistantConversationAssistantTransferAction) ProtoReflect() protoreflect.Message {
-	mi := &file_common_proto_msgTypes[39]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AssistantConversationAssistantTransferAction.ProtoReflect.Descriptor instead.
-func (*AssistantConversationAssistantTransferAction) Descriptor() ([]byte, []int) {
-	return file_common_proto_rawDescGZIP(), []int{39}
-}
-
-type AssistantConversationPhoneCallTransferAction struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-}
-
-func (x *AssistantConversationPhoneCallTransferAction) Reset() {
-	*x = AssistantConversationPhoneCallTransferAction{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_common_proto_msgTypes[40]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *AssistantConversationPhoneCallTransferAction) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AssistantConversationPhoneCallTransferAction) ProtoMessage() {}
-
-func (x *AssistantConversationPhoneCallTransferAction) ProtoReflect() protoreflect.Message {
-	mi := &file_common_proto_msgTypes[40]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AssistantConversationPhoneCallTransferAction.ProtoReflect.Descriptor instead.
-func (*AssistantConversationPhoneCallTransferAction) Descriptor() ([]byte, []int) {
-	return file_common_proto_rawDescGZIP(), []int{40}
+	return nil
 }
 
 type AssistantConversationInterruption struct {
@@ -3124,7 +3190,7 @@ type AssistantConversationInterruption struct {
 func (x *AssistantConversationInterruption) Reset() {
 	*x = AssistantConversationInterruption{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_common_proto_msgTypes[41]
+		mi := &file_common_proto_msgTypes[38]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3137,7 +3203,7 @@ func (x *AssistantConversationInterruption) String() string {
 func (*AssistantConversationInterruption) ProtoMessage() {}
 
 func (x *AssistantConversationInterruption) ProtoReflect() protoreflect.Message {
-	mi := &file_common_proto_msgTypes[41]
+	mi := &file_common_proto_msgTypes[38]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3150,7 +3216,7 @@ func (x *AssistantConversationInterruption) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use AssistantConversationInterruption.ProtoReflect.Descriptor instead.
 func (*AssistantConversationInterruption) Descriptor() ([]byte, []int) {
-	return file_common_proto_rawDescGZIP(), []int{41}
+	return file_common_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *AssistantConversationInterruption) GetId() string {
@@ -3186,7 +3252,7 @@ type AssistantConversationMessageTextContent struct {
 func (x *AssistantConversationMessageTextContent) Reset() {
 	*x = AssistantConversationMessageTextContent{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_common_proto_msgTypes[42]
+		mi := &file_common_proto_msgTypes[39]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3199,7 +3265,7 @@ func (x *AssistantConversationMessageTextContent) String() string {
 func (*AssistantConversationMessageTextContent) ProtoMessage() {}
 
 func (x *AssistantConversationMessageTextContent) ProtoReflect() protoreflect.Message {
-	mi := &file_common_proto_msgTypes[42]
+	mi := &file_common_proto_msgTypes[39]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3212,7 +3278,7 @@ func (x *AssistantConversationMessageTextContent) ProtoReflect() protoreflect.Me
 
 // Deprecated: Use AssistantConversationMessageTextContent.ProtoReflect.Descriptor instead.
 func (*AssistantConversationMessageTextContent) Descriptor() ([]byte, []int) {
-	return file_common_proto_rawDescGZIP(), []int{42}
+	return file_common_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *AssistantConversationMessageTextContent) GetContent() string {
@@ -3233,7 +3299,7 @@ type AssistantConversationMessageAudioContent struct {
 func (x *AssistantConversationMessageAudioContent) Reset() {
 	*x = AssistantConversationMessageAudioContent{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_common_proto_msgTypes[43]
+		mi := &file_common_proto_msgTypes[40]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3246,7 +3312,7 @@ func (x *AssistantConversationMessageAudioContent) String() string {
 func (*AssistantConversationMessageAudioContent) ProtoMessage() {}
 
 func (x *AssistantConversationMessageAudioContent) ProtoReflect() protoreflect.Message {
-	mi := &file_common_proto_msgTypes[43]
+	mi := &file_common_proto_msgTypes[40]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3259,7 +3325,7 @@ func (x *AssistantConversationMessageAudioContent) ProtoReflect() protoreflect.M
 
 // Deprecated: Use AssistantConversationMessageAudioContent.ProtoReflect.Descriptor instead.
 func (*AssistantConversationMessageAudioContent) Descriptor() ([]byte, []int) {
-	return file_common_proto_rawDescGZIP(), []int{43}
+	return file_common_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *AssistantConversationMessageAudioContent) GetContent() []byte {
@@ -3287,7 +3353,7 @@ type AssistantConversationUserMessage struct {
 func (x *AssistantConversationUserMessage) Reset() {
 	*x = AssistantConversationUserMessage{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_common_proto_msgTypes[44]
+		mi := &file_common_proto_msgTypes[41]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3300,7 +3366,7 @@ func (x *AssistantConversationUserMessage) String() string {
 func (*AssistantConversationUserMessage) ProtoMessage() {}
 
 func (x *AssistantConversationUserMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_common_proto_msgTypes[44]
+	mi := &file_common_proto_msgTypes[41]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3313,7 +3379,7 @@ func (x *AssistantConversationUserMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssistantConversationUserMessage.ProtoReflect.Descriptor instead.
 func (*AssistantConversationUserMessage) Descriptor() ([]byte, []int) {
-	return file_common_proto_rawDescGZIP(), []int{44}
+	return file_common_proto_rawDescGZIP(), []int{41}
 }
 
 func (m *AssistantConversationUserMessage) GetMessage() isAssistantConversationUserMessage_Message {
@@ -3394,7 +3460,7 @@ type AssistantConversationAssistantMessage struct {
 func (x *AssistantConversationAssistantMessage) Reset() {
 	*x = AssistantConversationAssistantMessage{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_common_proto_msgTypes[45]
+		mi := &file_common_proto_msgTypes[42]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3407,7 +3473,7 @@ func (x *AssistantConversationAssistantMessage) String() string {
 func (*AssistantConversationAssistantMessage) ProtoMessage() {}
 
 func (x *AssistantConversationAssistantMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_common_proto_msgTypes[45]
+	mi := &file_common_proto_msgTypes[42]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3420,7 +3486,7 @@ func (x *AssistantConversationAssistantMessage) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use AssistantConversationAssistantMessage.ProtoReflect.Descriptor instead.
 func (*AssistantConversationAssistantMessage) Descriptor() ([]byte, []int) {
-	return file_common_proto_rawDescGZIP(), []int{45}
+	return file_common_proto_rawDescGZIP(), []int{42}
 }
 
 func (m *AssistantConversationAssistantMessage) GetMessage() isAssistantConversationAssistantMessage_Message {
@@ -3905,7 +3971,7 @@ var file_common_proto_rawDesc = []byte{
 	0x01, 0x28, 0x0b, 0x32, 0x06, 0x2e, 0x45, 0x72, 0x72, 0x6f, 0x72, 0x52, 0x05, 0x65, 0x72, 0x72,
 	0x6f, 0x72, 0x12, 0x28, 0x0a, 0x09, 0x70, 0x61, 0x67, 0x69, 0x6e, 0x61, 0x74, 0x65, 0x64, 0x18,
 	0x05, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0a, 0x2e, 0x50, 0x61, 0x67, 0x69, 0x6e, 0x61, 0x74, 0x65,
-	0x64, 0x52, 0x09, 0x70, 0x61, 0x67, 0x69, 0x6e, 0x61, 0x74, 0x65, 0x64, 0x22, 0x98, 0x05, 0x0a,
+	0x64, 0x52, 0x09, 0x70, 0x61, 0x67, 0x69, 0x6e, 0x61, 0x74, 0x65, 0x64, 0x22, 0xfc, 0x05, 0x0a,
 	0x22, 0x41, 0x73, 0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72,
 	0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x75, 0x72, 0x61, 0x74,
 	0x69, 0x6f, 0x6e, 0x12, 0x3c, 0x0a, 0x17, 0x61, 0x73, 0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74,
@@ -3932,94 +3998,104 @@ var file_common_proto_rawDesc = []byte{
 	0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e,
 	0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x75, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x4f, 0x70,
 	0x74, 0x69, 0x6f, 0x6e, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x07, 0x6f, 0x70, 0x74, 0x69,
-	0x6f, 0x6e, 0x73, 0x1a, 0x51, 0x0a, 0x0d, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x45,
-	0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28,
-	0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x2a, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18,
-	0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x14, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70,
-	0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x41, 0x6e, 0x79, 0x52, 0x05, 0x76, 0x61, 0x6c,
-	0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x1a, 0x4d, 0x0a, 0x09, 0x41, 0x72, 0x67, 0x73, 0x45, 0x6e,
+	0x6f, 0x6e, 0x73, 0x12, 0x2f, 0x0a, 0x0b, 0x69, 0x6e, 0x70, 0x75, 0x74, 0x43, 0x6f, 0x6e, 0x66,
+	0x69, 0x67, 0x18, 0x07, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0d, 0x2e, 0x53, 0x74, 0x72, 0x65, 0x61,
+	0x6d, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x52, 0x0b, 0x69, 0x6e, 0x70, 0x75, 0x74, 0x43, 0x6f,
+	0x6e, 0x66, 0x69, 0x67, 0x12, 0x31, 0x0a, 0x0c, 0x6f, 0x75, 0x74, 0x70, 0x75, 0x74, 0x43, 0x6f,
+	0x6e, 0x66, 0x69, 0x67, 0x18, 0x08, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0d, 0x2e, 0x53, 0x74, 0x72,
+	0x65, 0x61, 0x6d, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x52, 0x0c, 0x6f, 0x75, 0x74, 0x70, 0x75,
+	0x74, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x1a, 0x51, 0x0a, 0x0d, 0x4d, 0x65, 0x74, 0x61, 0x64,
+	0x61, 0x74, 0x61, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x2a, 0x0a, 0x05, 0x76, 0x61,
+	0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x14, 0x2e, 0x67, 0x6f, 0x6f, 0x67,
+	0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x41, 0x6e, 0x79, 0x52,
+	0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x1a, 0x4d, 0x0a, 0x09, 0x41, 0x72,
+	0x67, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x2a, 0x0a, 0x05, 0x76, 0x61, 0x6c,
+	0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x14, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c,
+	0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x41, 0x6e, 0x79, 0x52, 0x05,
+	0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x1a, 0x50, 0x0a, 0x0c, 0x4f, 0x70, 0x74,
+	0x69, 0x6f, 0x6e, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x2a, 0x0a, 0x05, 0x76,
+	0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x14, 0x2e, 0x67, 0x6f, 0x6f,
+	0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x41, 0x6e, 0x79,
+	0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x22, 0x3a, 0x0a, 0x1a, 0x41,
+	0x73, 0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61,
+	0x74, 0x69, 0x6f, 0x6e, 0x45, 0x72, 0x72, 0x6f, 0x72, 0x12, 0x1c, 0x0a, 0x05, 0x65, 0x72, 0x72,
+	0x6f, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x06, 0x2e, 0x45, 0x72, 0x72, 0x6f, 0x72,
+	0x52, 0x05, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x22, 0x53, 0x0a, 0x0c, 0x53, 0x74, 0x72, 0x65, 0x61,
+	0x6d, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x12, 0x22, 0x0a, 0x05, 0x61, 0x75, 0x64, 0x69, 0x6f,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0c, 0x2e, 0x41, 0x75, 0x64, 0x69, 0x6f, 0x43, 0x6f,
+	0x6e, 0x66, 0x69, 0x67, 0x52, 0x05, 0x61, 0x75, 0x64, 0x69, 0x6f, 0x12, 0x1f, 0x0a, 0x04, 0x74,
+	0x65, 0x78, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0b, 0x2e, 0x54, 0x65, 0x78, 0x74,
+	0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x52, 0x04, 0x74, 0x65, 0x78, 0x74, 0x22, 0xae, 0x01, 0x0a,
+	0x0b, 0x41, 0x75, 0x64, 0x69, 0x6f, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x12, 0x1e, 0x0a, 0x0a,
+	0x73, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x52, 0x61, 0x74, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0d,
+	0x52, 0x0a, 0x73, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x52, 0x61, 0x74, 0x65, 0x12, 0x3a, 0x0a, 0x0b,
+	0x61, 0x75, 0x64, 0x69, 0x6f, 0x46, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28,
+	0x0e, 0x32, 0x18, 0x2e, 0x41, 0x75, 0x64, 0x69, 0x6f, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2e,
+	0x41, 0x75, 0x64, 0x69, 0x6f, 0x46, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x52, 0x0b, 0x61, 0x75, 0x64,
+	0x69, 0x6f, 0x46, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x12, 0x1a, 0x0a, 0x08, 0x63, 0x68, 0x61, 0x6e,
+	0x6e, 0x65, 0x6c, 0x73, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x08, 0x63, 0x68, 0x61, 0x6e,
+	0x6e, 0x65, 0x6c, 0x73, 0x22, 0x27, 0x0a, 0x0b, 0x41, 0x75, 0x64, 0x69, 0x6f, 0x46, 0x6f, 0x72,
+	0x6d, 0x61, 0x74, 0x12, 0x0c, 0x0a, 0x08, 0x4c, 0x49, 0x4e, 0x45, 0x41, 0x52, 0x31, 0x36, 0x10,
+	0x00, 0x12, 0x0a, 0x0a, 0x06, 0x4d, 0x75, 0x4c, 0x61, 0x77, 0x38, 0x10, 0x01, 0x22, 0x26, 0x0a,
+	0x0a, 0x54, 0x65, 0x78, 0x74, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x12, 0x18, 0x0a, 0x07, 0x63,
+	0x68, 0x61, 0x72, 0x73, 0x65, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x63, 0x68,
+	0x61, 0x72, 0x73, 0x65, 0x74, 0x22, 0x88, 0x03, 0x0a, 0x1b, 0x41, 0x73, 0x73, 0x69, 0x73, 0x74,
+	0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x41,
+	0x63, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x12, 0x3f, 0x0a, 0x06, 0x61, 0x63, 0x74,
+	0x69, 0x6f, 0x6e, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x27, 0x2e, 0x41, 0x73, 0x73, 0x69,
+	0x73, 0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f,
+	0x6e, 0x41, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x41, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x54, 0x79,
+	0x70, 0x65, 0x52, 0x06, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x3a, 0x0a, 0x04, 0x61, 0x72,
+	0x67, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x26, 0x2e, 0x41, 0x73, 0x73, 0x69, 0x73,
+	0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e,
+	0x41, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x41, 0x72, 0x67, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79,
+	0x52, 0x04, 0x61, 0x72, 0x67, 0x73, 0x1a, 0x4d, 0x0a, 0x09, 0x41, 0x72, 0x67, 0x73, 0x45, 0x6e,
 	0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09,
 	0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x2a, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02,
 	0x20, 0x01, 0x28, 0x0b, 0x32, 0x14, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72,
 	0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x41, 0x6e, 0x79, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75,
-	0x65, 0x3a, 0x02, 0x38, 0x01, 0x1a, 0x50, 0x0a, 0x0c, 0x4f, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x73,
-	0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01,
-	0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x2a, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65,
-	0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x14, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x41, 0x6e, 0x79, 0x52, 0x05, 0x76, 0x61,
-	0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x22, 0x3f, 0x0a, 0x25, 0x41, 0x73, 0x73, 0x69, 0x73,
-	0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e,
-	0x44, 0x69, 0x73, 0x63, 0x6f, 0x6e, 0x6e, 0x65, 0x63, 0x74, 0x41, 0x63, 0x74, 0x69, 0x6f, 0x6e,
-	0x12, 0x16, 0x0a, 0x06, 0x72, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09,
-	0x52, 0x06, 0x72, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x22, 0x3e, 0x0a, 0x20, 0x41, 0x73, 0x73, 0x69,
-	0x73, 0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x74, 0x61, 0x74, 0x69,
-	0x6f, 0x6e, 0x48, 0x6f, 0x6c, 0x64, 0x41, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x1a, 0x0a, 0x08,
-	0x68, 0x6f, 0x6c, 0x64, 0x54, 0x69, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x08,
-	0x68, 0x6f, 0x6c, 0x64, 0x54, 0x69, 0x6d, 0x65, 0x22, 0x46, 0x0a, 0x2e, 0x41, 0x73, 0x73, 0x69,
-	0x73, 0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x74, 0x61, 0x74, 0x69,
-	0x6f, 0x6e, 0x4b, 0x6e, 0x6f, 0x77, 0x6c, 0x65, 0x64, 0x67, 0x65, 0x52, 0x65, 0x74, 0x72, 0x69,
-	0x65, 0x76, 0x61, 0x6c, 0x41, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x14, 0x0a, 0x05, 0x71, 0x75,
-	0x65, 0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x71, 0x75, 0x65, 0x72, 0x79,
-	0x22, 0x28, 0x0a, 0x26, 0x41, 0x73, 0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e,
-	0x76, 0x65, 0x72, 0x73, 0x74, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x41, 0x70, 0x69, 0x52, 0x65, 0x71,
-	0x75, 0x65, 0x73, 0x74, 0x41, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x22, 0x26, 0x0a, 0x24, 0x41, 0x73,
-	0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x74, 0x61,
-	0x74, 0x69, 0x6f, 0x6e, 0x45, 0x6e, 0x64, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x41, 0x63, 0x74, 0x69,
-	0x6f, 0x6e, 0x22, 0x26, 0x0a, 0x24, 0x41, 0x73, 0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74, 0x43,
-	0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x44, 0x65, 0x76, 0x69, 0x61,
-	0x74, 0x69, 0x6f, 0x6e, 0x41, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x22, 0x2e, 0x0a, 0x2c, 0x41, 0x73,
-	0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74,
-	0x69, 0x6f, 0x6e, 0x41, 0x73, 0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74, 0x54, 0x72, 0x61, 0x6e,
-	0x73, 0x66, 0x65, 0x72, 0x41, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x22, 0x2e, 0x0a, 0x2c, 0x41, 0x73,
-	0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74,
-	0x69, 0x6f, 0x6e, 0x50, 0x68, 0x6f, 0x6e, 0x65, 0x43, 0x61, 0x6c, 0x6c, 0x54, 0x72, 0x61, 0x6e,
-	0x73, 0x66, 0x65, 0x72, 0x41, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x22, 0x9a, 0x02, 0x0a, 0x21, 0x41,
-	0x73, 0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61,
-	0x74, 0x69, 0x6f, 0x6e, 0x49, 0x6e, 0x74, 0x65, 0x72, 0x72, 0x75, 0x70, 0x74, 0x69, 0x6f, 0x6e,
-	0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64,
-	0x12, 0x47, 0x0a, 0x04, 0x74, 0x79, 0x70, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x33,
-	0x2e, 0x41, 0x73, 0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72,
-	0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x49, 0x6e, 0x74, 0x65, 0x72, 0x72, 0x75, 0x70, 0x74, 0x69,
-	0x6f, 0x6e, 0x2e, 0x49, 0x6e, 0x74, 0x65, 0x72, 0x72, 0x75, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x54,
-	0x79, 0x70, 0x65, 0x52, 0x04, 0x74, 0x79, 0x70, 0x65, 0x12, 0x2e, 0x0a, 0x04, 0x74, 0x69, 0x6d,
-	0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65,
-	0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54, 0x69, 0x6d, 0x65, 0x73, 0x74,
-	0x61, 0x6d, 0x70, 0x52, 0x04, 0x74, 0x69, 0x6d, 0x65, 0x22, 0x6c, 0x0a, 0x10, 0x49, 0x6e, 0x74,
-	0x65, 0x72, 0x72, 0x75, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x54, 0x79, 0x70, 0x65, 0x12, 0x21, 0x0a,
-	0x1d, 0x49, 0x4e, 0x54, 0x45, 0x52, 0x52, 0x55, 0x50, 0x54, 0x49, 0x4f, 0x4e, 0x5f, 0x54, 0x59,
-	0x50, 0x45, 0x5f, 0x55, 0x4e, 0x53, 0x50, 0x45, 0x43, 0x49, 0x46, 0x49, 0x45, 0x44, 0x10, 0x00,
-	0x12, 0x19, 0x0a, 0x15, 0x49, 0x4e, 0x54, 0x45, 0x52, 0x52, 0x55, 0x50, 0x54, 0x49, 0x4f, 0x4e,
-	0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x56, 0x41, 0x44, 0x10, 0x01, 0x12, 0x1a, 0x0a, 0x16, 0x49,
-	0x4e, 0x54, 0x45, 0x52, 0x52, 0x55, 0x50, 0x54, 0x49, 0x4f, 0x4e, 0x5f, 0x54, 0x59, 0x50, 0x45,
-	0x5f, 0x57, 0x4f, 0x52, 0x44, 0x10, 0x02, 0x22, 0x43, 0x0a, 0x27, 0x41, 0x73, 0x73, 0x69, 0x73,
-	0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e,
-	0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x54, 0x65, 0x78, 0x74, 0x43, 0x6f, 0x6e, 0x74, 0x65,
-	0x6e, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x18, 0x01, 0x20,
-	0x01, 0x28, 0x09, 0x52, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x22, 0x44, 0x0a, 0x28,
-	0x41, 0x73, 0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73,
-	0x61, 0x74, 0x69, 0x6f, 0x6e, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x41, 0x75, 0x64, 0x69,
-	0x6f, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x63, 0x6f, 0x6e, 0x74,
-	0x65, 0x6e, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65,
-	0x6e, 0x74, 0x22, 0x8e, 0x02, 0x0a, 0x20, 0x41, 0x73, 0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74,
-	0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x55, 0x73, 0x65, 0x72,
-	0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x41, 0x0a, 0x05, 0x61, 0x75, 0x64, 0x69, 0x6f,
-	0x18, 0x0a, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x29, 0x2e, 0x41, 0x73, 0x73, 0x69, 0x73, 0x74, 0x61,
-	0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x4d, 0x65,
-	0x73, 0x73, 0x61, 0x67, 0x65, 0x41, 0x75, 0x64, 0x69, 0x6f, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x6e,
-	0x74, 0x48, 0x00, 0x52, 0x05, 0x61, 0x75, 0x64, 0x69, 0x6f, 0x12, 0x3e, 0x0a, 0x04, 0x74, 0x65,
-	0x78, 0x74, 0x18, 0x0b, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x28, 0x2e, 0x41, 0x73, 0x73, 0x69, 0x73,
-	0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e,
-	0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x54, 0x65, 0x78, 0x74, 0x43, 0x6f, 0x6e, 0x74, 0x65,
-	0x6e, 0x74, 0x48, 0x00, 0x52, 0x04, 0x74, 0x65, 0x78, 0x74, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64,
-	0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x12, 0x1c, 0x0a, 0x09, 0x63, 0x6f,
-	0x6d, 0x70, 0x6c, 0x65, 0x74, 0x65, 0x64, 0x18, 0x03, 0x20, 0x01, 0x28, 0x08, 0x52, 0x09, 0x63,
-	0x6f, 0x6d, 0x70, 0x6c, 0x65, 0x74, 0x65, 0x64, 0x12, 0x2e, 0x0a, 0x04, 0x74, 0x69, 0x6d, 0x65,
-	0x18, 0x04, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61,
-	0x6d, 0x70, 0x52, 0x04, 0x74, 0x69, 0x6d, 0x65, 0x42, 0x09, 0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73,
-	0x61, 0x67, 0x65, 0x22, 0x93, 0x02, 0x0a, 0x25, 0x41, 0x73, 0x73, 0x69, 0x73, 0x74, 0x61, 0x6e,
-	0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x41, 0x73, 0x73,
-	0x69, 0x73, 0x74, 0x61, 0x6e, 0x74, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x41, 0x0a,
+	0x65, 0x3a, 0x02, 0x38, 0x01, 0x22, 0x88, 0x01, 0x0a, 0x0a, 0x41, 0x63, 0x74, 0x69, 0x6f, 0x6e,
+	0x54, 0x79, 0x70, 0x65, 0x12, 0x16, 0x0a, 0x12, 0x41, 0x43, 0x54, 0x49, 0x4f, 0x4e, 0x5f, 0x55,
+	0x4e, 0x53, 0x50, 0x45, 0x43, 0x49, 0x46, 0x49, 0x45, 0x44, 0x10, 0x00, 0x12, 0x17, 0x0a, 0x13,
+	0x4b, 0x4e, 0x4f, 0x57, 0x4c, 0x45, 0x44, 0x47, 0x45, 0x5f, 0x52, 0x45, 0x54, 0x52, 0x49, 0x45,
+	0x56, 0x41, 0x4c, 0x10, 0x01, 0x12, 0x0f, 0x0a, 0x0b, 0x41, 0x50, 0x49, 0x5f, 0x52, 0x45, 0x51,
+	0x55, 0x45, 0x53, 0x54, 0x10, 0x02, 0x12, 0x11, 0x0a, 0x0d, 0x45, 0x4e, 0x44, 0x50, 0x4f, 0x49,
+	0x4e, 0x54, 0x5f, 0x43, 0x41, 0x4c, 0x4c, 0x10, 0x03, 0x12, 0x0f, 0x0a, 0x0b, 0x50, 0x55, 0x54,
+	0x5f, 0x4f, 0x4e, 0x5f, 0x48, 0x4f, 0x4c, 0x44, 0x10, 0x04, 0x12, 0x14, 0x0a, 0x10, 0x45, 0x4e,
+	0x44, 0x5f, 0x43, 0x4f, 0x4e, 0x56, 0x45, 0x52, 0x53, 0x41, 0x54, 0x49, 0x4f, 0x4e, 0x10, 0x05,
+	0x22, 0x9a, 0x02, 0x0a, 0x21, 0x41, 0x73, 0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f,
+	0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x49, 0x6e, 0x74, 0x65, 0x72, 0x72,
+	0x75, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x12, 0x47, 0x0a, 0x04, 0x74, 0x79, 0x70, 0x65, 0x18, 0x02,
+	0x20, 0x01, 0x28, 0x0e, 0x32, 0x33, 0x2e, 0x41, 0x73, 0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74,
+	0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x49, 0x6e, 0x74, 0x65,
+	0x72, 0x72, 0x75, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x49, 0x6e, 0x74, 0x65, 0x72, 0x72, 0x75,
+	0x70, 0x74, 0x69, 0x6f, 0x6e, 0x54, 0x79, 0x70, 0x65, 0x52, 0x04, 0x74, 0x79, 0x70, 0x65, 0x12,
+	0x2e, 0x0a, 0x04, 0x74, 0x69, 0x6d, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e,
+	0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e,
+	0x54, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x52, 0x04, 0x74, 0x69, 0x6d, 0x65, 0x22,
+	0x6c, 0x0a, 0x10, 0x49, 0x6e, 0x74, 0x65, 0x72, 0x72, 0x75, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x54,
+	0x79, 0x70, 0x65, 0x12, 0x21, 0x0a, 0x1d, 0x49, 0x4e, 0x54, 0x45, 0x52, 0x52, 0x55, 0x50, 0x54,
+	0x49, 0x4f, 0x4e, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x55, 0x4e, 0x53, 0x50, 0x45, 0x43, 0x49,
+	0x46, 0x49, 0x45, 0x44, 0x10, 0x00, 0x12, 0x19, 0x0a, 0x15, 0x49, 0x4e, 0x54, 0x45, 0x52, 0x52,
+	0x55, 0x50, 0x54, 0x49, 0x4f, 0x4e, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x56, 0x41, 0x44, 0x10,
+	0x01, 0x12, 0x1a, 0x0a, 0x16, 0x49, 0x4e, 0x54, 0x45, 0x52, 0x52, 0x55, 0x50, 0x54, 0x49, 0x4f,
+	0x4e, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x57, 0x4f, 0x52, 0x44, 0x10, 0x02, 0x22, 0x43, 0x0a,
+	0x27, 0x41, 0x73, 0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72,
+	0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x54, 0x65, 0x78,
+	0x74, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x63, 0x6f, 0x6e, 0x74,
+	0x65, 0x6e, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65,
+	0x6e, 0x74, 0x22, 0x44, 0x0a, 0x28, 0x41, 0x73, 0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74, 0x43,
+	0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x4d, 0x65, 0x73, 0x73, 0x61,
+	0x67, 0x65, 0x41, 0x75, 0x64, 0x69, 0x6f, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x12, 0x18,
+	0x0a, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52,
+	0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x22, 0x8e, 0x02, 0x0a, 0x20, 0x41, 0x73, 0x73,
+	0x69, 0x73, 0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69,
+	0x6f, 0x6e, 0x55, 0x73, 0x65, 0x72, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x41, 0x0a,
 	0x05, 0x61, 0x75, 0x64, 0x69, 0x6f, 0x18, 0x0a, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x29, 0x2e, 0x41,
 	0x73, 0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61,
 	0x74, 0x69, 0x6f, 0x6e, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x41, 0x75, 0x64, 0x69, 0x6f,
@@ -4034,16 +4110,33 @@ var file_common_proto_rawDesc = []byte{
 	0x0a, 0x04, 0x74, 0x69, 0x6d, 0x65, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67,
 	0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54,
 	0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x52, 0x04, 0x74, 0x69, 0x6d, 0x65, 0x42, 0x09,
-	0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x2a, 0x4d, 0x0a, 0x06, 0x53, 0x6f, 0x75,
-	0x72, 0x63, 0x65, 0x12, 0x0e, 0x0a, 0x0a, 0x57, 0x45, 0x42, 0x5f, 0x50, 0x4c, 0x55, 0x47, 0x49,
-	0x4e, 0x10, 0x00, 0x12, 0x0c, 0x0a, 0x08, 0x44, 0x45, 0x42, 0x55, 0x47, 0x47, 0x45, 0x52, 0x10,
-	0x01, 0x12, 0x07, 0x0a, 0x03, 0x53, 0x44, 0x4b, 0x10, 0x02, 0x12, 0x0e, 0x0a, 0x0a, 0x50, 0x48,
-	0x4f, 0x4e, 0x45, 0x5f, 0x43, 0x41, 0x4c, 0x4c, 0x10, 0x03, 0x12, 0x0c, 0x0a, 0x08, 0x57, 0x48,
-	0x41, 0x54, 0x53, 0x41, 0x50, 0x50, 0x10, 0x04, 0x42, 0x35, 0x0a, 0x17, 0x61, 0x69, 0x2e, 0x72,
-	0x61, 0x70, 0x69, 0x64, 0x61, 0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x61, 0x72, 0x74, 0x69, 0x66, 0x61,
-	0x63, 0x74, 0x73, 0x5a, 0x1a, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f,
-	0x72, 0x61, 0x70, 0x69, 0x64, 0x61, 0x61, 0x69, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x62,
-	0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x22, 0x93, 0x02, 0x0a, 0x25, 0x41, 0x73,
+	0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74,
+	0x69, 0x6f, 0x6e, 0x41, 0x73, 0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74, 0x4d, 0x65, 0x73, 0x73,
+	0x61, 0x67, 0x65, 0x12, 0x41, 0x0a, 0x05, 0x61, 0x75, 0x64, 0x69, 0x6f, 0x18, 0x0a, 0x20, 0x01,
+	0x28, 0x0b, 0x32, 0x29, 0x2e, 0x41, 0x73, 0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74, 0x43, 0x6f,
+	0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67,
+	0x65, 0x41, 0x75, 0x64, 0x69, 0x6f, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x48, 0x00, 0x52,
+	0x05, 0x61, 0x75, 0x64, 0x69, 0x6f, 0x12, 0x3e, 0x0a, 0x04, 0x74, 0x65, 0x78, 0x74, 0x18, 0x0b,
+	0x20, 0x01, 0x28, 0x0b, 0x32, 0x28, 0x2e, 0x41, 0x73, 0x73, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x74,
+	0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x4d, 0x65, 0x73, 0x73,
+	0x61, 0x67, 0x65, 0x54, 0x65, 0x78, 0x74, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x48, 0x00,
+	0x52, 0x04, 0x74, 0x65, 0x78, 0x74, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x12, 0x1c, 0x0a, 0x09, 0x63, 0x6f, 0x6d, 0x70, 0x6c, 0x65,
+	0x74, 0x65, 0x64, 0x18, 0x03, 0x20, 0x01, 0x28, 0x08, 0x52, 0x09, 0x63, 0x6f, 0x6d, 0x70, 0x6c,
+	0x65, 0x74, 0x65, 0x64, 0x12, 0x2e, 0x0a, 0x04, 0x74, 0x69, 0x6d, 0x65, 0x18, 0x04, 0x20, 0x01,
+	0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74,
+	0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x52, 0x04,
+	0x74, 0x69, 0x6d, 0x65, 0x42, 0x09, 0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x2a,
+	0x4d, 0x0a, 0x06, 0x53, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x12, 0x0e, 0x0a, 0x0a, 0x57, 0x45, 0x42,
+	0x5f, 0x50, 0x4c, 0x55, 0x47, 0x49, 0x4e, 0x10, 0x00, 0x12, 0x0c, 0x0a, 0x08, 0x44, 0x45, 0x42,
+	0x55, 0x47, 0x47, 0x45, 0x52, 0x10, 0x01, 0x12, 0x07, 0x0a, 0x03, 0x53, 0x44, 0x4b, 0x10, 0x02,
+	0x12, 0x0e, 0x0a, 0x0a, 0x50, 0x48, 0x4f, 0x4e, 0x45, 0x5f, 0x43, 0x41, 0x4c, 0x4c, 0x10, 0x03,
+	0x12, 0x0c, 0x0a, 0x08, 0x57, 0x48, 0x41, 0x54, 0x53, 0x41, 0x50, 0x50, 0x10, 0x04, 0x42, 0x35,
+	0x0a, 0x17, 0x61, 0x69, 0x2e, 0x72, 0x61, 0x70, 0x69, 0x64, 0x61, 0x2e, 0x73, 0x64, 0x6b, 0x2e,
+	0x61, 0x72, 0x74, 0x69, 0x66, 0x61, 0x63, 0x74, 0x73, 0x5a, 0x1a, 0x67, 0x69, 0x74, 0x68, 0x75,
+	0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x72, 0x61, 0x70, 0x69, 0x64, 0x61, 0x61, 0x69, 0x2f, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -4058,143 +4151,152 @@ func file_common_proto_rawDescGZIP() []byte {
 	return file_common_proto_rawDescData
 }
 
-var file_common_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_common_proto_msgTypes = make([]protoimpl.MessageInfo, 51)
+var file_common_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_common_proto_msgTypes = make([]protoimpl.MessageInfo, 49)
 var file_common_proto_goTypes = []any{
-	(Source)(0), // 0: Source
-	(AssistantConversationInterruption_InterruptionType)(0), // 1: AssistantConversationInterruption.InterruptionType
-	(*FieldSelector)(nil),                                  // 2: FieldSelector
-	(*AssistantDefinition)(nil),                            // 3: AssistantDefinition
-	(*Criteria)(nil),                                       // 4: Criteria
-	(*Error)(nil),                                          // 5: Error
-	(*Paginate)(nil),                                       // 6: Paginate
-	(*Paginated)(nil),                                      // 7: Paginated
-	(*Ordering)(nil),                                       // 8: Ordering
-	(*User)(nil),                                           // 9: User
-	(*BaseResponse)(nil),                                   // 10: BaseResponse
-	(*Metadata)(nil),                                       // 11: Metadata
-	(*Argument)(nil),                                       // 12: Argument
-	(*Variable)(nil),                                       // 13: Variable
-	(*Tag)(nil),                                            // 14: Tag
-	(*Organization)(nil),                                   // 15: Organization
-	(*Metric)(nil),                                         // 16: Metric
-	(*Content)(nil),                                        // 17: Content
-	(*Message)(nil),                                        // 18: Message
-	(*ToolCall)(nil),                                       // 19: ToolCall
-	(*FunctionCall)(nil),                                   // 20: FunctionCall
-	(*Telemetry)(nil),                                      // 21: Telemetry
-	(*Knowledge)(nil),                                      // 22: Knowledge
-	(*TextPrompt)(nil),                                     // 23: TextPrompt
-	(*TextChatCompletePrompt)(nil),                         // 24: TextChatCompletePrompt
-	(*AssistantConversationMessage)(nil),                   // 25: AssistantConversationMessage
-	(*AssistantConversationContext)(nil),                   // 26: AssistantConversationContext
-	(*AssistantConversationRecording)(nil),                 // 27: AssistantConversationRecording
-	(*AssistantConversationTelephonyEvent)(nil),            // 28: AssistantConversationTelephonyEvent
-	(*AssistantConversation)(nil),                          // 29: AssistantConversation
-	(*GetAllAssistantConversationRequest)(nil),             // 30: GetAllAssistantConversationRequest
-	(*GetAllAssistantConversationResponse)(nil),            // 31: GetAllAssistantConversationResponse
-	(*GetAllConversationMessageRequest)(nil),               // 32: GetAllConversationMessageRequest
-	(*GetAllConversationMessageResponse)(nil),              // 33: GetAllConversationMessageResponse
-	(*AssistantConversationConfiguration)(nil),             // 34: AssistantConversationConfiguration
-	(*AssistantConversationDisconnectAction)(nil),          // 35: AssistantConversationDisconnectAction
-	(*AssistantConverstationHoldAction)(nil),               // 36: AssistantConverstationHoldAction
-	(*AssistantConverstationKnowledgeRetrievalAction)(nil), // 37: AssistantConverstationKnowledgeRetrievalAction
-	(*AssistantConverstationApiRequestAction)(nil),         // 38: AssistantConverstationApiRequestAction
-	(*AssistantConverstationEndpointAction)(nil),           // 39: AssistantConverstationEndpointAction
-	(*AssistantConversationDeviationAction)(nil),           // 40: AssistantConversationDeviationAction
-	(*AssistantConversationAssistantTransferAction)(nil),   // 41: AssistantConversationAssistantTransferAction
-	(*AssistantConversationPhoneCallTransferAction)(nil),   // 42: AssistantConversationPhoneCallTransferAction
-	(*AssistantConversationInterruption)(nil),              // 43: AssistantConversationInterruption
-	(*AssistantConversationMessageTextContent)(nil),        // 44: AssistantConversationMessageTextContent
-	(*AssistantConversationMessageAudioContent)(nil),       // 45: AssistantConversationMessageAudioContent
-	(*AssistantConversationUserMessage)(nil),               // 46: AssistantConversationUserMessage
-	(*AssistantConversationAssistantMessage)(nil),          // 47: AssistantConversationAssistantMessage
-	nil,                           // 48: BaseResponse.DataEntry
-	nil,                           // 49: Telemetry.AttributesEntry
-	nil,                           // 50: AssistantConversationConfiguration.MetadataEntry
-	nil,                           // 51: AssistantConversationConfiguration.ArgsEntry
-	nil,                           // 52: AssistantConversationConfiguration.OptionsEntry
+	(Source)(0),                                             // 0: Source
+	(AudioConfig_AudioFormat)(0),                            // 1: AudioConfig.AudioFormat
+	(AssistantConversationAction_ActionType)(0),             // 2: AssistantConversationAction.ActionType
+	(AssistantConversationInterruption_InterruptionType)(0), // 3: AssistantConversationInterruption.InterruptionType
+	(*FieldSelector)(nil),                                   // 4: FieldSelector
+	(*AssistantDefinition)(nil),                             // 5: AssistantDefinition
+	(*Criteria)(nil),                                        // 6: Criteria
+	(*Error)(nil),                                           // 7: Error
+	(*Paginate)(nil),                                        // 8: Paginate
+	(*Paginated)(nil),                                       // 9: Paginated
+	(*Ordering)(nil),                                        // 10: Ordering
+	(*User)(nil),                                            // 11: User
+	(*BaseResponse)(nil),                                    // 12: BaseResponse
+	(*Metadata)(nil),                                        // 13: Metadata
+	(*Argument)(nil),                                        // 14: Argument
+	(*Variable)(nil),                                        // 15: Variable
+	(*Tag)(nil),                                             // 16: Tag
+	(*Organization)(nil),                                    // 17: Organization
+	(*Metric)(nil),                                          // 18: Metric
+	(*Content)(nil),                                         // 19: Content
+	(*Message)(nil),                                         // 20: Message
+	(*ToolCall)(nil),                                        // 21: ToolCall
+	(*FunctionCall)(nil),                                    // 22: FunctionCall
+	(*Telemetry)(nil),                                       // 23: Telemetry
+	(*Knowledge)(nil),                                       // 24: Knowledge
+	(*TextPrompt)(nil),                                      // 25: TextPrompt
+	(*TextChatCompletePrompt)(nil),                          // 26: TextChatCompletePrompt
+	(*AssistantConversationMessage)(nil),                    // 27: AssistantConversationMessage
+	(*AssistantConversationContext)(nil),                    // 28: AssistantConversationContext
+	(*AssistantConversationRecording)(nil),                  // 29: AssistantConversationRecording
+	(*AssistantConversationTelephonyEvent)(nil),             // 30: AssistantConversationTelephonyEvent
+	(*AssistantConversation)(nil),                           // 31: AssistantConversation
+	(*GetAllAssistantConversationRequest)(nil),              // 32: GetAllAssistantConversationRequest
+	(*GetAllAssistantConversationResponse)(nil),             // 33: GetAllAssistantConversationResponse
+	(*GetAllConversationMessageRequest)(nil),                // 34: GetAllConversationMessageRequest
+	(*GetAllConversationMessageResponse)(nil),               // 35: GetAllConversationMessageResponse
+	(*AssistantConversationConfiguration)(nil),              // 36: AssistantConversationConfiguration
+	(*AssistantConversationError)(nil),                      // 37: AssistantConversationError
+	(*StreamConfig)(nil),                                    // 38: StreamConfig
+	(*AudioConfig)(nil),                                     // 39: AudioConfig
+	(*TextConfig)(nil),                                      // 40: TextConfig
+	(*AssistantConversationAction)(nil),                     // 41: AssistantConversationAction
+	(*AssistantConversationInterruption)(nil),               // 42: AssistantConversationInterruption
+	(*AssistantConversationMessageTextContent)(nil),         // 43: AssistantConversationMessageTextContent
+	(*AssistantConversationMessageAudioContent)(nil),        // 44: AssistantConversationMessageAudioContent
+	(*AssistantConversationUserMessage)(nil),                // 45: AssistantConversationUserMessage
+	(*AssistantConversationAssistantMessage)(nil),           // 46: AssistantConversationAssistantMessage
+	nil,                           // 47: BaseResponse.DataEntry
+	nil,                           // 48: Telemetry.AttributesEntry
+	nil,                           // 49: AssistantConversationConfiguration.MetadataEntry
+	nil,                           // 50: AssistantConversationConfiguration.ArgsEntry
+	nil,                           // 51: AssistantConversationConfiguration.OptionsEntry
+	nil,                           // 52: AssistantConversationAction.ArgsEntry
 	(*timestamppb.Timestamp)(nil), // 53: google.protobuf.Timestamp
 	(*structpb.Struct)(nil),       // 54: google.protobuf.Struct
 	(*anypb.Any)(nil),             // 55: google.protobuf.Any
 }
 var file_common_proto_depIdxs = []int32{
 	53, // 0: User.createdDate:type_name -> google.protobuf.Timestamp
-	48, // 1: BaseResponse.data:type_name -> BaseResponse.DataEntry
-	5,  // 2: BaseResponse.error:type_name -> Error
+	47, // 1: BaseResponse.data:type_name -> BaseResponse.DataEntry
+	7,  // 2: BaseResponse.error:type_name -> Error
 	54, // 3: Content.meta:type_name -> google.protobuf.Struct
-	17, // 4: Message.contents:type_name -> Content
-	19, // 5: Message.toolCalls:type_name -> ToolCall
-	20, // 6: ToolCall.function:type_name -> FunctionCall
+	19, // 4: Message.contents:type_name -> Content
+	21, // 5: Message.toolCalls:type_name -> ToolCall
+	22, // 6: ToolCall.function:type_name -> FunctionCall
 	53, // 7: Telemetry.startTime:type_name -> google.protobuf.Timestamp
 	53, // 8: Telemetry.endTime:type_name -> google.protobuf.Timestamp
-	49, // 9: Telemetry.attributes:type_name -> Telemetry.AttributesEntry
-	11, // 10: Knowledge.knowledgeEmbeddingModelOptions:type_name -> Metadata
-	9,  // 11: Knowledge.createdUser:type_name -> User
-	9,  // 12: Knowledge.updatedUser:type_name -> User
+	48, // 9: Telemetry.attributes:type_name -> Telemetry.AttributesEntry
+	13, // 10: Knowledge.knowledgeEmbeddingModelOptions:type_name -> Metadata
+	11, // 11: Knowledge.createdUser:type_name -> User
+	11, // 12: Knowledge.updatedUser:type_name -> User
 	53, // 13: Knowledge.createdDate:type_name -> google.protobuf.Timestamp
 	53, // 14: Knowledge.updatedDate:type_name -> google.protobuf.Timestamp
-	15, // 15: Knowledge.organization:type_name -> Organization
-	14, // 16: Knowledge.knowledgeTag:type_name -> Tag
-	23, // 17: TextChatCompletePrompt.prompt:type_name -> TextPrompt
-	13, // 18: TextChatCompletePrompt.promptVariables:type_name -> Variable
-	18, // 19: AssistantConversationMessage.request:type_name -> Message
-	18, // 20: AssistantConversationMessage.response:type_name -> Message
-	16, // 21: AssistantConversationMessage.metrics:type_name -> Metric
+	17, // 15: Knowledge.organization:type_name -> Organization
+	16, // 16: Knowledge.knowledgeTag:type_name -> Tag
+	25, // 17: TextChatCompletePrompt.prompt:type_name -> TextPrompt
+	15, // 18: TextChatCompletePrompt.promptVariables:type_name -> Variable
+	20, // 19: AssistantConversationMessage.request:type_name -> Message
+	20, // 20: AssistantConversationMessage.response:type_name -> Message
+	18, // 21: AssistantConversationMessage.metrics:type_name -> Metric
 	53, // 22: AssistantConversationMessage.createdDate:type_name -> google.protobuf.Timestamp
 	53, // 23: AssistantConversationMessage.updatedDate:type_name -> google.protobuf.Timestamp
-	11, // 24: AssistantConversationMessage.metadata:type_name -> Metadata
+	13, // 24: AssistantConversationMessage.metadata:type_name -> Metadata
 	54, // 25: AssistantConversationContext.metadata:type_name -> google.protobuf.Struct
 	54, // 26: AssistantConversationContext.result:type_name -> google.protobuf.Struct
 	54, // 27: AssistantConversationContext.query:type_name -> google.protobuf.Struct
 	54, // 28: AssistantConversationTelephonyEvent.payload:type_name -> google.protobuf.Struct
 	53, // 29: AssistantConversationTelephonyEvent.createdDate:type_name -> google.protobuf.Timestamp
 	53, // 30: AssistantConversationTelephonyEvent.updatedDate:type_name -> google.protobuf.Timestamp
-	9,  // 31: AssistantConversation.user:type_name -> User
-	25, // 32: AssistantConversation.assistantConversationMessage:type_name -> AssistantConversationMessage
+	11, // 31: AssistantConversation.user:type_name -> User
+	27, // 32: AssistantConversation.assistantConversationMessage:type_name -> AssistantConversationMessage
 	53, // 33: AssistantConversation.createdDate:type_name -> google.protobuf.Timestamp
 	53, // 34: AssistantConversation.updatedDate:type_name -> google.protobuf.Timestamp
-	26, // 35: AssistantConversation.contexts:type_name -> AssistantConversationContext
-	16, // 36: AssistantConversation.metrics:type_name -> Metric
-	11, // 37: AssistantConversation.metadata:type_name -> Metadata
-	12, // 38: AssistantConversation.arguments:type_name -> Argument
-	11, // 39: AssistantConversation.options:type_name -> Metadata
-	27, // 40: AssistantConversation.recordings:type_name -> AssistantConversationRecording
-	28, // 41: AssistantConversation.telephonyEvents:type_name -> AssistantConversationTelephonyEvent
-	6,  // 42: GetAllAssistantConversationRequest.paginate:type_name -> Paginate
-	4,  // 43: GetAllAssistantConversationRequest.criterias:type_name -> Criteria
+	28, // 35: AssistantConversation.contexts:type_name -> AssistantConversationContext
+	18, // 36: AssistantConversation.metrics:type_name -> Metric
+	13, // 37: AssistantConversation.metadata:type_name -> Metadata
+	14, // 38: AssistantConversation.arguments:type_name -> Argument
+	13, // 39: AssistantConversation.options:type_name -> Metadata
+	29, // 40: AssistantConversation.recordings:type_name -> AssistantConversationRecording
+	30, // 41: AssistantConversation.telephonyEvents:type_name -> AssistantConversationTelephonyEvent
+	8,  // 42: GetAllAssistantConversationRequest.paginate:type_name -> Paginate
+	6,  // 43: GetAllAssistantConversationRequest.criterias:type_name -> Criteria
 	0,  // 44: GetAllAssistantConversationRequest.source:type_name -> Source
-	29, // 45: GetAllAssistantConversationResponse.data:type_name -> AssistantConversation
-	5,  // 46: GetAllAssistantConversationResponse.error:type_name -> Error
-	7,  // 47: GetAllAssistantConversationResponse.paginated:type_name -> Paginated
-	6,  // 48: GetAllConversationMessageRequest.paginate:type_name -> Paginate
-	4,  // 49: GetAllConversationMessageRequest.criterias:type_name -> Criteria
-	8,  // 50: GetAllConversationMessageRequest.order:type_name -> Ordering
+	31, // 45: GetAllAssistantConversationResponse.data:type_name -> AssistantConversation
+	7,  // 46: GetAllAssistantConversationResponse.error:type_name -> Error
+	9,  // 47: GetAllAssistantConversationResponse.paginated:type_name -> Paginated
+	8,  // 48: GetAllConversationMessageRequest.paginate:type_name -> Paginate
+	6,  // 49: GetAllConversationMessageRequest.criterias:type_name -> Criteria
+	10, // 50: GetAllConversationMessageRequest.order:type_name -> Ordering
 	0,  // 51: GetAllConversationMessageRequest.source:type_name -> Source
-	25, // 52: GetAllConversationMessageResponse.data:type_name -> AssistantConversationMessage
-	5,  // 53: GetAllConversationMessageResponse.error:type_name -> Error
-	7,  // 54: GetAllConversationMessageResponse.paginated:type_name -> Paginated
-	3,  // 55: AssistantConversationConfiguration.assistant:type_name -> AssistantDefinition
+	27, // 52: GetAllConversationMessageResponse.data:type_name -> AssistantConversationMessage
+	7,  // 53: GetAllConversationMessageResponse.error:type_name -> Error
+	9,  // 54: GetAllConversationMessageResponse.paginated:type_name -> Paginated
+	5,  // 55: AssistantConversationConfiguration.assistant:type_name -> AssistantDefinition
 	53, // 56: AssistantConversationConfiguration.time:type_name -> google.protobuf.Timestamp
-	50, // 57: AssistantConversationConfiguration.metadata:type_name -> AssistantConversationConfiguration.MetadataEntry
-	51, // 58: AssistantConversationConfiguration.args:type_name -> AssistantConversationConfiguration.ArgsEntry
-	52, // 59: AssistantConversationConfiguration.options:type_name -> AssistantConversationConfiguration.OptionsEntry
-	1,  // 60: AssistantConversationInterruption.type:type_name -> AssistantConversationInterruption.InterruptionType
-	53, // 61: AssistantConversationInterruption.time:type_name -> google.protobuf.Timestamp
-	45, // 62: AssistantConversationUserMessage.audio:type_name -> AssistantConversationMessageAudioContent
-	44, // 63: AssistantConversationUserMessage.text:type_name -> AssistantConversationMessageTextContent
-	53, // 64: AssistantConversationUserMessage.time:type_name -> google.protobuf.Timestamp
-	45, // 65: AssistantConversationAssistantMessage.audio:type_name -> AssistantConversationMessageAudioContent
-	44, // 66: AssistantConversationAssistantMessage.text:type_name -> AssistantConversationMessageTextContent
-	53, // 67: AssistantConversationAssistantMessage.time:type_name -> google.protobuf.Timestamp
-	55, // 68: AssistantConversationConfiguration.MetadataEntry.value:type_name -> google.protobuf.Any
-	55, // 69: AssistantConversationConfiguration.ArgsEntry.value:type_name -> google.protobuf.Any
-	55, // 70: AssistantConversationConfiguration.OptionsEntry.value:type_name -> google.protobuf.Any
-	71, // [71:71] is the sub-list for method output_type
-	71, // [71:71] is the sub-list for method input_type
-	71, // [71:71] is the sub-list for extension type_name
-	71, // [71:71] is the sub-list for extension extendee
-	0,  // [0:71] is the sub-list for field type_name
+	49, // 57: AssistantConversationConfiguration.metadata:type_name -> AssistantConversationConfiguration.MetadataEntry
+	50, // 58: AssistantConversationConfiguration.args:type_name -> AssistantConversationConfiguration.ArgsEntry
+	51, // 59: AssistantConversationConfiguration.options:type_name -> AssistantConversationConfiguration.OptionsEntry
+	38, // 60: AssistantConversationConfiguration.inputConfig:type_name -> StreamConfig
+	38, // 61: AssistantConversationConfiguration.outputConfig:type_name -> StreamConfig
+	7,  // 62: AssistantConversationError.error:type_name -> Error
+	39, // 63: StreamConfig.audio:type_name -> AudioConfig
+	40, // 64: StreamConfig.text:type_name -> TextConfig
+	1,  // 65: AudioConfig.audioFormat:type_name -> AudioConfig.AudioFormat
+	2,  // 66: AssistantConversationAction.action:type_name -> AssistantConversationAction.ActionType
+	52, // 67: AssistantConversationAction.args:type_name -> AssistantConversationAction.ArgsEntry
+	3,  // 68: AssistantConversationInterruption.type:type_name -> AssistantConversationInterruption.InterruptionType
+	53, // 69: AssistantConversationInterruption.time:type_name -> google.protobuf.Timestamp
+	44, // 70: AssistantConversationUserMessage.audio:type_name -> AssistantConversationMessageAudioContent
+	43, // 71: AssistantConversationUserMessage.text:type_name -> AssistantConversationMessageTextContent
+	53, // 72: AssistantConversationUserMessage.time:type_name -> google.protobuf.Timestamp
+	44, // 73: AssistantConversationAssistantMessage.audio:type_name -> AssistantConversationMessageAudioContent
+	43, // 74: AssistantConversationAssistantMessage.text:type_name -> AssistantConversationMessageTextContent
+	53, // 75: AssistantConversationAssistantMessage.time:type_name -> google.protobuf.Timestamp
+	55, // 76: AssistantConversationConfiguration.MetadataEntry.value:type_name -> google.protobuf.Any
+	55, // 77: AssistantConversationConfiguration.ArgsEntry.value:type_name -> google.protobuf.Any
+	55, // 78: AssistantConversationConfiguration.OptionsEntry.value:type_name -> google.protobuf.Any
+	55, // 79: AssistantConversationAction.ArgsEntry.value:type_name -> google.protobuf.Any
+	80, // [80:80] is the sub-list for method output_type
+	80, // [80:80] is the sub-list for method input_type
+	80, // [80:80] is the sub-list for extension type_name
+	80, // [80:80] is the sub-list for extension extendee
+	0,  // [0:80] is the sub-list for field type_name
 }
 
 func init() { file_common_proto_init() }
@@ -4600,7 +4702,7 @@ func file_common_proto_init() {
 			}
 		}
 		file_common_proto_msgTypes[33].Exporter = func(v any, i int) any {
-			switch v := v.(*AssistantConversationDisconnectAction); i {
+			switch v := v.(*AssistantConversationError); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -4612,7 +4714,7 @@ func file_common_proto_init() {
 			}
 		}
 		file_common_proto_msgTypes[34].Exporter = func(v any, i int) any {
-			switch v := v.(*AssistantConverstationHoldAction); i {
+			switch v := v.(*StreamConfig); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -4624,7 +4726,7 @@ func file_common_proto_init() {
 			}
 		}
 		file_common_proto_msgTypes[35].Exporter = func(v any, i int) any {
-			switch v := v.(*AssistantConverstationKnowledgeRetrievalAction); i {
+			switch v := v.(*AudioConfig); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -4636,7 +4738,7 @@ func file_common_proto_init() {
 			}
 		}
 		file_common_proto_msgTypes[36].Exporter = func(v any, i int) any {
-			switch v := v.(*AssistantConverstationApiRequestAction); i {
+			switch v := v.(*TextConfig); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -4648,7 +4750,7 @@ func file_common_proto_init() {
 			}
 		}
 		file_common_proto_msgTypes[37].Exporter = func(v any, i int) any {
-			switch v := v.(*AssistantConverstationEndpointAction); i {
+			switch v := v.(*AssistantConversationAction); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -4660,42 +4762,6 @@ func file_common_proto_init() {
 			}
 		}
 		file_common_proto_msgTypes[38].Exporter = func(v any, i int) any {
-			switch v := v.(*AssistantConversationDeviationAction); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_common_proto_msgTypes[39].Exporter = func(v any, i int) any {
-			switch v := v.(*AssistantConversationAssistantTransferAction); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_common_proto_msgTypes[40].Exporter = func(v any, i int) any {
-			switch v := v.(*AssistantConversationPhoneCallTransferAction); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_common_proto_msgTypes[41].Exporter = func(v any, i int) any {
 			switch v := v.(*AssistantConversationInterruption); i {
 			case 0:
 				return &v.state
@@ -4707,7 +4773,7 @@ func file_common_proto_init() {
 				return nil
 			}
 		}
-		file_common_proto_msgTypes[42].Exporter = func(v any, i int) any {
+		file_common_proto_msgTypes[39].Exporter = func(v any, i int) any {
 			switch v := v.(*AssistantConversationMessageTextContent); i {
 			case 0:
 				return &v.state
@@ -4719,7 +4785,7 @@ func file_common_proto_init() {
 				return nil
 			}
 		}
-		file_common_proto_msgTypes[43].Exporter = func(v any, i int) any {
+		file_common_proto_msgTypes[40].Exporter = func(v any, i int) any {
 			switch v := v.(*AssistantConversationMessageAudioContent); i {
 			case 0:
 				return &v.state
@@ -4731,7 +4797,7 @@ func file_common_proto_init() {
 				return nil
 			}
 		}
-		file_common_proto_msgTypes[44].Exporter = func(v any, i int) any {
+		file_common_proto_msgTypes[41].Exporter = func(v any, i int) any {
 			switch v := v.(*AssistantConversationUserMessage); i {
 			case 0:
 				return &v.state
@@ -4743,7 +4809,7 @@ func file_common_proto_init() {
 				return nil
 			}
 		}
-		file_common_proto_msgTypes[45].Exporter = func(v any, i int) any {
+		file_common_proto_msgTypes[42].Exporter = func(v any, i int) any {
 			switch v := v.(*AssistantConversationAssistantMessage); i {
 			case 0:
 				return &v.state
@@ -4758,11 +4824,11 @@ func file_common_proto_init() {
 	}
 	file_common_proto_msgTypes[11].OneofWrappers = []any{}
 	file_common_proto_msgTypes[17].OneofWrappers = []any{}
-	file_common_proto_msgTypes[44].OneofWrappers = []any{
+	file_common_proto_msgTypes[41].OneofWrappers = []any{
 		(*AssistantConversationUserMessage_Audio)(nil),
 		(*AssistantConversationUserMessage_Text)(nil),
 	}
-	file_common_proto_msgTypes[45].OneofWrappers = []any{
+	file_common_proto_msgTypes[42].OneofWrappers = []any{
 		(*AssistantConversationAssistantMessage_Audio)(nil),
 		(*AssistantConversationAssistantMessage_Text)(nil),
 	}
@@ -4771,8 +4837,8 @@ func file_common_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_common_proto_rawDesc,
-			NumEnums:      2,
-			NumMessages:   51,
+			NumEnums:      4,
+			NumMessages:   49,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

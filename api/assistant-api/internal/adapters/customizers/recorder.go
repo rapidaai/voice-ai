@@ -1,9 +1,8 @@
-// Copyright (c) Rapida
-// Author: Prashant <prashant@rapida.ai>
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
 //
-// Licensed under the Rapida internal use license.
-// This file is part of Rapida's proprietary software.
-// Unauthorized copying, modification, or redistribution is strictly prohibited.
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package internal_adapter_request_customizers
 
 import (
@@ -14,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	"github.com/rapidaai/pkg/commons"
+	protos "github.com/rapidaai/protos"
 )
 
 // AudioChunk represents a timestamped audio chunk
@@ -23,12 +22,12 @@ type AudioChunk struct {
 	Data      []byte
 	Timestamp time.Time
 	IsSystem  bool // true for system audio, false for user audio
-	Config    *internal_audio.AudioConfig
+	Config    *protos.AudioConfig
 	ID        int64 // Add unique identifier for each chunk
 }
 
 type Recorder interface {
-	Initialize(userAudioConfig, systemAudioConfig *internal_audio.AudioConfig) error
+	Initialize(userAudioConfig, systemAudioConfig *protos.AudioConfig) error
 	User(in []byte) error
 	Interrupt() error
 	System(out []byte) error
@@ -40,8 +39,8 @@ type recorder struct {
 	mu               sync.Mutex   // Ensure thread-safe access
 	audioChunks      []AudioChunk // All audio chunks with timestamps
 	interruptionTime *time.Time   // When interruption occurred (nil if no interruption)
-	userConfig       *internal_audio.AudioConfig
-	systemConfig     *internal_audio.AudioConfig
+	userConfig       *protos.AudioConfig
+	systemConfig     *protos.AudioConfig
 	chunkIDCounter   int64 // Counter for unique chunk IDs
 }
 
@@ -53,7 +52,7 @@ func NewRecorder(logger commons.Logger) Recorder {
 	}
 }
 
-func (r *recorder) Initialize(userConfig, systemConfig *internal_audio.AudioConfig) error {
+func (r *recorder) Initialize(userConfig, systemConfig *protos.AudioConfig) error {
 	r.userConfig = userConfig
 	r.systemConfig = systemConfig
 	return nil
@@ -184,24 +183,24 @@ func (r *recorder) createSilentAudioData(byteLength int) []byte {
 	return make([]byte, byteLength)
 }
 
-func (r *recorder) trimAudioChunkData(data []byte, keepDuration time.Duration, config *internal_audio.AudioConfig) []byte {
+func (r *recorder) trimAudioChunkData(data []byte, keepDuration time.Duration, config *protos.AudioConfig) []byte {
 	if config == nil || keepDuration <= 0 {
 		return []byte{}
 	}
 
 	// Calculate bytes per sample based on audio format
 	var bytesPerSample int
-	switch config.Format {
-	case internal_audio.Linear16:
+	switch config.GetAudioFormat() {
+	case protos.AudioConfig_LINEAR16:
 		bytesPerSample = 2
-	case internal_audio.MuLaw8:
+	case protos.AudioConfig_MuLaw8:
 		bytesPerSample = 1
 	default:
 		bytesPerSample = 2 // Default to 16-bit PCM
 	}
 
 	// Calculate bytes per frame (sample + channels)
-	bytesPerFrame := bytesPerSample * config.Channels
+	bytesPerFrame := bytesPerSample * int(config.Channels)
 
 	// Calculate total samples to keep based on duration
 	samplesToKeep := int(keepDuration.Seconds() * float64(config.SampleRate))
@@ -290,7 +289,7 @@ func (r *recorder) Persist() ([]byte, error) {
 	return wavData, nil
 }
 
-func (r *recorder) getTargetAudioConfig() *internal_audio.AudioConfig {
+func (r *recorder) getTargetAudioConfig() *protos.AudioConfig {
 	if r.userConfig != nil {
 		return r.userConfig
 	}
@@ -303,7 +302,7 @@ func (r *recorder) getTargetAudioConfig() *internal_audio.AudioConfig {
 	return nil
 }
 
-func (r *recorder) mergeAudioChunks(targetConfig *internal_audio.AudioConfig) ([]byte, error) {
+func (r *recorder) mergeAudioChunks(targetConfig *protos.AudioConfig) ([]byte, error) {
 	if len(r.audioChunks) == 0 {
 		return nil, fmt.Errorf("no audio chunks to merge")
 	}
@@ -320,7 +319,7 @@ func (r *recorder) mergeAudioChunks(targetConfig *internal_audio.AudioConfig) ([
 	}
 
 	totalDuration := endTime.Sub(startTime)
-	totalSamples := int(totalDuration.Seconds() * float64(targetConfig.SampleRate))
+	totalSamples := uint32(totalDuration.Seconds() * float64(targetConfig.SampleRate))
 
 	// Create output buffer (16-bit samples)
 	outputSamples := make([]int32, totalSamples*targetConfig.Channels)
@@ -353,21 +352,21 @@ func (r *recorder) calculateChunkDuration(chunk AudioChunk) time.Duration {
 		return 0
 	}
 	var bytesPerSample int
-	switch chunk.Config.Format {
-	case internal_audio.Linear16:
+	switch chunk.Config.GetAudioFormat() {
+	case protos.AudioConfig_LINEAR16:
 		bytesPerSample = 2
-	case internal_audio.MuLaw8:
+	case protos.AudioConfig_MuLaw8:
 		bytesPerSample = 1
 	default:
 		bytesPerSample = 2 // default to 16-bit
 	}
 
-	samples := len(chunk.Data) / (bytesPerSample * chunk.Config.Channels)
+	samples := len(chunk.Data) / (bytesPerSample * int(chunk.Config.GetChannels()))
 	duration := float64(samples) / float64(chunk.Config.SampleRate)
 	return time.Duration(duration * float64(time.Second))
 }
 
-func (r *recorder) addChunkToOutput(chunk AudioChunk, output []int32, startTime time.Time, targetConfig *internal_audio.AudioConfig) error {
+func (r *recorder) addChunkToOutput(chunk AudioChunk, output []int32, startTime time.Time, targetConfig *protos.AudioConfig) error {
 	if chunk.Config == nil {
 		return fmt.Errorf("chunk has no audio configuration")
 	}
@@ -392,7 +391,7 @@ func (r *recorder) addChunkToOutput(chunk AudioChunk, output []int32, startTime 
 	} else {
 		// For user audio, use the timestamp-based offset
 		offsetDuration := chunk.Timestamp.Sub(startTime)
-		startIndex = int(offsetDuration.Seconds()*float64(targetConfig.SampleRate)) * targetConfig.Channels
+		startIndex = int(offsetDuration.Seconds()*float64(targetConfig.SampleRate)) * int(targetConfig.Channels)
 	}
 
 	// Add samples to output buffer
@@ -412,23 +411,23 @@ func (r *recorder) addChunkToOutput(chunk AudioChunk, output []int32, startTime 
 	return nil
 }
 
-func (r *recorder) convertToSamples(data []byte, config *internal_audio.AudioConfig) ([]int32, error) {
+func (r *recorder) convertToSamples(data []byte, config *protos.AudioConfig) ([]int32, error) {
 	var samples []int32
 
-	switch config.Format {
-	case internal_audio.Linear16:
+	switch config.AudioFormat {
+	case protos.AudioConfig_LINEAR16:
 		samples = make([]int32, len(data)/2)
 		for i := 0; i < len(samples); i++ {
 			sample := int16(binary.LittleEndian.Uint16(data[i*2:]))
 			samples[i] = int32(sample)
 		}
-	case internal_audio.MuLaw8:
+	case protos.AudioConfig_MuLaw8:
 		samples = make([]int32, len(data))
 		for i, b := range data {
 			samples[i] = r.muLawToLinear(b)
 		}
 	default:
-		return nil, fmt.Errorf("unsupported audio format: %v", config.Format)
+		return nil, fmt.Errorf("unsupported audio format: %v", config.AudioFormat.String())
 	}
 
 	return samples, nil
@@ -452,7 +451,7 @@ func (r *recorder) muLawToLinear(muLawByte byte) int32 {
 	return sample << 2 // Scale to 16-bit range
 }
 
-func (r *recorder) createWAVFile(pcmData []byte, config *internal_audio.AudioConfig) ([]byte, error) {
+func (r *recorder) createWAVFile(pcmData []byte, config *protos.AudioConfig) ([]byte, error) {
 	var buf bytes.Buffer
 
 	// WAV header

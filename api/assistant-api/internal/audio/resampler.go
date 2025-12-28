@@ -1,23 +1,24 @@
-// Copyright (c) Rapida
-// Author: Prashant <prashant@rapida.ai>
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
 //
-// Licensed under the Rapida internal use license.
-// This file is part of Rapida's proprietary software.
-// Unauthorized copying, modification, or redistribution is strictly prohibited.
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package internal_audio
 
 import (
 	"encoding/binary"
 	"fmt"
+
+	"github.com/rapidaai/protos"
 )
 
 const muLawBias = 33
 
 // AudioInfo holds information about audio data
 type AudioInfo struct {
-	SampleRate        int
-	Format            AudioFormat
-	Channels          int
+	SampleRate        uint32
+	Format            protos.AudioConfig_AudioFormat
+	Channels          uint32
 	SamplesPerChannel int
 	BytesPerSample    int
 	TotalBytes        int
@@ -28,9 +29,9 @@ type AudioInfo struct {
 func (info AudioInfo) String() string {
 	formatName := "Unknown"
 	switch info.Format {
-	case Linear16:
+	case protos.AudioConfig_LINEAR16:
 		formatName = "Linear16"
-	case MuLaw8:
+	case protos.AudioConfig_MuLaw8:
 		formatName = "μ-law 8-bit"
 	}
 
@@ -55,7 +56,7 @@ func NewAudioResampler() *AudioResampler {
 }
 
 // Resample converts audio data from source format to target format
-func (r *AudioResampler) Resample(data []byte, source, target *AudioConfig) ([]byte, error) {
+func (r *AudioResampler) Resample(data []byte, source, target *protos.AudioConfig) ([]byte, error) {
 
 	if source.SampleRate == target.SampleRate && source.Channels == target.Channels {
 		return data, nil // No resampling needed
@@ -83,7 +84,7 @@ func (r *AudioResampler) Resample(data []byte, source, target *AudioConfig) ([]b
 }
 
 // ConvertToFloat32 converts byte audio data to float32 samples with specified sample rate
-func (r *AudioResampler) ConvertToFloat32Samples(data []byte, config *AudioConfig) ([]float32, error) {
+func (r *AudioResampler) ConvertToFloat32Samples(data []byte, config *protos.AudioConfig) ([]float32, error) {
 	// First convert to float64 (our internal format)
 	float64Samples, err := r.decodeToFloat64(data, config)
 	if err != nil {
@@ -104,12 +105,12 @@ func (r *AudioResampler) ConvertToFloat32Samples(data []byte, config *AudioConfi
 }
 
 // ConvertToFloat32WithResample converts byte audio to float32 with resampling to target sample rate
-func (r *AudioResampler) ConvertToFloat32WithResample(data []byte, source *AudioConfig, targetSampleRate int) ([]float32, error) {
+func (r *AudioResampler) ConvertToFloat32WithResample(data []byte, source *protos.AudioConfig, targetSampleRate uint32) ([]float32, error) {
 	// Create target config with Linear16 format and target sample rate
-	target := &AudioConfig{
-		SampleRate: targetSampleRate,
-		Format:     Linear16,
-		Channels:   source.Channels,
+	target := &protos.AudioConfig{
+		SampleRate:  targetSampleRate,
+		AudioFormat: protos.AudioConfig_LINEAR16,
+		Channels:    source.Channels,
 	}
 
 	// Resample and convert to Linear16 if needed
@@ -123,7 +124,7 @@ func (r *AudioResampler) ConvertToFloat32WithResample(data []byte, source *Audio
 }
 
 // ConvertFromFloat32 converts float32 samples to byte audio data
-func (r *AudioResampler) ConvertToByteSamples(samples []float32, config *AudioConfig) ([]byte, error) {
+func (r *AudioResampler) ConvertToByteSamples(samples []float32, config *protos.AudioConfig) ([]byte, error) {
 	float64Samples := make([]float64, len(samples))
 	for i, sample := range samples {
 		float64Samples[i] = float64(sample)
@@ -132,25 +133,25 @@ func (r *AudioResampler) ConvertToByteSamples(samples []float32, config *AudioCo
 }
 
 // GetAudioInfo returns information about the byte audio data
-func (r *AudioResampler) GetAudioInfo(data []byte, config AudioConfig) AudioInfo {
+func (r *AudioResampler) GetAudioInfo(data []byte, config *protos.AudioConfig) AudioInfo {
 	var samplesPerChannel int
 	var bytesPerSample int
 
-	switch config.Format {
-	case Linear16:
+	switch config.GetAudioFormat() {
+	case protos.AudioConfig_LINEAR16:
 		bytesPerSample = 2
-		samplesPerChannel = len(data) / (bytesPerSample * config.Channels)
-	case MuLaw8:
+		samplesPerChannel = len(data) / (bytesPerSample * int(config.Channels))
+	case protos.AudioConfig_MuLaw8:
 		bytesPerSample = 1
-		samplesPerChannel = len(data) / (bytesPerSample * config.Channels)
+		samplesPerChannel = len(data) / (bytesPerSample * int(config.Channels))
 	}
 
 	duration := float64(samplesPerChannel) / float64(config.SampleRate)
 
 	return AudioInfo{
 		SampleRate:        config.SampleRate,
-		Format:            config.Format,
-		Channels:          config.Channels,
+		Format:            config.GetAudioFormat(),
+		Channels:          config.GetChannels(),
 		SamplesPerChannel: samplesPerChannel,
 		BytesPerSample:    bytesPerSample,
 		TotalBytes:        len(data),
@@ -159,26 +160,26 @@ func (r *AudioResampler) GetAudioInfo(data []byte, config AudioConfig) AudioInfo
 }
 
 // decodeToFloat64 converts various audio formats to normalized float64 samples
-func (r *AudioResampler) decodeToFloat64(data []byte, config *AudioConfig) ([]float64, error) {
-	switch config.Format {
-	case Linear16:
+func (r *AudioResampler) decodeToFloat64(data []byte, config *protos.AudioConfig) ([]float64, error) {
+	switch config.GetAudioFormat() {
+	case protos.AudioConfig_LINEAR16:
 		return r.decodePCM16ToFloat64(data), nil
-	case MuLaw8:
+	case protos.AudioConfig_MuLaw8:
 		return r.decodeMuLawToFloat64(data), nil
 	default:
-		return nil, fmt.Errorf("unsupported input format: %v", config.Format)
+		return nil, fmt.Errorf("unsupported input format: %v", config.GetAudioFormat())
 	}
 }
 
 // encodeFromFloat64 converts normalized float64 samples to target format
-func (r *AudioResampler) encodeFromFloat64(samples []float64, config *AudioConfig) ([]byte, error) {
-	switch config.Format {
-	case Linear16:
+func (r *AudioResampler) encodeFromFloat64(samples []float64, config *protos.AudioConfig) ([]byte, error) {
+	switch config.GetAudioFormat() {
+	case protos.AudioConfig_LINEAR16:
 		return r.encodeFloat64ToPCM16(samples), nil
-	case MuLaw8:
+	case protos.AudioConfig_MuLaw8:
 		return r.encodeFloat64ToMuLaw(samples), nil
 	default:
-		return nil, fmt.Errorf("unsupported output format: %v", config.Format)
+		return nil, fmt.Errorf("unsupported output format: %v", config.AudioFormat)
 	}
 }
 
@@ -271,7 +272,7 @@ func (r *AudioResampler) muLawEncode(sample int16) byte {
 }
 
 // resampleFloat64 performs high-quality resampling using linear interpolation
-func (r *AudioResampler) resampleFloat64(samples []float64, sourceSR, targetSR int) []float64 {
+func (r *AudioResampler) resampleFloat64(samples []float64, sourceSR, targetSR uint32) []float64 {
 	if sourceSR == targetSR {
 		return samples
 	}
@@ -298,7 +299,7 @@ func (r *AudioResampler) resampleFloat64(samples []float64, sourceSR, targetSR i
 }
 
 // convertChannels handles mono/stereo conversions
-func (r *AudioResampler) convertChannels(samples []float64, sourceChannels, targetChannels int) []float64 {
+func (r *AudioResampler) convertChannels(samples []float64, sourceChannels, targetChannels uint32) []float64 {
 	if sourceChannels == targetChannels {
 		return samples
 	}

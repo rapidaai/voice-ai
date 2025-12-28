@@ -9,8 +9,8 @@ package internal_transformer
 import (
 	"context"
 
-	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/protos"
 )
 
 // Transformers is a generic interface that defines a transform method
@@ -87,7 +87,7 @@ type TextToSpeechTransformer interface {
 type SpeechToTextInitializeOptions struct {
 
 	// audio config
-	AudioConfig *internal_audio.AudioConfig
+	AudioConfig *protos.AudioConfig
 
 	//
 	// on transcript
@@ -106,7 +106,7 @@ type SpeechToTextInitializeOptions struct {
 type TextToSpeechInitializeOptions struct {
 
 	// audio config
-	AudioConfig *internal_audio.AudioConfig
+	AudioConfig *protos.AudioConfig
 
 	// OnSpeech is called when speech is detected in the audio stream
 	// It receives a byte slice containing the speech audio data

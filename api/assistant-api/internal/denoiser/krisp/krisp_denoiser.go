@@ -3,17 +3,17 @@ package internal_denoiser_krisp
 import (
 	"context"
 
-	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_denoiser "github.com/rapidaai/api/assistant-api/internal/denoiser"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/protos"
 )
 
 type krispDenoiser struct {
 	logger commons.Logger
 }
 
-func NewKrispDenoiser(logger commons.Logger, inCfg *internal_audio.AudioConfig, options utils.Option) (internal_denoiser.Denoiser, error) {
+func NewKrispDenoiser(logger commons.Logger, inCfg *protos.AudioConfig, options utils.Option) (internal_denoiser.Denoiser, error) {
 	return &krispDenoiser{logger: logger}, nil
 }
 

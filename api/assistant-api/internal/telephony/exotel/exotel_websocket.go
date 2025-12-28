@@ -9,9 +9,7 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
-	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_streamers "github.com/rapidaai/api/assistant-api/internal/streamers"
-	internal_text "github.com/rapidaai/api/assistant-api/internal/text"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 )
@@ -162,7 +160,6 @@ func (exotel *exotelWebsocketStreamer) BuildVoiceRequest(audioData []byte) *prot
 }
 
 func (exotel *exotelWebsocketStreamer) Send(response *protos.AssistantMessagingResponse) error {
-
 	switch data := response.GetData().(type) {
 	case *protos.AssistantMessagingResponse_Assistant:
 		switch content := data.Assistant.Message.(type) {
@@ -204,19 +201,18 @@ func (exotel *exotelWebsocketStreamer) Send(response *protos.AssistantMessagingR
 			}
 		}
 	case *protos.AssistantMessagingResponse_Interruption:
-		exotel.logger.Debugf("clearing action")
 		exotel.audioBufferLock.Lock()
 		defer exotel.audioBufferLock.Unlock()
 		exotel.outputAudioBuffer.Reset() // Clear the buffer after flushing
-		err := exotel.sendingExotelMessage("clear", nil)
-		if err != nil {
+		if err := exotel.sendingExotelMessage("clear", nil); err != nil {
 			exotel.logger.Errorf("Error sending clear command:", err)
 		}
-	case *protos.AssistantMessagingResponse_DisconnectAction:
-		exotel.logger.Debugf("ending call action")
-		err := exotel.conn.Close()
-		if err != nil {
-			exotel.logger.Errorf("Error disconnecting command:", err)
+	case *protos.AssistantMessagingResponse_Action:
+		if data.Action.GetAction() == protos.AssistantConversationAction_END_CONVERSATION {
+			if err := exotel.conn.Close(); err != nil {
+				// terminate the conversation as end tool call is triggered
+				exotel.logger.Errorf("Error disconnecting command:", err)
+			}
 		}
 	}
 	return nil
@@ -251,17 +247,4 @@ func (exotel *exotelWebsocketStreamer) sendingExotelMessage(
 func (exo *exotelWebsocketStreamer) handleError(message string, err error) error {
 	exo.logger.Error(message, "error", err.Error())
 	return err
-}
-
-func (extl *exotelWebsocketStreamer) Config() *internal_streamers.StreamAttribute {
-	return internal_streamers.NewStreamAttribute(
-		internal_streamers.NewStreamConfig(internal_audio.NewLinear8khzMonoAudioConfig(),
-			&internal_text.TextConfig{
-				Charset: "UTF-8",
-			},
-		), internal_streamers.NewStreamConfig(internal_audio.NewLinear8khzMonoAudioConfig(),
-			&internal_text.TextConfig{
-				Charset: "UTF-8",
-			},
-		))
 }

@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"strings"
 
-	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	commons "github.com/rapidaai/pkg/commons"
 	utils "github.com/rapidaai/pkg/utils"
 
@@ -19,10 +18,10 @@ import (
 )
 
 func (dg *deepgramOption) GetEncoding() string {
-	switch dg.audioConfig.Format {
-	case internal_audio.Linear16:
+	switch dg.audioConfig.GetAudioFormat() {
+	case protos.AudioConfig_LINEAR16:
 		return "linear16"
-	case internal_audio.MuLaw8:
+	case protos.AudioConfig_MuLaw8:
 		return "mulaw"
 	default:
 		return "linear16"
@@ -34,13 +33,13 @@ type deepgramOption struct {
 	key         string
 	logger      commons.Logger
 	mdlOpts     utils.Option
-	audioConfig *internal_audio.AudioConfig
+	audioConfig *protos.AudioConfig
 }
 
 func NewDeepgramOption(
 	logger commons.Logger,
 	vaultCredential *protos.VaultCredential,
-	audioConfig *internal_audio.AudioConfig,
+	audioConfig *protos.AudioConfig,
 	opts utils.Option) (*deepgramOption, error) {
 	cx, ok := vaultCredential.GetValue().AsMap()["key"]
 	if !ok {
@@ -72,7 +71,7 @@ func (dgOpt *deepgramOption) SpeechToTextOptions() *interfaces.LiveTranscription
 		Punctuate:      true,
 		NoDelay:        true,
 		Encoding:       dgOpt.GetEncoding(),
-		SampleRate:     dgOpt.audioConfig.GetSampleRate(),
+		SampleRate:     int(dgOpt.audioConfig.GetSampleRate()),
 		Diarize:        false,
 		Multichannel:   false,
 	}
@@ -134,7 +133,7 @@ func (dgOpt *deepgramOption) TextToSpeechOptions() *interfaces.WSSpeakOptions {
 	opts := &interfaces.WSSpeakOptions{
 		Model:      "aura-asteria-en",
 		Encoding:   dgOpt.GetEncoding(),
-		SampleRate: dgOpt.audioConfig.SampleRate,
+		SampleRate: int(dgOpt.audioConfig.SampleRate),
 	}
 
 	if voiceIDValue, err := dgOpt.mdlOpts.GetString("speak.voice.id"); err == nil {

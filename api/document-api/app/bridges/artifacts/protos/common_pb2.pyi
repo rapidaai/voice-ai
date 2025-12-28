@@ -492,7 +492,7 @@ class GetAllConversationMessageResponse(_message.Message):
     def __init__(self, code: _Optional[int] = ..., success: bool = ..., data: _Optional[_Iterable[_Union[AssistantConversationMessage, _Mapping]]] = ..., error: _Optional[_Union[Error, _Mapping]] = ..., paginated: _Optional[_Union[Paginated, _Mapping]] = ...) -> None: ...
 
 class AssistantConversationConfiguration(_message.Message):
-    __slots__ = ("assistantConversationId", "assistant", "time", "metadata", "args", "options")
+    __slots__ = ("assistantConversationId", "assistant", "time", "metadata", "args", "options", "inputConfig", "outputConfig")
     class MetadataEntry(_message.Message):
         __slots__ = ("key", "value")
         KEY_FIELD_NUMBER: _ClassVar[int]
@@ -520,51 +520,84 @@ class AssistantConversationConfiguration(_message.Message):
     METADATA_FIELD_NUMBER: _ClassVar[int]
     ARGS_FIELD_NUMBER: _ClassVar[int]
     OPTIONS_FIELD_NUMBER: _ClassVar[int]
+    INPUTCONFIG_FIELD_NUMBER: _ClassVar[int]
+    OUTPUTCONFIG_FIELD_NUMBER: _ClassVar[int]
     assistantConversationId: int
     assistant: AssistantDefinition
     time: _timestamp_pb2.Timestamp
     metadata: _containers.MessageMap[str, _any_pb2.Any]
     args: _containers.MessageMap[str, _any_pb2.Any]
     options: _containers.MessageMap[str, _any_pb2.Any]
-    def __init__(self, assistantConversationId: _Optional[int] = ..., assistant: _Optional[_Union[AssistantDefinition, _Mapping]] = ..., time: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ..., metadata: _Optional[_Mapping[str, _any_pb2.Any]] = ..., args: _Optional[_Mapping[str, _any_pb2.Any]] = ..., options: _Optional[_Mapping[str, _any_pb2.Any]] = ...) -> None: ...
+    inputConfig: StreamConfig
+    outputConfig: StreamConfig
+    def __init__(self, assistantConversationId: _Optional[int] = ..., assistant: _Optional[_Union[AssistantDefinition, _Mapping]] = ..., time: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ..., metadata: _Optional[_Mapping[str, _any_pb2.Any]] = ..., args: _Optional[_Mapping[str, _any_pb2.Any]] = ..., options: _Optional[_Mapping[str, _any_pb2.Any]] = ..., inputConfig: _Optional[_Union[StreamConfig, _Mapping]] = ..., outputConfig: _Optional[_Union[StreamConfig, _Mapping]] = ...) -> None: ...
 
-class AssistantConversationDisconnectAction(_message.Message):
-    __slots__ = ("reason",)
-    REASON_FIELD_NUMBER: _ClassVar[int]
-    reason: str
-    def __init__(self, reason: _Optional[str] = ...) -> None: ...
+class AssistantConversationError(_message.Message):
+    __slots__ = ("error",)
+    ERROR_FIELD_NUMBER: _ClassVar[int]
+    error: Error
+    def __init__(self, error: _Optional[_Union[Error, _Mapping]] = ...) -> None: ...
 
-class AssistantConverstationHoldAction(_message.Message):
-    __slots__ = ("holdTime",)
-    HOLDTIME_FIELD_NUMBER: _ClassVar[int]
-    holdTime: int
-    def __init__(self, holdTime: _Optional[int] = ...) -> None: ...
+class StreamConfig(_message.Message):
+    __slots__ = ("audio", "text")
+    AUDIO_FIELD_NUMBER: _ClassVar[int]
+    TEXT_FIELD_NUMBER: _ClassVar[int]
+    audio: AudioConfig
+    text: TextConfig
+    def __init__(self, audio: _Optional[_Union[AudioConfig, _Mapping]] = ..., text: _Optional[_Union[TextConfig, _Mapping]] = ...) -> None: ...
 
-class AssistantConverstationKnowledgeRetrievalAction(_message.Message):
-    __slots__ = ("query",)
-    QUERY_FIELD_NUMBER: _ClassVar[int]
-    query: str
-    def __init__(self, query: _Optional[str] = ...) -> None: ...
+class AudioConfig(_message.Message):
+    __slots__ = ("sampleRate", "audioFormat", "channels")
+    class AudioFormat(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        LINEAR16: _ClassVar[AudioConfig.AudioFormat]
+        MuLaw8: _ClassVar[AudioConfig.AudioFormat]
+    LINEAR16: AudioConfig.AudioFormat
+    MuLaw8: AudioConfig.AudioFormat
+    SAMPLERATE_FIELD_NUMBER: _ClassVar[int]
+    AUDIOFORMAT_FIELD_NUMBER: _ClassVar[int]
+    CHANNELS_FIELD_NUMBER: _ClassVar[int]
+    sampleRate: int
+    audioFormat: AudioConfig.AudioFormat
+    channels: int
+    def __init__(self, sampleRate: _Optional[int] = ..., audioFormat: _Optional[_Union[AudioConfig.AudioFormat, str]] = ..., channels: _Optional[int] = ...) -> None: ...
 
-class AssistantConverstationApiRequestAction(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+class TextConfig(_message.Message):
+    __slots__ = ("charset",)
+    CHARSET_FIELD_NUMBER: _ClassVar[int]
+    charset: str
+    def __init__(self, charset: _Optional[str] = ...) -> None: ...
 
-class AssistantConverstationEndpointAction(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
-
-class AssistantConversationDeviationAction(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
-
-class AssistantConversationAssistantTransferAction(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
-
-class AssistantConversationPhoneCallTransferAction(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+class AssistantConversationAction(_message.Message):
+    __slots__ = ("name", "action", "args")
+    class ActionType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        ACTION_UNSPECIFIED: _ClassVar[AssistantConversationAction.ActionType]
+        KNOWLEDGE_RETRIEVAL: _ClassVar[AssistantConversationAction.ActionType]
+        API_REQUEST: _ClassVar[AssistantConversationAction.ActionType]
+        ENDPOINT_CALL: _ClassVar[AssistantConversationAction.ActionType]
+        PUT_ON_HOLD: _ClassVar[AssistantConversationAction.ActionType]
+        END_CONVERSATION: _ClassVar[AssistantConversationAction.ActionType]
+    ACTION_UNSPECIFIED: AssistantConversationAction.ActionType
+    KNOWLEDGE_RETRIEVAL: AssistantConversationAction.ActionType
+    API_REQUEST: AssistantConversationAction.ActionType
+    ENDPOINT_CALL: AssistantConversationAction.ActionType
+    PUT_ON_HOLD: AssistantConversationAction.ActionType
+    END_CONVERSATION: AssistantConversationAction.ActionType
+    class ArgsEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: _any_pb2.Any
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[_Union[_any_pb2.Any, _Mapping]] = ...) -> None: ...
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    ACTION_FIELD_NUMBER: _ClassVar[int]
+    ARGS_FIELD_NUMBER: _ClassVar[int]
+    name: str
+    action: AssistantConversationAction.ActionType
+    args: _containers.MessageMap[str, _any_pb2.Any]
+    def __init__(self, name: _Optional[str] = ..., action: _Optional[_Union[AssistantConversationAction.ActionType, str]] = ..., args: _Optional[_Mapping[str, _any_pb2.Any]] = ...) -> None: ...
 
 class AssistantConversationInterruption(_message.Message):
     __slots__ = ("id", "type", "time")

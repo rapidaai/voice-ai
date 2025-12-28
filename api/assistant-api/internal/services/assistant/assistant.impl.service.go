@@ -1,3 +1,8 @@
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
+//
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package internal_assistant_service
 
 import (
@@ -16,7 +21,6 @@ import (
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
-	assistant_grpc_api "github.com/rapidaai/protos"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -119,7 +123,7 @@ func (eService *assistantService) DeleteAssistant(ctx context.Context, auth type
 	return ed, nil
 }
 
-func (eService *assistantService) GetAllAssistantTool(ctx context.Context, auth types.SimplePrinciple, assistantId uint64, criterias []*assistant_grpc_api.Criteria, paginate *assistant_grpc_api.Paginate) (int64, []*internal_assistant_entity.AssistantTool, error) {
+func (eService *assistantService) GetAllAssistantTool(ctx context.Context, auth types.SimplePrinciple, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantTool, error) {
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	var (
@@ -460,7 +464,7 @@ func (eService *assistantService) UpdateAssistantVersion(ctx context.Context,
 	return ed, nil
 }
 
-func (eService *assistantService) GetAll(ctx context.Context, auth types.SimplePrinciple, criterias []*assistant_grpc_api.Criteria, paginate *assistant_grpc_api.Paginate, opts *internal_services.GetAssistantOption) (int64, []*internal_assistant_entity.Assistant, error) {
+func (eService *assistantService) GetAll(ctx context.Context, auth types.SimplePrinciple, criterias []*protos.Criteria, paginate *protos.Paginate, opts *internal_services.GetAssistantOption) (int64, []*internal_assistant_entity.Assistant, error) {
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	var (
@@ -535,8 +539,8 @@ func (eService *assistantService) GetAll(ctx context.Context, auth types.SimpleP
 func (eService *assistantService) GetAllAssistantProviderModel(
 	ctx context.Context,
 	auth types.SimplePrinciple,
-	assistantId uint64, criterias []*assistant_grpc_api.Criteria,
-	paginate *assistant_grpc_api.Paginate) (int64, []*internal_assistant_entity.AssistantProviderModel, error) {
+	assistantId uint64, criterias []*protos.Criteria,
+	paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantProviderModel, error) {
 
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
@@ -577,8 +581,8 @@ func (eService *assistantService) GetAllAssistantProviderModel(
 func (eService *assistantService) GetAllAssistantProviderAgentkit(
 	ctx context.Context,
 	auth types.SimplePrinciple,
-	assistantId uint64, criterias []*assistant_grpc_api.Criteria,
-	paginate *assistant_grpc_api.Paginate) (int64, []*internal_assistant_entity.AssistantProviderAgentkit, error) {
+	assistantId uint64, criterias []*protos.Criteria,
+	paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantProviderAgentkit, error) {
 
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
@@ -618,8 +622,8 @@ func (eService *assistantService) GetAllAssistantProviderAgentkit(
 func (eService *assistantService) GetAllAssistantProviderWebsocket(
 	ctx context.Context,
 	auth types.SimplePrinciple,
-	assistantId uint64, criterias []*assistant_grpc_api.Criteria,
-	paginate *assistant_grpc_api.Paginate) (int64, []*internal_assistant_entity.AssistantProviderWebsocket, error) {
+	assistantId uint64, criterias []*protos.Criteria,
+	paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantProviderWebsocket, error) {
 
 	start := time.Now()
 	db := eService.postgres.DB(ctx)

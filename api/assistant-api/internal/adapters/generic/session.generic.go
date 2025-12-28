@@ -1,9 +1,8 @@
-// Copyright (c) Rapida
-// Author: Prashant <prashant@rapida.ai>
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
 //
-// Licensed under the Rapida internal use license.
-// This file is part of Rapida's proprietary software.
-// Unauthorized copying, modification, or redistribution is strictly prohibited.
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package internal_adapter_request_generic
 
 import (
@@ -115,39 +114,33 @@ func (talking *GenericRequestor) Connect(ctx context.Context, iAuth types.Simple
 			K: "conversation_id",
 			V: internal_telemetry.IntValue(req.GetAssistantConversationId()),
 		})
-		return talking.OnResumeSession(ctx, assistant, identifier, req.GetAssistantConversationId(), customization)
+		return talking.OnResumeSession(ctx, req.GetInputConfig(), req.GetOutputConfig(), assistant, identifier, req.GetAssistantConversationId(), customization)
 	}
 	span.AddAttributes(ctx, internal_telemetry.KV{
 		K: "conversation_initiation",
 		V: internal_telemetry.StringValue("new"),
 	})
-	return talking.OnCreateSession(ctx, assistant, identifier, customization)
+	return talking.OnCreateSession(ctx, req.GetInputConfig(), req.GetOutputConfig(), assistant, identifier, customization)
 }
 
-func (talking *GenericRequestor) OnCreateSession(ctx context.Context, assistant *internal_assistant_entity.Assistant, identifier string, customization internal_adapter_requests.Customization,
+func (talking *GenericRequestor) OnCreateSession(ctx context.Context, inCfg, strmCfg *protos.StreamConfig, assistant *internal_assistant_entity.Assistant, identifier string, customization internal_adapter_requests.Customization,
 ) error {
 	ctx, span, err := talking.Tracer().StartSpan(ctx, utils.AssistantCreateConversationStage)
 	defer span.EndSpan(ctx, utils.AssistantCreateConversationStage)
-	streamInConfg, err := talking.streamer.Config().GetInputConfig()
-	if err != nil {
+
+	if inCfg == nil || strmCfg == nil {
 		talking.logger.Errorf("streamConfg is not set, please check the configuration")
 		return err
 	}
 
-	audioInConfig, err := streamInConfg.GetAudioConfig()
-	if err != nil {
+	audioInConfig := inCfg.GetAudio()
+	if audioInConfig == nil {
 		talking.logger.Errorf("streamConfg is not set, please check the configuration")
 		return err
 	}
 
-	streamOtConfg, err := talking.streamer.Config().GetOutputConfig()
-	if err != nil {
-		talking.logger.Errorf("streamConfg is not set, please check the configuration")
-		return err
-	}
-
-	audioOutConfig, err := streamOtConfg.GetAudioConfig()
-	if err != nil {
+	audioOutConfig := strmCfg.GetAudio()
+	if audioOutConfig == nil {
 		talking.logger.Errorf("streamConfg is not set, please check the configuration")
 		return err
 	}
@@ -160,23 +153,28 @@ func (talking *GenericRequestor) OnCreateSession(ctx context.Context, assistant 
 		return err
 	}
 
-	utils.Go(ctx, func() {
-		if err := talking.Notify(ctx,
-			&protos.AssistantConversationConfiguration{
-				AssistantConversationId: conversation.Id,
-				Assistant: &protos.AssistantDefinition{
-					AssistantId: assistant.Id,
-					Version:     fmt.Sprintf("vrsn_%d", assistant.AssistantProviderId),
-				},
-				Time: timestamppb.Now(),
+	if err := talking.Notify(ctx,
+		&protos.AssistantConversationConfiguration{
+			AssistantConversationId: conversation.Id,
+			Assistant: &protos.AssistantDefinition{
+				AssistantId: assistant.Id,
+				Version:     fmt.Sprintf("vrsn_%d", assistant.AssistantProviderId),
 			},
-		); err != nil {
-			talking.logger.Errorf("Error sending configuration: %v\n", err)
+			Time: timestamppb.Now(),
+		},
+	); err != nil {
+		talking.logger.Errorf("Error sending configuration: %v\n", err)
+	}
+
+	//  voice recording enabled before voice in or out
+	utils.Go(ctx, func() {
+		if err := talking.recorder.Initialize(audioInConfig, audioOutConfig); err != nil {
+			talking.logger.Tracef(ctx, "unable to init recorder %+v", err)
 		}
 	})
 
 	utils.Go(ctx, func() {
-		if err := talking.ConnectSpeaker(ctx, audioInConfig, audioOutConfig); err != nil {
+		if err := talking.ConnectSpeaker(ctx, audioOutConfig); err != nil {
 			talking.logger.Tracef(ctx, "unable to connect speaker %+v", err)
 		}
 		if err := talking.OnGreet(ctx); err != nil {
@@ -187,7 +185,7 @@ func (talking *GenericRequestor) OnCreateSession(ctx context.Context, assistant 
 
 	// establish listener
 	utils.Go(ctx, func() {
-		if err := talking.ConnectListener(ctx, audioInConfig, audioOutConfig); err != nil {
+		if err := talking.ConnectListener(ctx, audioInConfig); err != nil {
 			talking.logger.Tracef(ctx, "unable to init analyzer %+v", err)
 		}
 	})
@@ -199,11 +197,6 @@ func (talking *GenericRequestor) OnCreateSession(ctx context.Context, assistant 
 		}
 	})
 
-	utils.Go(ctx, func() {
-		if err := talking.recorder.Initialize(audioInConfig, audioOutConfig); err != nil {
-			talking.logger.Tracef(ctx, "unable to init recorder %+v", err)
-		}
-	})
 	utils.Go(ctx, func() {
 		talking.AddMetrics(talking.Auth(), &types.Metric{
 			Name:        type_enums.STATUS.String(),
@@ -229,74 +222,26 @@ func (talking *GenericRequestor) OnCreateSession(ctx context.Context, assistant 
 	return nil
 }
 
-func (talking *GenericRequestor) OnResumeSession(ctx context.Context, assistant *internal_assistant_entity.Assistant, identifier string, assistantConversationId uint64, customization internal_adapter_requests.Customization) error {
+func (talking *GenericRequestor) OnResumeSession(ctx context.Context, inCfg, strmCfg *protos.StreamConfig, assistant *internal_assistant_entity.Assistant, identifier string, assistantConversationId uint64, customization internal_adapter_requests.Customization) error {
 	ctx, span, err := talking.Tracer().StartSpan(talking.Context(), utils.AssistantResumeConverstaionStage)
 	defer span.EndSpan(ctx, utils.AssistantResumeConverstaionStage)
 
-	streamInConfg, err := talking.streamer.Config().GetInputConfig()
-	if err != nil {
+	if inCfg == nil || strmCfg == nil {
 		talking.logger.Errorf("streamConfg is not set, please check the configuration")
 		return err
 	}
 
-	audioInConfig, err := streamInConfg.GetAudioConfig()
-	if err != nil {
+	audioInConfig := inCfg.GetAudio()
+	if audioInConfig == nil {
 		talking.logger.Errorf("streamConfg is not set, please check the configuration")
 		return err
 	}
 
-	streamOtConfg, err := talking.streamer.Config().GetOutputConfig()
-	if err != nil {
+	audioOutConfig := strmCfg.GetAudio()
+	if audioOutConfig == nil {
 		talking.logger.Errorf("streamConfg is not set, please check the configuration")
 		return err
 	}
-
-	audioOutConfig, err := streamOtConfg.GetAudioConfig()
-	if err != nil {
-		talking.logger.Errorf("streamConfg is not set, please check the configuration")
-		return err
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	// establish listener
-	utils.Go(ctx, func() {
-		defer wg.Done()
-		if err := talking.ConnectListener(ctx, audioInConfig, audioOutConfig); err != nil {
-			talking.logger.Tracef(talking.Context(), "unable to init analyzer %+v", err)
-		}
-	})
-	// establish speaker
-
-	wg.Add(1)
-	utils.Go(talking.Context(), func() {
-		defer wg.Done()
-		if err := talking.ConnectSpeaker(ctx, audioInConfig, audioOutConfig); err != nil {
-			talking.logger.Tracef(talking.Context(), "unable to init analyzer %+v", err)
-		}
-
-	})
-
-	wg.Add(1)
-	utils.Go(talking.Context(), func() {
-		defer wg.Done()
-		if err := talking.recorder.Initialize(audioInConfig, audioOutConfig); err != nil {
-			talking.logger.Tracef(talking.Context(), "unable to init recorder %+v", err)
-		}
-	})
-
-	wg.Add(1)
-	utils.Go(talking.Context(), func() {
-		defer wg.Done()
-		client := types.GetClientInfoFromGrpcContext(talking.Context())
-		if client != nil {
-			if clj, err := client.ToJson(); err == nil {
-				talking.SetMetadata(talking.Auth(), map[string]interface{}{
-					"talk.client_information": clj,
-				})
-			}
-		}
-	})
 
 	// resume the conversation
 	conversation, err := talking.ResumeConversation(talking.Auth(), assistant, assistantConversationId, identifier)
@@ -315,18 +260,46 @@ func (talking *GenericRequestor) OnResumeSession(ctx context.Context, assistant 
 		talking.logger.Errorf("Error sending configuration: %v\n", err)
 	}
 
-	wg.Add(1)
-	utils.Go(talking.Context(), func() {
-		defer wg.Done()
+	// establish listener
+	utils.Go(ctx, func() {
+		if err := talking.ConnectListener(ctx, audioInConfig); err != nil {
+			talking.logger.Tracef(talking.Context(), "unable to init analyzer %+v", err)
+		}
+	})
+	// establish speaker
+
+	utils.Go(ctx, func() {
+		if err := talking.ConnectSpeaker(ctx, audioOutConfig); err != nil {
+			talking.logger.Tracef(ctx, "unable to init analyzer %+v", err)
+		}
+
+	})
+
+	utils.Go(ctx, func() {
+		if err := talking.recorder.Initialize(audioInConfig, audioOutConfig); err != nil {
+			talking.logger.Tracef(ctx, "unable to init recorder %+v", err)
+		}
+	})
+
+	utils.Go(ctx, func() {
+		client := types.GetClientInfoFromGrpcContext(ctx)
+		if client != nil {
+			if clj, err := client.ToJson(); err == nil {
+				talking.SetMetadata(talking.Auth(), map[string]interface{}{
+					"talk.client_information": clj,
+				})
+			}
+		}
+	})
+
+	utils.Go(ctx, func() {
 		talking.logger.Debugf("talking.OnStartSession.executor.Init")
 		if err := talking.assistantExecutor.Initialize(ctx, talking); err != nil {
 			talking.logger.Errorf("Error Initialize assistantExecutor: %v", err)
 		}
 	})
 
-	wg.Add(1)
-	utils.Go(talking.Context(), func() {
-		defer wg.Done()
+	utils.Go(ctx, func() {
 		talking.AddMetrics(
 			talking.Auth(),
 			&types.Metric{
@@ -335,7 +308,6 @@ func (talking *GenericRequestor) OnResumeSession(ctx context.Context, assistant 
 				Description: "Status of the given conversation",
 			})
 	})
-	wg.Wait()
 
 	if err := talking.OnResumeConversation(); err != nil {
 		talking.logger.Errorf("Error while resume the conversation: %v", err)

@@ -1,6 +1,8 @@
-// The `package internal_services` in this code snippet defines several interfaces for different
-// services related to workflows, assistants, knowledge, and knowledge documents. These interfaces
-// specify the methods that need to be implemented by concrete types that provide these services.
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
+//
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package internal_services
 
 import (

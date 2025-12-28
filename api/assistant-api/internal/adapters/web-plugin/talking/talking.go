@@ -1,9 +1,8 @@
-// Copyright (c) Rapida
-// Author: Prashant <prashant@rapida.ai>
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
 //
-// Licensed under the Rapida internal use license.
-// This file is part of Rapida's proprietary software.
-// Unauthorized copying, modification, or redistribution is strictly prohibited.
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package internal_adapter_request_talking_web_plugin
 
 import (
@@ -65,15 +64,11 @@ func NewTalking(
 * //+
 * The function doesn't return any value. It runs asynchronously in a separate goroutine.//+
  */
-func (talking *webpluginTalking) Talk(
-	ctx context.Context,
-	auth types.SimplePrinciple,
-	identifier string) error {
-
+func (talking *webpluginTalking) Talk(ctx context.Context, auth types.SimplePrinciple, identifier string) error {
 	talking.StartedAt = time.Now()
+
 	var initialized = false
 	for {
-		// Check if context is done
 		select {
 		case <-ctx.Done():
 			if initialized {
@@ -81,7 +76,6 @@ func (talking *webpluginTalking) Talk(
 			}
 			return ctx.Err()
 		default:
-			// Continue processing
 		}
 
 		req, err := talking.Streamer().Recv()
@@ -103,6 +97,7 @@ func (talking *webpluginTalking) Talk(
 				}
 			}
 		case *protos.AssistantMessagingRequest_Configuration:
+			initialized = false
 			if err := talking.Connect(ctx, auth, identifier, msg.Configuration); err != nil {
 				talking.logger.Errorf("unexpected error while connect assistant, might be problem in configuration %+v", err)
 				return fmt.Errorf("talking.Connect error: %w", err)

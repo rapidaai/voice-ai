@@ -1,3 +1,8 @@
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
+//
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package internal_telephony
 
 import (
@@ -37,6 +42,15 @@ type Telephony interface {
 
 	//
 	GetCaller(c *gin.Context) (string, bool)
+
+	// let telephony provider handle and allow to choose what will be best codecs and format
+	// streaming config
+	// added to support multiple audio codecs and format
+	InputStreamConfig() *protos.StreamConfig
+
+	// streaming config
+	// added to support multiple audio codecs and format
+	OutputStreamConfig() *protos.StreamConfig
 }
 
 func GetAnswerPath(provider string, auth types.SimplePrinciple, assistantId uint64, assistantConversationId uint64, toPhone string) string {

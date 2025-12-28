@@ -57,23 +57,15 @@ class AgentTalkRequest(_message.Message):
     def __init__(self, configuration: _Optional[_Union[_common_pb2.AssistantConversationConfiguration, _Mapping]] = ..., message: _Optional[_Union[_common_pb2.AssistantConversationUserMessage, _Mapping]] = ...) -> None: ...
 
 class AgentTalkResponse(_message.Message):
-    __slots__ = ("code", "success", "error", "interruption", "assistant", "disconnectAction", "holdAction", "assistantTransferAction", "phoneCallTransferAction")
+    __slots__ = ("code", "success", "error", "interruption", "assistant")
     CODE_FIELD_NUMBER: _ClassVar[int]
     SUCCESS_FIELD_NUMBER: _ClassVar[int]
     ERROR_FIELD_NUMBER: _ClassVar[int]
     INTERRUPTION_FIELD_NUMBER: _ClassVar[int]
     ASSISTANT_FIELD_NUMBER: _ClassVar[int]
-    DISCONNECTACTION_FIELD_NUMBER: _ClassVar[int]
-    HOLDACTION_FIELD_NUMBER: _ClassVar[int]
-    ASSISTANTTRANSFERACTION_FIELD_NUMBER: _ClassVar[int]
-    PHONECALLTRANSFERACTION_FIELD_NUMBER: _ClassVar[int]
     code: int
     success: bool
     error: _common_pb2.Error
     interruption: _common_pb2.AssistantConversationInterruption
     assistant: _common_pb2.AssistantConversationAssistantMessage
-    disconnectAction: _common_pb2.AssistantConversationDisconnectAction
-    holdAction: _common_pb2.AssistantConverstationHoldAction
-    assistantTransferAction: _common_pb2.AssistantConversationAssistantTransferAction
-    phoneCallTransferAction: _common_pb2.AssistantConversationPhoneCallTransferAction
-    def __init__(self, code: _Optional[int] = ..., success: bool = ..., error: _Optional[_Union[_common_pb2.Error, _Mapping]] = ..., interruption: _Optional[_Union[_common_pb2.AssistantConversationInterruption, _Mapping]] = ..., assistant: _Optional[_Union[_common_pb2.AssistantConversationAssistantMessage, _Mapping]] = ..., disconnectAction: _Optional[_Union[_common_pb2.AssistantConversationDisconnectAction, _Mapping]] = ..., holdAction: _Optional[_Union[_common_pb2.AssistantConverstationHoldAction, _Mapping]] = ..., assistantTransferAction: _Optional[_Union[_common_pb2.AssistantConversationAssistantTransferAction, _Mapping]] = ..., phoneCallTransferAction: _Optional[_Union[_common_pb2.AssistantConversationPhoneCallTransferAction, _Mapping]] = ...) -> None: ...
+    def __init__(self, code: _Optional[int] = ..., success: bool = ..., error: _Optional[_Union[_common_pb2.Error, _Mapping]] = ..., interruption: _Optional[_Union[_common_pb2.AssistantConversationInterruption, _Mapping]] = ..., assistant: _Optional[_Union[_common_pb2.AssistantConversationAssistantMessage, _Mapping]] = ...) -> None: ...

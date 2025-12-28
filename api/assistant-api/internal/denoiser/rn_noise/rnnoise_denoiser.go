@@ -1,9 +1,8 @@
-// Copyright (c) Rapida
-// Author: Prashant <prashant@rapida.ai>
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
 //
-// Licensed under the Rapida internal use license.
-// This file is part of Rapida's proprietary software.
-// Unauthorized copying, modification, or redistribution is strictly prohibited.
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package internal_denoiser_rnnoise
 
 import (
@@ -13,20 +12,21 @@ import (
 	internal_denoiser "github.com/rapidaai/api/assistant-api/internal/denoiser"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/protos"
 )
 
 type rnnoiseDenoiser struct {
 	rnNoise        *RNNoise
 	logger         commons.Logger
-	denoiserConfig *internal_audio.AudioConfig
-	inputConfig    *internal_audio.AudioConfig
-	outputConfig   *internal_audio.AudioConfig
+	denoiserConfig *protos.AudioConfig
+	inputConfig    *protos.AudioConfig
+	outputConfig   *protos.AudioConfig
 	audioSampler   *internal_audio.AudioResampler
 }
 
 // NewDenoiser creates a new denoiser instance
 func NewRnnoiseDenoiser(
-	logger commons.Logger, inputConfig *internal_audio.AudioConfig, options utils.Option,
+	logger commons.Logger, inputConfig *protos.AudioConfig, options utils.Option,
 ) (internal_denoiser.Denoiser, error) {
 
 	rn, err := NewRNNoise()
@@ -36,9 +36,9 @@ func NewRnnoiseDenoiser(
 	return &rnnoiseDenoiser{
 		audioSampler: internal_audio.NewAudioResampler(),
 		rnNoise:      rn,
-		denoiserConfig: &internal_audio.AudioConfig{
-			SampleRate: 48000,
-			Format:     internal_audio.Linear16,
+		denoiserConfig: &protos.AudioConfig{
+			SampleRate:  48000,
+			AudioFormat: protos.AudioConfig_LINEAR16,
 		},
 		inputConfig:  inputConfig,
 		outputConfig: inputConfig,
@@ -100,9 +100,9 @@ func (rnd *rnnoiseDenoiser) Denoise(ctx context.Context, input []byte) ([]byte, 
 	}
 
 	//
-	idm, err := rnd.audioSampler.Resample(ido, &internal_audio.AudioConfig{
-		SampleRate: 48000,
-		Format:     internal_audio.Linear16,
+	idm, err := rnd.audioSampler.Resample(ido, &protos.AudioConfig{
+		SampleRate:  48000,
+		AudioFormat: protos.AudioConfig_LINEAR16,
 	}, rnd.outputConfig)
 
 	if err != nil {

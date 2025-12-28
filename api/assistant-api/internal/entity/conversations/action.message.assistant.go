@@ -1,3 +1,8 @@
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
+//
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package internal_conversation_gorm
 
 import (
@@ -11,8 +16,6 @@ import (
 
 //
 
-// ALTER TABLE assistant_conversation_actions rename column message_id to assistant_conversation_message_id;
-// "assistant_conversation_message_id" of relation "assistant_conversation_actions" does
 type AssistantConversationAction struct {
 	gorm_model.Audited
 	AssistantId                    uint64 `json:"assistantId" gorm:"type:bigint;not null"`

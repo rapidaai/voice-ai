@@ -12,7 +12,6 @@ import (
 
 	"cloud.google.com/go/speech/apiv2/speechpb"
 	"cloud.google.com/go/texttospeech/apiv1/texttospeechpb"
-	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -30,7 +29,7 @@ const (
 type googleOption struct {
 	logger       commons.Logger
 	clientOptons []option.ClientOption
-	audioConfig  *internal_audio.AudioConfig
+	audioConfig  *protos.AudioConfig
 	mdlOpts      utils.Option
 	projectId    string
 }
@@ -39,7 +38,7 @@ type googleOption struct {
 // Improves error handling and logging for better debugging and robustness.
 func NewGoogleOption(logger commons.Logger,
 	vaultCredential *protos.VaultCredential,
-	audioConfig *internal_audio.AudioConfig,
+	audioConfig *protos.AudioConfig,
 	opts utils.Option) (*googleOption, error) {
 	co := make([]option.ClientOption, 0)
 	credentialsMap := vaultCredential.GetValue().AsMap()
@@ -74,7 +73,7 @@ func (gO *googleOption) GetClientOptions() []option.ClientOption {
 // SpeechToTextOptions generates a configuration for Google Speech-to-Text streaming recognition.
 // Default language and model are used unless overridden via mdlOpts.
 func (gog *googleOption) SpeechToTextOptions() *speechpb.StreamingRecognitionConfig {
-	audioEncoding := gog.GetSpeechToTextEncoding(gog.audioConfig.Format)
+	audioEncoding := gog.GetSpeechToTextEncoding(gog.audioConfig.GetAudioFormat())
 
 	opts := &speechpb.StreamingRecognitionConfig{
 
@@ -131,7 +130,7 @@ func (gog *googleOption) SpeechToTextOptions() *speechpb.StreamingRecognitionCon
 
 // TextToSpeechOptions generates a configuration for Google Text-to-Speech streaming synthesis.
 func (goog *googleOption) TextToSpeechOptions() *texttospeechpb.StreamingSynthesizeConfig {
-	audioEncoding := goog.GetTextToSpeechEncodingByName(goog.audioConfig.Format)
+	audioEncoding := goog.GetTextToSpeechEncodingByName(goog.audioConfig.GetAudioFormat())
 
 	options := &texttospeechpb.StreamingSynthesizeConfig{
 		Voice: &texttospeechpb.VoiceSelectionParams{
@@ -156,11 +155,11 @@ func (goog *googleOption) TextToSpeechOptions() *texttospeechpb.StreamingSynthes
 // GetSpeechToTextEncodingFromString maps internal_audio.AudioFormat to Google's Speech-to-Text encoding.
 
 // GetTextToSpeechEncodingByName maps internal_audio.AudioFormat to Google's Text-to-Speech encoding.
-func (gog *googleOption) GetTextToSpeechEncodingByName(encoding internal_audio.AudioFormat) texttospeechpb.AudioEncoding {
+func (gog *googleOption) GetTextToSpeechEncodingByName(encoding protos.AudioConfig_AudioFormat) texttospeechpb.AudioEncoding {
 	switch encoding {
-	case internal_audio.Linear16:
+	case protos.AudioConfig_LINEAR16:
 		return texttospeechpb.AudioEncoding_PCM
-	case internal_audio.MuLaw8:
+	case protos.AudioConfig_MuLaw8:
 		return texttospeechpb.AudioEncoding_MULAW
 	default:
 		return texttospeechpb.AudioEncoding_PCM
@@ -169,11 +168,11 @@ func (gog *googleOption) GetTextToSpeechEncodingByName(encoding internal_audio.A
 
 // GetAudioEncoding returns audio encoding for both SpeechToText and TextToSpeech based on internal_audio.AudioFormat.
 // Reduces repetitive logic in audio encoding handling.
-func (gog *googleOption) GetSpeechToTextEncoding(audioFormat internal_audio.AudioFormat) speechpb.ExplicitDecodingConfig_AudioEncoding {
+func (gog *googleOption) GetSpeechToTextEncoding(audioFormat protos.AudioConfig_AudioFormat) speechpb.ExplicitDecodingConfig_AudioEncoding {
 	switch audioFormat {
-	case internal_audio.Linear16:
+	case protos.AudioConfig_LINEAR16:
 		return speechpb.ExplicitDecodingConfig_LINEAR16
-	case internal_audio.MuLaw8:
+	case protos.AudioConfig_MuLaw8:
 		return speechpb.ExplicitDecodingConfig_MULAW
 	default:
 		return speechpb.ExplicitDecodingConfig_LINEAR16

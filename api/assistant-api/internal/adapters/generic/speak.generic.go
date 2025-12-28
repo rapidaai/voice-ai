@@ -1,9 +1,8 @@
-// Copyright (c) Rapida
-// Author: Prashant <prashant@rapida.ai>
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
 //
-// Licensed under the Rapida internal use license.
-// This file is part of Rapida's proprietary software.
-// Unauthorized copying, modification, or redistribution is strictly prohibited.
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package internal_adapter_request_generic
 
 import (
@@ -11,13 +10,13 @@ import (
 	"sync"
 	"time"
 
-	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_adapter_transformer_factory "github.com/rapidaai/api/assistant-api/internal/factory/transformer"
 	internal_synthesizers "github.com/rapidaai/api/assistant-api/internal/synthesizes"
 	internal_adapter_telemetry "github.com/rapidaai/api/assistant-api/internal/telemetry"
 	internal_tokenizer "github.com/rapidaai/api/assistant-api/internal/tokenizer"
 	internal_transformer "github.com/rapidaai/api/assistant-api/internal/transformer"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/protos"
 )
 
 func (spk *GenericRequestor) FinishSpeaking(
@@ -84,7 +83,7 @@ func (spk *GenericRequestor) Speak(contextId string, msg string) error {
 // Init initializes the audio talking system for a given assistant persona.
 // It sets up both audio input and output transformer.
 // This function is typically called at the beginning of a communication session.
-func (spk *GenericRequestor) ConnectSpeaker(ctx context.Context, audioInConfig, audioOutConfig *internal_audio.AudioConfig) error {
+func (spk *GenericRequestor) ConnectSpeaker(ctx context.Context, audioOutConfig *protos.AudioConfig) error {
 	context, span, _ := spk.Tracer().StartSpan(ctx, utils.AssistantSpeakConnectStage)
 	defer span.EndSpan(context, utils.AssistantSpeakConnectStage)
 

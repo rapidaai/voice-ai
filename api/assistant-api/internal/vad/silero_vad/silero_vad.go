@@ -11,22 +11,23 @@ import (
 	internal_vad "github.com/rapidaai/api/assistant-api/internal/vad"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/protos"
 	"github.com/streamer45/silero-vad-go/speech"
 )
 
 // SileroVAD implements Vad using silero-vad-go
 type SileroVAD struct {
 	logger       commons.Logger
-	inputConfig  *internal_audio.AudioConfig
+	inputConfig  *protos.AudioConfig
 	detector     *speech.Detector
 	onActivity   func(*internal_vad.VadResult) error
 	audioSampler *internal_audio.AudioResampler
-	vadConfig    *internal_audio.AudioConfig
+	vadConfig    *protos.AudioConfig
 }
 
 // NewSileroVAD creates a new SileroVAD
 func NewSileroVAD(logger commons.Logger,
-	inputAudio *internal_audio.AudioConfig,
+	inputAudio *protos.AudioConfig,
 	callback internal_vad.VADCallback, options utils.Option) (internal_vad.Vad, error) {
 
 	envModelPath := os.Getenv("SILERO_MODEL_PATH")
@@ -41,7 +42,7 @@ func NewSileroVAD(logger commons.Logger,
 	}
 	config := speech.DetectorConfig{
 		ModelPath:            envModelPath,
-		SampleRate:           vadAudioConfig.SampleRate,
+		SampleRate:           int(vadAudioConfig.SampleRate),
 		Threshold:            float32(threshold),
 		MinSilenceDurationMs: 100,
 		SpeechPadMs:          30,

@@ -1,9 +1,8 @@
-// Copyright (c) Rapida
-// Author: Prashant <prashant@rapida.ai>
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
 //
-// Licensed under the Rapida internal use license.
-// This file is part of Rapida's proprietary software.
-// Unauthorized copying, modification, or redistribution is strictly prohibited.
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package internal_agent_local_tool
 
 import (
@@ -63,7 +62,12 @@ func (afkTool *putOnHoldToolCaller) Call(
 	// duration := afkTool.argument(args)
 	err := communication.Notify(
 		ctx,
-		&protos.AssistantConverstationHoldAction{},
+		&protos.AssistantMessagingResponse_Action{
+			Action: &protos.AssistantConversationAction{
+				Name:   afkTool.Name(),
+				Action: protos.AssistantConversationAction_PUT_ON_HOLD,
+			},
+		},
 	)
 	metrics = append(metrics, types.NewTimeTakenMetric(time.Since(start)))
 	if err != nil {

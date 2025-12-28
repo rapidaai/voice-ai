@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"net/url"
 
-	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -35,10 +34,10 @@ type Word struct {
 }
 
 func (opts *assemblyaiOption) GetEncoding() string {
-	switch opts.audioConfig.Format {
-	case internal_audio.Linear16:
+	switch opts.audioConfig.GetAudioFormat() {
+	case protos.AudioConfig_LINEAR16:
 		return "pcm_s16le"
-	case internal_audio.MuLaw8:
+	case protos.AudioConfig_MuLaw8:
 		return "pcm_mulaw"
 	default:
 		return "pcm_s16le"
@@ -49,13 +48,13 @@ type assemblyaiOption struct {
 	logger      commons.Logger
 	key         string
 	mdlOpts     utils.Option
-	audioConfig *internal_audio.AudioConfig
+	audioConfig *protos.AudioConfig
 }
 
 func NewAssemblyaiOption(
 	logger commons.Logger,
 	vaultCredential *protos.VaultCredential,
-	audioConfig *internal_audio.AudioConfig,
+	audioConfig *protos.AudioConfig,
 	mdlOpts utils.Option) (*assemblyaiOption, error) {
 	cx, ok := vaultCredential.GetValue().AsMap()["key"]
 	if !ok {

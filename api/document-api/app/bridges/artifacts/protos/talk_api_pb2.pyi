@@ -17,40 +17,26 @@ class AssistantMessagingRequest(_message.Message):
     def __init__(self, configuration: _Optional[_Union[_common_pb2.AssistantConversationConfiguration, _Mapping]] = ..., message: _Optional[_Union[_common_pb2.AssistantConversationUserMessage, _Mapping]] = ...) -> None: ...
 
 class AssistantMessagingResponse(_message.Message):
-    __slots__ = ("code", "success", "error", "configuration", "interruption", "user", "assistant", "message", "disconnectAction", "holdAction", "knowledgeRetrievalAction", "apiRequestAction", "endpointAction", "deviationAction", "assistantTransferAction", "phoneCallTransferAction")
+    __slots__ = ("code", "success", "configuration", "interruption", "user", "assistant", "message", "action", "error")
     CODE_FIELD_NUMBER: _ClassVar[int]
     SUCCESS_FIELD_NUMBER: _ClassVar[int]
-    ERROR_FIELD_NUMBER: _ClassVar[int]
     CONFIGURATION_FIELD_NUMBER: _ClassVar[int]
     INTERRUPTION_FIELD_NUMBER: _ClassVar[int]
     USER_FIELD_NUMBER: _ClassVar[int]
     ASSISTANT_FIELD_NUMBER: _ClassVar[int]
     MESSAGE_FIELD_NUMBER: _ClassVar[int]
-    DISCONNECTACTION_FIELD_NUMBER: _ClassVar[int]
-    HOLDACTION_FIELD_NUMBER: _ClassVar[int]
-    KNOWLEDGERETRIEVALACTION_FIELD_NUMBER: _ClassVar[int]
-    APIREQUESTACTION_FIELD_NUMBER: _ClassVar[int]
-    ENDPOINTACTION_FIELD_NUMBER: _ClassVar[int]
-    DEVIATIONACTION_FIELD_NUMBER: _ClassVar[int]
-    ASSISTANTTRANSFERACTION_FIELD_NUMBER: _ClassVar[int]
-    PHONECALLTRANSFERACTION_FIELD_NUMBER: _ClassVar[int]
+    ACTION_FIELD_NUMBER: _ClassVar[int]
+    ERROR_FIELD_NUMBER: _ClassVar[int]
     code: int
     success: bool
-    error: _common_pb2.Error
     configuration: _common_pb2.AssistantConversationConfiguration
     interruption: _common_pb2.AssistantConversationInterruption
     user: _common_pb2.AssistantConversationUserMessage
     assistant: _common_pb2.AssistantConversationAssistantMessage
     message: _common_pb2.AssistantConversationMessage
-    disconnectAction: _common_pb2.AssistantConversationDisconnectAction
-    holdAction: _common_pb2.AssistantConverstationHoldAction
-    knowledgeRetrievalAction: _common_pb2.AssistantConverstationKnowledgeRetrievalAction
-    apiRequestAction: _common_pb2.AssistantConverstationApiRequestAction
-    endpointAction: _common_pb2.AssistantConverstationEndpointAction
-    deviationAction: _common_pb2.AssistantConversationDeviationAction
-    assistantTransferAction: _common_pb2.AssistantConversationAssistantTransferAction
-    phoneCallTransferAction: _common_pb2.AssistantConversationPhoneCallTransferAction
-    def __init__(self, code: _Optional[int] = ..., success: bool = ..., error: _Optional[_Union[_common_pb2.Error, _Mapping]] = ..., configuration: _Optional[_Union[_common_pb2.AssistantConversationConfiguration, _Mapping]] = ..., interruption: _Optional[_Union[_common_pb2.AssistantConversationInterruption, _Mapping]] = ..., user: _Optional[_Union[_common_pb2.AssistantConversationUserMessage, _Mapping]] = ..., assistant: _Optional[_Union[_common_pb2.AssistantConversationAssistantMessage, _Mapping]] = ..., message: _Optional[_Union[_common_pb2.AssistantConversationMessage, _Mapping]] = ..., disconnectAction: _Optional[_Union[_common_pb2.AssistantConversationDisconnectAction, _Mapping]] = ..., holdAction: _Optional[_Union[_common_pb2.AssistantConverstationHoldAction, _Mapping]] = ..., knowledgeRetrievalAction: _Optional[_Union[_common_pb2.AssistantConverstationKnowledgeRetrievalAction, _Mapping]] = ..., apiRequestAction: _Optional[_Union[_common_pb2.AssistantConverstationApiRequestAction, _Mapping]] = ..., endpointAction: _Optional[_Union[_common_pb2.AssistantConverstationEndpointAction, _Mapping]] = ..., deviationAction: _Optional[_Union[_common_pb2.AssistantConversationDeviationAction, _Mapping]] = ..., assistantTransferAction: _Optional[_Union[_common_pb2.AssistantConversationAssistantTransferAction, _Mapping]] = ..., phoneCallTransferAction: _Optional[_Union[_common_pb2.AssistantConversationPhoneCallTransferAction, _Mapping]] = ...) -> None: ...
+    action: _common_pb2.AssistantConversationAction
+    error: _common_pb2.Error
+    def __init__(self, code: _Optional[int] = ..., success: bool = ..., configuration: _Optional[_Union[_common_pb2.AssistantConversationConfiguration, _Mapping]] = ..., interruption: _Optional[_Union[_common_pb2.AssistantConversationInterruption, _Mapping]] = ..., user: _Optional[_Union[_common_pb2.AssistantConversationUserMessage, _Mapping]] = ..., assistant: _Optional[_Union[_common_pb2.AssistantConversationAssistantMessage, _Mapping]] = ..., message: _Optional[_Union[_common_pb2.AssistantConversationMessage, _Mapping]] = ..., action: _Optional[_Union[_common_pb2.AssistantConversationAction, _Mapping]] = ..., error: _Optional[_Union[_common_pb2.Error, _Mapping]] = ...) -> None: ...
 
 class CreateMessageMetricRequest(_message.Message):
     __slots__ = ("assistantId", "assistantConversationId", "messageId", "metrics")

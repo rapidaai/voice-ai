@@ -28,7 +28,7 @@ const (
 
 type sarvamOption struct {
 	logger      commons.Logger
-	audioConfig *internal_audio.AudioConfig
+	audioConfig *protos.AudioConfig
 	modelOpts   utils.Option
 	key         string
 	encoder     *base64.Encoding
@@ -37,7 +37,7 @@ type sarvamOption struct {
 
 func NewSarvamOption(logger commons.Logger,
 	vaultCredential *protos.VaultCredential,
-	audioConfig *internal_audio.AudioConfig, option utils.Option) (*sarvamOption, error) {
+	audioConfig *protos.AudioConfig, option utils.Option) (*sarvamOption, error) {
 
 	cx, ok := vaultCredential.GetValue().AsMap()["key"]
 	if !ok {
@@ -77,10 +77,10 @@ func (ro *sarvamOption) configureTextToSpeech() map[string]interface{} {
 		},
 	}
 
-	if ro.audioConfig.Format == internal_audio.Linear16 {
+	if ro.audioConfig.GetAudioFormat() == protos.AudioConfig_LINEAR16 {
 		configMsg["data"].(map[string]interface{})["output_audio_codec"] = "linear16"
 	}
-	if ro.audioConfig.Format == internal_audio.MuLaw8 {
+	if ro.audioConfig.GetAudioFormat() == protos.AudioConfig_MuLaw8 {
 		configMsg["data"].(map[string]interface{})["output_audio_codec"] = "mulaw"
 	}
 	// Dynamically update configMsg based on options

@@ -9,7 +9,6 @@ package internal_transformer_resemble
 import (
 	"fmt"
 
-	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -22,7 +21,7 @@ const (
 
 type resembleOption struct {
 	logger      commons.Logger
-	audioConfig *internal_audio.AudioConfig
+	audioConfig *protos.AudioConfig
 	modelOpts   utils.Option
 	key         string
 	projectId   string
@@ -30,7 +29,7 @@ type resembleOption struct {
 
 func NewResembleOption(logger commons.Logger,
 	vaultCredential *protos.VaultCredential,
-	audioConfig *internal_audio.AudioConfig, option utils.Option) (*resembleOption, error) {
+	audioConfig *protos.AudioConfig, option utils.Option) (*resembleOption, error) {
 
 	credentialsMap := vaultCredential.GetValue().AsMap()
 	cx, ok := credentialsMap["key"]
@@ -60,10 +59,10 @@ func (ro *resembleOption) GetProject() string {
 }
 
 func (ro *resembleOption) GetEncoding() string {
-	switch ro.audioConfig.Format {
-	case internal_audio.Linear16:
+	switch ro.audioConfig.GetAudioFormat() {
+	case protos.AudioConfig_LINEAR16:
 		return "PCM_16"
-	case internal_audio.MuLaw8:
+	case protos.AudioConfig_MuLaw8:
 		return "MULAW"
 	default:
 		return "PCM_16"

@@ -26,7 +26,8 @@ if _version_not_supported:
 
 
 class AgentActionStub(object):
-    """Missing associated documentation comment in .proto file."""
+    """agent action
+    """
 
     def __init__(self, channel):
         """Constructor.
@@ -42,10 +43,12 @@ class AgentActionStub(object):
 
 
 class AgentActionServicer(object):
-    """Missing associated documentation comment in .proto file."""
+    """agent action
+    """
 
     def Action(self, request_iterator, context):
-        """Missing associated documentation comment in .proto file."""
+        """for agent action
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -67,7 +70,8 @@ def add_AgentActionServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class AgentAction(object):
-    """Missing associated documentation comment in .proto file."""
+    """agent action
+    """
 
     @staticmethod
     def Action(request_iterator,
@@ -98,7 +102,8 @@ class AgentAction(object):
 
 
 class AgentTalkStub(object):
-    """Missing associated documentation comment in .proto file."""
+    """for extenal integration around grpc for agentkit call
+    """
 
     def __init__(self, channel):
         """Constructor.
@@ -114,10 +119,12 @@ class AgentTalkStub(object):
 
 
 class AgentTalkServicer(object):
-    """Missing associated documentation comment in .proto file."""
+    """for extenal integration around grpc for agentkit call
+    """
 
     def Talk(self, request_iterator, context):
-        """Missing associated documentation comment in .proto file."""
+        """bi stream of agentkit action
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -139,7 +146,8 @@ def add_AgentTalkServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class AgentTalk(object):
-    """Missing associated documentation comment in .proto file."""
+    """for extenal integration around grpc for agentkit call
+    """
 
     @staticmethod
     def Talk(request_iterator,

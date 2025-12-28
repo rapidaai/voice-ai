@@ -1,3 +1,8 @@
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
+//
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package internal_conversation_gorm
 
 import (
@@ -14,8 +19,7 @@ type AssistantConversation struct {
 	AssistantId              uint64 `json:"assistantId" gorm:"type:bigint;not null"`
 	AssistantProviderModelId uint64 `json:"assistantProviderModelId" gorm:"type:bigint;not null"`
 	Name                     string `json:"name" gorm:"type:text"`
-	// ProjectId                uint64                           `json:"projectId" gorm:"type:bigint;size:20;not null"`
-	// OrganizationId           uint64                           `json:"organizationId" gorm:"type:bigint;size:20;not null"`
+
 	Source    utils.RapidaSource               `json:"source" gorm:"type:string;size:50;not null;default:web-app"`
 	Direction type_enums.ConversationDirection `json:"direction" gorm:"type:string;size:20;not null;default:inbound"`
 

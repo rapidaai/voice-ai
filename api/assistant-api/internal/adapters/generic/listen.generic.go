@@ -1,9 +1,8 @@
-// Copyright (c) Rapida
-// Author: Prashant <prashant@rapida.ai>
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
 //
-// Licensed under the Rapida internal use license.
-// This file is part of Rapida's proprietary software.
-// Unauthorized copying, modification, or redistribution is strictly prohibited.
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package internal_adapter_request_generic
 
 import (
@@ -13,7 +12,6 @@ import (
 	"io"
 	"time"
 
-	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_end_of_speech "github.com/rapidaai/api/assistant-api/internal/end_of_speech"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_denoiser_factory "github.com/rapidaai/api/assistant-api/internal/factory/denoiser"
@@ -24,6 +22,7 @@ import (
 	internal_transformer "github.com/rapidaai/api/assistant-api/internal/transformer"
 	internal_vad "github.com/rapidaai/api/assistant-api/internal/vad"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/protos"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -77,7 +76,7 @@ func (listening *GenericRequestor) listenTranscript(
 func (listening *GenericRequestor) initializeSpeechToText(
 	ctx context.Context,
 	transformerConfig *internal_assistant_entity.AssistantDeploymentAudio,
-	audioConfig *internal_audio.AudioConfig,
+	audioConfig *protos.AudioConfig,
 	options utils.Option) error {
 	credentialId, err := options.GetUint64("rapida.credential_id")
 	if err != nil {
@@ -119,7 +118,7 @@ func (listening *GenericRequestor) initializeSpeechToText(
 // Init initializes the audio talking system for a given assistant persona.
 // It sets up both audio input and output transformer.
 // This function is typically called at the beginning of a communication session.
-func (listening *GenericRequestor) ConnectListener(ctx context.Context, audioConfig, audioOutConfig *internal_audio.AudioConfig) error {
+func (listening *GenericRequestor) ConnectListener(ctx context.Context, audioConfig *protos.AudioConfig) error {
 	ctx, span, _ := listening.Tracer().StartSpan(ctx, utils.AssistantListenConnectStage)
 	defer span.EndSpan(ctx, utils.AssistantListenConnectStage)
 
@@ -228,7 +227,7 @@ func (listening *GenericRequestor) initializeEndOfSpeech(
 
 func (listening *GenericRequestor) initializeDenoiser(
 	ctx context.Context,
-	audioConfig *internal_audio.AudioConfig,
+	audioConfig *protos.AudioConfig,
 	options utils.Option) error {
 	provider, err := options.GetString("microphone.denoising.provider")
 	if err != nil {
@@ -245,7 +244,7 @@ func (listening *GenericRequestor) initializeDenoiser(
 
 func (listening *GenericRequestor) initializeVAD(
 	ctx context.Context,
-	audioConfig *internal_audio.AudioConfig,
+	audioConfig *protos.AudioConfig,
 	options utils.Option,
 ) error {
 	start := time.Now()

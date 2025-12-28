@@ -1,11 +1,11 @@
 package internal_vad_factory
 
 import (
-	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_vad "github.com/rapidaai/api/assistant-api/internal/vad"
 	internal_vad_silero "github.com/rapidaai/api/assistant-api/internal/vad/silero_vad"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/protos"
 )
 
 type VADIdentifier string
@@ -16,7 +16,7 @@ const (
 )
 
 // logger, audioConfig, opts
-func GetVAD(aa VADIdentifier, logger commons.Logger, intputAudio *internal_audio.AudioConfig,
+func GetVAD(aa VADIdentifier, logger commons.Logger, intputAudio *protos.AudioConfig,
 	callback internal_vad.VADCallback,
 	options utils.Option) (internal_vad.Vad, error) {
 	switch aa {

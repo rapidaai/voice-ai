@@ -1,9 +1,8 @@
-// Copyright (c) Rapida
-// Author: Prashant <prashant@rapida.ai>
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
 //
-// Licensed under the Rapida internal use license.
-// This file is part of Rapida's proprietary software.
-// Unauthorized copying, modification, or redistribution is strictly prohibited.
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package internal_adapter_request_generic
 
 import (
@@ -166,26 +165,7 @@ func (n *GenericRequestor) Notify(
 				K: "activity", V: internal_adapter_telemetry.StringValue("assistant_configuration"),
 			},
 		)
-	case *protos.AssistantMessagingResponse_AssistantTransferAction:
-		// Handle assistant transfer action
-		utils.Go(ctx, func() {
-			n.sendMessage(ctx, &protos.AssistantMessagingResponse{
-				Code:    200,
-				Success: true,
-				Data:    actionData,
-			})
-		})
-		span.AddAttributes(
-			ctx,
-			internal_adapter_telemetry.KV{
-				K: "actor", V: internal_adapter_telemetry.StringValue("action"),
-			},
-
-			internal_adapter_telemetry.KV{
-				K: "activity", V: internal_adapter_telemetry.StringValue("assistant_transfer"),
-			},
-		)
-	case *protos.AssistantMessagingResponse_DisconnectAction:
+	case *protos.AssistantMessagingResponse_Action:
 		utils.Go(ctx, func() {
 			n.sendMessage(ctx, &protos.AssistantMessagingResponse{
 				Code:    200,

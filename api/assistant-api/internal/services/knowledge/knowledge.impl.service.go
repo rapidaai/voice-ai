@@ -1,3 +1,8 @@
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
+//
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package internal_knowledge_service
 
 import (
@@ -16,8 +21,8 @@ import (
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
-	assistant_grpc_api "github.com/rapidaai/protos"
-	protos "github.com/rapidaai/protos"
+	"github.com/rapidaai/protos"
+
 	"gorm.io/gorm/clause"
 )
 
@@ -41,8 +46,8 @@ func NewKnowledgeService(config *config.AssistantConfig,
 func (knowledge *knowledgeService) GetAll(
 	ctx context.Context,
 	auth types.SimplePrinciple,
-	criterias []*assistant_grpc_api.Criteria,
-	paginate *assistant_grpc_api.Paginate) (int64, *[]internal_knowledge_gorm.Knowledge, error) {
+	criterias []*protos.Criteria,
+	paginate *protos.Paginate) (int64, *[]internal_knowledge_gorm.Knowledge, error) {
 	db := knowledge.postgres.DB(ctx)
 	var knowledges []internal_knowledge_gorm.Knowledge
 	var cnt int64

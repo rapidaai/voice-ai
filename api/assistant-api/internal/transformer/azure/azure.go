@@ -12,7 +12,6 @@ import (
 	"github.com/Microsoft/cognitive-services-speech-sdk-go/audio"
 	"github.com/Microsoft/cognitive-services-speech-sdk-go/common"
 	"github.com/Microsoft/cognitive-services-speech-sdk-go/speech"
-	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -21,7 +20,7 @@ import (
 type azureOption struct {
 	logger          commons.Logger
 	mdlOpts         utils.Option
-	audioConfig     *internal_audio.AudioConfig
+	audioConfig     *protos.AudioConfig
 	endpoint        string
 	subscriptionKey string
 }
@@ -29,7 +28,7 @@ type azureOption struct {
 func NewAzureOption(
 	logger commons.Logger,
 	vaultCredential *protos.VaultCredential,
-	audioConfig *internal_audio.AudioConfig,
+	audioConfig *protos.AudioConfig,
 	options utils.Option,
 ) (*azureOption, error) {
 	subscriptionKey, ok := vaultCredential.GetValue().AsMap()["subscription_key"]
@@ -83,10 +82,10 @@ func (az *azureOption) TextToSpeechOption() (*speech.SpeechConfig, error) {
 }
 
 func (az *azureOption) GetSpeechSynthesisOutputFormat() common.SpeechSynthesisOutputFormat {
-	switch az.audioConfig.Format {
-	case internal_audio.MuLaw8:
+	switch az.audioConfig.GetAudioFormat() {
+	case protos.AudioConfig_MuLaw8:
 		return common.Raw8Khz8BitMonoMULaw
-	case internal_audio.Linear16:
+	case protos.AudioConfig_LINEAR16:
 		return common.Raw16Khz16BitMonoPcm
 	default:
 		return common.Raw16Khz16BitMonoPcm
@@ -94,11 +93,11 @@ func (az *azureOption) GetSpeechSynthesisOutputFormat() common.SpeechSynthesisOu
 }
 
 func (az *azureOption) GetAudioStreamFormat() *audio.AudioStreamFormat {
-	switch az.audioConfig.Format {
-	case internal_audio.MuLaw8:
+	switch az.audioConfig.GetAudioFormat() {
+	case protos.AudioConfig_MuLaw8:
 		v, _ := audio.GetWaveFormat(uint32(az.audioConfig.SampleRate), uint8(8), uint8(1), audio.WaveMULAW)
 		return v
-	case internal_audio.Linear16:
+	case protos.AudioConfig_LINEAR16:
 		v, _ := audio.GetWaveFormat(uint32(az.audioConfig.SampleRate), uint8(16), 1, audio.WavePCM)
 		return v
 	default:
