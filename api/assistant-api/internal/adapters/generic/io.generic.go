@@ -56,9 +56,6 @@ func (lio *GenericRequestor) OnRecieveTranscript(ctx context.Context,
 func (io *GenericRequestor) OnSilenceBreak(
 	ctx context.Context,
 ) error {
-	start := time.Now()
-	defer io.logger.Benchmark("io.OnSilenceBreakActivity", time.Since(start))
-
 	msg, err := io.messaging.GetMessage(type_enums.UserActor)
 	if err != nil {
 		io.logger.Tracef(ctx, "illegal message state with error %v", err)

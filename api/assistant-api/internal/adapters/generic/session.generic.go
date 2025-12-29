@@ -22,6 +22,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+// Disconnect handles the entire disconnection lifecycle for a conversation,
+// including closing listeners, speakers, persisting recordings, and exporting metrics.
 func (talking *GenericRequestor) Disconnect() {
 	ctx, span, _ := talking.Tracer().StartSpan(talking.Context(), utils.AssistantDisconnectStage)
 	start := time.Now()
@@ -91,6 +93,7 @@ func (talking *GenericRequestor) Disconnect() {
 	talking.logger.Benchmark("talking.OnEndSession", time.Since(start))
 }
 
+// Connect initializes a new assistant session or resumes an existing one, based on the provided conversation configuration.
 func (talking *GenericRequestor) Connect(ctx context.Context, iAuth types.SimplePrinciple, identifier string, req *protos.AssistantConversationConfiguration) error {
 	ctx, span, err := talking.Tracer().StartSpan(ctx, utils.AssistantConnectStage)
 	defer span.EndSpan(ctx, utils.AssistantConnectStage)
@@ -123,27 +126,12 @@ func (talking *GenericRequestor) Connect(ctx context.Context, iAuth types.Simple
 	return talking.OnCreateSession(ctx, req.GetInputConfig(), req.GetOutputConfig(), assistant, identifier, customization)
 }
 
+// OnCreateSession initializes a new assistant session, sets up listeners and speakers,
+// starts voice recording, and sends configuration notifications.
 func (talking *GenericRequestor) OnCreateSession(ctx context.Context, inCfg, strmCfg *protos.StreamConfig, assistant *internal_assistant_entity.Assistant, identifier string, customization internal_adapter_requests.Customization,
 ) error {
 	ctx, span, err := talking.Tracer().StartSpan(ctx, utils.AssistantCreateConversationStage)
 	defer span.EndSpan(ctx, utils.AssistantCreateConversationStage)
-
-	if inCfg == nil || strmCfg == nil {
-		talking.logger.Errorf("streamConfg is not set, please check the configuration")
-		return err
-	}
-
-	audioInConfig := inCfg.GetAudio()
-	if audioInConfig == nil {
-		talking.logger.Errorf("streamConfg is not set, please check the configuration")
-		return err
-	}
-
-	audioOutConfig := strmCfg.GetAudio()
-	if audioOutConfig == nil {
-		talking.logger.Errorf("streamConfg is not set, please check the configuration")
-		return err
-	}
 
 	//
 	//
@@ -166,16 +154,37 @@ func (talking *GenericRequestor) OnCreateSession(ctx context.Context, inCfg, str
 		talking.logger.Errorf("Error sending configuration: %v\n", err)
 	}
 
+	// do the conversation
+	utils.Go(ctx, func() {
+		if err := talking.assistantExecutor.Initialize(ctx, talking); err != nil {
+			talking.logger.Tracef(ctx, "unable to init executor %+v", err)
+		}
+	})
 	//  voice recording enabled before voice in or out
 	utils.Go(ctx, func() {
+
+		audioInConfig := inCfg.GetAudio()
+		if audioInConfig == nil {
+			talking.logger.Errorf("audio in config is nil, recorder is not intialized")
+			return
+		}
+
+		audioOutConfig := strmCfg.GetAudio()
+		if audioOutConfig == nil {
+			talking.logger.Errorf("audio out config is nil, recorder is not intialized")
+			return
+		}
+
 		if err := talking.recorder.Initialize(audioInConfig, audioOutConfig); err != nil {
 			talking.logger.Tracef(ctx, "unable to init recorder %+v", err)
 		}
 	})
 
 	utils.Go(ctx, func() {
-		if err := talking.ConnectSpeaker(ctx, audioOutConfig); err != nil {
-			talking.logger.Tracef(ctx, "unable to connect speaker %+v", err)
+		if audioOutConfig := strmCfg.GetAudio(); audioOutConfig != nil {
+			if err := talking.ConnectSpeaker(ctx, audioOutConfig); err != nil {
+				talking.logger.Tracef(ctx, "unable to connect speaker %+v", err)
+			}
 		}
 		if err := talking.OnGreet(ctx); err != nil {
 			talking.logger.Errorf("unable to greet user with error %+v", err)
@@ -185,15 +194,10 @@ func (talking *GenericRequestor) OnCreateSession(ctx context.Context, inCfg, str
 
 	// establish listener
 	utils.Go(ctx, func() {
-		if err := talking.ConnectListener(ctx, audioInConfig); err != nil {
-			talking.logger.Tracef(ctx, "unable to init analyzer %+v", err)
-		}
-	})
-
-	// do the conversation
-	utils.Go(ctx, func() {
-		if err := talking.assistantExecutor.Initialize(ctx, talking); err != nil {
-			talking.logger.Tracef(ctx, "unable to init executor %+v", err)
+		if audioInConfig := inCfg.GetAudio(); audioInConfig != nil {
+			if err := talking.ConnectListener(ctx, audioInConfig); err != nil {
+				talking.logger.Tracef(ctx, "unable to init analyzer %+v", err)
+			}
 		}
 	})
 
@@ -222,26 +226,11 @@ func (talking *GenericRequestor) OnCreateSession(ctx context.Context, inCfg, str
 	return nil
 }
 
+// OnResumeSession resumes an existing assistant session, re-initializes listeners and speakers,
+// and sends configuration notifications while also restoring ongoing conversation details.
 func (talking *GenericRequestor) OnResumeSession(ctx context.Context, inCfg, strmCfg *protos.StreamConfig, assistant *internal_assistant_entity.Assistant, identifier string, assistantConversationId uint64, customization internal_adapter_requests.Customization) error {
 	ctx, span, err := talking.Tracer().StartSpan(talking.Context(), utils.AssistantResumeConverstaionStage)
 	defer span.EndSpan(ctx, utils.AssistantResumeConverstaionStage)
-
-	if inCfg == nil || strmCfg == nil {
-		talking.logger.Errorf("streamConfg is not set, please check the configuration")
-		return err
-	}
-
-	audioInConfig := inCfg.GetAudio()
-	if audioInConfig == nil {
-		talking.logger.Errorf("streamConfg is not set, please check the configuration")
-		return err
-	}
-
-	audioOutConfig := strmCfg.GetAudio()
-	if audioOutConfig == nil {
-		talking.logger.Errorf("streamConfg is not set, please check the configuration")
-		return err
-	}
 
 	// resume the conversation
 	conversation, err := talking.ResumeConversation(talking.Auth(), assistant, assistantConversationId, identifier)
@@ -249,6 +238,7 @@ func (talking *GenericRequestor) OnResumeSession(ctx context.Context, inCfg, str
 		talking.logger.Errorf("unable to resume convsersation %+v", err)
 		return err
 	}
+
 	if err := talking.Notify(ctx, &protos.AssistantConversationConfiguration{
 		AssistantConversationId: conversation.Id,
 		Assistant: &protos.AssistantDefinition{
@@ -260,24 +250,46 @@ func (talking *GenericRequestor) OnResumeSession(ctx context.Context, inCfg, str
 		talking.logger.Errorf("Error sending configuration: %v\n", err)
 	}
 
-	// establish listener
 	utils.Go(ctx, func() {
-		if err := talking.ConnectListener(ctx, audioInConfig); err != nil {
-			talking.logger.Tracef(talking.Context(), "unable to init analyzer %+v", err)
+		if err := talking.assistantExecutor.Initialize(ctx, talking); err != nil {
+			talking.logger.Tracef(ctx, "unable to init executor %+v", err)
 		}
 	})
-	// establish speaker
 
 	utils.Go(ctx, func() {
-		if err := talking.ConnectSpeaker(ctx, audioOutConfig); err != nil {
-			talking.logger.Tracef(ctx, "unable to init analyzer %+v", err)
+
+		audioInConfig := inCfg.GetAudio()
+		if audioInConfig == nil {
+			talking.logger.Errorf("audio in config is nil, recorder is not intialized")
+			return
 		}
 
-	})
+		audioOutConfig := strmCfg.GetAudio()
+		if audioOutConfig == nil {
+			talking.logger.Errorf("audio out config is nil, recorder is not intialized")
+			return
+		}
 
-	utils.Go(ctx, func() {
 		if err := talking.recorder.Initialize(audioInConfig, audioOutConfig); err != nil {
 			talking.logger.Tracef(ctx, "unable to init recorder %+v", err)
+		}
+	})
+
+	utils.Go(ctx, func() {
+		if audioOutConfig := strmCfg.GetAudio(); audioOutConfig != nil {
+			if err := talking.ConnectSpeaker(ctx, audioOutConfig); err != nil {
+				talking.logger.Tracef(ctx, "unable to connect speaker %+v", err)
+			}
+		}
+
+	})
+
+	// establish listener
+	utils.Go(ctx, func() {
+		if audioInConfig := inCfg.GetAudio(); audioInConfig != nil {
+			if err := talking.ConnectListener(ctx, audioInConfig); err != nil {
+				talking.logger.Tracef(ctx, "unable to init analyzer %+v", err)
+			}
 		}
 	})
 
@@ -289,13 +301,6 @@ func (talking *GenericRequestor) OnResumeSession(ctx context.Context, inCfg, str
 					"talk.client_information": clj,
 				})
 			}
-		}
-	})
-
-	utils.Go(ctx, func() {
-		talking.logger.Debugf("talking.OnStartSession.executor.Init")
-		if err := talking.assistantExecutor.Initialize(ctx, talking); err != nil {
-			talking.logger.Errorf("Error Initialize assistantExecutor: %v", err)
 		}
 	})
 

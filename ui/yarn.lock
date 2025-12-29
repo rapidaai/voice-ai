@@ -2376,10 +2376,31 @@
     uuid "^10.0.0"
     zustand "^4.5.5"
 
-"@rapidaai/react@1.1.47":
-  version "1.1.47"
-  resolved "https://registry.yarnpkg.com/@rapidaai/react/-/react-1.1.47.tgz#cc72b0e4db3062ecb31a38be8260afb82fdd6f87"
-  integrity sha512-fKzcqIHmRysS2j4/GgBH+eg0ljJQUFsbb81Aplw7MRBLS0qkqW+kk2IRSaCJT7TkupVnK4T4wDvKOKyavjarrw==
+"@rapidaai/react@/Users/prashant.srivastav/Documents/codes/lexatic/sdk/rapida-sdk/rapida-react/rapidaai-react-1.1.48-v2.tgz":
+  version "1.1.48-v2"
+  resolved "/Users/prashant.srivastav/Documents/codes/lexatic/sdk/rapida-sdk/rapida-react/rapidaai-react-1.1.48-v2.tgz#df65281dbcfac97491aa8fc2800ce8d32ecef2b3"
+  dependencies:
+    "@emotion/is-prop-valid" "^1.3.1"
+    "@grpc/grpc-js" "^1.13.4"
+    "@improbable-eng/grpc-web" "^0.15.0"
+    "@tailwindcss/postcss" "^4.0.6"
+    clsx "^2.1.1"
+    css-loader "^7.1.2"
+    esbuild-css-modules-plugin "^3.1.4"
+    events "^3.3.0"
+    google-protobuf "^3.21.4"
+    moment "^2.30.1"
+    react-hook-form "^7.54.2"
+    rxjs "^7.8.1"
+    style-loader "^4.0.0"
+    styled-components "^6.1.15"
+    tailwind-merge "^3.0.1"
+    ts-protoc-gen "^0.15.1-pre.a71b34e"
+    typed-emitter "^2.1.0"
+
+"@rapidaai/react@file:../../../sdk/rapida-sdk/rapida-react/rapidaai-react-1.1.48-v1.tgz":
+  version "1.1.48-v1"
+  resolved "file:../../../sdk/rapida-sdk/rapida-react/rapidaai-react-1.1.48-v1.tgz#d3bd50443a58ea7995653977e1319b5fa028ce66"
   dependencies:
     "@emotion/is-prop-valid" "^1.3.1"
     "@grpc/grpc-js" "^1.13.4"

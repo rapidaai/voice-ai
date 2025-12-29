@@ -79,7 +79,7 @@
         "@popperjs/core": "2.11.8",
         "@protobuf-ts/plugin": "2.9.4",
         "@protobuf-ts/runtime": "2.9.4",
-        "@rapidaai/react": "1.1.47",
+        "@rapidaai/react": "/Users/prashant.srivastav/Documents/codes/lexatic/sdk/rapida-sdk/rapida-react/rapidaai-react-1.1.48-v2.tgz",
         "@rapidaai/react-widget": "1.0.0",
         "@reduxjs/toolkit": "1.8.5",
         "@sentry/react": "7.101.1",

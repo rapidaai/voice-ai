@@ -251,10 +251,7 @@ func (deb *GenericRequestor) OnMessageMetric(
 	return nil
 }
 
-func (deb *GenericRequestor) OnMessageMetadata(
-	ctx context.Context,
-	messageId string,
-	metadata map[string]interface{}) error {
+func (deb *GenericRequestor) OnMessageMetadata(ctx context.Context, messageId string, metadata map[string]interface{}) error {
 	start := time.Now()
 	_, err := deb.conversationService.ApplyMessageMetadata(ctx, deb.Auth(), deb.assistantConversation.Id, messageId, metadata)
 

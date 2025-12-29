@@ -175,7 +175,7 @@ func (r *recorder) removeInterruptedSystemAudio(interruptTime time.Time) {
 		}
 	}
 
-	r.logger.Info(fmt.Sprintf("Interruption processed: silenced %d chunks, modified %d chunks", silencedCount, modifiedCount))
+	// r.logger.Info(fmt.Sprintf("Interruption processed: silenced %d chunks, modified %d chunks", silencedCount, modifiedCount))
 }
 
 func (r *recorder) createSilentAudioData(byteLength int) []byte {

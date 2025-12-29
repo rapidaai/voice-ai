@@ -1,3 +1,8 @@
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
+//
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package commons
 
 import (
@@ -12,40 +17,85 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-// copied from
+// ============================================================================
+// Logger Interface - Core logging contract
+// ============================================================================
+
 type Logger interface {
-	InitLogger()
+	// Initialization
+	InitLogger() error
+
+	// Standard logging levels
 	Debug(args ...interface{})
 	Debugf(template string, args ...interface{})
+
 	Info(args ...interface{})
 	Infof(template string, args ...interface{})
+
 	Warn(args ...interface{})
 	Warnf(template string, args ...interface{})
+
 	Error(args ...interface{})
 	Errorf(template string, args ...interface{})
+
+	// Panic levels
 	DPanic(args ...interface{})
 	DPanicf(template string, args ...interface{})
+
+	Panic(args ...interface{})
+	Panicf(template string, args ...interface{})
+
 	Fatal(args ...interface{})
 	Fatalf(template string, args ...interface{})
 
-	//
+	// Specialized logging
 	Benchmark(functionName string, duration time.Duration)
 	Tracef(ctx context.Context, format string, args ...interface{})
+
+	// Lifecycle
+	Sync() error
 }
 
+// ============================================================================
+// Color codes for console output
+// ============================================================================
+
+const (
+	colorReset  = "\033[0m"
+	colorRed    = "\033[31m"
+	colorYellow = "\033[33m"
+	colorBlue   = "\033[34m"
+	colorGreen  = "\033[32m"
+	colorCyan   = "\033[36m"
+)
+
+// ============================================================================
+// Configuration Options
+// ============================================================================
+
 type logOptions struct {
-	level string
-	name  string
-	path  string
+	level         string
+	name          string
+	path          string
+	enableConsole bool
+	enableFile    bool
+	maxSize       int // MB
+	maxBackups    int
+	maxAge        int // days
+	compress      bool
 }
 
 var defaultLoggerOptions = logOptions{
-	level: "info",
-	name:  "go-template-service",
-	path:  "/var/log/go-app",
+	level:         "info",
+	name:          "go-app",
+	path:          "/var/log/go-app",
+	enableConsole: true,
+	enableFile:    true,
+	maxSize:       500,
+	maxBackups:    3,
+	maxAge:        28,
+	compress:      true,
 }
-
-var extraLoggerOptions []LoggerOption
 
 type LoggerOption interface {
 	apply(*logOptions)
@@ -55,66 +105,98 @@ type funcloggerOption struct {
 	f func(*logOptions)
 }
 
-func (fdo *funcloggerOption) apply(do *logOptions) {
-	fdo.f(do)
+func (flo *funcloggerOption) apply(opts *logOptions) {
+	flo.f(opts)
 }
 
 func newFuncLoggerOption(f func(*logOptions)) *funcloggerOption {
-	return &funcloggerOption{
-		f: f,
-	}
+	return &funcloggerOption{f: f}
 }
 
-// Name returns a LoggerOptions that sets the name for the logger to represent
-// The name will get printed with every logger as stranderd to provide greping capabilites.
-// default name (e.g. go-tempate-service)
+// Name sets the logger name for identification
 func Name(name string) LoggerOption {
 	return newFuncLoggerOption(func(o *logOptions) {
 		o.name = name
 	})
 }
 
-// Level returns a LoggerOptions that sets the level for the logger.
-// The level will get used to identifies what needs to be printed in console/file logs.
-// default level (e.g. info)
+// Level sets the logging level (debug, info, warn, error)
 func Level(level string) LoggerOption {
 	return newFuncLoggerOption(func(o *logOptions) {
 		o.level = level
 	})
 }
 
-// Logger
+// Path sets the log file directory
+func Path(path string) LoggerOption {
+	return newFuncLoggerOption(func(o *logOptions) {
+		o.path = path
+	})
+}
+
+// EnableConsole enables/disables console output
+func EnableConsole(enable bool) LoggerOption {
+	return newFuncLoggerOption(func(o *logOptions) {
+		o.enableConsole = enable
+	})
+}
+
+// EnableFile enables/disables file output
+func EnableFile(enable bool) LoggerOption {
+	return newFuncLoggerOption(func(o *logOptions) {
+		o.enableFile = enable
+	})
+}
+
+// MaxSize sets max log file size in MB
+func MaxSize(size int) LoggerOption {
+	return newFuncLoggerOption(func(o *logOptions) {
+		o.maxSize = size
+	})
+}
+
+// MaxBackups sets max number of backup log files
+func MaxBackups(backups int) LoggerOption {
+	return newFuncLoggerOption(func(o *logOptions) {
+		o.maxBackups = backups
+	})
+}
+
+// MaxAge sets max age of log files in days
+func MaxAge(days int) LoggerOption {
+	return newFuncLoggerOption(func(o *logOptions) {
+		o.maxAge = days
+	})
+}
+
+// ============================================================================
+// Application Logger Implementation
+// ============================================================================
+
 type applicationLogger struct {
 	opts        logOptions
 	sugarLogger *zap.SugaredLogger
+	logger      *zap.Logger
 }
 
-// Applicaiton Logger constructor level will be default info in production
+// NewApplicationLogger returns a logger with default options
 func NewApplicationLogger() *applicationLogger {
-	opts := defaultLoggerOptions
-	return &applicationLogger{opts: opts}
+	return &applicationLogger{opts: defaultLoggerOptions}
 }
 
-// NewApplicationLoggerWithOtptions returns a ptr application logger instance which impliment logger interface
-//
-// # This will also override default option for logger
-//
-// This function is provided for advanced uses; prefer to provide sepcific option when initializing the logger
-// using common.logger.NewApplicaitonLoggerWithOptions
-func NewApplicationLoggerWithOptions(opt ...LoggerOption) *applicationLogger {
-	opts := defaultLoggerOptions
-	for _, o := range extraLoggerOptions {
-		o.apply(&opts)
+// NewApplicationLoggerWithOptions returns a logger with custom options
+func NewApplicationLoggerWithOptions(opts ...LoggerOption) *applicationLogger {
+	options := defaultLoggerOptions
+	for _, opt := range opts {
+		opt.apply(&options)
 	}
-
-	for _, o := range opt {
-		o.apply(&opts)
-	}
-	return &applicationLogger{opts: opts}
-
+	return &applicationLogger{opts: options}
 }
 
-// For mapping config logger to app logger levels
+// ============================================================================
+// Logger Initialization
+// ============================================================================
+
 func (l *applicationLogger) getLoggerLevel() zapcore.Level {
 	switch l.opts.level {
 	case "debug":
@@ -126,12 +208,39 @@ func (l *applicationLogger) getLoggerLevel() zapcore.Level {
 	case "error":
 		return zapcore.ErrorLevel
 	default:
-		return zapcore.DebugLevel
-
+		return zapcore.InfoLevel
 	}
 }
 
-// just to mock don't feel bacd
+func getConsoleEncoder() zapcore.Encoder {
+	config := zap.NewDevelopmentEncoderConfig()
+	config.EncodeLevel = func(level zapcore.Level, encoder zapcore.PrimitiveArrayEncoder) {
+		switch level {
+		case zapcore.DebugLevel:
+			encoder.AppendString(colorGreen + "DEBUG" + colorReset)
+		case zapcore.InfoLevel:
+			encoder.AppendString(colorBlue + "INFO" + colorReset)
+		case zapcore.WarnLevel:
+			encoder.AppendString(colorYellow + "WARN" + colorReset)
+		case zapcore.ErrorLevel, zapcore.DPanicLevel, zapcore.PanicLevel, zapcore.FatalLevel:
+			encoder.AppendString(colorRed + level.CapitalString() + colorReset)
+		default:
+			encoder.AppendString(level.CapitalString())
+		}
+	}
+	config.EncodeTime = zapcore.ISO8601TimeEncoder
+	config.EncodeCaller = zapcore.ShortCallerEncoder
+	return zapcore.NewConsoleEncoder(config)
+}
+
+func getFileEncoder() zapcore.Encoder {
+	config := zap.NewDevelopmentEncoderConfig()
+	config.EncodeTime = zapcore.ISO8601TimeEncoder
+	config.EncodeCaller = zapcore.ShortCallerEncoder
+	config.EncodeLevel = zapcore.CapitalLevelEncoder
+	return zapcore.NewConsoleEncoder(config)
+}
+
 type WriteSyncer struct {
 	io.Writer
 }
@@ -141,115 +250,139 @@ func (ws WriteSyncer) Sync() error {
 }
 
 func getWriteSyncer(path, name string) zapcore.WriteSyncer {
-	var ioWriter = &lumberjack.Logger{
+	ioWriter := &lumberjack.Logger{
 		Filename:   fmt.Sprintf("%s/%s.log", path, name),
-		MaxSize:    500, // megabytes
+		MaxSize:    500,
 		MaxBackups: 3,
-		MaxAge:     28,   //days
-		Compress:   true, // disabled by default
+		MaxAge:     28,
+		Compress:   true,
 	}
-	var sw = WriteSyncer{
-		ioWriter,
-	}
-	return sw
+	return WriteSyncer{ioWriter}
 }
 
-// Init logger
-func (l *applicationLogger) InitLogger() {
-	l.init(os.Stdout, getWriteSyncer(l.opts.path, l.opts.name))
+// InitLogger initializes the logger with console and file writers
+func (l *applicationLogger) InitLogger() error {
+	var cores []zapcore.Core
+	level := zap.NewAtomicLevelAt(l.getLoggerLevel())
+
+	// Console output
+	if l.opts.enableConsole {
+		consoleEncoder := getConsoleEncoder()
+		consoleWriter := zapcore.AddSync(os.Stdout)
+		cores = append(cores, zapcore.NewCore(consoleEncoder, consoleWriter, level))
+	}
+
+	// File output
+	if l.opts.enableFile {
+		fileEncoder := getFileEncoder()
+		fileWriter := getWriteSyncer(l.opts.path, l.opts.name)
+		cores = append(cores, zapcore.NewCore(fileEncoder, fileWriter, level))
+	}
+
+	if len(cores) == 0 {
+		return fmt.Errorf("logger must have at least one output (console or file)")
+	}
+
+	var core zapcore.Core
+	if len(cores) == 1 {
+		core = cores[0]
+	} else {
+		core = zapcore.NewTee(cores...)
+	}
+
+	l.logger = zap.New(core, zap.AddCaller(), zap.AddCallerSkip(1))
+	l.sugarLogger = l.logger.Sugar()
+
+	return nil
 }
 
-func (l *applicationLogger) init(writer ...zapcore.WriteSyncer) {
-	l.sugarLogger = zap.New(
-		zapcore.NewCore(
-			zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()),
-			zap.CombineWriteSyncers(writer...),
-			zap.NewAtomicLevelAt(l.getLoggerLevel()),
-		),
-		zap.AddCaller(),
-		zap.AddCallerSkip(1)).Sugar()
-	if err := l.sugarLogger.Sync(); err != nil {
-		l.sugarLogger.Error(err)
+func (l *applicationLogger) Sync() error {
+	if l.logger != nil {
+		return l.logger.Sync()
 	}
+	return nil
 }
+
+// ============================================================================
+// Standard Logging Methods
+// ============================================================================
 
 func (l *applicationLogger) Debug(args ...interface{}) {
 	l.sugarLogger.Debug(args...)
 }
 
-func (l *applicationLogger) Debugf(msg string, args ...interface{}) {
-	l.sugarLogger.Debugf(msg, args...)
-}
-
-func (l *applicationLogger) Benchmark(functionName string, duration time.Duration) {
-	// Convert duration to milliseconds
-	durationMs := duration.Milliseconds()
-
-	// Format message with or without color based on the duration
-	var message string
-	if durationMs > 1 {
-		// Use red color if duration is more than 1 millisecond
-		message = fmt.Sprintf("\033[31mBenchmark: %s [%v]\033[0m", functionName, duration)
-	} else {
-		message = fmt.Sprintf("Benchmark: %s [%v]", functionName, duration)
-	}
-
-	// Log the message
-	l.sugarLogger.Infof(message)
-}
-
-func (l *applicationLogger) Tracef(ctx context.Context, format string, args ...interface{}) {
-	value := ctx.Value("x-request-id")
-	if value == nil {
-		value = "unknown"
-	}
-	l.sugarLogger.Info(fmt.Sprintf("[RequestID: %s] %s", value, fmt.Sprintf(format, args...)))
+func (l *applicationLogger) Debugf(template string, args ...interface{}) {
+	l.sugarLogger.Debugf(template, args...)
 }
 
 func (l *applicationLogger) Info(args ...interface{}) {
 	l.sugarLogger.Info(args...)
 }
 
-func (l *applicationLogger) Infof(msg string, args ...interface{}) {
-	l.sugarLogger.Infof(msg, args...)
+func (l *applicationLogger) Infof(template string, args ...interface{}) {
+	l.sugarLogger.Infof(template, args...)
 }
 
 func (l *applicationLogger) Warn(args ...interface{}) {
 	l.sugarLogger.Warn(args...)
 }
 
-func (l *applicationLogger) Warnf(msg string, args ...interface{}) {
-	l.sugarLogger.Warnf(msg, args...)
+func (l *applicationLogger) Warnf(template string, args ...interface{}) {
+	l.sugarLogger.Warnf(template, args...)
 }
 
 func (l *applicationLogger) Error(args ...interface{}) {
 	l.sugarLogger.Error(args...)
 }
 
-func (l *applicationLogger) Errorf(msg string, args ...interface{}) {
-	l.sugarLogger.Errorf(msg, args...)
+func (l *applicationLogger) Errorf(template string, args ...interface{}) {
+	l.sugarLogger.Errorf(template, args...)
 }
+
+// ============================================================================
+// Panic Logging Methods
+// ============================================================================
 
 func (l *applicationLogger) DPanic(args ...interface{}) {
 	l.sugarLogger.DPanic(args...)
 }
 
-func (l *applicationLogger) DPanicf(msg string, args ...interface{}) {
-	l.sugarLogger.DPanicf(msg, args...)
+func (l *applicationLogger) DPanicf(template string, args ...interface{}) {
+	l.sugarLogger.DPanicf(template, args...)
 }
 
 func (l *applicationLogger) Panic(args ...interface{}) {
 	l.sugarLogger.Panic(args...)
 }
 
-func (l *applicationLogger) Panicf(msg string, args ...interface{}) {
-	l.sugarLogger.Panicf(msg, args...)
+func (l *applicationLogger) Panicf(template string, args ...interface{}) {
+	l.sugarLogger.Panicf(template, args...)
 }
 
 func (l *applicationLogger) Fatal(args ...interface{}) {
 	l.sugarLogger.Fatal(args...)
 }
 
-func (l *applicationLogger) Fatalf(msg string, args ...interface{}) {
-	l.sugarLogger.Fatalf(msg, args...)
+func (l *applicationLogger) Fatalf(template string, args ...interface{}) {
+	l.sugarLogger.Fatalf(template, args...)
+}
+
+// ============================================================================
+// Specialized Logging Methods
+// ============================================================================
+
+func (l *applicationLogger) Benchmark(functionName string, duration time.Duration) {
+	l.sugarLogger.Infof("Benchmark: %s took %v", functionName, duration)
+}
+
+func (l *applicationLogger) Tracef(ctx context.Context, format string, args ...interface{}) {
+	requestID := "unknown"
+	if value := ctx.Value("x-request-id"); value != nil {
+		if id, ok := value.(string); ok {
+			requestID = id
+		}
+	}
+
+	message := fmt.Sprintf(format, args...)
+	l.sugarLogger.Infof("%s[RequestID: %s]%s %s", colorCyan, requestID, colorReset, message)
 }

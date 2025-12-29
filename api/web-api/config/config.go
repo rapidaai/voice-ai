@@ -67,12 +67,11 @@ func InitConfig() (*viper.Viper, error) {
 	}
 	vConfig.SetConfigType("env")
 	vConfig.AutomaticEnv()
-	err := vConfig.ReadInConfig()
-	if err == nil {
+	if err := vConfig.ReadInConfig(); err != nil {
 		log.Printf("Error while reading the config")
 	}
 
-	if err = vConfig.ReadInConfig(); err != nil && !os.IsNotExist(err) {
+	if err := vConfig.ReadInConfig(); err != nil && !os.IsNotExist(err) {
 		log.Printf("Reading from env varaibles.")
 	}
 
