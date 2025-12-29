@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/rapidaai/api/assistant-api/config"
-	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_streamers "github.com/rapidaai/api/assistant-api/internal/streamers"
 	internal_telephony "github.com/rapidaai/api/assistant-api/internal/telephony"
 	"github.com/rapidaai/pkg/commons"
@@ -198,16 +197,4 @@ func (tpc *twilioTelephony) GetCaller(c *gin.Context) (string, bool) {
 	clientNumber, ok := queryParams["from"]
 	return clientNumber, ok
 
-}
-
-func (tpc *twilioTelephony) InputStreamConfig() *protos.StreamConfig {
-	return &protos.StreamConfig{
-		Audio: internal_audio.NewMulaw8khzMonoAudioConfig(),
-	}
-}
-
-func (tpc *twilioTelephony) OutputStreamConfig() *protos.StreamConfig {
-	return &protos.StreamConfig{
-		Audio: internal_audio.NewMulaw8khzMonoAudioConfig(),
-	}
 }

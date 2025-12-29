@@ -12,7 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/rapidaai/api/assistant-api/config"
-	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_streamers "github.com/rapidaai/api/assistant-api/internal/streamers"
 	internal_telephony "github.com/rapidaai/api/assistant-api/internal/telephony"
 	"github.com/rapidaai/pkg/commons"
@@ -201,16 +200,4 @@ func (tpc *exotelTelephony) GetCaller(c *gin.Context) (string, bool) {
 
 	clientNumber, ok := queryParams["CallFrom"]
 	return clientNumber, ok
-}
-
-func (tpc *exotelTelephony) InputStreamConfig() *protos.StreamConfig {
-	return &protos.StreamConfig{
-		Audio: internal_audio.NewLinear8khzMonoAudioConfig(),
-	}
-}
-
-func (tpc *exotelTelephony) OutputStreamConfig() *protos.StreamConfig {
-	return &protos.StreamConfig{
-		Audio: internal_audio.NewLinear8khzMonoAudioConfig(),
-	}
 }

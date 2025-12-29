@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/rapidaai/api/assistant-api/config"
-	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_streamers "github.com/rapidaai/api/assistant-api/internal/streamers"
 	internal_telephony "github.com/rapidaai/api/assistant-api/internal/telephony"
 	"github.com/rapidaai/pkg/commons"
@@ -171,16 +170,4 @@ func (tpc *vonageTelephony) GetCaller(c *gin.Context) (string, bool) {
 	clientNumber, ok := queryParams["from"]
 	return clientNumber, ok
 
-}
-
-func (tpc *vonageTelephony) InputStreamConfig() *protos.StreamConfig {
-	return &protos.StreamConfig{
-		Audio: internal_audio.NewLinear16khzMonoAudioConfig(),
-	}
-}
-
-func (tpc *vonageTelephony) OutputStreamConfig() *protos.StreamConfig {
-	return &protos.StreamConfig{
-		Audio: internal_audio.NewLinear16khzMonoAudioConfig(),
-	}
 }

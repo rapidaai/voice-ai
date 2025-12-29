@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
+	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_streamers "github.com/rapidaai/api/assistant-api/internal/streamers"
 	"github.com/rapidaai/pkg/commons"
 	protos "github.com/rapidaai/protos"
@@ -82,38 +83,27 @@ func (vng *vonageWebsocketStreamer) Recv() (*protos.AssistantMessagingRequest, e
 	if err != nil {
 		return nil, vng.handleWebSocketError(err)
 	}
-
 	switch messageType {
 	case websocket.TextMessage:
-
 		var textEvent map[string]interface{}
 		if err := json.Unmarshal(message, &textEvent); err != nil {
 			vng.logger.Error("Failed to unmarshal text event", "error", err.Error())
 			return nil, err
 		}
+		switch textEvent["event"] {
+		case "websocket:connected":
+			return vng.handleConnectEvent()
 
-		// Example for handling a specific text message event, modify as needed
-		if textEvent["event"] == "stop" {
-			vng.logger.Info("WebSocket stream stopped")
+		case "stop":
 			vng.cancelFunc()
 			return nil, io.EOF
+
+		default:
+			vng.logger.Debugf("Unhandled event type: %s", textEvent["event"])
 		}
 
 	case websocket.BinaryMessage:
-		vng.audioBufferLock.Lock()
-		defer vng.audioBufferLock.Unlock()
-
-		vng.inputAudioBuffer.Write(message)
-		const bufferSizeThreshold = 32 * 60
-
-		if vng.inputAudioBuffer.Len() >= bufferSizeThreshold {
-			audioRequest := vng.BuildVoiceRequest(vng.inputAudioBuffer.Bytes())
-			vng.inputAudioBuffer.Reset()
-			return audioRequest, nil
-		}
-
-		// send back the audio
-
+		return vng.handleMediaEvent(message)
 	default:
 		vng.logger.Warn("Unhandled message type", "type", messageType)
 		return nil, nil
@@ -123,7 +113,41 @@ func (vng *vonageWebsocketStreamer) Recv() (*protos.AssistantMessagingRequest, e
 	return nil, nil
 }
 
-func (vng *vonageWebsocketStreamer) BuildVoiceRequest(audioData []byte) *protos.AssistantMessagingRequest {
+func (vng *vonageWebsocketStreamer) handleConnectEvent() (*protos.AssistantMessagingRequest, error) {
+	return &protos.AssistantMessagingRequest{
+		Request: &protos.AssistantMessagingRequest_Configuration{
+			Configuration: &protos.AssistantConversationConfiguration{
+				AssistantConversationId: vng.assistantConversationId,
+				Assistant: &protos.AssistantDefinition{
+					AssistantId: vng.assistant.AssistantId,
+					Version:     "latest",
+				},
+				InputConfig: &protos.StreamConfig{
+					Audio: internal_audio.NewLinear16khzMonoAudioConfig(),
+				},
+				OutputConfig: &protos.StreamConfig{
+					Audio: internal_audio.NewLinear16khzMonoAudioConfig(),
+				},
+			},
+		}}, nil
+}
+
+func (vng *vonageWebsocketStreamer) handleMediaEvent(message []byte) (*protos.AssistantMessagingRequest, error) {
+	vng.audioBufferLock.Lock()
+	defer vng.audioBufferLock.Unlock()
+
+	vng.inputAudioBuffer.Write(message)
+	const bufferSizeThreshold = 32 * 60
+
+	if vng.inputAudioBuffer.Len() >= bufferSizeThreshold {
+		audioRequest := vng.buildVoiceRequest(vng.inputAudioBuffer.Bytes())
+		vng.inputAudioBuffer.Reset()
+		return audioRequest, nil
+	}
+	return nil, nil
+}
+
+func (vng *vonageWebsocketStreamer) buildVoiceRequest(audioData []byte) *protos.AssistantMessagingRequest {
 	return &protos.AssistantMessagingRequest{
 		Request: &protos.AssistantMessagingRequest_Message{
 			Message: &protos.AssistantConversationUserMessage{
@@ -197,6 +221,7 @@ func (vng *vonageWebsocketStreamer) Send(response *protos.AssistantMessagingResp
 	}
 	return nil
 }
+
 func (vng *vonageWebsocketStreamer) handleError(message string, err error) error {
 	vng.logger.Error(message, "error", err.Error())
 	return err

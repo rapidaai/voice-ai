@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_streamers "github.com/rapidaai/api/assistant-api/internal/streamers"
 	"github.com/rapidaai/pkg/commons"
 	protos "github.com/rapidaai/protos"
@@ -92,8 +93,12 @@ func (tws *twilioWebsocketStreamer) Recv() (*protos.AssistantMessagingRequest, e
 		tws.logger.Error("Failed to unmarshal Twilio media event", "error", err.Error())
 		return nil, nil
 	}
-	tws.captureStreamSid(mediaEvent.StreamSid)
 	switch mediaEvent.Event {
+	case "connected":
+		return tws.handleConnectEvent()
+	case "start":
+		tws.handleStartEvent(mediaEvent)
+		return nil, nil
 	case "media":
 		return tws.handleMediaEvent(mediaEvent)
 	case "stop":
@@ -104,6 +109,38 @@ func (tws *twilioWebsocketStreamer) Recv() (*protos.AssistantMessagingRequest, e
 		tws.logger.Warn("Unhandled Twilio event", "event", mediaEvent.Event)
 		return nil, nil
 	}
+}
+
+func (tws *twilioWebsocketStreamer) captureStreamSid(streamSid string) {
+	if tws.streamSid == "" && streamSid != "" {
+		tws.streamSid = streamSid
+		tws.logger.Debug("Captured Twilio streamSid", "streamSid", tws.streamSid)
+	}
+}
+
+// start event contains streamSid to be used for subsequent media messages
+func (tws *twilioWebsocketStreamer) handleStartEvent(mediaEvent TwilioMediaEvent) {
+	tws.streamSid = mediaEvent.StreamSid
+}
+
+// when exotel is connected then connect the assistant
+func (tws *twilioWebsocketStreamer) handleConnectEvent() (*protos.AssistantMessagingRequest, error) {
+	return &protos.AssistantMessagingRequest{
+		Request: &protos.AssistantMessagingRequest_Configuration{
+			Configuration: &protos.AssistantConversationConfiguration{
+				AssistantConversationId: tws.assistantConversationId,
+				Assistant: &protos.AssistantDefinition{
+					AssistantId: tws.assistant.AssistantId,
+					Version:     "latest",
+				},
+				InputConfig: &protos.StreamConfig{
+					Audio: internal_audio.NewMulaw8khzMonoAudioConfig(),
+				},
+				OutputConfig: &protos.StreamConfig{
+					Audio: internal_audio.NewMulaw8khzMonoAudioConfig(),
+				},
+			},
+		}}, nil
 }
 
 func (tws *twilioWebsocketStreamer) handleMediaEvent(mediaEvent TwilioMediaEvent) (*protos.AssistantMessagingRequest, error) {
@@ -121,7 +158,7 @@ func (tws *twilioWebsocketStreamer) handleMediaEvent(mediaEvent TwilioMediaEvent
 	const bufferSizeThreshold = 8 * 60
 
 	if tws.inputAudioBuffer.Len() >= bufferSizeThreshold {
-		audioRequest := tws.BuildVoiceRequest(tws.inputAudioBuffer.Bytes())
+		audioRequest := tws.buildVoiceRequest(tws.inputAudioBuffer.Bytes())
 		tws.inputAudioBuffer.Reset()
 		return audioRequest, nil
 	}
@@ -129,7 +166,7 @@ func (tws *twilioWebsocketStreamer) handleMediaEvent(mediaEvent TwilioMediaEvent
 	return nil, nil
 }
 
-func (tws *twilioWebsocketStreamer) BuildVoiceRequest(audioData []byte) *protos.AssistantMessagingRequest {
+func (tws *twilioWebsocketStreamer) buildVoiceRequest(audioData []byte) *protos.AssistantMessagingRequest {
 	return &protos.AssistantMessagingRequest{
 		Request: &protos.AssistantMessagingRequest_Message{
 			Message: &protos.AssistantConversationUserMessage{
@@ -244,13 +281,6 @@ func (tws *twilioWebsocketStreamer) handleWebSocketError(err error) error {
 	tws.cancelFunc()
 	tws.conn = nil
 	return io.EOF
-}
-
-func (tws *twilioWebsocketStreamer) captureStreamSid(streamSid string) {
-	if tws.streamSid == "" && streamSid != "" {
-		tws.streamSid = streamSid
-		tws.logger.Debug("Captured Twilio streamSid", "streamSid", tws.streamSid)
-	}
 }
 
 func (tpc *twilioWebsocketStreamer) Streamer(c *gin.Context, connection *websocket.Conn, assistantID uint64, assistantVersion string, assistantConversationID uint64) internal_streamers.Streamer {

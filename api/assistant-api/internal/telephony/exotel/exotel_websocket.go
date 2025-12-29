@@ -100,7 +100,7 @@ func (exotel *exotelWebsocketStreamer) Recv() (*protos.AssistantMessagingRequest
 
 	switch mediaEvent.Event {
 	case "connected":
-		return exotel.handleConnectEvent(mediaEvent)
+		return exotel.handleConnectEvent()
 	case "start":
 		exotel.handleStartEvent(mediaEvent)
 		return nil, nil
@@ -123,7 +123,7 @@ func (exotel *exotelWebsocketStreamer) handleStartEvent(mediaEvent ExotelMediaEv
 }
 
 // when exotel is connected then connect the assistant
-func (exotel *exotelWebsocketStreamer) handleConnectEvent(mediaEvent ExotelMediaEvent) (*protos.AssistantMessagingRequest, error) {
+func (exotel *exotelWebsocketStreamer) handleConnectEvent() (*protos.AssistantMessagingRequest, error) {
 	return &protos.AssistantMessagingRequest{
 		Request: &protos.AssistantMessagingRequest_Configuration{
 			Configuration: &protos.AssistantConversationConfiguration{
@@ -157,7 +157,7 @@ func (exotel *exotelWebsocketStreamer) handleMediaEvent(mediaEvent ExotelMediaEv
 	const bufferSizeThreshold = 32 * 60
 
 	if exotel.inputAudioBuffer.Len() >= bufferSizeThreshold {
-		audioRequest := exotel.BuildVoiceRequest(exotel.inputAudioBuffer.Bytes())
+		audioRequest := exotel.buildVoiceRequest(exotel.inputAudioBuffer.Bytes())
 		exotel.inputAudioBuffer.Reset()
 		return audioRequest, nil
 	}
@@ -165,7 +165,7 @@ func (exotel *exotelWebsocketStreamer) handleMediaEvent(mediaEvent ExotelMediaEv
 	return nil, nil
 }
 
-func (exotel *exotelWebsocketStreamer) BuildVoiceRequest(audioData []byte) *protos.AssistantMessagingRequest {
+func (exotel *exotelWebsocketStreamer) buildVoiceRequest(audioData []byte) *protos.AssistantMessagingRequest {
 	return &protos.AssistantMessagingRequest{
 		Request: &protos.AssistantMessagingRequest_Message{
 			Message: &protos.AssistantConversationUserMessage{
