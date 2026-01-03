@@ -492,3 +492,60 @@ run-ui:
 # Add appropriate aliases for clarity
 run-{service-name}:
 	@echo "Please specify a valid service name: document-api, assistant, web, endpoint, or integration."
+
+
+# ============================================================================
+# LINTING & TESTING TARGETS
+# ============================================================================
+
+.PHONY: lint lint-go lint-ui lint-fix test test-go test-ui test-coverage fmt
+
+lint: lint-go lint-ui
+	@echo "✓ All linting passed"
+
+lint-go:
+	@echo "Running Go linter..."
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		CGO_ENABLED=0 golangci-lint run ./pkg/...; \
+	else \
+		echo "golangci-lint not installed. Install with: brew install golangci-lint"; \
+		exit 1; \
+	fi
+
+lint-ui:
+	@echo "Running UI linter..."
+	cd ui && yarn lint
+
+lint-fix:
+	@echo "Fixing Go lint issues..."
+	golangci-lint run --fix ./...
+	@echo "Fixing UI lint issues..."
+	cd ui && yarn lint:fix
+
+fmt:
+	@echo "Formatting Go code..."
+	gofmt -w .
+	goimports -w .
+	@echo "✓ Code formatted"
+
+test: test-go test-ui
+	@echo "✓ All tests passed"
+
+test-go:
+	@echo "Running Go tests..."
+	go test -race -v ./...
+
+test-ui:
+	@echo "Running UI tests..."
+	cd ui && yarn test --watchAll=false
+
+test-coverage:
+	@echo "Running Go tests with coverage..."
+	go test -race -coverprofile=coverage.txt -covermode=atomic ./...
+	go tool cover -html=coverage.txt -o coverage.html
+	@echo "✓ Coverage report generated: coverage.html"
+
+# Verify all checks pass (useful before committing)
+check: lint test
+	@echo ""
+	@echo "✓ All checks passed! Ready to commit."
