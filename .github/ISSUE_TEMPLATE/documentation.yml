@@ -1,0 +1,56 @@
+name: Documentation
+description: Report missing, unclear, or incorrect documentation
+title: "[Docs]: "
+labels:
+  - documentation
+  - good-first-issue
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Rapida documentation 🙌  
+        Clear docs help everyone build better voice AI.
+
+  - type: input
+    id: area
+    attributes:
+      label: Documentation area
+      description: Which part of the documentation needs work?
+      placeholder: README, setup, API, examples, deployment, observability, SDK
+    validations:
+      required: true
+
+  - type: textarea
+    id: issue
+    attributes:
+      label: What is missing or unclear?
+      description: Describe the problem with the current documentation.
+      placeholder: The setup guide does not explain how to configure STT providers...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What would you expect instead?
+      description: Describe what good documentation would look like here.
+      placeholder: Step-by-step setup with config examples and defaults.
+    validations:
+      required: false
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References or examples (optional)
+      description: Links, screenshots, or examples from similar projects.
+      placeholder: Link to docs, code, or external reference.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I would like to work on this issue
+        - label: I can submit a PR with documentation changes
