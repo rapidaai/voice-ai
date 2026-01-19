@@ -3,3 +3,6 @@
 .DS_Store
 .venv/
 license-check-and-add.json
+
+# Agent context documents (not committed)
+docs/agent-context/
