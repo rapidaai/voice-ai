@@ -98,7 +98,7 @@ func (s *azureSpeechToText) Initialize() error {
 	s.mu.Unlock()
 
 	s.registerEventHandlers()
-	s.client.StartContinuousRecognitionAsync()
+	<-s.client.StartContinuousRecognitionAsync()
 
 	return nil
 }
@@ -229,7 +229,7 @@ func (s *azureSpeechToText) Close(_ context.Context) error {
 	defer s.mu.Unlock()
 
 	if s.client != nil {
-		s.client.StopContinuousRecognitionAsync()
+		<-s.client.StopContinuousRecognitionAsync()
 		s.client.Close()
 	}
 	if s.inputstream != nil {

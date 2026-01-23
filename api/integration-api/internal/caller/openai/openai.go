@@ -19,7 +19,7 @@ type OpenAI struct {
 }
 
 var (
-	DEFUALT_URL         = "https://api.openai.com/v1"
+	DEFAULT_URL         = "https://api.openai.com/v1"
 	API_URL             = "url"
 	API_KEY             = "key"
 	AZ_ENDPOINT_KEY     = "endpoint"
@@ -61,24 +61,24 @@ func (openAI *OpenAI) GetClient() (*openai.Client, error) {
 	return &clt, nil
 }
 
-func (openAI *OpenAI) GetComplitionUsages(usages openai.CompletionUsage) types.Metrics {
+func (openAI *OpenAI) GetCompletionUsages(usages openai.CompletionUsage) types.Metrics {
 	metrics := make(types.Metrics, 0)
 	metrics = append(metrics, &types.Metric{
-		Name:        type_enums.OUTPUT_TOKEN.String(),
-		Value:       fmt.Sprintf("%d", usages.CompletionTokens),
+		Name:        type_enums.INPUT_TOKEN.String(),
+		Value:       fmt.Sprintf("%d", usages.PromptTokens),
 		Description: "Input token",
 	})
 
 	metrics = append(metrics, &types.Metric{
-		Name:        type_enums.INPUT_TOKEN.String(),
-		Value:       fmt.Sprintf("%d", usages.PromptTokens),
-		Description: "Output Token",
+		Name:        type_enums.OUTPUT_TOKEN.String(),
+		Value:       fmt.Sprintf("%d", usages.CompletionTokens),
+		Description: "Output token",
 	})
 
 	metrics = append(metrics, &types.Metric{
 		Name:        type_enums.TOTAL_TOKEN.String(),
 		Value:       fmt.Sprintf("%d", usages.TotalTokens),
-		Description: "Total Token",
+		Description: "Total token",
 	})
 	return metrics
 }

@@ -42,7 +42,7 @@ func (eService *assistantAnalysisService) Get(ctx context.Context, auth types.Si
 		First(&Analysis)
 	if tx.Error != nil {
 		eService.logger.Benchmark("AnalysisService.Get", time.Since(start))
-		eService.logger.Errorf("not able to find any webhook %v", tx.Error)
+		eService.logger.Errorf("not able to find any analysis: %v", tx.Error)
 		return nil, tx.Error
 	}
 	eService.logger.Benchmark("AnalysisService.Get", time.Since(start))
@@ -113,7 +113,7 @@ func (eService *assistantAnalysisService) Update(ctx context.Context,
 		assistantId).Updates(&analysis)
 	if tx.Error != nil {
 		eService.logger.Benchmark("assistantAnalysisService.Update", time.Since(start))
-		eService.logger.Errorf("error while creating webhook %v", tx.Error)
+		eService.logger.Errorf("error while updating analysis: %v", tx.Error)
 		return nil, tx.Error
 	}
 	eService.logger.Benchmark("assistantAnalysisService.Update", time.Since(start))
@@ -129,7 +129,7 @@ func (eService *assistantAnalysisService) Delete(ctx context.Context,
 	db := eService.postgres.DB(ctx)
 	analysis := &internal_assistant_entity.AssistantAnalysis{
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ARCHIEVE,
+			Status:    type_enums.RECORD_ARCHIVE,
 			UpdatedBy: *auth.GetUserId(),
 		},
 	}
@@ -137,11 +137,11 @@ func (eService *assistantAnalysisService) Delete(ctx context.Context,
 		analysisId,
 		assistantId).Updates(&analysis)
 	if tx.Error != nil {
-		eService.logger.Benchmark("assistantAnalysisService.Update", time.Since(start))
-		eService.logger.Errorf("error while creating webhook %v", tx.Error)
+		eService.logger.Benchmark("assistantAnalysisService.Delete", time.Since(start))
+		eService.logger.Errorf("error while deleting analysis: %v", tx.Error)
 		return nil, tx.Error
 	}
-	eService.logger.Benchmark("assistantAnalysisService.Update", time.Since(start))
+	eService.logger.Benchmark("assistantAnalysisService.Delete", time.Since(start))
 	return analysis, nil
 }
 
@@ -177,9 +177,9 @@ func (eService *assistantAnalysisService) GetAll(ctx context.Context,
 		}).Find(&analysises)
 
 	if tx.Error != nil {
-		eService.logger.Errorf("not able to find any Webhooks %v", tx.Error)
+		eService.logger.Errorf("not able to find any analysis: %v", tx.Error)
 		return cnt, nil, tx.Error
 	}
-	eService.logger.Benchmark("WebhookService.GetAll", time.Since(start))
+	eService.logger.Benchmark("AnalysisService.GetAll", time.Since(start))
 	return cnt, analysises, nil
 }

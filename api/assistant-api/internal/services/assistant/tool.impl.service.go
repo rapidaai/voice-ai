@@ -84,7 +84,7 @@ func (eService *assistantToolService) Delete(ctx context.Context, auth types.Sim
 	db := eService.postgres.DB(ctx)
 	aK := &internal_assistant_entity.AssistantTool{
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ARCHIEVE,
+			Status:    type_enums.RECORD_ARCHIVE,
 			UpdatedBy: *auth.GetUserId(),
 		},
 	}
@@ -93,7 +93,7 @@ func (eService *assistantToolService) Delete(ctx context.Context, auth types.Sim
 		assistantId).Updates(&aK)
 	if tx.Error != nil {
 		eService.logger.Benchmark("AssistantToolService.Delete", time.Since(start))
-		eService.logger.Errorf("error while creating webhook %v", tx.Error)
+		eService.logger.Errorf("error while deleting tool: %v", tx.Error)
 		return nil, tx.Error
 	}
 	eService.logger.Benchmark("AssistantToolService.Delete", time.Since(start))
@@ -219,7 +219,7 @@ func (eService *assistantToolService) MarkAllOptionsAsDeleted(
 	db := eService.postgres.DB(ctx)
 	tOptions := &internal_assistant_entity.AssistantToolOption{
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ARCHIEVE,
+			Status:    type_enums.RECORD_ARCHIVE,
 			UpdatedBy: *auth.GetUserId(),
 		},
 	}
@@ -335,7 +335,7 @@ func (eService *assistantToolService) CreateLog(
 	tx := db.Create(&toolLog)
 	if tx.Error != nil {
 		eService.logger.Benchmark("eService.Create", time.Since(start))
-		eService.logger.Errorf("error while creating webhook log %v", tx.Error)
+		eService.logger.Errorf("error while creating tool log: %v", tx.Error)
 		return nil, tx.Error
 	}
 	eService.logger.Benchmark("eService.Create", time.Since(start))
@@ -397,7 +397,7 @@ func (eService *assistantToolService) GetAllLog(
 		}).Find(&toolLogs)
 
 	if tx.Error != nil {
-		eService.logger.Errorf("not able to find any Webhooks %v", tx.Error)
+		eService.logger.Errorf("not able to find any tool logs: %v", tx.Error)
 		return cnt, nil, tx.Error
 	}
 	eService.logger.Benchmark("ToolService.GetAllLog", time.Since(start))

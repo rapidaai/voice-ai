@@ -136,7 +136,7 @@ func (pS *projectService) Archive(ctx context.Context, auth types.Principle, pro
 	db := pS.postgres.DB(ctx)
 	ct := &internal_entity.Project{
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ARCHIEVE,
+			Status:    type_enums.RECORD_ARCHIVE,
 			UpdatedBy: auth.GetUserInfo().Id,
 		},
 	}
@@ -174,7 +174,7 @@ func (pS *projectService) ArchiveCredential(ctx context.Context, auth types.Prin
 	db := pS.postgres.DB(ctx)
 	ct := &internal_entity.ProjectCredential{
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ARCHIEVE,
+			Status:    type_enums.RECORD_ARCHIVE,
 			UpdatedBy: auth.GetUserInfo().Id,
 		},
 	}

@@ -86,7 +86,7 @@ func (llc *largeLanguageCaller) StreamChatCompletion(
 		Role: "model",
 	}
 	isToolCall := false
-	accumlator := &GoogleChatCompletionAccumulator{}
+	accumulator := &GoogleChatCompletionAccumulator{}
 	for resp, err := range chat.SendMessageStream(ctx, current) {
 		if err != nil {
 			options.AIOptions.PostHook(map[string]interface{}{
@@ -97,7 +97,7 @@ func (llc *largeLanguageCaller) StreamChatCompletion(
 			onError(err)
 			return err
 		}
-		accumlator.AddChunk(resp)
+		accumulator.AddChunk(resp)
 		for _, choice := range resp.Candidates {
 			if choice.Content != nil {
 				for _, part := range choice.Content.Parts {
@@ -154,9 +154,9 @@ func (llc *largeLanguageCaller) StreamChatCompletion(
 		}
 	}
 	options.AIOptions.PostHook(map[string]interface{}{
-		"result": accumlator,
+		"result": accumulator,
 	}, metrics.OnSuccess().Build())
-	metrics.OnAddMetrics(llc.UsageMetrics(accumlator.UsageMetadata)...)
+	metrics.OnAddMetrics(llc.UsageMetrics(accumulator.UsageMetadata)...)
 	onMetrics(&completeMsg, metrics.OnSuccess().Build())
 	return nil
 }

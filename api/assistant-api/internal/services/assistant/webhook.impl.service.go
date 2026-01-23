@@ -135,7 +135,7 @@ func (eService *assistantWebhookService) Update(ctx context.Context,
 		assistantId).Updates(&webhook)
 	if tx.Error != nil {
 		eService.logger.Benchmark("assistantWebhookService.Update", time.Since(start))
-		eService.logger.Errorf("error while creating webhook %v", tx.Error)
+		eService.logger.Errorf("error while updating webhook: %v", tx.Error)
 		return nil, tx.Error
 	}
 	eService.logger.Benchmark("assistantWebhookService.Update", time.Since(start))
@@ -152,7 +152,7 @@ func (eService *assistantWebhookService) Delete(ctx context.Context,
 	webhook := &internal_assistant_entity.AssistantWebhook{
 		Mutable: gorm_models.Mutable{
 			UpdatedBy: *auth.GetUserId(),
-			Status:    type_enums.RECORD_ARCHIEVE,
+			Status:    type_enums.RECORD_ARCHIVE,
 		},
 	}
 	tx := db.Where("id = ? AND assistant_id = ? ",
@@ -160,7 +160,7 @@ func (eService *assistantWebhookService) Delete(ctx context.Context,
 		assistantId).Updates(&webhook)
 	if tx.Error != nil {
 		eService.logger.Benchmark("assistantWebhookService.Delete", time.Since(start))
-		eService.logger.Errorf("error while creating webhook %v", tx.Error)
+		eService.logger.Errorf("error while deleting webhook: %v", tx.Error)
 		return nil, tx.Error
 	}
 	eService.logger.Benchmark("assistantWebhookService.Delete", time.Since(start))

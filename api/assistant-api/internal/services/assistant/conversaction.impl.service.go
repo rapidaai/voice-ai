@@ -166,7 +166,7 @@ func (conversationService *assistantConversationService) Get(
 				for _, recording := range assistantConversationRecording {
 					pUrl, err := conversationService.GetRecordingPublicUrl(ctx, recording.RecordingUrl)
 					if err != nil {
-						conversationService.logger.Warnf("unable to get public url %+v", tx.Error)
+						conversationService.logger.Warnf("unable to get public url: %v", err)
 						continue
 					}
 					recording.RecordingUrl = *pUrl
@@ -345,7 +345,7 @@ func (conversationService *assistantConversationService) ApplyConversationOption
 	}).Create(&options)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.ApplyConversationOptions", time.Since(start))
-		conversationService.logger.Errorf("error while updating conversation argument %v", tx.Error)
+		conversationService.logger.Errorf("error while updating conversation option: %v", tx.Error)
 		return nil, tx.Error
 	}
 	conversationService.logger.Benchmark("conversationService.ApplyConversationOptions", time.Since(start))

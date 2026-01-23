@@ -21,8 +21,8 @@ type Assistant struct {
 	Visibility  string `json:"visibility" gorm:"type:string;default:private"`
 
 	//
-	Source           string  `json:"_" gorm:"type:string;size:50"`
-	SourceIdentifier *uint64 `json:"_" gorm:"type:bigint;size:20"`
+	Source           string  `json:"-" gorm:"type:string;size:50"`
+	SourceIdentifier *uint64 `json:"-" gorm:"type:bigint;size:20"`
 
 	//
 	Language            string                       `json:"language" gorm:"type:string;size:50;default:english"`
@@ -57,7 +57,7 @@ func (a *Assistant) IsAssistantApiDeploymentEnable() bool {
 }
 
 func (a *Assistant) IsWebPluginDeploymentEnable() bool {
-	return a.AssistantWhatsappDeployment != nil
+	return a.AssistantWebPluginDeployment != nil
 }
 
 // AssistantTag represents a tag associated with an assistant in the database.

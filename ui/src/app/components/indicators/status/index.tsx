@@ -74,7 +74,7 @@ export const StatusIndicator = ({ state, size = 'medium' }) => {
       Icon: MinusCircle,
       display: 'Inactive',
     },
-    ARCHIEVE: {
+    ARCHIVE: {
       bgColor: 'bg-amber-100 dark:bg-amber-900/30',
       textColor: 'text-amber-700 dark:text-amber-500',
       iconColor: 'text-amber-500 dark:text-amber-400',

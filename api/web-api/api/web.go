@@ -34,13 +34,13 @@ func NewWebApi(cfg *config.WebAppConfig, logger commons.Logger, postgres connect
 func (w *WebApi) GetUser(c context.Context, auth types.SimplePrinciple, userId uint64) *protos.User {
 	usr, err := w.userService.GetUser(c, userId)
 	if err != nil {
-		w.logger.Errorf("unable to get user form the database %+v", err)
+		w.logger.Errorf("unable to get user from the database: %+v", err)
 		return nil
 	}
 	ot := &protos.User{}
 	err = utils.Cast(usr, ot)
 	if err != nil {
-		w.logger.Errorf("unable to cast project to proto object %v", err)
+		w.logger.Errorf("unable to cast user to proto object: %v", err)
 	}
 	return ot
 }
@@ -48,13 +48,13 @@ func (w *WebApi) GetUser(c context.Context, auth types.SimplePrinciple, userId u
 func (w *WebApi) GetOrganization(c context.Context, auth types.SimplePrinciple, orgId uint64) *protos.Organization {
 	org, err := w.orgService.Get(c, orgId)
 	if err != nil {
-		w.logger.Errorf("unable to get organization form the database %+v", err)
+		w.logger.Errorf("unable to get organization from the database: %+v", err)
 		return nil
 	}
 	ot := &protos.Organization{}
 	err = utils.Cast(org, ot)
 	if err != nil {
-		w.logger.Errorf("unable to cast project to proto object %v", err)
+		w.logger.Errorf("unable to cast organization to proto object: %v", err)
 	}
 	return ot
 }

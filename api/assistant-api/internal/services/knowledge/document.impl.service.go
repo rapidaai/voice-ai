@@ -352,8 +352,8 @@ func (knowledge *knowledgeDocumentService) GetAllDocumentSegment(
 
 	result := knowledge.opensearch.SearchWithCount(ctx, indexs, string(searchBodyJSON))
 	if result.Err != nil {
-		knowledge.logger.Errorf("Error while searching opensearch: %v", err)
-		return 0, nil, err
+		knowledge.logger.Errorf("Error while searching opensearch: %v", result.Err)
+		return 0, nil, result.Err
 	}
 
 	segments := make([]*protos.KnowledgeDocumentSegment, 0)
@@ -470,8 +470,8 @@ func (knowledge *knowledgeDocumentService) DeleteDocumentSegment(
 	// Update the document status directly
 	updateBody := map[string]interface{}{
 		"doc": map[string]interface{}{
-			"status":          type_enums.RECORD_ARCHIEVE.String(), // Assuming there's a status field, adjust as needed
-			"archieve_reason": reason,
+			"status":         type_enums.RECORD_ARCHIVE.String(), // Assuming there's a status field, adjust as needed
+			"archive_reason": reason,
 		},
 	}
 	updateBodyJSON, err := json.Marshal(updateBody)
