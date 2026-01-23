@@ -69,7 +69,7 @@ const statusConfig = {
     Icon: MinusCircle,
     display: 'Inactive',
   },
-  ARCHIEVE: {
+  ARCHIVE: {
     bgColor: 'bg-amber-100 dark:bg-amber-900/30',
     textColor: 'text-amber-700 dark:text-amber-500',
     iconColor: 'text-amber-500 dark:text-amber-400',
@@ -118,11 +118,10 @@ const StatusSelector: React.FC<StatusSelectorProps> = ({
         <button
           key={value}
           onClick={() => selectStatus(value)}
-          className={`w-full flex items-center gap-3 p-3 border transition-all ${
-            selectedStatus === value
+          className={`w-full flex items-center gap-3 p-3 border transition-all ${selectedStatus === value
               ? `${config.bgColor} ${config.ringColor} ${config.textColor} border-l-4`
               : 'bg-light-background dark:bg-gray-950'
-          }`}
+            }`}
         >
           <config.Icon className={`w-4 h-4 ${config.iconColor}`} />
           <span className="text-sm font-medium">{config.display}</span>

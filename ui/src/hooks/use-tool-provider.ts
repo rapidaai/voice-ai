@@ -10,8 +10,8 @@ import { useProviderContext } from '@/context/provider-context';
  */
 
 export const useAllToolProviderCredentials = () => {
-  const { toolProviderCredentials } = useProviderContext();
+  const { providerCredentials } = useProviderContext();
   return {
-    toolProviderCredentials,
+    toolProviderCredentials: providerCredentials,
   };
 };

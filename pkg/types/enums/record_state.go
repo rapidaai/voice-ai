@@ -30,7 +30,7 @@ const (
 	RECORD_SUCCESS     RecordState = "SUCCESS"
 	RECORD_COMPLETE    RecordState = "COMPLETE"
 	RECORD_INACTIVE    RecordState = "INACTIVE"
-	RECORD_ARCHIEVE    RecordState = "ARCHIEVE"
+	RECORD_ARCHIVE     RecordState = "ARCHIVE"
 	RECORD_FAILED      RecordState = "FAILED"
 )
 

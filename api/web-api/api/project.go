@@ -122,7 +122,7 @@ func (wProjectApi *webProjectGRPCApi) UpdateProject(ctx context.Context, irReque
 
 	currentOrgRole := iAuth.GetOrganizationRole()
 	if currentOrgRole == nil {
-		wProjectApi.logger.Errorf("current org is not null, you can't create multiple organization at same time.")
+		wProjectApi.logger.Errorf("current org is null, you cannot update a project without an organization.")
 		return utils.Error[protos.UpdateProjectResponse](
 			errors.New("you cannot update a project when you are not part of any organization"),
 			"Please create organization before updating a project.")
@@ -155,7 +155,7 @@ func (wProjectApi *webProjectGRPCApi) GetAllProject(ctx context.Context, irReque
 
 	currentOrgRole := iAuth.GetOrganizationRole()
 	if currentOrgRole == nil {
-		wProjectApi.logger.Errorf("current org is not null, you can't create multiple organization at same time.")
+		wProjectApi.logger.Errorf("current org is null, you cannot list projects without an organization.")
 		return utils.Error[protos.GetAllProjectResponse](
 			errors.New("you are not part of any active organization"),
 			"Please create organization and try again.",
@@ -248,8 +248,8 @@ func (wProjectApi *webProjectGRPCApi) GetProject(ctx context.Context, irRequest 
 }
 
 func (wProjectApi *webProjectGRPCApi) AddUserToProject(ctx context.Context, auth types.Principle, email string, userId uint64, status type_enums.RecordState, role string, projectIds []uint64) (*protos.AddUsersToProjectResponse, error) {
-	projectNames := make([]string, len(projectIds))
-	projectOut := make([]*internal_entity.Project, len(projectIds))
+	projectNames := make([]string, 0, len(projectIds))
+	projectOut := make([]*internal_entity.Project, 0, len(projectIds))
 
 	for _, projectId := range projectIds {
 		p, err := wProjectApi.projectService.Get(ctx, auth, projectId)
@@ -358,12 +358,12 @@ func (wProjectApi *webProjectGRPCApi) ArchiveProject(c context.Context, irReques
 	wProjectApi.logger.Debugf("ArchiveProjectRequest from grpc with requestPayload %v, %v", irRequest, c)
 	auth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
 	if !isAuthenticated {
-		wProjectApi.logger.Errorf("DeleteProviderCredential from grpc with unauthenticated request")
+		wProjectApi.logger.Errorf("ArchiveProject from grpc with unauthenticated request")
 		return nil, errors.New("unauthenticated request")
 	}
 
 	if _, err := wProjectApi.projectService.Archive(c, auth, irRequest.Id); err != nil {
-		wProjectApi.logger.Errorf("DeleteProviderCredential while archieving project")
+		wProjectApi.logger.Errorf("ArchiveProject error while archiving project: %v", err)
 		return nil, err
 	}
 

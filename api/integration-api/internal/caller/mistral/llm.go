@@ -42,9 +42,9 @@ func (llc *largeLanguageCaller) GetChatCompletion(
 	allMessages []*protos.Message,
 	options *internal_callers.ChatCompletionOptions,
 ) (*types.Message, types.Metrics, error) {
-	llc.logger.Debugf("getting chat completion from google llc")
+	llc.logger.Debugf("getting chat completion from mistral llc")
 	//
-	// Working with chat complition with vision
+	// Working with chat completion with vision
 	//
 	metrics := internal_caller_metrics.NewMetricBuilder(options.RequestId)
 	metrics.OnStart()
@@ -97,7 +97,7 @@ func (llc *largeLanguageCaller) GetChatCompletion(
 
 	//
 	if err != nil {
-		llc.logger.Errorf("getting error for chat complition %v", err)
+		llc.logger.Errorf("getting error for chat completion: %v", err)
 
 		options.AIOptions.PostHook(map[string]interface{}{
 			"result": res,
@@ -108,7 +108,7 @@ func (llc *largeLanguageCaller) GetChatCompletion(
 	metrics.OnSuccess()
 	var resp MistralMessageResponse
 	if err := json.Unmarshal([]byte(*res), &resp); err != nil {
-		llc.logger.Errorf("error while parsing chat complition response %v", err)
+		llc.logger.Errorf("error while parsing chat completion response: %v", err)
 		options.AIOptions.PostHook(map[string]interface{}{
 			"result": res,
 			"error":  err,
@@ -145,12 +145,12 @@ func (llc *largeLanguageCaller) GetCompletion(
 ) ([]*types.Content, types.Metrics, error) {
 
 	//
-	// Working with chat complition with vision
+	// Working with chat completion with vision
 	//
-	llc.logger.Debugf("getting for completion for anthropic")
+	llc.logger.Debugf("getting for completion for mistral")
 	metrics := internal_caller_metrics.NewMetricBuilder(options.RequestId)
 	metrics.OnStart()
 
-	return nil, metrics.OnFailure().Build(), errors.New("illegal implimentation")
+	return nil, metrics.OnFailure().Build(), errors.New("illegal implementation")
 
 }

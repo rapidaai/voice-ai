@@ -51,6 +51,9 @@ func NewAzureOption(
 
 func (az *azureOption) SpeechToTextOption() (*speech.SpeechConfig, error) {
 	cfg, err := speech.NewSpeechConfigFromEndpointWithSubscription(az.endpoint, az.subscriptionKey)
+	if err != nil {
+		return nil, err
+	}
 	if language, ok := az.mdlOpts.GetString("listen.language"); ok == nil {
 		cfg.SetSpeechRecognitionLanguage(language)
 	}

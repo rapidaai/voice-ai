@@ -59,7 +59,7 @@ func (vS *vaultService) Delete(ctx context.Context, auth types.Principle, vaultI
 	db := vS.postgres.DB(ctx)
 	vlt := &internal_entity.Vault{
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ARCHIEVE,
+			Status:    type_enums.RECORD_ARCHIVE,
 			UpdatedBy: *auth.GetUserId(),
 		},
 	}

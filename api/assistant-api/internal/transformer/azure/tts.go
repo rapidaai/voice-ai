@@ -42,7 +42,7 @@ func NewAzureTextToSpeech(ctx context.Context, logger commons.Logger, credential
 
 	azureOption, err := NewAzureOption(logger, credential, audioConfig, opts)
 	if err != nil {
-		logger.Errorf("azure-tts: Unable to initilize azure option", err)
+		logger.Errorf("azure-tts: Unable to initialize azure option: %v", err)
 		return nil, err
 	}
 	ct, ctxCancel := context.WithCancel(ctx)
@@ -85,13 +85,13 @@ func (azure *azureTextToSpeech) Close(ctx context.Context) error {
 func (azure *azureTextToSpeech) Initialize() (err error) {
 	stream, err := audio.CreatePullAudioOutputStream()
 	if err != nil {
-		azure.logger.Errorf("azure-tts: failed to create audio stream:", err)
+		azure.logger.Errorf("azure-tts: failed to create audio stream: %v", err)
 		return fmt.Errorf("azure-tts: failed to create audio stream: %w", err)
 	}
 	audioConfig, err := audio.NewAudioConfigFromStreamOutput(stream)
 	if err != nil {
 		stream.Close()
-		azure.logger.Errorf("azure-tts: failed to create audio config:", err)
+		azure.logger.Errorf("azure-tts: failed to create audio config: %v", err)
 		return fmt.Errorf("azure-tts: failed to create audio config: %w", err)
 	}
 
@@ -99,7 +99,7 @@ func (azure *azureTextToSpeech) Initialize() (err error) {
 	if err != nil {
 		stream.Close()
 		audioConfig.Close()
-		azure.logger.Errorf("azure-tts: failed to get speech configuration:", err)
+		azure.logger.Errorf("azure-tts: failed to get speech configuration: %v", err)
 		return fmt.Errorf("azure-tts: failed to get speech configuration: %w", err)
 	}
 	// Close speechConfig after creating synthesizer as it's no longer needed
@@ -109,7 +109,7 @@ func (azure *azureTextToSpeech) Initialize() (err error) {
 	if err != nil {
 		stream.Close()
 		audioConfig.Close()
-		azure.logger.Errorf("azure-tts: failed to initialize speech synthesizer:", err)
+		azure.logger.Errorf("azure-tts: failed to initialize speech synthesizer: %v", err)
 		return fmt.Errorf("azure-tts: failed to initialize speech synthesizer: %w", err)
 	}
 

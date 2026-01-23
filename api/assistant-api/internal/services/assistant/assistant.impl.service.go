@@ -107,7 +107,7 @@ func (eService *assistantService) DeleteAssistant(ctx context.Context, auth type
 	ed := &internal_assistant_entity.Assistant{
 		Mutable: gorm_models.Mutable{
 			UpdatedBy: *auth.GetUserId(),
-			Status:    type_enums.RECORD_ARCHIEVE,
+			Status:    type_enums.RECORD_ARCHIVE,
 		},
 	}
 	tx := db.Where("id = ? AND project_id = ? AND organization_id = ?", assistantId,
@@ -404,23 +404,6 @@ func (eService *assistantService) Get(ctx context.Context,
 		utils.Go(ctx,
 			func() {
 				defer wg.Done()
-				var webhooks []*internal_assistant_entity.AssistantWebhook
-				tx := db.
-					Where("assistant_id = ? AND status = ?", assistantId, type_enums.RECORD_ACTIVE.String()).
-					Find(&webhooks).
-					Order("execution_priority DESC")
-				if tx.Error != nil {
-					return
-				}
-				assistant.AssistantWebhooks = webhooks
-			})
-	}
-
-	if opts.InjectWebhook {
-		wg.Add(1)
-		utils.Go(ctx,
-			func() {
-				defer wg.Done()
 				var analysis []*internal_assistant_entity.AssistantAnalysis
 				tx := db.
 					Where("assistant_id = ? AND status = ?", assistantId, type_enums.RECORD_ACTIVE.String()).
@@ -430,6 +413,23 @@ func (eService *assistantService) Get(ctx context.Context,
 					return
 				}
 				assistant.AssistantAnalyses = analysis
+			})
+	}
+
+	if opts.InjectWebhook {
+		wg.Add(1)
+		utils.Go(ctx,
+			func() {
+				defer wg.Done()
+				var webhooks []*internal_assistant_entity.AssistantWebhook
+				tx := db.
+					Where("assistant_id = ? AND status = ?", assistantId, type_enums.RECORD_ACTIVE.String()).
+					Find(&webhooks).
+					Order("execution_priority DESC")
+				if tx.Error != nil {
+					return
+				}
+				assistant.AssistantWebhooks = webhooks
 			})
 	}
 	wg.Wait()

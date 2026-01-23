@@ -116,7 +116,7 @@ func (eService *assistantKnowledgeService) Delete(ctx context.Context, auth type
 	db := eService.postgres.DB(ctx)
 	aK := &internal_assistant_entity.AssistantKnowledge{
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ARCHIEVE,
+			Status:    type_enums.RECORD_ARCHIVE,
 			UpdatedBy: *auth.GetUserId(),
 		},
 	}
@@ -222,7 +222,7 @@ func (eService *assistantKnowledgeService) Update(ctx context.Context, auth type
 		assistantId).Updates(&aK)
 	if tx.Error != nil {
 		eService.logger.Benchmark("AssistantKnowledgeService.Update", time.Since(start))
-		eService.logger.Errorf("error while creating webhook %v", tx.Error)
+		eService.logger.Errorf("error while updating assistant knowledge: %v", tx.Error)
 		return nil, tx.Error
 	}
 	eService.logger.Benchmark("AssistantKnowledgeService.Update", time.Since(start))

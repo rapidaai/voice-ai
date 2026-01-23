@@ -175,7 +175,7 @@ func (llc *largeLanguageCaller) GetChatCompletion(
 
 	client, err := llc.GetClient()
 	if err != nil {
-		llc.logger.Errorf("chat complition unable to get client for openai %v", err)
+		llc.logger.Errorf("chat completion unable to get client for openai: %v", err)
 		return nil, metrics.OnFailure().Build(), err
 	}
 
@@ -186,10 +186,10 @@ func (llc *largeLanguageCaller) GetChatCompletion(
 	// prehook
 	options.AIOptions.PreHook(utils.ToJson(llmRequest))
 
-	//chat complitions
+	//chat completions
 	resp, err := client.Chat.Completions.New(ctx, llmRequest)
 	if err != nil {
-		llc.logger.Errorf("chat complition failed to get response from openai %v", err)
+		llc.logger.Errorf("chat completion failed to get response from openai: %v", err)
 		options.AIOptions.PostHook(map[string]interface{}{
 			"error":  err,
 			"result": resp,
@@ -201,7 +201,7 @@ func (llc *largeLanguageCaller) GetChatCompletion(
 		Contents: make([]*types.Content, 0),
 	}
 	metrics.OnSuccess()
-	metrics.OnAddMetrics(llc.GetComplitionUsages(resp.Usage)...)
+	metrics.OnAddMetrics(llc.GetCompletionUsages(resp.Usage)...)
 	// all the usages into the metrics
 
 	for _, choice := range resp.Choices {
@@ -292,7 +292,7 @@ func (llc *largeLanguageCaller) StreamChatCompletion(
 		accumulate.AddChunk(chatCompletions)
 
 		if _, ok := accumulate.JustFinishedContent(); ok {
-			metrics.OnAddMetrics(llc.GetComplitionUsages(accumulate.Usage)...)
+			metrics.OnAddMetrics(llc.GetCompletionUsages(accumulate.Usage)...)
 			metrics.OnSuccess()
 			options.AIOptions.PostHook(map[string]interface{}{
 				"result": utils.ToJson(accumulate),
@@ -316,7 +316,7 @@ func (llc *largeLanguageCaller) StreamChatCompletion(
 				return err
 			}
 
-			metrics.OnAddMetrics(llc.GetComplitionUsages(accumulate.Usage)...)
+			metrics.OnAddMetrics(llc.GetCompletionUsages(accumulate.Usage)...)
 			options.AIOptions.PostHook(map[string]interface{}{
 				"result": utils.ToJson(accumulate),
 			}, metrics.Build())
