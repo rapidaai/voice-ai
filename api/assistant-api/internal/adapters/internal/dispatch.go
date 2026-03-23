@@ -827,6 +827,10 @@ func (talking *genericRequestor) handleDirective(ctx context.Context, vl interna
 	anyArgs, _ := utils.InterfaceMapToAnyMap(vl.Arguments)
 	switch vl.Directive {
 	case protos.ConversationDirective_END_CONVERSATION:
+		// Check for stage transition request
+		if stageName, ok := vl.Arguments["transition_stage"].(string); ok && stageName != "" {
+			talking.handleStageTransition(ctx, vl.ContextID, stageName)
+		}
 		if err := talking.Notify(ctx, &protos.ConversationDirective{
 			Id:   vl.ContextID,
 			Type: vl.Directive,
@@ -837,6 +841,55 @@ func (talking *genericRequestor) handleDirective(ctx context.Context, vl interna
 		}
 	default:
 	}
+}
+
+// handleStageTransition handles the stage transition by updating the conversation's current_stage_id
+func (talking *genericRequestor) handleStageTransition(ctx context.Context, contextID, stageName string) {
+	if talking.assistantService == nil {
+		talking.logger.Warn("assistant service not available for stage transition")
+		return
+	}
+
+	conversation := talking.Conversation()
+	if conversation == nil {
+		talking.logger.Warn("no conversation available for stage transition")
+		return
+	}
+
+	assistant := talking.assistant
+	if assistant == nil || assistant.AssistantProviderModel == nil {
+		talking.logger.Warn("no assistant available for stage transition")
+		return
+	}
+
+	// Get all stages and find matching one
+	stages, err := talking.assistantService.GetPromptStages(ctx, talking.auth, assistant.AssistantProviderModel.Id)
+	if err != nil {
+		talking.logger.Errorf("failed to get prompt stages: %v", err)
+		return
+	}
+
+	var stageId uint64
+	for _, stage := range stages {
+		if stage.Name == stageName {
+			stageId = stage.Id
+			break
+		}
+	}
+
+	if stageId == 0 {
+		talking.logger.Warnf("stage not found: %s", stageName)
+		return
+	}
+
+	// Update conversation stage
+	err = talking.assistantService.UpdateConversationStage(ctx, conversation.Id, stageId)
+	if err != nil {
+		talking.logger.Errorf("failed to update conversation stage: %v", err)
+		return
+	}
+
+	talking.logger.Infof("conversation %d transitioned to stage %s (id: %d)", conversation.Id, stageName, stageId)
 }
 
 // =============================================================================
