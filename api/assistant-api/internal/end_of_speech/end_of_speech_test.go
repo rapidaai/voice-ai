@@ -32,7 +32,9 @@ func TestGetEndOfSpeech_SilenceBasedIdentifier(t *testing.T) {
 	assert.IsType(t, endOfSpeech, endOfSpeech)
 }
 
-func TestGetEndOfSpeech_LiveKitIdentifier(t *testing.T) {
+func TestGetEndOfSpeech_LiveKitIdentifier_FallsBackToSilenceBased(t *testing.T) {
+	// LiveKit turn-detector removed due to license restrictions.
+	// Selecting livekit_eos now falls back to silence_based_eos.
 	logger, _ := commons.NewApplicationLogger()
 
 	endOfSpeech, err := GetEndOfSpeech(t.Context(), logger, mockCallback, utils.Option{EndOfSpeechOptionsKeyProvider: LiveKitEndOfSpeech})

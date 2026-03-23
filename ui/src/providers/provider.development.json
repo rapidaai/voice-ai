@@ -7,13 +7,6 @@
         ]
     },
     {
-        "name": "Ten Vad",
-        "code": "ten_vad",
-        "featureList": [
-            "vad"
-        ]
-    },
-    {
         "name": "FireRed Vad",
         "code": "firered_vad",
         "featureList": [
@@ -23,13 +16,6 @@
     {
         "name": "Silence based",
         "code": "silence_based_eos",
-        "featureList": [
-            "end_of_speech"
-        ]
-    },
-    {
-        "name": "LiveKit Turn Detector",
-        "code": "livekit_eos",
         "featureList": [
             "end_of_speech"
         ]
