@@ -47,6 +47,7 @@ import (
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	integration_client_builders "github.com/rapidaai/pkg/clients/integration/builders"
 	"github.com/rapidaai/pkg/commons"
+	gorm_types "github.com/rapidaai/pkg/models/gorm/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 	"golang.org/x/sync/errgroup"
@@ -68,14 +69,16 @@ type modelAssistantExecutor struct {
 	activeContextID    string // set by chat(), cleared on interrupt, checked by listener
 	ctx                context.Context
 	ctxCancel          context.CancelFunc
+	stageTemplates     map[uint64]gorm_types.PromptMap // stageId -> template
 }
 
 func NewModelAssistantExecutor(logger commons.Logger) internal_agent_executor.AssistantExecutor {
 	return &modelAssistantExecutor{
-		logger:       logger,
-		inputBuilder: integration_client_builders.NewChatInputBuilder(logger),
-		toolExecutor: internal_agent_tool.NewToolExecutor(logger),
-		history:      make([]*protos.Message, 0),
+		logger:         logger,
+		inputBuilder:   integration_client_builders.NewChatInputBuilder(logger),
+		toolExecutor:   internal_agent_tool.NewToolExecutor(logger),
+		history:        make([]*protos.Message, 0),
+		stageTemplates: make(map[uint64]gorm_types.PromptMap),
 	}
 }
 
@@ -361,7 +364,32 @@ func (e *modelAssistantExecutor) handleResponse(ctx context.Context, communicati
 // The caller provides the complete conversation messages (system prompt is prepended automatically).
 func (e *modelAssistantExecutor) buildChatRequest(communication internal_type.Communication, contextID string, messages ...*protos.Message) *protos.ChatRequest {
 	assistant := communication.Assistant()
-	template := assistant.AssistantProviderModel.Template.GetTextChatCompleteTemplate()
+	conversation := communication.Conversation()
+
+	var template *gorm_types.TextChatCompletePromptTemplate
+
+	// Check if conversation has a current stage
+	if conversation != nil && conversation.CurrentStageId > 0 {
+		// Load stage template from database (cached in assistant for now)
+		if stage, ok := e.stageTemplates[conversation.CurrentStageId]; ok {
+			template = stage.GetTextChatCompleteTemplate()
+		}
+	}
+
+	// Fall back to default template if no stage template found
+	if template == nil {
+		template = assistant.AssistantProviderModel.Template.GetTextChatCompleteTemplate()
+	}
+
+	// If conversation has a stage set via metadata, load its template
+	if stageID := communication.GetMetadata()["current_stage_id"]; stageID != nil {
+		if sid, ok := stageID.(uint64); ok {
+			if stageTmpl, ok := e.stageTemplates[sid]; ok {
+				template = stageTmpl.GetTextChatCompleteTemplate()
+			}
+		}
+	}
+
 	systemMessages := e.inputBuilder.Message(
 		template.Prompt,
 		utils.MergeMaps(e.inputBuilder.PromptArguments(template.Variables), communication.GetArgs()),

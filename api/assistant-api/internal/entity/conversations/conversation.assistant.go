@@ -23,6 +23,7 @@ type AssistantConversation struct {
 	Source    utils.RapidaSource               `json:"source" gorm:"type:string;size:50;not null;default:web-app"`
 	Direction type_enums.ConversationDirection `json:"direction" gorm:"type:string;size:20;not null;default:inbound"`
 
+	CurrentStageId  uint64                                 `json:"currentStageId" gorm:"type:bigint"`
 	Arguments       []*AssistantConversationArgument       `json:"arguments" gorm:"foreignKey:AssistantConversationId"`
 	Metadatas       []*AssistantConversationMetadata       `json:"metadata" gorm:"foreignKey:AssistantConversationId"`
 	Metrics         []*AssistantConversationMetric         `json:"metrics" gorm:"foreignKey:AssistantConversationId"`

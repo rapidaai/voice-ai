@@ -13,6 +13,7 @@ import (
 
 	"github.com/rapidaai/api/assistant-api/config"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
+	internal_conversation_entity "github.com/rapidaai/api/assistant-api/internal/entity/conversations"
 	internal_telemetry_entity "github.com/rapidaai/api/assistant-api/internal/entity/telemetry"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	"github.com/rapidaai/pkg/commons"
@@ -858,4 +859,157 @@ func (eService *assistantService) CreateOrUpdateAssistantTag(ctx context.Context
 	}
 	eService.logger.Benchmark("assistantService.CreateOrUpdateAssistantTag", time.Since(start))
 	return assistantTag, nil
+}
+
+func (eService *assistantService) CreatePromptStage(ctx context.Context,
+	auth types.SimplePrinciple,
+	providerModelId uint64,
+	name string,
+	description string,
+	template string,
+	isDefault bool,
+	order int,
+) (*internal_assistant_entity.AssistantPromptStage, error) {
+	start := time.Now()
+	db := eService.postgres.DB(ctx)
+
+	if isDefault {
+		db.Model(&internal_assistant_entity.AssistantPromptStage{}).Where("assistant_provider_model_id = ? AND is_default = ?", providerModelId, true).Update("is_default", false)
+	}
+
+	stage := &internal_assistant_entity.AssistantPromptStage{
+		AssistantProviderModelId: providerModelId,
+		Name:                     name,
+		Description:              description,
+		IsDefault:                isDefault,
+		Order:                    order,
+	}
+	stage.SetPrompt(template)
+
+	tx := db.Save(stage)
+	if tx.Error != nil {
+		eService.logger.Benchmark("assistantService.CreatePromptStage", time.Since(start))
+		eService.logger.Errorf("error while creating prompt stage %v", tx.Error)
+		return nil, tx.Error
+	}
+	eService.logger.Benchmark("assistantService.CreatePromptStage", time.Since(start))
+	return stage, nil
+}
+
+func (eService *assistantService) GetPromptStages(ctx context.Context,
+	auth types.SimplePrinciple,
+	providerModelId uint64,
+) ([]*internal_assistant_entity.AssistantPromptStage, error) {
+	start := time.Now()
+	db := eService.postgres.DB(ctx)
+
+	var stages []*internal_assistant_entity.AssistantPromptStage
+	tx := db.Where("assistant_provider_model_id = ?", providerModelId).Order("`order` ASC").Find(&stages)
+	if tx.Error != nil {
+		eService.logger.Benchmark("assistantService.GetPromptStages", time.Since(start))
+		eService.logger.Errorf("error while getting prompt stages %v", tx.Error)
+		return nil, tx.Error
+	}
+	eService.logger.Benchmark("assistantService.GetPromptStages", time.Since(start))
+	return stages, nil
+}
+
+func (eService *assistantService) UpdatePromptStage(ctx context.Context,
+	auth types.SimplePrinciple,
+	stageId uint64,
+	name string,
+	description string,
+	template string,
+	isDefault bool,
+	order int,
+) (*internal_assistant_entity.AssistantPromptStage, error) {
+	start := time.Now()
+	db := eService.postgres.DB(ctx)
+
+	var stage internal_assistant_entity.AssistantPromptStage
+	if err := db.First(&stage, stageId).Error; err != nil {
+		eService.logger.Benchmark("assistantService.UpdatePromptStage", time.Since(start))
+		eService.logger.Errorf("prompt stage not found %v", err)
+		return nil, err
+	}
+
+	if isDefault {
+		db.Model(&internal_assistant_entity.AssistantPromptStage{}).Where("assistant_provider_model_id = ? AND is_default = ? AND id != ?", stage.AssistantProviderModelId, true, stageId).Update("is_default", false)
+	}
+
+	stage.Name = name
+	stage.Description = description
+	stage.IsDefault = isDefault
+	stage.Order = order
+	stage.SetPrompt(template)
+
+	tx := db.Save(&stage)
+	if tx.Error != nil {
+		eService.logger.Benchmark("assistantService.UpdatePromptStage", time.Since(start))
+		eService.logger.Errorf("error while updating prompt stage %v", tx.Error)
+		return nil, tx.Error
+	}
+	eService.logger.Benchmark("assistantService.UpdatePromptStage", time.Since(start))
+	return &stage, nil
+}
+
+func (eService *assistantService) DeletePromptStage(ctx context.Context,
+	auth types.SimplePrinciple,
+	stageId uint64,
+) error {
+	start := time.Now()
+	db := eService.postgres.DB(ctx)
+
+	tx := db.Delete(&internal_assistant_entity.AssistantPromptStage{}, stageId)
+	if tx.Error != nil {
+		eService.logger.Benchmark("assistantService.DeletePromptStage", time.Since(start))
+		eService.logger.Errorf("error while deleting prompt stage %v", tx.Error)
+		return tx.Error
+	}
+	eService.logger.Benchmark("assistantService.DeletePromptStage", time.Since(start))
+	return nil
+}
+
+func (eService *assistantService) GetDefaultPromptStage(ctx context.Context,
+	auth types.SimplePrinciple,
+	providerModelId uint64,
+) (*internal_assistant_entity.AssistantPromptStage, error) {
+	start := time.Now()
+	db := eService.postgres.DB(ctx)
+
+	var stage internal_assistant_entity.AssistantPromptStage
+	tx := db.Where("assistant_provider_model_id = ? AND is_default = ?", providerModelId, true).First(&stage)
+	if tx.Error != nil {
+		if tx.Error == gorm.ErrRecordNotFound {
+			var stages []*internal_assistant_entity.AssistantPromptStage
+			tx := db.Where("assistant_provider_model_id = ?", providerModelId).Order("`order` ASC").Limit(1).Find(&stages)
+			if tx.Error != nil || len(stages) == 0 {
+				eService.logger.Benchmark("assistantService.GetDefaultPromptStage", time.Since(start))
+				return nil, tx.Error
+			}
+			eService.logger.Benchmark("assistantService.GetDefaultPromptStage", time.Since(start))
+			return stages[0], nil
+		}
+		eService.logger.Benchmark("assistantService.GetDefaultPromptStage", time.Since(start))
+		return nil, tx.Error
+	}
+	eService.logger.Benchmark("assistantService.GetDefaultPromptStage", time.Since(start))
+	return &stage, nil
+}
+
+func (eService *assistantService) UpdateConversationStage(ctx context.Context,
+	conversationId uint64,
+	stageId uint64,
+) error {
+	start := time.Now()
+	db := eService.postgres.DB(ctx)
+
+	tx := db.Model(&internal_conversation_entity.AssistantConversation{}).Where("id = ?", conversationId).Update("current_stage_id", stageId)
+	if tx.Error != nil {
+		eService.logger.Benchmark("assistantService.UpdateConversationStage", time.Since(start))
+		eService.logger.Errorf("error while updating conversation stage %v", tx.Error)
+		return tx.Error
+	}
+	eService.logger.Benchmark("assistantService.UpdateConversationStage", time.Since(start))
+	return nil
 }
