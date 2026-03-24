@@ -110,7 +110,31 @@ func (executor *toolExecutor) initializeTools(ctx context.Context, tools []*inte
 // Initialize sets up all tools (local + MCP) for the assistant
 func (executor *toolExecutor) Initialize(ctx context.Context, communication internal_type.Communication) error {
 	executor.initializeTools(ctx, communication.Assistant().AssistantTools, communication)
+
+	// Register built-in stage transition tool
+	executor.registerBuiltInStageTransitionTool(ctx, communication)
 	return nil
+}
+
+// registerBuiltInStageTransitionTool adds a tool for switching between prompt stages
+func (executor *toolExecutor) registerBuiltInStageTransitionTool(ctx context.Context, communication internal_type.Communication) {
+	stageTransitionDef := &protos.FunctionDefinition{
+		Name:        "transition_stage",
+		Description: "Transition to a different conversation stage. Use stage name (e.g., 'order_placement', 'identity_check'). Use after completing a task to switch prompts.",
+		Parameters: &protos.FunctionParameter{
+			Type:     "object",
+			Required: []string{"stage_name"},
+			Properties: map[string]*protos.FunctionParameterProperty{
+				"stage_name": {
+					Type:        "string",
+					Description: "The name of the stage to transition to (e.g., 'order_placement', 'identity_check', 'verification')",
+				},
+			},
+		},
+	}
+
+	caller := internal_tool_local.NewStageTransitionCaller(ctx, executor.logger, communication)
+	executor.registerTool(caller, stageTransitionDef)
 }
 
 func (executor *toolExecutor) GetFunctionDefinitions() []*protos.FunctionDefinition {

@@ -47,6 +47,7 @@ import (
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	integration_client_builders "github.com/rapidaai/pkg/clients/integration/builders"
 	"github.com/rapidaai/pkg/commons"
+	gorm_types "github.com/rapidaai/pkg/models/gorm/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 	"golang.org/x/sync/errgroup"
@@ -68,14 +69,16 @@ type modelAssistantExecutor struct {
 	activeContextID    string // set by chat(), cleared on interrupt, checked by listener
 	ctx                context.Context
 	ctxCancel          context.CancelFunc
+	stageTemplates     map[uint64]gorm_types.PromptMap // stageId -> template
 }
 
 func NewModelAssistantExecutor(logger commons.Logger) internal_agent_executor.AssistantExecutor {
 	return &modelAssistantExecutor{
-		logger:       logger,
-		inputBuilder: integration_client_builders.NewChatInputBuilder(logger),
-		toolExecutor: internal_agent_tool.NewToolExecutor(logger),
-		history:      make([]*protos.Message, 0),
+		logger:         logger,
+		inputBuilder:   integration_client_builders.NewChatInputBuilder(logger),
+		toolExecutor:   internal_agent_tool.NewToolExecutor(logger),
+		history:        make([]*protos.Message, 0),
+		stageTemplates: make(map[uint64]gorm_types.PromptMap),
 	}
 }
 
@@ -361,7 +364,16 @@ func (e *modelAssistantExecutor) handleResponse(ctx context.Context, communicati
 // The caller provides the complete conversation messages (system prompt is prepended automatically).
 func (e *modelAssistantExecutor) buildChatRequest(communication internal_type.Communication, contextID string, messages ...*protos.Message) *protos.ChatRequest {
 	assistant := communication.Assistant()
+
+	// Get template - check if stage template was passed via metadata
 	template := assistant.AssistantProviderModel.Template.GetTextChatCompleteTemplate()
+
+	if stageTemplate, ok := communication.GetMetadata()["stage_template"]; ok {
+		if st, ok := stageTemplate.(*gorm_types.TextChatCompletePromptTemplate); ok && st != nil {
+			template = st
+		}
+	}
+
 	systemMessages := e.inputBuilder.Message(
 		template.Prompt,
 		utils.MergeMaps(e.inputBuilder.PromptArguments(template.Variables), communication.GetArgs()),

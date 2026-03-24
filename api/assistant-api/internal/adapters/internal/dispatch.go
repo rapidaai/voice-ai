@@ -15,6 +15,7 @@ import (
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	observe "github.com/rapidaai/api/assistant-api/internal/observe"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	gorm_types "github.com/rapidaai/pkg/models/gorm/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -839,6 +840,63 @@ func (talking *genericRequestor) handleDirective(ctx context.Context, vl interna
 	}
 }
 
+// handleStageTransition handles the stage transition by updating the conversation's current_stage_id
+func (talking *genericRequestor) handleStageTransition(ctx context.Context, contextID, stageName string) {
+	if talking.assistantService == nil {
+		talking.logger.Warn("assistant service not available for stage transition")
+		return
+	}
+
+	conversation := talking.Conversation()
+	if conversation == nil {
+		talking.logger.Warn("no conversation available for stage transition")
+		return
+	}
+
+	assistant := talking.assistant
+	if assistant == nil || assistant.AssistantProviderModel == nil {
+		talking.logger.Warn("no assistant available for stage transition")
+		return
+	}
+
+	// Get all stages and find matching one
+	stages, err := talking.assistantService.GetPromptStages(ctx, talking.auth, assistant.AssistantProviderModel.Id)
+	if err != nil {
+		talking.logger.Errorf("failed to get prompt stages: %v", err)
+		return
+	}
+
+	var stageId uint64
+	var stageTemplate gorm_types.TextChatCompletePromptTemplate
+	for _, stage := range stages {
+		if stage.Name == stageName {
+			stageId = stage.Id
+			stageTemplate = *stage.Template.GetTextChatCompleteTemplate()
+			break
+		}
+	}
+
+	if stageId == 0 {
+		talking.logger.Warnf("stage not found: %s", stageName)
+		return
+	}
+
+	// Update conversation stage
+	err = talking.assistantService.UpdateConversationStage(ctx, talking.auth, conversation.Id, stageId)
+	if err != nil {
+		talking.logger.Errorf("failed to update conversation stage: %v", err)
+		return
+	}
+
+	// Update in-memory conversation state so next LLM turn uses the new prompt
+	conversation.CurrentStageId = stageId
+
+	// Set stage template in metadata so executor can use it
+	talking.metadata["stage_template"] = stageTemplate
+
+	talking.logger.Infof("conversation %d transitioned to stage %s (id: %d)", conversation.Id, stageName, stageId)
+}
+
 // =============================================================================
 // Observability handler
 // =============================================================================
@@ -852,6 +910,14 @@ func (talking *genericRequestor) handleConversationEvent(ctx context.Context, vl
 	if contextID == "" {
 		contextID = talking.GetID()
 	}
+
+	// Handle stage transition events
+	if vl.Name == "stage_transition" {
+		if stageName, ok := vl.Data["stage_name"]; ok {
+			talking.handleStageTransition(ctx, contextID, stageName)
+		}
+	}
+
 	if vl.Time.IsZero() {
 		vl.Time = time.Now()
 	}

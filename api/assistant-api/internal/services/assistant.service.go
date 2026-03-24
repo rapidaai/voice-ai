@@ -142,6 +142,13 @@ type AssistantService interface {
 		assistantId uint64,
 		tags []string,
 	) (*internal_assistant_entity.AssistantTag, error)
+
+	CreatePromptStage(ctx context.Context, auth types.SimplePrinciple, providerModelId uint64, name, description, template string, isDefault bool, order int) (*internal_assistant_entity.AssistantPromptStage, error)
+	GetPromptStages(ctx context.Context, auth types.SimplePrinciple, providerModelId uint64) ([]*internal_assistant_entity.AssistantPromptStage, error)
+	UpdatePromptStage(ctx context.Context, auth types.SimplePrinciple, stageId uint64, name, description, template string, isDefault bool, order int) (*internal_assistant_entity.AssistantPromptStage, error)
+	DeletePromptStage(ctx context.Context, auth types.SimplePrinciple, stageId uint64) error
+	GetDefaultPromptStage(ctx context.Context, auth types.SimplePrinciple, providerModelId uint64) (*internal_assistant_entity.AssistantPromptStage, error)
+	UpdateConversationStage(ctx context.Context, auth types.SimplePrinciple, conversationId uint64, stageId uint64) error
 }
 
 type AssistantDeploymentService interface {
