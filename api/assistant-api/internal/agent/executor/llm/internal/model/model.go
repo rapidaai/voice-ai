@@ -364,29 +364,13 @@ func (e *modelAssistantExecutor) handleResponse(ctx context.Context, communicati
 // The caller provides the complete conversation messages (system prompt is prepended automatically).
 func (e *modelAssistantExecutor) buildChatRequest(communication internal_type.Communication, contextID string, messages ...*protos.Message) *protos.ChatRequest {
 	assistant := communication.Assistant()
-	conversation := communication.Conversation()
 
-	var template *gorm_types.TextChatCompletePromptTemplate
+	// Get template - check if stage template was passed via metadata
+	template := assistant.AssistantProviderModel.Template.GetTextChatCompleteTemplate()
 
-	// Check if conversation has a current stage
-	if conversation != nil && conversation.CurrentStageId > 0 {
-		// Load stage template from database (cached in assistant for now)
-		if stage, ok := e.stageTemplates[conversation.CurrentStageId]; ok {
-			template = stage.GetTextChatCompleteTemplate()
-		}
-	}
-
-	// Fall back to default template if no stage template found
-	if template == nil {
-		template = assistant.AssistantProviderModel.Template.GetTextChatCompleteTemplate()
-	}
-
-	// If conversation has a stage set via metadata, load its template
-	if stageID := communication.GetMetadata()["current_stage_id"]; stageID != nil {
-		if sid, ok := stageID.(uint64); ok {
-			if stageTmpl, ok := e.stageTemplates[sid]; ok {
-				template = stageTmpl.GetTextChatCompleteTemplate()
-			}
+	if stageTemplate, ok := communication.GetMetadata()["stage_template"]; ok {
+		if st, ok := stageTemplate.(*gorm_types.TextChatCompletePromptTemplate); ok && st != nil {
+			template = st
 		}
 	}
 

@@ -866,9 +866,11 @@ func (talking *genericRequestor) handleStageTransition(ctx context.Context, cont
 	}
 
 	var stageId uint64
+	var stageTemplate interface{}
 	for _, stage := range stages {
 		if stage.Name == stageName {
 			stageId = stage.Id
+			stageTemplate = stage.GetTemplate()
 			break
 		}
 	}
@@ -887,6 +889,9 @@ func (talking *genericRequestor) handleStageTransition(ctx context.Context, cont
 
 	// Update in-memory conversation state so next LLM turn uses the new prompt
 	conversation.CurrentStageId = stageId
+
+	// Set stage template in metadata so executor can use it
+	talking.metadata["stage_template"] = stageTemplate
 
 	talking.logger.Infof("conversation %d transitioned to stage %s (id: %d)", conversation.Id, stageName, stageId)
 }
