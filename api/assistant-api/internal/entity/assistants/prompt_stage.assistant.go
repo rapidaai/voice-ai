@@ -24,13 +24,17 @@ type AssistantPromptStage struct {
 	TransitionRules          string               `json:"transitionRules" gorm:"type:text"`
 }
 
-func (aps *AssistantPromptStage) SetPrompt(promptString string) {
+func (aps *AssistantPromptStage) SetPrompt(promptString string) error {
+	if promptString == "" {
+		aps.Template = nil
+		return nil
+	}
 	var jsonData map[string]interface{}
-	err := json.Unmarshal([]byte(promptString), &jsonData)
-	if err != nil {
-		return
+	if err := json.Unmarshal([]byte(promptString), &jsonData); err != nil {
+		return err
 	}
 	aps.Template = jsonData
+	return nil
 }
 
 func (aps *AssistantPromptStage) GetTemplate() map[string]interface{} {

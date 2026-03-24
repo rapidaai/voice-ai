@@ -148,7 +148,7 @@ type AssistantService interface {
 	UpdatePromptStage(ctx context.Context, auth types.SimplePrinciple, stageId uint64, name, description, template string, isDefault bool, order int) (*internal_assistant_entity.AssistantPromptStage, error)
 	DeletePromptStage(ctx context.Context, auth types.SimplePrinciple, stageId uint64) error
 	GetDefaultPromptStage(ctx context.Context, auth types.SimplePrinciple, providerModelId uint64) (*internal_assistant_entity.AssistantPromptStage, error)
-	UpdateConversationStage(ctx context.Context, conversationId uint64, stageId uint64) error
+	UpdateConversationStage(ctx context.Context, auth types.SimplePrinciple, conversationId uint64, stageId uint64) error
 }
 
 type AssistantDeploymentService interface {

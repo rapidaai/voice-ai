@@ -827,10 +827,6 @@ func (talking *genericRequestor) handleDirective(ctx context.Context, vl interna
 	anyArgs, _ := utils.InterfaceMapToAnyMap(vl.Arguments)
 	switch vl.Directive {
 	case protos.ConversationDirective_END_CONVERSATION:
-		// Check for stage transition request
-		if stageName, ok := vl.Arguments["transition_stage"].(string); ok && stageName != "" {
-			talking.handleStageTransition(ctx, vl.ContextID, stageName)
-		}
 		if err := talking.Notify(ctx, &protos.ConversationDirective{
 			Id:   vl.ContextID,
 			Type: vl.Directive,
@@ -883,11 +879,14 @@ func (talking *genericRequestor) handleStageTransition(ctx context.Context, cont
 	}
 
 	// Update conversation stage
-	err = talking.assistantService.UpdateConversationStage(ctx, conversation.Id, stageId)
+	err = talking.assistantService.UpdateConversationStage(ctx, talking.auth, conversation.Id, stageId)
 	if err != nil {
 		talking.logger.Errorf("failed to update conversation stage: %v", err)
 		return
 	}
+
+	// Update in-memory conversation state so next LLM turn uses the new prompt
+	conversation.CurrentStageId = stageId
 
 	talking.logger.Infof("conversation %d transitioned to stage %s (id: %d)", conversation.Id, stageName, stageId)
 }
@@ -905,6 +904,14 @@ func (talking *genericRequestor) handleConversationEvent(ctx context.Context, vl
 	if contextID == "" {
 		contextID = talking.GetID()
 	}
+
+	// Handle stage transition events
+	if vl.Name == "stage_transition" {
+		if stageName, ok := vl.Data["stage_name"]; ok {
+			talking.handleStageTransition(ctx, contextID, stageName)
+		}
+	}
+
 	if vl.Time.IsZero() {
 		vl.Time = time.Now()
 	}

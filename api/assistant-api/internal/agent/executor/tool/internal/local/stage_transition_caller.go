@@ -8,6 +8,7 @@ package internal_tool_local
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	internal_tool "github.com/rapidaai/api/assistant-api/internal/agent/executor/tool/internal"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
@@ -55,15 +56,15 @@ func (caller *stageTransitionCaller) Call(ctx context.Context, contextID, toolId
 		return internal_tool.Result("Error: stage_name is required", false)
 	}
 
-	// Emit a directive packet with stage transition info
-	// Use END_CONVERSATION directive as a carrier, the actual stage_name will be in arguments
-	// The conversation handler needs to check arguments for TRANSITION_STAGE
-	communication.OnPacket(ctx, internal_type.DirectivePacket{
-		Directive: protos.ConversationDirective_END_CONVERSATION,
-		Arguments: map[string]interface{}{
-			"transition_stage": stageName,
-		},
+	// Emit a ConversationEventPacket with stage transition info
+	// The dispatch handler processes this and updates the stage
+	communication.OnPacket(ctx, internal_type.ConversationEventPacket{
 		ContextID: contextID,
+		Name:      "stage_transition",
+		Data: map[string]string{
+			"stage_name": stageName,
+		},
+		Time: time.Now(),
 	})
 
 	result := map[string]interface{}{
