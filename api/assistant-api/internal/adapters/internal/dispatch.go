@@ -15,6 +15,7 @@ import (
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	observe "github.com/rapidaai/api/assistant-api/internal/observe"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	gorm_types "github.com/rapidaai/pkg/models/gorm/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -866,11 +867,11 @@ func (talking *genericRequestor) handleStageTransition(ctx context.Context, cont
 	}
 
 	var stageId uint64
-	var stageTemplate interface{}
+	var stageTemplate gorm_types.TextChatCompletePromptTemplate
 	for _, stage := range stages {
 		if stage.Name == stageName {
 			stageId = stage.Id
-			stageTemplate = stage.GetTemplate()
+			stageTemplate = *stage.Template.GetTextChatCompleteTemplate()
 			break
 		}
 	}
