@@ -15,27 +15,27 @@ func TestAssistantPromptStage_SetAndGetPrompt(t *testing.T) {
 	stage := &AssistantPromptStage{}
 
 	promptJSON := `{
-		"text_chat_complete": {
-			"prompt": [
-				{"role": "system", "content": "You are a helpful assistant in stage {{stage}}"}
-			],
-			"variables": [
-				{"name": "stage", "type": "string", "default": "default"}
-			]
-		}
+		"prompt": [
+			{"role": "system", "content": "You are a helpful assistant in stage {{stage}}"}
+		],
+		"promptVariables": [
+			{"name": "stage", "type": "string", "defaultValue": "default"}
+		]
 	}`
 
-	stage.SetPrompt(promptJSON)
+	err := stage.SetPrompt(promptJSON)
+	assert.NoError(t, err, "SetPrompt should not return error for valid JSON")
 
 	template := stage.GetTemplate()
 	assert.NotNil(t, template, "Template should not be nil")
-	assert.Contains(t, template, "text_chat_complete", "Template should contain text_chat_complete")
+	assert.Contains(t, template, "prompt", "Template should contain prompt")
 }
 
 func TestAssistantPromptStage_SetPrompt_InvalidJSON(t *testing.T) {
 	stage := &AssistantPromptStage{}
 
-	stage.SetPrompt("not valid json")
+	err := stage.SetPrompt("not valid json")
+	assert.Error(t, err, "SetPrompt should return error for invalid JSON")
 
 	template := stage.GetTemplate()
 	assert.Nil(t, template, "Template should be nil for invalid JSON")
