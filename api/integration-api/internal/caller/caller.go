@@ -11,6 +11,7 @@ import (
 	internal_cohere_callers "github.com/rapidaai/api/integration-api/internal/caller/cohere"
 	internal_gemini_callers "github.com/rapidaai/api/integration-api/internal/caller/gemini"
 	internal_huggingface_callers "github.com/rapidaai/api/integration-api/internal/caller/huggingface"
+	internal_minimax_callers "github.com/rapidaai/api/integration-api/internal/caller/minimax"
 	internal_mistral_callers "github.com/rapidaai/api/integration-api/internal/caller/mistral"
 	internal_openai_callers "github.com/rapidaai/api/integration-api/internal/caller/openai"
 	internal_replicate_callers "github.com/rapidaai/api/integration-api/internal/caller/replicate"
@@ -31,6 +32,7 @@ const (
 	AZURE       IntegrationProvider = "azure-foundry"
 	COHERE      IntegrationProvider = "cohere"
 	MISTRAL     IntegrationProvider = "mistral"
+	MINIMAX     IntegrationProvider = "minimax"
 	REPLICATE   IntegrationProvider = "replicate"
 	HUGGINGFACE IntegrationProvider = "huggingface"
 	VOYAGEAI    IntegrationProvider = "voyageai"
@@ -52,6 +54,8 @@ func GetLargeLanguageCaller(logger commons.Logger, provider string, credential *
 		return internal_cohere_callers.NewLargeLanguageCaller(logger, credential), nil
 	case MISTRAL:
 		return internal_mistral_callers.NewLargeLanguageCaller(logger, credential), nil
+	case MINIMAX:
+		return internal_minimax_callers.NewLargeLanguageCaller(logger, credential), nil
 	case REPLICATE:
 		return internal_replicate_callers.NewLargeLanguageCaller(logger, credential), nil
 	case HUGGINGFACE:
@@ -111,6 +115,8 @@ func GetVerifier(logger commons.Logger, provider string, credential *protos.Cred
 		return internal_cohere_callers.NewVerifyCredentialCaller(logger, credential), nil
 	case MISTRAL:
 		return internal_mistral_callers.NewVerifyCredentialCaller(logger, credential), nil
+	case MINIMAX:
+		return internal_minimax_callers.NewVerifyCredentialCaller(logger, credential), nil
 	case REPLICATE:
 		return internal_replicate_callers.NewVerifyCredentialCaller(logger, credential), nil
 	case HUGGINGFACE:
