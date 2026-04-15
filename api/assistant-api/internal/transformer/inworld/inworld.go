@@ -28,6 +28,11 @@ const (
 	INWORLD_AUDIO_ENCODING = "LINEAR16"
 	INWORLD_SAMPLE_RATE    = 16000
 
+	// INWORLD_USER_AGENT identifies traffic originating from the Rapida
+	// integration so Inworld can bucket usage by SDK. Sent as X-User-Agent
+	// on every synth request.
+	INWORLD_USER_AGENT = "rapida-sdk"
+
 	// Defaults for voice and model. Both can be overridden via utils.Option
 	// keys "speak.voice.id" and "speak.model".
 	INWORLD_DEFAULT_VOICE_ID = "Ashley"

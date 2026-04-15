@@ -352,6 +352,7 @@ func (it *inworldTTS) synth(ctx context.Context, tr *turnRunner, text string) er
 	req.Header.Set("Authorization", "Basic "+it.GetKey())
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Connection", "keep-alive")
+	req.Header.Set("X-User-Agent", INWORLD_USER_AGENT)
 
 	resp, err := it.client.Do(req)
 	if err != nil {
