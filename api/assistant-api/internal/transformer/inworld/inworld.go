@@ -50,6 +50,9 @@ func NewInworldOption(logger commons.Logger, vaultCredential *protos.VaultCreden
 	if !ok {
 		return nil, fmt.Errorf("inworld: vault key is not a string")
 	}
+	if key == "" {
+		return nil, fmt.Errorf("inworld: empty vault key")
+	}
 	return &inworldOption{
 		key:     key,
 		logger:  logger,

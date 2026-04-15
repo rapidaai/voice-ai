@@ -26,11 +26,13 @@ type AudioConfig struct {
 }
 
 // CreateBody is the body of a "create" frame — opens a new context with the
-// selected voice/model/audio configuration.
+// selected voice/model/audio configuration. AutoMode lets the server decide
+// when to flush the text buffer for minimal latency while keeping quality.
 type CreateBody struct {
 	VoiceID     string      `json:"voice_id"`
 	ModelID     string      `json:"model_id"`
 	AudioConfig AudioConfig `json:"audio_config"`
+	AutoMode    bool        `json:"auto_mode,omitempty"`
 }
 
 // CreateRequest opens a context. Must be sent once per context_id before any
