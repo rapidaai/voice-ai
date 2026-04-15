@@ -30,7 +30,13 @@ import (
 // turn cannot bleed into the current one — every readLoop goroutine only
 // observes/mutates the turnState for the context it was started with.
 type turnState struct {
-	conn           *websocket.Conn
+	conn *websocket.Conn
+	// writeMu serializes all WriteJSON calls against conn for this turn.
+	// gorilla/websocket panics with "concurrent write to websocket connection"
+	// if two goroutines write at once, so every WriteJSON (create, send_text,
+	// close_context) must take this lock. writeMu is never held together with
+	// inworldTTS.mu — acquire one, release it, then acquire the other.
+	writeMu        sync.Mutex
 	contextCreated bool
 	ttsStartedAt   time.Time
 	ttsMetricSent  bool
@@ -41,17 +47,30 @@ type turnState struct {
 // connection is opened per TTS turn; the turn ends when Inworld emits
 // contextClosed (or done:true) in response to our close_context frame, or
 // when a server error terminates the turn.
+// wsDialFunc matches (*websocket.Dialer).Dial — injectable so tests can
+// substitute a mock/counting dialer without hitting the network.
+type wsDialFunc func(urlStr string, requestHeader http.Header) (*websocket.Conn, *http.Response, error)
+
 type inworldTTS struct {
 	*inworldOption
 	ctx       context.Context
 	ctxCancel context.CancelFunc
 
 	mu sync.Mutex
+	// initCond coordinates concurrent dialers. Guarded by mu. Only one
+	// goroutine at a time holds the "initializing" flag; others Wait() until
+	// the in-flight dial completes, then re-check pendingConn on wake-up.
+	initCond *sync.Cond
+	// initializing is true while some goroutine is performing a dial. It is
+	// the serialization handle for pendingConn mutation — pendingConn is only
+	// ever written by the goroutine that holds this flag.
+	initializing bool
 	// turns is keyed by the Inworld context_id (same as the Rapida turn
 	// ContextId we pass through). One entry per live turn.
 	turns map[string]*turnState
 	// pendingConn is a connection dialed by Initialize that has not yet
 	// been bound to a turn. Adopted by the next LLMResponseDeltaPacket.
+	// Only mutated under mu by a goroutine that holds initializing=true.
 	pendingConn *websocket.Conn
 	// activeContext is the most-recent Rapida turn id seen by Transform.
 	// Tracked for diagnostics only — per-turn writes are always routed via
@@ -60,6 +79,11 @@ type inworldTTS struct {
 	// ttsConnectedAt is the first-ever connect time; drives the duration
 	// metric emitted at Close.
 	ttsConnectedAt time.Time
+
+	// dialer performs the WebSocket dial. Tests inject a counting/mock dialer
+	// to verify serialization without hitting the network. Nil means use
+	// websocket.DefaultDialer.Dial.
+	dialer wsDialFunc
 
 	logger   commons.Logger
 	onPacket func(pkt ...internal_type.Packet) error
@@ -76,19 +100,39 @@ func NewInworldTextToSpeech(ctx context.Context, logger commons.Logger, credenti
 		return nil, err
 	}
 	ctx2, contextCancel := context.WithCancel(ctx)
-	return &inworldTTS{
+	it := &inworldTTS{
 		ctx:           ctx2,
 		ctxCancel:     contextCancel,
 		onPacket:      onPacket,
 		logger:        logger,
 		inworldOption: iwOpts,
 		turns:         make(map[string]*turnState),
-	}, nil
+	}
+	it.initCond = sync.NewCond(&it.mu)
+	return it, nil
 }
 
 // Name identifies this transformer in logs and events.
 func (*inworldTTS) Name() string {
 	return "inworld-text-to-speech"
+}
+
+// dial performs the WebSocket handshake without touching shared state. It is
+// the only place that actually talks to Inworld's server; all serialization
+// lives in acquireConn / Initialize.
+func (it *inworldTTS) dial() (*websocket.Conn, error) {
+	header := http.Header{}
+	header.Set("Authorization", fmt.Sprintf("Basic %s", it.GetKey()))
+	d := it.dialer
+	if d == nil {
+		d = websocket.DefaultDialer.Dial
+	}
+	conn, resp, err := d(it.GetTextToSpeechConnectionString(), header)
+	if err != nil {
+		it.logger.Errorf("inworld-tts: dial failed %s with response %v", err, resp)
+		return nil, err
+	}
+	return conn, nil
 }
 
 // Initialize opens a fresh WebSocket connection to Inworld, storing it as a
@@ -97,28 +141,43 @@ func (*inworldTTS) Name() string {
 // socket is available before the first text delta arrives. The read loop
 // is not started here — it is bound to a turn in Transform so every loop
 // has an authoritative contextID in scope.
+//
+// Concurrency: only one goroutine may dial at a time. Concurrent callers
+// (e.g. a startup warm-up racing a post-interrupt re-initialize) serialize
+// through initCond so pendingConn mutation is always single-threaded.
 func (it *inworldTTS) Initialize() error {
 	start := time.Now()
-	header := http.Header{}
-	header.Set("Authorization", fmt.Sprintf("Basic %s", it.GetKey()))
-	conn, resp, err := websocket.DefaultDialer.Dial(it.GetTextToSpeechConnectionString(), header)
-	if err != nil {
-		it.logger.Errorf("inworld-tts: dial failed %s with response %v", err, resp)
-		return err
-	}
 
 	it.mu.Lock()
-	// If Initialize is called again before the pendingConn was adopted (e.g.
-	// repeated interrupt), the previous pendingConn must be closed so it
-	// does not leak.
-	if it.pendingConn != nil {
-		_ = it.pendingConn.Close()
+	// Wait for any in-flight dial to finish before claiming the init slot.
+	for it.initializing {
+		it.initCond.Wait()
 	}
-	it.pendingConn = conn
-	if it.ttsConnectedAt.IsZero() {
-		it.ttsConnectedAt = time.Now()
-	}
+	it.initializing = true
 	it.mu.Unlock()
+
+	conn, err := it.dial()
+
+	it.mu.Lock()
+	it.initializing = false
+	if err == nil {
+		// If Initialize is called again before the pendingConn was adopted
+		// (e.g. repeated interrupt), the previous pendingConn must be closed
+		// so it does not leak.
+		if it.pendingConn != nil {
+			_ = it.pendingConn.Close()
+		}
+		it.pendingConn = conn
+		if it.ttsConnectedAt.IsZero() {
+			it.ttsConnectedAt = time.Now()
+		}
+	}
+	it.initCond.Broadcast()
+	it.mu.Unlock()
+
+	if err != nil {
+		return err
+	}
 
 	_ = it.onPacket(internal_type.ConversationEventPacket{
 		Name: "tts",
@@ -242,9 +301,10 @@ func (it *inworldTTS) handleFlushComplete(conn *websocket.Conn, boundCtxID strin
 	_ = it.onPacket(
 		internal_type.TextToSpeechEndPacket{ContextID: boundCtxID},
 		internal_type.ConversationEventPacket{
-			Name: "tts",
-			Data: map[string]string{"type": "completed"},
-			Time: time.Now(),
+			ContextID: boundCtxID,
+			Name:      "tts",
+			Data:      map[string]string{"type": "completed"},
+			Time:      time.Now(),
 		},
 	)
 	_ = conn.Close()
@@ -263,9 +323,10 @@ func (it *inworldTTS) handleTurnError(conn *websocket.Conn, boundCtxID, message 
 
 	_ = it.onPacket(
 		internal_type.ConversationEventPacket{
-			Name: "tts",
-			Data: map[string]string{"type": "error", "message": message},
-			Time: time.Now(),
+			ContextID: boundCtxID,
+			Name:      "tts",
+			Data:      map[string]string{"type": "error", "message": message},
+			Time:      time.Now(),
 		},
 		internal_type.TextToSpeechEndPacket{ContextID: boundCtxID},
 	)
@@ -276,25 +337,43 @@ func (it *inworldTTS) handleTurnError(conn *websocket.Conn, boundCtxID, message 
 // pending conn stashed by Initialize; if there isn't one (Initialize
 // hasn't run yet, or the pending conn was consumed by a prior turn), it
 // dials a fresh one.
+//
+// Concurrency: pendingConn is only ever mutated here or in Initialize, and
+// only by a goroutine that holds initializing=true under mu. Other callers
+// Wait() on initCond instead of racing to dial.
 func (it *inworldTTS) acquireConn() (*websocket.Conn, error) {
 	it.mu.Lock()
-	if it.pendingConn != nil {
-		conn := it.pendingConn
-		it.pendingConn = nil
-		it.mu.Unlock()
-		return conn, nil
+	for {
+		if it.pendingConn != nil {
+			conn := it.pendingConn
+			it.pendingConn = nil
+			it.mu.Unlock()
+			return conn, nil
+		}
+		if it.initializing {
+			// Another goroutine is dialing. Wait for it to finish, then
+			// re-check pendingConn (it may have been stashed for us) or
+			// claim the init slot ourselves if the dial failed / was taken.
+			it.initCond.Wait()
+			continue
+		}
+		it.initializing = true
+		break
 	}
 	it.mu.Unlock()
 
-	if err := it.Initialize(); err != nil {
-		return nil, err
-	}
+	conn, err := it.dial()
+
 	it.mu.Lock()
-	conn := it.pendingConn
-	it.pendingConn = nil
+	it.initializing = false
+	if err == nil && it.ttsConnectedAt.IsZero() {
+		it.ttsConnectedAt = time.Now()
+	}
+	it.initCond.Broadcast()
 	it.mu.Unlock()
-	if conn == nil {
-		return nil, fmt.Errorf("inworld-tts: pending connection missing after Initialize")
+
+	if err != nil {
+		return nil, err
 	}
 	return conn, nil
 }
@@ -323,10 +402,13 @@ func (it *inworldTTS) Transform(ctx context.Context, in internal_type.LLMPacket)
 		for _, c := range conns {
 			_ = c.Close()
 		}
+		// ContextID on the event identifies the turn whose VAD/word detector
+		// raised the interrupt — carried through from the inbound packet.
 		_ = it.onPacket(internal_type.ConversationEventPacket{
-			Name: "tts",
-			Data: map[string]string{"type": "interrupted"},
-			Time: time.Now(),
+			ContextID: input.ContextID,
+			Name:      "tts",
+			Data:      map[string]string{"type": "interrupted"},
+			Time:      time.Now(),
 		})
 		if err := it.Initialize(); err != nil {
 			it.logger.Errorf("inworld-tts: reconnect after interrupt failed: %v", err)
@@ -377,6 +459,12 @@ func (it *inworldTTS) Transform(ctx context.Context, in internal_type.LLMPacket)
 		// send_text. auto_mode lets the server control flushing for low
 		// latency while maintaining quality, so we do not also set
 		// flush_context on every send_text.
+		//
+		// All WriteJSON calls are serialized through ts.writeMu — gorilla
+		// panics on concurrent writes, and two Transform calls for the same
+		// turn can race here (e.g. create + send_text from caller A
+		// interleaving with send_text from caller B). We never hold it.mu
+		// and ts.writeMu at the same time.
 		if needCreate {
 			createFrame := inworld_internal.CreateRequest{
 				ContextID: ctxID,
@@ -390,7 +478,10 @@ func (it *inworldTTS) Transform(ctx context.Context, in internal_type.LLMPacket)
 					AutoMode: true,
 				},
 			}
-			if err := conn.WriteJSON(createFrame); err != nil {
+			ts.writeMu.Lock()
+			err := conn.WriteJSON(createFrame)
+			ts.writeMu.Unlock()
+			if err != nil {
 				it.logger.Errorf("inworld-tts: create frame write failed: %v", err)
 				return err
 			}
@@ -407,14 +498,18 @@ func (it *inworldTTS) Transform(ctx context.Context, in internal_type.LLMPacket)
 				Text: input.Text,
 			},
 		}
-		if err := conn.WriteJSON(sendFrame); err != nil {
+		ts.writeMu.Lock()
+		err := conn.WriteJSON(sendFrame)
+		ts.writeMu.Unlock()
+		if err != nil {
 			it.logger.Errorf("inworld-tts: send_text write failed: %v", err)
 			return err
 		}
 		_ = it.onPacket(internal_type.ConversationEventPacket{
-			Name: "tts",
-			Data: map[string]string{"type": "speaking", "text": input.Text},
-			Time: time.Now(),
+			ContextID: ctxID,
+			Name:      "tts",
+			Data:      map[string]string{"type": "speaking", "text": input.Text},
+			Time:      time.Now(),
 		})
 
 	case internal_type.LLMResponseDonePacket:
@@ -434,7 +529,10 @@ func (it *inworldTTS) Transform(ctx context.Context, in internal_type.LLMPacket)
 			ContextID:    ctxID,
 			CloseContext: map[string]interface{}{},
 		}
-		if err := conn.WriteJSON(closeFrame); err != nil {
+		ts.writeMu.Lock()
+		err := conn.WriteJSON(closeFrame)
+		ts.writeMu.Unlock()
+		if err != nil {
 			it.logger.Errorf("inworld-tts: close_context write failed: %v", err)
 			return err
 		}

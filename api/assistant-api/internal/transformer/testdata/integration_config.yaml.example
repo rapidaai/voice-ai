@@ -27,8 +27,13 @@ tts:
   inworld:
     enabled: false
     credential:
-      # Pre-encoded Basic auth token from platform.inworld.ai.
-      # Sent verbatim in the Authorization: Basic <key> header.
+      # Your Inworld API key — from platform.inworld.ai → API Keys →
+      # "Basic (Base64)". Despite the "API key" name, the value is a
+      # pre-encoded basic-auth token ("client:secret" already base64-encoded);
+      # the transformer sends it verbatim in the Authorization: Basic <key>
+      # header, so do NOT base64-encode it again. Keyed as INWORLD_API_KEY
+      # for consistency with Inworld's own docs and SDKs, which all use that
+      # name (see https://platform.inworld.ai).
       key: "YOUR_INWORLD_API_KEY"
     options:
       speak.model: "inworld-tts-1.5-max"

@@ -10,10 +10,12 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -207,7 +209,7 @@ func dialMock(t *testing.T, url string) *websocket.Conn {
 // tests can inject the connection directly via pendingConn.
 func newTestInworldTTS(ctx context.Context, collector *packetCollector) *inworldTTS {
 	ctx2, cancel := context.WithCancel(ctx)
-	return &inworldTTS{
+	iw := &inworldTTS{
 		ctx:       ctx2,
 		ctxCancel: cancel,
 		onPacket:  collector.onPacket,
@@ -219,6 +221,8 @@ func newTestInworldTTS(ctx context.Context, collector *packetCollector) *inworld
 			mdlOpts: utils.Option{},
 		},
 	}
+	iw.initCond = sync.NewCond(&iw.mu)
+	return iw
 }
 
 // writeAudioFrame serializes a minimal audio-chunk response for the mock
@@ -497,4 +501,167 @@ func TestInworldTTSServerErrorTerminatesTurn(t *testing.T) {
 		_, exists := iw.turns["ctx-err"]
 		return !exists
 	}), "server error should delete turn state")
+}
+
+// --- CodeRabbit round 2, Fix 1: per-turn writeMu guards WriteJSON ---
+
+// TestInworldTTSConcurrentWritesNoRace drives many Transform calls with the
+// same ContextID concurrently against a single mocked WebSocket. Without the
+// per-turn writeMu, gorilla/websocket panics with "concurrent write to
+// websocket connection" the moment two goroutines interleave WriteJSON.
+// This test is meaningful under `go test -race`: any regression surfaces as
+// a panic that fails the test immediately.
+func TestInworldTTSConcurrentWritesNoRace(t *testing.T) {
+	collector := &packetCollector{}
+	iw := newTestInworldTTS(context.Background(), collector)
+	defer iw.Close(context.Background())
+
+	// Server just drains frames from the client and pushes nothing back.
+	_, url := newMockInworldServer(t, func(c *websocket.Conn) {
+		for {
+			if _, _, err := c.ReadMessage(); err != nil {
+				return
+			}
+		}
+	})
+
+	// Pre-install the turn so every goroutine skips the acquireConn path and
+	// races purely on WriteJSON — that's the code path writeMu protects.
+	// contextCreated=true also skips the one-shot create frame so every
+	// Transform call goes straight to send_text.
+	conn := dialMock(t, url)
+	iw.mu.Lock()
+	iw.turns["ctx-concurrent"] = &turnState{
+		conn:           conn,
+		contextCreated: true,
+		ttsStartedAt:   time.Now(),
+	}
+	iw.mu.Unlock()
+
+	const goroutines = 8
+	const perGoroutine = 25
+	var wg sync.WaitGroup
+	errs := make(chan error, goroutines*perGoroutine)
+
+	// defer+recover catches gorilla/websocket's "concurrent write to
+	// websocket connection" panic in a test-friendly way; a raw panic in a
+	// goroutine would otherwise just kill the runner.
+	launch := func(text string) {
+		defer wg.Done()
+		defer func() {
+			if r := recover(); r != nil {
+				errs <- fmt.Errorf("panic in Transform: %v", r)
+			}
+		}()
+		for i := 0; i < perGoroutine; i++ {
+			if err := iw.Transform(context.Background(), internal_type.LLMResponseDeltaPacket{
+				ContextID: "ctx-concurrent",
+				Text:      text,
+			}); err != nil {
+				errs <- err
+				return
+			}
+		}
+	}
+
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go launch(fmt.Sprintf("delta-%d", i))
+	}
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		t.Fatalf("concurrent Transform failed: %v", err)
+	}
+
+	// Sanity: we generated many speaking events, all tagged with the turn id.
+	collector.mu.Lock()
+	defer collector.mu.Unlock()
+	speakingCount := 0
+	for _, ev := range collector.events {
+		if ev.Data["type"] == "speaking" {
+			speakingCount++
+			assert.Equal(t, "ctx-concurrent", ev.ContextID,
+				"every speaking event must carry the turn's ContextID")
+		}
+	}
+	assert.Equal(t, goroutines*perGoroutine, speakingCount,
+		"every concurrent Transform call should emit exactly one speaking event")
+}
+
+// --- CodeRabbit round 2, Fix 2: pendingConn dials serialize through Cond ---
+
+// TestInworldTTSConcurrentInitDialsOnce asserts that when many goroutines
+// trigger first-delta concurrently with no pre-dialed pending conn, dials
+// serialize cleanly: no goroutine sees the "pending connection missing
+// after Initialize" error, every Transform call either succeeds or fails
+// with a dial error (never a lost-race bug), and no races fire on
+// `it.pendingConn`. Also verifies exactly one turnState is created per
+// distinct ContextID — concurrent first-delta callers for the same turn
+// must not each install their own turnState.
+func TestInworldTTSConcurrentInitDialsOnce(t *testing.T) {
+	collector := &packetCollector{}
+	iw := newTestInworldTTS(context.Background(), collector)
+	defer iw.Close(context.Background())
+
+	// Mock server accepts any number of connections and just drains them.
+	_, url := newMockInworldServer(t, func(c *websocket.Conn) {
+		for {
+			if _, _, err := c.ReadMessage(); err != nil {
+				return
+			}
+		}
+	})
+
+	// Injected dialer counts dials and targets the in-process mock. No
+	// special-casing of the URL in the header — we ignore inworldTTS's
+	// connection string and route straight to the mock.
+	var dialCount int64
+	iw.dialer = func(_ string, _ http.Header) (*websocket.Conn, *http.Response, error) {
+		atomic.AddInt64(&dialCount, 1)
+		return websocket.DefaultDialer.Dial(url, nil)
+	}
+
+	// N goroutines, same ContextID. Exactly one turn should end up installed.
+	const goroutines = 16
+	var wg sync.WaitGroup
+	errs := make(chan error, goroutines)
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			err := iw.Transform(context.Background(), internal_type.LLMResponseDeltaPacket{
+				ContextID: "ctx-init-race",
+				Text:      fmt.Sprintf("delta-%d", i),
+			})
+			if err != nil {
+				errs <- err
+			}
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		assert.NotContains(t, err.Error(), "pending connection missing",
+			"pendingConn serialization must prevent 'pending connection missing' errors")
+		t.Errorf("unexpected Transform error: %v", err)
+	}
+
+	// Exactly one turnState for this ctx id.
+	iw.mu.Lock()
+	_, exists := iw.turns["ctx-init-race"]
+	turnsCount := len(iw.turns)
+	iw.mu.Unlock()
+	assert.True(t, exists, "first-delta callers must install the turn")
+	assert.Equal(t, 1, turnsCount, "concurrent first-delta for the same ctxID must produce exactly one turn")
+
+	// The bug the Cond guards against would let two dials race and replace
+	// each other's pendingConn. With the fix, dials happen at most once per
+	// "lost race" but the key invariant is that they don't clobber each
+	// other — sanity-check the count is bounded and non-zero.
+	final := atomic.LoadInt64(&dialCount)
+	assert.GreaterOrEqual(t, final, int64(1), "at least one dial must have happened")
+	assert.LessOrEqual(t, final, int64(goroutines), "dial count must be bounded by concurrent callers")
 }
