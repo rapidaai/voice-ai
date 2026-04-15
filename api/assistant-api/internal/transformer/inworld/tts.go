@@ -483,7 +483,7 @@ func (it *inworldTTS) Transform(ctx context.Context, in internal_type.LLMPacket)
 			ts.writeMu.Unlock()
 			if err != nil {
 				it.logger.Errorf("inworld-tts: create frame write failed: %v", err)
-				return err
+				return fmt.Errorf("inworld-tts: create frame write failed: %w", err)
 			}
 			it.mu.Lock()
 			ts.contextCreated = true
@@ -503,7 +503,7 @@ func (it *inworldTTS) Transform(ctx context.Context, in internal_type.LLMPacket)
 		ts.writeMu.Unlock()
 		if err != nil {
 			it.logger.Errorf("inworld-tts: send_text write failed: %v", err)
-			return err
+			return fmt.Errorf("inworld-tts: send_text write failed: %w", err)
 		}
 		_ = it.onPacket(internal_type.ConversationEventPacket{
 			ContextID: ctxID,
@@ -534,7 +534,7 @@ func (it *inworldTTS) Transform(ctx context.Context, in internal_type.LLMPacket)
 		ts.writeMu.Unlock()
 		if err != nil {
 			it.logger.Errorf("inworld-tts: close_context write failed: %v", err)
-			return err
+			return fmt.Errorf("inworld-tts: close_context write failed: %w", err)
 		}
 		// TextToSpeechEndPacket is emitted by handleFlushComplete once
 		// result.contextClosed or done:true arrives.

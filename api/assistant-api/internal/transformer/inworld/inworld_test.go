@@ -74,6 +74,20 @@ func TestNewInworldOption_EmptyKey(t *testing.T) {
 	assert.Contains(t, err.Error(), "empty vault key")
 }
 
+func TestNewInworldOption_NilCredential(t *testing.T) {
+	opt, err := NewInworldOption(newTestLogger(), nil, utils.Option{})
+	assert.Error(t, err)
+	assert.Nil(t, opt)
+	assert.Contains(t, err.Error(), "nil vault credential")
+}
+
+func TestNewInworldOption_NilVaultValue(t *testing.T) {
+	opt, err := NewInworldOption(newTestLogger(), &protos.VaultCredential{}, utils.Option{})
+	assert.Error(t, err)
+	assert.Nil(t, opt)
+	assert.Contains(t, err.Error(), "nil vault value")
+}
+
 // --- Encoding Tests ---
 
 func TestInworldGetEncoding(t *testing.T) {

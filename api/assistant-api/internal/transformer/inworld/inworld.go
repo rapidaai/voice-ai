@@ -42,7 +42,14 @@ type inworldOption struct {
 // token (Inworld issues keys as base64 "client:secret" pairs).
 func NewInworldOption(logger commons.Logger, vaultCredential *protos.VaultCredential,
 	opts utils.Option) (*inworldOption, error) {
-	cx, ok := vaultCredential.GetValue().AsMap()["key"]
+	if vaultCredential == nil {
+		return nil, fmt.Errorf("inworld: nil vault credential")
+	}
+	val := vaultCredential.GetValue()
+	if val == nil {
+		return nil, fmt.Errorf("inworld: nil vault value")
+	}
+	cx, ok := val.AsMap()["key"]
 	if !ok {
 		return nil, fmt.Errorf("inworld: illegal vault config")
 	}
