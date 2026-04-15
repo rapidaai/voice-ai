@@ -290,10 +290,15 @@ func (it *inworldTTS) run(tr *turnRunner) {
 		// Remove ourselves from the live-turn map on exit, unless another
 		// turn with the same id has already replaced us (possible after an
 		// interrupt + fresh turn race). Comparing by pointer identity keeps
-		// the cleanup safe without extra bookkeeping.
+		// the cleanup safe without extra bookkeeping. Also clear
+		// activeContext if it still points at us — mirrors the Interrupt
+		// path so diagnostics don't report a stale ctx id after Done.
 		it.mu.Lock()
 		if cur, ok := it.turns[tr.ctxID]; ok && cur == tr {
 			delete(it.turns, tr.ctxID)
+		}
+		if it.activeContext == tr.ctxID {
+			it.activeContext = ""
 		}
 		it.mu.Unlock()
 	}()
@@ -350,8 +355,10 @@ func (it *inworldTTS) run(tr *turnRunner) {
 // synth POSTs one sentence to voice:stream, decodes the NDJSON response,
 // and emits one TextToSpeechAudioPacket per audio chunk. The first chunk
 // also triggers a one-shot tts_latency_ms metric carrying the sentence's
-// TTFB. synth is called sequentially from the runner goroutine, so there
-// is no need to guard tr.metricSent/startedAt.
+// TTFB. tr.metricSent is only ever written by this runner goroutine
+// (single-writer — no lock needed); tr.startedAt is set in
+// getOrCreateRunner *before* `go it.run(tr)`, so the write is
+// happens-before the runner's first read.
 func (it *inworldTTS) synth(ctx context.Context, tr *turnRunner, text string) error {
 	body, err := json.Marshal(inworld_internal.StreamRequest{
 		Text:    text,
@@ -387,6 +394,10 @@ func (it *inworldTTS) synth(ctx context.Context, tr *turnRunner, text string) er
 		// to buffer an unbounded response. 4 KiB is enough for any JSON
 		// error envelope Inworld actually returns.
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4*1024))
+		// Drain whatever the LimitReader left so http.Transport can
+		// return the underlying conn to the idle pool (HTTP/2 streams
+		// don't release until the body is fully consumed).
+		_, _ = io.Copy(io.Discard, resp.Body)
 		return fmt.Errorf("inworld-tts: unexpected status %d: %s", resp.StatusCode, string(respBody))
 	}
 	return it.streamChunks(ctx, tr, resp.Body)
