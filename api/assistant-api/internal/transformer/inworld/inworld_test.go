@@ -212,10 +212,11 @@ func writeAudioLine(t *testing.T, w http.ResponseWriter, audio []byte) {
 }
 
 // newTestInworldTTS builds an inworldTTS pointed at the given httptest
-// URL. The production code posts to INWORLD_STREAM_URL; tests route
-// requests to httptest by installing an http.Transport whose RoundTrip
-// rewrites the request's scheme+host to the mock server's. This leaves
-// synth() and the production URL constant untouched.
+// URL. Tests set streamURL directly — no URL rewriting required because
+// the production synth() reads the target URL off the struct rather
+// than a hard-coded constant. A plain http.Transport with a small idle
+// pool stands in for newInworldHTTPClient so the keep-alive reuse test
+// still exercises real connection pooling.
 func newTestInworldTTS(ctx context.Context, url string, collector *packetCollector) *inworldTTS {
 	ctx2, cancel := context.WithCancel(ctx)
 	return &inworldTTS{
@@ -223,7 +224,12 @@ func newTestInworldTTS(ctx context.Context, url string, collector *packetCollect
 		ctxCancel: cancel,
 		onPacket:  collector.onPacket,
 		logger:    newTestLogger(),
-		client:    buildRoutedClient(hostOf(url)),
+		client: &http.Client{Transport: &http.Transport{
+			MaxIdleConns:        10,
+			MaxIdleConnsPerHost: 4,
+			IdleConnTimeout:     90 * time.Second,
+		}},
+		streamURL: url,
 		turns:     make(map[string]*turnRunner),
 		inworldOption: &inworldOption{
 			key:     "test-key",
@@ -231,47 +237,6 @@ func newTestInworldTTS(ctx context.Context, url string, collector *packetCollect
 			mdlOpts: utils.Option{},
 		},
 	}
-}
-
-// rewritingRoundTripper sends every outbound request to `host` regardless
-// of what URL the caller asked for. With a tuned idle-conn pool it is
-// byte-for-byte equivalent to production's HTTP transport, so the
-// keep-alive reuse test is meaningful.
-type rewritingRoundTripper struct {
-	host string // "127.0.0.1:NNNN"
-	base http.RoundTripper
-}
-
-func (r *rewritingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	out := req.Clone(req.Context())
-	u := *req.URL
-	u.Scheme = "http"
-	u.Host = r.host
-	out.URL = &u
-	out.Host = u.Host
-	return r.base.RoundTrip(out)
-}
-
-func buildRoutedClient(target string) *http.Client {
-	return &http.Client{Transport: &rewritingRoundTripper{
-		host: target,
-		base: &http.Transport{
-			MaxIdleConns:        10,
-			MaxIdleConnsPerHost: 4,
-			IdleConnTimeout:     90 * time.Second,
-		},
-	}}
-}
-
-// hostOf strips "http://" (or "https://") from an httptest URL, returning
-// just the host:port portion so rewritingRoundTripper can rewrite into it.
-func hostOf(url string) string {
-	for _, prefix := range []string{"http://", "https://"} {
-		if len(url) > len(prefix) && url[:len(prefix)] == prefix {
-			return url[len(prefix):]
-		}
-	}
-	return url
 }
 
 func waitFor(t *testing.T, timeout time.Duration, fn func() bool) bool {
@@ -711,4 +676,181 @@ func (l *countingListener) Accept() (net.Conn, error) {
 		atomic.AddInt64(l.count, 1)
 	}
 	return c, err
+}
+
+// --- HTTP non-200 status ---
+
+// TestInworldTTSHTTPErrorStatus asserts that a non-200 HTTP response
+// surfaces as a tts=error event, still emits a terminal end packet on
+// Done (so callers unblock), and does not cause the runner to exit —
+// subsequent sentences should still be attempted.
+func TestInworldTTSHTTPErrorStatus(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":"invalid api key"}`))
+	}))
+	defer srv.Close()
+
+	collector := &packetCollector{}
+	iw := newTestInworldTTS(context.Background(), srv.URL, collector)
+	defer iw.Close(context.Background())
+
+	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDeltaPacket{
+		ContextID: "ctx-401",
+		Text:      "hi.",
+	}))
+	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDonePacket{
+		ContextID: "ctx-401",
+	}))
+
+	require.True(t, waitFor(t, 2*time.Second, func() bool {
+		return len(collector.endsForCtx("ctx-401")) > 0
+	}), "HTTP error must still produce a terminal end packet")
+
+	collector.mu.Lock()
+	defer collector.mu.Unlock()
+	sawErr := false
+	for _, ev := range collector.events {
+		if ev.ContextID == "ctx-401" && ev.Data["type"] == "error" {
+			sawErr = true
+			assert.Contains(t, ev.Data["message"], "401",
+				"error event should mention the status code")
+		}
+	}
+	assert.True(t, sawErr, "HTTP error should surface as tts=error event")
+}
+
+// --- Malformed NDJSON chunk is silently skipped ---
+
+// TestInworldTTSMalformedChunkSkipped asserts that a bad JSON line mid-
+// stream is logged and dropped, but subsequent valid chunks still flow
+// through. This locks in the silent-drop branch in decodeChunk — the
+// alternative (failing the whole synth on one bad line) would be
+// worse.
+func TestInworldTTSMalformedChunkSkipped(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		w.WriteHeader(http.StatusOK)
+		writeAudioLine(t, w, []byte("good-1"))
+		// Bad line: not valid JSON.
+		_, _ = w.Write([]byte("{not json at all\n"))
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		// Another bad line: valid JSON but audioContent isn't base64.
+		_, _ = w.Write([]byte(`{"result":{"audioContent":"not!!!base64!!!"}}` + "\n"))
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		writeAudioLine(t, w, []byte("good-2"))
+	}))
+	defer srv.Close()
+
+	collector := &packetCollector{}
+	iw := newTestInworldTTS(context.Background(), srv.URL, collector)
+	defer iw.Close(context.Background())
+
+	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDeltaPacket{
+		ContextID: "ctx-bad",
+		Text:      "hi.",
+	}))
+	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDonePacket{
+		ContextID: "ctx-bad",
+	}))
+
+	require.True(t, waitFor(t, 2*time.Second, func() bool {
+		return len(collector.endsForCtx("ctx-bad")) > 0
+	}), "malformed chunks should not prevent the turn from completing")
+
+	audio := collector.audioForCtx("ctx-bad")
+	require.Len(t, audio, 2, "both valid chunks should be emitted, bad lines skipped")
+	assert.Equal(t, "good-1", string(audio[0].AudioChunk))
+	assert.Equal(t, "good-2", string(audio[1].AudioChunk))
+}
+
+// --- Unsupported packet type returns an error ---
+
+// TestInworldTTSUnsupportedPacketErrors covers the `default:` branch of
+// Transform — passing a packet type the transformer doesn't handle
+// should return an error without panicking or leaking goroutines.
+func TestInworldTTSUnsupportedPacketErrors(t *testing.T) {
+	collector := &packetCollector{}
+	// No httptest server needed — nothing should hit the network.
+	iw := newTestInworldTTS(context.Background(), "http://unused.invalid", collector)
+	defer iw.Close(context.Background())
+
+	// LLMToolCallPacket is an LLMPacket but not one Transform handles.
+	err := iw.Transform(context.Background(), internal_type.LLMToolCallPacket{
+		ContextID: "ctx-unsupported",
+		Name:      "some_tool",
+	})
+	require.Error(t, err, "unsupported packet type must return an error")
+	assert.Contains(t, err.Error(), "unsupported input type")
+}
+
+// --- Done without any prior Delta is a no-op ---
+
+// TestInworldTTSDoneWithoutDelta asserts that a Done packet for a ctx
+// id with no live runner does nothing — no runner is spawned, no
+// terminal end packet fires. Mirrors the "empty LLM response" path.
+func TestInworldTTSDoneWithoutDelta(t *testing.T) {
+	collector := &packetCollector{}
+	iw := newTestInworldTTS(context.Background(), "http://unused.invalid", collector)
+	defer iw.Close(context.Background())
+
+	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDonePacket{
+		ContextID: "ctx-empty",
+	}))
+
+	// Give any stray goroutine a moment to fire a bogus end packet.
+	time.Sleep(50 * time.Millisecond)
+
+	assert.Empty(t, collector.endsForCtx("ctx-empty"),
+		"Done without a matching Delta must not produce an end packet")
+	iw.mu.Lock()
+	_, exists := iw.turns["ctx-empty"]
+	iw.mu.Unlock()
+	assert.False(t, exists, "Done without a matching Delta must not spawn a runner")
+}
+
+// --- Duplicate Done is harmless ---
+
+// TestInworldTTSDuplicateDone asserts that firing Done twice for the
+// same turn doesn't panic (prior to the sentinel-item refactor the
+// second call would have hit close-of-closed-channel) and produces
+// exactly one terminal end packet.
+func TestInworldTTSDuplicateDone(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		w.WriteHeader(http.StatusOK)
+		writeAudioLine(t, w, []byte("ok"))
+	}))
+	defer srv.Close()
+
+	collector := &packetCollector{}
+	iw := newTestInworldTTS(context.Background(), srv.URL, collector)
+	defer iw.Close(context.Background())
+
+	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDeltaPacket{
+		ContextID: "ctx-dup",
+		Text:      "hi.",
+	}))
+	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDonePacket{
+		ContextID: "ctx-dup",
+	}))
+	// Wait for the runner to drain before firing the second Done, so
+	// the second one hits the "no live runner" early-return branch.
+	require.True(t, waitFor(t, 2*time.Second, func() bool {
+		return len(collector.endsForCtx("ctx-dup")) == 1
+	}), "first Done should produce exactly one end packet")
+
+	// Second Done — must not panic.
+	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDonePacket{
+		ContextID: "ctx-dup",
+	}))
+
+	// Still exactly one end packet (the second Done was a no-op).
+	time.Sleep(50 * time.Millisecond)
+	assert.Equal(t, 1, len(collector.endsForCtx("ctx-dup")),
+		"duplicate Done must not emit a second terminal end packet")
 }

@@ -74,6 +74,12 @@ type inworldTTS struct {
 	ctxCancel context.CancelFunc
 
 	client *http.Client
+	// streamURL is the target for every synth request. Initialized to
+	// INWORLD_STREAM_URL by the production constructor and overridable
+	// by in-package tests (the test file builds inworldTTS directly and
+	// points this at an httptest.Server URL — no URL-rewriting transport
+	// hack needed).
+	streamURL string
 
 	mu            sync.Mutex
 	turns         map[string]*turnRunner
@@ -104,6 +110,7 @@ func NewInworldTextToSpeech(ctx context.Context, logger commons.Logger, credenti
 		logger:        logger,
 		inworldOption: iwOpts,
 		client:        newInworldHTTPClient(),
+		streamURL:     INWORLD_STREAM_URL,
 		turns:         make(map[string]*turnRunner),
 	}, nil
 }
@@ -374,7 +381,7 @@ func (it *inworldTTS) synth(ctx context.Context, tr *turnRunner, text string) er
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		it.GetTextToSpeechConnectionString(), bytes.NewReader(body))
+		it.streamURL, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("inworld-tts: build request: %w", err)
 	}
