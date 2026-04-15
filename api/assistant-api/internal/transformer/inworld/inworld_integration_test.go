@@ -7,9 +7,10 @@
 // See LICENSE.md or contact sales@rapida.ai for commercial usage.
 
 // Inworld integration tests — verify connection, event sequencing, and
-// audio I/O against the real wss://api.inworld.ai TTS endpoint. Skipped
-// automatically when integration_config.yaml is missing or the inworld
-// provider is disabled.
+// audio I/O against the real https://api.inworld.ai HTTP streaming TTS
+// endpoint (POST /tts/v1/voice:stream). Skipped automatically when
+// integration_config.yaml is missing or the inworld provider is
+// disabled.
 
 package internal_transformer_inworld
 

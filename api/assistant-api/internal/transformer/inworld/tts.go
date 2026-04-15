@@ -328,7 +328,10 @@ func (it *inworldTTS) synth(ctx context.Context, tr *turnRunner, text string) er
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
+		// Cap the error-body read so a misbehaving server can't force us
+		// to buffer an unbounded response. 4 KiB is enough for any JSON
+		// error envelope Inworld actually returns.
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4*1024))
 		return fmt.Errorf("inworld-tts: unexpected status %d: %s", resp.StatusCode, string(respBody))
 	}
 	return it.streamChunks(ctx, tr, resp.Body)
