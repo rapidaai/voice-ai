@@ -13,7 +13,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -525,14 +524,21 @@ func TestInworldTTSInterruptScopedToContext(t *testing.T) {
 	// interrupt turn A. The server only replies with audio once the
 	// test releases the block.
 	releaseB := make(chan struct{})
+	type reqBody struct {
+		Text string `json:"text"`
+	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/x-ndjson")
 		w.WriteHeader(http.StatusOK)
-		// Read body to distinguish which turn this request is for.
-		buf := make([]byte, 256)
-		n, _ := r.Body.Read(buf)
-		body := string(buf[:n])
-		if strings.Contains(body, "B-text") {
+		// Decode the full JSON body so we can branch on which turn this
+		// request belongs to — a single r.Body.Read is permitted to
+		// short-read under the io.Reader contract.
+		var req reqBody
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("decode request body: %v", err)
+			return
+		}
+		if req.Text == "B-text." {
 			select {
 			case <-releaseB:
 			case <-r.Context().Done():

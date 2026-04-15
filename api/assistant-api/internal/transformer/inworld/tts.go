@@ -26,6 +26,18 @@ import (
 	"github.com/rapidaai/protos"
 )
 
+// sentenceItem carries one unit of work on the turn's sentence channel:
+// either a delta's text (done=false), or a terminal Done marker
+// (done=true, text empty). Using an in-band sentinel instead of
+// close(sentences) lets Transform push Done without racing concurrent
+// delta sends — no goroutine ever closes the channel, so "send on
+// closed channel" and "close of closed channel" panics are structurally
+// impossible.
+type sentenceItem struct {
+	text string
+	done bool
+}
+
 // turnRunner owns all state for one Rapida turn. Exactly one goroutine
 // drains `sentences`, so audio for a given turn is always emitted in the
 // order the aggregator delivered the sentences — and across turns we
@@ -34,7 +46,7 @@ import (
 // every emitted packet carries.
 type turnRunner struct {
 	ctxID     string
-	sentences chan string
+	sentences chan sentenceItem
 
 	// runCtx is a child of inworldTTS.ctx. Canceling it aborts the
 	// in-flight synth() and causes the runner goroutine to exit its loop.
@@ -190,16 +202,21 @@ func (it *inworldTTS) Transform(ctx context.Context, in internal_type.LLMPacket)
 	case internal_type.LLMResponseDeltaPacket:
 		tr := it.getOrCreateRunner(input.ContextID)
 		select {
-		case tr.sentences <- input.Text:
+		case tr.sentences <- sentenceItem{text: input.Text}:
+			// Only emit the speaking event on a successful enqueue so we
+			// never publish "speaking: X" for text the runner will never
+			// actually synthesize (the runCtx.Done case below drops the
+			// delta silently).
+			_ = it.onPacket(internal_type.ConversationEventPacket{
+				ContextID: input.ContextID,
+				Name:      "tts",
+				Data:      map[string]string{"type": "speaking", "text": input.Text},
+				Time:      time.Now(),
+			})
 		case <-tr.runCtx.Done():
-			// Turn was just canceled (interrupt) — drop the delta.
+			// Turn was just canceled (interrupt) — drop the delta. No
+			// speaking event: the text will never reach TTS.
 		}
-		_ = it.onPacket(internal_type.ConversationEventPacket{
-			ContextID: input.ContextID,
-			Name:      "tts",
-			Data:      map[string]string{"type": "speaking", "text": input.Text},
-			Time:      time.Now(),
-		})
 		return nil
 
 	case internal_type.LLMResponseDonePacket:
@@ -211,11 +228,16 @@ func (it *inworldTTS) Transform(ctx context.Context, in internal_type.LLMPacket)
 			// that never produced a delta (empty response) — nothing to do.
 			return nil
 		}
-		// Closing `sentences` signals the runner to drain + emit the
-		// terminal TextToSpeechEndPacket once the in-flight synth returns.
-		// The runner owns its own lifecycle and removes itself from
-		// it.turns when it exits, so there is nothing else to clean up here.
-		close(tr.sentences)
+		// Send an in-band done marker rather than close(tr.sentences).
+		// Closing the channel would race catastrophically with concurrent
+		// delta sends (send on closed channel) and with a duplicate Done
+		// (close of closed channel); the sentinel item side-steps both.
+		// If the runner has already exited (interrupt beat Done), the
+		// runCtx.Done branch fires and we drop the signal harmlessly.
+		select {
+		case tr.sentences <- sentenceItem{done: true}:
+		case <-tr.runCtx.Done():
+		}
 		return nil
 
 	default:
@@ -240,7 +262,7 @@ func (it *inworldTTS) getOrCreateRunner(ctxID string) *turnRunner {
 	runCtx, cancel := context.WithCancel(it.ctx) //nolint:gosec // cancel is invoked via tr.runCancel
 	tr := &turnRunner{
 		ctxID:     ctxID,
-		sentences: make(chan string, 8),
+		sentences: make(chan sentenceItem, 8),
 		runCtx:    runCtx,
 		runCancel: cancel,
 		startedAt: time.Now(),
@@ -284,12 +306,12 @@ func (it *inworldTTS) run(tr *turnRunner) {
 			// terminal end packet on a cancel — the caller initiated the
 			// teardown and is not waiting on completion.
 			return
-		case text, ok := <-tr.sentences:
-			if !ok {
-				// Done path: the channel was closed after we drained it.
-				// Guard against the Done-then-Interrupt race: if both
-				// fired before the select woke, skip the terminal packets
-				// because the interrupt semantically supersedes.
+		case item := <-tr.sentences:
+			if item.done {
+				// Done sentinel: Transform's Done path signaled end of
+				// turn. Guard against the Done-then-Interrupt race: if
+				// both fired before the select woke, skip the terminal
+				// packets because the interrupt semantically supersedes.
 				if tr.runCtx.Err() != nil {
 					return
 				}
@@ -304,7 +326,7 @@ func (it *inworldTTS) run(tr *turnRunner) {
 				)
 				return
 			}
-			if err := it.synth(tr.runCtx, tr, text); err != nil {
+			if err := it.synth(tr.runCtx, tr, item.text); err != nil {
 				if tr.runCtx.Err() != nil {
 					// Canceled mid-synth by an interrupt — exit quietly.
 					return
