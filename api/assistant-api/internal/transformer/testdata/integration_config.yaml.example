@@ -24,6 +24,16 @@ tts:
       speak.model: "eleven_turbo_v2"
       speak.voice: "21m00Tcm4TlvDq8ikWAM"
 
+  inworld:
+    enabled: false
+    credential:
+      # Pre-encoded Basic auth token from platform.inworld.ai.
+      # Sent verbatim in the Authorization: Basic <key> header.
+      key: "YOUR_INWORLD_API_KEY"
+    options:
+      speak.model: "inworld-tts-1.5-max"
+      speak.voice.id: "Ashley"
+
   cartesia:
     enabled: false
     credential:
