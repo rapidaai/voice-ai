@@ -20,10 +20,11 @@ import (
 	"testing"
 	"time"
 
-	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/internal/testutil"
-	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/internal/testutil"
+	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 )
 
 // ---------------------------------------------------------------------------

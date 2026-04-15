@@ -7,15 +7,16 @@
 package internal_transformer_inworld
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"time"
-
-	"github.com/gorilla/websocket"
 
 	inworld_internal "github.com/rapidaai/api/assistant-api/internal/transformer/inworld/internal"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
@@ -25,72 +26,56 @@ import (
 	"github.com/rapidaai/protos"
 )
 
-// turnState holds all per-turn Inworld state. Each Inworld context is
-// bound to its own WebSocket connection so that late frames from a prior
-// turn cannot bleed into the current one — every readLoop goroutine only
-// observes/mutates the turnState for the context it was started with.
-type turnState struct {
-	conn *websocket.Conn
-	// writeMu serializes all WriteJSON calls against conn for this turn.
-	// gorilla/websocket panics with "concurrent write to websocket connection"
-	// if two goroutines write at once, so every WriteJSON (create, send_text,
-	// close_context) must take this lock. writeMu is never held together with
-	// inworldTTS.mu — acquire one, release it, then acquire the other.
-	writeMu        sync.Mutex
-	contextCreated bool
-	ttsStartedAt   time.Time
-	ttsMetricSent  bool
+// turnRunner owns all state for one Rapida turn. Exactly one goroutine
+// drains `sentences`, so audio for a given turn is always emitted in the
+// order the aggregator delivered the sentences — and across turns we
+// simply have one runner per context id. runCtx cancels in-flight synth
+// requests (interrupts) while ctxID is the turn's Rapida context id that
+// every emitted packet carries.
+type turnRunner struct {
+	ctxID     string
+	sentences chan string
+
+	// runCtx is a child of inworldTTS.ctx. Canceling it aborts the
+	// in-flight synth() and causes the runner goroutine to exit its loop.
+	runCtx    context.Context
+	runCancel context.CancelFunc
+
+	// startedAt timestamps the first Delta for the turn so synth() can emit
+	// a one-shot tts_latency_ms metric with the true TTFB. Only touched by
+	// the runner goroutine after construction.
+	startedAt  time.Time
+	metricSent bool
 }
 
 // inworldTTS implements internal_type.TextToSpeechTransformer against
-// Inworld's bidirectional streaming TTS WebSocket. A dedicated WebSocket
-// connection is opened per TTS turn; the turn ends when Inworld emits
-// contextClosed (or done:true) in response to our close_context frame, or
-// when a server error terminates the turn.
-// wsDialFunc matches (*websocket.Dialer).Dial — injectable so tests can
-// substitute a mock/counting dialer without hitting the network.
-type wsDialFunc func(urlStr string, requestHeader http.Header) (*websocket.Conn, *http.Response, error)
-
+// Inworld's HTTP streaming endpoint (api.inworld.ai/tts/v1/voice:stream).
+// There is one HTTP POST per sentence — Rapida's aggregator already splits
+// LLM output at sentence boundaries before it reaches Transform, so the
+// bidirectional WebSocket's character-streaming capability was never being
+// exploited. HTTP streaming buys us the same latency (with keep-alive on a
+// shared *http.Transport) while eliminating the concurrency machinery a
+// per-turn WebSocket required.
 type inworldTTS struct {
 	*inworldOption
 	ctx       context.Context
 	ctxCancel context.CancelFunc
 
-	mu sync.Mutex
-	// initCond coordinates concurrent dialers. Guarded by mu. Only one
-	// goroutine at a time holds the "initializing" flag; others Wait() until
-	// the in-flight dial completes, then re-check pendingConn on wake-up.
-	initCond *sync.Cond
-	// initializing is true while some goroutine is performing a dial. It is
-	// the serialization handle for pendingConn mutation — pendingConn is only
-	// ever written by the goroutine that holds this flag.
-	initializing bool
-	// turns is keyed by the Inworld context_id (same as the Rapida turn
-	// ContextId we pass through). One entry per live turn.
-	turns map[string]*turnState
-	// pendingConn is a connection dialed by Initialize that has not yet
-	// been bound to a turn. Adopted by the next LLMResponseDeltaPacket.
-	// Only mutated under mu by a goroutine that holds initializing=true.
-	pendingConn *websocket.Conn
-	// activeContext is the most-recent Rapida turn id seen by Transform.
-	// Tracked for diagnostics only — per-turn writes are always routed via
-	// the turnState looked up by the packet's own ContextId.
-	activeContext string
-	// ttsConnectedAt is the first-ever connect time; drives the duration
-	// metric emitted at Close.
-	ttsConnectedAt time.Time
+	client *http.Client
 
-	// dialer performs the WebSocket dial. Tests inject a counting/mock dialer
-	// to verify serialization without hitting the network. Nil means use
-	// websocket.DefaultDialer.Dial.
-	dialer wsDialFunc
+	mu            sync.Mutex
+	turns         map[string]*turnRunner
+	activeContext string // most recent Transform ctx id — diagnostics only
+
+	// ttsConnectedAt is set the first time we route a sentence through the
+	// shared client. It drives the duration metric emitted at Close.
+	ttsConnectedAt time.Time
 
 	logger   commons.Logger
 	onPacket func(pkt ...internal_type.Packet) error
 }
 
-// NewInworldTextToSpeech constructs the Inworld TTS transformer. The caller
-// is expected to call Initialize() before sending text.
+// NewInworldTextToSpeech constructs the Inworld TTS transformer.
 func NewInworldTextToSpeech(ctx context.Context, logger commons.Logger, credential *protos.VaultCredential,
 	onPacket func(pkt ...internal_type.Packet) error,
 	opts utils.Option) (internal_type.TextToSpeechTransformer, error) {
@@ -99,17 +84,16 @@ func NewInworldTextToSpeech(ctx context.Context, logger commons.Logger, credenti
 		logger.Errorf("inworld-tts: initializing inworld failed %+v", err)
 		return nil, err
 	}
-	ctx2, contextCancel := context.WithCancel(ctx)
-	it := &inworldTTS{
+	ctx2, cancel := context.WithCancel(ctx)
+	return &inworldTTS{
 		ctx:           ctx2,
-		ctxCancel:     contextCancel,
+		ctxCancel:     cancel,
 		onPacket:      onPacket,
 		logger:        logger,
 		inworldOption: iwOpts,
-		turns:         make(map[string]*turnState),
-	}
-	it.initCond = sync.NewCond(&it.mu)
-	return it, nil
+		client:        newInworldHTTPClient(),
+		turns:         make(map[string]*turnRunner),
+	}, nil
 }
 
 // Name identifies this transformer in logs and events.
@@ -117,67 +101,19 @@ func (*inworldTTS) Name() string {
 	return "inworld-text-to-speech"
 }
 
-// dial performs the WebSocket handshake without touching shared state. It is
-// the only place that actually talks to Inworld's server; all serialization
-// lives in acquireConn / Initialize.
-func (it *inworldTTS) dial() (*websocket.Conn, error) {
-	header := http.Header{}
-	header.Set("Authorization", fmt.Sprintf("Basic %s", it.GetKey()))
-	d := it.dialer
-	if d == nil {
-		d = websocket.DefaultDialer.Dial
-	}
-	conn, resp, err := d(it.GetTextToSpeechConnectionString(), header)
-	if err != nil {
-		it.logger.Errorf("inworld-tts: dial failed %s with response %v", err, resp)
-		return nil, err
-	}
-	return conn, nil
-}
-
-// Initialize opens a fresh WebSocket connection to Inworld, storing it as a
-// pending connection that will be adopted by the next turn on its first
-// delta. Called at session start and after each interruption so a warm
-// socket is available before the first text delta arrives. The read loop
-// is not started here — it is bound to a turn in Transform so every loop
-// has an authoritative contextID in scope.
-//
-// Concurrency: only one goroutine may dial at a time. Concurrent callers
-// (e.g. a startup warm-up racing a post-interrupt re-initialize) serialize
-// through initCond so pendingConn mutation is always single-threaded.
+// Initialize emits the initialized event and, if this is the first call,
+// stamps the connection timestamp used by the Close duration metric. No
+// network work happens here — the HTTP client lazily dials on the first
+// synth request. We keep Initialize around so the transformer interface
+// behaves identically to the WebSocket version (and so the integration
+// test that asserts an "initialized" event still fires).
 func (it *inworldTTS) Initialize() error {
 	start := time.Now()
-
 	it.mu.Lock()
-	// Wait for any in-flight dial to finish before claiming the init slot.
-	for it.initializing {
-		it.initCond.Wait()
+	if it.ttsConnectedAt.IsZero() {
+		it.ttsConnectedAt = time.Now()
 	}
-	it.initializing = true
 	it.mu.Unlock()
-
-	conn, err := it.dial()
-
-	it.mu.Lock()
-	it.initializing = false
-	if err == nil {
-		// If Initialize is called again before the pendingConn was adopted
-		// (e.g. repeated interrupt), the previous pendingConn must be closed
-		// so it does not leak.
-		if it.pendingConn != nil {
-			_ = it.pendingConn.Close()
-		}
-		it.pendingConn = conn
-		if it.ttsConnectedAt.IsZero() {
-			it.ttsConnectedAt = time.Now()
-		}
-	}
-	it.initCond.Broadcast()
-	it.mu.Unlock()
-
-	if err != nil {
-		return err
-	}
 
 	_ = it.onPacket(internal_type.ConversationEventPacket{
 		Name: "tts",
@@ -191,382 +127,320 @@ func (it *inworldTTS) Initialize() error {
 	return nil
 }
 
-// readLoop owns a single WebSocket connection for the duration of one TTS
-// turn. The boundCtxID captures the Inworld context_id this conn was
-// create'd against — all packet emission uses it (or the server-echoed
-// payload.Result.ContextID when present) rather than any shared state, so
-// late frames cannot bleed into a different turn.
-func (it *inworldTTS) readLoop(conn *websocket.Conn, boundCtxID string) {
-	for {
-		select {
-		case <-it.ctx.Done():
-			return
-		default:
-		}
-		_, msg, err := conn.ReadMessage()
-		if err != nil {
-			it.mu.Lock()
-			ts, ok := it.turns[boundCtxID]
-			intentional := !ok || ts.conn != conn
-			if !intentional {
-				delete(it.turns, boundCtxID) // unintentional drop: clear turn state
-			}
-			it.mu.Unlock()
-			if !intentional {
-				it.logger.Errorf("inworld-tts: connection lost: %v", err)
-			}
-			return
-		}
-
-		var payload inworld_internal.InworldTTSResponse
-		if err := json.Unmarshal(msg, &payload); err != nil {
-			it.logger.Errorf("inworld-tts: error parsing response: %v", err)
-			continue
-		}
-
-		if payload.Error != nil {
-			it.logger.Errorf("inworld-tts: server error: %s", payload.Error.Message)
-			it.handleTurnError(conn, boundCtxID, payload.Error.Message)
-			return
-		}
-
-		// Terminal: either a plain done:true frame or result.contextClosed.
-		if (payload.Done != nil && *payload.Done) ||
-			(payload.Result != nil && payload.Result.ContextClosed != nil) {
-			it.handleFlushComplete(conn, boundCtxID)
-			return
-		}
-
-		if payload.Result == nil || payload.Result.AudioChunk == nil {
-			continue
-		}
-		audioContent := payload.Result.AudioChunk.AudioContent
-		if audioContent == "" {
-			continue
-		}
-
-		rawAudio, err := base64.StdEncoding.DecodeString(audioContent)
-		if err != nil {
-			it.logger.Errorf("inworld-tts: base64 decode failed: %v", err)
-			continue
-		}
-
-		// Prefer the server-echoed context id when present; fall back to the
-		// id we bound to the conn at turn start. This is defense-in-depth:
-		// the conn is already keyed by boundCtxID so they should match.
-		emitCtxID := boundCtxID
-		if payload.Result.ContextID != "" {
-			emitCtxID = payload.Result.ContextID
-		}
-
-		it.mu.Lock()
-		ts, ok := it.turns[boundCtxID]
-		if !ok || ts.conn != conn {
-			// This conn has already been detached from its turn (e.g.
-			// interruption, error, flushComplete). Drop stale audio.
-			it.mu.Unlock()
-			continue
-		}
-		startedAt := ts.ttsStartedAt
-		metricSent := ts.ttsMetricSent
-		if !metricSent && !startedAt.IsZero() {
-			ts.ttsMetricSent = true
-		}
-		it.mu.Unlock()
-
-		if !metricSent && !startedAt.IsZero() {
-			_ = it.onPacket(internal_type.AssistantMessageMetricPacket{
-				ContextID: emitCtxID,
-				Metrics: []*protos.Metric{{
-					Name:  "tts_latency_ms",
-					Value: fmt.Sprintf("%d", time.Since(startedAt).Milliseconds()),
-				}},
-			})
-		}
-		_ = it.onPacket(internal_type.TextToSpeechAudioPacket{ContextID: emitCtxID, AudioChunk: rawAudio})
-	}
-}
-
-// handleFlushComplete is called when Inworld signals end-of-context. It
-// clears the turn's state (if still held), emits TextToSpeechEndPacket —
-// correctly ordered after the last audio chunk — and closes this turn's
-// connection. Other turns are untouched.
-func (it *inworldTTS) handleFlushComplete(conn *websocket.Conn, boundCtxID string) {
-	it.mu.Lock()
-	if ts, ok := it.turns[boundCtxID]; ok && ts.conn == conn {
-		delete(it.turns, boundCtxID)
-	}
-	it.mu.Unlock()
-
-	_ = it.onPacket(
-		internal_type.TextToSpeechEndPacket{ContextID: boundCtxID},
-		internal_type.ConversationEventPacket{
-			ContextID: boundCtxID,
-			Name:      "tts",
-			Data:      map[string]string{"type": "completed"},
-			Time:      time.Now(),
-		},
-	)
-	_ = conn.Close()
-}
-
-// handleTurnError is the terminal handler for server-emitted error frames.
-// It tears down the turn just like a successful flush (so callers waiting
-// on TextToSpeechEndPacket stop waiting) and additionally surfaces the
-// error as a ConversationEventPacket for observability.
-func (it *inworldTTS) handleTurnError(conn *websocket.Conn, boundCtxID, message string) {
-	it.mu.Lock()
-	if ts, ok := it.turns[boundCtxID]; ok && ts.conn == conn {
-		delete(it.turns, boundCtxID)
-	}
-	it.mu.Unlock()
-
-	_ = it.onPacket(
-		internal_type.ConversationEventPacket{
-			ContextID: boundCtxID,
-			Name:      "tts",
-			Data:      map[string]string{"type": "error", "message": message},
-			Time:      time.Now(),
-		},
-		internal_type.TextToSpeechEndPacket{ContextID: boundCtxID},
-	)
-	_ = conn.Close()
-}
-
-// acquireConn returns a connection ready to host a new turn. It prefers the
-// pending conn stashed by Initialize; if there isn't one (Initialize
-// hasn't run yet, or the pending conn was consumed by a prior turn), it
-// dials a fresh one.
-//
-// Concurrency: pendingConn is only ever mutated here or in Initialize, and
-// only by a goroutine that holds initializing=true under mu. Other callers
-// Wait() on initCond instead of racing to dial.
-func (it *inworldTTS) acquireConn() (*websocket.Conn, error) {
-	it.mu.Lock()
-	for {
-		if it.pendingConn != nil {
-			conn := it.pendingConn
-			it.pendingConn = nil
-			it.mu.Unlock()
-			return conn, nil
-		}
-		if it.initializing {
-			// Another goroutine is dialing. Wait for it to finish, then
-			// re-check pendingConn (it may have been stashed for us) or
-			// claim the init slot ourselves if the dial failed / was taken.
-			it.initCond.Wait()
-			continue
-		}
-		it.initializing = true
-		break
-	}
-	it.mu.Unlock()
-
-	conn, err := it.dial()
-
-	it.mu.Lock()
-	it.initializing = false
-	if err == nil && it.ttsConnectedAt.IsZero() {
-		it.ttsConnectedAt = time.Now()
-	}
-	it.initCond.Broadcast()
-	it.mu.Unlock()
-
-	if err != nil {
-		return nil, err
-	}
-	return conn, nil
-}
-
-// Transform routes a single LLM/control packet into the Inworld protocol.
-// Supported packet types:
-//   - InterruptionDetectedPacket: tear down every open turn and reconnect.
-//   - LLMResponseDeltaPacket: on the first delta of a turn, adopt a fresh
-//     connection and send the create frame; subsequent deltas just send_text.
-//   - LLMResponseDonePacket: send close_context to drain & end the turn.
+// Transform routes one LLM/control packet into the Inworld protocol.
+//   - LLMResponseDeltaPacket: enqueue a sentence onto the per-turn runner,
+//     creating the runner (and starting its goroutine) on first delta.
+//   - LLMResponseDonePacket: close the turn's sentence channel; the runner
+//     drains its queue, emits TextToSpeechEndPacket, then exits.
+//   - InterruptionDetectedPacket: cancel every live runner, drop their
+//     state, emit a tts=interrupted event.
 func (it *inworldTTS) Transform(ctx context.Context, in internal_type.LLMPacket) error {
 	switch input := in.(type) {
 	case internal_type.InterruptionDetectedPacket:
 		it.mu.Lock()
-		conns := make([]*websocket.Conn, 0, len(it.turns)+1)
-		for id, ts := range it.turns {
-			conns = append(conns, ts.conn)
+		cancels := make([]context.CancelFunc, 0, len(it.turns))
+		for id, tr := range it.turns {
+			cancels = append(cancels, tr.runCancel)
 			delete(it.turns, id)
-		}
-		if it.pendingConn != nil {
-			conns = append(conns, it.pendingConn)
-			it.pendingConn = nil
 		}
 		it.activeContext = ""
 		it.mu.Unlock()
-		for _, c := range conns {
-			_ = c.Close()
+		for _, c := range cancels {
+			c()
 		}
-		// ContextID on the event identifies the turn whose VAD/word detector
-		// raised the interrupt — carried through from the inbound packet.
 		_ = it.onPacket(internal_type.ConversationEventPacket{
 			ContextID: input.ContextID,
 			Name:      "tts",
 			Data:      map[string]string{"type": "interrupted"},
 			Time:      time.Now(),
 		})
-		if err := it.Initialize(); err != nil {
-			it.logger.Errorf("inworld-tts: reconnect after interrupt failed: %v", err)
-		}
+		// Emit a fresh initialized event so the debugger UI sees a clean
+		// boundary between the interrupted turn and whatever follows. The
+		// HTTP client stays live — there is nothing to re-dial.
+		_ = it.onPacket(internal_type.ConversationEventPacket{
+			Name: "tts",
+			Data: map[string]string{
+				"type":     "initialized",
+				"provider": it.Name(),
+				"init_ms":  "0",
+			},
+			Time: time.Now(),
+		})
 		return nil
 
 	case internal_type.LLMResponseDeltaPacket:
-		ctxID := in.ContextId()
-
-		it.mu.Lock()
-		ts, exists := it.turns[ctxID]
-		it.mu.Unlock()
-
-		if !exists {
-			conn, err := it.acquireConn()
-			if err != nil {
-				return fmt.Errorf("inworld-tts: failed to connect: %w", err)
-			}
-			it.mu.Lock()
-			// Re-check: another Transform call with the same ctxID may have
-			// raced ahead while we were dialing.
-			if existing, ok := it.turns[ctxID]; ok {
-				it.mu.Unlock()
-				_ = conn.Close()
-				ts = existing
-			} else {
-				ts = &turnState{conn: conn, ttsStartedAt: time.Now()}
-				it.turns[ctxID] = ts
-				it.activeContext = ctxID
-				it.mu.Unlock()
-				go it.readLoop(conn, ctxID)
-			}
-		} else {
-			it.mu.Lock()
-			if ts.ttsStartedAt.IsZero() {
-				ts.ttsStartedAt = time.Now()
-			}
-			it.activeContext = ctxID
-			it.mu.Unlock()
-		}
-
-		it.mu.Lock()
-		needCreate := !ts.contextCreated
-		conn := ts.conn
-		it.mu.Unlock()
-
-		// Inworld requires a "create" frame to open each context before any
-		// send_text. auto_mode lets the server control flushing for low
-		// latency while maintaining quality, so we do not also set
-		// flush_context on every send_text.
-		//
-		// All WriteJSON calls are serialized through ts.writeMu — gorilla
-		// panics on concurrent writes, and two Transform calls for the same
-		// turn can race here (e.g. create + send_text from caller A
-		// interleaving with send_text from caller B). We never hold it.mu
-		// and ts.writeMu at the same time.
-		if needCreate {
-			createFrame := inworld_internal.CreateRequest{
-				ContextID: ctxID,
-				Create: inworld_internal.CreateBody{
-					VoiceID: it.GetVoiceID(),
-					ModelID: it.GetModelID(),
-					AudioConfig: inworld_internal.AudioConfig{
-						AudioEncoding:   INWORLD_AUDIO_ENCODING,
-						SampleRateHertz: INWORLD_SAMPLE_RATE,
-					},
-					AutoMode: true,
-				},
-			}
-			ts.writeMu.Lock()
-			err := conn.WriteJSON(createFrame)
-			ts.writeMu.Unlock()
-			if err != nil {
-				it.logger.Errorf("inworld-tts: create frame write failed: %v", err)
-				return fmt.Errorf("inworld-tts: create frame write failed: %w", err)
-			}
-			it.mu.Lock()
-			ts.contextCreated = true
-			it.mu.Unlock()
-		}
-
-		// Under auto_mode the server decides when to flush buffered text, so
-		// we omit flush_context entirely on each send_text.
-		sendFrame := inworld_internal.SendTextRequest{
-			ContextID: ctxID,
-			SendText: inworld_internal.SendTextBody{
-				Text: input.Text,
-			},
-		}
-		ts.writeMu.Lock()
-		err := conn.WriteJSON(sendFrame)
-		ts.writeMu.Unlock()
-		if err != nil {
-			it.logger.Errorf("inworld-tts: send_text write failed: %v", err)
-			return fmt.Errorf("inworld-tts: send_text write failed: %w", err)
+		tr := it.getOrCreateRunner(input.ContextID)
+		select {
+		case tr.sentences <- input.Text:
+		case <-tr.runCtx.Done():
+			// Turn was just canceled (interrupt) — drop the delta.
 		}
 		_ = it.onPacket(internal_type.ConversationEventPacket{
-			ContextID: ctxID,
+			ContextID: input.ContextID,
 			Name:      "tts",
 			Data:      map[string]string{"type": "speaking", "text": input.Text},
 			Time:      time.Now(),
 		})
+		return nil
 
 	case internal_type.LLMResponseDonePacket:
-		ctxID := in.ContextId()
 		it.mu.Lock()
-		ts, ok := it.turns[ctxID]
-		if !ok || !ts.contextCreated {
-			it.mu.Unlock()
-			// Either interrupted before done arrived, or we never opened a
-			// context (empty response) — nothing to close.
+		tr, ok := it.turns[input.ContextID]
+		it.mu.Unlock()
+		if !ok {
+			// Interrupted before Done arrived, or Done fired for a turn
+			// that never produced a delta (empty response) — nothing to do.
 			return nil
 		}
-		conn := ts.conn
-		it.mu.Unlock()
-
-		closeFrame := inworld_internal.CloseContextRequest{
-			ContextID:    ctxID,
-			CloseContext: map[string]interface{}{},
-		}
-		ts.writeMu.Lock()
-		err := conn.WriteJSON(closeFrame)
-		ts.writeMu.Unlock()
-		if err != nil {
-			it.logger.Errorf("inworld-tts: close_context write failed: %v", err)
-			return fmt.Errorf("inworld-tts: close_context write failed: %w", err)
-		}
-		// TextToSpeechEndPacket is emitted by handleFlushComplete once
-		// result.contextClosed or done:true arrives.
+		// Closing `sentences` signals the runner to drain + emit the
+		// terminal TextToSpeechEndPacket once the in-flight synth returns.
+		// The runner owns its own lifecycle and removes itself from
+		// it.turns when it exits, so there is nothing else to clean up here.
+		close(tr.sentences)
+		return nil
 
 	default:
 		return fmt.Errorf("inworld-tts: unsupported input type %T", in)
 	}
+}
+
+// getOrCreateRunner returns the turnRunner for ctxID, starting one (and
+// its goroutine) on first call. Called from Transform on every Delta; the
+// double-checked lookup keeps the fast path lock-free after the turn is
+// installed.
+func (it *inworldTTS) getOrCreateRunner(ctxID string) *turnRunner {
+	it.mu.Lock()
+	if tr, ok := it.turns[ctxID]; ok {
+		it.activeContext = ctxID
+		it.mu.Unlock()
+		return tr
+	}
+	// cancel is stashed in tr.runCancel and released by run()'s defer on
+	// every exit path (Done, interrupt, or parent-ctx cancel). gosec's
+	// intra-function analysis can't see that hop so silence G118 here.
+	runCtx, cancel := context.WithCancel(it.ctx) //nolint:gosec // cancel is invoked via tr.runCancel
+	tr := &turnRunner{
+		ctxID:     ctxID,
+		sentences: make(chan string, 8),
+		runCtx:    runCtx,
+		runCancel: cancel,
+		startedAt: time.Now(),
+	}
+	it.turns[ctxID] = tr
+	it.activeContext = ctxID
+	it.mu.Unlock()
+	go it.run(tr)
+	return tr
+}
+
+// run is the per-turn goroutine. It consumes sentences one at a time,
+// issues a synth() request per sentence, and emits the terminal packets
+// after the channel closes (Done path) or when the run context is
+// canceled (interrupt path).
+func (it *inworldTTS) run(tr *turnRunner) {
+	// Always release the run-context on exit. For the Done path the context
+	// would otherwise only be freed when the parent inworldTTS.ctx cancels;
+	// deferring here keeps the lifetime tight regardless of exit path.
+	defer tr.runCancel()
+	defer func() {
+		// Remove ourselves from the live-turn map on exit, unless another
+		// turn with the same id has already replaced us (possible after an
+		// interrupt + fresh turn race). Comparing by pointer identity keeps
+		// the cleanup safe without extra bookkeeping.
+		it.mu.Lock()
+		if cur, ok := it.turns[tr.ctxID]; ok && cur == tr {
+			delete(it.turns, tr.ctxID)
+		}
+		it.mu.Unlock()
+	}()
+
+	interrupted := false
+	for text := range tr.sentences {
+		if err := it.synth(tr.runCtx, tr, text); err != nil {
+			if tr.runCtx.Err() != nil {
+				// Canceled by an interrupt — drain any remaining queued
+				// sentences and exit without a terminal end packet.
+				interrupted = true
+				break
+			}
+			it.logger.Errorf("inworld-tts: synth failed for ctx=%s: %v", tr.ctxID, err)
+			// Surface the error to the observability channel but keep
+			// draining — subsequent sentences may succeed and, critically,
+			// callers waiting on TextToSpeechEndPacket still need one.
+			_ = it.onPacket(internal_type.ConversationEventPacket{
+				ContextID: tr.ctxID,
+				Name:      "tts",
+				Data:      map[string]string{"type": "error", "message": err.Error()},
+				Time:      time.Now(),
+			})
+		}
+	}
+
+	if interrupted {
+		// Interrupt path already emitted its own tts=interrupted event on
+		// the Transform side; nothing more to send here.
+		return
+	}
+
+	_ = it.onPacket(
+		internal_type.TextToSpeechEndPacket{ContextID: tr.ctxID},
+		internal_type.ConversationEventPacket{
+			ContextID: tr.ctxID,
+			Name:      "tts",
+			Data:      map[string]string{"type": "completed"},
+			Time:      time.Now(),
+		},
+	)
+}
+
+// synth POSTs one sentence to voice:stream, decodes the NDJSON response,
+// and emits one TextToSpeechAudioPacket per audio chunk. The first chunk
+// also triggers a one-shot tts_latency_ms metric carrying the sentence's
+// TTFB. synth is called sequentially from the runner goroutine, so there
+// is no need to guard tr.metricSent/startedAt.
+func (it *inworldTTS) synth(ctx context.Context, tr *turnRunner, text string) error {
+	body, err := json.Marshal(inworld_internal.StreamRequest{
+		Text:    text,
+		VoiceID: it.GetVoiceID(),
+		ModelID: it.GetModelID(),
+		AudioConfig: inworld_internal.AudioConfig{
+			AudioEncoding:   INWORLD_AUDIO_ENCODING,
+			SampleRateHertz: INWORLD_SAMPLE_RATE,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("inworld-tts: marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		it.GetTextToSpeechConnectionString(), bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("inworld-tts: build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Basic "+it.GetKey())
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Connection", "keep-alive")
+
+	resp, err := it.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("inworld-tts: stream request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("inworld-tts: unexpected status %d: %s", resp.StatusCode, string(respBody))
+	}
+	return it.streamChunks(ctx, tr, resp.Body)
+}
+
+// streamChunks decodes the NDJSON body and emits audio packets. It is
+// split out of synth so synth stays within the lint's cognitive-complexity
+// budget and so unit tests can reason about the decode path in isolation.
+func (it *inworldTTS) streamChunks(ctx context.Context, tr *turnRunner, body io.Reader) error {
+	scanner := bufio.NewScanner(body)
+	// Default token size is 64KB — raise the cap because a single NDJSON
+	// line can carry several seconds of base64 audio.
+	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+
+	first := true
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+		audio, err := it.decodeChunk(line)
+		if err != nil {
+			return err
+		}
+		if audio == nil {
+			continue
+		}
+		if first {
+			first = false
+			it.maybeEmitFirstChunkMetric(tr)
+		}
+		_ = it.onPacket(internal_type.TextToSpeechAudioPacket{
+			ContextID:  tr.ctxID,
+			AudioChunk: audio,
+		})
+	}
+	if err := scanner.Err(); err != nil {
+		// Treat context cancellation quietly — caller distinguishes
+		// intentional interrupt by checking ctx.Err().
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return fmt.Errorf("inworld-tts: stream read: %w", err)
+	}
 	return nil
 }
 
-// Close tears down every open connection and emits a final duration metric.
-// Safe to call even if Initialize was never invoked.
+// decodeChunk parses one NDJSON line. Returns (audio, nil) for an audio
+// chunk, (nil, nil) for a chunk that has nothing to emit (parse error,
+// empty result, ignorable envelope), and (nil, err) for a fatal server
+// error frame that must terminate the whole synth attempt.
+func (it *inworldTTS) decodeChunk(line []byte) ([]byte, error) {
+	var chunk inworld_internal.StreamChunk
+	if err := json.Unmarshal(line, &chunk); err != nil {
+		it.logger.Errorf("inworld-tts: parse chunk: %v", err)
+		return nil, nil
+	}
+	if chunk.Error != nil {
+		return nil, fmt.Errorf("inworld-tts: server error: %s", chunk.Error.Message)
+	}
+	if chunk.Result == nil || chunk.Result.AudioContent == "" {
+		return nil, nil
+	}
+	audio, err := base64.StdEncoding.DecodeString(chunk.Result.AudioContent)
+	if err != nil {
+		it.logger.Errorf("inworld-tts: base64 decode: %v", err)
+		return nil, nil
+	}
+	return audio, nil
+}
+
+// maybeEmitFirstChunkMetric emits the one-shot tts_latency_ms metric for
+// a turn. No-op after the first call per turn. Safe to call without
+// locking because the runner goroutine is the only writer to these fields.
+func (it *inworldTTS) maybeEmitFirstChunkMetric(tr *turnRunner) {
+	if tr.metricSent || tr.startedAt.IsZero() {
+		return
+	}
+	tr.metricSent = true
+	_ = it.onPacket(internal_type.AssistantMessageMetricPacket{
+		ContextID: tr.ctxID,
+		Metrics: []*protos.Metric{{
+			Name:  "tts_latency_ms",
+			Value: fmt.Sprintf("%d", time.Since(tr.startedAt).Milliseconds()),
+		}},
+	})
+}
+
+// Close cancels every live runner, waits briefly for them to drain, and
+// emits the final duration metric. Safe to call even if Initialize was
+// never invoked.
 func (it *inworldTTS) Close(ctx context.Context) error {
 	it.ctxCancel()
+
 	it.mu.Lock()
 	activeCtxID := it.activeContext
 	connectedAt := it.ttsConnectedAt
 	it.ttsConnectedAt = time.Time{}
-
-	conns := make([]*websocket.Conn, 0, len(it.turns)+1)
-	for id, ts := range it.turns {
-		conns = append(conns, ts.conn)
+	cancels := make([]context.CancelFunc, 0, len(it.turns))
+	for id, tr := range it.turns {
+		cancels = append(cancels, tr.runCancel)
 		delete(it.turns, id)
 	}
-	if it.pendingConn != nil {
-		conns = append(conns, it.pendingConn)
-		it.pendingConn = nil
-	}
 	it.mu.Unlock()
+	for _, c := range cancels {
+		c()
+	}
 
-	for _, c := range conns {
-		_ = c.Close()
+	// Release the HTTP transport's idle pool — nothing on this transformer
+	// will run another request.
+	if tr, ok := it.client.Transport.(*http.Transport); ok {
+		tr.CloseIdleConnections()
 	}
 
 	if !connectedAt.IsZero() {

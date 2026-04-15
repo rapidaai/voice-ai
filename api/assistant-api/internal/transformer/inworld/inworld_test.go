@@ -10,25 +10,23 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/gorilla/websocket"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	inworld_internal "github.com/rapidaai/api/assistant-api/internal/transformer/inworld/internal"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func newTestLogger() commons.Logger {
@@ -122,8 +120,7 @@ func TestInworldGetTextToSpeechConnectionString(t *testing.T) {
 	cred := newVaultCredential(map[string]interface{}{"key": "k"})
 	opt, _ := NewInworldOption(newTestLogger(), cred, utils.Option{})
 	connStr := opt.GetTextToSpeechConnectionString()
-	// Auth and configuration live in headers and frames — URL is static.
-	assert.Equal(t, "wss://api.inworld.ai/tts/v1/voice:streamBidirectional", connStr)
+	assert.Equal(t, "https://api.inworld.ai/tts/v1/voice:stream", connStr)
 }
 
 // --- Name ---
@@ -134,10 +131,10 @@ func TestInworldTTSName(t *testing.T) {
 	assert.Equal(t, "inworld-text-to-speech", tts.Name())
 }
 
-// --- Shared test harness for the streaming-layer tests ---
+// --- Streaming-layer test harness ---
 
-// packetCollector is a tiny sink that captures the packets Transform and
-// readLoop emit so tests can inspect them.
+// packetCollector captures the packets Transform and the runner emit so
+// tests can inspect them.
 type packetCollector struct {
 	mu      sync.Mutex
 	audio   []internal_type.TextToSpeechAudioPacket
@@ -188,74 +185,95 @@ func (c *packetCollector) endsForCtx(ctx string) []internal_type.TextToSpeechEnd
 	return out
 }
 
-// newMockInworldServer spins up an in-process WebSocket endpoint that hands
-// each new connection off to the supplied handler. The handler receives the
-// server-side *websocket.Conn and is responsible for reading client frames
-// and writing mock responses.
-func newMockInworldServer(t *testing.T, handler func(*websocket.Conn)) (*httptest.Server, string) {
-	t.Helper()
-	upgrader := websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool { return true },
-	}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		c, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			t.Errorf("upgrade failed: %v", err)
-			return
+func (c *packetCollector) hasErrorEvent(ctx string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, e := range c.events {
+		if e.ContextID == ctx && e.Data["type"] == "error" {
+			return true
 		}
-		defer c.Close()
-		handler(c)
-	}))
-	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http")
-	return srv, wsURL
+	}
+	return false
 }
 
-// dialMock dials the mock server and returns the client-side *websocket.Conn
-// — i.e. the end the transformer would hold after a successful Initialize.
-func dialMock(t *testing.T, url string) *websocket.Conn {
+// writeAudioLine serializes one NDJSON response line.
+func writeAudioLine(t *testing.T, w http.ResponseWriter, audio []byte) {
 	t.Helper()
-	c, _, err := websocket.DefaultDialer.Dial(url, nil)
-	require.NoError(t, err)
-	return c
+	chunk := inworld_internal.StreamChunk{
+		Result: &inworld_internal.StreamResult{
+			AudioContent: base64.StdEncoding.EncodeToString(audio),
+		},
+	}
+	enc := json.NewEncoder(w)
+	require.NoError(t, enc.Encode(chunk))
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
 }
 
-// newTestInworldTTS builds an inworldTTS by hand, bypassing Initialize so
-// tests can inject the connection directly via pendingConn.
-func newTestInworldTTS(ctx context.Context, collector *packetCollector) *inworldTTS {
+// newTestInworldTTS builds an inworldTTS pointed at the given httptest
+// URL. The production code posts to INWORLD_STREAM_URL; tests route
+// requests to httptest by installing an http.Transport whose RoundTrip
+// rewrites the request's scheme+host to the mock server's. This leaves
+// synth() and the production URL constant untouched.
+func newTestInworldTTS(ctx context.Context, url string, collector *packetCollector) *inworldTTS {
 	ctx2, cancel := context.WithCancel(ctx)
-	iw := &inworldTTS{
+	return &inworldTTS{
 		ctx:       ctx2,
 		ctxCancel: cancel,
 		onPacket:  collector.onPacket,
 		logger:    newTestLogger(),
-		turns:     make(map[string]*turnState),
+		client:    buildRoutedClient(hostOf(url)),
+		turns:     make(map[string]*turnRunner),
 		inworldOption: &inworldOption{
 			key:     "test-key",
 			logger:  newTestLogger(),
 			mdlOpts: utils.Option{},
 		},
 	}
-	iw.initCond = sync.NewCond(&iw.mu)
-	return iw
 }
 
-// writeAudioFrame serializes a minimal audio-chunk response for the mock
-// server to push to the client.
-func writeAudioFrame(t *testing.T, c *websocket.Conn, ctxID string, audio []byte) {
-	t.Helper()
-	resp := inworld_internal.InworldTTSResponse{
-		Result: &inworld_internal.Result{
-			ContextID: ctxID,
-			AudioChunk: &inworld_internal.AudioChunk{
-				AudioContent: base64.StdEncoding.EncodeToString(audio),
-			},
+// rewritingRoundTripper sends every outbound request to `host` regardless
+// of what URL the caller asked for. With a tuned idle-conn pool it is
+// byte-for-byte equivalent to production's HTTP transport, so the
+// keep-alive reuse test is meaningful.
+type rewritingRoundTripper struct {
+	host string // "127.0.0.1:NNNN"
+	base http.RoundTripper
+}
+
+func (r *rewritingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	out := req.Clone(req.Context())
+	u := *req.URL
+	u.Scheme = "http"
+	u.Host = r.host
+	out.URL = &u
+	out.Host = u.Host
+	return r.base.RoundTrip(out)
+}
+
+func buildRoutedClient(target string) *http.Client {
+	return &http.Client{Transport: &rewritingRoundTripper{
+		host: target,
+		base: &http.Transport{
+			MaxIdleConns:        10,
+			MaxIdleConnsPerHost: 4,
+			IdleConnTimeout:     90 * time.Second,
 		},
-	}
-	require.NoError(t, c.WriteJSON(resp))
+	}}
 }
 
-// waitFor polls fn until it returns true or the timeout elapses. Replaces
-// arbitrary sleeps that would make tests flaky on slow CI runners.
+// hostOf strips "http://" (or "https://") from an httptest URL, returning
+// just the host:port portion so rewritingRoundTripper can rewrite into it.
+func hostOf(url string) string {
+	for _, prefix := range []string{"http://", "https://"} {
+		if len(url) > len(prefix) && url[:len(prefix)] == prefix {
+			return url[len(prefix):]
+		}
+	}
+	return url
+}
+
 func waitFor(t *testing.T, timeout time.Duration, fn func() bool) bool {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
@@ -268,414 +286,290 @@ func waitFor(t *testing.T, timeout time.Duration, fn func() bool) bool {
 	return fn()
 }
 
-// --- Fix 2 regression: turn state must not bleed across turns ---
+// --- Streams audio in order ---
 
-// TestInworldTTSTurnsDoNotBleed drives two interleaved turns through
-// Transform with distinct ContextIDs and asserts each turn's audio is
-// always emitted under its own ContextID — even when a late frame for
-// turn A arrives after turn B has already started. The previous
-// (shared-state) impl would have misattributed that late frame to ctx-B
-// because readLoop read the mutable `it.contextId` at emission time;
-// with per-turn state and a per-loop captured ctx id this is no longer
-// possible.
-func TestInworldTTSTurnsDoNotBleed(t *testing.T) {
+// TestInworldTTSStreamsAudioInOrder fires two Delta packets for the same
+// turn and asserts audio arrives in submission order. The mock server
+// returns distinct audio bytes per sentence so the ordering assertion is
+// unambiguous.
+func TestInworldTTSStreamsAudioInOrder(t *testing.T) {
+	type reqBody struct {
+		Text string `json:"text"`
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req reqBody
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		w.WriteHeader(http.StatusOK)
+		// Two chunks per sentence so we can see intra-sentence order too.
+		writeAudioLine(t, w, []byte(req.Text+"#1"))
+		writeAudioLine(t, w, []byte(req.Text+"#2"))
+	}))
+	defer srv.Close()
+
 	collector := &packetCollector{}
-	iw := newTestInworldTTS(context.Background(), collector)
+	iw := newTestInworldTTS(context.Background(), srv.URL, collector)
 	defer iw.Close(context.Background())
 
-	// Each turn's mock handler reads the create frame, echoes the ctx id
-	// back on a channel, then emits audio chunks on demand until the test
-	// releases it. This lets us choreograph the bleed scenario: turn A
-	// stays alive while turn B opens, then fires a late frame *after*
-	// turn B has already started streaming.
-	type serverTurn struct {
-		ctxReady chan string
-		pulse    chan struct{} // each send triggers one audio frame
-		stopped  chan struct{}
-	}
-	newServerTurn := func() *serverTurn {
-		return &serverTurn{
-			ctxReady: make(chan string, 1),
-			pulse:    make(chan struct{}, 4),
-			stopped:  make(chan struct{}),
-		}
-	}
-	turn1 := newServerTurn()
-	turn2 := newServerTurn()
-	turns := []*serverTurn{turn1, turn2}
-	var turnIdx int
-	var turnMu sync.Mutex
-
-	_, url := newMockInworldServer(t, func(c *websocket.Conn) {
-		turnMu.Lock()
-		idx := turnIdx
-		turnIdx++
-		turnMu.Unlock()
-		if idx >= len(turns) {
-			return
-		}
-		tdata := turns[idx]
-		defer close(tdata.stopped)
-		_, raw, err := c.ReadMessage()
-		if err != nil {
-			return
-		}
-		var create inworld_internal.CreateRequest
-		if err := json.Unmarshal(raw, &create); err != nil {
-			return
-		}
-		tdata.ctxReady <- create.ContextID
-		// Drain subsequent client frames (send_text, close_context) in the
-		// background so the server-side ReadMessage doesn't block audio
-		// emission.
-		go func() {
-			for {
-				if _, _, err := c.ReadMessage(); err != nil {
-					return
-				}
-			}
-		}()
-		for range tdata.pulse {
-			writeAudioFrame(t, c, create.ContextID, []byte("chunk-"+create.ContextID))
-		}
-	})
-
-	// --- Open turn A and drive one audio frame through ---
-	iw.pendingConn = dialMock(t, url)
 	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDeltaPacket{
-		ContextID: "ctx-A",
-		Text:      "hello A",
+		ContextID: "ctx-order",
+		Text:      "hello.",
 	}))
-	require.Equal(t, "ctx-A", <-turn1.ctxReady)
-	turn1.pulse <- struct{}{} // server sends audio frame #1 for ctx-A
-	require.True(t, waitFor(t, 2*time.Second, func() bool {
-		return len(collector.audioForCtx("ctx-A")) >= 1
-	}), "turn A should receive first audio frame tagged ctx-A")
-
-	// --- Open turn B on a fresh conn while turn A is still alive ---
-	iw.pendingConn = dialMock(t, url)
 	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDeltaPacket{
-		ContextID: "ctx-B",
-		Text:      "hello B",
+		ContextID: "ctx-order",
+		Text:      "world.",
 	}))
-	require.Equal(t, "ctx-B", <-turn2.ctxReady)
-	turn2.pulse <- struct{}{} // server sends audio frame for ctx-B
+	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDonePacket{
+		ContextID: "ctx-order",
+	}))
+
 	require.True(t, waitFor(t, 2*time.Second, func() bool {
-		return len(collector.audioForCtx("ctx-B")) >= 1
-	}), "turn B should receive audio tagged ctx-B while turn A is still open")
+		return len(collector.endsForCtx("ctx-order")) > 0
+	}), "end packet should be emitted after Done drains")
 
-	// --- Late frame on turn A's still-open conn (the regression case) ---
-	// Under the old shared-state impl, readLoop would have read the
-	// transformer's mutable `contextId` at emission time — which by now
-	// points at ctx-B — and misattributed this audio chunk. Per-turn
-	// state makes that impossible.
-	turn1.pulse <- struct{}{}
+	audio := collector.audioForCtx("ctx-order")
+	require.Len(t, audio, 4, "two sentences × two chunks each")
+	assert.Equal(t, "hello.#1", string(audio[0].AudioChunk))
+	assert.Equal(t, "hello.#2", string(audio[1].AudioChunk))
+	assert.Equal(t, "world.#1", string(audio[2].AudioChunk))
+	assert.Equal(t, "world.#2", string(audio[3].AudioChunk))
+}
+
+// --- End after Done ---
+
+// TestInworldTTSEmitsEndAfterDone verifies that Done triggers a single
+// TextToSpeechEndPacket after all queued sentences have finished streaming.
+func TestInworldTTSEmitsEndAfterDone(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		w.WriteHeader(http.StatusOK)
+		writeAudioLine(t, w, []byte("a"))
+	}))
+	defer srv.Close()
+
+	collector := &packetCollector{}
+	iw := newTestInworldTTS(context.Background(), srv.URL, collector)
+	defer iw.Close(context.Background())
+
+	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDeltaPacket{
+		ContextID: "ctx-end",
+		Text:      "s1.",
+	}))
+	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDeltaPacket{
+		ContextID: "ctx-end",
+		Text:      "s2.",
+	}))
+	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDonePacket{
+		ContextID: "ctx-end",
+	}))
+
 	require.True(t, waitFor(t, 2*time.Second, func() bool {
-		return len(collector.audioForCtx("ctx-A")) >= 2
-	}), "late frame on turn A's conn must be tagged ctx-A, not ctx-B")
+		return len(collector.endsForCtx("ctx-end")) == 1
+	}), "should emit exactly one end packet")
 
-	close(turn1.pulse)
-	close(turn2.pulse)
-
-	// Every audio packet ever emitted must match the ctx id of the conn
-	// that produced it — double-check the invariant across the full set.
+	// `completed` event should follow the end packet.
 	collector.mu.Lock()
 	defer collector.mu.Unlock()
-	assert.NotEmpty(t, collector.audio)
-	for _, a := range collector.audio {
-		assert.Contains(t, []string{"ctx-A", "ctx-B"}, a.ContextID)
+	sawCompleted := false
+	for _, ev := range collector.events {
+		if ev.ContextID == "ctx-end" && ev.Data["type"] == "completed" {
+			sawCompleted = true
+		}
 	}
+	assert.True(t, sawCompleted, "should emit tts=completed event")
 }
 
-// --- Fix 5 wiring: create frame carries auto_mode and send_text has no flush_context ---
+// --- Interrupt cancels in-flight synth ---
 
-// TestInworldTTSCreateFrameEnablesAutoMode verifies the wire-level shape of
-// the frames Transform sends on the first delta: the create frame sets
-// auto_mode:true and the send_text frame omits flush_context entirely.
-func TestInworldTTSCreateFrameEnablesAutoMode(t *testing.T) {
+// TestInworldTTSInterruptCancelsInFlight fires a Delta, waits for the
+// mock server to start emitting audio, sends an Interrupt, and asserts
+// the runner exits without continuing to emit audio from the
+// still-open response body.
+func TestInworldTTSInterruptCancelsInFlight(t *testing.T) {
+	firstChunk := make(chan struct{})
+	releaseSecond := make(chan struct{})
+	secondSent := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		w.WriteHeader(http.StatusOK)
+		writeAudioLine(t, w, []byte("chunk-1"))
+		select {
+		case firstChunk <- struct{}{}:
+		default:
+		}
+		select {
+		case <-releaseSecond:
+			writeAudioLine(t, w, []byte("chunk-2"))
+			close(secondSent)
+		case <-r.Context().Done():
+			return
+		}
+	}))
+	defer srv.Close()
+
 	collector := &packetCollector{}
-	iw := newTestInworldTTS(context.Background(), collector)
+	iw := newTestInworldTTS(context.Background(), srv.URL, collector)
 	defer iw.Close(context.Background())
 
-	createRaw := make(chan []byte, 1)
-	sendRaw := make(chan []byte, 1)
-
-	_, url := newMockInworldServer(t, func(c *websocket.Conn) {
-		_, raw, err := c.ReadMessage()
-		if err != nil {
-			return
-		}
-		createRaw <- raw
-		_, raw, err = c.ReadMessage()
-		if err != nil {
-			return
-		}
-		sendRaw <- raw
-		// Keep the connection open so the client-side doesn't see a
-		// premature close while the test inspects the captured frames.
-		for {
-			if _, _, err := c.ReadMessage(); err != nil {
-				return
-			}
-		}
-	})
-
-	iw.pendingConn = dialMock(t, url)
 	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDeltaPacket{
-		ContextID: "ctx-auto",
-		Text:      "hi",
+		ContextID: "ctx-int",
+		Text:      "hello world.",
 	}))
 
-	// Inspect create frame — auto_mode must be present and true.
 	select {
-	case raw := <-createRaw:
-		var envelope struct {
-			ContextID string `json:"context_id"`
-			Create    struct {
-				VoiceID     string `json:"voice_id"`
-				ModelID     string `json:"model_id"`
-				AudioConfig struct {
-					AudioEncoding   string `json:"audio_encoding"`
-					SampleRateHertz int    `json:"sample_rate_hertz"`
-				} `json:"audio_config"`
-				AutoMode bool `json:"auto_mode"`
-			} `json:"create"`
-		}
-		require.NoError(t, json.Unmarshal(raw, &envelope))
-		assert.Equal(t, "ctx-auto", envelope.ContextID)
-		assert.True(t, envelope.Create.AutoMode, "create frame should enable auto_mode")
+	case <-firstChunk:
 	case <-time.After(2 * time.Second):
-		t.Fatal("create frame never arrived at mock server")
+		t.Fatal("never got first chunk")
 	}
-
-	// Inspect send_text frame — flush_context must NOT be present. We match
-	// on the raw JSON because an empty map vs a missing key is the whole
-	// distinction this test protects against.
-	select {
-	case raw := <-sendRaw:
-		assert.NotContains(t, string(raw), "flush_context",
-			"send_text must not carry flush_context under auto_mode")
-		// Sanity: text field still flows through.
-		assert.Contains(t, string(raw), `"text":"hi"`)
-	case <-time.After(2 * time.Second):
-		t.Fatal("send_text frame never arrived at mock server")
-	}
-}
-
-// --- Fix 3: server error frames must terminate the turn ---
-
-// TestInworldTTSServerErrorTerminatesTurn asserts that when Inworld pushes
-// an error response frame, readLoop emits a TextToSpeechEndPacket (so any
-// caller waiting on end-of-turn can unblock), tears down the turn state,
-// and closes the underlying connection.
-func TestInworldTTSServerErrorTerminatesTurn(t *testing.T) {
-	collector := &packetCollector{}
-	iw := newTestInworldTTS(context.Background(), collector)
-	defer iw.Close(context.Background())
-
-	connReady := make(chan struct{})
-	_, url := newMockInworldServer(t, func(c *websocket.Conn) {
-		// Server-side: just push an error frame immediately.
-		close(connReady)
-		errFrame := inworld_internal.InworldTTSResponse{
-			Error: &inworld_internal.ErrorBody{
-				Message: "boom",
-				Code:    42,
-			},
-		}
-		_ = c.WriteJSON(errFrame)
-		// Hold the conn open until the client closes it.
-		for {
-			if _, _, err := c.ReadMessage(); err != nil {
-				return
-			}
-		}
-	})
-
-	clientConn := dialMock(t, url)
-	<-connReady
-
-	// Seed a turn that owns this conn as if Transform had already bound it.
-	iw.mu.Lock()
-	iw.turns["ctx-err"] = &turnState{conn: clientConn, contextCreated: true, ttsStartedAt: time.Now()}
-	iw.mu.Unlock()
-	go iw.readLoop(clientConn, "ctx-err")
-
-	// The end packet is what unblocks callers — must arrive even though the
-	// server never sent done/contextClosed.
 	require.True(t, waitFor(t, 2*time.Second, func() bool {
-		return len(collector.endsForCtx("ctx-err")) > 0
-	}), "server error should emit TextToSpeechEndPacket for the turn")
+		return len(collector.audioForCtx("ctx-int")) >= 1
+	}), "should see the first audio packet before interrupting")
 
-	// Turn state must be cleared so a subsequent turn with the same ctx-id
-	// would dial a fresh conn.
+	require.NoError(t, iw.Transform(context.Background(), internal_type.InterruptionDetectedPacket{
+		ContextID: "ctx-int",
+		Source:    internal_type.InterruptionSourceVad,
+	}))
+
+	// Runner must have exited and removed the turn from the map.
 	require.True(t, waitFor(t, 2*time.Second, func() bool {
 		iw.mu.Lock()
 		defer iw.mu.Unlock()
-		_, exists := iw.turns["ctx-err"]
+		_, exists := iw.turns["ctx-int"]
 		return !exists
-	}), "server error should delete turn state")
-}
+	}), "turn state should be cleared after interrupt")
 
-// --- CodeRabbit round 2, Fix 1: per-turn writeMu guards WriteJSON ---
-
-// TestInworldTTSConcurrentWritesNoRace drives many Transform calls with the
-// same ContextID concurrently against a single mocked WebSocket. Without the
-// per-turn writeMu, gorilla/websocket panics with "concurrent write to
-// websocket connection" the moment two goroutines interleave WriteJSON.
-// This test is meaningful under `go test -race`: any regression surfaces as
-// a panic that fails the test immediately.
-func TestInworldTTSConcurrentWritesNoRace(t *testing.T) {
-	collector := &packetCollector{}
-	iw := newTestInworldTTS(context.Background(), collector)
-	defer iw.Close(context.Background())
-
-	// Server just drains frames from the client and pushes nothing back.
-	_, url := newMockInworldServer(t, func(c *websocket.Conn) {
-		for {
-			if _, _, err := c.ReadMessage(); err != nil {
-				return
-			}
-		}
-	})
-
-	// Pre-install the turn so every goroutine skips the acquireConn path and
-	// races purely on WriteJSON — that's the code path writeMu protects.
-	// contextCreated=true also skips the one-shot create frame so every
-	// Transform call goes straight to send_text.
-	conn := dialMock(t, url)
-	iw.mu.Lock()
-	iw.turns["ctx-concurrent"] = &turnState{
-		conn:           conn,
-		contextCreated: true,
-		ttsStartedAt:   time.Now(),
-	}
-	iw.mu.Unlock()
-
-	const goroutines = 8
-	const perGoroutine = 25
-	var wg sync.WaitGroup
-	errs := make(chan error, goroutines*perGoroutine)
-
-	// defer+recover catches gorilla/websocket's "concurrent write to
-	// websocket connection" panic in a test-friendly way; a raw panic in a
-	// goroutine would otherwise just kill the runner.
-	launch := func(text string) {
-		defer wg.Done()
-		defer func() {
-			if r := recover(); r != nil {
-				errs <- fmt.Errorf("panic in Transform: %v", r)
-			}
-		}()
-		for i := 0; i < perGoroutine; i++ {
-			if err := iw.Transform(context.Background(), internal_type.LLMResponseDeltaPacket{
-				ContextID: "ctx-concurrent",
-				Text:      text,
-			}); err != nil {
-				errs <- err
-				return
-			}
-		}
+	// Let the server proceed — if the runner were still alive, a second
+	// audio packet would arrive here. With the interrupt, the request's
+	// context was canceled and the scanner read returned early.
+	close(releaseSecond)
+	select {
+	case <-secondSent:
+	case <-time.After(1 * time.Second):
+		// Server may never have flushed the second line because the
+		// client closed early; either outcome is fine.
 	}
 
-	for i := 0; i < goroutines; i++ {
-		wg.Add(1)
-		go launch(fmt.Sprintf("delta-%d", i))
-	}
-	wg.Wait()
-	close(errs)
+	// Audio count should be 1 — the chunk we saw before the interrupt.
+	assert.Equal(t, 1, len(collector.audioForCtx("ctx-int")),
+		"no audio should be emitted after interrupt")
 
-	for err := range errs {
-		t.Fatalf("concurrent Transform failed: %v", err)
-	}
-
-	// Sanity: we generated many speaking events, all tagged with the turn id.
+	// Interrupt event should have fired.
 	collector.mu.Lock()
 	defer collector.mu.Unlock()
-	speakingCount := 0
+	interrupted := false
 	for _, ev := range collector.events {
-		if ev.Data["type"] == "speaking" {
-			speakingCount++
-			assert.Equal(t, "ctx-concurrent", ev.ContextID,
-				"every speaking event must carry the turn's ContextID")
+		if ev.ContextID == "ctx-int" && ev.Data["type"] == "interrupted" {
+			interrupted = true
 		}
 	}
-	assert.Equal(t, goroutines*perGoroutine, speakingCount,
-		"every concurrent Transform call should emit exactly one speaking event")
+	assert.True(t, interrupted, "should emit tts=interrupted event")
 }
 
-// --- CodeRabbit round 2, Fix 2: pendingConn dials serialize through Cond ---
+// --- Server error surfaces ---
 
-// TestInworldTTSConcurrentInitDialsOnce asserts that when many goroutines
-// trigger first-delta concurrently with no pre-dialed pending conn, dials
-// serialize cleanly: no goroutine sees the "pending connection missing
-// after Initialize" error, every Transform call either succeeds or fails
-// with a dial error (never a lost-race bug), and no races fire on
-// `it.pendingConn`. Also verifies exactly one turnState is created per
-// distinct ContextID — concurrent first-delta callers for the same turn
-// must not each install their own turnState.
-func TestInworldTTSConcurrentInitDialsOnce(t *testing.T) {
+// TestInworldTTSServerErrorSurfaces asserts that an NDJSON error line
+// from the server terminates the synth attempt, surfaces an error event,
+// and still emits a TextToSpeechEndPacket for the turn once Done arrives
+// so callers waiting on end-of-turn don't block.
+func TestInworldTTSServerErrorSurfaces(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		w.WriteHeader(http.StatusOK)
+		// Error line — no audio.
+		chunk := inworld_internal.StreamChunk{
+			Error: &inworld_internal.ErrorBody{Message: "voice not found"},
+		}
+		require.NoError(t, json.NewEncoder(w).Encode(chunk))
+	}))
+	defer srv.Close()
+
 	collector := &packetCollector{}
-	iw := newTestInworldTTS(context.Background(), collector)
+	iw := newTestInworldTTS(context.Background(), srv.URL, collector)
 	defer iw.Close(context.Background())
 
-	// Mock server accepts any number of connections and just drains them.
-	_, url := newMockInworldServer(t, func(c *websocket.Conn) {
-		for {
-			if _, _, err := c.ReadMessage(); err != nil {
-				return
-			}
+	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDeltaPacket{
+		ContextID: "ctx-err",
+		Text:      "boom.",
+	}))
+	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDonePacket{
+		ContextID: "ctx-err",
+	}))
+
+	// End packet should still fire — callers unblock.
+	require.True(t, waitFor(t, 2*time.Second, func() bool {
+		return len(collector.endsForCtx("ctx-err")) > 0
+	}), "server error must still produce an end packet")
+
+	// Error event should carry the message.
+	require.True(t, waitFor(t, 2*time.Second, func() bool {
+		return collector.hasErrorEvent("ctx-err")
+	}), "server error should surface as tts=error event")
+
+	collector.mu.Lock()
+	defer collector.mu.Unlock()
+	for _, ev := range collector.events {
+		if ev.ContextID == "ctx-err" && ev.Data["type"] == "error" {
+			assert.Contains(t, ev.Data["message"], "voice not found")
 		}
-	})
-
-	// Injected dialer counts dials and targets the in-process mock. No
-	// special-casing of the URL in the header — we ignore inworldTTS's
-	// connection string and route straight to the mock.
-	var dialCount int64
-	iw.dialer = func(_ string, _ http.Header) (*websocket.Conn, *http.Response, error) {
-		atomic.AddInt64(&dialCount, 1)
-		return websocket.DefaultDialer.Dial(url, nil)
 	}
+}
 
-	// N goroutines, same ContextID. Exactly one turn should end up installed.
-	const goroutines = 16
-	var wg sync.WaitGroup
-	errs := make(chan error, goroutines)
-	for i := 0; i < goroutines; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			err := iw.Transform(context.Background(), internal_type.LLMResponseDeltaPacket{
-				ContextID: "ctx-init-race",
-				Text:      fmt.Sprintf("delta-%d", i),
-			})
-			if err != nil {
-				errs <- err
-			}
-		}(i)
+// --- Keep-alive reuses TCP conn ---
+
+// TestInworldTTSKeepAliveReusesConn fires three sentences in succession
+// and asserts the underlying transport accepts only one TCP connection.
+// Regression: without keep-alive, each sentence dials fresh — and the
+// whole point of rewriting away from WebSocket was to keep first-byte
+// latency competitive via connection reuse.
+func TestInworldTTSKeepAliveReusesConn(t *testing.T) {
+	connCount := int64(0)
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	counting := &countingListener{Listener: listener, count: &connCount}
+
+	srv := &http.Server{
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/x-ndjson")
+			w.WriteHeader(http.StatusOK)
+			writeAudioLine(t, w, []byte("ok"))
+		}),
 	}
-	wg.Wait()
-	close(errs)
+	go srv.Serve(counting)
+	defer srv.Close()
 
-	for err := range errs {
-		assert.NotContains(t, err.Error(), "pending connection missing",
-			"pendingConn serialization must prevent 'pending connection missing' errors")
-		t.Errorf("unexpected Transform error: %v", err)
+	url := "http://" + listener.Addr().String()
+	collector := &packetCollector{}
+	iw := newTestInworldTTS(context.Background(), url, collector)
+	defer iw.Close(context.Background())
+
+	for i, text := range []string{"one.", "two.", "three."} {
+		require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDeltaPacket{
+			ContextID: "ctx-ka",
+			Text:      text,
+		}), "sentence %d", i)
 	}
+	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDonePacket{
+		ContextID: "ctx-ka",
+	}))
 
-	// Exactly one turnState for this ctx id.
-	iw.mu.Lock()
-	_, exists := iw.turns["ctx-init-race"]
-	turnsCount := len(iw.turns)
-	iw.mu.Unlock()
-	assert.True(t, exists, "first-delta callers must install the turn")
-	assert.Equal(t, 1, turnsCount, "concurrent first-delta for the same ctxID must produce exactly one turn")
+	require.True(t, waitFor(t, 3*time.Second, func() bool {
+		return len(collector.endsForCtx("ctx-ka")) > 0
+	}), "all three sentences should stream through and finish")
 
-	// The bug the Cond guards against would let two dials race and replace
-	// each other's pendingConn. With the fix, dials happen at most once per
-	// "lost race" but the key invariant is that they don't clobber each
-	// other — sanity-check the count is bounded and non-zero.
-	final := atomic.LoadInt64(&dialCount)
-	assert.GreaterOrEqual(t, final, int64(1), "at least one dial must have happened")
-	assert.LessOrEqual(t, final, int64(goroutines), "dial count must be bounded by concurrent callers")
+	assert.Equal(t, int64(1), atomic.LoadInt64(&connCount),
+		"keep-alive should reuse a single TCP conn across three sentences")
+}
+
+// countingListener wraps a net.Listener and atomically counts Accept calls.
+type countingListener struct {
+	net.Listener
+	count *int64
+}
+
+func (l *countingListener) Accept() (net.Conn, error) {
+	c, err := l.Listener.Accept()
+	if err == nil {
+		atomic.AddInt64(l.count, 1)
+	}
+	return c, err
 }

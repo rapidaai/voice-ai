@@ -8,6 +8,8 @@ package internal_transformer_inworld
 
 import (
 	"fmt"
+	"net/http"
+	"time"
 
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
@@ -15,8 +17,11 @@ import (
 )
 
 const (
-	// INWORLD_WSS_URL is the bidirectional streaming TTS endpoint.
-	INWORLD_WSS_URL = "wss://api.inworld.ai/tts/v1/voice:streamBidirectional"
+	// INWORLD_STREAM_URL is Inworld's HTTP streaming TTS endpoint. Each POST
+	// returns an NDJSON stream of audio chunks and closes when synthesis
+	// finishes. Rapida's aggregator already splits LLM deltas at sentence
+	// boundaries, so we issue one request per sentence.
+	INWORLD_STREAM_URL = "https://api.inworld.ai/tts/v1/voice:stream"
 
 	// Defaults chosen to match Rapida's pcm_16000 encoding used by elevenlabs
 	// and cartesia. Inworld's LINEAR16 @ 16000 Hz is byte-for-byte equivalent.
@@ -94,9 +99,28 @@ func (co *inworldOption) GetModelID() string {
 	return INWORLD_DEFAULT_MODEL_ID
 }
 
-// GetTextToSpeechConnectionString returns the WebSocket URL. Inworld carries
-// auth and configuration in headers and frames respectively, so no query
-// parameters are needed here.
+// GetTextToSpeechConnectionString returns the HTTP streaming URL. Auth and
+// configuration live in the Authorization header and request body; there
+// are no query parameters.
 func (co *inworldOption) GetTextToSpeechConnectionString() string {
-	return INWORLD_WSS_URL
+	return INWORLD_STREAM_URL
+}
+
+// newInworldHTTPClient returns an *http.Client tuned for the Inworld TTS
+// streaming endpoint. We keep a small idle-conn pool so successive
+// sentences reuse the same TCP+TLS connection (and an HTTP/2 multiplex slot
+// if Inworld supports it), which is what makes HTTP streaming latency
+// competitive with the WebSocket approach after the first request.
+//
+// No top-level timeout is set — per-synth deadlines are carried through the
+// request context so a canceled turn unblocks in-flight reads immediately.
+func newInworldHTTPClient() *http.Client {
+	tr := &http.Transport{
+		MaxIdleConns:        10,
+		MaxIdleConnsPerHost: 4,
+		IdleConnTimeout:     90 * time.Second,
+		ForceAttemptHTTP2:   true,
+		TLSHandshakeTimeout: 10 * time.Second,
+	}
+	return &http.Client{Transport: tr}
 }
