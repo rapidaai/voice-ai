@@ -137,13 +137,32 @@ func (it *inworldTTS) Initialize() error {
 func (it *inworldTTS) Transform(ctx context.Context, in internal_type.LLMPacket) error {
 	switch input := in.(type) {
 	case internal_type.InterruptionDetectedPacket:
+		// Scope the cancellation to the turn identified by the packet.
+		// Rapida's pipeline only has one active TTS turn at a time in
+		// practice, but if two contexts are ever synthesizing in parallel
+		// we must not drop audio/end packets on the bystander turn.
+		//
+		// If the inbound ContextID is unset (defensive — the dispatcher
+		// should always set it), fall through to a whole-session
+		// teardown so an interrupt is never silently ignored.
 		it.mu.Lock()
-		cancels := make([]context.CancelFunc, 0, len(it.turns))
-		for id, tr := range it.turns {
-			cancels = append(cancels, tr.runCancel)
-			delete(it.turns, id)
+		var cancels []context.CancelFunc
+		if input.ContextID != "" {
+			if tr, ok := it.turns[input.ContextID]; ok {
+				cancels = append(cancels, tr.runCancel)
+				delete(it.turns, input.ContextID)
+			}
+			if it.activeContext == input.ContextID {
+				it.activeContext = ""
+			}
+		} else {
+			cancels = make([]context.CancelFunc, 0, len(it.turns))
+			for id, tr := range it.turns {
+				cancels = append(cancels, tr.runCancel)
+				delete(it.turns, id)
+			}
+			it.activeContext = ""
 		}
-		it.activeContext = ""
 		it.mu.Unlock()
 		for _, c := range cancels {
 			c()
@@ -235,8 +254,11 @@ func (it *inworldTTS) getOrCreateRunner(ctxID string) *turnRunner {
 
 // run is the per-turn goroutine. It consumes sentences one at a time,
 // issues a synth() request per sentence, and emits the terminal packets
-// after the channel closes (Done path) or when the run context is
-// canceled (interrupt path).
+// on the Done path (sentence channel closed) — or exits silently on the
+// interrupt path (runCtx canceled). The select below is load-bearing:
+// a plain `for text := range tr.sentences` would park forever if the
+// runner is idle between synths when an interrupt fires, because
+// runCtx cancellation doesn't wake a channel receive on its own.
 func (it *inworldTTS) run(tr *turnRunner) {
 	// Always release the run-context on exit. For the Done path the context
 	// would otherwise only be freed when the parent inworldTTS.ctx cancels;
@@ -254,43 +276,53 @@ func (it *inworldTTS) run(tr *turnRunner) {
 		it.mu.Unlock()
 	}()
 
-	interrupted := false
-	for text := range tr.sentences {
-		if err := it.synth(tr.runCtx, tr, text); err != nil {
-			if tr.runCtx.Err() != nil {
-				// Canceled by an interrupt — drain any remaining queued
-				// sentences and exit without a terminal end packet.
-				interrupted = true
-				break
+	for {
+		select {
+		case <-tr.runCtx.Done():
+			// Interrupt or transformer Close. Transform already emitted
+			// the tts=interrupted event on the interrupt path; no
+			// terminal end packet on a cancel — the caller initiated the
+			// teardown and is not waiting on completion.
+			return
+		case text, ok := <-tr.sentences:
+			if !ok {
+				// Done path: the channel was closed after we drained it.
+				// Guard against the Done-then-Interrupt race: if both
+				// fired before the select woke, skip the terminal packets
+				// because the interrupt semantically supersedes.
+				if tr.runCtx.Err() != nil {
+					return
+				}
+				_ = it.onPacket(
+					internal_type.TextToSpeechEndPacket{ContextID: tr.ctxID},
+					internal_type.ConversationEventPacket{
+						ContextID: tr.ctxID,
+						Name:      "tts",
+						Data:      map[string]string{"type": "completed"},
+						Time:      time.Now(),
+					},
+				)
+				return
 			}
-			it.logger.Errorf("inworld-tts: synth failed for ctx=%s: %v", tr.ctxID, err)
-			// Surface the error to the observability channel but keep
-			// draining — subsequent sentences may succeed and, critically,
-			// callers waiting on TextToSpeechEndPacket still need one.
-			_ = it.onPacket(internal_type.ConversationEventPacket{
-				ContextID: tr.ctxID,
-				Name:      "tts",
-				Data:      map[string]string{"type": "error", "message": err.Error()},
-				Time:      time.Now(),
-			})
+			if err := it.synth(tr.runCtx, tr, text); err != nil {
+				if tr.runCtx.Err() != nil {
+					// Canceled mid-synth by an interrupt — exit quietly.
+					return
+				}
+				it.logger.Errorf("inworld-tts: synth failed for ctx=%s: %v", tr.ctxID, err)
+				// Surface the error to the observability channel but
+				// keep looping — subsequent sentences may succeed and,
+				// critically, callers waiting on TextToSpeechEndPacket
+				// still need one when Done eventually arrives.
+				_ = it.onPacket(internal_type.ConversationEventPacket{
+					ContextID: tr.ctxID,
+					Name:      "tts",
+					Data:      map[string]string{"type": "error", "message": err.Error()},
+					Time:      time.Now(),
+				})
+			}
 		}
 	}
-
-	if interrupted {
-		// Interrupt path already emitted its own tts=interrupted event on
-		// the Transform side; nothing more to send here.
-		return
-	}
-
-	_ = it.onPacket(
-		internal_type.TextToSpeechEndPacket{ContextID: tr.ctxID},
-		internal_type.ConversationEventPacket{
-			ContextID: tr.ctxID,
-			Name:      "tts",
-			Data:      map[string]string{"type": "completed"},
-			Time:      time.Now(),
-		},
-	)
 }
 
 // synth POSTs one sentence to voice:stream, decodes the NDJSON response,

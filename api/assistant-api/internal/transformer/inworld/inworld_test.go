@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -463,6 +464,138 @@ func TestInworldTTSInterruptCancelsInFlight(t *testing.T) {
 		}
 	}
 	assert.True(t, interrupted, "should emit tts=interrupted event")
+}
+
+// --- Idle runner responds to interrupt ---
+
+// TestInworldTTSInterruptWakesIdleRunner reproduces the runner-leak
+// regression: after a sentence finishes synthesizing, the runner
+// goroutine is parked on `<-tr.sentences` waiting for the next Delta.
+// Prior to the select-on-runCtx.Done() fix, calling runCancel() would
+// silently mark the context done but leave the goroutine blocked on
+// the channel receive forever. This test drives that idle state, fires
+// an interrupt, and asserts the runner exits (turn removed from map)
+// within a bounded window.
+func TestInworldTTSInterruptWakesIdleRunner(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		w.WriteHeader(http.StatusOK)
+		writeAudioLine(t, w, []byte("ok"))
+	}))
+	defer srv.Close()
+
+	collector := &packetCollector{}
+	iw := newTestInworldTTS(context.Background(), srv.URL, collector)
+	defer iw.Close(context.Background())
+
+	// Delta + drain: the runner now loops back to receive from an empty
+	// channel and parks — synth is NOT in flight.
+	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDeltaPacket{
+		ContextID: "ctx-idle",
+		Text:      "hello.",
+	}))
+	require.True(t, waitFor(t, 2*time.Second, func() bool {
+		return len(collector.audioForCtx("ctx-idle")) >= 1
+	}), "runner should finish its first synth and go idle")
+
+	// Fire interrupt while the runner is parked on <-tr.sentences.
+	require.NoError(t, iw.Transform(context.Background(), internal_type.InterruptionDetectedPacket{
+		ContextID: "ctx-idle",
+		Source:    internal_type.InterruptionSourceVad,
+	}))
+
+	// The runner MUST exit — without the select fix, this goroutine
+	// would stay parked forever and this assertion would time out.
+	require.True(t, waitFor(t, 2*time.Second, func() bool {
+		iw.mu.Lock()
+		defer iw.mu.Unlock()
+		_, exists := iw.turns["ctx-idle"]
+		return !exists
+	}), "idle runner must be reaped after interrupt")
+}
+
+// --- Interrupt is scoped to its ContextID ---
+
+// TestInworldTTSInterruptScopedToContext asserts that interrupting turn
+// A does not tear down turn B. Prior to scoping the cancellation by
+// input.ContextID, any interrupt would cancel every live runner and
+// drop audio/end packets for bystander turns.
+func TestInworldTTSInterruptScopedToContext(t *testing.T) {
+	// Block turn B's synth on a signal so we can keep it alive while we
+	// interrupt turn A. The server only replies with audio once the
+	// test releases the block.
+	releaseB := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		w.WriteHeader(http.StatusOK)
+		// Read body to distinguish which turn this request is for.
+		buf := make([]byte, 256)
+		n, _ := r.Body.Read(buf)
+		body := string(buf[:n])
+		if strings.Contains(body, "B-text") {
+			select {
+			case <-releaseB:
+			case <-r.Context().Done():
+				return
+			}
+		}
+		writeAudioLine(t, w, []byte("ok"))
+	}))
+	defer srv.Close()
+
+	collector := &packetCollector{}
+	iw := newTestInworldTTS(context.Background(), srv.URL, collector)
+	defer iw.Close(context.Background())
+
+	// Turn A — let it finish so its runner is idle.
+	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDeltaPacket{
+		ContextID: "ctx-A",
+		Text:      "A-text.",
+	}))
+	require.True(t, waitFor(t, 2*time.Second, func() bool {
+		return len(collector.audioForCtx("ctx-A")) >= 1
+	}), "turn A should receive its audio")
+
+	// Turn B — pending (server holds the request until releaseB closes).
+	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDeltaPacket{
+		ContextID: "ctx-B",
+		Text:      "B-text.",
+	}))
+	require.True(t, waitFor(t, 2*time.Second, func() bool {
+		iw.mu.Lock()
+		defer iw.mu.Unlock()
+		_, existsB := iw.turns["ctx-B"]
+		return existsB
+	}), "turn B runner should be registered before interrupt")
+
+	// Interrupt targeting turn A ONLY.
+	require.NoError(t, iw.Transform(context.Background(), internal_type.InterruptionDetectedPacket{
+		ContextID: "ctx-A",
+		Source:    internal_type.InterruptionSourceVad,
+	}))
+
+	// Turn A should be reaped; turn B must still be live.
+	require.True(t, waitFor(t, 2*time.Second, func() bool {
+		iw.mu.Lock()
+		defer iw.mu.Unlock()
+		_, aExists := iw.turns["ctx-A"]
+		_, bExists := iw.turns["ctx-B"]
+		return !aExists && bExists
+	}), "interrupt on ctx-A must not cancel ctx-B")
+
+	// Let turn B's synth finish, then Done → end packet for B.
+	close(releaseB)
+	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDonePacket{
+		ContextID: "ctx-B",
+	}))
+	require.True(t, waitFor(t, 2*time.Second, func() bool {
+		return len(collector.endsForCtx("ctx-B")) > 0
+	}), "turn B must produce its terminal end packet — the interrupt on A should not have affected it")
+
+	// Turn A: no end packet (interrupt path swallows it) but the
+	// interrupted event must have fired.
+	assert.Empty(t, collector.endsForCtx("ctx-A"),
+		"interrupted turn must not emit a terminal end packet")
 }
 
 // --- Server error surfaces ---
