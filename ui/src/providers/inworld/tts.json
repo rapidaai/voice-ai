@@ -79,6 +79,6 @@
         { "label": "On", "value": "ON" },
         { "label": "Off", "value": "OFF" }
       ]
-    },
+    }
   ]
 }
