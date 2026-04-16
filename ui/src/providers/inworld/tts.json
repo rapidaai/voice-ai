@@ -24,6 +24,87 @@
       "customValue": true,
       "helpText": "Each voice is tied to a specific language — the voice's language is shown in its name.",
       "errorMessage": "Please select a valid Inworld voice."
+    },
+    {
+      "key": "speak.audioConfig.speakingRate",
+      "label": "Speaking Rate",
+      "type": "number",
+      "required": false,
+      "advanced": true,
+      "min": 0.5,
+      "max": 1.5,
+      "step": 0.1,
+      "placeholder": "1.0 (default)",
+      "helpText": "Speaking speed. 1.0 is natural speed. Values below 0.8 may reduce quality."
+    },
+    {
+      "key": "speak.audioConfig.sampleRateHertz",
+      "label": "Sample Rate (Hz)",
+      "type": "select",
+      "required": false,
+      "advanced": true,
+      "helpText": "Synthesis sample rate. If different from the voice's natural rate, audio will be resampled.",
+      "choices": [
+        { "label": "Provider Default", "value": "" },
+        { "label": "8000", "value": "8000" },
+        { "label": "16000", "value": "16000" },
+        { "label": "22050", "value": "22050" },
+        { "label": "24000", "value": "24000" },
+        { "label": "32000", "value": "32000" },
+        { "label": "44100", "value": "44100" },
+        { "label": "48000", "value": "48000" }
+      ]
+    },
+    {
+      "key": "speak.temperature",
+      "label": "Temperature",
+      "type": "number",
+      "required": false,
+      "advanced": true,
+      "min": 0.01,
+      "max": 2,
+      "step": 0.05,
+      "placeholder": "1.0 (default)",
+      "helpText": "Controls randomness of audio token sampling. Higher values are more expressive; lower values are more deterministic."
+    },
+    {
+      "key": "speak.timestampType",
+      "label": "Timestamp Type",
+      "type": "select",
+      "required": false,
+      "advanced": true,
+      "helpText": "Controls timestamp metadata for word-highlighting, captions, or lipsync. Enabling adds latency.",
+      "choices": [
+        { "label": "None", "value": "" },
+        { "label": "Word", "value": "WORD" },
+        { "label": "Character", "value": "CHARACTER" }
+      ]
+    },
+    {
+      "key": "speak.applyTextNormalization",
+      "label": "Text Normalization",
+      "type": "select",
+      "required": false,
+      "advanced": true,
+      "helpText": "Expands numbers, dates, and abbreviations before synthesis. Disabling may reduce latency.",
+      "choices": [
+        { "label": "Auto", "value": "" },
+        { "label": "On", "value": "ON" },
+        { "label": "Off", "value": "OFF" }
+      ]
+    },
+    {
+      "key": "speak.timestampTransportStrategy",
+      "label": "Timestamp Transport",
+      "type": "select",
+      "required": false,
+      "advanced": true,
+      "helpText": "Controls how timestamps are delivered. Async reduces first-chunk latency with v1.5+ models.",
+      "choices": [
+        { "label": "Auto", "value": "" },
+        { "label": "Sync", "value": "SYNC" },
+        { "label": "Async", "value": "ASYNC" }
+      ]
     }
   ]
 }
