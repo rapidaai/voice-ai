@@ -493,6 +493,24 @@
         "website": "https://elevenlabs.io"
     },
     {
+        "code": "inworld",
+        "name": "Inworld",
+        "description": "Inworld AI offers expressive, multilingual text-to-speech with sub-500ms latency. Flagship (inworld-tts-1.5-max) and fast (inworld-tts-1.5-mini) models cover 11 languages and 20+ stock voices.",
+        "image": "https://rapida-assets-01.s3.ap-south-1.amazonaws.com/providers/inworld.png",
+        "featureList": [
+            "tts",
+            "external"
+        ],
+        "configurations": [
+            {
+                "name": "key",
+                "type": "string",
+                "label": "API Key"
+            }
+        ],
+        "website": "https://inworld.ai"
+    },
+    {
         "code": "rime",
         "name": "Rime",
         "image": "https://rapida-assets-01.s3.ap-south-1.amazonaws.com/providers/rime.jpeg",

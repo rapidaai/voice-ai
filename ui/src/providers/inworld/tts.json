@@ -1,0 +1,29 @@
+{
+  "preservePrefix": "speaker.",
+  "parameters": [
+    {
+      "key": "speak.model",
+      "label": "Model",
+      "type": "dropdown",
+      "required": true,
+      "default": "inworld-tts-1.5-max",
+      "data": "models.json",
+      "valueField": "model_id",
+      "errorMessage": "Please select a valid Inworld TTS model."
+    },
+    {
+      "key": "speak.voice.id",
+      "label": "Voice",
+      "type": "dropdown",
+      "required": true,
+      "default": "Ashley",
+      "data": "voices.json",
+      "valueField": "voice_id",
+      "searchable": true,
+      "strict": false,
+      "customValue": true,
+      "helpText": "Each voice is tied to a specific language — the voice's language is shown in its name.",
+      "errorMessage": "Please select a valid Inworld voice."
+    }
+  ]
+}

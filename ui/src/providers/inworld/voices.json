@@ -1,0 +1,1513 @@
+[
+  {
+    "voice_id": "Abby",
+    "name": "Abby — English",
+    "language_id": "en",
+    "description": "Bright, eager American female child voice, ideal for animated characters, upbeat educational content, and lively kids' commercials."
+  },
+  {
+    "voice_id": "1framework__adam_silver",
+    "name": "Adam Silver — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Alex",
+    "name": "Alex — English",
+    "language_id": "en",
+    "description": "Energetic and expressive mid-range male voice, with a mildly nasal quality"
+  },
+  {
+    "voice_id": "Amina",
+    "name": "Amina — English",
+    "language_id": "en",
+    "description": "Warm, inviting West African female voice, ideal for community outreach, cultural storytelling, and educational workshops."
+  },
+  {
+    "voice_id": "1framework__amina_andreas_test",
+    "name": "Amina (Andreas Test) — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__andreas_cross",
+    "name": "Andreas Cross — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Anjali",
+    "name": "Anjali — English",
+    "language_id": "en",
+    "description": "A confident and articulate Indian female voice, ideal for professional training materials."
+  },
+  {
+    "voice_id": "1framework__ann_less_than_1_second",
+    "name": "Ann (less than 1 second) — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__ann_feb",
+    "name": "Ann Feb — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__ann_feb_18",
+    "name": "Ann Feb 18 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__ann_takamaki-cfqam",
+    "name": "Ann Takamaki — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__ann_takamaki",
+    "name": "Ann Takamaki — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__ann_takamaki_2_seconds",
+    "name": "Ann Takamaki (2 seconds) — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__design-voice-75898785",
+    "name": "Another test voice — English",
+    "language_id": "en",
+    "description": "another test description"
+  },
+  {
+    "voice_id": "1framework__design-voice-7bb6ae3e",
+    "name": "Another test voice — English",
+    "language_id": "en",
+    "description": "another test description"
+  },
+  {
+    "voice_id": "1framework__design-voice-d317875a",
+    "name": "Another test voice — English",
+    "language_id": "en",
+    "description": "another test description"
+  },
+  {
+    "voice_id": "1framework__design-voice-d9e909d5",
+    "name": "Another test voice — English",
+    "language_id": "en",
+    "description": "another test description"
+  },
+  {
+    "voice_id": "Arjun",
+    "name": "Arjun — English",
+    "language_id": "en",
+    "description": "Clear, composed Indian male voice, well-suited for instructional webinars and technology explainers."
+  },
+  {
+    "voice_id": "Ashley",
+    "name": "Ashley — English",
+    "language_id": "en",
+    "description": "A warm, natural female voice"
+  },
+  {
+    "voice_id": "1framework__avalonjulianonhumancharacter",
+    "name": "AvalonJuliaNonHumanCharacter — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__avalonjulianonhumancharacter_removebackgroundnoise",
+    "name": "AvalonJuliaNonHumanCharacter_RemoveBackgroundNoise — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Avery",
+    "name": "Avery — English",
+    "language_id": "en",
+    "description": "Youthful, performative male voice, suited for gameshow-style hosting, energetic presenter reads, and expressive young character parts."
+  },
+  {
+    "voice_id": "Bianca",
+    "name": "Bianca — English",
+    "language_id": "en",
+    "description": "Deep, controlled female voice, ideal for serious corporate reads, composed documentary segments, and measured authority-led explainers."
+  },
+  {
+    "voice_id": "Blake",
+    "name": "Blake — English",
+    "language_id": "en",
+    "description": "Rich, intimate male voice, perfect for audiobooks, romantic content, and reassuring narration"
+  },
+  {
+    "voice_id": "1framework__blake-whisper",
+    "name": "Blake-whisper — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Brandon",
+    "name": "Brandon — English",
+    "language_id": "en",
+    "description": "Bold, strident male voice, ideal for structured announcements, news-style reads, and direct promotional messaging."
+  },
+  {
+    "voice_id": "Brian",
+    "name": "Brian — English",
+    "language_id": "en",
+    "description": "Friendly, encouraging American male voice, ideal for educational tutorials, motivational content, and instructional videos."
+  },
+  {
+    "voice_id": "1framework__cx",
+    "name": "CX — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Callum",
+    "name": "Callum — English",
+    "language_id": "en",
+    "description": "Casual and friendly Australian male voice, ideal for informal instructional content."
+  },
+  {
+    "voice_id": "Carter",
+    "name": "Carter — English",
+    "language_id": "en",
+    "description": "Energetic, mature radio announcer-style male voice, great for storytelling, pep talks, and voiceovers."
+  },
+  {
+    "voice_id": "Cedric",
+    "name": "Cedric — English",
+    "language_id": "en",
+    "description": "Crisp, measured male voice, ideal for formal announcements, premium trailer narration, and command-forward presentation scripts."
+  },
+  {
+    "voice_id": "Celeste",
+    "name": "Celeste — English",
+    "language_id": "en",
+    "description": "Soft, whispery female voice, ideal for ASMR videos, soothing lullabies, and gentle mindfulness sessions."
+  },
+  {
+    "voice_id": "Chloe",
+    "name": "Chloe — English",
+    "language_id": "en",
+    "description": "Thoughtful, introspective youthful female voice, perfect for coming-of-age narratives, personal growth stories, and emotional teen dramas."
+  },
+  {
+    "voice_id": "Claire",
+    "name": "Claire — English",
+    "language_id": "en",
+    "description": "Warm, gentle Eastern European female voice, ideal for bedtime stories, relaxation podcasts"
+  },
+  {
+    "voice_id": "Clive",
+    "name": "Clive — English",
+    "language_id": "en",
+    "description": "British-accented English-language male voice with a calm, cordial quality"
+  },
+  {
+    "voice_id": "1framework__cloned_voice_demo",
+    "name": "Cloned Voice Demo — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__cole_nav_julia_customer",
+    "name": "Cole Nav Julia Customer — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Conrad",
+    "name": "Conrad — English",
+    "language_id": "en",
+    "description": "Gruff, weathered male voice, perfect for detective archetypes, hard-edged audiobook roles, and serious investigative narration."
+  },
+  {
+    "voice_id": "Craig",
+    "name": "Craig — English",
+    "language_id": "en",
+    "description": "Older British male with a refined and articulate voice"
+  },
+  {
+    "voice_id": "1framework__dba_robot_en_v3",
+    "name": "DBA_Robot_En_v3 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Damon",
+    "name": "Damon — English",
+    "language_id": "en",
+    "description": "Calm, raspy male voice, suited for moody narration, atmospheric roleplay characters, and grounded meditative reads with subtle tension."
+  },
+  {
+    "voice_id": "1framework__daniel_sp2",
+    "name": "Daniel_sp2 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__daniel_srutnik",
+    "name": "Daniel_srutnik — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Darlene",
+    "name": "Darlene — English",
+    "language_id": "en",
+    "description": "Soothing, comforting Southern female voice, ideal for bedtime stories, family-centered commercials, and nostalgic narrations."
+  },
+  {
+    "voice_id": "Deborah",
+    "name": "Deborah — English",
+    "language_id": "en",
+    "description": "Warm, peaceful female voice with a calm tone"
+  },
+  {
+    "voice_id": "Dennis",
+    "name": "Dennis — English",
+    "language_id": "en",
+    "description": "Middle-aged man with a smooth, calm and friendly voice"
+  },
+  {
+    "voice_id": "1framework__dennis_laugh",
+    "name": "Dennis (laugh) — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Derek",
+    "name": "Derek — English",
+    "language_id": "en",
+    "description": "Steady, professional, composed American male voice, ideal for banking support, account inquiries, and service escalation calls."
+  },
+  {
+    "voice_id": "Dominus",
+    "name": "Dominus — English",
+    "language_id": "en",
+    "description": "Robotic, deep male voice with a menacing quality. Perfect for villains"
+  },
+  {
+    "voice_id": "1framework__design-voice-8bfe94f3",
+    "name": "Drunk Test Voice — English",
+    "language_id": "en",
+    "description": "Test voice with a tipsy, slightly slurred late-night delivery."
+  },
+  {
+    "voice_id": "1framework__dubbed_guard_-_1_1766618223465",
+    "name": "Dubbed_Guard - 1_1766618223465 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__dubbed_guard_-_2_1766618243130",
+    "name": "Dubbed_Guard - 2_1766618243130 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__dubbed_guard_1766616772472",
+    "name": "Dubbed_Guard_1766616772472 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__dubbed_guard_1766617032978",
+    "name": "Dubbed_Guard_1766617032978 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__dubbed_guard_1766617345212",
+    "name": "Dubbed_Guard_1766617345212 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__dubbed_queen_1766616756026",
+    "name": "Dubbed_Queen_1766616756026 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__dubbed_queen_1766617013126",
+    "name": "Dubbed_Queen_1766617013126 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__dubbed_queen_1766617327404",
+    "name": "Dubbed_Queen_1766617327404 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__dubbed_queen_1766618195920",
+    "name": "Dubbed_Queen_1766618195920 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__dubbed_servant_1766616792685",
+    "name": "Dubbed_Servant_1766616792685 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__dubbed_servant_1766617054711",
+    "name": "Dubbed_Servant_1766617054711 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__dubbed_servant_1766617364709",
+    "name": "Dubbed_Servant_1766617364709 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Duncan",
+    "name": "Duncan — English",
+    "language_id": "en",
+    "description": "Warm, articulate British male voice for customer support and education."
+  },
+  {
+    "voice_id": "1framework__e1",
+    "name": "E1 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__e3",
+    "name": "E3 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Edward",
+    "name": "Edward — English",
+    "language_id": "en",
+    "description": "American male with a emphatic, confident and streetwise tone"
+  },
+  {
+    "voice_id": "Eleanor",
+    "name": "Eleanor — English",
+    "language_id": "en",
+    "description": "Polished, approachable British female voice for support and learning."
+  },
+  {
+    "voice_id": "Elizabeth",
+    "name": "Elizabeth — English",
+    "language_id": "en",
+    "description": "Professional middle-aged woman, perfect for narrations and voiceovers"
+  },
+  {
+    "voice_id": "Elliot",
+    "name": "Elliot — English",
+    "language_id": "en",
+    "description": "A calm, steady male voice, suitable for nature documentaries, general informational content, and relaxed narrations."
+  },
+  {
+    "voice_id": "Ethan",
+    "name": "Ethan — English",
+    "language_id": "en",
+    "description": "Assured, precise male voice, perfect for tech tutorials, detailed gadget overviews, and captivating product demonstrations."
+  },
+  {
+    "voice_id": "Evan",
+    "name": "Evan — English",
+    "language_id": "en",
+    "description": "Friendly, approachable, easygoing male voice, ideal for onboarding calls, retail assistance, and customer check-ins."
+  },
+  {
+    "voice_id": "Evelyn",
+    "name": "Evelyn — English",
+    "language_id": "en",
+    "description": "A gentle and intimate female voice, ideal for personal ASMR content, affirmations, and close, calming conversations."
+  },
+  {
+    "voice_id": "1framework__evelyn_andreas_test",
+    "name": "Evelyn (Andreas Test) — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Felix",
+    "name": "Felix — English",
+    "language_id": "en",
+    "description": "Calm, friendly British male voice, ideal for help and tutorials."
+  },
+  {
+    "voice_id": "1framework__fermata",
+    "name": "Fermata — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Gareth",
+    "name": "Gareth — English",
+    "language_id": "en",
+    "description": "Soothing, gentle male voice, ideal for guided meditations, mindfulness exercises, and relaxation-focused wellness content."
+  },
+  {
+    "voice_id": "Graham",
+    "name": "Graham — English",
+    "language_id": "en",
+    "description": "Profound, authoritative British male voice, perfect for historical documentaries, luxury brand advertisements, and educational content."
+  },
+  {
+    "voice_id": "Grant",
+    "name": "Grant — English",
+    "language_id": "en",
+    "description": "Calm, attentive, helpful male voice, ideal for insurance claims, troubleshooting walkthroughs, and helpdesk interactions."
+  },
+  {
+    "voice_id": "1framework__gurinder_",
+    "name": "Gurinder  — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Hades",
+    "name": "Hades — English",
+    "language_id": "en",
+    "description": "Commanding and gruff male voice, think an omniscient narrator or castle guard"
+  },
+  {
+    "voice_id": "Hamish",
+    "name": "Hamish — English",
+    "language_id": "en",
+    "description": "Friendly and casual Australian male voice, ideal for character-driven roles and upbeat fitness."
+  },
+  {
+    "voice_id": "Hana",
+    "name": "Hana — English",
+    "language_id": "en",
+    "description": "Bright, expressive young female voice, perfect for storytelling, gaming, and playful content"
+  },
+  {
+    "voice_id": "Hank",
+    "name": "Hank — English",
+    "language_id": "en",
+    "description": "Warm, laid-back Southern male voice, ideal for travel documentaries, heritage storytelling, and down-to-earth podcast ads."
+  },
+  {
+    "voice_id": "1framework__hogsworth",
+    "name": "Hogsworth — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__hogsworth1",
+    "name": "Hogsworth1 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__hogsworth2",
+    "name": "Hogsworth2 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__ian",
+    "name": "Ian — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Jake",
+    "name": "Jake — English",
+    "language_id": "en",
+    "description": "Amiable, introspective male voice, ideal for motivational talks, personal growth content, and charming interviews."
+  },
+  {
+    "voice_id": "James",
+    "name": "James — English",
+    "language_id": "en",
+    "description": "Vibrant, expressive male voice, perfect for animated video content, lively event hosting, and captivating children's stories."
+  },
+  {
+    "voice_id": "Jason",
+    "name": "Jason — English",
+    "language_id": "en",
+    "description": "Lucid, engrossing male voice, ideal for tech tips, creative productivity hacks, and supportive user interface tutorials."
+  },
+  {
+    "voice_id": "Jessica",
+    "name": "Jessica — English",
+    "language_id": "en",
+    "description": "Encouraging, articulate American female voice, perfect for self-help audiobooks, warm customer service messages, and clear e-learning modules."
+  },
+  {
+    "voice_id": "1framework__joey_test_6_26",
+    "name": "Joey Test 6_26 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Jonah",
+    "name": "Jonah — English",
+    "language_id": "en",
+    "description": "Soothing, calm male voice, great for tutorial guidance, reassuring support flows, and gentle instructional narration with steady pacing."
+  },
+  {
+    "voice_id": "Julia",
+    "name": "Julia — English",
+    "language_id": "en",
+    "description": "Quirky, high-pitched female voice that delivers lines with playful energy"
+  },
+  {
+    "voice_id": "Kayla",
+    "name": "Kayla — English",
+    "language_id": "en",
+    "description": "Enthusiastic, youthful female voice, ideal for reaction videos, trendy product reviews, and energetic lifestyle vlogs."
+  },
+  {
+    "voice_id": "Kelsey",
+    "name": "Kelsey — English",
+    "language_id": "en",
+    "description": "Warm, empathetic, reassuring female voice, ideal for phone support, appointment confirmations, and customer success calls."
+  },
+  {
+    "voice_id": "Lauren",
+    "name": "Lauren — English",
+    "language_id": "en",
+    "description": "Confident, friendly American female voice, ideal for corporate presentations, upbeat commercials, and engaging podcasts."
+  },
+  {
+    "voice_id": "1framework__lee",
+    "name": "Lee — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Levi",
+    "name": "Levi — English",
+    "language_id": "en",
+    "description": "Measured, ominous male voice, ideal for suspense narration, dark fantasy storytelling, and composed dramatic monologues."
+  },
+  {
+    "voice_id": "Liam",
+    "name": "Liam — English",
+    "language_id": "en",
+    "description": "Upbeat, motivating Australian male voice, perfect for energizing workout sessions, lively event promotions, and informal lifestyle content."
+  },
+  {
+    "voice_id": "Loretta",
+    "name": "Loretta — English",
+    "language_id": "en",
+    "description": "Inviting, folksy Southern female voice, perfect for cooking shows, heartwarming family tales, and cozy radio ads."
+  },
+  {
+    "voice_id": "Lucian",
+    "name": "Lucian — English",
+    "language_id": "en",
+    "description": "Brooding, foreboding male voice, suited for villainous character arcs, gothic drama scenes, and dark narrative worldbuilding."
+  },
+  {
+    "voice_id": "Luna",
+    "name": "Luna — English",
+    "language_id": "en",
+    "description": "Calm, relaxing female voice, perfect for meditations, sleep stories, and mindfulness exercises"
+  },
+  {
+    "voice_id": "1framework__luvu_feb_18",
+    "name": "Luvu Feb 18 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Malcolm",
+    "name": "Malcolm — English",
+    "language_id": "en",
+    "description": "Authoritative, manipulative male voice, perfect for cunning leaders, intense negotiation scenes, and persuasive villain speeches."
+  },
+  {
+    "voice_id": "Marcus",
+    "name": "Marcus — English",
+    "language_id": "en",
+    "description": "Authoritative, empathetic male voice, great for civic campaigns, community outreach explainers, and trustworthy commercial reads with emotional credibility."
+  },
+  {
+    "voice_id": "Mark",
+    "name": "Mark — English",
+    "language_id": "en",
+    "description": "Energetic, expressive man with a rapid-fire delivery"
+  },
+  {
+    "voice_id": "Marlene",
+    "name": "Marlene — English",
+    "language_id": "en",
+    "description": "Friendly, relaxed Southern female voice, ideal for home-style cooking tutorials, community event promotions, and downhome commercials."
+  },
+  {
+    "voice_id": "1framework__meditation_feb_18",
+    "name": "Meditation (Feb 18) — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Mia",
+    "name": "Mia — English",
+    "language_id": "en",
+    "description": "Youthful, expressive female voice, ideal for adolescent characters, school-age animation dialogue, and bright coming-of-age narrative scenes."
+  },
+  {
+    "voice_id": "Miranda",
+    "name": "Miranda — English",
+    "language_id": "en",
+    "description": "Menacing, cold-hearted female voice, perfect for strategic villains, mysterious narratives"
+  },
+  {
+    "voice_id": "1framework__monster_with_prompt_leakage",
+    "name": "Monster with Prompt Leakage — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Mortimer",
+    "name": "Mortimer — English",
+    "language_id": "en",
+    "description": "Gravelly, aggressive male character voice, ideal for fantasy villains and high-intensity game dialogue."
+  },
+  {
+    "voice_id": "1framework__my_cloned_voice",
+    "name": "My Cloned Voice — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__my_voice1234",
+    "name": "My Voice1234 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Nadia",
+    "name": "Nadia — English",
+    "language_id": "en",
+    "description": "Personable, lively female voice, perfect for tutorial walkthroughs, friendly support messaging, and engaging narration for creator-led product content."
+  },
+  {
+    "voice_id": "Naomi",
+    "name": "Naomi — English",
+    "language_id": "en",
+    "description": "Warm, grounded female voice, perfect for narrative podcasting, people-first customer guidance, and emotionally real brand storytelling."
+  },
+  {
+    "voice_id": "Nate",
+    "name": "Nate — English",
+    "language_id": "en",
+    "description": "Conversational, sociable male voice, great for customer support and friendly guidance"
+  },
+  {
+    "voice_id": "1framework__design-voice-8cfd2558",
+    "name": "Old pirate — English",
+    "language_id": "en",
+    "description": "Oled pirate voice"
+  },
+  {
+    "voice_id": "Oliver",
+    "name": "Oliver — English",
+    "language_id": "en",
+    "description": "Neutral and clear male voice, ideal for public announcements and educational information."
+  },
+  {
+    "voice_id": "Olivia",
+    "name": "Olivia — English",
+    "language_id": "en",
+    "description": "Young, British female with a friendly and helpful tone, conveying confidence and efficiency."
+  },
+  {
+    "voice_id": "Pippa",
+    "name": "Pippa — English",
+    "language_id": "en",
+    "description": "Friendly and casual Australian female voice, ideal for relaxed instructional content."
+  },
+  {
+    "voice_id": "Pixie",
+    "name": "Pixie — English",
+    "language_id": "en",
+    "description": "High-pitched, childlike female voice with a squeaky quality - great for a cartoon character"
+  },
+  {
+    "voice_id": "Priya",
+    "name": "Priya — English",
+    "language_id": "en",
+    "description": "Even-toned female voice with an Indian accent"
+  },
+  {
+    "voice_id": "1framework__qwen5",
+    "name": "Qwen5 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Reed",
+    "name": "Reed — English",
+    "language_id": "en",
+    "description": "Clear, professional American male voice, well-suited for support and training."
+  },
+  {
+    "voice_id": "Riley",
+    "name": "Riley — English",
+    "language_id": "en",
+    "description": "Playful, youthful female voice, perfect for animated storytelling, upbeat game characters, and high-energy kid-focused digital content."
+  },
+  {
+    "voice_id": "1framework__robv_clone1",
+    "name": "Robv_Clone1 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Ronald",
+    "name": "Ronald — English",
+    "language_id": "en",
+    "description": "Confident, British man with a deep, gravelly voice"
+  },
+  {
+    "voice_id": "Rupert",
+    "name": "Rupert — English",
+    "language_id": "en",
+    "description": "Resonant, commanding British male voice, ideal for motivational speeches, epic film trailers, and dynamic corporate presentations."
+  },
+  {
+    "voice_id": "1framework__russel",
+    "name": "Russel — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__russel_from_storage",
+    "name": "Russel_from_storage — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__russel_v2",
+    "name": "Russel_v2 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Saanvi",
+    "name": "Saanvi — English",
+    "language_id": "en",
+    "description": "Crisp, articulate Indian female voice, ideal for dynamic e-learning modules, articulate documentary narrations, and vibrant travel vlogs."
+  },
+  {
+    "voice_id": "1framework__salient_clone_example",
+    "name": "Salient Clone Example — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Sarah",
+    "name": "Sarah — English",
+    "language_id": "en",
+    "description": "Fast-talking young adult woman, with a questioning and curious tone"
+  },
+  {
+    "voice_id": "1framework__scott_general",
+    "name": "Scott_general — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Sebastian",
+    "name": "Sebastian — English",
+    "language_id": "en",
+    "description": "Intimidating, steely male voice, perfect for ruthless antagonists, strategic power struggles, and chilling monologues."
+  },
+  {
+    "voice_id": "Selene",
+    "name": "Selene — English",
+    "language_id": "en",
+    "description": "Soft, flirtatious female voice, ideal for companion-style interactions, charming game dialogue, and emotionally playful character-driven story scenes."
+  },
+  {
+    "voice_id": "Serena",
+    "name": "Serena — English",
+    "language_id": "en",
+    "description": "Soft, nurturing female voice, perfect for mindfulness sessions, nature-inspired visualizations, and gentle wellness podcasts."
+  },
+  {
+    "voice_id": "Shaun",
+    "name": "Shaun — English",
+    "language_id": "en",
+    "description": "Friendly, dynamic male voice great for conversations"
+  },
+  {
+    "voice_id": "Simon",
+    "name": "Simon — English",
+    "language_id": "en",
+    "description": "Articulate, insightful male voice, perfect for corporate presentations, technical tutorials, and steady news reporting."
+  },
+  {
+    "voice_id": "Snik",
+    "name": "Snik — English",
+    "language_id": "en",
+    "description": "Hoarse, cunning male voice, perfect for devious goblin roles, fantasy heist scenarios, and trickster-themed animations."
+  },
+  {
+    "voice_id": "Sophie",
+    "name": "Sophie — English",
+    "language_id": "en",
+    "description": "Friendly British female voice, great for assistance and knowledge sharing."
+  },
+  {
+    "voice_id": "1framework__steve_general",
+    "name": "Steve_general — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__steve_positive",
+    "name": "Steve_positive — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__steve_surprized",
+    "name": "Steve_surprized — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__steve_teasing",
+    "name": "Steve_teasing — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__support",
+    "name": "Support — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Tessa",
+    "name": "Tessa — English",
+    "language_id": "en",
+    "description": "Upbeat, conversational Australian female voice, perfect for lifestyle vlogs, playful advertisements, and engaging social media content."
+  },
+  {
+    "voice_id": "1framework__test",
+    "name": "Test — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__design-voice-9841e8d7",
+    "name": "Test 124566 — English",
+    "language_id": "en",
+    "description": "A patient, helpful female voice with neutral American accent, 25-40 years old. Warm, friendly tone with genuine empathy. Professional yet approachable. Skilled at conveying understanding and solutions."
+  },
+  {
+    "voice_id": "1framework__design-voice-6b045906",
+    "name": "Test 124566123123123123 — English",
+    "language_id": "en",
+    "description": "A patient, helpful female voice with neutral American accent, 25-40 years old. Warm, friendly tone with genuine empathy. Professional yet approachable. Skilled at conveying understanding and solutions."
+  },
+  {
+    "voice_id": "1framework__design-voice-d9cbe72a",
+    "name": "Test 124566212121 — English",
+    "language_id": "en",
+    "description": "A patient, helpful female voice with neutral American accent, 25-40 years old. Warm, friendly tone with genuine empathy. Professional yet approachable. Skilled at conveying understanding and solutions."
+  },
+  {
+    "voice_id": "1framework__design-voice-9aafcea0",
+    "name": "Test 12456622 — English",
+    "language_id": "en",
+    "description": "A mature male voice with a clear British accent, speaking at a steady pace and neutral tone. The timbre is warm and resonant, conveying a sense of calm and authority, suitable for narrations."
+  },
+  {
+    "voice_id": "1framework__test_audiodata_field_verification",
+    "name": "Test AudioData Field Verification — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__test_tags",
+    "name": "Test Tags — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__test_voice_full_fields-9dxae",
+    "name": "Test Voice Full Fields — English",
+    "language_id": "en",
+    "description": "A test voice created with all optional fields for comprehensive testing"
+  },
+  {
+    "voice_id": "1framework__test_voice_full_fields",
+    "name": "Test Voice Full Fields — English",
+    "language_id": "en",
+    "description": "A test voice created with all optional fields for comprehensive testing"
+  },
+  {
+    "voice_id": "1framework__test_voice_multiple_samples-n6t0n",
+    "name": "Test Voice Multiple Samples — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__test_voice_multiple_samples",
+    "name": "Test Voice Multiple Samples — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Theodore",
+    "name": "Theodore — English",
+    "language_id": "en",
+    "description": "Gravelly male voice, with a time-worn quality"
+  },
+  {
+    "voice_id": "Timothy",
+    "name": "Timothy — English",
+    "language_id": "en",
+    "description": "Lively, upbeat American male voice"
+  },
+  {
+    "voice_id": "Trevor",
+    "name": "Trevor — English",
+    "language_id": "en",
+    "description": "Punchy, expressive male voice, perfect for energetic promos, announcer-driven reveals, and fast-moving scripted event intros."
+  },
+  {
+    "voice_id": "Tristan",
+    "name": "Tristan — English",
+    "language_id": "en",
+    "description": "Deliberate, controlled male voice, ideal for documentary narration, polished voiceover campaigns, and clear long-form infomercial storytelling."
+  },
+  {
+    "voice_id": "Tyler",
+    "name": "Tyler — English",
+    "language_id": "en",
+    "description": "Authoritative, insightful male voice, ideal for tech explainer videos, in-depth software reviews, and dynamic coding guides."
+  },
+  {
+    "voice_id": "1framework__test_voice_en_us-suywg",
+    "name": "Updated Test Voice — English",
+    "language_id": "en",
+    "description": "Updated description for testing"
+  },
+  {
+    "voice_id": "1framework__test_voice_en_us",
+    "name": "Updated Test Voice — English",
+    "language_id": "en",
+    "description": "Updated description for testing"
+  },
+  {
+    "voice_id": "1framework__valeria-czofz",
+    "name": "Valeria — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__valeria-fp1nf",
+    "name": "Valeria — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__valeria-rsh29",
+    "name": "Valeria — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__valeria",
+    "name": "Valeria — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__valeria_nextday",
+    "name": "Valeria_nextday — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Veronica",
+    "name": "Veronica — English",
+    "language_id": "en",
+    "description": "Intimidating, commanding female voice, perfect for ruthless antagonists, high-stakes negotiations, and chilling monologues."
+  },
+  {
+    "voice_id": "Victor",
+    "name": "Victor — English",
+    "language_id": "en",
+    "description": "Ominous, sinister male voice, ideal for dark conspiracies, eerie suspense scenes, and enigmatic villain roles."
+  },
+  {
+    "voice_id": "Victoria",
+    "name": "Victoria — English",
+    "language_id": "en",
+    "description": "Silky, cunning British female voice, ideal for narrating intricate plots"
+  },
+  {
+    "voice_id": "Vinny",
+    "name": "Vinny — English",
+    "language_id": "en",
+    "description": "Gritty, assertive New York male voice, perfect for crime dramas, urban documentaries, and no-nonsense character roles."
+  },
+  {
+    "voice_id": "1framework__volley_clone",
+    "name": "Volley Clone — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Wendy",
+    "name": "Wendy — English",
+    "language_id": "en",
+    "description": "Posh, middle-aged British female voice"
+  },
+  {
+    "voice_id": "1framework__yan-vjyjy",
+    "name": "Yan — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__yan",
+    "name": "Yan — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__zf",
+    "name": "ZF — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__asdfasd",
+    "name": "asdfasd — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__asdfasdf-ttrhi",
+    "name": "asdfasdf — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__asdfasdf",
+    "name": "asdfasdf — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__cale_demo",
+    "name": "cale_demo — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__cale_test_1",
+    "name": "cale_test_1 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__character_ai_diego_one",
+    "name": "character_ai_diego_one — English",
+    "language_id": "en",
+    "description": "This is the first voice cloning prompt from Diego"
+  },
+  {
+    "voice_id": "1framework__clone2",
+    "name": "clone2 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__clone_customer",
+    "name": "clone_customer — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__clone_sarah_test",
+    "name": "clone_sarah_test — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__customer_clone_short",
+    "name": "customer_clone_short — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__customer_voice",
+    "name": "customer_voice — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__eau",
+    "name": "eau — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__ed",
+    "name": "ed — English",
+    "language_id": "en",
+    "description": "mindmax.ai voice that has extra sentences"
+  },
+  {
+    "voice_id": "1framework__jin9-5i3xf",
+    "name": "jin9 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__jin9",
+    "name": "jin9 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__jstest",
+    "name": "jsTest — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__julia_murder_mystery",
+    "name": "julia murder mystery — English",
+    "language_id": "en",
+    "description": "I keep replaying it in my head... the scream, the glass shattering, that silence after. What was I supposed to do, just stand there? I needed to stop him!"
+  },
+  {
+    "voice_id": "1framework__julia_murder_mystery_2",
+    "name": "julia murder mystery 2 — English",
+    "language_id": "en",
+    "description": "I keep replaying it in my head... the scream, the glass shattering, that silence after. What was I supposed to do, just stand there? I needed to stop him! But it was already too late."
+  },
+  {
+    "voice_id": "1framework__julia_murder_mystery_3",
+    "name": "julia murder mystery 3 — English",
+    "language_id": "en",
+    "description": "I keep replaying it in my head... the scream, the glass shattering, that silence after. What was I supposed to do, just stand there? I needed to stop him! But it was already too late. It's time to mov"
+  },
+  {
+    "voice_id": "1framework__luvu_en-dz3kz",
+    "name": "luvu_en — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__luvu_en",
+    "name": "luvu_en — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__newvoice2",
+    "name": "newVoice2 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__reproduce_eng",
+    "name": "reproduce_eng — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__shaun",
+    "name": "shaun — English",
+    "language_id": "en",
+    "description": "test"
+  },
+  {
+    "voice_id": "1framework__shaun_v2",
+    "name": "shaun_v2 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__shaun_v3",
+    "name": "shaun_v3 — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__siimnaks_boring_history",
+    "name": "siimnaks_boring_history — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__test-1onux",
+    "name": "test — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__test_clone",
+    "name": "test clone — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__test_clone-m5iuk",
+    "name": "test_clone — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "1framework__try_clone",
+    "name": "try clone — English",
+    "language_id": "en"
+  },
+  {
+    "voice_id": "Nour",
+    "name": "Nour — Arabic",
+    "language_id": "ar",
+    "description": "Polished female Arabic voice with a friendly tone, great for voice over or support."
+  },
+  {
+    "voice_id": "Omar",
+    "name": "Omar — Arabic",
+    "language_id": "ar",
+    "description": "Bright, confident Arabic male voice, great for announcements, broadcasts, and voice overs."
+  },
+  {
+    "voice_id": "1framework__dba_robot_zh_v3",
+    "name": "DBA_Robot_Zh_v3 — Chinese",
+    "language_id": "zh"
+  },
+  {
+    "voice_id": "Jing",
+    "name": "Jing — Chinese",
+    "language_id": "zh",
+    "description": "An energetic, fast-paced young Chinese female"
+  },
+  {
+    "voice_id": "Xiaoyin",
+    "name": "Xiaoyin — Chinese",
+    "language_id": "zh",
+    "description": "A youthful Chinese female voice with a gentle, sweet voice"
+  },
+  {
+    "voice_id": "Xinyi",
+    "name": "Xinyi — Chinese",
+    "language_id": "zh",
+    "description": "A Chinese woman with a neutral tone, perfect for narrations"
+  },
+  {
+    "voice_id": "Yichen",
+    "name": "Yichen — Chinese",
+    "language_id": "zh",
+    "description": "A calm, flat young adult male Chinese voice"
+  },
+  {
+    "voice_id": "1framework__yan3",
+    "name": "yan3 — Chinese",
+    "language_id": "zh"
+  },
+  {
+    "voice_id": "Erik",
+    "name": "Erik — Dutch",
+    "language_id": "nl",
+    "description": "Older Dutch male voice with a weathered edge"
+  },
+  {
+    "voice_id": "Katrien",
+    "name": "Katrien — Dutch",
+    "language_id": "nl",
+    "description": "Dutch woman with an expressive voice"
+  },
+  {
+    "voice_id": "Lennart",
+    "name": "Lennart — Dutch",
+    "language_id": "nl",
+    "description": "A confident Dutch male voice. Calm and relaxed"
+  },
+  {
+    "voice_id": "Lore",
+    "name": "Lore — Dutch",
+    "language_id": "nl",
+    "description": "Clear, calm Dutch female voice, great for narrations and professional use cases"
+  },
+  {
+    "voice_id": "Alain",
+    "name": "Alain — French",
+    "language_id": "fr",
+    "description": "Deep, smooth middle-aged male French voice. Composed and calm"
+  },
+  {
+    "voice_id": "Hélène",
+    "name": "Hélène — French",
+    "language_id": "fr",
+    "description": "Middle-aged French woman, with a smooth, musical, and graceful voice"
+  },
+  {
+    "voice_id": "1framework__louis",
+    "name": "Louis — French",
+    "language_id": "fr"
+  },
+  {
+    "voice_id": "Mathieu",
+    "name": "Mathieu — French",
+    "language_id": "fr",
+    "description": "A French male voice carrying a nasal quality"
+  },
+  {
+    "voice_id": "Étienne",
+    "name": "Étienne — French",
+    "language_id": "fr",
+    "description": "Calm young adult French male"
+  },
+  {
+    "voice_id": "Johanna",
+    "name": "Johanna — German",
+    "language_id": "de",
+    "description": "A calm older German female with a low, smoky voice"
+  },
+  {
+    "voice_id": "Josef",
+    "name": "Josef — German",
+    "language_id": "de",
+    "description": "An articulate German male voice with an announcer-like quality"
+  },
+  {
+    "voice_id": "Oren",
+    "name": "Oren — Hebrew",
+    "language_id": "he",
+    "description": "Steady male Hebrew voice, great for podcasts, voice overs, or announcers."
+  },
+  {
+    "voice_id": "Yael",
+    "name": "Yael — Hebrew",
+    "language_id": "he",
+    "description": "Mid-range female Hebrew voice, suitable for narrations, storytelling, and more."
+  },
+  {
+    "voice_id": "1framework__he333",
+    "name": "he333 — Hebrew",
+    "language_id": "he"
+  },
+  {
+    "voice_id": "1framework__he_dev",
+    "name": "he_dev — Hebrew",
+    "language_id": "he"
+  },
+  {
+    "voice_id": "Manoj",
+    "name": "Manoj — Hindi",
+    "language_id": "hi",
+    "description": "Clear, professional Hindi male voice. Great for narrations, news anchors, and customer service."
+  },
+  {
+    "voice_id": "Riya",
+    "name": "Riya — Hindi",
+    "language_id": "hi",
+    "description": "Professional and clean female voice, with a clear and articulate tone, moderate pace, and a polished, approachable quality."
+  },
+  {
+    "voice_id": "1framework__dba_robot_it_v3",
+    "name": "DBA_Robot_It_v3 — Italian",
+    "language_id": "it"
+  },
+  {
+    "voice_id": "Gianni",
+    "name": "Gianni — Italian",
+    "language_id": "it",
+    "description": "Deep, smooth Italian male voice that speaks rapidly"
+  },
+  {
+    "voice_id": "Orietta",
+    "name": "Orietta — Italian",
+    "language_id": "it",
+    "description": "Calm adult female Italian voice, with a soothing cadence"
+  },
+  {
+    "voice_id": "Asuka",
+    "name": "Asuka — Japanese",
+    "language_id": "ja",
+    "description": "Friendly, young adult Japanese female voice"
+  },
+  {
+    "voice_id": "1framework__dba_robot_ja_v3",
+    "name": "DBA_Robot_Ja_v3 — Japanese",
+    "language_id": "ja"
+  },
+  {
+    "voice_id": "Satoshi",
+    "name": "Satoshi — Japanese",
+    "language_id": "ja",
+    "description": "Dramatic, expressive male Japanese voice filled with energy"
+  },
+  {
+    "voice_id": "Hyunwoo",
+    "name": "Hyunwoo — Korean",
+    "language_id": "ko",
+    "description": "Young adult Korean male voice"
+  },
+  {
+    "voice_id": "Minji",
+    "name": "Minji — Korean",
+    "language_id": "ko",
+    "description": "Energetic, friendly young Korean female voice"
+  },
+  {
+    "voice_id": "Seojun",
+    "name": "Seojun — Korean",
+    "language_id": "ko",
+    "description": "Clear, deep mature Korean male voice"
+  },
+  {
+    "voice_id": "Yoona",
+    "name": "Yoona — Korean",
+    "language_id": "ko",
+    "description": "Korean woman with a gentle, soothing voice"
+  },
+  {
+    "voice_id": "Szymon",
+    "name": "Szymon — Polish",
+    "language_id": "pl",
+    "description": "Polish adult male voice with a warm, friendly quality"
+  },
+  {
+    "voice_id": "Wojciech",
+    "name": "Wojciech — Polish",
+    "language_id": "pl",
+    "description": "A middle-aged Polish male voice"
+  },
+  {
+    "voice_id": "1framework__dba_robot_pt_v3",
+    "name": "DBA_Robot_Pt_v3 — Portuguese",
+    "language_id": "pt"
+  },
+  {
+    "voice_id": "Heitor",
+    "name": "Heitor — Portuguese",
+    "language_id": "pt",
+    "description": "Composed Portuguese-speaking male voice with a neutral tone"
+  },
+  {
+    "voice_id": "Maitê",
+    "name": "Maitê — Portuguese",
+    "language_id": "pt",
+    "description": "Middle-aged Portuguese-speaking female voice"
+  },
+  {
+    "voice_id": "1framework__dba_robot_ru_v3",
+    "name": "DBA_Robot_Ru_v3 — Russian",
+    "language_id": "ru"
+  },
+  {
+    "voice_id": "Dmitry",
+    "name": "Dmitry — Russian",
+    "language_id": "ru",
+    "description": "Deep, gravelly male voice, delivered at a moderate pace with a commanding and narrative tone."
+  },
+  {
+    "voice_id": "Elena",
+    "name": "Elena — Russian",
+    "language_id": "ru",
+    "description": "Clear, mid-range female voice, with a smooth texture and a neutral, informational tone."
+  },
+  {
+    "voice_id": "Nikolai",
+    "name": "Nikolai — Russian",
+    "language_id": "ru",
+    "description": "Deep, resonant male voice, delivered at a measured pace with a clear, theatrical, and narrative quality."
+  },
+  {
+    "voice_id": "Svetlana",
+    "name": "Svetlana — Russian",
+    "language_id": "ru",
+    "description": "Soft, high-pitched female voice, with a moderate pace and slightly breathy quality."
+  },
+  {
+    "voice_id": "1framework__valeria-7m3gl",
+    "name": "Valeria — Russian",
+    "language_id": "ru"
+  },
+  {
+    "voice_id": "1framework__geck1",
+    "name": "geck1 — Russian",
+    "language_id": "ru",
+    "description": "geck1"
+  },
+  {
+    "voice_id": "1framework__geck2",
+    "name": "geck2 — Russian",
+    "language_id": "ru"
+  },
+  {
+    "voice_id": "1framework__kirill",
+    "name": "kirill — Russian",
+    "language_id": "ru"
+  },
+  {
+    "voice_id": "1framework__ru7ssain",
+    "name": "ru7ssain — Russian",
+    "language_id": "ru"
+  },
+  {
+    "voice_id": "1framework__aak1",
+    "name": "AAK1 — Spanish",
+    "language_id": "es"
+  },
+  {
+    "voice_id": "1framework__dba_robot_es_v3",
+    "name": "DBA_Robot_Es_v3 — Spanish",
+    "language_id": "es"
+  },
+  {
+    "voice_id": "Diego",
+    "name": "Diego — Spanish",
+    "language_id": "es",
+    "description": "Spanish-speaking male voice with a soothing, gentle quality"
+  },
+  {
+    "voice_id": "Lupita",
+    "name": "Lupita — Spanish",
+    "language_id": "es",
+    "description": "Vibrant, energetic young Spanish-speaking female voice"
+  },
+  {
+    "voice_id": "1framework__mario",
+    "name": "Mario — Spanish",
+    "language_id": "es"
+  },
+  {
+    "voice_id": "Miguel",
+    "name": "Miguel — Spanish",
+    "language_id": "es",
+    "description": "A calm adult Spanish-speaking male voice, perfect for storytelling"
+  },
+  {
+    "voice_id": "Rafael",
+    "name": "Rafael — Spanish",
+    "language_id": "es",
+    "description": "Middle-aged Spanish-speaking male with a deep, composed voice. Great for narrations"
+  },
+  {
+    "voice_id": "1framework__valeria-gtovx",
+    "name": "Valeria — Spanish",
+    "language_id": "es"
+  }
+]
