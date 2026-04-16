@@ -24,8 +24,12 @@ const (
 	INWORLD_STREAM_URL = "https://api.inworld.ai/tts/v1/voice:stream"
 
 	// Defaults chosen to match Rapida's pcm_16000 encoding used by elevenlabs
-	// and cartesia. Inworld's LINEAR16 @ 16000 Hz is byte-for-byte equivalent.
-	INWORLD_AUDIO_ENCODING = "LINEAR16"
+	// and cartesia. Inworld's PCM encoding is raw little-endian 16-bit
+	// samples with no container — byte-for-byte what the Rapida pipeline
+	// already consumes. (LINEAR16 is the same samples but wraps every
+	// streaming NDJSON chunk in a RIFF/WAVE header, which would have to
+	// be stripped to avoid clicks; PCM avoids the wrapper entirely.)
+	INWORLD_AUDIO_ENCODING = "PCM"
 	INWORLD_SAMPLE_RATE    = 16000
 
 	// INWORLD_USER_AGENT identifies traffic originating from the Rapida
@@ -83,7 +87,8 @@ func (co *inworldOption) GetKey() string {
 }
 
 // GetEncoding returns Rapida's canonical encoding identifier. Inworld's
-// LINEAR16 @ 16000 Hz is equivalent to pcm_16000.
+// PCM @ 16000 Hz is raw little-endian 16-bit samples — identical to
+// pcm_16000.
 func (co *inworldOption) GetEncoding() string {
 	return "pcm_16000"
 }

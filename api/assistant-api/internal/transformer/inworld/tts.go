@@ -473,12 +473,7 @@ func (it *inworldTTS) decodeChunk(line []byte) ([]byte, error) {
 		it.logger.Errorf("inworld-tts: base64 decode: %v", err)
 		return nil, nil
 	}
-	// Inworld wraps each LINEAR16 payload in a minimal RIFF/WAVE
-	// container — concatenating those verbatim embeds a WAV header every
-	// few milliseconds and produces audible clicks. pcmFromStreamChunk
-	// extracts the `data` subchunk when a RIFF wrapper is present and
-	// passes bare PCM through untouched.
-	return pcmFromStreamChunk(audio), nil
+	return audio, nil
 }
 
 // maybeEmitFirstChunkMetric emits the one-shot tts_latency_ms metric for

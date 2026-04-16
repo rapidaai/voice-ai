@@ -15,7 +15,7 @@
 package inworld_internal
 
 // AudioConfig controls Inworld's output audio encoding and sample rate.
-// LINEAR16 @ 16000 Hz matches Rapida's pcm_16000 expectation used by
+// PCM @ 16000 Hz matches Rapida's pcm_16000 expectation used by
 // elevenlabs and cartesia transformers.
 type AudioConfig struct {
 	AudioEncoding   string `json:"audio_encoding"`
