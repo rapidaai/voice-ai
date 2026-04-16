@@ -854,3 +854,47 @@ func TestInworldTTSDuplicateDone(t *testing.T) {
 	assert.Equal(t, 1, len(collector.endsForCtx("ctx-dup")),
 		"duplicate Done must not emit a second terminal end packet")
 }
+
+// --- WAV-wrapped chunks are stripped before emission ---
+
+// TestInworldTTSStripsPerChunkWAVHeader exercises the whole decode
+// path with a response that wraps each LINEAR16 payload in a RIFF/WAVE
+// container — the shape Inworld actually sends. The audio packet
+// handed to the consumer must contain ONLY the data subchunk bytes;
+// concatenating two WAV-wrapped chunks verbatim would duplicate the
+// header and produce clicks downstream.
+func TestInworldTTSStripsPerChunkWAVHeader(t *testing.T) {
+	pcm1 := []byte{0x01, 0x00, 0x02, 0x00, 0x03, 0x00}
+	pcm2 := []byte{0x10, 0x00, 0x20, 0x00}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		w.WriteHeader(http.StatusOK)
+		// Each chunk is a complete mini-WAV, as Inworld returns them.
+		writeAudioLine(t, w, buildMinimalWAV(t, pcm1))
+		writeAudioLine(t, w, buildMinimalWAV(t, pcm2))
+	}))
+	defer srv.Close()
+
+	collector := &packetCollector{}
+	iw := newTestInworldTTS(context.Background(), srv.URL, collector)
+	defer iw.Close(context.Background())
+
+	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDeltaPacket{
+		ContextID: "ctx-wav",
+		Text:      "hi.",
+	}))
+	require.NoError(t, iw.Transform(context.Background(), internal_type.LLMResponseDonePacket{
+		ContextID: "ctx-wav",
+	}))
+
+	require.True(t, waitFor(t, 2*time.Second, func() bool {
+		return len(collector.endsForCtx("ctx-wav")) > 0
+	}), "WAV-stripped chunks should still complete the turn")
+
+	audio := collector.audioForCtx("ctx-wav")
+	require.Len(t, audio, 2, "both chunks should flow through")
+	assert.Equal(t, pcm1, audio[0].AudioChunk,
+		"first audio packet must contain only the data subchunk bytes")
+	assert.Equal(t, pcm2, audio[1].AudioChunk,
+		"second audio packet must contain only the data subchunk bytes")
+}
