@@ -68,19 +68,6 @@
       "helpText": "Controls randomness of audio token sampling. Higher values are more expressive; lower values are more deterministic."
     },
     {
-      "key": "speak.timestampType",
-      "label": "Timestamp Type",
-      "type": "select",
-      "required": false,
-      "advanced": true,
-      "helpText": "Controls timestamp metadata for word-highlighting, captions, or lipsync. Enabling adds latency.",
-      "choices": [
-        { "label": "None", "value": "" },
-        { "label": "Word", "value": "WORD" },
-        { "label": "Character", "value": "CHARACTER" }
-      ]
-    },
-    {
       "key": "speak.applyTextNormalization",
       "label": "Text Normalization",
       "type": "select",
@@ -93,18 +80,5 @@
         { "label": "Off", "value": "OFF" }
       ]
     },
-    {
-      "key": "speak.timestampTransportStrategy",
-      "label": "Timestamp Transport",
-      "type": "select",
-      "required": false,
-      "advanced": true,
-      "helpText": "Controls how timestamps are delivered. Async reduces first-chunk latency with v1.5+ models.",
-      "choices": [
-        { "label": "Auto", "value": "" },
-        { "label": "Sync", "value": "SYNC" },
-        { "label": "Async", "value": "ASYNC" }
-      ]
-    }
   ]
 }
