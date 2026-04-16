@@ -587,8 +587,9 @@
         "code": "minimax",
         "name": "MiniMax",
         "image": "https://rapida-assets-01.s3.ap-south-1.amazonaws.com/providers/minimax.png",
-        "description": "MiniMax provides advanced text-to-speech synthesis with streaming SSE support and multiple voice options.",
+        "description": "MiniMax provides advanced AI models for text generation and text-to-speech synthesis with streaming SSE support.",
         "featureList": [
+            "text",
             "tts",
             "external"
         ],

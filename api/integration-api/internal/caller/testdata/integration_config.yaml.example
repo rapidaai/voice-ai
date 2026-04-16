@@ -73,6 +73,13 @@ chat:
     options:
       model.name: "meta-llama/Meta-Llama-3-8B-Instruct"
 
+  minimax:
+    enabled: false
+    credential:
+      key: "..."
+    options:
+      model.name: "MiniMax-M2.7"
+
 # ─── Embeddings ────────────────────────────────────────────────────────────────
 embedding:
   openai:
@@ -201,6 +208,11 @@ verify:
       key: "hf_..."
 
   voyageai:
+    enabled: false
+    credential:
+      key: "..."
+
+  minimax:
     enabled: false
     credential:
       key: "..."

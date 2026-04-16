@@ -38,8 +38,8 @@ Rapida is written in **Go**, using the highly optimized [gRPC](https://github.co
 - **Real-time Voice Orchestration**  
   Stream and process audio with low latency using GRPC.
 
-- **LLM-Agnostic Architecture**  
-  Bring your own model—OpenAI, Anthropic, open-source models, or custom inference.
+- **LLM-Agnostic Architecture**
+  Bring your own model—OpenAI, Anthropic, MiniMax, open-source models, or custom inference.
 
 - **Production-grade Reliability**  
   Built-in retries, error handling, call lifecycle management, and health checks.
@@ -161,7 +161,7 @@ Edit environment files before starting:
 - `docker/integration-api/.integration.env` - Integration API (port 9004)
 - `docker/document-api/config.yaml` - Document API (port 9010)
 
-Add your API keys (OpenAI, Anthropic, Deepgram, Twilio, etc.) in these files.
+Add your API keys (OpenAI, Anthropic, MiniMax, Deepgram, Twilio, etc.) in these files.
 
 ---
 
