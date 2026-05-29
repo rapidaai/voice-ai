@@ -141,9 +141,17 @@ func (s *Server) handleInvite(req *sip.Request, tx sip.ServerTransaction) {
 	for k, v := range resolvedExtra {
 		session.SetMetadata(k, v)
 	}
+	session.SetMetadata(MetadataCallFromURI, fromURI)
+	session.SetMetadata(MetadataCallToURI, toURI)
 
 	// Register session and lifecycle hooks.
 	s.registerSession(session, callID)
+	s.mu.RLock()
+	onCreated := s.onCreated
+	s.mu.RUnlock()
+	if onCreated != nil {
+		onCreated(session, fromURI, toURI)
+	}
 
 	if s.isInviteCancelled(callID) {
 		s.terminatePendingInvite(callID, 487)
@@ -174,6 +182,12 @@ func (s *Server) handleInvite(req *sip.Request, tx sip.ServerTransaction) {
 		}
 	}
 	s.setCallState(session, CallStateRinging, "inbound_invite_ringing")
+	s.mu.RLock()
+	onRinging := s.onRinging
+	s.mu.RUnlock()
+	if onRinging != nil {
+		onRinging(session, fromURI, toURI)
+	}
 
 	s.logger.Debugw("Parsed remote SDP",
 		"call_id", callID,
@@ -185,6 +199,7 @@ func (s *Server) handleInvite(req *sip.Request, tx sip.ServerTransaction) {
 	rtpPort, err := s.rtpAllocator.Allocate()
 	if err != nil {
 		s.logger.Errorw("No RTP ports available", "error", err, "call_id", callID)
+		s.notifyError(session, err)
 		s.removeSession(callID)
 		s.sendResponse(tx, req, 503) // Service Unavailable
 		return
@@ -205,6 +220,7 @@ func (s *Server) handleInvite(req *sip.Request, tx sip.ServerTransaction) {
 	if err != nil {
 		s.rtpAllocator.Release(rtpPort)
 		s.logger.Errorw("Failed to create RTP handler", "error", err, "call_id", callID)
+		s.notifyError(session, err)
 		s.removeSession(callID)
 		s.sendResponse(tx, req, 500)
 		return
@@ -227,6 +243,8 @@ func (s *Server) handleInvite(req *sip.Request, tx sip.ServerTransaction) {
 
 	// Start RTP processing
 	rtpHandler.Start()
+	// NOTE: do not emit call.media.started here. Local RTP startup does not
+	// guarantee that real media packets have started flowing yet.
 
 	// Generate SDP for response — advertise the negotiated codec only.
 	// Using NegotiatedSDPConfig ensures we confirm the codec we agreed upon,
@@ -257,6 +275,12 @@ func (s *Server) handleInvite(req *sip.Request, tx sip.ServerTransaction) {
 	}
 	s.clearPendingInvite(callID)
 	s.setCallState(session, CallStateConnected, "inbound_invite_answered")
+	s.mu.RLock()
+	onAnswered := s.onAnswered
+	s.mu.RUnlock()
+	if onAnswered != nil {
+		onAnswered(session, fromURI, toURI)
+	}
 
 	s.logger.Infow("SIP call answered",
 		"call_id", callID,

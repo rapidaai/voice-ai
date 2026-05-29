@@ -49,6 +49,7 @@ type Dispatcher struct {
 	onCallStart          OnCallStartFunc
 	onCallEnd            OnCallEndFunc
 	onCreateObserver     OnCreateObserverFunc
+	onLifecycleWebhook   OnLifecycleWebhookFunc
 }
 
 type DIDResolverFunc func(did string) (assistantID uint64, auth types.SimplePrinciple, err error)
@@ -90,6 +91,7 @@ type OnCallStartFunc func(ctx context.Context, session *sip_infra.Session, setup
 type OnCallEndFunc func(callID string)
 
 type OnCreateObserverFunc func(ctx context.Context, setup *CallSetupResult, auth types.SimplePrinciple) *observe.ConversationObserver
+type OnLifecycleWebhookFunc func(ctx context.Context, eventType string, session *sip_infra.Session, payload map[string]interface{})
 
 type DispatcherConfig struct {
 	Logger               commons.Logger
@@ -103,6 +105,7 @@ type DispatcherConfig struct {
 	OnCallStart          OnCallStartFunc
 	OnCallEnd            OnCallEndFunc
 	OnCreateObserver     OnCreateObserverFunc
+	OnLifecycleWebhook   OnLifecycleWebhookFunc
 }
 
 // TransferServer is the minimal SIP infra surface required by transfer orchestration.
@@ -128,6 +131,7 @@ func NewDispatcher(cfg *DispatcherConfig) *Dispatcher {
 		onCallStart:          cfg.OnCallStart,
 		onCallEnd:            cfg.OnCallEnd,
 		onCreateObserver:     cfg.OnCreateObserver,
+		onLifecycleWebhook:   cfg.OnLifecycleWebhook,
 		signalCh:             make(chan callEnvelope, signalChSize),
 		setupCh:              make(chan callEnvelope, setupChSize),
 		mediaCh:              make(chan callEnvelope, mediaChSize),
@@ -147,10 +151,19 @@ func (d *Dispatcher) OnPipeline(ctx context.Context, stages ...sip_infra.Pipelin
 	for _, s := range stages {
 		e := callEnvelope{ctx: ctx, p: s}
 		switch s.(type) {
-		case sip_infra.ByeReceivedPipeline,
+		case sip_infra.CallCreatedPipeline,
+			sip_infra.CallRingingPipeline,
+			sip_infra.CallAnsweredPipeline,
+			sip_infra.CallMediaStartedPipeline,
+			sip_infra.ByeReceivedPipeline,
 			sip_infra.CancelReceivedPipeline,
+			sip_infra.TransferRequestedPipeline,
 			sip_infra.TransferInitiatedPipeline,
+			sip_infra.TransferAttemptStartedPipeline,
+			sip_infra.TransferTargetRingingPipeline,
 			sip_infra.TransferConnectedPipeline,
+			sip_infra.TransferAttemptEndedPipeline,
+			sip_infra.TransferCancelledPipeline,
 			sip_infra.TransferFailedPipeline,
 			sip_infra.CallEndedPipeline,
 			sip_infra.CallFailedPipeline:
@@ -193,16 +206,34 @@ func (d *Dispatcher) drain(ch chan callEnvelope) {
 
 func (d *Dispatcher) dispatch(ctx context.Context, p sip_infra.Pipeline) {
 	switch v := p.(type) {
+	case sip_infra.CallCreatedPipeline:
+		d.handleCallCreated(ctx, v)
+	case sip_infra.CallRingingPipeline:
+		d.handleCallRinging(ctx, v)
+	case sip_infra.CallAnsweredPipeline:
+		d.handleCallAnswered(ctx, v)
+	case sip_infra.CallMediaStartedPipeline:
+		d.handleCallMediaStarted(ctx, v)
 	case sip_infra.SessionEstablishedPipeline:
 		d.handleSessionEstablished(ctx, v)
 	case sip_infra.ByeReceivedPipeline:
 		d.handleByeReceived(ctx, v)
 	case sip_infra.CancelReceivedPipeline:
 		d.handleCancelReceived(ctx, v)
+	case sip_infra.TransferRequestedPipeline:
+		d.handleTransferRequested(ctx, v)
 	case sip_infra.TransferInitiatedPipeline:
 		d.handleTransferInitiated(ctx, v)
+	case sip_infra.TransferAttemptStartedPipeline:
+		d.handleTransferAttemptStarted(ctx, v)
+	case sip_infra.TransferTargetRingingPipeline:
+		d.handleTransferTargetRinging(ctx, v)
 	case sip_infra.TransferConnectedPipeline:
 		d.handleTransferConnected(ctx, v)
+	case sip_infra.TransferAttemptEndedPipeline:
+		d.handleTransferAttemptEnded(ctx, v)
+	case sip_infra.TransferCancelledPipeline:
+		d.handleTransferCancelled(ctx, v)
 	case sip_infra.TransferFailedPipeline:
 		d.handleTransferFailed(ctx, v)
 	case sip_infra.CallEndedPipeline:

@@ -301,6 +301,12 @@ const (
 	// outbound (B-leg) call created for the transfer.
 	MetadataBridgeTransferOutboundCallID = "bridge_transfer_outbound_call_id"
 
+	// MetadataCallFromURI stores the raw SIP From URI for lifecycle events.
+	MetadataCallFromURI = "call_from_uri"
+
+	// MetadataCallToURI stores the raw SIP To URI for lifecycle events.
+	MetadataCallToURI = "call_to_uri"
+
 	// PostTransferActionEndCall ends the inbound caller's session when the
 	// operator (transfer target) hangs up.
 	PostTransferActionEndCall = "end_call"

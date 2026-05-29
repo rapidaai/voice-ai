@@ -175,6 +175,9 @@ type Server struct {
 
 	// Event callbacks
 	onInvite func(session *Session, fromURI, toURI string) error
+	onCreated func(session *Session, fromURI, toURI string)
+	onRinging func(session *Session, fromURI, toURI string)
+	onAnswered func(session *Session, fromURI, toURI string)
 	onBye    func(session *Session) error
 	onCancel func(session *Session) error
 	onError  func(session *Session, err error)
@@ -523,6 +526,27 @@ func (s *Server) SetOnInvite(fn func(session *Session, fromURI, toURI string) er
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.onInvite = fn
+}
+
+// SetOnCreated sets the callback when a call session is created/registered.
+func (s *Server) SetOnCreated(fn func(session *Session, fromURI, toURI string)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onCreated = fn
+}
+
+// SetOnRinging sets the callback when a call reaches ringing state.
+func (s *Server) SetOnRinging(fn func(session *Session, fromURI, toURI string)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onRinging = fn
+}
+
+// SetOnAnswered sets the callback when a call is answered/connected.
+func (s *Server) SetOnAnswered(fn func(session *Session, fromURI, toURI string)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onAnswered = fn
 }
 
 // SetOnBye sets the callback for BYE requests
