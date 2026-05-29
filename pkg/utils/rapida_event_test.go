@@ -16,6 +16,23 @@ func TestAssistantWebhookEvent_Get(t *testing.T) {
 		{ConversationResume, "conversation.resume"},
 		{ConversationCompleted, "conversation.completed"},
 		{ConversationFailed, "conversation.failed"},
+		{CallCreated, "call.created"},
+		{CallRinging, "call.ringing"},
+		{CallAnswered, "call.answered"},
+		{CallMediaStarted, "call.media.started"},
+		{CallNoAnswer, "call.no_answer"},
+		{CallBusy, "call.busy"},
+		{CallRejected, "call.rejected"},
+		{CallCancelled, "call.cancelled"},
+		{CallEnded, "call.ended"},
+		{CallFailed, "call.failed"},
+		{TransferRequested, "transfer.requested"},
+		{TransferAttemptStarted, "transfer.attempt.started"},
+		{TransferTargetRinging, "transfer.target.ringing"},
+		{TransferConnected, "transfer.connected"},
+		{TransferAttemptEnded, "transfer.attempt.ended"},
+		{TransferCancelled, "transfer.cancelled"},
+		{TransferFailed, "transfer.failed"},
 	}
 
 	for _, tt := range tests {

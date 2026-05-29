@@ -16,10 +16,34 @@ import (
 )
 
 func (d *Dispatcher) handleTransferInitiated(ctx context.Context, v sip_infra.TransferInitiatedPipeline) {
+	if v.RoutingMode == "" {
+		v.RoutingMode = "sequential"
+	}
+	if v.TransferID == "" {
+		v.TransferID = fmt.Sprintf("transfer:%s", v.ID)
+	}
+	targets := v.Targets
+	if len(targets) == 0 && v.TargetURI != "" {
+		targets = []string{v.TargetURI}
+	}
+	d.OnPipeline(ctx, sip_infra.TransferRequestedPipeline{
+		ID:                 v.ID,
+		Session:            v.Session,
+		TransferID:         v.TransferID,
+		Targets:            targets,
+		RoutingMode:        v.RoutingMode,
+		PostTransferAction: v.PostTransferAction,
+	})
 	go d.executeTransfer(ctx, v)
 }
 
 func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_infra.TransferInitiatedPipeline) {
+	if v.RoutingMode == "" {
+		v.RoutingMode = "sequential"
+	}
+	if v.TransferID == "" {
+		v.TransferID = fmt.Sprintf("transfer:%s", v.ID)
+	}
 	d.logger.Infow("Pipeline: transfer_initiated",
 		"call_id", v.ID, "target", v.TargetURI)
 
@@ -30,6 +54,14 @@ func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_infra.TransferIn
 		if v.OnFailed != nil {
 			v.OnFailed()
 		}
+		d.OnPipeline(ctx, sip_infra.TransferFailedPipeline{
+			ID:          v.ID,
+			Session:     v.Session,
+			TransferID:  v.TransferID,
+			RoutingMode: v.RoutingMode,
+			Error:       fmt.Errorf("sip server unavailable"),
+			Reason:      "server_nil",
+		})
 		return
 	}
 
@@ -62,6 +94,17 @@ func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_infra.TransferIn
 		if v.OnAttempt != nil {
 			v.OnAttempt(target, attempt, len(targets))
 		}
+		d.OnPipeline(ctx, sip_infra.TransferAttemptStartedPipeline{
+			ID:          v.ID,
+			Session:     v.Session,
+			TransferID:  v.TransferID,
+			TargetURI:   target,
+			Attempt:     attempt,
+			Total:       len(targets),
+			RoutingMode: v.RoutingMode,
+		})
+		// TODO: emit TransferTargetRingingPipeline when bridge dialing exposes
+		// a reliable per-target ringing callback from SIP 180/183 progress.
 
 		// Each target gets its own BridgeCallTimeout. The overall budget is
 		// bounded by the inbound session context — if the caller hangs up
@@ -72,6 +115,19 @@ func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_infra.TransferIn
 		if err == nil {
 			outboundSession = session
 			connectedTarget = target
+			d.OnPipeline(ctx, sip_infra.TransferAttemptEndedPipeline{
+				ID:             v.ID,
+				Session:        v.Session,
+				TransferID:     v.TransferID,
+				AttemptID:      fmt.Sprintf("%s:%d", v.TransferID, attempt),
+				TargetURI:      target,
+				OutboundCallID: session.GetCallID(),
+				Attempt:        attempt,
+				Total:          len(targets),
+				RoutingMode:    v.RoutingMode,
+				State:          "connected",
+				Reason:         "connected",
+			})
 			break
 		}
 
@@ -88,6 +144,34 @@ func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_infra.TransferIn
 				"error":   err.Error(),
 			},
 		})
+		attemptState, attemptReason := classifyTransferAttemptFailure(err)
+		d.OnPipeline(ctx, sip_infra.TransferAttemptEndedPipeline{
+			ID:          v.ID,
+			Session:     v.Session,
+			TransferID:  v.TransferID,
+			AttemptID:   fmt.Sprintf("%s:%d", v.TransferID, attempt),
+			TargetURI:   target,
+			Attempt:     attempt,
+			Total:       len(targets),
+			RoutingMode: v.RoutingMode,
+			State:       attemptState,
+			Reason:      attemptReason,
+			Metadata: map[string]interface{}{
+				"error": err.Error(),
+			},
+		})
+		if attemptState == "cancelled" {
+			d.OnPipeline(ctx, sip_infra.TransferCancelledPipeline{
+				ID:          v.ID,
+				Session:     v.Session,
+				TransferID:  v.TransferID,
+				TargetURI:   target,
+				Attempt:     attempt,
+				Total:       len(targets),
+				RoutingMode: v.RoutingMode,
+				Reason:      attemptReason,
+			})
+		}
 
 		// Caller hung up or session ended — stop trying further targets.
 		if v.Session.Context().Err() != nil {
@@ -103,9 +187,12 @@ func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_infra.TransferIn
 			v.OnFailed()
 		}
 		d.OnPipeline(ctx, sip_infra.TransferFailedPipeline{
-			ID:     v.ID,
-			Error:  fmt.Errorf("all %d transfer targets failed", len(targets)),
-			Reason: "outbound_failed",
+			ID:          v.ID,
+			Session:     v.Session,
+			TransferID:  v.TransferID,
+			RoutingMode: v.RoutingMode,
+			Error:       fmt.Errorf("all %d transfer targets failed", len(targets)),
+			Reason:      "outbound_failed",
 		})
 		return
 	}
@@ -131,7 +218,32 @@ func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_infra.TransferIn
 		ID:              v.ID,
 		InboundSession:  v.Session,
 		OutboundSession: outboundSession,
+		TargetURI:       connectedTarget,
+		Attempt:         indexOfTarget(targets, connectedTarget) + 1,
+		TotalAttempts:   len(targets),
+		TransferID:      v.TransferID,
+		RoutingMode:     v.RoutingMode,
 	})
+	connectedIndex := indexOfTarget(targets, connectedTarget)
+	for i, target := range targets {
+		if target == connectedTarget {
+			continue
+		}
+		if v.RoutingMode != "parallel" && connectedIndex >= 0 && i < connectedIndex {
+			continue
+		}
+		d.OnPipeline(ctx, sip_infra.TransferCancelledPipeline{
+			ID:          v.ID,
+			Session:     v.Session,
+			TransferID:  v.TransferID,
+			TargetURI:   target,
+			Attempt:     i + 1,
+			Total:       len(targets),
+			RoutingMode: v.RoutingMode,
+			Reason:      reasonAnsweredOther,
+			AnsweredBy:  connectedTarget,
+		})
+	}
 
 	// Track bridge duration from the moment the transfer target answered
 	bridgeStart := time.Now()
@@ -181,23 +293,13 @@ func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_infra.TransferIn
 	}
 }
 
-func (d *Dispatcher) handleTransferConnected(ctx context.Context, v sip_infra.TransferConnectedPipeline) {
-	outboundInfo := v.OutboundSession.GetInfo()
-	d.logger.Infow("Pipeline: transfer_connected",
-		"call_id", v.ID,
-		"outbound_call_id", v.OutboundSession.GetCallID(),
-		"target_uri", outboundInfo.RemoteURI,
-		"codec", outboundInfo.Codec)
-}
-
-func (d *Dispatcher) handleTransferFailed(ctx context.Context, v sip_infra.TransferFailedPipeline) {
-	// Categorize the failure for structured alerting
-	category := categorizeTransferError(v.Reason, v.Error)
-	d.logger.Warnw("Pipeline: transfer_failed",
-		"call_id", v.ID,
-		"reason", v.Reason,
-		"category", category,
-		"error", v.Error)
+func indexOfTarget(targets []string, target string) int {
+	for i, t := range targets {
+		if t == target {
+			return i
+		}
+	}
+	return -1
 }
 
 // categorizeTransferError maps raw transfer failure reasons into high-level
@@ -213,13 +315,21 @@ func categorizeTransferError(reason string, err error) string {
 		return "setup"
 	case reason == "outbound_failed":
 		if err != nil {
-			errMsg := err.Error()
+			errMsg := strings.ToLower(err.Error())
 			if strings.Contains(errMsg, "timeout") || strings.Contains(errMsg, "deadline") {
 				return "network"
 			}
-			if strings.Contains(errMsg, "486") || strings.Contains(errMsg, "603") ||
-				strings.Contains(errMsg, "busy") || strings.Contains(errMsg, "declined") {
+			if strings.Contains(errMsg, "486") || strings.Contains(errMsg, "600") ||
+				strings.Contains(errMsg, "busy") {
 				return "rejected"
+			}
+			if strings.Contains(errMsg, "603") || strings.Contains(errMsg, "403") ||
+				strings.Contains(errMsg, "declined") || strings.Contains(errMsg, "rejected") {
+				return "rejected"
+			}
+			if strings.Contains(errMsg, "480") || strings.Contains(errMsg, "408") ||
+				strings.Contains(errMsg, "no answer") || strings.Contains(errMsg, "unavailable") {
+				return "network"
 			}
 		}
 		return "network"

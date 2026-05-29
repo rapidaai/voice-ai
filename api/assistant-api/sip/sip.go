@@ -57,6 +57,7 @@ type SIPEngine struct {
 	storage    storages.Storage
 
 	assistantConversationService internal_services.AssistantConversationService
+	assistantHTTPLogService      internal_services.AssistantHTTPLogService
 	assistantService             internal_services.AssistantService
 	deploymentService            internal_services.AssistantDeploymentService
 	vaultClient                  web_client.VaultClient
@@ -85,6 +86,7 @@ func NewSIPEngine(config *config.AssistantConfig, logger commons.Logger,
 		redis:                        redis,
 		opensearch:                   opensearch,
 		assistantConversationService: internal_assistant_service.NewAssistantConversationService(logger, postgres, storage_files.NewStorage(config.AssetStoreConfig, logger)),
+		assistantHTTPLogService:      internal_assistant_service.NewAssistantHTTPLogService(logger, postgres, storage_files.NewStorage(config.AssetStoreConfig, logger)),
 		assistantService:             internal_assistant_service.NewAssistantService(config, logger, postgres, opensearch),
 		deploymentService:            internal_assistant_service.NewAssistantDeploymentService(config, logger, postgres),
 		storage:                      storage_files.NewStorage(config.AssetStoreConfig, logger),
@@ -141,6 +143,9 @@ func (m *SIPEngine) Connect(ctx context.Context) error {
 		m.vaultConfigResolver, // Fetch SIP config from vault
 	)
 	server.SetOnInvite(m.onInvite)
+	server.SetOnCreated(m.onCreated)
+	server.SetOnRinging(m.onRinging)
+	server.SetOnAnswered(m.onAnswered)
 	server.SetOnBye(m.onBye)
 	server.SetOnCancel(m.onCancel)
 	server.SetOnError(m.onError)
@@ -167,6 +172,7 @@ func (m *SIPEngine) Connect(ctx context.Context) error {
 		OnCallStart:          m.pipelineCallStart,
 		OnCallEnd:            m.pipelineCallEnd,
 		OnCreateObserver:     m.createObserver,
+		OnLifecycleWebhook:   m.publishSIPLifecycleWebhook,
 	})
 	m.dispatcher.Start(m.ctx)
 
@@ -225,7 +231,7 @@ func (m *SIPEngine) assistantMiddleware(ctx *sip_infra.SIPRequestContext, next f
 	}
 
 	assistant, err := m.assistantService.Get(m.ctx, auth, assistantID, utils.GetVersionDefinition("latest"),
-		&internal_services.GetAssistantOption{InjectPhoneDeployment: true})
+		&internal_services.GetAssistantOption{InjectPhoneDeployment: true, InjectWebhook: true})
 	if err != nil {
 		m.logger.Error("SIP: assistant not found", "call_id", ctx.CallID, "method", ctx.Method, "assistant_id", assistantID, "error", err)
 		return sip_infra.Reject(404, "Assistant not found"), nil
@@ -324,6 +330,33 @@ func (m *SIPEngine) onInvite(session *sip_infra.Session, fromURI, toURI string) 
 	return nil
 }
 
+func (m *SIPEngine) onCreated(session *sip_infra.Session, fromURI, toURI string) {
+	m.dispatcher.OnPipeline(m.ctx, sip_infra.CallCreatedPipeline{
+		ID:      session.GetInfo().CallID,
+		Session: session,
+		FromURI: fromURI,
+		ToURI:   toURI,
+	})
+}
+
+func (m *SIPEngine) onRinging(session *sip_infra.Session, fromURI, toURI string) {
+	m.dispatcher.OnPipeline(m.ctx, sip_infra.CallRingingPipeline{
+		ID:      session.GetInfo().CallID,
+		Session: session,
+		FromURI: fromURI,
+		ToURI:   toURI,
+	})
+}
+
+func (m *SIPEngine) onAnswered(session *sip_infra.Session, fromURI, toURI string) {
+	m.dispatcher.OnPipeline(m.ctx, sip_infra.CallAnsweredPipeline{
+		ID:      session.GetInfo().CallID,
+		Session: session,
+		FromURI: fromURI,
+		ToURI:   toURI,
+	})
+}
+
 func (m *SIPEngine) onBye(session *sip_infra.Session) error {
 	m.dispatcher.OnPipeline(m.ctx, sip_infra.ByeReceivedPipeline{
 		ID:      session.GetInfo().CallID,
@@ -343,6 +376,10 @@ func (m *SIPEngine) onCancel(session *sip_infra.Session) error {
 // onError handles SIP-level errors by emitting a CallFailedPipeline event.
 // The pipeline handler (signal.go) creates the observer and persists metrics.
 func (m *SIPEngine) onError(session *sip_infra.Session, callErr error) {
+	if session == nil {
+		m.logger.Warnw("SIP error without session", "error", callErr)
+		return
+	}
 	m.logger.Warnw("SIP error", "call_id", session.GetCallID(), "error", callErr)
 	m.dispatcher.OnPipeline(m.ctx, sip_infra.CallFailedPipeline{
 		ID:      session.GetCallID(),
@@ -648,7 +685,7 @@ func (m *SIPEngine) pipelineCallSetup(ctx context.Context, session *sip_infra.Se
 	if assistant == nil {
 		var err error
 		assistant, err = m.assistantService.Get(ctx, auth, assistantID, utils.GetVersionDefinition("latest"),
-			&internal_services.GetAssistantOption{InjectPhoneDeployment: true})
+			&internal_services.GetAssistantOption{InjectPhoneDeployment: true, InjectWebhook: true})
 		if err != nil {
 			return nil, fmt.Errorf("failed to load assistant %d: %w", assistantID, err)
 		}
