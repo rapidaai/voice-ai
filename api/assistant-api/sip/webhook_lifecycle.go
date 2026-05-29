@@ -14,9 +14,9 @@ import (
 
 	internal_condition "github.com/rapidaai/api/assistant-api/internal/condition"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
+	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	internal_webhook "github.com/rapidaai/api/assistant-api/internal/webhook"
-	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
 	gorm_generator "github.com/rapidaai/pkg/models/gorm/generators"
 	"github.com/rapidaai/pkg/types"
@@ -57,7 +57,7 @@ func (c *sipWebhookCallback) OnPacket(ctx context.Context, pkts ...internal_type
 			httpPkt.ResponsePayload,
 		)
 		if err != nil {
-			return err
+			return fmt.Errorf("sip webhook callback: create http log (event=%s, context=%s): %w", httpPkt.SourceEvent, httpPkt.ContextID, err)
 		}
 	}
 	return nil
@@ -164,4 +164,3 @@ func allowSIPWebhookCondition(webhook *internal_assistant_entity.AssistantWebhoo
 	}
 	return allowed
 }
-

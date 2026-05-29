@@ -85,6 +85,8 @@ func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_infra.TransferIn
 
 	var outboundSession *sip_infra.Session
 	var connectedTarget string
+	connectedIndex := -1
+	var lastErr error
 	for i, target := range targets {
 		attempt := i + 1
 		d.logger.Infow("Pipeline: transfer_attempt",
@@ -115,6 +117,7 @@ func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_infra.TransferIn
 		if err == nil {
 			outboundSession = session
 			connectedTarget = target
+			connectedIndex = i
 			d.OnPipeline(ctx, sip_infra.TransferAttemptEndedPipeline{
 				ID:             v.ID,
 				Session:        v.Session,
@@ -134,6 +137,7 @@ func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_infra.TransferIn
 		d.logger.Warnw("Pipeline: transfer_target_failed",
 			"call_id", v.ID, "target", target,
 			"attempt", attempt, "error", err)
+		lastErr = err
 
 		d.OnPipeline(ctx, sip_infra.EventEmittedPipeline{
 			ID:    v.ID,
@@ -191,7 +195,7 @@ func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_infra.TransferIn
 			Session:     v.Session,
 			TransferID:  v.TransferID,
 			RoutingMode: v.RoutingMode,
-			Error:       fmt.Errorf("all %d transfer targets failed", len(targets)),
+			Error:       transferFailedError(len(targets), lastErr),
 			Reason:      "outbound_failed",
 		})
 		return
@@ -219,14 +223,13 @@ func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_infra.TransferIn
 		InboundSession:  v.Session,
 		OutboundSession: outboundSession,
 		TargetURI:       connectedTarget,
-		Attempt:         indexOfTarget(targets, connectedTarget) + 1,
+		Attempt:         connectedIndex + 1,
 		TotalAttempts:   len(targets),
 		TransferID:      v.TransferID,
 		RoutingMode:     v.RoutingMode,
 	})
-	connectedIndex := indexOfTarget(targets, connectedTarget)
 	for i, target := range targets {
-		if target == connectedTarget {
+		if i == connectedIndex {
 			continue
 		}
 		if v.RoutingMode != "parallel" && connectedIndex >= 0 && i < connectedIndex {
@@ -293,13 +296,11 @@ func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_infra.TransferIn
 	}
 }
 
-func indexOfTarget(targets []string, target string) int {
-	for i, t := range targets {
-		if t == target {
-			return i
-		}
+func transferFailedError(total int, lastErr error) error {
+	if lastErr == nil {
+		return fmt.Errorf("all %d transfer targets failed", total)
 	}
-	return -1
+	return fmt.Errorf("all %d transfer targets failed: %w", total, lastErr)
 }
 
 // categorizeTransferError maps raw transfer failure reasons into high-level

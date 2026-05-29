@@ -29,6 +29,8 @@ const (
 	reasonMediaError    = "media_error"
 	reasonInternalError = "internal_error"
 	reasonUnknown       = "unknown"
+	// maxExtensionLength is the maximum digit length treated as a SIP extension.
+	maxExtensionLength = 6
 )
 
 var sipCodePattern = regexp.MustCompile(`\b([1-6][0-9]{2})\b`)
@@ -219,7 +221,7 @@ func targetExtensionFromURI(uri string) string {
 			return ""
 		}
 	}
-	if len(user) > 0 && len(user) <= 6 {
+	if len(user) > 0 && len(user) <= maxExtensionLength {
 		return user
 	}
 	return ""
