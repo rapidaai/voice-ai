@@ -55,6 +55,11 @@ func TestAudioTransformerString(t *testing.T) {
 			expected: "custom-stt",
 		},
 		{
+			name:     "Ringg STT",
+			input:    RINGG,
+			expected: "ringg",
+		},
+		{
 			name:     "RevAI",
 			input:    REVAI,
 			expected: "revai",
@@ -148,6 +153,11 @@ func TestGetSpeechToTextTransformer(t *testing.T) {
 		{
 			name:            "Custom STT",
 			transformerType: CUSTOM_STT,
+			shouldError:     true, // Will fail due to missing credentials, but factory works
+		},
+		{
+			name:            "Ringg STT",
+			transformerType: RINGG,
 			shouldError:     true, // Will fail due to missing credentials, but factory works
 		},
 		{
@@ -323,6 +333,7 @@ func TestAllSpeechToTextTransformersCallFactory(t *testing.T) {
 		REVAI,
 		SARVAM,
 		CARTESIA,
+		RINGG,
 		CUSTOM_STT,
 	}
 

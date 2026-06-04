@@ -698,6 +698,22 @@
         "website": "https://www.speechmatics.com"
     },
     {
+        "code": "ringg",
+        "name": "Ringg AI",
+        "description": "Ringg AI speech-to-text with websocket streaming support.",
+        "featureList": [
+            "stt",
+            "external"
+        ],
+        "configurations": [
+            {
+                "name": "key",
+                "type": "string",
+                "label": "API Key"
+            }
+        ]
+    },
+    {
         "code": "nvidia",
         "name": "NVIDIA",
         "image": "https://cdn-01.rapida.ai/providers/nvidia.png",

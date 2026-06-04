@@ -25,6 +25,7 @@ import (
 	internal_transformer_resembleai "github.com/rapidaai/api/assistant-api/internal/transformer/resembleai"
 	internal_transformer_revai "github.com/rapidaai/api/assistant-api/internal/transformer/revai"
 	internal_transformer_rime "github.com/rapidaai/api/assistant-api/internal/transformer/rime"
+	internal_transformer_ringg "github.com/rapidaai/api/assistant-api/internal/transformer/ringg"
 	internal_transformer_sarvam "github.com/rapidaai/api/assistant-api/internal/transformer/sarvam"
 	internal_transformer_speechmatics "github.com/rapidaai/api/assistant-api/internal/transformer/speechmatics"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
@@ -52,6 +53,7 @@ const (
 	NEUPHONIC             AudioTransformer = "neuphonic"
 	MINIMAX               AudioTransformer = "minimax"
 	NVIDIA                AudioTransformer = "nvidia"
+	RINGG                 AudioTransformer = "ringg"
 	GROQ                  AudioTransformer = "groq"
 	AWS                   AudioTransformer = "aws"
 )
@@ -132,6 +134,8 @@ func GetSpeechToTextTransformer(ctx context.Context,
 		return internal_transformer_groq.NewGroqSpeechToText(ctx, logger, credential, onPacket, opts)
 	case NVIDIA:
 		return internal_transformer_nvidia.NewNvidiaSpeechToText(ctx, logger, credential, onPacket, opts)
+	case RINGG:
+		return internal_transformer_ringg.NewRinggSpeechToText(ctx, logger, credential, onPacket, opts)
 	case AWS:
 		return internal_transformer_aws.NewAWSSpeechToText(ctx, logger, credential, onPacket, opts)
 	case CUSTOM_STT:

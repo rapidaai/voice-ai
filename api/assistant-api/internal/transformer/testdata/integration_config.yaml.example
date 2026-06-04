@@ -188,6 +188,13 @@ stt:
     options:
       listen.language: "en"
 
+  ringg:
+    enabled: false
+    credential:
+      key: "YOUR_RINGG_API_KEY"
+    options:
+      listen.language: "en"
+
   groq:
     enabled: false
     credential:

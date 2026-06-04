@@ -1,0 +1,14 @@
+{
+  "preservePrefix": "microphone.",
+  "parameters": [
+    {
+      "key": "listen.language",
+      "label": "Language",
+      "type": "input",
+      "required": false,
+      "default": "en",
+      "placeholder": "en",
+      "helpText": "Language hint sent to Ringg."
+    }
+  ]
+}

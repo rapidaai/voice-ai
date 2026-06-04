@@ -65,7 +65,7 @@ describe('Speech-to-text provider runtime standard', () => {
     Boolean(loadProviderConfig(p.code)?.stt),
   );
   const modelDrivenSttProviders = configuredSttProviders.filter(
-    provider => provider.code !== 'custom-stt',
+    provider => provider.code !== 'custom-stt' && provider.code !== 'ringg',
   );
 
   it('all active speech-to-text providers are config-driven', () => {
@@ -222,5 +222,49 @@ describe('Speech-to-text provider runtime standard', () => {
     expect(
       ValidateSpeechToTextIfInvalid('unknown-provider', []),
     ).toBeUndefined();
+  });
+});
+
+describe('Ringg STT — config vs original', () => {
+  const config = loadProviderConfig('ringg')!;
+
+  it('loads a language-only STT config with microphone prefix', () => {
+    const sttConfig = config.stt;
+    expect(sttConfig).toBeDefined();
+    expect(sttConfig?.preservePrefix).toBe('microphone.');
+    const keys = sttConfig?.parameters.map(param => param.key) ?? [];
+    expect(keys).toEqual(expect.arrayContaining(['listen.language']));
+    expect(keys).not.toContain('listen.model');
+    expect(sttConfig?.parameters[0].type).toBe('input');
+    expect(sttConfig?.parameters[0].default).toBe('en');
+  });
+
+  it('preserves microphone metadata and validates credentials', () => {
+    const seed = [
+      createMetadata('rapida.credential_id', 'seed-cred'),
+      createMetadata('microphone.volume', '0.8'),
+    ];
+
+    const defaults = GetDefaultSpeechToTextIfInvalid('ringg', cloneMetadata(seed));
+    expect(getMetadataValue(defaults, 'listen.language')).toBe('en');
+    expect(getMetadataValue(defaults, 'microphone.volume')).toBe('0.8');
+    expect(getMetadataValue(defaults, 'rapida.credential_id')).toBe('seed-cred');
+
+    expect(
+      ValidateSpeechToTextIfInvalid('ringg', defaults, ['seed-cred']),
+    ).toBeUndefined();
+
+    const missingCred = ValidateSpeechToTextIfInvalid('ringg', [
+      createMetadata('listen.language', 'en'),
+    ]);
+    expect(missingCred).toBe('Please provide a valid ringg credential.');
+  });
+
+  it('keeps an existing language override', () => {
+    const defaults = GetDefaultSpeechToTextIfInvalid('ringg', [
+      createMetadata('rapida.credential_id', 'seed-cred'),
+      createMetadata('listen.language', 'hi'),
+    ]);
+    expect(getMetadataValue(defaults, 'listen.language')).toBe('hi');
   });
 });

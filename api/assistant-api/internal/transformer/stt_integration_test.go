@@ -30,6 +30,7 @@ var sttProviders = []string{
 	"sarvamai",
 	"cartesia",
 	"speechmatics",
+	"ringg",
 	"groq",
 	"nvidia",
 	"aws",
