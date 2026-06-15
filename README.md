@@ -60,6 +60,46 @@ Rapida is written in **Go**, using the highly optimized [gRPC](https://github.co
 
 https://doc.rapida.ai
 
+### MCP tool example: Resemble Detect
+
+Rapida can attach external MCP servers as assistant tools. Use Resemble Detect
+when a caller provides a recording or media URL that should be checked for
+synthetic speech before the assistant makes a trust decision.
+
+Configure an MCP tool with the hosted Resemble MCP endpoint:
+
+```json
+{
+  "name": "resemble_detect",
+  "description": "Use Resemble Detect to analyze a caller-provided media URL or detection job and return a synthetic-speech risk verdict.",
+  "executionMethod": "mcp",
+  "fields": {},
+  "executionOptions": [
+    {
+      "key": "mcp.server_url",
+      "value": "https://mcp.resemble.ai/mcp"
+    },
+    {
+      "key": "mcp.protocol",
+      "value": "streamable_http"
+    },
+    {
+      "key": "mcp.timeout",
+      "value": "90"
+    },
+    {
+      "key": "mcp.headers",
+      "value": "{\"Authorization\":\"Bearer <RESEMBLE_API_KEY>\"}"
+    }
+  ]
+}
+```
+
+Keep the Resemble API key in your deployment secret store, not in checked-in
+configuration. At runtime Rapida discovers the tools exposed by the MCP server,
+such as `detect_deepfake`, `get_detection`, `detect_watermark`, and related
+analysis tools.
+
 ## Prerequisites
 
 - **Docker** & **Docker Compose** ([Install](https://www.docker.com/))
