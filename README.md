@@ -60,18 +60,20 @@ Rapida is written in **Go**, using the highly optimized [gRPC](https://github.co
 
 https://doc.rapida.ai
 
-### MCP tool example: Resemble Detect
+### MCP tool example: Resemble Detect and Signal
 
 Rapida can attach external MCP servers as assistant tools. Use Resemble Detect
 when a caller provides a recording or media URL that should be checked for
-synthetic speech before the assistant makes a trust decision.
+synthetic speech before the assistant makes a trust decision. Use Resemble
+Signal when caller-provided text or transcript excerpts should be scored for
+fraud and scam intent before continuing.
 
 Configure an MCP tool with the hosted Resemble MCP endpoint:
 
 ```json
 {
-  "name": "resemble_detect",
-  "description": "Use Resemble Detect to analyze a caller-provided media URL or detection job and return a synthetic-speech risk verdict.",
+  "name": "resemble_trust",
+  "description": "Use Resemble Detect for caller-provided media authenticity checks and Resemble Signal for fraud or scam-intent scoring.",
   "executionMethod": "mcp",
   "fields": {},
   "executionOptions": [
@@ -97,8 +99,10 @@ Configure an MCP tool with the hosted Resemble MCP endpoint:
 
 Keep the Resemble API key in your deployment secret store, not in checked-in
 configuration. At runtime Rapida discovers the tools exposed by the MCP server,
-such as `detect_deepfake`, `get_detection`, `detect_watermark`, and related
-analysis tools.
+such as `detect_deepfake`, `get_detection`, `detect_watermark`, Signal scoring,
+and related analysis tools. Prompt the assistant to use Detect for media
+authenticity, and Signal before reset-code, credential, wire-transfer,
+urgent-payment, or account-change requests.
 
 ## Prerequisites
 
