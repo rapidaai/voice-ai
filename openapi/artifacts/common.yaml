@@ -67,7 +67,7 @@ components:
         - `1004004`: invalid assistant_id parameter - Please provide a valid assistantId parameter.
         - `1004005`: unable to create assistant debugger deployment - Unable to create assistant debugger deployment, please try again later.
         - `1004006`: invalid audio provider parameter - Please provide a valid audioProvider parameter.
-        - `1004007`: invalid ideal_timeout parameter - Please provide idealTimeout between 15 and 120 seconds.
+        - `1004007`: invalid ideal_timeout parameter - Please provide idealTimeout between 5 and 120 seconds.
         - `1004008`: invalid ideal_timeout_backoff parameter - Please provide idealTimeoutBackoff between 0 and 5 times.
         - `1004009`: invalid max_session_duration parameter - Please provide maxSessionDuration between 180 and 600 seconds.
 
@@ -78,7 +78,7 @@ components:
         - `1005004`: invalid assistant_id parameter - Please provide a valid assistantId parameter.
         - `1005005`: unable to create assistant phone deployment - Unable to create assistant phone deployment, please try again later.
         - `1005006`: invalid audio provider parameter - Please provide a valid audioProvider parameter.
-        - `1005007`: invalid ideal_timeout parameter - Please provide idealTimeout between 15 and 120 seconds.
+        - `1005007`: invalid ideal_timeout parameter - Please provide idealTimeout between 5 and 120 seconds.
         - `1005008`: invalid ideal_timeout_backoff parameter - Please provide idealTimeoutBackoff between 0 and 5 times.
         - `1005009`: invalid max_session_duration parameter - Please provide maxSessionDuration between 180 and 600 seconds.
         - `1005010`: missing phone_provider_name parameter - Please provide the required phoneProviderName parameter.
@@ -90,7 +90,7 @@ components:
         - `1006004`: invalid assistant_id parameter - Please provide a valid assistantId parameter.
         - `1006005`: unable to create assistant api deployment - Unable to create assistant api deployment, please try again later.
         - `1006006`: invalid audio provider parameter - Please provide a valid audioProvider parameter.
-        - `1006007`: invalid ideal_timeout parameter - Please provide idealTimeout between 15 and 120 seconds.
+        - `1006007`: invalid ideal_timeout parameter - Please provide idealTimeout between 5 and 120 seconds.
         - `1006008`: invalid ideal_timeout_backoff parameter - Please provide idealTimeoutBackoff between 0 and 5 times.
         - `1006009`: invalid max_session_duration parameter - Please provide maxSessionDuration between 180 and 600 seconds.
 
@@ -101,7 +101,7 @@ components:
         - `1007004`: invalid assistant_id parameter - Please provide a valid assistantId parameter.
         - `1007005`: unable to create assistant webplugin deployment - Unable to create assistant webplugin deployment, please try again later.
         - `1007006`: invalid audio provider parameter - Please provide a valid audioProvider parameter.
-        - `1007007`: invalid ideal_timeout parameter - Please provide idealTimeout between 15 and 120 seconds.
+        - `1007007`: invalid ideal_timeout parameter - Please provide idealTimeout between 5 and 120 seconds.
         - `1007008`: invalid ideal_timeout_backoff parameter - Please provide idealTimeoutBackoff between 0 and 5 times.
         - `1007009`: invalid max_session_duration parameter - Please provide maxSessionDuration between 180 and 600 seconds.
 
@@ -111,7 +111,7 @@ components:
         - `1008003`: missing authentication scope - Unauthenticated request, please try again with valid authentication.
         - `1008004`: invalid assistant_id parameter - Please provide a valid assistantId parameter.
         - `1008005`: unable to create assistant whatsapp deployment - Unable to create assistant whatsapp deployment, please try again later.
-        - `1008006`: invalid ideal_timeout parameter - Please provide idealTimeout between 15 and 120 seconds.
+        - `1008006`: invalid ideal_timeout parameter - Please provide idealTimeout between 5 and 120 seconds.
         - `1008007`: invalid ideal_timeout_backoff parameter - Please provide idealTimeoutBackoff between 0 and 5 times.
         - `1008008`: invalid max_session_duration parameter - Please provide maxSessionDuration between 180 and 600 seconds.
         - `1008009`: missing whatsapp_provider_name parameter - Please provide the required whatsappProviderName parameter.

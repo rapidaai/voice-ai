@@ -17,6 +17,8 @@ export interface ExperienceConfig {
   greeting?: string;
   greetingInterruptible?: boolean;
   messageOnError?: string;
+  unclearInputTimeout?: string;
+  unclearInputMessage?: string;
   idealTimeout?: string;
   idealMessage?: string;
   maxCallDuration?: string;
@@ -33,6 +35,18 @@ const ERROR_MESSAGE_OPTIONS = [
   'Sorry, I couldn’t process that. Could you try again?',
   'Something went wrong on my side. Please repeat that.',
   'I’m sorry, I ran into an issue. Let’s try again.',
+];
+
+export const DEFAULT_UNCLEAR_INPUT_TIMEOUT = '0.5';
+export const DEFAULT_UNCLEAR_INPUT_MESSAGE =
+  "I didn't catch that. Could you repeat that?";
+
+const UNCLEAR_INPUT_MESSAGE_OPTIONS = [
+  DEFAULT_UNCLEAR_INPUT_MESSAGE,
+  'Sorry, I missed that. Could you say it again?',
+  'I could not hear that clearly. Please repeat it.',
+  'Could you repeat that once more?',
+  'I did not get that clearly. Can you try again?',
 ];
 
 const IDLE_MESSAGE_OPTIONS = [
@@ -154,6 +168,54 @@ export const ConfigureExperience: FC<{
 
         <Stack gap={3}>
           {labelWithToggletip(
+            'Unclear Speech Wait (Seconds)',
+            'Seconds to wait after an interrupted or unclear user turn before asking the user to repeat.',
+          )}
+          <Slider
+            id="experience-unclear-input-timeout"
+            labelText="Unclear Speech Wait (Seconds)"
+            hideLabel
+            min={0.5}
+            max={5}
+            step={0.1}
+            value={parseFloat(
+              experienceConfig.unclearInputTimeout ||
+                DEFAULT_UNCLEAR_INPUT_TIMEOUT,
+            )}
+            onChange={({ value }: { value: number }) =>
+              update('unclearInputTimeout', value.toString())
+            }
+          />
+        </Stack>
+
+        <Stack gap={3}>
+          {labelWithToggletip(
+            'Unclear Speech Message',
+            'Message sent when the user interrupted but did not continue, or speech was not recognized confidently.',
+          )}
+          <ComboBox
+            id="experience-unclear-input-message"
+            aria-label="Unclear Speech Message"
+            items={UNCLEAR_INPUT_MESSAGE_OPTIONS}
+            itemToString={item => item || ''}
+            selectedItem={getSelectedMessage(
+              experienceConfig.unclearInputMessage ||
+                DEFAULT_UNCLEAR_INPUT_MESSAGE,
+            )}
+            allowCustomValue
+            placeholder="Message spoken when the assistant could not understand the user"
+            onChange={({ selectedItem, inputValue }) =>
+              handleMessageSelection(
+                'unclearInputMessage',
+                selectedItem,
+                inputValue,
+              )
+            }
+          />
+        </Stack>
+
+        <Stack gap={3}>
+          {labelWithToggletip(
             'Idle Silence Timeout (Seconds)',
             'Seconds of user silence before the assistant sends the idle message.',
           )}
@@ -161,8 +223,8 @@ export const ConfigureExperience: FC<{
             id="experience-idle-timeout"
             labelText="Idle Silence Timeout (Seconds)"
             hideLabel
-            min={15}
-            max={120}
+            min={5}
+            max={60}
             step={1}
             value={parseInt(experienceConfig.idealTimeout || '30')}
             onChange={({ value }: { value: number }) =>

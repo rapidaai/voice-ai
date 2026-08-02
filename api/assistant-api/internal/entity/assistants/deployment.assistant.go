@@ -85,13 +85,15 @@ type AssistantDeployment struct {
 
 type AssistantDeploymentBehavior struct {
 	AssistantDeployment
-	Greeting              *string `json:"greeting" gorm:"type:string;size:50;not null;"`
-	GreetingInterruptible *bool   `json:"greetingInterruptible"`
-	Mistake               *string `json:"mistake" gorm:"type:string;size:50;not null;"`
-	IdleTimeout           *uint64 `json:"idealTimeout"`
-	IdleTimeoutBackoff    *uint64 `json:"idealTimeoutBackoff"`
-	IdleTimeoutMessage    *string `json:"idealTimeoutMessage" gorm:"type:string;size:50;not null;"`
-	MaxSessionDuration    *uint64 `json:"maxSessionDuration"`
+	Greeting              *string  `json:"greeting" gorm:"type:string;size:50;not null;"`
+	GreetingInterruptible *bool    `json:"greetingInterruptible"`
+	Mistake               *string  `json:"mistake" gorm:"type:string;size:50;not null;"`
+	UnclearInputTimeout   *float64 `json:"unclearInputTimeout" gorm:"type:float"`
+	UnclearInputMessage   *string  `json:"unclearInputMessage" gorm:"type:string;size:250;"`
+	IdleTimeout           *uint64  `json:"idealTimeout"`
+	IdleTimeoutBackoff    *uint64  `json:"idealTimeoutBackoff"`
+	IdleTimeoutMessage    *string  `json:"idealTimeoutMessage" gorm:"type:string;size:50;not null;"`
+	MaxSessionDuration    *uint64  `json:"maxSessionDuration"`
 }
 
 type AssistantWebPluginDeployment struct {

@@ -36,6 +36,8 @@ func (deploymentApi *assistantDeploymentGrpcApi) CreateAssistantPhoneDeployment(
 		iAuth, deployment.GetPhone().GetAssistantId(),
 		deployment.GetPhone().Greeting,
 		deployment.GetPhone().Mistake,
+		deployment.GetPhone().UnclearInputTimeout,
+		deployment.GetPhone().UnclearInputMessage,
 		deployment.GetPhone().GreetingInterruptible,
 		&deployment.GetPhone().IdealTimeout,
 		&deployment.GetPhone().IdealTimeoutBackoff,

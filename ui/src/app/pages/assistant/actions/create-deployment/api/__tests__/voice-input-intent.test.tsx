@@ -67,6 +67,20 @@ jest.mock('@rapidaai/react', () => {
     setGreeting(_: string) {}
     setGreetinginterruptible(_: boolean) {}
     setMistake(_: string) {}
+    setUnclearinputtimeout(_: number) {}
+    hasUnclearinputtimeout() {
+      return false;
+    }
+    getUnclearinputtimeout() {
+      return 0;
+    }
+    setUnclearinputmessage(_: string) {}
+    hasUnclearinputmessage() {
+      return false;
+    }
+    getUnclearinputmessage() {
+      return '';
+    }
     setIdealtimeout(_: string) {}
     setIdealtimeoutbackoff(_: string) {}
     setIdealtimeoutmessage(_: string) {}

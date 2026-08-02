@@ -34,6 +34,8 @@ func (deploymentApi *assistantDeploymentGrpcApi) CreateAssistantApiDeployment(ct
 		iAuth, deployment.GetApi().GetAssistantId(),
 		deployment.GetApi().Greeting,
 		deployment.GetApi().Mistake,
+		deployment.GetApi().UnclearInputTimeout,
+		deployment.GetApi().UnclearInputMessage,
 		deployment.GetApi().GreetingInterruptible,
 		&deployment.GetApi().IdealTimeout,
 		&deployment.GetApi().IdealTimeoutBackoff,

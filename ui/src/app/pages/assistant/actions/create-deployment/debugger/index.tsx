@@ -1,5 +1,7 @@
 import {
   ConfigureExperience,
+  DEFAULT_UNCLEAR_INPUT_MESSAGE,
+  DEFAULT_UNCLEAR_INPUT_TIMEOUT,
   ExperienceConfig,
 } from '@/app/pages/assistant/actions/create-deployment/commons/configure-experience';
 import { ConfigureAudioOutputProvider } from '@/app/pages/assistant/actions/create-deployment/commons/configure-audio-output';
@@ -102,6 +104,8 @@ const ConfigureAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
       greeting: undefined,
       greetingInterruptible: true,
       messageOnError: undefined,
+      unclearInputTimeout: DEFAULT_UNCLEAR_INPUT_TIMEOUT,
+      unclearInputMessage: DEFAULT_UNCLEAR_INPUT_MESSAGE,
       idealTimeout: '30',
       idealMessage: 'Are you there?',
       maxCallDuration: '300',
@@ -113,6 +117,8 @@ const ConfigureAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
     greeting: undefined,
     greetingInterruptible: true,
     messageOnError: undefined,
+    unclearInputTimeout: DEFAULT_UNCLEAR_INPUT_TIMEOUT,
+    unclearInputMessage: DEFAULT_UNCLEAR_INPUT_MESSAGE,
     idealTimeout: '30',
     idealMessage: 'Are you there?',
     maxCallDuration: '300',
@@ -183,6 +189,12 @@ const ConfigureAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
             ? deployment.getGreetinginterruptible()
             : true,
           messageOnError: deployment.getMistake(),
+          unclearInputTimeout: deployment.hasUnclearinputtimeout?.()
+            ? deployment.getUnclearinputtimeout().toString()
+            : DEFAULT_UNCLEAR_INPUT_TIMEOUT,
+          unclearInputMessage: deployment.hasUnclearinputmessage?.()
+            ? deployment.getUnclearinputmessage()
+            : DEFAULT_UNCLEAR_INPUT_MESSAGE,
           idealTimeout: deployment.getIdealtimeout(),
           idealMessage: deployment.getIdealtimeoutmessage(),
           maxCallDuration: deployment.getMaxsessionduration(),
@@ -347,6 +359,12 @@ const ConfigureAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
       deployment.setGreeting(resolvedExperience.greeting);
     if (resolvedExperience.messageOnError)
       deployment.setMistake(resolvedExperience.messageOnError);
+    if (resolvedExperience.unclearInputTimeout)
+      deployment.setUnclearinputtimeout(
+        Number(resolvedExperience.unclearInputTimeout),
+      );
+    if (resolvedExperience.unclearInputMessage)
+      deployment.setUnclearinputmessage(resolvedExperience.unclearInputMessage);
     if (resolvedExperience.idealTimeout)
       deployment.setIdealtimeout(resolvedExperience.idealTimeout);
     if (resolvedExperience.idleTimeoutBackoffTimes)

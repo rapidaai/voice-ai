@@ -156,7 +156,7 @@ var (
 		HTTPStatusCode: http.StatusBadRequest,
 		Code:           CreateAssistantDebuggerDeploymentInvalidIdealTimeoutCode,
 		Error:          "invalid ideal_timeout parameter",
-		ErrorMessage:   "Please provide idealTimeout between 15 and 120 seconds.",
+		ErrorMessage:   "Please provide idealTimeout between 5 and 120 seconds.",
 	}
 	CreateAssistantDebuggerDeploymentInvalidTimeoutBackoff = PlatformError{
 		HTTPStatusCode: http.StatusBadRequest,
@@ -210,7 +210,7 @@ var (
 		HTTPStatusCode: http.StatusBadRequest,
 		Code:           CreateAssistantPhoneDeploymentInvalidIdealTimeoutCode,
 		Error:          "invalid ideal_timeout parameter",
-		ErrorMessage:   "Please provide idealTimeout between 15 and 120 seconds.",
+		ErrorMessage:   "Please provide idealTimeout between 5 and 120 seconds.",
 	}
 	CreateAssistantPhoneDeploymentInvalidTimeoutBackoff = PlatformError{
 		HTTPStatusCode: http.StatusBadRequest,
@@ -270,7 +270,7 @@ var (
 		HTTPStatusCode: http.StatusBadRequest,
 		Code:           CreateAssistantApiDeploymentInvalidIdealTimeoutCode,
 		Error:          "invalid ideal_timeout parameter",
-		ErrorMessage:   "Please provide idealTimeout between 15 and 120 seconds.",
+		ErrorMessage:   "Please provide idealTimeout between 5 and 120 seconds.",
 	}
 	CreateAssistantApiDeploymentInvalidTimeoutBackoff = PlatformError{
 		HTTPStatusCode: http.StatusBadRequest,
@@ -324,7 +324,7 @@ var (
 		HTTPStatusCode: http.StatusBadRequest,
 		Code:           CreateAssistantWebpluginDeploymentInvalidIdealTimeoutCode,
 		Error:          "invalid ideal_timeout parameter",
-		ErrorMessage:   "Please provide idealTimeout between 15 and 120 seconds.",
+		ErrorMessage:   "Please provide idealTimeout between 5 and 120 seconds.",
 	}
 	CreateAssistantWebpluginDeploymentInvalidTimeoutBackoff = PlatformError{
 		HTTPStatusCode: http.StatusBadRequest,
@@ -372,7 +372,7 @@ var (
 		HTTPStatusCode: http.StatusBadRequest,
 		Code:           CreateAssistantWhatsappDeploymentInvalidIdealTimeoutCode,
 		Error:          "invalid ideal_timeout parameter",
-		ErrorMessage:   "Please provide idealTimeout between 15 and 120 seconds.",
+		ErrorMessage:   "Please provide idealTimeout between 5 and 120 seconds.",
 	}
 	CreateAssistantWhatsappDeploymentInvalidTimeoutBackoff = PlatformError{
 		HTTPStatusCode: http.StatusBadRequest,

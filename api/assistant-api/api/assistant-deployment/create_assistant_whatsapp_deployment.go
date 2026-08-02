@@ -35,6 +35,8 @@ func (deploymentApi *assistantDeploymentGrpcApi) CreateAssistantWhatsappDeployme
 		iAuth, deployment.GetWhatsapp().GetAssistantId(),
 		deployment.GetWhatsapp().Greeting,
 		deployment.GetWhatsapp().Mistake,
+		deployment.GetWhatsapp().UnclearInputTimeout,
+		deployment.GetWhatsapp().UnclearInputMessage,
 		deployment.GetWhatsapp().GreetingInterruptible,
 		&deployment.GetWhatsapp().IdealTimeout,
 		&deployment.GetWhatsapp().IdealTimeoutBackoff,

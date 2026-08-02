@@ -73,7 +73,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantApiDeploymentRest(c 
 		})
 		return
 	}
-	if validator.NonNil(request.IdealTimeout) && !validator.Between(int(*request.IdealTimeout), 15, 120) {
+	if validator.NonNil(request.IdealTimeout) && !validator.Between(int(*request.IdealTimeout), 5, 120) {
 		c.JSON(pkg_errors.CreateAssistantApiDeploymentInvalidIdealTimeout.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantApiDeploymentInvalidIdealTimeout.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -204,6 +204,8 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantApiDeploymentRest(c 
 		assistantId,
 		request.Greeting,
 		request.Mistake,
+		request.UnclearInputTimeout,
+		request.UnclearInputMessage,
 		request.GreetingInterruptible,
 		request.IdealTimeout,
 		request.IdealTimeoutBackoff,
@@ -285,6 +287,8 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantApiDeploymentRest(c 
 			Greeting:              deployment.Greeting,
 			GreetingInterruptible: deployment.GreetingInterruptible,
 			Mistake:               deployment.Mistake,
+			UnclearInputTimeout:   deployment.UnclearInputTimeout,
+			UnclearInputMessage:   deployment.UnclearInputMessage,
 			InputAudio:            responseInputAudio,
 			OutputAudio:           responseOutputAudio,
 			Status:                &deploymentStatus,

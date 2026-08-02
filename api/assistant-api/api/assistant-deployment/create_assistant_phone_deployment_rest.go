@@ -85,7 +85,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantPhoneDeploymentRest(
 		})
 		return
 	}
-	if validator.NonNil(request.IdealTimeout) && !validator.Between(int(*request.IdealTimeout), 15, 120) {
+	if validator.NonNil(request.IdealTimeout) && !validator.Between(int(*request.IdealTimeout), 5, 120) {
 		c.JSON(pkg_errors.CreateAssistantPhoneDeploymentInvalidIdealTimeout.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantPhoneDeploymentInvalidIdealTimeout.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -231,6 +231,8 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantPhoneDeploymentRest(
 		assistantId,
 		request.Greeting,
 		request.Mistake,
+		request.UnclearInputTimeout,
+		request.UnclearInputMessage,
 		request.GreetingInterruptible,
 		request.IdealTimeout,
 		request.IdealTimeoutBackoff,
@@ -326,6 +328,8 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantPhoneDeploymentRest(
 			Greeting:              deployment.Greeting,
 			GreetingInterruptible: deployment.GreetingInterruptible,
 			Mistake:               deployment.Mistake,
+			UnclearInputTimeout:   deployment.UnclearInputTimeout,
+			UnclearInputMessage:   deployment.UnclearInputMessage,
 			InputAudio:            responseInputAudio,
 			OutputAudio:           responseOutputAudio,
 			PhoneProviderName:     &phoneProviderName,

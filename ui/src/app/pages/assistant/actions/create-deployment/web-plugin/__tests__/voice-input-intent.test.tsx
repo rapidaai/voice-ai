@@ -1,9 +1,13 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import '@testing-library/jest-dom';
 import {
-  ConfigureAssistantWebDeploymentPage,
-} from '@/app/pages/assistant/actions/create-deployment/web-plugin';
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
+import '@testing-library/jest-dom';
+import { ConfigureAssistantWebDeploymentPage } from '@/app/pages/assistant/actions/create-deployment/web-plugin';
 import {
   CreateAssistantWebpluginDeployment,
   GetAssistantWebpluginDeployment,
@@ -61,6 +65,20 @@ jest.mock('@rapidaai/react', () => {
     setGreeting(_: string) {}
     setGreetinginterruptible(_: boolean) {}
     setMistake(_: string) {}
+    setUnclearinputtimeout(_: number) {}
+    hasUnclearinputtimeout() {
+      return false;
+    }
+    getUnclearinputtimeout() {
+      return 0;
+    }
+    setUnclearinputmessage(_: string) {}
+    hasUnclearinputmessage() {
+      return false;
+    }
+    getUnclearinputmessage() {
+      return '';
+    }
     setIdealtimeout(_: string) {}
     setIdealtimeoutbackoff(_: string) {}
     setIdealtimeoutmessage(_: string) {}
@@ -128,7 +146,11 @@ jest.mock('@/hooks/use-model', () => ({
 }));
 
 jest.mock('@/hooks/use-credential', () => ({
-  useCurrentCredential: () => ({ authId: 'u-1', projectId: 'p-1', token: 't-1' }),
+  useCurrentCredential: () => ({
+    authId: 'u-1',
+    projectId: 'p-1',
+    token: 't-1',
+  }),
 }));
 
 jest.mock('@/hooks/use-global-navigator', () => ({
@@ -180,28 +202,37 @@ jest.mock('@/app/components/form/tab-form', () => ({
   },
 }));
 
-jest.mock('@/app/pages/assistant/actions/create-deployment/web-plugin/configure-experience', () => {
-  const React = require('react');
-  return {
-    ConfigureExperience: ({ setExperienceConfig }: any) => {
-      React.useEffect(() => {
-        setExperienceConfig((prev: any) => ({
-          ...prev,
-          greeting: prev.greeting || 'hello',
-        }));
-      }, [setExperienceConfig]);
-      return <div>experience</div>;
-    },
-  };
-});
+jest.mock(
+  '@/app/pages/assistant/actions/create-deployment/web-plugin/configure-experience',
+  () => {
+    const React = require('react');
+    return {
+      ConfigureExperience: ({ setExperienceConfig }: any) => {
+        React.useEffect(() => {
+          setExperienceConfig((prev: any) => ({
+            ...prev,
+            greeting: prev.greeting || 'hello',
+          }));
+        }, [setExperienceConfig]);
+        return <div>experience</div>;
+      },
+    };
+  },
+);
 
-jest.mock('@/app/pages/assistant/actions/create-deployment/commons/configure-audio-input', () => ({
-  ConfigureAudioInputProvider: () => <div>audio-input</div>,
-}));
+jest.mock(
+  '@/app/pages/assistant/actions/create-deployment/commons/configure-audio-input',
+  () => ({
+    ConfigureAudioInputProvider: () => <div>audio-input</div>,
+  }),
+);
 
-jest.mock('@/app/pages/assistant/actions/create-deployment/commons/configure-audio-output', () => ({
-  ConfigureAudioOutputProvider: () => <div>audio-output</div>,
-}));
+jest.mock(
+  '@/app/pages/assistant/actions/create-deployment/commons/configure-audio-output',
+  () => ({
+    ConfigureAudioOutputProvider: () => <div>audio-output</div>,
+  }),
+);
 
 jest.mock('@/app/components/providers/speech-to-text/provider', () => ({
   GetDefaultMicrophoneConfig: () => [],
@@ -218,9 +249,13 @@ jest.mock('@/app/components/providers/text-to-speech/provider', () => ({
 jest.mock('@/app/pages/assistant/actions/hooks/use-confirmation', () => {
   const React = require('react');
   return {
-    useConfirmDialog: ({ title = 'Are you sure?' }: { title?: string } = {}) => {
+    useConfirmDialog: ({
+      title = 'Are you sure?',
+    }: { title?: string } = {}) => {
       const [isOpen, setIsOpen] = React.useState(false);
-      const [onConfirm, setOnConfirm] = React.useState<() => void>(() => () => {});
+      const [onConfirm, setOnConfirm] = React.useState<() => void>(
+        () => () => {},
+      );
 
       return {
         showDialog: (cb: () => void) => {
@@ -244,9 +279,15 @@ jest.mock('@/app/pages/assistant/actions/hooks/use-confirmation', () => {
 });
 
 jest.mock('@/app/components/carbon/button', () => ({
-  PrimaryButton: ({ children, isLoading, ...props }: any) => <button {...props}>{children}</button>,
-  GhostButton: ({ children, isLoading, ...props }: any) => <button {...props}>{children}</button>,
-  SecondaryButton: ({ children, isLoading, ...props }: any) => <button {...props}>{children}</button>,
+  PrimaryButton: ({ children, isLoading, ...props }: any) => (
+    <button {...props}>{children}</button>
+  ),
+  GhostButton: ({ children, isLoading, ...props }: any) => (
+    <button {...props}>{children}</button>
+  ),
+  SecondaryButton: ({ children, isLoading, ...props }: any) => (
+    <button {...props}>{children}</button>
+  ),
 }));
 
 describe('Web plugin deployment voice input intent actions', () => {
@@ -303,7 +344,8 @@ describe('Web plugin deployment voice input intent actions', () => {
       expect(CreateAssistantWebpluginDeployment).toHaveBeenCalledTimes(1),
     );
 
-    const req = (CreateAssistantWebpluginDeployment as jest.Mock).mock.calls[0][1];
+    const req = (CreateAssistantWebpluginDeployment as jest.Mock).mock
+      .calls[0][1];
     const deployment = req.getPlugin();
     expect(deployment.getInputaudio()).toBeDefined();
     await act(async () => {});
@@ -321,7 +363,9 @@ describe('Web plugin deployment voice input intent actions', () => {
     fireEvent.click(
       screen.getByLabelText(/Enable Voice Input \(Speech-to-Text\)/i),
     );
-    expect(screen.getByText(/receive user input via text only/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/receive user input via text only/i),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     fireEvent.click(screen.getByRole('button', { name: 'Deploy Web Widget' }));
 
@@ -329,7 +373,8 @@ describe('Web plugin deployment voice input intent actions', () => {
       expect(CreateAssistantWebpluginDeployment).toHaveBeenCalledTimes(1),
     );
 
-    const req = (CreateAssistantWebpluginDeployment as jest.Mock).mock.calls[0][1];
+    const req = (CreateAssistantWebpluginDeployment as jest.Mock).mock
+      .calls[0][1];
     const deployment = req.getPlugin();
     expect(deployment.getInputaudio()).toBeUndefined();
     await act(async () => {});
@@ -341,7 +386,9 @@ describe('Web plugin deployment voice input intent actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() =>
-      expect(screen.getByText(/delivered via audio and text/i)).toBeInTheDocument(),
+      expect(
+        screen.getByText(/delivered via audio and text/i),
+      ).toBeInTheDocument(),
     );
     fireEvent.click(
       screen.getByLabelText(/Enable Voice Output \(Text-to-Speech\)/i),
@@ -352,7 +399,8 @@ describe('Web plugin deployment voice input intent actions', () => {
       expect(CreateAssistantWebpluginDeployment).toHaveBeenCalledTimes(1),
     );
 
-    const req = (CreateAssistantWebpluginDeployment as jest.Mock).mock.calls[0][1];
+    const req = (CreateAssistantWebpluginDeployment as jest.Mock).mock
+      .calls[0][1];
     const deployment = req.getPlugin();
     expect(deployment.getOutputaudio()).toBeUndefined();
     await act(async () => {});
@@ -373,7 +421,8 @@ describe('Web plugin deployment voice input intent actions', () => {
       expect(CreateAssistantWebpluginDeployment).toHaveBeenCalledTimes(1),
     );
 
-    const req = (CreateAssistantWebpluginDeployment as jest.Mock).mock.calls[0][1];
+    const req = (CreateAssistantWebpluginDeployment as jest.Mock).mock
+      .calls[0][1];
     const deployment = req.getPlugin();
     expect(deployment.getInputaudio()).toBeUndefined();
     expect(deployment.getOutputaudio()).toBeDefined();

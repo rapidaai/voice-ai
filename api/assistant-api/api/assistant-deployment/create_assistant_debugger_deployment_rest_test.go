@@ -52,6 +52,8 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateWhatsappDeployment(
 	assistantId uint64,
 	greeting *string,
 	mistake *string,
+	unclearInputTimeout *float64,
+	unclearInputMessage *string,
 	greetingInterruptible *bool,
 	idealTimeout *uint64,
 	idealTimeoutBackoff *uint64,
@@ -60,7 +62,7 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateWhatsappDeployment(
 	whatsappProvider string,
 	whatsappOptions []*protos.Metadata,
 ) (*internal_assistant_entity.AssistantWhatsappDeployment, error) {
-	_, _, _ = mistake, idealTimeoutBackoff, idealTimeoutMessage
+	_, _, _, _, _ = mistake, unclearInputTimeout, unclearInputMessage, idealTimeoutBackoff, idealTimeoutMessage
 	s.createCalled = true
 	s.assistantId = assistantId
 	s.greeting = greeting
@@ -79,6 +81,8 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateWhatsappDeployment(
 			},
 			Greeting:              greeting,
 			GreetingInterruptible: greetingInterruptible,
+			UnclearInputTimeout:   unclearInputTimeout,
+			UnclearInputMessage:   unclearInputMessage,
 			IdleTimeout:           idealTimeout,
 			MaxSessionDuration:    maxSessionDuration,
 		},
@@ -101,6 +105,8 @@ func (s *createDebuggerDeploymentRestServiceStub) CreatePhoneDeployment(
 	assistantId uint64,
 	greeting *string,
 	mistake *string,
+	unclearInputTimeout *float64,
+	unclearInputMessage *string,
 	greetingInterruptible *bool,
 	idealTimeout *uint64,
 	idealTimeoutBackoff *uint64,
@@ -111,7 +117,7 @@ func (s *createDebuggerDeploymentRestServiceStub) CreatePhoneDeployment(
 	outputAudio *protos.DeploymentAudioProvider,
 	phoneOptions []*protos.Metadata,
 ) (*internal_assistant_entity.AssistantPhoneDeployment, error) {
-	_, _, _, _, _ = mistake, idealTimeout, idealTimeoutBackoff, idealTimeoutMessage, outputAudio
+	_, _, _, _, _, _, _ = mistake, unclearInputTimeout, unclearInputMessage, idealTimeout, idealTimeoutBackoff, idealTimeoutMessage, outputAudio
 	s.createCalled = true
 	s.assistantId = assistantId
 	s.greeting = greeting
@@ -133,6 +139,8 @@ func (s *createDebuggerDeploymentRestServiceStub) CreatePhoneDeployment(
 			},
 			Greeting:              greeting,
 			GreetingInterruptible: greetingInterruptible,
+			UnclearInputTimeout:   unclearInputTimeout,
+			UnclearInputMessage:   unclearInputMessage,
 			MaxSessionDuration:    maxSessionDuration,
 		},
 		AssistantDeploymentTelephony: internal_assistant_entity.AssistantDeploymentTelephony{
@@ -155,6 +163,8 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateApiDeployment(
 	assistantId uint64,
 	greeting *string,
 	mistake *string,
+	unclearInputTimeout *float64,
+	unclearInputMessage *string,
 	greetingInterruptible *bool,
 	idealTimeout *uint64,
 	idealTimeoutBackoff *uint64,
@@ -163,7 +173,7 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateApiDeployment(
 	inputAudio *protos.DeploymentAudioProvider,
 	outputAudio *protos.DeploymentAudioProvider,
 ) (*internal_assistant_entity.AssistantApiDeployment, error) {
-	_, _, _ = mistake, idealTimeoutBackoff, idealTimeoutMessage
+	_, _, _, _, _ = mistake, unclearInputTimeout, unclearInputMessage, idealTimeoutBackoff, idealTimeoutMessage
 	s.createCalled = true
 	s.assistantId = assistantId
 	s.greeting = greeting
@@ -184,6 +194,8 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateApiDeployment(
 			},
 			Greeting:              greeting,
 			GreetingInterruptible: greetingInterruptible,
+			UnclearInputTimeout:   unclearInputTimeout,
+			UnclearInputMessage:   unclearInputMessage,
 			IdleTimeout:           idealTimeout,
 			MaxSessionDuration:    maxSessionDuration,
 		},
@@ -197,6 +209,8 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateDebuggerDeployment(
 	_ types.SimplePrinciple,
 	assistantId uint64,
 	greeting, _ *string,
+	unclearInputTimeout *float64,
+	unclearInputMessage *string,
 	greetingInterruptible *bool,
 	idealTimeout *uint64,
 	_ *uint64,
@@ -223,6 +237,8 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateDebuggerDeployment(
 			},
 			Greeting:              greeting,
 			GreetingInterruptible: greetingInterruptible,
+			UnclearInputTimeout:   unclearInputTimeout,
+			UnclearInputMessage:   unclearInputMessage,
 			IdleTimeout:           idealTimeout,
 			MaxSessionDuration:    maxSessionDuration,
 		},
@@ -236,6 +252,8 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateWebPluginDeployment(
 	assistantId uint64,
 	greeting *string,
 	mistake *string,
+	unclearInputTimeout *float64,
+	unclearInputMessage *string,
 	greetingInterruptible *bool,
 	idealTimeout *uint64,
 	idealTimeoutBackoff *uint64,
@@ -245,7 +263,7 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateWebPluginDeployment(
 	inputAudio *protos.DeploymentAudioProvider,
 	outputAudio *protos.DeploymentAudioProvider,
 ) (*internal_assistant_entity.AssistantWebPluginDeployment, error) {
-	_, _, _ = mistake, idealTimeoutBackoff, idealTimeoutMessage
+	_, _, _, _, _ = mistake, unclearInputTimeout, unclearInputMessage, idealTimeoutBackoff, idealTimeoutMessage
 	s.createCalled = true
 	s.assistantId = assistantId
 	s.greeting = greeting
@@ -267,6 +285,8 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateWebPluginDeployment(
 			},
 			Greeting:              greeting,
 			GreetingInterruptible: greetingInterruptible,
+			UnclearInputTimeout:   unclearInputTimeout,
+			UnclearInputMessage:   unclearInputMessage,
 			IdleTimeout:           idealTimeout,
 			MaxSessionDuration:    maxSessionDuration,
 		},
@@ -709,7 +729,7 @@ func TestCreateAssistantDebuggerDeploymentRest_InvalidIdealTimeout(t *testing.T)
 	context.Request = httptest.NewRequest(
 		http.MethodPost,
 		"/v1/assistant-deployment/create-debugger-deployment",
-		bytes.NewReader([]byte(`{"assistantId":"123","idealTimeout":14}`)),
+		bytes.NewReader([]byte(`{"assistantId":"123","idealTimeout":4}`)),
 	)
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
@@ -788,7 +808,7 @@ func TestCreateAssistantDebuggerDeploymentGRPC_InvalidIdealTimeout(t *testing.T)
 	service := &createDebuggerDeploymentRestServiceStub{}
 	deploymentApi := newCreateDebuggerDeploymentGRPCApi(t, service)
 	request := createDebuggerDeploymentGRPCRequest()
-	request.GetDebugger().IdealTimeout = 14
+	request.GetDebugger().IdealTimeout = 4
 
 	response, err := deploymentApi.CreateAssistantDebuggerDeployment(createDebuggerDeploymentGRPCContext(), request)
 
