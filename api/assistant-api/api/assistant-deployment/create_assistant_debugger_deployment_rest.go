@@ -73,6 +73,18 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantDebuggerDeploymentRe
 		})
 		return
 	}
+	if validator.NonNil(request.UnclearInputTimeout) && !validator.Between(*request.UnclearInputTimeout, 0.5, 5) {
+		c.JSON(pkg_errors.CreateAssistantDebuggerDeploymentInvalidUnclearTimeout.HTTPStatusCode, openapi.ErrorResponse{
+			Code:    utils.Ptr(pkg_errors.CreateAssistantDebuggerDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32()),
+			Success: utils.Ptr(false),
+			Error: &openapi.Error{
+				ErrorCode:    utils.Ptr(openapi.Uint64String(pkg_errors.CreateAssistantDebuggerDeploymentInvalidUnclearTimeout.CodeString())),
+				ErrorMessage: utils.Ptr(pkg_errors.CreateAssistantDebuggerDeploymentInvalidUnclearTimeout.Error),
+				HumanMessage: utils.Ptr(pkg_errors.CreateAssistantDebuggerDeploymentInvalidUnclearTimeout.ErrorMessage),
+			},
+		})
+		return
+	}
 	if validator.NonNil(request.IdealTimeout) && !validator.Between(int(*request.IdealTimeout), 5, 120) {
 		c.JSON(pkg_errors.CreateAssistantDebuggerDeploymentInvalidIdealTimeout.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantDebuggerDeploymentInvalidIdealTimeout.HTTPStatusCodeInt32()),

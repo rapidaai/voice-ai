@@ -9,8 +9,10 @@ import (
 	"context"
 	"errors"
 
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/pkg/validator"
 	assistant_api "github.com/rapidaai/protos"
 )
 
@@ -30,6 +32,29 @@ func (deploymentApi *assistantDeploymentGrpcApi) CreateAssistantWebpluginDeploym
 			errors.New("illegal parameters attached to deployment"),
 			"Please check and provide valid deployment request for webplugin.",
 		)
+	}
+	if deployment.GetPlugin().UnclearInputTimeout != nil &&
+		!validator.Between(*deployment.GetPlugin().UnclearInputTimeout, 0.5, 5) {
+		return &assistant_api.GetAssistantWebpluginDeploymentResponse{
+			Code:    pkg_errors.CreateAssistantWebpluginDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(),
+			Success: false,
+			Error: &assistant_api.Error{
+				ErrorCode:    uint64(pkg_errors.CreateAssistantWebpluginDeploymentInvalidUnclearTimeout.Code),
+				ErrorMessage: pkg_errors.CreateAssistantWebpluginDeploymentInvalidUnclearTimeout.Error,
+				HumanMessage: pkg_errors.CreateAssistantWebpluginDeploymentInvalidUnclearTimeout.ErrorMessage,
+			},
+		}, errors.New(pkg_errors.CreateAssistantWebpluginDeploymentInvalidUnclearTimeout.Error)
+	}
+	if !validator.Between(int(deployment.GetPlugin().GetIdealTimeout()), 5, 120) {
+		return &assistant_api.GetAssistantWebpluginDeploymentResponse{
+			Code:    pkg_errors.CreateAssistantWebpluginDeploymentInvalidIdealTimeout.HTTPStatusCodeInt32(),
+			Success: false,
+			Error: &assistant_api.Error{
+				ErrorCode:    uint64(pkg_errors.CreateAssistantWebpluginDeploymentInvalidIdealTimeout.Code),
+				ErrorMessage: pkg_errors.CreateAssistantWebpluginDeploymentInvalidIdealTimeout.Error,
+				HumanMessage: pkg_errors.CreateAssistantWebpluginDeploymentInvalidIdealTimeout.ErrorMessage,
+			},
+		}, errors.New(pkg_errors.CreateAssistantWebpluginDeploymentInvalidIdealTimeout.Error)
 	}
 
 	wpDeployment, err := deploymentApi.deploymentService.CreateWebPluginDeployment(ctx,

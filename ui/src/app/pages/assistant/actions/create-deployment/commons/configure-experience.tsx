@@ -224,7 +224,7 @@ export const ConfigureExperience: FC<{
             labelText="Idle Silence Timeout (Seconds)"
             hideLabel
             min={5}
-            max={60}
+            max={120}
             step={1}
             value={parseInt(experienceConfig.idealTimeout || '30')}
             onChange={({ value }: { value: number }) =>

@@ -86,13 +86,13 @@ export const ConfigureExperienceModalForm: FC<{
                 id="experience-idle-timeout"
                 labelText="Idle Silence Timeout (Seconds)"
                 min={5}
-                max={60}
+                max={120}
                 step={1}
                 value={parseInt(experienceConfig.idealTimeout || '30')}
                 onChange={({ value }: { value: number }) =>
                   update('idealTimeout', value.toString())
                 }
-                helperText="Duration of silence after which Rapida will prompt the user (5-60 s)."
+                helperText="Duration of silence after which Rapida will prompt the user (5-120 s)."
               />
 
               <Slider

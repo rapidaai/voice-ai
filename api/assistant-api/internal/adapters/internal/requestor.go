@@ -45,7 +45,6 @@ import (
 
 const (
 	Unknown            = adapter_lifecycle.Unknown
-	Interrupt          = adapter_lifecycle.Interrupt
 	Interrupted        = adapter_lifecycle.Interrupted
 	LLMGenerating      = adapter_lifecycle.LLMGenerating
 	LLMGenerated       = adapter_lifecycle.LLMGenerated

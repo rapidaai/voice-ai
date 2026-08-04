@@ -9,8 +9,10 @@ import (
 	"context"
 	"errors"
 
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/pkg/validator"
 	assistant_api "github.com/rapidaai/protos"
 )
 
@@ -30,6 +32,29 @@ func (deploymentApi *assistantDeploymentGrpcApi) CreateAssistantWhatsappDeployme
 			errors.New("illegal parameters attached to deployment"),
 			"Please check and provide valid deployment request for whatsapp.",
 		)
+	}
+	if deployment.GetWhatsapp().UnclearInputTimeout != nil &&
+		!validator.Between(*deployment.GetWhatsapp().UnclearInputTimeout, 0.5, 5) {
+		return &assistant_api.GetAssistantWhatsappDeploymentResponse{
+			Code:    pkg_errors.CreateAssistantWhatsappDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(),
+			Success: false,
+			Error: &assistant_api.Error{
+				ErrorCode:    uint64(pkg_errors.CreateAssistantWhatsappDeploymentInvalidUnclearTimeout.Code),
+				ErrorMessage: pkg_errors.CreateAssistantWhatsappDeploymentInvalidUnclearTimeout.Error,
+				HumanMessage: pkg_errors.CreateAssistantWhatsappDeploymentInvalidUnclearTimeout.ErrorMessage,
+			},
+		}, errors.New(pkg_errors.CreateAssistantWhatsappDeploymentInvalidUnclearTimeout.Error)
+	}
+	if !validator.Between(int(deployment.GetWhatsapp().GetIdealTimeout()), 5, 120) {
+		return &assistant_api.GetAssistantWhatsappDeploymentResponse{
+			Code:    pkg_errors.CreateAssistantWhatsappDeploymentInvalidIdealTimeout.HTTPStatusCodeInt32(),
+			Success: false,
+			Error: &assistant_api.Error{
+				ErrorCode:    uint64(pkg_errors.CreateAssistantWhatsappDeploymentInvalidIdealTimeout.Code),
+				ErrorMessage: pkg_errors.CreateAssistantWhatsappDeploymentInvalidIdealTimeout.Error,
+				HumanMessage: pkg_errors.CreateAssistantWhatsappDeploymentInvalidIdealTimeout.ErrorMessage,
+			},
+		}, errors.New(pkg_errors.CreateAssistantWhatsappDeploymentInvalidIdealTimeout.Error)
 	}
 	wpDeployment, err := deploymentApi.deploymentService.CreateWhatsappDeployment(ctx,
 		iAuth, deployment.GetWhatsapp().GetAssistantId(),
