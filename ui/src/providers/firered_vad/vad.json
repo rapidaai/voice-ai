@@ -1,6 +1,22 @@
 {
   "parameters": [
     {
+      "key": "microphone.vad.barge_in_trigger",
+      "label": "Barge-in Trigger",
+      "type": "select",
+      "default": "vad",
+      "choices": [
+        {
+          "label": "VAD",
+          "value": "vad"
+        },
+        {
+          "label": "Word",
+          "value": "word"
+        }
+      ]
+    },
+    {
       "key": "microphone.vad.threshold",
       "label": "Speech Threshold",
       "type": "slider",

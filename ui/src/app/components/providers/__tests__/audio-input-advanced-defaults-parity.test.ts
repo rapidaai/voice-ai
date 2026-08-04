@@ -8,25 +8,34 @@ jest.mock('@/app/components/providers/config-renderer', () => ({
   ConfigRenderer: () => null,
 }));
 
-const { GetDefaultVADConfig } = require('@/app/components/providers/vad/provider');
-const { GetDefaultEOSConfig } = require('@/app/components/providers/end-of-speech/provider');
-const { GetDefaultMicrophoneConfig } = require('@/app/components/providers/speech-to-text/provider');
+const {
+  GetDefaultVADConfig,
+} = require('@/app/components/providers/vad/provider');
+const {
+  GetDefaultEOSConfig,
+} = require('@/app/components/providers/end-of-speech/provider');
+const {
+  GetDefaultMicrophoneConfig,
+} = require('@/app/components/providers/speech-to-text/provider');
 const {
   GetDefaultNoiseCancellationConfig,
 } = require('@/app/components/providers/noise-removal/provider');
 
 const legacyVadDefaults: Record<string, Record<string, string>> = {
   silero_vad: {
+    'microphone.vad.barge_in_trigger': 'vad',
     'microphone.vad.threshold': '0.5',
     'microphone.vad.min_silence_frame': '20',
     'microphone.vad.min_speech_frame': '8',
   },
   ten_vad: {
+    'microphone.vad.barge_in_trigger': 'vad',
     'microphone.vad.threshold': '0.5',
     'microphone.vad.min_silence_frame': '20',
     'microphone.vad.min_speech_frame': '8',
   },
   firered_vad: {
+    'microphone.vad.barge_in_trigger': 'vad',
     'microphone.vad.threshold': '0.5',
     'microphone.vad.min_silence_frame': '10',
     'microphone.vad.min_speech_frame': '3',
@@ -204,7 +213,9 @@ describe('Audio input advanced defaults parity', () => {
 
     const switched = GetDefaultEOSConfig(
       'pipecat_smart_turn_eos',
-      cloneMetadata(seed).filter(m => !m.getKey().startsWith('microphone.eos.')),
+      cloneMetadata(seed).filter(
+        m => !m.getKey().startsWith('microphone.eos.'),
+      ),
     );
 
     expect(getMetadataValue(switched, 'microphone.eos.provider')).toBe(
@@ -214,7 +225,9 @@ describe('Audio input advanced defaults parity', () => {
       '500',
     );
     expect(getMetadataValue(switched, 'microphone.eos.threshold')).toBe('0.5');
-    expect(getMetadataValue(switched, 'microphone.eos.quick_timeout')).toBe('250');
+    expect(getMetadataValue(switched, 'microphone.eos.quick_timeout')).toBe(
+      '250',
+    );
     expect(getMetadataValue(switched, 'microphone.eos.extended_timeout')).toBe(
       '2000',
     );
@@ -222,6 +235,9 @@ describe('Audio input advanced defaults parity', () => {
 
   it('microphone defaults use pipecat eos provider', () => {
     const defaults = GetDefaultMicrophoneConfig([]);
+    expect(getMetadataValue(defaults, 'microphone.vad.barge_in_trigger')).toBe(
+      'vad',
+    );
     expect(getMetadataValue(defaults, 'microphone.eos.provider')).toBe(
       'pipecat_smart_turn_eos',
     );
@@ -229,7 +245,9 @@ describe('Audio input advanced defaults parity', () => {
       '500',
     );
     expect(getMetadataValue(defaults, 'microphone.eos.threshold')).toBe('0.5');
-    expect(getMetadataValue(defaults, 'microphone.eos.quick_timeout')).toBe('250');
+    expect(getMetadataValue(defaults, 'microphone.eos.quick_timeout')).toBe(
+      '250',
+    );
     expect(getMetadataValue(defaults, 'microphone.eos.extended_timeout')).toBe(
       '2000',
     );
@@ -246,8 +264,12 @@ describe('Audio input advanced defaults parity', () => {
     expect(getMetadataValue(defaults, 'microphone.eos.fallback_timeout')).toBe(
       '500',
     );
-    expect(getMetadataValue(defaults, 'microphone.eos.threshold')).toBe('0.0289');
-    expect(getMetadataValue(defaults, 'microphone.eos.quick_timeout')).toBe('250');
+    expect(getMetadataValue(defaults, 'microphone.eos.threshold')).toBe(
+      '0.0289',
+    );
+    expect(getMetadataValue(defaults, 'microphone.eos.quick_timeout')).toBe(
+      '250',
+    );
     expect(getMetadataValue(defaults, 'microphone.eos.extended_timeout')).toBe(
       '3000',
     );
@@ -261,7 +283,10 @@ describe('Audio input advanced defaults parity', () => {
       createMetadata('microphone.denoising.level', 'high'),
     ];
 
-    const current = GetDefaultNoiseCancellationConfig('rn_noise', cloneMetadata(seed));
+    const current = GetDefaultNoiseCancellationConfig(
+      'rn_noise',
+      cloneMetadata(seed),
+    );
     expect(normalizeMetadata(current)).toEqual(
       normalizeMetadata([
         createMetadata('listen.model', 'nova-3'),
@@ -279,10 +304,14 @@ describe('Audio input advanced defaults parity', () => {
     ];
 
     expect(
-      normalizeMetadata(GetDefaultVADConfig('unknown_vad', cloneMetadata(seed))),
+      normalizeMetadata(
+        GetDefaultVADConfig('unknown_vad', cloneMetadata(seed)),
+      ),
     ).toEqual(normalizeMetadata(seed));
     expect(
-      normalizeMetadata(GetDefaultEOSConfig('unknown_eos', cloneMetadata(seed))),
+      normalizeMetadata(
+        GetDefaultEOSConfig('unknown_eos', cloneMetadata(seed)),
+      ),
     ).toEqual(normalizeMetadata(seed));
     expect(
       normalizeMetadata(

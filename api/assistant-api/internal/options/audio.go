@@ -38,6 +38,15 @@ const (
 )
 
 const (
+	MicrophoneVADOptionBargeInTrigger = "microphone.vad.barge_in_trigger"
+)
+
+const (
+	BargeInTriggerVAD  = "vad"
+	BargeInTriggerWord = "word"
+)
+
+const (
 	SpeakOptionVoiceID         = "speak.voice.id"
 	SpeakOptionLanguage        = "speak.language"
 	SpeakOptionModel           = "speak.model"

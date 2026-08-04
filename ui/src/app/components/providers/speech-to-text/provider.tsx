@@ -160,6 +160,7 @@ export const GetDefaultMicrophoneConfig = (
     'microphone.eos.provider'?: string;
     'microphone.denoising.provider'?: string;
     'microphone.vad.provider'?: string;
+    'microphone.vad.barge_in_trigger'?: string;
     'microphone.vad.threshold'?: string;
   },
 ): Metadata[] => {
@@ -192,6 +193,10 @@ export const GetDefaultMicrophoneConfig = (
     {
       key: 'microphone.vad.provider',
       value: defaults?.['microphone.vad.provider'] ?? 'silero_vad',
+    },
+    {
+      key: 'microphone.vad.barge_in_trigger',
+      value: defaults?.['microphone.vad.barge_in_trigger'] ?? 'vad',
     },
     {
       key: 'microphone.vad.threshold',

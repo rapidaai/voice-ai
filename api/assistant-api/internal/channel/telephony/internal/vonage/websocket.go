@@ -287,10 +287,8 @@ func (vng *vonageWebsocketStreamer) Send(response internal_type.Stream) error {
 			return nil
 		}
 	case *protos.ConversationInterruption:
-		if data.Type == protos.ConversationInterruption_INTERRUPTION_TYPE_WORD {
-			if vng.mediaSession != nil {
-				vng.mediaSession.HandleInterrupt()
-			}
+		if vng.mediaSession != nil {
+			vng.mediaSession.HandleInterrupt()
 		}
 	case *protos.ConversationDisconnection:
 		_ = vng.Disconnect(data.GetType())

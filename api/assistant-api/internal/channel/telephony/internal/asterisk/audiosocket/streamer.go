@@ -359,10 +359,8 @@ func (as *Streamer) Send(response internal_type.Stream) error {
 			}
 		}
 	case *protos.ConversationInterruption:
-		if data.GetType() == protos.ConversationInterruption_INTERRUPTION_TYPE_WORD {
-			if as.mediaSession != nil {
-				as.mediaSession.HandleInterrupt()
-			}
+		if as.mediaSession != nil {
+			as.mediaSession.HandleInterrupt()
 		}
 	case *protos.ConversationDisconnection:
 		// Server-initiated disconnect: the talker already knows the reason

@@ -26,6 +26,7 @@ import (
 	internal_conversation_entity "github.com/rapidaai/api/assistant-api/internal/entity/conversations"
 	internal_llm "github.com/rapidaai/api/assistant-api/internal/llm"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	internal_options "github.com/rapidaai/api/assistant-api/internal/options"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	internal_transformer "github.com/rapidaai/api/assistant-api/internal/transformer"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
@@ -236,8 +237,49 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 	if p.ContextID == "" {
 		p.ContextID = h.r.GetID()
 	}
+
+	bargeInTrigger := internal_options.BargeInTriggerVAD
+	if opts := h.r.GetOptions(); len(opts) > 0 {
+		if value, err := opts.GetString(internal_options.MicrophoneVADOptionBargeInTrigger); err == nil {
+			bargeInTrigger = value
+		}
+	}
+
 	switch p.Source {
+	case internal_type.InterruptionSourceVad:
+		switch p.Event {
+		case internal_type.InterruptionEventStart:
+			if bargeInTrigger == internal_options.BargeInTriggerWord {
+				h.r.OnPacket(ctx, internal_type.SpeechToTextStartPacket{ContextID: p.ContextID})
+				return
+			}
+
+			h.r.OnPacket(ctx,
+				internal_type.StopIdleTimeoutPacket{ContextID: p.ContextID},
+				internal_type.EndOfSpeechInterruptionPacket{ContextID: p.ContextID, Source: internal_type.InterruptionSourceVad},
+			)
+			if err := h.r.Transition(Interrupted); err != nil {
+				return
+			}
+			h.r.OnPacket(ctx,
+				internal_type.TextToSpeechInterruptPacket{ContextID: p.ContextID, StartAt: p.StartAt, EndAt: p.EndAt},
+				internal_type.LLMInterruptPacket{ContextID: p.ContextID},
+			)
+			h.r.OnPacket(ctx, internal_type.SpeechToTextStartPacket{ContextID: h.r.GetID()})
+			utils.Go(ctx, func() {
+				h.r.Notify(ctx, &protos.ConversationInterruption{
+					Type: protos.ConversationInterruption_INTERRUPTION_TYPE_VAD,
+					Time: timestamppb.Now(),
+				})
+			})
+		case internal_type.InterruptionEventEnd:
+			h.r.OnPacket(ctx, internal_type.SpeechToTextEndPacket{ContextID: h.r.GetID()})
+		}
 	case internal_type.InterruptionSourceWord:
+		if bargeInTrigger != internal_options.BargeInTriggerWord {
+			return
+		}
+
 		h.r.OnPacket(ctx,
 			internal_type.StopIdleTimeoutPacket{ContextID: p.ContextID},
 			internal_type.EndOfSpeechInterruptionPacket{ContextID: p.ContextID, Source: internal_type.InterruptionSourceWord},
@@ -255,26 +297,6 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 				Time: timestamppb.Now(),
 			})
 		})
-
-	default:
-		switch p.Event {
-		case internal_type.InterruptionEventStart:
-			h.r.Transition(Interrupt)
-			h.r.OnPacket(
-				ctx,
-				internal_type.EndOfSpeechInterruptionPacket{ContextID: p.ContextID, Source: internal_type.InterruptionSourceVad},
-				internal_type.SpeechToTextStartPacket{ContextID: p.ContextID},
-			)
-			//
-			utils.Go(ctx, func() {
-				h.r.Notify(ctx, &protos.ConversationInterruption{
-					Type: protos.ConversationInterruption_INTERRUPTION_TYPE_VAD,
-					Time: timestamppb.Now(),
-				})
-			})
-		case internal_type.InterruptionEventEnd:
-			h.r.OnPacket(ctx, internal_type.SpeechToTextEndPacket{ContextID: p.ContextID})
-		}
 	}
 }
 
