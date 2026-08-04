@@ -57,7 +57,7 @@ func TestNotBlank(t *testing.T) {
 }
 
 func TestBetween(t *testing.T) {
-	tests := []struct {
+	intTests := []struct {
 		name  string
 		value int
 		min   int
@@ -72,10 +72,32 @@ func TestBetween(t *testing.T) {
 		{name: "invalid range", value: 5, min: 10, max: 1, want: false},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range intTests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := Between(tt.value, tt.min, tt.max); got != tt.want {
 				t.Fatalf("Between(%d, %d, %d) = %v, want %v", tt.value, tt.min, tt.max, got, tt.want)
+			}
+		})
+	}
+
+	floatTests := []struct {
+		name  string
+		value float64
+		min   float64
+		max   float64
+		want  bool
+	}{
+		{name: "float inside", value: 1.5, min: 0.5, max: 5, want: true},
+		{name: "float lower bound", value: 0.5, min: 0.5, max: 5, want: true},
+		{name: "float upper bound", value: 5, min: 0.5, max: 5, want: true},
+		{name: "float below", value: 0.4, min: 0.5, max: 5, want: false},
+		{name: "float above", value: 5.1, min: 0.5, max: 5, want: false},
+	}
+
+	for _, tt := range floatTests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Between(tt.value, tt.min, tt.max); got != tt.want {
+				t.Fatalf("Between(%f, %f, %f) = %v, want %v", tt.value, tt.min, tt.max, got, tt.want)
 			}
 		})
 	}

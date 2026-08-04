@@ -17,6 +17,7 @@ const (
 	CreateAssistantDebuggerDeploymentInvalidIdealTimeoutCode    ErrorCode = 1004007
 	CreateAssistantDebuggerDeploymentInvalidTimeoutBackoffCode  ErrorCode = 1004008
 	CreateAssistantDebuggerDeploymentInvalidSessionDurationCode ErrorCode = 1004009
+	CreateAssistantDebuggerDeploymentInvalidUnclearTimeoutCode  ErrorCode = 1004010
 
 	CreateAssistantPhoneDeploymentInvalidRequestCode         ErrorCode = 1005001
 	CreateAssistantPhoneDeploymentUnauthenticatedCode        ErrorCode = 1005002
@@ -28,6 +29,7 @@ const (
 	CreateAssistantPhoneDeploymentInvalidTimeoutBackoffCode  ErrorCode = 1005008
 	CreateAssistantPhoneDeploymentInvalidSessionDurationCode ErrorCode = 1005009
 	CreateAssistantPhoneDeploymentMissingPhoneProviderCode   ErrorCode = 1005010
+	CreateAssistantPhoneDeploymentInvalidUnclearTimeoutCode  ErrorCode = 1005011
 
 	CreateAssistantApiDeploymentInvalidRequestCode         ErrorCode = 1006001
 	CreateAssistantApiDeploymentUnauthenticatedCode        ErrorCode = 1006002
@@ -38,6 +40,7 @@ const (
 	CreateAssistantApiDeploymentInvalidIdealTimeoutCode    ErrorCode = 1006007
 	CreateAssistantApiDeploymentInvalidTimeoutBackoffCode  ErrorCode = 1006008
 	CreateAssistantApiDeploymentInvalidSessionDurationCode ErrorCode = 1006009
+	CreateAssistantApiDeploymentInvalidUnclearTimeoutCode  ErrorCode = 1006010
 
 	CreateAssistantWebpluginDeploymentInvalidRequestCode         ErrorCode = 1007001
 	CreateAssistantWebpluginDeploymentUnauthenticatedCode        ErrorCode = 1007002
@@ -48,6 +51,7 @@ const (
 	CreateAssistantWebpluginDeploymentInvalidIdealTimeoutCode    ErrorCode = 1007007
 	CreateAssistantWebpluginDeploymentInvalidTimeoutBackoffCode  ErrorCode = 1007008
 	CreateAssistantWebpluginDeploymentInvalidSessionDurationCode ErrorCode = 1007009
+	CreateAssistantWebpluginDeploymentInvalidUnclearTimeoutCode  ErrorCode = 1007010
 
 	CreateAssistantWhatsappDeploymentInvalidRequestCode         ErrorCode = 1008001
 	CreateAssistantWhatsappDeploymentUnauthenticatedCode        ErrorCode = 1008002
@@ -58,6 +62,7 @@ const (
 	CreateAssistantWhatsappDeploymentInvalidTimeoutBackoffCode  ErrorCode = 1008007
 	CreateAssistantWhatsappDeploymentInvalidSessionDurationCode ErrorCode = 1008008
 	CreateAssistantWhatsappDeploymentMissingProviderCode        ErrorCode = 1008009
+	CreateAssistantWhatsappDeploymentInvalidUnclearTimeoutCode  ErrorCode = 1008010
 
 	GetAssistantDebuggerDeploymentUnauthenticatedCode    ErrorCode = 1009001
 	GetAssistantDebuggerDeploymentMissingAuthScopeCode   ErrorCode = 1009002
@@ -158,6 +163,12 @@ var (
 		Error:          "invalid ideal_timeout parameter",
 		ErrorMessage:   "Please provide idealTimeout between 5 and 120 seconds.",
 	}
+	CreateAssistantDebuggerDeploymentInvalidUnclearTimeout = PlatformError{
+		HTTPStatusCode: http.StatusBadRequest,
+		Code:           CreateAssistantDebuggerDeploymentInvalidUnclearTimeoutCode,
+		Error:          "invalid unclear_input_timeout parameter",
+		ErrorMessage:   "Please provide unclearInputTimeout between 0.5 and 5 seconds.",
+	}
 	CreateAssistantDebuggerDeploymentInvalidTimeoutBackoff = PlatformError{
 		HTTPStatusCode: http.StatusBadRequest,
 		Code:           CreateAssistantDebuggerDeploymentInvalidTimeoutBackoffCode,
@@ -211,6 +222,12 @@ var (
 		Code:           CreateAssistantPhoneDeploymentInvalidIdealTimeoutCode,
 		Error:          "invalid ideal_timeout parameter",
 		ErrorMessage:   "Please provide idealTimeout between 5 and 120 seconds.",
+	}
+	CreateAssistantPhoneDeploymentInvalidUnclearTimeout = PlatformError{
+		HTTPStatusCode: http.StatusBadRequest,
+		Code:           CreateAssistantPhoneDeploymentInvalidUnclearTimeoutCode,
+		Error:          "invalid unclear_input_timeout parameter",
+		ErrorMessage:   "Please provide unclearInputTimeout between 0.5 and 5 seconds.",
 	}
 	CreateAssistantPhoneDeploymentInvalidTimeoutBackoff = PlatformError{
 		HTTPStatusCode: http.StatusBadRequest,
@@ -272,6 +289,12 @@ var (
 		Error:          "invalid ideal_timeout parameter",
 		ErrorMessage:   "Please provide idealTimeout between 5 and 120 seconds.",
 	}
+	CreateAssistantApiDeploymentInvalidUnclearTimeout = PlatformError{
+		HTTPStatusCode: http.StatusBadRequest,
+		Code:           CreateAssistantApiDeploymentInvalidUnclearTimeoutCode,
+		Error:          "invalid unclear_input_timeout parameter",
+		ErrorMessage:   "Please provide unclearInputTimeout between 0.5 and 5 seconds.",
+	}
 	CreateAssistantApiDeploymentInvalidTimeoutBackoff = PlatformError{
 		HTTPStatusCode: http.StatusBadRequest,
 		Code:           CreateAssistantApiDeploymentInvalidTimeoutBackoffCode,
@@ -326,6 +349,12 @@ var (
 		Error:          "invalid ideal_timeout parameter",
 		ErrorMessage:   "Please provide idealTimeout between 5 and 120 seconds.",
 	}
+	CreateAssistantWebpluginDeploymentInvalidUnclearTimeout = PlatformError{
+		HTTPStatusCode: http.StatusBadRequest,
+		Code:           CreateAssistantWebpluginDeploymentInvalidUnclearTimeoutCode,
+		Error:          "invalid unclear_input_timeout parameter",
+		ErrorMessage:   "Please provide unclearInputTimeout between 0.5 and 5 seconds.",
+	}
 	CreateAssistantWebpluginDeploymentInvalidTimeoutBackoff = PlatformError{
 		HTTPStatusCode: http.StatusBadRequest,
 		Code:           CreateAssistantWebpluginDeploymentInvalidTimeoutBackoffCode,
@@ -373,6 +402,12 @@ var (
 		Code:           CreateAssistantWhatsappDeploymentInvalidIdealTimeoutCode,
 		Error:          "invalid ideal_timeout parameter",
 		ErrorMessage:   "Please provide idealTimeout between 5 and 120 seconds.",
+	}
+	CreateAssistantWhatsappDeploymentInvalidUnclearTimeout = PlatformError{
+		HTTPStatusCode: http.StatusBadRequest,
+		Code:           CreateAssistantWhatsappDeploymentInvalidUnclearTimeoutCode,
+		Error:          "invalid unclear_input_timeout parameter",
+		ErrorMessage:   "Please provide unclearInputTimeout between 0.5 and 5 seconds.",
 	}
 	CreateAssistantWhatsappDeploymentInvalidTimeoutBackoff = PlatformError{
 		HTTPStatusCode: http.StatusBadRequest,

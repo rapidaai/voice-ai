@@ -1008,7 +1008,7 @@ components:
           maximum: 5
         unclearInputMessage:
           type: string
-          maxLength: 250
+          maxLength: 500
         idealTimeout:
           type: integer
           format: uint64
@@ -1051,7 +1051,7 @@ components:
           maximum: 5
         unclearInputMessage:
           type: string
-          maxLength: 250
+          maxLength: 500
         idealTimeout:
           type: integer
           format: uint64
@@ -1099,7 +1099,7 @@ components:
           maximum: 5
         unclearInputMessage:
           type: string
-          maxLength: 250
+          maxLength: 500
         idealTimeout:
           type: integer
           format: uint64
@@ -1141,7 +1141,7 @@ components:
           maximum: 5
         unclearInputMessage:
           type: string
-          maxLength: 250
+          maxLength: 500
         idealTimeout:
           type: integer
           format: uint64
@@ -1188,7 +1188,7 @@ components:
           maximum: 5
         unclearInputMessage:
           type: string
-          maxLength: 250
+          maxLength: 500
         idealTimeout:
           type: integer
           format: uint64
@@ -1559,7 +1559,7 @@ components:
           maximum: 5
         unclearInputMessage:
           type: string
-          maxLength: 250
+          maxLength: 500
         inputAudio:
           $ref: "#/components/schemas/DeploymentAudioProvider"
         outputAudio:
@@ -1603,7 +1603,7 @@ components:
           maximum: 5
         unclearInputMessage:
           type: string
-          maxLength: 250
+          maxLength: 500
         inputAudio:
           $ref: "#/components/schemas/DeploymentAudioProvider"
         outputAudio:
@@ -1653,7 +1653,7 @@ components:
           maximum: 5
         unclearInputMessage:
           type: string
-          maxLength: 250
+          maxLength: 500
         inputAudio:
           $ref: "#/components/schemas/DeploymentAudioProvider"
         outputAudio:
@@ -1697,7 +1697,7 @@ components:
           maximum: 5
         unclearInputMessage:
           type: string
-          maxLength: 250
+          maxLength: 500
         inputAudio:
           $ref: "#/components/schemas/DeploymentAudioProvider"
         outputAudio:
@@ -1745,7 +1745,7 @@ components:
           maximum: 5
         unclearInputMessage:
           type: string
-          maxLength: 250
+          maxLength: 500
         whatsappProviderName:
           type: string
         whatsappOptions:
