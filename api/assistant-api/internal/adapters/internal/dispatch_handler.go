@@ -273,6 +273,10 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 				})
 			})
 		case internal_type.InterruptionEventEnd:
+			if bargeInTrigger == internal_options.BargeInTriggerWord {
+				h.r.OnPacket(ctx, internal_type.SpeechToTextEndPacket{ContextID: p.ContextID})
+				return
+			}
 			h.r.OnPacket(ctx, internal_type.SpeechToTextEndPacket{ContextID: h.r.GetID()})
 		}
 	case internal_type.InterruptionSourceWord:

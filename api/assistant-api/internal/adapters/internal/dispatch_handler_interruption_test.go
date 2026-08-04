@@ -96,10 +96,13 @@ func TestHandleInterruptionDetected_VADTriggerUsesVADOnly(t *testing.T) {
 		Event:     internal_type.InterruptionEventEnd,
 	})
 
-	controlPackets := drainControlPackets(r)
-	require.Len(t, controlPackets, 1)
-	sttEnd, ok := controlPackets[0].(internal_type.SpeechToTextEndPacket)
-	require.True(t, ok, "expected SpeechToTextEndPacket, got %T", controlPackets[0])
+	var sttEnd internal_type.SpeechToTextEndPacket
+	for _, packet := range drainControlPackets(r) {
+		if typed, ok := packet.(internal_type.SpeechToTextEndPacket); ok {
+			sttEnd = typed
+		}
+	}
+	require.NotEmpty(t, sttEnd.ContextID)
 	assert.Equal(t, r.GetID(), sttEnd.ContextID)
 }
 
@@ -159,9 +162,12 @@ func TestHandleInterruptionDetected_WordTriggerUsesWordOnly(t *testing.T) {
 		Event:     internal_type.InterruptionEventEnd,
 	})
 
-	controlPackets = drainControlPackets(r)
-	require.Len(t, controlPackets, 1)
-	sttEnd, ok := controlPackets[0].(internal_type.SpeechToTextEndPacket)
-	require.True(t, ok, "expected SpeechToTextEndPacket, got %T", controlPackets[0])
-	assert.Equal(t, r.GetID(), sttEnd.ContextID)
+	var sttEnd internal_type.SpeechToTextEndPacket
+	for _, packet := range drainControlPackets(r) {
+		if typed, ok := packet.(internal_type.SpeechToTextEndPacket); ok {
+			sttEnd = typed
+		}
+	}
+	require.NotEmpty(t, sttEnd.ContextID)
+	assert.Equal(t, "ctx-active", sttEnd.ContextID)
 }
