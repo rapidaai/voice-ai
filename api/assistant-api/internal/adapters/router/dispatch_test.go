@@ -53,6 +53,8 @@ func (s *dispatchHandlerStub) HandleStopIdleTimeout(context.Context, internal_ty
 }
 func (s *dispatchHandlerStub) HandleIdleTimeoutExpired(context.Context, internal_type.IdleTimeoutExpiredPacket) {
 }
+func (s *dispatchHandlerStub) HandleUnclearInputExpired(context.Context, internal_type.UnclearInputExpiredPacket) {
+}
 func (s *dispatchHandlerStub) HandleMaxSessionExpired(context.Context, internal_type.MaxSessionExpiredPacket) {
 }
 func (s *dispatchHandlerStub) HandleTextToSpeechText(context.Context, internal_type.TextToSpeechTextPacket) {

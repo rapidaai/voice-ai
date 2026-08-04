@@ -122,6 +122,7 @@ type genericRequestor struct {
 
 	// experience
 	idleTimeoutWatchdog   *watchdog.IdleTimeoutWatchdog
+	unclearInputWatchdog  *watchdog.UnclearInputWatchdog
 	ttsCompletionWatchdog *watchdog.TTSCompletionWatchdog
 	maxSessionWatchdog    *watchdog.MaxSessionWatchdog
 
@@ -191,6 +192,10 @@ func NewGenericRequestor(
 	}
 
 	gr.idleTimeoutWatchdog = watchdog.NewIdleTimeoutWatchdog(
+		watchdog.WithOnPacket(gr.OnPacket),
+		watchdog.WithPacketContext(sessionCtx),
+	)
+	gr.unclearInputWatchdog = watchdog.NewUnclearInputWatchdog(
 		watchdog.WithOnPacket(gr.OnPacket),
 		watchdog.WithPacketContext(sessionCtx),
 	)

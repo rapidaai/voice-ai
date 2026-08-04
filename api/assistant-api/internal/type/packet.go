@@ -107,6 +107,7 @@ const (
 	PacketNameStartIdleTimeout                           PacketName = "StartIdleTimeoutPacket"
 	PacketNameStopIdleTimeout                            PacketName = "StopIdleTimeoutPacket"
 	PacketNameIdleTimeoutExpired                         PacketName = "IdleTimeoutExpiredPacket"
+	PacketNameUnclearInputExpired                        PacketName = "UnclearInputExpiredPacket"
 	PacketNameMaxSessionExpired                          PacketName = "MaxSessionExpiredPacket"
 	PacketNameLLMResponseDelta                           PacketName = "LLMResponseDeltaPacket"
 	PacketNameLLMResponseDone                            PacketName = "LLMResponseDonePacket"
@@ -1093,6 +1094,14 @@ type IdleTimeoutExpiredPacket struct {
 
 func (f IdleTimeoutExpiredPacket) ContextId() string      { return f.ContextID }
 func (f IdleTimeoutExpiredPacket) PacketName() PacketName { return PacketNameIdleTimeoutExpired }
+
+// UnclearInputExpiredPacket signals that an interrupted turn did not produce accepted user input.
+type UnclearInputExpiredPacket struct {
+	ContextID string
+}
+
+func (f UnclearInputExpiredPacket) ContextId() string      { return f.ContextID }
+func (f UnclearInputExpiredPacket) PacketName() PacketName { return PacketNameUnclearInputExpired }
 
 // MaxSessionExpiredPacket signals that the max-session watchdog expired.
 type MaxSessionExpiredPacket struct {

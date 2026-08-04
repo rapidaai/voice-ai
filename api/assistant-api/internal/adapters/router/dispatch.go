@@ -41,6 +41,7 @@ type DispatchHandler interface {
 	HandleStartIdleTimeout(context.Context, internal_type.StartIdleTimeoutPacket)
 	HandleStopIdleTimeout(context.Context, internal_type.StopIdleTimeoutPacket)
 	HandleIdleTimeoutExpired(context.Context, internal_type.IdleTimeoutExpiredPacket)
+	HandleUnclearInputExpired(context.Context, internal_type.UnclearInputExpiredPacket)
 	HandleMaxSessionExpired(context.Context, internal_type.MaxSessionExpiredPacket)
 	HandleTextToSpeechText(context.Context, internal_type.TextToSpeechTextPacket)
 	HandleTextToSpeechDone(context.Context, internal_type.TextToSpeechDonePacket)
@@ -157,6 +158,8 @@ func DispatchPacket(ctx context.Context, p internal_type.Packet, handler Dispatc
 		handler.HandleStopIdleTimeout(ctx, vl)
 	case internal_type.IdleTimeoutExpiredPacket:
 		handler.HandleIdleTimeoutExpired(ctx, vl)
+	case internal_type.UnclearInputExpiredPacket:
+		handler.HandleUnclearInputExpired(ctx, vl)
 	case internal_type.MaxSessionExpiredPacket:
 		handler.HandleMaxSessionExpired(ctx, vl)
 	case internal_type.TextToSpeechTextPacket:

@@ -125,6 +125,18 @@ func (h requestorDispatchHandler) HandleVadSpeechActivity(ctx context.Context, v
 }
 func (h requestorDispatchHandler) HandleSpeechToText(ctx context.Context, p internal_type.SpeechToTextPacket) {
 	p.ContextID = h.r.GetID()
+	if p.Interim && h.r.unclearInputWatchdog != nil {
+		if behavior, err := h.r.deploymentBehavior(); err == nil &&
+			validator.NonNil(behavior.UnclearInputTimeout) && *behavior.UnclearInputTimeout > 0 {
+			h.r.unclearInputWatchdog.Extend(
+				p.ContextID,
+				time.Duration(*behavior.UnclearInputTimeout*float64(time.Second)),
+			)
+		}
+	}
+	if !p.Interim && h.r.unclearInputWatchdog != nil && validator.NotBlank(p.Script) {
+		h.r.unclearInputWatchdog.Stop()
+	}
 	if h.r.endOfSpeechExecutor != nil {
 		_ = h.r.endOfSpeechExecutor.Execute(ctx, p)
 		return
@@ -148,6 +160,9 @@ func (h requestorDispatchHandler) HandleInterimEndOfSpeech(ctx context.Context, 
 	})
 }
 func (h requestorDispatchHandler) HandleEndOfSpeech(ctx context.Context, p internal_type.EndOfSpeechPacket) {
+	if h.r.unclearInputWatchdog != nil && validator.NotBlank(p.Speech) {
+		h.r.unclearInputWatchdog.Stop()
+	}
 	if err := h.callInputNormalizer(ctx, p); err != nil {
 		h.r.OnPacket(ctx, internal_type.UserInputPacket{
 			ContextID: p.ContextID,
@@ -156,6 +171,9 @@ func (h requestorDispatchHandler) HandleEndOfSpeech(ctx context.Context, p inter
 	}
 }
 func (h requestorDispatchHandler) HandleUserInput(ctx context.Context, p internal_type.UserInputPacket) {
+	if h.r.unclearInputWatchdog != nil && validator.NotBlank(p.Text) {
+		h.r.unclearInputWatchdog.Stop()
+	}
 	h.r.OnPacket(ctx, internal_type.StopIdleTimeoutPacket{
 		ContextID: h.r.GetID(), ResetCount: true,
 	})
@@ -266,6 +284,15 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 				internal_type.LLMInterruptPacket{ContextID: p.ContextID},
 			)
 			h.r.OnPacket(ctx, internal_type.SpeechToTextStartPacket{ContextID: h.r.GetID()})
+			if h.r.unclearInputWatchdog != nil {
+				if behavior, err := h.r.deploymentBehavior(); err == nil &&
+					validator.NonNil(behavior.UnclearInputTimeout) && *behavior.UnclearInputTimeout > 0 {
+					h.r.unclearInputWatchdog.Start(
+						h.r.GetID(),
+						time.Duration(*behavior.UnclearInputTimeout*float64(time.Second)),
+					)
+				}
+			}
 			utils.Go(ctx, func() {
 				h.r.Notify(ctx, &protos.ConversationInterruption{
 					Type: protos.ConversationInterruption_INTERRUPTION_TYPE_VAD,
@@ -295,6 +322,15 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 			internal_type.TextToSpeechInterruptPacket{ContextID: p.ContextID, StartAt: p.StartAt, EndAt: p.EndAt},
 			internal_type.LLMInterruptPacket{ContextID: p.ContextID},
 		)
+		if h.r.unclearInputWatchdog != nil {
+			if behavior, err := h.r.deploymentBehavior(); err == nil &&
+				validator.NonNil(behavior.UnclearInputTimeout) && *behavior.UnclearInputTimeout > 0 {
+				h.r.unclearInputWatchdog.Start(
+					h.r.GetID(),
+					time.Duration(*behavior.UnclearInputTimeout*float64(time.Second)),
+				)
+			}
+		}
 		utils.Go(ctx, func() {
 			h.r.Notify(ctx, &protos.ConversationInterruption{
 				Type: protos.ConversationInterruption_INTERRUPTION_TYPE_WORD,
@@ -997,6 +1033,35 @@ func (h requestorDispatchHandler) HandleIdleTimeoutExpired(ctx context.Context, 
 				"type":      "idle_timeout",
 				"count":     fmt.Sprintf("%d", idleTimeoutCount),
 				"max_count": fmt.Sprintf("%d", maxCount),
+			}),
+		},
+		internal_type.StartIdleTimeoutPacket{ContextID: contextID},
+	)
+}
+
+func (h requestorDispatchHandler) HandleUnclearInputExpired(ctx context.Context, p internal_type.UnclearInputExpiredPacket) {
+	if p.ContextID != h.r.GetID() {
+		return
+	}
+
+	behavior, err := h.r.deploymentBehavior()
+	if err != nil {
+		return
+	}
+
+	if !validator.NonNil(behavior.UnclearInputMessage) || !validator.NotBlank(*behavior.UnclearInputMessage) {
+		return
+	}
+
+	contextID := h.r.GetID()
+	h.r.OnPacket(ctx,
+		internal_type.TextToSpeechInterruptPacket{ContextID: contextID},
+		internal_type.InjectMessagePacket{ContextID: contextID, Text: *behavior.UnclearInputMessage},
+		internal_type.ObservabilityEventRecordPacket{
+			ContextID: contextID,
+			Scope:     internal_type.ObservabilityRecordScopeConversation,
+			Record: observability.NewConversationEventRecord(observability.ConversationAgentStateChanged, observability.Attributes{
+				"type": "unclear_input",
 			}),
 		},
 		internal_type.StartIdleTimeoutPacket{ContextID: contextID},
@@ -2989,6 +3054,9 @@ func (h requestorDispatchHandler) HandleFinalizeInboundDispatcher(ctx context.Co
 func (h requestorDispatchHandler) HandleFinalizeBehavior(ctx context.Context, p internal_type.FinalizeBehaviorPacket) {
 	if h.r.idleTimeoutWatchdog != nil {
 		h.r.idleTimeoutWatchdog.Cancel()
+	}
+	if h.r.unclearInputWatchdog != nil {
+		h.r.unclearInputWatchdog.Cancel()
 	}
 	if h.r.ttsCompletionWatchdog != nil {
 		h.r.ttsCompletionWatchdog.Cancel()
