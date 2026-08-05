@@ -117,6 +117,74 @@ func (e *agentkitExecutor) Write(ctx context.Context, comm internal_type.Communi
 			Text:      data.User.GetText(),
 		})
 
+	case *protos.TalkOutput_Control:
+		if data.Control == nil {
+			return
+		}
+		if !e.isCurrentContext(data.Control.GetId()) {
+			return
+		}
+		switch data.Control.GetAction() {
+		case protos.ConversationControl_CONTROL_ACTION_BLOCK:
+			for _, controlType := range data.Control.GetTypes() {
+				switch controlType {
+				case protos.ConversationControl_CONTROL_TYPE_USER_AUDIO:
+					comm.OnPacket(ctx, internal_type.DispatchPolicyPacket{
+						ContextID: data.Control.GetId(),
+						Policy: internal_type.DispatchPolicy{
+							Target: internal_type.PacketNameUserAudioReceived,
+							Action: internal_type.DispatchActionIgnore,
+						},
+					})
+				case protos.ConversationControl_CONTROL_TYPE_USER_TEXT:
+					comm.OnPacket(ctx, internal_type.DispatchPolicyPacket{
+						ContextID: data.Control.GetId(),
+						Policy: internal_type.DispatchPolicy{
+							Target: internal_type.PacketNameUserTextReceived,
+							Action: internal_type.DispatchActionIgnore,
+						},
+					})
+				case protos.ConversationControl_CONTROL_TYPE_BARGE_IN:
+					comm.OnPacket(ctx, internal_type.DispatchPolicyPacket{
+						ContextID: data.Control.GetId(),
+						Policy: internal_type.DispatchPolicy{
+							Target: internal_type.PacketNameInterruptionDetected,
+							Action: internal_type.DispatchActionIgnore,
+						},
+					})
+				}
+			}
+		case protos.ConversationControl_CONTROL_ACTION_UNBLOCK:
+			for _, controlType := range data.Control.GetTypes() {
+				switch controlType {
+				case protos.ConversationControl_CONTROL_TYPE_USER_AUDIO:
+					comm.OnPacket(ctx, internal_type.DispatchPolicyPacket{
+						ContextID: data.Control.GetId(),
+						Policy: internal_type.DispatchPolicy{
+							Target: internal_type.PacketNameUserAudioReceived,
+							Action: internal_type.DispatchActionPassthrough,
+						},
+					})
+				case protos.ConversationControl_CONTROL_TYPE_USER_TEXT:
+					comm.OnPacket(ctx, internal_type.DispatchPolicyPacket{
+						ContextID: data.Control.GetId(),
+						Policy: internal_type.DispatchPolicy{
+							Target: internal_type.PacketNameUserTextReceived,
+							Action: internal_type.DispatchActionPassthrough,
+						},
+					})
+				case protos.ConversationControl_CONTROL_TYPE_BARGE_IN:
+					comm.OnPacket(ctx, internal_type.DispatchPolicyPacket{
+						ContextID: data.Control.GetId(),
+						Policy: internal_type.DispatchPolicy{
+							Target: internal_type.PacketNameInterruptionDetected,
+							Action: internal_type.DispatchActionPassthrough,
+						},
+					})
+				}
+			}
+		}
+
 	case *protos.TalkOutput_Assistant:
 		if !e.isCurrentContext(data.Assistant.GetId()) {
 			return
