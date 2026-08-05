@@ -5,6 +5,22 @@ export interface IntegrationProvider extends RapidaProvider { }
 interface EndOfSpeechProvider extends RapidaProvider { }
 interface VADProvider extends RapidaProvider { }
 interface NoiseCancellationProvider extends RapidaProvider { }
+export interface RapidaProviderConfiguration {
+  name: string;
+  type: string;
+  label: string;
+  required?: boolean;
+  choices?: { label: string; value: string }[];
+  /** Example value shown inside the empty field. */
+  placeholder?: string;
+  /** Short description rendered under the field. */
+  helperText?: string;
+  /** Renders as a password input; never read back from the API. */
+  secret?: boolean;
+  /** Grouped under the collapsed "advanced settings" section. */
+  advanced?: boolean;
+}
+
 export interface RapidaProvider {
   code: string;
   name: string;
@@ -12,13 +28,7 @@ export interface RapidaProvider {
   description?: string;
   image?: string;
   url?: string;
-  configurations?: {
-    name: string;
-    type: string;
-    label: string;
-    required?: boolean;
-    choices?: { label: string; value: string }[];
-  }[];
+  configurations?: RapidaProviderConfiguration[];
 }
 
 /**

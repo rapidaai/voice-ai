@@ -89,7 +89,20 @@ type Config struct {
 	Realm    string `json:"sip_realm" mapstructure:"sip_realm"`
 	Domain   string `json:"sip_domain,omitempty" mapstructure:"sip_domain"`
 
-	// CallerID overrides the From header user in outbound calls.
+	// AuthUsername is the Digest authentication username. Providers that issue a
+	// separate auth identity set this; otherwise Username is used.
+	AuthUsername string `json:"sip_auth_username,omitempty" mapstructure:"sip_auth_username"`
+
+	// AORUser is the Address-of-Record user placed in REGISTER To/From and in the
+	// Contact header. This is the registration identity the registrar knows — it is
+	// NOT the DID and NOT the caller ID. Falls back to Username when unset.
+	AORUser string `json:"sip_aor_user,omitempty" mapstructure:"sip_aor_user"`
+
+	// OutboundProxy routes outbound requests through an SBC/proxy instead of Server.
+	OutboundProxy string `json:"sip_outbound_proxy,omitempty" mapstructure:"sip_outbound_proxy"`
+
+	// CallerID overrides the From header user in outbound calls. Outbound only —
+	// it must never be used to build a REGISTER.
 	CallerID string `json:"sip_caller_id,omitempty" mapstructure:"sip_caller_id"`
 
 	// CustomHeaders are added to outbound INVITE requests.
@@ -115,6 +128,43 @@ type Config struct {
 // Validate validates the shared SIP network configuration.
 func (c *Config) Validate() error {
 	return c.ValidateRTP()
+}
+
+// GetAuthUsername returns the Digest authentication username, falling back to
+// the SIP username when the provider does not issue a separate auth identity.
+func (c *Config) GetAuthUsername() string {
+	if c == nil {
+		return ""
+	}
+	if authUsername := strings.TrimSpace(c.AuthUsername); authUsername != "" {
+		return authUsername
+	}
+	return strings.TrimSpace(c.Username)
+}
+
+// GetAORUser returns the Address-of-Record user used for REGISTER To/From and
+// Contact, falling back to the SIP username. Callers must not substitute a DID
+// or caller ID here — those identify the phone number, not the registration.
+func (c *Config) GetAORUser() string {
+	if c == nil {
+		return ""
+	}
+	if aorUser := strings.TrimSpace(c.AORUser); aorUser != "" {
+		return aorUser
+	}
+	return strings.TrimSpace(c.Username)
+}
+
+// GetOutboundTarget returns the host outbound requests are sent to: the outbound
+// proxy when configured, otherwise the registrar itself.
+func (c *Config) GetOutboundTarget() string {
+	if c == nil {
+		return ""
+	}
+	if proxy := strings.TrimSpace(c.OutboundProxy); proxy != "" {
+		return proxy
+	}
+	return strings.TrimSpace(c.Server)
 }
 
 // ApplyOperationalDefaults fills unset platform-owned SIP runtime settings.
@@ -524,6 +574,22 @@ func ParseConfigFromVault(vaultCredential *protos.VaultCredential) (*Config, err
 	if domain, ok := stringValue(credMap, "sip_domain"); ok {
 		cfg.Domain = domain
 	}
+	if authUsername, ok := stringValue(credMap, "sip_auth_username"); ok {
+		cfg.AuthUsername = authUsername
+	}
+	if aorUser, ok := stringValue(credMap, "sip_aor_user"); ok {
+		cfg.AORUser = aorUser
+	}
+	if outboundProxy, ok := stringValue(credMap, "sip_outbound_proxy"); ok {
+		cfg.OutboundProxy = outboundProxy
+	}
+	// Transport is provider-owned when supplied; platform defaults fill it otherwise.
+	if transport, ok := stringValue(credMap, "sip_transport"); ok {
+		if candidate := Transport(strings.ToLower(transport)); candidate.IsValid() {
+			cfg.Transport = candidate
+		}
+	}
+	// Caller ID is outbound presentation only; it never feeds REGISTER.
 	if callerID, ok := stringValue(credMap, "sip_caller_id"); ok {
 		cfg.CallerID = callerID
 	}

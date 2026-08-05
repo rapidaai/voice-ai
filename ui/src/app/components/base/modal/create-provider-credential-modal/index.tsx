@@ -31,7 +31,11 @@ import { Add, TrashCan } from '@carbon/icons-react';
 import { connectionConfig } from '@/configs';
 import { useProviderContext } from '@/context/provider-context';
 import { Struct } from 'google-protobuf/google/protobuf/struct_pb';
-import { INTEGRATION_PROVIDER, RapidaProvider } from '@/providers';
+import {
+  INTEGRATION_PROVIDER,
+  RapidaProvider,
+  RapidaProviderConfiguration,
+} from '@/providers';
 import { createPortal } from 'react-dom';
 
 interface CreateProviderCredentialDialogProps extends ModalProps {
@@ -49,6 +53,7 @@ export function CreateProviderCredentialDialog(
   const [error, setError] = useState('');
   const [keyName, setKeyName] = useState('');
   const [config, setConfig] = useState<Record<string, string>>({});
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
     setProvider(
@@ -71,6 +76,76 @@ export function CreateProviderCredentialDialog(
     if (field.label?.toLowerCase().includes('(optional)')) return false;
     if (provider?.code === 'sip' && field.name === 'sip_headers') return false;
     return true;
+  };
+
+  // Advanced fields stay collapsed until asked for, so the common path is short.
+  const isAdvancedField = (field: { advanced?: boolean }) =>
+    field.advanced === true;
+  const basicConfigurations =
+    provider?.configurations?.filter(x => !isAdvancedField(x)) ?? [];
+  const advancedConfigurations =
+    provider?.configurations?.filter(isAdvancedField) ?? [];
+
+  const renderConfigField = (
+    x: RapidaProviderConfiguration,
+    key: string | number,
+  ) => {
+    const commonProps = {
+      id: `config-${x.name}`,
+      labelText: x.label,
+      helperText: x.helperText,
+      value: config[x.name] || '',
+      required: isConfigFieldRequired(x),
+    };
+
+    if (x.type === 'text') {
+      return (
+        <TextArea
+          {...commonProps}
+          key={key}
+          placeholder={x.placeholder ?? x.label}
+          onChange={e => handleConfigChange(x.name, e.target.value)}
+        />
+      );
+    }
+    if (x.type === 'key_value') {
+      return (
+        <CredentialKeyValueField
+          key={key}
+          name={x.name}
+          label={x.label}
+          helperText={x.helperText}
+          value={config[x.name] || ''}
+          onChange={value => handleConfigChange(x.name, value)}
+        />
+      );
+    }
+    if (x.type === 'select') {
+      return (
+        <CarbonSelect
+          {...commonProps}
+          key={key}
+          onChange={e =>
+            handleConfigChange(x.name, (e.target as HTMLSelectElement).value)
+          }
+        >
+          <SelectItem value="" text={`Select ${x.label.toLowerCase()}`} />
+          {(x.choices ?? []).map(c => (
+            <SelectItem key={c.value} value={c.value} text={c.label} />
+          ))}
+        </CarbonSelect>
+      );
+    }
+    return (
+      <TextInput
+        {...commonProps}
+        key={key}
+        // Secrets are masked on entry and are never read back from the API.
+        type={x.secret ? 'password' : 'text'}
+        placeholder={x.placeholder ?? x.label}
+        onChange={e => handleConfigChange(x.name, e.target.value)}
+      />
+    );
   };
 
   const validateAndSubmit = () => {
@@ -177,57 +252,22 @@ export function CreateProviderCredentialDialog(
             required
             onChange={e => setKeyName(e.target.value)}
           />
-          {provider &&
-            provider.configurations?.map((x, idx) =>
-              x.type === 'text' ? (
-                <TextArea
-                  key={idx}
-                  id={`config-${x.name}`}
-                  labelText={x.label}
-                  placeholder={x.label}
-                  value={config[x.name] || ''}
-                  required={isConfigFieldRequired(x)}
-                  onChange={e => handleConfigChange(x.name, e.target.value)}
-                />
-              ) : x.type === 'key_value' ? (
-                <CredentialKeyValueField
-                  key={idx}
-                  name={x.name}
-                  label={x.label}
-                  value={config[x.name] || ''}
-                  onChange={value => handleConfigChange(x.name, value)}
-                />
-              ) : x.type === 'select' ? (
-                <CarbonSelect
-                  key={idx}
-                  id={`config-${x.name}`}
-                  labelText={x.label}
-                  value={config[x.name] || ''}
-                  onChange={e =>
-                    handleConfigChange(x.name, (e.target as HTMLSelectElement).value)
-                  }
-                >
-                  <SelectItem value="" text={`Select ${x.label.toLowerCase()}`} />
-                  {(x.choices ?? []).map(c => (
-                    <SelectItem
-                      key={c.value}
-                      value={c.value}
-                      text={c.label}
-                    />
-                  ))}
-                </CarbonSelect>
-              ) : (
-                <TextInput
-                  key={idx}
-                  id={`config-${x.name}`}
-                  labelText={x.label}
-                  placeholder={x.label}
-                  value={config[x.name] || ''}
-                  required={isConfigFieldRequired(x)}
-                  onChange={e => handleConfigChange(x.name, e.target.value)}
-                />
-              ),
-            )}
+          {basicConfigurations.map((x, idx) => renderConfigField(x, idx))}
+          {advancedConfigurations.length > 0 && (
+            <>
+              <TertiaryButton
+                size="sm"
+                type="button"
+                onClick={() => setShowAdvanced(prev => !prev)}
+              >
+                {showAdvanced ? 'Hide advanced settings' : 'Show advanced settings'}
+              </TertiaryButton>
+              {showAdvanced &&
+                advancedConfigurations.map((x, idx) =>
+                  renderConfigField(x, `advanced-${idx}`),
+                )}
+            </>
+          )}
           <ErrorMessage message={error} />
         </Stack>
       </ModalBody>
@@ -254,11 +294,13 @@ export function CreateProviderCredentialDialog(
 function CredentialKeyValueField({
   name,
   label,
+  helperText,
   value,
   onChange,
 }: {
   name: string;
   label: string;
+  helperText?: string;
   value: string;
   onChange: (value: string) => void;
 }) {
@@ -312,9 +354,16 @@ function CredentialKeyValueField({
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-500 dark:text-gray-400">
-        {label} ({entries.length})
-      </p>
+      <div className="flex flex-col gap-1">
+        <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-500 dark:text-gray-400">
+          {label} ({entries.length})
+        </p>
+        {helperText && (
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {helperText}
+          </p>
+        )}
+      </div>
       <table className="w-full border-collapse border border-gray-200 dark:border-gray-700 text-sm [&_input]:!border-none [&_.cds--text-input]:!border-none [&_.cds--text-input]:!outline-none [&_.cds--form-item]:!m-0">
         <thead>
           <tr className="bg-gray-50 dark:bg-gray-900">

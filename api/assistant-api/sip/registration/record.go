@@ -8,6 +8,8 @@ package sip_registration
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"sort"
 	"strconv"
@@ -17,6 +19,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
+	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
 )
@@ -62,9 +65,22 @@ func (m *manager) loadRecords(ctx context.Context) ([]Record, error) {
 	for _, dep := range deployments {
 		opts := dep.GetOptions()
 
+		// A terminal status (config_error/rejected/...) permanently parks a
+		// deployment so a broken config is not retried forever. But once the user
+		// edits that config the verdict is stale: clear it and let the corrected
+		// settings be retried, instead of requiring a manual database reset.
 		sipStatus, _ := opts.GetString(OptKeySIPStatus)
+		configHash := sipRegistrationConfigHash(opts)
 		if isTerminalRegistrationStatus(RegistrationStatus(sipStatus)) {
-			continue
+			storedHash, _ := opts.GetString(OptKeySIPConfigHash)
+			if storedHash == configHash {
+				continue
+			}
+			m.logger.Infow("SIP config changed since terminal failure — retrying registration",
+				"deployment_id", dep.Id,
+				"assistant_id", dep.AssistantId,
+				"previous_status", sipStatus)
+			sipStatus = ""
 		}
 
 		sipInbound, _ := opts.GetString(OptKeySIPInbound)
@@ -176,6 +192,7 @@ func (m *manager) loadRecords(ctx context.Context) ([]Record, error) {
 			DeploymentID: dep.Id,
 			CredentialID: credentialID,
 			Status:       sipStatus,
+			ConfigHash:   configHash,
 		}
 		if assistant, ok := assistantByID[dep.AssistantId]; ok {
 			rec.ProjectID = assistant.ProjectId
@@ -296,4 +313,18 @@ func normalizeDIDForCollision(did string) string {
 		return "+" + v
 	}
 	return v
+}
+
+// sipRegistrationConfigHash fingerprints the deployment options that determine
+// whether a registration can succeed. When this changes, a previously terminal
+// failure is retried; when it does not, the failure stays parked.
+func sipRegistrationConfigHash(opts utils.Option) string {
+	keys := []string{OptKeyPhone, OptKeyExtension, OptKeyCredentialID, OptKeySIPInbound}
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		value, _ := opts.GetString(key)
+		parts = append(parts, key+"="+strings.TrimSpace(value))
+	}
+	sum := sha256.Sum256([]byte(strings.Join(parts, "\x1f")))
+	return hex.EncodeToString(sum[:8])
 }

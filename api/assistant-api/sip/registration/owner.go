@@ -67,7 +67,7 @@ func (m *manager) handleClaimOwnership(ctx context.Context, s ClaimOwnershipPipe
 				Attributes: attributes,
 			},
 		)
-		m.writeRegistrationStatus(ctx, rec.DeploymentID, RegistrationStatusUpdate{
+		m.writeRecordStatus(ctx, rec, RegistrationStatusUpdate{
 			Error:         err.Error(),
 			FailureClass:  RegistrationFailureClassOwnership,
 			FailureReason: RegistrationFailureReasonOwnershipClaimFailed,
@@ -133,7 +133,7 @@ func (m *manager) handleClaimOwnership(ctx context.Context, s ClaimOwnershipPipe
 				Attributes: attributes,
 			},
 		)
-		m.writeRegistrationStatus(ctx, rec.DeploymentID, RegistrationStatusUpdate{
+		m.writeRecordStatus(ctx, rec, RegistrationStatusUpdate{
 			Error:         err.Error(),
 			FailureClass:  RegistrationFailureClassOwnership,
 			FailureReason: RegistrationFailureReasonOwnershipClaimFailed,

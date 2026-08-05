@@ -18,15 +18,17 @@ func (c *Config) ToOutboundConfig() OutboundConfig {
 	}
 
 	return OutboundConfig{
-		Mode:            OutboundModeTrunkTermination,
-		Address:         c.Server,
+		Mode: OutboundModeTrunkTermination,
+		// Route via the outbound proxy when one is configured; otherwise the
+		// registrar host doubles as the termination target.
+		Address:         c.GetOutboundTarget(),
 		Port:            c.Port,
 		Transport:       c.GetTransport(),
 		Domain:          c.Domain,
 		RingingTimeout:  c.InviteTimeout,
 		MaxCallDuration: c.SessionTimeout,
 		Auth: SIPAuthConfig{
-			Username: c.Username,
+			Username: c.GetAuthUsername(),
 			Password: c.Password,
 			Realm:    c.Realm,
 		},

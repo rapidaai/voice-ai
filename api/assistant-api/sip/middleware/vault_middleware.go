@@ -68,8 +68,14 @@ func NewVaultMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 			return &sip_infra.SIPError{Code: 500, Message: "Failed to resolve SIP configuration", Err: sip_infra.ErrInvalidConfig}
 		}
 
-		if did, err := opts.GetString("phone"); err == nil && validator.NotBlank(did) {
-			sipConfig.CallerID = strings.TrimPrefix(did, "+")
+		// Outbound caller ID comes from the deployment's dedicated caller-id option.
+		// Fall back to the DID only when no explicit caller ID is set: the DID is a
+		// reasonable outbound presentation number, but it is deployment identity —
+		// it must never reach the credential's registration fields.
+		if callerID, err := opts.GetString("caller_id"); err == nil && validator.NotBlank(callerID) {
+			sipConfig.CallerID = strings.TrimPrefix(strings.TrimSpace(callerID), "+")
+		} else if did, err := opts.GetString("phone"); err == nil && validator.NotBlank(did) {
+			sipConfig.CallerID = strings.TrimPrefix(strings.TrimSpace(did), "+")
 		}
 		if validator.NonNil(m.applySIPConfigDefaults) {
 			m.applySIPConfigDefaults(sipConfig)

@@ -204,24 +204,86 @@
         ],
         "configurations": [
             {
-                "name": "sip_uri",
+                "name": "sip_server",
                 "type": "string",
-                "label": "SIP URI (e.g., sip:trunk.provider.com:5060)"
+                "label": "SIP Server",
+                "placeholder": "at1.provider.com",
+                "helperText": "Registrar hostname or IP. Do not include sip: or a port."
+            },
+            {
+                "name": "sip_port",
+                "type": "string",
+                "label": "SIP Port",
+                "placeholder": "5060",
+                "helperText": "Signalling port of the provider. Usually 5060."
+            },
+            {
+                "name": "sip_transport",
+                "type": "select",
+                "label": "Transport",
+                "choices": [
+                    { "value": "udp", "label": "UDP" },
+                    { "value": "tcp", "label": "TCP" },
+                    { "value": "tls", "label": "TLS" }
+                ],
+                "helperText": "Signalling transport required by the provider."
             },
             {
                 "name": "sip_username",
                 "type": "string",
-                "label": "SIP Username (optional)"
+                "label": "SIP Username",
+                "placeholder": "sip7f2a91",
+                "helperText": "The SIP account name. Not your phone number."
+            },
+            {
+                "name": "sip_auth_username",
+                "type": "string",
+                "label": "Authentication Username (optional)",
+                "required": false,
+                "placeholder": "Defaults to SIP Username",
+                "helperText": "Only set this if the provider issues a separate Digest auth username."
             },
             {
                 "name": "sip_password",
                 "type": "string",
-                "label": "SIP Password (optional)"
+                "label": "SIP Password",
+                "secret": true,
+                "helperText": "Stored encrypted and never returned by the API."
+            },
+            {
+                "name": "sip_aor_user",
+                "type": "string",
+                "label": "AOR User (optional)",
+                "required": false,
+                "advanced": true,
+                "placeholder": "Defaults to SIP Username",
+                "helperText": "Identity used in REGISTER and Contact. Leave empty unless the provider registers you under a different user."
+            },
+            {
+                "name": "sip_realm",
+                "type": "string",
+                "label": "Realm (optional)",
+                "required": false,
+                "advanced": true,
+                "placeholder": "Sent by the provider in the auth challenge",
+                "helperText": "Only needed when the provider requires a fixed realm."
+            },
+            {
+                "name": "sip_outbound_proxy",
+                "type": "string",
+                "label": "Outbound Proxy (optional)",
+                "required": false,
+                "advanced": true,
+                "placeholder": "sbc.provider.com",
+                "helperText": "Route outbound calls via an SBC or proxy instead of the SIP server."
             },
             {
                 "name": "sip_headers",
                 "type": "key_value",
-                "label": "Custom SIP Headers"
+                "label": "Custom SIP Headers",
+                "required": false,
+                "advanced": true,
+                "helperText": "Extra headers added to outbound INVITE requests."
             }
         ]
     },

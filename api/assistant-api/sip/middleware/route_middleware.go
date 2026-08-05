@@ -156,14 +156,19 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 				ProjectID      uint64
 				OrganizationID uint64
 			}
+			// Match the INVITE's user part against every inbound identifier a
+			// deployment can be reached by: the DID, the extension the PBX dials,
+			// and the AOR the trunk registered under. Providers differ in which one
+			// they put in the Request-URI, and a "+"-prefixed DID must still match
+			// an unprefixed one.
 			var result didLookupResult
 			tx := db.Model(&internal_assistant_entity.Assistant{}).
 				Select("assistants.id AS assistant_id, assistants.project_id, assistants.organization_id").
 				Joins("JOIN assistant_phone_deployments apd ON apd.assistant_id = assistants.id").
 				Joins("JOIN assistant_deployment_telephony_options o ON o.assistant_deployment_telephony_id = apd.id").
 				Where("apd.telephony_provider = ? AND apd.status = ?", "sip", type_enums.RECORD_ACTIVE).
-				Where("o.key = ?", "phone").
-				Where("o.value = ?", routeValue).
+				Where("o.key IN ?", inboundRouteOptionKeys).
+				Where("o.value IN ?", inboundRouteCandidates(routeValue)).
 				First(&result)
 			if tx.Error != nil {
 				m.logger.Warnw("SIP: DID route lookup failed",
@@ -221,4 +226,26 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 
 		return nil
 	}
+}
+
+// inboundRouteOptionKeys are the deployment option keys an inbound INVITE user
+// part may match. "phone" is the DID, "extension" is the identifier the PBX
+// dials internally, and "sip_aor_user" is the registered AOR — providers put
+// different ones in the Request-URI depending on how the trunk is provisioned.
+var inboundRouteOptionKeys = []string{"phone", "extension", "sip_aor_user"}
+
+// inboundRouteCandidates expands a SIP user part into the equivalent stored
+// values, so a "+"-prefixed DID matches an unprefixed one and vice versa.
+func inboundRouteCandidates(routeValue string) []string {
+	value := strings.TrimSpace(routeValue)
+	if value == "" {
+		return []string{""}
+	}
+	candidates := []string{value}
+	if trimmed := strings.TrimPrefix(value, "+"); trimmed != value {
+		candidates = append(candidates, trimmed)
+	} else {
+		candidates = append(candidates, "+"+value)
+	}
+	return candidates
 }

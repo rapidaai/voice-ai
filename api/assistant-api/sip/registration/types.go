@@ -25,7 +25,10 @@ const (
 	MaxTransientRetries = 10
 
 	OptKeyPhone            = "phone"
+	OptKeyExtension        = "extension"
+	OptKeyCallerID         = "caller_id"
 	OptKeyCredentialID     = "rapida.credential_id"
+	OptKeySIPConfigHash    = "rapida.sip_config_hash"
 	OptKeySIPStatus        = "rapida.sip_status"
 	OptKeySIPError         = "rapida.sip_error"
 	OptKeySIPRetry         = "rapida.sip_retry_count"
@@ -110,6 +113,7 @@ type RegistrationStatusUpdate struct {
 	NextRetryAt   time.Time // Expected time of the next retry, when retrying.
 	OwnerInstance string    // Rapida instance currently owning or attempting the DID.
 	LastSuccessAt time.Time // Time of the latest successful REGISTER or renewal.
+	ConfigHash    string    // Fingerprint of the config this verdict was reached with.
 }
 
 // Record is a single DID-registration work item carried by every Stage. The
@@ -125,6 +129,9 @@ type Record struct {
 	CredentialID   uint64
 	Status         string
 	Outcome        string
+	// ConfigHash fingerprints the registration-relevant options so a terminal
+	// failure can be retried automatically once the config actually changes.
+	ConfigHash string
 }
 
 // Outcome values written by handlers.

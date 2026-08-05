@@ -281,9 +281,14 @@ func (rc *RegistrationClient) sendRegisterWithMinExpires(
 
 	// To/From: the AOR (Address of Record) being registered.
 	// Per RFC 3261 §10.2, To and From are identical for REGISTER.
+	//
+	// The AOR user is the registration identity the registrar knows (AORUser, or
+	// the SIP username when unset) — never the DID and never the caller ID.
+	// Registrars that key accounts by username reject a DID-based AOR with 404.
+	aorUser := registrationAORUser(cfg, reg)
 	aor := sip.Uri{
 		Scheme: scheme,
-		User:   normalizeUser(reg.DID),
+		User:   aorUser,
 		Host:   domain,
 	}
 
@@ -305,7 +310,7 @@ func (rc *RegistrationClient) sendRegisterWithMinExpires(
 	contactHdr := &sip.ContactHeader{
 		Address: sip.Uri{
 			Scheme: scheme,
-			User:   normalizeUser(reg.DID),
+			User:   aorUser,
 			Host:   externalIP,
 			Port:   rc.listenConfig.Port,
 		},
@@ -347,7 +352,7 @@ func (rc *RegistrationClient) sendRegisterWithMinExpires(
 			"status", resp.StatusCode)
 
 		resp, err = rc.client.DoDigestAuth(reqCtx, req, resp, sipgo.DigestAuth{
-			Username: cfg.Username,
+			Username: cfg.GetAuthUsername(),
 			Password: cfg.Password,
 		})
 		if err != nil {
@@ -476,8 +481,30 @@ func contextWithTimeout(parent context.Context, timeout time.Duration) (context.
 
 // normalizeUser strips the "+" prefix from a DID for the SIP URI user part.
 // Some registrars reject "+" in the userinfo field.
+// normalizeUser strips the leading "+" from an E.164 DID so it can be used as a
+// SIP URI user part. Only apply this to phone numbers — alphanumeric SIP account
+// names must be sent verbatim.
 func normalizeUser(did string) string {
 	return strings.TrimPrefix(did, "+")
+}
+
+// registrationAORUser resolves the user part for the REGISTER AOR and Contact.
+//
+// Precedence:
+//  1. Config.AORUser  — explicit registration identity
+//  2. Config.Username — the SIP account name (the common case)
+//  3. Registration.DID — legacy fallback for credentials saved before the AOR and
+//     DID fields were separated, so existing deployments keep registering.
+//
+// Only the DID path is number-normalized; an account name is never rewritten.
+func registrationAORUser(cfg *Config, reg *Registration) string {
+	if aorUser := cfg.GetAORUser(); aorUser != "" {
+		return aorUser
+	}
+	if validator.NonNil(reg) {
+		return normalizeUser(strings.TrimSpace(reg.DID))
+	}
+	return ""
 }
 
 func (rc *RegistrationClient) markRenewalFailed(

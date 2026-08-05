@@ -3,13 +3,33 @@
     "parameters": [
       {
         "key": "phone",
-        "label": "Caller ID",
+        "label": "DID / Public Phone Number",
         "type": "input",
         "required": true,
         "default": "",
         "placeholder": "e.g., +15551234567",
-        "helpText": "The phone number to display as caller ID for outbound calls.",
-        "errorMessage": "Please provide a valid SIP caller ID."
+        "helpText": "The public number callers dial to reach this assistant. Used for inbound routing only — never for SIP registration.",
+        "errorMessage": "Please provide a valid public phone number."
+      },
+      {
+        "key": "extension",
+        "label": "Extension / Inbound Identifier",
+        "type": "input",
+        "required": false,
+        "default": "",
+        "placeholder": "e.g., 1044",
+        "helpText": "Optional. The extension or user your PBX puts in the INVITE. Set this when the provider routes by extension instead of the DID.",
+        "errorMessage": "Please provide a valid extension."
+      },
+      {
+        "key": "caller_id",
+        "label": "Outbound Caller ID",
+        "type": "input",
+        "required": false,
+        "default": "",
+        "placeholder": "Defaults to the DID above",
+        "helpText": "Optional. The number shown to the person you call. Applies to outbound calls only.",
+        "errorMessage": "Please provide a valid outbound caller ID."
       },
       {
         "key": "rapida.sip_inbound",
@@ -27,7 +47,7 @@
             "value": "false"
           }
         ],
-        "helpText": "Register this number with the SIP provider to receive incoming calls."
+        "helpText": "Register with the SIP provider using the credential's SIP username so incoming calls reach this assistant."
       }
     ]
   }

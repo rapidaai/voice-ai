@@ -33,7 +33,7 @@ func (m *manager) handleMarkActive(ctx context.Context, p MarkActivePipeline) Pi
 	}
 	retryCount := 0
 	now := time.Now().UTC()
-	m.writeRegistrationStatus(ctx, rec.DeploymentID, RegistrationStatusUpdate{
+	m.writeRecordStatus(ctx, rec, RegistrationStatusUpdate{
 		Status:        StatusActive,
 		Error:         "",
 		RetryCount:    &retryCount,
@@ -41,6 +41,19 @@ func (m *manager) handleMarkActive(ctx context.Context, p MarkActivePipeline) Pi
 		LastSuccessAt: now,
 	})
 	return nil
+}
+
+// writeRecordStatus writes a status update for a Record, stamping the config
+// fingerprint the verdict was reached with so a terminal failure is retried
+// automatically once the deployment config changes.
+func (m *manager) writeRecordStatus(ctx context.Context, rec *Record, update RegistrationStatusUpdate) {
+	if !validator.NonNil(rec) {
+		return
+	}
+	if !validator.NotBlank(update.ConfigHash) {
+		update.ConfigHash = rec.ConfigHash
+	}
+	m.writeRegistrationStatus(ctx, rec.DeploymentID, update)
 }
 
 func (m *manager) writeRegistrationStatus(ctx context.Context, deploymentID uint64, update RegistrationStatusUpdate) {
@@ -80,6 +93,11 @@ func (m *manager) writeRegistrationStatus(ctx context.Context, deploymentID uint
 	}
 	if !update.LastSuccessAt.IsZero() {
 		m.upsertOption(ctx, deploymentID, OptKeySIPLastSuccessAt, formatRegistrationTime(update.LastSuccessAt))
+	}
+	// Record which config produced this verdict. loadRecords compares against it
+	// so a terminal failure is retried automatically after the config is edited.
+	if validator.NotBlank(update.ConfigHash) {
+		m.upsertOption(ctx, deploymentID, OptKeySIPConfigHash, update.ConfigHash)
 	}
 }
 
@@ -176,7 +194,7 @@ func (m *manager) handleTransient(ctx context.Context, rec *Record, err error) {
 				Attributes: attributes,
 			},
 		)
-		m.writeRegistrationStatus(ctx, rec.DeploymentID, statusUpdate)
+		m.writeRecordStatus(ctx, rec, statusUpdate)
 		return
 	}
 
@@ -226,5 +244,5 @@ func (m *manager) handleTransient(ctx context.Context, rec *Record, err error) {
 			Attributes: attributes,
 		},
 	)
-	m.writeRegistrationStatus(ctx, rec.DeploymentID, statusUpdate)
+	m.writeRecordStatus(ctx, rec, statusUpdate)
 }

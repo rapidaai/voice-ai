@@ -67,6 +67,14 @@ type Config struct {
 	Realm    string `json:"sip_realm" mapstructure:"sip_realm"`
 	Domain   string `json:"sip_domain,omitempty" mapstructure:"sip_domain"`
 
+	// AuthUsername is the Digest auth identity; falls back to Username.
+	AuthUsername string `json:"sip_auth_username,omitempty" mapstructure:"sip_auth_username"`
+	// AORUser is the REGISTER/Contact identity; falls back to Username.
+	AORUser string `json:"sip_aor_user,omitempty" mapstructure:"sip_aor_user"`
+	// OutboundProxy overrides the outbound request target.
+	OutboundProxy string `json:"sip_outbound_proxy,omitempty" mapstructure:"sip_outbound_proxy"`
+
+	// CallerID is the outbound From user only — never used for REGISTER.
 	CallerID      string            `json:"sip_caller_id,omitempty" mapstructure:"sip_caller_id"`
 	CustomHeaders map[string]string `json:"sip_headers,omitempty" mapstructure:"sip_headers"`
 
@@ -158,6 +166,9 @@ func (c *Config) toCore() *internal_core.Config {
 		Password:               c.Password,
 		Realm:                  c.Realm,
 		Domain:                 c.Domain,
+		AuthUsername:           c.AuthUsername,
+		AORUser:                c.AORUser,
+		OutboundProxy:          c.OutboundProxy,
 		CallerID:               c.CallerID,
 		CustomHeaders:          c.CustomHeaders,
 		Port:                   c.Port,
@@ -186,6 +197,9 @@ func configFromCore(c *internal_core.Config) Config {
 		Password:               c.Password,
 		Realm:                  c.Realm,
 		Domain:                 c.Domain,
+		AuthUsername:           c.AuthUsername,
+		AORUser:                c.AORUser,
+		OutboundProxy:          c.OutboundProxy,
 		CallerID:               c.CallerID,
 		CustomHeaders:          c.CustomHeaders,
 		Port:                   c.Port,

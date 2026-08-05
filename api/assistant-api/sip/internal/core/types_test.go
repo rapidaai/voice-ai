@@ -316,3 +316,48 @@ func TestDefaultInboundAnswerPolicyAnswersImmediately(t *testing.T) {
 	assert.Equal(t, InboundAnswerModeImmediate, policy.Mode)
 	assert.Equal(t, defaultInboundACKTimeout, policy.ACKTimeout)
 }
+
+func TestParseConfigFromVault_IdentityFields(t *testing.T) {
+	cfg, err := ParseConfigFromVault(makeVaultCredential(map[string]interface{}{
+		"sip_server":         "at1.provider.com",
+		"sip_username":       "sip7f2a91",
+		"sip_auth_username":  "auth-user",
+		"sip_aor_user":       "1044",
+		"sip_outbound_proxy": "sbc.provider.com",
+		"sip_transport":      "tcp",
+		"sip_caller_id":      "+15551234567",
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, "sip7f2a91", cfg.Username)
+	assert.Equal(t, "auth-user", cfg.AuthUsername)
+	assert.Equal(t, "1044", cfg.AORUser)
+	assert.Equal(t, "sbc.provider.com", cfg.OutboundProxy)
+	assert.Equal(t, TransportTCP, cfg.Transport)
+	assert.Equal(t, "+15551234567", cfg.CallerID)
+}
+
+// Credentials written before the identity split carry none of the new keys;
+// they must still parse and keep working off sip_username alone.
+func TestParseConfigFromVault_LegacyCredentialStillResolves(t *testing.T) {
+	cfg, err := ParseConfigFromVault(makeVaultCredential(map[string]interface{}{
+		"sip_uri":      "sip:at1.provider.com:5060",
+		"sip_username": "sip7f2a91",
+		"sip_password": "secret",
+	}))
+	require.NoError(t, err)
+	assert.Empty(t, cfg.AORUser)
+	assert.Empty(t, cfg.AuthUsername)
+	assert.Equal(t, "sip7f2a91", cfg.GetAORUser())
+	assert.Equal(t, "sip7f2a91", cfg.GetAuthUsername())
+	assert.Equal(t, "at1.provider.com", cfg.GetOutboundTarget())
+}
+
+// An invalid transport string must not silently corrupt the config.
+func TestParseConfigFromVault_IgnoresInvalidTransport(t *testing.T) {
+	cfg, err := ParseConfigFromVault(makeVaultCredential(map[string]interface{}{
+		"sip_server":    "at1.provider.com",
+		"sip_transport": "carrier-pigeon",
+	}))
+	require.NoError(t, err)
+	assert.Empty(t, string(cfg.Transport))
+}

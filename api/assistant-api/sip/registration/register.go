@@ -53,7 +53,7 @@ func (m *manager) handleRegister(ctx context.Context, s RegisterPipeline) Pipeli
 		rec.Outcome = OutcomeConfigError
 		m.logger.Warnw("Failed to load assistant for registration",
 			"assistant_id", rec.AssistantID, "did", rec.DID, "error", err)
-		m.writeRegistrationStatus(ctx, rec.DeploymentID, RegistrationStatusUpdate{
+		m.writeRecordStatus(ctx, rec, RegistrationStatusUpdate{
 			Status:        StatusConfigError,
 			Error:         "assistant not found",
 			FailureClass:  RegistrationFailureClassConfig,
@@ -110,7 +110,7 @@ func (m *manager) handleRegister(ctx context.Context, s RegisterPipeline) Pipeli
 				Attributes: attributes,
 			},
 		)
-		m.writeRegistrationStatus(ctx, rec.DeploymentID, RegistrationStatusUpdate{
+		m.writeRecordStatus(ctx, rec, RegistrationStatusUpdate{
 			Status:        StatusConfigError,
 			Error:         "vault credential not found",
 			FailureClass:  RegistrationFailureClassConfig,
@@ -148,7 +148,7 @@ func (m *manager) handleRegister(ctx context.Context, s RegisterPipeline) Pipeli
 				Attributes: attributes,
 			},
 		)
-		m.writeRegistrationStatus(ctx, rec.DeploymentID, RegistrationStatusUpdate{
+		m.writeRecordStatus(ctx, rec, RegistrationStatusUpdate{
 			Status:        StatusConfigError,
 			Error:         "invalid SIP config: " + err.Error(),
 			FailureClass:  RegistrationFailureClassConfig,
@@ -259,7 +259,7 @@ func (m *manager) handleRegister(ctx context.Context, s RegisterPipeline) Pipeli
 				Attributes: attributes,
 			},
 		)
-		m.writeRegistrationStatus(ctx, rec.DeploymentID, statusUpdate)
+		m.writeRecordStatus(ctx, rec, statusUpdate)
 	case RegistrationFailureClassAuth:
 		rec.Outcome = OutcomeAuthFailed
 		m.logger.Errorw("SIP registration auth failed — marking deployment as failed",
@@ -284,7 +284,7 @@ func (m *manager) handleRegister(ctx context.Context, s RegisterPipeline) Pipeli
 				Attributes: attributes,
 			},
 		)
-		m.writeRegistrationStatus(ctx, rec.DeploymentID, statusUpdate)
+		m.writeRecordStatus(ctx, rec, statusUpdate)
 	case RegistrationFailureClassConfig:
 		rec.Outcome = OutcomeConfigError
 		m.logger.Errorw("SIP registration config failed — will not retry",
@@ -309,7 +309,7 @@ func (m *manager) handleRegister(ctx context.Context, s RegisterPipeline) Pipeli
 				Attributes: attributes,
 			},
 		)
-		m.writeRegistrationStatus(ctx, rec.DeploymentID, statusUpdate)
+		m.writeRecordStatus(ctx, rec, statusUpdate)
 	default:
 		rec.Outcome = OutcomeTransient
 		m.handleTransient(ctx, rec, regErr)
