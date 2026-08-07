@@ -1004,8 +1004,8 @@ components:
         unclearInputTimeout:
           type: number
           format: double
-          minimum: 0.5
-          maximum: 5
+          minimum: 2
+          maximum: 10
         unclearInputMessage:
           type: string
           maxLength: 500
@@ -1047,8 +1047,8 @@ components:
         unclearInputTimeout:
           type: number
           format: double
-          minimum: 0.5
-          maximum: 5
+          minimum: 2
+          maximum: 10
         unclearInputMessage:
           type: string
           maxLength: 500
@@ -1095,8 +1095,8 @@ components:
         unclearInputTimeout:
           type: number
           format: double
-          minimum: 0.5
-          maximum: 5
+          minimum: 2
+          maximum: 10
         unclearInputMessage:
           type: string
           maxLength: 500
@@ -1137,8 +1137,8 @@ components:
         unclearInputTimeout:
           type: number
           format: double
-          minimum: 0.5
-          maximum: 5
+          minimum: 2
+          maximum: 10
         unclearInputMessage:
           type: string
           maxLength: 500
@@ -1184,8 +1184,8 @@ components:
         unclearInputTimeout:
           type: number
           format: double
-          minimum: 0.5
-          maximum: 5
+          minimum: 2
+          maximum: 10
         unclearInputMessage:
           type: string
           maxLength: 500
@@ -1555,8 +1555,8 @@ components:
         unclearInputTimeout:
           type: number
           format: double
-          minimum: 0.5
-          maximum: 5
+          minimum: 2
+          maximum: 10
         unclearInputMessage:
           type: string
           maxLength: 500
@@ -1599,8 +1599,8 @@ components:
         unclearInputTimeout:
           type: number
           format: double
-          minimum: 0.5
-          maximum: 5
+          minimum: 2
+          maximum: 10
         unclearInputMessage:
           type: string
           maxLength: 500
@@ -1649,8 +1649,8 @@ components:
         unclearInputTimeout:
           type: number
           format: double
-          minimum: 0.5
-          maximum: 5
+          minimum: 2
+          maximum: 10
         unclearInputMessage:
           type: string
           maxLength: 500
@@ -1693,8 +1693,8 @@ components:
         unclearInputTimeout:
           type: number
           format: double
-          minimum: 0.5
-          maximum: 5
+          minimum: 2
+          maximum: 10
         unclearInputMessage:
           type: string
           maxLength: 500
@@ -1741,8 +1741,8 @@ components:
         unclearInputTimeout:
           type: number
           format: double
-          minimum: 0.5
-          maximum: 5
+          minimum: 2
+          maximum: 10
         unclearInputMessage:
           type: string
           maxLength: 500

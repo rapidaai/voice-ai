@@ -167,7 +167,7 @@ var (
 		HTTPStatusCode: http.StatusBadRequest,
 		Code:           CreateAssistantDebuggerDeploymentInvalidUnclearTimeoutCode,
 		Error:          "invalid unclear_input_timeout parameter",
-		ErrorMessage:   "Please provide unclearInputTimeout between 0.5 and 5 seconds.",
+		ErrorMessage:   "Please provide unclearInputTimeout between 2 and 10 seconds.",
 	}
 	CreateAssistantDebuggerDeploymentInvalidTimeoutBackoff = PlatformError{
 		HTTPStatusCode: http.StatusBadRequest,
@@ -227,7 +227,7 @@ var (
 		HTTPStatusCode: http.StatusBadRequest,
 		Code:           CreateAssistantPhoneDeploymentInvalidUnclearTimeoutCode,
 		Error:          "invalid unclear_input_timeout parameter",
-		ErrorMessage:   "Please provide unclearInputTimeout between 0.5 and 5 seconds.",
+		ErrorMessage:   "Please provide unclearInputTimeout between 2 and 10 seconds.",
 	}
 	CreateAssistantPhoneDeploymentInvalidTimeoutBackoff = PlatformError{
 		HTTPStatusCode: http.StatusBadRequest,
@@ -293,7 +293,7 @@ var (
 		HTTPStatusCode: http.StatusBadRequest,
 		Code:           CreateAssistantApiDeploymentInvalidUnclearTimeoutCode,
 		Error:          "invalid unclear_input_timeout parameter",
-		ErrorMessage:   "Please provide unclearInputTimeout between 0.5 and 5 seconds.",
+		ErrorMessage:   "Please provide unclearInputTimeout between 2 and 10 seconds.",
 	}
 	CreateAssistantApiDeploymentInvalidTimeoutBackoff = PlatformError{
 		HTTPStatusCode: http.StatusBadRequest,
@@ -353,7 +353,7 @@ var (
 		HTTPStatusCode: http.StatusBadRequest,
 		Code:           CreateAssistantWebpluginDeploymentInvalidUnclearTimeoutCode,
 		Error:          "invalid unclear_input_timeout parameter",
-		ErrorMessage:   "Please provide unclearInputTimeout between 0.5 and 5 seconds.",
+		ErrorMessage:   "Please provide unclearInputTimeout between 2 and 10 seconds.",
 	}
 	CreateAssistantWebpluginDeploymentInvalidTimeoutBackoff = PlatformError{
 		HTTPStatusCode: http.StatusBadRequest,
@@ -407,7 +407,7 @@ var (
 		HTTPStatusCode: http.StatusBadRequest,
 		Code:           CreateAssistantWhatsappDeploymentInvalidUnclearTimeoutCode,
 		Error:          "invalid unclear_input_timeout parameter",
-		ErrorMessage:   "Please provide unclearInputTimeout between 0.5 and 5 seconds.",
+		ErrorMessage:   "Please provide unclearInputTimeout between 2 and 10 seconds.",
 	}
 	CreateAssistantWhatsappDeploymentInvalidTimeoutBackoff = PlatformError{
 		HTTPStatusCode: http.StatusBadRequest,
