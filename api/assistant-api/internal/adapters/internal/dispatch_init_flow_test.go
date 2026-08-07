@@ -200,6 +200,78 @@ func TestInitializeBehavior_GreetingInterruptibleOption_ControlsAudioBlock(t *te
 	}
 }
 
+func TestInitializeBehavior_GreetingDoesNotStartIdleTimeoutBeforeCompletion(t *testing.T) {
+	greeting := "Welcome!"
+	idleTimeout := uint64(10)
+	requestorChannels := adapter_channel.NewRequestorChannels()
+	requestor := &genericRequestor{
+		source: utils.Debugger,
+		assistant: &internal_assistant_entity.Assistant{
+			AssistantDebuggerDeployment: &internal_assistant_entity.AssistantDebuggerDeployment{
+				AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
+					Greeting:    &greeting,
+					IdleTimeout: &idleTimeout,
+				},
+			},
+		},
+		messageLifecycle: adapter_lifecycle.NewMessageLifecycle(),
+		sessionLifecycle: adapter_lifecycle.NewSessionLifecycleWithState(adapter_lifecycle.StateInitializing),
+		dispatchRoute:    adapter_router.NewDispatchRoute(adapter_router.NewRoutePolicy(), requestorChannels),
+		channels:         requestorChannels,
+	}
+	requestor.messageLifecycle.SetContextID("ctx-greeting-idle")
+
+	requestorDispatchHandler{r: requestor}.HandleInitializeBehavior(context.Background(), internal_type.InitializeBehaviorPacket{
+		ContextID: "ctx-greeting-idle",
+		Config:    &protos.ConversationInitialization{StreamMode: protos.StreamMode_STREAM_MODE_TEXT},
+	})
+
+	var injectMessage internal_type.InjectMessagePacket
+	for len(requestor.channels.EgressChannel()) > 0 {
+		packet := (<-requestor.channels.EgressChannel()).Pkt
+		switch typed := packet.(type) {
+		case internal_type.InjectMessagePacket:
+			injectMessage = typed
+		case internal_type.StartIdleTimeoutPacket:
+			t.Fatalf("greeting should not start idle timeout before assistant completion: %+v", typed)
+		}
+	}
+	assert.Equal(t, greeting, injectMessage.Text)
+}
+
+func TestInitializeBehavior_StartsIdleTimeoutWhenNoGreetingIsInjected(t *testing.T) {
+	idleTimeout := uint64(10)
+	requestorChannels := adapter_channel.NewRequestorChannels()
+	requestor := &genericRequestor{
+		source: utils.Debugger,
+		assistant: &internal_assistant_entity.Assistant{
+			AssistantDebuggerDeployment: &internal_assistant_entity.AssistantDebuggerDeployment{
+				AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
+					IdleTimeout: &idleTimeout,
+				},
+			},
+		},
+		messageLifecycle: adapter_lifecycle.NewMessageLifecycle(),
+		sessionLifecycle: adapter_lifecycle.NewSessionLifecycleWithState(adapter_lifecycle.StateInitializing),
+		dispatchRoute:    adapter_router.NewDispatchRoute(adapter_router.NewRoutePolicy(), requestorChannels),
+		channels:         requestorChannels,
+	}
+	requestor.messageLifecycle.SetContextID("ctx-no-greeting-idle")
+
+	requestorDispatchHandler{r: requestor}.HandleInitializeBehavior(context.Background(), internal_type.InitializeBehaviorPacket{
+		ContextID: "ctx-no-greeting-idle",
+		Config:    &protos.ConversationInitialization{StreamMode: protos.StreamMode_STREAM_MODE_TEXT},
+	})
+
+	var startIdleTimeout internal_type.StartIdleTimeoutPacket
+	for len(requestor.channels.EgressChannel()) > 0 {
+		if typed, ok := (<-requestor.channels.EgressChannel()).Pkt.(internal_type.StartIdleTimeoutPacket); ok {
+			startIdleTimeout = typed
+		}
+	}
+	assert.Equal(t, "ctx-no-greeting-idle", startIdleTimeout.ContextID)
+}
+
 func TestInitializeBehavior_NonInterruptibleGreeting_BlocksAudioAndAcceptsAfterTextToSpeechEnd(t *testing.T) {
 	greeting := "Welcome!"
 	nonInterruptibleGreeting := false

@@ -153,7 +153,7 @@ func TestHandleSpeechToText_WithEOSExecutor_ExecutesAndSkipsFallback(t *testing.
 	h := requestorDispatchHandler{r: r}
 
 	h.HandleSpeechToText(t.Context(), internal_type.SpeechToTextPacket{
-		ContextID: "ignored",
+		ContextID: "ctx-stt-packet",
 		Script:    "hello world",
 		Interim:   false,
 	})
@@ -162,7 +162,7 @@ func TestHandleSpeechToText_WithEOSExecutor_ExecutesAndSkipsFallback(t *testing.
 	require.Len(t, executed, 1)
 	sttPkt, ok := executed[0].(internal_type.SpeechToTextPacket)
 	require.True(t, ok)
-	assert.Equal(t, "ctx-eos-stt", sttPkt.ContextID)
+	assert.Equal(t, "ctx-stt-packet", sttPkt.ContextID)
 
 	select {
 	case env := <-r.channels.IngressChannel():
@@ -189,15 +189,16 @@ func TestHandleSpeechToText_WithoutEOSExecutor_EmitsFallbackOnlyForFinal(t *test
 	}
 
 	h.HandleSpeechToText(t.Context(), internal_type.SpeechToTextPacket{
-		Script:  "final text",
-		Interim: false,
+		ContextID: "ctx-final-packet",
+		Script:    "final text",
+		Interim:   false,
 	})
 
 	select {
 	case env := <-r.channels.IngressChannel():
 		eosPkt, ok := env.Pkt.(internal_type.EndOfSpeechPacket)
 		require.True(t, ok, "expected EndOfSpeechPacket, got %T", env.Pkt)
-		assert.Equal(t, "ctx-eos-fallback", eosPkt.ContextID)
+		assert.Equal(t, "ctx-final-packet", eosPkt.ContextID)
 		assert.Equal(t, "final text", eosPkt.Speech)
 		require.Len(t, eosPkt.Speechs, 1)
 		assert.False(t, eosPkt.Speechs[0].Interim)

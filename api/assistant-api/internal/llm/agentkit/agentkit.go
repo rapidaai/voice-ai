@@ -23,13 +23,14 @@ import (
 )
 
 type agentkitExecutor struct {
-	logger           commons.Logger
-	ctx              context.Context
-	cancel           context.CancelCauseFunc
-	connection       *AgentkitConnection
-	stateMu          sync.RWMutex
-	activeContextID  string
-	requestStartedAt time.Time
+	logger                  commons.Logger
+	ctx                     context.Context
+	cancel                  context.CancelCauseFunc
+	connection              *AgentkitConnection
+	stateMu                 sync.RWMutex
+	activeContextID         string
+	requestStartedAt        time.Time
+	waitingForFirstResponse bool
 }
 
 type options struct {

@@ -70,8 +70,8 @@ export const ConfigureWebExperienceModalForm: FC<{
             <Slider
               id="widget-unclear-input-timeout"
               labelText="Unclear Speech Wait (Seconds)"
-              min={0.5}
-              max={5}
+              min={2}
+              max={10}
               step={0.1}
               value={parseFloat(
                 experienceConfig.unclearInputTimeout ||

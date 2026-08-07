@@ -12,6 +12,7 @@ import (
 
 	channel_pipeline "github.com/rapidaai/api/assistant-api/internal/channel/pipeline"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	internal_options "github.com/rapidaai/api/assistant-api/internal/options"
 	pkg_errors "github.com/rapidaai/pkg/errors"
 	"github.com/rapidaai/pkg/preset"
 	"github.com/rapidaai/pkg/types"
@@ -176,6 +177,28 @@ func (cApi *ConversationGrpcApi) CreatePhoneCall(ctx context.Context, ir *protos
 			},
 		}, errors.New(pkg_errors.CreatePhoneCallInvalidOptions.Error)
 	}
+	if value, err := utils.Option(opts).GetFloat64(internal_options.ExperienceOptionUnclearInputTimeout); err == nil && !validator.Between(value, 2, 10) {
+		_ = observer.Record(ctx, observability.AssistantScope{AssistantID: ir.GetAssistant().GetAssistantId()}, observability.RecordLog{
+			Level:   observability.LevelError,
+			Message: "CreatePhoneCall validation failed: invalid options",
+			Attributes: observability.Attributes{
+				"failure_stage": "validation",
+				"field":         internal_options.ExperienceOptionUnclearInputTimeout,
+				"error_code":    pkg_errors.CreatePhoneCallInvalidOptions.CodeString(),
+				"error":         pkg_errors.CreatePhoneCallInvalidOptions.Error,
+				"http_status":   fmt.Sprintf("%d", pkg_errors.CreatePhoneCallInvalidOptions.HTTPStatusCode),
+			},
+		})
+		return &protos.CreatePhoneCallResponse{
+			Code:    pkg_errors.CreatePhoneCallInvalidOptions.HTTPStatusCodeInt32(),
+			Success: false,
+			Error: &protos.Error{
+				ErrorCode:    uint64(pkg_errors.CreatePhoneCallInvalidOptions.Code),
+				ErrorMessage: pkg_errors.CreatePhoneCallInvalidOptions.Error,
+				HumanMessage: pkg_errors.CreatePhoneCallInvalidOptions.ErrorMessage,
+			},
+		}, errors.New(pkg_errors.CreatePhoneCallInvalidOptions.Error)
+	}
 
 	// Pipeline handles the full outbound flow
 	result := cApi.channelPipeline.Run(ctx, channel_pipeline.OutboundRequestedPipeline{
@@ -314,6 +337,17 @@ func (cApi *ConversationGrpcApi) CreateBulkPhoneCall(ctx context.Context, ir *pr
 		opts, err := utils.AnyMapToInterfaceMap(phoneCall.GetOptions())
 		if err != nil {
 			cApi.logger.Errorf("create bulk phone call invalid options: %v", err)
+			return &protos.CreateBulkPhoneCallResponse{
+				Code:    pkg_errors.CreateBulkPhoneCallInvalidOptions.HTTPStatusCodeInt32(),
+				Success: false,
+				Error: &protos.Error{
+					ErrorCode:    uint64(pkg_errors.CreateBulkPhoneCallInvalidOptions.Code),
+					ErrorMessage: pkg_errors.CreateBulkPhoneCallInvalidOptions.Error,
+					HumanMessage: pkg_errors.CreateBulkPhoneCallInvalidOptions.ErrorMessage,
+				},
+			}, errors.New(pkg_errors.CreateBulkPhoneCallInvalidOptions.Error)
+		}
+		if value, err := utils.Option(opts).GetFloat64(internal_options.ExperienceOptionUnclearInputTimeout); err == nil && !validator.Between(value, 2, 10) {
 			return &protos.CreateBulkPhoneCallResponse{
 				Code:    pkg_errors.CreateBulkPhoneCallInvalidOptions.HTTPStatusCodeInt32(),
 				Success: false,

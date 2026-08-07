@@ -37,7 +37,7 @@ const ERROR_MESSAGE_OPTIONS = [
   'I’m sorry, I ran into an issue. Let’s try again.',
 ];
 
-export const DEFAULT_UNCLEAR_INPUT_TIMEOUT = '0.5';
+export const DEFAULT_UNCLEAR_INPUT_TIMEOUT = '2';
 export const DEFAULT_UNCLEAR_INPUT_MESSAGE =
   "I didn't catch that. Could you repeat that?";
 
@@ -175,8 +175,8 @@ export const ConfigureExperience: FC<{
             id="experience-unclear-input-timeout"
             labelText="Unclear Speech Wait (Seconds)"
             hideLabel
-            min={0.5}
-            max={5}
+            min={2}
+            max={10}
             step={0.1}
             value={parseFloat(
               experienceConfig.unclearInputTimeout ||

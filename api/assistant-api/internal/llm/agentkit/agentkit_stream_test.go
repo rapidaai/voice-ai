@@ -3,6 +3,7 @@ package internal_llm_agentkit
 import (
 	"context"
 	"io"
+	"strconv"
 	"testing"
 	"time"
 
@@ -661,6 +662,80 @@ func TestWrite_CompletedTextContextID(t *testing.T) {
 	ev, ok := findPacket[internal_type.ObservabilityEventRecordPacket](pkts)
 	require.True(t, ok)
 	assert.Equal(t, "unique-ctx", ev.ContextID)
+}
+
+func TestWrite_FirstDeltaAddsTTFTAndCompletedAddsTRT(t *testing.T) {
+	e := newTestExecutor()
+	e.requestStartedAt = time.Now().Add(-25 * time.Millisecond)
+	e.waitingForFirstResponse = true
+	comm, collector := newTestComm()
+
+	e.Write(context.Background(), comm, &protos.TalkOutput{
+		Data: &protos.TalkOutput_Assistant{
+			Assistant: &protos.ConversationAssistantMessage{
+				Id:        "ctx-latency",
+				Completed: false,
+				Message:   &protos.ConversationAssistantMessage_Text{Text: "he"},
+			},
+		},
+	})
+	pkts := collector.all()
+	require.Len(t, pkts, 2)
+	delta, ok := pkts[0].(internal_type.LLMResponseDeltaPacket)
+	require.True(t, ok)
+	assert.Equal(t, "he", delta.Text)
+	ttftMetric, ok := pkts[1].(internal_type.ObservabilityMetricRecordPacket)
+	require.True(t, ok)
+	require.Len(t, ttftMetric.Record.Metrics, 1)
+	assert.Equal(t, observability.MetricAgentTTFTMs, ttftMetric.Record.Metrics[0].Name)
+	ttftMs, err := strconv.ParseInt(ttftMetric.Record.Metrics[0].Value, 10, 64)
+	require.NoError(t, err)
+	assert.Positive(t, ttftMs)
+
+	collector.reset()
+
+	e.Write(context.Background(), comm, &protos.TalkOutput{
+		Data: &protos.TalkOutput_Assistant{
+			Assistant: &protos.ConversationAssistantMessage{
+				Id:        "ctx-latency",
+				Completed: true,
+				Message:   &protos.ConversationAssistantMessage_Text{Text: "hello"},
+			},
+		},
+	})
+
+	metrics := findPackets[internal_type.ObservabilityMetricRecordPacket](collector.all())
+	require.Len(t, metrics, 1)
+	require.Len(t, metrics[0].Record.Metrics, 2)
+	assert.Equal(t, "llm_response_char_count", metrics[0].Record.Metrics[0].Name)
+	assert.Equal(t, observability.MetricAgentTRTMs, metrics[0].Record.Metrics[1].Name)
+	ms, err := strconv.ParseInt(metrics[0].Record.Metrics[1].Value, 10, 64)
+	require.NoError(t, err)
+	assert.Positive(t, ms)
+}
+
+func TestWrite_CompletedTextFirstPacketAddsTTFTAndTRT(t *testing.T) {
+	e := newTestExecutor()
+	e.requestStartedAt = time.Now().Add(-25 * time.Millisecond)
+	e.waitingForFirstResponse = true
+	comm, collector := newTestComm()
+
+	e.Write(context.Background(), comm, &protos.TalkOutput{
+		Data: &protos.TalkOutput_Assistant{
+			Assistant: &protos.ConversationAssistantMessage{
+				Id:        "ctx-completed-latency",
+				Completed: true,
+				Message:   &protos.ConversationAssistantMessage_Text{Text: "hello"},
+			},
+		},
+	})
+
+	metrics := findPackets[internal_type.ObservabilityMetricRecordPacket](collector.all())
+	require.Len(t, metrics, 1)
+	require.Len(t, metrics[0].Record.Metrics, 3)
+	assert.Equal(t, "llm_response_char_count", metrics[0].Record.Metrics[0].Name)
+	assert.Equal(t, observability.MetricAgentTTFTMs, metrics[0].Record.Metrics[1].Name)
+	assert.Equal(t, observability.MetricAgentTRTMs, metrics[0].Record.Metrics[2].Name)
 }
 
 func TestWrite_ToolResultFailed(t *testing.T) {

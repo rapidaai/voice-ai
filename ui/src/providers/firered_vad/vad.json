@@ -1,47 +1,37 @@
 {
   "parameters": [
     {
-      "key": "microphone.vad.barge_in_trigger",
-      "label": "Barge-in Trigger",
-      "type": "select",
-      "default": "vad",
-      "choices": [
-        {
-          "label": "VAD",
-          "value": "vad"
-        },
-        {
-          "label": "Word",
-          "value": "word"
-        }
-      ]
-    },
-    {
       "key": "microphone.vad.threshold",
       "label": "Speech Threshold",
       "type": "slider",
-      "default": "0.5",
-      "min": 0.3,
+      "default": "0.4",
+      "min": 0,
       "max": 1,
-      "step": 0.05
+      "step": 0.05,
+      "helpText": "Speech probability threshold used by FireRed VAD post-processing. Higher values are less sensitive; lower values detect quieter speech. Backend default is 0.4.",
+      "helpTextDisplay": "toggletip"
     },
     {
       "key": "microphone.vad.min_silence_frame",
       "label": "Min Silence Frames",
       "type": "slider",
-      "default": "10",
+      "default": "20",
       "min": 1,
-      "max": 30,
-      "step": 1
+      "max": 50,
+      "step": 1,
+      "helpText": "Number of consecutive silence frames before the backend marks speech ended. One frame is 10ms, so the default 20 frames is 200ms.",
+      "helpTextDisplay": "toggletip"
     },
     {
       "key": "microphone.vad.min_speech_frame",
       "label": "Min Speech Frames",
       "type": "slider",
-      "default": "3",
+      "default": "8",
       "min": 1,
       "max": 20,
-      "step": 1
+      "step": 1,
+      "helpText": "Number of speech frames FireRed requires before confirming speech start. One frame is 10ms, so the default 8 frames is 80ms.",
+      "helpTextDisplay": "toggletip"
     }
   ]
 }

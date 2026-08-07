@@ -6,6 +6,7 @@
 package lifecycle
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -13,58 +14,73 @@ import (
 	type_enums "github.com/rapidaai/pkg/types/enums"
 )
 
-// MessageState tracks current message/turn processing lifecycle.
-type MessageState int
+type MessageState string
 
 const (
-	Unknown       MessageState = 1
-	Interrupt     MessageState = 6
-	Interrupted   MessageState = 7
-	LLMGenerating MessageState = 8
-	LLMGenerated  MessageState = 5
+	MessageStateInterrupt MessageState = "interrupt"
+
+	MessageStateUserIdle      MessageState = "user_idle"
+	MessageStateUserListening MessageState = "user_listening"
+	MessageStateUserSpeaking  MessageState = "user_speaking"
+	MessageStateUserThinking  MessageState = "user_thinking"
+	MessageStateUserFinished  MessageState = "user_finished"
+	MessageStateUserPrompted  MessageState = "user_prompted"
+
+	MessageStateAssistantGenerating MessageState = "assistant_generating"
+	MessageStateAssistantGenerated  MessageState = "assistant_generated"
+	MessageStateAssistantSpeaking   MessageState = "assistant_speaking"
+	MessageStateAssistantFinished   MessageState = "assistant_finished"
+	MessageStateAssistantIdle       MessageState = "assistant_idle"
+	MessageStateAssistantPrompted   MessageState = "assistant_prompted"
 )
 
-func (s MessageState) String() string {
-	switch s {
-	case Unknown:
-		return "Unknown"
-	case LLMGenerated:
-		return "LLMGenerated"
-	case Interrupt:
-		return "Interrupt"
-	case Interrupted:
-		return "Interrupted"
-	case LLMGenerating:
-		return "LLMGenerating"
-	default:
-		return "InvalidState"
-	}
-}
+var (
+	ErrEmptyContextID    = errors.New("empty context id")
+	ErrStaleContext      = errors.New("stale context")
+	ErrInvalidTransition = errors.New("invalid message lifecycle transition")
+)
 
 type MessageLifecycle interface {
-	Current() MessageState
-	CanBe(MessageState) bool
-	Transition(MessageState) error
 	ContextID() string
 	SetContextID(string)
+	RotateContext() (string, error)
 	Mode() type_enums.MessageMode
 	SetMode(type_enums.MessageMode)
+	State() MessageState
+	UserIdle(string) error
+	UserListening(string) error
+	UserSpeaking(string) error
+	UserThinking(string) error
+	UserFinished(string) error
+	UserPrompted(string) error
+	UserPromptCount() uint64
+	AssistantGenerating(string) error
+	AssistantGenerated(string) error
+	AssistantSpeaking(string) error
+	AssistantFinished(string) error
+	AssistantIdle(string) error
+	AssistantPrompted(string) error
+	AssistantPromptCount() uint64
+	BeginInterrupt(string) error
+	CommitInterrupt() (string, string, error)
+	CancelInterrupt(string) error
 }
 
 type messageLifecycle struct {
-	mu            sync.RWMutex
-	state         MessageState
-	contextID     string
-	mode          type_enums.MessageMode
-	nextContextID func() string
+	mu               sync.RWMutex
+	contextID        string
+	mode             type_enums.MessageMode
+	state            MessageState
+	userPrompts      uint64
+	assistantPrompts uint64
+	nextContextID    func() string
 }
 
 func NewMessageLifecycle() MessageLifecycle {
-	return NewMessageLifecycleWithState(Unknown, uuid.NewString(), type_enums.TextMode, uuid.NewString)
+	return NewMessageLifecycleWithContext(uuid.NewString(), type_enums.TextMode, uuid.NewString)
 }
 
-func NewMessageLifecycleWithState(
-	initial MessageState,
+func NewMessageLifecycleWithContext(
 	initialContextID string,
 	initialMode type_enums.MessageMode,
 	nextContextID func() string,
@@ -79,40 +95,11 @@ func NewMessageLifecycleWithState(
 		initialMode = type_enums.TextMode
 	}
 	return &messageLifecycle{
-		state:         initial,
 		contextID:     initialContextID,
 		mode:          initialMode,
+		state:         MessageStateAssistantIdle,
 		nextContextID: nextContextID,
 	}
-}
-
-func (l *messageLifecycle) Current() MessageState {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
-	return l.state
-}
-
-func (l *messageLifecycle) CanBe(next MessageState) bool {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
-	return canTransitionMessage(l.state, next) == nil
-}
-
-func (l *messageLifecycle) Transition(next MessageState) error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if err := canTransitionMessage(l.state, next); err != nil {
-		return err
-	}
-	if next == Interrupted {
-		nctx := l.nextContextID()
-		if nctx == "" {
-			return fmt.Errorf("Transition: generated empty context id")
-		}
-		l.contextID = nctx
-	}
-	l.state = next
-	return nil
 }
 
 func (l *messageLifecycle) ContextID() string {
@@ -125,6 +112,20 @@ func (l *messageLifecycle) SetContextID(id string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.contextID = id
+	l.state = MessageStateAssistantIdle
+}
+
+func (l *messageLifecycle) RotateContext() (string, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	nctx := l.nextContextID()
+	if nctx == "" {
+		return "", fmt.Errorf("RotateContext: generated empty context id")
+	}
+	l.contextID = nctx
+	l.state = MessageStateAssistantIdle
+	return nctx, nil
 }
 
 func (l *messageLifecycle) Mode() type_enums.MessageMode {
@@ -139,21 +140,261 @@ func (l *messageLifecycle) SetMode(mode type_enums.MessageMode) {
 	l.mode = mode
 }
 
-func canTransitionMessage(current, next MessageState) error {
-	switch next {
-	case Unknown:
-		return fmt.Errorf("Transition: cannot transition to Unknown state")
-	case Interrupt:
-		if current == Interrupted || current == Interrupt {
-			return fmt.Errorf("Transition: cannot soft-interrupt from state %s", current)
-		}
-		if current == Unknown {
-			return fmt.Errorf("Transition: nothing active to soft-interrupt in state %s", current)
-		}
-	case Interrupted:
-		if current == Interrupted {
-			return fmt.Errorf("Transition: already interrupted")
-		}
+func (l *messageLifecycle) State() MessageState {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.state
+}
+
+func (l *messageLifecycle) UserIdle(contextID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := l.validateContextLocked(contextID); err != nil {
+		return err
+	}
+	switch l.state {
+	case MessageStateInterrupt, MessageStateUserIdle:
+		l.state = MessageStateUserIdle
+		return nil
+	default:
+		return fmt.Errorf("%w: user_idle from %s", ErrInvalidTransition, l.state)
+	}
+}
+
+func (l *messageLifecycle) UserListening(contextID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := l.validateContextLocked(contextID); err != nil {
+		return err
+	}
+	switch l.state {
+	case MessageStateInterrupt, MessageStateUserIdle, MessageStateUserListening:
+		l.state = MessageStateUserListening
+		return nil
+	default:
+		return fmt.Errorf("%w: user_listening from %s", ErrInvalidTransition, l.state)
+	}
+}
+
+func (l *messageLifecycle) UserSpeaking(contextID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := l.validateContextLocked(contextID); err != nil {
+		return err
+	}
+	switch l.state {
+	case MessageStateInterrupt, MessageStateUserIdle, MessageStateUserListening, MessageStateUserSpeaking:
+		l.state = MessageStateUserSpeaking
+		return nil
+	default:
+		return fmt.Errorf("%w: user_speaking from %s", ErrInvalidTransition, l.state)
+	}
+}
+
+func (l *messageLifecycle) UserThinking(contextID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := l.validateContextLocked(contextID); err != nil {
+		return err
+	}
+	switch l.state {
+	case MessageStateInterrupt, MessageStateUserIdle, MessageStateUserListening, MessageStateUserSpeaking, MessageStateUserThinking:
+		l.state = MessageStateUserThinking
+		return nil
+	default:
+		return fmt.Errorf("%w: user_thinking from %s", ErrInvalidTransition, l.state)
+	}
+}
+
+func (l *messageLifecycle) UserFinished(contextID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := l.validateContextLocked(contextID); err != nil {
+		return err
+	}
+	switch l.state {
+	case MessageStateAssistantIdle, MessageStateInterrupt, MessageStateUserIdle, MessageStateUserListening, MessageStateUserSpeaking, MessageStateUserThinking, MessageStateUserFinished:
+		l.state = MessageStateUserFinished
+		return nil
+	default:
+		return fmt.Errorf("%w: user_finished from %s", ErrInvalidTransition, l.state)
+	}
+}
+
+func (l *messageLifecycle) UserPrompted(contextID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := l.validateContextLocked(contextID); err != nil {
+		return err
+	}
+	switch l.state {
+	case MessageStateInterrupt, MessageStateUserIdle, MessageStateUserListening, MessageStateUserSpeaking, MessageStateUserThinking:
+		l.state = MessageStateUserPrompted
+		l.userPrompts++
+		return nil
+	default:
+		return fmt.Errorf("%w: user_prompted from %s", ErrInvalidTransition, l.state)
+	}
+}
+
+func (l *messageLifecycle) UserPromptCount() uint64 {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.userPrompts
+}
+
+func (l *messageLifecycle) AssistantGenerating(contextID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := l.validateContextLocked(contextID); err != nil {
+		return err
+	}
+	switch l.state {
+	case MessageStateAssistantIdle, MessageStateAssistantFinished, MessageStateAssistantPrompted, MessageStateUserFinished, MessageStateUserPrompted, MessageStateAssistantGenerating:
+		l.state = MessageStateAssistantGenerating
+		return nil
+	default:
+		return fmt.Errorf("%w: assistant_generating from %s", ErrInvalidTransition, l.state)
+	}
+}
+
+func (l *messageLifecycle) AssistantGenerated(contextID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := l.validateContextLocked(contextID); err != nil {
+		return err
+	}
+	switch l.state {
+	case MessageStateAssistantGenerating, MessageStateAssistantGenerated:
+		l.state = MessageStateAssistantGenerated
+		return nil
+	default:
+		return fmt.Errorf("%w: assistant_generated from %s", ErrInvalidTransition, l.state)
+	}
+}
+
+func (l *messageLifecycle) AssistantSpeaking(contextID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := l.validateContextLocked(contextID); err != nil {
+		return err
+	}
+	switch l.state {
+	case MessageStateAssistantGenerating, MessageStateAssistantGenerated, MessageStateAssistantSpeaking, MessageStateAssistantPrompted:
+		l.state = MessageStateAssistantSpeaking
+		return nil
+	default:
+		return fmt.Errorf("%w: assistant_speaking from %s", ErrInvalidTransition, l.state)
+	}
+}
+
+func (l *messageLifecycle) AssistantFinished(contextID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := l.validateContextLocked(contextID); err != nil {
+		return err
+	}
+	switch l.state {
+	case MessageStateAssistantGenerating, MessageStateAssistantGenerated, MessageStateAssistantSpeaking, MessageStateAssistantFinished:
+		l.state = MessageStateAssistantFinished
+		return nil
+	default:
+		return fmt.Errorf("%w: assistant_finished from %s", ErrInvalidTransition, l.state)
+	}
+}
+
+func (l *messageLifecycle) AssistantIdle(contextID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := l.validateContextLocked(contextID); err != nil {
+		return err
+	}
+	switch l.state {
+	case MessageStateAssistantFinished, MessageStateAssistantIdle:
+		l.state = MessageStateAssistantIdle
+		return nil
+	default:
+		return fmt.Errorf("%w: assistant_idle from %s", ErrInvalidTransition, l.state)
+	}
+}
+
+func (l *messageLifecycle) AssistantPrompted(contextID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := l.validateContextLocked(contextID); err != nil {
+		return err
+	}
+	switch l.state {
+	case MessageStateAssistantIdle:
+		l.state = MessageStateAssistantPrompted
+		l.assistantPrompts++
+		return nil
+	default:
+		return fmt.Errorf("%w: assistant_prompted from %s", ErrInvalidTransition, l.state)
+	}
+}
+
+func (l *messageLifecycle) AssistantPromptCount() uint64 {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.assistantPrompts
+}
+
+func (l *messageLifecycle) BeginInterrupt(contextID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := l.validateContextLocked(contextID); err != nil {
+		return err
+	}
+	switch l.state {
+	case MessageStateAssistantGenerating, MessageStateAssistantGenerated, MessageStateAssistantSpeaking, MessageStateAssistantPrompted:
+		l.state = MessageStateInterrupt
+		return nil
+	default:
+		return fmt.Errorf("%w: interrupt from %s", ErrInvalidTransition, l.state)
+	}
+}
+
+func (l *messageLifecycle) CommitInterrupt() (string, string, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	switch l.state {
+	case MessageStateInterrupt, MessageStateUserIdle, MessageStateUserListening, MessageStateUserSpeaking, MessageStateUserThinking, MessageStateUserPrompted:
+	default:
+		return "", "", fmt.Errorf("%w: commit_interrupt from %s", ErrInvalidTransition, l.state)
+	}
+
+	oldContextID := l.contextID
+	newContextID := l.nextContextID()
+	if newContextID == "" {
+		return "", "", fmt.Errorf("CommitInterrupt: generated empty context id")
+	}
+	l.contextID = newContextID
+	l.state = MessageStateAssistantIdle
+	return oldContextID, newContextID, nil
+}
+
+func (l *messageLifecycle) CancelInterrupt(contextID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := l.validateContextLocked(contextID); err != nil {
+		return err
+	}
+	switch l.state {
+	case MessageStateInterrupt, MessageStateUserIdle, MessageStateUserListening, MessageStateUserSpeaking, MessageStateUserThinking:
+		l.state = MessageStateAssistantSpeaking
+		return nil
+	default:
+		return fmt.Errorf("%w: cancel_interrupt from %s", ErrInvalidTransition, l.state)
+	}
+}
+
+func (l *messageLifecycle) validateContextLocked(contextID string) error {
+	if contextID == "" {
+		return ErrEmptyContextID
+	}
+	if contextID != l.contextID {
+		return fmt.Errorf("%w: got %s, current %s", ErrStaleContext, contextID, l.contextID)
 	}
 	return nil
 }

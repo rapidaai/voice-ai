@@ -35,7 +35,7 @@ func (deploymentApi *assistantDeploymentGrpcApi) CreateAssistantPhoneDeployment(
 		)
 	}
 	if deployment.GetPhone().UnclearInputTimeout != nil &&
-		!validator.Between(*deployment.GetPhone().UnclearInputTimeout, 0.5, 5) {
+		!validator.Between(*deployment.GetPhone().UnclearInputTimeout, 2, 10) {
 		return &assistant_api.GetAssistantPhoneDeploymentResponse{
 			Code:    pkg_errors.CreateAssistantPhoneDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(),
 			Success: false,
