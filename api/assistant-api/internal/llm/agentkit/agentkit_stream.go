@@ -387,6 +387,7 @@ func (e *agentkitExecutor) Write(ctx context.Context, comm internal_type.Communi
 		)
 
 	case *protos.TalkOutput_Observability:
+		e.logger.Debugf("agentkit observability record received: %v", data.Observability)
 		switch record := data.Observability.GetRecord().(type) {
 		case *protos.ObservabilityRecord_Log:
 			occurredAt := time.Now()

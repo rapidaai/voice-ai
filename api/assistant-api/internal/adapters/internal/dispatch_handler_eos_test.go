@@ -146,14 +146,14 @@ func TestHandleEndOfSpeechAudio_ExecutesEOS(t *testing.T) {
 
 func TestHandleSpeechToText_WithEOSExecutor_ExecutesAndSkipsFallback(t *testing.T) {
 	r := newDispatchHandlerVADTestRequestor(t)
-	r.messageLifecycle = adapter_lifecycle.NewMessageLifecycle()
-	r.messageLifecycle.SetContextID("ctx-eos-stt")
+	r.streamer = &streamTestStreamer{}
+	r.messageLifecycle = adapter_lifecycle.NewMessageLifecycleWithContext("ctx-eos-stt", "")
 	executor := &recordingEOSExecutor{}
 	r.endOfSpeechExecutor = executor
 	h := requestorDispatchHandler{r: r}
 
 	h.HandleSpeechToText(t.Context(), internal_type.SpeechToTextPacket{
-		ContextID: "ctx-stt-packet",
+		ContextID: "ctx-eos-stt",
 		Script:    "hello world",
 		Interim:   false,
 	})
@@ -162,7 +162,8 @@ func TestHandleSpeechToText_WithEOSExecutor_ExecutesAndSkipsFallback(t *testing.
 	require.Len(t, executed, 1)
 	sttPkt, ok := executed[0].(internal_type.SpeechToTextPacket)
 	require.True(t, ok)
-	assert.Equal(t, "ctx-stt-packet", sttPkt.ContextID)
+	assert.NotEmpty(t, sttPkt.ContextID)
+	assert.NotEqual(t, "ctx-eos-stt", sttPkt.ContextID)
 
 	select {
 	case env := <-r.channels.IngressChannel():
@@ -173,8 +174,8 @@ func TestHandleSpeechToText_WithEOSExecutor_ExecutesAndSkipsFallback(t *testing.
 
 func TestHandleSpeechToText_WithoutEOSExecutor_EmitsFallbackOnlyForFinal(t *testing.T) {
 	r := newDispatchHandlerVADTestRequestor(t)
-	r.messageLifecycle = adapter_lifecycle.NewMessageLifecycle()
-	r.messageLifecycle.SetContextID("ctx-eos-fallback")
+	r.streamer = &streamTestStreamer{}
+	r.messageLifecycle = adapter_lifecycle.NewMessageLifecycleWithContext("ctx-eos-fallback", "")
 	h := requestorDispatchHandler{r: r}
 
 	h.HandleSpeechToText(t.Context(), internal_type.SpeechToTextPacket{
@@ -189,7 +190,7 @@ func TestHandleSpeechToText_WithoutEOSExecutor_EmitsFallbackOnlyForFinal(t *test
 	}
 
 	h.HandleSpeechToText(t.Context(), internal_type.SpeechToTextPacket{
-		ContextID: "ctx-final-packet",
+		ContextID: "ctx-eos-fallback",
 		Script:    "final text",
 		Interim:   false,
 	})
@@ -198,7 +199,8 @@ func TestHandleSpeechToText_WithoutEOSExecutor_EmitsFallbackOnlyForFinal(t *test
 	case env := <-r.channels.IngressChannel():
 		eosPkt, ok := env.Pkt.(internal_type.EndOfSpeechPacket)
 		require.True(t, ok, "expected EndOfSpeechPacket, got %T", env.Pkt)
-		assert.Equal(t, "ctx-final-packet", eosPkt.ContextID)
+		assert.NotEmpty(t, eosPkt.ContextID)
+		assert.NotEqual(t, "ctx-eos-fallback", eosPkt.ContextID)
 		assert.Equal(t, "final text", eosPkt.Speech)
 		require.Len(t, eosPkt.Speechs, 1)
 		assert.False(t, eosPkt.Speechs[0].Interim)

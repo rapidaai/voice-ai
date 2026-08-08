@@ -450,9 +450,7 @@ func TestHandleInitializationCompleted_EmitsConversationWebhookRecord(t *testing
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			requestorChannels := adapter_channel.NewRequestorChannels()
-			messageLifecycle := adapter_lifecycle.NewMessageLifecycle()
-			messageLifecycle.SetContextID("ctx-init-webhook")
-			messageLifecycle.SetMode(type_enums.TextMode)
+			messageLifecycle := adapter_lifecycle.NewMessageLifecycleWithContext("ctx-init-webhook", type_enums.TextMode)
 			requestor := &genericRequestor{
 				source:           utils.Debugger,
 				streamer:         &streamTestStreamer{},

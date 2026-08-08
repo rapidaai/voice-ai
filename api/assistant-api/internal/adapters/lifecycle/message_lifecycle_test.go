@@ -8,7 +8,7 @@ import (
 )
 
 func TestMessageLifecycle_DefaultsMode(t *testing.T) {
-	l := NewMessageLifecycleWithContext("ctx", type_enums.MessageMode(""), func() string { return "ctx2" })
+	l := NewMessageLifecycleWithContext("ctx", type_enums.MessageMode(""))
 	if got := l.Mode(); got != type_enums.TextMode {
 		t.Fatalf("unexpected mode, got=%v want=%v", got, type_enums.TextMode)
 	}
@@ -18,30 +18,30 @@ func TestMessageLifecycle_DefaultsMode(t *testing.T) {
 }
 
 func TestMessageLifecycle_RotateContext(t *testing.T) {
-	l := NewMessageLifecycleWithContext("ctx-old", type_enums.MessageMode(""), func() string { return "ctx-new" })
+	l := NewMessageLifecycleWithContext("ctx-old", type_enums.MessageMode(""))
 	if err := l.AssistantGenerating("ctx-old"); err != nil {
 		t.Fatalf("unexpected assistant generating error: %v", err)
 	}
-	if _, err := l.RotateContext(); err != nil {
+	oldContextID, newContextID, err := l.RotateContext()
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got := l.ContextID(); got != "ctx-new" {
-		t.Fatalf("unexpected context id, got=%s want=%s", got, "ctx-new")
+	if oldContextID != "ctx-old" {
+		t.Fatalf("unexpected old context id, got=%s want=ctx-old", oldContextID)
+	}
+	if newContextID == "" || newContextID == "ctx-old" {
+		t.Fatalf("unexpected new context id, got=%s", newContextID)
+	}
+	if got := l.ContextID(); got != newContextID {
+		t.Fatalf("unexpected context id, got=%s want=%s", got, newContextID)
 	}
 	if got := l.State(); got != MessageStateAssistantIdle {
 		t.Fatalf("unexpected state, got=%s want=%s", got, MessageStateAssistantIdle)
 	}
 }
 
-func TestMessageLifecycle_RotateContextEmptyIDFails(t *testing.T) {
-	l := NewMessageLifecycleWithContext("ctx", type_enums.TextMode, func() string { return "" })
-	if _, err := l.RotateContext(); err == nil {
-		t.Fatalf("expected error when generated context id is empty")
-	}
-}
-
 func TestMessageLifecycle_BeginInterruptRequiresAssistantStarted(t *testing.T) {
-	l := NewMessageLifecycleWithContext("ctx", type_enums.TextMode, func() string { return "ctx2" })
+	l := NewMessageLifecycleWithContext("ctx", type_enums.TextMode)
 	if err := l.BeginInterrupt("ctx"); !errors.Is(err, ErrInvalidTransition) {
 		t.Fatalf("expected invalid transition, got=%v", err)
 	}
@@ -62,8 +62,8 @@ func TestMessageLifecycle_BeginInterruptRequiresAssistantStarted(t *testing.T) {
 	}
 }
 
-func TestMessageLifecycle_CommitInterruptRotatesAndResetsState(t *testing.T) {
-	l := NewMessageLifecycleWithContext("ctx-old", type_enums.TextMode, func() string { return "ctx-new" })
+func TestMessageLifecycle_RotateContextAfterInterruptResetsState(t *testing.T) {
+	l := NewMessageLifecycleWithContext("ctx-old", type_enums.TextMode)
 	if err := l.AssistantGenerating("ctx-old"); err != nil {
 		t.Fatalf("unexpected assistant generating error: %v", err)
 	}
@@ -73,18 +73,18 @@ func TestMessageLifecycle_CommitInterruptRotatesAndResetsState(t *testing.T) {
 	if err := l.UserSpeaking("ctx-old"); err != nil {
 		t.Fatalf("unexpected user speaking error: %v", err)
 	}
-	oldContextID, newContextID, err := l.CommitInterrupt()
+	oldContextID, newContextID, err := l.RotateContext()
 	if err != nil {
-		t.Fatalf("unexpected commit interrupt error: %v", err)
+		t.Fatalf("unexpected rotate context error: %v", err)
 	}
 	if oldContextID != "ctx-old" {
 		t.Fatalf("unexpected old context id, got=%s want=ctx-old", oldContextID)
 	}
-	if newContextID != "ctx-new" {
-		t.Fatalf("unexpected new context id, got=%s want=ctx-new", newContextID)
+	if newContextID == "" || newContextID == "ctx-old" {
+		t.Fatalf("unexpected new context id, got=%s", newContextID)
 	}
-	if got := l.ContextID(); got != "ctx-new" {
-		t.Fatalf("unexpected current context id, got=%s want=ctx-new", got)
+	if got := l.ContextID(); got != newContextID {
+		t.Fatalf("unexpected current context id, got=%s want=%s", got, newContextID)
 	}
 	if got := l.State(); got != MessageStateAssistantIdle {
 		t.Fatalf("unexpected state, got=%s want=%s", got, MessageStateAssistantIdle)
@@ -92,7 +92,7 @@ func TestMessageLifecycle_CommitInterruptRotatesAndResetsState(t *testing.T) {
 }
 
 func TestMessageLifecycle_UserFlow(t *testing.T) {
-	l := NewMessageLifecycleWithContext("ctx", type_enums.TextMode, func() string { return "ctx2" })
+	l := NewMessageLifecycleWithContext("ctx", type_enums.TextMode)
 	if err := l.AssistantGenerating("ctx"); err != nil {
 		t.Fatalf("unexpected assistant generating error: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestMessageLifecycle_UserFlow(t *testing.T) {
 }
 
 func TestMessageLifecycle_AssistantFlow(t *testing.T) {
-	l := NewMessageLifecycleWithContext("ctx", type_enums.TextMode, func() string { return "ctx2" })
+	l := NewMessageLifecycleWithContext("ctx", type_enums.TextMode)
 	if err := l.UserFinished("ctx"); err != nil {
 		t.Fatalf("unexpected user finished error: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestMessageLifecycle_AssistantFlow(t *testing.T) {
 }
 
 func TestMessageLifecycle_UserPromptedCountsAndBlocksDuplicate(t *testing.T) {
-	l := NewMessageLifecycleWithContext("ctx", type_enums.TextMode, func() string { return "ctx2" })
+	l := NewMessageLifecycleWithContext("ctx", type_enums.TextMode)
 	if err := l.AssistantGenerating("ctx"); err != nil {
 		t.Fatalf("unexpected assistant generating error: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestMessageLifecycle_UserPromptedCountsAndBlocksDuplicate(t *testing.T) {
 }
 
 func TestMessageLifecycle_AssistantPromptedCountsAndBlocksDuplicate(t *testing.T) {
-	l := NewMessageLifecycleWithContext("ctx", type_enums.TextMode, func() string { return "ctx2" })
+	l := NewMessageLifecycleWithContext("ctx", type_enums.TextMode)
 	if err := l.AssistantPrompted("ctx"); err != nil {
 		t.Fatalf("unexpected assistant prompted error: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestMessageLifecycle_AssistantPromptedCountsAndBlocksDuplicate(t *testing.T
 }
 
 func TestMessageLifecycle_StaleContextRejected(t *testing.T) {
-	l := NewMessageLifecycleWithContext("ctx", type_enums.TextMode, func() string { return "ctx2" })
+	l := NewMessageLifecycleWithContext("ctx", type_enums.TextMode)
 	if err := l.AssistantGenerating("old"); !errors.Is(err, ErrStaleContext) {
 		t.Fatalf("expected stale context error, got=%v", err)
 	}

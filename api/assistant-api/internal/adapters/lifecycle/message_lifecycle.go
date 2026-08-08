@@ -42,8 +42,7 @@ var (
 
 type MessageLifecycle interface {
 	ContextID() string
-	SetContextID(string)
-	RotateContext() (string, error)
+	RotateContext() (string, string, error)
 	Mode() type_enums.MessageMode
 	SetMode(type_enums.MessageMode)
 	State() MessageState
@@ -62,7 +61,6 @@ type MessageLifecycle interface {
 	AssistantPrompted(string) error
 	AssistantPromptCount() uint64
 	BeginInterrupt(string) error
-	CommitInterrupt() (string, string, error)
 	CancelInterrupt(string) error
 }
 
@@ -73,32 +71,26 @@ type messageLifecycle struct {
 	state            MessageState
 	userPrompts      uint64
 	assistantPrompts uint64
-	nextContextID    func() string
 }
 
 func NewMessageLifecycle() MessageLifecycle {
-	return NewMessageLifecycleWithContext(uuid.NewString(), type_enums.TextMode, uuid.NewString)
+	return NewMessageLifecycleWithContext(uuid.NewString(), type_enums.TextMode)
 }
 
 func NewMessageLifecycleWithContext(
 	initialContextID string,
 	initialMode type_enums.MessageMode,
-	nextContextID func() string,
 ) MessageLifecycle {
 	if initialContextID == "" {
 		initialContextID = uuid.NewString()
-	}
-	if nextContextID == nil {
-		nextContextID = uuid.NewString
 	}
 	if initialMode == "" {
 		initialMode = type_enums.TextMode
 	}
 	return &messageLifecycle{
-		contextID:     initialContextID,
-		mode:          initialMode,
-		state:         MessageStateAssistantIdle,
-		nextContextID: nextContextID,
+		contextID: initialContextID,
+		mode:      initialMode,
+		state:     MessageStateAssistantIdle,
 	}
 }
 
@@ -108,24 +100,15 @@ func (l *messageLifecycle) ContextID() string {
 	return l.contextID
 }
 
-func (l *messageLifecycle) SetContextID(id string) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.contextID = id
-	l.state = MessageStateAssistantIdle
-}
-
-func (l *messageLifecycle) RotateContext() (string, error) {
+func (l *messageLifecycle) RotateContext() (string, string, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	nctx := l.nextContextID()
-	if nctx == "" {
-		return "", fmt.Errorf("RotateContext: generated empty context id")
-	}
-	l.contextID = nctx
+	oldContextID := l.contextID
+	newContextID := uuid.NewString()
+	l.contextID = newContextID
 	l.state = MessageStateAssistantIdle
-	return nctx, nil
+	return oldContextID, newContextID, nil
 }
 
 func (l *messageLifecycle) Mode() type_enums.MessageMode {
@@ -153,7 +136,7 @@ func (l *messageLifecycle) UserIdle(contextID string) error {
 		return err
 	}
 	switch l.state {
-	case MessageStateInterrupt, MessageStateUserIdle:
+	case MessageStateAssistantIdle, MessageStateInterrupt, MessageStateUserIdle:
 		l.state = MessageStateUserIdle
 		return nil
 	default:
@@ -168,7 +151,7 @@ func (l *messageLifecycle) UserListening(contextID string) error {
 		return err
 	}
 	switch l.state {
-	case MessageStateInterrupt, MessageStateUserIdle, MessageStateUserListening:
+	case MessageStateAssistantIdle, MessageStateInterrupt, MessageStateUserIdle, MessageStateUserListening, MessageStateUserSpeaking:
 		l.state = MessageStateUserListening
 		return nil
 	default:
@@ -183,7 +166,7 @@ func (l *messageLifecycle) UserSpeaking(contextID string) error {
 		return err
 	}
 	switch l.state {
-	case MessageStateInterrupt, MessageStateUserIdle, MessageStateUserListening, MessageStateUserSpeaking:
+	case MessageStateAssistantIdle, MessageStateInterrupt, MessageStateUserIdle, MessageStateUserListening, MessageStateUserSpeaking:
 		l.state = MessageStateUserSpeaking
 		return nil
 	default:
@@ -353,25 +336,6 @@ func (l *messageLifecycle) BeginInterrupt(contextID string) error {
 	default:
 		return fmt.Errorf("%w: interrupt from %s", ErrInvalidTransition, l.state)
 	}
-}
-
-func (l *messageLifecycle) CommitInterrupt() (string, string, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	switch l.state {
-	case MessageStateInterrupt, MessageStateUserIdle, MessageStateUserListening, MessageStateUserSpeaking, MessageStateUserThinking, MessageStateUserPrompted:
-	default:
-		return "", "", fmt.Errorf("%w: commit_interrupt from %s", ErrInvalidTransition, l.state)
-	}
-
-	oldContextID := l.contextID
-	newContextID := l.nextContextID()
-	if newContextID == "" {
-		return "", "", fmt.Errorf("CommitInterrupt: generated empty context id")
-	}
-	l.contextID = newContextID
-	l.state = MessageStateAssistantIdle
-	return oldContextID, newContextID, nil
 }
 
 func (l *messageLifecycle) CancelInterrupt(contextID string) error {

@@ -159,13 +159,11 @@ func TestInitializeBehavior_GreetingInterruptibleOption_ControlsAudioBlock(t *te
 						},
 					},
 				},
-				messageLifecycle: adapter_lifecycle.NewMessageLifecycle(),
+				messageLifecycle: adapter_lifecycle.NewMessageLifecycleWithContext("ctx-greeting-init", type_enums.AudioMode),
 				sessionLifecycle: adapter_lifecycle.NewSessionLifecycleWithState(adapter_lifecycle.StateInitializing),
 				dispatchRoute:    adapter_router.NewDispatchRoute(adapter_router.NewRoutePolicy(), requestorChannels),
 				channels:         requestorChannels,
 			}
-			requestor.messageLifecycle.SetContextID("ctx-greeting-init")
-			requestor.messageLifecycle.SetMode(type_enums.AudioMode)
 
 			requestorDispatchHandler{r: requestor}.HandleInitializeBehavior(context.Background(), internal_type.InitializeBehaviorPacket{
 				ContextID: "ctx-greeting-init",
@@ -214,12 +212,11 @@ func TestInitializeBehavior_GreetingDoesNotStartIdleTimeoutBeforeCompletion(t *t
 				},
 			},
 		},
-		messageLifecycle: adapter_lifecycle.NewMessageLifecycle(),
+		messageLifecycle: adapter_lifecycle.NewMessageLifecycleWithContext("ctx-greeting-idle", type_enums.TextMode),
 		sessionLifecycle: adapter_lifecycle.NewSessionLifecycleWithState(adapter_lifecycle.StateInitializing),
 		dispatchRoute:    adapter_router.NewDispatchRoute(adapter_router.NewRoutePolicy(), requestorChannels),
 		channels:         requestorChannels,
 	}
-	requestor.messageLifecycle.SetContextID("ctx-greeting-idle")
 
 	requestorDispatchHandler{r: requestor}.HandleInitializeBehavior(context.Background(), internal_type.InitializeBehaviorPacket{
 		ContextID: "ctx-greeting-idle",
@@ -251,12 +248,11 @@ func TestInitializeBehavior_StartsIdleTimeoutWhenNoGreetingIsInjected(t *testing
 				},
 			},
 		},
-		messageLifecycle: adapter_lifecycle.NewMessageLifecycle(),
+		messageLifecycle: adapter_lifecycle.NewMessageLifecycleWithContext("ctx-no-greeting-idle", type_enums.TextMode),
 		sessionLifecycle: adapter_lifecycle.NewSessionLifecycleWithState(adapter_lifecycle.StateInitializing),
 		dispatchRoute:    adapter_router.NewDispatchRoute(adapter_router.NewRoutePolicy(), requestorChannels),
 		channels:         requestorChannels,
 	}
-	requestor.messageLifecycle.SetContextID("ctx-no-greeting-idle")
 
 	requestorDispatchHandler{r: requestor}.HandleInitializeBehavior(context.Background(), internal_type.InitializeBehaviorPacket{
 		ContextID: "ctx-no-greeting-idle",
@@ -288,13 +284,11 @@ func TestInitializeBehavior_NonInterruptibleGreeting_BlocksAudioAndAcceptsAfterT
 				},
 			},
 		},
-		messageLifecycle: adapter_lifecycle.NewMessageLifecycle(),
+		messageLifecycle: adapter_lifecycle.NewMessageLifecycleWithContext("ctx-greeting-audio", type_enums.AudioMode),
 		sessionLifecycle: adapter_lifecycle.NewSessionLifecycleWithState(adapter_lifecycle.StateInitializing),
 		dispatchRoute:    adapter_router.NewDispatchRoute(adapter_router.NewRoutePolicy(), requestorChannels),
 		channels:         requestorChannels,
 	}
-	requestor.messageLifecycle.SetContextID("ctx-greeting-audio")
-	requestor.messageLifecycle.SetMode(type_enums.AudioMode)
 
 	requestorDispatchHandler{r: requestor}.HandleInitializeBehavior(context.Background(), internal_type.InitializeBehaviorPacket{
 		ContextID: "ctx-greeting-audio",
@@ -349,13 +343,11 @@ func TestInitializeBehavior_NonInterruptibleGreeting_TextInputDoesNotKeepAudioBl
 				},
 			},
 		},
-		messageLifecycle: adapter_lifecycle.NewMessageLifecycle(),
+		messageLifecycle: adapter_lifecycle.NewMessageLifecycleWithContext("ctx-greeting-text", type_enums.AudioMode),
 		sessionLifecycle: adapter_lifecycle.NewSessionLifecycleWithState(adapter_lifecycle.StateInitializing),
 		dispatchRoute:    adapter_router.NewDispatchRoute(adapter_router.NewRoutePolicy(), requestorChannels),
 		channels:         requestorChannels,
 	}
-	requestor.messageLifecycle.SetContextID("ctx-greeting-text")
-	requestor.messageLifecycle.SetMode(type_enums.AudioMode)
 
 	requestorDispatchHandler{r: requestor}.HandleInitializeBehavior(context.Background(), internal_type.InitializeBehaviorPacket{
 		ContextID: "ctx-greeting-text",
