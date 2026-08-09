@@ -4,6 +4,7 @@ import {
   ConfigureExperience,
   WebWidgetExperienceConfig,
 } from '@/app/pages/assistant/actions/create-deployment/web-plugin/configure-experience';
+import { DEFAULT_IDEAL_TIMEOUT } from '@/app/pages/assistant/actions/create-deployment/commons/configure-experience';
 import { useRapidaStore } from '@/hooks';
 import { useAllProviderCredentials } from '@/hooks/use-model';
 import { useCurrentCredential } from '@/hooks/use-credential';
@@ -79,7 +80,7 @@ const EditAssistantWebDeployment: FC<{ assistantId: string }> = ({
       messageOnError: undefined,
       unclearInputTimeout: undefined,
       unclearInputMessage: undefined,
-      idealTimeout: '30',
+      idealTimeout: DEFAULT_IDEAL_TIMEOUT,
       idealMessage: 'Are you there?',
       maxCallDuration: '300',
       idleTimeoutBackoffTimes: '2',

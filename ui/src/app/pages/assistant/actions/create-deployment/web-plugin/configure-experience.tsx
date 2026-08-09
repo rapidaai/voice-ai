@@ -1,6 +1,7 @@
 import ConfigSelect from '@/app/components/configuration/config-var/config-select';
 import { TextInput, TextArea, Stack } from '@/app/components/carbon/form';
 import {
+  DEFAULT_IDEAL_TIMEOUT,
   DEFAULT_UNCLEAR_INPUT_MESSAGE,
   DEFAULT_UNCLEAR_INPUT_TIMEOUT,
   ExperienceConfig,
@@ -104,7 +105,9 @@ export const ConfigureExperience: FC<{
                 min={5}
                 max={120}
                 step={1}
-                value={parseInt(experienceConfig.idealTimeout || '30')}
+                value={parseInt(
+                  experienceConfig.idealTimeout || DEFAULT_IDEAL_TIMEOUT,
+                )}
                 onChange={({ value }: { value: number }) =>
                   update('idealTimeout', value.toString())
                 }

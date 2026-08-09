@@ -40,6 +40,7 @@ const ERROR_MESSAGE_OPTIONS = [
 export const DEFAULT_UNCLEAR_INPUT_TIMEOUT = '2';
 export const DEFAULT_UNCLEAR_INPUT_MESSAGE =
   "I didn't catch that. Could you repeat that?";
+export const DEFAULT_IDEAL_TIMEOUT = '10';
 
 const UNCLEAR_INPUT_MESSAGE_OPTIONS = [
   DEFAULT_UNCLEAR_INPUT_MESSAGE,
@@ -226,7 +227,9 @@ export const ConfigureExperience: FC<{
             min={5}
             max={120}
             step={1}
-            value={parseInt(experienceConfig.idealTimeout || '30')}
+            value={parseInt(
+              experienceConfig.idealTimeout || DEFAULT_IDEAL_TIMEOUT,
+            )}
             onChange={({ value }: { value: number }) =>
               update('idealTimeout', value.toString())
             }

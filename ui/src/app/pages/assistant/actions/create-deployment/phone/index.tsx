@@ -1,5 +1,6 @@
 import {
   ConfigureExperience,
+  DEFAULT_IDEAL_TIMEOUT,
   DEFAULT_UNCLEAR_INPUT_MESSAGE,
   DEFAULT_UNCLEAR_INPUT_TIMEOUT,
   ExperienceConfig,
@@ -105,7 +106,7 @@ const ConfigureAssistantCallDeployment: FC<{ assistantId: string }> = ({
     messageOnError: undefined,
     unclearInputTimeout: DEFAULT_UNCLEAR_INPUT_TIMEOUT,
     unclearInputMessage: DEFAULT_UNCLEAR_INPUT_MESSAGE,
-    idealTimeout: '30',
+    idealTimeout: DEFAULT_IDEAL_TIMEOUT,
     idealMessage: 'Are you there?',
     maxCallDuration: '300',
     idleTimeoutBackoffTimes: '2',
