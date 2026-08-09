@@ -1,5 +1,6 @@
 import {
   ConfigureExperience,
+  DEFAULT_IDEAL_TIMEOUT,
   ExperienceConfig,
 } from '@/app/pages/assistant/actions/create-deployment/commons/configure-experience';
 import { ConfigureAudioOutputProvider } from '@/app/pages/assistant/actions/create-deployment/commons/configure-audio-output';
@@ -38,10 +39,7 @@ import { Tabs } from '@/app/components/carbon/tabs';
 import { PrimaryButton, SecondaryButton } from '@/app/components/carbon/button';
 import { ButtonSet, CheckboxGroup } from '@carbon/react';
 import { InputCheckbox } from '@/app/components/carbon/form/input-checkbox';
-import {
-  ActionNotification,
-  Notification,
-} from '@/app/components/carbon/notification';
+import { Notification } from '@/app/components/carbon/notification';
 
 const EDIT_TABS = [
   {
@@ -95,7 +93,7 @@ const EditAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
     messageOnError: undefined,
     unclearInputTimeout: undefined,
     unclearInputMessage: undefined,
-    idealTimeout: '30',
+    idealTimeout: DEFAULT_IDEAL_TIMEOUT,
     idealMessage: 'Are you there?',
     maxCallDuration: '300',
     idleTimeoutBackoffTimes: '2',

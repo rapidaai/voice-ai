@@ -4,6 +4,7 @@ import { Slider } from '@carbon/react';
 import { ChevronDown } from '@carbon/icons-react';
 import { cn } from '@/utils';
 import {
+  DEFAULT_IDEAL_TIMEOUT,
   DEFAULT_UNCLEAR_INPUT_MESSAGE,
   DEFAULT_UNCLEAR_INPUT_TIMEOUT,
   ExperienceConfig,
@@ -99,7 +100,9 @@ export const ConfigureWebExperienceModalForm: FC<{
               min={5}
               max={120}
               step={1}
-              value={parseInt(experienceConfig.idealTimeout || '30')}
+              value={parseInt(
+                experienceConfig.idealTimeout || DEFAULT_IDEAL_TIMEOUT,
+              )}
               onChange={({ value }: { value: number }) =>
                 update('idealTimeout', value.toString())
               }

@@ -24,6 +24,7 @@ import { useCurrentCredential } from '@/hooks/use-credential';
 import { useAllProviderCredentials } from '@/hooks/use-model';
 import { useRapidaStore } from '@/hooks';
 import {
+  DEFAULT_IDEAL_TIMEOUT,
   ExperienceConfig,
 } from '@/app/pages/assistant/actions/create-deployment/commons/configure-experience';
 import {
@@ -65,7 +66,7 @@ const DEFAULT_EXPERIENCE: ExperienceConfig = {
   messageOnError: undefined,
   unclearInputTimeout: undefined,
   unclearInputMessage: undefined,
-  idealTimeout: '30',
+  idealTimeout: DEFAULT_IDEAL_TIMEOUT,
   idealMessage: 'Are you there?',
   maxCallDuration: '300',
   idleTimeoutBackoffTimes: '2',

@@ -1,5 +1,6 @@
 import {
   ConfigureExperience,
+  DEFAULT_IDEAL_TIMEOUT,
   ExperienceConfig,
 } from '@/app/pages/assistant/actions/create-deployment/commons/configure-experience';
 import { ConfigureAudioOutputProvider } from '@/app/pages/assistant/actions/create-deployment/commons/configure-audio-output';
@@ -78,7 +79,7 @@ const EditAssistantApiDeployment: FC<{ assistantId: string }> = ({
     messageOnError: undefined,
     unclearInputTimeout: undefined,
     unclearInputMessage: undefined,
-    idealTimeout: '30',
+    idealTimeout: DEFAULT_IDEAL_TIMEOUT,
     idealMessage: 'Are you there?',
     maxCallDuration: '300',
     idleTimeoutBackoffTimes: '2',
