@@ -58,6 +58,7 @@ audiosocket:
 
 sip:
   server: "0.0.0.0"
+  instance_id: "assistant-01"
   external_ip: "0.0.0.0"
   port: 5090
   transport: "udp"
