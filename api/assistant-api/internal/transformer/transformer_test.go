@@ -136,6 +136,51 @@ func TestGetTextToSpeechTransformer(t *testing.T) {
 	}
 }
 
+// TestGetTextToSpeechTransformer_InworldRouting asserts the INWORLD switch
+// branch is reachable via the factory: a non-empty "key" credential
+// resolves through to a concrete *inworldTTS, and an unknown provider
+// falls through to the same "illegal text to speech" error every other
+// unknown provider hits. Protects the dispatcher wiring against silent
+// regressions (it is trivially easy to delete a case and not notice, since
+// the constructor tests bypass the factory).
+func TestGetTextToSpeechTransformer_InworldRouting(t *testing.T) {
+	mockLogger, _ := commons.NewApplicationLogger()
+	ctx := context.Background()
+
+	t.Run("inworld success path", func(t *testing.T) {
+		val, err := structpb.NewStruct(map[string]interface{}{"key": "test-key"})
+		assert.NoError(t, err)
+		credential := &protos.VaultCredential{Value: val}
+
+		transformer, err := GetTextToSpeechTransformer(ctx, mockLogger, INWORLD.String(), credential,
+			func(pkt ...internal_type.Packet) error { return nil }, utils.Option{})
+		assert.NoError(t, err, "inworld factory should not error on a valid key")
+		assert.NotNil(t, transformer)
+		assert.Equal(t, "inworld-text-to-speech", transformer.Name(),
+			"factory should return the inworld TTS transformer, not another provider")
+	})
+
+	t.Run("inworld rejects empty key", func(t *testing.T) {
+		val, err := structpb.NewStruct(map[string]interface{}{"key": ""})
+		assert.NoError(t, err)
+		credential := &protos.VaultCredential{Value: val}
+
+		transformer, err := GetTextToSpeechTransformer(ctx, mockLogger, INWORLD.String(), credential,
+			func(pkt ...internal_type.Packet) error { return nil }, utils.Option{})
+		assert.Error(t, err)
+		assert.Nil(t, transformer)
+	})
+
+	t.Run("unknown provider falls back to factory error", func(t *testing.T) {
+		credential := &protos.VaultCredential{}
+		transformer, err := GetTextToSpeechTransformer(ctx, mockLogger, "nonexistent-provider", credential,
+			func(pkt ...internal_type.Packet) error { return nil }, utils.Option{})
+		assert.Error(t, err)
+		assert.Nil(t, transformer)
+		assert.Equal(t, "illegal text to speech idenitfier", err.Error())
+	})
+}
+
 // TestGetSpeechToTextTransformer tests speech-to-text transformer creation
 func TestGetSpeechToTextTransformer(t *testing.T) {
 	mockLogger, _ := commons.NewApplicationLogger()

@@ -19,6 +19,7 @@ import (
 	internal_transformer_elevenlabs "github.com/rapidaai/api/assistant-api/internal/transformer/elevenlabs"
 	internal_transformer_google "github.com/rapidaai/api/assistant-api/internal/transformer/google"
 	internal_transformer_groq "github.com/rapidaai/api/assistant-api/internal/transformer/groq"
+	internal_transformer_inworld "github.com/rapidaai/api/assistant-api/internal/transformer/inworld"
 	internal_transformer_minimax "github.com/rapidaai/api/assistant-api/internal/transformer/minimax"
 	internal_transformer_neuphonic "github.com/rapidaai/api/assistant-api/internal/transformer/neuphonic"
 	internal_transformer_nvidia "github.com/rapidaai/api/assistant-api/internal/transformer/nvidia"
@@ -46,6 +47,7 @@ const (
 	REVAI                 AudioTransformer = "revai"
 	SARVAM                AudioTransformer = "sarvamai"
 	ELEVENLABS            AudioTransformer = "elevenlabs"
+	INWORLD               AudioTransformer = "inworld"
 	RIME                  AudioTransformer = "rime"
 	ASSEMBLYAI            AudioTransformer = "assemblyai"
 	SPEECHMATICS          AudioTransformer = "speechmatics"
@@ -85,6 +87,8 @@ func GetTextToSpeechTransformer(ctx context.Context,
 		return internal_transformer_sarvam.NewSarvamTextToSpeech(ctx, logger, credential, onPacket, opts)
 	case ELEVENLABS:
 		return internal_transformer_elevenlabs.NewElevenlabsTextToSpeech(ctx, logger, credential, onPacket, opts)
+	case INWORLD:
+		return internal_transformer_inworld.NewInworldTextToSpeech(ctx, logger, credential, onPacket, opts)
 	case RIME:
 		return internal_transformer_rime.NewRimeTextToSpeech(ctx, logger, credential, onPacket, opts)
 	case RESEMBLEAI:

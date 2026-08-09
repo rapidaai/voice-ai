@@ -1,0 +1,12 @@
+[
+    {
+        "model_id": "inworld-tts-1.5-max",
+        "name": "Inworld TTS 1.5 Max",
+        "description": "Flagship expressive model. Best audio quality; higher latency than mini."
+    },
+    {
+        "model_id": "inworld-tts-1.5-mini",
+        "name": "Inworld TTS 1.5 Mini",
+        "description": "Fast model. Lowest TTFB; ideal for realtime conversational use."
+    }
+]
