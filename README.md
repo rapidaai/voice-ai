@@ -174,7 +174,7 @@ Add your API keys (OpenAI, Anthropic, Deepgram, Twilio, etc.) in these files.
 - Create local storage path in `/opt/rapida-data/assets/workflow` and make sure it is writable by user
 
 ```bash
-mkdir -p /opt/rapida-data/assets/workflow
+sudo mkdir -p /opt/rapida-data/assets/workflow
 sudo chown -R "$USER:$(id -gn)" /opt/rapida-data/assets
 ```
 
