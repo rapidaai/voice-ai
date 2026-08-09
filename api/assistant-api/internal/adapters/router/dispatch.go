@@ -20,7 +20,6 @@ type DispatchHandler interface {
 	HandleDenoise(context.Context, internal_type.DenoiseAudioPacket)
 	HandleDenoisedAudio(context.Context, internal_type.DenoisedAudioPacket)
 	HandleVadAudio(context.Context, internal_type.VadAudioPacket)
-	HandleVadSpeechActivity(context.Context, internal_type.VadSpeechActivityPacket)
 	HandleSpeechToText(context.Context, internal_type.SpeechToTextPacket)
 	HandleInterimEndOfSpeech(context.Context, internal_type.InterimEndOfSpeechPacket)
 	HandleEndOfSpeech(context.Context, internal_type.EndOfSpeechPacket)
@@ -120,8 +119,6 @@ func DispatchPacket(ctx context.Context, p internal_type.Packet, handler Dispatc
 		handler.HandleDenoisedAudio(ctx, vl)
 	case internal_type.VadAudioPacket:
 		handler.HandleVadAudio(ctx, vl)
-	case internal_type.VadSpeechActivityPacket:
-		handler.HandleVadSpeechActivity(ctx, vl)
 	case internal_type.SpeechToTextPacket:
 		handler.HandleSpeechToText(ctx, vl)
 	case internal_type.InterimEndOfSpeechPacket:

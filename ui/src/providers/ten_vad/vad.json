@@ -1,29 +1,15 @@
 {
   "parameters": [
     {
-      "key": "microphone.vad.barge_in_trigger",
-      "label": "Barge-in Trigger",
-      "type": "select",
-      "default": "vad",
-      "choices": [
-        {
-          "label": "VAD",
-          "value": "vad"
-        },
-        {
-          "label": "Word",
-          "value": "word"
-        }
-      ]
-    },
-    {
       "key": "microphone.vad.threshold",
       "label": "Speech Threshold",
       "type": "slider",
       "default": "0.5",
-      "min": 0.3,
+      "min": 0,
       "max": 1,
-      "step": 0.05
+      "step": 0.05,
+      "helpText": "Speech probability threshold used by TEN VAD. Higher values are less sensitive; lower values detect quieter speech. Backend valid range is 0 through 1.",
+      "helpTextDisplay": "toggletip"
     },
     {
       "key": "microphone.vad.min_silence_frame",
@@ -33,7 +19,8 @@
       "min": 1,
       "max": 50,
       "step": 1,
-      "helpText": "Frames of silence before speech ends (1 frame = 10ms)"
+      "helpText": "Number of consecutive silence frames before the backend marks speech ended. One frame is 10ms, so the default 20 frames is 200ms.",
+      "helpTextDisplay": "toggletip"
     },
     {
       "key": "microphone.vad.min_speech_frame",
@@ -43,7 +30,8 @@
       "min": 1,
       "max": 20,
       "step": 1,
-      "helpText": "Frames of padding around speech (1 frame = 10ms)"
+      "helpText": "Speech padding applied around detected speech boundaries. One frame is 10ms, so the default 8 frames is 80ms.",
+      "helpTextDisplay": "toggletip"
     }
   ]
 }

@@ -34,7 +34,7 @@ func (deploymentApi *assistantDeploymentGrpcApi) CreateAssistantWebpluginDeploym
 		)
 	}
 	if deployment.GetPlugin().UnclearInputTimeout != nil &&
-		!validator.Between(*deployment.GetPlugin().UnclearInputTimeout, 0.5, 5) {
+		!validator.Between(*deployment.GetPlugin().UnclearInputTimeout, 2, 10) {
 		return &assistant_api.GetAssistantWebpluginDeploymentResponse{
 			Code:    pkg_errors.CreateAssistantWebpluginDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(),
 			Success: false,

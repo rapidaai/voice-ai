@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -742,22 +743,24 @@ func TestCreateAssistantDebuggerDeploymentRest_InvalidIdealTimeout(t *testing.T)
 
 func TestCreateAssistantDebuggerDeploymentRest_InvalidUnclearInputTimeout(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	deploymentApi := newCreateDebuggerDeploymentRestApi(t, &createDebuggerDeploymentRestServiceStub{})
+	for _, unclearInputTimeout := range []float64{1.9, 10.1} {
+		deploymentApi := newCreateDebuggerDeploymentRestApi(t, &createDebuggerDeploymentRestServiceStub{})
 
-	recorder := httptest.NewRecorder()
-	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(
-		http.MethodPost,
-		"/v1/assistant-deployment/create-debugger-deployment",
-		bytes.NewReader([]byte(`{"assistantId":"123","unclearInputTimeout":0.4}`)),
-	)
-	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+		recorder := httptest.NewRecorder()
+		context, _ := gin.CreateTestContext(recorder)
+		context.Request = httptest.NewRequest(
+			http.MethodPost,
+			"/v1/assistant-deployment/create-debugger-deployment",
+			bytes.NewReader([]byte(fmt.Sprintf(`{"assistantId":"123","unclearInputTimeout":%f}`, unclearInputTimeout))),
+		)
+		context.Request.Header.Set("Content-Type", "application/json")
+		context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
 
-	deploymentApi.CreateAssistantDebuggerDeploymentRest(context)
+		deploymentApi.CreateAssistantDebuggerDeploymentRest(context)
 
-	require.Equal(t, http.StatusBadRequest, recorder.Code)
-	assert.Contains(t, recorder.Body.String(), pkg_errors.CreateAssistantDebuggerDeploymentInvalidUnclearTimeout.Error)
+		require.Equal(t, http.StatusBadRequest, recorder.Code)
+		assert.Contains(t, recorder.Body.String(), pkg_errors.CreateAssistantDebuggerDeploymentInvalidUnclearTimeout.Error)
+	}
 }
 
 func TestCreateAssistantDebuggerDeploymentRest_InvalidIdealTimeoutBackoff(t *testing.T) {
@@ -905,88 +908,93 @@ func TestCreateAssistantWhatsappDeploymentGRPC_InvalidIdealTimeout(t *testing.T)
 }
 
 func TestCreateAssistantDebuggerDeploymentGRPC_InvalidUnclearInputTimeout(t *testing.T) {
-	service := &createDebuggerDeploymentRestServiceStub{}
-	deploymentApi := newCreateDebuggerDeploymentGRPCApi(t, service)
-	request := createDebuggerDeploymentGRPCRequest()
-	unclearInputTimeout := 0.4
-	request.GetDebugger().UnclearInputTimeout = &unclearInputTimeout
+	for _, unclearInputTimeout := range []float64{1.9, 10.1} {
+		service := &createDebuggerDeploymentRestServiceStub{}
+		deploymentApi := newCreateDebuggerDeploymentGRPCApi(t, service)
+		request := createDebuggerDeploymentGRPCRequest()
+		request.GetDebugger().UnclearInputTimeout = &unclearInputTimeout
 
-	response, err := deploymentApi.CreateAssistantDebuggerDeployment(createDebuggerDeploymentGRPCContext(), request)
+		response, err := deploymentApi.CreateAssistantDebuggerDeployment(createDebuggerDeploymentGRPCContext(), request)
 
-	require.Error(t, err)
-	require.NotNil(t, response)
-	assert.False(t, service.createCalled)
-	assert.Equal(t, pkg_errors.CreateAssistantDebuggerDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(), response.Code)
-	require.NotNil(t, response.Error)
-	assert.Equal(t, uint64(pkg_errors.CreateAssistantDebuggerDeploymentInvalidUnclearTimeout.Code), response.Error.ErrorCode)
+		require.Error(t, err)
+		require.NotNil(t, response)
+		assert.False(t, service.createCalled)
+		assert.Equal(t, pkg_errors.CreateAssistantDebuggerDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(), response.Code)
+		require.NotNil(t, response.Error)
+		assert.Equal(t, uint64(pkg_errors.CreateAssistantDebuggerDeploymentInvalidUnclearTimeout.Code), response.Error.ErrorCode)
+	}
 }
 
 func TestCreateAssistantApiDeploymentGRPC_InvalidUnclearInputTimeout(t *testing.T) {
-	service := &createDebuggerDeploymentRestServiceStub{}
-	deploymentApi := newCreateDebuggerDeploymentGRPCApi(t, service)
-	request := createApiDeploymentGRPCRequest()
-	unclearInputTimeout := 0.4
-	request.GetApi().UnclearInputTimeout = &unclearInputTimeout
+	for _, unclearInputTimeout := range []float64{1.9, 10.1} {
+		service := &createDebuggerDeploymentRestServiceStub{}
+		deploymentApi := newCreateDebuggerDeploymentGRPCApi(t, service)
+		request := createApiDeploymentGRPCRequest()
+		request.GetApi().UnclearInputTimeout = &unclearInputTimeout
 
-	response, err := deploymentApi.CreateAssistantApiDeployment(createDebuggerDeploymentGRPCContext(), request)
+		response, err := deploymentApi.CreateAssistantApiDeployment(createDebuggerDeploymentGRPCContext(), request)
 
-	require.Error(t, err)
-	require.NotNil(t, response)
-	assert.False(t, service.createCalled)
-	assert.Equal(t, pkg_errors.CreateAssistantApiDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(), response.Code)
-	require.NotNil(t, response.Error)
-	assert.Equal(t, uint64(pkg_errors.CreateAssistantApiDeploymentInvalidUnclearTimeout.Code), response.Error.ErrorCode)
+		require.Error(t, err)
+		require.NotNil(t, response)
+		assert.False(t, service.createCalled)
+		assert.Equal(t, pkg_errors.CreateAssistantApiDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(), response.Code)
+		require.NotNil(t, response.Error)
+		assert.Equal(t, uint64(pkg_errors.CreateAssistantApiDeploymentInvalidUnclearTimeout.Code), response.Error.ErrorCode)
+	}
 }
 
 func TestCreateAssistantPhoneDeploymentGRPC_InvalidUnclearInputTimeout(t *testing.T) {
-	service := &createDebuggerDeploymentRestServiceStub{}
-	deploymentApi := newCreateDebuggerDeploymentGRPCApi(t, service)
-	request := createPhoneDeploymentGRPCRequest()
-	unclearInputTimeout := 0.4
-	request.GetPhone().UnclearInputTimeout = &unclearInputTimeout
+	for _, unclearInputTimeout := range []float64{1.9, 10.1} {
+		service := &createDebuggerDeploymentRestServiceStub{}
+		deploymentApi := newCreateDebuggerDeploymentGRPCApi(t, service)
+		request := createPhoneDeploymentGRPCRequest()
+		request.GetPhone().UnclearInputTimeout = &unclearInputTimeout
 
-	response, err := deploymentApi.CreateAssistantPhoneDeployment(createDebuggerDeploymentGRPCContext(), request)
+		response, err := deploymentApi.CreateAssistantPhoneDeployment(createDebuggerDeploymentGRPCContext(), request)
 
-	require.Error(t, err)
-	require.NotNil(t, response)
-	assert.False(t, service.createCalled)
-	assert.Equal(t, pkg_errors.CreateAssistantPhoneDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(), response.Code)
-	require.NotNil(t, response.Error)
-	assert.Equal(t, uint64(pkg_errors.CreateAssistantPhoneDeploymentInvalidUnclearTimeout.Code), response.Error.ErrorCode)
+		require.Error(t, err)
+		require.NotNil(t, response)
+		assert.False(t, service.createCalled)
+		assert.Equal(t, pkg_errors.CreateAssistantPhoneDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(), response.Code)
+		require.NotNil(t, response.Error)
+		assert.Equal(t, uint64(pkg_errors.CreateAssistantPhoneDeploymentInvalidUnclearTimeout.Code), response.Error.ErrorCode)
+	}
 }
 
 func TestCreateAssistantWebpluginDeploymentGRPC_InvalidUnclearInputTimeout(t *testing.T) {
-	service := &createDebuggerDeploymentRestServiceStub{}
-	deploymentApi := newCreateDebuggerDeploymentGRPCApi(t, service)
-	request := createWebpluginDeploymentGRPCRequest()
-	unclearInputTimeout := 0.4
-	request.GetPlugin().UnclearInputTimeout = &unclearInputTimeout
+	for _, unclearInputTimeout := range []float64{1.9, 10.1} {
+		service := &createDebuggerDeploymentRestServiceStub{}
+		deploymentApi := newCreateDebuggerDeploymentGRPCApi(t, service)
+		request := createWebpluginDeploymentGRPCRequest()
+		request.GetPlugin().UnclearInputTimeout = &unclearInputTimeout
 
-	response, err := deploymentApi.CreateAssistantWebpluginDeployment(createDebuggerDeploymentGRPCContext(), request)
+		response, err := deploymentApi.CreateAssistantWebpluginDeployment(createDebuggerDeploymentGRPCContext(), request)
 
-	require.Error(t, err)
-	require.NotNil(t, response)
-	assert.False(t, service.createCalled)
-	assert.Equal(t, pkg_errors.CreateAssistantWebpluginDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(), response.Code)
-	require.NotNil(t, response.Error)
-	assert.Equal(t, uint64(pkg_errors.CreateAssistantWebpluginDeploymentInvalidUnclearTimeout.Code), response.Error.ErrorCode)
+		require.Error(t, err)
+		require.NotNil(t, response)
+		assert.False(t, service.createCalled)
+		assert.Equal(t, pkg_errors.CreateAssistantWebpluginDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(), response.Code)
+		require.NotNil(t, response.Error)
+		assert.Equal(t, uint64(pkg_errors.CreateAssistantWebpluginDeploymentInvalidUnclearTimeout.Code), response.Error.ErrorCode)
+	}
 }
 
 func TestCreateAssistantWhatsappDeploymentGRPC_InvalidUnclearInputTimeout(t *testing.T) {
-	service := &createDebuggerDeploymentRestServiceStub{}
-	deploymentApi := newCreateDebuggerDeploymentGRPCApi(t, service)
-	request := createWhatsappDeploymentGRPCRequest()
-	unclearInputTimeout := 0.4
-	request.GetWhatsapp().UnclearInputTimeout = &unclearInputTimeout
+	for _, unclearInputTimeout := range []float64{1.9, 10.1} {
+		service := &createDebuggerDeploymentRestServiceStub{}
+		deploymentApi := newCreateDebuggerDeploymentGRPCApi(t, service)
+		request := createWhatsappDeploymentGRPCRequest()
+		request.GetWhatsapp().UnclearInputTimeout = &unclearInputTimeout
 
-	response, err := deploymentApi.CreateAssistantWhatsappDeployment(createDebuggerDeploymentGRPCContext(), request)
+		response, err := deploymentApi.CreateAssistantWhatsappDeployment(createDebuggerDeploymentGRPCContext(), request)
 
-	require.Error(t, err)
-	require.NotNil(t, response)
-	assert.False(t, service.createCalled)
-	assert.Equal(t, pkg_errors.CreateAssistantWhatsappDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(), response.Code)
-	require.NotNil(t, response.Error)
-	assert.Equal(t, uint64(pkg_errors.CreateAssistantWhatsappDeploymentInvalidUnclearTimeout.Code), response.Error.ErrorCode)
+		require.Error(t, err)
+		require.NotNil(t, response)
+		assert.False(t, service.createCalled)
+		assert.Equal(t, pkg_errors.CreateAssistantWhatsappDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(), response.Code)
+		require.NotNil(t, response.Error)
+		assert.Equal(t, uint64(pkg_errors.CreateAssistantWhatsappDeploymentInvalidUnclearTimeout.Code), response.Error.ErrorCode)
+	}
 }
 
 func TestCreateAssistantDebuggerDeploymentGRPC_InvalidIdealTimeoutBackoff(t *testing.T) {

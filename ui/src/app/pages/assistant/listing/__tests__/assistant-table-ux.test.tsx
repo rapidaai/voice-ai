@@ -38,8 +38,8 @@ jest.mock('@/app/components/indicators/source', () => ({
   default: ({ source }: any) => <span>Deployment: {source}</span>,
 }));
 
-jest.mock('@/app/components/carbon/status-indicator', () => ({
-  CarbonStatusIndicator: ({ state }: any) => <span>Status: {state}</span>,
+jest.mock('@/app/components/carbon/record-status-indicator', () => ({
+  RecordStatusIndicator: ({ state }: any) => <span>Status: {state}</span>,
 }));
 
 jest.mock('@/app/components/carbon/button/copy-button', () => ({

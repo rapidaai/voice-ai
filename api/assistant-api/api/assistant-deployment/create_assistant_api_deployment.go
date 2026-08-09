@@ -33,7 +33,7 @@ func (deploymentApi *assistantDeploymentGrpcApi) CreateAssistantApiDeployment(ct
 		)
 	}
 	if deployment.GetApi().UnclearInputTimeout != nil &&
-		!validator.Between(*deployment.GetApi().UnclearInputTimeout, 0.5, 5) {
+		!validator.Between(*deployment.GetApi().UnclearInputTimeout, 2, 10) {
 		return &assistant_api.GetAssistantApiDeploymentResponse{
 			Code:    pkg_errors.CreateAssistantApiDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(),
 			Success: false,

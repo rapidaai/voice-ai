@@ -45,6 +45,11 @@ jest.mock('@/app/components/providers/vad', () => ({
   ),
 }));
 
+jest.mock('@/app/components/providers/microphone/barge-in-trigger-control', () => ({
+  MICROPHONE_BARGE_IN_TRIGGER_KEY: 'microphone.barge_in_trigger',
+  BargeInTriggerControl: () => <div>barge-in control</div>,
+}));
+
 jest.mock('@/app/components/providers/end-of-speech', () => ({
   EndOfSpeechProvider: ({
     onChangeProvider,
@@ -108,6 +113,7 @@ describe('ConfigureAudioInputProvider design integration', () => {
     const inputParameters = [
       createMetadata('listen.model', 'nova-3'),
       createMetadata('microphone.eos.fallback_timeout', '900'),
+      createMetadata('microphone.barge_in_trigger', 'word'),
       createMetadata('microphone.vad.threshold', '0.7'),
       createMetadata('microphone.denoising.provider', 'rn_noise'),
       createMetadata('speaker.model', 'sonic'),
@@ -137,6 +143,7 @@ describe('ConfigureAudioInputProvider design integration', () => {
     expect(microphoneOnly.map(m => m.getKey()).sort()).toEqual(
       [
         'microphone.eos.fallback_timeout',
+        'microphone.barge_in_trigger',
         'microphone.vad.threshold',
         'microphone.denoising.provider',
       ].sort(),

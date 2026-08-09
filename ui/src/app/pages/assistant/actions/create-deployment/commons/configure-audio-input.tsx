@@ -13,6 +13,10 @@ import { GetDefaultVADConfig } from '@/app/components/providers/vad/provider';
 import { VADProvider } from '@/app/components/providers/vad';
 import { ChevronDown } from '@carbon/icons-react';
 import { cn } from '@/utils';
+import {
+  BargeInTriggerControl,
+  MICROPHONE_BARGE_IN_TRIGGER_KEY,
+} from '@/app/components/providers/microphone/barge-in-trigger-control';
 
 interface ConfigureAudioInputProviderProps {
   audioInputConfig: { provider: string; parameters: Metadata[] };
@@ -32,6 +36,7 @@ export const ConfigureAudioInputProvider: React.FC<
       const key = p.getKey();
       return (
         key.startsWith('microphone.eos.') ||
+        key === MICROPHONE_BARGE_IN_TRIGGER_KEY ||
         key.startsWith('microphone.vad.') ||
         key.startsWith('microphone.denoising.')
       );
@@ -90,6 +95,13 @@ export const ConfigureAudioInputProvider: React.FC<
 
           {showAdvanced && (
             <div className="flex flex-col gap-6 pt-6 border-t border-gray-200 dark:border-gray-800">
+              <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-500 dark:text-gray-400">
+                Barge-in Control
+              </p>
+              <BargeInTriggerControl
+                parameters={audioInputConfig.parameters}
+                onChangeParameter={onChangeAudioInputParameter}
+              />
               <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-500 dark:text-gray-400">
                 Voice Activity Detection
               </p>

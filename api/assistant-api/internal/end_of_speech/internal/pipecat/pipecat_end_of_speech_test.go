@@ -915,7 +915,7 @@ func TestEOS_InterruptionWithNoTextIgnored(t *testing.T) {
 	assert.Equal(t, int64(0), atomic.LoadInt64(&callCount))
 }
 
-func TestEOS_VadSpeechActivityExtendsTimer(t *testing.T) {
+func TestEOS_VADStartDefersFinalUntilRecoveryTimeout(t *testing.T) {
 	called := make(chan internal_type.EndOfSpeechPacket, 1)
 	callback := func(ctx context.Context, res ...internal_type.Packet) error {
 		for _, r := range res {
@@ -935,21 +935,292 @@ func TestEOS_VadSpeechActivityExtendsTimer(t *testing.T) {
 	}))
 	defer closeTestEndOfSpeech(eos)
 
+	require.NoError(t, eos.Execute(context.Background(), internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventStart,
+	}))
 	require.NoError(t, eos.Execute(context.Background(), sttInput("hello", true)))
-	time.Sleep(40 * time.Millisecond)
-	require.NoError(t, eos.Execute(context.Background(), internal_type.VadSpeechActivityPacket{}))
 
 	select {
 	case <-called:
-		t.Fatal("callback fired before vad speech activity extension elapsed")
-	case <-time.After(50 * time.Millisecond):
+		t.Fatal("callback fired before stuck VAD recovery elapsed")
+	case <-time.After(90 * time.Millisecond):
 	}
 
 	select {
 	case p := <-called:
 		assert.Equal(t, "hello", p.Speech)
 	case <-time.After(500 * time.Millisecond):
-		t.Fatal("timeout waiting for callback after vad speech activity extension")
+		t.Fatal("timeout waiting for callback after stuck VAD recovery")
+	}
+
+	select {
+	case p := <-called:
+		t.Fatalf("unexpected duplicate callback after stuck VAD recovery: %+v", p)
+	case <-time.After(150 * time.Millisecond):
+	}
+}
+
+func TestEOS_VADEndFlushesPendingFinal(t *testing.T) {
+	called := make(chan internal_type.EndOfSpeechPacket, 2)
+	callback := func(ctx context.Context, res ...internal_type.Packet) error {
+		for _, r := range res {
+			if p, ok := r.(internal_type.EndOfSpeechPacket); ok {
+				select {
+				case called <- p:
+				default:
+				}
+			}
+		}
+		return nil
+	}
+
+	eos := newTestEOS(callback, newTestOpts(map[string]any{
+		"microphone.eos.fallback_timeout": 100.0,
+		"microphone.eos.quick_timeout":    40.0,
+	}))
+	defer closeTestEndOfSpeech(eos)
+
+	require.NoError(t, eos.Execute(context.Background(), internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventStart,
+	}))
+	require.NoError(t, eos.Execute(context.Background(), sttInput("hello", true)))
+
+	select {
+	case <-called:
+		t.Fatal("callback fired before VAD end")
+	case <-time.After(60 * time.Millisecond):
+	}
+
+	deadline := time.After(300 * time.Millisecond)
+	for {
+		eos.mu.RLock()
+		pending := eos.state.pending != nil
+		eos.mu.RUnlock()
+		if pending {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatal("timeout waiting for pending final")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+
+	require.NoError(t, eos.Execute(context.Background(), internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventEnd,
+	}))
+
+	select {
+	case p := <-called:
+		assert.Equal(t, "hello", p.Speech)
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timeout waiting for callback after VAD end")
+	}
+
+	select {
+	case p := <-called:
+		t.Fatalf("unexpected duplicate callback after VAD end: %+v", p)
+	case <-time.After(150 * time.Millisecond):
+	}
+}
+
+func TestEOS_VADEndFlushWindowUsesLateFinalSTT(t *testing.T) {
+	called := make(chan internal_type.EndOfSpeechPacket, 2)
+	callback := func(ctx context.Context, res ...internal_type.Packet) error {
+		for _, r := range res {
+			if p, ok := r.(internal_type.EndOfSpeechPacket); ok {
+				select {
+				case called <- p:
+				default:
+				}
+			}
+		}
+		return nil
+	}
+
+	eos := newTestEOS(callback, newTestOpts(map[string]any{
+		"microphone.eos.fallback_timeout": 200.0,
+		"microphone.eos.quick_timeout":    40.0,
+	}))
+	defer closeTestEndOfSpeech(eos)
+
+	require.NoError(t, eos.Execute(context.Background(), internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventStart,
+	}))
+	require.NoError(t, eos.Execute(context.Background(), internal_type.SpeechToTextPacket{
+		ContextID: "ctx-late-final",
+		Script:    "me an idea about the how how do I do things?",
+		Interim:   false,
+	}))
+	require.NoError(t, eos.Execute(context.Background(), internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventEnd,
+	}))
+
+	time.Sleep(10 * time.Millisecond)
+	require.NoError(t, eos.Execute(context.Background(), internal_type.SpeechToTextPacket{
+		ContextID: "ctx-late-final",
+		Script:    "Rightly?",
+		Interim:   false,
+	}))
+
+	select {
+	case p := <-called:
+		assert.Equal(t, "me an idea about the how how do I do things? Rightly?", p.Speech)
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("timeout waiting for late final callback")
+	}
+}
+
+func TestEOS_VADEndCompleteClearsPendingInterimWhenFinalIsShorter(t *testing.T) {
+	called := make(chan internal_type.EndOfSpeechPacket, 2)
+	callback := func(ctx context.Context, res ...internal_type.Packet) error {
+		for _, r := range res {
+			if p, ok := r.(internal_type.EndOfSpeechPacket); ok {
+				select {
+				case called <- p:
+				default:
+				}
+			}
+		}
+		return nil
+	}
+
+	eos := newTestEOS(callback, newTestOpts(map[string]any{
+		"microphone.eos.fallback_timeout": 70.0,
+		"microphone.eos.quick_timeout":    20.0,
+	}))
+	defer closeTestEndOfSpeech(eos)
+
+	ctx := context.Background()
+	require.NoError(t, eos.Execute(ctx, internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventStart,
+	}))
+	require.NoError(t, eos.Execute(ctx, internal_type.SpeechToTextPacket{
+		ContextID: "ctx-short-final",
+		Script:    "me an idea about the how how do I do things? Rightly?",
+		Interim:   true,
+	}))
+	require.NoError(t, eos.Execute(ctx, internal_type.SpeechToTextPacket{
+		ContextID: "ctx-short-final",
+		Script:    "me an idea about the how how do I do things?",
+		Interim:   false,
+	}))
+	require.NoError(t, eos.Execute(ctx, internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventEnd,
+	}))
+
+	select {
+	case p := <-called:
+		assert.Equal(t, "me an idea about the how how do I do things?", p.Speech)
+		require.Len(t, p.Speechs, 2)
+		assert.True(t, p.Speechs[0].Interim)
+		assert.False(t, p.Speechs[1].Interim)
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("timeout waiting for final transcript")
+	}
+}
+
+func TestEOS_StaleTimerCompletionDoesNotShrinkLatestSegment(t *testing.T) {
+	called := make(chan internal_type.EndOfSpeechPacket, 2)
+	callback := func(ctx context.Context, res ...internal_type.Packet) error {
+		for _, r := range res {
+			if p, ok := r.(internal_type.EndOfSpeechPacket); ok {
+				called <- p
+			}
+		}
+		return nil
+	}
+
+	eos := newTestEOS(callback, newTestOpts(map[string]any{}))
+	defer closeTestEndOfSpeech(eos)
+
+	eos.mu.Lock()
+	eos.state.segment = speechSegment{
+		Revision:  1,
+		ContextID: "ctx-stale",
+		Text:      "me an idea about the how how do I do things?",
+		Timestamp: time.Now(),
+	}
+	oldSegment := eos.state.segment
+	eos.mu.Unlock()
+
+	eos.enqueueCommand(workerCommand{
+		ctx:     context.Background(),
+		segment: oldSegment,
+		timeout: 30 * time.Millisecond,
+	})
+
+	time.Sleep(10 * time.Millisecond)
+	latestSegment := speechSegment{
+		Revision:  2,
+		ContextID: "ctx-stale",
+		Text:      "me an idea about the how how do I do things? Rightly?",
+		Timestamp: time.Now(),
+	}
+	eos.mu.Lock()
+	eos.state.segment = latestSegment
+	eos.mu.Unlock()
+
+	select {
+	case p := <-called:
+		t.Fatalf("stale completion fired: %q", p.Speech)
+	case <-time.After(80 * time.Millisecond):
+	}
+
+	eos.enqueueCommand(workerCommand{
+		ctx:     context.Background(),
+		segment: latestSegment,
+		timeout: 10 * time.Millisecond,
+	})
+
+	select {
+	case p := <-called:
+		assert.Equal(t, latestSegment.Text, p.Speech)
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timeout waiting for latest completion")
+	}
+}
+
+func TestEOS_OnlyInterimWithVADDoesNotComplete(t *testing.T) {
+	called := make(chan internal_type.EndOfSpeechPacket, 1)
+	callback := func(ctx context.Context, res ...internal_type.Packet) error {
+		for _, r := range res {
+			if p, ok := r.(internal_type.EndOfSpeechPacket); ok {
+				select {
+				case called <- p:
+				default:
+				}
+			}
+		}
+		return nil
+	}
+
+	eos := newTestEOS(callback, newTestOpts(map[string]any{
+		"microphone.eos.fallback_timeout": 60.0,
+	}))
+	defer closeTestEndOfSpeech(eos)
+
+	require.NoError(t, eos.Execute(context.Background(), internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventStart,
+	}))
+	require.NoError(t, eos.Execute(context.Background(), sttInput("interim only", false)))
+	require.NoError(t, eos.Execute(context.Background(), internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventEnd,
+	}))
+
+	select {
+	case p := <-called:
+		t.Fatalf("callback should not fire for interim-only VAD input: %+v", p)
+	case <-time.After(200 * time.Millisecond):
 	}
 }
 
@@ -1447,6 +1718,8 @@ func TestEOS_CloseStopsWorker(t *testing.T) {
 	eos := newTestEOS(func(context.Context, ...internal_type.Packet) error { return nil },
 		newTestOpts(map[string]any{}))
 	err := eos.Close(context.Background())
+	assert.NoError(t, err)
+	err = eos.Close(context.Background())
 	assert.NoError(t, err)
 }
 

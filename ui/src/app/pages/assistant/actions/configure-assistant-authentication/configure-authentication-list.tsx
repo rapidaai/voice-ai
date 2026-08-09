@@ -39,7 +39,7 @@ import { UrlTableCell } from '@/app/components/carbon/url-table-cell';
 import { SectionLoader } from '@/app/components/loader/section-loader';
 import { TableSection } from '@/app/components/sections/table-section';
 import { EmptyState } from '@/app/components/carbon/empty-state';
-import { CarbonShapeIndicator } from '@/app/components/carbon/shape-indicator';
+import { RecordStatusIndicator } from '@/app/components/carbon/record-status-indicator';
 import { toHumanReadableDateTime } from '@/utils/date';
 
 import {
@@ -321,9 +321,8 @@ export const ConfigureAuthenticationList: FC<
                 </TableCell>
                 <UrlTableCell url={optionMap[AUTH_OPTION_ENDPOINT]} />
                 <TableCell className="text-sm whitespace-nowrap">
-                  <CarbonShapeIndicator
-                    kind={authenticationEnabled ? 'stable' : 'draft'}
-                    label={authenticationEnabled ? 'Enabled' : 'Disabled'}
+                  <RecordStatusIndicator
+                    state={authentication.getStatus()}
                     textSize={14}
                   />
                 </TableCell>

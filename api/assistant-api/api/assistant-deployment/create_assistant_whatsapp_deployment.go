@@ -34,7 +34,7 @@ func (deploymentApi *assistantDeploymentGrpcApi) CreateAssistantWhatsappDeployme
 		)
 	}
 	if deployment.GetWhatsapp().UnclearInputTimeout != nil &&
-		!validator.Between(*deployment.GetWhatsapp().UnclearInputTimeout, 0.5, 5) {
+		!validator.Between(*deployment.GetWhatsapp().UnclearInputTimeout, 2, 10) {
 		return &assistant_api.GetAssistantWhatsappDeploymentResponse{
 			Code:    pkg_errors.CreateAssistantWhatsappDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(),
 			Success: false,

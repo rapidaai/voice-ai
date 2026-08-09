@@ -82,7 +82,6 @@ func ClassifyName(name internal_type.PacketName) Route {
 		internal_type.PacketNameDenoiseAudio,
 		internal_type.PacketNameDenoisedAudio,
 		internal_type.PacketNameVadAudio,
-		internal_type.PacketNameVadSpeechActivity,
 		internal_type.PacketNameSpeechToText,
 		internal_type.PacketNameSpeechToTextAudio,
 		internal_type.PacketNameEndOfSpeechAudio,

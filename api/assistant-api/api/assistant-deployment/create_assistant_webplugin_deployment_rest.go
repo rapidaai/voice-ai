@@ -73,7 +73,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantWebpluginDeploymentR
 		})
 		return
 	}
-	if validator.NonNil(request.UnclearInputTimeout) && !validator.Between(*request.UnclearInputTimeout, 0.5, 5) {
+	if validator.NonNil(request.UnclearInputTimeout) && !validator.Between(*request.UnclearInputTimeout, 2, 10) {
 		c.JSON(pkg_errors.CreateAssistantWebpluginDeploymentInvalidUnclearTimeout.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantWebpluginDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),

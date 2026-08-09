@@ -27,7 +27,9 @@ describe('Voice advanced provider runtime parity', () => {
         meta('listen.model', 'nova-3'),
       ]);
       expect(getValue(defaults, 'microphone.vad.provider')).toBe(provider.code);
-      expect(getValue(defaults, 'microphone.vad.barge_in_trigger')).toBe('vad');
+      expect(
+        getValue(defaults, 'microphone.vad.barge_in_trigger'),
+      ).toBeUndefined();
       expect(getValue(defaults, 'listen.model')).toBe('nova-3');
     }
   });

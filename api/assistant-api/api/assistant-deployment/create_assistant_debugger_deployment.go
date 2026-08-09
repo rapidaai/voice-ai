@@ -33,7 +33,7 @@ func (deploymentApi *assistantDeploymentGrpcApi) CreateAssistantDebuggerDeployme
 		)
 	}
 	if deployment.GetDebugger().UnclearInputTimeout != nil &&
-		!validator.Between(*deployment.GetDebugger().UnclearInputTimeout, 0.5, 5) {
+		!validator.Between(*deployment.GetDebugger().UnclearInputTimeout, 2, 10) {
 		return &assistant_api.GetAssistantDebuggerDeploymentResponse{
 			Code:    pkg_errors.CreateAssistantDebuggerDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(),
 			Success: false,

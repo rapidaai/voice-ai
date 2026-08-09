@@ -135,15 +135,30 @@ func (e *agentkitExecutor) Write(ctx context.Context, comm internal_type.Communi
 							Target: internal_type.PacketNameUserAudioReceived,
 							Action: internal_type.DispatchActionIgnore,
 						},
-					})
+					},
+						internal_type.DispatchPolicyPacket{
+							ContextID: data.Control.GetId(),
+							Policy: internal_type.DispatchPolicy{
+								Target: internal_type.PacketNameInterruptionDetected,
+								Action: internal_type.DispatchActionIgnore,
+							},
+						})
 				case protos.ConversationControl_CONTROL_TYPE_USER_TEXT:
-					comm.OnPacket(ctx, internal_type.DispatchPolicyPacket{
-						ContextID: data.Control.GetId(),
-						Policy: internal_type.DispatchPolicy{
-							Target: internal_type.PacketNameUserTextReceived,
-							Action: internal_type.DispatchActionIgnore,
+					comm.OnPacket(ctx,
+						internal_type.DispatchPolicyPacket{
+							ContextID: data.Control.GetId(),
+							Policy: internal_type.DispatchPolicy{
+								Target: internal_type.PacketNameUserTextReceived,
+								Action: internal_type.DispatchActionIgnore,
+							},
 						},
-					})
+						internal_type.DispatchPolicyPacket{
+							ContextID: data.Control.GetId(),
+							Policy: internal_type.DispatchPolicy{
+								Target: internal_type.PacketNameInterruptionDetected,
+								Action: internal_type.DispatchActionIgnore,
+							},
+						})
 				case protos.ConversationControl_CONTROL_TYPE_BARGE_IN:
 					comm.OnPacket(ctx, internal_type.DispatchPolicyPacket{
 						ContextID: data.Control.GetId(),
@@ -192,11 +207,34 @@ func (e *agentkitExecutor) Write(ctx context.Context, comm internal_type.Communi
 
 		switch msg := data.Assistant.GetMessage().(type) {
 		case *protos.ConversationAssistantMessage_Text:
+			now := time.Now()
 			if data.Assistant.GetCompleted() {
 				e.stateMu.Lock()
 				requestStartedAt := e.requestStartedAt
+				publishTTFT := e.waitingForFirstResponse
+				e.waitingForFirstResponse = false
 				e.requestStartedAt = time.Time{}
 				e.stateMu.Unlock()
+
+				metrics := []*protos.Metric{{
+					Name:        "llm_response_char_count",
+					Value:       fmt.Sprintf("%d", len(msg.Text)),
+					Description: "AgentKit response character count",
+				}}
+				if !requestStartedAt.IsZero() {
+					if publishTTFT {
+						metrics = append(metrics, &protos.Metric{
+							Name:        observability.MetricAgentTTFTMs,
+							Value:       fmt.Sprintf("%d", now.Sub(requestStartedAt).Milliseconds()),
+							Description: "AgentKit time to first token in milliseconds",
+						})
+					}
+					metrics = append(metrics, &protos.Metric{
+						Name:        observability.MetricAgentTRTMs,
+						Value:       fmt.Sprintf("%d", now.Sub(requestStartedAt).Milliseconds()),
+						Description: "AgentKit total response time in milliseconds",
+					})
+				}
 
 				packets := []internal_type.Packet{
 					internal_type.LLMResponseDonePacket{ContextID: data.Assistant.GetId(), Text: msg.Text},
@@ -214,11 +252,7 @@ func (e *agentkitExecutor) Write(ctx context.Context, comm internal_type.Communi
 						Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
 						Record: observability.RecordMetric{
 							Attributes: observability.Attributes{"provider": e.Name()},
-							Metrics: []*protos.Metric{{
-								Name:        "llm_response_char_count",
-								Value:       fmt.Sprintf("%d", len(msg.Text)),
-								Description: "AgentKit response character count",
-							}},
+							Metrics:    metrics,
 						},
 					},
 				}
@@ -226,7 +260,7 @@ func (e *agentkitExecutor) Write(ctx context.Context, comm internal_type.Communi
 					packets = append(packets, internal_type.ObservabilityUsageRecordPacket{
 						ContextID: data.Assistant.GetId(),
 						Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-						Record: observability.NewLLMDurationUsageRecord(e.Name(), time.Since(requestStartedAt), observability.Attributes{
+						Record: observability.NewLLMDurationUsageRecord(e.Name(), now.Sub(requestStartedAt), observability.Attributes{
 							"context_id":          data.Assistant.GetId(),
 							"response_char_count": fmt.Sprintf("%d", len(msg.Text)),
 						}),
@@ -234,7 +268,31 @@ func (e *agentkitExecutor) Write(ctx context.Context, comm internal_type.Communi
 				}
 				comm.OnPacket(ctx, packets...)
 			} else {
-				comm.OnPacket(ctx, internal_type.LLMResponseDeltaPacket{ContextID: data.Assistant.GetId(), Text: msg.Text})
+				e.stateMu.Lock()
+				requestStartedAt := e.requestStartedAt
+				publishTTFT := e.waitingForFirstResponse
+				e.waitingForFirstResponse = false
+				e.stateMu.Unlock()
+
+				if publishTTFT && !requestStartedAt.IsZero() {
+					comm.OnPacket(ctx,
+						internal_type.LLMResponseDeltaPacket{ContextID: data.Assistant.GetId(), Text: msg.Text},
+						internal_type.ObservabilityMetricRecordPacket{
+							ContextID: data.Assistant.GetId(),
+							Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+							Record: observability.RecordMetric{
+								Attributes: observability.Attributes{"provider": e.Name()},
+								Metrics: []*protos.Metric{{
+									Name:        observability.MetricAgentTTFTMs,
+									Value:       fmt.Sprintf("%d", now.Sub(requestStartedAt).Milliseconds()),
+									Description: "AgentKit time to first token in milliseconds",
+								}},
+							},
+						},
+					)
+				} else {
+					comm.OnPacket(ctx, internal_type.LLMResponseDeltaPacket{ContextID: data.Assistant.GetId(), Text: msg.Text})
+				}
 			}
 		}
 
@@ -329,6 +387,7 @@ func (e *agentkitExecutor) Write(ctx context.Context, comm internal_type.Communi
 		)
 
 	case *protos.TalkOutput_Observability:
+		e.logger.Debugf("agentkit observability record received: %v", data.Observability)
 		switch record := data.Observability.GetRecord().(type) {
 		case *protos.ObservabilityRecord_Log:
 			occurredAt := time.Now()

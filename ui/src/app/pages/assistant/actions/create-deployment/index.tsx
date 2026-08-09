@@ -47,7 +47,7 @@ import {
   AssistantDeploymentVersionsModal,
 } from '@/app/components/base/modal/assistant-deployment-versions-modal';
 import SourceIndicator from '@/app/components/indicators/source';
-import { CarbonStatusIndicator } from '@/app/components/carbon/status-indicator';
+import { RecordStatusIndicator } from '@/app/components/carbon/record-status-indicator';
 import {
   OverflowMenu,
   OverflowMenuItem,
@@ -525,7 +525,7 @@ export const ConfigureAssistantDeploymentPage = () => {
                         )}
                       </TableCell>
                       <TableCell className="text-sm">
-                        <CarbonStatusIndicator state={row.status} />
+                        <RecordStatusIndicator state={row.status} />
                       </TableCell>
                       <TableCell className="text-sm">
                         <AudioProviderTag

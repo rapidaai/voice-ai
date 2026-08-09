@@ -41,7 +41,6 @@ const (
 	PacketNameDenoiseAudio                               PacketName = "DenoiseAudioPacket"
 	PacketNameDenoisedAudio                              PacketName = "DenoisedAudioPacket"
 	PacketNameVadAudio                                   PacketName = "VadAudioPacket"
-	PacketNameVadSpeechActivity                          PacketName = "VadSpeechActivityPacket"
 	PacketNameSpeechToText                               PacketName = "SpeechToTextPacket"
 	PacketNameEndOfSpeechAudio                           PacketName = "EndOfSpeechAudioPacket"
 	PacketNameEndOfSpeechInterruption                    PacketName = "EndOfSpeechInterruptionPacket"
@@ -267,16 +266,6 @@ type VadAudioPacket struct {
 
 func (f VadAudioPacket) ContextId() string      { return f.ContextID }
 func (f VadAudioPacket) PacketName() PacketName { return PacketNameVadAudio }
-
-// VadSpeechActivityPacket is a lightweight heartbeat emitted by the VAD on every
-// audio chunk where the user is actively speaking. The EOS detector uses it to
-// keep extending the silence timer during sustained speech.
-type VadSpeechActivityPacket struct {
-	ContextID string
-}
-
-func (f VadSpeechActivityPacket) ContextId() string      { return f.ContextID }
-func (f VadSpeechActivityPacket) PacketName() PacketName { return PacketNameVadSpeechActivity }
 
 // SpeechToTextPacket carries a transcript result from the STT provider.
 type SpeechToTextPacket struct {
