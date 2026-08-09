@@ -58,7 +58,7 @@ Rapida is written in **Go**, using the highly optimized [gRPC](https://github.co
 
 ## Documentation & Guides
 
-https://doc.rapida.ai
+<https://doc.rapida.ai>
 
 ## Prerequisites
 
@@ -87,12 +87,12 @@ docker compose ps
 
 **Services Ready (`make up-all`):**
 
-- UI: http://localhost:3000
-- API Gateway (nginx): http://localhost:8080
+- UI: <http://localhost:3000>
+- API Gateway (nginx): <http://localhost:8080>
 - Web API: internal-only by default (container network)
-- Assistant API: http://localhost:9007
-- Endpoint API: http://localhost:9005
-- Integration API: http://localhost:9004
+- Assistant API: <http://localhost:9007>
+- Endpoint API: <http://localhost:9005>
+- Integration API: <http://localhost:9004>
 
 To include knowledge services (OpenSearch + Document API), run:
 
@@ -102,7 +102,7 @@ make up-all-with-knowledge
 
 Then:
 
-- Document API: http://localhost:9010
+- Document API: <http://localhost:9010>
 
 **Stop services:**
 
@@ -166,6 +166,17 @@ Add your API keys (OpenAI, Anthropic, Deepgram, Twilio, etc.) in these files.
 ---
 
 ## Local Development (Without Docker)
+
+### Set up environment
+
+- Install the nginx; Copy the nginx configuration from `./nginx/nginx.conf`
+- Review service configuration (database connection parameters, redis connection parameters)
+- Create local storage path in `/opt/rapida-data/assets/workflow` and make sure it is writable by user
+
+```bash
+mkdir -p /opt/rapida-data/assets/workflow
+sudo chown -R $USER:GROUP /opt/rapida-data/assets
+```
 
 ### Go Services
 
@@ -281,7 +292,7 @@ At the same time, please consider supporting RapidaAi by sharing it on social me
 
 ## Security disclosure
 
-To protect your privacy, please avoid posting security issues on GitHub. Instead, report issues to contact@rapida.ai, and our team will respond with detailed answer.
+To protect your privacy, please avoid posting security issues on GitHub. Instead, report issues to <contact@rapida.ai>, and our team will respond with detailed answer.
 
 ## License
 
@@ -295,4 +306,4 @@ A commercial license is available for enterprise use, which allows:
 - Removal of branding
 - Closed-source usage
 - Private modifications
-  Contact sales@rapida.ai for details.
+  Contact <sales@rapida.ai> for details.
