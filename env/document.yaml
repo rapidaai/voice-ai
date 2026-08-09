@@ -32,7 +32,7 @@ internal_service:
 
 storage:
   storage_type: "local"
-  storage_path_prefix: ~/rapida-data/assets/workflow
+  storage_path_prefix: /opt/rapida-data/assets/workflow
 
 celery:
   broker: "redis://localhost:6379/0"

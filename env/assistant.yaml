@@ -35,7 +35,7 @@ redis:
 
 asset_store:
   storage_type: "local"
-  storage_path_prefix: "~/rapida-data/assets/workflow"
+  storage_path_prefix: "/opt/rapida-data/assets/workflow"
   public_url_prefix: "http://localhost:8080/rapida-data/assets/workflow"
 
 opensearch:
