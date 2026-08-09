@@ -175,7 +175,7 @@ Add your API keys (OpenAI, Anthropic, Deepgram, Twilio, etc.) in these files.
 
 ```bash
 mkdir -p /opt/rapida-data/assets/workflow
-sudo chown -R $USER:GROUP /opt/rapida-data/assets
+sudo chown -R "$USER:$(id -gn)" /opt/rapida-data/assets
 ```
 
 ### Go Services
