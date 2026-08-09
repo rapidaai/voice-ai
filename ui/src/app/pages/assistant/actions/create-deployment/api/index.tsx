@@ -155,10 +155,10 @@ const ConfigureAssistantApiDeployment: FC<{ assistantId: string }> = ({
             messageOnError: deployment?.getMistake(),
             unclearInputTimeout: deployment?.hasUnclearinputtimeout?.()
               ? deployment.getUnclearinputtimeout().toString()
-              : DEFAULT_UNCLEAR_INPUT_TIMEOUT,
+              : undefined,
             unclearInputMessage: deployment?.hasUnclearinputmessage?.()
               ? deployment.getUnclearinputmessage()
-              : DEFAULT_UNCLEAR_INPUT_MESSAGE,
+              : undefined,
             idealTimeout: deployment?.getIdealtimeout(),
             idealMessage: deployment?.getIdealtimeoutmessage(),
             maxCallDuration: deployment?.getMaxsessionduration(),
