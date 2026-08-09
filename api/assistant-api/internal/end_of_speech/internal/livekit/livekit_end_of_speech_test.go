@@ -240,13 +240,13 @@ func TestLivekitEndOfSpeech_EnqueueCommandBlocksUntilChannelHasSpace(t *testing.
 		stopCh:    make(chan struct{}),
 		state:     &endOfSpeechState{segment: speechSegment{}},
 	}
-	endOfSpeech.commandCh <- workerCommand{segment: speechSegment{Committed: "first"}}
+	endOfSpeech.commandCh <- workerCommand{segment: speechSegment{Text: "first", FinalText: "first"}}
 
 	started := make(chan struct{})
 	done := make(chan struct{})
 	go func() {
 		close(started)
-		endOfSpeech.enqueueCommand(workerCommand{segment: speechSegment{Committed: "second"}})
+		endOfSpeech.enqueueCommand(workerCommand{segment: speechSegment{Text: "second", FinalText: "second"}})
 		close(done)
 	}()
 
@@ -258,7 +258,7 @@ func TestLivekitEndOfSpeech_EnqueueCommandBlocksUntilChannelHasSpace(t *testing.
 	}
 
 	first := <-endOfSpeech.commandCh
-	assert.Equal(t, "first", first.segment.FullText())
+	assert.Equal(t, "first", first.segment.Text)
 
 	select {
 	case <-done:
@@ -267,7 +267,7 @@ func TestLivekitEndOfSpeech_EnqueueCommandBlocksUntilChannelHasSpace(t *testing.
 	}
 
 	second := <-endOfSpeech.commandCh
-	assert.Equal(t, "second", second.segment.FullText())
+	assert.Equal(t, "second", second.segment.Text)
 }
 
 func TestLivekitEndOfSpeech_FinalSTTInferenceFailure_UsesFallbackTimeout(t *testing.T) {
@@ -298,33 +298,431 @@ func TestLivekitEndOfSpeech_FinalSTTInferenceFailure_UsesFallbackTimeout(t *test
 	case command := <-endOfSpeech.commandCh:
 		assert.Equal(t, 60*time.Millisecond, command.timeout)
 		assert.Equal(t, 0.0, command.confidence)
-		assert.Equal(t, "fallback path", command.segment.FullText())
+		assert.Equal(t, "fallback path", command.segment.Text)
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("timeout waiting for fallback command")
 	}
 }
 
-func TestLivekitEndOfSpeech_VadSpeechActivityExtendsCurrentSegment(t *testing.T) {
+func TestLivekitEndOfSpeech_VADEndFlushesCurrentSegment(t *testing.T) {
 	endOfSpeech := &livekitEndOfSpeech{
 		commandCh: make(chan workerCommand, 1),
 		stopCh:    make(chan struct{}),
 		state: &endOfSpeechState{
-			segment:    speechSegment{ContextID: "ctx-vad", Committed: "hello"},
+			segment:    speechSegment{ContextID: "ctx-vad", Text: "hello", FinalText: "hello"},
 			confidence: 0.73,
 		},
+		quickTimeout:   20 * time.Millisecond,
 		silenceTimeout: 250 * time.Millisecond,
 	}
 
-	err := endOfSpeech.Execute(context.Background(), internal_type.VadSpeechActivityPacket{})
+	err := endOfSpeech.Execute(context.Background(), internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventStart,
+	})
 	require.NoError(t, err)
 
 	select {
 	case command := <-endOfSpeech.commandCh:
-		assert.Equal(t, 250*time.Millisecond, command.timeout)
-		assert.Equal(t, "hello", command.segment.FullText())
+		t.Fatalf("unexpected command on VAD start: %+v", command)
+	default:
+	}
+
+	err = endOfSpeech.Execute(context.Background(), internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventEnd,
+	})
+	require.NoError(t, err)
+
+	select {
+	case command := <-endOfSpeech.commandCh:
+		assert.False(t, command.fireImmediately)
+		assert.Equal(t, 20*time.Millisecond, command.timeout)
+		assert.Equal(t, "hello", command.segment.Text)
 		assert.InDelta(t, 0.73, command.confidence, 0.0001)
 	case <-time.After(100 * time.Millisecond):
-		t.Fatal("timeout waiting for VAD command")
+		t.Fatal("timeout waiting for VAD end command")
+	}
+}
+
+func TestLivekitEndOfSpeech_FaultyVADRecoversPendingFinal(t *testing.T) {
+	called := make(chan internal_type.EndOfSpeechPacket, 2)
+	endOfSpeech := &livekitEndOfSpeech{
+		onPacket: func(ctx context.Context, packets ...internal_type.Packet) error {
+			for _, packet := range packets {
+				if endOfSpeechPacket, ok := packet.(internal_type.EndOfSpeechPacket); ok {
+					select {
+					case called <- endOfSpeechPacket:
+					default:
+					}
+				}
+			}
+			return nil
+		},
+		predictor: testPredictor{
+			predict: func(string) (float64, error) {
+				return 0, errors.New("predict failed")
+			},
+		},
+		threshold:       defaultThreshold,
+		quickTimeout:    20 * time.Millisecond,
+		silenceTimeout:  900 * time.Millisecond,
+		fallbackTimeout: 60 * time.Millisecond,
+		maxHistory:      int(defaultMaxHistory),
+		commandCh:       make(chan workerCommand, 8),
+		stopCh:          make(chan struct{}),
+		state:           &endOfSpeechState{segment: speechSegment{}},
+	}
+	go endOfSpeech.worker()
+	defer func() { _ = endOfSpeech.Close(context.Background()) }()
+
+	require.NoError(t, endOfSpeech.Execute(context.Background(), internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventStart,
+	}))
+	require.NoError(t, endOfSpeech.Execute(context.Background(), internal_type.SpeechToTextPacket{
+		ContextID: "ctx-faulty-vad",
+		Script:    "hello",
+		Interim:   false,
+	}))
+
+	select {
+	case packet := <-called:
+		t.Fatalf("callback fired before stuck VAD recovery elapsed: %+v", packet)
+	case <-time.After(90 * time.Millisecond):
+	}
+
+	select {
+	case packet := <-called:
+		assert.Equal(t, "ctx-faulty-vad", packet.ContextID)
+		assert.Equal(t, "hello", packet.Speech)
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for callback after stuck VAD recovery")
+	}
+
+	select {
+	case packet := <-called:
+		t.Fatalf("unexpected duplicate callback after stuck VAD recovery: %+v", packet)
+	case <-time.After(150 * time.Millisecond):
+	}
+}
+
+func TestLivekitEndOfSpeech_VADEndFlushesPendingFinal(t *testing.T) {
+	called := make(chan internal_type.EndOfSpeechPacket, 2)
+	endOfSpeech := &livekitEndOfSpeech{
+		onPacket: func(ctx context.Context, packets ...internal_type.Packet) error {
+			for _, packet := range packets {
+				if endOfSpeechPacket, ok := packet.(internal_type.EndOfSpeechPacket); ok {
+					select {
+					case called <- endOfSpeechPacket:
+					default:
+					}
+				}
+			}
+			return nil
+		},
+		predictor: testPredictor{
+			predict: func(string) (float64, error) {
+				return 0, errors.New("predict failed")
+			},
+		},
+		threshold:       defaultThreshold,
+		quickTimeout:    20 * time.Millisecond,
+		silenceTimeout:  900 * time.Millisecond,
+		fallbackTimeout: 100 * time.Millisecond,
+		maxHistory:      int(defaultMaxHistory),
+		commandCh:       make(chan workerCommand, 8),
+		stopCh:          make(chan struct{}),
+		state:           &endOfSpeechState{segment: speechSegment{}},
+	}
+	go endOfSpeech.worker()
+	defer func() { _ = endOfSpeech.Close(context.Background()) }()
+
+	require.NoError(t, endOfSpeech.Execute(context.Background(), internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventStart,
+	}))
+	require.NoError(t, endOfSpeech.Execute(context.Background(), internal_type.SpeechToTextPacket{
+		ContextID: "ctx-vad-success",
+		Script:    "done",
+		Interim:   false,
+	}))
+
+	deadline := time.After(300 * time.Millisecond)
+	for {
+		endOfSpeech.mu.RLock()
+		pending := endOfSpeech.state.pending != nil
+		endOfSpeech.mu.RUnlock()
+		if pending {
+			break
+		}
+		select {
+		case packet := <-called:
+			t.Fatalf("callback fired before VAD end: %+v", packet)
+		case <-deadline:
+			t.Fatal("timeout waiting for pending final")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+
+	require.NoError(t, endOfSpeech.Execute(context.Background(), internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventEnd,
+	}))
+
+	select {
+	case packet := <-called:
+		assert.Equal(t, "ctx-vad-success", packet.ContextID)
+		assert.Equal(t, "done", packet.Speech)
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timeout waiting for callback after VAD end")
+	}
+
+	select {
+	case packet := <-called:
+		t.Fatalf("unexpected duplicate callback after VAD end: %+v", packet)
+	case <-time.After(150 * time.Millisecond):
+	}
+}
+
+func TestLivekitEndOfSpeech_VADEndFlushWindowUsesLateFinalSTT(t *testing.T) {
+	called := make(chan internal_type.EndOfSpeechPacket, 2)
+	endOfSpeech := &livekitEndOfSpeech{
+		onPacket: func(ctx context.Context, packets ...internal_type.Packet) error {
+			for _, packet := range packets {
+				if endOfSpeechPacket, ok := packet.(internal_type.EndOfSpeechPacket); ok {
+					select {
+					case called <- endOfSpeechPacket:
+					default:
+					}
+				}
+			}
+			return nil
+		},
+		predictor: testPredictor{
+			predict: func(string) (float64, error) {
+				return 0, errors.New("predict failed")
+			},
+		},
+		threshold:       defaultThreshold,
+		quickTimeout:    40 * time.Millisecond,
+		silenceTimeout:  900 * time.Millisecond,
+		fallbackTimeout: 200 * time.Millisecond,
+		maxHistory:      int(defaultMaxHistory),
+		commandCh:       make(chan workerCommand, 8),
+		stopCh:          make(chan struct{}),
+		state:           &endOfSpeechState{segment: speechSegment{}},
+	}
+	go endOfSpeech.worker()
+	defer func() { _ = endOfSpeech.Close(context.Background()) }()
+
+	require.NoError(t, endOfSpeech.Execute(context.Background(), internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventStart,
+	}))
+	require.NoError(t, endOfSpeech.Execute(context.Background(), internal_type.SpeechToTextPacket{
+		ContextID: "ctx-late-final",
+		Script:    "me an idea about the how how do I do things?",
+		Interim:   false,
+	}))
+	require.NoError(t, endOfSpeech.Execute(context.Background(), internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventEnd,
+	}))
+
+	time.Sleep(10 * time.Millisecond)
+	require.NoError(t, endOfSpeech.Execute(context.Background(), internal_type.SpeechToTextPacket{
+		ContextID: "ctx-late-final",
+		Script:    "Rightly?",
+		Interim:   false,
+	}))
+
+	select {
+	case packet := <-called:
+		assert.Equal(t, "me an idea about the how how do I do things? Rightly?", packet.Speech)
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("timeout waiting for late final callback")
+	}
+}
+
+func TestLivekitEndOfSpeech_VADEndCompleteClearsPendingInterimWhenFinalIsShorter(t *testing.T) {
+	called := make(chan internal_type.EndOfSpeechPacket, 2)
+	endOfSpeech := &livekitEndOfSpeech{
+		onPacket: func(ctx context.Context, packets ...internal_type.Packet) error {
+			for _, packet := range packets {
+				if endOfSpeechPacket, ok := packet.(internal_type.EndOfSpeechPacket); ok {
+					select {
+					case called <- endOfSpeechPacket:
+					default:
+					}
+				}
+			}
+			return nil
+		},
+		predictor: testPredictor{
+			predict: func(string) (float64, error) {
+				return 0, errors.New("predict failed")
+			},
+		},
+		threshold:       defaultThreshold,
+		quickTimeout:    20 * time.Millisecond,
+		silenceTimeout:  900 * time.Millisecond,
+		fallbackTimeout: 70 * time.Millisecond,
+		maxHistory:      int(defaultMaxHistory),
+		commandCh:       make(chan workerCommand, 8),
+		stopCh:          make(chan struct{}),
+		state:           &endOfSpeechState{segment: speechSegment{}},
+	}
+	go endOfSpeech.worker()
+	defer func() { _ = endOfSpeech.Close(context.Background()) }()
+
+	ctx := context.Background()
+	require.NoError(t, endOfSpeech.Execute(ctx, internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventStart,
+	}))
+	require.NoError(t, endOfSpeech.Execute(ctx, internal_type.SpeechToTextPacket{
+		ContextID: "ctx-short-final",
+		Script:    "me an idea about the how how do I do things? Rightly?",
+		Interim:   true,
+	}))
+	require.NoError(t, endOfSpeech.Execute(ctx, internal_type.SpeechToTextPacket{
+		ContextID: "ctx-short-final",
+		Script:    "me an idea about the how how do I do things?",
+		Interim:   false,
+	}))
+	require.NoError(t, endOfSpeech.Execute(ctx, internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventEnd,
+	}))
+
+	select {
+	case packet := <-called:
+		assert.Equal(t, "me an idea about the how how do I do things?", packet.Speech)
+		require.Len(t, packet.Speechs, 2)
+		assert.True(t, packet.Speechs[0].Interim)
+		assert.False(t, packet.Speechs[1].Interim)
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("timeout waiting for final transcript")
+	}
+}
+
+func TestLivekitEndOfSpeech_StaleTimerCompletionDoesNotShrinkLatestSegment(t *testing.T) {
+	called := make(chan internal_type.EndOfSpeechPacket, 2)
+	endOfSpeech := &livekitEndOfSpeech{
+		onPacket: func(ctx context.Context, packets ...internal_type.Packet) error {
+			for _, packet := range packets {
+				if endOfSpeechPacket, ok := packet.(internal_type.EndOfSpeechPacket); ok {
+					called <- endOfSpeechPacket
+				}
+			}
+			return nil
+		},
+		threshold:       defaultThreshold,
+		quickTimeout:    20 * time.Millisecond,
+		silenceTimeout:  900 * time.Millisecond,
+		fallbackTimeout: 100 * time.Millisecond,
+		maxHistory:      int(defaultMaxHistory),
+		commandCh:       make(chan workerCommand, 8),
+		stopCh:          make(chan struct{}),
+		state:           &endOfSpeechState{segment: speechSegment{}},
+	}
+	go endOfSpeech.worker()
+	defer func() { _ = endOfSpeech.Close(context.Background()) }()
+
+	endOfSpeech.mu.Lock()
+	endOfSpeech.state.segment = speechSegment{
+		Revision:  1,
+		ContextID: "ctx-stale",
+		Text:      "me an idea about the how how do I do things?",
+		FinalText: "me an idea about the how how do I do things?",
+		Timestamp: time.Now(),
+	}
+	oldSegment := endOfSpeech.state.segment
+	endOfSpeech.mu.Unlock()
+
+	endOfSpeech.enqueueCommand(workerCommand{
+		ctx:     context.Background(),
+		segment: oldSegment,
+		timeout: 30 * time.Millisecond,
+	})
+
+	time.Sleep(10 * time.Millisecond)
+	latestSegment := speechSegment{
+		Revision:  2,
+		ContextID: "ctx-stale",
+		Text:      "me an idea about the how how do I do things? Rightly?",
+		FinalText: "me an idea about the how how do I do things? Rightly?",
+		Timestamp: time.Now(),
+	}
+	endOfSpeech.mu.Lock()
+	endOfSpeech.state.segment = latestSegment
+	endOfSpeech.mu.Unlock()
+
+	select {
+	case packet := <-called:
+		t.Fatalf("stale completion fired: %q", packet.Speech)
+	case <-time.After(80 * time.Millisecond):
+	}
+
+	endOfSpeech.enqueueCommand(workerCommand{
+		ctx:     context.Background(),
+		segment: latestSegment,
+		timeout: 10 * time.Millisecond,
+	})
+
+	select {
+	case packet := <-called:
+		assert.Equal(t, latestSegment.Text, packet.Speech)
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timeout waiting for latest completion")
+	}
+}
+
+func TestLivekitEndOfSpeech_OnlyInterimWithVADDoesNotComplete(t *testing.T) {
+	called := make(chan internal_type.EndOfSpeechPacket, 1)
+	endOfSpeech := &livekitEndOfSpeech{
+		onPacket: func(ctx context.Context, packets ...internal_type.Packet) error {
+			for _, packet := range packets {
+				if endOfSpeechPacket, ok := packet.(internal_type.EndOfSpeechPacket); ok {
+					select {
+					case called <- endOfSpeechPacket:
+					default:
+					}
+				}
+			}
+			return nil
+		},
+		threshold:       defaultThreshold,
+		quickTimeout:    20 * time.Millisecond,
+		silenceTimeout:  900 * time.Millisecond,
+		fallbackTimeout: 60 * time.Millisecond,
+		maxHistory:      int(defaultMaxHistory),
+		commandCh:       make(chan workerCommand, 8),
+		stopCh:          make(chan struct{}),
+		state:           &endOfSpeechState{segment: speechSegment{}},
+	}
+	go endOfSpeech.worker()
+	defer func() { _ = endOfSpeech.Close(context.Background()) }()
+
+	require.NoError(t, endOfSpeech.Execute(context.Background(), internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventStart,
+	}))
+	require.NoError(t, endOfSpeech.Execute(context.Background(), internal_type.SpeechToTextPacket{
+		ContextID: "ctx-interim-only",
+		Script:    "interim only",
+		Interim:   true,
+	}))
+	require.NoError(t, endOfSpeech.Execute(context.Background(), internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventEnd,
+	}))
+
+	select {
+	case packet := <-called:
+		t.Fatalf("callback should not fire for interim-only VAD input: %+v", packet)
+	case <-time.After(200 * time.Millisecond):
 	}
 }
 
@@ -588,6 +986,8 @@ func TestLivekitEndOfSpeech_ObservabilityLifecycleEvents(t *testing.T) {
 			t.Fatal("timeout waiting for closed eos event")
 		}
 	}
+
+	require.NoError(t, executor.Close(context.Background()))
 }
 
 func TestLivekitEndOfSpeech_KeepsMetrics(t *testing.T) {

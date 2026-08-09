@@ -40,36 +40,8 @@ func TestMessageLifecycle_RotateContext(t *testing.T) {
 	}
 }
 
-func TestMessageLifecycle_BeginInterruptRequiresAssistantStarted(t *testing.T) {
-	l := NewMessageLifecycleWithContext("ctx", type_enums.TextMode)
-	if err := l.BeginInterrupt("ctx"); !errors.Is(err, ErrInvalidTransition) {
-		t.Fatalf("expected invalid transition, got=%v", err)
-	}
-	if err := l.AssistantSpeaking("ctx"); !errors.Is(err, ErrInvalidTransition) {
-		t.Fatalf("expected assistant speaking before generation to fail, got=%v", err)
-	}
-	if err := l.AssistantGenerating("ctx"); err != nil {
-		t.Fatalf("unexpected assistant generating error: %v", err)
-	}
-	if err := l.BeginInterrupt("ctx"); err != nil {
-		t.Fatalf("unexpected begin interrupt error: %v", err)
-	}
-	if got := l.State(); got != MessageStateInterrupt {
-		t.Fatalf("unexpected state, got=%s want=%s", got, MessageStateInterrupt)
-	}
-	if err := l.BeginInterrupt("ctx"); !errors.Is(err, ErrInvalidTransition) {
-		t.Fatalf("expected duplicate begin interrupt to fail, got=%v", err)
-	}
-}
-
-func TestMessageLifecycle_RotateContextAfterInterruptResetsState(t *testing.T) {
+func TestMessageLifecycle_RotateContextAfterUserSpeakingResetsState(t *testing.T) {
 	l := NewMessageLifecycleWithContext("ctx-old", type_enums.TextMode)
-	if err := l.AssistantGenerating("ctx-old"); err != nil {
-		t.Fatalf("unexpected assistant generating error: %v", err)
-	}
-	if err := l.BeginInterrupt("ctx-old"); err != nil {
-		t.Fatalf("unexpected begin interrupt error: %v", err)
-	}
 	if err := l.UserSpeaking("ctx-old"); err != nil {
 		t.Fatalf("unexpected user speaking error: %v", err)
 	}
@@ -93,12 +65,6 @@ func TestMessageLifecycle_RotateContextAfterInterruptResetsState(t *testing.T) {
 
 func TestMessageLifecycle_UserFlow(t *testing.T) {
 	l := NewMessageLifecycleWithContext("ctx", type_enums.TextMode)
-	if err := l.AssistantGenerating("ctx"); err != nil {
-		t.Fatalf("unexpected assistant generating error: %v", err)
-	}
-	if err := l.BeginInterrupt("ctx"); err != nil {
-		t.Fatalf("unexpected interrupt error: %v", err)
-	}
 	if err := l.UserIdle("ctx"); err != nil {
 		t.Fatalf("unexpected user idle error: %v", err)
 	}
@@ -116,6 +82,22 @@ func TestMessageLifecycle_UserFlow(t *testing.T) {
 	}
 	if got := l.State(); got != MessageStateUserFinished {
 		t.Fatalf("unexpected state, got=%s want=%s", got, MessageStateUserFinished)
+	}
+}
+
+func TestMessageLifecycle_UserFinishedRejectsUserSpeaking(t *testing.T) {
+	l := NewMessageLifecycleWithContext("ctx", type_enums.TextMode)
+	if err := l.UserSpeaking("ctx"); err != nil {
+		t.Fatalf("unexpected user speaking error: %v", err)
+	}
+	if err := l.UserFinished("ctx"); !errors.Is(err, ErrInvalidTransition) {
+		t.Fatalf("expected user speaking finish to fail, got=%v", err)
+	}
+	if err := l.UserListening("ctx"); err != nil {
+		t.Fatalf("unexpected user listening error: %v", err)
+	}
+	if err := l.UserFinished("ctx"); err != nil {
+		t.Fatalf("unexpected user finished error: %v", err)
 	}
 }
 
@@ -146,12 +128,6 @@ func TestMessageLifecycle_AssistantFlow(t *testing.T) {
 
 func TestMessageLifecycle_UserPromptedCountsAndBlocksDuplicate(t *testing.T) {
 	l := NewMessageLifecycleWithContext("ctx", type_enums.TextMode)
-	if err := l.AssistantGenerating("ctx"); err != nil {
-		t.Fatalf("unexpected assistant generating error: %v", err)
-	}
-	if err := l.BeginInterrupt("ctx"); err != nil {
-		t.Fatalf("unexpected interrupt error: %v", err)
-	}
 	if err := l.UserListening("ctx"); err != nil {
 		t.Fatalf("unexpected user listening error: %v", err)
 	}

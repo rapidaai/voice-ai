@@ -17,8 +17,6 @@ import (
 type MessageState string
 
 const (
-	MessageStateInterrupt MessageState = "interrupt"
-
 	MessageStateUserIdle      MessageState = "user_idle"
 	MessageStateUserListening MessageState = "user_listening"
 	MessageStateUserSpeaking  MessageState = "user_speaking"
@@ -60,8 +58,6 @@ type MessageLifecycle interface {
 	AssistantIdle(string) error
 	AssistantPrompted(string) error
 	AssistantPromptCount() uint64
-	BeginInterrupt(string) error
-	CancelInterrupt(string) error
 }
 
 type messageLifecycle struct {
@@ -136,7 +132,7 @@ func (l *messageLifecycle) UserIdle(contextID string) error {
 		return err
 	}
 	switch l.state {
-	case MessageStateAssistantIdle, MessageStateInterrupt, MessageStateUserIdle:
+	case MessageStateAssistantIdle, MessageStateUserIdle:
 		l.state = MessageStateUserIdle
 		return nil
 	default:
@@ -151,7 +147,7 @@ func (l *messageLifecycle) UserListening(contextID string) error {
 		return err
 	}
 	switch l.state {
-	case MessageStateAssistantIdle, MessageStateInterrupt, MessageStateUserIdle, MessageStateUserListening, MessageStateUserSpeaking:
+	case MessageStateAssistantIdle, MessageStateUserIdle, MessageStateUserListening, MessageStateUserSpeaking:
 		l.state = MessageStateUserListening
 		return nil
 	default:
@@ -166,7 +162,7 @@ func (l *messageLifecycle) UserSpeaking(contextID string) error {
 		return err
 	}
 	switch l.state {
-	case MessageStateAssistantIdle, MessageStateInterrupt, MessageStateUserIdle, MessageStateUserListening, MessageStateUserSpeaking:
+	case MessageStateAssistantIdle, MessageStateUserIdle, MessageStateUserListening, MessageStateUserSpeaking:
 		l.state = MessageStateUserSpeaking
 		return nil
 	default:
@@ -181,7 +177,7 @@ func (l *messageLifecycle) UserThinking(contextID string) error {
 		return err
 	}
 	switch l.state {
-	case MessageStateInterrupt, MessageStateUserIdle, MessageStateUserListening, MessageStateUserSpeaking, MessageStateUserThinking:
+	case MessageStateUserIdle, MessageStateUserListening, MessageStateUserSpeaking, MessageStateUserThinking:
 		l.state = MessageStateUserThinking
 		return nil
 	default:
@@ -196,7 +192,7 @@ func (l *messageLifecycle) UserFinished(contextID string) error {
 		return err
 	}
 	switch l.state {
-	case MessageStateAssistantIdle, MessageStateInterrupt, MessageStateUserIdle, MessageStateUserListening, MessageStateUserSpeaking, MessageStateUserThinking, MessageStateUserFinished:
+	case MessageStateAssistantIdle, MessageStateUserIdle, MessageStateUserListening, MessageStateUserThinking, MessageStateUserFinished:
 		l.state = MessageStateUserFinished
 		return nil
 	default:
@@ -211,7 +207,7 @@ func (l *messageLifecycle) UserPrompted(contextID string) error {
 		return err
 	}
 	switch l.state {
-	case MessageStateInterrupt, MessageStateUserIdle, MessageStateUserListening, MessageStateUserSpeaking, MessageStateUserThinking:
+	case MessageStateUserIdle, MessageStateUserListening, MessageStateUserSpeaking, MessageStateUserThinking:
 		l.state = MessageStateUserPrompted
 		l.userPrompts++
 		return nil
@@ -321,36 +317,6 @@ func (l *messageLifecycle) AssistantPromptCount() uint64 {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 	return l.assistantPrompts
-}
-
-func (l *messageLifecycle) BeginInterrupt(contextID string) error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if err := l.validateContextLocked(contextID); err != nil {
-		return err
-	}
-	switch l.state {
-	case MessageStateAssistantGenerating, MessageStateAssistantGenerated, MessageStateAssistantSpeaking, MessageStateAssistantPrompted:
-		l.state = MessageStateInterrupt
-		return nil
-	default:
-		return fmt.Errorf("%w: interrupt from %s", ErrInvalidTransition, l.state)
-	}
-}
-
-func (l *messageLifecycle) CancelInterrupt(contextID string) error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if err := l.validateContextLocked(contextID); err != nil {
-		return err
-	}
-	switch l.state {
-	case MessageStateInterrupt, MessageStateUserIdle, MessageStateUserListening, MessageStateUserSpeaking, MessageStateUserThinking:
-		l.state = MessageStateAssistantSpeaking
-		return nil
-	default:
-		return fmt.Errorf("%w: cancel_interrupt from %s", ErrInvalidTransition, l.state)
-	}
 }
 
 func (l *messageLifecycle) validateContextLocked(contextID string) error {

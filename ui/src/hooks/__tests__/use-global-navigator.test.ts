@@ -151,7 +151,7 @@ describe('useGlobalNavigation', () => {
 
     expect(mockNavigate).toHaveBeenNthCalledWith(
       1,
-      '/logs/traces?query=scopeAttributes.assistantConversationId%3A2340105440068632576',
+      '/logs/traces?query=conversation%3A2340105440068632576',
     );
     expect(mockNavigate).toHaveBeenNthCalledWith(
       2,

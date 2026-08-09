@@ -111,7 +111,6 @@ func TestClassifyName_DispatchablePacketNamesAreExplicitlyRouted(t *testing.T) {
 		internal_type.PacketNameDenoiseAudio:                               RouteIngress,
 		internal_type.PacketNameDenoisedAudio:                              RouteIngress,
 		internal_type.PacketNameVadAudio:                                   RouteIngress,
-		internal_type.PacketNameVadSpeechActivity:                          RouteIngress,
 		internal_type.PacketNameSpeechToText:                               RouteIngress,
 		internal_type.PacketNameInterimEndOfSpeech:                         RouteIngress,
 		internal_type.PacketNameEndOfSpeech:                                RouteIngress,

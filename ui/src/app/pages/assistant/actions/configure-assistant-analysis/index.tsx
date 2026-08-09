@@ -12,7 +12,7 @@ import { CreateAssistantAnalysis } from '@/app/pages/assistant/actions/configure
 import { useAssistantAnalysisPageStore } from '@/app/pages/assistant/actions/store/use-analysis-page-store';
 import { UpdateAssistantAnalysis } from '@/app/pages/assistant/actions/configure-assistant-analysis/update-assistant-analysis';
 import { IconOnlyButton, PrimaryButton } from '@/app/components/carbon/button';
-import { CarbonShapeIndicator } from '@/app/components/carbon/shape-indicator';
+import { RecordStatusIndicator } from '@/app/components/carbon/record-status-indicator';
 import { Pagination } from '@/app/components/carbon/pagination';
 import {
   Breadcrumb,
@@ -319,9 +319,8 @@ const ConfigureAssistantAnalysis: FC<{ assistantId: string }> = ({
                         {getAnalysisPriority(row)}
                       </TableCell>
                       <TableCell className="text-sm whitespace-nowrap">
-                        <CarbonShapeIndicator
-                          kind={row.getEnabled() ? 'stable' : 'draft'}
-                          label={row.getEnabled() ? 'Enabled' : 'Disabled'}
+                        <RecordStatusIndicator
+                          state={row.getStatus()}
                           textSize={14}
                         />
                       </TableCell>

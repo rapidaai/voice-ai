@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { TableRow, TableCell, Tag, Link } from '@carbon/react';
 import { ProviderTag } from '@/app/components/carbon/provider-tag';
 import { Launch, View, SourceControl } from '@carbon/icons-react';
-import { CarbonStatusIndicator } from '@/app/components/carbon/status-indicator';
+import { RecordStatusIndicator } from '@/app/components/carbon/record-status-indicator';
 import { VersionIndicator } from '@/app/components/indicators/version';
 import { IconOnlyButton } from '@/app/components/carbon/button';
 import { CopyButton } from '@/app/components/carbon/button/copy-button';
@@ -62,7 +62,7 @@ export const SingleEndpoint: FC<SingleEndpointProps> = ({ endpoint }) => {
       )}
       {endpointAction.visibleColumn('getStatus') && (
         <TableCell className="text-sm">
-          <CarbonStatusIndicator state={status} />
+          <RecordStatusIndicator state={status} />
         </TableCell>
       )}
       {endpointAction.visibleColumn('getCurrentModel') && (

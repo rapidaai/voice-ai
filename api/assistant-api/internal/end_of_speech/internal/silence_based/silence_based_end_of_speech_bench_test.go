@@ -236,7 +236,7 @@ func BenchmarkAnalyze_STTHighFrequency(b *testing.B) {
 // ============================================================================
 
 // BenchmarkAnalyze_RapidFireInputs measures performance with rapid sequential inputs.
-// Each new input invalidates the previous, testing generation counter efficiency.
+// Each new input invalidates the previous transcript revision.
 func BenchmarkAnalyze_RapidFireInputs(b *testing.B) {
 	logger, _ := commons.NewApplicationLogger()
 	callback := func(context.Context, ...internal_type.Packet) error { return nil }
@@ -308,9 +308,9 @@ func BenchmarkAnalyze_ContextCancellation(b *testing.B) {
 	}
 }
 
-// BenchmarkAnalyze_GenerationInvalidation measures performance under generation counter updates.
-// Tests cost of incrementing generation and invalidating old timers.
-func BenchmarkAnalyze_GenerationInvalidation(b *testing.B) {
+// BenchmarkAnalyze_RevisionInvalidation measures performance under transcript revision updates.
+// Tests cost of invalidating old timers.
+func BenchmarkAnalyze_RevisionInvalidation(b *testing.B) {
 	logger, _ := commons.NewApplicationLogger()
 	callback := func(context.Context, ...internal_type.Packet) error { return nil }
 	svcIface, _ := newSilenceBasedEndOfSpeechForTest(context.Background(), logger, callback, newTestOpts(map[string]any{"microphone.eos.timeout": 100.0}))
@@ -321,7 +321,7 @@ func BenchmarkAnalyze_GenerationInvalidation(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		// Each input increments generation counter
+		// Each input increments transcript revision.
 		_ = svcIface.Execute(ctx, systemInput(fmt.Sprintf("gen %d", i)))
 	}
 }

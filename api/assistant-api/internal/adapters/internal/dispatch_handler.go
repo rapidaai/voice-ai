@@ -50,8 +50,7 @@ func (h requestorDispatchHandler) HandleUserText(ctx context.Context, vl interna
 	}
 
 	switch h.r.messageLifecycle.State() {
-	case adapter_lifecycle.MessageStateInterrupt,
-		adapter_lifecycle.MessageStateUserIdle,
+	case adapter_lifecycle.MessageStateUserIdle,
 		adapter_lifecycle.MessageStateUserListening,
 		adapter_lifecycle.MessageStateUserSpeaking,
 		adapter_lifecycle.MessageStateUserThinking:
@@ -63,15 +62,13 @@ func (h requestorDispatchHandler) HandleUserText(ctx context.Context, vl interna
 		h.r.OnPacket(ctx,
 			internal_type.StopIdleTimeoutPacket{ContextID: oldContextID},
 			internal_type.EndOfSpeechInterruptionPacket{ContextID: oldContextID, Source: internal_type.InterruptionSourceWord},
-		)
-		h.HandleTurnChange(ctx, internal_type.TurnChangePacket{
-			ContextID:         newContextID,
-			PreviousContextID: oldContextID,
-			Reason:            "interrupted",
-			Source:            "requestor",
-			Time:              time.Now(),
-		})
-		h.r.OnPacket(ctx,
+			internal_type.TurnChangePacket{
+				ContextID:         newContextID,
+				PreviousContextID: oldContextID,
+				Reason:            "interrupted",
+				Source:            "requestor",
+				Time:              time.Now(),
+			},
 			internal_type.TextToSpeechInterruptPacket{ContextID: oldContextID},
 			internal_type.LLMInterruptPacket{ContextID: oldContextID},
 		)
@@ -153,11 +150,6 @@ func (h requestorDispatchHandler) HandleDenoisedAudio(ctx context.Context, vl in
 func (h requestorDispatchHandler) HandleVadAudio(ctx context.Context, vl internal_type.VadAudioPacket) {
 	_ = h.r.vadExecutor.Execute(ctx, internal_type.UserAudioReceivedPacket{ContextID: vl.ContextID, Audio: vl.Audio})
 }
-func (h requestorDispatchHandler) HandleVadSpeechActivity(ctx context.Context, vl internal_type.VadSpeechActivityPacket) {
-	if h.r.endOfSpeechExecutor != nil {
-		_ = h.r.endOfSpeechExecutor.Execute(ctx, vl)
-	}
-}
 func (h requestorDispatchHandler) HandleSpeechToText(ctx context.Context, p internal_type.SpeechToTextPacket) {
 	if !validator.NotBlank(p.Script) && !p.Interim {
 		return
@@ -168,16 +160,12 @@ func (h requestorDispatchHandler) HandleSpeechToText(ctx context.Context, p inte
 	p.ContextID = currentContextID
 	messageState := h.r.messageLifecycle.State()
 	if validator.NotBlank(p.Script) {
-		userTurnActive := false
 		switch messageState {
-		case adapter_lifecycle.MessageStateInterrupt,
-			adapter_lifecycle.MessageStateUserIdle,
+		case adapter_lifecycle.MessageStateUserIdle,
 			adapter_lifecycle.MessageStateUserListening,
 			adapter_lifecycle.MessageStateUserSpeaking,
 			adapter_lifecycle.MessageStateUserThinking:
-			userTurnActive = true
-		}
-		if !userTurnActive {
+		default:
 			if incomingContextID != "" && incomingContextID != currentContextID {
 				return
 			}
@@ -203,15 +191,13 @@ func (h requestorDispatchHandler) HandleSpeechToText(ctx context.Context, p inte
 			h.r.OnPacket(ctx,
 				internal_type.StopIdleTimeoutPacket{ContextID: oldContextID},
 				internal_type.EndOfSpeechInterruptionPacket{ContextID: oldContextID, Source: interruptionSource},
-			)
-			h.HandleTurnChange(ctx, internal_type.TurnChangePacket{
-				ContextID:         newContextID,
-				PreviousContextID: oldContextID,
-				Reason:            "interrupted",
-				Source:            "requestor",
-				Time:              time.Now(),
-			})
-			h.r.OnPacket(ctx,
+				internal_type.TurnChangePacket{
+					ContextID:         newContextID,
+					PreviousContextID: oldContextID,
+					Reason:            "interrupted",
+					Source:            "requestor",
+					Time:              time.Now(),
+				},
 				internal_type.TextToSpeechInterruptPacket{ContextID: oldContextID},
 				internal_type.LLMInterruptPacket{ContextID: oldContextID},
 			)
@@ -227,7 +213,6 @@ func (h requestorDispatchHandler) HandleSpeechToText(ctx context.Context, p inte
 	if validator.NotBlank(p.Script) {
 		switch h.r.messageLifecycle.State() {
 		case adapter_lifecycle.MessageStateAssistantIdle,
-			adapter_lifecycle.MessageStateInterrupt,
 			adapter_lifecycle.MessageStateUserIdle,
 			adapter_lifecycle.MessageStateUserListening:
 			if err := h.r.messageLifecycle.UserListening(p.ContextID); err != nil {
@@ -265,19 +250,17 @@ func (h requestorDispatchHandler) HandleEndOfSpeech(ctx context.Context, p inter
 	if p.ContextID != h.r.GetID() {
 		return
 	}
-	if h.r.messageLifecycle.State() == adapter_lifecycle.MessageStateUserSpeaking {
-		return
-	}
 	if validator.NotBlank(p.Speech) {
 		messageState := h.r.messageLifecycle.State()
-		if h.r.unclearInputWatchdog != nil &&
-			(messageState == adapter_lifecycle.MessageStateInterrupt ||
-				messageState == adapter_lifecycle.MessageStateUserIdle ||
-				messageState == adapter_lifecycle.MessageStateUserListening ||
-				messageState == adapter_lifecycle.MessageStateUserSpeaking ||
-				messageState == adapter_lifecycle.MessageStateUserThinking) {
+		switch messageState {
+		case adapter_lifecycle.MessageStateUserIdle,
+			adapter_lifecycle.MessageStateUserListening,
+			adapter_lifecycle.MessageStateUserSpeaking,
+			adapter_lifecycle.MessageStateUserThinking:
 			_ = h.r.messageLifecycle.UserThinking(p.ContextID)
-			h.r.unclearInputWatchdog.Stop()
+			if h.r.unclearInputWatchdog != nil {
+				h.r.unclearInputWatchdog.Stop()
+			}
 		}
 		if err := h.r.messageLifecycle.UserFinished(p.ContextID); err != nil {
 			return
@@ -372,8 +355,7 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 		switch p.Source {
 		case internal_type.InterruptionSourceWord:
 			switch messageState {
-			case adapter_lifecycle.MessageStateInterrupt,
-				adapter_lifecycle.MessageStateUserIdle,
+			case adapter_lifecycle.MessageStateUserIdle,
 				adapter_lifecycle.MessageStateUserListening,
 				adapter_lifecycle.MessageStateUserSpeaking,
 				adapter_lifecycle.MessageStateUserThinking:
@@ -386,8 +368,7 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 				return
 			}
 			switch messageState {
-			case adapter_lifecycle.MessageStateInterrupt,
-				adapter_lifecycle.MessageStateUserIdle,
+			case adapter_lifecycle.MessageStateUserIdle,
 				adapter_lifecycle.MessageStateUserListening,
 				adapter_lifecycle.MessageStateUserSpeaking:
 				p.ContextID = h.r.GetID()
@@ -413,16 +394,18 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 		switch p.Event {
 		case internal_type.InterruptionEventStart:
 			if bargeInTrigger == internal_options.BargeInTriggerWord {
+				if h.r.endOfSpeechExecutor != nil {
+					_ = h.r.endOfSpeechExecutor.Execute(ctx, p)
+				}
 				h.r.OnPacket(ctx, internal_type.SpeechToTextStartPacket{ContextID: p.ContextID})
 				return
 			}
 
 			messageState := h.r.messageLifecycle.State()
-			startedNewTurn := false
 			switch messageState {
-			case adapter_lifecycle.MessageStateInterrupt,
-				adapter_lifecycle.MessageStateUserIdle,
-				adapter_lifecycle.MessageStateUserListening,
+			case adapter_lifecycle.MessageStateUserIdle:
+				_ = h.r.messageLifecycle.UserSpeaking(p.ContextID)
+			case adapter_lifecycle.MessageStateUserListening,
 				adapter_lifecycle.MessageStateUserSpeaking,
 				adapter_lifecycle.MessageStateUserThinking:
 			default:
@@ -433,15 +416,13 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 				h.r.OnPacket(ctx,
 					internal_type.StopIdleTimeoutPacket{ContextID: oldContextID},
 					internal_type.EndOfSpeechInterruptionPacket{ContextID: oldContextID, Source: internal_type.InterruptionSourceVad},
-				)
-				h.HandleTurnChange(ctx, internal_type.TurnChangePacket{
-					ContextID:         newContextID,
-					PreviousContextID: oldContextID,
-					Reason:            "interrupted",
-					Source:            "requestor",
-					Time:              time.Now(),
-				})
-				h.r.OnPacket(ctx,
+					internal_type.TurnChangePacket{
+						ContextID:         newContextID,
+						PreviousContextID: oldContextID,
+						Reason:            "interrupted",
+						Source:            "requestor",
+						Time:              time.Now(),
+					},
 					internal_type.TextToSpeechInterruptPacket{ContextID: oldContextID},
 					internal_type.LLMInterruptPacket{ContextID: oldContextID},
 				)
@@ -452,24 +433,41 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 					})
 				})
 				p.ContextID = newContextID
-				startedNewTurn = true
-			}
-			if startedNewTurn ||
-				messageState == adapter_lifecycle.MessageStateInterrupt ||
-				messageState == adapter_lifecycle.MessageStateUserIdle {
 				_ = h.r.messageLifecycle.UserSpeaking(p.ContextID)
+			}
+			if h.r.endOfSpeechExecutor != nil {
+				_ = h.r.endOfSpeechExecutor.Execute(ctx, p)
 			}
 			h.r.OnPacket(ctx, internal_type.SpeechToTextStartPacket{ContextID: p.ContextID})
 		case internal_type.InterruptionEventEnd:
 			if bargeInTrigger == internal_options.BargeInTriggerWord {
 				h.r.OnPacket(ctx, internal_type.SpeechToTextEndPacket{ContextID: p.ContextID})
+				if h.r.endOfSpeechExecutor != nil {
+					_ = h.r.endOfSpeechExecutor.Execute(ctx, p)
+				}
 				return
 			}
 			h.r.OnPacket(ctx, internal_type.SpeechToTextEndPacket{ContextID: p.ContextID})
+			if p.ContextID == h.r.GetID() {
+				switch h.r.messageLifecycle.State() {
+				case adapter_lifecycle.MessageStateUserSpeaking:
+					if h.r.messageLifecycle.UserListening(p.ContextID) != nil {
+						return
+					}
+					if h.r.endOfSpeechExecutor != nil {
+						_ = h.r.endOfSpeechExecutor.Execute(ctx, p)
+					}
+				case adapter_lifecycle.MessageStateUserListening:
+					// VAD end still belongs to EOS even when STT already moved
+					// lifecycle into listening for this turn.
+					if h.r.endOfSpeechExecutor != nil {
+						_ = h.r.endOfSpeechExecutor.Execute(ctx, p)
+					}
+				}
+			}
 			if h.r.unclearInputWatchdog != nil &&
 				p.ContextID == h.r.GetID() &&
-				h.r.messageLifecycle.State() == adapter_lifecycle.MessageStateUserSpeaking &&
-				h.r.messageLifecycle.UserListening(p.ContextID) == nil {
+				h.r.messageLifecycle.State() == adapter_lifecycle.MessageStateUserListening {
 				if behavior, err := h.r.deploymentBehavior(); err == nil &&
 					validator.NonNil(behavior.UnclearInputTimeout) && *behavior.UnclearInputTimeout > 0 {
 					timeout := time.Duration(*behavior.UnclearInputTimeout * float64(time.Second))
@@ -480,8 +478,7 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 	case internal_type.InterruptionSourceWord:
 		if h.r.GetMode().Text() {
 			switch h.r.messageLifecycle.State() {
-			case adapter_lifecycle.MessageStateInterrupt,
-				adapter_lifecycle.MessageStateUserIdle,
+			case adapter_lifecycle.MessageStateUserIdle,
 				adapter_lifecycle.MessageStateUserListening,
 				adapter_lifecycle.MessageStateUserSpeaking,
 				adapter_lifecycle.MessageStateUserThinking:
@@ -493,15 +490,13 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 				h.r.OnPacket(ctx,
 					internal_type.StopIdleTimeoutPacket{ContextID: oldContextID},
 					internal_type.EndOfSpeechInterruptionPacket{ContextID: oldContextID, Source: internal_type.InterruptionSourceWord},
-				)
-				h.HandleTurnChange(ctx, internal_type.TurnChangePacket{
-					ContextID:         newContextID,
-					PreviousContextID: oldContextID,
-					Reason:            "interrupted",
-					Source:            "requestor",
-					Time:              time.Now(),
-				})
-				h.r.OnPacket(ctx,
+					internal_type.TurnChangePacket{
+						ContextID:         newContextID,
+						PreviousContextID: oldContextID,
+						Reason:            "interrupted",
+						Source:            "requestor",
+						Time:              time.Now(),
+					},
 					internal_type.TextToSpeechInterruptPacket{ContextID: oldContextID},
 					internal_type.LLMInterruptPacket{ContextID: oldContextID},
 				)
@@ -523,8 +518,7 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 
 		messageState := h.r.messageLifecycle.State()
 		switch messageState {
-		case adapter_lifecycle.MessageStateInterrupt,
-			adapter_lifecycle.MessageStateUserIdle,
+		case adapter_lifecycle.MessageStateUserIdle,
 			adapter_lifecycle.MessageStateUserListening,
 			adapter_lifecycle.MessageStateUserSpeaking,
 			adapter_lifecycle.MessageStateUserThinking:
@@ -536,15 +530,13 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 			h.r.OnPacket(ctx,
 				internal_type.StopIdleTimeoutPacket{ContextID: oldContextID},
 				internal_type.EndOfSpeechInterruptionPacket{ContextID: oldContextID, Source: internal_type.InterruptionSourceWord},
-			)
-			h.HandleTurnChange(ctx, internal_type.TurnChangePacket{
-				ContextID:         newContextID,
-				PreviousContextID: oldContextID,
-				Reason:            "interrupted",
-				Source:            "requestor",
-				Time:              time.Now(),
-			})
-			h.r.OnPacket(ctx,
+				internal_type.TurnChangePacket{
+					ContextID:         newContextID,
+					PreviousContextID: oldContextID,
+					Reason:            "interrupted",
+					Source:            "requestor",
+					Time:              time.Now(),
+				},
 				internal_type.TextToSpeechInterruptPacket{ContextID: oldContextID},
 				internal_type.LLMInterruptPacket{ContextID: oldContextID},
 			)
@@ -1203,15 +1195,14 @@ func (h requestorDispatchHandler) HandleIdleTimeoutExpired(ctx context.Context, 
 	if err != nil {
 		return
 	}
-	h.HandleTurnChange(ctx, internal_type.TurnChangePacket{
-		ContextID:         newContextID,
-		PreviousContextID: oldContextID,
-		Reason:            "interrupted",
-		Source:            "requestor",
-		Time:              time.Now(),
-	})
-
-	_ = h.r.OnPacket(ctx,
+	h.r.OnPacket(ctx,
+		internal_type.TurnChangePacket{
+			ContextID:         newContextID,
+			PreviousContextID: oldContextID,
+			Reason:            "interrupted",
+			Source:            "requestor",
+			Time:              time.Now(),
+		},
 		internal_type.TextToSpeechInterruptPacket{ContextID: oldContextID},
 		internal_type.InjectMessagePacket{ContextID: newContextID, Text: timeoutContent},
 		internal_type.ObservabilityEventRecordPacket{
@@ -1231,8 +1222,7 @@ func (h requestorDispatchHandler) HandleUnclearInputExpired(ctx context.Context,
 		return
 	}
 	messageState := h.r.messageLifecycle.State()
-	if messageState != adapter_lifecycle.MessageStateInterrupt &&
-		messageState != adapter_lifecycle.MessageStateUserIdle &&
+	if messageState != adapter_lifecycle.MessageStateUserIdle &&
 		messageState != adapter_lifecycle.MessageStateUserListening &&
 		messageState != adapter_lifecycle.MessageStateUserSpeaking &&
 		messageState != adapter_lifecycle.MessageStateUserThinking {
@@ -1273,15 +1263,13 @@ func (h requestorDispatchHandler) HandleUnclearInputExpired(ctx context.Context,
 	h.r.OnPacket(ctx,
 		internal_type.StopIdleTimeoutPacket{ContextID: oldContextID},
 		internal_type.EndOfSpeechInterruptionPacket{ContextID: oldContextID, Source: interruptionSource},
-	)
-	h.HandleTurnChange(ctx, internal_type.TurnChangePacket{
-		ContextID:         newContextID,
-		PreviousContextID: oldContextID,
-		Reason:            "interrupted",
-		Source:            "requestor",
-		Time:              time.Now(),
-	})
-	h.r.OnPacket(ctx,
+		internal_type.TurnChangePacket{
+			ContextID:         newContextID,
+			PreviousContextID: oldContextID,
+			Reason:            "interrupted",
+			Source:            "requestor",
+			Time:              time.Now(),
+		},
 		internal_type.TextToSpeechInterruptPacket{ContextID: oldContextID},
 		internal_type.LLMInterruptPacket{ContextID: oldContextID},
 	)
