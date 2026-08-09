@@ -11,7 +11,7 @@ import { EmptyState } from '@/app/components/carbon/empty-state';
 import { UpdateAssistantWebhook } from '@/app/pages/assistant/actions/configure-assistant-webhook/update-assistant-webhook';
 import { useAssistantWebhookPageStore } from '@/app/pages/assistant/actions/store/use-webhook-page-store';
 import { IconOnlyButton, PrimaryButton } from '@/app/components/carbon/button';
-import { CarbonShapeIndicator } from '@/app/components/carbon/shape-indicator';
+import { RecordStatusIndicator } from '@/app/components/carbon/record-status-indicator';
 import { UrlTableCell } from '@/app/components/carbon/url-table-cell';
 import { Pagination } from '@/app/components/carbon/pagination';
 import { Add, Renew, Webhook } from '@carbon/icons-react';
@@ -358,9 +358,8 @@ const ConfigureAssistantWebhook: FC<{ assistantId: string }> = ({
                           {getWebhookPriority(row)}
                         </TableCell>
                         <TableCell className="text-sm whitespace-nowrap">
-                          <CarbonShapeIndicator
-                            kind={row.getEnabled() ? 'stable' : 'draft'}
-                            label={row.getEnabled() ? 'Enabled' : 'Disabled'}
+                          <RecordStatusIndicator
+                            state={row.getStatus()}
                             textSize={14}
                           />
                         </TableCell>

@@ -85,7 +85,10 @@ jest.mock('@rapidaai/react', () => {
   class AssistantDebuggerDeployment {
     setAssistantid(_: string) {}
     setGreeting(_: string) {}
+    setGreetinginterruptible(_: boolean) {}
     setMistake(_: string) {}
+    setUnclearinputtimeout(_: number) {}
+    setUnclearinputmessage(_: string) {}
     setIdealtimeout(_: string) {}
     setIdealtimeoutbackoff(_: string) {}
     setIdealtimeoutmessage(_: string) {}
@@ -96,7 +99,10 @@ jest.mock('@rapidaai/react', () => {
   class AssistantApiDeployment {
     setAssistantid(_: string) {}
     setGreeting(_: string) {}
+    setGreetinginterruptible(_: boolean) {}
     setMistake(_: string) {}
+    setUnclearinputtimeout(_: number) {}
+    setUnclearinputmessage(_: string) {}
     setIdealtimeout(_: string) {}
     setIdealtimeoutbackoff(_: string) {}
     setIdealtimeoutmessage(_: string) {}
@@ -107,7 +113,10 @@ jest.mock('@rapidaai/react', () => {
   class AssistantWebpluginDeployment {
     setAssistantid(_: string) {}
     setGreeting(_: string) {}
+    setGreetinginterruptible(_: boolean) {}
     setMistake(_: string) {}
+    setUnclearinputtimeout(_: number) {}
+    setUnclearinputmessage(_: string) {}
     setIdealtimeout(_: string) {}
     setIdealtimeoutbackoff(_: string) {}
     setIdealtimeoutmessage(_: string) {}
@@ -126,7 +135,10 @@ jest.mock('@rapidaai/react', () => {
   class AssistantPhoneDeployment {
     setAssistantid(_: string) {}
     setGreeting(_: string) {}
+    setGreetinginterruptible(_: boolean) {}
     setMistake(_: string) {}
+    setUnclearinputtimeout(_: number) {}
+    setUnclearinputmessage(_: string) {}
     setIdealtimeout(_: string) {}
     setIdealtimeoutbackoff(_: string) {}
     setIdealtimeoutmessage(_: string) {}
@@ -329,11 +341,13 @@ jest.mock('@/app/components/tools', () => ({
       </div>
       <div data-testid="selected-tool-code">{config?.code || ''}</div>
       <div data-testid="loaded-endpoint-id">
-        {(config?.parameters || []).find((p: any) => p.getKey?.() === 'tool.endpoint_id')
+        {(config?.parameters || [])
+          .find((p: any) => p.getKey?.() === 'tool.endpoint_id')
           ?.getValue?.() || ''}
       </div>
       <div data-testid="loaded-mcp-server-url">
-        {(config?.parameters || []).find((p: any) => p.getKey?.() === 'mcp.server_url')
+        {(config?.parameters || [])
+          .find((p: any) => p.getKey?.() === 'mcp.server_url')
           ?.getValue?.() || ''}
       </div>
     </div>
@@ -853,7 +867,9 @@ describe('Deployment and tool flows', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Configure Tool' }));
 
     expect(CreateAssistantTool).toHaveBeenCalledTimes(1);
-    expect((CreateAssistantTool as jest.Mock).mock.calls[0][2]).toBe('mcp_tool');
+    expect((CreateAssistantTool as jest.Mock).mock.calls[0][2]).toBe(
+      'mcp_tool',
+    );
     expect((CreateAssistantTool as jest.Mock).mock.calls[0][5]).toBe('mcp');
     const executionOptions = (CreateAssistantTool as jest.Mock).mock
       .calls[0][6];
@@ -1153,7 +1169,9 @@ describe('Deployment and tool flows', () => {
     render(<CreateTool assistantId="assistant-1" />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Use Endpoint Tool' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Set Endpoint Config' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Set Endpoint Config' }),
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
     fireEvent.change(screen.getByLabelText('Tool Name'), {
       target: { value: 'endpoint_tool' },
@@ -1164,8 +1182,11 @@ describe('Deployment and tool flows', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Configure Tool' }));
 
     expect(CreateAssistantTool).toHaveBeenCalledTimes(1);
-    expect((CreateAssistantTool as jest.Mock).mock.calls[0][5]).toBe('endpoint');
-    const executionOptions = (CreateAssistantTool as jest.Mock).mock.calls[0][6];
+    expect((CreateAssistantTool as jest.Mock).mock.calls[0][5]).toBe(
+      'endpoint',
+    );
+    const executionOptions = (CreateAssistantTool as jest.Mock).mock
+      .calls[0][6];
     const byKey = Object.fromEntries(
       executionOptions.map((m: any) => [m.getKey(), m.getValue()]),
     );
@@ -1216,7 +1237,8 @@ describe('Deployment and tool flows', () => {
     expect((UpdateAssistantTool as jest.Mock).mock.calls[0][6]).toBe(
       'endpoint',
     );
-    const executionOptions = (UpdateAssistantTool as jest.Mock).mock.calls[0][7];
+    const executionOptions = (UpdateAssistantTool as jest.Mock).mock
+      .calls[0][7];
     const byKey = Object.fromEntries(
       executionOptions.map((m: any) => [m.getKey(), m.getValue()]),
     );

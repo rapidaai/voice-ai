@@ -65,6 +65,12 @@ func (r *genericRequestor) withExperienceOverrides(
 	if value, err := opts.GetString(internal_options.ExperienceOptionMistake); err == nil {
 		resolved.Mistake = &value
 	}
+	if value, err := opts.GetFloat64(internal_options.ExperienceOptionUnclearInputTimeout); err == nil {
+		resolved.UnclearInputTimeout = &value
+	}
+	if value, err := opts.GetString(internal_options.ExperienceOptionUnclearInputMessage); err == nil {
+		resolved.UnclearInputMessage = &value
+	}
 	if value, err := opts.GetUint64(internal_options.ExperienceOptionIdleTimeout); err == nil {
 		resolved.IdleTimeout = &value
 	}

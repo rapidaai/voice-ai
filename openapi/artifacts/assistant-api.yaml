@@ -1001,10 +1001,18 @@ components:
           type: boolean
         mistake:
           type: string
+        unclearInputTimeout:
+          type: number
+          format: double
+          minimum: 2
+          maximum: 10
+        unclearInputMessage:
+          type: string
+          maxLength: 500
         idealTimeout:
           type: integer
           format: uint64
-          minimum: 15
+          minimum: 5
           maximum: 120
         idealTimeoutBackoff:
           type: integer
@@ -1036,10 +1044,18 @@ components:
           type: boolean
         mistake:
           type: string
+        unclearInputTimeout:
+          type: number
+          format: double
+          minimum: 2
+          maximum: 10
+        unclearInputMessage:
+          type: string
+          maxLength: 500
         idealTimeout:
           type: integer
           format: uint64
-          minimum: 15
+          minimum: 5
           maximum: 120
         idealTimeoutBackoff:
           type: integer
@@ -1076,10 +1092,18 @@ components:
           type: boolean
         mistake:
           type: string
+        unclearInputTimeout:
+          type: number
+          format: double
+          minimum: 2
+          maximum: 10
+        unclearInputMessage:
+          type: string
+          maxLength: 500
         idealTimeout:
           type: integer
           format: uint64
-          minimum: 15
+          minimum: 5
           maximum: 120
         idealTimeoutBackoff:
           type: integer
@@ -1110,10 +1134,18 @@ components:
           type: boolean
         mistake:
           type: string
+        unclearInputTimeout:
+          type: number
+          format: double
+          minimum: 2
+          maximum: 10
+        unclearInputMessage:
+          type: string
+          maxLength: 500
         idealTimeout:
           type: integer
           format: uint64
-          minimum: 15
+          minimum: 5
           maximum: 120
         idealTimeoutBackoff:
           type: integer
@@ -1149,10 +1181,18 @@ components:
           type: boolean
         mistake:
           type: string
+        unclearInputTimeout:
+          type: number
+          format: double
+          minimum: 2
+          maximum: 10
+        unclearInputMessage:
+          type: string
+          maxLength: 500
         idealTimeout:
           type: integer
           format: uint64
-          minimum: 15
+          minimum: 5
           maximum: 120
         idealTimeoutBackoff:
           type: integer
@@ -1512,6 +1552,14 @@ components:
           type: boolean
         mistake:
           type: string
+        unclearInputTimeout:
+          type: number
+          format: double
+          minimum: 2
+          maximum: 10
+        unclearInputMessage:
+          type: string
+          maxLength: 500
         inputAudio:
           $ref: "#/components/schemas/DeploymentAudioProvider"
         outputAudio:
@@ -1526,7 +1574,7 @@ components:
         idealTimeout:
           type: integer
           format: uint64
-          minimum: 15
+          minimum: 5
           maximum: 120
         idealTimeoutBackoff:
           type: integer
@@ -1548,6 +1596,14 @@ components:
           type: boolean
         mistake:
           type: string
+        unclearInputTimeout:
+          type: number
+          format: double
+          minimum: 2
+          maximum: 10
+        unclearInputMessage:
+          type: string
+          maxLength: 500
         inputAudio:
           $ref: "#/components/schemas/DeploymentAudioProvider"
         outputAudio:
@@ -1568,7 +1624,7 @@ components:
         idealTimeout:
           type: integer
           format: uint64
-          minimum: 15
+          minimum: 5
           maximum: 120
         idealTimeoutBackoff:
           type: integer
@@ -1590,6 +1646,14 @@ components:
           type: boolean
         mistake:
           type: string
+        unclearInputTimeout:
+          type: number
+          format: double
+          minimum: 2
+          maximum: 10
+        unclearInputMessage:
+          type: string
+          maxLength: 500
         inputAudio:
           $ref: "#/components/schemas/DeploymentAudioProvider"
         outputAudio:
@@ -1604,7 +1668,7 @@ components:
         idealTimeout:
           type: integer
           format: uint64
-          minimum: 15
+          minimum: 5
           maximum: 120
         idealTimeoutBackoff:
           type: integer
@@ -1626,6 +1690,14 @@ components:
           type: boolean
         mistake:
           type: string
+        unclearInputTimeout:
+          type: number
+          format: double
+          minimum: 2
+          maximum: 10
+        unclearInputMessage:
+          type: string
+          maxLength: 500
         inputAudio:
           $ref: "#/components/schemas/DeploymentAudioProvider"
         outputAudio:
@@ -1644,7 +1716,7 @@ components:
         idealTimeout:
           type: integer
           format: uint64
-          minimum: 15
+          minimum: 5
           maximum: 120
         idealTimeoutBackoff:
           type: integer
@@ -1666,6 +1738,14 @@ components:
           type: boolean
         mistake:
           type: string
+        unclearInputTimeout:
+          type: number
+          format: double
+          minimum: 2
+          maximum: 10
+        unclearInputMessage:
+          type: string
+          maxLength: 500
         whatsappProviderName:
           type: string
         whatsappOptions:
@@ -1682,7 +1762,7 @@ components:
         idealTimeout:
           type: integer
           format: uint64
-          minimum: 15
+          minimum: 5
           maximum: 120
         idealTimeoutBackoff:
           type: integer

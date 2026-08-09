@@ -314,10 +314,8 @@ func (exotel *exotelWebsocketStreamer) Send(response internal_type.Stream) error
 			return nil
 		}
 	case *protos.ConversationInterruption:
-		if data.Type == protos.ConversationInterruption_INTERRUPTION_TYPE_WORD {
-			if exotel.mediaSession != nil {
-				exotel.mediaSession.HandleInterrupt()
-			}
+		if exotel.mediaSession != nil {
+			exotel.mediaSession.HandleInterrupt()
 		}
 	case *protos.ConversationDisconnection:
 		// Server-initiated disconnect: the talker already knows the reason

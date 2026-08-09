@@ -267,17 +267,6 @@ func (t *TenVAD) Execute(ctx context.Context, pkt internal_type.UserAudioReceive
 		}
 	}
 
-	// Emit a heartbeat while the user is actively speaking so the EOS
-	// silence timer keeps extending during sustained speech.
-	t.mu.RLock()
-	isSpeaking := t.triggered
-	t.mu.RUnlock()
-	if isSpeaking && t.onPacket != nil {
-		_ = t.onPacket(ctx,
-			internal_type.VadSpeechActivityPacket{},
-		)
-	}
-
 	// Emit explicit interruption lifecycle events from VAD transitions.
 	if hasSpeechStart {
 		t.notifyInterruption(ctx, pkt.ContextID, internal_type.InterruptionEventStart, speechStartAt, len(segments))

@@ -9,8 +9,10 @@ import (
 	"context"
 	"errors"
 
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/pkg/validator"
 	assistant_api "github.com/rapidaai/protos"
 )
 
@@ -32,10 +34,35 @@ func (deploymentApi *assistantDeploymentGrpcApi) CreateAssistantPhoneDeployment(
 			"Please check and provide valid deployment request for phone.",
 		)
 	}
+	if deployment.GetPhone().UnclearInputTimeout != nil &&
+		!validator.Between(*deployment.GetPhone().UnclearInputTimeout, 2, 10) {
+		return &assistant_api.GetAssistantPhoneDeploymentResponse{
+			Code:    pkg_errors.CreateAssistantPhoneDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(),
+			Success: false,
+			Error: &assistant_api.Error{
+				ErrorCode:    uint64(pkg_errors.CreateAssistantPhoneDeploymentInvalidUnclearTimeout.Code),
+				ErrorMessage: pkg_errors.CreateAssistantPhoneDeploymentInvalidUnclearTimeout.Error,
+				HumanMessage: pkg_errors.CreateAssistantPhoneDeploymentInvalidUnclearTimeout.ErrorMessage,
+			},
+		}, errors.New(pkg_errors.CreateAssistantPhoneDeploymentInvalidUnclearTimeout.Error)
+	}
+	if !validator.Between(int(deployment.GetPhone().GetIdealTimeout()), 5, 120) {
+		return &assistant_api.GetAssistantPhoneDeploymentResponse{
+			Code:    pkg_errors.CreateAssistantPhoneDeploymentInvalidIdealTimeout.HTTPStatusCodeInt32(),
+			Success: false,
+			Error: &assistant_api.Error{
+				ErrorCode:    uint64(pkg_errors.CreateAssistantPhoneDeploymentInvalidIdealTimeout.Code),
+				ErrorMessage: pkg_errors.CreateAssistantPhoneDeploymentInvalidIdealTimeout.Error,
+				HumanMessage: pkg_errors.CreateAssistantPhoneDeploymentInvalidIdealTimeout.ErrorMessage,
+			},
+		}, errors.New(pkg_errors.CreateAssistantPhoneDeploymentInvalidIdealTimeout.Error)
+	}
 	wpDeployment, err := deploymentApi.deploymentService.CreatePhoneDeployment(ctx,
 		iAuth, deployment.GetPhone().GetAssistantId(),
 		deployment.GetPhone().Greeting,
 		deployment.GetPhone().Mistake,
+		deployment.GetPhone().UnclearInputTimeout,
+		deployment.GetPhone().UnclearInputMessage,
 		deployment.GetPhone().GreetingInterruptible,
 		&deployment.GetPhone().IdealTimeout,
 		&deployment.GetPhone().IdealTimeoutBackoff,

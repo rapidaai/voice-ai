@@ -44,11 +44,6 @@ import (
 )
 
 const (
-	Unknown            = adapter_lifecycle.Unknown
-	Interrupt          = adapter_lifecycle.Interrupt
-	Interrupted        = adapter_lifecycle.Interrupted
-	LLMGenerating      = adapter_lifecycle.LLMGenerating
-	LLMGenerated       = adapter_lifecycle.LLMGenerated
 	dbWriteTimeout     = 5 * time.Second
 	recordingTimeout   = 3*storages.FileWriteTimeout + dbWriteTimeout
 	connectDeadline    = 30 * time.Second
@@ -123,6 +118,7 @@ type genericRequestor struct {
 
 	// experience
 	idleTimeoutWatchdog   *watchdog.IdleTimeoutWatchdog
+	unclearInputWatchdog  *watchdog.UnclearInputWatchdog
 	ttsCompletionWatchdog *watchdog.TTSCompletionWatchdog
 	maxSessionWatchdog    *watchdog.MaxSessionWatchdog
 
@@ -192,6 +188,10 @@ func NewGenericRequestor(
 	}
 
 	gr.idleTimeoutWatchdog = watchdog.NewIdleTimeoutWatchdog(
+		watchdog.WithOnPacket(gr.OnPacket),
+		watchdog.WithPacketContext(sessionCtx),
+	)
+	gr.unclearInputWatchdog = watchdog.NewUnclearInputWatchdog(
 		watchdog.WithOnPacket(gr.OnPacket),
 		watchdog.WithPacketContext(sessionCtx),
 	)
@@ -307,8 +307,6 @@ func (dm *genericRequestor) GetHistories() []internal_type.MessagePacket {
 // Interaction state methods — inline replacement for the former Messaging wrapper
 // =============================================================================
 
-// GetID returns the current interaction context UUID.
-// Rotates to a new UUID each time an Interrupted transition fires.
 func (r *genericRequestor) GetID() string {
 	return r.messageLifecycle.ContextID()
 }
@@ -321,29 +319,6 @@ func (r *genericRequestor) GetMode() type_enums.MessageMode {
 // SwitchMode sets the stream mode.
 func (r *genericRequestor) SwitchMode(mm type_enums.MessageMode) {
 	r.messageLifecycle.SetMode(mm)
-}
-
-func (r *genericRequestor) Transition(newState adapter_lifecycle.MessageState) error {
-	oldCtxID := r.GetID()
-	if err := r.messageLifecycle.Transition(newState); err != nil {
-		return err
-	}
-	if newState == Interrupted {
-		nCtxID := r.GetID()
-		if oldCtxID == nCtxID {
-			return nil
-		}
-		utils.Go(context.Background(), func() {
-			r.OnPacket(context.Background(), internal_type.TurnChangePacket{
-				ContextID:         nCtxID,
-				PreviousContextID: oldCtxID,
-				Reason:            "interrupted",
-				Source:            "state_machine",
-				Time:              time.Now(),
-			})
-		})
-	}
-	return nil
 }
 
 func (r *genericRequestor) canSwitchSession() bool {

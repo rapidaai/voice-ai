@@ -168,7 +168,7 @@ export const useGlobalNavigation = () => {
 
   const goToConversationTelemetry = (conversationId: string) => {
     const params = new URLSearchParams({
-      query: `scopeAttributes.assistantConversationId:${conversationId}`,
+      query: `conversation:${conversationId}`,
     });
     navigate(`/logs/traces?${params.toString()}`);
   };

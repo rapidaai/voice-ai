@@ -212,6 +212,8 @@ func (deploymentApi *AssistantDeploymentApi) GetAllAssistantPhoneDeploymentRest(
 			Greeting:              deployment.Greeting,
 			GreetingInterruptible: deployment.GreetingInterruptible,
 			Mistake:               deployment.Mistake,
+			UnclearInputTimeout:   deployment.UnclearInputTimeout,
+			UnclearInputMessage:   deployment.UnclearInputMessage,
 			InputAudio:            responseInputAudio,
 			OutputAudio:           responseOutputAudio,
 			PhoneProviderName:     &phoneProviderName,

@@ -312,8 +312,16 @@ jest.mock('@carbon/react', () => ({
   Tooltip: ({ children }: any) => <span>{children}</span>,
 }));
 
-jest.mock('@/app/components/carbon/shape-indicator', () => ({
-  CarbonShapeIndicator: ({ label }: any) => <span>{label}</span>,
+jest.mock('@/app/components/carbon/record-status-indicator', () => ({
+  RecordStatusIndicator: ({ state }: any) => (
+    <span>
+      {state === 'ACTIVE'
+        ? 'Active'
+        : state === 'INACTIVE'
+          ? 'Inactive'
+          : 'Draft'}
+    </span>
+  ),
 }));
 
 jest.mock('@/app/components/carbon/url-table-cell', () => ({
@@ -333,7 +341,7 @@ describe('CreateAssistantAuthenticationPage', () => {
         getId: () => 'auth-config-1',
         getProvider: () => 'http',
         getEnabled: () => enabled,
-        getStatus: () => 'ACTIVE',
+        getStatus: () => (enabled ? 'ACTIVE' : 'INACTIVE'),
         getCreateddate: () => undefined,
         getOptionsList: () => [
           makeOption('http_method', 'POST'),
@@ -654,7 +662,7 @@ describe('CreateAssistantAuthenticationPage', () => {
       expect(GetAllAssistantConfiguration).toHaveBeenCalledTimes(2),
     );
     await waitFor(() =>
-      expect(screen.getByText('Disabled')).toBeInTheDocument(),
+      expect(screen.getByText('Inactive')).toBeInTheDocument(),
     );
     await waitFor(() =>
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
@@ -682,7 +690,7 @@ describe('CreateAssistantAuthenticationPage', () => {
     render(<ConfigureAssistantAuthenticationPage />);
 
     await waitFor(() =>
-      expect(screen.getByText('Disabled')).toBeInTheDocument(),
+      expect(screen.getByText('Inactive')).toBeInTheDocument(),
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Enable' }));
@@ -706,9 +714,7 @@ describe('CreateAssistantAuthenticationPage', () => {
     await waitFor(() =>
       expect(GetAllAssistantConfiguration).toHaveBeenCalledTimes(2),
     );
-    await waitFor(() =>
-      expect(screen.getByText('Enabled')).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText('Active')).toBeInTheDocument());
     await waitFor(() =>
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
     );

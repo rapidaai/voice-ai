@@ -16,6 +16,12 @@ import (
 	"github.com/rapidaai/protos"
 )
 
+type numeric interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64 |
+		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr |
+		~float32 | ~float64
+}
+
 // OneOf returns true when value matches one of the provided options.
 func OneOf[T comparable](value T, options ...T) bool {
 	for _, option := range options {
@@ -51,7 +57,7 @@ func NotBlank(value string) bool {
 }
 
 // Between returns true when value is within the inclusive min/max range.
-func Between(value, min, max int) bool {
+func Between[T numeric](value, min, max T) bool {
 	return value >= min && value <= max
 }
 

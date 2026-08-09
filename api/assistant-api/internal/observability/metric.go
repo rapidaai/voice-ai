@@ -63,6 +63,8 @@ const (
 	MetricDenoiseInitLatencyMs        = "denoise_init_ms"
 	MetricLLMInitLatencyMs            = "llm_init_ms"
 	MetricLLMLatencyMs                = "llm_latency_ms"
+	MetricAgentTTFTMs                 = "agent.ttft_ms"
+	MetricAgentTRTMs                  = "agent.trt_ms"
 	MetricStorageInitLatencyMs        = "storage_init_ms"
 	MetricAnalysisInitLatencyMs       = "analysis_init_ms"
 	MetricAuthenticationInitLatencyMs = "authentication_init_ms"

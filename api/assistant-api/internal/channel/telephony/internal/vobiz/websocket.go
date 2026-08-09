@@ -265,10 +265,8 @@ func (vws *vobizWebsocketStreamer) Send(response internal_type.Stream) error {
 			return vws.mediaSession.HandleAssistantAudio(content.Audio, data.GetCompleted())
 		}
 	case *protos.ConversationInterruption:
-		if data.Type == protos.ConversationInterruption_INTERRUPTION_TYPE_WORD {
-			if vws.mediaSession != nil {
-				vws.mediaSession.HandleInterrupt()
-			}
+		if vws.mediaSession != nil {
+			vws.mediaSession.HandleInterrupt()
 		}
 	case *protos.ConversationDisconnection:
 		_ = vws.Disconnect(data.GetType())

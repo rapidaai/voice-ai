@@ -1,9 +1,13 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import '@testing-library/jest-dom';
 import {
-  ConfigureAssistantCallDeploymentPage,
-} from '@/app/pages/assistant/actions/create-deployment/phone';
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
+import '@testing-library/jest-dom';
+import { ConfigureAssistantCallDeploymentPage } from '@/app/pages/assistant/actions/create-deployment/phone';
 import { EditAssistantCallDeploymentPage } from '@/app/pages/assistant/actions/create-deployment/phone/edit';
 import {
   CreateAssistantPhoneDeployment,
@@ -68,6 +72,20 @@ jest.mock('@rapidaai/react', () => {
     setGreeting(_: string) {}
     setGreetinginterruptible(_: boolean) {}
     setMistake(_: string) {}
+    setUnclearinputtimeout(_: number) {}
+    hasUnclearinputtimeout() {
+      return false;
+    }
+    getUnclearinputtimeout() {
+      return 0;
+    }
+    setUnclearinputmessage(_: string) {}
+    hasUnclearinputmessage() {
+      return false;
+    }
+    getUnclearinputmessage() {
+      return '';
+    }
     setIdealtimeout(_: string) {}
     setIdealtimeoutbackoff(_: string) {}
     setIdealtimeoutmessage(_: string) {}
@@ -142,7 +160,11 @@ jest.mock('@/hooks/use-model', () => ({
 }));
 
 jest.mock('@/hooks/use-credential', () => ({
-  useCurrentCredential: () => ({ authId: 'u-1', projectId: 'p-1', token: 't-1' }),
+  useCurrentCredential: () => ({
+    authId: 'u-1',
+    projectId: 'p-1',
+    token: 't-1',
+  }),
 }));
 
 jest.mock('@/hooks/use-global-navigator', () => ({
@@ -188,11 +210,7 @@ jest.mock('@/app/components/carbon/tabs', () => ({
       <div>
         <div>
           {tabs.map((tab: string, index: number) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => onChange?.(index)}
-            >
+            <button key={tab} type="button" onClick={() => onChange?.(index)}>
               {tab}
             </button>
           ))}
@@ -203,15 +221,24 @@ jest.mock('@/app/components/carbon/tabs', () => ({
   },
 }));
 
-jest.mock('@/app/pages/assistant/actions/create-deployment/commons/configure-experience', () => ({
-  ConfigureExperience: () => <div>experience</div>,
-}));
-jest.mock('@/app/pages/assistant/actions/create-deployment/commons/configure-audio-input', () => ({
-  ConfigureAudioInputProvider: () => <div>audio-input</div>,
-}));
-jest.mock('@/app/pages/assistant/actions/create-deployment/commons/configure-audio-output', () => ({
-  ConfigureAudioOutputProvider: () => <div>audio-output</div>,
-}));
+jest.mock(
+  '@/app/pages/assistant/actions/create-deployment/commons/configure-experience',
+  () => ({
+    ConfigureExperience: () => <div>experience</div>,
+  }),
+);
+jest.mock(
+  '@/app/pages/assistant/actions/create-deployment/commons/configure-audio-input',
+  () => ({
+    ConfigureAudioInputProvider: () => <div>audio-input</div>,
+  }),
+);
+jest.mock(
+  '@/app/pages/assistant/actions/create-deployment/commons/configure-audio-output',
+  () => ({
+    ConfigureAudioOutputProvider: () => <div>audio-output</div>,
+  }),
+);
 
 jest.mock('@/app/components/providers/telephony', () => ({
   TelephonyProvider: () => <div>telephony</div>,
@@ -235,9 +262,15 @@ jest.mock('@/app/components/providers/text-to-speech/provider', () => ({
 }));
 
 jest.mock('@/app/components/carbon/button', () => ({
-  PrimaryButton: ({ children, isLoading, ...props }: any) => <button {...props}>{children}</button>,
-  SecondaryButton: ({ children, isLoading, ...props }: any) => <button {...props}>{children}</button>,
-  GhostButton: ({ children, isLoading, ...props }: any) => <button {...props}>{children}</button>,
+  PrimaryButton: ({ children, isLoading, ...props }: any) => (
+    <button {...props}>{children}</button>
+  ),
+  SecondaryButton: ({ children, isLoading, ...props }: any) => (
+    <button {...props}>{children}</button>
+  ),
+  GhostButton: ({ children, isLoading, ...props }: any) => (
+    <button {...props}>{children}</button>
+  ),
 }));
 
 describe('Phone deployment create and edit flows', () => {

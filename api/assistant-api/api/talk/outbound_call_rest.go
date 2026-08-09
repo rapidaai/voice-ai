@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	channel_pipeline "github.com/rapidaai/api/assistant-api/internal/channel/pipeline"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	internal_options "github.com/rapidaai/api/assistant-api/internal/options"
 	"github.com/rapidaai/openapi"
 	pkg_errors "github.com/rapidaai/pkg/errors"
 	"github.com/rapidaai/pkg/preset"
@@ -158,6 +159,18 @@ func (cApi *ConversationApi) CreatePhoneCallRest(c *gin.Context) {
 	var opts map[string]interface{}
 	if validator.NonNil(ir.Options) {
 		opts = *ir.Options
+	}
+	if value, err := utils.Option(opts).GetFloat64(internal_options.ExperienceOptionUnclearInputTimeout); err == nil && !validator.Between(value, 2, 10) {
+		c.JSON(pkg_errors.CreatePhoneCallInvalidOptions.HTTPStatusCode, openapi.ErrorResponse{
+			Code:    utils.Ptr(pkg_errors.CreatePhoneCallInvalidOptions.HTTPStatusCodeInt32()),
+			Success: utils.Ptr(false),
+			Error: &openapi.Error{
+				ErrorCode:    utils.Ptr(openapi.Uint64String(pkg_errors.CreatePhoneCallInvalidOptions.CodeString())),
+				ErrorMessage: utils.Ptr(pkg_errors.CreatePhoneCallInvalidOptions.Error),
+				HumanMessage: utils.Ptr(pkg_errors.CreatePhoneCallInvalidOptions.ErrorMessage),
+			},
+		})
+		return
 	}
 
 	result := cApi.channelPipeline.Run(c, channel_pipeline.OutboundRequestedPipeline{

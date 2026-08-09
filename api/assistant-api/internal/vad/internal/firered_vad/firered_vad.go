@@ -202,7 +202,6 @@ func (v *FireRedVAD) Execute(ctx context.Context, pkt internal_type.UserAudioRec
 	v.audioBuf = append(v.audioBuf, samples...)
 
 	// Process complete frames (400 samples each, 160-sample shift)
-	hasSpeech := false
 	var speechStartAt, speechEndAt float64
 	hasSpeechStart := false
 	hasSpeechEnd := false
@@ -288,25 +287,10 @@ func (v *FireRedVAD) Execute(ctx context.Context, pkt internal_type.UserAudioRec
 			hasSpeechEnd = true
 		}
 
-		// Only treat as speech when the postprocessor has confirmed onset
-		// (past MinSpeechFrame). Frames in statePossibleSpeech are
-		// unconfirmed and likely noise — skip them.
-		if v.postprocessor.InSpeech() {
-			hasSpeech = true
-		}
-
 		// Shift by frameShiftSamp (160 samples)
 		v.audioBuf = v.audioBuf[frameShiftSamp:]
 	}
 	v.mu.Unlock()
-
-	// Emit a heartbeat while in confirmed speech so the EOS silence
-	// timer keeps extending during sustained speech.
-	if hasSpeech && v.onPacket != nil {
-		_ = v.onPacket(ctx,
-			internal_type.VadSpeechActivityPacket{},
-		)
-	}
 
 	// Emit explicit interruption lifecycle events from VAD transitions.
 	if hasSpeechStart {

@@ -32,7 +32,19 @@ func (deploymentApi *assistantDeploymentGrpcApi) CreateAssistantDebuggerDeployme
 			"Please check and provide valid deployment request for debugger.",
 		)
 	}
-	if !validator.Between(int(deployment.GetDebugger().GetIdealTimeout()), 15, 120) {
+	if deployment.GetDebugger().UnclearInputTimeout != nil &&
+		!validator.Between(*deployment.GetDebugger().UnclearInputTimeout, 2, 10) {
+		return &assistant_api.GetAssistantDebuggerDeploymentResponse{
+			Code:    pkg_errors.CreateAssistantDebuggerDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(),
+			Success: false,
+			Error: &assistant_api.Error{
+				ErrorCode:    uint64(pkg_errors.CreateAssistantDebuggerDeploymentInvalidUnclearTimeout.Code),
+				ErrorMessage: pkg_errors.CreateAssistantDebuggerDeploymentInvalidUnclearTimeout.Error,
+				HumanMessage: pkg_errors.CreateAssistantDebuggerDeploymentInvalidUnclearTimeout.ErrorMessage,
+			},
+		}, errors.New(pkg_errors.CreateAssistantDebuggerDeploymentInvalidUnclearTimeout.Error)
+	}
+	if !validator.Between(int(deployment.GetDebugger().GetIdealTimeout()), 5, 120) {
 		return &assistant_api.GetAssistantDebuggerDeploymentResponse{
 			Code:    pkg_errors.CreateAssistantDebuggerDeploymentInvalidIdealTimeout.HTTPStatusCodeInt32(),
 			Success: false,
@@ -70,6 +82,8 @@ func (deploymentApi *assistantDeploymentGrpcApi) CreateAssistantDebuggerDeployme
 		iAuth, deployment.GetDebugger().GetAssistantId(),
 		deployment.GetDebugger().Greeting,
 		deployment.GetDebugger().Mistake,
+		deployment.GetDebugger().UnclearInputTimeout,
+		deployment.GetDebugger().UnclearInputMessage,
 		deployment.GetDebugger().GreetingInterruptible,
 		&deployment.GetDebugger().IdealTimeout,
 		&deployment.GetDebugger().IdealTimeoutBackoff,
