@@ -20,9 +20,36 @@ import (
 )
 
 const (
-	DeepgramSpeechToTextTransformerName = "deepgram-stt"
-	DeepgramTextToSpeechTransformerName = "deepgram-tts"
-	deepgramDefaultEndpoint             = "api.deepgram.com"
+	SpeechToTextTransformerName = "deepgram-stt"
+	TextToSpeechTransformerName = "deepgram-tts"
+	deepgramDefaultEndpoint     = "api.deepgram.com"
+)
+
+const (
+	IllegalVaultConfigErrorMessage = "illegal vault config"
+
+	STTCredentialRequiredErrorMessage       = "deepgram-stt: credential is required"
+	STTOnPacketRequiredErrorMessage         = "deepgram-stt: on packet handler is required"
+	STTConnectionFailedErrorMessage         = "deepgram-stt: connection failed"
+	STTConnectionNotInitializedErrorMessage = "deepgram-stt: connection is not initialized"
+	STTFinalizeErrorMessage                 = "deepgram finalize error: %w"
+	STTStreamErrorMessage                   = "deepgram stream error: %w"
+
+	STTCredentialFailedLogMessage     = "deepgram-stt: Key from credential failed %+v"
+	STTInitializationErrorLogMessage  = "deepgram-stt: error while initialization %s"
+	STTConnectErrorLogMessage         = "deepgram-stt: error while performing connect"
+	STTInitializationCompletedMessage = "deepgram-stt: initialization completed"
+	STTFinalizeErrorLogMessage        = "deepgram-stt: error while finalizing deepgram utterance: %v"
+	STTStreamErrorLogMessage          = "deepgram-stt: error while calling deepgram: %v"
+	STTUnhandledEventLogMessage       = "UnhandledEvent %+v"
+
+	STTInitializationFailureMetricDescription = "STT initialization failure count"
+	STTConnectionFailureMetricDescription     = "STT connection failure count"
+	STTInitializationLatencyMetricDescription = "STT initialization latency in milliseconds"
+	STTFinalizeFailureMetricDescription       = "STT finalize failure count"
+	STTStreamFailureMetricDescription         = "STT stream failure count"
+	STTLatencyMetricDescription               = "STT latency from speech end to final transcript in milliseconds"
+	STTProviderErrorMetricDescription         = "STT provider error count"
 )
 
 type DeepgramTextToSpeechResponse struct {
@@ -46,11 +73,11 @@ func NewDeepgramOption(
 	raw := vaultCredential.GetValue().AsMap()
 	cx, ok := raw["key"]
 	if !ok {
-		return nil, fmt.Errorf("illegal vault config")
+		return nil, fmt.Errorf(IllegalVaultConfigErrorMessage)
 	}
 	key, ok := cx.(string)
 	if !ok || strings.TrimSpace(key) == "" {
-		return nil, fmt.Errorf("illegal vault config")
+		return nil, fmt.Errorf(IllegalVaultConfigErrorMessage)
 	}
 	endpoint := deepgramDefaultEndpoint
 	if endpointValue, ok := raw["endpoint"]; ok {

@@ -47,7 +47,7 @@ func TestDeepgramTTSLifecycle(t *testing.T) {
 	tts, err := NewDeepgramTextToSpeech(ctx, logger, cred, collector.OnPacket, opts)
 	require.NoError(t, err)
 	require.NotNil(t, tts)
-	assert.Equal(t, deepgram_internal.DeepgramTextToSpeechTransformerName, tts.Name())
+	assert.Equal(t, deepgram_internal.TextToSpeechTransformerName, tts.Name())
 
 	require.NoError(t, tts.Initialize())
 	defer tts.Close(ctx)
@@ -513,7 +513,7 @@ func TestDeepgramSTTLifecycle(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.NotNil(t, stt)
-	assert.Equal(t, deepgram_internal.DeepgramSpeechToTextTransformerName, stt.Name())
+	assert.Equal(t, deepgram_internal.SpeechToTextTransformerName, stt.Name())
 
 	defer stt.Close(ctx)
 	assertSTTInitMetric(t, collector)

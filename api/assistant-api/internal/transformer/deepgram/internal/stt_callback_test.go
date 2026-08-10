@@ -587,6 +587,25 @@ func TestClose(t *testing.T) {
 	})
 }
 
+func TestError(t *testing.T) {
+	t.Run("records stt error metric at conversation scope", func(t *testing.T) {
+		collector, _, callback := createTestCallback(utils.Option{})
+
+		err := callback.Error(&msginterfaces.ErrorResponse{ErrMsg: "deepgram error"})
+
+		require.NoError(t, err)
+		packets := collector.GetPackets()
+		require.Len(t, packets, 2)
+
+		metric := packets[0].(internal_type.ObservabilityMetricRecordPacket)
+		assert.Equal(t, internal_type.ObservabilityRecordScopeConversation, metric.Scope)
+		require.Len(t, metric.Record.Metrics, 1)
+		assert.Equal(t, observability.MetricSTTError, metric.Record.Metrics[0].Name)
+		assert.Equal(t, "deepgram-stt", metric.Record.Attributes["provider"])
+		assert.NotContains(t, metric.Record.Attributes, "messageId")
+	})
+}
+
 // =============================================================================
 // Integration / Scenario Tests
 // =============================================================================

@@ -121,7 +121,7 @@ func (t *deepgramTTS) Initialize() error {
 }
 
 func (*deepgramTTS) Name() string {
-	return deepgram_internal.DeepgramTextToSpeechTransformerName
+	return deepgram_internal.TextToSpeechTransformerName
 }
 
 // handleFlushComplete is called when Deepgram signals Flushed. It emits

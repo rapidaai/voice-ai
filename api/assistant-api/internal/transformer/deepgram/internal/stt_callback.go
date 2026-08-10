@@ -92,7 +92,7 @@ func (d *deepgramSttCallback) Message(mr *msginterfaces.MessageResponse) error {
 									Metrics: []*protos.Metric{{
 										Name:        observability.MetricSTTLatencyMs,
 										Value:       strconv.FormatInt(transcriptLatency.Milliseconds(), 10),
-										Description: "STT latency from speech end to final transcript in milliseconds",
+										Description: STTLatencyMetricDescription,
 									}},
 									Attributes: observability.Attributes{
 										"provider":  d.providerName,
@@ -143,7 +143,7 @@ func (d *deepgramSttCallback) Message(mr *msginterfaces.MessageResponse) error {
 							Metrics: []*protos.Metric{{
 								Name:        observability.MetricSTTLatencyMs,
 								Value:       strconv.FormatInt(transcriptLatency.Milliseconds(), 10),
-								Description: "STT latency from speech end to final transcript in milliseconds",
+								Description: STTLatencyMetricDescription,
 							}},
 							Attributes: observability.Attributes{
 								"provider":  d.providerName,
@@ -236,16 +236,15 @@ func (d *deepgramSttCallback) Error(er *msginterfaces.ErrorResponse) error {
 	d.onPacket(
 		internal_type.ObservabilityMetricRecordPacket{
 			ContextID: ctxID,
-			Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+			Scope:     internal_type.ObservabilityRecordScopeConversation,
 			Record: observability.RecordMetric{
 				Metrics: []*protos.Metric{{
 					Name:        observability.MetricSTTError,
 					Value:       "1",
-					Description: "STT provider error count",
+					Description: STTProviderErrorMetricDescription,
 				}},
 				Attributes: observability.Attributes{
-					"provider":  d.providerName,
-					"messageId": ctxID,
+					"provider": d.providerName,
 				},
 			},
 		},
@@ -268,7 +267,7 @@ func (d *deepgramSttCallback) Error(er *msginterfaces.ErrorResponse) error {
 
 // Handle unhandled events (optional, can be left empty)
 func (d *deepgramSttCallback) UnhandledEvent(byData []byte) error {
-	d.logger.Errorf("UnhandledEvent %+v", byData)
+	d.logger.Errorf(STTUnhandledEventLogMessage, byData)
 	return nil
 }
 
