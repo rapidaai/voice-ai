@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rapidaai/api/assistant-api/internal/observability"
+	deepgram_internal "github.com/rapidaai/api/assistant-api/internal/transformer/deepgram/internal"
 	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/internal/testutil"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/stretchr/testify/assert"
@@ -45,7 +47,7 @@ func TestDeepgramTTSLifecycle(t *testing.T) {
 	tts, err := NewDeepgramTextToSpeech(ctx, logger, cred, collector.OnPacket, opts)
 	require.NoError(t, err)
 	require.NotNil(t, tts)
-	assert.Equal(t, "deepgram-tts", tts.Name())
+	assert.Equal(t, deepgram_internal.DeepgramTextToSpeechTransformerName, tts.Name())
 
 	require.NoError(t, tts.Initialize())
 	defer tts.Close(ctx)
@@ -488,7 +490,7 @@ func TestDeepgramTTSFlow_RapidDeltasDone(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestDeepgramSTTLifecycle verifies the full STT flow:
-// create → initialize (metric/log) → feed audio (no errors) → transcripts arrive.
+// create (connect + metric/log) → feed audio (no errors) → transcripts arrive.
 // If transcripts arrive, verify they carry the expected metadata fields.
 func TestDeepgramSTTLifecycle(t *testing.T) {
 	cfg := testutil.LoadConfig(t)
@@ -502,12 +504,17 @@ func TestDeepgramSTTLifecycle(t *testing.T) {
 	cred := testutil.BuildCredential(pcfg.Credential)
 	opts := testutil.BuildOptions(pcfg.Options)
 
-	stt, err := NewDeepgramSpeechToText(ctx, logger, cred, collector.OnPacket, opts)
+	stt, err := NewSpeechToText(
+		WithContext(ctx),
+		WithLogger(logger),
+		WithCredential(cred),
+		WithOnPacket(collector.OnPacket),
+		WithOptions(opts),
+	)
 	require.NoError(t, err)
 	require.NotNil(t, stt)
-	assert.Equal(t, "deepgram-stt", stt.Name())
+	assert.Equal(t, deepgram_internal.DeepgramSpeechToTextTransformerName, stt.Name())
 
-	require.NoError(t, stt.Initialize())
 	defer stt.Close(ctx)
 	assertSTTInitMetric(t, collector)
 
@@ -564,9 +571,14 @@ func TestDeepgramSTTAudioAcceptance(t *testing.T) {
 	cred := testutil.BuildCredential(pcfg.Credential)
 	opts := testutil.BuildOptions(pcfg.Options)
 
-	stt, err := NewDeepgramSpeechToText(ctx, logger, cred, collector.OnPacket, opts)
+	stt, err := NewSpeechToText(
+		WithContext(ctx),
+		WithLogger(logger),
+		WithCredential(cred),
+		WithOnPacket(collector.OnPacket),
+		WithOptions(opts),
+	)
 	require.NoError(t, err)
-	require.NoError(t, stt.Initialize())
 	defer stt.Close(ctx)
 
 	// Flow: each Transform call accepts the audio chunk without error
@@ -594,9 +606,14 @@ func TestDeepgramSTTSilentAudio(t *testing.T) {
 	cred := testutil.BuildCredential(pcfg.Credential)
 	opts := testutil.BuildOptions(pcfg.Options)
 
-	stt, err := NewDeepgramSpeechToText(ctx, logger, cred, collector.OnPacket, opts)
+	stt, err := NewSpeechToText(
+		WithContext(ctx),
+		WithLogger(logger),
+		WithCredential(cred),
+		WithOnPacket(collector.OnPacket),
+		WithOptions(opts),
+	)
 	require.NoError(t, err)
-	require.NoError(t, stt.Initialize())
 	defer stt.Close(ctx)
 
 	silence := testutil.SilentPCM(2.0)
@@ -626,9 +643,14 @@ func TestDeepgramSTTReconnect(t *testing.T) {
 		collector := testutil.NewPacketCollector()
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 
-		stt, err := NewDeepgramSpeechToText(ctx, logger, cred, collector.OnPacket, opts)
+		stt, err := NewSpeechToText(
+			WithContext(ctx),
+			WithLogger(logger),
+			WithCredential(cred),
+			WithOnPacket(collector.OnPacket),
+			WithOptions(opts),
+		)
 		require.NoError(t, err, "attempt %d", attempt)
-		require.NoError(t, stt.Initialize(), "attempt %d", attempt)
 		assertSTTInitMetric(t, collector)
 
 		feedDone := make(chan struct{})
@@ -662,11 +684,14 @@ func TestDeepgramSTTCloseWhileStreaming(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	stt, err := NewDeepgramSpeechToText(ctx, logger,
-		testutil.BuildCredential(pcfg.Credential), collector.OnPacket,
-		testutil.BuildOptions(pcfg.Options))
+	stt, err := NewSpeechToText(
+		WithContext(ctx),
+		WithLogger(logger),
+		WithCredential(testutil.BuildCredential(pcfg.Credential)),
+		WithOnPacket(collector.OnPacket),
+		WithOptions(testutil.BuildOptions(pcfg.Options)),
+	)
 	require.NoError(t, err)
-	require.NoError(t, stt.Initialize())
 	assertSTTInitMetric(t, collector)
 
 	go func() {
@@ -699,11 +724,14 @@ func TestDeepgramSTTTranscriptContent(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	stt, err := NewDeepgramSpeechToText(ctx, logger,
-		testutil.BuildCredential(pcfg.Credential), collector.OnPacket,
-		testutil.BuildOptions(pcfg.Options))
+	stt, err := NewSpeechToText(
+		WithContext(ctx),
+		WithLogger(logger),
+		WithCredential(testutil.BuildCredential(pcfg.Credential)),
+		WithOnPacket(collector.OnPacket),
+		WithOptions(testutil.BuildOptions(pcfg.Options)),
+	)
 	require.NoError(t, err)
-	require.NoError(t, stt.Initialize())
 	defer stt.Close(ctx)
 
 	feedDone := make(chan struct{})
@@ -762,16 +790,16 @@ func assertTTSInitMetric(t *testing.T, collector *testutil.PacketCollector) {
 	t.Helper()
 	for _, m := range collector.MetricPackets() {
 		for _, metric := range m.Record.Metrics {
-			if metric.Name == "tts_init_ms" {
+			if metric.Name == observability.MetricTTSInitLatencyMs {
 				ms, err := strconv.Atoi(metric.Value)
 				assert.NoError(t, err)
-				assert.GreaterOrEqual(t, ms, 0, "tts_init_ms should be non-negative")
-				t.Logf("tts_init_ms=%d", ms)
+				assert.GreaterOrEqual(t, ms, 0, "%s should be non-negative", observability.MetricTTSInitLatencyMs)
+				t.Logf("%s=%d", observability.MetricTTSInitLatencyMs, ms)
 				return
 			}
 		}
 	}
-	t.Error("should have tts_init_ms metric")
+	t.Errorf("should have %s metric", observability.MetricTTSInitLatencyMs)
 }
 
 func assertTTSInitMetricCountAtLeast(t *testing.T, collector *testutil.PacketCollector, minimumCount int) {
@@ -779,58 +807,58 @@ func assertTTSInitMetricCountAtLeast(t *testing.T, collector *testutil.PacketCol
 	count := 0
 	for _, m := range collector.MetricPackets() {
 		for _, metric := range m.Record.Metrics {
-			if metric.Name == "tts_init_ms" {
+			if metric.Name == observability.MetricTTSInitLatencyMs {
 				count++
 			}
 		}
 	}
-	assert.GreaterOrEqual(t, count, minimumCount, "should have enough tts_init_ms metrics")
+	assert.GreaterOrEqual(t, count, minimumCount, "should have enough %s metrics", observability.MetricTTSInitLatencyMs)
 }
 
 func assertTTSLatencyMetric(t *testing.T, collector *testutil.PacketCollector) {
 	t.Helper()
 	for _, m := range collector.MetricPackets() {
 		for _, metric := range m.Record.Metrics {
-			if metric.Name == "tts_latency_ms" {
+			if metric.Name == observability.MetricTTSLatencyMs {
 				ms, err := strconv.Atoi(metric.Value)
 				assert.NoError(t, err)
-				assert.Greater(t, ms, 0, "tts_latency_ms should be positive")
-				t.Logf("tts_latency_ms=%d", ms)
+				assert.Greater(t, ms, 0, "%s should be positive", observability.MetricTTSLatencyMs)
+				t.Logf("%s=%d", observability.MetricTTSLatencyMs, ms)
 				return
 			}
 		}
 	}
-	t.Error("should have tts_latency_ms metric")
+	t.Errorf("should have %s metric", observability.MetricTTSLatencyMs)
 }
 
 func assertSTTInitMetric(t *testing.T, collector *testutil.PacketCollector) {
 	t.Helper()
 	for _, m := range collector.MetricPackets() {
 		for _, metric := range m.Record.Metrics {
-			if metric.Name == "stt_init_ms" {
+			if metric.Name == observability.MetricSTTInitLatencyMs {
 				ms, err := strconv.Atoi(metric.Value)
 				assert.NoError(t, err)
-				assert.GreaterOrEqual(t, ms, 0, "stt_init_ms should be non-negative")
-				t.Logf("stt_init_ms=%d", ms)
+				assert.GreaterOrEqual(t, ms, 0, "%s should be non-negative", observability.MetricSTTInitLatencyMs)
+				t.Logf("%s=%d", observability.MetricSTTInitLatencyMs, ms)
 				return
 			}
 		}
 	}
-	t.Error("should have stt_init_ms metric")
+	t.Errorf("should have %s metric", observability.MetricSTTInitLatencyMs)
 }
 
 func assertSTTLatencyMetric(t *testing.T, collector *testutil.PacketCollector) {
 	t.Helper()
 	for _, m := range collector.MetricPackets() {
 		for _, metric := range m.Record.Metrics {
-			if metric.Name == "stt_latency_ms" {
+			if metric.Name == observability.MetricSTTLatencyMs {
 				ms, err := strconv.Atoi(metric.Value)
 				assert.NoError(t, err)
-				assert.GreaterOrEqual(t, ms, 0, "stt_latency_ms should be non-negative")
-				t.Logf("stt_latency_ms=%d", ms)
+				assert.GreaterOrEqual(t, ms, 0, "%s should be non-negative", observability.MetricSTTLatencyMs)
+				t.Logf("%s=%d", observability.MetricSTTLatencyMs, ms)
 				return
 			}
 		}
 	}
-	t.Error("should have stt_latency_ms metric")
+	t.Errorf("should have %s metric", observability.MetricSTTLatencyMs)
 }

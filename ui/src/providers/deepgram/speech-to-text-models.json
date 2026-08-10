@@ -34,6 +34,84 @@
           "colSpan": 2,
           "placeholder": "Enter keywords or key terms separated by space",
           "helpText": "Enter keywords separated by spaces. These will be used as key terms for transcription."
+        },
+        {
+          "key": "listen.smart_format",
+          "label": "Smart Format",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.filler_words",
+          "label": "Filler Words",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.endpointing",
+          "label": "Endpointing (ms)",
+          "type": "slider",
+          "required": false,
+          "default": "5",
+          "min": 5,
+          "max": 200,
+          "step": 1
+        },
+        {
+          "key": "listen.punctuate",
+          "label": "Punctuate",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.diarize",
+          "label": "Diarize",
+          "type": "select",
+          "required": false,
+          "default": "false",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
         }
       ]
     }
@@ -74,6 +152,84 @@
           "colSpan": 2,
           "placeholder": "Enter keywords or key terms separated by space",
           "helpText": "Enter keywords separated by spaces. These will be used as key terms for transcription."
+        },
+        {
+          "key": "listen.smart_format",
+          "label": "Smart Format",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.filler_words",
+          "label": "Filler Words",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.endpointing",
+          "label": "Endpointing (ms)",
+          "type": "slider",
+          "required": false,
+          "default": "5",
+          "min": 5,
+          "max": 200,
+          "step": 1
+        },
+        {
+          "key": "listen.punctuate",
+          "label": "Punctuate",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.diarize",
+          "label": "Diarize",
+          "type": "select",
+          "required": false,
+          "default": "false",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
         }
       ]
     }
@@ -114,6 +270,84 @@
           "colSpan": 2,
           "placeholder": "Enter keywords or key terms separated by space",
           "helpText": "Enter keywords separated by spaces. These will be used as key terms for transcription."
+        },
+        {
+          "key": "listen.smart_format",
+          "label": "Smart Format",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.filler_words",
+          "label": "Filler Words",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.endpointing",
+          "label": "Endpointing (ms)",
+          "type": "slider",
+          "required": false,
+          "default": "5",
+          "min": 5,
+          "max": 200,
+          "step": 1
+        },
+        {
+          "key": "listen.punctuate",
+          "label": "Punctuate",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.diarize",
+          "label": "Diarize",
+          "type": "select",
+          "required": false,
+          "default": "false",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
         }
       ]
     }
@@ -154,6 +388,84 @@
           "colSpan": 2,
           "placeholder": "Enter keywords or key terms separated by space",
           "helpText": "Enter keywords separated by spaces. These will be used as key terms for transcription."
+        },
+        {
+          "key": "listen.smart_format",
+          "label": "Smart Format",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.filler_words",
+          "label": "Filler Words",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.endpointing",
+          "label": "Endpointing (ms)",
+          "type": "slider",
+          "required": false,
+          "default": "5",
+          "min": 5,
+          "max": 200,
+          "step": 1
+        },
+        {
+          "key": "listen.punctuate",
+          "label": "Punctuate",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.diarize",
+          "label": "Diarize",
+          "type": "select",
+          "required": false,
+          "default": "false",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
         }
       ]
     }
@@ -194,6 +506,84 @@
           "colSpan": 2,
           "placeholder": "Enter keywords or key terms separated by space",
           "helpText": "Enter keywords separated by spaces. These will be used as key terms for transcription."
+        },
+        {
+          "key": "listen.smart_format",
+          "label": "Smart Format",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.filler_words",
+          "label": "Filler Words",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.endpointing",
+          "label": "Endpointing (ms)",
+          "type": "slider",
+          "required": false,
+          "default": "5",
+          "min": 5,
+          "max": 200,
+          "step": 1
+        },
+        {
+          "key": "listen.punctuate",
+          "label": "Punctuate",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.diarize",
+          "label": "Diarize",
+          "type": "select",
+          "required": false,
+          "default": "false",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
         }
       ]
     }
@@ -234,6 +624,84 @@
           "colSpan": 2,
           "placeholder": "Enter keywords or key terms separated by space",
           "helpText": "Enter keywords separated by spaces. These will be used as key terms for transcription."
+        },
+        {
+          "key": "listen.smart_format",
+          "label": "Smart Format",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.filler_words",
+          "label": "Filler Words",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.endpointing",
+          "label": "Endpointing (ms)",
+          "type": "slider",
+          "required": false,
+          "default": "5",
+          "min": 5,
+          "max": 200,
+          "step": 1
+        },
+        {
+          "key": "listen.punctuate",
+          "label": "Punctuate",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.diarize",
+          "label": "Diarize",
+          "type": "select",
+          "required": false,
+          "default": "false",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
         }
       ]
     }
@@ -274,6 +742,84 @@
           "colSpan": 2,
           "placeholder": "Enter keywords or key terms separated by space",
           "helpText": "Enter keywords separated by spaces. These will be used as key terms for transcription."
+        },
+        {
+          "key": "listen.smart_format",
+          "label": "Smart Format",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.filler_words",
+          "label": "Filler Words",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.endpointing",
+          "label": "Endpointing (ms)",
+          "type": "slider",
+          "required": false,
+          "default": "5",
+          "min": 5,
+          "max": 200,
+          "step": 1
+        },
+        {
+          "key": "listen.punctuate",
+          "label": "Punctuate",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.diarize",
+          "label": "Diarize",
+          "type": "select",
+          "required": false,
+          "default": "false",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
         }
       ]
     }
@@ -314,6 +860,84 @@
           "colSpan": 2,
           "placeholder": "Enter keywords or key terms separated by space",
           "helpText": "Enter keywords separated by spaces. These will be used as key terms for transcription."
+        },
+        {
+          "key": "listen.smart_format",
+          "label": "Smart Format",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.filler_words",
+          "label": "Filler Words",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.endpointing",
+          "label": "Endpointing (ms)",
+          "type": "slider",
+          "required": false,
+          "default": "5",
+          "min": 5,
+          "max": 200,
+          "step": 1
+        },
+        {
+          "key": "listen.punctuate",
+          "label": "Punctuate",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.diarize",
+          "label": "Diarize",
+          "type": "select",
+          "required": false,
+          "default": "false",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
         }
       ]
     }
@@ -354,6 +978,84 @@
           "colSpan": 2,
           "placeholder": "Enter keywords or key terms separated by space",
           "helpText": "Enter keywords separated by spaces. These will be used as key terms for transcription."
+        },
+        {
+          "key": "listen.smart_format",
+          "label": "Smart Format",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.filler_words",
+          "label": "Filler Words",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.endpointing",
+          "label": "Endpointing (ms)",
+          "type": "slider",
+          "required": false,
+          "default": "5",
+          "min": 5,
+          "max": 200,
+          "step": 1
+        },
+        {
+          "key": "listen.punctuate",
+          "label": "Punctuate",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.diarize",
+          "label": "Diarize",
+          "type": "select",
+          "required": false,
+          "default": "false",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
         }
       ]
     }
@@ -394,6 +1096,84 @@
           "colSpan": 2,
           "placeholder": "Enter keywords or key terms separated by space",
           "helpText": "Enter keywords separated by spaces. These will be used as key terms for transcription."
+        },
+        {
+          "key": "listen.smart_format",
+          "label": "Smart Format",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.filler_words",
+          "label": "Filler Words",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.endpointing",
+          "label": "Endpointing (ms)",
+          "type": "slider",
+          "required": false,
+          "default": "5",
+          "min": 5,
+          "max": 200,
+          "step": 1
+        },
+        {
+          "key": "listen.punctuate",
+          "label": "Punctuate",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.diarize",
+          "label": "Diarize",
+          "type": "select",
+          "required": false,
+          "default": "false",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
         }
       ]
     }
@@ -434,6 +1214,84 @@
           "colSpan": 2,
           "placeholder": "Enter keywords or key terms separated by space",
           "helpText": "Enter keywords separated by spaces. These will be used as key terms for transcription."
+        },
+        {
+          "key": "listen.smart_format",
+          "label": "Smart Format",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.filler_words",
+          "label": "Filler Words",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.endpointing",
+          "label": "Endpointing (ms)",
+          "type": "slider",
+          "required": false,
+          "default": "5",
+          "min": 5,
+          "max": 200,
+          "step": 1
+        },
+        {
+          "key": "listen.punctuate",
+          "label": "Punctuate",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.diarize",
+          "label": "Diarize",
+          "type": "select",
+          "required": false,
+          "default": "false",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
         }
       ]
     }
@@ -474,6 +1332,84 @@
           "colSpan": 2,
           "placeholder": "Enter keywords or key terms separated by space",
           "helpText": "Enter keywords separated by spaces. These will be used as key terms for transcription."
+        },
+        {
+          "key": "listen.smart_format",
+          "label": "Smart Format",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.filler_words",
+          "label": "Filler Words",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.endpointing",
+          "label": "Endpointing (ms)",
+          "type": "slider",
+          "required": false,
+          "default": "5",
+          "min": 5,
+          "max": 200,
+          "step": 1
+        },
+        {
+          "key": "listen.punctuate",
+          "label": "Punctuate",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.diarize",
+          "label": "Diarize",
+          "type": "select",
+          "required": false,
+          "default": "false",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
         }
       ]
     }
@@ -513,6 +1449,84 @@
           "colSpan": 2,
           "placeholder": "Enter keywords or key terms separated by space",
           "helpText": "Enter keywords separated by spaces. These will be used as key terms for transcription."
+        },
+        {
+          "key": "listen.smart_format",
+          "label": "Smart Format",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.filler_words",
+          "label": "Filler Words",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.endpointing",
+          "label": "Endpointing (ms)",
+          "type": "slider",
+          "required": false,
+          "default": "5",
+          "min": 5,
+          "max": 200,
+          "step": 1
+        },
+        {
+          "key": "listen.punctuate",
+          "label": "Punctuate",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.diarize",
+          "label": "Diarize",
+          "type": "select",
+          "required": false,
+          "default": "false",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
         }
       ]
     }
@@ -552,6 +1566,84 @@
           "colSpan": 2,
           "placeholder": "Enter keywords or key terms separated by space",
           "helpText": "Enter keywords separated by spaces. These will be used as key terms for transcription."
+        },
+        {
+          "key": "listen.smart_format",
+          "label": "Smart Format",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.filler_words",
+          "label": "Filler Words",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.endpointing",
+          "label": "Endpointing (ms)",
+          "type": "slider",
+          "required": false,
+          "default": "5",
+          "min": 5,
+          "max": 200,
+          "step": 1
+        },
+        {
+          "key": "listen.punctuate",
+          "label": "Punctuate",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.diarize",
+          "label": "Diarize",
+          "type": "select",
+          "required": false,
+          "default": "false",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
         }
       ]
     }
@@ -591,6 +1683,84 @@
           "colSpan": 2,
           "placeholder": "Enter keywords or key terms separated by space",
           "helpText": "Enter keywords separated by spaces. These will be used as key terms for transcription."
+        },
+        {
+          "key": "listen.smart_format",
+          "label": "Smart Format",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.filler_words",
+          "label": "Filler Words",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.endpointing",
+          "label": "Endpointing (ms)",
+          "type": "slider",
+          "required": false,
+          "default": "5",
+          "min": 5,
+          "max": 200,
+          "step": 1
+        },
+        {
+          "key": "listen.punctuate",
+          "label": "Punctuate",
+          "type": "select",
+          "required": false,
+          "default": "true",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "key": "listen.diarize",
+          "label": "Diarize",
+          "type": "select",
+          "required": false,
+          "default": "false",
+          "choices": [
+            {
+              "label": "True",
+              "value": "true"
+            },
+            {
+              "label": "False",
+              "value": "false"
+            }
+          ]
         }
       ]
     }

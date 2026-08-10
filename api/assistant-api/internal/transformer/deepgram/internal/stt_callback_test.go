@@ -12,6 +12,7 @@ import (
 	"time"
 
 	msginterfaces "github.com/deepgram/deepgram-go-sdk/v3/pkg/api/listen/v1/websocket/interfaces"
+	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
@@ -58,13 +59,15 @@ func (pc *packetCollector) Clear() {
 // =============================================================================
 
 func createTestCallback(opts utils.Option) (*packetCollector, commons.Logger, msginterfaces.LiveMessageCallback) {
-	return createTestCallbackWithStartTime(opts, time.Now().Add(-100*time.Millisecond))
+	return createTestCallbackWithSpeechEndedAt(opts, time.Now().Add(-100*time.Millisecond))
 }
 
-func createTestCallbackWithStartTime(opts utils.Option, startedAt time.Time) (*packetCollector, commons.Logger, msginterfaces.LiveMessageCallback) {
+func createTestCallbackWithSpeechEndedAt(opts utils.Option, speechEndedAt time.Time) (*packetCollector, commons.Logger, msginterfaces.LiveMessageCallback) {
 	logger, _ := commons.NewApplicationLogger()
 	collector := newPacketCollector()
-	callback := NewDeepgramSttCallback(logger, collector.OnPacket, opts, func() time.Time { return startedAt }, func() string { return "ctx-test" }, "deepgram-stt")
+	metrics := &SttSessionMetrics{}
+	metrics.SetSpeechEndedAt(speechEndedAt)
+	callback := NewDeepgramSttCallback(logger, collector.OnPacket, opts, func() string { return "ctx-test" }, "deepgram-stt", metrics)
 	return collector, logger, callback
 }
 
@@ -164,27 +167,30 @@ func TestMessage(t *testing.T) {
 		assert.Equal(t, 0.95, stt.Confidence)
 		assert.Equal(t, "en", stt.Language)
 		assert.False(t, stt.Interim) // IsFinal=true means Interim=false
+		assert.Greater(t, stt.Latency, time.Duration(0))
 
-		// Fourth packet should be ObservabilityMetricRecordPacket with stt_latency_ms
+		// Fourth packet should be ObservabilityMetricRecordPacket with STT latency.
 		metric, ok := packets[3].(internal_type.ObservabilityMetricRecordPacket)
 		assert.True(t, ok, "fourth packet should be ObservabilityMetricRecordPacket")
 		assert.Len(t, metric.Record.Metrics, 1)
-		assert.Equal(t, "stt_latency_ms", metric.Record.Metrics[0].Name)
+		assert.Equal(t, observability.MetricSTTLatencyMs, metric.Record.Metrics[0].Name)
 	})
 
-	t.Run("omits latency metric when start time is missing", func(t *testing.T) {
-		collector, _, callback := createTestCallbackWithStartTime(utils.Option{}, time.Time{})
+	t.Run("omits latency metric when speech end time is missing", func(t *testing.T) {
+		collector, _, callback := createTestCallbackWithSpeechEndedAt(utils.Option{}, time.Time{})
 
 		mr := createMessageResponse("hello world", 0.95, true, []string{"en"})
 		err := callback.Message(mr)
 
 		require.NoError(t, err)
 		packets := collector.GetPackets()
-		// Final without a start timestamp: InterruptionDetectedPacket + SpeechToTextPacket + ObservabilityEventRecordPacket
+		// Final without a speech end timestamp: InterruptionDetectedPacket + SpeechToTextPacket + ObservabilityEventRecordPacket
 		require.Len(t, packets, 3)
 
 		_, ok := packets[2].(internal_type.ObservabilityEventRecordPacket)
 		assert.True(t, ok, "third packet should be ObservabilityEventRecordPacket")
+		stt := packets[1].(internal_type.SpeechToTextPacket)
+		assert.Equal(t, time.Duration(0), stt.Latency)
 	})
 
 	t.Run("sets interim true when IsFinal is false", func(t *testing.T) {
@@ -261,6 +267,27 @@ func TestMessage(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Empty(t, collector.GetPackets())
 	})
+
+	t.Run("emits latency metric once per speech end", func(t *testing.T) {
+		collector, _, callback := createTestCallback(utils.Option{})
+
+		require.NoError(t, callback.Message(createMessageResponse("first final", 0.95, true, []string{"en"})))
+		require.NoError(t, callback.Message(createMessageResponse("second final", 0.95, true, []string{"en"})))
+
+		latencyMetrics := 0
+		for _, packet := range collector.GetPackets() {
+			metricPacket, ok := packet.(internal_type.ObservabilityMetricRecordPacket)
+			if !ok {
+				continue
+			}
+			for _, metric := range metricPacket.Record.Metrics {
+				if metric.Name == observability.MetricSTTLatencyMs {
+					latencyMetrics++
+				}
+			}
+		}
+		assert.Equal(t, 1, latencyMetrics)
+	})
 }
 
 // =============================================================================
@@ -280,8 +307,8 @@ func TestMessageWithConfidenceThreshold(t *testing.T) {
 
 		require.NoError(t, err)
 		packets := collector.GetPackets()
-		// Below threshold: only ObservabilityEventRecordPacket emitted
-		require.Len(t, packets, 1, "should emit only a conversation event when confidence is below threshold")
+		// Below threshold: transcript is filtered, but final provider latency is still recorded.
+		require.Len(t, packets, 2)
 
 		evt := packets[0].(internal_type.ObservabilityEventRecordPacket)
 		assert.Equal(t, "stt", evt.Record.Component.String())
@@ -289,6 +316,9 @@ func TestMessageWithConfidenceThreshold(t *testing.T) {
 		assert.Equal(t, "low confidence text", evt.Record.Attributes["script"])
 		assert.Equal(t, "0.7000", evt.Record.Attributes["confidence"])
 		assert.Equal(t, "0.9000", evt.Record.Attributes["threshold"])
+		metric := packets[1].(internal_type.ObservabilityMetricRecordPacket)
+		require.Len(t, metric.Record.Metrics, 1)
+		assert.Equal(t, observability.MetricSTTLatencyMs, metric.Record.Metrics[0].Name)
 	})
 
 	t.Run("respects IsFinal when confidence above threshold", func(t *testing.T) {
@@ -370,17 +400,19 @@ func TestMessageWithConfidenceThreshold(t *testing.T) {
 		}
 		collector, _, callback := createTestCallback(opts)
 
-		// Any confidence below 1.0 should emit low_confidence event only
+		// Any confidence below 1.0 should emit low_confidence event and provider latency.
 		mr := createMessageResponse("max threshold text", 0.99, true, []string{"en"})
 		err := callback.Message(mr)
 
 		require.NoError(t, err)
 		packets := collector.GetPackets()
-		// Below threshold: only ObservabilityEventRecordPacket emitted
-		require.Len(t, packets, 1, "should emit only a conversation event when confidence is below threshold")
+		require.Len(t, packets, 2)
 
 		evt := packets[0].(internal_type.ObservabilityEventRecordPacket)
 		assert.Equal(t, "low_confidence", evt.Record.Attributes["type"])
+		metric := packets[1].(internal_type.ObservabilityMetricRecordPacket)
+		require.Len(t, metric.Record.Metrics, 1)
+		assert.Equal(t, observability.MetricSTTLatencyMs, metric.Record.Metrics[0].Name)
 	})
 }
 
@@ -627,8 +659,8 @@ func TestConcurrentMessageProcessing(t *testing.T) {
 		wg.Wait()
 
 		packets := collector.GetPackets()
-		// Each final message generates 4 packets (Interruption + SpeechToText + ConversationEvent + MessageMetric)
-		assert.Len(t, packets, numGoroutines*4)
+		// Each final message generates 3 transcript packets; the session emits one STT latency metric.
+		assert.Len(t, packets, numGoroutines*3+1)
 	})
 }
 

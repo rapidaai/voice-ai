@@ -8,6 +8,7 @@ package deepgram_internal
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,33 +18,34 @@ import (
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/protos"
 )
 
 // Implement the LiveMessageCallback interface
 type deepgramSttCallback struct {
-	logger               commons.Logger
-	onPacket             func(pkt ...internal_type.Packet) error
-	options              utils.Option
-	getAndClearStartTime func() time.Time
-	contextID            func() string
-	providerName         string
+	logger       commons.Logger
+	onPacket     func(pkt ...internal_type.Packet) error
+	options      utils.Option
+	contextID    func() string
+	providerName string
+	metrics      *SttSessionMetrics
 }
 
 func NewDeepgramSttCallback(
 	logger commons.Logger,
 	onPacket func(pkt ...internal_type.Packet) error,
 	options utils.Option,
-	getAndClearStartTime func() time.Time,
 	contextID func() string,
 	providerName string,
+	metrics *SttSessionMetrics,
 ) msginterfaces.LiveMessageCallback {
 	return &deepgramSttCallback{
-		logger:               logger,
-		onPacket:             onPacket,
-		options:              options,
-		getAndClearStartTime: getAndClearStartTime,
-		contextID:            contextID,
-		providerName:         providerName,
+		logger:       logger,
+		onPacket:     onPacket,
+		options:      options,
+		contextID:    contextID,
+		providerName: providerName,
+		metrics:      metrics,
 	}
 }
 
@@ -54,40 +56,55 @@ func (d *deepgramSttCallback) Open(or *msginterfaces.OpenResponse) error {
 
 // Handle incoming transcription messages from Deepgram
 func (d *deepgramSttCallback) Message(mr *msginterfaces.MessageResponse) error {
+	ctxID := d.contextID()
 	for _, alternative := range mr.Channel.Alternatives {
 		if alternative.Transcript == "" {
 			continue
 		}
-		lang := d.GetMostUsedLanguage(alternative.Languages)
-		confStr := fmt.Sprintf("%.4f", alternative.Confidence)
-
-		if v, err := d.options.GetFloat64(internal_options.ListenOptionThreshold); err == nil {
-			if alternative.Confidence < v {
-				ctxID := d.contextID()
-				d.onPacket(
-					internal_type.ObservabilityEventRecordPacket{
-						ContextID: ctxID,
-						Scope:     internal_type.ObservabilityRecordScopeUserMessage,
-						Record: observability.RecordEvent{
-							Component: observability.ComponentSTT,
-							Event:     observability.STTLowConfidence,
-							Attributes: observability.Attributes{
-								"type":       "low_confidence",
-								"script":     alternative.Transcript,
-								"confidence": confStr,
-								"threshold":  fmt.Sprintf("%.4f", v),
-							},
-							OccurredAt: time.Now(),
-						},
-					},
-				)
-				return nil
-			}
-		}
 
 		if mr.IsFinal {
-			startedOn := d.getAndClearStartTime()
-			ctxID := d.contextID()
+			transcriptLatency := d.metrics.GetLatency(time.Now())
+			if v, err := d.options.GetFloat64(internal_options.ListenOptionThreshold); err == nil {
+				if alternative.Confidence < v {
+					d.onPacket(
+						internal_type.ObservabilityEventRecordPacket{
+							ContextID: ctxID,
+							Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+							Record: observability.RecordEvent{
+								Component: observability.ComponentSTT,
+								Event:     observability.STTLowConfidence,
+								Attributes: observability.Attributes{
+									"type":       "low_confidence",
+									"script":     alternative.Transcript,
+									"confidence": fmt.Sprintf("%.4f", alternative.Confidence),
+									"threshold":  fmt.Sprintf("%.4f", v),
+								},
+								OccurredAt: time.Now(),
+							},
+						},
+					)
+					if transcriptLatency > 0 && d.metrics.SetLatencyReported() {
+						d.onPacket(
+							internal_type.ObservabilityMetricRecordPacket{
+								ContextID: ctxID,
+								Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+								Record: observability.RecordMetric{
+									Metrics: []*protos.Metric{{
+										Name:        observability.MetricSTTLatencyMs,
+										Value:       strconv.FormatInt(transcriptLatency.Milliseconds(), 10),
+										Description: "STT latency from speech end to final transcript in milliseconds",
+									}},
+									Attributes: observability.Attributes{
+										"provider":  d.providerName,
+										"messageId": ctxID,
+									},
+								},
+							})
+					}
+					return nil
+				}
+			}
+			lang := d.GetMostUsedLanguage(alternative.Languages)
 			d.onPacket(
 				internal_type.InterruptionDetectedPacket{ContextID: ctxID, Source: "word"},
 				internal_type.SpeechToTextPacket{
@@ -96,6 +113,7 @@ func (d *deepgramSttCallback) Message(mr *msginterfaces.MessageResponse) error {
 					Confidence: alternative.Confidence,
 					Language:   lang,
 					Interim:    false,
+					Latency:    transcriptLatency,
 				},
 				internal_type.ObservabilityEventRecordPacket{
 					ContextID: ctxID,
@@ -106,51 +124,86 @@ func (d *deepgramSttCallback) Message(mr *msginterfaces.MessageResponse) error {
 						Attributes: observability.Attributes{
 							"type":       "completed",
 							"script":     alternative.Transcript,
-							"confidence": confStr,
+							"confidence": fmt.Sprintf("%.4f", alternative.Confidence),
 							"language":   lang,
 							"word_count": fmt.Sprintf("%d", len(strings.Fields(alternative.Transcript))),
+							"messageId":  ctxID,
 							"char_count": fmt.Sprintf("%d", len(alternative.Transcript)),
 						},
 						OccurredAt: time.Now(),
 					},
 				},
 			)
-			if !startedOn.IsZero() {
+			if transcriptLatency > 0 && d.metrics.SetLatencyReported() {
 				d.onPacket(
 					internal_type.ObservabilityMetricRecordPacket{
 						ContextID: ctxID,
 						Scope:     internal_type.ObservabilityRecordScopeUserMessage,
-						Record:    observability.NewMetricSTTLatencyMs(time.Since(startedOn), observability.Attributes{"provider": "deepgram-stt"}),
+						Record: observability.RecordMetric{
+							Metrics: []*protos.Metric{{
+								Name:        observability.MetricSTTLatencyMs,
+								Value:       strconv.FormatInt(transcriptLatency.Milliseconds(), 10),
+								Description: "STT latency from speech end to final transcript in milliseconds",
+							}},
+							Attributes: observability.Attributes{
+								"provider":  d.providerName,
+								"messageId": ctxID,
+							},
+						},
 					})
 			}
-		} else {
-			// Non-final interim transcript
-			ctxID := d.contextID()
-			d.onPacket(
-				internal_type.InterruptionDetectedPacket{ContextID: ctxID, Source: "word"},
-				internal_type.SpeechToTextPacket{
-					ContextID:  ctxID,
-					Script:     alternative.Transcript,
-					Confidence: alternative.Confidence,
-					Language:   lang,
-					Interim:    true,
-				},
-				internal_type.ObservabilityEventRecordPacket{
-					ContextID: ctxID,
-					Scope:     internal_type.ObservabilityRecordScopeUserMessage,
-					Record: observability.RecordEvent{
-						Component: observability.ComponentSTT,
-						Event:     observability.STTInterim,
-						Attributes: observability.Attributes{
-							"type":       "interim",
-							"script":     alternative.Transcript,
-							"confidence": confStr,
-						},
-						OccurredAt: time.Now(),
-					},
-				},
-			)
+			return nil
 		}
+
+		if v, err := d.options.GetFloat64(internal_options.ListenOptionThreshold); err == nil {
+			if alternative.Confidence < v {
+				d.onPacket(
+					internal_type.ObservabilityEventRecordPacket{
+						ContextID: ctxID,
+						Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+						Record: observability.RecordEvent{
+							Component: observability.ComponentSTT,
+							Event:     observability.STTLowConfidence,
+							Attributes: observability.Attributes{
+								"type":       "low_confidence",
+								"script":     alternative.Transcript,
+								"confidence": fmt.Sprintf("%.4f", alternative.Confidence),
+								"threshold":  fmt.Sprintf("%.4f", v),
+							},
+							OccurredAt: time.Now(),
+						},
+					},
+				)
+				return nil
+			}
+		}
+
+		lang := d.GetMostUsedLanguage(alternative.Languages)
+		d.onPacket(
+			internal_type.InterruptionDetectedPacket{ContextID: ctxID, Source: "word"},
+			internal_type.SpeechToTextPacket{
+				ContextID:  ctxID,
+				Script:     alternative.Transcript,
+				Confidence: alternative.Confidence,
+				Language:   lang,
+				Interim:    true,
+			},
+			internal_type.ObservabilityEventRecordPacket{
+				ContextID: ctxID,
+				Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentSTT,
+					Event:     observability.STTInterim,
+					Attributes: observability.Attributes{
+						"type":       "interim",
+						"script":     alternative.Transcript,
+						"messageId":  ctxID,
+						"confidence": fmt.Sprintf("%.4f", alternative.Confidence),
+					},
+					OccurredAt: time.Now(),
+				},
+			},
+		)
 		return nil
 	}
 	return nil
@@ -166,7 +219,7 @@ func (d *deepgramSttCallback) Metadata(md *msginterfaces.MetadataResponse) error
 	return nil
 }
 
-// Handle speech started event — no-op; timing is driven by Transform() via startedAtNano.
+// Handle speech started event — no-op; latency timing is driven by SpeechToTextEndPacket and Deepgram finalize.
 func (d *deepgramSttCallback) SpeechStarted(ssr *msginterfaces.SpeechStartedResponse) error {
 	return nil
 }
@@ -180,19 +233,36 @@ func (d *deepgramSttCallback) Close(cr *msginterfaces.CloseResponse) error {
 // Handle errors from Deepgram
 func (d *deepgramSttCallback) Error(er *msginterfaces.ErrorResponse) error {
 	ctxID := d.contextID()
-	d.onPacket(internal_type.ObservabilityLogRecordPacket{
-		ContextID: ctxID,
-		Scope:     internal_type.ObservabilityRecordScopeUserMessage,
-		Record: observability.RecordLog{
-			Level:   observability.LevelError,
-			Message: er.ErrMsg,
-			Attributes: observability.Attributes{
-				"component": observability.ComponentSTT.String(),
-				"error":     observability.AttributeValue(er),
+	d.onPacket(
+		internal_type.ObservabilityMetricRecordPacket{
+			ContextID: ctxID,
+			Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+			Record: observability.RecordMetric{
+				Metrics: []*protos.Metric{{
+					Name:        observability.MetricSTTError,
+					Value:       "1",
+					Description: "STT provider error count",
+				}},
+				Attributes: observability.Attributes{
+					"provider":  d.providerName,
+					"messageId": ctxID,
+				},
 			},
-			OccurredAt: time.Now(),
 		},
-	})
+		internal_type.ObservabilityLogRecordPacket{
+			ContextID: ctxID,
+			Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+			Record: observability.RecordLog{
+				Level:   observability.LevelError,
+				Message: er.ErrMsg,
+				Attributes: observability.Attributes{
+					"component": observability.ComponentSTT.String(),
+					"messageId": ctxID,
+					"error":     observability.AttributeValue(er),
+				},
+				OccurredAt: time.Now(),
+			},
+		})
 	return nil
 }
 

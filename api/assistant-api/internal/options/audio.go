@@ -23,6 +23,7 @@ const (
 	ListenOptionFillerWords    = "listen.filler_words"
 	ListenOptionVADEvents      = "listen.vad_events"
 	ListenOptionEndpointing    = "listen.endpointing"
+	ListenOptionPunctuate      = "listen.punctuate"
 	ListenOptionMultichannel   = "listen.multichannel"
 	ListenOptionKeyword        = "listen.keyword"
 	ListenOptionOperatingPoint = "listen.operating_point"

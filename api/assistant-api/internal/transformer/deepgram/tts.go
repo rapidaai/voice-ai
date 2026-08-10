@@ -29,7 +29,7 @@ Reference: https://developers.deepgram.com/reference/text-to-speech/speak-stream
 */
 
 type deepgramTTS struct {
-	*deepgramOption
+	*deepgram_internal.DeepgramOption
 	ctx            context.Context
 	ctxCancel      context.CancelFunc
 	contextId      string
@@ -49,14 +49,14 @@ func NewDeepgramTextToSpeech(ctx context.Context, logger commons.Logger, credent
 	onPacket func(pkt ...internal_type.Packet) error,
 	opts utils.Option) (internal_type.TextToSpeechTransformer, error) {
 
-	dGoptions, err := NewDeepgramOption(logger, credential, opts)
+	dGoptions, err := deepgram_internal.NewDeepgramOption(logger, credential, opts)
 	if err != nil {
 		logger.Errorf("deepgram-tts: error while intializing deepgram text to speech")
 		return nil, err
 	}
 	ctx2, cancel := context.WithCancel(ctx)
 	return &deepgramTTS{
-		deepgramOption: dGoptions,
+		DeepgramOption: dGoptions,
 		ctx:            ctx2,
 		ctxCancel:      cancel,
 		logger:         logger,
@@ -121,7 +121,7 @@ func (t *deepgramTTS) Initialize() error {
 }
 
 func (*deepgramTTS) Name() string {
-	return "deepgram-tts"
+	return deepgram_internal.DeepgramTextToSpeechTransformerName
 }
 
 // handleFlushComplete is called when Deepgram signals Flushed. It emits

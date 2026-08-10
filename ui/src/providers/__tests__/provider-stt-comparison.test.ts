@@ -100,6 +100,11 @@ describe('Deepgram STT — config vs original', () => {
   it('produces the same default keys and values', () => {
     const result = getDefaultsFromConfig(config, 'stt', [], 'deepgram');
     expect(findMeta(result, 'listen.model')).toBe('nova-3');
+    expect(findMeta(result, 'listen.smart_format')).toBe('true');
+    expect(findMeta(result, 'listen.filler_words')).toBe('true');
+    expect(findMeta(result, 'listen.endpointing')).toBe('5');
+    expect(findMeta(result, 'listen.punctuate')).toBe('true');
+    expect(findMeta(result, 'listen.diarize')).toBe('false');
     expect(findMeta(result, 'listen.language')).toBe('multi');
     expect(findMeta(result, 'listen.threshold')).toBe('0.5');
     expect(findMeta(result, 'listen.keywords')).toBe('');
@@ -111,6 +116,11 @@ describe('Deepgram STT — config vs original', () => {
     expect(keys).toEqual(
       expect.arrayContaining([
         'listen.model',
+        'listen.smart_format',
+        'listen.filler_words',
+        'listen.endpointing',
+        'listen.punctuate',
+        'listen.diarize',
         'listen.language',
         'listen.threshold',
         'listen.keywords',

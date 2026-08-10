@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"sync"
 	"time"
 
@@ -26,7 +27,7 @@ import (
 )
 
 type deepgramSTT struct {
-	*deepgramOption
+	*deepgram_internal.DeepgramOption
 	mu             sync.Mutex
 	ctx            context.Context
 	ctxCancel      context.CancelFunc
@@ -35,50 +36,132 @@ type deepgramSTT struct {
 	onPacket       func(pkt ...internal_type.Packet) error
 	contextId      string
 	sttConnectedAt time.Time
-	startedAt      time.Time
+	metrics        deepgram_internal.SttSessionMetrics
+}
+
+type options struct {
+	ctx        context.Context
+	logger     commons.Logger
+	credential *protos.VaultCredential
+	onPacket   func(pkt ...internal_type.Packet) error
+	sttOptions utils.Option
+}
+
+type Option func(*options)
+
+func WithContext(ctx context.Context) Option {
+	return func(options *options) {
+		options.ctx = ctx
+	}
+}
+
+func WithLogger(logger commons.Logger) Option {
+	return func(options *options) {
+		options.logger = logger
+	}
+}
+
+func WithCredential(credential *protos.VaultCredential) Option {
+	return func(options *options) {
+		options.credential = credential
+	}
+}
+
+func WithOnPacket(onPacket func(pkt ...internal_type.Packet) error) Option {
+	return func(options *options) {
+		options.onPacket = onPacket
+	}
+}
+
+func WithOptions(sttOptions utils.Option) Option {
+	return func(options *options) {
+		options.sttOptions = sttOptions
+	}
 }
 
 func (*deepgramSTT) Name() string {
-	return "deepgram-stt"
+	return deepgram_internal.DeepgramSpeechToTextTransformerName
 }
 
-func NewDeepgramSpeechToText(ctx context.Context, logger commons.Logger, vaultCredential *protos.VaultCredential,
+func (dg *deepgramSTT) Initialize() error {
+	return nil
+}
+
+// Deprecated: use NewSpeechToText with functional options instead.
+func NewDeepgramSpeechToText(
+	ctx context.Context,
+	logger commons.Logger,
+	vaultCredential *protos.VaultCredential,
 	onPacket func(pkt ...internal_type.Packet) error,
-	opts utils.Option) (internal_type.SpeechToTextTransformer, error) {
-	deepgramOpts, err := NewDeepgramOption(logger, vaultCredential, opts)
+	opts utils.Option,
+) (internal_type.SpeechToTextTransformer, error) {
+	return NewSpeechToText(
+		WithContext(ctx),
+		WithLogger(logger),
+		WithCredential(vaultCredential),
+		WithOnPacket(onPacket),
+		WithOptions(opts),
+	)
+}
+
+func NewSpeechToText(opts ...Option) (*deepgramSTT, error) {
+	options := &options{ctx: context.Background(), sttOptions: utils.Option{}}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(options)
+		}
+	}
+	if options.ctx == nil {
+		options.ctx = context.Background()
+	}
+	if options.credential == nil {
+		return nil, fmt.Errorf("deepgram-stt: credential is required")
+	}
+	if options.onPacket == nil {
+		return nil, fmt.Errorf("deepgram-stt: on packet handler is required")
+	}
+
+	deepgramOpts, err := deepgram_internal.NewDeepgramOption(options.logger, options.credential, options.sttOptions)
 	if err != nil {
-		logger.Errorf("deepgram-stt: Key from credential failed %+v", err)
+		options.logger.Errorf("deepgram-stt: Key from credential failed %+v", err)
 		return nil, err
 	}
-	ct, ctxCancel := context.WithCancel(ctx)
-	return &deepgramSTT{
+	ct, ctxCancel := context.WithCancel(options.ctx)
+	stt := &deepgramSTT{
 		ctx:            ct,
 		ctxCancel:      ctxCancel,
-		logger:         logger,
-		deepgramOption: deepgramOpts,
-		onPacket:       onPacket,
-	}, nil
-}
+		logger:         options.logger,
+		DeepgramOption: deepgramOpts,
+		onPacket:       options.onPacket,
+	}
 
-func (dg *deepgramSTT) getAndClearStartTime() time.Time {
-	dg.mu.Lock()
-	defer dg.mu.Unlock()
-	currentTime := dg.startedAt
-	dg.startedAt = time.Time{}
-	return currentTime
-}
-
-// The `Initialize` method in the `deepgram` struct is responsible for establishing a connection to the
-// Deepgram service using the WebSocket client `dg.client`.
-func (dg *deepgramSTT) Initialize() error {
 	start := time.Now()
 	dgClient, err := client.NewWSUsingCallback(
-		dg.ctx,
-		dg.GetKey(),
-		dg.ClientOptions(),
-		dg.SpeechToTextOptions(), deepgram_internal.NewDeepgramSttCallback(dg.logger, dg.onPacket, dg.deepgramOption.mdlOpts, dg.getAndClearStartTime, dg.getContextID, dg.Name()))
+		stt.ctx,
+		stt.GetKey(),
+		stt.ClientOptions(),
+		stt.SpeechToTextOptions(),
+		deepgram_internal.NewDeepgramSttCallback(
+			stt.logger,
+			stt.onPacket,
+			options.sttOptions,
+			stt.getContextID,
+			stt.Name(),
+			&stt.metrics,
+		))
 	if err != nil {
-		dg.onPacket(
+		stt.onPacket(
+			internal_type.ObservabilityMetricRecordPacket{
+				Scope: internal_type.ObservabilityRecordScopeConversation,
+				Record: observability.RecordMetric{
+					Metrics: []*protos.Metric{{
+						Name:        observability.MetricSTTError,
+						Value:       "1",
+						Description: "STT initialization failure count",
+					}},
+					Attributes: observability.Attributes{"provider": stt.Name()},
+				},
+			},
 			internal_type.ObservabilityLogRecordPacket{
 				Scope: internal_type.ObservabilityRecordScopeConversation,
 				Record: observability.RecordLog{
@@ -86,16 +169,27 @@ func (dg *deepgramSTT) Initialize() error {
 					Message: fmt.Sprintf("deepgram-stt: error while initialization %s", err.Error()),
 					Attributes: observability.Attributes{
 						"component": observability.ComponentSTT.String(),
-						"provider":  dg.Name(),
-						"options":   observability.AttributeValue(dg.SpeechToTextOptions()),
+						"provider":  stt.Name(),
+						"options":   observability.AttributeValue(stt.SpeechToTextOptions()),
 					},
 					OccurredAt: time.Now(),
 				},
 			})
-		return err
+		return nil, err
 	}
 	if !dgClient.Connect() {
-		dg.onPacket(
+		stt.onPacket(
+			internal_type.ObservabilityMetricRecordPacket{
+				Scope: internal_type.ObservabilityRecordScopeConversation,
+				Record: observability.RecordMetric{
+					Metrics: []*protos.Metric{{
+						Name:        observability.MetricSTTError,
+						Value:       "1",
+						Description: "STT connection failure count",
+					}},
+					Attributes: observability.Attributes{"provider": stt.Name()},
+				},
+			},
 			internal_type.ObservabilityLogRecordPacket{
 				Scope: internal_type.ObservabilityRecordScopeConversation,
 				Record: observability.RecordLog{
@@ -103,23 +197,28 @@ func (dg *deepgramSTT) Initialize() error {
 					Message: "deepgram-stt: error while performing connect",
 					Attributes: observability.Attributes{
 						"component": observability.ComponentSTT.String(),
-						"provider":  dg.Name(),
-						"options":   observability.AttributeValue(dg.SpeechToTextOptions()),
+						"provider":  stt.Name(),
+						"options":   observability.AttributeValue(stt.SpeechToTextOptions()),
 					},
 					OccurredAt: time.Now(),
 				},
 			})
-		return fmt.Errorf("deepgram-stt: connection failed")
+		return nil, fmt.Errorf("deepgram-stt: connection failed")
 	}
 
-	dg.mu.Lock()
-	dg.client = dgClient
-	dg.sttConnectedAt = time.Now()
-	dg.mu.Unlock()
-	dg.onPacket(
+	stt.client = dgClient
+	stt.sttConnectedAt = time.Now()
+	stt.onPacket(
 		internal_type.ObservabilityMetricRecordPacket{
-			Scope:  internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.NewMetricSTTInitLatencyMs(time.Since(start), observability.Attributes{"provider": dg.Name()}),
+			Scope: internal_type.ObservabilityRecordScopeConversation,
+			Record: observability.RecordMetric{
+				Metrics: []*protos.Metric{{
+					Name:        observability.MetricSTTInitLatencyMs,
+					Value:       strconv.FormatInt(time.Since(start).Milliseconds(), 10),
+					Description: "STT initialization latency in milliseconds",
+				}},
+				Attributes: observability.Attributes{"provider": stt.Name()},
+			},
 		},
 		internal_type.ObservabilityLogRecordPacket{
 			Scope: internal_type.ObservabilityRecordScopeConversation,
@@ -128,13 +227,14 @@ func (dg *deepgramSTT) Initialize() error {
 				Message: "deepgram-stt: initialization completed",
 				Attributes: observability.Attributes{
 					"component": observability.ComponentSTT.String(),
-					"provider":  dg.Name(),
-					"options":   observability.AttributeValue(dg.SpeechToTextOptions()),
+					"provider":  stt.Name(),
+					"options":   observability.AttributeValue(stt.SpeechToTextOptions()),
 				},
 				OccurredAt: time.Now(),
 			},
 		})
-	return nil
+
+	return stt, nil
 }
 
 // Transform implements internal_transformer.SpeechToTextTransformer.
@@ -152,14 +252,52 @@ func (dg *deepgramSTT) Transform(ctx context.Context, in internal_type.Packet) e
 		return nil
 	case internal_type.SpeechToTextStartPacket:
 		dg.mu.Lock()
-		dg.startedAt = time.Now()
+		if pkt.ContextID != "" {
+			dg.contextId = pkt.ContextID
+		}
 		dg.mu.Unlock()
+		dg.metrics.ResetSpeech()
+		return nil
+	case internal_type.SpeechToTextEndPacket:
+		dg.mu.Lock()
+		if pkt.ContextID != "" {
+			dg.contextId = pkt.ContextID
+		}
+		contextID := dg.contextId
+		client := dg.client
+		dg.mu.Unlock()
+
+		dg.metrics.SetSpeechEndedAt(time.Now())
+
+		if client == nil {
+			return fmt.Errorf("deepgram-stt: connection is not initialized")
+		}
+		if err := client.Finalize(); err != nil {
+			dg.logger.Errorf("deepgram-stt: error while finalizing deepgram utterance: %v", err)
+			dg.onPacket(
+				internal_type.ObservabilityMetricRecordPacket{
+					ContextID: contextID,
+					Scope:     internal_type.ObservabilityRecordScopeConversation,
+					Record: observability.RecordMetric{
+						Metrics: []*protos.Metric{{
+							Name:        observability.MetricSTTError,
+							Value:       "1",
+							Description: "STT finalize failure count",
+						}},
+						Attributes: observability.Attributes{"provider": dg.Name()},
+					},
+				},
+				internal_type.SpeechToTextErrorPacket{
+					ContextID: contextID,
+					Error:     fmt.Errorf("deepgram finalize error: %w", err),
+					Type:      internal_type.STTNetworkTimeout,
+				})
+			return fmt.Errorf("deepgram finalize error: %w", err)
+		}
 		return nil
 	case internal_type.SpeechToTextAudioPacket:
 		dg.mu.Lock()
-		if dg.startedAt.IsZero() {
-			dg.startedAt = time.Now()
-		}
+		contextID := dg.contextId
 		client := dg.client
 		dg.mu.Unlock()
 
@@ -172,6 +310,18 @@ func (dg *deepgramSTT) Transform(ctx context.Context, in internal_type.Packet) e
 				return nil
 			}
 			dg.logger.Errorf("deepgram-stt: error while calling deepgram: %v", err)
+			dg.onPacket(internal_type.ObservabilityMetricRecordPacket{
+				ContextID: contextID,
+				Scope:     internal_type.ObservabilityRecordScopeConversation,
+				Record: observability.RecordMetric{
+					Metrics: []*protos.Metric{{
+						Name:        observability.MetricSTTError,
+						Value:       "1",
+						Description: "STT stream failure count",
+					}},
+					Attributes: observability.Attributes{"provider": dg.Name()},
+				},
+			})
 			return fmt.Errorf("deepgram stream error: %w", err)
 		}
 		return err
