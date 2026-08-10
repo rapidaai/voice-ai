@@ -8,14 +8,20 @@ jest.mock('@/app/components/providers/config-renderer', () => ({
   ConfigRenderer: () => null,
 }));
 
-const { GetDefaultVADConfig } = require('@/app/components/providers/vad/provider');
-const { GetDefaultEOSConfig } = require('@/app/components/providers/end-of-speech/provider');
-const { GetDefaultMicrophoneConfig } = require('@/app/components/providers/speech-to-text/provider');
+const {
+  GetDefaultVADConfig,
+} = require('@/app/components/providers/vad/provider');
+const {
+  GetDefaultEOSConfig,
+} = require('@/app/components/providers/end-of-speech/provider');
+const {
+  GetDefaultMicrophoneConfig,
+} = require('@/app/components/providers/speech-to-text/provider');
 const {
   GetDefaultNoiseCancellationConfig,
 } = require('@/app/components/providers/noise-removal/provider');
 
-const legacyVadDefaults: Record<string, Record<string, string>> = {
+const backendVadDefaults: Record<string, Record<string, string>> = {
   silero_vad: {
     'microphone.vad.threshold': '0.5',
     'microphone.vad.min_silence_frame': '20',
@@ -27,9 +33,9 @@ const legacyVadDefaults: Record<string, Record<string, string>> = {
     'microphone.vad.min_speech_frame': '8',
   },
   firered_vad: {
-    'microphone.vad.threshold': '0.5',
-    'microphone.vad.min_silence_frame': '10',
-    'microphone.vad.min_speech_frame': '3',
+    'microphone.vad.threshold': '0.4',
+    'microphone.vad.min_silence_frame': '20',
+    'microphone.vad.min_speech_frame': '8',
   },
 };
 
@@ -72,12 +78,14 @@ const getMetadataValue = (source: Metadata[], key: string): string => {
   return value === undefined || value === null ? '' : String(value);
 };
 
-const legacyGetDefaultVADConfig = (
+const expectedGetDefaultVADConfig = (
   provider: string,
   current: Metadata[],
 ): Metadata[] => {
-  const defaults = legacyVadDefaults[provider] || {};
-  const nonVad = current.filter(m => !m.getKey().startsWith('microphone.vad.'));
+  const defaults = backendVadDefaults[provider] || {};
+  const nonVad = current.filter(
+    m => !m.getKey().startsWith('microphone.vad.'),
+  );
 
   const vadParams: Metadata[] = [];
   const providerMeta = new Metadata();
@@ -122,6 +130,19 @@ describe('Audio input advanced defaults parity', () => {
     }
   });
 
+  it('all active VAD parameters include toggletip help text', () => {
+    expect(VAD().length).toBeGreaterThan(0);
+    for (const provider of VAD()) {
+      const params = loadProviderConfig(provider.code)?.vad?.parameters ?? [];
+      expect(params.length).toBeGreaterThan(0);
+      for (const param of params) {
+        expect(param.helpText).toEqual(expect.any(String));
+        expect(param.helpText?.trim()).not.toHaveLength(0);
+        expect(param.helpTextDisplay).toBe('toggletip');
+      }
+    }
+  });
+
   it('all active end-of-speech providers are config-driven', () => {
     expect(EndOfSpeech().length).toBeGreaterThan(0);
     for (const provider of EndOfSpeech()) {
@@ -130,7 +151,7 @@ describe('Audio input advanced defaults parity', () => {
   });
 
   it.each(['silero_vad', 'ten_vad', 'firered_vad'])(
-    '%s VAD defaults stay parity with legacy behavior',
+    '%s VAD defaults stay in parity with backend defaults',
     provider => {
       const seed = [
         createMetadata('rapida.credential_id', 'cred'),
@@ -141,9 +162,12 @@ describe('Audio input advanced defaults parity', () => {
         createMetadata('microphone.vad.min_speech_frame', '4'),
       ];
 
-      const legacy = legacyGetDefaultVADConfig(provider, cloneMetadata(seed));
+      const expected = expectedGetDefaultVADConfig(
+        provider,
+        cloneMetadata(seed),
+      );
       const current = GetDefaultVADConfig(provider, cloneMetadata(seed));
-      expect(normalizeMetadata(current)).toEqual(normalizeMetadata(legacy));
+      expect(normalizeMetadata(current)).toEqual(normalizeMetadata(expected));
     },
   );
 
@@ -204,7 +228,9 @@ describe('Audio input advanced defaults parity', () => {
 
     const switched = GetDefaultEOSConfig(
       'pipecat_smart_turn_eos',
-      cloneMetadata(seed).filter(m => !m.getKey().startsWith('microphone.eos.')),
+      cloneMetadata(seed).filter(
+        m => !m.getKey().startsWith('microphone.eos.'),
+      ),
     );
 
     expect(getMetadataValue(switched, 'microphone.eos.provider')).toBe(
@@ -214,7 +240,9 @@ describe('Audio input advanced defaults parity', () => {
       '500',
     );
     expect(getMetadataValue(switched, 'microphone.eos.threshold')).toBe('0.5');
-    expect(getMetadataValue(switched, 'microphone.eos.quick_timeout')).toBe('250');
+    expect(getMetadataValue(switched, 'microphone.eos.quick_timeout')).toBe(
+      '250',
+    );
     expect(getMetadataValue(switched, 'microphone.eos.extended_timeout')).toBe(
       '2000',
     );
@@ -222,6 +250,10 @@ describe('Audio input advanced defaults parity', () => {
 
   it('microphone defaults use pipecat eos provider', () => {
     const defaults = GetDefaultMicrophoneConfig([]);
+    expect(getMetadataValue(defaults, 'microphone.barge_in_trigger')).toBe(
+      'vad',
+    );
+    expect(getMetadataValue(defaults, 'microphone.vad.threshold')).toBe('0.5');
     expect(getMetadataValue(defaults, 'microphone.eos.provider')).toBe(
       'pipecat_smart_turn_eos',
     );
@@ -229,7 +261,9 @@ describe('Audio input advanced defaults parity', () => {
       '500',
     );
     expect(getMetadataValue(defaults, 'microphone.eos.threshold')).toBe('0.5');
-    expect(getMetadataValue(defaults, 'microphone.eos.quick_timeout')).toBe('250');
+    expect(getMetadataValue(defaults, 'microphone.eos.quick_timeout')).toBe(
+      '250',
+    );
     expect(getMetadataValue(defaults, 'microphone.eos.extended_timeout')).toBe(
       '2000',
     );
@@ -246,12 +280,29 @@ describe('Audio input advanced defaults parity', () => {
     expect(getMetadataValue(defaults, 'microphone.eos.fallback_timeout')).toBe(
       '500',
     );
-    expect(getMetadataValue(defaults, 'microphone.eos.threshold')).toBe('0.0289');
-    expect(getMetadataValue(defaults, 'microphone.eos.quick_timeout')).toBe('250');
+    expect(getMetadataValue(defaults, 'microphone.eos.threshold')).toBe(
+      '0.0289',
+    );
+    expect(getMetadataValue(defaults, 'microphone.eos.quick_timeout')).toBe(
+      '250',
+    );
     expect(getMetadataValue(defaults, 'microphone.eos.extended_timeout')).toBe(
       '3000',
     );
     expect(getMetadataValue(defaults, 'microphone.eos.model')).toBe('en');
+  });
+
+  it('microphone defaults migrate legacy VAD barge-in trigger to microphone scope', () => {
+    const defaults = GetDefaultMicrophoneConfig([
+      createMetadata('microphone.vad.barge_in_trigger', 'word'),
+    ]);
+
+    expect(getMetadataValue(defaults, 'microphone.barge_in_trigger')).toBe(
+      'word',
+    );
+    expect(
+      getMetadataValue(defaults, 'microphone.vad.barge_in_trigger'),
+    ).toBe('');
   });
 
   it('noise provider update clears stale denoising params and keeps only provider', () => {
@@ -261,7 +312,10 @@ describe('Audio input advanced defaults parity', () => {
       createMetadata('microphone.denoising.level', 'high'),
     ];
 
-    const current = GetDefaultNoiseCancellationConfig('rn_noise', cloneMetadata(seed));
+    const current = GetDefaultNoiseCancellationConfig(
+      'rn_noise',
+      cloneMetadata(seed),
+    );
     expect(normalizeMetadata(current)).toEqual(
       normalizeMetadata([
         createMetadata('listen.model', 'nova-3'),
@@ -279,10 +333,14 @@ describe('Audio input advanced defaults parity', () => {
     ];
 
     expect(
-      normalizeMetadata(GetDefaultVADConfig('unknown_vad', cloneMetadata(seed))),
+      normalizeMetadata(
+        GetDefaultVADConfig('unknown_vad', cloneMetadata(seed)),
+      ),
     ).toEqual(normalizeMetadata(seed));
     expect(
-      normalizeMetadata(GetDefaultEOSConfig('unknown_eos', cloneMetadata(seed))),
+      normalizeMetadata(
+        GetDefaultEOSConfig('unknown_eos', cloneMetadata(seed)),
+      ),
     ).toEqual(normalizeMetadata(seed));
     expect(
       normalizeMetadata(

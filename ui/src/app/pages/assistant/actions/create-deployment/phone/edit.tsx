@@ -1,5 +1,6 @@
 import {
   ConfigureExperience,
+  DEFAULT_IDEAL_TIMEOUT,
   ExperienceConfig,
 } from '@/app/pages/assistant/actions/create-deployment/commons/configure-experience';
 import { ConfigureAudioInputProvider } from '@/app/pages/assistant/actions/create-deployment/commons/configure-audio-input';
@@ -97,7 +98,9 @@ const EditAssistantCallDeployment: FC<{ assistantId: string }> = ({
     greeting: undefined,
     greetingInterruptible: true,
     messageOnError: undefined,
-    idealTimeout: '30',
+    unclearInputTimeout: undefined,
+    unclearInputMessage: undefined,
+    idealTimeout: DEFAULT_IDEAL_TIMEOUT,
     idealMessage: 'Are you there?',
     maxCallDuration: '300',
     idleTimeoutBackoffTimes: '2',
@@ -162,6 +165,12 @@ const EditAssistantCallDeployment: FC<{ assistantId: string }> = ({
             ? deployment.getGreetinginterruptible()
             : true,
           messageOnError: deployment.getMistake(),
+          unclearInputTimeout: deployment.hasUnclearinputtimeout?.()
+            ? deployment.getUnclearinputtimeout().toString()
+            : undefined,
+          unclearInputMessage: deployment.hasUnclearinputmessage?.()
+            ? deployment.getUnclearinputmessage()
+            : undefined,
           idealTimeout: deployment.getIdealtimeout(),
           idealMessage: deployment.getIdealtimeoutmessage(),
           maxCallDuration: deployment.getMaxsessionduration(),
@@ -284,6 +293,12 @@ const EditAssistantCallDeployment: FC<{ assistantId: string }> = ({
       deployment.setGreeting(experienceConfig.greeting);
     if (experienceConfig.messageOnError)
       deployment.setMistake(experienceConfig.messageOnError);
+    if (experienceConfig.unclearInputTimeout)
+      deployment.setUnclearinputtimeout(
+        Number(experienceConfig.unclearInputTimeout),
+      );
+    if (experienceConfig.unclearInputMessage)
+      deployment.setUnclearinputmessage(experienceConfig.unclearInputMessage);
     if (experienceConfig.idealTimeout)
       deployment.setIdealtimeout(experienceConfig.idealTimeout);
     if (experienceConfig.idleTimeoutBackoffTimes)

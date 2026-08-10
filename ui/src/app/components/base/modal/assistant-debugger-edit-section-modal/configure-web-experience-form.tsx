@@ -3,7 +3,12 @@ import { TextInput, TextArea, Stack } from '@/app/components/carbon/form';
 import { Slider } from '@carbon/react';
 import { ChevronDown } from '@carbon/icons-react';
 import { cn } from '@/utils';
-import { ExperienceConfig } from '@/app/pages/assistant/actions/create-deployment/commons/configure-experience';
+import {
+  DEFAULT_IDEAL_TIMEOUT,
+  DEFAULT_UNCLEAR_INPUT_MESSAGE,
+  DEFAULT_UNCLEAR_INPUT_TIMEOUT,
+  ExperienceConfig,
+} from '@/app/pages/assistant/actions/create-deployment/commons/configure-experience';
 import ConfigSelect from '@/app/components/configuration/config-var/config-select';
 
 export const ConfigureWebExperienceModalForm: FC<{
@@ -64,13 +69,43 @@ export const ConfigureWebExperienceModalForm: FC<{
             />
 
             <Slider
+              id="widget-unclear-input-timeout"
+              labelText="Unclear Speech Wait (Seconds)"
+              min={2}
+              max={10}
+              step={0.1}
+              value={parseFloat(
+                experienceConfig.unclearInputTimeout ||
+                  DEFAULT_UNCLEAR_INPUT_TIMEOUT,
+              )}
+              onChange={({ value }: { value: number }) =>
+                update('unclearInputTimeout', value.toString())
+              }
+            />
+
+            <TextInput
+              id="widget-unclear-input-message"
+              labelText="Unclear Speech Message"
+              placeholder="Message spoken when the assistant could not understand the user"
+              value={
+                experienceConfig.unclearInputMessage ||
+                DEFAULT_UNCLEAR_INPUT_MESSAGE
+              }
+              onChange={e => update('unclearInputMessage', e.target.value)}
+            />
+
+            <Slider
               id="widget-idle-timeout"
               labelText="Idle Silence Timeout (Seconds)"
-              min={15}
+              min={5}
               max={120}
               step={1}
-              value={parseInt(experienceConfig.idealTimeout || '30')}
-              onChange={({ value }: { value: number }) => update('idealTimeout', value.toString())}
+              value={parseInt(
+                experienceConfig.idealTimeout || DEFAULT_IDEAL_TIMEOUT,
+              )}
+              onChange={({ value }: { value: number }) =>
+                update('idealTimeout', value.toString())
+              }
             />
 
             <Slider
@@ -80,7 +115,9 @@ export const ConfigureWebExperienceModalForm: FC<{
               max={5}
               step={1}
               value={parseInt(experienceConfig.idleTimeoutBackoffTimes || '2')}
-              onChange={({ value }: { value: number }) => update('idleTimeoutBackoffTimes', value.toString())}
+              onChange={({ value }: { value: number }) =>
+                update('idleTimeoutBackoffTimes', value.toString())
+              }
             />
 
             <TextInput
@@ -98,7 +135,9 @@ export const ConfigureWebExperienceModalForm: FC<{
               max={600}
               step={1}
               value={parseInt(experienceConfig.maxCallDuration || '300')}
-              onChange={({ value }: { value: number }) => update('maxCallDuration', value.toString())}
+              onChange={({ value }: { value: number }) =>
+                update('maxCallDuration', value.toString())
+              }
             />
           </Stack>
         </div>

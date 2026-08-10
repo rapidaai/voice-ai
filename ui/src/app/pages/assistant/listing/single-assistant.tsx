@@ -5,7 +5,7 @@ import SourceIndicator from '@/app/components/indicators/source';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
 import { Launch, Rocket, SourceControl, View } from '@carbon/icons-react';
 import { Link, TableRow, TableCell, Tag } from '@carbon/react';
-import { CarbonStatusIndicator } from '@/app/components/carbon/status-indicator';
+import { RecordStatusIndicator } from '@/app/components/carbon/record-status-indicator';
 import { IconOnlyButton } from '@/app/components/carbon/button';
 import { CopyButton } from '@/app/components/carbon/button/copy-button';
 import { VersionIndicator } from '@/app/components/indicators/version';
@@ -57,7 +57,7 @@ const SingleAssistant: FC<{ assistant: Assistant }> = ({ assistant }) => {
 
       <TableCell className="text-sm">
         {status ? (
-          <CarbonStatusIndicator state={status} />
+          <RecordStatusIndicator state={status} />
         ) : (
           <span className="text-sm text-gray-400">-</span>
         )}

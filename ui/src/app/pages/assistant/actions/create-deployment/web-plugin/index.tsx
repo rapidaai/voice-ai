@@ -4,6 +4,11 @@ import {
   ConfigureExperience,
   WebWidgetExperienceConfig,
 } from '@/app/pages/assistant/actions/create-deployment/web-plugin/configure-experience';
+import {
+  DEFAULT_IDEAL_TIMEOUT,
+  DEFAULT_UNCLEAR_INPUT_MESSAGE,
+  DEFAULT_UNCLEAR_INPUT_TIMEOUT,
+} from '@/app/pages/assistant/actions/create-deployment/commons/configure-experience';
 import { useRapidaStore } from '@/hooks';
 import { useAllProviderCredentials } from '@/hooks/use-model';
 import { useCurrentCredential } from '@/hooks/use-credential';
@@ -98,7 +103,9 @@ const ConfigureAssistantWebDeployment: FC<{ assistantId: string }> = ({
       greeting: undefined,
       greetingInterruptible: true,
       messageOnError: undefined,
-      idealTimeout: '30',
+      unclearInputTimeout: DEFAULT_UNCLEAR_INPUT_TIMEOUT,
+      unclearInputMessage: DEFAULT_UNCLEAR_INPUT_MESSAGE,
+      idealTimeout: DEFAULT_IDEAL_TIMEOUT,
       idealMessage: 'Are you there?',
       maxCallDuration: '300',
       idleTimeoutBackoffTimes: '2',
@@ -158,6 +165,12 @@ const ConfigureAssistantWebDeployment: FC<{ assistantId: string }> = ({
             : true,
           suggestions: deployment.getSuggestionList() || [],
           messageOnError: deployment.getMistake(),
+          unclearInputTimeout: deployment.hasUnclearinputtimeout?.()
+            ? deployment.getUnclearinputtimeout().toString()
+            : undefined,
+          unclearInputMessage: deployment.hasUnclearinputmessage?.()
+            ? deployment.getUnclearinputmessage()
+            : undefined,
           idealTimeout: deployment.getIdealtimeout(),
           idealMessage: deployment.getIdealtimeoutmessage(),
           maxCallDuration: deployment.getMaxsessionduration(),
@@ -310,6 +323,14 @@ const ConfigureAssistantWebDeployment: FC<{ assistantId: string }> = ({
       webDeployment.setGreeting(experienceConfig.greeting);
     if (experienceConfig.messageOnError)
       webDeployment.setMistake(experienceConfig.messageOnError);
+    if (experienceConfig.unclearInputTimeout)
+      webDeployment.setUnclearinputtimeout(
+        Number(experienceConfig.unclearInputTimeout),
+      );
+    if (experienceConfig.unclearInputMessage)
+      webDeployment.setUnclearinputmessage(
+        experienceConfig.unclearInputMessage,
+      );
     if (experienceConfig.idealTimeout)
       webDeployment.setIdealtimeout(experienceConfig.idealTimeout);
     if (experienceConfig.idleTimeoutBackoffTimes)

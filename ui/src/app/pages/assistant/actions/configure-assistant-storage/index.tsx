@@ -13,7 +13,7 @@ import { UpdateAssistantStorage } from './update-assistant-storage';
 import { useAssistantStoragePageStore } from '@/app/pages/assistant/actions/store/use-storage-page-store';
 import { STORAGE_PROVIDER } from '@/providers';
 import { IconOnlyButton, PrimaryButton } from '@/app/components/carbon/button';
-import { CarbonShapeIndicator } from '@/app/components/carbon/shape-indicator';
+import { RecordStatusIndicator } from '@/app/components/carbon/record-status-indicator';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -320,9 +320,8 @@ const ConfigureAssistantStorage: FC<{ assistantId: string }> = ({
                           {getStorageTarget(row)}
                         </TableCell>
                         <TableCell className="text-sm whitespace-nowrap">
-                          <CarbonShapeIndicator
-                            kind={row.getEnabled() ? 'stable' : 'draft'}
-                            label={row.getEnabled() ? 'Enabled' : 'Disabled'}
+                          <RecordStatusIndicator
+                            state={row.getStatus()}
                             textSize={14}
                           />
                         </TableCell>

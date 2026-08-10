@@ -24,6 +24,7 @@ import { useCurrentCredential } from '@/hooks/use-credential';
 import { useAllProviderCredentials } from '@/hooks/use-model';
 import { useRapidaStore } from '@/hooks';
 import {
+  DEFAULT_IDEAL_TIMEOUT,
   ExperienceConfig,
 } from '@/app/pages/assistant/actions/create-deployment/commons/configure-experience';
 import {
@@ -41,7 +42,11 @@ import {
   ValidateTelephonyOptions,
 } from '@/app/components/providers/telephony';
 
-export type EditSection = 'telephony' | 'experience' | 'voice-input' | 'voice-output';
+export type EditSection =
+  | 'telephony'
+  | 'experience'
+  | 'voice-input'
+  | 'voice-output';
 export type DeploymentType = 'debugger' | 'api' | 'web' | 'phone';
 
 type AudioConfig = { provider: string; parameters: Metadata[] };
@@ -59,7 +64,9 @@ const DEFAULT_EXPERIENCE: ExperienceConfig = {
   greeting: undefined,
   greetingInterruptible: true,
   messageOnError: undefined,
-  idealTimeout: '30',
+  unclearInputTimeout: undefined,
+  unclearInputMessage: undefined,
+  idealTimeout: DEFAULT_IDEAL_TIMEOUT,
   idealMessage: 'Are you there?',
   maxCallDuration: '300',
   idleTimeoutBackoffTimes: '2',
@@ -67,19 +74,27 @@ const DEFAULT_EXPERIENCE: ExperienceConfig = {
 
 const getDeploymentFetcher = (type: DeploymentType) => {
   switch (type) {
-    case 'debugger': return GetAssistantDebuggerDeployment;
-    case 'api': return GetAssistantApiDeployment;
-    case 'web': return GetAssistantWebpluginDeployment;
-    case 'phone': return GetAssistantPhoneDeployment;
+    case 'debugger':
+      return GetAssistantDebuggerDeployment;
+    case 'api':
+      return GetAssistantApiDeployment;
+    case 'web':
+      return GetAssistantWebpluginDeployment;
+    case 'phone':
+      return GetAssistantPhoneDeployment;
   }
 };
 
 const getDeploymentCreator = (type: DeploymentType) => {
   switch (type) {
-    case 'debugger': return CreateAssistantDebuggerDeployment;
-    case 'api': return CreateAssistantApiDeployment;
-    case 'web': return CreateAssistantWebpluginDeployment;
-    case 'phone': return CreateAssistantPhoneDeployment;
+    case 'debugger':
+      return CreateAssistantDebuggerDeployment;
+    case 'api':
+      return CreateAssistantApiDeployment;
+    case 'web':
+      return CreateAssistantWebpluginDeployment;
+    case 'phone':
+      return CreateAssistantPhoneDeployment;
   }
 };
 
@@ -108,17 +123,24 @@ export function useDeploymentSectionEdit(
   const [voiceInputEnable, setVoiceInputEnable] = useState(true);
   const [voiceOutputEnable, setVoiceOutputEnable] = useState(true);
 
-  const [experienceConfig, setExperienceConfig] =
-    useState<ExperienceConfig>({ ...DEFAULT_EXPERIENCE });
+  const [experienceConfig, setExperienceConfig] = useState<ExperienceConfig>({
+    ...DEFAULT_EXPERIENCE,
+  });
 
   const [audioInputConfig, setAudioInputConfig] = useState<AudioConfig>({
     provider: 'deepgram',
-    parameters: GetDefaultSpeechToTextIfInvalid('deepgram', GetDefaultMicrophoneConfig()),
+    parameters: GetDefaultSpeechToTextIfInvalid(
+      'deepgram',
+      GetDefaultMicrophoneConfig(),
+    ),
   });
 
   const [audioOutputConfig, setAudioOutputConfig] = useState<AudioConfig>({
     provider: 'cartesia',
-    parameters: GetDefaultTextToSpeechIfInvalid('cartesia', GetDefaultSpeakerConfig()),
+    parameters: GetDefaultTextToSpeechIfInvalid(
+      'cartesia',
+      GetDefaultSpeakerConfig(),
+    ),
   });
 
   const [telephonyConfig, setTelephonyConfig] = useState<TelephonyConfig>({
@@ -160,6 +182,12 @@ export function useDeploymentSectionEdit(
               ? deployment.getGreetinginterruptible()
               : true,
             messageOnError: deployment.getMistake(),
+            unclearInputTimeout: deployment.hasUnclearinputtimeout?.()
+              ? deployment.getUnclearinputtimeout().toString()
+              : undefined,
+            unclearInputMessage: deployment.hasUnclearinputmessage?.()
+              ? deployment.getUnclearinputmessage()
+              : undefined,
             idealTimeout: deployment.getIdealtimeout(),
             idealMessage: deployment.getIdealtimeoutmessage(),
             maxCallDuration: deployment.getMaxsessionduration(),
@@ -358,10 +386,20 @@ export function useDeploymentSectionEdit(
         deployment.setGreeting(resolvedExperience.greeting);
       if (resolvedExperience.messageOnError)
         deployment.setMistake(resolvedExperience.messageOnError);
+      if (resolvedExperience.unclearInputTimeout)
+        deployment.setUnclearinputtimeout(
+          Number(resolvedExperience.unclearInputTimeout),
+        );
+      if (resolvedExperience.unclearInputMessage)
+        deployment.setUnclearinputmessage(
+          resolvedExperience.unclearInputMessage,
+        );
       if (resolvedExperience.idealTimeout)
         deployment.setIdealtimeout(resolvedExperience.idealTimeout);
       if (resolvedExperience.idleTimeoutBackoffTimes)
-        deployment.setIdealtimeoutbackoff(resolvedExperience.idleTimeoutBackoffTimes);
+        deployment.setIdealtimeoutbackoff(
+          resolvedExperience.idleTimeoutBackoffTimes,
+        );
       if (resolvedExperience.idealMessage)
         deployment.setIdealtimeoutmessage(resolvedExperience.idealMessage);
       if (resolvedExperience.maxCallDuration)
@@ -410,7 +448,9 @@ export function useDeploymentSectionEdit(
     creator(connectionConfig, req, authHeaders())
       .then((response: any) => {
         if (response?.getData() && response.getSuccess()) {
-          toast.success(`${DEPLOYMENT_LABELS[type]} deployment updated successfully.`);
+          toast.success(
+            `${DEPLOYMENT_LABELS[type]} deployment updated successfully.`,
+          );
           setActiveEdit(null);
           onSuccess();
           return;
@@ -421,7 +461,9 @@ export function useDeploymentSectionEdit(
         );
       })
       .catch(() =>
-        setEditError('Unable to update deployment configuration. Please try again.'),
+        setEditError(
+          'Unable to update deployment configuration. Please try again.',
+        ),
       )
       .finally(() => setIsSaving(false));
   };

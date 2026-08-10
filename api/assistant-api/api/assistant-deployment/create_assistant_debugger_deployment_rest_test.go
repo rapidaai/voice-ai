@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -52,6 +53,8 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateWhatsappDeployment(
 	assistantId uint64,
 	greeting *string,
 	mistake *string,
+	unclearInputTimeout *float64,
+	unclearInputMessage *string,
 	greetingInterruptible *bool,
 	idealTimeout *uint64,
 	idealTimeoutBackoff *uint64,
@@ -60,7 +63,7 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateWhatsappDeployment(
 	whatsappProvider string,
 	whatsappOptions []*protos.Metadata,
 ) (*internal_assistant_entity.AssistantWhatsappDeployment, error) {
-	_, _, _ = mistake, idealTimeoutBackoff, idealTimeoutMessage
+	_, _, _, _, _ = mistake, unclearInputTimeout, unclearInputMessage, idealTimeoutBackoff, idealTimeoutMessage
 	s.createCalled = true
 	s.assistantId = assistantId
 	s.greeting = greeting
@@ -79,6 +82,8 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateWhatsappDeployment(
 			},
 			Greeting:              greeting,
 			GreetingInterruptible: greetingInterruptible,
+			UnclearInputTimeout:   unclearInputTimeout,
+			UnclearInputMessage:   unclearInputMessage,
 			IdleTimeout:           idealTimeout,
 			MaxSessionDuration:    maxSessionDuration,
 		},
@@ -101,6 +106,8 @@ func (s *createDebuggerDeploymentRestServiceStub) CreatePhoneDeployment(
 	assistantId uint64,
 	greeting *string,
 	mistake *string,
+	unclearInputTimeout *float64,
+	unclearInputMessage *string,
 	greetingInterruptible *bool,
 	idealTimeout *uint64,
 	idealTimeoutBackoff *uint64,
@@ -111,7 +118,7 @@ func (s *createDebuggerDeploymentRestServiceStub) CreatePhoneDeployment(
 	outputAudio *protos.DeploymentAudioProvider,
 	phoneOptions []*protos.Metadata,
 ) (*internal_assistant_entity.AssistantPhoneDeployment, error) {
-	_, _, _, _, _ = mistake, idealTimeout, idealTimeoutBackoff, idealTimeoutMessage, outputAudio
+	_, _, _, _, _, _, _ = mistake, unclearInputTimeout, unclearInputMessage, idealTimeout, idealTimeoutBackoff, idealTimeoutMessage, outputAudio
 	s.createCalled = true
 	s.assistantId = assistantId
 	s.greeting = greeting
@@ -133,6 +140,8 @@ func (s *createDebuggerDeploymentRestServiceStub) CreatePhoneDeployment(
 			},
 			Greeting:              greeting,
 			GreetingInterruptible: greetingInterruptible,
+			UnclearInputTimeout:   unclearInputTimeout,
+			UnclearInputMessage:   unclearInputMessage,
 			MaxSessionDuration:    maxSessionDuration,
 		},
 		AssistantDeploymentTelephony: internal_assistant_entity.AssistantDeploymentTelephony{
@@ -155,6 +164,8 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateApiDeployment(
 	assistantId uint64,
 	greeting *string,
 	mistake *string,
+	unclearInputTimeout *float64,
+	unclearInputMessage *string,
 	greetingInterruptible *bool,
 	idealTimeout *uint64,
 	idealTimeoutBackoff *uint64,
@@ -163,7 +174,7 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateApiDeployment(
 	inputAudio *protos.DeploymentAudioProvider,
 	outputAudio *protos.DeploymentAudioProvider,
 ) (*internal_assistant_entity.AssistantApiDeployment, error) {
-	_, _, _ = mistake, idealTimeoutBackoff, idealTimeoutMessage
+	_, _, _, _, _ = mistake, unclearInputTimeout, unclearInputMessage, idealTimeoutBackoff, idealTimeoutMessage
 	s.createCalled = true
 	s.assistantId = assistantId
 	s.greeting = greeting
@@ -184,6 +195,8 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateApiDeployment(
 			},
 			Greeting:              greeting,
 			GreetingInterruptible: greetingInterruptible,
+			UnclearInputTimeout:   unclearInputTimeout,
+			UnclearInputMessage:   unclearInputMessage,
 			IdleTimeout:           idealTimeout,
 			MaxSessionDuration:    maxSessionDuration,
 		},
@@ -197,6 +210,8 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateDebuggerDeployment(
 	_ types.SimplePrinciple,
 	assistantId uint64,
 	greeting, _ *string,
+	unclearInputTimeout *float64,
+	unclearInputMessage *string,
 	greetingInterruptible *bool,
 	idealTimeout *uint64,
 	_ *uint64,
@@ -223,6 +238,8 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateDebuggerDeployment(
 			},
 			Greeting:              greeting,
 			GreetingInterruptible: greetingInterruptible,
+			UnclearInputTimeout:   unclearInputTimeout,
+			UnclearInputMessage:   unclearInputMessage,
 			IdleTimeout:           idealTimeout,
 			MaxSessionDuration:    maxSessionDuration,
 		},
@@ -236,6 +253,8 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateWebPluginDeployment(
 	assistantId uint64,
 	greeting *string,
 	mistake *string,
+	unclearInputTimeout *float64,
+	unclearInputMessage *string,
 	greetingInterruptible *bool,
 	idealTimeout *uint64,
 	idealTimeoutBackoff *uint64,
@@ -245,7 +264,7 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateWebPluginDeployment(
 	inputAudio *protos.DeploymentAudioProvider,
 	outputAudio *protos.DeploymentAudioProvider,
 ) (*internal_assistant_entity.AssistantWebPluginDeployment, error) {
-	_, _, _ = mistake, idealTimeoutBackoff, idealTimeoutMessage
+	_, _, _, _, _ = mistake, unclearInputTimeout, unclearInputMessage, idealTimeoutBackoff, idealTimeoutMessage
 	s.createCalled = true
 	s.assistantId = assistantId
 	s.greeting = greeting
@@ -267,6 +286,8 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateWebPluginDeployment(
 			},
 			Greeting:              greeting,
 			GreetingInterruptible: greetingInterruptible,
+			UnclearInputTimeout:   unclearInputTimeout,
+			UnclearInputMessage:   unclearInputMessage,
 			IdleTimeout:           idealTimeout,
 			MaxSessionDuration:    maxSessionDuration,
 		},
@@ -709,7 +730,7 @@ func TestCreateAssistantDebuggerDeploymentRest_InvalidIdealTimeout(t *testing.T)
 	context.Request = httptest.NewRequest(
 		http.MethodPost,
 		"/v1/assistant-deployment/create-debugger-deployment",
-		bytes.NewReader([]byte(`{"assistantId":"123","idealTimeout":14}`)),
+		bytes.NewReader([]byte(`{"assistantId":"123","idealTimeout":4}`)),
 	)
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
@@ -718,6 +739,28 @@ func TestCreateAssistantDebuggerDeploymentRest_InvalidIdealTimeout(t *testing.T)
 
 	require.Equal(t, http.StatusBadRequest, recorder.Code)
 	assert.Contains(t, recorder.Body.String(), pkg_errors.CreateAssistantDebuggerDeploymentInvalidIdealTimeout.Error)
+}
+
+func TestCreateAssistantDebuggerDeploymentRest_InvalidUnclearInputTimeout(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, unclearInputTimeout := range []float64{1.9, 10.1} {
+		deploymentApi := newCreateDebuggerDeploymentRestApi(t, &createDebuggerDeploymentRestServiceStub{})
+
+		recorder := httptest.NewRecorder()
+		context, _ := gin.CreateTestContext(recorder)
+		context.Request = httptest.NewRequest(
+			http.MethodPost,
+			"/v1/assistant-deployment/create-debugger-deployment",
+			bytes.NewReader([]byte(fmt.Sprintf(`{"assistantId":"123","unclearInputTimeout":%f}`, unclearInputTimeout))),
+		)
+		context.Request.Header.Set("Content-Type", "application/json")
+		context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+
+		deploymentApi.CreateAssistantDebuggerDeploymentRest(context)
+
+		require.Equal(t, http.StatusBadRequest, recorder.Code)
+		assert.Contains(t, recorder.Body.String(), pkg_errors.CreateAssistantDebuggerDeploymentInvalidUnclearTimeout.Error)
+	}
 }
 
 func TestCreateAssistantDebuggerDeploymentRest_InvalidIdealTimeoutBackoff(t *testing.T) {
@@ -788,7 +831,7 @@ func TestCreateAssistantDebuggerDeploymentGRPC_InvalidIdealTimeout(t *testing.T)
 	service := &createDebuggerDeploymentRestServiceStub{}
 	deploymentApi := newCreateDebuggerDeploymentGRPCApi(t, service)
 	request := createDebuggerDeploymentGRPCRequest()
-	request.GetDebugger().IdealTimeout = 14
+	request.GetDebugger().IdealTimeout = 4
 
 	response, err := deploymentApi.CreateAssistantDebuggerDeployment(createDebuggerDeploymentGRPCContext(), request)
 
@@ -798,6 +841,160 @@ func TestCreateAssistantDebuggerDeploymentGRPC_InvalidIdealTimeout(t *testing.T)
 	assert.Equal(t, pkg_errors.CreateAssistantDebuggerDeploymentInvalidIdealTimeout.HTTPStatusCodeInt32(), response.Code)
 	require.NotNil(t, response.Error)
 	assert.Equal(t, uint64(pkg_errors.CreateAssistantDebuggerDeploymentInvalidIdealTimeout.Code), response.Error.ErrorCode)
+}
+
+func TestCreateAssistantApiDeploymentGRPC_InvalidIdealTimeout(t *testing.T) {
+	service := &createDebuggerDeploymentRestServiceStub{}
+	deploymentApi := newCreateDebuggerDeploymentGRPCApi(t, service)
+	request := createApiDeploymentGRPCRequest()
+	request.GetApi().IdealTimeout = 4
+
+	response, err := deploymentApi.CreateAssistantApiDeployment(createDebuggerDeploymentGRPCContext(), request)
+
+	require.Error(t, err)
+	require.NotNil(t, response)
+	assert.False(t, service.createCalled)
+	assert.Equal(t, pkg_errors.CreateAssistantApiDeploymentInvalidIdealTimeout.HTTPStatusCodeInt32(), response.Code)
+	require.NotNil(t, response.Error)
+	assert.Equal(t, uint64(pkg_errors.CreateAssistantApiDeploymentInvalidIdealTimeout.Code), response.Error.ErrorCode)
+}
+
+func TestCreateAssistantPhoneDeploymentGRPC_InvalidIdealTimeout(t *testing.T) {
+	service := &createDebuggerDeploymentRestServiceStub{}
+	deploymentApi := newCreateDebuggerDeploymentGRPCApi(t, service)
+	request := createPhoneDeploymentGRPCRequest()
+	request.GetPhone().IdealTimeout = 4
+
+	response, err := deploymentApi.CreateAssistantPhoneDeployment(createDebuggerDeploymentGRPCContext(), request)
+
+	require.Error(t, err)
+	require.NotNil(t, response)
+	assert.False(t, service.createCalled)
+	assert.Equal(t, pkg_errors.CreateAssistantPhoneDeploymentInvalidIdealTimeout.HTTPStatusCodeInt32(), response.Code)
+	require.NotNil(t, response.Error)
+	assert.Equal(t, uint64(pkg_errors.CreateAssistantPhoneDeploymentInvalidIdealTimeout.Code), response.Error.ErrorCode)
+}
+
+func TestCreateAssistantWebpluginDeploymentGRPC_InvalidIdealTimeout(t *testing.T) {
+	service := &createDebuggerDeploymentRestServiceStub{}
+	deploymentApi := newCreateDebuggerDeploymentGRPCApi(t, service)
+	request := createWebpluginDeploymentGRPCRequest()
+	request.GetPlugin().IdealTimeout = 4
+
+	response, err := deploymentApi.CreateAssistantWebpluginDeployment(createDebuggerDeploymentGRPCContext(), request)
+
+	require.Error(t, err)
+	require.NotNil(t, response)
+	assert.False(t, service.createCalled)
+	assert.Equal(t, pkg_errors.CreateAssistantWebpluginDeploymentInvalidIdealTimeout.HTTPStatusCodeInt32(), response.Code)
+	require.NotNil(t, response.Error)
+	assert.Equal(t, uint64(pkg_errors.CreateAssistantWebpluginDeploymentInvalidIdealTimeout.Code), response.Error.ErrorCode)
+}
+
+func TestCreateAssistantWhatsappDeploymentGRPC_InvalidIdealTimeout(t *testing.T) {
+	service := &createDebuggerDeploymentRestServiceStub{}
+	deploymentApi := newCreateDebuggerDeploymentGRPCApi(t, service)
+	request := createWhatsappDeploymentGRPCRequest()
+	request.GetWhatsapp().IdealTimeout = 4
+
+	response, err := deploymentApi.CreateAssistantWhatsappDeployment(createDebuggerDeploymentGRPCContext(), request)
+
+	require.Error(t, err)
+	require.NotNil(t, response)
+	assert.False(t, service.createCalled)
+	assert.Equal(t, pkg_errors.CreateAssistantWhatsappDeploymentInvalidIdealTimeout.HTTPStatusCodeInt32(), response.Code)
+	require.NotNil(t, response.Error)
+	assert.Equal(t, uint64(pkg_errors.CreateAssistantWhatsappDeploymentInvalidIdealTimeout.Code), response.Error.ErrorCode)
+}
+
+func TestCreateAssistantDebuggerDeploymentGRPC_InvalidUnclearInputTimeout(t *testing.T) {
+	for _, unclearInputTimeout := range []float64{1.9, 10.1} {
+		service := &createDebuggerDeploymentRestServiceStub{}
+		deploymentApi := newCreateDebuggerDeploymentGRPCApi(t, service)
+		request := createDebuggerDeploymentGRPCRequest()
+		request.GetDebugger().UnclearInputTimeout = &unclearInputTimeout
+
+		response, err := deploymentApi.CreateAssistantDebuggerDeployment(createDebuggerDeploymentGRPCContext(), request)
+
+		require.Error(t, err)
+		require.NotNil(t, response)
+		assert.False(t, service.createCalled)
+		assert.Equal(t, pkg_errors.CreateAssistantDebuggerDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(), response.Code)
+		require.NotNil(t, response.Error)
+		assert.Equal(t, uint64(pkg_errors.CreateAssistantDebuggerDeploymentInvalidUnclearTimeout.Code), response.Error.ErrorCode)
+	}
+}
+
+func TestCreateAssistantApiDeploymentGRPC_InvalidUnclearInputTimeout(t *testing.T) {
+	for _, unclearInputTimeout := range []float64{1.9, 10.1} {
+		service := &createDebuggerDeploymentRestServiceStub{}
+		deploymentApi := newCreateDebuggerDeploymentGRPCApi(t, service)
+		request := createApiDeploymentGRPCRequest()
+		request.GetApi().UnclearInputTimeout = &unclearInputTimeout
+
+		response, err := deploymentApi.CreateAssistantApiDeployment(createDebuggerDeploymentGRPCContext(), request)
+
+		require.Error(t, err)
+		require.NotNil(t, response)
+		assert.False(t, service.createCalled)
+		assert.Equal(t, pkg_errors.CreateAssistantApiDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(), response.Code)
+		require.NotNil(t, response.Error)
+		assert.Equal(t, uint64(pkg_errors.CreateAssistantApiDeploymentInvalidUnclearTimeout.Code), response.Error.ErrorCode)
+	}
+}
+
+func TestCreateAssistantPhoneDeploymentGRPC_InvalidUnclearInputTimeout(t *testing.T) {
+	for _, unclearInputTimeout := range []float64{1.9, 10.1} {
+		service := &createDebuggerDeploymentRestServiceStub{}
+		deploymentApi := newCreateDebuggerDeploymentGRPCApi(t, service)
+		request := createPhoneDeploymentGRPCRequest()
+		request.GetPhone().UnclearInputTimeout = &unclearInputTimeout
+
+		response, err := deploymentApi.CreateAssistantPhoneDeployment(createDebuggerDeploymentGRPCContext(), request)
+
+		require.Error(t, err)
+		require.NotNil(t, response)
+		assert.False(t, service.createCalled)
+		assert.Equal(t, pkg_errors.CreateAssistantPhoneDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(), response.Code)
+		require.NotNil(t, response.Error)
+		assert.Equal(t, uint64(pkg_errors.CreateAssistantPhoneDeploymentInvalidUnclearTimeout.Code), response.Error.ErrorCode)
+	}
+}
+
+func TestCreateAssistantWebpluginDeploymentGRPC_InvalidUnclearInputTimeout(t *testing.T) {
+	for _, unclearInputTimeout := range []float64{1.9, 10.1} {
+		service := &createDebuggerDeploymentRestServiceStub{}
+		deploymentApi := newCreateDebuggerDeploymentGRPCApi(t, service)
+		request := createWebpluginDeploymentGRPCRequest()
+		request.GetPlugin().UnclearInputTimeout = &unclearInputTimeout
+
+		response, err := deploymentApi.CreateAssistantWebpluginDeployment(createDebuggerDeploymentGRPCContext(), request)
+
+		require.Error(t, err)
+		require.NotNil(t, response)
+		assert.False(t, service.createCalled)
+		assert.Equal(t, pkg_errors.CreateAssistantWebpluginDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(), response.Code)
+		require.NotNil(t, response.Error)
+		assert.Equal(t, uint64(pkg_errors.CreateAssistantWebpluginDeploymentInvalidUnclearTimeout.Code), response.Error.ErrorCode)
+	}
+}
+
+func TestCreateAssistantWhatsappDeploymentGRPC_InvalidUnclearInputTimeout(t *testing.T) {
+	for _, unclearInputTimeout := range []float64{1.9, 10.1} {
+		service := &createDebuggerDeploymentRestServiceStub{}
+		deploymentApi := newCreateDebuggerDeploymentGRPCApi(t, service)
+		request := createWhatsappDeploymentGRPCRequest()
+		request.GetWhatsapp().UnclearInputTimeout = &unclearInputTimeout
+
+		response, err := deploymentApi.CreateAssistantWhatsappDeployment(createDebuggerDeploymentGRPCContext(), request)
+
+		require.Error(t, err)
+		require.NotNil(t, response)
+		assert.False(t, service.createCalled)
+		assert.Equal(t, pkg_errors.CreateAssistantWhatsappDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(), response.Code)
+		require.NotNil(t, response.Error)
+		assert.Equal(t, uint64(pkg_errors.CreateAssistantWhatsappDeploymentInvalidUnclearTimeout.Code), response.Error.ErrorCode)
+	}
 }
 
 func TestCreateAssistantDebuggerDeploymentGRPC_InvalidIdealTimeoutBackoff(t *testing.T) {
@@ -884,6 +1081,60 @@ func createDebuggerDeploymentGRPCRequest() *protos.CreateAssistantDeploymentRequ
 				IdealTimeout:        30,
 				IdealTimeoutBackoff: 1,
 				MaxSessionDuration:  600,
+			},
+		},
+	}
+}
+
+func createApiDeploymentGRPCRequest() *protos.CreateAssistantDeploymentRequest {
+	return &protos.CreateAssistantDeploymentRequest{
+		Deployment: &protos.CreateAssistantDeploymentRequest_Api{
+			Api: &protos.AssistantApiDeployment{
+				AssistantId:         123,
+				IdealTimeout:        30,
+				IdealTimeoutBackoff: 1,
+				MaxSessionDuration:  600,
+			},
+		},
+	}
+}
+
+func createPhoneDeploymentGRPCRequest() *protos.CreateAssistantDeploymentRequest {
+	return &protos.CreateAssistantDeploymentRequest{
+		Deployment: &protos.CreateAssistantDeploymentRequest_Phone{
+			Phone: &protos.AssistantPhoneDeployment{
+				AssistantId:         123,
+				IdealTimeout:        30,
+				IdealTimeoutBackoff: 1,
+				MaxSessionDuration:  600,
+				PhoneProviderName:   "twilio",
+			},
+		},
+	}
+}
+
+func createWebpluginDeploymentGRPCRequest() *protos.CreateAssistantDeploymentRequest {
+	return &protos.CreateAssistantDeploymentRequest{
+		Deployment: &protos.CreateAssistantDeploymentRequest_Plugin{
+			Plugin: &protos.AssistantWebpluginDeployment{
+				AssistantId:         123,
+				IdealTimeout:        30,
+				IdealTimeoutBackoff: 1,
+				MaxSessionDuration:  600,
+			},
+		},
+	}
+}
+
+func createWhatsappDeploymentGRPCRequest() *protos.CreateAssistantDeploymentRequest {
+	return &protos.CreateAssistantDeploymentRequest{
+		Deployment: &protos.CreateAssistantDeploymentRequest_Whatsapp{
+			Whatsapp: &protos.AssistantWhatsappDeployment{
+				AssistantId:          123,
+				IdealTimeout:         30,
+				IdealTimeoutBackoff:  1,
+				MaxSessionDuration:   600,
+				WhatsappProviderName: "twilio",
 			},
 		},
 	}

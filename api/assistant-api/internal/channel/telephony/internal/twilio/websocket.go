@@ -301,10 +301,8 @@ func (tws *twilioWebsocketStreamer) Send(response internal_type.Stream) error {
 			return nil
 		}
 	case *protos.ConversationInterruption:
-		if data.Type == protos.ConversationInterruption_INTERRUPTION_TYPE_WORD {
-			if tws.mediaSession != nil {
-				tws.mediaSession.HandleInterrupt()
-			}
+		if tws.mediaSession != nil {
+			tws.mediaSession.HandleInterrupt()
 		}
 	case *protos.ConversationDisconnection:
 		// Server-initiated disconnect: the talker already knows the reason

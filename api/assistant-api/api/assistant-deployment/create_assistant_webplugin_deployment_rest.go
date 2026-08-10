@@ -73,7 +73,19 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantWebpluginDeploymentR
 		})
 		return
 	}
-	if validator.NonNil(request.IdealTimeout) && !validator.Between(int(*request.IdealTimeout), 15, 120) {
+	if validator.NonNil(request.UnclearInputTimeout) && !validator.Between(*request.UnclearInputTimeout, 2, 10) {
+		c.JSON(pkg_errors.CreateAssistantWebpluginDeploymentInvalidUnclearTimeout.HTTPStatusCode, openapi.ErrorResponse{
+			Code:    utils.Ptr(pkg_errors.CreateAssistantWebpluginDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32()),
+			Success: utils.Ptr(false),
+			Error: &openapi.Error{
+				ErrorCode:    utils.Ptr(openapi.Uint64String(pkg_errors.CreateAssistantWebpluginDeploymentInvalidUnclearTimeout.CodeString())),
+				ErrorMessage: utils.Ptr(pkg_errors.CreateAssistantWebpluginDeploymentInvalidUnclearTimeout.Error),
+				HumanMessage: utils.Ptr(pkg_errors.CreateAssistantWebpluginDeploymentInvalidUnclearTimeout.ErrorMessage),
+			},
+		})
+		return
+	}
+	if validator.NonNil(request.IdealTimeout) && !validator.Between(int(*request.IdealTimeout), 5, 120) {
 		c.JSON(pkg_errors.CreateAssistantWebpluginDeploymentInvalidIdealTimeout.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantWebpluginDeploymentInvalidIdealTimeout.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -208,6 +220,8 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantWebpluginDeploymentR
 		assistantId,
 		request.Greeting,
 		request.Mistake,
+		request.UnclearInputTimeout,
+		request.UnclearInputMessage,
 		request.GreetingInterruptible,
 		request.IdealTimeout,
 		request.IdealTimeoutBackoff,
@@ -291,6 +305,8 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantWebpluginDeploymentR
 			Greeting:              deployment.Greeting,
 			GreetingInterruptible: deployment.GreetingInterruptible,
 			Mistake:               deployment.Mistake,
+			UnclearInputTimeout:   deployment.UnclearInputTimeout,
+			UnclearInputMessage:   deployment.UnclearInputMessage,
 			InputAudio:            responseInputAudio,
 			OutputAudio:           responseOutputAudio,
 			Suggestion:            &responseSuggestions,

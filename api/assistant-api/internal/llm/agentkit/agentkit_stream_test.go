@@ -3,6 +3,7 @@ package internal_llm_agentkit
 import (
 	"context"
 	"io"
+	"strconv"
 	"testing"
 	"time"
 
@@ -250,6 +251,99 @@ func TestWrite_AllTypes(t *testing.T) {
 				userInput, ok := pkts[0].(internal_type.UserInputPacket)
 				require.True(t, ok)
 				assert.Equal(t, "synthetic user", userInput.Text)
+			},
+		},
+		{
+			name: "control_block",
+			resp: &protos.TalkOutput{
+				Data: &protos.TalkOutput_Control{
+					Control: &protos.ConversationControl{
+						Id:     "ctx-control",
+						Action: protos.ConversationControl_CONTROL_ACTION_BLOCK,
+						Types: []protos.ConversationControl_Type{
+							protos.ConversationControl_CONTROL_TYPE_USER_AUDIO,
+							protos.ConversationControl_CONTROL_TYPE_USER_TEXT,
+							protos.ConversationControl_CONTROL_TYPE_BARGE_IN,
+						},
+					},
+				},
+			},
+			wantFunc: func(t *testing.T, pkts []internal_type.Packet) {
+				require.Len(t, pkts, 3)
+				audioPolicy, ok := pkts[0].(internal_type.DispatchPolicyPacket)
+				require.True(t, ok)
+				assert.Equal(t, "ctx-control", audioPolicy.ContextID)
+				assert.Equal(t, internal_type.PacketNameUserAudioReceived, audioPolicy.Policy.Target)
+				assert.Equal(t, internal_type.DispatchActionIgnore, audioPolicy.Policy.Action)
+
+				textPolicy, ok := pkts[1].(internal_type.DispatchPolicyPacket)
+				require.True(t, ok)
+				assert.Equal(t, internal_type.PacketNameUserTextReceived, textPolicy.Policy.Target)
+				assert.Equal(t, internal_type.DispatchActionIgnore, textPolicy.Policy.Action)
+
+				bargePolicy, ok := pkts[2].(internal_type.DispatchPolicyPacket)
+				require.True(t, ok)
+				assert.Equal(t, internal_type.PacketNameInterruptionDetected, bargePolicy.Policy.Target)
+				assert.Equal(t, internal_type.DispatchActionIgnore, bargePolicy.Policy.Action)
+			},
+		},
+		{
+			name: "control_unblock",
+			resp: &protos.TalkOutput{
+				Data: &protos.TalkOutput_Control{
+					Control: &protos.ConversationControl{
+						Id:     "ctx-control",
+						Action: protos.ConversationControl_CONTROL_ACTION_UNBLOCK,
+						Types: []protos.ConversationControl_Type{
+							protos.ConversationControl_CONTROL_TYPE_USER_AUDIO,
+							protos.ConversationControl_CONTROL_TYPE_USER_TEXT,
+							protos.ConversationControl_CONTROL_TYPE_BARGE_IN,
+						},
+					},
+				},
+			},
+			wantFunc: func(t *testing.T, pkts []internal_type.Packet) {
+				require.Len(t, pkts, 3)
+				audioPolicy, ok := pkts[0].(internal_type.DispatchPolicyPacket)
+				require.True(t, ok)
+				assert.Equal(t, internal_type.PacketNameUserAudioReceived, audioPolicy.Policy.Target)
+				assert.Equal(t, internal_type.DispatchActionPassthrough, audioPolicy.Policy.Action)
+
+				textPolicy, ok := pkts[1].(internal_type.DispatchPolicyPacket)
+				require.True(t, ok)
+				assert.Equal(t, internal_type.PacketNameUserTextReceived, textPolicy.Policy.Target)
+				assert.Equal(t, internal_type.DispatchActionPassthrough, textPolicy.Policy.Action)
+
+				bargePolicy, ok := pkts[2].(internal_type.DispatchPolicyPacket)
+				require.True(t, ok)
+				assert.Equal(t, internal_type.PacketNameInterruptionDetected, bargePolicy.Policy.Target)
+				assert.Equal(t, internal_type.DispatchActionPassthrough, bargePolicy.Policy.Action)
+			},
+		},
+		{
+			name: "control_unspecified_ignored",
+			resp: &protos.TalkOutput{
+				Data: &protos.TalkOutput_Control{
+					Control: &protos.ConversationControl{
+						Id:     "ctx-control",
+						Action: protos.ConversationControl_CONTROL_ACTION_UNSPECIFIED,
+						Types: []protos.ConversationControl_Type{
+							protos.ConversationControl_CONTROL_TYPE_USER_AUDIO,
+						},
+					},
+				},
+			},
+			wantFunc: func(t *testing.T, pkts []internal_type.Packet) {
+				assert.Empty(t, pkts)
+			},
+		},
+		{
+			name: "control_nil_ignored",
+			resp: &protos.TalkOutput{
+				Data: &protos.TalkOutput_Control{},
+			},
+			wantFunc: func(t *testing.T, pkts []internal_type.Packet) {
+				assert.Empty(t, pkts)
 			},
 		},
 		{
@@ -568,6 +662,80 @@ func TestWrite_CompletedTextContextID(t *testing.T) {
 	ev, ok := findPacket[internal_type.ObservabilityEventRecordPacket](pkts)
 	require.True(t, ok)
 	assert.Equal(t, "unique-ctx", ev.ContextID)
+}
+
+func TestWrite_FirstDeltaAddsTTFTAndCompletedAddsTRT(t *testing.T) {
+	e := newTestExecutor()
+	e.requestStartedAt = time.Now().Add(-25 * time.Millisecond)
+	e.waitingForFirstResponse = true
+	comm, collector := newTestComm()
+
+	e.Write(context.Background(), comm, &protos.TalkOutput{
+		Data: &protos.TalkOutput_Assistant{
+			Assistant: &protos.ConversationAssistantMessage{
+				Id:        "ctx-latency",
+				Completed: false,
+				Message:   &protos.ConversationAssistantMessage_Text{Text: "he"},
+			},
+		},
+	})
+	pkts := collector.all()
+	require.Len(t, pkts, 2)
+	delta, ok := pkts[0].(internal_type.LLMResponseDeltaPacket)
+	require.True(t, ok)
+	assert.Equal(t, "he", delta.Text)
+	ttftMetric, ok := pkts[1].(internal_type.ObservabilityMetricRecordPacket)
+	require.True(t, ok)
+	require.Len(t, ttftMetric.Record.Metrics, 1)
+	assert.Equal(t, observability.MetricAgentTTFTMs, ttftMetric.Record.Metrics[0].Name)
+	ttftMs, err := strconv.ParseInt(ttftMetric.Record.Metrics[0].Value, 10, 64)
+	require.NoError(t, err)
+	assert.Positive(t, ttftMs)
+
+	collector.reset()
+
+	e.Write(context.Background(), comm, &protos.TalkOutput{
+		Data: &protos.TalkOutput_Assistant{
+			Assistant: &protos.ConversationAssistantMessage{
+				Id:        "ctx-latency",
+				Completed: true,
+				Message:   &protos.ConversationAssistantMessage_Text{Text: "hello"},
+			},
+		},
+	})
+
+	metrics := findPackets[internal_type.ObservabilityMetricRecordPacket](collector.all())
+	require.Len(t, metrics, 1)
+	require.Len(t, metrics[0].Record.Metrics, 2)
+	assert.Equal(t, "llm_response_char_count", metrics[0].Record.Metrics[0].Name)
+	assert.Equal(t, observability.MetricAgentTRTMs, metrics[0].Record.Metrics[1].Name)
+	ms, err := strconv.ParseInt(metrics[0].Record.Metrics[1].Value, 10, 64)
+	require.NoError(t, err)
+	assert.Positive(t, ms)
+}
+
+func TestWrite_CompletedTextFirstPacketAddsTTFTAndTRT(t *testing.T) {
+	e := newTestExecutor()
+	e.requestStartedAt = time.Now().Add(-25 * time.Millisecond)
+	e.waitingForFirstResponse = true
+	comm, collector := newTestComm()
+
+	e.Write(context.Background(), comm, &protos.TalkOutput{
+		Data: &protos.TalkOutput_Assistant{
+			Assistant: &protos.ConversationAssistantMessage{
+				Id:        "ctx-completed-latency",
+				Completed: true,
+				Message:   &protos.ConversationAssistantMessage_Text{Text: "hello"},
+			},
+		},
+	})
+
+	metrics := findPackets[internal_type.ObservabilityMetricRecordPacket](collector.all())
+	require.Len(t, metrics, 1)
+	require.Len(t, metrics[0].Record.Metrics, 3)
+	assert.Equal(t, "llm_response_char_count", metrics[0].Record.Metrics[0].Name)
+	assert.Equal(t, observability.MetricAgentTTFTMs, metrics[0].Record.Metrics[1].Name)
+	assert.Equal(t, observability.MetricAgentTRTMs, metrics[0].Record.Metrics[2].Name)
 }
 
 func TestWrite_ToolResultFailed(t *testing.T) {

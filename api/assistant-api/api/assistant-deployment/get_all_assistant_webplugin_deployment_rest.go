@@ -202,6 +202,8 @@ func (deploymentApi *AssistantDeploymentApi) GetAllAssistantWebpluginDeploymentR
 			Greeting:              deployment.Greeting,
 			GreetingInterruptible: deployment.GreetingInterruptible,
 			Mistake:               deployment.Mistake,
+			UnclearInputTimeout:   deployment.UnclearInputTimeout,
+			UnclearInputMessage:   deployment.UnclearInputMessage,
 			InputAudio:            responseInputAudio,
 			OutputAudio:           responseOutputAudio,
 			Suggestion:            &responseSuggestions,

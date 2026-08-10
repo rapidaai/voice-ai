@@ -277,7 +277,7 @@ func (s *SileroVAD) Execute(ctx context.Context, pkt internal_type.UserAudioRece
 	}
 
 	// Perform detection with CGO safety
-	segments, isSpeaking, err := s.detectSafely(samples)
+	segments, _, err := s.detectSafely(samples)
 	if err != nil {
 		if s.onPacket != nil {
 			_ = s.onPacket(ctx,
@@ -330,14 +330,6 @@ func (s *SileroVAD) Execute(ctx context.Context, pkt internal_type.UserAudioRece
 			speechEndAt = seg.SpeechEndAt
 			hasSpeechEnd = true
 		}
-	}
-
-	// Emit a heartbeat while the user is actively speaking so the EOS
-	// silence timer keeps extending during sustained speech.
-	if isSpeaking && s.onPacket != nil {
-		_ = s.onPacket(ctx,
-			internal_type.VadSpeechActivityPacket{},
-		)
 	}
 
 	// Emit explicit interruption lifecycle events from VAD transitions.

@@ -27,7 +27,7 @@ redis:
 
 asset_store:
   storage_type: "local"
-  storage_path_prefix: "/Users/prashant.srivastav/rapida-data/assets/integration"
+  storage_path_prefix: "/opt/rapida-data/assets/integration"
 
 integration:
   host: "localhost:9004"

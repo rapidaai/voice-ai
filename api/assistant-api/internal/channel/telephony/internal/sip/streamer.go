@@ -290,10 +290,8 @@ func (s *Streamer) Send(response internal_type.Stream) error {
 			return s.mediaPort.HandleAssistantAudio(content.Audio, data.GetCompleted())
 		}
 	case *protos.ConversationInterruption:
-		if data.Type == protos.ConversationInterruption_INTERRUPTION_TYPE_WORD {
-			if s.mediaPort != nil {
-				s.mediaPort.HandleInterrupt()
-			}
+		if s.mediaPort != nil {
+			s.mediaPort.HandleInterrupt()
 		}
 	case *protos.ConversationDisconnection:
 		_ = s.Disconnect(data.GetType())

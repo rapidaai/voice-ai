@@ -11,6 +11,7 @@ import (
 	"time"
 
 	internal_message_gorm "github.com/rapidaai/api/assistant-api/internal/entity/messages"
+	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
 	"github.com/rapidaai/pkg/types"
@@ -281,7 +282,7 @@ func (conversationService *assistantConversationService) GetAllMessage(
 			case "=":
 				qry = qry.Where("assistant_conversation_messages.status = ?", ct.GetValue())
 			}
-		case "stt_latency_ms", "llm_latency_ms", "agent_time_to_first_token", "tts_latency_ms", "eos_latency_ms", "agent_total_token":
+		case "stt_latency_ms", "llm_latency_ms", "agent_time_to_first_token", observability.MetricAgentTTFTMs, observability.MetricAgentTRTMs, "tts_latency_ms", "eos_latency_ms", "agent_total_token":
 			switch ct.GetLogic() {
 			case "=":
 				qry = qry.Where(

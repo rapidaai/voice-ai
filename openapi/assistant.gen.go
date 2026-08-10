@@ -47,6 +47,8 @@ type AssistantApiDeployment struct {
 	Mistake               *string                  `json:"mistake,omitempty"`
 	OutputAudio           *DeploymentAudioProvider `json:"outputAudio,omitempty"`
 	Status                *string                  `json:"status,omitempty"`
+	UnclearInputMessage   *string                  `json:"unclearInputMessage,omitempty"`
+	UnclearInputTimeout   *float64                 `json:"unclearInputTimeout,omitempty"`
 }
 
 // AssistantConfiguration defines model for AssistantConfiguration.
@@ -80,6 +82,8 @@ type AssistantDebuggerDeployment struct {
 	Mistake               *string                  `json:"mistake,omitempty"`
 	OutputAudio           *DeploymentAudioProvider `json:"outputAudio,omitempty"`
 	Status                *string                  `json:"status,omitempty"`
+	UnclearInputMessage   *string                  `json:"unclearInputMessage,omitempty"`
+	UnclearInputTimeout   *float64                 `json:"unclearInputTimeout,omitempty"`
 }
 
 // AssistantKnowledge defines model for AssistantKnowledge.
@@ -112,6 +116,8 @@ type AssistantPhoneDeployment struct {
 	PhoneOptions          *[]Metadata              `json:"phoneOptions,omitempty"`
 	PhoneProviderName     *string                  `json:"phoneProviderName,omitempty"`
 	Status                *string                  `json:"status,omitempty"`
+	UnclearInputMessage   *string                  `json:"unclearInputMessage,omitempty"`
+	UnclearInputTimeout   *float64                 `json:"unclearInputTimeout,omitempty"`
 }
 
 // AssistantProviderAgentflow defines model for AssistantProviderAgentflow.
@@ -199,6 +205,8 @@ type AssistantWebpluginDeployment struct {
 	OutputAudio           *DeploymentAudioProvider `json:"outputAudio,omitempty"`
 	Status                *string                  `json:"status,omitempty"`
 	Suggestion            *[]string                `json:"suggestion,omitempty"`
+	UnclearInputMessage   *string                  `json:"unclearInputMessage,omitempty"`
+	UnclearInputTimeout   *float64                 `json:"unclearInputTimeout,omitempty"`
 }
 
 // AssistantWhatsappDeployment defines model for AssistantWhatsappDeployment.
@@ -213,6 +221,8 @@ type AssistantWhatsappDeployment struct {
 	MaxSessionDuration    *uint64       `json:"maxSessionDuration,omitempty"`
 	Mistake               *string       `json:"mistake,omitempty"`
 	Status                *string       `json:"status,omitempty"`
+	UnclearInputMessage   *string       `json:"unclearInputMessage,omitempty"`
+	UnclearInputTimeout   *float64      `json:"unclearInputTimeout,omitempty"`
 	WhatsappOptions       *[]Metadata   `json:"whatsappOptions,omitempty"`
 	WhatsappProviderName  *string       `json:"whatsappProviderName,omitempty"`
 }
@@ -229,6 +239,8 @@ type CreateAssistantApiDeploymentRequest struct {
 	MaxSessionDuration    *uint64                         `json:"maxSessionDuration,omitempty"`
 	Mistake               *string                         `json:"mistake,omitempty"`
 	OutputAudio           *DeploymentAudioProviderRequest `json:"outputAudio,omitempty"`
+	UnclearInputMessage   *string                         `json:"unclearInputMessage,omitempty"`
+	UnclearInputTimeout   *float64                        `json:"unclearInputTimeout,omitempty"`
 }
 
 // CreateAssistantConfigurationRequest defines model for CreateAssistantConfigurationRequest.
@@ -252,6 +264,8 @@ type CreateAssistantDebuggerDeploymentRequest struct {
 	MaxSessionDuration    *uint64                         `json:"maxSessionDuration,omitempty"`
 	Mistake               *string                         `json:"mistake,omitempty"`
 	OutputAudio           *DeploymentAudioProviderRequest `json:"outputAudio,omitempty"`
+	UnclearInputMessage   *string                         `json:"unclearInputMessage,omitempty"`
+	UnclearInputTimeout   *float64                        `json:"unclearInputTimeout,omitempty"`
 }
 
 // CreateAssistantKnowledgeRequest defines model for CreateAssistantKnowledgeRequest.
@@ -281,6 +295,8 @@ type CreateAssistantPhoneDeploymentRequest struct {
 	OutputAudio           *DeploymentAudioProviderRequest `json:"outputAudio,omitempty"`
 	PhoneOptions          *[]Metadata                     `json:"phoneOptions,omitempty"`
 	PhoneProviderName     string                          `json:"phoneProviderName"`
+	UnclearInputMessage   *string                         `json:"unclearInputMessage,omitempty"`
+	UnclearInputTimeout   *float64                        `json:"unclearInputTimeout,omitempty"`
 }
 
 // CreateAssistantProviderAgentflow defines model for CreateAssistantProviderAgentflow.
@@ -365,6 +381,8 @@ type CreateAssistantWebpluginDeploymentRequest struct {
 	Mistake               *string                         `json:"mistake,omitempty"`
 	OutputAudio           *DeploymentAudioProviderRequest `json:"outputAudio,omitempty"`
 	Suggestion            *[]string                       `json:"suggestion,omitempty"`
+	UnclearInputMessage   *string                         `json:"unclearInputMessage,omitempty"`
+	UnclearInputTimeout   *float64                        `json:"unclearInputTimeout,omitempty"`
 }
 
 // CreateAssistantWhatsappDeploymentRequest defines model for CreateAssistantWhatsappDeploymentRequest.
@@ -377,6 +395,8 @@ type CreateAssistantWhatsappDeploymentRequest struct {
 	IdealTimeoutMessage   *string      `json:"idealTimeoutMessage,omitempty"`
 	MaxSessionDuration    *uint64      `json:"maxSessionDuration,omitempty"`
 	Mistake               *string      `json:"mistake,omitempty"`
+	UnclearInputMessage   *string      `json:"unclearInputMessage,omitempty"`
+	UnclearInputTimeout   *float64     `json:"unclearInputTimeout,omitempty"`
 	WhatsappOptions       *[]Metadata  `json:"whatsappOptions,omitempty"`
 	WhatsappProviderName  string       `json:"whatsappProviderName"`
 }

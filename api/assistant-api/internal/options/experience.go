@@ -10,6 +10,8 @@ const (
 	ExperienceOptionGreeting              = "experience.greeting"
 	ExperienceOptionGreetingInterruptible = "experience.greeting_interruptible"
 	ExperienceOptionMistake               = "experience.mistake"
+	ExperienceOptionUnclearInputTimeout   = "experience.unclear_input_timeout"
+	ExperienceOptionUnclearInputMessage   = "experience.unclear_input_message"
 	ExperienceOptionIdleTimeout           = "experience.ideal_timeout"
 	ExperienceOptionIdleTimeoutBackoff    = "experience.ideal_timeout_backoff"
 	ExperienceOptionIdleTimeoutMessage    = "experience.ideal_timeout_message"

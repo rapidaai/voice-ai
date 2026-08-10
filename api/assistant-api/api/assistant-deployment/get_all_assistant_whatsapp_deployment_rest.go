@@ -166,6 +166,8 @@ func (deploymentApi *AssistantDeploymentApi) GetAllAssistantWhatsappDeploymentRe
 			Greeting:              deployment.Greeting,
 			GreetingInterruptible: deployment.GreetingInterruptible,
 			Mistake:               deployment.Mistake,
+			UnclearInputTimeout:   deployment.UnclearInputTimeout,
+			UnclearInputMessage:   deployment.UnclearInputMessage,
 			WhatsappProviderName:  &whatsappProviderName,
 			WhatsappOptions:       &responseWhatsappOptions,
 			Status:                &deploymentStatus,

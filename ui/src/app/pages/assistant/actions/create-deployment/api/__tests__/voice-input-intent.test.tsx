@@ -18,6 +18,8 @@ let mockParams: Record<string, string | undefined> = {
 };
 
 const mockGoToDeploymentAssistant = jest.fn();
+const mockSetUnclearInputTimeout = jest.fn();
+const mockSetUnclearInputMessage = jest.fn();
 
 jest.mock('@rapidaai/react', () => {
   class ConnectionConfig {
@@ -67,6 +69,24 @@ jest.mock('@rapidaai/react', () => {
     setGreeting(_: string) {}
     setGreetinginterruptible(_: boolean) {}
     setMistake(_: string) {}
+    setUnclearinputtimeout(v: number) {
+      mockSetUnclearInputTimeout(v);
+    }
+    hasUnclearinputtimeout() {
+      return false;
+    }
+    getUnclearinputtimeout() {
+      return 0;
+    }
+    setUnclearinputmessage(v: string) {
+      mockSetUnclearInputMessage(v);
+    }
+    hasUnclearinputmessage() {
+      return false;
+    }
+    getUnclearinputmessage() {
+      return '';
+    }
     setIdealtimeout(_: string) {}
     setIdealtimeoutbackoff(_: string) {}
     setIdealtimeoutmessage(_: string) {}
@@ -186,6 +206,9 @@ jest.mock(
   '@/app/pages/assistant/actions/create-deployment/commons/configure-experience',
   () => ({
     ConfigureExperience: () => <div>experience</div>,
+    DEFAULT_UNCLEAR_INPUT_TIMEOUT: '2',
+    DEFAULT_UNCLEAR_INPUT_MESSAGE:
+      "I didn't catch that. Could you repeat that?",
   }),
 );
 
@@ -314,6 +337,8 @@ describe('API deployment voice input intent actions', () => {
     const req = (CreateAssistantApiDeployment as jest.Mock).mock.calls[0][1];
     const deployment = req.getApi();
     expect(deployment.getInputaudio()).toBeDefined();
+    expect(mockSetUnclearInputTimeout).not.toHaveBeenCalled();
+    expect(mockSetUnclearInputMessage).not.toHaveBeenCalled();
     await act(async () => {});
   });
 

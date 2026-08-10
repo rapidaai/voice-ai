@@ -356,10 +356,8 @@ func (tws *telnyxWebsocketStreamer) Send(response internal_type.Stream) error {
 			return nil
 		}
 	case *protos.ConversationInterruption:
-		if data.Type == protos.ConversationInterruption_INTERRUPTION_TYPE_WORD {
-			if tws.mediaSession != nil {
-				tws.mediaSession.HandleInterrupt()
-			}
+		if tws.mediaSession != nil {
+			tws.mediaSession.HandleInterrupt()
 		}
 	case *protos.ConversationDisconnection:
 		_ = tws.Disconnect(data.GetType())

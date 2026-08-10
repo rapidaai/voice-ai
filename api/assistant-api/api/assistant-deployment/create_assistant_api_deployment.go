@@ -9,8 +9,10 @@ import (
 	"context"
 	"errors"
 
+	pkg_errors "github.com/rapidaai/pkg/errors"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/pkg/validator"
 	assistant_api "github.com/rapidaai/protos"
 )
 
@@ -30,10 +32,35 @@ func (deploymentApi *assistantDeploymentGrpcApi) CreateAssistantApiDeployment(ct
 			"Please check and provide valid deployment request for api.",
 		)
 	}
+	if deployment.GetApi().UnclearInputTimeout != nil &&
+		!validator.Between(*deployment.GetApi().UnclearInputTimeout, 2, 10) {
+		return &assistant_api.GetAssistantApiDeploymentResponse{
+			Code:    pkg_errors.CreateAssistantApiDeploymentInvalidUnclearTimeout.HTTPStatusCodeInt32(),
+			Success: false,
+			Error: &assistant_api.Error{
+				ErrorCode:    uint64(pkg_errors.CreateAssistantApiDeploymentInvalidUnclearTimeout.Code),
+				ErrorMessage: pkg_errors.CreateAssistantApiDeploymentInvalidUnclearTimeout.Error,
+				HumanMessage: pkg_errors.CreateAssistantApiDeploymentInvalidUnclearTimeout.ErrorMessage,
+			},
+		}, errors.New(pkg_errors.CreateAssistantApiDeploymentInvalidUnclearTimeout.Error)
+	}
+	if !validator.Between(int(deployment.GetApi().GetIdealTimeout()), 5, 120) {
+		return &assistant_api.GetAssistantApiDeploymentResponse{
+			Code:    pkg_errors.CreateAssistantApiDeploymentInvalidIdealTimeout.HTTPStatusCodeInt32(),
+			Success: false,
+			Error: &assistant_api.Error{
+				ErrorCode:    uint64(pkg_errors.CreateAssistantApiDeploymentInvalidIdealTimeout.Code),
+				ErrorMessage: pkg_errors.CreateAssistantApiDeploymentInvalidIdealTimeout.Error,
+				HumanMessage: pkg_errors.CreateAssistantApiDeploymentInvalidIdealTimeout.ErrorMessage,
+			},
+		}, errors.New(pkg_errors.CreateAssistantApiDeploymentInvalidIdealTimeout.Error)
+	}
 	wpDeployment, err := deploymentApi.deploymentService.CreateApiDeployment(ctx,
 		iAuth, deployment.GetApi().GetAssistantId(),
 		deployment.GetApi().Greeting,
 		deployment.GetApi().Mistake,
+		deployment.GetApi().UnclearInputTimeout,
+		deployment.GetApi().UnclearInputMessage,
 		deployment.GetApi().GreetingInterruptible,
 		&deployment.GetApi().IdealTimeout,
 		&deployment.GetApi().IdealTimeoutBackoff,

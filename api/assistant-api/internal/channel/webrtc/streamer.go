@@ -1421,25 +1421,23 @@ func (s *webrtcStreamer) Send(response internal_type.Stream) error {
 	case *protos.ConversationUserMessage:
 		s.Output(data)
 	case *protos.ConversationInterruption:
-		if data.Type == protos.ConversationInterruption_INTERRUPTION_TYPE_WORD {
-			s.clearBufferedOutputAudio()
-			clearedFrames := s.clearOutputAudio()
-			if clearedFrames > 0 {
-				_ = s.observer.Record(s.Ctx, s.sessionState.Scope, observability.RecordLog{
-					Level:   observability.LevelInfo,
-					Message: "WebRTC output queue cleared after user interruption; this drops queued assistant audio so the response stops promptly when the user speaks.",
-					Attributes: observability.Attributes{
-						"component":                              observability.ComponentWebRTC.String(),
-						webrtc_internal.DataType:                 webrtc_internal.EventOutputQueueCleared,
-						webrtc_internal.DataSessionID:            s.sessionID,
-						webrtc_internal.DataReason:               webrtc_internal.OutputQueueClearReasonInterruption,
-						webrtc_internal.DataClearedFrames:        fmt.Sprintf("%d", clearedFrames),
-						webrtc_internal.DataRemainingQueueFrames: fmt.Sprintf("%d", webrtc_internal.OutputAudioQueueEmptySize),
-					},
-				})
-			}
-			s.signalClear()
+		s.clearBufferedOutputAudio()
+		clearedFrames := s.clearOutputAudio()
+		if clearedFrames > 0 {
+			_ = s.observer.Record(s.Ctx, s.sessionState.Scope, observability.RecordLog{
+				Level:   observability.LevelInfo,
+				Message: "WebRTC output queue cleared after user interruption; this drops queued assistant audio so the response stops promptly when the user speaks.",
+				Attributes: observability.Attributes{
+					"component":                              observability.ComponentWebRTC.String(),
+					webrtc_internal.DataType:                 webrtc_internal.EventOutputQueueCleared,
+					webrtc_internal.DataSessionID:            s.sessionID,
+					webrtc_internal.DataReason:               webrtc_internal.OutputQueueClearReasonInterruption,
+					webrtc_internal.DataClearedFrames:        fmt.Sprintf("%d", clearedFrames),
+					webrtc_internal.DataRemainingQueueFrames: fmt.Sprintf("%d", webrtc_internal.OutputAudioQueueEmptySize),
+				},
+			})
 		}
+		s.signalClear()
 		s.Output(data)
 	case *protos.ConversationToolCall:
 		s.Output(data)

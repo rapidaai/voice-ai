@@ -426,10 +426,8 @@ func (aws *asteriskWebsocketStreamer) Send(response internal_type.Stream) error 
 		}
 
 	case *protos.ConversationInterruption:
-		if data.Type == protos.ConversationInterruption_INTERRUPTION_TYPE_WORD {
-			if aws.mediaSession != nil {
-				aws.mediaSession.HandleInterrupt()
-			}
+		if aws.mediaSession != nil {
+			aws.mediaSession.HandleInterrupt()
 		}
 
 	case *protos.ConversationDisconnection:

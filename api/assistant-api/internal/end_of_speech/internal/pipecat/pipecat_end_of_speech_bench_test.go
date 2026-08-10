@@ -424,7 +424,7 @@ func BenchmarkExecute_HighThroughput(b *testing.B) {
 	}
 }
 
-// BenchmarkExecute_RapidFireInputs measures generation counter efficiency.
+// BenchmarkExecute_RapidFireInputs measures stale timer invalidation efficiency.
 func BenchmarkExecute_RapidFireInputs(b *testing.B) {
 	callback := func(context.Context, ...internal_type.Packet) error { return nil }
 	eos := newTestEOS(callback, newTestOpts(map[string]any{"microphone.eos.fallback_timeout": 100.0}))

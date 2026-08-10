@@ -20,9 +20,7 @@ func (s *dispatchHandlerStub) HandleUserAudio(context.Context, internal_type.Use
 func (s *dispatchHandlerStub) HandleDenoise(context.Context, internal_type.DenoiseAudioPacket) {}
 func (s *dispatchHandlerStub) HandleDenoisedAudio(context.Context, internal_type.DenoisedAudioPacket) {
 }
-func (s *dispatchHandlerStub) HandleVadAudio(context.Context, internal_type.VadAudioPacket) {}
-func (s *dispatchHandlerStub) HandleVadSpeechActivity(context.Context, internal_type.VadSpeechActivityPacket) {
-}
+func (s *dispatchHandlerStub) HandleVadAudio(context.Context, internal_type.VadAudioPacket)         {}
 func (s *dispatchHandlerStub) HandleSpeechToText(context.Context, internal_type.SpeechToTextPacket) {}
 func (s *dispatchHandlerStub) HandleInterimEndOfSpeech(context.Context, internal_type.InterimEndOfSpeechPacket) {
 }
@@ -52,6 +50,8 @@ func (s *dispatchHandlerStub) HandleStartIdleTimeout(context.Context, internal_t
 func (s *dispatchHandlerStub) HandleStopIdleTimeout(context.Context, internal_type.StopIdleTimeoutPacket) {
 }
 func (s *dispatchHandlerStub) HandleIdleTimeoutExpired(context.Context, internal_type.IdleTimeoutExpiredPacket) {
+}
+func (s *dispatchHandlerStub) HandleUnclearInputExpired(context.Context, internal_type.UnclearInputExpiredPacket) {
 }
 func (s *dispatchHandlerStub) HandleMaxSessionExpired(context.Context, internal_type.MaxSessionExpiredPacket) {
 }

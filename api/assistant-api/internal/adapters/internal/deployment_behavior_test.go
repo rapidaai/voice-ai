@@ -13,6 +13,8 @@ func TestDeploymentBehavior_AppliesConversationExperienceOverrides(t *testing.T)
 	defaultGreeting := "saved greeting"
 	defaultGreetingInterruptible := true
 	defaultMistake := "saved mistake"
+	defaultUnclearInputTimeout := 0.5
+	defaultUnclearInputMessage := "saved unclear"
 	defaultIdleTimeout := uint64(10)
 	defaultIdleTimeoutBackoff := uint64(2)
 	defaultIdleTimeoutMessage := "saved idle"
@@ -26,6 +28,8 @@ func TestDeploymentBehavior_AppliesConversationExperienceOverrides(t *testing.T)
 					Greeting:              &defaultGreeting,
 					GreetingInterruptible: &defaultGreetingInterruptible,
 					Mistake:               &defaultMistake,
+					UnclearInputTimeout:   &defaultUnclearInputTimeout,
+					UnclearInputMessage:   &defaultUnclearInputMessage,
 					IdleTimeout:           &defaultIdleTimeout,
 					IdleTimeoutBackoff:    &defaultIdleTimeoutBackoff,
 					IdleTimeoutMessage:    &defaultIdleTimeoutMessage,
@@ -37,6 +41,8 @@ func TestDeploymentBehavior_AppliesConversationExperienceOverrides(t *testing.T)
 			internal_options.ExperienceOptionGreeting:              "override greeting",
 			internal_options.ExperienceOptionGreetingInterruptible: false,
 			internal_options.ExperienceOptionMistake:               "override mistake",
+			internal_options.ExperienceOptionUnclearInputTimeout:   "1.7",
+			internal_options.ExperienceOptionUnclearInputMessage:   "override unclear",
 			internal_options.ExperienceOptionIdleTimeout:           float64(15),
 			internal_options.ExperienceOptionIdleTimeoutBackoff:    "4",
 			internal_options.ExperienceOptionIdleTimeoutMessage:    "override idle",
@@ -50,6 +56,8 @@ func TestDeploymentBehavior_AppliesConversationExperienceOverrides(t *testing.T)
 	require.Equal(t, "override greeting", *behavior.Greeting)
 	require.False(t, *behavior.GreetingInterruptible)
 	require.Equal(t, "override mistake", *behavior.Mistake)
+	require.Equal(t, 1.7, *behavior.UnclearInputTimeout)
+	require.Equal(t, "override unclear", *behavior.UnclearInputMessage)
 	require.Equal(t, uint64(15), *behavior.IdleTimeout)
 	require.Equal(t, uint64(4), *behavior.IdleTimeoutBackoff)
 	require.Equal(t, "override idle", *behavior.IdleTimeoutMessage)
@@ -59,6 +67,8 @@ func TestDeploymentBehavior_AppliesConversationExperienceOverrides(t *testing.T)
 	require.Equal(t, defaultGreeting, *saved.Greeting)
 	require.True(t, *saved.GreetingInterruptible)
 	require.Equal(t, defaultMistake, *saved.Mistake)
+	require.Equal(t, defaultUnclearInputTimeout, *saved.UnclearInputTimeout)
+	require.Equal(t, defaultUnclearInputMessage, *saved.UnclearInputMessage)
 	require.Equal(t, defaultIdleTimeout, *saved.IdleTimeout)
 	require.Equal(t, defaultIdleTimeoutBackoff, *saved.IdleTimeoutBackoff)
 	require.Equal(t, defaultIdleTimeoutMessage, *saved.IdleTimeoutMessage)

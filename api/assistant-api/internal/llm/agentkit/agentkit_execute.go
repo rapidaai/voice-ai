@@ -131,6 +131,7 @@ func (e *agentkitExecutor) handleUserTurn(ctx context.Context, comm internal_typ
 	e.stateMu.Lock()
 	e.activeContextID = contextID
 	e.requestStartedAt = time.Now()
+	e.waitingForFirstResponse = true
 	e.stateMu.Unlock()
 
 	comm.OnPacket(ctx,

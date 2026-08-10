@@ -135,7 +135,6 @@ func NewAssistantServiceClientGRPC(config *config.AppConfig, logger commons.Logg
 }
 
 func (client *assistantServiceClient) GetAllAssistant(c context.Context, auth types.SimplePrinciple, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.Assistant, error) {
-	client.logger.Debugf("get all assistant request")
 	res, err := client.assistantClient.GetAllAssistant(client.WithAuth(c, auth), &protos.GetAllAssistantRequest{
 		Paginate:  paginate,
 		Criterias: criteria,

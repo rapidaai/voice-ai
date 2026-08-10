@@ -1,5 +1,6 @@
 import {
   ConfigureExperience,
+  DEFAULT_IDEAL_TIMEOUT,
   ExperienceConfig,
 } from '@/app/pages/assistant/actions/create-deployment/commons/configure-experience';
 import { ConfigureAudioOutputProvider } from '@/app/pages/assistant/actions/create-deployment/commons/configure-audio-output';
@@ -38,10 +39,7 @@ import { Tabs } from '@/app/components/carbon/tabs';
 import { PrimaryButton, SecondaryButton } from '@/app/components/carbon/button';
 import { ButtonSet, CheckboxGroup } from '@carbon/react';
 import { InputCheckbox } from '@/app/components/carbon/form/input-checkbox';
-import {
-  ActionNotification,
-  Notification,
-} from '@/app/components/carbon/notification';
+import { Notification } from '@/app/components/carbon/notification';
 
 const EDIT_TABS = [
   {
@@ -93,7 +91,9 @@ const EditAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
     greeting: undefined,
     greetingInterruptible: true,
     messageOnError: undefined,
-    idealTimeout: '30',
+    unclearInputTimeout: undefined,
+    unclearInputMessage: undefined,
+    idealTimeout: DEFAULT_IDEAL_TIMEOUT,
     idealMessage: 'Are you there?',
     maxCallDuration: '300',
     idleTimeoutBackoffTimes: '2',
@@ -151,6 +151,12 @@ const EditAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
             ? deployment.getGreetinginterruptible()
             : true,
           messageOnError: deployment.getMistake(),
+          unclearInputTimeout: deployment.hasUnclearinputtimeout?.()
+            ? deployment.getUnclearinputtimeout().toString()
+            : undefined,
+          unclearInputMessage: deployment.hasUnclearinputmessage?.()
+            ? deployment.getUnclearinputmessage()
+            : undefined,
           idealTimeout: deployment.getIdealtimeout(),
           idealMessage: deployment.getIdealtimeoutmessage(),
           maxCallDuration: deployment.getMaxsessionduration(),
@@ -258,6 +264,12 @@ const EditAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
       deployment.setGreeting(experienceConfig.greeting);
     if (experienceConfig.messageOnError)
       deployment.setMistake(experienceConfig.messageOnError);
+    if (experienceConfig.unclearInputTimeout)
+      deployment.setUnclearinputtimeout(
+        Number(experienceConfig.unclearInputTimeout),
+      );
+    if (experienceConfig.unclearInputMessage)
+      deployment.setUnclearinputmessage(experienceConfig.unclearInputMessage);
     if (experienceConfig.idealTimeout)
       deployment.setIdealtimeout(experienceConfig.idealTimeout);
     if (experienceConfig.idleTimeoutBackoffTimes)

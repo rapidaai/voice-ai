@@ -12,6 +12,10 @@ import {
 } from '@/providers/custom-stt/contract';
 import { ConfigRenderer } from '@/app/components/providers/config-renderer';
 import { FC } from 'react';
+import {
+  LEGACY_MICROPHONE_VAD_BARGE_IN_TRIGGER_KEY,
+  MICROPHONE_BARGE_IN_TRIGGER_KEY,
+} from '@/app/components/providers/microphone/barge-in-trigger-control';
 
 type ProviderCredentialRef = string | VaultCredential;
 
@@ -159,7 +163,9 @@ export const GetDefaultMicrophoneConfig = (
     'microphone.eos.model'?: string;
     'microphone.eos.provider'?: string;
     'microphone.denoising.provider'?: string;
+    'microphone.barge_in_trigger'?: string;
     'microphone.vad.provider'?: string;
+    'microphone.vad.barge_in_trigger'?: string;
     'microphone.vad.threshold'?: string;
   },
 ): Metadata[] => {
@@ -194,19 +200,38 @@ export const GetDefaultMicrophoneConfig = (
       value: defaults?.['microphone.vad.provider'] ?? 'silero_vad',
     },
     {
+      key: MICROPHONE_BARGE_IN_TRIGGER_KEY,
+      value:
+        defaults?.[MICROPHONE_BARGE_IN_TRIGGER_KEY] ??
+        defaults?.[LEGACY_MICROPHONE_VAD_BARGE_IN_TRIGGER_KEY] ??
+        'vad',
+    },
+    {
       key: 'microphone.vad.threshold',
-      value: defaults?.['microphone.vad.threshold'] ?? '0.6',
+      value: defaults?.['microphone.vad.threshold'] ?? '0.5',
     },
   ];
 
-  const existingKeys = new Set(existing.map(m => m.getKey()));
+  const legacyBargeInValue = existing.find(
+    m => m.getKey() === LEGACY_MICROPHONE_VAD_BARGE_IN_TRIGGER_KEY,
+  )?.getValue();
+  const existingWithoutLegacyBargeIn = existing.filter(
+    m => m.getKey() !== LEGACY_MICROPHONE_VAD_BARGE_IN_TRIGGER_KEY,
+  );
+  const existingKeys = new Set(
+    existingWithoutLegacyBargeIn.map(m => m.getKey()),
+  );
 
   const newConfigs = defaultConfig
     .filter(({ key }) => !existingKeys.has(key))
     .map(({ key, value }) => {
       const metadata = new Metadata();
       metadata.setKey(key);
-      metadata.setValue(value);
+      metadata.setValue(
+        key === MICROPHONE_BARGE_IN_TRIGGER_KEY && legacyBargeInValue
+          ? legacyBargeInValue
+          : value,
+      );
       return metadata;
     });
 
@@ -215,9 +240,13 @@ export const GetDefaultMicrophoneConfig = (
     existing.find(m => m.getKey() === 'microphone.eos.provider')?.getValue() ??
     'pipecat_smart_turn_eos';
 
-  let hydrated = GetDefaultEOSConfig(eosProvider, [...existing, ...newConfigs]);
+  let hydrated = GetDefaultEOSConfig(eosProvider, [
+    ...existingWithoutLegacyBargeIn,
+    ...newConfigs,
+  ]);
 
   for (const [key, value] of Object.entries(defaults ?? {})) {
+    if (key === LEGACY_MICROPHONE_VAD_BARGE_IN_TRIGGER_KEY) continue;
     if (!value || existingKeys.has(key)) continue;
     hydrated = upsertMetadata(hydrated, key, value);
   }
