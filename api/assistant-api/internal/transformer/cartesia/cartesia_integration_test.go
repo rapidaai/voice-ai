@@ -358,9 +358,12 @@ func TestCartesiaSTTLifecycle(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	stt, err := NewCartesiaSpeechToText(ctx, logger,
-		testutil.BuildCredential(pcfg.Credential), collector.OnPacket,
-		testutil.BuildOptions(pcfg.Options))
+	stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(
+		testutil.BuildCredential(pcfg.Credential)), WithOnPacket(
+		collector.OnPacket), WithOptions(
+
+		testutil.BuildOptions(pcfg.Options)))
+
 	require.NoError(t, err)
 	require.NotNil(t, stt)
 	assert.Equal(t, "cartesia-stt", stt.Name())
@@ -411,9 +414,12 @@ func TestCartesiaSTTAudioAcceptance(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	stt, err := NewCartesiaSpeechToText(ctx, logger,
-		testutil.BuildCredential(pcfg.Credential), collector.OnPacket,
-		testutil.BuildOptions(pcfg.Options))
+	stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(
+		testutil.BuildCredential(pcfg.Credential)), WithOnPacket(
+		collector.OnPacket), WithOptions(
+
+		testutil.BuildOptions(pcfg.Options)))
+
 	require.NoError(t, err)
 	require.NoError(t, stt.Initialize())
 	defer stt.Close(ctx)
@@ -435,9 +441,12 @@ func TestCartesiaSTTSilentAudio(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	stt, err := NewCartesiaSpeechToText(ctx, logger,
-		testutil.BuildCredential(pcfg.Credential), collector.OnPacket,
-		testutil.BuildOptions(pcfg.Options))
+	stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(
+		testutil.BuildCredential(pcfg.Credential)), WithOnPacket(
+		collector.OnPacket), WithOptions(
+
+		testutil.BuildOptions(pcfg.Options)))
+
 	require.NoError(t, err)
 	require.NoError(t, stt.Initialize())
 	defer stt.Close(ctx)
@@ -466,7 +475,7 @@ func TestCartesiaSTTReconnect(t *testing.T) {
 		collector := testutil.NewPacketCollector()
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 
-		stt, err := NewCartesiaSpeechToText(ctx, logger, cred, collector.OnPacket, opts)
+		stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(cred), WithOnPacket(collector.OnPacket), WithOptions(opts))
 		require.NoError(t, err, "attempt %d", attempt)
 		require.NoError(t, stt.Initialize(), "attempt %d", attempt)
 
@@ -499,9 +508,12 @@ func TestCartesiaSTTCloseWhileStreaming(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	stt, err := NewCartesiaSpeechToText(ctx, logger,
-		testutil.BuildCredential(pcfg.Credential), collector.OnPacket,
-		testutil.BuildOptions(pcfg.Options))
+	stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(
+		testutil.BuildCredential(pcfg.Credential)), WithOnPacket(
+		collector.OnPacket), WithOptions(
+
+		testutil.BuildOptions(pcfg.Options)))
+
 	require.NoError(t, err)
 	require.NoError(t, stt.Initialize())
 
@@ -537,9 +549,12 @@ func TestCartesiaSTTTranscriptContent(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	stt, err := NewCartesiaSpeechToText(ctx, logger,
-		testutil.BuildCredential(pcfg.Credential), collector.OnPacket,
-		testutil.BuildOptions(pcfg.Options))
+	stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(
+		testutil.BuildCredential(pcfg.Credential)), WithOnPacket(
+		collector.OnPacket), WithOptions(
+
+		testutil.BuildOptions(pcfg.Options)))
+
 	require.NoError(t, err)
 	require.NoError(t, stt.Initialize())
 	defer stt.Close(ctx)

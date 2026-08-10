@@ -23,6 +23,24 @@ const (
 	SpeechToTextTransformerName = "deepgram-stt"
 	TextToSpeechTransformerName = "deepgram-tts"
 	deepgramDefaultEndpoint     = "api.deepgram.com"
+	STTAgentIDTag               = "agent:%d"
+	STTConversationIDTag        = "conversation:%d"
+)
+
+const (
+	STTDefaultModel          = "nova"
+	STTDefaultLanguage       = "en-US"
+	STTDefaultChannels       = 1
+	STTDefaultSmartFormat    = true
+	STTDefaultInterimResults = true
+	STTDefaultFillerWords    = true
+	STTDefaultVADEvents      = false
+	STTDefaultEndpointing    = "5"
+	STTDefaultPunctuate      = true
+	STTDefaultNoDelay        = true
+	STTDefaultSampleRate     = 16000
+	STTDefaultDiarize        = false
+	STTDefaultMultichannel   = false
 )
 
 const (
@@ -64,12 +82,15 @@ type DeepgramOption struct {
 	endpoint string
 	logger   commons.Logger
 	mdlOpts  utils.Option
+	tags     []string
 }
 
 func NewDeepgramOption(
 	logger commons.Logger,
 	vaultCredential *protos.VaultCredential,
-	opts utils.Option) (*DeepgramOption, error) {
+	opts utils.Option,
+	tags ...string,
+) (*DeepgramOption, error) {
 	raw := vaultCredential.GetValue().AsMap()
 	cx, ok := raw["key"]
 	if !ok {
@@ -85,12 +106,14 @@ func NewDeepgramOption(
 			endpoint = endpointString
 		}
 	}
-	return &DeepgramOption{
+	deepgramOption := &DeepgramOption{
 		key:      key,
 		endpoint: endpoint,
 		logger:   logger,
 		mdlOpts:  opts,
-	}, nil
+		tags:     append([]string(nil), tags...),
+	}
+	return deepgramOption, nil
 }
 
 func (dgOpt *DeepgramOption) GetEncoding() string {
@@ -115,20 +138,21 @@ func (dgOpt *DeepgramOption) ClientOptions() *interfaces.ClientOptions {
 
 func (dgOpt *DeepgramOption) SpeechToTextOptions() *interfaces.LiveTranscriptionOptions {
 	opts := &interfaces.LiveTranscriptionOptions{
-		Model:          "nova",
-		Language:       "en-US",
-		Channels:       1,
-		SmartFormat:    true,
-		InterimResults: true,
-		FillerWords:    true,
-		VadEvents:      false,
-		Endpointing:    "5",
-		Punctuate:      true,
-		NoDelay:        true,
+		Model:          STTDefaultModel,
+		Language:       STTDefaultLanguage,
+		Channels:       STTDefaultChannels,
+		SmartFormat:    STTDefaultSmartFormat,
+		InterimResults: STTDefaultInterimResults,
+		FillerWords:    STTDefaultFillerWords,
+		VadEvents:      STTDefaultVADEvents,
+		Endpointing:    STTDefaultEndpointing,
+		Punctuate:      STTDefaultPunctuate,
+		NoDelay:        STTDefaultNoDelay,
 		Encoding:       dgOpt.GetEncoding(),
-		SampleRate:     16000,
-		Diarize:        false,
-		Multichannel:   false,
+		SampleRate:     STTDefaultSampleRate,
+		Diarize:        STTDefaultDiarize,
+		Multichannel:   STTDefaultMultichannel,
+		Tag:            make([]string, 0),
 	}
 
 	if language, err := dgOpt.mdlOpts.GetString(internal_options.ListenOptionLanguage); err == nil {
@@ -160,6 +184,7 @@ func (dgOpt *DeepgramOption) SpeechToTextOptions() *interfaces.LiveTranscription
 	if model, err := dgOpt.mdlOpts.GetString(internal_options.ListenOptionModel); err == nil {
 		opts.Model = model
 	}
+	opts.Tag = append(opts.Tag, dgOpt.tags...)
 
 	if keywordsRaw, exists := dgOpt.mdlOpts[internal_options.ListenOptionKeyword]; exists {
 		var keywords []string

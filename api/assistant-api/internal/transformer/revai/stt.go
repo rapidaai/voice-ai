@@ -15,11 +15,61 @@ import (
 	"github.com/rapidaai/protos"
 )
 
-func NewRevaiSpeechToText(
-	ctx context.Context,
-	logger commons.Logger,
-	credential *protos.VaultCredential,
-	onPacket func(pkt ...internal_type.Packet) error,
-	opts utils.Option) (internal_type.SpeechToTextTransformer, error) {
+type options struct {
+	ctx        context.Context
+	logger     commons.Logger
+	credential *protos.VaultCredential
+	onPacket   func(pkt ...internal_type.Packet) error
+	sttOptions utils.Option
+
+	assistantID    uint64
+	conversationID uint64
+}
+
+type Option func(*options)
+
+func WithContext(ctx context.Context) Option {
+	return func(options *options) {
+		options.ctx = ctx
+	}
+}
+
+func WithLogger(logger commons.Logger) Option {
+	return func(options *options) {
+		options.logger = logger
+	}
+}
+
+func WithCredential(credential *protos.VaultCredential) Option {
+	return func(options *options) {
+		options.credential = credential
+	}
+}
+
+func WithOnPacket(onPacket func(pkt ...internal_type.Packet) error) Option {
+	return func(options *options) {
+		options.onPacket = onPacket
+	}
+}
+
+func WithOptions(sttOptions utils.Option) Option {
+	return func(options *options) {
+		options.sttOptions = sttOptions
+	}
+}
+
+func WithAssistantID(assistantID uint64) Option {
+	return func(options *options) {
+		options.assistantID = assistantID
+	}
+}
+
+func WithConversationID(conversationID uint64) Option {
+	return func(options *options) {
+		options.conversationID = conversationID
+	}
+}
+
+func NewSpeechToText(opts ...Option) (internal_type.SpeechToTextTransformer, error) {
 	return nil, nil
 }

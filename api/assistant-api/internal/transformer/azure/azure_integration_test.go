@@ -337,7 +337,7 @@ func TestAzureSTTLifecycle(t *testing.T) {
 	cred := testutil.BuildCredential(pcfg.Credential)
 	opts := testutil.BuildOptions(pcfg.Options)
 
-	stt, err := NewAzureSpeechToText(ctx, logger, cred, collector.OnPacket, opts)
+	stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(cred), WithOnPacket(collector.OnPacket), WithOptions(opts))
 	require.NoError(t, err)
 	require.NotNil(t, stt)
 	assert.Equal(t, "azure-stt", stt.Name())
@@ -391,9 +391,12 @@ func TestAzureSTTAudioAcceptance(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	stt, err := NewAzureSpeechToText(ctx, logger,
-		testutil.BuildCredential(pcfg.Credential), collector.OnPacket,
-		testutil.BuildOptions(pcfg.Options))
+	stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(
+		testutil.BuildCredential(pcfg.Credential)), WithOnPacket(
+		collector.OnPacket), WithOptions(
+
+		testutil.BuildOptions(pcfg.Options)))
+
 	require.NoError(t, err)
 	require.NoError(t, stt.Initialize())
 	defer stt.Close(ctx)
@@ -417,9 +420,12 @@ func TestAzureSTTSilentAudio(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	stt, err := NewAzureSpeechToText(ctx, logger,
-		testutil.BuildCredential(pcfg.Credential), collector.OnPacket,
-		testutil.BuildOptions(pcfg.Options))
+	stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(
+		testutil.BuildCredential(pcfg.Credential)), WithOnPacket(
+		collector.OnPacket), WithOptions(
+
+		testutil.BuildOptions(pcfg.Options)))
+
 	require.NoError(t, err)
 	require.NoError(t, stt.Initialize())
 	defer stt.Close(ctx)
@@ -449,7 +455,7 @@ func TestAzureSTTReconnect(t *testing.T) {
 		collector := testutil.NewPacketCollector()
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 
-		stt, err := NewAzureSpeechToText(ctx, logger, cred, collector.OnPacket, opts)
+		stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(cred), WithOnPacket(collector.OnPacket), WithOptions(opts))
 		require.NoError(t, err, "attempt %d", attempt)
 		require.NoError(t, stt.Initialize(), "attempt %d", attempt)
 
@@ -484,9 +490,12 @@ func TestAzureSTTCloseWhileStreaming(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	stt, err := NewAzureSpeechToText(ctx, logger,
-		testutil.BuildCredential(pcfg.Credential), collector.OnPacket,
-		testutil.BuildOptions(pcfg.Options))
+	stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(
+		testutil.BuildCredential(pcfg.Credential)), WithOnPacket(
+		collector.OnPacket), WithOptions(
+
+		testutil.BuildOptions(pcfg.Options)))
+
 	require.NoError(t, err)
 	require.NoError(t, stt.Initialize())
 
@@ -524,9 +533,12 @@ func TestAzureSTTTranscriptContent(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	stt, err := NewAzureSpeechToText(ctx, logger,
-		testutil.BuildCredential(pcfg.Credential), collector.OnPacket,
-		testutil.BuildOptions(pcfg.Options))
+	stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(
+		testutil.BuildCredential(pcfg.Credential)), WithOnPacket(
+		collector.OnPacket), WithOptions(
+
+		testutil.BuildOptions(pcfg.Options)))
+
 	require.NoError(t, err)
 	require.NoError(t, stt.Initialize())
 	defer stt.Close(ctx)

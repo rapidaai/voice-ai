@@ -2587,13 +2587,16 @@ func (h requestorDispatchHandler) HandleInitializeSpeechToText(ctx context.Conte
 		})
 		return
 	}
-	atransformer, err := internal_transformer.GetSpeechToTextTransformer(
-		ctx,
-		h.r.logger,
-		cfg.AudioProvider,
-		credential,
-		func(pkt ...internal_type.Packet) error { return h.r.OnPacket(ctx, pkt...) },
-		options)
+	atransformer, err := internal_transformer.NewSpeechToText(
+		internal_transformer.WithContext(ctx),
+		internal_transformer.WithLogger(h.r.logger),
+		internal_transformer.WithProvider(cfg.AudioProvider),
+		internal_transformer.WithCredential(credential),
+		internal_transformer.WithOnPacket(func(pkt ...internal_type.Packet) error { return h.r.OnPacket(ctx, pkt...) }),
+		internal_transformer.WithOptions(options),
+		internal_transformer.WithAssistantID(p.Config.GetAssistant().GetAssistantId()),
+		internal_transformer.WithConversationID(p.Config.GetAssistantConversationId()),
+	)
 	if err != nil {
 		h.r.OnPacket(ctx, internal_type.InitializationFailedPacket{
 			ContextID: p.ContextID,
@@ -2775,48 +2778,46 @@ func (h requestorDispatchHandler) HandleInitializeBehavior(ctx context.Context, 
 		})
 		return
 	}
-	if validator.NonNil(behavior.Greeting) {
-		greetingContent := *behavior.Greeting
-		if validator.NotBlank(greetingContent) {
-			contextID := h.r.GetID()
-			if h.r.GetMode().Audio() && validator.NonNil(behavior.GreetingInterruptible) && !*behavior.GreetingInterruptible {
-				_ = h.r.OnPacket(ctx,
-					internal_type.DispatchPolicyPacket{
-						ContextID: contextID,
-						Policy: internal_type.DispatchPolicy{
-							Target: internal_type.PacketNameUserAudioReceived,
-							Action: internal_type.DispatchActionIgnore,
-						},
-					},
-					internal_type.DispatchPolicyPacket{
-						ContextID: contextID,
-						Policy: internal_type.DispatchPolicy{
-							Target: internal_type.PacketNameUserTextReceived,
-							Action: internal_type.DispatchActionIgnore,
-						},
-					},
-					internal_type.DispatchPolicyPacket{
-						ContextID: contextID,
-						Policy: internal_type.DispatchPolicy{
-							Target: internal_type.PacketNameInterruptionDetected,
-							Action: internal_type.DispatchActionIgnore,
-						},
-					},
-				)
-			}
+	if validator.NonNil(behavior.Greeting) && validator.NotBlank(*behavior.Greeting) {
+		contextID := h.r.GetID()
+		if h.r.GetMode().Audio() && validator.NonNil(behavior.GreetingInterruptible) && !*behavior.GreetingInterruptible {
 			_ = h.r.OnPacket(ctx,
-				internal_type.InjectMessagePacket{ContextID: contextID, Text: greetingContent},
-				internal_type.ObservabilityEventRecordPacket{
+				internal_type.DispatchPolicyPacket{
 					ContextID: contextID,
-					Scope:     internal_type.ObservabilityRecordScopeConversation,
-					Record: observability.NewConversationEventRecord(observability.ConversationAgentStateChanged, observability.Attributes{
-						"type":       "greeting",
-						"text_chars": fmt.Sprintf("%d", len(greetingContent)),
-					}),
+					Policy: internal_type.DispatchPolicy{
+						Target: internal_type.PacketNameUserAudioReceived,
+						Action: internal_type.DispatchActionIgnore,
+					},
 				},
-				internal_type.StartIdleTimeoutPacket{ContextID: h.r.GetID()},
+				internal_type.DispatchPolicyPacket{
+					ContextID: contextID,
+					Policy: internal_type.DispatchPolicy{
+						Target: internal_type.PacketNameUserTextReceived,
+						Action: internal_type.DispatchActionIgnore,
+					},
+				},
+				internal_type.DispatchPolicyPacket{
+					ContextID: contextID,
+					Policy: internal_type.DispatchPolicy{
+						Target: internal_type.PacketNameInterruptionDetected,
+						Action: internal_type.DispatchActionIgnore,
+					},
+				},
 			)
 		}
+		_ = h.r.OnPacket(ctx,
+			internal_type.InjectMessagePacket{ContextID: contextID, Text: *behavior.Greeting},
+			internal_type.ObservabilityEventRecordPacket{
+				ContextID: contextID,
+				Scope:     internal_type.ObservabilityRecordScopeConversation,
+				Record: observability.NewConversationEventRecord(observability.ConversationAgentStateChanged, observability.Attributes{
+					"type":       "greeting",
+					"text_chars": fmt.Sprintf("%d", len(*behavior.Greeting)),
+				}),
+			},
+		)
+	} else {
+		h.r.OnPacket(ctx, internal_type.StartIdleTimeoutPacket{ContextID: h.r.GetID()})
 	}
 	if validator.NonNil(behavior.MaxSessionDuration) && *behavior.MaxSessionDuration > 0 {
 		timeoutDuration := time.Duration(*behavior.MaxSessionDuration) * time.Second
@@ -2940,13 +2941,34 @@ func (h requestorDispatchHandler) HandleModeSwitchInitializeSpeechToText(ctx con
 		})
 		return
 	}
-	atransformer, err := internal_transformer.GetSpeechToTextTransformer(
-		ctx,
-		h.r.logger,
-		cfg.AudioProvider,
-		credential,
-		func(pkt ...internal_type.Packet) error { return h.r.OnPacket(ctx, pkt...) },
-		options)
+	assistant, err := h.r.Assistant()
+	if err != nil {
+		h.r.OnPacket(ctx, internal_type.ModeSwitchErrorPacket{
+			ContextID: p.ContextID,
+			Type:      internal_type.ModeSwitchErrorTypeInitializeSpeechToText,
+			Error:     err,
+		})
+		return
+	}
+	conversation, err := h.r.Conversation()
+	if err != nil {
+		h.r.OnPacket(ctx, internal_type.ModeSwitchErrorPacket{
+			ContextID: p.ContextID,
+			Type:      internal_type.ModeSwitchErrorTypeInitializeSpeechToText,
+			Error:     err,
+		})
+		return
+	}
+	atransformer, err := internal_transformer.NewSpeechToText(
+		internal_transformer.WithContext(ctx),
+		internal_transformer.WithLogger(h.r.logger),
+		internal_transformer.WithProvider(cfg.AudioProvider),
+		internal_transformer.WithCredential(credential),
+		internal_transformer.WithOnPacket(func(pkt ...internal_type.Packet) error { return h.r.OnPacket(ctx, pkt...) }),
+		internal_transformer.WithOptions(options),
+		internal_transformer.WithAssistantID(assistant.Id),
+		internal_transformer.WithConversationID(conversation.Id),
+	)
 	if err != nil {
 		h.r.OnPacket(ctx, internal_type.ModeSwitchErrorPacket{
 			ContextID: p.ContextID,

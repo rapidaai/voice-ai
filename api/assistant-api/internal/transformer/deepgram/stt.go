@@ -45,6 +45,9 @@ type options struct {
 	credential *protos.VaultCredential
 	onPacket   func(pkt ...internal_type.Packet) error
 	sttOptions utils.Option
+
+	assistantID    uint64
+	conversationID uint64
 }
 
 type Option func(*options)
@@ -79,29 +82,24 @@ func WithOptions(sttOptions utils.Option) Option {
 	}
 }
 
+func WithAssistantID(assistantID uint64) Option {
+	return func(options *options) {
+		options.assistantID = assistantID
+	}
+}
+
+func WithConversationID(conversationID uint64) Option {
+	return func(options *options) {
+		options.conversationID = conversationID
+	}
+}
+
 func (*deepgramSTT) Name() string {
 	return deepgram_internal.SpeechToTextTransformerName
 }
 
 func (dg *deepgramSTT) Initialize() error {
 	return nil
-}
-
-// Deprecated: use NewSpeechToText with functional options instead.
-func NewDeepgramSpeechToText(
-	ctx context.Context,
-	logger commons.Logger,
-	vaultCredential *protos.VaultCredential,
-	onPacket func(pkt ...internal_type.Packet) error,
-	opts utils.Option,
-) (internal_type.SpeechToTextTransformer, error) {
-	return NewSpeechToText(
-		WithContext(ctx),
-		WithLogger(logger),
-		WithCredential(vaultCredential),
-		WithOnPacket(onPacket),
-		WithOptions(opts),
-	)
 }
 
 func NewSpeechToText(opts ...Option) (*deepgramSTT, error) {
@@ -121,7 +119,13 @@ func NewSpeechToText(opts ...Option) (*deepgramSTT, error) {
 		return nil, fmt.Errorf(deepgram_internal.STTOnPacketRequiredErrorMessage)
 	}
 
-	deepgramOpts, err := deepgram_internal.NewDeepgramOption(options.logger, options.credential, options.sttOptions)
+	deepgramOpts, err := deepgram_internal.NewDeepgramOption(
+		options.logger,
+		options.credential,
+		options.sttOptions,
+		fmt.Sprintf(deepgram_internal.STTAgentIDTag, options.assistantID),
+		fmt.Sprintf(deepgram_internal.STTConversationIDTag, options.conversationID),
+	)
 	if err != nil {
 		options.logger.Errorf(deepgram_internal.STTCredentialFailedLogMessage, err)
 		return nil, err

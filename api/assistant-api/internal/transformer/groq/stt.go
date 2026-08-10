@@ -40,20 +40,83 @@ type groqSTT struct {
 	onPacket func(pkt ...internal_type.Packet) error
 }
 
-func NewGroqSpeechToText(ctx context.Context, logger commons.Logger, credential *protos.VaultCredential,
-	onPacket func(pkt ...internal_type.Packet) error,
-	opts utils.Option) (internal_type.SpeechToTextTransformer, error) {
-	groqOpts, err := NewGroqOption(logger, credential, opts)
+type options struct {
+	ctx        context.Context
+	logger     commons.Logger
+	credential *protos.VaultCredential
+	onPacket   func(pkt ...internal_type.Packet) error
+	sttOptions utils.Option
+
+	assistantID    uint64
+	conversationID uint64
+}
+
+type Option func(*options)
+
+func WithContext(ctx context.Context) Option {
+	return func(options *options) {
+		options.ctx = ctx
+	}
+}
+
+func WithLogger(logger commons.Logger) Option {
+	return func(options *options) {
+		options.logger = logger
+	}
+}
+
+func WithCredential(credential *protos.VaultCredential) Option {
+	return func(options *options) {
+		options.credential = credential
+	}
+}
+
+func WithOnPacket(onPacket func(pkt ...internal_type.Packet) error) Option {
+	return func(options *options) {
+		options.onPacket = onPacket
+	}
+}
+
+func WithOptions(sttOptions utils.Option) Option {
+	return func(options *options) {
+		options.sttOptions = sttOptions
+	}
+}
+
+func WithAssistantID(assistantID uint64) Option {
+	return func(options *options) {
+		options.assistantID = assistantID
+	}
+}
+
+func WithConversationID(conversationID uint64) Option {
+	return func(options *options) {
+		options.conversationID = conversationID
+	}
+}
+
+func NewSpeechToText(opts ...Option) (internal_type.SpeechToTextTransformer, error) {
+	options := &options{ctx: context.Background(), sttOptions: utils.Option{}}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(options)
+		}
+	}
+	if options.ctx == nil {
+		options.ctx = context.Background()
+	}
+
+	groqOpts, err := NewGroqOption(options.logger, options.credential, options.sttOptions)
 	if err != nil {
-		logger.Errorf("groq-stt: initializing groq failed %+v", err)
+		options.logger.Errorf("groq-stt: initializing groq failed %+v", err)
 		return nil, err
 	}
-	ctx2, contextCancel := context.WithCancel(ctx)
+	ctx2, contextCancel := context.WithCancel(options.ctx)
 	return &groqSTT{
 		ctx:        ctx2,
 		ctxCancel:  contextCancel,
-		onPacket:   onPacket,
-		logger:     logger,
+		onPacket:   options.onPacket,
+		logger:     options.logger,
 		groqOption: groqOpts,
 	}, nil
 }

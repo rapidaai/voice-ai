@@ -94,6 +94,7 @@ func TestSpeechToTextOptions_Defaults(t *testing.T) {
 	assert.Equal(t, 16000, sttOpts.SampleRate)
 	assert.False(t, sttOpts.Diarize)
 	assert.False(t, sttOpts.Multichannel)
+	assert.Empty(t, sttOpts.Tag)
 }
 
 func TestSpeechToTextOptions_WithOverrides(t *testing.T) {
@@ -124,6 +125,20 @@ func TestSpeechToTextOptions_WithOverrides(t *testing.T) {
 	// Encoding and sample rate remain hardcoded
 	assert.Equal(t, "linear16", sttOpts.Encoding)
 	assert.Equal(t, 16000, sttOpts.SampleRate)
+}
+
+func TestSpeechToTextOptions_WithTags(t *testing.T) {
+	cred := newVaultCredential(map[string]interface{}{"key": "k"})
+	opt, _ := deepgram_internal.NewDeepgramOption(
+		testutil.NewTestLogger(),
+		cred,
+		utils.Option{},
+		"agent:123",
+		"conversation:456",
+	)
+	sttOpts := opt.SpeechToTextOptions()
+
+	assert.Equal(t, []string{"agent:123", "conversation:456"}, sttOpts.Tag)
 }
 
 func TestSpeechToTextOptions_KeywordsNova2(t *testing.T) {

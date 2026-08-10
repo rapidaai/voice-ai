@@ -578,7 +578,7 @@ func TestGoogleSTTLifecycle(t *testing.T) {
 	cred := testutil.BuildCredential(pcfg.Credential)
 	opts := testutil.BuildOptions(pcfg.Options)
 
-	stt, err := NewGoogleSpeechToText(ctx, logger, cred, collector.OnPacket, opts)
+	stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(cred), WithOnPacket(collector.OnPacket), WithOptions(opts))
 	require.NoError(t, err)
 	require.NotNil(t, stt)
 	assert.Equal(t, "google-stt", stt.Name())
@@ -664,7 +664,7 @@ func TestGoogleSTTAudioAcceptance(t *testing.T) {
 	cred := testutil.BuildCredential(pcfg.Credential)
 	opts := testutil.BuildOptions(pcfg.Options)
 
-	stt, err := NewGoogleSpeechToText(ctx, logger, cred, collector.OnPacket, opts)
+	stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(cred), WithOnPacket(collector.OnPacket), WithOptions(opts))
 	require.NoError(t, err)
 	require.NoError(t, stt.Initialize())
 	defer stt.Close(ctx)
@@ -694,7 +694,7 @@ func TestGoogleSTTSilentAudio(t *testing.T) {
 	cred := testutil.BuildCredential(pcfg.Credential)
 	opts := testutil.BuildOptions(pcfg.Options)
 
-	stt, err := NewGoogleSpeechToText(ctx, logger, cred, collector.OnPacket, opts)
+	stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(cred), WithOnPacket(collector.OnPacket), WithOptions(opts))
 	require.NoError(t, err)
 	require.NoError(t, stt.Initialize())
 	defer stt.Close(ctx)
@@ -728,7 +728,7 @@ func TestGoogleSTTReconnect(t *testing.T) {
 		collector := testutil.NewPacketCollector()
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 
-		stt, err := NewGoogleSpeechToText(ctx, logger, cred, collector.OnPacket, opts)
+		stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(cred), WithOnPacket(collector.OnPacket), WithOptions(opts))
 		require.NoError(t, err, "attempt %d", attempt)
 		require.NoError(t, stt.Initialize(), "attempt %d", attempt)
 
@@ -769,7 +769,7 @@ func TestGoogleSTTCloseWhileStreaming(t *testing.T) {
 	cred := testutil.BuildCredential(pcfg.Credential)
 	opts := testutil.BuildOptions(pcfg.Options)
 
-	stt, err := NewGoogleSpeechToText(ctx, logger, cred, collector.OnPacket, opts)
+	stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(cred), WithOnPacket(collector.OnPacket), WithOptions(opts))
 	require.NoError(t, err)
 	require.NoError(t, stt.Initialize())
 
@@ -812,7 +812,7 @@ func TestGoogleSTTTranscriptContent(t *testing.T) {
 	cred := testutil.BuildCredential(pcfg.Credential)
 	opts := testutil.BuildOptions(pcfg.Options)
 
-	stt, err := NewGoogleSpeechToText(ctx, logger, cred, collector.OnPacket, opts)
+	stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(cred), WithOnPacket(collector.OnPacket), WithOptions(opts))
 	require.NoError(t, err)
 	require.NoError(t, stt.Initialize())
 	defer stt.Close(ctx)
