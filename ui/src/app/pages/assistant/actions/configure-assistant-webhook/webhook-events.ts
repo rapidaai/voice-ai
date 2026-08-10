@@ -40,13 +40,6 @@ export const webhookEvents: WebhookEventOption[] = [
     group: 'Call',
   },
   {
-    id: 'call.outbound_dispatch_failed',
-    name: 'call.outbound_dispatch_failed',
-    description:
-      'Triggered when an outbound call request cannot be sent to the provider.',
-    group: 'Call',
-  },
-  {
     id: 'call.started',
     name: 'call.started',
     description: 'Triggered when the call session starts.',
