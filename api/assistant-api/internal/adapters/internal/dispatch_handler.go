@@ -2775,12 +2775,10 @@ func (h requestorDispatchHandler) HandleInitializeBehavior(ctx context.Context, 
 		})
 		return
 	}
-	greetingInjected := false
 	if validator.NonNil(behavior.Greeting) {
 		greetingContent := *behavior.Greeting
 		if validator.NotBlank(greetingContent) {
 			contextID := h.r.GetID()
-			greetingInjected = true
 			if h.r.GetMode().Audio() && validator.NonNil(behavior.GreetingInterruptible) && !*behavior.GreetingInterruptible {
 				_ = h.r.OnPacket(ctx,
 					internal_type.DispatchPolicyPacket{
@@ -2816,12 +2814,9 @@ func (h requestorDispatchHandler) HandleInitializeBehavior(ctx context.Context, 
 						"text_chars": fmt.Sprintf("%d", len(greetingContent)),
 					}),
 				},
-				// internal_type.StartIdleTimeoutPacket{ContextID: contextID},
+				internal_type.StartIdleTimeoutPacket{ContextID: h.r.GetID()},
 			)
 		}
-	}
-	if !greetingInjected && validator.NonNil(behavior.IdleTimeout) && *behavior.IdleTimeout > 0 {
-		_ = h.r.OnPacket(ctx, internal_type.StartIdleTimeoutPacket{ContextID: h.r.GetID()})
 	}
 	if validator.NonNil(behavior.MaxSessionDuration) && *behavior.MaxSessionDuration > 0 {
 		timeoutDuration := time.Duration(*behavior.MaxSessionDuration) * time.Second
