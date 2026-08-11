@@ -34,22 +34,20 @@ type StreamVadFrameResult struct {
 type PostprocessorConfig struct {
 	SmoothWindowSize int
 	SpeechThreshold  float32
-	PadStartFrame    int
 	MinSpeechFrame   int
 	MaxSpeechFrame   int
 	MinSilenceFrame  int
 }
 
-// DefaultPostprocessorConfig returns the default configuration matching
-// the FireRedVAD streaming defaults.
+// DefaultPostprocessorConfig returns the default configuration exposed by the
+// provider options.
 func DefaultPostprocessorConfig() PostprocessorConfig {
 	return PostprocessorConfig{
 		SmoothWindowSize: 5,
-		SpeechThreshold:  0.4,
-		PadStartFrame:    5,
-		MinSpeechFrame:   8,
+		SpeechThreshold:  defaultConfidence,
+		MinSpeechFrame:   vadDurationFrames(defaultStartSecs),
 		MaxSpeechFrame:   2000,
-		MinSilenceFrame:  20,
+		MinSilenceFrame:  vadDurationFrames(defaultStopSecs),
 	}
 }
 
@@ -78,9 +76,6 @@ type Postprocessor struct {
 func NewPostprocessor(cfg PostprocessorConfig) *Postprocessor {
 	if cfg.SmoothWindowSize < 1 {
 		cfg.SmoothWindowSize = 1
-	}
-	if cfg.PadStartFrame < cfg.SmoothWindowSize {
-		cfg.PadStartFrame = cfg.SmoothWindowSize
 	}
 	return &Postprocessor{
 		cfg:                  cfg,
@@ -179,7 +174,7 @@ func (p *Postprocessor) stateTransition(isSpeech bool, result *StreamVadFrameRes
 			if p.speechCnt >= p.cfg.MinSpeechFrame {
 				p.state = stateSpeech
 				result.IsSpeechStart = true
-				startFrame := p.frameCnt - p.speechCnt + 1 - p.cfg.PadStartFrame
+				startFrame := p.frameCnt - p.speechCnt + 1
 				if startFrame < 1 {
 					startFrame = 1
 				}

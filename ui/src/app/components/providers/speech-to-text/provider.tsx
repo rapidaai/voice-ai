@@ -166,7 +166,10 @@ export const GetDefaultMicrophoneConfig = (
     'microphone.barge_in_trigger'?: string;
     'microphone.vad.provider'?: string;
     'microphone.vad.barge_in_trigger'?: string;
-    'microphone.vad.threshold'?: string;
+    'microphone.vad.confidence'?: string;
+    'microphone.vad.start_secs'?: string;
+    'microphone.vad.stop_secs'?: string;
+    'microphone.vad.min_volume'?: string;
   },
 ): Metadata[] => {
   const upsertMetadata = (
@@ -207,8 +210,20 @@ export const GetDefaultMicrophoneConfig = (
         'vad',
     },
     {
-      key: 'microphone.vad.threshold',
-      value: defaults?.['microphone.vad.threshold'] ?? '0.5',
+      key: 'microphone.vad.confidence',
+      value: defaults?.['microphone.vad.confidence'] ?? '0.7',
+    },
+    {
+      key: 'microphone.vad.start_secs',
+      value: defaults?.['microphone.vad.start_secs'] ?? '0.2',
+    },
+    {
+      key: 'microphone.vad.stop_secs',
+      value: defaults?.['microphone.vad.stop_secs'] ?? '0.2',
+    },
+    {
+      key: 'microphone.vad.min_volume',
+      value: defaults?.['microphone.vad.min_volume'] ?? '0.6',
     },
   ];
 

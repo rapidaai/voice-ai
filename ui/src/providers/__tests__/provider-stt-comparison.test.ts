@@ -6,7 +6,7 @@
  * as the original hand-written constant.ts functions.
  */
 import { Metadata } from '@rapidaai/react';
-import { loadProviderConfig } from '../config-loader';
+import { loadProviderConfig, resolveCategoryParameters } from '../config-loader';
 import { getDefaultsFromConfig, validateFromConfig } from '../config-defaults';
 
 function createMetadata(key: string, value: string): Metadata {
@@ -126,6 +126,24 @@ describe('Deepgram STT — config vs original', () => {
         'listen.keywords',
       ]),
     );
+  });
+
+  it('renders endpointing as a bounded number input', () => {
+    const params = resolveCategoryParameters(
+      'deepgram',
+      'stt',
+      config.stt!,
+      [createMetadata('listen.model', 'nova-3')],
+    );
+    const endpointing = params.find(p => p.key === 'listen.endpointing');
+
+    expect(endpointing).toMatchObject({
+      label: 'Endpointing (ms)',
+      type: 'number',
+      min: 5,
+      max: 500,
+      step: 1,
+    });
   });
 
   it('validates: valid options returns undefined', () => {

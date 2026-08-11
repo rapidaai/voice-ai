@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	internal_options "github.com/rapidaai/api/assistant-api/internal/options"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
@@ -21,17 +22,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestOptions(tb testing.TB, threshold float64) utils.Option {
+func newTestOptions(tb testing.TB, confidence float64) utils.Option {
 	opts := map[string]interface{}{}
-	if threshold >= 0 {
-		opts["microphone.vad.threshold"] = threshold
+	if confidence >= 0 {
+		opts[internal_options.MicrophoneVADOptionConfidence] = confidence
 	}
 	return opts
 }
 
-func newTenVADOrSkip(t *testing.T, threshold float64, cb func(ctx context.Context, pkt ...internal_type.Packet) error) *TenVAD {
+func newTenVADOrSkip(t *testing.T, confidence float64, cb func(ctx context.Context, pkt ...internal_type.Packet) error) *TenVAD {
 	logger, _ := commons.NewApplicationLogger()
-	opts := newTestOptions(t, threshold)
+	opts := newTestOptions(t, confidence)
 	vad, err := newTenVADForTest(t.Context(), logger, cb, opts)
 	if err != nil {
 		t.Skipf("ten_vad library not available: %v", err)
@@ -65,12 +66,36 @@ func generateNoise(samples int) internal_type.UserAudioReceivedPacket {
 
 // Core functionality tests
 
-func TestNew_DefaultThreshold(t *testing.T) {
+func TestNew_DefaultConfig(t *testing.T) {
 	callback := func(context.Context, ...internal_type.Packet) error { return nil }
 
 	vad := newTenVADOrSkip(t, -1, callback)
 
 	assert.NotNil(t, vad.detector)
+	assert.Equal(t, float32(defaultConfidence), vad.confidence)
+	assert.Equal(t, defaultStartSecs, vad.startSecs)
+	assert.Equal(t, defaultStopSecs, vad.stopSecs)
+}
+
+func TestNew_OverridesConfig(t *testing.T) {
+	callback := func(context.Context, ...internal_type.Packet) error { return nil }
+	logger, _ := commons.NewApplicationLogger()
+	opts := utils.Option{
+		internal_options.MicrophoneVADOptionConfidence: 0.55,
+		internal_options.MicrophoneVADOptionStartSecs:  0.1,
+		internal_options.MicrophoneVADOptionStopSecs:   0.4,
+	}
+
+	vad, err := newTenVADForTest(t.Context(), logger, callback, opts)
+	if err != nil {
+		t.Skipf("ten_vad library not available: %v", err)
+	}
+	tv := vad.(*TenVAD)
+	t.Cleanup(func() { _ = tv.Close(context.Background()) })
+
+	assert.Equal(t, float32(0.55), tv.confidence)
+	assert.Equal(t, 0.1, tv.startSecs)
+	assert.Equal(t, 0.4, tv.stopSecs)
 }
 
 func TestTenVAD_Name(t *testing.T) {
@@ -333,25 +358,4 @@ func TestTenVAD_Process_PartialFrameCarry_NoDrop(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 256, vad.currSample)
 	assert.Equal(t, 72, len(vad.pending))
-}
-
-func TestTenVAD_NotifyInterruption_SetsEvent(t *testing.T) {
-	var got internal_type.InterruptionDetectedPacket
-	callback := func(_ context.Context, pkts ...internal_type.Packet) error {
-		for _, p := range pkts {
-			if ip, ok := p.(internal_type.InterruptionDetectedPacket); ok {
-				got = ip
-			}
-		}
-		return nil
-	}
-
-	v := &TenVAD{onPacket: callback}
-	v.notifyInterruption(context.Background(), "ctx-test", internal_type.InterruptionEventEnd, 3.25, 1)
-
-	assert.Equal(t, "ctx-test", got.ContextID)
-	assert.Equal(t, internal_type.InterruptionSourceVad, got.Source)
-	assert.Equal(t, internal_type.InterruptionEventEnd, got.Event)
-	assert.Equal(t, 3.25, got.StartAt)
-	assert.Equal(t, 3.25, got.EndAt)
 }

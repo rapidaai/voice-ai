@@ -23,19 +23,20 @@ const {
 
 const backendVadDefaults: Record<string, Record<string, string>> = {
   silero_vad: {
-    'microphone.vad.threshold': '0.5',
-    'microphone.vad.min_silence_frame': '20',
-    'microphone.vad.min_speech_frame': '8',
+    'microphone.vad.confidence': '0.7',
+    'microphone.vad.start_secs': '0.2',
+    'microphone.vad.stop_secs': '0.2',
+    'microphone.vad.min_volume': '0.6',
   },
   ten_vad: {
-    'microphone.vad.threshold': '0.5',
-    'microphone.vad.min_silence_frame': '20',
-    'microphone.vad.min_speech_frame': '8',
+    'microphone.vad.confidence': '0.7',
+    'microphone.vad.start_secs': '0.2',
+    'microphone.vad.stop_secs': '0.2',
   },
   firered_vad: {
-    'microphone.vad.threshold': '0.4',
-    'microphone.vad.min_silence_frame': '20',
-    'microphone.vad.min_speech_frame': '8',
+    'microphone.vad.confidence': '0.7',
+    'microphone.vad.start_secs': '0.2',
+    'microphone.vad.stop_secs': '0.2',
   },
 };
 
@@ -157,9 +158,9 @@ describe('Audio input advanced defaults parity', () => {
         createMetadata('rapida.credential_id', 'cred'),
         createMetadata('listen.model', 'nova-3'),
         createMetadata('microphone.vad.provider', 'ten_vad'),
-        createMetadata('microphone.vad.threshold', '0.77'),
-        createMetadata('microphone.vad.min_silence_frame', '15'),
-        createMetadata('microphone.vad.min_speech_frame', '4'),
+        createMetadata('microphone.vad.confidence', '0.77'),
+        createMetadata('microphone.vad.start_secs', '0.04'),
+        createMetadata('microphone.vad.stop_secs', '0.15'),
       ];
 
       const expected = expectedGetDefaultVADConfig(
@@ -194,7 +195,7 @@ describe('Audio input advanced defaults parity', () => {
   it('VAD provider key is always updated to the selected provider', () => {
     const seed = [
       createMetadata('microphone.vad.provider', 'ten_vad'),
-      createMetadata('microphone.vad.threshold', '0.3'),
+      createMetadata('microphone.vad.confidence', '0.3'),
     ];
     const updated = GetDefaultVADConfig('silero_vad', cloneMetadata(seed));
 
@@ -253,7 +254,10 @@ describe('Audio input advanced defaults parity', () => {
     expect(getMetadataValue(defaults, 'microphone.barge_in_trigger')).toBe(
       'vad',
     );
-    expect(getMetadataValue(defaults, 'microphone.vad.threshold')).toBe('0.5');
+    expect(getMetadataValue(defaults, 'microphone.vad.confidence')).toBe('0.7');
+    expect(getMetadataValue(defaults, 'microphone.vad.start_secs')).toBe('0.2');
+    expect(getMetadataValue(defaults, 'microphone.vad.stop_secs')).toBe('0.2');
+    expect(getMetadataValue(defaults, 'microphone.vad.min_volume')).toBe('0.6');
     expect(getMetadataValue(defaults, 'microphone.eos.provider')).toBe(
       'pipecat_smart_turn_eos',
     );
@@ -328,7 +332,7 @@ describe('Audio input advanced defaults parity', () => {
     const seed = [
       createMetadata('listen.model', 'nova-3'),
       createMetadata('microphone.eos.fallback_timeout', '700'),
-      createMetadata('microphone.vad.threshold', '0.6'),
+      createMetadata('microphone.vad.confidence', '0.6'),
       createMetadata('microphone.denoising.provider', 'rn_noise'),
     ];
 

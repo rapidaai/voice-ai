@@ -72,11 +72,11 @@
         {
           "key": "listen.endpointing",
           "label": "Endpointing (ms)",
-          "type": "slider",
+          "type": "number",
           "required": false,
           "default": "5",
           "min": 5,
-          "max": 200,
+          "max": 500,
           "step": 1
         },
         {
@@ -190,11 +190,11 @@
         {
           "key": "listen.endpointing",
           "label": "Endpointing (ms)",
-          "type": "slider",
+          "type": "number",
           "required": false,
           "default": "5",
           "min": 5,
-          "max": 200,
+          "max": 500,
           "step": 1
         },
         {
@@ -308,11 +308,11 @@
         {
           "key": "listen.endpointing",
           "label": "Endpointing (ms)",
-          "type": "slider",
+          "type": "number",
           "required": false,
           "default": "5",
           "min": 5,
-          "max": 200,
+          "max": 500,
           "step": 1
         },
         {
@@ -426,11 +426,11 @@
         {
           "key": "listen.endpointing",
           "label": "Endpointing (ms)",
-          "type": "slider",
+          "type": "number",
           "required": false,
           "default": "5",
           "min": 5,
-          "max": 200,
+          "max": 500,
           "step": 1
         },
         {
@@ -544,11 +544,11 @@
         {
           "key": "listen.endpointing",
           "label": "Endpointing (ms)",
-          "type": "slider",
+          "type": "number",
           "required": false,
           "default": "5",
           "min": 5,
-          "max": 200,
+          "max": 500,
           "step": 1
         },
         {
@@ -662,11 +662,11 @@
         {
           "key": "listen.endpointing",
           "label": "Endpointing (ms)",
-          "type": "slider",
+          "type": "number",
           "required": false,
           "default": "5",
           "min": 5,
-          "max": 200,
+          "max": 500,
           "step": 1
         },
         {
@@ -780,11 +780,11 @@
         {
           "key": "listen.endpointing",
           "label": "Endpointing (ms)",
-          "type": "slider",
+          "type": "number",
           "required": false,
           "default": "5",
           "min": 5,
-          "max": 200,
+          "max": 500,
           "step": 1
         },
         {
@@ -898,11 +898,11 @@
         {
           "key": "listen.endpointing",
           "label": "Endpointing (ms)",
-          "type": "slider",
+          "type": "number",
           "required": false,
           "default": "5",
           "min": 5,
-          "max": 200,
+          "max": 500,
           "step": 1
         },
         {
@@ -1016,11 +1016,11 @@
         {
           "key": "listen.endpointing",
           "label": "Endpointing (ms)",
-          "type": "slider",
+          "type": "number",
           "required": false,
           "default": "5",
           "min": 5,
-          "max": 200,
+          "max": 500,
           "step": 1
         },
         {
@@ -1134,11 +1134,11 @@
         {
           "key": "listen.endpointing",
           "label": "Endpointing (ms)",
-          "type": "slider",
+          "type": "number",
           "required": false,
           "default": "5",
           "min": 5,
-          "max": 200,
+          "max": 500,
           "step": 1
         },
         {
@@ -1252,11 +1252,11 @@
         {
           "key": "listen.endpointing",
           "label": "Endpointing (ms)",
-          "type": "slider",
+          "type": "number",
           "required": false,
           "default": "5",
           "min": 5,
-          "max": 200,
+          "max": 500,
           "step": 1
         },
         {
@@ -1370,11 +1370,11 @@
         {
           "key": "listen.endpointing",
           "label": "Endpointing (ms)",
-          "type": "slider",
+          "type": "number",
           "required": false,
           "default": "5",
           "min": 5,
-          "max": 200,
+          "max": 500,
           "step": 1
         },
         {
@@ -1487,11 +1487,11 @@
         {
           "key": "listen.endpointing",
           "label": "Endpointing (ms)",
-          "type": "slider",
+          "type": "number",
           "required": false,
           "default": "5",
           "min": 5,
-          "max": 200,
+          "max": 500,
           "step": 1
         },
         {
@@ -1604,11 +1604,11 @@
         {
           "key": "listen.endpointing",
           "label": "Endpointing (ms)",
-          "type": "slider",
+          "type": "number",
           "required": false,
           "default": "5",
           "min": 5,
-          "max": 200,
+          "max": 500,
           "step": 1
         },
         {
@@ -1721,11 +1721,11 @@
         {
           "key": "listen.endpointing",
           "label": "Endpointing (ms)",
-          "type": "slider",
+          "type": "number",
           "required": false,
           "default": "5",
           "min": 5,
-          "max": 200,
+          "max": 500,
           "step": 1
         },
         {

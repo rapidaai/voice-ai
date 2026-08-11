@@ -18,10 +18,10 @@ import (
 
 // Benchmark helpers
 
-func newBenchmarkTenVAD(b *testing.B, threshold float64) *TenVAD {
+func newBenchmarkTenVAD(b *testing.B, confidence float64) *TenVAD {
 	logger, _ := commons.NewApplicationLogger()
 	callback := func(context.Context, ...internal_type.Packet) error { return nil }
-	opts := newTestOptions(b, threshold)
+	opts := newTestOptions(b, confidence)
 
 	vad, err := newTenVADForTest(b.Context(), logger, callback, opts)
 	if err != nil {
@@ -180,9 +180,9 @@ func BenchmarkTenVAD_Process_ChunkSize_2s(b *testing.B) {
 	}
 }
 
-// Different thresholds
+// Different confidence values
 
-func BenchmarkTenVAD_Process_Threshold_0_1(b *testing.B) {
+func BenchmarkTenVAD_Process_Confidence_0_1(b *testing.B) {
 	vad := newBenchmarkTenVAD(b, 0.1)
 	data := generateBenchmarkSineWave(8000, 440, 0.8)
 
@@ -193,7 +193,7 @@ func BenchmarkTenVAD_Process_Threshold_0_1(b *testing.B) {
 	}
 }
 
-func BenchmarkTenVAD_Process_Threshold_0_5(b *testing.B) {
+func BenchmarkTenVAD_Process_Confidence_0_5(b *testing.B) {
 	vad := newBenchmarkTenVAD(b, 0.5)
 	data := generateBenchmarkSineWave(8000, 440, 0.8)
 
@@ -204,7 +204,7 @@ func BenchmarkTenVAD_Process_Threshold_0_5(b *testing.B) {
 	}
 }
 
-func BenchmarkTenVAD_Process_Threshold_0_9(b *testing.B) {
+func BenchmarkTenVAD_Process_Confidence_0_9(b *testing.B) {
 	vad := newBenchmarkTenVAD(b, 0.9)
 	data := generateBenchmarkSineWave(8000, 440, 0.8)
 
