@@ -53,12 +53,13 @@ func (d *Dispatcher) runOutbound(ctx context.Context, v OutboundRequestedPipelin
 			},
 		}, observability.RecordWebhook{
 			Event: observability.CallFailed,
-			Payload: map[string]interface{}{
-				"to":        v.ToPhone,
-				"from":      v.FromPhone,
-				"stage":     "assistant_load",
-				"direction": "outbound",
-				"error":     err.Error(),
+			Payload: observability.CallFailedWebhookPayload{
+				V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+				To:                   v.ToPhone,
+				From:                 v.FromPhone,
+				Direction:            "outbound",
+				Stage:                "assistant_load",
+				Error:                err.Error(),
 			},
 		}, observability.RecordMetric{
 			Metrics: observability.CallStatusMetric(observability.MetricCallStatusFailed, err.Error()),
@@ -79,12 +80,13 @@ func (d *Dispatcher) runOutbound(ctx context.Context, v OutboundRequestedPipelin
 			},
 			observability.RecordWebhook{
 				Event: observability.CallFailed,
-				Payload: map[string]interface{}{
-					"to":        v.ToPhone,
-					"from":      v.FromPhone,
-					"stage":     "phone_deployment",
-					"direction": "outbound",
-					"error":     "Please check phone deployment not enabled",
+				Payload: observability.CallFailedWebhookPayload{
+					V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+					To:                   v.ToPhone,
+					From:                 v.FromPhone,
+					Direction:            "outbound",
+					Stage:                "phone_deployment",
+					Error:                "Please check phone deployment not enabled",
 				},
 			},
 			observability.RecordMetric{
@@ -112,13 +114,14 @@ func (d *Dispatcher) runOutbound(ctx context.Context, v OutboundRequestedPipelin
 				},
 				observability.RecordWebhook{
 					Event: observability.CallFailed,
-					Payload: map[string]interface{}{
-						"provider":  assistant.AssistantPhoneDeployment.TelephonyProvider,
-						"to":        v.ToPhone,
-						"from":      v.FromPhone,
-						"direction": "outbound",
-						"stage":     "from_phone_resolve",
-						"error":     err.Error(),
+					Payload: observability.CallFailedWebhookPayload{
+						V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+						Provider:             assistant.AssistantPhoneDeployment.TelephonyProvider,
+						To:                   v.ToPhone,
+						From:                 v.FromPhone,
+						Direction:            "outbound",
+						Stage:                "from_phone_resolve",
+						Error:                err.Error(),
 					},
 				},
 				observability.RecordMetric{
@@ -145,13 +148,14 @@ func (d *Dispatcher) runOutbound(ctx context.Context, v OutboundRequestedPipelin
 			},
 			observability.RecordWebhook{
 				Event: observability.CallFailed,
-				Payload: map[string]interface{}{
-					"provider":  assistant.AssistantPhoneDeployment.TelephonyProvider,
-					"to":        v.ToPhone,
-					"from":      fromPhone,
-					"stage":     "conversation_create",
-					"direction": "outbound",
-					"error":     err.Error(),
+				Payload: observability.CallFailedWebhookPayload{
+					V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+					Provider:             assistant.AssistantPhoneDeployment.TelephonyProvider,
+					To:                   v.ToPhone,
+					From:                 fromPhone,
+					Direction:            "outbound",
+					Stage:                "conversation_create",
+					Error:                err.Error(),
 				},
 			},
 			observability.RecordMetric{
@@ -228,14 +232,15 @@ func (d *Dispatcher) runOutbound(ctx context.Context, v OutboundRequestedPipelin
 			observability.RecordWebhook{
 				ContextID: contextID,
 				Event:     observability.CallFailed,
-				Payload: map[string]interface{}{
-					"provider":   assistant.AssistantPhoneDeployment.TelephonyProvider,
-					"to":         v.ToPhone,
-					"from":       fromPhone,
-					"context_id": contextID,
-					"stage":      "call_context_save",
-					"direction":  "outbound",
-					"error":      err.Error(),
+				Payload: observability.CallFailedWebhookPayload{
+					V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+					Provider:             assistant.AssistantPhoneDeployment.TelephonyProvider,
+					To:                   v.ToPhone,
+					From:                 fromPhone,
+					Direction:            "outbound",
+					ContextID:            contextID,
+					Stage:                "call_context_save",
+					Error:                err.Error(),
 				},
 			},
 			observability.RecordMetadata{
@@ -284,12 +289,13 @@ func (d *Dispatcher) runOutbound(ctx context.Context, v OutboundRequestedPipelin
 		observability.RecordWebhook{
 			Event:     observability.CallOutboundRequested,
 			ContextID: contextID,
-			Payload: map[string]interface{}{
-				"provider":   assistant.AssistantPhoneDeployment.TelephonyProvider,
-				"to":         v.ToPhone,
-				"from":       fromPhone,
-				"context_id": contextID,
-				"direction":  "outbound",
+			Payload: observability.CallOutboundRequestedWebhookPayload{
+				V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+				Provider:             assistant.AssistantPhoneDeployment.TelephonyProvider,
+				To:                   v.ToPhone,
+				From:                 fromPhone,
+				Direction:            "outbound",
+				ContextID:            contextID,
 			},
 		})
 
@@ -322,14 +328,15 @@ func (d *Dispatcher) runOutbound(ctx context.Context, v OutboundRequestedPipelin
 			observability.RecordWebhook{
 				Event:     observability.CallFailed,
 				ContextID: contextID,
-				Payload: map[string]interface{}{
-					"provider":   assistant.AssistantPhoneDeployment.TelephonyProvider,
-					"to":         v.ToPhone,
-					"from":       fromPhone,
-					"context_id": contextID,
-					"stage":      "provider_dispatch",
-					"direction":  "outbound",
-					"error":      err.Error(),
+				Payload: observability.CallFailedWebhookPayload{
+					V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+					Provider:             assistant.AssistantPhoneDeployment.TelephonyProvider,
+					To:                   v.ToPhone,
+					From:                 fromPhone,
+					Direction:            "outbound",
+					ContextID:            contextID,
+					Stage:                "provider_dispatch",
+					Error:                err.Error(),
 				},
 			},
 			observability.RecordMetadata{
@@ -357,22 +364,24 @@ func (d *Dispatcher) runOutbound(ctx context.Context, v OutboundRequestedPipelin
 				"from":              fromPhone,
 				"context_id":        contextID,
 				"call_id":           callInfo.ChannelUUID,
-				"status_event":      callInfo.StatusInfo.Event,
+				"status_event":      callInfo.StatusInfo.Event.String(),
 				"provider_response": observability.AttributeValue(callInfo.StatusInfo.Payload),
 			},
 		},
 		observability.RecordWebhook{
 			Event:     observability.CallOutboundDispatched,
 			ContextID: contextID,
-			Payload: map[string]interface{}{
-				"provider":          assistant.AssistantPhoneDeployment.TelephonyProvider,
-				"to":                v.ToPhone,
-				"from":              fromPhone,
-				"call_id":           callInfo.ChannelUUID,
-				"context_id":        contextID,
-				"direction":         "outbound",
-				"status_event":      callInfo.StatusInfo.Event,
-				"provider_response": callInfo.StatusInfo.Payload,
+			Payload: observability.CallOutboundDispatchedWebhookPayload{
+				V1WebhookPayloadBase: observability.NewV1WebhookPayload(map[string]interface{}{
+					"provider_response": callInfo.StatusInfo.Payload,
+				}),
+				Provider:    assistant.AssistantPhoneDeployment.TelephonyProvider,
+				CallID:      callInfo.ChannelUUID,
+				To:          v.ToPhone,
+				From:        fromPhone,
+				Direction:   "outbound",
+				ContextID:   contextID,
+				StatusEvent: callInfo.StatusInfo.Event.String(),
 			},
 		})
 

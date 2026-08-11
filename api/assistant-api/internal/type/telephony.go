@@ -18,12 +18,38 @@ import (
 	"github.com/rapidaai/protos"
 )
 
+type TelephonyEvent string
+
+const (
+	TelephonyEventCompleted        TelephonyEvent = "completed"
+	TelephonyEventRinging          TelephonyEvent = "ringing"
+	TelephonyEventAnswered         TelephonyEvent = "answered"
+	TelephonyEventStreamStarted    TelephonyEvent = "stream-started"
+	TelephonyEventChannelDestroyed TelephonyEvent = "channel_destroyed"
+)
+
+func (e TelephonyEvent) String() string {
+	return string(e)
+}
+
+type TelephonyStatus string
+
+const (
+	TelephonyStatusFailed  TelephonyStatus = "FAILED"
+	TelephonyStatusSuccess TelephonyStatus = "SUCCESS"
+)
+
+func (s TelephonyStatus) String() string {
+	return string(s)
+}
+
 // StatusInfo is the structured response returned by status/event callbacks.
 // It carries the event name and raw payload from the provider.
 type StatusInfo struct {
 	// Event is the status/event name from the provider callback
 	// (e.g. "completed", "ringing", "answered", "stream-started", "channel_destroyed").
-	Event string
+	//
+	Event TelephonyEvent
 
 	// ChannelUUID is the provider-specific call identifier from the callback.
 	ChannelUUID string
@@ -73,7 +99,7 @@ type CallInfo struct {
 	Direction string
 
 	// Status is the call status string (e.g. "SUCCESS", "FAILED", "initiated").
-	Status string
+	Status TelephonyStatus
 
 	// StatusInfo carries the event name and payload for the call.
 	// For OutboundCall: the initial event (e.g. "initiated", "channel_created").

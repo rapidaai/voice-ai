@@ -32,6 +32,23 @@ const (
 	EventTypeClear     EventType = "clear"
 )
 
+type OutboundFailureReason string
+
+const (
+	OutboundFailureReasonRequestCancelled     OutboundFailureReason = "telnyx_outbound_request_cancelled"
+	OutboundFailureReasonAuthenticationFailed OutboundFailureReason = "telnyx_outbound_authentication_failed"
+	OutboundFailureReasonRequestPayloadFailed OutboundFailureReason = "telnyx_outbound_request_payload_failed"
+	OutboundFailureReasonRequestCreateFailed  OutboundFailureReason = "telnyx_outbound_request_create_failed"
+	OutboundFailureReasonProviderAPIError     OutboundFailureReason = "telnyx_outbound_provider_api_error"
+	OutboundFailureReasonResponseReadFailed   OutboundFailureReason = "telnyx_outbound_provider_response_read_failed"
+	OutboundFailureReasonResponseDecodeFailed OutboundFailureReason = "telnyx_outbound_provider_response_decode_failed"
+	OutboundFailureReasonHTTPStatusFailed     OutboundFailureReason = "telnyx_outbound_provider_http_status_failed"
+)
+
+func (r OutboundFailureReason) String() string {
+	return string(r)
+}
+
 type TelnyxWebSocketEvent struct {
 	Event    EventType         `json:"event"`
 	StreamID string            `json:"stream_id"`

@@ -10,10 +10,12 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+
+	"github.com/rapidaai/pkg/utils"
 )
 
 func TestNewStatusCallback_MissingStatusUsesTypedError(t *testing.T) {
-	callback, err := NewStatusCallback(map[string]interface{}{"uuid": "call-id"}, "")
+	callback, err := NewStatusCallback(utils.Option{"uuid": "call-id"}, "")
 
 	if callback != nil {
 		t.Fatalf("callback=%+v want nil", callback)

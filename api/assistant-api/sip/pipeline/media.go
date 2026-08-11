@@ -199,13 +199,14 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 			observability.RecordWebhook{
 				Event:     observability.CallStarted,
 				ContextID: contextID,
-				Payload: map[string]interface{}{
-					"provider":   "sip",
-					"to":         setup.CallContext.CallerNumber,
-					"from":       setup.CallContext.FromNumber,
-					"call_id":    v.ID,
-					"context_id": contextID,
-					"direction":  string(v.Direction),
+				Payload: observability.CallStartedWebhookPayload{
+					V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+					Provider:             "sip",
+					CallID:               v.ID,
+					To:                   setup.CallContext.CallerNumber,
+					From:                 setup.CallContext.FromNumber,
+					Direction:            string(v.Direction),
+					ContextID:            contextID,
 				},
 			},
 			observability.RecordMetric{
@@ -254,16 +255,18 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 					observability.RecordWebhook{
 						Event:     observability.CallFailed,
 						ContextID: contextID,
-						Payload: map[string]interface{}{
-							"provider":    "sip",
-							"to":          setup.CallContext.CallerNumber,
-							"from":        setup.CallContext.FromNumber,
-							"call_id":     v.ID,
-							"context_id":  contextID,
-							"direction":   string(v.Direction),
-							"reason":      reason,
-							"status":      observability.MetricCallStatusFailed,
-							"duration_ms": durationMs,
+						Payload: observability.CallFailedWebhookPayload{
+							V1WebhookPayloadBase: observability.NewV1WebhookPayload(map[string]interface{}{
+								"status": observability.MetricCallStatusFailed,
+							}),
+							Provider:   "sip",
+							CallID:     v.ID,
+							To:         setup.CallContext.CallerNumber,
+							From:       setup.CallContext.FromNumber,
+							Direction:  string(v.Direction),
+							ContextID:  contextID,
+							Reason:     reason,
+							DurationMs: fmt.Sprintf("%d", durationMs),
 						},
 					},
 					observability.RecordMetric{
@@ -326,16 +329,18 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 							observability.RecordWebhook{
 								Event:     observability.CallFailed,
 								ContextID: contextID,
-								Payload: map[string]interface{}{
-									"provider":    "sip",
-									"to":          setup.CallContext.CallerNumber,
-									"from":        setup.CallContext.FromNumber,
-									"call_id":     v.ID,
-									"context_id":  contextID,
-									"direction":   string(v.Direction),
-									"reason":      reason,
-									"status":      observability.MetricCallStatusFailed,
-									"duration_ms": durationMs,
+								Payload: observability.CallFailedWebhookPayload{
+									V1WebhookPayloadBase: observability.NewV1WebhookPayload(map[string]interface{}{
+										"status": observability.MetricCallStatusFailed,
+									}),
+									Provider:   "sip",
+									CallID:     v.ID,
+									To:         setup.CallContext.CallerNumber,
+									From:       setup.CallContext.FromNumber,
+									Direction:  string(v.Direction),
+									ContextID:  contextID,
+									Reason:     reason,
+									DurationMs: fmt.Sprintf("%d", durationMs),
 								},
 							},
 							observability.RecordMetric{
@@ -375,16 +380,18 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 					observability.RecordWebhook{
 						Event:     observability.CallFailed,
 						ContextID: contextID,
-						Payload: map[string]interface{}{
-							"provider":    "sip",
-							"to":          setup.CallContext.CallerNumber,
-							"from":        setup.CallContext.FromNumber,
-							"call_id":     v.ID,
-							"context_id":  contextID,
-							"direction":   string(v.Direction),
-							"reason":      reason,
-							"status":      observability.MetricCallStatusFailed,
-							"duration_ms": durationMs,
+						Payload: observability.CallFailedWebhookPayload{
+							V1WebhookPayloadBase: observability.NewV1WebhookPayload(map[string]interface{}{
+								"status": observability.MetricCallStatusFailed,
+							}),
+							Provider:   "sip",
+							CallID:     v.ID,
+							To:         setup.CallContext.CallerNumber,
+							From:       setup.CallContext.FromNumber,
+							Direction:  string(v.Direction),
+							ContextID:  contextID,
+							Reason:     reason,
+							DurationMs: fmt.Sprintf("%d", durationMs),
 						},
 					},
 					observability.RecordMetric{
@@ -441,16 +448,17 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 						observability.RecordWebhook{
 							Event:     observability.CallEnded,
 							ContextID: contextID,
-							Payload: map[string]interface{}{
-								"provider":    "sip",
-								"to":          setup.CallContext.CallerNumber,
-								"from":        setup.CallContext.FromNumber,
-								"call_id":     v.ID,
-								"context_id":  contextID,
-								"direction":   string(v.Direction),
-								"reason":      "transfer_" + transferStatus,
-								"status":      observability.MetricCallStatusComplete,
-								"duration_ms": durationMs,
+							Payload: observability.CallEndedWebhookPayload{
+								V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+								Provider:             "sip",
+								CallID:               v.ID,
+								To:                   setup.CallContext.CallerNumber,
+								From:                 setup.CallContext.FromNumber,
+								Direction:            string(v.Direction),
+								ContextID:            contextID,
+								DurationMs:           fmt.Sprintf("%d", durationMs),
+								Reason:               "transfer_" + transferStatus,
+								Status:               observability.MetricCallStatusComplete,
 							},
 						},
 						observability.RecordMetric{
@@ -489,16 +497,17 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 				observability.RecordWebhook{
 					Event:     observability.CallEnded,
 					ContextID: contextID,
-					Payload: map[string]interface{}{
-						"provider":    "sip",
-						"to":          setup.CallContext.CallerNumber,
-						"from":        setup.CallContext.FromNumber,
-						"call_id":     v.ID,
-						"context_id":  contextID,
-						"direction":   string(v.Direction),
-						"reason":      "talk_completed",
-						"status":      observability.MetricCallStatusComplete,
-						"duration_ms": durationMs,
+					Payload: observability.CallEndedWebhookPayload{
+						V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+						Provider:             "sip",
+						CallID:               v.ID,
+						To:                   setup.CallContext.CallerNumber,
+						From:                 setup.CallContext.FromNumber,
+						Direction:            string(v.Direction),
+						ContextID:            contextID,
+						DurationMs:           fmt.Sprintf("%d", durationMs),
+						Reason:               "talk_completed",
+						Status:               observability.MetricCallStatusComplete,
 					},
 				},
 				observability.RecordMetric{
@@ -568,16 +577,18 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 						observability.RecordWebhook{
 							Event:     observability.CallFailed,
 							ContextID: contextID,
-							Payload: map[string]interface{}{
-								"provider":    "sip",
-								"to":          setup.CallContext.CallerNumber,
-								"from":        setup.CallContext.FromNumber,
-								"call_id":     v.ID,
-								"context_id":  contextID,
-								"direction":   string(v.Direction),
-								"reason":      reason,
-								"status":      observability.MetricCallStatusFailed,
-								"duration_ms": durationMs,
+							Payload: observability.CallFailedWebhookPayload{
+								V1WebhookPayloadBase: observability.NewV1WebhookPayload(map[string]interface{}{
+									"status": observability.MetricCallStatusFailed,
+								}),
+								Provider:   "sip",
+								CallID:     v.ID,
+								To:         setup.CallContext.CallerNumber,
+								From:       setup.CallContext.FromNumber,
+								Direction:  string(v.Direction),
+								ContextID:  contextID,
+								Reason:     reason,
+								DurationMs: fmt.Sprintf("%d", durationMs),
 							},
 						},
 						observability.RecordMetric{
@@ -617,16 +628,18 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 				observability.RecordWebhook{
 					Event:     observability.CallFailed,
 					ContextID: contextID,
-					Payload: map[string]interface{}{
-						"provider":    "sip",
-						"to":          setup.CallContext.CallerNumber,
-						"from":        setup.CallContext.FromNumber,
-						"call_id":     v.ID,
-						"context_id":  contextID,
-						"direction":   string(v.Direction),
-						"reason":      reason,
-						"status":      observability.MetricCallStatusFailed,
-						"duration_ms": durationMs,
+					Payload: observability.CallFailedWebhookPayload{
+						V1WebhookPayloadBase: observability.NewV1WebhookPayload(map[string]interface{}{
+							"status": observability.MetricCallStatusFailed,
+						}),
+						Provider:   "sip",
+						CallID:     v.ID,
+						To:         setup.CallContext.CallerNumber,
+						From:       setup.CallContext.FromNumber,
+						Direction:  string(v.Direction),
+						ContextID:  contextID,
+						Reason:     reason,
+						DurationMs: fmt.Sprintf("%d", durationMs),
 					},
 				},
 				observability.RecordMetric{
@@ -694,16 +707,18 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 						observability.RecordWebhook{
 							Event:     observability.CallFailed,
 							ContextID: contextID,
-							Payload: map[string]interface{}{
-								"provider":    "sip",
-								"to":          setup.CallContext.CallerNumber,
-								"from":        setup.CallContext.FromNumber,
-								"call_id":     v.ID,
-								"context_id":  contextID,
-								"direction":   string(v.Direction),
-								"reason":      reason,
-								"status":      observability.MetricCallStatusFailed,
-								"duration_ms": durationMs,
+							Payload: observability.CallFailedWebhookPayload{
+								V1WebhookPayloadBase: observability.NewV1WebhookPayload(map[string]interface{}{
+									"status": observability.MetricCallStatusFailed,
+								}),
+								Provider:   "sip",
+								CallID:     v.ID,
+								To:         setup.CallContext.CallerNumber,
+								From:       setup.CallContext.FromNumber,
+								Direction:  string(v.Direction),
+								ContextID:  contextID,
+								Reason:     reason,
+								DurationMs: fmt.Sprintf("%d", durationMs),
 							},
 						},
 						observability.RecordMetric{
@@ -743,16 +758,18 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 				observability.RecordWebhook{
 					Event:     observability.CallFailed,
 					ContextID: contextID,
-					Payload: map[string]interface{}{
-						"provider":    "sip",
-						"to":          setup.CallContext.CallerNumber,
-						"from":        setup.CallContext.FromNumber,
-						"call_id":     v.ID,
-						"context_id":  contextID,
-						"direction":   string(v.Direction),
-						"reason":      reason,
-						"status":      observability.MetricCallStatusFailed,
-						"duration_ms": durationMs,
+					Payload: observability.CallFailedWebhookPayload{
+						V1WebhookPayloadBase: observability.NewV1WebhookPayload(map[string]interface{}{
+							"status": observability.MetricCallStatusFailed,
+						}),
+						Provider:   "sip",
+						CallID:     v.ID,
+						To:         setup.CallContext.CallerNumber,
+						From:       setup.CallContext.FromNumber,
+						Direction:  string(v.Direction),
+						ContextID:  contextID,
+						Reason:     reason,
+						DurationMs: fmt.Sprintf("%d", durationMs),
 					},
 				},
 				observability.RecordMetric{
@@ -819,16 +836,17 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 					observability.RecordWebhook{
 						Event:     observability.CallEnded,
 						ContextID: contextID,
-						Payload: map[string]interface{}{
-							"provider":    "sip",
-							"to":          setup.CallContext.CallerNumber,
-							"from":        setup.CallContext.FromNumber,
-							"call_id":     v.ID,
-							"context_id":  contextID,
-							"direction":   string(v.Direction),
-							"reason":      reason,
-							"status":      observability.MetricCallStatusComplete,
-							"duration_ms": durationMs,
+						Payload: observability.CallEndedWebhookPayload{
+							V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+							Provider:             "sip",
+							CallID:               v.ID,
+							To:                   setup.CallContext.CallerNumber,
+							From:                 setup.CallContext.FromNumber,
+							Direction:            string(v.Direction),
+							ContextID:            contextID,
+							DurationMs:           fmt.Sprintf("%d", durationMs),
+							Reason:               reason,
+							Status:               observability.MetricCallStatusComplete,
 						},
 					},
 					observability.RecordMetric{
@@ -868,16 +886,17 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 			observability.RecordWebhook{
 				Event:     observability.CallEnded,
 				ContextID: contextID,
-				Payload: map[string]interface{}{
-					"provider":    "sip",
-					"to":          setup.CallContext.CallerNumber,
-					"from":        setup.CallContext.FromNumber,
-					"call_id":     v.ID,
-					"context_id":  contextID,
-					"direction":   string(v.Direction),
-					"reason":      reason,
-					"status":      observability.MetricCallStatusComplete,
-					"duration_ms": durationMs,
+				Payload: observability.CallEndedWebhookPayload{
+					V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+					Provider:             "sip",
+					CallID:               v.ID,
+					To:                   setup.CallContext.CallerNumber,
+					From:                 setup.CallContext.FromNumber,
+					Direction:            string(v.Direction),
+					ContextID:            contextID,
+					DurationMs:           fmt.Sprintf("%d", durationMs),
+					Reason:               reason,
+					Status:               observability.MetricCallStatusComplete,
 				},
 			},
 			observability.RecordMetric{

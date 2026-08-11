@@ -37,6 +37,23 @@ const (
 	EventTypeClear     EventType = "clear"
 )
 
+type OutboundFailureReason string
+
+const (
+	OutboundFailureReasonRequestCancelled       OutboundFailureReason = "exotel_outbound_request_cancelled"
+	OutboundFailureReasonProviderURLBuildFailed OutboundFailureReason = "exotel_outbound_provider_url_build_failed"
+	OutboundFailureReasonAppURLBuildFailed      OutboundFailureReason = "exotel_outbound_app_url_build_failed"
+	OutboundFailureReasonRequestCreateFailed    OutboundFailureReason = "exotel_outbound_request_create_failed"
+	OutboundFailureReasonProviderAPIError       OutboundFailureReason = "exotel_outbound_provider_api_error"
+	OutboundFailureReasonResponseReadFailed     OutboundFailureReason = "exotel_outbound_provider_response_read_failed"
+	OutboundFailureReasonHTTPStatusFailed       OutboundFailureReason = "exotel_outbound_provider_http_status_failed"
+	OutboundFailureReasonResponseDecodeFailed   OutboundFailureReason = "exotel_outbound_provider_response_decode_failed"
+)
+
+func (r OutboundFailureReason) String() string {
+	return string(r)
+}
+
 type ExotelMediaEvent struct {
 	Event     EventType    `json:"event"`
 	StreamSid string       `json:"stream_sid"`

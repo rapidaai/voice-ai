@@ -7,15 +7,14 @@
 package internal_telnyx
 
 import (
-	"strings"
 	"time"
 
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/utils"
-	"github.com/rapidaai/pkg/validator"
 )
 
 type StatusCallback struct {
+	Event        internal_type.TelephonyEvent
 	EventType    string
 	ChannelUUID  string
 	Duration     *time.Duration
@@ -24,35 +23,58 @@ type StatusCallback struct {
 	ErrorCode    string
 	ErrorMessage string
 	RawPayload   string
-	Payload      map[string]interface{}
+	Payload      utils.Option
 }
 
-func NewStatusCallback(payload map[string]interface{}, rawCallbackPayload string) (*StatusCallback, error) {
-	rawData, ok := payload["data"].(map[string]interface{})
+func NewStatusCallback(eventDetails utils.Option, rawCallbackPayload string) (*StatusCallback, error) {
+	rawData, ok := eventDetails["data"].(map[string]interface{})
+	if !ok {
+		if data, ok := eventDetails["data"].(utils.Option); ok {
+			rawData = data
+			ok = true
+		}
+	}
 	if !ok {
 		return nil, ErrStatusCallbackDataMissing
 	}
 	data := utils.Option(rawData)
 
-	eventType, _ := data.GetString("event_type")
-	if !validator.NotBlank(eventType) {
+	eventType, err := data.GetString("event_type")
+	if err != nil || eventType == "" {
 		return nil, ErrStatusCallbackEventTypeMissing
 	}
 
 	payloadData := utils.Option{}
 	if rawPayloadData, ok := data["payload"].(map[string]interface{}); ok {
 		payloadData = utils.Option(rawPayloadData)
+	} else if rawPayloadData, ok := data["payload"].(utils.Option); ok {
+		payloadData = rawPayloadData
 	}
 
-	channelUUID, _ := payloadData.GetString("call_control_id")
-	if !validator.NotBlank(channelUUID) {
-		channelUUID, _ = payloadData.GetString("call_session_id")
+	callback := &StatusCallback{
+		Event:      StatusEvent(eventType),
+		EventType:  eventType,
+		RawPayload: rawCallbackPayload,
+		Payload:    eventDetails,
 	}
-	if !validator.NotBlank(channelUUID) {
-		channelUUID, _ = data.GetString("call_control_id")
+
+	if channelUUID, err := payloadData.GetString("call_control_id"); err == nil {
+		callback.ChannelUUID = channelUUID
 	}
-	if !validator.NotBlank(channelUUID) {
-		channelUUID, _ = data.GetString("id")
+	if callback.ChannelUUID == "" {
+		if channelUUID, err := payloadData.GetString("call_session_id"); err == nil {
+			callback.ChannelUUID = channelUUID
+		}
+	}
+	if callback.ChannelUUID == "" {
+		if channelUUID, err := data.GetString("call_control_id"); err == nil {
+			callback.ChannelUUID = channelUUID
+		}
+	}
+	if callback.ChannelUUID == "" {
+		if channelUUID, err := data.GetString("id"); err == nil {
+			callback.ChannelUUID = channelUUID
+		}
 	}
 
 	duration, err := payloadData.GetDuration("duration")
@@ -62,85 +84,106 @@ func NewStatusCallback(payload map[string]interface{}, rawCallbackPayload string
 	if err != nil {
 		duration, err = payloadData.GetDuration("call_duration")
 	}
-	var durationPtr *time.Duration
 	if err == nil {
-		durationPtr = utils.Ptr(duration)
+		callback.Duration = utils.Ptr(duration)
 	}
 
-	price, _ := payloadData.GetString("price")
-	if !validator.NotBlank(price) {
-		price, _ = payloadData.GetString("cost")
+	if price, err := payloadData.GetString("price"); err == nil {
+		callback.Price = price
+	}
+	if callback.Price == "" {
+		if price, err := payloadData.GetString("cost"); err == nil {
+			callback.Price = price
+		}
 	}
 
-	reason, _ := payloadData.GetString("hangup_cause")
-	if !validator.NotBlank(reason) {
-		reason, _ = payloadData.GetString("cause")
+	if reason, err := payloadData.GetString("hangup_cause"); err == nil {
+		callback.Reason = reason
 	}
-	if !validator.NotBlank(reason) {
-		reason, _ = payloadData.GetString("sip_hangup_cause")
+	if callback.Reason == "" {
+		if reason, err := payloadData.GetString("cause"); err == nil {
+			callback.Reason = reason
+		}
 	}
-	errorCode, _ := payloadData.GetString("error_code")
-	errorMessage, _ := payloadData.GetString("error_message")
-
-	return &StatusCallback{
-		EventType:    eventType,
-		ChannelUUID:  channelUUID,
-		Duration:     durationPtr,
-		Price:        price,
-		Reason:       reason,
-		ErrorCode:    errorCode,
-		ErrorMessage: errorMessage,
-		RawPayload:   rawCallbackPayload,
-		Payload:      payload,
-	}, nil
+	if callback.Reason == "" {
+		if reason, err := payloadData.GetString("sip_hangup_cause"); err == nil {
+			callback.Reason = reason
+		}
+	}
+	if errorCode, err := payloadData.GetString("error_code"); err == nil {
+		callback.ErrorCode = errorCode
+	}
+	if errorMessage, err := payloadData.GetString("error_message"); err == nil {
+		callback.ErrorMessage = errorMessage
+	}
+	return callback, nil
 }
 
 func (s *StatusCallback) StatusInfo() *internal_type.StatusInfo {
-	callbackFailed := s.Failed()
 	statusInfo := &internal_type.StatusInfo{
-		Event:       s.EventType,
+		Event:       s.Event,
 		ChannelUUID: s.ChannelUUID,
-		Completed:   strings.EqualFold(s.EventType, "call.hangup") && !callbackFailed,
+		Completed:   s.IsCompleted(),
 		Duration:    s.Duration,
 		Price:       s.Price,
 		RawPayload:  s.RawPayload,
 		Payload:     s.Payload,
 	}
-	if callbackFailed {
-		statusInfo.Error = &internal_type.StatusError{Error: "failed", Reason: s.FailureReason()}
+	if statusError := s.StatusError(); statusError != nil {
+		statusInfo.Error = statusError
 	}
 	return statusInfo
 }
 
-func (s *StatusCallback) Failed() bool {
-	eventLower := strings.ToLower(s.EventType)
-	failed := eventLower == "call.failed" ||
-		eventLower == "call.rejected" ||
-		eventLower == "call.bridging.failed" ||
-		validator.NotBlank(s.ErrorCode) ||
-		validator.NotBlank(s.ErrorMessage)
-	if eventLower == "call.hangup" {
-		lowerReason := strings.ToLower(s.Reason)
-		failed = failed ||
-			lowerReason == "busy" ||
-			lowerReason == "no_answer" ||
-			lowerReason == "no-answer" ||
-			lowerReason == "rejected" ||
-			lowerReason == "failed" ||
-			lowerReason == "timeout"
-	}
-	return failed
+func (s *StatusCallback) IsCompleted() bool {
+	return s.EventType == "call.hangup" && !s.Failed()
 }
 
-func (s *StatusCallback) FailureReason() string {
-	if validator.NotBlank(s.Reason) {
-		return s.Reason
+func (s *StatusCallback) Failed() bool {
+	switch s.EventType {
+	case "call.failed", "call.rejected", "call.bridging.failed":
+		return true
 	}
-	if validator.NotBlank(s.ErrorMessage) {
-		return s.ErrorMessage
+	if s.ErrorCode != "" || s.ErrorMessage != "" {
+		return true
 	}
-	if validator.NotBlank(s.ErrorCode) {
-		return s.ErrorCode
+	if s.EventType == "call.hangup" {
+		switch s.Reason {
+		case "busy", "no_answer", "no-answer", "rejected", "failed", "timeout":
+			return true
+		}
 	}
-	return s.EventType
+	return false
+}
+
+func (s *StatusCallback) StatusError() *internal_type.StatusError {
+	if !s.Failed() {
+		return nil
+	}
+	if s.Reason != "" {
+		return &internal_type.StatusError{Error: "failed", Reason: s.Reason}
+	}
+	if s.ErrorMessage != "" {
+		return &internal_type.StatusError{Error: "failed", Reason: s.ErrorMessage}
+	}
+	if s.ErrorCode != "" {
+		return &internal_type.StatusError{Error: "failed", Reason: s.ErrorCode}
+	}
+	if s.EventType != "" {
+		return &internal_type.StatusError{Error: "failed", Reason: s.EventType}
+	}
+	return &internal_type.StatusError{Error: "failed", Reason: s.Event.String()}
+}
+
+func StatusEvent(eventType string) internal_type.TelephonyEvent {
+	switch eventType {
+	case "call.initiated", "call.ringing", "initiated", "queued", "ringing":
+		return internal_type.TelephonyEventRinging
+	case "call.answered", "answered":
+		return internal_type.TelephonyEventAnswered
+	case "call.hangup", "call.failed", "call.rejected", "call.bridging.failed", "completed", "failed", "busy", "no-answer", "canceled":
+		return internal_type.TelephonyEventCompleted
+	default:
+		return internal_type.TelephonyEvent(eventType)
+	}
 }

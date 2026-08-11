@@ -393,7 +393,7 @@ type RecordWebhook struct {
 	ID         string
 	Event      EventName
 	ContextID  string
-	Payload    map[string]interface{}
+	Payload    V1WebhookPayload
 	OccurredAt time.Time
 }
 

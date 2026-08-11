@@ -69,7 +69,12 @@ func TestCollector_SendsWebhookEventPayload(t *testing.T) {
 		ID:        "evt-1",
 		Event:     observability.CallRinging,
 		ContextID: "call-context-1",
-		Payload:   map[string]interface{}{"status": "ringing", "callId": "call-1"},
+		Payload: observability.CallRingingWebhookPayload{
+			V1WebhookPayloadBase: observability.NewV1WebhookPayload(map[string]interface{}{"status": "ringing"}),
+			Provider:             "test",
+			CallID:               "call-1",
+			StatusEvent:          "ringing",
+		},
 	})
 	if err != nil {
 		t.Fatalf("CollectWebhook returned error: %v", err)
@@ -83,7 +88,11 @@ func TestCollector_SendsWebhookEventPayload(t *testing.T) {
 		t.Fatalf("unexpected conversation payload: %+v", got)
 	}
 	dataPayload, ok := got["data"].(map[string]interface{})
-	if !ok || dataPayload["status"] != "ringing" || dataPayload["callId"] != "call-1" {
+	if !ok || dataPayload["status_event"] != "ringing" || dataPayload["call_id"] != "call-1" || dataPayload["version"] != observability.WebhookPayloadVersionV1 {
+		t.Fatalf("unexpected data payload: %+v", got)
+	}
+	extraPayload, ok := dataPayload["extra"].(map[string]interface{})
+	if !ok || extraPayload["status"] != "ringing" {
 		t.Fatalf("unexpected data payload: %+v", got)
 	}
 	if got["event"] != observability.CallRinging.String() {
@@ -299,8 +308,11 @@ func TestCollector_ReturnsHTTPError(t *testing.T) {
 	})
 
 	err := collector.Collect(context.Background(), observability.AssistantScope{AssistantID: 10}, observability.Context{}, observability.RecordWebhook{
-		Event:   observability.CallFailed,
-		Payload: map[string]interface{}{"status": "failed"},
+		Event: observability.CallFailed,
+		Payload: observability.CallFailedWebhookPayload{
+			V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+			Reason:               "failed",
+		},
 	})
 	if err == nil {
 		t.Fatal("expected HTTP error")

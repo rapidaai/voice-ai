@@ -6,6 +6,38 @@
 
 package internal_asterisk
 
+import "errors"
+
+const (
+	Provider     = "asterisk"
+	WebhookEvent = "webhook"
+)
+
+type OutboundFailureReason string
+
+const (
+	OutboundFailureReasonRequestCancelled       OutboundFailureReason = "asterisk_outbound_request_cancelled"
+	OutboundFailureReasonMissingVaultCredential OutboundFailureReason = "asterisk_outbound_missing_vault_credential"
+	OutboundFailureReasonARIURLMissing          OutboundFailureReason = "asterisk_outbound_ari_url_missing"
+	OutboundFailureReasonRequestPayloadFailed   OutboundFailureReason = "asterisk_outbound_request_payload_failed"
+	OutboundFailureReasonRequestCreateFailed    OutboundFailureReason = "asterisk_outbound_request_create_failed"
+	OutboundFailureReasonProviderAPIError       OutboundFailureReason = "asterisk_outbound_provider_api_error"
+	OutboundFailureReasonHTTPStatusFailed       OutboundFailureReason = "asterisk_outbound_provider_http_status_failed"
+)
+
+func (r OutboundFailureReason) String() string {
+	return string(r)
+}
+
+var (
+	ErrRequestBodyReadFailed   = errors.New("failed to read request body")
+	ErrRequestBodyParseFailed  = errors.New("failed to parse request body")
+	ErrVaultCredentialMissing  = errors.New("missing vault credential for Asterisk ARI")
+	ErrVaultARIURLMissing      = errors.New("missing ari_url in vault credential")
+	ErrInboundCallerMissing    = errors.New("missing caller information in query params")
+	ErrProviderARIStatusFailed = errors.New("ARI returned failed status")
+)
+
 type AsteriskMediaEvent struct {
 	Event            string `json:"event,omitempty"`
 	Command          string `json:"command,omitempty"`

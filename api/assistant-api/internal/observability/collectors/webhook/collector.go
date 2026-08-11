@@ -96,20 +96,12 @@ func (c *Collector) Collect(ctx context.Context, scope observability.Scope, _ ob
 	if !validator.NotEmpty(webhookConfigurations) {
 		return nil
 	}
-	webhookEventPayload := map[string]interface{}{}
-	if len(webhookRecord.Payload) > 0 {
-		webhookEventPayload = make(map[string]interface{}, len(webhookRecord.Payload))
-		for key, value := range webhookRecord.Payload {
-			webhookEventPayload[key] = value
-		}
-	}
-
 	var webhookErrors []error
 	for _, webhookConfiguration := range webhookConfigurations {
 		if !c.shouldSend(webhookConfiguration, webhookRecord.Event.String()) {
 			continue
 		}
-		if err := c.send(ctx, scope, webhookConfiguration, webhookRecord.Event.String(), webhookRecord.ContextID, webhookEventPayload); err != nil {
+		if err := c.send(ctx, scope, webhookConfiguration, webhookRecord.Event.String(), webhookRecord.ContextID, webhookRecord.Payload); err != nil {
 			webhookErrors = append(webhookErrors, err)
 			if validator.NonNil(c.logger) {
 				c.logger.Warnw("observability webhook failed", "webhookID", webhookConfiguration.Id, "event", webhookRecord.Event.String(), "error", err)
@@ -163,7 +155,7 @@ func (c *Collector) shouldSend(webhookConfiguration *internal_assistant_entity.A
 	return slices.Contains(webhookConfiguration.GetOptions().GetStringSlice("assistant_events"), eventName)
 }
 
-func (c *Collector) send(ctx context.Context, scope observability.Scope, webhookConfiguration *internal_assistant_entity.AssistantConfiguration, webhookEventName string, webhookContextID string, webhookPayload map[string]interface{}) error {
+func (c *Collector) send(ctx context.Context, scope observability.Scope, webhookConfiguration *internal_assistant_entity.AssistantConfiguration, webhookEventName string, webhookContextID string, webhookPayload observability.V1WebhookPayload) error {
 	webhookOptions := webhookConfiguration.GetOptions()
 	webhookHTTPMethod, err := webhookOptions.GetString(WebhookOptionHTTPMethodKey)
 	if err != nil || !validator.NotBlank(webhookHTTPMethod) {

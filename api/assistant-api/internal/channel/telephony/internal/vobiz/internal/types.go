@@ -11,7 +11,10 @@ import (
 	"time"
 )
 
-const VobizProvider = "vobiz"
+const (
+	VobizProvider = "vobiz"
+	WebhookEvent  = "webhook"
+)
 
 type EventType string
 
@@ -27,6 +30,22 @@ const (
 	EventTypeClearAudio EventType = "clearAudio"
 	EventTypeStop       EventType = "stop"
 )
+
+type OutboundFailureReason string
+
+const (
+	OutboundFailureReasonRequestCancelled           OutboundFailureReason = "vobiz_outbound_request_cancelled"
+	OutboundFailureReasonMissingVaultCredential     OutboundFailureReason = "vobiz_outbound_missing_vault_credential"
+	OutboundFailureReasonAuthIDMissing              OutboundFailureReason = "vobiz_outbound_auth_id_missing"
+	OutboundFailureReasonAuthTokenMissing           OutboundFailureReason = "vobiz_outbound_auth_token_missing"
+	OutboundFailureReasonContextIDMissing           OutboundFailureReason = "vobiz_outbound_context_id_missing"
+	OutboundFailureReasonProviderAPIError           OutboundFailureReason = "vobiz_outbound_provider_api_error"
+	OutboundFailureReasonResponseMissingRequestUUID OutboundFailureReason = "vobiz_outbound_provider_response_missing_request_uuid"
+)
+
+func (r OutboundFailureReason) String() string {
+	return string(r)
+}
 
 // VobizMediaEvent is the inbound JSON envelope vobiz sends over the WebSocket.
 // Identifiers live inside the nested `start` object on the start event; the
@@ -140,6 +159,7 @@ var (
 	ErrVaultCredentialValueMissing    = errors.New("vault credential value is nil")
 	ErrVaultAuthIDMissing             = errors.New("illegal vault config auth_id not found")
 	ErrVaultAuthTokenMissing          = errors.New("illegal vault config auth_token not found")
+	ErrStatusCallbackStatusMissing    = errors.New("status not found in payload")
 	ErrCatchAllChannelUUIDMissing     = errors.New("call uuid not found in catch-all callback")
 	ErrOutboundResponseMissingUUID    = errors.New("vobiz call response missing request_uuid")
 	ErrAudioProcessorInitFailed       = errors.New("failed to initialize vobiz audio processor")

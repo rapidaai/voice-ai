@@ -12,9 +12,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rapidaai/api/assistant-api/config"
@@ -89,7 +87,7 @@ func (t *sipTelephony) StatusCallback(
 	assistantId uint64,
 	assistantConversationId uint64,
 ) (*internal_type.StatusInfo, error) {
-	payload := make(map[string]interface{})
+	payload := utils.Option{}
 	rawPayload := ""
 	if body, err := c.GetRawData(); err == nil && len(body) > 0 {
 		rawPayload = string(body)
@@ -114,108 +112,12 @@ func (t *sipTelephony) StatusCallback(
 		}
 	}
 
-	eventType, _ := payload["event"].(string)
-	if eventType == "" {
-		eventType, _ = payload["status"].(string)
-	}
-	if eventType == "" {
-		eventType, _ = payload["state"].(string)
-	}
-	callID, _ := payload["call_id"].(string)
-	if callID == "" {
-		callID, _ = payload["callId"].(string)
-	}
-	if callID == "" {
-		callID, _ = payload["call-id"].(string)
-	}
-	if callID == "" {
-		callID, _ = payload["Call-ID"].(string)
-	}
-	if callID == "" {
-		callID, _ = payload["channel_uuid"].(string)
-	}
-
-	var durationPtr *time.Duration
-	duration, err := utils.Option(payload).GetDuration("duration")
+	callback, err := internal_sip.NewStatusCallback(payload, rawPayload)
 	if err != nil {
-		duration, err = utils.Option(payload).GetDuration("call_duration")
-	}
-	if err != nil {
-		duration, err = utils.Option(payload).GetDuration("CallDuration")
-	}
-	if err == nil {
-		durationPtr = utils.Ptr(duration)
-	}
-	if durationPtr == nil {
-		switch v := payload["duration_ms"].(type) {
-		case string:
-			if ms, parseErr := strconv.ParseFloat(strings.TrimSpace(v), 64); parseErr == nil {
-				duration := time.Duration(ms * float64(time.Millisecond))
-				durationPtr = utils.Ptr(duration)
-			}
-		case float64:
-			duration := time.Duration(v * float64(time.Millisecond))
-			durationPtr = utils.Ptr(duration)
-		case int:
-			duration := time.Duration(v) * time.Millisecond
-			durationPtr = utils.Ptr(duration)
-		case int64:
-			duration := time.Duration(v) * time.Millisecond
-			durationPtr = utils.Ptr(duration)
-		}
+		return nil, err
 	}
 
-	price, _ := payload["price"].(string)
-	if price == "" {
-		price, _ = payload["cost"].(string)
-	}
-	reason, _ := payload["reason"].(string)
-	if reason == "" {
-		reason, _ = payload["disconnect_reason"].(string)
-	}
-	if reason == "" {
-		reason, _ = payload["failure_reason"].(string)
-	}
-	if reason == "" {
-		reason, _ = payload["error_message"].(string)
-	}
-	if reason == "" {
-		reason, _ = payload["error"].(string)
-	}
-	if reason == "" {
-		reason, _ = payload["sip_code"].(string)
-	}
-
-	t.logger.Debug("SIP status callback received",
-		"event", eventType,
-		"call_id", callID,
-		"assistant_id", assistantId,
-		"conversation_id", assistantConversationId)
-
-	statusInfo := &internal_type.StatusInfo{
-		Event:       eventType,
-		ChannelUUID: callID,
-		Duration:    durationPtr,
-		Price:       price,
-		RawPayload:  rawPayload,
-		Payload:     payload,
-	}
-	switch strings.ToLower(eventType) {
-	case "completed", "complete", "ended", "end", "hangup", "bye", "terminated":
-		statusInfo.Completed = true
-	case "failed", "failure", "busy", "no-answer", "no_answer", "unanswered", "rejected", "timeout", "error":
-		if reason == "" {
-			reason = eventType
-		}
-		statusInfo.Error = &internal_type.StatusError{Error: "failed", Reason: reason}
-	}
-	if statusInfo.Error == nil && reason != "" {
-		errorCode, _ := payload["error_code"].(string)
-		if errorCode != "" {
-			statusInfo.Error = &internal_type.StatusError{Error: "failed", Reason: reason}
-		}
-	}
-	return statusInfo, nil
+	return callback.StatusInfo(), nil
 }
 
 func (t *sipTelephony) CatchAllStatusCallback(ctx *gin.Context) (*internal_type.StatusInfo, error) {
@@ -236,12 +138,12 @@ func (t *sipTelephony) OutboundCall(
 	info := &internal_type.CallInfo{Provider: internal_sip.Provider}
 	cfg, err := t.parseConfig(vaultCredential)
 	if err != nil {
-		info.Status = "FAILED"
-		info.ErrorMessage = fmt.Sprintf("config error: %s", err.Error())
+		info.Status = internal_type.TelephonyStatusFailed
+		info.ErrorMessage = err.Error()
 		internal_telephony_base.ReportOutboundFailure(
 			statusReporter,
 			internal_telephony_base.OutboundFailureClassConfiguration,
-			"invalid SIP outbound configuration",
+			internal_sip.OutboundFailureReasonInvalidConfiguration.String(),
 			internal_telephony_base.OutboundDisconnectReasonSetupFailed,
 			err,
 			0,
@@ -252,21 +154,13 @@ func (t *sipTelephony) OutboundCall(
 	contextID, _ := opts.GetString("rapida.context_id")
 	fromUser := strings.TrimSpace(fromPhone)
 	if t.sharedServer == nil {
-		err := fmt.Errorf("shared SIP server not available")
-		info.Status = "FAILED"
-		info.ErrorMessage = "SIP server not initialized"
-		t.logger.Warnw("SIP outbound call blocked before setup",
-			"context_id", contextID,
-			"assistant_id", assistant.Id,
-			"conversation_id", assistantConversationId,
-			"to_user", strings.TrimSpace(toPhone),
-			"from_user", fromUser,
-			"trunk_address", cfg.Server,
-			"reason", "server_not_initialized")
+		err := internal_sip.ErrSIPServerNotInitialized
+		info.Status = internal_type.TelephonyStatusFailed
+		info.ErrorMessage = err.Error()
 		internal_telephony_base.ReportOutboundFailure(
 			statusReporter,
 			internal_telephony_base.OutboundFailureClassHealthGate,
-			"sip server not initialized",
+			internal_sip.OutboundFailureReasonServerNotInitialized.String(),
 			internal_telephony_base.OutboundDisconnectReasonHealthGate,
 			err,
 			0,
@@ -274,21 +168,13 @@ func (t *sipTelephony) OutboundCall(
 		return info, err
 	}
 	if !t.sharedServer.IsRunning() {
-		err := fmt.Errorf("shared SIP server is not running")
-		info.Status = "FAILED"
-		info.ErrorMessage = "SIP server not running"
-		t.logger.Warnw("SIP outbound call blocked before setup",
-			"context_id", contextID,
-			"assistant_id", assistant.Id,
-			"conversation_id", assistantConversationId,
-			"to_user", strings.TrimSpace(toPhone),
-			"from_user", fromUser,
-			"trunk_address", cfg.Server,
-			"reason", "server_not_running")
+		err := internal_sip.ErrSIPServerNotRunning
+		info.Status = internal_type.TelephonyStatusFailed
+		info.ErrorMessage = err.Error()
 		internal_telephony_base.ReportOutboundFailure(
 			statusReporter,
 			internal_telephony_base.OutboundFailureClassHealthGate,
-			"sip server not running",
+			internal_sip.OutboundFailureReasonServerNotRunning.String(),
 			internal_telephony_base.OutboundDisconnectReasonHealthGate,
 			err,
 			0,
@@ -296,39 +182,16 @@ func (t *sipTelephony) OutboundCall(
 		return info, err
 	}
 
-	t.logger.Infow("SIP outbound call setup requested",
-		"context_id", contextID,
-		"assistant_id", assistant.Id,
-		"conversation_id", assistantConversationId,
-		"to_user", strings.TrimSpace(toPhone),
-		"from_user", fromUser,
-		"trunk_address", cfg.Server,
-		"trunk_port", cfg.Port,
-		"transport", cfg.GetTransport(),
-		"ringing_timeout_ms", cfg.InviteTimeout.Milliseconds(),
-		"max_call_duration_ms", cfg.SessionTimeout.Milliseconds(),
-		"outbound_health_gate", t.outboundHealthGateEnabled(t.appCfg))
-
 	if t.outboundHealthGateEnabled(t.appCfg) {
 		healthSnapshot := t.sharedServer.HealthSnapshot()
 		if !healthSnapshot.Ready {
 			err := fmt.Errorf("SIP outbound health gate failed: %s", healthSnapshot.Reason)
-			info.Status = "FAILED"
+			info.Status = internal_type.TelephonyStatusFailed
 			info.ErrorMessage = err.Error()
-			t.logger.Warnw("SIP outbound call blocked by health gate",
-				"context_id", contextID,
-				"assistant_id", assistant.Id,
-				"conversation_id", assistantConversationId,
-				"to_user", strings.TrimSpace(toPhone),
-				"from_user", fromUser,
-				"trunk_address", cfg.Server,
-				"health_reason", healthSnapshot.Reason,
-				"active_calls", healthSnapshot.ActiveCalls,
-				"rtp_ports_in_use", healthSnapshot.RTPPortsInUse)
 			internal_telephony_base.ReportOutboundFailure(
 				statusReporter,
 				internal_telephony_base.OutboundFailureClassHealthGate,
-				healthSnapshot.Reason,
+				internal_sip.OutboundFailureReasonHealthGateFailed.String(),
 				internal_telephony_base.OutboundDisconnectReasonHealthGate,
 				err,
 				0,
@@ -346,35 +209,25 @@ func (t *sipTelephony) OutboundCall(
 		CallStatusObserver: statusReporter,
 	})
 	if err != nil {
-		info.Status = "FAILED"
-		info.ErrorMessage = fmt.Sprintf("call error: %s", err.Error())
+		info.Status = internal_type.TelephonyStatusFailed
+		info.ErrorMessage = err.Error()
 		internal_telephony_base.ReportOutboundFailure(
 			statusReporter,
 			internal_telephony_base.OutboundFailureClassSetup,
-			"sip outbound setup failed",
+			internal_sip.OutboundFailureReasonSetupFailed.String(),
 			internal_telephony_base.OutboundDisconnectReasonSetupFailed,
 			err,
 			0,
 		)
 		return info, err
 	}
-	t.logger.Infow("SIP outbound call initiated",
-		"context_id", contextID,
-		"to_user", strings.TrimSpace(toPhone),
-		"from_user", fromUser,
-		"trunk_address", cfg.Server,
-		"trunk_port", cfg.Port,
-		"transport", cfg.GetTransport(),
-		"call_id", session.GetCallID(),
-		"assistant_id", assistant.Id,
-		"conversation_id", assistantConversationId)
 
 	return &internal_type.CallInfo{
 		Provider:    internal_sip.Provider,
 		ChannelUUID: session.GetCallID(),
-		Status:      string(sip_infra.OutboundCallStatusInitiated),
+		Status:      internal_type.TelephonyStatusSuccess,
 		StatusInfo: internal_type.StatusInfo{
-			Event: string(sip_infra.OutboundCallStatusInitiated),
+			Event: internal_sip.StatusEvent(string(sip_infra.OutboundCallStatusInitiated)),
 			Payload: map[string]interface{}{
 				"to":              toPhone,
 				"from":            fromUser,
@@ -419,7 +272,7 @@ func (t *sipTelephony) ReceiveCall(c *gin.Context) (*internal_type.CallInfo, err
 		clientNumber = c.Query("caller")
 	}
 	if clientNumber == "" {
-		return nil, fmt.Errorf("missing caller information")
+		return nil, internal_sip.ErrInboundCallerMissing
 	}
 
 	dialedNumber := c.Query("to")
@@ -439,8 +292,8 @@ func (t *sipTelephony) ReceiveCall(c *gin.Context) (*internal_type.CallInfo, err
 		CallerNumber: clientNumber,
 		FromNumber:   dialedNumber,
 		Provider:     internal_sip.Provider,
-		Status:       "SUCCESS",
-		StatusInfo:   internal_type.StatusInfo{Event: "webhook", Payload: queryParams},
+		Status:       internal_type.TelephonyStatusSuccess,
+		StatusInfo:   internal_type.StatusInfo{Event: internal_type.TelephonyEvent(internal_sip.WebhookEvent), Payload: queryParams},
 	}
 	if callID := c.Query("call_id"); callID != "" {
 		info.ChannelUUID = callID

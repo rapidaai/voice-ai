@@ -19,6 +19,7 @@ import (
 
 const (
 	Provider               = "sip"
+	WebhookEvent           = "webhook"
 	DefaultOutboundSIPPort = 5060
 	DefaultRingtone        = "ringtone_us"
 
@@ -32,11 +33,28 @@ const (
 	InputBufferThreshold  = Linear16BytesPerMs * 40
 )
 
+type OutboundFailureReason string
+
+const (
+	OutboundFailureReasonInvalidConfiguration OutboundFailureReason = "sip_outbound_invalid_configuration"
+	OutboundFailureReasonServerNotInitialized OutboundFailureReason = "sip_outbound_server_not_initialized"
+	OutboundFailureReasonServerNotRunning     OutboundFailureReason = "sip_outbound_server_not_running"
+	OutboundFailureReasonHealthGateFailed     OutboundFailureReason = "sip_outbound_health_gate_failed"
+	OutboundFailureReasonSetupFailed          OutboundFailureReason = "sip_outbound_setup_failed"
+)
+
+func (r OutboundFailureReason) String() string {
+	return string(r)
+}
+
 var (
 	Rapida16kConfig = internal_audio.NewLinear16khzMonoAudioConfig()
 	Mulaw8kConfig   = internal_audio.NewMulaw8khzMonoAudioConfig()
 	Linear8kConfig  = internal_audio.NewLinear8khzMonoAudioConfig()
 
+	ErrInboundCallerMissing           = errors.New("missing caller information")
+	ErrSIPServerNotInitialized        = errors.New("SIP server not initialized")
+	ErrSIPServerNotRunning            = errors.New("SIP server not running")
 	ErrProviderAudioConversionFailed  = errors.New("audio conversion to 16kHz linear16 failed")
 	ErrAssistantAudioConversionFailed = errors.New("audio conversion to mulaw 8kHz failed")
 	ErrRTPOutputQueueFull             = sip_infra.ErrRTPOutputQueueFull

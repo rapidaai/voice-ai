@@ -550,10 +550,11 @@ func (s *webrtcStreamer) bindPeerHandlers(peerConnection *pionwebrtc.PeerConnect
 		}
 		if err := s.observer.Record(s.Ctx, s.sessionState.Scope, observability.RecordWebhook{
 			Event: observability.WebRTCAudioTrackReceived,
-			Payload: map[string]interface{}{
-				webrtc_internal.DataSessionID:      s.sessionID,
-				webrtc_internal.DataMediaSessionID: mediaSessionID,
-				webrtc_internal.DataCodec:          remoteAudioCodec.MimeType,
+			Payload: observability.WebRTCAudioTrackReceivedWebhookPayload{
+				V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+				SessionID:            s.sessionID,
+				MediaSessionID:       mediaSessionID,
+				Codec:                remoteAudioCodec.MimeType,
 			},
 		}); err != nil && s.Logger != nil {
 			s.Logger.Warnw("webrtc webhook record failed",
@@ -1201,12 +1202,13 @@ func (s *webrtcStreamer) handleConfigurationMessage(mode protos.StreamMode) {
 			}
 			if recordErr := s.observer.Record(s.Ctx, s.sessionState.Scope, observability.RecordWebhook{
 				Event: observability.WebRTCFailed,
-				Payload: map[string]interface{}{
-					webrtc_internal.DataType:      "media_session_start_failed",
-					webrtc_internal.DataSessionID: s.sessionID,
-					webrtc_internal.DataReason:    "start_media_session",
-					"error":                       err.Error(),
-					"fallback":                    "text",
+				Payload: observability.WebRTCFailedWebhookPayload{
+					V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+					Type:                 "media_session_start_failed",
+					SessionID:            s.sessionID,
+					Reason:               "start_media_session",
+					Error:                err.Error(),
+					Fallback:             "text",
 				},
 			}); recordErr != nil && s.Logger != nil {
 				s.Logger.Warnw("webrtc webhook record failed",
@@ -1512,10 +1514,11 @@ func (s *webrtcStreamer) Close() error {
 		}
 		if err := s.observer.Record(s.Ctx, s.sessionState.Scope, observability.RecordWebhook{
 			Event: observability.WebRTCDisconnected,
-			Payload: map[string]interface{}{
-				webrtc_internal.DataSessionID:      s.sessionID,
-				webrtc_internal.DataMediaSessionID: mediaSessionID,
-				webrtc_internal.DataReason:         "closed",
+			Payload: observability.WebRTCDisconnectedWebhookPayload{
+				V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+				SessionID:            s.sessionID,
+				MediaSessionID:       mediaSessionID,
+				Reason:               "closed",
 			},
 		}); err != nil && s.Logger != nil {
 			s.Logger.Warnw("webrtc webhook record failed",

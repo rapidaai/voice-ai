@@ -67,7 +67,7 @@ func vonageAuth(vaultCredential *protos.VaultCredential) (vonage.Auth, error) {
 }
 
 func (vng *vonageTelephony) CatchAllStatusCallback(ctx *gin.Context) (*internal_type.StatusInfo, error) {
-	eventDetails := map[string]interface{}{}
+	eventDetails := utils.Option{}
 	rawCallbackPayload := ctx.Request.URL.RawQuery
 	for key, values := range ctx.Request.URL.Query() {
 		if len(values) > 0 {
@@ -87,15 +87,14 @@ func (vng *vonageTelephony) CatchAllStatusCallback(ctx *gin.Context) (*internal_
 		return nil, internal_vonage.ErrCatchAllChannelUUIDMissing
 	}
 
-	vng.logger.Debugf("catch-all event processed | status: %s, payload: %+v", callback.Status, eventDetails)
 	return callback.StatusInfo(), nil
 }
 
 func (vng *vonageTelephony) StatusCallback(c *gin.Context, auth types.SimplePrinciple, assistantId uint64, assistantConversationId uint64) (*internal_type.StatusInfo, error) {
-	var payload map[string]interface{}
+	var payload utils.Option
 	rawCallbackPayload := c.Request.URL.RawQuery
 	if len(c.Request.URL.Query()) > 0 {
-		payload = make(map[string]interface{})
+		payload = utils.Option{}
 		for key, values := range c.Request.URL.Query() {
 			if len(values) > 0 {
 				payload[key] = values[0]
@@ -138,12 +137,12 @@ func (vng *vonageTelephony) OutboundCall(
 	info := &internal_type.CallInfo{Provider: internal_vonage.Provider}
 
 	if err := ctx.Err(); err != nil {
-		info.Status = "FAILED"
-		info.ErrorMessage = fmt.Sprintf("request cancelled: %s", err.Error())
+		info.Status = internal_type.TelephonyStatusFailed
+		info.ErrorMessage = err.Error()
 		internal_telephony_base.ReportOutboundFailure(
 			statusReporter,
 			internal_telephony_base.OutboundFailureClassRequestCancelled,
-			"request cancelled",
+			internal_vonage.OutboundFailureReasonRequestCancelled.String(),
 			internal_telephony_base.OutboundDisconnectReasonRequestCancelled,
 			err,
 			0,
@@ -153,12 +152,12 @@ func (vng *vonageTelephony) OutboundCall(
 
 	cAuth, err := vonageAuth(vaultCredential)
 	if err != nil {
-		info.Status = "FAILED"
-		info.ErrorMessage = fmt.Sprintf("authentication error: %s", err.Error())
+		info.Status = internal_type.TelephonyStatusFailed
+		info.ErrorMessage = err.Error()
 		internal_telephony_base.ReportOutboundFailure(
 			statusReporter,
 			internal_telephony_base.OutboundFailureClassAuthentication,
-			"authentication error",
+			internal_vonage.OutboundFailureReasonAuthenticationFailed.String(),
 			internal_telephony_base.OutboundDisconnectReasonSetupFailed,
 			err,
 			0,
@@ -191,12 +190,12 @@ func (vng *vonageTelephony) OutboundCall(
 		})
 
 	if apiError != nil {
-		info.Status = "FAILED"
-		info.ErrorMessage = fmt.Sprintf("API error: %s", apiError.Error())
+		info.Status = internal_type.TelephonyStatusFailed
+		info.ErrorMessage = apiError.Error()
 		internal_telephony_base.ReportOutboundFailure(
 			statusReporter,
 			internal_telephony_base.OutboundFailureClassProviderAPI,
-			"provider API error",
+			internal_vonage.OutboundFailureReasonProviderAPIError.String(),
 			internal_telephony_base.OutboundDisconnectReasonSetupFailed,
 			apiError,
 			0,
@@ -206,12 +205,12 @@ func (vng *vonageTelephony) OutboundCall(
 
 	if vErr.Error != nil {
 		err := internal_vonage.ErrProviderCallCreateFailed
-		info.Status = "FAILED"
-		info.ErrorMessage = fmt.Sprintf("Calling error: %v", vErr.Error)
+		info.Status = internal_type.TelephonyStatusFailed
+		info.ErrorMessage = fmt.Sprint(vErr.Error)
 		internal_telephony_base.ReportOutboundFailure(
 			statusReporter,
 			internal_telephony_base.OutboundFailureClassProviderResponse,
-			fmt.Sprintf("%v", vErr.Error),
+			internal_vonage.OutboundFailureReasonProviderCallCreate.String(),
 			internal_telephony_base.OutboundDisconnectReasonSetupFailed,
 			err,
 			0,
@@ -220,8 +219,8 @@ func (vng *vonageTelephony) OutboundCall(
 	}
 
 	info.ChannelUUID = result.Uuid
-	info.Status = "SUCCESS"
-	info.StatusInfo = internal_type.StatusInfo{Event: result.Status, Payload: result}
+	info.Status = internal_type.TelephonyStatusSuccess
+	info.StatusInfo = internal_type.StatusInfo{Event: internal_vonage.StatusEvent(result.Status), Payload: result}
 	info.Extra = map[string]string{
 		"conversation_uuid": result.ConversationUuid,
 	}
@@ -269,7 +268,7 @@ func (vng *vonageTelephony) ReceiveCall(c *gin.Context) (*internal_type.CallInfo
 	info := &internal_type.CallInfo{
 		CallerNumber: clientNumber,
 		Provider:     internal_vonage.Provider,
-		Status:       "SUCCESS",
+		Status:       internal_type.TelephonyStatusSuccess,
 		StatusInfo:   internal_type.StatusInfo{Event: internal_vonage.WebhookEvent, Payload: queryParams},
 		Extra:        make(map[string]string),
 	}
