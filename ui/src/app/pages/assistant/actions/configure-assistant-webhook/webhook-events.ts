@@ -46,12 +46,6 @@ export const webhookEvents: WebhookEventOption[] = [
     group: 'Call',
   },
   {
-    id: 'call.hangup',
-    name: 'call.hangup',
-    description: 'Triggered when a hangup signal is received.',
-    group: 'Call',
-  },
-  {
     id: 'call.ended',
     name: 'call.ended',
     description: 'Triggered when the call session finishes.',
@@ -61,12 +55,6 @@ export const webhookEvents: WebhookEventOption[] = [
     id: 'call.failed',
     name: 'call.failed',
     description: 'Triggered when the call fails.',
-    group: 'Call',
-  },
-  {
-    id: 'call.cancelled',
-    name: 'call.cancelled',
-    description: 'Triggered when an outbound call is cancelled before connect.',
     group: 'Call',
   },
   {
