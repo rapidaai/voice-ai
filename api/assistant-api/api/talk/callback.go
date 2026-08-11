@@ -9,12 +9,12 @@ import (
 	"context"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	"github.com/rapidaai/api/assistant-api/internal/observability/collectors"
+	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
@@ -72,7 +72,7 @@ func (cApi *ConversationApi) UnviersalCallback(c *gin.Context) {
 			Message: "telephony provider callback received",
 			Attributes: observability.Attributes{
 				"provider":     cc.Provider,
-				"status_event": statusInfo.Event,
+				"status_event": statusInfo.Event.String(),
 				"context_id":   cc.ContextID,
 				"direction":    cc.Direction,
 				"channel_uuid": statusInfo.ChannelUUID,
@@ -83,7 +83,7 @@ func (cApi *ConversationApi) UnviersalCallback(c *gin.Context) {
 			Event: observability.CallStatus,
 			Attributes: observability.Attributes{
 				"provider":     cc.Provider,
-				"status_event": statusInfo.Event,
+				"status_event": statusInfo.Event.String(),
 				"context_id":   cc.ContextID,
 				"direction":    cc.Direction,
 				"channel_uuid": statusInfo.ChannelUUID,
@@ -98,19 +98,21 @@ func (cApi *ConversationApi) UnviersalCallback(c *gin.Context) {
 			observability.RecordWebhook{
 				Event:     observability.CallFailed,
 				ContextID: cc.ContextID,
-				Payload: map[string]interface{}{
-					"provider":     cc.Provider,
-					"direction":    cc.Direction,
-					"to":           cc.CallerNumber,
-					"from":         cc.FromNumber,
-					"call_id":      statusInfo.ChannelUUID,
-					"context_id":   cc.ContextID,
-					"source":       "provider_callback",
-					"status_event": statusInfo.Event,
-					"raw_payload":  statusInfo.RawPayload,
-					"payload":      statusInfo.Payload,
-					"error":        statusInfo.Error.Error,
-					"reason":       statusInfo.Error.Reason,
+				Payload: observability.CallFailedWebhookPayload{
+					V1WebhookPayloadBase: observability.NewV1WebhookPayload(map[string]interface{}{
+						"raw_payload": statusInfo.RawPayload,
+						"payload":     statusInfo.Payload,
+					}),
+					Provider:    cc.Provider,
+					CallID:      statusInfo.ChannelUUID,
+					To:          cc.CallerNumber,
+					From:        cc.FromNumber,
+					Direction:   cc.Direction,
+					ContextID:   cc.ContextID,
+					Source:      "provider_callback",
+					StatusEvent: statusInfo.Event.String(),
+					Error:       statusInfo.Error.Error,
+					Reason:      statusInfo.Error.Reason,
 				},
 			})
 		if err := cApi.callContextStore.UpdateCallStatus(c, cc.ContextID, callcontext.CallStatusUpdate{
@@ -143,7 +145,7 @@ func (cApi *ConversationApi) UnviersalCallback(c *gin.Context) {
 	} else if statusInfo.Completed {
 		if err := cApi.callContextStore.UpdateCallStatus(c, cc.ContextID, callcontext.CallStatusUpdate{
 			CallStatus:       callcontext.CallStatusCompleted,
-			DisconnectReason: statusInfo.Event,
+			DisconnectReason: statusInfo.Event.String(),
 		}); err != nil {
 			cApi.logger.Warnf("failed to update call context %s from completed callback: %v", cc.ContextID, err)
 		}
@@ -153,32 +155,50 @@ func (cApi *ConversationApi) UnviersalCallback(c *gin.Context) {
 				ConversationID: cc.ConversationID,
 			},
 			observability.RecordMetric{
-				Metrics: observability.CallStatusMetric(observability.MetricCallStatusComplete, statusInfo.Event),
+				Metrics: observability.CallStatusMetric(observability.MetricCallStatusComplete, statusInfo.Event.String()),
 			})
-	} else if validator.NotBlank(statusInfo.Event) {
+	} else if statusInfo.Event != "" {
 		if err := cApi.callContextStore.UpdateCallStatus(c, cc.ContextID, callcontext.CallStatusUpdate{
-			CallStatus: statusInfo.Event,
+			CallStatus: statusInfo.Event.String(),
 		}); err != nil {
 			cApi.logger.Warnf("failed to update call context %s from callback event %s: %v", cc.ContextID, statusInfo.Event, err)
 		}
-		switch strings.ToUpper(statusInfo.Event) {
-		case "RINGING":
+		switch statusInfo.Event {
+		case internal_type.TelephonyEventRinging:
 			observer.Record(c,
 				observability.ConversationScope{
 					AssistantScope: observability.AssistantScope{AssistantID: cc.AssistantID},
 					ConversationID: cc.ConversationID,
 				},
+				observability.RecordWebhook{
+					Event:     observability.CallRinging,
+					ContextID: cc.ContextID,
+					Payload: observability.CallRingingWebhookPayload{
+						V1WebhookPayloadBase: observability.NewV1WebhookPayload(map[string]interface{}{
+							"raw_payload": statusInfo.RawPayload,
+							"payload":     statusInfo.Payload,
+						}),
+						Provider:    cc.Provider,
+						CallID:      statusInfo.ChannelUUID,
+						To:          cc.CallerNumber,
+						From:        cc.FromNumber,
+						Direction:   cc.Direction,
+						ContextID:   cc.ContextID,
+						Source:      "provider_callback",
+						StatusEvent: statusInfo.Event.String(),
+					},
+				},
 				observability.RecordMetric{
-					Metrics: observability.CallStatusMetric(observability.MetricCallStatusRinging, statusInfo.Event),
+					Metrics: observability.CallStatusMetric(observability.MetricCallStatusRinging, statusInfo.Event.String()),
 				})
-		case "CANCELLED", "CANCELED":
+		case internal_type.TelephonyEvent("cancelled"), internal_type.TelephonyEvent("canceled"):
 			observer.Record(c,
 				observability.ConversationScope{
 					AssistantScope: observability.AssistantScope{AssistantID: cc.AssistantID},
 					ConversationID: cc.ConversationID,
 				},
 				observability.RecordMetric{
-					Metrics: observability.CallStatusMetric(observability.MetricCallStatusCancelled, statusInfo.Event),
+					Metrics: observability.CallStatusMetric(observability.MetricCallStatusCancelled, statusInfo.Event.String()),
 				})
 		default:
 			observer.Record(c,
@@ -187,7 +207,7 @@ func (cApi *ConversationApi) UnviersalCallback(c *gin.Context) {
 					ConversationID: cc.ConversationID,
 				},
 				observability.RecordMetric{
-					Metrics: observability.CallStatusMetric(observability.MetricCallStatusInProgress, statusInfo.Event),
+					Metrics: observability.CallStatusMetric(observability.MetricCallStatusInProgress, statusInfo.Event.String()),
 				})
 		}
 	}
@@ -267,7 +287,7 @@ func (cApi *ConversationApi) CallbackByContext(c *gin.Context) {
 			Message: "telephony provider callback received",
 			Attributes: observability.Attributes{
 				"provider":     cc.Provider,
-				"status_event": statusInfo.Event,
+				"status_event": statusInfo.Event.String(),
 				"context_id":   contextID,
 				"direction":    cc.Direction,
 				"channel_uuid": statusInfo.ChannelUUID,
@@ -278,7 +298,7 @@ func (cApi *ConversationApi) CallbackByContext(c *gin.Context) {
 			Event: observability.CallStatus,
 			Attributes: observability.Attributes{
 				"provider":     cc.Provider,
-				"status_event": statusInfo.Event,
+				"status_event": statusInfo.Event.String(),
 				"context_id":   contextID,
 				"direction":    cc.Direction,
 				"channel_uuid": statusInfo.ChannelUUID,
@@ -293,19 +313,21 @@ func (cApi *ConversationApi) CallbackByContext(c *gin.Context) {
 			observability.RecordWebhook{
 				Event:     observability.CallFailed,
 				ContextID: cc.ContextID,
-				Payload: map[string]interface{}{
-					"provider":     cc.Provider,
-					"to":           cc.CallerNumber,
-					"from":         cc.FromNumber,
-					"call_id":      statusInfo.ChannelUUID,
-					"context_id":   cc.ContextID,
-					"direction":    cc.Direction,
-					"source":       "provider_callback",
-					"status_event": statusInfo.Event,
-					"raw_payload":  statusInfo.RawPayload,
-					"payload":      statusInfo.Payload,
-					"error":        statusInfo.Error.Error,
-					"reason":       statusInfo.Error.Reason,
+				Payload: observability.CallFailedWebhookPayload{
+					V1WebhookPayloadBase: observability.NewV1WebhookPayload(map[string]interface{}{
+						"raw_payload": statusInfo.RawPayload,
+						"payload":     statusInfo.Payload,
+					}),
+					Provider:    cc.Provider,
+					CallID:      statusInfo.ChannelUUID,
+					To:          cc.CallerNumber,
+					From:        cc.FromNumber,
+					Direction:   cc.Direction,
+					ContextID:   cc.ContextID,
+					Source:      "provider_callback",
+					StatusEvent: statusInfo.Event.String(),
+					Error:       statusInfo.Error.Error,
+					Reason:      statusInfo.Error.Reason,
 				},
 			})
 		if err := cApi.callContextStore.UpdateCallStatus(c, cc.ContextID, callcontext.CallStatusUpdate{
@@ -337,7 +359,7 @@ func (cApi *ConversationApi) CallbackByContext(c *gin.Context) {
 	} else if statusInfo.Completed {
 		if err := cApi.callContextStore.UpdateCallStatus(c, cc.ContextID, callcontext.CallStatusUpdate{
 			CallStatus:       callcontext.CallStatusCompleted,
-			DisconnectReason: statusInfo.Event,
+			DisconnectReason: statusInfo.Event.String(),
 		}); err != nil {
 			cApi.logger.Warnf("failed to update call context %s from completed callback: %v", cc.ContextID, err)
 		}
@@ -347,32 +369,50 @@ func (cApi *ConversationApi) CallbackByContext(c *gin.Context) {
 				ConversationID: cc.ConversationID,
 			},
 			observability.RecordMetric{
-				Metrics: observability.CallStatusMetric(observability.MetricCallStatusComplete, statusInfo.Event),
+				Metrics: observability.CallStatusMetric(observability.MetricCallStatusComplete, statusInfo.Event.String()),
 			})
-	} else if validator.NotBlank(statusInfo.Event) {
+	} else if statusInfo.Event != "" {
 		if err := cApi.callContextStore.UpdateCallStatus(c, cc.ContextID, callcontext.CallStatusUpdate{
-			CallStatus: statusInfo.Event,
+			CallStatus: statusInfo.Event.String(),
 		}); err != nil {
 			cApi.logger.Warnf("failed to update call context %s from callback event %s: %v", cc.ContextID, statusInfo.Event, err)
 		}
-		switch strings.ToUpper(statusInfo.Event) {
-		case "RINGING":
+		switch statusInfo.Event {
+		case internal_type.TelephonyEventRinging:
 			observer.Record(c,
 				observability.ConversationScope{
 					AssistantScope: observability.AssistantScope{AssistantID: cc.AssistantID},
 					ConversationID: cc.ConversationID,
 				},
+				observability.RecordWebhook{
+					Event:     observability.CallRinging,
+					ContextID: cc.ContextID,
+					Payload: observability.CallRingingWebhookPayload{
+						V1WebhookPayloadBase: observability.NewV1WebhookPayload(map[string]interface{}{
+							"raw_payload": statusInfo.RawPayload,
+							"payload":     statusInfo.Payload,
+						}),
+						Provider:    cc.Provider,
+						CallID:      statusInfo.ChannelUUID,
+						To:          cc.CallerNumber,
+						From:        cc.FromNumber,
+						Direction:   cc.Direction,
+						ContextID:   cc.ContextID,
+						Source:      "provider_callback",
+						StatusEvent: statusInfo.Event.String(),
+					},
+				},
 				observability.RecordMetric{
-					Metrics: observability.CallStatusMetric(observability.MetricCallStatusRinging, statusInfo.Event),
+					Metrics: observability.CallStatusMetric(observability.MetricCallStatusRinging, statusInfo.Event.String()),
 				})
-		case "CANCELLED", "CANCELED":
+		case internal_type.TelephonyEvent("cancelled"), internal_type.TelephonyEvent("canceled"):
 			observer.Record(c,
 				observability.ConversationScope{
 					AssistantScope: observability.AssistantScope{AssistantID: cc.AssistantID},
 					ConversationID: cc.ConversationID,
 				},
 				observability.RecordMetric{
-					Metrics: observability.CallStatusMetric(observability.MetricCallStatusCancelled, statusInfo.Event),
+					Metrics: observability.CallStatusMetric(observability.MetricCallStatusCancelled, statusInfo.Event.String()),
 				})
 		default:
 			observer.Record(c,
@@ -381,7 +421,7 @@ func (cApi *ConversationApi) CallbackByContext(c *gin.Context) {
 					ConversationID: cc.ConversationID,
 				},
 				observability.RecordMetric{
-					Metrics: observability.CallStatusMetric(observability.MetricCallStatusInProgress, statusInfo.Event),
+					Metrics: observability.CallStatusMetric(observability.MetricCallStatusInProgress, statusInfo.Event.String()),
 				})
 		}
 	}
@@ -391,7 +431,7 @@ func (cApi *ConversationApi) CallbackByContext(c *gin.Context) {
 			AssistantScope: observability.AssistantScope{AssistantID: cc.AssistantID},
 			ConversationID: cc.ConversationID,
 		},
-			observability.RecordMetric{Metrics: []*protos.Metric{&protos.Metric{Name: observability.MetricCallDurationMs, Value: strconv.FormatInt(statusInfo.Duration.Milliseconds(), 10), Description: "Call duration in milliseconds"}}})
+			observability.RecordMetric{Metrics: []*protos.Metric{{Name: observability.MetricCallDurationMs, Value: strconv.FormatInt(statusInfo.Duration.Milliseconds(), 10), Description: "Call duration in milliseconds"}}})
 	}
 	if validator.NotBlank(statusInfo.Price) {
 		observer.Record(c,
@@ -399,7 +439,7 @@ func (cApi *ConversationApi) CallbackByContext(c *gin.Context) {
 				AssistantScope: observability.AssistantScope{AssistantID: cc.AssistantID},
 				ConversationID: cc.ConversationID,
 			},
-			observability.RecordMetric{Metrics: []*protos.Metric{&protos.Metric{Name: observability.MetricCallPrice, Value: statusInfo.Price, Description: "Call price"}}})
+			observability.RecordMetric{Metrics: []*protos.Metric{{Name: observability.MetricCallPrice, Value: statusInfo.Price, Description: "Call price"}}})
 	}
 
 	if err := observer.Close(context.Background()); err != nil {

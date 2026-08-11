@@ -178,7 +178,7 @@ func (d *InboundDispatcher) SaveCallContext(ctx context.Context, auth types.Simp
 		FromNumber:          callInfo.FromNumber,
 		Provider:            provider,
 		ChannelUUID:         callInfo.ChannelUUID,
-		CallStatus:          callInfo.Status,
+		CallStatus:          callInfo.Status.String(),
 	}
 	if auth.GetCurrentProjectId() != nil {
 		cc.ProjectID = *auth.GetCurrentProjectId()

@@ -139,12 +139,12 @@ func TestReceiveCall(t *testing.T) {
 			checkCallInfo: func(t *testing.T, info *internal_type.CallInfo) {
 				require.NotNil(t, info)
 				assert.Equal(t, internal_exotel.Provider, info.Provider)
-				assert.Equal(t, "SUCCESS", info.Status)
+				assert.Equal(t, internal_type.TelephonyStatusSuccess, info.Status)
 				assert.Equal(t, "+919876543210", info.CallerNumber)
 				assert.Equal(t, "exotel-call-sid-12345", info.ChannelUUID)
 
 				// Check StatusInfo
-				assert.Equal(t, internal_exotel.WebhookEvent, info.StatusInfo.Event)
+				assert.Equal(t, internal_type.TelephonyEvent(internal_exotel.WebhookEvent), info.StatusInfo.Event)
 				assert.NotNil(t, info.StatusInfo.Payload)
 				payload, ok := info.StatusInfo.Payload.(map[string]string)
 				require.True(t, ok, "Payload should be map[string]string")
@@ -163,9 +163,9 @@ func TestReceiveCall(t *testing.T) {
 			checkCallInfo: func(t *testing.T, info *internal_type.CallInfo) {
 				require.NotNil(t, info)
 				assert.Equal(t, internal_exotel.Provider, info.Provider)
-				assert.Equal(t, "SUCCESS", info.Status)
+				assert.Equal(t, internal_type.TelephonyStatusSuccess, info.Status)
 				assert.Empty(t, info.ChannelUUID, "ChannelUUID should be empty without CallSid")
-				assert.Equal(t, internal_exotel.WebhookEvent, info.StatusInfo.Event)
+				assert.Equal(t, internal_type.TelephonyEvent(internal_exotel.WebhookEvent), info.StatusInfo.Event)
 				assert.NotNil(t, info.StatusInfo.Payload)
 			},
 		},
@@ -272,7 +272,7 @@ func TestStatusCallback(t *testing.T) {
 			},
 			checkStatus: func(t *testing.T, info *internal_type.StatusInfo) {
 				require.NotNil(t, info)
-				assert.Equal(t, "completed", info.Event)
+				assert.Equal(t, internal_type.TelephonyEventCompleted, info.Event)
 				assert.Equal(t, "exotel-call-sid-12345", info.ChannelUUID)
 				require.NotNil(t, info.Duration)
 				assert.Equal(t, 17*time.Second, *info.Duration)
@@ -288,7 +288,7 @@ func TestStatusCallback(t *testing.T) {
 			},
 			checkStatus: func(t *testing.T, info *internal_type.StatusInfo) {
 				require.NotNil(t, info)
-				assert.Equal(t, "busy", info.Event)
+				assert.Equal(t, internal_type.TelephonyEventCompleted, info.Event)
 				require.NotNil(t, info.Error)
 				assert.Equal(t, "failed", info.Error.Error)
 				assert.Equal(t, "busy", info.Error.Reason)
@@ -303,7 +303,7 @@ func TestStatusCallback(t *testing.T) {
 			},
 			checkStatus: func(t *testing.T, info *internal_type.StatusInfo) {
 				require.NotNil(t, info)
-				assert.Equal(t, "failed", info.Event)
+				assert.Equal(t, internal_type.TelephonyEventCompleted, info.Event)
 				require.NotNil(t, info.Error)
 				assert.Equal(t, "failed", info.Error.Error)
 				assert.Equal(t, "remote_busy", info.Error.Reason)
@@ -351,7 +351,7 @@ func TestCatchAllStatusCallback(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, statusInfo)
-		assert.Equal(t, "no-answer", statusInfo.Event)
+		assert.Equal(t, internal_type.TelephonyEventCompleted, statusInfo.Event)
 		assert.Equal(t, "exotel-call-sid-12345", statusInfo.ChannelUUID)
 		require.NotNil(t, statusInfo.Error)
 		assert.Equal(t, "no-answer", statusInfo.Error.Reason)
@@ -401,7 +401,7 @@ func TestReceiveCall_QueryParameterExtraction(t *testing.T) {
 	require.NotNil(t, callInfo)
 
 	// Verify StatusInfo contains webhook event with all query parameters as payload
-	assert.Equal(t, internal_exotel.WebhookEvent, callInfo.StatusInfo.Event)
+	assert.Equal(t, internal_type.TelephonyEvent(internal_exotel.WebhookEvent), callInfo.StatusInfo.Event)
 	require.NotNil(t, callInfo.StatusInfo.Payload, "StatusInfo payload should not be nil")
 
 	payloadMap, ok := callInfo.StatusInfo.Payload.(map[string]string)
@@ -458,12 +458,12 @@ func TestReceiveCall_CallInfoStructure(t *testing.T) {
 
 	// Verify CallInfo fields
 	assert.Equal(t, internal_exotel.Provider, callInfo.Provider)
-	assert.Equal(t, "SUCCESS", callInfo.Status)
+	assert.Equal(t, internal_type.TelephonyStatusSuccess, callInfo.Status)
 	assert.Equal(t, "+919876543210", callInfo.CallerNumber)
 	assert.Equal(t, "exotel-call-sid-12345", callInfo.ChannelUUID)
 	assert.Empty(t, callInfo.ErrorMessage)
 
 	// Verify StatusInfo
-	assert.Equal(t, internal_exotel.WebhookEvent, callInfo.StatusInfo.Event)
+	assert.Equal(t, internal_type.TelephonyEvent(internal_exotel.WebhookEvent), callInfo.StatusInfo.Event)
 	assert.NotNil(t, callInfo.StatusInfo.Payload)
 }

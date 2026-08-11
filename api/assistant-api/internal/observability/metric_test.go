@@ -107,8 +107,8 @@ func TestNewMetricSTTLatencyMs(t *testing.T) {
 	if metric.Value != "456" {
 		t.Fatalf("expected metric value %q, got %q", "456", metric.Value)
 	}
-	if metric.Description != "STT latency from speech start to final transcript in milliseconds" {
-		t.Fatalf("expected metric description %q, got %q", "STT latency from speech start to final transcript in milliseconds", metric.Description)
+	if metric.Description != "STT latency from speech end to final transcript in milliseconds" {
+		t.Fatalf("expected metric description %q, got %q", "STT latency from speech end to final transcript in milliseconds", metric.Description)
 	}
 	assertRecordAttribute(t, record, "provider", "deepgram")
 }

@@ -97,11 +97,12 @@ func (s *webrtcStreamer) handlePeerState(mediaSessionID uint64, state pionwebrtc
 				},
 			}, observability.RecordWebhook{
 				Event: observability.WebRTCConnected,
-				Payload: map[string]interface{}{
-					webrtc_internal.DataSessionID:           s.sessionID,
-					webrtc_internal.DataMediaSessionID:      mediaSessionID,
-					webrtc_internal.DataICELatencyMs:        iceLatencyMs,
-					webrtc_internal.DataPeerConnectionState: state.String(),
+				Payload: observability.WebRTCConnectedWebhookPayload{
+					V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+					SessionID:            s.sessionID,
+					MediaSessionID:       mediaSessionID,
+					ICELatencyMs:         iceLatencyMs,
+					PeerConnectionState:  state.String(),
 				},
 			}, observability.RecordMetric{
 				Metrics: []*protos.Metric{{
@@ -138,12 +139,13 @@ func (s *webrtcStreamer) handlePeerState(mediaSessionID uint64, state pionwebrtc
 			},
 			observability.RecordWebhook{
 				Event: observability.WebRTCFailed,
-				Payload: map[string]interface{}{
-					webrtc_internal.DataType:                "peer_failed",
-					webrtc_internal.DataSessionID:           s.sessionID,
-					webrtc_internal.DataMediaSessionID:      mediaSessionID,
-					webrtc_internal.DataReason:              webrtc_internal.ReasonPeerFailed,
-					webrtc_internal.DataPeerConnectionState: state.String(),
+				Payload: observability.WebRTCFailedWebhookPayload{
+					V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+					Type:                 "peer_failed",
+					SessionID:            s.sessionID,
+					MediaSessionID:       mediaSessionID,
+					Reason:               webrtc_internal.ReasonPeerFailed,
+					PeerConnectionState:  state.String(),
 				},
 			})
 		s.queueMediaSessionRecovery(mediaSessionID, webrtc_internal.ReasonPeerFailed, peerStateChangedAt)
@@ -178,12 +180,13 @@ func (s *webrtcStreamer) handlePeerState(mediaSessionID uint64, state pionwebrtc
 			},
 			observability.RecordWebhook{
 				Event: observability.WebRTCDisconnected,
-				Payload: map[string]interface{}{
-					webrtc_internal.DataType:                "peer_disconnected",
-					webrtc_internal.DataSessionID:           s.sessionID,
-					webrtc_internal.DataMediaSessionID:      mediaSessionID,
-					webrtc_internal.DataReason:              webrtc_internal.ReasonPeerDisconnected,
-					webrtc_internal.DataPeerConnectionState: state.String(),
+				Payload: observability.WebRTCDisconnectedWebhookPayload{
+					V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+					Type:                 "peer_disconnected",
+					SessionID:            s.sessionID,
+					MediaSessionID:       mediaSessionID,
+					Reason:               webrtc_internal.ReasonPeerDisconnected,
+					PeerConnectionState:  state.String(),
 				},
 			},
 		)

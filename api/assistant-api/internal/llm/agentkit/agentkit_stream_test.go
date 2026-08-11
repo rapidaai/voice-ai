@@ -269,7 +269,7 @@ func TestWrite_AllTypes(t *testing.T) {
 				},
 			},
 			wantFunc: func(t *testing.T, pkts []internal_type.Packet) {
-				require.Len(t, pkts, 3)
+				require.Len(t, pkts, 5)
 				audioPolicy, ok := pkts[0].(internal_type.DispatchPolicyPacket)
 				require.True(t, ok)
 				assert.Equal(t, "ctx-control", audioPolicy.ContextID)
@@ -281,7 +281,17 @@ func TestWrite_AllTypes(t *testing.T) {
 				assert.Equal(t, internal_type.PacketNameUserTextReceived, textPolicy.Policy.Target)
 				assert.Equal(t, internal_type.DispatchActionIgnore, textPolicy.Policy.Action)
 
-				bargePolicy, ok := pkts[2].(internal_type.DispatchPolicyPacket)
+				bargeAudioPolicy, ok := pkts[2].(internal_type.DispatchPolicyPacket)
+				require.True(t, ok)
+				assert.Equal(t, internal_type.PacketNameUserAudioReceived, bargeAudioPolicy.Policy.Target)
+				assert.Equal(t, internal_type.DispatchActionIgnore, bargeAudioPolicy.Policy.Action)
+
+				bargeTextPolicy, ok := pkts[3].(internal_type.DispatchPolicyPacket)
+				require.True(t, ok)
+				assert.Equal(t, internal_type.PacketNameUserTextReceived, bargeTextPolicy.Policy.Target)
+				assert.Equal(t, internal_type.DispatchActionIgnore, bargeTextPolicy.Policy.Action)
+
+				bargePolicy, ok := pkts[4].(internal_type.DispatchPolicyPacket)
 				require.True(t, ok)
 				assert.Equal(t, internal_type.PacketNameInterruptionDetected, bargePolicy.Policy.Target)
 				assert.Equal(t, internal_type.DispatchActionIgnore, bargePolicy.Policy.Action)
@@ -303,7 +313,7 @@ func TestWrite_AllTypes(t *testing.T) {
 				},
 			},
 			wantFunc: func(t *testing.T, pkts []internal_type.Packet) {
-				require.Len(t, pkts, 3)
+				require.Len(t, pkts, 5)
 				audioPolicy, ok := pkts[0].(internal_type.DispatchPolicyPacket)
 				require.True(t, ok)
 				assert.Equal(t, internal_type.PacketNameUserAudioReceived, audioPolicy.Policy.Target)
@@ -314,7 +324,17 @@ func TestWrite_AllTypes(t *testing.T) {
 				assert.Equal(t, internal_type.PacketNameUserTextReceived, textPolicy.Policy.Target)
 				assert.Equal(t, internal_type.DispatchActionPassthrough, textPolicy.Policy.Action)
 
-				bargePolicy, ok := pkts[2].(internal_type.DispatchPolicyPacket)
+				bargeAudioPolicy, ok := pkts[2].(internal_type.DispatchPolicyPacket)
+				require.True(t, ok)
+				assert.Equal(t, internal_type.PacketNameUserAudioReceived, bargeAudioPolicy.Policy.Target)
+				assert.Equal(t, internal_type.DispatchActionPassthrough, bargeAudioPolicy.Policy.Action)
+
+				bargeTextPolicy, ok := pkts[3].(internal_type.DispatchPolicyPacket)
+				require.True(t, ok)
+				assert.Equal(t, internal_type.PacketNameUserTextReceived, bargeTextPolicy.Policy.Target)
+				assert.Equal(t, internal_type.DispatchActionPassthrough, bargeTextPolicy.Policy.Action)
+
+				bargePolicy, ok := pkts[4].(internal_type.DispatchPolicyPacket)
 				require.True(t, ok)
 				assert.Equal(t, internal_type.PacketNameInterruptionDetected, bargePolicy.Policy.Target)
 				assert.Equal(t, internal_type.DispatchActionPassthrough, bargePolicy.Policy.Action)

@@ -973,9 +973,11 @@ func (h requestorDispatchHandler) HandleError(ctx context.Context, p internal_ty
 				Scope:     webhookScope,
 				Record: observability.RecordWebhook{
 					Event: observability.ConversationError,
-					Payload: map[string]interface{}{
-						"reason":  protos.ConversationDisconnection_DISCONNECTION_TYPE_ERROR.String(),
-						"message": p.ErrMessage(),
+					Payload: observability.ConversationErrorWebhookPayload{
+						V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+						Source:               fmt.Sprintf("%v", h.r.source),
+						Reason:               protos.ConversationDisconnection_DISCONNECTION_TYPE_ERROR.String(),
+						Message:              p.ErrMessage(),
 					},
 				},
 			},
@@ -3292,18 +3294,19 @@ func (h requestorDispatchHandler) HandleInitializationCompleted(ctx context.Cont
 
 	event := utils.ConversationResume
 	webhookEvent := observability.ConversationResume
-	webhookData := map[string]interface{}{
-		"source":        fmt.Sprintf("%v", h.r.source),
-		"identifier":    h.r.identifier(p.Config),
-		"message_count": fmt.Sprintf("%d", len(h.r.GetHistories())),
+	var webhookPayload observability.V1WebhookPayload = observability.ConversationResumeWebhookPayload{
+		V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+		Source:               fmt.Sprintf("%v", h.r.source),
+		Identifier:           h.r.identifier(p.Config),
+		MessageCount:         fmt.Sprintf("%d", len(h.r.GetHistories())),
 	}
 	if p.Config.GetAssistantConversationId() == 0 {
 		event = utils.ConversationBegin
 		webhookEvent = observability.ConversationBegin
-		webhookData = map[string]interface{}{
-			"source":     fmt.Sprintf("%v", h.r.source),
-			"is_new":     "true",
-			"identifier": h.r.identifier(p.Config),
+		webhookPayload = observability.ConversationBeginWebhookPayload{
+			V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+			Source:               fmt.Sprintf("%v", h.r.source),
+			Identifier:           h.r.identifier(p.Config),
 		}
 	}
 	h.r.OnPacket(ctx, internal_type.ObservabilityEventRecordPacket{
@@ -3318,7 +3321,7 @@ func (h requestorDispatchHandler) HandleInitializationCompleted(ctx context.Cont
 		Scope:     internal_type.ObservabilityRecordScopeConversation,
 		Record: observability.RecordWebhook{
 			Event:   webhookEvent,
-			Payload: webhookData,
+			Payload: webhookPayload,
 		},
 	})
 
@@ -3650,12 +3653,14 @@ func (h requestorDispatchHandler) HandleFinalizeConversation(ctx context.Context
 			observability.RecordWebhook{
 				Event:     observability.ConversationCompleted,
 				ContextID: p.ContextID,
-				Payload: map[string]interface{}{
-					"reason":   "conversation_completed",
-					"status":   "completed",
-					"messages": messagesPayload,
-					"metadata": metadataPayload,
-					"metrics":  metricsPayload,
+				Payload: observability.ConversationCompletedWebhookPayload{
+					V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+					Source:               fmt.Sprintf("%v", h.r.source),
+					Reason:               "conversation_completed",
+					Status:               "completed",
+					Messages:             messagesPayload,
+					Metadata:             metadataPayload,
+					Metrics:              metricsPayload,
 				},
 			}); err != nil {
 			h.r.logger.Errorw("observability completed webhook failed to record", "error", err, "context_id", p.ContextID)

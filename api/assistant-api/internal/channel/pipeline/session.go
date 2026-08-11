@@ -62,13 +62,14 @@ func (d *Dispatcher) runSession(ctx context.Context, v SessionConnectedPipeline)
 		observability.RecordWebhook{
 			Event:     observability.CallStarted,
 			ContextID: contextID,
-			Payload: map[string]interface{}{
-				"provider":   v.CallContext.Provider,
-				"to":         v.CallContext.CallerNumber,
-				"from":       v.CallContext.FromNumber,
-				"call_id":    v.CallContext.ChannelUUID,
-				"context_id": contextID,
-				"direction":  v.CallContext.Direction,
+			Payload: observability.CallStartedWebhookPayload{
+				V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+				Provider:             v.CallContext.Provider,
+				CallID:               v.CallContext.ChannelUUID,
+				To:                   v.CallContext.CallerNumber,
+				From:                 v.CallContext.FromNumber,
+				Direction:            v.CallContext.Direction,
+				ContextID:            contextID,
 			},
 		},
 		observability.RecordLog{
@@ -142,15 +143,16 @@ func (d *Dispatcher) runSession(ctx context.Context, v SessionConnectedPipeline)
 			observability.RecordWebhook{
 				Event:     observability.CallFailed,
 				ContextID: contextID,
-				Payload: map[string]interface{}{
-					"provider":    v.CallContext.Provider,
-					"to":          v.CallContext.CallerNumber,
-					"from":        v.CallContext.FromNumber,
-					"call_id":     v.CallContext.ChannelUUID,
-					"context_id":  contextID,
-					"direction":   v.CallContext.Direction,
-					"error":       err.Error(),
-					"duration_ms": fmt.Sprintf("%d", time.Since(startTime).Milliseconds()),
+				Payload: observability.CallFailedWebhookPayload{
+					V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+					Provider:             v.CallContext.Provider,
+					CallID:               v.CallContext.ChannelUUID,
+					To:                   v.CallContext.CallerNumber,
+					From:                 v.CallContext.FromNumber,
+					Direction:            v.CallContext.Direction,
+					ContextID:            contextID,
+					Error:                err.Error(),
+					DurationMs:           fmt.Sprintf("%d", time.Since(startTime).Milliseconds()),
 				},
 			})
 		v.Observer.Record(ctx,
@@ -192,14 +194,15 @@ func (d *Dispatcher) runSession(ctx context.Context, v SessionConnectedPipeline)
 		observability.RecordWebhook{
 			Event:     observability.CallEnded,
 			ContextID: contextID,
-			Payload: map[string]interface{}{
-				"provider":    v.CallContext.Provider,
-				"to":          v.CallContext.CallerNumber,
-				"from":        v.CallContext.FromNumber,
-				"call_id":     v.CallContext.ChannelUUID,
-				"context_id":  contextID,
-				"direction":   v.CallContext.Direction,
-				"duration_ms": fmt.Sprintf("%d", time.Since(startTime).Milliseconds()),
+			Payload: observability.CallEndedWebhookPayload{
+				V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+				Provider:             v.CallContext.Provider,
+				CallID:               v.CallContext.ChannelUUID,
+				To:                   v.CallContext.CallerNumber,
+				From:                 v.CallContext.FromNumber,
+				Direction:            v.CallContext.Direction,
+				ContextID:            contextID,
+				DurationMs:           fmt.Sprintf("%d", time.Since(startTime).Milliseconds()),
 			},
 		},
 		observability.RecordMetric{

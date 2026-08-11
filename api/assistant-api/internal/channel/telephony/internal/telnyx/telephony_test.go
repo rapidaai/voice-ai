@@ -90,7 +90,7 @@ func TestCatchAllStatusCallback(t *testing.T) {
 		if statusInfo == nil {
 			t.Fatal("expected StatusInfo")
 		}
-		if statusInfo.Event != "call.hangup" {
+		if statusInfo.Event != internal_type.TelephonyEventCompleted {
 			t.Fatalf("expected call.hangup, got %s", statusInfo.Event)
 		}
 		if statusInfo.ChannelUUID != "call-control-123" {
@@ -141,7 +141,7 @@ func TestStatusCallback(t *testing.T) {
 		name        string
 		payload     map[string]interface{}
 		expectErr   bool
-		expectEvent string
+		expectEvent internal_type.TelephonyEvent
 		expectDone  bool
 	}{
 		{
@@ -156,7 +156,7 @@ func TestStatusCallback(t *testing.T) {
 				},
 			},
 			expectErr:   false,
-			expectEvent: "call.answered",
+			expectEvent: internal_type.TelephonyEventAnswered,
 			expectDone:  false,
 		},
 		{
@@ -173,7 +173,7 @@ func TestStatusCallback(t *testing.T) {
 				},
 			},
 			expectErr:   false,
-			expectEvent: "call.hangup",
+			expectEvent: internal_type.TelephonyEventCompleted,
 			expectDone:  false,
 		},
 		{
@@ -185,7 +185,7 @@ func TestStatusCallback(t *testing.T) {
 				},
 			},
 			expectErr:   false,
-			expectEvent: "call.hangup",
+			expectEvent: internal_type.TelephonyEventCompleted,
 			expectDone:  true,
 		},
 		{
@@ -539,7 +539,7 @@ func TestOutboundCall_MissingCredentials(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for nil vault credential")
 	}
-	if info.Status != "FAILED" {
+	if info.Status != internal_type.TelephonyStatusFailed {
 		t.Errorf("expected FAILED status, got %s", info.Status)
 	}
 	if statusUpdate.CallStatus != callcontext.CallStatusFailed {

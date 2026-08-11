@@ -400,9 +400,14 @@ func TestRecorder_RecordWebhook_FansOut(t *testing.T) {
 	recorder := New(WithCollectors(first, second))
 
 	err := recorder.Record(context.Background(), AssistantScope{AssistantID: 10}, RecordWebhook{
-		ID:      "wh-1",
-		Event:   CallReceived,
-		Payload: map[string]interface{}{"status": "ok"},
+		ID:    "wh-1",
+		Event: CallReceived,
+		Payload: CallReceivedWebhookPayload{
+			V1WebhookPayloadBase: NewV1WebhookPayload(nil),
+			Provider:             "test",
+			CallID:               "call-1",
+			Direction:            "inbound",
+		},
 	})
 	if err != nil {
 		t.Fatalf("Record returned error: %v", err)
@@ -501,11 +506,17 @@ func TestRecorder_RecordSnapshotsMutablePayloads(t *testing.T) {
 	webhookNestedPayload := map[string]interface{}{"value": "before"}
 	webhookListPayload := []interface{}{map[string]interface{}{"value": "before"}}
 	webhookBytesPayload := []byte("before")
-	webhookPayload := map[string]interface{}{
-		"status": "before",
-		"nested": webhookNestedPayload,
-		"list":   webhookListPayload,
-		"bytes":  webhookBytesPayload,
+	webhookPayload := CallRingingWebhookPayload{
+		V1WebhookPayloadBase: NewV1WebhookPayload(map[string]interface{}{
+			"status": "before",
+			"nested": webhookNestedPayload,
+			"list":   webhookListPayload,
+			"bytes":  webhookBytesPayload,
+		}),
+		Provider:    "test",
+		CallID:      "call-1",
+		Direction:   "outbound",
+		StatusEvent: "ringing",
 	}
 	toolRequestPayload := []byte("tool-request-before")
 	toolResponsePayload := []byte("tool-response-before")
@@ -541,7 +552,7 @@ func TestRecorder_RecordSnapshotsMutablePayloads(t *testing.T) {
 	metric.Value = "2000"
 	metric.Description = "after"
 	metadata.Value = "fr"
-	webhookPayload["status"] = "after"
+	webhookPayload.Extra["status"] = "after"
 	webhookNestedPayload["value"] = "after"
 	webhookListPayload[0].(map[string]interface{})["value"] = "after"
 	webhookBytesPayload[0] = 'x'
@@ -567,16 +578,20 @@ func TestRecorder_RecordSnapshotsMutablePayloads(t *testing.T) {
 	if got := collector.metadata[0].Metadata[0]; got.GetValue() != "en" {
 		t.Fatalf("metadata was not snapshotted: %+v", got)
 	}
-	if got := collector.webhooks[0].Payload["status"]; got != "before" {
+	webhookRecordPayload, ok := collector.webhooks[0].Payload.(CallRingingWebhookPayload)
+	if !ok {
+		t.Fatalf("expected CallRingingWebhookPayload, got %T", collector.webhooks[0].Payload)
+	}
+	if got := webhookRecordPayload.Extra["status"]; got != "before" {
 		t.Fatalf("webhook payload was not snapshotted: %v", got)
 	}
-	if got := collector.webhooks[0].Payload["nested"].(map[string]interface{})["value"]; got != "before" {
+	if got := webhookRecordPayload.Extra["nested"].(map[string]interface{})["value"]; got != "before" {
 		t.Fatalf("webhook nested payload was not snapshotted: %v", got)
 	}
-	if got := collector.webhooks[0].Payload["list"].([]interface{})[0].(map[string]interface{})["value"]; got != "before" {
+	if got := webhookRecordPayload.Extra["list"].([]interface{})[0].(map[string]interface{})["value"]; got != "before" {
 		t.Fatalf("webhook list payload was not snapshotted: %v", got)
 	}
-	if got := string(collector.webhooks[0].Payload["bytes"].([]byte)); got != "before" {
+	if got := string(webhookRecordPayload.Extra["bytes"].([]byte)); got != "before" {
 		t.Fatalf("webhook bytes payload was not snapshotted: %s", got)
 	}
 	if got := string(collector.toolLogs[0].RequestPayload); got != "tool-request-before" {

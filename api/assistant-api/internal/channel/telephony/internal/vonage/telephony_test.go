@@ -25,6 +25,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
+	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -130,11 +131,11 @@ func TestCatchAllStatusCallback(t *testing.T) {
 			},
 			checkStatus: func(t *testing.T, statusInfo *internal_type.StatusInfo) {
 				require.NotNil(t, statusInfo)
-				assert.Equal(t, "completed", statusInfo.Event)
+				assert.Equal(t, internal_type.TelephonyEventCompleted, statusInfo.Event)
 				assert.Equal(t, "6fbb257e-75e5-4c68-a5f2-bc560fa200d3", statusInfo.ChannelUUID)
 				assert.Nil(t, statusInfo.Error)
-				payload, ok := statusInfo.Payload.(map[string]interface{})
-				require.True(t, ok, "Payload should be map[string]interface{}")
+				payload, ok := statusInfo.Payload.(utils.Option)
+				require.True(t, ok, "Payload should be utils.Option")
 				assert.Equal(t, "6fbb257e-75e5-4c68-a5f2-bc560fa200d3", payload["uuid"])
 				assert.Equal(t, "CON-dbde628c-2039-4fe3-83f2-9e757d3e9e13", payload["conversation_uuid"])
 				assert.Equal(t, "user", payload["disconnected_by"])
@@ -153,7 +154,7 @@ func TestCatchAllStatusCallback(t *testing.T) {
 			},
 			checkStatus: func(t *testing.T, statusInfo *internal_type.StatusInfo) {
 				require.NotNil(t, statusInfo)
-				assert.Equal(t, "completed", statusInfo.Event)
+				assert.Equal(t, internal_type.TelephonyEventCompleted, statusInfo.Event)
 				assert.Equal(t, "f9abbc8a-457a-40b2-a8bf-3717c0abc918", statusInfo.ChannelUUID)
 				require.NotNil(t, statusInfo.Duration)
 				assert.Equal(t, time.Duration(0), *statusInfo.Duration)
@@ -244,7 +245,7 @@ func TestStatusCallback_QueryPayload(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, statusInfo)
-	assert.Equal(t, "completed", statusInfo.Event)
+	assert.Equal(t, internal_type.TelephonyEventCompleted, statusInfo.Event)
 	assert.Equal(t, "f9abbc8a-457a-40b2-a8bf-3717c0abc918", statusInfo.ChannelUUID)
 	require.NotNil(t, statusInfo.Duration)
 	assert.Equal(t, time.Duration(0), *statusInfo.Duration)
@@ -311,12 +312,12 @@ func TestReceiveCall(t *testing.T) {
 			checkCallInfo: func(t *testing.T, info *internal_type.CallInfo) {
 				require.NotNil(t, info)
 				assert.Equal(t, internal_vonage.Provider, info.Provider)
-				assert.Equal(t, "SUCCESS", info.Status)
+				assert.Equal(t, internal_type.TelephonyStatusSuccess, info.Status)
 				assert.Equal(t, "15703768754", info.CallerNumber)
 				assert.Equal(t, "bccbc3faaf864e1641fe0cdb1921b6aa", info.ChannelUUID)
 
 				// Check StatusInfo
-				assert.Equal(t, internal_vonage.WebhookEvent, info.StatusInfo.Event)
+				assert.Equal(t, internal_type.TelephonyEvent(internal_vonage.WebhookEvent), info.StatusInfo.Event)
 				assert.NotNil(t, info.StatusInfo.Payload)
 				payload, ok := info.StatusInfo.Payload.(map[string]string)
 				require.True(t, ok, "Payload should be map[string]string")
@@ -338,8 +339,8 @@ func TestReceiveCall(t *testing.T) {
 			checkCallInfo: func(t *testing.T, info *internal_type.CallInfo) {
 				require.NotNil(t, info)
 				assert.Equal(t, internal_vonage.Provider, info.Provider)
-				assert.Equal(t, "SUCCESS", info.Status)
-				assert.Equal(t, internal_vonage.WebhookEvent, info.StatusInfo.Event)
+				assert.Equal(t, internal_type.TelephonyStatusSuccess, info.Status)
+				assert.Equal(t, internal_type.TelephonyEvent(internal_vonage.WebhookEvent), info.StatusInfo.Event)
 				assert.NotNil(t, info.StatusInfo.Payload)
 				assert.Empty(t, info.ChannelUUID, "ChannelUUID should be empty without uuid param")
 			},
@@ -669,7 +670,7 @@ func TestReceiveCall_QueryParameterExtraction(t *testing.T) {
 	require.NotNil(t, callInfo)
 
 	// Verify StatusInfo contains webhook event with all query parameters as payload
-	assert.Equal(t, internal_vonage.WebhookEvent, callInfo.StatusInfo.Event)
+	assert.Equal(t, internal_type.TelephonyEvent(internal_vonage.WebhookEvent), callInfo.StatusInfo.Event)
 	require.NotNil(t, callInfo.StatusInfo.Payload, "StatusInfo payload should not be nil")
 
 	payloadMap, ok := callInfo.StatusInfo.Payload.(map[string]string)

@@ -147,12 +147,12 @@ func TestReceiveCall(t *testing.T) {
 			checkCallInfo: func(t *testing.T, info *internal_type.CallInfo) {
 				require.NotNil(t, info)
 				assert.Equal(t, "twilio", info.Provider)
-				assert.Equal(t, "SUCCESS", info.Status)
+				assert.Equal(t, internal_type.TelephonyStatusSuccess, info.Status)
 				assert.Equal(t, "+15703768754", info.CallerNumber)
 				assert.Equal(t, "CAf64ab88f90f35581dcb16e60f875ea4a", info.ChannelUUID)
 
 				// Check StatusInfo
-				assert.Equal(t, "webhook", info.StatusInfo.Event)
+				assert.Equal(t, internal_type.TelephonyEvent("webhook"), info.StatusInfo.Event)
 				assert.NotNil(t, info.StatusInfo.Payload)
 				payload, ok := info.StatusInfo.Payload.(map[string]string)
 				require.True(t, ok, "Payload should be map[string]string")
@@ -172,9 +172,9 @@ func TestReceiveCall(t *testing.T) {
 			checkCallInfo: func(t *testing.T, info *internal_type.CallInfo) {
 				require.NotNil(t, info)
 				assert.Equal(t, "twilio", info.Provider)
-				assert.Equal(t, "SUCCESS", info.Status)
+				assert.Equal(t, internal_type.TelephonyStatusSuccess, info.Status)
 				assert.Equal(t, "CAf64ab88f90f35581dcb16e60f875ea4a", info.ChannelUUID)
-				assert.Equal(t, "webhook", info.StatusInfo.Event)
+				assert.Equal(t, internal_type.TelephonyEvent("webhook"), info.StatusInfo.Event)
 				assert.NotNil(t, info.StatusInfo.Payload)
 			},
 		},
@@ -189,9 +189,9 @@ func TestReceiveCall(t *testing.T) {
 			checkCallInfo: func(t *testing.T, info *internal_type.CallInfo) {
 				require.NotNil(t, info)
 				assert.Equal(t, "twilio", info.Provider)
-				assert.Equal(t, "SUCCESS", info.Status)
+				assert.Equal(t, internal_type.TelephonyStatusSuccess, info.Status)
 				assert.Empty(t, info.ChannelUUID, "ChannelUUID should be empty without CallSid")
-				assert.Equal(t, "webhook", info.StatusInfo.Event)
+				assert.Equal(t, internal_type.TelephonyEvent("webhook"), info.StatusInfo.Event)
 			},
 		},
 		{
@@ -297,7 +297,7 @@ func TestStatusCallback(t *testing.T) {
 			},
 			checkStatus: func(t *testing.T, info *internal_type.StatusInfo) {
 				require.NotNil(t, info)
-				assert.Equal(t, "completed", info.Event)
+				assert.Equal(t, internal_type.TelephonyEventCompleted, info.Event)
 				assert.Equal(t, "CAf64ab88f90f35581dcb16e60f875ea4a", info.ChannelUUID)
 				assert.True(t, info.Completed)
 				require.NotNil(t, info.Duration)
@@ -315,7 +315,7 @@ func TestStatusCallback(t *testing.T) {
 			},
 			checkStatus: func(t *testing.T, info *internal_type.StatusInfo) {
 				require.NotNil(t, info)
-				assert.Equal(t, "busy", info.Event)
+				assert.Equal(t, internal_type.TelephonyEventCompleted, info.Event)
 				assert.False(t, info.Completed)
 				require.NotNil(t, info.Error)
 				assert.Equal(t, "failed", info.Error.Error)
@@ -332,7 +332,7 @@ func TestStatusCallback(t *testing.T) {
 			},
 			checkStatus: func(t *testing.T, info *internal_type.StatusInfo) {
 				require.NotNil(t, info)
-				assert.Equal(t, "completed", info.Event)
+				assert.Equal(t, internal_type.TelephonyEventCompleted, info.Event)
 				assert.False(t, info.Completed)
 				require.NotNil(t, info.Error)
 				assert.Equal(t, "failed", info.Error.Error)
@@ -382,7 +382,7 @@ func TestCatchAllStatusCallback(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, statusInfo)
-		assert.Equal(t, "no-answer", statusInfo.Event)
+		assert.Equal(t, internal_type.TelephonyEventCompleted, statusInfo.Event)
 		assert.Equal(t, "CAf64ab88f90f35581dcb16e60f875ea4a", statusInfo.ChannelUUID)
 		assert.NotEmpty(t, statusInfo.RawPayload)
 		require.NotNil(t, statusInfo.Error)
@@ -453,7 +453,7 @@ func TestReceiveCall_QueryParameterExtraction(t *testing.T) {
 	require.NotNil(t, callInfo)
 
 	// Verify StatusInfo contains webhook event with all query parameters as payload
-	assert.Equal(t, "webhook", callInfo.StatusInfo.Event)
+	assert.Equal(t, internal_type.TelephonyEvent("webhook"), callInfo.StatusInfo.Event)
 	require.NotNil(t, callInfo.StatusInfo.Payload, "StatusInfo payload should not be nil")
 
 	payloadMap, ok := callInfo.StatusInfo.Payload.(map[string]string)
@@ -538,12 +538,12 @@ func TestReceiveCall_CallInfoStructure(t *testing.T) {
 
 	// Verify CallInfo fields
 	assert.Equal(t, "twilio", callInfo.Provider)
-	assert.Equal(t, "SUCCESS", callInfo.Status)
+	assert.Equal(t, internal_type.TelephonyStatusSuccess, callInfo.Status)
 	assert.Equal(t, "+15703768754", callInfo.CallerNumber)
 	assert.Equal(t, "CAf64ab88f90f35581dcb16e60f875ea4a", callInfo.ChannelUUID)
 	assert.Empty(t, callInfo.ErrorMessage)
 
 	// Verify StatusInfo
-	assert.Equal(t, "webhook", callInfo.StatusInfo.Event)
+	assert.Equal(t, internal_type.TelephonyEvent("webhook"), callInfo.StatusInfo.Event)
 	assert.NotNil(t, callInfo.StatusInfo.Payload)
 }

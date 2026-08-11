@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rapidaai/api/assistant-api/config"
 	internal_sip "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/sip/internal"
+	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
@@ -60,7 +61,7 @@ func TestStatusCallback_NormalizesCompletedJSONPayload(t *testing.T) {
 		t.Fatalf("StatusCallback() error = %v", err)
 	}
 
-	if info.Event != "completed" {
+	if info.Event != internal_type.TelephonyEventCompleted {
 		t.Fatalf("expected completed event, got %q", info.Event)
 	}
 	if !info.Completed {
@@ -99,7 +100,7 @@ func TestStatusCallback_NormalizesFailedFormPayload(t *testing.T) {
 		t.Fatalf("StatusCallback() error = %v", err)
 	}
 
-	if info.Event != "failed" {
+	if info.Event != internal_type.TelephonyEventCompleted {
 		t.Fatalf("expected failed event, got %q", info.Event)
 	}
 	if info.Error == nil {
@@ -127,7 +128,7 @@ func TestStatusCallback_NormalizesCancelledQueryPayload(t *testing.T) {
 		t.Fatalf("StatusCallback() error = %v", err)
 	}
 
-	if info.Event != "cancelled" {
+	if info.Event != internal_type.TelephonyEvent("cancelled") {
 		t.Fatalf("expected cancelled event, got %q", info.Event)
 	}
 	if info.Completed {

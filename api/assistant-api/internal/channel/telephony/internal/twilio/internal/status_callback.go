@@ -6,16 +6,15 @@
 package internal_twilio
 
 import (
-	"strings"
 	"time"
 
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/utils"
-	"github.com/rapidaai/pkg/validator"
 )
 
 type StatusCallback struct {
-	Event        string
+	Event        internal_type.TelephonyEvent
+	Status       string
 	ChannelUUID  string
 	Duration     *time.Duration
 	Price        string
@@ -27,81 +26,100 @@ type StatusCallback struct {
 }
 
 func NewStatusCallback(eventDetails utils.Option, rawCallbackPayload string) (*StatusCallback, error) {
-	event, _ := eventDetails.GetString("CallStatus")
-	streamEvent, _ := eventDetails.GetString("StreamEvent")
-	if validator.NotBlank(streamEvent) {
-		event = streamEvent
-	}
-	if !validator.NotBlank(event) {
+	status, statusErr := eventDetails.GetString("CallStatus")
+	streamEvent, streamErr := eventDetails.GetString("StreamEvent")
+	if statusErr != nil && streamErr != nil {
 		return nil, ErrStatusCallbackStatusMissing
 	}
 
-	channelUUID, _ := eventDetails.GetString("CallSid")
+	callback := &StatusCallback{
+		Event:      StatusEvent(status),
+		Status:     status,
+		RawPayload: rawCallbackPayload,
+		Payload:    eventDetails,
+	}
+	if streamErr == nil && streamEvent == "stream-started" {
+		callback.Event = internal_type.TelephonyEventStreamStarted
+	}
 	duration, err := eventDetails.GetDuration("CallDuration")
-	if err != nil {
-		duration, err = eventDetails.GetDuration("Duration")
-	}
-	var durationPtr *time.Duration
 	if err == nil {
-		durationPtr = utils.Ptr(duration)
+		callback.Duration = utils.Ptr(duration)
 	}
-
-	price, _ := eventDetails.GetString("Price")
-	errorCode, _ := eventDetails.GetString("ErrorCode")
-	errorMessage, _ := eventDetails.GetString("ErrorMessage")
-	streamError, _ := eventDetails.GetString("StreamError")
-
-	return &StatusCallback{
-		Event:        event,
-		ChannelUUID:  channelUUID,
-		Duration:     durationPtr,
-		Price:        price,
-		ErrorCode:    errorCode,
-		ErrorMessage: errorMessage,
-		StreamError:  streamError,
-		RawPayload:   rawCallbackPayload,
-		Payload:      eventDetails,
-	}, nil
+	if channelUUID, err := eventDetails.GetString("CallSid"); err == nil {
+		callback.ChannelUUID = channelUUID
+	}
+	if price, err := eventDetails.GetString("Price"); err == nil {
+		callback.Price = price
+	}
+	if errorCode, err := eventDetails.GetString("ErrorCode"); err == nil {
+		callback.ErrorCode = errorCode
+	}
+	if errorMessage, err := eventDetails.GetString("ErrorMessage"); err == nil {
+		callback.ErrorMessage = errorMessage
+	}
+	if streamError, err := eventDetails.GetString("StreamError"); err == nil {
+		callback.StreamError = streamError
+	}
+	return callback, nil
 }
 
 func (s *StatusCallback) StatusInfo() *internal_type.StatusInfo {
-	callbackFailed := s.Failed()
-	statusInfo := &internal_type.StatusInfo{
+	info := &internal_type.StatusInfo{
 		Event:       s.Event,
 		ChannelUUID: s.ChannelUUID,
-		Completed:   strings.EqualFold(s.Event, "completed") && !callbackFailed,
+		Completed:   s.IsCompleted(),
 		Duration:    s.Duration,
 		Price:       s.Price,
 		RawPayload:  s.RawPayload,
 		Payload:     s.Payload,
 	}
-	if callbackFailed {
-		statusInfo.Error = &internal_type.StatusError{Error: "failed", Reason: s.FailureReason()}
+	if statusError := s.StatusError(); statusError != nil {
+		info.Error = statusError
 	}
-	return statusInfo
+	return info
+}
+
+func (s *StatusCallback) IsCompleted() bool {
+	return s.Status == "completed" && !s.Failed()
 }
 
 func (s *StatusCallback) Failed() bool {
-	eventLower := strings.ToLower(s.Event)
-	return eventLower == "failed" ||
-		eventLower == "busy" ||
-		eventLower == "no-answer" ||
-		eventLower == "canceled" ||
-		eventLower == "cancelled" ||
-		validator.NotBlank(s.ErrorCode) ||
-		validator.NotBlank(s.ErrorMessage) ||
-		validator.NotBlank(s.StreamError)
+	switch s.Status {
+	case "failed", "busy", "no-answer", "canceled":
+		return true
+	}
+	return s.ErrorCode != "" || s.ErrorMessage != "" || s.StreamError != ""
 }
 
-func (s *StatusCallback) FailureReason() string {
-	if validator.NotBlank(s.ErrorMessage) {
-		return s.ErrorMessage
+func (s *StatusCallback) StatusError() *internal_type.StatusError {
+	if !s.Failed() {
+		return nil
 	}
-	if validator.NotBlank(s.StreamError) {
-		return s.StreamError
+
+	if s.ErrorMessage != "" {
+		return &internal_type.StatusError{Error: "failed", Reason: s.ErrorMessage}
 	}
-	if validator.NotBlank(s.ErrorCode) {
-		return s.ErrorCode
+	if s.StreamError != "" {
+		return &internal_type.StatusError{Error: "failed", Reason: s.StreamError}
 	}
-	return s.Event
+	if s.ErrorCode != "" {
+		return &internal_type.StatusError{Error: "failed", Reason: s.ErrorCode}
+	}
+	if s.Status != "" {
+		return &internal_type.StatusError{Error: "failed", Reason: s.Status}
+	}
+	return &internal_type.StatusError{Error: "failed", Reason: s.Event.String()}
+}
+
+func StatusEvent(status string) internal_type.TelephonyEvent {
+	switch status {
+	case "queued", "initiated", "ringing":
+		return internal_type.TelephonyEventRinging
+	case "in-progress", "answered":
+		return internal_type.TelephonyEventAnswered
+	case "completed", "busy", "failed", "no-answer", "canceled":
+		return internal_type.TelephonyEventCompleted
+	default:
+		return internal_type.TelephonyEvent(status)
+	}
 }
