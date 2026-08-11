@@ -40,22 +40,9 @@ export const webhookEvents: WebhookEventOption[] = [
     group: 'Call',
   },
   {
-    id: 'call.outbound_dispatch_failed',
-    name: 'call.outbound_dispatch_failed',
-    description:
-      'Triggered when an outbound call request cannot be sent to the provider.',
-    group: 'Call',
-  },
-  {
     id: 'call.started',
     name: 'call.started',
     description: 'Triggered when the call session starts.',
-    group: 'Call',
-  },
-  {
-    id: 'call.hangup',
-    name: 'call.hangup',
-    description: 'Triggered when a hangup signal is received.',
     group: 'Call',
   },
   {
@@ -68,12 +55,6 @@ export const webhookEvents: WebhookEventOption[] = [
     id: 'call.failed',
     name: 'call.failed',
     description: 'Triggered when the call fails.',
-    group: 'Call',
-  },
-  {
-    id: 'call.cancelled',
-    name: 'call.cancelled',
-    description: 'Triggered when an outbound call is cancelled before connect.',
     group: 'Call',
   },
   {

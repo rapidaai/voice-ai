@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rapidaai/api/assistant-api/config"
+	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 )
 
@@ -44,8 +45,8 @@ func TestStatusCallback_NormalizesChannelDestroyedCompleted(t *testing.T) {
 		t.Fatalf("StatusCallback() error = %v", err)
 	}
 
-	if info.Event != "ChannelDestroyed" {
-		t.Fatalf("expected ChannelDestroyed event, got %q", info.Event)
+	if info.Event != internal_type.TelephonyEventCompleted {
+		t.Fatalf("expected completed event, got %q", info.Event)
 	}
 	if !info.Completed {
 		t.Fatal("expected completed callback")
@@ -107,7 +108,7 @@ func TestStatusCallback_NormalizesRingingStateChange(t *testing.T) {
 		t.Fatalf("StatusCallback() error = %v", err)
 	}
 
-	if info.Event != "ringing" {
+	if info.Event != internal_type.TelephonyEventRinging {
 		t.Fatalf("expected ringing event, got %q", info.Event)
 	}
 	if info.Completed || info.Error != nil {

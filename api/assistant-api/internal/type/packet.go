@@ -275,6 +275,7 @@ type SpeechToTextPacket struct {
 	Confidence float64
 	Language   string
 	Interim    bool
+	Latency    time.Duration
 }
 
 func (f SpeechToTextPacket) ContextId() string      { return f.ContextID }

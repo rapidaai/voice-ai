@@ -36,17 +36,19 @@ resampling is a no-op.
    - All graph optimizations enabled
    - If loading fails, return an error and abort initialization.
 
-3. Resolve the speech detection threshold:
+3. Resolve the Pipecat-style VAD parameters:
 
-   - Read `microphone.vad.threshold` from configuration.
-   - If not provided, default to `0.5`.
+   - Read `microphone.vad.confidence` from configuration.
+   - Read `microphone.vad.start_secs` from configuration.
+   - Read `microphone.vad.stop_secs` from configuration.
+   - If not provided, default to confidence `0.7`, start `0.2s`, stop `0.2s`.
 
 4. Initialize the detector with:
 
    - The loaded ONNX session
-   - The resolved detection threshold
-   - Min silence duration: 100 ms
-   - Speech pad: 30 ms
+   - The resolved confidence threshold
+   - Speech-start debounce duration
+   - Speech-stop debounce duration
 
 5. Create an internal audio processing configuration:
 
@@ -76,7 +78,7 @@ resampling is a no-op.
    - Slide a 512-sample window across the buffer (2 windows per 80 ms chunk).
    - For each window, prepend 64 samples of context from the previous window.
    - Run ONNX inference to get speech probability.
-   - Track speech onset/offset using threshold with 0.15 hysteresis.
+   - Track speech onset/offset using confidence plus start/stop debounce windows.
 
 5. If the buffer is smaller than one window (512 samples / 32 ms):
 

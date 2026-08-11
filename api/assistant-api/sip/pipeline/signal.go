@@ -110,13 +110,15 @@ func (d *Dispatcher) handleCallFailed(ctx context.Context, v sip_infra.CallFaile
 		observability.RecordWebhook{
 			Event:     observability.CallFailed,
 			ContextID: contextID,
-			Payload: map[string]interface{}{
-				"provider":   "sip",
-				"context_id": contextID,
-				"call_id":    v.ID,
-				"direction":  string(v.Session.GetInfo().Direction),
-				"sip_code":   fmt.Sprintf("%d", v.SIPCode),
-				"error":      errorMessage,
+			Payload: observability.CallFailedWebhookPayload{
+				V1WebhookPayloadBase: observability.NewV1WebhookPayload(map[string]interface{}{
+					"sip_code": fmt.Sprintf("%d", v.SIPCode),
+				}),
+				Provider:  "sip",
+				CallID:    v.ID,
+				Direction: string(v.Session.GetInfo().Direction),
+				ContextID: contextID,
+				Error:     errorMessage,
 			},
 		},
 		observability.RecordMetric{

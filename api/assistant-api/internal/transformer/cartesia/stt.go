@@ -44,21 +44,84 @@ func (*cartesiaSpeechToText) Name() string {
 	return "cartesia-stt"
 }
 
-func NewCartesiaSpeechToText(ctx context.Context, logger commons.Logger, credential *protos.VaultCredential,
-	onPacket func(pkt ...internal_type.Packet) error,
-	opts utils.Option) (internal_type.SpeechToTextTransformer, error) {
-	cartesiaOpts, err := NewCartesiaOption(logger, credential, opts)
+type options struct {
+	ctx        context.Context
+	logger     commons.Logger
+	credential *protos.VaultCredential
+	onPacket   func(pkt ...internal_type.Packet) error
+	sttOptions utils.Option
+
+	assistantID    uint64
+	conversationID uint64
+}
+
+type Option func(*options)
+
+func WithContext(ctx context.Context) Option {
+	return func(options *options) {
+		options.ctx = ctx
+	}
+}
+
+func WithLogger(logger commons.Logger) Option {
+	return func(options *options) {
+		options.logger = logger
+	}
+}
+
+func WithCredential(credential *protos.VaultCredential) Option {
+	return func(options *options) {
+		options.credential = credential
+	}
+}
+
+func WithOnPacket(onPacket func(pkt ...internal_type.Packet) error) Option {
+	return func(options *options) {
+		options.onPacket = onPacket
+	}
+}
+
+func WithOptions(sttOptions utils.Option) Option {
+	return func(options *options) {
+		options.sttOptions = sttOptions
+	}
+}
+
+func WithAssistantID(assistantID uint64) Option {
+	return func(options *options) {
+		options.assistantID = assistantID
+	}
+}
+
+func WithConversationID(conversationID uint64) Option {
+	return func(options *options) {
+		options.conversationID = conversationID
+	}
+}
+
+func NewSpeechToText(opts ...Option) (internal_type.SpeechToTextTransformer, error) {
+	options := &options{ctx: context.Background(), sttOptions: utils.Option{}}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(options)
+		}
+	}
+	if options.ctx == nil {
+		options.ctx = context.Background()
+	}
+
+	cartesiaOpts, err := NewCartesiaOption(options.logger, options.credential, options.sttOptions)
 	if err != nil {
-		logger.Errorf("cartesia-stt: intializing cartesia failed %+v", err)
+		options.logger.Errorf("cartesia-stt: intializing cartesia failed %+v", err)
 		return nil, err
 	}
-	ct, ctxCancel := context.WithCancel(ctx)
+	ct, ctxCancel := context.WithCancel(options.ctx)
 	return &cartesiaSpeechToText{
 		ctx:            ct,
 		ctxCancel:      ctxCancel,
-		logger:         logger,
+		logger:         options.logger,
 		cartesiaOption: cartesiaOpts,
-		onPacket:       onPacket,
+		onPacket:       options.onPacket,
 	}, nil
 }
 

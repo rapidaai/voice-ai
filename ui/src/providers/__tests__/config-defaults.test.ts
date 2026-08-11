@@ -148,8 +148,8 @@ const scopedVadConfig: ProviderConfig = {
   vad: {
     parameters: [
       {
-        key: 'microphone.vad.threshold',
-        label: 'VAD Threshold',
+        key: 'microphone.vad.confidence',
+        label: 'VAD Confidence',
         type: 'slider',
         default: '0.6',
       },
@@ -351,8 +351,8 @@ describe('getDefaultsFromConfig', () => {
       createMetadata('rapida.credential_id', 'cred-1'),
       createMetadata('listen.model', 'nova-3'),
       createMetadata('microphone.vad.provider', 'ten_vad'),
-      createMetadata('microphone.vad.threshold', '0.8'),
-      createMetadata('microphone.vad.min_silence_frame', '12'),
+      createMetadata('microphone.vad.confidence', '0.8'),
+      createMetadata('microphone.vad.stop_secs', '0.12'),
     ];
 
     const result = getDefaultsFromConfig(
@@ -368,8 +368,8 @@ describe('getDefaultsFromConfig', () => {
 
     expect(findMeta(result, 'listen.model')?.getValue()).toBe('nova-3');
     expect(findMeta(result, 'rapida.credential_id')?.getValue()).toBe('cred-1');
-    expect(findMeta(result, 'microphone.vad.threshold')?.getValue()).toBe('0.8');
-    expect(findMeta(result, 'microphone.vad.min_silence_frame')).toBeUndefined();
+    expect(findMeta(result, 'microphone.vad.confidence')?.getValue()).toBe('0.8');
+    expect(findMeta(result, 'microphone.vad.stop_secs')).toBeUndefined();
   });
 });
 

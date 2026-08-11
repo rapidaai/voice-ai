@@ -55,8 +55,15 @@ func TestSTTBasic(t *testing.T) {
 			cred := testutil.BuildCredential(pcfg.Credential)
 			opts := testutil.BuildOptions(pcfg.Options)
 
-			stt, err := GetSpeechToTextTransformer(ctx, logger, provider, cred, collector.OnPacket, opts)
-			require.NoError(t, err, "factory should succeed")
+			stt, err := NewSpeechToText(
+				WithContext(ctx),
+				WithLogger(logger),
+				WithProvider(provider),
+				WithCredential(cred),
+				WithOnPacket(collector.OnPacket),
+				WithOptions(opts),
+			)
+			require.NoError(t, err, "constructor should succeed")
 			require.NotNil(t, stt)
 
 			err = stt.Initialize()
@@ -97,7 +104,14 @@ func TestSTTInterimAndFinal(t *testing.T) {
 			cred := testutil.BuildCredential(pcfg.Credential)
 			opts := testutil.BuildOptions(pcfg.Options)
 
-			stt, err := GetSpeechToTextTransformer(ctx, logger, provider, cred, collector.OnPacket, opts)
+			stt, err := NewSpeechToText(
+				WithContext(ctx),
+				WithLogger(logger),
+				WithProvider(provider),
+				WithCredential(cred),
+				WithOnPacket(collector.OnPacket),
+				WithOptions(opts),
+			)
 			require.NoError(t, err)
 			require.NoError(t, stt.Initialize())
 			defer stt.Close(ctx)
@@ -144,7 +158,14 @@ func TestSTTMetricsAndEvents(t *testing.T) {
 			cred := testutil.BuildCredential(pcfg.Credential)
 			opts := testutil.BuildOptions(pcfg.Options)
 
-			stt, err := GetSpeechToTextTransformer(ctx, logger, provider, cred, collector.OnPacket, opts)
+			stt, err := NewSpeechToText(
+				WithContext(ctx),
+				WithLogger(logger),
+				WithProvider(provider),
+				WithCredential(cred),
+				WithOnPacket(collector.OnPacket),
+				WithOptions(opts),
+			)
 			require.NoError(t, err)
 			require.NoError(t, stt.Initialize())
 			defer stt.Close(ctx)
@@ -195,7 +216,14 @@ func TestSTTInterruption(t *testing.T) {
 			cred := testutil.BuildCredential(pcfg.Credential)
 			opts := testutil.BuildOptions(pcfg.Options)
 
-			stt, err := GetSpeechToTextTransformer(ctx, logger, provider, cred, collector.OnPacket, opts)
+			stt, err := NewSpeechToText(
+				WithContext(ctx),
+				WithLogger(logger),
+				WithProvider(provider),
+				WithCredential(cred),
+				WithOnPacket(collector.OnPacket),
+				WithOptions(opts),
+			)
 			require.NoError(t, err)
 			require.NoError(t, stt.Initialize())
 			defer stt.Close(ctx)
@@ -239,7 +267,14 @@ func TestSTTSilentAudio(t *testing.T) {
 			cred := testutil.BuildCredential(pcfg.Credential)
 			opts := testutil.BuildOptions(pcfg.Options)
 
-			stt, err := GetSpeechToTextTransformer(ctx, logger, provider, cred, collector.OnPacket, opts)
+			stt, err := NewSpeechToText(
+				WithContext(ctx),
+				WithLogger(logger),
+				WithProvider(provider),
+				WithCredential(cred),
+				WithOnPacket(collector.OnPacket),
+				WithOptions(opts),
+			)
 			require.NoError(t, err)
 			require.NoError(t, stt.Initialize())
 			defer stt.Close(ctx)
@@ -281,8 +316,15 @@ func TestSTTReconnect(t *testing.T) {
 				collector := testutil.NewPacketCollector()
 				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 
-				stt, err := GetSpeechToTextTransformer(ctx, logger, provider, cred, collector.OnPacket, opts)
-				require.NoError(t, err, "attempt %d: factory should succeed", attempt)
+				stt, err := NewSpeechToText(
+					WithContext(ctx),
+					WithLogger(logger),
+					WithProvider(provider),
+					WithCredential(cred),
+					WithOnPacket(collector.OnPacket),
+					WithOptions(opts),
+				)
+				require.NoError(t, err, "attempt %d: constructor should succeed", attempt)
 				require.NoError(t, stt.Initialize(), "attempt %d: Initialize should succeed", attempt)
 
 				go feedAudio(ctx, t, stt, speech)

@@ -8,6 +8,7 @@ package internal_firered_vad
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -16,6 +17,7 @@ import (
 
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	internal_options "github.com/rapidaai/api/assistant-api/internal/options"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
@@ -29,6 +31,11 @@ const (
 	vadName          = "firered_vad"
 	envModelPathKey  = "FIRERED_VAD_MODEL_PATH"
 	defaultModelFile = "models/fireredvad_stream_vad_with_cache.onnx"
+
+	// Default configuration values aligned with Pipecat-style VAD options.
+	defaultConfidence = 0.7
+	defaultStartSecs  = 0.2
+	defaultStopSecs   = 0.2
 )
 
 // -----------------------------------------------------------------------------
@@ -106,6 +113,28 @@ func New(opts ...Option) (internal_type.VoiceActivityDetectorExecutor, error) {
 	}
 	start := time.Now()
 
+	ppCfg := DefaultPostprocessorConfig()
+	if options.options != nil {
+		if v, err := options.options.GetFloat64(internal_options.MicrophoneVADOptionConfidence); err == nil {
+			ppCfg.SpeechThreshold = float32(v)
+		}
+		if v, err := options.options.GetFloat64(internal_options.MicrophoneVADOptionStartSecs); err == nil {
+			if v < 0 {
+				return nil, fmt.Errorf("invalid %s: should be a positive number", internal_options.MicrophoneVADOptionStartSecs)
+			}
+			ppCfg.MinSpeechFrame = vadDurationFrames(v)
+		}
+		if v, err := options.options.GetFloat64(internal_options.MicrophoneVADOptionStopSecs); err == nil {
+			if v < 0 {
+				return nil, fmt.Errorf("invalid %s: should be a positive number", internal_options.MicrophoneVADOptionStopSecs)
+			}
+			ppCfg.MinSilenceFrame = vadDurationFrames(v)
+		}
+	}
+	if ppCfg.SpeechThreshold < 0 || ppCfg.SpeechThreshold > 1 {
+		return nil, fmt.Errorf("invalid %s: should be in range [0, 1]", internal_options.MicrophoneVADOptionConfidence)
+	}
+
 	modelPath := resolveModelPath()
 	detector, err := NewDetector(modelPath)
 	if err != nil {
@@ -126,8 +155,6 @@ func New(opts ...Option) (internal_type.VoiceActivityDetectorExecutor, error) {
 		}
 		return nil, fmt.Errorf("firered_vad: failed to create detector: %w", err)
 	}
-
-	ppCfg := resolvePostprocessorConfig(options.options)
 
 	vad := &FireRedVAD{
 		logger:        options.logger,
@@ -294,10 +321,56 @@ func (v *FireRedVAD) Execute(ctx context.Context, pkt internal_type.UserAudioRec
 
 	// Emit explicit interruption lifecycle events from VAD transitions.
 	if hasSpeechStart {
-		v.notifyInterruption(ctx, pkt.ContextID, internal_type.InterruptionEventStart, speechStartAt)
+		v.onPacket(ctx,
+			internal_type.InterruptionDetectedPacket{
+				ContextID: pkt.ContextID,
+				Source:    internal_type.InterruptionSourceVad,
+				Event:     internal_type.InterruptionEventStart,
+				StartAt:   speechStartAt,
+				EndAt:     speechEndAt,
+			},
+			internal_type.ObservabilityEventRecordPacket{
+				ContextID: pkt.ContextID,
+				Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentVAD,
+					Event:     observability.VADSpeechStarted,
+					Attributes: observability.Attributes{
+						"provider": vadName,
+						"event":    string(internal_type.InterruptionEventStart),
+						"start_at": fmt.Sprintf("%f", speechStartAt),
+						"end_at":   fmt.Sprintf("%f", speechEndAt),
+					},
+					OccurredAt: time.Now(),
+				},
+			},
+		)
 	}
 	if hasSpeechEnd {
-		v.notifyInterruption(ctx, pkt.ContextID, internal_type.InterruptionEventEnd, speechEndAt)
+		v.onPacket(ctx,
+			internal_type.InterruptionDetectedPacket{
+				ContextID: pkt.ContextID,
+				Source:    internal_type.InterruptionSourceVad,
+				Event:     internal_type.InterruptionEventEnd,
+				StartAt:   speechStartAt,
+				EndAt:     speechEndAt,
+			},
+			internal_type.ObservabilityEventRecordPacket{
+				ContextID: pkt.ContextID,
+				Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentVAD,
+					Event:     observability.VADSpeechEnded,
+					Attributes: observability.Attributes{
+						"provider": vadName,
+						"event":    string(internal_type.InterruptionEventEnd),
+						"start_at": fmt.Sprintf("%f", speechStartAt),
+						"end_at":   fmt.Sprintf("%f", speechEndAt),
+					},
+					OccurredAt: time.Now(),
+				},
+			},
+		)
 	}
 
 	return nil
@@ -358,59 +431,13 @@ func resolveModelPath() string {
 	return filepath.Join(filepath.Dir(currentFile), defaultModelFile)
 }
 
-func resolvePostprocessorConfig(options utils.Option) PostprocessorConfig {
-	cfg := DefaultPostprocessorConfig()
-	if options == nil {
-		return cfg
-	}
-	if v, err := options.GetFloat64("microphone.vad.threshold"); err == nil {
-		cfg.SpeechThreshold = float32(v)
-	}
-	if v, err := options.GetFloat64("microphone.vad.min_silence_frame"); err == nil {
-		cfg.MinSilenceFrame = int(v)
-	}
-	if v, err := options.GetFloat64("microphone.vad.min_speech_frame"); err == nil {
-		cfg.MinSpeechFrame = int(v)
-	}
-	return cfg
+func vadDurationFrames(durationSecs float64) int {
+	frameSecs := float64(frameShiftMs) / 1000
+	return int(math.RoundToEven(durationSecs / frameSecs))
 }
 
 func (v *FireRedVAD) isActive() bool {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
 	return !v.isTerminated && v.detector != nil
-}
-
-func (v *FireRedVAD) notifyInterruption(ctx context.Context, contextID string, event internal_type.InterruptionEvent, at float64) {
-	if v.onPacket == nil {
-		return
-	}
-	eventName := observability.VADSpeechStarted
-	if event == internal_type.InterruptionEventEnd {
-		eventName = observability.VADSpeechEnded
-	}
-	v.onPacket(ctx,
-		internal_type.InterruptionDetectedPacket{
-			ContextID: contextID,
-			Source:    internal_type.InterruptionSourceVad,
-			Event:     event,
-			StartAt:   at,
-			EndAt:     at,
-		},
-		internal_type.ObservabilityEventRecordPacket{
-			ContextID: contextID,
-			Scope:     internal_type.ObservabilityRecordScopeUserMessage,
-			Record: observability.RecordEvent{
-				Component: observability.ComponentVAD,
-				Event:     eventName,
-				Attributes: observability.Attributes{
-					"provider": vadName,
-					"event":    string(event),
-					"start_at": fmt.Sprintf("%f", at),
-					"end_at":   fmt.Sprintf("%f", at),
-				},
-				OccurredAt: time.Now(),
-			},
-		},
-	)
 }

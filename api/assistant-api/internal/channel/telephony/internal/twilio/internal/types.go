@@ -22,6 +22,19 @@ const (
 	EventTypeClear     EventType = "clear"
 )
 
+type OutboundFailureReason string
+
+const (
+	OutboundFailureReasonRequestCancelled           OutboundFailureReason = "twilio_outbound_request_cancelled"
+	OutboundFailureReasonAuthenticationFailed       OutboundFailureReason = "twilio_outbound_authentication_failed"
+	OutboundFailureReasonProviderAPIError           OutboundFailureReason = "twilio_outbound_provider_api_error"
+	OutboundFailureReasonResponseMissingStatusOrSID OutboundFailureReason = "twilio_outbound_provider_response_missing_status_or_sid"
+)
+
+func (r OutboundFailureReason) String() string {
+	return string(r)
+}
+
 type TwilioMediaEvent struct {
 	Event     EventType    `json:"event"`
 	Media     *TwilioMedia `json:"media,omitempty"`

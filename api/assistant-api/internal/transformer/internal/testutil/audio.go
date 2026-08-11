@@ -32,6 +32,10 @@ const (
 	FrameSize = SampleRate * BytesPerSample * FrameDuration / 1000 // 640
 )
 
+type speechToTextAudioTransformer interface {
+	Transform(ctx context.Context, in internal_type.Packet) error
+}
+
 // SilentPCM generates silence (all zeros) of the specified duration in seconds.
 // Returns raw LINEAR16, 16 kHz, mono PCM bytes.
 func SilentPCM(durationSec float64) []byte {
@@ -85,7 +89,7 @@ func ChunkAudio(data []byte, chunkSize int) [][]byte {
 // After all speech audio is sent, it appends 1 second of silence so the STT
 // provider's endpointing logic detects the utterance boundary and emits a final
 // transcript.
-func FeedAudio(ctx context.Context, t *testing.T, stt internal_type.SpeechToTextTransformer, audio []byte) {
+func FeedAudio(ctx context.Context, t *testing.T, stt speechToTextAudioTransformer, audio []byte) {
 	t.Helper()
 	// Append trailing silence so the provider can finalize the utterance.
 	audioWithSilence := make([]byte, len(audio)+SampleRate*BytesPerSample) // +1s silence

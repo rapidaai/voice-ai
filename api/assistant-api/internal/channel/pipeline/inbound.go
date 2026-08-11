@@ -8,13 +8,13 @@ package channel_pipeline
 
 import (
 	"context"
-	"strings"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	"github.com/rapidaai/api/assistant-api/internal/observability/collectors"
 	observability_collector_requestlog "github.com/rapidaai/api/assistant-api/internal/observability/collectors/requestlog"
 	observability_collector_toollog "github.com/rapidaai/api/assistant-api/internal/observability/collectors/toollog"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -73,12 +73,13 @@ func (d *Dispatcher) runInboundCall(ctx context.Context, v CallReceivedPipeline)
 		},
 		observability.RecordWebhook{
 			Event: observability.CallReceived,
-			Payload: map[string]interface{}{
-				"provider":  v.Provider,
-				"call_id":   callInfo.ChannelUUID,
-				"to":        callInfo.CallerNumber,
-				"from":      callInfo.FromNumber,
-				"direction": "inbound",
+			Payload: observability.CallReceivedWebhookPayload{
+				V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+				Provider:             v.Provider,
+				CallID:               callInfo.ChannelUUID,
+				To:                   callInfo.CallerNumber,
+				From:                 callInfo.FromNumber,
+				Direction:            "inbound",
 			},
 		})
 
@@ -97,14 +98,15 @@ func (d *Dispatcher) runInboundCall(ctx context.Context, v CallReceivedPipeline)
 				},
 			}, observability.RecordWebhook{
 				Event: observability.CallFailed,
-				Payload: map[string]interface{}{
-					"provider":  v.Provider,
-					"call_id":   callInfo.ChannelUUID,
-					"to":        callInfo.CallerNumber,
-					"from":      callInfo.FromNumber,
-					"stage":     "assistant_load",
-					"direction": "inbound",
-					"error":     err.Error(),
+				Payload: observability.CallFailedWebhookPayload{
+					V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+					Provider:             v.Provider,
+					CallID:               callInfo.ChannelUUID,
+					To:                   callInfo.CallerNumber,
+					From:                 callInfo.FromNumber,
+					Direction:            "inbound",
+					Stage:                "assistant_load",
+					Error:                err.Error(),
 				},
 			},
 			observability.RecordMetric{
@@ -140,14 +142,15 @@ func (d *Dispatcher) runInboundCall(ctx context.Context, v CallReceivedPipeline)
 			},
 			observability.RecordWebhook{
 				Event: observability.CallFailed,
-				Payload: map[string]interface{}{
-					"provider":  v.Provider,
-					"call_id":   callInfo.ChannelUUID,
-					"to":        callInfo.CallerNumber,
-					"from":      callInfo.FromNumber,
-					"direction": "inbound",
-					"stage":     "conversation_create",
-					"error":     err.Error(),
+				Payload: observability.CallFailedWebhookPayload{
+					V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+					Provider:             v.Provider,
+					CallID:               callInfo.ChannelUUID,
+					To:                   callInfo.CallerNumber,
+					From:                 callInfo.FromNumber,
+					Direction:            "inbound",
+					Stage:                "conversation_create",
+					Error:                err.Error(),
 				},
 			},
 			observability.RecordMetric{
@@ -192,15 +195,16 @@ func (d *Dispatcher) runInboundCall(ctx context.Context, v CallReceivedPipeline)
 			observability.RecordWebhook{
 				Event:     observability.CallFailed,
 				ContextID: contextID,
-				Payload: map[string]interface{}{
-					"provider":   v.Provider,
-					"call_id":    callInfo.ChannelUUID,
-					"to":         callInfo.CallerNumber,
-					"from":       callInfo.FromNumber,
-					"context_id": contextID,
-					"stage":      "call_context_save",
-					"direction":  "inbound",
-					"error":      err.Error(),
+				Payload: observability.CallFailedWebhookPayload{
+					V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+					Provider:             v.Provider,
+					CallID:               callInfo.ChannelUUID,
+					To:                   callInfo.CallerNumber,
+					From:                 callInfo.FromNumber,
+					Direction:            "inbound",
+					ContextID:            contextID,
+					Stage:                "call_context_save",
+					Error:                err.Error(),
 				},
 			},
 			observability.RecordMetadata{
@@ -257,45 +261,45 @@ func (d *Dispatcher) runInboundCall(ctx context.Context, v CallReceivedPipeline)
 					"from":         callInfo.FromNumber,
 					"call_id":      callInfo.ChannelUUID,
 					"context_id":   contextID,
-					"status_event": callInfo.StatusInfo.Event,
+					"status_event": callInfo.StatusInfo.Event.String(),
 				},
 			})
-		switch strings.ToUpper(callInfo.StatusInfo.Event) {
-		case "RINGING":
+		switch callInfo.StatusInfo.Event {
+		case internal_type.TelephonyEventRinging:
 			_ = v.Observer.Record(ctx,
 				observability.ConversationScope{
 					AssistantScope: observability.AssistantScope{AssistantID: v.AssistantID},
 					ConversationID: conversation.Id,
 				},
 				observability.RecordMetric{
-					Metrics: observability.CallStatusMetric(observability.MetricCallStatusRinging, callInfo.StatusInfo.Event),
+					Metrics: observability.CallStatusMetric(observability.MetricCallStatusRinging, callInfo.StatusInfo.Event.String()),
 				})
-		case "CANCELLED", "CANCELED":
+		case internal_type.TelephonyEvent("cancelled"), internal_type.TelephonyEvent("canceled"):
 			_ = v.Observer.Record(ctx,
 				observability.ConversationScope{
 					AssistantScope: observability.AssistantScope{AssistantID: v.AssistantID},
 					ConversationID: conversation.Id,
 				},
 				observability.RecordMetric{
-					Metrics: observability.CallStatusMetric(observability.MetricCallStatusCancelled, callInfo.StatusInfo.Event),
+					Metrics: observability.CallStatusMetric(observability.MetricCallStatusCancelled, callInfo.StatusInfo.Event.String()),
 				})
-		case "FAILED":
+		case internal_type.TelephonyEvent("failed"):
 			_ = v.Observer.Record(ctx,
 				observability.ConversationScope{
 					AssistantScope: observability.AssistantScope{AssistantID: v.AssistantID},
 					ConversationID: conversation.Id,
 				},
 				observability.RecordMetric{
-					Metrics: observability.CallStatusMetric(observability.MetricCallStatusFailed, callInfo.StatusInfo.Event),
+					Metrics: observability.CallStatusMetric(observability.MetricCallStatusFailed, callInfo.StatusInfo.Event.String()),
 				})
-		case "COMPLETED", "COMPLETE":
+		case internal_type.TelephonyEventCompleted, internal_type.TelephonyEvent("complete"):
 			_ = v.Observer.Record(ctx,
 				observability.ConversationScope{
 					AssistantScope: observability.AssistantScope{AssistantID: v.AssistantID},
 					ConversationID: conversation.Id,
 				},
 				observability.RecordMetric{
-					Metrics: observability.CallStatusMetric(observability.MetricCallStatusComplete, callInfo.StatusInfo.Event),
+					Metrics: observability.CallStatusMetric(observability.MetricCallStatusComplete, callInfo.StatusInfo.Event.String()),
 				})
 		default:
 			_ = v.Observer.Record(ctx,
@@ -304,7 +308,7 @@ func (d *Dispatcher) runInboundCall(ctx context.Context, v CallReceivedPipeline)
 					ConversationID: conversation.Id,
 				},
 				observability.RecordMetric{
-					Metrics: observability.CallStatusMetric(observability.MetricCallStatusInProgress, callInfo.StatusInfo.Event),
+					Metrics: observability.CallStatusMetric(observability.MetricCallStatusInProgress, callInfo.StatusInfo.Event.String()),
 				})
 		}
 	}
@@ -331,15 +335,16 @@ func (d *Dispatcher) runInboundCall(ctx context.Context, v CallReceivedPipeline)
 			observability.RecordWebhook{
 				Event:     observability.CallFailed,
 				ContextID: contextID,
-				Payload: map[string]interface{}{
-					"provider":   v.Provider,
-					"call_id":    callInfo.ChannelUUID,
-					"to":         callInfo.CallerNumber,
-					"from":       callInfo.FromNumber,
-					"stage":      "provider_answer",
-					"context_id": contextID,
-					"direction":  "inbound",
-					"error":      err.Error(),
+				Payload: observability.CallFailedWebhookPayload{
+					V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+					Provider:             v.Provider,
+					CallID:               callInfo.ChannelUUID,
+					To:                   callInfo.CallerNumber,
+					From:                 callInfo.FromNumber,
+					Direction:            "inbound",
+					ContextID:            contextID,
+					Stage:                "provider_answer",
+					Error:                err.Error(),
 				},
 			},
 			observability.RecordMetadata{
@@ -371,13 +376,14 @@ func (d *Dispatcher) runInboundCall(ctx context.Context, v CallReceivedPipeline)
 		observability.RecordWebhook{
 			Event:     observability.CallProviderAnswered,
 			ContextID: contextID,
-			Payload: map[string]interface{}{
-				"provider":   v.Provider,
-				"call_id":    callInfo.ChannelUUID,
-				"to":         callInfo.CallerNumber,
-				"from":       callInfo.FromNumber,
-				"context_id": contextID,
-				"direction":  "inbound",
+			Payload: observability.CallProviderAnsweredWebhookPayload{
+				V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+				Provider:             v.Provider,
+				CallID:               callInfo.ChannelUUID,
+				To:                   callInfo.CallerNumber,
+				From:                 callInfo.FromNumber,
+				Direction:            "inbound",
+				ContextID:            contextID,
 			},
 		})
 

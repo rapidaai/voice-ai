@@ -27,6 +27,19 @@ const (
 	EventTypeStop               EventType = "stop"
 )
 
+type OutboundFailureReason string
+
+const (
+	OutboundFailureReasonRequestCancelled     OutboundFailureReason = "vonage_outbound_request_cancelled"
+	OutboundFailureReasonAuthenticationFailed OutboundFailureReason = "vonage_outbound_authentication_failed"
+	OutboundFailureReasonProviderAPIError     OutboundFailureReason = "vonage_outbound_provider_api_error"
+	OutboundFailureReasonProviderCallCreate   OutboundFailureReason = "vonage_outbound_provider_call_create_failed"
+)
+
+func (r OutboundFailureReason) String() string {
+	return string(r)
+}
+
 type VonageWebSocketEvent struct {
 	Event EventType `json:"event"`
 }

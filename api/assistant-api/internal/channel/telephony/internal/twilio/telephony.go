@@ -168,12 +168,12 @@ func (tpc *twilioTelephony) OutboundCall(ctx context.Context,
 	opts utils.Option) (*internal_type.CallInfo, error) {
 	info := &internal_type.CallInfo{Provider: internal_twilio.TwilioProvider}
 	if err := ctx.Err(); err != nil {
-		info.Status = "FAILED"
-		info.ErrorMessage = fmt.Sprintf("request cancelled: %s", err.Error())
+		info.Status = internal_type.TelephonyStatusFailed
+		info.ErrorMessage = err.Error()
 		internal_telephony_base.ReportOutboundFailure(
 			statusReporter,
 			internal_telephony_base.OutboundFailureClassRequestCancelled,
-			"request cancelled",
+			internal_twilio.OutboundFailureReasonRequestCancelled.String(),
 			internal_telephony_base.OutboundDisconnectReasonRequestCancelled,
 			err,
 			0,
@@ -184,12 +184,12 @@ func (tpc *twilioTelephony) OutboundCall(ctx context.Context,
 	contextID, _ := opts.GetString("rapida.context_id")
 	client, err := twilioClient(vaultCredential)
 	if err != nil {
-		info.Status = "FAILED"
-		info.ErrorMessage = fmt.Sprintf("authentication error: %s", err.Error())
+		info.Status = internal_type.TelephonyStatusFailed
+		info.ErrorMessage = err.Error()
 		internal_telephony_base.ReportOutboundFailure(
 			statusReporter,
 			internal_telephony_base.OutboundFailureClassAuthentication,
-			"authentication error",
+			internal_twilio.OutboundFailureReasonAuthenticationFailed.String(),
 			internal_telephony_base.OutboundDisconnectReasonSetupFailed,
 			err,
 			0,
@@ -217,12 +217,12 @@ func (tpc *twilioTelephony) OutboundCall(ctx context.Context,
 	)
 	resp, err := client.Api.CreateCall(callParams)
 	if err != nil {
-		info.Status = "FAILED"
-		info.ErrorMessage = fmt.Sprintf("API error: %s", err.Error())
+		info.Status = internal_type.TelephonyStatusFailed
+		info.ErrorMessage = err.Error()
 		internal_telephony_base.ReportOutboundFailure(
 			statusReporter,
 			internal_telephony_base.OutboundFailureClassProviderAPI,
-			"provider API error",
+			internal_twilio.OutboundFailureReasonProviderAPIError.String(),
 			internal_telephony_base.OutboundDisconnectReasonSetupFailed,
 			err,
 			0,
@@ -231,12 +231,12 @@ func (tpc *twilioTelephony) OutboundCall(ctx context.Context,
 	}
 	if resp.Status == nil || resp.Sid == nil {
 		err := internal_twilio.ErrOutboundResponseMissingStatusSID
-		info.Status = "FAILED"
+		info.Status = internal_type.TelephonyStatusFailed
 		info.ErrorMessage = err.Error()
 		internal_telephony_base.ReportOutboundFailure(
 			statusReporter,
 			internal_telephony_base.OutboundFailureClassProviderResponse,
-			"provider response missing status or sid",
+			internal_twilio.OutboundFailureReasonResponseMissingStatusOrSID.String(),
 			internal_telephony_base.OutboundDisconnectReasonSetupFailed,
 			err,
 			0,
@@ -245,8 +245,8 @@ func (tpc *twilioTelephony) OutboundCall(ctx context.Context,
 	}
 
 	info.ChannelUUID = *resp.Sid
-	info.Status = "SUCCESS"
-	info.StatusInfo = internal_type.StatusInfo{Event: *resp.Status, Payload: resp}
+	info.Status = internal_type.TelephonyStatusSuccess
+	info.StatusInfo = internal_type.StatusInfo{Event: internal_twilio.StatusEvent(*resp.Status), Payload: resp}
 	internal_telephony_base.ReportOutboundInitiated(statusReporter, info.ChannelUUID)
 	return info, nil
 }
@@ -303,7 +303,7 @@ func (tpc *twilioTelephony) ReceiveCall(c *gin.Context) (*internal_type.CallInfo
 	info := &internal_type.CallInfo{
 		CallerNumber: clientNumber,
 		Provider:     internal_twilio.TwilioProvider,
-		Status:       "SUCCESS",
+		Status:       internal_type.TelephonyStatusSuccess,
 		StatusInfo:   internal_type.StatusInfo{Event: "webhook", Payload: queryParams},
 	}
 	if v, ok := queryParams["To"]; ok && v != "" {

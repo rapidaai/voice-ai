@@ -18,10 +18,10 @@ import (
 	"github.com/rapidaai/pkg/commons"
 )
 
-func newBenchmarkFireRedVAD(b *testing.B, threshold float64) *FireRedVAD {
+func newBenchmarkFireRedVAD(b *testing.B, confidence float64) *FireRedVAD {
 	logger, _ := commons.NewApplicationLogger()
 	callback := func(context.Context, ...internal_type.Packet) error { return nil }
-	opts := newTestOptions(b, threshold)
+	opts := newTestOptions(b, confidence)
 
 	vad, err := newFireRedVADForTest(b.Context(), logger, callback, opts)
 	if err != nil {

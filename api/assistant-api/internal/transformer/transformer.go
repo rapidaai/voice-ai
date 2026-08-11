@@ -10,7 +10,6 @@ import (
 	"context"
 	"fmt"
 
-	internal_transformer_assemblyai "github.com/rapidaai/api/assistant-api/internal/transformer/assembly-ai"
 	internal_transformer_aws "github.com/rapidaai/api/assistant-api/internal/transformer/aws"
 	internal_transformer_azure "github.com/rapidaai/api/assistant-api/internal/transformer/azure"
 	internal_transformer_cartesia "github.com/rapidaai/api/assistant-api/internal/transformer/cartesia"
@@ -105,44 +104,5 @@ func GetTextToSpeechTransformer(ctx context.Context,
 		return internal_transformer_smallest.NewSmallestTextToSpeech(ctx, logger, credential, onPacket, opts)
 	default:
 		return nil, fmt.Errorf("illegal text to speech idenitfier")
-	}
-}
-
-func GetSpeechToTextTransformer(ctx context.Context,
-	logger commons.Logger,
-	provider string,
-	credential *protos.VaultCredential,
-	onPacket func(pkt ...internal_type.Packet) error,
-	opts utils.Option,
-) (internal_type.SpeechToTextTransformer, error) {
-	switch AudioTransformer(provider) {
-	case DEEPGRAM:
-		return internal_transformer_deepgram.NewDeepgramSpeechToText(ctx, logger, credential, onPacket, opts)
-	case AZURE_SPEECH_SERVICE:
-		return internal_transformer_azure.NewAzureSpeechToText(ctx, logger, credential, onPacket, opts)
-	case GOOGLE_SPEECH_SERVICE:
-		return internal_transformer_google.NewGoogleSpeechToText(ctx, logger, credential, onPacket, opts)
-	case ASSEMBLYAI:
-		return internal_transformer_assemblyai.NewAssemblyaiSpeechToText(ctx, logger, credential, onPacket, opts)
-	case REVAI:
-		return internal_transformer_revai.NewRevaiSpeechToText(ctx, logger, credential, onPacket, opts)
-	case SARVAM:
-		return internal_transformer_sarvam.NewSarvamSpeechToText(ctx, logger, credential, onPacket, opts)
-	case CARTESIA:
-		return internal_transformer_cartesia.NewCartesiaSpeechToText(ctx, logger, credential, onPacket, opts)
-	case SPEECHMATICS:
-		return internal_transformer_speechmatics.NewSpeechmaticsSpeechToText(ctx, logger, credential, onPacket, opts)
-	case GROQ:
-		return internal_transformer_groq.NewGroqSpeechToText(ctx, logger, credential, onPacket, opts)
-	case NVIDIA:
-		return internal_transformer_nvidia.NewNvidiaSpeechToText(ctx, logger, credential, onPacket, opts)
-	case AWS:
-		return internal_transformer_aws.NewAWSSpeechToText(ctx, logger, credential, onPacket, opts)
-	case CUSTOM_STT:
-		return internal_transformer_custom.NewSpeechToText(ctx, logger, credential, onPacket, opts)
-	case SMALLEST:
-		return internal_transformer_smallest.NewSmallestSpeechToText(ctx, logger, credential, onPacket, opts)
-	default:
-		return nil, fmt.Errorf("illegal speech to text idenitfier")
 	}
 }

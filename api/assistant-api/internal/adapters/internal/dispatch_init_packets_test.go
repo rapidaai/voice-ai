@@ -429,21 +429,15 @@ func TestHandleInitializationCompleted_EmitsConversationWebhookRecord(t *testing
 		name                    string
 		assistantConversationID uint64
 		expectedEvent           observability.EventName
-		expectedDataKey         string
-		expectedDataValue       interface{}
 	}{
 		{
-			name:              "begin",
-			expectedEvent:     observability.ConversationBegin,
-			expectedDataKey:   "is_new",
-			expectedDataValue: "true",
+			name:          "begin",
+			expectedEvent: observability.ConversationBegin,
 		},
 		{
 			name:                    "resume",
 			assistantConversationID: 303,
 			expectedEvent:           observability.ConversationResume,
-			expectedDataKey:         "message_count",
-			expectedDataValue:       "0",
 		},
 	}
 
@@ -491,7 +485,17 @@ func TestHandleInitializationCompleted_EmitsConversationWebhookRecord(t *testing
 			assert.Equal(t, "ctx-init-webhook", webhookPacket.ContextID)
 			assert.Equal(t, internal_type.ObservabilityRecordScopeConversation, webhookPacket.Scope)
 			assert.Equal(t, testCase.expectedEvent, webhookPacket.Record.Event)
-			assert.Equal(t, testCase.expectedDataValue, webhookPacket.Record.Payload[testCase.expectedDataKey])
+			switch testCase.expectedEvent {
+			case observability.ConversationBegin:
+				payload, ok := webhookPacket.Record.Payload.(observability.ConversationBeginWebhookPayload)
+				require.True(t, ok)
+				assert.Equal(t, "debugger", payload.Source)
+				assert.NotEmpty(t, payload.Identifier)
+			case observability.ConversationResume:
+				payload, ok := webhookPacket.Record.Payload.(observability.ConversationResumeWebhookPayload)
+				require.True(t, ok)
+				assert.Equal(t, "0", payload.MessageCount)
+			}
 		})
 	}
 }
@@ -602,19 +606,18 @@ func TestHandleFinalizeConversation_RecordsCompletedWebhookBeforeClosingAnalysis
 	webhookRecord, ok := recorder.records[0].(observability.RecordWebhook)
 	require.True(t, ok)
 	assert.Equal(t, observability.ConversationCompleted, webhookRecord.Event)
-	assert.Equal(t, "conversation_completed", webhookRecord.Payload["reason"])
-	assert.Equal(t, "completed", webhookRecord.Payload["status"])
-	messagesPayload, ok := webhookRecord.Payload["messages"].([]map[string]interface{})
+	payload, ok := webhookRecord.Payload.(observability.ConversationCompletedWebhookPayload)
 	require.True(t, ok)
+	assert.Equal(t, "conversation_completed", payload.Reason)
+	assert.Equal(t, "completed", payload.Status)
+	messagesPayload := payload.Messages
 	require.Len(t, messagesPayload, 2)
 	assert.Equal(t, "msg-user-1", messagesPayload[0]["id"])
 	assert.Equal(t, "user", messagesPayload[0]["role"])
 	assert.Equal(t, "hello", messagesPayload[0]["content"])
-	metadataPayload, ok := webhookRecord.Payload["metadata"].(map[string]interface{})
-	require.True(t, ok)
+	metadataPayload := payload.Metadata
 	assert.Equal(t, "customer-1", metadataPayload["customer_id"])
-	metricsPayload, ok := webhookRecord.Payload["metrics"].([]map[string]interface{})
-	require.True(t, ok)
+	metricsPayload := payload.Metrics
 	metricValues := map[string]string{}
 	for _, metric := range metricsPayload {
 		name, _ := metric["name"].(string)
@@ -657,7 +660,9 @@ func TestHandleFinalizeConversation_RecordsCompletedWebhookWithoutAnalysis(t *te
 	webhookRecord, ok := recorder.records[0].(observability.RecordWebhook)
 	require.True(t, ok)
 	assert.Equal(t, observability.ConversationCompleted, webhookRecord.Event)
-	assert.Equal(t, "completed", webhookRecord.Payload["status"])
+	payload, ok := webhookRecord.Payload.(observability.ConversationCompletedWebhookPayload)
+	require.True(t, ok)
+	assert.Equal(t, "completed", payload.Status)
 	select {
 	case envelope := <-requestor.channels.DataChannel():
 		assert.Equal(t, internal_type.PacketNameFinalizeAnalysisExecutor, envelope.Pkt.PacketName())
@@ -719,8 +724,9 @@ func TestFinalizeFlow_WithAnalysis_RunsAnalysisThenWebhookThenEnds(t *testing.T)
 	require.Len(t, recorder.records, 1)
 	webhookRecord, ok := recorder.records[0].(observability.RecordWebhook)
 	require.True(t, ok)
-	metadataPayload, ok := webhookRecord.Payload["metadata"].(map[string]interface{})
+	payload, ok := webhookRecord.Payload.(observability.ConversationCompletedWebhookPayload)
 	require.True(t, ok)
+	metadataPayload := payload.Metadata
 	assert.Equal(t, "done", metadataPayload["analysis.summary"])
 	assert.Equal(t, adapter_lifecycle.StateDisconnected, requestor.sessionLifecycle.Current())
 }
@@ -838,8 +844,10 @@ func TestHandleError_NonRecoverable_EmitsConversationErrorWebhookRecord(t *testi
 	assert.Equal(t, "ctx-error-webhook", webhookPacket.ContextID)
 	assert.Equal(t, internal_type.ObservabilityRecordScopeConversation, webhookPacket.Scope)
 	assert.Equal(t, observability.ConversationError, webhookPacket.Record.Event)
-	assert.Equal(t, protos.ConversationDisconnection_DISCONNECTION_TYPE_ERROR.String(), webhookPacket.Record.Payload["reason"])
-	assert.Contains(t, webhookPacket.Record.Payload["message"], "tts provider rejected credentials")
+	payload, ok := webhookPacket.Record.Payload.(observability.ConversationErrorWebhookPayload)
+	require.True(t, ok)
+	assert.Equal(t, protos.ConversationDisconnection_DISCONNECTION_TYPE_ERROR.String(), payload.Reason)
+	assert.Contains(t, payload.Message, "tts provider rejected credentials")
 }
 
 func TestHandleInitializeBehavior_RuntimeConfigUnavailable_LogsAndReturns(t *testing.T) {

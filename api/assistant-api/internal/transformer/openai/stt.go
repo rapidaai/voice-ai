@@ -16,6 +16,7 @@ import (
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/protos"
 )
 
 type openaiSpeechToText struct {
@@ -27,6 +28,61 @@ type openaiSpeechToText struct {
 	contextId string
 
 	sttConnectedAt time.Time
+}
+
+type options struct {
+	ctx        context.Context
+	logger     commons.Logger
+	credential *protos.VaultCredential
+	onPacket   func(pkt ...internal_type.Packet) error
+	sttOptions utils.Option
+
+	assistantID    uint64
+	conversationID uint64
+}
+
+type Option func(*options)
+
+func WithContext(ctx context.Context) Option {
+	return func(options *options) {
+		options.ctx = ctx
+	}
+}
+
+func WithLogger(logger commons.Logger) Option {
+	return func(options *options) {
+		options.logger = logger
+	}
+}
+
+func WithCredential(credential *protos.VaultCredential) Option {
+	return func(options *options) {
+		options.credential = credential
+	}
+}
+
+func WithOnPacket(onPacket func(pkt ...internal_type.Packet) error) Option {
+	return func(options *options) {
+		options.onPacket = onPacket
+	}
+}
+
+func WithOptions(sttOptions utils.Option) Option {
+	return func(options *options) {
+		options.sttOptions = sttOptions
+	}
+}
+
+func WithAssistantID(assistantID uint64) Option {
+	return func(options *options) {
+		options.assistantID = assistantID
+	}
+}
+
+func WithConversationID(conversationID uint64) Option {
+	return func(options *options) {
+		options.conversationID = conversationID
+	}
 }
 
 func (o *openaiSpeechToText) Initialize() error {
@@ -111,15 +167,19 @@ func (o *openaiSpeechToText) Transform(ctx context.Context, byt internal_type.Pa
 	}
 }
 
-func NewOpenaiSpeechToText(
-	ctx context.Context,
-	logger commons.Logger,
-	onPacket func(pkt ...internal_type.Packet) error,
-	opts utils.Option,
-) (internal_type.SpeechToTextTransformer, error) {
-	stt := &openaiSpeechToText{
-		logger:   logger,
-		onPacket: onPacket,
+func NewSpeechToText(opts ...Option) (internal_type.SpeechToTextTransformer, error) {
+	options := &options{ctx: context.Background(), sttOptions: utils.Option{}}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(options)
+		}
 	}
-	return stt, nil
+	if options.ctx == nil {
+		options.ctx = context.Background()
+	}
+	return &openaiSpeechToText{
+		ctx:      options.ctx,
+		logger:   options.logger,
+		onPacket: options.onPacket,
+	}, nil
 }

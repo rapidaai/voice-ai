@@ -6,19 +6,18 @@
 package internal_vobiz
 
 import (
-	"strings"
 	"time"
 
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/utils"
-	"github.com/rapidaai/pkg/validator"
 )
 
 // StatusCallback parses a vobiz call/stream webhook (ring_url/hangup_url and
 // Stream statusCallbackUrl events: Ring, StartApp, Hangup, StartStream,
 // StopStream).
 type StatusCallback struct {
-	Event       string
+	Event       internal_type.TelephonyEvent
+	RawEvent    string
 	CallStatus  string
 	ChannelUUID string
 	Duration    *time.Duration
@@ -27,61 +26,100 @@ type StatusCallback struct {
 }
 
 func NewStatusCallback(eventDetails utils.Option, rawCallbackPayload string) (*StatusCallback, error) {
-	event, _ := eventDetails.GetString("Event")
-	callStatus, _ := eventDetails.GetString("CallStatus")
-	channelUUID, _ := eventDetails.GetString("CallUUID")
-	if !validator.NotBlank(channelUUID) {
-		channelUUID, _ = eventDetails.GetString("RequestUUID")
+	event, eventErr := eventDetails.GetString("Event")
+	callStatus, statusErr := eventDetails.GetString("CallStatus")
+	if eventErr != nil && statusErr != nil {
+		return nil, ErrStatusCallbackStatusMissing
 	}
-	var durationPtr *time.Duration
-	if d, err := eventDetails.GetDuration("Duration"); err == nil {
-		durationPtr = utils.Ptr(d)
+
+	callback := &StatusCallback{
+		Event:      StatusEvent(event, callStatus),
+		RawEvent:   event,
+		CallStatus: callStatus,
+		RawPayload: rawCallbackPayload,
+		Payload:    eventDetails,
 	}
-	return &StatusCallback{
-		Event:       event,
-		CallStatus:  callStatus,
-		ChannelUUID: channelUUID,
-		Duration:    durationPtr,
-		RawPayload:  rawCallbackPayload,
-		Payload:     eventDetails,
-	}, nil
+	duration, err := eventDetails.GetDuration("Duration")
+	if err == nil {
+		callback.Duration = utils.Ptr(duration)
+	}
+	if channelUUID, err := eventDetails.GetString("CallUUID"); err == nil {
+		callback.ChannelUUID = channelUUID
+	}
+	if callback.ChannelUUID == "" {
+		if requestUUID, err := eventDetails.GetString("RequestUUID"); err == nil {
+			callback.ChannelUUID = requestUUID
+		}
+	}
+	return callback, nil
 }
 
 func (s *StatusCallback) StatusInfo() *internal_type.StatusInfo {
-	failed := s.Failed()
-	completed := strings.EqualFold(s.CallStatus, "completed") || strings.EqualFold(s.Event, "Hangup")
 	statusInfo := &internal_type.StatusInfo{
-		Event:       s.eventName(),
+		Event:       s.Event,
 		ChannelUUID: s.ChannelUUID,
-		Completed:   completed && !failed,
+		Completed:   s.IsCompleted(),
 		Duration:    s.Duration,
 		RawPayload:  s.RawPayload,
 		Payload:     s.Payload,
 	}
-	if failed {
-		statusInfo.Error = &internal_type.StatusError{Error: "failed", Reason: s.FailureReason()}
+	if statusError := s.StatusError(); statusError != nil {
+		statusInfo.Error = statusError
 	}
 	return statusInfo
 }
 
-func (s *StatusCallback) eventName() string {
-	if validator.NotBlank(s.Event) {
-		return s.Event
-	}
-	if validator.NotBlank(s.CallStatus) {
-		return s.CallStatus
-	}
-	return "webhook"
+func (s *StatusCallback) IsCompleted() bool {
+	return (s.CallStatus == "completed" || s.RawEvent == "Hangup") && !s.Failed()
 }
 
 func (s *StatusCallback) Failed() bool {
-	st := strings.ToLower(s.CallStatus)
-	return st == "failed" || st == "busy" || st == "no-answer" || st == "no_answer" || st == "canceled" || st == "cancelled"
+	switch s.CallStatus {
+	case "failed", "busy", "no-answer", "no_answer", "canceled", "cancelled":
+		return true
+	}
+	return false
 }
 
-func (s *StatusCallback) FailureReason() string {
-	if validator.NotBlank(s.CallStatus) {
-		return s.CallStatus
+func (s *StatusCallback) StatusError() *internal_type.StatusError {
+	if !s.Failed() {
+		return nil
 	}
-	return s.Event
+	if s.CallStatus != "" {
+		return &internal_type.StatusError{Error: "failed", Reason: s.CallStatus}
+	}
+	if s.RawEvent != "" {
+		return &internal_type.StatusError{Error: "failed", Reason: s.RawEvent}
+	}
+	return &internal_type.StatusError{Error: "failed", Reason: s.Event.String()}
+}
+
+func StatusEvent(event string, status string) internal_type.TelephonyEvent {
+	switch event {
+	case "Ring":
+		return internal_type.TelephonyEventRinging
+	case "StartApp":
+		return internal_type.TelephonyEventAnswered
+	case "StartStream":
+		return internal_type.TelephonyEventStreamStarted
+	case "Hangup", "StopStream":
+		return internal_type.TelephonyEventCompleted
+	}
+
+	switch status {
+	case "ringing":
+		return internal_type.TelephonyEventRinging
+	case "in-progress", "answered":
+		return internal_type.TelephonyEventAnswered
+	case "completed", "failed", "busy", "no-answer", "no_answer", "canceled", "cancelled":
+		return internal_type.TelephonyEventCompleted
+	}
+
+	if status != "" {
+		return internal_type.TelephonyEvent(status)
+	}
+	if event != "" {
+		return internal_type.TelephonyEvent(event)
+	}
+	return internal_type.TelephonyEvent(WebhookEvent)
 }

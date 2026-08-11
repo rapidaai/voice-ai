@@ -93,14 +93,14 @@ func TestNewTextToSpeech_UnsupportedCompatibility(t *testing.T) {
 func TestNewSpeechToText_UnsupportedCompatibility(t *testing.T) {
 	logger, _ := commons.NewApplicationLogger()
 	_, err := NewSpeechToText(
-		context.Background(),
-		logger,
-		testVaultCredential(t, map[string]any{
+		WithContext(context.Background()),
+		WithLogger(logger),
+		WithCredential(testVaultCredential(t, map[string]any{
 			CredentialKeyAPICompatibilityCamel: "unknown",
 			"baseUrl":                          "wss://example.invalid/ws",
-		}),
-		func(pkt ...internal_type.Packet) error { return nil },
-		utils.Option{},
+		})),
+		WithOnPacket(func(pkt ...internal_type.Packet) error { return nil }),
+		WithOptions(utils.Option{}),
 	)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported api compatibility")
@@ -109,17 +109,17 @@ func TestNewSpeechToText_UnsupportedCompatibility(t *testing.T) {
 func TestNewSpeechToText_HTTPCompatibility(t *testing.T) {
 	logger, _ := commons.NewApplicationLogger()
 	transformer, err := NewSpeechToText(
-		context.Background(),
-		logger,
-		testVaultCredential(t, map[string]any{
+		WithContext(context.Background()),
+		WithLogger(logger),
+		WithCredential(testVaultCredential(t, map[string]any{
 			CredentialKeyAPICompatibilityCamel: "http_v1",
 			"baseUrl":                          "https://example.invalid/predict",
-		}),
-		func(pkt ...internal_type.Packet) error { return nil },
-		utils.Option{
+		})),
+		WithOnPacket(func(pkt ...internal_type.Packet) error { return nil }),
+		WithOptions(utils.Option{
 			"listen.request_rules":  `[{"when":{"packet":"audio"},"send":{"frame":"json","body":{"audio":{"$path":"packet.audio.wav_base64"}}}}]`,
 			"listen.response_rules": `[{"when":{"frame":"json"},"emit":{"script":{"$path":"text"},"interim":false}}]`,
-		},
+		}),
 	)
 	require.NoError(t, err)
 	assert.Equal(t, "custom-stt-http-v1", transformer.Name())

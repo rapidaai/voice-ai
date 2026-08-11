@@ -370,7 +370,7 @@ func TestSmallestSTTLifecycle(t *testing.T) {
 	cred := testutil.BuildCredential(pcfg.Credential)
 	opts := testutil.BuildOptions(pcfg.Options)
 
-	stt, err := NewSmallestSpeechToText(ctx, logger, cred, collector.OnPacket, opts)
+	stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(cred), WithOnPacket(collector.OnPacket), WithOptions(opts))
 	require.NoError(t, err)
 	require.NotNil(t, stt)
 	assert.Equal(t, "smallest-stt", stt.Name())
@@ -424,9 +424,12 @@ func TestSmallestSTTAudioAcceptance(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	stt, err := NewSmallestSpeechToText(ctx, logger,
-		testutil.BuildCredential(pcfg.Credential), collector.OnPacket,
-		testutil.BuildOptions(pcfg.Options))
+	stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(
+		testutil.BuildCredential(pcfg.Credential)), WithOnPacket(
+		collector.OnPacket), WithOptions(
+
+		testutil.BuildOptions(pcfg.Options)))
+
 	require.NoError(t, err)
 	require.NoError(t, stt.Initialize())
 	defer stt.Close(ctx)
@@ -450,9 +453,12 @@ func TestSmallestSTTSilentAudio(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	stt, err := NewSmallestSpeechToText(ctx, logger,
-		testutil.BuildCredential(pcfg.Credential), collector.OnPacket,
-		testutil.BuildOptions(pcfg.Options))
+	stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(
+		testutil.BuildCredential(pcfg.Credential)), WithOnPacket(
+		collector.OnPacket), WithOptions(
+
+		testutil.BuildOptions(pcfg.Options)))
+
 	require.NoError(t, err)
 	require.NoError(t, stt.Initialize())
 	defer stt.Close(ctx)
@@ -483,7 +489,7 @@ func TestSmallestSTTReconnect(t *testing.T) {
 		collector := testutil.NewPacketCollector()
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 
-		stt, err := NewSmallestSpeechToText(ctx, logger, cred, collector.OnPacket, opts)
+		stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(cred), WithOnPacket(collector.OnPacket), WithOptions(opts))
 		require.NoError(t, err, "attempt %d", attempt)
 		require.NoError(t, stt.Initialize(), "attempt %d", attempt)
 
@@ -519,9 +525,12 @@ func TestSmallestSTTCloseWhileStreaming(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	stt, err := NewSmallestSpeechToText(ctx, logger,
-		testutil.BuildCredential(pcfg.Credential), collector.OnPacket,
-		testutil.BuildOptions(pcfg.Options))
+	stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(
+		testutil.BuildCredential(pcfg.Credential)), WithOnPacket(
+		collector.OnPacket), WithOptions(
+
+		testutil.BuildOptions(pcfg.Options)))
+
 	require.NoError(t, err)
 	require.NoError(t, stt.Initialize())
 
@@ -571,7 +580,7 @@ func TestSmallestSTTFeatureFlags(t *testing.T) {
 		"listen.smart_format":        true,
 	})
 
-	stt, err := NewSmallestSpeechToText(ctx, logger, testutil.BuildCredential(pcfg.Credential), collector.OnPacket, opts)
+	stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(testutil.BuildCredential(pcfg.Credential)), WithOnPacket(collector.OnPacket), WithOptions(opts))
 	require.NoError(t, err)
 	require.NoError(t, stt.Initialize())
 	defer stt.Close(ctx)
@@ -629,9 +638,12 @@ func TestSmallestSTTTranscriptContent(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	stt, err := NewSmallestSpeechToText(ctx, logger,
-		testutil.BuildCredential(pcfg.Credential), collector.OnPacket,
-		testutil.BuildOptions(pcfg.Options))
+	stt, err := NewSpeechToText(WithContext(ctx), WithLogger(logger), WithCredential(
+		testutil.BuildCredential(pcfg.Credential)), WithOnPacket(
+		collector.OnPacket), WithOptions(
+
+		testutil.BuildOptions(pcfg.Options)))
+
 	require.NoError(t, err)
 	require.NoError(t, stt.Initialize())
 	defer stt.Close(ctx)

@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	internal_options "github.com/rapidaai/api/assistant-api/internal/options"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
@@ -28,7 +29,7 @@ import (
 func newTestOptions(tb testing.TB, threshold float64) utils.Option {
 	opts := map[string]interface{}{}
 	if threshold >= 0 {
-		opts["microphone.vad.threshold"] = threshold
+		opts[internal_options.MicrophoneVADOptionConfidence] = threshold
 	}
 	return opts
 }
@@ -394,25 +395,4 @@ func TestSileroVAD_Process_RemainderCarry(t *testing.T) {
 	err = vad.Execute(context.Background(), generateSilence(448))
 	require.NoError(t, err)
 	assert.Equal(t, 2048, vad.detector.currSample, "64 carry + 448 samples should process one more window")
-}
-
-func TestSileroVAD_NotifyInterruption_SetsEvent(t *testing.T) {
-	var got internal_type.InterruptionDetectedPacket
-	callback := func(_ context.Context, pkts ...internal_type.Packet) error {
-		for _, p := range pkts {
-			if ip, ok := p.(internal_type.InterruptionDetectedPacket); ok {
-				got = ip
-			}
-		}
-		return nil
-	}
-
-	s := &SileroVAD{onPacket: callback}
-	s.notifyInterruption(context.Background(), "ctx-test", internal_type.InterruptionEventEnd, 2.75, 1)
-
-	assert.Equal(t, "ctx-test", got.ContextID)
-	assert.Equal(t, internal_type.InterruptionSourceVad, got.Source)
-	assert.Equal(t, internal_type.InterruptionEventEnd, got.Event)
-	assert.Equal(t, 2.75, got.StartAt)
-	assert.Equal(t, 2.75, got.EndAt)
 }

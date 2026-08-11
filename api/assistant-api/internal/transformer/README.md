@@ -41,12 +41,13 @@ import (
 )
 
 // Get STT transformer
-sttTransformer, err := transformer.GetSpeechToTextTransformer(
-    transformer.DEEPGRAM,
-    ctx,
-    logger,
-    credential,
-    opts,
+sttTransformer, err := transformer.NewSpeechToText(
+    transformer.WithContext(ctx),
+    transformer.WithLogger(logger),
+    transformer.WithProvider(transformer.DEEPGRAM.String()),
+    transformer.WithCredential(credential),
+    transformer.WithOnPacket(onPacket),
+    transformer.WithOptions(opts),
 )
 
 // Get TTS transformer
@@ -551,17 +552,18 @@ const (
     MYPROVIDER AudioTransformer = "my-provider"
 )
 
-func GetSpeechToTextTransformer(
-    at AudioTransformer,
-    ctx context.Context,
-    logger commons.Logger,
-    credential *protos.VaultCredential,
-    opts *internal_type.SpeechToTextInitializeOptions,
-) (internal_type.SpeechToTextTransformer, error) {
-    switch at {
+func NewSpeechToText(opts ...Option) (internal_type.SpeechToTextTransformer, error) {
+    // ... apply options
+    switch AudioTransformer(options.provider) {
     // ... existing cases
     case MYPROVIDER:
-        return internal_transformer_myprovider.NewMyProviderSpeechToText(ctx, logger, credential, opts)
+        return internal_transformer_myprovider.NewSpeechToText(
+            internal_transformer_myprovider.WithContext(options.ctx),
+            internal_transformer_myprovider.WithLogger(options.logger),
+            internal_transformer_myprovider.WithCredential(options.credential),
+            internal_transformer_myprovider.WithOnPacket(options.onPacket),
+            internal_transformer_myprovider.WithOptions(options.sttOptions),
+        )
     default:
         return nil, fmt.Errorf("illegal speech to text identifier")
     }
@@ -668,12 +670,13 @@ func main() {
         },
     }
 
-    stt, err := transformer.GetSpeechToTextTransformer(
-        transformer.DEEPGRAM,
-        ctx,
-        logger,
-        credential,
-        sttOpts,
+    stt, err := transformer.NewSpeechToText(
+        transformer.WithContext(ctx),
+        transformer.WithLogger(logger),
+        transformer.WithProvider(transformer.DEEPGRAM.String()),
+        transformer.WithCredential(credential),
+        transformer.WithOnPacket(sttOpts.OnPacket),
+        transformer.WithOptions(options),
     )
     if err != nil {
         logger.Fatalf("Failed to create STT transformer: %v", err)
@@ -841,7 +844,7 @@ To implement a new STT or TTS provider:
 1. **Create directory**: `transformer/{provider}/`
 2. **Implement `option.go`**: Configuration extraction from credentials
 3. **Implement `{stt|tts}.go`**: Core transformer with interface methods
-4. **Register in factory**: Add case to `GetSpeechToTextTransformer()` or `GetTextToSpeechTransformer()`
+4. **Register constructor**: Add STT provider cases to `NewSpeechToText()` and TTS provider cases to `GetTextToSpeechTransformer()`
 5. **Test thoroughly**: Unit tests + integration tests with real credentials
 6. **Follow patterns**: Use mutex for thread safety, context for cancellation
 

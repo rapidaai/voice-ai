@@ -55,44 +55,60 @@ func (v *vobizTelephony) AnswerXML(streamPath, statusCallbackPath string) (strin
 func (v *vobizTelephony) OutboundCall(ctx context.Context, auth types.SimplePrinciple, toPhone string, fromPhone string, assistant *internal_assistant_entity.Assistant, assistantConversationId uint64, vaultCredential *protos.VaultCredential, statusReporter internal_type.ProviderCallStatusReporter, opts utils.Option) (*internal_type.CallInfo, error) {
 	info := &internal_type.CallInfo{Provider: internal_vobiz.VobizProvider}
 	if err := ctx.Err(); err != nil {
-		info.Status = "FAILED"
-		info.ErrorMessage = fmt.Sprintf("request cancelled: %s", err.Error())
+		info.Status = internal_type.TelephonyStatusFailed
+		info.ErrorMessage = err.Error()
 		internal_telephony_base.ReportOutboundFailure(
 			statusReporter,
 			internal_telephony_base.OutboundFailureClassRequestCancelled,
-			"request cancelled",
+			internal_vobiz.OutboundFailureReasonRequestCancelled.String(),
 			internal_telephony_base.OutboundDisconnectReasonRequestCancelled, err, 0)
 		return info, err
 	}
 
 	if !validator.NonNil(vaultCredential.GetValue()) {
-		info.Status = "FAILED"
-		info.ErrorMessage = internal_vobiz.ErrVaultCredentialValueMissing.Error()
+		err := internal_vobiz.ErrVaultCredentialValueMissing
+		info.Status = internal_type.TelephonyStatusFailed
+		info.ErrorMessage = err.Error()
 		internal_telephony_base.ReportOutboundFailure(
 			statusReporter,
 			internal_telephony_base.OutboundFailureClassConfiguration,
-			"missing vault credential",
-			internal_telephony_base.OutboundDisconnectReasonRequestCancelled, internal_vobiz.ErrVaultCredentialValueMissing, 0)
-		return info, internal_vobiz.ErrVaultCredentialValueMissing
+			internal_vobiz.OutboundFailureReasonMissingVaultCredential.String(),
+			internal_telephony_base.OutboundDisconnectReasonRequestCancelled, err, 0)
+		return info, err
 	}
 
 	vobizCredential := vaultCredential.GetValue().AsMap()
 	authID, ok := vobizCredential["auth_id"].(string)
 	if !ok {
-		return nil, internal_vobiz.ErrVaultAuthIDMissing
+		err := internal_vobiz.ErrVaultAuthIDMissing
+		info.Status = internal_type.TelephonyStatusFailed
+		info.ErrorMessage = err.Error()
+		internal_telephony_base.ReportOutboundFailure(statusReporter,
+			internal_telephony_base.OutboundFailureClassConfiguration,
+			internal_vobiz.OutboundFailureReasonAuthIDMissing.String(),
+			internal_telephony_base.OutboundDisconnectReasonSetupFailed, err, 0)
+		return info, err
 	}
 	authToken, ok := vobizCredential["auth_token"].(string)
 	if !ok {
-		return nil, internal_vobiz.ErrVaultAuthTokenMissing
+		err := internal_vobiz.ErrVaultAuthTokenMissing
+		info.Status = internal_type.TelephonyStatusFailed
+		info.ErrorMessage = err.Error()
+		internal_telephony_base.ReportOutboundFailure(statusReporter,
+			internal_telephony_base.OutboundFailureClassConfiguration,
+			internal_vobiz.OutboundFailureReasonAuthTokenMissing.String(),
+			internal_telephony_base.OutboundDisconnectReasonSetupFailed, err, 0)
+		return info, err
 	}
 
 	contextID, _ := opts.GetString("rapida.context_id")
 	if contextID == "" {
 		err := fmt.Errorf("missing rapida.context_id; cannot build answer/event callback URLs")
-		info.Status = "FAILED"
+		info.Status = internal_type.TelephonyStatusFailed
 		info.ErrorMessage = err.Error()
 		internal_telephony_base.ReportOutboundFailure(statusReporter,
-			internal_telephony_base.OutboundFailureClassProviderResponse, "missing context id",
+			internal_telephony_base.OutboundFailureClassProviderResponse,
+			internal_vobiz.OutboundFailureReasonContextIDMissing.String(),
 			internal_telephony_base.OutboundDisconnectReasonSetupFailed, err, 0)
 		return info, err
 	}
@@ -112,26 +128,28 @@ func (v *vobizTelephony) OutboundCall(ctx context.Context, auth types.SimplePrin
 		HangupMethod: "POST",
 	})
 	if err != nil {
-		info.Status = "FAILED"
-		info.ErrorMessage = fmt.Sprintf("API error: %s", err.Error())
+		info.Status = internal_type.TelephonyStatusFailed
+		info.ErrorMessage = err.Error()
 		internal_telephony_base.ReportOutboundFailure(statusReporter,
-			internal_telephony_base.OutboundFailureClassProviderAPI, "provider API error",
+			internal_telephony_base.OutboundFailureClassProviderAPI,
+			internal_vobiz.OutboundFailureReasonProviderAPIError.String(),
 			internal_telephony_base.OutboundDisconnectReasonSetupFailed, err, 0)
 		return info, err
 	}
 	if resp.RequestUUID == "" {
 		err := internal_vobiz.ErrOutboundResponseMissingUUID
-		info.Status = "FAILED"
+		info.Status = internal_type.TelephonyStatusFailed
 		info.ErrorMessage = err.Error()
 		internal_telephony_base.ReportOutboundFailure(statusReporter,
-			internal_telephony_base.OutboundFailureClassProviderResponse, "provider response missing request_uuid",
+			internal_telephony_base.OutboundFailureClassProviderResponse,
+			internal_vobiz.OutboundFailureReasonResponseMissingRequestUUID.String(),
 			internal_telephony_base.OutboundDisconnectReasonSetupFailed, err, 0)
 		return info, err
 	}
 
 	info.ChannelUUID = resp.RequestUUID
-	info.Status = "SUCCESS"
-	info.StatusInfo = internal_type.StatusInfo{Event: resp.Message, Payload: resp}
+	info.Status = internal_type.TelephonyStatusSuccess
+	info.StatusInfo = internal_type.StatusInfo{Event: internal_type.TelephonyEvent(resp.Message), Payload: resp}
 	internal_telephony_base.ReportOutboundInitiated(statusReporter, info.ChannelUUID)
 	return info, nil
 }
@@ -190,8 +208,8 @@ func (v *vobizTelephony) ReceiveCall(c *gin.Context) (*internal_type.CallInfo, e
 	}
 	info := &internal_type.CallInfo{
 		Provider:   internal_vobiz.VobizProvider,
-		Status:     "SUCCESS",
-		StatusInfo: internal_type.StatusInfo{Event: "webhook", Payload: queryParams},
+		Status:     internal_type.TelephonyStatusSuccess,
+		StatusInfo: internal_type.StatusInfo{Event: internal_type.TelephonyEvent(internal_vobiz.WebhookEvent), Payload: queryParams},
 	}
 	if v := queryParams["From"]; v != "" {
 		info.CallerNumber = v

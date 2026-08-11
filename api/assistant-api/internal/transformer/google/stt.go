@@ -50,33 +50,95 @@ func (g *googleSpeechToText) Name() string {
 	return "google-stt"
 }
 
-func NewGoogleSpeechToText(ctx context.Context, logger commons.Logger, credential *protos.VaultCredential,
-	onPacket func(pkt ...internal_type.Packet) error,
-	opts utils.Option,
-) (internal_type.SpeechToTextTransformer, error) {
+type options struct {
+	ctx        context.Context
+	logger     commons.Logger
+	credential *protos.VaultCredential
+	onPacket   func(pkt ...internal_type.Packet) error
+	sttOptions utils.Option
+
+	assistantID    uint64
+	conversationID uint64
+}
+
+type Option func(*options)
+
+func WithContext(ctx context.Context) Option {
+	return func(options *options) {
+		options.ctx = ctx
+	}
+}
+
+func WithLogger(logger commons.Logger) Option {
+	return func(options *options) {
+		options.logger = logger
+	}
+}
+
+func WithCredential(credential *protos.VaultCredential) Option {
+	return func(options *options) {
+		options.credential = credential
+	}
+}
+
+func WithOnPacket(onPacket func(pkt ...internal_type.Packet) error) Option {
+	return func(options *options) {
+		options.onPacket = onPacket
+	}
+}
+
+func WithOptions(sttOptions utils.Option) Option {
+	return func(options *options) {
+		options.sttOptions = sttOptions
+	}
+}
+
+func WithAssistantID(assistantID uint64) Option {
+	return func(options *options) {
+		options.assistantID = assistantID
+	}
+}
+
+func WithConversationID(conversationID uint64) Option {
+	return func(options *options) {
+		options.conversationID = conversationID
+	}
+}
+
+func NewSpeechToText(opts ...Option) (internal_type.SpeechToTextTransformer, error) {
+	options := &options{ctx: context.Background(), sttOptions: utils.Option{}}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(options)
+		}
+	}
+	if options.ctx == nil {
+		options.ctx = context.Background()
+	}
+
 	start := time.Now()
-	googleOption, err := NewGoogleOption(logger, credential, opts)
+	googleOption, err := NewGoogleOption(options.logger, options.credential, options.sttOptions)
 	if err != nil {
-		logger.Errorf("google-stt: Error while GoogleOption err: %v", err)
+		options.logger.Errorf("google-stt: Error while GoogleOption err: %v", err)
 		return nil, err
 	}
-	client, err := speech.NewClient(ctx, googleOption.GetSpeechToTextClientOptions()...)
+	client, err := speech.NewClient(options.ctx, googleOption.GetSpeechToTextClientOptions()...)
 
 	if err != nil {
-		logger.Errorf("google-stt: Error creating Google client: %v", err)
+		options.logger.Errorf("google-stt: Error creating Google client: %v", err)
 		return nil, err
 	}
 
-	xctx, contextCancel := context.WithCancel(ctx)
+	xctx, contextCancel := context.WithCancel(options.ctx)
 	// Context for callback management
-	logger.Benchmark("google.NewGoogleSpeechToText", time.Since(start))
+	options.logger.Benchmark("google.NewSpeechToText", time.Since(start))
 	g := &googleSpeechToText{
 		ctx:          xctx,
 		ctxCancel:    contextCancel,
-		logger:       logger,
+		logger:       options.logger,
 		client:       client,
 		googleOption: googleOption,
-		onPacket:     onPacket,
+		onPacket:     options.onPacket,
 	}
 	g.streamFactory = func(ctx context.Context) (speechpb.Speech_StreamingRecognizeClient, error) {
 		return client.StreamingRecognize(ctx)

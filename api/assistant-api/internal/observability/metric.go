@@ -105,7 +105,7 @@ func NewMetricSTTLatencyMs(duration time.Duration, attr Attributes) RecordMetric
 	record := NewConversationMetricRecord([]*protos.Metric{{
 		Name:        MetricSTTLatencyMs,
 		Value:       strconv.FormatInt(duration.Milliseconds(), 10),
-		Description: "STT latency from speech start to final transcript in milliseconds",
+		Description: "STT latency from speech end to final transcript in milliseconds",
 	}})
 	record.Attributes = attr
 	return record

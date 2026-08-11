@@ -9,6 +9,7 @@ package observability
 import (
 	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
@@ -102,12 +103,12 @@ func (r *recorder) prepareObservation(scope Scope, record Record) (observation, 
 			return observation{}, errors.New("observability: webhook event is required")
 		}
 		if typed.Payload == nil {
-			typed.Payload = map[string]interface{}{}
+			typed.Payload = NewV1WebhookPayload(nil)
 		}
 		if typed.OccurredAt.IsZero() {
 			typed.OccurredAt = now
 		}
-		typed.Payload = cloneWebhookPayload(typed.Payload)
+		typed.Payload = cloneV1WebhookPayload(typed.Payload)
 		return observation{scope: scope, record: typed}, nil
 	case RecordToolLog:
 		switch typed.Operation {
@@ -190,15 +191,30 @@ func cloneMetadataRecords(metadataRecords []*protos.Metadata) []*protos.Metadata
 	return clonedMetadataRecords
 }
 
-func cloneWebhookPayload(payload map[string]interface{}) map[string]interface{} {
-	if len(payload) == 0 {
-		return map[string]interface{}{}
+func cloneV1WebhookPayload(payload V1WebhookPayload) V1WebhookPayload {
+	if payload == nil {
+		return NewV1WebhookPayload(nil)
 	}
-	clonedPayload := make(map[string]interface{}, len(payload))
-	for key, value := range payload {
-		clonedPayload[key] = cloneWebhookPayloadValue(value)
+	if clonedPayload, ok := cloneWebhookPayloadValue(payload).(V1WebhookPayload); ok {
+		return clonedPayload
 	}
-	return clonedPayload
+	return payload
+}
+
+func cloneWebhookPayload(payload interface{}) interface{} {
+	switch typedPayload := payload.(type) {
+	case map[string]interface{}:
+		if len(typedPayload) == 0 {
+			return map[string]interface{}{}
+		}
+		clonedPayload := make(map[string]interface{}, len(typedPayload))
+		for key, value := range typedPayload {
+			clonedPayload[key] = cloneWebhookPayloadValue(value)
+		}
+		return clonedPayload
+	default:
+		return payload
+	}
 }
 
 func cloneWebhookPayloadValue(value interface{}) interface{} {
@@ -220,7 +236,9 @@ func cloneWebhookPayloadValue(value interface{}) interface{} {
 	case []map[string]interface{}:
 		clonedSlice := make([]map[string]interface{}, len(typedValue))
 		for index, value := range typedValue {
-			clonedSlice[index] = cloneWebhookPayload(value)
+			if clonedValue, ok := cloneWebhookPayload(value).(map[string]interface{}); ok {
+				clonedSlice[index] = clonedValue
+			}
 		}
 		return clonedSlice
 	case []string:
@@ -228,8 +246,39 @@ func cloneWebhookPayloadValue(value interface{}) interface{} {
 	case []byte:
 		return cloneBytes(typedValue)
 	default:
+		reflectedValue := reflect.ValueOf(value)
+		if reflectedValue.IsValid() && reflectedValue.Kind() == reflect.Struct {
+			return cloneWebhookPayloadStruct(reflectedValue).Interface()
+		}
 		return value
 	}
+}
+
+func cloneWebhookPayloadStruct(value reflect.Value) reflect.Value {
+	clonedStruct := reflect.New(value.Type()).Elem()
+	for index := 0; index < value.NumField(); index++ {
+		field := value.Field(index)
+		clonedField := clonedStruct.Field(index)
+		if !field.CanInterface() || !clonedField.CanSet() {
+			clonedField.Set(field)
+			continue
+		}
+		clonedValue := cloneWebhookPayloadValue(field.Interface())
+		if clonedValue == nil {
+			clonedField.Set(reflect.Zero(clonedField.Type()))
+			continue
+		}
+		clonedReflectValue := reflect.ValueOf(clonedValue)
+		switch {
+		case clonedReflectValue.Type().AssignableTo(clonedField.Type()):
+			clonedField.Set(clonedReflectValue)
+		case clonedReflectValue.Type().ConvertibleTo(clonedField.Type()):
+			clonedField.Set(clonedReflectValue.Convert(clonedField.Type()))
+		default:
+			clonedField.Set(field)
+		}
+	}
+	return clonedStruct
 }
 
 func cloneBytes(value []byte) []byte {

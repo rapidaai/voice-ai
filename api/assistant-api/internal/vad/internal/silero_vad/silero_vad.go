@@ -17,6 +17,7 @@ import (
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_audio_resampler "github.com/rapidaai/api/assistant-api/internal/audio/resampler"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	internal_options "github.com/rapidaai/api/assistant-api/internal/options"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
@@ -30,11 +31,11 @@ const (
 	// vadName is the identifier for this VAD implementation
 	vadName = "silero_vad"
 
-	// Default configuration values — aligned with FireRedVAD defaults
-	// (20 frames × 10 ms = 200 ms silence, 8 frames × 10 ms = 80 ms pad)
-	defaultThreshold            = 0.5
-	defaultMinSilenceDurationMs = 200
-	defaultSpeechPadMs          = 80
+	// Default configuration values aligned with Pipecat VADParams.
+	defaultConfidence = 0.7
+	defaultStartSecs  = 0.2
+	defaultStopSecs   = 0.2
+	defaultMinVolume  = 0.6
 
 	// Environment variable for model path
 	envModelPathKey = "SILERO_MODEL_PATH"
@@ -332,12 +333,59 @@ func (s *SileroVAD) Execute(ctx context.Context, pkt internal_type.UserAudioRece
 		}
 	}
 
-	// Emit explicit interruption lifecycle events from VAD transitions.
 	if hasSpeechStart {
-		s.notifyInterruption(ctx, pkt.ContextID, internal_type.InterruptionEventStart, speechStartAt, len(segments))
+		s.onPacket(ctx,
+			internal_type.InterruptionDetectedPacket{
+				ContextID: pkt.ContextID,
+				Source:    internal_type.InterruptionSourceVad,
+				Event:     internal_type.InterruptionEventStart,
+				StartAt:   speechStartAt,
+				EndAt:     speechEndAt,
+			},
+			internal_type.ObservabilityEventRecordPacket{
+				ContextID: pkt.ContextID,
+				Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentVAD,
+					Event:     observability.VADSpeechStarted,
+					Attributes: observability.Attributes{
+						"provider":      vadName,
+						"event":         string(internal_type.InterruptionEventStart),
+						"start_at":      fmt.Sprintf("%f", speechStartAt),
+						"end_at":        fmt.Sprintf("%f", speechEndAt),
+						"segment_count": fmt.Sprintf("%d", len(segments)),
+					},
+					OccurredAt: time.Now(),
+				},
+			},
+		)
 	}
 	if hasSpeechEnd {
-		s.notifyInterruption(ctx, pkt.ContextID, internal_type.InterruptionEventEnd, speechEndAt, len(segments))
+		s.onPacket(ctx,
+			internal_type.InterruptionDetectedPacket{
+				ContextID: pkt.ContextID,
+				Source:    internal_type.InterruptionSourceVad,
+				Event:     internal_type.InterruptionEventEnd,
+				StartAt:   speechStartAt,
+				EndAt:     speechEndAt,
+			},
+			internal_type.ObservabilityEventRecordPacket{
+				ContextID: pkt.ContextID,
+				Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentVAD,
+					Event:     observability.VADSpeechEnded,
+					Attributes: observability.Attributes{
+						"provider":      vadName,
+						"event":         string(internal_type.InterruptionEventEnd),
+						"start_at":      fmt.Sprintf("%f", speechStartAt),
+						"end_at":        fmt.Sprintf("%f", speechEndAt),
+						"segment_count": fmt.Sprintf("%d", len(segments)),
+					},
+					OccurredAt: time.Now(),
+				},
+			},
+		)
 	}
 
 	return nil
@@ -395,15 +443,31 @@ func (s *SileroVAD) Close(ctx context.Context) error {
 // createDetector initializes the Silero speech detector with configuration.
 func createDetector(options utils.Option) (*Detector, error) {
 	modelPath := resolveModelPath()
-	threshold := resolveThreshold(options)
 
 	config := DetectorConfig{
-		ModelPath:            modelPath,
-		SampleRate:           16000, // Silero requires 16kHz
-		Threshold:            float32(threshold),
-		MinSilenceDurationMs: resolveMinSilenceDurationMs(options),
-		SpeechPadMs:          resolveSpeechPadMs(options),
+		ModelPath:  modelPath,
+		SampleRate: 16000, // Silero requires 16kHz
+		Confidence: defaultConfidence,
+		StartSecs:  defaultStartSecs,
+		StopSecs:   defaultStopSecs,
+		MinVolume:  defaultMinVolume,
 	}
+
+	if options != nil {
+		if confidence, err := options.GetFloat64(internal_options.MicrophoneVADOptionConfidence); err == nil {
+			config.Confidence = float32(confidence)
+		}
+		if startSecs, err := options.GetFloat64(internal_options.MicrophoneVADOptionStartSecs); err == nil {
+			config.StartSecs = startSecs
+		}
+		if stopSecs, err := options.GetFloat64(internal_options.MicrophoneVADOptionStopSecs); err == nil {
+			config.StopSecs = stopSecs
+		}
+		if minVolume, err := options.GetFloat64(internal_options.MicrophoneVADOptionMinVolume); err == nil {
+			config.MinVolume = minVolume
+		}
+	}
+
 	return NewDetector(config)
 }
 
@@ -415,45 +479,6 @@ func resolveModelPath() string {
 
 	_, currentFile, _, _ := runtime.Caller(0)
 	return filepath.Join(filepath.Dir(currentFile), defaultModelFile)
-}
-
-// resolveThreshold extracts threshold from options or returns default.
-func resolveThreshold(options utils.Option) float64 {
-	if options == nil {
-		return defaultThreshold
-	}
-
-	if threshold, err := options.GetFloat64("microphone.vad.threshold"); err == nil {
-		return threshold
-	}
-
-	return defaultThreshold
-}
-
-// resolveMinSilenceDurationMs extracts min silence duration from options.
-// The option key uses frame count (consistent with FireRedVAD config);
-// each frame is 10 ms, so we multiply by 10 to get milliseconds.
-func resolveMinSilenceDurationMs(options utils.Option) int {
-	if options == nil {
-		return defaultMinSilenceDurationMs
-	}
-	if v, err := options.GetFloat64("microphone.vad.min_silence_frame"); err == nil {
-		return int(v) * 10
-	}
-	return defaultMinSilenceDurationMs
-}
-
-// resolveSpeechPadMs extracts speech pad duration from options.
-// The option key uses frame count (consistent with FireRedVAD config);
-// each frame is 10 ms, so we multiply by 10 to get milliseconds.
-func resolveSpeechPadMs(options utils.Option) int {
-	if options == nil {
-		return defaultSpeechPadMs
-	}
-	if v, err := options.GetFloat64("microphone.vad.min_speech_frame"); err == nil {
-		return int(v) * 10
-	}
-	return defaultSpeechPadMs
 }
 
 // isActive checks if the VAD is still operational.
@@ -486,39 +511,4 @@ func (s *SileroVAD) detectSafely(samples []float32) ([]Segment, bool, error) {
 	}
 
 	return segments, s.detector.triggered, nil
-}
-
-// notifyInterruption emits a VAD interruption lifecycle event packet.
-func (s *SileroVAD) notifyInterruption(ctx context.Context, contextID string, event internal_type.InterruptionEvent, at float64, segmentCount int) {
-	if s.onPacket != nil {
-		eventName := observability.VADSpeechStarted
-		if event == internal_type.InterruptionEventEnd {
-			eventName = observability.VADSpeechEnded
-		}
-		_ = s.onPacket(ctx,
-			internal_type.InterruptionDetectedPacket{
-				ContextID: contextID,
-				Source:    internal_type.InterruptionSourceVad,
-				Event:     event,
-				StartAt:   at,
-				EndAt:     at,
-			},
-			internal_type.ObservabilityEventRecordPacket{
-				ContextID: contextID,
-				Scope:     internal_type.ObservabilityRecordScopeUserMessage,
-				Record: observability.RecordEvent{
-					Component: observability.ComponentVAD,
-					Event:     eventName,
-					Attributes: observability.Attributes{
-						"provider":      vadName,
-						"event":         string(event),
-						"start_at":      fmt.Sprintf("%f", at),
-						"end_at":        fmt.Sprintf("%f", at),
-						"segment_count": fmt.Sprintf("%d", segmentCount),
-					},
-					OccurredAt: time.Now(),
-				},
-			},
-		)
-	}
 }

@@ -160,22 +160,22 @@ func (outboundCall *Outbound) waitForAnswer(outboundConfig OutboundConfig, ringi
 		Username: outboundConfig.Auth.Username,
 		Password: outboundConfig.Auth.Password,
 		OnResponse: func(response *sip.Response) error {
-			statusCode := response.StatusCode
 			outboundCall.server.logger.Debugw("Outbound call response",
 				"call_id", outboundCall.session.GetCallID(),
-				"status", statusCode)
+				"status", response.StatusCode)
 
-			if outboundAuthMissingForChallenge(outboundConfig.Auth, statusCode) {
+			if outboundAuthMissingForChallenge(outboundConfig.Auth, response.StatusCode) {
 				return ErrAuthRequired
 			}
-			if statusCode == 180 || statusCode == 183 {
+			switch response.StatusCode {
+			case 180, 183:
 				outboundCall.session.SetOutboundDialogPhase(OutboundDialogPhaseProceeding)
 				outboundCall.server.TransitionCall(outboundCall.session, CallStateRinging, LifecycleReasonOutboundProgressRinging)
 				if ringingReported.CompareAndSwap(false, true) {
 					outboundCall.ReportStatus(internal_type.ProviderCallStatusUpdate{
 						CallStatus:         string(OutboundCallStatusRinging),
 						DisconnectReason:   LifecycleReasonOutboundProgressRinging.String(),
-						ProviderStatusCode: statusCode,
+						ProviderStatusCode: response.StatusCode,
 					})
 				}
 			}

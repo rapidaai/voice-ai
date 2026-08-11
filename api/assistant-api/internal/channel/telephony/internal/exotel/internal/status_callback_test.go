@@ -23,3 +23,56 @@ func TestNewStatusCallback_MissingStatusUsesTypedError(t *testing.T) {
 		t.Fatalf("err=%v want %v", err, ErrStatusCallbackStatusMissing)
 	}
 }
+
+func TestNewStatusCallback_MapsStatusToEvent(t *testing.T) {
+	callback, err := NewStatusCallback(utils.Option{
+		"CallSid": "call-id",
+		"Status":  "in-progress",
+	}, "")
+
+	if err != nil {
+		t.Fatalf("NewStatusCallback() error = %v", err)
+	}
+	if callback.Event != "answered" {
+		t.Fatalf("Event=%q want answered", callback.Event)
+	}
+	if callback.Status != "in-progress" {
+		t.Fatalf("Status=%q want in-progress", callback.Status)
+	}
+}
+
+func TestNewStatusCallback_AllowsUnknownStatus(t *testing.T) {
+	callback, err := NewStatusCallback(utils.Option{
+		"CallSid": "call-id",
+		"Status":  "provider-specific",
+	}, "")
+
+	if err != nil {
+		t.Fatalf("NewStatusCallback() error = %v", err)
+	}
+	if callback.Event.String() != "provider-specific" {
+		t.Fatalf("Event=%q want provider-specific", callback.Event)
+	}
+}
+
+func TestStatusInfo_FailedStatusKeepsStatusFailureReason(t *testing.T) {
+	callback, err := NewStatusCallback(utils.Option{
+		"CallSid": "call-id",
+		"Status":  "no-answer",
+	}, "")
+	if err != nil {
+		t.Fatalf("NewStatusCallback() error = %v", err)
+	}
+
+	statusInfo := callback.StatusInfo()
+
+	if statusInfo.Event.String() != "completed" {
+		t.Fatalf("Event=%q want completed", statusInfo.Event)
+	}
+	if statusInfo.Error == nil {
+		t.Fatal("Error=nil want failed status error")
+	}
+	if statusInfo.Error.Reason != "no-answer" {
+		t.Fatalf("Reason=%q want no-answer", statusInfo.Error.Reason)
+	}
+}

@@ -197,13 +197,14 @@ func (s *webrtcStreamer) restartICEOrMediaSessionFallback(mediaSessionID uint64,
 		},
 		observability.RecordWebhook{
 			Event: observability.WebRTCReconnecting,
-			Payload: map[string]interface{}{
-				webrtc_internal.DataType:           webrtc_internal.EventICERestarting,
-				webrtc_internal.DataSessionID:      s.sessionID,
-				webrtc_internal.DataMediaSessionID: mediaSessionID,
-				webrtc_internal.DataReason:         reason,
-				webrtc_internal.DataRestartAttempt: iceRestartAttempt,
-				webrtc_internal.DataRestartLimit:   webrtc_internal.ICERestartAttemptLimit,
+			Payload: observability.WebRTCReconnectingWebhookPayload{
+				V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+				Type:                 webrtc_internal.EventICERestarting,
+				SessionID:            s.sessionID,
+				MediaSessionID:       mediaSessionID,
+				Reason:               reason,
+				RestartAttempt:       iceRestartAttempt,
+				RestartLimit:         webrtc_internal.ICERestartAttemptLimit,
 			},
 		})
 
@@ -240,12 +241,13 @@ func (s *webrtcStreamer) restartMediaSessionOrFallbackToText(mediaSessionID uint
 			},
 			observability.RecordWebhook{
 				Event: observability.WebRTCFailed,
-				Payload: map[string]interface{}{
-					webrtc_internal.DataType:           "media_restart_limit_reached",
-					webrtc_internal.DataSessionID:      s.sessionID,
-					webrtc_internal.DataMediaSessionID: mediaSessionID,
-					webrtc_internal.DataReason:         reason,
-					"fallback":                         "text",
+				Payload: observability.WebRTCFailedWebhookPayload{
+					V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+					Type:                 "media_restart_limit_reached",
+					SessionID:            s.sessionID,
+					MediaSessionID:       mediaSessionID,
+					Reason:               reason,
+					Fallback:             "text",
 				},
 			})
 		s.stopMediaSessionAndFallbackToText()
@@ -267,13 +269,14 @@ func (s *webrtcStreamer) restartMediaSessionOrFallbackToText(mediaSessionID uint
 		},
 		observability.RecordWebhook{
 			Event: observability.WebRTCReconnecting,
-			Payload: map[string]interface{}{
-				webrtc_internal.DataType:           webrtc_internal.EventMediaSessionRestarting,
-				webrtc_internal.DataSessionID:      s.sessionID,
-				webrtc_internal.DataMediaSessionID: mediaSessionID,
-				webrtc_internal.DataReason:         reason,
-				webrtc_internal.DataRestartAttempt: restartAttempt,
-				webrtc_internal.DataRestartLimit:   webrtc_internal.MediaRestartAttemptLimit,
+			Payload: observability.WebRTCReconnectingWebhookPayload{
+				V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+				Type:                 webrtc_internal.EventMediaSessionRestarting,
+				SessionID:            s.sessionID,
+				MediaSessionID:       mediaSessionID,
+				Reason:               reason,
+				RestartAttempt:       restartAttempt,
+				RestartLimit:         webrtc_internal.MediaRestartAttemptLimit,
 			},
 		})
 
@@ -305,13 +308,14 @@ func (s *webrtcStreamer) restartMediaSessionOrFallbackToText(mediaSessionID uint
 			},
 			observability.RecordWebhook{
 				Event: observability.WebRTCFailed,
-				Payload: map[string]interface{}{
-					webrtc_internal.DataType:           "media_session_restart_failed",
-					webrtc_internal.DataSessionID:      s.sessionID,
-					webrtc_internal.DataMediaSessionID: mediaSessionID,
-					webrtc_internal.DataReason:         reason,
-					"error":                            err.Error(),
-					"fallback":                         "text",
+				Payload: observability.WebRTCFailedWebhookPayload{
+					V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
+					Type:                 "media_session_restart_failed",
+					SessionID:            s.sessionID,
+					MediaSessionID:       mediaSessionID,
+					Reason:               reason,
+					Error:                err.Error(),
+					Fallback:             "text",
 				},
 			})
 		s.stopMediaSessionAndFallbackToText()
