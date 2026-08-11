@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	internal_options "github.com/rapidaai/api/assistant-api/internal/options"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
@@ -23,17 +24,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestOptions(tb testing.TB, threshold float64) utils.Option {
+func newTestOptions(tb testing.TB, confidence float64) utils.Option {
 	opts := map[string]interface{}{}
-	if threshold >= 0 {
-		opts["microphone.vad.threshold"] = threshold
+	if confidence >= 0 {
+		opts[internal_options.MicrophoneVADOptionConfidence] = confidence
 	}
 	return opts
 }
 
-func newFireRedOrSkip(t *testing.T, threshold float64, cb func(ctx context.Context, pkt ...internal_type.Packet) error) *FireRedVAD {
+func newFireRedOrSkip(t *testing.T, confidence float64, cb func(ctx context.Context, pkt ...internal_type.Packet) error) *FireRedVAD {
 	logger, _ := commons.NewApplicationLogger()
-	opts := newTestOptions(t, threshold)
+	opts := newTestOptions(t, confidence)
 	vad, err := newFireRedVADForTest(t.Context(), logger, cb, opts)
 	if err != nil {
 		if os.IsNotExist(err) || strings.Contains(err.Error(), "no such file") {
@@ -70,7 +71,7 @@ func generateNoise(samples int) internal_type.UserAudioReceivedPacket {
 
 // Core functionality tests
 
-func TestNew_DefaultThreshold(t *testing.T) {
+func TestNew_DefaultConfig(t *testing.T) {
 	callback := func(context.Context, ...internal_type.Packet) error { return nil }
 
 	vad := newFireRedOrSkip(t, -1, callback)
@@ -78,6 +79,71 @@ func TestNew_DefaultThreshold(t *testing.T) {
 	assert.NotNil(t, vad.detector)
 	assert.NotNil(t, vad.fbank)
 	assert.NotNil(t, vad.postprocessor)
+	assert.Equal(t, float32(defaultConfidence), vad.postprocessor.cfg.SpeechThreshold)
+	assert.Equal(t, vadDurationFrames(defaultStartSecs), vad.postprocessor.cfg.MinSpeechFrame)
+	assert.Equal(t, vadDurationFrames(defaultStopSecs), vad.postprocessor.cfg.MinSilenceFrame)
+}
+
+func TestNew_OverridesConfig(t *testing.T) {
+	callback := func(context.Context, ...internal_type.Packet) error { return nil }
+	logger, _ := commons.NewApplicationLogger()
+	opts := utils.Option{
+		internal_options.MicrophoneVADOptionConfidence: 0.55,
+		internal_options.MicrophoneVADOptionStartSecs:  0.1,
+		internal_options.MicrophoneVADOptionStopSecs:   0.4,
+	}
+
+	vad, err := newFireRedVADForTest(t.Context(), logger, callback, opts)
+	if err != nil {
+		if os.IsNotExist(err) || strings.Contains(err.Error(), "no such file") {
+			t.Skipf("firered model not available: %v", err)
+		}
+		require.NoError(t, err)
+	}
+	fr := vad.(*FireRedVAD)
+	t.Cleanup(func() { _ = fr.Close(context.Background()) })
+
+	assert.Equal(t, float32(0.55), fr.postprocessor.cfg.SpeechThreshold)
+	assert.Equal(t, 10, fr.postprocessor.cfg.MinSpeechFrame)
+	assert.Equal(t, 40, fr.postprocessor.cfg.MinSilenceFrame)
+}
+
+func TestNew_RejectsNegativeDurationBeforeFrameConversion(t *testing.T) {
+	callback := func(context.Context, ...internal_type.Packet) error { return nil }
+
+	for name, opts := range map[string]utils.Option{
+		"start_secs": {
+			internal_options.MicrophoneVADOptionStartSecs: -0.004,
+		},
+		"stop_secs": {
+			internal_options.MicrophoneVADOptionStopSecs: -0.004,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := New(WithContext(t.Context()), WithOnPacket(callback), WithOptions(opts))
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "should be a positive number")
+		})
+	}
+}
+
+func TestPostprocessor_SpeechStartFrameIsNotBackdated(t *testing.T) {
+	pp := NewPostprocessor(PostprocessorConfig{
+		SmoothWindowSize: 1,
+		SpeechThreshold:  0.5,
+		MinSpeechFrame:   3,
+		MaxSpeechFrame:   2000,
+		MinSilenceFrame:  2,
+	})
+
+	pp.ProcessFrame(0)
+	pp.ProcessFrame(0)
+	pp.ProcessFrame(1)
+	pp.ProcessFrame(1)
+	result := pp.ProcessFrame(1)
+
+	require.True(t, result.IsSpeechStart)
+	assert.Equal(t, 3, result.SpeechStartFrame)
 }
 
 func TestFireRedVAD_Name(t *testing.T) {
@@ -349,25 +415,4 @@ func TestFireRedVAD_Process_PartialFrameCarry_NoDrop(t *testing.T) {
 	require.NoError(t, err)
 	// 428 total samples buffered -> one frame processed, shift by 160 samples -> 268 retained.
 	assert.Equal(t, 268, len(vad.audioBuf))
-}
-
-func TestFireRedVAD_NotifyInterruption_SetsEvent(t *testing.T) {
-	var got internal_type.InterruptionDetectedPacket
-	callback := func(_ context.Context, pkts ...internal_type.Packet) error {
-		for _, p := range pkts {
-			if ip, ok := p.(internal_type.InterruptionDetectedPacket); ok {
-				got = ip
-			}
-		}
-		return nil
-	}
-
-	v := &FireRedVAD{onPacket: callback}
-	v.notifyInterruption(context.Background(), "ctx-test", internal_type.InterruptionEventEnd, 1.75)
-
-	assert.Equal(t, "ctx-test", got.ContextID)
-	assert.Equal(t, internal_type.InterruptionSourceVad, got.Source)
-	assert.Equal(t, internal_type.InterruptionEventEnd, got.Event)
-	assert.Equal(t, 1.75, got.StartAt)
-	assert.Equal(t, 1.75, got.EndAt)
 }

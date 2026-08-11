@@ -7,6 +7,7 @@ import (
 
 	adapter_channel "github.com/rapidaai/api/assistant-api/internal/adapters/channel"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
+	internal_options "github.com/rapidaai/api/assistant-api/internal/options"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	internal_vad "github.com/rapidaai/api/assistant-api/internal/vad"
 	"github.com/rapidaai/pkg/commons"
@@ -100,8 +101,8 @@ func TestHandleModeSwitchInitializeVoiceActivityDetection_VADError_EmitsModeSwit
 		},
 	}
 	r.options = map[string]interface{}{
-		internal_vad.OptionsKeyVadProvider: internal_vad.SILERO_VAD,
-		"microphone.vad.threshold":         1.5, // invalid: detector requires (0,1)
+		internal_vad.OptionsKeyVadProvider:             internal_vad.SILERO_VAD,
+		internal_options.MicrophoneVADOptionConfidence: 1.5, // invalid: detector requires (0,1)
 	}
 	h := requestorDispatchHandler{r: r}
 

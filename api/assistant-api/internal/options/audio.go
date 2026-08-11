@@ -41,6 +41,10 @@ const (
 const (
 	MicrophoneOptionBargeInTrigger          = "microphone.barge_in_trigger"
 	MicrophoneLegacyVADOptionBargeInTrigger = "microphone.vad.barge_in_trigger"
+	MicrophoneVADOptionConfidence           = "microphone.vad.confidence"
+	MicrophoneVADOptionStartSecs            = "microphone.vad.start_secs"
+	MicrophoneVADOptionStopSecs             = "microphone.vad.stop_secs"
+	MicrophoneVADOptionMinVolume            = "microphone.vad.min_volume"
 )
 
 const (

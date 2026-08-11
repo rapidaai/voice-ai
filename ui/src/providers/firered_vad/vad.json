@@ -1,36 +1,36 @@
 {
   "parameters": [
     {
-      "key": "microphone.vad.threshold",
-      "label": "Speech Threshold",
+      "key": "microphone.vad.confidence",
+      "label": "Confidence",
       "type": "slider",
-      "default": "0.4",
+      "default": "0.7",
       "min": 0,
       "max": 1,
       "step": 0.05,
-      "helpText": "Speech probability threshold used by FireRed VAD post-processing. Higher values are less sensitive; lower values detect quieter speech. Backend default is 0.4.",
+      "helpText": "Speech probability required to classify a frame as speech.",
       "helpTextDisplay": "toggletip"
     },
     {
-      "key": "microphone.vad.min_silence_frame",
-      "label": "Min Silence Frames",
+      "key": "microphone.vad.start_secs",
+      "label": "Start Seconds",
       "type": "slider",
-      "default": "20",
-      "min": 1,
-      "max": 50,
-      "step": 1,
-      "helpText": "Number of consecutive silence frames before the backend marks speech ended. One frame is 10ms, so the default 20 frames is 200ms.",
+      "default": "0.2",
+      "min": 0,
+      "max": 2,
+      "step": 0.05,
+      "helpText": "Seconds of continuous speech required before confirming speech start.",
       "helpTextDisplay": "toggletip"
     },
     {
-      "key": "microphone.vad.min_speech_frame",
-      "label": "Min Speech Frames",
+      "key": "microphone.vad.stop_secs",
+      "label": "Stop Seconds",
       "type": "slider",
-      "default": "8",
-      "min": 1,
-      "max": 20,
-      "step": 1,
-      "helpText": "Number of speech frames FireRed requires before confirming speech start. One frame is 10ms, so the default 8 frames is 80ms.",
+      "default": "0.2",
+      "min": 0,
+      "max": 2,
+      "step": 0.05,
+      "helpText": "Seconds of continuous non-speech required before confirming speech end.",
       "helpTextDisplay": "toggletip"
     }
   ]

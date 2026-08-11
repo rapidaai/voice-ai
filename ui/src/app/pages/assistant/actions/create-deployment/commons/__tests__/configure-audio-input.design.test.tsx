@@ -114,13 +114,13 @@ describe('ConfigureAudioInputProvider design integration', () => {
       createMetadata('listen.model', 'nova-3'),
       createMetadata('microphone.eos.fallback_timeout', '900'),
       createMetadata('microphone.barge_in_trigger', 'word'),
-      createMetadata('microphone.vad.threshold', '0.7'),
+      createMetadata('microphone.vad.confidence', '0.7'),
       createMetadata('microphone.denoising.provider', 'rn_noise'),
       createMetadata('speaker.model', 'sonic'),
     ];
     const microphoneDefaults = [
       createMetadata('microphone.eos.fallback_timeout', '700'),
-      createMetadata('microphone.vad.threshold', '0.6'),
+      createMetadata('microphone.vad.confidence', '0.6'),
       createMetadata('microphone.denoising.provider', 'rn_noise'),
     ];
     const sttDefaults = [createMetadata('listen.model', 'whisper-large-v3-turbo')];
@@ -144,7 +144,7 @@ describe('ConfigureAudioInputProvider design integration', () => {
       [
         'microphone.eos.fallback_timeout',
         'microphone.barge_in_trigger',
-        'microphone.vad.threshold',
+        'microphone.vad.confidence',
         'microphone.denoising.provider',
       ].sort(),
     );

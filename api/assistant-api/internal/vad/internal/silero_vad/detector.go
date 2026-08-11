@@ -12,6 +12,7 @@ import "C"
 
 import (
 	"fmt"
+	"math"
 	"unsafe"
 )
 
@@ -27,6 +28,12 @@ const (
 	// contextLen is the number of trailing samples saved from each window
 	// and prepended to the next inference call for temporal continuity.
 	contextLen = 64
+
+	// volumeWindowSecs matches Pipecat's VAD volume rolling window.
+	volumeWindowSecs = 0.4
+
+	// volumeSmoothingFactor matches Pipecat's exponential smoothing factor.
+	volumeSmoothingFactor = 0.2
 )
 
 // -----------------------------------------------------------------------------
@@ -39,14 +46,15 @@ type DetectorConfig struct {
 	ModelPath string
 	// SampleRate of the input audio. Must be 8000 or 16000.
 	SampleRate int
-	// Threshold is the speech probability above which we detect voice.
-	// Valid range: (0, 1). A good default is 0.5.
-	Threshold float32
-	// MinSilenceDurationMs is the minimum silence duration (ms) before
-	// splitting a speech segment.
-	MinSilenceDurationMs int
-	// SpeechPadMs is padding (ms) added around speech segment boundaries.
-	SpeechPadMs int
+	// Confidence is the speech probability above which we detect voice.
+	// Valid range: (0, 1). A good default is 0.7.
+	Confidence float32
+	// StartSecs is the duration of continuous speech before confirming a start.
+	StartSecs float64
+	// StopSecs is the duration of continuous non-speech before confirming an end.
+	StopSecs float64
+	// MinVolume is the minimum detector volume score required to classify speech.
+	MinVolume float64
 }
 
 func (c DetectorConfig) validate() error {
@@ -56,14 +64,17 @@ func (c DetectorConfig) validate() error {
 	if c.SampleRate != 8000 && c.SampleRate != 16000 {
 		return fmt.Errorf("invalid SampleRate: valid values are 8000 and 16000")
 	}
-	if c.Threshold <= 0 || c.Threshold >= 1 {
-		return fmt.Errorf("invalid Threshold: should be in range (0, 1)")
+	if c.Confidence <= 0 || c.Confidence >= 1 {
+		return fmt.Errorf("invalid Confidence: should be in range (0, 1)")
 	}
-	if c.MinSilenceDurationMs < 0 {
-		return fmt.Errorf("invalid MinSilenceDurationMs: should be a positive number")
+	if c.StartSecs < 0 {
+		return fmt.Errorf("invalid StartSecs: should be a positive number")
 	}
-	if c.SpeechPadMs < 0 {
-		return fmt.Errorf("invalid SpeechPadMs: should be a positive number")
+	if c.StopSecs < 0 {
+		return fmt.Errorf("invalid StopSecs: should be a positive number")
+	}
+	if c.MinVolume < 0 || c.MinVolume > 1 {
+		return fmt.Errorf("invalid MinVolume: should be in range [0, 1]")
 	}
 	return nil
 }
@@ -111,9 +122,14 @@ type Detector struct {
 	// Pending samples (< window size) carried across Detect calls
 	pending []float32
 
+	// Rolling volume state used as a second speech gate.
+	volumeWindow []float32
+	prevVolume   float64
+
 	// Speech segmentation state
 	currSample int
 	triggered  bool
+	tempStart  int
 	tempEnd    int
 }
 
@@ -125,8 +141,9 @@ func NewDetector(cfg DetectorConfig) (*Detector, error) {
 	}
 
 	sd := &Detector{
-		cfg:      cfg,
-		cStrings: map[string]*C.char{},
+		cfg:       cfg,
+		cStrings:  map[string]*C.char{},
+		tempStart: -1,
 	}
 
 	// Obtain the global ONNX Runtime API handle
@@ -235,8 +252,8 @@ func (sd *Detector) Detect(pcm []float32) ([]Segment, error) {
 		return nil, nil
 	}
 
-	minSilenceSamples := sd.cfg.MinSilenceDurationMs * sd.cfg.SampleRate / 1000
-	speechPadSamples := sd.cfg.SpeechPadMs * sd.cfg.SampleRate / 1000
+	startSamples := vadDurationSamples(sd.cfg.StartSecs, windowSize, sd.cfg.SampleRate)
+	stopSamples := vadDurationSamples(sd.cfg.StopSecs, windowSize, sd.cfg.SampleRate)
 
 	var segments []Segment
 	fullWindows := len(input) / windowSize
@@ -248,38 +265,49 @@ func (sd *Detector) Detect(pcm []float32) ([]Segment, error) {
 		}
 
 		sd.currSample += windowSize
+		windowStartSample := sd.currSample - windowSize
+		volume := sd.voiceVolumeScore(input[i : i+windowSize])
+		speaking := speechProb >= sd.cfg.Confidence && volume >= sd.cfg.MinVolume
 
 		// Speech resumes during a silence measurement — cancel the silence timer
-		if speechProb >= sd.cfg.Threshold && sd.tempEnd != 0 {
+		if speaking && sd.tempEnd != 0 {
 			sd.tempEnd = 0
 		}
 
 		// Speech onset
-		if speechProb >= sd.cfg.Threshold && !sd.triggered {
-			sd.triggered = true
-			speechStartAt := float64(sd.currSample-windowSize-speechPadSamples) / float64(sd.cfg.SampleRate)
-			if speechStartAt < 0 {
-				speechStartAt = 0
+		if speaking && !sd.triggered {
+			if sd.tempStart < 0 {
+				sd.tempStart = windowStartSample
 			}
+			if sd.currSample-sd.tempStart < startSamples {
+				continue
+			}
+			sd.triggered = true
+			speechStartAt := float64(sd.tempStart) / float64(sd.cfg.SampleRate)
+			sd.tempStart = -1
 			segments = append(segments, Segment{
 				SpeechStartAt: speechStartAt,
 				SpeechEndAt:   -1,
 			})
 		}
+		if !speaking && !sd.triggered {
+			sd.tempStart = -1
+		}
 
-		// Speech offset (with hysteresis)
-		if speechProb < (sd.cfg.Threshold-0.15) && sd.triggered {
+		// Speech offset
+		if !speaking && sd.triggered {
 			if sd.tempEnd == 0 {
-				sd.tempEnd = sd.currSample
+				sd.tempEnd = windowStartSample
 			}
 
 			// Not enough silence yet to split
-			if sd.currSample-sd.tempEnd < minSilenceSamples {
+			if sd.currSample-sd.tempEnd < stopSamples {
 				continue
 			}
 
-			speechEndAt := float64(sd.tempEnd+speechPadSamples) / float64(sd.cfg.SampleRate)
+			speechEndAt := float64(sd.tempEnd) / float64(sd.cfg.SampleRate)
 			sd.tempEnd = 0
+			sd.tempStart = -1
 			sd.triggered = false
 
 			// Speech started in a previous Detect() call — no start event in
@@ -306,6 +334,53 @@ func (sd *Detector) Detect(pcm []float32) ([]Segment, error) {
 	return segments, nil
 }
 
+func vadDurationSamples(durationSecs float64, frameSamples, sampleRate int) int {
+	frameSecs := float64(frameSamples) / float64(sampleRate)
+	return int(math.RoundToEven(durationSecs/frameSecs)) * frameSamples
+}
+
+func (sd *Detector) voiceVolumeScore(pcm []float32) float64 {
+	windowSamples := int(volumeWindowSecs * float64(sd.cfg.SampleRate))
+	sd.volumeWindow = append(sd.volumeWindow, pcm...)
+	if len(sd.volumeWindow) > windowSamples {
+		sd.volumeWindow = sd.volumeWindow[len(sd.volumeWindow)-windowSamples:]
+	}
+	if len(sd.volumeWindow) < windowSamples {
+		return 0
+	}
+
+	score := sd.volumeScore()
+	smoothed := sd.prevVolume + volumeSmoothingFactor*(score-sd.prevVolume)
+	sd.prevVolume = smoothed
+	return smoothed
+}
+
+func (sd *Detector) volumeScore() float64 {
+	var sum float64
+	for _, sample := range sd.volumeWindow {
+		value := float64(sample)
+		sum += value * value
+	}
+	if sum <= 0 {
+		return 0
+	}
+
+	rms := math.Sqrt(sum / float64(len(sd.volumeWindow)))
+	if rms <= 0 {
+		return 0
+	}
+
+	dbfs := 20 * math.Log10(rms)
+	score := (dbfs + 110) / 100
+	if score < 0 {
+		return 0
+	}
+	if score > 1 {
+		return 1
+	}
+	return score
+}
+
 // Reset clears all stateful data: hidden state, context buffer, and
 // speech segmentation counters. Use this to reuse the detector for
 // a new audio stream without re-loading the model.
@@ -315,7 +390,10 @@ func (sd *Detector) Reset() {
 	}
 	sd.currSample = 0
 	sd.triggered = false
+	sd.tempStart = -1
 	sd.tempEnd = 0
+	sd.volumeWindow = sd.volumeWindow[:0]
+	sd.prevVolume = 0
 	for i := range sd.state {
 		sd.state[i] = 0
 	}

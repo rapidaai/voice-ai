@@ -8,11 +8,13 @@ package internal_ten_vad
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	internal_options "github.com/rapidaai/api/assistant-api/internal/options"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
@@ -28,13 +30,10 @@ const (
 	// TEN VAD processes fixed-size frames. hop_size=256 = 16ms at 16kHz.
 	defaultHopSize = 256
 
-	// Default speech detection threshold [0.0, 1.0]
-	defaultThreshold = 0.5
-
-	// Default durations — aligned with FireRedVAD defaults
-	// (20 frames × 10 ms = 200 ms silence, 8 frames × 10 ms = 80 ms pad)
-	defaultMinSilenceDurationMs = 200
-	defaultSpeechPadMs          = 80
+	// Default configuration values aligned with Pipecat-style VAD options.
+	defaultConfidence = 0.7
+	defaultStartSecs  = 0.2
+	defaultStopSecs   = 0.2
 )
 
 // -----------------------------------------------------------------------------
@@ -62,14 +61,15 @@ type TenVAD struct {
 	// Frame-level state for segment tracking
 	currSample int
 	triggered  bool
+	tempStart  int
 	tempEnd    int
 	pending    []int16
 
 	// Configuration
-	hopSize              int
-	threshold            float32
-	minSilenceDurationMs int
-	speechPadMs          int
+	hopSize    int
+	confidence float32
+	startSecs  float64
+	stopSecs   float64
 }
 
 type options struct {
@@ -123,9 +123,29 @@ func New(opts ...Option) (internal_type.VoiceActivityDetectorExecutor, error) {
 	start := time.Now()
 
 	hopSize := defaultHopSize
-	threshold := resolveThreshold(options.options)
+	confidence := defaultConfidence
+	startSecs := defaultStartSecs
+	stopSecs := defaultStopSecs
+	if options.options != nil {
+		if v, err := options.options.GetFloat64(internal_options.MicrophoneVADOptionConfidence); err == nil {
+			confidence = v
+		}
+		if v, err := options.options.GetFloat64(internal_options.MicrophoneVADOptionStartSecs); err == nil {
+			startSecs = v
+		}
+		if v, err := options.options.GetFloat64(internal_options.MicrophoneVADOptionStopSecs); err == nil {
+			stopSecs = v
+		}
+	}
 
-	detector, err := NewDetector(hopSize, float32(threshold))
+	if startSecs < 0 {
+		return nil, fmt.Errorf("invalid %s: should be a positive number", internal_options.MicrophoneVADOptionStartSecs)
+	}
+	if stopSecs < 0 {
+		return nil, fmt.Errorf("invalid %s: should be a positive number", internal_options.MicrophoneVADOptionStopSecs)
+	}
+
+	detector, err := NewDetector(hopSize, float32(confidence))
 	if err != nil {
 		if options.onPacket != nil {
 			_ = options.onPacket(options.ctx, internal_type.ObservabilityLogRecordPacket{
@@ -146,16 +166,17 @@ func New(opts ...Option) (internal_type.VoiceActivityDetectorExecutor, error) {
 	}
 
 	tv := &TenVAD{
-		logger:               options.logger,
-		onPacket:             options.onPacket,
-		opts:                 options.options,
-		detector:             detector,
-		hopSize:              hopSize,
-		threshold:            float32(threshold),
-		minSilenceDurationMs: resolveMinSilenceDurationMs(options.options),
-		speechPadMs:          resolveSpeechPadMs(options.options),
-		isTerminated:         false,
-		vadStartedAt:         time.Now(),
+		logger:       options.logger,
+		onPacket:     options.onPacket,
+		opts:         options.options,
+		detector:     detector,
+		hopSize:      hopSize,
+		confidence:   float32(confidence),
+		startSecs:    startSecs,
+		stopSecs:     stopSecs,
+		tempStart:    -1,
+		isTerminated: false,
+		vadStartedAt: time.Now(),
 	}
 
 	// Auto-close on context cancellation
@@ -269,10 +290,58 @@ func (t *TenVAD) Execute(ctx context.Context, pkt internal_type.UserAudioReceive
 
 	// Emit explicit interruption lifecycle events from VAD transitions.
 	if hasSpeechStart {
-		t.notifyInterruption(ctx, pkt.ContextID, internal_type.InterruptionEventStart, speechStartAt, len(segments))
+		t.onPacket(ctx,
+			internal_type.InterruptionDetectedPacket{
+				ContextID: pkt.ContextID,
+				Source:    internal_type.InterruptionSourceVad,
+				Event:     internal_type.InterruptionEventStart,
+				StartAt:   speechStartAt,
+				EndAt:     speechEndAt,
+			},
+			internal_type.ObservabilityEventRecordPacket{
+				ContextID: pkt.ContextID,
+				Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentVAD,
+					Event:     observability.VADSpeechStarted,
+					Attributes: observability.Attributes{
+						"provider":      vadName,
+						"event":         string(internal_type.InterruptionEventStart),
+						"start_at":      fmt.Sprintf("%f", speechStartAt),
+						"end_at":        fmt.Sprintf("%f", speechEndAt),
+						"segment_count": fmt.Sprintf("%d", len(segments)),
+					},
+					OccurredAt: time.Now(),
+				},
+			},
+		)
 	}
 	if hasSpeechEnd {
-		t.notifyInterruption(ctx, pkt.ContextID, internal_type.InterruptionEventEnd, speechEndAt, len(segments))
+		t.onPacket(ctx,
+			internal_type.InterruptionDetectedPacket{
+				ContextID: pkt.ContextID,
+				Source:    internal_type.InterruptionSourceVad,
+				Event:     internal_type.InterruptionEventEnd,
+				StartAt:   speechStartAt,
+				EndAt:     speechEndAt,
+			},
+			internal_type.ObservabilityEventRecordPacket{
+				ContextID: pkt.ContextID,
+				Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentVAD,
+					Event:     observability.VADSpeechEnded,
+					Attributes: observability.Attributes{
+						"provider":      vadName,
+						"event":         string(internal_type.InterruptionEventEnd),
+						"start_at":      fmt.Sprintf("%f", speechStartAt),
+						"end_at":        fmt.Sprintf("%f", speechEndAt),
+						"segment_count": fmt.Sprintf("%d", len(segments)),
+					},
+					OccurredAt: time.Now(),
+				},
+			},
+		)
 	}
 
 	return nil
@@ -350,8 +419,8 @@ func (t *TenVAD) processFrames(samples []int16) ([]segment, error) {
 	}
 
 	sampleRate := 16000
-	minSilenceSamples := t.minSilenceDurationMs * sampleRate / 1000
-	speechPadSamples := t.speechPadMs * sampleRate / 1000
+	startSamples := vadDurationSamples(t.startSecs, t.hopSize, sampleRate)
+	stopSamples := vadDurationSamples(t.stopSecs, t.hopSize, sampleRate)
 
 	input := samples
 	if len(t.pending) > 0 {
@@ -384,34 +453,44 @@ func (t *TenVAD) processFrames(samples []int16) ([]segment, error) {
 		}
 
 		t.currSample += t.hopSize
+		windowStartSample := t.currSample - t.hopSize
+		speaking := probability >= t.confidence
 
 		// Speech resumes during silence measurement
-		if probability >= t.threshold && t.tempEnd != 0 {
+		if speaking && t.tempEnd != 0 {
 			t.tempEnd = 0
 		}
 
 		// Speech onset
-		if probability >= t.threshold && !t.triggered {
-			t.triggered = true
-			speechStartAt := float64(t.currSample-t.hopSize-speechPadSamples) / float64(sampleRate)
-			if speechStartAt < 0 {
-				speechStartAt = 0
+		if speaking && !t.triggered {
+			if t.tempStart < 0 {
+				t.tempStart = windowStartSample
 			}
+			if t.currSample-t.tempStart < startSamples {
+				continue
+			}
+			t.triggered = true
+			speechStartAt := float64(t.tempStart) / float64(sampleRate)
+			t.tempStart = -1
 			segments = append(segments, segment{startAt: speechStartAt, endAt: -1})
 		}
+		if !speaking && !t.triggered {
+			t.tempStart = -1
+		}
 
-		// Speech offset (with hysteresis)
-		if probability < (t.threshold-0.15) && t.triggered {
+		// Speech offset
+		if !speaking && t.triggered {
 			if t.tempEnd == 0 {
-				t.tempEnd = t.currSample
+				t.tempEnd = windowStartSample
 			}
 
-			if t.currSample-t.tempEnd < minSilenceSamples {
+			if t.currSample-t.tempEnd < stopSamples {
 				continue
 			}
 
-			speechEndAt := float64(t.tempEnd+speechPadSamples) / float64(sampleRate)
+			speechEndAt := float64(t.tempEnd) / float64(sampleRate)
 			t.tempEnd = 0
+			t.tempStart = -1
 			t.triggered = false
 
 			// Speech started in a previous call — onset already reported
@@ -426,72 +505,7 @@ func (t *TenVAD) processFrames(samples []int16) ([]segment, error) {
 	return segments, nil
 }
 
-func (t *TenVAD) notifyInterruption(ctx context.Context, contextID string, event internal_type.InterruptionEvent, at float64, segmentCount int) {
-	if t.onPacket != nil {
-		eventName := observability.VADSpeechStarted
-		if event == internal_type.InterruptionEventEnd {
-			eventName = observability.VADSpeechEnded
-		}
-		_ = t.onPacket(ctx,
-			internal_type.InterruptionDetectedPacket{
-				ContextID: contextID,
-				Source:    internal_type.InterruptionSourceVad,
-				Event:     event,
-				StartAt:   at,
-				EndAt:     at,
-			},
-			internal_type.ObservabilityEventRecordPacket{
-				ContextID: contextID,
-				Scope:     internal_type.ObservabilityRecordScopeUserMessage,
-				Record: observability.RecordEvent{
-					Component: observability.ComponentVAD,
-					Event:     eventName,
-					Attributes: observability.Attributes{
-						"provider":      vadName,
-						"event":         string(event),
-						"start_at":      fmt.Sprintf("%f", at),
-						"end_at":        fmt.Sprintf("%f", at),
-						"segment_count": fmt.Sprintf("%d", segmentCount),
-					},
-					OccurredAt: time.Now(),
-				},
-			},
-		)
-	}
-}
-
-func resolveThreshold(options utils.Option) float64 {
-	if options == nil {
-		return defaultThreshold
-	}
-	if threshold, err := options.GetFloat64("microphone.vad.threshold"); err == nil {
-		return threshold
-	}
-	return defaultThreshold
-}
-
-// resolveMinSilenceDurationMs extracts min silence duration from options.
-// The option key uses frame count (consistent with FireRedVAD config);
-// each frame is 10 ms, so we multiply by 10 to get milliseconds.
-func resolveMinSilenceDurationMs(options utils.Option) int {
-	if options == nil {
-		return defaultMinSilenceDurationMs
-	}
-	if v, err := options.GetFloat64("microphone.vad.min_silence_frame"); err == nil {
-		return int(v) * 10
-	}
-	return defaultMinSilenceDurationMs
-}
-
-// resolveSpeechPadMs extracts speech pad duration from options.
-// The option key uses frame count (consistent with FireRedVAD config);
-// each frame is 10 ms, so we multiply by 10 to get milliseconds.
-func resolveSpeechPadMs(options utils.Option) int {
-	if options == nil {
-		return defaultSpeechPadMs
-	}
-	if v, err := options.GetFloat64("microphone.vad.min_speech_frame"); err == nil {
-		return int(v) * 10
-	}
-	return defaultSpeechPadMs
+func vadDurationSamples(durationSecs float64, frameSamples, sampleRate int) int {
+	frameSecs := float64(frameSamples) / float64(sampleRate)
+	return int(math.RoundToEven(durationSecs/frameSecs)) * frameSamples
 }
