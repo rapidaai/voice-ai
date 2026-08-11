@@ -10549,6 +10549,16 @@
       outline-style: none !important;
     }
   }
+  .\[\&_\.cds--slider\]\:\!max-w-none {
+    & .cds--slider {
+      max-width: none !important;
+    }
+  }
+  .\[\&_\.cds--slider\]\:\!min-w-0 {
+    & .cds--slider {
+      min-width: calc(var(--spacing) * 0) !important;
+    }
+  }
   .\[\&_\.cds--slider__range-label\]\:hidden {
     & .cds--slider  range-label {
       display: none;
