@@ -6,7 +6,9 @@
 package internal_exotel_telephony
 
 import (
+	"bytes"
 	"errors"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -332,6 +334,67 @@ func TestStatusCallback(t *testing.T) {
 	}
 }
 
+func TestStatusCallback_MultipartForm(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	logger, err := commons.NewApplicationLogger()
+	require.NoError(t, err)
+	telephony, err := NewExotelTelephony(&config.AssistantConfig{}, logger)
+	require.NoError(t, err)
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	require.NoError(t, writer.WriteField("CallSid", "exotel-call-sid-12345"))
+	require.NoError(t, writer.WriteField("Status", "no-answer"))
+	require.NoError(t, writer.Close())
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	req := httptest.NewRequest(http.MethodPost, "/", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	c.Request = req
+
+	statusInfo, err := telephony.StatusCallback(c, nil, 1, 1)
+
+	require.NoError(t, err)
+	require.NotNil(t, statusInfo)
+	assert.Equal(t, internal_type.TelephonyEventCompleted, statusInfo.Event)
+	assert.Equal(t, "exotel-call-sid-12345", statusInfo.ChannelUUID)
+	require.NotNil(t, statusInfo.Error)
+	assert.Equal(t, "no-answer", statusInfo.Error.Reason)
+}
+
+func TestStatusCallback_QueryAndMultipartForm(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	logger, err := commons.NewApplicationLogger()
+	require.NoError(t, err)
+	telephony, err := NewExotelTelephony(&config.AssistantConfig{}, logger)
+	require.NoError(t, err)
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	require.NoError(t, writer.WriteField("CallSid", "exotel-call-sid-12345"))
+	require.NoError(t, writer.WriteField("Status", "no-answer"))
+	require.NoError(t, writer.Close())
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	req := httptest.NewRequest(http.MethodPost, "/?CustomField=context-answer-path", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	c.Request = req
+
+	statusInfo, err := telephony.StatusCallback(c, nil, 1, 1)
+
+	require.NoError(t, err)
+	require.NotNil(t, statusInfo)
+	assert.Equal(t, internal_type.TelephonyEventCompleted, statusInfo.Event)
+	assert.Equal(t, "exotel-call-sid-12345", statusInfo.ChannelUUID)
+	require.NotNil(t, statusInfo.Error)
+	assert.Equal(t, "no-answer", statusInfo.Error.Reason)
+	payload, ok := statusInfo.Payload.(utils.Option)
+	require.True(t, ok)
+	assert.Equal(t, "context-answer-path", payload["CustomField"])
+}
+
 func TestCatchAllStatusCallback(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	logger, err := commons.NewApplicationLogger()
@@ -368,6 +431,35 @@ func TestCatchAllStatusCallback(t *testing.T) {
 		assert.Nil(t, statusInfo)
 		assert.True(t, errors.Is(err, internal_exotel.ErrCatchAllCallSIDMissing))
 	})
+}
+
+func TestCatchAllStatusCallback_MultipartForm(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	logger, err := commons.NewApplicationLogger()
+	require.NoError(t, err)
+	telephony, err := NewExotelTelephony(&config.AssistantConfig{}, logger)
+	require.NoError(t, err)
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	require.NoError(t, writer.WriteField("CallSid", "exotel-call-sid-12345"))
+	require.NoError(t, writer.WriteField("Status", "no-answer"))
+	require.NoError(t, writer.Close())
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	req := httptest.NewRequest(http.MethodPost, "/", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	c.Request = req
+
+	statusInfo, err := telephony.CatchAllStatusCallback(c)
+
+	require.NoError(t, err)
+	require.NotNil(t, statusInfo)
+	assert.Equal(t, internal_type.TelephonyEventCompleted, statusInfo.Event)
+	assert.Equal(t, "exotel-call-sid-12345", statusInfo.ChannelUUID)
+	require.NotNil(t, statusInfo.Error)
+	assert.Equal(t, "no-answer", statusInfo.Error.Reason)
 }
 
 // TestReceiveCall_QueryParameterExtraction tests that all query parameters are captured in CallInfo payload
