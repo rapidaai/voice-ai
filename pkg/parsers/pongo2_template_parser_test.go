@@ -256,3 +256,20 @@ func TestPongo2StringTemplateParser_Parse_CompositeInterpolation(t *testing.T) {
 		})
 	}
 }
+
+func TestPongo2StringTemplateParser_Parse_Fallbacks(t *testing.T) {
+	logger, _ := commons.NewApplicationLogger()
+	parser := NewPongo2StringTemplateParser(logger)
+
+	t.Run("malformed template is returned unchanged", func(t *testing.T) {
+		template := "{% for m in messages %}{{ m.role }}"
+		result := parser.Parse(template, map[string]interface{}{"messages": `[{"role":"user"}]`})
+		assert.Equal(t, template, result)
+	})
+
+	t.Run("composite that cannot be encoded keeps its original value", func(t *testing.T) {
+		unencodable := map[string]interface{}{"callback": func() {}}
+		result := parser.Parse("{{ data }}", map[string]interface{}{"data": unencodable})
+		assert.NotContains(t, result, "callback")
+	})
+}
