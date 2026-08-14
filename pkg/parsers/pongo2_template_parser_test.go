@@ -196,3 +196,63 @@ Take care of yourself, and remember that recognizing your worth is the first ste
 		})
 	}
 }
+
+func TestPongo2StringTemplateParser_Parse_CompositeInterpolation(t *testing.T) {
+	logger, _ := commons.NewApplicationLogger()
+	parser := NewPongo2StringTemplateParser(logger)
+
+	transcript := `[{"role":"user","content":"i want to book a cab"},` +
+		`{"role":"assistant","content":"sure, where to?"}]`
+
+	tests := []struct {
+		name     string
+		template string
+		argument map[string]interface{}
+		expected string
+	}{
+		{
+			name:     "interpolated slice renders as json rather than a go value",
+			template: "Analyse this conversation: {{ messages }}",
+			argument: map[string]interface{}{"messages": transcript},
+			expected: `Analyse this conversation: [{"content":"i want to book a cab","role":"user"},` +
+				`{"content":"sure, where to?","role":"assistant"}]`,
+		},
+		{
+			name:     "interpolated map renders as json",
+			template: "{{ metadata }}",
+			argument: map[string]interface{}{"metadata": `{"channel":"phone"}`},
+			expected: `{"channel":"phone"}`,
+		},
+		{
+			name:     "encoded json is not html escaped",
+			template: "{{ metadata }}",
+			argument: map[string]interface{}{"metadata": `{"note":"a & b"}`},
+			expected: `{"note":"a & b"}`,
+		},
+		{
+			name:     "tag templates keep iterating the composite",
+			template: "{% for m in messages %}{{ m.role }}: {{ m.content }}\n{% endfor %}",
+			argument: map[string]interface{}{"messages": transcript},
+			expected: "user: i want to book a cab\nassistant: sure, where to?\n",
+		},
+		{
+			name:     "attribute access still resolves against the live map",
+			template: "lang={{ message.language }}",
+			argument: map[string]interface{}{"message": `{"language":"en"}`},
+			expected: "lang=en",
+		},
+		{
+			name:     "scalars are unaffected",
+			template: "Hello, {{ name }}!",
+			argument: map[string]interface{}{"name": "World"},
+			expected: "Hello, World!",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parser.Parse(tt.template, tt.argument)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
