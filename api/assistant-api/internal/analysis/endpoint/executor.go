@@ -92,11 +92,18 @@ func New(opts ...Option) (internal_type.AnalysisExecutor, error) {
 		_ = executor.onPacket(executor.ctx,
 			internal_type.ObservabilityMetricRecordPacket{
 				Scope: internal_type.ObservabilityRecordScopeConversation,
-				Record: observability.NewMetricAnalysisInitLatencyMs(time.Since(start), observability.Attributes{
-					"provider":         executor.analysis.Provider,
-					"configuration_id": fmt.Sprintf("%d", executor.analysis.Id),
-					"executor":         executor.Name(),
-				}),
+				Record: observability.RecordMetric{
+					Attributes: observability.Attributes{
+						"provider":         executor.analysis.Provider,
+						"configuration_id": fmt.Sprintf("%d", executor.analysis.Id),
+						"executor":         executor.Name(),
+					},
+					Metrics: []*protos.Metric{{
+						Name:        observability.MetricAnalysisInitLatencyMs,
+						Value:       fmt.Sprintf("%d", time.Since(start).Milliseconds()),
+						Description: "Analysis initialization latency in milliseconds",
+					}},
+				},
 			},
 			internal_type.ObservabilityLogRecordPacket{
 				Scope: internal_type.ObservabilityRecordScopeConversation,
