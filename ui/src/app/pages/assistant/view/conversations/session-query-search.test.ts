@@ -83,6 +83,13 @@ describe('session query search criteria', () => {
         v: '60',
       },
     ]);
+    expect(getSessionSearchCriteria('denoise.init_ms~<=:25')).toEqual([
+      {
+        k: 'denoise.init_ms',
+        logic: '<=',
+        v: '25',
+      },
+    ]);
   });
 
   it('maps date-only timestamp is to the local day range', () => {
