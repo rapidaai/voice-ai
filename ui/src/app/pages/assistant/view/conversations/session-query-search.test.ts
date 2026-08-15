@@ -97,6 +97,13 @@ describe('session query search criteria', () => {
         v: '30',
       },
     ]);
+    expect(getSessionSearchCriteria('agent.init_ms~>=:40')).toEqual([
+      {
+        k: 'agent.init_ms',
+        logic: '>=',
+        v: '40',
+      },
+    ]);
     expect(getSessionSearchCriteria('vad.init_ms~>=:35')).toEqual([
       {
         k: 'vad.init_ms',
