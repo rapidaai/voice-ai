@@ -64,7 +64,7 @@ export const METRIC_NAME_OPTIONS: FilterOption[] = [
   { id: 'eos_word_count', text: 'eos_word_count' },
   { id: 'eos_char_count', text: 'eos_char_count' },
   { id: 'eos_confidence', text: 'eos_confidence' },
-  { id: 'denoise_init_ms', text: 'denoise_init_ms' },
+  { id: 'denoise.init_ms', text: 'denoise.init_ms' },
   { id: 'llm_init_ms', text: 'llm_init_ms' },
   { id: 'storage.init_ms', text: 'storage.init_ms' },
   { id: 'analysis.init_ms', text: 'analysis.init_ms' },

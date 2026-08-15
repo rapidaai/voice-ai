@@ -47,7 +47,7 @@ func TestMetricNames_MirrorCurrentImplementation(t *testing.T) {
 		{MetricEOSWordCount, "eos_word_count"},
 		{MetricEOSCharCount, "eos_char_count"},
 		{MetricEOSConfidence, "eos_confidence"},
-		{MetricDenoiseInitLatencyMs, "denoise_init_ms"},
+		{MetricDenoiseInitLatencyMs, "denoise.init_ms"},
 		{MetricLLMInitLatencyMs, "llm_init_ms"},
 		{MetricLLMLatencyMs, "llm_latency_ms"},
 		{MetricAgentTTFTMs, "agent.ttft_ms"},
@@ -180,22 +180,6 @@ func TestNewMetricEOSInitLatencyMs(t *testing.T) {
 		t.Fatalf("expected metric description %q, got %q", "EOS initialization latency in milliseconds", metric.Description)
 	}
 	assertRecordAttribute(t, record, "provider", "silenceBasedEndOfSpeech")
-}
-
-func TestNewMetricDenoiseInitLatencyMs(t *testing.T) {
-	record := NewMetricDenoiseInitLatencyMs(123*time.Millisecond, Attributes{"provider": "rn_noise"})
-	metric := singleMetric(t, record)
-
-	if metric.Name != MetricDenoiseInitLatencyMs {
-		t.Fatalf("expected metric name %q, got %q", MetricDenoiseInitLatencyMs, metric.Name)
-	}
-	if metric.Value != "123" {
-		t.Fatalf("expected metric value %q, got %q", "123", metric.Value)
-	}
-	if metric.Description != "Denoise initialization latency in milliseconds" {
-		t.Fatalf("expected metric description %q, got %q", "Denoise initialization latency in milliseconds", metric.Description)
-	}
-	assertRecordAttribute(t, record, "provider", "rn_noise")
 }
 
 func TestNewMetricLLMInitLatencyMs(t *testing.T) {
