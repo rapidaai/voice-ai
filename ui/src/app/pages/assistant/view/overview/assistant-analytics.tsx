@@ -91,7 +91,7 @@ type BucketData = {
   sttLatency: number;
   eosLatency: number;
   ttsLatency: number;
-  llmLatency: number;
+  agentLatency: number;
   label: string;
 };
 
@@ -249,6 +249,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
   const avgLatency = latency?.getAveragems() || 0;
   const avgSttLatency = latency?.getSttms() || 0;
   const avgEosLatency = latency?.getEosms() || 0;
+  const avgTtsLatency = latency?.getTtsms() || 0;
   const avgLlmLatency = latency?.getLlmms() || 0;
 
   const totalTokens = usage?.getTotaltokens() || 0;
@@ -289,7 +290,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
           sttLatency: Math.round(bucket.getSttlatencyms()),
           eosLatency: Math.round(bucket.getEoslatencyms()),
           ttsLatency: Math.round(bucket.getTtslatencyms()),
-          llmLatency: Math.round(bucket.getLlmlatencyms()),
+          agentLatency: Math.round(bucket.getLlmlatencyms()),
           label: `From: ${startDate.toISOString().split('.')[0].replace('T', ' ')}`,
         };
       }),
@@ -400,7 +401,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
           unit={hasDashboard ? 'ms' : undefined}
           caption={
             hasDashboard
-              ? `STT ${Math.round(avgSttLatency).toLocaleString()} ms, LLM ${Math.round(avgLlmLatency).toLocaleString()} ms`
+              ? `STT ${Math.round(avgSttLatency).toLocaleString()} ms, Agent ${Math.round(avgLlmLatency).toLocaleString()} ms`
               : emptyDashboardCaption
           }
           isLoading={loading}
@@ -462,7 +463,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
         </DashboardWidget>
 
         <DashboardWidget title="Latency" size="large" isLoading={loading}>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-5">
             <InlineMetric
               label="Avg latency"
               value={
@@ -491,7 +492,16 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
               unit={hasDashboard ? 'ms' : undefined}
             />
             <InlineMetric
-              label="LLM"
+              label="TTS"
+              value={
+                hasDashboard
+                  ? Math.round(avgTtsLatency)
+                  : DASHBOARD_UNAVAILABLE_VALUE
+              }
+              unit={hasDashboard ? 'ms' : undefined}
+            />
+            <InlineMetric
+              label="Agent"
               value={
                 hasDashboard
                   ? Math.round(avgLlmLatency)
@@ -535,7 +545,13 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
                       stopOpacity={0.02}
                     />
                   </linearGradient>
-                  <linearGradient id="llmGradient" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient
+                    id="agentGradient"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
                     <stop offset="0%" stopColor="#24a148" stopOpacity={0.28} />
                     <stop
                       offset="100%"
@@ -573,10 +589,10 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
                 />
                 <Area
                   type="monotone"
-                  dataKey="llmLatency"
+                  dataKey="agentLatency"
                   stroke="#24a148"
                   strokeWidth={1.5}
-                  fill="url(#llmGradient)"
+                  fill="url(#agentGradient)"
                   dot={false}
                   activeDot={{ r: 3 }}
                 />
@@ -588,7 +604,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
                         sttLatency: 'STT',
                         eosLatency: 'EOS',
                         ttsLatency: 'TTS',
-                        llmLatency: 'LLM',
+                        agentLatency: 'Agent',
                       };
                       return (
                         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-lg px-3 py-2 text-sm min-w-[140px]">
@@ -624,7 +640,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
             <LegendItem color="#ff832b" label="STT" />
             <LegendItem color="#1192e8" label="EOS" />
             <LegendItem color="var(--cds-interactive, #0f62fe)" label="TTS" />
-            <LegendItem color="#24a148" label="LLM" />
+            <LegendItem color="#24a148" label="Agent" />
           </div>
         </DashboardWidget>
 

@@ -51,15 +51,14 @@ func TestModel_CurrentContextAndStaleCheck(t *testing.T) {
 	require.Equal(t, "ctx-1", e.currentContextID())
 }
 
-func TestModel_BuildCompletionMetrics_AddsLatencyMs(t *testing.T) {
+func TestModel_BuildCompletionMetrics_PassesThroughFixedMetrics(t *testing.T) {
 	e, _, _, _ := newModelTestEnv(t)
-	out := e.buildCompletionMetrics([]*protos.Metric{{Name: "time_to_first_token", Value: "1000000"}, {Name: "token_count", Value: "9"}})
-	require.Len(t, out, 3)
+	out := e.buildCompletionMetrics([]*protos.Metric{{Name: "agent.ttft_ms", Value: "1"}, {Name: "agent.total_token", Value: "9"}})
+	require.Len(t, out, 2)
 	require.Equal(t, "agent.ttft_ms", out[0].GetName())
 	require.Equal(t, "1", out[0].GetValue())
-	require.Equal(t, "llm_latency_ms", out[1].GetName())
-	require.Equal(t, "1", out[1].GetValue())
-	require.Equal(t, "agent_token_count", out[2].GetName())
+	require.Equal(t, "agent.total_token", out[1].GetName())
+	require.Equal(t, "9", out[1].GetValue())
 }
 
 func TestModel_Close_ThenLatePackets_NoCrash(t *testing.T) {

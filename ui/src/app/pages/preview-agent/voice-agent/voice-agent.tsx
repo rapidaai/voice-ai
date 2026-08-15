@@ -1082,7 +1082,7 @@ function computeMetrics(events: EventEntry[]): Record<string, string | number> {
   for (let i = events.length - 1; i >= 0; i--) {
     const e = events[i];
 
-    // Server-emitted ConversationMetric packets (stt.latency_ms, llm_ttft_ms, etc.)
+    // Server-emitted ConversationMetric packets (stt.latency_ms, agent.ttft_ms, etc.)
     if (e.type === 'metric') {
       const list: Array<{ name: string; value: string }> =
         e.payload?.metricsList ?? [];

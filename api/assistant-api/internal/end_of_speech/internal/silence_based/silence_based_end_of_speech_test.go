@@ -461,7 +461,7 @@ func TestSilenceBasedEndOfSpeech_MetricUsesLastTimerArm(t *testing.T) {
 	}
 	metricMs, err := strconv.Atoi(metric.Record.Metrics[0].Value)
 	if err != nil {
-		t.Fatalf("parse eos_latency_ms: %v", err)
+		t.Fatalf("parse eos.latency_ms: %v", err)
 	}
 
 	if metric.Record.Metrics[0].Name != observability.MetricEOSLatencyMs {

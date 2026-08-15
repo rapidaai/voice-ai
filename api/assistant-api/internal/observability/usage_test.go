@@ -12,10 +12,10 @@ import (
 )
 
 func TestNewUsageRecord(t *testing.T) {
-	record := NewUsageRecord(ComponentLLM, "openai", 123*time.Millisecond)
+	record := NewUsageRecord(ComponentAgent, "openai", 123*time.Millisecond)
 
-	if record.Component != ComponentLLM {
-		t.Fatalf("expected component %q, got %q", ComponentLLM, record.Component)
+	if record.Component != ComponentAgent {
+		t.Fatalf("expected component %q, got %q", ComponentAgent, record.Component)
 	}
 	if record.Provider != "openai" {
 		t.Fatalf("expected provider %q, got %q", "openai", record.Provider)

@@ -138,8 +138,8 @@ func (handler *AgentHandler) Execute(ctx context.Context, request Request) (Resu
 		ContextID: request.ContextID,
 		Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
 		Record: observability.RecordEvent{
-			Component: observability.ComponentAgentflow,
-			Event:     observability.AgentflowTransitionTriggered,
+			Component: observability.ComponentAgent,
+			Event:     observability.AgentTransitionTriggered,
 			Attributes: observability.Attributes{
 				"context_id":      request.ContextID,
 				"from_node_id":    request.Node.ID,

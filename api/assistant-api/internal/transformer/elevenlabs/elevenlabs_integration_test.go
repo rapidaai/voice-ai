@@ -439,14 +439,14 @@ func assertTTSLatencyMetric(t *testing.T, collector *testutil.PacketCollector) {
 	t.Helper()
 	for _, m := range collector.MetricPackets() {
 		for _, metric := range m.Record.Metrics {
-			if metric.Name == "tts_latency_ms" {
+			if metric.Name == "tts.latency_ms" {
 				ms, err := strconv.Atoi(metric.Value)
 				assert.NoError(t, err)
-				assert.Greater(t, ms, 0, "tts_latency_ms should be positive")
-				t.Logf("tts_latency_ms=%d", ms)
+				assert.Greater(t, ms, 0, "tts.latency_ms should be positive")
+				t.Logf("tts.latency_ms=%d", ms)
 				return
 			}
 		}
 	}
-	t.Error("should have tts_latency_ms metric")
+	t.Error("should have tts.latency_ms metric")
 }

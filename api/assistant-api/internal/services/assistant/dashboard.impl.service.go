@@ -209,13 +209,12 @@ WHERE %s
 		observability.MetricSTTLatencyMs,
 		observability.MetricEOSLatencyMs,
 		observability.MetricTTSLatencyMs,
-		observability.MetricLLMLatencyMs,
-		observability.MetricTotalToken,
+		observability.MetricAgentLatencyMs,
 		observability.MetricSTTLatencyMs,
 		observability.MetricEOSLatencyMs,
 		observability.MetricTTSLatencyMs,
-		observability.MetricLLMLatencyMs,
-		observability.MetricTotalToken,
+		observability.MetricAgentLatencyMs,
+		observability.MetricAgentTotalToken,
 	)
 	messageSummaryArguments = append(messageSummaryArguments, queryFilters.messageArguments...)
 
@@ -381,11 +380,11 @@ func (assistantService *assistantService) getAssistantDashboardBuckets(
 		observability.MetricSTTLatencyMs,
 		observability.MetricEOSLatencyMs,
 		observability.MetricTTSLatencyMs,
-		observability.MetricLLMLatencyMs,
+		observability.MetricAgentLatencyMs,
 		observability.MetricSTTLatencyMs,
 		observability.MetricEOSLatencyMs,
 		observability.MetricTTSLatencyMs,
-		observability.MetricLLMLatencyMs,
+		observability.MetricAgentLatencyMs,
 	)
 	bucketQueryArguments = append(bucketQueryArguments, queryFilters.messageArguments...)
 

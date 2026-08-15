@@ -130,7 +130,7 @@ describe('conversation telemetry structured criteria helpers', () => {
     ).toBe(true);
   });
 
-  it('builds latency series with stt/tts/llm/eos metrics merged by context', () => {
+  it('builds latency series with stt/tts/agent/eos metrics merged by context', () => {
     const series = buildLatencySeries([
       {
         timestampMs: 2000,
@@ -138,7 +138,7 @@ describe('conversation telemetry structured criteria helpers', () => {
         conversationId: 'conv-1',
         metrics: [
           { name: 'stt.latency_ms', value: '10' },
-          { name: 'tts_latency_ms', value: '20' },
+          { name: 'tts.latency_ms', value: '20' },
         ],
       },
       {
@@ -146,8 +146,8 @@ describe('conversation telemetry structured criteria helpers', () => {
         contextId: 'ctx-1',
         conversationId: 'conv-1',
         metrics: [
-          { name: 'llm_latency_ms', value: '30' },
-          { name: 'eos_latency_ms', value: '40' },
+          { name: 'agent.latency_ms', value: '30' },
+          { name: 'eos.latency_ms', value: '40' },
         ],
       },
       {
@@ -160,7 +160,7 @@ describe('conversation telemetry structured criteria helpers', () => {
         timestampMs: 2200,
         contextId: 'ctx-3',
         conversationId: 'conv-1',
-        metrics: [{ name: 'agent_total_token', value: '100' }],
+        metrics: [{ name: 'agent.total_token', value: '100' }],
       },
     ]);
 
@@ -170,9 +170,9 @@ describe('conversation telemetry structured criteria helpers', () => {
       contextId: 'ctx-1',
       conversationId: 'conv-1',
       'stt.latency_ms': 10,
-      tts_latency_ms: 20,
-      llm_latency_ms: 30,
-      eos_latency_ms: 40,
+      'tts.latency_ms': 20,
+      'agent.latency_ms': 30,
+      'eos.latency_ms': 40,
       sequence: 1,
       timestampMs: 1900,
     });

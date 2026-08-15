@@ -837,7 +837,6 @@ func (endOfSpeech *livekitEndOfSpeech) fire(command workerCommand, timerArmedAt 
 					{Name: observability.MetricEOSLatencyMs, Value: fmt.Sprintf("%d", waitToTriggerMs)},
 					{Name: observability.MetricEOSTextToTriggerMs, Value: fmt.Sprintf("%d", textToTriggerMs)},
 					{Name: observability.MetricEOSWordCount, Value: fmt.Sprintf("%d", wordCount)},
-					{Name: observability.MetricEOSCharCount, Value: fmt.Sprintf("%d", len(speech))},
 					{Name: observability.MetricEOSConfidence, Value: fmt.Sprintf("%.4f", confidence)},
 				},
 			},

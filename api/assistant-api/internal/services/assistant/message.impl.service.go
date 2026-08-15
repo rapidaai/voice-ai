@@ -283,12 +283,12 @@ func (conversationService *assistantConversationService) GetAllMessage(
 				qry = qry.Where("assistant_conversation_messages.status = ?", ct.GetValue())
 			}
 		case observability.MetricSTTLatencyMs,
-			observability.MetricLLMLatencyMs,
+			observability.MetricAgentLatencyMs,
 			observability.MetricAgentTTFTMs,
 			observability.MetricAgentTRTMs,
 			observability.MetricTTSLatencyMs,
 			observability.MetricEOSLatencyMs,
-			"agent_total_token":
+			observability.MetricAgentTotalToken:
 			switch ct.GetLogic() {
 			case "=":
 				qry = qry.Where(

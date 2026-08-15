@@ -199,13 +199,19 @@ describe('AssistantAnalytics sessions toggletip', () => {
     ).toHaveLength(1);
   });
 
-  it('includes eos latency in the latency summary', async () => {
+  it('includes all overview latency metrics in the latency summary', async () => {
     const assistant = { getId: () => 'assistant-1' } as any;
     render(<AssistantAnalytics assistant={assistant} />);
 
     await waitFor(() => {
+      expect(screen.getByText('25')).toBeInTheDocument();
       expect(screen.getByText('42')).toBeInTheDocument();
+      expect(screen.getByText('60')).toBeInTheDocument();
+      expect(screen.getByText('120')).toBeInTheDocument();
+      expect(screen.getAllByText('STT')).toHaveLength(2);
       expect(screen.getAllByText('EOS')).toHaveLength(2);
+      expect(screen.getAllByText('TTS')).toHaveLength(2);
+      expect(screen.getAllByText('Agent')).toHaveLength(2);
     });
   });
 

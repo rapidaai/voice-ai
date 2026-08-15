@@ -631,7 +631,7 @@ func (h requestorDispatchHandler) HandleLLMInterrupt(ctx context.Context, p inte
 					Level:   observability.LevelError,
 					Message: "LLM interrupt failed; generation may continue after user interruption",
 					Attributes: observability.Attributes{
-						"component":    observability.ComponentLLM.String(),
+						"component":    observability.ComponentAgent.String(),
 						"operation":    "interrupt",
 						"packet":       "LLMInterruptPacket",
 						"context_id":   p.ContextID,
@@ -766,7 +766,7 @@ func (h requestorDispatchHandler) HandleLLMResponseDelta(ctx context.Context, p 
 		h.r.OnPacket(ctx, internal_type.ObservabilityEventRecordPacket{
 			ContextID: p.ContextID,
 			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.NewMessageRecord(p.ContextID, observability.ComponentLLM, observability.LLMDiscarded, observability.MessageRoleAssistant, observability.Attributes{
+			Record: observability.NewMessageRecord(p.ContextID, observability.ComponentAgent, observability.AgentDiscarded, observability.MessageRoleAssistant, observability.Attributes{
 				"reason":          "stale_context",
 				"current_context": h.r.GetID(),
 				"text":            p.Text,
@@ -786,7 +786,7 @@ func (h requestorDispatchHandler) HandleLLMResponseDone(ctx context.Context, p i
 		h.r.OnPacket(ctx, internal_type.ObservabilityEventRecordPacket{
 			ContextID: p.ContextID,
 			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.NewMessageRecord(p.ContextID, observability.ComponentLLM, observability.LLMDiscarded, observability.MessageRoleAssistant, observability.Attributes{
+			Record: observability.NewMessageRecord(p.ContextID, observability.ComponentAgent, observability.AgentDiscarded, observability.MessageRoleAssistant, observability.Attributes{
 				"reason":          "stale_context",
 				"packet":          "done",
 				"current_context": h.r.GetID(),
@@ -858,15 +858,15 @@ func (h requestorDispatchHandler) HandleError(ctx context.Context, p internal_ty
 					p.ContextId(),
 					observability.MessageRoleAssistant,
 					[]*protos.Metric{{
-						Name:        "llm_error",
-						Value:       p.ErrMessage(),
+						Name:        observability.MetricAgentError,
+						Value:       observability.MetricValueYes,
 						Description: "An error occurred during LLM processing"}},
 				),
 			},
 			internal_type.ObservabilityEventRecordPacket{
 				ContextID: p.ContextId(),
 				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.NewMessageRecord(p.ContextId(), observability.ComponentLLM, observability.LLMError, observability.MessageRoleAssistant, observability.Attributes{
+				Record: observability.NewMessageRecord(p.ContextId(), observability.ComponentAgent, observability.AgentError, observability.MessageRoleAssistant, observability.Attributes{
 					"message": p.ErrMessage(),
 				}),
 			})
@@ -900,8 +900,8 @@ func (h requestorDispatchHandler) HandleError(ctx context.Context, p internal_ty
 					p.ContextId(),
 					observability.MessageRoleAssistant,
 					[]*protos.Metric{{
-						Name:        "tts_error",
-						Value:       p.ErrMessage(),
+						Name:        observability.MetricTTSError,
+						Value:       observability.MetricValueYes,
 						Description: "An error occurred during TTS processing"}},
 				),
 			},
@@ -1040,7 +1040,7 @@ func (h requestorDispatchHandler) HandleInjectMessage(ctx context.Context, p int
 						Level:   observability.LevelError,
 						Message: "Assistant executor failed during response generation",
 						Attributes: observability.Attributes{
-							"component":    observability.ComponentLLM.String(),
+							"component":    observability.ComponentAgent.String(),
 							"operation":    "execute",
 							"packet":       "InjectMessagePacket",
 							"context_id":   h.r.GetID(),
@@ -1363,24 +1363,48 @@ func (h requestorDispatchHandler) HandleMaxSessionExpired(ctx context.Context, p
 
 func (h requestorDispatchHandler) HandleTextToSpeechText(ctx context.Context, p internal_type.TextToSpeechTextPacket) {
 	if p.ContextID != h.r.GetID() {
-		h.r.OnPacket(ctx, internal_type.ObservabilityLogRecordPacket{
-			ContextID: p.ContextID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.RecordLog{
-				Level:   observability.LevelError,
-				Message: "Skipped TTS for stale context; assistant text belongs to an older turn",
-				Attributes: observability.Attributes{
-					"component":          observability.ComponentTTS.String(),
-					"operation":          "discard",
-					"packet":             "TextToSpeechTextPacket",
-					"context_id":         p.ContextID,
-					"current_context_id": h.r.GetID(),
-					"message_role":       string(observability.MessageRoleAssistant),
-					"text_length":        fmt.Sprintf("%d", len(p.Text)),
-					"error":              "stale context, current context is " + h.r.GetID(),
+		h.r.OnPacket(ctx,
+			internal_type.ObservabilityLogRecordPacket{
+				ContextID: p.ContextID,
+				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+				Record: observability.RecordLog{
+					Level:   observability.LevelError,
+					Message: "Skipped TTS for stale context; assistant text belongs to an older turn",
+					Attributes: observability.Attributes{
+						"component":          observability.ComponentTTS.String(),
+						"operation":          "discard",
+						"packet":             "TextToSpeechTextPacket",
+						"context_id":         p.ContextID,
+						"current_context_id": h.r.GetID(),
+						"message_role":       string(observability.MessageRoleAssistant),
+						"text_length":        fmt.Sprintf("%d", len(p.Text)),
+						"error":              "stale context, current context is " + h.r.GetID(),
+					},
 				},
 			},
-		})
+			internal_type.ObservabilityMetricRecordPacket{
+				ContextID: p.ContextID,
+				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+				Record: observability.NewMessageMetricRecord(
+					p.ContextID,
+					observability.MessageRoleAssistant,
+					[]*protos.Metric{{
+						Name:        observability.MetricDiscardedTTSChunk,
+						Value:       observability.MetricValueYes,
+						Description: fmt.Sprintf("tts text chunk discarded due to stale contextID %s", h.r.GetID()),
+					}},
+				),
+			},
+			internal_type.ObservabilityEventRecordPacket{
+				ContextID: p.ContextID,
+				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+				Record: observability.NewMessageRecord(p.ContextID, observability.ComponentTTS, observability.TTSDiscardChunk, observability.MessageRoleAssistant, observability.Attributes{
+					"reason":          "stale_context",
+					"packet":          "TextToSpeechTextPacket",
+					"current_context": h.r.GetID(),
+					"message":         p.Text,
+				}),
+			})
 		return
 	}
 	_ = h.r.messageLifecycle.AssistantSpeaking(p.ContextID)
@@ -1474,7 +1498,7 @@ func (h requestorDispatchHandler) HandleTextToSpeechAudio(ctx context.Context, p
 			internal_type.ObservabilityEventRecordPacket{
 				ContextID: p.ContextID,
 				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.NewMessageRecord(p.ContextID, observability.ComponentTTS, observability.TTSDiscarded, observability.MessageRoleAssistant, observability.Attributes{
+				Record: observability.NewMessageRecord(p.ContextID, observability.ComponentTTS, observability.TTSDiscardChunk, observability.MessageRoleAssistant, observability.Attributes{
 					"reason":          "stale_context",
 					"packet":          "tts_audio",
 					"current_context": h.r.GetID(),
@@ -1486,7 +1510,11 @@ func (h requestorDispatchHandler) HandleTextToSpeechAudio(ctx context.Context, p
 				Record: observability.NewMessageMetricRecord(
 					p.ContextID,
 					observability.MessageRoleAssistant,
-					[]*protos.Metric{{Name: "discarded_tts_chunk", Value: "true", Description: fmt.Sprintf("tts end packet discarded due to stale contextID %s", h.r.GetID())}},
+					[]*protos.Metric{{
+						Name:        observability.MetricDiscardedTTSChunk,
+						Value:       observability.MetricValueYes,
+						Description: fmt.Sprintf("tts audio chunk discarded due to stale contextID %s", h.r.GetID()),
+					}},
 				),
 			})
 		return
@@ -1506,25 +1534,15 @@ func (h requestorDispatchHandler) HandleTextToSpeechEnd(ctx context.Context, p i
 		h.r.ttsCompletionWatchdog.Complete(p.ContextID)
 	}
 	if p.ContextID != h.r.GetID() {
-		h.r.OnPacket(ctx,
-			internal_type.ObservabilityEventRecordPacket{
-				ContextID: p.ContextID,
-				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.NewMessageRecord(p.ContextID, observability.ComponentTTS, observability.TTSDiscarded, observability.MessageRoleAssistant, observability.Attributes{
-					"reason":          "stale_context",
-					"packet":          "tts_end",
-					"current_context": h.r.GetID(),
-				}),
-			},
-			internal_type.ObservabilityMetricRecordPacket{
-				ContextID: p.ContextID,
-				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.NewMessageMetricRecord(
-					p.ContextID,
-					observability.MessageRoleAssistant,
-					[]*protos.Metric{{Name: "discarded_tts", Value: "true", Description: fmt.Sprintf("tts end packet discarded due to stale contextID %s", h.r.GetID())}},
-				),
-			})
+		h.r.OnPacket(ctx, internal_type.ObservabilityEventRecordPacket{
+			ContextID: p.ContextID,
+			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+			Record: observability.NewMessageRecord(p.ContextID, observability.ComponentTTS, observability.TTSDiscardChunk, observability.MessageRoleAssistant, observability.Attributes{
+				"reason":          "stale_context",
+				"packet":          "tts_end",
+				"current_context": h.r.GetID(),
+			}),
+		})
 		return
 	}
 	assistantIdle := h.r.messageLifecycle.AssistantFinished(p.ContextID) == nil &&
@@ -3708,7 +3726,7 @@ func (h requestorDispatchHandler) HandleFinalizeAssistant(ctx context.Context, p
 					Level:   observability.LevelError,
 					Message: "Assistant executor close failed; shutdown may leave resources open",
 					Attributes: observability.Attributes{
-						"component":  observability.ComponentLLM.String(),
+						"component":  observability.ComponentAgent.String(),
 						"operation":  "finalize",
 						"packet":     "FinalizeAssistantPacket",
 						"context_id": p.ContextID,

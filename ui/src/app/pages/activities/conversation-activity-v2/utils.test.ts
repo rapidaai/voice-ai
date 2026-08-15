@@ -126,36 +126,48 @@ describe('conversation activity v2 telemetry utilities', () => {
 
     expect(metricIds).toEqual(
       expect.arrayContaining([
-        'llm_latency_ms',
+        'agent.latency_ms',
         'llm_input_char_count',
         'llm_history_count',
         'llm_response_char_count',
-        'agent_time_taken',
         'authentication.init_ms',
         'recording.init_ms',
         'agent_status',
-        'agent_llm_request_id',
+        'agent.llm_request_id',
         'agent_input_token',
         'agent_output_token',
-        'agent_total_token',
-        'agent_cached_content_token',
-        'agent_cost',
-        'agent_input_cost',
-        'agent_output_cost',
-        'agent_token_pre_second',
+        'agent.total_token',
+        'agent.cached_content_token',
+        'agent.cost',
+        'agent.input_cost',
+        'agent.output_cost',
+        'agent.token_pre_second',
         'agent.ttft_ms',
+        'agent.trt_ms',
+        'agent_token_count',
+        'agent.error',
+      ]),
+    );
+    expect(metricIds).not.toEqual(
+      expect.arrayContaining([
+        'time_taken',
+        'agent_time_taken',
+        'time_to_first_token',
+        'provider_total_time',
+        'provider_generate_time',
         'agent_provider_total_time',
         'agent_provider_generate_time',
-        'agent_token_count',
       ]),
     );
   });
 
   it('uses current backend observability components and events', () => {
     const componentIds = COMPONENT_OPTIONS.map(option => option.id);
-    expect(componentIds).toContain('agentflow');
+    expect(componentIds).toContain('agent');
     expect(componentIds).toContain('sip');
     expect(componentIds).toContain('webrtc');
+    expect(componentIds).not.toContain('agentflow');
+    expect(componentIds).not.toContain('llm');
     expect(componentIds).not.toContain('session');
     expect(componentIds).not.toContain('audio');
 
@@ -163,12 +175,17 @@ describe('conversation activity v2 telemetry utilities', () => {
     expect(EVENTS_BY_COMPONENT.call).not.toContain('call.answered');
     expect(EVENTS_BY_COMPONENT.stt).toContain('stt.interim');
     expect(EVENTS_BY_COMPONENT.stt).not.toContain('stt.final');
-    expect(EVENTS_BY_COMPONENT.tts).toContain('tts.discarded');
+    expect(EVENTS_BY_COMPONENT.tts).toContain('tts.discard_chunk');
+    expect(EVENTS_BY_COMPONENT.tts).not.toContain('tts.discarded');
     expect(EVENTS_BY_COMPONENT.tts).not.toContain('tts.first_audio');
-    expect(EVENTS_BY_COMPONENT.agentflow).toEqual([
-      'agentflow.transition.triggered',
-      'agentflow.transition.matched',
-      'agentflow.transition.missing_edge',
+    expect(EVENTS_BY_COMPONENT.agent).toEqual([
+      'agent.started',
+      'agent.completed',
+      'agent.discarded',
+      'agent.error',
+      'agent.transition.triggered',
+      'agent.transition.matched',
+      'agent.transition.missing_edge',
     ]);
     expect(EVENTS_BY_COMPONENT.conversation).toContain(
       'conversation.authentication_started',

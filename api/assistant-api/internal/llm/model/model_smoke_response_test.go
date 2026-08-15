@@ -25,7 +25,7 @@ func TestModel_ResponsePipeline_DropsStaleResponse(t *testing.T) {
 	require.Empty(t, stream.sendCalls)
 }
 
-func TestModel_ResponsePipeline_Error_EmitsLLMErrorAndEvent(t *testing.T) {
+func TestModel_ResponsePipeline_Error_EmitsAgentErrorAndEvent(t *testing.T) {
 	e, comm, _, _ := newModelTestEnv(t)
 	e.currentPacket = &internal_type.UserInputPacket{ContextID: "ctx-1"}
 
@@ -40,7 +40,7 @@ func TestModel_ResponsePipeline_Error_EmitsLLMErrorAndEvent(t *testing.T) {
 	require.EqualError(t, errPkt.Error, "provider down")
 	evt, ok := findPacket[internal_type.ObservabilityEventRecordPacket](comm.pkts)
 	require.True(t, ok)
-	require.Equal(t, observability.LLMError, evt.Record.Event)
+	require.Equal(t, observability.AgentError, evt.Record.Event)
 }
 
 func TestModel_ResponsePipeline_Chunk_EmitsDeltaEvenWhenEmpty(t *testing.T) {

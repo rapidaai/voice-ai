@@ -330,7 +330,7 @@ func TestNew_SendsInitializationAndEmitsInitializedEvent(t *testing.T) {
 	pkts := collector.all()
 	eventPackets := findPackets[internal_type.ObservabilityEventRecordPacket](pkts)
 	for _, event := range eventPackets {
-		assert.NotEqual(t, observability.LLMStarted, event.Record.Event, "init should not emit llm.started")
+		assert.NotEqual(t, observability.AgentStarted, event.Record.Event, "init should not emit agent.started")
 	}
 
 	metricPackets := findPackets[internal_type.ObservabilityMetricRecordPacket](pkts)
@@ -612,7 +612,7 @@ func TestE2E_FullConversationTurn(t *testing.T) {
 
 	evs := findPackets[internal_type.ObservabilityEventRecordPacket](collector.all())
 	require.Len(t, evs, 1)
-	assert.Equal(t, observability.LLMStarted, evs[0].Record.Event)
+	assert.Equal(t, observability.AgentStarted, evs[0].Record.Event)
 
 	// 2. Simulate streaming deltas from agent
 	e.Write(context.Background(), comm, &protos.TalkOutput{

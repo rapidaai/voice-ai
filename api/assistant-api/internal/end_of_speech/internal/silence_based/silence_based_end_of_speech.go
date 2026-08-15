@@ -658,7 +658,6 @@ func (endOfSpeech *silenceBasedEndOfSpeech) emitEndOfSpeech(command workerComman
 					{Name: observability.MetricEOSLatencyMs, Value: fmt.Sprintf("%d", waitToTriggerMs)},
 					{Name: observability.MetricEOSTextToTriggerMs, Value: fmt.Sprintf("%d", textToTriggerMs)},
 					{Name: observability.MetricEOSWordCount, Value: fmt.Sprintf("%d", wordCount)},
-					{Name: observability.MetricEOSCharCount, Value: fmt.Sprintf("%d", len(segment.Text))},
 					{Name: observability.MetricEOSConfidence, Value: "0.0000"},
 				},
 			},

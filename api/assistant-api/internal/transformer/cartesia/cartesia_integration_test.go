@@ -613,7 +613,7 @@ func sttEventTypes(events []internal_type.ObservabilityEventRecordPacket) []stri
 
 func assertTTSLatencyMetric(t *testing.T, collector *testutil.PacketCollector) {
 	t.Helper()
-	assertMetricValue(t, collector, "tts_latency_ms", 1)
+	assertMetricValue(t, collector, "tts.latency_ms", 1)
 }
 
 func assertSTTLatencyMetric(t *testing.T, collector *testutil.PacketCollector) {
