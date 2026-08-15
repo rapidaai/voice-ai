@@ -97,6 +97,13 @@ describe('session query search criteria', () => {
         v: '30',
       },
     ]);
+    expect(getSessionSearchCriteria('vad.init_ms~>=:35')).toEqual([
+      {
+        k: 'vad.init_ms',
+        logic: '>=',
+        v: '35',
+      },
+    ]);
   });
 
   it('maps date-only timestamp is to the local day range', () => {
