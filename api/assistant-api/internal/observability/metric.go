@@ -16,9 +16,9 @@ import (
 // Conversation metric names mirror the current observe/type_enums names.
 const (
 	MetricConversationStatus      = "status"
-	MetricConversationDuration    = "duration"
-	MetricConversationSTTDuration = "stt_duration"
-	MetricConversationTTSDuration = "tts_duration"
+	MetricConversationDuration    = "conversation.duration_ms"
+	MetricConversationSTTDuration = "stt.duration_ms"
+	MetricConversationTTSDuration = "tts.duration_ms"
 )
 
 // Current call, SIP, and WebRTC metric names.
@@ -214,8 +214,8 @@ func NewMetricRecordingInitLatencyMs(duration time.Duration, attr Attributes) Re
 func NewMetricSTTDuration(duration time.Duration, attr Attributes) RecordMetric {
 	record := NewConversationMetricRecord([]*protos.Metric{{
 		Name:        MetricConversationSTTDuration,
-		Value:       strconv.FormatInt(duration.Nanoseconds(), 10),
-		Description: "Total STT connection duration in nanoseconds",
+		Value:       strconv.FormatInt(duration.Milliseconds(), 10),
+		Description: "Total STT connection duration in milliseconds",
 	}})
 	record.Attributes = attr
 	return record
@@ -224,8 +224,8 @@ func NewMetricSTTDuration(duration time.Duration, attr Attributes) RecordMetric 
 func NewMetricTTSDuration(duration time.Duration, attr Attributes) RecordMetric {
 	record := NewConversationMetricRecord([]*protos.Metric{{
 		Name:        MetricConversationTTSDuration,
-		Value:       strconv.FormatInt(duration.Nanoseconds(), 10),
-		Description: "Total TTS connection duration in nanoseconds",
+		Value:       strconv.FormatInt(duration.Milliseconds(), 10),
+		Description: "Total TTS connection duration in milliseconds",
 	}})
 	record.Attributes = attr
 	return record

@@ -39,7 +39,7 @@ func (assistantService *assistantService) GetAssistantDashboard(
 		return nil, err
 	}
 
-	sessionSummary, sttDurationNanoseconds, ttsDurationNanoseconds, err := assistantService.getAssistantDashboardSessionSummary(ctx, queryFilters)
+	sessionSummary, sttDurationMs, ttsDurationMs, err := assistantService.getAssistantDashboardSessionSummary(ctx, queryFilters)
 	if err != nil {
 		return nil, err
 	}
@@ -106,8 +106,8 @@ func (assistantService *assistantService) GetAssistantDashboard(
 		Latency: latencySummary,
 		Usage: &protos.AssistantDashboardUsage{
 			TotalTokens:          totalTokens,
-			SttDurationSeconds:   sttDurationNanoseconds / 1e9,
-			TtsDurationSeconds:   ttsDurationNanoseconds / 1e9,
+			SttDurationSeconds:   sttDurationMs / 1000,
+			TtsDurationSeconds:   ttsDurationMs / 1000,
 			TotalDurationSeconds: totalDurationSeconds,
 		},
 		Sources:   sourceDistribution,
@@ -128,8 +128,8 @@ SELECT
 	COUNT(*) AS total_sessions,
 	COALESCE(SUM(CASE WHEN UPPER(COALESCE(conversation_status_metric.value, 'ACTIVE')) IN ('COMPLETE', 'COMPLETED') THEN 1 ELSE 0 END), 0) AS completed_sessions,
 	COALESCE(SUM(CASE WHEN UPPER(COALESCE(conversation_status_metric.value, '')) IN ('FAILED', 'ERROR') THEN 1 ELSE 0 END), 0) AS failed_sessions,
-	COALESCE(SUM(conversation_stt_duration_metric.value::double precision), 0) AS stt_duration_nanoseconds,
-	COALESCE(SUM(conversation_tts_duration_metric.value::double precision), 0) AS tts_duration_nanoseconds
+	COALESCE(SUM(conversation_stt_duration_metric.value::double precision), 0) AS stt_duration_ms,
+	COALESCE(SUM(conversation_tts_duration_metric.value::double precision), 0) AS tts_duration_ms
 FROM assistant_conversations
 LEFT JOIN assistant_conversation_metrics conversation_status_metric
 	ON conversation_status_metric.assistant_conversation_id = assistant_conversations.id
@@ -152,11 +152,11 @@ WHERE %s
 	sessionSummaryArguments = append(sessionSummaryArguments, queryFilters.conversationArguments...)
 
 	sessionSummaryRow := struct {
-		TotalSessions          uint32
-		CompletedSessions      uint32
-		FailedSessions         uint32
-		SttDurationNanoseconds float64
-		TtsDurationNanoseconds float64
+		TotalSessions     uint32
+		CompletedSessions uint32
+		FailedSessions    uint32
+		SttDurationMs     float64
+		TtsDurationMs     float64
 	}{}
 	if err := database.Raw(sessionSummaryQuery, sessionSummaryArguments...).Scan(&sessionSummaryRow).Error; err != nil {
 		assistantService.logger.Errorf("unable to get assistant dashboard session summary %v", err)
@@ -166,7 +166,7 @@ WHERE %s
 		TotalSessions:     sessionSummaryRow.TotalSessions,
 		CompletedSessions: sessionSummaryRow.CompletedSessions,
 		FailedSessions:    sessionSummaryRow.FailedSessions,
-	}, sessionSummaryRow.SttDurationNanoseconds, sessionSummaryRow.TtsDurationNanoseconds, nil
+	}, sessionSummaryRow.SttDurationMs, sessionSummaryRow.TtsDurationMs, nil
 }
 
 func (assistantService *assistantService) getAssistantDashboardMessageSummary(

@@ -19,9 +19,9 @@ func TestMetricNames_MirrorCurrentImplementation(t *testing.T) {
 		expected string
 	}{
 		{MetricConversationStatus, "status"},
-		{MetricConversationDuration, "duration"},
-		{MetricConversationSTTDuration, "stt_duration"},
-		{MetricConversationTTSDuration, "tts_duration"},
+		{MetricConversationDuration, "conversation.duration_ms"},
+		{MetricConversationSTTDuration, "stt.duration_ms"},
+		{MetricConversationTTSDuration, "tts.duration_ms"},
 		{MetricCallDurationMs, "call.duration_ms"},
 		{MetricCallStatus, "call.status"},
 		{MetricCallPrice, "call.price"},
@@ -210,7 +210,7 @@ func TestNewMetricLLMInitLatencyMs(t *testing.T) {
 }
 
 func TestNewMetricSTTDuration(t *testing.T) {
-	record := NewMetricSTTDuration(789*time.Nanosecond, Attributes{"provider": "deepgram"})
+	record := NewMetricSTTDuration(789*time.Millisecond, Attributes{"provider": "deepgram"})
 	metric := singleMetric(t, record)
 
 	if metric.Name != MetricConversationSTTDuration {
@@ -219,14 +219,14 @@ func TestNewMetricSTTDuration(t *testing.T) {
 	if metric.Value != "789" {
 		t.Fatalf("expected metric value %q, got %q", "789", metric.Value)
 	}
-	if metric.Description != "Total STT connection duration in nanoseconds" {
-		t.Fatalf("expected metric description %q, got %q", "Total STT connection duration in nanoseconds", metric.Description)
+	if metric.Description != "Total STT connection duration in milliseconds" {
+		t.Fatalf("expected metric description %q, got %q", "Total STT connection duration in milliseconds", metric.Description)
 	}
 	assertRecordAttribute(t, record, "provider", "deepgram")
 }
 
 func TestNewMetricTTSDuration(t *testing.T) {
-	record := NewMetricTTSDuration(987*time.Nanosecond, Attributes{"provider": "deepgram"})
+	record := NewMetricTTSDuration(987*time.Millisecond, Attributes{"provider": "deepgram"})
 	metric := singleMetric(t, record)
 
 	if metric.Name != MetricConversationTTSDuration {
@@ -235,8 +235,8 @@ func TestNewMetricTTSDuration(t *testing.T) {
 	if metric.Value != "987" {
 		t.Fatalf("expected metric value %q, got %q", "987", metric.Value)
 	}
-	if metric.Description != "Total TTS connection duration in nanoseconds" {
-		t.Fatalf("expected metric description %q, got %q", "Total TTS connection duration in nanoseconds", metric.Description)
+	if metric.Description != "Total TTS connection duration in milliseconds" {
+		t.Fatalf("expected metric description %q, got %q", "Total TTS connection duration in milliseconds", metric.Description)
 	}
 	assertRecordAttribute(t, record, "provider", "deepgram")
 }

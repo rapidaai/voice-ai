@@ -10,20 +10,16 @@ export const UNKNOWN_DURATION_VALUE = 'unknown';
 
 const DURATION_BREAKDOWN_METRICS = [
   {
-    key: 'duration',
-    sourceUnit: 'nanoseconds',
+    key: 'conversation.duration_ms',
   },
   {
     key: 'call.duration_ms',
-    sourceUnit: 'milliseconds',
   },
   {
-    key: 'tts_duration',
-    sourceUnit: 'nanoseconds',
+    key: 'tts.duration_ms',
   },
   {
-    key: 'stt_duration',
-    sourceUnit: 'nanoseconds',
+    key: 'stt.duration_ms',
   },
 ] as const;
 
@@ -58,22 +54,13 @@ export const getDisconnectReasonValue = (
 export const getChannelValue = (conversation: AssistantConversation): string =>
   getSessionMetadataValue(conversation, CHANNEL_KEY, DEFAULT_CHANNEL);
 
-const formatDurationMetricSeconds = (
-  rawValue: string,
-  sourceUnit: (typeof DURATION_BREAKDOWN_METRICS)[number]['sourceUnit'],
-): string => {
+const formatDurationMetricSeconds = (rawValue: string): string => {
   if (!rawValue?.trim()) return UNKNOWN_DURATION_VALUE;
 
   const numericValue = Number(rawValue);
   if (!Number.isFinite(numericValue)) return UNKNOWN_DURATION_VALUE;
 
-  const seconds =
-    sourceUnit === 'nanoseconds'
-      ? numericValue / 1_000_000_000
-      : sourceUnit === 'milliseconds'
-        ? numericValue / 1_000
-        : numericValue;
-  return seconds.toFixed(2);
+  return (numericValue / 1_000).toFixed(2);
 };
 
 export const getDurationBreakdownRows = (
@@ -82,9 +69,6 @@ export const getDurationBreakdownRows = (
   const metrics = conversation.getMetricsList();
   return DURATION_BREAKDOWN_METRICS.map(metric => ({
     key: metric.key,
-    value: formatDurationMetricSeconds(
-      getMetricValue(metrics, metric.key),
-      metric.sourceUnit,
-    ),
+    value: formatDurationMetricSeconds(getMetricValue(metrics, metric.key)),
   }));
 };
