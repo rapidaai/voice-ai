@@ -55,6 +55,7 @@ export type QuerySearchProps = {
   onApply: (value: string) => void;
   onChange: (value: string) => void;
   placeholder?: string;
+  preserveDateOnly?: boolean;
   tabs?: QuerySearchTab[];
   timeOptions?: string[];
   value: string;
@@ -148,7 +149,10 @@ const formatDateFilterValue = (
   timeValue: string,
   includeTime: boolean,
   dateTimeMode: QuerySearchDateTimeMode,
+  preserveDateOnly: boolean,
 ): string => {
+  if (!includeTime && preserveDateOnly) return dateValue;
+
   if (dateTimeMode === 'raw') {
     return includeTime ? `${dateValue}T${timeValue || '00:00'}` : dateValue;
   }
@@ -453,6 +457,7 @@ type ValueEditorProps = {
   value: string;
   valueOptions: QuerySearchOption[];
   onSelectValue: (field: QuerySearchField, option: QuerySearchOption) => void;
+  preserveDateOnly: boolean;
 };
 
 const getTextInputWidth = (value: string, minWidth = 5, maxWidth = 48) =>
@@ -526,6 +531,7 @@ const DateFilterValueEditor = ({
   onChangeValue,
   onFocus,
   onKeyDown,
+  preserveDateOnly,
   timeOptions,
   value,
 }: ValueEditorProps) => {
@@ -706,6 +712,7 @@ const DateFilterValueEditor = ({
                       draftTimeValue,
                       includeTime,
                       dateTimeMode,
+                      preserveDateOnly,
                     ),
                   )
                 }
@@ -744,6 +751,7 @@ type FilterPillProps = {
   onSelectField: (field: QuerySearchField) => void;
   onSelectLogic: (logic: string) => void;
   onSelectValue: (field: QuerySearchField, option: QuerySearchOption) => void;
+  preserveDateOnly: boolean;
   timeOptions: string[];
   value: string;
   valueOptions: QuerySearchOption[];
@@ -767,6 +775,7 @@ const FilterPill = ({
   onSelectField,
   onSelectLogic,
   onSelectValue,
+  preserveDateOnly,
   timeOptions,
   value,
   valueOptions,
@@ -803,6 +812,7 @@ const FilterPill = ({
           onChangeValue={onChangeValue}
           onFocus={onEditValue}
           onKeyDown={onKeyDown}
+          preserveDateOnly={preserveDateOnly}
           timeOptions={timeOptions}
           onSelectValue={onSelectValue}
         />
@@ -836,6 +846,7 @@ export const QuerySearch = ({
   onApply,
   onChange,
   placeholder = 'Search or filter',
+  preserveDateOnly = false,
   tabs,
   timeOptions = TIME_OPTIONS,
   value,
@@ -1144,10 +1155,10 @@ export const QuerySearch = ({
     >
       <div
         className={[
-          'flex h-12 min-w-0 items-center gap-2 border-0 border-b bg-[var(--cds-field)] px-3 text-sm text-[var(--cds-text-primary)]',
+          'flex h-12 min-w-0 items-center gap-2 border-0 bg-transparent px-3 text-sm text-[var(--cds-text-primary)] transition-colors hover:bg-[var(--cds-field)]',
           isOpen
-            ? 'border-[var(--cds-focus)] outline outline-2 -outline-offset-2 outline-[var(--cds-focus)]'
-            : 'border-[var(--cds-border-strong)]',
+            ? 'bg-[var(--cds-field)] outline outline-2 -outline-offset-2 outline-[var(--cds-focus)]'
+            : '',
         ].join(' ')}
       >
         <Search className="h-4 w-4 shrink-0 text-gray-500" />
@@ -1184,6 +1195,7 @@ export const QuerySearch = ({
               onSelectValue={(field, option) =>
                 selectChipValue(index, field, option)
               }
+              preserveDateOnly={preserveDateOnly}
               timeOptions={timeOptions}
             />
           );
@@ -1212,6 +1224,7 @@ export const QuerySearch = ({
             onSelectField={selectDraftField}
             onSelectLogic={queryKey => selectLogic(selectedField, queryKey)}
             onSelectValue={selectValue}
+            preserveDateOnly={preserveDateOnly}
             timeOptions={timeOptions}
           />
         ) : (

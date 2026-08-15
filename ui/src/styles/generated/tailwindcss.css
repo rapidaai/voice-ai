@@ -6831,6 +6831,13 @@
       }
     }
   }
+  .hover\:bg-\[var\(--cds-field\)\] {
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--cds-field);
+      }
+    }
+  }
   .hover\:bg-blue-500\/5 {
     &:hover {
       @media (hover: hover) {

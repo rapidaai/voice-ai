@@ -444,21 +444,79 @@ const SESSION_SEARCH_TABS = [
   { id: 'metrics', text: 'Metrics' },
 ];
 
+const DATE_ONLY_VALUE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const getLocalDateBoundaryIso = (
+  dateValue: string,
+  boundary: 'start' | 'end',
+): string => {
+  const [year, month, day] = dateValue.split('-').map(Number);
+  if (!year || !month || !day) return dateValue;
+
+  return new Date(
+    year,
+    month - 1,
+    day,
+    boundary === 'end' ? 23 : 0,
+    boundary === 'end' ? 59 : 0,
+    boundary === 'end' ? 59 : 0,
+    boundary === 'end' ? 999 : 0,
+  ).toISOString();
+};
+
+const getTimestampCriteria = (
+  value: string,
+  logic: string,
+): SessionSearchCriteria[] => {
+  if (!DATE_ONLY_VALUE_PATTERN.test(value)) {
+    return [{ k: 'created_date', logic, v: value }];
+  }
+
+  if (logic === '=') {
+    return [
+      {
+        k: 'created_date',
+        logic: '>=',
+        v: getLocalDateBoundaryIso(value, 'start'),
+      },
+      {
+        k: 'created_date',
+        logic: '<=',
+        v: getLocalDateBoundaryIso(value, 'end'),
+      },
+    ];
+  }
+
+  return [
+    {
+      k: 'created_date',
+      logic,
+      v: getLocalDateBoundaryIso(value, logic === '<=' ? 'end' : 'start'),
+    },
+  ];
+};
+
 export const getSessionSearchCriteria = (
   value: string,
 ): SessionSearchCriteria[] =>
   parseQuerySearchFilters(SESSION_SEARCH_FIELDS, value)
-    .map(filter => {
+    .flatMap(filter => {
       const criteria = SESSION_SEARCH_CRITERIA[filter.key];
-      if (!criteria || !filter.value.trim()) return null;
+      if (!criteria || !filter.value.trim()) return [];
 
-      return {
-        k: criteria,
-        logic: filter.logic,
-        v: filter.value,
-      };
+      if (filter.key === 'timestamp') {
+        return getTimestampCriteria(filter.value, filter.logic);
+      }
+
+      return [
+        {
+          k: criteria,
+          logic: filter.logic,
+          v: filter.value,
+        },
+      ];
     })
-    .filter((criteria): criteria is SessionSearchCriteria => criteria !== null);
+    .filter((criteria): criteria is SessionSearchCriteria => Boolean(criteria));
 
 export const SessionQuerySearch = ({
   onApply,
@@ -472,6 +530,7 @@ export const SessionQuerySearch = ({
     value={value}
     maxOptions={SESSION_SEARCH_FIELDS.length}
     placeholder="Search for sessionID, client, metrics and more"
+    preserveDateOnly
     onChange={onChange}
     onApply={nextValue => onApply(getSessionSearchCriteria(nextValue))}
   />
