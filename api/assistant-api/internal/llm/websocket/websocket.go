@@ -184,8 +184,15 @@ func (e *websocketExecutor) initialize(ctx context.Context, comm internal_type.C
 	}
 	comm.OnPacket(ctx,
 		internal_type.ObservabilityMetricRecordPacket{
-			Scope:  internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.NewMetricLLMInitLatencyMs(time.Since(start), observability.Attributes{"provider": e.Name()}),
+			Scope: internal_type.ObservabilityRecordScopeConversation,
+			Record: observability.RecordMetric{
+				Attributes: observability.Attributes{"provider": e.Name()},
+				Metrics: []*protos.Metric{{
+					Name:        observability.MetricLLMInitLatencyMs,
+					Value:       fmt.Sprintf("%d", time.Since(start).Milliseconds()),
+					Description: "LLM initialization latency in milliseconds",
+				}},
+			},
 		},
 		internal_type.ObservabilityLogRecordPacket{
 			Scope: internal_type.ObservabilityRecordScopeConversation,

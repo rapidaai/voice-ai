@@ -61,7 +61,7 @@ const (
 	MetricEOSCharCount                = "eos_char_count"
 	MetricEOSConfidence               = "eos_confidence"
 	MetricDenoiseInitLatencyMs        = "denoise.init_ms"
-	MetricLLMInitLatencyMs            = "llm_init_ms"
+	MetricLLMInitLatencyMs            = "agent.init_ms"
 	MetricLLMLatencyMs                = "llm_latency_ms"
 	MetricAgentTTFTMs                 = "agent.ttft_ms"
 	MetricAgentTRTMs                  = "agent.trt_ms"
@@ -127,16 +127,6 @@ func NewMetricTTSLatencyMs(duration time.Duration, attr Attributes) RecordMetric
 		Name:        MetricTTSLatencyMs,
 		Value:       strconv.FormatInt(duration.Milliseconds(), 10),
 		Description: "TTS latency from text input to first audio in milliseconds",
-	}})
-	record.Attributes = attr
-	return record
-}
-
-func NewMetricLLMInitLatencyMs(duration time.Duration, attr Attributes) RecordMetric {
-	record := NewConversationMetricRecord([]*protos.Metric{{
-		Name:        MetricLLMInitLatencyMs,
-		Value:       strconv.FormatInt(duration.Milliseconds(), 10),
-		Description: "LLM initialization latency in milliseconds",
 	}})
 	record.Attributes = attr
 	return record
