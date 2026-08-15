@@ -20,6 +20,7 @@ import (
 	"github.com/rapidaai/pkg/commons"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/protos"
 )
 
 const (
@@ -108,11 +109,18 @@ func New(opts ...Option) (internal_type.AuthenticationExecutor, error) {
 			internal_type.ObservabilityMetricRecordPacket{
 				ContextID: executor.contextID,
 				Scope:     internal_type.ObservabilityRecordScopeConversation,
-				Record: observability.NewMetricAuthenticationInitLatencyMs(time.Since(start), observability.Attributes{
-					"provider":         executor.authenticator.Provider,
-					"configuration_id": fmt.Sprintf("%d", executor.authenticator.Id),
-					"executor":         executor.Name(),
-				}),
+				Record: observability.RecordMetric{
+					Attributes: observability.Attributes{
+						"provider":         executor.authenticator.Provider,
+						"configuration_id": fmt.Sprintf("%d", executor.authenticator.Id),
+						"executor":         executor.Name(),
+					},
+					Metrics: []*protos.Metric{{
+						Name:        observability.MetricAuthenticationInitLatencyMs,
+						Value:       fmt.Sprintf("%d", time.Since(start).Milliseconds()),
+						Description: "Authentication initialization latency in milliseconds",
+					}},
+				},
 			},
 			internal_type.ObservabilityLogRecordPacket{
 				ContextID: executor.contextID,
@@ -179,12 +187,57 @@ func (e *runtimeExecutor) Execute(ctx context.Context, input internal_type.Authe
 	response, err := e.send(callCtx, client, method, input.Arguments, headers)
 	if err != nil {
 		errMsg := err.Error()
+		if e.onPacket != nil {
+			_ = e.onPacket(ctx, internal_type.ObservabilityMetricRecordPacket{
+				ContextID: input.ContextID,
+				Scope:     internal_type.ObservabilityRecordScopeConversation,
+				Record: observability.RecordMetric{
+					Attributes: observability.Attributes{
+						"provider":         e.authenticator.Provider,
+						"configuration_id": fmt.Sprintf("%d", e.authenticator.Id),
+						"executor":         e.Name(),
+						"method":           method,
+						"status":           type_enums.RECORD_FAILED.String(),
+					},
+					Metrics: []*protos.Metric{{
+						Name:        observability.MetricAuthenticationLatencyMs,
+						Value:       fmt.Sprintf("%d", time.Since(startTime).Milliseconds()),
+						Description: "Authentication request latency in milliseconds",
+					}},
+				},
+			})
+		}
 		e.onCreateLog(ctx, input.ContextID, url, method, e.authenticator.Id, startTime, type_enums.RECORD_FAILED, 0, &errMsg, requestPayload, nil)
 		return nil, fmt.Errorf("authentication: request failed: %w", err)
 	}
 
 	result := &internal_type.AuthenticationOutput{
 		Authenticated: response.StatusCode >= 200 && response.StatusCode < 300,
+	}
+	metricStatus := type_enums.RECORD_COMPLETE
+	if !result.Authenticated {
+		metricStatus = type_enums.RECORD_FAILED
+	}
+	if e.onPacket != nil {
+		_ = e.onPacket(ctx, internal_type.ObservabilityMetricRecordPacket{
+			ContextID: input.ContextID,
+			Scope:     internal_type.ObservabilityRecordScopeConversation,
+			Record: observability.RecordMetric{
+				Attributes: observability.Attributes{
+					"provider":         e.authenticator.Provider,
+					"configuration_id": fmt.Sprintf("%d", e.authenticator.Id),
+					"executor":         e.Name(),
+					"method":           method,
+					"response_status":  fmt.Sprintf("%d", response.StatusCode),
+					"status":           metricStatus.String(),
+				},
+				Metrics: []*protos.Metric{{
+					Name:        observability.MetricAuthenticationLatencyMs,
+					Value:       fmt.Sprintf("%d", time.Since(startTime).Milliseconds()),
+					Description: "Authentication request latency in milliseconds",
+				}},
+			},
+		})
 	}
 	if parsed, err := response.ToMap(); err == nil {
 		if args, ok := parsed[ResponseArgumentsKeyV1].(map[string]interface{}); ok {

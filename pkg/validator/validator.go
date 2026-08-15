@@ -8,6 +8,7 @@
 package validator
 
 import (
+	"math"
 	"net/mail"
 	"reflect"
 	"strconv"
@@ -54,6 +55,12 @@ func NonNil(value interface{}) bool {
 // NotBlank returns true when value has non-whitespace content.
 func NotBlank(value string) bool {
 	return strings.TrimSpace(value) != ""
+}
+
+// Numeric returns true when value can be parsed as a finite number.
+func Numeric(value string) bool {
+	parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+	return err == nil && !math.IsNaN(parsed) && !math.IsInf(parsed, 0)
 }
 
 // Between returns true when value is within the inclusive min/max range.

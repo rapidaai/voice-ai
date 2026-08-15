@@ -56,6 +56,31 @@ func TestNotBlank(t *testing.T) {
 	}
 }
 
+func TestNumeric(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  bool
+	}{
+		{name: "integer", value: "123", want: true},
+		{name: "decimal", value: "123.45", want: true},
+		{name: "trimmed decimal", value: " 123.45 ", want: true},
+		{name: "negative", value: "-123.45", want: true},
+		{name: "blank", value: " ", want: false},
+		{name: "text", value: "abc", want: false},
+		{name: "nan", value: "NaN", want: false},
+		{name: "infinity", value: "+Inf", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Numeric(tt.value); got != tt.want {
+				t.Fatalf("Numeric(%q) = %v, want %v", tt.value, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestBetween(t *testing.T) {
 	intTests := []struct {
 		name  string

@@ -52,6 +52,23 @@ describe('session query search criteria', () => {
         v: '120',
       },
     ]);
+
+    expect(getSessionSearchCriteria('authentication.init_ms~<=:80')).toEqual([
+      {
+        k: 'authentication.init_ms',
+        logic: '<=',
+        v: '80',
+      },
+    ]);
+    expect(
+      getSessionSearchCriteria('authentication.latency_ms~>=:120'),
+    ).toEqual([
+      {
+        k: 'authentication.latency_ms',
+        logic: '>=',
+        v: '120',
+      },
+    ]);
   });
 
   it('maps date-only timestamp is to the local day range', () => {
