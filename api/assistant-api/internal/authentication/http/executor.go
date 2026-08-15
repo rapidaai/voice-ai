@@ -20,6 +20,7 @@ import (
 	"github.com/rapidaai/pkg/commons"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/protos"
 )
 
 const (
@@ -108,11 +109,18 @@ func New(opts ...Option) (internal_type.AuthenticationExecutor, error) {
 			internal_type.ObservabilityMetricRecordPacket{
 				ContextID: executor.contextID,
 				Scope:     internal_type.ObservabilityRecordScopeConversation,
-				Record: observability.NewMetricAuthenticationInitLatencyMs(time.Since(start), observability.Attributes{
-					"provider":         executor.authenticator.Provider,
-					"configuration_id": fmt.Sprintf("%d", executor.authenticator.Id),
-					"executor":         executor.Name(),
-				}),
+				Record: observability.RecordMetric{
+					Attributes: observability.Attributes{
+						"provider":         executor.authenticator.Provider,
+						"configuration_id": fmt.Sprintf("%d", executor.authenticator.Id),
+						"executor":         executor.Name(),
+					},
+					Metrics: []*protos.Metric{{
+						Name:        observability.MetricAuthenticationInitLatencyMs,
+						Value:       fmt.Sprintf("%d", time.Since(start).Milliseconds()),
+						Description: "Authentication initialization latency in milliseconds",
+					}},
+				},
 			},
 			internal_type.ObservabilityLogRecordPacket{
 				ContextID: executor.contextID,

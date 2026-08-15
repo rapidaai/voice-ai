@@ -191,6 +191,7 @@ func (conversationService *assistantConversationService) GetAll(ctx context.Cont
 				qry = qry.Where("EXISTS (SELECT 1 FROM assistant_conversation_metadata WHERE assistant_conversation_metadata.assistant_conversation_id = assistant_conversations.id AND assistant_conversation_metadata.key = ? AND assistant_conversation_metadata.value = ?)", "disconnect_reason", ct.GetValue())
 			}
 		case observability.MetricRecordingInitLatencyMs,
+			observability.MetricAuthenticationInitLatencyMs,
 			observability.MetricSTTInitLatencyMs,
 			observability.MetricTTSInitLatencyMs,
 			observability.MetricLLMInitLatencyMs,
