@@ -69,7 +69,7 @@ export const METRIC_NAME_OPTIONS: FilterOption[] = [
   { id: 'storage_init_ms', text: 'storage_init_ms' },
   { id: 'analysis_init_ms', text: 'analysis_init_ms' },
   { id: 'authentication_init_ms', text: 'authentication_init_ms' },
-  { id: 'recording_init_ms', text: 'recording_init_ms' },
+  { id: 'recording.init_ms', text: 'recording.init_ms' },
   { id: 'knowledge_latency_ms', text: 'knowledge_latency_ms' },
   { id: 'llm_latency_ms', text: 'llm_latency_ms' },
   { id: 'llm_input_char_count', text: 'llm_input_char_count' },

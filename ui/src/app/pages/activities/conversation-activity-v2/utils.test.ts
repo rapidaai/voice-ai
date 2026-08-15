@@ -131,6 +131,7 @@ describe('conversation activity v2 telemetry utilities', () => {
         'llm_history_count',
         'llm_response_char_count',
         'agent_time_taken',
+        'recording.init_ms',
         'agent_status',
         'agent_llm_request_id',
         'agent_input_token',

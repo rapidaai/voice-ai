@@ -44,6 +44,16 @@ describe('session query search criteria', () => {
     ]);
   });
 
+  it('maps recording init metric filter', () => {
+    expect(getSessionSearchCriteria('recording.init_ms~>=:120')).toEqual([
+      {
+        k: 'recording.init_ms',
+        logic: '>=',
+        v: '120',
+      },
+    ]);
+  });
+
   it('maps date-only timestamp is to the local day range', () => {
     expect(getSessionSearchCriteria('timestamp~=:2026-08-13')).toEqual([
       {
