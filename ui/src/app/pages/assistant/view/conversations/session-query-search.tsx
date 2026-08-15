@@ -310,6 +310,18 @@ const SESSION_SEARCH_FIELDS: QuerySearchField[] = [
       { label: 'is greater than or equal to', logic: '>=' },
       { label: 'is less than or equal to', logic: '<=' },
     ],
+    queryKey: 'analysis.init_ms',
+    text: 'analysis.init_ms',
+    type: 'number',
+  },
+  {
+    category: 'metrics',
+    logicLabel: 'is',
+    logicOptions: [
+      { label: 'is', logic: '=' },
+      { label: 'is greater than or equal to', logic: '>=' },
+      { label: 'is less than or equal to', logic: '<=' },
+    ],
     queryKey: 'stt_init_ms',
     text: 'stt_init_ms',
     type: 'number',
@@ -431,6 +443,7 @@ const SESSION_SEARCH_FIELDS: QuerySearchField[] = [
 ];
 
 const SESSION_SEARCH_CRITERIA: Record<string, string> = {
+  'analysis.init_ms': 'analysis.init_ms',
   assistant_provider_model_id: 'assistant_provider_model_id',
   'authentication.init_ms': 'authentication.init_ms',
   'authentication.latency_ms': 'authentication.latency_ms',

@@ -52,6 +52,7 @@ func TestMetricNames_MirrorCurrentImplementation(t *testing.T) {
 		{MetricLLMLatencyMs, "llm_latency_ms"},
 		{MetricAgentTTFTMs, "agent.ttft_ms"},
 		{MetricAgentTRTMs, "agent.trt_ms"},
+		{MetricAnalysisInitLatencyMs, "analysis.init_ms"},
 		{MetricAuthenticationInitLatencyMs, "authentication.init_ms"},
 		{MetricAuthenticationLatencyMs, "authentication.latency_ms"},
 		{MetricRecordingInitLatencyMs, "recording.init_ms"},
