@@ -149,7 +149,7 @@ export const useConversationLogPageStore = create<ConversationLog>(
       { name: 'LLM', key: 'llm_latency_ms', visible: true },
       {
         name: 'TTFT',
-        key: 'agent_time_to_first_token',
+        key: 'agent.ttft_ms',
         visible: true,
       },
       { name: 'TTS', key: 'tts_latency_ms', visible: true },

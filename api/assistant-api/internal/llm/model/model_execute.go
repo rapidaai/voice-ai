@@ -446,16 +446,21 @@ func (e *modelAssistantExecutor) isStaleResponse(requestID string) bool {
 func (e *modelAssistantExecutor) buildCompletionMetrics(providerMetrics []*protos.Metric) []*protos.Metric {
 	out := make([]*protos.Metric, 0, len(providerMetrics)+1)
 	for _, m := range providerMetrics {
+		if m.GetName() == observability.MetricTimeToFirstToken {
+			if ns, err := strconv.ParseInt(m.GetValue(), 10, 64); err == nil {
+				ms := fmt.Sprintf("%d", ns/int64(time.Millisecond))
+				out = append(out, &protos.Metric{
+					Name: observability.MetricAgentTTFTMs, Value: ms, Description: m.GetDescription(),
+				})
+				out = append(out, &protos.Metric{
+					Name: observability.MetricLLMLatencyMs, Value: ms,
+				})
+			}
+			continue
+		}
 		out = append(out, &protos.Metric{
 			Name: "agent_" + m.GetName(), Value: m.GetValue(), Description: m.GetDescription(),
 		})
-		if m.GetName() == "time_to_first_token" {
-			if ns, err := strconv.ParseInt(m.GetValue(), 10, 64); err == nil {
-				out = append(out, &protos.Metric{
-					Name: "llm_latency_ms", Value: fmt.Sprintf("%d", ns/int64(time.Millisecond)),
-				})
-			}
-		}
 	}
 	return out
 }

@@ -87,7 +87,7 @@ func (kr *genericRequestor) RetrieveToolKnowledge(ctx context.Context, knowledge
 				ContextID: messageId,
 				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
 				Record: observability.NewMessageMetricRecord(messageId, observability.MessageRoleAssistant, []*protos.Metric{{
-					Name:  "knowledge_latency_ms",
+					Name:  observability.MetricKnowledgeLatencyMs,
 					Value: fmt.Sprintf("%d", latencyMs),
 				}}),
 			},

@@ -169,11 +169,11 @@ export const ListingPage: FC<{}> = () => {
                     'llm_latency_ms',
                     formatMetricMilliseconds,
                   );
-                case 'agent_time_to_first_token':
+                case 'agent.ttft_ms':
                   return getMetricDisplayValue(
                     row,
-                    'agent_time_to_first_token',
-                    formatNanoToReadableMilli,
+                    'agent.ttft_ms',
+                    formatMetricMilliseconds,
                   );
                 case 'tts_latency_ms':
                   return getMetricDisplayValue(
@@ -451,14 +451,12 @@ export const ListingPage: FC<{}> = () => {
                         )}
                       </TableCell>
                     )}
-                    {conversationLogAction.visibleColumn(
-                      'agent_time_to_first_token',
-                    ) && (
+                    {conversationLogAction.visibleColumn('agent.ttft_ms') && (
                       <TableCell className="font-mono text-[13px]">
                         {getMetricDisplayValue(
                           row,
-                          'agent_time_to_first_token',
-                          formatNanoToReadableMilli,
+                          'agent.ttft_ms',
+                          formatMetricMilliseconds,
                         )}
                       </TableCell>
                     )}

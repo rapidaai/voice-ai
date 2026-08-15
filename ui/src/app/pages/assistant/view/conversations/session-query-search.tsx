@@ -351,7 +351,7 @@ const SESSION_SEARCH_FIELDS: QuerySearchField[] = [
     type: 'number',
   },
   {
-    category: 'metrics',
+    category: 'duration',
     logicLabel: 'is',
     logicOptions: [
       { label: 'is', logic: '=' },
@@ -363,7 +363,7 @@ const SESSION_SEARCH_FIELDS: QuerySearchField[] = [
     type: 'number',
   },
   {
-    category: 'metrics',
+    category: 'duration',
     logicLabel: 'is',
     logicOptions: [
       { label: 'is', logic: '=' },
@@ -375,7 +375,7 @@ const SESSION_SEARCH_FIELDS: QuerySearchField[] = [
     type: 'number',
   },
   {
-    category: 'metrics',
+    category: 'duration',
     logicLabel: 'is',
     logicOptions: [
       { label: 'is', logic: '=' },
@@ -387,7 +387,7 @@ const SESSION_SEARCH_FIELDS: QuerySearchField[] = [
     type: 'number',
   },
   {
-    category: 'metrics',
+    category: 'duration',
     logicLabel: 'is',
     logicOptions: [
       { label: 'is', logic: '=' },
@@ -441,6 +441,7 @@ const SESSION_SEARCH_TABS = [
   { id: 'all', text: 'All' },
   { id: 'session', text: 'Session' },
   { id: 'client', text: 'Client' },
+  { id: 'duration', text: 'Duration' },
   { id: 'metrics', text: 'Metrics' },
 ];
 

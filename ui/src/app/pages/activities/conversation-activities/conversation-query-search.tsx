@@ -109,7 +109,7 @@ const CONVERSATION_LOG_SEARCH_FIELDS: QuerySearchField[] = [
   {
     logicLabel: 'is',
     logicOptions: NUMBER_LOGIC_OPTIONS,
-    queryKey: 'agent_time_to_first_token',
+    queryKey: 'agent.ttft_ms',
     text: 'ttft',
     type: 'number',
   },
@@ -147,7 +147,7 @@ const CONVERSATION_LOG_SEARCH_FIELDS: QuerySearchField[] = [
 ];
 
 const CONVERSATION_LOG_SEARCH_CRITERIA: Record<string, string> = {
-  agent_time_to_first_token: 'agent_time_to_first_token',
+  'agent.ttft_ms': 'agent.ttft_ms',
   agent_total_token: 'agent_total_token',
   assistant_conversation_id: 'assistant_conversation_id',
   assistant_id: 'assistant_id',

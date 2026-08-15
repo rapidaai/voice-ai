@@ -92,7 +92,7 @@ export const METRIC_NAME_OPTIONS: FilterOption[] = [
   { id: 'agent_input_cost', text: 'agent_input_cost' },
   { id: 'agent_output_cost', text: 'agent_output_cost' },
   { id: 'agent_token_pre_second', text: 'agent_token_pre_second' },
-  { id: 'agent_time_to_first_token', text: 'agent_time_to_first_token' },
+  { id: 'agent.ttft_ms', text: 'agent.ttft_ms' },
   { id: 'agent_provider_total_time', text: 'agent_provider_total_time' },
   { id: 'agent_provider_generate_time', text: 'agent_provider_generate_time' },
   { id: 'agent_token_count', text: 'agent_token_count' },

@@ -141,7 +141,7 @@ describe('conversation activity v2 telemetry utilities', () => {
         'agent_input_cost',
         'agent_output_cost',
         'agent_token_pre_second',
-        'agent_time_to_first_token',
+        'agent.ttft_ms',
         'agent_provider_total_time',
         'agent_provider_generate_time',
         'agent_token_count',
