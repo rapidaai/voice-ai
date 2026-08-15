@@ -76,6 +76,13 @@ describe('session query search criteria', () => {
         v: '40',
       },
     ]);
+    expect(getSessionSearchCriteria('storage.init_ms~>=:60')).toEqual([
+      {
+        k: 'storage.init_ms',
+        logic: '>=',
+        v: '60',
+      },
+    ]);
   });
 
   it('maps date-only timestamp is to the local day range', () => {

@@ -22,6 +22,7 @@ import (
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
+	"github.com/rapidaai/protos"
 )
 
 const (
@@ -108,11 +109,18 @@ func NewAWS(opts ...AWSOption) (internal_type.ArtifactPushExecutor, error) {
 	_ = executor.onPacket(executor.ctx,
 		internal_type.ObservabilityMetricRecordPacket{
 			Scope: internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.NewMetricStorageInitLatencyMs(time.Since(start), observability.Attributes{
-				"provider":         executor.configuration.Provider,
-				"configuration_id": fmt.Sprintf("%d", executor.configuration.Id),
-				"executor":         executor.Name(),
-			}),
+			Record: observability.RecordMetric{
+				Attributes: observability.Attributes{
+					"provider":         executor.configuration.Provider,
+					"configuration_id": fmt.Sprintf("%d", executor.configuration.Id),
+					"executor":         executor.Name(),
+				},
+				Metrics: []*protos.Metric{{
+					Name:        observability.MetricStorageInitLatencyMs,
+					Value:       fmt.Sprintf("%d", time.Since(start).Milliseconds()),
+					Description: "Storage initialization latency in milliseconds",
+				}},
+			},
 		},
 		internal_type.ObservabilityLogRecordPacket{
 			Scope: internal_type.ObservabilityRecordScopeConversation,

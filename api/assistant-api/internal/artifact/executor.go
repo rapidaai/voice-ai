@@ -17,6 +17,7 @@ import (
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/protos"
 )
 
 const (
@@ -110,11 +111,18 @@ func New(opts ...Option) (internal_type.ArtifactPushExecutor, error) {
 			_ = options.onPacket(options.ctx,
 				internal_type.ObservabilityMetricRecordPacket{
 					Scope: internal_type.ObservabilityRecordScopeConversation,
-					Record: observability.NewMetricStorageInitLatencyMs(time.Since(start), observability.Attributes{
-						"provider":         options.configuration.Provider,
-						"configuration_id": fmt.Sprintf("%d", options.configuration.Id),
-						"status":           "failed",
-					}),
+					Record: observability.RecordMetric{
+						Attributes: observability.Attributes{
+							"provider":         options.configuration.Provider,
+							"configuration_id": fmt.Sprintf("%d", options.configuration.Id),
+							"status":           "failed",
+						},
+						Metrics: []*protos.Metric{{
+							Name:        observability.MetricStorageInitLatencyMs,
+							Value:       fmt.Sprintf("%d", time.Since(start).Milliseconds()),
+							Description: "Storage initialization latency in milliseconds",
+						}},
+					},
 				},
 				internal_type.ObservabilityLogRecordPacket{
 					Scope: internal_type.ObservabilityRecordScopeConversation,
