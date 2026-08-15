@@ -68,6 +68,7 @@ const (
 	MetricStorageInitLatencyMs        = "storage_init_ms"
 	MetricAnalysisInitLatencyMs       = "analysis_init_ms"
 	MetricAuthenticationInitLatencyMs = "authentication.init_ms"
+	MetricAuthenticationLatencyMs     = "authentication.latency_ms"
 	MetricRecordingInitLatencyMs      = "recording.init_ms"
 	MetricKnowledgeLatencyMs          = "knowledge_latency_ms"
 	MetricLLMError                    = "llm_error"

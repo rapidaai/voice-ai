@@ -192,6 +192,7 @@ func (conversationService *assistantConversationService) GetAll(ctx context.Cont
 			}
 		case observability.MetricRecordingInitLatencyMs,
 			observability.MetricAuthenticationInitLatencyMs,
+			observability.MetricAuthenticationLatencyMs,
 			observability.MetricSTTInitLatencyMs,
 			observability.MetricTTSInitLatencyMs,
 			observability.MetricLLMInitLatencyMs,
