@@ -90,6 +90,13 @@ describe('session query search criteria', () => {
         v: '25',
       },
     ]);
+    expect(getSessionSearchCriteria('eos.init_ms~<=:30')).toEqual([
+      {
+        k: 'eos.init_ms',
+        logic: '<=',
+        v: '30',
+      },
+    ]);
   });
 
   it('maps date-only timestamp is to the local day range', () => {
