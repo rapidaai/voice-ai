@@ -260,7 +260,7 @@ func (dg *deepgramSTT) Transform(ctx context.Context, in internal_type.Packet) e
 			dg.contextId = pkt.ContextID
 		}
 		dg.mu.Unlock()
-		dg.metrics.ResetSpeech()
+		dg.metrics.ResetSpeech(time.Now())
 		return nil
 	case internal_type.SpeechToTextEndPacket:
 		dg.mu.Lock()

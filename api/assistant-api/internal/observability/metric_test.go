@@ -36,8 +36,10 @@ func TestMetricNames_MirrorCurrentImplementation(t *testing.T) {
 		{MetricCallStatusCancelled, "CANCELLED"},
 		{MetricUserTurn, "user_turn"},
 		{MetricAssistantTurn, "assistant_turn"},
-		{MetricSTTInitLatencyMs, "stt_init_ms"},
-		{MetricSTTLatencyMs, "stt_latency_ms"},
+		{MetricSTTInitLatencyMs, "stt.init_ms"},
+		{MetricSTTLatencyMs, "stt.latency_ms"},
+		{MetricSTTTimeToFirstTokenMs, "stt.ttft_ms"},
+		{MetricSTTTimeToLastTokenMs, "stt.ttlt_ms"},
 		{MetricTTSInitLatencyMs, "tts_init_ms"},
 		{MetricTTSLatencyMs, "tts_latency_ms"},
 		{MetricVADInitLatencyMs, "vad.init_ms"},
@@ -59,7 +61,7 @@ func TestMetricNames_MirrorCurrentImplementation(t *testing.T) {
 		{MetricRecordingInitLatencyMs, "recording.init_ms"},
 		{MetricKnowledgeLatencyMs, "knowledge_latency_ms"},
 		{MetricLLMError, "llm_error"},
-		{MetricSTTError, "stt_error"},
+		{MetricSTTError, "stt.error"},
 		{MetricTTSError, "tts_error"},
 		{MetricDiscardedTTSChunk, "discarded_tts_chunk"},
 		{MetricDiscardedTTS, "discarded_tts"},
@@ -84,22 +86,6 @@ func TestMetricNames_MirrorCurrentImplementation(t *testing.T) {
 			t.Fatalf("expected metric name %q, got %q", test.expected, test.actual)
 		}
 	}
-}
-
-func TestNewMetricSTTInitLatencyMs(t *testing.T) {
-	record := NewMetricSTTInitLatencyMs(123*time.Millisecond, Attributes{"provider": "deepgram"})
-	metric := singleMetric(t, record)
-
-	if metric.Name != MetricSTTInitLatencyMs {
-		t.Fatalf("expected metric name %q, got %q", MetricSTTInitLatencyMs, metric.Name)
-	}
-	if metric.Value != "123" {
-		t.Fatalf("expected metric value %q, got %q", "123", metric.Value)
-	}
-	if metric.Description != "STT initialization latency in milliseconds" {
-		t.Fatalf("expected metric description %q, got %q", "STT initialization latency in milliseconds", metric.Description)
-	}
-	assertRecordAttribute(t, record, "provider", "deepgram")
 }
 
 func TestNewMetricSTTLatencyMs(t *testing.T) {

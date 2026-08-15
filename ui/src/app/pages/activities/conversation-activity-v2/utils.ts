@@ -172,8 +172,11 @@ const isDurationMetricName = (name: string): boolean => {
       normalizedName,
     ) ||
     normalizedName.endsWith('_duration_ms') ||
+    normalizedName.endsWith('.duration_ms') ||
     normalizedName.endsWith('_latency_ms') ||
-    normalizedName.endsWith('_elapsed_ms')
+    normalizedName.endsWith('.latency_ms') ||
+    normalizedName.endsWith('_elapsed_ms') ||
+    normalizedName.endsWith('.elapsed_ms')
   );
 };
 

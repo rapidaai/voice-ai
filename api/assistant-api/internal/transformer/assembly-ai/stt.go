@@ -164,8 +164,15 @@ func (aai *assemblyaiSTT) Initialize() error {
 
 	aai.onPacket(
 		internal_type.ObservabilityMetricRecordPacket{
-			Scope:  internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.NewMetricSTTInitLatencyMs(time.Since(start), observability.Attributes{"provider": aai.Name()}),
+			Scope: internal_type.ObservabilityRecordScopeConversation,
+			Record: observability.RecordMetric{
+				Attributes: observability.Attributes{"provider": aai.Name()},
+				Metrics: []*protos.Metric{{
+					Name:        observability.MetricSTTInitLatencyMs,
+					Value:       fmt.Sprintf("%d", time.Since(start).Milliseconds()),
+					Description: "STT initialization latency in milliseconds",
+				}},
+			},
 		},
 		internal_type.ObservabilityLogRecordPacket{
 			Scope: internal_type.ObservabilityRecordScopeConversation,

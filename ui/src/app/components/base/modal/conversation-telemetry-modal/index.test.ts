@@ -137,7 +137,7 @@ describe('conversation telemetry structured criteria helpers', () => {
         contextId: 'ctx-1',
         conversationId: 'conv-1',
         metrics: [
-          { name: 'stt_latency_ms', value: '10' },
+          { name: 'stt.latency_ms', value: '10' },
           { name: 'tts_latency_ms', value: '20' },
         ],
       },
@@ -154,7 +154,7 @@ describe('conversation telemetry structured criteria helpers', () => {
         timestampMs: 2100,
         contextId: 'ctx-2',
         conversationId: 'conv-1',
-        metrics: [{ name: 'stt_latency_ms', value: '5' }],
+        metrics: [{ name: 'stt.latency_ms', value: '5' }],
       },
       {
         timestampMs: 2200,
@@ -169,7 +169,7 @@ describe('conversation telemetry structured criteria helpers', () => {
     expect(series[0]).toMatchObject({
       contextId: 'ctx-1',
       conversationId: 'conv-1',
-      stt_latency_ms: 10,
+      'stt.latency_ms': 10,
       tts_latency_ms: 20,
       llm_latency_ms: 30,
       eos_latency_ms: 40,
@@ -180,7 +180,7 @@ describe('conversation telemetry structured criteria helpers', () => {
     expect(series[1]).toMatchObject({
       contextId: 'ctx-2',
       conversationId: 'conv-1',
-      stt_latency_ms: 5,
+      'stt.latency_ms': 5,
       sequence: 2,
     });
   });

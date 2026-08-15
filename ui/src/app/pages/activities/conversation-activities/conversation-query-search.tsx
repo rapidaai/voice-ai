@@ -95,7 +95,7 @@ const CONVERSATION_LOG_SEARCH_FIELDS: QuerySearchField[] = [
   {
     logicLabel: 'is',
     logicOptions: NUMBER_LOGIC_OPTIONS,
-    queryKey: 'stt_latency_ms',
+    queryKey: 'stt.latency_ms',
     text: 'stt',
     type: 'number',
   },
@@ -159,7 +159,7 @@ const CONVERSATION_LOG_SEARCH_CRITERIA: Record<string, string> = {
   role: 'role',
   source: 'source',
   status: 'status',
-  stt_latency_ms: 'stt_latency_ms',
+  'stt.latency_ms': 'stt.latency_ms',
   timestamp: 'created_date',
   tts_latency_ms: 'tts_latency_ms',
 };

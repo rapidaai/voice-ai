@@ -157,10 +157,10 @@ export const ListingPage: FC<{}> = () => {
                     : '';
                 case 'status':
                   return row.getStatus();
-                case 'stt_latency_ms':
+                case 'stt.latency_ms':
                   return getMetricDisplayValue(
                     row,
-                    'stt_latency_ms',
+                    'stt.latency_ms',
                     formatMetricMilliseconds,
                   );
                 case 'llm_latency_ms':
@@ -433,11 +433,11 @@ export const ListingPage: FC<{}> = () => {
                         )}
                       </TableCell>
                     )}
-                    {conversationLogAction.visibleColumn('stt_latency_ms') && (
+                    {conversationLogAction.visibleColumn('stt.latency_ms') && (
                       <TableCell className="font-mono text-[13px]">
                         {getMetricDisplayValue(
                           row,
-                          'stt_latency_ms',
+                          'stt.latency_ms',
                           formatMetricMilliseconds,
                         )}
                       </TableCell>

@@ -39,7 +39,7 @@ export type TelemetryRow =
   | { kind: 'metric'; ts: Date; key: string; record: TelemetryMetric };
 
 export type LatencyMetricName =
-  | 'stt_latency_ms'
+  | 'stt.latency_ms'
   | 'tts_latency_ms'
   | 'llm_latency_ms'
   | 'eos_latency_ms';
@@ -128,7 +128,7 @@ export const LATENCY_METRIC_META: Record<
   LatencyMetricName,
   { label: string; shortLabel: string; color: string; fillOpacity: number }
 > = {
-  stt_latency_ms: {
+  'stt.latency_ms': {
     label: 'STT Latency',
     shortLabel: 'STT',
     color: '#fbbf24',
@@ -155,7 +155,7 @@ export const LATENCY_METRIC_META: Record<
 };
 
 export const LATENCY_STACK_ORDER: LatencyMetricName[] = [
-  'stt_latency_ms',
+  'stt.latency_ms',
   'eos_latency_ms',
   'llm_latency_ms',
   'tts_latency_ms',
@@ -265,7 +265,7 @@ export function formatDateTime(d: Date): string {
 }
 
 const isLatencyMetricName = (name: string): name is LatencyMetricName =>
-  name === 'stt_latency_ms' ||
+  name === 'stt.latency_ms' ||
   name === 'tts_latency_ms' ||
   name === 'llm_latency_ms' ||
   name === 'eos_latency_ms';

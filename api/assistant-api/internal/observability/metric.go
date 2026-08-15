@@ -46,8 +46,10 @@ const (
 	MetricUserTurn      = "user_turn"
 	MetricAssistantTurn = "assistant_turn"
 
-	MetricSTTInitLatencyMs = "stt_init_ms"
-	MetricSTTLatencyMs     = "stt_latency_ms"
+	MetricSTTInitLatencyMs      = "stt.init_ms"
+	MetricSTTLatencyMs          = "stt.latency_ms"
+	MetricSTTTimeToFirstTokenMs = "stt.ttft_ms"
+	MetricSTTTimeToLastTokenMs  = "stt.ttlt_ms"
 
 	MetricTTSInitLatencyMs = "tts_init_ms"
 	MetricTTSLatencyMs     = "tts_latency_ms"
@@ -72,7 +74,7 @@ const (
 	MetricRecordingInitLatencyMs      = "recording.init_ms"
 	MetricKnowledgeLatencyMs          = "knowledge_latency_ms"
 	MetricLLMError                    = "llm_error"
-	MetricSTTError                    = "stt_error"
+	MetricSTTError                    = "stt.error"
 	MetricTTSError                    = "tts_error"
 	MetricDiscardedTTSChunk           = "discarded_tts_chunk"
 	MetricDiscardedTTS                = "discarded_tts"
@@ -91,16 +93,6 @@ const (
 	MetricProviderTotalTime           = "provider_total_time"
 	MetricProviderGenerateTime        = "provider_generate_time"
 )
-
-func NewMetricSTTInitLatencyMs(duration time.Duration, attr Attributes) RecordMetric {
-	record := NewConversationMetricRecord([]*protos.Metric{{
-		Name:        MetricSTTInitLatencyMs,
-		Value:       strconv.FormatInt(duration.Milliseconds(), 10),
-		Description: "STT initialization latency in milliseconds",
-	}})
-	record.Attributes = attr
-	return record
-}
 
 func NewMetricSTTLatencyMs(duration time.Duration, attr Attributes) RecordMetric {
 	record := NewConversationMetricRecord([]*protos.Metric{{
