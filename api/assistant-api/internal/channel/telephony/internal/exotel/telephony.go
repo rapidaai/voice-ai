@@ -44,23 +44,28 @@ func NewExotelTelephony(config *config.AssistantConfig, logger commons.Logger) (
 func (exo *exotelTelephony) CatchAllStatusCallback(ctx *gin.Context) (*internal_type.StatusInfo, error) {
 	eventDetails := utils.Option{}
 	rawCallbackPayload := ctx.Request.URL.RawQuery
-	if len(ctx.Request.URL.Query()) > 0 {
-		for key, values := range ctx.Request.URL.Query() {
-			if len(values) > 0 {
-				eventDetails[key] = values[0]
-			} else {
-				eventDetails[key] = nil
-			}
+
+	for key, values := range ctx.Request.URL.Query() {
+		if len(values) > 0 {
+			eventDetails[key] = values[0]
+		} else {
+			eventDetails[key] = nil
 		}
-	} else {
-		body, err := io.ReadAll(ctx.Request.Body)
-		if err != nil {
-			return nil, fmt.Errorf("%w: %w", internal_exotel.ErrCallbackFormParseFailed, err)
-		}
+	}
+
+	body, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", internal_exotel.ErrCallbackFormParseFailed, err)
+	}
+	if len(body) > 0 {
 		rawCallbackPayload = string(body)
 		ctx.Request.Body = io.NopCloser(bytes.NewReader(body))
-		if err := ctx.Request.ParseForm(); err == nil && len(ctx.Request.PostForm) > 0 {
-			for key, values := range ctx.Request.PostForm {
+		if strings.HasPrefix(strings.ToLower(ctx.Request.Header.Get("Content-Type")), "multipart/form-data") {
+			form, err := ctx.MultipartForm()
+			if err != nil {
+				return nil, fmt.Errorf("%w: %w", internal_exotel.ErrCallbackFormParseFailed, err)
+			}
+			for key, values := range form.Value {
 				if len(values) > 0 {
 					eventDetails[key] = values[0]
 				} else {
@@ -68,11 +73,10 @@ func (exo *exotelTelephony) CatchAllStatusCallback(ctx *gin.Context) (*internal_
 				}
 			}
 		} else {
-			form, err := ctx.MultipartForm()
-			if err != nil {
+			if err := ctx.Request.ParseForm(); err != nil {
 				return nil, fmt.Errorf("%w: %w", internal_exotel.ErrCallbackFormParseFailed, err)
 			}
-			for key, values := range form.Value {
+			for key, values := range ctx.Request.PostForm {
 				if len(values) > 0 {
 					eventDetails[key] = values[0]
 				} else {
@@ -95,23 +99,29 @@ func (exo *exotelTelephony) CatchAllStatusCallback(ctx *gin.Context) (*internal_
 func (exo *exotelTelephony) StatusCallback(c *gin.Context, auth types.SimplePrinciple, assistantId uint64, assistantConversationId uint64) (*internal_type.StatusInfo, error) {
 	eventDetails := utils.Option{}
 	rawCallbackPayload := c.Request.URL.RawQuery
-	if len(c.Request.URL.Query()) > 0 {
-		for key, values := range c.Request.URL.Query() {
-			if len(values) > 0 {
-				eventDetails[key] = values[0]
-			} else {
-				eventDetails[key] = nil
-			}
+
+	for key, values := range c.Request.URL.Query() {
+		if len(values) > 0 {
+			eventDetails[key] = values[0]
+		} else {
+			eventDetails[key] = nil
 		}
-	} else {
-		body, err := io.ReadAll(c.Request.Body)
-		if err != nil {
-			return nil, fmt.Errorf("%w: %w", internal_exotel.ErrCallbackFormParseFailed, err)
-		}
+	}
+
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", internal_exotel.ErrCallbackFormParseFailed, err)
+	}
+	if len(body) > 0 {
 		rawCallbackPayload = string(body)
 		c.Request.Body = io.NopCloser(bytes.NewReader(body))
-		if err := c.Request.ParseForm(); err == nil && len(c.Request.PostForm) > 0 {
-			for key, values := range c.Request.PostForm {
+
+		if strings.HasPrefix(strings.ToLower(c.Request.Header.Get("Content-Type")), "multipart/form-data") {
+			form, err := c.MultipartForm()
+			if err != nil {
+				return nil, fmt.Errorf("%w: %w", internal_exotel.ErrCallbackFormParseFailed, err)
+			}
+			for key, values := range form.Value {
 				if len(values) > 0 {
 					eventDetails[key] = values[0]
 				} else {
@@ -119,11 +129,10 @@ func (exo *exotelTelephony) StatusCallback(c *gin.Context, auth types.SimplePrin
 				}
 			}
 		} else {
-			form, err := c.MultipartForm()
-			if err != nil {
+			if err := c.Request.ParseForm(); err != nil {
 				return nil, fmt.Errorf("%w: %w", internal_exotel.ErrCallbackFormParseFailed, err)
 			}
-			for key, values := range form.Value {
+			for key, values := range c.Request.PostForm {
 				if len(values) > 0 {
 					eventDetails[key] = values[0]
 				} else {
