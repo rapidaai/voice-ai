@@ -21,6 +21,7 @@ import (
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/protos"
 )
 
 // -----------------------------------------------------------------------------
@@ -176,8 +177,15 @@ func New(opts ...Option) (internal_type.VoiceActivityDetectorExecutor, error) {
 	if options.onPacket != nil {
 		_ = options.onPacket(options.ctx,
 			internal_type.ObservabilityMetricRecordPacket{
-				Scope:  internal_type.ObservabilityRecordScopeConversation,
-				Record: observability.NewMetricVADInitLatencyMs(time.Since(start), observability.Attributes{"provider": vad.Name()}),
+				Scope: internal_type.ObservabilityRecordScopeConversation,
+				Record: observability.RecordMetric{
+					Attributes: observability.Attributes{"provider": vad.Name()},
+					Metrics: []*protos.Metric{{
+						Name:        observability.MetricVADInitLatencyMs,
+						Value:       fmt.Sprintf("%d", time.Since(start).Milliseconds()),
+						Description: "VAD initialization latency in milliseconds",
+					}},
+				},
 			},
 			internal_type.ObservabilityLogRecordPacket{
 				Scope: internal_type.ObservabilityRecordScopeConversation,

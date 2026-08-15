@@ -52,7 +52,7 @@ const (
 	MetricTTSInitLatencyMs = "tts_init_ms"
 	MetricTTSLatencyMs     = "tts_latency_ms"
 
-	MetricVADInitLatencyMs = "vad_init_ms"
+	MetricVADInitLatencyMs = "vad.init_ms"
 
 	MetricEOSInitLatencyMs            = "eos.init_ms"
 	MetricEOSLatencyMs                = "eos_latency_ms"
@@ -127,16 +127,6 @@ func NewMetricTTSLatencyMs(duration time.Duration, attr Attributes) RecordMetric
 		Name:        MetricTTSLatencyMs,
 		Value:       strconv.FormatInt(duration.Milliseconds(), 10),
 		Description: "TTS latency from text input to first audio in milliseconds",
-	}})
-	record.Attributes = attr
-	return record
-}
-
-func NewMetricVADInitLatencyMs(duration time.Duration, attr Attributes) RecordMetric {
-	record := NewConversationMetricRecord([]*protos.Metric{{
-		Name:        MetricVADInitLatencyMs,
-		Value:       strconv.FormatInt(duration.Milliseconds(), 10),
-		Description: "VAD initialization latency in milliseconds",
 	}})
 	record.Attributes = attr
 	return record
