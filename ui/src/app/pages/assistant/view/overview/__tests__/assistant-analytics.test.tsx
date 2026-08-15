@@ -116,6 +116,17 @@ jest.mock('@carbon/react', () => ({
   Button: ({ children, ...props }: any) => (
     <button {...props}>{children}</button>
   ),
+  SkeletonPlaceholder: ({ className }: any) => (
+    <div className={className} data-testid="skeleton-placeholder" />
+  ),
+  SkeletonText: ({ className, heading, width }: any) => (
+    <span
+      className={className}
+      data-heading={heading ? 'true' : 'false'}
+      data-testid="skeleton-text"
+      style={{ width }}
+    />
+  ),
   Toggletip: ({ children }: any) => <span>{children}</span>,
   ToggletipButton: ({ label }: any) => <button type="button">{label}</button>,
   ToggletipContent: ({ children }: any) => {
@@ -183,6 +194,24 @@ describe('AssistantAnalytics sessions toggletip', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Go to sessions' }));
 
     expect(mockGoToAssistantSessionList).toHaveBeenCalledWith('assistant-1');
+  });
+
+  it('keeps dashboard card structure visible while metrics are loading', () => {
+    mockGetAssistantDashboard.mockReturnValue(new Promise(() => {}));
+
+    const assistant = { getId: () => 'assistant-1' } as any;
+    render(<AssistantAnalytics assistant={assistant} />);
+
+    expect(screen.getByText('Sessions')).toBeInTheDocument();
+    expect(screen.getByText('Messages')).toBeInTheDocument();
+    expect(screen.getByText('Latency')).toBeInTheDocument();
+    expect(screen.getByText('Sources')).toBeInTheDocument();
+    expect(screen.getByText('Message activity')).toBeInTheDocument();
+    expect(screen.getAllByTestId('skeleton-text').length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByTestId('skeleton-placeholder').length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText('Total sessions')).not.toBeInTheDocument();
   });
 
   it('keeps sessions navigation action scoped to sessions metric', async () => {

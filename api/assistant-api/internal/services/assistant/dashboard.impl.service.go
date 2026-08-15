@@ -210,6 +210,7 @@ WHERE %s
 		observability.MetricEOSLatencyMs,
 		observability.MetricTTSLatencyMs,
 		observability.MetricAgentLatencyMs,
+		observability.MetricAgentTotalToken,
 		observability.MetricSTTLatencyMs,
 		observability.MetricEOSLatencyMs,
 		observability.MetricTTSLatencyMs,
