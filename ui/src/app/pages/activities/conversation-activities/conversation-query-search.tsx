@@ -102,8 +102,8 @@ const CONVERSATION_LOG_SEARCH_FIELDS: QuerySearchField[] = [
   {
     logicLabel: 'is',
     logicOptions: NUMBER_LOGIC_OPTIONS,
-    queryKey: 'llm_latency_ms',
-    text: 'llm',
+    queryKey: 'agent.latency_ms',
+    text: 'agent',
     type: 'number',
   },
   {
@@ -116,21 +116,21 @@ const CONVERSATION_LOG_SEARCH_FIELDS: QuerySearchField[] = [
   {
     logicLabel: 'is',
     logicOptions: NUMBER_LOGIC_OPTIONS,
-    queryKey: 'tts_latency_ms',
+    queryKey: 'tts.latency_ms',
     text: 'tts',
     type: 'number',
   },
   {
     logicLabel: 'is',
     logicOptions: NUMBER_LOGIC_OPTIONS,
-    queryKey: 'eos_latency_ms',
+    queryKey: 'eos.latency_ms',
     text: 'eos',
     type: 'number',
   },
   {
     logicLabel: 'is',
     logicOptions: NUMBER_LOGIC_OPTIONS,
-    queryKey: 'agent_total_token',
+    queryKey: 'agent.total_token',
     text: 'tokens',
     type: 'number',
   },
@@ -148,20 +148,20 @@ const CONVERSATION_LOG_SEARCH_FIELDS: QuerySearchField[] = [
 
 const CONVERSATION_LOG_SEARCH_CRITERIA: Record<string, string> = {
   'agent.ttft_ms': 'agent.ttft_ms',
-  agent_total_token: 'agent_total_token',
+  'agent.total_token': 'agent.total_token',
   assistant_conversation_id: 'assistant_conversation_id',
   assistant_id: 'assistant_id',
   body: 'body',
-  eos_latency_ms: 'eos_latency_ms',
+  'agent.latency_ms': 'agent.latency_ms',
+  'eos.latency_ms': 'eos.latency_ms',
   language: 'language',
-  llm_latency_ms: 'llm_latency_ms',
   message_id: 'message_id',
   role: 'role',
   source: 'source',
   status: 'status',
   'stt.latency_ms': 'stt.latency_ms',
   timestamp: 'created_date',
-  tts_latency_ms: 'tts_latency_ms',
+  'tts.latency_ms': 'tts.latency_ms',
 };
 
 export const getConversationLogSearchCriteria = (

@@ -150,7 +150,7 @@ func TestHandleResponse_Complete_EmitsLLMResponseDonePacket(t *testing.T) {
 	assert.Equal(t, "done text", done.Text)
 	ev, ok := collected[1].(internal_type.ObservabilityEventRecordPacket)
 	require.True(t, ok)
-	assert.Equal(t, observability.LLMCompleted, ev.Record.Event)
+	assert.Equal(t, observability.AgentCompleted, ev.Record.Event)
 	metric, ok := collected[2].(internal_type.ObservabilityMetricRecordPacket)
 	require.True(t, ok)
 	require.Len(t, metric.Record.Metrics, 1)
@@ -211,7 +211,7 @@ func TestHandleResponse_Interruption(t *testing.T) {
 	assert.Equal(t, internal_type.InterruptionSourceVad, ip.Source)
 	ev, ok := collected[1].(internal_type.ObservabilityEventRecordPacket)
 	require.True(t, ok)
-	assert.Equal(t, observability.LLMDiscarded, ev.Record.Event)
+	assert.Equal(t, observability.AgentDiscarded, ev.Record.Event)
 }
 
 func TestHandleResponse_Interruption_WordSource(t *testing.T) {
@@ -234,7 +234,7 @@ func TestHandleResponse_Interruption_WordSource(t *testing.T) {
 	assert.Equal(t, internal_type.InterruptionSourceWord, ip.Source)
 	ev, ok := collected[1].(internal_type.ObservabilityEventRecordPacket)
 	require.True(t, ok)
-	assert.Equal(t, observability.LLMDiscarded, ev.Record.Event)
+	assert.Equal(t, observability.AgentDiscarded, ev.Record.Event)
 }
 
 func TestHandleResponse_Close(t *testing.T) {
@@ -278,7 +278,7 @@ func TestHandleResponse_Error(t *testing.T) {
 
 	ev, ok := collected[1].(internal_type.ObservabilityEventRecordPacket)
 	require.True(t, ok)
-	assert.Equal(t, observability.LLMError, ev.Record.Event)
+	assert.Equal(t, observability.AgentError, ev.Record.Event)
 	assert.Equal(t, "websocket", ev.Record.Attributes["provider"])
 
 	log, ok := collected[2].(internal_type.ObservabilityLogRecordPacket)

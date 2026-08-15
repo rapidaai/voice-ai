@@ -138,7 +138,7 @@ func (e *agentkitExecutor) handleUserTurn(ctx context.Context, comm internal_typ
 		internal_type.ObservabilityEventRecordPacket{
 			ContextID: contextID,
 			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.NewMessageRecord(contextID, observability.ComponentLLM, observability.LLMStarted, observability.MessageRoleAssistant, observability.Attributes{
+			Record: observability.NewMessageRecord(contextID, observability.ComponentAgent, observability.AgentStarted, observability.MessageRoleAssistant, observability.Attributes{
 				"provider":         e.Name(),
 				"context_id":       contextID,
 				"input_char_count": fmt.Sprintf("%d", len(text)),
@@ -151,7 +151,7 @@ func (e *agentkitExecutor) handleUserTurn(ctx context.Context, comm internal_typ
 				Level:   observability.LevelDebug,
 				Message: "agentkit request started",
 				Attributes: observability.Attributes{
-					"component":        observability.ComponentLLM.String(),
+					"component":        observability.ComponentAgent.String(),
 					"operation":        "execute",
 					"provider":         e.Name(),
 					"context_id":       contextID,

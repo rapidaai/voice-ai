@@ -66,8 +66,8 @@ func (f fakeAgentHandler) Execute(ctx context.Context, request node.Request) (no
 		ContextID: request.ContextID,
 		Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
 		Record: observability.RecordEvent{
-			Component: observability.ComponentAgentflow,
-			Event:     observability.AgentflowTransitionTriggered,
+			Component: observability.ComponentAgent,
+			Event:     observability.AgentTransitionTriggered,
 			Attributes: observability.Attributes{
 				"context_id":      request.ContextID,
 				"from_node_id":    request.Node.ID,
@@ -178,7 +178,7 @@ func TestExecutorStaticMessageThenEnd(t *testing.T) {
 	require.IsType(t, internal_type.LLMResponseDonePacket{}, comm.packets[1])
 	matchedEvent, ok := comm.packets[2].(internal_type.ObservabilityEventRecordPacket)
 	require.True(t, ok)
-	require.Equal(t, observability.AgentflowTransitionMatched, matchedEvent.Record.Event)
+	require.Equal(t, observability.AgentTransitionMatched, matchedEvent.Record.Event)
 	require.Equal(t, "message-1", matchedEvent.Record.Attributes["from_node_id"])
 	require.Equal(t, "end-1", matchedEvent.Record.Attributes["to_node_id"])
 	endCall, ok := comm.packets[3].(internal_type.LLMToolCallPacket)
@@ -216,13 +216,13 @@ func TestExecutorAgentTransitionRoutesToTransfer(t *testing.T) {
 	require.Len(t, comm.packets, 3)
 	triggeredEvent, ok := comm.packets[0].(internal_type.ObservabilityEventRecordPacket)
 	require.True(t, ok)
-	require.Equal(t, observability.AgentflowTransitionTriggered, triggeredEvent.Record.Event)
+	require.Equal(t, observability.AgentTransitionTriggered, triggeredEvent.Record.Event)
 	require.Equal(t, "agent-1", triggeredEvent.Record.Attributes["from_node_id"])
 	require.Equal(t, "transition-transfer", triggeredEvent.Record.Attributes["transition_id"])
 	require.Equal(t, "transfer_to_human", triggeredEvent.Record.Attributes["transition_name"])
 	matchedEvent, ok := comm.packets[1].(internal_type.ObservabilityEventRecordPacket)
 	require.True(t, ok)
-	require.Equal(t, observability.AgentflowTransitionMatched, matchedEvent.Record.Event)
+	require.Equal(t, observability.AgentTransitionMatched, matchedEvent.Record.Event)
 	require.Equal(t, "transfer-1", matchedEvent.Record.Attributes["to_node_id"])
 	transferCall, ok := comm.packets[2].(internal_type.LLMToolCallPacket)
 	require.True(t, ok)
@@ -290,10 +290,10 @@ func TestExecutorAgentTransitionMissingEdgeEmitsEvent(t *testing.T) {
 	require.Len(t, comm.packets, 2)
 	triggeredEvent, ok := comm.packets[0].(internal_type.ObservabilityEventRecordPacket)
 	require.True(t, ok)
-	require.Equal(t, observability.AgentflowTransitionTriggered, triggeredEvent.Record.Event)
+	require.Equal(t, observability.AgentTransitionTriggered, triggeredEvent.Record.Event)
 	missingEdgeEvent, ok := comm.packets[1].(internal_type.ObservabilityEventRecordPacket)
 	require.True(t, ok)
-	require.Equal(t, observability.AgentflowTransitionMissingEdge, missingEdgeEvent.Record.Event)
+	require.Equal(t, observability.AgentTransitionMissingEdge, missingEdgeEvent.Record.Event)
 	require.Equal(t, "agent-1", missingEdgeEvent.Record.Attributes["from_node_id"])
 	require.Equal(t, "transition-transfer,transfer_to_human", missingEdgeEvent.Record.Attributes["route_handles"])
 }
@@ -352,15 +352,15 @@ func TestExecutorConditionRoutesByAgentTransitionParameter(t *testing.T) {
 	require.Len(t, comm.packets, 4)
 	triggeredEvent, ok := comm.packets[0].(internal_type.ObservabilityEventRecordPacket)
 	require.True(t, ok)
-	require.Equal(t, observability.AgentflowTransitionTriggered, triggeredEvent.Record.Event)
+	require.Equal(t, observability.AgentTransitionTriggered, triggeredEvent.Record.Event)
 	require.Equal(t, "check_order_status", triggeredEvent.Record.Attributes["transition_name"])
 	agentMatchedEvent, ok := comm.packets[1].(internal_type.ObservabilityEventRecordPacket)
 	require.True(t, ok)
-	require.Equal(t, observability.AgentflowTransitionMatched, agentMatchedEvent.Record.Event)
+	require.Equal(t, observability.AgentTransitionMatched, agentMatchedEvent.Record.Event)
 	require.Equal(t, "condition-1", agentMatchedEvent.Record.Attributes["to_node_id"])
 	conditionMatchedEvent, ok := comm.packets[2].(internal_type.ObservabilityEventRecordPacket)
 	require.True(t, ok)
-	require.Equal(t, observability.AgentflowTransitionMatched, conditionMatchedEvent.Record.Event)
+	require.Equal(t, observability.AgentTransitionMatched, conditionMatchedEvent.Record.Event)
 	require.Equal(t, "condition-1", conditionMatchedEvent.Record.Attributes["from_node_id"])
 	require.Equal(t, "end-matched", conditionMatchedEvent.Record.Attributes["to_node_id"])
 	endCall, ok := comm.packets[3].(internal_type.LLMToolCallPacket)

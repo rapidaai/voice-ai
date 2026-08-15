@@ -122,7 +122,7 @@ func New(opts ...Option) (*agentkitExecutor, error) {
 				Level:   observability.LevelError,
 				Message: fmt.Sprintf("%s: error while initialization %s", executor.Name(), err.Error()),
 				Attributes: observability.Attributes{
-					"component":  observability.ComponentLLM.String(),
+					"component":  observability.ComponentAgent.String(),
 					"provider":   executor.Name(),
 					"options":    observability.AttributeValue(executor.connection.GetOption()),
 					"url":        provider.Url,
@@ -143,7 +143,7 @@ func New(opts ...Option) (*agentkitExecutor, error) {
 				Level:   observability.LevelError,
 				Message: fmt.Sprintf("%s: error while initialization %s", executor.Name(), err.Error()),
 				Attributes: observability.Attributes{
-					"component":  observability.ComponentLLM.String(),
+					"component":  observability.ComponentAgent.String(),
 					"provider":   executor.Name(),
 					"options":    observability.AttributeValue(executor.connection.GetOption()),
 					"url":        provider.Url,
@@ -182,7 +182,7 @@ func New(opts ...Option) (*agentkitExecutor, error) {
 				Level:   observability.LevelError,
 				Message: fmt.Sprintf("%s: error while initialization %s", executor.Name(), err.Error()),
 				Attributes: observability.Attributes{
-					"component":  observability.ComponentLLM.String(),
+					"component":  observability.ComponentAgent.String(),
 					"provider":   executor.Name(),
 					"options":    observability.AttributeValue(executor.connection.GetOption()),
 					"url":        provider.Url,
@@ -214,7 +214,7 @@ func New(opts ...Option) (*agentkitExecutor, error) {
 				Level:   observability.LevelInfo,
 				Message: fmt.Sprintf("%s: initialization completed", executor.Name()),
 				Attributes: observability.Attributes{
-					"component": observability.ComponentLLM.String(),
+					"component": observability.ComponentAgent.String(),
 					"provider":  executor.Name(),
 					"url":       provider.Url,
 					"options":   observability.AttributeValue(executor.connection.GetOption()),

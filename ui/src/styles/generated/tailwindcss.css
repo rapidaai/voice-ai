@@ -7506,6 +7506,11 @@
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
   }
+  .md\:grid-cols-5 {
+    @media (width >= 48rem) {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+  }
   .md\:grid-cols-9 {
     @media (width >= 48rem) {
       grid-template-columns: repeat(9, minmax(0, 1fr));

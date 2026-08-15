@@ -109,7 +109,7 @@ func (e *modelAssistantExecutor) handleUserTurn(ctx context.Context, communicati
 			internal_type.ObservabilityEventRecordPacket{
 				ContextID: p.ContextID,
 				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.NewMessageRecord(p.ContextID, observability.ComponentLLM, observability.LLMError, observability.MessageRoleAssistant, observability.Attributes{
+				Record: observability.NewMessageRecord(p.ContextID, observability.ComponentAgent, observability.AgentError, observability.MessageRoleAssistant, observability.Attributes{
 					"provider":   providerName,
 					"context_id": p.ContextID,
 					"error":      err.Error(),
@@ -122,7 +122,7 @@ func (e *modelAssistantExecutor) handleUserTurn(ctx context.Context, communicati
 					Level:   observability.LevelError,
 					Message: "llm request failed",
 					Attributes: observability.Attributes{
-						"component":  observability.ComponentLLM.String(),
+						"component":  observability.ComponentAgent.String(),
 						"operation":  "execute",
 						"provider":   providerName,
 						"context_id": p.ContextID,
@@ -139,7 +139,7 @@ func (e *modelAssistantExecutor) handleUserTurn(ctx context.Context, communicati
 		internal_type.ObservabilityEventRecordPacket{
 			ContextID: p.ContextID,
 			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.NewMessageRecord(p.ContextID, observability.ComponentLLM, observability.LLMStarted, observability.MessageRoleAssistant, observability.Attributes{
+			Record: observability.NewMessageRecord(p.ContextID, observability.ComponentAgent, observability.AgentStarted, observability.MessageRoleAssistant, observability.Attributes{
 				"provider":         providerName,
 				"context_id":       p.ContextID,
 				"input_char_count": fmt.Sprintf("%d", len(p.Text)),
@@ -153,7 +153,7 @@ func (e *modelAssistantExecutor) handleUserTurn(ctx context.Context, communicati
 				Level:   observability.LevelDebug,
 				Message: "llm request started",
 				Attributes: observability.Attributes{
-					"component":        observability.ComponentLLM.String(),
+					"component":        observability.ComponentAgent.String(),
 					"operation":        "execute",
 					"provider":         providerName,
 					"context_id":       p.ContextID,
@@ -186,7 +186,7 @@ func (e *modelAssistantExecutor) handleUserTurn(ctx context.Context, communicati
 			internal_type.ObservabilityEventRecordPacket{
 				ContextID: p.ContextID,
 				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.NewMessageRecord(p.ContextID, observability.ComponentLLM, observability.LLMError, observability.MessageRoleAssistant, observability.Attributes{
+				Record: observability.NewMessageRecord(p.ContextID, observability.ComponentAgent, observability.AgentError, observability.MessageRoleAssistant, observability.Attributes{
 					"provider":   providerName,
 					"context_id": p.ContextID,
 					"error":      err.Error(),
@@ -199,7 +199,7 @@ func (e *modelAssistantExecutor) handleUserTurn(ctx context.Context, communicati
 					Level:   observability.LevelError,
 					Message: "llm request failed",
 					Attributes: observability.Attributes{
-						"component":  observability.ComponentLLM.String(),
+						"component":  observability.ComponentAgent.String(),
 						"operation":  "execute",
 						"provider":   providerName,
 						"context_id": p.ContextID,
@@ -303,7 +303,7 @@ func (e *modelAssistantExecutor) handleResponse(ctx context.Context, communicati
 			internal_type.ObservabilityEventRecordPacket{
 				ContextID: contextID,
 				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.NewMessageRecord(contextID, observability.ComponentLLM, observability.LLMError, observability.MessageRoleAssistant, observability.Attributes{
+				Record: observability.NewMessageRecord(contextID, observability.ComponentAgent, observability.AgentError, observability.MessageRoleAssistant, observability.Attributes{
 					"provider":   providerName,
 					"context_id": contextID,
 					"error":      errMsg,
@@ -316,7 +316,7 @@ func (e *modelAssistantExecutor) handleResponse(ctx context.Context, communicati
 					Level:   observability.LevelError,
 					Message: "llm response failed",
 					Attributes: observability.Attributes{
-						"component":  observability.ComponentLLM.String(),
+						"component":  observability.ComponentAgent.String(),
 						"operation":  "response",
 						"provider":   providerName,
 						"context_id": contextID,
@@ -380,7 +380,7 @@ func (e *modelAssistantExecutor) onCompletion(ctx context.Context, communication
 		internal_type.ObservabilityEventRecordPacket{
 			ContextID: contextID,
 			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.NewMessageRecord(contextID, observability.ComponentLLM, observability.LLMCompleted, observability.MessageRoleAssistant, observability.Attributes{
+			Record: observability.NewMessageRecord(contextID, observability.ComponentAgent, observability.AgentCompleted, observability.MessageRoleAssistant, observability.Attributes{
 				"provider":            providerName,
 				"context_id":          contextID,
 				"response_char_count": fmt.Sprintf("%d", len(responseText)),
@@ -399,10 +399,9 @@ func (e *modelAssistantExecutor) onCompletion(ctx context.Context, communication
 	}
 	var usageDuration time.Duration
 	for _, metric := range metrics {
-		switch metric.GetName() {
-		case observability.MetricTimeTaken, observability.MetricProviderTotalTime:
-			if ns, err := strconv.ParseInt(metric.GetValue(), 10, 64); err == nil && ns > 0 {
-				usageDuration = time.Duration(ns)
+		if metric.GetName() == observability.MetricAgentTRTMs {
+			if ms, err := strconv.ParseInt(metric.GetValue(), 10, 64); err == nil && ms > 0 {
+				usageDuration = time.Duration(ms) * time.Millisecond
 			}
 		}
 	}
@@ -444,22 +443,10 @@ func (e *modelAssistantExecutor) isStaleResponse(requestID string) bool {
 }
 
 func (e *modelAssistantExecutor) buildCompletionMetrics(providerMetrics []*protos.Metric) []*protos.Metric {
-	out := make([]*protos.Metric, 0, len(providerMetrics)+1)
+	out := make([]*protos.Metric, 0, len(providerMetrics))
 	for _, m := range providerMetrics {
-		if m.GetName() == observability.MetricTimeToFirstToken {
-			if ns, err := strconv.ParseInt(m.GetValue(), 10, 64); err == nil {
-				ms := fmt.Sprintf("%d", ns/int64(time.Millisecond))
-				out = append(out, &protos.Metric{
-					Name: observability.MetricAgentTTFTMs, Value: ms, Description: m.GetDescription(),
-				})
-				out = append(out, &protos.Metric{
-					Name: observability.MetricLLMLatencyMs, Value: ms,
-				})
-			}
-			continue
-		}
 		out = append(out, &protos.Metric{
-			Name: "agent_" + m.GetName(), Value: m.GetValue(), Description: m.GetDescription(),
+			Name: m.GetName(), Value: m.GetValue(), Description: m.GetDescription(),
 		})
 	}
 	return out

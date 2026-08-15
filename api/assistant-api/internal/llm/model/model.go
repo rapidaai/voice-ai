@@ -145,7 +145,7 @@ func New(opts ...Option) (*modelAssistantExecutor, error) {
 				Level:   observability.LevelError,
 				Message: fmt.Sprintf("%s: error while initialization %s", executor.Name(), err.Error()),
 				Attributes: observability.Attributes{
-					"component":  observability.ComponentLLM.String(),
+					"component":  observability.ComponentAgent.String(),
 					"provider":   provider,
 					"options":    observability.AttributeValue(providerOptions),
 					"error":      err.Error(),
@@ -167,7 +167,7 @@ func New(opts ...Option) (*modelAssistantExecutor, error) {
 				Level:   observability.LevelError,
 				Message: fmt.Sprintf("%s: error while initialization %s", executor.Name(), err.Error()),
 				Attributes: observability.Attributes{
-					"component":  observability.ComponentLLM.String(),
+					"component":  observability.ComponentAgent.String(),
 					"provider":   provider,
 					"options":    observability.AttributeValue(providerOptions),
 					"error":      err.Error(),
@@ -189,7 +189,7 @@ func New(opts ...Option) (*modelAssistantExecutor, error) {
 				Level:   observability.LevelError,
 				Message: fmt.Sprintf("%s: error while initialization %s", executor.Name(), err.Error()),
 				Attributes: observability.Attributes{
-					"component":  observability.ComponentLLM.String(),
+					"component":  observability.ComponentAgent.String(),
 					"provider":   provider,
 					"options":    observability.AttributeValue(providerOptions),
 					"error":      err.Error(),
@@ -220,7 +220,7 @@ func New(opts ...Option) (*modelAssistantExecutor, error) {
 				Level:   observability.LevelInfo,
 				Message: fmt.Sprintf("%s: initialization completed", executor.Name()),
 				Attributes: observability.Attributes{
-					"component": observability.ComponentLLM.String(),
+					"component": observability.ComponentAgent.String(),
 					"provider":  provider,
 					"options":   observability.AttributeValue(providerOptions),
 				},

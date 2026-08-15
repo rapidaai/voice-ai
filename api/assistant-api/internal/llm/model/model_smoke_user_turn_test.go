@@ -30,7 +30,7 @@ func TestModel_ExecuteUserTurn_SendsChatAndAppendsUser(t *testing.T) {
 
 	evt, ok := findPacket[internal_type.ObservabilityEventRecordPacket](comm.pkts)
 	require.True(t, ok)
-	require.Equal(t, observability.LLMStarted, evt.Record.Event)
+	require.Equal(t, observability.AgentStarted, evt.Record.Event)
 	require.Equal(t, "5", evt.Record.Attributes["input_char_count"])
 }
 

@@ -121,7 +121,7 @@ func (e *modelAssistantExecutor) listen(ctx context.Context, communication inter
 				internal_type.ObservabilityEventRecordPacket{
 					ContextID: contextID,
 					Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-					Record: observability.NewMessageRecord(contextID, observability.ComponentLLM, observability.LLMError, observability.MessageRoleAssistant, observability.Attributes{
+					Record: observability.NewMessageRecord(contextID, observability.ComponentAgent, observability.AgentError, observability.MessageRoleAssistant, observability.Attributes{
 						"provider":   providerName,
 						"context_id": contextID,
 						"error":      err.Error(),
@@ -135,7 +135,7 @@ func (e *modelAssistantExecutor) listen(ctx context.Context, communication inter
 						Level:   observability.LevelError,
 						Message: "llm stream receive failed",
 						Attributes: observability.Attributes{
-							"component":  observability.ComponentLLM.String(),
+							"component":  observability.ComponentAgent.String(),
 							"operation":  "listen",
 							"provider":   providerName,
 							"context_id": contextID,

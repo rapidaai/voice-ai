@@ -19,8 +19,7 @@ const (
 	ComponentTurn           ComponentName = "turn"
 	ComponentSTT            ComponentName = "stt"
 	ComponentTTS            ComponentName = "tts"
-	ComponentLLM            ComponentName = "llm"
-	ComponentAgentflow      ComponentName = "agentflow"
+	ComponentAgent          ComponentName = "agent"
 	ComponentVAD            ComponentName = "vad"
 	ComponentEOS            ComponentName = "eos"
 	ComponentDenoise        ComponentName = "denoise"
@@ -91,25 +90,25 @@ const (
 )
 
 const (
-	TTSSpeaking    EventName = "tts.speaking"
-	TTSCompleted   EventName = "tts.completed"
-	TTSDiscarded   EventName = "tts.discarded"
-	TTSInterrupted EventName = "tts.interrupted"
-	TTSClosed      EventName = "tts.closed"
-	TTSError       EventName = "tts.error"
+	TTSSpeaking     EventName = "tts.speaking"
+	TTSCompleted    EventName = "tts.completed"
+	TTSDiscardChunk EventName = "tts.discard_chunk"
+	TTSInterrupted  EventName = "tts.interrupted"
+	TTSClosed       EventName = "tts.closed"
+	TTSError        EventName = "tts.error"
 )
 
 const (
-	LLMStarted   EventName = "llm.started"
-	LLMCompleted EventName = "llm.completed"
-	LLMDiscarded EventName = "llm.discarded"
-	LLMError     EventName = "llm.error"
+	AgentStarted   EventName = "agent.started"
+	AgentCompleted EventName = "agent.completed"
+	AgentDiscarded EventName = "agent.discarded"
+	AgentError     EventName = "agent.error"
 )
 
 const (
-	AgentflowTransitionTriggered   EventName = "agentflow.transition.triggered"
-	AgentflowTransitionMatched     EventName = "agentflow.transition.matched"
-	AgentflowTransitionMissingEdge EventName = "agentflow.transition.missing_edge"
+	AgentTransitionTriggered   EventName = "agent.transition.triggered"
+	AgentTransitionMatched     EventName = "agent.transition.matched"
+	AgentTransitionMissingEdge EventName = "agent.transition.missing_edge"
 )
 
 const (
@@ -218,21 +217,19 @@ var eventsByComponent = map[ComponentName][]EventName{
 	ComponentTTS: {
 		TTSSpeaking,
 		TTSCompleted,
-		TTSDiscarded,
+		TTSDiscardChunk,
 		TTSInterrupted,
 		TTSClosed,
 		TTSError,
 	},
-	ComponentLLM: {
-		LLMStarted,
-		LLMCompleted,
-		LLMDiscarded,
-		LLMError,
-	},
-	ComponentAgentflow: {
-		AgentflowTransitionTriggered,
-		AgentflowTransitionMatched,
-		AgentflowTransitionMissingEdge,
+	ComponentAgent: {
+		AgentStarted,
+		AgentCompleted,
+		AgentDiscarded,
+		AgentError,
+		AgentTransitionTriggered,
+		AgentTransitionMatched,
+		AgentTransitionMissingEdge,
 	},
 	ComponentVAD: {
 		VADSpeechStarted,
