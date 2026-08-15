@@ -60,6 +60,7 @@ const (
 	MetadataRetryable          = "retryable"
 	MetadataProviderStatusCode = "provider_status_code"
 	MetadataTelephonyError     = "telephony.error"
+	MetadataSTTRequestID       = "stt.request_id"
 )
 
 // Current SIP transfer metadata names.

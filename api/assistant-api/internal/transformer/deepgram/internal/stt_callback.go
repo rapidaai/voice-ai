@@ -62,45 +62,102 @@ func (d *deepgramSttCallback) Message(mr *msginterfaces.MessageResponse) error {
 			continue
 		}
 
+		now := time.Now()
+		transcriptLatency := time.Duration(0)
+		ttftValue := ""
+		ttltValue := ""
+		latencyValue := ""
+		d.metrics.mu.Lock()
+		if !d.metrics.speechStartedAt.IsZero() && !now.Before(d.metrics.speechStartedAt) {
+			speechStartedMs := strconv.FormatInt(now.Sub(d.metrics.speechStartedAt).Milliseconds(), 10)
+			if !d.metrics.ttftReported {
+				d.metrics.ttftReported = true
+				ttftValue = speechStartedMs
+			}
+			if mr.IsFinal && !d.metrics.ttltReported {
+				d.metrics.ttltReported = true
+				ttltValue = speechStartedMs
+			}
+		}
+		if mr.IsFinal && !d.metrics.speechEndedAt.IsZero() && !now.Before(d.metrics.speechEndedAt) {
+			transcriptLatency = now.Sub(d.metrics.speechEndedAt)
+			if !d.metrics.latencyReported {
+				d.metrics.latencyReported = true
+				latencyValue = strconv.FormatInt(transcriptLatency.Milliseconds(), 10)
+			}
+		}
+		d.metrics.mu.Unlock()
+
+		if ttftValue != "" {
+			d.onPacket(internal_type.ObservabilityMetricRecordPacket{
+				ContextID: ctxID,
+				Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+				Record: observability.RecordMetric{
+					Metrics: []*protos.Metric{{
+						Name:        observability.MetricSTTTimeToFirstTokenMs,
+						Value:       ttftValue,
+						Description: STTTimeToFirstTokenMetricDescription,
+					}},
+					Attributes: observability.Attributes{
+						"provider":  d.providerName,
+						"messageId": ctxID,
+					},
+				},
+			})
+		}
+		if ttltValue != "" {
+			d.onPacket(internal_type.ObservabilityMetricRecordPacket{
+				ContextID: ctxID,
+				Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+				Record: observability.RecordMetric{
+					Metrics: []*protos.Metric{{
+						Name:        observability.MetricSTTTimeToLastTokenMs,
+						Value:       ttltValue,
+						Description: STTTimeToLastTokenMetricDescription,
+					}},
+					Attributes: observability.Attributes{
+						"provider":  d.providerName,
+						"messageId": ctxID,
+					},
+				},
+			})
+		}
+		if latencyValue != "" {
+			d.onPacket(internal_type.ObservabilityMetricRecordPacket{
+				ContextID: ctxID,
+				Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+				Record: observability.RecordMetric{
+					Metrics: []*protos.Metric{{
+						Name:        observability.MetricSTTLatencyMs,
+						Value:       latencyValue,
+						Description: STTLatencyMetricDescription,
+					}},
+					Attributes: observability.Attributes{
+						"provider":  d.providerName,
+						"messageId": ctxID,
+					},
+				},
+			})
+		}
+
 		if mr.IsFinal {
-			transcriptLatency := d.metrics.GetLatency(time.Now())
 			if v, err := d.options.GetFloat64(internal_options.ListenOptionThreshold); err == nil {
 				if alternative.Confidence < v {
-					d.onPacket(
-						internal_type.ObservabilityEventRecordPacket{
-							ContextID: ctxID,
-							Scope:     internal_type.ObservabilityRecordScopeUserMessage,
-							Record: observability.RecordEvent{
-								Component: observability.ComponentSTT,
-								Event:     observability.STTLowConfidence,
-								Attributes: observability.Attributes{
-									"type":       "low_confidence",
-									"script":     alternative.Transcript,
-									"confidence": fmt.Sprintf("%.4f", alternative.Confidence),
-									"threshold":  fmt.Sprintf("%.4f", v),
-								},
-								OccurredAt: time.Now(),
+					d.onPacket(internal_type.ObservabilityEventRecordPacket{
+						ContextID: ctxID,
+						Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+						Record: observability.RecordEvent{
+							Component: observability.ComponentSTT,
+							Event:     observability.STTLowConfidence,
+							Attributes: observability.Attributes{
+								"type":       "low_confidence",
+								"script":     alternative.Transcript,
+								"confidence": fmt.Sprintf("%.4f", alternative.Confidence),
+								"threshold":  fmt.Sprintf("%.4f", v),
 							},
+							OccurredAt: now,
 						},
-					)
-					if transcriptLatency > 0 && d.metrics.SetLatencyReported() {
-						d.onPacket(
-							internal_type.ObservabilityMetricRecordPacket{
-								ContextID: ctxID,
-								Scope:     internal_type.ObservabilityRecordScopeUserMessage,
-								Record: observability.RecordMetric{
-									Metrics: []*protos.Metric{{
-										Name:        observability.MetricSTTLatencyMs,
-										Value:       strconv.FormatInt(transcriptLatency.Milliseconds(), 10),
-										Description: STTLatencyMetricDescription,
-									}},
-									Attributes: observability.Attributes{
-										"provider":  d.providerName,
-										"messageId": ctxID,
-									},
-								},
-							})
-					}
+					})
 					return nil
 				}
 			}
@@ -130,50 +187,30 @@ func (d *deepgramSttCallback) Message(mr *msginterfaces.MessageResponse) error {
 							"messageId":  ctxID,
 							"char_count": fmt.Sprintf("%d", len(alternative.Transcript)),
 						},
-						OccurredAt: time.Now(),
+						OccurredAt: now,
 					},
 				},
 			)
-			if transcriptLatency > 0 && d.metrics.SetLatencyReported() {
-				d.onPacket(
-					internal_type.ObservabilityMetricRecordPacket{
-						ContextID: ctxID,
-						Scope:     internal_type.ObservabilityRecordScopeUserMessage,
-						Record: observability.RecordMetric{
-							Metrics: []*protos.Metric{{
-								Name:        observability.MetricSTTLatencyMs,
-								Value:       strconv.FormatInt(transcriptLatency.Milliseconds(), 10),
-								Description: STTLatencyMetricDescription,
-							}},
-							Attributes: observability.Attributes{
-								"provider":  d.providerName,
-								"messageId": ctxID,
-							},
-						},
-					})
-			}
 			return nil
 		}
 
 		if v, err := d.options.GetFloat64(internal_options.ListenOptionThreshold); err == nil {
 			if alternative.Confidence < v {
-				d.onPacket(
-					internal_type.ObservabilityEventRecordPacket{
-						ContextID: ctxID,
-						Scope:     internal_type.ObservabilityRecordScopeUserMessage,
-						Record: observability.RecordEvent{
-							Component: observability.ComponentSTT,
-							Event:     observability.STTLowConfidence,
-							Attributes: observability.Attributes{
-								"type":       "low_confidence",
-								"script":     alternative.Transcript,
-								"confidence": fmt.Sprintf("%.4f", alternative.Confidence),
-								"threshold":  fmt.Sprintf("%.4f", v),
-							},
-							OccurredAt: time.Now(),
+				d.onPacket(internal_type.ObservabilityEventRecordPacket{
+					ContextID: ctxID,
+					Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+					Record: observability.RecordEvent{
+						Component: observability.ComponentSTT,
+						Event:     observability.STTLowConfidence,
+						Attributes: observability.Attributes{
+							"type":       "low_confidence",
+							"script":     alternative.Transcript,
+							"confidence": fmt.Sprintf("%.4f", alternative.Confidence),
+							"threshold":  fmt.Sprintf("%.4f", v),
 						},
+						OccurredAt: now,
 					},
-				)
+				})
 				return nil
 			}
 		}
@@ -200,7 +237,7 @@ func (d *deepgramSttCallback) Message(mr *msginterfaces.MessageResponse) error {
 						"messageId":  ctxID,
 						"confidence": fmt.Sprintf("%.4f", alternative.Confidence),
 					},
-					OccurredAt: time.Now(),
+					OccurredAt: now,
 				},
 			},
 		)
@@ -214,12 +251,22 @@ func (d *deepgramSttCallback) UtteranceEnd(ur *msginterfaces.UtteranceEndRespons
 	return nil
 }
 
-// Handle metadata (optional, can be left empty)
+// Handle metadata emitted by Deepgram for the active STT stream.
 func (d *deepgramSttCallback) Metadata(md *msginterfaces.MetadataResponse) error {
+	if md != nil {
+		d.onPacket(internal_type.ObservabilityMetadataRecordPacket{
+			ContextID: d.contextID(),
+			Scope:     internal_type.ObservabilityRecordScopeConversation,
+			Record: observability.NewConversationMetadataRecord([]*protos.Metadata{{
+				Key:   observability.MetadataSTTRequestID,
+				Value: md.RequestID,
+			}}),
+		})
+	}
 	return nil
 }
 
-// Handle speech started event — no-op; latency timing is driven by SpeechToTextEndPacket and Deepgram finalize.
+// Handle speech started event — no-op; timing is driven by the conversation STT packets.
 func (d *deepgramSttCallback) SpeechStarted(ssr *msginterfaces.SpeechStartedResponse) error {
 	return nil
 }

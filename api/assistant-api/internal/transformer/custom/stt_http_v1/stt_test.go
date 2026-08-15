@@ -173,13 +173,13 @@ func TestSpeechToText_HTTPFlow_FlushesBufferedSpeechOnVADEnd(t *testing.T) {
 	for _, packet := range collector.all() {
 		if metric, ok := packet.(internal_type.ObservabilityMetricRecordPacket); ok {
 			for _, item := range metric.Record.Metrics {
-				if item.GetName() == "stt_latency_ms" {
+				if item.GetName() == "stt.latency_ms" {
 					hasLatencyMetric = true
 				}
 			}
 		}
 	}
-	assert.True(t, hasLatencyMetric, "expected stt_latency_ms metric")
+	assert.True(t, hasLatencyMetric, "expected stt.latency_ms metric")
 }
 
 func TestSpeechToText_HTTPStatusError_EmitsErrorLog(t *testing.T) {

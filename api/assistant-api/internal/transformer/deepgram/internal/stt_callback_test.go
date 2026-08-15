@@ -54,6 +54,53 @@ func (pc *packetCollector) Clear() {
 	pc.packets = make([]internal_type.Packet, 0)
 }
 
+func countMetricPackets(packets []internal_type.Packet, metricName string) int {
+	count := 0
+	for _, packet := range packets {
+		metricPacket, ok := packet.(internal_type.ObservabilityMetricRecordPacket)
+		if !ok {
+			continue
+		}
+		for _, metric := range metricPacket.Record.Metrics {
+			if metric.Name == metricName {
+				count++
+			}
+		}
+	}
+	return count
+}
+
+func findSpeechToTextPacket(packets []internal_type.Packet) (internal_type.SpeechToTextPacket, bool) {
+	for _, packet := range packets {
+		sttPacket, ok := packet.(internal_type.SpeechToTextPacket)
+		if ok {
+			return sttPacket, true
+		}
+	}
+	return internal_type.SpeechToTextPacket{}, false
+}
+
+func findSpeechToTextPackets(packets []internal_type.Packet) []internal_type.SpeechToTextPacket {
+	sttPackets := []internal_type.SpeechToTextPacket{}
+	for _, packet := range packets {
+		sttPacket, ok := packet.(internal_type.SpeechToTextPacket)
+		if ok {
+			sttPackets = append(sttPackets, sttPacket)
+		}
+	}
+	return sttPackets
+}
+
+func findEventPacket(packets []internal_type.Packet) (internal_type.ObservabilityEventRecordPacket, bool) {
+	for _, packet := range packets {
+		eventPacket, ok := packet.(internal_type.ObservabilityEventRecordPacket)
+		if ok {
+			return eventPacket, true
+		}
+	}
+	return internal_type.ObservabilityEventRecordPacket{}, false
+}
+
 // =============================================================================
 // Test Helper Functions
 // =============================================================================
@@ -66,6 +113,16 @@ func createTestCallbackWithSpeechEndedAt(opts utils.Option, speechEndedAt time.T
 	logger, _ := commons.NewApplicationLogger()
 	collector := newPacketCollector()
 	metrics := &SttSessionMetrics{}
+	metrics.SetSpeechEndedAt(speechEndedAt)
+	callback := NewDeepgramSttCallback(logger, collector.OnPacket, opts, func() string { return "ctx-test" }, "deepgram-stt", metrics)
+	return collector, logger, callback
+}
+
+func createTestCallbackWithSpeechWindow(opts utils.Option, speechStartedAt, speechEndedAt time.Time) (*packetCollector, commons.Logger, msginterfaces.LiveMessageCallback) {
+	logger, _ := commons.NewApplicationLogger()
+	collector := newPacketCollector()
+	metrics := &SttSessionMetrics{}
+	metrics.ResetSpeech(speechStartedAt)
 	metrics.SetSpeechEndedAt(speechEndedAt)
 	callback := NewDeepgramSttCallback(logger, collector.OnPacket, opts, func() string { return "ctx-test" }, "deepgram-stt", metrics)
 	return collector, logger, callback
@@ -152,28 +209,23 @@ func TestMessage(t *testing.T) {
 
 		require.NoError(t, err)
 		packets := collector.GetPackets()
-		// Final: InterruptionDetectedPacket + SpeechToTextPacket + ObservabilityEventRecordPacket + ObservabilityMetricRecordPacket
+		// Final: metric packet + InterruptionDetectedPacket + SpeechToTextPacket + ObservabilityEventRecordPacket.
 		require.Len(t, packets, 4)
 
-		// First packet should be InterruptionDetectedPacket
-		interruption, ok := packets[0].(internal_type.InterruptionDetectedPacket)
+		// Second packet should be InterruptionDetectedPacket
+		interruption, ok := packets[1].(internal_type.InterruptionDetectedPacket)
 		assert.True(t, ok, "first packet should be InterruptionDetectedPacket")
 		assert.Equal(t, internal_type.InterruptionSourceWord, interruption.Source)
 
-		// Second packet should be SpeechToTextPacket
-		stt, ok := packets[1].(internal_type.SpeechToTextPacket)
+		// Third packet should be SpeechToTextPacket
+		stt, ok := packets[2].(internal_type.SpeechToTextPacket)
 		assert.True(t, ok, "second packet should be SpeechToTextPacket")
 		assert.Equal(t, "hello world", stt.Script)
 		assert.Equal(t, 0.95, stt.Confidence)
 		assert.Equal(t, "en", stt.Language)
 		assert.False(t, stt.Interim) // IsFinal=true means Interim=false
 		assert.Greater(t, stt.Latency, time.Duration(0))
-
-		// Fourth packet should be ObservabilityMetricRecordPacket with STT latency.
-		metric, ok := packets[3].(internal_type.ObservabilityMetricRecordPacket)
-		assert.True(t, ok, "fourth packet should be ObservabilityMetricRecordPacket")
-		assert.Len(t, metric.Record.Metrics, 1)
-		assert.Equal(t, observability.MetricSTTLatencyMs, metric.Record.Metrics[0].Name)
+		assert.Equal(t, 1, countMetricPackets(packets, observability.MetricSTTLatencyMs))
 	})
 
 	t.Run("omits latency metric when speech end time is missing", func(t *testing.T) {
@@ -187,9 +239,10 @@ func TestMessage(t *testing.T) {
 		// Final without a speech end timestamp: InterruptionDetectedPacket + SpeechToTextPacket + ObservabilityEventRecordPacket
 		require.Len(t, packets, 3)
 
-		_, ok := packets[2].(internal_type.ObservabilityEventRecordPacket)
-		assert.True(t, ok, "third packet should be ObservabilityEventRecordPacket")
-		stt := packets[1].(internal_type.SpeechToTextPacket)
+		_, ok := findEventPacket(packets)
+		assert.True(t, ok, "expected ObservabilityEventRecordPacket")
+		stt, ok := findSpeechToTextPacket(packets)
+		require.True(t, ok)
 		assert.Equal(t, time.Duration(0), stt.Latency)
 	})
 
@@ -204,7 +257,8 @@ func TestMessage(t *testing.T) {
 		// Interim: InterruptionDetectedPacket + SpeechToTextPacket + ObservabilityEventRecordPacket (no metric)
 		require.Len(t, packets, 3)
 
-		stt := packets[1].(internal_type.SpeechToTextPacket)
+		stt, ok := findSpeechToTextPacket(packets)
+		require.True(t, ok)
 		assert.True(t, stt.Interim)
 	})
 
@@ -231,10 +285,11 @@ func TestMessage(t *testing.T) {
 
 		require.NoError(t, err)
 		packets := collector.GetPackets()
-		// Final: InterruptionDetectedPacket + SpeechToTextPacket + ObservabilityEventRecordPacket + ObservabilityMetricRecordPacket
+		// Final: metric packet + InterruptionDetectedPacket + SpeechToTextPacket + ObservabilityEventRecordPacket.
 		require.Len(t, packets, 4)
 
-		stt := packets[1].(internal_type.SpeechToTextPacket)
+		stt, ok := findSpeechToTextPacket(packets)
+		require.True(t, ok)
 		assert.Equal(t, "second transcript", stt.Script)
 		assert.Equal(t, 0.8, stt.Confidence)
 	})
@@ -274,19 +329,21 @@ func TestMessage(t *testing.T) {
 		require.NoError(t, callback.Message(createMessageResponse("first final", 0.95, true, []string{"en"})))
 		require.NoError(t, callback.Message(createMessageResponse("second final", 0.95, true, []string{"en"})))
 
-		latencyMetrics := 0
-		for _, packet := range collector.GetPackets() {
-			metricPacket, ok := packet.(internal_type.ObservabilityMetricRecordPacket)
-			if !ok {
-				continue
-			}
-			for _, metric := range metricPacket.Record.Metrics {
-				if metric.Name == observability.MetricSTTLatencyMs {
-					latencyMetrics++
-				}
-			}
-		}
-		assert.Equal(t, 1, latencyMetrics)
+		assert.Equal(t, 1, countMetricPackets(collector.GetPackets(), observability.MetricSTTLatencyMs))
+	})
+
+	t.Run("emits deepgram timing metrics for final transcript", func(t *testing.T) {
+		startedAt := time.Now().Add(-250 * time.Millisecond)
+		endedAt := time.Now().Add(-100 * time.Millisecond)
+		collector, _, callback := createTestCallbackWithSpeechWindow(utils.Option{}, startedAt, endedAt)
+
+		require.NoError(t, callback.Message(createMessageResponse("final timing", 0.95, true, []string{"en"})))
+
+		packets := collector.GetPackets()
+		require.Len(t, packets, 6)
+		assert.Equal(t, 1, countMetricPackets(packets, observability.MetricSTTTimeToFirstTokenMs))
+		assert.Equal(t, 1, countMetricPackets(packets, observability.MetricSTTTimeToLastTokenMs))
+		assert.Equal(t, 1, countMetricPackets(packets, observability.MetricSTTLatencyMs))
 	})
 }
 
@@ -310,15 +367,14 @@ func TestMessageWithConfidenceThreshold(t *testing.T) {
 		// Below threshold: transcript is filtered, but final provider latency is still recorded.
 		require.Len(t, packets, 2)
 
-		evt := packets[0].(internal_type.ObservabilityEventRecordPacket)
+		evt, ok := findEventPacket(packets)
+		require.True(t, ok)
 		assert.Equal(t, "stt", evt.Record.Component.String())
 		assert.Equal(t, "low_confidence", evt.Record.Attributes["type"])
 		assert.Equal(t, "low confidence text", evt.Record.Attributes["script"])
 		assert.Equal(t, "0.7000", evt.Record.Attributes["confidence"])
 		assert.Equal(t, "0.9000", evt.Record.Attributes["threshold"])
-		metric := packets[1].(internal_type.ObservabilityMetricRecordPacket)
-		require.Len(t, metric.Record.Metrics, 1)
-		assert.Equal(t, observability.MetricSTTLatencyMs, metric.Record.Metrics[0].Name)
+		assert.Equal(t, 1, countMetricPackets(packets, observability.MetricSTTLatencyMs))
 	})
 
 	t.Run("respects IsFinal when confidence above threshold", func(t *testing.T) {
@@ -336,7 +392,8 @@ func TestMessageWithConfidenceThreshold(t *testing.T) {
 		// Final above threshold: InterruptionDetectedPacket + SpeechToTextPacket + ObservabilityEventRecordPacket + ObservabilityMetricRecordPacket
 		require.Len(t, packets, 4)
 
-		stt := packets[1].(internal_type.SpeechToTextPacket)
+		stt, ok := findSpeechToTextPacket(packets)
+		require.True(t, ok)
 		assert.False(t, stt.Interim, "should use IsFinal value when confidence is above threshold")
 	})
 
@@ -355,7 +412,8 @@ func TestMessageWithConfidenceThreshold(t *testing.T) {
 		// Final at boundary: InterruptionDetectedPacket + SpeechToTextPacket + ObservabilityEventRecordPacket + ObservabilityMetricRecordPacket
 		require.Len(t, packets, 4)
 
-		stt := packets[1].(internal_type.SpeechToTextPacket)
+		stt, ok := findSpeechToTextPacket(packets)
+		require.True(t, ok)
 		// When confidence equals threshold, it should NOT be below threshold
 		assert.False(t, stt.Interim)
 	})
@@ -371,7 +429,8 @@ func TestMessageWithConfidenceThreshold(t *testing.T) {
 		// Final without threshold: InterruptionDetectedPacket + SpeechToTextPacket + ObservabilityEventRecordPacket + ObservabilityMetricRecordPacket
 		require.Len(t, packets, 4)
 
-		stt := packets[1].(internal_type.SpeechToTextPacket)
+		stt, ok := findSpeechToTextPacket(packets)
+		require.True(t, ok)
 		// Without threshold, should use IsFinal directly
 		assert.False(t, stt.Interim)
 	})
@@ -390,7 +449,8 @@ func TestMessageWithConfidenceThreshold(t *testing.T) {
 		// Final above zero threshold: InterruptionDetectedPacket + SpeechToTextPacket + ObservabilityEventRecordPacket + ObservabilityMetricRecordPacket
 		require.Len(t, packets, 4)
 
-		stt := packets[1].(internal_type.SpeechToTextPacket)
+		stt, ok := findSpeechToTextPacket(packets)
+		require.True(t, ok)
 		assert.False(t, stt.Interim)
 	})
 
@@ -408,11 +468,10 @@ func TestMessageWithConfidenceThreshold(t *testing.T) {
 		packets := collector.GetPackets()
 		require.Len(t, packets, 2)
 
-		evt := packets[0].(internal_type.ObservabilityEventRecordPacket)
+		evt, ok := findEventPacket(packets)
+		require.True(t, ok)
 		assert.Equal(t, "low_confidence", evt.Record.Attributes["type"])
-		metric := packets[1].(internal_type.ObservabilityMetricRecordPacket)
-		require.Len(t, metric.Record.Metrics, 1)
-		assert.Equal(t, observability.MetricSTTLatencyMs, metric.Record.Metrics[0].Name)
+		assert.Equal(t, 1, countMetricPackets(packets, observability.MetricSTTLatencyMs))
 	})
 }
 
@@ -470,7 +529,8 @@ func TestMessageLanguageDetection(t *testing.T) {
 
 		require.NoError(t, err)
 		packets := collector.GetPackets()
-		stt := packets[1].(internal_type.SpeechToTextPacket)
+		stt, ok := findSpeechToTextPacket(packets)
+		require.True(t, ok)
 		assert.Equal(t, "fr", stt.Language)
 	})
 
@@ -482,7 +542,8 @@ func TestMessageLanguageDetection(t *testing.T) {
 
 		require.NoError(t, err)
 		packets := collector.GetPackets()
-		stt := packets[1].(internal_type.SpeechToTextPacket)
+		stt, ok := findSpeechToTextPacket(packets)
+		require.True(t, ok)
 		assert.Equal(t, "de", stt.Language)
 	})
 
@@ -494,7 +555,8 @@ func TestMessageLanguageDetection(t *testing.T) {
 
 		require.NoError(t, err)
 		packets := collector.GetPackets()
-		stt := packets[1].(internal_type.SpeechToTextPacket)
+		stt, ok := findSpeechToTextPacket(packets)
+		require.True(t, ok)
 		assert.Equal(t, "en", stt.Language)
 	})
 }
@@ -526,12 +588,19 @@ func TestUtteranceEnd(t *testing.T) {
 // =============================================================================
 
 func TestMetadata(t *testing.T) {
-	t.Run("returns nil on metadata", func(t *testing.T) {
-		_, _, callback := createTestCallback(utils.Option{})
+	t.Run("emits empty stt request id metadata", func(t *testing.T) {
+		collector, _, callback := createTestCallback(utils.Option{})
 
 		err := callback.Metadata(&msginterfaces.MetadataResponse{})
 
 		assert.NoError(t, err)
+		packets := collector.GetPackets()
+		require.Len(t, packets, 1)
+		metadataPacket, ok := packets[0].(internal_type.ObservabilityMetadataRecordPacket)
+		require.True(t, ok)
+		require.Len(t, metadataPacket.Record.Metadata, 1)
+		assert.Equal(t, observability.MetadataSTTRequestID, metadataPacket.Record.Metadata[0].Key)
+		assert.Equal(t, "", metadataPacket.Record.Metadata[0].Value)
 	})
 
 	t.Run("handles nil MetadataResponse", func(t *testing.T) {
@@ -540,6 +609,22 @@ func TestMetadata(t *testing.T) {
 		err := callback.Metadata(nil)
 
 		assert.NoError(t, err)
+	})
+
+	t.Run("emits stt request id metadata", func(t *testing.T) {
+		collector, _, callback := createTestCallback(utils.Option{})
+
+		err := callback.Metadata(&msginterfaces.MetadataResponse{RequestID: "dg-request-1"})
+
+		require.NoError(t, err)
+		packets := collector.GetPackets()
+		require.Len(t, packets, 1)
+		metadataPacket, ok := packets[0].(internal_type.ObservabilityMetadataRecordPacket)
+		require.True(t, ok)
+		assert.Equal(t, internal_type.ObservabilityRecordScopeConversation, metadataPacket.Scope)
+		require.Len(t, metadataPacket.Record.Metadata, 1)
+		assert.Equal(t, observability.MetadataSTTRequestID, metadataPacket.Record.Metadata[0].Key)
+		assert.Equal(t, "dg-request-1", metadataPacket.Record.Metadata[0].Value)
 	})
 }
 
@@ -628,11 +713,13 @@ func TestMessageSequence(t *testing.T) {
 		}
 
 		packets := collector.GetPackets()
-		// 3 interim × 3 packets + 1 final × 4 packets = 13 packets
+		// 3 interim × 3 packets + final latency metric + final transcript packets = 13 packets
 		assert.Len(t, packets, 13)
 
 		// Verify the last SpeechToTextPacket is marked as final (Interim=false)
-		lastStt := packets[10].(internal_type.SpeechToTextPacket)
+		sttPackets := findSpeechToTextPackets(packets)
+		require.NotEmpty(t, sttPackets)
+		lastStt := sttPackets[len(sttPackets)-1]
 		assert.False(t, lastStt.Interim)
 		assert.Equal(t, "hello world", lastStt.Script)
 	})
@@ -703,7 +790,8 @@ func TestEdgeCases(t *testing.T) {
 		packets := collector.GetPackets()
 		require.Len(t, packets, 4)
 
-		stt := packets[1].(internal_type.SpeechToTextPacket)
+		stt, ok := findSpeechToTextPacket(packets)
+		require.True(t, ok)
 		assert.Len(t, stt.Script, 10000)
 	})
 
@@ -718,7 +806,8 @@ func TestEdgeCases(t *testing.T) {
 		packets := collector.GetPackets()
 		require.Len(t, packets, 4)
 
-		stt := packets[1].(internal_type.SpeechToTextPacket)
+		stt, ok := findSpeechToTextPacket(packets)
+		require.True(t, ok)
 		assert.Equal(t, unicodeText, stt.Script)
 	})
 
@@ -733,7 +822,8 @@ func TestEdgeCases(t *testing.T) {
 		packets := collector.GetPackets()
 		require.Len(t, packets, 4)
 
-		stt := packets[1].(internal_type.SpeechToTextPacket)
+		stt, ok := findSpeechToTextPacket(packets)
+		require.True(t, ok)
 		assert.Equal(t, specialText, stt.Script)
 	})
 
@@ -747,7 +837,8 @@ func TestEdgeCases(t *testing.T) {
 		packets := collector.GetPackets()
 		require.Len(t, packets, 4)
 
-		stt := packets[1].(internal_type.SpeechToTextPacket)
+		stt, ok := findSpeechToTextPacket(packets)
+		require.True(t, ok)
 		assert.Equal(t, 0.0, stt.Confidence)
 	})
 
@@ -762,7 +853,8 @@ func TestEdgeCases(t *testing.T) {
 		packets := collector.GetPackets()
 		require.Len(t, packets, 4)
 
-		stt := packets[1].(internal_type.SpeechToTextPacket)
+		stt, ok := findSpeechToTextPacket(packets)
+		require.True(t, ok)
 		assert.Equal(t, 1.5, stt.Confidence)
 	})
 
@@ -777,7 +869,8 @@ func TestEdgeCases(t *testing.T) {
 		packets := collector.GetPackets()
 		require.Len(t, packets, 4)
 
-		stt := packets[1].(internal_type.SpeechToTextPacket)
+		stt, ok := findSpeechToTextPacket(packets)
+		require.True(t, ok)
 		assert.Equal(t, -0.5, stt.Confidence)
 	})
 
@@ -792,7 +885,8 @@ func TestEdgeCases(t *testing.T) {
 		packets := collector.GetPackets()
 		require.Len(t, packets, 4)
 
-		stt := packets[1].(internal_type.SpeechToTextPacket)
+		stt, ok := findSpeechToTextPacket(packets)
+		require.True(t, ok)
 		assert.Equal(t, "   ", stt.Script)
 	})
 

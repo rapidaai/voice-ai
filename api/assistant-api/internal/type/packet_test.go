@@ -43,3 +43,14 @@ func TestSpeechToTextPacket_GetConcat(t *testing.T) {
 		})
 	}
 }
+
+func TestObservabilityMetricRecordPacket_IsAsync(t *testing.T) {
+	var packet any = ObservabilityMetricRecordPacket{}
+	asyncPacket, ok := packet.(AsyncPacket)
+	if !ok {
+		t.Fatal("expected ObservabilityMetricRecordPacket to implement AsyncPacket")
+	}
+	if !asyncPacket.IsAsync() {
+		t.Fatal("expected ObservabilityMetricRecordPacket IsAsync to return true")
+	}
+}

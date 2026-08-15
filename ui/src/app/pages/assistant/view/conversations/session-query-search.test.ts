@@ -76,6 +76,34 @@ describe('session query search criteria', () => {
         v: '40',
       },
     ]);
+    expect(getSessionSearchCriteria('stt.init_ms~>=:20')).toEqual([
+      {
+        k: 'stt.init_ms',
+        logic: '>=',
+        v: '20',
+      },
+    ]);
+    expect(getSessionSearchCriteria('stt.latency_ms~<=:120')).toEqual([
+      {
+        k: 'stt.latency_ms',
+        logic: '<=',
+        v: '120',
+      },
+    ]);
+    expect(getSessionSearchCriteria('stt.ttft_ms~<=:80')).toEqual([
+      {
+        k: 'stt.ttft_ms',
+        logic: '<=',
+        v: '80',
+      },
+    ]);
+    expect(getSessionSearchCriteria('stt.ttlt_ms~<=:180')).toEqual([
+      {
+        k: 'stt.ttlt_ms',
+        logic: '<=',
+        v: '180',
+      },
+    ]);
     expect(getSessionSearchCriteria('storage.init_ms~>=:60')).toEqual([
       {
         k: 'storage.init_ms',

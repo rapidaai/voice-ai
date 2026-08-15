@@ -879,7 +879,7 @@ func (h requestorDispatchHandler) HandleError(ctx context.Context, p internal_ty
 					p.ContextId(),
 					observability.MessageRoleUser,
 					[]*protos.Metric{{
-						Name:        "stt_error",
+						Name:        observability.MetricSTTError,
 						Value:       p.ErrMessage(),
 						Description: "An error occurred during STT processing"}},
 				),

@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rapidaai/api/assistant-api/internal/observability"
 	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/internal/testutil"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/stretchr/testify/assert"
@@ -371,7 +372,7 @@ func TestCartesiaSTTLifecycle(t *testing.T) {
 	require.NoError(t, stt.Initialize())
 	defer stt.Close(ctx)
 
-	assertMetricValue(t, collector, "stt_init_ms", 0)
+	assertMetricValue(t, collector, observability.MetricSTTInitLatencyMs, 0)
 
 	feedDone := make(chan struct{})
 	go func() {
@@ -491,7 +492,7 @@ func TestCartesiaSTTReconnect(t *testing.T) {
 			t.Fatalf("attempt %d: context cancelled", attempt)
 		}
 
-		assertMetricValue(t, collector, "stt_init_ms", 0)
+		assertMetricValue(t, collector, observability.MetricSTTInitLatencyMs, 0)
 		t.Logf("attempt=%d transcripts=%d", attempt, len(collector.TranscriptPackets()))
 
 		stt.Close(ctx)
@@ -617,7 +618,7 @@ func assertTTSLatencyMetric(t *testing.T, collector *testutil.PacketCollector) {
 
 func assertSTTLatencyMetric(t *testing.T, collector *testutil.PacketCollector) {
 	t.Helper()
-	assertMetricValue(t, collector, "stt_latency_ms", 0)
+	assertMetricValue(t, collector, "stt.latency_ms", 0)
 }
 
 func assertMetricValue(t *testing.T, collector *testutil.PacketCollector, metricName string, minValue int) {

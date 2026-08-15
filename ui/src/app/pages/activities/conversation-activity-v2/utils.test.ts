@@ -66,7 +66,7 @@ describe('conversation activity v2 telemetry utilities', () => {
   it('uses component latency metrics as waterfall durations', () => {
     const document = telemetryRecordToTimelineDocument(
       observabilityRecord(
-        metricRecord({ name: 'stt_latency_ms', value: '47.4' }),
+        metricRecord({ name: 'stt.latency_ms', value: '47.4' }),
       ),
       0,
     );

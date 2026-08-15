@@ -100,7 +100,14 @@ func (transformer *speechToText) Initialize() error {
 		internal_type.ObservabilityMetricRecordPacket{
 			ContextID: contextID,
 			Scope:     internal_type.ObservabilityRecordScopeConversation,
-			Record:    observability.NewMetricSTTInitLatencyMs(time.Since(start), observability.Attributes{"provider": transformer.Name()}),
+			Record: observability.RecordMetric{
+				Attributes: observability.Attributes{"provider": transformer.Name()},
+				Metrics: []*protos.Metric{{
+					Name:        observability.MetricSTTInitLatencyMs,
+					Value:       fmt.Sprintf("%d", time.Since(start).Milliseconds()),
+					Description: "STT initialization latency in milliseconds",
+				}},
+			},
 		},
 		internal_type.ObservabilityLogRecordPacket{
 			ContextID: contextID,

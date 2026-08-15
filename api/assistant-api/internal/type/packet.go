@@ -1480,6 +1480,7 @@ func (p ObservabilityMetricRecordPacket) ContextId() string { return p.ContextID
 func (p ObservabilityMetricRecordPacket) PacketName() PacketName {
 	return PacketNameObservabilityMetricRecord
 }
+func (p ObservabilityMetricRecordPacket) IsAsync() bool { return true }
 func (p ObservabilityMetricRecordPacket) GetScope() ObservabilityRecordScope {
 	return p.Scope
 }
