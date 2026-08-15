@@ -65,7 +65,7 @@ const (
 	MetricLLMLatencyMs                = "llm_latency_ms"
 	MetricAgentTTFTMs                 = "agent.ttft_ms"
 	MetricAgentTRTMs                  = "agent.trt_ms"
-	MetricStorageInitLatencyMs        = "storage_init_ms"
+	MetricStorageInitLatencyMs        = "storage.init_ms"
 	MetricAnalysisInitLatencyMs       = "analysis.init_ms"
 	MetricAuthenticationInitLatencyMs = "authentication.init_ms"
 	MetricAuthenticationLatencyMs     = "authentication.latency_ms"
@@ -167,16 +167,6 @@ func NewMetricLLMInitLatencyMs(duration time.Duration, attr Attributes) RecordMe
 		Name:        MetricLLMInitLatencyMs,
 		Value:       strconv.FormatInt(duration.Milliseconds(), 10),
 		Description: "LLM initialization latency in milliseconds",
-	}})
-	record.Attributes = attr
-	return record
-}
-
-func NewMetricStorageInitLatencyMs(duration time.Duration, attr Attributes) RecordMetric {
-	record := NewConversationMetricRecord([]*protos.Metric{{
-		Name:        MetricStorageInitLatencyMs,
-		Value:       strconv.FormatInt(duration.Milliseconds(), 10),
-		Description: "Storage initialization latency in milliseconds",
 	}})
 	record.Attributes = attr
 	return record
