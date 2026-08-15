@@ -58,7 +58,7 @@ export const METRIC_NAME_OPTIONS: FilterOption[] = [
   { id: 'tts_init_ms', text: 'tts_init_ms' },
   { id: 'tts_latency_ms', text: 'tts_latency_ms' },
   { id: 'vad_init_ms', text: 'vad_init_ms' },
-  { id: 'eos_init_ms', text: 'eos_init_ms' },
+  { id: 'eos.init_ms', text: 'eos.init_ms' },
   { id: 'eos_latency_ms', text: 'eos_latency_ms' },
   { id: 'eos_text_to_trigger_ms', text: 'eos_text_to_trigger_ms' },
   { id: 'eos_word_count', text: 'eos_word_count' },

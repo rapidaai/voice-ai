@@ -250,8 +250,15 @@ func New(opts ...Option) (internal_type.EndOfSpeechExecutor, error) {
 	go endOfSpeech.worker()
 	_ = endOfSpeech.onPacket(options.ctx,
 		internal_type.ObservabilityMetricRecordPacket{
-			Scope:  internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.NewMetricEOSInitLatencyMs(time.Since(start), observability.Attributes{"provider": endOfSpeech.Name()}),
+			Scope: internal_type.ObservabilityRecordScopeConversation,
+			Record: observability.RecordMetric{
+				Attributes: observability.Attributes{"provider": endOfSpeech.Name()},
+				Metrics: []*protos.Metric{{
+					Name:        observability.MetricEOSInitLatencyMs,
+					Value:       fmt.Sprintf("%d", time.Since(start).Milliseconds()),
+					Description: "EOS initialization latency in milliseconds",
+				}},
+			},
 		},
 		internal_type.ObservabilityLogRecordPacket{
 			Scope: internal_type.ObservabilityRecordScopeConversation,

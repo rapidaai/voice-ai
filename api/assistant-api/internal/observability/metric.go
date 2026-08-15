@@ -54,7 +54,7 @@ const (
 
 	MetricVADInitLatencyMs = "vad_init_ms"
 
-	MetricEOSInitLatencyMs            = "eos_init_ms"
+	MetricEOSInitLatencyMs            = "eos.init_ms"
 	MetricEOSLatencyMs                = "eos_latency_ms"
 	MetricEOSTextToTriggerMs          = "eos_text_to_trigger_ms"
 	MetricEOSWordCount                = "eos_word_count"
@@ -137,16 +137,6 @@ func NewMetricVADInitLatencyMs(duration time.Duration, attr Attributes) RecordMe
 		Name:        MetricVADInitLatencyMs,
 		Value:       strconv.FormatInt(duration.Milliseconds(), 10),
 		Description: "VAD initialization latency in milliseconds",
-	}})
-	record.Attributes = attr
-	return record
-}
-
-func NewMetricEOSInitLatencyMs(duration time.Duration, attr Attributes) RecordMetric {
-	record := NewConversationMetricRecord([]*protos.Metric{{
-		Name:        MetricEOSInitLatencyMs,
-		Value:       strconv.FormatInt(duration.Milliseconds(), 10),
-		Description: "EOS initialization latency in milliseconds",
 	}})
 	record.Attributes = attr
 	return record
