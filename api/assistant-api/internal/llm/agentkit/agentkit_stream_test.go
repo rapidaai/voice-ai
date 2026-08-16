@@ -409,7 +409,7 @@ func TestWrite_AllTypes(t *testing.T) {
 				metric, ok := pkts[2].(internal_type.ObservabilityMetricRecordPacket)
 				require.True(t, ok)
 				require.Len(t, metric.Record.Metrics, 1)
-				assert.Equal(t, "llm_response_char_count", metric.Record.Metrics[0].Name)
+				assert.Equal(t, observability.MetricAgentResponseCharCount, metric.Record.Metrics[0].Name)
 			},
 		},
 		{
@@ -727,7 +727,7 @@ func TestWrite_FirstDeltaAddsTTFTAndCompletedAddsTRT(t *testing.T) {
 	metrics := findPackets[internal_type.ObservabilityMetricRecordPacket](collector.all())
 	require.Len(t, metrics, 1)
 	require.Len(t, metrics[0].Record.Metrics, 2)
-	assert.Equal(t, "llm_response_char_count", metrics[0].Record.Metrics[0].Name)
+	assert.Equal(t, observability.MetricAgentResponseCharCount, metrics[0].Record.Metrics[0].Name)
 	assert.Equal(t, observability.MetricAgentTRTMs, metrics[0].Record.Metrics[1].Name)
 	ms, err := strconv.ParseInt(metrics[0].Record.Metrics[1].Value, 10, 64)
 	require.NoError(t, err)
@@ -753,7 +753,7 @@ func TestWrite_CompletedTextFirstPacketAddsTTFTAndTRT(t *testing.T) {
 	metrics := findPackets[internal_type.ObservabilityMetricRecordPacket](collector.all())
 	require.Len(t, metrics, 1)
 	require.Len(t, metrics[0].Record.Metrics, 3)
-	assert.Equal(t, "llm_response_char_count", metrics[0].Record.Metrics[0].Name)
+	assert.Equal(t, observability.MetricAgentResponseCharCount, metrics[0].Record.Metrics[0].Name)
 	assert.Equal(t, observability.MetricAgentTTFTMs, metrics[0].Record.Metrics[1].Name)
 	assert.Equal(t, observability.MetricAgentTRTMs, metrics[0].Record.Metrics[2].Name)
 }

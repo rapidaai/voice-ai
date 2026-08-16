@@ -68,7 +68,15 @@ func (e *modelAssistantExecutor) handleToolFollowUp(ctx context.Context, communi
 		e.logger.Errorf("tool follow-up request build failed: %v", err)
 		return
 	}
+	e.mu.Lock()
+	e.requestStartedAt = time.Now()
+	e.waitingForFirstResponse = true
+	e.mu.Unlock()
 	if err := connection.Send(&protos.StreamChatRequest{Request: &protos.StreamChatRequest_Chat{Chat: request}}); err != nil {
+		e.mu.Lock()
+		e.requestStartedAt = time.Time{}
+		e.waitingForFirstResponse = false
+		e.mu.Unlock()
 		e.logger.Errorf("tool follow-up send failed: %v", err)
 	}
 }

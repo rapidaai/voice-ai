@@ -33,10 +33,12 @@ type modelAssistantExecutor struct {
 	connection         *ModelConnection
 	providerOptions    utils.Option
 
-	currentPacket *internal_type.UserInputPacket
-	mu            sync.RWMutex
-	ctx           context.Context
-	ctxCancel     context.CancelFunc
+	currentPacket           *internal_type.UserInputPacket
+	requestStartedAt        time.Time
+	waitingForFirstResponse bool
+	mu                      sync.RWMutex
+	ctx                     context.Context
+	ctxCancel               context.CancelFunc
 }
 
 type options struct {
@@ -238,6 +240,8 @@ func (e *modelAssistantExecutor) Close(ctx context.Context) error {
 	e.mu.Lock()
 	activeConnection := e.connection
 	e.currentPacket = nil
+	e.requestStartedAt = time.Time{}
+	e.waitingForFirstResponse = false
 	e.connection = nil
 	e.mu.Unlock()
 	if validator.NonNil(e.history) {

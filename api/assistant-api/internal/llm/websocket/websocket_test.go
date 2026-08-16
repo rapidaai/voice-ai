@@ -131,7 +131,7 @@ func TestName(t *testing.T) {
 
 func TestHandleResponse_Complete_EmitsLLMResponseDonePacket(t *testing.T) {
 	e := newTestExecutor(t)
-	e.currentID = "ctx-1"
+	e.setCurrentContextID("ctx-1")
 	collected := make([]internal_type.Packet, 0)
 	onPacket := func(_ context.Context, pkts ...internal_type.Packet) error {
 		collected = append(collected, pkts...)
@@ -143,7 +143,7 @@ func TestHandleResponse_Complete_EmitsLLMResponseDonePacket(t *testing.T) {
 		Data: json.RawMessage(`{"id":"ctx-1","content":"done text","metrics":[{"name":"tokens","value":10}]}`),
 	}, onPacket)
 
-	require.Len(t, collected, 3)
+	require.Len(t, collected, 4)
 	done, ok := collected[0].(internal_type.LLMResponseDonePacket)
 	require.True(t, ok)
 	assert.Equal(t, "ctx-1", done.ContextID)
@@ -153,8 +153,13 @@ func TestHandleResponse_Complete_EmitsLLMResponseDonePacket(t *testing.T) {
 	assert.Equal(t, observability.AgentCompleted, ev.Record.Event)
 	metric, ok := collected[2].(internal_type.ObservabilityMetricRecordPacket)
 	require.True(t, ok)
-	require.Len(t, metric.Record.Metrics, 1)
-	assert.Equal(t, "tokens", metric.Record.Metrics[0].Name)
+	require.Len(t, metric.Record.Metrics, 3)
+	assert.Equal(t, observability.MetricAgentResponseCharCount, metric.Record.Metrics[0].Name)
+	assert.Equal(t, observability.MetricAgentTTFTMs, metric.Record.Metrics[1].Name)
+	assert.Equal(t, observability.MetricAgentTRTMs, metric.Record.Metrics[2].Name)
+	usage, ok := collected[3].(internal_type.ObservabilityUsageRecordPacket)
+	require.True(t, ok)
+	assert.Equal(t, "ctx-1", usage.ContextID)
 }
 
 func TestHandleResponse_Complete_StaleContextDropped(t *testing.T) {

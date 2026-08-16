@@ -235,7 +235,7 @@ func (e *agentkitExecutor) Write(ctx context.Context, comm internal_type.Communi
 				e.stateMu.Unlock()
 
 				metrics := []*protos.Metric{{
-					Name:        "llm_response_char_count",
+					Name:        observability.MetricAgentResponseCharCount,
 					Value:       fmt.Sprintf("%d", len(msg.Text)),
 					Description: "AgentKit response character count",
 				}}

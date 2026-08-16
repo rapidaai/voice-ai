@@ -166,7 +166,7 @@ func (e *agentkitExecutor) handleUserTurn(ctx context.Context, comm internal_typ
 			Record: observability.RecordMetric{
 				Attributes: observability.Attributes{"provider": e.Name()},
 				Metrics: []*protos.Metric{{
-					Name:        "llm_input_char_count",
+					Name:        observability.MetricAgentMessageCharCount,
 					Value:       fmt.Sprintf("%d", len(text)),
 					Description: "Input character count sent to AgentKit",
 				}},

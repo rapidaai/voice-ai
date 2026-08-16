@@ -81,6 +81,9 @@ const (
 
 	MetricKnowledgeLatencyMs = "knowledge_latency_ms"
 
+	MetricAgentMessageCount       = "agent.message_count"
+	MetricAgentMessageCharCount   = "agent.message_char_count"
+	MetricAgentResponseCharCount  = "agent.response_char_count"
 	MetricAgentTotalToken         = "agent.total_token"
 	MetricAgentCachedContentToken = "agent.cached_content_token"
 	MetricAgentCost               = "agent.cost"
