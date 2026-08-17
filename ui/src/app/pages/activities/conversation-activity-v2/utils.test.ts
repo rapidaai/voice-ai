@@ -11,6 +11,7 @@ import {
   createTraceFilter,
   dedupeTraceFilters,
   getDocumentComponent,
+  getTraceFilterValues,
   matchesTraceFilters,
   parseTraceFilterQuery,
   telemetryRecordToTimelineDocument,
@@ -339,5 +340,40 @@ describe('conversation activity v2 telemetry utilities', () => {
 
     expect(filters).toHaveLength(1);
     expect(filters[0]?.criteriaKey).toBe('assistantConversationId');
+  });
+
+  it('matches comma-separated component filters as OR values', () => {
+    const document: TimelineDocument = {
+      id: 'evt-eos-completed',
+      kind: 'event',
+      name: 'eos.completed',
+      category: 'eos',
+      level: 'info',
+      outcome: 'success',
+      title: 'EOS completed',
+      projectId: 2,
+      organizationId: 1,
+      scope: 'message',
+      assistantId: '2337454103765975040',
+      assistantConversationId: '2340105440068632576',
+      messageId: 'message-1',
+      messageRole: 'user',
+      traceId: 'trace-1',
+      contextId: 'message-1',
+      occurredAt: '2026-06-04T03:10:00.000Z',
+      receivedAt: '2026-06-04T03:10:00.000Z',
+      attributes: { component: 'eos' },
+      data: {},
+    };
+    const filters = parseTraceFilterQuery('component:eos,stt,agent').filters;
+
+    expect(getTraceFilterValues(filters[0])).toEqual(['eos', 'stt', 'agent']);
+    expect(matchesTraceFilters(document, filters)).toBe(true);
+    expect(
+      matchesTraceFilters(
+        document,
+        parseTraceFilterQuery('component:stt,agent').filters,
+      ),
+    ).toBe(false);
   });
 });

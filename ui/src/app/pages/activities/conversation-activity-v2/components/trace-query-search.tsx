@@ -49,7 +49,13 @@ const field = (
 
 const QUERY_FILTER_FIELDS: QuerySearchField[] = [
   field('scope', 'conversation', 'conversation', 'number'),
-  field('attributes', 'component', 'component', 'string', COMPONENT_OPTIONS),
+  field(
+    'attributes',
+    'component',
+    'component',
+    'multi-select',
+    COMPONENT_OPTIONS,
+  ),
   field('event', 'event', 'event', 'string', ALL_EVENT_OPTIONS),
   field('scope', 'scope', 'scope', 'string', SCOPE_OPTIONS),
   field('scope', 'role', 'role', 'string', ROLE_OPTIONS),

@@ -155,7 +155,7 @@ func (d *deepgramSttCallback) Message(mr *msginterfaces.MessageResponse) error {
 								"confidence": fmt.Sprintf("%.4f", alternative.Confidence),
 								"threshold":  fmt.Sprintf("%.4f", v),
 							},
-							OccurredAt: now,
+							OccurredAt: time.Now(),
 						},
 					})
 					return nil
@@ -187,7 +187,7 @@ func (d *deepgramSttCallback) Message(mr *msginterfaces.MessageResponse) error {
 							"messageId":  ctxID,
 							"char_count": fmt.Sprintf("%d", len(alternative.Transcript)),
 						},
-						OccurredAt: now,
+						OccurredAt: time.Now(),
 					},
 				},
 			)
@@ -208,7 +208,7 @@ func (d *deepgramSttCallback) Message(mr *msginterfaces.MessageResponse) error {
 							"confidence": fmt.Sprintf("%.4f", alternative.Confidence),
 							"threshold":  fmt.Sprintf("%.4f", v),
 						},
-						OccurredAt: now,
+						OccurredAt: time.Now(),
 					},
 				})
 				return nil
@@ -237,7 +237,7 @@ func (d *deepgramSttCallback) Message(mr *msginterfaces.MessageResponse) error {
 						"messageId":  ctxID,
 						"confidence": fmt.Sprintf("%.4f", alternative.Confidence),
 					},
-					OccurredAt: now,
+					OccurredAt: time.Now(),
 				},
 			},
 		)

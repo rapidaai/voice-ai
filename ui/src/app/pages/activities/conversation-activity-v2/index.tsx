@@ -66,6 +66,7 @@ import {
   matchesTimelineSearch,
   parseTraceFilterQuery,
   telemetryRecordToTimelineDocument,
+  getTraceFilterValues,
 } from './utils';
 import type { TraceFilterToken } from './utils';
 
@@ -271,6 +272,69 @@ const getFacetTraceFilters = (filters: TraceFilterState): TraceFilterToken[] =>
       ? createTraceFilter('role', filters.selectedRole.id, 'facet')
       : null,
   ]);
+
+const getRequestTraceFilterSets = (
+  filters: TraceFilterToken[],
+): TraceFilterToken[][] =>
+  filters.reduce<TraceFilterToken[][]>(
+    (sets, filter) => {
+      const filterValues = getTraceFilterValues(filter);
+      if (filterValues.length <= 1) {
+        return sets.map(set => [...set, filter]);
+      }
+
+      return sets.flatMap(set =>
+        filterValues.map(filterValue => [
+          ...set,
+          { ...filter, value: filterValue },
+        ]),
+      );
+    },
+    [[]],
+  );
+
+const getRequestCriteriaSets = ({
+  dateRange,
+  freeText,
+  filters,
+}: {
+  dateRange: TraceFilterState['dateRange'];
+  filters: TraceFilterToken[];
+  freeText: string;
+}): Criteria[][] =>
+  getRequestTraceFilterSets(filters).map(filterSet => {
+    const criteria: Array<Criteria | null> = [
+      createRequestCriteria('search', freeText, 'match'),
+      ...filterSet.map(filter =>
+        createRequestCriteria(filter.criteriaKey, filter.value, filter.logic),
+      ),
+    ];
+
+    if (dateRange) {
+      const endDate = new Date(dateRange[1]);
+      endDate.setHours(23, 59, 59, 999);
+      criteria.push(
+        createRequestCriteria('timestamp', dateRange[0].toISOString(), '>='),
+        createRequestCriteria('timestamp', endDate.toISOString(), '<='),
+      );
+    }
+
+    return criteria.filter((item): item is Criteria => Boolean(item));
+  });
+
+const mergeTimelineDocuments = (documents: TimelineDocument[]) =>
+  Array.from(
+    documents
+      .reduce((documentsById, document) => {
+        documentsById.set(document.id, document);
+        return documentsById;
+      }, new Map<string, TimelineDocument>())
+      .values(),
+  ).sort(
+    (left, right) =>
+      new Date(right.occurredAt).getTime() -
+      new Date(left.occurredAt).getTime(),
+  );
 
 const getMetricValues = (document: TimelineDocument): MetricValue[] =>
   (
@@ -960,30 +1024,15 @@ export const ListingPage = () => {
     setRefreshKey(key => key + 1);
   }, [queryFilters, searchParamsKey]);
 
-  const requestCriteria = useMemo(() => {
-    const next: Criteria[] = [];
-    const addCriteria = (key: string, value: string, logic = '=') => {
-      if (!value) return;
-      const criteria = new Criteria();
-      criteria.setKey(key);
-      criteria.setValue(value);
-      criteria.setLogic(logic);
-      next.push(criteria);
-    };
-
-    addCriteria('search', appliedQuery.freeText, 'match');
-    appliedTraceFilters.forEach(filter => {
-      addCriteria(filter.criteriaKey, filter.value, filter.logic);
-    });
-    if (appliedFilters.dateRange) {
-      addCriteria('timestamp', appliedFilters.dateRange[0].toISOString(), '>=');
-      const endDate = new Date(appliedFilters.dateRange[1]);
-      endDate.setHours(23, 59, 59, 999);
-      addCriteria('timestamp', endDate.toISOString(), '<=');
-    }
-
-    return next;
-  }, [appliedFilters.dateRange, appliedQuery.freeText, appliedTraceFilters]);
+  const requestCriteriaSets = useMemo(
+    () =>
+      getRequestCriteriaSets({
+        dateRange: appliedFilters.dateRange,
+        filters: appliedTraceFilters,
+        freeText: appliedQuery.freeText,
+      }),
+    [appliedFilters.dateRange, appliedQuery.freeText, appliedTraceFilters],
+  );
 
   useEffect(() => {
     if (selectedKind.id !== 'log') setSelectedLevel(LEVEL_OPTIONS[0]);
@@ -1001,46 +1050,77 @@ export const ListingPage = () => {
 
     const fetchTelemetry = async () => {
       setIsLoading(true);
+      const shouldMergeRequests = requestCriteriaSets.length > 1;
+      const requestPage = shouldMergeRequests ? 1 : page;
+      const requestPageSize = shouldMergeRequests ? page * pageSize : pageSize;
 
-      const request = new GetAllTelemetryRequest();
-      const paginate = new Paginate();
-      paginate.setPage(page);
-      paginate.setPagesize(pageSize);
-      request.setPaginate(paginate);
-      request.setCriteriasList(requestCriteria);
+      const createTelemetryRequest = (criteria: Criteria[]) => {
+        const request = new GetAllTelemetryRequest();
+        const paginate = new Paginate();
+        paginate.setPage(requestPage);
+        paginate.setPagesize(requestPageSize);
+        request.setPaginate(paginate);
+        request.setCriteriasList(criteria);
 
-      const order = new Ordering();
-      order.setColumn('occurredAt');
-      order.setOrder('desc');
-      request.setOrder(order);
+        const order = new Ordering();
+        order.setColumn('occurredAt');
+        order.setOrder('desc');
+        request.setOrder(order);
+        return request;
+      };
 
       try {
-        const response = await GetAllTelemetry(
-          connectionConfig,
-          request,
-          ConnectionConfig.WithDebugger({
-            authorization: token,
-            userId: authId,
-            projectId,
-          }),
+        const responses = await Promise.all(
+          requestCriteriaSets.map(criteria =>
+            GetAllTelemetry(
+              connectionConfig,
+              createTelemetryRequest(criteria),
+              ConnectionConfig.WithDebugger({
+                authorization: token,
+                userId: authId,
+                projectId,
+              }),
+            ),
+          ),
         );
         if (!active) return;
 
-        if (!response.getSuccess()) {
+        const failedResponse = responses.find(
+          response => !response.getSuccess(),
+        );
+        if (failedResponse) {
           const message =
-            response.getError()?.getHumanmessage() || TRACE_LOAD_ERROR_MESSAGE;
+            failedResponse.getError()?.getHumanmessage() ||
+            TRACE_LOAD_ERROR_MESSAGE;
           toast.error(message);
           return;
         }
 
-        const nextDocuments = response
-          .getDataList()
-          .map(telemetryRecordToTimelineDocument)
-          .filter(Boolean) as TimelineDocument[];
+        const mergedDocuments = mergeTimelineDocuments(
+          responses.flatMap(
+            response =>
+              response
+                .getDataList()
+                .map(telemetryRecordToTimelineDocument)
+                .filter(Boolean) as TimelineDocument[],
+          ),
+        );
+        const nextDocuments = shouldMergeRequests
+          ? mergedDocuments.slice((page - 1) * pageSize, page * pageSize)
+          : mergedDocuments;
 
         setDocuments(nextDocuments);
         setTotalItem(
-          response.getPaginated()?.getTotalitem() || nextDocuments.length,
+          shouldMergeRequests
+            ? responses.reduce(
+                (total, response) =>
+                  total +
+                  (response.getPaginated()?.getTotalitem() ||
+                    response.getDataList().length),
+                0,
+              )
+            : responses[0]?.getPaginated()?.getTotalitem() ||
+                nextDocuments.length,
         );
       } catch (error) {
         if (!active) return;
@@ -1056,7 +1136,15 @@ export const ListingPage = () => {
     return () => {
       active = false;
     };
-  }, [authId, page, pageSize, projectId, refreshKey, requestCriteria, token]);
+  }, [
+    authId,
+    page,
+    pageSize,
+    projectId,
+    refreshKey,
+    requestCriteriaSets,
+    token,
+  ]);
 
   const filteredDocuments = useMemo(
     () =>

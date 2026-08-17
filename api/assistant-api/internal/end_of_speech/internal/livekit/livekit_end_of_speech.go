@@ -926,7 +926,7 @@ func (endOfSpeech *livekitEndOfSpeech) fire(command workerCommand, timerArmedAt 
 			Record: observability.RecordEvent{
 				Component:  observability.ComponentEOS,
 				Event:      observability.EOSCompleted,
-				OccurredAt: triggerAt,
+				OccurredAt: time.Now(),
 				Attributes: observability.Attributes{
 					"provider":           eosName,
 					"context_id":         segment.ContextID,
@@ -943,7 +943,7 @@ func (endOfSpeech *livekitEndOfSpeech) fire(command workerCommand, timerArmedAt 
 			ContextID: segment.ContextID,
 			Scope:     internal_type.ObservabilityRecordScopeUserMessage,
 			Record: observability.RecordMetric{
-				OccurredAt: triggerAt,
+				OccurredAt: time.Now(),
 				Attributes: observability.Attributes{
 					"provider": endOfSpeech.Name(),
 				},

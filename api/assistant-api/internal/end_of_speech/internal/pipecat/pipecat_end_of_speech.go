@@ -948,7 +948,7 @@ func (endOfSpeech *pipecatEndOfSpeech) emitEndOfSpeech(command workerCommand, ti
 			Record: observability.RecordEvent{
 				Component:  observability.ComponentEOS,
 				Event:      observability.EOSCompleted,
-				OccurredAt: triggerAt,
+				OccurredAt: time.Now(),
 				Attributes: observability.Attributes{
 					"provider":           endOfSpeech.Name(),
 					"context_id":         segment.ContextID,
@@ -965,7 +965,7 @@ func (endOfSpeech *pipecatEndOfSpeech) emitEndOfSpeech(command workerCommand, ti
 			ContextID: segment.ContextID,
 			Scope:     internal_type.ObservabilityRecordScopeUserMessage,
 			Record: observability.RecordMetric{
-				OccurredAt: triggerAt,
+				OccurredAt: time.Now(),
 				Attributes: observability.Attributes{
 					"provider": endOfSpeech.Name(),
 				},

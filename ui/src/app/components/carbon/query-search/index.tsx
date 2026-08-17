@@ -22,7 +22,7 @@ export type QuerySearchField = {
   logicOptions?: QuerySearchLogicOption[];
   queryKey: string;
   text: string;
-  type: 'date' | 'number' | 'string';
+  type: 'date' | 'multi-select' | 'number' | 'string';
 };
 
 export type QuerySearchLogicOption = {
@@ -238,6 +238,44 @@ const getCurrentTokenRange = (value: string) => {
 const quoteFilterValue = (value: string): string =>
   /\s/.test(value) ? `"${value.replace(/"/g, '\\"')}"` : value;
 
+const splitMultiSelectValue = (value: string): string[] =>
+  Array.from(
+    new Set(
+      value
+        .split(',')
+        .map(item => item.trim())
+        .filter(Boolean),
+    ),
+  );
+
+const joinMultiSelectValue = (values: string[]): string =>
+  Array.from(new Set(values.map(value => value.trim()).filter(Boolean))).join(
+    ',',
+  );
+
+const getOptionText = (field: QuerySearchField, value: string): string =>
+  field.items?.find(option => option.id === value)?.text || value;
+
+const formatMultiSelectDisplayValue = (
+  field: QuerySearchField,
+  value: string,
+): string =>
+  splitMultiSelectValue(value)
+    .map(selectedValue => getOptionText(field, selectedValue))
+    .join(' or ');
+
+const formatFilterDisplayValue = (
+  field: QuerySearchField,
+  value: string,
+  dateTimeMode: QuerySearchDateTimeMode,
+): string => {
+  if (field.type === 'date') return formatDateTimeValue(value, dateTimeMode);
+  if (field.type === 'multi-select') {
+    return formatMultiSelectDisplayValue(field, value);
+  }
+  return field.formatValue?.(value) || value;
+};
+
 const unquoteFilterValue = (value: string): string => {
   if (
     (value.startsWith('"') && value.endsWith('"')) ||
@@ -448,6 +486,7 @@ type ValueEditorProps = {
   inputRef: RefObject<HTMLInputElement>;
   isOpen: boolean;
   labels: QuerySearchLabels;
+  onApplyValue: (nextValue: string) => void;
   onBlur: () => void;
   onChangeValue: (nextValue: string) => void;
   onCommitValue: (nextValue: string) => void;
@@ -469,6 +508,7 @@ const TextFilterValueEditor = ({
   inputRef,
   isOpen,
   labels: _labels,
+  onApplyValue: _onApplyValue,
   onBlur,
   onCommitValue: _onCommitValue,
   onChangeValue,
@@ -513,6 +553,93 @@ const TextFilterValueEditor = ({
                 </span>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+const MultiSelectFilterValueEditor = ({
+  dateTimeMode: _dateTimeMode,
+  field,
+  inputRef,
+  isOpen,
+  labels: _labels,
+  onApplyValue,
+  onBlur: _onBlur,
+  onChangeValue: _onChangeValue,
+  onCommitValue: _onCommitValue,
+  onFocus,
+  onKeyDown,
+  timeOptions: _timeOptions,
+  onSelectValue: _onSelectValue,
+  value,
+  valueOptions: _valueOptions,
+}: ValueEditorProps) => {
+  const [searchText, setSearchText] = useState('');
+  const selectedValues = splitMultiSelectValue(value);
+  const selectedValueSet = new Set(selectedValues);
+  const selectedText = formatMultiSelectDisplayValue(field, value);
+  const normalizedSearch = searchText.trim().toLowerCase();
+  const options = (field.items || []).filter(option => {
+    if (!normalizedSearch) return true;
+    return matchesOptionSearch(option, normalizedSearch);
+  });
+
+  useEffect(() => {
+    if (!isOpen) setSearchText('');
+  }, [isOpen]);
+
+  const toggleValue = (option: QuerySearchOption, checked: boolean) => {
+    const nextValues = checked
+      ? [...selectedValues, option.id]
+      : selectedValues.filter(selectedValue => selectedValue !== option.id);
+    onApplyValue(joinMultiSelectValue(nextValues));
+  };
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        className="bg-transparent text-[var(--cds-link-primary)] outline-none placeholder:text-[var(--cds-link-primary)]"
+        type="text"
+        style={{
+          width: getTextInputWidth(searchText || selectedText, 14, 48),
+        }}
+        value={searchText}
+        placeholder={selectedText}
+        onChange={event => setSearchText(event.target.value)}
+        onFocus={onFocus}
+        onKeyDown={onKeyDown}
+      />
+      {isOpen && (
+        <div
+          className="absolute left-0 top-[calc(100%+0.25rem)] z-40 w-[min(360px,calc(100vw-2rem))] overflow-hidden border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-950"
+          onMouseDown={event => event.preventDefault()}
+        >
+          <div className="max-h-[320px] overflow-auto py-2">
+            {options.length > 0 ? (
+              options.map(option => (
+                <div
+                  key={option.id}
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-900"
+                >
+                  <span className="truncate font-mono text-sm text-[var(--cds-text-primary)]">
+                    {option.text}
+                  </span>
+                  <Checkbox
+                    id={`query-search-${field.queryKey}-${option.id}`}
+                    labelText={option.text}
+                    hideLabel
+                    checked={selectedValueSet.has(option.id)}
+                    onChange={(_, data) => toggleValue(option, data.checked)}
+                  />
+                </div>
+              ))
+            ) : (
+              <p className="px-4 py-3 text-sm text-gray-500">No values found</p>
+            )}
           </div>
         </div>
       )}
@@ -729,6 +856,7 @@ const DateFilterValueEditor = ({
 
 const FILTER_VALUE_EDITORS = {
   date: DateFilterValueEditor,
+  'multi-select': MultiSelectFilterValueEditor,
   number: TextFilterValueEditor,
   string: TextFilterValueEditor,
 };
@@ -742,6 +870,7 @@ type FilterPillProps = {
   isOpen: boolean;
   labels: QuerySearchLabels;
   logic: QuerySearchLogicOption;
+  onApplyValue: (nextValue: string) => void;
   onBlur: () => void;
   onChangeValue: (nextValue: string) => void;
   onCommitValue: (nextValue: string) => void;
@@ -766,6 +895,7 @@ const FilterPill = ({
   isOpen,
   labels,
   logic,
+  onApplyValue,
   onBlur,
   onChangeValue,
   onCommitValue,
@@ -781,13 +911,10 @@ const FilterPill = ({
   valueOptions,
 }: FilterPillProps) => {
   const ValueEditor = FILTER_VALUE_EDITORS[field.type];
-  const displayValue =
-    field.type === 'date'
-      ? formatDateTimeValue(value, dateTimeMode)
-      : field.formatValue?.(value) || value;
+  const displayValue = formatFilterDisplayValue(field, value, dateTimeMode);
 
   return (
-    <span className="relative inline-flex w-fit shrink-0 items-center gap-1 border border-gray-200 bg-gray-50 px-2 py-1 font-mono text-sm dark:border-gray-800 dark:bg-gray-900">
+    <span className="relative inline-flex w-fit shrink-0 items-center gap-2 border border-gray-200 bg-gray-50 px-2 py-1 font-mono text-sm dark:border-gray-800 dark:bg-gray-900">
       <KeyPicker
         fields={fields}
         selectedField={field}
@@ -807,6 +934,7 @@ const FilterPill = ({
           labels={labels}
           value={value}
           valueOptions={valueOptions}
+          onApplyValue={onApplyValue}
           onBlur={onBlur}
           onCommitValue={onCommitValue}
           onChangeValue={onChangeValue}
@@ -951,6 +1079,22 @@ export const QuerySearch = ({
     }, 150);
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const closeWhenClickLeaves = (event: MouseEvent) => {
+      if (rootRef.current?.contains(event.target as Node)) return;
+      setEditingChipIndex(null);
+      setIsEditingDraft(false);
+      setIsOpen(false);
+    };
+
+    document.addEventListener('mousedown', closeWhenClickLeaves);
+    return () => {
+      document.removeEventListener('mousedown', closeWhenClickLeaves);
+    };
+  }, [isOpen]);
+
   const setChipTokens = (nextChips: QueryFilterChip[], shouldApply = false) => {
     const nextValue = joinQueryParts(nextChips, draftValue);
     if (shouldApply) {
@@ -1043,6 +1187,20 @@ export const QuerySearch = ({
     );
     applyNextValue(`${joinQueryParts(chipTokens, nextDraft)} `);
     setIsOpen(false);
+  };
+
+  const applyCurrentFilterValue = (nextValue: string) => {
+    if (!selectedField) return;
+    const nextDraft = completeCurrentToken(
+      draftValue,
+      `${getFilterRawKey(
+        selectedField,
+        selectedLogic.logic,
+      )}:${quoteFilterValue(nextValue)}`,
+    );
+    applyNextValue(`${joinQueryParts(chipTokens, nextDraft)} `);
+    setEditingChipIndex(chipTokens.length);
+    setIsOpen(true);
   };
 
   const selectField = (field: QuerySearchField) => {
@@ -1180,6 +1338,9 @@ export const QuerySearch = ({
               logic={chipLogic}
               value={chip.value}
               valueOptions={getValueOptions(chipField, chip.value)}
+              onApplyValue={nextValue =>
+                updateChipValue(index, nextValue, true)
+              }
               onBlur={closeWhenFocusLeaves}
               onChangeValue={nextValue => updateChipValue(index, nextValue)}
               onCommitValue={nextValue => {
@@ -1212,6 +1373,7 @@ export const QuerySearch = ({
             logic={selectedLogic}
             value={currentDisplayValue}
             valueOptions={valueOptions}
+            onApplyValue={applyCurrentFilterValue}
             onBlur={closeWhenFocusLeaves}
             onChangeValue={updateCurrentFilterValue}
             onCommitValue={commitCurrentFilterValue}

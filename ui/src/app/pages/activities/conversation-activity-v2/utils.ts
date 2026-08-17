@@ -433,7 +433,11 @@ export const getDocumentComponent = (doc: TimelineDocument): string => {
   const attributeComponent =
     doc.attributes?.component || doc.attributes?.provider;
   const fallback = doc.category || doc.name.split('.')[0] || 'conversation';
-  return doc.component || attributeComponent || inferComponentFromName(doc.name, fallback);
+  return (
+    doc.component ||
+    attributeComponent ||
+    inferComponentFromName(doc.name, fallback)
+  );
 };
 
 export type TraceFilterSource = 'facet' | 'query';
@@ -465,6 +469,16 @@ export type ParsedTraceFilterQuery = {
   filters: TraceFilterToken[];
   freeText: string;
 };
+
+export const getTraceFilterValues = (filter: TraceFilterToken): string[] =>
+  Array.from(
+    new Set(
+      filter.value
+        .split(',')
+        .map(value => value.trim())
+        .filter(Boolean),
+    ),
+  );
 
 const getMetricNames = (doc: TimelineDocument): string[] => {
   const metrics = doc.data?.metrics as
@@ -746,9 +760,12 @@ export const matchesTraceFilters = (
   filters.every(filter => {
     const field = getTraceFilterField(filter.fieldKey);
     if (!field) return true;
-    if (field.match) return field.match(doc, filter.value, filter.logic);
-    const value = field.getDocumentValue?.(doc);
-    return String(value ?? '') === filter.value;
+    const filterValues = getTraceFilterValues(filter);
+    return filterValues.some(filterValue => {
+      if (field.match) return field.match(doc, filterValue, filter.logic);
+      const value = field.getDocumentValue?.(doc);
+      return String(value ?? '') === filterValue;
+    });
   });
 
 export const getDocumentColor = (doc: TimelineDocument): string => {
