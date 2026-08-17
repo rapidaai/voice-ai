@@ -124,7 +124,7 @@ export const ConversationWaterfall: FC<ConversationWaterfallProps> = ({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-gray-200 dark:border-gray-800">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="grid min-w-[880px] grid-cols-[360px_120px_120px_minmax(420px,1fr)] bg-white text-xs font-medium uppercase text-gray-500 dark:bg-gray-950">
         <div className="px-4 py-2">Message / Component</div>
         <div className="px-3 py-2">Component</div>

@@ -373,26 +373,40 @@ func (t *TenVAD) Close(ctx context.Context) error {
 	t.mu.Unlock()
 
 	if t.onPacket != nil {
-		packets := []internal_type.Packet{}
 		if !vadStartedAt.IsZero() {
 			duration := time.Since(vadStartedAt)
-			packets = append(packets, internal_type.ObservabilityUsageRecordPacket{
-				Scope:  internal_type.ObservabilityRecordScopeConversation,
-				Record: observability.NewVADDurationUsageRecord(t.Name(), duration, observability.Attributes{}),
-			})
-		}
-		packets = append(packets, internal_type.ObservabilityEventRecordPacket{
-			Scope: internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.RecordEvent{
-				Component: observability.ComponentVAD,
-				Event:     observability.VADClosed,
-				Attributes: observability.Attributes{
-					"provider": t.Name(),
+			_ = t.onPacket(ctx,
+				internal_type.ObservabilityUsageRecordPacket{
+					Scope:  internal_type.ObservabilityRecordScopeConversation,
+					Record: observability.NewVADDurationUsageRecord(t.Name(), duration, observability.Attributes{"provider": t.Name()}),
 				},
-				OccurredAt: time.Now(),
+				internal_type.ObservabilityEventRecordPacket{
+					Scope: internal_type.ObservabilityRecordScopeConversation,
+					Record: observability.RecordEvent{
+						Component: observability.ComponentVAD,
+						Event:     observability.VADClosed,
+						Attributes: observability.Attributes{
+							"provider": t.Name(),
+						},
+						OccurredAt: time.Now(),
+					},
+				},
+			)
+			return nil
+		}
+		_ = t.onPacket(ctx,
+			internal_type.ObservabilityEventRecordPacket{
+				Scope: internal_type.ObservabilityRecordScopeConversation,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentVAD,
+					Event:     observability.VADClosed,
+					Attributes: observability.Attributes{
+						"provider": t.Name(),
+					},
+					OccurredAt: time.Now(),
+				},
 			},
-		})
-		_ = t.onPacket(ctx, packets...)
+		)
 	}
 
 	return nil

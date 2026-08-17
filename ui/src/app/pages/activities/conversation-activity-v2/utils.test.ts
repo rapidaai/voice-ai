@@ -99,6 +99,36 @@ describe('conversation activity v2 telemetry utilities', () => {
     expect(document ? getDocumentComponent(document) : '').toBe('webrtc');
   });
 
+  it('prefers the record component over provider attributes', () => {
+    const document: TimelineDocument = {
+      id: 'evt-eos-completed',
+      kind: 'event',
+      name: 'eos.completed',
+      component: 'eos',
+      category: 'eos',
+      level: 'info',
+      outcome: 'success',
+      title: 'eos.completed',
+      projectId: 2,
+      organizationId: 1,
+      scope: 'message',
+      assistantId: '2337454103765975040',
+      assistantConversationId: '2340105440068632576',
+      messageId: 'a49f2845-68ec-4a59-a30d-5e2b30df87bf',
+      messageRole: 'user',
+      traceId: 'trace-1',
+      contextId: 'a49f2845-68ec-4a59-a30d-5e2b30df87bf',
+      occurredAt: '2026-06-04T03:10:00.000Z',
+      receivedAt: '2026-06-04T03:10:00.000Z',
+      attributes: { provider: 'pipecatEndOfSpeech' },
+    };
+
+    const filters = parseTraceFilterQuery('component:eos').filters;
+
+    expect(getDocumentComponent(document)).toBe('eos');
+    expect(matchesTraceFilters(document, filters)).toBe(true);
+  });
+
   it('uses current backend log levels, scopes, and message roles', () => {
     expect(LEVEL_OPTIONS.map(option => option.id)).toEqual([
       'all',

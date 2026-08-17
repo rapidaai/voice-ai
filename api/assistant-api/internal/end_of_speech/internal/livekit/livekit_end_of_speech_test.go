@@ -942,11 +942,16 @@ func TestLivekitEndOfSpeech_ObservabilityLifecycleEvents(t *testing.T) {
 
 	sawInitMetric := false
 	sawInitLog := false
+	sawStarted := false
 	sawDetected := false
 	timeout := time.After(500 * time.Millisecond)
-	for !sawInitMetric || !sawInitLog || !sawDetected {
+	for !sawInitMetric || !sawInitLog || !sawStarted || !sawDetected {
 		select {
 		case event := <-events:
+			if event.Record.Event == observability.EOSStarted {
+				sawStarted = true
+				continue
+			}
 			if event.Record.Event == observability.EOSCompleted {
 				sawDetected = true
 				continue
@@ -980,6 +985,7 @@ func TestLivekitEndOfSpeech_ObservabilityLifecycleEvents(t *testing.T) {
 			}
 		case usage := <-usages:
 			if usage.Record.Component == observability.ComponentName(observability.UsageConversationEOSDuration) {
+				assert.Equal(t, eosName, usage.Record.Attributes["provider"])
 				sawUsage = true
 			}
 		case <-timeout:
@@ -988,6 +994,59 @@ func TestLivekitEndOfSpeech_ObservabilityLifecycleEvents(t *testing.T) {
 	}
 
 	require.NoError(t, executor.Close(context.Background()))
+}
+
+func TestLivekitEndOfSpeech_ObservabilityStartedForSpeechToText(t *testing.T) {
+	events := make(chan internal_type.ObservabilityEventRecordPacket, 2)
+	endOfSpeech := &livekitEndOfSpeech{
+		onPacket: func(ctx context.Context, packets ...internal_type.Packet) error {
+			for _, packet := range packets {
+				event, ok := packet.(internal_type.ObservabilityEventRecordPacket)
+				if !ok || event.Record.Event != observability.EOSStarted {
+					continue
+				}
+				select {
+				case events <- event:
+				default:
+				}
+			}
+			return nil
+		},
+		stopCh: make(chan struct{}),
+		state:  &endOfSpeechState{segment: speechSegment{}},
+	}
+	defer func() { _ = endOfSpeech.Close(context.Background()) }()
+
+	ctx := context.Background()
+	require.NoError(t, endOfSpeech.Execute(ctx, internal_type.SpeechToTextPacket{
+		ContextID: "ctx-started",
+		Script:    "hello",
+		Interim:   true,
+	}))
+
+	select {
+	case event := <-events:
+		assert.Equal(t, "ctx-started", event.ContextID)
+		assert.Equal(t, internal_type.ObservabilityRecordScopeUserMessage, event.Scope)
+		assert.Equal(t, observability.ComponentEOS, event.Record.Component)
+		assert.Equal(t, eosName, event.Record.Attributes["provider"])
+		assert.Equal(t, "ctx-started", event.Record.Attributes["context_id"])
+		assert.Equal(t, "hello", event.Record.Attributes["speech"])
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for eos started event")
+	}
+
+	require.NoError(t, endOfSpeech.Execute(ctx, internal_type.SpeechToTextPacket{
+		ContextID: "ctx-started",
+		Script:    "hello again",
+		Interim:   true,
+	}))
+
+	select {
+	case event := <-events:
+		t.Fatalf("unexpected duplicate started event: %+v", event)
+	case <-time.After(100 * time.Millisecond):
+	}
 }
 
 func TestLivekitEndOfSpeech_KeepsMetrics(t *testing.T) {

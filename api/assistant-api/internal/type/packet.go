@@ -1461,6 +1461,7 @@ func (p ObservabilityEventRecordPacket) ContextId() string { return p.ContextID 
 func (p ObservabilityEventRecordPacket) PacketName() PacketName {
 	return PacketNameObservabilityEventRecord
 }
+func (p ObservabilityEventRecordPacket) IsAsync() bool { return true }
 func (p ObservabilityEventRecordPacket) GetScope() ObservabilityRecordScope {
 	return p.Scope
 }

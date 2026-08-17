@@ -88,6 +88,7 @@ type endOfSpeechState struct {
 	segment       speechSegment
 	pending       *workerCommand
 	confidence    float64
+	started       bool
 	callbackFired bool
 	vadState      vadState
 	transcript    transcriptState
@@ -315,11 +316,26 @@ func (endOfSpeech *livekitEndOfSpeech) Execute(ctx context.Context, packet inter
 		endOfSpeech.state.transcript = transcriptStateFinalized
 		endOfSpeech.mu.Unlock()
 
-		packets := []internal_type.Packet{internal_type.InterimEndOfSpeechPacket{
-			Speech:    command.segment.Text,
-			ContextID: command.segment.ContextID,
-		}}
-		_ = endOfSpeech.onPacket(ctx, packets...)
+		_ = endOfSpeech.onPacket(ctx,
+			internal_type.InterimEndOfSpeechPacket{
+				Speech:    command.segment.Text,
+				ContextID: command.segment.ContextID,
+			},
+			internal_type.ObservabilityEventRecordPacket{
+				ContextID: command.segment.ContextID,
+				Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+				Record: observability.RecordEvent{
+					Component:  observability.ComponentEOS,
+					Event:      observability.EOSStarted,
+					OccurredAt: time.Now(),
+					Attributes: observability.Attributes{
+						"provider":   endOfSpeech.Name(),
+						"context_id": command.segment.ContextID,
+						"speech":     command.segment.Text,
+					},
+				},
+			},
+		)
 		endOfSpeech.enqueueCommand(command)
 
 	case internal_type.EndOfSpeechInterruptionPacket:
@@ -426,6 +442,10 @@ func (endOfSpeech *livekitEndOfSpeech) Execute(ctx context.Context, packet inter
 				pendingTranscript = ""
 			}
 			segment.Text = segment.FinalText + pendingTranscript
+			emitStarted := segment.Text != "" && !endOfSpeech.state.started
+			if emitStarted {
+				endOfSpeech.state.started = true
+			}
 			if previous.FinalText == "" {
 				endOfSpeech.state.transcript = transcriptStateInterimPending
 			} else {
@@ -442,19 +462,65 @@ func (endOfSpeech *livekitEndOfSpeech) Execute(ctx context.Context, packet inter
 				}
 				endOfSpeech.mu.Unlock()
 
-				_ = endOfSpeech.onPacket(ctx, internal_type.InterimEndOfSpeechPacket{
-					Speech:    command.segment.Text,
-					ContextID: command.segment.ContextID,
-				})
+				if emitStarted {
+					_ = endOfSpeech.onPacket(ctx,
+						internal_type.InterimEndOfSpeechPacket{
+							Speech:    command.segment.Text,
+							ContextID: command.segment.ContextID,
+						},
+						internal_type.ObservabilityEventRecordPacket{
+							ContextID: command.segment.ContextID,
+							Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+							Record: observability.RecordEvent{
+								Component:  observability.ComponentEOS,
+								Event:      observability.EOSStarted,
+								OccurredAt: time.Now(),
+								Attributes: observability.Attributes{
+									"provider":   endOfSpeech.Name(),
+									"context_id": command.segment.ContextID,
+									"speech":     command.segment.Text,
+								},
+							},
+						},
+					)
+				} else {
+					_ = endOfSpeech.onPacket(ctx, internal_type.InterimEndOfSpeechPacket{
+						Speech:    command.segment.Text,
+						ContextID: command.segment.ContextID,
+					})
+				}
 				endOfSpeech.enqueueCommand(command)
 				return nil
 			}
 			endOfSpeech.mu.Unlock()
 
-			_ = endOfSpeech.onPacket(ctx, internal_type.InterimEndOfSpeechPacket{
-				Speech:    segment.Text,
-				ContextID: segment.ContextID,
-			})
+			if emitStarted {
+				_ = endOfSpeech.onPacket(ctx,
+					internal_type.InterimEndOfSpeechPacket{
+						Speech:    segment.Text,
+						ContextID: segment.ContextID,
+					},
+					internal_type.ObservabilityEventRecordPacket{
+						ContextID: segment.ContextID,
+						Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+						Record: observability.RecordEvent{
+							Component:  observability.ComponentEOS,
+							Event:      observability.EOSStarted,
+							OccurredAt: time.Now(),
+							Attributes: observability.Attributes{
+								"provider":   endOfSpeech.Name(),
+								"context_id": segment.ContextID,
+								"speech":     segment.Text,
+							},
+						},
+					},
+				)
+			} else {
+				_ = endOfSpeech.onPacket(ctx, internal_type.InterimEndOfSpeechPacket{
+					Speech:    segment.Text,
+					ContextID: segment.ContextID,
+				})
+			}
 			return nil
 		}
 
@@ -486,6 +552,10 @@ func (endOfSpeech *livekitEndOfSpeech) Execute(ctx context.Context, packet inter
 			pendingTranscript = ""
 		}
 		segment.Text = segment.FinalText + pendingTranscript
+		emitStarted := segment.Text != "" && !endOfSpeech.state.started
+		if emitStarted {
+			endOfSpeech.state.started = true
+		}
 		endOfSpeech.state.transcript = transcriptStateFinalized
 		if segment.Text != segment.FinalText {
 			endOfSpeech.state.transcript = transcriptStateFinalizedWithPendingInterim
@@ -508,11 +578,33 @@ func (endOfSpeech *livekitEndOfSpeech) Execute(ctx context.Context, packet inter
 			if fullText == "" {
 				return nil
 			}
-			packets := []internal_type.Packet{internal_type.InterimEndOfSpeechPacket{
-				Speech:    fullText,
-				ContextID: command.segment.ContextID,
-			}}
-			_ = endOfSpeech.onPacket(ctx, packets...)
+			if emitStarted {
+				_ = endOfSpeech.onPacket(ctx,
+					internal_type.InterimEndOfSpeechPacket{
+						Speech:    fullText,
+						ContextID: command.segment.ContextID,
+					},
+					internal_type.ObservabilityEventRecordPacket{
+						ContextID: command.segment.ContextID,
+						Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+						Record: observability.RecordEvent{
+							Component:  observability.ComponentEOS,
+							Event:      observability.EOSStarted,
+							OccurredAt: time.Now(),
+							Attributes: observability.Attributes{
+								"provider":   endOfSpeech.Name(),
+								"context_id": command.segment.ContextID,
+								"speech":     fullText,
+							},
+						},
+					},
+				)
+			} else {
+				_ = endOfSpeech.onPacket(ctx, internal_type.InterimEndOfSpeechPacket{
+					Speech:    fullText,
+					ContextID: command.segment.ContextID,
+				})
+			}
 			endOfSpeech.enqueueCommand(command)
 			return nil
 		}
@@ -522,12 +614,33 @@ func (endOfSpeech *livekitEndOfSpeech) Execute(ctx context.Context, packet inter
 			return nil
 		}
 
-		// Emit interim update (same as silence-based on final STT)
-		packets := []internal_type.Packet{internal_type.InterimEndOfSpeechPacket{
-			Speech:    fullText,
-			ContextID: segment.ContextID,
-		}}
-		_ = endOfSpeech.onPacket(ctx, packets...)
+		if emitStarted {
+			_ = endOfSpeech.onPacket(ctx,
+				internal_type.InterimEndOfSpeechPacket{
+					Speech:    fullText,
+					ContextID: segment.ContextID,
+				},
+				internal_type.ObservabilityEventRecordPacket{
+					ContextID: segment.ContextID,
+					Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+					Record: observability.RecordEvent{
+						Component:  observability.ComponentEOS,
+						Event:      observability.EOSStarted,
+						OccurredAt: time.Now(),
+						Attributes: observability.Attributes{
+							"provider":   endOfSpeech.Name(),
+							"context_id": segment.ContextID,
+							"speech":     fullText,
+						},
+					},
+				},
+			)
+		} else {
+			_ = endOfSpeech.onPacket(ctx, internal_type.InterimEndOfSpeechPacket{
+				Speech:    fullText,
+				ContextID: segment.ContextID,
+			})
+		}
 
 		// Run model inference on accumulated final text.
 		// YES (prob >= threshold) → quick_timeout buffer, then fire.
@@ -652,6 +765,7 @@ func (endOfSpeech *livekitEndOfSpeech) worker() {
 		endOfSpeech.state.segment = speechSegment{Revision: endOfSpeech.state.segment.Revision + 1}
 		endOfSpeech.state.pending = nil
 		endOfSpeech.state.confidence = 0
+		endOfSpeech.state.started = false
 		endOfSpeech.state.vadState = vadStateIdle
 		endOfSpeech.state.transcript = transcriptStateIdle
 	}
@@ -857,8 +971,10 @@ func (endOfSpeech *livekitEndOfSpeech) Close(ctx context.Context) error {
 		if endOfSpeech.onPacket != nil {
 			if !eosStartedAt.IsZero() {
 				endOfSpeech.onPacket(ctx, internal_type.ObservabilityUsageRecordPacket{
-					Scope:  internal_type.ObservabilityRecordScopeConversation,
-					Record: observability.NewEOSDurationUsageRecord(endOfSpeech.Name(), time.Since(eosStartedAt), observability.Attributes{}),
+					Scope: internal_type.ObservabilityRecordScopeConversation,
+					Record: observability.NewEOSDurationUsageRecord(endOfSpeech.Name(), time.Since(eosStartedAt), observability.Attributes{
+						"provider": endOfSpeech.Name(),
+					}),
 				})
 			}
 			endOfSpeech.onPacket(ctx, internal_type.ObservabilityEventRecordPacket{

@@ -14,6 +14,14 @@ import {
   Tag,
   Loading,
 } from '@carbon/react';
+import {
+  Area,
+  AreaChart,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { Activity, Close, Renew, WarningAlt } from '@carbon/icons-react';
 import {
   ConnectionConfig,
@@ -31,7 +39,11 @@ import { ScrollableTableSection } from '@/app/components/sections/table-section'
 import { CopyButton } from '@/app/components/carbon/button/copy-button';
 import { connectionConfig } from '@/configs';
 import { useCurrentCredential } from '@/hooks/use-credential';
-import { ConversationWaterfall } from './components/conversation-waterfall';
+import {
+  EventInspectorContent,
+  EventMainTableSummary,
+} from './event-renderers';
+import { LogInspectorContent, LogMainTableSummary } from './log-renderers';
 import { TraceQuerySearch } from './components/trace-query-search';
 import {
   ALL_EVENT_OPTION,
@@ -50,8 +62,6 @@ import {
   formatTime,
   createTraceFilter,
   dedupeTraceFilters,
-  getDocumentComponent,
-  groupTimelineItems,
   matchesTraceFilters,
   matchesTimelineSearch,
   parseTraceFilterQuery,
@@ -63,6 +73,12 @@ type MetricValue = {
   description?: string;
   name?: string;
   value?: number | string;
+};
+
+type MetricChartPoint = {
+  label: string;
+  timestamp: number;
+  value: number;
 };
 
 type TraceFilterState = {
@@ -132,6 +148,97 @@ const compactFilters = (
 ): TraceFilterToken[] =>
   filters.filter((filter): filter is TraceFilterToken => Boolean(filter));
 
+const createRequestCriteria = (
+  key: string,
+  value: string | number | undefined,
+  logic = '=',
+): Criteria | null => {
+  const normalizedValue = String(value ?? '').trim();
+  if (!normalizedValue) return null;
+
+  const criteria = new Criteria();
+  criteria.setKey(key);
+  criteria.setValue(normalizedValue);
+  criteria.setLogic(logic);
+  return criteria;
+};
+
+const getScopedInspectorCriteria = (
+  document: TimelineDocument,
+): Array<Criteria | null> => {
+  const scope = String(document.scope || '').toLowerCase();
+
+  if (scope === 'message') {
+    return [
+      createRequestCriteria('scope', document.scope),
+      createRequestCriteria(
+        'assistantConversationId',
+        document.assistantConversationId,
+      ) || createRequestCriteria('contextId', document.contextId),
+    ];
+  }
+
+  if (scope === 'conversation') {
+    return [
+      createRequestCriteria('scope', document.scope),
+      createRequestCriteria('assistantId', document.assistantId) ||
+        createRequestCriteria(
+          'assistantConversationId',
+          document.assistantConversationId,
+        ) ||
+        createRequestCriteria('contextId', document.contextId),
+    ];
+  }
+
+  if (scope === 'assistant') {
+    return [
+      createRequestCriteria('scope', document.scope),
+      createRequestCriteria('assistantId', document.assistantId) ||
+        createRequestCriteria('contextId', document.contextId),
+    ];
+  }
+
+  return [
+    createRequestCriteria(
+      'assistantConversationId',
+      document.assistantConversationId,
+    ) ||
+      createRequestCriteria('assistantId', document.assistantId) ||
+      createRequestCriteria('contextId', document.contextId),
+  ];
+};
+
+const getInspectorCriteria = (document: TimelineDocument): Criteria[] => {
+  const criteria: Array<Criteria | null> = [];
+
+  if (document.kind === 'metric') {
+    criteria.push(
+      createRequestCriteria('kind', 'metric'),
+      createRequestCriteria('name', document.name),
+      ...getScopedInspectorCriteria(document),
+    );
+  } else if (document.kind === 'event') {
+    criteria.push(
+      createRequestCriteria('kind', 'event'),
+      createRequestCriteria('event', document.name),
+      ...getScopedInspectorCriteria(document),
+    );
+  } else {
+    criteria.push(
+      createRequestCriteria(
+        'assistantConversationId',
+        document.assistantConversationId,
+      ),
+    );
+  }
+
+  if (document.kind === 'log' && !document.assistantConversationId) {
+    criteria.push(createRequestCriteria('contextId', document.contextId));
+  }
+
+  return criteria.filter((item): item is Criteria => Boolean(item));
+};
+
 const getFacetTraceFilters = (filters: TraceFilterState): TraceFilterToken[] =>
   compactFilters([
     createTraceFilter('trace', filters.traceIdInput, 'facet'),
@@ -178,6 +285,29 @@ const getMetricValues = (document: TimelineDocument): MetricValue[] =>
 const getMetricSummary = (document: TimelineDocument) =>
   getMetricValues(document)[0];
 
+const getMetricNumericValue = (document: TimelineDocument): number | null => {
+  const metricValue = getMetricSummary(document)?.value;
+  const numericValue = Number(metricValue);
+  return Number.isFinite(numericValue) ? numericValue : null;
+};
+
+const getMetricChartData = (records: TimelineDocument[]): MetricChartPoint[] =>
+  records
+    .map(record => {
+      const value = getMetricNumericValue(record);
+      const timestamp = new Date(record.occurredAt).getTime();
+
+      if (value === null || !Number.isFinite(timestamp)) return null;
+
+      return {
+        label: formatTime(record.occurredAt),
+        timestamp,
+        value,
+      };
+    })
+    .filter((point): point is MetricChartPoint => Boolean(point))
+    .sort((a, b) => a.timestamp - b.timestamp);
+
 const getRelatedRecords = (
   document: TimelineDocument,
   records: TimelineDocument[],
@@ -191,7 +321,7 @@ const getRelatedRecords = (
 const getLeftPanelTitle = (document: TimelineDocument) => {
   if (document.kind === 'log') return 'Logs';
   if (document.kind === 'metric') return 'Metrics';
-  return 'Timeline';
+  return 'Events';
 };
 
 const getRecordCountLabel = (document: TimelineDocument, count: number) => {
@@ -204,6 +334,30 @@ const getRecordCountLabel = (document: TimelineDocument, count: number) => {
   return `${count} ${count === 1 ? 'event' : 'events'}`;
 };
 
+const getTimeWindowLabel = (records: TimelineDocument[]): string => {
+  const times = records
+    .map(record => new Date(record.occurredAt).getTime())
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b);
+
+  if (times.length === 0) return 'No time window';
+
+  const start = new Date(times[0]).toISOString();
+  const end = new Date(times[times.length - 1]).toISOString();
+
+  if (start === end) return formatTime(start);
+  return `${formatTime(start)} - ${formatTime(end)}`;
+};
+
+const getEventInspectorScopeLabel = (document: TimelineDocument): string => {
+  const scope = String(document.scope || '').toLowerCase();
+
+  if (scope === 'message') return 'Conversation scope';
+  if (scope === 'conversation') return 'Assistant scope';
+  if (scope) return `${scope[0].toUpperCase()}${scope.slice(1)} scope`;
+  return 'Unknown scope';
+};
+
 const LogRecordList = ({
   records,
   selectedDocumentId,
@@ -213,7 +367,7 @@ const LogRecordList = ({
   selectedDocumentId?: string;
   onSelectDocument: (document: TimelineDocument) => void;
 }) => (
-  <div className="min-h-0 flex-1 overflow-auto border-t border-gray-200 dark:border-gray-800">
+  <div className="min-h-0 flex-1 overflow-auto">
     {records.map(record => (
       <button
         key={record.id}
@@ -226,30 +380,16 @@ const LogRecordList = ({
         ].join(' ')}
         onClick={() => onSelectDocument(record)}
       >
-        <div className="mb-2 flex min-w-0 items-center gap-3 font-mono text-xs text-gray-500">
-          <span
-            className={
-              record.level.toLowerCase() === 'error'
-                ? 'text-red-600 dark:text-red-400'
-                : ''
-            }
-          >
-            {record.level.toLowerCase()}
-          </span>
-          <span className="truncate">{getDocumentComponent(record)}</span>
-          <span className="ml-auto whitespace-nowrap">
-            {formatTime(record.occurredAt)}
-          </span>
-        </div>
-        <p className="truncate font-mono text-sm text-gray-900 dark:text-gray-100">
-          [{record.level.toLowerCase()}] {record.title || record.name}
-        </p>
+        <LogInspectorContent
+          document={record}
+          occurredAtLabel={formatTime(record.occurredAt)}
+        />
       </button>
     ))}
   </div>
 );
 
-const MetricRecordList = ({
+const EventRecordList = ({
   records,
   selectedDocumentId,
   onSelectDocument,
@@ -258,7 +398,7 @@ const MetricRecordList = ({
   selectedDocumentId?: string;
   onSelectDocument: (document: TimelineDocument) => void;
 }) => (
-  <div className="min-h-0 flex-1 overflow-auto border-t border-gray-200 dark:border-gray-800">
+  <div className="min-h-0 flex-1 overflow-auto">
     {records.map(record => (
       <button
         key={record.id}
@@ -271,43 +411,122 @@ const MetricRecordList = ({
         ].join(' ')}
         onClick={() => onSelectDocument(record)}
       >
-        <div className="mb-2 flex min-w-0 items-center gap-2">
-          <Tag type="cool-gray">{getDocumentComponent(record)}</Tag>
-          <span className="ml-auto whitespace-nowrap font-mono text-xs text-gray-500">
-            {formatTime(record.occurredAt)}
-          </span>
-        </div>
-        <div className="space-y-1">
-          {getMetricValues(record).map((metric, index) => (
-            <p
-              key={`${record.id}-${metric.name || index}`}
-              className="truncate font-mono text-sm text-gray-900 dark:text-gray-100"
-            >
-              [{metric.name || record.name}] {metric.value ?? '-'}
-              {metric.description && (
-                <span className="text-gray-500"> {metric.description}</span>
-              )}
-            </p>
-          ))}
-        </div>
+        <EventInspectorContent
+          document={record}
+          occurredAtLabel={formatTime(record.occurredAt)}
+        />
       </button>
     ))}
   </div>
 );
+
+const MetricTrendChart = ({ records }: { records: TimelineDocument[] }) => {
+  const chartData = getMetricChartData(records);
+
+  if (chartData.length === 0) {
+    return (
+      <div className="flex h-full min-h-[180px] items-center justify-center px-4 text-sm text-gray-500 dark:text-gray-400">
+        No numeric metric values recorded for this selection.
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full min-h-[180px] py-3 [&_.recharts-surface:focus]:outline-none [&_.recharts-surface]:outline-none [&_.recharts-wrapper:focus]:outline-none [&_.recharts-wrapper]:outline-none">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart
+          data={chartData}
+          margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+        >
+          <defs>
+            <linearGradient
+              id="metricTrendGradient"
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="1"
+            >
+              <stop
+                offset="0%"
+                stopColor="var(--cds-interactive, #0f62fe)"
+                stopOpacity={0.28}
+              />
+              <stop
+                offset="100%"
+                stopColor="var(--cds-interactive, #0f62fe)"
+                stopOpacity={0.02}
+              />
+            </linearGradient>
+          </defs>
+          <XAxis
+            dataKey="label"
+            tick={{ fontSize: 11, fill: '#9ca3af' }}
+            tickLine={false}
+            axisLine={false}
+            interval="preserveStartEnd"
+            minTickGap={24}
+          />
+          <YAxis
+            tick={{ fontSize: 11, fill: '#9ca3af' }}
+            tickLine={false}
+            axisLine={false}
+            width={44}
+          />
+          <RechartsTooltip
+            content={({ active, payload }) => {
+              if (!active || !payload?.length) return null;
+              return (
+                <div className="min-w-[140px] border border-gray-200 bg-white px-3 py-2 text-sm shadow-lg dark:border-gray-800 dark:bg-gray-900">
+                  <p className="mb-1.5 text-xs text-gray-400">
+                    {payload[0]?.payload?.label}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="h-2 w-2"
+                      style={{
+                        backgroundColor: 'var(--cds-interactive, #0f62fe)',
+                      }}
+                    />
+                    <span className="text-xs uppercase text-gray-600 dark:text-gray-300">
+                      Value
+                    </span>
+                    <span className="ml-auto font-semibold tabular-nums">
+                      {payload[0]?.value}
+                    </span>
+                  </div>
+                </div>
+              );
+            }}
+          />
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke="var(--cds-interactive, #0f62fe)"
+            strokeWidth={1.5}
+            fill="url(#metricTrendGradient)"
+            dot={false}
+            activeDot={{ r: 3 }}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
 
 const InspectorPrimaryPanel = ({
   document,
   records,
   selectedDocumentId,
   onSelectDocument,
+  isLoading,
 }: {
   document: TimelineDocument;
+  isLoading?: boolean;
   records: TimelineDocument[];
   selectedDocumentId?: string;
   onSelectDocument: (document: TimelineDocument) => void;
 }) => {
   const relatedRecords = getRelatedRecords(document, records);
-  const groups = groupTimelineItems(relatedRecords);
 
   return (
     <div className="flex min-w-0 min-h-0 flex-col border-r border-gray-200 dark:border-gray-800">
@@ -316,26 +535,34 @@ const InspectorPrimaryPanel = ({
           <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
             {getLeftPanelTitle(document)}
           </p>
+          {document.kind === 'event' && !isLoading && (
+            <p className="mt-1 truncate font-mono text-xs text-gray-500">
+              {getEventInspectorScopeLabel(document)} ·{' '}
+              {getTimeWindowLabel(relatedRecords)}
+            </p>
+          )}
         </div>
         <Tag type="cool-gray">
-          {getRecordCountLabel(document, relatedRecords.length)}
+          {isLoading
+            ? 'Loading...'
+            : getRecordCountLabel(document, relatedRecords.length)}
         </Tag>
       </div>
-      {document.kind === 'log' ? (
+      {isLoading ? (
+        <div className="flex min-h-0 flex-1 items-center justify-center">
+          <Loading withOverlay={false} small />
+        </div>
+      ) : document.kind === 'log' ? (
         <LogRecordList
           records={relatedRecords}
           selectedDocumentId={selectedDocumentId}
           onSelectDocument={onSelectDocument}
         />
       ) : document.kind === 'metric' ? (
-        <MetricRecordList
-          records={relatedRecords}
-          selectedDocumentId={selectedDocumentId}
-          onSelectDocument={onSelectDocument}
-        />
+        <MetricTrendChart records={relatedRecords} />
       ) : (
-        <ConversationWaterfall
-          groups={groups}
+        <EventRecordList
+          records={relatedRecords}
           selectedDocumentId={selectedDocumentId}
           onSelectDocument={onSelectDocument}
         />
@@ -418,15 +645,13 @@ const TelemetryStreamTable = ({
                     </span>
                   </p>
                 ) : (
-                  <p className="truncate font-mono text-[13px]">
-                    {document.kind === 'log'
-                      ? `[${document.level.toLowerCase()}] ${
-                          document.title || document.name
-                        }`
-                      : `[${getDocumentComponent(document)}] ${
-                          document.title || document.name
-                        }`}
-                  </p>
+                  <>
+                    {document.kind === 'log' ? (
+                      <LogMainTableSummary document={document} />
+                    ) : (
+                      <EventMainTableSummary document={document} />
+                    )}
+                  </>
                 )}
               </div>
             </TableCell>
@@ -442,6 +667,7 @@ const TelemetryStreamTable = ({
 
 const TraceInspectorPanel = ({
   document,
+  isLoading,
   records,
   recordCount,
   selectedContextId,
@@ -450,22 +676,19 @@ const TraceInspectorPanel = ({
   onClose,
 }: {
   document: TimelineDocument | null;
+  isLoading?: boolean;
   records: TimelineDocument[];
   recordCount: number;
   selectedContextId: string;
   selectedDocumentId?: string;
   onSelectDocument: (document: TimelineDocument) => void;
   onClose: () => void;
-}) => (
-  <div
-    className={[
-      'absolute inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white shadow-2xl transition-transform duration-200 ease-out dark:border-gray-800 dark:bg-gray-950',
-      document ? 'translate-y-0' : 'pointer-events-none translate-y-full',
-    ].join(' ')}
-    aria-hidden={!document}
-  >
-    {document && (
-      <section className="relative flex max-h-[62vh] min-h-[360px] flex-col">
+}) => {
+  if (!document) return null;
+
+  return (
+    <aside className="flex max-h-[48vh] min-h-[320px] shrink-0 border-t border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-950">
+      <section className="relative flex min-h-0 flex-1 flex-col">
         <Button
           hasIconOnly
           kind="ghost"
@@ -493,9 +716,10 @@ const TraceInspectorPanel = ({
             </p>
           </div>
         </div>
-        <div className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1.3fr)_minmax(420px,0.7fr)]">
+        <div className="grid min-h-0 flex-1 overflow-hidden md:grid-cols-[minmax(0,1.3fr)_minmax(420px,0.7fr)]">
           <InspectorPrimaryPanel
             document={document}
+            isLoading={isLoading}
             records={records}
             selectedDocumentId={selectedDocumentId}
             onSelectDocument={onSelectDocument}
@@ -575,9 +799,9 @@ const TraceInspectorPanel = ({
           </div>
         </div>
       </section>
-    )}
-  </div>
-);
+    </aside>
+  );
+};
 
 export const ListingPage = () => {
   const { token, authId, projectId } = useCurrentCredential();
@@ -628,6 +852,10 @@ export const ListingPage = () => {
   const [selectedContextId, setSelectedContextId] = useState('');
   const [selectedDocument, setSelectedDocument] =
     useState<TimelineDocument | null>(null);
+  const [inspectorDocuments, setInspectorDocuments] = useState<
+    TimelineDocument[]
+  >([]);
+  const [isInspectorLoading, setIsInspectorLoading] = useState(false);
 
   const selectedComponentId = selectedComponents[0] || 'all';
 
@@ -862,6 +1090,11 @@ export const ListingPage = () => {
     [filteredDocuments, selectedContextId],
   );
 
+  const visibleInspectorDocuments =
+    inspectorDocuments.length > 0
+      ? inspectorDocuments
+      : selectedTimelineDocuments;
+
   useEffect(() => {
     const currentContextExists = filteredDocuments.some(
       document => document.contextId === selectedContextId,
@@ -883,7 +1116,74 @@ export const ListingPage = () => {
     }
   }, [eventFilterOptions, selectedEvent]);
 
+  useEffect(() => {
+    if (!selectedDocument) {
+      setInspectorDocuments([]);
+      setIsInspectorLoading(false);
+      return;
+    }
+
+    let active = true;
+
+    const fetchInspectorDocuments = async () => {
+      setInspectorDocuments([]);
+      setIsInspectorLoading(true);
+
+      const request = new GetAllTelemetryRequest();
+      const paginate = new Paginate();
+      paginate.setPage(1);
+      paginate.setPagesize(500);
+      request.setPaginate(paginate);
+      request.setCriteriasList(getInspectorCriteria(selectedDocument));
+
+      const order = new Ordering();
+      order.setColumn('occurredAt');
+      order.setOrder('asc');
+      request.setOrder(order);
+
+      try {
+        const response = await GetAllTelemetry(
+          connectionConfig,
+          request,
+          ConnectionConfig.WithDebugger({
+            authorization: token,
+            userId: authId,
+            projectId,
+          }),
+        );
+        if (!active) return;
+
+        if (!response.getSuccess()) {
+          const message =
+            response.getError()?.getHumanmessage() || TRACE_LOAD_ERROR_MESSAGE;
+          toast.error(message);
+          return;
+        }
+
+        const nextDocuments = response
+          .getDataList()
+          .map(telemetryRecordToTimelineDocument)
+          .filter(Boolean) as TimelineDocument[];
+
+        setInspectorDocuments(nextDocuments);
+      } catch (error) {
+        if (!active) return;
+        toast.error(getTelemetryErrorMessage(error));
+      } finally {
+        if (active) setIsInspectorLoading(false);
+      }
+    };
+
+    fetchInspectorDocuments();
+
+    return () => {
+      active = false;
+    };
+  }, [authId, projectId, selectedDocument, token]);
+
   const selectRecord = (document: TimelineDocument) => {
+    setInspectorDocuments([]);
+    setIsInspectorLoading(true);
     setSelectedContextId(document.contextId);
     setSelectedDocument(document);
   };
@@ -911,52 +1211,55 @@ export const ListingPage = () => {
           </TableToolbarContent>
         </TableToolbar>
 
-        <div className="flex min-h-0 flex-1">
-          {isLoading ? (
-            <div className="flex flex-1 items-center justify-center">
-              <Loading withOverlay={false} small />
-            </div>
-          ) : filteredDocuments.length === 0 ? (
-            <EmptyState
-              icon={appliedFilters.searchText ? WarningAlt : Activity}
-              title="No traces found"
-              subtitle="Adjust search, scope, component, event, or date filters."
-            />
-          ) : (
-            <div className="flex min-w-0 flex-1 flex-col">
-              <TelemetryStreamTable
-                selectedDocumentId={selectedDocument?.id}
-                records={filteredDocuments}
-                onSelectRecord={selectRecord}
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex min-h-0 min-w-0 flex-1">
+            {isLoading ? (
+              <div className="flex flex-1 items-center justify-center">
+                <Loading withOverlay={false} small />
+              </div>
+            ) : filteredDocuments.length === 0 ? (
+              <EmptyState
+                icon={appliedFilters.searchText ? WarningAlt : Activity}
+                title="No traces found"
+                subtitle="Adjust search, scope, component, event, or date filters."
               />
+            ) : (
+              <div className="flex min-w-0 flex-1 flex-col">
+                <TelemetryStreamTable
+                  selectedDocumentId={selectedDocument?.id}
+                  records={filteredDocuments}
+                  onSelectRecord={selectRecord}
+                />
 
-              <Pagination
-                className="shrink-0 border-t border-gray-200 dark:border-gray-800"
-                totalItems={totalItem}
-                page={page}
-                pageSize={pageSize}
-                pageSizes={[25, 50, 100]}
-                onChange={({ page: nextPage, pageSize: nextPageSize }) => {
-                  if (nextPageSize !== pageSize) {
-                    setPageSize(nextPageSize);
-                    setPage(1);
-                    return;
-                  }
-                  setPage(nextPage);
-                }}
-              />
-            </div>
-          )}
+                <Pagination
+                  className="shrink-0 border-t border-gray-200 dark:border-gray-800"
+                  totalItems={totalItem}
+                  page={page}
+                  pageSize={pageSize}
+                  pageSizes={[25, 50, 100]}
+                  onChange={({ page: nextPage, pageSize: nextPageSize }) => {
+                    if (nextPageSize !== pageSize) {
+                      setPageSize(nextPageSize);
+                      setPage(1);
+                      return;
+                    }
+                    setPage(nextPage);
+                  }}
+                />
+              </div>
+            )}
+          </div>
+          <TraceInspectorPanel
+            document={selectedDocument}
+            isLoading={isInspectorLoading}
+            records={visibleInspectorDocuments}
+            recordCount={visibleInspectorDocuments.length}
+            selectedContextId={selectedContextId}
+            selectedDocumentId={selectedDocument?.id}
+            onSelectDocument={setSelectedDocument}
+            onClose={() => setSelectedDocument(null)}
+          />
         </div>
-        <TraceInspectorPanel
-          document={selectedDocument}
-          records={selectedTimelineDocuments}
-          recordCount={selectedTimelineDocuments.length}
-          selectedContextId={selectedContextId}
-          selectedDocumentId={selectedDocument?.id}
-          onSelectDocument={setSelectedDocument}
-          onClose={() => setSelectedDocument(null)}
-        />
       </div>
     </div>
   );

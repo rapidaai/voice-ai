@@ -83,23 +83,13 @@ func (h requestorDispatchHandler) HandleUserText(ctx context.Context, vl interna
 	if h.r.unclearInputWatchdog != nil {
 		h.r.unclearInputWatchdog.Stop()
 	}
+	if h.r.endOfSpeechExecutor != nil {
+		_ = h.r.endOfSpeechExecutor.Execute(ctx, vl)
+		return
+	}
 	h.r.OnPacket(ctx,
 		internal_type.InterimEndOfSpeechPacket{Speech: vl.Text, ContextID: vl.ContextID},
-		internal_type.ObservabilityEventRecordPacket{
-			ContextID: vl.ContextID,
-			Scope:     internal_type.ObservabilityRecordScopeUserMessage,
-			Record:    observability.NewMessageRecord(vl.ContextID, observability.ComponentEOS, observability.EOSStarted, observability.MessageRoleUser, observability.Attributes{"speech": vl.Text}),
-		},
 		internal_type.EndOfSpeechPacket{Speech: vl.Text, ContextID: vl.ContextID},
-		internal_type.ObservabilityEventRecordPacket{
-			ContextID: vl.ContextID,
-			Scope:     internal_type.ObservabilityRecordScopeUserMessage,
-			Record: observability.NewMessageRecord(vl.ContextID, observability.ComponentEOS, observability.EOSCompleted, observability.MessageRoleUser, observability.Attributes{
-				"provider":   "text_input",
-				"context_id": vl.ContextID,
-				"speech":     vl.Text,
-			}),
-		},
 	)
 }
 

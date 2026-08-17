@@ -274,6 +274,7 @@ const buildBaseDocument = ({
   id,
   kind,
   name,
+  component: component || undefined,
   category: component || name.split('.')[0] || kind,
   level,
   outcome: inferOutcome({ attributes, level, name }),
@@ -432,9 +433,7 @@ export const getDocumentComponent = (doc: TimelineDocument): string => {
   const attributeComponent =
     doc.attributes?.component || doc.attributes?.provider;
   const fallback = doc.category || doc.name.split('.')[0] || 'conversation';
-  return (
-    attributeComponent || inferComponentFromName(doc.name, fallback)
-  ).toLowerCase();
+  return doc.component || attributeComponent || inferComponentFromName(doc.name, fallback);
 };
 
 export type TraceFilterSource = 'facet' | 'query';
