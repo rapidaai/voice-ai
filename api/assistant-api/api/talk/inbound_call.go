@@ -7,6 +7,7 @@ package assistant_talk_api
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -17,8 +18,10 @@ import (
 	channel_pipeline "github.com/rapidaai/api/assistant-api/internal/channel/pipeline"
 	channel_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/pkg/validator"
 )
 
 // CallReciever handles incoming calls for the given assistant.
@@ -70,6 +73,39 @@ func (cApi *ConversationApi) CallReciever(c *gin.Context) {
 		cApi.logger.Errorf("failed to handle inbound call: %v", result.Error)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Unable to initiate talker"})
 	}
+}
+
+// CallAnswerByContext returns the <Stream> answer XML for a resolved call context.
+// A provider's answer_url fetches this to open the bidirectional media stream.
+// TODO(plivo): move answer-XML generation onto the Telephony interface (inlined here for now).
+func (cApi *ConversationApi) CallAnswerByContext(c *gin.Context) {
+	contextID := c.Param("contextId")
+	if !validator.NotBlank(contextID) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing contextId"})
+		return
+	}
+
+	cc, err := cApi.callContextStore.Get(c, contextID)
+	if err != nil {
+		cApi.logger.Errorf("failed to resolve call context %s for answer: %v", contextID, err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid context to answer"})
+		return
+	}
+
+	provider := c.Param("telephony")
+	if !validator.NotBlank(provider) {
+		provider = cc.Provider
+	}
+
+	public := cApi.cfg.Assistant.Public
+	wsURL := fmt.Sprintf("wss://%s/%s", public, internal_type.GetContextAnswerPath(provider, cc.ContextID))
+	eventURL := fmt.Sprintf("https://%s/%s", public, internal_type.GetContextEventPath(provider, cc.ContextID))
+
+	answerXML := fmt.Sprintf(`<Response>
+	<Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-mulaw;rate=8000" statusCallbackUrl="%s" statusCallbackMethod="POST">%s</Stream>
+</Response>`, eventURL, wsURL)
+
+	c.Data(http.StatusOK, "text/xml", []byte(answerXML))
 }
 
 // CallTalkerByContext handles WebSocket connections for media streaming.
