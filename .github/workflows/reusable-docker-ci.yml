@@ -18,7 +18,6 @@ jobs:
           - integration-api
           - endpoint-api
           - assistant-api
-          - document-api
           - ui
     steps:
       - name: Checkout code

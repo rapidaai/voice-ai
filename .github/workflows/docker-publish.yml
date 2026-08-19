@@ -6,11 +6,18 @@ on:
       - main
       - saas
     paths:
-      - "api/**"
+      - "api/web-api/**"
+      - "api/integration-api/**"
+      - "api/endpoint-api/**"
+      - "api/assistant-api/**"
       - "cmd/**"
       - "pkg/**"
       - "ui/**"
-      - "docker/**"
+      - "docker/web-api/**"
+      - "docker/integration-api/**"
+      - "docker/endpoint-api/**"
+      - "docker/assistant-api/**"
+      - "docker/ui/**"
       - "go.mod"
       - "go.sum"
       - ".github/actions/docker-build/action.yml"
@@ -18,7 +25,7 @@ on:
   workflow_dispatch:
     inputs:
       images:
-        description: "Images to publish: all or comma-separated web-api,integration-api,endpoint-api,assistant-api,document-api,ui"
+        description: "Images to publish: all or comma-separated web-api,integration-api,endpoint-api,assistant-api,ui"
         required: false
         default: all
 
@@ -37,7 +44,6 @@ jobs:
       integration-api: ${{ steps.set.outputs.integration-api }}
       endpoint-api: ${{ steps.set.outputs.endpoint-api }}
       assistant-api: ${{ steps.set.outputs.assistant-api }}
-      document-api: ${{ steps.set.outputs.document-api }}
       ui: ${{ steps.set.outputs.ui }}
     steps:
       - name: Checkout code
@@ -77,9 +83,6 @@ jobs:
               - "docker/assistant-api/**"
               - "go.mod"
               - "go.sum"
-            document-api:
-              - "api/document-api/**"
-              - "docker/document-api/**"
             ui:
               - "ui/**"
               - "docker/ui/**"
@@ -110,7 +113,6 @@ jobs:
               select_image integration-api
               select_image endpoint-api
               select_image assistant-api
-              select_image document-api
               select_image ui
             } >> "$GITHUB_OUTPUT"
           else
@@ -119,7 +121,6 @@ jobs:
               echo "integration-api=${{ steps.filter.outputs.integration-api }}"
               echo "endpoint-api=${{ steps.filter.outputs.endpoint-api }}"
               echo "assistant-api=${{ steps.filter.outputs.assistant-api }}"
-              echo "document-api=${{ steps.filter.outputs.document-api }}"
               echo "ui=${{ steps.filter.outputs.ui }}"
             } >> "$GITHUB_OUTPUT"
           fi
@@ -240,31 +241,6 @@ jobs:
           registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
           registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-  document-api:
-    name: Build document-api
-    needs:
-      - changes
-      - meta
-    if: needs.changes.outputs.document-api == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Build and push document-api
-        uses: ./.github/actions/docker-build
-        with:
-          context: .
-          dockerfile: ./docker/document-api/Dockerfile
-          push: "true"
-          tags: |
-            ${{ env.DOCKER_REGISTRY }}/document-api:latest
-            ${{ env.DOCKER_REGISTRY }}/document-api:${{ needs.meta.outputs.sha_short }}
-            ${{ env.DOCKER_REGISTRY }}/document-api:${{ needs.meta.outputs.date }}
-          cache-scope: document-api
-          registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
-          registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
-
   ui:
     name: Build ui
     needs:
@@ -299,7 +275,6 @@ jobs:
       - integration-api
       - endpoint-api
       - assistant-api
-      - document-api
       - ui
     if: always()
     runs-on: ubuntu-latest
@@ -315,6 +290,5 @@ jobs:
             echo "| integration-api | ${{ needs.integration-api.result }} | latest, ${{ needs.meta.outputs.sha_short }}, ${{ needs.meta.outputs.date }} |"
             echo "| endpoint-api | ${{ needs.endpoint-api.result }} | latest, ${{ needs.meta.outputs.sha_short }}, ${{ needs.meta.outputs.date }} |"
             echo "| assistant-api | ${{ needs.assistant-api.result }} | latest, ${{ needs.meta.outputs.sha_short }}, ${{ needs.meta.outputs.date }} |"
-            echo "| document-api | ${{ needs.document-api.result }} | latest, ${{ needs.meta.outputs.sha_short }}, ${{ needs.meta.outputs.date }} |"
             echo "| ui | ${{ needs.ui.result }} | latest, ${{ needs.meta.outputs.sha_short }}, ${{ needs.meta.outputs.date }} |"
           } >> "$GITHUB_STEP_SUMMARY"
