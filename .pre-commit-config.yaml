@@ -1,0 +1,112 @@
+minimum_pre_commit_version: "2.20.0"
+default_install_hook_types:
+  - pre-commit
+  - commit-msg
+  - pre-push
+default_stages:
+  - commit
+
+repos:
+  - repo: local
+    hooks:
+      - id: merge-conflict-markers
+        name: Check for merge conflict markers
+        entry: bash bin/pre-commit-hygiene merge-conflict
+        language: system
+        pass_filenames: true
+
+      - id: private-key
+        name: Detect private keys
+        entry: bash bin/pre-commit-hygiene private-key
+        language: system
+        pass_filenames: true
+
+      - id: common-secrets
+        name: Detect common secret tokens
+        entry: bash bin/pre-commit-hygiene secrets
+        language: system
+        pass_filenames: true
+
+      - id: check-json
+        name: Validate JSON files
+        entry: bash bin/pre-commit-hygiene json
+        language: system
+        files: \.json$
+        exclude: (^|/)(tsconfig|jsconfig)\.json$
+        pass_filenames: true
+
+      - id: check-shell
+        name: Validate shell script syntax
+        entry: bash bin/pre-commit-hygiene shell-syntax
+        language: system
+        files: \.sh$
+        pass_filenames: true
+
+      - id: gofmt
+        name: Check Go formatting
+        entry: bash bin/pre-commit-go fmt
+        language: system
+        files: \.go$
+        exclude: ^(protos/|sdks/|vendor/)
+        pass_filenames: true
+
+      - id: go-mod-tidy
+        name: Verify go.mod and go.sum are tidy
+        entry: bash bin/pre-commit-go mod-tidy
+        language: system
+        files: ^(go\.mod|go\.sum|.*\.go)$
+        pass_filenames: false
+
+      - id: go-formatters
+        name: Run golangci-lint formatters (strict)
+        entry: bash bin/pre-commit-go formatters
+        language: system
+        files: \.go$
+        pass_filenames: false
+        stages:
+          - manual
+
+      - id: golangci-lint
+        name: Run golangci-lint on CI-safe Go packages (strict)
+        entry: bash bin/pre-commit-go lint
+        language: system
+        files: \.go$
+        pass_filenames: false
+        stages:
+          - manual
+
+      - id: go-vet
+        name: Run go vet on CI-safe Go packages
+        entry: bash bin/pre-commit-go vet
+        language: system
+        files: \.go$
+        pass_filenames: false
+        stages:
+          - push
+
+      - id: go-test
+        name: Run Go tests on CI-safe Go packages (strict)
+        entry: bash bin/pre-commit-go test
+        language: system
+        files: \.go$
+        pass_filenames: false
+        stages:
+          - manual
+
+      - id: go-build
+        name: Build CI Go binaries
+        entry: bash bin/pre-commit-go build
+        language: system
+        files: \.go$
+        pass_filenames: false
+        stages:
+          - push
+
+      - id: commit-msg
+        name: Validate commit message format
+        entry: bash githooks/commit-msg
+        language: system
+        stages:
+          - commit-msg
+        always_run: true
+        pass_filenames: true

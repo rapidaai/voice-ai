@@ -3,16 +3,27 @@ name: Build and Push Docker Images
 on:
   push:
     branches:
+      - main
       - saas
     paths:
-      - 'api/**'
-      - 'cmd/**'
-      - 'pkg/**'
-      - 'ui/**'
-      - 'docker/**'
-      - 'go.mod'
-      - 'go.sum'
+      - "api/**"
+      - "cmd/**"
+      - "pkg/**"
+      - "ui/**"
+      - "docker/**"
+      - "go.mod"
+      - "go.sum"
+      - ".github/actions/docker-build/action.yml"
+      - ".github/workflows/docker-publish.yml"
   workflow_dispatch:
+    inputs:
+      images:
+        description: "Images to publish: all or comma-separated web-api,integration-api,endpoint-api,assistant-api,document-api,ui"
+        required: false
+        default: all
+
+permissions:
+  contents: read
 
 env:
   DOCKER_REGISTRY: rapidaai
@@ -22,44 +33,96 @@ jobs:
     name: Detect changes
     runs-on: ubuntu-latest
     outputs:
-      web-api: ${{ steps.filter.outputs.web-api }}
-      integration-api: ${{ steps.filter.outputs.integration-api }}
-      endpoint-api: ${{ steps.filter.outputs.endpoint-api }}
-      assistant-api: ${{ steps.filter.outputs.assistant-api }}
-      ui: ${{ steps.filter.outputs.ui }}
+      web-api: ${{ steps.set.outputs.web-api }}
+      integration-api: ${{ steps.set.outputs.integration-api }}
+      endpoint-api: ${{ steps.set.outputs.endpoint-api }}
+      assistant-api: ${{ steps.set.outputs.assistant-api }}
+      document-api: ${{ steps.set.outputs.document-api }}
+      ui: ${{ steps.set.outputs.ui }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect changed images
+        uses: dorny/paths-filter@v3
         id: filter
+        if: github.event_name == 'push'
         with:
           filters: |
             web-api:
-              - 'api/web-api/**'
-              - 'cmd/web/**'
-              - 'pkg/**'
-              - 'docker/web-api/**'
-              - 'go.mod'
+              - "api/web-api/**"
+              - "cmd/web/**"
+              - "pkg/**"
+              - "docker/web-api/**"
+              - "go.mod"
+              - "go.sum"
             integration-api:
-              - 'api/integration-api/**'
-              - 'cmd/integration/**'
-              - 'pkg/**'
-              - 'docker/integration-api/**'
-              - 'go.mod'
+              - "api/integration-api/**"
+              - "cmd/integration/**"
+              - "pkg/**"
+              - "docker/integration-api/**"
+              - "go.mod"
+              - "go.sum"
             endpoint-api:
-              - 'api/endpoint-api/**'
-              - 'cmd/endpoint/**'
-              - 'pkg/**'
-              - 'docker/endpoint-api/**'
-              - 'go.mod'
+              - "api/endpoint-api/**"
+              - "cmd/endpoint/**"
+              - "pkg/**"
+              - "docker/endpoint-api/**"
+              - "go.mod"
+              - "go.sum"
             assistant-api:
-              - 'api/assistant-api/**'
-              - 'cmd/assistant/**'
-              - 'pkg/**'
-              - 'docker/assistant-api/**'
-              - 'go.mod'
+              - "api/assistant-api/**"
+              - "cmd/assistant/**"
+              - "pkg/**"
+              - "docker/assistant-api/**"
+              - "go.mod"
+              - "go.sum"
+            document-api:
+              - "api/document-api/**"
+              - "docker/document-api/**"
             ui:
-              - 'ui/**'
-              - 'docker/ui/**'
+              - "ui/**"
+              - "docker/ui/**"
+
+      - name: Set publish targets
+        id: set
+        run: |
+          set -euo pipefail
+
+          select_image() {
+            local name="$1"
+            if [ "$PUBLISH_ALL" = "true" ] || printf '%s' "$INPUT" | tr ',' '\n' | grep -qx "$name"; then
+              echo "${name}=true"
+            else
+              echo "${name}=false"
+            fi
+          }
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            INPUT="${{ inputs.images }}"
+            if [ -z "$INPUT" ] || [ "$INPUT" = "all" ]; then
+              PUBLISH_ALL=true
+            else
+              PUBLISH_ALL=false
+            fi
+            {
+              select_image web-api
+              select_image integration-api
+              select_image endpoint-api
+              select_image assistant-api
+              select_image document-api
+              select_image ui
+            } >> "$GITHUB_OUTPUT"
+          else
+            {
+              echo "web-api=${{ steps.filter.outputs.web-api }}"
+              echo "integration-api=${{ steps.filter.outputs.integration-api }}"
+              echo "endpoint-api=${{ steps.filter.outputs.endpoint-api }}"
+              echo "assistant-api=${{ steps.filter.outputs.assistant-api }}"
+              echo "document-api=${{ steps.filter.outputs.document-api }}"
+              echo "ui=${{ steps.filter.outputs.ui }}"
+            } >> "$GITHUB_OUTPUT"
+          fi
 
   meta:
     name: Extract metadata
@@ -68,148 +131,190 @@ jobs:
       sha_short: ${{ steps.meta.outputs.sha_short }}
       date: ${{ steps.meta.outputs.date }}
     steps:
-      - uses: actions/checkout@v4
-      - id: meta
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Resolve tags
+        id: meta
         run: |
           echo "sha_short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
           echo "date=$(date +'%Y%m%d')" >> "$GITHUB_OUTPUT"
 
   web-api:
     name: Build web-api
-    needs: [changes, meta]
+    needs:
+      - changes
+      - meta
     if: needs.changes.outputs.web-api == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: docker/build-push-action@v5
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build and push web-api
+        uses: ./.github/actions/docker-build
         with:
           context: .
-          file: ./docker/web-api/Dockerfile
-          push: true
+          dockerfile: ./docker/web-api/Dockerfile
+          push: "true"
           tags: |
             ${{ env.DOCKER_REGISTRY }}/web-api:latest
             ${{ env.DOCKER_REGISTRY }}/web-api:${{ needs.meta.outputs.sha_short }}
             ${{ env.DOCKER_REGISTRY }}/web-api:${{ needs.meta.outputs.date }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-scope: web-api
+          registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
 
   integration-api:
     name: Build integration-api
-    needs: [changes, meta]
+    needs:
+      - changes
+      - meta
     if: needs.changes.outputs.integration-api == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: docker/build-push-action@v5
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build and push integration-api
+        uses: ./.github/actions/docker-build
         with:
           context: .
-          file: ./docker/integration-api/Dockerfile
-          push: true
+          dockerfile: ./docker/integration-api/Dockerfile
+          push: "true"
           tags: |
             ${{ env.DOCKER_REGISTRY }}/integration-api:latest
             ${{ env.DOCKER_REGISTRY }}/integration-api:${{ needs.meta.outputs.sha_short }}
             ${{ env.DOCKER_REGISTRY }}/integration-api:${{ needs.meta.outputs.date }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-scope: integration-api
+          registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
 
   endpoint-api:
     name: Build endpoint-api
-    needs: [changes, meta]
+    needs:
+      - changes
+      - meta
     if: needs.changes.outputs.endpoint-api == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: docker/build-push-action@v5
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build and push endpoint-api
+        uses: ./.github/actions/docker-build
         with:
           context: .
-          file: ./docker/endpoint-api/Dockerfile
-          push: true
+          dockerfile: ./docker/endpoint-api/Dockerfile
+          push: "true"
           tags: |
             ${{ env.DOCKER_REGISTRY }}/endpoint-api:latest
             ${{ env.DOCKER_REGISTRY }}/endpoint-api:${{ needs.meta.outputs.sha_short }}
             ${{ env.DOCKER_REGISTRY }}/endpoint-api:${{ needs.meta.outputs.date }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-scope: endpoint-api
+          registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
 
   assistant-api:
     name: Build assistant-api
-    needs: [changes, meta]
+    needs:
+      - changes
+      - meta
     if: needs.changes.outputs.assistant-api == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: docker/build-push-action@v5
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build and push assistant-api
+        uses: ./.github/actions/docker-build
         with:
           context: .
-          file: ./docker/assistant-api/Dockerfile
-          push: true
+          dockerfile: ./docker/assistant-api/Dockerfile
+          push: "true"
           tags: |
             ${{ env.DOCKER_REGISTRY }}/assistant-api:latest
             ${{ env.DOCKER_REGISTRY }}/assistant-api:${{ needs.meta.outputs.sha_short }}
             ${{ env.DOCKER_REGISTRY }}/assistant-api:${{ needs.meta.outputs.date }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-scope: assistant-api
+          registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  document-api:
+    name: Build document-api
+    needs:
+      - changes
+      - meta
+    if: needs.changes.outputs.document-api == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build and push document-api
+        uses: ./.github/actions/docker-build
+        with:
+          context: .
+          dockerfile: ./docker/document-api/Dockerfile
+          push: "true"
+          tags: |
+            ${{ env.DOCKER_REGISTRY }}/document-api:latest
+            ${{ env.DOCKER_REGISTRY }}/document-api:${{ needs.meta.outputs.sha_short }}
+            ${{ env.DOCKER_REGISTRY }}/document-api:${{ needs.meta.outputs.date }}
+          cache-scope: document-api
+          registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
 
   ui:
     name: Build ui
-    needs: [changes, meta]
+    needs:
+      - changes
+      - meta
     if: needs.changes.outputs.ui == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: docker/build-push-action@v5
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build and push ui
+        uses: ./.github/actions/docker-build
         with:
           context: .
-          file: ./docker/ui/Dockerfile
-          push: true
+          dockerfile: ./docker/ui/Dockerfile
+          push: "true"
           build-args: EDITION=community
           tags: |
             ${{ env.DOCKER_REGISTRY }}/ui:latest
             ${{ env.DOCKER_REGISTRY }}/ui:${{ needs.meta.outputs.sha_short }}
             ${{ env.DOCKER_REGISTRY }}/ui:${{ needs.meta.outputs.date }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-scope: ui
+          registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
 
   summary:
     name: Summary
-    needs: [meta, web-api, integration-api, endpoint-api, assistant-api, ui]
+    needs:
+      - meta
+      - web-api
+      - integration-api
+      - endpoint-api
+      - assistant-api
+      - document-api
+      - ui
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - run: |
+      - name: Write summary
+        run: |
           {
-            echo "## Docker Images Published 🐳"
+            echo "## Docker Images Published"
             echo ""
-            echo "| Image | Built | Tags |"
-            echo "|-------|-------|------|"
-            echo "| web-api | ${{ needs.web-api.result }} | ${{ needs.meta.outputs.sha_short }}, ${{ needs.meta.outputs.date }} |"
-            echo "| integration-api | ${{ needs.integration-api.result }} | ${{ needs.meta.outputs.sha_short }}, ${{ needs.meta.outputs.date }} |"
-            echo "| endpoint-api | ${{ needs.endpoint-api.result }} | ${{ needs.meta.outputs.sha_short }}, ${{ needs.meta.outputs.date }} |"
-            echo "| assistant-api | ${{ needs.assistant-api.result }} | ${{ needs.meta.outputs.sha_short }}, ${{ needs.meta.outputs.date }} |"
-            echo "| ui | ${{ needs.ui.result }} | ${{ needs.meta.outputs.sha_short }}, ${{ needs.meta.outputs.date }} |"
+            echo "| Image | Result | Tags |"
+            echo "|-------|--------|------|"
+            echo "| web-api | ${{ needs.web-api.result }} | latest, ${{ needs.meta.outputs.sha_short }}, ${{ needs.meta.outputs.date }} |"
+            echo "| integration-api | ${{ needs.integration-api.result }} | latest, ${{ needs.meta.outputs.sha_short }}, ${{ needs.meta.outputs.date }} |"
+            echo "| endpoint-api | ${{ needs.endpoint-api.result }} | latest, ${{ needs.meta.outputs.sha_short }}, ${{ needs.meta.outputs.date }} |"
+            echo "| assistant-api | ${{ needs.assistant-api.result }} | latest, ${{ needs.meta.outputs.sha_short }}, ${{ needs.meta.outputs.date }} |"
+            echo "| document-api | ${{ needs.document-api.result }} | latest, ${{ needs.meta.outputs.sha_short }}, ${{ needs.meta.outputs.date }} |"
+            echo "| ui | ${{ needs.ui.result }} | latest, ${{ needs.meta.outputs.sha_short }}, ${{ needs.meta.outputs.date }} |"
           } >> "$GITHUB_STEP_SUMMARY"

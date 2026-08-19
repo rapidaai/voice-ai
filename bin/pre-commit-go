@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$ROOT"
+
+GO_CI_PACKAGES=(
+  "./api/web-api/..."
+  "./api/integration-api/..."
+  "./api/endpoint-api/..."
+  "./pkg/..."
+  "./cmd/web/..."
+  "./cmd/integration/..."
+  "./cmd/endpoint/..."
+  "./config/..."
+)
+
+usage() {
+  cat <<'USAGE'
+Usage: bin/pre-commit-go <fmt|mod-tidy|formatters|lint|vet|test|build> [files...]
+USAGE
+}
+
+require_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "error: required command not found: $1" >&2
+    case "$1" in
+      golangci-lint)
+        echo "Install golangci-lint before pushing, or run with SKIP=golangci-lint,go-formatters for an emergency bypass." >&2
+        ;;
+    esac
+    exit 1
+  fi
+}
+
+ensure_go_cache() {
+  require_cmd go
+
+  cache="${GOCACHE:-}"
+  if [ -z "$cache" ]; then
+    cache="$(go env GOCACHE 2>/dev/null || true)"
+  fi
+
+  if [ -z "$cache" ]; then
+    return
+  fi
+
+  probe="$cache/.voice-ai-pre-commit-cache-test.$$"
+  if ! (mkdir -p "$cache" && : >"$probe" && rm -f "$probe") >/dev/null 2>&1; then
+    export GOCACHE="${TMPDIR:-/tmp}/voice-ai-go-build-cache"
+    mkdir -p "$GOCACHE"
+  fi
+}
+
+ensure_golangci_lint_cache() {
+  require_cmd golangci-lint
+
+  cache="${GOLANGCI_LINT_CACHE:-}"
+  if [ -z "$cache" ]; then
+    cache="$(golangci-lint cache status 2>/dev/null | awk '/^Dir:/ {print $2}' || true)"
+  fi
+
+  if [ -z "$cache" ]; then
+    return
+  fi
+
+  probe="$cache/.voice-ai-pre-commit-cache-test.$$"
+  if ! (mkdir -p "$cache" && : >"$probe" && rm -f "$probe") >/dev/null 2>&1; then
+    export GOLANGCI_LINT_CACHE="${TMPDIR:-/tmp}/voice-ai-golangci-lint-cache"
+    mkdir -p "$GOLANGCI_LINT_CACHE"
+  fi
+}
+
+write_go_files_for_gofmt() {
+  for file in "$@"; do
+    case "$file" in
+      *.go)
+        case "$file" in
+          protos/*|sdks/*|vendor/*)
+            continue
+            ;;
+        esac
+        if [ -f "$file" ]; then
+          printf '%s\0' "$file"
+        fi
+        ;;
+    esac
+  done
+}
+
+cmd="${1:-}"
+if [ "$#" -gt 0 ]; then
+  shift
+fi
+
+case "$cmd" in
+  fmt)
+    require_cmd gofmt
+    tmp="$(mktemp "${TMPDIR:-/tmp}/voice-ai-gofmt.XXXXXX")"
+    trap 'rm -f "$tmp"' EXIT
+    write_go_files_for_gofmt "$@" >"$tmp"
+
+    if [ ! -s "$tmp" ]; then
+      exit 0
+    fi
+
+    unformatted="$(xargs -0 gofmt -l <"$tmp")"
+    if [ -n "$unformatted" ]; then
+      echo "Go files need gofmt:"
+      echo "$unformatted"
+      echo ""
+      echo "Run: gofmt -w <file> ..."
+      exit 1
+    fi
+    ;;
+
+  mod-tidy)
+    ensure_go_cache
+    go mod tidy
+    if ! git diff --quiet -- go.mod go.sum; then
+      echo "go.mod or go.sum changed after 'go mod tidy'. Review and stage the diff:"
+      git diff -- go.mod go.sum
+      exit 1
+    fi
+    ;;
+
+  formatters)
+    ensure_go_cache
+    ensure_golangci_lint_cache
+    golangci-lint fmt --diff "${GO_CI_PACKAGES[@]}"
+    ;;
+
+  lint)
+    ensure_go_cache
+    ensure_golangci_lint_cache
+    CGO_ENABLED=0 golangci-lint run --timeout=5m --build-tags=nocgo "${GO_CI_PACKAGES[@]}"
+    ;;
+
+  vet)
+    ensure_go_cache
+    CGO_ENABLED=0 go vet "${GO_CI_PACKAGES[@]}"
+    ;;
+
+  test)
+    ensure_go_cache
+    CGO_ENABLED=1 go test -count=1 "${GO_CI_PACKAGES[@]}"
+    ;;
+
+  build)
+    ensure_go_cache
+    out_dir="${TMPDIR:-/tmp}/voice-ai-pre-commit-build"
+    mkdir -p "$out_dir"
+    CGO_ENABLED=0 GOOS=linux go build -o "$out_dir/web-api" ./cmd/web/web.go
+    CGO_ENABLED=0 GOOS=linux go build -o "$out_dir/integration-api" ./cmd/integration/integration.go
+    CGO_ENABLED=0 GOOS=linux go build -o "$out_dir/endpoint-api" ./cmd/endpoint/endpoint.go
+    ;;
+
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac

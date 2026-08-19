@@ -1,0 +1,33 @@
+name: Package directory
+description: Archive a directory and upload it as a tar.gz artifact.
+
+inputs:
+  source-directory:
+    description: Directory to package.
+    required: true
+  package-name:
+    description: Output package file name without extension.
+    required: true
+  artifact-name:
+    description: Uploaded artifact name.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Create package
+      shell: bash
+      run: |
+        set -euo pipefail
+        test -d "${{ inputs.source-directory }}"
+        mkdir -p dist
+        tar czf "dist/${{ inputs.package-name }}.tar.gz" -C "${{ inputs.source-directory }}" .
+        ls -lh "dist/${{ inputs.package-name }}.tar.gz"
+
+    - name: Upload package
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: dist/${{ inputs.package-name }}.tar.gz
+        if-no-files-found: error
+        retention-days: 14

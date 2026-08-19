@@ -1,0 +1,93 @@
+name: Reusable UI CI
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: Node.js version to install.
+        required: true
+        type: string
+    secrets:
+      CODECOV_TOKEN:
+        description: Optional Codecov token.
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: UI Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up UI
+        uses: ./.github/actions/setup-ui
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Run ESLint
+        working-directory: ui
+        run: yarn lint
+
+  typecheck:
+    name: UI Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up UI
+        uses: ./.github/actions/setup-ui
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Run TypeScript
+        working-directory: ui
+        run: yarn checkTs
+
+  test:
+    name: UI Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up UI
+        uses: ./.github/actions/setup-ui
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Run tests with coverage
+        working-directory: ui
+        run: yarn test --watchAll=false --passWithNoTests --coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./ui/coverage/lcov.info
+          flags: frontend
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  build:
+    name: UI Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up UI
+        uses: ./.github/actions/setup-ui
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Build
+        working-directory: ui
+        env:
+          CI: false
+          DISABLE_ESLINT_PLUGIN: true
+        run: yarn build

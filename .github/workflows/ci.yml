@@ -2,13 +2,14 @@ name: CI
 
 on:
   pull_request:
-    branches:
-      - main
-      - develop
   push:
     branches:
       - main
       - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -16,463 +17,64 @@ concurrency:
 
 env:
   GO_VERSION: "1.25.12"
-  NODE_VERSION: "20"
+  NODE_VERSION: "22"
 
 jobs:
-  go-lint:
-    name: Go Lint
-    runs-on: ubuntu-latest
-    if: github.repository == 'rapidaai/voice-ai'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  go:
+    name: Go
+    uses: ./.github/workflows/reusable-go-ci.yml
+    secrets: inherit
+    with:
+      go-version: "1.25.12"
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+  ui:
+    name: UI
+    uses: ./.github/workflows/reusable-ui-ci.yml
+    secrets: inherit
+    with:
+      node-version: "22"
 
-      - name: Install golangci-lint
-        run: |
-          # Install latest golangci-lint that supports Go 1.25
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b "$(go env GOPATH)/bin"
+  repository:
+    name: Repository
+    uses: ./.github/workflows/reusable-repository-ci.yml
+    with:
+      node-version: "22"
 
-      - name: Run golangci-lint
-        run: |
-          # Skip assistant-api entirely - it has deep CGO dependencies (azure speech, silero-vad, rnnoise)
-          # that require C libraries not available in CI. These are validated by Docker build.
-          # Run in informational mode - don't fail on pre-existing issues, but report them
-          golangci-lint run --timeout=5m --build-tags=nocgo \
-            ./api/web-api/... \
-            ./api/integration-api/... \
-            ./api/endpoint-api/... \
-            ./pkg/... \
-            ./cmd/web/... \
-            ./cmd/integration/... \
-            ./cmd/endpoint/... \
-            ./config/... || true
-        env:
-          CGO_ENABLED: 0
-
-  go-fmt:
-    name: Go Format
-    runs-on: ubuntu-latest
-    if: github.repository == 'rapidaai/voice-ai'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
-      - name: Check formatting
-        run: |
-          # Find Go files excluding generated directories (protos, sdks)
-          UNFORMATTED=$(find . -name '*.go' -not -path './protos/*' -not -path './sdks/*' -not -path './vendor/*' -print0 | xargs -0 gofmt -l 2>/dev/null || true)
-          if [ -n "$UNFORMATTED" ]; then
-            echo "The following files are not formatted:"
-            echo "$UNFORMATTED"
-            echo ""
-            echo "Run 'gofmt -w .' to fix formatting"
-            exit 1
-          fi
-
-  go-vet:
-    name: Go Vet
-    runs-on: ubuntu-latest
-    if: github.repository == 'rapidaai/voice-ai'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
-      - name: Run go vet
-        run: |
-          # Skip assistant-api entirely - it has deep CGO dependencies (azure speech, silero-vad, rnnoise)
-          # that require C libraries not available in CI. These are validated by Docker build.
-          CGO_ENABLED=0 go vet \
-            ./api/web-api/... \
-            ./api/integration-api/... \
-            ./api/endpoint-api/... \
-            ./pkg/... \
-            ./cmd/web/... \
-            ./cmd/integration/... \
-            ./cmd/endpoint/... \
-            ./config/...
-
-  go-test:
-    name: Go Tests
-    runs-on: ubuntu-latest
-    if: github.repository == 'rapidaai/voice-ai'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
-      - name: Download dependencies
-        run: go mod download
-
-      - name: Run tests with coverage
-        run: |
-          # Skip assistant-api entirely - it has deep CGO dependencies (azure speech, silero-vad, rnnoise)
-          # that require C libraries not available in CI. These are validated by Docker build.
-          # Keep CGO enabled here because web-api tests use sqlite (go-sqlite3) in test setup.
-          CGO_ENABLED=1 go test -v -coverprofile=coverage.out -covermode=atomic \
-            ./api/web-api/... \
-            ./api/integration-api/... \
-            ./api/endpoint-api/... \
-            ./pkg/... \
-            ./cmd/web/... \
-            ./cmd/integration/... \
-            ./cmd/endpoint/... \
-            ./config/...
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./coverage.out
-          flags: backend
-          fail_ci_if_error: false
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-  go-build:
-    name: Go Build
-    runs-on: ubuntu-latest
-    if: github.repository == 'rapidaai/voice-ai'
-    strategy:
-      matrix:
-        # Note: assistant is excluded - it has CGO dependencies that require C libraries
-        # assistant-api is built and validated in the Docker build step instead
-        service: [web, integration, endpoint]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
-      - name: Build ${{ matrix.service }}
-        run: |
-          CGO_ENABLED=0 GOOS=linux go build -o bin/${{ matrix.service }}-api ./cmd/${{ matrix.service }}/${{ matrix.service }}.go
-
-  go-mod-tidy:
-    name: Go Mod Tidy
-    runs-on: ubuntu-latest
-    if: github.repository == 'rapidaai/voice-ai'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
-      - name: Check go.mod and go.sum
-        run: |
-          go mod tidy
-          if [ -n "$(git status --porcelain go.mod go.sum)" ]; then
-            echo "go.mod or go.sum is not tidy. Run 'go mod tidy' and commit changes."
-            git diff go.mod go.sum
-            exit 1
-          fi
-
-  # ============================================================================
-  # UI FRONTEND CHECKS
-  # ============================================================================
-
-  ui-lint:
-    name: UI Lint
-    runs-on: ubuntu-latest
-    if: github.repository == 'rapidaai/voice-ai'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: "yarn"
-          cache-dependency-path: ui/yarn.lock
-
-      - name: Install dependencies
-        working-directory: ui
-        run: yarn install --frozen-lockfile
-
-      - name: Run ESLint
-        working-directory: ui
-        run: yarn lint
-
-  ui-test:
-    name: UI Tests
-    runs-on: ubuntu-latest
-    if: github.repository == 'rapidaai/voice-ai'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: "yarn"
-          cache-dependency-path: ui/yarn.lock
-
-      - name: Install dependencies
-        working-directory: ui
-        run: yarn install --frozen-lockfile
-
-      - name: Run tests with coverage
-        working-directory: ui
-        run: yarn test --watchAll=false --passWithNoTests --coverage
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./ui/coverage/lcov.info
-          flags: frontend
-          fail_ci_if_error: false
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-  ui-build:
-    name: UI Build
-    runs-on: ubuntu-latest
-    if: github.repository == 'rapidaai/voice-ai'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: "yarn"
-          cache-dependency-path: ui/yarn.lock
-
-      - name: Install dependencies
-        working-directory: ui
-        run: yarn install --frozen-lockfile
-
-      - name: Build
-        working-directory: ui
-        run: yarn build
-        env:
-          CI: false
-          DISABLE_ESLINT_PLUGIN: true
-
-  # ============================================================================
-  # SECURITY CHECKS
-  # ============================================================================
-
-  security-dependencies:
-    name: Dependency Vulnerability Scan
-    runs-on: ubuntu-latest
-    if: github.repository == 'rapidaai/voice-ai'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
-      - name: Run govulncheck
-        run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-          # Skip assistant-api entirely - it has CGO dependencies not available in CI
-          CGO_ENABLED=0 govulncheck \
-            ./api/web-api/... \
-            ./api/integration-api/... \
-            ./api/endpoint-api/... \
-            ./pkg/... \
-            ./cmd/web/... \
-            ./cmd/integration/... \
-            ./cmd/endpoint/... \
-            ./config/...
-
-  security-trivy:
-    name: Trivy Vulnerability Scan
-    runs-on: ubuntu-latest
-    if: github.repository == 'rapidaai/voice-ai'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: "fs"
-          scan-ref: "."
-          severity: "CRITICAL,HIGH"
-          exit-code: "0"
-          ignore-unfixed: true
-
-  # ============================================================================
-  # CODE QUALITY CHECKS
-  # ============================================================================
-
-  license-check:
-    name: License Check
-    runs-on: ubuntu-latest
-    if: github.repository == 'rapidaai/voice-ai'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Check license headers
-        run: |
-          # Check if LICENSE file exists
-          if [ ! -f LICENSE.md ] && [ ! -f LICENSE ]; then
-            echo "LICENSE file is missing"
-            exit 1
-          fi
-          echo "✓ LICENSE file exists"
-
-  commit-lint:
-    name: Commit Message Lint
-    runs-on: ubuntu-latest
-    if: github.repository == 'rapidaai/voice-ai' && github.event_name == 'pull_request'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install commitlint
-        run: |
-          npm install -g @commitlint/cli @commitlint/config-conventional
-
-      - name: Validate PR commits
-        run: |
-          npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
-
-  # ============================================================================
-  # DOCKER BUILD VERIFICATION
-  # ============================================================================
-
-  docker-build:
-    name: Docker Build Test
-    runs-on: ubuntu-latest
-    if: github.repository == 'rapidaai/voice-ai'
-    strategy:
-      matrix:
-        service:
-          - web-api
-          - integration-api
-          - endpoint-api
-          - assistant-api
-          - document-api
-          - ui
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build ${{ matrix.service }}
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./docker/${{ matrix.service }}/Dockerfile
-          push: false
-          tags: rapida/${{ matrix.service }}:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  # ============================================================================
-  # FINAL STATUS CHECK
-  # ============================================================================
+  docker:
+    name: Docker
+    uses: ./.github/workflows/reusable-docker-ci.yml
 
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
     needs:
-      - go-lint
-      - go-fmt
-      - go-vet
-      - go-test
-      - go-build
-      - go-mod-tidy
-      - ui-lint
-      - ui-test
-      - ui-build
-      - security-dependencies
-      - security-trivy
-      - license-check
-      - docker-build
-    if: always() && github.repository == 'rapidaai/voice-ai'
+      - go
+      - ui
+      - repository
+      - docker
+    if: always()
     steps:
       - name: Check all jobs passed
         run: |
-          if [ "${{ contains(needs.*.result, 'failure') }}" == "true" ]; then
+          if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ]; then
             echo "Some checks failed"
             exit 1
           fi
-          if [ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]; then
+          if [ "${{ contains(needs.*.result, 'cancelled') }}" = "true" ]; then
             echo "Some checks were cancelled"
             exit 1
           fi
-          echo "All checks passed!"
+          echo "All checks passed"
 
       - name: Summary
         run: |
           {
             echo "## CI Results"
             echo ""
-            echo "### Backend (Go)"
-            echo "- Lint (golangci-lint)"
-            echo "- Format (gofmt)"
-            echo "- Vet (go vet)"
-            echo "- Tests with coverage"
-            echo "- Build verification"
-            echo "- Module tidiness"
-            echo ""
-            echo "### Frontend (React/TypeScript)"
-            echo "- ESLint"
-            echo "- TypeScript type check"
-            echo "- Tests with coverage"
-            echo "- Build verification"
-            echo ""
-            echo "### Security"
-            echo "- Dependency vulnerabilities (govulncheck)"
-            echo "- Trivy scan"
-            echo ""
-            echo "### Other"
-            echo "- License check"
-            echo "- Docker build verification"
+            echo "| Area | Result |"
+            echo "|------|--------|"
+            echo "| Go | ${{ needs.go.result }} |"
+            echo "| UI | ${{ needs.ui.result }} |"
+            echo "| Repository | ${{ needs.repository.result }} |"
+            echo "| Docker | ${{ needs.docker.result }} |"
           } >> "$GITHUB_STEP_SUMMARY"

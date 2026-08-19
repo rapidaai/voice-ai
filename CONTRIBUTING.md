@@ -86,6 +86,26 @@ Please include:
 7. Submit the PR  
 8. Get merged! 🎉
 
+## Local Quality Gates
+
+Install the repository hooks once after cloning:
+
+```sh
+./bin/git-commit-hook-setup.sh
+```
+
+The pre-commit hook checks merge-conflict markers, private keys, common secret tokens, JSON syntax, shell syntax, Go formatting, and `go mod tidy`.
+
+The pre-push hook runs CI-safe Go gates that currently pass in this repository: `go vet` and Linux builds for `web-api`, `integration-api`, and `endpoint-api`. The stricter `golangci-lint`, import-order formatter, and full Go test hooks are available as manual checks while the existing lint/test baseline is cleaned up. The `assistant-api` package is intentionally excluded from these local pre-push checks because it needs external CGO libraries; Docker/CI validation covers that surface.
+
+Useful manual commands:
+
+```sh
+./bin/pre-commit run --all-files
+./bin/pre-commit run --hook-stage push --all-files
+./bin/pre-commit run --hook-stage manual --all-files
+```
+
 ---
 
 ## Setting Up Rapida

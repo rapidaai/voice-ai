@@ -1,0 +1,30 @@
+name: Set up UI
+description: Install Node.js, Yarn, and UI dependencies.
+
+inputs:
+  node-version:
+    description: Node.js version to install.
+    required: true
+  working-directory:
+    description: Directory that contains the UI package.json.
+    required: false
+    default: ui
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: yarn
+        cache-dependency-path: ${{ inputs.working-directory }}/yarn.lock
+
+    - name: Install Yarn
+      shell: bash
+      run: npm install --global yarn@1.22.22
+
+    - name: Install UI dependencies
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: yarn install --frozen-lockfile
