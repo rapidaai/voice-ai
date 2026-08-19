@@ -39,10 +39,10 @@ export type TelemetryRow =
   | { kind: 'metric'; ts: Date; key: string; record: TelemetryMetric };
 
 export type LatencyMetricName =
-  | 'stt_latency_ms'
-  | 'tts_latency_ms'
-  | 'llm_latency_ms'
-  | 'eos_latency_ms';
+  | 'stt.latency_ms'
+  | 'tts.latency_ms'
+  | 'agent.latency_ms'
+  | 'eos.latency_ms';
 
 export type LatencyMetricDocument = {
   timestampMs: number;
@@ -87,7 +87,7 @@ export const EVENT_TAG_TYPE: Record<string, TelemetryTagType> = {
   telephony: 'teal',
   webrtc: 'cool-gray',
   stt: 'green',
-  llm: 'blue',
+  agent: 'blue',
   tts: 'purple',
   vad: 'warm-gray',
   eos: 'cyan',
@@ -103,7 +103,7 @@ export const EVENT_NAME_OPTIONS: SelectOption[] = [
   'telephony',
   'webrtc',
   'stt',
-  'llm',
+  'agent',
   'tts',
   'vad',
   'eos',
@@ -128,25 +128,25 @@ export const LATENCY_METRIC_META: Record<
   LatencyMetricName,
   { label: string; shortLabel: string; color: string; fillOpacity: number }
 > = {
-  stt_latency_ms: {
+  'stt.latency_ms': {
     label: 'STT Latency',
     shortLabel: 'STT',
     color: '#fbbf24',
     fillOpacity: 0.16,
   },
-  tts_latency_ms: {
+  'tts.latency_ms': {
     label: 'TTS Latency',
     shortLabel: 'TTS',
     color: '#7c3aed',
     fillOpacity: 0.38,
   },
-  llm_latency_ms: {
-    label: 'LLM Latency',
-    shortLabel: 'LLM',
+  'agent.latency_ms': {
+    label: 'Agent Latency',
+    shortLabel: 'Agent',
     color: '#10b981',
     fillOpacity: 0.3,
   },
-  eos_latency_ms: {
+  'eos.latency_ms': {
     label: 'EOS Latency',
     shortLabel: 'EOS',
     color: '#06b6d4',
@@ -155,10 +155,10 @@ export const LATENCY_METRIC_META: Record<
 };
 
 export const LATENCY_STACK_ORDER: LatencyMetricName[] = [
-  'stt_latency_ms',
-  'eos_latency_ms',
-  'llm_latency_ms',
-  'tts_latency_ms',
+  'stt.latency_ms',
+  'eos.latency_ms',
+  'agent.latency_ms',
+  'tts.latency_ms',
 ];
 
 export const normalizeComponentType = (nameKey: string): string =>
@@ -265,10 +265,10 @@ export function formatDateTime(d: Date): string {
 }
 
 const isLatencyMetricName = (name: string): name is LatencyMetricName =>
-  name === 'stt_latency_ms' ||
-  name === 'tts_latency_ms' ||
-  name === 'llm_latency_ms' ||
-  name === 'eos_latency_ms';
+  name === 'stt.latency_ms' ||
+  name === 'tts.latency_ms' ||
+  name === 'agent.latency_ms' ||
+  name === 'eos.latency_ms';
 
 export const buildLatencySeries = (
   documents: LatencyMetricDocument[],

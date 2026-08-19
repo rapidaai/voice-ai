@@ -330,7 +330,7 @@ func TestNew_SendsInitializationAndEmitsInitializedEvent(t *testing.T) {
 	pkts := collector.all()
 	eventPackets := findPackets[internal_type.ObservabilityEventRecordPacket](pkts)
 	for _, event := range eventPackets {
-		assert.NotEqual(t, observability.LLMStarted, event.Record.Event, "init should not emit llm.started")
+		assert.NotEqual(t, observability.AgentStarted, event.Record.Event, "init should not emit agent.started")
 	}
 
 	metricPackets := findPackets[internal_type.ObservabilityMetricRecordPacket](pkts)
@@ -612,7 +612,7 @@ func TestE2E_FullConversationTurn(t *testing.T) {
 
 	evs := findPackets[internal_type.ObservabilityEventRecordPacket](collector.all())
 	require.Len(t, evs, 1)
-	assert.Equal(t, observability.LLMStarted, evs[0].Record.Event)
+	assert.Equal(t, observability.AgentStarted, evs[0].Record.Event)
 
 	// 2. Simulate streaming deltas from agent
 	e.Write(context.Background(), comm, &protos.TalkOutput{
@@ -960,7 +960,7 @@ func TestConsistency_StaleContextDoesNotEmitPackets(t *testing.T) {
 
 	e.activeContextID = "ctx-active"
 
-	// Stale responses should not emit
+	// Stale assistant text emits a discard event; non-text stale responses stay silent.
 	staleTypes := []*protos.TalkOutput{
 		{Data: &protos.TalkOutput_Assistant{Assistant: &protos.ConversationAssistantMessage{
 			Id: "ctx-stale", Completed: true,
@@ -976,5 +976,8 @@ func TestConsistency_StaleContextDoesNotEmitPackets(t *testing.T) {
 		e.Write(context.Background(), comm, resp)
 	}
 
-	assert.Empty(t, collector.all(), "all stale context responses should be dropped")
+	events := findPackets[internal_type.ObservabilityEventRecordPacket](collector.all())
+	require.Len(t, events, 1)
+	assert.Equal(t, observability.AgentDiscarded, events[0].Record.Event)
+	assert.Equal(t, "ignore", events[0].Record.Attributes["script"])
 }

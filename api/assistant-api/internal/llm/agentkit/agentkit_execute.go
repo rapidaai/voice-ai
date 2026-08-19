@@ -138,11 +138,17 @@ func (e *agentkitExecutor) handleUserTurn(ctx context.Context, comm internal_typ
 		internal_type.ObservabilityEventRecordPacket{
 			ContextID: contextID,
 			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.NewMessageRecord(contextID, observability.ComponentLLM, observability.LLMStarted, observability.MessageRoleAssistant, observability.Attributes{
-				"provider":         e.Name(),
-				"context_id":       contextID,
-				"input_char_count": fmt.Sprintf("%d", len(text)),
-			}),
+			Record: observability.RecordEvent{
+				Component: observability.ComponentAgent,
+				Event:     observability.AgentStarted,
+				Attributes: observability.Attributes{
+					"provider":         e.Name(),
+					"context_id":       contextID,
+					"script":           text,
+					"input_char_count": fmt.Sprintf("%d", len(text)),
+				},
+				OccurredAt: time.Now(),
+			},
 		},
 		internal_type.ObservabilityLogRecordPacket{
 			ContextID: contextID,
@@ -151,7 +157,7 @@ func (e *agentkitExecutor) handleUserTurn(ctx context.Context, comm internal_typ
 				Level:   observability.LevelDebug,
 				Message: "agentkit request started",
 				Attributes: observability.Attributes{
-					"component":        observability.ComponentLLM.String(),
+					"component":        observability.ComponentAgent.String(),
 					"operation":        "execute",
 					"provider":         e.Name(),
 					"context_id":       contextID,
@@ -166,7 +172,7 @@ func (e *agentkitExecutor) handleUserTurn(ctx context.Context, comm internal_typ
 			Record: observability.RecordMetric{
 				Attributes: observability.Attributes{"provider": e.Name()},
 				Metrics: []*protos.Metric{{
-					Name:        "llm_input_char_count",
+					Name:        observability.MetricAgentMessageCharCount,
 					Value:       fmt.Sprintf("%d", len(text)),
 					Description: "Input character count sent to AgentKit",
 				}},

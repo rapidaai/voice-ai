@@ -122,7 +122,7 @@ func New(opts ...Option) (*agentkitExecutor, error) {
 				Level:   observability.LevelError,
 				Message: fmt.Sprintf("%s: error while initialization %s", executor.Name(), err.Error()),
 				Attributes: observability.Attributes{
-					"component":  observability.ComponentLLM.String(),
+					"component":  observability.ComponentAgent.String(),
 					"provider":   executor.Name(),
 					"options":    observability.AttributeValue(executor.connection.GetOption()),
 					"url":        provider.Url,
@@ -143,7 +143,7 @@ func New(opts ...Option) (*agentkitExecutor, error) {
 				Level:   observability.LevelError,
 				Message: fmt.Sprintf("%s: error while initialization %s", executor.Name(), err.Error()),
 				Attributes: observability.Attributes{
-					"component":  observability.ComponentLLM.String(),
+					"component":  observability.ComponentAgent.String(),
 					"provider":   executor.Name(),
 					"options":    observability.AttributeValue(executor.connection.GetOption()),
 					"url":        provider.Url,
@@ -182,7 +182,7 @@ func New(opts ...Option) (*agentkitExecutor, error) {
 				Level:   observability.LevelError,
 				Message: fmt.Sprintf("%s: error while initialization %s", executor.Name(), err.Error()),
 				Attributes: observability.Attributes{
-					"component":  observability.ComponentLLM.String(),
+					"component":  observability.ComponentAgent.String(),
 					"provider":   executor.Name(),
 					"options":    observability.AttributeValue(executor.connection.GetOption()),
 					"url":        provider.Url,
@@ -198,8 +198,15 @@ func New(opts ...Option) (*agentkitExecutor, error) {
 
 	options.communication.OnPacket(options.ctx,
 		internal_type.ObservabilityMetricRecordPacket{
-			Scope:  internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.NewMetricLLMInitLatencyMs(time.Since(start), observability.Attributes{"provider": executor.Name()}),
+			Scope: internal_type.ObservabilityRecordScopeConversation,
+			Record: observability.RecordMetric{
+				Attributes: observability.Attributes{"provider": executor.Name()},
+				Metrics: []*protos.Metric{{
+					Name:        observability.MetricLLMInitLatencyMs,
+					Value:       fmt.Sprintf("%d", time.Since(start).Milliseconds()),
+					Description: "LLM initialization latency in milliseconds",
+				}},
+			},
 		},
 		internal_type.ObservabilityLogRecordPacket{
 			Scope: internal_type.ObservabilityRecordScopeConversation,
@@ -207,7 +214,7 @@ func New(opts ...Option) (*agentkitExecutor, error) {
 				Level:   observability.LevelInfo,
 				Message: fmt.Sprintf("%s: initialization completed", executor.Name()),
 				Attributes: observability.Attributes{
-					"component": observability.ComponentLLM.String(),
+					"component": observability.ComponentAgent.String(),
 					"provider":  executor.Name(),
 					"url":       provider.Url,
 					"options":   observability.AttributeValue(executor.connection.GetOption()),

@@ -42,6 +42,8 @@ import { Tile } from '@/app/components/carbon/tile';
 import toast from 'react-hot-toast/headless';
 import {
   Button,
+  SkeletonPlaceholder,
+  SkeletonText,
   Toggletip,
   ToggletipButton,
   ToggletipContent,
@@ -91,7 +93,7 @@ type BucketData = {
   sttLatency: number;
   eosLatency: number;
   ttsLatency: number;
-  llmLatency: number;
+  agentLatency: number;
   label: string;
 };
 
@@ -103,6 +105,13 @@ type ChartTooltipPayload = {
   stroke?: string;
   value?: ReactNode;
 };
+
+type DashboardWidgetSkeletonVariant =
+  | 'metric-list'
+  | 'latency-chart'
+  | 'donut'
+  | 'progress-list'
+  | 'bar-chart';
 
 const DASHBOARD_UNAVAILABLE_VALUE = '--';
 const DASHBOARD_LOAD_ERROR = 'Dashboard data is unavailable. Please try again.';
@@ -249,6 +258,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
   const avgLatency = latency?.getAveragems() || 0;
   const avgSttLatency = latency?.getSttms() || 0;
   const avgEosLatency = latency?.getEosms() || 0;
+  const avgTtsLatency = latency?.getTtsms() || 0;
   const avgLlmLatency = latency?.getLlmms() || 0;
 
   const totalTokens = usage?.getTotaltokens() || 0;
@@ -289,7 +299,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
           sttLatency: Math.round(bucket.getSttlatencyms()),
           eosLatency: Math.round(bucket.getEoslatencyms()),
           ttsLatency: Math.round(bucket.getTtslatencyms()),
-          llmLatency: Math.round(bucket.getLlmlatencyms()),
+          agentLatency: Math.round(bucket.getLlmlatencyms()),
           label: `From: ${startDate.toISOString().split('.')[0].replace('T', ' ')}`,
         };
       }),
@@ -400,7 +410,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
           unit={hasDashboard ? 'ms' : undefined}
           caption={
             hasDashboard
-              ? `STT ${Math.round(avgSttLatency).toLocaleString()} ms, LLM ${Math.round(avgLlmLatency).toLocaleString()} ms`
+              ? `STT ${Math.round(avgSttLatency).toLocaleString()} ms, Agent ${Math.round(avgLlmLatency).toLocaleString()} ms`
               : emptyDashboardCaption
           }
           isLoading={loading}
@@ -422,7 +432,11 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <DashboardWidget title="Session details" isLoading={loading}>
+        <DashboardWidget
+          title="Session details"
+          isLoading={loading}
+          skeletonVariant="metric-list"
+        >
           <WidgetHeroMetric
             label="Avg session duration"
             value={
@@ -461,8 +475,13 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
           />
         </DashboardWidget>
 
-        <DashboardWidget title="Latency" size="large" isLoading={loading}>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-4">
+        <DashboardWidget
+          title="Latency"
+          size="large"
+          isLoading={loading}
+          skeletonVariant="latency-chart"
+        >
+          <div className="grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-5">
             <InlineMetric
               label="Avg latency"
               value={
@@ -491,7 +510,16 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
               unit={hasDashboard ? 'ms' : undefined}
             />
             <InlineMetric
-              label="LLM"
+              label="TTS"
+              value={
+                hasDashboard
+                  ? Math.round(avgTtsLatency)
+                  : DASHBOARD_UNAVAILABLE_VALUE
+              }
+              unit={hasDashboard ? 'ms' : undefined}
+            />
+            <InlineMetric
+              label="Agent"
               value={
                 hasDashboard
                   ? Math.round(avgLlmLatency)
@@ -535,7 +563,13 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
                       stopOpacity={0.02}
                     />
                   </linearGradient>
-                  <linearGradient id="llmGradient" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient
+                    id="agentGradient"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
                     <stop offset="0%" stopColor="#24a148" stopOpacity={0.28} />
                     <stop
                       offset="100%"
@@ -573,10 +607,10 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
                 />
                 <Area
                   type="monotone"
-                  dataKey="llmLatency"
+                  dataKey="agentLatency"
                   stroke="#24a148"
                   strokeWidth={1.5}
-                  fill="url(#llmGradient)"
+                  fill="url(#agentGradient)"
                   dot={false}
                   activeDot={{ r: 3 }}
                 />
@@ -588,7 +622,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
                         sttLatency: 'STT',
                         eosLatency: 'EOS',
                         ttsLatency: 'TTS',
-                        llmLatency: 'LLM',
+                        agentLatency: 'Agent',
                       };
                       return (
                         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-lg px-3 py-2 text-sm min-w-[140px]">
@@ -624,11 +658,15 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
             <LegendItem color="#ff832b" label="STT" />
             <LegendItem color="#1192e8" label="EOS" />
             <LegendItem color="var(--cds-interactive, #0f62fe)" label="TTS" />
-            <LegendItem color="#24a148" label="LLM" />
+            <LegendItem color="#24a148" label="Agent" />
           </div>
         </DashboardWidget>
 
-        <DashboardWidget title="Usage totals" isLoading={loading}>
+        <DashboardWidget
+          title="Usage totals"
+          isLoading={loading}
+          skeletonVariant="metric-list"
+        >
           <WidgetHeroMetric
             label="Tokens"
             value={hasDashboard ? totalTokens : DASHBOARD_UNAVAILABLE_VALUE}
@@ -662,7 +700,11 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
           />
         </DashboardWidget>
 
-        <DashboardWidget title="Sources" isLoading={loading}>
+        <DashboardWidget
+          title="Sources"
+          isLoading={loading}
+          skeletonVariant="donut"
+        >
           <DonutContent
             data={sourceData}
             dataKey="count"
@@ -671,11 +713,19 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
           />
         </DashboardWidget>
 
-        <DashboardWidget title="Languages" isLoading={loading}>
+        <DashboardWidget
+          title="Languages"
+          isLoading={loading}
+          skeletonVariant="progress-list"
+        >
           <LanguageContent data={languageData} />
         </DashboardWidget>
 
-        <DashboardWidget title="Reliability" isLoading={loading}>
+        <DashboardWidget
+          title="Reliability"
+          isLoading={loading}
+          skeletonVariant="metric-list"
+        >
           <WidgetHeroMetric
             label="Completed sessions"
             value={
@@ -717,6 +767,7 @@ export const AssistantAnalytics: FC<{ assistant: Assistant }> = props => {
           title="Message activity"
           size="large"
           isLoading={loading}
+          skeletonVariant="bar-chart"
           bodyClassName="pt-4"
         >
           <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
@@ -797,6 +848,7 @@ const DashboardWidget: FC<{
   className?: string;
   bodyClassName?: string;
   isLoading?: boolean;
+  skeletonVariant?: DashboardWidgetSkeletonVariant;
   children: ReactNode;
 }> = ({
   title,
@@ -805,10 +857,10 @@ const DashboardWidget: FC<{
   className,
   bodyClassName,
   isLoading = false,
+  skeletonVariant = 'metric-list',
   children,
 }) => (
   <Tile
-    isLoading={isLoading}
     className={cn(
       '!rounded-none !p-0 !bg-white dark:!bg-[#262626] border border-gray-200 dark:border-gray-800 h-[310px]',
       size === 'large' && 'xl:col-span-2',
@@ -823,7 +875,13 @@ const DashboardWidget: FC<{
       </div>
       {action && <div className="ml-4 shrink-0">{action}</div>}
     </div>
-    <div className={cn('h-[262px] p-6', bodyClassName)}>{children}</div>
+    <div className={cn('h-[262px] p-6', bodyClassName)}>
+      {isLoading ? (
+        <DashboardWidgetSkeleton variant={skeletonVariant} />
+      ) : (
+        children
+      )}
+    </div>
   </Tile>
 );
 
@@ -836,10 +894,7 @@ const KpiTile: FC<{
   action?: ReactNode;
   isLoading?: boolean;
 }> = ({ title, label, value, unit, caption, action, isLoading = false }) => (
-  <Tile
-    isLoading={isLoading}
-    className="!rounded-none !p-0 !bg-white dark:!bg-[#262626] border border-gray-200 dark:border-gray-800 h-[156px]"
-  >
+  <Tile className="!rounded-none !p-0 !bg-white dark:!bg-[#262626] border border-gray-200 dark:border-gray-800 h-[156px]">
     <div className="flex h-10 items-center justify-between border-b border-gray-200 px-4 dark:border-gray-800">
       <h3 className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
         {title}
@@ -847,29 +902,137 @@ const KpiTile: FC<{
       {action && <div className="ml-3 shrink-0">{action}</div>}
     </div>
     <div className="flex h-[116px] flex-col justify-between p-4">
-      <div>
-        <p className="truncate text-xs text-gray-500 dark:text-gray-400">
-          {label}
-        </p>
-        <div className="mt-2 flex items-baseline gap-1">
-          <span className="text-4xl font-light leading-none tabular-nums text-gray-900 dark:text-gray-100">
-            {typeof value === 'number' ? value.toLocaleString() : value}
-          </span>
-          {unit && (
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              {unit}
-            </span>
+      {isLoading ? (
+        <KpiTileSkeleton />
+      ) : (
+        <>
+          <div>
+            <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+              {label}
+            </p>
+            <div className="mt-2 flex items-baseline gap-1">
+              <span className="text-4xl font-light leading-none tabular-nums text-gray-900 dark:text-gray-100">
+                {typeof value === 'number' ? value.toLocaleString() : value}
+              </span>
+              {unit && (
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  {unit}
+                </span>
+              )}
+            </div>
+          </div>
+          {caption && (
+            <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+              {caption}
+            </p>
           )}
-        </div>
-      </div>
-      {caption && (
-        <p className="truncate text-xs text-gray-500 dark:text-gray-400">
-          {caption}
-        </p>
+        </>
       )}
     </div>
   </Tile>
 );
+
+const KpiTileSkeleton = () => (
+  <>
+    <div>
+      <SkeletonText width="44%" className="!mb-0" />
+      <div className="mt-3 flex items-end gap-2">
+        <SkeletonText heading width="96px" className="!mb-0" />
+        <SkeletonPlaceholder className="!h-4 !w-8" />
+      </div>
+    </div>
+    <SkeletonText width="78%" className="!mb-0" />
+  </>
+);
+
+const DashboardWidgetSkeleton: FC<{
+  variant: DashboardWidgetSkeletonVariant;
+}> = ({ variant }) => {
+  if (variant === 'latency-chart') {
+    return (
+      <div className="flex h-full flex-col">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div key={index}>
+              <SkeletonText width="52px" className="!mb-2" />
+              <SkeletonText heading width="56px" className="!mb-0" />
+            </div>
+          ))}
+        </div>
+        <SkeletonPlaceholder className="!mt-5 !h-[126px] !w-full" />
+        <div className="mt-4 flex flex-wrap gap-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <SkeletonPlaceholder key={index} className="!h-3 !w-12" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (variant === 'donut') {
+    return (
+      <div className="flex h-full flex-col">
+        <div className="flex h-[140px] items-center justify-center">
+          <SkeletonPlaceholder className="!h-[116px] !w-[116px] !rounded-full" />
+        </div>
+        <div className="mt-4 space-y-2">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="flex items-center gap-2">
+              <SkeletonPlaceholder className="!h-2.5 !w-2.5 shrink-0" />
+              <SkeletonText width="100%" className="!mb-0 flex-1" />
+              <SkeletonPlaceholder className="!h-3 !w-10 shrink-0" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (variant === 'progress-list') {
+    return (
+      <div className="space-y-4">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div key={index}>
+            <div className="mb-2 flex items-center justify-between gap-4">
+              <SkeletonText width="96px" className="!mb-0" />
+              <SkeletonPlaceholder className="!h-4 !w-10 shrink-0" />
+            </div>
+            <SkeletonPlaceholder className="!h-2 !w-full" />
+            <SkeletonText width="120px" className="!mt-2 !mb-0" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (variant === 'bar-chart') {
+    return (
+      <div className="flex h-full flex-col">
+        <SkeletonText width="160px" className="!mb-3" />
+        <SkeletonPlaceholder className="!h-[206px] !w-full" />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <SkeletonText width="44%" className="!mb-2" />
+      <SkeletonText heading width="112px" className="!mb-2" />
+      <SkeletonText width="72%" className="!mb-0" />
+      <div className="mt-5 divide-y divide-gray-200 border-t border-gray-200 dark:divide-gray-800 dark:border-gray-800">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div
+            key={index}
+            className="flex items-center justify-between gap-4 py-2.5"
+          >
+            <SkeletonText width="92px" className="!mb-0" />
+            <SkeletonPlaceholder className="!h-4 !w-14 shrink-0" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const WidgetHeroMetric: FC<{
   label: string;

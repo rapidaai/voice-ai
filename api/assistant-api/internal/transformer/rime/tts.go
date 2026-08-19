@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -105,8 +106,15 @@ func (rt *rimeTTS) Initialize() error {
 
 	rt.onPacket(
 		internal_type.ObservabilityMetricRecordPacket{
-			Scope:  internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.NewMetricTTSInitLatencyMs(time.Since(start), observability.Attributes{"provider": rt.Name()}),
+			Scope: internal_type.ObservabilityRecordScopeConversation,
+			Record: observability.RecordMetric{
+				Metrics: []*protos.Metric{{
+					Name:        observability.MetricTTSInitLatencyMs,
+					Value:       strconv.FormatInt(time.Since(start).Milliseconds(), 10),
+					Description: "TTS initialization latency in milliseconds",
+				}},
+				Attributes: observability.Attributes{"provider": rt.Name()},
+			},
 		},
 		internal_type.ObservabilityLogRecordPacket{
 			Scope: internal_type.ObservabilityRecordScopeConversation,

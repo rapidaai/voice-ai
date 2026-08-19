@@ -21,6 +21,7 @@ import (
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/protos"
 )
 
 // -----------------------------------------------------------------------------
@@ -186,8 +187,15 @@ func New(opts ...Option) (internal_type.VoiceActivityDetectorExecutor, error) {
 	if options.onPacket != nil {
 		_ = options.onPacket(options.ctx,
 			internal_type.ObservabilityMetricRecordPacket{
-				Scope:  internal_type.ObservabilityRecordScopeConversation,
-				Record: observability.NewMetricVADInitLatencyMs(time.Since(start), observability.Attributes{"provider": svad.Name()}),
+				Scope: internal_type.ObservabilityRecordScopeConversation,
+				Record: observability.RecordMetric{
+					Attributes: observability.Attributes{"provider": svad.Name()},
+					Metrics: []*protos.Metric{{
+						Name:        observability.MetricVADInitLatencyMs,
+						Value:       fmt.Sprintf("%d", time.Since(start).Milliseconds()),
+						Description: "VAD initialization latency in milliseconds",
+					}},
+				},
 			},
 			internal_type.ObservabilityLogRecordPacket{
 				Scope: internal_type.ObservabilityRecordScopeConversation,
@@ -411,26 +419,40 @@ func (s *SileroVAD) Close(ctx context.Context) error {
 	s.mu.Unlock()
 
 	if s.onPacket != nil {
-		packets := []internal_type.Packet{}
 		if !vadStartedAt.IsZero() {
 			duration := time.Since(vadStartedAt)
-			packets = append(packets, internal_type.ObservabilityUsageRecordPacket{
-				Scope:  internal_type.ObservabilityRecordScopeConversation,
-				Record: observability.NewVADDurationUsageRecord(s.Name(), duration, observability.Attributes{}),
-			})
-		}
-		packets = append(packets, internal_type.ObservabilityEventRecordPacket{
-			Scope: internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.RecordEvent{
-				Component: observability.ComponentVAD,
-				Event:     observability.VADClosed,
-				Attributes: observability.Attributes{
-					"provider": s.Name(),
+			_ = s.onPacket(ctx,
+				internal_type.ObservabilityUsageRecordPacket{
+					Scope:  internal_type.ObservabilityRecordScopeConversation,
+					Record: observability.NewVADDurationUsageRecord(s.Name(), duration, observability.Attributes{"provider": s.Name()}),
 				},
-				OccurredAt: time.Now(),
+				internal_type.ObservabilityEventRecordPacket{
+					Scope: internal_type.ObservabilityRecordScopeConversation,
+					Record: observability.RecordEvent{
+						Component: observability.ComponentVAD,
+						Event:     observability.VADClosed,
+						Attributes: observability.Attributes{
+							"provider": s.Name(),
+						},
+						OccurredAt: time.Now(),
+					},
+				},
+			)
+			return nil
+		}
+		_ = s.onPacket(ctx,
+			internal_type.ObservabilityEventRecordPacket{
+				Scope: internal_type.ObservabilityRecordScopeConversation,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentVAD,
+					Event:     observability.VADClosed,
+					Attributes: observability.Attributes{
+						"provider": s.Name(),
+					},
+					OccurredAt: time.Now(),
+				},
 			},
-		})
-		_ = s.onPacket(ctx, packets...)
+		)
 	}
 
 	return nil

@@ -5,15 +5,14 @@ import { Struct, Value } from 'google-protobuf/google/protobuf/struct_pb';
 const TIME_TAKEN = 'time_taken';
 const STATUS = 'status';
 const TOTAL_TOKEN = 'agent_total_token';
+const CONVERSATION_DURATION_MS = 'conversation.duration_ms';
 
 // ── Universal metric finder ─────────────────────────────────────────────────
 // Proto metrics may expose the name via getName() or getKey() depending on the
 // message type (conversation-level vs message-level). This helper checks both.
 
 export function findMetricByName(metrics: any[], name: string): string {
-  const m = metrics.find(
-    (x: any) => (x.getName?.() || x.getKey?.()) === name,
-  );
+  const m = metrics.find((x: any) => (x.getName?.() || x.getKey?.()) === name);
   return m ? m.getValue() : '';
 }
 
@@ -46,16 +45,14 @@ export function formatDurationSeconds(secs: number): string {
   return `${Math.round(secs)}s`;
 }
 
-/** Read conversation_duration metric (seconds) or fallback to TIME_TAKEN (nanoseconds) */
+/** Read conversation duration in milliseconds. */
 export function getConversationDuration(metrics: any[]): string {
   const conversationDuration = findMetricByName(
     metrics,
-    'duration',
+    CONVERSATION_DURATION_MS,
   );
   if (conversationDuration)
-    return formatDurationSeconds(Number(conversationDuration) / 1e9);
-  const timeTakenNano = findMetricByName(metrics, TIME_TAKEN);
-  if (timeTakenNano) return formatDurationSeconds(Number(timeTakenNano) / 1e9);
+    return formatDurationSeconds(Number(conversationDuration) / 1_000);
   return '–';
 }
 

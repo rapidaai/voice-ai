@@ -302,11 +302,16 @@ func TestSilenceBasedEndOfSpeech_ObservabilityLifecycleEvents(t *testing.T) {
 
 	sawInitMetric := false
 	sawInitLog := false
+	sawStarted := false
 	sawDetected := false
 	timeout := time.After(500 * time.Millisecond)
-	for !sawInitMetric || !sawInitLog || !sawDetected {
+	for !sawInitMetric || !sawInitLog || !sawStarted || !sawDetected {
 		select {
 		case event := <-events:
+			if event.Record.Event == observability.EOSStarted {
+				sawStarted = true
+				continue
+			}
 			if event.Record.Event == observability.EOSCompleted {
 				sawDetected = true
 				continue
@@ -342,11 +347,82 @@ func TestSilenceBasedEndOfSpeech_ObservabilityLifecycleEvents(t *testing.T) {
 			}
 		case usage := <-usages:
 			if usage.Record.Component == observability.ComponentName(observability.UsageConversationEOSDuration) {
+				if usage.Record.Attributes["provider"] != silenceBasedEndOfSpeechName {
+					t.Fatalf("unexpected usage provider: %+v", usage)
+				}
 				sawUsage = true
 			}
 		case <-timeout:
 			t.Fatal("timeout waiting for closed eos event")
 		}
+	}
+}
+
+func TestSilenceBasedEndOfSpeech_ObservabilityStartedForSpeechToText(t *testing.T) {
+	logger, _ := commons.NewApplicationLogger()
+	events := make(chan internal_type.ObservabilityEventRecordPacket, 2)
+	callback := func(ctx context.Context, packets ...internal_type.Packet) error {
+		for _, packet := range packets {
+			event, ok := packet.(internal_type.ObservabilityEventRecordPacket)
+			if !ok || event.Record.Event != observability.EOSStarted {
+				continue
+			}
+			select {
+			case events <- event:
+			default:
+			}
+		}
+		return nil
+	}
+
+	svcIface, err := newSilenceBasedEndOfSpeechForTest(context.Background(), logger, callback, newTestOpts(map[string]any{}))
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+	defer func() { _ = svcIface.Close(context.Background()) }()
+
+	ctx := context.Background()
+	if err := svcIface.Execute(ctx, internal_type.SpeechToTextPacket{
+		ContextID: "ctx-started",
+		Script:    "hello",
+		Interim:   true,
+	}); err != nil {
+		t.Fatalf("execute interim stt: %v", err)
+	}
+
+	select {
+	case event := <-events:
+		if event.ContextID != "ctx-started" {
+			t.Fatalf("unexpected started context: %+v", event)
+		}
+		if event.Scope != internal_type.ObservabilityRecordScopeUserMessage {
+			t.Fatalf("unexpected started scope: %+v", event)
+		}
+		if event.Record.Component != observability.ComponentEOS {
+			t.Fatalf("unexpected started component: %+v", event)
+		}
+		if event.Record.Attributes["provider"] != silenceBasedEndOfSpeechName {
+			t.Fatalf("unexpected started provider: %+v", event)
+		}
+		if event.Record.Attributes["context_id"] != "ctx-started" || event.Record.Attributes["speech"] != "hello" {
+			t.Fatalf("unexpected started data: %+v", event)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for eos started event")
+	}
+
+	if err := svcIface.Execute(ctx, internal_type.SpeechToTextPacket{
+		ContextID: "ctx-started",
+		Script:    "hello again",
+		Interim:   true,
+	}); err != nil {
+		t.Fatalf("execute second interim stt: %v", err)
+	}
+
+	select {
+	case event := <-events:
+		t.Fatalf("unexpected duplicate started event: %+v", event)
+	case <-time.After(100 * time.Millisecond):
 	}
 }
 
@@ -461,7 +537,7 @@ func TestSilenceBasedEndOfSpeech_MetricUsesLastTimerArm(t *testing.T) {
 	}
 	metricMs, err := strconv.Atoi(metric.Record.Metrics[0].Value)
 	if err != nil {
-		t.Fatalf("parse eos_latency_ms: %v", err)
+		t.Fatalf("parse eos.latency_ms: %v", err)
 	}
 
 	if metric.Record.Metrics[0].Name != observability.MetricEOSLatencyMs {

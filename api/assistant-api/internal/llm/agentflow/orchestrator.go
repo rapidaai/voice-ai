@@ -106,8 +106,8 @@ func (orchestrator *orchestrator) runFromNode(
 					ContextID: contextID,
 					Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
 					Record: observability.RecordEvent{
-						Component: observability.ComponentAgentflow,
-						Event:     observability.AgentflowTransitionMissingEdge,
+						Component: observability.ComponentAgent,
+						Event:     observability.AgentTransitionMissingEdge,
 						Attributes: observability.Attributes{
 							"context_id":      contextID,
 							"from_node_id":    currentNode.ID,
@@ -128,8 +128,8 @@ func (orchestrator *orchestrator) runFromNode(
 				ContextID: contextID,
 				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
 				Record: observability.RecordEvent{
-					Component: observability.ComponentAgentflow,
-					Event:     observability.AgentflowTransitionMatched,
+					Component: observability.ComponentAgent,
+					Event:     observability.AgentTransitionMatched,
 					Attributes: observability.Attributes{
 						"context_id":      contextID,
 						"from_node_id":    currentNode.ID,

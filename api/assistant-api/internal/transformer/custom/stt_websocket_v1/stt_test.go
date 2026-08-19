@@ -259,7 +259,7 @@ func TestSpeechToText_WebsocketFlow_JSONRequestRules(t *testing.T) {
 			interruptionPacketCount++
 		case internal_type.ObservabilityMetricRecordPacket:
 			for _, metric := range typed.Record.Metrics {
-				if metric.GetName() == "stt_latency_ms" {
+				if metric.GetName() == "stt.latency_ms" {
 					hasLatencyMetric = true
 					latencyMetricPacketCount++
 				}
@@ -274,7 +274,7 @@ func TestSpeechToText_WebsocketFlow_JSONRequestRules(t *testing.T) {
 	assert.True(t, hasInterimEmptyConcat, "expected interim transcript with explicit empty concat")
 	assert.True(t, hasFinalEmptyConcat, "expected final transcript with explicit empty concat")
 	assert.GreaterOrEqual(t, interruptionPacketCount, 2, "expected interruption packet for interim and final transcripts")
-	assert.True(t, hasLatencyMetric, "expected stt_latency_ms metric")
+	assert.True(t, hasLatencyMetric, "expected stt.latency_ms metric")
 	assert.Equal(t, 1, latencyMetricPacketCount, "expected one latency metric per interruption window")
 	assert.False(t, hasSpeechToTextError, "did not expect stt error packet")
 }
@@ -432,7 +432,7 @@ func TestSpeechToText_WebsocketFlow_TextTranscriptFrames(t *testing.T) {
 			}
 		case internal_type.ObservabilityMetricRecordPacket:
 			for _, metric := range typed.Record.Metrics {
-				if metric.GetName() == "stt_latency_ms" {
+				if metric.GetName() == "stt.latency_ms" {
 					hasLatency = true
 				}
 			}
@@ -506,7 +506,7 @@ func TestSpeechToText_EmitsLatencyMetricFromFirstAudioWithoutStart(t *testing.T)
 			continue
 		}
 		for _, metric := range metricPacket.Record.Metrics {
-			if metric.GetName() == "stt_latency_ms" {
+			if metric.GetName() == "stt.latency_ms" {
 				latencyMetricPacketCount++
 			}
 		}
@@ -584,7 +584,7 @@ func TestSpeechToText_LatencyUsesLatestStartInWindow(t *testing.T) {
 			continue
 		}
 		for _, metric := range metricPacket.Record.Metrics {
-			if metric.GetName() != "stt_latency_ms" {
+			if metric.GetName() != "stt.latency_ms" {
 				continue
 			}
 			latencyMetricPacketCount++

@@ -20,7 +20,7 @@ export const COMPONENT_COLORS: Record<string, string> = {
   conversation: '#8a3ffc',
   turn: '#4589ff',
   stt: '#198038',
-  llm: '#f1c21b',
+  agent: '#f1c21b',
   tool: '#ff7eb6',
   tts: '#fa4d56',
   vad: '#007d79',
@@ -52,7 +52,7 @@ const METRIC_COMPONENT_PREFIXES: readonly string[] = [
   'vad',
   'eos',
   'denoise',
-  'llm',
+  'agent',
   'storage',
   'analysis',
   'authentication',
@@ -172,8 +172,11 @@ const isDurationMetricName = (name: string): boolean => {
       normalizedName,
     ) ||
     normalizedName.endsWith('_duration_ms') ||
+    normalizedName.endsWith('.duration_ms') ||
     normalizedName.endsWith('_latency_ms') ||
-    normalizedName.endsWith('_elapsed_ms')
+    normalizedName.endsWith('.latency_ms') ||
+    normalizedName.endsWith('_elapsed_ms') ||
+    normalizedName.endsWith('.elapsed_ms')
   );
 };
 
@@ -271,6 +274,7 @@ const buildBaseDocument = ({
   id,
   kind,
   name,
+  component: component || undefined,
   category: component || name.split('.')[0] || kind,
   level,
   outcome: inferOutcome({ attributes, level, name }),
@@ -430,8 +434,10 @@ export const getDocumentComponent = (doc: TimelineDocument): string => {
     doc.attributes?.component || doc.attributes?.provider;
   const fallback = doc.category || doc.name.split('.')[0] || 'conversation';
   return (
-    attributeComponent || inferComponentFromName(doc.name, fallback)
-  ).toLowerCase();
+    doc.component ||
+    attributeComponent ||
+    inferComponentFromName(doc.name, fallback)
+  );
 };
 
 export type TraceFilterSource = 'facet' | 'query';
@@ -463,6 +469,16 @@ export type ParsedTraceFilterQuery = {
   filters: TraceFilterToken[];
   freeText: string;
 };
+
+export const getTraceFilterValues = (filter: TraceFilterToken): string[] =>
+  Array.from(
+    new Set(
+      filter.value
+        .split(',')
+        .map(value => value.trim())
+        .filter(Boolean),
+    ),
+  );
 
 const getMetricNames = (doc: TimelineDocument): string[] => {
   const metrics = doc.data?.metrics as
@@ -744,9 +760,12 @@ export const matchesTraceFilters = (
   filters.every(filter => {
     const field = getTraceFilterField(filter.fieldKey);
     if (!field) return true;
-    if (field.match) return field.match(doc, filter.value, filter.logic);
-    const value = field.getDocumentValue?.(doc);
-    return String(value ?? '') === filter.value;
+    const filterValues = getTraceFilterValues(filter);
+    return filterValues.some(filterValue => {
+      if (field.match) return field.match(doc, filterValue, filter.logic);
+      const value = field.getDocumentValue?.(doc);
+      return String(value ?? '') === filterValue;
+    });
   });
 
 export const getDocumentColor = (doc: TimelineDocument): string => {
@@ -1013,10 +1032,10 @@ export const sampleTimelineDocuments: TimelineDocument[] = [
     durationMs: 620,
   },
   {
-    id: 'evt-llm-response',
+    id: 'evt-agent-response',
     kind: 'event',
-    name: 'llm.response.completed',
-    category: 'llm',
+    name: 'agent.completed',
+    category: 'agent',
     level: 'info',
     outcome: 'success',
     title: 'Assistant response generated',
@@ -1028,7 +1047,7 @@ export const sampleTimelineDocuments: TimelineDocument[] = [
     messageId: 'assistant-turn-1',
     messageRole: 'assistant',
     contextId: 'turn-1',
-    attributes: { component: 'llm', provider: 'openai', model: 'gpt-4.1' },
+    attributes: { component: 'agent', provider: 'openai', model: 'gpt-4.1' },
     data: { promptTokens: 542, completionTokens: 68 },
     occurredAt: '2026-06-04T03:10:01.760Z',
     receivedAt: '2026-06-04T03:10:02.650Z',
@@ -1101,10 +1120,10 @@ export const sampleTimelineDocuments: TimelineDocument[] = [
     durationMs: 510,
   },
   {
-    id: 'evt-llm-response-2',
+    id: 'evt-agent-response-2',
     kind: 'event',
-    name: 'llm.response.completed',
-    category: 'llm',
+    name: 'agent.completed',
+    category: 'agent',
     level: 'info',
     outcome: 'success',
     title: 'Assistant response generated',
@@ -1116,7 +1135,7 @@ export const sampleTimelineDocuments: TimelineDocument[] = [
     messageId: 'assistant-turn-2',
     messageRole: 'assistant',
     contextId: 'turn-2',
-    attributes: { component: 'llm', provider: 'openai', model: 'gpt-4.1' },
+    attributes: { component: 'agent', provider: 'openai', model: 'gpt-4.1' },
     data: { promptTokens: 610, completionTokens: 42 },
     occurredAt: '2026-06-04T03:10:08.950Z',
     receivedAt: '2026-06-04T03:10:09.580Z',

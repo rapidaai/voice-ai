@@ -2,6 +2,7 @@ export type TimelineDocument = {
   id: string;
   kind: 'log' | 'event' | 'metric';
   name: string;
+  component?: string;
   category: string;
   level: string;
   outcome: string;

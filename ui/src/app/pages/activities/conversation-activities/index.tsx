@@ -12,7 +12,6 @@ import {
   getMetricValueOrDefault,
   getMetadataValueOrDefault,
   getTimeTakenMetric,
-  getTotalTokenMetric,
 } from '@/utils/metadata';
 import { useConversationLogPageStore } from '@/hooks/use-conversation-log-page-store';
 import { Helmet } from '@/app/components/helmet';
@@ -157,40 +156,40 @@ export const ListingPage: FC<{}> = () => {
                     : '';
                 case 'status':
                   return row.getStatus();
-                case 'stt_latency_ms':
+                case 'stt.latency_ms':
                   return getMetricDisplayValue(
                     row,
-                    'stt_latency_ms',
+                    'stt.latency_ms',
                     formatMetricMilliseconds,
                   );
-                case 'llm_latency_ms':
+                case 'agent.latency_ms':
                   return getMetricDisplayValue(
                     row,
-                    'llm_latency_ms',
+                    'agent.latency_ms',
                     formatMetricMilliseconds,
                   );
-                case 'agent_time_to_first_token':
+                case 'agent.ttft_ms':
                   return getMetricDisplayValue(
                     row,
-                    'agent_time_to_first_token',
-                    formatNanoToReadableMilli,
-                  );
-                case 'tts_latency_ms':
-                  return getMetricDisplayValue(
-                    row,
-                    'tts_latency_ms',
+                    'agent.ttft_ms',
                     formatMetricMilliseconds,
                   );
-                case 'eos_latency_ms':
+                case 'tts.latency_ms':
                   return getMetricDisplayValue(
                     row,
-                    'eos_latency_ms',
+                    'tts.latency_ms',
+                    formatMetricMilliseconds,
+                  );
+                case 'eos.latency_ms':
+                  return getMetricDisplayValue(
+                    row,
+                    'eos.latency_ms',
                     formatMetricMilliseconds,
                   );
                 case 'time_taken':
                   return `${getTimeTakenMetric(row.getMetricsList()) / 1000000}ms`;
                 case 'total_token':
-                  return getTotalTokenMetric(row.getMetricsList());
+                  return getMetricDisplayValue(row, 'agent.total_token');
                 case 'language':
                   return getLanguageDisplayValue(row);
                 default:
@@ -433,56 +432,56 @@ export const ListingPage: FC<{}> = () => {
                         )}
                       </TableCell>
                     )}
-                    {conversationLogAction.visibleColumn('stt_latency_ms') && (
+                    {conversationLogAction.visibleColumn('stt.latency_ms') && (
                       <TableCell className="font-mono text-[13px]">
                         {getMetricDisplayValue(
                           row,
-                          'stt_latency_ms',
-                          formatMetricMilliseconds,
-                        )}
-                      </TableCell>
-                    )}
-                    {conversationLogAction.visibleColumn('llm_latency_ms') && (
-                      <TableCell className="font-mono text-[13px]">
-                        {getMetricDisplayValue(
-                          row,
-                          'llm_latency_ms',
+                          'stt.latency_ms',
                           formatMetricMilliseconds,
                         )}
                       </TableCell>
                     )}
                     {conversationLogAction.visibleColumn(
-                      'agent_time_to_first_token',
+                      'agent.latency_ms',
                     ) && (
                       <TableCell className="font-mono text-[13px]">
                         {getMetricDisplayValue(
                           row,
-                          'agent_time_to_first_token',
-                          formatNanoToReadableMilli,
-                        )}
-                      </TableCell>
-                    )}
-                    {conversationLogAction.visibleColumn('tts_latency_ms') && (
-                      <TableCell className="font-mono text-[13px]">
-                        {getMetricDisplayValue(
-                          row,
-                          'tts_latency_ms',
+                          'agent.latency_ms',
                           formatMetricMilliseconds,
                         )}
                       </TableCell>
                     )}
-                    {conversationLogAction.visibleColumn('eos_latency_ms') && (
+                    {conversationLogAction.visibleColumn('agent.ttft_ms') && (
                       <TableCell className="font-mono text-[13px]">
                         {getMetricDisplayValue(
                           row,
-                          'eos_latency_ms',
+                          'agent.ttft_ms',
+                          formatMetricMilliseconds,
+                        )}
+                      </TableCell>
+                    )}
+                    {conversationLogAction.visibleColumn('tts.latency_ms') && (
+                      <TableCell className="font-mono text-[13px]">
+                        {getMetricDisplayValue(
+                          row,
+                          'tts.latency_ms',
+                          formatMetricMilliseconds,
+                        )}
+                      </TableCell>
+                    )}
+                    {conversationLogAction.visibleColumn('eos.latency_ms') && (
+                      <TableCell className="font-mono text-[13px]">
+                        {getMetricDisplayValue(
+                          row,
+                          'eos.latency_ms',
                           formatMetricMilliseconds,
                         )}
                       </TableCell>
                     )}
                     {conversationLogAction.visibleColumn('total_token') && (
                       <TableCell className="text-sm tabular-nums">
-                        {getTotalTokenMetric(row.getMetricsList())}
+                        {getMetricDisplayValue(row, 'agent.total_token')}
                       </TableCell>
                     )}
                     {conversationLogAction.visibleColumn('language') && (

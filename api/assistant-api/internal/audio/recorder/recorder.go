@@ -13,6 +13,7 @@ import (
 	internal_recorder "github.com/rapidaai/api/assistant-api/internal/audio/recorder/internal"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/protos"
 )
 
 type options struct {
@@ -73,9 +74,14 @@ func New(opts ...Option) (internal_type.ConversationRecordingExecutor, error) {
 			internal_type.ObservabilityMetricRecordPacket{
 				ContextID: options.contextID,
 				Scope:     internal_type.ObservabilityRecordScopeConversation,
-				Record: observability.NewMetricRecordingInitLatencyMs(time.Since(start), observability.Attributes{
-					"provider": executor.Name(),
-				}),
+				Record: observability.RecordMetric{
+					Attributes: observability.Attributes{"provider": executor.Name()},
+					Metrics: []*protos.Metric{{
+						Name:        observability.MetricRecordingInitLatencyMs,
+						Value:       fmt.Sprintf("%d", time.Since(start).Milliseconds()),
+						Description: "Recording initialization latency in milliseconds",
+					}},
+				},
 			},
 			internal_type.ObservabilityLogRecordPacket{
 				ContextID: options.contextID,

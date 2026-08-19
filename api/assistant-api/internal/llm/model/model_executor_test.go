@@ -3,7 +3,9 @@ package internal_llm_model
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/require"
@@ -51,14 +53,35 @@ func TestModel_CurrentContextAndStaleCheck(t *testing.T) {
 	require.Equal(t, "ctx-1", e.currentContextID())
 }
 
-func TestModel_BuildCompletionMetrics_AddsLatencyMs(t *testing.T) {
-	e, _, _, _ := newModelTestEnv(t)
-	out := e.buildCompletionMetrics([]*protos.Metric{{Name: "time_to_first_token", Value: "1000000"}, {Name: "token_count", Value: "9"}})
-	require.Len(t, out, 3)
-	require.Equal(t, "agent_time_to_first_token", out[0].GetName())
-	require.Equal(t, "llm_latency_ms", out[1].GetName())
-	require.Equal(t, "1", out[1].GetValue())
-	require.Equal(t, "agent_token_count", out[2].GetName())
+func TestModel_ResponsePipeline_EmitsLocalTimingMetrics(t *testing.T) {
+	e, comm, _, _ := newModelTestEnv(t)
+	e.currentPacket = &internal_type.UserInputPacket{ContextID: "ctx-1"}
+	e.requestStartedAt = time.Now().Add(-25 * time.Millisecond)
+	e.waitingForFirstResponse = true
+
+	e.handleResponse(context.Background(), comm, &protos.StreamChatOutput{
+		RequestId: "ctx-1",
+		Data: &protos.Message{
+			Role:    "assistant",
+			Message: &protos.Message_Assistant{Assistant: &protos.AssistantMessage{Contents: []string{"hello"}}},
+		},
+	})
+	e.handleResponse(context.Background(), comm, &protos.StreamChatOutput{
+		RequestId: "ctx-1",
+		Data: &protos.Message{
+			Role:    "assistant",
+			Message: &protos.Message_Assistant{Assistant: &protos.AssistantMessage{Contents: []string{"hello done"}}},
+		},
+		Metrics: []*protos.Metric{{Name: "token_count", Value: "9"}},
+	})
+
+	metrics := findPackets[internal_type.ObservabilityMetricRecordPacket](comm.pkts)
+	require.Len(t, metrics, 2)
+	require.Len(t, metrics[0].Record.Metrics, 1)
+	require.Equal(t, observability.MetricAgentTTFTMs, metrics[0].Record.Metrics[0].Name)
+	require.Len(t, metrics[1].Record.Metrics, 2)
+	require.Equal(t, observability.MetricAgentResponseCharCount, metrics[1].Record.Metrics[0].Name)
+	require.Equal(t, observability.MetricAgentTRTMs, metrics[1].Record.Metrics[1].Name)
 }
 
 func TestModel_Close_ThenLatePackets_NoCrash(t *testing.T) {

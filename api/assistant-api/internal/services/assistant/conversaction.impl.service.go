@@ -8,10 +8,12 @@ package internal_assistant_service
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
 	internal_conversation_entity "github.com/rapidaai/api/assistant-api/internal/entity/conversations"
+	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
@@ -21,6 +23,7 @@ import (
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
 	"gorm.io/gorm/clause"
 )
@@ -47,6 +50,8 @@ func (conversationService *assistantConversationService) GetAll(ctx context.Cont
 	assistantId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate, opts *internal_services.GetConversationOption) (int64, []*internal_conversation_entity.AssistantConversation, error) {
+	const numericMetricValuePattern = `^[0-9]+(\.[0-9]+)?$`
+
 	start := time.Now()
 	db := conversationService.postgres.DB(ctx)
 	var (
@@ -185,14 +190,35 @@ func (conversationService *assistantConversationService) GetAll(ctx context.Cont
 			default:
 				qry = qry.Where("EXISTS (SELECT 1 FROM assistant_conversation_metadata WHERE assistant_conversation_metadata.assistant_conversation_id = assistant_conversations.id AND assistant_conversation_metadata.key = ? AND assistant_conversation_metadata.value = ?)", "disconnect_reason", ct.GetValue())
 			}
-		case "recording_init_ms", "stt_init_ms", "tts_init_ms", "llm_init_ms", "denoise_init_ms", "eos_init_ms", "vad_init_ms", "duration", "call.duration_ms", "tts_duration", "stt_duration":
+		case observability.MetricRecordingInitLatencyMs,
+			observability.MetricAnalysisInitLatencyMs,
+			observability.MetricAuthenticationInitLatencyMs,
+			observability.MetricAuthenticationLatencyMs,
+			observability.MetricStorageInitLatencyMs,
+			observability.MetricSTTInitLatencyMs,
+			observability.MetricSTTLatencyMs,
+			observability.MetricSTTTimeToFirstTokenMs,
+			observability.MetricSTTTimeToLastTokenMs,
+			observability.MetricTTSInitLatencyMs,
+			observability.MetricLLMInitLatencyMs,
+			observability.MetricDenoiseInitLatencyMs,
+			observability.MetricEOSInitLatencyMs,
+			observability.MetricVADInitLatencyMs,
+			observability.MetricConversationDuration,
+			observability.MetricCallDurationMs,
+			observability.MetricConversationTTSDuration,
+			observability.MetricConversationSTTDuration:
+			if !validator.Numeric(ct.GetValue()) {
+				return cnt, nil, fmt.Errorf("invalid numeric metric filter value %q for %s", ct.GetValue(), ct.GetKey())
+			}
+			metricValue, _ := strconv.ParseFloat(ct.GetValue(), 64)
 			switch ct.GetLogic() {
 			case ">=":
-				qry = qry.Where("EXISTS (SELECT 1 FROM assistant_conversation_metrics WHERE assistant_conversation_metrics.assistant_conversation_id = assistant_conversations.id AND assistant_conversation_metrics.name = ? AND assistant_conversation_metrics.value ~ '^[0-9]+(\\.[0-9]+)?$' AND assistant_conversation_metrics.value::numeric >= ?::numeric)", ct.GetKey(), ct.GetValue())
+				qry = qry.Where("EXISTS (SELECT 1 FROM assistant_conversation_metrics WHERE assistant_conversation_metrics.assistant_conversation_id = assistant_conversations.id AND assistant_conversation_metrics.name = ? AND assistant_conversation_metrics.value ~ ? AND CAST(assistant_conversation_metrics.value AS numeric) >= ?)", ct.GetKey(), numericMetricValuePattern, metricValue)
 			case "<=":
-				qry = qry.Where("EXISTS (SELECT 1 FROM assistant_conversation_metrics WHERE assistant_conversation_metrics.assistant_conversation_id = assistant_conversations.id AND assistant_conversation_metrics.name = ? AND assistant_conversation_metrics.value ~ '^[0-9]+(\\.[0-9]+)?$' AND assistant_conversation_metrics.value::numeric <= ?::numeric)", ct.GetKey(), ct.GetValue())
+				qry = qry.Where("EXISTS (SELECT 1 FROM assistant_conversation_metrics WHERE assistant_conversation_metrics.assistant_conversation_id = assistant_conversations.id AND assistant_conversation_metrics.name = ? AND assistant_conversation_metrics.value ~ ? AND CAST(assistant_conversation_metrics.value AS numeric) <= ?)", ct.GetKey(), numericMetricValuePattern, metricValue)
 			default:
-				qry = qry.Where("EXISTS (SELECT 1 FROM assistant_conversation_metrics WHERE assistant_conversation_metrics.assistant_conversation_id = assistant_conversations.id AND assistant_conversation_metrics.name = ? AND assistant_conversation_metrics.value ~ '^[0-9]+(\\.[0-9]+)?$' AND assistant_conversation_metrics.value::numeric = ?::numeric)", ct.GetKey(), ct.GetValue())
+				qry = qry.Where("EXISTS (SELECT 1 FROM assistant_conversation_metrics WHERE assistant_conversation_metrics.assistant_conversation_id = assistant_conversations.id AND assistant_conversation_metrics.name = ? AND assistant_conversation_metrics.value ~ ? AND CAST(assistant_conversation_metrics.value AS numeric) = ?)", ct.GetKey(), numericMetricValuePattern, metricValue)
 			}
 		}
 	}

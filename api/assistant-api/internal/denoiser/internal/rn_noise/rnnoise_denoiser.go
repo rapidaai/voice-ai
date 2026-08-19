@@ -158,8 +158,15 @@ func New(opts ...Option) (internal_type.VoiceDenoiserExecutor, error) {
 	}
 	_ = options.onPacket(options.ctx,
 		internal_type.ObservabilityMetricRecordPacket{
-			Scope:  internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.NewMetricDenoiseInitLatencyMs(time.Since(start), observability.Attributes{"provider": d.Name()}),
+			Scope: internal_type.ObservabilityRecordScopeConversation,
+			Record: observability.RecordMetric{
+				Attributes: observability.Attributes{"provider": d.Name()},
+				Metrics: []*protos.Metric{{
+					Name:        observability.MetricDenoiseInitLatencyMs,
+					Value:       fmt.Sprintf("%d", time.Since(start).Milliseconds()),
+					Description: "Denoise initialization latency in milliseconds",
+				}},
+			},
 		},
 		internal_type.ObservabilityLogRecordPacket{
 			Scope: internal_type.ObservabilityRecordScopeConversation,

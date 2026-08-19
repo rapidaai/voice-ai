@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rapidaai/api/assistant-api/internal/observability"
 	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/internal/testutil"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/stretchr/testify/assert"
@@ -410,16 +411,16 @@ func assertTTSInitMetric(t *testing.T, collector *testutil.PacketCollector) {
 	t.Helper()
 	for _, m := range collector.MetricPackets() {
 		for _, metric := range m.Record.Metrics {
-			if metric.Name == "tts_init_ms" {
+			if metric.Name == observability.MetricTTSInitLatencyMs {
 				ms, err := strconv.Atoi(metric.Value)
 				assert.NoError(t, err)
-				assert.GreaterOrEqual(t, ms, 0, "tts_init_ms should be non-negative")
-				t.Logf("tts_init_ms=%d", ms)
+				assert.GreaterOrEqual(t, ms, 0, "%s should be non-negative", observability.MetricTTSInitLatencyMs)
+				t.Logf("%s=%d", observability.MetricTTSInitLatencyMs, ms)
 				return
 			}
 		}
 	}
-	t.Error("should have tts_init_ms metric")
+	t.Errorf("should have %s metric", observability.MetricTTSInitLatencyMs)
 }
 
 func assertTTSInitMetricCountAtLeast(t *testing.T, collector *testutil.PacketCollector, minimumCount int) {
@@ -427,26 +428,26 @@ func assertTTSInitMetricCountAtLeast(t *testing.T, collector *testutil.PacketCol
 	count := 0
 	for _, m := range collector.MetricPackets() {
 		for _, metric := range m.Record.Metrics {
-			if metric.Name == "tts_init_ms" {
+			if metric.Name == observability.MetricTTSInitLatencyMs {
 				count++
 			}
 		}
 	}
-	assert.GreaterOrEqual(t, count, minimumCount, "should have enough tts_init_ms metrics")
+	assert.GreaterOrEqual(t, count, minimumCount, "should have enough %s metrics", observability.MetricTTSInitLatencyMs)
 }
 
 func assertTTSLatencyMetric(t *testing.T, collector *testutil.PacketCollector) {
 	t.Helper()
 	for _, m := range collector.MetricPackets() {
 		for _, metric := range m.Record.Metrics {
-			if metric.Name == "tts_latency_ms" {
+			if metric.Name == "tts.latency_ms" {
 				ms, err := strconv.Atoi(metric.Value)
 				assert.NoError(t, err)
-				assert.Greater(t, ms, 0, "tts_latency_ms should be positive")
-				t.Logf("tts_latency_ms=%d", ms)
+				assert.Greater(t, ms, 0, "tts.latency_ms should be positive")
+				t.Logf("tts.latency_ms=%d", ms)
 				return
 			}
 		}
 	}
-	t.Error("should have tts_latency_ms metric")
+	t.Error("should have tts.latency_ms metric")
 }

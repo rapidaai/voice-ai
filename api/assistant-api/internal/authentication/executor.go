@@ -16,6 +16,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
+	"github.com/rapidaai/protos"
 )
 
 type options struct {
@@ -99,11 +100,18 @@ func New(opts ...Option) (internal_type.AuthenticationExecutor, error) {
 			_ = options.onPacket(options.ctx,
 				internal_type.ObservabilityMetricRecordPacket{
 					Scope: internal_type.ObservabilityRecordScopeConversation,
-					Record: observability.NewMetricAuthenticationInitLatencyMs(time.Since(start), observability.Attributes{
-						"provider":         options.authenticator.Provider,
-						"configuration_id": fmt.Sprintf("%d", options.authenticator.Id),
-						"status":           "failed",
-					}),
+					Record: observability.RecordMetric{
+						Attributes: observability.Attributes{
+							"provider":         options.authenticator.Provider,
+							"configuration_id": fmt.Sprintf("%d", options.authenticator.Id),
+							"status":           "failed",
+						},
+						Metrics: []*protos.Metric{{
+							Name:        observability.MetricAuthenticationInitLatencyMs,
+							Value:       fmt.Sprintf("%d", time.Since(start).Milliseconds()),
+							Description: "Authentication initialization latency in milliseconds",
+						}},
+					},
 				},
 				internal_type.ObservabilityLogRecordPacket{
 					Scope: internal_type.ObservabilityRecordScopeConversation,

@@ -130,15 +130,15 @@ describe('conversation telemetry structured criteria helpers', () => {
     ).toBe(true);
   });
 
-  it('builds latency series with stt/tts/llm/eos metrics merged by context', () => {
+  it('builds latency series with stt/tts/agent/eos metrics merged by context', () => {
     const series = buildLatencySeries([
       {
         timestampMs: 2000,
         contextId: 'ctx-1',
         conversationId: 'conv-1',
         metrics: [
-          { name: 'stt_latency_ms', value: '10' },
-          { name: 'tts_latency_ms', value: '20' },
+          { name: 'stt.latency_ms', value: '10' },
+          { name: 'tts.latency_ms', value: '20' },
         ],
       },
       {
@@ -146,21 +146,21 @@ describe('conversation telemetry structured criteria helpers', () => {
         contextId: 'ctx-1',
         conversationId: 'conv-1',
         metrics: [
-          { name: 'llm_latency_ms', value: '30' },
-          { name: 'eos_latency_ms', value: '40' },
+          { name: 'agent.latency_ms', value: '30' },
+          { name: 'eos.latency_ms', value: '40' },
         ],
       },
       {
         timestampMs: 2100,
         contextId: 'ctx-2',
         conversationId: 'conv-1',
-        metrics: [{ name: 'stt_latency_ms', value: '5' }],
+        metrics: [{ name: 'stt.latency_ms', value: '5' }],
       },
       {
         timestampMs: 2200,
         contextId: 'ctx-3',
         conversationId: 'conv-1',
-        metrics: [{ name: 'agent_total_token', value: '100' }],
+        metrics: [{ name: 'agent.total_token', value: '100' }],
       },
     ]);
 
@@ -169,10 +169,10 @@ describe('conversation telemetry structured criteria helpers', () => {
     expect(series[0]).toMatchObject({
       contextId: 'ctx-1',
       conversationId: 'conv-1',
-      stt_latency_ms: 10,
-      tts_latency_ms: 20,
-      llm_latency_ms: 30,
-      eos_latency_ms: 40,
+      'stt.latency_ms': 10,
+      'tts.latency_ms': 20,
+      'agent.latency_ms': 30,
+      'eos.latency_ms': 40,
       sequence: 1,
       timestampMs: 1900,
     });
@@ -180,7 +180,7 @@ describe('conversation telemetry structured criteria helpers', () => {
     expect(series[1]).toMatchObject({
       contextId: 'ctx-2',
       conversationId: 'conv-1',
-      stt_latency_ms: 5,
+      'stt.latency_ms': 5,
       sequence: 2,
     });
   });

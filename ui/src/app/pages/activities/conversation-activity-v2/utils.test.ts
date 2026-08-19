@@ -11,6 +11,7 @@ import {
   createTraceFilter,
   dedupeTraceFilters,
   getDocumentComponent,
+  getTraceFilterValues,
   matchesTraceFilters,
   parseTraceFilterQuery,
   telemetryRecordToTimelineDocument,
@@ -66,7 +67,7 @@ describe('conversation activity v2 telemetry utilities', () => {
   it('uses component latency metrics as waterfall durations', () => {
     const document = telemetryRecordToTimelineDocument(
       observabilityRecord(
-        metricRecord({ name: 'stt_latency_ms', value: '47.4' }),
+        metricRecord({ name: 'stt.latency_ms', value: '47.4' }),
       ),
       0,
     );
@@ -99,6 +100,36 @@ describe('conversation activity v2 telemetry utilities', () => {
     expect(document ? getDocumentComponent(document) : '').toBe('webrtc');
   });
 
+  it('prefers the record component over provider attributes', () => {
+    const document: TimelineDocument = {
+      id: 'evt-eos-completed',
+      kind: 'event',
+      name: 'eos.completed',
+      component: 'eos',
+      category: 'eos',
+      level: 'info',
+      outcome: 'success',
+      title: 'eos.completed',
+      projectId: 2,
+      organizationId: 1,
+      scope: 'message',
+      assistantId: '2337454103765975040',
+      assistantConversationId: '2340105440068632576',
+      messageId: 'a49f2845-68ec-4a59-a30d-5e2b30df87bf',
+      messageRole: 'user',
+      traceId: 'trace-1',
+      contextId: 'a49f2845-68ec-4a59-a30d-5e2b30df87bf',
+      occurredAt: '2026-06-04T03:10:00.000Z',
+      receivedAt: '2026-06-04T03:10:00.000Z',
+      attributes: { provider: 'pipecatEndOfSpeech' },
+    };
+
+    const filters = parseTraceFilterQuery('component:eos').filters;
+
+    expect(getDocumentComponent(document)).toBe('eos');
+    expect(matchesTraceFilters(document, filters)).toBe(true);
+  });
+
   it('uses current backend log levels, scopes, and message roles', () => {
     expect(LEVEL_OPTIONS.map(option => option.id)).toEqual([
       'all',
@@ -126,34 +157,50 @@ describe('conversation activity v2 telemetry utilities', () => {
 
     expect(metricIds).toEqual(
       expect.arrayContaining([
-        'llm_latency_ms',
-        'llm_input_char_count',
-        'llm_history_count',
-        'llm_response_char_count',
+        'agent.latency_ms',
+        'agent.message_char_count',
+        'agent.message_count',
+        'agent.response_char_count',
+        'authentication.init_ms',
+        'recording.init_ms',
+        'agent.ttft_ms',
+        'agent.trt_ms',
+        'agent.error',
+      ]),
+    );
+    expect(metricIds).not.toEqual(
+      expect.arrayContaining([
+        'time_taken',
         'agent_time_taken',
-        'agent_status',
-        'agent_llm_request_id',
-        'agent_input_token',
-        'agent_output_token',
-        'agent_total_token',
-        'agent_cached_content_token',
-        'agent_cost',
-        'agent_input_cost',
-        'agent_output_cost',
-        'agent_token_pre_second',
-        'agent_time_to_first_token',
+        'time_to_first_token',
+        'provider_total_time',
+        'provider_generate_time',
         'agent_provider_total_time',
         'agent_provider_generate_time',
+        'agent_status',
+        'agent.llm_request_id',
+        'agent_input_token',
+        'agent_output_token',
+        'agent.total_token',
+        'agent.cached_content_token',
+        'agent.cost',
+        'agent.input_cost',
+        'agent.output_cost',
+        'agent.token_pre_second',
         'agent_token_count',
+        'input_token',
+        'output_token',
       ]),
     );
   });
 
   it('uses current backend observability components and events', () => {
     const componentIds = COMPONENT_OPTIONS.map(option => option.id);
-    expect(componentIds).toContain('agentflow');
+    expect(componentIds).toContain('agent');
     expect(componentIds).toContain('sip');
     expect(componentIds).toContain('webrtc');
+    expect(componentIds).not.toContain('agentflow');
+    expect(componentIds).not.toContain('llm');
     expect(componentIds).not.toContain('session');
     expect(componentIds).not.toContain('audio');
 
@@ -161,12 +208,22 @@ describe('conversation activity v2 telemetry utilities', () => {
     expect(EVENTS_BY_COMPONENT.call).not.toContain('call.answered');
     expect(EVENTS_BY_COMPONENT.stt).toContain('stt.interim');
     expect(EVENTS_BY_COMPONENT.stt).not.toContain('stt.final');
-    expect(EVENTS_BY_COMPONENT.tts).toContain('tts.discarded');
+    expect(EVENTS_BY_COMPONENT.turn).toEqual([
+      'turn.interrupted',
+      'turn.change',
+      'turn.started',
+    ]);
+    expect(EVENTS_BY_COMPONENT.tts).not.toContain('tts.discard_chunk');
+    expect(EVENTS_BY_COMPONENT.tts).not.toContain('tts.discarded');
     expect(EVENTS_BY_COMPONENT.tts).not.toContain('tts.first_audio');
-    expect(EVENTS_BY_COMPONENT.agentflow).toEqual([
-      'agentflow.transition.triggered',
-      'agentflow.transition.matched',
-      'agentflow.transition.missing_edge',
+    expect(EVENTS_BY_COMPONENT.agent).toEqual([
+      'agent.started',
+      'agent.completed',
+      'agent.discarded',
+      'agent.error',
+      'agent.transition.triggered',
+      'agent.transition.matched',
+      'agent.transition.missing_edge',
     ]);
     expect(EVENTS_BY_COMPONENT.conversation).toContain(
       'conversation.authentication_started',
@@ -288,5 +345,40 @@ describe('conversation activity v2 telemetry utilities', () => {
 
     expect(filters).toHaveLength(1);
     expect(filters[0]?.criteriaKey).toBe('assistantConversationId');
+  });
+
+  it('matches comma-separated component filters as OR values', () => {
+    const document: TimelineDocument = {
+      id: 'evt-eos-completed',
+      kind: 'event',
+      name: 'eos.completed',
+      category: 'eos',
+      level: 'info',
+      outcome: 'success',
+      title: 'EOS completed',
+      projectId: 2,
+      organizationId: 1,
+      scope: 'message',
+      assistantId: '2337454103765975040',
+      assistantConversationId: '2340105440068632576',
+      messageId: 'message-1',
+      messageRole: 'user',
+      traceId: 'trace-1',
+      contextId: 'message-1',
+      occurredAt: '2026-06-04T03:10:00.000Z',
+      receivedAt: '2026-06-04T03:10:00.000Z',
+      attributes: { component: 'eos' },
+      data: {},
+    };
+    const filters = parseTraceFilterQuery('component:eos,stt,agent').filters;
+
+    expect(getTraceFilterValues(filters[0])).toEqual(['eos', 'stt', 'agent']);
+    expect(matchesTraceFilters(document, filters)).toBe(true);
+    expect(
+      matchesTraceFilters(
+        document,
+        parseTraceFilterQuery('component:stt,agent').filters,
+      ),
+    ).toBe(false);
   });
 });

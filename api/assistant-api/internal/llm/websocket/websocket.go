@@ -27,12 +27,13 @@ import (
 )
 
 type websocketExecutor struct {
-	logger           commons.Logger
-	conn             *websocket.Conn
-	writeMu          sync.Mutex
-	contextMu        sync.RWMutex
-	currentID        string
-	requestStartedAt time.Time
+	logger                  commons.Logger
+	conn                    *websocket.Conn
+	writeMu                 sync.Mutex
+	contextMu               sync.RWMutex
+	currentID               string
+	requestStartedAt        time.Time
+	waitingForFirstResponse bool
 }
 
 type options struct {
@@ -123,7 +124,7 @@ func (e *websocketExecutor) initialize(ctx context.Context, comm internal_type.C
 				Level:   observability.LevelError,
 				Message: fmt.Sprintf("%s: error while initialization %s", e.Name(), "websocket provider is not enabled"),
 				Attributes: observability.Attributes{
-					"component": observability.ComponentLLM.String(),
+					"component": observability.ComponentAgent.String(),
 					"provider":  e.Name(),
 					"options":   observability.AttributeValue(comm.GetOptions()),
 					"error":     "websocket provider is not enabled",
@@ -142,7 +143,7 @@ func (e *websocketExecutor) initialize(ctx context.Context, comm internal_type.C
 				Level:   observability.LevelError,
 				Message: fmt.Sprintf("%s: error while initialization %s", e.Name(), err.Error()),
 				Attributes: observability.Attributes{
-					"component":  observability.ComponentLLM.String(),
+					"component":  observability.ComponentAgent.String(),
 					"provider":   e.Name(),
 					"options":    observability.AttributeValue(comm.GetOptions()),
 					"url":        provider.Url,
@@ -170,7 +171,7 @@ func (e *websocketExecutor) initialize(ctx context.Context, comm internal_type.C
 				Level:   observability.LevelError,
 				Message: fmt.Sprintf("%s: error while initialization %s", e.Name(), err.Error()),
 				Attributes: observability.Attributes{
-					"component":  observability.ComponentLLM.String(),
+					"component":  observability.ComponentAgent.String(),
 					"provider":   e.Name(),
 					"options":    observability.AttributeValue(comm.GetOptions()),
 					"url":        provider.Url,
@@ -184,8 +185,15 @@ func (e *websocketExecutor) initialize(ctx context.Context, comm internal_type.C
 	}
 	comm.OnPacket(ctx,
 		internal_type.ObservabilityMetricRecordPacket{
-			Scope:  internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.NewMetricLLMInitLatencyMs(time.Since(start), observability.Attributes{"provider": e.Name()}),
+			Scope: internal_type.ObservabilityRecordScopeConversation,
+			Record: observability.RecordMetric{
+				Attributes: observability.Attributes{"provider": e.Name()},
+				Metrics: []*protos.Metric{{
+					Name:        observability.MetricLLMInitLatencyMs,
+					Value:       fmt.Sprintf("%d", time.Since(start).Milliseconds()),
+					Description: "LLM initialization latency in milliseconds",
+				}},
+			},
 		},
 		internal_type.ObservabilityLogRecordPacket{
 			Scope: internal_type.ObservabilityRecordScopeConversation,
@@ -193,7 +201,7 @@ func (e *websocketExecutor) initialize(ctx context.Context, comm internal_type.C
 				Level:   observability.LevelInfo,
 				Message: fmt.Sprintf("%s: initialization completed", e.Name()),
 				Attributes: observability.Attributes{
-					"component": observability.ComponentLLM.String(),
+					"component": observability.ComponentAgent.String(),
 					"provider":  e.Name(),
 					"url":       provider.Url,
 					"options":   observability.AttributeValue(comm.GetOptions()),
@@ -265,6 +273,10 @@ func (e *websocketExecutor) setCurrentContextID(id string) {
 	e.currentID = id
 	if strings.TrimSpace(id) != "" {
 		e.requestStartedAt = time.Now()
+		e.waitingForFirstResponse = true
+	} else {
+		e.requestStartedAt = time.Time{}
+		e.waitingForFirstResponse = false
 	}
 	e.contextMu.Unlock()
 }
@@ -325,7 +337,7 @@ func (e *websocketExecutor) listen(ctx context.Context, onPacket func(ctx contex
 						Level:   observability.LevelError,
 						Message: "websocket read failed",
 						Attributes: observability.Attributes{
-							"component":  observability.ComponentLLM.String(),
+							"component":  observability.ComponentAgent.String(),
 							"operation":  "listen",
 							"provider":   e.Name(),
 							"context_id": currentID,
@@ -353,7 +365,7 @@ func (e *websocketExecutor) listen(ctx context.Context, onPacket func(ctx contex
 					Level:   observability.LevelError,
 					Message: "websocket response decode failed",
 					Attributes: observability.Attributes{
-						"component":  observability.ComponentLLM.String(),
+						"component":  observability.ComponentAgent.String(),
 						"operation":  "decode_response",
 						"provider":   e.Name(),
 						"context_id": currentID,
@@ -377,9 +389,11 @@ func (e *websocketExecutor) handleResponse(ctx context.Context, resp *Response, 
 		var d ErrorData
 		json.Unmarshal(resp.Data, &d)
 		e.logger.Errorf("Error: %d - %s", d.Code, d.Message)
-		e.contextMu.RLock()
+		e.contextMu.Lock()
 		currentID := e.currentID
-		e.contextMu.RUnlock()
+		e.requestStartedAt = time.Time{}
+		e.waitingForFirstResponse = false
+		e.contextMu.Unlock()
 		onPacket(ctx,
 			internal_type.LLMErrorPacket{
 				ContextID: currentID,
@@ -389,7 +403,7 @@ func (e *websocketExecutor) handleResponse(ctx context.Context, resp *Response, 
 			internal_type.ObservabilityEventRecordPacket{
 				ContextID: currentID,
 				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.NewMessageRecord(currentID, observability.ComponentLLM, observability.LLMError, observability.MessageRoleAssistant, observability.Attributes{
+				Record: observability.NewMessageRecord(currentID, observability.ComponentAgent, observability.AgentError, observability.MessageRoleAssistant, observability.Attributes{
 					"provider":   e.Name(),
 					"context_id": currentID,
 					"code":       fmt.Sprintf("%d", d.Code),
@@ -403,7 +417,7 @@ func (e *websocketExecutor) handleResponse(ctx context.Context, resp *Response, 
 					Level:   observability.LevelError,
 					Message: "websocket llm response failed",
 					Attributes: observability.Attributes{
-						"component":  observability.ComponentLLM.String(),
+						"component":  observability.ComponentAgent.String(),
 						"operation":  "response",
 						"provider":   e.Name(),
 						"context_id": currentID,
@@ -419,6 +433,46 @@ func (e *websocketExecutor) handleResponse(ctx context.Context, resp *Response, 
 		var d StreamData
 		json.Unmarshal(resp.Data, &d)
 		if !e.isCurrentContextID(d.ID) {
+			onPacket(ctx, internal_type.ObservabilityEventRecordPacket{
+				ContextID: d.ID,
+				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentAgent,
+					Event:     observability.AgentDiscarded,
+					Attributes: observability.Attributes{
+						"provider":   e.Name(),
+						"context_id": d.ID,
+						"reason":     "stale_context",
+						"script":     d.Content,
+					},
+					OccurredAt: time.Now(),
+				},
+			})
+			return
+		}
+		now := time.Now()
+		e.contextMu.Lock()
+		requestStartedAt := e.requestStartedAt
+		publishTTFT := e.waitingForFirstResponse
+		e.waitingForFirstResponse = false
+		e.contextMu.Unlock()
+
+		if publishTTFT && !requestStartedAt.IsZero() {
+			onPacket(ctx,
+				internal_type.LLMResponseDeltaPacket{ContextID: d.ID, Text: d.Content},
+				internal_type.ObservabilityMetricRecordPacket{
+					ContextID: d.ID,
+					Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+					Record: observability.RecordMetric{
+						Attributes: observability.Attributes{"provider": e.Name()},
+						Metrics: []*protos.Metric{{
+							Name:        observability.MetricAgentTTFTMs,
+							Value:       fmt.Sprintf("%d", now.Sub(requestStartedAt).Milliseconds()),
+							Description: "Agent time to first token in milliseconds",
+						}},
+					},
+				},
+			)
 			return
 		}
 		onPacket(ctx, internal_type.LLMResponseDeltaPacket{ContextID: d.ID, Text: d.Content})
@@ -427,12 +481,30 @@ func (e *websocketExecutor) handleResponse(ctx context.Context, resp *Response, 
 		var d CompleteData
 		json.Unmarshal(resp.Data, &d)
 		if !e.isCurrentContextID(d.ID) {
+			onPacket(ctx, internal_type.ObservabilityEventRecordPacket{
+				ContextID: d.ID,
+				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentAgent,
+					Event:     observability.AgentDiscarded,
+					Attributes: observability.Attributes{
+						"provider":   e.Name(),
+						"context_id": d.ID,
+						"reason":     "stale_context",
+						"script":     d.Content,
+					},
+					OccurredAt: time.Now(),
+				},
+			})
 			return
 		}
 		if d.Content != "" {
+			now := time.Now()
 			e.contextMu.Lock()
 			requestStartedAt := e.requestStartedAt
+			publishTTFT := e.waitingForFirstResponse
 			e.requestStartedAt = time.Time{}
+			e.waitingForFirstResponse = false
 			e.contextMu.Unlock()
 			packets := []internal_type.Packet{
 				internal_type.LLMResponseDonePacket{
@@ -442,63 +514,46 @@ func (e *websocketExecutor) handleResponse(ctx context.Context, resp *Response, 
 				internal_type.ObservabilityEventRecordPacket{
 					ContextID: d.ID,
 					Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-					Record: observability.NewMessageRecord(d.ID, observability.ComponentLLM, observability.LLMCompleted, observability.MessageRoleAssistant, observability.Attributes{
+					Record: observability.NewMessageRecord(d.ID, observability.ComponentAgent, observability.AgentCompleted, observability.MessageRoleAssistant, observability.Attributes{
 						"provider":            e.Name(),
 						"context_id":          d.ID,
+						"script":              d.Content,
 						"response_char_count": fmt.Sprintf("%d", len(d.Content)),
 					}),
 				},
 			}
-			var usageDuration time.Duration
-			if len(d.Metrics) > 0 {
-				metrics := make([]*protos.Metric, 0, len(d.Metrics))
-				for _, metric := range d.Metrics {
+			metrics := []*protos.Metric{{
+				Name:        observability.MetricAgentResponseCharCount,
+				Value:       fmt.Sprintf("%d", len(d.Content)),
+				Description: "Agent response character count",
+			}}
+			if !requestStartedAt.IsZero() {
+				if publishTTFT {
 					metrics = append(metrics, &protos.Metric{
-						Name:  metric.Name,
-						Value: fmt.Sprintf("%f", metric.Value),
+						Name:        observability.MetricAgentTTFTMs,
+						Value:       fmt.Sprintf("%d", now.Sub(requestStartedAt).Milliseconds()),
+						Description: "Agent time to first token in milliseconds",
 					})
-					switch metric.Name {
-					case observability.MetricTimeTaken, observability.MetricProviderTotalTime:
-						if metric.Value > 0 {
-							switch metric.Unit {
-							case "s", "sec", "second", "seconds":
-								usageDuration = time.Duration(metric.Value * float64(time.Second))
-							case "ms", "millisecond", "milliseconds":
-								usageDuration = time.Duration(metric.Value * float64(time.Millisecond))
-							default:
-								usageDuration = time.Duration(metric.Value)
-							}
-						}
-					}
 				}
-				packets = append(packets, internal_type.ObservabilityMetricRecordPacket{
-					ContextID: d.ID,
-					Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-					Record: observability.RecordMetric{
-						Attributes: observability.Attributes{"provider": e.Name()},
-						Metrics:    metrics,
-					},
+				metrics = append(metrics, &protos.Metric{
+					Name:        observability.MetricAgentTRTMs,
+					Value:       fmt.Sprintf("%d", now.Sub(requestStartedAt).Milliseconds()),
+					Description: "Agent total response time in milliseconds",
 				})
-				if usageDuration > 0 {
-					packets = append(packets, internal_type.ObservabilityUsageRecordPacket{
-						ContextID: d.ID,
-						Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-						Record: observability.NewLLMDurationUsageRecord(
-							e.Name(),
-							usageDuration,
-							observability.Attributes{
-								"context_id":          d.ID,
-								"response_char_count": fmt.Sprintf("%d", len(d.Content)),
-							},
-						),
-					})
-				}
 			}
-			if usageDuration == 0 && !requestStartedAt.IsZero() {
+			packets = append(packets, internal_type.ObservabilityMetricRecordPacket{
+				ContextID: d.ID,
+				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+				Record: observability.RecordMetric{
+					Attributes: observability.Attributes{"provider": e.Name()},
+					Metrics:    metrics,
+				},
+			})
+			if !requestStartedAt.IsZero() {
 				packets = append(packets, internal_type.ObservabilityUsageRecordPacket{
 					ContextID: d.ID,
 					Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-					Record: observability.NewLLMDurationUsageRecord(e.Name(), time.Since(requestStartedAt), observability.Attributes{
+					Record: observability.NewLLMDurationUsageRecord(e.Name(), now.Sub(requestStartedAt), observability.Attributes{
 						"context_id":          d.ID,
 						"response_char_count": fmt.Sprintf("%d", len(d.Content)),
 					}),
@@ -522,7 +577,7 @@ func (e *websocketExecutor) handleResponse(ctx context.Context, resp *Response, 
 			internal_type.ObservabilityEventRecordPacket{
 				ContextID: d.ID,
 				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.NewMessageRecord(d.ID, observability.ComponentLLM, observability.LLMDiscarded, observability.MessageRoleAssistant, observability.Attributes{
+				Record: observability.NewMessageRecord(d.ID, observability.ComponentAgent, observability.AgentDiscarded, observability.MessageRoleAssistant, observability.Attributes{
 					"provider":   e.Name(),
 					"context_id": d.ID,
 					"reason":     "interruption",
@@ -555,8 +610,50 @@ func (e *websocketExecutor) handleResponse(ctx context.Context, resp *Response, 
 func (e *websocketExecutor) Execute(ctx context.Context, comm internal_type.Communication, packet internal_type.Packet) error {
 	switch p := packet.(type) {
 	case internal_type.UserInputPacket:
+		if comm == nil {
+			return e.sendUserMessage(p.ContextID, p.Text)
+		}
+		if strings.TrimSpace(p.ContextID) == "" {
+			return e.sendUserMessage(p.ContextID, p.Text)
+		}
+		comm.OnPacket(ctx, internal_type.ObservabilityEventRecordPacket{
+			ContextID: p.ContextID,
+			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+			Record: observability.RecordEvent{
+				Component: observability.ComponentAgent,
+				Event:     observability.AgentStarted,
+				Attributes: observability.Attributes{
+					"provider":         e.Name(),
+					"context_id":       p.ContextID,
+					"script":           p.Text,
+					"input_char_count": fmt.Sprintf("%d", len(p.Text)),
+				},
+				OccurredAt: time.Now(),
+			},
+		})
 		return e.sendUserMessage(p.ContextID, p.Text)
 	case internal_type.UserTextReceivedPacket:
+		if comm == nil {
+			return e.sendUserMessage(p.ContextID, p.Text)
+		}
+		if strings.TrimSpace(p.ContextID) == "" {
+			return e.sendUserMessage(p.ContextID, p.Text)
+		}
+		comm.OnPacket(ctx, internal_type.ObservabilityEventRecordPacket{
+			ContextID: p.ContextID,
+			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+			Record: observability.RecordEvent{
+				Component: observability.ComponentAgent,
+				Event:     observability.AgentStarted,
+				Attributes: observability.Attributes{
+					"provider":         e.Name(),
+					"context_id":       p.ContextID,
+					"script":           p.Text,
+					"input_char_count": fmt.Sprintf("%d", len(p.Text)),
+				},
+				OccurredAt: time.Now(),
+			},
+		})
 		return e.sendUserMessage(p.ContextID, p.Text)
 	case internal_type.InjectMessagePacket:
 		return nil
@@ -580,6 +677,7 @@ func (e *websocketExecutor) Close(ctx context.Context) error {
 	e.contextMu.Lock()
 	e.currentID = ""
 	e.requestStartedAt = time.Time{}
+	e.waitingForFirstResponse = false
 	e.contextMu.Unlock()
 	return nil
 }

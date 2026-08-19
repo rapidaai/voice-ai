@@ -9,6 +9,7 @@ package internal_transformer_azure
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -198,8 +199,15 @@ func (azure *azureTextToSpeech) Initialize() (err error) {
 	azure.client.SynthesisCanceled(azure.OnCancel)
 	azure.onPacket(
 		internal_type.ObservabilityMetricRecordPacket{
-			Scope:  internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.NewMetricTTSInitLatencyMs(time.Since(start), observability.Attributes{"provider": azure.Name()}),
+			Scope: internal_type.ObservabilityRecordScopeConversation,
+			Record: observability.RecordMetric{
+				Metrics: []*protos.Metric{{
+					Name:        observability.MetricTTSInitLatencyMs,
+					Value:       strconv.FormatInt(time.Since(start).Milliseconds(), 10),
+					Description: "TTS initialization latency in milliseconds",
+				}},
+				Attributes: observability.Attributes{"provider": azure.Name()},
+			},
 		},
 		internal_type.ObservabilityLogRecordPacket{
 			Scope: internal_type.ObservabilityRecordScopeConversation,

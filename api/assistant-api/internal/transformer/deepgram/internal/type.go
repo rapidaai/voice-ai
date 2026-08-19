@@ -66,6 +66,8 @@ const (
 	STTInitializationLatencyMetricDescription = "STT initialization latency in milliseconds"
 	STTFinalizeFailureMetricDescription       = "STT finalize failure count"
 	STTStreamFailureMetricDescription         = "STT stream failure count"
+	STTTimeToFirstTokenMetricDescription      = "STT time to first token from speech start in milliseconds"
+	STTTimeToLastTokenMetricDescription       = "STT time to final token from speech start in milliseconds"
 	STTLatencyMetricDescription               = "STT latency from speech end to final transcript in milliseconds"
 	STTProviderErrorMetricDescription         = "STT provider error count"
 )
@@ -226,14 +228,20 @@ func (dgOpt *DeepgramOption) GetTextToSpeechConnectionString() string {
 
 type SttSessionMetrics struct {
 	mu              sync.Mutex
+	speechStartedAt time.Time
 	speechEndedAt   time.Time
+	ttftReported    bool
+	ttltReported    bool
 	latencyReported bool
 }
 
-func (metrics *SttSessionMetrics) ResetSpeech() {
+func (metrics *SttSessionMetrics) ResetSpeech(speechStartedAt time.Time) {
 	metrics.mu.Lock()
 	defer metrics.mu.Unlock()
+	metrics.speechStartedAt = speechStartedAt
 	metrics.speechEndedAt = time.Time{}
+	metrics.ttftReported = false
+	metrics.ttltReported = false
 	metrics.latencyReported = false
 }
 
@@ -242,23 +250,4 @@ func (metrics *SttSessionMetrics) SetSpeechEndedAt(speechEndedAt time.Time) {
 	defer metrics.mu.Unlock()
 	metrics.speechEndedAt = speechEndedAt
 	metrics.latencyReported = false
-}
-
-func (metrics *SttSessionMetrics) GetLatency(receivedAt time.Time) time.Duration {
-	metrics.mu.Lock()
-	defer metrics.mu.Unlock()
-	if metrics.speechEndedAt.IsZero() || receivedAt.Before(metrics.speechEndedAt) {
-		return 0
-	}
-	return receivedAt.Sub(metrics.speechEndedAt)
-}
-
-func (metrics *SttSessionMetrics) SetLatencyReported() bool {
-	metrics.mu.Lock()
-	defer metrics.mu.Unlock()
-	if metrics.latencyReported || metrics.speechEndedAt.IsZero() {
-		return false
-	}
-	metrics.latencyReported = true
-	return true
 }

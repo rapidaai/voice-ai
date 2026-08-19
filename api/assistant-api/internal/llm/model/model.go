@@ -33,10 +33,12 @@ type modelAssistantExecutor struct {
 	connection         *ModelConnection
 	providerOptions    utils.Option
 
-	currentPacket *internal_type.UserInputPacket
-	mu            sync.RWMutex
-	ctx           context.Context
-	ctxCancel     context.CancelFunc
+	currentPacket           *internal_type.UserInputPacket
+	requestStartedAt        time.Time
+	waitingForFirstResponse bool
+	mu                      sync.RWMutex
+	ctx                     context.Context
+	ctxCancel               context.CancelFunc
 }
 
 type options struct {
@@ -145,7 +147,7 @@ func New(opts ...Option) (*modelAssistantExecutor, error) {
 				Level:   observability.LevelError,
 				Message: fmt.Sprintf("%s: error while initialization %s", executor.Name(), err.Error()),
 				Attributes: observability.Attributes{
-					"component":  observability.ComponentLLM.String(),
+					"component":  observability.ComponentAgent.String(),
 					"provider":   provider,
 					"options":    observability.AttributeValue(providerOptions),
 					"error":      err.Error(),
@@ -167,7 +169,7 @@ func New(opts ...Option) (*modelAssistantExecutor, error) {
 				Level:   observability.LevelError,
 				Message: fmt.Sprintf("%s: error while initialization %s", executor.Name(), err.Error()),
 				Attributes: observability.Attributes{
-					"component":  observability.ComponentLLM.String(),
+					"component":  observability.ComponentAgent.String(),
 					"provider":   provider,
 					"options":    observability.AttributeValue(providerOptions),
 					"error":      err.Error(),
@@ -189,7 +191,7 @@ func New(opts ...Option) (*modelAssistantExecutor, error) {
 				Level:   observability.LevelError,
 				Message: fmt.Sprintf("%s: error while initialization %s", executor.Name(), err.Error()),
 				Attributes: observability.Attributes{
-					"component":  observability.ComponentLLM.String(),
+					"component":  observability.ComponentAgent.String(),
 					"provider":   provider,
 					"options":    observability.AttributeValue(providerOptions),
 					"error":      err.Error(),
@@ -204,8 +206,15 @@ func New(opts ...Option) (*modelAssistantExecutor, error) {
 
 	options.communication.OnPacket(options.ctx,
 		internal_type.ObservabilityMetricRecordPacket{
-			Scope:  internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.NewMetricLLMInitLatencyMs(time.Since(start), observability.Attributes{"provider": provider}),
+			Scope: internal_type.ObservabilityRecordScopeConversation,
+			Record: observability.RecordMetric{
+				Attributes: observability.Attributes{"provider": provider},
+				Metrics: []*protos.Metric{{
+					Name:        observability.MetricLLMInitLatencyMs,
+					Value:       fmt.Sprintf("%d", time.Since(start).Milliseconds()),
+					Description: "LLM initialization latency in milliseconds",
+				}},
+			},
 		},
 		internal_type.ObservabilityLogRecordPacket{
 			Scope: internal_type.ObservabilityRecordScopeConversation,
@@ -213,7 +222,7 @@ func New(opts ...Option) (*modelAssistantExecutor, error) {
 				Level:   observability.LevelInfo,
 				Message: fmt.Sprintf("%s: initialization completed", executor.Name()),
 				Attributes: observability.Attributes{
-					"component": observability.ComponentLLM.String(),
+					"component": observability.ComponentAgent.String(),
 					"provider":  provider,
 					"options":   observability.AttributeValue(providerOptions),
 				},
@@ -231,6 +240,8 @@ func (e *modelAssistantExecutor) Close(ctx context.Context) error {
 	e.mu.Lock()
 	activeConnection := e.connection
 	e.currentPacket = nil
+	e.requestStartedAt = time.Time{}
+	e.waitingForFirstResponse = false
 	e.connection = nil
 	e.mu.Unlock()
 	if validator.NonNil(e.history) {

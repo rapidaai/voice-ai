@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -109,7 +108,7 @@ func (e *modelAssistantExecutor) handleUserTurn(ctx context.Context, communicati
 			internal_type.ObservabilityEventRecordPacket{
 				ContextID: p.ContextID,
 				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.NewMessageRecord(p.ContextID, observability.ComponentLLM, observability.LLMError, observability.MessageRoleAssistant, observability.Attributes{
+				Record: observability.NewMessageRecord(p.ContextID, observability.ComponentAgent, observability.AgentError, observability.MessageRoleAssistant, observability.Attributes{
 					"provider":   providerName,
 					"context_id": p.ContextID,
 					"error":      err.Error(),
@@ -122,7 +121,7 @@ func (e *modelAssistantExecutor) handleUserTurn(ctx context.Context, communicati
 					Level:   observability.LevelError,
 					Message: "llm request failed",
 					Attributes: observability.Attributes{
-						"component":  observability.ComponentLLM.String(),
+						"component":  observability.ComponentAgent.String(),
 						"operation":  "execute",
 						"provider":   providerName,
 						"context_id": p.ContextID,
@@ -135,16 +134,27 @@ func (e *modelAssistantExecutor) handleUserTurn(ctx context.Context, communicati
 		return
 	}
 
+	e.mu.Lock()
+	e.requestStartedAt = time.Now()
+	e.waitingForFirstResponse = true
+	e.mu.Unlock()
+
 	communication.OnPacket(ctx,
 		internal_type.ObservabilityEventRecordPacket{
 			ContextID: p.ContextID,
 			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.NewMessageRecord(p.ContextID, observability.ComponentLLM, observability.LLMStarted, observability.MessageRoleAssistant, observability.Attributes{
-				"provider":         providerName,
-				"context_id":       p.ContextID,
-				"input_char_count": fmt.Sprintf("%d", len(p.Text)),
-				"history_count":    fmt.Sprintf("%d", len(snapshot)),
-			}),
+			Record: observability.RecordEvent{
+				Component: observability.ComponentAgent,
+				Event:     observability.AgentStarted,
+				Attributes: observability.Attributes{
+					"provider":         providerName,
+					"context_id":       p.ContextID,
+					"script":           p.Text,
+					"input_char_count": fmt.Sprintf("%d", len(p.Text)),
+					"history_count":    fmt.Sprintf("%d", len(snapshot)),
+				},
+				OccurredAt: time.Now(),
+			},
 		},
 		internal_type.ObservabilityLogRecordPacket{
 			ContextID: p.ContextID,
@@ -153,7 +163,7 @@ func (e *modelAssistantExecutor) handleUserTurn(ctx context.Context, communicati
 				Level:   observability.LevelDebug,
 				Message: "llm request started",
 				Attributes: observability.Attributes{
-					"component":        observability.ComponentLLM.String(),
+					"component":        observability.ComponentAgent.String(),
 					"operation":        "execute",
 					"provider":         providerName,
 					"context_id":       p.ContextID,
@@ -169,8 +179,8 @@ func (e *modelAssistantExecutor) handleUserTurn(ctx context.Context, communicati
 			Record: observability.RecordMetric{
 				Attributes: observability.Attributes{"provider": providerName},
 				Metrics: []*protos.Metric{
-					{Name: "llm_input_char_count", Value: fmt.Sprintf("%d", len(p.Text)), Description: "Input character count sent to LLM"},
-					{Name: "llm_history_count", Value: fmt.Sprintf("%d", len(snapshot)), Description: "History message count sent to LLM"},
+					{Name: observability.MetricAgentMessageCharCount, Value: fmt.Sprintf("%d", len(p.Text)), Description: "Input character count sent to agent"},
+					{Name: observability.MetricAgentMessageCount, Value: fmt.Sprintf("%d", len(snapshot)), Description: "History message count sent to agent"},
 				},
 			},
 		},
@@ -181,12 +191,16 @@ func (e *modelAssistantExecutor) handleUserTurn(ctx context.Context, communicati
 		Message: &protos.Message_User{User: &protos.UserMessage{Content: p.Text}},
 	}
 	if err := e.sendChat(communication, p.ContextID, promptArgs, append(snapshot, userMsg)...); err != nil {
+		e.mu.Lock()
+		e.requestStartedAt = time.Time{}
+		e.waitingForFirstResponse = false
+		e.mu.Unlock()
 		communication.OnPacket(ctx,
 			internal_type.LLMErrorPacket{ContextID: p.ContextID, Error: err},
 			internal_type.ObservabilityEventRecordPacket{
 				ContextID: p.ContextID,
 				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.NewMessageRecord(p.ContextID, observability.ComponentLLM, observability.LLMError, observability.MessageRoleAssistant, observability.Attributes{
+				Record: observability.NewMessageRecord(p.ContextID, observability.ComponentAgent, observability.AgentError, observability.MessageRoleAssistant, observability.Attributes{
 					"provider":   providerName,
 					"context_id": p.ContextID,
 					"error":      err.Error(),
@@ -199,7 +213,7 @@ func (e *modelAssistantExecutor) handleUserTurn(ctx context.Context, communicati
 					Level:   observability.LevelError,
 					Message: "llm request failed",
 					Attributes: observability.Attributes{
-						"component":  observability.ComponentLLM.String(),
+						"component":  observability.ComponentAgent.String(),
 						"operation":  "execute",
 						"provider":   providerName,
 						"context_id": p.ContextID,
@@ -281,11 +295,30 @@ func (e *modelAssistantExecutor) handleToolResult(ctx context.Context, communica
 }
 
 func (e *modelAssistantExecutor) handleInterruption() {
+	e.mu.Lock()
+	e.requestStartedAt = time.Time{}
+	e.waitingForFirstResponse = false
+	e.mu.Unlock()
 	e.history.SupersedePending()
 }
 
 func (e *modelAssistantExecutor) handleResponse(ctx context.Context, communication internal_type.Communication, resp *protos.StreamChatOutput) {
 	if e.isStaleResponse(resp.GetRequestId()) {
+		text := strings.Join(resp.GetData().GetAssistant().GetContents(), "")
+		communication.OnPacket(ctx, internal_type.ObservabilityEventRecordPacket{
+			ContextID: resp.GetRequestId(),
+			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+			Record: observability.RecordEvent{
+				Component: observability.ComponentAgent,
+				Event:     observability.AgentDiscarded,
+				Attributes: observability.Attributes{
+					"context_id": resp.GetRequestId(),
+					"reason":     "stale_context",
+					"script":     text,
+				},
+				OccurredAt: time.Now(),
+			},
+		})
 		return
 	}
 	contextID := resp.GetRequestId()
@@ -297,13 +330,17 @@ func (e *modelAssistantExecutor) handleResponse(ctx context.Context, communicati
 	providerName := assistant.AssistantProviderModel.ModelProviderName
 
 	if resp.GetError() != nil {
+		e.mu.Lock()
+		e.requestStartedAt = time.Time{}
+		e.waitingForFirstResponse = false
+		e.mu.Unlock()
 		errMsg := resp.GetError().GetErrorMessage()
 		communication.OnPacket(ctx,
 			internal_type.LLMErrorPacket{ContextID: contextID, Error: errors.New(errMsg)},
 			internal_type.ObservabilityEventRecordPacket{
 				ContextID: contextID,
 				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.NewMessageRecord(contextID, observability.ComponentLLM, observability.LLMError, observability.MessageRoleAssistant, observability.Attributes{
+				Record: observability.NewMessageRecord(contextID, observability.ComponentAgent, observability.AgentError, observability.MessageRoleAssistant, observability.Attributes{
 					"provider":   providerName,
 					"context_id": contextID,
 					"error":      errMsg,
@@ -316,7 +353,7 @@ func (e *modelAssistantExecutor) handleResponse(ctx context.Context, communicati
 					Level:   observability.LevelError,
 					Message: "llm response failed",
 					Attributes: observability.Attributes{
-						"component":  observability.ComponentLLM.String(),
+						"component":  observability.ComponentAgent.String(),
 						"operation":  "response",
 						"provider":   providerName,
 						"context_id": contextID,
@@ -335,18 +372,51 @@ func (e *modelAssistantExecutor) handleResponse(ctx context.Context, communicati
 	}
 
 	if len(resp.GetMetrics()) == 0 {
-		e.onStreamingChunk(ctx, communication, contextID, output)
+		e.onStreamingChunk(ctx, communication, contextID, output, providerName)
 		return
 	}
-	e.onCompletion(ctx, communication, contextID, resp.GetFinishReason(), output, resp.GetMetrics(), providerName)
+	e.onCompletion(ctx, communication, contextID, resp.GetFinishReason(), output, providerName)
 }
 
-func (e *modelAssistantExecutor) onStreamingChunk(ctx context.Context, communication internal_type.Communication, contextID string, output *protos.Message) {
+func (e *modelAssistantExecutor) onStreamingChunk(ctx context.Context, communication internal_type.Communication, contextID string, output *protos.Message, providerName string) {
 	text := strings.Join(output.GetAssistant().GetContents(), "")
+	now := time.Now()
+	e.mu.Lock()
+	requestStartedAt := e.requestStartedAt
+	publishTTFT := e.waitingForFirstResponse
+	e.waitingForFirstResponse = false
+	e.mu.Unlock()
+
+	if publishTTFT && !requestStartedAt.IsZero() {
+		communication.OnPacket(ctx,
+			internal_type.LLMResponseDeltaPacket{ContextID: contextID, Text: text},
+			internal_type.ObservabilityMetricRecordPacket{
+				ContextID: contextID,
+				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+				Record: observability.RecordMetric{
+					Attributes: observability.Attributes{"provider": providerName},
+					Metrics: []*protos.Metric{{
+						Name:        observability.MetricAgentTTFTMs,
+						Value:       fmt.Sprintf("%d", now.Sub(requestStartedAt).Milliseconds()),
+						Description: "Agent time to first token in milliseconds",
+					}},
+				},
+			},
+		)
+		return
+	}
 	communication.OnPacket(ctx, internal_type.LLMResponseDeltaPacket{ContextID: contextID, Text: text})
 }
 
-func (e *modelAssistantExecutor) onCompletion(ctx context.Context, communication internal_type.Communication, contextID, finishReason string, output *protos.Message, metrics []*protos.Metric, providerName string) {
+func (e *modelAssistantExecutor) onCompletion(ctx context.Context, communication internal_type.Communication, contextID, finishReason string, output *protos.Message, providerName string) {
+	now := time.Now()
+	e.mu.Lock()
+	requestStartedAt := e.requestStartedAt
+	publishTTFT := e.waitingForFirstResponse
+	e.waitingForFirstResponse = false
+	e.requestStartedAt = time.Time{}
+	e.mu.Unlock()
+
 	assistant := output.GetAssistant()
 	responseText := strings.Join(assistant.GetContents(), "")
 	toolCalls := assistant.GetToolCalls()
@@ -380,39 +450,50 @@ func (e *modelAssistantExecutor) onCompletion(ctx context.Context, communication
 		internal_type.ObservabilityEventRecordPacket{
 			ContextID: contextID,
 			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.NewMessageRecord(contextID, observability.ComponentLLM, observability.LLMCompleted, observability.MessageRoleAssistant, observability.Attributes{
+			Record: observability.NewMessageRecord(contextID, observability.ComponentAgent, observability.AgentCompleted, observability.MessageRoleAssistant, observability.Attributes{
 				"provider":            providerName,
 				"context_id":          contextID,
+				"script":              responseText,
 				"response_char_count": fmt.Sprintf("%d", len(responseText)),
 				"finish_reason":       finishReason,
 				"tool_call_count":     fmt.Sprintf("%d", len(toolCalls)),
 			}),
 		},
-		internal_type.ObservabilityMetricRecordPacket{
-			ContextID: contextID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.RecordMetric{
-				Attributes: observability.Attributes{"provider": providerName},
-				Metrics:    e.buildCompletionMetrics(metrics),
-			},
-		},
 	}
-	var usageDuration time.Duration
-	for _, metric := range metrics {
-		switch metric.GetName() {
-		case observability.MetricTimeTaken, observability.MetricProviderTotalTime:
-			if ns, err := strconv.ParseInt(metric.GetValue(), 10, 64); err == nil && ns > 0 {
-				usageDuration = time.Duration(ns)
-			}
+	metrics := []*protos.Metric{{
+		Name:        observability.MetricAgentResponseCharCount,
+		Value:       fmt.Sprintf("%d", len(responseText)),
+		Description: "Agent response character count",
+	}}
+	if !requestStartedAt.IsZero() {
+		if publishTTFT {
+			metrics = append(metrics, &protos.Metric{
+				Name:        observability.MetricAgentTTFTMs,
+				Value:       fmt.Sprintf("%d", now.Sub(requestStartedAt).Milliseconds()),
+				Description: "Agent time to first token in milliseconds",
+			})
 		}
+		metrics = append(metrics, &protos.Metric{
+			Name:        observability.MetricAgentTRTMs,
+			Value:       fmt.Sprintf("%d", now.Sub(requestStartedAt).Milliseconds()),
+			Description: "Agent total response time in milliseconds",
+		})
 	}
-	if usageDuration > 0 {
+	packets = append(packets, internal_type.ObservabilityMetricRecordPacket{
+		ContextID: contextID,
+		Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+		Record: observability.RecordMetric{
+			Attributes: observability.Attributes{"provider": providerName},
+			Metrics:    metrics,
+		},
+	})
+	if !requestStartedAt.IsZero() {
 		packets = append(packets, internal_type.ObservabilityUsageRecordPacket{
 			ContextID: contextID,
 			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
 			Record: observability.NewLLMDurationUsageRecord(
 				providerName,
-				usageDuration,
+				now.Sub(requestStartedAt),
 				observability.Attributes{
 					"context_id":          contextID,
 					"finish_reason":       finishReason,
@@ -441,23 +522,6 @@ func (e *modelAssistantExecutor) isStaleResponse(requestID string) bool {
 		return true
 	}
 	return requestID != e.currentPacket.ContextId()
-}
-
-func (e *modelAssistantExecutor) buildCompletionMetrics(providerMetrics []*protos.Metric) []*protos.Metric {
-	out := make([]*protos.Metric, 0, len(providerMetrics)+1)
-	for _, m := range providerMetrics {
-		out = append(out, &protos.Metric{
-			Name: "agent_" + m.GetName(), Value: m.GetValue(), Description: m.GetDescription(),
-		})
-		if m.GetName() == "time_to_first_token" {
-			if ns, err := strconv.ParseInt(m.GetValue(), 10, 64); err == nil {
-				out = append(out, &protos.Metric{
-					Name: "llm_latency_ms", Value: fmt.Sprintf("%d", ns/int64(time.Millisecond)),
-				})
-			}
-		}
-	}
-	return out
 }
 
 func (e *modelAssistantExecutor) buildPromptArgs(communication internal_type.Communication, p internal_type.UserInputPacket) map[string]interface{} {

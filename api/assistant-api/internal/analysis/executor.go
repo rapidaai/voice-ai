@@ -16,6 +16,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
+	"github.com/rapidaai/protos"
 )
 
 type options struct {
@@ -90,11 +91,18 @@ func New(opts ...Option) (internal_type.AnalysisExecutor, error) {
 			_ = options.onPacket(options.ctx,
 				internal_type.ObservabilityMetricRecordPacket{
 					Scope: internal_type.ObservabilityRecordScopeConversation,
-					Record: observability.NewMetricAnalysisInitLatencyMs(time.Since(start), observability.Attributes{
-						"provider":         options.analysis.Provider,
-						"configuration_id": fmt.Sprintf("%d", options.analysis.Id),
-						"status":           "failed",
-					}),
+					Record: observability.RecordMetric{
+						Attributes: observability.Attributes{
+							"provider":         options.analysis.Provider,
+							"configuration_id": fmt.Sprintf("%d", options.analysis.Id),
+							"status":           "failed",
+						},
+						Metrics: []*protos.Metric{{
+							Name:        observability.MetricAnalysisInitLatencyMs,
+							Value:       fmt.Sprintf("%d", time.Since(start).Milliseconds()),
+							Description: "Analysis initialization latency in milliseconds",
+						}},
+					},
 				},
 				internal_type.ObservabilityLogRecordPacket{
 					Scope: internal_type.ObservabilityRecordScopeConversation,

@@ -438,6 +438,9 @@ type TurnChangePacket struct {
 	PreviousContextID string
 	Reason            string
 	Source            string
+	PreviousState     string
+	Trigger           string
+	Text              string
 	Time              time.Time
 }
 
@@ -1461,6 +1464,7 @@ func (p ObservabilityEventRecordPacket) ContextId() string { return p.ContextID 
 func (p ObservabilityEventRecordPacket) PacketName() PacketName {
 	return PacketNameObservabilityEventRecord
 }
+func (p ObservabilityEventRecordPacket) IsAsync() bool { return true }
 func (p ObservabilityEventRecordPacket) GetScope() ObservabilityRecordScope {
 	return p.Scope
 }
@@ -1480,6 +1484,7 @@ func (p ObservabilityMetricRecordPacket) ContextId() string { return p.ContextID
 func (p ObservabilityMetricRecordPacket) PacketName() PacketName {
 	return PacketNameObservabilityMetricRecord
 }
+func (p ObservabilityMetricRecordPacket) IsAsync() bool { return true }
 func (p ObservabilityMetricRecordPacket) GetScope() ObservabilityRecordScope {
 	return p.Scope
 }

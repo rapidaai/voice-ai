@@ -723,16 +723,16 @@ func assertTTSLatencyMetric(t *testing.T, collector *testutil.PacketCollector) {
 	t.Helper()
 	for _, m := range collector.MetricPackets() {
 		for _, metric := range m.Record.Metrics {
-			if metric.Name == "tts_latency_ms" {
+			if metric.Name == "tts.latency_ms" {
 				ms, err := strconv.Atoi(metric.Value)
 				assert.NoError(t, err)
-				assert.Greater(t, ms, 0, "tts_latency_ms should be positive")
-				t.Logf("tts_latency_ms=%d", ms)
+				assert.Greater(t, ms, 0, "tts.latency_ms should be positive")
+				t.Logf("tts.latency_ms=%d", ms)
 				return
 			}
 		}
 	}
-	t.Error("should have tts_latency_ms metric")
+	t.Error("should have tts.latency_ms metric")
 }
 
 func assertTTSInitMetric(t *testing.T, collector *testutil.PacketCollector) {
@@ -760,16 +760,16 @@ func assertSTTLatencyMetric(t *testing.T, collector *testutil.PacketCollector) {
 	t.Helper()
 	for _, m := range collector.MetricPackets() {
 		for _, metric := range m.Record.Metrics {
-			if metric.Name == "stt_latency_ms" {
+			if metric.Name == "stt.latency_ms" {
 				ms, err := strconv.Atoi(metric.Value)
 				assert.NoError(t, err)
-				assert.GreaterOrEqual(t, ms, 0, "stt_latency_ms should be non-negative")
-				t.Logf("stt_latency_ms=%d", ms)
+				assert.GreaterOrEqual(t, ms, 0, "stt.latency_ms should be non-negative")
+				t.Logf("stt.latency_ms=%d", ms)
 				return
 			}
 		}
 	}
-	t.Error("should have stt_latency_ms metric")
+	t.Error("should have stt.latency_ms metric")
 }
 
 func assertSTTInitMetric(t *testing.T, collector *testutil.PacketCollector) {

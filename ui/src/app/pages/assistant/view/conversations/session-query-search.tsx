@@ -274,8 +274,8 @@ const SESSION_SEARCH_FIELDS: QuerySearchField[] = [
       { label: 'is greater than or equal to', logic: '>=' },
       { label: 'is less than or equal to', logic: '<=' },
     ],
-    queryKey: 'recording_init_ms',
-    text: 'recording_init_ms',
+    queryKey: 'recording.init_ms',
+    text: 'recording.init_ms',
     type: 'number',
   },
   {
@@ -286,8 +286,8 @@ const SESSION_SEARCH_FIELDS: QuerySearchField[] = [
       { label: 'is greater than or equal to', logic: '>=' },
       { label: 'is less than or equal to', logic: '<=' },
     ],
-    queryKey: 'stt_init_ms',
-    text: 'stt_init_ms',
+    queryKey: 'authentication.init_ms',
+    text: 'authentication.init_ms',
     type: 'number',
   },
   {
@@ -298,8 +298,8 @@ const SESSION_SEARCH_FIELDS: QuerySearchField[] = [
       { label: 'is greater than or equal to', logic: '>=' },
       { label: 'is less than or equal to', logic: '<=' },
     ],
-    queryKey: 'tts_init_ms',
-    text: 'tts_init_ms',
+    queryKey: 'authentication.latency_ms',
+    text: 'authentication.latency_ms',
     type: 'number',
   },
   {
@@ -310,8 +310,8 @@ const SESSION_SEARCH_FIELDS: QuerySearchField[] = [
       { label: 'is greater than or equal to', logic: '>=' },
       { label: 'is less than or equal to', logic: '<=' },
     ],
-    queryKey: 'llm_init_ms',
-    text: 'llm_init_ms',
+    queryKey: 'analysis.init_ms',
+    text: 'analysis.init_ms',
     type: 'number',
   },
   {
@@ -322,8 +322,8 @@ const SESSION_SEARCH_FIELDS: QuerySearchField[] = [
       { label: 'is greater than or equal to', logic: '>=' },
       { label: 'is less than or equal to', logic: '<=' },
     ],
-    queryKey: 'denoise_init_ms',
-    text: 'denoise_init_ms',
+    queryKey: 'storage.init_ms',
+    text: 'storage.init_ms',
     type: 'number',
   },
   {
@@ -334,8 +334,8 @@ const SESSION_SEARCH_FIELDS: QuerySearchField[] = [
       { label: 'is greater than or equal to', logic: '>=' },
       { label: 'is less than or equal to', logic: '<=' },
     ],
-    queryKey: 'eos_init_ms',
-    text: 'eos_init_ms',
+    queryKey: 'stt.init_ms',
+    text: 'stt.init_ms',
     type: 'number',
   },
   {
@@ -346,8 +346,8 @@ const SESSION_SEARCH_FIELDS: QuerySearchField[] = [
       { label: 'is greater than or equal to', logic: '>=' },
       { label: 'is less than or equal to', logic: '<=' },
     ],
-    queryKey: 'vad_init_ms',
-    text: 'vad_init_ms',
+    queryKey: 'stt.latency_ms',
+    text: 'stt.latency_ms',
     type: 'number',
   },
   {
@@ -358,12 +358,96 @@ const SESSION_SEARCH_FIELDS: QuerySearchField[] = [
       { label: 'is greater than or equal to', logic: '>=' },
       { label: 'is less than or equal to', logic: '<=' },
     ],
-    queryKey: 'duration',
-    text: 'duration',
+    queryKey: 'stt.ttft_ms',
+    text: 'stt.ttft_ms',
     type: 'number',
   },
   {
     category: 'metrics',
+    logicLabel: 'is',
+    logicOptions: [
+      { label: 'is', logic: '=' },
+      { label: 'is greater than or equal to', logic: '>=' },
+      { label: 'is less than or equal to', logic: '<=' },
+    ],
+    queryKey: 'stt.ttlt_ms',
+    text: 'stt.ttlt_ms',
+    type: 'number',
+  },
+  {
+    category: 'metrics',
+    logicLabel: 'is',
+    logicOptions: [
+      { label: 'is', logic: '=' },
+      { label: 'is greater than or equal to', logic: '>=' },
+      { label: 'is less than or equal to', logic: '<=' },
+    ],
+    queryKey: 'tts.init_ms',
+    text: 'tts.init_ms',
+    type: 'number',
+  },
+  {
+    category: 'metrics',
+    logicLabel: 'is',
+    logicOptions: [
+      { label: 'is', logic: '=' },
+      { label: 'is greater than or equal to', logic: '>=' },
+      { label: 'is less than or equal to', logic: '<=' },
+    ],
+    queryKey: 'agent.init_ms',
+    text: 'agent.init_ms',
+    type: 'number',
+  },
+  {
+    category: 'metrics',
+    logicLabel: 'is',
+    logicOptions: [
+      { label: 'is', logic: '=' },
+      { label: 'is greater than or equal to', logic: '>=' },
+      { label: 'is less than or equal to', logic: '<=' },
+    ],
+    queryKey: 'denoise.init_ms',
+    text: 'denoise.init_ms',
+    type: 'number',
+  },
+  {
+    category: 'metrics',
+    logicLabel: 'is',
+    logicOptions: [
+      { label: 'is', logic: '=' },
+      { label: 'is greater than or equal to', logic: '>=' },
+      { label: 'is less than or equal to', logic: '<=' },
+    ],
+    queryKey: 'eos.init_ms',
+    text: 'eos.init_ms',
+    type: 'number',
+  },
+  {
+    category: 'metrics',
+    logicLabel: 'is',
+    logicOptions: [
+      { label: 'is', logic: '=' },
+      { label: 'is greater than or equal to', logic: '>=' },
+      { label: 'is less than or equal to', logic: '<=' },
+    ],
+    queryKey: 'vad.init_ms',
+    text: 'vad.init_ms',
+    type: 'number',
+  },
+  {
+    category: 'duration',
+    logicLabel: 'is',
+    logicOptions: [
+      { label: 'is', logic: '=' },
+      { label: 'is greater than or equal to', logic: '>=' },
+      { label: 'is less than or equal to', logic: '<=' },
+    ],
+    queryKey: 'conversation.duration_ms',
+    text: 'conversation.duration_ms',
+    type: 'number',
+  },
+  {
+    category: 'duration',
     logicLabel: 'is',
     logicOptions: [
       { label: 'is', logic: '=' },
@@ -375,27 +459,27 @@ const SESSION_SEARCH_FIELDS: QuerySearchField[] = [
     type: 'number',
   },
   {
-    category: 'metrics',
+    category: 'duration',
     logicLabel: 'is',
     logicOptions: [
       { label: 'is', logic: '=' },
       { label: 'is greater than or equal to', logic: '>=' },
       { label: 'is less than or equal to', logic: '<=' },
     ],
-    queryKey: 'tts_duration',
-    text: 'tts_duration',
+    queryKey: 'tts.duration_ms',
+    text: 'tts.duration_ms',
     type: 'number',
   },
   {
-    category: 'metrics',
+    category: 'duration',
     logicLabel: 'is',
     logicOptions: [
       { label: 'is', logic: '=' },
       { label: 'is greater than or equal to', logic: '>=' },
       { label: 'is less than or equal to', logic: '<=' },
     ],
-    queryKey: 'stt_duration',
-    text: 'stt_duration',
+    queryKey: 'stt.duration_ms',
+    text: 'stt.duration_ms',
     type: 'number',
   },
   {
@@ -407,9 +491,13 @@ const SESSION_SEARCH_FIELDS: QuerySearchField[] = [
 ];
 
 const SESSION_SEARCH_CRITERIA: Record<string, string> = {
+  'analysis.init_ms': 'analysis.init_ms',
   assistant_provider_model_id: 'assistant_provider_model_id',
+  'authentication.init_ms': 'authentication.init_ms',
+  'authentication.latency_ms': 'authentication.latency_ms',
   'call.status': 'call.status',
   'call.duration_ms': 'call.duration_ms',
+  'conversation.duration_ms': 'conversation.duration_ms',
   'client.assistant_phone': 'client.assistant_phone',
   'client.channel': 'client.channel',
   'client.codec': 'client.codec',
@@ -418,47 +506,109 @@ const SESSION_SEARCH_CRITERIA: Record<string, string> = {
   'client.phone': 'client.phone',
   'client.provider_call_id': 'client.provider_call_id',
   'client.sample_rate': 'client.sample_rate',
-  denoise_init_ms: 'denoise_init_ms',
+  'denoise.init_ms': 'denoise.init_ms',
   direction: 'direction',
   disconnect_reason: 'disconnect_reason',
-  duration: 'duration',
-  eos_init_ms: 'eos_init_ms',
+  'eos.init_ms': 'eos.init_ms',
   id: 'id',
   identifier: 'identifier',
-  llm_init_ms: 'llm_init_ms',
-  recording_init_ms: 'recording_init_ms',
+  'agent.init_ms': 'agent.init_ms',
+  'recording.init_ms': 'recording.init_ms',
   source: 'source',
   status: 'status',
-  stt_duration: 'stt_duration',
-  stt_init_ms: 'stt_init_ms',
+  'storage.init_ms': 'storage.init_ms',
+  'stt.duration_ms': 'stt.duration_ms',
+  'stt.init_ms': 'stt.init_ms',
+  'stt.latency_ms': 'stt.latency_ms',
+  'stt.ttft_ms': 'stt.ttft_ms',
+  'stt.ttlt_ms': 'stt.ttlt_ms',
   timestamp: 'created_date',
-  tts_duration: 'tts_duration',
-  tts_init_ms: 'tts_init_ms',
-  vad_init_ms: 'vad_init_ms',
+  'tts.duration_ms': 'tts.duration_ms',
+  'tts.init_ms': 'tts.init_ms',
+  'vad.init_ms': 'vad.init_ms',
 };
 
 const SESSION_SEARCH_TABS = [
   { id: 'all', text: 'All' },
   { id: 'session', text: 'Session' },
   { id: 'client', text: 'Client' },
+  { id: 'duration', text: 'Duration' },
   { id: 'metrics', text: 'Metrics' },
 ];
+
+const DATE_ONLY_VALUE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const getLocalDateBoundaryIso = (
+  dateValue: string,
+  boundary: 'start' | 'end',
+): string => {
+  const [year, month, day] = dateValue.split('-').map(Number);
+  if (!year || !month || !day) return dateValue;
+
+  return new Date(
+    year,
+    month - 1,
+    day,
+    boundary === 'end' ? 23 : 0,
+    boundary === 'end' ? 59 : 0,
+    boundary === 'end' ? 59 : 0,
+    boundary === 'end' ? 999 : 0,
+  ).toISOString();
+};
+
+const getTimestampCriteria = (
+  value: string,
+  logic: string,
+): SessionSearchCriteria[] => {
+  if (!DATE_ONLY_VALUE_PATTERN.test(value)) {
+    return [{ k: 'created_date', logic, v: value }];
+  }
+
+  if (logic === '=') {
+    return [
+      {
+        k: 'created_date',
+        logic: '>=',
+        v: getLocalDateBoundaryIso(value, 'start'),
+      },
+      {
+        k: 'created_date',
+        logic: '<=',
+        v: getLocalDateBoundaryIso(value, 'end'),
+      },
+    ];
+  }
+
+  return [
+    {
+      k: 'created_date',
+      logic,
+      v: getLocalDateBoundaryIso(value, logic === '<=' ? 'end' : 'start'),
+    },
+  ];
+};
 
 export const getSessionSearchCriteria = (
   value: string,
 ): SessionSearchCriteria[] =>
   parseQuerySearchFilters(SESSION_SEARCH_FIELDS, value)
-    .map(filter => {
+    .flatMap(filter => {
       const criteria = SESSION_SEARCH_CRITERIA[filter.key];
-      if (!criteria || !filter.value.trim()) return null;
+      if (!criteria || !filter.value.trim()) return [];
 
-      return {
-        k: criteria,
-        logic: filter.logic,
-        v: filter.value,
-      };
+      if (filter.key === 'timestamp') {
+        return getTimestampCriteria(filter.value, filter.logic);
+      }
+
+      return [
+        {
+          k: criteria,
+          logic: filter.logic,
+          v: filter.value,
+        },
+      ];
     })
-    .filter((criteria): criteria is SessionSearchCriteria => criteria !== null);
+    .filter((criteria): criteria is SessionSearchCriteria => Boolean(criteria));
 
 export const SessionQuerySearch = ({
   onApply,
@@ -472,6 +622,7 @@ export const SessionQuerySearch = ({
     value={value}
     maxOptions={SESSION_SEARCH_FIELDS.length}
     placeholder="Search for sessionID, client, metrics and more"
+    preserveDateOnly
     onChange={onChange}
     onApply={nextValue => onApply(getSessionSearchCriteria(nextValue))}
   />

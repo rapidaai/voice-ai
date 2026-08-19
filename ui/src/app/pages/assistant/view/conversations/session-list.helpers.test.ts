@@ -39,16 +39,16 @@ describe('session list helpers', () => {
 
   it('converts duration breakdown metrics to seconds', () => {
     const conv = conversation();
-    conv.addMetrics(metric('duration', '6575255208'));
+    conv.addMetrics(metric('conversation.duration_ms', '6575'));
     conv.addMetrics(metric('call.duration_ms', '7000'));
-    conv.addMetrics(metric('tts_duration', '5456317791'));
-    conv.addMetrics(metric('stt_duration', '5481100708'));
+    conv.addMetrics(metric('tts.duration_ms', '5456'));
+    conv.addMetrics(metric('stt.duration_ms', '5481'));
 
     expect(getDurationBreakdownRows(conv)).toEqual([
-      { key: 'duration', value: '6.58' },
+      { key: 'conversation.duration_ms', value: '6.58' },
       { key: 'call.duration_ms', value: '7.00' },
-      { key: 'tts_duration', value: '5.46' },
-      { key: 'stt_duration', value: '5.48' },
+      { key: 'tts.duration_ms', value: '5.46' },
+      { key: 'stt.duration_ms', value: '5.48' },
     ]);
   });
 });

@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -152,8 +153,15 @@ func (google *googleTextToSpeech) Initialize() error {
 	go google.recvLoop(stream, currentContextId)
 	google.onPacket(
 		internal_type.ObservabilityMetricRecordPacket{
-			Scope:  internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.NewMetricTTSInitLatencyMs(time.Since(start), observability.Attributes{"provider": google.Name()}),
+			Scope: internal_type.ObservabilityRecordScopeConversation,
+			Record: observability.RecordMetric{
+				Metrics: []*protos.Metric{{
+					Name:        observability.MetricTTSInitLatencyMs,
+					Value:       strconv.FormatInt(time.Since(start).Milliseconds(), 10),
+					Description: "TTS initialization latency in milliseconds",
+				}},
+				Attributes: observability.Attributes{"provider": google.Name()},
+			},
 		},
 		internal_type.ObservabilityLogRecordPacket{
 			Scope: internal_type.ObservabilityRecordScopeConversation,
