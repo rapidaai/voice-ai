@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage: bin/pre-commit-hygiene <merge-conflict|private-key|secrets|json|shell-syntax> [files...]
+USAGE
+}
+
+is_text_file() {
+  [ -f "$1" ] && LC_ALL=C grep -Iq . "$1"
+}
+
+skip_secret_file() {
+  case "$1" in
+    go.sum|*/go.sum|package-lock.json|*/package-lock.json|yarn.lock|*/yarn.lock|ui/src/styles/generated/*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+check_pattern() {
+  label="$1"
+  pattern="$2"
+  shift 2
+
+  failed=0
+  for file in "$@"; do
+    if ! is_text_file "$file"; then
+      continue
+    fi
+
+    matches="$(LC_ALL=C grep -nE "$pattern" "$file" 2>/dev/null || true)"
+    if [ -n "$matches" ]; then
+      echo "$label detected in $file:"
+      echo "$matches" | awk -F: '{print "  line " $1}'
+      failed=1
+    fi
+  done
+
+  exit "$failed"
+}
+
+check_secrets() {
+  pattern='((AKIA|ASIA)[A-Z0-9]{16}|AIza[0-9A-Za-z_-]{35}|sk-[A-Za-z0-9]{32,}|sk-proj-[A-Za-z0-9_-]{32,}|xox[baprs]-[A-Za-z0-9-]{20,}|gh[pousr]_[A-Za-z0-9_]{30,}|(api[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token):[[:space:]]*["'\'']?[A-Za-z0-9_./+=-]{20,}["'\'']?)'
+  failed=0
+
+  for file in "$@"; do
+    if skip_secret_file "$file" || ! is_text_file "$file"; then
+      continue
+    fi
+
+    matches="$(LC_ALL=C grep -nE "$pattern" "$file" 2>/dev/null || true)"
+    if [ -n "$matches" ]; then
+      echo "Possible secret token detected in $file:"
+      echo "$matches" | awk -F: '{print "  line " $1}'
+      failed=1
+    fi
+  done
+
+  exit "$failed"
+}
+
+check_json() {
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "error: python3 is required to validate JSON files" >&2
+    exit 1
+  fi
+
+  failed=0
+  for file in "$@"; do
+    case "$file" in
+      *.json)
+        if [ -f "$file" ] && ! python3 -m json.tool "$file" >/dev/null; then
+          echo "Invalid JSON: $file"
+          failed=1
+        fi
+        ;;
+    esac
+  done
+
+  exit "$failed"
+}
+
+check_shell_syntax() {
+  failed=0
+  for file in "$@"; do
+    case "$file" in
+      *.sh)
+        if [ -f "$file" ] && ! bash -n "$file"; then
+          failed=1
+        fi
+        ;;
+    esac
+  done
+
+  exit "$failed"
+}
+
+cmd="${1:-}"
+if [ "$#" -gt 0 ]; then
+  shift
+fi
+
+case "$cmd" in
+  merge-conflict)
+    check_pattern "Merge conflict marker" '^(<<<<<<<|>>>>>>>)([[:space:]]|$)' "$@"
+    ;;
+  private-key)
+    check_pattern "Private key" '-----BEGIN ([A-Z0-9]+ )?PRIVATE KEY-----' "$@"
+    ;;
+  secrets)
+    check_secrets "$@"
+    ;;
+  json)
+    check_json "$@"
+    ;;
+  shell-syntax)
+    check_shell_syntax "$@"
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac

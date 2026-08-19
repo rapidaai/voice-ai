@@ -1,0 +1,117 @@
+name: Package Artifacts
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      goos:
+        description: Target GOOS for Go service packages.
+        required: false
+        default: linux
+      goarch:
+        description: Target GOARCH for Go service packages.
+        required: false
+        default: amd64
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: "1.25.12"
+  NODE_VERSION: "22"
+
+jobs:
+  go-services:
+    name: Package ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: web-api
+            command: ./cmd/web/web.go
+            binary: web-api
+          - service: integration-api
+            command: ./cmd/integration/integration.go
+            binary: integration-api
+          - service: endpoint-api
+            command: ./cmd/endpoint/endpoint.go
+            binary: endpoint-api
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Package ${{ matrix.service }}
+        uses: ./.github/actions/package-go-service
+        with:
+          service: ${{ matrix.service }}
+          command: ${{ matrix.command }}
+          binary: ${{ matrix.binary }}
+          artifact-name: ${{ matrix.service }}-${{ github.sha }}
+          go-version: ${{ env.GO_VERSION }}
+          goos: ${{ github.event.inputs.goos || 'linux' }}
+          goarch: ${{ github.event.inputs.goarch || 'amd64' }}
+          cgo-enabled: "0"
+
+  document-api:
+    name: Package document-api
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Package document-api source
+        uses: ./.github/actions/package-directory
+        with:
+          source-directory: api/document-api
+          package-name: document-api
+          artifact-name: document-api-${{ github.sha }}
+
+  ui:
+    name: Package ui
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up UI
+        uses: ./.github/actions/setup-ui
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build UI
+        working-directory: ui
+        env:
+          CI: false
+          DISABLE_ESLINT_PLUGIN: true
+        run: yarn build
+
+      - name: Package UI build
+        uses: ./.github/actions/package-directory
+        with:
+          source-directory: ui/build
+          package-name: ui-build
+          artifact-name: ui-build-${{ github.sha }}
+
+  summary:
+    name: Package Summary
+    runs-on: ubuntu-latest
+    needs:
+      - go-services
+      - document-api
+      - ui
+    if: always()
+    steps:
+      - name: Write summary
+        run: |
+          {
+            echo "## Package Results"
+            echo ""
+            echo "| Package group | Result |"
+            echo "|---------------|--------|"
+            echo "| Go services | ${{ needs.go-services.result }} |"
+            echo "| document-api | ${{ needs.document-api.result }} |"
+            echo "| ui | ${{ needs.ui.result }} |"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,65 @@
+name: Package Go service
+description: Build a Go service binary and upload it as a tar.gz artifact.
+
+inputs:
+  service:
+    description: Service name.
+    required: true
+  command:
+    description: Go package or file to build.
+    required: true
+  binary:
+    description: Output binary name.
+    required: true
+  artifact-name:
+    description: Uploaded artifact name.
+    required: true
+  go-version:
+    description: Go version to install.
+    required: true
+  goos:
+    description: Target GOOS.
+    required: false
+    default: linux
+  goarch:
+    description: Target GOARCH.
+    required: false
+    default: amd64
+  cgo-enabled:
+    description: Target CGO_ENABLED value.
+    required: false
+    default: "0"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Go
+      uses: ./.github/actions/setup-go
+      with:
+        go-version: ${{ inputs.go-version }}
+
+    - name: Build binary
+      shell: bash
+      env:
+        GOOS: ${{ inputs.goos }}
+        GOARCH: ${{ inputs.goarch }}
+        CGO_ENABLED: ${{ inputs.cgo-enabled }}
+      run: |
+        set -euo pipefail
+        mkdir -p "dist/${{ inputs.service }}"
+        go build -ldflags="-s -w" -o "dist/${{ inputs.service }}/${{ inputs.binary }}" "${{ inputs.command }}"
+
+    - name: Create package
+      shell: bash
+      run: |
+        set -euo pipefail
+        tar czf "dist/${{ inputs.service }}.tar.gz" -C "dist/${{ inputs.service }}" .
+        ls -lh "dist/${{ inputs.service }}.tar.gz"
+
+    - name: Upload package
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: dist/${{ inputs.service }}.tar.gz
+        if-no-files-found: error
+        retention-days: 14

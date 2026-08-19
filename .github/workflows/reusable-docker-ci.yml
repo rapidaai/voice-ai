@@ -1,0 +1,34 @@
+name: Reusable Docker CI
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - web-api
+          - integration-api
+          - endpoint-api
+          - assistant-api
+          - document-api
+          - ui
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build ${{ matrix.service }}
+        uses: ./.github/actions/docker-build
+        with:
+          context: .
+          dockerfile: ./docker/${{ matrix.service }}/Dockerfile
+          push: "false"
+          tags: rapida/${{ matrix.service }}:test
+          cache-scope: ci-${{ matrix.service }}

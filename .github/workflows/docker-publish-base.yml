@@ -5,249 +5,222 @@ on:
     branches:
       - main
     paths:
-      - 'docker/base/**'
+      - "docker/base/**"
+      - ".github/actions/docker-build/action.yml"
+      - ".github/workflows/docker-publish-base.yml"
   workflow_dispatch:
     inputs:
       images:
-        description: 'Images to rebuild (comma-separated: golang-bookworm,golang-alpine,alpine,debian-slim,node-alpine,python — or leave blank for all)'
+        description: "Images to rebuild: all or comma-separated golang-bookworm,golang-alpine,alpine,debian-slim,node-alpine,python"
         required: false
-        default: 'all'
+        default: all
+
+permissions:
+  contents: read
 
 env:
   REGISTRY: rapidaai
 
 jobs:
-  # ── Detect which base Dockerfiles changed ──────────────────────────────────
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
     outputs:
       golang-bookworm: ${{ steps.set.outputs.golang-bookworm }}
-      golang-alpine:   ${{ steps.set.outputs.golang-alpine }}
-      alpine:          ${{ steps.set.outputs.alpine }}
-      debian-slim:     ${{ steps.set.outputs.debian-slim }}
-      node-alpine:     ${{ steps.set.outputs.node-alpine }}
-      python:          ${{ steps.set.outputs.python }}
+      golang-alpine: ${{ steps.set.outputs.golang-alpine }}
+      alpine: ${{ steps.set.outputs.alpine }}
+      debian-slim: ${{ steps.set.outputs.debian-slim }}
+      node-alpine: ${{ steps.set.outputs.node-alpine }}
+      python: ${{ steps.set.outputs.python }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Path filter (push only)
+      - name: Detect changed base images
         uses: dorny/paths-filter@v3
         id: filter
         if: github.event_name == 'push'
         with:
           filters: |
             golang-bookworm:
-              - 'docker/base/rapida-golang-bookworm.Dockerfile'
+              - "docker/base/rapida-golang-bookworm.Dockerfile"
             golang-alpine:
-              - 'docker/base/rapida-golang-alpine.Dockerfile'
+              - "docker/base/rapida-golang-alpine.Dockerfile"
             alpine:
-              - 'docker/base/rapida-alpine.Dockerfile'
+              - "docker/base/rapida-alpine.Dockerfile"
             debian-slim:
-              - 'docker/base/rapida-debian-slim.Dockerfile'
+              - "docker/base/rapida-debian-slim.Dockerfile"
             node-alpine:
-              - 'docker/base/rapida-node-alpine.Dockerfile'
+              - "docker/base/rapida-node-alpine.Dockerfile"
             python:
-              - 'docker/base/rapida-python.Dockerfile'
+              - "docker/base/rapida-python.Dockerfile"
 
       - name: Set rebuild targets
         id: set
         run: |
+          set -euo pipefail
+
+          select_image() {
+            local name="$1"
+            if [ "$REBUILD_ALL" = "true" ] || printf '%s' "$INPUT" | tr ',' '\n' | grep -qx "$name"; then
+              echo "${name}=true"
+            else
+              echo "${name}=false"
+            fi
+          }
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             INPUT="${{ inputs.images }}"
-            if [ "$INPUT" = "all" ] || [ -z "$INPUT" ]; then
+            if [ -z "$INPUT" ] || [ "$INPUT" = "all" ]; then
               REBUILD_ALL=true
             else
               REBUILD_ALL=false
             fi
-            rebuild() {
-              local name="$1"
-              if [ "$REBUILD_ALL" = "true" ] || echo "$INPUT" | grep -qw "$name"; then
-                echo "${name}=true" >> "$GITHUB_OUTPUT"
-              else
-                echo "${name}=false" >> "$GITHUB_OUTPUT"
-              fi
-            }
-            rebuild golang-bookworm
-            rebuild golang-alpine
-            rebuild alpine
-            rebuild debian-slim
-            rebuild node-alpine
-            rebuild python
+            {
+              select_image golang-bookworm
+              select_image golang-alpine
+              select_image alpine
+              select_image debian-slim
+              select_image node-alpine
+              select_image python
+            } >> "$GITHUB_OUTPUT"
           else
-            echo "golang-bookworm=${{ steps.filter.outputs.golang-bookworm }}" >> "$GITHUB_OUTPUT"
-            echo "golang-alpine=${{ steps.filter.outputs.golang-alpine }}"     >> "$GITHUB_OUTPUT"
-            echo "alpine=${{ steps.filter.outputs.alpine }}"                   >> "$GITHUB_OUTPUT"
-            echo "debian-slim=${{ steps.filter.outputs.debian-slim }}"         >> "$GITHUB_OUTPUT"
-            echo "node-alpine=${{ steps.filter.outputs.node-alpine }}"         >> "$GITHUB_OUTPUT"
-            echo "python=${{ steps.filter.outputs.python }}"                   >> "$GITHUB_OUTPUT"
+            {
+              echo "golang-bookworm=${{ steps.filter.outputs.golang-bookworm }}"
+              echo "golang-alpine=${{ steps.filter.outputs.golang-alpine }}"
+              echo "alpine=${{ steps.filter.outputs.alpine }}"
+              echo "debian-slim=${{ steps.filter.outputs.debian-slim }}"
+              echo "node-alpine=${{ steps.filter.outputs.node-alpine }}"
+              echo "python=${{ steps.filter.outputs.python }}"
+            } >> "$GITHUB_OUTPUT"
           fi
 
-  # ── Shared login step (reused via composite would be ideal, but keeping it inline) ──
-
-  # ── rapidaai/rapida-golang:1.25.12-bookworm (heavy — ONNX, RNNoise, Azure Speech SDK) ──
   push-golang-bookworm:
     name: Push rapida-golang:1.25.12-bookworm
     needs: changes
     if: needs.changes.outputs.golang-bookworm == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-buildx-action@v3
-
-      - uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Build and push
-        uses: docker/build-push-action@v5
+        uses: ./.github/actions/docker-build
         with:
           context: .
-          file: ./docker/base/rapida-golang-bookworm.Dockerfile
-          push: true
+          dockerfile: ./docker/base/rapida-golang-bookworm.Dockerfile
+          push: "true"
           platforms: linux/amd64
           tags: ${{ env.REGISTRY }}/rapida-golang:1.25.12-bookworm
-          cache-from: type=gha,scope=rapida-golang-bookworm
-          cache-to: type=gha,scope=rapida-golang-bookworm,mode=max
+          cache-scope: rapida-golang-bookworm
+          registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-  # ── rapidaai/rapida-golang:1.25.12-alpine ──────────────────────────────────
   push-golang-alpine:
     name: Push rapida-golang:1.25.12-alpine
     needs: changes
     if: needs.changes.outputs.golang-alpine == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-buildx-action@v3
-
-      - uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Build and push
-        uses: docker/build-push-action@v5
+        uses: ./.github/actions/docker-build
         with:
           context: .
-          file: ./docker/base/rapida-golang-alpine.Dockerfile
-          push: true
+          dockerfile: ./docker/base/rapida-golang-alpine.Dockerfile
+          push: "true"
           platforms: linux/amd64
           tags: ${{ env.REGISTRY }}/rapida-golang:1.25.12-alpine
-          cache-from: type=gha,scope=rapida-golang-alpine
-          cache-to: type=gha,scope=rapida-golang-alpine,mode=max
+          cache-scope: rapida-golang-alpine
+          registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-  # ── rapidaai/rapida-alpine:3.21 ───────────────────────────────────────────
   push-alpine:
     name: Push rapida-alpine:3.21
     needs: changes
     if: needs.changes.outputs.alpine == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-buildx-action@v3
-
-      - uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Build and push
-        uses: docker/build-push-action@v5
+        uses: ./.github/actions/docker-build
         with:
           context: .
-          file: ./docker/base/rapida-alpine.Dockerfile
-          push: true
+          dockerfile: ./docker/base/rapida-alpine.Dockerfile
+          push: "true"
           platforms: linux/amd64
           tags: ${{ env.REGISTRY }}/rapida-alpine:3.21
-          cache-from: type=gha,scope=rapida-alpine
-          cache-to: type=gha,scope=rapida-alpine,mode=max
+          cache-scope: rapida-alpine
+          registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-  # ── rapidaai/rapida-debian:bookworm-slim ──────────────────────────────────
   push-debian-slim:
     name: Push rapida-debian:bookworm-slim
     needs: changes
     if: needs.changes.outputs.debian-slim == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-buildx-action@v3
-
-      - uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Build and push
-        uses: docker/build-push-action@v5
+        uses: ./.github/actions/docker-build
         with:
           context: .
-          file: ./docker/base/rapida-debian-slim.Dockerfile
-          push: true
+          dockerfile: ./docker/base/rapida-debian-slim.Dockerfile
+          push: "true"
           platforms: linux/amd64
           tags: ${{ env.REGISTRY }}/rapida-debian:bookworm-slim
-          cache-from: type=gha,scope=rapida-debian-slim
-          cache-to: type=gha,scope=rapida-debian-slim,mode=max
+          cache-scope: rapida-debian-slim
+          registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-  # ── rapidaai/rapida-node:22-alpine ────────────────────────────────────────
   push-node-alpine:
     name: Push rapida-node:22-alpine
     needs: changes
     if: needs.changes.outputs.node-alpine == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-buildx-action@v3
-
-      - uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Build and push
-        uses: docker/build-push-action@v5
+        uses: ./.github/actions/docker-build
         with:
           context: .
-          file: ./docker/base/rapida-node-alpine.Dockerfile
-          push: true
+          dockerfile: ./docker/base/rapida-node-alpine.Dockerfile
+          push: "true"
           platforms: linux/amd64
           tags: ${{ env.REGISTRY }}/rapida-node:22-alpine
-          cache-from: type=gha,scope=rapida-node-alpine
-          cache-to: type=gha,scope=rapida-node-alpine,mode=max
+          cache-scope: rapida-node-alpine
+          registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-  # ── rapidaai/rapida-python:3.11 ───────────────────────────────────────────
   push-python:
     name: Push rapida-python:3.11
     needs: changes
     if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-buildx-action@v3
-
-      - uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Build and push
-        uses: docker/build-push-action@v5
+        uses: ./.github/actions/docker-build
         with:
           context: .
-          file: ./docker/base/rapida-python.Dockerfile
-          push: true
+          dockerfile: ./docker/base/rapida-python.Dockerfile
+          push: "true"
           platforms: linux/amd64
           tags: ${{ env.REGISTRY }}/rapida-python:3.11
-          cache-from: type=gha,scope=rapida-python
-          cache-to: type=gha,scope=rapida-python,mode=max
+          cache-scope: rapida-python
+          registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-  # ── Summary ───────────────────────────────────────────────────────────────
   summary:
     name: Summary
     runs-on: ubuntu-latest
@@ -263,14 +236,14 @@ jobs:
       - name: Write summary
         run: |
           {
-            echo "## Base Images ${{ job.status == 'success' && '✅' || '⚠️' }}"
+            echo "## Base Images"
             echo ""
             echo "| Image | Result |"
             echo "|-------|--------|"
-            echo "| \`rapidaai/rapida-golang:1.25.12-bookworm\` | ${{ needs.push-golang-bookworm.result }} |"
-            echo "| \`rapidaai/rapida-golang:1.25.12-alpine\`   | ${{ needs.push-golang-alpine.result }} |"
-            echo "| \`rapidaai/rapida-alpine:3.21\`            | ${{ needs.push-alpine.result }} |"
-            echo "| \`rapidaai/rapida-debian:bookworm-slim\`   | ${{ needs.push-debian-slim.result }} |"
-            echo "| \`rapidaai/rapida-node:22-alpine\`         | ${{ needs.push-node-alpine.result }} |"
-            echo "| \`rapidaai/rapida-python:3.11\`            | ${{ needs.push-python.result }} |"
+            echo "| rapidaai/rapida-golang:1.25.12-bookworm | ${{ needs.push-golang-bookworm.result }} |"
+            echo "| rapidaai/rapida-golang:1.25.12-alpine | ${{ needs.push-golang-alpine.result }} |"
+            echo "| rapidaai/rapida-alpine:3.21 | ${{ needs.push-alpine.result }} |"
+            echo "| rapidaai/rapida-debian:bookworm-slim | ${{ needs.push-debian-slim.result }} |"
+            echo "| rapidaai/rapida-node:22-alpine | ${{ needs.push-node-alpine.result }} |"
+            echo "| rapidaai/rapida-python:3.11 | ${{ needs.push-python.result }} |"
           } >> "$GITHUB_STEP_SUMMARY"

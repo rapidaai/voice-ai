@@ -1,56 +1,29 @@
 name: Documentation
-description: Report missing, unclear, or incorrect documentation
-title: "[Docs]: "
+description: Report missing, unclear, or incorrect docs.
+title: "docs: "
 labels:
   - documentation
-  - good-first-issue
 body:
-  - type: markdown
-    attributes:
-      value: |
-        Thanks for helping improve Rapida documentation 🙌  
-        Clear docs help everyone build better voice AI.
-
-  - type: input
-    id: area
-    attributes:
-      label: Documentation area
-      description: Which part of the documentation needs work?
-      placeholder: README, setup, API, examples, deployment, observability, SDK
-    validations:
-      required: true
-
   - type: textarea
     id: issue
     attributes:
-      label: What is missing or unclear?
-      description: Describe the problem with the current documentation.
-      placeholder: The setup guide does not explain how to configure STT providers...
+      label: Documentation issue
+      description: What is missing, unclear, or incorrect?
     validations:
       required: true
 
   - type: textarea
-    id: expected
+    id: location
     attributes:
-      label: What would you expect instead?
-      description: Describe what good documentation would look like here.
-      placeholder: Step-by-step setup with config examples and defaults.
+      label: Location
+      description: Link, file path, section, or command related to the docs.
     validations:
       required: false
 
   - type: textarea
-    id: references
+    id: suggestion
     attributes:
-      label: References or examples (optional)
-      description: Links, screenshots, or examples from similar projects.
-      placeholder: Link to docs, code, or external reference.
+      label: Suggested change
+      description: What would make this clearer?
     validations:
       required: false
-
-  - type: checkboxes
-    id: contribution
-    attributes:
-      label: Contribution
-      options:
-        - label: I would like to work on this issue
-        - label: I can submit a PR with documentation changes

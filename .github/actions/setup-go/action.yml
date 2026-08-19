@@ -1,0 +1,26 @@
+name: Set up Go
+description: Install Go and optionally download module dependencies.
+
+inputs:
+  go-version:
+    description: Go version to install.
+    required: true
+  download-dependencies:
+    description: Whether to run go mod download.
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ inputs.go-version }}
+        cache: true
+        cache-dependency-path: go.sum
+
+    - name: Download Go dependencies
+      if: inputs.download-dependencies == 'true'
+      shell: bash
+      run: go mod download
