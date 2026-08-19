@@ -1,0 +1,297 @@
+language: en-US
+
+tone_instructions: >-
+  Review as a pragmatic senior engineer. Be direct, concise, respectful, and
+  evidence-based. Focus on behavior, engineering principles, and operational
+  impact rather than referring reviewers to instruction documents. Only raise
+  actionable issues introduced by the pull request. Verify concerns against
+  the surrounding implementation before commenting, explain the concrete
+  failure mode, and distinguish correctness defects from optional improvements.
+  Avoid speculative advice, compliments, generated-code feedback, and style
+  comments already enforced by automated tooling.
+
+early_access: false
+
+reviews:
+  profile: chill
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  changed_files_summary: true
+  estimate_code_review_effort: true
+  review_details: true
+  sequence_diagrams: false
+  related_issues: true
+  related_prs: true
+  assess_linked_issues: true
+  suggested_labels: true
+  auto_apply_labels: false
+  suggested_reviewers: true
+  auto_assign_reviewers: false
+  poem: false
+  in_progress_fortune: false
+  request_changes_workflow: false
+  commit_status: true
+  fail_commit_status: false
+
+  high_level_summary_instructions: >-
+    Explain the intent, behavior change, affected system boundaries, user or
+    operator impact, compatibility concerns, and validation performed. Evaluate
+    the change against ownership, KISS, YAGNI, separation of concerns, explicit
+    contracts, least privilege, fail-safe behavior, observability, and
+    maintainability. Highlight only material risks involving correctness,
+    security, data isolation, concurrency, latency, resource lifecycle,
+    migrations, external dependencies, or backward compatibility. Do not
+    restate the diff.
+
+  auto_title_instructions: >-
+    Use a Conventional Commit style title in imperative mood:
+    type(scope): concise summary. Choose the smallest meaningful scope and keep
+    the title specific and under 72 characters.
+  auto_title_placeholder: "chore: summarize pull request"
+
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    auto_pause_after_reviewed_commits: 5
+    drafts: false
+    base_branches:
+      - main
+      - develop
+    ignore_title_keywords:
+      - "[skip coderabbit]"
+
+  path_filters:
+    - "**"
+    - "!protos/**/*.pb.go"
+    - "!protos/**/*_grpc.pb.go"
+    - "!openapi/**/*.gen.go"
+    - "!sdks/**"
+    - "!ui/src/styles/generated/**"
+    - "!ui/public/fonts/**"
+    - "!ui/public/videos/**"
+    - "!ui/public/favicon_io/**"
+    - "!**/*.min.js"
+    - "!**/*.min.css"
+    - "!**/coverage/**"
+
+  path_instructions:
+    - path: "**/*.go"
+      instructions: >-
+        Enforce clear ownership of state, goroutines, channels, timers,
+        connections, and cleanup. Prefer the simplest implementation that
+        preserves explicit contracts. Review nil handling, error propagation,
+        context cancellation, races, deadlocks, blocking work, resource leaks,
+        and public behavior. Reject abstractions that add indirection without a
+        demonstrated need. Require focused tests for success and failure paths.
+
+    - path: "api/assistant-api/**"
+      instructions: >-
+        Treat the voice pipeline as latency-sensitive concurrent infrastructure.
+        Preserve packet ordering, interruption semantics, context ownership,
+        stale-result rejection, bounded buffering, deterministic shutdown, and
+        transport independence. Keep detection, finalization, transformation,
+        orchestration, and transport responsibilities separate. Every resource
+        created by a component must have one clear owner and cleanup path.
+
+    - path: "api/assistant-api/internal/transformer/**"
+      instructions: >-
+        Keep provider differences isolated behind stable transformer contracts.
+        Prefer small adapters over shared conditionals that couple providers.
+        Verify credential validation, option mapping, streaming lifecycle,
+        terminal events, interruption, idempotent close behavior, factory
+        selection, and parity with runtime configuration. Provider failures must
+        be explicit and must not corrupt packet state.
+
+    - path: "api/assistant-api/internal/vad/**"
+      instructions: >-
+        Keep speech-activity detection focused on detection. Preserve frame and
+        sample assumptions, threshold semantics, state transitions, reset
+        behavior, and deterministic cleanup. Do not mix transcript finalization
+        or end-of-speech policy into the detector.
+
+    - path: "api/assistant-api/internal/end_of_speech/**"
+      instructions: >-
+        Keep turn finalization focused on deciding when a user turn is complete.
+        Verify history ownership, timeouts, cancellation, stale context handling,
+        exactly-once finalization, reset behavior, and deterministic cleanup.
+        Avoid hidden coupling to detection engine internals.
+
+    - path: "api/assistant-api/internal/denoiser/**"
+      instructions: >-
+        Preserve audio format and packet boundaries. Verify buffer ownership,
+        bounded latency, initialization, bypass and fallback behavior, error
+        transparency, and idempotent cleanup. A processing failure must not
+        silently alter audio semantics.
+
+    - path: "api/assistant-api/internal/channel/telephony/**"
+      instructions: >-
+        Model calls as explicit lifecycles with one owner for each session,
+        connection, buffer, and credential. Verify authentication, framing,
+        codec conversion, cancellation, retries, idempotency, disconnect paths,
+        and sensitive-data handling. Keep provider-specific transport details
+        behind stable channel contracts.
+
+    - path: "api/assistant-api/sip/**"
+      instructions: >-
+        Treat signaling and media as concurrent state machines. Require explicit
+        state transitions, bounded retries and timeouts, correct authentication,
+        negotiation compatibility, lock discipline, port ownership, and cleanup
+        for success, failure, cancellation, and retransmission paths. Prefer
+        protocol clarity over clever abstractions.
+
+    - path: "api/integration-api/**"
+      instructions: >-
+        Keep provider SDK behavior behind stable caller contracts. Verify input
+        validation, option mapping, cancellation, streaming completion, tool-call
+        preservation, retry boundaries, normalized errors, metrics, auditability,
+        and factory selection. Avoid leaking provider-specific concepts into
+        shared orchestration without a demonstrated cross-provider requirement.
+
+    - path: "api/*-api/api/**"
+      instructions: >-
+        Enforce least privilege, tenant isolation, explicit validation, stable
+        response contracts, predictable error mapping, idempotency, and service
+        boundary ownership. Reject handlers that trust client-supplied scope,
+        expose secrets or internal errors, duplicate domain logic, or perform
+        unbounded work in request paths.
+
+    - path: "api/*-api/migrations/**"
+      instructions: >-
+        Prefer additive, reversible, and operationally safe migrations. Review
+        compatibility with existing data, lock and rewrite risk, defaults,
+        indexes, rollback behavior, and staged rollout needs. Destructive changes
+        require an explicit preservation and deployment strategy.
+
+    - path: "api/document-api/**"
+      instructions: >-
+        Preserve async boundaries, tenant isolation, input limits, idempotency,
+        retry ownership, transaction clarity, and safe handling of untrusted
+        documents. Avoid blocking work in async execution and avoid abstractions
+        that obscure the processing pipeline. Require behavior-focused tests for
+        normal, invalid, and failure cases.
+
+    - path: "ui/src/**"
+      instructions: >-
+        Favor simple, composable components with one clear responsibility.
+        Preserve predictable state ownership, loading and error behavior,
+        cleanup, accessibility, responsive layout, and existing design patterns.
+        Avoid duplicated sources of truth, unnecessary effects, speculative
+        abstractions, and configuration hidden in presentation components.
+        Require focused user-observable tests for changed behavior.
+
+    - path: "ui/src/providers/**"
+      instructions: >-
+        Treat provider metadata and defaults as runtime contracts. Maintain a
+        single source of truth, environment parity, stable provider identity,
+        backward-compatible option keys, and deterministic loading. Reject
+        duplicated configuration or one-sided updates that can make selection,
+        validation, and execution disagree.
+
+    - path: "protos/artifacts/**"
+      instructions: >-
+        Preserve wire compatibility and ownership of shared contracts. Never
+        reuse field numbers or silently change existing semantics. Prefer
+        additive evolution, stable enums, explicit optionality, and changes that
+        account for all producers and consumers.
+
+    - path: "openapi/artifacts/**"
+      instructions: >-
+        Preserve client compatibility, explicit authentication, consistent
+        errors, clear required and nullable semantics, and additive evolution.
+        Breaking contract changes must be intentional, visible, and paired with
+        a migration strategy.
+
+    - path: "docker/**"
+      instructions: >-
+        Apply least privilege, minimal images, deterministic builds, pinned
+        dependencies, explicit runtime requirements, effective caching, and no
+        embedded secrets. Every package and build stage should justify its
+        presence. Preserve architecture and native-library compatibility.
+
+    - path: ".github/workflows/**"
+      instructions: >-
+        Keep automation deterministic, least-privileged, and resistant to
+        untrusted input. Verify action pinning, secret boundaries, concurrency,
+        cache correctness, branch behavior, failure propagation, and parity with
+        local validation. Do not allow convenience changes to weaken required
+        quality or security checks.
+
+    - path: "**/*_test.go"
+      instructions: >-
+        Tests should prove behavior rather than implementation detail. Require a
+        success path and the relevant failure, fallback, cancellation, or
+        selection path. Prefer deterministic tests with explicit ownership of
+        goroutines and resources. Avoid sleeps, external network dependencies,
+        shared mutable state, and assertions that merely mirror the code.
+
+    - path: "ui/src/**/*.test.ts"
+      instructions: >-
+        Test user-visible contracts and meaningful state transitions. Include a
+        normal case and a regression or edge case. Prefer accessible queries and
+        stable outcomes over implementation-specific selectors or snapshots.
+
+    - path: "ui/src/**/*.test.tsx"
+      instructions: >-
+        Test user-visible contracts and meaningful state transitions. Include a
+        normal case and a regression or edge case. Prefer accessible queries and
+        stable outcomes over implementation-specific selectors or snapshots.
+
+  tools:
+    github-checks:
+      enabled: true
+    golangci-lint:
+      enabled: true
+      config_file: .golangci.yml
+    eslint:
+      enabled: true
+      config_file: ui/.eslintrc.js
+    stylelint:
+      enabled: true
+    flake8:
+      enabled: true
+    shellcheck:
+      enabled: true
+    hadolint:
+      enabled: true
+    actionlint:
+      enabled: true
+    yamllint:
+      enabled: true
+    checkmake:
+      enabled: true
+    buf:
+      enabled: true
+    oasdiff:
+      enabled: true
+    gitleaks:
+      enabled: true
+    trivy:
+      enabled: true
+    reactDoctor:
+      enabled: true
+
+knowledge_base:
+  web_search:
+    enabled: true
+
+chat:
+  auto_reply: true
+
+code_generation:
+  unit_tests:
+    path_instructions:
+      - path: "**/*.go"
+        instructions: >-
+          Generate small, deterministic, behavior-focused tests using existing
+          package patterns. Cover success, failure or fallback, cancellation and
+          cleanup where relevant, plus selection behavior when a factory changes.
+      - path: "ui/src/**"
+        instructions: >-
+          Generate focused tests around user-observable behavior using existing
+          testing patterns. Cover the normal flow and one meaningful regression
+          or edge case without coupling to implementation details.
+      - path: "api/document-api/**"
+        instructions: >-
+          Generate focused tests around observable processing behavior. Cover
+          normal input and the relevant invalid, retry, or failure case while
+          keeping external services isolated.
