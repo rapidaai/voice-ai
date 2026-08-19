@@ -727,15 +727,15 @@ func assertTTSInitMetricCountAtLeast(t *testing.T, collector *testutil.PacketCol
 	count := 0
 	for _, m := range collector.MetricPackets() {
 		for _, metric := range m.Record.Metrics {
-			if metric.Name == "tts_init_ms" {
+			if metric.Name == observability.MetricTTSInitLatencyMs {
 				ms, err := strconv.Atoi(metric.Value)
 				assert.NoError(t, err)
-				assert.GreaterOrEqual(t, ms, 0, "tts_init_ms should be non-negative")
+				assert.GreaterOrEqual(t, ms, 0, "%s should be non-negative", observability.MetricTTSInitLatencyMs)
 				count++
 			}
 		}
 	}
-	assert.GreaterOrEqual(t, count, minimumCount, "should have enough tts_init_ms metrics")
+	assert.GreaterOrEqual(t, count, minimumCount, "should have enough %s metrics", observability.MetricTTSInitLatencyMs)
 }
 
 func assertSTTLatencyMetric(t *testing.T, collector *testutil.PacketCollector) {

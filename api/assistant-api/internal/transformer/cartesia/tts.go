@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -96,8 +97,15 @@ func (ct *cartesiaTTS) Initialize() error {
 	go ct.readLoop(conn)
 	ct.onPacket(
 		internal_type.ObservabilityMetricRecordPacket{
-			Scope:  internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.NewMetricTTSInitLatencyMs(time.Since(start), observability.Attributes{"provider": ct.Name()}),
+			Scope: internal_type.ObservabilityRecordScopeConversation,
+			Record: observability.RecordMetric{
+				Metrics: []*protos.Metric{{
+					Name:        observability.MetricTTSInitLatencyMs,
+					Value:       strconv.FormatInt(time.Since(start).Milliseconds(), 10),
+					Description: "TTS initialization latency in milliseconds",
+				}},
+				Attributes: observability.Attributes{"provider": ct.Name()},
+			},
 		},
 		internal_type.ObservabilityLogRecordPacket{
 			Scope: internal_type.ObservabilityRecordScopeConversation,

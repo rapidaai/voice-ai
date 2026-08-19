@@ -382,8 +382,8 @@ const SESSION_SEARCH_FIELDS: QuerySearchField[] = [
       { label: 'is greater than or equal to', logic: '>=' },
       { label: 'is less than or equal to', logic: '<=' },
     ],
-    queryKey: 'tts_init_ms',
-    text: 'tts_init_ms',
+    queryKey: 'tts.init_ms',
+    text: 'tts.init_ms',
     type: 'number',
   },
   {
@@ -524,7 +524,7 @@ const SESSION_SEARCH_CRITERIA: Record<string, string> = {
   'stt.ttlt_ms': 'stt.ttlt_ms',
   timestamp: 'created_date',
   'tts.duration_ms': 'tts.duration_ms',
-  tts_init_ms: 'tts_init_ms',
+  'tts.init_ms': 'tts.init_ms',
   'vad.init_ms': 'vad.init_ms',
 };
 

@@ -405,6 +405,7 @@ func TestWrite_AllTypes(t *testing.T) {
 				ev, ok := pkts[1].(internal_type.ObservabilityEventRecordPacket)
 				require.True(t, ok)
 				assert.Equal(t, observability.AgentCompleted, ev.Record.Event)
+				assert.Equal(t, "world", ev.Record.Attributes["script"])
 				assert.Equal(t, "5", ev.Record.Attributes["response_char_count"])
 				metric, ok := pkts[2].(internal_type.ObservabilityMetricRecordPacket)
 				require.True(t, ok)
@@ -813,5 +814,9 @@ func TestWrite_StaleContext_Dropped(t *testing.T) {
 		},
 	}
 	e.Write(context.Background(), comm, resp)
-	assert.Empty(t, collector.all())
+	events := findPackets[internal_type.ObservabilityEventRecordPacket](collector.all())
+	require.Len(t, events, 1)
+	assert.Equal(t, observability.AgentDiscarded, events[0].Record.Event)
+	assert.False(t, events[0].Record.OccurredAt.IsZero())
+	assert.Equal(t, "ignore", events[0].Record.Attributes["script"])
 }

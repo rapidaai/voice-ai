@@ -57,7 +57,7 @@ func TestAzureTTSLifecycle(t *testing.T) {
 	require.NoError(t, tts.Initialize())
 	defer tts.Close(ctx)
 
-	assertMetricValue(t, collector, "tts_init_ms", 0)
+	assertMetricValue(t, collector, observability.MetricTTSInitLatencyMs, 0)
 
 	// Azure: delta triggers StartSpeakingTextAsync, done is a no-op
 	require.NoError(t, tts.Transform(ctx, internal_type.LLMResponseDeltaPacket{

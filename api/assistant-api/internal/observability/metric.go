@@ -52,7 +52,7 @@ const (
 	MetricSTTTimeToLastTokenMs  = "stt.ttlt_ms"
 	MetricSTTError              = "stt.error"
 
-	MetricTTSInitLatencyMs  = "tts_init_ms"
+	MetricTTSInitLatencyMs  = "tts.init_ms"
 	MetricTTSLatencyMs      = "tts.latency_ms"
 	MetricTTSError          = "tts.error"
 	MetricDiscardedTTSChunk = "tts.discard_chunk_count"
@@ -102,16 +102,6 @@ func NewMetricSTTLatencyMs(duration time.Duration, attr Attributes) RecordMetric
 		Name:        MetricSTTLatencyMs,
 		Value:       strconv.FormatInt(duration.Milliseconds(), 10),
 		Description: "STT latency from speech end to final transcript in milliseconds",
-	}})
-	record.Attributes = attr
-	return record
-}
-
-func NewMetricTTSInitLatencyMs(duration time.Duration, attr Attributes) RecordMetric {
-	record := NewConversationMetricRecord([]*protos.Metric{{
-		Name:        MetricTTSInitLatencyMs,
-		Value:       strconv.FormatInt(duration.Milliseconds(), 10),
-		Description: "TTS initialization latency in milliseconds",
 	}})
 	record.Attributes = attr
 	return record

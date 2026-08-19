@@ -69,7 +69,12 @@ func TestHandleResponse_Stream_StaleContextDropped(t *testing.T) {
 		return nil
 	})
 
-	assert.Empty(t, collected)
+	require.Len(t, collected, 1)
+	ev, ok := collected[0].(internal_type.ObservabilityEventRecordPacket)
+	require.True(t, ok)
+	assert.Equal(t, observability.AgentDiscarded, ev.Record.Event)
+	assert.False(t, ev.Record.OccurredAt.IsZero())
+	assert.Equal(t, "hello", ev.Record.Attributes["script"])
 }
 
 func TestHandleResponse_Stream_CurrentContextEmits(t *testing.T) {
@@ -151,6 +156,7 @@ func TestHandleResponse_Complete_EmitsLLMResponseDonePacket(t *testing.T) {
 	ev, ok := collected[1].(internal_type.ObservabilityEventRecordPacket)
 	require.True(t, ok)
 	assert.Equal(t, observability.AgentCompleted, ev.Record.Event)
+	assert.Equal(t, "done text", ev.Record.Attributes["script"])
 	metric, ok := collected[2].(internal_type.ObservabilityMetricRecordPacket)
 	require.True(t, ok)
 	require.Len(t, metric.Record.Metrics, 3)
@@ -176,7 +182,12 @@ func TestHandleResponse_Complete_StaleContextDropped(t *testing.T) {
 		Data: json.RawMessage(`{"id":"ctx-stale","content":"ignore"}`),
 	}, onPacket)
 
-	assert.Empty(t, collected)
+	require.Len(t, collected, 1)
+	ev, ok := collected[0].(internal_type.ObservabilityEventRecordPacket)
+	require.True(t, ok)
+	assert.Equal(t, observability.AgentDiscarded, ev.Record.Event)
+	assert.False(t, ev.Record.OccurredAt.IsZero())
+	assert.Equal(t, "ignore", ev.Record.Attributes["script"])
 }
 
 func TestHandleResponse_Complete_EmptyContentNoPacket(t *testing.T) {
@@ -634,4 +645,9 @@ func TestConsistency_StaleAfterContextSwitch(t *testing.T) {
 	require.Len(t, deltas, 2)
 	assert.Equal(t, "ok", deltas[0].Text)
 	assert.Equal(t, "new", deltas[1].Text)
+	events := findPackets[internal_type.ObservabilityEventRecordPacket](collector.all())
+	require.Len(t, events, 1)
+	assert.Equal(t, observability.AgentDiscarded, events[0].Record.Event)
+	assert.False(t, events[0].Record.OccurredAt.IsZero())
+	assert.Equal(t, "stale", events[0].Record.Attributes["script"])
 }

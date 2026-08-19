@@ -219,12 +219,26 @@ func (e *agentkitExecutor) Write(ctx context.Context, comm internal_type.Communi
 		}
 
 	case *protos.TalkOutput_Assistant:
-		if !e.isCurrentContext(data.Assistant.GetId()) {
-			return
-		}
-
 		switch msg := data.Assistant.GetMessage().(type) {
 		case *protos.ConversationAssistantMessage_Text:
+			if !e.isCurrentContext(data.Assistant.GetId()) {
+				comm.OnPacket(ctx, internal_type.ObservabilityEventRecordPacket{
+					ContextID: data.Assistant.GetId(),
+					Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+					Record: observability.RecordEvent{
+						Component: observability.ComponentAgent,
+						Event:     observability.AgentDiscarded,
+						Attributes: observability.Attributes{
+							"provider":   e.Name(),
+							"context_id": data.Assistant.GetId(),
+							"reason":     "stale_context",
+							"script":     msg.Text,
+						},
+						OccurredAt: time.Now(),
+					},
+				})
+				return
+			}
 			now := time.Now()
 			if data.Assistant.GetCompleted() {
 				e.stateMu.Lock()
@@ -254,7 +268,7 @@ func (e *agentkitExecutor) Write(ctx context.Context, comm internal_type.Communi
 					})
 				}
 
-				packets := []internal_type.Packet{
+				comm.OnPacket(ctx,
 					internal_type.LLMResponseDonePacket{ContextID: data.Assistant.GetId(), Text: msg.Text},
 					internal_type.ObservabilityEventRecordPacket{
 						ContextID: data.Assistant.GetId(),
@@ -262,6 +276,7 @@ func (e *agentkitExecutor) Write(ctx context.Context, comm internal_type.Communi
 						Record: observability.NewMessageRecord(data.Assistant.GetId(), observability.ComponentAgent, observability.AgentCompleted, observability.MessageRoleAssistant, observability.Attributes{
 							"provider":            e.Name(),
 							"context_id":          data.Assistant.GetId(),
+							"script":              msg.Text,
 							"response_char_count": fmt.Sprintf("%d", len(msg.Text)),
 						}),
 					},
@@ -272,10 +287,9 @@ func (e *agentkitExecutor) Write(ctx context.Context, comm internal_type.Communi
 							Attributes: observability.Attributes{"provider": e.Name()},
 							Metrics:    metrics,
 						},
-					},
-				}
+					})
 				if !requestStartedAt.IsZero() {
-					packets = append(packets, internal_type.ObservabilityUsageRecordPacket{
+					comm.OnPacket(ctx, internal_type.ObservabilityUsageRecordPacket{
 						ContextID: data.Assistant.GetId(),
 						Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
 						Record: observability.NewLLMDurationUsageRecord(e.Name(), now.Sub(requestStartedAt), observability.Attributes{
@@ -284,7 +298,7 @@ func (e *agentkitExecutor) Write(ctx context.Context, comm internal_type.Communi
 						}),
 					})
 				}
-				comm.OnPacket(ctx, packets...)
+
 			} else {
 				e.stateMu.Lock()
 				requestStartedAt := e.requestStartedAt
@@ -405,7 +419,6 @@ func (e *agentkitExecutor) Write(ctx context.Context, comm internal_type.Communi
 		)
 
 	case *protos.TalkOutput_Observability:
-		e.logger.Debugf("agentkit observability record received: %v", data.Observability)
 		switch record := data.Observability.GetRecord().(type) {
 		case *protos.ObservabilityRecord_Log:
 			occurredAt := time.Now()

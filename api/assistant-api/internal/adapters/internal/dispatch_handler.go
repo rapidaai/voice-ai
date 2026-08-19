@@ -49,7 +49,8 @@ func (h requestorDispatchHandler) HandleUserText(ctx context.Context, vl interna
 		return
 	}
 
-	switch h.r.messageLifecycle.State() {
+	previousState := h.r.messageLifecycle.State()
+	switch previousState {
 	case adapter_lifecycle.MessageStateUserIdle,
 		adapter_lifecycle.MessageStateUserListening,
 		adapter_lifecycle.MessageStateUserSpeaking,
@@ -62,12 +63,53 @@ func (h requestorDispatchHandler) HandleUserText(ctx context.Context, vl interna
 		h.r.OnPacket(ctx,
 			internal_type.StopIdleTimeoutPacket{ContextID: oldContextID},
 			internal_type.EndOfSpeechInterruptionPacket{ContextID: oldContextID, Source: internal_type.InterruptionSourceWord},
+			internal_type.ObservabilityEventRecordPacket{
+				ContextID: oldContextID,
+				Scope:     internal_type.ObservabilityRecordScopeConversation,
+				Record: observability.RecordEvent{
+					Component:  observability.ComponentTurn,
+					Event:      observability.TurnInterrupted,
+					OccurredAt: time.Now(),
+					Attributes: observability.Attributes{
+						"old_context_id": oldContextID,
+						"new_context_id": newContextID,
+						"reason":         "interrupted",
+						"source":         "text",
+						"mode":           h.r.GetMode().String(),
+						"state":          string(previousState),
+						"trigger":        string(vl.PacketName()),
+						"text":           vl.Text,
+					},
+				},
+			},
 			internal_type.TurnChangePacket{
 				ContextID:         newContextID,
 				PreviousContextID: oldContextID,
 				Reason:            "interrupted",
-				Source:            "requestor",
+				Source:            "text",
+				PreviousState:     string(previousState),
+				Trigger:           string(vl.PacketName()),
+				Text:              vl.Text,
 				Time:              time.Now(),
+			},
+			internal_type.ObservabilityEventRecordPacket{
+				ContextID: newContextID,
+				Scope:     internal_type.ObservabilityRecordScopeConversation,
+				Record: observability.RecordEvent{
+					Component:  observability.ComponentTurn,
+					Event:      observability.TurnStarted,
+					OccurredAt: time.Now(),
+					Attributes: observability.Attributes{
+						"context_id":          newContextID,
+						"previous_context_id": oldContextID,
+						"reason":              "interruption",
+						"source":              "text",
+						"mode":                h.r.GetMode().String(),
+						"previous_state":      string(previousState),
+						"trigger":             string(vl.PacketName()),
+						"text":                vl.Text,
+					},
+				},
 			},
 			internal_type.TextToSpeechInterruptPacket{ContextID: oldContextID},
 			internal_type.LLMInterruptPacket{ContextID: oldContextID},
@@ -181,12 +223,53 @@ func (h requestorDispatchHandler) HandleSpeechToText(ctx context.Context, p inte
 			h.r.OnPacket(ctx,
 				internal_type.StopIdleTimeoutPacket{ContextID: oldContextID},
 				internal_type.EndOfSpeechInterruptionPacket{ContextID: oldContextID, Source: interruptionSource},
+				internal_type.ObservabilityEventRecordPacket{
+					ContextID: oldContextID,
+					Scope:     internal_type.ObservabilityRecordScopeConversation,
+					Record: observability.RecordEvent{
+						Component:  observability.ComponentTurn,
+						Event:      observability.TurnInterrupted,
+						OccurredAt: time.Now(),
+						Attributes: observability.Attributes{
+							"old_context_id": oldContextID,
+							"new_context_id": newContextID,
+							"reason":         "interrupted",
+							"source":         string(interruptionSource),
+							"mode":           h.r.GetMode().String(),
+							"state":          string(messageState),
+							"trigger":        string(p.PacketName()),
+							"text":           p.Script,
+						},
+					},
+				},
 				internal_type.TurnChangePacket{
 					ContextID:         newContextID,
 					PreviousContextID: oldContextID,
 					Reason:            "interrupted",
-					Source:            "requestor",
+					Source:            string(interruptionSource),
+					PreviousState:     string(messageState),
+					Trigger:           string(p.PacketName()),
+					Text:              p.Script,
 					Time:              time.Now(),
+				},
+				internal_type.ObservabilityEventRecordPacket{
+					ContextID: newContextID,
+					Scope:     internal_type.ObservabilityRecordScopeConversation,
+					Record: observability.RecordEvent{
+						Component:  observability.ComponentTurn,
+						Event:      observability.TurnStarted,
+						OccurredAt: time.Now(),
+						Attributes: observability.Attributes{
+							"context_id":          newContextID,
+							"previous_context_id": oldContextID,
+							"reason":              "interruption",
+							"source":              string(interruptionSource),
+							"mode":                h.r.GetMode().String(),
+							"previous_state":      string(messageState),
+							"trigger":             string(p.PacketName()),
+							"text":                p.Script,
+						},
+					},
 				},
 				internal_type.TextToSpeechInterruptPacket{ContextID: oldContextID},
 				internal_type.LLMInterruptPacket{ContextID: oldContextID},
@@ -406,12 +489,50 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 				h.r.OnPacket(ctx,
 					internal_type.StopIdleTimeoutPacket{ContextID: oldContextID},
 					internal_type.EndOfSpeechInterruptionPacket{ContextID: oldContextID, Source: internal_type.InterruptionSourceVad},
+					internal_type.ObservabilityEventRecordPacket{
+						ContextID: oldContextID,
+						Scope:     internal_type.ObservabilityRecordScopeConversation,
+						Record: observability.RecordEvent{
+							Component:  observability.ComponentTurn,
+							Event:      observability.TurnInterrupted,
+							OccurredAt: time.Now(),
+							Attributes: observability.Attributes{
+								"old_context_id": oldContextID,
+								"new_context_id": newContextID,
+								"reason":         "interrupted",
+								"source":         string(internal_type.InterruptionSourceVad),
+								"mode":           h.r.GetMode().String(),
+								"state":          string(messageState),
+								"trigger":        string(p.PacketName()),
+							},
+						},
+					},
 					internal_type.TurnChangePacket{
 						ContextID:         newContextID,
 						PreviousContextID: oldContextID,
 						Reason:            "interrupted",
-						Source:            "requestor",
+						Source:            string(internal_type.InterruptionSourceVad),
+						PreviousState:     string(messageState),
+						Trigger:           string(p.PacketName()),
 						Time:              time.Now(),
+					},
+					internal_type.ObservabilityEventRecordPacket{
+						ContextID: newContextID,
+						Scope:     internal_type.ObservabilityRecordScopeConversation,
+						Record: observability.RecordEvent{
+							Component:  observability.ComponentTurn,
+							Event:      observability.TurnStarted,
+							OccurredAt: time.Now(),
+							Attributes: observability.Attributes{
+								"context_id":          newContextID,
+								"previous_context_id": oldContextID,
+								"reason":              "interruption",
+								"source":              string(internal_type.InterruptionSourceVad),
+								"mode":                h.r.GetMode().String(),
+								"previous_state":      string(messageState),
+								"trigger":             string(p.PacketName()),
+							},
+						},
 					},
 					internal_type.TextToSpeechInterruptPacket{ContextID: oldContextID},
 					internal_type.LLMInterruptPacket{ContextID: oldContextID},
@@ -467,7 +588,8 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 		}
 	case internal_type.InterruptionSourceWord:
 		if h.r.GetMode().Text() {
-			switch h.r.messageLifecycle.State() {
+			messageState := h.r.messageLifecycle.State()
+			switch messageState {
 			case adapter_lifecycle.MessageStateUserIdle,
 				adapter_lifecycle.MessageStateUserListening,
 				adapter_lifecycle.MessageStateUserSpeaking,
@@ -480,12 +602,50 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 				h.r.OnPacket(ctx,
 					internal_type.StopIdleTimeoutPacket{ContextID: oldContextID},
 					internal_type.EndOfSpeechInterruptionPacket{ContextID: oldContextID, Source: internal_type.InterruptionSourceWord},
+					internal_type.ObservabilityEventRecordPacket{
+						ContextID: oldContextID,
+						Scope:     internal_type.ObservabilityRecordScopeConversation,
+						Record: observability.RecordEvent{
+							Component:  observability.ComponentTurn,
+							Event:      observability.TurnInterrupted,
+							OccurredAt: time.Now(),
+							Attributes: observability.Attributes{
+								"old_context_id": oldContextID,
+								"new_context_id": newContextID,
+								"reason":         "interrupted",
+								"source":         string(internal_type.InterruptionSourceWord),
+								"mode":           h.r.GetMode().String(),
+								"state":          string(messageState),
+								"trigger":        string(p.PacketName()),
+							},
+						},
+					},
 					internal_type.TurnChangePacket{
 						ContextID:         newContextID,
 						PreviousContextID: oldContextID,
 						Reason:            "interrupted",
-						Source:            "requestor",
+						Source:            string(internal_type.InterruptionSourceWord),
+						PreviousState:     string(messageState),
+						Trigger:           string(p.PacketName()),
 						Time:              time.Now(),
+					},
+					internal_type.ObservabilityEventRecordPacket{
+						ContextID: newContextID,
+						Scope:     internal_type.ObservabilityRecordScopeConversation,
+						Record: observability.RecordEvent{
+							Component:  observability.ComponentTurn,
+							Event:      observability.TurnStarted,
+							OccurredAt: time.Now(),
+							Attributes: observability.Attributes{
+								"context_id":          newContextID,
+								"previous_context_id": oldContextID,
+								"reason":              "interruption",
+								"source":              string(internal_type.InterruptionSourceWord),
+								"mode":                h.r.GetMode().String(),
+								"previous_state":      string(messageState),
+								"trigger":             string(p.PacketName()),
+							},
+						},
 					},
 					internal_type.TextToSpeechInterruptPacket{ContextID: oldContextID},
 					internal_type.LLMInterruptPacket{ContextID: oldContextID},
@@ -520,12 +680,50 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 			h.r.OnPacket(ctx,
 				internal_type.StopIdleTimeoutPacket{ContextID: oldContextID},
 				internal_type.EndOfSpeechInterruptionPacket{ContextID: oldContextID, Source: internal_type.InterruptionSourceWord},
+				internal_type.ObservabilityEventRecordPacket{
+					ContextID: oldContextID,
+					Scope:     internal_type.ObservabilityRecordScopeConversation,
+					Record: observability.RecordEvent{
+						Component:  observability.ComponentTurn,
+						Event:      observability.TurnInterrupted,
+						OccurredAt: time.Now(),
+						Attributes: observability.Attributes{
+							"old_context_id": oldContextID,
+							"new_context_id": newContextID,
+							"reason":         "interrupted",
+							"source":         string(internal_type.InterruptionSourceWord),
+							"mode":           h.r.GetMode().String(),
+							"state":          string(messageState),
+							"trigger":        string(p.PacketName()),
+						},
+					},
+				},
 				internal_type.TurnChangePacket{
 					ContextID:         newContextID,
 					PreviousContextID: oldContextID,
 					Reason:            "interrupted",
-					Source:            "requestor",
+					Source:            string(internal_type.InterruptionSourceWord),
+					PreviousState:     string(messageState),
+					Trigger:           string(p.PacketName()),
 					Time:              time.Now(),
+				},
+				internal_type.ObservabilityEventRecordPacket{
+					ContextID: newContextID,
+					Scope:     internal_type.ObservabilityRecordScopeConversation,
+					Record: observability.RecordEvent{
+						Component:  observability.ComponentTurn,
+						Event:      observability.TurnStarted,
+						OccurredAt: time.Now(),
+						Attributes: observability.Attributes{
+							"context_id":          newContextID,
+							"previous_context_id": oldContextID,
+							"reason":              "interruption",
+							"source":              string(internal_type.InterruptionSourceWord),
+							"mode":                h.r.GetMode().String(),
+							"previous_state":      string(messageState),
+							"trigger":             string(p.PacketName()),
+						},
+					},
 				},
 				internal_type.TextToSpeechInterruptPacket{ContextID: oldContextID},
 				internal_type.LLMInterruptPacket{ContextID: oldContextID},
@@ -747,21 +945,16 @@ func (h requestorDispatchHandler) HandleTurnChange(ctx context.Context, p intern
 				"new_context_id": p.ContextID,
 				"reason":         p.Reason,
 				"source":         p.Source,
+				"mode":           h.r.GetMode().String(),
+				"previous_state": p.PreviousState,
+				"trigger":        p.Trigger,
+				"text":           p.Text,
 			},
 		},
 	})
 }
 func (h requestorDispatchHandler) HandleLLMResponseDelta(ctx context.Context, p internal_type.LLMResponseDeltaPacket) {
 	if p.ContextID != h.r.GetID() {
-		h.r.OnPacket(ctx, internal_type.ObservabilityEventRecordPacket{
-			ContextID: p.ContextID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.NewMessageRecord(p.ContextID, observability.ComponentAgent, observability.AgentDiscarded, observability.MessageRoleAssistant, observability.Attributes{
-				"reason":          "stale_context",
-				"current_context": h.r.GetID(),
-				"text":            p.Text,
-			}),
-		})
 		return
 	}
 	_ = h.r.messageLifecycle.AssistantGenerating(p.ContextID)
@@ -773,16 +966,6 @@ func (h requestorDispatchHandler) HandleLLMResponseDelta(ctx context.Context, p 
 }
 func (h requestorDispatchHandler) HandleLLMResponseDone(ctx context.Context, p internal_type.LLMResponseDonePacket) {
 	if p.ContextID != h.r.GetID() {
-		h.r.OnPacket(ctx, internal_type.ObservabilityEventRecordPacket{
-			ContextID: p.ContextID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.NewMessageRecord(p.ContextID, observability.ComponentAgent, observability.AgentDiscarded, observability.MessageRoleAssistant, observability.Attributes{
-				"reason":          "stale_context",
-				"packet":          "done",
-				"current_context": h.r.GetID(),
-				"text":            p.Text,
-			}),
-		})
 		return
 	}
 	_ = h.r.messageLifecycle.AssistantGenerated(p.ContextID)
@@ -1384,16 +1567,6 @@ func (h requestorDispatchHandler) HandleTextToSpeechText(ctx context.Context, p 
 						Description: fmt.Sprintf("tts text chunk discarded due to stale contextID %s", h.r.GetID()),
 					}},
 				),
-			},
-			internal_type.ObservabilityEventRecordPacket{
-				ContextID: p.ContextID,
-				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.NewMessageRecord(p.ContextID, observability.ComponentTTS, observability.TTSDiscardChunk, observability.MessageRoleAssistant, observability.Attributes{
-					"reason":          "stale_context",
-					"packet":          "TextToSpeechTextPacket",
-					"current_context": h.r.GetID(),
-					"message":         p.Text,
-				}),
 			})
 		return
 	}
@@ -1485,15 +1658,6 @@ func (h requestorDispatchHandler) HandleTextToSpeechAudio(ctx context.Context, p
 	}
 	if p.ContextID != h.r.GetID() {
 		h.r.OnPacket(ctx,
-			internal_type.ObservabilityEventRecordPacket{
-				ContextID: p.ContextID,
-				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.NewMessageRecord(p.ContextID, observability.ComponentTTS, observability.TTSDiscardChunk, observability.MessageRoleAssistant, observability.Attributes{
-					"reason":          "stale_context",
-					"packet":          "tts_audio",
-					"current_context": h.r.GetID(),
-				}),
-			},
 			internal_type.ObservabilityMetricRecordPacket{
 				ContextID: p.ContextID,
 				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
@@ -1524,15 +1688,6 @@ func (h requestorDispatchHandler) HandleTextToSpeechEnd(ctx context.Context, p i
 		h.r.ttsCompletionWatchdog.Complete(p.ContextID)
 	}
 	if p.ContextID != h.r.GetID() {
-		h.r.OnPacket(ctx, internal_type.ObservabilityEventRecordPacket{
-			ContextID: p.ContextID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.NewMessageRecord(p.ContextID, observability.ComponentTTS, observability.TTSDiscardChunk, observability.MessageRoleAssistant, observability.Attributes{
-				"reason":          "stale_context",
-				"packet":          "tts_end",
-				"current_context": h.r.GetID(),
-			}),
-		})
 		return
 	}
 	assistantIdle := h.r.messageLifecycle.AssistantFinished(p.ContextID) == nil &&

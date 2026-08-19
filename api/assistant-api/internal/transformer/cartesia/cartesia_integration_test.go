@@ -49,7 +49,7 @@ func TestCartesiaTTSLifecycle(t *testing.T) {
 	require.NoError(t, tts.Initialize())
 	defer tts.Close(ctx)
 
-	assertMetricValue(t, collector, "tts_init_ms", 0)
+	assertMetricValue(t, collector, observability.MetricTTSInitLatencyMs, 0)
 
 	// Send delta + done (done sends continue:false, flush:true → Cartesia responds with done:true)
 	require.NoError(t, tts.Transform(ctx, internal_type.LLMResponseDeltaPacket{

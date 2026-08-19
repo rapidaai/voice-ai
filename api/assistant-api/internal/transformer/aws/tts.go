@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -80,7 +81,14 @@ func (t *awsTTS) Initialize() error {
 		internal_type.ObservabilityMetricRecordPacket{
 			ContextID: ctxID,
 			Scope:     internal_type.ObservabilityRecordScopeConversation,
-			Record:    observability.NewMetricTTSInitLatencyMs(time.Since(start), observability.Attributes{"provider": t.Name()}),
+			Record: observability.RecordMetric{
+				Metrics: []*protos.Metric{{
+					Name:        observability.MetricTTSInitLatencyMs,
+					Value:       strconv.FormatInt(time.Since(start).Milliseconds(), 10),
+					Description: "TTS initialization latency in milliseconds",
+				}},
+				Attributes: observability.Attributes{"provider": t.Name()},
+			},
 		},
 		internal_type.ObservabilityLogRecordPacket{
 			ContextID: ctxID,

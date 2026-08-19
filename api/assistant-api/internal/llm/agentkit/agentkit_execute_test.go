@@ -27,6 +27,8 @@ func TestExecute_UserInputPacket(t *testing.T) {
 	evs := findPackets[internal_type.ObservabilityEventRecordPacket](collector.all())
 	require.Len(t, evs, 1)
 	assert.Equal(t, observability.AgentStarted, evs[0].Record.Event)
+	assert.False(t, evs[0].Record.OccurredAt.IsZero())
+	assert.Equal(t, "hello world", evs[0].Record.Attributes["script"])
 	assert.Equal(t, "11", evs[0].Record.Attributes["input_char_count"])
 
 	talker.mu.Lock()

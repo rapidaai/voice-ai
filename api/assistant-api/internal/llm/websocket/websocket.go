@@ -433,6 +433,21 @@ func (e *websocketExecutor) handleResponse(ctx context.Context, resp *Response, 
 		var d StreamData
 		json.Unmarshal(resp.Data, &d)
 		if !e.isCurrentContextID(d.ID) {
+			onPacket(ctx, internal_type.ObservabilityEventRecordPacket{
+				ContextID: d.ID,
+				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentAgent,
+					Event:     observability.AgentDiscarded,
+					Attributes: observability.Attributes{
+						"provider":   e.Name(),
+						"context_id": d.ID,
+						"reason":     "stale_context",
+						"script":     d.Content,
+					},
+					OccurredAt: time.Now(),
+				},
+			})
 			return
 		}
 		now := time.Now()
@@ -466,6 +481,21 @@ func (e *websocketExecutor) handleResponse(ctx context.Context, resp *Response, 
 		var d CompleteData
 		json.Unmarshal(resp.Data, &d)
 		if !e.isCurrentContextID(d.ID) {
+			onPacket(ctx, internal_type.ObservabilityEventRecordPacket{
+				ContextID: d.ID,
+				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentAgent,
+					Event:     observability.AgentDiscarded,
+					Attributes: observability.Attributes{
+						"provider":   e.Name(),
+						"context_id": d.ID,
+						"reason":     "stale_context",
+						"script":     d.Content,
+					},
+					OccurredAt: time.Now(),
+				},
+			})
 			return
 		}
 		if d.Content != "" {
@@ -487,6 +517,7 @@ func (e *websocketExecutor) handleResponse(ctx context.Context, resp *Response, 
 					Record: observability.NewMessageRecord(d.ID, observability.ComponentAgent, observability.AgentCompleted, observability.MessageRoleAssistant, observability.Attributes{
 						"provider":            e.Name(),
 						"context_id":          d.ID,
+						"script":              d.Content,
 						"response_char_count": fmt.Sprintf("%d", len(d.Content)),
 					}),
 				},
@@ -579,8 +610,50 @@ func (e *websocketExecutor) handleResponse(ctx context.Context, resp *Response, 
 func (e *websocketExecutor) Execute(ctx context.Context, comm internal_type.Communication, packet internal_type.Packet) error {
 	switch p := packet.(type) {
 	case internal_type.UserInputPacket:
+		if comm == nil {
+			return e.sendUserMessage(p.ContextID, p.Text)
+		}
+		if strings.TrimSpace(p.ContextID) == "" {
+			return e.sendUserMessage(p.ContextID, p.Text)
+		}
+		comm.OnPacket(ctx, internal_type.ObservabilityEventRecordPacket{
+			ContextID: p.ContextID,
+			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+			Record: observability.RecordEvent{
+				Component: observability.ComponentAgent,
+				Event:     observability.AgentStarted,
+				Attributes: observability.Attributes{
+					"provider":         e.Name(),
+					"context_id":       p.ContextID,
+					"script":           p.Text,
+					"input_char_count": fmt.Sprintf("%d", len(p.Text)),
+				},
+				OccurredAt: time.Now(),
+			},
+		})
 		return e.sendUserMessage(p.ContextID, p.Text)
 	case internal_type.UserTextReceivedPacket:
+		if comm == nil {
+			return e.sendUserMessage(p.ContextID, p.Text)
+		}
+		if strings.TrimSpace(p.ContextID) == "" {
+			return e.sendUserMessage(p.ContextID, p.Text)
+		}
+		comm.OnPacket(ctx, internal_type.ObservabilityEventRecordPacket{
+			ContextID: p.ContextID,
+			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+			Record: observability.RecordEvent{
+				Component: observability.ComponentAgent,
+				Event:     observability.AgentStarted,
+				Attributes: observability.Attributes{
+					"provider":         e.Name(),
+					"context_id":       p.ContextID,
+					"script":           p.Text,
+					"input_char_count": fmt.Sprintf("%d", len(p.Text)),
+				},
+				OccurredAt: time.Now(),
+			},
+		})
 		return e.sendUserMessage(p.ContextID, p.Text)
 	case internal_type.InjectMessagePacket:
 		return nil

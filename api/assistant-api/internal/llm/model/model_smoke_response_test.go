@@ -21,7 +21,11 @@ func TestModel_ResponsePipeline_DropsStaleResponse(t *testing.T) {
 		Data:      &protos.Message{Role: "assistant", Message: &protos.Message_Assistant{Assistant: &protos.AssistantMessage{Contents: []string{"ignored"}}}},
 	}})
 
-	require.Empty(t, comm.pkts)
+	evt, ok := findPacket[internal_type.ObservabilityEventRecordPacket](comm.pkts)
+	require.True(t, ok)
+	require.Equal(t, observability.AgentDiscarded, evt.Record.Event)
+	require.False(t, evt.Record.OccurredAt.IsZero())
+	require.Equal(t, "ignored", evt.Record.Attributes["script"])
 	require.Empty(t, stream.sendCalls)
 }
 

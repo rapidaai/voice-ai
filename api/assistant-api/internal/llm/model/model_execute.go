@@ -143,12 +143,18 @@ func (e *modelAssistantExecutor) handleUserTurn(ctx context.Context, communicati
 		internal_type.ObservabilityEventRecordPacket{
 			ContextID: p.ContextID,
 			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.NewMessageRecord(p.ContextID, observability.ComponentAgent, observability.AgentStarted, observability.MessageRoleAssistant, observability.Attributes{
-				"provider":         providerName,
-				"context_id":       p.ContextID,
-				"input_char_count": fmt.Sprintf("%d", len(p.Text)),
-				"history_count":    fmt.Sprintf("%d", len(snapshot)),
-			}),
+			Record: observability.RecordEvent{
+				Component: observability.ComponentAgent,
+				Event:     observability.AgentStarted,
+				Attributes: observability.Attributes{
+					"provider":         providerName,
+					"context_id":       p.ContextID,
+					"script":           p.Text,
+					"input_char_count": fmt.Sprintf("%d", len(p.Text)),
+					"history_count":    fmt.Sprintf("%d", len(snapshot)),
+				},
+				OccurredAt: time.Now(),
+			},
 		},
 		internal_type.ObservabilityLogRecordPacket{
 			ContextID: p.ContextID,
@@ -298,6 +304,21 @@ func (e *modelAssistantExecutor) handleInterruption() {
 
 func (e *modelAssistantExecutor) handleResponse(ctx context.Context, communication internal_type.Communication, resp *protos.StreamChatOutput) {
 	if e.isStaleResponse(resp.GetRequestId()) {
+		text := strings.Join(resp.GetData().GetAssistant().GetContents(), "")
+		communication.OnPacket(ctx, internal_type.ObservabilityEventRecordPacket{
+			ContextID: resp.GetRequestId(),
+			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+			Record: observability.RecordEvent{
+				Component: observability.ComponentAgent,
+				Event:     observability.AgentDiscarded,
+				Attributes: observability.Attributes{
+					"context_id": resp.GetRequestId(),
+					"reason":     "stale_context",
+					"script":     text,
+				},
+				OccurredAt: time.Now(),
+			},
+		})
 		return
 	}
 	contextID := resp.GetRequestId()
@@ -432,6 +453,7 @@ func (e *modelAssistantExecutor) onCompletion(ctx context.Context, communication
 			Record: observability.NewMessageRecord(contextID, observability.ComponentAgent, observability.AgentCompleted, observability.MessageRoleAssistant, observability.Attributes{
 				"provider":            providerName,
 				"context_id":          contextID,
+				"script":              responseText,
 				"response_char_count": fmt.Sprintf("%d", len(responseText)),
 				"finish_reason":       finishReason,
 				"tool_call_count":     fmt.Sprintf("%d", len(toolCalls)),

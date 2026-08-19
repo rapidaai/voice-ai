@@ -78,7 +78,9 @@ const (
 )
 
 const (
-	TurnChange EventName = "turn.change"
+	TurnInterrupted EventName = "turn.interrupted"
+	TurnChange      EventName = "turn.change"
+	TurnStarted     EventName = "turn.started"
 )
 
 const (
@@ -90,12 +92,11 @@ const (
 )
 
 const (
-	TTSSpeaking     EventName = "tts.speaking"
-	TTSCompleted    EventName = "tts.completed"
-	TTSDiscardChunk EventName = "tts.discard_chunk"
-	TTSInterrupted  EventName = "tts.interrupted"
-	TTSClosed       EventName = "tts.closed"
-	TTSError        EventName = "tts.error"
+	TTSSpeaking    EventName = "tts.speaking"
+	TTSCompleted   EventName = "tts.completed"
+	TTSInterrupted EventName = "tts.interrupted"
+	TTSClosed      EventName = "tts.closed"
+	TTSError       EventName = "tts.error"
 )
 
 const (
@@ -204,7 +205,9 @@ var eventsByComponent = map[ComponentName][]EventName{
 		ConversationModeSwitchFailed,
 	},
 	ComponentTurn: {
+		TurnInterrupted,
 		TurnChange,
+		TurnStarted,
 	},
 
 	ComponentSTT: {
@@ -217,7 +220,6 @@ var eventsByComponent = map[ComponentName][]EventName{
 	ComponentTTS: {
 		TTSSpeaking,
 		TTSCompleted,
-		TTSDiscardChunk,
 		TTSInterrupted,
 		TTSClosed,
 		TTSError,

@@ -138,11 +138,17 @@ func (e *agentkitExecutor) handleUserTurn(ctx context.Context, comm internal_typ
 		internal_type.ObservabilityEventRecordPacket{
 			ContextID: contextID,
 			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.NewMessageRecord(contextID, observability.ComponentAgent, observability.AgentStarted, observability.MessageRoleAssistant, observability.Attributes{
-				"provider":         e.Name(),
-				"context_id":       contextID,
-				"input_char_count": fmt.Sprintf("%d", len(text)),
-			}),
+			Record: observability.RecordEvent{
+				Component: observability.ComponentAgent,
+				Event:     observability.AgentStarted,
+				Attributes: observability.Attributes{
+					"provider":         e.Name(),
+					"context_id":       contextID,
+					"script":           text,
+					"input_char_count": fmt.Sprintf("%d", len(text)),
+				},
+				OccurredAt: time.Now(),
+			},
 		},
 		internal_type.ObservabilityLogRecordPacket{
 			ContextID: contextID,

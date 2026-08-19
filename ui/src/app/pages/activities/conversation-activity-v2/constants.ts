@@ -57,7 +57,7 @@ export const METRIC_NAME_OPTIONS: FilterOption[] = [
   { id: 'stt.latency_ms', text: 'stt.latency_ms' },
   { id: 'stt.ttft_ms', text: 'stt.ttft_ms' },
   { id: 'stt.ttlt_ms', text: 'stt.ttlt_ms' },
-  { id: 'tts_init_ms', text: 'tts_init_ms' },
+  { id: 'tts.init_ms', text: 'tts.init_ms' },
   { id: 'tts.latency_ms', text: 'tts.latency_ms' },
   { id: 'vad.init_ms', text: 'vad.init_ms' },
   { id: 'eos.init_ms', text: 'eos.init_ms' },
@@ -147,7 +147,7 @@ export const EVENTS_BY_COMPONENT: Record<string, string[]> = {
     'conversation.agent_state_changed',
     'conversation.mode_switch_failed',
   ],
-  turn: ['turn.change'],
+  turn: ['turn.interrupted', 'turn.change', 'turn.started'],
   stt: [
     'stt.interim',
     'stt.completed',
@@ -158,7 +158,6 @@ export const EVENTS_BY_COMPONENT: Record<string, string[]> = {
   tts: [
     'tts.speaking',
     'tts.completed',
-    'tts.discard_chunk',
     'tts.interrupted',
     'tts.closed',
     'tts.error',

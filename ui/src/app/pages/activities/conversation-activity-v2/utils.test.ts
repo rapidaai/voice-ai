@@ -208,7 +208,12 @@ describe('conversation activity v2 telemetry utilities', () => {
     expect(EVENTS_BY_COMPONENT.call).not.toContain('call.answered');
     expect(EVENTS_BY_COMPONENT.stt).toContain('stt.interim');
     expect(EVENTS_BY_COMPONENT.stt).not.toContain('stt.final');
-    expect(EVENTS_BY_COMPONENT.tts).toContain('tts.discard_chunk');
+    expect(EVENTS_BY_COMPONENT.turn).toEqual([
+      'turn.interrupted',
+      'turn.change',
+      'turn.started',
+    ]);
+    expect(EVENTS_BY_COMPONENT.tts).not.toContain('tts.discard_chunk');
     expect(EVENTS_BY_COMPONENT.tts).not.toContain('tts.discarded');
     expect(EVENTS_BY_COMPONENT.tts).not.toContain('tts.first_audio');
     expect(EVENTS_BY_COMPONENT.agent).toEqual([

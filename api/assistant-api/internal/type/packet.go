@@ -438,6 +438,9 @@ type TurnChangePacket struct {
 	PreviousContextID string
 	Reason            string
 	Source            string
+	PreviousState     string
+	Trigger           string
+	Text              string
 	Time              time.Time
 }
 

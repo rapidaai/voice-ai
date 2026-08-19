@@ -960,7 +960,7 @@ func TestConsistency_StaleContextDoesNotEmitPackets(t *testing.T) {
 
 	e.activeContextID = "ctx-active"
 
-	// Stale responses should not emit
+	// Stale assistant text emits a discard event; non-text stale responses stay silent.
 	staleTypes := []*protos.TalkOutput{
 		{Data: &protos.TalkOutput_Assistant{Assistant: &protos.ConversationAssistantMessage{
 			Id: "ctx-stale", Completed: true,
@@ -976,5 +976,8 @@ func TestConsistency_StaleContextDoesNotEmitPackets(t *testing.T) {
 		e.Write(context.Background(), comm, resp)
 	}
 
-	assert.Empty(t, collector.all(), "all stale context responses should be dropped")
+	events := findPackets[internal_type.ObservabilityEventRecordPacket](collector.all())
+	require.Len(t, events, 1)
+	assert.Equal(t, observability.AgentDiscarded, events[0].Record.Event)
+	assert.Equal(t, "ignore", events[0].Record.Attributes["script"])
 }

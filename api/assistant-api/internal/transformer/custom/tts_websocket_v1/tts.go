@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -422,7 +423,14 @@ func (transformer *textToSpeech) getOrOpenConnection(scope queryScope) (*websock
 		internal_type.ObservabilityMetricRecordPacket{
 			ContextID: scope.MessageID,
 			Scope:     internal_type.ObservabilityRecordScopeConversation,
-			Record:    observability.NewMetricTTSInitLatencyMs(time.Since(start), observability.Attributes{"provider": transformer.Name()}),
+			Record: observability.RecordMetric{
+				Metrics: []*protos.Metric{{
+					Name:        observability.MetricTTSInitLatencyMs,
+					Value:       strconv.FormatInt(time.Since(start).Milliseconds(), 10),
+					Description: "TTS initialization latency in milliseconds",
+				}},
+				Attributes: observability.Attributes{"provider": transformer.Name()},
+			},
 		},
 		internal_type.ObservabilityLogRecordPacket{
 			ContextID: scope.MessageID,
