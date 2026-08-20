@@ -1,0 +1,45 @@
+name: Workflow Lint
+
+on:
+  pull_request:
+    paths:
+      - .github/actions/**
+      - .github/dependabot.yml
+      - .github/workflows/**
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - .github/actions/**
+      - .github/dependabot.yml
+      - .github/workflows/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workflow-lint-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actionlint:
+    name: Actionlint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: "1.25.13"
+          cache: false
+
+      - name: Install actionlint
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+
+      - name: Lint workflows
+        run: actionlint -color

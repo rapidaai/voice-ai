@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Resolve version
         id: vars
@@ -36,15 +36,15 @@ jobs:
           fi
 
       - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f
 
       - name: Setup Packer
-        uses: hashicorp/setup-packer@main
+        uses: hashicorp/setup-packer@ce93c3c08a6c2ff2275bf4b54ff0d9a75f6c9789
         with:
           version: latest
 
@@ -72,7 +72,7 @@ jobs:
           echo "image_name=${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Upload manifest artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: packer-manifest-gcp-${{ steps.vars.outputs.version }}
           path: deploy/gcp/packer/manifest.json
