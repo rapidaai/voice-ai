@@ -1,0 +1,717 @@
+{
+  "info": {
+    "_postman_id": "b2cc9097-a0ad-5bf3-a1ff-4ac2fcbf1e89",
+    "name": "Rapida Assistant API Smoke",
+    "description": "CI/CD smoke collection generated from `openapi/artifacts/assistant-api.yaml`. This collection intentionally contains only the ordered smoke flow.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:9007",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "assistantId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "configurationId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "apiDeploymentId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "page",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "pageSize",
+      "value": "20",
+      "type": "string"
+    },
+    {
+      "key": "sourceIdentifier",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "modelProviderName",
+      "value": "openai",
+      "type": "string"
+    },
+    {
+      "key": "sttProviderName",
+      "value": "deepgram",
+      "type": "string"
+    },
+    {
+      "key": "ttsProviderName",
+      "value": "elevenlabs",
+      "type": "string"
+    },
+    {
+      "key": "phoneProviderName",
+      "value": "twilio",
+      "type": "string"
+    },
+    {
+      "key": "whatsappProviderName",
+      "value": "twilio",
+      "type": "string"
+    },
+    {
+      "key": "callerId",
+      "value": "+15551234567",
+      "type": "string"
+    },
+    {
+      "key": "whatsappBusinessNumber",
+      "value": "+15551234567",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Smoke Flow",
+      "item": [
+        {
+          "name": "01 Create Assistant",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/assistant/create-assistant",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "assistant",
+                "create-assistant"
+              ]
+            },
+            "description": "Create an assistant\n\nOpenAPI operationId: `createAssistant`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assistantProvider\": {\n    \"model\": {\n      \"modelProviderName\": \"{{modelProviderName}}\",\n      \"template\": {\n        \"prompt\": [\n          {\n            \"role\": \"system\",\n            \"content\": \"You are a helpful voice assistant.\"\n          }\n        ]\n      },\n      \"assistantModelOptions\": [\n        {\n          \"key\": \"temperature\",\n          \"value\": \"0.7\"\n        },\n        {\n          \"key\": \"max_tokens\",\n          \"value\": \"512\"\n        }\n      ]\n    }\n  },\n  \"description\": \"Assistant created from the Postman collection.\",\n  \"visibility\": \"private\",\n  \"language\": \"en\",\n  \"source\": \"postman\",\n  \"sourceIdentifier\": \"{{sourceIdentifier}}\",\n  \"tags\": [\n    \"postman\",\n    \"assistant-api\"\n  ],\n  \"name\": \"Postman Assistant\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "let jsonData = {};",
+                  "if (pm.response && pm.response.text()) {",
+                  "  jsonData = pm.response.json();",
+                  "}",
+                  "pm.test('success is true', function () {",
+                  "  pm.expect(jsonData.success).to.eql(true);",
+                  "});",
+                  "pm.test('assistant is created', function () {",
+                  "  const data = jsonData.data || {};",
+                  "  pm.expect(data.name).to.eql('Postman Assistant');",
+                  "  pm.expect(data.id).to.exist;",
+                  "});",
+                  "if (jsonData.data && jsonData.data.id) {",
+                  "  pm.collectionVariables.set('assistantId', String(jsonData.data.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Create Configuration",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/assistant/configurations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "assistant",
+                "configurations"
+              ]
+            },
+            "description": "Create assistant configuration\n\nOpenAPI operationId: `createAssistantConfiguration`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assistantId\": \"{{assistantId}}\",\n  \"configurationType\": \"webhook\",\n  \"provider\": \"custom\",\n  \"enabled\": true,\n  \"options\": [\n    {\n      \"key\": \"url\",\n      \"value\": \"https://example.com/webhook\"\n    },\n    {\n      \"key\": \"method\",\n      \"value\": \"POST\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "let jsonData = {};",
+                  "if (pm.response && pm.response.text()) {",
+                  "  jsonData = pm.response.json();",
+                  "}",
+                  "pm.test('success is true', function () {",
+                  "  pm.expect(jsonData.success).to.eql(true);",
+                  "});",
+                  "pm.test('configuration is created for assistant', function () {",
+                  "  const data = jsonData.data || {};",
+                  "  pm.expect(data.assistantId).to.eql(pm.collectionVariables.get('assistantId'));",
+                  "  pm.expect(data.configurationType).to.eql('webhook');",
+                  "  pm.expect(data.provider).to.eql('custom');",
+                  "});",
+                  "if (jsonData.data && jsonData.data.id) {",
+                  "  pm.collectionVariables.set('configurationId', String(jsonData.data.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 Get Configuration",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{configurationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "assistant",
+                "configurations",
+                "{{assistantId}}",
+                "{{configurationId}}"
+              ]
+            },
+            "description": "Get assistant configuration\n\nOpenAPI operationId: `getAssistantConfiguration`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "let jsonData = {};",
+                  "if (pm.response && pm.response.text()) {",
+                  "  jsonData = pm.response.json();",
+                  "}",
+                  "pm.test('success is true', function () {",
+                  "  pm.expect(jsonData.success).to.eql(true);",
+                  "});",
+                  "pm.test('get returns created configuration', function () {",
+                  "  const data = jsonData.data || {};",
+                  "  pm.expect(data.id).to.eql(pm.collectionVariables.get('configurationId'));",
+                  "  pm.expect(data.assistantId).to.eql(pm.collectionVariables.get('assistantId'));",
+                  "  pm.expect(data.provider).to.eql('custom');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 List Configurations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "assistant",
+                "configurations",
+                "{{assistantId}}"
+              ],
+              "query": [
+                {
+                  "key": "configurationType",
+                  "value": "webhook",
+                  "description": "Optional query parameter.",
+                  "disabled": true
+                },
+                {
+                  "key": "provider",
+                  "value": "custom",
+                  "description": "Optional query parameter.",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "description": "Optional query parameter."
+                },
+                {
+                  "key": "pageSize",
+                  "value": "{{pageSize}}",
+                  "description": "Optional query parameter."
+                }
+              ]
+            },
+            "description": "Get assistant configurations\n\nOpenAPI operationId: `getAllAssistantConfiguration`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "let jsonData = {};",
+                  "if (pm.response && pm.response.text()) {",
+                  "  jsonData = pm.response.json();",
+                  "}",
+                  "pm.test('success is true', function () {",
+                  "  pm.expect(jsonData.success).to.eql(true);",
+                  "});",
+                  "pm.test('list includes created configuration', function () {",
+                  "  const ids = (jsonData.data || []).map(item => String(item.id));",
+                  "  pm.expect(ids).to.include(pm.collectionVariables.get('configurationId'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 Update Configuration",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{configurationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "assistant",
+                "configurations",
+                "{{assistantId}}",
+                "{{configurationId}}"
+              ]
+            },
+            "description": "Update assistant configuration\n\nOpenAPI operationId: `updateAssistantConfiguration`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"configurationType\": \"webhook\",\n  \"provider\": \"custom-v2\",\n  \"enabled\": false,\n  \"options\": [\n    {\n      \"key\": \"url\",\n      \"value\": \"https://example.com/webhook-v2\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "let jsonData = {};",
+                  "if (pm.response && pm.response.text()) {",
+                  "  jsonData = pm.response.json();",
+                  "}",
+                  "pm.test('success is true', function () {",
+                  "  pm.expect(jsonData.success).to.eql(true);",
+                  "});",
+                  "pm.test('configuration is updated', function () {",
+                  "  const data = jsonData.data || {};",
+                  "  pm.expect(data.id).to.eql(pm.collectionVariables.get('configurationId'));",
+                  "  pm.expect(data.provider).to.eql('custom-v2');",
+                  "  pm.expect(data.enabled).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 Get Updated Configuration",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{configurationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "assistant",
+                "configurations",
+                "{{assistantId}}",
+                "{{configurationId}}"
+              ]
+            },
+            "description": "Get assistant configuration\n\nOpenAPI operationId: `getAssistantConfiguration`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "let jsonData = {};",
+                  "if (pm.response && pm.response.text()) {",
+                  "  jsonData = pm.response.json();",
+                  "}",
+                  "pm.test('success is true', function () {",
+                  "  pm.expect(jsonData.success).to.eql(true);",
+                  "});",
+                  "pm.test('get returns updated configuration', function () {",
+                  "  const data = jsonData.data || {};",
+                  "  pm.expect(data.id).to.eql(pm.collectionVariables.get('configurationId'));",
+                  "  pm.expect(data.provider).to.eql('custom-v2');",
+                  "  pm.expect(data.enabled).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 Create API Deployment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/assistant-deployment/create-api-deployment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "assistant-deployment",
+                "create-api-deployment"
+              ]
+            },
+            "description": "Creates an API deployment for an assistant. This endpoint requires user authentication with organization and project scope.\n\nOpenAPI operationId: `createAssistantApiDeployment`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assistantId\": \"{{assistantId}}\",\n  \"greeting\": \"Hello, how can I help you today?\",\n  \"greetingInterruptible\": true,\n  \"mistake\": \"Sorry, I did not catch that.\",\n  \"unclearInputTimeout\": 4,\n  \"unclearInputMessage\": \"Could you repeat that?\",\n  \"idealTimeout\": 30,\n  \"idealTimeoutBackoff\": 2,\n  \"idealTimeoutMessage\": \"Are you still there?\",\n  \"maxSessionDuration\": 300,\n  \"inputAudio\": {\n    \"audioType\": \"input\",\n    \"audioProvider\": \"{{sttProviderName}}\",\n    \"status\": \"ACTIVE\",\n    \"audioOptions\": [\n      {\n        \"key\": \"language\",\n        \"value\": \"en-US\"\n      }\n    ]\n  },\n  \"outputAudio\": {\n    \"audioType\": \"output\",\n    \"audioProvider\": \"{{ttsProviderName}}\",\n    \"status\": \"ACTIVE\",\n    \"audioOptions\": [\n      {\n        \"key\": \"voice\",\n        \"value\": \"default\"\n      }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "let jsonData = {};",
+                  "if (pm.response && pm.response.text()) {",
+                  "  jsonData = pm.response.json();",
+                  "}",
+                  "pm.test('success is true', function () {",
+                  "  pm.expect(jsonData.success).to.eql(true);",
+                  "});",
+                  "pm.test('api deployment is created', function () {",
+                  "  const data = jsonData.data || {};",
+                  "  pm.expect(data.assistantId).to.eql(pm.collectionVariables.get('assistantId'));",
+                  "  pm.expect(data.greeting).to.eql('Hello, how can I help you today?');",
+                  "});",
+                  "if (jsonData.data && jsonData.data.id) {",
+                  "  pm.collectionVariables.set('apiDeploymentId', String(jsonData.data.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 Get Latest API Deployment",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/assistant-deployment/get-api-deployment/{{assistantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "assistant-deployment",
+                "get-api-deployment",
+                "{{assistantId}}"
+              ]
+            },
+            "description": "Gets the latest API deployment for an assistant. This endpoint requires user authentication with organization and project scope.\n\nOpenAPI operationId: `getAssistantApiDeployment`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "let jsonData = {};",
+                  "if (pm.response && pm.response.text()) {",
+                  "  jsonData = pm.response.json();",
+                  "}",
+                  "pm.test('success is true', function () {",
+                  "  pm.expect(jsonData.success).to.eql(true);",
+                  "});",
+                  "pm.test('latest api deployment matches created deployment', function () {",
+                  "  const data = jsonData.data || {};",
+                  "  pm.expect(data.id).to.eql(pm.collectionVariables.get('apiDeploymentId'));",
+                  "  pm.expect(data.assistantId).to.eql(pm.collectionVariables.get('assistantId'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 List API Deployments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/assistant-deployment/get-all-api-deployment/{{assistantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "assistant-deployment",
+                "get-all-api-deployment",
+                "{{assistantId}}"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "description": "Optional query parameter."
+                },
+                {
+                  "key": "pageSize",
+                  "value": "{{pageSize}}",
+                  "description": "Optional query parameter."
+                },
+                {
+                  "key": "criterias",
+                  "value": "[{\"key\":\"status\",\"value\":\"active\",\"logic\":\"equal\"}]",
+                  "description": "Optional query parameter.",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Gets API deployments for an assistant. This endpoint requires user authentication with organization and project scope.\n\nOpenAPI operationId: `getAllAssistantApiDeployment`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "let jsonData = {};",
+                  "if (pm.response && pm.response.text()) {",
+                  "  jsonData = pm.response.json();",
+                  "}",
+                  "pm.test('success is true', function () {",
+                  "  pm.expect(jsonData.success).to.eql(true);",
+                  "});",
+                  "pm.test('list includes created api deployment', function () {",
+                  "  const ids = (jsonData.data || []).map(item => String(item.id));",
+                  "  pm.expect(ids).to.include(pm.collectionVariables.get('apiDeploymentId'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 Delete Configuration",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{configurationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "assistant",
+                "configurations",
+                "{{assistantId}}",
+                "{{configurationId}}"
+              ]
+            },
+            "description": "Delete assistant configuration\n\nOpenAPI operationId: `deleteAssistantConfiguration`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "let jsonData = {};",
+                  "if (pm.response && pm.response.text()) {",
+                  "  jsonData = pm.response.json();",
+                  "}",
+                  "pm.test('success is true', function () {",
+                  "  pm.expect(jsonData.success).to.eql(true);",
+                  "});",
+                  "pm.test('deleted configuration is returned', function () {",
+                  "  const data = jsonData.data || {};",
+                  "  pm.expect(data.id).to.eql(pm.collectionVariables.get('configurationId'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
