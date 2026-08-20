@@ -1,14 +1,10 @@
 language: en-US
 
 tone_instructions: >-
-  Review as a pragmatic senior engineer. Be direct, concise, respectful, and
-  evidence-based. Focus on behavior, engineering principles, and operational
-  impact rather than referring reviewers to instruction documents. Only raise
-  actionable issues introduced by the pull request. Verify concerns against
-  the surrounding implementation before commenting, explain the concrete
-  failure mode, and distinguish correctness defects from optional improvements.
-  Avoid speculative advice, compliments, generated-code feedback, and style
-  comments already enforced by automated tooling.
+  Review as a pragmatic senior engineer. Be concise and evidence-based. Focus
+  on behavior and operational impact. Report only actionable PR-introduced
+  issues, verify context, explain failure modes, and distinguish defects from
+  optional improvements.
 
 early_access: false
 
