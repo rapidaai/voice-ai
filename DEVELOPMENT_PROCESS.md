@@ -6,7 +6,7 @@ This repository uses a principle-driven, multi-agent lifecycle designed for Orca
 
 The required sequence is:
 
-`understand -> plan -> discuss -> approve -> implement -> verify -> review -> ship`
+`understand -> plan -> draft RFC -> challenge -> confirm -> implement -> verify -> review -> ship`
 
 No agent may collapse planning, implementation, verification, and final code review into one self-approved action for a non-trivial change.
 
@@ -64,6 +64,15 @@ Before implementation, the approved plan must contain:
 - Required test categories and exact verification commands.
 - Rollback, disablement, or migration strategy.
 - Plan challenge outcome and explicit approval.
+- Reserved RFC path and the exact accepted RFC SHA-256.
+- RFC confirmation gate receipt with Run, Task, Gate, question, resolution, and timestamps.
+
+The RFC author drafts only the coordinator-reserved path. The challenger reviews the
+exact plan and RFC bytes. After all findings are resolved, the final challenged bytes
+must already contain the sole metadata line `- Status: Accepted`. The coordinator then
+creates a gate whose question includes the RFC path and SHA-256 without editing the RFC.
+Implementation may start only after that gate resolves to `approved`. Any
+subsequent RFC byte change requires a new challenge and confirmation.
 
 The approved plan is stored as a separate JSON artifact. Its SHA-256 and a coordinator-generated HMAC are recorded in the cumulative lifecycle envelope, and every gate verifies that the envelope plan still matches that artifact. The HMAC signs `<run_id>:<plan_sha256>` using `DEVELOPMENT_GATE_KEY`. That key belongs only to the coordinator or CI gate runner and must not be exposed to implementation or review workers.
 
@@ -83,9 +92,28 @@ Start a governed Run from an Orca-managed terminal:
 
 ```bash
 make orca-development-run OBJECTIVE="describe the desired outcome" AGENT=codex
+  RFC="rfcs/NNNN-short-name.md"
 ```
 
-The command creates the Orca Run, dependent planning, challenge, implementation, verification, and code-review tasks, an approval gate blocking implementation, and a supervised planner worker. Orca must be running with orchestration enabled.
+The command creates the Orca Run and dependent planning, RFC-authoring, and challenge
+tasks, then starts only the planner. It intentionally does not create or start an
+implementation task.
+
+After challenge approval, the coordinator creates the exact-digest gate on a dedicated
+confirmation task. No implementation task is created yet:
+
+```bash
+make orca-confirm-rfc-create RUN_ID="<run>" CHALLENGE_TASK_ID="<challenge-task>" \
+  CHALLENGE_RECEIPT="<approved-challenge.json>" RFC="rfcs/NNNN-short-name.md"
+```
+
+After the gate resolves, collect the authoritative receipt before starting a worker:
+
+```bash
+make orca-confirm-rfc-collect RUN_ID="<run>" TASK_ID="<confirmation-task>" \
+  CHALLENGE_TASK_ID="<challenge-task>" CHALLENGE_RECEIPT="<approved-challenge.json>" \
+  GATE_ID="<gate>" RFC="rfcs/NNNN-short-name.md" RECEIPT="<receipt.json>"
+```
 
 Generate the development panel from a lifecycle envelope:
 
@@ -102,15 +130,16 @@ make orca-panel-open PANEL_INPUT="path/to/lifecycle-input.json"
 The panel displays stage readiness, principle decisions, ownership, exact verification commands, review findings, final-gate issues, and Orca Run/Task/Dispatch provenance. With `DEVELOPMENT_GATE_KEY` available to the coordinator, it also executes the final gate and shows trusted ship readiness.
 
 1. Create one Orca Run for the objective.
-2. Create investigation and planning tasks before implementation tasks.
-3. Dispatch the planner and plan challenger independently.
-4. Resolve discussion through messages and an explicit decision gate.
-5. Create implementation tasks with disjoint file ownership.
-6. Dispatch verification after implementation settles.
-7. Dispatch the code reviewer only after verification passes.
-8. Route review findings to the original implementation owner.
-9. Re-run affected verification after fixes.
-10. Ship only after the final review decision is `approved`.
+2. Reserve the RFC number and create planning, RFC-authoring, and challenge tasks.
+3. Dispatch planner, RFC author, and challenger in dependency order.
+4. Resolve challenge findings before marking the RFC `Accepted`.
+5. Create an exact-digest confirmation gate on a dedicated confirmation task.
+6. Collect the approved receipt and preserve the accepted RFC baseline.
+7. Start implementation tasks with disjoint file ownership.
+8. Dispatch verification after implementation settles.
+9. Dispatch the code reviewer only after verification passes.
+10. Route findings to the original implementation owner and re-verify fixes.
+11. Ship only after the final review decision is `approved`.
 
 The final review envelope must include the Orca Run, review Task, and review Dispatch identifiers. Reviewer identity comes from the execution metadata, while implementation ownership comes from the coordinator-attested approved-plan artifact.
 
@@ -128,6 +157,7 @@ Use Orca worktree comments to record decisions and keep each implementation task
 A completed change retains:
 
 - Approved plan and challenge decision.
+- Accepted RFC and exact-digest confirmation receipt.
 - Implementation summary and changed-file list.
 - Verification commands with results.
 - Independent code-review report.

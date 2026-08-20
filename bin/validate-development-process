@@ -302,6 +302,235 @@ module = importlib.machinery.SourceFileLoader("orca_development_panel", sys.argv
 assert module.resolve_orca_command() == ["/path with spaces/orca", "--environment", "local"]
 PY
 
+rfc_fixture_root="$output_dir/rfc-confirmation"
+mkdir -p "$rfc_fixture_root/rfcs"
+cat >"$rfc_fixture_root/rfcs/0042-confirmation-test.md" <<'EOF'
+# RFC 0042: Confirmation Test
+
+- Status: Accepted
+
+## Summary
+
+Exercise the exact-digest confirmation contract.
+EOF
+rfc_digest="$(shasum -a 256 "$rfc_fixture_root/rfcs/0042-confirmation-test.md" | awk '{print $1}')"
+challenge_receipt="$rfc_fixture_root/challenge-receipt.json"
+cat >"$challenge_receipt" <<EOF
+{
+  "run_id": "run_test",
+  "task_id": "task_challenge",
+  "decision": "approved",
+  "rfc_file": "rfcs/0042-confirmation-test.md",
+  "rfc_sha256": "$rfc_digest",
+  "reviewed_at": "2026-08-20T09:59:00Z",
+  "reviewer": "independent-reviewer"
+}
+EOF
+challenge_receipt_digest="$(shasum -a 256 "$challenge_receipt" | awk '{print $1}')"
+
+mock_orca="$output_dir/mock-orca"
+cat >"$mock_orca" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case " $* " in
+  *" task-create "*) printf '%s\n' '{"result":{"task":{"id":"task_confirm"}}}' ;;
+  *" gate-create "*) printf '%s\n' '{"result":{"gate":{"id":"gate_confirm"}}}' ;;
+  *" gate-list "*)
+    digest="$(shasum -a 256 "$RFC_FIXTURE" | awk '{print $1}')"
+    printf '{"result":{"gates":[{"id":"gate_confirm","run_id":"%s","task_id":"%s","question":"Approve implementation of RFC rfcs/0042-confirmation-test.md with SHA-256 %s after approved challenge task task_challenge with receipt SHA-256 %s?","status":"%s","resolution":"%s","created_at":"%s","resolved_at":"%s"}]}}\n' \
+      "${GATE_RUN_ID-run_test}" "${GATE_TASK_ID-task_confirm}" "$digest" \
+      "$CHALLENGE_RECEIPT_DIGEST" \
+      "${GATE_STATUS-resolved}" "${GATE_RESOLUTION-approved}" \
+      "${GATE_CREATED_AT-2026-08-20T10:00:00Z}" "${GATE_RESOLVED_AT-2026-08-20T10:01:00Z}"
+    ;;
+  *) printf '%s\n' '{"ok":false}' >&2; exit 2 ;;
+esac
+EOF
+chmod +x "$mock_orca"
+
+RFC_FIXTURE="$rfc_fixture_root/rfcs/0042-confirmation-test.md" CHALLENGE_RECEIPT_DIGEST="$challenge_receipt_digest" \
+ORCA_CLI_COMMAND="$mock_orca" python3 "$repo_root/bin/orca-confirm-rfc" \
+  --repo-root "$rfc_fixture_root" create --run run_test --challenge-task task_challenge \
+  --challenge-receipt "$challenge_receipt" --rfc rfcs/0042-confirmation-test.md \
+  >"$output_dir/rfc-create.json"
+grep -q '"confirmation_task_id": "task_confirm"' "$output_dir/rfc-create.json"
+grep -q '"gate_id": "gate_confirm"' "$output_dir/rfc-create.json"
+
+RFC_FIXTURE="$rfc_fixture_root/rfcs/0042-confirmation-test.md" CHALLENGE_RECEIPT_DIGEST="$challenge_receipt_digest" \
+ORCA_CLI_COMMAND="$mock_orca" python3 "$repo_root/bin/orca-confirm-rfc" \
+  --repo-root "$rfc_fixture_root" collect --run run_test --task task_confirm \
+  --challenge-task task_challenge --challenge-receipt "$challenge_receipt" --gate gate_confirm \
+  --rfc rfcs/0042-confirmation-test.md --output "$output_dir/rfc-receipt.json"
+grep -q '"resolution": "approved"' "$output_dir/rfc-receipt.json"
+
+cp "$rfc_fixture_root/rfcs/0042-confirmation-test.md" "$output_dir/original-rfc.md"
+sed -i.bak 's/Confirmation Test/Changed Confirmation Test/' "$rfc_fixture_root/rfcs/0042-confirmation-test.md"
+if RFC_FIXTURE="$output_dir/original-rfc.md" CHALLENGE_RECEIPT_DIGEST="$challenge_receipt_digest" ORCA_CLI_COMMAND="$mock_orca" \
+  python3 "$repo_root/bin/orca-confirm-rfc" --repo-root "$rfc_fixture_root" collect \
+  --run run_test --task task_confirm --challenge-task task_challenge \
+  --challenge-receipt "$challenge_receipt" --gate gate_confirm --rfc rfcs/0042-confirmation-test.md \
+  >/dev/null 2>&1; then
+  echo "Changed RFC digest unexpectedly reused an old confirmation gate." >&2
+  exit 1
+fi
+
+for gate_case in wrong_run wrong_task pending rejected bad_timestamp; do
+  case "$gate_case" in
+    wrong_run) gate_env=(GATE_RUN_ID=other_run) ;;
+    wrong_task) gate_env=(GATE_TASK_ID=other_task) ;;
+    pending) gate_env=(GATE_STATUS=pending GATE_RESOLUTION=) ;;
+    rejected) gate_env=(GATE_STATUS=resolved GATE_RESOLUTION=rejected) ;;
+    bad_timestamp) gate_env=(GATE_CREATED_AT=2026-08-20) ;;
+  esac
+  if env RFC_FIXTURE="$rfc_fixture_root/rfcs/0042-confirmation-test.md" CHALLENGE_RECEIPT_DIGEST="$challenge_receipt_digest" \
+    ORCA_CLI_COMMAND="$mock_orca" "${gate_env[@]}" \
+    python3 "$repo_root/bin/orca-confirm-rfc" --repo-root "$rfc_fixture_root" collect \
+    --run run_test --task task_confirm --challenge-task task_challenge \
+    --challenge-receipt "$challenge_receipt" --gate gate_confirm --rfc rfcs/0042-confirmation-test.md \
+    >/dev/null 2>&1; then
+    echo "RFC gate failure case unexpectedly succeeded: $gate_case" >&2
+    exit 1
+  fi
+done
+
+python3 - "$challenge_receipt" "$output_dir/rejected-challenge.json" <<'PY'
+import json
+import sys
+
+receipt = json.load(open(sys.argv[1], encoding="utf-8"))
+receipt["decision"] = "revise"
+json.dump(receipt, open(sys.argv[2], "w", encoding="utf-8"))
+PY
+if RFC_FIXTURE="$rfc_fixture_root/rfcs/0042-confirmation-test.md" CHALLENGE_RECEIPT_DIGEST="$challenge_receipt_digest" ORCA_CLI_COMMAND="$mock_orca" \
+  python3 "$repo_root/bin/orca-confirm-rfc" --repo-root "$rfc_fixture_root" create \
+  --run run_test --challenge-task task_challenge \
+  --challenge-receipt "$output_dir/rejected-challenge.json" \
+  --rfc rfcs/0042-confirmation-test.md >/dev/null 2>&1; then
+  echo "Non-approved challenge receipt unexpectedly created a confirmation gate." >&2
+  exit 1
+fi
+
+python3 - "$repo_root/bin/orca-confirm-rfc" "$rfc_fixture_root" <<'PY'
+import importlib.machinery
+import pathlib
+import sys
+
+module = importlib.machinery.SourceFileLoader("orca_confirm_rfc", sys.argv[1]).load_module()
+root = pathlib.Path(sys.argv[2])
+
+def rejected(path):
+    try:
+        module.load_rfc(root, path)
+    except SystemExit:
+        return
+    raise AssertionError(f"unexpectedly accepted {path}")
+
+for invalid in ("/tmp/rfcs/0042-test.md", "rfcs/../rfcs/0042-test.md"):
+    rejected(invalid)
+
+multiple = root / "rfcs/0044-multiple-status.md"
+multiple.write_text("# RFC\n\n- Status: Accepted\n- Status: Draft\n\n## Summary\n", encoding="utf-8")
+rejected("rfcs/0044-multiple-status.md")
+
+substring = root / "rfcs/0045-substring-status.md"
+substring.write_text("# RFC\n\nprefix - Status: Accepted suffix\n\n## Summary\n", encoding="utf-8")
+rejected("rfcs/0045-substring-status.md")
+
+directory = root / "rfcs/0046-directory.md"
+directory.mkdir()
+rejected("rfcs/0046-directory.md")
+
+symlink = root / "rfcs/0047-symlink.md"
+symlink.symlink_to(root / "rfcs/0042-confirmation-test.md")
+rejected("rfcs/0047-symlink.md")
+PY
+
+run_mock="$output_dir/mock-orca-run"
+run_log="$output_dir/orca-run-calls.jsonl"
+cat >"$run_mock" <<'PY'
+#!/usr/bin/env python3
+import json
+import os
+import sys
+
+args = sys.argv[1:]
+with open(os.environ["ORCA_RUN_LOG"], "a", encoding="utf-8") as log:
+    log.write(json.dumps(args) + "\n")
+if args[:2] == ["status", "--json"]:
+    payload = {"result": {"app": {"running": True}, "runtime": {"reachable": True}}}
+elif args[:2] == ["orchestration", "run-create"]:
+    payload = {"result": {"run": {"id": "run_flow"}}}
+elif args[:2] == ["orchestration", "task-create"]:
+    title = args[args.index("--task-title") + 1]
+    identifiers = {
+        "Understand and plan": "task_plan",
+        "Draft reserved RFC": "task_rfc",
+        "Challenge exact plan and RFC": "task_challenge",
+    }
+    payload = {"result": {"task": {"id": identifiers[title]}}}
+elif args[:2] == ["orchestration", "worker-start"]:
+    payload = {"result": {"dispatch": {"id": "dispatch_planner"}}}
+else:
+    raise SystemExit(f"unexpected command: {args}")
+print(json.dumps(payload))
+PY
+chmod +x "$run_mock"
+mkdir -p "$output_dir/run-worktree/rfcs"
+git -C "$output_dir/run-worktree" init -q
+(
+  cd "$output_dir/run-worktree"
+  ORCA_CLI_COMMAND="$run_mock" ORCA_RUN_LOG="$run_log" \
+    bash "$repo_root/bin/orca-development-run" "test objective" codex rfcs/0043-flow-test.md \
+    >"$output_dir/orca-development-run.out"
+)
+touch "$output_dir/run-worktree/rfcs/0044-collision.md"
+if (
+  cd "$output_dir/run-worktree"
+  ORCA_CLI_COMMAND="$run_mock" ORCA_RUN_LOG="$run_log" \
+    bash "$repo_root/bin/orca-development-run" "collision" codex rfcs/0044-collision.md \
+    >/dev/null 2>&1
+); then
+  echo "Existing RFC reservation collision unexpectedly succeeded." >&2
+  exit 1
+fi
+
+reservation_repo="$output_dir/reservation-repo"
+reservation_linked="$output_dir/reservation-linked"
+mkdir -p "$reservation_repo/rfcs"
+git -C "$reservation_repo" init -q
+git -C "$reservation_repo" config user.name validator
+git -C "$reservation_repo" config user.email validator@example.invalid
+git -C "$reservation_repo" commit --allow-empty -qm init
+git -C "$reservation_repo" worktree add -qb reservation-linked "$reservation_linked"
+mkdir -p "$reservation_linked/rfcs"
+(
+  cd "$reservation_repo"
+  ORCA_CLI_COMMAND="$run_mock" ORCA_RUN_LOG="$output_dir/reservation-run.log" \
+    bash "$repo_root/bin/orca-development-run" "reserve once" codex rfcs/0050-shared-lock.md \
+    >/dev/null
+)
+if (
+  cd "$reservation_linked"
+  ORCA_CLI_COMMAND="$run_mock" ORCA_RUN_LOG="$output_dir/reservation-linked.log" \
+    bash "$repo_root/bin/orca-development-run" "reserve twice" codex rfcs/0050-shared-lock.md \
+    >/dev/null 2>&1
+); then
+  echo "Linked worktree reused a repository-wide RFC reservation." >&2
+  exit 1
+fi
+python3 - "$run_log" <<'PY'
+import json
+import sys
+
+calls = [json.loads(line) for line in open(sys.argv[1], encoding="utf-8")]
+task_calls = [call for call in calls if call[:2] == ["orchestration", "task-create"]]
+worker_calls = [call for call in calls if call[:2] == ["orchestration", "worker-start"]]
+assert len(task_calls) == 3, task_calls
+assert len(worker_calls) == 1, worker_calls
+assert worker_calls[0][worker_calls[0].index("--task") + 1] == "task_plan"
+assert not any("Implement" in " ".join(call) for call in calls)
+PY
+
 grep -q "repeat(auto-fit,minmax(150px,1fr))" "$trusted_panel"
 grep -q "@media (max-width:600px)" "$trusted_panel"
 

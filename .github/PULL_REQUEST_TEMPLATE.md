@@ -12,6 +12,12 @@
 - Ownership:
 - Rollback or disablement:
 
+## RFC Confirmation
+
+- Accepted RFC:
+- Confirmed SHA-256:
+- Orca confirmation gate / receipt:
+
 ## Principles
 
 <!-- Explain relevant tradeoffs. Use N/A only when genuinely inapplicable. -->
@@ -41,7 +47,8 @@
 
 ## Checklist
 
-- [ ] The plan was challenged and explicitly approved before implementation.
+- [ ] The exact plan and RFC were challenged before implementation.
+- [ ] The accepted RFC digest was explicitly confirmed before implementation started.
 - [ ] I kept the change focused.
 - [ ] I updated tests or docs where needed.
 - [ ] Required validation commands passed.

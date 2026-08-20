@@ -59,7 +59,11 @@ for root in .codex .claude; do
     grep -q 'Never approve or review your own' "$role_file" || fail "missing reviewer separation in $role_file"
   done
   grep -q '^tools: Read,Glob,Grep,LS$' "$root/agents/code-reviewer.md" || fail "code reviewer must remain read-only in $root"
+  grep -q '^name: rfc-author$' "$root/agents/rfc-author.md" || fail "missing RFC author role in $root"
+  grep -q 'coordinator-reserved RFC path' "$root/agents/rfc-author.md" || fail "missing RFC path ownership in $root"
 done
+
+cmp -s .codex/agents/rfc-author.md .claude/agents/rfc-author.md || fail "RFC author role parity drift"
 
 python3 - "$repo_root/.claude/settings.json" <<'PY'
 import json

@@ -13,6 +13,13 @@
 - Acceptance criteria:
 - Non-goals:
 
+## RFC
+
+- Reserved path:
+- RFC author:
+- Exact reviewed SHA-256:
+- Confirmation gate / receipt:
+
 ## Scope and Ownership
 
 | Path or module | Owner | Responsibility |
