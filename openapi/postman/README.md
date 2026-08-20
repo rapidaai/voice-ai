@@ -34,8 +34,12 @@ npx --yes newman run openapi/postman/assistant-api/assistant-api.smoke.postman_c
   --folder "Smoke Flow" \
   --bail \
   --env-var baseUrl=http://localhost:9007 \
-  --env-var authToken="$AUTH_TOKEN"
+  --env-var authToken="$AUTH_TOKEN" \
+  --env-var authId="$AUTH_ID" \
+  --env-var projectId="$PROJECT_ID"
 ```
+
+`authToken` must be the raw Rapida auth token without a `Bearer ` prefix. The assistant API also requires the authenticated user ID in `x-auth-id` and the selected project ID in `x-project-id`.
 
 The assistant-api smoke flow runs:
 
