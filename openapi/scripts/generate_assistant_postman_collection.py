@@ -191,6 +191,8 @@ REQUEST_EXAMPLES: dict[str, dict[str, Any]] = {
 COLLECTION_VARIABLES: list[dict[str, str]] = [
     {"key": "baseUrl", "value": "http://localhost:9007", "type": "string"},
     {"key": "authToken", "value": "", "type": "string"},
+    {"key": "authId", "value": "", "type": "string"},
+    {"key": "projectId", "value": "", "type": "string"},
     {"key": "assistantId", "value": "1", "type": "string"},
     {"key": "configurationId", "value": "1", "type": "string"},
     {"key": "apiDeploymentId", "value": "1", "type": "string"},
@@ -512,8 +514,12 @@ def build_collection(ctx: OpenApiContext) -> dict[str, Any]:
             "schema": POSTMAN_SCHEMA,
         },
         "auth": {
-            "type": "bearer",
-            "bearer": [{"key": "token", "value": "{{authToken}}", "type": "string"}],
+            "type": "apikey",
+            "apikey": [
+                {"key": "key", "value": "authorization", "type": "string"},
+                {"key": "value", "value": "{{authToken}}", "type": "string"},
+                {"key": "in", "value": "header", "type": "string"},
+            ],
         },
         "event": [
             {
@@ -555,8 +561,12 @@ def build_smoke_collection(ctx: OpenApiContext) -> dict[str, Any]:
             "schema": POSTMAN_SCHEMA,
         },
         "auth": {
-            "type": "bearer",
-            "bearer": [{"key": "token", "value": "{{authToken}}", "type": "string"}],
+            "type": "apikey",
+            "apikey": [
+                {"key": "key", "value": "authorization", "type": "string"},
+                {"key": "value", "value": "{{authToken}}", "type": "string"},
+                {"key": "in", "value": "header", "type": "string"},
+            ],
         },
         "variable": COLLECTION_VARIABLES,
         "item": [
@@ -652,7 +662,11 @@ def build_item(
 
 
 def build_headers(operation: dict[str, Any]) -> list[dict[str, str]]:
-    headers = [{"key": "Accept", "value": "application/json"}]
+    headers = [
+        {"key": "Accept", "value": "application/json"},
+        {"key": "x-auth-id", "value": "{{authId}}"},
+        {"key": "x-project-id", "value": "{{projectId}}"},
+    ]
     if operation.get("requestBody"):
         headers.append({"key": "Content-Type", "value": "application/json"})
     return headers

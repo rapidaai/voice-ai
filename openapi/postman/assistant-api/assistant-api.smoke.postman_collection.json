@@ -6,11 +6,21 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
-    "type": "bearer",
-    "bearer": [
+    "type": "apikey",
+    "apikey": [
       {
-        "key": "token",
+        "key": "key",
+        "value": "authorization",
+        "type": "string"
+      },
+      {
+        "key": "value",
         "value": "{{authToken}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
         "type": "string"
       }
     ]
@@ -23,6 +33,16 @@
     },
     {
       "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "authId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "projectId",
       "value": "",
       "type": "string"
     },
@@ -106,6 +126,14 @@
                 "value": "application/json"
               },
               {
+                "key": "x-auth-id",
+                "value": "{{authId}}"
+              },
+              {
+                "key": "x-project-id",
+                "value": "{{projectId}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -170,6 +198,14 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "x-auth-id",
+                "value": "{{authId}}"
+              },
+              {
+                "key": "x-project-id",
+                "value": "{{projectId}}"
               },
               {
                 "key": "Content-Type",
@@ -237,6 +273,14 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "x-auth-id",
+                "value": "{{authId}}"
+              },
+              {
+                "key": "x-project-id",
+                "value": "{{projectId}}"
               }
             ],
             "url": {
@@ -290,6 +334,14 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "x-auth-id",
+                "value": "{{authId}}"
+              },
+              {
+                "key": "x-project-id",
+                "value": "{{projectId}}"
               }
             ],
             "url": {
@@ -366,6 +418,14 @@
                 "value": "application/json"
               },
               {
+                "key": "x-auth-id",
+                "value": "{{authId}}"
+              },
+              {
+                "key": "x-project-id",
+                "value": "{{projectId}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -430,6 +490,14 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "x-auth-id",
+                "value": "{{authId}}"
+              },
+              {
+                "key": "x-project-id",
+                "value": "{{projectId}}"
               }
             ],
             "url": {
@@ -483,6 +551,14 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "x-auth-id",
+                "value": "{{authId}}"
+              },
+              {
+                "key": "x-project-id",
+                "value": "{{projectId}}"
               },
               {
                 "key": "Content-Type",
@@ -549,6 +625,14 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "x-auth-id",
+                "value": "{{authId}}"
+              },
+              {
+                "key": "x-project-id",
+                "value": "{{projectId}}"
               }
             ],
             "url": {
@@ -600,6 +684,14 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "x-auth-id",
+                "value": "{{authId}}"
+              },
+              {
+                "key": "x-project-id",
+                "value": "{{projectId}}"
               }
             ],
             "url": {
@@ -668,6 +760,14 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "x-auth-id",
+                "value": "{{authId}}"
+              },
+              {
+                "key": "x-project-id",
+                "value": "{{projectId}}"
               }
             ],
             "url": {
