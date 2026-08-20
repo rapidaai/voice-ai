@@ -5,13 +5,12 @@ This folder contains command hooks wired from `.claude/settings.json`.
 ## Installed hooks
 
 - `PostToolUse`:
+  - `track_changed_files.py` for Edit/Write/NotebookEdit events
   - `post_tool_test_hint.py` (non-blocking reminder)
 - `SubagentStop`:
-  - `validate_changed_tests.py` (blocking gate)
-  - `run_required_tests.py` (blocking gate)
+  - `enforce_completion.py` (sequenced blocking gate)
 - `Stop`:
-  - `validate_changed_tests.py` (blocking gate)
-  - `run_required_tests.py` (blocking gate)
+  - `enforce_completion.py` (sequenced blocking gate)
 
 ## Behavior
 
@@ -40,4 +39,6 @@ python3 .claude/hooks/run_required_tests.py </dev/null
 Resolution order inside hooks:
 1. `HOOK_CHANGED_FILES` env var
 2. paths parsed from hook stdin JSON payload
-3. fallback to repo-wide `git diff` + untracked files
+3. session-scoped paths recorded by `track_changed_files.py`
+
+Repository-wide `git diff` is intentionally not used because worktrees may contain unrelated local or parallel-agent changes.

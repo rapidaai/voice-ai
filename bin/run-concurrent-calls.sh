@@ -6,7 +6,7 @@ API_KEY="${RAPIDA_API_KEY:-e4da0463dfddcca57c8f4432a64fb6540f3669513f26379d8f1ac
 ASSISTANT_ID="${RAPIDA_ASSISTANT_ID:-2341188802971697152}"
 FROM_NUMBER="${RAPIDA_FROM_NUMBER:-5002}"
 TO_NUMBER="${RAPIDA_TO_NUMBER:-5001}"
-COUNT="${RAPIDA_CALL_COUNT:-20}"
+COUNT="${RAPIDA_CALL_COUNT:-1}"
 RUN_ID="$(date +%Y%m%d-%H%M%S)"
 OUT_DIR="${TMPDIR:-/tmp}/rapida-call-run-${RUN_ID}"
 
@@ -26,6 +26,9 @@ for i in $(seq 1 "$COUNT"); do
         \"assistant\": {
           \"assistantId\": \"${ASSISTANT_ID}\",
           \"version\": \"latest\"
+        },
+        \"options\": {
+          \"speak.voice.id\": \"varsha\"
         },
         \"fromNumber\": \"${FROM_NUMBER}\",
         \"toNumber\": \"${TO_NUMBER}\",

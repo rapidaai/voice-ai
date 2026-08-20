@@ -45,6 +45,13 @@ Do not implement production changes in this skill.
 - test + validation command plan
 - risk + rollback path
 
+## Governed lifecycle
+
+- This planning skill owns only the `understand` and `plan` phases from `DEVELOPMENT_PROCESS.md`.
+- The plan must declare acceptance criteria, non-goals, allowed paths, explicit owners, principles, required tests and commands, risks, and rollback.
+- A separate `plan-challenger` must review the output; this skill may not approve its own plan or perform implementation.
+- The coordinator attests the approved plan before any implementation worker starts.
+
 ## Validation commands
 
 - `rg -n "GetTelephony|GetSpeechToTextTransformer|GetTextToSpeechTransformer|GetEndOfSpeech|GetVAD" api`

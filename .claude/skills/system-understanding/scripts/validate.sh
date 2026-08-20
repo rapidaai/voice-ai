@@ -62,7 +62,7 @@ if [[ $check_diff -eq 1 ]]; then
   if [[ ${#changed[@]} -gt 0 ]]; then
     provider_required=0
     case "$skill_name" in
-      end-of-speech-integration|vad-integration|telephony-integration|stt-integration|tts-integration|llm-integration|telemetry-integration)
+      end-of-speech-integration|vad-integration|telephony-integration|stt-integration|tts-integration|llm-integration|telemetry-integration|noise-reduction-integration)
         provider_required=1
         ;;
     esac

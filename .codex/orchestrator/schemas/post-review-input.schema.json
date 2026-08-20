@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rapida.ai/schemas/orchestrator/post-review-input.schema.json",
+  "title": "Post Review Hook Input",
+  "type": "object",
+  "required": ["task", "task_plan", "implementation", "verification", "orchestration", "review", "meta"],
+  "properties": {
+    "task": { "type": "object" },
+    "task_plan": { "type": "object" },
+    "implementation": { "type": "object" },
+    "verification": { "type": "object" },
+    "orchestration": {
+      "type": "object",
+      "required": ["run_id", "task_id", "dispatch_id"],
+      "properties": {
+        "run_id": { "type": "string", "minLength": 1 },
+        "task_id": { "type": "string", "minLength": 1 },
+        "dispatch_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "review": {
+      "type": "object",
+      "required": ["reviewer", "evidence", "findings", "decision"],
+      "properties": {
+        "reviewer": { "type": "string", "minLength": 1 },
+        "evidence": {
+          "type": "object",
+          "required": ["plan", "implementation", "verification", "diff"],
+          "properties": {
+            "plan": { "type": "string", "minLength": 1 },
+            "implementation": { "type": "string", "minLength": 1 },
+            "verification": { "type": "string", "minLength": 1 },
+            "diff": { "type": "string", "minLength": 1 }
+          }
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["severity", "status", "message"],
+            "properties": {
+              "severity": { "enum": ["critical", "major", "minor", "note"] },
+              "status": { "enum": ["open", "resolved", "accepted_follow_up"] },
+              "message": { "type": "string", "minLength": 1 },
+              "file": { "type": "string" }
+            }
+          }
+        },
+        "decision": { "enum": ["approved", "changes_requested", "blocked"] }
+      }
+    },
+    "meta": { "type": "object" }
+  },
+  "additionalProperties": true
+}

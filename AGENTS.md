@@ -4,24 +4,55 @@
 
 Repository-wide operating rules for Codex sessions.
 
-## Subagent delegation flow
+## Required development lifecycle
 
-1. Plan first:
-- Define changed files, provider scope, and test scope.
-- Keep implementation/test write sets explicit.
+Every non-trivial change follows this sequence:
 
-2. Delegate implementation:
-- Use execution-focused worker(s) for code changes.
-- Keep ownership disjoint by file/module.
+1. Understand:
+- Map the affected contracts, dependencies, owners, existing tests, and production risks.
+- Separate verified facts from assumptions and open questions.
 
-3. Delegate tests:
+2. Plan:
+- Define acceptance criteria, allowed paths, out-of-scope paths, file ownership, required tests, required commands, risks, and rollback strategy.
+- Record how the plan applies KISS, YAGNI, single ownership, explicit contracts, fail-safe behavior, observability, and least privilege.
+
+3. Discuss:
+- A plan challenger who is not the planner must test assumptions, identify a simpler option, and surface compatibility or operational risks.
+- Implementation must not start until open questions are resolved and the plan decision is explicitly `approved`.
+
+4. Implement:
+- Use execution-focused worker(s) with disjoint ownership by file or module.
+- Do not expand scope without returning to the plan and discussion gate.
+
+5. Test and verify:
 - UI changes in `ui/src/**` must include UI unit tests using existing local patterns.
 - Backend changes in `api/**`, `pkg/**`, or `cmd/**` must include corresponding `*_test.go` updates in the same package.
+- Run targeted tests, required validation commands, and relevant integration strict validators.
 
-4. Verification:
-- Run targeted backend tests for changed packages.
-- Run UI provider tests when UI provider/config changes.
-- Run skill strict validator for integration changes with `--check-diff --provider <provider>`.
+6. Code review:
+- A dedicated code reviewer who did not implement the change must review the complete diff after verification.
+- The reviewer is read-only: findings are routed to the implementation owner for correction.
+- The reviewer must check correctness, acceptance criteria, scope, simplicity, ownership, contracts, failure behavior, security, observability, tests, and rollback safety.
+- Critical or major findings block shipping. Approval must be explicit and include evidence.
+
+7. Ship:
+- Ship only after implementation, verification, and independent code review gates pass.
+- Preserve the approved plan, verification commands, review report, and unresolved follow-ups in the PR.
+
+See `DEVELOPMENT_PROCESS.md` for role responsibilities and the Orca workflow.
+
+## Engineering principles
+
+- KISS: choose the smallest complete solution and minimize moving parts.
+- YAGNI: reject speculative abstractions, configuration, and generalization.
+- Ownership: every file, state transition, goroutine, resource, and test has one explicit owner.
+- Single source of truth: do not duplicate authoritative state or configuration.
+- Explicit contracts: make API, schema, compatibility, timeout, and error behavior visible.
+- Fail safely: invalid input, cancellation, timeout, partial failure, and cleanup are intentional paths.
+- Observability: changed production behavior has actionable logs, metrics, or traces where appropriate.
+- Least privilege: minimize permissions, secret exposure, trust, and data access.
+- Reversibility: risky changes include a rollback, disablement, or migration strategy.
+- Evidence over confidence: tests, commands, and review findings determine readiness.
 
 ## UI testing rules
 

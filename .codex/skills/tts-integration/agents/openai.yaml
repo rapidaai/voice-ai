@@ -1,3 +1,3 @@
 display_name: TTS Integration
 short_description: Transport-aware TTS provider integration with lifecycle and metric correctness.
-default_prompt: Use the tts-integration skill. Determine TTS transport mode (WS/SSE/SDK/HTTP), implement provider-specific lifecycle for delta/done/interruption, preserve tts_latency_ms semantics, and run strict validation with --provider.
+default_prompt: Use the tts-integration skill from a coordinator-attested approved plan. Respect assigned ownership, preserve delta, done, interruption, audio, and latency contracts, add required tests, run every declared command plus strict validation with --provider, and return evidence for independent code review; do not self-approve.

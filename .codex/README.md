@@ -6,6 +6,7 @@ This repository keeps Codex skills at `.codex/skills/`.
 
 Prerequisites:
 - `python3`
+- Python package `jsonschema`
 - `go`
 - `yarn` (for UI-related checks)
 
@@ -13,7 +14,8 @@ Validate local setup:
 
 ```bash
 find .codex/skills -maxdepth 2 -type d | sort
-python3 .codex/orchestrator/scripts/hook-run.py --stage pre-implementation --input .codex/orchestrator/examples/pre-input.json --output /tmp/hook-out.json
+make validate-development-process
+make validate-agent-tooling
 python3 .codex/hooks/validate_changed_tests.py </dev/null
 ```
 
@@ -46,16 +48,31 @@ For integration skills (`stt`, `tts`, `telephony`, `llm`, `telemetry`, `vad`, `e
 
 ## Orchestrator Hooks
 
-Starter hook contracts and runner are available at `.codex/orchestrator/`:
+Lifecycle hook contracts, templates, and the runner are available at `.codex/orchestrator/`:
 
 ```bash
-python3 .codex/orchestrator/scripts/hook-run.py --stage pre-implementation --input .codex/orchestrator/examples/pre-input.json --output /tmp/hook-out.json
+DEVELOPMENT_GATE_KEY="<coordinator-key>" python3 .codex/orchestrator/scripts/hook-run.py --stage pre-implementation --input .codex/orchestrator/examples/lifecycle-input.json --output /tmp/hook-out.json
+```
+
+Required lifecycle:
+
+`understand -> plan -> discuss -> approve -> implement -> verify -> independent code review -> ship`
+
+The final `post-review` gate rejects self-review and unresolved critical or major findings. See `DEVELOPMENT_PROCESS.md`.
+
+Render or open the Orca development panel:
+
+```bash
+make orca-panel PANEL_INPUT="path/to/lifecycle-input.json"
+make orca-panel-open PANEL_INPUT="path/to/lifecycle-input.json"
 ```
 
 Parity assets for subagent/hook workflow are available in:
 
 - `.codex/agents/`
 - `.codex/hooks/`
+
+Use `make validate-development-toolkit` to validate lifecycle gates, skill packaging, agent role contracts, Claude hook wiring, hook parity, and tracked-file enforcement together.
 
 Codex-standard repo guidance is defined in root `AGENTS.md`.
 Custom project subagent profiles are defined in `.codex/agents/*.md`.

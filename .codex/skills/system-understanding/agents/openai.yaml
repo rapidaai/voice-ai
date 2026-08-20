@@ -1,3 +1,3 @@
 display_name: System Understanding
 short_description: Code-grounded planning skill for integration work before implementation.
-default_prompt: Use the system-understanding skill to map factory boundaries, packet flow, and provider config loading. Produce an exact in-scope file list, out-of-scope list, and validation plan before coding.
+default_prompt: Use the system-understanding skill for planning only. Produce acceptance criteria, non-goals, exact allowed and out-of-scope paths, explicit owners, principle decisions, required tests and commands, risks, and rollback. Mark the plan pending for an independent plan-challenger; do not implement or self-approve.

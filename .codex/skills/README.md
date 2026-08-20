@@ -41,6 +41,8 @@ Each skill folder should include:
 - `examples/sample.md`: expected output format
 - `scripts/validate.sh`: local validator
 
+Codex packaging intentionally uses `agents/openai.yaml` and `references/`. Semantic lifecycle parity with Claude is enforced by `make validate-agent-tooling`, not by requiring identical directory trees.
+
 ## Available skills
 
 - `system-understanding`
@@ -80,6 +82,8 @@ Notes:
 - strict mode enforces provider/factory/contract boundaries.
 - strict mode should be run when working in an isolated/clean diff for best signal.
 - `local-setup-and-run` uses `--check-diff` without `--provider`.
+
+Every skill participates in the governed lifecycle and hands implementation evidence to an independent reviewer. Run `make validate-development-toolkit` before shipping toolkit changes.
 
 ## Security
 

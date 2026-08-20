@@ -3,7 +3,7 @@ set -euo pipefail
 
 skill_dir="$(cd "$(dirname "$0")/.." && pwd)"
 skill_name="$(basename "$skill_dir")"
-repo_root="$(cd "$skill_dir/../.." && pwd)"
+repo_root="$(cd "$skill_dir/../../.." && pwd)"
 
 required=("SKILL.md" "references/checklist.md" "examples/sample.md" "scripts/validate.sh" "agents/openai.yaml")
 for f in "${required[@]}"; do
@@ -90,7 +90,7 @@ if [[ $check_diff -eq 1 ]]; then
     fi
 
     allowed_patterns=(
-      '^skills/'"$skill_name"'/'
+      '^\.codex/skills/'"$skill_name"'/'
     )
     disallowed_patterns=()
 
