@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="${GO_VERSION_CHECK_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+GO_VERSION="$(awk '$1 == "go" { print $2; exit }' "$ROOT/go.mod")"
+
+if [ -z "$GO_VERSION" ]; then
+  echo "error: unable to read the Go version from go.mod" >&2
+  exit 1
+fi
+
+failed=0
+
+expect_line() {
+  file="$1"
+  expected="$2"
+
+  if ! grep -Fqx "$expected" "$ROOT/$file"; then
+    echo "Go version mismatch in $file" >&2
+    echo "  expected: $expected" >&2
+    failed=1
+  fi
+}
+
+expect_match() {
+  file="$1"
+  expected="$2"
+
+  if ! grep -Fq "$expected" "$ROOT/$file"; then
+    echo "Go version mismatch in $file" >&2
+    echo "  expected reference: $expected" >&2
+    failed=1
+  fi
+}
+
+expect_line "docker/base/rapida-golang-alpine.Dockerfile" "FROM golang:${GO_VERSION}-alpine"
+expect_line "docker/base/rapida-golang-bookworm.Dockerfile" "FROM golang:${GO_VERSION}-bookworm AS base"
+expect_line "docker/web-api/Dockerfile" "FROM rapidaai/rapida-golang:${GO_VERSION}-alpine AS builder"
+expect_line "docker/integration-api/Dockerfile" "FROM rapidaai/rapida-golang:${GO_VERSION}-alpine AS builder"
+expect_line "docker/endpoint-api/Dockerfile" "FROM rapidaai/rapida-golang:${GO_VERSION}-alpine AS builder"
+expect_line "docker/assistant-api/Dockerfile" "FROM rapidaai/rapida-golang:${GO_VERSION}-bookworm AS builder"
+
+expect_match ".github/workflows/ci.yml" "GO_VERSION: \"${GO_VERSION}\""
+expect_match ".github/workflows/ci.yml" "go-version: \"${GO_VERSION}\""
+expect_match ".github/workflows/package.yml" "GO_VERSION: \"${GO_VERSION}\""
+expect_match ".github/workflows/docker-publish-base.yml" "rapida-golang:${GO_VERSION}-alpine"
+expect_match ".github/workflows/docker-publish-base.yml" "rapida-golang:${GO_VERSION}-bookworm"
+expect_match "Makefile" "rapida-golang:${GO_VERSION}-alpine"
+expect_match "Makefile" "rapida-golang:${GO_VERSION}-bookworm"
+
+if [ "$failed" -ne 0 ]; then
+  echo "Update all Go and rapida-golang version references to ${GO_VERSION}." >&2
+  exit 1
+fi
+
+echo "Go version references are consistent at ${GO_VERSION}."

@@ -1,6 +1,6 @@
 module github.com/rapidaai
 
-go 1.25.12
+go 1.25.13
 
 replace github.com/vonage/vonage-go-sdk => github.com/iamprashant/vonage-go-sdk v0.0.0-20251001095859-c473c1750cbd
 

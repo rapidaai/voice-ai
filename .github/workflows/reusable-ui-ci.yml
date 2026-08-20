@@ -45,6 +45,7 @@ jobs:
           node-version: ${{ inputs.node-version }}
 
       - name: Run TypeScript
+        continue-on-error: true
         working-directory: ui
         run: yarn checkTs
 

@@ -42,6 +42,13 @@ repos:
         files: \.sh$
         pass_filenames: true
 
+      - id: go-version-consistency
+        name: Verify Go and base-image versions match
+        entry: bash bin/check-go-version-consistency
+        language: system
+        always_run: true
+        pass_filenames: false
+
       - id: gofmt
         name: Check Go formatting
         entry: bash bin/pre-commit-go fmt

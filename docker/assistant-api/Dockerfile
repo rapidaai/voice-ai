@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # ---- Build stage ----
-FROM rapidaai/rapida-golang:1.25.12-bookworm AS builder
+FROM rapidaai/rapida-golang:1.25.13-bookworm AS builder
 
 WORKDIR /app
 
