@@ -1,0 +1,304 @@
+#!/usr/bin/env python3
+import argparse
+import hashlib
+import json
+import os
+import re
+import shlex
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+
+
+RFC_PATTERN = re.compile(r"^rfcs/[0-9]{4}-[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?\.md$")
+
+
+def fail(message: str) -> None:
+    raise SystemExit(message)
+
+
+def orca_command() -> list[str]:
+    configured = os.environ.get("ORCA_CLI_COMMAND", "").strip()
+    if configured:
+        return shlex.split(configured)
+    if os.environ.get("ORCA_DEV_REPO_ROOT"):
+        return ["orca-dev"]
+    if sys.platform.startswith("linux"):
+        return ["orca-ide"]
+    return ["orca"]
+
+
+def run_orca(*arguments: str) -> dict:
+    completed = subprocess.run(
+        [*orca_command(), *arguments, "--json"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode != 0:
+        fail(completed.stderr.strip() or completed.stdout.strip() or "Orca command failed")
+    try:
+        return json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        fail(f"Orca returned invalid JSON: {exc}")
+
+
+def find_identifier(payload: object, names: tuple[str, ...], nested: str) -> str:
+    if isinstance(payload, dict):
+        for name in names:
+            value = payload.get(name)
+            if isinstance(value, str) and value:
+                return value
+        value = payload.get(nested)
+        if isinstance(value, dict):
+            identifier = value.get("id")
+            if isinstance(identifier, str) and identifier:
+                return identifier
+        for value in payload.values():
+            identifier = find_identifier(value, names, nested)
+            if identifier:
+                return identifier
+    if isinstance(payload, list):
+        for value in payload:
+            identifier = find_identifier(value, names, nested)
+            if identifier:
+                return identifier
+    return ""
+
+
+def load_rfc(repo_root: Path, relative_path: str) -> tuple[Path, bytes, str]:
+    if not RFC_PATTERN.fullmatch(relative_path) or Path(relative_path).is_absolute():
+        fail("RFC must be a relative path matching rfcs/NNNN-short-name.md")
+    root = repo_root.resolve()
+    rfc_directory = root / "rfcs"
+    if rfc_directory.is_symlink() or not rfc_directory.is_dir():
+        fail("Repository rfcs path must be a real directory, not a symlink")
+    rfc_root = rfc_directory.resolve()
+    candidate = root / relative_path
+    if candidate.is_symlink() or not candidate.is_file():
+        fail("RFC must be an existing regular file, not a symlink")
+    resolved = candidate.resolve()
+    try:
+        resolved.relative_to(rfc_root)
+    except ValueError:
+        fail("RFC path escapes the repository rfcs directory")
+    raw = resolved.read_bytes()
+    text = raw.decode("utf-8")
+    header = text.split("\n## ", 1)[0]
+    status_lines = [line for line in header.splitlines() if line.startswith("- Status:")]
+    if status_lines != ["- Status: Accepted"]:
+        fail("RFC must contain exactly one '- Status: Accepted' before the first section")
+    return resolved, raw, hashlib.sha256(raw).hexdigest()
+
+
+def confirmation_question(rfc_path: str, digest: str, challenge_task: str, challenge_receipt_sha256: str) -> str:
+    return (
+        f"Approve implementation of RFC {rfc_path} with SHA-256 {digest} after approved "
+        f"challenge task {challenge_task} with receipt SHA-256 {challenge_receipt_sha256}?"
+    )
+
+
+def load_challenge_receipt(path: str, run_id: str, challenge_task: str, rfc_file: str, digest: str) -> tuple[dict, str]:
+    receipt_path = Path(path)
+    if receipt_path.is_symlink() or not receipt_path.is_file():
+        fail("Challenge receipt must be an existing regular JSON file")
+    raw = receipt_path.read_bytes()
+    try:
+        receipt = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        fail(f"Challenge receipt is invalid: {exc}")
+    expected = {
+        "run_id": run_id,
+        "task_id": challenge_task,
+        "decision": "approved",
+        "rfc_file": rfc_file,
+        "rfc_sha256": digest,
+    }
+    for key, value in expected.items():
+        if receipt.get(key) != value:
+            fail(f"Challenge receipt {key} does not match the confirmed RFC")
+    parse_timestamp(receipt.get("reviewed_at"), "reviewed_at")
+    reviewer = receipt.get("reviewer")
+    if not isinstance(reviewer, str) or not reviewer.strip():
+        fail("Challenge receipt reviewer is required")
+    return receipt, hashlib.sha256(raw).hexdigest()
+
+
+def iter_gates(payload: object):
+    if isinstance(payload, dict):
+        if isinstance(payload.get("gate_id") or payload.get("gateId") or payload.get("id"), str) and (
+            "question" in payload or "resolution" in payload or "status" in payload
+        ):
+            yield payload
+        for value in payload.values():
+            yield from iter_gates(value)
+    elif isinstance(payload, list):
+        for value in payload:
+            yield from iter_gates(value)
+
+
+def parse_timestamp(value: object, field: str) -> str:
+    if not isinstance(value, str) or not value:
+        fail(f"Gate is missing {field}")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        fail(f"Gate has malformed {field}")
+    if "T" not in value or parsed.tzinfo is None:
+        fail(f"Gate {field} must be an RFC3339 timestamp with timezone")
+    return value
+
+
+def create(args: argparse.Namespace) -> None:
+    _, _, digest = load_rfc(Path(args.repo_root), args.rfc)
+    _, challenge_receipt_sha256 = load_challenge_receipt(
+        args.challenge_receipt, args.run, args.challenge_task, args.rfc, digest
+    )
+    question = confirmation_question(args.rfc, digest, args.challenge_task, challenge_receipt_sha256)
+    task_payload = run_orca(
+        "orchestration",
+        "task-create",
+        "--run",
+        args.run,
+        "--task-title",
+        "Confirm exact RFC",
+        "--spec",
+        f"Record confirmation for {args.rfc} at SHA-256 {digest}. This task does not authorize or perform implementation.",
+        "--deps",
+        json.dumps([args.challenge_task]),
+    )
+    task_id = find_identifier(task_payload, ("taskId", "task_id"), "task")
+    if not task_id:
+        fail("Unable to find confirmation task id in Orca response")
+    gate_payload = run_orca(
+        "orchestration",
+        "gate-create",
+        "--task",
+        task_id,
+        "--question",
+        question,
+        "--options",
+        json.dumps(["approved", "rejected"]),
+    )
+    gate_id = find_identifier(gate_payload, ("gateId", "gate_id"), "gate")
+    if not gate_id:
+        fail("Unable to find gate id in Orca response")
+    print(
+        json.dumps(
+            {
+                "run_id": args.run,
+                "challenge_task_id": args.challenge_task,
+                "challenge_receipt_sha256": challenge_receipt_sha256,
+                "confirmation_task_id": task_id,
+                "gate_id": gate_id,
+                "rfc_file": args.rfc,
+                "rfc_sha256": digest,
+                "question": question,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    git_path = subprocess.run(
+        ["git", "-C", args.repo_root, "rev-parse", "--git-common-dir"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if git_path.returncode == 0:
+        reservation_root = Path(git_path.stdout.strip())
+        if not reservation_root.is_absolute():
+            reservation_root = Path(args.repo_root) / reservation_root
+        reservation = reservation_root / "orca-rfc-reservations" / f"{Path(args.rfc).name}.lock"
+        try:
+            reservation.rmdir()
+        except OSError:
+            pass
+
+
+def collect(args: argparse.Namespace) -> None:
+    _, _, digest = load_rfc(Path(args.repo_root), args.rfc)
+    challenge_receipt, challenge_receipt_sha256 = load_challenge_receipt(
+        args.challenge_receipt, args.run, args.challenge_task, args.rfc, digest
+    )
+    expected_question = confirmation_question(
+        args.rfc, digest, args.challenge_task, challenge_receipt_sha256
+    )
+    payload = run_orca("orchestration", "gate-list", "--run", args.run, "--task", args.task)
+    matching = []
+    for gate in iter_gates(payload):
+        identifier = gate.get("gate_id") or gate.get("gateId") or gate.get("id")
+        if identifier == args.gate:
+            matching.append(gate)
+    if len(matching) != 1:
+        fail("Expected exactly one authoritative matching gate")
+    gate = matching[0]
+    gate_task = gate.get("task_id") or gate.get("taskId")
+    if gate_task != args.task:
+        fail("Gate task does not match the requested confirmation task")
+    gate_run = gate.get("run_id") or gate.get("runId")
+    if gate_run != args.run:
+        fail("Gate run does not match the requested Run")
+    if gate.get("question") != expected_question:
+        fail("Gate question does not match the current RFC path and digest")
+    resolution = str(gate.get("resolution") or "").lower()
+    status = str(gate.get("status") or "").lower()
+    if resolution != "approved" or status != "resolved":
+        fail("RFC confirmation gate is not approved")
+    created_at = parse_timestamp(gate.get("created_at") or gate.get("createdAt"), "created_at")
+    resolved_at = parse_timestamp(gate.get("resolved_at") or gate.get("resolvedAt"), "resolved_at")
+    receipt = {
+        "run_id": args.run,
+        "task_id": args.task,
+        "challenge_task_id": args.challenge_task,
+        "challenge_reviewer": challenge_receipt["reviewer"],
+        "challenge_reviewed_at": challenge_receipt["reviewed_at"],
+        "challenge_receipt_sha256": challenge_receipt_sha256,
+        "gate_id": args.gate,
+        "question": expected_question,
+        "resolution": "approved",
+        "created_at": created_at,
+        "resolved_at": resolved_at,
+        "confirmed_sha256": digest,
+        "rfc_file": args.rfc,
+    }
+    rendered = json.dumps(receipt, indent=2, sort_keys=True) + "\n"
+    if args.output:
+        output = Path(args.output)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(rendered, encoding="utf-8")
+    else:
+        print(rendered, end="")
+
+
+def parser() -> argparse.ArgumentParser:
+    result = argparse.ArgumentParser(description="Create or collect an exact-digest RFC confirmation gate")
+    result.add_argument("--repo-root", default=".")
+    subparsers = result.add_subparsers(dest="command", required=True)
+    create_parser = subparsers.add_parser("create")
+    create_parser.add_argument("--run", required=True)
+    create_parser.add_argument("--challenge-task", required=True)
+    create_parser.add_argument("--challenge-receipt", required=True)
+    create_parser.add_argument("--rfc", required=True)
+    create_parser.set_defaults(handler=create)
+    collect_parser = subparsers.add_parser("collect")
+    collect_parser.add_argument("--run", required=True)
+    collect_parser.add_argument("--task", required=True)
+    collect_parser.add_argument("--challenge-task", required=True)
+    collect_parser.add_argument("--challenge-receipt", required=True)
+    collect_parser.add_argument("--gate", required=True)
+    collect_parser.add_argument("--rfc", required=True)
+    collect_parser.add_argument("--output")
+    collect_parser.set_defaults(handler=collect)
+    return result
+
+
+def main() -> int:
+    args = parser().parse_args()
+    args.handler(args)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

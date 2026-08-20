@@ -2,12 +2,44 @@
 set -euo pipefail
 
 objective="${1:-}"
-planner_agent="${2:-codex}"
+planner_agent="${2:-}"
+rfc_path="${3:-}"
 
-if [[ -z "$objective" ]]; then
-  echo "Usage: $0 <objective> [planner-agent]" >&2
+if [[ -z "$objective" || -z "$planner_agent" || -z "$rfc_path" ]]; then
+  echo "Usage: $0 <objective> <planner-agent> <reserved-rfc-path>" >&2
   exit 2
 fi
+
+if [[ "$rfc_path" == /* || ! "$rfc_path" =~ ^rfcs/[0-9]{4}-[a-z0-9]+([a-z0-9-]*[a-z0-9])?\.md$ ]]; then
+  echo "RFC path must be a relative unused path matching rfcs/NNNN-short-name.md." >&2
+  exit 2
+fi
+
+if [[ -e "$rfc_path" || -L "$rfc_path" ]]; then
+  echo "Reserved RFC path already exists: $rfc_path" >&2
+  exit 2
+fi
+
+git_common_dir="$(git rev-parse --git-common-dir 2>/dev/null || true)"
+reservation_root="${git_common_dir:+$git_common_dir/orca-rfc-reservations}"
+if [[ -z "$reservation_root" ]]; then
+  echo "RFC reservation requires a Git worktree." >&2
+  exit 1
+fi
+mkdir -p "$reservation_root"
+reservation_name="${rfc_path#rfcs/}"
+reservation_lock="$reservation_root/$reservation_name.lock"
+if ! mkdir "$reservation_lock" 2>/dev/null; then
+  echo "RFC path is already reserved by another Run: $rfc_path" >&2
+  exit 2
+fi
+reservation_active=1
+cleanup_reservation() {
+  if [[ "$reservation_active" == 1 ]]; then
+    rmdir "$reservation_lock" 2>/dev/null || true
+  fi
+}
+trap cleanup_reservation EXIT
 
 if [[ -n "${ORCA_CLI_COMMAND:-}" ]]; then
   read -r -a orca_cmd <<<"$ORCA_CLI_COMMAND"
@@ -102,33 +134,17 @@ create_task() {
 
 planner_task="$(create_task \
   "Understand and plan" \
-  "Investigate: $objective. Use the task-planner role and task-plan template. Do not edit code. Produce verified context, acceptance criteria, non-goals, explicit path ownership, principle decisions, risks, exact verification commands, and open questions.")"
+  "Investigate: $objective. Use the task-planner role and task-plan template. Do not edit repository files. Produce verified context, acceptance criteria, non-goals, explicit path ownership, principle decisions, risks, exact verification commands, and open questions. Hand the completed plan to the RFC author; do not approve it.")"
 
-challenger_task="$(create_task \
-  "Challenge plan" \
-  "Independently challenge the completed plan for $objective. Use the plan-challenger role. Find a simpler solution, ownership conflicts, missing contracts, unsafe failure paths, weak tests, and rollout risks. Return approve, revise, or block with evidence." \
+rfc_task="$(create_task \
+  "Draft reserved RFC" \
+  "Draft and revise the RFC for: $objective. Use the rfc-author role. The only path you may create or edit is $rfc_path, which the coordinator reserved for this run. Translate the completed plan into exact RFC bytes with contracts, alternatives, migration, testing, observability, rollback, and open decisions. Before final challenge approval, set the sole metadata status line to '- Status: Accepted'. Do not edit the RFC index." \
   "[\"$planner_task\"]")"
 
-implementation_task="$(create_task \
-  "Implement approved plan" \
-  "Implement only the coordinator-approved plan for $objective. Respect its allowed paths and disjoint ownership. Add behavior-focused tests and return the implementation evidence envelope. Do not request or use DEVELOPMENT_GATE_KEY; the coordinator runs lifecycle gates." \
-  "[\"$challenger_task\"]")"
-
-verification_task="$(create_task \
-  "Verify implementation" \
-  "Independently verify $objective. Run every required command and record exit codes and required test categories in the evidence envelope. Do not replace required commands with substitutes or request DEVELOPMENT_GATE_KEY; the coordinator runs lifecycle gates." \
-  "[\"$implementation_task\"]")"
-
-review_task="$(create_task \
-  "Independent code review" \
-  "Review the complete verified diff for $objective using the read-only code-reviewer role. You must not be an implementation owner. Record Orca run/task/dispatch provenance and classify findings. Critical or major findings require changes_requested. Do not request DEVELOPMENT_GATE_KEY; the coordinator runs the final gate." \
-  "[\"$verification_task\"]")"
-
-gate_response="$(run_orca orchestration gate-create \
-  --task "$implementation_task" \
-  --question "Approve the challenged plan before implementation?" \
-  --options '["approved","revise","blocked"]' \
-  --json)"
+challenger_task="$(create_task \
+  "Challenge exact plan and RFC" \
+  "Independently challenge the completed plan and the exact RFC at $rfc_path for: $objective. Use the plan-challenger role and remain read-only. Verify the RFC matches the plan, identify a simpler solution, ownership conflicts, missing contracts, unsafe failure paths, weak tests, and rollout risks. Return approve, revise, or block with evidence. Approval applies only to the reviewed RFC bytes; any later RFC change requires another challenge and confirmation." \
+  "[\"$rfc_task\"]")"
 
 planner_response="$(run_orca orchestration worker-start \
   --run "$run_id" \
@@ -138,21 +154,31 @@ planner_response="$(run_orca orchestration worker-start \
   --json)"
 
 cat <<EOF
-Orca development run created.
+Orca RFC planning run created.
 
-Run:            $run_id
-Planner task:   $planner_task
-Challenge task: $challenger_task
-Implementation: $implementation_task
-Verification:   $verification_task
-Code review:    $review_task
+Run:             $run_id
+Planner task:    $planner_task
+RFC author task: $rfc_task
+Challenge task:  $challenger_task
+Reserved RFC:    $rfc_path
 
-The implementation task is blocked by an approval gate.
-The supervised planner worker has started with agent: $planner_agent
+Only the planner worker has started. Implementation, verification, and review
+tasks must not be created until the challenged RFC is confirmed and committed as
+the governance baseline.
 
-Gate receipt:
-$gate_response
+After the RFC author and challenger finish, create the exact-digest confirmation gate:
+  make orca-confirm-rfc-create RUN_ID="$run_id" CHALLENGE_TASK_ID="$challenger_task" RFC="$rfc_path" CHALLENGE_RECEIPT="<challenge-receipt.json>"
+
+After the gate is resolved, collect the receipt and record the governance baseline:
+  make orca-confirm-rfc-collect RUN_ID="$run_id" TASK_ID="<confirmation-task-id>" CHALLENGE_TASK_ID="$challenger_task" CHALLENGE_RECEIPT="<challenge-receipt.json>" RFC="$rfc_path" GATE_ID="<gate-id>" RECEIPT="<confirmation-receipt.json>"
+  git add "$rfc_path" <approved-plan.json> <confirmation-receipt.json>
+  git commit -m "docs: accept RFC for $objective"
+  DEVELOPMENT_GATE_KEY="..." make sign-approved-plan RUN_ID="$run_id" PLAN="<approved-plan.json>" BASE_REF="<governance-commit>"
+
+Only after the receipt and governance baseline are preserved may the coordinator create
+implementation, verification, and review tasks.
 
 Planner receipt:
 $planner_response
 EOF
+reservation_active=0

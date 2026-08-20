@@ -16,9 +16,12 @@ Every non-trivial change follows this sequence:
 - Define acceptance criteria, allowed paths, out-of-scope paths, file ownership, required tests, required commands, risks, and rollback strategy.
 - Record how the plan applies KISS, YAGNI, single ownership, explicit contracts, fail-safe behavior, observability, and least privilege.
 
-3. Discuss:
-- A plan challenger who is not the planner must test assumptions, identify a simpler option, and surface compatibility or operational risks.
-- Implementation must not start until open questions are resolved and the plan decision is explicitly `approved`.
+3. RFC and discuss:
+- Reserve an unused `rfcs/NNNN-short-name.md` path before drafting.
+- An RFC author converts the plan into an RFC without implementing the change and resolves challenge revisions.
+- A plan challenger who is neither planner nor RFC author must challenge the exact plan and RFC bytes, identify a simpler option, and surface compatibility or operational risks.
+- The challenger approves only final bytes whose sole metadata status line is `- Status: Accepted`; the coordinator then creates an exact-digest confirmation gate without changing the RFC.
+- Implementation must not start until the gate is explicitly `approved`; any RFC byte change invalidates confirmation.
 
 4. Implement:
 - Use execution-focused worker(s) with disjoint ownership by file or module.
@@ -38,6 +41,7 @@ Every non-trivial change follows this sequence:
 7. Ship:
 - Ship only after implementation, verification, and independent code review gates pass.
 - Preserve the approved plan, verification commands, review report, and unresolved follow-ups in the PR.
+- Preserve the accepted RFC path, confirmed digest, and confirmation receipt in the PR.
 
 See `DEVELOPMENT_PROCESS.md` for role responsibilities and the Orca workflow.
 
