@@ -17,7 +17,7 @@ GO_CI_PACKAGES=(
 
 usage() {
   cat <<'USAGE'
-Usage: bin/pre-commit-go <fmt|mod-tidy|formatters|lint|security|vet|test|build> [files...]
+Usage: bin/pre-commit-go <fmt|mod-tidy|formatters|lint|security|vet|test|vuln|build> [files...]
 USAGE
 }
 
@@ -27,6 +27,9 @@ require_cmd() {
     case "$1" in
       golangci-lint)
         echo "Install golangci-lint before pushing, or run with SKIP=golangci-lint,go-formatters for an emergency bypass." >&2
+        ;;
+      govulncheck)
+        echo "Install govulncheck with: go install golang.org/x/vuln/cmd/govulncheck@latest" >&2
         ;;
     esac
     exit 1
@@ -161,6 +164,12 @@ case "$cmd" in
   test)
     ensure_go_cache
     CGO_ENABLED=1 go test -count=1 "${GO_CI_PACKAGES[@]}"
+    ;;
+
+  vuln)
+    ensure_go_cache
+    require_cmd govulncheck
+    CGO_ENABLED=0 govulncheck "${GO_CI_PACKAGES[@]}"
     ;;
 
   security)
