@@ -100,6 +100,22 @@ repos:
         stages:
           - manual
 
+      - id: go-security-scan
+        name: Scan changed Go packages for security issues
+        entry: bash bin/pre-commit-go security
+        language: system
+        files: \.go$
+        exclude: ^(protos/|sdks/|vendor/)
+        pass_filenames: true
+
+      - id: go-vulnerability-scan
+        name: Check Go dependencies for known vulnerabilities
+        entry: bash bin/pre-commit-go vuln
+        language: system
+        files: ^(go\.mod|go\.sum|.*\.go)$
+        exclude: ^(protos/|sdks/|vendor/)
+        pass_filenames: false
+
       - id: go-build
         name: Build CI Go binaries
         entry: bash bin/pre-commit-go build
