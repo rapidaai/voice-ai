@@ -3,7 +3,7 @@
   "$id": "https://rapida.ai/schemas/orchestrator/envelope.schema.json",
   "title": "Orchestrator Envelope",
   "type": "object",
-  "required": ["version", "run_id", "repo_root", "task", "meta"],
+  "required": ["version", "run_id", "repo_root", "task", "artifacts", "meta"],
   "properties": {
     "version": { "type": "string", "minLength": 1 },
     "run_id": { "type": "string", "minLength": 1 },
@@ -24,8 +24,10 @@
       "type": "object",
       "properties": {
         "planner": { "type": "string" },
+        "challenger": { "type": "string" },
         "implementer": { "type": "string" },
-        "verifier": { "type": "string" }
+        "verifier": { "type": "string" },
+        "reviewer": { "type": "string" }
       },
       "additionalProperties": true
     },
@@ -33,8 +35,12 @@
       "type": "object",
       "properties": {
         "plan_file": { "type": "string" },
+        "approved_plan_file": { "type": "string", "minLength": 1 },
+        "approved_plan_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "approved_plan_hmac": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "impl_report_file": { "type": "string" },
-        "verify_report_file": { "type": "string" }
+        "verify_report_file": { "type": "string" },
+        "review_report_file": { "type": "string" }
       },
       "additionalProperties": true
     },
@@ -52,6 +58,15 @@
     "task_plan": { "type": "object" },
     "implementation": { "type": "object" },
     "verification": { "type": "object" },
+    "review": { "type": "object" },
+    "orchestration": {
+      "type": "object",
+      "properties": {
+        "run_id": { "type": "string" },
+        "task_id": { "type": "string" },
+        "dispatch_id": { "type": "string" }
+      }
+    },
     "meta": {
       "type": "object",
       "required": ["triggered_by", "timestamp"],

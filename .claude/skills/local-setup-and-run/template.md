@@ -35,5 +35,12 @@
 
 ## Verification evidence
 
+## Governed lifecycle handoff
+
+- Approved plan artifact and attestation:
+- Assigned documentation owner:
+- Exact commands and results:
+- Independent reviewer and decision:
+
 - Commands executed:
 - Output summary:

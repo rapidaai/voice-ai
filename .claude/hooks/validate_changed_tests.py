@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from hook_state import read_tracked_files
+
 
 def _run(cmd: list[str]) -> str:
     out = subprocess.run(cmd, check=False, capture_output=True, text=True)
@@ -75,16 +77,21 @@ def _paths_from_env(repo_root: str) -> list[str]:
 
 
 def _changed_files(stdin_raw: str) -> list[str]:
-    """Return only files explicitly mentioned in the hook payload or env.
-    Never fall back to git diff — that picks up the entire branch and
-    causes the hook to run for files Claude didn't touch this turn."""
+    """Resolve explicitly scoped files, then session-scoped edit records.
+
+    Never fall back to repository-wide git diff because the worktree may contain
+    unrelated user or agent changes.
+    """
     repo_root = _repo_root()
 
     env_files = _paths_from_env(repo_root)
     if env_files:
         return env_files
 
-    return _paths_from_stdin_payload(stdin_raw, repo_root)
+    payload_files = _paths_from_stdin_payload(stdin_raw, repo_root)
+    if payload_files:
+        return payload_files
+    return read_tracked_files(stdin_raw, repo_root)
 
 
 def _is_ui_code(path: str) -> bool:

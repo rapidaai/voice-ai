@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+fail() {
+  echo "agent tooling validation failed: $*" >&2
+  exit 1
+}
+
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf "$tmp_dir"' EXIT
+
+find .codex/skills -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort >"$tmp_dir/codex-skills"
+find .claude/skills -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort >"$tmp_dir/claude-skills"
+diff -u "$tmp_dir/codex-skills" "$tmp_dir/claude-skills" >/dev/null || fail "Codex and Claude skill names differ"
+
+common_hooks="hook_state.py track_changed_files.py enforce_completion.py post_tool_test_hint.py validate_changed_tests.py run_required_tests.py"
+for hook in $common_hooks; do
+  cmp -s ".codex/hooks/$hook" ".claude/hooks/$hook" || fail "hook parity drift: $hook"
+done
+
+while IFS= read -r skill; do
+  codex_dir=".codex/skills/$skill"
+  claude_dir=".claude/skills/$skill"
+
+  test -f "$codex_dir/SKILL.md" || fail "missing $codex_dir/SKILL.md"
+  test -f "$codex_dir/agents/openai.yaml" || fail "missing $codex_dir/agents/openai.yaml"
+  test -f "$codex_dir/scripts/validate.sh" || fail "missing $codex_dir/scripts/validate.sh"
+  test -f "$claude_dir/SKILL.md" || fail "missing $claude_dir/SKILL.md"
+  test -f "$claude_dir/template.md" || fail "missing $claude_dir/template.md"
+  test -f "$claude_dir/scripts/validate.sh" || fail "missing $claude_dir/scripts/validate.sh"
+
+  grep -q '^## Governed lifecycle' "$codex_dir/SKILL.md" || fail "missing governed lifecycle in $codex_dir/SKILL.md"
+  grep -q '^## Governed lifecycle' "$claude_dir/SKILL.md" || fail "missing governed lifecycle in $claude_dir/SKILL.md"
+  grep -Eq 'do not self-approve|do not implement or self-approve' "$codex_dir/agents/openai.yaml" || fail "missing reviewer separation in $codex_dir/agents/openai.yaml"
+  grep -Eq '^## Governed lifecycle|^## Challenge and approval' "$claude_dir/template.md" || fail "missing lifecycle handoff in $claude_dir/template.md"
+
+  grep -q 'skill_dir/../../..' "$codex_dir/scripts/validate.sh" || fail "wrong repository root in $codex_dir/scripts/validate.sh"
+  if grep -q '\.claude/' "$codex_dir/scripts/validate.sh"; then
+    fail "Claude path leaked into $codex_dir/scripts/validate.sh"
+  fi
+  if grep -q '\.codex/' "$claude_dir/scripts/validate.sh"; then
+    fail "Codex path leaked into $claude_dir/scripts/validate.sh"
+  fi
+
+  bash -n "$codex_dir/scripts/validate.sh"
+  bash -n "$claude_dir/scripts/validate.sh"
+  bash "$codex_dir/scripts/validate.sh" >/dev/null
+  bash "$claude_dir/scripts/validate.sh" >/dev/null
+done <"$tmp_dir/codex-skills"
+
+for root in .codex .claude; do
+  for role in backend-implementation backend-unit-tests ui-implementation ui-unit-tests; do
+    role_file="$root/agents/$role.md"
+    grep -q '^Governed lifecycle:' "$role_file" || fail "missing lifecycle contract in $role_file"
+    grep -q 'completion hooks can track' "$role_file" || fail "missing tracked-edit rule in $role_file"
+    grep -q 'Never approve or review your own' "$role_file" || fail "missing reviewer separation in $role_file"
+  done
+  grep -q '^tools: Read,Glob,Grep,LS$' "$root/agents/code-reviewer.md" || fail "code reviewer must remain read-only in $root"
+done
+
+python3 - "$repo_root/.claude/settings.json" <<'PY'
+import json
+import sys
+
+settings = json.load(open(sys.argv[1], encoding="utf-8"))
+hooks = settings.get("hooks", {})
+required = {"PostToolUse", "SubagentStop", "Stop"}
+missing = required - hooks.keys()
+if missing:
+    raise SystemExit(f"missing Claude hook events: {sorted(missing)}")
+post = hooks["PostToolUse"]
+if not post or post[0].get("matcher") != "Edit|MultiEdit|Write|NotebookEdit":
+    raise SystemExit("Claude PostToolUse matcher is not aligned")
+commands = [
+    hook.get("command", "")
+    for event in required
+    for group in hooks[event]
+    for hook in group.get("hooks", [])
+]
+for expected in ("track_changed_files.py", "post_tool_test_hint.py", "enforce_completion.py"):
+    if not any(expected in command for command in commands):
+        raise SystemExit(f"missing Claude hook command: {expected}")
+PY
+
+python3 -m py_compile .codex/hooks/*.py .claude/hooks/*.py
+
+state_dir="$tmp_dir/hook-state"
+backend_payload='{"session_id":"alignment","agent_id":"backend","tool_input":{"file_path":"api/example/service.go"}}'
+backend_test_payload='{"session_id":"alignment","agent_id":"backend","tool_input":{"file_path":"api/example/service_test.go"}}'
+stop_payload='{"session_id":"alignment","agent_id":"backend"}'
+
+printf '%s' "$backend_payload" | AGENT_HOOK_STATE_DIR="$state_dir" python3 .codex/hooks/track_changed_files.py >/dev/null
+if printf '%s' "$stop_payload" | AGENT_HOOK_STATE_DIR="$state_dir" python3 .codex/hooks/validate_changed_tests.py >/dev/null 2>&1; then
+  fail "hook state accepted backend code without a test"
+fi
+printf '%s' "$backend_test_payload" | AGENT_HOOK_STATE_DIR="$state_dir" python3 .codex/hooks/track_changed_files.py >/dev/null
+printf '%s' "$stop_payload" | AGENT_HOOK_STATE_DIR="$state_dir" python3 .codex/hooks/validate_changed_tests.py >/dev/null
+
+echo "agent tooling validation passed"

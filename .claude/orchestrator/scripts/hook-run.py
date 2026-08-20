@@ -1,14 +1,98 @@
 #!/usr/bin/env python3
 import argparse
+import hashlib
+import hmac
 import json
+import os
 import sys
 from pathlib import Path
+
+import jsonschema
 
 
 def err(code: str, message: str, **extra):
     out = {"code": code, "message": message}
     out.update(extra)
     return out
+
+
+def validate_stage_schema(data: dict, stage: str) -> list[dict]:
+    schema_dir = Path(__file__).resolve().parent.parent / "schemas"
+    schema_paths = [schema_dir / "envelope.schema.json", schema_dir / f"{stage}-input.schema.json"]
+    for schema_path in schema_paths:
+        try:
+            schema = json.loads(schema_path.read_text(encoding="utf-8"))
+            jsonschema.validate(instance=data, schema=schema)
+        except jsonschema.ValidationError as exc:
+            location = ".".join(str(part) for part in exc.absolute_path)
+            return [
+                err(
+                    "SCHEMA_VALIDATION_FAILED",
+                    exc.message,
+                    path=location,
+                    schema=str(schema_path),
+                )
+            ]
+        except (OSError, json.JSONDecodeError, jsonschema.SchemaError) as exc:
+            return [err("SCHEMA_LOAD_FAILED", str(exc), schema=str(schema_path))]
+    return []
+
+
+def load_approved_plan(data: dict) -> tuple[dict | None, list[dict]]:
+    artifacts = data.get("artifacts") or {}
+    plan_file = str(artifacts.get("approved_plan_file", "")).strip()
+    expected_sha256 = str(artifacts.get("approved_plan_sha256", "")).strip()
+    expected_hmac = str(artifacts.get("approved_plan_hmac", "")).strip()
+    gate_key = os.environ.get("DEVELOPMENT_GATE_KEY", "")
+    if not plan_file or not expected_sha256 or not expected_hmac:
+        return None, [err("MISSING_PLAN_ARTIFACT", "Approved plan file, SHA-256, and HMAC are required")]
+    if not gate_key:
+        return None, [
+            err(
+                "MISSING_GATE_KEY",
+                "DEVELOPMENT_GATE_KEY is required and must be held by the coordinator",
+            )
+        ]
+
+    plan_path = Path(plan_file)
+    if not plan_path.is_absolute():
+        plan_path = Path(str(data.get("repo_root", ""))) / plan_path
+
+    try:
+        raw_plan = plan_path.read_bytes()
+        approved_plan = json.loads(raw_plan.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return None, [err("PLAN_ARTIFACT_LOAD_FAILED", str(exc), file=str(plan_path))]
+
+    actual_sha256 = hashlib.sha256(raw_plan).hexdigest()
+    if actual_sha256 != expected_sha256:
+        return None, [
+            err(
+                "PLAN_ARTIFACT_DIGEST_MISMATCH",
+                "Approved plan artifact does not match its recorded SHA-256",
+                expected=expected_sha256,
+                actual=actual_sha256,
+            )
+        ]
+    run_id = str(data.get("run_id", "")).strip()
+    signed_message = f"{run_id}:{actual_sha256}".encode("utf-8")
+    actual_hmac = hmac.new(gate_key.encode("utf-8"), signed_message, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(actual_hmac, expected_hmac):
+        return None, [
+            err(
+                "PLAN_ATTESTATION_INVALID",
+                "Approved plan HMAC does not match coordinator attestation",
+            )
+        ]
+    if approved_plan != data.get("task_plan"):
+        return None, [
+            err(
+                "PLAN_ARTIFACT_MISMATCH",
+                "task_plan differs from the approved plan artifact",
+                file=str(plan_path),
+            )
+        ]
+    return approved_plan, []
 
 
 def _is_in_allowed(path: str, allowed_paths: list[str]) -> bool:
@@ -77,9 +161,14 @@ def run_pre_implementation(data: dict) -> dict:
         "scope_declared": "fail",
         "tests_declared": "fail",
         "commands_declared": "fail",
+        "principles_declared": "fail",
+        "ownership_declared": "fail",
+        "discussion_approved": "fail",
     }
 
-    plan = data.get("task_plan")
+    approved_plan, artifact_errors = load_approved_plan(data)
+    errors.extend(artifact_errors)
+    plan = approved_plan if approved_plan is not None else data.get("task_plan")
     if not isinstance(plan, dict):
         errors.append(err("MISSING_PLAN", "task_plan is required"))
         return {"status": "fail", "errors": errors, "warnings": warnings, "checks": checks}
@@ -90,8 +179,13 @@ def run_pre_implementation(data: dict) -> dict:
     out_scope = plan.get("out_of_scope_paths") or []
     req_tests = plan.get("required_tests") or []
     req_cmds = plan.get("required_commands") or []
+    acceptance = plan.get("acceptance_criteria") or []
+    non_goals = plan.get("non_goals") or []
+    ownership = plan.get("ownership") or {}
+    principles = plan.get("principles") or {}
+    discussion = plan.get("discussion") or {}
 
-    if allowed and out_scope:
+    if allowed and "out_of_scope_paths" in plan and isinstance(out_scope, list):
         checks["scope_declared"] = "pass"
     else:
         errors.append(err("MISSING_SCOPE", "allowed_paths and out_of_scope_paths are required"))
@@ -105,6 +199,66 @@ def run_pre_implementation(data: dict) -> dict:
         checks["commands_declared"] = "pass"
     else:
         errors.append(err("MISSING_COMMANDS", "required_commands must not be empty"))
+
+    required_principles = {
+        "kiss",
+        "yagni",
+        "single_source_of_truth",
+        "contracts",
+        "fail_safe",
+        "security",
+        "observability",
+        "reversibility",
+    }
+    missing_principles = sorted(
+        key for key in required_principles if not str(principles.get(key, "")).strip()
+    )
+    if acceptance and non_goals and not missing_principles:
+        checks["principles_declared"] = "pass"
+    else:
+        errors.append(
+            err(
+                "INCOMPLETE_PRINCIPLE_PLAN",
+                "acceptance_criteria, non_goals, and all principle decisions are required",
+                missing_principles=missing_principles,
+            )
+        )
+
+    invalid_owners = [path for path, owner in ownership.items() if not str(owner).strip()]
+    missing_owners = [path for path in allowed if path not in ownership]
+    if ownership and not invalid_owners and not missing_owners:
+        checks["ownership_declared"] = "pass"
+    else:
+        errors.append(
+            err(
+                "MISSING_OWNERSHIP",
+                "task_plan.ownership must assign one owner to every writable path",
+                invalid_paths=invalid_owners,
+                missing_paths=missing_owners,
+            )
+        )
+
+    planner = str(discussion.get("planner", "")).strip()
+    challenger = str(discussion.get("challenger", "")).strip()
+    approved_by = str(discussion.get("approved_by", "")).strip()
+    decision = str(discussion.get("decision", "")).strip()
+    open_blockers = discussion.get("open_blockers") or []
+    if (
+        planner
+        and challenger
+        and planner != challenger
+        and approved_by
+        and decision == "approved"
+        and not open_blockers
+    ):
+        checks["discussion_approved"] = "pass"
+    else:
+        errors.append(
+            err(
+                "PLAN_NOT_APPROVED",
+                "An independent challenge and explicit approval are required before implementation",
+            )
+        )
 
     has_strict_validator = any("--check-diff" in c and "--provider" in c for c in req_cmds)
     if not has_strict_validator and data.get("task", {}).get("type") == "integration":
@@ -121,12 +275,18 @@ def run_pre_implementation(data: dict) -> dict:
             "out_of_scope_paths": out_scope,
             "required_tests": req_tests,
             "required_commands": req_cmds,
+            "acceptance_criteria": acceptance,
+            "non_goals": non_goals,
+            "ownership": ownership,
+            "principles": principles,
+            "discussion": discussion,
         },
     }
 
 
 def run_post_implementation(data: dict) -> dict:
-    errors = _base_envelope_checks(data)
+    pre_result = run_pre_implementation(data)
+    errors = list(pre_result.get("errors", []))
     checks = {
         "scope_guard": "fail",
         "required_test_presence": "fail",
@@ -190,7 +350,8 @@ def run_post_implementation(data: dict) -> dict:
 
 
 def run_post_verification(data: dict) -> dict:
-    errors = _base_envelope_checks(data)
+    implementation_result = run_post_implementation(data)
+    errors = list(implementation_result.get("errors", []))
     issues = []
 
     plan = data.get("task_plan") or {}
@@ -209,9 +370,31 @@ def run_post_verification(data: dict) -> dict:
     required_tests = set(plan.get("required_tests") or [])
     passed_categories = set(coverage.get("required_categories_passed") or [])
 
-    failed_cmds = [c for c in commands if int(c.get("exit_code", 1)) != 0]
+    failed_cmds = [
+        command
+        for command in commands
+        if not isinstance(command, dict) or int(command.get("exit_code", 1)) != 0
+    ]
     for c in failed_cmds:
-        issues.append(err("TEST_FAIL", "Verification command failed", command=c.get("cmd", "")))
+        command = c.get("cmd", "") if isinstance(c, dict) else ""
+        issues.append(err("TEST_FAIL", "Verification command failed", command=command))
+
+    successful_commands = {
+        str(command.get("cmd", "")).strip()
+        for command in commands
+        if isinstance(command, dict) and int(command.get("exit_code", 1)) == 0
+    }
+    missing_commands = [
+        command for command in plan.get("required_commands") or [] if command not in successful_commands
+    ]
+    if missing_commands:
+        issues.append(
+            err(
+                "REQUIRED_COMMANDS_MISSING",
+                "Required verification commands were not successfully executed",
+                missing=missing_commands,
+            )
+        )
 
     if coverage.get("unit_tests_present") is False:
         issues.append(err("UNIT_TESTS_MISSING", "coverage.unit_tests_present is false"))
@@ -237,7 +420,132 @@ def run_post_verification(data: dict) -> dict:
 
     return {
         "status": "pass",
-        "final_decision": "ready",
+        "final_decision": "ready_for_review",
+        "issues": [],
+        "reroute_payload": {},
+    }
+
+
+def run_post_review(data: dict) -> dict:
+    verification_result = run_post_verification(data)
+    errors = list(verification_result.get("issues", []))
+    review = data.get("review")
+    if not isinstance(review, dict):
+        errors.append(err("MISSING_REVIEW", "review is required"))
+        return {
+            "status": "fail",
+            "final_decision": "block",
+            "issues": errors,
+            "reroute_payload": {},
+        }
+
+    reviewer = str((data.get("meta") or {}).get("triggered_by", "")).strip()
+    claimed_reviewer = str(review.get("reviewer", "")).strip()
+    implementation_owners = {
+        str(owner).strip()
+        for owner in (data.get("task_plan") or {}).get("ownership", {}).values()
+        if str(owner).strip()
+    }
+    findings = review.get("findings") or []
+    decision = str(review.get("decision", "")).strip()
+    evidence = review.get("evidence") or {}
+    orchestration = data.get("orchestration") or {}
+
+    if not reviewer:
+        errors.append(err("MISSING_REVIEWER", "meta.triggered_by is required"))
+    elif claimed_reviewer != reviewer:
+        errors.append(
+            err(
+                "REVIEWER_IDENTITY_MISMATCH",
+                "review.reviewer must match meta.triggered_by",
+                reviewer=claimed_reviewer,
+                triggered_by=reviewer,
+            )
+        )
+    elif reviewer in implementation_owners:
+        errors.append(
+            err(
+                "REVIEWER_NOT_INDEPENDENT",
+                "The code reviewer must not be an implementation owner",
+                reviewer=reviewer,
+            )
+        )
+
+    if not implementation_owners:
+        errors.append(err("MISSING_IMPLEMENTATION_OWNERS", "task_plan.ownership must not be empty"))
+
+    required_evidence = {"plan", "implementation", "verification", "diff"}
+    missing_evidence = sorted(
+        key for key in required_evidence if not str(evidence.get(key, "")).strip()
+    )
+    if missing_evidence:
+        errors.append(
+            err(
+                "MISSING_REVIEW_EVIDENCE",
+                "Review must reference plan, implementation, verification, and diff evidence",
+                missing=missing_evidence,
+            )
+        )
+
+    required_orchestration = {"run_id", "task_id", "dispatch_id"}
+    missing_orchestration = sorted(
+        key for key in required_orchestration if not str(orchestration.get(key, "")).strip()
+    )
+    if missing_orchestration:
+        errors.append(
+            err(
+                "MISSING_ORCA_PROVENANCE",
+                "Orca run, task, and dispatch provenance are required for final review",
+                missing=missing_orchestration,
+            )
+        )
+    elif str(orchestration.get("run_id", "")).strip() != str(data.get("run_id", "")).strip():
+        errors.append(
+            err(
+                "ORCA_RUN_MISMATCH",
+                "Orca provenance run_id must match the coordinator-attested run_id",
+                envelope_run_id=data.get("run_id", ""),
+                orchestration_run_id=orchestration.get("run_id", ""),
+            )
+        )
+
+    blocking_findings = [
+        finding
+        for finding in findings
+        if isinstance(finding, dict)
+        and str(finding.get("severity", "")).strip() in {"critical", "major"}
+        and str(finding.get("status", "")).strip() != "resolved"
+    ]
+    invalid_findings = [finding for finding in findings if not isinstance(finding, dict)]
+    if invalid_findings:
+        errors.append(err("INVALID_REVIEW_FINDING", "Every review finding must be an object"))
+    if blocking_findings:
+        errors.append(
+            err(
+                "BLOCKING_REVIEW_FINDINGS",
+                "Critical or major review findings remain unresolved",
+                count=len(blocking_findings),
+            )
+        )
+
+    if decision != "approved":
+        errors.append(err("REVIEW_NOT_APPROVED", "review.decision must be approved"))
+
+    if errors:
+        return {
+            "status": "fail",
+            "final_decision": "reroute_to_implementer",
+            "issues": errors,
+            "reroute_payload": {
+                "target_agent": "implementer",
+                "fix_only": True,
+                "todo": [issue.get("message", "") for issue in errors],
+            },
+        }
+
+    return {
+        "status": "pass",
+        "final_decision": "ready_to_ship",
         "issues": [],
         "reroute_payload": {},
     }
@@ -248,7 +556,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--stage",
         required=True,
-        choices=["pre-implementation", "post-implementation", "post-verification"],
+        choices=["pre-implementation", "post-implementation", "post-verification", "post-review"],
     )
     parser.add_argument("--input", required=True, help="Path to JSON input envelope")
     parser.add_argument("--output", required=True, help="Path to JSON output")
@@ -266,11 +574,24 @@ def main() -> int:
 
     try:
         if args.stage == "pre-implementation":
-            result = run_pre_implementation(data)
+            runner = run_pre_implementation
         elif args.stage == "post-implementation":
-            result = run_post_implementation(data)
+            runner = run_post_implementation
+        elif args.stage == "post-verification":
+            runner = run_post_verification
         else:
-            result = run_post_verification(data)
+            runner = run_post_review
+
+        schema_errors = validate_stage_schema(data, args.stage)
+        if schema_errors:
+            result = {
+                "status": "fail",
+                "final_decision": "block",
+                "issues": schema_errors,
+                "reroute_payload": {},
+            }
+        else:
+            result = runner(data)
 
         output_path = Path(args.output)
         output_path.parent.mkdir(parents=True, exist_ok=True)

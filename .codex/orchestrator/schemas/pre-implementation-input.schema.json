@@ -17,12 +17,54 @@
     },
     "task_plan": {
       "type": "object",
-      "required": ["allowed_paths", "out_of_scope_paths", "required_tests", "required_commands"],
+      "required": [
+        "acceptance_criteria",
+        "non_goals",
+        "allowed_paths",
+        "out_of_scope_paths",
+        "ownership",
+        "principles",
+        "required_tests",
+        "required_commands",
+        "discussion"
+      ],
       "properties": {
+        "acceptance_criteria": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "non_goals": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
         "allowed_paths": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
         "out_of_scope_paths": { "type": "array", "items": { "type": "string" } },
+        "ownership": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        },
+        "principles": {
+          "type": "object",
+          "required": ["kiss", "yagni", "single_source_of_truth", "contracts", "fail_safe", "security", "observability", "reversibility"],
+          "properties": {
+            "kiss": { "type": "string", "minLength": 1 },
+            "yagni": { "type": "string", "minLength": 1 },
+            "single_source_of_truth": { "type": "string", "minLength": 1 },
+            "contracts": { "type": "string", "minLength": 1 },
+            "fail_safe": { "type": "string", "minLength": 1 },
+            "security": { "type": "string", "minLength": 1 },
+            "observability": { "type": "string", "minLength": 1 },
+            "reversibility": { "type": "string", "minLength": 1 }
+          }
+        },
         "required_tests": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
-        "required_commands": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+        "required_commands": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "discussion": {
+          "type": "object",
+          "required": ["planner", "challenger", "decision", "approved_by", "open_blockers"],
+          "properties": {
+            "planner": { "type": "string", "minLength": 1 },
+            "challenger": { "type": "string", "minLength": 1 },
+            "decision": { "const": "approved" },
+            "approved_by": { "type": "string", "minLength": 1 },
+            "open_blockers": { "type": "array", "maxItems": 0 }
+          }
+        }
       }
     },
     "meta": { "type": "object" }

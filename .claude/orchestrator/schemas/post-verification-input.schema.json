@@ -3,10 +3,11 @@
   "$id": "https://rapida.ai/schemas/orchestrator/post-verification-input.schema.json",
   "title": "Post Verification Hook Input",
   "type": "object",
-  "required": ["task", "task_plan", "verification", "meta"],
+  "required": ["task", "task_plan", "implementation", "verification", "meta"],
   "properties": {
     "task": { "type": "object" },
     "task_plan": { "type": "object" },
+    "implementation": { "type": "object" },
     "verification": {
       "type": "object",
       "required": ["commands"],

@@ -58,6 +58,9 @@ services:
     volumes:
       - ./docker/document-api/config.yaml:/app/env/document.yaml:ro
       - ${HOME}/rapida-data/assets:/app/rapida-data/assets
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      UNSTRUCTURED_API_KEY: ${UNSTRUCTURED_API_KEY:-}
     networks:
       - api-network
     healthcheck:

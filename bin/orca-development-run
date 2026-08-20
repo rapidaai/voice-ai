@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+objective="${1:-}"
+planner_agent="${2:-codex}"
+
+if [[ -z "$objective" ]]; then
+  echo "Usage: $0 <objective> [planner-agent]" >&2
+  exit 2
+fi
+
+if [[ -n "${ORCA_CLI_COMMAND:-}" ]]; then
+  read -r -a orca_cmd <<<"$ORCA_CLI_COMMAND"
+elif [[ -n "${ORCA_DEV_REPO_ROOT:-}" ]]; then
+  orca_cmd=(orca-dev)
+elif [[ "$(uname -s)" == "Linux" ]]; then
+  orca_cmd=(orca-ide)
+else
+  orca_cmd=(orca)
+fi
+
+if ! command -v "${orca_cmd[0]}" >/dev/null 2>&1; then
+  echo "Orca CLI is not installed or not on PATH." >&2
+  exit 1
+fi
+
+run_orca() {
+  "${orca_cmd[@]}" "$@"
+}
+
+status_response="$(run_orca status --json)"
+printf '%s' "$status_response" | python3 -c '
+import json
+import sys
+
+payload = json.load(sys.stdin)
+result = payload.get("result") or {}
+app = result.get("app") or {}
+runtime = result.get("runtime") or {}
+if not app.get("running") or not runtime.get("reachable"):
+    raise SystemExit("Orca app/runtime is not running or reachable. Start Orca and enable orchestration.")
+'
+
+extract_id() {
+  local kind="$1"
+  python3 -c '
+import json
+import sys
+
+kind = sys.argv[1]
+payload = json.load(sys.stdin)
+preferred = {
+    "run": ("runId", "run_id"),
+    "task": ("taskId", "task_id"),
+}
+
+def find(value):
+    if isinstance(value, dict):
+        for key in preferred[kind]:
+            candidate = value.get(key)
+            if isinstance(candidate, str) and candidate:
+                return candidate
+        nested = value.get(kind)
+        if isinstance(nested, dict):
+            candidate = nested.get("id")
+            if isinstance(candidate, str) and candidate:
+                return candidate
+        for child in value.values():
+            candidate = find(child)
+            if candidate:
+                return candidate
+    elif isinstance(value, list):
+        for child in value:
+            candidate = find(child)
+            if candidate:
+                return candidate
+    return None
+
+identifier = find(payload)
+if not identifier:
+    raise SystemExit(f"Unable to find {kind} id in Orca response")
+print(identifier)
+' "$kind"
+}
+
+run_response="$(run_orca orchestration run-create --objective "$objective" --json)"
+run_id="$(printf '%s' "$run_response" | extract_id run)"
+
+create_task() {
+  local title="$1"
+  local spec="$2"
+  local deps="${3:-}"
+  local response
+
+  if [[ -n "$deps" ]]; then
+    response="$(run_orca orchestration task-create --run "$run_id" --task-title "$title" --spec "$spec" --deps "$deps" --json)"
+  else
+    response="$(run_orca orchestration task-create --run "$run_id" --task-title "$title" --spec "$spec" --json)"
+  fi
+  printf '%s' "$response" | extract_id task
+}
+
+planner_task="$(create_task \
+  "Understand and plan" \
+  "Investigate: $objective. Use the task-planner role and task-plan template. Do not edit code. Produce verified context, acceptance criteria, non-goals, explicit path ownership, principle decisions, risks, exact verification commands, and open questions.")"
+
+challenger_task="$(create_task \
+  "Challenge plan" \
+  "Independently challenge the completed plan for $objective. Use the plan-challenger role. Find a simpler solution, ownership conflicts, missing contracts, unsafe failure paths, weak tests, and rollout risks. Return approve, revise, or block with evidence." \
+  "[\"$planner_task\"]")"
+
+implementation_task="$(create_task \
+  "Implement approved plan" \
+  "Implement only the coordinator-approved plan for $objective. Respect its allowed paths and disjoint ownership. Add behavior-focused tests and return the implementation evidence envelope. Do not request or use DEVELOPMENT_GATE_KEY; the coordinator runs lifecycle gates." \
+  "[\"$challenger_task\"]")"
+
+verification_task="$(create_task \
+  "Verify implementation" \
+  "Independently verify $objective. Run every required command and record exit codes and required test categories in the evidence envelope. Do not replace required commands with substitutes or request DEVELOPMENT_GATE_KEY; the coordinator runs lifecycle gates." \
+  "[\"$implementation_task\"]")"
+
+review_task="$(create_task \
+  "Independent code review" \
+  "Review the complete verified diff for $objective using the read-only code-reviewer role. You must not be an implementation owner. Record Orca run/task/dispatch provenance and classify findings. Critical or major findings require changes_requested. Do not request DEVELOPMENT_GATE_KEY; the coordinator runs the final gate." \
+  "[\"$verification_task\"]")"
+
+gate_response="$(run_orca orchestration gate-create \
+  --task "$implementation_task" \
+  --question "Approve the challenged plan before implementation?" \
+  --options '["approved","revise","blocked"]' \
+  --json)"
+
+planner_response="$(run_orca orchestration worker-start \
+  --run "$run_id" \
+  --task "$planner_task" \
+  --worktree current \
+  --agent "$planner_agent" \
+  --json)"
+
+cat <<EOF
+Orca development run created.
+
+Run:            $run_id
+Planner task:   $planner_task
+Challenge task: $challenger_task
+Implementation: $implementation_task
+Verification:   $verification_task
+Code review:    $review_task
+
+The implementation task is blocked by an approval gate.
+The supervised planner worker has started with agent: $planner_agent
+
+Gate receipt:
+$gate_response
+
+Planner receipt:
+$planner_response
+EOF

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 skill_dir="$(cd "$(dirname "$0")/.." && pwd)"
-repo_root="$(cd "$skill_dir/../.." && pwd)"
+repo_root="$(cd "$skill_dir/../../.." && pwd)"
 skill_name="$(basename "$skill_dir")"
 
 required=("SKILL.md" "references/checklist.md" "examples/sample.md" "scripts/validate.sh" "agents/openai.yaml")
@@ -39,9 +39,9 @@ if [[ $check_diff -eq 1 ]]; then
   )
 
   allowed=(
-    '^skills/local-setup-and-run/'
-    '^skills/README.md$'
-    '^skills/SECURITY_GUIDELINES.md$'
+    '^\.codex/skills/local-setup-and-run/'
+    '^\.codex/skills/README.md$'
+    '^\.codex/skills/SECURITY_GUIDELINES.md$'
     '^README.md$'
     '^Makefile$'
     '^docker-compose\.yml$'

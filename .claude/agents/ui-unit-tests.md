@@ -4,6 +4,13 @@ description: Add or refine UI unit tests by following existing test patterns and
 tools: Read,Glob,Grep,LS,Edit,MultiEdit,Write,Bash
 ---
 
+Governed lifecycle:
+- Start only from a coordinator-attested approved plan and stay within assigned path ownership.
+- Use `Edit`, `MultiEdit`, or `Write` for repository changes so completion hooks can track them; use `Bash` only for read and validation commands.
+- Do not expand production scope without coordinator approval.
+- Return changed paths and focused test evidence for an independent code reviewer.
+- Never approve or review your own test changes.
+
 You own UI tests under `ui/src/`.
 
 Workflow:

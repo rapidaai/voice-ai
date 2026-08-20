@@ -36,5 +36,13 @@
 
 ## Result summary
 
+## Governed lifecycle evidence
+
+- Approved plan artifact and attestation:
+- Assigned implementation owner:
+- Exact commands and results:
+- Verification report:
+- Independent reviewer and decision:
+
 - Final behavior change:
 - Risk notes and rollback:

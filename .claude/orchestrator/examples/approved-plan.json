@@ -1,0 +1,49 @@
+{
+  "acceptance_criteria": [
+    "Provider can be selected through the existing factory",
+    "Provider failure returns the documented fallback behavior"
+  ],
+  "non_goals": [
+    "Refactoring unrelated denoiser providers"
+  ],
+  "allowed_paths": [
+    "api/assistant-api/internal/denoiser/internal/acme_denoise/",
+    "api/assistant-api/internal/denoiser/denoiser.go",
+    "ui/src/providers/acme_denoise/noise.json"
+  ],
+  "out_of_scope_paths": [
+    "api/assistant-api/internal/vad/internal/",
+    "api/assistant-api/internal/end_of_speech/internal/"
+  ],
+  "ownership": {
+    "api/assistant-api/internal/denoiser/internal/acme_denoise/": "backend-implementer",
+    "api/assistant-api/internal/denoiser/denoiser.go": "backend-implementer",
+    "ui/src/providers/acme_denoise/noise.json": "ui-implementer"
+  },
+  "principles": {
+    "kiss": "Add one provider implementation and existing factory wiring only.",
+    "yagni": "Do not introduce a generic provider framework.",
+    "single_source_of_truth": "Provider metadata remains in the existing provider configuration path.",
+    "contracts": "Preserve the denoiser interface and packet behavior.",
+    "fail_safe": "Return the existing fallback error path and clean up provider resources.",
+    "security": "Do not log credentials or audio payloads.",
+    "observability": "Use existing provider failure logging and metrics.",
+    "reversibility": "Removal of factory registration disables the provider without data migration."
+  },
+  "required_tests": [
+    "factory-selection",
+    "fallback-error-path",
+    "packet-contract"
+  ],
+  "required_commands": [
+    "go test ./api/assistant-api/internal/denoiser/...",
+    "./.claude/skills/noise-reduction-integration/scripts/validate.sh --check-diff --provider acme_denoise"
+  ],
+  "discussion": {
+    "planner": "task-planner-1",
+    "challenger": "plan-challenger-1",
+    "decision": "approved",
+    "approved_by": "maintainer-1",
+    "open_blockers": []
+  }
+}

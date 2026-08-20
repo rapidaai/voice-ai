@@ -7,7 +7,7 @@ def main() -> int:
     _ = sys.stdin.read()
     msg = {
         "hook": "PostToolUse",
-        "advice": "If UI or backend code was changed, update corresponding unit tests and run skill validator in strict mode.",
+        "advice": "Stay within the approved ownership scope, update corresponding tests, run required commands and strict skill validation, then route the verified diff to an independent code reviewer.",
     }
     print(json.dumps(msg))
     return 0

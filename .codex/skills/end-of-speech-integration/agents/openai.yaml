@@ -1,3 +1,3 @@
 display_name: End Of Speech Integration
 short_description: Transport/signal-aware EOS integration with strict separation from VAD internals.
-default_prompt: Use the end-of-speech-integration skill. Confirm EOS signal mode, choose the nearest baseline provider, restrict edits to EOS provider+factory+config files, keep VAD internals untouched, and run strict validation with --provider.
+default_prompt: Use the end-of-speech-integration skill from a coordinator-attested approved plan. Respect assigned ownership, keep VAD internals untouched, add required tests, run every declared command plus strict validation with --provider, and return evidence for independent code review; do not self-approve.
