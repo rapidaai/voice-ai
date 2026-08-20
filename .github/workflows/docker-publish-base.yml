@@ -96,7 +96,7 @@ jobs:
           fi
 
   push-golang-bookworm:
-    name: Push rapida-golang:1.25.12-bookworm
+    name: Push rapida-golang:1.25.13-bookworm
     needs: changes
     if: needs.changes.outputs.golang-bookworm == 'true'
     runs-on: ubuntu-latest
@@ -111,13 +111,13 @@ jobs:
           dockerfile: ./docker/base/rapida-golang-bookworm.Dockerfile
           push: "true"
           platforms: linux/amd64
-          tags: ${{ env.REGISTRY }}/rapida-golang:1.25.12-bookworm
+          tags: ${{ env.REGISTRY }}/rapida-golang:1.25.13-bookworm
           cache-scope: rapida-golang-bookworm
           registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
           registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
 
   push-golang-alpine:
-    name: Push rapida-golang:1.25.12-alpine
+    name: Push rapida-golang:1.25.13-alpine
     needs: changes
     if: needs.changes.outputs.golang-alpine == 'true'
     runs-on: ubuntu-latest
@@ -132,7 +132,7 @@ jobs:
           dockerfile: ./docker/base/rapida-golang-alpine.Dockerfile
           push: "true"
           platforms: linux/amd64
-          tags: ${{ env.REGISTRY }}/rapida-golang:1.25.12-alpine
+          tags: ${{ env.REGISTRY }}/rapida-golang:1.25.13-alpine
           cache-scope: rapida-golang-alpine
           registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
           registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -240,8 +240,8 @@ jobs:
             echo ""
             echo "| Image | Result |"
             echo "|-------|--------|"
-            echo "| rapidaai/rapida-golang:1.25.12-bookworm | ${{ needs.push-golang-bookworm.result }} |"
-            echo "| rapidaai/rapida-golang:1.25.12-alpine | ${{ needs.push-golang-alpine.result }} |"
+            echo "| rapidaai/rapida-golang:1.25.13-bookworm | ${{ needs.push-golang-bookworm.result }} |"
+            echo "| rapidaai/rapida-golang:1.25.13-alpine | ${{ needs.push-golang-alpine.result }} |"
             echo "| rapidaai/rapida-alpine:3.21 | ${{ needs.push-alpine.result }} |"
             echo "| rapidaai/rapida-debian:bookworm-slim | ${{ needs.push-debian-slim.result }} |"
             echo "| rapidaai/rapida-node:22-alpine | ${{ needs.push-node-alpine.result }} |"
