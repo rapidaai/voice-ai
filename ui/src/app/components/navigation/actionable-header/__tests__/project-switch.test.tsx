@@ -8,7 +8,33 @@ import {
 } from '@/app/components/navigation/actionable-header';
 import { AuthContext } from '@/context/auth-context';
 
-const mockToggleDarkMode = jest.fn();
+const mockToggleMode = jest.fn();
+
+const mockTheme = {
+  allowModeSelection: true,
+  brand: {
+    name: 'Acme Voice',
+    logos: {
+      full: {
+        light: '/brand/full-light.svg',
+        dark: '/brand/full-dark.svg',
+      },
+      compact: {
+        light: '/brand/compact-light.svg',
+        dark: '/brand/compact-dark.svg',
+      },
+    },
+  },
+  links: {
+    documentation: 'https://example.com/docs',
+    source: 'https://example.com/source',
+    support: 'https://example.com/support',
+    terms: 'https://example.com/terms',
+    privacy: 'https://example.com/privacy',
+  },
+};
+
+let mockResolvedMode: 'light' | 'dark' = 'light';
 
 let mockPathname = '/dashboard/assistant/list';
 
@@ -17,10 +43,11 @@ jest.mock('react-router-dom', () => ({
   useLocation: () => ({ pathname: mockPathname }),
 }));
 
-jest.mock('@/context/dark-mode-context', () => ({
-  useDarkMode: () => ({
-    isDarkMode: false,
-    toggleDarkMode: mockToggleDarkMode,
+jest.mock('@/theme/theme-provider', () => ({
+  useTheme: () => ({
+    resolvedMode: mockResolvedMode,
+    toggleMode: mockToggleMode,
+    theme: mockTheme,
   }),
 }));
 
@@ -38,10 +65,14 @@ jest.mock('@carbon/react', () => ({
   Breadcrumb: ({ children }: any) => <ol>{children}</ol>,
   BreadcrumbItem: ({ children }: any) => <li>{children}</li>,
   HeaderGlobalBar: ({ children }: any) => <div>{children}</div>,
-  HeaderGlobalAction: ({ children, tooltipAlignment, isActive, ...props }: any) => (
-    <button {...props}>{children}</button>
-  ),
-  HeaderPanel: ({ children, expanded }: any) => (expanded ? <div>{children}</div> : null),
+  HeaderGlobalAction: ({
+    children,
+    tooltipAlignment,
+    isActive,
+    ...props
+  }: any) => <button {...props}>{children}</button>,
+  HeaderPanel: ({ children, expanded }: any) =>
+    expanded ? <div>{children}</div> : null,
   Switcher: ({ children }: any) => <ul>{children}</ul>,
   SwitcherItem: ({ children, href, ...props }: any) => (
     <a href={href} {...props}>
@@ -56,7 +87,10 @@ jest.mock('@carbon/react', () => ({
     itemToString,
     onChange,
   }: any) => {
-    const selectedIndex = Math.max(items.findIndex((x: any) => x === selectedItem), 0);
+    const selectedIndex = Math.max(
+      items.findIndex((x: any) => x === selectedItem),
+      0,
+    );
     return (
       <select
         id={id}
@@ -87,6 +121,8 @@ describe('Actionable header project switcher', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPathname = '/dashboard/assistant/list';
+    mockResolvedMode = 'light';
+    mockTheme.allowModeSelection = true;
   });
 
   it('renders project dropdown in header and switches project on selection', () => {
@@ -126,5 +162,55 @@ describe('Actionable header project switcher', () => {
     );
 
     expect(screen.queryByLabelText('Select a Project')).not.toBeInTheDocument();
+  });
+
+  it('renders configured branding and resource links in the account panel', () => {
+    render(
+      <AuthContext.Provider value={{}}>
+        <CustomerOptions />
+      </AuthContext.Provider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Account' }));
+
+    expect(screen.getByRole('img', { name: 'Acme Voice' })).toHaveAttribute(
+      'src',
+      '/brand/full-light.svg',
+    );
+    expect(screen.getByLabelText('Documentation')).toHaveAttribute(
+      'href',
+      mockTheme.links.documentation,
+    );
+    expect(screen.getByLabelText('Source')).toHaveAttribute(
+      'href',
+      mockTheme.links.source,
+    );
+    expect(screen.getByLabelText('Support')).toHaveAttribute(
+      'href',
+      mockTheme.links.support,
+    );
+    expect(screen.getByLabelText('Terms')).toHaveAttribute(
+      'href',
+      mockTheme.links.terms,
+    );
+    expect(screen.getByLabelText('Privacy')).toHaveAttribute(
+      'href',
+      mockTheme.links.privacy,
+    );
+  });
+
+  it('hides the mode action when the theme disables mode selection', () => {
+    mockTheme.allowModeSelection = false;
+
+    render(
+      <AuthContext.Provider value={{}}>
+        <CustomerOptions />
+      </AuthContext.Provider>,
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Switch to dark mode' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Account' })).toBeInTheDocument();
   });
 });

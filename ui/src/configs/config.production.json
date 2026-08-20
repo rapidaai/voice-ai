@@ -15,7 +15,6 @@
     },
     "workspace": {
         "domain": "rapida.ai",
-        "title": "RapidaAi",
         "authentication": {
             "signIn": {
                 "providers": {

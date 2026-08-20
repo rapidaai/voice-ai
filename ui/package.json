@@ -35,6 +35,8 @@
         "build:css": "npx @tailwindcss/cli -i src/styles/tailwind.css -o src/styles/generated/tailwindcss.css --minify --optimize",
         "tailwind:watch": "npx @tailwindcss/cli -i ./src/styles/tailwind.css -o ./src/styles/generated/tailwindcss.css --watch",
         "test": "craco test",
+        "check:theme-contract": "node scripts/check-theme-contract.mjs",
+        "test:theme-contract": "node --test scripts/check-theme-contract.test.mjs",
         "checkTs": "tsc --noEmit",
         "eslint": "eslint --ext js,ts,tsx",
         "lint": "yarn eslint src",

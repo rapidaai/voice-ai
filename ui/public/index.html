@@ -2,29 +2,64 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <script>
+      (function () {
+        var mode;
+
+        try {
+          var cachedTheme = JSON.parse(
+            localStorage.getItem('ui-theme-manifest') || 'null',
+          );
+          var storedMode = localStorage.getItem('ui-theme-mode');
+          var canSelectMode = cachedTheme?.allowModeSelection !== false;
+          var defaultMode = cachedTheme?.defaultMode;
+
+          if (
+            canSelectMode &&
+            (storedMode === 'light' || storedMode === 'dark')
+          ) {
+            mode = storedMode;
+          } else if (defaultMode === 'light' || defaultMode === 'dark') {
+            mode = defaultMode;
+          }
+        } catch {
+          mode = undefined;
+        }
+
+        if (!mode) {
+          mode = window.matchMedia('(prefers-color-scheme: dark)').matches
+            ? 'dark'
+            : 'light';
+        }
+
+        document.documentElement.setAttribute('data-color-mode', mode);
+
+        if (cachedTheme?.id) {
+          document.documentElement.setAttribute('data-brand', cachedTheme.id);
+        }
+
+        var colors = cachedTheme?.colors?.[mode];
+        if (colors) {
+          document.documentElement.style.setProperty(
+            '--brand-primary',
+            colors.primary,
+          );
+          document.documentElement.style.setProperty(
+            '--brand-primary-hover',
+            colors.primaryHover,
+          );
+          document.documentElement.style.setProperty(
+            '--brand-primary-active',
+            colors.primaryActive,
+          );
+          document.documentElement.style.setProperty(
+            '--brand-on-primary',
+            colors.onPrimary,
+          );
+        }
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="manifest" href="/favicon_io/site.webmanifest" />
-    <!-- Touch Icons - iOS and Android 2.1+ 152x152 pixels in size. -->
-    <link
-      rel="apple-touch-icon-precomposed"
-      href="favicon_io/apple-touch-icon.png"
-    />
-
-    <!-- Firefox, Chrome, Safari, IE 11+ and Opera. 96x96 pixels in size. -->
-    <link rel="icon" href="/favicon_io/favicon.ico" />
-    <link
-      rel="icon"
-      href="/favicon_io/favicon-16x16.png"
-      sizes="16x16"
-      type="image/png"
-    />
-    <link
-      rel="icon"
-      href="/favicon_io/favicon-32x32.png"
-      sizes="32x32"
-      type="image/png"
-    />
-
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
@@ -49,35 +84,9 @@
       rel="stylesheet"
     />
 
-    <title>RapidaAI App</title>
-    <!-- Google Tag Manager -->
-    <script>
-      (function (w, d, s, l, i) {
-        w[l] = w[l] || [];
-        w[l].push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
-        var f = d.getElementsByTagName(s)[0],
-          j = d.createElement(s),
-          dl = l != 'dataLayer' ? '&l=' + l : '';
-        j.async = true;
-        j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl;
-        f.parentNode.insertBefore(j, f);
-      })(window, document, 'script', 'dataLayer', 'GTM-M8W6J9HH');
-    </script>
-    <!-- End Google Tag Manager -->
+    <title>Voice AI Console</title>
   </head>
-  <body
-    class="dark:bg-gray-900 text-gray-800 dark:text-gray-400 antialiased dark:border-gray-700"
-  >
-    <!-- Google Tag Manager (noscript) -->
-    <noscript
-      ><iframe
-        src="https://www.googletagmanager.com/ns.html?id=GTM-M8W6J9HH"
-        height="0"
-        width="0"
-        style="display: none; visibility: hidden"
-      ></iframe
-    ></noscript>
-    <!-- End Google Tag Manager (noscript) -->
+  <body class="bg-surface text-foreground antialiased">
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
   </body>

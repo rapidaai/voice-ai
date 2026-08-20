@@ -9,7 +9,6 @@
     },
     "workspace": {
         "domain": "rapida.ai",
-        "title": "Rapida Ai",
         "authentication": {
             "signIn": {
                 "enable": true,

@@ -11,11 +11,6 @@ export interface SentryAnalyticsConfig {
 
 export interface WorkspaceConfig {
   domain: string;
-  title: string;
-  logo?: {
-    light: string;
-    dark: string;
-  };
   authentication: {
     signIn: {
       providers: Record<'password' | 'google' | 'linkedin' | 'github', boolean>;

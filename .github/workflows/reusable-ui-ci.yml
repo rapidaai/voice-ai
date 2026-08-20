@@ -28,6 +28,14 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
 
+      - name: Check theme contract
+        working-directory: ui
+        run: yarn check:theme-contract
+
+      - name: Test theme contract checker
+        working-directory: ui
+        run: yarn test:theme-contract
+
       - name: Run ESLint
         working-directory: ui
         run: yarn lint

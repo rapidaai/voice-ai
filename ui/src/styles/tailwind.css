@@ -1,17 +1,7 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/typography';
 
-@custom-variant dark {
-  @media (prefers-color-scheme: dark) {
-    &:not(.light *) {
-      @slot;
-    }
-  }
-
-  &:is(.dark *) {
-    @slot;
-  }
-}
+@custom-variant dark (&:where([data-color-mode='dark'], [data-color-mode='dark'] *));
 
 @keyframes animateTop {
   25% {
@@ -106,8 +96,7 @@
   }
 }
 
-
-@theme {
+@theme inline {
   --font-sans: 'IBM Plex Sans', sans-serif;
   --font-mono: 'IBM Plex Mono', monospace;
   --font-weight-medium: 450;
@@ -116,10 +105,22 @@
   /* IBM Plex Medium — headings, card titles */
   --font-weight-bold: 700;
   /* IBM Plex Bold — reserved, rarely used */
-  --color-primary: #0353e9;
+  --color-primary: var(--brand-primary);
   --color-secondary: #f4ede4;
-  --color-light-background: #f4f4f4;
-  --color-primary-dark: #0353e9;
+  --color-light-background: var(--cds-layer-01);
+  --color-primary-dark: var(--brand-primary);
+  --color-surface: var(--cds-background);
+  --color-shell: var(--cds-layer-01);
+  --color-layer: var(--cds-layer-01);
+  --color-layer-hover: var(--cds-layer-hover-01);
+  --color-foreground: var(--cds-text-primary);
+  --color-muted: var(--cds-text-secondary);
+  --color-border-subtle: color-mix(
+    in oklab,
+    var(--cds-border-subtle-01) 55%,
+    transparent
+  );
+  --color-border-strong: var(--cds-border-strong-01);
   --color-custom-gray: rgba(31, 31, 31, 0.1);
   --color-custom-pink: rgba(200, 153, 241, 0.1);
   --color-custom-blue: rgba(159, 194, 238, 0.1);
@@ -505,19 +506,6 @@
   ::backdrop,
   ::file-selector-button {
     border-color: var(--color-gray-200, currentcolor);
-  }
-}
-
-@layer base {
-  :is(.dark *),
-  :root:is(.dark) {
-    --color-primary: #4589ff;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not(.light) {
-    --color-primary: #4589ff;
   }
 }
 
