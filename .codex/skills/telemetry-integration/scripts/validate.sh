@@ -3,7 +3,7 @@ set -euo pipefail
 
 skill_dir="$(cd "$(dirname "$0")/.." && pwd)"
 skill_name="$(basename "$skill_dir")"
-repo_root="$(cd "$skill_dir/../.." && pwd)"
+repo_root="$(cd "$skill_dir/../../.." && pwd)"
 
 required=("SKILL.md" "references/checklist.md" "examples/sample.md" "scripts/validate.sh" "agents/openai.yaml")
 for f in "${required[@]}"; do
@@ -70,7 +70,7 @@ if [[ $check_diff -eq 1 ]]; then
   if [[ ${#changed[@]} -gt 0 ]]; then
     provider_required=0
     case "$skill_name" in
-      end-of-speech-integration|vad-integration|telephony-integration|stt-integration|tts-integration|llm-integration|telemetry-integration)
+      end-of-speech-integration|vad-integration|telephony-integration|stt-integration|tts-integration|llm-integration|telemetry-integration|noise-reduction-integration)
         provider_required=1
         ;;
     esac
@@ -90,7 +90,7 @@ if [[ $check_diff -eq 1 ]]; then
     fi
 
     allowed_patterns=(
-      '^skills/'"$skill_name"'/'
+      '^\.codex/skills/'"$skill_name"'/'
     )
     disallowed_patterns=()
 
@@ -204,10 +204,10 @@ if [[ $check_diff -eq 1 ]]; then
         ;;
       system-understanding)
         allowed_patterns+=(
-          '^skills/system-understanding/'
-          '^CLAUDE.md$'
-          '^\.claude/skills/README.md$'
-          '^\.claude/skills/ENTERPRISE_POLICY.md$'
+          '^\.codex/skills/system-understanding/'
+          '^AGENTS.md$'
+          '^DEVELOPMENT_PROCESS.md$'
+          '^\.codex/skills/README.md$'
         )
         ;;
       *)

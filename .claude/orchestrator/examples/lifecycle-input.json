@@ -1,0 +1,129 @@
+{
+  "version": "1.0",
+  "run_id": "example-run-1",
+  "repo_root": ".",
+  "task": {
+    "id": "task-123",
+    "type": "integration",
+    "skill": "noise-reduction-integration",
+    "provider": "acme_denoise",
+    "service": "assistant-api"
+  },
+  "artifacts": {
+    "approved_plan_file": ".claude/orchestrator/examples/approved-plan.json",
+    "approved_plan_sha256": "2b5d713a1225383e73709488d857f21d52056810c476bdda6b9ea7bdeaa337e8",
+    "approved_plan_hmac": "e361758ec1939148a07f9b0fe97545c70085693ec4777cfa3df01c9e1fdb5c43"
+  },
+  "task_plan": {
+    "acceptance_criteria": [
+      "Provider can be selected through the existing factory",
+      "Provider failure returns the documented fallback behavior"
+    ],
+    "non_goals": [
+      "Refactoring unrelated denoiser providers"
+    ],
+    "allowed_paths": [
+      "api/assistant-api/internal/denoiser/internal/acme_denoise/",
+      "api/assistant-api/internal/denoiser/denoiser.go",
+      "ui/src/providers/acme_denoise/noise.json"
+    ],
+    "out_of_scope_paths": [
+      "api/assistant-api/internal/vad/internal/",
+      "api/assistant-api/internal/end_of_speech/internal/"
+    ],
+    "ownership": {
+      "api/assistant-api/internal/denoiser/internal/acme_denoise/": "backend-implementer",
+      "api/assistant-api/internal/denoiser/denoiser.go": "backend-implementer",
+      "ui/src/providers/acme_denoise/noise.json": "ui-implementer"
+    },
+    "principles": {
+      "kiss": "Add one provider implementation and existing factory wiring only.",
+      "yagni": "Do not introduce a generic provider framework.",
+      "single_source_of_truth": "Provider metadata remains in the existing provider configuration path.",
+      "contracts": "Preserve the denoiser interface and packet behavior.",
+      "fail_safe": "Return the existing fallback error path and clean up provider resources.",
+      "security": "Do not log credentials or audio payloads.",
+      "observability": "Use existing provider failure logging and metrics.",
+      "reversibility": "Removal of factory registration disables the provider without data migration."
+    },
+    "required_tests": [
+      "factory-selection",
+      "fallback-error-path",
+      "packet-contract"
+    ],
+    "required_commands": [
+      "go test ./api/assistant-api/internal/denoiser/...",
+      "./.claude/skills/noise-reduction-integration/scripts/validate.sh --check-diff --provider acme_denoise"
+    ],
+    "discussion": {
+      "planner": "task-planner-1",
+      "challenger": "plan-challenger-1",
+      "decision": "approved",
+      "approved_by": "maintainer-1",
+      "open_blockers": []
+    }
+  },
+  "implementation": {
+    "changed_files": [
+      "api/assistant-api/internal/denoiser/denoiser.go",
+      "api/assistant-api/internal/denoiser/internal/acme_denoise/denoiser.go",
+      "api/assistant-api/internal/denoiser/internal/acme_denoise/denoiser_test.go",
+      "ui/src/providers/acme_denoise/noise.json"
+    ],
+    "test_files_added": [
+      "api/assistant-api/internal/denoiser/internal/acme_denoise/denoiser_test.go"
+    ],
+    "tests_covered": [
+      "factory-selection",
+      "fallback-error-path",
+      "packet-contract"
+    ],
+    "summary": "Provider wired and tests added."
+  },
+  "verification": {
+    "commands": [
+      {
+        "cmd": "go test ./api/assistant-api/internal/denoiser/...",
+        "exit_code": 0
+      },
+      {
+        "cmd": "./.claude/skills/noise-reduction-integration/scripts/validate.sh --check-diff --provider acme_denoise",
+        "exit_code": 0
+      }
+    ],
+    "coverage": {
+      "unit_tests_present": true,
+      "required_categories_passed": [
+        "factory-selection",
+        "fallback-error-path",
+        "packet-contract"
+      ]
+    }
+  },
+  "orchestration": {
+    "run_id": "example-run-1",
+    "task_id": "orca-review-task-1",
+    "dispatch_id": "orca-review-dispatch-1"
+  },
+  "review": {
+    "reviewer": "code-reviewer-1",
+    "evidence": {
+      "plan": "approved task plan artifact",
+      "implementation": "implementation report artifact",
+      "verification": "post-verification report artifact",
+      "diff": "reviewed commit or diff identifier"
+    },
+    "findings": [
+      {
+        "severity": "minor",
+        "status": "accepted_follow_up",
+        "message": "Consider documenting provider tuning guidance after production validation."
+      }
+    ],
+    "decision": "approved"
+  },
+  "meta": {
+    "triggered_by": "code-reviewer-1",
+    "timestamp": "2026-08-20T12:15:00Z"
+  }
+}

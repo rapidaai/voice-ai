@@ -1,0 +1,300 @@
+#!/usr/bin/env python3
+import argparse
+import html
+import json
+import os
+import shlex
+import subprocess
+import sys
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Render the Orca development lifecycle panel.")
+    parser.add_argument(
+        "--input",
+        default=".codex/orchestrator/examples/lifecycle-input.json",
+        help="Cumulative lifecycle envelope JSON",
+    )
+    parser.add_argument(
+        "--output",
+        default=".cache/orca-development-panel.html",
+        help="Generated HTML panel path",
+    )
+    parser.add_argument("--open", action="store_true", help="Open the panel in the active Orca worktree")
+    return parser.parse_args()
+
+
+def escape(value) -> str:
+    return html.escape(str(value))
+
+
+def list_items(values, empty="None declared") -> str:
+    if not values:
+        return f'<p class="empty">{escape(empty)}</p>'
+    return "<ul>" + "".join(f"<li>{escape(value)}</li>" for value in values) + "</ul>"
+
+
+def status(kind: str, label: str, detail: str) -> dict:
+    return {"kind": kind, "label": label, "detail": detail}
+
+
+def result_state(result: dict, success_label: str, success_detail: str) -> dict:
+    if result.get("status") == "pass":
+        return status("complete", success_label, success_detail)
+    issues = result.get("issues") or result.get("errors") or []
+    first_issue = issues[0] if issues else {}
+    code = first_issue.get("code", "GATE_FAILED")
+    message = first_issue.get("message", "Gate did not pass.")
+    return status("blocked", code.replace("_", " ").title(), message)
+
+
+def stage_states(gate_results: dict[str, dict] | None) -> list[dict]:
+    if gate_results is None:
+        locked = status(
+            "locked",
+            "Unverified",
+            "Coordinator gate was not executed. Set DEVELOPMENT_GATE_KEY and regenerate.",
+        )
+        return [{"name": name, **locked} for name in ["Understand", "Plan", "Discuss", "Implement", "Verify", "Review", "Ship"]]
+
+    pre_state = result_state(
+        gate_results["pre-implementation"],
+        "Approved",
+        "Task context, plan, challenge, ownership, and coordinator attestation passed.",
+    )
+    implementation_state = result_state(
+        gate_results["post-implementation"],
+        "Implemented",
+        "Implementation scope and required test categories passed.",
+    )
+    verification_state = result_state(
+        gate_results["post-verification"],
+        "Verified",
+        "Every required verification command and test category passed.",
+    )
+    review_state = result_state(
+        gate_results["post-review"],
+        "Approved",
+        "Independent reviewer identity, evidence, findings, and Orca provenance passed.",
+    )
+    ship_state = (
+        status("complete", "Ready To Ship", "All lifecycle and independent review gates passed.")
+        if gate_results["post-review"].get("status") == "pass"
+        else result_state(gate_results["post-review"], "Ready To Ship", "All gates passed.")
+    )
+    return [
+        {"name": "Understand", **pre_state},
+        {"name": "Plan", **pre_state},
+        {"name": "Discuss", **pre_state},
+        {"name": "Implement", **implementation_state},
+        {"name": "Verify", **verification_state},
+        {"name": "Review", **review_state},
+        {"name": "Ship", **ship_state},
+    ]
+
+
+def run_gates(repo_root: Path, input_path: Path, agent_root: str) -> dict[str, dict] | None:
+    if not os.environ.get("DEVELOPMENT_GATE_KEY"):
+        return None
+    runner = repo_root / agent_root / "orchestrator/scripts/hook-run.py"
+    results = {}
+    for stage in ["pre-implementation", "post-implementation", "post-verification", "post-review"]:
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as output_file:
+            output_path = Path(output_file.name)
+        try:
+            completed = subprocess.run(
+                [sys.executable, str(runner), "--stage", stage, "--input", str(input_path), "--output", str(output_path)],
+                cwd=repo_root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if completed.returncode != 0 or not output_path.exists():
+                results[stage] = {
+                    "status": "fail",
+                    "issues": [{"code": "GATE_EXECUTION_FAILED", "message": completed.stderr.strip()}],
+                }
+            else:
+                results[stage] = json.loads(output_path.read_text(encoding="utf-8"))
+        finally:
+            output_path.unlink(missing_ok=True)
+    return results
+
+
+def render_panel(payload: dict, gate_results: dict[str, dict] | None, source_path: Path) -> str:
+    task = payload.get("task") or {}
+    plan = payload.get("task_plan") or {}
+    implementation = payload.get("implementation") or {}
+    verification = payload.get("verification") or {}
+    review = payload.get("review") or {}
+    orchestration = payload.get("orchestration") or {}
+    principles = plan.get("principles") or {}
+    stages = stage_states(gate_results)
+    completed_count = sum(stage["kind"] == "complete" for stage in stages)
+    progress = round((completed_count / len(stages)) * 100)
+    findings = review.get("findings") or []
+    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    stage_html = "".join(
+        f"""
+        <article class="stage {escape(stage['kind'])}">
+          <div class="stage-index">{index}</div>
+          <div><h3>{escape(stage['name'])}</h3><span class="badge">{escape(stage['label'])}</span></div>
+          <p>{escape(stage['detail'])}</p>
+        </article>
+        """
+        for index, stage in enumerate(stages, start=1)
+    )
+
+    owner_rows = "".join(
+        f"<tr><td><code>{escape(path)}</code></td><td>{escape(owner)}</td></tr>"
+        for path, owner in (plan.get("ownership") or {}).items()
+    ) or '<tr><td colspan="2" class="empty">No ownership declared</td></tr>'
+
+    command_rows = "".join(
+        f"<tr><td><code>{escape(command.get('cmd', ''))}</code></td><td><span class=\"result {'pass' if command.get('exit_code') == 0 else 'fail'}\">{escape(command.get('exit_code', 'missing'))}</span></td></tr>"
+        for command in verification.get("commands") or []
+        if isinstance(command, dict)
+    ) or '<tr><td colspan="2" class="empty">No verification commands recorded</td></tr>'
+
+    finding_rows = "".join(
+        f"<tr><td><span class=\"severity {escape(finding.get('severity', 'note'))}\">{escape(finding.get('severity', 'note'))}</span></td><td>{escape(finding.get('message', ''))}</td><td>{escape(finding.get('status', 'open'))}</td></tr>"
+        for finding in findings
+        if isinstance(finding, dict)
+    ) or '<tr><td colspan="3" class="empty">No review findings recorded</td></tr>'
+
+    principle_cards = "".join(
+        f"<article class=\"principle\"><h3>{escape(key.replace('_', ' ').title())}</h3><p>{escape(value)}</p></article>"
+        for key, value in principles.items()
+    )
+
+    if gate_results is None:
+        gate_html = '<p class="empty">Coordinator gate not executed. Status is unverified.</p>'
+    else:
+        final_result = gate_results["post-review"]
+        gate_issues = final_result.get("issues") or final_result.get("errors") or []
+        gate_html = list_items(
+            [f"{issue.get('code', 'ISSUE')}: {issue.get('message', '')}" for issue in gate_issues],
+            "No gate issues",
+        )
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voice AI · Orca Development Panel</title>
+  <style>
+    :root {{ color-scheme: dark; --bg:#07110f; --surface:#0c1a17; --surface2:#11231f; --line:#24423a; --text:#e8f5ef; --muted:#8ba79d; --green:#47d69a; --amber:#f4bd58; --red:#ff776f; --blue:#73a7ff; }}
+    * {{ box-sizing:border-box; }} body {{ margin:0; background:radial-gradient(circle at 85% 0%,#173b31 0,transparent 32%),var(--bg); color:var(--text); font:14px/1.5 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }}
+    main {{ width:min(1440px,calc(100% - 32px)); margin:0 auto; padding:32px 0 56px; }}
+    header {{ display:flex; justify-content:space-between; gap:24px; align-items:flex-end; margin-bottom:24px; }}
+    .eyebrow {{ color:var(--green); text-transform:uppercase; letter-spacing:.14em; font-weight:800; font-size:12px; }} h1 {{ margin:5px 0 4px; font-size:clamp(28px,4vw,48px); line-height:1.08; }}
+    .subtitle,.meta,.empty {{ color:var(--muted); }} .summary {{ min-width:250px; background:rgba(12,26,23,.86); border:1px solid var(--line); border-radius:16px; padding:16px; }}
+    .progress {{ height:8px; background:#18322b; border-radius:999px; overflow:hidden; margin:10px 0 6px; }} .progress span {{ display:block; height:100%; width:{progress}%; background:linear-gradient(90deg,var(--green),var(--blue)); }}
+    .stages {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; padding-bottom:6px; }}
+    .stage,.panel,.principle {{ background:linear-gradient(180deg,rgba(17,35,31,.96),rgba(10,24,21,.96)); border:1px solid var(--line); border-radius:16px; }} .stage {{ min-height:172px; padding:14px; position:relative; }}
+    .stage-index {{ width:28px; height:28px; display:grid; place-items:center; border-radius:9px; background:#18322b; color:var(--muted); font-weight:800; }} .stage h3 {{ margin:14px 0 7px; }} .stage p {{ color:var(--muted); margin:14px 0 0; }}
+    .badge,.result,.severity {{ display:inline-flex; border-radius:999px; padding:3px 8px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; }} .complete .badge,.result.pass {{ background:rgba(71,214,154,.14); color:var(--green); }} .blocked .badge,.result.fail,.severity.critical,.severity.major {{ background:rgba(255,119,111,.14); color:var(--red); }} .pending .badge,.locked .badge {{ background:rgba(244,189,88,.14); color:var(--amber); }}
+    .grid {{ display:grid; grid-template-columns:repeat(12,1fr); gap:14px; margin-top:14px; }} .panel {{ padding:18px; grid-column:span 6; }} .panel.wide {{ grid-column:1/-1; }} .panel.third {{ grid-column:span 4; }} .panel h2 {{ font-size:16px; margin:0 0 14px; }}
+    .principles {{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }} .principle {{ padding:13px; }} .principle h3 {{ margin:0 0 6px; font-size:13px; color:var(--green); }} .principle p {{ margin:0; color:var(--muted); }}
+    table {{ width:100%; border-collapse:collapse; }} th,td {{ padding:9px 8px; border-bottom:1px solid rgba(36,66,58,.7); text-align:left; vertical-align:top; }} th {{ color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em; }} code {{ color:#b7d9cc; overflow-wrap:anywhere; }} ul {{ padding-left:18px; margin:0; }} li+li {{ margin-top:6px; }}
+    .facts {{ display:grid; grid-template-columns:auto 1fr; gap:8px 14px; }} .facts dt {{ color:var(--muted); }} .facts dd {{ margin:0; overflow-wrap:anywhere; }} footer {{ color:var(--muted); margin-top:18px; display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }}
+    @media (max-width:980px) {{ header {{ align-items:flex-start; flex-direction:column; }} .summary {{ width:100%; }} .panel,.panel.third {{ grid-column:1/-1; }} .principles {{ grid-template-columns:repeat(2,1fr); }} .stages {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} }}
+    @media (max-width:600px) {{ main {{ width:min(100% - 20px,1440px); padding-top:20px; }} .principles,.stages {{ grid-template-columns:1fr; }} }}
+  </style>
+</head>
+<body><main>
+  <header>
+    <div><div class="eyebrow">Orca Development Panel</div><h1>{escape(task.get('service', 'Voice AI'))}</h1><div class="subtitle">{escape(task.get('skill', task.get('type', 'development')))} · {escape(task.get('provider', 'repository workflow'))}</div></div>
+    <section class="summary"><strong>{completed_count}/{len(stages)} stages complete</strong><div class="progress"><span></span></div><div class="meta">Task {escape(task.get('id', 'unassigned'))}</div></section>
+  </header>
+  <section class="stages">{stage_html}</section>
+  <section class="grid">
+    <article class="panel wide"><h2>Principle Decisions</h2><div class="principles">{principle_cards}</div></article>
+    <article class="panel"><h2>Acceptance Criteria</h2>{list_items(plan.get('acceptance_criteria') or [])}</article>
+    <article class="panel"><h2>Non-goals</h2>{list_items(plan.get('non_goals') or [])}</article>
+    <article class="panel wide"><h2>Ownership</h2><table><thead><tr><th>Path</th><th>Owner</th></tr></thead><tbody>{owner_rows}</tbody></table></article>
+    <article class="panel wide"><h2>Verification Evidence</h2><table><thead><tr><th>Command</th><th>Exit</th></tr></thead><tbody>{command_rows}</tbody></table></article>
+    <article class="panel"><h2>Independent Review</h2><table><thead><tr><th>Severity</th><th>Finding</th><th>Status</th></tr></thead><tbody>{finding_rows}</tbody></table></article>
+    <article class="panel"><h2>Final Gate</h2>{gate_html}</article>
+    <article class="panel third"><h2>Orca Provenance</h2><dl class="facts"><dt>Run</dt><dd>{escape(orchestration.get('run_id','missing'))}</dd><dt>Task</dt><dd>{escape(orchestration.get('task_id','missing'))}</dd><dt>Dispatch</dt><dd>{escape(orchestration.get('dispatch_id','missing'))}</dd></dl></article>
+    <article class="panel third"><h2>Implementation</h2><dl class="facts"><dt>Files</dt><dd>{len(implementation.get('changed_files') or [])}</dd><dt>Tests</dt><dd>{len(implementation.get('test_files_added') or [])}</dd><dt>Summary</dt><dd>{escape(implementation.get('summary','Not recorded'))}</dd></dl></article>
+    <article class="panel third"><h2>Discussion</h2><dl class="facts"><dt>Planner</dt><dd>{escape((plan.get('discussion') or {{}}).get('planner','missing'))}</dd><dt>Challenger</dt><dd>{escape((plan.get('discussion') or {{}}).get('challenger','missing'))}</dd><dt>Approved by</dt><dd>{escape((plan.get('discussion') or {{}}).get('approved_by','missing'))}</dd></dl></article>
+  </section>
+  <footer><span>Generated {escape(generated_at)}</span><span>Source: <code>{escape(source_path)}</code></span></footer>
+</main></body></html>"""
+
+
+def resolve_orca_command() -> list[str]:
+    if os.environ.get("ORCA_CLI_COMMAND"):
+        return shlex.split(os.environ["ORCA_CLI_COMMAND"])
+    if os.environ.get("ORCA_DEV_REPO_ROOT"):
+        return ["orca-dev"]
+    if sys.platform.startswith("linux"):
+        return ["orca-ide"]
+    return ["orca"]
+
+
+def open_in_orca(output_path: Path) -> None:
+    command = resolve_orca_command()
+    status_result = subprocess.run(command + ["status", "--json"], check=False, capture_output=True, text=True)
+    if status_result.returncode != 0:
+        raise RuntimeError(status_result.stderr.strip() or "Unable to contact Orca")
+    status_payload = json.loads(status_result.stdout)
+    result = status_payload.get("result") or {}
+    if not (result.get("app") or {}).get("running") or not (result.get("runtime") or {}).get("reachable"):
+        raise RuntimeError("Orca app/runtime is not running or reachable")
+    subprocess.run(
+        command + ["tab", "create", "--url", output_path.resolve().as_uri(), "--worktree", "current", "--json"],
+        check=True,
+    )
+
+
+def main() -> int:
+    args = parse_args()
+    repo_root = Path(__file__).resolve().parent.parent
+    input_path = Path(args.input)
+    if not input_path.is_absolute():
+        input_path = repo_root / input_path
+    output_path = Path(args.output)
+    if not output_path.is_absolute():
+        output_path = repo_root / output_path
+
+    resolved_input = input_path.resolve(strict=True)
+    resolved_output = output_path.resolve(strict=False)
+    same_file = resolved_input == resolved_output
+    if output_path.exists():
+        same_file = same_file or os.path.samefile(resolved_input, resolved_output)
+    if same_file:
+        print("Panel output must not overwrite the lifecycle input envelope.", file=sys.stderr)
+        return 2
+
+    raw_input = input_path.read_bytes()
+    payload = json.loads(raw_input.decode("utf-8"))
+    agent_root = ".claude" if ".claude" in input_path.parts else ".codex"
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as snapshot_file:
+        snapshot_file.write(raw_input)
+        snapshot_path = Path(snapshot_file.name)
+    try:
+        gate_results = run_gates(repo_root, snapshot_path, agent_root)
+    finally:
+        snapshot_path.unlink(missing_ok=True)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(render_panel(payload, gate_results, input_path), encoding="utf-8")
+    print(output_path)
+
+    if args.open:
+        try:
+            open_in_orca(output_path)
+        except (OSError, RuntimeError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
+            print(f"Panel generated, but Orca could not open it: {exc}", file=sys.stderr)
+            return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,3 +1,3 @@
 display_name: Noise Reduction Integration
 short_description: Provider-scoped denoiser integration with packet ordering and fallback safety.
-default_prompt: Use the noise-reduction-integration skill. Confirm denoiser runtime and audio assumptions, implement under denoiser provider folder and factory only, preserve DenoisedAudioPacket semantics including fallback behavior, and run strict validation with --provider.
+default_prompt: Use the noise-reduction-integration skill from a coordinator-attested approved plan. Respect assigned ownership, preserve packet ordering and fallback behavior, add required tests, run every declared command plus strict validation with --provider, and return evidence for independent code review; do not self-approve.

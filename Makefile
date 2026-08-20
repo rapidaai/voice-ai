@@ -14,7 +14,7 @@
         push-rapida-golang-bookworm push-rapida-golang-alpine push-rapida-alpine \
         push-rapida-debian-slim push-rapida-node-alpine push-rapida-python \
         test-tts-integration test-stt-integration test-transformer-integration \
-        doctor
+        validate-development-process validate-agent-tooling validate-development-toolkit sign-approved-plan orca-development-run orca-panel orca-panel-open doctor
 
 COMPOSE           := DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose -f docker-compose.yml
 COMPOSE_KNOWLEDGE := DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose -f docker-compose.yml -f docker-compose.knowledge.yml
@@ -777,6 +777,30 @@ test-stt-integration:
 test-transformer-integration:
 	@echo "Running all transformer integration tests..."
 	go test -tags integration -v -timeout 180s ./api/assistant-api/internal/transformer/...
+
+# Validate plan, implementation, verification, and independent review gates.
+validate-development-process:
+	@bash bin/validate-development-process
+
+validate-agent-tooling:
+	@bash bin/validate-agent-tooling
+
+validate-development-toolkit: validate-development-process validate-agent-tooling
+
+sign-approved-plan:
+	@test -n "$(RUN_ID)" -a -n "$(PLAN)" || (echo "Usage: DEVELOPMENT_GATE_KEY=... make sign-approved-plan RUN_ID='<orca-run-id>' PLAN='<approved-plan.json>'" && exit 2)
+	@bash bin/sign-approved-plan "$(RUN_ID)" "$(PLAN)"
+
+orca-development-run:
+	@test -n "$(OBJECTIVE)" || (echo "Usage: make orca-development-run OBJECTIVE='task objective' [AGENT=codex]" && exit 2)
+	@bash bin/orca-development-run "$(OBJECTIVE)" "$(or $(AGENT),codex)"
+
+orca-panel:
+	@python3 bin/orca-development-panel --input "$(or $(PANEL_INPUT),.codex/orchestrator/examples/lifecycle-input.json)" --output "$(or $(PANEL_OUTPUT),.cache/orca-development-panel.html)"
+
+orca-panel-open:
+	@python3 bin/orca-development-panel --input "$(or $(PANEL_INPUT),.codex/orchestrator/examples/lifecycle-input.json)" --output "$(or $(PANEL_OUTPUT),.cache/orca-development-panel.html)" --open
+
 # Add appropriate aliases for clarity
 run-{service-name}:
 	@echo "Please specify a valid service name: document-api, assistant, web, endpoint, or integration."

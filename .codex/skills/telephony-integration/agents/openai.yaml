@@ -1,3 +1,3 @@
 display_name: Telephony Integration
 short_description: Telephony provider integration with webhook, streamer, and codec/resampling correctness.
-default_prompt: Use the telephony-integration skill. Identify transport type (WebSocket/SIP/AudioSocket), wire provider folder and telephony factory only, validate ReceiveCall/InboundCall/StatusCallback/Streamer behavior, and run strict validation with --provider.
+default_prompt: Use the telephony-integration skill from a coordinator-attested approved plan. Respect assigned ownership, preserve webhook, streamer, codec, cleanup, and compatibility contracts, add required tests, run every declared command plus strict validation with --provider, and return evidence for independent code review; do not self-approve.

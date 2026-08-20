@@ -64,6 +64,13 @@ Required outputs:
 - Final EOS emitted once per turn in tests.
 - Config loads via `ui/src/providers/config-loader.ts` path resolution.
 
+## Governed lifecycle
+
+- Non-trivial work follows `understand -> plan -> challenge -> approve -> implement -> verify -> independent review -> ship` from `DEVELOPMENT_PROCESS.md`.
+- This skill operates only in its assigned phase and path ownership; it may not approve its own plan or code review.
+- Implementation starts only from a coordinator-attested approved plan with explicit allowed paths, owners, tests, commands, and rollback.
+- Return changed-file and verification evidence to the coordinator, then route the complete verified diff to the read-only `code-reviewer`.
+
 ## Validation commands
 
 - `go test ./api/assistant-api/internal/end_of_speech/...`

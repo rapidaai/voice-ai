@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+run_id="${1:-}"
+plan_file="${2:-}"
+
+if [[ -z "$run_id" || -z "$plan_file" ]]; then
+  echo "Usage: DEVELOPMENT_GATE_KEY=... $0 <run-id> <approved-plan.json>" >&2
+  exit 2
+fi
+
+if [[ -z "${DEVELOPMENT_GATE_KEY:-}" ]]; then
+  echo "DEVELOPMENT_GATE_KEY is required." >&2
+  exit 1
+fi
+
+python3 - "$run_id" "$plan_file" <<'PY'
+import hashlib
+import hmac
+import json
+import os
+import sys
+from pathlib import Path
+
+run_id, plan_file = sys.argv[1:]
+plan_path = Path(plan_file)
+raw_plan = plan_path.read_bytes()
+json.loads(raw_plan.decode("utf-8"))
+plan_sha256 = hashlib.sha256(raw_plan).hexdigest()
+signature = hmac.new(
+    os.environ["DEVELOPMENT_GATE_KEY"].encode("utf-8"),
+    f"{run_id}:{plan_sha256}".encode("utf-8"),
+    hashlib.sha256,
+).hexdigest()
+print(
+    json.dumps(
+        {
+            "approved_plan_file": str(plan_path),
+            "approved_plan_sha256": plan_sha256,
+            "approved_plan_hmac": signature,
+        },
+        indent=2,
+    )
+)
+PY

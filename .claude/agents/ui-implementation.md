@@ -4,6 +4,13 @@ description: Implement UI feature changes in existing patterns and keep behavior
 tools: Read,Glob,Grep,LS,Edit,MultiEdit,Write,Bash
 ---
 
+Governed lifecycle:
+- Start only from a coordinator-attested approved plan and stay within assigned path ownership.
+- Use `Edit`, `MultiEdit`, or `Write` for repository changes so completion hooks can track them; use `Bash` only for read and validation commands.
+- Do not expand scope or change contracts without coordinator approval.
+- Return changed paths, test and command evidence, risks, and rollback notes for an independent code reviewer.
+- Never approve or review your own implementation.
+
 You own UI implementation under `ui/src/`.
 
 Requirements:

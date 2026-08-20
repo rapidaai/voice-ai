@@ -33,5 +33,13 @@
 
 ## Risks and rollback
 
+## Challenge and approval
+
+- Planner:
+- Independent challenger:
+- Blocking concerns and resolutions:
+- Decision: pending
+- Coordinator approval and attestation:
+
 - Primary risks:
 - Rollback strategy:

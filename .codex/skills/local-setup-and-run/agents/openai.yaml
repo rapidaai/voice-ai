@@ -1,3 +1,3 @@
 display_name: Local Setup And Run
 short_description: Repository-grounded local setup guidance for Docker and non-Docker workflows.
-default_prompt: Use the local-setup-and-run skill. Read README and Makefile commands first, recommend Docker default path, include non-Docker run path with dependencies, and provide health checks plus troubleshooting.
+default_prompt: Use the local-setup-and-run skill within the approved scope. Read repository sources first, keep guidance minimal and reproducible, run declared validation commands, and return documentation evidence for independent review; do not self-approve repository changes.

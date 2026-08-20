@@ -4,9 +4,11 @@ Codex does not use Claude hook config directly, but this folder mirrors the same
 
 Included scripts:
 
+- `track_changed_files.py` (session-scoped edit tracking)
 - `post_tool_test_hint.py`
 - `validate_changed_tests.py`
 - `run_required_tests.py`
+- `enforce_completion.py` (sequenced blocking completion gate)
 
 Usage example:
 
@@ -32,4 +34,6 @@ python3 .codex/hooks/run_required_tests.py </dev/null
 Resolution order inside hooks:
 1. `HOOK_CHANGED_FILES` env var
 2. paths parsed from hook stdin JSON payload
-3. fallback to repo-wide `git diff` + untracked files
+3. session-scoped paths recorded by `track_changed_files.py`
+
+Repository-wide `git diff` is intentionally not used because worktrees may contain unrelated local or parallel-agent changes.

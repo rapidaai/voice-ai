@@ -1,0 +1,308 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+export DEVELOPMENT_GATE_KEY="development-process-test-key"
+output_dir="$(mktemp -d)"
+trap 'rm -rf "$output_dir"' EXIT
+
+validate_result() {
+  local output_file="$1"
+  local expected_decision="$2"
+
+  python3 - "$output_file" "$expected_decision" <<'PY'
+import json
+import sys
+
+output_path, expected_decision = sys.argv[1:]
+result = json.loads(open(output_path, encoding="utf-8").read())
+if result.get("status") != "pass":
+    raise SystemExit(f"{output_path}: expected pass, got {result}")
+if expected_decision and result.get("final_decision") != expected_decision:
+    raise SystemExit(
+        f"{output_path}: expected final_decision={expected_decision}, got {result.get('final_decision')}"
+    )
+PY
+}
+
+validate_failure_code() {
+  local output_file="$1"
+  local expected_code="$2"
+
+  python3 - "$output_file" "$expected_code" <<'PY'
+import json
+import sys
+
+output_path, expected_code = sys.argv[1:]
+result = json.loads(open(output_path, encoding="utf-8").read())
+if result.get("status") != "fail":
+    raise SystemExit(f"{output_path}: expected fail, got {result}")
+issue_codes = {issue.get("code") for issue in result.get("issues", [])}
+if expected_code not in issue_codes:
+    raise SystemExit(f"{output_path}: expected {expected_code}, got {sorted(issue_codes)}")
+PY
+}
+
+for agent_root in .codex .claude; do
+  runner="$repo_root/$agent_root/orchestrator/scripts/hook-run.py"
+  examples="$repo_root/$agent_root/orchestrator/examples"
+  lifecycle_input="$examples/lifecycle-input.json"
+
+  python3 "$runner" \
+    --stage pre-implementation \
+    --input "$lifecycle_input" \
+    --output "$output_dir/${agent_root#.}-pre.json"
+  validate_result "$output_dir/${agent_root#.}-pre.json" ""
+
+  python3 "$runner" \
+    --stage post-implementation \
+    --input "$lifecycle_input" \
+    --output "$output_dir/${agent_root#.}-implementation.json"
+  validate_result "$output_dir/${agent_root#.}-implementation.json" ""
+
+  python3 "$runner" \
+    --stage post-verification \
+    --input "$lifecycle_input" \
+    --output "$output_dir/${agent_root#.}-verification.json"
+  validate_result "$output_dir/${agent_root#.}-verification.json" "ready_for_review"
+
+  python3 "$runner" \
+    --stage post-review \
+    --input "$lifecycle_input" \
+    --output "$output_dir/${agent_root#.}-review.json"
+  validate_result "$output_dir/${agent_root#.}-review.json" "ready_to_ship"
+
+  python3 - "$lifecycle_input" "$output_dir/${agent_root#.}-self-review-input.json" <<'PY'
+import json
+import sys
+
+source_path, output_path = sys.argv[1:]
+payload = json.loads(open(source_path, encoding="utf-8").read())
+implementation_owner = next(iter(payload["task_plan"]["ownership"].values()))
+payload["review"]["reviewer"] = implementation_owner
+payload["meta"]["triggered_by"] = implementation_owner
+with open(output_path, "w", encoding="utf-8") as output_file:
+    json.dump(payload, output_file)
+PY
+  python3 "$runner" \
+    --stage post-review \
+    --input "$output_dir/${agent_root#.}-self-review-input.json" \
+    --output "$output_dir/${agent_root#.}-self-review-output.json"
+  validate_failure_code "$output_dir/${agent_root#.}-self-review-output.json" "REVIEWER_NOT_INDEPENDENT"
+
+  python3 - "$lifecycle_input" "$output_dir/${agent_root#.}-missing-command-input.json" <<'PY'
+import json
+import sys
+
+source_path, output_path = sys.argv[1:]
+payload = json.loads(open(source_path, encoding="utf-8").read())
+payload["verification"]["commands"] = []
+with open(output_path, "w", encoding="utf-8") as output_file:
+    json.dump(payload, output_file)
+PY
+  python3 "$runner" \
+    --stage post-verification \
+    --input "$output_dir/${agent_root#.}-missing-command-input.json" \
+    --output "$output_dir/${agent_root#.}-missing-command-output.json"
+  validate_failure_code "$output_dir/${agent_root#.}-missing-command-output.json" "REQUIRED_COMMANDS_MISSING"
+
+  python3 - "$lifecycle_input" "$output_dir/${agent_root#.}-missing-implementation-input.json" <<'PY'
+import json
+import sys
+
+source_path, output_path = sys.argv[1:]
+payload = json.loads(open(source_path, encoding="utf-8").read())
+payload.pop("implementation")
+with open(output_path, "w", encoding="utf-8") as output_file:
+    json.dump(payload, output_file)
+PY
+  python3 "$runner" \
+    --stage post-review \
+    --input "$output_dir/${agent_root#.}-missing-implementation-input.json" \
+    --output "$output_dir/${agent_root#.}-missing-implementation-output.json"
+  validate_failure_code "$output_dir/${agent_root#.}-missing-implementation-output.json" "SCHEMA_VALIDATION_FAILED"
+
+  python3 - "$lifecycle_input" "$output_dir/${agent_root#.}-rewritten-owner-input.json" <<'PY'
+import json
+import sys
+
+source_path, output_path = sys.argv[1:]
+payload = json.loads(open(source_path, encoding="utf-8").read())
+owner_path = next(iter(payload["task_plan"]["ownership"]))
+payload["task_plan"]["ownership"][owner_path] = payload["review"]["reviewer"]
+with open(output_path, "w", encoding="utf-8") as output_file:
+    json.dump(payload, output_file)
+PY
+  python3 "$runner" \
+    --stage post-review \
+    --input "$output_dir/${agent_root#.}-rewritten-owner-input.json" \
+    --output "$output_dir/${agent_root#.}-rewritten-owner-output.json"
+  validate_failure_code "$output_dir/${agent_root#.}-rewritten-owner-output.json" "PLAN_ARTIFACT_MISMATCH"
+
+  python3 - "$lifecycle_input" "$output_dir/${agent_root#.}-forged-plan.json" "$output_dir/${agent_root#.}-forged-plan-input.json" <<'PY'
+import hashlib
+import json
+import sys
+
+source_path, forged_plan_path, output_path = sys.argv[1:]
+payload = json.loads(open(source_path, encoding="utf-8").read())
+owner_path = next(iter(payload["task_plan"]["ownership"]))
+payload["task_plan"]["ownership"][owner_path] = payload["review"]["reviewer"]
+with open(forged_plan_path, "w", encoding="utf-8") as plan_file:
+    json.dump(payload["task_plan"], plan_file)
+raw_plan = open(forged_plan_path, "rb").read()
+payload["artifacts"]["approved_plan_file"] = forged_plan_path
+payload["artifacts"]["approved_plan_sha256"] = hashlib.sha256(raw_plan).hexdigest()
+with open(output_path, "w", encoding="utf-8") as output_file:
+    json.dump(payload, output_file)
+PY
+  python3 "$runner" \
+    --stage post-review \
+    --input "$output_dir/${agent_root#.}-forged-plan-input.json" \
+    --output "$output_dir/${agent_root#.}-forged-plan-output.json"
+  validate_failure_code "$output_dir/${agent_root#.}-forged-plan-output.json" "PLAN_ATTESTATION_INVALID"
+
+  python3 - "$lifecycle_input" "$output_dir/${agent_root#.}-missing-envelope-input.json" <<'PY'
+import json
+import sys
+
+source_path, output_path = sys.argv[1:]
+payload = json.loads(open(source_path, encoding="utf-8").read())
+payload.pop("version")
+with open(output_path, "w", encoding="utf-8") as output_file:
+    json.dump(payload, output_file)
+PY
+  python3 "$runner" \
+    --stage post-review \
+    --input "$output_dir/${agent_root#.}-missing-envelope-input.json" \
+    --output "$output_dir/${agent_root#.}-missing-envelope-output.json"
+  validate_failure_code "$output_dir/${agent_root#.}-missing-envelope-output.json" "SCHEMA_VALIDATION_FAILED"
+
+  python3 - "$lifecycle_input" "$output_dir/${agent_root#.}-wrong-run-input.json" <<'PY'
+import json
+import sys
+
+source_path, output_path = sys.argv[1:]
+payload = json.loads(open(source_path, encoding="utf-8").read())
+payload["orchestration"]["run_id"] = "unrelated-run"
+with open(output_path, "w", encoding="utf-8") as output_file:
+    json.dump(payload, output_file)
+PY
+  python3 "$runner" \
+    --stage post-review \
+    --input "$output_dir/${agent_root#.}-wrong-run-input.json" \
+    --output "$output_dir/${agent_root#.}-wrong-run-output.json"
+  validate_failure_code "$output_dir/${agent_root#.}-wrong-run-output.json" "ORCA_RUN_MISMATCH"
+done
+
+trusted_panel="$output_dir/orca-development-panel-trusted.html"
+python3 "$repo_root/bin/orca-development-panel" \
+  --input "$repo_root/.codex/orchestrator/examples/lifecycle-input.json" \
+  --output "$trusted_panel" >/dev/null
+grep -q "Ready To Ship" "$trusted_panel"
+grep -q "7/7 stages complete" "$trusted_panel"
+
+locked_panel="$output_dir/orca-development-panel-locked.html"
+env -u DEVELOPMENT_GATE_KEY python3 "$repo_root/bin/orca-development-panel" \
+  --input "$repo_root/.codex/orchestrator/examples/lifecycle-input.json" \
+  --output "$locked_panel" >/dev/null
+grep -q "Unverified" "$locked_panel"
+grep -q "Coordinator gate not executed" "$locked_panel"
+grep -q "0/7 stages complete" "$locked_panel"
+
+invalid_attestation_input="$output_dir/orca-development-panel-invalid-attestation.json"
+python3 - "$repo_root/.codex/orchestrator/examples/lifecycle-input.json" "$invalid_attestation_input" <<'PY'
+import json
+import sys
+
+source_path, output_path = sys.argv[1:]
+payload = json.loads(open(source_path, encoding="utf-8").read())
+payload["artifacts"]["approved_plan_hmac"] = "0" * 64
+with open(output_path, "w", encoding="utf-8") as output_file:
+    json.dump(payload, output_file)
+PY
+invalid_attestation_panel="$output_dir/orca-development-panel-invalid-attestation.html"
+python3 "$repo_root/bin/orca-development-panel" \
+  --input "$invalid_attestation_input" \
+  --output "$invalid_attestation_panel" >/dev/null
+grep -q "Plan Attestation Invalid" "$invalid_attestation_panel"
+grep -q "0/7 stages complete" "$invalid_attestation_panel"
+if grep -q ">Planned<" "$invalid_attestation_panel"; then
+  echo "Invalid attestation must not render a completed plan stage." >&2
+  exit 1
+fi
+
+injection_input="$output_dir/orca-development-panel-injection.json"
+python3 - "$repo_root/.codex/orchestrator/examples/lifecycle-input.json" "$injection_input" <<'PY'
+import json
+import sys
+
+source_path, output_path = sys.argv[1:]
+payload = json.loads(open(source_path, encoding="utf-8").read())
+payload["task"]["service"] = "<script>alert('panel')</script>"
+with open(output_path, "w", encoding="utf-8") as output_file:
+    json.dump(payload, output_file)
+PY
+injection_panel="$output_dir/orca-development-panel-injection.html"
+env -u DEVELOPMENT_GATE_KEY python3 "$repo_root/bin/orca-development-panel" \
+  --input "$injection_input" \
+  --output "$injection_panel" >/dev/null
+grep -q "&lt;script&gt;alert(&#x27;panel&#x27;)&lt;/script&gt;" "$injection_panel"
+if grep -q "<script>alert('panel')</script>" "$injection_panel"; then
+  echo "Panel output contains unescaped input." >&2
+  exit 1
+fi
+
+malformed_input="$output_dir/orca-development-panel-malformed.json"
+printf '{invalid json' > "$malformed_input"
+if env -u DEVELOPMENT_GATE_KEY python3 "$repo_root/bin/orca-development-panel" \
+  --input "$malformed_input" \
+  --output "$output_dir/orca-development-panel-malformed.html" >/dev/null 2>&1; then
+  echo "Malformed panel input unexpectedly succeeded." >&2
+  exit 1
+fi
+
+collision_input="$output_dir/orca-development-panel-collision.json"
+cp "$repo_root/.codex/orchestrator/examples/lifecycle-input.json" "$collision_input"
+if env -u DEVELOPMENT_GATE_KEY python3 "$repo_root/bin/orca-development-panel" \
+  --input "$collision_input" \
+  --output "$collision_input" >/dev/null 2>&1; then
+  echo "Panel input/output collision unexpectedly succeeded." >&2
+  exit 1
+fi
+python3 -m json.tool "$collision_input" >/dev/null
+
+collision_symlink="$output_dir/orca-development-panel-collision-link"
+ln -s "$collision_input" "$collision_symlink"
+if env -u DEVELOPMENT_GATE_KEY python3 "$repo_root/bin/orca-development-panel" \
+  --input "$collision_input" \
+  --output "$collision_symlink" >/dev/null 2>&1; then
+  echo "Panel symlink input/output collision unexpectedly succeeded." >&2
+  exit 1
+fi
+python3 -m json.tool "$collision_input" >/dev/null
+
+collision_hardlink="$output_dir/orca-development-panel-collision-hardlink"
+ln "$collision_input" "$collision_hardlink"
+if env -u DEVELOPMENT_GATE_KEY python3 "$repo_root/bin/orca-development-panel" \
+  --input "$collision_input" \
+  --output "$collision_hardlink" >/dev/null 2>&1; then
+  echo "Panel hard-link input/output collision unexpectedly succeeded." >&2
+  exit 1
+fi
+python3 -m json.tool "$collision_input" >/dev/null
+
+ORCA_CLI_COMMAND='"/path with spaces/orca" --environment local' python3 - "$repo_root/bin/orca-development-panel" <<'PY'
+import importlib.machinery
+import os
+import sys
+
+module = importlib.machinery.SourceFileLoader("orca_development_panel", sys.argv[1]).load_module()
+assert module.resolve_orca_command() == ["/path with spaces/orca", "--environment", "local"]
+PY
+
+grep -q "repeat(auto-fit,minmax(150px,1fr))" "$trusted_panel"
+grep -q "@media (max-width:600px)" "$trusted_panel"
+
+echo "Development process gates passed for Codex and Claude."

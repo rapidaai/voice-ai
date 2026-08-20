@@ -8,6 +8,7 @@ See LICENSE.md for details or contact sales@rapida.ai for commercial use.
 
 import functools
 import logging
+import os
 from typing import List, Optional
 
 import yaml
@@ -117,6 +118,6 @@ class ApplicationSettings(BaseSettings):
 def get_settings() -> "ApplicationSettings":
     """Get current app settings."""
     with open("env/document.yaml", "r") as file:
-        config_data = yaml.safe_load(file)
+        config_data = yaml.safe_load(os.path.expandvars(file.read()))
     config = ApplicationSettings(**config_data)
     return config

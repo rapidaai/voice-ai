@@ -6,6 +6,7 @@ This repository includes Claude skills in `.claude/skills/`.
 
 Prerequisites:
 - `python3`
+- Python package `jsonschema`
 - `go`
 - `yarn` (for UI-related checks)
 
@@ -13,7 +14,8 @@ Validate local setup:
 
 ```bash
 find .claude/skills -maxdepth 2 -type d | sort
-python3 .claude/orchestrator/scripts/hook-run.py --stage pre-implementation --input .claude/orchestrator/examples/pre-input.json --output /tmp/hook-out.json
+make validate-development-process
+make validate-agent-tooling
 python3 .claude/hooks/validate_changed_tests.py </dev/null
 ```
 
@@ -52,10 +54,23 @@ For integration skills (`stt`, `tts`, `telephony`, `llm`, `telemetry`, `vad`, `e
 
 ## Orchestrator Hooks
 
-Starter hook contracts and runner are available at `.claude/orchestrator/`:
+Lifecycle hook contracts, templates, and the runner are available at `.claude/orchestrator/`:
 
 ```bash
-python3 .claude/orchestrator/scripts/hook-run.py --stage pre-implementation --input .claude/orchestrator/examples/pre-input.json --output /tmp/hook-out.json
+DEVELOPMENT_GATE_KEY="<coordinator-key>" python3 .claude/orchestrator/scripts/hook-run.py --stage pre-implementation --input .claude/orchestrator/examples/lifecycle-input.json --output /tmp/hook-out.json
+```
+
+Required lifecycle:
+
+`understand -> plan -> discuss -> approve -> implement -> verify -> independent code review -> ship`
+
+The final `post-review` gate rejects self-review and unresolved critical or major findings. See `DEVELOPMENT_PROCESS.md`.
+
+Render or open the Orca development panel:
+
+```bash
+make orca-panel PANEL_INPUT="path/to/lifecycle-input.json"
+make orca-panel-open PANEL_INPUT="path/to/lifecycle-input.json"
 ```
 
 Standard Claude automation config is now committed in:
@@ -63,6 +78,8 @@ Standard Claude automation config is now committed in:
 - `.claude/settings.json` (hooks)
 - `.claude/hooks/` (hook commands)
 - `.claude/agents/` (subagents for UI/backend implementation and tests)
+
+Use `make validate-development-toolkit` to validate lifecycle gates, skill packaging, agent role contracts, Claude hook wiring, hook parity, and tracked-file enforcement together.
 
 ## References
 

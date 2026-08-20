@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from hook_state import read_tracked_files
+
 
 def _run(cmd: list[str]) -> str:
     out = subprocess.run(cmd, check=False, capture_output=True, text=True)
@@ -75,6 +77,11 @@ def _paths_from_env(repo_root: str) -> list[str]:
 
 
 def _changed_files(stdin_raw: str) -> list[str]:
+    """Resolve explicitly scoped files, then session-scoped edit records.
+
+    Never fall back to repository-wide git diff because the worktree may contain
+    unrelated user or agent changes.
+    """
     repo_root = _repo_root()
 
     env_files = _paths_from_env(repo_root)
@@ -84,16 +91,7 @@ def _changed_files(stdin_raw: str) -> list[str]:
     payload_files = _paths_from_stdin_payload(stdin_raw, repo_root)
     if payload_files:
         return payload_files
-
-    tracked = _run(["git", "diff", "--name-only", "--diff-filter=ACMRTUXB", "HEAD", "--", "."])
-    untracked = _run(["git", "ls-files", "--others", "--exclude-standard"])
-    files = set()
-    for block in (tracked, untracked):
-        for line in block.splitlines():
-            line = line.strip()
-            if line:
-                files.add(line)
-    return sorted(files)
+    return read_tracked_files(stdin_raw, repo_root)
 
 
 def _is_ui_code(path: str) -> bool:
