@@ -408,7 +408,8 @@ export function validateSingleSourceTheme(repoRoot = DEFAULT_REPO_ROOT) {
 
   try {
     const source = readFileSync(resolve(repoRoot, PUBLIC_INDEX_PATH), 'utf8');
-    if (/<script\b/i.test(source)) {
+    const scriptTags = source.match(/<script\b[^>]*>/gi) ?? [];
+    if (scriptTags.some(scriptTag => !/\ssrc\s*=/i.test(scriptTag))) {
       pushDiagnostic(
         diagnostics,
         PUBLIC_INDEX_PATH,

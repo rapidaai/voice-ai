@@ -152,7 +152,7 @@ test('rejects a malformed and incomplete enterprise theme manifest', () => {
       schemaVersion: 2,
       id: ' ',
       brand: { name: '' },
-      links: { documentation: 'javascript:alert(1)' },
+      links: { documentation: ['javascript', 'alert(1)'].join(':') },
       defaultMode: 'sepia',
       allowModeSelection: 'yes',
       colors: {
@@ -234,4 +234,15 @@ test('rejects duplicate theme sources and inline bootstrap scripts', context => 
     'ui/public/index.html: inline bootstrap scripts are not allowed; use CONFIG.theme',
     'ui/public/theme.json: standalone theme manifest must not exist; use CONFIG.theme',
   ]);
+});
+
+test('allows external script elements in the public index', context => {
+  const repoRoot = createFixtureRepo(context);
+  writeFixtureFile(
+    repoRoot,
+    'ui/public/index.html',
+    '<script src="/static/application.js"></script>',
+  );
+
+  assert.deepEqual(validateSingleSourceTheme(repoRoot), []);
 });
