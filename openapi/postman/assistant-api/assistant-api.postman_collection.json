@@ -1,0 +1,945 @@
+{
+  "info": {
+    "_postman_id": "704efaf7-ab1e-533a-8410-4adde87af3f7",
+    "name": "Rapida Assistant API",
+    "description": "Curated Postman collection generated from `openapi/artifacts/assistant-api.yaml`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test('response is not a server error', function () {",
+          "  if (!pm.response || typeof pm.response.code !== 'number') {",
+          "    throw new Error('No HTTP response received');",
+          "  }",
+          "  pm.expect(pm.response.code).to.be.below(500);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:9007",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "assistantId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "configurationId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "apiDeploymentId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "page",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "pageSize",
+      "value": "20",
+      "type": "string"
+    },
+    {
+      "key": "sourceIdentifier",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "modelProviderName",
+      "value": "openai",
+      "type": "string"
+    },
+    {
+      "key": "sttProviderName",
+      "value": "deepgram",
+      "type": "string"
+    },
+    {
+      "key": "ttsProviderName",
+      "value": "elevenlabs",
+      "type": "string"
+    },
+    {
+      "key": "phoneProviderName",
+      "value": "twilio",
+      "type": "string"
+    },
+    {
+      "key": "whatsappProviderName",
+      "value": "twilio",
+      "type": "string"
+    },
+    {
+      "key": "callerId",
+      "value": "+15551234567",
+      "type": "string"
+    },
+    {
+      "key": "whatsappBusinessNumber",
+      "value": "+15551234567",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Assistant",
+      "item": [
+        {
+          "name": "Create Assistant",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/assistant/create-assistant",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "assistant",
+                "create-assistant"
+              ]
+            },
+            "description": "Create an assistant\n\nOpenAPI operationId: `createAssistant`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assistantProvider\": {\n    \"model\": {\n      \"modelProviderName\": \"{{modelProviderName}}\",\n      \"template\": {\n        \"prompt\": [\n          {\n            \"role\": \"system\",\n            \"content\": \"You are a helpful voice assistant.\"\n          }\n        ]\n      },\n      \"assistantModelOptions\": [\n        {\n          \"key\": \"temperature\",\n          \"value\": \"0.7\"\n        },\n        {\n          \"key\": \"max_tokens\",\n          \"value\": \"512\"\n        }\n      ]\n    }\n  },\n  \"description\": \"Assistant created from the Postman collection.\",\n  \"visibility\": \"private\",\n  \"language\": \"en\",\n  \"source\": \"postman\",\n  \"sourceIdentifier\": \"{{sourceIdentifier}}\",\n  \"tags\": [\n    \"postman\",\n    \"assistant-api\"\n  ],\n  \"name\": \"Postman Assistant\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let jsonData = {};",
+                  "try { jsonData = pm.response.json(); } catch (e) {}",
+                  "if (jsonData && jsonData.data && jsonData.data.id) {",
+                  "  pm.collectionVariables.set('assistantId', String(jsonData.data.id));",
+                  "  console.log('Captured assistant id: ' + jsonData.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Assistant Configurations",
+      "item": [
+        {
+          "name": "Create Configuration",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/assistant/configurations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "assistant",
+                "configurations"
+              ]
+            },
+            "description": "Create assistant configuration\n\nOpenAPI operationId: `createAssistantConfiguration`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assistantId\": \"{{assistantId}}\",\n  \"configurationType\": \"webhook\",\n  \"provider\": \"custom\",\n  \"enabled\": true,\n  \"options\": [\n    {\n      \"key\": \"url\",\n      \"value\": \"https://example.com/webhook\"\n    },\n    {\n      \"key\": \"method\",\n      \"value\": \"POST\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let jsonData = {};",
+                  "try { jsonData = pm.response.json(); } catch (e) {}",
+                  "if (jsonData && jsonData.data && jsonData.data.id) {",
+                  "  pm.collectionVariables.set('configurationId', String(jsonData.data.id));",
+                  "  console.log('Captured configuration id: ' + jsonData.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Configurations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "assistant",
+                "configurations",
+                "{{assistantId}}"
+              ],
+              "query": [
+                {
+                  "key": "configurationType",
+                  "value": "webhook",
+                  "description": "Optional query parameter.",
+                  "disabled": true
+                },
+                {
+                  "key": "provider",
+                  "value": "custom",
+                  "description": "Optional query parameter.",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "description": "Optional query parameter."
+                },
+                {
+                  "key": "pageSize",
+                  "value": "{{pageSize}}",
+                  "description": "Optional query parameter."
+                }
+              ]
+            },
+            "description": "Get assistant configurations\n\nOpenAPI operationId: `getAllAssistantConfiguration`."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Configuration",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{configurationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "assistant",
+                "configurations",
+                "{{assistantId}}",
+                "{{configurationId}}"
+              ]
+            },
+            "description": "Get assistant configuration\n\nOpenAPI operationId: `getAssistantConfiguration`."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Configuration",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{configurationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "assistant",
+                "configurations",
+                "{{assistantId}}",
+                "{{configurationId}}"
+              ]
+            },
+            "description": "Update assistant configuration\n\nOpenAPI operationId: `updateAssistantConfiguration`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"configurationType\": \"webhook\",\n  \"provider\": \"custom\",\n  \"enabled\": true,\n  \"options\": [\n    {\n      \"key\": \"url\",\n      \"value\": \"https://example.com/webhook\"\n    },\n    {\n      \"key\": \"method\",\n      \"value\": \"POST\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Configuration",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{configurationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "assistant",
+                "configurations",
+                "{{assistantId}}",
+                "{{configurationId}}"
+              ]
+            },
+            "description": "Delete assistant configuration\n\nOpenAPI operationId: `deleteAssistantConfiguration`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Assistant Deployments",
+      "item": [
+        {
+          "name": "API Deployments",
+          "item": [
+            {
+              "name": "Create API Deployment",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant-deployment/create-api-deployment",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant-deployment",
+                    "create-api-deployment"
+                  ]
+                },
+                "description": "Creates an API deployment for an assistant. This endpoint requires user authentication with organization and project scope.\n\nOpenAPI operationId: `createAssistantApiDeployment`.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"assistantId\": \"{{assistantId}}\",\n  \"greeting\": \"Hello, how can I help you today?\",\n  \"greetingInterruptible\": true,\n  \"mistake\": \"Sorry, I did not catch that.\",\n  \"unclearInputTimeout\": 4,\n  \"unclearInputMessage\": \"Could you repeat that?\",\n  \"idealTimeout\": 30,\n  \"idealTimeoutBackoff\": 2,\n  \"idealTimeoutMessage\": \"Are you still there?\",\n  \"maxSessionDuration\": 300,\n  \"inputAudio\": {\n    \"audioType\": \"input\",\n    \"audioProvider\": \"{{sttProviderName}}\",\n    \"status\": \"ACTIVE\",\n    \"audioOptions\": [\n      {\n        \"key\": \"language\",\n        \"value\": \"en-US\"\n      }\n    ]\n  },\n  \"outputAudio\": {\n    \"audioType\": \"output\",\n    \"audioProvider\": \"{{ttsProviderName}}\",\n    \"status\": \"ACTIVE\",\n    \"audioOptions\": [\n      {\n        \"key\": \"voice\",\n        \"value\": \"default\"\n      }\n    ]\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Latest API Deployment",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant-deployment/get-api-deployment/{{assistantId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant-deployment",
+                    "get-api-deployment",
+                    "{{assistantId}}"
+                  ]
+                },
+                "description": "Gets the latest API deployment for an assistant. This endpoint requires user authentication with organization and project scope.\n\nOpenAPI operationId: `getAssistantApiDeployment`."
+              },
+              "response": []
+            },
+            {
+              "name": "List API Deployments",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant-deployment/get-all-api-deployment/{{assistantId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant-deployment",
+                    "get-all-api-deployment",
+                    "{{assistantId}}"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "{{page}}",
+                      "description": "Optional query parameter."
+                    },
+                    {
+                      "key": "pageSize",
+                      "value": "{{pageSize}}",
+                      "description": "Optional query parameter."
+                    },
+                    {
+                      "key": "criterias",
+                      "value": "[{\"key\":\"status\",\"value\":\"active\",\"logic\":\"equal\"}]",
+                      "description": "Optional query parameter.",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Gets API deployments for an assistant. This endpoint requires user authentication with organization and project scope.\n\nOpenAPI operationId: `getAllAssistantApiDeployment`."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Debugger Deployments",
+          "item": [
+            {
+              "name": "Create Debugger Deployment",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant-deployment/create-debugger-deployment",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant-deployment",
+                    "create-debugger-deployment"
+                  ]
+                },
+                "description": "Creates a debugger deployment for an assistant. This endpoint requires user authentication with organization and project scope.\n\nOpenAPI operationId: `createAssistantDebuggerDeployment`.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"assistantId\": \"{{assistantId}}\",\n  \"greeting\": \"Hello, how can I help you today?\",\n  \"greetingInterruptible\": true,\n  \"mistake\": \"Sorry, I did not catch that.\",\n  \"unclearInputTimeout\": 4,\n  \"unclearInputMessage\": \"Could you repeat that?\",\n  \"idealTimeout\": 30,\n  \"idealTimeoutBackoff\": 2,\n  \"idealTimeoutMessage\": \"Are you still there?\",\n  \"maxSessionDuration\": 300,\n  \"inputAudio\": {\n    \"audioType\": \"input\",\n    \"audioProvider\": \"{{sttProviderName}}\",\n    \"status\": \"ACTIVE\",\n    \"audioOptions\": [\n      {\n        \"key\": \"language\",\n        \"value\": \"en-US\"\n      }\n    ]\n  },\n  \"outputAudio\": {\n    \"audioType\": \"output\",\n    \"audioProvider\": \"{{ttsProviderName}}\",\n    \"status\": \"ACTIVE\",\n    \"audioOptions\": [\n      {\n        \"key\": \"voice\",\n        \"value\": \"default\"\n      }\n    ]\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Latest Debugger Deployment",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant-deployment/get-debugger-deployment/{{assistantId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant-deployment",
+                    "get-debugger-deployment",
+                    "{{assistantId}}"
+                  ]
+                },
+                "description": "Gets the latest debugger deployment for an assistant. This endpoint requires user authentication with organization and project scope.\n\nOpenAPI operationId: `getAssistantDebuggerDeployment`."
+              },
+              "response": []
+            },
+            {
+              "name": "List Debugger Deployments",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant-deployment/get-all-debugger-deployment/{{assistantId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant-deployment",
+                    "get-all-debugger-deployment",
+                    "{{assistantId}}"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "{{page}}",
+                      "description": "Optional query parameter."
+                    },
+                    {
+                      "key": "pageSize",
+                      "value": "{{pageSize}}",
+                      "description": "Optional query parameter."
+                    },
+                    {
+                      "key": "criterias",
+                      "value": "[{\"key\":\"status\",\"value\":\"active\",\"logic\":\"equal\"}]",
+                      "description": "Optional query parameter.",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Gets debugger deployments for an assistant. This endpoint requires user authentication with organization and project scope.\n\nOpenAPI operationId: `getAllAssistantDebuggerDeployment`."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Phone Deployments",
+          "item": [
+            {
+              "name": "Create Phone Deployment",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant-deployment/create-phone-deployment",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant-deployment",
+                    "create-phone-deployment"
+                  ]
+                },
+                "description": "Creates a phone deployment for an assistant. This endpoint requires user authentication with organization and project scope.\n\nOpenAPI operationId: `createAssistantPhoneDeployment`.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"assistantId\": \"{{assistantId}}\",\n  \"greeting\": \"Hello, how can I help you today?\",\n  \"greetingInterruptible\": true,\n  \"mistake\": \"Sorry, I did not catch that.\",\n  \"unclearInputTimeout\": 4,\n  \"unclearInputMessage\": \"Could you repeat that?\",\n  \"idealTimeout\": 30,\n  \"idealTimeoutBackoff\": 2,\n  \"idealTimeoutMessage\": \"Are you still there?\",\n  \"maxSessionDuration\": 300,\n  \"phoneProviderName\": \"{{phoneProviderName}}\",\n  \"phoneOptions\": [\n    {\n      \"key\": \"callerId\",\n      \"value\": \"{{callerId}}\"\n    }\n  ],\n  \"inputAudio\": {\n    \"audioType\": \"input\",\n    \"audioProvider\": \"{{sttProviderName}}\",\n    \"status\": \"ACTIVE\",\n    \"audioOptions\": [\n      {\n        \"key\": \"language\",\n        \"value\": \"en-US\"\n      }\n    ]\n  },\n  \"outputAudio\": {\n    \"audioType\": \"output\",\n    \"audioProvider\": \"{{ttsProviderName}}\",\n    \"status\": \"ACTIVE\",\n    \"audioOptions\": [\n      {\n        \"key\": \"voice\",\n        \"value\": \"default\"\n      }\n    ]\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Latest Phone Deployment",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant-deployment/get-phone-deployment/{{assistantId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant-deployment",
+                    "get-phone-deployment",
+                    "{{assistantId}}"
+                  ]
+                },
+                "description": "Gets the latest phone deployment for an assistant. This endpoint requires user authentication with organization and project scope.\n\nOpenAPI operationId: `getAssistantPhoneDeployment`."
+              },
+              "response": []
+            },
+            {
+              "name": "List Phone Deployments",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant-deployment/get-all-phone-deployment/{{assistantId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant-deployment",
+                    "get-all-phone-deployment",
+                    "{{assistantId}}"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "{{page}}",
+                      "description": "Optional query parameter."
+                    },
+                    {
+                      "key": "pageSize",
+                      "value": "{{pageSize}}",
+                      "description": "Optional query parameter."
+                    },
+                    {
+                      "key": "criterias",
+                      "value": "[{\"key\":\"status\",\"value\":\"active\",\"logic\":\"equal\"}]",
+                      "description": "Optional query parameter.",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Gets phone deployments for an assistant. This endpoint requires user authentication with organization and project scope.\n\nOpenAPI operationId: `getAllAssistantPhoneDeployment`."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Webplugin Deployments",
+          "item": [
+            {
+              "name": "Create Webplugin Deployment",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant-deployment/create-webplugin-deployment",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant-deployment",
+                    "create-webplugin-deployment"
+                  ]
+                },
+                "description": "Creates a webplugin deployment for an assistant. This endpoint requires user authentication with organization and project scope.\n\nOpenAPI operationId: `createAssistantWebpluginDeployment`.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"assistantId\": \"{{assistantId}}\",\n  \"greeting\": \"Hello, how can I help you today?\",\n  \"greetingInterruptible\": true,\n  \"mistake\": \"Sorry, I did not catch that.\",\n  \"unclearInputTimeout\": 4,\n  \"unclearInputMessage\": \"Could you repeat that?\",\n  \"idealTimeout\": 30,\n  \"idealTimeoutBackoff\": 2,\n  \"idealTimeoutMessage\": \"Are you still there?\",\n  \"maxSessionDuration\": 300,\n  \"suggestion\": [\n    \"Talk to support\",\n    \"Check order status\"\n  ],\n  \"inputAudio\": {\n    \"audioType\": \"input\",\n    \"audioProvider\": \"{{sttProviderName}}\",\n    \"status\": \"ACTIVE\",\n    \"audioOptions\": [\n      {\n        \"key\": \"language\",\n        \"value\": \"en-US\"\n      }\n    ]\n  },\n  \"outputAudio\": {\n    \"audioType\": \"output\",\n    \"audioProvider\": \"{{ttsProviderName}}\",\n    \"status\": \"ACTIVE\",\n    \"audioOptions\": [\n      {\n        \"key\": \"voice\",\n        \"value\": \"default\"\n      }\n    ]\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Latest Webplugin Deployment",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant-deployment/get-webplugin-deployment/{{assistantId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant-deployment",
+                    "get-webplugin-deployment",
+                    "{{assistantId}}"
+                  ]
+                },
+                "description": "Gets the latest webplugin deployment for an assistant. This endpoint requires user authentication with organization and project scope.\n\nOpenAPI operationId: `getAssistantWebpluginDeployment`."
+              },
+              "response": []
+            },
+            {
+              "name": "List Webplugin Deployments",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant-deployment/get-all-webplugin-deployment/{{assistantId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant-deployment",
+                    "get-all-webplugin-deployment",
+                    "{{assistantId}}"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "{{page}}",
+                      "description": "Optional query parameter."
+                    },
+                    {
+                      "key": "pageSize",
+                      "value": "{{pageSize}}",
+                      "description": "Optional query parameter."
+                    },
+                    {
+                      "key": "criterias",
+                      "value": "[{\"key\":\"status\",\"value\":\"active\",\"logic\":\"equal\"}]",
+                      "description": "Optional query parameter.",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Gets webplugin deployments for an assistant. This endpoint requires user authentication with organization and project scope.\n\nOpenAPI operationId: `getAllAssistantWebpluginDeployment`."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "WhatsApp Deployments",
+          "item": [
+            {
+              "name": "Create WhatsApp Deployment",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant-deployment/create-whatsapp-deployment",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant-deployment",
+                    "create-whatsapp-deployment"
+                  ]
+                },
+                "description": "Creates a WhatsApp deployment for an assistant. This endpoint requires user authentication with organization and project scope.\n\nOpenAPI operationId: `createAssistantWhatsappDeployment`.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"assistantId\": \"{{assistantId}}\",\n  \"greeting\": \"Hello, how can I help you today?\",\n  \"greetingInterruptible\": true,\n  \"mistake\": \"Sorry, I did not catch that.\",\n  \"unclearInputTimeout\": 4,\n  \"unclearInputMessage\": \"Could you repeat that?\",\n  \"idealTimeout\": 30,\n  \"idealTimeoutBackoff\": 2,\n  \"idealTimeoutMessage\": \"Are you still there?\",\n  \"maxSessionDuration\": 300,\n  \"whatsappProviderName\": \"{{whatsappProviderName}}\",\n  \"whatsappOptions\": [\n    {\n      \"key\": \"businessNumber\",\n      \"value\": \"{{whatsappBusinessNumber}}\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Latest WhatsApp Deployment",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant-deployment/get-whatsapp-deployment/{{assistantId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant-deployment",
+                    "get-whatsapp-deployment",
+                    "{{assistantId}}"
+                  ]
+                },
+                "description": "Gets the latest WhatsApp deployment for an assistant. This endpoint requires user authentication with organization and project scope.\n\nOpenAPI operationId: `getAssistantWhatsappDeployment`."
+              },
+              "response": []
+            },
+            {
+              "name": "List WhatsApp Deployments",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant-deployment/get-all-whatsapp-deployment/{{assistantId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant-deployment",
+                    "get-all-whatsapp-deployment",
+                    "{{assistantId}}"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "{{page}}",
+                      "description": "Optional query parameter."
+                    },
+                    {
+                      "key": "pageSize",
+                      "value": "{{pageSize}}",
+                      "description": "Optional query parameter."
+                    },
+                    {
+                      "key": "criterias",
+                      "value": "[{\"key\":\"status\",\"value\":\"active\",\"logic\":\"equal\"}]",
+                      "description": "Optional query parameter.",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Gets WhatsApp deployments for an assistant. This endpoint requires user authentication with organization and project scope.\n\nOpenAPI operationId: `getAllAssistantWhatsappDeployment`."
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
