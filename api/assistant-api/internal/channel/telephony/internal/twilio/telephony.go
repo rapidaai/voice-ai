@@ -7,6 +7,7 @@ package internal_twilio_telephony
 
 import (
 	"context"
+	"encoding/xml"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -29,6 +30,28 @@ import (
 type twilioTelephony struct {
 	appCfg *config.AssistantConfig
 	logger commons.Logger
+}
+
+type twimlResponse struct {
+	XMLName xml.Name     `xml:"Response"`
+	Connect twimlConnect `xml:"Connect"`
+}
+
+type twimlConnect struct {
+	Stream twimlStream `xml:"Stream"`
+}
+
+type twimlStream struct {
+	URL                 string           `xml:"url,attr"`
+	Name                string           `xml:"name,attr"`
+	StatusCallback      string           `xml:"statusCallback,attr"`
+	StatusCallbackEvent string           `xml:"statusCallbackEvent,attr"`
+	Parameters          []twimlParameter `xml:"Parameter"`
+}
+
+type twimlParameter struct {
+	Name  string `xml:"name,attr"`
+	Value string `xml:"value,attr"`
 }
 
 func NewTwilioTelephony(config *config.AssistantConfig, logger commons.Logger) (internal_type.Telephony, error) {
@@ -252,23 +275,25 @@ func (tpc *twilioTelephony) OutboundCall(ctx context.Context,
 }
 
 func (tpc *twilioTelephony) CreateTwinML(mediaServer string, name, path string, callback string, assistantId uint64, clientNumber string) string {
-	return fmt.Sprintf(`
-	    <Response>
-		 	<Connect>
-	        	<Stream url="wss://%s/%s" name="%s" statusCallback="%s" statusCallbackEvent="initiated ringing answered completed">
-					<Parameter name="assistant_id" value="%d"/>
-					<Parameter name="client_number" value="%s"/>
-				</Stream>
-			</Connect>
-	    </Response>
-	`,
-		mediaServer,
-		path,
-		name,
-		callback,
-		assistantId,
-		clientNumber,
-	)
+	payload, err := xml.Marshal(twimlResponse{
+		Connect: twimlConnect{
+			Stream: twimlStream{
+				URL:                 fmt.Sprintf("wss://%s/%s", mediaServer, path),
+				Name:                name,
+				StatusCallback:      callback,
+				StatusCallbackEvent: "initiated ringing answered completed",
+				Parameters: []twimlParameter{
+					{Name: "assistant_id", Value: fmt.Sprintf("%d", assistantId)},
+					{Name: "client_number", Value: clientNumber},
+				},
+			},
+		},
+	})
+	if err != nil {
+		tpc.logger.Errorf("failed to marshal TwiML with error %+v", err)
+		return ""
+	}
+	return string(payload)
 }
 
 func (tpc *twilioTelephony) InboundCall(c *gin.Context, auth types.SimplePrinciple, assistantId uint64, clientNumber string, assistantConversationId uint64) error {

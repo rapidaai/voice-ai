@@ -6,6 +6,7 @@
 package internal_twilio_telephony
 
 import (
+	"encoding/xml"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -99,6 +100,51 @@ func TestTwilioClient_NilVaultValue(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, client)
 	assert.True(t, errors.Is(err, internal_twilio.ErrVaultCredentialValueMissing))
+}
+
+func TestCreateTwinML(t *testing.T) {
+	tests := []struct {
+		name         string
+		mediaServer  string
+		streamName   string
+		path         string
+		callback     string
+		clientNumber string
+	}{
+		{
+			name:         "creates valid TwiML",
+			mediaServer:  "media.example.com",
+			streamName:   "assistant-stream",
+			path:         "v1/twilio/answer",
+			callback:     "https://api.example.com/v1/twilio/events",
+			clientNumber: "+12025550123",
+		},
+		{
+			name:         "escapes attribute delimiters",
+			mediaServer:  `media.example.com\" injected=\"true`,
+			streamName:   `assistant\" name`,
+			path:         `v1/twilio/answer?token=\"quoted\"&mode=test`,
+			callback:     `https://api.example.com/events?next=\"quoted\"&mode=test`,
+			clientNumber: `+12025550123\" injected=\"true`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			telephony := &twilioTelephony{}
+			payload := telephony.CreateTwinML(test.mediaServer, test.streamName, test.path, test.callback, 42, test.clientNumber)
+
+			var response twimlResponse
+			require.NoError(t, xml.Unmarshal([]byte(payload), &response))
+			assert.Equal(t, "wss://"+test.mediaServer+"/"+test.path, response.Connect.Stream.URL)
+			assert.Equal(t, test.streamName, response.Connect.Stream.Name)
+			assert.Equal(t, test.callback, response.Connect.Stream.StatusCallback)
+			assert.Equal(t, "initiated ringing answered completed", response.Connect.Stream.StatusCallbackEvent)
+			require.Len(t, response.Connect.Stream.Parameters, 2)
+			assert.Equal(t, twimlParameter{Name: "assistant_id", Value: "42"}, response.Connect.Stream.Parameters[0])
+			assert.Equal(t, twimlParameter{Name: "client_number", Value: test.clientNumber}, response.Connect.Stream.Parameters[1])
+		})
+	}
 }
 
 // TestReceiveCall tests the ReceiveCall method with Twilio webhook parameters
