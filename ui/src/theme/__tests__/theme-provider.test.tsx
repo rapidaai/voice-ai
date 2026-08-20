@@ -1,8 +1,11 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { ThemeProvider, useTheme } from '@/theme/theme-provider';
-import { DEFAULT_THEME, THEME_STORAGE_KEY } from '@/theme/theme-loader';
+import { THEME_STORAGE_KEY } from '@/theme/theme-config';
 import { ThemeManifest } from '@/theme/types';
+import developmentConfig from '@/configs/config.development.json';
+
+const configuredTheme = developmentConfig.theme as unknown as ThemeManifest;
 
 const matchMedia = (matches: boolean) =>
   ({
@@ -35,11 +38,15 @@ describe('ThemeProvider', () => {
     document.documentElement.removeAttribute('data-color-mode');
     document.documentElement.removeAttribute('data-theme-ready');
     document.documentElement.removeAttribute('style');
+    document.querySelector("meta[name='theme-color']")?.remove();
+    document
+      .querySelectorAll("link[rel~='icon']")
+      .forEach(icon => icon.remove());
   });
 
   it('applies brand tokens and toggles the resolved color mode', () => {
     render(
-      <ThemeProvider theme={DEFAULT_THEME}>
+      <ThemeProvider theme={configuredTheme}>
         <ThemeConsumer />
       </ThemeProvider>,
     );
@@ -56,13 +63,13 @@ describe('ThemeProvider', () => {
     );
     expect(
       document.documentElement.style.getPropertyValue('--brand-primary'),
-    ).toBe(DEFAULT_THEME.colors.light.primary);
+    ).toBe(configuredTheme.colors.light.primary);
     expect(
       document.documentElement.style.getPropertyValue('--brand-on-primary'),
-    ).toBe(DEFAULT_THEME.colors.light.onPrimary);
+    ).toBe(configuredTheme.colors.light.onPrimary);
     expect(document.querySelector("meta[name='theme-color']")).toHaveAttribute(
       'content',
-      DEFAULT_THEME.colors.light.primary,
+      configuredTheme.colors.light.primary,
     );
 
     fireEvent.click(screen.getByRole('button'));
@@ -72,12 +79,13 @@ describe('ThemeProvider', () => {
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
     expect(
       document.documentElement.style.getPropertyValue('--brand-primary'),
-    ).toBe(DEFAULT_THEME.colors.dark.primary);
+    ).toBe(configuredTheme.colors.dark.primary);
   });
 
   it('does not change a locked whitelabel theme', () => {
+    localStorage.setItem(THEME_STORAGE_KEY, 'light');
     const lockedTheme: ThemeManifest = {
-      ...DEFAULT_THEME,
+      ...configuredTheme,
       defaultMode: 'dark',
       allowModeSelection: false,
     };
@@ -91,23 +99,20 @@ describe('ThemeProvider', () => {
     fireEvent.click(screen.getByRole('button'));
 
     expect(screen.getByRole('button')).toHaveTextContent('Rapida AI:dark');
-    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
   });
 
   it('synchronizes mode changes from another browser tab', () => {
     render(
-      <ThemeProvider theme={DEFAULT_THEME}>
+      <ThemeProvider theme={configuredTheme}>
         <ThemeConsumer />
       </ThemeProvider>,
     );
 
-    fireEvent(
-      window,
-      new StorageEvent('storage', {
-        key: THEME_STORAGE_KEY,
-        newValue: 'dark',
-      }),
-    );
+    const storageEvent = new Event('storage');
+    Object.defineProperty(storageEvent, 'key', { value: THEME_STORAGE_KEY });
+    Object.defineProperty(storageEvent, 'newValue', { value: 'dark' });
+    fireEvent(window, storageEvent);
 
     expect(screen.getByRole('button')).toHaveTextContent('Rapida AI:dark');
     expect(document.documentElement).toHaveAttribute('data-color-mode', 'dark');
@@ -122,12 +127,60 @@ describe('ThemeProvider', () => {
     });
 
     render(
-      <ThemeProvider theme={DEFAULT_THEME}>
+      <ThemeProvider theme={configuredTheme}>
         <ThemeConsumer />
       </ThemeProvider>,
     );
 
     fireEvent.click(screen.getByRole('button'));
+
+    expect(screen.getByRole('button')).toHaveTextContent('Rapida AI:dark');
+  });
+
+  it('keeps a selected mode when a selectable theme object refreshes', () => {
+    const { rerender } = render(
+      <ThemeProvider theme={configuredTheme}>
+        <ThemeConsumer />
+      </ThemeProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button'));
+    rerender(
+      <ThemeProvider theme={{ ...configuredTheme, id: 'refreshed' }}>
+        <ThemeConsumer />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByRole('button')).toHaveTextContent('Rapida AI:dark');
+  });
+
+  it('follows system changes when selection is locked to system', () => {
+    let mediaListener: ((event: MediaQueryListEvent) => void) | undefined;
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: jest.fn().mockReturnValue({
+        matches: false,
+        addEventListener: jest.fn(
+          (_event: string, listener: (event: MediaQueryListEvent) => void) => {
+            mediaListener = listener;
+          },
+        ),
+        removeEventListener: jest.fn(),
+      }),
+    });
+    const lockedSystemTheme: ThemeManifest = {
+      ...configuredTheme,
+      defaultMode: 'system',
+      allowModeSelection: false,
+    };
+
+    render(
+      <ThemeProvider theme={lockedSystemTheme}>
+        <ThemeConsumer />
+      </ThemeProvider>,
+    );
+
+    act(() => mediaListener?.({ matches: true } as MediaQueryListEvent));
 
     expect(screen.getByRole('button')).toHaveTextContent('Rapida AI:dark');
   });

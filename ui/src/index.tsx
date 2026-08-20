@@ -12,17 +12,17 @@ import {
   getInitialThemeState,
   ThemeProvider,
 } from '@/theme/theme-provider';
-import { getBootstrapTheme, loadThemeManifest } from '@/theme/theme-loader';
+import { CONFIG } from '@/configs';
+import { getValidatedThemeOrRenderError } from '@/theme/theme-bootstrap';
 
-const root = ReactDOM.createRoot(
-  document.getElementById('root') as HTMLElement,
-);
-initializeAnalytics();
+const rootElement = document.getElementById('root') as HTMLElement;
+const theme = getValidatedThemeOrRenderError(CONFIG.theme, rootElement);
 
-const renderApp = (theme: Awaited<ReturnType<typeof loadThemeManifest>>) => {
+if (theme) {
   applyThemeToDocument(theme, getInitialThemeState(theme).resolvedMode);
+  initializeAnalytics();
 
-  root.render(
+  ReactDOM.createRoot(rootElement).render(
     <HelmetProvider>
       <React.StrictMode>
         <ThemeProvider theme={theme}>
@@ -35,16 +35,4 @@ const renderApp = (theme: Awaited<ReturnType<typeof loadThemeManifest>>) => {
       </React.StrictMode>
     </HelmetProvider>,
   );
-};
-
-async function bootstrap() {
-  const bootstrapTheme = getBootstrapTheme();
-  renderApp(bootstrapTheme);
-
-  const runtimeTheme = await loadThemeManifest();
-  if (JSON.stringify(runtimeTheme) !== JSON.stringify(bootstrapTheme)) {
-    renderApp(runtimeTheme);
-  }
 }
-
-void bootstrap();

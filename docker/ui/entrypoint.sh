@@ -3,16 +3,6 @@ set -e
 
 BUILD_DIR="/app/build"
 CONFIG_FILE="/app/config.ui.json"
-THEME_FILE="/app/theme.json"
-
-# Replace the default runtime theme when a deployment-specific manifest is
-# mounted at /app/theme.json. The temporary file avoids serving partial writes.
-if [ -f "$THEME_FILE" ]; then
-  echo "Installing runtime theme manifest..."
-  cp "$THEME_FILE" "$BUILD_DIR/theme.json.tmp"
-  mv "$BUILD_DIR/theme.json.tmp" "$BUILD_DIR/theme.json"
-fi
-
 # If a runtime config is mounted, inject it into the built JS bundle
 # by replacing the placeholder values that were baked at build time
 if [ -f "$CONFIG_FILE" ]; then

@@ -8,10 +8,12 @@ import test from 'node:test';
 
 import {
   SHELL_CONTRACTS,
+  THEME_CONFIG_PATHS,
   checkThemeContract,
   findHardcodedColorUtilities,
   validateLegacyThemeRemoval,
   validateShellSource,
+  validateSingleSourceTheme,
   validateThemeManifest,
 } from './check-theme-contract.mjs';
 
@@ -80,12 +82,15 @@ const createFixtureRepo = context => {
     );
   }
 
-  writeFixtureFile(
-    repoRoot,
-    'ui/public/theme.json',
-    `${JSON.stringify(validManifest, null, 2)}\n`,
-  );
+  for (const configPath of THEME_CONFIG_PATHS) {
+    writeFixtureFile(
+      repoRoot,
+      configPath,
+      `${JSON.stringify({ theme: validManifest }, null, 2)}\n`,
+    );
+  }
   writeFixtureFile(repoRoot, 'ui/src/index.tsx', 'export {};\n');
+  writeFixtureFile(repoRoot, 'ui/public/index.html', '<div id="root"></div>\n');
 
   return repoRoot;
 };
@@ -141,33 +146,37 @@ test('rejects variant hardcoded palettes while allowing non-color utilities', ()
 });
 
 test('rejects a malformed and incomplete enterprise theme manifest', () => {
-  const diagnostics = validateThemeManifest({
-    schemaVersion: 2,
-    id: ' ',
-    brand: { name: '' },
-    links: { documentation: 'javascript:alert(1)' },
-    defaultMode: 'sepia',
-    allowModeSelection: 'yes',
-    colors: {
-      light: { primary: 'red; background: black' },
-      dark: {},
+  const manifestPath = 'ui/src/configs/config.development.json#theme';
+  const diagnostics = validateThemeManifest(
+    {
+      schemaVersion: 2,
+      id: ' ',
+      brand: { name: '' },
+      links: { documentation: 'javascript:alert(1)' },
+      defaultMode: 'sepia',
+      allowModeSelection: 'yes',
+      colors: {
+        light: { primary: 'red; background: black' },
+        dark: {},
+      },
     },
-  });
+    manifestPath,
+  );
 
   assert.ok(
-    diagnostics.includes('ui/public/theme.json: schemaVersion must equal 1'),
+    diagnostics.includes(`${manifestPath}: schemaVersion must equal 1`),
   );
   assert.ok(
-    diagnostics.includes('ui/public/theme.json: id must be a nonempty string'),
+    diagnostics.includes(`${manifestPath}: id must be a nonempty string`),
   );
   assert.ok(
     diagnostics.includes(
-      'ui/public/theme.json: links.documentation must be root-relative or use https/mailto',
+      `${manifestPath}: links.documentation must be root-relative or use https/mailto`,
     ),
   );
   assert.ok(
     diagnostics.includes(
-      'ui/public/theme.json: colors.light.primary must be a six-digit hexadecimal color',
+      `${manifestPath}: colors.light.primary must be a six-digit hexadecimal color`,
     ),
   );
   assert.ok(diagnostics.length > 10);
@@ -177,8 +186,8 @@ test('returns deterministic, sorted diagnostics', context => {
   const repoRoot = createFixtureRepo(context);
   writeFixtureFile(
     repoRoot,
-    'ui/public/theme.json',
-    JSON.stringify({ schemaVersion: 0 }),
+    'ui/src/configs/config.development.json',
+    JSON.stringify({ theme: { schemaVersion: 0 } }),
   );
   writeFixtureFile(
     repoRoot,
@@ -201,7 +210,11 @@ test('returns deterministic, sorted diagnostics', context => {
 
 test('CLI exits nonzero and reports diagnostics for an invalid repository', context => {
   const repoRoot = createFixtureRepo(context);
-  writeFixtureFile(repoRoot, 'ui/public/theme.json', '{ invalid json');
+  writeFixtureFile(
+    repoRoot,
+    'ui/src/configs/config.development.json',
+    '{ invalid json',
+  );
 
   const result = spawnSync(process.execPath, [checkerPath, repoRoot], {
     encoding: 'utf8',
@@ -209,5 +222,16 @@ test('CLI exits nonzero and reports diagnostics for an invalid repository', cont
 
   assert.equal(result.status, 1);
   assert.match(result.stderr, /Theme contract check failed:/);
-  assert.match(result.stderr, /could not parse theme manifest/);
+  assert.match(result.stderr, /could not parse UI config/);
+});
+
+test('rejects duplicate theme sources and inline bootstrap scripts', context => {
+  const repoRoot = createFixtureRepo(context);
+  writeFixtureFile(repoRoot, 'ui/public/theme.json', '{}');
+  writeFixtureFile(repoRoot, 'ui/public/index.html', '<script>boot()</script>');
+
+  assert.deepEqual(validateSingleSourceTheme(repoRoot), [
+    'ui/public/index.html: inline bootstrap scripts are not allowed; use CONFIG.theme',
+    'ui/public/theme.json: standalone theme manifest must not exist; use CONFIG.theme',
+  ]);
 });

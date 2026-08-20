@@ -33,5 +33,46 @@
             "knowledge": false,
             "telemetry": true
         }
+    },
+    "theme": {
+        "schemaVersion": 1,
+        "id": "rapida",
+        "brand": {
+            "name": "Rapida AI",
+            "logos": {
+                "full": {
+                    "light": "/logos/rapida-db.svg",
+                    "dark": "/logos/rapida-wh.svg"
+                },
+                "compact": {
+                    "light": "/favicon_io/original-icon.png",
+                    "dark": "/favicon_io/original-icon.png"
+                }
+            },
+            "favicon": "/favicon_io/favicon.ico"
+        },
+        "links": {
+            "documentation": "https://doc.rapida.ai",
+            "source": "https://github.com/rapidaai/voice-ai",
+            "support": "mailto:prashant@rapida.ai",
+            "terms": "/static/terms-and-conditions",
+            "privacy": "/static/privacy-policy"
+        },
+        "defaultMode": "system",
+        "allowModeSelection": true,
+        "colors": {
+            "light": {
+                "primary": "#0353e9",
+                "primaryHover": "#002d9c",
+                "primaryActive": "#001d6c",
+                "onPrimary": "#ffffff"
+            },
+            "dark": {
+                "primary": "#4589ff",
+                "primaryHover": "#78a9ff",
+                "primaryActive": "#a6c8ff",
+                "onPrimary": "#161616"
+            }
+        }
     }
 }

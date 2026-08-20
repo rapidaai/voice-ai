@@ -1,57 +1,6 @@
 import { ThemeManifest, ThemeMode } from './types';
-import { safeStorageGet, safeStorageSet } from './theme-storage';
 
 export const THEME_STORAGE_KEY = 'ui-theme-mode';
-export const THEME_CACHE_KEY = 'ui-theme-manifest';
-export const THEME_LOAD_TIMEOUT_MS = 3000;
-
-export const getThemeManifestUrl = () =>
-  new URL(
-    `${process.env.PUBLIC_URL?.replace(/\/$/, '') ?? ''}/theme.json`,
-    window.location.origin,
-  ).toString();
-
-export const DEFAULT_THEME: ThemeManifest = {
-  schemaVersion: 1,
-  id: 'rapida',
-  brand: {
-    name: 'Rapida AI',
-    logos: {
-      full: {
-        light: '/logos/rapida-db.svg',
-        dark: '/logos/rapida-wh.svg',
-      },
-      compact: {
-        light: '/favicon_io/original-icon.png',
-        dark: '/favicon_io/original-icon.png',
-      },
-    },
-    favicon: '/favicon_io/favicon.ico',
-  },
-  links: {
-    documentation: 'https://doc.rapida.ai',
-    source: 'https://github.com/rapidaai/voice-ai',
-    support: 'mailto:prashant@rapida.ai',
-    terms: '/static/terms-and-conditions',
-    privacy: '/static/privacy-policy',
-  },
-  defaultMode: 'system',
-  allowModeSelection: true,
-  colors: {
-    light: {
-      primary: '#0353e9',
-      primaryHover: '#002d9c',
-      primaryActive: '#001d6c',
-      onPrimary: '#ffffff',
-    },
-    dark: {
-      primary: '#4589ff',
-      primaryHover: '#78a9ff',
-      primaryActive: '#a6c8ff',
-      onPrimary: '#161616',
-    },
-  },
-};
 
 const isThemeMode = (value: unknown): value is ThemeMode =>
   value === 'light' || value === 'dark' || value === 'system';
@@ -98,8 +47,7 @@ const isAppLink = (value: unknown): value is string => {
   if (value.startsWith('/') && !value.startsWith('//')) return true;
 
   try {
-    const url = new URL(value);
-    return ['https:', 'mailto:'].includes(url.protocol);
+    return ['https:', 'mailto:'].includes(new URL(value).protocol);
   } catch {
     return false;
   }
@@ -110,8 +58,7 @@ const isAssetLink = (value: unknown): value is string => {
   if (value.startsWith('/') && !value.startsWith('//')) return true;
 
   try {
-    const url = new URL(value);
-    return url.protocol === 'https:';
+    return new URL(value).protocol === 'https:';
   } catch {
     return false;
   }
@@ -159,59 +106,12 @@ export const isThemeManifest = (value: unknown): value is ThemeManifest => {
   );
 };
 
-export const getCachedThemeManifest = (): ThemeManifest | null => {
-  const cachedTheme = safeStorageGet(THEME_CACHE_KEY);
-  if (!cachedTheme) return null;
-
-  try {
-    const manifest: unknown = JSON.parse(cachedTheme);
-    return isThemeManifest(manifest) ? manifest : null;
-  } catch {
-    return null;
-  }
-};
-
-export const getBootstrapTheme = (): ThemeManifest =>
-  getCachedThemeManifest() ?? DEFAULT_THEME;
-
-const warnThemeFallback = (reason: string) => {
-  if (process.env.NODE_ENV !== 'test') {
-    console.warn(`[theme] ${reason}; using the default theme.`);
-  }
-};
-
-export async function loadThemeManifest(
-  timeoutMs = THEME_LOAD_TIMEOUT_MS,
-): Promise<ThemeManifest> {
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const response = await fetch(getThemeManifestUrl(), {
-      cache: 'no-store',
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      warnThemeFallback(`manifest request failed with HTTP ${response.status}`);
-      return DEFAULT_THEME;
-    }
-
-    const manifest: unknown = await response.json();
-    if (!isThemeManifest(manifest)) {
-      warnThemeFallback('manifest validation failed');
-      return DEFAULT_THEME;
-    }
-
-    safeStorageSet(THEME_CACHE_KEY, JSON.stringify(manifest));
-    return manifest;
-  } catch (error) {
-    warnThemeFallback(
-      error instanceof DOMException && error.name === 'AbortError'
-        ? `manifest request timed out after ${timeoutMs}ms`
-        : 'manifest request failed',
+export const assertThemeManifest = (
+  value: unknown,
+): asserts value is ThemeManifest => {
+  if (!isThemeManifest(value)) {
+    throw new Error(
+      'CONFIG.theme is invalid. Update the selected UI config with a complete ThemeManifest.',
     );
-    return getCachedThemeManifest() ?? DEFAULT_THEME;
-  } finally {
-    window.clearTimeout(timeout);
   }
-}
+};

@@ -40,7 +40,16 @@ export const FORBIDDEN_THEME_SYMBOLS = Object.freeze([
 ]);
 
 const THEME_CONTEXT_PATH = 'ui/src/context/dark-mode-context.tsx';
-const THEME_MANIFEST_PATH = 'ui/public/theme.json';
+const LEGACY_THEME_MANIFEST_PATH = 'ui/public/theme.json';
+const PUBLIC_INDEX_PATH = 'ui/public/index.html';
+export const THEME_CONFIG_PATHS = Object.freeze([
+  'ui/src/configs/config.development.json',
+  'ui/src/configs/config.production.json',
+  'docker/ui/config.community.json',
+  'docker/ui/config.enterprise.json',
+  'docker/ui/config.local.json',
+  'docker/ui/config.local-knowledge.json',
+]);
 const GENERATED_STYLES_DIRECTORY = 'ui/src/styles/generated';
 const REQUIRED_LINKS = Object.freeze([
   'documentation',
@@ -126,10 +135,7 @@ const pushDiagnostic = (diagnostics, path, message) => {
   diagnostics.push(`${path}: ${message}`);
 };
 
-export function validateThemeManifest(
-  manifest,
-  manifestPath = THEME_MANIFEST_PATH,
-) {
+export function validateThemeManifest(manifest, manifestPath = 'CONFIG.theme') {
   const diagnostics = [];
 
   if (!isPlainObject(manifest)) {
@@ -361,26 +367,73 @@ export function validateShellFiles(repoRoot = DEFAULT_REPO_ROOT) {
   return diagnostics.sort();
 }
 
-export function validateThemeManifestFile(repoRoot = DEFAULT_REPO_ROOT) {
-  try {
-    const source = readFileSync(resolve(repoRoot, THEME_MANIFEST_PATH), 'utf8');
-    return validateThemeManifest(JSON.parse(source), THEME_MANIFEST_PATH);
-  } catch (error) {
-    return [
-      `${THEME_MANIFEST_PATH}: ${
+export function validateThemeConfigFiles(repoRoot = DEFAULT_REPO_ROOT) {
+  const diagnostics = [];
+
+  for (const configPath of THEME_CONFIG_PATHS) {
+    try {
+      const source = readFileSync(resolve(repoRoot, configPath), 'utf8');
+      const config = JSON.parse(source);
+      diagnostics.push(
+        ...validateThemeManifest(config.theme, `${configPath}#theme`),
+      );
+    } catch (error) {
+      pushDiagnostic(
+        diagnostics,
+        configPath,
         error?.code === 'ENOENT'
-          ? 'theme manifest is missing'
-          : `could not parse theme manifest: ${error.message}`
-      }`,
-    ];
+          ? 'deployable UI config is missing'
+          : `could not parse UI config: ${error.message}`,
+      );
+    }
   }
+
+  return diagnostics.sort();
+}
+
+export function validateSingleSourceTheme(repoRoot = DEFAULT_REPO_ROOT) {
+  const diagnostics = [];
+
+  try {
+    if (statSync(resolve(repoRoot, LEGACY_THEME_MANIFEST_PATH)).isFile()) {
+      pushDiagnostic(
+        diagnostics,
+        LEGACY_THEME_MANIFEST_PATH,
+        'standalone theme manifest must not exist; use CONFIG.theme',
+      );
+    }
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+
+  try {
+    const source = readFileSync(resolve(repoRoot, PUBLIC_INDEX_PATH), 'utf8');
+    if (/<script\b/i.test(source)) {
+      pushDiagnostic(
+        diagnostics,
+        PUBLIC_INDEX_PATH,
+        'inline bootstrap scripts are not allowed; use CONFIG.theme',
+      );
+    }
+  } catch (error) {
+    pushDiagnostic(
+      diagnostics,
+      PUBLIC_INDEX_PATH,
+      error?.code === 'ENOENT'
+        ? 'public index is missing'
+        : `could not read public index: ${error.message}`,
+    );
+  }
+
+  return diagnostics.sort();
 }
 
 export function checkThemeContract(repoRoot = DEFAULT_REPO_ROOT) {
   return [
     ...validateLegacyThemeRemoval(repoRoot),
     ...validateShellFiles(repoRoot),
-    ...validateThemeManifestFile(repoRoot),
+    ...validateThemeConfigFiles(repoRoot),
+    ...validateSingleSourceTheme(repoRoot),
   ].sort();
 }
 

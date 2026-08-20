@@ -1,7 +1,10 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { SidebarNavigation } from '@/app/components/navigation/sidebar';
-import { DEFAULT_THEME } from '@/theme/theme-loader';
+import developmentConfig from '@/configs/config.development.json';
+import { ThemeManifest } from '@/theme/types';
+
+const theme = developmentConfig.theme as unknown as ThemeManifest;
 
 let mockOpen = true;
 
@@ -16,8 +19,8 @@ jest.mock('@/context/sidebar-context', () => ({
 
 jest.mock('@/theme/theme-provider', () => ({
   useTheme: () => {
-    const { DEFAULT_THEME: theme } = jest.requireActual('@/theme/theme-loader');
-    return { resolvedMode: 'dark', theme };
+    const config = jest.requireActual('@/configs/config.development.json');
+    return { resolvedMode: 'dark', theme: config.theme };
   },
 }));
 
@@ -72,7 +75,7 @@ describe('sidebar shell', () => {
     );
     expect(screen.getByAltText('Rapida AI')).toHaveAttribute(
       'src',
-      DEFAULT_THEME.brand.logos?.full.dark,
+      theme.brand.logos?.full.dark,
     );
     expect(screen.getByAltText('Rapida AI').parentElement).toHaveClass(
       'justify-start',
@@ -86,7 +89,7 @@ describe('sidebar shell', () => {
 
     expect(screen.getByAltText('Rapida AI')).toHaveAttribute(
       'src',
-      DEFAULT_THEME.brand.logos?.compact.dark,
+      theme.brand.logos?.compact.dark,
     );
     expect(screen.getByAltText('Rapida AI')).toHaveClass('h-6', 'w-6');
     expect(screen.getByAltText('Rapida AI').parentElement).toHaveClass(

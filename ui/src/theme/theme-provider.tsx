@@ -5,9 +5,10 @@ import React, {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
-import { THEME_STORAGE_KEY } from './theme-loader';
+import { THEME_STORAGE_KEY } from './theme-config';
 import { safeStorageGet, safeStorageSet } from './theme-storage';
 import { ResolvedThemeMode, ThemeManifest, ThemeMode } from './types';
 
@@ -99,11 +100,17 @@ export const ThemeProvider: React.FC<{
   const [mode, setModeState] = useState<ThemeMode>(() => getStoredMode(theme));
   const [systemMode, setSystemMode] =
     useState<ResolvedThemeMode>(getSystemMode);
+  const previousAllowModeSelection = useRef(theme.allowModeSelection);
   const resolvedMode = resolveThemeMode(mode, systemMode);
 
   useEffect(() => {
-    setModeState(getStoredMode(theme));
-  }, [theme]);
+    if (!theme.allowModeSelection) {
+      setModeState(theme.defaultMode);
+    } else if (!previousAllowModeSelection.current) {
+      setModeState(getStoredMode(theme));
+    }
+    previousAllowModeSelection.current = theme.allowModeSelection;
+  }, [theme.allowModeSelection, theme.defaultMode]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');

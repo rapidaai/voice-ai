@@ -61,7 +61,6 @@ li::marker {
   background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgZmlsbD0ibm9uZSIgdmlld0JveD0iMCAwIDIwIDIwIj48ZyBmaWxsPSIjMmYzMjM3Ij48cGF0aCBkPSJNOS41IDYuNWEuNS41IDAgMSAxIDEgMHYzaDIuOTk4YS41LjUgMCAwIDEgMCAxLjAwMUgxMC41djNhLjUuNSAwIDAgMS0xIDB2LTNoLTNhLjUuNSAwIDEgMSAwLTEuMDAxaDN6Ii8+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBkPSJNMTAgM2E3IDcgMCAxIDEgMCAxNCA3IDcgMCAwIDEgMC0xNHptMCAxYTYgNiAwIDEgMCAwIDEyIDYgNiAwIDAgMCAwLTEyeiIgY2xpcC1ydWxlPSJldmVub2RkIi8+PC9nPjwvc3ZnPg==);
 }
 
-/*  */
 .message-container > .day-0 ~ .day-0 > .date-header {
   display: none;
 }
@@ -188,7 +187,7 @@ li::marker {
 
 /* start of react flow */
 .wmde-markdown {
-  font-family: 'Rubik', sans-serif !important;
+  font-family: Rubik, sans-serif !important;
 }
 
 .workflow-panel-animation .react-flow__viewport {
@@ -222,7 +221,7 @@ li::marker {
 }
 
 .normal-text .ͼ1 .cm-scroller {
-  font-family: 'Rubik', sans-serif !important;
+  font-family: Rubik, sans-serif !important;
 }
 
 .cm-content {
@@ -230,7 +229,7 @@ li::marker {
 }
 
 .markdown-editor .cm-line {
-  font-family: 'Rubik', sans-serif;
+  font-family: Rubik, sans-serif;
 }
 
 .cm-line .cm-placeholder {
@@ -244,7 +243,7 @@ li::marker {
 }
 
 .markdown-viewer-with-uiw .wmde-markdown {
-  font-family: 'Rubik', sans-serif;
+  font-family: Rubik, sans-serif;
 }
 
 .monaco-editor .margin-view-overlays .current-line,
@@ -400,10 +399,6 @@ li::marker {
   z-index: 0;
   top: 50%;
   transform-origin: top center;
-}
-
-/* electron app bar */
-.electron .electron-titlebar {
 }
 
 .listening {

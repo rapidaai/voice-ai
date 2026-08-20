@@ -1,8 +1,0 @@
-{
-  "short_name": "Voice AI",
-  "name": "Voice AI Console",
-  "start_url": ".",
-  "display": "standalone",
-  "theme_color": "#2463EB",
-  "background_color": "#ffffff"
-}

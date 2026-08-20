@@ -1,6 +1,7 @@
 /* eslint-disable import/no-mutable-exports */
 import { InputVarType } from '@/models/common';
 import { ConnectionConfig } from '@rapidaai/react';
+import type { ThemeManifest } from '@/theme/types';
 import devConfig from './config.development.json';
 import prodConfig from './config.production.json';
 
@@ -44,11 +45,21 @@ export interface RapidaConfig {
   };
   analytics?: SentryAnalyticsConfig;
   workspace: WorkspaceConfig;
+  theme: ThemeManifest;
 }
-export const getConfig = (): RapidaConfig => {
-  const env = process.env.NODE_ENV || 'development';
-  return env === 'production' ? prodConfig : devConfig;
+const developmentConfig: RapidaConfig = {
+  ...devConfig,
+  theme: devConfig.theme as ThemeManifest,
 };
+const productionConfig: RapidaConfig = {
+  ...prodConfig,
+  theme: prodConfig.theme as ThemeManifest,
+};
+
+export const getConfig = (
+  environment = process.env.NODE_ENV || 'development',
+): RapidaConfig =>
+  environment === 'production' ? productionConfig : developmentConfig;
 
 export const CONFIG = getConfig();
 export const connectionConfig = new ConnectionConfig(CONFIG.connection);

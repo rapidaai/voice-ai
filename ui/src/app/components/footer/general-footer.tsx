@@ -12,7 +12,7 @@ export function GeneralFooter() {
   return (
     <Header
       aria-label={`${theme.brand.name} Platform`}
-      className="[inset-block-start:auto]! [inset-block-end:0]! border-gray-200! dark:border-gray-900! border-t!"
+      className="[inset-block-start:auto]! [inset-block-end:0]! border-border-subtle! border-t!"
     >
       <HeaderName href="#" prefix={theme.brand.name}>
         [Platform]

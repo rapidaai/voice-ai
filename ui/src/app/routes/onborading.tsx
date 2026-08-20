@@ -42,7 +42,7 @@ const FEATURES = [
 
 // ── Layout ────────────────────────────────────────────────────────────────────
 
-function OnboardingLayout() {
+export function OnboardingLayout() {
   const location = useLocation();
   const { theme, resolvedMode } = useTheme();
 

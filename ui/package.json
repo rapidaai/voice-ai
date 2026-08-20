@@ -15,7 +15,7 @@
         "**/zustand": "4.5.1"
     },
     "engines": {
-        "node": ">=14.x"
+        "node": ">=22"
     },
     "bugs": {
         "url": "https://github.com/rapidaai/voice-ai/issues"
