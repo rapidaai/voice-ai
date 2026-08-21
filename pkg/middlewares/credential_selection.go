@@ -19,9 +19,10 @@ import (
 const authenticationFailureMessage = "invalid authentication credentials"
 
 type credentialPresence struct {
-	user    bool
-	project bool
-	service bool
+	user         bool
+	project      bool
+	organization bool
+	service      bool
 }
 
 func (presence credentialPresence) count() int {
@@ -30,6 +31,9 @@ func (presence credentialPresence) count() int {
 		count++
 	}
 	if presence.project {
+		count++
+	}
+	if presence.organization {
 		count++
 	}
 	if presence.service {
@@ -46,6 +50,9 @@ func (presence credentialPresence) classes() string {
 	if presence.project {
 		classes = append(classes, "project")
 	}
+	if presence.organization {
+		classes = append(classes, "organization")
+	}
 	if presence.service {
 		classes = append(classes, "service")
 	}
@@ -58,8 +65,9 @@ func grpcCredentialPresence(ctx context.Context) credentialPresence {
 		user: strings.TrimSpace(incoming.Get(types.AUTHORIZATION_KEY)) != "" ||
 			strings.TrimSpace(incoming.Get(types.AUTH_KEY)) != "" ||
 			strings.TrimSpace(incoming.Get(types.PROJECT_KEY)) != "",
-		project: strings.TrimSpace(incoming.Get(types.PROJECT_SCOPE_KEY)) != "",
-		service: strings.TrimSpace(incoming.Get(types.SERVICE_SCOPE_KEY)) != "",
+		project:      strings.TrimSpace(incoming.Get(types.PROJECT_SCOPE_KEY)) != "",
+		organization: strings.TrimSpace(incoming.Get(types.ORG_SCOPE_KEY)) != "",
+		service:      strings.TrimSpace(incoming.Get(types.SERVICE_SCOPE_KEY)) != "",
 	}
 }
 

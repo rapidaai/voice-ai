@@ -7,8 +7,9 @@ package endpoint_api
 
 import (
 	"context"
-	"errors"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	internal_gorm "github.com/rapidaai/api/endpoint-api/internal/entity"
@@ -19,14 +20,13 @@ import (
 )
 
 func (endpointGRPCApi *endpointGRPCApi) CreateEndpointProviderModel(ctx context.Context, iRequest *endpoint_grpc_api.CreateEndpointProviderModelRequest) (*endpoint_grpc_api.CreateEndpointProviderModelResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	_, projectAuthErr := types.RequireProject(iAuth)
-	if !isAuthenticated || projectAuthErr != nil {
-		endpointGRPCApi.logger.Errorf("unauthenticated request for invoke")
-		return utils.Error[endpoint_grpc_api.CreateEndpointProviderModelResponse](
-			errors.New("unauthenticated request for CreateEndpointProviderModel"),
-			"Please provider valid service credentials to perfom invoke, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
 	ep, err := endpointGRPCApi.endpointService.Get(ctx, iAuth, iRequest.GetEndpointId(), nil, internal_services.NewDefaultGetEndpointOption())

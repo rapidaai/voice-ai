@@ -35,8 +35,11 @@ func TestCredentialConflictUnaryRejectsEveryPair(t *testing.T) {
 		values []string
 	}{
 		{name: "user and project", values: []string{types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "1", types.PROJECT_SCOPE_KEY, "key"}},
+		{name: "user and organization", values: []string{types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "1", types.ORG_SCOPE_KEY, "organization"}},
 		{name: "user and service", values: []string{types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "1", types.SERVICE_SCOPE_KEY, "service"}},
+		{name: "project and organization", values: []string{types.PROJECT_SCOPE_KEY, "key", types.ORG_SCOPE_KEY, "organization"}},
 		{name: "project and service", values: []string{types.PROJECT_SCOPE_KEY, "key", types.SERVICE_SCOPE_KEY, "service"}},
+		{name: "organization and service", values: []string{types.ORG_SCOPE_KEY, "organization", types.SERVICE_SCOPE_KEY, "service"}},
 	}
 
 	for _, test := range tests {
@@ -69,6 +72,7 @@ func TestCredentialConflictUnaryAllowsSingleAndNoCredential(t *testing.T) {
 		{name: "none"},
 		{name: "user", values: []string{types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "1"}},
 		{name: "project", values: []string{types.PROJECT_SCOPE_KEY, "key"}},
+		{name: "organization", values: []string{types.ORG_SCOPE_KEY, "organization"}},
 		{name: "service", values: []string{types.SERVICE_SCOPE_KEY, "service"}},
 	}
 

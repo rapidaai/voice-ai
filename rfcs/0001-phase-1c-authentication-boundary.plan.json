@@ -2,7 +2,7 @@
   "rfc": "0001-actor-aware-audit-identity",
   "phase": "1C",
   "title": "Simplify the authentication boundary and controller contract",
-  "status": "draft",
+  "status": "approved",
   "supersedes": [
     "rfcs/0001-phase-1b-multi-credential-actor.plan.json"
   ],
@@ -104,6 +104,61 @@
       "Deployment"
     ],
     "grpc_reflection": "not registered"
+  },
+  "endpoint_rpc_scope_inventory": {
+    "error_contract": {
+      "missing_malformed_conflicting_or_rejected_credential": "Unauthenticated from the coordinating middleware before controller execution.",
+      "authenticated_but_unlisted_auth_type": "PermissionDenied from auth.Scope in the controller.",
+      "missing_resource_capability_or_denied_resource": "Existing Endpoint service authorization behavior remains unchanged in the pilot."
+    },
+    "EndpointService": {
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "methods": [
+        "GetEndpoint",
+        "GetAllEndpoint",
+        "GetAllEndpointProviderModel",
+        "UpdateEndpointVersion",
+        "CreateEndpoint",
+        "CreateEndpointProviderModel",
+        "CreateEndpointCacheConfiguration",
+        "CreateEndpointRetryConfiguration",
+        "CreateEndpointTag",
+        "ForkEndpoint",
+        "UpdateEndpointDetail",
+        "GetAllEndpointLog",
+        "GetEndpointLog"
+      ],
+      "reason": "These methods currently require project context directly or in the Endpoint service. Organization authentication remains excluded until project selection for an organization caller is defined."
+    },
+    "Deployment.Invoke": {
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "organization",
+        "service"
+      ],
+      "reason": "Invoke currently accepts any authenticated principle; public endpoint lookup may not require project context, while non-public resource checks remain in the service."
+    },
+    "Deployment.Probe": {
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "reason": "Probe currently requires project context."
+    },
+    "Deployment.Update": {
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "reason": "Update currently requires project context."
+    }
   },
   "credential_compatibility": {
     "grpc_user": {
@@ -232,9 +287,11 @@
   "discussion": {
     "planner": "codex-coordinator",
     "challenger": "Gibbs",
-    "decision": "APPROVE documentation-only draft; implementation remains blocked",
-    "approved_by": "pending",
-    "open_blockers": [
+    "decision": "APPROVE",
+    "approved_by": "user",
+    "approval_message": "Then start the implimentation",
+    "open_blockers": [],
+    "follow_ups_blocking_expansion_beyond_endpoint": [
       "Define how an organization-authenticated caller selects and proves access to a project-specific Endpoint operation without mutating authentication identity.",
       "Define the resource-authorization replacement for user x-project-id SwitchProject before expanding the authentication boundary beyond Endpoint."
     ]

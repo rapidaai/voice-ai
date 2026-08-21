@@ -7,6 +7,7 @@ package types
 
 import (
 	"context"
+	"errors"
 
 	"github.com/gin-gonic/gin"
 )
@@ -56,6 +57,24 @@ type AuthenticationPrinciple interface {
 	IsAuthenticated() bool
 	GetCurrentToken() string
 	Type() AuthType
+}
+
+type Authentication interface {
+	AuthenticationPrinciple
+	Scope(allowed ...AuthType) (AuthenticationPrinciple, error)
+}
+
+var (
+	ErrUnauthenticated               = errors.New("authentication required")
+	ErrAuthenticationScopeNotAllowed = errors.New("authentication scope is not allowed")
+)
+
+func Authorize(ctx context.Context) (Authentication, error) {
+	auth, ok := ctx.Value(CTX_).(Authentication)
+	if !ok || auth == nil || !auth.IsAuthenticated() {
+		return nil, ErrUnauthenticated
+	}
+	return auth, nil
 }
 
 type SimplePrinciple = AuthenticationPrinciple

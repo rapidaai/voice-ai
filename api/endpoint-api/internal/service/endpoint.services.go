@@ -9,9 +9,10 @@ import (
 )
 
 type GetEndpointOption struct {
-	InjectTag     bool
-	InjectRetry   bool
-	InjectCaching bool
+	InjectTag                 bool
+	InjectRetry               bool
+	InjectCaching             bool
+	AllowPublicWithoutProject bool
 }
 
 func NewGetEndpointOption() *GetEndpointOption {
@@ -24,6 +25,10 @@ func NewDefaultGetEndpointOption() *GetEndpointOption {
 		InjectRetry:   true,
 		InjectCaching: true,
 	}
+}
+
+func NewInvokeGetEndpointOption() *GetEndpointOption {
+	return &GetEndpointOption{AllowPublicWithoutProject: true}
 }
 
 type EndpointService interface {

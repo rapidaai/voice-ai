@@ -13,16 +13,10 @@ func TestGRPCAuthenticationMiddlewareOrder(t *testing.T) {
 	file := parseCommandSource(t, "endpoint.go")
 
 	assertMiddlewareOrder(t, interceptorChain(t, file, "ChainUnaryInterceptor"),
-		"NewCredentialConflictUnaryServerMiddleware",
-		"NewProjectAuthenticatorUnaryServerMiddleware",
-		"NewAuthenticationUnaryServerMiddleware",
-		"NewServiceAuthenticatorUnaryServerMiddleware",
+		"NewAuthenticationBoundaryUnaryServerMiddleware",
 	)
 	assertMiddlewareOrder(t, interceptorChain(t, file, "ChainStreamInterceptor"),
-		"NewCredentialConflictStreamServerMiddleware",
-		"NewServiceAuthenticatorStreamServerMiddleware",
-		"NewAuthenticationStreamServerMiddleware",
-		"NewProjectAuthenticatorStreamServerMiddleware",
+		"NewAuthenticationBoundaryStreamServerMiddleware",
 	)
 }
 

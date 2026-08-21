@@ -43,6 +43,18 @@ func (ss *ProjectScope) IsAuthenticated() bool {
 	return ok && ss.IsActive()
 }
 
+func (ss *ProjectScope) Scope(allowed ...AuthType) (AuthenticationPrinciple, error) {
+	if !ss.IsAuthenticated() {
+		return nil, ErrUnauthenticated
+	}
+	for _, authType := range allowed {
+		if authType == AuthTypeProject {
+			return ss, nil
+		}
+	}
+	return nil, ErrAuthenticationScopeNotAllowed
+}
+
 func (ss *ProjectScope) GetCurrentToken() string {
 	return ss.CurrentToken
 }

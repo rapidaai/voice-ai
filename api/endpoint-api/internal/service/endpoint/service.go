@@ -50,6 +50,10 @@ func (eService *endpointService) Get(ctx context.Context,
 	endpointId uint64,
 	endpointProviderModelId *uint64,
 	opts *internal_service.GetEndpointOption) (*internal_gorm.Endpoint, error) {
+	projectContext, err := types.RequireProject(auth)
+	if err != nil && !opts.AllowPublicWithoutProject {
+		return nil, err
+	}
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	var endpoint *internal_gorm.Endpoint
@@ -84,8 +88,7 @@ func (eService *endpointService) Get(ctx context.Context,
 		eService.logger.Errorf("not able to find any endpoint %v", tx.Error)
 		return nil, tx.Error
 	}
-	if endpoint.Visibility != nil && *endpoint.Visibility != "public" {
-		projectContext, err := types.RequireProject(auth)
+	if endpoint.Visibility == nil || *endpoint.Visibility != "public" {
 		if err != nil {
 			return nil, err
 		}

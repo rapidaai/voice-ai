@@ -35,6 +35,18 @@ func (ss *ServiceScope) IsAuthenticated() bool {
 	return ok
 }
 
+func (ss *ServiceScope) Scope(allowed ...AuthType) (AuthenticationPrinciple, error) {
+	if !ss.IsAuthenticated() {
+		return nil, ErrUnauthenticated
+	}
+	for _, authType := range allowed {
+		if authType == AuthTypeService {
+			return ss, nil
+		}
+	}
+	return nil, ErrAuthenticationScopeNotAllowed
+}
+
 func (ss *ServiceScope) GetCurrentToken() string {
 	return ss.CurrentToken
 }

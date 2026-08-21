@@ -12,6 +12,7 @@ import (
 
 	"github.com/rapidaai/api/endpoint-api/config"
 	internal_gorm "github.com/rapidaai/api/endpoint-api/internal/entity"
+	internal_service "github.com/rapidaai/api/endpoint-api/internal/service"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
@@ -165,8 +166,21 @@ func TestEndpointServiceRequiresCapabilities(t *testing.T) {
 	organizationID := uint64(10)
 	projectID := uint64(20)
 	active := type_enums.RECORD_ACTIVE.String()
+	projectlessUser := &types.PlainAuthPrinciple{
+		User:             types.UserInfo{Id: 1},
+		OrganizationRole: &types.OrganizaitonRole{OrganizationId: organizationID},
+	}
 
-	_, _, err := service.GetAll(
+	_, err := service.Get(
+		context.Background(),
+		projectlessUser,
+		1,
+		nil,
+		internal_service.NewDefaultGetEndpointOption(),
+	)
+	require.Error(t, err)
+
+	_, _, err = service.GetAll(
 		context.Background(),
 		&types.OrganizationScope{OrganizationId: &organizationID, Status: active},
 		nil,
@@ -182,6 +196,55 @@ func TestEndpointServiceRequiresCapabilities(t *testing.T) {
 		nil,
 		nil,
 		nil,
+	)
+	require.Error(t, err)
+}
+
+func TestEndpointServiceInvokeLookupAllowsOrganizationForPublicEndpoint(t *testing.T) {
+	service, db := newEndpointServiceTest(t)
+	organizationID := uint64(10)
+	endpoint := insertEndpoint(t, db, 104, organizationID, 20, "public")
+	providerModel := &internal_gorm.EndpointProviderModel{
+		Audited:    gorm_models.Audited{Id: 204},
+		EndpointId: endpoint.Id,
+	}
+	require.NoError(t, db.Create(providerModel).Error)
+	require.NoError(t, db.Model(endpoint).Update("endpoint_provider_model_id", providerModel.Id).Error)
+
+	result, err := service.Get(
+		context.Background(),
+		&types.OrganizationScope{
+			OrganizationId: &organizationID,
+			Status:         type_enums.RECORD_ACTIVE.String(),
+		},
+		endpoint.Id,
+		nil,
+		internal_service.NewInvokeGetEndpointOption(),
+	)
+	require.NoError(t, err)
+	require.Equal(t, endpoint.Id, result.Id)
+}
+
+func TestEndpointServiceInvokeLookupRejectsOrganizationForPrivateEndpoint(t *testing.T) {
+	service, db := newEndpointServiceTest(t)
+	organizationID := uint64(10)
+	endpoint := insertEndpoint(t, db, 105, organizationID, 20, "private")
+	providerModel := &internal_gorm.EndpointProviderModel{
+		Audited:    gorm_models.Audited{Id: 205},
+		EndpointId: endpoint.Id,
+	}
+	require.NoError(t, db.Create(providerModel).Error)
+	require.NoError(t, db.Model(endpoint).Update("endpoint_provider_model_id", providerModel.Id).Error)
+
+	_, err := service.Get(
+		context.Background(),
+		&types.OrganizationScope{
+			OrganizationId: &organizationID,
+			Status:         type_enums.RECORD_ACTIVE.String(),
+		},
+		endpoint.Id,
+		nil,
+		internal_service.NewInvokeGetEndpointOption(),
 	)
 	require.Error(t, err)
 }

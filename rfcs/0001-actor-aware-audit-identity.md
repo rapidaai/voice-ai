@@ -1,7 +1,7 @@
 # RFC 0001: Actor-Aware Audit Identity
 
 - Status: Accepted
-- Draft amendment: Phase 1C authentication boundary remains blocked pending its recorded authorization decisions
+- Approved pilot: Phase 1C may implement the Endpoint-only authentication boundary; its recorded authorization follow-ups block expansion to other binaries
 - Date: 2026-08-20
 - Owners: Platform and API teams
 - Reviewers: Authentication, data, SDK, UI, and service owners

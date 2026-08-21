@@ -35,6 +35,18 @@ func (ss *OrganizationScope) IsAuthenticated() bool {
 	return ok && ss.IsActive()
 }
 
+func (ss *OrganizationScope) Scope(allowed ...AuthType) (AuthenticationPrinciple, error) {
+	if !ss.IsAuthenticated() {
+		return nil, ErrUnauthenticated
+	}
+	for _, authType := range allowed {
+		if authType == AuthTypeOrg {
+			return ss, nil
+		}
+	}
+	return nil, ErrAuthenticationScopeNotAllowed
+}
+
 func (ss *OrganizationScope) GetCurrentToken() string {
 	return ss.CurrentToken
 }

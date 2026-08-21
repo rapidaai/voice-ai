@@ -7,7 +7,9 @@ package endpoint_api
 
 import (
 	"context"
-	"errors"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	internal_services "github.com/rapidaai/api/endpoint-api/internal/service"
 	"github.com/rapidaai/pkg/types"
@@ -16,14 +18,13 @@ import (
 )
 
 func (endpointGRPCApi *endpointGRPCApi) CreateEndpointTag(ctx context.Context, eRequest *protos.CreateEndpointTagRequest) (*protos.GetEndpointResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	_, projectAuthErr := types.RequireProject(iAuth)
-	if !isAuthenticated || projectAuthErr != nil {
-		endpointGRPCApi.logger.Errorf("unauthenticated request for invoke")
-		return utils.Error[protos.GetEndpointResponse](
-			errors.New("unauthenticated request for CreateEndpointProviderModel"),
-			"Please provider valid service credentials to perfom invoke, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	_, err := endpointGRPCApi.endpointService.CreateOrUpdateEndpointTag(ctx, iAuth, eRequest.GetEndpointId(), eRequest.GetTags())
 	if err != nil {

@@ -7,7 +7,9 @@ package endpoint_api
 
 import (
 	"context"
-	"errors"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
@@ -15,14 +17,13 @@ import (
 )
 
 func (endpointGRPCApi *endpointGRPCApi) GetAllEndpoint(ctx context.Context, cepm *endpoint_grpc_api.GetAllEndpointRequest) (*endpoint_grpc_api.GetAllEndpointResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	_, projectAuthErr := types.RequireProject(iAuth)
-	if !isAuthenticated || projectAuthErr != nil {
-		endpointGRPCApi.logger.Errorf("unauthenticated request for GetAllEndpoint")
-		return utils.Error[endpoint_grpc_api.GetAllEndpointResponse](
-			errors.New("unauthenticated request for get allendpoint"),
-			"Please provider valid service credentials to perfom invoke, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	cnt, endpoints, err := endpointGRPCApi.endpointService.GetAll(ctx, iAuth,
 		cepm.GetCriterias(),

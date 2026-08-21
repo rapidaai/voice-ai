@@ -139,6 +139,18 @@ func (aP *PlainAuthPrinciple) IsAuthenticated() bool {
 	return hasOrganization && hasUser
 }
 
+func (aP *PlainAuthPrinciple) Scope(allowed ...AuthType) (AuthenticationPrinciple, error) {
+	if !aP.IsAuthenticated() {
+		return nil, ErrUnauthenticated
+	}
+	for _, authType := range allowed {
+		if authType == AuthTypeUser {
+			return aP, nil
+		}
+	}
+	return nil, ErrAuthenticationScopeNotAllowed
+}
+
 func (aP *PlainAuthPrinciple) GetProjectRoles() []*ProjectRole {
 	return aP.ProjectRoles
 }
