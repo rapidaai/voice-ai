@@ -131,21 +131,6 @@ export const CustomerOptions: FC<{
           aria-label={`${theme.brand.name} account`}
           expanded={accountDropdownOpen}
         >
-          {theme.brand.logos && (
-            <li className="px-4 py-3">
-              <picture>
-                <source
-                  media="(max-width: 20rem)"
-                  srcSet={theme.brand.logos.compact[resolvedMode]}
-                />
-                <img
-                  alt={theme.brand.name}
-                  className="h-6 max-w-full object-contain object-left"
-                  src={theme.brand.logos.full[resolvedMode]}
-                />
-              </picture>
-            </li>
-          )}
           <li className="cds--switcher__item--divider">
             <span className="uppercase!">Account</span>
           </li>

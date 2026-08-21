@@ -164,7 +164,7 @@ describe('Actionable header project switcher', () => {
     expect(screen.queryByLabelText('Select a Project')).not.toBeInTheDocument();
   });
 
-  it('renders configured branding and resource links in the account panel', () => {
+  it('renders resource links without branding in the account panel', () => {
     render(
       <AuthContext.Provider value={{}}>
         <CustomerOptions />
@@ -173,10 +173,9 @@ describe('Actionable header project switcher', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Account' }));
 
-    expect(screen.getByRole('img', { name: 'Acme Voice' })).toHaveAttribute(
-      'src',
-      '/brand/full-light.svg',
-    );
+    expect(
+      screen.queryByRole('img', { name: 'Acme Voice' }),
+    ).not.toBeInTheDocument();
     expect(screen.getByLabelText('Documentation')).toHaveAttribute(
       'href',
       mockTheme.links.documentation,
