@@ -20,7 +20,7 @@ RUN if [ -n "$EDITION" ] && [ -f "/tmp/configs/config.${EDITION}.json" ]; then \
       cp "/tmp/configs/config.${EDITION}.json" src/configs/config.development.json; \
     fi
 
-RUN yarn build:docker
+RUN yarn checkTs && yarn build:docker
 
 # ── Stage 2: Serve ──────────────────────────────────────────────────────────
 FROM node:22-alpine

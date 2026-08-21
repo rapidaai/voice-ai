@@ -37,7 +37,12 @@
         "test": "craco test",
         "check:theme-contract": "node scripts/check-theme-contract.mjs",
         "test:theme-contract": "node --test scripts/check-theme-contract.test.mjs",
-        "checkTs": "tsc --noEmit",
+        "check:bundle-size": "node scripts/check-bundle-size.mjs",
+        "test:bundle-size": "node --test scripts/check-bundle-size.test.mjs",
+        "checkTs": "node scripts/check-typescript.mjs",
+        "checkTs:raw": "tsc --noEmit",
+        "checkTs:update-baseline": "node scripts/check-typescript.mjs --update",
+        "test:typescript-check": "node --test scripts/check-typescript.test.mjs",
         "eslint": "eslint --ext js,ts,tsx",
         "lint": "yarn eslint src",
         "lint:fix": "yarn eslint --fix src",
@@ -234,7 +239,7 @@
         "tailwindcss": "4.2.1",
         "ts-jest": "27.1.5",
         "ts-node": "10.9.1",
-        "typescript": "4.6.4",
+        "typescript": "5.9.3",
         "wait-on": "7.2.0"
     },
     "browserslist": {

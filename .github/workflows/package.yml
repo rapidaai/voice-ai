@@ -67,12 +67,20 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      - name: Type-check UI
+        working-directory: ui
+        run: yarn checkTs
+
       - name: Build UI
         working-directory: ui
         env:
           CI: false
           DISABLE_ESLINT_PLUGIN: true
         run: yarn build
+
+      - name: Enforce bundle-size budgets
+        working-directory: ui
+        run: yarn check:bundle-size
 
       - name: Package UI build
         uses: ./.github/actions/package-directory
