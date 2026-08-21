@@ -1,0 +1,242 @@
+{
+  "rfc": "0001-actor-aware-audit-identity",
+  "phase": "1C",
+  "title": "Simplify the authentication boundary and controller contract",
+  "status": "draft",
+  "supersedes": [
+    "rfcs/0001-phase-1b-multi-credential-actor.plan.json"
+  ],
+  "objective": "Define the shared Authorize(ctx) and auth.Scope(allowed...) contract, then validate one fail-closed authentication decision in an Endpoint gRPC pilot before any broader API migration.",
+  "verified_current_state": [
+    "User, project, organization, and service credentials are authenticated by separate middleware.",
+    "Multiple middleware can inspect the same request and write different authentication values into the shared CTX_ context slot.",
+    "Several credential middleware silently continue when credentials are missing or rejected.",
+    "Controllers repeat GetSimplePrincipleGRPC or GetAuthPrinciple plus RequireUser and RequireProject checks.",
+    "ResolveAuditActor currently has no production caller.",
+    "Organization credential authentication exists, but organization credentials do not yet expose a durable credential actor ID."
+  ],
+  "acceptance_criteria": [
+    "Every protected Endpoint gRPC unary and stream request reaches exactly one authentication decision in the pilot.",
+    "Protected requests with no credential, malformed credentials, rejected credentials, or multiple credential classes fail before the controller runs.",
+    "Exactly one AuthenticationPrinciple is written to the existing CTX_ request context key after successful authentication.",
+    "Controllers obtain authentication only through types.Authorize(ctx).",
+    "Authorize reads the existing CTX_ context key directly and does not call an authenticationFromContext-style helper.",
+    "Controllers declare allowed authentication types only through auth.Scope(allowed...).",
+    "Scope returns the authenticated principle when its concrete authentication type is allowed and returns an error otherwise.",
+    "No new authentication-time project or organization mutation is introduced; the Endpoint pilot documents and tests the temporary existing user x-project-id SwitchProject compatibility behavior.",
+    "Resource authorization remains explicit and separate from authentication-type validation.",
+    "Intentionally public routes remain accessible through explicit public registration or policy.",
+    "No raw credential, token, or secret appears in logs, errors, context keys, or audit identity.",
+    "Legacy authentication middleware and accessors are removed only after every caller migrates."
+  ],
+  "scope_semantics": {
+    "allowed_match": "Return the same authenticated principle when its concrete AuthType appears in the allowed list.",
+    "empty_allowed_list": "Return an error.",
+    "unknown_auth_type": "Return an error.",
+    "duplicate_allowed_type": "Ignore duplicates; matching remains deterministic.",
+    "resource_authorization": "Scope validates caller class only and never grants organization, project, assistant, endpoint, or other resource access."
+  },
+  "contract": {
+    "controller": [
+      "auth, err := types.Authorize(ctx)",
+      "scopedAuth, err := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, ...)"
+    ],
+    "authorize": "Read the existing CTX_ key directly, require a non-nil authenticated AuthenticationPrinciple, and return ErrUnauthenticated otherwise.",
+    "scope": "Validate the concrete authentication type against explicitly allowed AuthType values and return the same authenticated principle or an error.",
+    "prohibited_abstractions": [
+      "authenticationFromContext helper",
+      "WithAuthentication helper",
+      "generic context getter or setter utilities",
+      "generic scope helper functions",
+      "reflection-based scope detection",
+      "registry or plugin frameworks for four known credential types",
+      "new wrapper types without a demonstrated controller or service requirement"
+    ]
+  },
+  "implementation_sequence": [
+    {
+      "name": "contract",
+      "changes": [
+        "Define Authorize(ctx) and the Scope contract in pkg/types while reusing the existing CTX_ key.",
+        "Keep errors explicit and transport-independent.",
+        "Implement Scope directly on concrete authentication principles rather than introducing utility layers.",
+        "Retain UserIdentityProvider, OrganizationContextProvider, ProjectContextProvider, DelegatedContextProvider, and current resource-authorization behavior during the pilot."
+      ]
+    },
+    {
+      "name": "coordinating middleware",
+      "changes": [
+        "Create coordinating gRPC unary and stream authentication middleware for the Endpoint pilot.",
+        "Extract credential presence once and reject missing, malformed, or conflicting protected requests.",
+        "Dispatch to the existing user, project, organization, or service authenticator.",
+        "Write exactly one successful authentication value directly with context.WithValue."
+      ]
+    },
+    {
+      "name": "endpoint pilot",
+      "changes": [
+        "Replace the Endpoint API credential middleware chain with the coordinating middleware.",
+        "Migrate every Endpoint gRPC controller from GetSimplePrincipleGRPC entry checks to Authorize(ctx) and Scope in the same binary-level slice.",
+        "Keep Endpoint Gin /readiness/ and /healthz/ public and outside the gRPC authentication boundary.",
+        "Treat every method registered by EndpointService and Deployment as protected.",
+        "Validate user, project, organization, and service credential authentication before considering broad migration."
+      ]
+    },
+    {
+      "name": "pilot decision gate",
+      "changes": [
+        "Review the complete Endpoint middleware and controller migration before expanding scope.",
+        "Inventory public routes and credential sources independently for Assistant, Integration, and Web.",
+        "Create separately approved follow-up plans for each remaining binary.",
+        "Defer legacy middleware deletion until every binary has migrated and rollback windows have closed."
+      ]
+    }
+  ],
+  "endpoint_public_inventory": {
+    "gin_public_routes": [
+      "/readiness/",
+      "/healthz/"
+    ],
+    "gin_protected_routes": [],
+    "grpc_public_methods": [],
+    "grpc_protected_services": [
+      "EndpointService",
+      "Deployment"
+    ],
+    "grpc_reflection": "not registered"
+  },
+  "credential_compatibility": {
+    "grpc_user": {
+      "sources": [
+        "authorization metadata",
+        "x-auth-id metadata",
+        "optional x-project-id metadata"
+      ],
+      "rules": [
+        "Any presented user tuple field selects the user credential class.",
+        "authorization and x-auth-id are both required.",
+        "x-auth-id and optional x-project-id must be non-zero unsigned integers.",
+        "Existing user x-project-id and SwitchProject behavior remains as an explicit temporary pilot exception because Endpoint services still require selected project context.",
+        "The pilot cannot expand to another binary until an approved resource-authorization design removes authentication-time SwitchProject."
+      ]
+    },
+    "grpc_project": {
+      "source": "x-api-key metadata",
+      "rules": [
+        "Trim surrounding whitespace.",
+        "Remove only one leading rpd-prj- prefix.",
+        "Reject an empty normalized credential."
+      ]
+    },
+    "grpc_organization": {
+      "source": "x-org-key metadata",
+      "rules": [
+        "Trim surrounding whitespace.",
+        "A presented but rejected organization credential fails closed instead of continuing unauthenticated."
+      ]
+    },
+    "grpc_service": {
+      "source": "x-internal-service-key metadata",
+      "rules": [
+        "Trim surrounding whitespace.",
+        "A presented but rejected service credential fails closed."
+      ]
+    },
+    "conflicts": "Reject every request presenting more than one of user, project, organization, or service credential classes.",
+    "failure_response": "Return gRPC Unauthenticated with the stable public message invalid authentication credentials; log only credential class and failure category."
+  },
+  "allowed_paths": [
+    "rfcs/",
+    "pkg/types/",
+    "pkg/middlewares/",
+    "pkg/authenticators/",
+    "cmd/endpoint/",
+    "api/endpoint-api/"
+  ],
+  "out_of_scope_paths": [
+    "protos/",
+    "sdks/",
+    "ui/",
+    "cmd/assistant/",
+    "cmd/integration/",
+    "cmd/web/",
+    "api/assistant-api/",
+    "api/integration-api/",
+    "api/web-api/",
+    "api/assistant-api/migrations/",
+    "api/endpoint-api/migrations/",
+    "api/integration-api/migrations/",
+    "api/web-api/migrations/"
+  ],
+  "out_of_scope_behavior": [
+    "Audit persistence schema or dual-write migration.",
+    "Organization credential persistence or credential management APIs.",
+    "Service identity provisioning.",
+    "Permission model redesign.",
+    "Public API response redesign.",
+    "SDK or UI changes."
+  ],
+  "ownership": {
+    "rfcs/": "coordinator",
+    "pkg/types/": "authentication-contract-owner",
+    "pkg/middlewares/": "authentication-boundary-owner",
+    "pkg/authenticators/": "credential-verification-owner",
+    "cmd/endpoint/": "endpoint-transport-owner",
+    "api/endpoint-api/": "endpoint-controller-owner"
+  },
+  "principles": {
+    "kiss": "Expose only Authorize(ctx) and auth.Scope(allowed...) to controllers and keep four concrete credential paths explicit.",
+    "yagni": "Do not create context utilities, scope utilities, registries, plugins, wrappers, or generalized policy engines.",
+    "single_ownership": "The coordinating middleware owns credential selection and the single context write; concrete authenticators own credential verification; controllers own allowed authentication types.",
+    "single_source_of_truth": "The existing CTX_ request context key contains exactly one AuthenticationPrinciple; new Endpoint controllers use Authorize(ctx) while unchanged packages may continue reading that same value during staged rollout.",
+    "explicit_contracts": "Missing credentials, conflicting classes, rejected credentials, allowed authentication types, public routes, and resource authorization boundaries are visible in code.",
+    "fail_safe": "Every protected authentication failure returns before controller execution.",
+    "observability": "Log only authentication class and failure category, never credential material.",
+    "least_privilege": "Scope validates only explicitly listed authentication types and does not grant resource access by itself.",
+    "reversibility": "Pilot only Endpoint and retain its previous middleware and accessors until the pilot review permits cleanup.",
+    "open_source_readability": "Prefer direct Go code and named interfaces over hidden helpers, reflection, metaprogramming, or framework-style abstractions."
+  },
+  "required_tests": [
+    "Authorize rejects missing, nil, and unauthenticated context values.",
+    "Authorize returns each valid concrete user, project, organization, and service principle.",
+    "Scope accepts every explicitly allowed authentication type and rejects every omitted type.",
+    "Endpoint unary and stream middleware reject missing credentials on protected methods.",
+    "Endpoint unary and stream middleware reject malformed, rejected, and conflicting credentials before controller execution.",
+    "Endpoint unary and stream middleware authenticate each user, project, organization, and service credential path.",
+    "Exactly one authentication value is visible to the controller.",
+    "Endpoint /readiness/ and /healthz/ remain accessible without credentials.",
+    "Endpoint controller tests cover allowed multi-scope access and rejected unlisted authentication types across the migrated controller package.",
+    "Resource authorization tests remain separate from authentication-type tests.",
+    "Credential tests preserve user tuple rules, project prefix handling, organization and service failure behavior, every cross-class conflict, and the stable gRPC error mapping.",
+    "Authorize and legacy accessors read the same single CTX_ value during staged rollout; tests prove there is no dual context write.",
+    "Logs and errors contain no raw credential values."
+  ],
+  "required_commands": [
+    "go test ./pkg/types ./pkg/middlewares/... ./pkg/authenticators/...",
+    "go test ./cmd/endpoint",
+    "go test ./api/endpoint-api/...",
+    "go test ./pkg/...",
+    "go vet ./pkg/types ./pkg/middlewares/... ./pkg/authenticators/... ./cmd/endpoint ./api/endpoint-api/...",
+    "git diff --check"
+  ],
+  "risks": [
+    "Global gRPC interceptors can accidentally protect future public methods unless the Endpoint public inventory remains reviewed and tested.",
+    "Changing missing-credential behavior from pass-through to rejection can expose callers that relied on accidental anonymous access.",
+    "Migrating authentication and resource authorization together can create an oversized change; keep them as separate checks.",
+    "Concrete principles may not currently expose all resource context required by services; do not solve that by adding fake identity methods.",
+    "Organization authentication can succeed without project context; project-specific access requires a separately approved project-selection and resource-authorization rule.",
+    "Temporary user SwitchProject compatibility contradicts the target separation and must block expansion beyond Endpoint until resolved.",
+    "Deleting legacy accessors during the pilot would prevent binary-level rollback and is prohibited."
+  ],
+  "rollback": "Revert Endpoint transport wiring and the Endpoint controller package to the previous credential middleware and context accessor behavior. The pilot reuses CTX_ and retains existing authenticators, capability providers, legacy middleware, and accessors, so rollback requires no schema, protobuf, SDK, or credential changes.",
+  "discussion": {
+    "planner": "codex-coordinator",
+    "challenger": "Gibbs",
+    "decision": "APPROVE documentation-only draft; implementation remains blocked",
+    "approved_by": "pending",
+    "open_blockers": [
+      "Define how an organization-authenticated caller selects and proves access to a project-specific Endpoint operation without mutating authentication identity.",
+      "Define the resource-authorization replacement for user x-project-id SwitchProject before expanding the authentication boundary beyond Endpoint."
+    ]
+  }
+}

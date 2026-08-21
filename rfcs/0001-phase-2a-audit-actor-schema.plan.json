@@ -1,0 +1,225 @@
+{
+  "rfc": "0001-actor-aware-audit-identity",
+  "phase": "2A",
+  "title": "Expand audited tables with actor identity columns",
+  "status": "approved",
+  "objective": "Add nullable actor identity columns to every audited table without changing current writers, readers, legacy columns, or production behavior.",
+  "acceptance_criteria": [
+    "Every table currently declaring created_by receives created_actor_type, created_actor_id, updated_actor_type, and updated_actor_id.",
+    "Actor type columns use varchar(32) and actor ID columns use text.",
+    "All four actor columns are nullable and have no default in Phase 2A.",
+    "created_by and updated_by remain unchanged.",
+    "No schema migration backfills rows or rewrites existing table data.",
+    "Every up and down migration sets a finite five-second PostgreSQL lock_timeout before ALTER TABLE statements.",
+    "No application model, writer, reader, API, protobuf, SDK, or UI behavior changes in Phase 2A.",
+    "Each service migration has a matching down migration that removes only the four new actor columns.",
+    "Integration API receives no migration because its schema contains no audited tables.",
+    "Migration SQL is deterministic, explicit, and contains no dynamic table discovery or generated runtime procedure."
+  ],
+  "table_inventory": {
+    "assistant_api": [
+      "assistant_api_deployments",
+      "assistant_configuration_options",
+      "assistant_configurations",
+      "assistant_conversation_action_metrics",
+      "assistant_conversation_arguments",
+      "assistant_conversation_message_metadata",
+      "assistant_conversation_message_metrics",
+      "assistant_conversation_messages",
+      "assistant_conversation_metadata",
+      "assistant_conversation_metrics",
+      "assistant_conversation_options",
+      "assistant_conversation_recordings",
+      "assistant_conversations",
+      "assistant_debugger_deployments",
+      "assistant_deployment_audio_options",
+      "assistant_deployment_audios",
+      "assistant_deployment_telephony_options",
+      "assistant_deployment_whatsapp_options",
+      "assistant_knowledge_logs",
+      "assistant_knowledge_reranker_options",
+      "assistant_knowledges",
+      "assistant_phone_deployments",
+      "assistant_provider_agentflows",
+      "assistant_provider_agentkits",
+      "assistant_provider_model_options",
+      "assistant_provider_models",
+      "assistant_provider_websockets",
+      "assistant_tags",
+      "assistant_tool_logs",
+      "assistant_tool_options",
+      "assistant_tools",
+      "assistant_web_plugin_deployments",
+      "assistant_http_logs",
+      "assistant_whatsapp_deployments",
+      "assistants",
+      "knowledge_document_process_rules",
+      "knowledge_documents",
+      "knowledge_embedding_model_options",
+      "knowledge_logs",
+      "knowledge_tags",
+      "knowledges"
+    ],
+    "endpoint_api": [
+      "endpoint_cachings",
+      "endpoint_log_arguments",
+      "endpoint_log_metadata",
+      "endpoint_log_metrics",
+      "endpoint_log_options",
+      "endpoint_provider_model_options",
+      "endpoint_provider_models",
+      "endpoint_retries",
+      "endpoint_tags",
+      "endpoints"
+    ],
+    "web_api": [
+      "notification_settings",
+      "organizations",
+      "project_credentials",
+      "projects",
+      "user_auth_tokens",
+      "user_auths",
+      "user_feature_permissions",
+      "user_organization_roles",
+      "user_project_roles",
+      "user_roles",
+      "vaults"
+    ],
+    "integration_api": []
+  },
+  "migration_files": {
+    "assistant_up": "api/assistant-api/migrations/000055_expand_audit_actor_identity.up.sql",
+    "assistant_down": "api/assistant-api/migrations/000055_expand_audit_actor_identity.down.sql",
+    "endpoint_up": "api/endpoint-api/migrations/000002_expand_audit_actor_identity.up.sql",
+    "endpoint_down": "api/endpoint-api/migrations/000002_expand_audit_actor_identity.down.sql",
+    "web_up": "api/web-api/migrations/000005_expand_audit_actor_identity.up.sql",
+    "web_down": "api/web-api/migrations/000005_expand_audit_actor_identity.down.sql"
+  },
+  "future_gates": [
+    {
+      "phase": "2B",
+      "name": "dual write",
+      "requirements": [
+        "Add actor fields to shared and service models.",
+        "Resolve durable actor before persistent mutations.",
+        "Write actor and legacy fields transactionally.",
+        "Add mismatch and missing-actor observability."
+      ]
+    },
+    {
+      "phase": "2C",
+      "name": "historical backfill",
+      "requirements": [
+        "Run outside schema migration transactions.",
+        "Process bounded primary-key ranges.",
+        "Map only non-zero legacy IDs to user actors.",
+        "Mark ambiguous rows unknown without guessing actor IDs.",
+        "Be idempotent, resumable, rate-limited, and observable."
+      ]
+    },
+    {
+      "phase": "2D",
+      "name": "read cutover",
+      "requirements": [
+        "Prefer actor columns and retain legacy fallback.",
+        "Verify public API and SDK compatibility.",
+        "Complete a measured compatibility window."
+      ]
+    },
+    {
+      "phase": "2E",
+      "name": "legacy contract removal",
+      "requirements": [
+        "Prove no writer, reader, API, SDK, export, or rollback path uses created_by or updated_by.",
+        "Take and verify backups.",
+        "Drop legacy columns in separately approved per-service migrations.",
+        "Remove legacy shared-model fields only after every database migration succeeds."
+      ]
+    }
+  ],
+  "allowed_paths": [
+    "rfcs/0001-actor-aware-audit-identity.md",
+    "rfcs/0001-phase-2a-audit-actor-schema.plan.json",
+    "rfcs/0001-phase-2a-audit-actor-schema.confirmation.json",
+    "api/assistant-api/migrations/000055_expand_audit_actor_identity.up.sql",
+    "api/assistant-api/migrations/000055_expand_audit_actor_identity.down.sql",
+    "api/endpoint-api/migrations/000002_expand_audit_actor_identity.up.sql",
+    "api/endpoint-api/migrations/000002_expand_audit_actor_identity.down.sql",
+    "api/web-api/migrations/000005_expand_audit_actor_identity.up.sql",
+    "api/web-api/migrations/000005_expand_audit_actor_identity.down.sql"
+  ],
+  "out_of_scope_paths": [
+    "pkg/models/",
+    "pkg/types/",
+    "pkg/middlewares/",
+    "pkg/authenticators/",
+    "cmd/",
+    "api/integration-api/migrations/",
+    "protos/",
+    "sdks/",
+    "ui/"
+  ],
+  "out_of_scope_behavior": [
+    "Historical row backfill.",
+    "Dual-write application changes.",
+    "Actor-aware reads or public API fields.",
+    "Dropping created_by or updated_by.",
+    "Adding defaults, not-null constraints, check constraints, or indexes to actor columns.",
+    "Organization credential or stable service identity implementation."
+  ],
+  "ownership": {
+    "rfcs/": "coordinator",
+    "api/assistant-api/migrations/": "assistant-schema-owner",
+    "api/endpoint-api/migrations/": "endpoint-schema-owner",
+    "api/web-api/migrations/": "web-schema-owner"
+  },
+  "principles": {
+    "kiss": "Use explicit ALTER TABLE statements and four plainly named columns; do not add procedures, metadata tables, generators, or migration frameworks.",
+    "yagni": "Do not add constraints, indexes, defaults, model fields, or backfill machinery before the dual-write and backfill phases require them.",
+    "single_ownership": "Each service owns its schema migration and rollback.",
+    "single_source_of_truth": "The reviewed table inventory is the authoritative Phase 2A migration scope.",
+    "explicit_contracts": "Actor columns, SQL types, nullability, migration versions, and deferred destructive behavior are visible in the plan.",
+    "fail_safe": "Schema expansion does not rewrite data or remove columns, so mixed-version applications remain compatible.",
+    "observability": "No runtime behavior changes in Phase 2A; migration execution and duration remain visible through existing deployment migration logs.",
+    "least_privilege": "Migrations alter only tables already containing legacy audit columns.",
+    "reversibility": "Down migrations remove only newly added nullable actor columns.",
+    "open_source_readability": "Every table and column is written explicitly so contributors can audit the migration without custom tooling."
+  },
+  "required_tests": [
+    "The migration inventory exactly matches every current CREATE TABLE definition containing created_by across assistant, endpoint, and web migrations.",
+    "The assistant inventory excludes tables removed by migration 000030.",
+    "Every up migration adds all four actor columns to every inventoried table.",
+    "Every down migration drops all four actor columns from every inventoried table.",
+    "No up migration contains UPDATE, DELETE, created_by removal, updated_by removal, actor defaults, or actor indexes.",
+    "Up and down migrations contain matching table sets.",
+    "Migration numbering follows each service migration head without collision.",
+    "A PostgreSQL validation environment applies each service's full migration history, verifies actor column types, nullability, missing defaults, and preserved legacy columns, applies one down migration, and verifies only actor columns were removed."
+  ],
+  "required_commands": [
+    "python3 -m json.tool rfcs/0001-phase-2a-audit-actor-schema.plan.json",
+    "rg -n 'UPDATE|DELETE|DROP COLUMN (created_by|updated_by)|DEFAULT|CREATE INDEX' api/assistant-api/migrations/000055_expand_audit_actor_identity.up.sql api/endpoint-api/migrations/000002_expand_audit_actor_identity.up.sql api/web-api/migrations/000005_expand_audit_actor_identity.up.sql",
+    "docker run --rm -d --name voice-ai-audit-migration-postgres -e POSTGRES_PASSWORD=postgres -p 55432:5432 postgres:16",
+    "create isolated assistant_audit, endpoint_audit, and web_audit databases in the validation PostgreSQL container",
+    "migrate -path api/assistant-api/migrations -database postgresql://postgres:postgres@localhost:55432/assistant_audit?sslmode=disable up",
+    "migrate -path api/endpoint-api/migrations -database postgresql://postgres:postgres@localhost:55432/endpoint_audit?sslmode=disable up",
+    "migrate -path api/web-api/migrations -database postgresql://postgres:postgres@localhost:55432/web_audit?sslmode=disable up",
+    "query information_schema.columns for exact actor types, nullability, defaults, legacy-column preservation, and up/down parity",
+    "git diff --check",
+    "go test ./cmd/assistant ./cmd/endpoint ./cmd/web"
+  ],
+  "risks": [
+    "ALTER TABLE acquires locks even for nullable metadata-only columns; every migration uses a five-second lock_timeout and must be timed on representative production-size schemas.",
+    "The historical migration inventory may include tables later replaced or renamed; explicit current-schema validation is required before production rollout.",
+    "A missed audited table would create inconsistent later dual-write behavior.",
+    "Running down migrations after Phase 2B begins would discard actor data; Phase 2A rollback is safe only before actor-aware writers deploy."
+  ],
+  "rollback": "Before Phase 2B, run the service-specific down migration to remove only the four nullable actor columns. After actor-aware writers begin, disable writes first and preserve actor data rather than applying the destructive Phase 2A down migration.",
+  "discussion": {
+    "planner": "codex-coordinator",
+    "challenger": "Gibbs",
+    "decision": "APPROVE",
+    "approved_by": "user",
+    "approval_message": "Perfect update the rfc and execute it properly",
+    "open_blockers": []
+  }
+}

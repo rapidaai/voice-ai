@@ -1,6 +1,7 @@
 # RFC 0001: Actor-Aware Audit Identity
 
 - Status: Accepted
+- Draft amendment: Phase 1C authentication boundary remains blocked pending its recorded authorization decisions
 - Date: 2026-08-20
 - Owners: Platform and API teams
 - Reviewers: Authentication, data, SDK, UI, and service owners
@@ -222,96 +223,116 @@ hard-deleted when historical actor resolution is required.
 
 ### Principle Integration
 
-The legacy `SimplePrinciple` contract mixed authentication with optional user,
-organization, and project capabilities. That forced project and organization credentials
-to implement meaningless methods such as `GetUserId() *uint64 { return nil }`.
+The legacy authentication boundary spreads one authentication decision across multiple
+optional middleware and multiple context accessors. Project, user, organization, and
+service middleware independently inspect a request, may silently continue, and may write
+different values into the same context slot. Controllers then repeat authentication and
+scope probing with `GetSimplePrincipleGRPC`, `GetAuthPrinciple`, `RequireUser`, and
+`RequireProject`.
 
-Replace that contract with authentication-only behavior:
+Replace that flow with one authentication decision at the transport boundary and one
+small controller contract. The public contract must remain readable to open-source
+contributors and must not hide context access or scope checks behind utility layers.
 
 ```go
 type AuthenticationPrinciple interface {
     IsAuthenticated() bool
-    GetCurrentToken() string
     Type() AuthType
-}
-
-// Compatibility name for pass-through APIs that only transport authentication.
-type SimplePrinciple = AuthenticationPrinciple
-
-type UserIdentityProvider interface {
-    UserIdentity() (uint64, bool)
-}
-
-type OrganizationContextProvider interface {
-    OrganizationContext() (uint64, bool)
-}
-
-type ProjectContextProvider interface {
-    ProjectContext() (ProjectContext, bool)
-}
-
-type DelegatedContextProvider interface {
-    DelegatedContext() (DelegatedContext, bool)
+    Scope(allowed ...AuthType) (AuthenticationPrinciple, error)
 }
 ```
 
-Context is resolved through explicit, fail-closed requirements that return validated,
-non-zero values:
+`Scope` accepts one or more authentication types. It returns the same authenticated
+principle when its concrete type is allowed and returns an error otherwise. It validates
+the caller class; it does not perform resource authorization and does not mutate user,
+organization, or project context.
+
+An empty allowed list, an unknown authentication type, or an unauthenticated principle
+returns an error. Duplicate allowed types are harmless and do not change the result.
+
+Authentication is read directly from the request context:
 
 ```go
-type ProjectContext struct {
-    OrganizationID uint64
-    ProjectID      uint64
-}
-
-func RequireUser(AuthenticationPrinciple) (uint64, error)
-func RequireOrganization(AuthenticationPrinciple) (uint64, error)
-func RequireProject(AuthenticationPrinciple) (ProjectContext, error)
-```
-
-`ProjectScope` provides project and organization context only. It must not implement user
-identity methods. `OrganizationScope` provides organization context only. User principles
-provide user identity and may optionally provide a selected project context. Callers that
-require a capability resolve it once at the authentication boundary instead of probing
-`HasUser`, `HasOrganization`, or `HasProject` throughout business logic.
-
-Internal service assertions preserve delegated tenant context through an explicit value:
-
-```go
-type DelegatedContext struct {
-    UserID         *uint64
-    OrganizationID uint64
-    ProjectID      *uint64
+func Authorize(ctx context.Context) (AuthenticationPrinciple, error) {
+    auth, ok := ctx.Value(CTX_).(AuthenticationPrinciple)
+    if !ok || auth == nil || !auth.IsAuthenticated() {
+        return nil, ErrUnauthenticated
+    }
+    return auth, nil
 }
 ```
 
-`ServiceScope` exposes delegated context for internal transport. It does not become the
-originating user or project actor, and it does not implement fake user/project identity
-methods.
+Do not introduce `authenticationFromContext`, `WithAuthentication`, generic context
+helpers, scope utility functions, or wrapper abstractions around this contract. The
+authentication middleware writes the value with `context.WithValue`; `Authorize` reads it
+directly; controllers call `Scope` directly.
 
-The richer user `Principle` contract embeds `AuthenticationPrinciple`,
-`UserIdentityProvider`, and `OrganizationContextProvider`. It does not embed
-`ProjectContextProvider`, because a user can be authenticated before selecting a project.
-Concrete user principles may implement the optional project provider, and `RequireProject`
-validates its result.
-
-Add a companion contract:
+Controllers begin with the same two operations:
 
 ```go
-type ActorIdentityProvider interface {
-    AuditActor() (ActorIdentity, bool)
+auth, err := types.Authorize(ctx)
+if err != nil {
+    return nil, unauthenticatedError
+}
+
+scopedAuth, err := auth.Scope(
+    types.AuthTypeUser,
+    types.AuthTypeProject,
+    types.AuthTypeOrg,
+)
+if err != nil {
+    return nil, permissionDeniedError
 }
 ```
 
-Audit-writing code uses a centralized, fail-closed resolver:
+An API lists every authentication type allowed to call it. User-only APIs pass only
+`AuthTypeUser`. APIs available to user, project, organization, or service callers list
+those types explicitly. Authentication-type checks must not be inferred from incidental
+availability of user, organization, or project IDs.
 
-```go
-func ResolveAuditActor(auth AuthenticationPrinciple) (ActorIdentity, error)
-```
+Authentication and resource authorization are separate. After `Scope` succeeds, the
+controller or service authorizes the requested organization, project, assistant, or other
+resource. The target design does not call `SwitchProject` or otherwise mutate identity
+from request parameters during authentication.
 
-The resolver rejects authenticated mutation paths that claim to support actor-aware audit
-but do not provide a stable identity. Compatibility-only paths may explicitly use
-`unknown` while rollout is in progress.
+The Endpoint pilot temporarily preserves the existing user `x-project-id` and
+`SwitchProject` behavior because Endpoint services currently derive project authorization
+from that selected context. This is explicit compatibility debt, not the target contract.
+It must be replaced by an approved resource-authorization design before the authentication
+boundary expands beyond the Endpoint pilot.
+
+The existing narrow `UserIdentityProvider`, `OrganizationContextProvider`,
+`ProjectContextProvider`, and `DelegatedContextProvider` contracts remain available to
+resource-authorization code during migration. They are not replaced with a new large
+authentication interface, fake identity methods, reflection, or generic capability
+utilities. Their removal or replacement requires a separately approved authorization
+design.
+
+The transport boundary uses one coordinating middleware for each transport shape: gRPC
+unary, gRPC stream, and Gin. Each middleware delegates credential verification to the
+existing user, project, organization, and service authenticators, but it alone owns:
+
+1. extracting presented credential classes;
+2. rejecting missing, malformed, or conflicting credentials for protected routes;
+3. selecting exactly one concrete authenticator;
+4. attaching exactly one authenticated principle to context; and
+5. returning a consistent unauthenticated response on failure.
+
+Health and other intentionally public routes are registered outside protected middleware
+groups or are listed explicitly as public methods. Missing credentials must never pass
+silently through a protected route.
+
+Each binary must publish and test its public-route inventory before adopting fail-closed
+middleware. Phase 1C pilots only Endpoint gRPC and migrates all Endpoint gRPC controllers
+as one binary-level unit. Endpoint Gin exposes only `/readiness/` and `/healthz/`, which
+remain outside the protected gRPC boundary. The registered `EndpointService` and
+`Deployment` gRPC methods are protected. gRPC reflection is not registered by the
+Endpoint binary.
+
+Actor identity remains distinct from authentication scope. Once authentication is
+established, audit-writing code derives the durable actor from the concrete authenticated
+principle. Project IDs and organization IDs remain authorization scope and must not replace
+credential actor IDs.
 
 ### Project Credentials
 
@@ -348,6 +369,12 @@ as a system actor implicitly.
 
 ## Persistence Design
 
+The persistence contract uses **actor**, not **scope**. Actor identifies the durable user,
+credential, service, or system that performed the operation. Scope identifies the
+organization or project where that actor was authorized. A project credential ID must be
+stored as `created_actor_id`; it must never be stored in a `scope_id` column or confused
+with `project_id`.
+
 Add four nullable columns to every audited persistent resource table:
 
 ```text
@@ -363,6 +390,28 @@ Keep the legacy columns unchanged:
 created_by bigint
 updated_by bigint
 ```
+
+The legacy columns remain only through schema expansion, dual write, backfill, read
+cutover, and a measured compatibility window. The final contract phase removes
+`created_by` and `updated_by` after every writer, reader, API projection, SDK, and rollback
+path has stopped depending on them. They must not be removed in the same deployment that
+adds actor columns.
+
+### Historical Backfill
+
+Historical non-zero legacy values are treated only as verified legacy user candidates:
+
+```text
+created_by > 0 -> created_actor_type = user, created_actor_id = created_by::text
+updated_by > 0 -> updated_actor_type = user, updated_actor_id = updated_by::text
+```
+
+Zero, null, or otherwise ambiguous values become `unknown` with no actor ID. Backfill must
+not infer project credentials, organization credentials, services, or system jobs from
+current secrets, tenant IDs, logs, or present-day credential ownership.
+
+Large tables are backfilled outside schema migration transactions in bounded primary-key
+ranges. Backfill is idempotent and updates only rows whose actor fields are still unset.
 
 ### Write Behavior
 
@@ -453,12 +502,16 @@ identity primitives, project credential propagation, and safe versioned scope-au
 behavior. Later Phase 1 slices add organization credential entities and stable signed
 service identities before those actors may perform actor-aware mutations.
 
-- Add actor identity types and resolver.
+- Establish one fail-closed authentication decision at each protected transport boundary.
+- Expose only `Authorize(ctx)` and `auth.Scope(allowed...)` to controllers.
+- Keep concrete user, project, organization, and service credential verification separate
+  behind the coordinating middleware.
+- Remove silent protected-route pass-through and multi-middleware context overwrites.
+- Remove legacy context accessors and capability probing only after all consumers migrate.
+- Keep resource authorization and audit actor resolution separate from authentication.
 - Propagate project credential ID through scope authorization.
-- Introduce stable organization credential and service identities.
-- Add versioned authentication cache entries containing actor identity.
-- Replace raw-token cache keys with domain-separated HMAC fingerprints.
-- Add bounded cache TTL and credential invalidation behavior.
+- Introduce stable organization credential and service identities before actor-aware writes.
+- Preserve versioned HMAC-fingerprinted authentication cache entries and bounded TTL.
 
 ### Phase 2: Schema Expansion
 
@@ -508,7 +561,13 @@ After a full SDK and client compatibility window:
 
 - Mark legacy numeric audit fields as deprecated.
 - Stop adding new dependencies on `createdUser` and `updatedUser`.
-- Evaluate removal only through a separate RFC.
+- Verify no production writer, reader, projection, SDK, export, or rollback path uses
+  `created_by` or `updated_by`.
+- Execute separately approved per-service contract migrations that drop `created_by` and
+  `updated_by`.
+- Remove legacy fields from shared models only after every service contract migration has
+  completed successfully.
+- Preserve a database backup and tested rollback procedure before destructive migration.
 
 This RFC does not approve removing legacy fields.
 
@@ -694,3 +753,6 @@ Implementation must not begin while this RFC remains `Draft`.
 | 2026-08-20 | Actor IDs use strings at contract boundaries; organization and service identities use dedicated durable owners. | Approved |
 | 2026-08-20 | Resource-owning services are canonical audit writers; assistant create/update is the first dual-write pilot. | Approved |
 | 2026-08-20 | Phase 1A includes versioned HMAC-fingerprinted scope-auth cache entries with bounded TTL. | Approved |
+| 2026-08-21 | Reopen RFC 0001 for an authentication-boundary amendment: one protected-request authentication decision, `Authorize(ctx)`, `auth.Scope(allowed...)`, and no context utility layers. | Draft |
+| 2026-08-21 | Persist audit identity as `created_actor_type`, `created_actor_id`, `updated_actor_type`, and `updated_actor_id`; actor and scope remain separate concepts. | Approved |
+| 2026-08-21 | Remove `created_by` and `updated_by` only in a later per-service contract phase after dual write, backfill, read cutover, compatibility evidence, and rollback validation. | Approved |
