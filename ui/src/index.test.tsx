@@ -60,14 +60,24 @@ describe('application entry point', () => {
 
   afterEach(() => jest.restoreAllMocks());
 
-  it('stops startup before side effects when theme config is invalid', () => {
-    mockConfiguredTheme = { id: 'invalid' };
+  it('shows the specific config diagnostic and stops startup side effects', () => {
+    mockConfiguredTheme = {
+      ...developmentConfig.theme,
+      colors: {
+        ...developmentConfig.theme.colors,
+        dark: {
+          ...developmentConfig.theme.colors.dark,
+          primaryHover: '#7ccdf7l',
+        },
+      },
+    };
 
     jest.isolateModules(() => require('./index'));
 
     expect(document.getElementById('root')).toHaveTextContent(
-      'Application configuration error.',
+      'Application configuration error: CONFIG.theme.colors.dark.primaryHover must be a 6-digit hexadecimal color such as #0f62fe.',
     );
+    expect(document.getElementById('root')).not.toHaveTextContent('#7ccdf7l');
     expect(mockApplyThemeToDocument).not.toHaveBeenCalled();
     expect(mockInitializeAnalytics).not.toHaveBeenCalled();
     expect(mockCreateRoot).not.toHaveBeenCalled();
