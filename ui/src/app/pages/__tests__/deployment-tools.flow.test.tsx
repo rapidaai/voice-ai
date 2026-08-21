@@ -465,31 +465,6 @@ jest.mock('@/app/components/providers/telephony', () => ({
   ValidateTelephonyOptions: () => true,
 }));
 
-jest.mock(
-  '@/app/components/base/modal/assistant-debugger-edit-section-modal/configure-experience-form',
-  () => ({
-    ConfigureExperienceModalForm: () => <div>experience-form</div>,
-  }),
-);
-jest.mock(
-  '@/app/components/base/modal/assistant-debugger-edit-section-modal/configure-web-experience-form',
-  () => ({
-    ConfigureWebExperienceModalForm: () => <div>web-experience-form</div>,
-  }),
-);
-jest.mock(
-  '@/app/components/base/modal/assistant-debugger-edit-section-modal/configure-audio-input-form',
-  () => ({
-    ConfigureAudioInputModalForm: () => <div>audio-input-form</div>,
-  }),
-);
-jest.mock(
-  '@/app/components/base/modal/assistant-debugger-edit-section-modal/configure-audio-output-form',
-  () => ({
-    ConfigureAudioOutputModalForm: () => <div>audio-output-form</div>,
-  }),
-);
-
 jest.mock('@/app/components/base/corner-border', () => ({
   CornerBorderOverlay: () => null,
 }));

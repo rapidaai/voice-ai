@@ -32,19 +32,6 @@ jest.mock('react-helmet-async', () => ({
     <>{children}</>
   ),
 }));
-jest.mock('@/context/provider-credential-modal-context', () => ({
-  ProviderCredentialModalProvider: ({
-    children,
-  }: {
-    children: React.ReactNode;
-  }) => <>{children}</>,
-}));
-jest.mock('@/workspace', () => ({
-  WorkspaceProvider: ({ children }: { children: React.ReactNode }) => (
-    <>{children}</>
-  ),
-}));
-
 describe('application entry point', () => {
   beforeEach(() => {
     jest.resetModules();

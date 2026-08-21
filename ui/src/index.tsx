@@ -4,8 +4,6 @@ import * as React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from '@/app';
 import { HelmetProvider } from 'react-helmet-async';
-import { ProviderCredentialModalProvider } from '@/context/provider-credential-modal-context';
-import { WorkspaceProvider } from '@/workspace';
 import { initializeAnalytics } from '@/react-web-analytics';
 import {
   applyThemeToDocument,
@@ -25,11 +23,7 @@ ReactDOM.createRoot(rootElement).render(
   <HelmetProvider>
     <React.StrictMode>
       <ThemeProvider theme={theme}>
-        <ProviderCredentialModalProvider>
-          <WorkspaceProvider>
-            <App />
-          </WorkspaceProvider>
-        </ProviderCredentialModalProvider>
+        <App />
       </ThemeProvider>
     </React.StrictMode>
   </HelmetProvider>,
