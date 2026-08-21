@@ -74,38 +74,30 @@ func main() {
 
 	// interservice communication is authenticated now
 	authClient := web_client.NewAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)
+	userAuthenticator := authenticators.NewUserAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient)
+	projectAuthenticator := authenticators.NewProjectAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient)
+	organizationAuthenticator := authenticators.NewOrganizationAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient)
+	serviceAuthenticator := authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Postgres)
 	appRunner.S = grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			middlewares.NewRequestLoggerUnaryServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryUnaryServerMiddleware(appRunner.Logger),
-			middlewares.NewCredentialConflictUnaryServerMiddleware(appRunner.Logger),
-			middlewares.NewServiceAuthenticatorUnaryServerMiddleware(
-				authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Postgres),
-				appRunner.Logger,
-			),
-			middlewares.NewProjectAuthenticatorUnaryServerMiddleware(
-				authenticators.NewProjectAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient),
-				appRunner.Logger,
-			),
-			middlewares.NewAuthenticationUnaryServerMiddleware(
-				authenticators.NewUserAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient),
+			middlewares.NewAuthenticationBoundaryUnaryServerMiddleware(
+				userAuthenticator,
+				projectAuthenticator,
+				organizationAuthenticator,
+				serviceAuthenticator,
 				appRunner.Logger,
 			),
 		),
 		grpc.ChainStreamInterceptor(
 			middlewares.NewRequestLoggerStreamServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryStreamServerMiddleware(appRunner.Logger),
-			middlewares.NewCredentialConflictStreamServerMiddleware(appRunner.Logger),
-			middlewares.NewServiceAuthenticatorStreamServerMiddleware(
-				authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Postgres),
-				appRunner.Logger,
-			),
-			middlewares.NewProjectAuthenticatorStreamServerMiddleware(
-				authenticators.NewProjectAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient),
-				appRunner.Logger,
-			),
-			middlewares.NewAuthenticationStreamServerMiddleware(
-				authenticators.NewUserAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient),
+			middlewares.NewAuthenticationBoundaryStreamServerMiddleware(
+				userAuthenticator,
+				projectAuthenticator,
+				organizationAuthenticator,
+				serviceAuthenticator,
 				appRunner.Logger,
 			),
 		),

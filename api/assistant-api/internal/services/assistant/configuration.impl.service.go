@@ -41,11 +41,11 @@ func NewAssistantConfigurationService(
 
 func (s *assistantConfigurationService) Get(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	configurationId uint64,
 	assistantId uint64,
 ) (*internal_assistant_entity.AssistantConfiguration, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -74,14 +74,14 @@ func (s *assistantConfigurationService) Get(
 
 func (s *assistantConfigurationService) GetAll(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	configurationType string,
 	provider string,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
 ) (int64, []*internal_assistant_entity.AssistantConfiguration, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return 0, nil, err
 	}
@@ -143,14 +143,18 @@ func (s *assistantConfigurationService) GetAll(
 
 func (s *assistantConfigurationService) Create(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	configurationType string,
 	provider string,
 	enabled bool,
 	options []*protos.Metadata,
 ) (*internal_assistant_entity.AssistantConfiguration, error) {
-	authContext, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
+	if err != nil {
+		return nil, err
+	}
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -167,12 +171,12 @@ func (s *assistantConfigurationService) Create(
 		Provider:          provider,
 		Enabled:           enabled,
 		Organizational: gorm_models.Organizational{
-			ProjectId:      authContext.Project.ProjectID,
-			OrganizationId: authContext.Project.OrganizationID,
+			ProjectId:      projectContext.ProjectID,
+			OrganizationId: projectContext.OrganizationID,
 		},
 		Mutable: gorm_models.Mutable{
-			CreatedBy: authContext.UserID,
-			UpdatedBy: authContext.UserID,
+			CreatedBy: userContext.UserID,
+			UpdatedBy: userContext.UserID,
 			Status:    type_enums.RECORD_ACTIVE,
 		},
 	}
@@ -200,7 +204,7 @@ func (s *assistantConfigurationService) Create(
 
 func (s *assistantConfigurationService) Update(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	configurationId uint64,
 	assistantId uint64,
 	configurationType string,
@@ -208,7 +212,11 @@ func (s *assistantConfigurationService) Update(
 	enabled bool,
 	options []*protos.Metadata,
 ) (*internal_assistant_entity.AssistantConfiguration, error) {
-	authContext, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
+	if err != nil {
+		return nil, err
+	}
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -225,15 +233,15 @@ func (s *assistantConfigurationService) Update(
 			"configuration_type": internal_assistant_entity.AssistantConfigurationType(configurationType),
 			"provider":           provider,
 			"enabled":            enabled,
-			"updated_by":         authContext.UserID,
+			"updated_by":         userContext.UserID,
 		}
 		query := tx.WithContext(ctx).
 			Model(&internal_assistant_entity.AssistantConfiguration{}).
 			Where("id = ? AND assistant_id = ? AND organization_id = ? AND project_id = ? AND status = ?",
 				configurationId,
 				assistantId,
-				authContext.Project.OrganizationID,
-				authContext.Project.ProjectID,
+				projectContext.OrganizationID,
+				projectContext.ProjectID,
 				type_enums.RECORD_ACTIVE,
 			).
 			Updates(patch)
@@ -254,8 +262,8 @@ func (s *assistantConfigurationService) Update(
 			Where("id = ? AND assistant_id = ? AND organization_id = ? AND project_id = ?",
 				configurationId,
 				assistantId,
-				authContext.Project.OrganizationID,
-				authContext.Project.ProjectID,
+				projectContext.OrganizationID,
+				projectContext.ProjectID,
 			).
 			First(&out).Error
 	})
@@ -270,11 +278,15 @@ func (s *assistantConfigurationService) Update(
 
 func (s *assistantConfigurationService) Delete(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	configurationId uint64,
 	assistantId uint64,
 ) (*internal_assistant_entity.AssistantConfiguration, error) {
-	authContext, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
+	if err != nil {
+		return nil, err
+	}
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -289,8 +301,8 @@ func (s *assistantConfigurationService) Delete(
 			Where("id = ? AND assistant_id = ? AND organization_id = ? AND project_id = ? AND status = ?",
 				configurationId,
 				assistantId,
-				authContext.Project.OrganizationID,
-				authContext.Project.ProjectID,
+				projectContext.OrganizationID,
+				projectContext.ProjectID,
 				type_enums.RECORD_ACTIVE,
 			).
 			First(&out).Error; err != nil {
@@ -301,13 +313,13 @@ func (s *assistantConfigurationService) Delete(
 			Where("id = ? AND assistant_id = ? AND organization_id = ? AND project_id = ? AND status = ?",
 				configurationId,
 				assistantId,
-				authContext.Project.OrganizationID,
-				authContext.Project.ProjectID,
+				projectContext.OrganizationID,
+				projectContext.ProjectID,
 				type_enums.RECORD_ACTIVE,
 			).
 			Updates(map[string]interface{}{
 				"status":     type_enums.RECORD_ARCHIEVE,
-				"updated_by": authContext.UserID,
+				"updated_by": userContext.UserID,
 			})
 		if query.Error != nil {
 			return query.Error
@@ -329,10 +341,11 @@ func (s *assistantConfigurationService) Delete(
 func (s *assistantConfigurationService) archiveOptions(
 	ctx context.Context,
 	tx *gorm.DB,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	configurationId uint64,
 ) error {
-	userID, err := types.RequireUser(auth)
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return err
 	}
@@ -349,11 +362,12 @@ func (s *assistantConfigurationService) archiveOptions(
 func (s *assistantConfigurationService) createOptions(
 	ctx context.Context,
 	tx *gorm.DB,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	configurationId uint64,
 	options []*protos.Metadata,
 ) ([]*internal_assistant_entity.AssistantConfigurationOption, error) {
-	userID, err := types.RequireUser(auth)
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return nil, err
 	}

@@ -18,17 +18,17 @@ import (
 type AssistantToolService interface {
 	Get(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantToolId uint64,
 		assistantId uint64) (*internal_assistant_entity.AssistantTool, error)
 
 	GetAll(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		criterias []*workflow_api.Criteria, paginate *workflow_api.Paginate) (int64, []*internal_assistant_entity.AssistantTool, error)
 
 	Create(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		name string,
 		description *string,
@@ -38,7 +38,7 @@ type AssistantToolService interface {
 	) (*internal_assistant_entity.AssistantTool, error)
 
 	Update(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantToolId uint64,
 		assistantId uint64,
 		name string,
@@ -49,13 +49,13 @@ type AssistantToolService interface {
 	) (*internal_assistant_entity.AssistantTool, error)
 
 	Delete(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		toolId uint64,
 		assistantId uint64) (*internal_assistant_entity.AssistantTool, error)
 
 	CreateLog(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId, conversationId uint64,
 		messageId string,
 		toolCallId string,
@@ -66,7 +66,7 @@ type AssistantToolService interface {
 
 	UpdateLog(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		toolCallId string,
 		conversationId uint64,
 		status type_enums.RecordState,
@@ -75,13 +75,13 @@ type AssistantToolService interface {
 
 	GetLog(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		projectId uint64,
 		toolLogId uint64) (*internal_assistant_entity.AssistantToolLog, error)
 
 	GetAllLog(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		projectId uint64,
 		criterias []*protos.Criteria,
 		paginate *protos.Paginate,
@@ -89,6 +89,6 @@ type AssistantToolService interface {
 
 	GetLogObject(
 		ctx context.Context,
-		organizationId,
-		projectId, toolLogId uint64) (requestData []byte, responseData []byte, err error)
+		auth *types.Authentication,
+		toolLogId uint64) (requestData []byte, responseData []byte, err error)
 }

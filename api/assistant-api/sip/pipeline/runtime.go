@@ -28,7 +28,7 @@ import (
 type sipPreparedCallRuntime struct {
 	logger      commons.Logger
 	session     *sip_infra.Session
-	auth        types.SimplePrinciple
+	auth        *types.Authentication
 	callContext *callcontext.CallContext
 	talkContext context.Context
 	cancelTalk  context.CancelFunc
@@ -80,7 +80,10 @@ func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, session *sip_inf
 		return nil, fmt.Errorf("session_ended_before_start")
 	}
 	auth := session.GetAuth()
-	resolvedCallContext := d.resolveSIPCallContext(session, setup, direction)
+	resolvedCallContext, err := d.resolveSIPCallContext(session, setup, direction)
+	if err != nil {
+		return nil, fmt.Errorf("resolve SIP call context: %w", err)
+	}
 	talkContext, cancelTalk := context.WithCancel(session.Context())
 
 	go func() {
@@ -199,7 +202,7 @@ func inboundRuntimeReadyTimeout(config *sip_infra.Config) time.Duration {
 	return 30 * time.Second
 }
 
-func (d *Dispatcher) resolveSIPCallContext(session *sip_infra.Session, setup *CallSetupResult, direction string) *callcontext.CallContext {
+func (d *Dispatcher) resolveSIPCallContext(session *sip_infra.Session, setup *CallSetupResult, direction string) (*callcontext.CallContext, error) {
 	callID := session.GetCallID()
 	if setup.CallContext != nil {
 		call := setup.CallContext
@@ -212,7 +215,7 @@ func (d *Dispatcher) resolveSIPCallContext(session *sip_infra.Session, setup *Ca
 		if call.OrganizationID == 0 {
 			call.OrganizationID = setup.OrganizationID
 		}
-		return call
+		return call, nil
 	}
 
 	d.logger.Warnw("setup.CallContext missing - reconstructing from session", "call_id", callID)
@@ -221,12 +224,10 @@ func (d *Dispatcher) resolveSIPCallContext(session *sip_infra.Session, setup *Ca
 	if clientPhone == "" {
 		clientPhone = info.RemoteURI
 	}
-	return &callcontext.CallContext{
+	callContext := &callcontext.CallContext{
 		AssistantID:         setup.AssistantID,
 		ConversationID:      setup.ConversationID,
 		AssistantProviderId: setup.AssistantProviderId,
-		AuthToken:           setup.AuthToken,
-		AuthType:            setup.AuthType,
 		Direction:           direction,
 		Provider:            "sip",
 		CallerNumber:        clientPhone,
@@ -236,6 +237,10 @@ func (d *Dispatcher) resolveSIPCallContext(session *sip_infra.Session, setup *Ca
 		ProjectID:           setup.ProjectID,
 		OrganizationID:      setup.OrganizationID,
 	}
+	if err := callContext.SetAuthentication(setup.Auth); err != nil {
+		return nil, err
+	}
+	return callContext, nil
 }
 
 func (d *Dispatcher) configureSIPTransfer(ctx context.Context, session *sip_infra.Session, sipConfig *sip_infra.Config, call *callcontext.CallContext, transferStreamer internal_type.SIPTransferStreamer) {

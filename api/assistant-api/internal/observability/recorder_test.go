@@ -178,10 +178,11 @@ func TestRecorder_RecordInjectsAuthIntoObservationContext(t *testing.T) {
 	organizationID := uint64(7)
 	projectID := uint64(8)
 	userID := uint64(9)
-	auth := &types.ServiceScope{
-		UserId:         &userID,
-		OrganizationId: &organizationID,
-		ProjectId:      &projectID,
+	auth := &types.Authentication{
+		AuthType:          types.AuthTypeService,
+		UserValue:         &types.UserContext{UserID: userID},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
 	}
 	collector := &recordingCollector{key: "collector"}
 	recorder := New(
@@ -215,7 +216,10 @@ func TestRecorder_RecordInjectsAuthIntoObservationContext(t *testing.T) {
 
 func TestRecorder_UsesOrganizationOnlyDelegatedContext(t *testing.T) {
 	organizationID := uint64(7)
-	auth := &types.ServiceScope{OrganizationId: &organizationID}
+	auth := &types.Authentication{
+		AuthType:          types.AuthTypeService,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+	}
 	collector := &recordingCollector{key: "collector"}
 	recorder := New(WithAuth(auth), WithCollector(collector))
 

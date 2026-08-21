@@ -35,7 +35,7 @@ const (
 
 type recorder struct {
 	logger           commons.Logger
-	auth             types.SimplePrinciple
+	auth             *types.Authentication
 	globalScope      GlobalScope
 	context          Context
 	clock            func() time.Time
@@ -100,16 +100,11 @@ func New(options ...Option) Recorder {
 
 	globalScope := resolvedOptions.globalScope
 	if validator.NonNil(resolvedOptions.auth) {
-		if projectContext, err := types.RequireProject(resolvedOptions.auth); err == nil {
+		if projectContext, err := resolvedOptions.auth.ProjectContext(); err == nil {
 			globalScope.ProjectID = projectContext.ProjectID
 			globalScope.OrganizationID = projectContext.OrganizationID
-		} else if delegatedContext, err := types.ResolveDelegatedContext(resolvedOptions.auth); err == nil {
-			globalScope.OrganizationID = delegatedContext.OrganizationID
-			if delegatedContext.ProjectID != nil {
-				globalScope.ProjectID = *delegatedContext.ProjectID
-			}
-		} else if organizationID, err := types.RequireOrganization(resolvedOptions.auth); err == nil {
-			globalScope.OrganizationID = organizationID
+		} else if organizationContext, err := resolvedOptions.auth.OrganizationContext(); err == nil {
+			globalScope.OrganizationID = organizationContext.OrganizationID
 		}
 	}
 	clock := resolvedOptions.clock

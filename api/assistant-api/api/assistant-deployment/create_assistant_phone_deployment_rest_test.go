@@ -10,7 +10,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	pkg_errors "github.com/rapidaai/pkg/errors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -42,7 +41,7 @@ func TestCreateAssistantPhoneDeploymentRest_HappyPath(t *testing.T) {
 		bytes.NewReader(requestBody),
 	)
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.CreateAssistantPhoneDeploymentRest(context)
 
@@ -97,10 +96,7 @@ func TestCreateAssistantPhoneDeploymentRest_MissingAuthScope(t *testing.T) {
 		bytes.NewReader([]byte(`{"assistantId":"123","phoneProviderName":"twilio"}`)),
 	)
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), &types.PlainAuthPrinciple{
-		User:             types.UserInfo{Id: 11},
-		OrganizationRole: &types.OrganizaitonRole{OrganizationId: 22},
-	})
+	attachTestAuthentication(context, testProjectAuthentication(22, 33))
 
 	deploymentApi.CreateAssistantPhoneDeploymentRest(context)
 
@@ -120,7 +116,7 @@ func TestCreateAssistantPhoneDeploymentRest_MissingPhoneProvider(t *testing.T) {
 		bytes.NewReader([]byte(`{"assistantId":"123","phoneProviderName":""}`)),
 	)
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.CreateAssistantPhoneDeploymentRest(context)
 
@@ -140,7 +136,7 @@ func TestCreateAssistantPhoneDeploymentRest_InvalidAudioProvider(t *testing.T) {
 		bytes.NewReader([]byte(`{"assistantId":"123","phoneProviderName":"twilio","inputAudio":{"audioProvider":""}}`)),
 	)
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.CreateAssistantPhoneDeploymentRest(context)
 
@@ -163,7 +159,7 @@ func TestCreateAssistantPhoneDeploymentRest_CreateDeploymentErrorDoesNotExposeIn
 		bytes.NewReader([]byte(`{"assistantId":"123","phoneProviderName":"twilio"}`)),
 	)
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.CreateAssistantPhoneDeploymentRest(context)
 

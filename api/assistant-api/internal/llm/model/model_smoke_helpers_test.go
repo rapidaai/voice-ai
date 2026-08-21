@@ -72,7 +72,7 @@ type testComm struct {
 	assistant         *internal_assistant_entity.Assistant
 	conversation      *internal_conversation_entity.AssistantConversation
 	integrationCaller integration_client.IntegrationServiceClient
-	auth              types.SimplePrinciple
+	auth              *types.Authentication
 	options           utils.Option
 	pkts              []internal_type.Packet
 }
@@ -84,7 +84,7 @@ func (m *testComm) OnPacket(_ context.Context, pkts ...internal_type.Packet) err
 func (m *testComm) IntegrationCaller() integration_client.IntegrationServiceClient {
 	return m.integrationCaller
 }
-func (m *testComm) Auth() types.SimplePrinciple { return m.auth }
+func (m *testComm) Auth() *types.Authentication { return m.auth }
 func (m *testComm) Assistant() (*internal_assistant_entity.Assistant, error) {
 	return m.assistant, nil
 }
@@ -109,7 +109,7 @@ type testIntegrationClient struct {
 	calls  int
 }
 
-func (m *testIntegrationClient) StreamChat(context.Context, types.SimplePrinciple, string) (grpc.BidiStreamingClient[protos.StreamChatRequest, protos.StreamChatResponse], error) {
+func (m *testIntegrationClient) StreamChat(context.Context, *types.Authentication, string) (grpc.BidiStreamingClient[protos.StreamChatRequest, protos.StreamChatResponse], error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.calls++

@@ -15,7 +15,6 @@ import (
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
@@ -75,11 +74,7 @@ func (m *manager) loadRecords(ctx context.Context) ([]Record, error) {
 		did, _ := opts.GetString(OptKeyPhone)
 		if !validator.NotBlank(did) {
 			if assistant, ok := assistantByID[dep.AssistantId]; ok {
-				auth := &types.ProjectScope{
-					ProjectId:      &assistant.ProjectId,
-					OrganizationId: &assistant.OrganizationId,
-					Status:         type_enums.RECORD_ACTIVE.String(),
-				}
+				auth := projectAuthentication(assistant.OrganizationId, assistant.ProjectId)
 				observer := m.observer(ctx, auth)
 				attributes := observability.Attributes{
 					"assistant_id":   strconv.FormatUint(dep.AssistantId, 10),
@@ -123,11 +118,7 @@ func (m *manager) loadRecords(ctx context.Context) ([]Record, error) {
 		credentialID, err := opts.GetUint64(OptKeyCredentialID)
 		if err != nil {
 			if assistant, ok := assistantByID[dep.AssistantId]; ok {
-				auth := &types.ProjectScope{
-					ProjectId:      &assistant.ProjectId,
-					OrganizationId: &assistant.OrganizationId,
-					Status:         type_enums.RECORD_ACTIVE.String(),
-				}
+				auth := projectAuthentication(assistant.OrganizationId, assistant.ProjectId)
 				observer := m.observer(ctx, auth)
 				attributes := observability.Attributes{
 					"did":            did,
@@ -228,11 +219,7 @@ func (m *manager) loadRecords(ctx context.Context) ([]Record, error) {
 				didKey, winner.assistant, winner.deployment,
 			)
 			if loser.record.ProjectID != 0 && loser.record.OrganizationID != 0 {
-				auth := &types.ProjectScope{
-					ProjectId:      &loser.record.ProjectID,
-					OrganizationId: &loser.record.OrganizationID,
-					Status:         type_enums.RECORD_ACTIVE.String(),
-				}
+				auth := projectAuthentication(loser.record.OrganizationID, loser.record.ProjectID)
 				observer := m.observer(ctx, auth)
 				attributes := observability.Attributes{
 					"did":                  didKey,

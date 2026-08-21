@@ -16,14 +16,14 @@ import (
 type AssistantConfigurationService interface {
 	Get(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		configurationId uint64,
 		assistantId uint64,
 	) (*internal_assistant_entity.AssistantConfiguration, error)
 
 	GetAll(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		configurationType string,
 		provider string,
@@ -33,7 +33,7 @@ type AssistantConfigurationService interface {
 
 	Create(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		configurationType string,
 		provider string,
@@ -43,7 +43,7 @@ type AssistantConfigurationService interface {
 
 	Update(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		configurationId uint64,
 		assistantId uint64,
 		configurationType string,
@@ -54,7 +54,7 @@ type AssistantConfigurationService interface {
 
 	Delete(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		configurationId uint64,
 		assistantId uint64,
 	) (*internal_assistant_entity.AssistantConfiguration, error)

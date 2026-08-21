@@ -7,7 +7,8 @@ package assistant_api
 
 import (
 	"context"
-	"errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
@@ -16,14 +17,13 @@ import (
 )
 
 func (assistantApi *assistantGrpcApi) GetAssistantToolLog(ctx context.Context, cepm *protos.GetAssistantToolLogRequest) (*protos.GetAssistantToolLogResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	projectContext, authErr := types.RequireProject(iAuth)
-	if !isAuthenticated || authErr != nil {
-		assistantApi.logger.Errorf("unauthenticated request for GetAssistantToolLogRequest")
-		return utils.Error[protos.GetAssistantToolLogResponse](
-			errors.New("unauthenticated request for get assistant converstaion"),
-			"Please provider valid service credentials to perform GetAssistantToolLogRequest, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	lg, err := assistantApi.assistantToolService.GetLog(
 		ctx,
@@ -40,8 +40,7 @@ func (assistantApi *assistantGrpcApi) GetAssistantToolLog(ctx context.Context, c
 	if err != nil {
 		assistantApi.logger.Errorf("unable to cast the assistant ToolLog to the response object")
 	}
-	re, rs, _ := assistantApi.assistantToolService.GetLogObject(ctx, projectContext.OrganizationID,
-		projectContext.ProjectID, cepm.GetId())
+	re, rs, _ := assistantApi.assistantToolService.GetLogObject(ctx, iAuth, cepm.GetId())
 	// if err != nil {
 	if re != nil {
 		s := &structpb.Struct{}

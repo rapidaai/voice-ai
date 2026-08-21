@@ -191,12 +191,34 @@ func TestAuthenticationBoundaryRejectsUnauthorizedUserProjectSelection(t *testin
 	}
 }
 
-func TestAuthenticationBoundaryRejectsMissingAndConflictingCredentials(t *testing.T) {
+func TestAuthenticationBoundaryAllowsMissingCredentials(t *testing.T) {
+	handlerCalled := false
+	_, err := NewAuthenticationBoundaryUnaryServerMiddleware(
+		userAuthenticatorStub{},
+		&projectScopeClaimAuthenticatorStub{},
+		organizationScopeClaimAuthenticatorStub{},
+		serviceScopeClaimAuthenticatorStub{},
+		nil,
+	)(context.Background(), nil, nil, func(ctx context.Context, _ any) (any, error) {
+		handlerCalled = true
+		if _, err := types.Authorize(ctx); err == nil {
+			t.Fatal("Authorize() succeeded without credentials")
+		}
+		return nil, nil
+	})
+	if err != nil {
+		t.Fatalf("middleware error = %v", err)
+	}
+	if !handlerCalled {
+		t.Fatal("handler not called for credential-free request")
+	}
+}
+
+func TestAuthenticationBoundaryRejectsConflictingCredentials(t *testing.T) {
 	tests := []struct {
 		name   string
 		values []string
 	}{
-		{name: "missing"},
 		{name: "user and project", values: []string{types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "1", types.PROJECT_SCOPE_KEY, "project"}},
 		{name: "user and organization", values: []string{types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "1", types.ORG_SCOPE_KEY, "organization"}},
 		{name: "user and service", values: []string{types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "1", types.SERVICE_SCOPE_KEY, "service"}},
@@ -273,6 +295,52 @@ func TestAuthenticationBoundaryRejectsResolverFailures(t *testing.T) {
 			}
 			if handlerCalled {
 				t.Fatal("handler called after resolver failure")
+			}
+		})
+	}
+}
+
+func TestAuthenticationBoundaryRejectsUnsupportedCredentialClass(t *testing.T) {
+	tests := []struct {
+		name         string
+		values       []string
+		user         types.Authenticator
+		project      types.ClaimAuthenticator[*types.ProjectScope]
+		organization types.ClaimAuthenticator[*types.OrganizationScope]
+		service      types.ClaimAuthenticator[*types.ServiceScope]
+	}{
+		{
+			name: "user", values: []string{types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "1"},
+			project: &projectScopeClaimAuthenticatorStub{}, organization: organizationScopeClaimAuthenticatorStub{}, service: serviceScopeClaimAuthenticatorStub{},
+		},
+		{
+			name: "project", values: []string{types.PROJECT_SCOPE_KEY, "project"},
+			user: userAuthenticatorStub{}, organization: organizationScopeClaimAuthenticatorStub{}, service: serviceScopeClaimAuthenticatorStub{},
+		},
+		{
+			name: "organization", values: []string{types.ORG_SCOPE_KEY, "organization"},
+			user: userAuthenticatorStub{}, project: &projectScopeClaimAuthenticatorStub{}, service: serviceScopeClaimAuthenticatorStub{},
+		},
+		{
+			name: "service", values: []string{types.SERVICE_SCOPE_KEY, "service"},
+			user: userAuthenticatorStub{}, project: &projectScopeClaimAuthenticatorStub{}, organization: organizationScopeClaimAuthenticatorStub{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			handlerCalled := false
+			_, err := NewAuthenticationBoundaryUnaryServerMiddleware(
+				test.user, test.project, test.organization, test.service, nil,
+			)(incomingContext(test.values...), nil, nil, func(context.Context, any) (any, error) {
+				handlerCalled = true
+				return nil, nil
+			})
+			if status.Code(err) != codes.Unauthenticated {
+				t.Fatalf("status.Code(error) = %v, want %v", status.Code(err), codes.Unauthenticated)
+			}
+			if handlerCalled {
+				t.Fatal("handler called for unsupported credential class")
 			}
 		})
 	}

@@ -19,8 +19,8 @@ import (
 )
 
 func (deploymentApi *AssistantDeploymentApi) CreateAssistantDebuggerDeploymentRest(c *gin.Context) {
-	auth, isAuthenticated := types.GetAuthPrinciple(c)
-	if !isAuthenticated {
+	auth, authErr := types.Authorize(c.Request.Context())
+	if authErr != nil {
 		c.JSON(pkg_errors.CreateAssistantDebuggerDeploymentUnauthenticated.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantDebuggerDeploymentUnauthenticated.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -32,9 +32,8 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantDebuggerDeploymentRe
 		})
 		return
 	}
-	_, userAuthErr := types.RequireUser(auth)
-	_, projectAuthErr := types.RequireProject(auth)
-	if userAuthErr != nil || projectAuthErr != nil {
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
 		c.JSON(pkg_errors.CreateAssistantDebuggerDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantDebuggerDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -214,7 +213,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantDebuggerDeploymentRe
 
 	deployment, err := deploymentApi.deploymentService.CreateDebuggerDeployment(
 		c,
-		auth,
+		iAuth,
 		assistantId,
 		request.Greeting,
 		request.Mistake,

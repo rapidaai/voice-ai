@@ -2,31 +2,19 @@ package clients
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"testing"
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/rapidaai/config"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/types"
 )
-
-type internalClientProjectPrinciple struct {
-	organizationID uint64
-	projectID      uint64
-}
-
-func (p internalClientProjectPrinciple) IsAuthenticated() bool   { return true }
-func (p internalClientProjectPrinciple) GetCurrentToken() string { return "" }
-func (p internalClientProjectPrinciple) Type() types.AuthType    { return types.AuthTypeProject }
-func (p internalClientProjectPrinciple) OrganizationContext() (uint64, bool) {
-	return p.organizationID, p.organizationID != 0
-}
-func (p internalClientProjectPrinciple) ProjectContext() (types.ProjectContext, bool) {
-	return types.ProjectContext{OrganizationID: p.organizationID, ProjectID: p.projectID}, p.organizationID != 0 && p.projectID != 0
-}
 
 type recordingRedisConnector struct {
 	command string
@@ -80,7 +68,12 @@ func TestInternalClientCacheWithTTLRejectsNonPositiveTTL(t *testing.T) {
 
 func TestInternalClientCreateServiceScopeToken(t *testing.T) {
 	client := &internalClient{cfg: &config.AppConfig{Secret: "secret"}}
-	token, err := client.createServiceScopeToken(internalClientProjectPrinciple{organizationID: 7, projectID: 11})
+	token, err := client.createServiceScopeToken(&types.Authentication{
+		AuthType:          types.AuthTypeUser,
+		UserValue:         &types.UserContext{UserID: 5},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
+		ProjectValue:      &types.ProjectContext{OrganizationID: 7, ProjectID: 11},
+	})
 	if err != nil {
 		t.Fatalf("createServiceScopeToken() error = %v", err)
 	}
@@ -89,7 +82,85 @@ func TestInternalClientCreateServiceScopeToken(t *testing.T) {
 		t.Fatalf("ExtractServiceScope() error = %v", err)
 	}
 	context, ok := scope.DelegatedContext()
-	if !ok || context.OrganizationID != 7 || context.ProjectID == nil || *context.ProjectID != 11 {
+	if !ok || context.OrganizationID != 7 || context.UserID == nil || *context.UserID != 5 || context.ProjectID == nil || *context.ProjectID != 11 {
 		t.Fatalf("DelegatedContext() = %+v, %v", context, ok)
+	}
+}
+
+func TestInternalClientCreateServiceScopeTokenRequiresOrganization(t *testing.T) {
+	client := &internalClient{cfg: &config.AppConfig{Secret: "secret"}}
+	_, err := client.createServiceScopeToken(&types.Authentication{
+		AuthType:  types.AuthTypeUser,
+		UserValue: &types.UserContext{UserID: 5},
+	})
+	if !errors.Is(err, types.ErrOrganizationContextUnavailable) {
+		t.Fatalf("createServiceScopeToken() error = %v", err)
+	}
+}
+
+func TestInternalClientCreateServiceScopeTokenRejectsMismatchedProjectOrganization(t *testing.T) {
+	client := &internalClient{cfg: &config.AppConfig{Secret: "secret"}}
+	_, err := client.createServiceScopeToken(&types.Authentication{
+		AuthType:          types.AuthTypeProject,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
+		ProjectValue:      &types.ProjectContext{OrganizationID: 8, ProjectID: 11},
+	})
+	if err == nil {
+		t.Fatal("createServiceScopeToken() error = nil")
+	}
+}
+
+func TestInternalClientWithAuthReturnsErrorWithoutContext(t *testing.T) {
+	client := &internalClient{cfg: &config.AppConfig{Secret: "secret"}}
+	authContext, err := client.WithAuth(context.Background(), &types.Authentication{})
+	if !errors.Is(err, types.ErrOrganizationContextUnavailable) {
+		t.Fatalf("WithAuth() error = %v", err)
+	}
+	if authContext != nil {
+		t.Fatalf("WithAuth() context = %v, want nil", authContext)
+	}
+}
+
+func TestInternalClientWithAuthAddsServiceAssertion(t *testing.T) {
+	client := &internalClient{cfg: &config.AppConfig{Secret: "secret"}}
+	authContext, err := client.WithAuth(context.Background(), &types.Authentication{
+		AuthType:          types.AuthTypeOrg,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
+	})
+	if err != nil {
+		t.Fatalf("WithAuth() error = %v", err)
+	}
+	outgoingMetadata, ok := metadata.FromOutgoingContext(authContext)
+	if !ok || len(outgoingMetadata.Get(types.SERVICE_SCOPE_KEY)) != 1 {
+		t.Fatalf("WithAuth() metadata = %v, %v", outgoingMetadata, ok)
+	}
+}
+
+func TestInternalClientWithPlatformReturnsAuthError(t *testing.T) {
+	client := &internalClient{cfg: &config.AppConfig{Secret: "secret"}}
+	authContext, err := client.WithPlatform(context.Background(), &types.Authentication{})
+	if !errors.Is(err, types.ErrOrganizationContextUnavailable) {
+		t.Fatalf("WithPlatform() error = %v", err)
+	}
+	if authContext != nil {
+		t.Fatalf("WithPlatform() context = %v, want nil", authContext)
+	}
+}
+
+func TestInternalClientWithHttpAuthDoesNotMutateRequestOnAuthError(t *testing.T) {
+	client := &internalClient{cfg: &config.AppConfig{Secret: "secret"}}
+	request, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authenticatedRequest, err := client.WithHttpAuth(context.Background(), &types.Authentication{}, request)
+	if !errors.Is(err, types.ErrOrganizationContextUnavailable) {
+		t.Fatalf("WithHttpAuth() error = %v", err)
+	}
+	if authenticatedRequest != nil {
+		t.Fatalf("WithHttpAuth() request = %v, want nil", authenticatedRequest)
+	}
+	if authorization := request.Header.Get("Authorization"); authorization != "" {
+		t.Fatalf("Authorization header = %q, want empty", authorization)
 	}
 }

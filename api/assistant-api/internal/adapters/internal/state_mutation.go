@@ -16,7 +16,7 @@ import (
 	"github.com/rapidaai/protos"
 )
 
-func (deb *genericRequestor) setAuth(auth types.SimplePrinciple) {
+func (deb *genericRequestor) setAuth(auth *types.Authentication) {
 	deb.auth = auth
 }
 

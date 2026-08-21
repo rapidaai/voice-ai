@@ -31,7 +31,7 @@ func NewWebApi(cfg *config.WebAppConfig, logger commons.Logger, postgres connect
 	}
 }
 
-func (w *WebApi) GetUser(c context.Context, auth types.SimplePrinciple, userId uint64) *protos.User {
+func (w *WebApi) GetUser(c context.Context, auth *types.Authentication, userId uint64) *protos.User {
 	usr, err := w.userService.GetUser(c, userId)
 	if err != nil {
 		w.logger.Errorf("unable to get user form the database %+v", err)
@@ -45,7 +45,7 @@ func (w *WebApi) GetUser(c context.Context, auth types.SimplePrinciple, userId u
 	return ot
 }
 
-func (w *WebApi) GetOrganization(c context.Context, auth types.SimplePrinciple, orgId uint64) *protos.Organization {
+func (w *WebApi) GetOrganization(c context.Context, auth *types.Authentication, orgId uint64) *protos.Organization {
 	org, err := w.orgService.Get(c, orgId)
 	if err != nil {
 		w.logger.Errorf("unable to get organization form the database %+v", err)

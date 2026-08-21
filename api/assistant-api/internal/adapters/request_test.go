@@ -268,7 +268,7 @@ func TestRequestFactory_ComprehensiveCoverage(t *testing.T) {
 
 	t.Run("All functions handle context and authentication", func(t *testing.T) {
 		// Most functions accept context.Context for request handling
-		// and types.SimplePrinciple for authentication
+		// and *types.Authentication for authentication
 		assert.True(t, true)
 	})
 }

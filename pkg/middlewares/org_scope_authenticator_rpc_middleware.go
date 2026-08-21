@@ -12,6 +12,8 @@ import (
 	"github.com/rapidaai/pkg/types"
 )
 
+// NewOrganizationAuthenticatorMiddleware authenticates only organization credentials.
+// Deprecated: use NewAuthenticationBoundaryMiddleware.
 func NewOrganizationAuthenticatorMiddleware(resolver types.ClaimAuthenticator[*types.OrganizationScope], logger commons.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authToken, ok := c.GetQuery(types.ORG_SCOPE_KEY)

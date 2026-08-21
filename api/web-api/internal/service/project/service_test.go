@@ -60,11 +60,11 @@ func TestProjectServiceClaimSelectsCredentialID(t *testing.T) {
 	if !ok || actor.ID != "42" {
 		t.Fatalf("AuditActor() = %+v, %v", actor, ok)
 	}
-	projectContext, err := types.RequireProject(principle.Info)
-	if err != nil {
-		t.Fatalf("RequireProject() error = %v", err)
+	projectContext, ok := principle.Info.ProjectContext()
+	if !ok {
+		t.Fatal("ProjectContext() ok = false")
 	}
 	if projectContext != (types.ProjectContext{OrganizationID: 9, ProjectID: 7}) {
-		t.Fatalf("RequireProject() = %+v", projectContext)
+		t.Fatalf("ProjectContext() = %+v", projectContext)
 	}
 }

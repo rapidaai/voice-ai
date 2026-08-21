@@ -3,6 +3,7 @@
 - Status: Accepted
 - Approved pilot: Phase 1C may implement the Endpoint-only authentication boundary; its recorded authorization follow-ups block expansion to other binaries
 - Approved cleanup direction: Endpoint middleware creates one request `Authentication` object; controllers stop at `Authorize` and `Scope`; Endpoint services consume its context methods directly without `optionalUserID`, `Require*`, type assertions, or type switches
+- Approved repository direction: migrate shared clients, Integration, Web, and Assistant to the same request `Authentication` contract, then delete legacy accessors and capability helpers after repository-wide zero-caller evidence
 - Date: 2026-08-20
 - Owners: Platform and API teams
 - Reviewers: Authentication, data, SDK, UI, and service owners
@@ -758,3 +759,4 @@ Implementation must not begin while this RFC remains `Draft`.
 | 2026-08-21 | Persist audit identity as `created_actor_type`, `created_actor_id`, `updated_actor_type`, and `updated_actor_id`; actor and scope remain separate concepts. | Approved |
 | 2026-08-21 | Remove `created_by` and `updated_by` only in a later per-service contract phase after dual write, backfill, read cutover, compatibility evidence, and rollback validation. | Approved |
 | 2026-08-21 | Endpoint middleware converts credential-specific principles into one request `Authentication` object containing actor and available user, organization, and project contexts; no normalization naming is used. | Approved |
+| 2026-08-21 | Apply the request `Authentication` contract to every API and shared client without compatibility type checks; preserve existing per-RPC authorization semantics during migration. | Approved |

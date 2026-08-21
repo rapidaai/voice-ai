@@ -7,6 +7,8 @@ package assistant_deployment_api
 
 import (
 	"context"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/rapidaai/pkg/exceptions"
 	"github.com/rapidaai/pkg/types"
@@ -18,11 +20,13 @@ func (assistantApi *assistantDeploymentGrpcApi) GetAllAssistantDebuggerDeploymen
 	ctx context.Context,
 	req *assistant_api.GetAllAssistantDeploymentRequest,
 ) (*assistant_api.GetAllAssistantDebuggerDeploymentResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	_, projectAuthErr := types.RequireProject(iAuth)
-	if !isAuthenticated || projectAuthErr != nil {
-		assistantApi.logger.Errorf("unauthenticated request for get all assistant debugger deployments")
-		return exceptions.AuthenticationError[assistant_api.GetAllAssistantDebuggerDeploymentResponse]()
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	paginate := req.GetPaginate()
 	if paginate == nil {

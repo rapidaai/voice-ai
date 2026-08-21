@@ -149,6 +149,8 @@ func Authorize(ctx context.Context) (*Authentication, error) {
 	return auth, nil
 }
 
+// SimplePrinciple is retained for source compatibility.
+// Deprecated: use Authentication for request authentication.
 type SimplePrinciple = AuthenticationPrinciple
 
 type UserIdentityProvider interface {
@@ -171,6 +173,8 @@ type DelegatedContextProvider interface {
  A large principle
 */
 
+// Principle is retained for source compatibility with legacy authenticators.
+// Deprecated: use Authentication for request authentication.
 type Principle interface {
 	AuthenticationPrinciple
 	UserIdentityProvider
@@ -186,6 +190,8 @@ type Principle interface {
 	GetFeaturePermission() []*FeaturePermission
 }
 
+// GetAuthPrincipleGPRC reads a legacy principle from context.
+// Deprecated: use Authorize.
 func GetAuthPrincipleGPRC(ctx context.Context) (Principle, bool) {
 	ath := ctx.Value(CTX_)
 	switch md := ath.(type) {
@@ -196,6 +202,8 @@ func GetAuthPrincipleGPRC(ctx context.Context) (Principle, bool) {
 	}
 }
 
+// GetScopePrincipleGRPC reads a legacy scoped principle from context.
+// Deprecated: use Authorize and Authentication.Scope.
 func GetScopePrincipleGRPC[T SimplePrinciple](ctx context.Context) (SimplePrinciple, bool) {
 	ath := ctx.Value(CTX_)
 	switch md := ath.(type) {

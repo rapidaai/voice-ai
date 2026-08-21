@@ -74,8 +74,10 @@ func grpcCredentialPresence(ctx context.Context) credentialPresence {
 func ginCredentialPresence(ctx *gin.Context) credentialPresence {
 	userToken, userID, projectID := ginUserCredentials(ctx)
 	return credentialPresence{
-		user:    strings.TrimSpace(userToken) != "" || strings.TrimSpace(userID) != "" || strings.TrimSpace(projectID) != "",
-		project: strings.TrimSpace(ginProjectCredential(ctx)) != "",
+		user:         strings.TrimSpace(userToken) != "" || strings.TrimSpace(userID) != "" || strings.TrimSpace(projectID) != "",
+		project:      strings.TrimSpace(ginProjectCredential(ctx)) != "",
+		organization: strings.TrimSpace(ginOrganizationCredential(ctx)) != "",
+		service:      strings.TrimSpace(ginServiceCredential(ctx)) != "",
 	}
 }
 
@@ -117,6 +119,28 @@ func ginProjectCredential(ctx *gin.Context) string {
 	return authToken
 }
 
+func ginOrganizationCredential(ctx *gin.Context) string {
+	authToken := ctx.GetHeader(types.ORG_SCOPE_KEY)
+	if strings.TrimSpace(authToken) == "" {
+		authToken = ctx.Query(types.ORG_SCOPE_KEY)
+	}
+	if strings.TrimSpace(authToken) == "" {
+		authToken = ctx.Param(types.ORG_SCOPE_KEY)
+	}
+	return authToken
+}
+
+func ginServiceCredential(ctx *gin.Context) string {
+	authToken := ctx.GetHeader(types.SERVICE_SCOPE_KEY)
+	if strings.TrimSpace(authToken) == "" {
+		authToken = ctx.Query(types.SERVICE_SCOPE_KEY)
+	}
+	if strings.TrimSpace(authToken) == "" {
+		authToken = ctx.Param(types.SERVICE_SCOPE_KEY)
+	}
+	return authToken
+}
+
 func grpcAuthenticationError() error {
 	return status.Error(codes.Unauthenticated, authenticationFailureMessage)
 }
@@ -131,6 +155,8 @@ func abortGinAuthentication(ctx *gin.Context) {
 	ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": authenticationFailureMessage})
 }
 
+// NewCredentialConflictUnaryServerMiddleware rejects conflicting credential classes.
+// Deprecated: conflict handling is built into NewAuthenticationBoundaryUnaryServerMiddleware.
 func NewCredentialConflictUnaryServerMiddleware(logger commons.Logger) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		presence := grpcCredentialPresence(ctx)
@@ -142,6 +168,8 @@ func NewCredentialConflictUnaryServerMiddleware(logger commons.Logger) grpc.Unar
 	}
 }
 
+// NewCredentialConflictStreamServerMiddleware rejects conflicting credential classes.
+// Deprecated: conflict handling is built into NewAuthenticationBoundaryStreamServerMiddleware.
 func NewCredentialConflictStreamServerMiddleware(logger commons.Logger) grpc.StreamServerInterceptor {
 	return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		presence := grpcCredentialPresence(stream.Context())
@@ -155,6 +183,8 @@ func NewCredentialConflictStreamServerMiddleware(logger commons.Logger) grpc.Str
 	}
 }
 
+// NewCredentialConflictMiddleware rejects conflicting credential classes.
+// Deprecated: conflict handling is built into NewAuthenticationBoundaryMiddleware.
 func NewCredentialConflictMiddleware(logger commons.Logger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		presence := ginCredentialPresence(ctx)

@@ -34,20 +34,20 @@ func TestAuthPrincipleCapabilities(t *testing.T) {
 		currentProjectRole: &types.ProjectRole{ProjectId: 92},
 	}
 
-	userID, err := types.RequireUser(principle)
-	if err != nil || userID != 73 {
-		t.Fatalf("RequireUser() = %d, %v", userID, err)
+	userID, ok := principle.UserIdentity()
+	if !ok || userID != 73 {
+		t.Fatalf("UserIdentity() = %d, %v", userID, ok)
 	}
-	organizationID, err := types.RequireOrganization(principle)
-	if err != nil || organizationID != 81 {
-		t.Fatalf("RequireOrganization() = %d, %v", organizationID, err)
+	organizationID, ok := principle.OrganizationContext()
+	if !ok || organizationID != 81 {
+		t.Fatalf("OrganizationContext() = %d, %v", organizationID, ok)
 	}
-	projectContext, err := types.RequireProject(principle)
-	if err != nil {
-		t.Fatalf("RequireProject() error = %v", err)
+	projectContext, ok := principle.ProjectContext()
+	if !ok {
+		t.Fatal("ProjectContext() ok = false")
 	}
 	if projectContext != (types.ProjectContext{OrganizationID: 81, ProjectID: 92}) {
-		t.Fatalf("RequireProject() = %+v", projectContext)
+		t.Fatalf("ProjectContext() = %+v", projectContext)
 	}
 }
 
@@ -64,7 +64,7 @@ func TestAuthPrincipleProjectContextOptional(t *testing.T) {
 	if !principle.IsAuthenticated() {
 		t.Fatal("IsAuthenticated() = false without selected project")
 	}
-	if _, err := types.RequireProject(principle); err == nil {
-		t.Fatal("RequireProject() error = nil without selected project")
+	if _, ok := principle.ProjectContext(); ok {
+		t.Fatal("ProjectContext() ok = true without selected project")
 	}
 }

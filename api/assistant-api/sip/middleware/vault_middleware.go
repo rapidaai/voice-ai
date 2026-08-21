@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/validator"
 )
 
@@ -77,8 +76,8 @@ func NewVaultMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 		}
 
 		var orgID uint64
-		if delegatedContext, err := types.ResolveDelegatedContext(auth); err == nil {
-			orgID = delegatedContext.OrganizationID
+		if organizationContext, err := auth.OrganizationContext(); err == nil {
+			orgID = organizationContext.OrganizationID
 		}
 		m.logger.Infow("SIP request authenticated",
 			"call_id", ctx.CallID,

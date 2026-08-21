@@ -20,8 +20,8 @@ import (
 )
 
 func (deploymentApi *AssistantDeploymentApi) GetAllAssistantWebpluginDeploymentRest(c *gin.Context) {
-	auth, isAuthenticated := types.GetAuthPrinciple(c)
-	if !isAuthenticated {
+	auth, authErr := types.Authorize(c.Request.Context())
+	if authErr != nil {
 		c.JSON(pkg_errors.GetAllAssistantWebpluginDeploymentUnauthenticated.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.GetAllAssistantWebpluginDeploymentUnauthenticated.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -33,9 +33,8 @@ func (deploymentApi *AssistantDeploymentApi) GetAllAssistantWebpluginDeploymentR
 		})
 		return
 	}
-	_, userAuthErr := types.RequireUser(auth)
-	_, projectAuthErr := types.RequireProject(auth)
-	if userAuthErr != nil || projectAuthErr != nil {
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
 		c.JSON(pkg_errors.GetAllAssistantWebpluginDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.GetAllAssistantWebpluginDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -128,7 +127,7 @@ func (deploymentApi *AssistantDeploymentApi) GetAllAssistantWebpluginDeploymentR
 		}
 	}
 
-	totalItems, deployments, err := deploymentApi.deploymentService.GetAllAssistantWebpluginDeployment(c, auth, assistantId, criterias, paginate)
+	totalItems, deployments, err := deploymentApi.deploymentService.GetAllAssistantWebpluginDeployment(c, iAuth, assistantId, criterias, paginate)
 	if err != nil {
 		deploymentApi.logger.Errorf("unable to get all assistant webplugin deployments: %v", err)
 		c.JSON(pkg_errors.GetAllAssistantWebpluginDeploymentGetDeployment.HTTPStatusCode, openapi.ErrorResponse{

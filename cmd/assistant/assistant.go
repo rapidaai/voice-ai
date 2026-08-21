@@ -77,24 +77,19 @@ func main() {
 
 	// init
 	authClient := web_client.NewAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)
+	userAuthenticator := authenticators.NewUserAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient)
+	projectAuthenticator := authenticators.NewProjectAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient)
+	organizationAuthenticator := authenticators.NewOrganizationAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient)
+	serviceAuthenticator := authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Postgres)
 	appRunner.S = grpc.NewServer(
 		grpc.ChainStreamInterceptor(
 			middlewares.NewRequestLoggerStreamServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryStreamServerMiddleware(appRunner.Logger),
-			middlewares.NewCredentialConflictStreamServerMiddleware(appRunner.Logger),
-			middlewares.NewServiceAuthenticatorStreamServerMiddleware(
-				authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Postgres),
-				appRunner.Logger,
-			),
-			middlewares.NewAuthenticationStreamServerMiddleware(
-				authenticators.NewUserAuthenticator(&appRunner.Cfg.AppConfig,
-					appRunner.Logger,
-					authClient),
-				appRunner.Logger,
-			),
-			middlewares.NewProjectAuthenticatorStreamServerMiddleware(
-				authenticators.NewProjectAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger,
-					authClient),
+			middlewares.NewAuthenticationBoundaryStreamServerMiddleware(
+				userAuthenticator,
+				projectAuthenticator,
+				organizationAuthenticator,
+				serviceAuthenticator,
 				appRunner.Logger,
 			),
 			middlewares.NewClientInformationStreamServerMiddleware(
@@ -104,20 +99,11 @@ func main() {
 		grpc.ChainUnaryInterceptor(
 			middlewares.NewRequestLoggerUnaryServerMiddleware(appRunner.Cfg.AppConfig.Name, appRunner.Logger),
 			middlewares.NewRecoveryUnaryServerMiddleware(appRunner.Logger),
-			middlewares.NewCredentialConflictUnaryServerMiddleware(appRunner.Logger),
-			middlewares.NewProjectAuthenticatorUnaryServerMiddleware(
-				authenticators.NewProjectAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger,
-					authClient),
-				appRunner.Logger,
-			),
-			middlewares.NewAuthenticationUnaryServerMiddleware(
-				authenticators.NewUserAuthenticator(&appRunner.Cfg.AppConfig,
-					appRunner.Logger,
-					authClient),
-				appRunner.Logger,
-			),
-			middlewares.NewServiceAuthenticatorUnaryServerMiddleware(
-				authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Postgres),
+			middlewares.NewAuthenticationBoundaryUnaryServerMiddleware(
+				userAuthenticator,
+				projectAuthenticator,
+				organizationAuthenticator,
+				serviceAuthenticator,
 				appRunner.Logger,
 			),
 			middlewares.NewClientInformationUnaryServerMiddleware(
@@ -357,19 +343,12 @@ func (g *AppRunner) RecoveryMiddleware() {
 }
 
 func (g *AppRunner) AuthenticationMiddleware() {
-	g.E.Use(middlewares.NewCredentialConflictMiddleware(g.Logger))
-	g.E.Use(middlewares.NewAuthenticationMiddleware(
-		authenticators.NewUserAuthenticator(&g.Cfg.AppConfig,
-			g.Logger,
-			web_client.NewAuthenticator(&g.Cfg.AppConfig, g.Logger, g.Redis)),
-		g.Logger,
-	))
-	g.E.Use(middlewares.NewProjectAuthenticatorMiddleware(
-		authenticators.NewProjectAuthenticator(
-			&g.Cfg.AppConfig,
-			g.Logger,
-			web_client.NewAuthenticator(&g.Cfg.AppConfig, g.Logger, g.Redis),
-		),
+	authClient := web_client.NewAuthenticator(&g.Cfg.AppConfig, g.Logger, g.Redis)
+	g.E.Use(middlewares.NewAuthenticationBoundaryMiddleware(
+		authenticators.NewUserAuthenticator(&g.Cfg.AppConfig, g.Logger, authClient),
+		authenticators.NewProjectAuthenticator(&g.Cfg.AppConfig, g.Logger, authClient),
+		authenticators.NewOrganizationAuthenticator(&g.Cfg.AppConfig, g.Logger, authClient),
+		authenticators.NewServiceAuthenticator(&g.Cfg.AppConfig, g.Logger, g.Postgres),
 		g.Logger,
 	))
 }

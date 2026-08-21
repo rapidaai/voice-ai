@@ -25,6 +25,10 @@ func (d *Dispatcher) runSession(ctx context.Context, v SessionConnectedPipeline)
 	if contextID == "" {
 		contextID = v.ID
 	}
+	auth, err := v.CallContext.ToAuthentication()
+	if err != nil {
+		return &PipelineResult{ContextID: contextID, Error: fmt.Errorf("invalid call context authentication: %w", err)}
+	}
 	v.Observer.AddCollectors(
 		observability_collector_requestlog.New(observability_collector_requestlog.Config{
 			Logger:         d.logger,
@@ -34,7 +38,7 @@ func (d *Dispatcher) runSession(ctx context.Context, v SessionConnectedPipeline)
 			Logger:      d.logger,
 			ToolService: d.assistantToolService,
 		}),
-		collectors.NewWithWebhookConfiguration(ctx, d.logger, v.CallContext.ToAuth(), v.CallContext.AssistantID, d.configurationService, d.httpLogService),
+		collectors.NewWithWebhookConfiguration(ctx, d.logger, auth, v.CallContext.AssistantID, d.configurationService, d.httpLogService),
 	)
 
 	v.Observer.Record(ctx,
@@ -117,7 +121,7 @@ func (d *Dispatcher) runSession(ctx context.Context, v SessionConnectedPipeline)
 			result = &PipelineResult{ContextID: contextID, Error: fmt.Errorf("%v", r)}
 		}
 	}()
-	err := v.Talker.Talk(ctx, v.CallContext.ToAuth())
+	err = v.Talker.Talk(ctx, auth)
 	if err != nil {
 		v.Observer.Record(ctx,
 			observability.ConversationScope{

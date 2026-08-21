@@ -4,8 +4,22 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 )
+
+func mustTelemetryQueryParts(t *testing.T, organizationID, projectID uint64) telemetryQueryParts {
+	t.Helper()
+	parts, err := newTelemetryQueryParts(&types.Authentication{
+		AuthType:          types.AuthTypeProject,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
+	})
+	if err != nil {
+		t.Fatalf("newTelemetryQueryParts() error = %v", err)
+	}
+	return parts
+}
 
 func telemetryCriteria(key string, value string) *protos.Criteria {
 	return &protos.Criteria{Key: key, Value: value}
@@ -80,7 +94,7 @@ func TestTelemetrySearchFilterIncludesTraceIDMatching(t *testing.T) {
 }
 
 func TestTelemetryQueryPartsIgnoresEmptyCriteria(t *testing.T) {
-	parts := newTelemetryQueryParts(1, 2)
+	parts := mustTelemetryQueryParts(t, 1, 2)
 
 	parts.applyCriteria([]*protos.Criteria{
 		nil,
@@ -108,7 +122,7 @@ func TestTelemetryQueryPartsIgnoresEmptyCriteria(t *testing.T) {
 }
 
 func TestTelemetryQueryPartsSupportsCanonicalCriteriaKeys(t *testing.T) {
-	parts := newTelemetryQueryParts(1, 2)
+	parts := mustTelemetryQueryParts(t, 1, 2)
 
 	parts.applyCriteria([]*protos.Criteria{
 		telemetryCriteria("scope", "message"),
@@ -136,7 +150,7 @@ func TestTelemetryQueryPartsSupportsCanonicalCriteriaKeys(t *testing.T) {
 }
 
 func TestTelemetryQueryPartsSupportsTimestampLogic(t *testing.T) {
-	parts := newTelemetryQueryParts(1, 2)
+	parts := mustTelemetryQueryParts(t, 1, 2)
 
 	parts.applyCriteria([]*protos.Criteria{
 		telemetryCriteriaWithLogic("timestamp", "2026-06-04T03:10:00Z", ">="),

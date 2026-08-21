@@ -7,7 +7,8 @@ package assistant_api
 
 import (
 	"context"
-	"errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	"github.com/rapidaai/pkg/types"
@@ -17,14 +18,13 @@ import (
 
 // GetAllAssistantConversation implements assistant_api.AssistantServiceServer.
 func (assistantApi *assistantGrpcApi) GetAllAssistantConversation(ctx context.Context, cepm *assistant_api.GetAllAssistantConversationRequest) (*assistant_api.GetAllAssistantConversationResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	_, projectAuthErr := types.RequireProject(iAuth)
-	if !isAuthenticated || projectAuthErr != nil {
-		assistantApi.logger.Errorf("unauthenticated request for GetAllassistant")
-		return utils.Error[assistant_api.GetAllAssistantConversationResponse](
-			errors.New("unauthenticated request for get all assistant skills"),
-			"Please provider valid service credentials to get all assistant skills, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	cnt, conversations, err := assistantApi.conversactionService.GetAll(ctx, iAuth,
 		cepm.GetAssistantId(),

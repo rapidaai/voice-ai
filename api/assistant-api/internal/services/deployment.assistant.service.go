@@ -16,7 +16,7 @@ import (
 type AssistantDeploymentService interface {
 	CreateWhatsappDeployment(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		greeting, mistake *string,
 		unclearInputTimeout *float64, unclearInputMessage *string,
@@ -28,7 +28,7 @@ type AssistantDeploymentService interface {
 
 	CreatePhoneDeployment(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		greeting, mistake *string,
 		unclearInputTimeout *float64, unclearInputMessage *string,
@@ -41,7 +41,7 @@ type AssistantDeploymentService interface {
 
 	CreateApiDeployment(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		greeting, mistake *string,
 		unclearInputTimeout *float64, unclearInputMessage *string,
@@ -52,7 +52,7 @@ type AssistantDeploymentService interface {
 
 	CreateDebuggerDeployment(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		greeting, mistake *string,
 		unclearInputTimeout *float64, unclearInputMessage *string,
@@ -63,7 +63,7 @@ type AssistantDeploymentService interface {
 
 	CreateWebPluginDeployment(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		greeting, mistake *string,
 		unclearInputTimeout *float64, unclearInputMessage *string,
@@ -73,21 +73,21 @@ type AssistantDeploymentService interface {
 		inputAudio, outputAudio *workflow_api.DeploymentAudioProvider,
 	) (*internal_assistant_entity.AssistantWebPluginDeployment, error)
 
-	GetAssistantApiDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.AssistantApiDeployment, error)
-	GetAssistantDebuggerDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.AssistantDebuggerDeployment, error)
-	GetAssistantPhoneDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.AssistantPhoneDeployment, error)
-	GetAssistantWebpluginDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.AssistantWebPluginDeployment, error)
-	GetAssistantWhatsappDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.AssistantWhatsappDeployment, error)
+	GetAssistantApiDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.AssistantApiDeployment, error)
+	GetAssistantDebuggerDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.AssistantDebuggerDeployment, error)
+	GetAssistantPhoneDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.AssistantPhoneDeployment, error)
+	GetAssistantWebpluginDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.AssistantWebPluginDeployment, error)
+	GetAssistantWhatsappDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.AssistantWhatsappDeployment, error)
 
-	GetAllAssistantApiDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64, criterias []*workflow_api.Criteria, paginate *workflow_api.Paginate) (int64, []*internal_assistant_entity.AssistantApiDeployment, error)
-	GetAllAssistantDebuggerDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64, criterias []*workflow_api.Criteria, paginate *workflow_api.Paginate) (int64, []*internal_assistant_entity.AssistantDebuggerDeployment, error)
-	GetAllAssistantPhoneDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64, criterias []*workflow_api.Criteria, paginate *workflow_api.Paginate) (int64, []*internal_assistant_entity.AssistantPhoneDeployment, error)
-	GetAllAssistantWebpluginDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64, criterias []*workflow_api.Criteria, paginate *workflow_api.Paginate) (int64, []*internal_assistant_entity.AssistantWebPluginDeployment, error)
-	GetAllAssistantWhatsappDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64, criterias []*workflow_api.Criteria, paginate *workflow_api.Paginate) (int64, []*internal_assistant_entity.AssistantWhatsappDeployment, error)
+	GetAllAssistantApiDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64, criterias []*workflow_api.Criteria, paginate *workflow_api.Paginate) (int64, []*internal_assistant_entity.AssistantApiDeployment, error)
+	GetAllAssistantDebuggerDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64, criterias []*workflow_api.Criteria, paginate *workflow_api.Paginate) (int64, []*internal_assistant_entity.AssistantDebuggerDeployment, error)
+	GetAllAssistantPhoneDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64, criterias []*workflow_api.Criteria, paginate *workflow_api.Paginate) (int64, []*internal_assistant_entity.AssistantPhoneDeployment, error)
+	GetAllAssistantWebpluginDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64, criterias []*workflow_api.Criteria, paginate *workflow_api.Paginate) (int64, []*internal_assistant_entity.AssistantWebPluginDeployment, error)
+	GetAllAssistantWhatsappDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64, criterias []*workflow_api.Criteria, paginate *workflow_api.Paginate) (int64, []*internal_assistant_entity.AssistantWhatsappDeployment, error)
 
-	DisableAssistantApiDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.AssistantApiDeployment, error)
-	DisableAssistantDebuggerDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.AssistantDebuggerDeployment, error)
-	DisableAssistantPhoneDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.AssistantPhoneDeployment, error)
-	DisableAssistantWebpluginDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.AssistantWebPluginDeployment, error)
-	DisableAssistantWhatsappDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.AssistantWhatsappDeployment, error)
+	DisableAssistantApiDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.AssistantApiDeployment, error)
+	DisableAssistantDebuggerDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.AssistantDebuggerDeployment, error)
+	DisableAssistantPhoneDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.AssistantPhoneDeployment, error)
+	DisableAssistantWebpluginDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.AssistantWebPluginDeployment, error)
+	DisableAssistantWhatsappDeployment(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.AssistantWhatsappDeployment, error)
 }

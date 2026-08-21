@@ -5,30 +5,30 @@ import (
 	"testing"
 
 	"github.com/rapidaai/pkg/types"
-	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 )
 
-func projectAuth(organizationID, projectID uint64) types.SimplePrinciple {
-	return &types.ProjectScope{
-		OrganizationId: &organizationID,
-		ProjectId:      &projectID,
-		Status:         type_enums.RECORD_ACTIVE.String(),
+func projectAuth(organizationID, projectID uint64) *types.Authentication {
+	return &types.Authentication{
+		AuthType:          types.AuthTypeProject,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
 	}
 }
 
-func organizationAuth(organizationID uint64) types.SimplePrinciple {
-	return &types.OrganizationScope{
-		OrganizationId: &organizationID,
-		Status:         type_enums.RECORD_ACTIVE.String(),
+func organizationAuth(organizationID uint64) *types.Authentication {
+	return &types.Authentication{
+		AuthType:          types.AuthTypeOrg,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 	}
 }
 
-func userAuth(userID, organizationID, projectID uint64) types.SimplePrinciple {
-	return &types.PlainAuthPrinciple{
-		User:               types.UserInfo{Id: userID},
-		OrganizationRole:   &types.OrganizaitonRole{OrganizationId: organizationID},
-		CurrentProjectRole: &types.ProjectRole{ProjectId: projectID},
+func userAuth(userID, organizationID, projectID uint64) *types.Authentication {
+	return &types.Authentication{
+		AuthType:          types.AuthTypeUser,
+		UserValue:         &types.UserContext{UserID: userID},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
 	}
 }
 

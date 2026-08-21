@@ -3,6 +3,8 @@ package web_api
 import (
 	"context"
 	"errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"net/http"
 	"strconv"
 
@@ -82,22 +84,25 @@ const (
 )
 
 func (wConnectApi *webConnectGRPCApi) GeneralConnect(ctx context.Context, kcr *protos.GeneralConnectRequest) (*protos.GeneralConnectResponse, error) {
-	auth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
-	if !isAuthenticated {
-		wConnectApi.logger.Errorf("unauthenticated request to fork endpoint")
-		return utils.AuthenticateError[protos.GeneralConnectResponse]()
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
 	}
-	userID, err := types.RequireUser(auth)
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	}
+	userContext, err := iAuth.UserContext()
 	if err != nil {
 		wConnectApi.logger.Errorf("unable to resolve user identity for connector callback: %v", err)
 		return utils.AuthenticateError[protos.GeneralConnectResponse]()
 	}
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := iAuth.ProjectContext()
 	if err != nil {
 		wConnectApi.logger.Errorf("unable to resolve project context for connector callback: %v", err)
 		return utils.AuthenticateError[protos.GeneralConnectResponse]()
 	}
-	decodedState, err := wConnectApi.googleDriveConnect.DecodeState(ctx, auth, kcr.State)
+	decodedState, err := wConnectApi.googleDriveConnect.DecodeState(ctx, iAuth, kcr.State)
 	if err != nil {
 		wConnectApi.logger.Errorf("illegal state for oauth %v", err)
 		return utils.Error[protos.GeneralConnectResponse](err, "illegal state for oauth")
@@ -128,7 +133,7 @@ func (wConnectApi *webConnectGRPCApi) GeneralConnect(ctx context.Context, kcr *p
 	}
 
 	_, err = wConnectApi.vaultService.Create(
-		ctx, userID, projectContext, decodedState.Provider, "connected-org-tool", credential)
+		ctx, userContext.UserID, projectContext, decodedState.Provider, "connected-org-tool", credential)
 	if err != nil {
 		return utils.Error[protos.GeneralConnectResponse](err, "Unable to store the generated token")
 	}
@@ -398,12 +403,15 @@ func (connectApi *webConnectGRPCApi) GetConnectorFiles(ctx context.Context,
 	r *protos.GetConnectorFilesRequest) (*protos.GetConnectorFilesResponse, error) {
 	//
 	// toolId uint64, q *string, pageToken *string
-	auth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
-	if !isAuthenticated {
-		connectApi.logger.Errorf("unauthenticated request to fork endpoint")
-		return utils.AuthenticateError[protos.GetConnectorFilesResponse]()
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
 	}
-	organizationID, err := types.RequireOrganization(auth)
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	}
+	organizationContext, err := iAuth.OrganizationContext()
 	if err != nil {
 		connectApi.logger.Errorf("unable to resolve organization context for connector files: %v", err)
 		return utils.AuthenticateError[protos.GetConnectorFilesResponse]()
@@ -411,7 +419,7 @@ func (connectApi *webConnectGRPCApi) GetConnectorFiles(ctx context.Context,
 
 	// need to modify
 	crd, err := connectApi.vaultService.GetProviderCredential(
-		ctx, organizationID, r.GetProvider())
+		ctx, organizationContext.OrganizationID, r.GetProvider())
 	if err != nil {
 		connectApi.logger.Errorf("unable to get tool credentials %v", err)
 		return utils.Error[protos.GetConnectorFilesResponse](err, "Unable to get tool credential to get list of files.")

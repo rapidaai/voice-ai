@@ -53,8 +53,8 @@ func NewKnowledgeDocumentService(config *config.AssistantConfig, logger commons.
 	}
 }
 
-func (knowledge *knowledgeDocumentService) GetCounts(ctx context.Context, auth types.SimplePrinciple, knowledgeId uint64) (documentCount, wordCount, tokenCount uint32) {
-	projectContext, err := types.RequireProject(auth)
+func (knowledge *knowledgeDocumentService) GetCounts(ctx context.Context, auth *types.Authentication, knowledgeId uint64) (documentCount, wordCount, tokenCount uint32) {
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return 0, 0, 0
 	}
@@ -80,10 +80,10 @@ func (knowledge *knowledgeDocumentService) GetCounts(ctx context.Context, auth t
 
 }
 
-func (knowledge *knowledgeDocumentService) GetAll(ctx context.Context, auth types.SimplePrinciple,
+func (knowledge *knowledgeDocumentService) GetAll(ctx context.Context, auth *types.Authentication,
 	knowledgeId uint64,
 	criterias []*protos.Criteria, paginate *protos.Paginate) (int64, *[]internal_knowledge_gorm.KnowledgeDocument, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return 0, nil, err
 	}
@@ -116,8 +116,8 @@ func (knowledge *knowledgeDocumentService) GetAll(ctx context.Context, auth type
 	return cnt, &knowledgeDocuments, nil
 }
 
-func (knowledge *knowledgeDocumentService) Get(ctx context.Context, auth types.SimplePrinciple, knowledgeId uint64, knowledgeDocumentId uint64) (*internal_knowledge_gorm.KnowledgeDocument, error) {
-	projectContext, err := types.RequireProject(auth)
+func (knowledge *knowledgeDocumentService) Get(ctx context.Context, auth *types.Authentication, knowledgeId uint64, knowledgeDocumentId uint64) (*internal_knowledge_gorm.KnowledgeDocument, error) {
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -133,16 +133,21 @@ func (knowledge *knowledgeDocumentService) Get(ctx context.Context, auth types.S
 }
 
 func (knowledgeDocument *knowledgeDocumentService) CreateToolDocument(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	knowledge *internal_knowledge_gorm.Knowledge,
 	datasource string,
 	documentStructure string,
 	contents []*protos.DocumentContent,
 ) ([]*internal_knowledge_gorm.KnowledgeDocument, error) {
-	userID, projectContext, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
 	if err != nil {
 		return nil, err
 	}
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
+	userID := userContext.UserID
 	db := knowledgeDocument.postgres.DB(ctx)
 	allKnowledge := make([]*internal_knowledge_gorm.KnowledgeDocument, 0)
 	for _, cntnt := range contents {
@@ -176,16 +181,21 @@ func (knowledgeDocument *knowledgeDocumentService) CreateToolDocument(ctx contex
 
 func (knowledgeDocument *knowledgeDocumentService) CreateManualDocument(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	knowledge *internal_knowledge_gorm.Knowledge,
 	datasource string,
 	documentStructure string,
 	contents []*protos.DocumentContent,
 ) ([]*internal_knowledge_gorm.KnowledgeDocument, error) {
-	userID, projectContext, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
 	if err != nil {
 		return nil, err
 	}
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
+	userID := userContext.UserID
 
 	db := knowledgeDocument.postgres.DB(ctx)
 	allKnowledge := make([]*internal_knowledge_gorm.KnowledgeDocument, 0)
@@ -303,12 +313,12 @@ func (knowledge *knowledgeDocumentService) webfileMimeType(
 
 func (knowledge *knowledgeDocumentService) GetAllDocumentSegment(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	knowledgeId uint64,
 	storageNamespace string,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate) (int64, []*protos.KnowledgeDocumentSegment, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return 0, nil, err
 	}
@@ -407,7 +417,7 @@ func (knowledge *knowledgeDocumentService) GetAllDocumentSegment(
 
 func (knowledge *knowledgeDocumentService) UpdateDocumentSegment(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	index string,
 	documentId string,
 	documentName string,
@@ -421,7 +431,7 @@ func (knowledge *knowledgeDocumentService) UpdateDocumentSegment(
 	locations []string,
 	industries []string,
 ) (*protos.KnowledgeDocumentSegment, error) {
-	if _, err := types.RequireProject(auth); err != nil {
+	if _, err := auth.ProjectContext(); err != nil {
 		return nil, err
 	}
 	// Construct the update query
@@ -489,12 +499,12 @@ func (knowledge *knowledgeDocumentService) UpdateDocumentSegment(
 
 func (knowledge *knowledgeDocumentService) DeleteDocumentSegment(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	index string,
 	documentId string,
 	reason string,
 ) (*protos.KnowledgeDocumentSegment, error) {
-	if _, err := types.RequireProject(auth); err != nil {
+	if _, err := auth.ProjectContext(); err != nil {
 		return nil, err
 	}
 	// Update the document status directly

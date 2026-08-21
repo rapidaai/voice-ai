@@ -7,7 +7,8 @@ package knowledge_api
 
 import (
 	"context"
-	"errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
@@ -16,14 +17,13 @@ import (
 )
 
 func (knowledgeApi *knowledgeGrpcApi) GetKnowledgeLog(ctx context.Context, cepm *knowledge_api.GetKnowledgeLogRequest) (*knowledge_api.GetKnowledgeLogResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	projectContext, authErr := types.RequireProject(iAuth)
-	if !isAuthenticated || authErr != nil {
-		knowledgeApi.logger.Errorf("unauthenticated request for GetKnowledgeLogRequest")
-		return utils.Error[knowledge_api.GetKnowledgeLogResponse](
-			errors.New("unauthenticated request for get assistant converstaion"),
-			"Please provider valid service credentials to perform GetKnowledgeLogRequest, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	lg, err := knowledgeApi.knowledgeService.GetLog(
 		ctx,
@@ -43,8 +43,7 @@ func (knowledgeApi *knowledgeGrpcApi) GetKnowledgeLog(ctx context.Context, cepm 
 
 	//
 
-	re, rs, _ := knowledgeApi.knowledgeService.GetLogObject(ctx, projectContext.OrganizationID,
-		projectContext.ProjectID, cepm.GetId())
+	re, rs, _ := knowledgeApi.knowledgeService.GetLogObject(ctx, iAuth, cepm.GetId())
 	// if err != nil {
 	if re != nil {
 		s := &structpb.Struct{}

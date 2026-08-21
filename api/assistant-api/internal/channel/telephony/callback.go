@@ -15,7 +15,7 @@ import (
 )
 
 // HandleStatusCallback resolves the telephony provider and parses a status callback webhook.
-func (d *InboundDispatcher) HandleStatusCallback(c *gin.Context, provider string, auth types.SimplePrinciple, assistantId, conversationId uint64) (*internal_type.StatusInfo, error) {
+func (d *InboundDispatcher) HandleStatusCallback(c *gin.Context, provider string, auth *types.Authentication, assistantId, conversationId uint64) (*internal_type.StatusInfo, error) {
 	tel, err := GetTelephony(Telephony(provider), d.cfg, d.logger, d.telephonyOpt)
 	if err != nil {
 		return nil, fmt.Errorf("invalid telephony provider %s: %w", provider, err)

@@ -72,28 +72,29 @@ func main() {
 	}
 
 	// init
+	userAuthenticator := web_authenticators.GetUserAuthenticator(appRunner.Logger, appRunner.Postgres)
+	projectAuthenticator := web_authenticators.GetProjectAuthenticator(appRunner.Logger, appRunner.Postgres)
+	serviceAuthenticator := authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Postgres)
 	appRunner.S = grpc.NewServer(
 		grpc.ChainStreamInterceptor(
 			middlewares.NewRequestLoggerStreamServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryStreamServerMiddleware(appRunner.Logger),
-			middlewares.NewCredentialConflictStreamServerMiddleware(appRunner.Logger),
-			middlewares.NewAuthenticationStreamServerMiddleware(
-				web_authenticators.GetUserAuthenticator(appRunner.Logger, appRunner.Postgres),
-				appRunner.Logger),
-			middlewares.NewProjectAuthenticatorStreamServerMiddleware(web_authenticators.GetProjectAuthenticator(appRunner.Logger, appRunner.Postgres),
-				appRunner.Logger),
+			middlewares.NewAuthenticationBoundaryStreamServerMiddleware(
+				userAuthenticator,
+				projectAuthenticator,
+				nil,
+				serviceAuthenticator,
+				appRunner.Logger,
+			),
 		),
 		grpc.ChainUnaryInterceptor(
 			middlewares.NewRequestLoggerUnaryServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryUnaryServerMiddleware(appRunner.Logger),
-			middlewares.NewCredentialConflictUnaryServerMiddleware(appRunner.Logger),
-			middlewares.NewAuthenticationUnaryServerMiddleware(web_authenticators.GetUserAuthenticator(appRunner.Logger, appRunner.Postgres), appRunner.Logger),
-			middlewares.NewProjectAuthenticatorUnaryServerMiddleware(
-				web_authenticators.GetProjectAuthenticator(appRunner.Logger, appRunner.Postgres),
-				appRunner.Logger,
-			),
-			middlewares.NewServiceAuthenticatorUnaryServerMiddleware(
-				authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Postgres),
+			middlewares.NewAuthenticationBoundaryUnaryServerMiddleware(
+				userAuthenticator,
+				projectAuthenticator,
+				nil,
+				serviceAuthenticator,
 				appRunner.Logger,
 			),
 		),
@@ -264,7 +265,13 @@ func (g *AppRunner) AllMiddlewares() {
 	g.RecoveryMiddleware()
 	g.CorsMiddleware()
 	g.RequestLoggerMiddleware()
-	g.E.Use(middlewares.NewAuthenticationMiddleware(web_authenticators.GetUserAuthenticator(g.Logger, g.Postgres), g.Logger))
+	g.E.Use(middlewares.NewAuthenticationBoundaryMiddleware(
+		web_authenticators.GetUserAuthenticator(g.Logger, g.Postgres),
+		web_authenticators.GetProjectAuthenticator(g.Logger, g.Postgres),
+		nil,
+		authenticators.NewServiceAuthenticator(&g.Cfg.AppConfig, g.Logger, g.Postgres),
+		g.Logger,
+	))
 }
 
 // Recovery middleware

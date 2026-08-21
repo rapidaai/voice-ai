@@ -103,7 +103,8 @@ func (d *Dispatcher) prepareSession(ctx context.Context, v sip_infra.SessionEsta
 
 	cc, err := d.ensureCallContext(ctx, v, conversationID)
 	if err != nil {
-		d.logger.Warnw("Pipeline: ensure call context failed", "call_id", v.ID, "error", err)
+		d.logger.Error("Pipeline: ensure call context failed", "call_id", v.ID, "error", err)
+		return nil, newSessionPreparationError(sip_infra.LifecycleReasonPipelineSetupFailed, err)
 	}
 
 	setup, err := d.setupCall(ctx, v, conversationID, cc)

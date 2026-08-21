@@ -64,7 +64,7 @@ func (ec *ExternalConnect) EncodeState(
 	return identifier, nil
 }
 
-func (ec *ExternalConnect) DecodeState(ctx context.Context, auth types.SimplePrinciple, identifier string) (*internal_entity.OAuthExternalConnect, error) {
+func (ec *ExternalConnect) DecodeState(ctx context.Context, auth *types.Authentication, identifier string) (*internal_entity.OAuthExternalConnect, error) {
 	db := ec.postgres.DB(ctx)
 	var ct internal_entity.OAuthExternalConnect
 	tx := db.Last(&ct, "identifier = ?", identifier)

@@ -7,6 +7,9 @@ import (
 	"context"
 	"errors"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	internal_callers "github.com/rapidaai/api/integration-api/internal/type"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
@@ -20,14 +23,17 @@ func (iApi *integrationApi) Reranking(
 	tag string,
 	rerankerCaller internal_callers.RerankingCaller,
 ) (*integration_api.RerankingResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	projectContext, authErr := types.RequireProject(iAuth)
-	if !isAuthenticated || authErr != nil {
-		iApi.logger.Errorf("unauthenticated request for invoke")
-		return utils.Error[integration_api.RerankingResponse](
-			errors.New("unauthenticated request for generate"),
-			"Please provider valid service credentials to perfom invoke, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	}
+	projectContext, projectErr := iAuth.ProjectContext()
+	if projectErr != nil {
+		return nil, status.Error(codes.PermissionDenied, projectErr.Error())
 	}
 	uuID := iApi.RequestId()
 

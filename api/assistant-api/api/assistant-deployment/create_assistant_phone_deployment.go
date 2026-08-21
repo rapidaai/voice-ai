@@ -8,6 +8,8 @@ package assistant_deployment_api
 import (
 	"context"
 	"errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	pkg_errors "github.com/rapidaai/pkg/errors"
 	"github.com/rapidaai/pkg/types"
@@ -18,14 +20,13 @@ import (
 
 // CreateAssistantPhoneDeployment implements assistant_api.AssistantDeploymentServiceServer.
 func (deploymentApi *assistantDeploymentGrpcApi) CreateAssistantPhoneDeployment(ctx context.Context, deployment *assistant_api.CreateAssistantDeploymentRequest) (*assistant_api.GetAssistantPhoneDeploymentResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	_, projectAuthErr := types.RequireProject(iAuth)
-	if !isAuthenticated || projectAuthErr != nil {
-		deploymentApi.logger.Errorf("unauthenticated request for invoke")
-		return utils.Error[assistant_api.GetAssistantPhoneDeploymentResponse](
-			errors.New("unauthenticated request for create assistant phone deployment"),
-			"Please provider valid service credentials to perfom invoke, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	// name, role, tone, expertise, greeting, mistake, ending string,
 	//

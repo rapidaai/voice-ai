@@ -7,6 +7,8 @@ package assistant_deployment_api
 
 import (
 	"context"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/rapidaai/pkg/exceptions"
 	"github.com/rapidaai/pkg/types"
@@ -15,11 +17,13 @@ import (
 )
 
 func (deploymentApi *assistantDeploymentGrpcApi) DisableAssistantApiDeployment(ctx context.Context, req *assistant_api.GetAssistantDeploymentRequest) (*assistant_api.GetAssistantApiDeploymentResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	_, projectAuthErr := types.RequireProject(iAuth)
-	if !isAuthenticated || projectAuthErr != nil {
-		deploymentApi.logger.Errorf("unauthenticated request for disable assistant api deployment")
-		return exceptions.AuthenticationError[assistant_api.GetAssistantApiDeploymentResponse]()
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
 	deployment, err := deploymentApi.deploymentService.DisableAssistantApiDeployment(ctx, iAuth, req.GetAssistantId())

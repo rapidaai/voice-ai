@@ -7,7 +7,8 @@ package assistant_api
 
 import (
 	"context"
-	"errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
@@ -16,14 +17,13 @@ import (
 )
 
 func (assistantApi *assistantGrpcApi) RetryAssistantHTTPLog(ctx context.Context, req *protos.RetryAssistantHTTPLogRequest) (*protos.GetAssistantHTTPLogResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	projectContext, authErr := types.RequireProject(iAuth)
-	if !isAuthenticated || authErr != nil {
-		assistantApi.logger.Errorf("unauthenticated request for RetryAssistantHTTPLogRequest")
-		return utils.Error[protos.GetAssistantHTTPLogResponse](
-			errors.New("unauthenticated request for retry assistant http log"),
-			"Please provide valid service credentials to perform RetryAssistantHTTPLogRequest, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
 	logRecord, err := assistantApi.assistantHTTPLogService.RetryLog(
@@ -46,8 +46,7 @@ func (assistantApi *assistantGrpcApi) RetryAssistantHTTPLog(ctx context.Context,
 
 	requestData, responseData, _ := assistantApi.assistantHTTPLogService.GetLogObject(
 		ctx,
-		projectContext.OrganizationID,
-		projectContext.ProjectID,
+		iAuth,
 		logRecord.Id,
 	)
 	if requestData != nil {

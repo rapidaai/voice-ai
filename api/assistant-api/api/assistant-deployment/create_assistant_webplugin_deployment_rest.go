@@ -19,8 +19,8 @@ import (
 )
 
 func (deploymentApi *AssistantDeploymentApi) CreateAssistantWebpluginDeploymentRest(c *gin.Context) {
-	auth, isAuthenticated := types.GetAuthPrinciple(c)
-	if !isAuthenticated {
+	auth, authErr := types.Authorize(c.Request.Context())
+	if authErr != nil {
 		c.JSON(pkg_errors.CreateAssistantWebpluginDeploymentUnauthenticated.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantWebpluginDeploymentUnauthenticated.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -32,9 +32,8 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantWebpluginDeploymentR
 		})
 		return
 	}
-	_, userAuthErr := types.RequireUser(auth)
-	_, projectAuthErr := types.RequireProject(auth)
-	if userAuthErr != nil || projectAuthErr != nil {
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
 		c.JSON(pkg_errors.CreateAssistantWebpluginDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantWebpluginDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -218,7 +217,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantWebpluginDeploymentR
 	}
 	deployment, err := deploymentApi.deploymentService.CreateWebPluginDeployment(
 		c,
-		auth,
+		iAuth,
 		assistantId,
 		request.Greeting,
 		request.Mistake,

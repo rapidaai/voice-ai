@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	config "github.com/rapidaai/api/integration-api/config"
@@ -34,14 +36,17 @@ func NewAuditLoggingGRPC(config *config.IntegrationConfig, logger commons.Logger
 }
 
 func (als *auditLoggingGRPCApi) GetAuditLog(c context.Context, ir *integration_api.GetAuditLogRequest) (*integration_api.GetAuditLogResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	projectContext, authErr := types.RequireProject(iAuth)
-	if !isAuthenticated || authErr != nil {
-		als.logger.Errorf("unauthenticated request for invoke")
-		return utils.Error[integration_api.GetAuditLogResponse](
-			errors.New("unauthenticated request for getAuditLog"),
-			"Please provider a valid credentials.",
-		)
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	}
+	projectContext, projectErr := iAuth.ProjectContext()
+	if projectErr != nil {
+		return nil, status.Error(codes.PermissionDenied, projectErr.Error())
 	}
 
 	lg, err := als.auditService.Get(c, projectContext.OrganizationID, projectContext.ProjectID, ir.GetId())
@@ -82,14 +87,17 @@ func (als *auditLoggingGRPCApi) GetAuditLog(c context.Context, ir *integration_a
 }
 
 func (als *auditLoggingGRPCApi) GetAllAuditLog(c context.Context, ir *integration_api.GetAllAuditLogRequest) (*integration_api.GetAllAuditLogResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	projectContext, authErr := types.RequireProject(iAuth)
-	if !isAuthenticated || authErr != nil {
-		als.logger.Errorf("unauthenticated request for invoke")
-		return utils.Error[integration_api.GetAllAuditLogResponse](
-			errors.New("unauthenticated request for getAuditLog"),
-			"Please provider valid service credentials to perfom invoke, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	}
+	projectContext, projectErr := iAuth.ProjectContext()
+	if projectErr != nil {
+		return nil, status.Error(codes.PermissionDenied, projectErr.Error())
 	}
 
 	cnt, lgs, err := als.auditService.GetAll(c,
@@ -116,14 +124,17 @@ func (als *auditLoggingGRPCApi) GetAllAuditLog(c context.Context, ir *integratio
 
 // CreateMetadata implements protos.AuditLoggingServiceServer.
 func (als *auditLoggingGRPCApi) CreateMetadata(c context.Context, cmr *integration_api.CreateMetadataRequest) (*integration_api.CreateMetadataResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	projectContext, authErr := types.RequireProject(iAuth)
-	if !isAuthenticated || authErr != nil {
-		als.logger.Errorf("unauthenticated request for invoke")
-		return utils.Error[integration_api.CreateMetadataResponse](
-			errors.New("unauthenticated request for CreateMetadata"),
-			"Please provider valid service credentials to perfom probe, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	}
+	projectContext, projectErr := iAuth.ProjectContext()
+	if projectErr != nil {
+		return nil, status.Error(codes.PermissionDenied, projectErr.Error())
 	}
 	_adt, err := als.auditService.Get(c, projectContext.OrganizationID, projectContext.ProjectID, cmr.GetId())
 	if err != nil {

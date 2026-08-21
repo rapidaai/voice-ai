@@ -18,7 +18,7 @@ import (
 type AssistantHTTPLogService interface {
 	CreateLog(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		source string,
 		sourceRefId uint64,
 		sourceEvent string,
@@ -38,14 +38,14 @@ type AssistantHTTPLogService interface {
 
 	GetLog(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		projectId uint64,
 		httpLogId uint64,
 	) (*internal_assistant_entity.AssistantHTTPLog, error)
 
 	GetAllLog(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		projectId uint64,
 		criterias []*protos.Criteria,
 		paginate *protos.Paginate,
@@ -54,14 +54,13 @@ type AssistantHTTPLogService interface {
 
 	GetLogObject(
 		ctx context.Context,
-		organizationId uint64,
-		projectId uint64,
+		auth *types.Authentication,
 		httpLogId uint64,
 	) (requestData []byte, responseData []byte, err error)
 
 	RetryLog(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		projectId uint64,
 		httpLogId uint64,
 	) (*internal_assistant_entity.AssistantHTTPLog, error)

@@ -2,8 +2,10 @@ package web_proxy_api
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	web_api "github.com/rapidaai/api/web-api/api"
 	internal_service "github.com/rapidaai/api/web-api/internal/service"
@@ -47,20 +49,26 @@ func NewActivityGRPC(config *config.WebAppConfig, logger commons.Logger, postgre
 
 func (wActivity *webActivityGRPCApi) GetAuditLog(c context.Context, irRequest *protos.GetAuditLogRequest) (*protos.GetAuditLogResponse, error) {
 	wActivity.logger.Debugf("GetActivities from grpc with requestPayload %v, %v", irRequest, c)
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	if !isAuthenticated {
-		wActivity.logger.Errorf("unauthenticated request for get actvities")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	return wActivity.auditClient.GetAuditLog(c, iAuth, irRequest.GetId())
 }
 
 func (wActivity *webActivityGRPCApi) GetAllAuditLog(c context.Context, irRequest *protos.GetAllAuditLogRequest) (*protos.GetAllAuditLogResponse, error) {
 	wActivity.logger.Debugf("GetActivities from grpc with requestPayload %v, %v", irRequest, c)
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	if !isAuthenticated {
-		wActivity.logger.Errorf("unauthenticated request for get actvities")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
 	// check if he is already part of current organization

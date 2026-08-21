@@ -44,14 +44,15 @@ func NewAssistantService(cfg *config.AssistantConfig, logger commons.Logger, pos
 }
 
 func (eService *assistantService) CreateAssistantProviderWebsocket(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	description string,
 	url string,
 	headers map[string]string,
 	parameters map[string]string,
 ) (*internal_assistant_entity.AssistantProviderWebsocket, error) {
-	userID, err := types.RequireUser(auth)
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +80,7 @@ func (eService *assistantService) CreateAssistantProviderWebsocket(ctx context.C
 }
 
 func (eService *assistantService) CreateAssistantProviderAgentkit(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	description string,
 	url string,
@@ -94,7 +95,8 @@ func (eService *assistantService) CreateAssistantProviderAgentkit(ctx context.Co
 	maxRecvMessageBytes *uint32,
 	maxSendMessageBytes *uint32,
 ) (*internal_assistant_entity.AssistantProviderAgentkit, error) {
-	userID, err := types.RequireUser(auth)
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return nil, err
 	}
@@ -130,13 +132,14 @@ func (eService *assistantService) CreateAssistantProviderAgentkit(ctx context.Co
 }
 
 func (eService *assistantService) CreateAssistantProviderAgentflow(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	description string,
 	schemaVersion string,
 	definition map[string]interface{},
 ) (*internal_assistant_entity.AssistantProviderAgentflow, error) {
-	userID, err := types.RequireUser(auth)
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return nil, err
 	}
@@ -162,8 +165,12 @@ func (eService *assistantService) CreateAssistantProviderAgentflow(ctx context.C
 	return epm, nil
 }
 
-func (eService *assistantService) DeleteAssistant(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.Assistant, error) {
-	authContext, err := requireMutationContext(auth)
+func (eService *assistantService) DeleteAssistant(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.Assistant, error) {
+	userContext, err := auth.UserContext()
+	if err != nil {
+		return nil, err
+	}
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -172,13 +179,13 @@ func (eService *assistantService) DeleteAssistant(ctx context.Context, auth type
 	db := eService.postgres.DB(ctx)
 	ed := &internal_assistant_entity.Assistant{
 		Mutable: gorm_models.Mutable{
-			UpdatedBy: authContext.UserID,
+			UpdatedBy: userContext.UserID,
 			Status:    type_enums.RECORD_ARCHIEVE,
 		},
 	}
 	tx := db.Where("id = ? AND project_id = ? AND organization_id = ?", assistantId,
-		authContext.Project.ProjectID,
-		authContext.Project.OrganizationID,
+		projectContext.ProjectID,
+		projectContext.OrganizationID,
 	).Clauses(clause.Returning{}).Updates(ed)
 	if tx.Error != nil {
 		eService.logger.Benchmark("assistantService.DeleteAssistant", time.Since(start))
@@ -189,8 +196,8 @@ func (eService *assistantService) DeleteAssistant(ctx context.Context, auth type
 	return ed, nil
 }
 
-func (eService *assistantService) GetAllAssistantTool(ctx context.Context, auth types.SimplePrinciple, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantTool, error) {
-	projectContext, err := types.RequireProject(auth)
+func (eService *assistantService) GetAllAssistantTool(ctx context.Context, auth *types.Authentication, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantTool, error) {
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return 0, nil, err
 	}
@@ -233,11 +240,11 @@ func (eService *assistantService) GetAllAssistantTool(ctx context.Context, auth 
 }
 
 func (eService *assistantService) Get(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	assistantProviderId *uint64,
 	opts *internal_services.GetAssistantOption) (*internal_assistant_entity.Assistant, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -575,11 +582,15 @@ func (eService *assistantService) Get(ctx context.Context,
 }
 
 func (eService *assistantService) UpdateAssistantVersion(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	assistantProvider type_enums.AssistantProvider,
 	assistantProviderId uint64) (*internal_assistant_entity.Assistant, error) {
-	authContext, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
+	if err != nil {
+		return nil, err
+	}
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -588,14 +599,14 @@ func (eService *assistantService) UpdateAssistantVersion(ctx context.Context,
 	db := eService.postgres.DB(ctx)
 	ed := &internal_assistant_entity.Assistant{
 		Mutable: gorm_models.Mutable{
-			UpdatedBy: authContext.UserID,
+			UpdatedBy: userContext.UserID,
 		},
 		AssistantProvider:   assistantProvider,
 		AssistantProviderId: assistantProviderId,
 	}
 	tx := db.Where("id = ? AND project_id = ? AND organization_id = ?", assistantId,
-		authContext.Project.ProjectID,
-		authContext.Project.OrganizationID,
+		projectContext.ProjectID,
+		projectContext.OrganizationID,
 	).Clauses(clause.Returning{}).Updates(ed)
 	if tx.Error != nil {
 		eService.logger.Benchmark("assistantService.UpdateAssistantVersion", time.Since(start))
@@ -606,8 +617,8 @@ func (eService *assistantService) UpdateAssistantVersion(ctx context.Context,
 	return ed, nil
 }
 
-func (eService *assistantService) GetAll(ctx context.Context, auth types.SimplePrinciple, criterias []*protos.Criteria, paginate *protos.Paginate, opts *internal_services.GetAssistantOption) (int64, []*internal_assistant_entity.Assistant, error) {
-	projectContext, err := types.RequireProject(auth)
+func (eService *assistantService) GetAll(ctx context.Context, auth *types.Authentication, criterias []*protos.Criteria, paginate *protos.Paginate, opts *internal_services.GetAssistantOption) (int64, []*internal_assistant_entity.Assistant, error) {
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return 0, nil, err
 	}
@@ -706,7 +717,7 @@ func (eService *assistantService) GetAll(ctx context.Context, auth types.SimpleP
 
 func (eService *assistantService) GetAllAssistantProviderModel(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64, criterias []*protos.Criteria,
 	paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantProviderModel, error) {
 
@@ -748,7 +759,7 @@ func (eService *assistantService) GetAllAssistantProviderModel(
 
 func (eService *assistantService) GetAllAssistantProviderAgentkit(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64, criterias []*protos.Criteria,
 	paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantProviderAgentkit, error) {
 
@@ -789,7 +800,7 @@ func (eService *assistantService) GetAllAssistantProviderAgentkit(
 
 func (eService *assistantService) GetAllAssistantProviderAgentflow(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64, criterias []*protos.Criteria,
 	paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantProviderAgentflow, error) {
 
@@ -829,7 +840,7 @@ func (eService *assistantService) GetAllAssistantProviderAgentflow(
 
 func (eService *assistantService) GetAllAssistantProviderWebsocket(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64, criterias []*protos.Criteria,
 	paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantProviderWebsocket, error) {
 
@@ -869,13 +880,17 @@ func (eService *assistantService) GetAllAssistantProviderWebsocket(
 }
 
 func (eService *assistantService) CreateAssistant(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	name, description string,
 	visibility string,
 	source string,
 	sourceIdentifier *uint64,
 	language string) (*internal_assistant_entity.Assistant, error) {
-	authContext, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
+	if err != nil {
+		return nil, err
+	}
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -884,12 +899,12 @@ func (eService *assistantService) CreateAssistant(ctx context.Context,
 	db := eService.postgres.DB(ctx)
 	ep := &internal_assistant_entity.Assistant{
 		Mutable: gorm_models.Mutable{
-			CreatedBy: authContext.UserID,
+			CreatedBy: userContext.UserID,
 			Status:    type_enums.RECORD_ACTIVE,
 		},
 		Organizational: gorm_models.Organizational{
-			ProjectId:      authContext.Project.ProjectID,
-			OrganizationId: authContext.Project.OrganizationID,
+			ProjectId:      projectContext.ProjectID,
+			OrganizationId: projectContext.OrganizationID,
 		},
 		Visibility:  visibility,
 		Name:        name,
@@ -912,10 +927,14 @@ func (eService *assistantService) CreateAssistant(ctx context.Context,
 }
 
 func (eService *assistantService) UpdateAssistantDetail(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	name, description string) (*internal_assistant_entity.Assistant, error) {
-	authContext, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
+	if err != nil {
+		return nil, err
+	}
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -924,14 +943,14 @@ func (eService *assistantService) UpdateAssistantDetail(ctx context.Context,
 	db := eService.postgres.DB(ctx)
 	ed := &internal_assistant_entity.Assistant{
 		Mutable: gorm_models.Mutable{
-			UpdatedBy: authContext.UserID,
+			UpdatedBy: userContext.UserID,
 		},
 		Name:        name,
 		Description: description,
 	}
 	tx := db.Where("id = ? AND project_id = ? AND organization_id = ?", assistantId,
-		authContext.Project.ProjectID,
-		authContext.Project.OrganizationID,
+		projectContext.ProjectID,
+		projectContext.OrganizationID,
 	).Updates(ed)
 	if tx.Error != nil {
 		eService.logger.Benchmark("assistantService.UpdateAssistantDetail", time.Since(start))
@@ -944,14 +963,15 @@ func (eService *assistantService) UpdateAssistantDetail(ctx context.Context,
 
 func (eService *assistantService) CreateAssistantProviderModel(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	description string,
 	promptRequest string,
 	modelProviderName string,
 	options []*protos.Metadata,
 ) (*internal_assistant_entity.AssistantProviderModel, error) {
-	userID, err := types.RequireUser(auth)
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return nil, err
 	}
@@ -1009,11 +1029,15 @@ func (eService *assistantService) CreateAssistantProviderModel(
 }
 
 func (eService *assistantService) AttachProviderModelToAssistant(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	providerType type_enums.AssistantProvider,
 	assistantProviderId uint64) (*internal_assistant_entity.Assistant, error) {
-	authContext, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
+	if err != nil {
+		return nil, err
+	}
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -1023,11 +1047,11 @@ func (eService *assistantService) AttachProviderModelToAssistant(ctx context.Con
 	ed := &internal_assistant_entity.Assistant{
 		AssistantProvider:   providerType,
 		AssistantProviderId: assistantProviderId,
-		Mutable:             gorm_models.Mutable{UpdatedBy: authContext.UserID},
+		Mutable:             gorm_models.Mutable{UpdatedBy: userContext.UserID},
 	}
 	tx := db.Where("id = ? AND project_id = ? AND organization_id = ?", assistantId,
-		authContext.Project.ProjectID,
-		authContext.Project.OrganizationID,
+		projectContext.ProjectID,
+		projectContext.OrganizationID,
 	).Clauses(clause.Returning{}).Updates(ed)
 	if tx.Error != nil {
 		eService.logger.Benchmark("assistantService.AttachProviderModelToAssistant", time.Since(start))
@@ -1039,11 +1063,12 @@ func (eService *assistantService) AttachProviderModelToAssistant(ctx context.Con
 }
 
 func (eService *assistantService) CreateOrUpdateAssistantTag(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	tags []string,
 ) (*internal_assistant_entity.AssistantTag, error) {
-	userID, err := types.RequireUser(auth)
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return nil, err
 	}

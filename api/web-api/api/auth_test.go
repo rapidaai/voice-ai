@@ -1,6 +1,7 @@
 package web_api
 
 import (
+	"context"
 	"testing"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -9,26 +10,26 @@ import (
 	protos "github.com/rapidaai/protos"
 )
 
-func TestScopedAuthenticationIncludesProjectActor(t *testing.T) {
-	credentialID := uint64(55)
-	projectID := uint64(77)
-	organizationID := uint64(99)
-	principle := &types.ProjectScope{
-		CredentialId:   &credentialID,
-		ProjectId:      &projectID,
-		OrganizationId: &organizationID,
-		Status:         "ACTIVE",
+func TestScopeAuthorizeIncludesProjectActor(t *testing.T) {
+	actor := types.ActorIdentity{Type: types.ActorTypeProject, ID: "55"}
+	auth := &types.Authentication{
+		AuthType:          types.AuthTypeProject,
+		ActorValue:        &actor,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: 99},
+		ProjectValue:      &types.ProjectContext{OrganizationID: 99, ProjectID: 77},
 	}
+	ctx := context.WithValue(context.Background(), types.CTX_, auth)
 
-	auth, err := scopedAuthentication(principle)
+	response, err := (&webAuthGRPCApi{}).ScopeAuthorize(ctx, &protos.ScopeAuthorizeRequest{Scope: "project"})
 	if err != nil {
-		t.Fatalf("scopedAuthentication() error = %v", err)
+		t.Fatalf("ScopeAuthorize() error = %v", err)
 	}
-	if auth.GetActorType() != "project" || auth.GetActorId() != "55" {
-		t.Fatalf("scopedAuthentication() actor = %q/%q", auth.GetActorType(), auth.GetActorId())
+	data := response.GetData()
+	if data.GetActorType() != "project" || data.GetActorId() != "55" {
+		t.Fatalf("ScopeAuthorize() actor = %q/%q", data.GetActorType(), data.GetActorId())
 	}
-	if auth.GetProjectId() != projectID || auth.GetOrganizationId() != organizationID {
-		t.Fatalf("scopedAuthentication() scope = %d/%d", auth.GetProjectId(), auth.GetOrganizationId())
+	if data.GetProjectId() != 77 || data.GetOrganizationId() != 99 {
+		t.Fatalf("ScopeAuthorize() scope = %d/%d", data.GetProjectId(), data.GetOrganizationId())
 	}
 }
 
@@ -49,15 +50,13 @@ func TestScopedAuthenticationActorFieldNumbers(t *testing.T) {
 	}
 }
 
-func TestScopedAuthenticationRejectsMissingProjectCredential(t *testing.T) {
-	projectID := uint64(77)
-	organizationID := uint64(99)
-	principle := &types.ProjectScope{
-		ProjectId:      &projectID,
-		OrganizationId: &organizationID,
-		Status:         "ACTIVE",
+func TestScopeAuthorizeRejectsWrongScope(t *testing.T) {
+	auth := &types.Authentication{
+		AuthType:          types.AuthTypeOrg,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: 99},
 	}
-	if _, err := scopedAuthentication(principle); err == nil {
-		t.Fatal("scopedAuthentication() error = nil, want missing actor error")
+	ctx := context.WithValue(context.Background(), types.CTX_, auth)
+	if _, err := (&webAuthGRPCApi{}).ScopeAuthorize(ctx, &protos.ScopeAuthorizeRequest{Scope: "project"}); err == nil {
+		t.Fatal("ScopeAuthorize() error = nil")
 	}
 }

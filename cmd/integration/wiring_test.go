@@ -9,21 +9,11 @@ import (
 	"testing"
 )
 
-func TestGRPCAuthenticationMiddlewareOrder(t *testing.T) {
+func TestGRPCUsesCoordinatingAuthenticationBoundary(t *testing.T) {
 	file := parseCommandSource(t, "integration.go")
 
-	assertMiddlewareOrder(t, interceptorChain(t, file, "ChainUnaryInterceptor"),
-		"NewCredentialConflictUnaryServerMiddleware",
-		"NewServiceAuthenticatorUnaryServerMiddleware",
-		"NewProjectAuthenticatorUnaryServerMiddleware",
-		"NewAuthenticationUnaryServerMiddleware",
-	)
-	assertMiddlewareOrder(t, interceptorChain(t, file, "ChainStreamInterceptor"),
-		"NewCredentialConflictStreamServerMiddleware",
-		"NewServiceAuthenticatorStreamServerMiddleware",
-		"NewProjectAuthenticatorStreamServerMiddleware",
-		"NewAuthenticationStreamServerMiddleware",
-	)
+	assertOnlyAuthenticationBoundary(t, interceptorChain(t, file, "ChainUnaryInterceptor"), "NewAuthenticationBoundaryUnaryServerMiddleware")
+	assertOnlyAuthenticationBoundary(t, interceptorChain(t, file, "ChainStreamInterceptor"), "NewAuthenticationBoundaryStreamServerMiddleware")
 }
 
 func parseCommandSource(t *testing.T, name string) *ast.File {
@@ -74,18 +64,24 @@ func callName(call *ast.CallExpr) string {
 	}
 }
 
-func assertMiddlewareOrder(t *testing.T, chain []string, first string, followers ...string) {
+func assertOnlyAuthenticationBoundary(t *testing.T, chain []string, boundary string) {
 	t.Helper()
-	firstIndex := middlewareIndex(chain, first)
-	if firstIndex < 0 {
-		t.Fatalf("%s not found in %v", first, chain)
+	if middlewareIndex(chain, boundary) < 0 {
+		t.Fatalf("%s not found in %v", boundary, chain)
 	}
-	for _, follower := range followers {
-		followerIndex := middlewareIndex(chain, follower)
-		if followerIndex < 0 {
-			t.Errorf("%s not found in %v", follower, chain)
-		} else if firstIndex >= followerIndex {
-			t.Errorf("%s must precede %s in %v", first, follower, chain)
+	legacy := []string{
+		"NewCredentialConflictUnaryServerMiddleware",
+		"NewCredentialConflictStreamServerMiddleware",
+		"NewServiceAuthenticatorUnaryServerMiddleware",
+		"NewServiceAuthenticatorStreamServerMiddleware",
+		"NewProjectAuthenticatorUnaryServerMiddleware",
+		"NewProjectAuthenticatorStreamServerMiddleware",
+		"NewAuthenticationUnaryServerMiddleware",
+		"NewAuthenticationStreamServerMiddleware",
+	}
+	for _, middleware := range legacy {
+		if middlewareIndex(chain, middleware) >= 0 {
+			t.Errorf("legacy middleware %s found in %v", middleware, chain)
 		}
 	}
 }

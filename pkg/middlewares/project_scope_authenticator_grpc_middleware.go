@@ -17,6 +17,8 @@ import (
 	"github.com/rapidaai/pkg/types"
 )
 
+// NewProjectAuthenticatorUnaryServerMiddleware authenticates only project credentials.
+// Deprecated: use NewAuthenticationBoundaryUnaryServerMiddleware.
 func NewProjectAuthenticatorUnaryServerMiddleware(resolver types.ClaimAuthenticator[*types.ProjectScope], logger commons.Logger) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		apiKey := metadata.ExtractIncoming(ctx).Get(types.PROJECT_SCOPE_KEY)
@@ -37,6 +39,8 @@ func NewProjectAuthenticatorUnaryServerMiddleware(resolver types.ClaimAuthentica
 	}
 }
 
+// NewProjectAuthenticatorStreamServerMiddleware authenticates only project credentials.
+// Deprecated: use NewAuthenticationBoundaryStreamServerMiddleware.
 func NewProjectAuthenticatorStreamServerMiddleware(resolver types.ClaimAuthenticator[*types.ProjectScope], logger commons.Logger) grpc.StreamServerInterceptor {
 	return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		ctx := stream.Context()

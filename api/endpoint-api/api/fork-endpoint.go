@@ -20,9 +20,10 @@ func (endpointGRPCApi *endpointGRPCApi) ForkEndpoint(ctx context.Context, eReque
 	if authErr != nil {
 		return nil, status.Error(codes.Unauthenticated, authErr.Error())
 	}
-	_, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
 	if scopeErr != nil {
 		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
+	_ = iAuth
 	return nil, status.Error(codes.Unimplemented, "ForkEndpoint is not implemented")
 }

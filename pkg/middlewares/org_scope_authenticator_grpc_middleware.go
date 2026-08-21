@@ -15,6 +15,8 @@ import (
 	"github.com/rapidaai/pkg/types"
 )
 
+// NewOrganizationAuthenticatorUnaryServerMiddleware authenticates only organization credentials.
+// Deprecated: use NewAuthenticationBoundaryUnaryServerMiddleware.
 func NewOrganizationAuthenticatorUnaryServerMiddleware(resolver types.ClaimAuthenticator[*types.OrganizationScope], logger commons.Logger) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		apiKey := metadata.ExtractIncoming(ctx).Get(types.ORG_SCOPE_KEY)

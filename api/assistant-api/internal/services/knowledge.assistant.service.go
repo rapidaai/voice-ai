@@ -15,16 +15,16 @@ import (
 )
 
 type AssistantKnowledgeService interface {
-	Get(ctx context.Context, auth types.SimplePrinciple,
+	Get(ctx context.Context, auth *types.Authentication,
 		assistantKnowledgeId, assistantId uint64) (*internal_assistant_entity.AssistantKnowledge, error)
 	GetAll(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		criterias []*workflow_api.Criteria,
 		paginate *workflow_api.Paginate) (int64, []*internal_assistant_entity.AssistantKnowledge, error)
 
 	Create(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		knowledgeId uint64,
 		retrievalMethod gorm_types.RetrievalMethod,
@@ -37,7 +37,7 @@ type AssistantKnowledgeService interface {
 	) (*internal_assistant_entity.AssistantKnowledge, error)
 
 	Update(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantKnowledgeId uint64,
 		assistantId uint64,
 		knowledgeId uint64,
@@ -50,6 +50,6 @@ type AssistantKnowledgeService interface {
 		rerankerProviderModelOptions []*workflow_api.Metadata) (*internal_assistant_entity.AssistantKnowledge, error)
 
 	Delete(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantKnowledgeId, assistantId uint64) (*internal_assistant_entity.AssistantKnowledge, error)
 }

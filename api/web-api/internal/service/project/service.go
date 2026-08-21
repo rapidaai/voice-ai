@@ -59,14 +59,19 @@ func (p *projectService) Claim(ctx context.Context, claimToken string) (*types.P
 	}, nil
 }
 
-func (pS *projectService) Create(ctx context.Context, auth types.Principle, organizationId uint64, name string, description string) (*internal_entity.Project, error) {
+func (pS *projectService) Create(ctx context.Context, auth *types.Authentication, organizationId uint64, name string, description string) (*internal_entity.Project, error) {
+	userContext, authErr := auth.UserContext()
+	if authErr != nil {
+		return nil, authErr
+	}
+
 	db := pS.postgres.DB(ctx)
 	project := &internal_entity.Project{
 		Name:           name,
 		OrganizationId: organizationId,
 		Description:    description,
 		Mutable: gorm_models.Mutable{
-			CreatedBy: auth.GetUserInfo().Id,
+			CreatedBy: userContext.UserID,
 		},
 	}
 	tx := db.Save(project)
@@ -75,14 +80,19 @@ func (pS *projectService) Create(ctx context.Context, auth types.Principle, orga
 	}
 	return project, nil
 }
-func (pS *projectService) Update(ctx context.Context, auth types.Principle, projectId uint64, name *string, description *string) (*internal_entity.Project, error) {
+func (pS *projectService) Update(ctx context.Context, auth *types.Authentication, projectId uint64, name *string, description *string) (*internal_entity.Project, error) {
+	userContext, authErr := auth.UserContext()
+	if authErr != nil {
+		return nil, authErr
+	}
+
 	db := pS.postgres.DB(ctx)
 	project := &internal_entity.Project{
 		Audited: gorm_models.Audited{
 			Id: projectId,
 		},
 	}
-	updates := map[string]interface{}{"updated_by": auth.GetUserInfo().Id}
+	updates := map[string]interface{}{"updated_by": userContext.UserID}
 
 	if name != nil {
 		updates["name"] = *name
@@ -97,7 +107,7 @@ func (pS *projectService) Update(ctx context.Context, auth types.Principle, proj
 	return project, nil
 }
 
-func (pS *projectService) GetAll(ctx context.Context, auth types.SimplePrinciple, organizationId uint64, criteria []*web_api.Criteria, paginate *web_api.Paginate) (int64, []*internal_entity.Project, error) {
+func (pS *projectService) GetAll(ctx context.Context, auth *types.Authentication, organizationId uint64, criteria []*web_api.Criteria, paginate *web_api.Paginate) (int64, []*internal_entity.Project, error) {
 	db := pS.postgres.DB(ctx)
 	var projects []*internal_entity.Project
 	var cnt int64
@@ -127,7 +137,7 @@ func (pS *projectService) GetAll(ctx context.Context, auth types.SimplePrinciple
 	return cnt, projects, nil
 }
 
-func (pS *projectService) Get(ctx context.Context, auth types.SimplePrinciple, projectId uint64) (*internal_entity.Project, error) {
+func (pS *projectService) Get(ctx context.Context, auth *types.Authentication, projectId uint64) (*internal_entity.Project, error) {
 	db := pS.postgres.DB(ctx)
 	var project internal_entity.Project
 	tx := db.Where("id = ? AND status = ? ", projectId, type_enums.RECORD_ACTIVE).First(&project)
@@ -138,7 +148,7 @@ func (pS *projectService) Get(ctx context.Context, auth types.SimplePrinciple, p
 	return &project, nil
 }
 
-func (pS *projectService) GetAllByOrganization(ctx context.Context, auth types.SimplePrinciple, organizationId uint64, projectIds []uint64) ([]*internal_entity.Project, error) {
+func (pS *projectService) GetAllByOrganization(ctx context.Context, auth *types.Authentication, organizationId uint64, projectIds []uint64) ([]*internal_entity.Project, error) {
 	db := pS.postgres.DB(ctx)
 	uniqueProjectIds := utils.Unique(projectIds)
 
@@ -157,12 +167,17 @@ func (pS *projectService) GetAllByOrganization(ctx context.Context, auth types.S
 	return projects, nil
 }
 
-func (pS *projectService) Archive(ctx context.Context, auth types.Principle, projectId uint64) (*internal_entity.Project, error) {
+func (pS *projectService) Archive(ctx context.Context, auth *types.Authentication, projectId uint64) (*internal_entity.Project, error) {
+	userContext, authErr := auth.UserContext()
+	if authErr != nil {
+		return nil, authErr
+	}
+
 	db := pS.postgres.DB(ctx)
 	ct := &internal_entity.Project{
 		Mutable: gorm_models.Mutable{
 			Status:    type_enums.RECORD_ARCHIEVE,
-			UpdatedBy: auth.GetUserInfo().Id,
+			UpdatedBy: userContext.UserID,
 		},
 	}
 	tx := db.Where("id=?", projectId).Updates(&ct)
@@ -173,7 +188,12 @@ func (pS *projectService) Archive(ctx context.Context, auth types.Principle, pro
 	return ct, nil
 }
 
-func (pS *projectService) CreateCredential(ctx context.Context, auth types.Principle, name string, projectId, organizationId uint64) (*internal_entity.ProjectCredential, error) {
+func (pS *projectService) CreateCredential(ctx context.Context, auth *types.Authentication, name string, projectId, organizationId uint64) (*internal_entity.ProjectCredential, error) {
+	userContext, authErr := auth.UserContext()
+	if authErr != nil {
+		return nil, authErr
+	}
+
 	db := pS.postgres.DB(ctx)
 	key := ciphers.Token("rpx_")
 	prc := &internal_entity.ProjectCredential{
@@ -185,7 +205,7 @@ func (pS *projectService) CreateCredential(ctx context.Context, auth types.Princ
 		Key:  key,
 		Mutable: gorm_models.Mutable{
 			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: auth.GetUserInfo().Id,
+			CreatedBy: userContext.UserID,
 		},
 	}
 	tx := db.Save(prc)
@@ -195,12 +215,17 @@ func (pS *projectService) CreateCredential(ctx context.Context, auth types.Princ
 	return prc, nil
 }
 
-func (pS *projectService) ArchiveCredential(ctx context.Context, auth types.Principle, credentialId, projectId, organizationId uint64) (*internal_entity.ProjectCredential, error) {
+func (pS *projectService) ArchiveCredential(ctx context.Context, auth *types.Authentication, credentialId, projectId, organizationId uint64) (*internal_entity.ProjectCredential, error) {
+	userContext, authErr := auth.UserContext()
+	if authErr != nil {
+		return nil, authErr
+	}
+
 	db := pS.postgres.DB(ctx)
 	ct := &internal_entity.ProjectCredential{
 		Mutable: gorm_models.Mutable{
 			Status:    type_enums.RECORD_ARCHIEVE,
-			UpdatedBy: auth.GetUserInfo().Id,
+			UpdatedBy: userContext.UserID,
 		},
 	}
 	tx := db.Where("id=? AND project_id = ? AND organization_id = ?", credentialId, projectId, organizationId).Updates(&ct)
@@ -211,7 +236,7 @@ func (pS *projectService) ArchiveCredential(ctx context.Context, auth types.Prin
 	return ct, nil
 }
 
-func (pS *projectService) GetAllCredential(ctx context.Context, auth types.Principle, projectId, organizationId uint64, criteria []*web_api.Criteria, paginate *web_api.Paginate) (int64, []*internal_entity.ProjectCredential, error) {
+func (pS *projectService) GetAllCredential(ctx context.Context, auth *types.Authentication, projectId, organizationId uint64, criteria []*web_api.Criteria, paginate *web_api.Paginate) (int64, []*internal_entity.ProjectCredential, error) {
 	db := pS.postgres.DB(ctx)
 	var pcs []*internal_entity.ProjectCredential
 	var cnt int64

@@ -69,7 +69,7 @@ func (d *Dispatcher) ensureCallContext(ctx context.Context, stage sip_infra.Sess
 	if stage.Direction == sip_infra.CallDirectionOutbound {
 		contextID := stage.Session.GetContextID()
 		if contextID == "" {
-			return reconstructCallContext(stage.Auth, stage.AssistantID, conversationID, dirStr, callID, "", stage.FromURI, stage.ToURI), nil
+			return reconstructCallContext(stage.Auth, stage.AssistantID, conversationID, dirStr, callID, "", stage.FromURI, stage.ToURI)
 		}
 		if claimed, err := d.callContextStore.Claim(ctx, contextID); err == nil {
 			return claimed, nil
@@ -77,25 +77,20 @@ func (d *Dispatcher) ensureCallContext(ctx context.Context, stage sip_infra.Sess
 		if loaded, err := d.callContextStore.Get(ctx, contextID); err == nil {
 			return loaded, nil
 		}
-		return reconstructCallContext(stage.Auth, stage.AssistantID, conversationID, dirStr, callID, contextID, stage.FromURI, stage.ToURI), nil
+		return reconstructCallContext(stage.Auth, stage.AssistantID, conversationID, dirStr, callID, contextID, stage.FromURI, stage.ToURI)
 	}
 
 	callContext := &callcontext.CallContext{
 		AssistantID:    stage.AssistantID,
 		ConversationID: conversationID,
-		AuthToken:      stage.Auth.GetCurrentToken(),
-		AuthType:       stage.Auth.Type().String(),
 		Direction:      dirStr,
 		Provider:       "sip",
 		CallerNumber:   extractDIDOrRaw(stage.FromURI),
 		FromNumber:     extractDIDOrRaw(stage.ToURI),
 		ChannelUUID:    callID,
 	}
-	if delegatedContext, err := types.ResolveDelegatedContext(stage.Auth); err == nil {
-		callContext.OrganizationID = delegatedContext.OrganizationID
-		if delegatedContext.ProjectID != nil {
-			callContext.ProjectID = *delegatedContext.ProjectID
-		}
+	if err := callContext.SetAuthentication(stage.Auth); err != nil {
+		return nil, err
 	}
 	if assistant := stage.Session.GetAssistant(); assistant != nil {
 		callContext.AssistantProviderId = assistant.AssistantProviderId
@@ -125,26 +120,23 @@ func (d *Dispatcher) setupCall(ctx context.Context, stage sip_infra.SessionEstab
 		AssistantID:    stage.AssistantID,
 		ConversationID: conversationID,
 		CallContext:    cc,
+		Auth:           stage.Auth,
 	}
 	if assistant != nil {
 		result.AssistantID = assistant.Id
 		result.AssistantProviderId = assistant.AssistantProviderId
 	}
-	if stage.Auth != nil {
-		result.AuthToken = stage.Auth.GetCurrentToken()
-		result.AuthType = stage.Auth.Type().String()
-		if delegatedContext, err := types.ResolveDelegatedContext(stage.Auth); err == nil {
-			result.OrganizationID = delegatedContext.OrganizationID
-			if delegatedContext.ProjectID != nil {
-				result.ProjectID = *delegatedContext.ProjectID
-			}
-		}
+	if projectContext, err := stage.Auth.ProjectContext(); err == nil {
+		result.OrganizationID = projectContext.OrganizationID
+		result.ProjectID = projectContext.ProjectID
+	} else if organizationContext, err := stage.Auth.OrganizationContext(); err == nil {
+		result.OrganizationID = organizationContext.OrganizationID
 	}
 
 	return result, nil
 }
 
-func (d *Dispatcher) createObserver(ctx context.Context, scope *CallSetupResult, auth types.SimplePrinciple) observability.Recorder {
+func (d *Dispatcher) createObserver(ctx context.Context, scope *CallSetupResult, auth *types.Authentication) observability.Recorder {
 	recorder := observability.New(
 		observability.WithLogger(d.logger),
 		observability.WithAuth(auth),
@@ -179,7 +171,7 @@ func (d *Dispatcher) createObserver(ctx context.Context, scope *CallSetupResult,
 }
 
 func reconstructCallContext(
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantID uint64,
 	conversationID uint64,
 	direction string,
@@ -187,16 +179,17 @@ func reconstructCallContext(
 	contextID string,
 	fromURI string,
 	toURI string,
-) *callcontext.CallContext {
+) (*callcontext.CallContext, error) {
 	callContext := &callcontext.CallContext{
 		AssistantID:    assistantID,
 		ConversationID: conversationID,
-		AuthToken:      auth.GetCurrentToken(),
-		AuthType:       auth.Type().String(),
 		Direction:      direction,
 		Provider:       "sip",
 		ChannelUUID:    callID,
 		ContextID:      contextID,
+	}
+	if err := callContext.SetAuthentication(auth); err != nil {
+		return nil, err
 	}
 	if direction == string(sip_infra.CallDirectionOutbound) {
 		callContext.CallerNumber = extractDIDOrRaw(toURI)
@@ -205,13 +198,7 @@ func reconstructCallContext(
 		callContext.CallerNumber = extractDIDOrRaw(fromURI)
 		callContext.FromNumber = extractDIDOrRaw(toURI)
 	}
-	if delegatedContext, err := types.ResolveDelegatedContext(auth); err == nil {
-		callContext.OrganizationID = delegatedContext.OrganizationID
-		if delegatedContext.ProjectID != nil {
-			callContext.ProjectID = *delegatedContext.ProjectID
-		}
-	}
-	return callContext
+	return callContext, nil
 }
 
 func extractDIDOrRaw(uri string) string {

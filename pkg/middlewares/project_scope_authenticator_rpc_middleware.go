@@ -14,6 +14,8 @@ import (
 	"github.com/rapidaai/pkg/types"
 )
 
+// NewProjectAuthenticatorMiddleware authenticates only project credentials.
+// Deprecated: use NewAuthenticationBoundaryMiddleware.
 func NewProjectAuthenticatorMiddleware(resolver types.ClaimAuthenticator[*types.ProjectScope], logger commons.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authToken := ginProjectCredential(c)

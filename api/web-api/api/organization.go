@@ -2,7 +2,9 @@ package web_api
 
 import (
 	"context"
-	"errors"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	internal_project_service "github.com/rapidaai/api/web-api/internal/service/project"
 
@@ -79,8 +81,20 @@ func NewOrganizationGRPC(config *config.WebAppConfig, logger commons.Logger,
 }
 
 func (orgR *webOrganizationRPCApi) CreateOrganization(c *gin.Context) {
-	auth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
-	if !isAuthenticated {
+	auth, authErr := types.Authorize(c.Request.Context())
+	if authErr != nil {
+		_ = c.Error(status.Error(codes.Unauthenticated, authErr.Error()))
+		c.AbortWithStatusJSON(401, "illegal request.")
+		return
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		_ = c.Error(status.Error(codes.PermissionDenied, scopeErr.Error()))
+		c.AbortWithStatusJSON(403, "illegal request.")
+		return
+	}
+	userContext, authErr := iAuth.UserContext()
+	if authErr != nil {
 		c.JSON(401, "illegal request.")
 		return
 	}
@@ -98,7 +112,7 @@ func (orgR *webOrganizationRPCApi) CreateOrganization(c *gin.Context) {
 		return
 	}
 
-	aOrg, err := orgR.organizationService.Create(c, auth, irRequest.OrganizationName, irRequest.OrganizationSize, irRequest.OrganizationIndustry)
+	aOrg, err := orgR.organizationService.Create(c, iAuth, irRequest.OrganizationName, irRequest.OrganizationSize, irRequest.OrganizationIndustry)
 	if err != nil {
 		c.JSON(500, commons.Response{
 			Code:    500,
@@ -108,7 +122,7 @@ func (orgR *webOrganizationRPCApi) CreateOrganization(c *gin.Context) {
 		return
 	}
 
-	oRole, err := orgR.userService.CreateOrganizationRole(c, auth, type_enums.ORGANIZATION_ROLE_OWNER.String(), auth.GetUserInfo().Id, aOrg.Id, type_enums.RECORD_ACTIVE)
+	oRole, err := orgR.userService.CreateOrganizationRole(c, iAuth, type_enums.ORGANIZATION_ROLE_OWNER.String(), userContext.UserID, aOrg.Id, type_enums.RECORD_ACTIVE)
 	if err != nil {
 		c.JSON(500, commons.Response{
 			Code:    500,
@@ -128,15 +142,20 @@ func (orgR *webOrganizationRPCApi) CreateOrganization(c *gin.Context) {
 For creation of organization and
 */
 func (orgG *webOrganizationGRPCApi) CreateOrganization(c context.Context, irRequest *protos.CreateOrganizationRequest) (*protos.CreateOrganizationResponse, error) {
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
-	if !isAuthenticated {
-		orgG.logger.Errorf("unauthenticated request for create organization")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
-	// check if he is already part of current organization
-	currentOrg := iAuth.GetOrganizationRole()
-	if currentOrg != nil {
+	userContext, err := iAuth.UserContext()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := iAuth.OrganizationContext(); err == nil {
 		orgG.logger.Errorf("current org is not null, you can't create multiple organization at same time.")
 		return &protos.CreateOrganizationResponse{
 			Code:    400,
@@ -163,7 +182,7 @@ func (orgG *webOrganizationGRPCApi) CreateOrganization(c context.Context, irRequ
 	}
 
 	// creation of organization role
-	aRole, err := orgG.userService.CreateOrganizationRole(c, iAuth, type_enums.ORGANIZATION_ROLE_OWNER.String(), iAuth.GetUserInfo().Id, aOrg.Id, type_enums.RECORD_ACTIVE)
+	aRole, err := orgG.userService.CreateOrganizationRole(c, iAuth, type_enums.ORGANIZATION_ROLE_OWNER.String(), userContext.UserID, aOrg.Id, type_enums.RECORD_ACTIVE)
 	if err != nil {
 		orgG.logger.Errorf("CreateOrganizationRole from grpc with erro %v", err)
 		return &protos.CreateOrganizationResponse{
@@ -195,10 +214,13 @@ func (orgG *webOrganizationGRPCApi) CreateOrganization(c context.Context, irRequ
 }
 
 func (orgG *webOrganizationGRPCApi) UpdateOrganization(c context.Context, irRequest *protos.UpdateOrganizationRequest) (*protos.UpdateOrganizationResponse, error) {
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
-	if !isAuthenticated {
-		orgG.logger.Errorf("UpdateOrganization from grpc not authenticated")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
 	// updating organization
@@ -223,13 +245,20 @@ func (orgG *webOrganizationGRPCApi) UpdateOrganization(c context.Context, irRequ
 
 // getting all the organization
 func (orgG *webOrganizationGRPCApi) GetOrganization(c context.Context, irRequest *protos.GetOrganizationRequest) (*protos.GetOrganizationResponse, error) {
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
-	if !isAuthenticated {
-		orgG.logger.Errorf("GetOrganization from grpc not authenticated")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
-	aRole, err := orgG.userService.GetOrganizationRole(c, iAuth.GetUserInfo().Id)
+	userContext, err := iAuth.UserContext()
+	if err != nil {
+		return nil, err
+	}
+	aRole, err := orgG.userService.GetOrganizationRole(c, userContext.UserID)
 	if err != nil {
 		orgG.logger.Errorf("userService.GetOrganizationRole from grpc with erro %v", err)
 		return &protos.GetOrganizationResponse{

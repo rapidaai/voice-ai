@@ -45,10 +45,10 @@ func NewKnowledgeService(config *config.AssistantConfig,
 
 func (knowledge *knowledgeService) GetAll(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate) (int64, *[]internal_knowledge_gorm.Knowledge, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return 0, nil, err
 	}
@@ -90,8 +90,8 @@ func (knowledge *knowledgeService) GetAll(
 	return cnt, &knowledges, nil
 }
 
-func (knowledge *knowledgeService) Get(ctx context.Context, auth types.SimplePrinciple, knowledgeId uint64) (*internal_knowledge_gorm.Knowledge, error) {
-	projectContext, err := types.RequireProject(auth)
+func (knowledge *knowledgeService) Get(ctx context.Context, auth *types.Authentication, knowledgeId uint64) (*internal_knowledge_gorm.Knowledge, error) {
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -108,14 +108,18 @@ func (knowledge *knowledgeService) Get(ctx context.Context, auth types.SimplePri
 }
 
 func (knowledge *knowledgeService) CreateOrUpdateKnowledgeTag(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	knowledgeId uint64,
 	tags []string,
 ) (*internal_knowledge_gorm.KnowledgeTag, error) {
-	userID, _, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
 	if err != nil {
 		return nil, err
 	}
+	if _, err := auth.ProjectContext(); err != nil {
+		return nil, err
+	}
+	userID := userContext.UserID
 	db := knowledge.postgres.DB(ctx)
 	knowledgeTag := &internal_knowledge_gorm.KnowledgeTag{
 		KnowledgeId: knowledgeId,
@@ -137,15 +141,20 @@ func (knowledge *knowledgeService) CreateOrUpdateKnowledgeTag(ctx context.Contex
 	return knowledgeTag, nil
 }
 
-func (knowledge *knowledgeService) CreateKnowledge(ctx context.Context, auth types.SimplePrinciple,
+func (knowledge *knowledgeService) CreateKnowledge(ctx context.Context, auth *types.Authentication,
 	name string, description, visibility *string,
 	embeddingModelProviderName string,
 	embeddingModelOptions []*protos.Metadata,
 ) (*internal_knowledge_gorm.Knowledge, error) {
-	userID, projectContext, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
 	if err != nil {
 		return nil, err
 	}
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
+	userID := userContext.UserID
 	db := knowledge.postgres.DB(ctx)
 	knowledgeId := gorm_generator.ID()
 	_knowledge := &internal_knowledge_gorm.Knowledge{
@@ -207,13 +216,18 @@ func (knowledge *knowledgeService) CreateKnowledge(ctx context.Context, auth typ
 }
 
 func (eService *knowledgeService) UpdateKnowledgeDetail(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	knowledgeId uint64,
 	name, description string) (*internal_knowledge_gorm.Knowledge, error) {
-	userID, projectContext, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
 	if err != nil {
 		return nil, err
 	}
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
+	userID := userContext.UserID
 	db := eService.postgres.DB(ctx)
 	ed := &internal_knowledge_gorm.Knowledge{
 		Name:        name,
@@ -235,7 +249,7 @@ func (eService *knowledgeService) UpdateKnowledgeDetail(ctx context.Context,
 
 func (eService *knowledgeService) CreateLog(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	knowledgeId uint64,
 	retrievalMethod string,
 	topK uint32,
@@ -246,7 +260,7 @@ func (eService *knowledgeService) CreateLog(
 	status type_enums.RecordState,
 	request, response []byte,
 ) (*internal_knowledge_gorm.KnowledgeLog, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -296,10 +310,10 @@ func (eService *knowledgeService) CreateLog(
 
 func (eService *knowledgeService) GetLog(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	projectId uint64,
 	toolLogId uint64) (*internal_knowledge_gorm.KnowledgeLog, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -322,12 +336,12 @@ func (eService *knowledgeService) GetLog(
 
 func (eService *knowledgeService) GetAllLog(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	projectId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
 	order *protos.Ordering) (int64, []*internal_knowledge_gorm.KnowledgeLog, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return 0, nil, err
 	}
@@ -377,9 +391,13 @@ func (eService *knowledgeService) ObjectKey(keyPrefix string, auditId uint64, ob
 
 func (eService *knowledgeService) GetLogObject(
 	ctx context.Context,
-	organizationId,
-	projectId, toolLogId uint64) (requestData []byte, responseData []byte, err error) {
-	keyPrefix := eService.ObjectPrefix(organizationId, projectId)
+	auth *types.Authentication,
+	toolLogId uint64) (requestData []byte, responseData []byte, err error) {
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, nil, err
+	}
+	keyPrefix := eService.ObjectPrefix(projectContext.OrganizationID, projectContext.ProjectID)
 	responseKey := eService.ObjectKey(keyPrefix, toolLogId, "response.json")
 	requestKey := eService.ObjectKey(keyPrefix, toolLogId, "request.json")
 

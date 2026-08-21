@@ -32,12 +32,13 @@ type assistantKnowledgeService struct {
 }
 
 // CreateAssistantKnowledge implements internal_services.AssistantKnowledgeService.
-func (eService *assistantKnowledgeService) Create(ctx context.Context, auth types.SimplePrinciple, assistantId uint64, knowledgeId uint64,
+func (eService *assistantKnowledgeService) Create(ctx context.Context, auth *types.Authentication, assistantId uint64, knowledgeId uint64,
 	retrievalMethod gorm_types.RetrievalMethod,
 	rerankEnabled bool, scoreThreshold float32, topK uint32, rerankerProviderModelId *uint64,
 	rerankerProviderModelName *string,
 	rerankerProviderModelOptions []*protos.Metadata) (*internal_assistant_entity.AssistantKnowledge, error) {
-	userID, err := types.RequireUser(auth)
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return nil, err
 	}
@@ -116,8 +117,9 @@ func (eService *assistantKnowledgeService) Create(ctx context.Context, auth type
 }
 
 // DeleteAssistantKnowledge implements internal_services.AssistantKnowledgeService.
-func (eService *assistantKnowledgeService) Delete(ctx context.Context, auth types.SimplePrinciple, akId uint64, assistantId uint64) (*internal_assistant_entity.AssistantKnowledge, error) {
-	userID, err := types.RequireUser(auth)
+func (eService *assistantKnowledgeService) Delete(ctx context.Context, auth *types.Authentication, akId uint64, assistantId uint64) (*internal_assistant_entity.AssistantKnowledge, error) {
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +145,7 @@ func (eService *assistantKnowledgeService) Delete(ctx context.Context, auth type
 }
 
 // GetAllAssistantKnowledge implements internal_services.AssistantKnowledgeService.
-func (eService *assistantKnowledgeService) GetAll(ctx context.Context, auth types.SimplePrinciple, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantKnowledge, error) {
+func (eService *assistantKnowledgeService) GetAll(ctx context.Context, auth *types.Authentication, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantKnowledge, error) {
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	var (
@@ -180,7 +182,7 @@ func (eService *assistantKnowledgeService) GetAll(ctx context.Context, auth type
 }
 
 // GetAssistantKnowledge implements internal_services.AssistantKnowledgeService.
-func (eService *assistantKnowledgeService) Get(ctx context.Context, auth types.SimplePrinciple, akId, assistantId uint64) (*internal_assistant_entity.AssistantKnowledge, error) {
+func (eService *assistantKnowledgeService) Get(ctx context.Context, auth *types.Authentication, akId, assistantId uint64) (*internal_assistant_entity.AssistantKnowledge, error) {
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	var aK *internal_assistant_entity.AssistantKnowledge
@@ -199,8 +201,9 @@ func (eService *assistantKnowledgeService) Get(ctx context.Context, auth types.S
 }
 
 // UpdateAssistantKnowledge implements internal_services.AssistantKnowledgeService.
-func (eService *assistantKnowledgeService) Update(ctx context.Context, auth types.SimplePrinciple, akId uint64, assistantId uint64, knowledgeId uint64, retrievalMethod gorm_types.RetrievalMethod, rerankEnabled bool, scoreThreshold float32, topK uint32, rerankerProviderModelId *uint64, rerankerProviderModelName *string, rerankerProviderModelOptions []*protos.Metadata) (*internal_assistant_entity.AssistantKnowledge, error) {
-	userID, err := types.RequireUser(auth)
+func (eService *assistantKnowledgeService) Update(ctx context.Context, auth *types.Authentication, akId uint64, assistantId uint64, knowledgeId uint64, retrievalMethod gorm_types.RetrievalMethod, rerankEnabled bool, scoreThreshold float32, topK uint32, rerankerProviderModelId *uint64, rerankerProviderModelName *string, rerankerProviderModelOptions []*protos.Metadata) (*internal_assistant_entity.AssistantKnowledge, error) {
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return nil, err
 	}

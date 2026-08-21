@@ -9,6 +9,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	agentkit "github.com/rapidaai/api/assistant-api/internal/llm/agentkit"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
@@ -23,13 +25,13 @@ import (
 // CreateAssistantProviderModel implements assistant_api.AssistantServiceServer.
 func (assistantApi *assistantGrpcApi) CreateAssistantProvider(ctx context.Context,
 	iRequest *assistant_api.CreateAssistantProviderRequest) (*assistant_api.GetAssistantProviderResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated {
-		assistantApi.logger.Errorf("unauthenticated request for invoke")
-		return utils.Error[assistant_api.GetAssistantProviderResponse](
-			errors.New("unauthenticated request for GetAssistantProviderResponse"),
-			"Please provider valid service credentials to perfom invoke, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	assistant, err := assistantApi.assistantService.Get(ctx,
 		iAuth,

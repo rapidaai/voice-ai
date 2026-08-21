@@ -1,0 +1,108 @@
+{
+  "rfc": "0001-actor-aware-audit-identity",
+  "phase": "1E",
+  "title": "Repository-wide request authentication migration",
+  "status": "challenged-after-revision",
+  "objective": "Migrate shared clients and every API binary to the concrete request Authentication contract so controllers only call Authorize and Scope, services consume direct contexts, and internal production use of legacy authentication accessors and Require helpers reaches zero while exported contracts remain deprecated for compatibility.",
+  "verified_inventory": {
+    "shared_client_auth_signatures": 196,
+    "assistant_old_accessor_files": 93,
+    "assistant_legacy_helper_files": 100,
+    "web_old_accessor_files": 15,
+    "web_legacy_helper_files": 8,
+    "integration_old_accessor_files": 4,
+    "integration_legacy_helper_files": 4,
+    "endpoint_old_accessor_files": 0,
+    "endpoint_legacy_helper_files": 0,
+    "protected_handler_policy_entries": 239,
+    "policy_matrix": "rfcs/0001-phase-1e-auth-policy-matrix.json"
+  },
+  "acceptance_criteria": [
+    "All protected gRPC binaries use one coordinating authentication boundary that writes exactly one *types.Authentication.",
+    "Assistant and Web HTTP middleware write the same *types.Authentication into request context.",
+    "Every controller uses Authorize and Scope only for authentication policy.",
+    "Every RPC allowlist preserves its existing effective credential policy: user-plus-project checks remain user-only; project checks allow user/project/service with project context; organization-only operations use the explicitly inventoried current policy.",
+    "Services and internal components accept *types.Authentication and call UserContext, OrganizationContext, ProjectContext, or Actor directly.",
+    "All shared client methods accept *types.Authentication and construct delegated service assertions directly from its contexts.",
+    "InternalClient.WithAuth and WithPlatform return (context.Context, error); WithHttpAuth returns (*http.Request, error); every caller stops before downstream I/O when assertion creation fails.",
+    "Vault and cache tenant selection use Authentication.OrganizationContext directly.",
+    "No raw credential or token is retained in Authentication or propagated except newly signed service assertions.",
+    "Assistant background work persists a token-free AuthenticationSnapshot containing AuthType, optional actor, user ID, organization ID, and project ID, then reconstructs *Authentication for callbacks, sockets, SIP, and telephony.",
+    "CallContext stops writing AuthToken; the legacy auth_token column remains for rollback compatibility and is ignored by new reads.",
+    "Assistant migration 000056 adds nullable auth_user_id bigint, auth_actor_type varchar(50), and auth_actor_id varchar(255) columns to call_contexts; existing organization_id, project_id, and auth_type columns remain authoritative snapshot fields.",
+    "Old call_context rows reconstruct organization/project/service authentication when their stored contexts are valid; old user rows without auth_user_id fail closed and must be re-initiated.",
+    "Migration 000056 deploys before application code; rollback reverts application code before running the down migration; auth_token is retained throughout Phase 1E for rollback only and new code never reads or writes it.",
+    "No internal production caller remains for GetSimplePrincipleGRPC, GetAuthPrincipleGPRC, GetAuthPrinciple, RequireUser, RequireOrganization, RequireProject, or ResolveDelegatedContext.",
+    "Exported legacy accessors, aliases, Principle, provider interfaces, and Require helpers remain deprecated for open-source compatibility; deletion requires a separately approved major-version phase.",
+    "Sequential credential middleware is deleted only after all binaries use the coordinating boundary and internal callers are zero.",
+    "No concrete authentication type assertions, AuthType switches outside authentication construction, generic context utilities, or normalize naming are introduced."
+  ],
+  "implementation_sequence": [
+    "Create and review the exact policy matrix before production edits.",
+    "In one atomic compile-safe implementation commit, change InternalClient and all pkg/clients signatures, migrate Integration, Web, Assistant, background AuthenticationSnapshot reconstruction, and every caller.",
+    "In the same atomic commit, replace all binary middleware and controller authentication contracts while preserving the matrix allowlists and required contexts.",
+    "After repository-wide verification, remove unused sequential middleware but retain exported legacy type/accessor/helper contracts as deprecated compatibility surfaces.",
+    "Use follow-up commits only for test corrections or independent review findings; every pushed commit remains repository-buildable."
+  ],
+  "allowed_paths": [
+    "pkg/types/**",
+    "pkg/middlewares/**",
+    "pkg/clients/**",
+    "api/assistant-api/**",
+    "api/integration-api/**",
+    "api/web-api/**",
+    "api/endpoint-api/**",
+    "cmd/assistant/**",
+    "cmd/integration/**",
+    "cmd/web/**",
+    "cmd/endpoint/**",
+    "rfcs/0001-*"
+  ],
+  "out_of_scope": [
+    "Actor dual-write and backfill",
+    "Legacy audit column removal",
+    "Organization/service durable actor provisioning",
+    "SDK, UI, docs submodule, example submodule, and unrelated repository changes"
+  ],
+  "principles": {
+    "KISS": "One request Authentication object and direct context methods everywhere.",
+    "YAGNI": "No adapters, compatibility type checks, parallel authentication object, registries, or reflection; exported legacy contracts remain only for source compatibility.",
+    "ownership": "Middleware constructs authentication; controllers own type policy; services own resource context; clients own delegated assertion creation.",
+    "explicit_contracts": "Every RPC allowlist and required service context is visible in code and tests.",
+    "fail_safe": "Missing credentials, conflicting credentials, disallowed types, or unavailable required contexts fail before mutation or downstream calls.",
+    "observability": "Authentication failures remain actionable without logging secrets.",
+    "least_privilege": "Existing effective authorization behavior is preserved unless separately approved.",
+    "reversibility": "The coupled signature and caller migration is one atomic commit and one atomic revert; actor schema remains independent."
+  },
+  "required_tests": [
+    "InternalClient delegated assertion tests for user, project, organization, and service request Authentication values",
+    "Vault organization-context tests using *Authentication",
+    "Middleware acceptance/rejection tests for every credential class in each binary",
+    "Per-controller source-contract tests for Authorize and exact Scope allowlists",
+    "Service success and unavailable-context tests in each changed package",
+    "HTTP and gRPC context propagation tests",
+    "Fail-closed tests proving no downstream gRPC or HTTP request occurs when service assertion creation fails",
+    "AuthenticationSnapshot round-trip tests for callback, socket, SIP, and telephony contexts without stored tokens",
+    "Call-context migration up/down/up tests, old-row reconstruction tests, and PostgreSQL full-history validation",
+    "Repository-wide zero-internal-caller tests for deprecated legacy contracts"
+  ],
+  "required_commands": [
+    "go test ./pkg/...",
+    "go test ./api/assistant-api/... ./api/integration-api/... ./api/web-api/... ./api/endpoint-api/...",
+    "go test ./cmd/assistant ./cmd/integration ./cmd/web ./cmd/endpoint",
+    "go vet ./pkg/... ./api/assistant-api/... ./api/integration-api/... ./api/web-api/... ./api/endpoint-api/... ./cmd/assistant ./cmd/integration ./cmd/web ./cmd/endpoint",
+    "PostgreSQL 16 full assistant migration history up, 000056 down, and 000056 up validation",
+    "rg -n 'GetSimplePrincipleGRPC|GetAuthPrincipleGPRC|GetAuthPrinciple\\(|RequireUser|RequireOrganization|RequireProject|ResolveDelegatedContext' api pkg cmd",
+    "test -z \"$(rg -l 'GetSimplePrincipleGRPC|GetAuthPrincipleGPRC|GetAuthPrinciple\\(|RequireUser|RequireOrganization|RequireProject|ResolveDelegatedContext' api pkg cmd -g '*.go' | rg -v '^pkg/types/')\"",
+    "git diff --check"
+  ],
+  "risks": [
+    "The shared client signature change creates a wide compile-time migration across all binaries and therefore ships atomically.",
+    "Incorrect inferred Scope allowlists could broaden or reduce existing access.",
+    "Assistant transport and background paths carry authentication outside controllers; AuthenticationSnapshot owns token-free persistence and reconstruction.",
+    "HTTP middleware must attach Authentication to the standard request context without helper getters.",
+    "Old user call-context rows lack user identity and intentionally fail closed after the application cutover.",
+    "Partial deployment between services remains compatible because downstream authentication uses existing signed service-scope headers."
+  ],
+  "rollback": "Atomically revert the Phase 1E implementation commit. Existing auth_token columns and deprecated exported contracts remain available for rollback; do not revert actor schema migrations."
+}

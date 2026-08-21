@@ -12,7 +12,6 @@ import (
 	"strconv"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 	"github.com/redis/go-redis/v9"
@@ -30,11 +29,7 @@ func (m *manager) handleClaimOwnership(ctx context.Context, s ClaimOwnershipPipe
 	if err != nil {
 		rec.Outcome = OutcomeClaimError
 		m.logger.Warnw("Ownership claim failed", "did", rec.DID, "error", err)
-		auth := &types.ProjectScope{
-			ProjectId:      &rec.ProjectID,
-			OrganizationId: &rec.OrganizationID,
-			Status:         type_enums.RECORD_ACTIVE.String(),
-		}
+		auth := projectAuthentication(rec.OrganizationID, rec.ProjectID)
 		observer := m.observer(ctx, auth)
 		defer observer.Close(context.Background())
 		attributes := observability.Attributes{
@@ -96,11 +91,7 @@ func (m *manager) handleClaimOwnership(ctx context.Context, s ClaimOwnershipPipe
 	if err != nil {
 		rec.Outcome = OutcomeClaimError
 		m.logger.Warnw("Ownership claim failed", "did", rec.DID, "error", err)
-		auth := &types.ProjectScope{
-			ProjectId:      &rec.ProjectID,
-			OrganizationId: &rec.OrganizationID,
-			Status:         type_enums.RECORD_ACTIVE.String(),
-		}
+		auth := projectAuthentication(rec.OrganizationID, rec.ProjectID)
 		observer := m.observer(ctx, auth)
 		defer observer.Close(context.Background())
 		attributes := observability.Attributes{

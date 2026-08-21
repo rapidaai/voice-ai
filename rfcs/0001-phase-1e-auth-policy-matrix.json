@@ -1,0 +1,4141 @@
+{
+  "generation": "AST inventory of current controller accessors, direct identity getters, capability checks, and established Endpoint policies",
+  "entries": [
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/create_assistant_api_deployment.go",
+      "handler": "CreateAssistantApiDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/create_assistant_api_deployment_rest.go",
+      "handler": "CreateAssistantApiDeploymentRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/create_assistant_debugger_deployment.go",
+      "handler": "CreateAssistantDebuggerDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/create_assistant_debugger_deployment_rest.go",
+      "handler": "CreateAssistantDebuggerDeploymentRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/create_assistant_phone_deployment.go",
+      "handler": "CreateAssistantPhoneDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/create_assistant_phone_deployment_rest.go",
+      "handler": "CreateAssistantPhoneDeploymentRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/create_assistant_webplugin_deployment.go",
+      "handler": "CreateAssistantWebpluginDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/create_assistant_webplugin_deployment_rest.go",
+      "handler": "CreateAssistantWebpluginDeploymentRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/create_assistant_whatsapp_deployment.go",
+      "handler": "CreateAssistantWhatsappDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/create_assistant_whatsapp_deployment_rest.go",
+      "handler": "CreateAssistantWhatsappDeploymentRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/disable_assistant_api_deployment.go",
+      "handler": "DisableAssistantApiDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/disable_assistant_debugger_deployment.go",
+      "handler": "DisableAssistantDebuggerDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/disable_assistant_phone_deployment.go",
+      "handler": "DisableAssistantPhoneDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/disable_assistant_webplugin_deployment.go",
+      "handler": "DisableAssistantWebpluginDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/disable_assistant_whatsapp_deployment.go",
+      "handler": "DisableAssistantWhatsappDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/get_all_assistant_api_deployment.go",
+      "handler": "GetAllAssistantApiDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/get_all_assistant_api_deployment_rest.go",
+      "handler": "GetAllAssistantApiDeploymentRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/get_all_assistant_debugger_deployment.go",
+      "handler": "GetAllAssistantDebuggerDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/get_all_assistant_debugger_deployment_rest.go",
+      "handler": "GetAllAssistantDebuggerDeploymentRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/get_all_assistant_phone_deployment.go",
+      "handler": "GetAllAssistantPhoneDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/get_all_assistant_phone_deployment_rest.go",
+      "handler": "GetAllAssistantPhoneDeploymentRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/get_all_assistant_webplugin_deployment.go",
+      "handler": "GetAllAssistantWebpluginDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/get_all_assistant_webplugin_deployment_rest.go",
+      "handler": "GetAllAssistantWebpluginDeploymentRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/get_all_assistant_whatsapp_deployment.go",
+      "handler": "GetAllAssistantWhatsappDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/get_all_assistant_whatsapp_deployment_rest.go",
+      "handler": "GetAllAssistantWhatsappDeploymentRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/get_assistant_api_deployment.go",
+      "handler": "GetAssistantApiDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/get_assistant_api_deployment_rest.go",
+      "handler": "GetAssistantApiDeploymentRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/get_assistant_debugger_deployment.go",
+      "handler": "GetAssistantDebuggerDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/get_assistant_debugger_deployment_rest.go",
+      "handler": "GetAssistantDebuggerDeploymentRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/get_assistant_phone_deployment.go",
+      "handler": "GetAssistantPhoneDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/get_assistant_phone_deployment_rest.go",
+      "handler": "GetAssistantPhoneDeploymentRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/get_assistant_webplugin_deployment.go",
+      "handler": "GetAssistantWebpluginDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/get_assistant_webplugin_deployment_rest.go",
+      "handler": "GetAssistantWebpluginDeploymentRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/get_assistant_whatsapp_deployment.go",
+      "handler": "GetAssistantWhatsappDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant-deployment/get_assistant_whatsapp_deployment_rest.go",
+      "handler": "GetAssistantWhatsappDeploymentRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/assistant_configuration_rest.go",
+      "handler": "CreateAssistantConfigurationRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/assistant_configuration_rest.go",
+      "handler": "DeleteAssistantConfigurationRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/assistant_configuration_rest.go",
+      "handler": "GetAllAssistantConfigurationRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/assistant_configuration_rest.go",
+      "handler": "GetAssistantConfigurationRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/assistant_configuration_rest.go",
+      "handler": "UpdateAssistantConfigurationRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/create_assistant.go",
+      "handler": "CreateAssistant",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/create_assistant_configuration.go",
+      "handler": "CreateAssistantConfiguration",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/create_assistant_knowledge.go",
+      "handler": "CreateAssistantKnowledge",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/create_assistant_provider.go",
+      "handler": "CreateAssistantProvider",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/create_assistant_rest.go",
+      "handler": "CreateAssistantRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/create_assistant_tag.go",
+      "handler": "CreateAssistantTag",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/create_assistant_tool.go",
+      "handler": "CreateAssistantTool",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/delete_assistant.go",
+      "handler": "DeleteAssistant",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/delete_assistant_configuration.go",
+      "handler": "DeleteAssistantConfiguration",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/delete_assistant_knowledge.go",
+      "handler": "DeleteAssistantKnowledge",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/delete_assistant_tool.go",
+      "handler": "DeleteAssistantTool",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/get_all_assistant.go",
+      "handler": "GetAllAssistant",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/get_all_assistant_configuration.go",
+      "handler": "GetAllAssistantConfiguration",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/get_all_assistant_conversation.go",
+      "handler": "GetAllAssistantConversation",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/get_all_assistant_http_log.go",
+      "handler": "GetAllAssistantHTTPLog",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/get_all_assistant_knowledge.go",
+      "handler": "GetAllAssistantKnowledge",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/get_all_assistant_message.go",
+      "handler": "GetAllAssistantMessage",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/get_all_assistant_provider.go",
+      "handler": "GetAllAssistantProvider",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/get_all_assistant_tool.go",
+      "handler": "GetAllAssistantTool",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/get_all_assistant_tool_log.go",
+      "handler": "GetAllAssistantToolLog",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/get_all_conversation_message.go",
+      "handler": "GetAllConversationMessage",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/get_all_message.go",
+      "handler": "GetAllMessage",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/get_assistant.go",
+      "handler": "GetAssistant",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/get_assistant_configuration.go",
+      "handler": "GetAssistantConfiguration",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/get_assistant_conversation.go",
+      "handler": "GetAssistantConversation",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/get_assistant_dashboard.go",
+      "handler": "GetAssistantDashboard",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/get_assistant_http_log.go",
+      "handler": "GetAssistantHTTPLog",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/get_assistant_knowledge.go",
+      "handler": "GetAssistantKnowledge",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/get_assistant_tool.go",
+      "handler": "GetAssistantTool",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/get_assistant_tool_log.go",
+      "handler": "GetAssistantToolLog",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/retry_assistant_http_log.go",
+      "handler": "RetryAssistantHTTPLog",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/update_assistant_configuration.go",
+      "handler": "UpdateAssistantConfiguration",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/update_assistant_detail.go",
+      "handler": "UpdateAssistantDetail",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/update_assistant_knowledge.go",
+      "handler": "UpdateAssistantKnowledge",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/update_assistant_tool.go",
+      "handler": "UpdateAssistantTool",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/assistant/update_assistant_version.go",
+      "handler": "UpdateAssistantVersion",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/knowledge/create_knowledge.go",
+      "handler": "CreateKnowledge",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/knowledge/create_knowledge_document.go",
+      "handler": "CreateKnowledgeDocument",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/knowledge/create_knowledge_tag.go",
+      "handler": "CreateKnowledgeTag",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/knowledge/delete_knowledge_document_segment.go",
+      "handler": "DeleteKnowledgeDocumentSegment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/knowledge/get_all_knowledge.go",
+      "handler": "GetAllKnowledge",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/knowledge/get_all_knowledge_document.go",
+      "handler": "GetAllKnowledgeDocument",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/knowledge/get_all_knowledge_document_segment.go",
+      "handler": "GetAllKnowledgeDocumentSegment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/knowledge/get_all_knowledge_log.go",
+      "handler": "GetAllKnowledgeLog",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/knowledge/get_knowledge.go",
+      "handler": "GetKnowledge",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/knowledge/get_knowledge_log.go",
+      "handler": "GetKnowledgeLog",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/knowledge/index_knowledge_document.go",
+      "handler": "IndexKnowledgeDocument",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/knowledge/update_knowledge_detail.go",
+      "handler": "UpdateKnowledgeDetail",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/knowledge/update_knowledge_document_segment.go",
+      "handler": "UpdateKnowledgeDocumentSegment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/observability/get_all_telemetry.go",
+      "handler": "GetAllTelemetry",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/talk/get.go",
+      "handler": "GetAllAssistantConversation",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/talk/get.go",
+      "handler": "GetAllConversationMessage",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/talk/inbound_call.go",
+      "handler": "CallReciever",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/talk/metric.go",
+      "handler": "CreateConversationMetric",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/talk/metric.go",
+      "handler": "CreateMessageMetric",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/talk/outbound_bulk_call_rest.go",
+      "handler": "CreateBulkPhoneCallRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/talk/outbound_call.go",
+      "handler": "CreateBulkPhoneCall",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/talk/outbound_call.go",
+      "handler": "CreatePhoneCall",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/talk/outbound_call_rest.go",
+      "handler": "CreatePhoneCallRest",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrinciple",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/talk/talk.go",
+      "handler": "AssistantTalk",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "assistant-api",
+      "file": "api/assistant-api/api/talk/talk.go",
+      "handler": "WebTalk",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "endpoint-api",
+      "file": "api/endpoint-api/api/create-endpoint-cache-configuration.go",
+      "handler": "CreateEndpointCacheConfiguration",
+      "transport": "grpc",
+      "existing_accessor": "Authorize",
+      "existing_checks": null,
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "user",
+        "project"
+      ]
+    },
+    {
+      "api": "endpoint-api",
+      "file": "api/endpoint-api/api/create-endpoint-provider-model.go",
+      "handler": "CreateEndpointProviderModel",
+      "transport": "grpc",
+      "existing_accessor": "Authorize",
+      "existing_checks": null,
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "user",
+        "project"
+      ]
+    },
+    {
+      "api": "endpoint-api",
+      "file": "api/endpoint-api/api/create-endpoint-retry-configuration.go",
+      "handler": "CreateEndpointRetryConfiguration",
+      "transport": "grpc",
+      "existing_accessor": "Authorize",
+      "existing_checks": null,
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "user",
+        "project"
+      ]
+    },
+    {
+      "api": "endpoint-api",
+      "file": "api/endpoint-api/api/create-endpoint-tag.go",
+      "handler": "CreateEndpointTag",
+      "transport": "grpc",
+      "existing_accessor": "Authorize",
+      "existing_checks": null,
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "user",
+        "project"
+      ]
+    },
+    {
+      "api": "endpoint-api",
+      "file": "api/endpoint-api/api/create-endpoint.go",
+      "handler": "CreateEndpoint",
+      "transport": "grpc",
+      "existing_accessor": "Authorize",
+      "existing_checks": null,
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "user",
+        "project"
+      ]
+    },
+    {
+      "api": "endpoint-api",
+      "file": "api/endpoint-api/api/fork-endpoint.go",
+      "handler": "ForkEndpoint",
+      "transport": "grpc",
+      "existing_accessor": "Authorize",
+      "existing_checks": null,
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "endpoint-api",
+      "file": "api/endpoint-api/api/get-all-endpoint-logs.go",
+      "handler": "GetAllEndpointLog",
+      "transport": "grpc",
+      "existing_accessor": "Authorize",
+      "existing_checks": null,
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "endpoint-api",
+      "file": "api/endpoint-api/api/get-all-endpoints.go",
+      "handler": "GetAllEndpoint",
+      "transport": "grpc",
+      "existing_accessor": "Authorize",
+      "existing_checks": null,
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "endpoint-api",
+      "file": "api/endpoint-api/api/get-all-provider-models.go",
+      "handler": "GetAllEndpointProviderModel",
+      "transport": "grpc",
+      "existing_accessor": "Authorize",
+      "existing_checks": null,
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "endpoint-api",
+      "file": "api/endpoint-api/api/get-endpoint-log.go",
+      "handler": "GetEndpointLog",
+      "transport": "grpc",
+      "existing_accessor": "Authorize",
+      "existing_checks": null,
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "endpoint-api",
+      "file": "api/endpoint-api/api/get-endpoint.go",
+      "handler": "GetEndpoint",
+      "transport": "grpc",
+      "existing_accessor": "Authorize",
+      "existing_checks": null,
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "endpoint-api",
+      "file": "api/endpoint-api/api/invoker-endpoint.go",
+      "handler": "Invoke",
+      "transport": "grpc",
+      "existing_accessor": "Authorize",
+      "existing_checks": null,
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "organization",
+        "service"
+      ],
+      "required_contexts": [
+        "organization"
+      ],
+      "conditional_contexts": [
+        "project: private endpoint"
+      ]
+    },
+    {
+      "api": "endpoint-api",
+      "file": "api/endpoint-api/api/invoker-endpoint.go",
+      "handler": "Probe",
+      "transport": "grpc",
+      "existing_accessor": "Authorize",
+      "existing_checks": null,
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "endpoint-api",
+      "file": "api/endpoint-api/api/invoker-endpoint.go",
+      "handler": "Update",
+      "transport": "grpc",
+      "existing_accessor": "Authorize",
+      "existing_checks": null,
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "endpoint-api",
+      "file": "api/endpoint-api/api/update-endpoint-detail.go",
+      "handler": "UpdateEndpointDetail",
+      "transport": "grpc",
+      "existing_accessor": "Authorize",
+      "existing_checks": null,
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "user",
+        "project"
+      ]
+    },
+    {
+      "api": "endpoint-api",
+      "file": "api/endpoint-api/api/update-endpoint-version.go",
+      "handler": "UpdateEndpointVersion",
+      "transport": "grpc",
+      "existing_accessor": "Authorize",
+      "existing_checks": null,
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "user",
+        "project"
+      ]
+    },
+    {
+      "api": "integration-api",
+      "file": "api/integration-api/api/audit_logging.go",
+      "handler": "CreateMetadata",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "integration-api",
+      "file": "api/integration-api/api/audit_logging.go",
+      "handler": "GetAllAuditLog",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "integration-api",
+      "file": "api/integration-api/api/audit_logging.go",
+      "handler": "GetAuditLog",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "integration-api",
+      "file": "api/integration-api/api/chat.go",
+      "handler": "Chat",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "integration-api",
+      "file": "api/integration-api/api/chat.go",
+      "handler": "StreamChatBidirectionalUnified",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "integration-api",
+      "file": "api/integration-api/api/embedding.go",
+      "handler": "Embedding",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "integration-api",
+      "file": "api/integration-api/api/reranking.go",
+      "handler": "Reranking",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/auth.go",
+      "handler": "Authorize",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/auth.go",
+      "handler": "ChangePassword",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/auth.go",
+      "handler": "GetAllUser",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/auth.go",
+      "handler": "GetUser",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/auth.go",
+      "handler": "UpdateUser",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/connect.go",
+      "handler": "GeneralConnect",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/connect.go",
+      "handler": "GetConnectorFiles",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/notification.go",
+      "handler": "GetNotificationSettting",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/notification.go",
+      "handler": "UpdateNotificationSetting",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/organization.go",
+      "handler": "CreateOrganization",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/organization.go",
+      "handler": "CreateOrganization",
+      "transport": "http",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/organization.go",
+      "handler": "GetOrganization",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/organization.go",
+      "handler": "UpdateOrganization",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/organization_membership.go",
+      "handler": "DeleteUserFromOrganization",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/organization_membership.go",
+      "handler": "InviteUserToOrganization",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/organization_membership.go",
+      "handler": "UpdateUserOrganizationRole",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/project.go",
+      "handler": "AddUserToProjects",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/project.go",
+      "handler": "ArchiveProject",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/project.go",
+      "handler": "CreateProject",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/project.go",
+      "handler": "CreateProjectCredential",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/project.go",
+      "handler": "DeleteUserFromProject",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/project.go",
+      "handler": "GetAllProject",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/project.go",
+      "handler": "GetAllProjectCredential",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/project.go",
+      "handler": "GetProject",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/project.go",
+      "handler": "UpdateProject",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/activity.go",
+      "handler": "GetAllAuditLog",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/activity.go",
+      "handler": "GetAuditLog",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "CreateAssistant",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "CreateAssistantConfiguration",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "CreateAssistantKnowledge",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "CreateAssistantProvider",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "CreateAssistantTag",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "CreateAssistantTool",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "DeleteAssistant",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "DeleteAssistantConfiguration",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "DeleteAssistantKnowledge",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "DeleteAssistantTool",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "GetAllAssistant",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "GetAllAssistantConfiguration",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "GetAllAssistantConversation",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "GetAllAssistantHTTPLog",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "GetAllAssistantKnowledge",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "GetAllAssistantMessage",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "GetAllAssistantProvider",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "GetAllAssistantTool",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "GetAllAssistantToolLog",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "GetAllConversationMessage",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "GetAllMessage",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "GetAssistant",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "GetAssistantConfiguration",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "GetAssistantConversation",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "GetAssistantDashboard",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "GetAssistantHTTPLog",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "GetAssistantKnowledge",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "GetAssistantTool",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "GetAssistantToolLog",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "RetryAssistantHTTPLog",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "UpdateAssistantConfiguration",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "UpdateAssistantDetail",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "UpdateAssistantKnowledge",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "UpdateAssistantTool",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant.go",
+      "handler": "UpdateAssistantVersion",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant_deployment.go",
+      "handler": "CreateAssistantApiDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant_deployment.go",
+      "handler": "CreateAssistantDebuggerDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant_deployment.go",
+      "handler": "CreateAssistantPhoneDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant_deployment.go",
+      "handler": "CreateAssistantWebpluginDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant_deployment.go",
+      "handler": "CreateAssistantWhatsappDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant_deployment.go",
+      "handler": "DisableAssistantApiDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant_deployment.go",
+      "handler": "DisableAssistantDebuggerDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant_deployment.go",
+      "handler": "DisableAssistantPhoneDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant_deployment.go",
+      "handler": "DisableAssistantWebpluginDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant_deployment.go",
+      "handler": "DisableAssistantWhatsappDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant_deployment.go",
+      "handler": "GetAllAssistantApiDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant_deployment.go",
+      "handler": "GetAllAssistantDebuggerDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant_deployment.go",
+      "handler": "GetAllAssistantPhoneDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant_deployment.go",
+      "handler": "GetAllAssistantWebpluginDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant_deployment.go",
+      "handler": "GetAllAssistantWhatsappDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant_deployment.go",
+      "handler": "GetAssistantApiDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant_deployment.go",
+      "handler": "GetAssistantDebuggerDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant_deployment.go",
+      "handler": "GetAssistantPhoneDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant_deployment.go",
+      "handler": "GetAssistantWebpluginDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/assistant_deployment.go",
+      "handler": "GetAssistantWhatsappDeployment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/document.go",
+      "handler": "IndexKnowledgeDocument",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/endpoint.go",
+      "handler": "CreateEndpoint",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/endpoint.go",
+      "handler": "CreateEndpointCacheConfiguration",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/endpoint.go",
+      "handler": "CreateEndpointProviderModel",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/endpoint.go",
+      "handler": "CreateEndpointRetryConfiguration",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/endpoint.go",
+      "handler": "CreateEndpointTag",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/endpoint.go",
+      "handler": "ForkEndpoint",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/endpoint.go",
+      "handler": "GetAllEndpoint",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/endpoint.go",
+      "handler": "GetAllEndpointLog",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/endpoint.go",
+      "handler": "GetAllEndpointProviderModel",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/endpoint.go",
+      "handler": "GetEndpoint",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/endpoint.go",
+      "handler": "GetEndpointLog",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/endpoint.go",
+      "handler": "UpdateEndpointDetail",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/endpoint.go",
+      "handler": "UpdateEndpointVersion",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/invoke.go",
+      "handler": "Invoke",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/knowledge.go",
+      "handler": "CreateKnowledge",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/knowledge.go",
+      "handler": "CreateKnowledgeDocument",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/knowledge.go",
+      "handler": "CreateKnowledgeTag",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/knowledge.go",
+      "handler": "DeleteKnowledgeDocumentSegment",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/knowledge.go",
+      "handler": "GetAllKnowledge",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/knowledge.go",
+      "handler": "GetAllKnowledgeDocument",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/knowledge.go",
+      "handler": "GetAllKnowledgeDocumentSegment",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/knowledge.go",
+      "handler": "GetAllKnowledgeLog",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/knowledge.go",
+      "handler": "GetKnowledge",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/knowledge.go",
+      "handler": "GetKnowledgeLog",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/knowledge.go",
+      "handler": "UpdateKnowledgeDetail",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/knowledge.go",
+      "handler": "UpdateKnowledgeDocumentSegment",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/proxy/observability.go",
+      "handler": "GetAllTelemetry",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": []
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/vault.go",
+      "handler": "CreateProviderCredential",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/vault.go",
+      "handler": "DeleteCredential",
+      "transport": "grpc",
+      "existing_accessor": "GetAuthPrincipleGPRC",
+      "existing_checks": [
+        "user",
+        "organization",
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user"
+      ],
+      "required_contexts": [
+        "user",
+        "organization",
+        "project"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/vault.go",
+      "handler": "GetAllOrganizationCredential",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/vault.go",
+      "handler": "GetCredential",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    },
+    {
+      "api": "web-api",
+      "file": "api/web-api/api/vault.go",
+      "handler": "GetOauth2Credential",
+      "transport": "grpc",
+      "existing_accessor": "GetSimplePrincipleGRPC",
+      "existing_checks": [
+        "project"
+      ],
+      "allowed_auth_types": [
+        "user",
+        "project",
+        "service"
+      ],
+      "required_contexts": [
+        "project"
+      ]
+    }
+  ]
+}

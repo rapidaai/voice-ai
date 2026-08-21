@@ -17,7 +17,7 @@ import (
 
 type recorderOptions struct {
 	logger           commons.Logger
-	auth             types.SimplePrinciple
+	auth             *types.Authentication
 	globalScope      GlobalScope
 	context          Context
 	clock            func() time.Time
@@ -41,7 +41,7 @@ func newOption(applyFunc func(*recorderOptions)) Option {
 	return &funcOption{applyFunc: applyFunc}
 }
 
-func WithAuth(auth types.SimplePrinciple) Option {
+func WithAuth(auth *types.Authentication) Option {
 	return newOption(func(recorderOptions *recorderOptions) {
 		recorderOptions.auth = auth
 	})

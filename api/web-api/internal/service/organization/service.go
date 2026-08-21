@@ -24,7 +24,11 @@ type organizationService struct {
 	postgres connectors.PostgresConnector
 }
 
-func (oS *organizationService) Create(ctx context.Context, auth types.Principle, name string, size string, industry string) (*internal_entity.Organization, error) {
+func (oS *organizationService) Create(ctx context.Context, auth *types.Authentication, name string, size string, industry string) (*internal_entity.Organization, error) {
+	userContext, err := auth.UserContext()
+	if err != nil {
+		return nil, err
+	}
 	db := oS.postgres.DB(ctx)
 	org := &internal_entity.Organization{
 		Name:     name,
@@ -32,7 +36,7 @@ func (oS *organizationService) Create(ctx context.Context, auth types.Principle,
 		Size:     size,
 		Mutable: gorm_models.Mutable{
 			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: auth.GetUserInfo().Id,
+			CreatedBy: userContext.UserID,
 		},
 	}
 	tx := db.Save(org)
@@ -53,12 +57,16 @@ func (oS *organizationService) Get(ctx context.Context, organizationId uint64) (
 	return &ct, nil
 }
 
-func (oS *organizationService) Update(ctx context.Context, auth types.Principle, organizationId uint64, name *string, industry *string, email *string) (*internal_entity.Organization, error) {
+func (oS *organizationService) Update(ctx context.Context, auth *types.Authentication, organizationId uint64, name *string, industry *string, email *string) (*internal_entity.Organization, error) {
+	userContext, err := auth.UserContext()
+	if err != nil {
+		return nil, err
+	}
 	db := oS.postgres.DB(ctx)
 	org := &internal_entity.Organization{
 		Mutable: gorm_models.Mutable{
 			Status:    type_enums.RECORD_ACTIVE,
-			UpdatedBy: auth.GetUserInfo().Id,
+			UpdatedBy: userContext.UserID,
 		},
 	}
 

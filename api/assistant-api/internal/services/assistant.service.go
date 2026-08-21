@@ -49,20 +49,20 @@ func NewDefaultGetAssistantOption() *GetAssistantOption {
 
 type AssistantService interface {
 	Get(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		assistantProviderId *uint64,
 		opts *GetAssistantOption) (*internal_assistant_entity.Assistant, error)
 
 	GetAll(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		criterias []*workflow_api.Criteria,
 		paginate *workflow_api.Paginate,
 		opts *GetAssistantOption) (int64, []*internal_assistant_entity.Assistant, error)
 
 	GetAssistantDashboard(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		fromDate *timestamppb.Timestamp,
 		toDate *timestamppb.Timestamp,
@@ -70,50 +70,50 @@ type AssistantService interface {
 
 	GetAllAssistantProviderModel(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64, criterias []*workflow_api.Criteria,
 		paginate *workflow_api.Paginate) (int64, []*internal_assistant_entity.AssistantProviderModel, error)
 
 	GetAllAssistantProviderWebsocket(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64, criterias []*workflow_api.Criteria,
 		paginate *workflow_api.Paginate) (int64, []*internal_assistant_entity.AssistantProviderWebsocket, error)
 	GetAllAssistantProviderAgentkit(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64, criterias []*workflow_api.Criteria,
 		paginate *workflow_api.Paginate) (int64, []*internal_assistant_entity.AssistantProviderAgentkit, error)
 	GetAllAssistantProviderAgentflow(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64, criterias []*workflow_api.Criteria,
 		paginate *workflow_api.Paginate) (int64, []*internal_assistant_entity.AssistantProviderAgentflow, error)
 
 	UpdateAssistantVersion(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		assistantProvider type_enums.AssistantProvider,
 		assistantProviderId uint64,
 	) (*internal_assistant_entity.Assistant, error)
 
 	UpdateAssistantDetail(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		name, description string) (*internal_assistant_entity.Assistant, error)
 
 	CreateAssistant(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		name, description string,
 		visibility string, source string, sourceIdentifier *uint64,
 		language string,
 	) (*internal_assistant_entity.Assistant, error)
 
-	DeleteAssistant(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.Assistant, error)
+	DeleteAssistant(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.Assistant, error)
 
 	CreateAssistantProviderModel(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		description string,
 		template string,
@@ -122,7 +122,7 @@ type AssistantService interface {
 	) (*internal_assistant_entity.AssistantProviderModel, error)
 
 	CreateAssistantProviderWebsocket(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		description string,
 		url string,
@@ -131,7 +131,7 @@ type AssistantService interface {
 	) (*internal_assistant_entity.AssistantProviderWebsocket, error)
 
 	CreateAssistantProviderAgentkit(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		description string,
 		url string,
@@ -148,7 +148,7 @@ type AssistantService interface {
 	) (*internal_assistant_entity.AssistantProviderAgentkit, error)
 
 	CreateAssistantProviderAgentflow(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		description string,
 		schemaVersion string,
@@ -156,7 +156,7 @@ type AssistantService interface {
 	) (*internal_assistant_entity.AssistantProviderAgentflow, error)
 
 	AttachProviderModelToAssistant(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		assistantProvider type_enums.AssistantProvider,
 		assistantProviderId uint64,
@@ -164,7 +164,7 @@ type AssistantService interface {
 
 	//
 	CreateOrUpdateAssistantTag(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		tags []string,
 	) (*internal_assistant_entity.AssistantTag, error)

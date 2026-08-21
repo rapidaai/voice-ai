@@ -8,6 +8,8 @@ package assistant_api
 import (
 	"context"
 	"errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/rapidaai/pkg/types"
 	enums "github.com/rapidaai/pkg/types/enums"
@@ -16,13 +18,13 @@ import (
 )
 
 func (assistantApi *assistantGrpcApi) UpdateAssistantVersion(ctx context.Context, cer *protos.UpdateAssistantVersionRequest) (*protos.GetAssistantResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated {
-		assistantApi.logger.Errorf("unauthenticated request for UpdateassistantVersion")
-		return utils.Error[protos.GetAssistantResponse](
-			errors.New("unauthenticated request for updateassistantversion"),
-			"Please provider valid service credentials to perfom invoke, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
 	ep, err := assistantApi.assistantService.UpdateAssistantVersion(

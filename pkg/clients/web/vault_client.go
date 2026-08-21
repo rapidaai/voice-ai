@@ -24,8 +24,8 @@ import (
 )
 
 type VaultClient interface {
-	GetCredential(ctx context.Context, auth types.SimplePrinciple, vaultId uint64) (*vault_api.VaultCredential, error)
-	GetOauth2Credential(ctx context.Context, auth types.SimplePrinciple, vaultId uint64) (*vault_api.VaultCredential, error)
+	GetCredential(ctx context.Context, auth *types.Authentication, vaultId uint64) (*vault_api.VaultCredential, error)
+	GetOauth2Credential(ctx context.Context, auth *types.Authentication, vaultId uint64) (*vault_api.VaultCredential, error)
 }
 
 type vaultServiceClient struct {
@@ -50,12 +50,16 @@ func NewVaultClientGRPC(cfg *config.AppConfig, logger commons.Logger, redis conn
 }
 
 func (client *vaultServiceClient) GetOauth2Credential(c context.Context,
-	auth types.SimplePrinciple, vaultId uint64) (*vault_api.VaultCredential, error) {
+	auth *types.Authentication, vaultId uint64) (*vault_api.VaultCredential, error) {
 	start := time.Now()
+	authContext, err := client.WithAuth(c, auth)
+	if err != nil {
+		return nil, err
+	}
 
 	data := &vault_api.VaultCredential{}
 	// Call the vault service to fetch data
-	res, err := client.vaultClient.GetOauth2Credential(client.WithAuth(c, auth), &vault_api.GetCredentialRequest{
+	res, err := client.vaultClient.GetOauth2Credential(authContext, &vault_api.GetCredentialRequest{
 		VaultId: vaultId,
 	})
 	if err != nil {
@@ -84,13 +88,17 @@ func (client *vaultServiceClient) GetOauth2Credential(c context.Context,
 	return data, nil
 }
 
-func (client *vaultServiceClient) GetCredential(c context.Context, auth types.SimplePrinciple, vaultId uint64) (*vault_api.VaultCredential, error) {
+func (client *vaultServiceClient) GetCredential(c context.Context, auth *types.Authentication, vaultId uint64) (*vault_api.VaultCredential, error) {
 	start := time.Now()
-	organizationID, err := types.RequireOrganization(auth)
+	organizationContext, err := auth.OrganizationContext()
 	if err != nil {
 		return nil, fmt.Errorf("vault credential requires organization context: %w", err)
 	}
-	cacheKey := client.CacheKey(c, "GetCredential", fmt.Sprintf("%d", organizationID), fmt.Sprintf("vlt__%d", vaultId))
+	bgCtx, err := client.WithAuth(context.Background(), auth)
+	if err != nil {
+		return nil, err
+	}
+	cacheKey := client.CacheKey(c, "GetCredential", fmt.Sprintf("%d", organizationContext.OrganizationID), fmt.Sprintf("vlt__%d", vaultId))
 	cachedValue := client.Retrieve(c, cacheKey)
 	if cachedValue.HasError() {
 		client.logger.Errorf("Cache missed for the request: %v", cachedValue.Err)
@@ -101,9 +109,8 @@ func (client *vaultServiceClient) GetCredential(c context.Context, auth types.Si
 
 	// Start a goroutine to fetch from API and update cache
 	var apiData = make(chan *vault_api.VaultCredential, 1)
-	bgCtx := context.Background()
 	utils.Go(bgCtx, func() {
-		res, err := client.vaultClient.GetCredential(client.WithAuth(bgCtx, auth), &vault_api.GetCredentialRequest{
+		res, err := client.vaultClient.GetCredential(bgCtx, &vault_api.GetCredentialRequest{
 			VaultId: vaultId,
 		})
 		if err != nil {

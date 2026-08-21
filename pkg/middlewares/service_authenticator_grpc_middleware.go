@@ -17,6 +17,8 @@ import (
 	"github.com/rapidaai/pkg/types"
 )
 
+// NewServiceAuthenticatorUnaryServerMiddleware authenticates only service credentials.
+// Deprecated: use NewAuthenticationBoundaryUnaryServerMiddleware.
 func NewServiceAuthenticatorUnaryServerMiddleware(resolver types.ClaimAuthenticator[*types.ServiceScope], logger commons.Logger) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		apiKey := metadata.ExtractIncoming(ctx).Get(types.SERVICE_SCOPE_KEY)
@@ -32,6 +34,8 @@ func NewServiceAuthenticatorUnaryServerMiddleware(resolver types.ClaimAuthentica
 	}
 }
 
+// NewServiceAuthenticatorStreamServerMiddleware authenticates only service credentials.
+// Deprecated: use NewAuthenticationBoundaryStreamServerMiddleware.
 func NewServiceAuthenticatorStreamServerMiddleware(resolver types.ClaimAuthenticator[*types.ServiceScope], logger commons.Logger) grpc.StreamServerInterceptor {
 	return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		ctx := stream.Context()

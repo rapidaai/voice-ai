@@ -46,11 +46,11 @@ func NewAssistantConversationService(
 }
 
 func (conversationService *assistantConversationService) GetAll(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate, opts *internal_services.GetConversationOption) (int64, []*internal_conversation_entity.AssistantConversation, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return 0, nil, err
 	}
@@ -252,11 +252,11 @@ func (conversationService *assistantConversationService) GetAll(ctx context.Cont
 }
 func (conversationService *assistantConversationService) Get(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	assistantConversationId uint64,
 	opts *internal_services.GetConversationOption) (*internal_conversation_entity.AssistantConversation, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -347,11 +347,11 @@ func (conversationService *assistantConversationService) Get(
 
 func (conversationService *assistantConversationService) GetConversation(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	assistantConversationId uint64,
 	opts *internal_services.GetConversationOption) (*internal_conversation_entity.AssistantConversation, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -398,12 +398,16 @@ func (conversationService *assistantConversationService) GetConversation(
 
 func (conversationService *assistantConversationService) CreateConversation(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	identifier string,
 	assistantId uint64,
 	assistantProviderModelId uint64,
 	direction type_enums.ConversationDirection, source utils.RapidaSource) (*internal_conversation_entity.AssistantConversation, error) {
-	authContext, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
+	if err != nil {
+		return nil, err
+	}
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -412,8 +416,8 @@ func (conversationService *assistantConversationService) CreateConversation(
 	db := conversationService.postgres.DB(ctx)
 	conversation := &internal_conversation_entity.AssistantConversation{
 		Organizational: gorm_models.Organizational{
-			ProjectId:      authContext.Project.ProjectID,
-			OrganizationId: authContext.Project.OrganizationID,
+			ProjectId:      projectContext.ProjectID,
+			OrganizationId: projectContext.OrganizationID,
 		},
 		Identifier:               identifier,
 		AssistantId:              assistantId,
@@ -421,7 +425,7 @@ func (conversationService *assistantConversationService) CreateConversation(
 		Source:                   source,
 		Direction:                direction,
 	}
-	conversation.Mutable.CreatedBy = authContext.UserID
+	conversation.Mutable.CreatedBy = userContext.UserID
 	tx := db.Create(&conversation)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.CreateConversation", time.Since(start))
@@ -434,12 +438,13 @@ func (conversationService *assistantConversationService) CreateConversation(
 
 func (conversationService *assistantConversationService) CreateOrUpdateConversationMetadata(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId,
 	assistantConversationId uint64,
 	metadata []*protos.Metadata,
 ) ([]*internal_conversation_entity.AssistantConversationMetadata, error) {
-	userID, err := types.RequireUser(auth)
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return nil, err
 	}
@@ -484,11 +489,12 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 }
 
 func (conversationService *assistantConversationService) CreateOrUpdateConversationOption(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId,
 	assistantConversationId uint64,
 	opts map[string]interface{}) ([]*internal_conversation_entity.AssistantConversationOption, error) {
-	userID, err := types.RequireUser(auth)
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return nil, err
 	}
@@ -532,12 +538,13 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 }
 
 func (conversationService *assistantConversationService) CreateOrUpdateConversationArgument(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId,
 	assistantConversationId uint64,
 	arguments map[string]interface{},
 ) ([]*internal_conversation_entity.AssistantConversationArgument, error) {
-	userID, err := types.RequireUser(auth)
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return nil, err
 	}
@@ -585,12 +592,13 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 **/
 func (conversationService *assistantConversationService) CreateOrUpdateConversationMetrics(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId,
 	assistantConversationId uint64,
 	metrics []*protos.Metric,
 ) ([]*internal_conversation_entity.AssistantConversationMetric, error) {
-	userID, err := types.RequireUser(auth)
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return nil, err
 	}
@@ -631,12 +639,13 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 
 func (conversationService *assistantConversationService) CreateCustomConversationMetric(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	assistantConversationId uint64,
 	metrics []*protos.Metric,
 ) ([]*internal_conversation_entity.AssistantConversationMetric, error) {
-	userID, err := types.RequireUser(auth)
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return nil, err
 	}
@@ -677,12 +686,16 @@ func (conversationService *assistantConversationService) CreateCustomConversatio
 
 func (conversationService *assistantConversationService) CreateConversationRecording(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId,
 	assistantConversationId uint64,
 	user, assistant, conversation []byte,
 ) (*internal_conversation_entity.AssistantConversationRecording, error) {
-	authContext, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
+	if err != nil {
+		return nil, err
+	}
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -690,7 +703,7 @@ func (conversationService *assistantConversationService) CreateConversationRecor
 	start := time.Now()
 	db := conversationService.postgres.DB(ctx)
 
-	s3Prefix := conversationService.ObjectPrefix(authContext.Project.OrganizationID, authContext.Project.ProjectID)
+	s3Prefix := conversationService.ObjectPrefix(projectContext.OrganizationID, projectContext.ProjectID)
 	recordingId := gorm_generator.ID()
 
 	userKey := conversationService.ObjectKey(s3Prefix, assistantConversationId, fmt.Sprintf("user-%d.wav", recordingId))
@@ -720,8 +733,8 @@ func (conversationService *assistantConversationService) CreateConversationRecor
 			Id: recordingId,
 		},
 		Organizational: gorm_models.Organizational{
-			ProjectId:      authContext.Project.ProjectID,
-			OrganizationId: authContext.Project.OrganizationID,
+			ProjectId:      projectContext.ProjectID,
+			OrganizationId: projectContext.OrganizationID,
 		},
 		AssistantId:              assistantId,
 		AssistantConversationId:  assistantConversationId,
@@ -729,7 +742,7 @@ func (conversationService *assistantConversationService) CreateConversationRecor
 		UserRecordingUrl:         userKey,
 		ConversationRecordingUrl: conversationKey,
 	}
-	conversationRecording.Mutable.CreatedBy = authContext.UserID
+	conversationRecording.Mutable.CreatedBy = userContext.UserID
 	tx := db.Create(&conversationRecording)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.CreateConversationRecording", time.Since(start))

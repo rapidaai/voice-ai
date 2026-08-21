@@ -19,8 +19,8 @@ import (
 )
 
 func (deploymentApi *AssistantDeploymentApi) CreateAssistantWhatsappDeploymentRest(c *gin.Context) {
-	auth, isAuthenticated := types.GetAuthPrinciple(c)
-	if !isAuthenticated {
+	auth, authErr := types.Authorize(c.Request.Context())
+	if authErr != nil {
 		c.JSON(pkg_errors.CreateAssistantWhatsappDeploymentUnauthenticated.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantWhatsappDeploymentUnauthenticated.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -32,9 +32,8 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantWhatsappDeploymentRe
 		})
 		return
 	}
-	_, userAuthErr := types.RequireUser(auth)
-	_, projectAuthErr := types.RequireProject(auth)
-	if userAuthErr != nil || projectAuthErr != nil {
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
 		c.JSON(pkg_errors.CreateAssistantWhatsappDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantWhatsappDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -153,7 +152,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantWhatsappDeploymentRe
 
 	deployment, err := deploymentApi.deploymentService.CreateWhatsappDeployment(
 		c,
-		auth,
+		iAuth,
 		assistantId,
 		request.Greeting,
 		request.Mistake,

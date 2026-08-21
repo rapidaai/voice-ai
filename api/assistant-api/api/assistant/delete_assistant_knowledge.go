@@ -7,7 +7,8 @@ package assistant_api
 
 import (
 	"context"
-	"errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
@@ -15,13 +16,13 @@ import (
 )
 
 func (assistantApi *assistantGrpcApi) DeleteAssistantKnowledge(ctx context.Context, cer *assistant_api.DeleteAssistantKnowledgeRequest) (*assistant_api.GetAssistantKnowledgeResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated {
-		assistantApi.logger.Errorf("unauthenticated request for DeleteAssistantKnowledgeRequest")
-		return utils.Error[assistant_api.GetAssistantKnowledgeResponse](
-			errors.New("unauthenticated request for DeleteAssistantKnowledgeRequest"),
-			"Please provider valid service credentials to perfom DeleteAssistantKnowledgeRequest, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	analysis, err := assistantApi.assistantKnowledgeService.Delete(ctx,
 		iAuth,

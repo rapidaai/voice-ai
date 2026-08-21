@@ -5,16 +5,15 @@ import (
 	"testing"
 
 	"github.com/rapidaai/pkg/types"
-	type_enums "github.com/rapidaai/pkg/types/enums"
 )
 
 func TestMutationRequiresUserCapability(t *testing.T) {
 	organizationID := uint64(11)
 	projectID := uint64(22)
-	auth := &types.ProjectScope{
-		OrganizationId: &organizationID,
-		ProjectId:      &projectID,
-		Status:         type_enums.RECORD_ACTIVE.String(),
+	auth := &types.Authentication{
+		AuthType:          types.AuthTypeProject,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
 	}
 
 	service := &assistantToolService{}
@@ -25,9 +24,9 @@ func TestMutationRequiresUserCapability(t *testing.T) {
 
 func TestScopeReadRequiresProjectCapability(t *testing.T) {
 	organizationID := uint64(11)
-	auth := &types.OrganizationScope{
-		OrganizationId: &organizationID,
-		Status:         type_enums.RECORD_ACTIVE.String(),
+	auth := &types.Authentication{
+		AuthType:          types.AuthTypeOrg,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 	}
 
 	service := &assistantToolService{}
@@ -39,10 +38,10 @@ func TestScopeReadRequiresProjectCapability(t *testing.T) {
 func TestScopeReadRejectsMismatchedProject(t *testing.T) {
 	organizationID := uint64(11)
 	projectID := uint64(22)
-	auth := &types.ProjectScope{
-		OrganizationId: &organizationID,
-		ProjectId:      &projectID,
-		Status:         type_enums.RECORD_ACTIVE.String(),
+	auth := &types.Authentication{
+		AuthType:          types.AuthTypeProject,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
 	}
 
 	service := &assistantToolService{}

@@ -9,6 +9,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"strconv"
 	"strings"
 	"time"
@@ -92,16 +94,20 @@ type telemetryQueryParts struct {
 	timeRange map[string]interface{}
 }
 
-func newTelemetryQueryParts(organizationID uint64, projectID uint64) telemetryQueryParts {
+func newTelemetryQueryParts(auth *types.Authentication) (telemetryQueryParts, error) {
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return telemetryQueryParts{}, err
+	}
 	return telemetryQueryParts{
 		indices: []string{"rapida-logs-*", "rapida-events-*", "rapida-metrics-*"},
 		filter: []interface{}{
-			telemetryTermFilter("organizationId", organizationID),
-			telemetryTermFilter("projectId", projectID),
+			telemetryTermFilter("organizationId", projectContext.OrganizationID),
+			telemetryTermFilter("projectId", projectContext.ProjectID),
 		},
 		must:      []interface{}{},
 		timeRange: map[string]interface{}{},
-	}
+	}, nil
 }
 
 func (parts *telemetryQueryParts) applyCriteria(criteriaList []*protos.Criteria) {
@@ -177,11 +183,13 @@ func (api *observabilityGrpcApi) GetAllTelemetry(
 	ctx context.Context,
 	request *protos.GetAllTelemetryRequest,
 ) (*protos.GetAllTelemetryResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	projectContext, authErr := types.RequireProject(iAuth)
-	if !isAuthenticated || authErr != nil {
-		api.logger.Errorf("unauthenticated request for GetAllTelemetry")
-		return exceptions.AuthenticationError[protos.GetAllTelemetryResponse]()
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
 	if api.opensearch == nil {
@@ -198,10 +206,10 @@ func (api *observabilityGrpcApi) GetAllTelemetry(
 	}
 	from := (page - 1) * size
 
-	queryParts := newTelemetryQueryParts(
-		projectContext.OrganizationID,
-		projectContext.ProjectID,
-	)
+	queryParts, err := newTelemetryQueryParts(iAuth)
+	if err != nil {
+		return exceptions.AuthenticationError[protos.GetAllTelemetryResponse]()
+	}
 	queryParts.applyCriteria(request.GetCriterias())
 
 	orderColumn := "occurredAt"

@@ -54,15 +54,15 @@ func (t *assistantProxyPostgresConnector) DB(ctx context.Context) *gorm.DB {
 
 type fakeAssistantServiceClient struct {
 	assistant_client.AssistantServiceClient
-	getAllAssistantFunc func(context.Context, types.SimplePrinciple, []*protos.Criteria, *protos.Paginate) (*protos.Paginated, []*protos.Assistant, error)
-	getAssistantFunc    func(context.Context, types.SimplePrinciple, *protos.GetAssistantRequest) (*protos.GetAssistantResponse, error)
+	getAllAssistantFunc func(context.Context, *types.Authentication, []*protos.Criteria, *protos.Paginate) (*protos.Paginated, []*protos.Assistant, error)
+	getAssistantFunc    func(context.Context, *types.Authentication, *protos.GetAssistantRequest) (*protos.GetAssistantResponse, error)
 }
 
-func (f *fakeAssistantServiceClient) GetAllAssistant(ctx context.Context, auth types.SimplePrinciple, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.Assistant, error) {
+func (f *fakeAssistantServiceClient) GetAllAssistant(ctx context.Context, auth *types.Authentication, criteria []*protos.Criteria, paginate *protos.Paginate) (*protos.Paginated, []*protos.Assistant, error) {
 	return f.getAllAssistantFunc(ctx, auth, criteria, paginate)
 }
 
-func (f *fakeAssistantServiceClient) GetAssistant(ctx context.Context, auth types.SimplePrinciple, request *protos.GetAssistantRequest) (*protos.GetAssistantResponse, error) {
+func (f *fakeAssistantServiceClient) GetAssistant(ctx context.Context, auth *types.Authentication, request *protos.GetAssistantRequest) (*protos.GetAssistantResponse, error) {
 	return f.getAssistantFunc(ctx, auth, request)
 }
 
@@ -105,23 +105,16 @@ func newAssistantProxyTest(t *testing.T, client assistant_client.AssistantServic
 }
 
 func assistantProxyContext() context.Context {
-	return context.WithValue(context.Background(), types.CTX_, &types.PlainAuthPrinciple{
-		User: types.UserInfo{
-			Id:    1,
-			Name:  "Owner",
-			Email: "owner@example.com",
-		},
-		OrganizationRole: &types.OrganizaitonRole{
-			Id:             1,
-			OrganizationId: 10,
-			Role:           type_enums.ORGANIZATION_ROLE_ADMIN.String(),
-		},
+	return context.WithValue(context.Background(), types.CTX_, &types.Authentication{
+		AuthType:          types.AuthTypeUser,
+		UserValue:         &types.UserContext{UserID: 1},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: 10},
 	})
 }
 
 func TestGetAllAssistantHydratesTopLevelCreatedUser(t *testing.T) {
 	api := newAssistantProxyTest(t, &fakeAssistantServiceClient{
-		getAllAssistantFunc: func(context.Context, types.SimplePrinciple, []*protos.Criteria, *protos.Paginate) (*protos.Paginated, []*protos.Assistant, error) {
+		getAllAssistantFunc: func(context.Context, *types.Authentication, []*protos.Criteria, *protos.Paginate) (*protos.Paginated, []*protos.Assistant, error) {
 			return &protos.Paginated{TotalItem: 1, CurrentPage: 1}, []*protos.Assistant{
 				{Id: 100, CreatedBy: 42, Name: "Support assistant"},
 			}, nil
@@ -140,7 +133,7 @@ func TestGetAllAssistantHydratesTopLevelCreatedUser(t *testing.T) {
 
 func TestGetAssistantHydratesTopLevelCreatedUser(t *testing.T) {
 	api := newAssistantProxyTest(t, &fakeAssistantServiceClient{
-		getAssistantFunc: func(context.Context, types.SimplePrinciple, *protos.GetAssistantRequest) (*protos.GetAssistantResponse, error) {
+		getAssistantFunc: func(context.Context, *types.Authentication, *protos.GetAssistantRequest) (*protos.GetAssistantResponse, error) {
 			return &protos.GetAssistantResponse{
 				Code:    200,
 				Success: true,

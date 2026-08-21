@@ -27,7 +27,11 @@ type notificationService struct {
 	postgres connectors.PostgresConnector
 }
 
-func (oS *notificationService) UpdateNotificationSetting(ctx context.Context, auth types.Principle, authId uint64, settings []*protos.NotificationSetting) ([]*internal_entity.NotificationSetting, error) {
+func (oS *notificationService) UpdateNotificationSetting(ctx context.Context, auth *types.Authentication, authId uint64, settings []*protos.NotificationSetting) ([]*internal_entity.NotificationSetting, error) {
+	userContext, err := auth.UserContext()
+	if err != nil {
+		return nil, err
+	}
 	db := oS.postgres.DB(ctx)
 	nts := make([]*internal_entity.NotificationSetting, 0)
 	for _, st := range settings {
@@ -38,7 +42,7 @@ func (oS *notificationService) UpdateNotificationSetting(ctx context.Context, au
 			UserAuthId: authId,
 			Mutable: gorm_models.Mutable{
 				Status:    type_enums.RECORD_ACTIVE,
-				CreatedBy: auth.GetUserInfo().Id,
+				CreatedBy: userContext.UserID,
 			},
 		})
 	}
@@ -55,7 +59,7 @@ func (oS *notificationService) UpdateNotificationSetting(ctx context.Context, au
 	}
 }
 
-func (oS *notificationService) GetAllNotificationSetting(ctx context.Context, auth types.Principle, userId uint64) ([]*internal_entity.NotificationSetting, error) {
+func (oS *notificationService) GetAllNotificationSetting(ctx context.Context, auth *types.Authentication, userId uint64) ([]*internal_entity.NotificationSetting, error) {
 	db := oS.postgres.DB(ctx)
 	var nts []*internal_entity.NotificationSetting
 	tx := db.Where("user_auth_id = ?", userId).Find(&nts)

@@ -7,7 +7,8 @@ package knowledge_api
 
 import (
 	"context"
-	"errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
@@ -16,14 +17,13 @@ import (
 
 // CreateKnowledgeTag implements knowledge_api.KnowledgeServiceServer.
 func (knowledgeApi *knowledgeGrpcApi) CreateKnowledgeTag(ctx context.Context, eRequest *knowledge_api.CreateKnowledgeTagRequest) (*knowledge_api.GetKnowledgeResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	_, projectAuthErr := types.RequireProject(iAuth)
-	if !isAuthenticated || projectAuthErr != nil {
-		knowledgeApi.logger.Errorf("unauthenticated request for invoke")
-		return utils.Error[knowledge_api.GetKnowledgeResponse](
-			errors.New("unauthenticated request for CreateAssistantProviderModel"),
-			"Please provider valid service credentials to create assistant tag, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	tag, err := knowledgeApi.knowledgeService.CreateOrUpdateKnowledgeTag(ctx, iAuth, eRequest.GetKnowledgeId(), eRequest.GetTags())
 	if err != nil {

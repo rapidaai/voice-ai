@@ -22,7 +22,7 @@ type SessionEstablishedPipeline struct {
 	VaultCredential *protos.VaultCredential
 	Direction       CallDirection
 	AssistantID     uint64
-	Auth            types.SimplePrinciple
+	Auth            *types.Authentication
 	FromURI         string
 	ToURI           string
 	ConversationID  uint64

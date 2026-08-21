@@ -16,6 +16,8 @@ import (
 	// "github.com/rapidaai/pkg/models"
 )
 
+// NewAuthenticationMiddleware authenticates only user credentials.
+// Deprecated: use NewAuthenticationBoundaryMiddleware.
 func NewAuthenticationMiddleware(resolver types.Authenticator, logger commons.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get the token from the request header, URL param, or query param

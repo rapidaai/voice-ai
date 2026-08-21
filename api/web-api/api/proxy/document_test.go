@@ -4,20 +4,22 @@ import (
 	"context"
 	"testing"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	document_client "github.com/rapidaai/pkg/clients/document"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
-	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 )
 
 type fakeIndexerServiceClient struct {
 	document_client.IndexerServiceClient
 	calls int
-	auth  types.SimplePrinciple
+	auth  *types.Authentication
 }
 
-func (f *fakeIndexerServiceClient) IndexKnowledgeDocument(_ context.Context, auth types.SimplePrinciple, _ *protos.IndexKnowledgeDocumentRequest) (*protos.IndexKnowledgeDocumentResponse, error) {
+func (f *fakeIndexerServiceClient) IndexKnowledgeDocument(_ context.Context, auth *types.Authentication, _ *protos.IndexKnowledgeDocumentRequest) (*protos.IndexKnowledgeDocumentResponse, error) {
 	f.calls++
 	f.auth = auth
 	return &protos.IndexKnowledgeDocumentResponse{Success: true}, nil
@@ -32,17 +34,8 @@ func newDocumentProxyTest(t *testing.T, client document_client.IndexerServiceCli
 	return &indexerApi{logger: logger, indexerServiceClient: client}
 }
 
-func documentProxyContext(principle types.SimplePrinciple) context.Context {
-	switch auth := principle.(type) {
-	case *types.ProjectScope:
-		return context.WithValue(context.Background(), types.CTX_, &types.PlainClaimPrinciple[*types.ProjectScope]{Info: auth})
-	case *types.ServiceScope:
-		return context.WithValue(context.Background(), types.CTX_, &types.PlainClaimPrinciple[*types.ServiceScope]{Info: auth})
-	case *types.OrganizationScope:
-		return context.WithValue(context.Background(), types.CTX_, &types.PlainClaimPrinciple[*types.OrganizationScope]{Info: auth})
-	default:
-		return context.Background()
-	}
+func documentProxyContext(auth *types.Authentication) context.Context {
+	return context.WithValue(context.Background(), types.CTX_, auth)
 }
 
 func TestIndexKnowledgeDocumentRejectsMissingProjectContext(t *testing.T) {
@@ -50,26 +43,26 @@ func TestIndexKnowledgeDocumentRejectsMissingProjectContext(t *testing.T) {
 	client := &fakeIndexerServiceClient{}
 	api := newDocumentProxyTest(t, client)
 
-	response, err := api.IndexKnowledgeDocument(documentProxyContext(&types.OrganizationScope{
-		OrganizationId: &organizationID,
-		Status:         type_enums.RECORD_ACTIVE.String(),
+	response, err := api.IndexKnowledgeDocument(documentProxyContext(&types.Authentication{
+		AuthType:          types.AuthTypeOrg,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 	}), &protos.IndexKnowledgeDocumentRequest{})
 
-	if err == nil || err.Error() != "unauthenticated request for invoke" {
+	if status.Code(err) != codes.PermissionDenied {
 		t.Fatalf("IndexKnowledgeDocument() error = %v", err)
 	}
-	if response.GetSuccess() || client.calls != 0 {
-		t.Fatalf("IndexKnowledgeDocument() response success = %v, client calls = %d", response.GetSuccess(), client.calls)
+	if response != nil || client.calls != 0 {
+		t.Fatalf("IndexKnowledgeDocument() response = %v, client calls = %d", response, client.calls)
 	}
 }
 
 func TestIndexKnowledgeDocumentAcceptsProjectScope(t *testing.T) {
 	organizationID := uint64(11)
 	projectID := uint64(22)
-	auth := &types.ProjectScope{
-		OrganizationId: &organizationID,
-		ProjectId:      &projectID,
-		Status:         type_enums.RECORD_ACTIVE.String(),
+	auth := &types.Authentication{
+		AuthType:          types.AuthTypeProject,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
 	}
 	client := &fakeIndexerServiceClient{}
 	api := newDocumentProxyTest(t, client)
@@ -87,9 +80,10 @@ func TestIndexKnowledgeDocumentAcceptsProjectScope(t *testing.T) {
 func TestIndexKnowledgeDocumentAcceptsDelegatedProjectContext(t *testing.T) {
 	organizationID := uint64(11)
 	projectID := uint64(22)
-	auth := &types.ServiceScope{
-		OrganizationId: &organizationID,
-		ProjectId:      &projectID,
+	auth := &types.Authentication{
+		AuthType:          types.AuthTypeService,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
 	}
 	client := &fakeIndexerServiceClient{}
 	api := newDocumentProxyTest(t, client)

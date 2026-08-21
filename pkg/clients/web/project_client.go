@@ -20,7 +20,7 @@ import (
 )
 
 type ProjectClient interface {
-	GetProject(c context.Context, auth types.SimplePrinciple, projectId uint64) (*project_api.GetProjectResponse, error)
+	GetProject(c context.Context, auth *types.Authentication, projectId uint64) (*project_api.GetProjectResponse, error)
 }
 type projectServiceClient struct {
 	clients.InternalClient
@@ -43,8 +43,12 @@ func NewProjectServiceClientGRPC(config *config.AppConfig, logger commons.Logger
 	}
 }
 
-func (pClient projectServiceClient) GetProject(c context.Context, auth types.SimplePrinciple, projectId uint64) (*project_api.GetProjectResponse, error) {
-	pr, err := pClient.projectClient.GetProject(pClient.WithAuth(c, auth), &project_api.GetProjectRequest{ProjectId: projectId})
+func (pClient projectServiceClient) GetProject(c context.Context, auth *types.Authentication, projectId uint64) (*project_api.GetProjectResponse, error) {
+	authContext, err := pClient.WithAuth(c, auth)
+	if err != nil {
+		return nil, err
+	}
+	pr, err := pClient.projectClient.GetProject(authContext, &project_api.GetProjectRequest{ProjectId: projectId})
 	if err != nil {
 		pClient.logger.Errorf("Unable to get the project %+v", err)
 		return nil, err

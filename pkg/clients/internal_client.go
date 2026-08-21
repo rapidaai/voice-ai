@@ -24,9 +24,9 @@ import (
 )
 
 type InternalClient interface {
-	WithPlatform(ctx context.Context, auth types.SimplePrinciple) context.Context
-	WithAuth(ctx context.Context, auth types.SimplePrinciple) context.Context
-	WithHttpAuth(c context.Context, auth types.SimplePrinciple, req *http.Request) *http.Request
+	WithPlatform(ctx context.Context, auth *types.Authentication) (context.Context, error)
+	WithAuth(ctx context.Context, auth *types.Authentication) (context.Context, error)
+	WithHttpAuth(c context.Context, auth *types.Authentication, req *http.Request) (*http.Request, error)
 
 	WithToken(ctx context.Context, token string, userId uint64) context.Context
 	WithScopeToken(c context.Context, token string, scope string) context.Context
@@ -72,21 +72,19 @@ func (ic *internalClient) WithScopeToken(c context.Context, token string, scope 
 	return metadata.NewOutgoingContext(c, md)
 }
 
-func (ic *internalClient) WithAuth(c context.Context, auth types.SimplePrinciple) context.Context {
+func (ic *internalClient) WithAuth(c context.Context, auth *types.Authentication) (context.Context, error) {
 	token, err := ic.createServiceScopeToken(auth)
 	if err != nil {
-		ic.logger.Errorf("Unable to create jwt token for internal service communication %v", err)
-		return c
+		return nil, err
 	}
 	md := metadata.New(map[string]string{types.SERVICE_SCOPE_KEY: token})
-	return metadata.NewOutgoingContext(c, md)
+	return metadata.NewOutgoingContext(c, md), nil
 }
 
-func (ic *internalClient) WithPlatform(c context.Context, auth types.SimplePrinciple) context.Context {
+func (ic *internalClient) WithPlatform(c context.Context, auth *types.Authentication) (context.Context, error) {
 	token, err := ic.createServiceScopeToken(auth)
 	if err != nil {
-		ic.logger.Errorf("Unable to create jwt token for internal service communication %v", err)
-		return c
+		return nil, err
 	}
 	_platform := map[string]string{
 		types.SERVICE_SCOPE_KEY: token,
@@ -107,28 +105,36 @@ func (ic *internalClient) WithPlatform(c context.Context, auth types.SimplePrinc
 		_platform[utils.HEADER_REGION_KEY] = region.Get()
 	}
 
-	return metadata.NewOutgoingContext(c, metadata.New(_platform))
+	return metadata.NewOutgoingContext(c, metadata.New(_platform)), nil
 }
 
-func (ic *internalClient) WithHttpAuth(c context.Context, auth types.SimplePrinciple, req *http.Request) *http.Request {
-	// Create the token using the provided auth and the client's secret
+func (ic *internalClient) WithHttpAuth(c context.Context, auth *types.Authentication, req *http.Request) (*http.Request, error) {
 	token, err := ic.createServiceScopeToken(auth)
 	if err != nil {
-		ic.logger.Errorf("Unable to create JWT token for internal service communication: %v", err)
-		return req.WithContext(c) // Return the original request with context if token generation fails
+		return nil, err
 	}
-
-	// Add the token to the request header (assuming SERVICE_SCOPE_KEY is the header name)
 	req.Header.Set("Authorization", token)
-
-	// Return the modified request with the new token in the header
-	return req.WithContext(c)
+	return req.WithContext(c), nil
 }
 
-func (ic *internalClient) createServiceScopeToken(auth types.AuthenticationPrinciple) (string, error) {
-	delegatedContext, err := types.ResolveDelegatedContext(auth)
+func (ic *internalClient) createServiceScopeToken(auth *types.Authentication) (string, error) {
+	organizationContext, err := auth.OrganizationContext()
 	if err != nil {
 		return "", err
+	}
+	delegatedContext := types.DelegatedContext{OrganizationID: organizationContext.OrganizationID}
+	if userContext, userErr := auth.UserContext(); userErr == nil {
+		delegatedContext.UserID = &userContext.UserID
+	} else if !errors.Is(userErr, types.ErrUserContextUnavailable) {
+		return "", userErr
+	}
+	if projectContext, projectErr := auth.ProjectContext(); projectErr == nil {
+		if projectContext.OrganizationID != organizationContext.OrganizationID {
+			return "", errors.New("project context organization does not match authentication organization")
+		}
+		delegatedContext.ProjectID = &projectContext.ProjectID
+	} else if !errors.Is(projectErr, types.ErrProjectContextUnavailable) {
+		return "", projectErr
 	}
 	return types.CreateServiceScopeToken(delegatedContext, ic.cfg.Secret)
 }

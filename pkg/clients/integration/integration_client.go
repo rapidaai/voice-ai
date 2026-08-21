@@ -22,13 +22,13 @@ import (
 
 type IntegrationServiceClient interface {
 	Chat(c context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		providerName string,
 		request *protos.ChatRequest) (*protos.ChatResponse, error)
-	StreamChat(c context.Context, auth types.SimplePrinciple, providerName string) (grpc.BidiStreamingClient[protos.StreamChatRequest, protos.StreamChatResponse], error)
-	Embedding(ctx context.Context, auth types.SimplePrinciple, providerName string, in *protos.EmbeddingRequest) (*protos.EmbeddingResponse, error)
-	Reranking(ctx context.Context, auth types.SimplePrinciple, providerName string, in *protos.RerankingRequest) (*protos.RerankingResponse, error)
-	VerifyCredential(ctx context.Context, auth types.SimplePrinciple, providerName string, in *protos.Credential) (*protos.VerifyCredentialResponse, error)
+	StreamChat(c context.Context, auth *types.Authentication, providerName string) (grpc.BidiStreamingClient[protos.StreamChatRequest, protos.StreamChatResponse], error)
+	Embedding(ctx context.Context, auth *types.Authentication, providerName string, in *protos.EmbeddingRequest) (*protos.EmbeddingResponse, error)
+	Reranking(ctx context.Context, auth *types.Authentication, providerName string, in *protos.RerankingRequest) (*protos.RerankingResponse, error)
+	VerifyCredential(ctx context.Context, auth *types.Authentication, providerName string, in *protos.Credential) (*protos.VerifyCredentialResponse, error)
 }
 
 type integrationServiceClient struct {
@@ -54,43 +54,62 @@ func NewIntegrationServiceClientGRPC(config *config.AppConfig, logger commons.Lo
 }
 
 func (client *integrationServiceClient) Embedding(c context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	providerName string,
 	request *protos.EmbeddingRequest) (*protos.EmbeddingResponse, error) {
 	request.ProviderName = strings.ToLower(providerName)
-	return client.unifiedClient.Embedding(client.WithAuth(c, auth), request)
+	authContext, err := client.WithAuth(c, auth)
+	if err != nil {
+		return nil, err
+	}
+	return client.unifiedClient.Embedding(authContext, request)
 }
 
 func (client *integrationServiceClient) Reranking(c context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	providerName string,
 	request *protos.RerankingRequest) (*protos.RerankingResponse, error) {
 	request.ProviderName = strings.ToLower(providerName)
-	return client.unifiedClient.Reranking(client.WithAuth(c, auth), request)
+	authContext, err := client.WithAuth(c, auth)
+	if err != nil {
+		return nil, err
+	}
+	return client.unifiedClient.Reranking(authContext, request)
 }
 
 func (client *integrationServiceClient) Chat(c context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	providerName string,
 	request *protos.ChatRequest) (*protos.ChatResponse, error) {
 	request.ProviderName = strings.ToLower(providerName)
-	return client.unifiedClient.Chat(client.WithAuth(c, auth), request)
+	authContext, err := client.WithAuth(c, auth)
+	if err != nil {
+		return nil, err
+	}
+	return client.unifiedClient.Chat(authContext, request)
 }
 
 // StreamChat opens a bidirectional stream via the unified provider service.
 // The caller must set ProviderName on each ChatRequest before sending.
-func (client *integrationServiceClient) StreamChat(c context.Context, auth types.SimplePrinciple, providerName string) (grpc.BidiStreamingClient[protos.StreamChatRequest, protos.StreamChatResponse], error) {
-	ctx := client.WithAuth(c, auth)
-	return client.unifiedClient.StreamChat(ctx)
+func (client *integrationServiceClient) StreamChat(c context.Context, auth *types.Authentication, providerName string) (grpc.BidiStreamingClient[protos.StreamChatRequest, protos.StreamChatResponse], error) {
+	authContext, err := client.WithAuth(c, auth)
+	if err != nil {
+		return nil, err
+	}
+	return client.unifiedClient.StreamChat(authContext)
 }
 
 func (client *integrationServiceClient) VerifyCredential(c context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	providerName string,
 	cr *protos.Credential) (*protos.VerifyCredentialResponse, error) {
 	request := &protos.VerifyCredentialRequest{
 		Credential:   cr,
 		ProviderName: strings.ToLower(providerName),
 	}
-	return client.unifiedClient.VerifyCredential(client.WithAuth(c, auth), request)
+	authContext, err := client.WithAuth(c, auth)
+	if err != nil {
+		return nil, err
+	}
+	return client.unifiedClient.VerifyCredential(authContext, request)
 }

@@ -29,14 +29,14 @@ type outboundDispatcherTestStore struct {
 type outboundDispatcherConversationServiceStub struct {
 	internal_services.AssistantConversationService
 
-	metricAuth           types.SimplePrinciple
+	metricAuth           *types.Authentication
 	metricAssistantID    uint64
 	metricConversationID uint64
 	metrics              []*protos.Metric
 	metricRecorded       chan struct{}
 	metricOnce           sync.Once
 
-	metadataAuth           types.SimplePrinciple
+	metadataAuth           *types.Authentication
 	metadataAssistantID    uint64
 	metadataConversationID uint64
 	metadata               []*protos.Metadata
@@ -46,7 +46,7 @@ type outboundDispatcherConversationServiceStub struct {
 
 func (s *outboundDispatcherConversationServiceStub) CreateOrUpdateConversationMetrics(
 	_ context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantID uint64,
 	conversationID uint64,
 	metrics []*protos.Metric,
@@ -63,7 +63,7 @@ func (s *outboundDispatcherConversationServiceStub) CreateOrUpdateConversationMe
 
 func (s *outboundDispatcherConversationServiceStub) CreateOrUpdateConversationMetadata(
 	_ context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantID uint64,
 	conversationID uint64,
 	metadata []*protos.Metadata,
@@ -91,7 +91,11 @@ func TestInboundDispatcherSaveCallContextUsesDelegatedContext(t *testing.T) {
 
 	_, err := dispatcher.SaveCallContext(
 		context.Background(),
-		&types.ServiceScope{OrganizationId: &organizationID, ProjectId: &projectID, CurrentToken: "token"},
+		&types.Authentication{
+			AuthType:          types.AuthTypeService,
+			OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+			ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
+		},
 		&internal_assistant_entity.Assistant{},
 		9,
 		&internal_type.CallInfo{},
@@ -295,6 +299,7 @@ func TestOutboundDispatcher_StatusReporterRecordsTerminalObservability(t *testin
 			ConversationID: 44,
 			OrganizationID: organizationID,
 			ProjectID:      projectID,
+			AuthType:       types.AuthTypeService.String(),
 		},
 	}
 	dispatcher := &OutboundDispatcher{
@@ -394,6 +399,9 @@ func TestOutboundDispatcher_StatusReporterRecordsRingingProgressObservability(t 
 			Status:         callcontext.StatusPending,
 			AssistantID:    33,
 			ConversationID: 44,
+			OrganizationID: 11,
+			ProjectID:      22,
+			AuthType:       types.AuthTypeService.String(),
 		},
 	}
 	dispatcher := &OutboundDispatcher{

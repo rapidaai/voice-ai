@@ -7,7 +7,8 @@ package knowledge_api
 
 import (
 	"context"
-	"errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
@@ -16,14 +17,13 @@ import (
 
 // CreateKnowledge implements protos.KnowledgeServiceServer.
 func (knowledgeApi *knowledgeGrpcApi) CreateKnowledge(ctx context.Context, cer *protos.CreateKnowledgeRequest) (*protos.CreateKnowledgeResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	_, projectAuthErr := types.RequireProject(iAuth)
-	if !isAuthenticated || projectAuthErr != nil {
-		knowledgeApi.logger.Errorf("unauthenticated request for invoke")
-		return utils.Error[protos.CreateKnowledgeResponse](
-			errors.New("unauthenticated request for invoke"),
-			"Please provider valid service credentials to perfom invoke, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	_kn, err := knowledgeApi.knowledgeService.CreateKnowledge(ctx, iAuth,
 		cer.GetName(),

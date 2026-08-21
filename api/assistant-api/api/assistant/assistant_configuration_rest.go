@@ -21,8 +21,8 @@ import (
 )
 
 func (assistantApi *assistantGrpcApi) CreateAssistantConfigurationRest(c *gin.Context) {
-	auth, isAuthenticated := types.GetAuthPrinciple(c)
-	if !isAuthenticated {
+	auth, authErr := types.Authorize(c.Request.Context())
+	if authErr != nil {
 		platformError := pkg_errors.AssistantConfigurationUnauthenticated
 		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
@@ -35,9 +35,8 @@ func (assistantApi *assistantGrpcApi) CreateAssistantConfigurationRest(c *gin.Co
 		})
 		return
 	}
-	_, userAuthErr := types.RequireUser(auth)
-	_, projectAuthErr := types.RequireProject(auth)
-	if userAuthErr != nil || projectAuthErr != nil {
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
 		platformError := pkg_errors.AssistantConfigurationMissingAuthScope
 		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
@@ -50,6 +49,7 @@ func (assistantApi *assistantGrpcApi) CreateAssistantConfigurationRest(c *gin.Co
 		})
 		return
 	}
+
 	var req openapi.CreateAssistantConfigurationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		platformError := pkg_errors.AssistantConfigurationInvalidRequest
@@ -144,7 +144,7 @@ func (assistantApi *assistantGrpcApi) CreateAssistantConfigurationRest(c *gin.Co
 	options := assistantConfigurationOpenAPIOptions(req.Options)
 	configuration, err := assistantApi.assistantConfigService.Create(
 		c,
-		auth,
+		iAuth,
 		assistantId,
 		req.ConfigurationType,
 		req.Provider,
@@ -173,8 +173,8 @@ func (assistantApi *assistantGrpcApi) CreateAssistantConfigurationRest(c *gin.Co
 }
 
 func (assistantApi *assistantGrpcApi) UpdateAssistantConfigurationRest(c *gin.Context) {
-	auth, isAuthenticated := types.GetAuthPrinciple(c)
-	if !isAuthenticated {
+	auth, authErr := types.Authorize(c.Request.Context())
+	if authErr != nil {
 		platformError := pkg_errors.AssistantConfigurationUnauthenticated
 		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
@@ -187,9 +187,8 @@ func (assistantApi *assistantGrpcApi) UpdateAssistantConfigurationRest(c *gin.Co
 		})
 		return
 	}
-	_, userAuthErr := types.RequireUser(auth)
-	_, projectAuthErr := types.RequireProject(auth)
-	if userAuthErr != nil || projectAuthErr != nil {
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
 		platformError := pkg_errors.AssistantConfigurationMissingAuthScope
 		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
@@ -202,6 +201,7 @@ func (assistantApi *assistantGrpcApi) UpdateAssistantConfigurationRest(c *gin.Co
 		})
 		return
 	}
+
 	assistantId, assistantErr := utils.StringToUint64(c.Param("assistantId"))
 	if assistantErr != nil || !validator.NonZero(assistantId) {
 		platformError := pkg_errors.AssistantConfigurationInvalidAssistantID
@@ -310,7 +310,7 @@ func (assistantApi *assistantGrpcApi) UpdateAssistantConfigurationRest(c *gin.Co
 	options := assistantConfigurationOpenAPIOptions(req.Options)
 	configuration, err := assistantApi.assistantConfigService.Update(
 		c,
-		auth,
+		iAuth,
 		configurationId,
 		assistantId,
 		req.ConfigurationType,
@@ -340,8 +340,8 @@ func (assistantApi *assistantGrpcApi) UpdateAssistantConfigurationRest(c *gin.Co
 }
 
 func (assistantApi *assistantGrpcApi) GetAssistantConfigurationRest(c *gin.Context) {
-	auth, isAuthenticated := types.GetAuthPrinciple(c)
-	if !isAuthenticated {
+	auth, authErr := types.Authorize(c.Request.Context())
+	if authErr != nil {
 		platformError := pkg_errors.AssistantConfigurationUnauthenticated
 		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
@@ -354,9 +354,8 @@ func (assistantApi *assistantGrpcApi) GetAssistantConfigurationRest(c *gin.Conte
 		})
 		return
 	}
-	_, userAuthErr := types.RequireUser(auth)
-	_, projectAuthErr := types.RequireProject(auth)
-	if userAuthErr != nil || projectAuthErr != nil {
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
 		platformError := pkg_errors.AssistantConfigurationMissingAuthScope
 		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
@@ -369,6 +368,7 @@ func (assistantApi *assistantGrpcApi) GetAssistantConfigurationRest(c *gin.Conte
 		})
 		return
 	}
+
 	assistantId, assistantErr := utils.StringToUint64(c.Param("assistantId"))
 	if assistantErr != nil || !validator.NonZero(assistantId) {
 		platformError := pkg_errors.AssistantConfigurationInvalidAssistantID
@@ -397,7 +397,7 @@ func (assistantApi *assistantGrpcApi) GetAssistantConfigurationRest(c *gin.Conte
 		})
 		return
 	}
-	configuration, err := assistantApi.assistantConfigService.Get(c, auth, configurationId, assistantId)
+	configuration, err := assistantApi.assistantConfigService.Get(c, iAuth, configurationId, assistantId)
 	if err != nil {
 		assistantApi.logger.Errorf("unable to get assistant configuration: %v", err)
 		platformError := pkg_errors.AssistantConfigurationGet
@@ -420,8 +420,8 @@ func (assistantApi *assistantGrpcApi) GetAssistantConfigurationRest(c *gin.Conte
 }
 
 func (assistantApi *assistantGrpcApi) GetAllAssistantConfigurationRest(c *gin.Context) {
-	auth, isAuthenticated := types.GetAuthPrinciple(c)
-	if !isAuthenticated {
+	auth, authErr := types.Authorize(c.Request.Context())
+	if authErr != nil {
 		platformError := pkg_errors.AssistantConfigurationUnauthenticated
 		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
@@ -434,9 +434,8 @@ func (assistantApi *assistantGrpcApi) GetAllAssistantConfigurationRest(c *gin.Co
 		})
 		return
 	}
-	_, userAuthErr := types.RequireUser(auth)
-	_, projectAuthErr := types.RequireProject(auth)
-	if userAuthErr != nil || projectAuthErr != nil {
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
 		platformError := pkg_errors.AssistantConfigurationMissingAuthScope
 		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
@@ -449,6 +448,7 @@ func (assistantApi *assistantGrpcApi) GetAllAssistantConfigurationRest(c *gin.Co
 		})
 		return
 	}
+
 	assistantId, err := utils.StringToUint64(c.Param("assistantId"))
 	if err != nil || !validator.NonZero(assistantId) {
 		platformError := pkg_errors.AssistantConfigurationInvalidAssistantID
@@ -514,7 +514,7 @@ func (assistantApi *assistantGrpcApi) GetAllAssistantConfigurationRest(c *gin.Co
 	}
 	cnt, configurations, err := assistantApi.assistantConfigService.GetAll(
 		c,
-		auth,
+		iAuth,
 		assistantId,
 		configurationType,
 		c.Query("provider"),
@@ -557,8 +557,8 @@ func (assistantApi *assistantGrpcApi) GetAllAssistantConfigurationRest(c *gin.Co
 }
 
 func (assistantApi *assistantGrpcApi) DeleteAssistantConfigurationRest(c *gin.Context) {
-	auth, isAuthenticated := types.GetAuthPrinciple(c)
-	if !isAuthenticated {
+	auth, authErr := types.Authorize(c.Request.Context())
+	if authErr != nil {
 		platformError := pkg_errors.AssistantConfigurationUnauthenticated
 		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
@@ -571,9 +571,8 @@ func (assistantApi *assistantGrpcApi) DeleteAssistantConfigurationRest(c *gin.Co
 		})
 		return
 	}
-	_, userAuthErr := types.RequireUser(auth)
-	_, projectAuthErr := types.RequireProject(auth)
-	if userAuthErr != nil || projectAuthErr != nil {
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
 		platformError := pkg_errors.AssistantConfigurationMissingAuthScope
 		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
@@ -586,6 +585,7 @@ func (assistantApi *assistantGrpcApi) DeleteAssistantConfigurationRest(c *gin.Co
 		})
 		return
 	}
+
 	assistantId, assistantErr := utils.StringToUint64(c.Param("assistantId"))
 	if assistantErr != nil || !validator.NonZero(assistantId) {
 		platformError := pkg_errors.AssistantConfigurationInvalidAssistantID
@@ -614,7 +614,7 @@ func (assistantApi *assistantGrpcApi) DeleteAssistantConfigurationRest(c *gin.Co
 		})
 		return
 	}
-	configuration, err := assistantApi.assistantConfigService.Delete(c, auth, configurationId, assistantId)
+	configuration, err := assistantApi.assistantConfigService.Delete(c, iAuth, configurationId, assistantId)
 	if err != nil {
 		assistantApi.logger.Errorf("unable to delete assistant configuration: %v", err)
 		platformError := pkg_errors.AssistantConfigurationDelete

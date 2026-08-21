@@ -16,6 +16,8 @@ type DelegatedContext struct {
 	ProjectID      *uint64
 }
 
+// RequireUser resolves a user from a legacy authentication principle.
+// Deprecated: use Authentication.UserContext.
 func RequireUser(auth AuthenticationPrinciple) (uint64, error) {
 	if err := requireAuthenticated(auth); err != nil {
 		return 0, err
@@ -31,6 +33,8 @@ func RequireUser(auth AuthenticationPrinciple) (uint64, error) {
 	return userID, nil
 }
 
+// RequireOrganization resolves an organization from a legacy authentication principle.
+// Deprecated: use Authentication.OrganizationContext.
 func RequireOrganization(auth AuthenticationPrinciple) (uint64, error) {
 	if err := requireAuthenticated(auth); err != nil {
 		return 0, err
@@ -49,6 +53,8 @@ func RequireOrganization(auth AuthenticationPrinciple) (uint64, error) {
 	return delegatedContext.OrganizationID, nil
 }
 
+// RequireProject resolves a project from a legacy authentication principle.
+// Deprecated: use Authentication.ProjectContext.
 func RequireProject(auth AuthenticationPrinciple) (ProjectContext, error) {
 	if err := requireAuthenticated(auth); err != nil {
 		return ProjectContext{}, err
@@ -70,6 +76,8 @@ func RequireProject(auth AuthenticationPrinciple) (ProjectContext, error) {
 	}, nil
 }
 
+// ResolveDelegatedContext resolves contexts from a legacy authentication principle.
+// Deprecated: use Authentication context methods directly.
 func ResolveDelegatedContext(auth AuthenticationPrinciple) (DelegatedContext, error) {
 	if err := requireAuthenticated(auth); err != nil {
 		return DelegatedContext{}, err

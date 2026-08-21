@@ -58,7 +58,7 @@ type genericRequestor struct {
 	logger   commons.Logger
 	config   *config.AssistantConfig
 	source   utils.RapidaSource
-	auth     types.SimplePrinciple
+	auth     *types.Authentication
 	streamer internal_type.Streamer
 
 	// service
@@ -218,7 +218,7 @@ func (dm *genericRequestor) GetSource() utils.RapidaSource {
 	return dm.source
 }
 
-func (gr *genericRequestor) getAssistantConversation(ctx context.Context, auth types.SimplePrinciple, assistantId uint64, assistantConversationId uint64) (*internal_conversation_entity.AssistantConversation, error) {
+func (gr *genericRequestor) getAssistantConversation(ctx context.Context, auth *types.Authentication, assistantId uint64, assistantConversationId uint64) (*internal_conversation_entity.AssistantConversation, error) {
 	return gr.conversationService.GetConversation(ctx, auth, assistantId, assistantConversationId, &internal_services.GetConversationOption{
 		InjectContext:  true,
 		InjectArgument: true,

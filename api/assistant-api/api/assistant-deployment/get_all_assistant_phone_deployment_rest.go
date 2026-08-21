@@ -20,8 +20,8 @@ import (
 )
 
 func (deploymentApi *AssistantDeploymentApi) GetAllAssistantPhoneDeploymentRest(c *gin.Context) {
-	auth, isAuthenticated := types.GetAuthPrinciple(c)
-	if !isAuthenticated {
+	auth, authErr := types.Authorize(c.Request.Context())
+	if authErr != nil {
 		c.JSON(pkg_errors.GetAllAssistantPhoneDeploymentUnauthenticated.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.GetAllAssistantPhoneDeploymentUnauthenticated.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -33,9 +33,8 @@ func (deploymentApi *AssistantDeploymentApi) GetAllAssistantPhoneDeploymentRest(
 		})
 		return
 	}
-	_, userAuthErr := types.RequireUser(auth)
-	_, projectAuthErr := types.RequireProject(auth)
-	if userAuthErr != nil || projectAuthErr != nil {
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
 		c.JSON(pkg_errors.GetAllAssistantPhoneDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.GetAllAssistantPhoneDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -128,7 +127,7 @@ func (deploymentApi *AssistantDeploymentApi) GetAllAssistantPhoneDeploymentRest(
 		}
 	}
 
-	totalItems, deployments, err := deploymentApi.deploymentService.GetAllAssistantPhoneDeployment(c, auth, assistantId, criterias, paginate)
+	totalItems, deployments, err := deploymentApi.deploymentService.GetAllAssistantPhoneDeployment(c, iAuth, assistantId, criterias, paginate)
 	if err != nil {
 		deploymentApi.logger.Errorf("unable to get all assistant phone deployments: %v", err)
 		c.JSON(pkg_errors.GetAllAssistantPhoneDeploymentGetDeployment.HTTPStatusCode, openapi.ErrorResponse{

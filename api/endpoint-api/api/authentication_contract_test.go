@@ -1,14 +1,17 @@
 package endpoint_api
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"go/ast"
+	"go/format"
 	"go/parser"
 	"go/token"
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 
 	"google.golang.org/grpc/codes"
@@ -67,7 +70,8 @@ func TestEndpointRPCAuthenticationContract(t *testing.T) {
 		if filepath.Ext(filename) != ".go" || len(filename) >= 8 && filename[len(filename)-8:] == "_test.go" {
 			continue
 		}
-		file, err := parser.ParseFile(token.NewFileSet(), filename, nil, 0)
+		fileSet := token.NewFileSet()
+		file, err := parser.ParseFile(fileSet, filename, nil, 0)
 		if err != nil {
 			t.Fatalf("parse %s: %v", filename, err)
 		}
@@ -79,6 +83,7 @@ func TestEndpointRPCAuthenticationContract(t *testing.T) {
 			if _, tracked := expected[function.Name.Name]; !tracked {
 				continue
 			}
+			assertEndpointExplicitAuthenticationPattern(t, fileSet, filename, function)
 			hasAuthorize := false
 			scopes := map[string]struct{}{}
 			ast.Inspect(function.Body, func(node ast.Node) bool {
@@ -120,6 +125,26 @@ func TestEndpointRPCAuthenticationContract(t *testing.T) {
 
 	if !reflect.DeepEqual(actual, expected) {
 		t.Fatalf("RPC authentication scopes = %#v, want %#v", actual, expected)
+	}
+}
+
+func assertEndpointExplicitAuthenticationPattern(t *testing.T, fileSet *token.FileSet, filename string, function *ast.FuncDecl) {
+	t.Helper()
+	var source bytes.Buffer
+	if err := format.Node(&source, fileSet, function); err != nil {
+		t.Fatalf("format %s:%s: %v", filename, function.Name.Name, err)
+	}
+	for _, required := range []string{
+		"auth, authErr := types.Authorize(",
+		"if authErr != nil {",
+		"status.Error(codes.Unauthenticated, authErr.Error())",
+		"iAuth, scopeErr := auth.Scope(",
+		"if scopeErr != nil {",
+		"status.Error(codes.PermissionDenied, scopeErr.Error())",
+	} {
+		if !strings.Contains(source.String(), required) {
+			t.Errorf("%s:%s missing explicit authentication contract %q", filename, function.Name.Name, required)
+		}
 	}
 }
 

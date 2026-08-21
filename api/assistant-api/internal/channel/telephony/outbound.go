@@ -213,7 +213,10 @@ func (d *OutboundDispatcher) performOutbound(ctx context.Context, callContext *c
 		return nil, fmt.Errorf("telephony provider %s not available: %w", callContext.Provider, err)
 	}
 
-	callAuth := callContext.ToAuth()
+	callAuth, err := callContext.ToAuthentication()
+	if err != nil {
+		return nil, fmt.Errorf("invalid call context authentication: %w", err)
+	}
 
 	assistant, err := d.assistantService.Get(ctx, callAuth, callContext.AssistantID, nil, &internal_services.GetAssistantOption{InjectPhoneDeployment: true})
 	if err != nil {

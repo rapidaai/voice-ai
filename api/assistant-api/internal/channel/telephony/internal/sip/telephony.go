@@ -83,7 +83,7 @@ func (t *sipTelephony) parseConfig(vaultCredential *protos.VaultCredential) (*si
 
 func (t *sipTelephony) StatusCallback(
 	c *gin.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	assistantConversationId uint64,
 ) (*internal_type.StatusInfo, error) {
@@ -126,7 +126,7 @@ func (t *sipTelephony) CatchAllStatusCallback(ctx *gin.Context) (*internal_type.
 
 func (t *sipTelephony) OutboundCall(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	toPhone string,
 	fromPhone string,
 	assistant *internal_assistant_entity.Assistant,
@@ -251,7 +251,7 @@ func (t *sipTelephony) outboundHealthGateEnabled(appCfg *config.AssistantConfig)
 
 func (t *sipTelephony) InboundCall(
 	c *gin.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	clientNumber string,
 	assistantConversationId uint64,

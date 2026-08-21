@@ -66,7 +66,7 @@ type SIPAuthConfig struct {
 
 // MakeCallOptions carries application context into a primary outbound call leg.
 type MakeCallOptions struct {
-	Auth               types.SimplePrinciple
+	Auth               *types.Authentication
 	Assistant          *internal_assistant_entity.Assistant
 	ConversationID     uint64
 	ContextID          string
@@ -83,7 +83,7 @@ type TransferBridgeCallOptions struct {
 	// TotalAttempts is the number of transfer targets available for this request.
 	TotalAttempts int
 	// Auth is the authenticated principal associated with the parent call.
-	Auth types.SimplePrinciple
+	Auth *types.Authentication
 	// Assistant is the assistant resolved for the parent call.
 	Assistant *internal_assistant_entity.Assistant
 	// ConversationID is the active parent assistant conversation.

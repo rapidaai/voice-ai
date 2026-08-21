@@ -19,6 +19,8 @@ import (
 	// "github.com/rapidaai/pkg/models"
 )
 
+// NewAuthenticationUnaryServerMiddleware authenticates only user credentials.
+// Deprecated: use NewAuthenticationBoundaryUnaryServerMiddleware.
 func NewAuthenticationUnaryServerMiddleware(resolver types.Authenticator, logger commons.Logger) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		authToken := metadata.ExtractIncoming(ctx).Get(types.AUTHORIZATION_KEY)
@@ -63,6 +65,8 @@ func NewAuthenticationUnaryServerMiddleware(resolver types.Authenticator, logger
 
 // StreamServerInterceptor returns a new unary server interceptors that performs per-request auth.
 // NOTE(bwplotka): For more complex auth interceptor see https://github.com/grpc/grpc-go/blob/master/authz/grpc_authz_server_interceptors.go.
+// NewAuthenticationStreamServerMiddleware authenticates only user credentials.
+// Deprecated: use NewAuthenticationBoundaryStreamServerMiddleware.
 func NewAuthenticationStreamServerMiddleware(resolver types.Authenticator, logger commons.Logger) grpc.StreamServerInterceptor {
 	return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		ctx := stream.Context()

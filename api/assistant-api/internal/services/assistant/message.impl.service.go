@@ -20,7 +20,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-func (conversationService *assistantConversationService) GetAllConversationMessage(ctx context.Context, auth types.SimplePrinciple, assistantConversationId uint64, criterias []*protos.Criteria, paginate *protos.Paginate, ordering *protos.Ordering, opts *internal_services.GetMessageOption) (int64, []*internal_message_gorm.AssistantConversationMessage, error) {
+func (conversationService *assistantConversationService) GetAllConversationMessage(ctx context.Context, auth *types.Authentication, assistantConversationId uint64, criterias []*protos.Criteria, paginate *protos.Paginate, ordering *protos.Ordering, opts *internal_services.GetMessageOption) (int64, []*internal_message_gorm.AssistantConversationMessage, error) {
 	start := time.Now()
 	db := conversationService.postgres.DB(ctx)
 	var (
@@ -75,14 +75,14 @@ func (conversationService *assistantConversationService) GetAllConversationMessa
 
 func (conversationService *assistantConversationService) GetAllAssistantMessage(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
 	ordering *protos.Ordering,
 	opts *internal_services.GetMessageOption,
 ) (int64, []*internal_message_gorm.AssistantConversationMessage, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return 0, nil, err
 	}
@@ -168,13 +168,13 @@ func (conversationService *assistantConversationService) GetAllAssistantMessage(
 
 func (conversationService *assistantConversationService) GetAllMessage(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
 	ordering *protos.Ordering,
 	opts *internal_services.GetMessageOption,
 ) (int64, []*internal_message_gorm.AssistantConversationMessage, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return 0, nil, err
 	}
@@ -358,7 +358,7 @@ func (conversationService *assistantConversationService) GetAllMessage(
 
 // func (conversationService *assistantConversationService) UpdateConversationMessage(
 // ctx context.Context,
-// auth types.SimplePrinciple,
+// auth *types.Authentication,
 // assistantConversationId uint64,
 // assistantConversationMessageId string,
 // message *types.Message,
@@ -392,7 +392,7 @@ func (conversationService *assistantConversationService) GetAllMessage(
 
 func (conversationService *assistantConversationService) CreateConversationMessage(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	source utils.RapidaSource,
 	assistantId, assistantProviderModelId,
 	assistantConversationId uint64,
@@ -400,7 +400,8 @@ func (conversationService *assistantConversationService) CreateConversationMessa
 	role string,
 	message string,
 ) (*internal_message_gorm.AssistantConversationMessage, error) {
-	userID, err := types.RequireUser(auth)
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return nil, err
 	}
@@ -434,12 +435,13 @@ func (conversationService *assistantConversationService) CreateConversationMessa
 
 func (conversationService *assistantConversationService) CreateOrUpdateMessageMetadata(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantConversationId uint64,
 	assistantConversationMessageId string,
 	metadata []*protos.Metadata,
 ) ([]*internal_message_gorm.AssistantConversationMessageMetadata, error) {
-	userID, err := types.RequireUser(auth)
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return nil, err
 	}
@@ -485,12 +487,13 @@ func (conversationService *assistantConversationService) CreateOrUpdateMessageMe
 
 func (conversationService *assistantConversationService) CreateOrUpdateMessageMetrics(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantConversationId uint64,
 	assistantConversationMessageId string,
 	metrics []*protos.Metric,
 ) ([]*internal_message_gorm.AssistantConversationMessageMetric, error) {
-	userID, err := types.RequireUser(auth)
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return nil, err
 	}

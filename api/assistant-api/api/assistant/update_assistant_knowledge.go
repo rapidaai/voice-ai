@@ -7,6 +7,8 @@ package assistant_api
 
 import (
 	"context"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/rapidaai/pkg/exceptions"
 	gorm_types "github.com/rapidaai/pkg/models/gorm/types"
@@ -16,11 +18,13 @@ import (
 )
 
 func (assistantApi *assistantGrpcApi) UpdateAssistantKnowledge(ctx context.Context, cawr *assistant_api.UpdateAssistantKnowledgeRequest) (*assistant_api.GetAssistantKnowledgeResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	_, projectAuthErr := types.RequireProject(iAuth)
-	if !isAuthenticated || projectAuthErr != nil {
-		assistantApi.logger.Errorf("unauthenticated request for UpdateAssistantKnowledge")
-		return exceptions.AuthenticationError[assistant_api.GetAssistantKnowledgeResponse]()
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	wl, err := assistantApi.assistantKnowledgeService.Update(
 		ctx,

@@ -33,8 +33,9 @@ type assistantToolService struct {
 }
 
 // CreateAssistantTool implements internal_services.AssistantToolService.
-func (eService *assistantToolService) Create(ctx context.Context, auth types.SimplePrinciple, assistantId uint64, name string, description *string, fields map[string]interface{}, executionMethod string, options []*protos.Metadata) (*internal_assistant_entity.AssistantTool, error) {
-	userID, err := types.RequireUser(auth)
+func (eService *assistantToolService) Create(ctx context.Context, auth *types.Authentication, assistantId uint64, name string, description *string, fields map[string]interface{}, executionMethod string, options []*protos.Metadata) (*internal_assistant_entity.AssistantTool, error) {
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return nil, err
 	}
@@ -83,8 +84,9 @@ func (eService *assistantToolService) Create(ctx context.Context, auth types.Sim
 }
 
 // DeleteAssistantTool implements internal_services.AssistantToolService.
-func (eService *assistantToolService) Delete(ctx context.Context, auth types.SimplePrinciple, toolId uint64, assistantId uint64) (*internal_assistant_entity.AssistantTool, error) {
-	userID, err := types.RequireUser(auth)
+func (eService *assistantToolService) Delete(ctx context.Context, auth *types.Authentication, toolId uint64, assistantId uint64) (*internal_assistant_entity.AssistantTool, error) {
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +112,7 @@ func (eService *assistantToolService) Delete(ctx context.Context, auth types.Sim
 }
 
 // GetAllAssistantTool implements internal_services.AssistantToolService.
-func (eService *assistantToolService) GetAll(ctx context.Context, auth types.SimplePrinciple, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantTool, error) {
+func (eService *assistantToolService) GetAll(ctx context.Context, auth *types.Authentication, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantTool, error) {
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	var (
@@ -146,7 +148,7 @@ func (eService *assistantToolService) GetAll(ctx context.Context, auth types.Sim
 }
 
 // GetAssistantTool implements internal_services.AssistantToolService.
-func (eService *assistantToolService) Get(ctx context.Context, auth types.SimplePrinciple, toolId uint64, assistantId uint64) (*internal_assistant_entity.AssistantTool, error) {
+func (eService *assistantToolService) Get(ctx context.Context, auth *types.Authentication, toolId uint64, assistantId uint64) (*internal_assistant_entity.AssistantTool, error) {
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	var aK *internal_assistant_entity.AssistantTool
@@ -164,10 +166,11 @@ func (eService *assistantToolService) Get(ctx context.Context, auth types.Simple
 }
 
 // UpdateAssistantTool implements internal_services.AssistantToolService.
-func (eService *assistantToolService) Update(ctx context.Context, auth types.SimplePrinciple,
+func (eService *assistantToolService) Update(ctx context.Context, auth *types.Authentication,
 	toolId uint64,
 	assistantId uint64, name string, description *string, fields map[string]interface{}, executionMethod string, options []*protos.Metadata) (*internal_assistant_entity.AssistantTool, error) {
-	userID, err := types.RequireUser(auth)
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return nil, err
 	}
@@ -226,10 +229,11 @@ func (eService *assistantToolService) Update(ctx context.Context, auth types.Sim
 
 func (eService *assistantToolService) markAllOptionsAsDeleted(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantToolId uint64,
 ) error {
-	userID, err := types.RequireUser(auth)
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return err
 	}
@@ -257,11 +261,12 @@ func (eService *assistantToolService) markAllOptionsAsDeleted(
 
 func (eService *assistantToolService) CreateOrUpdateExecutionOption(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantToolId uint64,
 	metadata []*protos.Metadata,
 ) ([]*internal_assistant_entity.AssistantToolOption, error) {
-	userID, err := types.RequireUser(auth)
+	userContext, err := auth.UserContext()
+	userID := userContext.UserID
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +315,7 @@ func NewAssistantToolService(logger commons.Logger, postgres connectors.Postgres
 
 func (eService *assistantToolService) CreateLog(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId, conversationId uint64,
 	messageId string,
 	toolCallId string,
@@ -318,7 +323,7 @@ func (eService *assistantToolService) CreateLog(
 	status type_enums.RecordState,
 	request []byte,
 ) (*internal_assistant_entity.AssistantToolLog, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +368,7 @@ func (eService *assistantToolService) CreateLog(
 
 func (eService *assistantToolService) UpdateLog(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	toolCallId string,
 	conversationId uint64,
 	status type_enums.RecordState,
@@ -396,10 +401,10 @@ func (eService *assistantToolService) UpdateLog(
 
 func (eService *assistantToolService) GetLog(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	projectId uint64,
 	toolLogId uint64) (*internal_assistant_entity.AssistantToolLog, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -424,12 +429,12 @@ func (eService *assistantToolService) GetLog(
 
 func (eService *assistantToolService) GetAllLog(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	projectId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
 	order *protos.Ordering) (int64, []*internal_assistant_entity.AssistantToolLog, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return 0, nil, err
 	}
@@ -535,9 +540,13 @@ func (eService *assistantToolService) ObjectKey(keyPrefix string, auditId uint64
 
 func (eService *assistantToolService) GetLogObject(
 	ctx context.Context,
-	organizationId,
-	projectId, toolLogId uint64) (requestData []byte, responseData []byte, err error) {
-	keyPrefix := eService.ObjectPrefix(organizationId, projectId)
+	auth *types.Authentication,
+	toolLogId uint64) (requestData []byte, responseData []byte, err error) {
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, nil, err
+	}
+	keyPrefix := eService.ObjectPrefix(projectContext.OrganizationID, projectContext.ProjectID)
 	responseKey := eService.ObjectKey(keyPrefix, toolLogId, "response.json")
 	requestKey := eService.ObjectKey(keyPrefix, toolLogId, "request.json")
 

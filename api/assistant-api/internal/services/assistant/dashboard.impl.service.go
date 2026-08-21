@@ -29,7 +29,7 @@ type assistantDashboardSQLFilters struct {
 
 func (assistantService *assistantService) GetAssistantDashboard(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	fromDate *timestamppb.Timestamp,
 	toDate *timestamppb.Timestamp,
@@ -478,12 +478,12 @@ ORDER BY bucket_index ASC
 }
 
 func (assistantService *assistantService) buildAssistantDashboardSQLFilters(
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	fromDate *timestamppb.Timestamp,
 	toDate *timestamppb.Timestamp,
 ) (*assistantDashboardSQLFilters, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}

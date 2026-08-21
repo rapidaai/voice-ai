@@ -55,7 +55,7 @@ func NewAssistantHTTPLogService(
 
 func (s *assistantHTTPLogService) CreateLog(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	source string,
 	sourceRefId uint64,
 	sourceEvent string,
@@ -72,7 +72,7 @@ func (s *assistantHTTPLogService) CreateLog(
 	request []byte,
 	response []byte,
 ) (*internal_assistant_entity.AssistantHTTPLog, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -130,11 +130,11 @@ func (s *assistantHTTPLogService) CreateLog(
 
 func (s *assistantHTTPLogService) GetLog(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	projectId uint64,
 	httpLogId uint64,
 ) (*internal_assistant_entity.AssistantHTTPLog, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -159,13 +159,13 @@ func (s *assistantHTTPLogService) GetLog(
 
 func (s *assistantHTTPLogService) GetAllLog(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	projectId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
 	order *protos.Ordering,
 ) (int64, []*internal_assistant_entity.AssistantHTTPLog, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return 0, nil, err
 	}
@@ -297,11 +297,14 @@ func (s *assistantHTTPLogService) GetAllLog(
 
 func (s *assistantHTTPLogService) GetLogObject(
 	ctx context.Context,
-	organizationId uint64,
-	projectId uint64,
+	auth *types.Authentication,
 	httpLogId uint64,
 ) (requestData []byte, responseData []byte, err error) {
-	keyPrefix := s.ObjectPrefix(organizationId, projectId)
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, nil, err
+	}
+	keyPrefix := s.ObjectPrefix(projectContext.OrganizationID, projectContext.ProjectID)
 	responseKey := s.ObjectKey(keyPrefix, httpLogId, "response.json")
 	requestKey := s.ObjectKey(keyPrefix, httpLogId, "request.json")
 
@@ -360,21 +363,16 @@ func (s *assistantHTTPLogService) GetLogObject(
 
 func (s *assistantHTTPLogService) RetryLog(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	projectId uint64,
 	httpLogId uint64,
 ) (*internal_assistant_entity.AssistantHTTPLog, error) {
-	projectContext, err := types.RequireProject(auth)
-	if err != nil {
-		return nil, err
-	}
-
 	httpLog, err := s.GetLog(ctx, auth, projectId, httpLogId)
 	if err != nil {
 		return nil, err
 	}
 
-	requestPayload, _, _ := s.GetLogObject(ctx, projectContext.OrganizationID, projectContext.ProjectID, httpLogId)
+	requestPayload, _, _ := s.GetLogObject(ctx, auth, httpLogId)
 	snapshot, err := s.parseRetryRequestSnapshot(requestPayload)
 	if err != nil {
 		return nil, fmt.Errorf("http retry: invalid request snapshot for log %d: %w", httpLogId, err)

@@ -25,6 +25,9 @@ func NewAuthenticationBoundaryUnaryServerMiddleware(
 		if err != nil {
 			return nil, err
 		}
+		if auth == nil {
+			return handler(ctx, req)
+		}
 		return handler(context.WithValue(ctx, types.CTX_, auth), req)
 	}
 }
@@ -40,6 +43,9 @@ func NewAuthenticationBoundaryStreamServerMiddleware(
 		auth, err := authenticateGRPCRequest(stream.Context(), user, project, organization, service, logger)
 		if err != nil {
 			return err
+		}
+		if auth == nil {
+			return handler(srv, stream)
 		}
 		wrapped := middleware.WrapServerStream(stream)
 		wrapped.WrappedContext = context.WithValue(stream.Context(), types.CTX_, auth)
@@ -57,8 +63,7 @@ func authenticateGRPCRequest(
 ) (*types.Authentication, error) {
 	presence := grpcCredentialPresence(ctx)
 	if presence.count() == 0 {
-		logAuthenticationFailure(logger, "authentication credential is missing")
-		return nil, grpcAuthenticationError()
+		return nil, nil
 	}
 	if presence.count() > 1 {
 		logAuthenticationFailure(logger, "authentication credential conflict: classes=%s", presence.classes())
@@ -67,6 +72,10 @@ func authenticateGRPCRequest(
 
 	incoming := metadata.ExtractIncoming(ctx)
 	if presence.user {
+		if user == nil {
+			logAuthenticationFailure(logger, "user credential is not supported")
+			return nil, grpcAuthenticationError()
+		}
 		authToken := strings.TrimSpace(incoming.Get(types.AUTHORIZATION_KEY))
 		authID := strings.TrimSpace(incoming.Get(types.AUTH_KEY))
 		projectID := strings.TrimSpace(incoming.Get(types.PROJECT_KEY))
@@ -113,6 +122,10 @@ func authenticateGRPCRequest(
 	}
 
 	if presence.project {
+		if project == nil {
+			logAuthenticationFailure(logger, "project credential is not supported")
+			return nil, grpcAuthenticationError()
+		}
 		apiKey := strings.TrimPrefix(strings.TrimSpace(incoming.Get(types.PROJECT_SCOPE_KEY)), types.PROJECT_KEY_PREFIX)
 		if apiKey == "" {
 			logAuthenticationFailure(logger, "project credential is empty")
@@ -136,6 +149,10 @@ func authenticateGRPCRequest(
 	}
 
 	if presence.organization {
+		if organization == nil {
+			logAuthenticationFailure(logger, "organization credential is not supported")
+			return nil, grpcAuthenticationError()
+		}
 		apiKey := strings.TrimSpace(incoming.Get(types.ORG_SCOPE_KEY))
 		auth, err := organization.Claim(ctx, apiKey)
 		if err != nil || auth == nil || auth.Info == nil || !auth.Info.IsAuthenticated() {
@@ -149,6 +166,10 @@ func authenticateGRPCRequest(
 		}, nil
 	}
 
+	if service == nil {
+		logAuthenticationFailure(logger, "service credential is not supported")
+		return nil, grpcAuthenticationError()
+	}
 	apiKey := strings.TrimSpace(incoming.Get(types.SERVICE_SCOPE_KEY))
 	auth, err := service.Claim(ctx, apiKey)
 	if err != nil || auth == nil || auth.Info == nil || !auth.Info.IsAuthenticated() {
