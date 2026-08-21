@@ -193,16 +193,18 @@ func (invokeApi *invokerGRPCApi) Invoke(ctx context.Context, iRequest *invoker_a
 }
 
 func (endpoint *invokerGRPCApi) Probe(ctx context.Context, rpv *invoker_api.ProbeRequest) (*invoker_api.ProbeResponse, error) {
-	_, isAuthenticated := getProjectPrincipleGRPC(ctx)
-	if !isAuthenticated {
+	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
+	_, projectAuthErr := types.RequireProject(iAuth)
+	if !isAuthenticated || projectAuthErr != nil {
 		return utils.AuthenticateError[invoker_api.ProbeResponse]()
 	}
 	return nil, nil
 }
 
 func (endpoint *invokerGRPCApi) Update(ctx context.Context, ur *invoker_api.UpdateRequest) (*invoker_api.UpdateResponse, error) {
-	_, isAuthenticated := getProjectPrincipleGRPC(ctx)
-	if !isAuthenticated {
+	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
+	_, projectAuthErr := types.RequireProject(iAuth)
+	if !isAuthenticated || projectAuthErr != nil {
 		return utils.AuthenticateError[invoker_api.UpdateResponse]()
 	}
 	return nil, nil

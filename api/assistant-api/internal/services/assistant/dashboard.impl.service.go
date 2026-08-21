@@ -483,7 +483,7 @@ func (assistantService *assistantService) buildAssistantDashboardSQLFilters(
 	fromDate *timestamppb.Timestamp,
 	toDate *timestamppb.Timestamp,
 ) (*assistantDashboardSQLFilters, error) {
-	projectContext, err := requireProject(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return nil, err
 	}

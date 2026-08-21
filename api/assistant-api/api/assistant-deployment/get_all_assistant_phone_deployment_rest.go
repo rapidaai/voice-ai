@@ -33,7 +33,9 @@ func (deploymentApi *AssistantDeploymentApi) GetAllAssistantPhoneDeploymentRest(
 		})
 		return
 	}
-	if !hasUserProjectCapability(auth) {
+	_, userAuthErr := types.RequireUser(auth)
+	_, projectAuthErr := types.RequireProject(auth)
+	if userAuthErr != nil || projectAuthErr != nil {
 		c.JSON(pkg_errors.GetAllAssistantPhoneDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.GetAllAssistantPhoneDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),

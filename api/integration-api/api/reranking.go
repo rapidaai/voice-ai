@@ -21,7 +21,7 @@ func (iApi *integrationApi) Reranking(
 	rerankerCaller internal_callers.RerankingCaller,
 ) (*integration_api.RerankingResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	projectContext, authErr := requireProjectContext(iAuth)
+	projectContext, authErr := types.RequireProject(iAuth)
 	if !isAuthenticated || authErr != nil {
 		iApi.logger.Errorf("unauthenticated request for invoke")
 		return utils.Error[integration_api.RerankingResponse](

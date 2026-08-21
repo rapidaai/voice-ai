@@ -178,7 +178,7 @@ func (api *observabilityGrpcApi) GetAllTelemetry(
 	request *protos.GetAllTelemetryRequest,
 ) (*protos.GetAllTelemetryResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	projectContext, authErr := requireTelemetryProjectContext(iAuth)
+	projectContext, authErr := types.RequireProject(iAuth)
 	if !isAuthenticated || authErr != nil {
 		api.logger.Errorf("unauthenticated request for GetAllTelemetry")
 		return exceptions.AuthenticationError[protos.GetAllTelemetryResponse]()

@@ -20,7 +20,8 @@ import (
 // CreateAssistantKnowledgeConfiguration implements assistant_api.AssistantServiceServer.
 func (assistantApi *assistantGrpcApi) CreateAssistantKnowledge(ctx context.Context, cepm *assistant_api.CreateAssistantKnowledgeRequest) (*assistant_api.GetAssistantKnowledgeResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !hasProjectCapability(iAuth) {
+	_, projectAuthErr := types.RequireProject(iAuth)
+	if !isAuthenticated || projectAuthErr != nil {
 		assistantApi.logger.Errorf("unauthenticated request for invoke")
 		return utils.Error[assistant_api.GetAssistantKnowledgeResponse](
 			errors.New("unauthenticated request for get assistant"),

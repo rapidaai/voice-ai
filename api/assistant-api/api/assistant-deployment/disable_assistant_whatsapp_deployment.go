@@ -16,7 +16,8 @@ import (
 
 func (deploymentApi *assistantDeploymentGrpcApi) DisableAssistantWhatsappDeployment(ctx context.Context, req *assistant_api.GetAssistantDeploymentRequest) (*assistant_api.GetAssistantWhatsappDeploymentResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !hasProjectCapability(iAuth) {
+	_, projectAuthErr := types.RequireProject(iAuth)
+	if !isAuthenticated || projectAuthErr != nil {
 		deploymentApi.logger.Errorf("unauthenticated request for disable assistant whatsapp deployment")
 		return exceptions.AuthenticationError[assistant_api.GetAssistantWhatsappDeploymentResponse]()
 	}

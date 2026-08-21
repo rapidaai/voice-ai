@@ -18,7 +18,8 @@ import (
 
 func (assistantApi *assistantGrpcApi) GetAssistant(ctx context.Context, cepm *assistant_api.GetAssistantRequest) (*assistant_api.GetAssistantResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !hasProjectCapability(iAuth) {
+	_, projectAuthErr := types.RequireProject(iAuth)
+	if !isAuthenticated || projectAuthErr != nil {
 		assistantApi.logger.Errorf("unauthenticated request for invoke")
 		return utils.Error[assistant_api.GetAssistantResponse](
 			errors.New("unauthenticated request for get assistant"),

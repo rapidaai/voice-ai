@@ -28,7 +28,7 @@ func (iApi *integrationApi) Chat(
 ) (*protos.ChatResponse, error) {
 	tag = strings.ToLower(tag)
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	projectContext, authErr := requireProjectContext(iAuth)
+	projectContext, authErr := types.RequireProject(iAuth)
 	if !isAuthenticated || authErr != nil {
 		return utils.Error[protos.ChatResponse](
 			errors.New("unauthenticated request for chat"),
@@ -111,7 +111,7 @@ func (iApi *integrationApi) StreamChatBidirectionalUnified(
 	stream grpc.BidiStreamingServer[protos.StreamChatRequest, protos.StreamChatResponse],
 ) error {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(context)
-	projectContext, authErr := requireProjectContext(iAuth)
+	projectContext, authErr := types.RequireProject(iAuth)
 	if !isAuthenticated || authErr != nil {
 		iApi.logger.Errorf("unauthenticated request for bidirectional stream chat")
 		return status.Error(codes.Unauthenticated, "Please provide valid service credentials to perform invoke.")

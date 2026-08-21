@@ -52,7 +52,7 @@ func (eService assistantDeploymentService) CreateWebPluginDeployment(
 	suggestion []string,
 	inputAudio, outputAudio *protos.DeploymentAudioProvider,
 ) (*internal_assistant_entity.AssistantWebPluginDeployment, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (eService assistantDeploymentService) createAssistantDeploymentAudio(
 	auth types.SimplePrinciple, deploymentId uint64,
 	audioType string,
 	audioConfig *protos.DeploymentAudioProvider) (*internal_assistant_entity.AssistantDeploymentAudio, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +171,7 @@ func (eService assistantDeploymentService) CreateDebuggerDeployment(
 	IdleTimeoutMessage *string, maxSessionDuration *uint64,
 	inputAudio, outputAudio *protos.DeploymentAudioProvider,
 ) (*internal_assistant_entity.AssistantDebuggerDeployment, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -229,7 +229,7 @@ func (eService assistantDeploymentService) CreateApiDeployment(
 	IdleTimeoutMessage *string, maxSessionDuration *uint64,
 	inputAudio, outputAudio *protos.DeploymentAudioProvider,
 ) (*internal_assistant_entity.AssistantApiDeployment, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +288,7 @@ func (eService assistantDeploymentService) CreateWhatsappDeployment(
 	whatsappProvider string,
 	whatsappOptions []*protos.Metadata,
 ) (*internal_assistant_entity.AssistantWhatsappDeployment, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -375,7 +375,7 @@ func (eService assistantDeploymentService) CreatePhoneDeployment(
 	inputAudio, outputAudio *protos.DeploymentAudioProvider,
 	opts []*protos.Metadata,
 ) (*internal_assistant_entity.AssistantPhoneDeployment, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -737,7 +737,7 @@ func (eService assistantDeploymentService) GetAllAssistantWhatsappDeployment(ctx
 }
 
 func (eService assistantDeploymentService) DisableAssistantApiDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.AssistantApiDeployment, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -802,7 +802,7 @@ func (eService assistantDeploymentService) DisableAssistantApiDeployment(ctx con
 }
 
 func (eService assistantDeploymentService) DisableAssistantDebuggerDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.AssistantDebuggerDeployment, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -867,7 +867,7 @@ func (eService assistantDeploymentService) DisableAssistantDebuggerDeployment(ct
 }
 
 func (eService assistantDeploymentService) DisableAssistantPhoneDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.AssistantPhoneDeployment, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -958,7 +958,7 @@ func (eService assistantDeploymentService) DisableAssistantPhoneDeployment(ctx c
 }
 
 func (eService assistantDeploymentService) DisableAssistantWebpluginDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.AssistantWebPluginDeployment, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -1024,7 +1024,7 @@ func (eService assistantDeploymentService) DisableAssistantWebpluginDeployment(c
 }
 
 func (eService assistantDeploymentService) DisableAssistantWhatsappDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.AssistantWhatsappDeployment, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}

@@ -35,7 +35,7 @@ func NewAuditLoggingGRPC(config *config.IntegrationConfig, logger commons.Logger
 
 func (als *auditLoggingGRPCApi) GetAuditLog(c context.Context, ir *integration_api.GetAuditLogRequest) (*integration_api.GetAuditLogResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	projectContext, authErr := requireProjectContext(iAuth)
+	projectContext, authErr := types.RequireProject(iAuth)
 	if !isAuthenticated || authErr != nil {
 		als.logger.Errorf("unauthenticated request for invoke")
 		return utils.Error[integration_api.GetAuditLogResponse](
@@ -83,7 +83,7 @@ func (als *auditLoggingGRPCApi) GetAuditLog(c context.Context, ir *integration_a
 
 func (als *auditLoggingGRPCApi) GetAllAuditLog(c context.Context, ir *integration_api.GetAllAuditLogRequest) (*integration_api.GetAllAuditLogResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	projectContext, authErr := requireProjectContext(iAuth)
+	projectContext, authErr := types.RequireProject(iAuth)
 	if !isAuthenticated || authErr != nil {
 		als.logger.Errorf("unauthenticated request for invoke")
 		return utils.Error[integration_api.GetAllAuditLogResponse](
@@ -117,7 +117,7 @@ func (als *auditLoggingGRPCApi) GetAllAuditLog(c context.Context, ir *integratio
 // CreateMetadata implements protos.AuditLoggingServiceServer.
 func (als *auditLoggingGRPCApi) CreateMetadata(c context.Context, cmr *integration_api.CreateMetadataRequest) (*integration_api.CreateMetadataResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	projectContext, authErr := requireProjectContext(iAuth)
+	projectContext, authErr := types.RequireProject(iAuth)
 	if !isAuthenticated || authErr != nil {
 		als.logger.Errorf("unauthenticated request for invoke")
 		return utils.Error[integration_api.CreateMetadataResponse](

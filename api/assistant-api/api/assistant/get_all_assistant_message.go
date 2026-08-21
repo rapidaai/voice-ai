@@ -18,7 +18,8 @@ import (
 // GetAllAssistantMessage implements assistant_api.AssistantServiceServer.
 func (assistantApi *assistantGrpcApi) GetAllAssistantMessage(ctx context.Context, cepm *assistant_api.GetAllAssistantMessageRequest) (*assistant_api.GetAllAssistantMessageResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !hasProjectCapability(iAuth) {
+	_, projectAuthErr := types.RequireProject(iAuth)
+	if !isAuthenticated || projectAuthErr != nil {
 		assistantApi.logger.Errorf("unauthenticated request for invoke")
 		return exceptions.AuthenticationError[assistant_api.GetAllAssistantMessageResponse]()
 	}

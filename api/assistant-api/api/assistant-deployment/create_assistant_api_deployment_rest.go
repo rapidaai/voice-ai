@@ -32,7 +32,9 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantApiDeploymentRest(c 
 		})
 		return
 	}
-	if !hasUserProjectCapability(auth) {
+	_, userAuthErr := types.RequireUser(auth)
+	_, projectAuthErr := types.RequireProject(auth)
+	if userAuthErr != nil || projectAuthErr != nil {
 		c.JSON(pkg_errors.CreateAssistantApiDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantApiDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),

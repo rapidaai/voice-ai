@@ -16,7 +16,8 @@ import (
 
 func (assistantApi *assistantGrpcApi) GetAllAssistantKnowledge(ctx context.Context, cepm *assistant_api.GetAllAssistantKnowledgeRequest) (*assistant_api.GetAllAssistantKnowledgeResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !hasProjectCapability(iAuth) {
+	_, projectAuthErr := types.RequireProject(iAuth)
+	if !isAuthenticated || projectAuthErr != nil {
 		assistantApi.logger.Errorf("unauthenticated request for GetAllassistant")
 		return utils.Error[assistant_api.GetAllAssistantKnowledgeResponse](
 			errors.New("unauthenticated request for get all assistant knowledge"),

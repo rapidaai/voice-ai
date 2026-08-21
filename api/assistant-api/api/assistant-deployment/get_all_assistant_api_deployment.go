@@ -19,7 +19,8 @@ func (assistantApi *assistantDeploymentGrpcApi) GetAllAssistantApiDeployment(
 	req *assistant_api.GetAllAssistantDeploymentRequest,
 ) (*assistant_api.GetAllAssistantApiDeploymentResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !hasProjectCapability(iAuth) {
+	_, projectAuthErr := types.RequireProject(iAuth)
+	if !isAuthenticated || projectAuthErr != nil {
 		assistantApi.logger.Errorf("unauthenticated request for get all assistant api deployments")
 		return exceptions.AuthenticationError[assistant_api.GetAllAssistantApiDeploymentResponse]()
 	}

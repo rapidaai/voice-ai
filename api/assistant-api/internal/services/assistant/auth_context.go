@@ -7,14 +7,6 @@ type mutationContext struct {
 	Project types.ProjectContext
 }
 
-func requireUser(auth types.SimplePrinciple) (uint64, error) {
-	return types.RequireUser(auth)
-}
-
-func requireProject(auth types.SimplePrinciple) (types.ProjectContext, error) {
-	return types.RequireProject(auth)
-}
-
 func requireMutationContext(auth types.SimplePrinciple) (mutationContext, error) {
 	userID, err := types.RequireUser(auth)
 	if err != nil {

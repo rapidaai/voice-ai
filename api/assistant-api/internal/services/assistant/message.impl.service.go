@@ -82,7 +82,7 @@ func (conversationService *assistantConversationService) GetAllAssistantMessage(
 	ordering *protos.Ordering,
 	opts *internal_services.GetMessageOption,
 ) (int64, []*internal_message_gorm.AssistantConversationMessage, error) {
-	projectContext, err := requireProject(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -174,7 +174,7 @@ func (conversationService *assistantConversationService) GetAllMessage(
 	ordering *protos.Ordering,
 	opts *internal_services.GetMessageOption,
 ) (int64, []*internal_message_gorm.AssistantConversationMessage, error) {
-	projectContext, err := requireProject(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -400,7 +400,7 @@ func (conversationService *assistantConversationService) CreateConversationMessa
 	role string,
 	message string,
 ) (*internal_message_gorm.AssistantConversationMessage, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -439,7 +439,7 @@ func (conversationService *assistantConversationService) CreateOrUpdateMessageMe
 	assistantConversationMessageId string,
 	metadata []*protos.Metadata,
 ) ([]*internal_message_gorm.AssistantConversationMessageMetadata, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -490,7 +490,7 @@ func (conversationService *assistantConversationService) CreateOrUpdateMessageMe
 	assistantConversationMessageId string,
 	metrics []*protos.Metric,
 ) ([]*internal_message_gorm.AssistantConversationMessageMetric, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}

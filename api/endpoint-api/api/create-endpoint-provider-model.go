@@ -19,8 +19,9 @@ import (
 )
 
 func (endpointGRPCApi *endpointGRPCApi) CreateEndpointProviderModel(ctx context.Context, iRequest *endpoint_grpc_api.CreateEndpointProviderModelRequest) (*endpoint_grpc_api.CreateEndpointProviderModelResponse, error) {
-	iAuth, isAuthenticated := getProjectPrincipleGRPC(ctx)
-	if !isAuthenticated {
+	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
+	_, projectAuthErr := types.RequireProject(iAuth)
+	if !isAuthenticated || projectAuthErr != nil {
 		endpointGRPCApi.logger.Errorf("unauthenticated request for invoke")
 		return utils.Error[endpoint_grpc_api.CreateEndpointProviderModelResponse](
 			errors.New("unauthenticated request for CreateEndpointProviderModel"),

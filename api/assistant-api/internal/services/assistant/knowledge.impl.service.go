@@ -37,7 +37,7 @@ func (eService *assistantKnowledgeService) Create(ctx context.Context, auth type
 	rerankEnabled bool, scoreThreshold float32, topK uint32, rerankerProviderModelId *uint64,
 	rerankerProviderModelName *string,
 	rerankerProviderModelOptions []*protos.Metadata) (*internal_assistant_entity.AssistantKnowledge, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +117,7 @@ func (eService *assistantKnowledgeService) Create(ctx context.Context, auth type
 
 // DeleteAssistantKnowledge implements internal_services.AssistantKnowledgeService.
 func (eService *assistantKnowledgeService) Delete(ctx context.Context, auth types.SimplePrinciple, akId uint64, assistantId uint64) (*internal_assistant_entity.AssistantKnowledge, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +200,7 @@ func (eService *assistantKnowledgeService) Get(ctx context.Context, auth types.S
 
 // UpdateAssistantKnowledge implements internal_services.AssistantKnowledgeService.
 func (eService *assistantKnowledgeService) Update(ctx context.Context, auth types.SimplePrinciple, akId uint64, assistantId uint64, knowledgeId uint64, retrievalMethod gorm_types.RetrievalMethod, rerankEnabled bool, scoreThreshold float32, topK uint32, rerankerProviderModelId *uint64, rerankerProviderModelName *string, rerankerProviderModelOptions []*protos.Metadata) (*internal_assistant_entity.AssistantKnowledge, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}

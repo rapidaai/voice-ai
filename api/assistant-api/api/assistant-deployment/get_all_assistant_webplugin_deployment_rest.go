@@ -33,7 +33,9 @@ func (deploymentApi *AssistantDeploymentApi) GetAllAssistantWebpluginDeploymentR
 		})
 		return
 	}
-	if !hasUserProjectCapability(auth) {
+	_, userAuthErr := types.RequireUser(auth)
+	_, projectAuthErr := types.RequireProject(auth)
+	if userAuthErr != nil || projectAuthErr != nil {
 		c.JSON(pkg_errors.GetAllAssistantWebpluginDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.GetAllAssistantWebpluginDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),

@@ -48,7 +48,7 @@ func (knowledge *knowledgeService) GetAll(
 	auth types.SimplePrinciple,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate) (int64, *[]internal_knowledge_gorm.Knowledge, error) {
-	projectContext, err := requireProjectContext(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -91,7 +91,7 @@ func (knowledge *knowledgeService) GetAll(
 }
 
 func (knowledge *knowledgeService) Get(ctx context.Context, auth types.SimplePrinciple, knowledgeId uint64) (*internal_knowledge_gorm.Knowledge, error) {
-	projectContext, err := requireProjectContext(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +246,7 @@ func (eService *knowledgeService) CreateLog(
 	status type_enums.RecordState,
 	request, response []byte,
 ) (*internal_knowledge_gorm.KnowledgeLog, error) {
-	projectContext, err := requireProjectContext(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -299,7 +299,7 @@ func (eService *knowledgeService) GetLog(
 	auth types.SimplePrinciple,
 	projectId uint64,
 	toolLogId uint64) (*internal_knowledge_gorm.KnowledgeLog, error) {
-	projectContext, err := requireProjectContext(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -327,7 +327,7 @@ func (eService *knowledgeService) GetAllLog(
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
 	order *protos.Ordering) (int64, []*internal_knowledge_gorm.KnowledgeLog, error) {
-	projectContext, err := requireProjectContext(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return 0, nil, err
 	}

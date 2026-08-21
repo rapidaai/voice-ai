@@ -2,10 +2,6 @@ package internal_knowledge_service
 
 import "github.com/rapidaai/pkg/types"
 
-func requireProjectContext(auth types.SimplePrinciple) (types.ProjectContext, error) {
-	return types.RequireProject(auth)
-}
-
 func requireMutationContext(auth types.SimplePrinciple) (uint64, types.ProjectContext, error) {
 	userID, err := types.RequireUser(auth)
 	if err != nil {

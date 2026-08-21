@@ -16,7 +16,8 @@ import (
 
 func (knowledgeApi *knowledgeGrpcApi) GetAllKnowledgeLog(ctx context.Context, gaar *knowledge_api.GetAllKnowledgeLogRequest) (*knowledge_api.GetAllKnowledgeLogResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !hasProjectCapability(iAuth) {
+	_, projectAuthErr := types.RequireProject(iAuth)
+	if !isAuthenticated || projectAuthErr != nil {
 		knowledgeApi.logger.Errorf("unauthenticated request for invoke")
 		return exceptions.AuthenticationError[knowledge_api.GetAllKnowledgeLogResponse]()
 	}

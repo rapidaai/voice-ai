@@ -9,13 +9,15 @@ import (
 	"context"
 	"errors"
 
+	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	endpoint_grpc_api "github.com/rapidaai/protos"
 )
 
 func (endpointGRPCApi *endpointGRPCApi) GetAllEndpoint(ctx context.Context, cepm *endpoint_grpc_api.GetAllEndpointRequest) (*endpoint_grpc_api.GetAllEndpointResponse, error) {
-	iAuth, isAuthenticated := getProjectPrincipleGRPC(ctx)
-	if !isAuthenticated {
+	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
+	_, projectAuthErr := types.RequireProject(iAuth)
+	if !isAuthenticated || projectAuthErr != nil {
 		endpointGRPCApi.logger.Errorf("unauthenticated request for GetAllEndpoint")
 		return utils.Error[endpoint_grpc_api.GetAllEndpointResponse](
 			errors.New("unauthenticated request for get allendpoint"),

@@ -17,7 +17,8 @@ import (
 
 func (assistantApi *assistantGrpcApi) GetAssistantConversation(ctx context.Context, cepm *protos.GetAssistantConversationRequest) (*protos.GetAssistantConversationResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !hasProjectCapability(iAuth) {
+	_, projectAuthErr := types.RequireProject(iAuth)
+	if !isAuthenticated || projectAuthErr != nil {
 		assistantApi.logger.Errorf("unauthenticated request for invoke")
 		return utils.Error[protos.GetAssistantConversationResponse](
 			errors.New("unauthenticated request for get assistant converstaion"),

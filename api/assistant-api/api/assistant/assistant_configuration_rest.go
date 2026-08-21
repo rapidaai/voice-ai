@@ -35,7 +35,9 @@ func (assistantApi *assistantGrpcApi) CreateAssistantConfigurationRest(c *gin.Co
 		})
 		return
 	}
-	if !hasUserProjectCapability(auth) {
+	_, userAuthErr := types.RequireUser(auth)
+	_, projectAuthErr := types.RequireProject(auth)
+	if userAuthErr != nil || projectAuthErr != nil {
 		platformError := pkg_errors.AssistantConfigurationMissingAuthScope
 		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
@@ -185,7 +187,9 @@ func (assistantApi *assistantGrpcApi) UpdateAssistantConfigurationRest(c *gin.Co
 		})
 		return
 	}
-	if !hasUserProjectCapability(auth) {
+	_, userAuthErr := types.RequireUser(auth)
+	_, projectAuthErr := types.RequireProject(auth)
+	if userAuthErr != nil || projectAuthErr != nil {
 		platformError := pkg_errors.AssistantConfigurationMissingAuthScope
 		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
@@ -350,7 +354,9 @@ func (assistantApi *assistantGrpcApi) GetAssistantConfigurationRest(c *gin.Conte
 		})
 		return
 	}
-	if !hasUserProjectCapability(auth) {
+	_, userAuthErr := types.RequireUser(auth)
+	_, projectAuthErr := types.RequireProject(auth)
+	if userAuthErr != nil || projectAuthErr != nil {
 		platformError := pkg_errors.AssistantConfigurationMissingAuthScope
 		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
@@ -428,7 +434,9 @@ func (assistantApi *assistantGrpcApi) GetAllAssistantConfigurationRest(c *gin.Co
 		})
 		return
 	}
-	if !hasUserProjectCapability(auth) {
+	_, userAuthErr := types.RequireUser(auth)
+	_, projectAuthErr := types.RequireProject(auth)
+	if userAuthErr != nil || projectAuthErr != nil {
 		platformError := pkg_errors.AssistantConfigurationMissingAuthScope
 		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),
@@ -563,7 +571,9 @@ func (assistantApi *assistantGrpcApi) DeleteAssistantConfigurationRest(c *gin.Co
 		})
 		return
 	}
-	if !hasUserProjectCapability(auth) {
+	_, userAuthErr := types.RequireUser(auth)
+	_, projectAuthErr := types.RequireProject(auth)
+	if userAuthErr != nil || projectAuthErr != nil {
 		platformError := pkg_errors.AssistantConfigurationMissingAuthScope
 		c.JSON(platformError.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(platformError.HTTPStatusCodeInt32()),

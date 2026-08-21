@@ -17,7 +17,8 @@ import (
 // GetAssistantDashboard implements assistant_api.AssistantServiceServer.
 func (assistantApi *assistantGrpcApi) GetAssistantDashboard(ctx context.Context, dashboardRequest *assistant_api.GetAssistantDashboardRequest) (*assistant_api.GetAssistantDashboardResponse, error) {
 	authPrinciple, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !hasProjectCapability(authPrinciple) {
+	_, projectAuthErr := types.RequireProject(authPrinciple)
+	if !isAuthenticated || projectAuthErr != nil {
 		assistantApi.logger.Errorf("unauthenticated request for get assistant dashboard")
 		return exceptions.AuthenticationError[assistant_api.GetAssistantDashboardResponse]()
 	}

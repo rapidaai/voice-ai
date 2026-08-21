@@ -16,7 +16,8 @@ import (
 
 func (assistantApi *assistantGrpcApi) GetAllAssistantHTTPLog(ctx context.Context, req *protos.GetAllAssistantHTTPLogRequest) (*protos.GetAllAssistantHTTPLogResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !hasProjectCapability(iAuth) {
+	_, projectAuthErr := types.RequireProject(iAuth)
+	if !isAuthenticated || projectAuthErr != nil {
 		assistantApi.logger.Errorf("unauthenticated request for invoke")
 		return exceptions.AuthenticationError[protos.GetAllAssistantHTTPLogResponse]()
 	}

@@ -17,7 +17,8 @@ import (
 // CreateKnowledgeTag implements knowledge_api.KnowledgeServiceServer.
 func (knowledgeApi *knowledgeGrpcApi) CreateKnowledgeTag(ctx context.Context, eRequest *knowledge_api.CreateKnowledgeTagRequest) (*knowledge_api.GetKnowledgeResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !hasProjectCapability(iAuth) {
+	_, projectAuthErr := types.RequireProject(iAuth)
+	if !isAuthenticated || projectAuthErr != nil {
 		knowledgeApi.logger.Errorf("unauthenticated request for invoke")
 		return utils.Error[knowledge_api.GetKnowledgeResponse](
 			errors.New("unauthenticated request for CreateAssistantProviderModel"),

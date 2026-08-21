@@ -17,7 +17,8 @@ import (
 // UpdateKnowledgeDocumentSegment implements knowledge_api.KnowledgeServiceServer.
 func (knowledgeApi *knowledgeGrpcApi) UpdateKnowledgeDocumentSegment(ctx context.Context, dsr *knowledge_api.UpdateKnowledgeDocumentSegmentRequest) (*knowledge_api.BaseResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !hasProjectCapability(iAuth) {
+	_, projectAuthErr := types.RequireProject(iAuth)
+	if !isAuthenticated || projectAuthErr != nil {
 		knowledgeApi.logger.Errorf("unauthenticated request for invoke")
 		return utils.Error[knowledge_api.BaseResponse](
 			errors.New("unauthenticated request for update document segment"),

@@ -54,7 +54,7 @@ func NewKnowledgeDocumentService(config *config.AssistantConfig, logger commons.
 }
 
 func (knowledge *knowledgeDocumentService) GetCounts(ctx context.Context, auth types.SimplePrinciple, knowledgeId uint64) (documentCount, wordCount, tokenCount uint32) {
-	projectContext, err := requireProjectContext(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return 0, 0, 0
 	}
@@ -83,7 +83,7 @@ func (knowledge *knowledgeDocumentService) GetCounts(ctx context.Context, auth t
 func (knowledge *knowledgeDocumentService) GetAll(ctx context.Context, auth types.SimplePrinciple,
 	knowledgeId uint64,
 	criterias []*protos.Criteria, paginate *protos.Paginate) (int64, *[]internal_knowledge_gorm.KnowledgeDocument, error) {
-	projectContext, err := requireProjectContext(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -117,7 +117,7 @@ func (knowledge *knowledgeDocumentService) GetAll(ctx context.Context, auth type
 }
 
 func (knowledge *knowledgeDocumentService) Get(ctx context.Context, auth types.SimplePrinciple, knowledgeId uint64, knowledgeDocumentId uint64) (*internal_knowledge_gorm.KnowledgeDocument, error) {
-	projectContext, err := requireProjectContext(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -308,7 +308,7 @@ func (knowledge *knowledgeDocumentService) GetAllDocumentSegment(
 	storageNamespace string,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate) (int64, []*protos.KnowledgeDocumentSegment, error) {
-	projectContext, err := requireProjectContext(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -421,7 +421,7 @@ func (knowledge *knowledgeDocumentService) UpdateDocumentSegment(
 	locations []string,
 	industries []string,
 ) (*protos.KnowledgeDocumentSegment, error) {
-	if _, err := requireProjectContext(auth); err != nil {
+	if _, err := types.RequireProject(auth); err != nil {
 		return nil, err
 	}
 	// Construct the update query
@@ -494,7 +494,7 @@ func (knowledge *knowledgeDocumentService) DeleteDocumentSegment(
 	documentId string,
 	reason string,
 ) (*protos.KnowledgeDocumentSegment, error) {
-	if _, err := requireProjectContext(auth); err != nil {
+	if _, err := types.RequireProject(auth); err != nil {
 		return nil, err
 	}
 	// Update the document status directly

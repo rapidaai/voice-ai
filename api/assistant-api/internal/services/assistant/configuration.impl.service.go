@@ -45,7 +45,7 @@ func (s *assistantConfigurationService) Get(
 	configurationId uint64,
 	assistantId uint64,
 ) (*internal_assistant_entity.AssistantConfiguration, error) {
-	projectContext, err := requireProject(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (s *assistantConfigurationService) GetAll(
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
 ) (int64, []*internal_assistant_entity.AssistantConfiguration, error) {
-	projectContext, err := requireProject(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -332,7 +332,7 @@ func (s *assistantConfigurationService) archiveOptions(
 	auth types.SimplePrinciple,
 	configurationId uint64,
 ) error {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return err
 	}
@@ -353,7 +353,7 @@ func (s *assistantConfigurationService) createOptions(
 	configurationId uint64,
 	options []*protos.Metadata,
 ) ([]*internal_assistant_entity.AssistantConfigurationOption, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}

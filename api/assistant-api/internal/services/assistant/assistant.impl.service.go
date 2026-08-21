@@ -51,7 +51,7 @@ func (eService *assistantService) CreateAssistantProviderWebsocket(ctx context.C
 	headers map[string]string,
 	parameters map[string]string,
 ) (*internal_assistant_entity.AssistantProviderWebsocket, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func (eService *assistantService) CreateAssistantProviderAgentkit(ctx context.Co
 	maxRecvMessageBytes *uint32,
 	maxSendMessageBytes *uint32,
 ) (*internal_assistant_entity.AssistantProviderAgentkit, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +136,7 @@ func (eService *assistantService) CreateAssistantProviderAgentflow(ctx context.C
 	schemaVersion string,
 	definition map[string]interface{},
 ) (*internal_assistant_entity.AssistantProviderAgentflow, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +190,7 @@ func (eService *assistantService) DeleteAssistant(ctx context.Context, auth type
 }
 
 func (eService *assistantService) GetAllAssistantTool(ctx context.Context, auth types.SimplePrinciple, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantTool, error) {
-	projectContext, err := requireProject(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -237,7 +237,7 @@ func (eService *assistantService) Get(ctx context.Context,
 	assistantId uint64,
 	assistantProviderId *uint64,
 	opts *internal_services.GetAssistantOption) (*internal_assistant_entity.Assistant, error) {
-	projectContext, err := requireProject(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -607,7 +607,7 @@ func (eService *assistantService) UpdateAssistantVersion(ctx context.Context,
 }
 
 func (eService *assistantService) GetAll(ctx context.Context, auth types.SimplePrinciple, criterias []*protos.Criteria, paginate *protos.Paginate, opts *internal_services.GetAssistantOption) (int64, []*internal_assistant_entity.Assistant, error) {
-	projectContext, err := requireProject(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -951,7 +951,7 @@ func (eService *assistantService) CreateAssistantProviderModel(
 	modelProviderName string,
 	options []*protos.Metadata,
 ) (*internal_assistant_entity.AssistantProviderModel, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -1043,7 +1043,7 @@ func (eService *assistantService) CreateOrUpdateAssistantTag(ctx context.Context
 	assistantId uint64,
 	tags []string,
 ) (*internal_assistant_entity.AssistantTag, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}

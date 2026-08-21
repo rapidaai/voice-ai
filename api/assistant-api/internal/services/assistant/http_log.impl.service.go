@@ -72,7 +72,7 @@ func (s *assistantHTTPLogService) CreateLog(
 	request []byte,
 	response []byte,
 ) (*internal_assistant_entity.AssistantHTTPLog, error) {
-	projectContext, err := requireProject(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +134,7 @@ func (s *assistantHTTPLogService) GetLog(
 	projectId uint64,
 	httpLogId uint64,
 ) (*internal_assistant_entity.AssistantHTTPLog, error) {
-	projectContext, err := requireProject(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +165,7 @@ func (s *assistantHTTPLogService) GetAllLog(
 	paginate *protos.Paginate,
 	order *protos.Ordering,
 ) (int64, []*internal_assistant_entity.AssistantHTTPLog, error) {
-	projectContext, err := requireProject(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -364,7 +364,7 @@ func (s *assistantHTTPLogService) RetryLog(
 	projectId uint64,
 	httpLogId uint64,
 ) (*internal_assistant_entity.AssistantHTTPLog, error) {
-	projectContext, err := requireProject(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return nil, err
 	}

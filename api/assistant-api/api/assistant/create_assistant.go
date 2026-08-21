@@ -34,7 +34,7 @@ func (assistantApi *assistantGrpcApi) CreateAssistant(ctx context.Context, cer *
 			},
 		}, errors.New(pkg_errors.CreateAssistantUnauthenticated.Error)
 	}
-	if !hasUserCapability(iAuth) {
+	if _, authErr := types.RequireUser(iAuth); authErr != nil {
 		return &assistant_api.GetAssistantResponse{
 			Code:    pkg_errors.CreateAssistantMissingAuthScope.HTTPStatusCodeInt32(),
 			Success: false,
@@ -45,7 +45,7 @@ func (assistantApi *assistantGrpcApi) CreateAssistant(ctx context.Context, cer *
 			},
 		}, errors.New(pkg_errors.CreateAssistantMissingAuthScope.Error)
 	}
-	if !hasProjectCapability(iAuth) {
+	if _, authErr := types.RequireProject(iAuth); authErr != nil {
 		return &assistant_api.GetAssistantResponse{
 			Code:    pkg_errors.CreateAssistantMissingAuthScope.HTTPStatusCodeInt32(),
 			Success: false,
@@ -56,7 +56,7 @@ func (assistantApi *assistantGrpcApi) CreateAssistant(ctx context.Context, cer *
 			},
 		}, errors.New(pkg_errors.CreateAssistantMissingAuthScope.Error)
 	}
-	if !hasOrganizationCapability(iAuth) {
+	if _, authErr := types.RequireOrganization(iAuth); authErr != nil {
 		return &assistant_api.GetAssistantResponse{
 			Code:    pkg_errors.CreateAssistantMissingAuthScope.HTTPStatusCodeInt32(),
 			Success: false,

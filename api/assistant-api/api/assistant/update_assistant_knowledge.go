@@ -17,7 +17,8 @@ import (
 
 func (assistantApi *assistantGrpcApi) UpdateAssistantKnowledge(ctx context.Context, cawr *assistant_api.UpdateAssistantKnowledgeRequest) (*assistant_api.GetAssistantKnowledgeResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !hasProjectCapability(iAuth) {
+	_, projectAuthErr := types.RequireProject(iAuth)
+	if !isAuthenticated || projectAuthErr != nil {
 		assistantApi.logger.Errorf("unauthenticated request for UpdateAssistantKnowledge")
 		return exceptions.AuthenticationError[assistant_api.GetAssistantKnowledgeResponse]()
 	}

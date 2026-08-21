@@ -34,7 +34,7 @@ type assistantToolService struct {
 
 // CreateAssistantTool implements internal_services.AssistantToolService.
 func (eService *assistantToolService) Create(ctx context.Context, auth types.SimplePrinciple, assistantId uint64, name string, description *string, fields map[string]interface{}, executionMethod string, options []*protos.Metadata) (*internal_assistant_entity.AssistantTool, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func (eService *assistantToolService) Create(ctx context.Context, auth types.Sim
 
 // DeleteAssistantTool implements internal_services.AssistantToolService.
 func (eService *assistantToolService) Delete(ctx context.Context, auth types.SimplePrinciple, toolId uint64, assistantId uint64) (*internal_assistant_entity.AssistantTool, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +167,7 @@ func (eService *assistantToolService) Get(ctx context.Context, auth types.Simple
 func (eService *assistantToolService) Update(ctx context.Context, auth types.SimplePrinciple,
 	toolId uint64,
 	assistantId uint64, name string, description *string, fields map[string]interface{}, executionMethod string, options []*protos.Metadata) (*internal_assistant_entity.AssistantTool, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -229,7 +229,7 @@ func (eService *assistantToolService) markAllOptionsAsDeleted(
 	auth types.SimplePrinciple,
 	assistantToolId uint64,
 ) error {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return err
 	}
@@ -261,7 +261,7 @@ func (eService *assistantToolService) CreateOrUpdateExecutionOption(
 	assistantToolId uint64,
 	metadata []*protos.Metadata,
 ) ([]*internal_assistant_entity.AssistantToolOption, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -318,7 +318,7 @@ func (eService *assistantToolService) CreateLog(
 	status type_enums.RecordState,
 	request []byte,
 ) (*internal_assistant_entity.AssistantToolLog, error) {
-	projectContext, err := requireProject(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -399,7 +399,7 @@ func (eService *assistantToolService) GetLog(
 	auth types.SimplePrinciple,
 	projectId uint64,
 	toolLogId uint64) (*internal_assistant_entity.AssistantToolLog, error) {
-	projectContext, err := requireProject(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -429,7 +429,7 @@ func (eService *assistantToolService) GetAllLog(
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
 	order *protos.Ordering) (int64, []*internal_assistant_entity.AssistantToolLog, error) {
-	projectContext, err := requireProject(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return 0, nil, err
 	}

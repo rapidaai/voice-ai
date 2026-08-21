@@ -50,7 +50,7 @@ func (conversationService *assistantConversationService) GetAll(ctx context.Cont
 	assistantId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate, opts *internal_services.GetConversationOption) (int64, []*internal_conversation_entity.AssistantConversation, error) {
-	projectContext, err := requireProject(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -256,7 +256,7 @@ func (conversationService *assistantConversationService) Get(
 	assistantId uint64,
 	assistantConversationId uint64,
 	opts *internal_services.GetConversationOption) (*internal_conversation_entity.AssistantConversation, error) {
-	projectContext, err := requireProject(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -351,7 +351,7 @@ func (conversationService *assistantConversationService) GetConversation(
 	assistantId uint64,
 	assistantConversationId uint64,
 	opts *internal_services.GetConversationOption) (*internal_conversation_entity.AssistantConversation, error) {
-	projectContext, err := requireProject(auth)
+	projectContext, err := types.RequireProject(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -439,7 +439,7 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 	assistantConversationId uint64,
 	metadata []*protos.Metadata,
 ) ([]*internal_conversation_entity.AssistantConversationMetadata, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -488,7 +488,7 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 	assistantId,
 	assistantConversationId uint64,
 	opts map[string]interface{}) ([]*internal_conversation_entity.AssistantConversationOption, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -537,7 +537,7 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 	assistantConversationId uint64,
 	arguments map[string]interface{},
 ) ([]*internal_conversation_entity.AssistantConversationArgument, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -590,7 +590,7 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 	assistantConversationId uint64,
 	metrics []*protos.Metric,
 ) ([]*internal_conversation_entity.AssistantConversationMetric, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -636,7 +636,7 @@ func (conversationService *assistantConversationService) CreateCustomConversatio
 	assistantConversationId uint64,
 	metrics []*protos.Metric,
 ) ([]*internal_conversation_entity.AssistantConversationMetric, error) {
-	userID, err := requireUser(auth)
+	userID, err := types.RequireUser(auth)
 	if err != nil {
 		return nil, err
 	}
