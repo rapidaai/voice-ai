@@ -43,3 +43,45 @@ func TestProjectRole_GetProjectId(t *testing.T) {
 		t.Errorf("GetProjectId() = %v, want %v", p.GetProjectId(), 456)
 	}
 }
+
+func TestPlainAuthPrincipleCapabilities(t *testing.T) {
+	principle := &PlainAuthPrinciple{
+		User:               UserInfo{Id: 7},
+		OrganizationRole:   &OrganizaitonRole{OrganizationId: 8},
+		CurrentProjectRole: &ProjectRole{ProjectId: 9},
+	}
+
+	if userID, err := RequireUser(principle); err != nil || userID != 7 {
+		t.Fatalf("RequireUser() = %d, %v", userID, err)
+	}
+	if organizationID, err := RequireOrganization(principle); err != nil || organizationID != 8 {
+		t.Fatalf("RequireOrganization() = %d, %v", organizationID, err)
+	}
+	projectContext, err := RequireProject(principle)
+	if err != nil || projectContext != (ProjectContext{OrganizationID: 8, ProjectID: 9}) {
+		t.Fatalf("RequireProject() = %+v, %v", projectContext, err)
+	}
+}
+
+func TestPlainAuthPrincipleAuthenticatesWithoutProject(t *testing.T) {
+	principle := &PlainAuthPrinciple{
+		User:             UserInfo{Id: 7},
+		OrganizationRole: &OrganizaitonRole{OrganizationId: 8},
+	}
+
+	if !principle.IsAuthenticated() {
+		t.Fatal("IsAuthenticated() = false, want true")
+	}
+	if _, err := RequireProject(principle); err == nil {
+		t.Fatal("RequireProject() error = nil without selected project")
+	}
+}
+
+var (
+	_ AuthenticationPrinciple     = (*PlainAuthPrinciple)(nil)
+	_ UserIdentityProvider        = (*PlainAuthPrinciple)(nil)
+	_ OrganizationContextProvider = (*PlainAuthPrinciple)(nil)
+	_ ProjectContextProvider      = (*PlainAuthPrinciple)(nil)
+	_ ActorIdentityProvider       = (*PlainAuthPrinciple)(nil)
+	_ Principle                   = (*PlainAuthPrinciple)(nil)
+)

@@ -19,7 +19,7 @@ func (assistantApi *assistantDeploymentGrpcApi) GetAllAssistantDebuggerDeploymen
 	req *assistant_api.GetAllAssistantDeploymentRequest,
 ) (*assistant_api.GetAllAssistantDebuggerDeploymentResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !iAuth.HasProject() {
+	if !isAuthenticated || !hasProjectCapability(iAuth) {
 		assistantApi.logger.Errorf("unauthenticated request for get all assistant debugger deployments")
 		return exceptions.AuthenticationError[assistant_api.GetAllAssistantDebuggerDeploymentResponse]()
 	}

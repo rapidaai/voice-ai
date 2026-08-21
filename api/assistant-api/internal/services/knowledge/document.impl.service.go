@@ -54,6 +54,10 @@ func NewKnowledgeDocumentService(config *config.AssistantConfig, logger commons.
 }
 
 func (knowledge *knowledgeDocumentService) GetCounts(ctx context.Context, auth types.SimplePrinciple, knowledgeId uint64) (documentCount, wordCount, tokenCount uint32) {
+	projectContext, err := requireProjectContext(auth)
+	if err != nil {
+		return 0, 0, 0
+	}
 	var result struct {
 		DocumentCount   uint32
 		TotalTokenCount uint32
@@ -64,12 +68,12 @@ func (knowledge *knowledgeDocumentService) GetCounts(ctx context.Context, auth t
 	tx := db.Model(&internal_knowledge_gorm.KnowledgeDocument{}).
 		Select("COUNT(*) as document_count, SUM(token_count) as total_token_count, SUM(word_count) as total_word_count").
 		Where("knowledge_id = ?", knowledgeId).
-		Where("project_id = ? ", *auth.GetCurrentProjectId()).
-		Where("organization_id = ? ", *auth.GetCurrentOrganizationId()).
+		Where("project_id = ? ", projectContext.ProjectID).
+		Where("organization_id = ? ", projectContext.OrganizationID).
 		Scan(&result)
 
 	if tx.Error != nil {
-		knowledge.logger.Debugf("unable to find any knowledge for given project %v and organization  %v", *auth.GetCurrentProjectId(), *auth.GetCurrentOrganizationId())
+		knowledge.logger.Debugf("unable to find any knowledge for given project %v and organization  %v", projectContext.ProjectID, projectContext.OrganizationID)
 		return 0, 0, 0
 	}
 	return result.DocumentCount, result.TotalWordCount, result.TotalTokenCount
@@ -79,11 +83,15 @@ func (knowledge *knowledgeDocumentService) GetCounts(ctx context.Context, auth t
 func (knowledge *knowledgeDocumentService) GetAll(ctx context.Context, auth types.SimplePrinciple,
 	knowledgeId uint64,
 	criterias []*protos.Criteria, paginate *protos.Paginate) (int64, *[]internal_knowledge_gorm.KnowledgeDocument, error) {
+	projectContext, err := requireProjectContext(auth)
+	if err != nil {
+		return 0, nil, err
+	}
 	db := knowledge.postgres.DB(ctx)
 	var knowledgeDocuments []internal_knowledge_gorm.KnowledgeDocument
 	var cnt int64
 	qry := db.Model(internal_knowledge_gorm.KnowledgeDocument{}).
-		Where("knowledge_id = ? AND status = ?", knowledgeId, "active")
+		Where("knowledge_id = ? AND status = ? AND project_id = ? AND organization_id = ?", knowledgeId, "active", projectContext.ProjectID, projectContext.OrganizationID)
 	for _, ct := range criterias {
 		qry.Where(fmt.Sprintf("%s = ?", ct.GetKey()), ct.GetValue())
 	}
@@ -101,7 +109,7 @@ func (knowledge *knowledgeDocumentService) GetAll(ctx context.Context, auth type
 		}).
 		Find(&knowledgeDocuments)
 	if tx.Error != nil {
-		knowledge.logger.Debugf("unable to find any knowledge for given project %v and organization  %v", *auth.GetCurrentProjectId(), *auth.GetCurrentOrganizationId())
+		knowledge.logger.Debugf("unable to find any knowledge for given project %v and organization  %v", projectContext.ProjectID, projectContext.OrganizationID)
 		return cnt, nil, tx.Error
 	}
 
@@ -109,10 +117,14 @@ func (knowledge *knowledgeDocumentService) GetAll(ctx context.Context, auth type
 }
 
 func (knowledge *knowledgeDocumentService) Get(ctx context.Context, auth types.SimplePrinciple, knowledgeId uint64, knowledgeDocumentId uint64) (*internal_knowledge_gorm.KnowledgeDocument, error) {
+	projectContext, err := requireProjectContext(auth)
+	if err != nil {
+		return nil, err
+	}
 	db := knowledge.postgres.DB(ctx)
 	var _knowledge internal_knowledge_gorm.KnowledgeDocument
 	tx := db.
-		Where("id = ? AND knowledge_id = ? AND status = ?", knowledgeDocumentId, knowledgeId, "active").
+		Where("id = ? AND knowledge_id = ? AND status = ? AND project_id = ? AND organization_id = ?", knowledgeDocumentId, knowledgeId, "active", projectContext.ProjectID, projectContext.OrganizationID).
 		First(&_knowledge)
 	if tx.Error != nil {
 		return nil, tx.Error
@@ -127,15 +139,19 @@ func (knowledgeDocument *knowledgeDocumentService) CreateToolDocument(ctx contex
 	documentStructure string,
 	contents []*protos.DocumentContent,
 ) ([]*internal_knowledge_gorm.KnowledgeDocument, error) {
+	userID, projectContext, err := requireMutationContext(auth)
+	if err != nil {
+		return nil, err
+	}
 	db := knowledgeDocument.postgres.DB(ctx)
 	allKnowledge := make([]*internal_knowledge_gorm.KnowledgeDocument, 0)
 	for _, cntnt := range contents {
 		allKnowledge = append(allKnowledge, &internal_knowledge_gorm.KnowledgeDocument{
 			KnowledgeId:       knowledge.Id,
 			Name:              cntnt.GetName(),
-			ProjectId:         *auth.GetCurrentProjectId(),
-			OrganizationId:    *auth.GetCurrentOrganizationId(),
-			CreatedBy:         *auth.GetUserId(),
+			ProjectId:         projectContext.ProjectID,
+			OrganizationId:    projectContext.OrganizationID,
+			CreatedBy:         userID,
 			DocumentStructure: documentStructure,
 			DocumentSize:      0,
 			DocumentPath:      cntnt.GetName(),
@@ -166,6 +182,10 @@ func (knowledgeDocument *knowledgeDocumentService) CreateManualDocument(
 	documentStructure string,
 	contents []*protos.DocumentContent,
 ) ([]*internal_knowledge_gorm.KnowledgeDocument, error) {
+	userID, projectContext, err := requireMutationContext(auth)
+	if err != nil {
+		return nil, err
+	}
 
 	db := knowledgeDocument.postgres.DB(ctx)
 	allKnowledge := make([]*internal_knowledge_gorm.KnowledgeDocument, 0)
@@ -174,9 +194,9 @@ func (knowledgeDocument *knowledgeDocumentService) CreateManualDocument(
 	case "manual-file":
 		for _, cntnt := range contents {
 			fileName := fmt.Sprintf("%d/%d/%d_%s%s",
-				*auth.GetCurrentOrganizationId(),
-				*auth.GetCurrentProjectId(),
-				*auth.GetUserId(),
+				projectContext.OrganizationID,
+				projectContext.ProjectID,
+				userID,
 				ciphers.RandomHash(KNOWLEDGE_DOCUMENT_PREFIX), path.Ext(cntnt.GetName()))
 
 			fileContent := cntnt.GetContent()
@@ -196,9 +216,9 @@ func (knowledgeDocument *knowledgeDocumentService) CreateManualDocument(
 			allKnowledge = append(allKnowledge, &internal_knowledge_gorm.KnowledgeDocument{
 				KnowledgeId:       knowledge.Id,
 				Name:              cntnt.GetName(),
-				ProjectId:         *auth.GetCurrentProjectId(),
-				OrganizationId:    *auth.GetCurrentOrganizationId(),
-				CreatedBy:         *auth.GetUserId(),
+				ProjectId:         projectContext.ProjectID,
+				OrganizationId:    projectContext.OrganizationID,
+				CreatedBy:         userID,
 				DocumentSize:      0,
 				DocumentStructure: documentStructure,
 				DocumentPath:      storageResponse.CompletePath,
@@ -227,9 +247,9 @@ func (knowledgeDocument *knowledgeDocumentService) CreateManualDocument(
 			allKnowledge = append(allKnowledge, &internal_knowledge_gorm.KnowledgeDocument{
 				KnowledgeId:       knowledge.Id,
 				Name:              cntnt.GetName(),
-				ProjectId:         *auth.GetCurrentProjectId(),
-				OrganizationId:    *auth.GetCurrentOrganizationId(),
-				CreatedBy:         *auth.GetUserId(),
+				ProjectId:         projectContext.ProjectID,
+				OrganizationId:    projectContext.OrganizationID,
+				CreatedBy:         userID,
 				DocumentPath:      cntnt.GetName(),
 				DocumentStructure: documentStructure,
 				DocumentSize:      0,
@@ -288,6 +308,10 @@ func (knowledge *knowledgeDocumentService) GetAllDocumentSegment(
 	storageNamespace string,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate) (int64, []*protos.KnowledgeDocumentSegment, error) {
+	projectContext, err := requireProjectContext(auth)
+	if err != nil {
+		return 0, nil, err
+	}
 	indexs := make([]string, 0)
 	indexs = append(indexs, storageNamespace)
 	// Construct the OpenSearch query
@@ -302,12 +326,12 @@ func (knowledge *knowledgeDocumentService) GetAllDocumentSegment(
 					},
 					{
 						"term": map[string]uint64{
-							"metadata.project_id": *auth.GetCurrentProjectId(),
+							"metadata.project_id": projectContext.ProjectID,
 						},
 					},
 					{
 						"term": map[string]uint64{
-							"metadata.organization_id": *auth.GetCurrentOrganizationId(),
+							"metadata.organization_id": projectContext.OrganizationID,
 						},
 					},
 				},
@@ -397,6 +421,9 @@ func (knowledge *knowledgeDocumentService) UpdateDocumentSegment(
 	locations []string,
 	industries []string,
 ) (*protos.KnowledgeDocumentSegment, error) {
+	if _, err := requireProjectContext(auth); err != nil {
+		return nil, err
+	}
 	// Construct the update query
 	updateQuery := map[string]interface{}{
 		"doc": map[string]interface{}{},
@@ -467,6 +494,9 @@ func (knowledge *knowledgeDocumentService) DeleteDocumentSegment(
 	documentId string,
 	reason string,
 ) (*protos.KnowledgeDocumentSegment, error) {
+	if _, err := requireProjectContext(auth); err != nil {
+		return nil, err
+	}
 	// Update the document status directly
 	updateBody := map[string]interface{}{
 		"doc": map[string]interface{}{

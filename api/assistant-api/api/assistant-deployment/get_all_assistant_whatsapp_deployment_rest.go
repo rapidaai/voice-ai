@@ -33,7 +33,7 @@ func (deploymentApi *AssistantDeploymentApi) GetAllAssistantWhatsappDeploymentRe
 		})
 		return
 	}
-	if !auth.HasUser() || !auth.HasProject() || !auth.HasOrganization() {
+	if !hasUserProjectCapability(auth) {
 		c.JSON(pkg_errors.GetAllAssistantWhatsappDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.GetAllAssistantWhatsappDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),

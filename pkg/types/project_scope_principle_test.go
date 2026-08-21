@@ -6,126 +6,79 @@
 package types
 
 import (
+	"reflect"
 	"testing"
 
 	type_enums "github.com/rapidaai/pkg/types/enums"
 )
 
-func TestProjectScope_GetUserId(t *testing.T) {
-	ss := &ProjectScope{}
-	if ss.GetUserId() != nil {
-		t.Errorf("GetUserId() = %v, want nil", ss.GetUserId())
+func TestProjectScopeCapabilities(t *testing.T) {
+	credentialID := uint64(42)
+	projectID := uint64(2)
+	organizationID := uint64(1)
+	scope := &ProjectScope{
+		CredentialId:   &credentialID,
+		ProjectId:      &projectID,
+		OrganizationId: &organizationID,
+		Status:         type_enums.RECORD_ACTIVE.String(),
+	}
+
+	projectContext, ok := scope.ProjectContext()
+	if !ok || projectContext != (ProjectContext{OrganizationID: organizationID, ProjectID: projectID}) {
+		t.Fatalf("ProjectContext() = %+v, %v", projectContext, ok)
+	}
+	if got, ok := scope.OrganizationContext(); !ok || got != organizationID {
+		t.Fatalf("OrganizationContext() = %d, %v", got, ok)
+	}
+	if !scope.IsAuthenticated() {
+		t.Fatal("IsAuthenticated() = false, want true")
+	}
+	actor, ok := scope.AuditActor()
+	if !ok || actor != (ActorIdentity{Type: ActorTypeProject, ID: "42"}) {
+		t.Fatalf("AuditActor() = %+v, %v", actor, ok)
 	}
 }
 
-func TestProjectScope_GetCurrentProjectId(t *testing.T) {
-	projectId := uint64(2)
-	ss := &ProjectScope{ProjectId: &projectId}
-	if ss.GetCurrentProjectId() == nil || *ss.GetCurrentProjectId() != projectId {
-		t.Errorf("GetCurrentProjectId() = %v, want %v", ss.GetCurrentProjectId(), projectId)
-	}
-}
-
-func TestProjectScope_GetCurrentOrganizationId(t *testing.T) {
-	orgId := uint64(1)
-	ss := &ProjectScope{OrganizationId: &orgId}
-	if ss.GetCurrentOrganizationId() == nil || *ss.GetCurrentOrganizationId() != orgId {
-		t.Errorf("GetCurrentOrganizationId() = %v, want %v", ss.GetCurrentOrganizationId(), orgId)
-	}
-}
-
-func TestProjectScope_HasOrganization(t *testing.T) {
+func TestProjectScopeRejectsMissingOrZeroContext(t *testing.T) {
+	active := type_enums.RECORD_ACTIVE.String()
+	zero := uint64(0)
+	organizationID := uint64(1)
+	projectID := uint64(2)
 	tests := []struct {
-		name string
-		ss   *ProjectScope
-		want bool
+		name  string
+		scope *ProjectScope
 	}{
-		{"has org", &ProjectScope{OrganizationId: &[]uint64{1}[0]}, true},
-		{"no org", &ProjectScope{}, false},
+		{name: "missing organization", scope: &ProjectScope{ProjectId: &projectID, Status: active}},
+		{name: "zero organization", scope: &ProjectScope{ProjectId: &projectID, OrganizationId: &zero, Status: active}},
+		{name: "missing project", scope: &ProjectScope{OrganizationId: &organizationID, Status: active}},
+		{name: "zero project", scope: &ProjectScope{ProjectId: &zero, OrganizationId: &organizationID, Status: active}},
+		{name: "inactive", scope: &ProjectScope{ProjectId: &projectID, OrganizationId: &organizationID}},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.ss.HasOrganization(); got != tt.want {
-				t.Errorf("HasOrganization() = %v, want %v", got, tt.want)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.scope.IsAuthenticated() {
+				t.Fatal("IsAuthenticated() = true, want false")
+			}
+			if _, err := RequireProject(test.scope); err == nil {
+				t.Fatal("RequireProject() error = nil")
 			}
 		})
 	}
 }
 
-func TestProjectScope_HasUser(t *testing.T) {
-	ss := &ProjectScope{}
-	if ss.HasUser() {
-		t.Errorf("HasUser() = %v, want false", ss.HasUser())
+func TestProjectScopeDoesNotExposeUserIdentity(t *testing.T) {
+	typeOfScope := reflect.TypeOf(&ProjectScope{})
+	for _, method := range []string{"GetUserId", "HasUser", "UserIdentity"} {
+		if _, ok := typeOfScope.MethodByName(method); ok {
+			t.Fatalf("ProjectScope unexpectedly exposes %s", method)
+		}
 	}
 }
 
-func TestProjectScope_HasProject(t *testing.T) {
-	tests := []struct {
-		name string
-		ss   *ProjectScope
-		want bool
-	}{
-		{"has project", &ProjectScope{ProjectId: &[]uint64{2}[0]}, true},
-		{"no project", &ProjectScope{}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.ss.HasProject(); got != tt.want {
-				t.Errorf("HasProject() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestProjectScope_IsActive(t *testing.T) {
-	tests := []struct {
-		name string
-		ss   *ProjectScope
-		want bool
-	}{
-		{"active", &ProjectScope{Status: type_enums.RECORD_ACTIVE.String()}, true},
-		{"inactive", &ProjectScope{Status: type_enums.RECORD_INACTIVE.String()}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.ss.IsActive(); got != tt.want {
-				t.Errorf("IsActive() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestProjectScope_IsAuthenticated(t *testing.T) {
-	tests := []struct {
-		name string
-		ss   *ProjectScope
-		want bool
-	}{
-		{"authenticated", &ProjectScope{ProjectId: &[]uint64{2}[0], OrganizationId: &[]uint64{1}[0], Status: type_enums.RECORD_ACTIVE.String()}, true},
-		{"no project", &ProjectScope{OrganizationId: &[]uint64{1}[0], Status: type_enums.RECORD_ACTIVE.String()}, false},
-		{"no org", &ProjectScope{ProjectId: &[]uint64{2}[0], Status: type_enums.RECORD_ACTIVE.String()}, false},
-		{"inactive", &ProjectScope{ProjectId: &[]uint64{2}[0], OrganizationId: &[]uint64{1}[0], Status: type_enums.RECORD_INACTIVE.String()}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.ss.IsAuthenticated(); got != tt.want {
-				t.Errorf("IsAuthenticated() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestProjectScope_GetCurrentToken(t *testing.T) {
-	token := "token"
-	ss := &ProjectScope{CurrentToken: token}
-	if ss.GetCurrentToken() != token {
-		t.Errorf("GetCurrentToken() = %v, want %v", ss.GetCurrentToken(), token)
-	}
-}
-
-func TestProjectScope_Type(t *testing.T) {
-	ss := &ProjectScope{}
-	if ss.Type() != "project" {
-		t.Errorf("Type() = %v, want %v", ss.Type(), "project")
-	}
-}
+var (
+	_ AuthenticationPrinciple     = (*ProjectScope)(nil)
+	_ OrganizationContextProvider = (*ProjectScope)(nil)
+	_ ProjectContextProvider      = (*ProjectScope)(nil)
+	_ ActorIdentityProvider       = (*ProjectScope)(nil)
+)

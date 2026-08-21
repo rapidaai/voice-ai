@@ -42,6 +42,10 @@ func TestRouteMiddleware_AgentRoute(t *testing.T) {
 	assert.Equal(t, "42", ctx.AssistantID)
 	assert.NotNil(t, ctx.Auth)
 	assert.NotNil(t, ctx.Assistant)
+	projectContext, authErr := types.RequireProject(ctx.Auth)
+	require.NoError(t, authErr)
+	assert.Equal(t, uint64(7), projectContext.ProjectID)
+	assert.Equal(t, uint64(8), projectContext.OrganizationID)
 }
 
 func TestRouteMiddleware_DIDRoute(t *testing.T) {

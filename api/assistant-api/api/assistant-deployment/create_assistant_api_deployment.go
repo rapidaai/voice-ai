@@ -19,7 +19,7 @@ import (
 // CreateAssistantApiDeployment implements assistant_api.AssistantDeploymentServiceServer.
 func (deploymentApi *assistantDeploymentGrpcApi) CreateAssistantApiDeployment(ctx context.Context, deployment *assistant_api.CreateAssistantDeploymentRequest) (*assistant_api.GetAssistantApiDeploymentResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || iAuth.GetCurrentProjectId() == nil {
+	if !isAuthenticated || !hasProjectCapability(iAuth) {
 		deploymentApi.logger.Errorf("unauthenticated request for invoke")
 		return utils.Error[assistant_api.GetAssistantApiDeploymentResponse](
 			errors.New("unauthenticated request for create assistant api deployment"),

@@ -1,0 +1,12 @@
+{
+  "phase": "1A amendment - explicit authentication capabilities",
+  "status": "approved",
+  "approved_by": "user",
+  "approval_message": "Yes so fix it",
+  "approved_at": "2026-08-21",
+  "rfc_sha256": "0b8339bf0d1a29ecb441f15e8c30337825413abb01a7a290928cabe48a36d2e1",
+  "plan_sha256": "d09ce5cde70671f78ee6d6a13f513eb8b850de8cc68abcf0a7c2755406b7256d",
+  "challenger": "Gibbs",
+  "challenger_decision": "APPROVE",
+  "open_blockers": []
+}

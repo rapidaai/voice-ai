@@ -72,9 +72,13 @@ func (s *assistantHTTPLogService) CreateLog(
 	request []byte,
 	response []byte,
 ) (*internal_assistant_entity.AssistantHTTPLog, error) {
+	projectContext, err := requireProject(auth)
+	if err != nil {
+		return nil, err
+	}
 	start := time.Now()
 	db := s.postgres.DB(ctx)
-	assetPrefix := s.ObjectPrefix(*auth.GetCurrentOrganizationId(), *auth.GetCurrentProjectId())
+	assetPrefix := s.ObjectPrefix(projectContext.OrganizationID, projectContext.ProjectID)
 	logID := gorm_generator.ID()
 
 	utils.Go(ctx, func() {
@@ -105,8 +109,8 @@ func (s *assistantHTTPLogService) CreateLog(
 		RetryCount:              retryCount,
 		ErrorMessage:            errorMessage,
 		Organizational: gorm_models.Organizational{
-			ProjectId:      *auth.GetCurrentProjectId(),
-			OrganizationId: *auth.GetCurrentOrganizationId(),
+			ProjectId:      projectContext.ProjectID,
+			OrganizationId: projectContext.OrganizationID,
 		},
 		Mutable: gorm_models.Mutable{
 			Status: status,
@@ -130,10 +134,18 @@ func (s *assistantHTTPLogService) GetLog(
 	projectId uint64,
 	httpLogId uint64,
 ) (*internal_assistant_entity.AssistantHTTPLog, error) {
+	projectContext, err := requireProject(auth)
+	if err != nil {
+		return nil, err
+	}
+	if projectId != projectContext.ProjectID {
+		return nil, fmt.Errorf("project %d does not match authenticated project %d", projectId, projectContext.ProjectID)
+	}
+
 	start := time.Now()
 	db := s.postgres.DB(ctx)
 	var httpLog *internal_assistant_entity.AssistantHTTPLog
-	tx := db.Where("id = ? AND organization_id = ? AND project_id = ?", httpLogId, *auth.GetCurrentOrganizationId(), projectId).
+	tx := db.Where("id = ? AND organization_id = ? AND project_id = ?", httpLogId, projectContext.OrganizationID, projectContext.ProjectID).
 		First(&httpLog)
 	if tx.Error != nil {
 		s.logger.Benchmark("assistantHTTPLogService.GetLog", time.Since(start))
@@ -153,6 +165,14 @@ func (s *assistantHTTPLogService) GetAllLog(
 	paginate *protos.Paginate,
 	order *protos.Ordering,
 ) (int64, []*internal_assistant_entity.AssistantHTTPLog, error) {
+	projectContext, err := requireProject(auth)
+	if err != nil {
+		return 0, nil, err
+	}
+	if projectId != projectContext.ProjectID {
+		return 0, nil, fmt.Errorf("project %d does not match authenticated project %d", projectId, projectContext.ProjectID)
+	}
+
 	start := time.Now()
 	db := s.postgres.DB(ctx)
 	var (
@@ -160,7 +180,7 @@ func (s *assistantHTTPLogService) GetAllLog(
 		cnt      int64
 	)
 	qry := db.Model(internal_assistant_entity.AssistantHTTPLog{})
-	qry = qry.Where("organization_id = ? AND project_id = ? ", *auth.GetCurrentOrganizationId(), projectId)
+	qry = qry.Where("organization_id = ? AND project_id = ? ", projectContext.OrganizationID, projectContext.ProjectID)
 	for _, ct := range criterias {
 		if ct == nil || ct.GetKey() == "" || ct.GetValue() == "" {
 			continue
@@ -344,12 +364,17 @@ func (s *assistantHTTPLogService) RetryLog(
 	projectId uint64,
 	httpLogId uint64,
 ) (*internal_assistant_entity.AssistantHTTPLog, error) {
+	projectContext, err := requireProject(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	httpLog, err := s.GetLog(ctx, auth, projectId, httpLogId)
 	if err != nil {
 		return nil, err
 	}
 
-	requestPayload, _, _ := s.GetLogObject(ctx, *auth.GetCurrentOrganizationId(), *auth.GetCurrentProjectId(), httpLogId)
+	requestPayload, _, _ := s.GetLogObject(ctx, projectContext.OrganizationID, projectContext.ProjectID, httpLogId)
 	snapshot, err := s.parseRetryRequestSnapshot(requestPayload)
 	if err != nil {
 		return nil, fmt.Errorf("http retry: invalid request snapshot for log %d: %w", httpLogId, err)

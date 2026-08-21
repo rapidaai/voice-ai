@@ -86,14 +86,18 @@ func (client *vaultServiceClient) GetOauth2Credential(c context.Context,
 
 func (client *vaultServiceClient) GetCredential(c context.Context, auth types.SimplePrinciple, vaultId uint64) (*vault_api.VaultCredential, error) {
 	start := time.Now()
-	cacheKey := client.CacheKey(c, "GetCredential", fmt.Sprintf("%d", *auth.GetCurrentOrganizationId()), fmt.Sprintf("vlt__%d", vaultId))
+	organizationID, err := types.RequireOrganization(auth)
+	if err != nil {
+		return nil, fmt.Errorf("vault credential requires organization context: %w", err)
+	}
+	cacheKey := client.CacheKey(c, "GetCredential", fmt.Sprintf("%d", organizationID), fmt.Sprintf("vlt__%d", vaultId))
 	cachedValue := client.Retrieve(c, cacheKey)
 	if cachedValue.HasError() {
 		client.logger.Errorf("Cache missed for the request: %v", cachedValue.Err)
 	}
 
 	data := &vault_api.VaultCredential{}
-	err := cachedValue.ResultStruct(data)
+	err = cachedValue.ResultStruct(data)
 
 	// Start a goroutine to fetch from API and update cache
 	var apiData = make(chan *vault_api.VaultCredential, 1)

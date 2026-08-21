@@ -91,11 +91,11 @@ func (d *Dispatcher) ensureCallContext(ctx context.Context, stage sip_infra.Sess
 		FromNumber:     extractDIDOrRaw(stage.ToURI),
 		ChannelUUID:    callID,
 	}
-	if pid := stage.Auth.GetCurrentProjectId(); pid != nil {
-		callContext.ProjectID = *pid
-	}
-	if oid := stage.Auth.GetCurrentOrganizationId(); oid != nil {
-		callContext.OrganizationID = *oid
+	if delegatedContext, err := types.ResolveDelegatedContext(stage.Auth); err == nil {
+		callContext.OrganizationID = delegatedContext.OrganizationID
+		if delegatedContext.ProjectID != nil {
+			callContext.ProjectID = *delegatedContext.ProjectID
+		}
 	}
 	if assistant := stage.Session.GetAssistant(); assistant != nil {
 		callContext.AssistantProviderId = assistant.AssistantProviderId
@@ -133,11 +133,11 @@ func (d *Dispatcher) setupCall(ctx context.Context, stage sip_infra.SessionEstab
 	if stage.Auth != nil {
 		result.AuthToken = stage.Auth.GetCurrentToken()
 		result.AuthType = stage.Auth.Type().String()
-		if stage.Auth.GetCurrentProjectId() != nil {
-			result.ProjectID = *stage.Auth.GetCurrentProjectId()
-		}
-		if stage.Auth.GetCurrentOrganizationId() != nil {
-			result.OrganizationID = *stage.Auth.GetCurrentOrganizationId()
+		if delegatedContext, err := types.ResolveDelegatedContext(stage.Auth); err == nil {
+			result.OrganizationID = delegatedContext.OrganizationID
+			if delegatedContext.ProjectID != nil {
+				result.ProjectID = *delegatedContext.ProjectID
+			}
 		}
 	}
 
@@ -205,11 +205,11 @@ func reconstructCallContext(
 		callContext.CallerNumber = extractDIDOrRaw(fromURI)
 		callContext.FromNumber = extractDIDOrRaw(toURI)
 	}
-	if pid := auth.GetCurrentProjectId(); pid != nil {
-		callContext.ProjectID = *pid
-	}
-	if oid := auth.GetCurrentOrganizationId(); oid != nil {
-		callContext.OrganizationID = *oid
+	if delegatedContext, err := types.ResolveDelegatedContext(auth); err == nil {
+		callContext.OrganizationID = delegatedContext.OrganizationID
+		if delegatedContext.ProjectID != nil {
+			callContext.ProjectID = *delegatedContext.ProjectID
+		}
 	}
 	return callContext
 }

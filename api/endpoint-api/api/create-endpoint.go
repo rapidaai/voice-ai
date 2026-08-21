@@ -10,14 +10,13 @@ import (
 	"errors"
 
 	internal_gorm "github.com/rapidaai/api/endpoint-api/internal/entity"
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	protos "github.com/rapidaai/protos"
 )
 
 func (endpointGRPCApi *endpointGRPCApi) CreateEndpoint(ctx context.Context, cer *protos.CreateEndpointRequest) (*protos.CreateEndpointResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !iAuth.HasProject() {
+	iAuth, isAuthenticated := getProjectPrincipleGRPC(ctx)
+	if !isAuthenticated {
 		endpointGRPCApi.logger.Errorf("unauthenticated request for invoke")
 		return utils.Error[protos.CreateEndpointResponse](
 			errors.New("unauthenticated request for invoke"),

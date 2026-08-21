@@ -17,7 +17,7 @@ import (
 // GetAllKnowledgeDocument implements knowledge_api.KnowledgeServiceServer.
 func (knowledgeApi *knowledgeGrpcApi) GetAllKnowledgeDocument(ctx context.Context, cer *knowledge_api.GetAllKnowledgeDocumentRequest) (*knowledge_api.GetAllKnowledgeDocumentResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !iAuth.HasProject() {
+	if !isAuthenticated || !hasProjectCapability(iAuth) {
 		knowledgeApi.logger.Errorf("unauthenticated request for invoke")
 		return utils.Error[knowledge_api.GetAllKnowledgeDocumentResponse](
 			errors.New("unauthenticated request for invoke"),

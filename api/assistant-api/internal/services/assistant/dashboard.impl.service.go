@@ -483,10 +483,9 @@ func (assistantService *assistantService) buildAssistantDashboardSQLFilters(
 	fromDate *timestamppb.Timestamp,
 	toDate *timestamppb.Timestamp,
 ) (*assistantDashboardSQLFilters, error) {
-	currentOrganizationId := auth.GetCurrentOrganizationId()
-	currentProjectId := auth.GetCurrentProjectId()
-	if currentOrganizationId == nil || currentProjectId == nil {
-		return nil, fmt.Errorf("missing organization or project scope")
+	projectContext, err := requireProject(auth)
+	if err != nil {
+		return nil, err
 	}
 
 	rangeEnd := time.Now()
@@ -517,7 +516,7 @@ func (assistantService *assistantService) buildAssistantDashboardSQLFilters(
 			"assistant_conversations.created_date >= ?",
 			"assistant_conversations.created_date <= ?",
 		},
-		conversationArguments: []interface{}{assistantId, *currentOrganizationId, *currentProjectId, rangeStart, rangeEnd},
+		conversationArguments: []interface{}{assistantId, projectContext.OrganizationID, projectContext.ProjectID, rangeStart, rangeEnd},
 		messageConditions: []string{
 			"assistant_conversations.assistant_id = ?",
 			"assistant_conversations.organization_id = ?",
@@ -525,7 +524,7 @@ func (assistantService *assistantService) buildAssistantDashboardSQLFilters(
 			"assistant_conversation_messages.created_date >= ?",
 			"assistant_conversation_messages.created_date <= ?",
 		},
-		messageArguments: []interface{}{assistantId, *currentOrganizationId, *currentProjectId, rangeStart, rangeEnd},
+		messageArguments: []interface{}{assistantId, projectContext.OrganizationID, projectContext.ProjectID, rangeStart, rangeEnd},
 		rangeStart:       rangeStart,
 		rangeEnd:         rangeEnd,
 	}

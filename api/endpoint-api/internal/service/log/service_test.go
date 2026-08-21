@@ -116,11 +116,42 @@ func newEndpointLogServiceTest(t *testing.T) (*endpointLogService, *gorm.DB) {
 }
 
 func testAuth(userID, orgID, projectID uint64) types.SimplePrinciple {
-	return &types.ServiceScope{
-		UserId:         &userID,
-		OrganizationId: &orgID,
-		ProjectId:      &projectID,
+	return &types.PlainAuthPrinciple{
+		User:               types.UserInfo{Id: userID},
+		OrganizationRole:   &types.OrganizaitonRole{OrganizationId: orgID},
+		CurrentProjectRole: &types.ProjectRole{ProjectId: projectID},
 	}
+}
+
+func TestEndpointLogServiceRequiresProjectCapability(t *testing.T) {
+	service, _ := newEndpointLogServiceTest(t)
+	organizationID := uint64(10)
+
+	_, err := service.GetEndpointLog(
+		context.Background(),
+		&types.OrganizationScope{OrganizationId: &organizationID, Status: type_enums.RECORD_ACTIVE.String()},
+		1,
+		2,
+	)
+	require.Error(t, err)
+}
+
+func TestApplyMetadataAllowsProjectAuthWithoutFakeUser(t *testing.T) {
+	service, db := newEndpointLogServiceTest(t)
+	require.NoError(t, db.Exec("CREATE UNIQUE INDEX idx_endpoint_log_metadata_log_key ON endpoint_log_metadata(endpoint_log_id, key)").Error)
+	organizationID := uint64(10)
+	projectID := uint64(20)
+	auth := &types.ProjectScope{
+		OrganizationId: &organizationID,
+		ProjectId:      &projectID,
+		Status:         type_enums.RECORD_ACTIVE.String(),
+	}
+
+	metadata, err := service.ApplyMetadata(context.Background(), auth, 1, map[string]interface{}{"trace_id": "trace-1"})
+	require.NoError(t, err)
+	require.Len(t, metadata, 1)
+	require.Zero(t, metadata[0].CreatedBy)
+	require.Zero(t, metadata[0].UpdatedBy)
 }
 
 func TestGetEndpointLogPreloadsMetricsAndContext(t *testing.T) {

@@ -191,6 +191,7 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 		ctx.Auth = &types.ProjectScope{
 			ProjectId:      &projectID,
 			OrganizationId: &organizationID,
+			Status:         type_enums.RECORD_ACTIVE.String(),
 		}
 		if !validator.NonNil(m.assistantService) {
 			return &sip_infra.SIPError{Code: 500, Message: "SIP assistant resolver not configured", Err: sip_infra.ErrInvalidConfig}
@@ -206,9 +207,8 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 				"error", err)
 			return &sip_infra.SIPError{Code: 404, Message: "Assistant not found", Err: sip_infra.ErrAuthRequired}
 		}
-		if !validator.NonNil(ctx.Auth.GetCurrentProjectId()) ||
-			!validator.NonZero(assistant.ProjectId) ||
-			*ctx.Auth.GetCurrentProjectId() != assistant.ProjectId {
+		projectContext, authErr := types.RequireProject(ctx.Auth)
+		if authErr != nil || !validator.NonZero(assistant.ProjectId) || projectContext.ProjectID != assistant.ProjectId {
 			return &sip_infra.SIPError{Code: 403, Message: "API key does not have access to this assistant", Err: sip_infra.ErrAuthRequired}
 		}
 		ctx.Assistant = assistant

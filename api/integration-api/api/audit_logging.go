@@ -35,7 +35,8 @@ func NewAuditLoggingGRPC(config *config.IntegrationConfig, logger commons.Logger
 
 func (als *auditLoggingGRPCApi) GetAuditLog(c context.Context, ir *integration_api.GetAuditLogRequest) (*integration_api.GetAuditLogResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	if !isAuthenticated || !iAuth.HasProject() {
+	projectContext, authErr := requireProjectContext(iAuth)
+	if !isAuthenticated || authErr != nil {
 		als.logger.Errorf("unauthenticated request for invoke")
 		return utils.Error[integration_api.GetAuditLogResponse](
 			errors.New("unauthenticated request for getAuditLog"),
@@ -43,8 +44,7 @@ func (als *auditLoggingGRPCApi) GetAuditLog(c context.Context, ir *integration_a
 		)
 	}
 
-	lg, err := als.auditService.Get(c, *iAuth.GetCurrentOrganizationId(),
-		*iAuth.GetCurrentProjectId(), ir.GetId())
+	lg, err := als.auditService.Get(c, projectContext.OrganizationID, projectContext.ProjectID, ir.GetId())
 	if err != nil {
 		als.logger.Errorf("unable to get audit log %v", err)
 		return &integration_api.GetAuditLogResponse{
@@ -59,8 +59,7 @@ func (als *auditLoggingGRPCApi) GetAuditLog(c context.Context, ir *integration_a
 		als.logger.Errorf("unable to cast the information to generic struct %v", err)
 	}
 
-	re, rs, _ := als.GetRequestAndResponse(c, *iAuth.GetCurrentOrganizationId(),
-		*iAuth.GetCurrentProjectId(), lg.CredentialId, lg.Id)
+	re, rs, _ := als.GetRequestAndResponse(c, projectContext.OrganizationID, projectContext.ProjectID, lg.CredentialId, lg.Id)
 	// if err != nil {
 	if re != nil {
 		s := &structpb.Struct{}
@@ -84,7 +83,8 @@ func (als *auditLoggingGRPCApi) GetAuditLog(c context.Context, ir *integration_a
 
 func (als *auditLoggingGRPCApi) GetAllAuditLog(c context.Context, ir *integration_api.GetAllAuditLogRequest) (*integration_api.GetAllAuditLogResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	if !isAuthenticated || !iAuth.HasProject() {
+	projectContext, authErr := requireProjectContext(iAuth)
+	if !isAuthenticated || authErr != nil {
 		als.logger.Errorf("unauthenticated request for invoke")
 		return utils.Error[integration_api.GetAllAuditLogResponse](
 			errors.New("unauthenticated request for getAuditLog"),
@@ -93,8 +93,8 @@ func (als *auditLoggingGRPCApi) GetAllAuditLog(c context.Context, ir *integratio
 	}
 
 	cnt, lgs, err := als.auditService.GetAll(c,
-		*iAuth.GetCurrentOrganizationId(),
-		*iAuth.GetCurrentProjectId(), ir.GetPaginate(), ir.GetCriterias())
+		projectContext.OrganizationID,
+		projectContext.ProjectID, ir.GetPaginate(), ir.GetCriterias())
 	if err != nil {
 		return &integration_api.GetAllAuditLogResponse{
 			Code:    200,
@@ -117,14 +117,15 @@ func (als *auditLoggingGRPCApi) GetAllAuditLog(c context.Context, ir *integratio
 // CreateMetadata implements protos.AuditLoggingServiceServer.
 func (als *auditLoggingGRPCApi) CreateMetadata(c context.Context, cmr *integration_api.CreateMetadataRequest) (*integration_api.CreateMetadataResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	if !isAuthenticated || !iAuth.HasProject() {
+	projectContext, authErr := requireProjectContext(iAuth)
+	if !isAuthenticated || authErr != nil {
 		als.logger.Errorf("unauthenticated request for invoke")
 		return utils.Error[integration_api.CreateMetadataResponse](
 			errors.New("unauthenticated request for CreateMetadata"),
 			"Please provider valid service credentials to perfom probe, read docs @ docs.rapida.ai",
 		)
 	}
-	_adt, err := als.auditService.Get(c, *iAuth.GetCurrentOrganizationId(), *iAuth.GetCurrentProjectId(), cmr.GetId())
+	_adt, err := als.auditService.Get(c, projectContext.OrganizationID, projectContext.ProjectID, cmr.GetId())
 	if err != nil {
 		return utils.Error[integration_api.CreateMetadataResponse](
 			errors.New("unauthenticated request for CreateMetadata"),

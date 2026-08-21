@@ -42,8 +42,12 @@ func NewProjectAuthenticator(logger commons.Logger, postgres connectors.Postgres
 func (p *projectService) Claim(ctx context.Context, claimToken string) (*types.PlainClaimPrinciple[*types.ProjectScope], error) {
 	start := time.Now()
 	db := p.postgres.DB(ctx)
-	var prjScope *types.ProjectScope
-	tx := db.Table("project_credentials").Order("created_date DESC").Where("key = ?", claimToken).First(&prjScope)
+	var prjScope types.ProjectScope
+	tx := db.Table("project_credentials").
+		Select("id AS credential_id, project_id, organization_id, status").
+		Order("created_date DESC").
+		Where("key = ?", claimToken).
+		Take(&prjScope)
 	if tx.Error != nil {
 		p.logger.Errorf("Authentication error, illegal key request %v", tx.Error)
 		return nil, tx.Error
@@ -51,7 +55,7 @@ func (p *projectService) Claim(ctx context.Context, claimToken string) (*types.P
 	p.logger.Debugf("Benchmarking: projectAuthenticator.Claim time taken %v and value %+v", time.Since(start), prjScope)
 	prjScope.CurrentToken = claimToken
 	return &types.PlainClaimPrinciple[*types.ProjectScope]{
-		Info: prjScope,
+		Info: &prjScope,
 	}, nil
 }
 

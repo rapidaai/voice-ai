@@ -21,7 +21,8 @@ func (iApi *integrationApi) Reranking(
 	rerankerCaller internal_callers.RerankingCaller,
 ) (*integration_api.RerankingResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	if !isAuthenticated || !iAuth.HasProject() {
+	projectContext, authErr := requireProjectContext(iAuth)
+	if !isAuthenticated || authErr != nil {
 		iApi.logger.Errorf("unauthenticated request for invoke")
 		return utils.Error[integration_api.RerankingResponse](
 			errors.New("unauthenticated request for generate"),
@@ -64,8 +65,8 @@ func (iApi *integrationApi) Reranking(
 		internal_callers.NewRerankerOptions(
 			uuID,
 			irRequest,
-			iApi.PreHook(c, iAuth, irRequest, uuID, tag),
-			iApi.PostHook(c, iAuth, irRequest, uuID, tag),
+			iApi.PreHook(c, projectContext, irRequest, uuID, tag),
+			iApi.PostHook(c, projectContext, irRequest, uuID, tag),
 		),
 	)
 	if err == nil {

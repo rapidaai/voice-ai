@@ -7,6 +7,7 @@ package types
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
@@ -14,23 +15,22 @@ import (
 )
 
 // CreateJWT creates a JWT token with the provided claims and returns the token string
-func CreateServiceScopeToken(principle SimplePrinciple, secretKey string) (string, error) {
-	if principle == nil {
-		return "", fmt.Errorf("principle cannot be nil")
+func CreateServiceScopeToken(delegatedContext DelegatedContext, secretKey string) (string, error) {
+	normalizedContext, ok := normalizeDelegatedContext(delegatedContext, true)
+	if !ok {
+		return "", fmt.Errorf("delegated context must contain a valid organization and non-zero optional identities")
 	}
 
 	claims := jwt.MapClaims{
-		"exp": time.Now().Add(time.Hour * 24).Unix(), // token expires in 24 hours
+		"exp":            time.Now().Add(time.Hour * 24).Unix(),
+		"organizationId": normalizedContext.OrganizationID,
 	}
 
-	if principle.GetUserId() != nil {
-		claims["userId"] = *principle.GetUserId()
+	if normalizedContext.UserID != nil {
+		claims["userId"] = *normalizedContext.UserID
 	}
-	if principle.GetCurrentOrganizationId() != nil {
-		claims["organizationId"] = *principle.GetCurrentOrganizationId()
-	}
-	if principle.GetCurrentProjectId() != nil {
-		claims["projectId"] = *principle.GetCurrentProjectId()
+	if normalizedContext.ProjectID != nil {
+		claims["projectId"] = *normalizedContext.ProjectID
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -61,46 +61,80 @@ func ExtractServiceScope(tokenString string, secretKey string) (*ServiceScope, e
 		return nil, fmt.Errorf("invalid claims format")
 	}
 
-	ol := &ServiceScope{
-		CurrentToken: tokenString,
+	organizationID, ok := requiredUint64Claim(claims, "organizationId")
+	if !ok {
+		return nil, fmt.Errorf("service scope token requires a valid organizationId claim")
 	}
+	userID, ok := optionalUint64Claim(claims, "userId")
+	if !ok {
+		return nil, fmt.Errorf("service scope token contains an invalid userId claim")
+	}
+	projectID, ok := optionalUint64Claim(claims, "projectId")
+	if !ok {
+		return nil, fmt.Errorf("service scope token contains an invalid projectId claim")
+	}
+	normalizedContext, ok := normalizeDelegatedContext(DelegatedContext{
+		UserID:         userID,
+		OrganizationID: organizationID,
+		ProjectID:      projectID,
+	}, true)
+	if !ok {
+		return nil, fmt.Errorf("service scope token contains malformed delegated context")
+	}
+	return &ServiceScope{
+		UserId:         normalizedContext.UserID,
+		OrganizationId: &normalizedContext.OrganizationID,
+		ProjectId:      normalizedContext.ProjectID,
+		CurrentToken:   tokenString,
+	}, nil
+}
 
-	if _, exists := claims["userId"]; exists {
-		user, ok := toUint64(claims["userId"])
-		if ok {
-			ol.UserId = &user
-		}
+func requiredUint64Claim(claims jwt.MapClaims, name string) (uint64, bool) {
+	value, exists := claims[name]
+	if !exists {
+		return 0, false
 	}
+	result, ok := toUint64(value)
+	return result, ok && result != 0
+}
 
-	if _, exists := claims["organizationId"]; exists {
-		organizationId, ok := toUint64(claims["organizationId"])
-		if ok {
-			ol.OrganizationId = &organizationId
-		}
+func optionalUint64Claim(claims jwt.MapClaims, name string) (*uint64, bool) {
+	value, exists := claims[name]
+	if !exists {
+		return nil, true
 	}
-
-	if _, exists := claims["projectId"]; exists {
-		projectId, ok := toUint64(claims["projectId"])
-		if ok {
-			ol.ProjectId = &projectId
-		}
+	result, ok := toUint64(value)
+	if !ok || result == 0 {
+		return nil, false
 	}
-	return ol, nil
+	return &result, true
 }
 
 func toUint64(value interface{}) (uint64, bool) {
 	switch v := value.(type) {
 	case float64:
+		if v <= 0 || math.Trunc(v) != v || v >= math.Exp2(64) {
+			return 0, false
+		}
 		return uint64(v), true
 	case int:
+		if v <= 0 {
+			return 0, false
+		}
 		return uint64(v), true
 	case int64:
+		if v <= 0 {
+			return 0, false
+		}
 		return uint64(v), true
+	case uint64:
+		return v, v != 0
+	case uint:
+		return uint64(v), v != 0
 	case string:
-		if parsed, err := strconv.ParseUint(v, 10, 64); err == nil {
+		if parsed, err := strconv.ParseUint(v, 10, 64); err == nil && parsed != 0 {
 			return parsed, true
 		}
-		// Add more cases as needed
 	}
 	return 0, false
 }

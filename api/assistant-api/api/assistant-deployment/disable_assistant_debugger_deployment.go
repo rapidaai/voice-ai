@@ -16,7 +16,7 @@ import (
 
 func (deploymentApi *assistantDeploymentGrpcApi) DisableAssistantDebuggerDeployment(ctx context.Context, req *assistant_api.GetAssistantDeploymentRequest) (*assistant_api.GetAssistantDebuggerDeploymentResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || iAuth.GetCurrentProjectId() == nil {
+	if !isAuthenticated || !hasProjectCapability(iAuth) {
 		deploymentApi.logger.Errorf("unauthenticated request for disable assistant debugger deployment")
 		return exceptions.AuthenticationError[assistant_api.GetAssistantDebuggerDeploymentResponse]()
 	}

@@ -17,7 +17,7 @@ import (
 // UpdateKnowledgeDetail implements knowledge_api.KnowledgeServiceServer.
 func (knowledgeApi *knowledgeGrpcApi) UpdateKnowledgeDetail(ctx context.Context, cer *knowledge_api.UpdateKnowledgeDetailRequest) (*knowledge_api.GetKnowledgeResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !iAuth.HasProject() {
+	if !isAuthenticated || !hasProjectCapability(iAuth) {
 		knowledgeApi.logger.Errorf("unauthenticated request for invoke")
 		return utils.Error[knowledge_api.GetKnowledgeResponse](
 			errors.New("unauthenticated request for invoke"),

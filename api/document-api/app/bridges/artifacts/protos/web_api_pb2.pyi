@@ -109,16 +109,20 @@ class Authentication(_message.Message):
     def __init__(self, user: _Optional[_Union[_common_pb2.User, _Mapping]] = ..., token: _Optional[_Union[Token, _Mapping]] = ..., organizationRole: _Optional[_Union[OrganizationRole, _Mapping]] = ..., projectRoles: _Optional[_Iterable[_Union[ProjectRole, _Mapping]]] = ..., featurePermissions: _Optional[_Iterable[_Union[FeaturePermission, _Mapping]]] = ..., billingPlan: _Optional[_Union[AuthBillingPlan, _Mapping]] = ...) -> None: ...
 
 class ScopedAuthentication(_message.Message):
-    __slots__ = ("userId", "organizationId", "projectId", "status")
+    __slots__ = ("userId", "organizationId", "projectId", "status", "actorType", "actorId")
     USERID_FIELD_NUMBER: _ClassVar[int]
     ORGANIZATIONID_FIELD_NUMBER: _ClassVar[int]
     PROJECTID_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
+    ACTORTYPE_FIELD_NUMBER: _ClassVar[int]
+    ACTORID_FIELD_NUMBER: _ClassVar[int]
     userId: int
     organizationId: int
     projectId: int
     status: str
-    def __init__(self, userId: _Optional[int] = ..., organizationId: _Optional[int] = ..., projectId: _Optional[int] = ..., status: _Optional[str] = ...) -> None: ...
+    actorType: str
+    actorId: str
+    def __init__(self, userId: _Optional[int] = ..., organizationId: _Optional[int] = ..., projectId: _Optional[int] = ..., status: _Optional[str] = ..., actorType: _Optional[str] = ..., actorId: _Optional[str] = ...) -> None: ...
 
 class AuthenticateResponse(_message.Message):
     __slots__ = ("code", "success", "data", "error")

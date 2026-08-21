@@ -49,8 +49,13 @@ func (nts *webNotificationGRPCApi) GetNotificationSettting(ctx context.Context, 
 		nts.logger.Errorf("unauthenticated request for GetNotificationSettting")
 		return nil, errors.New("unauthenticated request")
 	}
+	userID, err := types.RequireUser(iAuth)
+	if err != nil {
+		nts.logger.Errorf("unable to resolve user identity for GetNotificationSettting: %v", err)
+		return nil, err
+	}
 
-	settings, err := nts.notificationService.GetAllNotificationSetting(ctx, iAuth, *iAuth.GetUserId())
+	settings, err := nts.notificationService.GetAllNotificationSetting(ctx, iAuth, userID)
 	if err != nil {
 		nts.logger.Errorf("vaultService.GetAll from grpc with err %v", err)
 		return utils.Error[protos.NotificationSettingResponse](
@@ -77,7 +82,12 @@ func (nts *webNotificationGRPCApi) UpdateNotificationSetting(ctx context.Context
 		nts.logger.Errorf("unauthenticated request for create organization")
 		return nil, errors.New("unauthenticated request")
 	}
-	_, err := nts.notificationService.UpdateNotificationSetting(ctx, iAuth, *iAuth.GetUserId(), irequest.GetSettings())
+	userID, err := types.RequireUser(iAuth)
+	if err != nil {
+		nts.logger.Errorf("unable to resolve user identity for UpdateNotificationSetting: %v", err)
+		return nil, err
+	}
+	_, err = nts.notificationService.UpdateNotificationSetting(ctx, iAuth, userID, irequest.GetSettings())
 	if err != nil {
 		return &protos.NotificationSettingResponse{
 			Code:    400,

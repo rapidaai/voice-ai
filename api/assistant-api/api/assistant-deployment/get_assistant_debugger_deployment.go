@@ -17,7 +17,7 @@ import (
 // GetAssistantDebuggerDeployment implements assistant_api.AssistantDeploymentServiceServer.
 func (deploymentApi *assistantDeploymentGrpcApi) GetAssistantDebuggerDeployment(ctx context.Context, getter *assistant_api.GetAssistantDeploymentRequest) (*assistant_api.GetAssistantDebuggerDeploymentResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || iAuth.GetCurrentProjectId() == nil {
+	if !isAuthenticated || !hasProjectCapability(iAuth) {
 		deploymentApi.logger.Errorf("unauthenticated request for invoke")
 		return utils.Error[assistant_api.GetAssistantDebuggerDeploymentResponse](
 			errors.New("unauthenticated request for create assistant whatsapp deployment"),

@@ -489,8 +489,13 @@ func (wAuthApi *webAuthGRPCApi) ChangePassword(c context.Context, irRequest *pro
 			}}, nil
 	}
 
-	//
-	_, err = wAuthApi.userService.UpdatePassword(c, *currentAuth.GetUserId(), irRequest.GetPassword())
+	userID, err := types.RequireUser(currentAuth)
+	if err != nil {
+		wAuthApi.logger.Errorf("unable to resolve authenticated user for password change %v", err)
+		return nil, err
+	}
+
+	_, err = wAuthApi.userService.UpdatePassword(c, userID, irRequest.GetPassword())
 	if err != nil {
 		wAuthApi.logger.Errorf("unable to change password for user failed %v", err)
 		return &protos.ChangePasswordResponse{
@@ -562,8 +567,10 @@ func (wAuthApi *webAuthGRPCApi) ScopeAuthorize(c context.Context, irRequest *pro
 		if !isAuthenticated {
 			return nil, errors.New("unauthenticated request")
 		}
-		auth := &protos.ScopedAuthentication{}
-		utils.Cast(iAuth, auth)
+		auth, err := scopedAuthentication(iAuth)
+		if err != nil {
+			return nil, err
+		}
 		return &protos.ScopedAuthenticationResponse{Code: 200, Success: true, Data: auth}, nil
 	}
 
@@ -574,6 +581,19 @@ func (wAuthApi *webAuthGRPCApi) ScopeAuthorize(c context.Context, irRequest *pro
 	auth := &protos.ScopedAuthentication{}
 	utils.Cast(iAuth, auth)
 	return &protos.ScopedAuthenticationResponse{Code: 200, Success: true, Data: auth}, nil
+}
+
+func scopedAuthentication(principle types.SimplePrinciple) (*protos.ScopedAuthentication, error) {
+	auth := &protos.ScopedAuthentication{}
+	utils.Cast(principle, auth)
+	actor, err := types.ResolveAuditActor(principle)
+	if err != nil {
+		return nil, err
+	}
+	actorType := string(actor.Type)
+	auth.ActorType = &actorType
+	auth.ActorId = &actor.ID
+	return auth, nil
 }
 
 func (wAuthApi *webAuthApi) VerifyToken(c context.Context, irRequest *protos.VerifyTokenRequest) (*protos.VerifyTokenResponse, error) {

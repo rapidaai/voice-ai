@@ -153,11 +153,37 @@ func newEndpointServiceTest(t *testing.T) (*endpointService, *gorm.DB) {
 }
 
 func testAuth(userID, orgID, projectID uint64) types.SimplePrinciple {
-	return &types.ServiceScope{
-		UserId:         &userID,
-		OrganizationId: &orgID,
-		ProjectId:      &projectID,
+	return &types.PlainAuthPrinciple{
+		User:               types.UserInfo{Id: userID},
+		OrganizationRole:   &types.OrganizaitonRole{OrganizationId: orgID},
+		CurrentProjectRole: &types.ProjectRole{ProjectId: projectID},
 	}
+}
+
+func TestEndpointServiceRequiresCapabilities(t *testing.T) {
+	service, _ := newEndpointServiceTest(t)
+	organizationID := uint64(10)
+	projectID := uint64(20)
+	active := type_enums.RECORD_ACTIVE.String()
+
+	_, _, err := service.GetAll(
+		context.Background(),
+		&types.OrganizationScope{OrganizationId: &organizationID, Status: active},
+		nil,
+		&protos.Paginate{},
+	)
+	require.Error(t, err)
+
+	_, err = service.CreateEndpoint(
+		context.Background(),
+		&types.ProjectScope{OrganizationId: &organizationID, ProjectId: &projectID, Status: active},
+		"endpoint",
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+	require.Error(t, err)
 }
 
 func insertEndpoint(t *testing.T, db *gorm.DB, id, orgID, projectID uint64, visibility string) *internal_gorm.Endpoint {

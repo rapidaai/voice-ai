@@ -7,6 +7,9 @@ package web_client
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -18,7 +21,13 @@ import (
 	"github.com/rapidaai/pkg/clients"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
+	"github.com/rapidaai/pkg/types"
 	web_api "github.com/rapidaai/protos"
+)
+
+const (
+	scopeAuthorizationCacheVersion = "v2"
+	scopeAuthorizationCacheTTL     = 5 * time.Minute
 )
 
 type authServiceClient struct {
@@ -96,8 +105,7 @@ func (client *authServiceClient) Authorize(c context.Context, authToken string, 
 
 func (client *authServiceClient) ScopeAuthorize(c context.Context, scopeToken string, scopeType string) (*web_api.ScopedAuthentication, error) {
 	start := time.Now()
-	// Generate cache key
-	cacheKey := client.CacheKey(c, "ScopeAuthorize", scopeToken, scopeType)
+	cacheKey := client.scopeAuthorizationCacheKey(c, scopeToken, scopeType)
 
 	// Retrieve data from cache
 	cachedValue := client.Retrieve(c, cacheKey)
@@ -106,6 +114,9 @@ func (client *authServiceClient) ScopeAuthorize(c context.Context, scopeToken st
 	data := &web_api.ScopedAuthentication{}
 	// Parse cached value into data
 	err := cachedValue.ResultStruct(data)
+	if err == nil {
+		err = validateScopedAuthentication(data, scopeType)
+	}
 	if err != nil {
 		client.logger.Errorf("Failed to parse cached data: %v", err)
 
@@ -120,8 +131,11 @@ func (client *authServiceClient) ScopeAuthorize(c context.Context, scopeToken st
 
 		// Check if the request was successful
 		if res.GetSuccess() && res.GetData() != nil {
+			if err := validateScopedAuthentication(res.GetData(), scopeType); err != nil {
+				return nil, err
+			}
 			// Cache the fetched data
-			_c := client.Cache(c, cacheKey, res.GetData())
+			_c := client.CacheWithTTL(c, cacheKey, res.GetData(), scopeAuthorizationCacheTTL)
 			if _c.HasError() {
 				client.logger.Errorf("Failed to cache the data %+v: %v", res.GetData(), _c.Err)
 			}
@@ -140,4 +154,18 @@ func (client *authServiceClient) ScopeAuthorize(c context.Context, scopeToken st
 	// Log benchmarking information
 	client.logger.Benchmark("Benchmarking: AuthClient.ScopeAuthorize", time.Since(start))
 	return data, nil
+}
+
+func validateScopedAuthentication(authentication *web_api.ScopedAuthentication, scopeType string) error {
+	if scopeType == "project" && (authentication.GetActorType() != string(types.ActorTypeProject) || authentication.GetActorId() == "") {
+		return errors.New("project authentication is missing durable actor identity")
+	}
+	return nil
+}
+
+func (client *authServiceClient) scopeAuthorizationCacheKey(c context.Context, scopeToken string, scopeType string) string {
+	mac := hmac.New(sha256.New, []byte(client.cfg.Secret))
+	_, _ = mac.Write([]byte(scopeToken))
+	fingerprint := hex.EncodeToString(mac.Sum(nil))
+	return client.CacheKey(c, "ScopeAuthorize", scopeAuthorizationCacheVersion, scopeType, fingerprint)
 }

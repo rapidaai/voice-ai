@@ -45,6 +45,11 @@ func (s *assistantConfigurationService) Get(
 	configurationId uint64,
 	assistantId uint64,
 ) (*internal_assistant_entity.AssistantConfiguration, error) {
+	projectContext, err := requireProject(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	start := time.Now()
 	db := s.postgres.DB(ctx)
 
@@ -53,8 +58,8 @@ func (s *assistantConfigurationService) Get(
 		Where("id = ? AND assistant_id = ? AND organization_id = ? AND project_id = ? AND status = ?",
 			configurationId,
 			assistantId,
-			*auth.GetCurrentOrganizationId(),
-			*auth.GetCurrentProjectId(),
+			projectContext.OrganizationID,
+			projectContext.ProjectID,
 			type_enums.RECORD_ACTIVE,
 		).
 		First(&out)
@@ -76,6 +81,11 @@ func (s *assistantConfigurationService) GetAll(
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
 ) (int64, []*internal_assistant_entity.AssistantConfiguration, error) {
+	projectContext, err := requireProject(auth)
+	if err != nil {
+		return 0, nil, err
+	}
+
 	start := time.Now()
 	db := s.postgres.DB(ctx)
 
@@ -88,8 +98,8 @@ func (s *assistantConfigurationService) GetAll(
 		Preload("Options", "status = ?", type_enums.RECORD_ACTIVE).
 		Where("assistant_id = ? AND organization_id = ? AND project_id = ? AND status = ?",
 			assistantId,
-			*auth.GetCurrentOrganizationId(),
-			*auth.GetCurrentProjectId(),
+			projectContext.OrganizationID,
+			projectContext.ProjectID,
 			type_enums.RECORD_ACTIVE,
 		)
 	if strings.TrimSpace(configurationType) != "" {
@@ -140,6 +150,11 @@ func (s *assistantConfigurationService) Create(
 	enabled bool,
 	options []*protos.Metadata,
 ) (*internal_assistant_entity.AssistantConfiguration, error) {
+	authContext, err := requireMutationContext(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	start := time.Now()
 	db := s.postgres.DB(ctx)
 
@@ -152,17 +167,17 @@ func (s *assistantConfigurationService) Create(
 		Provider:          provider,
 		Enabled:           enabled,
 		Organizational: gorm_models.Organizational{
-			ProjectId:      *auth.GetCurrentProjectId(),
-			OrganizationId: *auth.GetCurrentOrganizationId(),
+			ProjectId:      authContext.Project.ProjectID,
+			OrganizationId: authContext.Project.OrganizationID,
 		},
 		Mutable: gorm_models.Mutable{
-			CreatedBy: *auth.GetUserId(),
-			UpdatedBy: *auth.GetUserId(),
+			CreatedBy: authContext.UserID,
+			UpdatedBy: authContext.UserID,
 			Status:    type_enums.RECORD_ACTIVE,
 		},
 	}
 
-	err := db.Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.WithContext(ctx).Create(out).Error; err != nil {
 			return err
 		}
@@ -193,6 +208,11 @@ func (s *assistantConfigurationService) Update(
 	enabled bool,
 	options []*protos.Metadata,
 ) (*internal_assistant_entity.AssistantConfiguration, error) {
+	authContext, err := requireMutationContext(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	start := time.Now()
 	db := s.postgres.DB(ctx)
 
@@ -200,20 +220,20 @@ func (s *assistantConfigurationService) Update(
 	provider = strings.TrimSpace(provider)
 
 	var out *internal_assistant_entity.AssistantConfiguration
-	err := db.Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		patch := map[string]interface{}{
 			"configuration_type": internal_assistant_entity.AssistantConfigurationType(configurationType),
 			"provider":           provider,
 			"enabled":            enabled,
-			"updated_by":         *auth.GetUserId(),
+			"updated_by":         authContext.UserID,
 		}
 		query := tx.WithContext(ctx).
 			Model(&internal_assistant_entity.AssistantConfiguration{}).
 			Where("id = ? AND assistant_id = ? AND organization_id = ? AND project_id = ? AND status = ?",
 				configurationId,
 				assistantId,
-				*auth.GetCurrentOrganizationId(),
-				*auth.GetCurrentProjectId(),
+				authContext.Project.OrganizationID,
+				authContext.Project.ProjectID,
 				type_enums.RECORD_ACTIVE,
 			).
 			Updates(patch)
@@ -234,8 +254,8 @@ func (s *assistantConfigurationService) Update(
 			Where("id = ? AND assistant_id = ? AND organization_id = ? AND project_id = ?",
 				configurationId,
 				assistantId,
-				*auth.GetCurrentOrganizationId(),
-				*auth.GetCurrentProjectId(),
+				authContext.Project.OrganizationID,
+				authContext.Project.ProjectID,
 			).
 			First(&out).Error
 	})
@@ -254,18 +274,23 @@ func (s *assistantConfigurationService) Delete(
 	configurationId uint64,
 	assistantId uint64,
 ) (*internal_assistant_entity.AssistantConfiguration, error) {
+	authContext, err := requireMutationContext(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	start := time.Now()
 	db := s.postgres.DB(ctx)
 
 	var out *internal_assistant_entity.AssistantConfiguration
-	err := db.Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.WithContext(ctx).
 			Preload("Options", "status = ?", type_enums.RECORD_ACTIVE).
 			Where("id = ? AND assistant_id = ? AND organization_id = ? AND project_id = ? AND status = ?",
 				configurationId,
 				assistantId,
-				*auth.GetCurrentOrganizationId(),
-				*auth.GetCurrentProjectId(),
+				authContext.Project.OrganizationID,
+				authContext.Project.ProjectID,
 				type_enums.RECORD_ACTIVE,
 			).
 			First(&out).Error; err != nil {
@@ -276,13 +301,13 @@ func (s *assistantConfigurationService) Delete(
 			Where("id = ? AND assistant_id = ? AND organization_id = ? AND project_id = ? AND status = ?",
 				configurationId,
 				assistantId,
-				*auth.GetCurrentOrganizationId(),
-				*auth.GetCurrentProjectId(),
+				authContext.Project.OrganizationID,
+				authContext.Project.ProjectID,
 				type_enums.RECORD_ACTIVE,
 			).
 			Updates(map[string]interface{}{
 				"status":     type_enums.RECORD_ARCHIEVE,
-				"updated_by": *auth.GetUserId(),
+				"updated_by": authContext.UserID,
 			})
 		if query.Error != nil {
 			return query.Error
@@ -307,12 +332,17 @@ func (s *assistantConfigurationService) archiveOptions(
 	auth types.SimplePrinciple,
 	configurationId uint64,
 ) error {
+	userID, err := requireUser(auth)
+	if err != nil {
+		return err
+	}
+
 	return tx.WithContext(ctx).
 		Model(&internal_assistant_entity.AssistantConfigurationOption{}).
 		Where("assistant_configuration_id = ? AND status = ?", configurationId, type_enums.RECORD_ACTIVE).
 		Updates(map[string]interface{}{
 			"status":     type_enums.RECORD_ARCHIEVE,
-			"updated_by": *auth.GetUserId(),
+			"updated_by": userID,
 		}).Error
 }
 
@@ -323,6 +353,11 @@ func (s *assistantConfigurationService) createOptions(
 	configurationId uint64,
 	options []*protos.Metadata,
 ) ([]*internal_assistant_entity.AssistantConfigurationOption, error) {
+	userID, err := requireUser(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	if len(options) == 0 {
 		return []*internal_assistant_entity.AssistantConfigurationOption{}, nil
 	}
@@ -336,8 +371,8 @@ func (s *assistantConfigurationService) createOptions(
 			},
 			Mutable: gorm_models.Mutable{
 				Status:    type_enums.RECORD_ACTIVE,
-				CreatedBy: *auth.GetUserId(),
-				UpdatedBy: *auth.GetUserId(),
+				CreatedBy: userID,
+				UpdatedBy: userID,
 			},
 		})
 	}

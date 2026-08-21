@@ -16,7 +16,7 @@ import (
 
 func (assistantApi *assistantGrpcApi) UpdateAssistantTool(ctx context.Context, cawr *protos.UpdateAssistantToolRequest) (*protos.GetAssistantToolResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !iAuth.HasProject() {
+	if !isAuthenticated || !hasProjectCapability(iAuth) {
 		assistantApi.logger.Errorf("unauthenticated request for UpdateAssistantTool")
 		return exceptions.AuthenticationError[protos.GetAssistantToolResponse]()
 	}

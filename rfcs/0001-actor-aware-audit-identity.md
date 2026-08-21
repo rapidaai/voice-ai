@@ -222,8 +222,78 @@ hard-deleted when historical actor resolution is required.
 
 ### Principle Integration
 
-Do not add new methods directly to `SimplePrinciple`. That would immediately break every
-implementation and test mock.
+The legacy `SimplePrinciple` contract mixed authentication with optional user,
+organization, and project capabilities. That forced project and organization credentials
+to implement meaningless methods such as `GetUserId() *uint64 { return nil }`.
+
+Replace that contract with authentication-only behavior:
+
+```go
+type AuthenticationPrinciple interface {
+    IsAuthenticated() bool
+    GetCurrentToken() string
+    Type() AuthType
+}
+
+// Compatibility name for pass-through APIs that only transport authentication.
+type SimplePrinciple = AuthenticationPrinciple
+
+type UserIdentityProvider interface {
+    UserIdentity() (uint64, bool)
+}
+
+type OrganizationContextProvider interface {
+    OrganizationContext() (uint64, bool)
+}
+
+type ProjectContextProvider interface {
+    ProjectContext() (ProjectContext, bool)
+}
+
+type DelegatedContextProvider interface {
+    DelegatedContext() (DelegatedContext, bool)
+}
+```
+
+Context is resolved through explicit, fail-closed requirements that return validated,
+non-zero values:
+
+```go
+type ProjectContext struct {
+    OrganizationID uint64
+    ProjectID      uint64
+}
+
+func RequireUser(AuthenticationPrinciple) (uint64, error)
+func RequireOrganization(AuthenticationPrinciple) (uint64, error)
+func RequireProject(AuthenticationPrinciple) (ProjectContext, error)
+```
+
+`ProjectScope` provides project and organization context only. It must not implement user
+identity methods. `OrganizationScope` provides organization context only. User principles
+provide user identity and may optionally provide a selected project context. Callers that
+require a capability resolve it once at the authentication boundary instead of probing
+`HasUser`, `HasOrganization`, or `HasProject` throughout business logic.
+
+Internal service assertions preserve delegated tenant context through an explicit value:
+
+```go
+type DelegatedContext struct {
+    UserID         *uint64
+    OrganizationID uint64
+    ProjectID      *uint64
+}
+```
+
+`ServiceScope` exposes delegated context for internal transport. It does not become the
+originating user or project actor, and it does not implement fake user/project identity
+methods.
+
+The richer user `Principle` contract embeds `AuthenticationPrinciple`,
+`UserIdentityProvider`, and `OrganizationContextProvider`. It does not embed
+`ProjectContextProvider`, because a user can be authenticated before selecting a project.
+Concrete user principles may implement the optional project provider, and `RequireProject`
+validates its result.
 
 Add a companion contract:
 
@@ -236,7 +306,7 @@ type ActorIdentityProvider interface {
 Audit-writing code uses a centralized, fail-closed resolver:
 
 ```go
-func ResolveAuditActor(auth SimplePrinciple) (ActorIdentity, error)
+func ResolveAuditActor(auth AuthenticationPrinciple) (ActorIdentity, error)
 ```
 
 The resolver rejects authenticated mutation paths that claim to support actor-aware audit

@@ -33,7 +33,7 @@ func (assistantApi *assistantGrpcApi) UpdateAssistantConfiguration(
 			},
 		}, errors.New(pkg_errors.AssistantConfigurationUnauthenticated.Error)
 	}
-	if !iAuth.HasUser() || !iAuth.HasProject() || !iAuth.HasOrganization() {
+	if !hasUserProjectCapability(iAuth) {
 		return &protos.GetAssistantConfigurationResponse{
 			Code:    pkg_errors.AssistantConfigurationMissingAuthScope.HTTPStatusCodeInt32(),
 			Success: false,

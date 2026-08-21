@@ -8,9 +8,11 @@ package clients
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"google.golang.org/grpc/metadata"
 
@@ -30,6 +32,7 @@ type InternalClient interface {
 	WithScopeToken(c context.Context, token string, scope string) context.Context
 
 	Cache(c context.Context, key string, value interface{}) *connectors.RedisResponse
+	CacheWithTTL(c context.Context, key string, value interface{}, ttl time.Duration) *connectors.RedisResponse
 	Retrieve(c context.Context, key string) *connectors.RedisResponse
 	CacheKey(c context.Context, funcName string, key ...string) string
 }
@@ -70,7 +73,7 @@ func (ic *internalClient) WithScopeToken(c context.Context, token string, scope 
 }
 
 func (ic *internalClient) WithAuth(c context.Context, auth types.SimplePrinciple) context.Context {
-	token, err := types.CreateServiceScopeToken(auth, ic.cfg.Secret)
+	token, err := ic.createServiceScopeToken(auth)
 	if err != nil {
 		ic.logger.Errorf("Unable to create jwt token for internal service communication %v", err)
 		return c
@@ -80,7 +83,7 @@ func (ic *internalClient) WithAuth(c context.Context, auth types.SimplePrinciple
 }
 
 func (ic *internalClient) WithPlatform(c context.Context, auth types.SimplePrinciple) context.Context {
-	token, err := types.CreateServiceScopeToken(auth, ic.cfg.Secret)
+	token, err := ic.createServiceScopeToken(auth)
 	if err != nil {
 		ic.logger.Errorf("Unable to create jwt token for internal service communication %v", err)
 		return c
@@ -109,7 +112,7 @@ func (ic *internalClient) WithPlatform(c context.Context, auth types.SimplePrinc
 
 func (ic *internalClient) WithHttpAuth(c context.Context, auth types.SimplePrinciple, req *http.Request) *http.Request {
 	// Create the token using the provided auth and the client's secret
-	token, err := types.CreateServiceScopeToken(auth, ic.cfg.Secret)
+	token, err := ic.createServiceScopeToken(auth)
 	if err != nil {
 		ic.logger.Errorf("Unable to create JWT token for internal service communication: %v", err)
 		return req.WithContext(c) // Return the original request with context if token generation fails
@@ -122,6 +125,14 @@ func (ic *internalClient) WithHttpAuth(c context.Context, auth types.SimplePrinc
 	return req.WithContext(c)
 }
 
+func (ic *internalClient) createServiceScopeToken(auth types.AuthenticationPrinciple) (string, error) {
+	delegatedContext, err := types.ResolveDelegatedContext(auth)
+	if err != nil {
+		return "", err
+	}
+	return types.CreateServiceScopeToken(delegatedContext, ic.cfg.Secret)
+}
+
 func (client *internalClient) Cache(c context.Context, key string, value interface{}) *connectors.RedisResponse {
 	data, err := json.Marshal(value)
 	if err != nil {
@@ -129,6 +140,22 @@ func (client *internalClient) Cache(c context.Context, key string, value interfa
 		return nil
 	}
 	put := client.redis.Cmd(c, "SET", []string{key, string(data)})
+	if put != nil && put.Err != nil {
+		client.logger.Errorf("unable to set cache value with err %v for key %s", put, key)
+	}
+	return put
+}
+
+func (client *internalClient) CacheWithTTL(c context.Context, key string, value interface{}, ttl time.Duration) *connectors.RedisResponse {
+	if ttl <= 0 {
+		return &connectors.RedisResponse{Err: errors.New("cache TTL must be positive")}
+	}
+	data, err := json.Marshal(value)
+	if err != nil {
+		client.logger.Errorf("Unable to cache the record as value is not marshalable %s", err, key)
+		return &connectors.RedisResponse{Err: err}
+	}
+	put := client.redis.Cmd(c, "SET", []string{key, string(data), "EX", strconv.FormatInt(int64(ttl/time.Second), 10)})
 	if put != nil && put.Err != nil {
 		client.logger.Errorf("unable to set cache value with err %v for key %s", put, key)
 	}

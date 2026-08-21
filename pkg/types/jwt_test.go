@@ -7,141 +7,115 @@ package types
 
 import (
 	"testing"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
-func TestCreateServiceScopeToken(t *testing.T) {
+func TestServiceScopeTokenRoundTrip(t *testing.T) {
 	secretKey := "test-secret"
+	userID := uint64(1)
+	projectID := uint64(3)
+	want := DelegatedContext{UserID: &userID, OrganizationID: 2, ProjectID: &projectID}
 
+	token, err := CreateServiceScopeToken(want, secretKey)
+	if err != nil {
+		t.Fatalf("CreateServiceScopeToken() error = %v", err)
+	}
+	scope, err := ExtractServiceScope(token, secretKey)
+	if err != nil {
+		t.Fatalf("ExtractServiceScope() error = %v", err)
+	}
+	got, err := ResolveDelegatedContext(scope)
+	if err != nil {
+		t.Fatalf("ResolveDelegatedContext() error = %v", err)
+	}
+	if got.OrganizationID != want.OrganizationID || got.UserID == nil || *got.UserID != userID || got.ProjectID == nil || *got.ProjectID != projectID {
+		t.Fatalf("delegated context = %+v", got)
+	}
+	organizationID, err := RequireOrganization(scope)
+	if err != nil || organizationID != want.OrganizationID {
+		t.Fatalf("RequireOrganization() = %d, %v", organizationID, err)
+	}
+	projectContext, err := RequireProject(scope)
+	if err != nil || projectContext != (ProjectContext{OrganizationID: want.OrganizationID, ProjectID: projectID}) {
+		t.Fatalf("RequireProject() = %+v, %v", projectContext, err)
+	}
+	if _, err := RequireUser(scope); err == nil {
+		t.Fatal("RequireUser() error = nil for delegated service scope")
+	}
+}
+
+func TestCreateServiceScopeTokenAcceptsOrganizationOnly(t *testing.T) {
+	token, err := CreateServiceScopeToken(DelegatedContext{OrganizationID: 2}, "test-secret")
+	if err != nil || token == "" {
+		t.Fatalf("CreateServiceScopeToken() = %q, %v", token, err)
+	}
+	scope, err := ExtractServiceScope(token, "test-secret")
+	if err != nil {
+		t.Fatalf("ExtractServiceScope() error = %v", err)
+	}
+	if _, err := RequireProject(scope); err == nil {
+		t.Fatal("RequireProject() error = nil without delegated project")
+	}
+}
+
+func TestCreateServiceScopeTokenRejectsMalformedContext(t *testing.T) {
+	zero := uint64(0)
+	for _, delegatedContext := range []DelegatedContext{
+		{},
+		{OrganizationID: 2, UserID: &zero},
+		{OrganizationID: 2, ProjectID: &zero},
+	} {
+		if _, err := CreateServiceScopeToken(delegatedContext, "test-secret"); err == nil {
+			t.Fatalf("CreateServiceScopeToken(%+v) error = nil", delegatedContext)
+		}
+	}
+}
+
+func TestExtractServiceScopeRejectsMalformedRequiredOrganization(t *testing.T) {
+	secretKey := "test-secret"
 	tests := []struct {
-		name      string
-		principle SimplePrinciple
-		wantErr   bool
+		name   string
+		claims jwt.MapClaims
 	}{
-		{
-			name: "valid principle with all fields",
-			principle: &ServiceScope{
-				UserId:         &[]uint64{1}[0],
-				OrganizationId: &[]uint64{2}[0],
-				ProjectId:      &[]uint64{3}[0],
-			},
-			wantErr: false,
-		},
-		{
-			name: "principle with only user",
-			principle: &ServiceScope{
-				UserId: &[]uint64{1}[0],
-			},
-			wantErr: false,
-		},
-		{
-			name: "principle with only organization",
-			principle: &ServiceScope{
-				OrganizationId: &[]uint64{2}[0],
-			},
-			wantErr: false,
-		},
-		{
-			name: "principle with only project",
-			principle: &ServiceScope{
-				ProjectId: &[]uint64{3}[0],
-			},
-			wantErr: false,
-		},
-		{
-			name:      "nil principle",
-			principle: nil,
-			wantErr:   true,
-		},
+		{name: "missing", claims: jwt.MapClaims{"exp": time.Now().Add(time.Hour).Unix()}},
+		{name: "zero", claims: jwt.MapClaims{"exp": time.Now().Add(time.Hour).Unix(), "organizationId": 0}},
+		{name: "invalid", claims: jwt.MapClaims{"exp": time.Now().Add(time.Hour).Unix(), "organizationId": "invalid"}},
+		{name: "fractional", claims: jwt.MapClaims{"exp": time.Now().Add(time.Hour).Unix(), "organizationId": 2.5}},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			token, err := CreateServiceScopeToken(tt.principle, secretKey)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("CreateServiceScopeToken() error = %v, wantErr %v", err, tt.wantErr)
-				return
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			token := jwt.NewWithClaims(jwt.SigningMethodHS256, test.claims)
+			tokenString, err := token.SignedString([]byte(secretKey))
+			if err != nil {
+				t.Fatalf("SignedString() error = %v", err)
 			}
-			if !tt.wantErr && token == "" {
-				t.Errorf("CreateServiceScopeToken() returned empty token")
+			if _, err := ExtractServiceScope(tokenString, secretKey); err == nil {
+				t.Fatal("ExtractServiceScope() error = nil")
 			}
 		})
 	}
 }
 
-func TestExtractServiceScope(t *testing.T) {
-	secretKey := "test-secret"
-	principle := &ServiceScope{
-		UserId:         &[]uint64{1}[0],
-		OrganizationId: &[]uint64{2}[0],
-		ProjectId:      &[]uint64{3}[0],
+func TestExtractServiceScopeRejectsInvalidTokens(t *testing.T) {
+	validToken, err := CreateServiceScopeToken(DelegatedContext{OrganizationID: 2}, "test-secret")
+	if err != nil {
+		t.Fatal(err)
 	}
-	validToken, _ := CreateServiceScopeToken(principle, secretKey)
-
-	tests := []struct {
-		name     string
-		token    string
-		secret   string
-		wantUser *uint64
-		wantOrg  *uint64
-		wantProj *uint64
-		wantErr  bool
+	for _, test := range []struct {
+		name   string
+		token  string
+		secret string
 	}{
-		{
-			name:     "valid token",
-			token:    validToken,
-			secret:   secretKey,
-			wantUser: &[]uint64{1}[0],
-			wantOrg:  &[]uint64{2}[0],
-			wantProj: &[]uint64{3}[0],
-			wantErr:  false,
-		},
-		{
-			name:    "invalid token",
-			token:   "invalid.token.here",
-			secret:  secretKey,
-			wantErr: true,
-		},
-		{
-			name:    "wrong secret",
-			token:   validToken,
-			secret:  "wrong-secret",
-			wantErr: true,
-		},
-		{
-			name:    "empty token",
-			token:   "",
-			secret:  secretKey,
-			wantErr: true,
-		},
-		{
-			name:    "malformed token",
-			token:   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ",
-			secret:  secretKey,
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			scope, err := ExtractServiceScope(tt.token, tt.secret)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ExtractServiceScope() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !tt.wantErr {
-				if scope == nil {
-					t.Errorf("ExtractServiceScope() returned nil scope")
-					return
-				}
-				if tt.wantUser != nil && (scope.UserId == nil || *scope.UserId != *tt.wantUser) {
-					t.Errorf("ExtractServiceScope() userId = %v, want %v", scope.UserId, tt.wantUser)
-				}
-				if tt.wantOrg != nil && (scope.OrganizationId == nil || *scope.OrganizationId != *tt.wantOrg) {
-					t.Errorf("ExtractServiceScope() orgId = %v, want %v", scope.OrganizationId, tt.wantOrg)
-				}
-				if tt.wantProj != nil && (scope.ProjectId == nil || *scope.ProjectId != *tt.wantProj) {
-					t.Errorf("ExtractServiceScope() projId = %v, want %v", scope.ProjectId, tt.wantProj)
-				}
+		{name: "invalid", token: "invalid.token.here", secret: "test-secret"},
+		{name: "wrong secret", token: validToken, secret: "wrong-secret"},
+		{name: "empty", token: "", secret: "test-secret"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := ExtractServiceScope(test.token, test.secret); err == nil {
+				t.Fatal("ExtractServiceScope() error = nil")
 			}
 		})
 	}
@@ -154,52 +128,23 @@ func TestToUint64(t *testing.T) {
 		want  uint64
 		ok    bool
 	}{
-		{
-			name:  "float64",
-			value: float64(123),
-			want:  123,
-			ok:    true,
-		},
-		{
-			name:  "int",
-			value: 456,
-			want:  456,
-			ok:    true,
-		},
-		{
-			name:  "int64",
-			value: int64(789),
-			want:  789,
-			ok:    true,
-		},
-		{
-			name:  "string valid",
-			value: "101112",
-			want:  101112,
-			ok:    true,
-		},
-		{
-			name:  "string invalid",
-			value: "not-a-number",
-			want:  0,
-			ok:    false,
-		},
-		{
-			name:  "unsupported type",
-			value: true,
-			want:  0,
-			ok:    false,
-		},
+		{name: "float64", value: float64(123), want: 123, ok: true},
+		{name: "int", value: 456, want: 456, ok: true},
+		{name: "int64", value: int64(789), want: 789, ok: true},
+		{name: "uint64", value: uint64(10), want: 10, ok: true},
+		{name: "string valid", value: "101112", want: 101112, ok: true},
+		{name: "zero", value: 0, ok: false},
+		{name: "negative", value: -1, ok: false},
+		{name: "fractional", value: 1.5, ok: false},
+		{name: "string invalid", value: "not-a-number", ok: false},
+		{name: "unsupported type", value: true, ok: false},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, ok := toUint64(tt.value)
-			if ok != tt.ok {
-				t.Errorf("toUint64() ok = %v, want %v", ok, tt.ok)
-			}
-			if ok && got != tt.want {
-				t.Errorf("toUint64() = %v, want %v", got, tt.want)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, ok := toUint64(test.value)
+			if ok != test.ok || ok && got != test.want {
+				t.Fatalf("toUint64() = %d, %v; want %d, %v", got, ok, test.want, test.ok)
 			}
 		})
 	}

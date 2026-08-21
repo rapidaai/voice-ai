@@ -30,7 +30,7 @@ func TestVaultMiddleware_ResolvesSIPConfig(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	auth := &types.ProjectScope{ProjectId: &projectID, OrganizationId: &organizationID}
+	auth := &types.ServiceScope{ProjectId: &projectID, OrganizationId: &organizationID}
 	assistant := &internal_assistant_entity.Assistant{
 		AssistantPhoneDeployment: &internal_assistant_entity.AssistantPhoneDeployment{
 			AssistantDeploymentTelephony: internal_assistant_entity.AssistantDeploymentTelephony{

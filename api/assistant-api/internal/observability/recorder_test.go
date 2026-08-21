@@ -213,6 +213,27 @@ func TestRecorder_RecordInjectsAuthIntoObservationContext(t *testing.T) {
 	}
 }
 
+func TestRecorder_UsesOrganizationOnlyDelegatedContext(t *testing.T) {
+	organizationID := uint64(7)
+	auth := &types.ServiceScope{OrganizationId: &organizationID}
+	collector := &recordingCollector{key: "collector"}
+	recorder := New(WithAuth(auth), WithCollector(collector))
+
+	if err := recorder.Record(context.Background(), ConversationScope{AssistantScope: AssistantScope{AssistantID: 1}, ConversationID: 2}, RecordMetric{Metrics: []*protos.Metric{{Name: MetricConversationStatus, Value: "ACTIVE"}}}); err != nil {
+		t.Fatalf("Record() error = %v", err)
+	}
+	if err := recorder.Close(context.Background()); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if err := waitForRecorderDone(t, recorder); err != nil {
+		t.Fatalf("recorder close error = %v", err)
+	}
+	global := collector.scopes[0].GlobalScopeValue()
+	if global.OrganizationID != organizationID || global.ProjectID != 0 {
+		t.Fatalf("global scope = %+v", global)
+	}
+}
+
 func TestRecorder_RecordUsesRequestIDFromRecordContext(t *testing.T) {
 	collector := &recordingCollector{key: "collector"}
 	recorder := New(

@@ -9,14 +9,13 @@ import (
 	"context"
 	"errors"
 
-	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	endpoint_grpc_api "github.com/rapidaai/protos"
 )
 
 func (endpointGRPCApi *endpointGRPCApi) ForkEndpoint(ctx context.Context, eRequest *endpoint_grpc_api.ForkEndpointRequest) (*endpoint_grpc_api.BaseResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !iAuth.HasProject() {
+	_, isAuthenticated := getProjectPrincipleGRPC(ctx)
+	if !isAuthenticated {
 		endpointGRPCApi.logger.Errorf("unauthenticated request for invoke")
 		return utils.Error[endpoint_grpc_api.BaseResponse](
 			errors.New("unauthenticated request for CreateEndpointProviderModel"),

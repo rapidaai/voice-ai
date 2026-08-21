@@ -7,6 +7,8 @@ package authenticators
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/rapidaai/config"
@@ -34,9 +36,17 @@ func (authenticator *projectAuthenticator) Claim(ctx context.Context, claimToken
 		authenticator.logger.Debugf("error while claim %v", err)
 		return nil, err
 	}
+	if ath.GetActorType() != string(types.ActorTypeProject) {
+		return nil, fmt.Errorf("project authentication returned actor type %q", ath.GetActorType())
+	}
+	credentialID, err := strconv.ParseUint(ath.GetActorId(), 10, 64)
+	if err != nil || credentialID == 0 {
+		return nil, fmt.Errorf("project authentication returned invalid actor id")
+	}
 	authenticator.logger.Benchmark("Benchmarking: projectAuthenticator.Claim", time.Since(start))
 	return &types.PlainClaimPrinciple[*types.ProjectScope]{
 		Info: &types.ProjectScope{
+			CredentialId:   &credentialID,
 			OrganizationId: &ath.OrganizationId,
 			ProjectId:      &ath.ProjectId,
 			Status:         ath.GetStatus(),

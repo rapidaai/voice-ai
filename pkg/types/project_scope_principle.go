@@ -8,32 +8,30 @@ package types
 import type_enums "github.com/rapidaai/pkg/types/enums"
 
 type ProjectScope struct {
+	CredentialId   *uint64 `json:"credentialId" gorm:"column:credential_id"`
 	ProjectId      *uint64 `json:"projectId"`
 	OrganizationId *uint64 `json:"organizationId"`
 	Status         string  `json:"status"`
 	CurrentToken   string  `json:"currentToken"`
 }
 
-func (ss *ProjectScope) GetUserId() *uint64 {
-	return nil
-}
-func (ss *ProjectScope) GetCurrentProjectId() *uint64 {
-	return ss.ProjectId
-}
-func (ss *ProjectScope) GetCurrentOrganizationId() *uint64 {
-	return ss.OrganizationId
+func (ss *ProjectScope) AuditActor() (ActorIdentity, bool) {
+	return numericActor(ActorTypeProject, ss.CredentialId)
 }
 
-func (ss *ProjectScope) HasOrganization() bool {
-	return ss.GetCurrentOrganizationId() != nil
+func (ss *ProjectScope) OrganizationContext() (uint64, bool) {
+	if ss.OrganizationId == nil || *ss.OrganizationId == 0 {
+		return 0, false
+	}
+	return *ss.OrganizationId, true
 }
 
-func (ss *ProjectScope) HasUser() bool {
-	return ss.GetUserId() != nil
-}
-
-func (ss *ProjectScope) HasProject() bool {
-	return ss.GetCurrentProjectId() != nil
+func (ss *ProjectScope) ProjectContext() (ProjectContext, bool) {
+	organizationID, ok := ss.OrganizationContext()
+	if !ok || ss.ProjectId == nil || *ss.ProjectId == 0 {
+		return ProjectContext{}, false
+	}
+	return ProjectContext{OrganizationID: organizationID, ProjectID: *ss.ProjectId}, true
 }
 
 func (ss *ProjectScope) IsActive() bool {
@@ -41,8 +39,8 @@ func (ss *ProjectScope) IsActive() bool {
 }
 
 func (ss *ProjectScope) IsAuthenticated() bool {
-	// org scope is already to have only org
-	return ss.HasProject() && ss.IsActive() && ss.HasOrganization()
+	_, ok := ss.ProjectContext()
+	return ok && ss.IsActive()
 }
 
 func (ss *ProjectScope) GetCurrentToken() string {

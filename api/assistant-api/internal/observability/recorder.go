@@ -100,11 +100,16 @@ func New(options ...Option) Recorder {
 
 	globalScope := resolvedOptions.globalScope
 	if validator.NonNil(resolvedOptions.auth) {
-		if pid := resolvedOptions.auth.GetCurrentProjectId(); pid != nil {
-			globalScope.ProjectID = *pid
-		}
-		if oid := resolvedOptions.auth.GetCurrentOrganizationId(); oid != nil {
-			globalScope.OrganizationID = *oid
+		if projectContext, err := types.RequireProject(resolvedOptions.auth); err == nil {
+			globalScope.ProjectID = projectContext.ProjectID
+			globalScope.OrganizationID = projectContext.OrganizationID
+		} else if delegatedContext, err := types.ResolveDelegatedContext(resolvedOptions.auth); err == nil {
+			globalScope.OrganizationID = delegatedContext.OrganizationID
+			if delegatedContext.ProjectID != nil {
+				globalScope.ProjectID = *delegatedContext.ProjectID
+			}
+		} else if organizationID, err := types.RequireOrganization(resolvedOptions.auth); err == nil {
+			globalScope.OrganizationID = organizationID
 		}
 	}
 	clock := resolvedOptions.clock

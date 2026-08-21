@@ -29,17 +29,18 @@ func NewVaultService(logger commons.Logger, postgres connectors.PostgresConnecto
 }
 
 func (vs *vaultService) Create(ctx context.Context,
-	auth types.SimplePrinciple,
+	userID uint64,
+	projectContext types.ProjectContext,
 	provider string,
 	name string, credential map[string]interface{}) (*internal_entity.Vault, error) {
 	db := vs.postgres.DB(ctx)
 	vlt := &internal_entity.Vault{
 		Mutable: gorm_models.Mutable{
-			CreatedBy: *auth.GetUserId(),
+			CreatedBy: userID,
 		},
 		Organizational: gorm_models.Organizational{
-			OrganizationId: *auth.GetCurrentOrganizationId(),
-			ProjectId:      *auth.GetCurrentProjectId(),
+			OrganizationId: projectContext.OrganizationID,
+			ProjectId:      projectContext.ProjectID,
 		},
 		Name:     name,
 		Provider: provider,
@@ -54,15 +55,15 @@ func (vs *vaultService) Create(ctx context.Context,
 	return vlt, nil
 }
 
-func (vS *vaultService) Delete(ctx context.Context, auth types.Principle, vaultId uint64) (*internal_entity.Vault, error) {
+func (vS *vaultService) Delete(ctx context.Context, userID uint64, projectContext types.ProjectContext, vaultId uint64) (*internal_entity.Vault, error) {
 	db := vS.postgres.DB(ctx)
 	vlt := &internal_entity.Vault{
 		Mutable: gorm_models.Mutable{
 			Status:    type_enums.RECORD_ARCHIEVE,
-			UpdatedBy: *auth.GetUserId(),
+			UpdatedBy: userID,
 		},
 	}
-	tx := db.Where("id = ? AND organization_id = ? AND project_id = ?", vaultId, *auth.GetCurrentOrganizationId(), *auth.GetCurrentProjectId()).Clauses(clause.Returning{}).Updates(vlt)
+	tx := db.Where("id = ? AND organization_id = ? AND project_id = ?", vaultId, projectContext.OrganizationID, projectContext.ProjectID).Clauses(clause.Returning{}).Updates(vlt)
 	if err := tx.Error; err != nil {
 		vS.logger.Debugf("unable to delete vault %v")
 		return nil, err
@@ -70,7 +71,7 @@ func (vS *vaultService) Delete(ctx context.Context, auth types.Principle, vaultI
 	return vlt, nil
 }
 
-func (vS *vaultService) GetAllOrganizationCredential(ctx context.Context, auth types.SimplePrinciple, criteria []*web_api.Criteria, paginate *web_api.Paginate) (int64, []*internal_entity.Vault, error) {
+func (vS *vaultService) GetAllOrganizationCredential(ctx context.Context, projectContext types.ProjectContext, criteria []*web_api.Criteria, paginate *web_api.Paginate) (int64, []*internal_entity.Vault, error) {
 	db := vS.postgres.DB(ctx)
 	var vaults []*internal_entity.Vault
 	var cnt int64
@@ -78,8 +79,8 @@ func (vS *vaultService) GetAllOrganizationCredential(ctx context.Context, auth t
 	qry := db.Model(internal_entity.Vault{})
 	qry.
 		Where("organization_id = ? AND project_id = ? AND status = ?",
-			*auth.GetCurrentOrganizationId(),
-			*auth.GetCurrentProjectId(), type_enums.RECORD_ACTIVE)
+			projectContext.OrganizationID,
+			projectContext.ProjectID, type_enums.RECORD_ACTIVE)
 	for _, ct := range criteria {
 		switch ct.GetLogic() {
 		case "or":
@@ -104,21 +105,21 @@ func (vS *vaultService) GetAllOrganizationCredential(ctx context.Context, auth t
 		}).Find(&vaults)
 
 	if tx.Error != nil {
-		vS.logger.Debugf("unable to find any vault %v", *auth.GetCurrentOrganizationId())
+		vS.logger.Debugf("unable to find any vault %v", projectContext.OrganizationID)
 		return cnt, nil, tx.Error
 	}
 
 	return cnt, vaults, nil
 }
 
-func (vS *vaultService) Get(ctx context.Context, auth types.SimplePrinciple, id uint64) (*internal_entity.Vault, error) {
+func (vS *vaultService) Get(ctx context.Context, projectContext types.ProjectContext, id uint64) (*internal_entity.Vault, error) {
 	db := vS.postgres.DB(ctx)
 	var vault internal_entity.Vault
 	tx := db.Where("id = ? AND status = ? AND organization_id = ? AND project_id = ?",
 		id,
 		type_enums.RECORD_ACTIVE.String(),
-		*auth.GetCurrentOrganizationId(),
-		*auth.GetCurrentProjectId(),
+		projectContext.OrganizationID,
+		projectContext.ProjectID,
 	).Last(&vault)
 	if tx.Error != nil {
 		vS.logger.Errorf("get credential error  %v", tx.Error)
@@ -127,13 +128,13 @@ func (vS *vaultService) Get(ctx context.Context, auth types.SimplePrinciple, id 
 	return &vault, nil
 }
 
-func (vS *vaultService) GetProviderCredential(ctx context.Context, auth types.SimplePrinciple, provider string) (*internal_entity.Vault, error) {
+func (vS *vaultService) GetProviderCredential(ctx context.Context, organizationID uint64, provider string) (*internal_entity.Vault, error) {
 	db := vS.postgres.DB(ctx)
 	var vault internal_entity.Vault
 	tx := db.Where("provider = ? AND status = ? AND organization_id = ?",
 		provider,
 		type_enums.RECORD_ACTIVE.String(),
-		*auth.GetCurrentOrganizationId(),
+		organizationID,
 	).Last(&vault)
 	if tx.Error != nil {
 		vS.logger.Errorf("get credential error  %v", tx.Error)

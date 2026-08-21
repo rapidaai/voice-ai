@@ -17,7 +17,8 @@ import (
 
 func (assistantApi *assistantGrpcApi) GetAssistantToolLog(ctx context.Context, cepm *protos.GetAssistantToolLogRequest) (*protos.GetAssistantToolLogResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !iAuth.HasProject() {
+	projectContext, authErr := types.RequireProject(iAuth)
+	if !isAuthenticated || authErr != nil {
 		assistantApi.logger.Errorf("unauthenticated request for GetAssistantToolLogRequest")
 		return utils.Error[protos.GetAssistantToolLogResponse](
 			errors.New("unauthenticated request for get assistant converstaion"),
@@ -39,8 +40,8 @@ func (assistantApi *assistantGrpcApi) GetAssistantToolLog(ctx context.Context, c
 	if err != nil {
 		assistantApi.logger.Errorf("unable to cast the assistant ToolLog to the response object")
 	}
-	re, rs, _ := assistantApi.assistantToolService.GetLogObject(ctx, *iAuth.GetCurrentOrganizationId(),
-		*iAuth.GetCurrentProjectId(), cepm.GetId())
+	re, rs, _ := assistantApi.assistantToolService.GetLogObject(ctx, projectContext.OrganizationID,
+		projectContext.ProjectID, cepm.GetId())
 	// if err != nil {
 	if re != nil {
 		s := &structpb.Struct{}

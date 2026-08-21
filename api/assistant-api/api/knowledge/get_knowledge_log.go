@@ -17,7 +17,8 @@ import (
 
 func (knowledgeApi *knowledgeGrpcApi) GetKnowledgeLog(ctx context.Context, cepm *knowledge_api.GetKnowledgeLogRequest) (*knowledge_api.GetKnowledgeLogResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !iAuth.HasProject() {
+	projectContext, authErr := types.RequireProject(iAuth)
+	if !isAuthenticated || authErr != nil {
 		knowledgeApi.logger.Errorf("unauthenticated request for GetKnowledgeLogRequest")
 		return utils.Error[knowledge_api.GetKnowledgeLogResponse](
 			errors.New("unauthenticated request for get assistant converstaion"),
@@ -42,8 +43,8 @@ func (knowledgeApi *knowledgeGrpcApi) GetKnowledgeLog(ctx context.Context, cepm 
 
 	//
 
-	re, rs, _ := knowledgeApi.knowledgeService.GetLogObject(ctx, *iAuth.GetCurrentOrganizationId(),
-		*iAuth.GetCurrentProjectId(), cepm.GetId())
+	re, rs, _ := knowledgeApi.knowledgeService.GetLogObject(ctx, projectContext.OrganizationID,
+		projectContext.ProjectID, cepm.GetId())
 	// if err != nil {
 	if re != nil {
 		s := &structpb.Struct{}

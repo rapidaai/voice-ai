@@ -12,6 +12,7 @@ import (
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
 )
@@ -65,11 +66,11 @@ func (d *Dispatcher) handleCallFailed(ctx context.Context, v sip_infra.CallFaile
 		AssistantID:    assistant.Id,
 		ConversationID: conversationID,
 	}
-	if auth.GetCurrentProjectId() != nil {
-		callSetupResult.ProjectID = *auth.GetCurrentProjectId()
-	}
-	if auth.GetCurrentOrganizationId() != nil {
-		callSetupResult.OrganizationID = *auth.GetCurrentOrganizationId()
+	if delegatedContext, err := types.ResolveDelegatedContext(auth); err == nil {
+		callSetupResult.OrganizationID = delegatedContext.OrganizationID
+		if delegatedContext.ProjectID != nil {
+			callSetupResult.ProjectID = *delegatedContext.ProjectID
+		}
 	}
 
 	observer := d.createObserver(ctx, callSetupResult, auth)

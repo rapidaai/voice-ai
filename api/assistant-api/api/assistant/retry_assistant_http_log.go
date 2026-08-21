@@ -17,7 +17,8 @@ import (
 
 func (assistantApi *assistantGrpcApi) RetryAssistantHTTPLog(ctx context.Context, req *protos.RetryAssistantHTTPLogRequest) (*protos.GetAssistantHTTPLogResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !iAuth.HasProject() {
+	projectContext, authErr := types.RequireProject(iAuth)
+	if !isAuthenticated || authErr != nil {
 		assistantApi.logger.Errorf("unauthenticated request for RetryAssistantHTTPLogRequest")
 		return utils.Error[protos.GetAssistantHTTPLogResponse](
 			errors.New("unauthenticated request for retry assistant http log"),
@@ -45,8 +46,8 @@ func (assistantApi *assistantGrpcApi) RetryAssistantHTTPLog(ctx context.Context,
 
 	requestData, responseData, _ := assistantApi.assistantHTTPLogService.GetLogObject(
 		ctx,
-		*iAuth.GetCurrentOrganizationId(),
-		*iAuth.GetCurrentProjectId(),
+		projectContext.OrganizationID,
+		projectContext.ProjectID,
 		logRecord.Id,
 	)
 	if requestData != nil {

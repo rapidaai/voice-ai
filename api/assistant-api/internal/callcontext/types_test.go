@@ -1,6 +1,10 @@
 package internal_callcontext
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/rapidaai/pkg/types"
+)
 
 func TestCallContextToAuthIncludesServiceScope(t *testing.T) {
 	callContext := &CallContext{
@@ -13,11 +17,12 @@ func TestCallContextToAuthIncludesServiceScope(t *testing.T) {
 	if auth.GetCurrentToken() != "service-token" {
 		t.Fatalf("expected auth token service-token, got %q", auth.GetCurrentToken())
 	}
-	if auth.GetCurrentProjectId() == nil || *auth.GetCurrentProjectId() != 22 {
-		t.Fatalf("expected project id 22, got %v", auth.GetCurrentProjectId())
+	delegatedContext, err := types.ResolveDelegatedContext(auth)
+	if err != nil {
+		t.Fatalf("ResolveDelegatedContext() error = %v", err)
 	}
-	if auth.GetCurrentOrganizationId() == nil || *auth.GetCurrentOrganizationId() != 33 {
-		t.Fatalf("expected organization id 33, got %v", auth.GetCurrentOrganizationId())
+	if delegatedContext.ProjectID == nil || *delegatedContext.ProjectID != 22 || delegatedContext.OrganizationID != 33 {
+		t.Fatalf("unexpected delegated context: %+v", delegatedContext)
 	}
 }
 
@@ -28,10 +33,7 @@ func TestCallContextToAuthOmitsEmptyScopeIDs(t *testing.T) {
 	if auth.GetCurrentToken() != "service-token" {
 		t.Fatalf("expected auth token service-token, got %q", auth.GetCurrentToken())
 	}
-	if auth.GetCurrentProjectId() != nil {
-		t.Fatalf("expected nil project id, got %v", auth.GetCurrentProjectId())
-	}
-	if auth.GetCurrentOrganizationId() != nil {
-		t.Fatalf("expected nil organization id, got %v", auth.GetCurrentOrganizationId())
+	if _, err := types.ResolveDelegatedContext(auth); err == nil {
+		t.Fatal("ResolveDelegatedContext() error = nil, want missing organization error")
 	}
 }

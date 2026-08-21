@@ -22,7 +22,8 @@ func (iApi *integrationApi) Embedding(c context.Context,
 ) (*integration_api.EmbeddingResponse, error) {
 	iApi.logger.Infof("request for embedding %s", tag)
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	if !isAuthenticated || !iAuth.HasProject() {
+	projectContext, authErr := requireProjectContext(iAuth)
+	if !isAuthenticated || authErr != nil {
 		iApi.logger.Errorf("unauthenticated request for embedding")
 		return exceptions.APIAuthenticationError[integration_api.EmbeddingResponse]()
 	}
@@ -68,8 +69,8 @@ func (iApi *integrationApi) Embedding(c context.Context,
 		internal_callers.NewEmbeddingOptions(
 			requestId,
 			irRequest,
-			iApi.PreHook(c, iAuth, irRequest, requestId, tag),
-			iApi.PostHook(c, iAuth, irRequest, requestId, tag),
+			iApi.PreHook(c, projectContext, irRequest, requestId, tag),
+			iApi.PostHook(c, projectContext, irRequest, requestId, tag),
 		),
 	)
 	if err == nil {

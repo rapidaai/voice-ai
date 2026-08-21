@@ -17,7 +17,7 @@ import (
 // CreateKnowledge implements protos.KnowledgeServiceServer.
 func (knowledgeApi *knowledgeGrpcApi) CreateKnowledge(ctx context.Context, cer *protos.CreateKnowledgeRequest) (*protos.CreateKnowledgeResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !iAuth.HasProject() {
+	if !isAuthenticated || !hasProjectCapability(iAuth) {
 		knowledgeApi.logger.Errorf("unauthenticated request for invoke")
 		return utils.Error[protos.CreateKnowledgeResponse](
 			errors.New("unauthenticated request for invoke"),

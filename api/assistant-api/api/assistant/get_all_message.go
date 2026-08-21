@@ -17,7 +17,7 @@ import (
 
 func (assistantApi *assistantGrpcApi) GetAllMessage(ctx context.Context, cepm *assistant_api.GetAllMessageRequest) (*assistant_api.GetAllMessageResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !iAuth.HasProject() {
+	if !isAuthenticated || !hasProjectCapability(iAuth) {
 		assistantApi.logger.Errorf("unauthenticated request for invoke")
 		return exceptions.AuthenticationError[assistant_api.GetAllMessageResponse]()
 	}

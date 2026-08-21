@@ -18,7 +18,7 @@ import (
 // GetAllAssistant implements protos.AssistantServiceServer.
 func (assistantApi *assistantGrpcApi) GetAllAssistant(ctx context.Context, cepm *protos.GetAllAssistantRequest) (*protos.GetAllAssistantResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !iAuth.HasProject() {
+	if !isAuthenticated || !hasProjectCapability(iAuth) {
 		assistantApi.logger.Errorf("unauthenticated request for GetAllassistant")
 		return utils.Error[protos.GetAllAssistantResponse](
 			errors.New("unauthenticated request for get allassistant"),

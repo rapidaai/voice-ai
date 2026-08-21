@@ -61,15 +61,22 @@ func NewVaultGRPC(config *config.WebAppConfig, oauthCfg *config.OAuth2Config, lo
 }
 
 func (wVault *webVaultGRPCApi) CreateProviderCredential(ctx context.Context, irRequest *protos.CreateProviderCredentialRequest) (*protos.GetCredentialResponse, error) {
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
-	if !isAuthenticated && !iAuth.HasProject() {
+	iAuth, _ := types.GetAuthPrincipleGPRC(ctx)
+	userID, err := types.RequireUser(iAuth)
+	if err != nil {
 		wVault.logger.Errorf("CreateProviderCredential from grpc with unauthenticated request")
+		return utils.AuthenticateError[protos.GetCredentialResponse]()
+	}
+	projectContext, err := types.RequireProject(iAuth)
+	if err != nil {
+		wVault.logger.Errorf("CreateProviderCredential from grpc without project context: %v", err)
 		return utils.AuthenticateError[protos.GetCredentialResponse]()
 	}
 
 	vlt, err := wVault.vaultService.Create(
 		ctx,
-		iAuth,
+		userID,
+		projectContext,
 		irRequest.GetProvider(),
 		irRequest.GetName(), irRequest.GetCredential().AsMap())
 	if err != nil {
@@ -88,13 +95,19 @@ func (wVault *webVaultGRPCApi) CreateProviderCredential(ctx context.Context, irR
 }
 
 func (wVault *webVaultGRPCApi) DeleteCredential(c context.Context, irRequest *protos.DeleteCredentialRequest) (*protos.GetCredentialResponse, error) {
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
-	if !isAuthenticated && !iAuth.HasProject() {
+	iAuth, _ := types.GetAuthPrincipleGPRC(c)
+	userID, err := types.RequireUser(iAuth)
+	if err != nil {
 		wVault.logger.Errorf("DeleteProviderCredential from grpc with unauthenticated request")
 		return utils.AuthenticateError[protos.GetCredentialResponse]()
 	}
+	projectContext, err := types.RequireProject(iAuth)
+	if err != nil {
+		wVault.logger.Errorf("DeleteProviderCredential from grpc without project context: %v", err)
+		return utils.AuthenticateError[protos.GetCredentialResponse]()
+	}
 
-	vlt, err := wVault.vaultService.Delete(c, iAuth, irRequest.GetVaultId())
+	vlt, err := wVault.vaultService.Delete(c, userID, projectContext, irRequest.GetVaultId())
 	if err != nil {
 		wVault.logger.Errorf("vaultService.Delete from grpc with err %v", err)
 		return &protos.GetCredentialResponse{
@@ -115,12 +128,13 @@ func (wVault *webVaultGRPCApi) DeleteCredential(c context.Context, irRequest *pr
 }
 
 func (wVault *webVaultGRPCApi) GetAllOrganizationCredential(c context.Context, irRequest *protos.GetAllOrganizationCredentialRequest) (*protos.GetAllOrganizationCredentialResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	if !isAuthenticated && !iAuth.HasProject() {
+	iAuth, _ := types.GetSimplePrincipleGRPC(c)
+	projectContext, err := types.RequireProject(iAuth)
+	if err != nil {
 		wVault.logger.Errorf("GetAllOrganizationCredential from grpc with unauthenticated request")
 		return utils.AuthenticateError[protos.GetAllOrganizationCredentialResponse]()
 	}
-	cnt, vlts, err := wVault.vaultService.GetAllOrganizationCredential(c, iAuth, irRequest.GetCriterias(), irRequest.GetPaginate())
+	cnt, vlts, err := wVault.vaultService.GetAllOrganizationCredential(c, projectContext, irRequest.GetCriterias(), irRequest.GetPaginate())
 	if err != nil {
 		wVault.logger.Errorf("vaultService.GetAll from grpc with err %v", err)
 		return utils.Error[protos.GetAllOrganizationCredentialResponse](
@@ -145,13 +159,14 @@ func (wVault *webVaultGRPCApi) GetAllOrganizationCredential(c context.Context, i
 }
 
 func (wVault *webVaultGRPCApi) GetOauth2Credential(ctx context.Context, request *protos.GetCredentialRequest) (*protos.GetCredentialResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated && !iAuth.HasProject() {
+	iAuth, _ := types.GetSimplePrincipleGRPC(ctx)
+	projectContext, err := types.RequireProject(iAuth)
+	if err != nil {
 		wVault.logger.Errorf("GetAllProviderCredential from grpc with unauthenticated request")
 		return utils.AuthenticateError[protos.GetCredentialResponse]()
 	}
 	vlt, err := wVault.vaultService.Get(
-		ctx, iAuth, request.GetVaultId())
+		ctx, projectContext, request.GetVaultId())
 
 	if err != nil {
 		wVault.logger.Errorf("unable to get tool credentials %v", err)
@@ -174,13 +189,14 @@ func (wVault *webVaultGRPCApi) GetOauth2Credential(ctx context.Context, request 
 }
 
 func (wVault *webVaultGRPCApi) GetCredential(ctx context.Context, request *protos.GetCredentialRequest) (*protos.GetCredentialResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated && !iAuth.HasProject() {
+	iAuth, _ := types.GetSimplePrincipleGRPC(ctx)
+	projectContext, err := types.RequireProject(iAuth)
+	if err != nil {
 		wVault.logger.Errorf("GetCredentialRequest from grpc with unauthenticated request")
 		return utils.AuthenticateError[protos.GetCredentialResponse]()
 	}
 	//
-	vlt, err := wVault.vaultService.Get(ctx, iAuth, request.GetVaultId())
+	vlt, err := wVault.vaultService.Get(ctx, projectContext, request.GetVaultId())
 	if err != nil {
 		return utils.Error[protos.GetCredentialResponse](
 			err,

@@ -33,6 +33,11 @@ func NewEndpointLogService(logger commons.Logger, postgres connectors.PostgresCo
 	}
 }
 
+func optionalUserID(auth types.SimplePrinciple) (uint64, bool) {
+	userID, err := types.RequireUser(auth)
+	return userID, err == nil
+}
+
 func (els *endpointLogService) CreateEndpointLog(
 	ctx context.Context,
 	auth types.SimplePrinciple,
@@ -41,6 +46,10 @@ func (els *endpointLogService) CreateEndpointLog(
 	logId uint64,
 	arguments, metadata, options map[string]interface{},
 ) (*internal_gorm.EndpointLog, error) {
+	projectContext, err := types.RequireProject(auth)
+	if err != nil {
+		return nil, err
+	}
 	db := els.postgres.DB(ctx)
 	endpointLog := &internal_gorm.EndpointLog{
 		Source: source.Get(),
@@ -50,8 +59,8 @@ func (els *endpointLogService) CreateEndpointLog(
 		EndpointId:              endpointId,
 		EndpointProviderModelId: endpointProviderModelId,
 		Organizational: gorm_models.Organizational{
-			ProjectId:      *auth.GetCurrentProjectId(),
-			OrganizationId: *auth.GetCurrentOrganizationId(),
+			ProjectId:      projectContext.ProjectID,
+			OrganizationId: projectContext.OrganizationID,
 		},
 		Status: type_enums.RECORD_IN_PROGRESS,
 	}
@@ -83,14 +92,18 @@ func (els *endpointLogService) UpdateEndpointLog(
 	metrics []*endpoint_grpc_api.Metric,
 	timeTaken uint64,
 ) (*internal_gorm.EndpointLog, error) {
+	projectContext, err := types.RequireProject(auth)
+	if err != nil {
+		return nil, err
+	}
 	db := els.postgres.DB(ctx)
 	endpointLog := &internal_gorm.EndpointLog{
 		Audited: gorm_models.Audited{
 			Id: logId,
 		},
 		Organizational: gorm_models.Organizational{
-			ProjectId:      *auth.GetCurrentProjectId(),
-			OrganizationId: *auth.GetCurrentOrganizationId(),
+			ProjectId:      projectContext.ProjectID,
+			OrganizationId: projectContext.OrganizationID,
 		},
 		Status:    type_enums.RECORD_COMPLETE,
 		TimeTaken: timeTaken,
@@ -126,6 +139,7 @@ func (els *endpointLogService) ApplyMetadata(
 	}
 	db := els.postgres.DB(ctx)
 	_metadatas := make([]*internal_gorm.EndpointLogMetadata, 0)
+	userID, hasUser := optionalUserID(auth)
 	//
 	for k, mt := range metadata {
 		_meta := &internal_gorm.EndpointLogMetadata{
@@ -135,9 +149,9 @@ func (els *endpointLogService) ApplyMetadata(
 			},
 		}
 		_meta.SetValue(mt)
-		if auth.GetUserId() != nil {
-			_meta.UpdatedBy = *auth.GetUserId()
-			_meta.CreatedBy = *auth.GetUserId()
+		if hasUser {
+			_meta.UpdatedBy = userID
+			_meta.CreatedBy = userID
 		}
 		_metadatas = append(_metadatas, _meta)
 	}
@@ -169,6 +183,7 @@ func (els *endpointLogService) ApplyOption(ctx context.Context,
 
 	db := els.postgres.DB(ctx)
 	options := make([]*internal_gorm.EndpointLogOption, 0)
+	userID, hasUser := optionalUserID(auth)
 
 	for k, o := range opts {
 		option := &internal_gorm.EndpointLogOption{
@@ -178,9 +193,9 @@ func (els *endpointLogService) ApplyOption(ctx context.Context,
 			},
 		}
 		option.SetValue(o)
-		if auth.GetUserId() != nil {
-			option.CreatedBy = *auth.GetUserId()
-			option.UpdatedBy = *auth.GetUserId()
+		if hasUser {
+			option.CreatedBy = userID
+			option.UpdatedBy = userID
 		}
 		options = append(options, option)
 	}
@@ -214,6 +229,7 @@ func (els *endpointLogService) ApplyArgument(ctx context.Context,
 
 	db := els.postgres.DB(ctx)
 	_arguments := make([]*internal_gorm.EndpointLogArgument, 0)
+	userID, hasUser := optionalUserID(auth)
 
 	for k, arg := range arguments {
 		ag := &internal_gorm.EndpointLogArgument{
@@ -223,8 +239,8 @@ func (els *endpointLogService) ApplyArgument(ctx context.Context,
 			},
 		}
 		ag.SetValue(arg)
-		if auth.GetUserId() != nil {
-			ag.UpdatedBy = *auth.GetUserId()
+		if hasUser {
+			ag.UpdatedBy = userID
 		}
 		_arguments = append(_arguments, ag)
 	}
@@ -259,6 +275,7 @@ func (els *endpointLogService) ApplyMetrics(
 	start := time.Now()
 	db := els.postgres.DB(ctx)
 	mtrs := make([]*internal_gorm.EndpointLogMetric, 0)
+	userID, hasUser := optionalUserID(auth)
 	for _, mtr := range metrics {
 		_mtr := &internal_gorm.EndpointLogMetric{
 			Metric: gorm_models.Metric{
@@ -269,9 +286,9 @@ func (els *endpointLogService) ApplyMetrics(
 			EndpointLogId: logId,
 		}
 
-		if auth.GetUserId() != nil {
-			_mtr.UpdatedBy = *auth.GetUserId()
-			_mtr.CreatedBy = *auth.GetUserId()
+		if hasUser {
+			_mtr.UpdatedBy = userID
+			_mtr.CreatedBy = userID
 		}
 		mtrs = append(mtrs, _mtr)
 	}
@@ -295,6 +312,10 @@ func (els *endpointLogService) GetAllEndpointLog(ctx context.Context,
 	auth types.SimplePrinciple,
 	endpointId uint64,
 	criteria []*endpoint_grpc_api.Criteria, paginate *endpoint_grpc_api.Paginate) (int64, []*internal_gorm.EndpointLog, error) {
+	projectContext, err := types.RequireProject(auth)
+	if err != nil {
+		return 0, nil, err
+	}
 	start := time.Now()
 	db := els.postgres.DB(ctx)
 	var (
@@ -307,7 +328,7 @@ func (els *endpointLogService) GetAllEndpointLog(ctx context.Context,
 		Preload("Metadata").
 		Preload("Options").
 		Preload("Metrics").
-		Where("organization_id = ? AND project_id = ? AND endpoint_id = ?", *auth.GetCurrentOrganizationId(), *auth.GetCurrentProjectId(), endpointId)
+		Where("organization_id = ? AND project_id = ? AND endpoint_id = ?", projectContext.OrganizationID, projectContext.ProjectID, endpointId)
 	for _, ct := range criteria {
 		qry.Where(fmt.Sprintf("%s %s ?", ct.GetKey(), ct.GetLogic()), ct.GetValue())
 	}
@@ -332,6 +353,10 @@ func (els *endpointLogService) GetAllEndpointLog(ctx context.Context,
 	return cnt, endpointLogs, nil
 }
 func (els *endpointLogService) GetEndpointLog(ctx context.Context, auth types.SimplePrinciple, logId, endpointId uint64) (*internal_gorm.EndpointLog, error) {
+	projectContext, err := types.RequireProject(auth)
+	if err != nil {
+		return nil, err
+	}
 	start := time.Now()
 	db := els.postgres.DB(ctx)
 	var wkg *internal_gorm.EndpointLog
@@ -340,7 +365,7 @@ func (els *endpointLogService) GetEndpointLog(ctx context.Context, auth types.Si
 		Preload("Metadata").
 		Preload("Options").
 		Preload("Metrics").
-		Where("id = ? AND organization_id = ? AND project_id = ? AND endpoint_id = ?", logId, *auth.GetCurrentOrganizationId(), *auth.GetCurrentProjectId(), endpointId).
+		Where("id = ? AND organization_id = ? AND project_id = ? AND endpoint_id = ?", logId, projectContext.OrganizationID, projectContext.ProjectID, endpointId).
 		First(&wkg)
 	if tx.Error != nil {
 		els.logger.Benchmark("EndpointLogService.GetLog", time.Since(start))

@@ -180,11 +180,11 @@ func (d *InboundDispatcher) SaveCallContext(ctx context.Context, auth types.Simp
 		ChannelUUID:         callInfo.ChannelUUID,
 		CallStatus:          callInfo.Status.String(),
 	}
-	if auth.GetCurrentProjectId() != nil {
-		cc.ProjectID = *auth.GetCurrentProjectId()
-	}
-	if auth.GetCurrentOrganizationId() != nil {
-		cc.OrganizationID = *auth.GetCurrentOrganizationId()
+	if delegatedContext, err := types.ResolveDelegatedContext(auth); err == nil {
+		cc.OrganizationID = delegatedContext.OrganizationID
+		if delegatedContext.ProjectID != nil {
+			cc.ProjectID = *delegatedContext.ProjectID
+		}
 	}
 	return d.store.Save(ctx, cc)
 }

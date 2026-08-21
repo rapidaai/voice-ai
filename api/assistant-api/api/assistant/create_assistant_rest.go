@@ -36,7 +36,7 @@ func (assistantApi *assistantApi) CreateAssistantRest(c *gin.Context) {
 		})
 		return
 	}
-	if !auth.HasUser() || !auth.HasProject() || !auth.HasOrganization() {
+	if !hasUserProjectCapability(auth) {
 		c.JSON(pkg_errors.CreateAssistantMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantMissingAuthScope.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),

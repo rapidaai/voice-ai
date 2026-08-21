@@ -15,30 +15,24 @@ type ServiceScope struct {
 	CurrentToken   string  `json:"currentToken"`
 }
 
-func (ss *ServiceScope) GetUserId() *uint64 {
-	return ss.UserId
-}
-func (ss *ServiceScope) GetCurrentProjectId() *uint64 {
-	return ss.ProjectId
-}
-func (ss *ServiceScope) GetCurrentOrganizationId() *uint64 {
-	return ss.OrganizationId
+func (ss *ServiceScope) AuditActor() (ActorIdentity, bool) {
+	return ActorIdentity{}, false
 }
 
-func (ss *ServiceScope) HasOrganization() bool {
-	return ss.GetCurrentOrganizationId() != nil
-}
-
-func (ss *ServiceScope) HasUser() bool {
-	return ss.GetUserId() != nil
-}
-
-func (ss *ServiceScope) HasProject() bool {
-	return ss.GetCurrentProjectId() != nil
+func (ss *ServiceScope) DelegatedContext() (DelegatedContext, bool) {
+	if ss.OrganizationId == nil {
+		return DelegatedContext{}, false
+	}
+	return normalizeDelegatedContext(DelegatedContext{
+		UserID:         ss.UserId,
+		OrganizationID: *ss.OrganizationId,
+		ProjectID:      ss.ProjectId,
+	}, true)
 }
 
 func (ss *ServiceScope) IsAuthenticated() bool {
-	return (ss.HasUser() || ss.HasProject()) && ss.HasOrganization()
+	_, ok := ss.DelegatedContext()
+	return ok
 }
 
 func (ss *ServiceScope) GetCurrentToken() string {

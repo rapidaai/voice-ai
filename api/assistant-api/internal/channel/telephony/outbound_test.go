@@ -9,6 +9,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/config"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
+	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_conversation_entity "github.com/rapidaai/api/assistant-api/internal/entity/conversations"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
@@ -78,7 +79,30 @@ func (s *outboundDispatcherConversationServiceStub) CreateOrUpdateConversationMe
 }
 
 func (s *outboundDispatcherTestStore) Save(ctx context.Context, cc *callcontext.CallContext) (string, error) {
+	s.callContext = cc
 	return cc.ContextID, nil
+}
+
+func TestInboundDispatcherSaveCallContextUsesDelegatedContext(t *testing.T) {
+	organizationID := uint64(7)
+	projectID := uint64(8)
+	store := &outboundDispatcherTestStore{}
+	dispatcher := &InboundDispatcher{store: store}
+
+	_, err := dispatcher.SaveCallContext(
+		context.Background(),
+		&types.ServiceScope{OrganizationId: &organizationID, ProjectId: &projectID, CurrentToken: "token"},
+		&internal_assistant_entity.Assistant{},
+		9,
+		&internal_type.CallInfo{},
+		"sip",
+	)
+	if err != nil {
+		t.Fatalf("SaveCallContext() error = %v", err)
+	}
+	if store.callContext == nil || store.callContext.OrganizationID != organizationID || store.callContext.ProjectID != projectID {
+		t.Fatalf("saved call context = %+v", store.callContext)
+	}
 }
 
 func (s *outboundDispatcherTestStore) Get(ctx context.Context, contextID string) (*callcontext.CallContext, error) {

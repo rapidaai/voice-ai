@@ -19,7 +19,7 @@ func (assistantApi *assistantDeploymentGrpcApi) GetAllAssistantWhatsappDeploymen
 	req *assistant_api.GetAllAssistantDeploymentRequest,
 ) (*assistant_api.GetAllAssistantWhatsappDeploymentResponse, error) {
 	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !iAuth.HasProject() {
+	if !isAuthenticated || !hasProjectCapability(iAuth) {
 		assistantApi.logger.Errorf("unauthenticated request for get all assistant whatsapp deployments")
 		return exceptions.AuthenticationError[assistant_api.GetAllAssistantWhatsappDeploymentResponse]()
 	}

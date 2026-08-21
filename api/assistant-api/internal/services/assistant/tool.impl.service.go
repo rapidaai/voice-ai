@@ -34,6 +34,11 @@ type assistantToolService struct {
 
 // CreateAssistantTool implements internal_services.AssistantToolService.
 func (eService *assistantToolService) Create(ctx context.Context, auth types.SimplePrinciple, assistantId uint64, name string, description *string, fields map[string]interface{}, executionMethod string, options []*protos.Metadata) (*internal_assistant_entity.AssistantTool, error) {
+	userID, err := requireUser(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 
@@ -51,7 +56,7 @@ func (eService *assistantToolService) Create(ctx context.Context, auth types.Sim
 
 	aTool := &internal_assistant_entity.AssistantTool{
 		Mutable: gorm_models.Mutable{
-			CreatedBy: *auth.GetUserId(),
+			CreatedBy: userID,
 		},
 		AssistantId:     assistantId,
 		Name:            name,
@@ -79,12 +84,17 @@ func (eService *assistantToolService) Create(ctx context.Context, auth types.Sim
 
 // DeleteAssistantTool implements internal_services.AssistantToolService.
 func (eService *assistantToolService) Delete(ctx context.Context, auth types.SimplePrinciple, toolId uint64, assistantId uint64) (*internal_assistant_entity.AssistantTool, error) {
+	userID, err := requireUser(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	aK := &internal_assistant_entity.AssistantTool{
 		Mutable: gorm_models.Mutable{
 			Status:    type_enums.RECORD_ARCHIEVE,
-			UpdatedBy: *auth.GetUserId(),
+			UpdatedBy: userID,
 		},
 	}
 	tx := db.Where("id = ? AND assistant_id = ? ",
@@ -157,6 +167,11 @@ func (eService *assistantToolService) Get(ctx context.Context, auth types.Simple
 func (eService *assistantToolService) Update(ctx context.Context, auth types.SimplePrinciple,
 	toolId uint64,
 	assistantId uint64, name string, description *string, fields map[string]interface{}, executionMethod string, options []*protos.Metadata) (*internal_assistant_entity.AssistantTool, error) {
+	userID, err := requireUser(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 
@@ -174,7 +189,7 @@ func (eService *assistantToolService) Update(ctx context.Context, auth types.Sim
 	//
 	aTool := &internal_assistant_entity.AssistantTool{
 		Mutable: gorm_models.Mutable{
-			UpdatedBy: *auth.GetUserId(),
+			UpdatedBy: userID,
 		},
 		Name:            name,
 		Description:     description,
@@ -191,7 +206,7 @@ func (eService *assistantToolService) Update(ctx context.Context, auth types.Sim
 		return nil, tx.Error
 	}
 	//
-	err := eService.markAllOptionsAsDeleted(ctx, auth, toolId)
+	err = eService.markAllOptionsAsDeleted(ctx, auth, toolId)
 	if err != nil {
 		eService.logger.Benchmark("AssistantToolService.Update", time.Since(start))
 		eService.logger.Errorf("error while updating tool options %v", tx.Error)
@@ -214,12 +229,17 @@ func (eService *assistantToolService) markAllOptionsAsDeleted(
 	auth types.SimplePrinciple,
 	assistantToolId uint64,
 ) error {
+	userID, err := requireUser(auth)
+	if err != nil {
+		return err
+	}
+
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	tOptions := &internal_assistant_entity.AssistantToolOption{
 		Mutable: gorm_models.Mutable{
 			Status:    type_enums.RECORD_ARCHIEVE,
-			UpdatedBy: *auth.GetUserId(),
+			UpdatedBy: userID,
 		},
 	}
 	tx := db.Where("assistant_tool_id = ? ",
@@ -241,6 +261,11 @@ func (eService *assistantToolService) CreateOrUpdateExecutionOption(
 	assistantToolId uint64,
 	metadata []*protos.Metadata,
 ) ([]*internal_assistant_entity.AssistantToolOption, error) {
+	userID, err := requireUser(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	mtrs := make([]*internal_assistant_entity.AssistantToolOption, 0)
@@ -255,10 +280,8 @@ func (eService *assistantToolService) CreateOrUpdateExecutionOption(
 			},
 			AssistantToolId: assistantToolId,
 		}
-		if auth.GetUserId() != nil {
-			_mtr.UpdatedBy = *auth.GetUserId()
-			_mtr.CreatedBy = *auth.GetUserId()
-		}
+		_mtr.UpdatedBy = userID
+		_mtr.CreatedBy = userID
 		mtrs = append(mtrs, _mtr)
 	}
 	tx := db.Clauses(clause.OnConflict{
@@ -295,9 +318,13 @@ func (eService *assistantToolService) CreateLog(
 	status type_enums.RecordState,
 	request []byte,
 ) (*internal_assistant_entity.AssistantToolLog, error) {
+	projectContext, err := requireProject(auth)
+	if err != nil {
+		return nil, err
+	}
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
-	s3Prefix := eService.ObjectPrefix(*auth.GetCurrentOrganizationId(), *auth.GetCurrentProjectId())
+	s3Prefix := eService.ObjectPrefix(projectContext.OrganizationID, projectContext.ProjectID)
 	_auditId := gorm_generator.ID()
 
 	// store request in blob storage and log the key in db to avoid storing large request/response in db
@@ -317,8 +344,8 @@ func (eService *assistantToolService) CreateLog(
 		AssistantToolName:              toolName,
 		AssetPrefix:                    s3Prefix,
 		Organizational: gorm_models.Organizational{
-			ProjectId:      *auth.GetCurrentProjectId(),
-			OrganizationId: *auth.GetCurrentOrganizationId(),
+			ProjectId:      projectContext.ProjectID,
+			OrganizationId: projectContext.OrganizationID,
 		},
 		Mutable: gorm_models.Mutable{
 			Status: status,
@@ -372,11 +399,19 @@ func (eService *assistantToolService) GetLog(
 	auth types.SimplePrinciple,
 	projectId uint64,
 	toolLogId uint64) (*internal_assistant_entity.AssistantToolLog, error) {
+	projectContext, err := requireProject(auth)
+	if err != nil {
+		return nil, err
+	}
+	if projectId != projectContext.ProjectID {
+		return nil, fmt.Errorf("project %d does not match authenticated project %d", projectId, projectContext.ProjectID)
+	}
+
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	var wkg *internal_assistant_entity.AssistantToolLog
 	tx := db.
-		Where("id = ? AND organization_id = ? AND project_id = ?", toolLogId, *auth.GetCurrentOrganizationId(), projectId).
+		Where("id = ? AND organization_id = ? AND project_id = ?", toolLogId, projectContext.OrganizationID, projectContext.ProjectID).
 		First(&wkg)
 	if tx.Error != nil {
 		eService.logger.Benchmark("ToolService.GetLog", time.Since(start))
@@ -394,6 +429,14 @@ func (eService *assistantToolService) GetAllLog(
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
 	order *protos.Ordering) (int64, []*internal_assistant_entity.AssistantToolLog, error) {
+	projectContext, err := requireProject(auth)
+	if err != nil {
+		return 0, nil, err
+	}
+	if projectId != projectContext.ProjectID {
+		return 0, nil, fmt.Errorf("project %d does not match authenticated project %d", projectId, projectContext.ProjectID)
+	}
+
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	var (
@@ -401,7 +444,7 @@ func (eService *assistantToolService) GetAllLog(
 		cnt      int64
 	)
 	qry := db.Model(internal_assistant_entity.AssistantToolLog{}).
-		Where("organization_id = ? AND project_id = ? ", *auth.GetCurrentOrganizationId(), projectId)
+		Where("organization_id = ? AND project_id = ? ", projectContext.OrganizationID, projectContext.ProjectID)
 	for _, ct := range criterias {
 		switch ct.GetKey() {
 		case "id":

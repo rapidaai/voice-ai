@@ -52,27 +52,28 @@ type PlainClaimPrinciple[T SimplePrinciple] struct {
 	Info T `json:"info"`
 }
 
-/*
-An simple principle that can be used for passing and receiving the data
-*/
-type SimplePrinciple interface {
-	GetUserId() *uint64
-	// later will support the user can be part of multiple org
-	GetCurrentOrganizationId() *uint64
-	// current project context
-	GetCurrentProjectId() *uint64
-	// has an user
-	HasUser() bool
-	// has an org
-	HasOrganization() bool
-	// has an project
-	HasProject() bool
-	//
+type AuthenticationPrinciple interface {
 	IsAuthenticated() bool
-	//
 	GetCurrentToken() string
-	// type of the principle, can be used for checking the type in runtime and do type assertion
 	Type() AuthType
+}
+
+type SimplePrinciple = AuthenticationPrinciple
+
+type UserIdentityProvider interface {
+	UserIdentity() (uint64, bool)
+}
+
+type OrganizationContextProvider interface {
+	OrganizationContext() (uint64, bool)
+}
+
+type ProjectContextProvider interface {
+	ProjectContext() (ProjectContext, bool)
+}
+
+type DelegatedContextProvider interface {
+	DelegatedContext() (DelegatedContext, bool)
 }
 
 /*
@@ -80,7 +81,9 @@ type SimplePrinciple interface {
 */
 
 type Principle interface {
-	SimplePrinciple
+	AuthenticationPrinciple
+	UserIdentityProvider
+	OrganizationContextProvider
 	GetAuthToken() *AuthToken
 	GetOrganizationRole() *OrganizaitonRole
 	GetUserInfo() *UserInfo

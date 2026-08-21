@@ -52,12 +52,17 @@ func (eService assistantDeploymentService) CreateWebPluginDeployment(
 	suggestion []string,
 	inputAudio, outputAudio *protos.DeploymentAudioProvider,
 ) (*internal_assistant_entity.AssistantWebPluginDeployment, error) {
+	userID, err := requireUser(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	db := eService.postgres.DB(ctx)
 	deployment := &internal_assistant_entity.AssistantWebPluginDeployment{
 		AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
 			AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 				Mutable: gorm_models.Mutable{
-					CreatedBy: *auth.GetUserId(),
+					CreatedBy: userID,
 					Status:    type_enums.RECORD_ACTIVE,
 				},
 				AssistantId: assistantId,
@@ -75,7 +80,7 @@ func (eService assistantDeploymentService) CreateWebPluginDeployment(
 		Suggestion: suggestion,
 	}
 
-	if err := eService.archiveDeploymentRecords(ctx, db, &internal_assistant_entity.AssistantWebPluginDeployment{}, assistantId, *auth.GetUserId()); err != nil {
+	if err := eService.archiveDeploymentRecords(ctx, db, &internal_assistant_entity.AssistantWebPluginDeployment{}, assistantId, userID); err != nil {
 		return nil, err
 	}
 
@@ -101,10 +106,15 @@ func (eService assistantDeploymentService) createAssistantDeploymentAudio(
 	auth types.SimplePrinciple, deploymentId uint64,
 	audioType string,
 	audioConfig *protos.DeploymentAudioProvider) (*internal_assistant_entity.AssistantDeploymentAudio, error) {
+	userID, err := requireUser(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	db := eService.postgres.DB(ctx)
 	deployment := &internal_assistant_entity.AssistantDeploymentAudio{
 		Mutable: gorm_models.Mutable{
-			CreatedBy: *auth.GetUserId(),
+			CreatedBy: userID,
 			Status:    type_enums.RecordState(audioConfig.GetStatus()),
 		},
 		AudioType:             audioType,
@@ -126,8 +136,8 @@ func (eService assistantDeploymentService) createAssistantDeploymentAudio(
 		audioDeploymentOptions = append(audioDeploymentOptions, &internal_assistant_entity.AssistantDeploymentAudioOption{
 			AssistantDeploymentAudioId: deployment.Id,
 			Mutable: gorm_models.Mutable{
-				CreatedBy: *auth.GetUserId(),
-				UpdatedBy: *auth.GetUserId(),
+				CreatedBy: userID,
+				UpdatedBy: userID,
 				Status:    type_enums.RecordState(audioConfig.GetStatus()),
 			},
 			Metadata: gorm_models.Metadata{
@@ -161,12 +171,17 @@ func (eService assistantDeploymentService) CreateDebuggerDeployment(
 	IdleTimeoutMessage *string, maxSessionDuration *uint64,
 	inputAudio, outputAudio *protos.DeploymentAudioProvider,
 ) (*internal_assistant_entity.AssistantDebuggerDeployment, error) {
+	userID, err := requireUser(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	db := eService.postgres.DB(ctx)
 	deployment := &internal_assistant_entity.AssistantDebuggerDeployment{
 		AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
 			AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 				Mutable: gorm_models.Mutable{
-					CreatedBy: *auth.GetUserId(),
+					CreatedBy: userID,
 					Status:    type_enums.RECORD_ACTIVE,
 				},
 				AssistantId: assistantId,
@@ -183,7 +198,7 @@ func (eService assistantDeploymentService) CreateDebuggerDeployment(
 		},
 	}
 
-	if err := eService.archiveDeploymentRecords(ctx, db, &internal_assistant_entity.AssistantDebuggerDeployment{}, assistantId, *auth.GetUserId()); err != nil {
+	if err := eService.archiveDeploymentRecords(ctx, db, &internal_assistant_entity.AssistantDebuggerDeployment{}, assistantId, userID); err != nil {
 		return nil, err
 	}
 
@@ -214,12 +229,17 @@ func (eService assistantDeploymentService) CreateApiDeployment(
 	IdleTimeoutMessage *string, maxSessionDuration *uint64,
 	inputAudio, outputAudio *protos.DeploymentAudioProvider,
 ) (*internal_assistant_entity.AssistantApiDeployment, error) {
+	userID, err := requireUser(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	db := eService.postgres.DB(ctx)
 	deployment := &internal_assistant_entity.AssistantApiDeployment{
 		AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
 			AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 				Mutable: gorm_models.Mutable{
-					CreatedBy: *auth.GetUserId(),
+					CreatedBy: userID,
 					Status:    type_enums.RECORD_ACTIVE,
 				},
 				AssistantId: assistantId,
@@ -236,7 +256,7 @@ func (eService assistantDeploymentService) CreateApiDeployment(
 		},
 	}
 
-	if err := eService.archiveDeploymentRecords(ctx, db, &internal_assistant_entity.AssistantApiDeployment{}, assistantId, *auth.GetUserId()); err != nil {
+	if err := eService.archiveDeploymentRecords(ctx, db, &internal_assistant_entity.AssistantApiDeployment{}, assistantId, userID); err != nil {
 		return nil, err
 	}
 
@@ -268,12 +288,17 @@ func (eService assistantDeploymentService) CreateWhatsappDeployment(
 	whatsappProvider string,
 	whatsappOptions []*protos.Metadata,
 ) (*internal_assistant_entity.AssistantWhatsappDeployment, error) {
+	userID, err := requireUser(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	db := eService.postgres.DB(ctx)
 	deployment := &internal_assistant_entity.AssistantWhatsappDeployment{
 		AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
 			AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 				Mutable: gorm_models.Mutable{
-					CreatedBy: *auth.GetUserId(),
+					CreatedBy: userID,
 					Status:    type_enums.RECORD_ACTIVE,
 				},
 				AssistantId: assistantId,
@@ -293,7 +318,7 @@ func (eService assistantDeploymentService) CreateWhatsappDeployment(
 		},
 	}
 
-	if err := eService.archiveDeploymentRecords(ctx, db, &internal_assistant_entity.AssistantWhatsappDeployment{}, assistantId, *auth.GetUserId()); err != nil {
+	if err := eService.archiveDeploymentRecords(ctx, db, &internal_assistant_entity.AssistantWhatsappDeployment{}, assistantId, userID); err != nil {
 		return nil, err
 	}
 
@@ -313,8 +338,8 @@ func (eService assistantDeploymentService) CreateWhatsappDeployment(
 		whatsappOpts = append(whatsappOpts, &internal_assistant_entity.AssistantDeploymentWhatsappOption{
 			AssistantDeploymentWhatsappId: deployment.Id,
 			Mutable: gorm_models.Mutable{
-				CreatedBy: *auth.GetUserId(),
-				UpdatedBy: *auth.GetUserId(),
+				CreatedBy: userID,
+				UpdatedBy: userID,
 				Status:    type_enums.RECORD_ACTIVE,
 			},
 			Metadata: gorm_models.Metadata{
@@ -350,12 +375,17 @@ func (eService assistantDeploymentService) CreatePhoneDeployment(
 	inputAudio, outputAudio *protos.DeploymentAudioProvider,
 	opts []*protos.Metadata,
 ) (*internal_assistant_entity.AssistantPhoneDeployment, error) {
+	userID, err := requireUser(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	db := eService.postgres.DB(ctx)
 	deployment := &internal_assistant_entity.AssistantPhoneDeployment{
 		AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
 			AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 				Mutable: gorm_models.Mutable{
-					CreatedBy: *auth.GetUserId(),
+					CreatedBy: userID,
 					Status:    type_enums.RECORD_ACTIVE,
 				},
 				AssistantId: assistantId,
@@ -375,7 +405,7 @@ func (eService assistantDeploymentService) CreatePhoneDeployment(
 		},
 	}
 
-	if err := eService.archiveDeploymentRecords(ctx, db, &internal_assistant_entity.AssistantPhoneDeployment{}, assistantId, *auth.GetUserId()); err != nil {
+	if err := eService.archiveDeploymentRecords(ctx, db, &internal_assistant_entity.AssistantPhoneDeployment{}, assistantId, userID); err != nil {
 		return nil, err
 	}
 
@@ -402,8 +432,8 @@ func (eService assistantDeploymentService) CreatePhoneDeployment(
 		phoneOpts = append(phoneOpts, &internal_assistant_entity.AssistantDeploymentTelephonyOption{
 			AssistantDeploymentTelephonyId: deployment.Id,
 			Mutable: gorm_models.Mutable{
-				CreatedBy: *auth.GetUserId(),
-				UpdatedBy: *auth.GetUserId(),
+				CreatedBy: userID,
+				UpdatedBy: userID,
 				Status:    type_enums.RECORD_ACTIVE,
 			},
 			Metadata: gorm_models.Metadata{
@@ -707,9 +737,14 @@ func (eService assistantDeploymentService) GetAllAssistantWhatsappDeployment(ctx
 }
 
 func (eService assistantDeploymentService) DisableAssistantApiDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.AssistantApiDeployment, error) {
+	userID, err := requireUser(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	db := eService.postgres.DB(ctx)
 	var out *internal_assistant_entity.AssistantApiDeployment
-	err := db.Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		var current *internal_assistant_entity.AssistantApiDeployment
 		getTx := tx.
 			Preload("InputAudio", "audio_type = ?", "input").
@@ -726,7 +761,7 @@ func (eService assistantDeploymentService) DisableAssistantApiDeployment(ctx con
 			return getTx.Error
 		}
 
-		if err := eService.archiveDeploymentRecords(ctx, tx, &internal_assistant_entity.AssistantApiDeployment{}, assistantId, *auth.GetUserId()); err != nil {
+		if err := eService.archiveDeploymentRecords(ctx, tx, &internal_assistant_entity.AssistantApiDeployment{}, assistantId, userID); err != nil {
 			return err
 		}
 
@@ -734,8 +769,8 @@ func (eService assistantDeploymentService) DisableAssistantApiDeployment(ctx con
 			AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
 				AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 					Mutable: gorm_models.Mutable{
-						CreatedBy: *auth.GetUserId(),
-						UpdatedBy: *auth.GetUserId(),
+						CreatedBy: userID,
+						UpdatedBy: userID,
 						Status:    type_enums.RECORD_INACTIVE,
 					},
 					AssistantId: assistantId,
@@ -767,9 +802,14 @@ func (eService assistantDeploymentService) DisableAssistantApiDeployment(ctx con
 }
 
 func (eService assistantDeploymentService) DisableAssistantDebuggerDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.AssistantDebuggerDeployment, error) {
+	userID, err := requireUser(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	db := eService.postgres.DB(ctx)
 	var out *internal_assistant_entity.AssistantDebuggerDeployment
-	err := db.Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		var current *internal_assistant_entity.AssistantDebuggerDeployment
 		getTx := tx.
 			Preload("InputAudio", "audio_type = ?", "input").
@@ -786,7 +826,7 @@ func (eService assistantDeploymentService) DisableAssistantDebuggerDeployment(ct
 			return getTx.Error
 		}
 
-		if err := eService.archiveDeploymentRecords(ctx, tx, &internal_assistant_entity.AssistantDebuggerDeployment{}, assistantId, *auth.GetUserId()); err != nil {
+		if err := eService.archiveDeploymentRecords(ctx, tx, &internal_assistant_entity.AssistantDebuggerDeployment{}, assistantId, userID); err != nil {
 			return err
 		}
 
@@ -794,8 +834,8 @@ func (eService assistantDeploymentService) DisableAssistantDebuggerDeployment(ct
 			AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
 				AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 					Mutable: gorm_models.Mutable{
-						CreatedBy: *auth.GetUserId(),
-						UpdatedBy: *auth.GetUserId(),
+						CreatedBy: userID,
+						UpdatedBy: userID,
 						Status:    type_enums.RECORD_INACTIVE,
 					},
 					AssistantId: assistantId,
@@ -827,9 +867,14 @@ func (eService assistantDeploymentService) DisableAssistantDebuggerDeployment(ct
 }
 
 func (eService assistantDeploymentService) DisableAssistantPhoneDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.AssistantPhoneDeployment, error) {
+	userID, err := requireUser(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	db := eService.postgres.DB(ctx)
 	var out *internal_assistant_entity.AssistantPhoneDeployment
-	err := db.Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		var current *internal_assistant_entity.AssistantPhoneDeployment
 		getTx := tx.
 			Preload("TelephonyOption").
@@ -847,7 +892,7 @@ func (eService assistantDeploymentService) DisableAssistantPhoneDeployment(ctx c
 			return getTx.Error
 		}
 
-		if err := eService.archiveDeploymentRecords(ctx, tx, &internal_assistant_entity.AssistantPhoneDeployment{}, assistantId, *auth.GetUserId()); err != nil {
+		if err := eService.archiveDeploymentRecords(ctx, tx, &internal_assistant_entity.AssistantPhoneDeployment{}, assistantId, userID); err != nil {
 			return err
 		}
 
@@ -855,8 +900,8 @@ func (eService assistantDeploymentService) DisableAssistantPhoneDeployment(ctx c
 			AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
 				AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 					Mutable: gorm_models.Mutable{
-						CreatedBy: *auth.GetUserId(),
-						UpdatedBy: *auth.GetUserId(),
+						CreatedBy: userID,
+						UpdatedBy: userID,
 						Status:    type_enums.RECORD_INACTIVE,
 					},
 					AssistantId: assistantId,
@@ -892,8 +937,8 @@ func (eService assistantDeploymentService) DisableAssistantPhoneDeployment(ctx c
 				phoneOpts = append(phoneOpts, &internal_assistant_entity.AssistantDeploymentTelephonyOption{
 					AssistantDeploymentTelephonyId: created.Id,
 					Mutable: gorm_models.Mutable{
-						CreatedBy: *auth.GetUserId(),
-						UpdatedBy: *auth.GetUserId(),
+						CreatedBy: userID,
+						UpdatedBy: userID,
 						Status:    type_enums.RECORD_ACTIVE,
 					},
 					Metadata: gorm_models.Metadata{
@@ -913,9 +958,14 @@ func (eService assistantDeploymentService) DisableAssistantPhoneDeployment(ctx c
 }
 
 func (eService assistantDeploymentService) DisableAssistantWebpluginDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.AssistantWebPluginDeployment, error) {
+	userID, err := requireUser(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	db := eService.postgres.DB(ctx)
 	var out *internal_assistant_entity.AssistantWebPluginDeployment
-	err := db.Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		var current *internal_assistant_entity.AssistantWebPluginDeployment
 		getTx := tx.
 			Preload("InputAudio", "audio_type = ?", "input").
@@ -932,7 +982,7 @@ func (eService assistantDeploymentService) DisableAssistantWebpluginDeployment(c
 			return getTx.Error
 		}
 
-		if err := eService.archiveDeploymentRecords(ctx, tx, &internal_assistant_entity.AssistantWebPluginDeployment{}, assistantId, *auth.GetUserId()); err != nil {
+		if err := eService.archiveDeploymentRecords(ctx, tx, &internal_assistant_entity.AssistantWebPluginDeployment{}, assistantId, userID); err != nil {
 			return err
 		}
 
@@ -940,8 +990,8 @@ func (eService assistantDeploymentService) DisableAssistantWebpluginDeployment(c
 			AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
 				AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 					Mutable: gorm_models.Mutable{
-						CreatedBy: *auth.GetUserId(),
-						UpdatedBy: *auth.GetUserId(),
+						CreatedBy: userID,
+						UpdatedBy: userID,
 						Status:    type_enums.RECORD_INACTIVE,
 					},
 					AssistantId: assistantId,
@@ -974,9 +1024,14 @@ func (eService assistantDeploymentService) DisableAssistantWebpluginDeployment(c
 }
 
 func (eService assistantDeploymentService) DisableAssistantWhatsappDeployment(ctx context.Context, auth types.SimplePrinciple, assistantId uint64) (*internal_assistant_entity.AssistantWhatsappDeployment, error) {
+	userID, err := requireUser(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	db := eService.postgres.DB(ctx)
 	var out *internal_assistant_entity.AssistantWhatsappDeployment
-	err := db.Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		var current *internal_assistant_entity.AssistantWhatsappDeployment
 		getTx := tx.
 			Preload("WhatsappOptions").
@@ -990,7 +1045,7 @@ func (eService assistantDeploymentService) DisableAssistantWhatsappDeployment(ct
 			return getTx.Error
 		}
 
-		if err := eService.archiveDeploymentRecords(ctx, tx, &internal_assistant_entity.AssistantWhatsappDeployment{}, assistantId, *auth.GetUserId()); err != nil {
+		if err := eService.archiveDeploymentRecords(ctx, tx, &internal_assistant_entity.AssistantWhatsappDeployment{}, assistantId, userID); err != nil {
 			return err
 		}
 
@@ -998,8 +1053,8 @@ func (eService assistantDeploymentService) DisableAssistantWhatsappDeployment(ct
 			AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
 				AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 					Mutable: gorm_models.Mutable{
-						CreatedBy: *auth.GetUserId(),
-						UpdatedBy: *auth.GetUserId(),
+						CreatedBy: userID,
+						UpdatedBy: userID,
 						Status:    type_enums.RECORD_INACTIVE,
 					},
 					AssistantId: assistantId,
@@ -1027,8 +1082,8 @@ func (eService assistantDeploymentService) DisableAssistantWhatsappDeployment(ct
 				whatsappOpts = append(whatsappOpts, &internal_assistant_entity.AssistantDeploymentWhatsappOption{
 					AssistantDeploymentWhatsappId: created.Id,
 					Mutable: gorm_models.Mutable{
-						CreatedBy: *auth.GetUserId(),
-						UpdatedBy: *auth.GetUserId(),
+						CreatedBy: userID,
+						UpdatedBy: userID,
 						Status:    type_enums.RECORD_ACTIVE,
 					},
 					Metadata: gorm_models.Metadata{

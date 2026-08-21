@@ -37,6 +37,11 @@ func (eService *assistantKnowledgeService) Create(ctx context.Context, auth type
 	rerankEnabled bool, scoreThreshold float32, topK uint32, rerankerProviderModelId *uint64,
 	rerankerProviderModelName *string,
 	rerankerProviderModelOptions []*protos.Metadata) (*internal_assistant_entity.AssistantKnowledge, error) {
+	userID, err := requireUser(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 
@@ -59,8 +64,8 @@ func (eService *assistantKnowledgeService) Create(ctx context.Context, auth type
 		TopK:            topK,
 		Mutable: gorm_models.Mutable{
 			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: *auth.GetUserId(),
-			UpdatedBy: *auth.GetUserId(),
+			CreatedBy: userID,
+			UpdatedBy: userID,
 		},
 	}
 
@@ -85,8 +90,8 @@ func (eService *assistantKnowledgeService) Create(ctx context.Context, auth type
 		modelOptions = append(modelOptions, &internal_assistant_entity.AssistantKnowledgeRerankerOption{
 			AssistantKnowledgeId: assistantKnowledgeConfig.Id,
 			Mutable: gorm_models.Mutable{
-				CreatedBy: *auth.GetUserId(),
-				UpdatedBy: *auth.GetUserId(),
+				CreatedBy: userID,
+				UpdatedBy: userID,
 				Status:    type_enums.RECORD_ACTIVE,
 			},
 			Metadata: gorm_models.Metadata{
@@ -112,12 +117,17 @@ func (eService *assistantKnowledgeService) Create(ctx context.Context, auth type
 
 // DeleteAssistantKnowledge implements internal_services.AssistantKnowledgeService.
 func (eService *assistantKnowledgeService) Delete(ctx context.Context, auth types.SimplePrinciple, akId uint64, assistantId uint64) (*internal_assistant_entity.AssistantKnowledge, error) {
+	userID, err := requireUser(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	aK := &internal_assistant_entity.AssistantKnowledge{
 		Mutable: gorm_models.Mutable{
 			Status:    type_enums.RECORD_ARCHIEVE,
-			UpdatedBy: *auth.GetUserId(),
+			UpdatedBy: userID,
 		},
 	}
 	tx := db.Where("id = ? AND assistant_id = ? ",
@@ -190,6 +200,11 @@ func (eService *assistantKnowledgeService) Get(ctx context.Context, auth types.S
 
 // UpdateAssistantKnowledge implements internal_services.AssistantKnowledgeService.
 func (eService *assistantKnowledgeService) Update(ctx context.Context, auth types.SimplePrinciple, akId uint64, assistantId uint64, knowledgeId uint64, retrievalMethod gorm_types.RetrievalMethod, rerankEnabled bool, scoreThreshold float32, topK uint32, rerankerProviderModelId *uint64, rerankerProviderModelName *string, rerankerProviderModelOptions []*protos.Metadata) (*internal_assistant_entity.AssistantKnowledge, error) {
+	userID, err := requireUser(auth)
+	if err != nil {
+		return nil, err
+	}
+
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 
@@ -210,7 +225,7 @@ func (eService *assistantKnowledgeService) Update(ctx context.Context, auth type
 		RerankerEnable:  rerankEnabled,
 		TopK:            topK,
 		Mutable: gorm_models.Mutable{
-			UpdatedBy: *auth.GetUserId(),
+			UpdatedBy: userID,
 		},
 	}
 	if rerankEnabled {

@@ -6,113 +6,59 @@
 package types
 
 import (
+	"reflect"
 	"testing"
 
 	type_enums "github.com/rapidaai/pkg/types/enums"
 )
 
-func TestOrganizationScope_GetUserId(t *testing.T) {
-	ss := &OrganizationScope{}
-	if ss.GetUserId() != nil {
-		t.Errorf("GetUserId() = %v, want nil", ss.GetUserId())
+func TestOrganizationScopeCapabilities(t *testing.T) {
+	organizationID := uint64(1)
+	scope := &OrganizationScope{
+		OrganizationId: &organizationID,
+		Status:         type_enums.RECORD_ACTIVE.String(),
+	}
+
+	if got, ok := scope.OrganizationContext(); !ok || got != organizationID {
+		t.Fatalf("OrganizationContext() = %d, %v", got, ok)
+	}
+	if !scope.IsAuthenticated() {
+		t.Fatal("IsAuthenticated() = false, want true")
+	}
+	if _, ok := scope.AuditActor(); ok {
+		t.Fatal("AuditActor() ok = true, want false until organization credentials have durable identity")
 	}
 }
 
-func TestOrganizationScope_GetCurrentProjectId(t *testing.T) {
-	ss := &OrganizationScope{}
-	if ss.GetCurrentProjectId() != nil {
-		t.Errorf("GetCurrentProjectId() = %v, want nil", ss.GetCurrentProjectId())
+func TestOrganizationScopeRejectsMissingOrZeroContext(t *testing.T) {
+	zero := uint64(0)
+	for _, scope := range []*OrganizationScope{
+		{Status: type_enums.RECORD_ACTIVE.String()},
+		{OrganizationId: &zero, Status: type_enums.RECORD_ACTIVE.String()},
+	} {
+		if scope.IsAuthenticated() {
+			t.Fatal("IsAuthenticated() = true, want false")
+		}
+		if _, err := RequireOrganization(scope); err == nil {
+			t.Fatal("RequireOrganization() error = nil")
+		}
 	}
 }
 
-func TestOrganizationScope_GetCurrentOrganizationId(t *testing.T) {
-	orgId := uint64(1)
-	ss := &OrganizationScope{OrganizationId: &orgId}
-	if ss.GetCurrentOrganizationId() == nil || *ss.GetCurrentOrganizationId() != orgId {
-		t.Errorf("GetCurrentOrganizationId() = %v, want %v", ss.GetCurrentOrganizationId(), orgId)
+func TestOrganizationScopeDoesNotExposeFakeCapabilities(t *testing.T) {
+	typeOfScope := reflect.TypeOf(&OrganizationScope{})
+	for _, method := range []string{
+		"GetUserId", "HasUser", "UserIdentity",
+		"GetCurrentProjectId", "HasProject", "ProjectContext",
+	} {
+		if _, ok := typeOfScope.MethodByName(method); ok {
+			t.Fatalf("OrganizationScope unexpectedly exposes %s", method)
+		}
 	}
 }
 
-func TestOrganizationScope_HasOrganization(t *testing.T) {
-	tests := []struct {
-		name string
-		ss   *OrganizationScope
-		want bool
-	}{
-		{"has org", &OrganizationScope{OrganizationId: &[]uint64{1}[0]}, true},
-		{"no org", &OrganizationScope{}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.ss.HasOrganization(); got != tt.want {
-				t.Errorf("HasOrganization() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestOrganizationScope_HasUser(t *testing.T) {
-	ss := &OrganizationScope{}
-	if ss.HasUser() {
-		t.Errorf("HasUser() = %v, want false", ss.HasUser())
-	}
-}
-
-func TestOrganizationScope_HasProject(t *testing.T) {
-	ss := &OrganizationScope{}
-	if ss.HasProject() {
-		t.Errorf("HasProject() = %v, want false", ss.HasProject())
-	}
-}
-
-func TestOrganizationScope_IsActive(t *testing.T) {
-	tests := []struct {
-		name string
-		ss   *OrganizationScope
-		want bool
-	}{
-		{"active", &OrganizationScope{Status: type_enums.RECORD_ACTIVE.String()}, true},
-		{"inactive", &OrganizationScope{Status: type_enums.RECORD_INACTIVE.String()}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.ss.IsActive(); got != tt.want {
-				t.Errorf("IsActive() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestOrganizationScope_IsAuthenticated(t *testing.T) {
-	tests := []struct {
-		name string
-		ss   *OrganizationScope
-		want bool
-	}{
-		{"authenticated", &OrganizationScope{OrganizationId: &[]uint64{1}[0], Status: type_enums.RECORD_ACTIVE.String()}, true},
-		{"no org", &OrganizationScope{Status: type_enums.RECORD_ACTIVE.String()}, false},
-		{"inactive", &OrganizationScope{OrganizationId: &[]uint64{1}[0], Status: type_enums.RECORD_INACTIVE.String()}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.ss.IsAuthenticated(); got != tt.want {
-				t.Errorf("IsAuthenticated() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestOrganizationScope_GetCurrentToken(t *testing.T) {
-	token := "token"
-	ss := &OrganizationScope{CurrentToken: token}
-	if ss.GetCurrentToken() != token {
-		t.Errorf("GetCurrentToken() = %v, want %v", ss.GetCurrentToken(), token)
-	}
-}
-
-func TestOrganizationScope_Type(t *testing.T) {
-	ss := &OrganizationScope{}
-	if ss.Type() != "organization" {
-		t.Errorf("Type() = %v, want %v", ss.Type(), "organization")
-	}
-}
+var (
+	_ AuthenticationPrinciple     = (*OrganizationScope)(nil)
+	_ OrganizationContextProvider = (*OrganizationScope)(nil)
+	_ ActorIdentityProvider       = (*OrganizationScope)(nil)
+)

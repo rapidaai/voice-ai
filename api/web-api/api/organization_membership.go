@@ -160,8 +160,21 @@ func (orgG *webOrganizationGRPCApi) InviteUserToOrganization(ctx context.Context
 				},
 			}, nil
 		}
+		invitedUserID, err := types.RequireUser(ePrinciple)
+		if err != nil {
+			orgG.logger.Errorf("unable to resolve invited user identity err %v", err)
+			return &protos.InviteUserToOrganizationResponse{
+				Code:    pkg_errors.InviteUserToOrganizationCreateUser.HTTPStatusCodeInt32(),
+				Success: false,
+				Error: &protos.Error{
+					ErrorCode:    uint64(pkg_errors.InviteUserToOrganizationCreateUser.Code),
+					ErrorMessage: pkg_errors.InviteUserToOrganizationCreateUser.Error,
+					HumanMessage: pkg_errors.InviteUserToOrganizationCreateUser.ErrorMessage,
+				},
+			}, nil
+		}
 
-		_, err = orgG.userService.CreateOrganizationRole(ctx, auth, irRequest.GetOrganizationRole(), *ePrinciple.GetUserId(), currentOrgRole.OrganizationId, type_enums.RECORD_INVITED)
+		_, err = orgG.userService.CreateOrganizationRole(ctx, auth, irRequest.GetOrganizationRole(), invitedUserID, currentOrgRole.OrganizationId, type_enums.RECORD_INVITED)
 		if err != nil {
 			orgG.logger.Errorf("unable to create organization role err %v", err)
 			return &protos.InviteUserToOrganizationResponse{
@@ -175,7 +188,7 @@ func (orgG *webOrganizationGRPCApi) InviteUserToOrganization(ctx context.Context
 			}, nil
 		}
 		for _, projectRole := range irRequest.GetProjectRoles() {
-			_, err = orgG.userService.CreateProjectRole(ctx, auth, *ePrinciple.GetUserId(), projectRole.GetProjectRole(), projectRole.GetProjectId(), type_enums.RECORD_INVITED)
+			_, err = orgG.userService.CreateProjectRole(ctx, auth, invitedUserID, projectRole.GetProjectRole(), projectRole.GetProjectId(), type_enums.RECORD_INVITED)
 			if err != nil {
 				orgG.logger.Errorf("unable to create project role for invite err %v", err)
 				return &protos.InviteUserToOrganizationResponse{
@@ -206,7 +219,7 @@ func (orgG *webOrganizationGRPCApi) InviteUserToOrganization(ctx context.Context
 			Code:    200,
 			Success: true,
 			Data: &protos.User{
-				Id:     *ePrinciple.GetUserId(),
+				Id:     invitedUserID,
 				Name:   ePrinciple.GetUserInfo().Name,
 				Email:  irRequest.GetEmail(),
 				Role:   irRequest.GetOrganizationRole(),
