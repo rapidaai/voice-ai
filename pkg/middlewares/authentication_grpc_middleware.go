@@ -8,6 +8,7 @@ package middlewares
 import (
 	"context"
 	"strconv"
+	"strings"
 
 	middleware "github.com/grpc-ecosystem/go-grpc-middleware/v2"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/metadata"
@@ -23,33 +24,37 @@ func NewAuthenticationUnaryServerMiddleware(resolver types.Authenticator, logger
 		authToken := metadata.ExtractIncoming(ctx).Get(types.AUTHORIZATION_KEY)
 		authId := metadata.ExtractIncoming(ctx).Get(types.AUTH_KEY)
 		projectId := metadata.ExtractIncoming(ctx).Get(types.PROJECT_KEY)
-		if authToken == "" {
+		if strings.TrimSpace(authToken) == "" && strings.TrimSpace(authId) == "" && strings.TrimSpace(projectId) == "" {
 			return handler(ctx, req)
 		}
+		if strings.TrimSpace(authToken) == "" || strings.TrimSpace(authId) == "" {
+			logAuthenticationFailure(logger, "user credential is incomplete")
+			return nil, grpcAuthenticationError()
+		}
 		id, err := strconv.ParseUint(authId, 0, 64)
-		if err != nil {
-			logger.Errorf("auth id is not int. passed auth id %s", authId)
-			return handler(ctx, req)
+		if err != nil || id == 0 {
+			logAuthenticationFailure(logger, "user credential has invalid auth id")
+			return nil, grpcAuthenticationError()
 		}
 		auth, err := resolver.Authorize(ctx, authToken, id)
 		if err != nil {
-			logger.Errorf("unable to resolve auth token and id with error %v", err)
-			return handler(ctx, req)
+			logAuthenticationFailure(logger, "user credential was rejected")
+			return nil, grpcAuthenticationError()
 		}
 
-		if projectId == "" {
+		if strings.TrimSpace(projectId) == "" {
 			return handler(context.WithValue(ctx, types.CTX_, auth), req)
 		}
 		pId, err := strconv.ParseUint(projectId, 0, 64)
-		if err != nil {
-			logger.Errorf("there is project id but not able to resolve with err %v and project id %s", err, projectId)
-			return handler(context.WithValue(ctx, types.CTX_, auth), req)
+		if err != nil || pId == 0 {
+			logAuthenticationFailure(logger, "user credential has invalid project id")
+			return nil, grpcAuthenticationError()
 		}
 
 		err = auth.SwitchProject(pId)
 		if err != nil {
-			logger.Errorf("there is project id but not found in the list of user project")
-			return handler(context.WithValue(ctx, types.CTX_, auth), req)
+			logAuthenticationFailure(logger, "user credential project selection was rejected")
+			return nil, grpcAuthenticationError()
 		}
 
 		return handler(context.WithValue(ctx, types.CTX_, auth), req)
@@ -64,42 +69,43 @@ func NewAuthenticationStreamServerMiddleware(resolver types.Authenticator, logge
 		authToken := metadata.ExtractIncoming(ctx).Get(types.AUTHORIZATION_KEY)
 		authId := metadata.ExtractIncoming(ctx).Get(types.AUTH_KEY)
 		projectId := metadata.ExtractIncoming(ctx).Get(types.PROJECT_KEY)
-		if authToken == "" {
+		if strings.TrimSpace(authToken) == "" && strings.TrimSpace(authId) == "" && strings.TrimSpace(projectId) == "" {
 			wrapped := middleware.WrapServerStream(stream)
 			wrapped.WrappedContext = ctx
 			return handler(srv, wrapped)
 		}
+		if strings.TrimSpace(authToken) == "" || strings.TrimSpace(authId) == "" {
+			logAuthenticationFailure(logger, "user credential is incomplete")
+			return grpcAuthenticationError()
+		}
 
 		id, err := strconv.ParseUint(authId, 0, 64)
-		if err != nil {
-			logger.Errorf("auth id is not int.")
-			wrapped := middleware.WrapServerStream(stream)
-			wrapped.WrappedContext = ctx
-			return handler(srv, wrapped)
+		if err != nil || id == 0 {
+			logAuthenticationFailure(logger, "user credential has invalid auth id")
+			return grpcAuthenticationError()
 		}
 
 		auth, err := resolver.Authorize(ctx, authToken, id)
 		if err != nil {
-			logger.Errorf("unable to resolve auth token and id")
-			wrapped := middleware.WrapServerStream(stream)
-			wrapped.WrappedContext = ctx
-			return handler(srv, wrapped)
+			logAuthenticationFailure(logger, "user credential was rejected")
+			return grpcAuthenticationError()
 		}
 
-		pId, err := strconv.ParseUint(projectId, 0, 64)
-		if err != nil {
-			logger.Errorf("there is project id but not able to resolve")
+		if strings.TrimSpace(projectId) == "" {
 			wrapped := middleware.WrapServerStream(stream)
-			wrapped.WrappedContext = ctx
+			wrapped.WrappedContext = context.WithValue(ctx, types.CTX_, auth)
 			return handler(srv, wrapped)
+		}
+		pId, err := strconv.ParseUint(projectId, 0, 64)
+		if err != nil || pId == 0 {
+			logAuthenticationFailure(logger, "user credential has invalid project id")
+			return grpcAuthenticationError()
 		}
 
 		err = auth.SwitchProject(pId)
 		if err != nil {
-			logger.Errorf("there is project id but not able to resolve")
-			wrapped := middleware.WrapServerStream(stream)
-			wrapped.WrappedContext = ctx
-			return handler(srv, wrapped)
+			logAuthenticationFailure(logger, "user credential project selection was rejected")
+			return grpcAuthenticationError()
 		}
 		wrapped := middleware.WrapServerStream(stream)
 		wrapped.WrappedContext = context.WithValue(ctx, types.CTX_, auth)

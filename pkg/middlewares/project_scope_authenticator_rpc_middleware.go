@@ -6,29 +6,31 @@
 package middlewares
 
 import (
+	"strings"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
-	"github.com/rapidaai/pkg/validator"
 )
 
 func NewProjectAuthenticatorMiddleware(resolver types.ClaimAuthenticator[*types.ProjectScope], logger commons.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authToken := c.GetHeader(types.PROJECT_SCOPE_KEY)
-		if !validator.NotBlank(authToken) {
-			authToken = c.Query(types.PROJECT_SCOPE_KEY)
-			if !validator.NotBlank(authToken) {
-				authToken = c.Param(types.PROJECT_SCOPE_KEY)
-			}
-		}
-		if !validator.NotBlank(authToken) {
+		authToken := ginProjectCredential(c)
+		if strings.TrimSpace(authToken) == "" {
 			c.Next()
+			return
+		}
+		authToken = strings.TrimPrefix(strings.TrimSpace(authToken), types.PROJECT_KEY_PREFIX)
+		if authToken == "" {
+			logAuthenticationFailure(logger, "project credential is empty")
+			abortGinAuthentication(c)
 			return
 		}
 		auth, err := resolver.Claim(c, authToken)
 		if err != nil {
-			c.Next()
+			logAuthenticationFailure(logger, "project credential was rejected")
+			abortGinAuthentication(c)
 			return
 		}
 		c.Set(string(types.CTX_), auth)

@@ -4,13 +4,14 @@ import "testing"
 
 type actorIdentityTestPrinciple struct {
 	actor         ActorIdentity
+	authType      AuthType
 	authenticated bool
 	available     bool
 }
 
 func (p *actorIdentityTestPrinciple) IsAuthenticated() bool             { return p.authenticated }
 func (p *actorIdentityTestPrinciple) GetCurrentToken() string           { return "" }
-func (p *actorIdentityTestPrinciple) Type() AuthType                    { return AuthTypeProject }
+func (p *actorIdentityTestPrinciple) Type() AuthType                    { return p.authType }
 func (p *actorIdentityTestPrinciple) AuditActor() (ActorIdentity, bool) { return p.actor, p.available }
 
 type actorIdentityUnsupportedPrinciple struct{}
@@ -27,9 +28,20 @@ func TestResolveAuditActor(t *testing.T) {
 		wantError bool
 	}{
 		{
-			name: "resolves durable actor",
+			name: "resolves user actor",
+			principle: &actorIdentityTestPrinciple{
+				actor:         ActorIdentity{Type: ActorTypeUser, ID: "7"},
+				authType:      AuthTypeUser,
+				authenticated: true,
+				available:     true,
+			},
+			want: ActorIdentity{Type: ActorTypeUser, ID: "7"},
+		},
+		{
+			name: "resolves project actor",
 			principle: &actorIdentityTestPrinciple{
 				actor:         ActorIdentity{Type: ActorTypeProject, ID: "42"},
+				authType:      AuthTypeProject,
 				authenticated: true,
 				available:     true,
 			},
@@ -53,9 +65,36 @@ func TestResolveAuditActor(t *testing.T) {
 			wantError: true,
 		},
 		{
+			name: "rejects actor type mismatch",
+			principle: &actorIdentityTestPrinciple{
+				actor:         ActorIdentity{Type: ActorTypeUser, ID: "42"},
+				authType:      AuthTypeProject,
+				authenticated: true,
+				available:     true,
+			},
+			wantError: true,
+		},
+		{
+			name: "rejects actorless organization principle",
+			principle: &actorIdentityTestPrinciple{
+				authType:      AuthTypeOrg,
+				authenticated: true,
+			},
+			wantError: true,
+		},
+		{
+			name: "rejects actorless service principle",
+			principle: &actorIdentityTestPrinciple{
+				authType:      AuthTypeService,
+				authenticated: true,
+			},
+			wantError: true,
+		},
+		{
 			name: "rejects unknown actor",
 			principle: &actorIdentityTestPrinciple{
 				actor:         ActorIdentity{Type: ActorTypeUnknown, ID: "42"},
+				authType:      AuthTypeProject,
 				authenticated: true,
 				available:     true,
 			},
@@ -65,6 +104,7 @@ func TestResolveAuditActor(t *testing.T) {
 			name: "rejects empty actor type",
 			principle: &actorIdentityTestPrinciple{
 				actor:         ActorIdentity{ID: "42"},
+				authType:      AuthTypeProject,
 				authenticated: true,
 				available:     true,
 			},
@@ -74,6 +114,7 @@ func TestResolveAuditActor(t *testing.T) {
 			name: "rejects malformed actor type",
 			principle: &actorIdentityTestPrinciple{
 				actor:         ActorIdentity{Type: ActorType("invalid"), ID: "42"},
+				authType:      AuthTypeProject,
 				authenticated: true,
 				available:     true,
 			},
@@ -83,6 +124,7 @@ func TestResolveAuditActor(t *testing.T) {
 			name: "rejects empty actor id",
 			principle: &actorIdentityTestPrinciple{
 				actor:         ActorIdentity{Type: ActorTypeProject},
+				authType:      AuthTypeProject,
 				authenticated: true,
 				available:     true,
 			},

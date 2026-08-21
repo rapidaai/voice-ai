@@ -7,6 +7,7 @@ package middlewares
 
 import (
 	"context"
+	"strings"
 
 	middleware "github.com/grpc-ecosystem/go-grpc-middleware/v2"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/metadata"
@@ -19,13 +20,13 @@ import (
 func NewServiceAuthenticatorUnaryServerMiddleware(resolver types.ClaimAuthenticator[*types.ServiceScope], logger commons.Logger) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		apiKey := metadata.ExtractIncoming(ctx).Get(types.SERVICE_SCOPE_KEY)
-		if apiKey == "" {
+		if strings.TrimSpace(apiKey) == "" {
 			return handler(ctx, req)
 		}
 		auth, err := resolver.Claim(ctx, apiKey)
 		if err != nil {
-			logger.Errorf("unable to resolve given internal-service-key")
-			return handler(ctx, req)
+			logAuthenticationFailure(logger, "service credential was rejected")
+			return nil, grpcAuthenticationError()
 		}
 		return handler(context.WithValue(ctx, types.CTX_, auth), req)
 	}
@@ -35,7 +36,7 @@ func NewServiceAuthenticatorStreamServerMiddleware(resolver types.ClaimAuthentic
 	return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		ctx := stream.Context()
 		apiKey := metadata.ExtractIncoming(ctx).Get(types.SERVICE_SCOPE_KEY)
-		if apiKey == "" {
+		if strings.TrimSpace(apiKey) == "" {
 			wrapped := middleware.WrapServerStream(stream)
 			wrapped.WrappedContext = ctx
 			return handler(srv, wrapped)
@@ -43,10 +44,8 @@ func NewServiceAuthenticatorStreamServerMiddleware(resolver types.ClaimAuthentic
 
 		auth, err := resolver.Claim(ctx, apiKey)
 		if err != nil {
-			logger.Errorf("unable to resolve auth token and id")
-			wrapped := middleware.WrapServerStream(stream)
-			wrapped.WrappedContext = ctx
-			return handler(srv, wrapped)
+			logAuthenticationFailure(logger, "service credential was rejected")
+			return grpcAuthenticationError()
 		}
 
 		wrapped := middleware.WrapServerStream(stream)

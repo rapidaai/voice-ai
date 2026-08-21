@@ -7,6 +7,7 @@ package middlewares
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -19,45 +20,35 @@ func NewAuthenticationMiddleware(resolver types.Authenticator, logger commons.Lo
 	return func(c *gin.Context) {
 		// Get the token from the request header, URL param, or query param
 		// Query param is needed for WebSocket connections (browsers can't set custom WS headers)
-		authToken := c.Param(types.AUTHORIZATION_KEY)
-		if authToken == "" {
-			authToken = c.GetHeader(types.AUTHORIZATION_KEY)
-		}
-		if authToken == "" {
-			authToken = c.Query(types.AUTHORIZATION_KEY)
-		}
-		authId := c.GetHeader(types.AUTH_KEY)
-		if authId == "" {
-			authId = c.Param(types.AUTH_KEY)
-		}
-		if authId == "" {
-			authId = c.Query(types.AUTH_KEY)
-		}
-		projectId := c.GetHeader(types.PROJECT_KEY)
-		if projectId == "" {
-			projectId = c.Param(types.PROJECT_KEY)
-		}
-		if projectId == "" {
-			projectId = c.Query(types.PROJECT_KEY)
-		}
-		if authToken == "" {
+		authToken, authId, projectId := ginUserCredentials(c)
+		if strings.TrimSpace(authToken) == "" && strings.TrimSpace(authId) == "" && strings.TrimSpace(projectId) == "" {
 			c.Next() // Continue processing the request without authentication
 			return
 		}
+		if strings.TrimSpace(authToken) == "" || strings.TrimSpace(authId) == "" {
+			logAuthenticationFailure(logger, "user credential is incomplete")
+			abortGinAuthentication(c)
+			return
+		}
 		id, err := strconv.ParseUint(authId, 0, 64)
-		if err != nil {
-			c.Next()
+		if err != nil || id == 0 {
+			logAuthenticationFailure(logger, "user credential has invalid auth id")
+			abortGinAuthentication(c)
 			return
 		}
 		auth, err := resolver.Authorize(c, authToken, id)
 		if err != nil {
-			logger.Errorf("unable to resolve auth token and id")
-			c.Next()
+			logAuthenticationFailure(logger, "user credential was rejected")
+			abortGinAuthentication(c)
 			return
 		}
-		pid, err := strconv.ParseUint(projectId, 0, 64)
-		if err == nil {
-			auth.SwitchProject(pid)
+		if strings.TrimSpace(projectId) != "" {
+			pid, err := strconv.ParseUint(projectId, 0, 64)
+			if err != nil || pid == 0 || auth.SwitchProject(pid) != nil {
+				logAuthenticationFailure(logger, "user credential project selection was rejected")
+				abortGinAuthentication(c)
+				return
+			}
 		}
 		// Attach the user information to the context
 		c.Set(string(types.CTX_), auth)

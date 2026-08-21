@@ -23,11 +23,15 @@ func NewProjectAuthenticatorUnaryServerMiddleware(resolver types.ClaimAuthentica
 		if strings.TrimSpace(apiKey) == "" {
 			return handler(ctx, req)
 		}
-		apiKey = strings.Replace(apiKey, types.PROJECT_KEY_PREFIX, "", 1)
+		apiKey = strings.TrimPrefix(strings.TrimSpace(apiKey), types.PROJECT_KEY_PREFIX)
+		if apiKey == "" {
+			logAuthenticationFailure(logger, "project credential is empty")
+			return nil, grpcAuthenticationError()
+		}
 		auth, err := resolver.Claim(ctx, apiKey)
 		if err != nil {
-			logger.Errorf("unable to resolve given api key for project")
-			return handler(ctx, req)
+			logAuthenticationFailure(logger, "project credential was rejected")
+			return nil, grpcAuthenticationError()
 		}
 		return handler(context.WithValue(ctx, types.CTX_, auth), req)
 	}
@@ -44,13 +48,15 @@ func NewProjectAuthenticatorStreamServerMiddleware(resolver types.ClaimAuthentic
 		}
 
 		// mutating api keys
-		apiKey = strings.Replace(apiKey, types.PROJECT_KEY_PREFIX, "", 1)
+		apiKey = strings.TrimPrefix(strings.TrimSpace(apiKey), types.PROJECT_KEY_PREFIX)
+		if apiKey == "" {
+			logAuthenticationFailure(logger, "project credential is empty")
+			return grpcAuthenticationError()
+		}
 		auth, err := resolver.Claim(ctx, apiKey)
 		if err != nil {
-			logger.Errorf("unable to resolve auth token and id")
-			wrapped := middleware.WrapServerStream(stream)
-			wrapped.WrappedContext = ctx
-			return handler(srv, wrapped)
+			logAuthenticationFailure(logger, "project credential was rejected")
+			return grpcAuthenticationError()
 		}
 
 		wrapped := middleware.WrapServerStream(stream)

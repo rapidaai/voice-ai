@@ -68,6 +68,24 @@ func TestNewProjectAuthenticatorMiddleware_HeaderToken(t *testing.T) {
 	assert.JSONEq(t, `{"hasAuth":true}`, rec.Body.String())
 }
 
+func TestNewProjectAuthenticatorMiddleware_RemovesLeadingPrefix(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	resolver := &projectScopeClaimAuthenticatorStub{}
+	engine := gin.New()
+	engine.Use(NewProjectAuthenticatorMiddleware(resolver, nil))
+	engine.GET("/test", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set(types.PROJECT_SCOPE_KEY, types.PROJECT_KEY_PREFIX+"secret")
+	rec := httptest.NewRecorder()
+	engine.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "secret", resolver.lastToken)
+}
+
 func TestNewProjectAuthenticatorMiddleware_QueryFallback(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	resolver := &projectScopeClaimAuthenticatorStub{}

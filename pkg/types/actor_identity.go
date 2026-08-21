@@ -37,6 +37,9 @@ func ResolveAuditActor(auth AuthenticationPrinciple) (ActorIdentity, error) {
 	if !ok || !actor.Type.isDurable() || actor.ID == "" {
 		return ActorIdentity{}, errors.New("authenticated principle has no durable audit actor")
 	}
+	if actor.Type != ActorType(auth.Type()) {
+		return ActorIdentity{}, errors.New("audit actor type does not match authenticated principle type")
+	}
 	return actor, nil
 }
 

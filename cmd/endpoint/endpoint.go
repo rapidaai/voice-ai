@@ -76,6 +76,7 @@ func main() {
 		grpc.ChainStreamInterceptor(
 			middlewares.NewRequestLoggerStreamServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryStreamServerMiddleware(appRunner.Logger),
+			middlewares.NewCredentialConflictStreamServerMiddleware(appRunner.Logger),
 			middlewares.NewServiceAuthenticatorStreamServerMiddleware(
 				authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Postgres),
 				appRunner.Logger,
@@ -95,6 +96,7 @@ func main() {
 		grpc.ChainUnaryInterceptor(
 			middlewares.NewRequestLoggerUnaryServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryUnaryServerMiddleware(appRunner.Logger),
+			middlewares.NewCredentialConflictUnaryServerMiddleware(appRunner.Logger),
 			middlewares.NewProjectAuthenticatorUnaryServerMiddleware(
 				authenticators.NewProjectAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient),
 				appRunner.Logger,
