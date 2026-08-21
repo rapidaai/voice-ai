@@ -153,11 +153,12 @@ func newEndpointServiceTest(t *testing.T) (*endpointService, *gorm.DB) {
 	}, db
 }
 
-func testAuth(userID, orgID, projectID uint64) types.SimplePrinciple {
-	return &types.PlainAuthPrinciple{
-		User:               types.UserInfo{Id: userID},
-		OrganizationRole:   &types.OrganizaitonRole{OrganizationId: orgID},
-		CurrentProjectRole: &types.ProjectRole{ProjectId: projectID},
+func testAuth(userID, orgID, projectID uint64) *types.Authentication {
+	return &types.Authentication{
+		AuthType:          types.AuthTypeUser,
+		UserValue:         &types.UserContext{UserID: userID},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: orgID},
+		ProjectValue:      &types.ProjectContext{OrganizationID: orgID, ProjectID: projectID},
 	}
 }
 
@@ -165,10 +166,10 @@ func TestEndpointServiceRequiresCapabilities(t *testing.T) {
 	service, _ := newEndpointServiceTest(t)
 	organizationID := uint64(10)
 	projectID := uint64(20)
-	active := type_enums.RECORD_ACTIVE.String()
-	projectlessUser := &types.PlainAuthPrinciple{
-		User:             types.UserInfo{Id: 1},
-		OrganizationRole: &types.OrganizaitonRole{OrganizationId: organizationID},
+	projectlessUser := &types.Authentication{
+		AuthType:          types.AuthTypeUser,
+		UserValue:         &types.UserContext{UserID: 1},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 	}
 
 	_, err := service.Get(
@@ -182,7 +183,7 @@ func TestEndpointServiceRequiresCapabilities(t *testing.T) {
 
 	_, _, err = service.GetAll(
 		context.Background(),
-		&types.OrganizationScope{OrganizationId: &organizationID, Status: active},
+		&types.Authentication{AuthType: types.AuthTypeOrg, OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID}},
 		nil,
 		&protos.Paginate{},
 	)
@@ -190,7 +191,7 @@ func TestEndpointServiceRequiresCapabilities(t *testing.T) {
 
 	_, err = service.CreateEndpoint(
 		context.Background(),
-		&types.ProjectScope{OrganizationId: &organizationID, ProjectId: &projectID, Status: active},
+		&types.Authentication{AuthType: types.AuthTypeProject, OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID}, ProjectValue: &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID}},
 		"endpoint",
 		nil,
 		nil,
@@ -213,10 +214,7 @@ func TestEndpointServiceInvokeLookupAllowsOrganizationForPublicEndpoint(t *testi
 
 	result, err := service.Get(
 		context.Background(),
-		&types.OrganizationScope{
-			OrganizationId: &organizationID,
-			Status:         type_enums.RECORD_ACTIVE.String(),
-		},
+		&types.Authentication{AuthType: types.AuthTypeOrg, OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID}},
 		endpoint.Id,
 		nil,
 		internal_service.NewInvokeGetEndpointOption(),
@@ -238,10 +236,7 @@ func TestEndpointServiceInvokeLookupRejectsOrganizationForPrivateEndpoint(t *tes
 
 	_, err := service.Get(
 		context.Background(),
-		&types.OrganizationScope{
-			OrganizationId: &organizationID,
-			Status:         type_enums.RECORD_ACTIVE.String(),
-		},
+		&types.Authentication{AuthType: types.AuthTypeOrg, OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID}},
 		endpoint.Id,
 		nil,
 		internal_service.NewInvokeGetEndpointOption(),

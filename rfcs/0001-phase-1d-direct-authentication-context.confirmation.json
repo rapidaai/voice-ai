@@ -1,0 +1,13 @@
+{
+  "rfc": "rfcs/0001-actor-aware-audit-identity.md",
+  "status": "approved",
+  "approved_by": "user",
+  "approval_message": "Perfect do this. DO not use normaliz e name",
+  "approved_at": "2026-08-21",
+  "rfc_sha256": "2d9a28136896312c0d820629ef1724b25d173f7cd82d8d0dc9fabbd5c071ddc3",
+  "plan": "rfcs/0001-phase-1d-direct-authentication-context.plan.json",
+  "plan_sha256": "a58dd80c026d13b5dfaaf2fa3fc0142b89748a21ecd3f7fee8c8ed8b3d75394b",
+  "challenger": "Gibbs",
+  "challenger_decision": "APPROVE",
+  "implementation_scope": "Endpoint request Authentication object and direct service context cleanup"
+}

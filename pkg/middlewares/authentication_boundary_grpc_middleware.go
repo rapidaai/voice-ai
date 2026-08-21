@@ -54,7 +54,7 @@ func authenticateGRPCRequest(
 	organization types.ClaimAuthenticator[*types.OrganizationScope],
 	service types.ClaimAuthenticator[*types.ServiceScope],
 	logger commons.Logger,
-) (types.Authentication, error) {
+) (*types.Authentication, error) {
 	presence := grpcCredentialPresence(ctx)
 	if presence.count() == 0 {
 		logAuthenticationFailure(logger, "authentication credential is missing")
@@ -85,12 +85,6 @@ func authenticateGRPCRequest(
 			logAuthenticationFailure(logger, "user credential was rejected")
 			return nil, grpcAuthenticationError()
 		}
-		authentication, ok := auth.(types.Authentication)
-		if !ok {
-			logAuthenticationFailure(logger, "user authentication contract is unsupported")
-			return nil, grpcAuthenticationError()
-		}
-
 		if projectID != "" {
 			selectedProjectID, err := strconv.ParseUint(projectID, 0, 64)
 			if err != nil || selectedProjectID == 0 {
@@ -102,7 +96,20 @@ func authenticateGRPCRequest(
 				return nil, grpcAuthenticationError()
 			}
 		}
-		return authentication, nil
+		authenticatedUserID := auth.GetUserInfo().GetId()
+		organizationID := auth.GetOrganizationRole().OrganizationId
+		requestAuth := &types.Authentication{
+			AuthType:          types.AuthTypeUser,
+			UserValue:         &types.UserContext{UserID: authenticatedUserID},
+			OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+		}
+		actor := types.ActorIdentity{Type: types.ActorTypeUser, ID: strconv.FormatUint(authenticatedUserID, 10)}
+		requestAuth.ActorValue = &actor
+		if projectRole := auth.GetCurrentProjectRole(); projectRole != nil && projectRole.ProjectId > 0 {
+			projectContext := types.ProjectContext{OrganizationID: organizationID, ProjectID: projectRole.ProjectId}
+			requestAuth.ProjectValue = &projectContext
+		}
+		return requestAuth, nil
 	}
 
 	if presence.project {
@@ -116,7 +123,16 @@ func authenticateGRPCRequest(
 			logAuthenticationFailure(logger, "project credential was rejected")
 			return nil, grpcAuthenticationError()
 		}
-		return auth.Info, nil
+		projectContext, _ := auth.Info.ProjectContext()
+		requestAuth := &types.Authentication{
+			AuthType:          types.AuthTypeProject,
+			OrganizationValue: &types.OrganizationContext{OrganizationID: projectContext.OrganizationID},
+			ProjectValue:      &projectContext,
+		}
+		if actor, ok := auth.Info.AuditActor(); ok {
+			requestAuth.ActorValue = &actor
+		}
+		return requestAuth, nil
 	}
 
 	if presence.organization {
@@ -126,7 +142,11 @@ func authenticateGRPCRequest(
 			logAuthenticationFailure(logger, "organization credential was rejected")
 			return nil, grpcAuthenticationError()
 		}
-		return auth.Info, nil
+		organizationID, _ := auth.Info.OrganizationContext()
+		return &types.Authentication{
+			AuthType:          types.AuthTypeOrg,
+			OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+		}, nil
 	}
 
 	apiKey := strings.TrimSpace(incoming.Get(types.SERVICE_SCOPE_KEY))
@@ -135,5 +155,16 @@ func authenticateGRPCRequest(
 		logAuthenticationFailure(logger, "service credential was rejected")
 		return nil, grpcAuthenticationError()
 	}
-	return auth.Info, nil
+	delegatedContext, _ := auth.Info.DelegatedContext()
+	requestAuth := &types.Authentication{
+		AuthType:          types.AuthTypeService,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: delegatedContext.OrganizationID},
+	}
+	if delegatedContext.UserID != nil {
+		requestAuth.UserValue = &types.UserContext{UserID: *delegatedContext.UserID}
+	}
+	if delegatedContext.ProjectID != nil {
+		requestAuth.ProjectValue = &types.ProjectContext{OrganizationID: delegatedContext.OrganizationID, ProjectID: *delegatedContext.ProjectID}
+	}
+	return requestAuth, nil
 }

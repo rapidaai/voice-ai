@@ -146,9 +146,9 @@ func TestAuthenticationBoundaryUserProjectSelectionCompatibility(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Authorize() error = %v", err)
 		}
-		projectContext, err := types.RequireProject(auth)
+		projectContext, err := auth.ProjectContext()
 		if err != nil {
-			t.Fatalf("RequireProject() error = %v", err)
+			t.Fatalf("ProjectContext() error = %v", err)
 		}
 		if projectContext.ProjectID != selectedProjectID {
 			t.Fatalf("selected project = %d, want %d", projectContext.ProjectID, selectedProjectID)

@@ -4,16 +4,14 @@ import (
 	"context"
 	"errors"
 	"testing"
-
-	type_enums "github.com/rapidaai/pkg/types/enums"
 )
 
 func TestAuthorize(t *testing.T) {
-	user := &PlainAuthPrinciple{
-		User:             UserInfo{Id: 1},
-		OrganizationRole: &OrganizaitonRole{OrganizationId: 2},
+	authentication := &Authentication{
+		AuthType:          AuthTypeUser,
+		UserValue:         &UserContext{UserID: 1},
+		OrganizationValue: &OrganizationContext{OrganizationID: 2},
 	}
-
 	tests := []struct {
 		name string
 		ctx  context.Context
@@ -21,95 +19,62 @@ func TestAuthorize(t *testing.T) {
 	}{
 		{name: "missing", ctx: context.Background(), err: ErrUnauthenticated},
 		{name: "wrong context value", ctx: context.WithValue(context.Background(), CTX_, "invalid"), err: ErrUnauthenticated},
-		{name: "unauthenticated", ctx: context.WithValue(context.Background(), CTX_, &OrganizationScope{}), err: ErrUnauthenticated},
-		{name: "authenticated", ctx: context.WithValue(context.Background(), CTX_, user)},
+		{name: "unauthenticated", ctx: context.WithValue(context.Background(), CTX_, &Authentication{}), err: ErrUnauthenticated},
+		{name: "authenticated", ctx: context.WithValue(context.Background(), CTX_, authentication)},
 	}
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			auth, err := Authorize(test.ctx)
 			if !errors.Is(err, test.err) {
 				t.Fatalf("Authorize() error = %v, want %v", err, test.err)
 			}
-			if test.err == nil && auth != user {
-				t.Fatalf("Authorize() = %T, want original user principle", auth)
+			if test.err == nil && auth != authentication {
+				t.Fatal("Authorize() did not return request authentication")
 			}
 		})
 	}
 }
 
-func TestAuthenticationScope(t *testing.T) {
-	projectID := uint64(10)
-	organizationID := uint64(20)
-	tests := []struct {
-		name    string
-		auth    Authentication
-		allowed []AuthType
-		err     error
-	}{
-		{
-			name: "user allowed",
-			auth: &PlainAuthPrinciple{
-				User:             UserInfo{Id: 1},
-				OrganizationRole: &OrganizaitonRole{OrganizationId: organizationID},
-			},
-			allowed: []AuthType{AuthTypeProject, AuthTypeUser},
-		},
-		{
-			name: "project allowed",
-			auth: &ProjectScope{
-				ProjectId:      &projectID,
-				OrganizationId: &organizationID,
-				Status:         type_enums.RECORD_ACTIVE.String(),
-			},
-			allowed: []AuthType{AuthTypeProject},
-		},
-		{
-			name: "organization allowed",
-			auth: &OrganizationScope{
-				OrganizationId: &organizationID,
-				Status:         type_enums.RECORD_ACTIVE.String(),
-			},
-			allowed: []AuthType{AuthTypeOrg},
-		},
-		{
-			name:    "service allowed",
-			auth:    &ServiceScope{OrganizationId: &organizationID},
-			allowed: []AuthType{AuthTypeService, AuthTypeService},
-		},
-		{
-			name: "empty allowlist",
-			auth: &ServiceScope{OrganizationId: &organizationID},
-			err:  ErrAuthenticationScopeNotAllowed,
-		},
-		{
-			name:    "scope rejected",
-			auth:    &ServiceScope{OrganizationId: &organizationID},
-			allowed: []AuthType{AuthTypeUser, AuthTypeProject},
-			err:     ErrAuthenticationScopeNotAllowed,
-		},
-		{
-			name:    "unknown scope rejected",
-			auth:    &ServiceScope{OrganizationId: &organizationID},
-			allowed: []AuthType{AuthType("unknown")},
-			err:     ErrAuthenticationScopeNotAllowed,
-		},
-		{
-			name:    "unauthenticated rejected",
-			auth:    &OrganizationScope{},
-			allowed: []AuthType{AuthTypeOrg},
-			err:     ErrUnauthenticated,
-		},
+func TestAuthenticationScopeAndContexts(t *testing.T) {
+	actor := ActorIdentity{Type: ActorTypeUser, ID: "1"}
+	auth := &Authentication{
+		AuthType:          AuthTypeUser,
+		ActorValue:        &actor,
+		UserValue:         &UserContext{UserID: 1},
+		OrganizationValue: &OrganizationContext{OrganizationID: 2},
+		ProjectValue:      &ProjectContext{OrganizationID: 2, ProjectID: 3},
 	}
+	if scoped, err := auth.Scope(AuthTypeProject, AuthTypeUser); err != nil || scoped != auth {
+		t.Fatalf("Scope() = %v, %v", scoped, err)
+	}
+	if _, err := auth.Scope(); !errors.Is(err, ErrAuthenticationScopeNotAllowed) {
+		t.Fatalf("Scope() error = %v", err)
+	}
+	if value, err := auth.Actor(); err != nil || value != actor {
+		t.Fatalf("Actor() = %+v, %v", value, err)
+	}
+	if value, err := auth.UserContext(); err != nil || value.UserID != 1 {
+		t.Fatalf("UserContext() = %+v, %v", value, err)
+	}
+	if value, err := auth.OrganizationContext(); err != nil || value.OrganizationID != 2 {
+		t.Fatalf("OrganizationContext() = %+v, %v", value, err)
+	}
+	if value, err := auth.ProjectContext(); err != nil || value.ProjectID != 3 {
+		t.Fatalf("ProjectContext() = %+v, %v", value, err)
+	}
+}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			scoped, err := test.auth.Scope(test.allowed...)
-			if !errors.Is(err, test.err) {
-				t.Fatalf("Scope() error = %v, want %v", err, test.err)
-			}
-			if test.err == nil && scoped != test.auth {
-				t.Fatalf("Scope() did not return original authentication")
+func TestAuthenticationUnavailableValues(t *testing.T) {
+	auth := &Authentication{AuthType: AuthTypeOrg}
+	for name, run := range map[string]func() error{
+		"actor":        func() error { _, err := auth.Actor(); return err },
+		"user":         func() error { _, err := auth.UserContext(); return err },
+		"organization": func() error { _, err := auth.OrganizationContext(); return err },
+		"project":      func() error { _, err := auth.ProjectContext(); return err },
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := run(); err == nil {
+				t.Fatal("error = nil")
 			}
 		})
 	}

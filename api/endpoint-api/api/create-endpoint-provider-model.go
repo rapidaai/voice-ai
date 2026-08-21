@@ -53,7 +53,7 @@ func (endpointGRPCApi *endpointGRPCApi) CreateEndpointProviderModel(ctx context.
 }
 
 func (endpointGRPCApi *endpointGRPCApi) createEndpointProviderModel(ctx context.Context,
-	iAuth types.SimplePrinciple,
+	iAuth *types.Authentication,
 	endpoint *internal_gorm.Endpoint,
 	ea *endpoint_grpc_api.EndpointProviderModelAttribute,
 ) (*internal_gorm.EndpointProviderModel, error) {

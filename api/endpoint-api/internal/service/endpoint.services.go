@@ -32,24 +32,24 @@ func NewInvokeGetEndpointOption() *GetEndpointOption {
 }
 
 type EndpointService interface {
-	Get(ctx context.Context, auth types.SimplePrinciple,
+	Get(ctx context.Context, auth *types.Authentication,
 		endpointId uint64, endpointProviderModelId *uint64, opts *GetEndpointOption) (*internal_gorm.Endpoint, error)
 
 	GetAll(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		criteria []*endpoint_grpc_api.Criteria, paginate *endpoint_grpc_api.Paginate) (int64, []*internal_gorm.Endpoint, error)
 
 	GetAllEndpointProviderModel(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		endpointId uint64, criteria []*endpoint_grpc_api.Criteria, paginate *endpoint_grpc_api.Paginate) (int64, []*internal_gorm.EndpointProviderModel, error)
 
 	UpdateEndpointVersion(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		endpointId, endpointProviderModelId uint64,
 	) (*internal_gorm.Endpoint, error)
 
 	CreateEndpoint(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		name string,
 		description *string,
 		visibility *string,
@@ -58,7 +58,7 @@ type EndpointService interface {
 
 	CreateEndpointProviderModel(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		endpointId uint64,
 		description string,
 		providerName string,
@@ -67,13 +67,13 @@ type EndpointService interface {
 	) (*internal_gorm.EndpointProviderModel, error)
 
 	AttachProviderModelToEndpoint(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		endpointProviderModelId, endpointId uint64) (*internal_gorm.Endpoint, error)
 	/*
 		In order to configure retry
 	*/
 	ConfigureEndpointCaching(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		endpointId uint64,
 		caching internal_gorm.Cache,
 		expiryInterval uint64,
@@ -83,7 +83,7 @@ type EndpointService interface {
 	/**/
 
 	ConfigureEndpointRetry(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		endpointId uint64,
 		retry internal_gorm.Retry,
 		maxAttempts uint64,
@@ -94,12 +94,12 @@ type EndpointService interface {
 
 	//
 	CreateOrUpdateEndpointTag(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		endpointId uint64,
 		tags []string,
 	) (*internal_gorm.EndpointTag, error)
 
 	UpdateEndpointDetail(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		endpointId uint64, name string, description *string) (*internal_gorm.Endpoint, error)
 }

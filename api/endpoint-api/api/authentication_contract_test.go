@@ -17,7 +17,6 @@ import (
 	internal_gorm "github.com/rapidaai/api/endpoint-api/internal/entity"
 	internal_services "github.com/rapidaai/api/endpoint-api/internal/service"
 	"github.com/rapidaai/pkg/types"
-	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 )
 
@@ -29,7 +28,7 @@ type endpointLookupStub struct {
 
 func (stub *endpointLookupStub) Get(
 	_ context.Context,
-	_ types.SimplePrinciple,
+	_ *types.Authentication,
 	_ uint64,
 	_ *uint64,
 	option *internal_services.GetEndpointOption,
@@ -126,13 +125,14 @@ func TestEndpointRPCAuthenticationContract(t *testing.T) {
 
 func TestEndpointRPCAuthenticationErrors(t *testing.T) {
 	organizationID := uint64(2)
-	projectlessUserContext := context.WithValue(context.Background(), types.CTX_, &types.PlainAuthPrinciple{
-		User:             types.UserInfo{Id: 1},
-		OrganizationRole: &types.OrganizaitonRole{OrganizationId: organizationID},
+	projectlessUserContext := context.WithValue(context.Background(), types.CTX_, &types.Authentication{
+		AuthType:          types.AuthTypeUser,
+		UserValue:         &types.UserContext{UserID: 1},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 	})
-	organizationContext := context.WithValue(context.Background(), types.CTX_, &types.OrganizationScope{
-		OrganizationId: &organizationID,
-		Status:         type_enums.RECORD_ACTIVE.String(),
+	organizationContext := context.WithValue(context.Background(), types.CTX_, &types.Authentication{
+		AuthType:          types.AuthTypeOrg,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 	})
 
 	tests := []struct {
@@ -157,28 +157,28 @@ func TestEndpointRPCAuthenticationErrors(t *testing.T) {
 			code: codes.PermissionDenied,
 		},
 		{
-			name: "fork requires project context",
+			name: "fork is unimplemented after scope",
 			call: func() error {
 				_, err := (&endpointGRPCApi{}).ForkEndpoint(projectlessUserContext, &protos.ForkEndpointRequest{})
 				return err
 			},
-			code: codes.PermissionDenied,
+			code: codes.Unimplemented,
 		},
 		{
-			name: "probe requires project context",
+			name: "probe is unimplemented after scope",
 			call: func() error {
 				_, err := (&invokerGRPCApi{}).Probe(projectlessUserContext, &protos.ProbeRequest{})
 				return err
 			},
-			code: codes.PermissionDenied,
+			code: codes.Unimplemented,
 		},
 		{
-			name: "update requires project context",
+			name: "update is unimplemented after scope",
 			call: func() error {
 				_, err := (&invokerGRPCApi{}).Update(projectlessUserContext, &protos.UpdateRequest{})
 				return err
 			},
-			code: codes.PermissionDenied,
+			code: codes.Unimplemented,
 		},
 	}
 
@@ -193,9 +193,9 @@ func TestEndpointRPCAuthenticationErrors(t *testing.T) {
 
 func TestOrganizationInvokeUsesPublicEndpointLookupPolicy(t *testing.T) {
 	organizationID := uint64(2)
-	ctx := context.WithValue(context.Background(), types.CTX_, &types.OrganizationScope{
-		OrganizationId: &organizationID,
-		Status:         type_enums.RECORD_ACTIVE.String(),
+	ctx := context.WithValue(context.Background(), types.CTX_, &types.Authentication{
+		AuthType:          types.AuthTypeOrg,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 	})
 	endpointService := &endpointLookupStub{}
 	api := &invokerGRPCApi{invokerApi: invokerApi{endpointService: endpointService}}

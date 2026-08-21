@@ -203,14 +203,11 @@ func (endpoint *invokerGRPCApi) Probe(ctx context.Context, rpv *invoker_api.Prob
 	if authErr != nil {
 		return nil, status.Error(codes.Unauthenticated, authErr.Error())
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	_, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
 	if scopeErr != nil {
 		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
-	if _, projectErr := types.RequireProject(iAuth); projectErr != nil {
-		return nil, status.Error(codes.PermissionDenied, projectErr.Error())
-	}
-	return nil, nil
+	return nil, status.Error(codes.Unimplemented, "Probe is not implemented")
 }
 
 func (endpoint *invokerGRPCApi) Update(ctx context.Context, ur *invoker_api.UpdateRequest) (*invoker_api.UpdateResponse, error) {
@@ -218,12 +215,9 @@ func (endpoint *invokerGRPCApi) Update(ctx context.Context, ur *invoker_api.Upda
 	if authErr != nil {
 		return nil, status.Error(codes.Unauthenticated, authErr.Error())
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	_, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
 	if scopeErr != nil {
 		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
-	if _, projectErr := types.RequireProject(iAuth); projectErr != nil {
-		return nil, status.Error(codes.PermissionDenied, projectErr.Error())
-	}
-	return nil, nil
+	return nil, status.Error(codes.Unimplemented, "Update is not implemented")
 }

@@ -33,24 +33,12 @@ func NewEndpointService(cfg *config.EndpointConfig, logger commons.Logger, postg
 	}
 }
 
-func requireMutationContext(auth types.SimplePrinciple) (uint64, types.ProjectContext, error) {
-	userID, err := types.RequireUser(auth)
-	if err != nil {
-		return 0, types.ProjectContext{}, err
-	}
-	projectContext, err := types.RequireProject(auth)
-	if err != nil {
-		return 0, types.ProjectContext{}, err
-	}
-	return userID, projectContext, nil
-}
-
 func (eService *endpointService) Get(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	endpointId uint64,
 	endpointProviderModelId *uint64,
 	opts *internal_service.GetEndpointOption) (*internal_gorm.Endpoint, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil && !opts.AllowPublicWithoutProject {
 		return nil, err
 	}
@@ -102,12 +90,17 @@ func (eService *endpointService) Get(ctx context.Context,
 
 // update endpoint version
 func (eService *endpointService) UpdateEndpointVersion(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	endpointId, endpointProviderModelId uint64) (*internal_gorm.Endpoint, error) {
-	userID, projectContext, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
 	if err != nil {
 		return nil, err
 	}
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
+	userID := userContext.UserID
 	db := eService.postgres.DB(ctx)
 	ed := &internal_gorm.Endpoint{
 		EndpointProviderModelId: endpointProviderModelId,
@@ -126,8 +119,8 @@ func (eService *endpointService) UpdateEndpointVersion(ctx context.Context,
 	return ed, nil
 }
 
-func (eService *endpointService) GetAll(ctx context.Context, auth types.SimplePrinciple, criteria []*endpoint_grpc_api.Criteria, paginate *endpoint_grpc_api.Paginate) (int64, []*internal_gorm.Endpoint, error) {
-	projectContext, err := types.RequireProject(auth)
+func (eService *endpointService) GetAll(ctx context.Context, auth *types.Authentication, criteria []*endpoint_grpc_api.Criteria, paginate *endpoint_grpc_api.Paginate) (int64, []*internal_gorm.Endpoint, error) {
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return 0, nil, err
 	}
@@ -195,8 +188,8 @@ func (eService *endpointService) GetAll(ctx context.Context, auth types.SimplePr
 
 	return cnt, endpoints, nil
 }
-func (eService *endpointService) GetAllEndpointProviderModel(ctx context.Context, auth types.SimplePrinciple, endpointId uint64, criteria []*endpoint_grpc_api.Criteria, paginate *endpoint_grpc_api.Paginate) (int64, []*internal_gorm.EndpointProviderModel, error) {
-	projectContext, err := types.RequireProject(auth)
+func (eService *endpointService) GetAllEndpointProviderModel(ctx context.Context, auth *types.Authentication, endpointId uint64, criteria []*endpoint_grpc_api.Criteria, paginate *endpoint_grpc_api.Paginate) (int64, []*internal_gorm.EndpointProviderModel, error) {
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return 0, nil, err
 	}
@@ -237,17 +230,22 @@ func (eService *endpointService) GetAllEndpointProviderModel(ctx context.Context
 	return cnt, epms, nil
 }
 func (eService *endpointService) CreateEndpoint(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	name string,
 	description *string,
 	visibility *string,
 	source *string,
 	sourceIdentifier *uint64,
 ) (*internal_gorm.Endpoint, error) {
-	userID, projectContext, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
 	if err != nil {
 		return nil, err
 	}
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
+	userID := userContext.UserID
 	db := eService.postgres.DB(ctx)
 	ep := &internal_gorm.Endpoint{
 		Mutable: gorm_models.Mutable{
@@ -287,17 +285,22 @@ func (eService *endpointService) CreateEndpoint(ctx context.Context,
 
 func (eService *endpointService) CreateEndpointProviderModel(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	endpointId uint64,
 	description string,
 	providerName string,
 	promptRequest string,
 	options []*endpoint_grpc_api.Metadata,
 ) (*internal_gorm.EndpointProviderModel, error) {
-	userID, projectContext, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
 	if err != nil {
 		return nil, err
 	}
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
+	userID := userContext.UserID
 	db := eService.postgres.DB(ctx)
 	var endpoint internal_gorm.Endpoint
 	tx := db.
@@ -357,12 +360,17 @@ func (eService *endpointService) CreateEndpointProviderModel(
 }
 
 func (eService *endpointService) AttachProviderModelToEndpoint(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	endpointProviderModelId, endpointId uint64) (*internal_gorm.Endpoint, error) {
-	userID, projectContext, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
 	if err != nil {
 		return nil, err
 	}
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
+	userID := userContext.UserID
 	db := eService.postgres.DB(ctx)
 	ed := &internal_gorm.Endpoint{
 		EndpointProviderModelId: endpointProviderModelId,
@@ -385,7 +393,7 @@ func (eService *endpointService) AttachProviderModelToEndpoint(ctx context.Conte
 Configuring endpoint retry
 */
 func (eService *endpointService) ConfigureEndpointRetry(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	endpointId uint64,
 	retry internal_gorm.Retry,
 	maxAttempts uint64,
@@ -393,10 +401,15 @@ func (eService *endpointService) ConfigureEndpointRetry(ctx context.Context,
 	exponentialBackoff bool,
 	retryables []string,
 ) (*internal_gorm.EndpointRetry, error) {
-	userID, projectContext, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
 	if err != nil {
 		return nil, err
 	}
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
+	userID := userContext.UserID
 	db := eService.postgres.DB(ctx)
 
 	retryEnable := retry != internal_gorm.NEVER_RETRY
@@ -450,16 +463,21 @@ func (eService *endpointService) ConfigureEndpointRetry(ctx context.Context,
 Configuring endpoint retry
 */
 func (eService *endpointService) ConfigureEndpointCaching(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	endpointId uint64,
 	caching internal_gorm.Cache,
 	expiryInterval uint64,
 	matchThreshold float32,
 ) (*internal_gorm.EndpointCaching, error) {
-	userID, projectContext, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
 	if err != nil {
 		return nil, err
 	}
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
+	userID := userContext.UserID
 	db := eService.postgres.DB(ctx)
 	cacheEnable := caching != internal_gorm.NEVER_CACHE
 	endpoint := &internal_gorm.Endpoint{
@@ -505,14 +523,19 @@ func (eService *endpointService) ConfigureEndpointCaching(ctx context.Context,
 }
 
 func (eService *endpointService) CreateOrUpdateEndpointTag(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	endpointId uint64,
 	tags []string,
 ) (*internal_gorm.EndpointTag, error) {
-	userID, projectContext, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
 	if err != nil {
 		return nil, err
 	}
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
+	userID := userContext.UserID
 	db := eService.postgres.DB(ctx)
 	var endpoint internal_gorm.Endpoint
 	tx := db.
@@ -546,12 +569,17 @@ func (eService *endpointService) CreateOrUpdateEndpointTag(ctx context.Context,
 }
 
 func (eService *endpointService) UpdateEndpointDetail(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	endpointId uint64, name string, description *string) (*internal_gorm.Endpoint, error) {
-	userID, projectContext, err := requireMutationContext(auth)
+	userContext, err := auth.UserContext()
 	if err != nil {
 		return nil, err
 	}
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
+	userID := userContext.UserID
 	db := eService.postgres.DB(ctx)
 	ed := &internal_gorm.Endpoint{
 		Name:        name,

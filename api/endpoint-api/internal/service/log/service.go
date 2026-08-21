@@ -33,20 +33,15 @@ func NewEndpointLogService(logger commons.Logger, postgres connectors.PostgresCo
 	}
 }
 
-func optionalUserID(auth types.SimplePrinciple) (uint64, bool) {
-	userID, err := types.RequireUser(auth)
-	return userID, err == nil
-}
-
 func (els *endpointLogService) CreateEndpointLog(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	source utils.RapidaSource,
 	endpointId, endpointProviderModelId uint64,
 	logId uint64,
 	arguments, metadata, options map[string]interface{},
 ) (*internal_gorm.EndpointLog, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -87,12 +82,12 @@ func (els *endpointLogService) CreateEndpointLog(
 
 func (els *endpointLogService) UpdateEndpointLog(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	logId uint64,
 	metrics []*endpoint_grpc_api.Metric,
 	timeTaken uint64,
 ) (*internal_gorm.EndpointLog, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +123,7 @@ func (els *endpointLogService) UpdateEndpointLog(
 
 func (els *endpointLogService) ApplyMetadata(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	logId uint64,
 	metadata map[string]interface{},
 ) ([]*internal_gorm.EndpointLogMetadata, error) {
@@ -139,7 +134,7 @@ func (els *endpointLogService) ApplyMetadata(
 	}
 	db := els.postgres.DB(ctx)
 	_metadatas := make([]*internal_gorm.EndpointLogMetadata, 0)
-	userID, hasUser := optionalUserID(auth)
+	userContext, userErr := auth.UserContext()
 	//
 	for k, mt := range metadata {
 		_meta := &internal_gorm.EndpointLogMetadata{
@@ -149,9 +144,9 @@ func (els *endpointLogService) ApplyMetadata(
 			},
 		}
 		_meta.SetValue(mt)
-		if hasUser {
-			_meta.UpdatedBy = userID
-			_meta.CreatedBy = userID
+		if userErr == nil {
+			_meta.UpdatedBy = userContext.UserID
+			_meta.CreatedBy = userContext.UserID
 		}
 		_metadatas = append(_metadatas, _meta)
 	}
@@ -172,7 +167,7 @@ func (els *endpointLogService) ApplyMetadata(
 }
 
 func (els *endpointLogService) ApplyOption(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	logId uint64,
 	opts map[string]interface{}) ([]*internal_gorm.EndpointLogOption, error) {
 	start := time.Now()
@@ -183,7 +178,7 @@ func (els *endpointLogService) ApplyOption(ctx context.Context,
 
 	db := els.postgres.DB(ctx)
 	options := make([]*internal_gorm.EndpointLogOption, 0)
-	userID, hasUser := optionalUserID(auth)
+	userContext, userErr := auth.UserContext()
 
 	for k, o := range opts {
 		option := &internal_gorm.EndpointLogOption{
@@ -193,9 +188,9 @@ func (els *endpointLogService) ApplyOption(ctx context.Context,
 			},
 		}
 		option.SetValue(o)
-		if hasUser {
-			option.CreatedBy = userID
-			option.UpdatedBy = userID
+		if userErr == nil {
+			option.CreatedBy = userContext.UserID
+			option.UpdatedBy = userContext.UserID
 		}
 		options = append(options, option)
 	}
@@ -216,7 +211,7 @@ func (els *endpointLogService) ApplyOption(ctx context.Context,
 }
 
 func (els *endpointLogService) ApplyArgument(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	logId uint64,
 	arguments map[string]interface{},
 ) ([]*internal_gorm.EndpointLogArgument, error) {
@@ -229,7 +224,7 @@ func (els *endpointLogService) ApplyArgument(ctx context.Context,
 
 	db := els.postgres.DB(ctx)
 	_arguments := make([]*internal_gorm.EndpointLogArgument, 0)
-	userID, hasUser := optionalUserID(auth)
+	userContext, userErr := auth.UserContext()
 
 	for k, arg := range arguments {
 		ag := &internal_gorm.EndpointLogArgument{
@@ -239,8 +234,8 @@ func (els *endpointLogService) ApplyArgument(ctx context.Context,
 			},
 		}
 		ag.SetValue(arg)
-		if hasUser {
-			ag.UpdatedBy = userID
+		if userErr == nil {
+			ag.UpdatedBy = userContext.UserID
 		}
 		_arguments = append(_arguments, ag)
 	}
@@ -268,14 +263,14 @@ func (els *endpointLogService) ApplyArgument(ctx context.Context,
 **/
 func (els *endpointLogService) ApplyMetrics(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	logId uint64,
 	metrics []*types.Metric,
 ) ([]*internal_gorm.EndpointLogMetric, error) {
 	start := time.Now()
 	db := els.postgres.DB(ctx)
 	mtrs := make([]*internal_gorm.EndpointLogMetric, 0)
-	userID, hasUser := optionalUserID(auth)
+	userContext, userErr := auth.UserContext()
 	for _, mtr := range metrics {
 		_mtr := &internal_gorm.EndpointLogMetric{
 			Metric: gorm_models.Metric{
@@ -286,9 +281,9 @@ func (els *endpointLogService) ApplyMetrics(
 			EndpointLogId: logId,
 		}
 
-		if hasUser {
-			_mtr.UpdatedBy = userID
-			_mtr.CreatedBy = userID
+		if userErr == nil {
+			_mtr.UpdatedBy = userContext.UserID
+			_mtr.CreatedBy = userContext.UserID
 		}
 		mtrs = append(mtrs, _mtr)
 	}
@@ -309,10 +304,10 @@ func (els *endpointLogService) ApplyMetrics(
 }
 
 func (els *endpointLogService) GetAllEndpointLog(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	endpointId uint64,
 	criteria []*endpoint_grpc_api.Criteria, paginate *endpoint_grpc_api.Paginate) (int64, []*internal_gorm.EndpointLog, error) {
-	projectContext, err := types.RequireProject(auth)
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return 0, nil, err
 	}
@@ -352,8 +347,8 @@ func (els *endpointLogService) GetAllEndpointLog(ctx context.Context,
 	els.logger.Benchmark("EndpointLogService.GetAllLog", time.Since(start))
 	return cnt, endpointLogs, nil
 }
-func (els *endpointLogService) GetEndpointLog(ctx context.Context, auth types.SimplePrinciple, logId, endpointId uint64) (*internal_gorm.EndpointLog, error) {
-	projectContext, err := types.RequireProject(auth)
+func (els *endpointLogService) GetEndpointLog(ctx context.Context, auth *types.Authentication, logId, endpointId uint64) (*internal_gorm.EndpointLog, error) {
+	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
@@ -376,7 +371,7 @@ func (els *endpointLogService) GetEndpointLog(ctx context.Context, auth types.Si
 	return wkg, nil
 }
 
-func (els *endpointLogService) GetAggregatedEndpointAnalytics(ctx context.Context, auth types.SimplePrinciple, endpointId uint64) *endpoint_grpc_api.AggregatedEndpointAnalytics {
+func (els *endpointLogService) GetAggregatedEndpointAnalytics(ctx context.Context, auth *types.Authentication, endpointId uint64) *endpoint_grpc_api.AggregatedEndpointAnalytics {
 	criteria := []*endpoint_grpc_api.Criteria{{
 		Key:   "created_date",
 		Logic: ">=",

@@ -1,0 +1,65 @@
+{
+  "rfc": "0001-actor-aware-audit-identity",
+  "phase": "1D",
+  "title": "Request authentication context cleanup",
+  "status": "approved",
+  "objective": "Create one request Authentication object at the Endpoint middleware boundary so controllers only authorize credential type and services directly request user, organization, or project context.",
+  "acceptance_criteria": [
+    "Endpoint middleware stores exactly one *types.Authentication in CTX_.",
+    "Authentication contains AuthType, optional actor identity, and available user, organization, and project contexts.",
+    "Authentication.Actor() returns the actor or an explicit unavailable error; organization and service authentication remain valid without a durable actor in Phase 1D.",
+    "Authorize returns *Authentication and Scope returns the same object when its AuthType is allowed.",
+    "Authentication.UserContext(), OrganizationContext(), and ProjectContext() return explicit values or errors.",
+    "Credential-specific principles do not gain fake context methods.",
+    "Endpoint controllers use only Authorize and Scope for authentication policy.",
+    "Endpoint services accept *Authentication and contain no optionalUserID, requireMutationContext, RequireUser, RequireOrganization, RequireProject, concrete type assertions, or AuthType switches.",
+    "Persistent Endpoint mutations continue to require UserContext and ProjectContext until actor dual-write is approved; services enforce both directly without helper utilities.",
+    "Endpoint invocation logs retain the existing optional legacy user attribution behavior and leave legacy user fields zero when UserContext is unavailable.",
+    "Organization scope may Invoke public endpoints; private endpoint access requires ProjectContext.",
+    "Fork, Probe, and Update return Unimplemented after authentication and Scope until a resource-owning implementation exists.",
+    "No identifier, type, function, or comment introduced by this phase uses normalize or normalized naming."
+  ],
+  "allowed_paths": [
+    "pkg/types/**",
+    "pkg/middlewares/authentication_boundary_grpc_middleware.go",
+    "pkg/middlewares/authentication_boundary_grpc_middleware_test.go",
+    "api/endpoint-api/api/**",
+    "api/endpoint-api/internal/service/**",
+    "cmd/endpoint/**",
+    "rfcs/0001-*"
+  ],
+  "out_of_scope": [
+    "Migrating non-Endpoint binaries from legacy authentication accessors",
+    "Deleting compatibility Require functions while non-Endpoint callers remain",
+    "Audit actor dual-write or legacy column removal",
+    "Unrelated dirty submodules"
+  ],
+  "principles": {
+    "KISS": "One concrete request object with direct context methods.",
+    "YAGNI": "No registries, generic context helpers, reflection, or credential-type switches outside middleware construction.",
+    "ownership": "Middleware owns authentication construction; controllers own allowed types; services own resource context requirements.",
+    "explicit_contracts": "Unavailable context is an error and never inferred from zero values.",
+    "fail_safe": "Private and project operations fail without ProjectContext.",
+    "least_privilege": "Scope approval never grants resource access.",
+    "reversibility": "Revert Phase 1D independently of Phase 1C middleware and schema changes."
+  },
+  "required_tests": [
+    "Authentication context accessor and Scope tests",
+    "Boundary tests for all four credential classes and context construction",
+    "Controller source contract test prohibiting Require calls",
+    "Endpoint service tests for user, project, service, and organization behavior",
+    "Legacy audit fields remain zero for actors without UserContext"
+  ],
+  "required_commands": [
+    "go test ./pkg/types ./pkg/middlewares ./api/endpoint-api/... ./cmd/endpoint",
+    "go test ./pkg/...",
+    "go vet ./pkg/types ./pkg/middlewares ./api/endpoint-api/... ./cmd/endpoint",
+    "git diff --check"
+  ],
+  "risks": [
+    "Endpoint service interface signatures change from SimplePrinciple to *Authentication.",
+    "Legacy audit columns cannot represent non-user actors; persistent Endpoint mutations therefore remain user-required until actor dual-write.",
+    "Missing context construction at middleware could deny valid requests; boundary tests cover every credential class."
+  ],
+  "rollback": "Revert the Phase 1D commit; Phase 1C middleware, actor schema, and historical confirmations remain unchanged."
+}
