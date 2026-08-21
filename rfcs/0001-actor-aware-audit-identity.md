@@ -1,6 +1,6 @@
 # RFC 0001: Actor-Aware Audit Identity
 
-- Status: Draft
+- Status: Accepted
 - Date: 2026-08-20
 - Owners: Platform and API teams
 - Reviewers: Authentication, data, SDK, UI, and service owners
@@ -144,7 +144,9 @@ or credential name. Projections are best-effort and may change over time.
 - Background operations record an explicit system actor.
 - Creation and update identities are maintained independently.
 - Actor identity is derived on the server and cannot be supplied by the caller.
-- Actor resolution failure does not convert a successful mutation into a failure.
+- Pre-write durable actor resolution is part of mutation authorization and fails closed
+  before persistence. Post-write actor display or projection lookup failure is best-effort
+  and does not convert an already successful mutation into a failure.
 
 ### Compatibility Requirements
 
@@ -376,6 +378,11 @@ be regenerated from the implementation branch.
 
 ### Phase 1: Authentication Foundation
 
+Phase 1 is delivered in independently reviewed slices. Phase 1A establishes actor
+identity primitives, project credential propagation, and safe versioned scope-auth cache
+behavior. Later Phase 1 slices add organization credential entities and stable signed
+service identities before those actors may perform actor-aware mutations.
+
 - Add actor identity types and resolver.
 - Propagate project credential ID through scope authorization.
 - Introduce stable organization credential and service identities.
@@ -567,21 +574,30 @@ Rejected for security, rotation, expiration, and reliability reasons.
 These risks are mitigated through additive fields, phased service ownership, server-derived
 identity, best-effort projections, bounded backfills, metrics, and rollback switches.
 
-## Open Questions
+## Resolved Design Decisions
 
-1. Is actor ID a string in all contracts, or should storage use separate numeric and text
-   representations?
-2. What durable entity owns organization credentials?
-3. What registry or identifier owns internal service identity?
-4. Which service is the canonical public edge for each exposed mutation?
-5. Which historical rows can be confidently classified as user-created?
-6. How long must legacy fields remain supported across SDKs?
-7. Should actor display metadata expose user email, or only ID and display name?
-8. Which endpoints may temporarily write `unknown` during rollout?
-9. Is deletion/archive actor identity stored in `updatedActor`, or should a separate
-   lifecycle-event audit record be required?
-10. Which domain is the approved pilot after assistant creation and update inventory is
-    complete?
+1. Actor IDs are strings in shared, protobuf, and public contracts. Numeric database
+   identifiers are formatted in base 10 at the contract boundary.
+2. Organization credentials will be owned by a durable `organization_credentials`
+   entity. Organization ID remains authorization scope and is never the credential actor
+   ID.
+3. Internal service identity is a signed stable `service_id` string from an allow-listed
+   service registry. Shared secrets and tenant scope are not identities.
+4. The service that owns the persistent resource is the canonical audit-writing edge.
+   Gateways and callers propagate identity but do not write duplicate audit state.
+5. Historical rows with a verified non-zero legacy user ID may be classified as `user`.
+   All ambiguous rows become `unknown`.
+6. Legacy fields remain supported through at least two minor SDK release cycles after all
+   public actor fields are generally available.
+7. Actor display metadata exposes ID and display name by default. Email requires a
+   separately authorized projection and is not part of the base actor contract.
+8. `unknown` is allowed only for legacy fallback, historical backfill ambiguity, and
+   explicitly allow-listed compatibility paths. Newly actor-aware authenticated mutation
+   paths fail closed when durable identity is unavailable.
+9. Archive and soft-delete attribution is stored in `updatedActor`. Hard deletion and
+   immutable lifecycle history require a separate audit-event design.
+10. Assistant creation and update are the first dual-write pilot after the authentication
+    foundation, contract inventory, and assistant schema expansion are approved.
 
 ## Acceptance Criteria
 
@@ -589,11 +605,14 @@ This RFC may move to `Accepted` when:
 
 - Actor taxonomy and identifier format are approved.
 - Project, organization, service, and system identity ownership is defined.
-- The externally exposed mutation inventory is reviewed by service owners.
 - Backward-compatible API and SDK strategy is approved.
 - Historical backfill policy is approved.
 - Pilot domain, rollout sequence, observability, and rollback are approved.
 - A plan challenger finds no unresolved critical or major issue.
+
+The externally exposed mutation inventory remains a mandatory Phase 0 deliverable before
+schema expansion or dual write begins; it does not block the additive authentication
+foundation in Phase 1A.
 
 Implementation must not begin while this RFC remains `Draft`.
 
@@ -602,3 +621,6 @@ Implementation must not begin while this RFC remains `Draft`.
 | Date | Decision | Status |
 | --- | --- | --- |
 | 2026-08-20 | Actor type `project` stores the project credential ID; project ID remains authorization scope. | Approved |
+| 2026-08-20 | Actor IDs use strings at contract boundaries; organization and service identities use dedicated durable owners. | Approved |
+| 2026-08-20 | Resource-owning services are canonical audit writers; assistant create/update is the first dual-write pilot. | Approved |
+| 2026-08-20 | Phase 1A includes versioned HMAC-fingerprinted scope-auth cache entries with bounded TTL. | Approved |

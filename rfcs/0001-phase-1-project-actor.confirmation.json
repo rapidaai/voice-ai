@@ -1,0 +1,19 @@
+{
+  "challenge_receipt_sha256": "ed0dcb6e85ae31aac9215feb6c03ce39dd15cba33fdc4f5124387dc40ec3c782",
+  "challenge_reviewed_at": "2026-08-20T17:14:32Z",
+  "challenge_reviewer": "codex-plan-challenger",
+  "challenge_task_id": "task_7562784ab1e2",
+  "confirmed_sha256": "213a0a5cfd737fbc4a8895e5363096ccdad2d158e0aacdae2db959915d4e9d96",
+  "created_at": "2026-08-20 17:15:09",
+  "gate_id": "gate_03a0bce4decc",
+  "plan_file": "rfcs/0001-phase-1-project-actor.plan.json",
+  "plan_sha256": "d10d11fb57cfec580bf473d6c8e9e97dbff0f0d3a52a3b9239342bee33c0b756",
+  "plan_task_id": "task_06b4bfed26ee",
+  "question": "Approve implementation of RFC rfcs/0001-actor-aware-audit-identity.md with SHA-256 213a0a5cfd737fbc4a8895e5363096ccdad2d158e0aacdae2db959915d4e9d96 after approved challenge task task_7562784ab1e2 with receipt SHA-256 ed0dcb6e85ae31aac9215feb6c03ce39dd15cba33fdc4f5124387dc40ec3c782?",
+  "resolution": "approved",
+  "resolved_at": "2026-08-21 00:39:41",
+  "rfc_file": "rfcs/0001-actor-aware-audit-identity.md",
+  "run_id": "run_0b78ec2f4d0a",
+  "task_id": "task_a4d56aaa072b",
+  "timestamp_format": "orca-local-naive"
+}
