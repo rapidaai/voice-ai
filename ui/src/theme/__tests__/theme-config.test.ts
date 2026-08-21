@@ -2,7 +2,9 @@ import developmentConfig from '@/configs/config.development.json';
 import {
   assertThemeManifest,
   getContrastRatio,
+  getThemeManifestValidationErrors,
   isThemeManifest,
+  ThemeManifestValidationError,
 } from '@/theme/theme-config';
 import { ThemeManifest } from '@/theme/types';
 
@@ -25,17 +27,50 @@ describe('theme config', () => {
     }
   });
 
-  it('rejects unsafe, incomplete, or inaccessible configured themes', () => {
-    expect(() =>
-      assertThemeManifest({
+  it('reports the exact field when a theme color is malformed', () => {
+    const invalidTheme = {
+      ...theme,
+      colors: {
+        ...theme.colors,
+        dark: { ...theme.colors.dark, primaryHover: '#7ccdf7l' },
+      },
+    };
+
+    expect(getThemeManifestValidationErrors(invalidTheme)).toContain(
+      'CONFIG.theme.colors.dark.primaryHover must be a 6-digit hexadecimal color such as #0f62fe.',
+    );
+    expect(() => assertThemeManifest(invalidTheme)).toThrow(
+      ThemeManifestValidationError,
+    );
+    expect(() => assertThemeManifest(invalidTheme)).toThrow(
+      'CONFIG.theme.colors.dark.primaryHover must be a 6-digit hexadecimal color',
+    );
+  });
+
+  it('reports the exact interaction field when WCAG contrast is insufficient', () => {
+    const inaccessibleTheme = {
+      ...theme,
+      colors: {
+        ...theme.colors,
+        light: { ...theme.colors.light, primary: '#3186df' },
+      },
+    };
+
+    expect(getThemeManifestValidationErrors(inaccessibleTheme)).toContain(
+      'CONFIG.theme.colors.light.primary must have at least 4.5:1 contrast with the corresponding onPrimary color.',
+    );
+    expect(() => assertThemeManifest(inaccessibleTheme)).toThrow(
+      'CONFIG.theme.colors.light.primary must have at least 4.5:1 contrast',
+    );
+  });
+
+  it('rejects unsafe or incomplete configured themes', () => {
+    expect(
+      isThemeManifest({
         ...theme,
         brand: { ...theme.brand, favicon: '//attacker.example/favicon.ico' },
-        colors: {
-          ...theme.colors,
-          dark: { ...theme.colors.dark, onPrimary: '#ffffff' },
-        },
       }),
-    ).toThrow('CONFIG.theme is invalid');
+    ).toBe(false);
 
     expect(
       isThemeManifest({
