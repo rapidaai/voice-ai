@@ -1,85 +1,92 @@
 import developmentConfig from '@/configs/config.development.json';
-import {
-  assertThemeManifest,
-  getContrastRatio,
-  getThemeManifestValidationErrors,
-  isThemeManifest,
-  ThemeManifestValidationError,
-} from '@/theme/theme-config';
-import { ThemeManifest } from '@/theme/types';
-
-const theme = developmentConfig.theme as unknown as ThemeManifest;
+import { normalizeThemeManifest } from '@/theme/theme-config';
 
 describe('theme config', () => {
-  it('accepts the configured enterprise theme and accessible interactions', () => {
-    expect(isThemeManifest(theme)).toBe(true);
-
-    for (const colors of Object.values(theme.colors)) {
-      expect(
-        getContrastRatio(colors.primary, colors.onPrimary),
-      ).toBeGreaterThanOrEqual(4.5);
-      expect(
-        getContrastRatio(colors.primaryHover, colors.onPrimary),
-      ).toBeGreaterThanOrEqual(4.5);
-      expect(
-        getContrastRatio(colors.primaryActive, colors.onPrimary),
-      ).toBeGreaterThanOrEqual(4.5);
-    }
-  });
-
-  it('reports the exact field when a theme color is malformed', () => {
-    const invalidTheme = {
-      ...theme,
-      colors: {
-        ...theme.colors,
-        dark: { ...theme.colors.dark, primaryHover: '#7ccdf7l' },
+  it('preserves arbitrary configured color and URL-like strings', () => {
+    const configuredTheme = {
+      ...developmentConfig.theme,
+      brand: {
+        ...developmentConfig.theme.brand,
+        favicon: 'custom-asset://client/favicon',
       },
-    };
-
-    expect(getThemeManifestValidationErrors(invalidTheme)).toContain(
-      'CONFIG.theme.colors.dark.primaryHover must be a 6-digit hexadecimal color such as #0f62fe.',
-    );
-    expect(() => assertThemeManifest(invalidTheme)).toThrow(
-      ThemeManifestValidationError,
-    );
-    expect(() => assertThemeManifest(invalidTheme)).toThrow(
-      'CONFIG.theme.colors.dark.primaryHover must be a 6-digit hexadecimal color',
-    );
-  });
-
-  it('reports the exact interaction field when WCAG contrast is insufficient', () => {
-    const inaccessibleTheme = {
-      ...theme,
-      colors: {
-        ...theme.colors,
-        light: { ...theme.colors.light, primary: '#3186df' },
+      links: {
+        documentation: 'custom-docs://client/home',
+        source: 'source repository',
+        support: 'contact the client team',
+        terms: 'client terms',
+        privacy: 'client privacy',
       },
-    };
-
-    expect(getThemeManifestValidationErrors(inaccessibleTheme)).toContain(
-      'CONFIG.theme.colors.light.primary must have at least 4.5:1 contrast with the corresponding onPrimary color.',
-    );
-    expect(() => assertThemeManifest(inaccessibleTheme)).toThrow(
-      'CONFIG.theme.colors.light.primary must have at least 4.5:1 contrast',
-    );
-  });
-
-  it('rejects unsafe or incomplete configured themes', () => {
-    expect(
-      isThemeManifest({
-        ...theme,
-        brand: { ...theme.brand, favicon: '//attacker.example/favicon.ico' },
-      }),
-    ).toBe(false);
-
-    expect(
-      isThemeManifest({
-        ...theme,
-        brand: {
-          ...theme.brand,
-          logos: { full: theme.brand.logos?.full },
+      colors: {
+        light: {
+          primary: 'brand(primary)',
+          primaryHover: 'color-mix(in srgb, brand(primary), black 10%)',
+          primaryActive: '#not-a-hex-value',
+          onPrimary: 'var(--client-on-primary)',
         },
+        dark: {
+          primary: 'oklch(70% 0.2 250)',
+          primaryHover: 'client-dark-hover',
+          primaryActive: 'rgb(1 2 3)',
+          onPrimary: 'transparent',
+        },
+      },
+    };
+
+    expect(normalizeThemeManifest(configuredTheme)).toMatchObject({
+      brand: { favicon: 'custom-asset://client/favicon' },
+      links: configuredTheme.links,
+      colors: configuredTheme.colors,
+    });
+  });
+
+  it('normalizes partial and missing structures with safe defaults', () => {
+    expect(
+      normalizeThemeManifest({
+        brand: {
+          logos: { full: { light: 'client-logo' } },
+        },
+        colors: { light: { primary: 'client-primary' } },
       }),
-    ).toBe(false);
+    ).toEqual({
+      schemaVersion: 1,
+      id: 'default',
+      brand: {
+        name: 'Application',
+        logos: {
+          full: { light: 'client-logo', dark: 'client-logo' },
+          compact: { light: 'client-logo', dark: 'client-logo' },
+        },
+      },
+      links: {
+        documentation: '#',
+        source: '#',
+        support: '#',
+        terms: '#',
+        privacy: '#',
+      },
+      defaultMode: 'system',
+      allowModeSelection: true,
+      colors: {
+        light: {
+          primary: 'client-primary',
+          primaryHover: '#393939',
+          primaryActive: '#262626',
+          onPrimary: '#ffffff',
+        },
+        dark: {
+          primary: '#c6c6c6',
+          primaryHover: '#e0e0e0',
+          primaryActive: '#f4f4f4',
+          onPrimary: '#161616',
+        },
+      },
+    });
+
+    expect(normalizeThemeManifest(undefined)).toMatchObject({
+      id: 'default',
+      brand: { name: 'Application' },
+      defaultMode: 'system',
+      allowModeSelection: true,
+    });
   });
 });

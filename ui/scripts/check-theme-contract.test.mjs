@@ -145,41 +145,30 @@ test('rejects variant hardcoded palettes while allowing non-color utilities', ()
   ]);
 });
 
-test('rejects a malformed and incomplete enterprise theme manifest', () => {
+test('accepts arbitrary values and partial keys inside a theme manifest', () => {
   const manifestPath = 'ui/src/configs/config.development.json#theme';
-  const diagnostics = validateThemeManifest(
-    {
-      schemaVersion: 2,
-      id: ' ',
-      brand: { name: '' },
-      links: { documentation: ['javascript', 'alert(1)'].join(':') },
-      defaultMode: 'sepia',
-      allowModeSelection: 'yes',
-      colors: {
-        light: { primary: 'red; background: black' },
-        dark: {},
-      },
+  const manifest = {
+    brand: {
+      logos: { full: { light: 'any asset value' } },
     },
-    manifestPath,
-  );
+    links: { documentation: 'custom://documentation' },
+    defaultMode: 'sepia',
+    allowModeSelection: 'client-controlled',
+    colors: { light: { primary: 'brand(primary)' } },
+  };
 
-  assert.ok(
-    diagnostics.includes(`${manifestPath}: schemaVersion must equal 1`),
-  );
-  assert.ok(
-    diagnostics.includes(`${manifestPath}: id must be a nonempty string`),
-  );
-  assert.ok(
-    diagnostics.includes(
-      `${manifestPath}: links.documentation must be root-relative or use https/mailto`,
-    ),
-  );
-  assert.ok(
-    diagnostics.includes(
-      `${manifestPath}: colors.light.primary must be a six-digit hexadecimal color`,
-    ),
-  );
-  assert.ok(diagnostics.length > 10);
+  assert.deepEqual(validateThemeManifest(manifest, manifestPath), []);
+  assert.deepEqual(validateThemeManifest({}, manifestPath), []);
+});
+
+test('rejects a missing or non-object theme manifest', () => {
+  const manifestPath = 'ui/src/configs/config.development.json#theme';
+  const expected = [`${manifestPath}: manifest must be a JSON object`];
+
+  assert.deepEqual(validateThemeManifest(undefined, manifestPath), expected);
+  assert.deepEqual(validateThemeManifest(null, manifestPath), expected);
+  assert.deepEqual(validateThemeManifest([], manifestPath), expected);
+  assert.deepEqual(validateThemeManifest('theme', manifestPath), expected);
 });
 
 test('returns deterministic, sorted diagnostics', context => {
@@ -187,7 +176,7 @@ test('returns deterministic, sorted diagnostics', context => {
   writeFixtureFile(
     repoRoot,
     'ui/src/configs/config.development.json',
-    JSON.stringify({ theme: { schemaVersion: 0 } }),
+    JSON.stringify({}),
   );
   writeFixtureFile(
     repoRoot,

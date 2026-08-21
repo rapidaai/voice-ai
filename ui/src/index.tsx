@@ -13,26 +13,24 @@ import {
   ThemeProvider,
 } from '@/theme/theme-provider';
 import { CONFIG } from '@/configs';
-import { getValidatedThemeOrRenderError } from '@/theme/theme-bootstrap';
+import { normalizeThemeManifest } from '@/theme/theme-config';
 
 const rootElement = document.getElementById('root') as HTMLElement;
-const theme = getValidatedThemeOrRenderError(CONFIG.theme, rootElement);
+const theme = normalizeThemeManifest(CONFIG.theme);
 
-if (theme) {
-  applyThemeToDocument(theme, getInitialThemeState(theme).resolvedMode);
-  initializeAnalytics();
+applyThemeToDocument(theme, getInitialThemeState(theme).resolvedMode);
+initializeAnalytics();
 
-  ReactDOM.createRoot(rootElement).render(
-    <HelmetProvider>
-      <React.StrictMode>
-        <ThemeProvider theme={theme}>
-          <ProviderCredentialModalProvider>
-            <WorkspaceProvider>
-              <App />
-            </WorkspaceProvider>
-          </ProviderCredentialModalProvider>
-        </ThemeProvider>
-      </React.StrictMode>
-    </HelmetProvider>,
-  );
-}
+ReactDOM.createRoot(rootElement).render(
+  <HelmetProvider>
+    <React.StrictMode>
+      <ThemeProvider theme={theme}>
+        <ProviderCredentialModalProvider>
+          <WorkspaceProvider>
+            <App />
+          </WorkspaceProvider>
+        </ProviderCredentialModalProvider>
+      </ThemeProvider>
+    </React.StrictMode>
+  </HelmetProvider>,
+);

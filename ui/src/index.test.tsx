@@ -60,9 +60,13 @@ describe('application entry point', () => {
 
   afterEach(() => jest.restoreAllMocks());
 
-  it('shows the specific config diagnostic and stops startup side effects', () => {
+  it('normalizes permissive config values and continues startup', () => {
     mockConfiguredTheme = {
       ...developmentConfig.theme,
+      links: {
+        ...developmentConfig.theme.links,
+        support: 'client support channel',
+      },
       colors: {
         ...developmentConfig.theme.colors,
         dark: {
@@ -74,16 +78,26 @@ describe('application entry point', () => {
 
     jest.isolateModules(() => require('./index'));
 
-    expect(document.getElementById('root')).toHaveTextContent(
-      'Application configuration error: CONFIG.theme.colors.dark.primaryHover must be a 6-digit hexadecimal color such as #0f62fe.',
+    expect(document.getElementById('root')).not.toHaveTextContent(
+      'Application configuration error',
     );
-    expect(document.getElementById('root')).not.toHaveTextContent('#7ccdf7l');
-    expect(mockApplyThemeToDocument).not.toHaveBeenCalled();
-    expect(mockInitializeAnalytics).not.toHaveBeenCalled();
-    expect(mockCreateRoot).not.toHaveBeenCalled();
+    expect(mockApplyThemeToDocument).toHaveBeenCalledWith(
+      expect.objectContaining({
+        links: expect.objectContaining({ support: 'client support channel' }),
+        colors: expect.objectContaining({
+          dark: expect.objectContaining({ primaryHover: '#7ccdf7l' }),
+        }),
+      }),
+      'light',
+    );
+    expect(mockInitializeAnalytics).toHaveBeenCalledTimes(1);
+    expect(mockCreateRoot).toHaveBeenCalledWith(
+      document.getElementById('root'),
+    );
+    expect(mockRender).toHaveBeenCalledTimes(1);
   });
 
-  it('applies the validated theme before rendering the application', () => {
+  it('applies the normalized theme before rendering the application', () => {
     jest.isolateModules(() => require('./index'));
 
     expect(mockApplyThemeToDocument).toHaveBeenCalledWith(

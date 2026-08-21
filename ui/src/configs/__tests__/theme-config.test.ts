@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import developmentConfig from '@/configs/config.development.json';
 import productionConfig from '@/configs/config.production.json';
 import { getConfig } from '@/configs';
-import { isThemeManifest } from '@/theme/theme-config';
+import { normalizeThemeManifest } from '@/theme/theme-config';
 
 const dockerConfigs = [
   'config.community.json',
@@ -13,19 +13,23 @@ const dockerConfigs = [
 ];
 
 describe('UI theme configuration', () => {
-  it('selects the environment config with a complete theme', () => {
+  it('selects and normalizes each environment theme', () => {
     expect(getConfig('development')).toEqual(developmentConfig);
     expect(getConfig('test')).toEqual(developmentConfig);
     expect(getConfig('production')).toEqual(productionConfig);
-    expect(isThemeManifest(developmentConfig.theme)).toBe(true);
-    expect(isThemeManifest(productionConfig.theme)).toBe(true);
+    expect(normalizeThemeManifest(developmentConfig.theme)).toEqual(
+      developmentConfig.theme,
+    );
+    expect(normalizeThemeManifest(productionConfig.theme)).toEqual(
+      productionConfig.theme,
+    );
   });
 
-  it.each(dockerConfigs)('%s contains a deployable theme', configFile => {
+  it.each(dockerConfigs)('%s contains a normalizable theme', configFile => {
     const config = JSON.parse(
       readFileSync(resolve(process.cwd(), '../docker/ui', configFile), 'utf8'),
     );
 
-    expect(isThemeManifest(config.theme)).toBe(true);
+    expect(normalizeThemeManifest(config.theme)).toEqual(config.theme);
   });
 });

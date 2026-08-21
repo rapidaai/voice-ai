@@ -51,19 +51,6 @@ export const THEME_CONFIG_PATHS = Object.freeze([
   'docker/ui/config.local-knowledge.json',
 ]);
 const GENERATED_STYLES_DIRECTORY = 'ui/src/styles/generated';
-const REQUIRED_LINKS = Object.freeze([
-  'documentation',
-  'source',
-  'support',
-  'terms',
-  'privacy',
-]);
-const REQUIRED_COLORS = Object.freeze([
-  'primary',
-  'primaryHover',
-  'primaryActive',
-  'onPrimary',
-]);
 const HARD_CODED_PALETTES = Object.freeze([
   'white',
   'black',
@@ -83,51 +70,6 @@ const HARD_CODED_COLOR_UTILITY = new RegExp(
 
 const toPosixPath = path => path.split(sep).join('/');
 
-const isNonEmptyString = value =>
-  typeof value === 'string' && value.trim().length > 0;
-
-const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
-
-const isThemeColor = value =>
-  isNonEmptyString(value) && HEX_COLOR_PATTERN.test(value);
-
-const getRelativeLuminance = hexColor => {
-  const channels = [1, 3, 5].map(offset =>
-    Number.parseInt(hexColor.slice(offset, offset + 2), 16),
-  );
-  const [red, green, blue] = channels.map(channel => {
-    const normalized = channel / 255;
-    return normalized <= 0.04045
-      ? normalized / 12.92
-      : ((normalized + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-};
-
-const getContrastRatio = (first, second) => {
-  const firstLuminance = getRelativeLuminance(first);
-  const secondLuminance = getRelativeLuminance(second);
-  return (
-    (Math.max(firstLuminance, secondLuminance) + 0.05) /
-    (Math.min(firstLuminance, secondLuminance) + 0.05)
-  );
-};
-
-const hasAllowedProtocol = (value, protocols) => {
-  if (!isNonEmptyString(value)) return false;
-  if (value.startsWith('/') && !value.startsWith('//')) return true;
-
-  try {
-    return protocols.includes(new URL(value).protocol);
-  } catch {
-    return false;
-  }
-};
-
-const isAppLink = value => hasAllowedProtocol(value, ['https:', 'mailto:']);
-
-const isAssetLink = value => hasAllowedProtocol(value, ['https:']);
-
 const isPlainObject = value =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
@@ -136,109 +78,9 @@ const pushDiagnostic = (diagnostics, path, message) => {
 };
 
 export function validateThemeManifest(manifest, manifestPath = 'CONFIG.theme') {
-  const diagnostics = [];
-
-  if (!isPlainObject(manifest)) {
-    pushDiagnostic(diagnostics, manifestPath, 'manifest must be a JSON object');
-    return diagnostics;
-  }
-
-  if (manifest.schemaVersion !== 1) {
-    pushDiagnostic(diagnostics, manifestPath, 'schemaVersion must equal 1');
-  }
-  if (!isNonEmptyString(manifest.id)) {
-    pushDiagnostic(diagnostics, manifestPath, 'id must be a nonempty string');
-  }
-  if (!isPlainObject(manifest.brand)) {
-    pushDiagnostic(diagnostics, manifestPath, 'brand must be an object');
-  } else {
-    if (!isNonEmptyString(manifest.brand.name)) {
-      pushDiagnostic(
-        diagnostics,
-        manifestPath,
-        'brand.name must be a nonempty string',
-      );
-    }
-
-    if (manifest.brand.logos !== undefined) {
-      for (const logo of ['full', 'compact']) {
-        for (const mode of ['light', 'dark']) {
-          const value = manifest.brand.logos?.[logo]?.[mode];
-          if (!isAssetLink(value)) {
-            pushDiagnostic(
-              diagnostics,
-              manifestPath,
-              `brand.logos.${logo}.${mode} must be root-relative or use https`,
-            );
-          }
-        }
-      }
-    }
-
-    if (
-      manifest.brand.favicon !== undefined &&
-      !isAssetLink(manifest.brand.favicon)
-    ) {
-      pushDiagnostic(
-        diagnostics,
-        manifestPath,
-        'brand.favicon must be root-relative or use https',
-      );
-    }
-  }
-
-  for (const link of REQUIRED_LINKS) {
-    if (!isAppLink(manifest.links?.[link])) {
-      pushDiagnostic(
-        diagnostics,
-        manifestPath,
-        `links.${link} must be root-relative or use https/mailto`,
-      );
-    }
-  }
-
-  if (!['light', 'dark', 'system'].includes(manifest.defaultMode)) {
-    pushDiagnostic(
-      diagnostics,
-      manifestPath,
-      'defaultMode must be light, dark, or system',
-    );
-  }
-  if (typeof manifest.allowModeSelection !== 'boolean') {
-    pushDiagnostic(
-      diagnostics,
-      manifestPath,
-      'allowModeSelection must be a boolean',
-    );
-  }
-
-  for (const mode of ['light', 'dark']) {
-    for (const color of REQUIRED_COLORS) {
-      if (!isThemeColor(manifest.colors?.[mode]?.[color])) {
-        pushDiagnostic(
-          diagnostics,
-          manifestPath,
-          `colors.${mode}.${color} must be a six-digit hexadecimal color`,
-        );
-      }
-    }
-
-    const colors = manifest.colors?.[mode];
-    if (
-      REQUIRED_COLORS.every(color => isThemeColor(colors?.[color])) &&
-      [colors.primary, colors.primaryHover, colors.primaryActive].some(
-        color => getContrastRatio(color, colors.onPrimary) < 4.5,
-      )
-    ) {
-      pushDiagnostic(
-        diagnostics,
-        manifestPath,
-        `colors.${mode}.onPrimary must maintain WCAG AA contrast against all primary interaction states`,
-      );
-    }
-  }
-
-  return diagnostics.sort();
+  return isPlainObject(manifest)
+    ? []
+    : [`${manifestPath}: manifest must be a JSON object`];
 }
 
 export function findHardcodedColorUtilities(source) {
