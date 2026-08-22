@@ -46,9 +46,9 @@ func TestFreeSWITCHTwilioElasticTrunkInbound(t *testing.T) {
 	answeredSessions := make(chan *sip_infra.Session, 1)
 	remoteByeSessions := make(chan *sip_infra.Session, 1)
 
-	harness.server.SetOnInvite(func(session *sip_infra.Session, _, fromIdentity, toIdentity string) error {
-		require.Contains(t, fromIdentity, freeSWITCHUser(twilioProfile.callerUser))
-		require.Contains(t, toIdentity, freeSWITCHUser(twilioProfile.inboundDID))
+	harness.server.SetOnInviteIdentity(func(session *sip_infra.Session, identity sip_infra.SIPRequestIdentity) error {
+		require.Contains(t, identity.FromIdentity, freeSWITCHUser(twilioProfile.callerUser))
+		require.Contains(t, identity.ToIdentity, freeSWITCHUser(twilioProfile.inboundDID))
 		answeredSessions <- session
 		return nil
 	})

@@ -22,7 +22,7 @@ func TestFreeSWITCHRegistrationBasedInboundCall(t *testing.T) {
 	answeredSessions := make(chan *sip_infra.Session, 1)
 	remoteByeSessions := make(chan *sip_infra.Session, 1)
 
-	harness.server.SetOnInvite(func(session *sip_infra.Session, _, _, _ string) error {
+	harness.server.SetOnInviteIdentity(func(session *sip_infra.Session, _ sip_infra.SIPRequestIdentity) error {
 		answeredSessions <- session
 		return nil
 	})

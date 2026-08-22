@@ -48,6 +48,8 @@ func (s *Server) SetMiddlewares(middlewares []Middleware) {
 				RequestURI:      ctx.RequestURI,
 				FromIdentity:    ctx.FromIdentity,
 				ToIdentity:      ctx.ToIdentity,
+				FromURI:         ctx.FromIdentity,
+				ToURI:           ctx.ToIdentity,
 				SDPInfo:         sdpInfoFromCore(ctx.SDPInfo),
 				APIKey:          ctx.APIKey,
 				AssistantID:     ctx.AssistantID,
@@ -105,13 +107,30 @@ func (s *Server) SessionCount() int {
 	return s.inner.SessionCount()
 }
 
-func (s *Server) SetOnApplicationReady(fn func(session *Session, requestURI, fromIdentity, toIdentity string) error) {
+// SetOnApplicationReady sets the legacy application-ready callback.
+// Deprecated: use SetOnApplicationReadyIdentity.
+func (s *Server) SetOnApplicationReady(fn func(session *Session, fromURI, toURI string) error) {
 	if fn == nil {
 		s.inner.SetOnApplicationReady(nil)
 		return
 	}
 	s.inner.SetOnApplicationReady(func(session *internal_core.Session, requestURI, fromIdentity, toIdentity string) error {
-		return fn(wrapSession(session), requestURI, fromIdentity, toIdentity)
+		return fn(wrapSession(session), fromIdentity, toIdentity)
+	})
+}
+
+// SetOnApplicationReadyIdentity sets the application-ready callback with explicit SIP identities.
+func (s *Server) SetOnApplicationReadyIdentity(fn func(session *Session, identity SIPRequestIdentity) error) {
+	if fn == nil {
+		s.inner.SetOnApplicationReady(nil)
+		return
+	}
+	s.inner.SetOnApplicationReady(func(session *internal_core.Session, requestURI, fromIdentity, toIdentity string) error {
+		return fn(wrapSession(session), SIPRequestIdentity{
+			RequestURI:   requestURI,
+			FromIdentity: fromIdentity,
+			ToIdentity:   toIdentity,
+		})
 	})
 }
 
@@ -125,13 +144,30 @@ func (s *Server) SetOnApplicationCleanup(fn func(session *Session)) {
 	})
 }
 
-func (s *Server) SetOnInvite(fn func(session *Session, requestURI, fromIdentity, toIdentity string) error) {
+// SetOnInvite sets the legacy answered-INVITE callback.
+// Deprecated: use SetOnInviteIdentity.
+func (s *Server) SetOnInvite(fn func(session *Session, fromURI, toURI string) error) {
 	if fn == nil {
 		s.inner.SetOnInvite(nil)
 		return
 	}
 	s.inner.SetOnInvite(func(session *internal_core.Session, requestURI, fromIdentity, toIdentity string) error {
-		return fn(wrapSession(session), requestURI, fromIdentity, toIdentity)
+		return fn(wrapSession(session), fromIdentity, toIdentity)
+	})
+}
+
+// SetOnInviteIdentity sets the answered-INVITE callback with explicit SIP identities.
+func (s *Server) SetOnInviteIdentity(fn func(session *Session, identity SIPRequestIdentity) error) {
+	if fn == nil {
+		s.inner.SetOnInvite(nil)
+		return
+	}
+	s.inner.SetOnInvite(func(session *internal_core.Session, requestURI, fromIdentity, toIdentity string) error {
+		return fn(wrapSession(session), SIPRequestIdentity{
+			RequestURI:   requestURI,
+			FromIdentity: fromIdentity,
+			ToIdentity:   toIdentity,
+		})
 	})
 }
 
