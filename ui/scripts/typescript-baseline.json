@@ -1,5 +1,4 @@
 {
-  "src/app/components/base/modal/assistant-debugger-edit-section-modal/configure-experience-form.tsx|TS2322|Type '{ id: string; labelText: string; min: number; max: number; step: number; value: number; onChange: ({ value }: { value: number; }) => void; helperText: string; }' is not assignable to type 'IntrinsicAttributes & SliderProps'.": 4,
   "src/app/components/base/modal/column-preference-modal/index.tsx|TS2322|Type '(value: string) => void' is not assignable to type '(selection: string | number | undefined, name: string, event: ChangeEvent<HTMLInputElement>) => void'.": 1,
   "src/app/components/base/modal/conversation-telemetry-modal/index.tsx|TS2724|'\"@rapidaai/react\"' has no exported member named 'GetAllAssistantTelemetry'. Did you mean 'GetAllAssistantTool'?": 1,
   "src/app/components/base/modal/conversation-telemetry-modal/index.tsx|TS2724|'\"@rapidaai/react\"' has no exported member named 'GetAllAssistantTelemetryRequest'. Did you mean 'GetAllAssistantToolRequest'?": 1,
@@ -79,9 +78,7 @@
   "src/app/pages/user-onboarding/__tests__/onboarding-index.test.tsx|TS2556|A spread argument must either have a tuple type or be passed to a rest parameter.": 1,
   "src/app/pages/user/account-setting/account-setting.tsx|TS2322|Type '{ children: string; size: \"md\"; renderIcon: CarbonIconType; type: \"submit\"; form: string; isLoading: boolean; }' is not assignable to type 'IntrinsicAttributes & CarbonButtonProps'.": 1,
   "src/hooks/use-assistant-page-store.ts|TS2304|Cannot find name 'ServiceError'.": 2,
-  "src/hooks/use-electron-rediect.ts|TS2307|Cannot find module '@/context/environment-context' or its corresponding type declarations.": 1,
   "src/hooks/use-oauth-callback.ts|TS2339|Property 'reloadToolCredentials' does not exist on type '{ providerCredentials: VaultCredential[]; reloadProviderCredentials: () => void; }'.": 1,
-  "src/hooks/use-tool-provider.ts|TS2339|Property 'toolProviderCredentials' does not exist on type '{ providerCredentials: VaultCredential[]; reloadProviderCredentials: () => void; }'.": 1,
   "src/providers/custom-stt/contract.ts|TS2322|Type 'Record<\"audio\" | \"interrupt\" | \"turn_change\", CustomSttRequestRuleContext>' is not assignable to type 'Record<\"audio\" | \"interrupt\" | \"turn_change\", WebsocketDslScopedContext>'.": 2,
   "src/providers/custom-stt/contract.ts|TS2345|Argument of type 'CustomSttRequestRuleContext' is not assignable to parameter of type 'WebsocketDslScopedContext'.": 1,
   "src/providers/custom-tts/contract.ts|TS2322|Type 'Record<\"text\" | \"done\" | \"interrupt\", CustomTtsRequestRuleContext>' is not assignable to type 'Record<\"text\" | \"done\" | \"interrupt\", WebsocketDslScopedContext>'.": 2,
