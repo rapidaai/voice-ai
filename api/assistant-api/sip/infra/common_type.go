@@ -7,7 +7,6 @@
 package sip_infra
 
 import (
-	"errors"
 	"time"
 
 	internal_core "github.com/rapidaai/api/assistant-api/sip/internal/core"
@@ -473,12 +472,4 @@ func ParseConfigFromVault(vaultCredential *protos.VaultCredential) (*Config, err
 	}
 	config := configFromCore(coreConfig)
 	return &config, nil
-}
-
-func isCoreSIPError(err error) (*internal_core.SIPError, bool) {
-	var sipErr *internal_core.SIPError
-	if errors.As(err, &sipErr) {
-		return sipErr, true
-	}
-	return nil, false
 }

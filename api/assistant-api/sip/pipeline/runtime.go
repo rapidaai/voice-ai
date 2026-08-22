@@ -73,14 +73,20 @@ func (runtime *sipPreparedCallRuntime) Close(_ context.Context) {
 	_ = runtime.streamer.Close()
 }
 
-func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, session *sip_infra.Session, setup *CallSetupResult, observer observability.Recorder, vaultCred interface{}, sipConfig *sip_infra.Config, direction, fromIdentity, toIdentity string) (*sipPreparedCallRuntime, error) {
+func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, stage sip_infra.SessionEstablishedPipeline, setup *CallSetupResult, observer observability.Recorder) (*sipPreparedCallRuntime, error) {
+	session := stage.Session
 	callID := session.GetCallID()
 	if session.IsEnded() {
 		d.logger.Warnw("Session already ended before call runtime preparation", "call_id", callID)
 		return nil, fmt.Errorf("session_ended_before_start")
 	}
-	auth := session.GetAuth()
-	resolvedCallContext, err := d.resolveSIPCallContext(session, setup, direction, fromIdentity, toIdentity)
+	resolvedCallContext, err := d.resolveSIPCallContext(
+		session,
+		setup,
+		string(stage.Direction),
+		stage.FromIdentity,
+		stage.ToIdentity,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("resolve SIP call context: %w", err)
 	}
@@ -102,10 +108,8 @@ func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, session *sip_inf
 	default:
 	}
 
-	var vaultCredential *protos.VaultCredential
-	if v, ok := vaultCred.(*protos.VaultCredential); ok {
-		vaultCredential = v
-	} else {
+	vaultCredential := stage.VaultCredential
+	if vaultCredential == nil {
 		vaultCredential = session.GetVaultCredential()
 	}
 	streamer, err := internal_telephony.New(
@@ -128,7 +132,7 @@ func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, session *sip_inf
 		return nil, fmt.Errorf("session_ended_after_streamer")
 	}
 
-	d.configureSIPTransfer(ctx, session, sipConfig, resolvedCallContext, streamer)
+	d.configureSIPTransfer(ctx, session, stage.Config, resolvedCallContext, streamer)
 	talker, err := internal_adapter.New(
 		internal_adapter.WithSource(utils.PhoneCall),
 		internal_adapter.WithContext(talkContext),
@@ -156,7 +160,7 @@ func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, session *sip_inf
 		cancelTalk:  cancelTalk,
 		streamer:    streamer,
 		talker:      talker,
-		direction:   direction,
+		direction:   string(stage.Direction),
 	}, nil
 }
 

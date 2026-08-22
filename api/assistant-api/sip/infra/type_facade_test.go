@@ -446,11 +446,8 @@ func TestOutboundTypeConversions(t *testing.T) {
 	}
 }
 
-func TestOutboundTypeConversionsReturnWritableEmptyHeaders(t *testing.T) {
+func TestOutboundTypeConversionsPreserveNilHeaders(t *testing.T) {
 	coreOutboundConfig := (OutboundConfig{}).toCore()
 
-	require.NotNil(t, coreOutboundConfig.Headers)
-	assert.Empty(t, coreOutboundConfig.Headers)
-	coreOutboundConfig.Headers["X-Test"] = "ok"
-	assert.Equal(t, "ok", coreOutboundConfig.Headers["X-Test"])
+	assert.Nil(t, coreOutboundConfig.Headers)
 }

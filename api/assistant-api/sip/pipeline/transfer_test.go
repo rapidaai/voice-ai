@@ -703,10 +703,6 @@ func TestExecuteTransfer_NewLegUsesTransferTargetAndConfiguredCallerIdentity(t *
 
 	inbound := newTransferTestSession(t)
 	outbound := newTransferTestOutboundSession(t)
-	parentCall := &callcontext.CallContext{
-		CallerNumber: "sip:original-caller@example.com",
-		FromNumber:   "sip:original-assistant@sip.rapida.ai",
-	}
 	config := newTransferTestConfig()
 	config.CallerID = "transfer-assistant"
 
@@ -740,10 +736,6 @@ func TestExecuteTransfer_NewLegUsesTransferTargetAndConfiguredCallerIdentity(t *
 
 	assert.Equal(t, "transfer-target", capturedTarget)
 	assert.Equal(t, "transfer-assistant", capturedFrom)
-	assert.NotEqual(t, parentCall.CallerNumber, capturedTarget)
-	assert.NotEqual(t, parentCall.FromNumber, capturedFrom)
-	assert.Equal(t, "sip:original-caller@example.com", parentCall.CallerNumber)
-	assert.Equal(t, "sip:original-assistant@sip.rapida.ai", parentCall.FromNumber)
 	assert.Equal(t, inbound.GetCallID(), capturedOptions.ParentCallID)
 	assert.Equal(t, 1, capturedOptions.Attempt)
 	assert.Equal(t, 2, capturedOptions.TotalAttempts)
