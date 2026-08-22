@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -56,7 +57,9 @@ func inboundInviteIdentityFromRequest(request *sip.Request) (inboundInviteIdenti
 		request.CallID().Value() == "" ||
 		request.From() == nil ||
 		request.From().Params == nil ||
-		request.To() == nil {
+		request.To() == nil ||
+		strings.TrimSpace(request.From().Address.Host) == "" ||
+		strings.TrimSpace(request.To().Address.Host) == "" {
 		return inboundInviteIdentity{}, false
 	}
 	fromTag, ok := request.From().Params.Get("tag")
