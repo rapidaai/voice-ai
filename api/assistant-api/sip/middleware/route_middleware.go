@@ -113,15 +113,15 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 			if err != nil {
 				m.logger.Warnw("SIP: invalid agent route",
 					"call_id", ctx.CallID,
-					"route_value", routeValue,
-					"error", err)
+					"route_kind", routeKind,
+					"reason", "invalid_assistant_id")
 				return &sip_infra.SIPError{Code: 404, Message: "Invalid assistant route", Err: sip_infra.ErrAuthRequired}
 			}
 			if !validator.NonZero(parsedAssistantID) {
 				m.logger.Warnw("SIP: invalid agent route",
 					"call_id", ctx.CallID,
-					"route_value", routeValue,
-					"error", "assistant id is zero")
+					"route_kind", routeKind,
+					"reason", "zero_assistant_id")
 				return &sip_infra.SIPError{Code: 404, Message: "Invalid assistant route", Err: sip_infra.ErrAuthRequired}
 			}
 
@@ -162,7 +162,8 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 			if tx.Error != nil {
 				m.logger.Warnw("SIP: DID route lookup failed",
 					"call_id", ctx.CallID,
-					"did", routeValue,
+					"route_kind", routeKind,
+					"result", "not_found",
 					"error", tx.Error)
 				return &sip_infra.SIPError{Code: 404, Message: "No assistant found for this SIP route", Err: sip_infra.ErrAuthRequired}
 			}
@@ -174,7 +175,7 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 			m.logger.Warnw("SIP: route returned incomplete scope",
 				"call_id", ctx.CallID,
 				"route_kind", routeKind,
-				"route_value", routeValue,
+				"result", "incomplete_scope",
 				"assistant_id", assistantID,
 				"project_id", projectID,
 				"organization_id", organizationID)
@@ -210,7 +211,7 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 		m.logger.Infow("SIP: routed inbound call",
 			"call_id", ctx.CallID,
 			"route_kind", routeKind,
-			"route_value", routeValue,
+			"result", "resolved",
 			"assistant_id", assistantID)
 
 		return nil
