@@ -200,8 +200,7 @@
   }
 
   @keyframes borderRotate {
-    0%,
-    100% {
+    0% {
       --border-angle: 0deg;
     }
 

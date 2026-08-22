@@ -1,5 +1,5 @@
 body {
-  font-family: 'IBM Plex Sans' !important;
+  font-family: 'IBM Plex Sans', sans-serif !important;
 }
 
 body > iframe {
@@ -220,12 +220,17 @@ li::marker {
   position: absolute !important;
 }
 
-.normal-text .ͼ1 .cm-scroller {
-  font-family: Rubik, sans-serif !important;
-}
-
 .cm-content {
   white-space: pre-wrap !important;
+  border: none !important;
+}
+
+.cm-scroller {
+  line-height: 30px !important;
+}
+
+.normal-text .ͼ1 .cm-scroller {
+  font-family: Rubik, sans-serif !important;
 }
 
 .markdown-editor .cm-line {
@@ -249,10 +254,6 @@ li::marker {
 .monaco-editor .margin-view-overlays .current-line,
 .monaco-editor .view-overlays .current-line {
   border: none !important;
-}
-
-.cm-scroller {
-  line-height: 30px !important;
 }
 
 .margin-view-overlays {
@@ -366,12 +367,6 @@ li::marker {
 [data-color-mode='dark'] .ͼ1 .cm-dropCursor {
   border-left: 1px solid var(--cds-text-primary) !important;
   border-right: 1px solid var(--cds-background) !important;
-}
-
-.cm-content {
-  /* background: white; */
-  /* padding-left: 10px !important; */
-  border: none !important;
 }
 
 .ͼo {

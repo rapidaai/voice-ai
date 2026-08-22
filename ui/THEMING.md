@@ -74,10 +74,12 @@ placeholder at container startup. It does not change branding or theme values.
 
 - Full logos should be horizontal SVG or PNG assets with transparent backgrounds.
 - Compact logos should be square and remain legible at 24 by 24 pixels.
-- Asset URLs must be same-origin paths or HTTPS URLs.
-- Product links accept same-origin paths, HTTPS, and `mailto:` URLs.
-- Brand colors use six-digit hexadecimal values.
-- `onPrimary` must maintain WCAG AA contrast against primary, hover, and active colors.
+- Asset and product-link fields preserve arbitrary non-empty string values so
+  deployments can use tenant-specific schemes, tokens, or routing conventions.
+- Brand color fields preserve arbitrary non-empty string values, including CSS
+  color functions, custom properties, and tenant-specific tokens.
+- Theme loading does not validate color format or contrast. Deployments own
+  browser compatibility and accessible contrast for their configured values.
 
 ## Theme behavior
 
