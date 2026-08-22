@@ -127,7 +127,6 @@ class PostgresKnowledgeDocumentStore(KnowledgeDocumentStore):
                     segment_document.content = doc.page_content
                     segment_document.token_count = count_string_token(doc.page_content)
                     segment_document.enabled = False
-                    segment_document.created_by = self.knowledge_document.created_by
                     if doc.metadata.get("answer"):
                         segment_document.answer = doc.metadata.pop("answer", "")
 

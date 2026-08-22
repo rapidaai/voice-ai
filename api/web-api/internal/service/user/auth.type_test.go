@@ -1,6 +1,7 @@
 package internal_user_service
 
 import (
+	"math"
 	"testing"
 
 	internal_entity "github.com/rapidaai/api/web-api/internal/entity"
@@ -18,8 +19,34 @@ func TestAuthPrincipleAuditActor(t *testing.T) {
 	if !ok {
 		t.Fatal("AuditActor() ok = false, want true")
 	}
-	if actor != (types.ActorIdentity{Type: types.ActorTypeUser, ID: "73"}) {
+	if actor != (types.ActorIdentity{Type: types.ActorTypeUser, ID: 73}) {
 		t.Fatalf("AuditActor() = %+v", actor)
+	}
+}
+
+func TestAuthPrincipleAuditActorRange(t *testing.T) {
+	tests := []struct {
+		name string
+		id   uint64
+		ok   bool
+	}{
+		{name: "zero rejected", id: 0},
+		{name: "max bigint accepted", id: math.MaxInt64, ok: true},
+		{name: "above max bigint rejected", id: uint64(math.MaxInt64) + 1},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			principle := &authPrinciple{user: &internal_entity.UserAuth{}}
+			principle.user.Id = test.id
+			actor, ok := principle.AuditActor()
+			if ok != test.ok {
+				t.Fatalf("AuditActor() ok = %v, want %v", ok, test.ok)
+			}
+			if ok && actor.ID != test.id {
+				t.Fatalf("AuditActor() ID = %d, want %d", actor.ID, test.id)
+			}
+		})
 	}
 }
 

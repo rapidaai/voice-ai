@@ -37,11 +37,6 @@ func (eService *assistantKnowledgeService) Create(ctx context.Context, auth *typ
 	rerankEnabled bool, scoreThreshold float32, topK uint32, rerankerProviderModelId *uint64,
 	rerankerProviderModelName *string,
 	rerankerProviderModelOptions []*protos.Metadata) (*internal_assistant_entity.AssistantKnowledge, error) {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return nil, err
-	}
 
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
@@ -64,9 +59,7 @@ func (eService *assistantKnowledgeService) Create(ctx context.Context, auth *typ
 		RerankerEnable:  rerankEnabled,
 		TopK:            topK,
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: userID,
-			UpdatedBy: userID,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 	}
 
@@ -91,9 +84,7 @@ func (eService *assistantKnowledgeService) Create(ctx context.Context, auth *typ
 		modelOptions = append(modelOptions, &internal_assistant_entity.AssistantKnowledgeRerankerOption{
 			AssistantKnowledgeId: assistantKnowledgeConfig.Id,
 			Mutable: gorm_models.Mutable{
-				CreatedBy: userID,
-				UpdatedBy: userID,
-				Status:    type_enums.RECORD_ACTIVE,
+				Status: type_enums.RECORD_ACTIVE,
 			},
 			Metadata: gorm_models.Metadata{
 				Key:   v.GetKey(),
@@ -105,7 +96,7 @@ func (eService *assistantKnowledgeService) Create(ctx context.Context, auth *typ
 		Columns: []clause.Column{{Name: "assistant_provider_model_id"}, {Name: "key"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value",
-			"updated_by"}),
+		}),
 	}).Create(modelOptions)
 	if tx.Error != nil {
 		eService.logger.Errorf("unable to create model options with error %v", tx.Error)
@@ -118,18 +109,12 @@ func (eService *assistantKnowledgeService) Create(ctx context.Context, auth *typ
 
 // DeleteAssistantKnowledge implements internal_services.AssistantKnowledgeService.
 func (eService *assistantKnowledgeService) Delete(ctx context.Context, auth *types.Authentication, akId uint64, assistantId uint64) (*internal_assistant_entity.AssistantKnowledge, error) {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return nil, err
-	}
 
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	aK := &internal_assistant_entity.AssistantKnowledge{
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ARCHIEVE,
-			UpdatedBy: userID,
+			Status: type_enums.RECORD_ARCHIEVE,
 		},
 	}
 	tx := db.Where("id = ? AND assistant_id = ? ",
@@ -202,11 +187,6 @@ func (eService *assistantKnowledgeService) Get(ctx context.Context, auth *types.
 
 // UpdateAssistantKnowledge implements internal_services.AssistantKnowledgeService.
 func (eService *assistantKnowledgeService) Update(ctx context.Context, auth *types.Authentication, akId uint64, assistantId uint64, knowledgeId uint64, retrievalMethod gorm_types.RetrievalMethod, rerankEnabled bool, scoreThreshold float32, topK uint32, rerankerProviderModelId *uint64, rerankerProviderModelName *string, rerankerProviderModelOptions []*protos.Metadata) (*internal_assistant_entity.AssistantKnowledge, error) {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return nil, err
-	}
 
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
@@ -227,9 +207,7 @@ func (eService *assistantKnowledgeService) Update(ctx context.Context, auth *typ
 		ScoreThreshold:  scoreThreshold,
 		RerankerEnable:  rerankEnabled,
 		TopK:            topK,
-		Mutable: gorm_models.Mutable{
-			UpdatedBy: userID,
-		},
+		Mutable:         gorm_models.Mutable{},
 	}
 	if rerankEnabled {
 		aK.RerankerModelProviderId = rerankerProviderModelId

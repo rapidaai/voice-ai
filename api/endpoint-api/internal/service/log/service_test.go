@@ -70,8 +70,10 @@ func newEndpointLogServiceTest(t *testing.T) (*endpointLogService, *gorm.DB) {
 			created_date datetime,
 			updated_date datetime,
 			status text,
-			created_by integer,
-			updated_by integer,
+			created_actor_type text,
+			created_actor_id integer,
+			updated_actor_type text,
+			updated_actor_id integer,
 			name text,
 			value text,
 			endpoint_log_id integer
@@ -81,8 +83,10 @@ func newEndpointLogServiceTest(t *testing.T) (*endpointLogService, *gorm.DB) {
 			created_date datetime,
 			updated_date datetime,
 			status text,
-			created_by integer,
-			updated_by integer,
+			created_actor_type text,
+			created_actor_id integer,
+			updated_actor_type text,
+			updated_actor_id integer,
 			key text,
 			value text,
 			endpoint_log_id integer
@@ -92,8 +96,10 @@ func newEndpointLogServiceTest(t *testing.T) (*endpointLogService, *gorm.DB) {
 			created_date datetime,
 			updated_date datetime,
 			status text,
-			created_by integer,
-			updated_by integer,
+			created_actor_type text,
+			created_actor_id integer,
+			updated_actor_type text,
+			updated_actor_id integer,
 			name text,
 			value text,
 			description text,
@@ -151,8 +157,8 @@ func TestApplyMetadataAllowsProjectAuthWithoutFakeUser(t *testing.T) {
 	metadata, err := service.ApplyMetadata(context.Background(), auth, 1, map[string]interface{}{"trace_id": "trace-1"})
 	require.NoError(t, err)
 	require.Len(t, metadata, 1)
-	require.Zero(t, metadata[0].CreatedBy)
-	require.Zero(t, metadata[0].UpdatedBy)
+	require.Nil(t, metadata[0].CreatedActor)
+	require.Nil(t, metadata[0].UpdatedActor)
 }
 
 func TestGetEndpointLogPreloadsMetricsAndContext(t *testing.T) {
@@ -173,8 +179,7 @@ func TestGetEndpointLogPreloadsMetricsAndContext(t *testing.T) {
 	require.NoError(t, db.Create(&internal_gorm.EndpointLogMetric{
 		Audited: gorm_models.Audited{Id: 101},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		Metric: gorm_models.Metric{
 			Name:        type_enums.TOTAL_TOKEN.String(),
@@ -186,8 +191,7 @@ func TestGetEndpointLogPreloadsMetricsAndContext(t *testing.T) {
 	require.NoError(t, db.Create(&internal_gorm.EndpointLogMetadata{
 		Audited: gorm_models.Audited{Id: 102},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		Metadata:      *gorm_models.NewMetadata("trace_id", "trace-1"),
 		EndpointLogId: 100,
@@ -195,8 +199,7 @@ func TestGetEndpointLogPreloadsMetricsAndContext(t *testing.T) {
 	require.NoError(t, db.Create(&internal_gorm.EndpointLogArgument{
 		Audited: gorm_models.Audited{Id: 103},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		Argument: gorm_models.Argument{
 			Name:  "prompt",

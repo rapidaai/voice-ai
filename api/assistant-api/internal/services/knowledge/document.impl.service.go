@@ -139,15 +139,13 @@ func (knowledgeDocument *knowledgeDocumentService) CreateToolDocument(ctx contex
 	documentStructure string,
 	contents []*protos.DocumentContent,
 ) ([]*internal_knowledge_gorm.KnowledgeDocument, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
+	if _, err := auth.Actor(); err != nil {
 		return nil, err
 	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
-	userID := userContext.UserID
 	db := knowledgeDocument.postgres.DB(ctx)
 	allKnowledge := make([]*internal_knowledge_gorm.KnowledgeDocument, 0)
 	for _, cntnt := range contents {
@@ -156,7 +154,6 @@ func (knowledgeDocument *knowledgeDocumentService) CreateToolDocument(ctx contex
 			Name:              cntnt.GetName(),
 			ProjectId:         projectContext.ProjectID,
 			OrganizationId:    projectContext.OrganizationID,
-			CreatedBy:         userID,
 			DocumentStructure: documentStructure,
 			DocumentSize:      0,
 			DocumentPath:      cntnt.GetName(),
@@ -187,15 +184,17 @@ func (knowledgeDocument *knowledgeDocumentService) CreateManualDocument(
 	documentStructure string,
 	contents []*protos.DocumentContent,
 ) ([]*internal_knowledge_gorm.KnowledgeDocument, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
+	if _, err := auth.Actor(); err != nil {
 		return nil, err
 	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
-	userID := userContext.UserID
+	actor, err := auth.Actor()
+	if err != nil {
+		return nil, err
+	}
 
 	db := knowledgeDocument.postgres.DB(ctx)
 	allKnowledge := make([]*internal_knowledge_gorm.KnowledgeDocument, 0)
@@ -206,7 +205,7 @@ func (knowledgeDocument *knowledgeDocumentService) CreateManualDocument(
 			fileName := fmt.Sprintf("%d/%d/%d_%s%s",
 				projectContext.OrganizationID,
 				projectContext.ProjectID,
-				userID,
+				actor.ID,
 				ciphers.RandomHash(KNOWLEDGE_DOCUMENT_PREFIX), path.Ext(cntnt.GetName()))
 
 			fileContent := cntnt.GetContent()
@@ -228,7 +227,6 @@ func (knowledgeDocument *knowledgeDocumentService) CreateManualDocument(
 				Name:              cntnt.GetName(),
 				ProjectId:         projectContext.ProjectID,
 				OrganizationId:    projectContext.OrganizationID,
-				CreatedBy:         userID,
 				DocumentSize:      0,
 				DocumentStructure: documentStructure,
 				DocumentPath:      storageResponse.CompletePath,
@@ -259,7 +257,6 @@ func (knowledgeDocument *knowledgeDocumentService) CreateManualDocument(
 				Name:              cntnt.GetName(),
 				ProjectId:         projectContext.ProjectID,
 				OrganizationId:    projectContext.OrganizationID,
-				CreatedBy:         userID,
 				DocumentPath:      cntnt.GetName(),
 				DocumentStructure: documentStructure,
 				DocumentSize:      0,

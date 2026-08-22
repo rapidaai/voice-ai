@@ -8,6 +8,7 @@ package authenticators
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
@@ -40,7 +41,7 @@ func (authenticator *projectAuthenticator) Claim(ctx context.Context, claimToken
 		return nil, fmt.Errorf("project authentication returned actor type %q", ath.GetActorType())
 	}
 	credentialID, err := strconv.ParseUint(ath.GetActorId(), 10, 64)
-	if err != nil || credentialID == 0 {
+	if err != nil || credentialID == 0 || credentialID > math.MaxInt64 {
 		return nil, fmt.Errorf("project authentication returned invalid actor id")
 	}
 	authenticator.logger.Benchmark("Benchmarking: projectAuthenticator.Claim", time.Since(start))

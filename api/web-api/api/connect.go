@@ -92,11 +92,6 @@ func (wConnectApi *webConnectGRPCApi) GeneralConnect(ctx context.Context, kcr *p
 	if scopeErr != nil {
 		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
-	userContext, err := iAuth.UserContext()
-	if err != nil {
-		wConnectApi.logger.Errorf("unable to resolve user identity for connector callback: %v", err)
-		return utils.AuthenticateError[protos.GeneralConnectResponse]()
-	}
 	projectContext, err := iAuth.ProjectContext()
 	if err != nil {
 		wConnectApi.logger.Errorf("unable to resolve project context for connector callback: %v", err)
@@ -133,7 +128,7 @@ func (wConnectApi *webConnectGRPCApi) GeneralConnect(ctx context.Context, kcr *p
 	}
 
 	_, err = wConnectApi.vaultService.Create(
-		ctx, userContext.UserID, projectContext, decodedState.Provider, "connected-org-tool", credential)
+		ctx, iAuth, projectContext, decodedState.Provider, "connected-org-tool", credential)
 	if err != nil {
 		return utils.Error[protos.GeneralConnectResponse](err, "Unable to store the generated token")
 	}

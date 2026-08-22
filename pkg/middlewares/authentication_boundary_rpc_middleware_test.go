@@ -1,6 +1,7 @@
 package middlewares
 
 import (
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -28,7 +29,7 @@ func TestAuthenticationBoundaryGinAcceptsEveryCredentialClass(t *testing.T) {
 			engine := gin.New()
 			engine.Use(NewAuthenticationBoundaryMiddleware(
 				userAuthenticatorStub{},
-				&projectScopeClaimAuthenticatorStub{},
+				boundaryProjectScopeClaimAuthenticatorStub{},
 				organizationScopeClaimAuthenticatorStub{},
 				serviceScopeClaimAuthenticatorStub{},
 				nil,
@@ -44,6 +45,14 @@ func TestAuthenticationBoundaryGinAcceptsEveryCredentialClass(t *testing.T) {
 					t.Errorf("authentication type = %v, want %v", auth.Type(), test.expected)
 					ctx.Status(http.StatusInternalServerError)
 					return
+				}
+				if test.expected == types.AuthTypeOrg {
+					actor, err := auth.Actor()
+					if err != nil || actor != (types.ActorIdentity{Type: types.ActorTypeOrganization, ID: 3}) {
+						t.Errorf("organization actor = %+v, %v", actor, err)
+						ctx.Status(http.StatusInternalServerError)
+						return
+					}
 				}
 				ctx.Status(http.StatusNoContent)
 			})
@@ -80,12 +89,133 @@ func TestAuthenticationBoundaryGinAllowsPublicRequestWithoutCredential(t *testin
 	}
 }
 
+func TestAuthenticationBoundaryGinRejectsOutOfRangeUserActor(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	organizationID := uint64(2)
+	user := &types.PlainAuthPrinciple{
+		User:             types.UserInfo{Id: uint64(math.MaxInt64) + 1},
+		OrganizationRole: &types.OrganizaitonRole{OrganizationId: organizationID},
+	}
+	engine := gin.New()
+	engine.Use(NewAuthenticationBoundaryMiddleware(
+		projectSelectingUserAuthenticatorStub{auth: user},
+		boundaryProjectScopeClaimAuthenticatorStub{},
+		organizationScopeClaimAuthenticatorStub{},
+		serviceScopeClaimAuthenticatorStub{},
+		nil,
+	))
+	handlerCalled := false
+	engine.GET("/test", func(ctx *gin.Context) {
+		handlerCalled = true
+		ctx.Status(http.StatusNoContent)
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/test", nil)
+	request.Header.Set(types.AUTHORIZATION_KEY, "token")
+	request.Header.Set(types.AUTH_KEY, "1")
+	recorder := httptest.NewRecorder()
+	engine.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnauthorized)
+	}
+	if handlerCalled {
+		t.Fatal("handler called for out-of-range user actor")
+	}
+}
+
+func TestAuthenticationBoundaryGinRejectsInvalidProjectActor(t *testing.T) {
+	zeroActorID := uint64(0)
+	aboveMaxActorID := uint64(math.MaxInt64) + 1
+	tests := []struct {
+		name          string
+		authenticator boundaryProjectScopeClaimAuthenticatorStub
+	}{
+		{name: "missing", authenticator: boundaryProjectScopeClaimAuthenticatorStub{omitActor: true}},
+		{name: "zero", authenticator: boundaryProjectScopeClaimAuthenticatorStub{credentialID: &zeroActorID}},
+		{name: "above max bigint", authenticator: boundaryProjectScopeClaimAuthenticatorStub{credentialID: &aboveMaxActorID}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			engine := gin.New()
+			engine.Use(NewAuthenticationBoundaryMiddleware(
+				userAuthenticatorStub{},
+				test.authenticator,
+				organizationScopeClaimAuthenticatorStub{},
+				serviceScopeClaimAuthenticatorStub{},
+				nil,
+			))
+			handlerCalled := false
+			engine.GET("/test", func(ctx *gin.Context) {
+				handlerCalled = true
+				ctx.Status(http.StatusNoContent)
+			})
+
+			request := httptest.NewRequest(http.MethodGet, "/test", nil)
+			request.Header.Set(types.PROJECT_SCOPE_KEY, "project")
+			recorder := httptest.NewRecorder()
+			engine.ServeHTTP(recorder, request)
+
+			if recorder.Code != http.StatusUnauthorized {
+				t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnauthorized)
+			}
+			if handlerCalled {
+				t.Fatal("handler called for invalid project actor")
+			}
+		})
+	}
+}
+
+func TestAuthenticationBoundaryGinRejectsInvalidOrganizationActor(t *testing.T) {
+	zeroActorID := uint64(0)
+	aboveMaxActorID := uint64(math.MaxInt64) + 1
+	tests := []struct {
+		name          string
+		authenticator organizationScopeClaimAuthenticatorStub
+	}{
+		{name: "missing", authenticator: organizationScopeClaimAuthenticatorStub{omitActor: true}},
+		{name: "zero", authenticator: organizationScopeClaimAuthenticatorStub{credentialID: &zeroActorID}},
+		{name: "above max bigint", authenticator: organizationScopeClaimAuthenticatorStub{credentialID: &aboveMaxActorID}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			engine := gin.New()
+			engine.Use(NewAuthenticationBoundaryMiddleware(
+				userAuthenticatorStub{},
+				boundaryProjectScopeClaimAuthenticatorStub{},
+				test.authenticator,
+				serviceScopeClaimAuthenticatorStub{},
+				nil,
+			))
+			handlerCalled := false
+			engine.GET("/test", func(ctx *gin.Context) {
+				handlerCalled = true
+				ctx.Status(http.StatusNoContent)
+			})
+			request := httptest.NewRequest(http.MethodGet, "/test", nil)
+			request.Header.Set(types.ORG_SCOPE_KEY, "organization")
+			recorder := httptest.NewRecorder()
+			engine.ServeHTTP(recorder, request)
+			if recorder.Code != http.StatusUnauthorized {
+				t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnauthorized)
+			}
+			if handlerCalled {
+				t.Fatal("handler called for invalid organization actor")
+			}
+		})
+	}
+}
+
 func TestAuthenticationBoundaryGinRejectsConflictingCredentials(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
 	engine.Use(NewAuthenticationBoundaryMiddleware(
 		userAuthenticatorStub{},
-		&projectScopeClaimAuthenticatorStub{},
+		boundaryProjectScopeClaimAuthenticatorStub{},
 		organizationScopeClaimAuthenticatorStub{},
 		serviceScopeClaimAuthenticatorStub{},
 		nil,

@@ -158,39 +158,6 @@ func (assistant *webAssistantGRPCApi) GetAssistant(c context.Context, iRequest *
 			"Unable to get your assistant, please try again in sometime.")
 	}
 
-	if _assistant.GetSuccess() {
-		if _assistant.GetData() != nil {
-			_assistant.GetData().CreatedUser = assistant.GetUser(c, iAuth, _assistant.GetData().GetCreatedBy())
-		}
-
-		providerModel := _assistant.GetData().GetAssistantProviderModel()
-		if providerModel != nil {
-			user := assistant.GetUser(c, iAuth, providerModel.GetCreatedBy())
-			providerModel.CreatedUser = user
-			_assistant.GetData().AssistantProviderModel = providerModel
-		}
-
-		agentKit := _assistant.GetData().GetAssistantProviderAgentkit()
-		if agentKit != nil {
-			user := assistant.GetUser(c, iAuth, agentKit.GetCreatedBy())
-			agentKit.CreatedUser = user
-			_assistant.GetData().AssistantProviderAgentkit = agentKit
-		}
-
-		websocket := _assistant.GetData().GetAssistantProviderWebsocket()
-		if websocket != nil {
-			user := assistant.GetUser(c, iAuth, websocket.GetCreatedBy())
-			websocket.CreatedUser = user
-			_assistant.GetData().AssistantProviderWebsocket = websocket
-		}
-
-		agentflow := _assistant.GetData().GetAssistantProviderAgentflow()
-		if agentflow != nil {
-			user := assistant.GetUser(c, iAuth, agentflow.GetCreatedBy())
-			agentflow.CreatedUser = user
-			_assistant.GetData().AssistantProviderAgentflow = agentflow
-		}
-	}
 	return _assistant, nil
 }
 
@@ -216,37 +183,6 @@ func (assistant *webAssistantGRPCApi) GetAllAssistant(c context.Context, iReques
 			"Unable to get your assistant, please try again in sometime.")
 	}
 
-	for _, ast := range _assistant {
-		ast.CreatedUser = assistant.GetUser(c, iAuth, ast.GetCreatedBy())
-
-		providerModel := ast.GetAssistantProviderModel()
-		if providerModel != nil {
-			user := assistant.GetUser(c, iAuth, providerModel.GetCreatedBy())
-			providerModel.CreatedUser = user
-			ast.AssistantProviderModel = providerModel
-		}
-
-		agentKit := ast.GetAssistantProviderAgentkit()
-		if agentKit != nil {
-			user := assistant.GetUser(c, iAuth, agentKit.GetCreatedBy())
-			agentKit.CreatedUser = user
-			ast.AssistantProviderAgentkit = agentKit
-		}
-
-		websocket := ast.GetAssistantProviderWebsocket()
-		if websocket != nil {
-			user := assistant.GetUser(c, iAuth, websocket.GetCreatedBy())
-			websocket.CreatedUser = user
-			ast.AssistantProviderWebsocket = websocket
-		}
-
-		agentflow := ast.GetAssistantProviderAgentflow()
-		if agentflow != nil {
-			user := assistant.GetUser(c, iAuth, agentflow.GetCreatedBy())
-			agentflow.CreatedUser = user
-			ast.AssistantProviderAgentflow = agentflow
-		}
-	}
 	return utils.PaginatedSuccess[protos.GetAllAssistantResponse, []*protos.Assistant](
 		_page.GetTotalItem(), _page.GetCurrentPage(),
 		_assistant)
@@ -281,28 +217,6 @@ func (assistantGRPCApi *webAssistantGRPCApi) GetAllAssistantProvider(ctx context
 			"Unable to get your assistant provider models, please try again in sometime.")
 	}
 
-	for _, ast := range _assistantProviders {
-		if ast.GetAssistantProvider() != nil {
-			switch assistantProvider := ast.GetAssistantProvider().(type) {
-			case *protos.GetAllAssistantProviderResponse_AssistantProvider_AssistantProviderAgentkit:
-				user := assistantGRPCApi.GetUser(ctx, iAuth, assistantProvider.AssistantProviderAgentkit.GetCreatedBy())
-				assistantProvider.AssistantProviderAgentkit.CreatedUser = user
-				ast.AssistantProvider = assistantProvider
-			case *protos.GetAllAssistantProviderResponse_AssistantProvider_AssistantProviderModel:
-				user := assistantGRPCApi.GetUser(ctx, iAuth, assistantProvider.AssistantProviderModel.GetCreatedBy())
-				assistantProvider.AssistantProviderModel.CreatedUser = user
-				ast.AssistantProvider = assistantProvider
-			case *protos.GetAllAssistantProviderResponse_AssistantProvider_AssistantProviderWebsocket:
-				user := assistantGRPCApi.GetUser(ctx, iAuth, assistantProvider.AssistantProviderWebsocket.GetCreatedBy())
-				assistantProvider.AssistantProviderWebsocket.CreatedUser = user
-				ast.AssistantProvider = assistantProvider
-			case *protos.GetAllAssistantProviderResponse_AssistantProvider_AssistantProviderAgentflow:
-				user := assistantGRPCApi.GetUser(ctx, iAuth, assistantProvider.AssistantProviderAgentflow.GetCreatedBy())
-				assistantProvider.AssistantProviderAgentflow.CreatedUser = user
-				ast.AssistantProvider = assistantProvider
-			}
-		}
-	}
 	return &protos.GetAllAssistantProviderResponse{
 		Code:      200,
 		Success:   true,

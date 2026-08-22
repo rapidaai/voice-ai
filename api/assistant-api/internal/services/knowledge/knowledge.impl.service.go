@@ -112,26 +112,22 @@ func (knowledge *knowledgeService) CreateOrUpdateKnowledgeTag(ctx context.Contex
 	knowledgeId uint64,
 	tags []string,
 ) (*internal_knowledge_gorm.KnowledgeTag, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
+	if _, err := auth.Actor(); err != nil {
 		return nil, err
 	}
 	if _, err := auth.ProjectContext(); err != nil {
 		return nil, err
 	}
-	userID := userContext.UserID
 	db := knowledge.postgres.DB(ctx)
 	knowledgeTag := &internal_knowledge_gorm.KnowledgeTag{
 		KnowledgeId: knowledgeId,
 		Tag:         tags,
-		CreatedBy:   userID,
-		UpdatedBy:   userID,
 	}
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "knowledge_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"tag",
-			"updated_by"}),
+		}),
 	}).Create(&knowledgeTag)
 
 	if tx.Error != nil {
@@ -146,27 +142,23 @@ func (knowledge *knowledgeService) CreateKnowledge(ctx context.Context, auth *ty
 	embeddingModelProviderName string,
 	embeddingModelOptions []*protos.Metadata,
 ) (*internal_knowledge_gorm.Knowledge, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
+	if _, err := auth.Actor(); err != nil {
 		return nil, err
 	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
-	userID := userContext.UserID
 	db := knowledge.postgres.DB(ctx)
 	knowledgeId := gorm_generator.ID()
 	_knowledge := &internal_knowledge_gorm.Knowledge{
 		Audited: gorm_models.Audited{
 			Id: knowledgeId,
 		},
-		Name:           name,
-		ProjectId:      projectContext.ProjectID,
-		OrganizationId: projectContext.OrganizationID,
-		Mutable: gorm_models.Mutable{
-			CreatedBy: userID,
-		},
+		Name:                       name,
+		ProjectId:                  projectContext.ProjectID,
+		OrganizationId:             projectContext.OrganizationID,
+		Mutable:                    gorm_models.Mutable{},
 		EmbeddingModelProviderName: embeddingModelProviderName,
 		StorageNamespace:           commons.KnowledgeIndex(knowledge.config.IsDevelopment(), projectContext.OrganizationID, projectContext.ProjectID, knowledgeId),
 	}
@@ -190,9 +182,7 @@ func (knowledge *knowledgeService) CreateKnowledge(ctx context.Context, auth *ty
 		modelOptions = append(modelOptions, &internal_knowledge_gorm.KnowledgeEmbeddingModelOption{
 			KnowledgeId: _knowledge.Id,
 			Mutable: gorm_models.Mutable{
-				CreatedBy: userID,
-				UpdatedBy: userID,
-				Status:    type_enums.RECORD_ACTIVE,
+				Status: type_enums.RECORD_ACTIVE,
 			},
 			Metadata: gorm_models.Metadata{
 				Key:   v.GetKey(),
@@ -204,7 +194,7 @@ func (knowledge *knowledgeService) CreateKnowledge(ctx context.Context, auth *ty
 		Columns: []clause.Column{{Name: "knowledge_id"}, {Name: "key"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value",
-			"updated_by"}),
+		}),
 	}).Create(modelOptions)
 	_knowledge.KnowledgeEmbeddingModelOptions = modelOptions
 	if tx.Error != nil {
@@ -219,22 +209,18 @@ func (eService *knowledgeService) UpdateKnowledgeDetail(ctx context.Context,
 	auth *types.Authentication,
 	knowledgeId uint64,
 	name, description string) (*internal_knowledge_gorm.Knowledge, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
+	if _, err := auth.Actor(); err != nil {
 		return nil, err
 	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
-	userID := userContext.UserID
 	db := eService.postgres.DB(ctx)
 	ed := &internal_knowledge_gorm.Knowledge{
 		Name:        name,
 		Description: description,
-		Mutable: gorm_models.Mutable{
-			UpdatedBy: userID,
-		},
+		Mutable:     gorm_models.Mutable{},
 	}
 	tx := db.Where("id = ? AND project_id = ? AND organization_id = ?", knowledgeId,
 		projectContext.ProjectID,

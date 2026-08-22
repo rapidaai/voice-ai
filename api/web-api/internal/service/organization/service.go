@@ -2,31 +2,75 @@ package internal_organization_service
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"math"
+	"strings"
+	"time"
 
 	internal_entity "github.com/rapidaai/api/web-api/internal/entity"
 	internal_services "github.com/rapidaai/api/web-api/internal/service"
+	"github.com/rapidaai/pkg/ciphers"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
+	gorm_generators "github.com/rapidaai/pkg/models/gorm/generators"
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 )
 
-func NewOrganizationService(logger commons.Logger, postgres connectors.PostgresConnector) internal_services.OrganizationService {
+func NewOrganizationService(logger commons.Logger, postgres connectors.PostgresConnector, fingerprintKey ...string) internal_services.OrganizationService {
+	var key string
+	if len(fingerprintKey) > 0 {
+		key = fingerprintKey[0]
+	}
 	return &organizationService{
-		logger:   logger,
-		postgres: postgres,
+		logger:         logger,
+		postgres:       postgres,
+		fingerprintKey: []byte(key),
 	}
 }
 
+func NewOrganizationAuthenticator(logger commons.Logger, postgres connectors.PostgresConnector, fingerprintKey string) types.ClaimAuthenticator[*types.OrganizationScope] {
+	return &organizationService{logger: logger, postgres: postgres, fingerprintKey: []byte(fingerprintKey)}
+}
+
 type organizationService struct {
-	logger   commons.Logger
-	postgres connectors.PostgresConnector
+	logger         commons.Logger
+	postgres       connectors.PostgresConnector
+	fingerprintKey []byte
+}
+
+func (oS *organizationService) Claim(ctx context.Context, claimToken string) (*types.PlainClaimPrinciple[*types.OrganizationScope], error) {
+	fingerprint, err := oS.fingerprint(claimToken)
+	if err != nil {
+		return nil, err
+	}
+	var scope types.OrganizationScope
+	tx := oS.postgres.DB(ctx).
+		Table("organization_credentials").
+		Select("id AS credential_id, organization_id, status").
+		Where("key = ? AND status = ?", fingerprint, type_enums.RECORD_ACTIVE).
+		Take(&scope)
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+	scope.CurrentToken = claimToken
+	if !scope.IsAuthenticated() {
+		return nil, errors.New("organization credential has invalid identity")
+	}
+	return &types.PlainClaimPrinciple[*types.OrganizationScope]{Info: &scope}, nil
 }
 
 func (oS *organizationService) Create(ctx context.Context, auth *types.Authentication, name string, size string, industry string) (*internal_entity.Organization, error) {
-	userContext, err := auth.UserContext()
+	actor, err := authenticatedUserActor(auth)
 	if err != nil {
+		return nil, err
+	}
+	mutable := gorm_models.Mutable{Status: type_enums.RECORD_ACTIVE}
+	if err := mutable.SetCreatedActor(actor); err != nil {
 		return nil, err
 	}
 	db := oS.postgres.DB(ctx)
@@ -34,10 +78,7 @@ func (oS *organizationService) Create(ctx context.Context, auth *types.Authentic
 		Name:     name,
 		Industry: industry,
 		Size:     size,
-		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: userContext.UserID,
-		},
+		Mutable:  mutable,
 	}
 	tx := db.Save(org)
 	if err := tx.Error; err != nil {
@@ -58,31 +99,182 @@ func (oS *organizationService) Get(ctx context.Context, organizationId uint64) (
 }
 
 func (oS *organizationService) Update(ctx context.Context, auth *types.Authentication, organizationId uint64, name *string, industry *string, email *string) (*internal_entity.Organization, error) {
-	userContext, err := auth.UserContext()
+	actor, err := credentialActor(auth, organizationId)
 	if err != nil {
 		return nil, err
 	}
 	db := oS.postgres.DB(ctx)
-	org := &internal_entity.Organization{
-		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			UpdatedBy: userContext.UserID,
-		},
+	updates := map[string]interface{}{
+		"status":             type_enums.RECORD_ACTIVE,
+		"updated_actor_type": string(actor.Type),
+		"updated_actor_id":   actor.ID,
+		"updated_date":       time.Now(),
 	}
 
 	if name != nil {
-		org.Name = *name
+		updates["name"] = *name
 	}
 	if industry != nil {
-		org.Industry = *industry
+		updates["industry"] = *industry
 	}
 	if email != nil {
-		org.Contact = *email
+		updates["contact"] = *email
 	}
-	tx := db.Where("id = ? ", organizationId).Updates(org)
+	org := &internal_entity.Organization{}
+	tx := db.Model(org).Where("id = ? ", organizationId).Updates(updates)
 	if err := tx.Error; err != nil {
 		return nil, err
 	} else {
 		return org, nil
 	}
+}
+
+func (oS *organizationService) CreateCredential(ctx context.Context, auth *types.Authentication, organizationId uint64, name string) (*internal_entity.OrganizationCredential, string, error) {
+	if organizationId == 0 || organizationId > math.MaxInt64 || strings.TrimSpace(name) == "" {
+		return nil, "", errors.New("organization credential requires a valid organization and name")
+	}
+	actor, err := credentialActor(auth, organizationId)
+	if err != nil {
+		return nil, "", err
+	}
+	rawKey := types.ORG_KEY_PREFIX + ciphers.Token("organization")
+	fingerprint, err := oS.fingerprint(rawKey)
+	if err != nil {
+		return nil, "", err
+	}
+	credentialID := gorm_generators.ID()
+	if credentialID == 0 || credentialID > math.MaxInt64 {
+		return nil, "", errors.New("organization credential generated an invalid id")
+	}
+	mutable := gorm_models.Mutable{Status: type_enums.RECORD_ACTIVE}
+	if err := mutable.SetCreatedActor(actor); err != nil {
+		return nil, "", err
+	}
+	credential := &internal_entity.OrganizationCredential{
+		Audited: gorm_models.Audited{
+			Id: credentialID,
+		},
+		OrganizationId: organizationId,
+		Name:           strings.TrimSpace(name),
+		Key:            fingerprint,
+		Mutable:        mutable,
+	}
+	if err := oS.postgres.DB(ctx).Create(credential).Error; err != nil {
+		return nil, "", err
+	}
+	return credential, rawKey, nil
+}
+
+func (oS *organizationService) RotateCredential(ctx context.Context, auth *types.Authentication, organizationId, credentialId uint64) (*internal_entity.OrganizationCredential, string, error) {
+	if err := validCredentialIdentity(organizationId, credentialId); err != nil {
+		return nil, "", err
+	}
+	actor, err := credentialActor(auth, organizationId)
+	if err != nil {
+		return nil, "", err
+	}
+	rawKey := types.ORG_KEY_PREFIX + ciphers.Token("organization")
+	fingerprint, err := oS.fingerprint(rawKey)
+	if err != nil {
+		return nil, "", err
+	}
+	credential := &internal_entity.OrganizationCredential{}
+	tx := oS.postgres.DB(ctx).Model(credential).
+		Where("id = ? AND organization_id = ? AND status = ?", credentialId, organizationId, type_enums.RECORD_ACTIVE).
+		Updates(map[string]interface{}{
+			"key":                fingerprint,
+			"updated_actor_type": string(actor.Type),
+			"updated_actor_id":   actor.ID,
+			"updated_date":       time.Now(),
+		})
+	if tx.Error != nil {
+		return nil, "", tx.Error
+	}
+	if tx.RowsAffected != 1 {
+		return nil, "", errors.New("active organization credential not found")
+	}
+	if err := oS.postgres.DB(ctx).Where("id = ?", credentialId).Take(credential).Error; err != nil {
+		return nil, "", err
+	}
+	return credential, rawKey, nil
+}
+
+func (oS *organizationService) ArchiveCredential(ctx context.Context, auth *types.Authentication, organizationId, credentialId uint64) (*internal_entity.OrganizationCredential, error) {
+	if err := validCredentialIdentity(organizationId, credentialId); err != nil {
+		return nil, err
+	}
+	actor, err := credentialActor(auth, organizationId)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	credential := &internal_entity.OrganizationCredential{}
+	tx := oS.postgres.DB(ctx).Model(credential).
+		Where("id = ? AND organization_id = ? AND status = ?", credentialId, organizationId, type_enums.RECORD_ACTIVE).
+		Updates(map[string]interface{}{
+			"status":             type_enums.RECORD_ARCHIEVE,
+			"archived_date":      now,
+			"updated_actor_type": string(actor.Type),
+			"updated_actor_id":   actor.ID,
+			"updated_date":       now,
+		})
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+	if tx.RowsAffected != 1 {
+		return nil, errors.New("active organization credential not found")
+	}
+	if err := oS.postgres.DB(ctx).Where("id = ?", credentialId).Take(credential).Error; err != nil {
+		return nil, err
+	}
+	return credential, nil
+}
+
+func (oS *organizationService) fingerprint(rawKey string) (string, error) {
+	if len(oS.fingerprintKey) == 0 || strings.TrimSpace(rawKey) == "" {
+		return "", errors.New("organization credential fingerprint key and credential are required")
+	}
+	mac := hmac.New(sha256.New, oS.fingerprintKey)
+	_, _ = mac.Write([]byte(rawKey))
+	return hex.EncodeToString(mac.Sum(nil)), nil
+}
+
+func credentialActor(auth *types.Authentication, organizationId uint64) (types.ActorIdentity, error) {
+	actor, err := authenticatedUserActor(auth)
+	if err != nil {
+		return types.ActorIdentity{}, err
+	}
+	organizationContext, err := auth.OrganizationContext()
+	if err != nil {
+		return types.ActorIdentity{}, err
+	}
+	if organizationContext.OrganizationID != organizationId {
+		return types.ActorIdentity{}, errors.New("organization credential scope does not match authentication organization")
+	}
+	return actor, nil
+}
+
+func authenticatedUserActor(auth *types.Authentication) (types.ActorIdentity, error) {
+	if auth == nil {
+		return types.ActorIdentity{}, types.ErrActorUnavailable
+	}
+	if _, err := auth.Scope(types.AuthTypeUser); err != nil {
+		return types.ActorIdentity{}, err
+	}
+	actor, err := auth.Actor()
+	if err != nil {
+		return types.ActorIdentity{}, err
+	}
+	userContext, err := auth.UserContext()
+	if err != nil || userContext.UserID != actor.ID {
+		return types.ActorIdentity{}, types.ErrActorUnavailable
+	}
+	return actor, nil
+}
+
+func validCredentialIdentity(organizationId, credentialId uint64) error {
+	if organizationId == 0 || organizationId > math.MaxInt64 || credentialId == 0 || credentialId > math.MaxInt64 {
+		return errors.New("organization credential identity is invalid")
+	}
+	return nil
 }

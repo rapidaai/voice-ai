@@ -14,6 +14,7 @@ import (
 
 type ExternalAudit struct {
 	gorm_model.Audited
+	gorm_model.ActorAudit
 	IntegrationName        string                  `json:"integrationName" gorm:"type:string;size:200;not null"`
 	AssetPrefix            string                  `json:"assetPrefix" gorm:"type:string;size:200;not null"`
 	ResponseStatus         int64                   `json:"responseStatus" gorm:"type:bigint;size:10"`
@@ -56,6 +57,7 @@ func (epm *ExternalAudit) SetMetrics(metrics []*protos.Metric) {
 
 type ExternalAuditMetadata struct {
 	gorm_model.Audited
+	gorm_model.ActorAudit
 	ExternalAuditId uint64 `json:"externalAuditId" gorm:"type:bigint;not null"`
 	Key             string `json:"key" gorm:"type:string;size:200;not null"`
 	Value           string `json:"value" gorm:"type:string;size:1000;not null"`

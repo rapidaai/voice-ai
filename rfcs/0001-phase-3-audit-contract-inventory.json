@@ -1,0 +1,162 @@
+{
+  "rfc": "0001-actor-aware-audit-identity",
+  "phase": "3",
+  "generation": "Source inventory of public handlers, canonical service writers, migrations, protobuf sources, SDK roots, and UI references on 2026-08-22",
+  "counts": {
+    "administrative_public_mutation_edges": 83,
+    "assistant_api": 48,
+    "endpoint_api": 9,
+    "web_api": 25,
+    "integration_api": 1,
+    "runtime_persistence_handlers": 6,
+    "integration_lifecycle_handlers": 1,
+    "all_canonical_persistence_handlers": 90,
+    "audited_tables": 67
+  },
+  "audited_table_inventory": {
+    "assistant_api": ["assistant_api_deployments","assistant_configuration_options","assistant_configurations","assistant_conversation_action_metrics","assistant_conversation_arguments","assistant_conversation_message_metadata","assistant_conversation_message_metrics","assistant_conversation_messages","assistant_conversation_metadata","assistant_conversation_metrics","assistant_conversation_options","assistant_conversation_recordings","assistant_conversations","assistant_debugger_deployments","assistant_deployment_audio_options","assistant_deployment_audios","assistant_deployment_telephony_options","assistant_deployment_whatsapp_options","assistant_knowledge_logs","assistant_knowledge_reranker_options","assistant_knowledges","assistant_phone_deployments","assistant_provider_agentflows","assistant_provider_agentkits","assistant_provider_model_options","assistant_provider_models","assistant_provider_websockets","assistant_tags","assistant_tool_logs","assistant_tool_options","assistant_tools","assistant_web_plugin_deployments","assistant_http_logs","assistant_whatsapp_deployments","assistants","knowledge_document_process_rules","knowledge_documents","knowledge_embedding_model_options","knowledge_logs","knowledge_tags","knowledges"],
+    "endpoint_api": ["endpoint_cachings","endpoint_log_arguments","endpoint_log_metadata","endpoint_log_metrics","endpoint_log_options","endpoint_provider_model_options","endpoint_provider_models","endpoint_retries","endpoint_tags","endpoints"],
+    "web_api": ["notification_settings","organization_credentials","organizations","project_credentials","projects","service_identities","system_identities","user_auth_tokens","user_auths","user_feature_permissions","user_organization_roles","user_project_roles","user_roles","vaults"],
+    "integration_api": ["external_audits","external_audit_metadata"]
+  },
+  "derived_table_dispositions": {
+    "assistant_conversation_action_metrics": "Derived conversation action execution; inherits the initiating runtime request actor.",
+    "assistant_knowledge_logs": "Derived assistant knowledge execution; inherits the initiating assistant/runtime actor.",
+    "assistant_tool_logs": "Derived assistant tool execution; inherits the initiating assistant/runtime actor.",
+    "knowledge_embedding_model_options": "Child of knowledge configuration creation/update; inherits the canonical knowledge mutation actor.",
+    "knowledge_logs": "Derived knowledge indexing/query execution; inherits the initiating authenticated actor or registered system actor.",
+    "user_feature_permissions": "Derived role/permission assignment; inherits the canonical membership or role mutation actor.",
+    "user_roles": "Bootstrap or administrative role assignment; new rows require the initiating user or registered system actor.",
+    "external_audits": "Integration execution record; canonical integration invocation writes its authenticated or service actor.",
+    "external_audit_metadata": "CreateMetadata and derived integration metadata writes use the authenticated actor and update actor on conflict."
+  },
+  "administrative_public_edges": {
+    "assistant_api": [
+      {"file":"api/assistant-api/api/assistant/create_assistant.go","handlers":["CreateAssistant"],"owner":"assistantService.CreateAssistant","tables":["assistants"]},
+      {"file":"api/assistant-api/api/assistant/create_assistant_rest.go","handlers":["CreateAssistantRest"],"owner":"assistantService.CreateAssistant","tables":["assistants"]},
+      {"file":"api/assistant-api/api/assistant/update_assistant_detail.go","handlers":["UpdateAssistantDetail"],"owner":"assistantService.UpdateAssistantDetail","tables":["assistants"]},
+      {"file":"api/assistant-api/api/assistant/update_assistant_version.go","handlers":["UpdateAssistantVersion"],"owner":"assistantService.UpdateAssistantVersion","tables":["assistants"]},
+      {"file":"api/assistant-api/api/assistant/delete_assistant.go","handlers":["DeleteAssistant"],"owner":"assistantService.DeleteAssistant","tables":["assistants"]},
+      {"file":"api/assistant-api/api/assistant/create_assistant_configuration.go","handlers":["CreateAssistantConfiguration"],"owner":"assistantConfigurationService.Create","tables":["assistant_configurations","assistant_configuration_options"]},
+      {"file":"api/assistant-api/api/assistant/update_assistant_configuration.go","handlers":["UpdateAssistantConfiguration"],"owner":"assistantConfigurationService.Update","tables":["assistant_configurations","assistant_configuration_options"]},
+      {"file":"api/assistant-api/api/assistant/delete_assistant_configuration.go","handlers":["DeleteAssistantConfiguration"],"owner":"assistantConfigurationService.Delete","tables":["assistant_configurations"]},
+      {"file":"api/assistant-api/api/assistant/assistant_configuration_rest.go","handlers":["CreateAssistantConfigurationRest","UpdateAssistantConfigurationRest","DeleteAssistantConfigurationRest"],"owner":"assistantConfigurationService","tables":["assistant_configurations","assistant_configuration_options"]},
+      {"file":"api/assistant-api/api/assistant/create_assistant_provider.go","handlers":["CreateAssistantProvider"],"owner":"assistantService provider creation methods","tables":["assistant_provider_models","assistant_provider_model_options","assistant_provider_agentkits","assistant_provider_websockets","assistant_provider_agentflows"]},
+      {"file":"api/assistant-api/api/assistant/create_assistant_tag.go","handlers":["CreateAssistantTag"],"owner":"assistantService.CreateOrUpdateAssistantTag","tables":["assistant_tags"]},
+      {"file":"api/assistant-api/api/assistant/create_assistant_knowledge.go","handlers":["CreateAssistantKnowledge"],"owner":"assistantKnowledgeService.Create","tables":["assistant_knowledges","assistant_knowledge_reranker_options"]},
+      {"file":"api/assistant-api/api/assistant/update_assistant_knowledge.go","handlers":["UpdateAssistantKnowledge"],"owner":"assistantKnowledgeService.Update","tables":["assistant_knowledges","assistant_knowledge_reranker_options"]},
+      {"file":"api/assistant-api/api/assistant/delete_assistant_knowledge.go","handlers":["DeleteAssistantKnowledge"],"owner":"assistantKnowledgeService.Delete","tables":["assistant_knowledges"]},
+      {"file":"api/assistant-api/api/assistant/create_assistant_tool.go","handlers":["CreateAssistantTool"],"owner":"assistantToolService.Create","tables":["assistant_tools","assistant_tool_options"]},
+      {"file":"api/assistant-api/api/assistant/update_assistant_tool.go","handlers":["UpdateAssistantTool"],"owner":"assistantToolService.Update","tables":["assistant_tools","assistant_tool_options"]},
+      {"file":"api/assistant-api/api/assistant/delete_assistant_tool.go","handlers":["DeleteAssistantTool"],"owner":"assistantToolService.Delete","tables":["assistant_tools"]},
+      {"file":"api/assistant-api/api/assistant-deployment/create_assistant_api_deployment.go","handlers":["CreateAssistantApiDeployment"],"owner":"assistantDeploymentService.CreateApiDeployment","tables":["assistant_api_deployments","assistant_deployment_audios","assistant_deployment_audio_options"]},
+      {"file":"api/assistant-api/api/assistant-deployment/create_assistant_api_deployment_rest.go","handlers":["CreateAssistantApiDeploymentRest"],"owner":"assistantDeploymentService.CreateApiDeployment","tables":["assistant_api_deployments","assistant_deployment_audios","assistant_deployment_audio_options"]},
+      {"file":"api/assistant-api/api/assistant-deployment/create_assistant_debugger_deployment.go","handlers":["CreateAssistantDebuggerDeployment"],"owner":"assistantDeploymentService.CreateDebuggerDeployment","tables":["assistant_debugger_deployments","assistant_deployment_audios","assistant_deployment_audio_options"]},
+      {"file":"api/assistant-api/api/assistant-deployment/create_assistant_debugger_deployment_rest.go","handlers":["CreateAssistantDebuggerDeploymentRest"],"owner":"assistantDeploymentService.CreateDebuggerDeployment","tables":["assistant_debugger_deployments","assistant_deployment_audios","assistant_deployment_audio_options"]},
+      {"file":"api/assistant-api/api/assistant-deployment/create_assistant_phone_deployment.go","handlers":["CreateAssistantPhoneDeployment"],"owner":"assistantDeploymentService.CreatePhoneDeployment","tables":["assistant_phone_deployments","assistant_deployment_audios","assistant_deployment_audio_options","assistant_deployment_telephony_options"]},
+      {"file":"api/assistant-api/api/assistant-deployment/create_assistant_phone_deployment_rest.go","handlers":["CreateAssistantPhoneDeploymentRest"],"owner":"assistantDeploymentService.CreatePhoneDeployment","tables":["assistant_phone_deployments","assistant_deployment_audios","assistant_deployment_audio_options","assistant_deployment_telephony_options"]},
+      {"file":"api/assistant-api/api/assistant-deployment/create_assistant_webplugin_deployment.go","handlers":["CreateAssistantWebpluginDeployment"],"owner":"assistantDeploymentService.CreateWebPluginDeployment","tables":["assistant_web_plugin_deployments","assistant_deployment_audios","assistant_deployment_audio_options"]},
+      {"file":"api/assistant-api/api/assistant-deployment/create_assistant_webplugin_deployment_rest.go","handlers":["CreateAssistantWebpluginDeploymentRest"],"owner":"assistantDeploymentService.CreateWebPluginDeployment","tables":["assistant_web_plugin_deployments","assistant_deployment_audios","assistant_deployment_audio_options"]},
+      {"file":"api/assistant-api/api/assistant-deployment/create_assistant_whatsapp_deployment.go","handlers":["CreateAssistantWhatsappDeployment"],"owner":"assistantDeploymentService.CreateWhatsappDeployment","tables":["assistant_whatsapp_deployments","assistant_deployment_audios","assistant_deployment_audio_options","assistant_deployment_whatsapp_options"]},
+      {"file":"api/assistant-api/api/assistant-deployment/create_assistant_whatsapp_deployment_rest.go","handlers":["CreateAssistantWhatsappDeploymentRest"],"owner":"assistantDeploymentService.CreateWhatsappDeployment","tables":["assistant_whatsapp_deployments","assistant_deployment_audios","assistant_deployment_audio_options","assistant_deployment_whatsapp_options"]},
+      {"file":"api/assistant-api/api/assistant-deployment/disable_assistant_api_deployment.go","handlers":["DisableAssistantApiDeployment"],"owner":"assistantDeploymentService.DisableApiDeployment","tables":["assistant_api_deployments"]},
+      {"file":"api/assistant-api/api/assistant-deployment/disable_assistant_debugger_deployment.go","handlers":["DisableAssistantDebuggerDeployment"],"owner":"assistantDeploymentService.DisableDebuggerDeployment","tables":["assistant_debugger_deployments"]},
+      {"file":"api/assistant-api/api/assistant-deployment/disable_assistant_phone_deployment.go","handlers":["DisableAssistantPhoneDeployment"],"owner":"assistantDeploymentService.DisablePhoneDeployment","tables":["assistant_phone_deployments"]},
+      {"file":"api/assistant-api/api/assistant-deployment/disable_assistant_webplugin_deployment.go","handlers":["DisableAssistantWebpluginDeployment"],"owner":"assistantDeploymentService.DisableWebPluginDeployment","tables":["assistant_web_plugin_deployments"]},
+      {"file":"api/assistant-api/api/assistant-deployment/disable_assistant_whatsapp_deployment.go","handlers":["DisableAssistantWhatsappDeployment"],"owner":"assistantDeploymentService.DisableWhatsappDeployment","tables":["assistant_whatsapp_deployments"]},
+      {"file":"api/assistant-api/api/assistant/retry_assistant_http_log.go","handlers":["RetryAssistantHTTPLog"],"owner":"httpLogService.RetryLog/CreateLog","tables":["assistant_http_logs"]},
+      {"file":"api/assistant-api/api/knowledge/create_knowledge.go","handlers":["CreateKnowledge"],"owner":"knowledgeService.CreateKnowledge","tables":["knowledges","knowledge_tags"]},
+      {"file":"api/assistant-api/api/knowledge/update_knowledge_detail.go","handlers":["UpdateKnowledgeDetail"],"owner":"knowledgeService.UpdateKnowledgeDetail","tables":["knowledges"]},
+      {"file":"api/assistant-api/api/knowledge/create_knowledge_tag.go","handlers":["CreateKnowledgeTag"],"owner":"knowledgeService.CreateOrUpdateKnowledgeTag","tables":["knowledge_tags"]},
+      {"file":"api/assistant-api/api/knowledge/create_knowledge_document.go","handlers":["CreateKnowledgeDocument"],"owner":"knowledgeDocumentService","tables":["knowledge_documents","knowledge_document_process_rules"]},
+      {"file":"api/assistant-api/api/knowledge/update_knowledge_document_segment.go","handlers":["UpdateKnowledgeDocumentSegment"],"owner":"document/indexer service","tables":[]},
+      {"file":"api/assistant-api/api/knowledge/delete_knowledge_document_segment.go","handlers":["DeleteKnowledgeDocumentSegment"],"owner":"document/indexer service","tables":[]},
+      {"file":"api/assistant-api/api/knowledge/index_knowledge_document.go","handlers":["IndexKnowledgeDocument"],"owner":"document/indexer service","tables":["knowledge_documents"]},
+      {"file":"api/assistant-api/api/talk/outbound_call.go","handlers":["CreatePhoneCall","CreateBulkPhoneCall"],"owner":"conversation pipeline","tables":["assistant_conversations"]},
+      {"file":"api/assistant-api/api/talk/outbound_call_rest.go","handlers":["CreatePhoneCallRest"],"owner":"conversation pipeline","tables":["assistant_conversations"]},
+      {"file":"api/assistant-api/api/talk/outbound_bulk_call_rest.go","handlers":["CreateBulkPhoneCallRest"],"owner":"conversation pipeline","tables":["assistant_conversations"]},
+      {"file":"api/assistant-api/api/talk/metric.go","handlers":["CreateConversationMetric","CreateMessageMetric"],"owner":"conversation/message metric services","tables":["assistant_conversation_metrics","assistant_conversation_message_metrics"]}
+    ],
+    "endpoint_api": [
+      {"file":"api/endpoint-api/api/create-endpoint.go","handlers":["CreateEndpoint"],"owner":"endpointService.CreateEndpoint","tables":["endpoints"]},
+      {"file":"api/endpoint-api/api/create-endpoint-provider-model.go","handlers":["CreateEndpointProviderModel"],"owner":"endpointService.CreateEndpointProviderModel","tables":["endpoint_provider_models","endpoint_provider_model_options"]},
+      {"file":"api/endpoint-api/api/create-endpoint-retry-configuration.go","handlers":["CreateEndpointRetryConfiguration"],"owner":"endpointService.CreateEndpointRetryConfiguration","tables":["endpoint_retries"]},
+      {"file":"api/endpoint-api/api/create-endpoint-cache-configuration.go","handlers":["CreateEndpointCacheConfiguration"],"owner":"endpointService.CreateEndpointCacheConfiguration","tables":["endpoint_cachings"]},
+      {"file":"api/endpoint-api/api/create-endpoint-tag.go","handlers":["CreateEndpointTag"],"owner":"endpointService.CreateOrUpdateEndpointTag","tables":["endpoint_tags"]},
+      {"file":"api/endpoint-api/api/update-endpoint-detail.go","handlers":["UpdateEndpointDetail"],"owner":"endpointService.UpdateEndpointDetail","tables":["endpoints"]},
+      {"file":"api/endpoint-api/api/update-endpoint-version.go","handlers":["UpdateEndpointVersion"],"owner":"endpointService.UpdateEndpointVersion","tables":["endpoints"]},
+      {"file":"api/endpoint-api/api/invoker-endpoint.go","handlers":["Invoke","Update"],"owner":"endpoint invocation log service","tables":["endpoint_logs","endpoint_log_arguments","endpoint_log_metadata","endpoint_log_metrics","endpoint_log_options"]}
+    ],
+    "web_api": [
+      {"file":"api/web-api/api/organization.go","handlers":["CreateOrganization","CreateOrganizationHTTP","UpdateOrganization"],"owner":"organizationService","tables":["organizations","user_organization_roles"]},
+      {"file":"api/web-api/api/organization_membership.go","handlers":["InviteUserToOrganization","UpdateUserOrganizationRole","DeleteUserFromOrganization"],"owner":"userService role methods","tables":["user_auths","user_organization_roles","user_project_roles"]},
+      {"file":"api/web-api/api/project.go","handlers":["CreateProject","UpdateProject","AddUserToProjects","DeleteUserFromProject","ArchiveProject","CreateProjectCredential"],"owner":"projectService and userService role methods","tables":["projects","project_credentials","user_project_roles"]},
+      {"file":"api/web-api/api/vault.go","handlers":["CreateProviderCredential","DeleteCredential"],"owner":"vaultService","tables":["vaults"]},
+      {"file":"api/web-api/api/notification.go","handlers":["UpdateNotificationSetting"],"owner":"notificationService","tables":["notification_settings"]},
+      {"file":"api/web-api/api/connect.go","handlers":["GeneralConnect"],"owner":"vaultService.Create","tables":["vaults"]},
+      {"file":"api/web-api/api/auth.go","handlers":["RegisterUser","RegisterUserHTTP","ForgotPassword","ChangePassword","CreatePassword","UpdateUser","Github","Linkedin","Google"],"owner":"userService","tables":["user_auths","user_auth_tokens","user_organization_roles","user_project_roles"]}
+    ],
+    "integration_api": [
+      {"file":"api/integration-api/api/audit_logging.go","handlers":["CreateMetadata"],"owner":"auditService.UpdateMetadata","tables":["external_audit_metadata"],"note":"Integration receives actor columns without legacy conversion; the public CreateMetadata RPC updates metadata and writes updated actor on conflict."}
+    ]
+  },
+  "runtime_persistence_handlers": [
+    "api/assistant-api/api/talk/talk.go:AssistantTalk",
+    "api/assistant-api/api/talk/talk.go:WebTalk",
+    "api/assistant-api/api/talk/inbound_call.go:CallReciever",
+    "api/assistant-api/api/talk/inbound_call.go:CallTalkerByContext",
+    "api/assistant-api/api/talk/callback.go:UnviersalCallback",
+    "api/assistant-api/api/talk/callback.go:CallbackByContext"
+  ],
+  "integration_lifecycle_handlers": [
+    {"file":"api/integration-api/api/integration.go","handler":"integrationApi.preHook","owner":"auditService.Create","tables":["external_audits","external_audit_metadata"],"note":"Derived from authenticated integration invocations; creates the external audit row and initial metadata with the propagated actor."}
+  ],
+  "background_writer_inventory": [
+    {"file":"api/document-api/app/tasks/index_knowledge_document.py","handler":"index_document","owner":"KnowledgeService and IndexingRunner","actor_source":"The originating authenticated request serializes actor_type and actor_id into the task payload; the worker validates and propagates that actor to relational and OpenSearch writes.","system_actor":"Not applicable: this is deferred request work, not an autonomous system-originated mutation."},
+    {"file":"api/integration-api/api/integration.go","handlers":["integrationApi.preHook","integrationApi.postHook"],"owner":"auditService","actor_source":"The goroutines detach cancellation while preserving the authenticated request value used by audit writes.","system_actor":"Not applicable: these are asynchronous continuations of authenticated integration requests."}
+  ],
+  "autonomous_system_writer_inventory": [],
+  "autonomous_system_writer_finding": "No production background mutation path in the audited inventory originates without a request actor. RAPIDA_SYSTEM_ACTOR_ID remains a validated reserved identity for future autonomous jobs; Phase 3 does not synthesize a system actor for request-derived work.",
+  "derived_internal_writes": {
+    "assistant_deployments": ["assistant_deployment_audios","assistant_deployment_audio_options","assistant_deployment_telephony_options","assistant_deployment_whatsapp_options"],
+    "conversation_pipeline": ["assistant_conversation_options","assistant_conversation_arguments","assistant_conversation_metadata","assistant_conversation_messages","assistant_conversation_message_metadata","assistant_conversation_message_metrics","assistant_conversation_metrics","assistant_conversation_recordings","call_contexts"],
+    "endpoint_invocation": ["endpoint_log_arguments","endpoint_log_metadata","endpoint_log_metrics","endpoint_log_options"],
+    "authentication": ["user_auth_tokens","user_socials","user_organization_roles","user_project_roles"],
+    "knowledge_indexing": ["knowledge_document_process_rules","api/document-api relational knowledge document updates","api/document-api OpenSearch segment metadata"],
+    "integration_runtime": ["external_audits","initial external_audit_metadata"]
+  },
+  "legacy_behavior_findings": [
+    "New user and social user_auths rows omit both legacy audit IDs, while generated user_auth_tokens use the new user ID as created_by.",
+    "Password and invitation activation paths use the target user ID as updated_by rather than an independently authenticated actor.",
+    "RetryAssistantHTTPLog creates a new assistant_http_logs row with both legacy audit IDs omitted.",
+    "Conversation and endpoint argument rows omit created_by and set only updated_by; project and service endpoint log children leave legacy user IDs zero when UserContext is unavailable.",
+    "call_contexts persist AuthenticationSnapshot actor identity and do not contain legacy created_by or updated_by columns.",
+    "Web proxy mutation handlers are gateways and never become canonical audit writers; downstream resource-owning services own attribution."
+  ],
+  "public_contracts": {
+    "protobuf_sources": {
+      "protos/artifacts/assistant-api.proto": ["Assistant","AssistantConfiguration"],
+      "protos/artifacts/assistant-provider.proto": ["AssistantProviderAgentkit","AssistantProviderWebsocket","AssistantProviderModel","AssistantProviderAgentflow"],
+      "protos/artifacts/common.proto": ["Knowledge","AssistantConversationMessage","AssistantConversation"],
+      "protos/artifacts/endpoint-api.proto": ["Endpoint","EndpointProviderModel","EndpointRetryConfiguration","EndpointCacheConfiguration"],
+      "protos/artifacts/knowledge-api.proto": ["KnowledgeDocument"],
+      "protos/artifacts/web-api.proto": ["ProjectCredential"]
+    },
+    "sdk_roots": [
+      "sdks/go/protos/artifacts",
+      "sdks/nodejs/src/clients/protos/artifacts",
+      "sdks/python/rapida/clients/protos/artifacts",
+      "sdks/react/src/clients/protos/artifacts",
+      "sdks/react-widget via published @rapidaai/react"
+    ],
+    "known_drift": [
+      "Go and Python SDK-only AssistantAnalysis and AssistantWebhook proto copies reserve the removed legacy audit names and numbers; they contain no active legacy audit fields and require no Phase 3 source change.",
+      "sdks/react-widget has no checked-in protobuf root and consumes the generated @rapidaai/react contract; its tests and build remain required."
+    ],
+    "ui_references": [
+      "ui/src/app/pages/assistant/view/version-list/index.tsx",
+      "ui/src/app/pages/endpoint/view/version-list/index.tsx"
+    ]
+  },
+  "implementation_time_contract_test": "The in-repository api/document-api request and Celery indexing paths must be invoked with user, project, and service authentication and their relational and OpenSearch actor writes asserted before Phase 3 writer completion."
+}

@@ -2,7 +2,7 @@ package types
 
 import (
 	"errors"
-	"strconv"
+	"math"
 )
 
 type ActorType string
@@ -18,11 +18,18 @@ const (
 
 type ActorIdentity struct {
 	Type ActorType `json:"type"`
-	ID   string    `json:"id"`
+	ID   uint64    `json:"id"`
 }
 
 type ActorIdentityProvider interface {
 	AuditActor() (ActorIdentity, bool)
+}
+
+func (actor ActorIdentity) Validate() error {
+	if !actor.Type.isDurable() || actor.ID == 0 || actor.ID > math.MaxInt64 {
+		return errors.New("actor identity is invalid")
+	}
+	return nil
 }
 
 func ResolveAuditActor(auth AuthenticationPrinciple) (ActorIdentity, error) {
@@ -34,7 +41,7 @@ func ResolveAuditActor(auth AuthenticationPrinciple) (ActorIdentity, error) {
 		return ActorIdentity{}, errors.New("authenticated principle does not provide an audit actor")
 	}
 	actor, ok := provider.AuditActor()
-	if !ok || !actor.Type.isDurable() || actor.ID == "" {
+	if !ok || actor.Validate() != nil {
 		return ActorIdentity{}, errors.New("authenticated principle has no durable audit actor")
 	}
 	if actor.Type != ActorType(auth.Type()) {
@@ -50,11 +57,4 @@ func (actorType ActorType) isDurable() bool {
 	default:
 		return false
 	}
-}
-
-func numericActor(actorType ActorType, id *uint64) (ActorIdentity, bool) {
-	if id == nil || *id == 0 {
-		return ActorIdentity{}, false
-	}
-	return ActorIdentity{Type: actorType, ID: strconv.FormatUint(*id, 10)}, true
 }

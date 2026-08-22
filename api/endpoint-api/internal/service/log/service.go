@@ -134,8 +134,6 @@ func (els *endpointLogService) ApplyMetadata(
 	}
 	db := els.postgres.DB(ctx)
 	_metadatas := make([]*internal_gorm.EndpointLogMetadata, 0)
-	userContext, userErr := auth.UserContext()
-	//
 	for k, mt := range metadata {
 		_meta := &internal_gorm.EndpointLogMetadata{
 			EndpointLogId: logId,
@@ -144,10 +142,6 @@ func (els *endpointLogService) ApplyMetadata(
 			},
 		}
 		_meta.SetValue(mt)
-		if userErr == nil {
-			_meta.UpdatedBy = userContext.UserID
-			_meta.CreatedBy = userContext.UserID
-		}
 		_metadatas = append(_metadatas, _meta)
 	}
 
@@ -155,7 +149,7 @@ func (els *endpointLogService) ApplyMetadata(
 		Columns: []clause.Column{{Name: "endpoint_log_id"}, {Name: "key"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value",
-			"updated_by", "updated_date"}),
+			"updated_date"}),
 	}).Create(&_metadatas)
 	if tx.Error != nil {
 		els.logger.Benchmark("els.ApplyMetadata", time.Since(start))
@@ -178,8 +172,6 @@ func (els *endpointLogService) ApplyOption(ctx context.Context,
 
 	db := els.postgres.DB(ctx)
 	options := make([]*internal_gorm.EndpointLogOption, 0)
-	userContext, userErr := auth.UserContext()
-
 	for k, o := range opts {
 		option := &internal_gorm.EndpointLogOption{
 			EndpointLogId: logId,
@@ -188,10 +180,6 @@ func (els *endpointLogService) ApplyOption(ctx context.Context,
 			},
 		}
 		option.SetValue(o)
-		if userErr == nil {
-			option.CreatedBy = userContext.UserID
-			option.UpdatedBy = userContext.UserID
-		}
 		options = append(options, option)
 	}
 
@@ -199,7 +187,7 @@ func (els *endpointLogService) ApplyOption(ctx context.Context,
 		Columns: []clause.Column{{Name: "endpoint_log_id"}, {Name: "key"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value",
-			"updated_by", "updated_date"}),
+			"updated_date"}),
 	}).Create(&options)
 	if tx.Error != nil {
 		els.logger.Benchmark("els.ApplyOption", time.Since(start))
@@ -224,8 +212,6 @@ func (els *endpointLogService) ApplyArgument(ctx context.Context,
 
 	db := els.postgres.DB(ctx)
 	_arguments := make([]*internal_gorm.EndpointLogArgument, 0)
-	userContext, userErr := auth.UserContext()
-
 	for k, arg := range arguments {
 		ag := &internal_gorm.EndpointLogArgument{
 			EndpointLogId: logId,
@@ -234,9 +220,6 @@ func (els *endpointLogService) ApplyArgument(ctx context.Context,
 			},
 		}
 		ag.SetValue(arg)
-		if userErr == nil {
-			ag.UpdatedBy = userContext.UserID
-		}
 		_arguments = append(_arguments, ag)
 	}
 
@@ -244,7 +227,7 @@ func (els *endpointLogService) ApplyArgument(ctx context.Context,
 		Columns: []clause.Column{{Name: "endpoint_log_id"}, {Name: "name"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value",
-			"updated_by", "updated_date"}),
+			"updated_date"}),
 	}).Create(&_arguments)
 	if tx.Error != nil {
 		els.logger.Benchmark("els.ApplyArgument", time.Since(start))
@@ -270,7 +253,6 @@ func (els *endpointLogService) ApplyMetrics(
 	start := time.Now()
 	db := els.postgres.DB(ctx)
 	mtrs := make([]*internal_gorm.EndpointLogMetric, 0)
-	userContext, userErr := auth.UserContext()
 	for _, mtr := range metrics {
 		_mtr := &internal_gorm.EndpointLogMetric{
 			Metric: gorm_models.Metric{
@@ -281,10 +263,6 @@ func (els *endpointLogService) ApplyMetrics(
 			EndpointLogId: logId,
 		}
 
-		if userErr == nil {
-			_mtr.UpdatedBy = userContext.UserID
-			_mtr.CreatedBy = userContext.UserID
-		}
 		mtrs = append(mtrs, _mtr)
 	}
 
@@ -292,7 +270,7 @@ func (els *endpointLogService) ApplyMetrics(
 		Columns: []clause.Column{{Name: "endpoint_log_id"}, {Name: "name"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value", "description",
-			"updated_by", "updated_date"}),
+			"updated_date"}),
 	}).Create(&mtrs)
 	if tx.Error != nil {
 		els.logger.Benchmark("els.ApplyMetrics", time.Since(start))

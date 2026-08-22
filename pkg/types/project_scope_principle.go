@@ -5,7 +5,11 @@
 // See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package types
 
-import type_enums "github.com/rapidaai/pkg/types/enums"
+import (
+	"math"
+
+	type_enums "github.com/rapidaai/pkg/types/enums"
+)
 
 type ProjectScope struct {
 	CredentialId   *uint64 `json:"credentialId" gorm:"column:credential_id"`
@@ -16,7 +20,10 @@ type ProjectScope struct {
 }
 
 func (ss *ProjectScope) AuditActor() (ActorIdentity, bool) {
-	return numericActor(ActorTypeProject, ss.CredentialId)
+	if ss.CredentialId == nil || *ss.CredentialId == 0 || *ss.CredentialId > math.MaxInt64 {
+		return ActorIdentity{}, false
+	}
+	return ActorIdentity{Type: ActorTypeProject, ID: *ss.CredentialId}, true
 }
 
 func (ss *ProjectScope) OrganizationContext() (uint64, bool) {

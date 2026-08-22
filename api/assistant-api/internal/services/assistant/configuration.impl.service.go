@@ -150,10 +150,6 @@ func (s *assistantConfigurationService) Create(
 	enabled bool,
 	options []*protos.Metadata,
 ) (*internal_assistant_entity.AssistantConfiguration, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
-		return nil, err
-	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
@@ -175,9 +171,7 @@ func (s *assistantConfigurationService) Create(
 			OrganizationId: projectContext.OrganizationID,
 		},
 		Mutable: gorm_models.Mutable{
-			CreatedBy: userContext.UserID,
-			UpdatedBy: userContext.UserID,
-			Status:    type_enums.RECORD_ACTIVE,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 	}
 
@@ -212,10 +206,6 @@ func (s *assistantConfigurationService) Update(
 	enabled bool,
 	options []*protos.Metadata,
 ) (*internal_assistant_entity.AssistantConfiguration, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
-		return nil, err
-	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
@@ -233,7 +223,6 @@ func (s *assistantConfigurationService) Update(
 			"configuration_type": internal_assistant_entity.AssistantConfigurationType(configurationType),
 			"provider":           provider,
 			"enabled":            enabled,
-			"updated_by":         userContext.UserID,
 		}
 		query := tx.WithContext(ctx).
 			Model(&internal_assistant_entity.AssistantConfiguration{}).
@@ -282,10 +271,6 @@ func (s *assistantConfigurationService) Delete(
 	configurationId uint64,
 	assistantId uint64,
 ) (*internal_assistant_entity.AssistantConfiguration, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
-		return nil, err
-	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
@@ -318,8 +303,7 @@ func (s *assistantConfigurationService) Delete(
 				type_enums.RECORD_ACTIVE,
 			).
 			Updates(map[string]interface{}{
-				"status":     type_enums.RECORD_ARCHIEVE,
-				"updated_by": userContext.UserID,
+				"status": type_enums.RECORD_ARCHIEVE,
 			})
 		if query.Error != nil {
 			return query.Error
@@ -344,18 +328,11 @@ func (s *assistantConfigurationService) archiveOptions(
 	auth *types.Authentication,
 	configurationId uint64,
 ) error {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return err
-	}
-
 	return tx.WithContext(ctx).
 		Model(&internal_assistant_entity.AssistantConfigurationOption{}).
 		Where("assistant_configuration_id = ? AND status = ?", configurationId, type_enums.RECORD_ACTIVE).
 		Updates(map[string]interface{}{
-			"status":     type_enums.RECORD_ARCHIEVE,
-			"updated_by": userID,
+			"status": type_enums.RECORD_ARCHIEVE,
 		}).Error
 }
 
@@ -366,11 +343,6 @@ func (s *assistantConfigurationService) createOptions(
 	configurationId uint64,
 	options []*protos.Metadata,
 ) ([]*internal_assistant_entity.AssistantConfigurationOption, error) {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return nil, err
-	}
 
 	if len(options) == 0 {
 		return []*internal_assistant_entity.AssistantConfigurationOption{}, nil
@@ -384,9 +356,7 @@ func (s *assistantConfigurationService) createOptions(
 				Value: opt.GetValue(),
 			},
 			Mutable: gorm_models.Mutable{
-				Status:    type_enums.RECORD_ACTIVE,
-				CreatedBy: userID,
-				UpdatedBy: userID,
+				Status: type_enums.RECORD_ACTIVE,
 			},
 		})
 	}
@@ -399,7 +369,6 @@ func (s *assistantConfigurationService) createOptions(
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value",
 			"status",
-			"updated_by",
 			"updated_date",
 		}),
 	}).Create(&out).Error; err != nil {

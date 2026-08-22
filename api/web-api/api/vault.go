@@ -71,10 +71,6 @@ func (wVault *webVaultGRPCApi) CreateProviderCredential(ctx context.Context, irR
 	if scopeErr != nil {
 		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
-	userContext, err := iAuth.UserContext()
-	if err != nil {
-		return nil, err
-	}
 	projectContext, err := iAuth.ProjectContext()
 	if err != nil {
 		wVault.logger.Errorf("CreateProviderCredential from grpc without project context: %v", err)
@@ -83,7 +79,7 @@ func (wVault *webVaultGRPCApi) CreateProviderCredential(ctx context.Context, irR
 
 	vlt, err := wVault.vaultService.Create(
 		ctx,
-		userContext.UserID,
+		iAuth,
 		projectContext,
 		irRequest.GetProvider(),
 		irRequest.GetName(), irRequest.GetCredential().AsMap())
@@ -111,17 +107,13 @@ func (wVault *webVaultGRPCApi) DeleteCredential(c context.Context, irRequest *pr
 	if scopeErr != nil {
 		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
-	userContext, err := iAuth.UserContext()
-	if err != nil {
-		return nil, err
-	}
 	projectContext, err := iAuth.ProjectContext()
 	if err != nil {
 		wVault.logger.Errorf("DeleteProviderCredential from grpc without project context: %v", err)
 		return utils.AuthenticateError[protos.GetCredentialResponse]()
 	}
 
-	vlt, err := wVault.vaultService.Delete(c, userContext.UserID, projectContext, irRequest.GetVaultId())
+	vlt, err := wVault.vaultService.Delete(c, iAuth, projectContext, irRequest.GetVaultId())
 	if err != nil {
 		wVault.logger.Errorf("vaultService.Delete from grpc with err %v", err)
 		return &protos.GetCredentialResponse{

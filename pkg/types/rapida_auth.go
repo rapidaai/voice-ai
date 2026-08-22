@@ -8,6 +8,7 @@ package types
 import (
 	"context"
 	"errors"
+	"math"
 
 	"github.com/gin-gonic/gin"
 )
@@ -32,6 +33,7 @@ type AuthType string
 const (
 	AuthTypeUser    AuthType = "user"
 	AuthTypeService AuthType = "service"
+	AuthTypeSystem  AuthType = "system"
 	AuthTypeProject AuthType = "project"
 	AuthTypeOrg     AuthType = "organization"
 )
@@ -99,6 +101,9 @@ func (auth *Authentication) IsAuthenticated() bool {
 	case AuthTypeOrg, AuthTypeService:
 		_, organizationErr := auth.OrganizationContext()
 		return organizationErr == nil
+	case AuthTypeSystem:
+		_, actorErr := auth.Actor()
+		return actorErr == nil
 	default:
 		return false
 	}
@@ -117,7 +122,10 @@ func (auth *Authentication) Scope(allowed ...AuthType) (*Authentication, error) 
 	return nil, ErrAuthenticationScopeNotAllowed
 }
 func (auth *Authentication) Actor() (ActorIdentity, error) {
-	if auth == nil || auth.ActorValue == nil {
+	if auth == nil || auth.ActorValue == nil || !auth.ActorValue.Type.isDurable() || auth.ActorValue.ID == 0 || auth.ActorValue.ID > math.MaxInt64 {
+		return ActorIdentity{}, ErrActorUnavailable
+	}
+	if auth.ActorValue.Type != ActorType(auth.AuthType) {
 		return ActorIdentity{}, ErrActorUnavailable
 	}
 	return *auth.ActorValue, nil

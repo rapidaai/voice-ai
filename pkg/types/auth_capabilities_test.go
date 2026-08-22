@@ -146,13 +146,17 @@ func TestResolveDelegatedContextDerivesCompatibleCapabilities(t *testing.T) {
 	}
 	projectID := uint64(12)
 	projectOrganizationID := uint64(11)
+	projectCredentialID := uint64(14)
 	project := &ProjectScope{
+		CredentialId:   &projectCredentialID,
 		ProjectId:      &projectID,
 		OrganizationId: &projectOrganizationID,
 		Status:         type_enums.RECORD_ACTIVE.String(),
 	}
 	organizationID := uint64(13)
+	organizationCredentialID := uint64(15)
 	organization := &OrganizationScope{
+		CredentialId:   &organizationCredentialID,
 		OrganizationId: &organizationID,
 		Status:         type_enums.RECORD_ACTIVE.String(),
 	}

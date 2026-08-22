@@ -38,4 +38,4 @@ change after confirmation requires another challenge and confirmation before imp
 
 | RFC | Title | Status |
 | --- | --- | --- |
-| [0001](0001-actor-aware-audit-identity.md) | Actor-Aware Audit Identity | Draft |
+| [0001](0001-actor-aware-audit-identity.md) | Actor-Aware Audit Identity | Accepted |

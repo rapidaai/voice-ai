@@ -92,21 +92,17 @@ func (eService *endpointService) Get(ctx context.Context,
 func (eService *endpointService) UpdateEndpointVersion(ctx context.Context,
 	auth *types.Authentication,
 	endpointId, endpointProviderModelId uint64) (*internal_gorm.Endpoint, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
+	if _, err := auth.Actor(); err != nil {
 		return nil, err
 	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
-	userID := userContext.UserID
 	db := eService.postgres.DB(ctx)
 	ed := &internal_gorm.Endpoint{
 		EndpointProviderModelId: endpointProviderModelId,
-		Mutable: gorm_models.Mutable{
-			UpdatedBy: userID,
-		},
+		Mutable:                 gorm_models.Mutable{},
 	}
 	tx := db.Where("id = ? AND project_id = ? AND organization_id = ?", endpointId,
 		projectContext.ProjectID,
@@ -237,20 +233,17 @@ func (eService *endpointService) CreateEndpoint(ctx context.Context,
 	source *string,
 	sourceIdentifier *uint64,
 ) (*internal_gorm.Endpoint, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
+	if _, err := auth.Actor(); err != nil {
 		return nil, err
 	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
-	userID := userContext.UserID
 	db := eService.postgres.DB(ctx)
 	ep := &internal_gorm.Endpoint{
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: userID,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		Organizational: gorm_models.Organizational{
 			ProjectId:      projectContext.ProjectID,
@@ -292,15 +285,13 @@ func (eService *endpointService) CreateEndpointProviderModel(
 	promptRequest string,
 	options []*endpoint_grpc_api.Metadata,
 ) (*internal_gorm.EndpointProviderModel, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
+	if _, err := auth.Actor(); err != nil {
 		return nil, err
 	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
-	userID := userContext.UserID
 	db := eService.postgres.DB(ctx)
 	var endpoint internal_gorm.Endpoint
 	tx := db.
@@ -313,8 +304,7 @@ func (eService *endpointService) CreateEndpointProviderModel(
 
 	epm := &internal_gorm.EndpointProviderModel{
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: userID,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		Description:       description,
 		ModelProviderName: providerName,
@@ -335,9 +325,7 @@ func (eService *endpointService) CreateEndpointProviderModel(
 		modelOptions = append(modelOptions, &internal_gorm.EndpointProviderModelOption{
 			EndpointProviderModelId: epm.Id,
 			Mutable: gorm_models.Mutable{
-				CreatedBy: userID,
-				UpdatedBy: userID,
-				Status:    type_enums.RECORD_ACTIVE,
+				Status: type_enums.RECORD_ACTIVE,
 			},
 			Metadata: gorm_models.Metadata{
 				Key:   v.GetKey(),
@@ -349,7 +337,7 @@ func (eService *endpointService) CreateEndpointProviderModel(
 		Columns: []clause.Column{{Name: "endpoint_provider_model_id"}, {Name: "key"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value",
-			"updated_by"}),
+		}),
 	}).Create(modelOptions)
 	if tx.Error != nil {
 		eService.logger.Errorf("unable to create deployment audio config metadata for assistant with error %v", tx.Error)
@@ -362,21 +350,17 @@ func (eService *endpointService) CreateEndpointProviderModel(
 func (eService *endpointService) AttachProviderModelToEndpoint(ctx context.Context,
 	auth *types.Authentication,
 	endpointProviderModelId, endpointId uint64) (*internal_gorm.Endpoint, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
+	if _, err := auth.Actor(); err != nil {
 		return nil, err
 	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
-	userID := userContext.UserID
 	db := eService.postgres.DB(ctx)
 	ed := &internal_gorm.Endpoint{
 		EndpointProviderModelId: endpointProviderModelId,
-		Mutable: gorm_models.Mutable{
-			UpdatedBy: userID,
-		},
+		Mutable:                 gorm_models.Mutable{},
 	}
 	tx := db.Where("id = ? AND project_id = ? AND organization_id = ?", endpointId,
 		projectContext.ProjectID,
@@ -401,22 +385,18 @@ func (eService *endpointService) ConfigureEndpointRetry(ctx context.Context,
 	exponentialBackoff bool,
 	retryables []string,
 ) (*internal_gorm.EndpointRetry, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
+	if _, err := auth.Actor(); err != nil {
 		return nil, err
 	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
-	userID := userContext.UserID
 	db := eService.postgres.DB(ctx)
 
 	retryEnable := retry != internal_gorm.NEVER_RETRY
 	endpoint := &internal_gorm.Endpoint{
-		Mutable: gorm_models.Mutable{
-			UpdatedBy: userID,
-		},
+		Mutable:     gorm_models.Mutable{},
 		RetryEnable: retryEnable,
 	}
 	tx := db.Where("id = ? AND project_id = ? AND organization_id = ?", endpointId,
@@ -440,10 +420,7 @@ func (eService *endpointService) ConfigureEndpointRetry(ctx context.Context,
 		DelaySeconds:       delaySeconds,
 		ExponentialBackoff: exponentialBackoff,
 		Retryables:         retryables,
-		Mutable: gorm_models.Mutable{
-			CreatedBy: userID,
-			UpdatedBy: userID,
-		},
+		Mutable:            gorm_models.Mutable{},
 	}
 	tx = db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "endpoint_id"}, {Name: "retry_type"}},
@@ -469,21 +446,17 @@ func (eService *endpointService) ConfigureEndpointCaching(ctx context.Context,
 	expiryInterval uint64,
 	matchThreshold float32,
 ) (*internal_gorm.EndpointCaching, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
+	if _, err := auth.Actor(); err != nil {
 		return nil, err
 	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
-	userID := userContext.UserID
 	db := eService.postgres.DB(ctx)
 	cacheEnable := caching != internal_gorm.NEVER_CACHE
 	endpoint := &internal_gorm.Endpoint{
-		Mutable: gorm_models.Mutable{
-			UpdatedBy: userID,
-		},
+		Mutable:     gorm_models.Mutable{},
 		CacheEnable: cacheEnable,
 	}
 	tx := db.Where("id = ? AND project_id = ? AND organization_id = ?", endpointId,
@@ -501,12 +474,11 @@ func (eService *endpointService) ConfigureEndpointCaching(ctx context.Context,
 	}
 
 	cachingEndpoint := &internal_gorm.EndpointCaching{
+		Mutable:        gorm_models.Mutable{},
 		EndpointId:     endpointId,
 		CacheType:      caching,
 		ExpiryInterval: expiryInterval,
 		MatchThreshold: matchThreshold,
-		CreatedBy:      userID,
-		UpdatedBy:      userID,
 	}
 	tx = db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "endpoint_id"}},
@@ -527,15 +499,13 @@ func (eService *endpointService) CreateOrUpdateEndpointTag(ctx context.Context,
 	endpointId uint64,
 	tags []string,
 ) (*internal_gorm.EndpointTag, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
+	if _, err := auth.Actor(); err != nil {
 		return nil, err
 	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
-	userID := userContext.UserID
 	db := eService.postgres.DB(ctx)
 	var endpoint internal_gorm.Endpoint
 	tx := db.
@@ -549,16 +519,13 @@ func (eService *endpointService) CreateOrUpdateEndpointTag(ctx context.Context,
 	endpointTag := &internal_gorm.EndpointTag{
 		EndpointId: endpointId,
 		Tag:        tags,
-		Mutable: gorm_models.Mutable{
-			CreatedBy: userID,
-			UpdatedBy: userID,
-		},
+		Mutable:    gorm_models.Mutable{},
 	}
 	tx = db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "endpoint_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"tag",
-			"updated_by"}),
+		}),
 	}).Create(&endpointTag)
 
 	if tx.Error != nil {
@@ -571,22 +538,18 @@ func (eService *endpointService) CreateOrUpdateEndpointTag(ctx context.Context,
 func (eService *endpointService) UpdateEndpointDetail(ctx context.Context,
 	auth *types.Authentication,
 	endpointId uint64, name string, description *string) (*internal_gorm.Endpoint, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
+	if _, err := auth.Actor(); err != nil {
 		return nil, err
 	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
 	}
-	userID := userContext.UserID
 	db := eService.postgres.DB(ctx)
 	ed := &internal_gorm.Endpoint{
 		Name:        name,
 		Description: description,
-		Mutable: gorm_models.Mutable{
-			UpdatedBy: userID,
-		},
+		Mutable:     gorm_models.Mutable{},
 	}
 
 	tx := db.Where("id = ? AND project_id = ? AND organization_id = ?", endpointId,

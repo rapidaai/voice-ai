@@ -2,7 +2,10 @@ package internal_project_service
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"math"
+	"strings"
 	"time"
 
 	"gorm.io/gorm/clause"
@@ -13,6 +16,7 @@ import (
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
+	gorm_generators "github.com/rapidaai/pkg/models/gorm/generators"
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
@@ -60,9 +64,13 @@ func (p *projectService) Claim(ctx context.Context, claimToken string) (*types.P
 }
 
 func (pS *projectService) Create(ctx context.Context, auth *types.Authentication, organizationId uint64, name string, description string) (*internal_entity.Project, error) {
-	userContext, authErr := auth.UserContext()
-	if authErr != nil {
-		return nil, authErr
+	actor, err := projectCredentialActor(auth, organizationId)
+	if err != nil {
+		return nil, err
+	}
+	mutable := gorm_models.Mutable{}
+	if err := mutable.SetCreatedActor(actor); err != nil {
+		return nil, err
 	}
 
 	db := pS.postgres.DB(ctx)
@@ -70,9 +78,7 @@ func (pS *projectService) Create(ctx context.Context, auth *types.Authentication
 		Name:           name,
 		OrganizationId: organizationId,
 		Description:    description,
-		Mutable: gorm_models.Mutable{
-			CreatedBy: userContext.UserID,
-		},
+		Mutable:        mutable,
 	}
 	tx := db.Save(project)
 	if err := tx.Error; err != nil {
@@ -81,9 +87,9 @@ func (pS *projectService) Create(ctx context.Context, auth *types.Authentication
 	return project, nil
 }
 func (pS *projectService) Update(ctx context.Context, auth *types.Authentication, projectId uint64, name *string, description *string) (*internal_entity.Project, error) {
-	userContext, authErr := auth.UserContext()
-	if authErr != nil {
-		return nil, authErr
+	actor, err := authenticatedProjectUserActor(auth)
+	if err != nil {
+		return nil, err
 	}
 
 	db := pS.postgres.DB(ctx)
@@ -92,7 +98,11 @@ func (pS *projectService) Update(ctx context.Context, auth *types.Authentication
 			Id: projectId,
 		},
 	}
-	updates := map[string]interface{}{"updated_by": userContext.UserID}
+	updates := map[string]interface{}{
+		"updated_actor_type": string(actor.Type),
+		"updated_actor_id":   actor.ID,
+		"updated_date":       time.Now(),
+	}
 
 	if name != nil {
 		updates["name"] = *name
@@ -168,19 +178,19 @@ func (pS *projectService) GetAllByOrganization(ctx context.Context, auth *types.
 }
 
 func (pS *projectService) Archive(ctx context.Context, auth *types.Authentication, projectId uint64) (*internal_entity.Project, error) {
-	userContext, authErr := auth.UserContext()
-	if authErr != nil {
-		return nil, authErr
+	actor, err := authenticatedProjectUserActor(auth)
+	if err != nil {
+		return nil, err
 	}
 
 	db := pS.postgres.DB(ctx)
-	ct := &internal_entity.Project{
-		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ARCHIEVE,
-			UpdatedBy: userContext.UserID,
-		},
-	}
-	tx := db.Where("id=?", projectId).Updates(&ct)
+	ct := &internal_entity.Project{}
+	tx := db.Model(ct).Where("id = ?", projectId).Updates(map[string]interface{}{
+		"status":             type_enums.RECORD_ARCHIEVE,
+		"updated_actor_type": string(actor.Type),
+		"updated_actor_id":   actor.ID,
+		"updated_date":       time.Now(),
+	})
 	if tx.Error != nil {
 		pS.logger.Debugf("unable to update the project %v", projectId)
 		return nil, tx.Error
@@ -189,26 +199,35 @@ func (pS *projectService) Archive(ctx context.Context, auth *types.Authenticatio
 }
 
 func (pS *projectService) CreateCredential(ctx context.Context, auth *types.Authentication, name string, projectId, organizationId uint64) (*internal_entity.ProjectCredential, error) {
-	userContext, authErr := auth.UserContext()
-	if authErr != nil {
-		return nil, authErr
+	if projectId == 0 || projectId > math.MaxInt64 || organizationId == 0 || organizationId > math.MaxInt64 || strings.TrimSpace(name) == "" {
+		return nil, errors.New("project credential requires a valid project, organization, and name")
+	}
+	actor, err := projectCredentialActor(auth, organizationId)
+	if err != nil {
+		return nil, err
+	}
+	credentialID := gorm_generators.ID()
+	if credentialID == 0 || credentialID > math.MaxInt64 {
+		return nil, errors.New("project credential generated an invalid id")
 	}
 
 	db := pS.postgres.DB(ctx)
 	key := ciphers.Token("rpx_")
+	mutable := gorm_models.Mutable{Status: type_enums.RECORD_ACTIVE}
+	if err := mutable.SetCreatedActor(actor); err != nil {
+		return nil, err
+	}
 	prc := &internal_entity.ProjectCredential{
+		Audited: gorm_models.Audited{Id: credentialID},
 		Organizational: gorm_models.Organizational{
 			ProjectId:      projectId,
 			OrganizationId: organizationId,
 		},
-		Name: name,
-		Key:  key,
-		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: userContext.UserID,
-		},
+		Name:    strings.TrimSpace(name),
+		Key:     key,
+		Mutable: mutable,
 	}
-	tx := db.Save(prc)
+	tx := db.Create(prc)
 	if err := tx.Error; err != nil {
 		return nil, err
 	}
@@ -216,24 +235,70 @@ func (pS *projectService) CreateCredential(ctx context.Context, auth *types.Auth
 }
 
 func (pS *projectService) ArchiveCredential(ctx context.Context, auth *types.Authentication, credentialId, projectId, organizationId uint64) (*internal_entity.ProjectCredential, error) {
-	userContext, authErr := auth.UserContext()
-	if authErr != nil {
-		return nil, authErr
+	if credentialId == 0 || credentialId > math.MaxInt64 || projectId == 0 || projectId > math.MaxInt64 || organizationId == 0 || organizationId > math.MaxInt64 {
+		return nil, errors.New("project credential identity is invalid")
+	}
+	actor, err := projectCredentialActor(auth, organizationId)
+	if err != nil {
+		return nil, err
 	}
 
 	db := pS.postgres.DB(ctx)
-	ct := &internal_entity.ProjectCredential{
-		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ARCHIEVE,
-			UpdatedBy: userContext.UserID,
-		},
-	}
-	tx := db.Where("id=? AND project_id = ? AND organization_id = ?", credentialId, projectId, organizationId).Updates(&ct)
+	actorType := string(actor.Type)
+	actorID := actor.ID
+	ct := &internal_entity.ProjectCredential{}
+	tx := db.Model(ct).
+		Where("id = ? AND project_id = ? AND organization_id = ? AND status = ?", credentialId, projectId, organizationId, type_enums.RECORD_ACTIVE).
+		Updates(map[string]interface{}{
+			"status":             type_enums.RECORD_ARCHIEVE,
+			"updated_actor_type": actorType,
+			"updated_actor_id":   actorID,
+			"updated_date":       time.Now(),
+		})
 	if tx.Error != nil {
 		pS.logger.Debugf("unable to update project credentials %v", credentialId)
 		return nil, tx.Error
 	}
+	if tx.RowsAffected != 1 {
+		return nil, errors.New("active project credential not found")
+	}
+	if err := db.Where("id = ?", credentialId).Take(ct).Error; err != nil {
+		return nil, err
+	}
 	return ct, nil
+}
+
+func projectCredentialActor(auth *types.Authentication, organizationId uint64) (types.ActorIdentity, error) {
+	actor, err := authenticatedProjectUserActor(auth)
+	if err != nil {
+		return types.ActorIdentity{}, err
+	}
+	organizationContext, err := auth.OrganizationContext()
+	if err != nil {
+		return types.ActorIdentity{}, err
+	}
+	if organizationContext.OrganizationID != organizationId {
+		return types.ActorIdentity{}, errors.New("project credential scope does not match authentication organization")
+	}
+	return actor, nil
+}
+
+func authenticatedProjectUserActor(auth *types.Authentication) (types.ActorIdentity, error) {
+	if auth == nil {
+		return types.ActorIdentity{}, types.ErrActorUnavailable
+	}
+	if _, err := auth.Scope(types.AuthTypeUser); err != nil {
+		return types.ActorIdentity{}, err
+	}
+	actor, err := auth.Actor()
+	if err != nil {
+		return types.ActorIdentity{}, err
+	}
+	userContext, err := auth.UserContext()
+	if err != nil || userContext.UserID != actor.ID {
+		return types.ActorIdentity{}, types.ErrActorUnavailable
+	}
+	return actor, nil
 }
 
 func (pS *projectService) GetAllCredential(ctx context.Context, auth *types.Authentication, projectId, organizationId uint64, criteria []*web_api.Criteria, paginate *web_api.Paginate) (int64, []*internal_entity.ProjectCredential, error) {
@@ -242,7 +307,6 @@ func (pS *projectService) GetAllCredential(ctx context.Context, auth *types.Auth
 	var cnt int64
 	qry := db.
 		Model(internal_entity.ProjectCredential{}).
-		Preload("CreatedUser").
 		Where("project_id = ? AND organization_id = ? AND status = ? ", projectId, organizationId, type_enums.RECORD_ACTIVE)
 	for _, ct := range criteria {
 		qry.Where(fmt.Sprintf("%s = ?", ct.GetKey()), ct.GetValue())

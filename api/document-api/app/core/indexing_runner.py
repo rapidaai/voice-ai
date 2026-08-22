@@ -73,6 +73,7 @@ class IndexingRunner:
             knowledge_document: KnowledgeDocument,
             integration_client: IntegrationBridge,
             vault_client: VaultBridge,
+            actor: dict,
             index_type="paragraph-index",
     ):
         """
@@ -92,7 +93,8 @@ class IndexingRunner:
         self.storage = storage
         self.postgres = postgres
         self.elastic_search = elastic_search
-        self.knowledge_service = KnowledgeService(postgres)
+        self.actor = actor
+        self.knowledge_service = KnowledgeService(postgres, actor=actor)
         self.index_type = index_type
         self.knowledge = knowledge
         self.knowledge_document = knowledge_document
@@ -179,6 +181,8 @@ class IndexingRunner:
         for text_doc in text_docs:
             text_doc.metadata["knowledge_document_id"] = self.knowledge_document.id
             text_doc.metadata["knowledge_id"] = self.knowledge.id
+            text_doc.metadata["created_actor"] = dict(self.actor)
+            text_doc.metadata["updated_actor"] = dict(self.actor)
 
         return text_docs
 

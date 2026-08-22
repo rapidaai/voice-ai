@@ -6,6 +6,7 @@
 package types
 
 import (
+	"math"
 	"reflect"
 	"testing"
 
@@ -14,7 +15,9 @@ import (
 
 func TestOrganizationScopeCapabilities(t *testing.T) {
 	organizationID := uint64(1)
+	credentialID := uint64(2)
 	scope := &OrganizationScope{
+		CredentialId:   &credentialID,
 		OrganizationId: &organizationID,
 		Status:         type_enums.RECORD_ACTIVE.String(),
 	}
@@ -25,22 +28,42 @@ func TestOrganizationScopeCapabilities(t *testing.T) {
 	if !scope.IsAuthenticated() {
 		t.Fatal("IsAuthenticated() = false, want true")
 	}
-	if _, ok := scope.AuditActor(); ok {
-		t.Fatal("AuditActor() ok = true, want false until organization credentials have durable identity")
+	if actor, ok := scope.AuditActor(); !ok || actor != (ActorIdentity{Type: ActorTypeOrganization, ID: credentialID}) {
+		t.Fatalf("AuditActor() = %+v, %v", actor, ok)
 	}
 }
 
 func TestOrganizationScopeRejectsMissingOrZeroContext(t *testing.T) {
 	zero := uint64(0)
+	credentialID := uint64(2)
 	for _, scope := range []*OrganizationScope{
 		{Status: type_enums.RECORD_ACTIVE.String()},
-		{OrganizationId: &zero, Status: type_enums.RECORD_ACTIVE.String()},
+		{CredentialId: &credentialID, OrganizationId: &zero, Status: type_enums.RECORD_ACTIVE.String()},
 	} {
 		if scope.IsAuthenticated() {
 			t.Fatal("IsAuthenticated() = true, want false")
 		}
 		if _, err := RequireOrganization(scope); err == nil {
 			t.Fatal("RequireOrganization() error = nil")
+		}
+	}
+}
+
+func TestOrganizationScopeRejectsInvalidCredentialActor(t *testing.T) {
+	organizationID := uint64(1)
+	zero := uint64(0)
+	aboveMax := uint64(math.MaxInt64) + 1
+	for _, credentialID := range []*uint64{nil, &zero, &aboveMax} {
+		scope := &OrganizationScope{
+			CredentialId:   credentialID,
+			OrganizationId: &organizationID,
+			Status:         type_enums.RECORD_ACTIVE.String(),
+		}
+		if scope.IsAuthenticated() {
+			t.Fatal("IsAuthenticated() = true for invalid organization credential actor")
+		}
+		if _, ok := scope.AuditActor(); ok {
+			t.Fatal("AuditActor() ok = true for invalid organization credential actor")
 		}
 	}
 }

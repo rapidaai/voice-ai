@@ -37,8 +37,10 @@ func TestVaultServiceUsesNormalizedIdentityContext(t *testing.T) {
 		created_date DATETIME NOT NULL,
 		updated_date DATETIME,
 		status TEXT NOT NULL DEFAULT 'ACTIVE',
-		created_by INTEGER NOT NULL,
-		updated_by INTEGER,
+		created_actor_type TEXT,
+		created_actor_id INTEGER,
+		updated_actor_type TEXT,
+		updated_actor_id INTEGER,
 		project_id INTEGER NOT NULL,
 		organization_id INTEGER NOT NULL,
 		provider TEXT NOT NULL,
@@ -53,13 +55,23 @@ func TestVaultServiceUsesNormalizedIdentityContext(t *testing.T) {
 	}
 	service := NewVaultService(logger, &vaultTestPostgres{db: db})
 	projectContext := types.ProjectContext{OrganizationID: 81, ProjectID: 92}
+	auth := &types.Authentication{
+		AuthType:          types.AuthTypeUser,
+		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeUser, ID: 73},
+		UserValue:         &types.UserContext{UserID: 73},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: 81},
+		ProjectValue:      &projectContext,
+	}
 
-	vault, err := service.Create(context.Background(), 73, projectContext, "provider", "credential", map[string]interface{}{"token": "secret"})
+	vault, err := service.Create(context.Background(), auth, projectContext, "provider", "credential", map[string]interface{}{"token": "secret"})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	if vault.CreatedBy != 73 || vault.OrganizationId != 81 || vault.ProjectId != 92 {
-		t.Fatalf("Create() identity context = user:%d organization:%d project:%d", vault.CreatedBy, vault.OrganizationId, vault.ProjectId)
+	if vault.CreatedActor == nil || vault.CreatedActor.ID != 73 || vault.CreatedActor.Type != types.ActorTypeUser || vault.OrganizationId != 81 || vault.ProjectId != 92 {
+		t.Fatalf("Create() identity context = actor:%+v organization:%d project:%d", vault.CreatedActor, vault.OrganizationId, vault.ProjectId)
+	}
+	if vault.CreatedActorType == nil || *vault.CreatedActorType != "user" || vault.CreatedActorID == nil || *vault.CreatedActorID != 73 {
+		t.Fatalf("Create() actor = %v/%v", vault.CreatedActorType, vault.CreatedActorID)
 	}
 
 	loaded, err := service.Get(context.Background(), projectContext, vault.Id)

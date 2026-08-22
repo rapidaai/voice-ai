@@ -80,7 +80,7 @@ func (iApi *integrationApi) preHook(ctx context.Context, projectContext types.Pr
 	keyPrefix := iApi.ObjectPrefix(projectContext.OrganizationID, projectContext.ProjectID, credentialId)
 	start := time.Now()
 	go func(currentCtx context.Context, requestId uint64, s3Prefix string, additionalData map[string]string, _request map[string]interface{}) {
-		nCtx := context.Background()
+		nCtx := detachedAuditContext(currentCtx)
 		_, err := iApi.auditService.Create(nCtx, requestId, projectContext.OrganizationID, projectContext.ProjectID, credentialId, intName, keyPrefix, []*protos.Metric{}, type_enums.RECORD_ACTIVE)
 		if err != nil {
 			iApi.logger.Benchmark("integration.PreHook.Execute", time.Since(start))
@@ -111,7 +111,7 @@ func (iApi *integrationApi) postHook(ctx context.Context, projectContext types.P
 	keyPrefix := iApi.ObjectPrefix(projectContext.OrganizationID, projectContext.ProjectID, credentialId)
 
 	go func(currentContext context.Context, _auditId uint64, s3Prefix string, _response map[string]interface{}) {
-		nCtx := context.Background()
+		nCtx := detachedAuditContext(currentContext)
 		_, err := iApi.auditService.UpdateMetadata(nCtx, requestId, extras)
 		if err != nil {
 			iApi.logger.Errorf("unable to update the external audit metadata table for audit Id %d", _auditId)
@@ -144,6 +144,10 @@ func (iApi *integrationApi) postHook(ctx context.Context, projectContext types.P
 		}
 		iApi.storage.Store(nCtx, key, _str)
 	}(ctx, requestId, keyPrefix, response)
+}
+
+func detachedAuditContext(ctx context.Context) context.Context {
+	return context.WithoutCancel(ctx)
 }
 
 func (iApi *integrationApi) GetRequestAndResponse(ctx context.Context, organizationId, projectId, credentialId, auditId uint64) (requestData []byte, responseData []byte, err error) {

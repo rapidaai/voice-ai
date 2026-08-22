@@ -86,6 +86,7 @@ func (s *outboundDispatcherTestStore) Save(ctx context.Context, cc *callcontext.
 func TestInboundDispatcherSaveCallContextUsesDelegatedContext(t *testing.T) {
 	organizationID := uint64(7)
 	projectID := uint64(8)
+	serviceID := uint64(9)
 	store := &outboundDispatcherTestStore{}
 	dispatcher := &InboundDispatcher{store: store}
 
@@ -93,6 +94,7 @@ func TestInboundDispatcherSaveCallContextUsesDelegatedContext(t *testing.T) {
 		context.Background(),
 		&types.Authentication{
 			AuthType:          types.AuthTypeService,
+			ActorValue:        &types.ActorIdentity{Type: types.ActorTypeService, ID: serviceID},
 			OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 			ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
 		},
@@ -106,6 +108,9 @@ func TestInboundDispatcherSaveCallContextUsesDelegatedContext(t *testing.T) {
 	}
 	if store.callContext == nil || store.callContext.OrganizationID != organizationID || store.callContext.ProjectID != projectID {
 		t.Fatalf("saved call context = %+v", store.callContext)
+	}
+	if store.callContext.AuthActorType == nil || *store.callContext.AuthActorType != string(types.ActorTypeService) || store.callContext.AuthActorID == nil || *store.callContext.AuthActorID != serviceID {
+		t.Fatalf("saved actor = %v/%v", store.callContext.AuthActorType, store.callContext.AuthActorID)
 	}
 }
 
@@ -286,6 +291,8 @@ func TestOutboundDispatcher_StatusReporterPersistsFailureDetails(t *testing.T) {
 func TestOutboundDispatcher_StatusReporterRecordsTerminalObservability(t *testing.T) {
 	organizationID := uint64(11)
 	projectID := uint64(22)
+	serviceID := uint64(55)
+	actorType := string(types.ActorTypeService)
 	service := &outboundDispatcherConversationServiceStub{
 		metricRecorded:   make(chan struct{}),
 		metadataRecorded: make(chan struct{}),
@@ -300,6 +307,8 @@ func TestOutboundDispatcher_StatusReporterRecordsTerminalObservability(t *testin
 			OrganizationID: organizationID,
 			ProjectID:      projectID,
 			AuthType:       types.AuthTypeService.String(),
+			AuthActorType:  &actorType,
+			AuthActorID:    &serviceID,
 		},
 	}
 	dispatcher := &OutboundDispatcher{
@@ -389,6 +398,8 @@ func TestOutboundDispatcher_StatusReporterRecordsTerminalObservability(t *testin
 }
 
 func TestOutboundDispatcher_StatusReporterRecordsRingingProgressObservability(t *testing.T) {
+	serviceID := uint64(55)
+	actorType := string(types.ActorTypeService)
 	service := &outboundDispatcherConversationServiceStub{
 		metricRecorded: make(chan struct{}),
 	}
@@ -402,6 +413,8 @@ func TestOutboundDispatcher_StatusReporterRecordsRingingProgressObservability(t 
 			OrganizationID: 11,
 			ProjectID:      22,
 			AuthType:       types.AuthTypeService.String(),
+			AuthActorType:  &actorType,
+			AuthActorID:    &serviceID,
 		},
 	}
 	dispatcher := &OutboundDispatcher{

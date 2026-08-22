@@ -72,7 +72,6 @@ func (knowledge *webKnowledgeGRPCApi) GetKnowledge(c context.Context, iRequest *
 			"Unable to get your knowledge, please try again in sometime.")
 	}
 
-	_knowledge.CreatedUser = knowledge.GetUser(c, iAuth, _knowledge.GetCreatedBy())
 	return utils.Success[protos.GetKnowledgeResponse, *protos.Knowledge](_knowledge)
 }
 
@@ -98,9 +97,6 @@ func (knowledge *webKnowledgeGRPCApi) GetAllKnowledge(c context.Context, iReques
 			"Unable to get your knowledge, please try again in sometime.")
 	}
 
-	for _, _ep := range _knowledge {
-		_ep.CreatedUser = knowledge.GetUser(c, iAuth, _ep.GetCreatedBy())
-	}
 	return utils.PaginatedSuccess[protos.GetAllKnowledgeResponse, []*protos.Knowledge](
 		_page.GetTotalItem(), _page.GetCurrentPage(),
 		_knowledge)

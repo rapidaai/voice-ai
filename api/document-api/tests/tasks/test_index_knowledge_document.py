@@ -33,6 +33,8 @@ def _base_data(**overrides):
         "project_id": "proj-2",
         "knowledge_id": "know-3",
         "knowledge_document_id": "doc-4",
+        "actor_type": "service",
+        "actor_id": 41,
     }
     data.update(overrides)
     return data
@@ -219,6 +221,7 @@ class TestIndexingRunnerConstruction:
 
         assert "integration_client" in runner_kwargs
         assert "vault_client" in runner_kwargs
+        assert runner_kwargs["actor"] == {"type": "service", "id": 41}
 
 
 class TestTaskValidation:
@@ -239,6 +242,22 @@ class TestTaskValidation:
 
         assert result["status"] == "error"
         assert "org" in result["msg"].lower() or "organization" in result["msg"].lower()
+
+    @pytest.mark.asyncio
+    async def test_invalid_actor_returns_error(self):
+        settings = _make_settings()
+        with (
+            patch("app.tasks.index_knowledge_document.get_settings", return_value=settings),
+            patch("app.tasks.index_knowledge_document.get_me_postgres", new_callable=AsyncMock),
+            patch("app.tasks.index_knowledge_document.get_me_elastic_search", new_callable=AsyncMock),
+            patch("app.tasks.index_knowledge_document.get_me_storage", new_callable=AsyncMock),
+            patch("app.tasks.index_knowledge_document.get_me_integration_client", return_value=MagicMock()),
+            patch("app.tasks.index_knowledge_document.get_me_vault_service_client", return_value=MagicMock()),
+        ):
+            result = await _get_index_fn()(MagicMock(), _base_data(actor_id=0))
+
+        assert result["status"] == "error"
+        assert "actor" in result["msg"].lower()
 
     @pytest.mark.asyncio
     async def test_missing_project_id_returns_error(self):

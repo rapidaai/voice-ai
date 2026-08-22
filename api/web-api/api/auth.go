@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	internal_connects "github.com/rapidaai/api/web-api/internal/connect"
@@ -53,9 +54,7 @@ type webAuthGRPCApi struct {
 	webAuthApi
 }
 
-var (
-	GOOGLE_STATE = "google"
-)
+var GOOGLE_STATE = "google"
 
 func NewAuthRPC(config *config.WebAppConfig, oauthCfg *config.OAuth2Config, logger commons.Logger, postgres connectors.PostgresConnector) *webAuthRPCApi {
 	return &webAuthRPCApi{
@@ -606,11 +605,14 @@ func (wAuthApi *webAuthGRPCApi) ScopeAuthorize(c context.Context, irRequest *pro
 		}
 		response.OrganizationId = organizationContext.OrganizationID
 	}
-	if actor, actorErr := iAuth.Actor(); actorErr == nil {
-		actorType := string(actor.Type)
-		response.ActorType = &actorType
-		response.ActorId = &actor.ID
+	actor, actorErr := iAuth.Actor()
+	if actorErr != nil {
+		return nil, status.Error(codes.PermissionDenied, actorErr.Error())
 	}
+	actorType := string(actor.Type)
+	actorID := strconv.FormatUint(actor.ID, 10)
+	response.ActorType = &actorType
+	response.ActorId = &actorID
 	return &protos.ScopedAuthenticationResponse{Code: 200, Success: true, Data: response}, nil
 }
 

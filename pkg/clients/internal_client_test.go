@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
 	"testing"
 	"time"
 
@@ -19,6 +20,19 @@ import (
 type recordingRedisConnector struct {
 	command string
 	args    []string
+}
+
+func TestInternalClientWithTokenPreservesUint64UserID(t *testing.T) {
+	client := &internalClient{}
+	userID := ^uint64(0)
+	authContext := client.WithToken(context.Background(), "token", userID)
+	outgoingMetadata, ok := metadata.FromOutgoingContext(authContext)
+	if !ok {
+		t.Fatal("WithToken() did not attach outgoing metadata")
+	}
+	if authID := outgoingMetadata.Get(types.AUTH_KEY); len(authID) != 1 || authID[0] != strconv.FormatUint(userID, 10) {
+		t.Fatalf("auth id = %v, want %s", authID, strconv.FormatUint(userID, 10))
+	}
 }
 
 func (r *recordingRedisConnector) Connect(context.Context) error    { return nil }
@@ -67,7 +81,7 @@ func TestInternalClientCacheWithTTLRejectsNonPositiveTTL(t *testing.T) {
 }
 
 func TestInternalClientCreateServiceScopeToken(t *testing.T) {
-	client := &internalClient{cfg: &config.AppConfig{Secret: "secret"}}
+	client := actorAwareInternalClient(t)
 	token, err := client.createServiceScopeToken(&types.Authentication{
 		AuthType:          types.AuthTypeUser,
 		UserValue:         &types.UserContext{UserID: 5},
@@ -77,18 +91,22 @@ func TestInternalClientCreateServiceScopeToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("createServiceScopeToken() error = %v", err)
 	}
-	scope, err := types.ExtractServiceScope(token, "secret")
+	scope, err := types.ExtractServiceScope(token, client.cfg.Secret)
 	if err != nil {
 		t.Fatalf("ExtractServiceScope() error = %v", err)
 	}
 	context, ok := scope.DelegatedContext()
-	if !ok || context.OrganizationID != 7 || context.UserID == nil || *context.UserID != 5 || context.ProjectID == nil || *context.ProjectID != 11 {
+	if !ok || context.OrganizationID != 7 || context.UserID != nil || context.ProjectID == nil || *context.ProjectID != 11 {
 		t.Fatalf("DelegatedContext() = %+v, %v", context, ok)
+	}
+	actor, err := types.ResolveAuditActor(scope)
+	if err != nil || actor != (types.ActorIdentity{Type: types.ActorTypeService, ID: 41}) {
+		t.Fatalf("ResolveAuditActor() = %+v, %v", actor, err)
 	}
 }
 
 func TestInternalClientCreateServiceScopeTokenRequiresOrganization(t *testing.T) {
-	client := &internalClient{cfg: &config.AppConfig{Secret: "secret"}}
+	client := actorAwareInternalClient(t)
 	_, err := client.createServiceScopeToken(&types.Authentication{
 		AuthType:  types.AuthTypeUser,
 		UserValue: &types.UserContext{UserID: 5},
@@ -99,7 +117,7 @@ func TestInternalClientCreateServiceScopeTokenRequiresOrganization(t *testing.T)
 }
 
 func TestInternalClientCreateServiceScopeTokenRejectsMismatchedProjectOrganization(t *testing.T) {
-	client := &internalClient{cfg: &config.AppConfig{Secret: "secret"}}
+	client := actorAwareInternalClient(t)
 	_, err := client.createServiceScopeToken(&types.Authentication{
 		AuthType:          types.AuthTypeProject,
 		OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
@@ -110,8 +128,25 @@ func TestInternalClientCreateServiceScopeTokenRejectsMismatchedProjectOrganizati
 	}
 }
 
+func TestInternalClientCreateServiceScopeTokenRequiresActorAndSecret(t *testing.T) {
+	client := actorAwareInternalClient(t)
+	authentication := &types.Authentication{
+		AuthType:          types.AuthTypeOrg,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
+	}
+	t.Setenv("RAPIDA_SERVICE_ACTOR_ID", "")
+	if _, err := client.createServiceScopeToken(authentication); err == nil {
+		t.Fatal("createServiceScopeToken() error = nil without service actor ID")
+	}
+	t.Setenv("RAPIDA_SERVICE_ACTOR_ID", "41")
+	client.cfg.Secret = ""
+	if _, err := client.createServiceScopeToken(authentication); err == nil {
+		t.Fatal("createServiceScopeToken() error = nil without shared secret")
+	}
+}
+
 func TestInternalClientWithAuthReturnsErrorWithoutContext(t *testing.T) {
-	client := &internalClient{cfg: &config.AppConfig{Secret: "secret"}}
+	client := actorAwareInternalClient(t)
 	authContext, err := client.WithAuth(context.Background(), &types.Authentication{})
 	if !errors.Is(err, types.ErrOrganizationContextUnavailable) {
 		t.Fatalf("WithAuth() error = %v", err)
@@ -122,7 +157,7 @@ func TestInternalClientWithAuthReturnsErrorWithoutContext(t *testing.T) {
 }
 
 func TestInternalClientWithAuthAddsServiceAssertion(t *testing.T) {
-	client := &internalClient{cfg: &config.AppConfig{Secret: "secret"}}
+	client := actorAwareInternalClient(t)
 	authContext, err := client.WithAuth(context.Background(), &types.Authentication{
 		AuthType:          types.AuthTypeOrg,
 		OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
@@ -137,7 +172,7 @@ func TestInternalClientWithAuthAddsServiceAssertion(t *testing.T) {
 }
 
 func TestInternalClientWithPlatformReturnsAuthError(t *testing.T) {
-	client := &internalClient{cfg: &config.AppConfig{Secret: "secret"}}
+	client := actorAwareInternalClient(t)
 	authContext, err := client.WithPlatform(context.Background(), &types.Authentication{})
 	if !errors.Is(err, types.ErrOrganizationContextUnavailable) {
 		t.Fatalf("WithPlatform() error = %v", err)
@@ -148,7 +183,7 @@ func TestInternalClientWithPlatformReturnsAuthError(t *testing.T) {
 }
 
 func TestInternalClientWithHttpAuthDoesNotMutateRequestOnAuthError(t *testing.T) {
-	client := &internalClient{cfg: &config.AppConfig{Secret: "secret"}}
+	client := actorAwareInternalClient(t)
 	request, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -163,4 +198,10 @@ func TestInternalClientWithHttpAuthDoesNotMutateRequestOnAuthError(t *testing.T)
 	if authorization := request.Header.Get("Authorization"); authorization != "" {
 		t.Fatalf("Authorization header = %q, want empty", authorization)
 	}
+}
+
+func actorAwareInternalClient(t *testing.T) *internalClient {
+	t.Helper()
+	t.Setenv("RAPIDA_SERVICE_ACTOR_ID", "41")
+	return &internalClient{cfg: &config.AppConfig{Name: "assistant-api", Secret: "secret"}}
 }

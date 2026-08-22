@@ -378,7 +378,7 @@ func (conversationService *assistantConversationService) GetAllMessage(
 // 		Columns: []clause.Column{{Name: "message_id"}, {Name: "assistant_conversation_id"}},
 // 		DoUpdates: clause.AssignmentColumns([]string{
 // 			"response",
-// 			"updated_by", "updated_date"}),
+// 			"updated_date"}),
 // 	}).Create(&conversation)
 // 	// Where("message_id = ? AND assistant_conversation_id = ? ", assistantConversationMessageId, assistantConversationId).Updates(conversation)
 // 	if tx.Error != nil {
@@ -400,11 +400,6 @@ func (conversationService *assistantConversationService) CreateConversationMessa
 	role string,
 	message string,
 ) (*internal_message_gorm.AssistantConversationMessage, error) {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return nil, err
-	}
 
 	start := time.Now()
 	db := conversationService.postgres.DB(ctx)
@@ -416,12 +411,8 @@ func (conversationService *assistantConversationService) CreateConversationMessa
 		Source:                   source.Get(),
 		Role:                     role,
 		Body:                     message,
-		Mutable: gorm_models.Mutable{
-			CreatedBy: 99,
-		},
+		Mutable:                  gorm_models.Mutable{},
 	}
-	conversationMessage.CreatedBy = userID
-	conversationMessage.UpdatedBy = userID
 	tx := db.Create(&conversationMessage)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.CreateConversationMessage", time.Since(start))
@@ -440,11 +431,6 @@ func (conversationService *assistantConversationService) CreateOrUpdateMessageMe
 	assistantConversationMessageId string,
 	metadata []*protos.Metadata,
 ) ([]*internal_message_gorm.AssistantConversationMessageMetadata, error) {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return nil, err
-	}
 
 	start := time.Now()
 	db := conversationService.postgres.DB(ctx)
@@ -458,8 +444,6 @@ func (conversationService *assistantConversationService) CreateOrUpdateMessageMe
 				Value: m.GetValue(),
 			},
 		}
-		_mtd.UpdatedBy = userID
-		_mtd.CreatedBy = userID
 		_mtdata = append(_mtdata, _mtd)
 	}
 	if len(_mtdata) == 0 {
@@ -469,7 +453,7 @@ func (conversationService *assistantConversationService) CreateOrUpdateMessageMe
 		Columns: []clause.Column{{Name: "key"}, {Name: "assistant_conversation_message_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value",
-			"updated_by", "updated_date"}),
+			"updated_date"}),
 	}).Create(&_mtdata)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.CreateOrUpdateMessageMetadata", time.Since(start))
@@ -492,11 +476,6 @@ func (conversationService *assistantConversationService) CreateOrUpdateMessageMe
 	assistantConversationMessageId string,
 	metrics []*protos.Metric,
 ) ([]*internal_message_gorm.AssistantConversationMessageMetric, error) {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return nil, err
-	}
 
 	start := time.Now()
 	db := conversationService.postgres.DB(ctx)
@@ -511,8 +490,6 @@ func (conversationService *assistantConversationService) CreateOrUpdateMessageMe
 			AssistantConversationId:        assistantConversationId,
 			AssistantConversationMessageId: assistantConversationMessageId,
 		}
-		_mtr.UpdatedBy = userID
-		_mtr.CreatedBy = userID
 		mtrs = append(mtrs, _mtr)
 	}
 
@@ -524,7 +501,7 @@ func (conversationService *assistantConversationService) CreateOrUpdateMessageMe
 		Columns: []clause.Column{{Name: "name"}, {Name: "assistant_conversation_message_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value", "description",
-			"updated_by", "updated_date"}),
+			"updated_date"}),
 	}).Create(&mtrs)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.CreateOrUpdateMessageMetrics", time.Since(start))

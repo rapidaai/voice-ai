@@ -34,6 +34,7 @@ import (
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/middlewares"
+	gorm_models "github.com/rapidaai/pkg/models/gorm"
 )
 
 // wrapper for gin engine
@@ -75,7 +76,7 @@ func main() {
 	userAuthenticator := authenticators.NewUserAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient)
 	projectAuthenticator := authenticators.NewProjectAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient)
 	organizationAuthenticator := authenticators.NewOrganizationAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient)
-	serviceAuthenticator := authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Postgres)
+	serviceAuthenticator := authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger)
 	appRunner.S = grpc.NewServer(
 		grpc.ChainStreamInterceptor(
 			middlewares.NewRequestLoggerStreamServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
@@ -228,6 +229,9 @@ func (app *AppRunner) Init(ctx context.Context) error {
 	err := app.Postgres.Connect(ctx)
 	if err != nil {
 		app.Logger.Error("error while connecting to postgres.", err)
+		return err
+	}
+	if err := gorm_models.RegisterAuditActorCallbacks(app.Postgres.DB(ctx)); err != nil {
 		return err
 	}
 	err = app.Redis.Connect(ctx)

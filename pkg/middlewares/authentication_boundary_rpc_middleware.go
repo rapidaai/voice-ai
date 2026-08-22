@@ -2,6 +2,7 @@ package middlewares
 
 import (
 	"context"
+	"math"
 	"strconv"
 	"strings"
 
@@ -46,7 +47,7 @@ func NewAuthenticationBoundaryMiddleware(
 				return
 			}
 			userID, err := strconv.ParseUint(authID, 0, 64)
-			if err != nil || userID == 0 {
+			if err != nil || userID == 0 || userID > math.MaxInt64 {
 				logAuthenticationFailure(logger, "user credential has invalid auth id")
 				abortGinAuthentication(ctx)
 				return
@@ -67,13 +68,18 @@ func NewAuthenticationBoundaryMiddleware(
 			}
 			authenticatedUserID := principle.GetUserInfo().GetId()
 			organizationID := principle.GetOrganizationRole().OrganizationId
+			actor, err := types.ResolveAuditActor(principle)
+			if err != nil {
+				logAuthenticationFailure(logger, "user credential has invalid audit actor")
+				abortGinAuthentication(ctx)
+				return
+			}
 			auth = &types.Authentication{
 				AuthType:          types.AuthTypeUser,
+				ActorValue:        &actor,
 				UserValue:         &types.UserContext{UserID: authenticatedUserID},
 				OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 			}
-			actor := types.ActorIdentity{Type: types.ActorTypeUser, ID: strconv.FormatUint(authenticatedUserID, 10)}
-			auth.ActorValue = &actor
 			if projectRole := principle.GetCurrentProjectRole(); projectRole != nil && projectRole.ProjectId > 0 {
 				projectContext := types.ProjectContext{OrganizationID: organizationID, ProjectID: projectRole.ProjectId}
 				auth.ProjectValue = &projectContext
@@ -98,14 +104,18 @@ func NewAuthenticationBoundaryMiddleware(
 				abortGinAuthentication(ctx)
 				return
 			}
+			actor, err := types.ResolveAuditActor(principle.Info)
+			if err != nil {
+				logAuthenticationFailure(logger, "project credential has invalid audit actor")
+				abortGinAuthentication(ctx)
+				return
+			}
 			projectContext, _ := principle.Info.ProjectContext()
 			auth = &types.Authentication{
 				AuthType:          types.AuthTypeProject,
+				ActorValue:        &actor,
 				OrganizationValue: &types.OrganizationContext{OrganizationID: projectContext.OrganizationID},
 				ProjectValue:      &projectContext,
-			}
-			if actor, ok := principle.Info.AuditActor(); ok {
-				auth.ActorValue = &actor
 			}
 		}
 
@@ -121,9 +131,16 @@ func NewAuthenticationBoundaryMiddleware(
 				abortGinAuthentication(ctx)
 				return
 			}
+			actor, err := types.ResolveAuditActor(principle.Info)
+			if err != nil {
+				logAuthenticationFailure(logger, "organization credential has invalid audit actor")
+				abortGinAuthentication(ctx)
+				return
+			}
 			organizationID, _ := principle.Info.OrganizationContext()
 			auth = &types.Authentication{
 				AuthType:          types.AuthTypeOrg,
+				ActorValue:        &actor,
 				OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 			}
 		}
@@ -141,12 +158,16 @@ func NewAuthenticationBoundaryMiddleware(
 				return
 			}
 			delegatedContext, _ := principle.Info.DelegatedContext()
+			actor, err := types.ResolveAuditActor(principle.Info)
+			if err != nil {
+				logAuthenticationFailure(logger, "service credential has invalid audit actor")
+				abortGinAuthentication(ctx)
+				return
+			}
 			auth = &types.Authentication{
 				AuthType:          types.AuthTypeService,
+				ActorValue:        &actor,
 				OrganizationValue: &types.OrganizationContext{OrganizationID: delegatedContext.OrganizationID},
-			}
-			if delegatedContext.UserID != nil {
-				auth.UserValue = &types.UserContext{UserID: *delegatedContext.UserID}
 			}
 			if delegatedContext.ProjectID != nil {
 				auth.ProjectValue = &types.ProjectContext{

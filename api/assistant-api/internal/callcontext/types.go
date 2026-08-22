@@ -59,7 +59,7 @@ type CallContext struct {
 	AuthType       string    `json:"authType" gorm:"column:auth_type;type:varchar(50);not null;default:''"`
 	AuthUserID     *uint64   `json:"authUserId,omitempty" gorm:"column:auth_user_id;type:bigint"`
 	AuthActorType  *string   `json:"authActorType,omitempty" gorm:"column:auth_actor_type;type:varchar(50)"`
-	AuthActorID    *string   `json:"authActorId,omitempty" gorm:"column:auth_actor_id;type:varchar(255)"`
+	AuthActorID    *uint64   `json:"authActorId,omitempty" gorm:"column:auth_actor_id;type:bigint"`
 	Provider       string    `json:"provider" gorm:"column:provider;type:varchar(50);not null;default:''"`
 	Direction      string    `json:"direction" gorm:"column:direction;type:varchar(20);not null;default:''"`
 	CallerNumber   string    `json:"callerNumber" gorm:"column:caller_number;type:varchar(50);not null;default:''"`
@@ -100,6 +100,10 @@ func (cc *CallContext) SetAuthentication(auth *types.Authentication) error {
 	if auth == nil || !auth.IsAuthenticated() {
 		return types.ErrUnauthenticated
 	}
+	actor, err := auth.Actor()
+	if err != nil {
+		return err
+	}
 
 	cc.AuthType = auth.AuthType.String()
 	cc.AuthUserID = nil
@@ -117,11 +121,9 @@ func (cc *CallContext) SetAuthentication(auth *types.Authentication) error {
 	if projectContext, err := auth.ProjectContext(); err == nil {
 		cc.ProjectID = projectContext.ProjectID
 	}
-	if actor, err := auth.Actor(); err == nil {
-		actorType := string(actor.Type)
-		cc.AuthActorType = &actorType
-		cc.AuthActorID = &actor.ID
-	}
+	actorType := string(actor.Type)
+	cc.AuthActorType = &actorType
+	cc.AuthActorID = &actor.ID
 	return nil
 }
 
@@ -140,24 +142,21 @@ func (cc *CallContext) ToAuthentication() (*types.Authentication, error) {
 	if cc.ProjectID != 0 {
 		auth.ProjectValue = &types.ProjectContext{OrganizationID: cc.OrganizationID, ProjectID: cc.ProjectID}
 	}
-
-	actorType := ""
-	actorID := ""
-	if cc.AuthActorType != nil {
-		actorType = strings.TrimSpace(*cc.AuthActorType)
-	}
-	if cc.AuthActorID != nil {
-		actorID = strings.TrimSpace(*cc.AuthActorID)
-	}
-	if (actorType == "") != (actorID == "") {
-		return nil, errors.New("call context authentication actor is incomplete")
-	}
-	if actorType != "" {
-		auth.ActorValue = &types.ActorIdentity{Type: types.ActorType(actorType), ID: actorID}
-	}
-
 	if !auth.IsAuthenticated() {
 		return nil, fmt.Errorf("call context authentication is invalid for auth type %q: %w", cc.AuthType, types.ErrUnauthenticated)
 	}
+
+	actorType := ""
+	if cc.AuthActorType != nil {
+		actorType = strings.TrimSpace(*cc.AuthActorType)
+	}
+	if actorType == "" || cc.AuthActorID == nil {
+		return nil, errors.New("call context authentication actor is incomplete")
+	}
+	auth.ActorValue = &types.ActorIdentity{Type: types.ActorType(actorType), ID: *cc.AuthActorID}
+	if _, err := auth.Actor(); err != nil {
+		return nil, fmt.Errorf("call context authentication actor is invalid: %w", err)
+	}
+
 	return auth, nil
 }

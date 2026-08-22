@@ -253,20 +253,20 @@ func (cApi *ConversationApi) CallbackByContext(c *gin.Context) {
 
 	cc, err := cApi.callContextStore.Get(c, contextID)
 	if err != nil {
-		cApi.logger.Errorf("failed to resolve call context %s for event callback: %v", contextID, err)
+		cApi.logger.Errorw("failed to resolve call context for event callback", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event to process"})
 		return
 	}
 
 	auth, err := cc.ToAuthentication()
 	if err != nil {
-		cApi.logger.Errorf("failed to reconstruct call authentication for context %s: %v", contextID, err)
+		cApi.logger.Errorw("failed to reconstruct call authentication", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event to process"})
 		return
 	}
 	statusInfo, err := cApi.inboundDispatcher.HandleStatusCallback(c, cc.Provider, auth, cc.AssistantID, cc.ConversationID)
 	if err != nil {
-		cApi.logger.Errorf("status callback failed for context %s: %v", contextID, err)
+		cApi.logger.Errorw("status callback failed", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event to process"})
 		return
 	}

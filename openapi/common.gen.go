@@ -7,6 +7,16 @@ import (
 	"time"
 )
 
+// Defines values for AuditActorType.
+const (
+	AuditActorTypeOrganization AuditActorType = "organization"
+	AuditActorTypeProject      AuditActorType = "project"
+	AuditActorTypeService      AuditActorType = "service"
+	AuditActorTypeSystem       AuditActorType = "system"
+	AuditActorTypeUnknown      AuditActorType = "unknown"
+	AuditActorTypeUser         AuditActorType = "user"
+)
+
 // Argument defines model for Argument.
 type Argument struct {
 	Id    *Uint64String `json:"id,omitempty"`
@@ -21,7 +31,7 @@ type AssistantConversation struct {
 	AssistantId                  *Uint64String                          `json:"assistantId,omitempty"`
 	AssistantProviderModelId     *Uint64String                          `json:"assistantProviderModelId,omitempty"`
 	Contexts                     *[]AssistantConversationContext        `json:"contexts,omitempty"`
-	CreatedBy                    *Uint64String                          `json:"createdBy,omitempty"`
+	CreatedActor                 *AuditActor                            `json:"createdActor,omitempty"`
 	CreatedDate                  *time.Time                             `json:"createdDate,omitempty"`
 	Direction                    *string                                `json:"direction,omitempty"`
 	Id                           *Uint64String                          `json:"id,omitempty"`
@@ -36,7 +46,7 @@ type AssistantConversation struct {
 	Source                       *string                                `json:"source,omitempty"`
 	Status                       *string                                `json:"status,omitempty"`
 	TelephonyEvents              *[]AssistantConversationTelephonyEvent `json:"telephonyEvents,omitempty"`
-	UpdatedBy                    *Uint64String                          `json:"updatedBy,omitempty"`
+	UpdatedActor                 *AuditActor                            `json:"updatedActor,omitempty"`
 	UpdatedDate                  *time.Time                             `json:"updatedDate,omitempty"`
 	User                         *User                                  `json:"user,omitempty"`
 	UserId                       *Uint64String                          `json:"userId,omitempty"`
@@ -89,6 +99,16 @@ type AssistantDefinition struct {
 	AssistantId *Uint64String `json:"assistantId,omitempty"`
 	Version     *string       `json:"version,omitempty"`
 }
+
+// AuditActor defines model for AuditActor.
+type AuditActor struct {
+	DisplayName *string        `json:"displayName,omitempty"`
+	Id          Uint64String   `json:"id"`
+	Type        AuditActorType `json:"type"`
+}
+
+// AuditActorType defines model for AuditActor.Type.
+type AuditActorType string
 
 // Criteria defines model for Criteria.
 type Criteria struct {

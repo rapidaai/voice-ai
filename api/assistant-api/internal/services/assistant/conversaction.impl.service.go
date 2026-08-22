@@ -403,10 +403,6 @@ func (conversationService *assistantConversationService) CreateConversation(
 	assistantId uint64,
 	assistantProviderModelId uint64,
 	direction type_enums.ConversationDirection, source utils.RapidaSource) (*internal_conversation_entity.AssistantConversation, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
-		return nil, err
-	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
@@ -425,7 +421,6 @@ func (conversationService *assistantConversationService) CreateConversation(
 		Source:                   source,
 		Direction:                direction,
 	}
-	conversation.Mutable.CreatedBy = userContext.UserID
 	tx := db.Create(&conversation)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.CreateConversation", time.Since(start))
@@ -443,11 +438,6 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 	assistantConversationId uint64,
 	metadata []*protos.Metadata,
 ) ([]*internal_conversation_entity.AssistantConversationMetadata, error) {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return nil, err
-	}
 
 	start := time.Now()
 	//
@@ -468,8 +458,6 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 			AssistantId: assistantId,
 		}
 		_meta.SetValue(mt.Value)
-		_meta.UpdatedBy = userID
-		_meta.CreatedBy = userID
 		_metadatas = append(_metadatas, _meta)
 	}
 
@@ -477,7 +465,7 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 		Columns: []clause.Column{{Name: "assistant_conversation_id"}, {Name: "key"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value",
-			"updated_by", "updated_date"}),
+			"updated_date"}),
 	}).Create(&_metadatas)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.CreateOrUpdateConversationMetadata", time.Since(start))
@@ -493,11 +481,6 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 	assistantId,
 	assistantConversationId uint64,
 	opts map[string]interface{}) ([]*internal_conversation_entity.AssistantConversationOption, error) {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return nil, err
-	}
 
 	start := time.Now()
 	if len(opts) == 0 {
@@ -516,8 +499,6 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 			AssistantId: assistantId,
 		}
 		option.SetValue(o)
-		option.CreatedBy = userID
-		option.UpdatedBy = userID
 		options = append(options, option)
 	}
 
@@ -525,7 +506,7 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 		Columns: []clause.Column{{Name: "assistant_conversation_id"}, {Name: "key"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value",
-			"updated_by", "updated_date"}),
+			"updated_date"}),
 	}).Create(&options)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.CreateOrUpdateConversationOptions", time.Since(start))
@@ -543,11 +524,6 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 	assistantConversationId uint64,
 	arguments map[string]interface{},
 ) ([]*internal_conversation_entity.AssistantConversationArgument, error) {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return nil, err
-	}
 
 	start := time.Now()
 	if len(arguments) == 0 {
@@ -565,7 +541,6 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 			},
 		}
 		ag.SetValue(arg)
-		ag.UpdatedBy = userID
 		_arguments = append(_arguments, ag)
 	}
 
@@ -573,7 +548,7 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 		Columns: []clause.Column{{Name: "assistant_conversation_id"}, {Name: "name"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value",
-			"updated_by", "updated_date"}),
+			"updated_date"}),
 	}).Create(&_arguments)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.ApplyConversationArgument", time.Since(start))
@@ -597,11 +572,6 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 	assistantConversationId uint64,
 	metrics []*protos.Metric,
 ) ([]*internal_conversation_entity.AssistantConversationMetric, error) {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return nil, err
-	}
 
 	start := time.Now()
 	db := conversationService.postgres.DB(ctx)
@@ -617,8 +587,6 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 			AssistantId:             assistantId,
 		}
 
-		_mtr.UpdatedBy = userID
-		_mtr.CreatedBy = userID
 		mtrs = append(mtrs, _mtr)
 	}
 
@@ -626,7 +594,7 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 		Columns: []clause.Column{{Name: "assistant_conversation_id"}, {Name: "name"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value", "description",
-			"updated_by", "updated_date"}),
+			"updated_date"}),
 	}).Create(&mtrs)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.CreateOrUpdateConversationMetrics", time.Since(start))
@@ -644,11 +612,6 @@ func (conversationService *assistantConversationService) CreateCustomConversatio
 	assistantConversationId uint64,
 	metrics []*protos.Metric,
 ) ([]*internal_conversation_entity.AssistantConversationMetric, error) {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return nil, err
-	}
 
 	start := time.Now()
 	db := conversationService.postgres.DB(ctx)
@@ -664,8 +627,6 @@ func (conversationService *assistantConversationService) CreateCustomConversatio
 			AssistantConversationId: assistantConversationId,
 		}
 
-		metric.UpdatedBy = userID
-		metric.CreatedBy = userID
 		mtrx = append(mtrx, metric)
 	}
 
@@ -673,7 +634,7 @@ func (conversationService *assistantConversationService) CreateCustomConversatio
 		Columns: []clause.Column{{Name: "assistant_conversation_id"}, {Name: "name"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value", "description",
-			"updated_by", "updated_date"}),
+			"updated_date"}),
 	}).Create(&mtrx)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.CreateCustomConversationMetric", time.Since(start))
@@ -691,10 +652,6 @@ func (conversationService *assistantConversationService) CreateConversationRecor
 	assistantConversationId uint64,
 	user, assistant, conversation []byte,
 ) (*internal_conversation_entity.AssistantConversationRecording, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
-		return nil, err
-	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
@@ -742,7 +699,6 @@ func (conversationService *assistantConversationService) CreateConversationRecor
 		UserRecordingUrl:         userKey,
 		ConversationRecordingUrl: conversationKey,
 	}
-	conversationRecording.Mutable.CreatedBy = userContext.UserID
 	tx := db.Create(&conversationRecording)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.CreateConversationRecording", time.Since(start))

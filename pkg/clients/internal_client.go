@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -54,7 +55,7 @@ func NewInternalClient(cfg *config.AppConfig, logger commons.Logger, redis conne
 func (ic *internalClient) WithToken(c context.Context, token string, userId uint64) context.Context {
 	md := metadata.New(map[string]string{
 		types.AUTHORIZATION_KEY: token,
-		types.AUTH_KEY:          strconv.Itoa(int(userId)),
+		types.AUTH_KEY:          strconv.FormatUint(userId, 10),
 	})
 	return metadata.NewOutgoingContext(c, md)
 }
@@ -123,11 +124,6 @@ func (ic *internalClient) createServiceScopeToken(auth *types.Authentication) (s
 		return "", err
 	}
 	delegatedContext := types.DelegatedContext{OrganizationID: organizationContext.OrganizationID}
-	if userContext, userErr := auth.UserContext(); userErr == nil {
-		delegatedContext.UserID = &userContext.UserID
-	} else if !errors.Is(userErr, types.ErrUserContextUnavailable) {
-		return "", userErr
-	}
 	if projectContext, projectErr := auth.ProjectContext(); projectErr == nil {
 		if projectContext.OrganizationID != organizationContext.OrganizationID {
 			return "", errors.New("project context organization does not match authentication organization")
@@ -136,7 +132,21 @@ func (ic *internalClient) createServiceScopeToken(auth *types.Authentication) (s
 	} else if !errors.Is(projectErr, types.ErrProjectContextUnavailable) {
 		return "", projectErr
 	}
-	return types.CreateServiceScopeToken(delegatedContext, ic.cfg.Secret)
+	if ic.cfg == nil || strings.TrimSpace(ic.cfg.Name) == "" {
+		return "", errors.New("service name is required for internal authentication")
+	}
+	serviceActorID, err := strconv.ParseUint(strings.TrimSpace(os.Getenv("RAPIDA_SERVICE_ACTOR_ID")), 10, 64)
+	if err != nil {
+		return "", errors.New("RAPIDA_SERVICE_ACTOR_ID must contain a positive bigint service identity")
+	}
+	if strings.TrimSpace(ic.cfg.Secret) == "" {
+		return "", errors.New("service secret is required for internal authentication")
+	}
+	return types.CreateServiceScopeToken(delegatedContext, types.ServiceAssertion{
+		ActorID: serviceActorID,
+		Issuer:  ic.cfg.Name,
+		TTL:     5 * time.Minute,
+	}, ic.cfg.Secret)
 }
 
 func (client *internalClient) Cache(c context.Context, key string, value interface{}) *connectors.RedisResponse {

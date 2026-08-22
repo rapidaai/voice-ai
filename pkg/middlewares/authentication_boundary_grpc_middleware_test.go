@@ -3,6 +3,7 @@ package middlewares
 import (
 	"context"
 	"errors"
+	"math"
 	"testing"
 
 	"google.golang.org/grpc"
@@ -14,11 +15,40 @@ import (
 )
 
 type organizationScopeClaimAuthenticatorStub struct {
-	err error
+	err          error
+	credentialID *uint64
+	omitActor    bool
 }
 
 type projectSelectingUserAuthenticatorStub struct {
 	auth *types.PlainAuthPrinciple
+}
+
+type boundaryProjectScopeClaimAuthenticatorStub struct {
+	credentialID *uint64
+	omitActor    bool
+}
+
+func (stub boundaryProjectScopeClaimAuthenticatorStub) Claim(
+	context.Context,
+	string,
+) (*types.PlainClaimPrinciple[*types.ProjectScope], error) {
+	credentialID := uint64(1)
+	if stub.credentialID != nil {
+		credentialID = *stub.credentialID
+	}
+	projectID := uint64(1)
+	organizationID := uint64(1)
+	projectScope := &types.ProjectScope{
+		CredentialId:   &credentialID,
+		ProjectId:      &projectID,
+		OrganizationId: &organizationID,
+		Status:         type_enums.RECORD_ACTIVE.String(),
+	}
+	if stub.omitActor {
+		projectScope.CredentialId = nil
+	}
+	return &types.PlainClaimPrinciple[*types.ProjectScope]{Info: projectScope}, nil
 }
 
 func (stub projectSelectingUserAuthenticatorStub) Authorize(context.Context, string, uint64) (types.Principle, error) {
@@ -37,11 +67,20 @@ func (stub organizationScopeClaimAuthenticatorStub) Claim(
 		return nil, stub.err
 	}
 	organizationID := uint64(2)
+	credentialID := uint64(3)
+	if stub.credentialID != nil {
+		credentialID = *stub.credentialID
+	}
+	organizationScope := &types.OrganizationScope{
+		CredentialId:   &credentialID,
+		OrganizationId: &organizationID,
+		Status:         type_enums.RECORD_ACTIVE.String(),
+	}
+	if stub.omitActor {
+		organizationScope.CredentialId = nil
+	}
 	return &types.PlainClaimPrinciple[*types.OrganizationScope]{
-		Info: &types.OrganizationScope{
-			OrganizationId: &organizationID,
-			Status:         type_enums.RECORD_ACTIVE.String(),
-		},
+		Info: organizationScope,
 	}, nil
 }
 
@@ -61,7 +100,7 @@ func TestAuthenticationBoundaryUnaryAcceptsEveryCredentialClass(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			_, err := NewAuthenticationBoundaryUnaryServerMiddleware(
 				userAuthenticatorStub{},
-				&projectScopeClaimAuthenticatorStub{},
+				boundaryProjectScopeClaimAuthenticatorStub{},
 				organizationScopeClaimAuthenticatorStub{},
 				serviceScopeClaimAuthenticatorStub{},
 				nil,
@@ -72,6 +111,12 @@ func TestAuthenticationBoundaryUnaryAcceptsEveryCredentialClass(t *testing.T) {
 				}
 				if auth.Type() != test.expected {
 					t.Fatalf("authentication type = %v, want %v", auth.Type(), test.expected)
+				}
+				if test.expected == types.AuthTypeOrg {
+					actor, err := auth.Actor()
+					if err != nil || actor != (types.ActorIdentity{Type: types.ActorTypeOrganization, ID: 3}) {
+						t.Fatalf("organization actor = %+v, %v", actor, err)
+					}
 				}
 				return nil, nil
 			})
@@ -98,7 +143,7 @@ func TestAuthenticationBoundaryStreamAcceptsEveryCredentialClass(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			err := NewAuthenticationBoundaryStreamServerMiddleware(
 				userAuthenticatorStub{},
-				&projectScopeClaimAuthenticatorStub{},
+				boundaryProjectScopeClaimAuthenticatorStub{},
 				organizationScopeClaimAuthenticatorStub{},
 				serviceScopeClaimAuthenticatorStub{},
 				nil,
@@ -133,7 +178,7 @@ func TestAuthenticationBoundaryUserProjectSelectionCompatibility(t *testing.T) {
 
 	_, err := NewAuthenticationBoundaryUnaryServerMiddleware(
 		projectSelectingUserAuthenticatorStub{auth: user},
-		&projectScopeClaimAuthenticatorStub{},
+		boundaryProjectScopeClaimAuthenticatorStub{},
 		organizationScopeClaimAuthenticatorStub{},
 		serviceScopeClaimAuthenticatorStub{},
 		nil,
@@ -160,6 +205,103 @@ func TestAuthenticationBoundaryUserProjectSelectionCompatibility(t *testing.T) {
 	}
 }
 
+func TestAuthenticationBoundaryUnaryRejectsOutOfRangeUserActor(t *testing.T) {
+	organizationID := uint64(2)
+	user := &types.PlainAuthPrinciple{
+		User:             types.UserInfo{Id: uint64(math.MaxInt64) + 1},
+		OrganizationRole: &types.OrganizaitonRole{OrganizationId: organizationID},
+	}
+	handlerCalled := false
+
+	_, err := NewAuthenticationBoundaryUnaryServerMiddleware(
+		projectSelectingUserAuthenticatorStub{auth: user},
+		boundaryProjectScopeClaimAuthenticatorStub{},
+		organizationScopeClaimAuthenticatorStub{},
+		serviceScopeClaimAuthenticatorStub{},
+		nil,
+	)(incomingContext(types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "1"), nil, nil, func(context.Context, any) (any, error) {
+		handlerCalled = true
+		return nil, nil
+	})
+	if status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("middleware error = %v, want unauthenticated", err)
+	}
+	if handlerCalled {
+		t.Fatal("handler called for out-of-range user actor")
+	}
+}
+
+func TestAuthenticationBoundaryUnaryRejectsInvalidProjectActor(t *testing.T) {
+	zeroActorID := uint64(0)
+	aboveMaxActorID := uint64(math.MaxInt64) + 1
+	tests := []struct {
+		name          string
+		authenticator boundaryProjectScopeClaimAuthenticatorStub
+	}{
+		{name: "missing", authenticator: boundaryProjectScopeClaimAuthenticatorStub{omitActor: true}},
+		{name: "zero", authenticator: boundaryProjectScopeClaimAuthenticatorStub{credentialID: &zeroActorID}},
+		{name: "above max bigint", authenticator: boundaryProjectScopeClaimAuthenticatorStub{credentialID: &aboveMaxActorID}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			handlerCalled := false
+			_, err := NewAuthenticationBoundaryUnaryServerMiddleware(
+				userAuthenticatorStub{},
+				test.authenticator,
+				organizationScopeClaimAuthenticatorStub{},
+				serviceScopeClaimAuthenticatorStub{},
+				nil,
+			)(incomingContext(types.PROJECT_SCOPE_KEY, "project"), nil, nil, func(context.Context, any) (any, error) {
+				handlerCalled = true
+				return nil, nil
+			})
+
+			if status.Code(err) != codes.Unauthenticated {
+				t.Fatalf("middleware error = %v, want unauthenticated", err)
+			}
+			if handlerCalled {
+				t.Fatal("handler called for invalid project actor")
+			}
+		})
+	}
+}
+
+func TestAuthenticationBoundaryUnaryRejectsInvalidOrganizationActor(t *testing.T) {
+	zeroActorID := uint64(0)
+	aboveMaxActorID := uint64(math.MaxInt64) + 1
+	tests := []struct {
+		name          string
+		authenticator organizationScopeClaimAuthenticatorStub
+	}{
+		{name: "missing", authenticator: organizationScopeClaimAuthenticatorStub{omitActor: true}},
+		{name: "zero", authenticator: organizationScopeClaimAuthenticatorStub{credentialID: &zeroActorID}},
+		{name: "above max bigint", authenticator: organizationScopeClaimAuthenticatorStub{credentialID: &aboveMaxActorID}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			handlerCalled := false
+			_, err := NewAuthenticationBoundaryUnaryServerMiddleware(
+				userAuthenticatorStub{},
+				boundaryProjectScopeClaimAuthenticatorStub{},
+				test.authenticator,
+				serviceScopeClaimAuthenticatorStub{},
+				nil,
+			)(incomingContext(types.ORG_SCOPE_KEY, "organization"), nil, nil, func(context.Context, any) (any, error) {
+				handlerCalled = true
+				return nil, nil
+			})
+			if status.Code(err) != codes.Unauthenticated {
+				t.Fatalf("status.Code(error) = %v, want %v", status.Code(err), codes.Unauthenticated)
+			}
+			if handlerCalled {
+				t.Fatal("handler called for invalid organization actor")
+			}
+		})
+	}
+}
+
 func TestAuthenticationBoundaryRejectsUnauthorizedUserProjectSelection(t *testing.T) {
 	organizationID := uint64(2)
 	user := &types.PlainAuthPrinciple{
@@ -171,7 +313,7 @@ func TestAuthenticationBoundaryRejectsUnauthorizedUserProjectSelection(t *testin
 
 	_, err := NewAuthenticationBoundaryUnaryServerMiddleware(
 		projectSelectingUserAuthenticatorStub{auth: user},
-		&projectScopeClaimAuthenticatorStub{},
+		boundaryProjectScopeClaimAuthenticatorStub{},
 		organizationScopeClaimAuthenticatorStub{},
 		serviceScopeClaimAuthenticatorStub{},
 		nil,
@@ -195,7 +337,7 @@ func TestAuthenticationBoundaryAllowsMissingCredentials(t *testing.T) {
 	handlerCalled := false
 	_, err := NewAuthenticationBoundaryUnaryServerMiddleware(
 		userAuthenticatorStub{},
-		&projectScopeClaimAuthenticatorStub{},
+		boundaryProjectScopeClaimAuthenticatorStub{},
 		organizationScopeClaimAuthenticatorStub{},
 		serviceScopeClaimAuthenticatorStub{},
 		nil,
@@ -232,7 +374,7 @@ func TestAuthenticationBoundaryRejectsConflictingCredentials(t *testing.T) {
 			handlerCalled := false
 			_, err := NewAuthenticationBoundaryUnaryServerMiddleware(
 				userAuthenticatorStub{},
-				&projectScopeClaimAuthenticatorStub{},
+				boundaryProjectScopeClaimAuthenticatorStub{},
 				organizationScopeClaimAuthenticatorStub{},
 				serviceScopeClaimAuthenticatorStub{},
 				nil,
@@ -261,7 +403,7 @@ func TestAuthenticationBoundaryRejectsResolverFailures(t *testing.T) {
 	}{
 		{
 			name: "user", values: []string{types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "1"},
-			user: userAuthenticatorStub{err: errors.New("rejected")}, project: &projectScopeClaimAuthenticatorStub{},
+			user: userAuthenticatorStub{err: errors.New("rejected")}, project: boundaryProjectScopeClaimAuthenticatorStub{},
 			organization: organizationScopeClaimAuthenticatorStub{}, service: serviceScopeClaimAuthenticatorStub{},
 		},
 		{
@@ -271,12 +413,12 @@ func TestAuthenticationBoundaryRejectsResolverFailures(t *testing.T) {
 		},
 		{
 			name: "organization", values: []string{types.ORG_SCOPE_KEY, "organization"},
-			user: userAuthenticatorStub{}, project: &projectScopeClaimAuthenticatorStub{},
+			user: userAuthenticatorStub{}, project: boundaryProjectScopeClaimAuthenticatorStub{},
 			organization: organizationScopeClaimAuthenticatorStub{err: errors.New("rejected")}, service: serviceScopeClaimAuthenticatorStub{},
 		},
 		{
 			name: "service", values: []string{types.SERVICE_SCOPE_KEY, "service"},
-			user: userAuthenticatorStub{}, project: &projectScopeClaimAuthenticatorStub{},
+			user: userAuthenticatorStub{}, project: boundaryProjectScopeClaimAuthenticatorStub{},
 			organization: organizationScopeClaimAuthenticatorStub{}, service: serviceScopeClaimAuthenticatorStub{err: errors.New("rejected")},
 		},
 	}
@@ -311,7 +453,7 @@ func TestAuthenticationBoundaryRejectsUnsupportedCredentialClass(t *testing.T) {
 	}{
 		{
 			name: "user", values: []string{types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "1"},
-			project: &projectScopeClaimAuthenticatorStub{}, organization: organizationScopeClaimAuthenticatorStub{}, service: serviceScopeClaimAuthenticatorStub{},
+			project: boundaryProjectScopeClaimAuthenticatorStub{}, organization: organizationScopeClaimAuthenticatorStub{}, service: serviceScopeClaimAuthenticatorStub{},
 		},
 		{
 			name: "project", values: []string{types.PROJECT_SCOPE_KEY, "project"},
@@ -319,11 +461,11 @@ func TestAuthenticationBoundaryRejectsUnsupportedCredentialClass(t *testing.T) {
 		},
 		{
 			name: "organization", values: []string{types.ORG_SCOPE_KEY, "organization"},
-			user: userAuthenticatorStub{}, project: &projectScopeClaimAuthenticatorStub{}, service: serviceScopeClaimAuthenticatorStub{},
+			user: userAuthenticatorStub{}, project: boundaryProjectScopeClaimAuthenticatorStub{}, service: serviceScopeClaimAuthenticatorStub{},
 		},
 		{
 			name: "service", values: []string{types.SERVICE_SCOPE_KEY, "service"},
-			user: userAuthenticatorStub{}, project: &projectScopeClaimAuthenticatorStub{}, organization: organizationScopeClaimAuthenticatorStub{},
+			user: userAuthenticatorStub{}, project: boundaryProjectScopeClaimAuthenticatorStub{}, organization: organizationScopeClaimAuthenticatorStub{},
 		},
 	}
 

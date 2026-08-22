@@ -11,28 +11,29 @@ import (
 )
 
 func TestServiceScopeDelegatedContext(t *testing.T) {
-	userID := uint64(1)
 	organizationID := uint64(2)
 	projectID := uint64(3)
-	scope := &ServiceScope{UserId: &userID, OrganizationId: &organizationID, ProjectId: &projectID}
+	scope := &ServiceScope{
+		ActorId:        4,
+		Issuer:         "assistant-api",
+		Audience:       ServiceAssertionAudience,
+		OrganizationId: &organizationID,
+		ProjectId:      &projectID,
+	}
 
 	delegatedContext, ok := scope.DelegatedContext()
 	if !ok {
 		t.Fatal("DelegatedContext() ok = false")
 	}
-	if delegatedContext.OrganizationID != organizationID || delegatedContext.UserID == nil || *delegatedContext.UserID != userID || delegatedContext.ProjectID == nil || *delegatedContext.ProjectID != projectID {
+	if delegatedContext.OrganizationID != organizationID || delegatedContext.UserID != nil || delegatedContext.ProjectID == nil || *delegatedContext.ProjectID != projectID {
 		t.Fatalf("DelegatedContext() = %+v", delegatedContext)
 	}
 	if !scope.IsAuthenticated() {
 		t.Fatal("IsAuthenticated() = false, want true")
 	}
 
-	*delegatedContext.UserID = 99
-	if *scope.UserId != userID {
-		t.Fatal("DelegatedContext() returned an aliased user ID")
-	}
-	if _, ok := scope.AuditActor(); ok {
-		t.Fatal("AuditActor() ok = true, want false until service assertions have stable identity")
+	if actor, ok := scope.AuditActor(); !ok || actor != (ActorIdentity{Type: ActorTypeService, ID: 4}) {
+		t.Fatalf("AuditActor() = %+v, %v", actor, ok)
 	}
 }
 
@@ -42,8 +43,8 @@ func TestServiceScopeRejectsMalformedDelegatedContext(t *testing.T) {
 	for _, scope := range []*ServiceScope{
 		{},
 		{OrganizationId: &zero},
-		{OrganizationId: &organizationID, UserId: &zero},
 		{OrganizationId: &organizationID, ProjectId: &zero},
+		{ActorId: 1, OrganizationId: &organizationID},
 	} {
 		if scope.IsAuthenticated() {
 			t.Fatal("IsAuthenticated() = true, want false")

@@ -356,7 +356,12 @@ func (stub serviceScopeClaimAuthenticatorStub) Claim(
 	}
 	organizationID := uint64(2)
 	return &types.PlainClaimPrinciple[*types.ServiceScope]{
-		Info: &types.ServiceScope{OrganizationId: &organizationID},
+		Info: &types.ServiceScope{
+			ActorId:        4,
+			Issuer:         "assistant-api",
+			Audience:       types.ServiceAssertionAudience,
+			OrganizationId: &organizationID,
+		},
 	}, nil
 }
 

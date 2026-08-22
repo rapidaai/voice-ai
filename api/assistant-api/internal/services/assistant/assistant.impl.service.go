@@ -51,18 +51,12 @@ func (eService *assistantService) CreateAssistantProviderWebsocket(ctx context.C
 	headers map[string]string,
 	parameters map[string]string,
 ) (*internal_assistant_entity.AssistantProviderWebsocket, error) {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return nil, err
-	}
 
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	epm := &internal_assistant_entity.AssistantProviderWebsocket{
 		AssistantProvider: internal_assistant_entity.AssistantProvider{
 			Description: description,
-			CreatedBy:   userID,
 			AssistantId: assistantId,
 		},
 		Url:        url,
@@ -95,18 +89,12 @@ func (eService *assistantService) CreateAssistantProviderAgentkit(ctx context.Co
 	maxRecvMessageBytes *uint32,
 	maxSendMessageBytes *uint32,
 ) (*internal_assistant_entity.AssistantProviderAgentkit, error) {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return nil, err
-	}
 
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	epm := &internal_assistant_entity.AssistantProviderAgentkit{
 		AssistantProvider: internal_assistant_entity.AssistantProvider{
 			Description: description,
-			CreatedBy:   userID,
 			AssistantId: assistantId,
 		},
 		Url:                 url,
@@ -138,18 +126,12 @@ func (eService *assistantService) CreateAssistantProviderAgentflow(ctx context.C
 	schemaVersion string,
 	definition map[string]interface{},
 ) (*internal_assistant_entity.AssistantProviderAgentflow, error) {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return nil, err
-	}
 
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	epm := &internal_assistant_entity.AssistantProviderAgentflow{
 		AssistantProvider: internal_assistant_entity.AssistantProvider{
 			Description: description,
-			CreatedBy:   userID,
 			AssistantId: assistantId,
 		},
 		SchemaVersion: schemaVersion,
@@ -166,10 +148,6 @@ func (eService *assistantService) CreateAssistantProviderAgentflow(ctx context.C
 }
 
 func (eService *assistantService) DeleteAssistant(ctx context.Context, auth *types.Authentication, assistantId uint64) (*internal_assistant_entity.Assistant, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
-		return nil, err
-	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
@@ -179,8 +157,7 @@ func (eService *assistantService) DeleteAssistant(ctx context.Context, auth *typ
 	db := eService.postgres.DB(ctx)
 	ed := &internal_assistant_entity.Assistant{
 		Mutable: gorm_models.Mutable{
-			UpdatedBy: userContext.UserID,
-			Status:    type_enums.RECORD_ARCHIEVE,
+			Status: type_enums.RECORD_ARCHIEVE,
 		},
 	}
 	tx := db.Where("id = ? AND project_id = ? AND organization_id = ?", assistantId,
@@ -586,10 +563,6 @@ func (eService *assistantService) UpdateAssistantVersion(ctx context.Context,
 	assistantId uint64,
 	assistantProvider type_enums.AssistantProvider,
 	assistantProviderId uint64) (*internal_assistant_entity.Assistant, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
-		return nil, err
-	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
@@ -598,9 +571,7 @@ func (eService *assistantService) UpdateAssistantVersion(ctx context.Context,
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	ed := &internal_assistant_entity.Assistant{
-		Mutable: gorm_models.Mutable{
-			UpdatedBy: userContext.UserID,
-		},
+		Mutable:             gorm_models.Mutable{},
 		AssistantProvider:   assistantProvider,
 		AssistantProviderId: assistantProviderId,
 	}
@@ -886,10 +857,6 @@ func (eService *assistantService) CreateAssistant(ctx context.Context,
 	source string,
 	sourceIdentifier *uint64,
 	language string) (*internal_assistant_entity.Assistant, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
-		return nil, err
-	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
@@ -899,8 +866,7 @@ func (eService *assistantService) CreateAssistant(ctx context.Context,
 	db := eService.postgres.DB(ctx)
 	ep := &internal_assistant_entity.Assistant{
 		Mutable: gorm_models.Mutable{
-			CreatedBy: userContext.UserID,
-			Status:    type_enums.RECORD_ACTIVE,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		Organizational: gorm_models.Organizational{
 			ProjectId:      projectContext.ProjectID,
@@ -930,10 +896,6 @@ func (eService *assistantService) UpdateAssistantDetail(ctx context.Context,
 	auth *types.Authentication,
 	assistantId uint64,
 	name, description string) (*internal_assistant_entity.Assistant, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
-		return nil, err
-	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
@@ -942,9 +904,7 @@ func (eService *assistantService) UpdateAssistantDetail(ctx context.Context,
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	ed := &internal_assistant_entity.Assistant{
-		Mutable: gorm_models.Mutable{
-			UpdatedBy: userContext.UserID,
-		},
+		Mutable:     gorm_models.Mutable{},
 		Name:        name,
 		Description: description,
 	}
@@ -970,11 +930,6 @@ func (eService *assistantService) CreateAssistantProviderModel(
 	modelProviderName string,
 	options []*protos.Metadata,
 ) (*internal_assistant_entity.AssistantProviderModel, error) {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return nil, err
-	}
 
 	start := time.Now()
 
@@ -982,7 +937,6 @@ func (eService *assistantService) CreateAssistantProviderModel(
 	epm := &internal_assistant_entity.AssistantProviderModel{
 		AssistantProvider: internal_assistant_entity.AssistantProvider{
 			Description: description,
-			CreatedBy:   userID,
 		},
 		AssistantId:       assistantId,
 		ModelProviderName: modelProviderName,
@@ -1003,9 +957,7 @@ func (eService *assistantService) CreateAssistantProviderModel(
 		modelOptions = append(modelOptions, &internal_assistant_entity.AssistantProviderModelOption{
 			AssistantProviderModelId: epm.Id,
 			Mutable: gorm_models.Mutable{
-				CreatedBy: userID,
-				UpdatedBy: userID,
-				Status:    type_enums.RECORD_ACTIVE,
+				Status: type_enums.RECORD_ACTIVE,
 			},
 			Metadata: gorm_models.Metadata{
 				Key:   v.GetKey(),
@@ -1017,7 +969,7 @@ func (eService *assistantService) CreateAssistantProviderModel(
 		Columns: []clause.Column{{Name: "assistant_provider_model_id"}, {Name: "key"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value",
-			"updated_by"}),
+		}),
 	}).Create(modelOptions)
 	if tx.Error != nil {
 		eService.logger.Errorf("unable to create model options with error %v", tx.Error)
@@ -1033,10 +985,6 @@ func (eService *assistantService) AttachProviderModelToAssistant(ctx context.Con
 	assistantId uint64,
 	providerType type_enums.AssistantProvider,
 	assistantProviderId uint64) (*internal_assistant_entity.Assistant, error) {
-	userContext, err := auth.UserContext()
-	if err != nil {
-		return nil, err
-	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
@@ -1047,7 +995,6 @@ func (eService *assistantService) AttachProviderModelToAssistant(ctx context.Con
 	ed := &internal_assistant_entity.Assistant{
 		AssistantProvider:   providerType,
 		AssistantProviderId: assistantProviderId,
-		Mutable:             gorm_models.Mutable{UpdatedBy: userContext.UserID},
 	}
 	tx := db.Where("id = ? AND project_id = ? AND organization_id = ?", assistantId,
 		projectContext.ProjectID,
@@ -1067,11 +1014,6 @@ func (eService *assistantService) CreateOrUpdateAssistantTag(ctx context.Context
 	assistantId uint64,
 	tags []string,
 ) (*internal_assistant_entity.AssistantTag, error) {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return nil, err
-	}
 
 	start := time.Now()
 
@@ -1079,14 +1021,12 @@ func (eService *assistantService) CreateOrUpdateAssistantTag(ctx context.Context
 	assistantTag := &internal_assistant_entity.AssistantTag{
 		AssistantId: assistantId,
 		Tag:         tags,
-		CreatedBy:   userID,
-		UpdatedBy:   userID,
 	}
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "assistant_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"tag",
-			"updated_by"}),
+		}),
 	}).Create(&assistantTag)
 
 	if tx.Error != nil {

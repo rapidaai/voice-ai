@@ -665,8 +665,6 @@ func assistantConfigurationOpenAPI(configuration *internal_assistant_entity.Assi
 	assistantId := openapi.Uint64String(strconv.FormatUint(configuration.AssistantId, 10))
 	projectId := openapi.Uint64String(strconv.FormatUint(configuration.ProjectId, 10))
 	organizationId := openapi.Uint64String(strconv.FormatUint(configuration.OrganizationId, 10))
-	createdBy := openapi.Uint64String(strconv.FormatUint(configuration.CreatedBy, 10))
-	updatedBy := openapi.Uint64String(strconv.FormatUint(configuration.UpdatedBy, 10))
 	configurationType := string(configuration.ConfigurationType)
 	status := configuration.Status.String()
 	createdDate := time.Time(configuration.CreatedDate)
@@ -691,9 +689,18 @@ func assistantConfigurationOpenAPI(configuration *internal_assistant_entity.Assi
 		Enabled:           &configuration.Enabled,
 		Options:           &options,
 		Status:            &status,
-		CreatedBy:         &createdBy,
-		UpdatedBy:         &updatedBy,
+		CreatedActor:      auditActorOpenAPI(configuration.CreatedActor),
+		UpdatedActor:      auditActorOpenAPI(configuration.UpdatedActor),
 		CreatedDate:       &createdDate,
 		UpdatedDate:       &updatedDate,
 	}
+}
+
+func auditActorOpenAPI(actor *types.ActorIdentity) *openapi.AuditActor {
+	if actor == nil || actor.Validate() != nil {
+		return nil
+	}
+	actorType := openapi.AuditActorType(actor.Type)
+	actorID := openapi.Uint64String(strconv.FormatUint(actor.ID, 10))
+	return &openapi.AuditActor{Type: actorType, Id: actorID}
 }

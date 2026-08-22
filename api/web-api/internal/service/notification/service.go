@@ -28,7 +28,7 @@ type notificationService struct {
 }
 
 func (oS *notificationService) UpdateNotificationSetting(ctx context.Context, auth *types.Authentication, authId uint64, settings []*protos.NotificationSetting) ([]*internal_entity.NotificationSetting, error) {
-	userContext, err := auth.UserContext()
+	_, err := auth.Scope(types.AuthTypeUser)
 	if err != nil {
 		return nil, err
 	}
@@ -41,8 +41,7 @@ func (oS *notificationService) UpdateNotificationSetting(ctx context.Context, au
 			Enabled:    st.GetEnabled(),
 			UserAuthId: authId,
 			Mutable: gorm_models.Mutable{
-				Status:    type_enums.RECORD_ACTIVE,
-				CreatedBy: userContext.UserID,
+				Status: type_enums.RECORD_ACTIVE,
 			},
 		})
 	}
@@ -50,7 +49,7 @@ func (oS *notificationService) UpdateNotificationSetting(ctx context.Context, au
 		Columns: []clause.Column{{Name: "channel"}, {Name: "event_type"}, {Name: "user_auth_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"enabled",
-			"updated_by", "updated_date"}),
+			"updated_date"}),
 	}).Save(nts)
 	if err := tx.Error; err != nil {
 		return nil, err

@@ -34,7 +34,7 @@ func TestProjectScopeCapabilities(t *testing.T) {
 		t.Fatal("IsAuthenticated() = false, want true")
 	}
 	actor, ok := scope.AuditActor()
-	if !ok || actor != (ActorIdentity{Type: ActorTypeProject, ID: "42"}) {
+	if !ok || actor != (ActorIdentity{Type: ActorTypeProject, ID: 42}) {
 		t.Fatalf("AuditActor() = %+v, %v", actor, ok)
 	}
 }

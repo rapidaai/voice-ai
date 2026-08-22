@@ -14,6 +14,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+
+	"github.com/rapidaai/pkg/types"
 )
 
 func setupTestDB(t *testing.T) *gorm.DB {
@@ -86,17 +88,100 @@ func TestAudited_BeforeUpdate(t *testing.T) {
 }
 
 func TestMutable_JSONMarshaling(t *testing.T) {
+	createdActorType := "user"
+	createdActorID := uint64(123)
+	updatedActorType := "project"
+	updatedActorID := uint64(789)
+	createdActor := &types.ActorIdentity{Type: types.ActorTypeUser, ID: 123}
+	updatedActor := &types.ActorIdentity{Type: types.ActorTypeProject, ID: 789}
 	mutable := Mutable{
-		Status:    "ACTIVE",
-		CreatedBy: 123,
-		UpdatedBy: 456,
+		Status: "ACTIVE",
+		ActorAudit: ActorAudit{
+			CreatedActorType: &createdActorType,
+			CreatedActorID:   &createdActorID,
+			UpdatedActorType: &updatedActorType,
+			UpdatedActorID:   &updatedActorID,
+			CreatedActor:     createdActor,
+			UpdatedActor:     updatedActor,
+		},
 	}
 
 	data, err := json.Marshal(mutable)
 	assert.NoError(t, err)
 	assert.Contains(t, string(data), `"status":"ACTIVE"`)
-	assert.Contains(t, string(data), `"createdBy":123`)
-	assert.Contains(t, string(data), `"updatedBy":456`)
+	assert.NotContains(t, string(data), `"createdActorType"`)
+	assert.NotContains(t, string(data), `"createdActorId"`)
+	assert.NotContains(t, string(data), `"createdBy"`)
+	assert.NotContains(t, string(data), `"updatedBy"`)
+	assert.Contains(t, string(data), `"createdActor":{"type":"user","id":123}`)
+	assert.Contains(t, string(data), `"updatedActor":{"type":"project","id":789}`)
+}
+
+func TestMutableAfterFindHydratesActorProjection(t *testing.T) {
+	createdType := "service"
+	createdID := uint64(41)
+	updatedType := "system"
+	updatedID := uint64(99)
+	mutable := Mutable{
+		ActorAudit: ActorAudit{
+			CreatedActorType: &createdType,
+			CreatedActorID:   &createdID,
+			UpdatedActorType: &updatedType,
+			UpdatedActorID:   &updatedID,
+		},
+	}
+	if err := mutable.AfterFind(nil); err != nil {
+		t.Fatal(err)
+	}
+	if mutable.CreatedActor == nil || *mutable.CreatedActor != (types.ActorIdentity{Type: types.ActorTypeService, ID: 41}) {
+		t.Fatalf("created actor = %+v", mutable.CreatedActor)
+	}
+	if mutable.UpdatedActor == nil || *mutable.UpdatedActor != (types.ActorIdentity{Type: types.ActorTypeSystem, ID: 99}) {
+		t.Fatalf("updated actor = %+v", mutable.UpdatedActor)
+	}
+}
+
+func TestMutableActorAssignment(t *testing.T) {
+	mutable := Mutable{}
+	if err := mutable.SetCreatedActor(types.ActorIdentity{Type: types.ActorTypeProject, ID: 123}); err != nil {
+		t.Fatal(err)
+	}
+	if mutable.CreatedActorType == nil || *mutable.CreatedActorType != "project" || mutable.CreatedActorID == nil || *mutable.CreatedActorID != 123 {
+		t.Fatalf("created actor fields = %+v", mutable)
+	}
+	if err := mutable.SetUpdatedActor(types.ActorIdentity{Type: types.ActorTypeUser, ID: 456}); err != nil {
+		t.Fatal(err)
+	}
+	if mutable.UpdatedActorType == nil || *mutable.UpdatedActorType != "user" || mutable.UpdatedActorID == nil || *mutable.UpdatedActorID != 456 {
+		t.Fatalf("updated actor fields = %+v", mutable)
+	}
+	if err := mutable.SetCreatedActor(types.ActorIdentity{Type: types.ActorTypeUnknown}); err == nil {
+		t.Fatal("SetCreatedActor() error = nil for unknown actor")
+	}
+}
+
+func TestNewMutableAndActorUpdateColumns(t *testing.T) {
+	actor := types.ActorIdentity{Type: types.ActorTypeService, ID: 42}
+	mutable, err := NewMutable("ACTIVE", actor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mutable.CreatedActorID == nil || *mutable.CreatedActorID != 42 || mutable.UpdatedActorID == nil || *mutable.UpdatedActorID != 42 {
+		t.Fatalf("NewMutable() = %+v", mutable)
+	}
+	columns, err := MergeActorUpdateColumns(map[string]interface{}{"status": "ARCHIEVE"}, actor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := columns["updated_by"]; exists {
+		t.Fatalf("MergeActorUpdateColumns() retained legacy column: %+v", columns)
+	}
+	if columns["updated_actor_type"] != "service" || columns["updated_actor_id"] != uint64(42) {
+		t.Fatalf("MergeActorUpdateColumns() = %+v", columns)
+	}
+	if _, err := MergeActorUpdateColumns(map[string]interface{}{"updated_actor_id": uint64(1)}, actor); err == nil {
+		t.Fatal("MergeActorUpdateColumns() error = nil for owned column")
+	}
 }
 
 func TestOrganizational_JSONMarshaling(t *testing.T) {

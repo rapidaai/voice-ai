@@ -165,6 +165,32 @@ func TestIntegrationRPCAuthenticationErrors(t *testing.T) {
 	}
 }
 
+func TestDetachedAuditContextPreservesAuthenticationAfterCancellation(t *testing.T) {
+	authentication := &types.Authentication{
+		AuthType:          types.AuthTypeService,
+		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeService, ID: 41},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: 2},
+	}
+	requestContext, cancel := context.WithCancel(context.WithValue(context.Background(), types.CTX_, authentication))
+	detachedContext := detachedAuditContext(requestContext)
+	cancel()
+
+	if detachedContext.Err() != nil {
+		t.Fatalf("detached context error = %v, want nil", detachedContext.Err())
+	}
+	resolved, err := types.Authorize(detachedContext)
+	if err != nil {
+		t.Fatalf("authorize detached context: %v", err)
+	}
+	actor, err := resolved.Actor()
+	if err != nil {
+		t.Fatalf("resolve detached actor: %v", err)
+	}
+	if actor.Type != types.ActorTypeService || actor.ID != 41 {
+		t.Fatalf("actor = %+v, want service:41", actor)
+	}
+}
+
 func assertExplicitAuthenticationPattern(t *testing.T, fileSet *token.FileSet, filename string, function *ast.FuncDecl) {
 	t.Helper()
 	var source bytes.Buffer

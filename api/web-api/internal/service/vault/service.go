@@ -2,7 +2,9 @@ package internal_vault_service
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"gorm.io/gorm/clause"
 
@@ -29,15 +31,21 @@ func NewVaultService(logger commons.Logger, postgres connectors.PostgresConnecto
 }
 
 func (vs *vaultService) Create(ctx context.Context,
-	userID uint64,
+	auth *types.Authentication,
 	projectContext types.ProjectContext,
 	provider string,
 	name string, credential map[string]interface{}) (*internal_entity.Vault, error) {
+	actor, err := vaultActor(auth, projectContext)
+	if err != nil {
+		return nil, err
+	}
+	mutable := gorm_models.Mutable{}
+	if err := mutable.SetCreatedActor(actor); err != nil {
+		return nil, err
+	}
 	db := vs.postgres.DB(ctx)
 	vlt := &internal_entity.Vault{
-		Mutable: gorm_models.Mutable{
-			CreatedBy: userID,
-		},
+		Mutable: mutable,
 		Organizational: gorm_models.Organizational{
 			OrganizationId: projectContext.OrganizationID,
 			ProjectId:      projectContext.ProjectID,
@@ -55,20 +63,49 @@ func (vs *vaultService) Create(ctx context.Context,
 	return vlt, nil
 }
 
-func (vS *vaultService) Delete(ctx context.Context, userID uint64, projectContext types.ProjectContext, vaultId uint64) (*internal_entity.Vault, error) {
-	db := vS.postgres.DB(ctx)
-	vlt := &internal_entity.Vault{
-		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ARCHIEVE,
-			UpdatedBy: userID,
-		},
+func (vS *vaultService) Delete(ctx context.Context, auth *types.Authentication, projectContext types.ProjectContext, vaultId uint64) (*internal_entity.Vault, error) {
+	actor, err := vaultActor(auth, projectContext)
+	if err != nil {
+		return nil, err
 	}
-	tx := db.Where("id = ? AND organization_id = ? AND project_id = ?", vaultId, projectContext.OrganizationID, projectContext.ProjectID).Clauses(clause.Returning{}).Updates(vlt)
+	db := vS.postgres.DB(ctx)
+	vlt := &internal_entity.Vault{}
+	tx := db.Model(vlt).Where("id = ? AND organization_id = ? AND project_id = ?", vaultId, projectContext.OrganizationID, projectContext.ProjectID).Clauses(clause.Returning{}).Updates(map[string]interface{}{
+		"status":             type_enums.RECORD_ARCHIEVE,
+		"updated_actor_type": string(actor.Type),
+		"updated_actor_id":   actor.ID,
+		"updated_date":       time.Now(),
+	})
 	if err := tx.Error; err != nil {
 		vS.logger.Debugf("unable to delete vault %v")
 		return nil, err
 	}
 	return vlt, nil
+}
+
+func vaultActor(auth *types.Authentication, projectContext types.ProjectContext) (types.ActorIdentity, error) {
+	if auth == nil {
+		return types.ActorIdentity{}, types.ErrActorUnavailable
+	}
+	if _, err := auth.Scope(types.AuthTypeUser); err != nil {
+		return types.ActorIdentity{}, err
+	}
+	actor, err := auth.Actor()
+	if err != nil {
+		return types.ActorIdentity{}, err
+	}
+	userContext, err := auth.UserContext()
+	if err != nil || userContext.UserID != actor.ID {
+		return types.ActorIdentity{}, types.ErrActorUnavailable
+	}
+	authProject, err := auth.ProjectContext()
+	if err != nil {
+		return types.ActorIdentity{}, err
+	}
+	if authProject != projectContext {
+		return types.ActorIdentity{}, errors.New("vault scope does not match authentication project")
+	}
+	return actor, nil
 }
 
 func (vS *vaultService) GetAllOrganizationCredential(ctx context.Context, projectContext types.ProjectContext, criteria []*web_api.Criteria, paginate *web_api.Paginate) (int64, []*internal_entity.Vault, error) {

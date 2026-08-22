@@ -35,6 +35,7 @@ import (
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/middlewares"
+	gorm_models "github.com/rapidaai/pkg/models/gorm"
 )
 
 // wrapper for gin engine
@@ -74,7 +75,8 @@ func main() {
 	// init
 	userAuthenticator := web_authenticators.GetUserAuthenticator(appRunner.Logger, appRunner.Postgres)
 	projectAuthenticator := web_authenticators.GetProjectAuthenticator(appRunner.Logger, appRunner.Postgres)
-	serviceAuthenticator := authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Postgres)
+	organizationAuthenticator := web_authenticators.GetOrganizationAuthenticator(appRunner.Logger, appRunner.Postgres, appRunner.Cfg.Secret)
+	serviceAuthenticator := authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger)
 	appRunner.S = grpc.NewServer(
 		grpc.ChainStreamInterceptor(
 			middlewares.NewRequestLoggerStreamServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
@@ -82,7 +84,7 @@ func main() {
 			middlewares.NewAuthenticationBoundaryStreamServerMiddleware(
 				userAuthenticator,
 				projectAuthenticator,
-				nil,
+				organizationAuthenticator,
 				serviceAuthenticator,
 				appRunner.Logger,
 			),
@@ -93,7 +95,7 @@ func main() {
 			middlewares.NewAuthenticationBoundaryUnaryServerMiddleware(
 				userAuthenticator,
 				projectAuthenticator,
-				nil,
+				organizationAuthenticator,
 				serviceAuthenticator,
 				appRunner.Logger,
 			),
@@ -227,6 +229,9 @@ func (app *AppRunner) Init(ctx context.Context) error {
 		app.Logger.Error("error while connecting to postgres.", err)
 		return err
 	}
+	if err := gorm_models.RegisterAuditActorCallbacks(app.Postgres.DB(ctx)); err != nil {
+		return err
+	}
 	err = app.Redis.Connect(ctx)
 	if err != nil {
 		app.Logger.Error("error while connecting to redis.", err)
@@ -268,8 +273,8 @@ func (g *AppRunner) AllMiddlewares() {
 	g.E.Use(middlewares.NewAuthenticationBoundaryMiddleware(
 		web_authenticators.GetUserAuthenticator(g.Logger, g.Postgres),
 		web_authenticators.GetProjectAuthenticator(g.Logger, g.Postgres),
-		nil,
-		authenticators.NewServiceAuthenticator(&g.Cfg.AppConfig, g.Logger, g.Postgres),
+		web_authenticators.GetOrganizationAuthenticator(g.Logger, g.Postgres, g.Cfg.Secret),
+		authenticators.NewServiceAuthenticator(&g.Cfg.AppConfig, g.Logger),
 		g.Logger,
 	))
 }

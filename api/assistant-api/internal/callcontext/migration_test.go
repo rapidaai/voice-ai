@@ -22,7 +22,7 @@ func TestAuthenticationSnapshotMigrationContract(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read down migration: %v", err)
 	}
-	for _, column := range []string{"auth_user_id bigint", "auth_actor_type varchar(50)", "auth_actor_id varchar(255)"} {
+	for _, column := range []string{"auth_user_id bigint", "auth_actor_type varchar(50)", "auth_actor_id bigint"} {
 		if !strings.Contains(string(up), column) {
 			t.Errorf("up migration missing %q", column)
 		}

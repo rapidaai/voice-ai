@@ -2,6 +2,7 @@ package middlewares
 
 import (
 	"context"
+	"math"
 	"strconv"
 	"strings"
 
@@ -85,7 +86,7 @@ func authenticateGRPCRequest(
 		}
 
 		userID, err := strconv.ParseUint(authID, 0, 64)
-		if err != nil || userID == 0 {
+		if err != nil || userID == 0 || userID > math.MaxInt64 {
 			logAuthenticationFailure(logger, "user credential has invalid auth id")
 			return nil, grpcAuthenticationError()
 		}
@@ -107,13 +108,17 @@ func authenticateGRPCRequest(
 		}
 		authenticatedUserID := auth.GetUserInfo().GetId()
 		organizationID := auth.GetOrganizationRole().OrganizationId
+		actor, err := types.ResolveAuditActor(auth)
+		if err != nil {
+			logAuthenticationFailure(logger, "user credential has invalid audit actor")
+			return nil, grpcAuthenticationError()
+		}
 		requestAuth := &types.Authentication{
 			AuthType:          types.AuthTypeUser,
+			ActorValue:        &actor,
 			UserValue:         &types.UserContext{UserID: authenticatedUserID},
 			OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 		}
-		actor := types.ActorIdentity{Type: types.ActorTypeUser, ID: strconv.FormatUint(authenticatedUserID, 10)}
-		requestAuth.ActorValue = &actor
 		if projectRole := auth.GetCurrentProjectRole(); projectRole != nil && projectRole.ProjectId > 0 {
 			projectContext := types.ProjectContext{OrganizationID: organizationID, ProjectID: projectRole.ProjectId}
 			requestAuth.ProjectValue = &projectContext
@@ -136,14 +141,17 @@ func authenticateGRPCRequest(
 			logAuthenticationFailure(logger, "project credential was rejected")
 			return nil, grpcAuthenticationError()
 		}
+		actor, err := types.ResolveAuditActor(auth.Info)
+		if err != nil {
+			logAuthenticationFailure(logger, "project credential has invalid audit actor")
+			return nil, grpcAuthenticationError()
+		}
 		projectContext, _ := auth.Info.ProjectContext()
 		requestAuth := &types.Authentication{
 			AuthType:          types.AuthTypeProject,
+			ActorValue:        &actor,
 			OrganizationValue: &types.OrganizationContext{OrganizationID: projectContext.OrganizationID},
 			ProjectValue:      &projectContext,
-		}
-		if actor, ok := auth.Info.AuditActor(); ok {
-			requestAuth.ActorValue = &actor
 		}
 		return requestAuth, nil
 	}
@@ -159,9 +167,15 @@ func authenticateGRPCRequest(
 			logAuthenticationFailure(logger, "organization credential was rejected")
 			return nil, grpcAuthenticationError()
 		}
+		actor, err := types.ResolveAuditActor(auth.Info)
+		if err != nil {
+			logAuthenticationFailure(logger, "organization credential has invalid audit actor")
+			return nil, grpcAuthenticationError()
+		}
 		organizationID, _ := auth.Info.OrganizationContext()
 		return &types.Authentication{
 			AuthType:          types.AuthTypeOrg,
+			ActorValue:        &actor,
 			OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 		}, nil
 	}
@@ -177,12 +191,15 @@ func authenticateGRPCRequest(
 		return nil, grpcAuthenticationError()
 	}
 	delegatedContext, _ := auth.Info.DelegatedContext()
+	actor, err := types.ResolveAuditActor(auth.Info)
+	if err != nil {
+		logAuthenticationFailure(logger, "service credential has invalid audit actor")
+		return nil, grpcAuthenticationError()
+	}
 	requestAuth := &types.Authentication{
 		AuthType:          types.AuthTypeService,
+		ActorValue:        &actor,
 		OrganizationValue: &types.OrganizationContext{OrganizationID: delegatedContext.OrganizationID},
-	}
-	if delegatedContext.UserID != nil {
-		requestAuth.UserValue = &types.UserContext{UserID: *delegatedContext.UserID}
 	}
 	if delegatedContext.ProjectID != nil {
 		requestAuth.ProjectValue = &types.ProjectContext{OrganizationID: delegatedContext.OrganizationID, ProjectID: *delegatedContext.ProjectID}

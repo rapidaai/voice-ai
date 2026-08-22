@@ -9,14 +9,20 @@ package types
 Service scope
 */
 type ServiceScope struct {
-	UserId         *uint64 `json:"userId"`
+	ActorId        uint64  `json:"actorId"`
+	Issuer         string  `json:"issuer"`
+	Audience       string  `json:"audience"`
 	ProjectId      *uint64 `json:"projectId"`
 	OrganizationId *uint64 `json:"organizationId"`
 	CurrentToken   string  `json:"currentToken"`
 }
 
 func (ss *ServiceScope) AuditActor() (ActorIdentity, bool) {
-	return ActorIdentity{}, false
+	if ss == nil {
+		return ActorIdentity{}, false
+	}
+	actor := ActorIdentity{Type: ActorTypeService, ID: ss.ActorId}
+	return actor, actor.Validate() == nil
 }
 
 func (ss *ServiceScope) DelegatedContext() (DelegatedContext, bool) {
@@ -24,15 +30,15 @@ func (ss *ServiceScope) DelegatedContext() (DelegatedContext, bool) {
 		return DelegatedContext{}, false
 	}
 	return normalizeDelegatedContext(DelegatedContext{
-		UserID:         ss.UserId,
 		OrganizationID: *ss.OrganizationId,
 		ProjectID:      ss.ProjectId,
 	}, true)
 }
 
 func (ss *ServiceScope) IsAuthenticated() bool {
-	_, ok := ss.DelegatedContext()
-	return ok
+	_, contextOK := ss.DelegatedContext()
+	_, actorOK := ss.AuditActor()
+	return contextOK && actorOK && ss.Issuer != "" && ss.Audience != ""
 }
 
 func (ss *ServiceScope) Scope(allowed ...AuthType) (AuthenticationPrinciple, error) {

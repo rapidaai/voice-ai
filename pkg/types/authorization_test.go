@@ -36,7 +36,7 @@ func TestAuthorize(t *testing.T) {
 }
 
 func TestAuthenticationScopeAndContexts(t *testing.T) {
-	actor := ActorIdentity{Type: ActorTypeUser, ID: "1"}
+	actor := ActorIdentity{Type: ActorTypeUser, ID: 1}
 	auth := &Authentication{
 		AuthType:          AuthTypeUser,
 		ActorValue:        &actor,

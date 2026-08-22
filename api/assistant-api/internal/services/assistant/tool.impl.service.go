@@ -34,9 +34,7 @@ type assistantToolService struct {
 
 // CreateAssistantTool implements internal_services.AssistantToolService.
 func (eService *assistantToolService) Create(ctx context.Context, auth *types.Authentication, assistantId uint64, name string, description *string, fields map[string]interface{}, executionMethod string, options []*protos.Metadata) (*internal_assistant_entity.AssistantTool, error) {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
+	if _, err := auth.Actor(); err != nil {
 		return nil, err
 	}
 
@@ -56,9 +54,7 @@ func (eService *assistantToolService) Create(ctx context.Context, auth *types.Au
 	}
 
 	aTool := &internal_assistant_entity.AssistantTool{
-		Mutable: gorm_models.Mutable{
-			CreatedBy: userID,
-		},
+		Mutable:         gorm_models.Mutable{},
 		AssistantId:     assistantId,
 		Name:            name,
 		Description:     description,
@@ -85,18 +81,12 @@ func (eService *assistantToolService) Create(ctx context.Context, auth *types.Au
 
 // DeleteAssistantTool implements internal_services.AssistantToolService.
 func (eService *assistantToolService) Delete(ctx context.Context, auth *types.Authentication, toolId uint64, assistantId uint64) (*internal_assistant_entity.AssistantTool, error) {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return nil, err
-	}
 
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	aK := &internal_assistant_entity.AssistantTool{
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ARCHIEVE,
-			UpdatedBy: userID,
+			Status: type_enums.RECORD_ARCHIEVE,
 		},
 	}
 	tx := db.Where("id = ? AND assistant_id = ? ",
@@ -169,11 +159,6 @@ func (eService *assistantToolService) Get(ctx context.Context, auth *types.Authe
 func (eService *assistantToolService) Update(ctx context.Context, auth *types.Authentication,
 	toolId uint64,
 	assistantId uint64, name string, description *string, fields map[string]interface{}, executionMethod string, options []*protos.Metadata) (*internal_assistant_entity.AssistantTool, error) {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return nil, err
-	}
 
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
@@ -191,9 +176,7 @@ func (eService *assistantToolService) Update(ctx context.Context, auth *types.Au
 
 	//
 	aTool := &internal_assistant_entity.AssistantTool{
-		Mutable: gorm_models.Mutable{
-			UpdatedBy: userID,
-		},
+		Mutable:         gorm_models.Mutable{},
 		Name:            name,
 		Description:     description,
 		Fields:          fields,
@@ -209,7 +192,7 @@ func (eService *assistantToolService) Update(ctx context.Context, auth *types.Au
 		return nil, tx.Error
 	}
 	//
-	err = eService.markAllOptionsAsDeleted(ctx, auth, toolId)
+	err := eService.markAllOptionsAsDeleted(ctx, auth, toolId)
 	if err != nil {
 		eService.logger.Benchmark("AssistantToolService.Update", time.Since(start))
 		eService.logger.Errorf("error while updating tool options %v", tx.Error)
@@ -232,18 +215,11 @@ func (eService *assistantToolService) markAllOptionsAsDeleted(
 	auth *types.Authentication,
 	assistantToolId uint64,
 ) error {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return err
-	}
-
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	tOptions := &internal_assistant_entity.AssistantToolOption{
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ARCHIEVE,
-			UpdatedBy: userID,
+			Status: type_enums.RECORD_ARCHIEVE,
 		},
 	}
 	tx := db.Where("assistant_tool_id = ? ",
@@ -265,11 +241,6 @@ func (eService *assistantToolService) CreateOrUpdateExecutionOption(
 	assistantToolId uint64,
 	metadata []*protos.Metadata,
 ) ([]*internal_assistant_entity.AssistantToolOption, error) {
-	userContext, err := auth.UserContext()
-	userID := userContext.UserID
-	if err != nil {
-		return nil, err
-	}
 
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
@@ -285,8 +256,6 @@ func (eService *assistantToolService) CreateOrUpdateExecutionOption(
 			},
 			AssistantToolId: assistantToolId,
 		}
-		_mtr.UpdatedBy = userID
-		_mtr.CreatedBy = userID
 		mtrs = append(mtrs, _mtr)
 	}
 	tx := db.Clauses(clause.OnConflict{
@@ -294,7 +263,7 @@ func (eService *assistantToolService) CreateOrUpdateExecutionOption(
 		DoUpdates: clause.AssignmentColumns([]string{
 			"status",
 			"value",
-			"updated_by", "updated_date"}),
+			"updated_date"}),
 	}).Create(&mtrs)
 	if tx.Error != nil {
 		eService.logger.Benchmark("assistantService.CreateOrUpdateMetadata", time.Since(start))

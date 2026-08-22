@@ -109,7 +109,7 @@ class CreateAssistantProviderRequest(_message.Message):
     def __init__(self, assistantId: _Optional[int] = ..., description: _Optional[str] = ..., model: _Optional[_Union[CreateAssistantProviderRequest.CreateAssistantProviderModel, _Mapping]] = ..., agentkit: _Optional[_Union[CreateAssistantProviderRequest.CreateAssistantProviderAgentkit, _Mapping]] = ..., websocket: _Optional[_Union[CreateAssistantProviderRequest.CreateAssistantProviderWebsocket, _Mapping]] = ..., agentflow: _Optional[_Union[CreateAssistantProviderRequest.CreateAssistantProviderAgentflow, _Mapping]] = ...) -> None: ...
 
 class AssistantProviderAgentkit(_message.Message):
-    __slots__ = ("id", "description", "assistantId", "status", "url", "certificate", "metadata", "createdBy", "createdUser", "updatedBy", "updatedUser", "createdDate", "updatedDate", "transportSecurity", "tlsVerification", "tlsServerName", "connectTimeoutMs", "keepaliveTimeMs", "keepaliveTimeoutMs", "maxRecvMessageBytes", "maxSendMessageBytes")
+    __slots__ = ("id", "description", "assistantId", "status", "url", "certificate", "metadata", "createdActor", "updatedActor", "createdDate", "updatedDate", "transportSecurity", "tlsVerification", "tlsServerName", "connectTimeoutMs", "keepaliveTimeMs", "keepaliveTimeoutMs", "maxRecvMessageBytes", "maxSendMessageBytes")
     class MetadataEntry(_message.Message):
         __slots__ = ("key", "value")
         KEY_FIELD_NUMBER: _ClassVar[int]
@@ -124,10 +124,8 @@ class AssistantProviderAgentkit(_message.Message):
     URL_FIELD_NUMBER: _ClassVar[int]
     CERTIFICATE_FIELD_NUMBER: _ClassVar[int]
     METADATA_FIELD_NUMBER: _ClassVar[int]
-    CREATEDBY_FIELD_NUMBER: _ClassVar[int]
-    CREATEDUSER_FIELD_NUMBER: _ClassVar[int]
-    UPDATEDBY_FIELD_NUMBER: _ClassVar[int]
-    UPDATEDUSER_FIELD_NUMBER: _ClassVar[int]
+    CREATEDACTOR_FIELD_NUMBER: _ClassVar[int]
+    UPDATEDACTOR_FIELD_NUMBER: _ClassVar[int]
     CREATEDDATE_FIELD_NUMBER: _ClassVar[int]
     UPDATEDDATE_FIELD_NUMBER: _ClassVar[int]
     TRANSPORTSECURITY_FIELD_NUMBER: _ClassVar[int]
@@ -145,10 +143,8 @@ class AssistantProviderAgentkit(_message.Message):
     url: str
     certificate: str
     metadata: _containers.ScalarMap[str, str]
-    createdBy: int
-    createdUser: _common_pb2.User
-    updatedBy: int
-    updatedUser: _common_pb2.User
+    createdActor: _common_pb2.AuditActor
+    updatedActor: _common_pb2.AuditActor
     createdDate: _timestamp_pb2.Timestamp
     updatedDate: _timestamp_pb2.Timestamp
     transportSecurity: str
@@ -159,10 +155,10 @@ class AssistantProviderAgentkit(_message.Message):
     keepaliveTimeoutMs: int
     maxRecvMessageBytes: int
     maxSendMessageBytes: int
-    def __init__(self, id: _Optional[int] = ..., description: _Optional[str] = ..., assistantId: _Optional[int] = ..., status: _Optional[str] = ..., url: _Optional[str] = ..., certificate: _Optional[str] = ..., metadata: _Optional[_Mapping[str, str]] = ..., createdBy: _Optional[int] = ..., createdUser: _Optional[_Union[_common_pb2.User, _Mapping]] = ..., updatedBy: _Optional[int] = ..., updatedUser: _Optional[_Union[_common_pb2.User, _Mapping]] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., transportSecurity: _Optional[str] = ..., tlsVerification: _Optional[str] = ..., tlsServerName: _Optional[str] = ..., connectTimeoutMs: _Optional[int] = ..., keepaliveTimeMs: _Optional[int] = ..., keepaliveTimeoutMs: _Optional[int] = ..., maxRecvMessageBytes: _Optional[int] = ..., maxSendMessageBytes: _Optional[int] = ...) -> None: ...
+    def __init__(self, id: _Optional[int] = ..., description: _Optional[str] = ..., assistantId: _Optional[int] = ..., status: _Optional[str] = ..., url: _Optional[str] = ..., certificate: _Optional[str] = ..., metadata: _Optional[_Mapping[str, str]] = ..., createdActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., updatedActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., transportSecurity: _Optional[str] = ..., tlsVerification: _Optional[str] = ..., tlsServerName: _Optional[str] = ..., connectTimeoutMs: _Optional[int] = ..., keepaliveTimeMs: _Optional[int] = ..., keepaliveTimeoutMs: _Optional[int] = ..., maxRecvMessageBytes: _Optional[int] = ..., maxSendMessageBytes: _Optional[int] = ...) -> None: ...
 
 class AssistantProviderWebsocket(_message.Message):
-    __slots__ = ("id", "description", "assistantId", "url", "headers", "parameters", "status", "createdBy", "createdUser", "updatedBy", "updatedUser", "createdDate", "updatedDate")
+    __slots__ = ("id", "description", "assistantId", "url", "headers", "parameters", "status", "createdActor", "updatedActor", "createdDate", "updatedDate")
     class HeadersEntry(_message.Message):
         __slots__ = ("key", "value")
         KEY_FIELD_NUMBER: _ClassVar[int]
@@ -184,10 +180,8 @@ class AssistantProviderWebsocket(_message.Message):
     HEADERS_FIELD_NUMBER: _ClassVar[int]
     PARAMETERS_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
-    CREATEDBY_FIELD_NUMBER: _ClassVar[int]
-    CREATEDUSER_FIELD_NUMBER: _ClassVar[int]
-    UPDATEDBY_FIELD_NUMBER: _ClassVar[int]
-    UPDATEDUSER_FIELD_NUMBER: _ClassVar[int]
+    CREATEDACTOR_FIELD_NUMBER: _ClassVar[int]
+    UPDATEDACTOR_FIELD_NUMBER: _ClassVar[int]
     CREATEDDATE_FIELD_NUMBER: _ClassVar[int]
     UPDATEDDATE_FIELD_NUMBER: _ClassVar[int]
     id: int
@@ -197,16 +191,14 @@ class AssistantProviderWebsocket(_message.Message):
     headers: _containers.ScalarMap[str, str]
     parameters: _containers.ScalarMap[str, str]
     status: str
-    createdBy: int
-    createdUser: _common_pb2.User
-    updatedBy: int
-    updatedUser: _common_pb2.User
+    createdActor: _common_pb2.AuditActor
+    updatedActor: _common_pb2.AuditActor
     createdDate: _timestamp_pb2.Timestamp
     updatedDate: _timestamp_pb2.Timestamp
-    def __init__(self, id: _Optional[int] = ..., description: _Optional[str] = ..., assistantId: _Optional[int] = ..., url: _Optional[str] = ..., headers: _Optional[_Mapping[str, str]] = ..., parameters: _Optional[_Mapping[str, str]] = ..., status: _Optional[str] = ..., createdBy: _Optional[int] = ..., createdUser: _Optional[_Union[_common_pb2.User, _Mapping]] = ..., updatedBy: _Optional[int] = ..., updatedUser: _Optional[_Union[_common_pb2.User, _Mapping]] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, id: _Optional[int] = ..., description: _Optional[str] = ..., assistantId: _Optional[int] = ..., url: _Optional[str] = ..., headers: _Optional[_Mapping[str, str]] = ..., parameters: _Optional[_Mapping[str, str]] = ..., status: _Optional[str] = ..., createdActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., updatedActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class AssistantProviderModel(_message.Message):
-    __slots__ = ("id", "template", "description", "assistantId", "modelProviderName", "assistantModelOptions", "status", "createdBy", "createdUser", "updatedBy", "updatedUser", "createdDate", "updatedDate")
+    __slots__ = ("id", "template", "description", "assistantId", "modelProviderName", "assistantModelOptions", "status", "createdActor", "updatedActor", "createdDate", "updatedDate")
     ID_FIELD_NUMBER: _ClassVar[int]
     TEMPLATE_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
@@ -214,10 +206,8 @@ class AssistantProviderModel(_message.Message):
     MODELPROVIDERNAME_FIELD_NUMBER: _ClassVar[int]
     ASSISTANTMODELOPTIONS_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
-    CREATEDBY_FIELD_NUMBER: _ClassVar[int]
-    CREATEDUSER_FIELD_NUMBER: _ClassVar[int]
-    UPDATEDBY_FIELD_NUMBER: _ClassVar[int]
-    UPDATEDUSER_FIELD_NUMBER: _ClassVar[int]
+    CREATEDACTOR_FIELD_NUMBER: _ClassVar[int]
+    UPDATEDACTOR_FIELD_NUMBER: _ClassVar[int]
     CREATEDDATE_FIELD_NUMBER: _ClassVar[int]
     UPDATEDDATE_FIELD_NUMBER: _ClassVar[int]
     id: int
@@ -227,26 +217,22 @@ class AssistantProviderModel(_message.Message):
     modelProviderName: str
     assistantModelOptions: _containers.RepeatedCompositeFieldContainer[_common_pb2.Metadata]
     status: str
-    createdBy: int
-    createdUser: _common_pb2.User
-    updatedBy: int
-    updatedUser: _common_pb2.User
+    createdActor: _common_pb2.AuditActor
+    updatedActor: _common_pb2.AuditActor
     createdDate: _timestamp_pb2.Timestamp
     updatedDate: _timestamp_pb2.Timestamp
-    def __init__(self, id: _Optional[int] = ..., template: _Optional[_Union[_common_pb2.TextChatCompletePrompt, _Mapping]] = ..., description: _Optional[str] = ..., assistantId: _Optional[int] = ..., modelProviderName: _Optional[str] = ..., assistantModelOptions: _Optional[_Iterable[_Union[_common_pb2.Metadata, _Mapping]]] = ..., status: _Optional[str] = ..., createdBy: _Optional[int] = ..., createdUser: _Optional[_Union[_common_pb2.User, _Mapping]] = ..., updatedBy: _Optional[int] = ..., updatedUser: _Optional[_Union[_common_pb2.User, _Mapping]] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, id: _Optional[int] = ..., template: _Optional[_Union[_common_pb2.TextChatCompletePrompt, _Mapping]] = ..., description: _Optional[str] = ..., assistantId: _Optional[int] = ..., modelProviderName: _Optional[str] = ..., assistantModelOptions: _Optional[_Iterable[_Union[_common_pb2.Metadata, _Mapping]]] = ..., status: _Optional[str] = ..., createdActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., updatedActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class AssistantProviderAgentflow(_message.Message):
-    __slots__ = ("id", "description", "assistantId", "schemaVersion", "definition", "status", "createdBy", "createdUser", "updatedBy", "updatedUser", "createdDate", "updatedDate")
+    __slots__ = ("id", "description", "assistantId", "schemaVersion", "definition", "status", "createdActor", "updatedActor", "createdDate", "updatedDate")
     ID_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
     ASSISTANTID_FIELD_NUMBER: _ClassVar[int]
     SCHEMAVERSION_FIELD_NUMBER: _ClassVar[int]
     DEFINITION_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
-    CREATEDBY_FIELD_NUMBER: _ClassVar[int]
-    CREATEDUSER_FIELD_NUMBER: _ClassVar[int]
-    UPDATEDBY_FIELD_NUMBER: _ClassVar[int]
-    UPDATEDUSER_FIELD_NUMBER: _ClassVar[int]
+    CREATEDACTOR_FIELD_NUMBER: _ClassVar[int]
+    UPDATEDACTOR_FIELD_NUMBER: _ClassVar[int]
     CREATEDDATE_FIELD_NUMBER: _ClassVar[int]
     UPDATEDDATE_FIELD_NUMBER: _ClassVar[int]
     id: int
@@ -255,13 +241,11 @@ class AssistantProviderAgentflow(_message.Message):
     schemaVersion: str
     definition: _struct_pb2.Struct
     status: str
-    createdBy: int
-    createdUser: _common_pb2.User
-    updatedBy: int
-    updatedUser: _common_pb2.User
+    createdActor: _common_pb2.AuditActor
+    updatedActor: _common_pb2.AuditActor
     createdDate: _timestamp_pb2.Timestamp
     updatedDate: _timestamp_pb2.Timestamp
-    def __init__(self, id: _Optional[int] = ..., description: _Optional[str] = ..., assistantId: _Optional[int] = ..., schemaVersion: _Optional[str] = ..., definition: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., status: _Optional[str] = ..., createdBy: _Optional[int] = ..., createdUser: _Optional[_Union[_common_pb2.User, _Mapping]] = ..., updatedBy: _Optional[int] = ..., updatedUser: _Optional[_Union[_common_pb2.User, _Mapping]] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, id: _Optional[int] = ..., description: _Optional[str] = ..., assistantId: _Optional[int] = ..., schemaVersion: _Optional[str] = ..., definition: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., status: _Optional[str] = ..., createdActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., updatedActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class GetAllAssistantProviderRequest(_message.Message):
     __slots__ = ("paginate", "criterias", "assistantId")

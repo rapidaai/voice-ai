@@ -2,7 +2,7 @@ package internal_user_service
 
 import (
 	"errors"
-	"fmt"
+	"math"
 
 	internal_entity "github.com/rapidaai/api/web-api/internal/entity"
 	"github.com/rapidaai/pkg/types"
@@ -122,10 +122,10 @@ func (aP *authPrinciple) UserIdentity() (uint64, bool) {
 
 func (aP *authPrinciple) AuditActor() (types.ActorIdentity, bool) {
 	userID, ok := aP.UserIdentity()
-	if !ok {
+	if !ok || userID > math.MaxInt64 {
 		return types.ActorIdentity{}, false
 	}
-	return types.ActorIdentity{Type: types.ActorTypeUser, ID: fmt.Sprintf("%d", userID)}, true
+	return types.ActorIdentity{Type: types.ActorTypeUser, ID: userID}, true
 }
 
 func (aP *authPrinciple) OrganizationContext() (uint64, bool) {

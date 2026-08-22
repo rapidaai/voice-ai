@@ -83,11 +83,6 @@ func (endpoint *webEndpointGRPCApi) GetAllEndpoint(c context.Context, iRequest *
 			"Unable to get your endpoint, please try again in sometime.")
 	}
 
-	for _, _ep := range _endpoint {
-		if _ep.GetEndpointProviderModel() != nil {
-			_ep.EndpointProviderModel.CreatedUser = endpoint.GetUser(c, iAuth, _ep.EndpointProviderModel.GetCreatedBy())
-		}
-	}
 	return utils.PaginatedSuccess[protos.GetAllEndpointResponse, []*protos.Endpoint](
 		_page.GetTotalItem(), _page.GetCurrentPage(),
 		_endpoint)
@@ -124,9 +119,6 @@ func (endpointGRPCApi *webEndpointGRPCApi) GetAllEndpointProviderModel(ctx conte
 			"Unable to get your endpoint provider models, please try again in sometime.")
 	}
 
-	for _, _ep := range _endpoints {
-		_ep.CreatedUser = endpointGRPCApi.GetUser(ctx, iAuth, _ep.GetCreatedBy())
-	}
 	return utils.PaginatedSuccess[protos.GetAllEndpointProviderModelResponse, []*protos.EndpointProviderModel](
 		_page.GetTotalItem(), _page.GetCurrentPage(),
 		_endpoints)

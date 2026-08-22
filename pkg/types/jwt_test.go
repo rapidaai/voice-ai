@@ -1,8 +1,3 @@
-// Copyright (c) 2023-2025 RapidaAI
-// Author: Prashant Srivastav <prashant@rapida.ai>
-//
-// Licensed under GPL-2.0 with RapidaAI
-// See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package types
 
 import (
@@ -12,113 +7,141 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func TestServiceScopeTokenRoundTrip(t *testing.T) {
-	secretKey := "test-secret"
-	userID := uint64(1)
-	projectID := uint64(3)
-	want := DelegatedContext{UserID: &userID, OrganizationID: 2, ProjectID: &projectID}
+const testServiceSecret = "shared-service-secret"
 
-	token, err := CreateServiceScopeToken(want, secretKey)
+func TestCreateAndExtractServiceScopeToken(t *testing.T) {
+	projectID := uint64(3)
+	token, err := CreateServiceScopeToken(DelegatedContext{OrganizationID: 2, ProjectID: &projectID}, testServiceAssertion(), testServiceSecret)
 	if err != nil {
 		t.Fatalf("CreateServiceScopeToken() error = %v", err)
 	}
-	scope, err := ExtractServiceScope(token, secretKey)
+	scope, err := ExtractServiceScope(token, testServiceSecret)
 	if err != nil {
 		t.Fatalf("ExtractServiceScope() error = %v", err)
 	}
-	got, err := ResolveDelegatedContext(scope)
-	if err != nil {
-		t.Fatalf("ResolveDelegatedContext() error = %v", err)
+	if scope.ActorId != 41 || scope.Issuer != "assistant-api" || scope.Audience != ServiceAssertionAudience {
+		t.Fatalf("ExtractServiceScope() = %+v", scope)
 	}
-	if got.OrganizationID != want.OrganizationID || got.UserID == nil || *got.UserID != userID || got.ProjectID == nil || *got.ProjectID != projectID {
-		t.Fatalf("delegated context = %+v", got)
-	}
-	organizationID, err := RequireOrganization(scope)
-	if err != nil || organizationID != want.OrganizationID {
-		t.Fatalf("RequireOrganization() = %d, %v", organizationID, err)
-	}
-	projectContext, err := RequireProject(scope)
-	if err != nil || projectContext != (ProjectContext{OrganizationID: want.OrganizationID, ProjectID: projectID}) {
-		t.Fatalf("RequireProject() = %+v, %v", projectContext, err)
-	}
-	if _, err := RequireUser(scope); err == nil {
-		t.Fatal("RequireUser() error = nil for delegated service scope")
+	delegatedContext, ok := scope.DelegatedContext()
+	if !ok || delegatedContext.OrganizationID != 2 || delegatedContext.UserID != nil || delegatedContext.ProjectID == nil || *delegatedContext.ProjectID != projectID {
+		t.Fatalf("DelegatedContext() = %+v, %v", delegatedContext, ok)
 	}
 }
 
-func TestCreateServiceScopeTokenAcceptsOrganizationOnly(t *testing.T) {
-	token, err := CreateServiceScopeToken(DelegatedContext{OrganizationID: 2}, "test-secret")
-	if err != nil || token == "" {
-		t.Fatalf("CreateServiceScopeToken() = %q, %v", token, err)
+func TestCreateAndExtractServiceScopeTokenPreservesBigintActor(t *testing.T) {
+	const actorID = uint64(9007199254740993)
+	token, err := CreateServiceScopeToken(DelegatedContext{OrganizationID: actorID}, ServiceAssertion{
+		ActorID: actorID,
+		Issuer:  "assistant-api",
+		TTL:     time.Minute,
+	}, testServiceSecret)
+	if err != nil {
+		t.Fatalf("CreateServiceScopeToken() error = %v", err)
 	}
-	scope, err := ExtractServiceScope(token, "test-secret")
+	scope, err := ExtractServiceScope(token, testServiceSecret)
 	if err != nil {
 		t.Fatalf("ExtractServiceScope() error = %v", err)
 	}
-	if _, err := RequireProject(scope); err == nil {
-		t.Fatal("RequireProject() error = nil without delegated project")
+	if scope.ActorId != actorID || scope.OrganizationId == nil || *scope.OrganizationId != actorID {
+		t.Fatalf("ExtractServiceScope() lost bigint precision: %+v", scope)
 	}
 }
 
-func TestCreateServiceScopeTokenRejectsMalformedContext(t *testing.T) {
+func TestCreateServiceScopeTokenDoesNotForwardUser(t *testing.T) {
+	userID := uint64(5)
+	if _, err := CreateServiceScopeToken(DelegatedContext{OrganizationID: 2, UserID: &userID}, testServiceAssertion(), testServiceSecret); err == nil {
+		t.Fatal("CreateServiceScopeToken() error = nil")
+	}
+}
+
+func TestCreateServiceScopeTokenRejectsInvalidInputs(t *testing.T) {
 	zero := uint64(0)
-	for _, delegatedContext := range []DelegatedContext{
-		{},
-		{OrganizationID: 2, UserID: &zero},
-		{OrganizationID: 2, ProjectID: &zero},
-	} {
-		if _, err := CreateServiceScopeToken(delegatedContext, "test-secret"); err == nil {
-			t.Fatalf("CreateServiceScopeToken(%+v) error = nil", delegatedContext)
-		}
-	}
-}
-
-func TestExtractServiceScopeRejectsMalformedRequiredOrganization(t *testing.T) {
-	secretKey := "test-secret"
 	tests := []struct {
-		name   string
-		claims jwt.MapClaims
+		name      string
+		context   DelegatedContext
+		assertion ServiceAssertion
+		secret    string
 	}{
-		{name: "missing", claims: jwt.MapClaims{"exp": time.Now().Add(time.Hour).Unix()}},
-		{name: "zero", claims: jwt.MapClaims{"exp": time.Now().Add(time.Hour).Unix(), "organizationId": 0}},
-		{name: "invalid", claims: jwt.MapClaims{"exp": time.Now().Add(time.Hour).Unix(), "organizationId": "invalid"}},
-		{name: "fractional", claims: jwt.MapClaims{"exp": time.Now().Add(time.Hour).Unix(), "organizationId": 2.5}},
+		{name: "missing organization", context: DelegatedContext{}, assertion: testServiceAssertion(), secret: testServiceSecret},
+		{name: "zero project", context: DelegatedContext{OrganizationID: 2, ProjectID: &zero}, assertion: testServiceAssertion(), secret: testServiceSecret},
+		{name: "zero actor", context: DelegatedContext{OrganizationID: 2}, assertion: ServiceAssertion{Issuer: "assistant-api", TTL: time.Minute}, secret: testServiceSecret},
+		{name: "missing issuer", context: DelegatedContext{OrganizationID: 2}, assertion: ServiceAssertion{ActorID: 41, TTL: time.Minute}, secret: testServiceSecret},
+		{name: "missing secret", context: DelegatedContext{OrganizationID: 2}, assertion: testServiceAssertion()},
+		{name: "long ttl", context: DelegatedContext{OrganizationID: 2}, assertion: ServiceAssertion{ActorID: 41, Issuer: "assistant-api", TTL: 6 * time.Minute}, secret: testServiceSecret},
 	}
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			token := jwt.NewWithClaims(jwt.SigningMethodHS256, test.claims)
-			tokenString, err := token.SignedString([]byte(secretKey))
-			if err != nil {
-				t.Fatalf("SignedString() error = %v", err)
-			}
-			if _, err := ExtractServiceScope(tokenString, secretKey); err == nil {
-				t.Fatal("ExtractServiceScope() error = nil")
+			if _, err := CreateServiceScopeToken(test.context, test.assertion, test.secret); err == nil {
+				t.Fatal("CreateServiceScopeToken() error = nil")
 			}
 		})
 	}
 }
 
 func TestExtractServiceScopeRejectsInvalidTokens(t *testing.T) {
-	validToken, err := CreateServiceScopeToken(DelegatedContext{OrganizationID: 2}, "test-secret")
-	if err != nil {
-		t.Fatal(err)
+	now := time.Now()
+	validClaims := jwt.MapClaims{
+		"actor_type":     "service",
+		"actor_id":       41,
+		"iss":            "assistant-api",
+		"aud":            ServiceAssertionAudience,
+		"iat":            now.Unix(),
+		"exp":            now.Add(time.Minute).Unix(),
+		"organizationId": 2,
 	}
-	for _, test := range []struct {
+	validToken := signServiceTestToken(t, jwt.SigningMethodHS256, validClaims, testServiceSecret)
+	longLivedClaims := cloneClaims(validClaims)
+	longLivedClaims["exp"] = now.Add(6 * time.Minute).Unix()
+	expiredClaims := cloneClaims(validClaims)
+	expiredClaims["iat"] = now.Add(-2 * time.Minute).Unix()
+	expiredClaims["exp"] = now.Add(-time.Minute).Unix()
+	invalidActorClaims := cloneClaims(validClaims)
+	invalidActorClaims["actor_id"] = 0
+	forwardedUserClaims := cloneClaims(validClaims)
+	forwardedUserClaims["userId"] = 9
+
+	tests := []struct {
 		name   string
 		token  string
 		secret string
 	}{
-		{name: "invalid", token: "invalid.token.here", secret: "test-secret"},
+		{name: "invalid", token: "invalid.token.here", secret: testServiceSecret},
 		{name: "wrong secret", token: validToken, secret: "wrong-secret"},
-		{name: "empty", token: "", secret: "test-secret"},
-	} {
+		{name: "wrong algorithm", token: signServiceTestToken(t, jwt.SigningMethodHS384, validClaims, testServiceSecret), secret: testServiceSecret},
+		{name: "expired", token: signServiceTestToken(t, jwt.SigningMethodHS256, expiredClaims, testServiceSecret), secret: testServiceSecret},
+		{name: "long lived", token: signServiceTestToken(t, jwt.SigningMethodHS256, longLivedClaims, testServiceSecret), secret: testServiceSecret},
+		{name: "invalid actor", token: signServiceTestToken(t, jwt.SigningMethodHS256, invalidActorClaims, testServiceSecret), secret: testServiceSecret},
+		{name: "forwarded user", token: signServiceTestToken(t, jwt.SigningMethodHS256, forwardedUserClaims, testServiceSecret), secret: testServiceSecret},
+		{name: "empty secret", token: validToken},
+	}
+	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			if _, err := ExtractServiceScope(test.token, test.secret); err == nil {
 				t.Fatal("ExtractServiceScope() error = nil")
 			}
 		})
 	}
+}
+
+func signServiceTestToken(t *testing.T, method jwt.SigningMethod, claims jwt.MapClaims, secret string) string {
+	t.Helper()
+	token, err := jwt.NewWithClaims(method, claims).SignedString([]byte(secret))
+	if err != nil {
+		t.Fatalf("SignedString() error = %v", err)
+	}
+	return token
+}
+
+func cloneClaims(claims jwt.MapClaims) jwt.MapClaims {
+	result := make(jwt.MapClaims, len(claims))
+	for key, value := range claims {
+		result[key] = value
+	}
+	return result
+}
+
+func testServiceAssertion() ServiceAssertion {
+	return ServiceAssertion{ActorID: 41, Issuer: "assistant-api", TTL: time.Minute}
 }
 
 func TestToUint64(t *testing.T) {
@@ -139,7 +162,6 @@ func TestToUint64(t *testing.T) {
 		{name: "string invalid", value: "not-a-number", ok: false},
 		{name: "unsupported type", value: true, ok: false},
 	}
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			got, ok := toUint64(test.value)

@@ -16,6 +16,7 @@ import (
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -73,12 +74,11 @@ func newAssistantProxyTest(t *testing.T, client assistant_client.AssistantServic
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Discard.LogMode(logger.Silent)})
 	require.NoError(t, err)
-	require.NoError(t, db.Exec(`CREATE TABLE user_auths (id integer primary key, created_date datetime, updated_date datetime, status text, created_by integer, updated_by integer, name text, email text, password text, source text)`).Error)
+	require.NoError(t, db.Exec(`CREATE TABLE user_auths (id integer primary key, created_date datetime, updated_date datetime, status text, created_actor_type text, created_actor_id integer, updated_actor_type text, updated_actor_id integer, name text, email text, password text, source text)`).Error)
 	require.NoError(t, db.Create(&internal_entity.UserAuth{
 		Audited: gorm_models.Audited{Id: 42},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		Name:     "Assistant Owner",
 		Email:    "assistant-owner@example.com",
@@ -112,11 +112,11 @@ func assistantProxyContext() context.Context {
 	})
 }
 
-func TestGetAllAssistantHydratesTopLevelCreatedUser(t *testing.T) {
+func TestGetAllAssistantPreservesCreatedActor(t *testing.T) {
 	api := newAssistantProxyTest(t, &fakeAssistantServiceClient{
 		getAllAssistantFunc: func(context.Context, *types.Authentication, []*protos.Criteria, *protos.Paginate) (*protos.Paginated, []*protos.Assistant, error) {
 			return &protos.Paginated{TotalItem: 1, CurrentPage: 1}, []*protos.Assistant{
-				{Id: 100, CreatedBy: 42, Name: "Support assistant"},
+				{Id: 100, CreatedActor: &protos.AuditActor{Type: "user", Id: 42, DisplayName: proto.String("Assistant Owner")}, Name: "Support assistant"},
 			}, nil
 		},
 	})
@@ -128,16 +128,16 @@ func TestGetAllAssistantHydratesTopLevelCreatedUser(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, res.GetSuccess())
 	require.Len(t, res.GetData(), 1)
-	require.Equal(t, "Assistant Owner", res.GetData()[0].GetCreatedUser().GetName())
+	require.Equal(t, "Assistant Owner", res.GetData()[0].GetCreatedActor().GetDisplayName())
 }
 
-func TestGetAssistantHydratesTopLevelCreatedUser(t *testing.T) {
+func TestGetAssistantPreservesCreatedActor(t *testing.T) {
 	api := newAssistantProxyTest(t, &fakeAssistantServiceClient{
 		getAssistantFunc: func(context.Context, *types.Authentication, *protos.GetAssistantRequest) (*protos.GetAssistantResponse, error) {
 			return &protos.GetAssistantResponse{
 				Code:    200,
 				Success: true,
-				Data:    &protos.Assistant{Id: 100, CreatedBy: 42, Name: "Support assistant"},
+				Data:    &protos.Assistant{Id: 100, CreatedActor: &protos.AuditActor{Type: "user", Id: 42, DisplayName: proto.String("Assistant Owner")}, Name: "Support assistant"},
 			}, nil
 		},
 	})
@@ -146,5 +146,5 @@ func TestGetAssistantHydratesTopLevelCreatedUser(t *testing.T) {
 
 	require.NoError(t, err)
 	require.True(t, res.GetSuccess())
-	require.Equal(t, "Assistant Owner", res.GetData().GetCreatedUser().GetName())
+	require.Equal(t, "Assistant Owner", res.GetData().GetCreatedActor().GetDisplayName())
 }

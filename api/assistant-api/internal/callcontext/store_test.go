@@ -2,6 +2,7 @@ package internal_callcontext
 
 import (
 	"context"
+	"math"
 	"testing"
 	"time"
 
@@ -44,7 +45,7 @@ func newTestStore(t *testing.T) (Store, context.Context) {
 			auth_type TEXT NOT NULL DEFAULT '',
 			auth_user_id BIGINT,
 			auth_actor_type TEXT,
-			auth_actor_id TEXT,
+			auth_actor_id INTEGER,
 			provider TEXT NOT NULL DEFAULT '',
 			direction TEXT NOT NULL DEFAULT '',
 			caller_number TEXT NOT NULL DEFAULT '',
@@ -546,8 +547,8 @@ func TestStoreAuthenticationSnapshotRoundTripDoesNotWriteLegacyToken(t *testing.
 	store, ctx := newTestStore(t)
 	auth := &types.Authentication{
 		AuthType:          types.AuthTypeUser,
-		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeUser, ID: "11"},
-		UserValue:         &types.UserContext{UserID: 11},
+		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeUser, ID: math.MaxInt64},
+		UserValue:         &types.UserContext{UserID: math.MaxInt64},
 		OrganizationValue: &types.OrganizationContext{OrganizationID: 33},
 		ProjectValue:      &types.ProjectContext{OrganizationID: 33, ProjectID: 22},
 	}
@@ -568,8 +569,12 @@ func TestStoreAuthenticationSnapshotRoundTripDoesNotWriteLegacyToken(t *testing.
 		t.Fatalf("ToAuthentication() error = %v", err)
 	}
 	userContext, err := reconstructed.UserContext()
-	if err != nil || userContext.UserID != 11 {
+	if err != nil || userContext.UserID != math.MaxInt64 {
 		t.Fatalf("UserContext() = %+v, %v", userContext, err)
+	}
+	actor, err := reconstructed.Actor()
+	if err != nil || actor.ID != math.MaxInt64 {
+		t.Fatalf("Actor() = %+v, %v", actor, err)
 	}
 	var authToken string
 	testStore := store.(*postgresStore)

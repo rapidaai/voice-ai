@@ -7,6 +7,7 @@ package types
 
 import (
 	"errors"
+	"math"
 	"time"
 
 	"github.com/rapidaai/pkg/utils"
@@ -172,10 +173,10 @@ func (aP *PlainAuthPrinciple) UserIdentity() (uint64, bool) {
 
 func (aP *PlainAuthPrinciple) AuditActor() (ActorIdentity, bool) {
 	userID, ok := aP.UserIdentity()
-	if !ok {
+	if !ok || userID > math.MaxInt64 {
 		return ActorIdentity{}, false
 	}
-	return numericActor(ActorTypeUser, &userID)
+	return ActorIdentity{Type: ActorTypeUser, ID: userID}, true
 }
 
 func (aP *PlainAuthPrinciple) GetCurrentOrganizationId() *uint64 {
