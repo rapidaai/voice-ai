@@ -33,15 +33,19 @@ func TestInboundCall_InvalidSDPRejectsWithoutSession(t *testing.T) {
 
 func TestInboundCall_InvalidIdentityRejectsWithoutSession(t *testing.T) {
 	cases := []struct {
-		name          string
-		callID        string
-		removeHeader  string
-		removeFromTag bool
+		name             string
+		callID           string
+		removeHeader     string
+		removeFromTag    bool
+		emptyFromAddress bool
+		emptyToAddress   bool
 	}{
 		{name: "missing call id", callID: "inbound-missing-call-id", removeHeader: "Call-ID"},
 		{name: "missing from", callID: "inbound-missing-from", removeHeader: "From"},
 		{name: "missing from tag", callID: "inbound-missing-from-tag", removeFromTag: true},
 		{name: "missing to", callID: "inbound-missing-to", removeHeader: "To"},
+		{name: "empty from address", callID: "inbound-empty-from-address", emptyFromAddress: true},
+		{name: "empty to address", callID: "inbound-empty-to-address", emptyToAddress: true},
 	}
 
 	for _, tc := range cases {
@@ -52,6 +56,12 @@ func TestInboundCall_InvalidIdentityRejectsWithoutSession(t *testing.T) {
 			}
 			if tc.removeFromTag && request.From() != nil && request.From().Params != nil {
 				delete(request.From().Params, "tag")
+			}
+			if tc.emptyFromAddress {
+				request.From().Address = sip.Uri{Scheme: "sip"}
+			}
+			if tc.emptyToAddress {
+				request.To().Address = sip.Uri{Scheme: "sip"}
 			}
 			transaction := newTestServerTx()
 
