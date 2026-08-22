@@ -298,10 +298,18 @@ func (outboundCall *Outbound) callOutboundInviteHandler(answerTime time.Time) er
 		return nil
 	}
 
-	info := outboundCall.session.GetInfo()
 	outboundCall.server.logger.Infow("Starting onInvite handler for outbound call",
 		"call_id", outboundCall.session.GetCallID())
-	if err := inviteHandler(outboundCall.session, info.RemoteURI, info.LocalURI, info.RemoteURI); err != nil {
+	inviteRequest := outboundCall.dialog.InviteRequest()
+	if inviteRequest == nil {
+		return fmt.Errorf("outbound INVITE request is unavailable")
+	}
+	if err := inviteHandler(
+		outboundCall.session,
+		inviteRequest.Recipient.String(),
+		outboundCall.request.Identity.FromUser,
+		outboundCall.request.Identity.ToUser,
+	); err != nil {
 		return err
 	}
 	outboundCall.server.logger.Infow("onInvite handler completed",
