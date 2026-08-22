@@ -45,9 +45,21 @@ jobs:
     name: Docker
     uses: ./.github/workflows/reusable-docker-ci.yml
 
+  # Stabilization lanes report independently until the RFC graduation thresholds
+  # are met. They intentionally remain outside ci-success, and Docker CI remains.
+  assistant-native:
+    name: Assistant Native (stabilizing)
+    uses: ./.github/workflows/reusable-assistant-native-ci.yml
+
+  system:
+    name: System (stabilizing)
+    uses: ./.github/workflows/reusable-system-ci.yml
+
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
+    # Graduation: add each lane only after its RFC sample passes. When system
+    # graduates, remove docker here and remove the standalone docker job above.
     needs:
       - go
       - ui

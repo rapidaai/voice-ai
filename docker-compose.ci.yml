@@ -1,0 +1,153 @@
+services:
+  postgres:
+    container_name: !reset null
+    ports: !reset []
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    container_name: !reset null
+    ports: !reset []
+    volumes: !override []
+    tmpfs:
+      - /data
+
+  nginx:
+    container_name: !reset null
+    ports: !reset []
+    volumes:
+      - system-assets:/app/rapida-data/assets
+
+  ui:
+    container_name: !reset null
+    ports: !reset []
+    build:
+      cache_from:
+        - type=gha,scope=${SYSTEM_CACHE_SCOPE:?SYSTEM_CACHE_SCOPE is required}-ui
+      cache_to:
+        - type=gha,scope=${SYSTEM_CACHE_SCOPE:?SYSTEM_CACHE_SCOPE is required}-ui,mode=max
+
+  web-api:
+    container_name: !reset null
+    ports: !reset []
+    command: ["./web-api", "-skip-migration"]
+    build:
+      cache_from:
+        - type=gha,scope=${SYSTEM_CACHE_SCOPE:?SYSTEM_CACHE_SCOPE is required}-web-api
+      cache_to:
+        - type=gha,scope=${SYSTEM_CACHE_SCOPE:?SYSTEM_CACHE_SCOPE is required}-web-api,mode=max
+    volumes:
+      - system-assets:/app/rapida-data/assets
+
+  integration-api:
+    container_name: !reset null
+    ports: !reset []
+    command: ["./integration-api", "-skip-migration"]
+    build:
+      cache_from:
+        - type=gha,scope=${SYSTEM_CACHE_SCOPE:?SYSTEM_CACHE_SCOPE is required}-integration-api
+      cache_to:
+        - type=gha,scope=${SYSTEM_CACHE_SCOPE:?SYSTEM_CACHE_SCOPE is required}-integration-api,mode=max
+    volumes:
+      - system-assets:/app/rapida-data/assets
+
+  endpoint-api:
+    container_name: !reset null
+    ports: !reset []
+    command: ["./endpoint-api", "-skip-migration"]
+    build:
+      cache_from:
+        - type=gha,scope=${SYSTEM_CACHE_SCOPE:?SYSTEM_CACHE_SCOPE is required}-endpoint-api
+      cache_to:
+        - type=gha,scope=${SYSTEM_CACHE_SCOPE:?SYSTEM_CACHE_SCOPE is required}-endpoint-api,mode=max
+    volumes:
+      - system-assets:/app/rapida-data/assets
+
+  assistant-api:
+    container_name: !reset null
+    ports: !reset []
+    command: ["./assistant-api", "-skip-migration"]
+    build:
+      cache_from:
+        - type=gha,scope=${SYSTEM_CACHE_SCOPE:?SYSTEM_CACHE_SCOPE is required}-assistant-api
+      cache_to:
+        - type=gha,scope=${SYSTEM_CACHE_SCOPE:?SYSTEM_CACHE_SCOPE is required}-assistant-api,mode=max
+    volumes:
+      - system-assets:/app/rapida-data/assets
+
+  migrate-web:
+    image: migrate/migrate:v4.18.1@sha256:f21c436af23c282f4516b00ba3e93bccf5c5fe5cd52530fd5c319a936998f539
+    platform: linux/amd64
+    entrypoint: ["/migrate", "-path=/migrations", "-database=postgres://rapida_user:rapida_db_password@postgres:5432/web_db?sslmode=disable"]
+    volumes:
+      - ./api/web-api/migrations:/migrations:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - api-network
+
+  migrate-integration:
+    image: migrate/migrate:v4.18.1@sha256:f21c436af23c282f4516b00ba3e93bccf5c5fe5cd52530fd5c319a936998f539
+    platform: linux/amd64
+    entrypoint: ["/migrate", "-path=/migrations", "-database=postgres://rapida_user:rapida_db_password@postgres:5432/integration_db?sslmode=disable"]
+    volumes:
+      - ./api/integration-api/migrations:/migrations:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - api-network
+
+  migrate-endpoint:
+    image: migrate/migrate:v4.18.1@sha256:f21c436af23c282f4516b00ba3e93bccf5c5fe5cd52530fd5c319a936998f539
+    platform: linux/amd64
+    entrypoint: ["/migrate", "-path=/migrations", "-database=postgres://rapida_user:rapida_db_password@postgres:5432/endpoint_db?sslmode=disable"]
+    volumes:
+      - ./api/endpoint-api/migrations:/migrations:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - api-network
+
+  migrate-assistant:
+    image: migrate/migrate:v4.18.1@sha256:f21c436af23c282f4516b00ba3e93bccf5c5fe5cd52530fd5c319a936998f539
+    platform: linux/amd64
+    entrypoint: ["/migrate", "-path=/migrations", "-database=postgres://rapida_user:rapida_db_password@postgres:5432/assistant_db?sslmode=disable"]
+    volumes:
+      - ./api/assistant-api/migrations:/migrations:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - api-network
+
+  test-runner:
+    image: rapida-system-test-runner:ci
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: tests/system/test-runner/Dockerfile
+      cache_from:
+        - type=gha,scope=${SYSTEM_CACHE_SCOPE:?SYSTEM_CACHE_SCOPE is required}-test-runner
+      cache_to:
+        - type=gha,scope=${SYSTEM_CACHE_SCOPE:?SYSTEM_CACHE_SCOPE is required}-test-runner,mode=max
+    environment:
+      PGPASSWORD: rapida_db_password
+    tmpfs:
+      - /run/secrets:mode=0700,uid=1000,gid=1000
+    volumes:
+      - system-reports:/reports
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - api-network
+
+volumes:
+  postgres-data:
+  system-assets:
+  system-reports:

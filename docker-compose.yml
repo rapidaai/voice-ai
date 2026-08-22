@@ -2,7 +2,7 @@
 services:
   postgres:
     platform: linux/amd64
-    image: postgres:15-alpine
+    image: postgres:15-alpine@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b
     container_name: rapida__postgres
     ports:
       - "5432:5432"
@@ -25,7 +25,7 @@ services:
   # Redis Cache
   redis:
     platform: linux/amd64
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     container_name: rapida__redis
     ports:
       - "6379:6379"
@@ -43,13 +43,12 @@ services:
 
   nginx:
     platform: linux/amd64
-    image: nginx:alpine
+    image: nginx:alpine@sha256:db35bfc6b2951e7f8a72db5db120288c127ffaeeb4a6d4b95a26fead017d5913
     container_name: rapida__nginx
     ports:
       - "8080:8080"
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ui_build:/usr/share/nginx/html:ro
       - ./docker/nginx/ssl:/etc/nginx/ssl:ro
       - ${HOME}/rapida-data/assets:/app/rapida-data/assets
     depends_on:
@@ -201,4 +200,3 @@ networks:
 
 volumes:
   go-mod-cache:
-  ui_build:

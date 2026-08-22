@@ -1,0 +1,50 @@
+name: Reusable Assistant Native CI
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  assistant-native:
+    name: Assistant Native
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          submodules: recursive
+
+      - name: Verify native contracts
+        run: |
+          ./bin/check-go-version-consistency
+          ./docker/assistant-api/scripts/verify-native-deps.sh docker/assistant-api/native-deps.lock
+
+      - name: Prepare complete Docker context
+        run: |
+          context="$RUNNER_TEMP/assistant-native-context"
+          mkdir -p "$context"
+          git ls-files -z | tar --null -T - -cf - | tar -xf - -C "$context"
+          rm -f "$context/.dockerignore"
+          echo "ASSISTANT_NATIVE_CONTEXT=$context" >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+
+      - name: Build native CI image
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25
+        with:
+          context: ${{ env.ASSISTANT_NATIVE_CONTEXT }}
+          file: ${{ env.ASSISTANT_NATIVE_CONTEXT }}/docker/assistant-api/Dockerfile
+          target: ci
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: rapida/assistant-native-ci:${{ github.sha }}
+          cache-from: type=gha,scope=assistant-native-${{ hashFiles('docker/assistant-api/native-deps.lock') }}
+          cache-to: type=gha,scope=assistant-native-${{ hashFiles('docker/assistant-api/native-deps.lock') }},mode=max
+
+      - name: Run native package, vet, test, race, vulnerability, and build checks
+        run: docker run --rm --platform linux/amd64 "rapida/assistant-native-ci:${GITHUB_SHA}"

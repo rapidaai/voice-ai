@@ -1,0 +1,35 @@
+#!/bin/sh
+set -eu
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+lock_file="$script_dir/../tools.lock"
+read_lock() { sed -n "s/^$1=//p" "$lock_file"; }
+
+case "$(uname -s)-$(uname -m)" in
+    Linux-x86_64) artifact=docker-compose-linux-x86_64; checksum_key=compose.linux-amd64.sha256 ;;
+    Darwin-arm64) artifact=docker-compose-darwin-aarch64; checksum_key=compose.darwin-arm64.sha256 ;;
+    *) echo "unsupported Docker Compose platform: $(uname -s)-$(uname -m)" >&2; exit 1 ;;
+esac
+
+version=$(read_lock compose.version)
+expected=$(read_lock "$checksum_key")
+cache_root=${XDG_CACHE_HOME:-${HOME:-/tmp}/.cache}/rapida-ci-tools
+binary="$cache_root/docker-compose-$version-$artifact"
+
+checksum() {
+    if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'; else shasum -a 256 "$1" | awk '{print $1}'; fi
+}
+
+if [ ! -f "$binary" ] || [ "$(checksum "$binary")" != "$expected" ]; then
+    mkdir -p "$cache_root"
+    temporary=$(mktemp "$cache_root/.compose.XXXXXX")
+    trap 'rm -f "$temporary"' EXIT HUP INT TERM
+    curl --fail --silent --show-error --location "https://github.com/docker/compose/releases/download/v$version/$artifact" --output "$temporary"
+    actual=$(checksum "$temporary")
+    [ "$actual" = "$expected" ] || { echo "Docker Compose checksum mismatch: expected $expected, got $actual" >&2; exit 1; }
+    chmod 0755 "$temporary"
+    mv "$temporary" "$binary"
+    trap - EXIT HUP INT TERM
+fi
+
+exec "$binary" "$@"

@@ -1,0 +1,8 @@
+{
+  "name": "rapida-system-test-runner",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "newman": "6.2.1"
+  }
+}

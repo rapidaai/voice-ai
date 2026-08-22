@@ -33,12 +33,42 @@ expect_match() {
   fi
 }
 
+native_lock="$ROOT/docker/assistant-api/native-deps.lock"
+
+read_lock_value() {
+  key="$1"
+  awk -F= -v key="$key" '$1 == key { value = substr($0, index($0, "=") + 1) } END { print value }' "$native_lock"
+}
+
 expect_line "docker/base/rapida-golang-alpine.Dockerfile" "FROM golang:${GO_VERSION}-alpine"
 expect_line "docker/base/rapida-golang-bookworm.Dockerfile" "FROM golang:${GO_VERSION}-bookworm AS base"
 expect_line "docker/web-api/Dockerfile" "FROM rapidaai/rapida-golang:${GO_VERSION}-alpine AS builder"
 expect_line "docker/integration-api/Dockerfile" "FROM rapidaai/rapida-golang:${GO_VERSION}-alpine AS builder"
 expect_line "docker/endpoint-api/Dockerfile" "FROM rapidaai/rapida-golang:${GO_VERSION}-alpine AS builder"
-expect_line "docker/assistant-api/Dockerfile" "FROM rapidaai/rapida-golang:${GO_VERSION}-bookworm AS builder"
+
+if [ ! -f "$native_lock" ]; then
+  echo "Missing assistant native dependency lock: $native_lock" >&2
+  failed=1
+else
+  assistant_builder_image="$(read_lock_value BUILDER_IMAGE)"
+  assistant_builder_digest="$(read_lock_value BUILDER_DIGEST)"
+  expected_assistant_builder="rapidaai/rapida-golang:${GO_VERSION}-bookworm"
+
+  if [ "$assistant_builder_image" != "$expected_assistant_builder" ]; then
+    echo "Go version mismatch in docker/assistant-api/native-deps.lock" >&2
+    echo "  expected BUILDER_IMAGE=${expected_assistant_builder}" >&2
+    failed=1
+  fi
+
+  if ! printf '%s\n' "$assistant_builder_digest" | grep -Eq '^sha256:[0-9a-f]{64}$'; then
+    echo "Invalid BUILDER_DIGEST in docker/assistant-api/native-deps.lock" >&2
+    echo "  expected: sha256 followed by 64 lowercase hexadecimal characters" >&2
+    failed=1
+  elif [ -n "$assistant_builder_image" ]; then
+    expect_line "docker/assistant-api/Dockerfile" \
+      "FROM ${assistant_builder_image}@${assistant_builder_digest} AS native-toolchain"
+  fi
+fi
 
 expect_match ".github/workflows/ci.yml" "GO_VERSION: \"${GO_VERSION}\""
 expect_match ".github/workflows/ci.yml" "go-version: \"${GO_VERSION}\""
