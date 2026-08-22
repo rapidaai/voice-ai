@@ -43,10 +43,21 @@ jobs:
       - name: Test TypeScript baseline checker
         working-directory: ui
         run: yarn test:typescript-check
+      - name: Check public assets
+        working-directory: ui
+        run: yarn check:public-assets
+
+      - name: Test public asset checker
+        working-directory: ui
+        run: yarn test:public-assets
 
       - name: Run ESLint
         working-directory: ui
         run: yarn lint
+
+      - name: Run Stylelint
+        working-directory: ui
+        run: yarn lint:css
 
   typecheck:
     name: UI Type Check
