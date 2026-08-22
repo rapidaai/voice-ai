@@ -34,9 +34,9 @@ This contract applies equally when the dialog-forming request represents a direc
 call created after `REFER`, or a replacement/transfer INVITE. Each new SIP dialog resolves its
 own parties from its own dialog-forming request.
 
-This RFC changes only native SIP identity handling and the assistant-authentication UI key.
-Other telephony providers, public APIs, protobuf contracts, and database schemas are
-unchanged.
+This RFC changes only native SIP identity handling and assistant-authentication UI keys.
+Other telephony providers, public APIs, protobuf contracts, and database schemas remain
+compatible. Existing exported Go symbols receive deprecated adapters for at least one release.
 
 ## Status of This Memo
 
@@ -232,7 +232,7 @@ The semantic source of each field is fixed:
 | `fromIdentity` | `request.From().Address.String()` |
 | `toIdentity` | `request.To().Address.String()` |
 
-Equivalent exported boundary fields MUST use these names:
+Canonical exported boundary fields MUST use these names:
 
 ```go
 RequestURI   string
@@ -240,8 +240,30 @@ FromIdentity string
 ToIdentity   string
 ```
 
-New code MUST NOT introduce `FromURI` or `ToURI` fields for these values. Existing ambiguous
-fields MUST be renamed within the native SIP boundary as part of this change.
+New internal code MUST use the canonical fields. Existing exported `FromURI` and `ToURI`
+fields MUST remain as deprecated compatibility aliases for at least one released version.
+Boundary adapters MUST populate them from `FromIdentity` and `ToIdentity`; routing and metadata
+code MUST ignore the deprecated aliases. Their later removal requires a separately approved
+breaking-change RFC.
+
+The exported `ExtractDIDFromURI` function MUST remain as a deprecated compatibility wrapper for
+downstream Go consumers. Native SIP implementation code MUST NOT call it.
+
+Existing exported callback signatures MUST remain available. New identity-aware callbacks MUST
+accept a value object rather than adjacent positional strings:
+
+```go
+type SIPRequestIdentity struct {
+    RequestURI   string
+    FromIdentity string
+    ToIdentity   string
+}
+```
+
+The existing callbacks receive the canonical From and To values through their historical two
+string parameters. Native SIP application wiring MUST use the identity-aware callbacks so it
+also receives RequestURI. Removing the deprecated callbacks requires a separately approved
+breaking-change RFC.
 
 ### Direction-Aware Call Context Mapping
 
@@ -285,10 +307,14 @@ The only supported assistant authentication source is:
 client.assistant_phone
 ```
 
-The authentication UI MUST save `assistant_phone` as the client variable name.
+The authentication UI MUST save canonical snake_case client variable names, including
+`assistant_phone` and `provider_call_id`.
 
-The implementation MUST NOT add a `client.assistantPhone` compatibility alias. Existing
-incorrect configurations must be corrected by their owners.
+The runtime MUST NOT add `client.assistantPhone` or `client.providerCallId` metadata aliases.
+When the authentication UI loads or saves an existing configuration, it MUST normalize
+`assistantPhone` to `assistant_phone` and `providerCallId` to `provider_call_id`. If both legacy
+and canonical keys are present, the canonical key wins. The saved configuration MUST contain
+only canonical keys.
 
 ## Inbound Call Protocol
 
@@ -487,20 +513,20 @@ Replacement INVITE arrives
 | Service or component | Impact | Required update |
 | --- | --- | --- |
 | `assistant-api`: SIP core | Required | Capture distinct RequestURI, FromIdentity, and ToIdentity values from the dialog-forming request. |
-| `assistant-api`: SIP infra | Required | Preserve all three values across core/infra conversions. |
+| `assistant-api`: SIP infra | Required | Preserve all three values across core/infra conversions and retain deprecated exported adapters for one release. |
 | `assistant-api`: SIP middleware | Required | Route using RequestURI and preserve FromIdentity and ToIdentity unchanged. |
 | `assistant-api`: SIP pipeline | Required | Map identities by direction and remove DID extraction or session-URI fallback. |
 | `assistant-api`: SIP transfer | Verification required | Keep existing-leg identities immutable and resolve every new leg independently. |
 | `assistant-api`: telephony metadata | Verification required | Continue emitting values only from call context. |
-| `assistant-api`: authentication | Verification required | Read only canonical `client.assistant_phone`; add no alias. |
-| `ui`: authentication configuration | Required | Save `assistant_phone` instead of `assistantPhone`. |
+| `assistant-api`: authentication | Verification required | Read only canonical snake_case metadata keys; add no runtime aliases. |
+| `ui`: authentication configuration | Required | Save canonical `assistant_phone` and `provider_call_id`; normalize legacy camelCase keys when editing existing configurations. |
 | Non-SIP telephony providers | No implementation change | Preserve current behavior; do not modify provider adapters. |
 | `web-api` | No impact | No route, schema, or authentication contract change. |
 | `integration-api` | No impact | No caller or model-provider change. |
 | `endpoint-api` | No impact | No endpoint runtime contract change. |
 | `document-api` | No impact | No document contract change. |
 | Database and migrations | No impact | Continue using existing conversation metadata storage. |
-| Public protobuf, REST, and SDK contracts | No impact | Preserve all wire fields and names. |
+| Public Go, protobuf, REST, and SDK contracts | Compatibility update | Preserve existing exported Go fields, functions, and callbacks through deprecated adapters; preserve all wire fields and names. |
 
 ### Required File Boundaries
 
@@ -529,7 +555,7 @@ reconfirmed.
 
 ## External and Wire Compatibility
 
-This RFC introduces no SIP wire-format change and no public API change.
+This RFC introduces no SIP wire-format change and no immediate public API removal.
 
 - Incoming SIP headers are consumed as already received.
 - Outgoing SIP construction remains unchanged.
@@ -538,6 +564,10 @@ This RFC introduces no SIP wire-format change and no public API change.
 - REST routes and JSON response shapes remain unchanged.
 - No SDK regeneration is required.
 - No non-SIP provider payload changes are required.
+- Existing `SIPRequestContext.FromURI`, `SIPRequestContext.ToURI`, `ExtractDIDFromURI`, and
+  two-string server callbacks remain callable but are deprecated.
+- Identity-aware server callbacks use `SIPRequestIdentity` so RequestURI, FromIdentity, and
+  ToIdentity cannot be swapped accidentally.
 
 The intentional behavior change is internal representation:
 
@@ -605,6 +635,10 @@ No label or attribute introduced by this RFC may contain an unbounded identity s
 2. Populate them from `request.Recipient`, `request.From().Address`, and
    `request.To().Address` respectively.
 3. Add equivalent exported fields to core/infra request context types.
+4. Populate deprecated exported `FromURI` and `ToURI` aliases at compatibility boundaries only.
+5. Retain `ExtractDIDFromURI` as a deprecated exported wrapper with no native SIP callers.
+6. Preserve existing server callback signatures and add identity-aware callback variants using
+   `SIPRequestIdentity`.
 
 ### Phase 2: Separate Routing
 
@@ -638,8 +672,11 @@ No label or attribute introduced by this RFC may contain an unbounded identity s
 ### Phase 6: Authentication UI
 
 1. Save `assistant_phone` instead of `assistantPhone`.
-2. Add UI regression tests.
-3. Add no runtime compatibility alias.
+2. Save `provider_call_id` instead of `providerCallId`.
+3. Normalize both legacy camelCase keys while loading and before saving existing configurations.
+4. Prefer canonical values and remove legacy keys when both forms exist.
+5. Add UI form-submission and update-path regression tests.
+6. Add no runtime compatibility aliases.
 
 ## Testing and Verification
 
@@ -692,9 +729,13 @@ Required cases:
 
 Required cases:
 
-- Assistant Phone saves `assistant_phone`;
-- the label remains unchanged; and
-- no new configuration saves `assistantPhone`.
+- all client option values match canonical runtime metadata keys;
+- Assistant Phone saves `assistant_phone` through the form submission path;
+- Provider Call ID saves `provider_call_id` through the form submission path;
+- existing `assistantPhone` and `providerCallId` values normalize during the update path;
+- canonical values win if both legacy and canonical forms exist;
+- labels remain unchanged; and
+- no saved configuration contains `assistantPhone` or `providerCallId`.
 
 ### Required Commands
 
@@ -718,7 +759,9 @@ git diff --check
 
 ## Rollout
 
-The implementation is code-only and requires no cross-service migration ordering.
+The implementation is code-only and requires no cross-service migration ordering. Existing
+authentication configurations are migrated opportunistically when loaded and saved through the
+UI; runtime metadata remains canonical-only.
 
 Rollout checks:
 
@@ -766,9 +809,11 @@ From and To identities.
 Rejected. Existing dialogs retain their original identity snapshot. New dialogs resolve new
 snapshots.
 
-### Support `client.assistantPhone`
+### Support Runtime CamelCase Metadata Aliases
 
-Rejected. Only the canonical snake_case metadata contract is supported.
+Rejected. Only the canonical snake_case runtime metadata contract is supported. Compatibility
+is provided by normalizing legacy UI configuration keys during load/save, not by emitting or
+reading duplicate runtime metadata.
 
 ### Update Non-SIP Providers
 
@@ -783,7 +828,8 @@ Rejected for this RFC. Their existing resolution contracts remain unchanged.
 | Routing fallback mutates To identity | Metadata no longer matches the request | Keep routing result separate and test identity immutability. |
 | Transfer code reuses an old call context | New leg receives stale identities | Require a new snapshot for each dialog-forming request and add transfer tests. |
 | Raw identities leak through observability | Sensitive SIP data exposure | Emit presence and origin enums only. |
-| Existing camelCase UI mappings remain invalid | Existing authentication configuration may not resolve | Require explicit configuration correction; add no hidden alias. |
+| Existing camelCase UI mappings remain invalid | Existing authentication configuration may not resolve | Normalize legacy keys on UI load/save, prefer canonical values, and add no runtime alias. |
+| Deprecated exported SIP symbols remain in use | Removal could later break downstream Go consumers | Mark adapters deprecated, keep them for at least one release, and require a separate breaking-change RFC before removal. |
 
 ## Acceptance Criteria
 
@@ -799,13 +845,18 @@ Rejected for this RFC. Their existing resolution contracts remain unchanged.
 10. Reconstruction paths never derive identities from LocalURI or RemoteURI.
 11. Outbound behavior remains unchanged.
 12. Non-SIP provider implementations remain unchanged.
-13. The UI saves only `client.assistant_phone`.
-14. No `client.assistantPhone` alias is added.
-15. No database, protobuf, REST, SDK, provider webhook, or SIP wire-format migration is
+13. The UI saves canonical `client.assistant_phone` and `client.provider_call_id` references.
+14. Existing `assistantPhone` and `providerCallId` configuration keys normalize on UI load/save,
+    with canonical keys taking precedence.
+15. No camelCase runtime metadata alias is added.
+16. Existing exported SIP fields, functions, and callbacks remain available through deprecated
+    adapters for at least one release.
+17. New identity-aware callbacks use `SIPRequestIdentity` rather than positional identity strings.
+18. No database, protobuf, REST, SDK, provider webhook, or SIP wire-format migration is
     introduced.
-16. Required backend and UI tests pass.
-17. Independent review reports no unresolved critical or major findings.
-18. Final RFC bytes receive exact-digest confirmation before implementation begins.
+19. Required backend and UI tests pass.
+20. Independent review reports no unresolved critical or major findings.
+21. Final RFC bytes receive exact-digest confirmation before implementation begins.
 
 ## References
 
@@ -833,5 +884,6 @@ Rejected for this RFC. Their existing resolution contracts remain unchanged.
 | 2026-08-22 | Keep Request-URI routing-only. | Request routing and logical party identity are independent. |
 | 2026-08-22 | Snapshot From and To per dialog-forming request. | Existing dialogs remain stable while new transfer legs resolve independently. |
 | 2026-08-22 | Keep `CallContext` and metadata field names. | Avoid public and persistence migrations while correcting native SIP semantics. |
-| 2026-08-22 | Add no camelCase authentication alias. | The canonical metadata contract remains singular. |
+| 2026-08-22 | Normalize legacy UI authentication keys without runtime aliases. | Existing configurations become valid when edited while runtime metadata remains singular. |
+| 2026-08-22 | Retain deprecated exported SIP adapters for at least one release. | Preserve downstream Go compatibility while moving internal code to explicit identity contracts. |
 | 2026-08-22 | Make no non-SIP provider changes. | This RFC addresses native SIP only. |

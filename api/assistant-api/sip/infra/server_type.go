@@ -25,11 +25,15 @@ const (
 )
 
 type SIPRequestContext struct {
-	Method          string
-	CallID          string
-	RequestURI      string
-	FromIdentity    string
-	ToIdentity      string
+	Method       string
+	CallID       string
+	RequestURI   string
+	FromIdentity string
+	ToIdentity   string
+	// Deprecated: use FromIdentity.
+	FromURI string
+	// Deprecated: use ToIdentity.
+	ToURI           string
 	APIKey          string
 	AssistantID     string
 	Auth            types.SimplePrinciple
@@ -37,6 +41,12 @@ type SIPRequestContext struct {
 	Assistant       *internal_assistant_entity.Assistant
 	VaultCredential *protos.VaultCredential
 	Config          *Config
+}
+
+type SIPRequestIdentity struct {
+	RequestURI   string
+	FromIdentity string
+	ToIdentity   string
 }
 
 type Middleware func(ctx *SIPRequestContext) error
@@ -136,6 +146,8 @@ func (c *ServerConfig) toCore() *internal_core.ServerConfig {
 				RequestURI:      ctx.RequestURI,
 				FromIdentity:    ctx.FromIdentity,
 				ToIdentity:      ctx.ToIdentity,
+				FromURI:         ctx.FromIdentity,
+				ToURI:           ctx.ToIdentity,
 				SDPInfo:         sdpInfoFromCore(ctx.SDPInfo),
 				APIKey:          ctx.APIKey,
 				AssistantID:     ctx.AssistantID,

@@ -271,13 +271,21 @@ func TestServerConfigMiddlewareConversionPreservesSIPIdentities(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, received)
-	assert.Equal(t, coreContext.RequestURI, received.RequestURI)
-	assert.Equal(t, coreContext.FromIdentity, received.FromIdentity)
-	assert.Equal(t, coreContext.ToIdentity, received.ToIdentity)
+	assert.Equal(t, "sip:agent-42@sip.rapida.ai", received.RequestURI)
+	assert.Equal(t, "sip:alice@example.com;user=phone", received.FromIdentity)
+	assert.Equal(t, "sips:support@example.net", received.ToIdentity)
+	assert.Equal(t, "sip:alice@example.com;user=phone", received.FromURI)
+	assert.Equal(t, "sips:support@example.net", received.ToURI)
 	assert.Equal(t, "42", coreContext.AssistantID)
-	assert.Equal(t, "sip:agent-42@sip.rapida.ai", coreContext.RequestURI)
-	assert.Equal(t, "sip:alice@example.com;user=phone", coreContext.FromIdentity)
-	assert.Equal(t, "sips:support@example.net", coreContext.ToIdentity)
+}
+
+func TestDeprecatedSIPCompatibilitySurface(t *testing.T) {
+	var _ func(*Server, func(*Session, string, string) error) = (*Server).SetOnApplicationReady
+	var _ func(*Server, func(*Session, string, string) error) = (*Server).SetOnInvite
+	var _ func(*Server, func(*Session, SIPRequestIdentity) error) = (*Server).SetOnApplicationReadyIdentity
+	var _ func(*Server, func(*Session, SIPRequestIdentity) error) = (*Server).SetOnInviteIdentity
+
+	assert.Equal(t, "+15551234567", ExtractDIDFromURI("sip:15551234567@example.com"))
 }
 
 func TestSIPRequestContextMiddleware(t *testing.T) {

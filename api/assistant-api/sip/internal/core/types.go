@@ -605,3 +605,18 @@ func parseHeadersValue(value any) map[string]string {
 	}
 	return nil
 }
+
+// ExtractDIDFromURI is retained for compatibility with the public SIP facade.
+// Deprecated: native SIP identity handling preserves parsed SIP addresses.
+func ExtractDIDFromURI(uri string) string {
+	raw := strings.TrimPrefix(strings.TrimPrefix(uri, "sip:"), "sips:")
+	user, _, _ := strings.Cut(raw, "@")
+	user, _, _ = strings.Cut(user, ";")
+	if user == "" || strings.Contains(user, ":") {
+		return ""
+	}
+	if len(user) > 5 && user[0] != '+' {
+		user = "+" + user
+	}
+	return user
+}

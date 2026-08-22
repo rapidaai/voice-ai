@@ -45,8 +45,8 @@ export const AUTH_KEY_OPTIONS_BY_TYPE = {
     { value: 'phone', name: 'Phone' },
     { value: 'assistant_phone', name: 'Assistant Phone' },
     { value: 'direction', name: 'Direction' },
-    { value: 'provider', name: 'Provider' },
-    { value: 'providerCallId', name: 'Provider Call ID' },
+    { value: 'channel', name: 'Channel' },
+    { value: 'provider_call_id', name: 'Provider Call ID' },
   ],
   conversation: [
     { value: 'messages', name: 'Messages' },
@@ -68,6 +68,35 @@ export const fromApiFailBehavior = (value?: string): FailBehavior => {
 
 export const toApiFailBehavior = (value: FailBehavior): string =>
   value === 'do_nothing' ? FAIL_BEHAVIOR_DO_NOTHING : FAIL_BEHAVIOR_BLOCK;
+
+const LEGACY_CLIENT_KEYS: Record<string, string> = {
+  'client.assistantPhone': 'client.assistant_phone',
+  'client.providerCallId': 'client.provider_call_id',
+};
+
+export const normalizeAuthenticationBody = (value: string): string => {
+  try {
+    const parsed = JSON.parse(value);
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
+      return value;
+    }
+
+    const normalized = { ...(parsed as Record<string, unknown>) };
+    Object.entries(LEGACY_CLIENT_KEYS).forEach(([legacyKey, canonicalKey]) => {
+      if (!(canonicalKey in normalized) && legacyKey in normalized) {
+        normalized[canonicalKey] = normalized[legacyKey];
+      }
+      delete normalized[legacyKey];
+    });
+    return JSON.stringify(normalized);
+  } catch {
+    return value;
+  }
+};
 
 export const toOptionMap = (options: Metadata[] = []) =>
   options.reduce(
