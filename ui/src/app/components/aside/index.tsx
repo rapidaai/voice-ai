@@ -9,8 +9,8 @@ export const Aside: FC<AsideProps> = (props: AsideProps) => {
     <div
       className={cn(
         'flex flex-col shrink-0 z-12',
-        'bg-white dark:bg-gray-900',
-        'border-r border-gray-200 dark:border-gray-800',
+        'bg-shell text-foreground',
+        'border-r border-border-subtle',
         'no-scrollbar overflow-y-auto',
         'group',
         open ? 'w-64' : 'w-12',

@@ -25,11 +25,9 @@ module.exports = {
         ...webpackConfig.output,
         publicPath: '/', // Ensures assets are loaded with relative paths in Electron
       };
-      // Disable the minimizer
-      webpackConfig.optimization = {
-        ...webpackConfig.optimization,
-        minimize: false,
-      };
+      webpackConfig.plugins = webpackConfig.plugins.filter(
+        plugin => plugin?.constructor?.name !== 'ForkTsCheckerWebpackPlugin',
+      );
       return webpackConfig;
     },
   },

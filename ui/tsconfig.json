@@ -13,13 +13,18 @@
         "allowSyntheticDefaultImports": true,
         "strict": true,
         "forceConsistentCasingInFileNames": true,
-        "module": "Node16",
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
         "resolveJsonModule": true,
         "isolatedModules": true,
         "noEmit": true,
         "noFallthroughCasesInSwitch": true,
         "jsx": "react-jsx",
-        "ignoreDeprecations": "6.0",
+        "ignoreDeprecations": "5.0",
+        "types": [
+            "node",
+            "jest"
+        ],
         "baseUrl": ".",
         "paths": {
             "@/*": [

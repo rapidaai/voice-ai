@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import Editor, { OnChange, OnMount } from '@monaco-editor/react';
-import { useDarkMode } from '@/context/dark-mode-context';
+import { useTheme } from '@/theme/theme-provider';
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
 import {
   extractPromptVariableQuery,
@@ -29,7 +29,7 @@ const PromptEditor = ({
   placeholder = '',
   enableReservedVariableSuggestions = false,
 }: PromptEditorProps) => {
-  const { isDarkMode } = useDarkMode();
+  const { resolvedMode } = useTheme();
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const completionProviderRef = useRef<monaco.IDisposable | null>(null);
 
@@ -39,9 +39,8 @@ const PromptEditor = ({
     completionProviderRef.current?.dispose();
     completionProviderRef.current = null;
     if (enableReservedVariableSuggestions) {
-      completionProviderRef.current = monaco.languages.registerCompletionItemProvider(
-        'twig',
-        {
+      completionProviderRef.current =
+        monaco.languages.registerCompletionItemProvider('twig', {
           triggerCharacters: ['{', '.'],
           provideCompletionItems(model, position) {
             const linePrefix = model
@@ -77,8 +76,7 @@ const PromptEditor = ({
 
             return { suggestions };
           },
-        },
-      );
+        });
     }
 
     if (placeholder && editor.getValue() === '') {
@@ -135,7 +133,7 @@ const PromptEditor = ({
       defaultValue={value}
       onMount={handleEditorDidMount}
       onChange={handleChange}
-      theme={isDarkMode ? 'vs-dark' : 'vs'}
+      theme={resolvedMode === 'dark' ? 'vs-dark' : 'vs'}
       options={{
         readOnly: !editable,
         minimap: { enabled: false },

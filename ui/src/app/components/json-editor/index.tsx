@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import Editor, { OnChange, OnMount } from '@monaco-editor/react';
-import { useDarkMode } from '@/context/dark-mode-context';
+import { useTheme } from '@/theme/theme-provider';
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
 
 export type JsonEditorDisposable = { dispose(): void };
@@ -31,7 +31,7 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({
   height = '200px',
   configureEditor,
 }) => {
-  const { isDarkMode } = useDarkMode();
+  const { resolvedMode } = useTheme();
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const disposableRef = useRef<JsonEditorDisposable | null>(null);
 
@@ -83,7 +83,7 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({
       value={value}
       onMount={handleEditorDidMount}
       onChange={handleChange}
-      theme={isDarkMode ? 'vs-dark' : 'vs'}
+      theme={resolvedMode === 'dark' ? 'vs-dark' : 'vs'}
       options={{
         readOnly: !editable,
         minimap: { enabled: false },

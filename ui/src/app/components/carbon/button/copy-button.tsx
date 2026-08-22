@@ -7,9 +7,16 @@ import { cn } from '@/utils';
 interface CopyButtonProps {
   children?: ReactNode;
   className?: string;
+  copyDescription?: string;
+  copiedDescription?: string;
 }
 
-export const CopyButton: FC<CopyButtonProps> = ({ children, className }) => {
+export const CopyButton: FC<CopyButtonProps> = ({
+  children,
+  className,
+  copyDescription = 'Copy',
+  copiedDescription = 'Copied',
+}) => {
   const [copied, setCopied] = useState(false);
 
   const copyItem = (item: any) => {
@@ -23,7 +30,7 @@ export const CopyButton: FC<CopyButtonProps> = ({ children, className }) => {
       kind="ghost"
       size="sm"
       renderIcon={copied ? Checkmark : Copy}
-      iconDescription={copied ? 'Copied' : 'Copy'}
+      iconDescription={copied ? copiedDescription : copyDescription}
       onClick={() => copyItem(children)}
       className={cn(copied && 'text-green-600', className)}
     />

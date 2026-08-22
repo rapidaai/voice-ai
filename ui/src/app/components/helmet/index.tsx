@@ -1,5 +1,5 @@
-import { useWorkspace } from '@/workspace';
 import { Helmet as HM } from 'react-helmet-async';
+import { useTheme } from '@/theme/theme-provider';
 
 /**
  *
@@ -15,12 +15,15 @@ interface HelmetProps {
  * @returns
  */
 export function Helmet(props: HelmetProps) {
-  const workspace = useWorkspace();
+  const { theme } = useTheme();
+  const title = props.title
+    ? `${props.title} - ${theme.brand.name}`
+    : theme.brand.name;
+
   return (
     <HM>
-      <title>
-        {props.title} - {workspace.title || 'RapidaAi'}
-      </title>
+      <title>{title}</title>
+      <meta name="application-name" content={theme.brand.name} />
       {props.meta &&
         props.meta.map((mt, idx) => {
           return (

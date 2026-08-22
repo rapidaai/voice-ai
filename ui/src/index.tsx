@@ -4,24 +4,27 @@ import * as React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from '@/app';
 import { HelmetProvider } from 'react-helmet-async';
-import { DarkModeProvider } from '@/context/dark-mode-context';
-import { ProviderCredentialModalProvider } from '@/context/provider-credential-modal-context';
-import { WorkspaceProvider } from '@/workspace';
 import { initializeAnalytics } from '@/react-web-analytics';
-const root = ReactDOM.createRoot(
-  document.getElementById('root') as HTMLElement,
-);
+import {
+  applyThemeToDocument,
+  getInitialThemeState,
+  ThemeProvider,
+} from '@/theme/theme-provider';
+import { CONFIG } from '@/configs';
+import { normalizeThemeManifest } from '@/theme/theme-config';
+
+const rootElement = document.getElementById('root') as HTMLElement;
+const theme = normalizeThemeManifest(CONFIG.theme);
+
+applyThemeToDocument(theme, getInitialThemeState(theme).resolvedMode);
 initializeAnalytics();
-root.render(
+
+ReactDOM.createRoot(rootElement).render(
   <HelmetProvider>
     <React.StrictMode>
-      <DarkModeProvider>
-        <ProviderCredentialModalProvider>
-          <WorkspaceProvider>
-            <App />
-          </WorkspaceProvider>
-        </ProviderCredentialModalProvider>
-      </DarkModeProvider>
+      <ThemeProvider theme={theme}>
+        <App />
+      </ThemeProvider>
     </React.StrictMode>
   </HelmetProvider>,
 );

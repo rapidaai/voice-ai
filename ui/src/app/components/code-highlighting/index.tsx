@@ -1,4 +1,4 @@
-import { useDarkMode } from '@/context/dark-mode-context';
+import { useTheme } from '@/theme/theme-provider';
 import { cn } from '@/utils';
 import React, { FC, HTMLAttributes } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
@@ -14,7 +14,7 @@ export interface CodeHighlightingProps extends HTMLAttributes<HTMLDivElement> {
 
 export const CodeHighlighting: FC<CodeHighlightingProps> = React.memo(
   ({ code, language = 'javascript', className }) => {
-    const { isDarkMode } = useDarkMode();
+    const { resolvedMode } = useTheme();
     const handleEditorDidMount: OnMount = (editor, monaco) => {
       editor.updateOptions({
         minimap: { enabled: false },
@@ -37,7 +37,7 @@ export const CodeHighlighting: FC<CodeHighlightingProps> = React.memo(
           className={cn('flex flex-1 ', className)}
           language={language}
           value={code}
-          theme={isDarkMode ? 'vs-dark' : 'vs'}
+          theme={resolvedMode === 'dark' ? 'vs-dark' : 'vs'}
           onMount={handleEditorDidMount}
           options={{
             glyphMargin: false,

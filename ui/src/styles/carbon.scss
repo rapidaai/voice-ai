@@ -56,11 +56,11 @@
   background: var(--cds-field, var(--cds-layer, #ffffff));
 }
 
-.dark .flatpickr-calendar,
-.dark .flatpickr-months,
-.dark .flatpickr-month,
-.dark .flatpickr-weekdays,
-.dark .flatpickr-weekday {
+[data-color-mode='dark'] .flatpickr-calendar,
+[data-color-mode='dark'] .flatpickr-months,
+[data-color-mode='dark'] .flatpickr-month,
+[data-color-mode='dark'] .flatpickr-weekdays,
+[data-color-mode='dark'] .flatpickr-weekday {
   background: #393939;
 }
 
@@ -141,60 +141,48 @@
   @include carbon-theme.theme(themes.$white);
 
   // Custom primary overrides
-  --cds-background-brand: #0353e9;
-  --cds-interactive: var(--color-primary);
-  --cds-button-primary: var(--color-primary);
-  --cds-button-primary-hover: color-mix(in oklab, var(--color-primary) 85%, black);
-  --cds-button-primary-active: color-mix(in oklab, var(--color-primary) 70%, black);
-  --cds-button-tertiary: var(--color-primary);
-  --cds-button-tertiary-hover: var(--color-primary);
-  --cds-button-tertiary-active: color-mix(in oklab, var(--color-primary) 70%, black);
-  --cds-focus: var(--color-primary);
-  --cds-border-interactive: var(--color-primary);
-  --cds-link-primary: var(--color-primary);
-  --cds-link-primary-hover: color-mix(in oklab, var(--color-primary) 80%, black);
+  --cds-background-brand: var(--brand-primary);
+  --cds-interactive: var(--brand-primary);
+  --cds-button-primary: var(--brand-primary);
+  --cds-button-primary-hover: var(--brand-primary-hover);
+  --cds-button-primary-active: var(--brand-primary-active);
+  --cds-text-on-color: var(--brand-on-primary);
+  --cds-button-tertiary: var(--brand-primary);
+  --cds-button-tertiary-hover: var(--brand-primary-hover);
+  --cds-button-tertiary-active: var(--brand-primary-active);
+  --cds-focus: var(--brand-primary);
+  --cds-border-interactive: var(--brand-primary);
+  --cds-link-primary: var(--brand-primary);
+  --cds-link-primary-hover: var(--brand-primary-hover);
 }
 
 // ─── Dark theme — Carbon g100 ───────────────────────────────────────────────
-:is(.dark *),
-:root:is(.dark) {
+:root[data-color-mode='dark'] {
   @include carbon-theme.theme(themes.$g100);
 
   // Background — use page bg color, not transparent
   --cds-background: #0a0a0a;
-  --cds-background-brand: #0353e9;
+  --cds-background-brand: var(--brand-primary);
   --cds-layer-01: #161616;
 
   // Focus / interactive — use primary instead of g100 default white
-  --cds-focus: #0353e9;
-  --cds-border-interactive: #0353e9;
-  --cds-interactive: #0353e9;
-  --cds-link-primary: #0353e9;
-  --cds-link-primary-hover: color-mix(in oklab, #0353e9 80%, white);
-  --cds-button-primary: #0f62fe;
-  --cds-button-primary-hover: #0353e9;
-  --cds-button-tertiary: #0353e9;
-  --cds-button-tertiary-hover: #0353e9;
+  --cds-focus: var(--brand-primary);
+  --cds-border-interactive: var(--brand-primary);
+  --cds-interactive: var(--brand-primary);
+  --cds-link-primary: var(--brand-primary);
+  --cds-link-primary-hover: var(--brand-primary-hover);
+  --cds-button-primary: var(--brand-primary);
+  --cds-button-primary-hover: var(--brand-primary-hover);
+  --cds-button-primary-active: var(--brand-primary-active);
+  --cds-text-on-color: var(--brand-on-primary);
+  --cds-button-tertiary: var(--brand-primary);
+  --cds-button-tertiary-hover: var(--brand-primary-hover);
+  --cds-button-tertiary-active: var(--brand-primary-active);
 }
 
-// ─── System preference dark (when no .dark class) ────────────────────────────
-@media (prefers-color-scheme: dark) {
-  :root:not(.light) {
-    @include carbon-theme.theme(themes.$g100);
-
-    --cds-background: #0a0a0a;
-    --cds-background-brand: #0353e9;
-    --cds-layer-01: #161616;
-    --cds-focus: #0353e9;
-    --cds-border-interactive: #0353e9;
-    --cds-interactive: #0353e9;
-    --cds-link-primary: #0353e9;
-    --cds-link-primary-hover: color-mix(in oklab, #0353e9 80%, white);
-    --cds-button-primary: #0f62fe;
-    --cds-button-primary-hover: #0353e9;
-    --cds-button-tertiary: #0353e9;
-    --cds-button-tertiary-hover: #0353e9;
-  }
+// ─── Scoped inverse theme zone ───────────────────────────────────────────────
+.carbon-theme-g100 {
+  @include carbon-theme.theme(themes.$g100);
 }
 
 // ─── Toolbar styling ─────────────────────────────────────────────────────────
@@ -336,19 +324,13 @@
 
 // ─── SideNav background ─────────────────────────────────────────────────────
 .cds--side-nav {
-  background-color: #ffffff;
-}
-
-:is(.dark *) .cds--side-nav,
-:root:is(.dark) .cds--side-nav {
-  background-color: #1a1a1a;
+  background-color: var(--cds-layer-01);
 }
 
 // ─── SideNav submenu items font weight ───────────────────────────────────────
 .cds--side-nav__menu-item .cds--side-nav__link-text {
   font-weight: 500;
 }
-
 
 :root {
   --cds-tag-background-cool-gray: #dde1e6;
@@ -359,8 +341,7 @@
   --cds-tag-hover-gray: #cacaca;
 }
 
-:is(.dark *),
-:root:is(.dark) {
+:root[data-color-mode='dark'] {
   --cds-tag-background-cool-gray: #343a3f;
   --cds-tag-color-cool-gray: #dde1e6;
   --cds-tag-hover-cool-gray: #4d5358;

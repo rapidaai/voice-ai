@@ -3,7 +3,6 @@ import { ProjectRole } from '@rapidaai/react';
 import { cn } from '@/utils';
 import { useLocation } from 'react-router-dom';
 import { CustomLink } from '@/app/components/custom-link';
-import { useDarkMode } from '@/context/dark-mode-context';
 import { AuthContext } from '@/context/auth-context';
 import { Moon, Sun, UserAvatar } from '@carbon/icons-react';
 import {
@@ -16,6 +15,7 @@ import {
 import { Breadcrumb } from '@/app/components/carbon/breadcrumb';
 import { Dropdown } from '@/app/components/carbon/dropdown';
 import { useRapidaStore } from '@/hooks';
+import { useTheme } from '@/theme/theme-provider';
 
 export function ActionableHeader(props: { reload?: boolean }) {
   const location = useLocation();
@@ -47,8 +47,8 @@ export function ActionableHeader(props: { reload?: boolean }) {
     <header
       className={cn(
         'h-12 flex items-center justify-between',
-        'bg-white dark:bg-gray-900',
-        'border-b border-gray-200 dark:border-gray-800',
+        'bg-shell text-foreground',
+        'border-b border-border-subtle',
         'shrink-0',
       )}
     >
@@ -78,7 +78,8 @@ export const CustomerOptions: FC<{
     useContext(AuthContext);
 
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
-  const { isDarkMode, toggleDarkMode } = useDarkMode();
+  const { resolvedMode, theme, toggleMode } = useTheme();
+  const isDarkMode = resolvedMode === 'dark';
 
   return (
     <HeaderGlobalBar>
@@ -104,14 +105,15 @@ export const CustomerOptions: FC<{
         />
       )}
 
-      {/* Dark/Light toggle */}
-      <HeaderGlobalAction
-        aria-label={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
-        onClick={toggleDarkMode}
-        tooltipAlignment="end"
-      >
-        {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-      </HeaderGlobalAction>
+      {theme.allowModeSelection && (
+        <HeaderGlobalAction
+          aria-label={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
+          onClick={toggleMode}
+          tooltipAlignment="end"
+        >
+          {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+        </HeaderGlobalAction>
+      )}
 
       {/* Profile avatar */}
       <HeaderGlobalAction
@@ -125,7 +127,10 @@ export const CustomerOptions: FC<{
 
       {/* Account panel — Carbon Switcher */}
       <HeaderPanel expanded={accountDropdownOpen}>
-        <Switcher aria-label="Account" expanded={accountDropdownOpen}>
+        <Switcher
+          aria-label={`${theme.brand.name} account`}
+          expanded={accountDropdownOpen}
+        >
           <li className="cds--switcher__item--divider">
             <span className="uppercase!">Account</span>
           </li>
@@ -137,17 +142,28 @@ export const CustomerOptions: FC<{
           </li>
           <SwitcherItem
             aria-label="Documentation"
-            href="https://doc.rapida.ai"
+            href={theme.links.documentation}
             target="_blank"
             rel="noopener noreferrer"
           >
             Documentation
           </SwitcherItem>
           <SwitcherItem
-            aria-label="Contact us"
-            href="mailto:prashant@rapida.ai"
+            aria-label="Source"
+            href={theme.links.source}
+            target="_blank"
+            rel="noopener noreferrer"
           >
-            Contact us
+            Source
+          </SwitcherItem>
+          <SwitcherItem aria-label="Support" href={theme.links.support}>
+            Support
+          </SwitcherItem>
+          <SwitcherItem aria-label="Terms" href={theme.links.terms}>
+            Terms
+          </SwitcherItem>
+          <SwitcherItem aria-label="Privacy" href={theme.links.privacy}>
+            Privacy
           </SwitcherItem>
           <li className="cds--switcher__item--divider">
             <span className="uppercase!">Session</span>
