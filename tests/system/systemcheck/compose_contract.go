@@ -121,6 +121,9 @@ func validateOverrideKeys(data []byte) error {
 	if err := yaml.Unmarshal(data, &document); err != nil {
 		return err
 	}
+	if len(document.Content) != 1 || document.Content[0].Kind != yaml.MappingNode {
+		return errors.New("Compose override root must be a non-empty mapping")
+	}
 	root := document.Content[0]
 	for index := 0; index < len(root.Content); index += 2 {
 		if root.Content[index].Value != "services" && root.Content[index].Value != "volumes" {

@@ -78,15 +78,18 @@ case ${phase} in
       echo "System image build failed; sanitized diagnostics will be collected" >&2
       exit 1
     fi
+    metadata_command_log="${diagnostic_work_dir}/build-metadata-command.log"
     if ! go run ./tests/system/cmd/systemcheck build-metadata \
       --compose-images "${diagnostic_work_dir}/compose-images.json" \
       --output "${diagnostic_work_dir}/buildkit-metadata.json" \
-      > "${SYSTEM_STATE_DIR}/build-metadata-command.log" 2>&1; then
-      rm -f "${SYSTEM_STATE_DIR}/build-metadata-command.log"
-      echo "System image metadata validation failed" >&2
+      > "${metadata_command_log}" 2>&1; then
+      sed 's/^/ERROR build metadata: /' "${metadata_command_log}" \
+        >> "${diagnostic_work_dir}/buildkit.log"
+      rm -f "${metadata_command_log}"
+      echo "System image metadata validation failed; sanitized diagnostics will be collected" >&2
       exit 1
     fi
-    rm -f "${SYSTEM_STATE_DIR}/build-metadata-command.log"
+    rm -f "${metadata_command_log}"
     ;;
   migrations)
     "${compose[@]}" run --rm migrate-web up
@@ -112,7 +115,11 @@ case ${phase} in
       systemcheck ui-nginx --base-url http://nginx:8080 \
       --require-spa-root --require-hashed-asset \
       --proxy-route /talk_api.TalkService/GetAllAssistantConversation=assistant-api:9007 \
-      --proxy-route /web_api.AuthenticationService/ForgotPassword=web-api:9001
+      --proxy-route /web_api.AuthenticationService/ForgotPassword=web-api:9001 \
+      --http-route /v1/__systemcheck__=web-api:9001 \
+      --http-route /oauth/__systemcheck__=web-api:9001 \
+      --http-route /readiness/=web-api:9001 \
+      --http-route /healthz/=web-api:9001
     ;;
   assistant-collection-drift)
     python3 openapi/scripts/generate_assistant_postman_collection.py --check

@@ -20,6 +20,7 @@ run_case() {
 
   cat > "${sandbox}/bin/timeout" <<'SCRIPT'
 #!/usr/bin/env bash
+printf 'timeout %s\n' "$*" >> "${MOCK_STATE_DIR}/timeouts"
 while [[ $# -gt 0 ]]; do
   case $1 in
     --signal=*|--kill-after=*) shift ;;
@@ -66,7 +67,7 @@ SCRIPT
   set +e
   (
     cd "${sandbox}/repo"
-    PATH="${sandbox}/bin:${PATH}" \
+      PATH="${sandbox}/bin:${PATH}" \
       MOCK_STATE_DIR="${sandbox}/state" \
       MOCK_INSPECT_ABSENT_AT="${inspect_absent_at}" \
       MOCK_CACHE_ABSENT_AT="${cache_absent_at}" \
@@ -84,6 +85,14 @@ SCRIPT
   actual_sleeps=$(wc -l < "${sandbox}/state/sleep-calls" 2>/dev/null || echo 0)
   [[ ${actual_sleeps} -eq ${expected_sleeps} ]]
   [[ $(grep -Fc "docker buildx rm builder-${name}" "${sandbox}/state/commands") -eq 1 ]]
+  [[ $(grep -Fc "docker buildx inspect builder-${name}" "${sandbox}/state/commands") -eq ${expected_attempts} ]]
+  [[ $(grep -Fc "docker buildx du --builder builder-${name}" "${sandbox}/state/commands") -eq ${expected_attempts} ]]
+  grep -Fxq "timeout --signal=TERM --kill-after=1s 5s docker buildx rm builder-${name}" \
+    "${sandbox}/state/timeouts"
+  grep -Fxq "timeout --signal=TERM --kill-after=1s 1s docker buildx inspect builder-${name}" \
+    "${sandbox}/state/timeouts"
+  grep -Fxq "timeout --signal=TERM --kill-after=1s 1s docker buildx du --builder builder-${name}" \
+    "${sandbox}/state/timeouts"
   grep -Fq -- '--retries 10 --interval 1s' "${sandbox}/state/commands"
   if [[ ${expected_status} -eq 0 ]]; then
     [[ ! -s ${sandbox}/stderr ]]
@@ -96,4 +105,6 @@ SCRIPT
 
 run_case eventual-success 3 4 0 4 3
 run_case exhausted 99 99 1 10 9
+grep -Fq 'remove_builder_emergency' "${repository_root}/.github/actions/system-test/cleanup.sh"
+grep -Fq "trap 'on_signal 143' TERM" "${repository_root}/.github/actions/system-test/cleanup.sh"
 echo "cleanup retry regression tests passed"

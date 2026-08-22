@@ -142,14 +142,16 @@ func Execute(ctx context.Context, args []string, stdout, stderr io.Writer) error
 		requireSPARoot := fs.Bool("require-spa-root", false, "require the SPA entry document")
 		requireHashedAsset := fs.Bool("require-hashed-asset", false, "require and fetch a content-hashed asset")
 		var proxyRoutes stringListFlag
+		var httpRoutes stringListFlag
 		fs.Var(&proxyRoutes, "proxy-route", "proxy route mapping PATH=HOST:PORT; may be repeated")
+		fs.Var(&httpRoutes, "http-route", "HTTP route mapping PATH=HOST:PORT; may be repeated")
 		if err := fs.Parse(args[1:]); err != nil {
 			return err
 		}
-		if fs.NArg() != 0 || !*requireSPARoot || !*requireHashedAsset || len(proxyRoutes) == 0 {
-			return errors.New("usage: systemcheck ui-nginx --base-url <url> --asset-pattern <regexp> --require-spa-root --require-hashed-asset --proxy-route <path=host:port> [--proxy-route <path=host:port>]")
+		if fs.NArg() != 0 || !*requireSPARoot || !*requireHashedAsset || len(proxyRoutes) == 0 || len(httpRoutes) == 0 {
+			return errors.New("usage: systemcheck ui-nginx --base-url <url> --asset-pattern <regexp> --require-spa-root --require-hashed-asset --proxy-route <path=host:port> [--proxy-route <path=host:port>] --http-route <path=host:port> [--http-route <path=host:port>]")
 		}
-		return checkUI(ctx, http.DefaultClient, *baseURL, *assetPattern, proxyRoutes)
+		return checkUI(ctx, http.DefaultClient, *baseURL, *assetPattern, proxyRoutes, httpRoutes)
 	case "assistant-smoke":
 		fs := flag.NewFlagSet("assistant-smoke", flag.ContinueOnError)
 		fs.SetOutput(stderr)
@@ -283,6 +285,13 @@ func validateReference(root, current, reference string, visited map[string]bool)
 	target := current
 	if parsed.Path != "" {
 		target = filepath.Join(filepath.Dir(current), filepath.FromSlash(parsed.Path))
+	}
+	canonical, err := filepath.Abs(target)
+	if err != nil {
+		return fmt.Errorf("resolve $ref %q: %w", reference, err)
+	}
+	if canonical != root && !strings.HasPrefix(canonical, root+string(os.PathSeparator)) {
+		return fmt.Errorf("reference escapes directory: %s", target)
 	}
 	data, err := os.ReadFile(target)
 	if err != nil {
@@ -514,6 +523,14 @@ type proxyRoute struct {
 	Upstream string
 }
 
+type httpRoute struct {
+	Path        string
+	Upstream    string
+	StatusCode  int
+	ContentType string
+	BodyCheck   func([]byte) error
+}
+
 const (
 	talkProxyRPCPath  = "/talk_api.TalkService/GetAllAssistantConversation"
 	webProxyRPCPath   = "/web_api.AuthenticationService/ForgotPassword"
@@ -526,8 +543,47 @@ var proxyRPCUpstreams = map[string]string{
 	webProxyRPCPath:  webProxyUpstream,
 }
 
-func checkUI(ctx context.Context, client *http.Client, baseURL, assetPattern string, routes []string) error {
-	parsedRoutes, err := parseProxyRoutes(routes)
+var httpRouteContracts = map[string]httpRoute{
+	"/v1/__systemcheck__": {
+		Path:        "/v1/__systemcheck__",
+		Upstream:    webProxyUpstream,
+		StatusCode:  http.StatusNotFound,
+		ContentType: "text/plain",
+		BodyCheck:   requireNonHTMLBody,
+	},
+	"/oauth/__systemcheck__": {
+		Path:        "/oauth/__systemcheck__",
+		Upstream:    webProxyUpstream,
+		StatusCode:  http.StatusNotFound,
+		ContentType: "text/plain",
+		BodyCheck:   requireNonHTMLBody,
+	},
+	"/readiness/": {
+		Path:        "/readiness/",
+		Upstream:    webProxyUpstream,
+		StatusCode:  http.StatusOK,
+		ContentType: "application/json",
+		BodyCheck: func(body []byte) error {
+			return requireHealthResponse(body, readinessPostgresKey)
+		},
+	},
+	"/healthz/": {
+		Path:        "/healthz/",
+		Upstream:    webProxyUpstream,
+		StatusCode:  http.StatusOK,
+		ContentType: "application/json",
+		BodyCheck: func(body []byte) error {
+			return requireHealthResponse(body, "healthy")
+		},
+	},
+}
+
+func checkUI(ctx context.Context, client *http.Client, baseURL, assetPattern string, proxyRouteValues, httpRouteValues []string) error {
+	parsedProxyRoutes, err := parseProxyRoutes(proxyRouteValues)
+	if err != nil {
+		return err
+	}
+	parsedHTTPRoutes, err := parseHTTPRoutes(httpRouteValues)
 	if err != nil {
 		return err
 	}
@@ -551,12 +607,41 @@ func checkUI(ctx context.Context, client *http.Client, baseURL, assetPattern str
 	if err != nil {
 		return err
 	}
-	for _, route := range parsedRoutes {
+	for _, route := range parsedProxyRoutes {
 		if err := checkProxyRoute(ctx, client, baseURL, route); err != nil {
 			return err
 		}
 	}
+	for _, route := range parsedHTTPRoutes {
+		if err := checkHTTPRoute(ctx, client, baseURL, route); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func parseHTTPRoutes(values []string) ([]httpRoute, error) {
+	if len(values) != len(httpRouteContracts) {
+		return nil, fmt.Errorf("HTTP routes must contain exactly %d registered paths", len(httpRouteContracts))
+	}
+	routes := make([]httpRoute, 0, len(values))
+	seen := make(map[string]bool, len(values))
+	for _, value := range values {
+		path, upstream, ok := strings.Cut(value, "=")
+		contract, registered := httpRouteContracts[path]
+		if !ok || !registered {
+			return nil, fmt.Errorf("invalid HTTP route %q; path is not registered", value)
+		}
+		if upstream != contract.Upstream {
+			return nil, fmt.Errorf("HTTP path %s requires upstream %s, got %s", path, contract.Upstream, upstream)
+		}
+		if seen[path] {
+			return nil, fmt.Errorf("duplicate HTTP path %q", path)
+		}
+		seen[path] = true
+		routes = append(routes, contract)
+	}
+	return routes, nil
 }
 
 func parseProxyRoute(value string) (proxyRoute, error) {
@@ -616,6 +701,76 @@ func checkProxyRoute(ctx context.Context, client *http.Client, baseURL string, r
 	}
 	if proxied.StatusCode != upstream.StatusCode || proxied.ContentType != upstream.ContentType || proxied.GRPCStatus != upstream.GRPCStatus || !bytes.Equal(proxied.Body, upstream.Body) {
 		return fmt.Errorf("proxy route %s does not match expected upstream %s", route.RPCPath, route.Upstream)
+	}
+	return nil
+}
+
+func checkHTTPRoute(ctx context.Context, client *http.Client, baseURL string, route httpRoute) error {
+	proxied, err := probeHTTP(ctx, client, strings.TrimRight(baseURL, "/")+route.Path)
+	if err != nil {
+		return err
+	}
+	upstream, err := probeHTTP(ctx, client, "http://"+route.Upstream+route.Path)
+	if err != nil {
+		return err
+	}
+	if upstream.StatusCode != route.StatusCode || upstream.ContentType != route.ContentType {
+		return fmt.Errorf("HTTP route %s upstream contract changed: HTTP %d content-type %q", route.Path, upstream.StatusCode, upstream.ContentType)
+	}
+	if err := route.BodyCheck(upstream.Body); err != nil {
+		return fmt.Errorf("HTTP route %s upstream contract changed: %w", route.Path, err)
+	}
+	if proxied.StatusCode != upstream.StatusCode || proxied.ContentType != upstream.ContentType || !bytes.Equal(proxied.Body, upstream.Body) {
+		return fmt.Errorf("HTTP route %s does not match expected upstream %s", route.Path, route.Upstream)
+	}
+	return nil
+}
+
+type httpResponse struct {
+	StatusCode  int
+	ContentType string
+	Body        []byte
+}
+
+func probeHTTP(ctx context.Context, client *http.Client, endpoint string) (httpResponse, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return httpResponse{}, err
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return httpResponse{}, err
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(response.Body, 64<<10))
+	if err != nil {
+		return httpResponse{}, err
+	}
+	contentType := strings.ToLower(strings.TrimSpace(strings.Split(response.Header.Get("Content-Type"), ";")[0]))
+	return httpResponse{StatusCode: response.StatusCode, ContentType: contentType, Body: body}, nil
+}
+
+func requireNonHTMLBody(body []byte) error {
+	if len(bytes.TrimSpace(body)) == 0 {
+		return errors.New("empty response body")
+	}
+	if bytes.Contains(bytes.ToLower(body), []byte("<html")) {
+		return errors.New("response body is HTML")
+	}
+	return nil
+}
+
+func requireHealthResponse(body []byte, key string) error {
+	var payload struct {
+		Code    int             `json:"code"`
+		Success bool            `json:"success"`
+		Data    map[string]bool `json:"data"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return fmt.Errorf("invalid JSON: %w", err)
+	}
+	if payload.Code != http.StatusOK || !payload.Success || !payload.Data[key] {
+		return fmt.Errorf("missing successful %q status", key)
 	}
 	return nil
 }

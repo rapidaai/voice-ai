@@ -195,9 +195,13 @@ func composeImageIDs(path string) (map[string]string, bool, error) {
 	result := make(map[string]string, len(records))
 	for _, record := range records {
 		service := record.Service
-		if service != "" && regexpImageID.MatchString(record.ID) {
-			result[service] = record.ID
+		if service == "" || record.ID == "" {
+			continue
 		}
+		if !regexpImageID.MatchString(record.ID) {
+			return nil, false, fmt.Errorf("Compose image ID for %q is malformed", service)
+		}
+		result[service] = record.ID
 	}
 	return result, true, nil
 }

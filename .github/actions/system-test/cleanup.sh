@@ -12,19 +12,32 @@ else
 fi
 compose=(./tests/system/bin/docker-compose -f docker-compose.yml -f docker-compose.ci.yml)
 cleanup_status=0
+termination_requested=false
+
+check_builder() {
+  local timeout_seconds=$1
+  builder_present=false
+  cache_addressable=false
+  timeout --signal=TERM --kill-after=1s "${timeout_seconds}s" \
+    docker buildx inspect "${SYSTEM_BUILDER_NAME}" >/dev/null 2>&1 &
+  inspect_pid=$!
+  timeout --signal=TERM --kill-after=1s "${timeout_seconds}s" \
+    docker buildx du --builder "${SYSTEM_BUILDER_NAME}" >/dev/null 2>&1 &
+  du_pid=$!
+  if wait "${inspect_pid}"; then
+    builder_present=true
+  fi
+  if wait "${du_pid}"; then
+    cache_addressable=true
+  fi
+}
 
 remove_builder() {
-  timeout 10s docker buildx rm "${SYSTEM_BUILDER_NAME}" >/dev/null 2>&1 || true
+  timeout --signal=TERM --kill-after=1s 5s \
+    docker buildx rm "${SYSTEM_BUILDER_NAME}" >/dev/null 2>&1 || true
 
   for ((attempt = 1; attempt <= 10; attempt++)); do
-    builder_present=false
-    cache_addressable=false
-    if timeout 3s docker buildx inspect "${SYSTEM_BUILDER_NAME}" >/dev/null 2>&1; then
-      builder_present=true
-    fi
-    if timeout 3s docker buildx du --builder "${SYSTEM_BUILDER_NAME}" >/dev/null 2>&1; then
-      cache_addressable=true
-    fi
+    check_builder 1
     if [[ ${builder_present} == false && ${cache_addressable} == false ]]; then
       return
     fi
@@ -37,16 +50,37 @@ remove_builder() {
   cleanup_status=1
 }
 
+remove_builder_emergency() {
+  timeout --signal=TERM --kill-after=1s 3s \
+    docker buildx rm "${SYSTEM_BUILDER_NAME}" >/dev/null 2>&1 || true
+  check_builder 1
+  if [[ ${builder_present} == true || ${cache_addressable} == true ]]; then
+    echo "Buildx builder or cache remains after emergency cleanup: ${SYSTEM_BUILDER_NAME}" >&2
+    cleanup_status=1
+  fi
+}
+
 on_exit() {
   status=$?
   trap - EXIT HUP INT TERM
   if [[ ${status} -ne 0 && ${cleanup_status} -eq 0 ]]; then
     cleanup_status=${status}
   fi
-  remove_builder
+  if [[ ${termination_requested} == true ]]; then
+    remove_builder_emergency
+  else
+    remove_builder
+  fi
   exit "${cleanup_status}"
 }
-trap on_exit EXIT HUP INT TERM
+on_signal() {
+  termination_requested=true
+  exit "$1"
+}
+trap on_exit EXIT
+trap 'on_signal 129' HUP
+trap 'on_signal 130' INT
+trap 'on_signal 143' TERM
 
 timeout --signal=TERM --kill-after=5s 30s \
   "${compose[@]}" down --volumes --remove-orphans --timeout 30 || cleanup_status=$?

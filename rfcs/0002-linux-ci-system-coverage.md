@@ -19,7 +19,8 @@ reliability programs:
    migrations, semantic health checks, UI/nginx checks, the existing assistant-api
    OpenAPI/Newman smoke flow, and cleanup assertions;
 3. one compatibility job checks the existing assistant/talk OpenAPI artifacts and
-   the protobuf module against the pull-request target branch.
+   descriptors generated from tracked protobuf Go packages against the pull-request
+   target branch.
 
 Previous-release upgrades, FreeSWITCH voice lifecycles, provider-failure injection,
 restart/drain behavior, OpenSearch, and generalized multi-service smoke orchestration
@@ -73,9 +74,11 @@ neutralizes only host-specific behavior and adds test orchestration.
   `openapi/artifacts/assistant-api.yaml`, `talk-api.yaml`, and `common.yaml`.
 - The existing assistant smoke collection is
   `openapi/postman/assistant-api/assistant-api.smoke.postman_collection.json`.
-- The protobuf source module is `protos/artifacts`, configured by `buf.yaml`.
-- The current protobuf module has unrelated legacy `buf lint` violations; those do
-  not prevent target-baseline `buf breaking` comparison.
+- The tracked generated protobuf Go packages are `protos/*.pb.go`; the source
+  `protos/artifacts` submodule is not required for compatibility execution.
+- Recursive checkout is not viable in GitHub Actions because unrelated/private
+  sibling submodules are inaccessible to `GITHUB_TOKEN` and no repository submodule
+  credential exists.
 - Local networking suites cannot bind the required ports in the reported restricted
   sandbox. Linux CI is authoritative for system execution.
 
@@ -128,8 +131,9 @@ Jobs must never assume access to containers created on another GitHub-hosted run
 ### Compatibility baseline
 
 For pull requests, the primary compatibility baseline is the pull request target
-branch SHA provided by GitHub. CI checks out full history and submodules and records
-the target SHA and protobuf submodule SHA.
+branch SHA provided by GitHub. CI checks out tracked repository content without
+submodules and records the target SHA plus the SHA-256 values of the generated current
+and baseline protobuf descriptor images.
 
 For protected-branch pushes, the baseline is the first parent of the pushed commit.
 Tag-build compatibility behavior is outside this narrowed RFC; the reusable
@@ -148,7 +152,7 @@ Previous-release database upgrades are not part of RFC 0002.
 6. Verify UI static assets are served through nginx.
 7. Execute the existing assistant OpenAPI smoke flow against the production image.
 8. Detect breaking changes reachable from the existing assistant/talk OpenAPI roots
-   and from the protobuf module.
+   and from deterministic descriptors generated from tracked protobuf Go packages.
 9. Fail safely and publish sanitized, actionable diagnostics.
 10. Establish measured runtime and flake thresholds before expanding required gates.
 
@@ -220,9 +224,10 @@ implicitly passing because local execution is restricted.
 
 13. One `system-core` job owns stack creation, all assertions, diagnostics, and
     cleanup on a single runner. No other job depends on its live containers.
-14. The job runs on `ubuntu-24.04` with a 25-minute hard timeout. Its main test driver
+14. The job runs on `ubuntu-24.04` with a 30-minute hard timeout. Its main test driver
     has a 20-minute deadline, reserving up to five minutes for `if: always()`
-    diagnostics and cleanup.
+    diagnostics and cleanup. The remaining time covers checkout, step transitions,
+    and artifact upload without consuming the diagnostics and cleanup reserve.
 15. Every stack lifecycle or test command applies
     `-f docker-compose.yml -f docker-compose.ci.yml`; the contract validator also
     renders `docker-compose.yml` alone for base-versus-merged comparison.
@@ -302,12 +307,14 @@ turn a PostgreSQL readiness failure into a false pass.
 28. Through nginx, the UI service returns the SPA entry document at `/` and one
     content-hashed static asset referenced by that document.
 29. The smallest shared production change removes the unused persistent `ui_build`
-    mount and volume declaration from `docker-compose.yml` and changes only the nginx
+    mount and volume declaration from `docker-compose.yml` and changes the nginx
     catch-all `location /` in `docker/nginx/nginx.conf` to proxy the existing
-    `ui:3000` service. Existing recording, assistant talk, WebSocket, and named API
-    proxy locations remain unchanged. Runtime checks exercise a representative
-    `/talk_api` route to assistant-api and `/web_api` route to web-api. No UI asset
-    copy-up, persistent UI volume, or CI-only nginx config is created.
+    `ui:3000` service. Explicit locations preserve the existing non-gRPC web routes
+    `/v1/`, `/oauth/`, `/readiness/`, and `/healthz/` by continuing to proxy them to
+    `web-api:9001`; all existing specialized recording, assistant talk, WebSocket,
+    and named API proxy locations remain unchanged. Runtime checks exercise those
+    four web routes plus representative `/talk_api` and `/web_api` routes. No UI
+    asset copy-up, persistent UI volume, or CI-only nginx config is created.
 30. The system job runs
     `python3 openapi/scripts/generate_assistant_postman_collection.py --check`.
 31. The job runs the checked-in assistant smoke collection with pinned Newman and
@@ -329,7 +336,7 @@ turn a PostgreSQL readiness failure into a false pass.
 35. Contract scope is limited to:
     - `openapi/artifacts/assistant-api.yaml`;
     - `openapi/artifacts/talk-api.yaml`;
-    - `protos/artifacts` as configured by `buf.yaml`.
+    - tracked `protos/*.pb.go` packages and their module inputs `go.mod` and `go.sum`.
     `common.yaml` is preserved in both directory trees so references resolve, but
     schemas not reachable from assistant-api or talk-api are not claimed as protected
     by RFC 0002.
@@ -340,13 +347,15 @@ turn a PostgreSQL readiness failure into a false pass.
     baseline/current directory trees so relative `common.yaml` references resolve.
     Only root-reachable common schemas are covered; standalone common-schema coverage
     requires a follow-up contract RFC with an authoritative consumer or schema rule.
-38. Pinned `buf breaking` compares the current protobuf module with the target
-    branch's pinned protobuf submodule checkout. `buf lint` is not a gate in this RFC
-    because the existing module has unrelated legacy lint violations; this lane must
-    report compatibility regressions rather than remain permanently red on prior
-    style debt.
-39. CI uses `actions/checkout` with `fetch-depth: 0` and recursive submodules for
-    compatibility work.
+38. CI deterministically generates `FileDescriptorSet` images from the tracked current
+    and target-base `protos/*.pb.go` packages, using the corresponding `go.mod` and
+    `go.sum`, then runs pinned
+    `buf breaking <current-image> --against <baseline-image>`. Descriptor generation
+    and comparison fail closed. `buf lint` is not a gate because this lane detects
+    compatibility from tracked generated packages rather than source-style debt.
+39. `assistant-native`, `system-core`, and contract compatibility use
+    `actions/checkout` without submodules. Compatibility uses `fetch-depth: 0` to
+    materialize target-base tracked files.
 40. Breaking-change allowlists require an owner, reason, migration link, and expiry.
     Compatibility jobs never use broad `continue-on-error`.
 
@@ -414,6 +423,7 @@ turn a PostgreSQL readiness failure into a false pass.
 
 Add a dedicated reusable workflow or dedicated jobs in the existing reusable Go
 workflow. The lane must not reuse the generic `GO_CI_PACKAGES` execution environment.
+It checks out tracked repository content without submodules.
 
 The implementation adds a named `ci` target to
 `docker/assistant-api/Dockerfile`; it does not create a parallel assistant
@@ -432,7 +442,7 @@ workflow. The generic tarball package workflow remains unchanged.
 Add `.github/workflows/reusable-system-ci.yml` with one `system-core` job. The job
 performs these named steps on the same runner:
 
-1. checkout full history and recursive submodules;
+1. checkout tracked repository content without submodules;
 2. install exact Docker Compose `v2.24.4` and pinned test tooling, then reject any
    other Compose version;
 3. validate native-builder and service-image digest locks with their separate
@@ -504,12 +514,14 @@ tool locks, and executable wrappers live under `tests/system/**` or
 
 The shared production UI wiring is intentionally small and independently owned:
 `docker-compose.yml` removes the unused `ui_build` mount from nginx and removes the
-top-level `ui_build` volume declaration, while `docker/nginx/nginx.conf` changes only
-the catch-all `location /` to `proxy_pass http://ui:3000`. Existing recording-asset,
-assistant talk, WebSocket, and named API proxy locations remain unchanged. The nginx
-test must fetch `/`, discover a content-hashed asset reference in the returned entry
-document, fetch that asset through nginx, and prove representative `/talk_api` and
-`/web_api` routes still reach their existing upstreams.
+top-level `ui_build` volume declaration, while `docker/nginx/nginx.conf` changes the
+catch-all `location /` to `proxy_pass http://ui:3000` and adds explicit locations for
+`/v1/`, `/oauth/`, `/readiness/`, and `/healthz/` that continue proxying to
+`web-api:9001`. Existing recording-asset, assistant talk, WebSocket, and other named
+API proxy locations remain unchanged. The nginx test must fetch `/`, discover a
+content-hashed asset reference in the returned entry document, fetch that asset
+through nginx, and prove `/v1/`, `/oauth/`, `/readiness/`, `/healthz/`, representative
+`/talk_api`, and `/web_api` routes still reach their existing upstreams.
 
 The Compose contract validator renders base and merged JSON and permits only these
 CI deltas: removal of `container_name` and `ports`, the exact storage substitutions
@@ -551,7 +563,10 @@ The implementation pins:
 - PostgreSQL, Redis, nginx, and test-runner images by digest, updating the
   authoritative `docker-compose.yml` references where the shared services are
   defined;
-- Newman in a repository lockfile, invoked without `npx --yes`;
+- Newman in a repository lockfile, invoked without `npx --yes`; the lock may use
+  explicit overrides for vulnerable transitive packages to patched versions without
+  changing the pinned Newman major/version contract. The currently required override
+  is `handlebars=4.7.9`, and dependency-review must pass;
 - Buf and oasdiff versions and checksums;
 - native models/source archives through the native dependency lock.
 
@@ -588,18 +603,19 @@ compatibility are not invented or claimed in this RFC.
 For a pull request, CI materializes the complete target-branch `openapi/artifacts`
 tree into a temporary directory using the exact target SHA. It runs separate
 assistant-api and talk-api comparisons so relative `common.yaml` references resolve.
-For protobuf, CI checks out the target commit's `protos/artifacts`
-submodule SHA into a temporary directory and uses it as the `buf breaking` baseline.
+For protobuf, CI materializes target-base `go.mod`, `go.sum`, and tracked
+`protos/*.go` beside the corresponding current files, then deterministically generates
+current and baseline `FileDescriptorSet` images from those Go packages. Pinned
+`buf breaking <current-image> --against <baseline-image>` compares the images and
+fails closed if either descriptor generation or comparison fails.
 
-The protobuf risk is explicitly bounded: the existing module has legacy lint
-violations unrelated to this CI correction, so adding `buf lint` here would make the
-new compatibility lane permanently red without identifying a new break. RFC 0002
-therefore pins Buf and runs `buf breaking` only. This does not claim the module is
-lint-clean; lint cleanup is tracked as follow-up debt and can become required only
-after the existing violations are resolved in a separately owned change.
+The protobuf risk is explicitly bounded: RFC 0002 pins Buf and runs `buf breaking`
+against deterministic descriptor images generated from tracked Go packages. It does
+not require source-module checkout or claim source lint coverage; source lint cleanup
+remains separately owned follow-up work.
 
-The target SHA and both current/baseline protobuf submodule SHAs are written to the
-job summary.
+The target SHA and SHA-256 values of both current and baseline protobuf descriptor
+images are written to the job summary.
 
 ## Ownership and Allowed Paths
 
@@ -637,8 +653,9 @@ Writable paths:
 - `tests/system/bin/verify-service-image-digests`.
 
 This owner makes only the removal of the unused root `ui_build` mount/volume, the
-nginx catch-all proxy to the existing UI service, and digest-qualified service-image
-changes specified in this RFC. It preserves every named API and WebSocket proxy
+nginx catch-all proxy to the existing UI service, the explicit web-api locations for
+`/v1/`, `/oauth/`, `/readiness/`, and `/healthz/`, and digest-qualified service-image
+changes specified in this RFC. It preserves every other named API and WebSocket proxy
 location and forbids incidental image major/base-track upgrades. Native builder
 digest/version validation remains exclusively with the Native CI owner.
 
@@ -689,9 +706,9 @@ Writable paths:
 - `buf.yaml`;
 - contract comparison scripts under `scripts/contracts/**`.
 
-The `protos/artifacts` submodule pointer changes only for an intentional product
-contract change, not to satisfy CI. No production `cmd/**`, `api/**`, or `pkg/**`
-paths are authorized by this RFC.
+Baseline materialization reads tracked `go.mod`, `go.sum`, and `protos/*.go` but does
+not authorize changes to them solely to satisfy CI. No production `cmd/**`, `api/**`,
+or `pkg/**` paths are authorized by this RFC.
 
 ## Required Commands
 
@@ -740,7 +757,11 @@ python3 openapi/scripts/generate_assistant_postman_collection.py --check
 
 # Contracts
 go run ./tests/system/cmd/systemcheck openapi-parse openapi/artifacts
-./tests/system/bin/buf breaking protos/artifacts --against /tmp/baseline/protos/artifacts
+scripts/contracts/materialize-baseline.sh /tmp/baseline
+scripts/contracts/generate-protobuf-descriptor.sh --module-root . --output /tmp/current-protos.binpb
+scripts/contracts/generate-protobuf-descriptor.sh --module-root /tmp/baseline --output /tmp/baseline-protos.binpb
+./tests/system/bin/buf breaking /tmp/current-protos.binpb --against /tmp/baseline-protos.binpb
+sha256sum /tmp/current-protos.binpb /tmp/baseline-protos.binpb
 ./tests/system/bin/oasdiff breaking /tmp/baseline/openapi/artifacts/assistant-api.yaml openapi/artifacts/assistant-api.yaml
 ./tests/system/bin/oasdiff breaking /tmp/baseline/openapi/artifacts/talk-api.yaml openapi/artifacts/talk-api.yaml
 
@@ -764,7 +785,7 @@ COMPOSE_PROJECT_NAME=<unique> docker compose -f docker-compose.yml -f docker-com
 COMPOSE_PROJECT_NAME=<unique> docker compose -f docker-compose.yml -f docker-compose.ci.yml run --rm migrate-assistant up
 COMPOSE_PROJECT_NAME=<unique> docker compose -f docker-compose.yml -f docker-compose.ci.yml run --rm test-runner \
   systemcheck migrations --require-clean --require-head \
-  --report /run/reports/migrations.json
+  --report /reports/migrations.json
 COMPOSE_PROJECT_NAME=<unique> docker compose -f docker-compose.yml -f docker-compose.ci.yml up \
   -d --no-build postgres redis web-api integration-api endpoint-api assistant-api ui nginx
 COMPOSE_PROJECT_NAME=<unique> docker compose -f docker-compose.yml -f docker-compose.ci.yml run --rm test-runner \
@@ -774,8 +795,12 @@ COMPOSE_PROJECT_NAME=<unique> docker compose -f docker-compose.yml -f docker-com
 COMPOSE_PROJECT_NAME=<unique> docker compose -f docker-compose.yml -f docker-compose.ci.yml run --rm test-runner \
   systemcheck ui-nginx --base-url http://nginx:8080 \
   --require-spa-root --require-hashed-asset \
-  --proxy-route /talk_api=assistant-api:9007 \
-  --proxy-route /web_api=web-api:9001
+  --http-route /v1/__systemcheck__=web-api:9001 \
+  --http-route /oauth/__systemcheck__=web-api:9001 \
+  --http-route /readiness/=web-api:9001 \
+  --http-route /healthz/=web-api:9001 \
+  --proxy-route /talk_api.TalkService/GetAllAssistantConversation=assistant-api:9007 \
+  --proxy-route /web_api.AuthenticationService/ForgotPassword=web-api:9001
 # GitHub Actions step name: Assistant smoke
 COMPOSE_PROJECT_NAME=<unique> docker compose -f docker-compose.yml -f docker-compose.ci.yml run --rm test-runner \
   systemcheck assistant-smoke \
@@ -846,9 +871,10 @@ builder/cache identifiers, disk-usage totals, and selected redacted log messages
 - Expanded suites do not become required through this RFC.
 - A failure signature repeated twice during stabilization has one named owner and a
   48-hour investigation deadline.
-- The 25-minute hard runner timeout may forfeit diagnostics if GitHub terminates the
-  host. The 20-minute main deadline and five-minute cleanup reserve minimize this;
-  the RFC does not claim cleanup after forced runner destruction.
+- The 30-minute hard runner timeout may forfeit diagnostics if GitHub terminates the
+  host. The 20-minute main deadline and up-to-five-minute diagnostics and cleanup
+  reserve minimize this, while the remaining time covers checkout, step transitions,
+  and artifact upload; the RFC does not claim cleanup after forced runner destruction.
 
 ## Rollback
 
@@ -1015,8 +1041,28 @@ additionally:
 - matches the unchanged readiness payload's exact CI connector key,
   `data["PSQL psql://postgres:5432"]`, with positive and fail-closed negative tests
   and no arbitrary-true fallback; and
-- retains pinned `buf breaking` against the target submodule while deferring the
-  existing module's unrelated lint violations to explicitly tracked follow-up debt.
+- retains pinned `buf breaking` compatibility while deferring unrelated protobuf
+  source lint work to explicitly tracked follow-up debt.
+
+The ninth revision returns accepted SHA-256
+`6fb2cb9511c0908193be6f2e94e370dc34b6321f25ab5d7fcb221a3e4f20bbed` to Draft and
+additionally:
+
+- raises the `system-core` hard job timeout from 25 to 30 minutes while retaining the
+  20-minute main deadline and up-to-five-minute diagnostics and cleanup reserve, with
+  remaining time for checkout, step transitions, and artifact upload;
+- permits explicit nginx locations preserving `/v1/`, `/oauth/`, `/readiness/`, and
+  `/healthz/` routing to `web-api:9001` after the catch-all switches to UI, and
+  requires route-level contract coverage; and
+- corrects the migration report path to `/reports/migrations.json`.
+
+The tenth revision corrects only the Required Commands `ui-nginx` invocation to use
+the implemented HTTP route flag and probe paths and the executable gRPC method paths.
+
+The eleventh revision removes inaccessible recursive submodule checkout, generates
+and compares deterministic protobuf descriptor images from tracked current and
+target-base Go packages, and permits the pinned Newman lock's required patched
+`handlebars=4.7.9` transitive override subject to dependency-review.
 
 ## RFC Lifecycle State
 

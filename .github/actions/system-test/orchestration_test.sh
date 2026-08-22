@@ -112,13 +112,22 @@ if [[ $* == *'systemcheck build-metadata'* ]]; then
     fi
     shift
   done
+  if [[ ${FAIL_BUILD_METADATA:-false} == true ]]; then
+    printf 'metadata failed credential=raw-secret for synthetic image\n' >&2
+    exit 23
+  fi
 fi
 if [[ $* == *'systemcheck collect-diagnostics'* ]]; then
   while [[ $# -gt 0 ]]; do
     if [[ $1 == --directory ]]; then
       work_dir=$2
       printf '{"services":[]}\n' > "${work_dir}/diagnostics.json"
-      printf '{"builder":"synthetic-builder"}\n' > "${work_dir}/build-diagnostics.json"
+      if grep -Fq 'ERROR build metadata:' "${work_dir}/buildkit.log"; then
+        printf '{"builder":"synthetic-builder","logs":["ERROR build metadata: metadata failed credential=[REDACTED] for synthetic image"]}\n' \
+          > "${work_dir}/build-diagnostics.json"
+      else
+        printf '{"builder":"synthetic-builder"}\n' > "${work_dir}/build-diagnostics.json"
+      fi
       rm -f \
         "${work_dir}/buildx-builder.txt" \
         "${work_dir}/buildx-du.txt" \
@@ -185,6 +194,22 @@ run_phase health
 run_phase ui-nginx
 run_phase assistant-smoke
 
+set +e
+FAIL_BUILD_METADATA=true run_phase build-images \
+  > "${sandbox}/metadata-failure-stdout" \
+  2> "${sandbox}/metadata-failure-stderr"
+metadata_failure_status=$?
+set -e
+[[ ${metadata_failure_status} -eq 1 ]]
+test ! -s "${sandbox}/metadata-failure-stdout"
+grep -Fxq 'System image metadata validation failed; sanitized diagnostics will be collected' \
+  "${sandbox}/metadata-failure-stderr"
+if grep -Fq 'raw-secret' "${sandbox}/metadata-failure-stderr"; then
+  echo "raw metadata failure escaped to workflow logs" >&2
+  exit 1
+fi
+test ! -e "${sandbox}/state/diagnostics-work/build-metadata-command.log"
+
 (
   cd "${sandbox}/repo"
   PATH="${sandbox}/bin:${PATH}" \
@@ -215,12 +240,14 @@ container_line=$(grep -nFm1 'compose -f docker-compose.yml -f docker-compose.ci.
 (( config_line < container_line ))
 grep -Fxq 'compose -f docker-compose.yml -f docker-compose.ci.yml run --rm test-runner systemcheck migrations --require-clean --require-head --report /reports/migrations.json' "${sandbox}/trace"
 grep -Fxq "compose -f docker-compose.yml -f docker-compose.ci.yml run --rm test-runner systemcheck health --timeout-per-service 60s --interval 1s --readiness-key PSQL psql://postgres:5432 --reject-arbitrary-true-fallback" "${sandbox}/trace"
-grep -Fxq 'compose -f docker-compose.yml -f docker-compose.ci.yml run --rm test-runner systemcheck ui-nginx --base-url http://nginx:8080 --require-spa-root --require-hashed-asset --proxy-route /talk_api.TalkService/GetAllAssistantConversation=assistant-api:9007 --proxy-route /web_api.AuthenticationService/ForgotPassword=web-api:9001' "${sandbox}/trace"
+grep -Fxq 'compose -f docker-compose.yml -f docker-compose.ci.yml run --rm test-runner systemcheck ui-nginx --base-url http://nginx:8080 --require-spa-root --require-hashed-asset --proxy-route /talk_api.TalkService/GetAllAssistantConversation=assistant-api:9007 --proxy-route /web_api.AuthenticationService/ForgotPassword=web-api:9001 --http-route /v1/__systemcheck__=web-api:9001 --http-route /oauth/__systemcheck__=web-api:9001 --http-route /readiness/=web-api:9001 --http-route /healthz/=web-api:9001' "${sandbox}/trace"
 grep -Fxq 'compose -f docker-compose.yml -f docker-compose.ci.yml run --rm test-runner systemcheck assistant-smoke --collection openapi/postman/assistant-api/assistant-api.smoke.postman_collection.json --base-url http://assistant-api:9007 --tmpfs /run/secrets' "${sandbox}/trace"
 grep -Fq 'go run ./tests/system/cmd/systemcheck collect-diagnostics --compose-project synthetic --directory' "${sandbox}/trace"
 grep -Fq 'go run ./tests/system/cmd/systemcheck sanitize-artifacts --directory' "${sandbox}/trace"
 test -f "${sandbox}/diagnostics/diagnostics.json"
 test -f "${sandbox}/diagnostics/build-diagnostics.json"
+grep -Fq 'ERROR build metadata: metadata failed credential=[REDACTED] for synthetic image' \
+  "${sandbox}/diagnostics/build-diagnostics.json"
 [[ $(find "${sandbox}/diagnostics" -type f | wc -l) -eq 2 ]]
 test ! -e "${sandbox}/diagnostics/buildkit.log"
 test ! -e "${sandbox}/diagnostics/compose-images.json"
@@ -241,5 +268,7 @@ grep -Fq 'timeout --signal=TERM --kill-after=10s 190s .github/actions/system-tes
   "${repository_root}/.github/workflows/reusable-system-ci.yml"
 grep -Fq 'timeout --signal=TERM --kill-after=10s 80s .github/actions/system-test/collect-diagnostics.sh' \
   "${repository_root}/.github/workflows/reusable-system-ci.yml"
+[[ $(grep -Fc 'persist-credentials: false' \
+  "${repository_root}/.github/workflows/reusable-system-ci.yml") -eq 2 ]]
 
 echo "system orchestration regression tests passed"

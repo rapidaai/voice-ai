@@ -64,6 +64,38 @@ func TestParseOpenAPIDirectoryRejectsMalformedYAML(t *testing.T) {
 	}
 }
 
+func TestParseOpenAPIDirectoryRejectsTraversalBeforeReadingTarget(t *testing.T) {
+	parent := t.TempDir()
+	directory := filepath.Join(parent, "openapi")
+	if err := os.Mkdir(directory, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(parent, "outside.yaml"), []byte("not: [valid"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	root := "openapi: 3.0.3\npaths: {}\ncomponents:\n  schemas:\n    Outside:\n      $ref: ../outside.yaml\n"
+	for _, name := range []string{"assistant-api.yaml", "talk-api.yaml"} {
+		if err := os.WriteFile(filepath.Join(directory, name), []byte(root), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	err := parseOpenAPIDirectory(directory, io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "reference escapes directory") {
+		t.Fatalf("expected traversal rejection before target parsing, got %v", err)
+	}
+}
+
+func TestComposeImageIDsRejectMalformedNonEmptyID(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "compose-images.json")
+	data := `[{"Service":"assistant-api","ID":"not-an-image-id"}]`
+	if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := composeImageIDs(path); err == nil {
+		t.Fatal("expected malformed non-empty image ID to fail")
+	}
+}
+
 func TestParseMigrationState(t *testing.T) {
 	version, dirty, err := parseMigrationState("54|f\n")
 	if err != nil || version != 54 || dirty {
@@ -169,6 +201,9 @@ func TestCheckUIFetchesHashedAsset(t *testing.T) {
 	}))
 	defer talkBackend.Close()
 	webBackend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if serveHTTPRouteContract(w, r) {
+			return
+		}
 		if r.URL.Path != webProxyRPCPath {
 			writeGRPCWebResponse(w, "12", "unknown web method")
 			return
@@ -177,6 +212,9 @@ func TestCheckUIFetchesHashedAsset(t *testing.T) {
 	}))
 	defer webBackend.Close()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if serveHTTPRouteContract(w, r) {
+			return
+		}
 		switch r.URL.Path {
 		case "/":
 			io.WriteString(w, `<script src="/static/js/main.1234abcd.js"></script>`)
@@ -195,7 +233,7 @@ func TestCheckUIFetchesHashedAsset(t *testing.T) {
 		talkProxyUpstream: talkBackend.URL,
 		webProxyUpstream:  webBackend.URL,
 	})
-	if err := checkUI(context.Background(), client, server.URL, defaultAssetPattern, workflowProxyRouteArguments()); err != nil {
+	if err := checkUI(context.Background(), client, server.URL, defaultAssetPattern, workflowProxyRouteArguments(), workflowHTTPRouteArguments()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -216,7 +254,7 @@ func TestCheckUIRejectsArbitraryProxy404(t *testing.T) {
 	}))
 	defer server.Close()
 	client := proxyRouteClient(server.Client(), map[string]string{talkProxyUpstream: backend.URL, webProxyUpstream: backend.URL})
-	if err := checkUI(context.Background(), client, server.URL, defaultAssetPattern, workflowProxyRouteArguments()); err == nil {
+	if err := checkUI(context.Background(), client, server.URL, defaultAssetPattern, workflowProxyRouteArguments(), workflowHTTPRouteArguments()); err == nil {
 		t.Fatal("expected arbitrary 404 proxy response to fail")
 	}
 }
@@ -238,7 +276,7 @@ func TestCheckUIRejectsWrongBackendWithGenericEqualBody(t *testing.T) {
 	}))
 	defer server.Close()
 	client := proxyRouteClient(server.Client(), map[string]string{talkProxyUpstream: backend.URL, webProxyUpstream: backend.URL})
-	if err := checkUI(context.Background(), client, server.URL, defaultAssetPattern, workflowProxyRouteArguments()); err == nil {
+	if err := checkUI(context.Background(), client, server.URL, defaultAssetPattern, workflowProxyRouteArguments(), workflowHTTPRouteArguments()); err == nil {
 		t.Fatal("expected wrong backend gRPC status to fail despite equal HTTP body")
 	}
 }
@@ -260,8 +298,39 @@ func TestCheckUIRejectsEqualUnimplementedResponses(t *testing.T) {
 	}))
 	defer server.Close()
 	client := proxyRouteClient(server.Client(), map[string]string{talkProxyUpstream: backend.URL, webProxyUpstream: backend.URL})
-	if err := checkUI(context.Background(), client, server.URL, defaultAssetPattern, workflowProxyRouteArguments()); err == nil {
+	if err := checkUI(context.Background(), client, server.URL, defaultAssetPattern, workflowProxyRouteArguments(), workflowHTTPRouteArguments()); err == nil {
 		t.Fatal("expected equal unimplemented responses to fail")
+	}
+}
+
+func TestCheckUIRejectsHTTPRouteServedByUI(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if serveHTTPRouteContract(w, r) {
+			return
+		}
+		writeGRPCWebResponse(w, "0", "response")
+	}))
+	defer backend.Close()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/":
+			_, _ = io.WriteString(w, `<script src="/static/js/main.1234abcd.js"></script>`)
+		case "/static/js/main.1234abcd.js":
+			_, _ = io.WriteString(w, "asset")
+		case "/v1/__systemcheck__":
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = io.WriteString(w, "<html>ui fallback</html>")
+		default:
+			if serveHTTPRouteContract(w, r) {
+				return
+			}
+			writeGRPCWebResponse(w, "0", "response")
+		}
+	}))
+	defer server.Close()
+	client := proxyRouteClient(server.Client(), map[string]string{talkProxyUpstream: backend.URL, webProxyUpstream: backend.URL})
+	if err := checkUI(context.Background(), client, server.URL, defaultAssetPattern, workflowProxyRouteArguments(), workflowHTTPRouteArguments()); err == nil {
+		t.Fatal("expected UI fallback for /v1/ to fail HTTP upstream parity")
 	}
 }
 
@@ -311,6 +380,32 @@ func TestParseProxyRoutesRejectsInvalidContracts(t *testing.T) {
 	}
 }
 
+func TestHTTPRoutesAcceptExactWorkflowArguments(t *testing.T) {
+	routes, err := parseHTTPRoutes(workflowHTTPRouteArguments())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(routes) != len(httpRouteContracts) {
+		t.Fatalf("unexpected parsed HTTP routes: %#v", routes)
+	}
+}
+
+func TestParseHTTPRoutesRejectsInvalidContracts(t *testing.T) {
+	tests := map[string][]string{
+		"missing":    workflowHTTPRouteArguments()[:3],
+		"unknown":    append(workflowHTTPRouteArguments()[:3], "/unknown/=web-api:9001"),
+		"duplicate":  append(workflowHTTPRouteArguments()[:3], workflowHTTPRouteArguments()[0]),
+		"wrong-host": append(workflowHTTPRouteArguments()[:3], "/healthz/=ui:3000"),
+	}
+	for name, routes := range tests {
+		t.Run(name, func(t *testing.T) {
+			if _, err := parseHTTPRoutes(routes); err == nil {
+				t.Fatalf("expected invalid HTTP routes to fail: %q", routes)
+			}
+		})
+	}
+}
+
 func TestGRPCWebTrailerStatus(t *testing.T) {
 	payload := []byte("grpc-status: 7\r\ngrpc-message: denied\r\n")
 	frame := make([]byte, 5, 5+len(payload))
@@ -334,6 +429,33 @@ func workflowProxyRouteArguments() []string {
 		"/talk_api.TalkService/GetAllAssistantConversation=assistant-api:9007",
 		"/web_api.AuthenticationService/ForgotPassword=web-api:9001",
 	}
+}
+
+func workflowHTTPRouteArguments() []string {
+	return []string{
+		"/v1/__systemcheck__=web-api:9001",
+		"/oauth/__systemcheck__=web-api:9001",
+		"/readiness/=web-api:9001",
+		"/healthz/=web-api:9001",
+	}
+}
+
+func serveHTTPRouteContract(writer http.ResponseWriter, request *http.Request) bool {
+	switch request.URL.Path {
+	case "/v1/__systemcheck__", "/oauth/__systemcheck__":
+		writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		writer.WriteHeader(http.StatusNotFound)
+		_, _ = io.WriteString(writer, "404 page not found")
+	case "/readiness/":
+		writer.Header().Set("Content-Type", "application/json; charset=utf-8")
+		_, _ = io.WriteString(writer, `{"code":200,"success":true,"data":{"PSQL psql://postgres:5432":true}}`)
+	case "/healthz/":
+		writer.Header().Set("Content-Type", "application/json; charset=utf-8")
+		_, _ = io.WriteString(writer, `{"code":200,"success":true,"data":{"healthy":true}}`)
+	default:
+		return false
+	}
+	return true
 }
 
 func proxyRouteClient(client *http.Client, upstreams map[string]string) *http.Client {

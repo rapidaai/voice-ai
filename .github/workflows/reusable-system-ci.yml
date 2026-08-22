@@ -10,7 +10,7 @@ jobs:
   system-core:
     name: System Core (stabilizing)
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
       COMPOSE_PROJECT_NAME: rapida-ci-${{ github.run_id }}-${{ github.run_attempt }}
       SYSTEM_BUILDER_NAME: rapida-ci-${{ github.run_id }}-${{ github.run_attempt }}
@@ -20,11 +20,11 @@ jobs:
       EVENT_NAME: ${{ github.event_name }}
       PULL_REQUEST_BASE_SHA: ${{ github.event.pull_request.base.sha }}
     steps:
-      - name: Checkout full history and submodules
+      - name: Checkout full history
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
-          submodules: recursive
+          persist-credentials: false
 
       - name: Initialize 20-minute main budget
         uses: ./.github/actions/system-test
@@ -110,11 +110,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - name: Checkout full history and submodules
+      - name: Checkout full history
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
-          submodules: recursive
+          persist-credentials: false
 
       - name: Resolve target branch baseline
         id: baseline

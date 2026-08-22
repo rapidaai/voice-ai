@@ -25,6 +25,17 @@ func verifyServiceImages(composePath, lockPath, baselinePath string, forbidMajor
 	if err != nil {
 		return err
 	}
+	for _, key := range []string{
+		"postgres.image", "postgres.platform",
+		"redis.image", "redis.platform",
+		"nginx.image", "nginx.platform",
+		"migrate.image", "migrate.platform",
+		"test-runner-builder.image", "test-runner-runtime.image", "test-runner.platform",
+	} {
+		if strings.TrimSpace(lock[key]) == "" {
+			return fmt.Errorf("required lock key %q is missing or empty", key)
+		}
+	}
 	current, err := readImageCompose(composePath)
 	if err != nil {
 		return err

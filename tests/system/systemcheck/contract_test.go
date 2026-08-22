@@ -10,10 +10,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
-	"strings"
+	"regexp"
 	"sync"
 	"testing"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestComposeContract(t *testing.T) {
@@ -108,6 +110,20 @@ func TestComposeContractRejectsUnapprovedFieldChange(t *testing.T) {
 	}
 }
 
+func TestValidateOverrideKeysRejectsInvalidRoots(t *testing.T) {
+	for name, input := range map[string]string{
+		"empty":    "",
+		"scalar":   "services",
+		"sequence": "- services",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := validateOverrideKeys([]byte(input)); err == nil {
+				t.Fatal("expected invalid Compose override root to fail")
+			}
+		})
+	}
+}
+
 func writeJSONFile(t *testing.T, path string, value any) {
 	t.Helper()
 	data, err := json.Marshal(value)
@@ -139,6 +155,32 @@ func TestServiceImageDigestsRejectLockDrift(t *testing.T) {
 	}
 	if err := verifyServiceImages(filepath.Join(root, "docker-compose.yml"), lock, "", false); err == nil {
 		t.Fatal("expected image lock mismatch")
+	}
+}
+
+func TestServiceImageDigestsRequireEveryLockKey(t *testing.T) {
+	root := filepath.Join("..", "..", "..")
+	data, err := os.ReadFile(filepath.Join(root, "tests/system/service-images.lock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{
+		"postgres.image", "postgres.platform",
+		"redis.image", "redis.platform",
+		"nginx.image", "nginx.platform",
+		"migrate.image", "migrate.platform",
+		"test-runner-builder.image", "test-runner-runtime.image", "test-runner.platform",
+	} {
+		t.Run(key, func(t *testing.T) {
+			lock := filepath.Join(t.TempDir(), "service-images.lock")
+			missing := regexp.MustCompile(`(?m)^`+regexp.QuoteMeta(key)+`=.*\n?`).ReplaceAll(data, nil)
+			if err := os.WriteFile(lock, missing, 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := verifyServiceImages(filepath.Join(root, "docker-compose.yml"), lock, "", false); err == nil {
+				t.Fatalf("expected missing %s to fail", key)
+			}
+		})
 	}
 }
 
@@ -175,6 +217,61 @@ func TestMigrationReportSharedVolumeContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	data, err := os.ReadFile(filepath.Join(root, "docker-compose.ci.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var compose struct {
+		Services map[string]struct {
+			Volumes []string `yaml:"volumes"`
+		} `yaml:"services"`
+	}
+	if err := yaml.Unmarshal(data, &compose); err != nil {
+		t.Fatal(err)
+	}
+	if !contains(compose.Services["test-runner"].Volumes, "system-reports:/reports") {
+		t.Fatal("test-runner must mount system-reports at /reports")
+	}
+	script, err := os.ReadFile(filepath.Join(root, ".github/actions/system-test/system-phase.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(script, []byte("systemcheck migrations --require-clean --require-head")) || !bytes.Contains(script, []byte("--report /reports/migrations.json")) {
+		t.Fatal("migration producer must write /reports/migrations.json")
+	}
+	composeWrapper, err := resolveComposeWrapper()
+	if err != nil {
+		t.Fatal(err)
+	}
+	called := false
+	runner := func(_ context.Context, name string, args []string, _ io.Reader, stdout, _ io.Writer, _ []string) error {
+		called = true
+		if name != composeWrapper {
+			t.Fatalf("migration diagnostics invoked %q instead of %q", name, composeWrapper)
+		}
+		expected := []string{"-p", "ci-contract", "-f", "docker-compose.yml", "-f", "docker-compose.ci.yml", "run", "--rm", "--no-deps", "--entrypoint", "cat", "test-runner", "/reports/migrations.json"}
+		if !reflect.DeepEqual(args, expected) {
+			t.Fatalf("migration diagnostic args=%q want=%q", args, expected)
+		}
+		_, _ = io.WriteString(stdout, `[{"service":"web-api","version":4,"expectedVersion":4,"dirty":false},{"service":"integration-api","version":1,"expectedVersion":1,"dirty":false},{"service":"endpoint-api","version":1,"expectedVersion":1,"dirty":false},{"service":"assistant-api","version":54,"expectedVersion":54,"dirty":false}]`)
+		return nil
+	}
+	if _, err := collectMigrationReport(context.Background(), runner, composeWrapper, "ci-contract"); err != nil {
+		t.Fatal(err)
+	}
+	if !called {
+		t.Fatal("migration diagnostic reader was not invoked")
+	}
+}
+
+func TestRealComposeMigrationReportSharedVolumeContract(t *testing.T) {
+	if os.Getenv("SYSTEMCHECK_REAL_COMPOSE") != "1" {
+		t.Skip("set SYSTEMCHECK_REAL_COMPOSE=1 to validate the rendered Compose model")
+	}
+	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
 	composeWrapper, err := resolveComposeWrapper()
 	if err != nil {
 		t.Fatal(err)
@@ -198,32 +295,6 @@ func TestMigrationReportSharedVolumeContract(t *testing.T) {
 	if !ok || !hasVolumeTarget(testRunner, "/reports", "system-reports") {
 		t.Fatal("rendered test-runner must mount system-reports at /reports")
 	}
-	script, err := os.ReadFile(filepath.Join(root, ".github/actions/system-test/system-phase.sh"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Contains(script, []byte("systemcheck migrations --require-clean --require-head")) || !bytes.Contains(script, []byte("--report /reports/migrations.json")) {
-		t.Fatal("migration producer must write /reports/migrations.json")
-	}
-	called := false
-	runner := func(_ context.Context, name string, args []string, _ io.Reader, stdout, _ io.Writer, _ []string) error {
-		called = true
-		if name != composeWrapper {
-			t.Fatalf("migration diagnostics invoked %q instead of %q", name, composeWrapper)
-		}
-		expected := []string{"-p", "ci-contract", "-f", "docker-compose.yml", "-f", "docker-compose.ci.yml", "run", "--rm", "--no-deps", "--entrypoint", "cat", "test-runner", "/reports/migrations.json"}
-		if !reflect.DeepEqual(args, expected) {
-			t.Fatalf("migration diagnostic args=%q want=%q", args, expected)
-		}
-		_, _ = io.WriteString(stdout, `[{"service":"web-api","version":4,"expectedVersion":4,"dirty":false},{"service":"integration-api","version":1,"expectedVersion":1,"dirty":false},{"service":"endpoint-api","version":1,"expectedVersion":1,"dirty":false},{"service":"assistant-api","version":54,"expectedVersion":54,"dirty":false}]`)
-		return nil
-	}
-	if _, err := collectMigrationReport(context.Background(), runner, composeWrapper, "ci-contract"); err != nil {
-		t.Fatal(err)
-	}
-	if !called {
-		t.Fatal("migration diagnostic reader was not invoked")
-	}
 }
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -234,25 +305,35 @@ func (function roundTripFunc) RoundTrip(request *http.Request) (*http.Response, 
 
 func TestReadinessValidatorUsesIndependentServiceTimeouts(t *testing.T) {
 	var mutex sync.Mutex
-	attempts := map[string]int{}
+	contexts := map[string]context.Context{}
 	client := &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
-		key := request.URL.Host + request.URL.Path
+		key := request.URL.Host
 		mutex.Lock()
-		attempts[key]++
-		attempt := attempts[key]
-		mutex.Unlock()
-		status, body := http.StatusOK, `{"code":200,"success":true,"data":{"PSQL psql://postgres:5432":true,"healthy":true}}`
-		if strings.HasSuffix(request.URL.Path, "/healthz/") && attempt == 1 {
-			time.Sleep(10 * time.Millisecond)
-			status = http.StatusServiceUnavailable
+		if previous, ok := contexts[key]; ok && previous != request.Context() {
+			mutex.Unlock()
+			t.Fatalf("service %s did not reuse its timeout context", key)
 		}
-		return &http.Response{StatusCode: status, Body: io.NopCloser(bytes.NewBufferString(body)), Header: make(http.Header)}, nil
+		contexts[key] = request.Context()
+		mutex.Unlock()
+		body := `{"code":200,"success":true,"data":{"PSQL psql://postgres:5432":true,"healthy":true}}`
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewBufferString(body)), Header: make(http.Header)}, nil
 	})}
-	started := time.Now()
-	if err := checkHealth(context.Background(), client, 25*time.Millisecond, time.Millisecond, readinessPostgresKey, io.Discard); err != nil {
+	if err := checkHealth(context.Background(), client, time.Second, time.Millisecond, readinessPostgresKey, io.Discard); err != nil {
 		t.Fatal(err)
 	}
-	if time.Since(started) < 35*time.Millisecond {
-		t.Fatal("test did not exercise independent service budgets")
+	if len(contexts) != len(services) {
+		t.Fatalf("captured %d service contexts, want %d", len(contexts), len(services))
+	}
+	seen := map[context.Context]string{}
+	for service, serviceContext := range contexts {
+		if previous, duplicate := seen[serviceContext]; duplicate {
+			t.Fatalf("services %s and %s shared a timeout context", previous, service)
+		}
+		seen[serviceContext] = service
+		select {
+		case <-serviceContext.Done():
+		default:
+			t.Fatalf("service %s timeout context was not canceled", service)
+		}
 	}
 }
