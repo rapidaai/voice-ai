@@ -1,6 +1,6 @@
 # RFC 0003: Native SIP Party Identity Resolution
 
-- Status: Draft
+- Status: Accepted
 - Date: 2026-08-22
 - Owners: Assistant API Native SIP, Assistant Authentication
 - Reviewers: SIP, Telephony, UI, Security, and SRE owners
