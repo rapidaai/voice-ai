@@ -1,0 +1,93 @@
+{
+  "status": "accepted",
+  "rfc": "rfcs/0003-simplify-audit-backfill.md",
+  "objective": "Simplify the unshipped Phase 3 audit actor data migration across Assistant, Endpoint, Integration, and Web by replacing batched procedures and metrics with direct SQL backfills and removing SQL-text Go tests.",
+  "acceptance_criteria": [
+    "Assistant, Endpoint, and Web preflight every audited table, then copy legacy created_by and updated_by values into user actor fields without unknown fallback classification.",
+    "Integration historical rows use unknown creation actors because the schema has no legacy actor ID.",
+    "No Phase 3 migration creates or references audit_actor_migration_metrics or a backfill procedure.",
+    "All Go tests under service migration directories and the callcontext migration SQL-text test are removed at the user's direction.",
+    "Executable PostgreSQL migration validation replaces every removed contract, including exhaustive table inventory, successful mapping, invalid-ID failure before updates, final constraints and triggers, call-context schema and rollback, organization credential fingerprint storage, removed legacy columns, and removed registry tables.",
+    "The existing four-database rollback validator passes."
+  ],
+  "allowed_paths": [
+    "api/assistant-api/migrations/**",
+    "api/assistant-api/internal/callcontext/migration_test.go",
+    "api/endpoint-api/migrations/**",
+    "api/integration-api/migrations/**",
+    "api/web-api/migrations/**",
+    "bin/verify-phase3-migrations.sh",
+    "bin/verify-phase3-rollback.sh",
+    "rfcs/0001-phase-3-cleanup-runbook.md",
+    "rfcs/0001-phase-3-verification.md",
+    "rfcs/0003-simplify-audit-backfill.md",
+    "rfcs/0003-simplify-audit-backfill.plan.json",
+    "rfcs/0003-simplify-audit-backfill.confirmation.json",
+    "rfcs/0003-simplify-audit-backfill.operational-readiness.json",
+    "rfcs/0003-simplify-audit-backfill.review.md",
+    "rfcs/README.md"
+  ],
+  "out_of_scope": [
+    "Runtime authentication or actor propagation changes",
+    "Application schema shape, actor constraints, immutability triggers, or legacy-column cleanup semantics; removal of migration-internal procedure and metrics objects is in scope",
+    "Protobuf, SDK, UI, or Document API changes",
+    "Unrelated Redis, docs, or example worktree changes"
+  ],
+  "ownership": {
+    "service migration SQL": "Direct backfill statements and removal of procedure/metrics infrastructure",
+    "migration Go tests": "Removal of SQL-text assertions from migration packages",
+    "callcontext migration test": "Removal of migration-file inspection from the runtime package",
+    "bin/verify-phase3-migrations.sh": "Executable PostgreSQL behavior verification",
+    "RFC evidence": "Plan, confirmation, verification, and review records"
+  },
+  "required_tests": [
+    "Full-history PostgreSQL migration verification for all four services",
+    "Exhaustive audited-table inventory plus user-ID mapping and null-update assertions",
+    "Invalid legacy user ID rejection",
+    "Integration unknown-history assertion",
+    "Call-context snapshot schema and rollback assertions",
+    "Organization credential fingerprint-only and registry-removal assertions",
+    "Additive expansion, lock timeout, irreversible-down guidance, registry constraints and ordering, and credential uniqueness assertions",
+    "Four-database rollback verification",
+    "Relevant Go package tests and formatting"
+  ],
+  "required_commands": [
+    "go test ./api/assistant-api/internal/callcontext ./api/assistant-api/... ./api/endpoint-api/... ./api/integration-api/... ./api/web-api/...",
+    "bash bin/verify-phase3-migrations.sh",
+    "PREVIOUS_RELEASE_REF=v3.0.0 bash bin/verify-phase3-rollback.sh",
+    "! rg -n 'audit_actor_migration_metrics|backfill_(assistant|endpoint|integration|web)_audit_actor_identity' api/*/migrations bin/verify-phase3-migrations.sh",
+    "test -z \"$(find api -path '*/migrations/*_test.go' -print)\"",
+    "test ! -e api/assistant-api/internal/callcontext/migration_test.go",
+    "test -f rfcs/0003-simplify-audit-backfill.operational-readiness.json",
+    "git diff --check"
+  ],
+  "verification_assertions": {
+    "assistant-api": "Every audited table is listed exactly once; positive legacy created_by and updated_by values become matching user actors; null updated_by remains a null actor pair.",
+    "endpoint-api": "Every audited table is listed exactly once; positive legacy created_by and updated_by values become matching user actors; null updated_by remains a null actor pair.",
+    "web-api": "Every audited table is listed exactly once; positive legacy created_by and updated_by values become matching user actors; null updated_by remains a null actor pair; credential storage remains fingerprint-only; registry tables remain absent.",
+    "integration-api": "Historical rows become unknown creation actors with null IDs because no legacy user ID exists.",
+    "invalid-data": "A null or non-positive legacy creation user ID, or a non-positive non-null update ID, fails preflight before any backfill update runs.",
+    "callcontext": "Authentication snapshot columns are added, auth_token is preserved, and rollback removes only the snapshot columns.",
+    "removed-tests": "Executable PostgreSQL checks preserve additive expansion, lock timeout/reset, irreversible-down guidance, organization credential constraints and uniqueness, registry constraints and dependency-safe removal ordering."
+  },
+  "principles": {
+    "kiss": "Use one preflight and direct UPDATE statements instead of persisted procedures, batching, metrics, and resumability machinery.",
+    "yagni": "Do not retain interruption-resume infrastructure for an unshipped one-time migration.",
+    "single_ownership": "Each service migration owns its explicit table updates; the shell validator owns executable contract checks; the release owner owns the deployment readiness receipt.",
+    "explicit_contracts": "Legacy audit IDs are user IDs; Integration has no legacy actor identity; invalid source data fails migration.",
+    "fail_safe": "Actor-pair constraints reject invalid copied IDs and the verifier includes a failure case.",
+    "observability": "Migration success is determined by migration exit status plus executable schema and data assertions rather than a persistent metrics table.",
+    "least_privilege": "No security permissions or runtime trust boundaries change.",
+    "reversibility": "The existing same-point four-database backup and previous-release rollback procedure remains authoritative; deployment is blocked until its owner and backup identity are recorded."
+  },
+  "risks": [
+    "Direct updates may hold locks longer than the removed batched procedure; deployment requires fenced writes, recorded table sizes, and a production-sized rehearsal with an approved duration.",
+    "Rewriting migration files is unsafe if any affected version has already been applied outside this unshipped feature branch.",
+    "Invalid legacy IDs now fail closed instead of being converted to unknown.",
+    "Integration history remains unknown because no source user ID exists."
+  ],
+  "approval_conditions": [
+    "Exact-digest user approval attests that populated legacy audit IDs are user IDs, all legacy creation IDs are positive and non-null, all non-null update IDs are positive, and no affected Phase 3 migration version has been deployed.",
+    "Implementation and commit may proceed after exact-digest approval; deployment remains blocked until the release owner approves rfcs/0003-simplify-audit-backfill.operational-readiness.json with row counts, rehearsal duration, maximum duration, backup identity, and rollback owner."
+  ]
+}

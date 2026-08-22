@@ -256,6 +256,3 @@ FOR EACH ROW EXECUTE FUNCTION public.reject_created_actor_change();
 CREATE TRIGGER audit_created_actor_immutable
 BEFORE UPDATE ON public.knowledges
 FOR EACH ROW EXECUTE FUNCTION public.reject_created_actor_change();
-
-
-DROP PROCEDURE public.backfill_assistant_audit_actor_identity();

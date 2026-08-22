@@ -6,6 +6,8 @@
 - Independent code review: Approved after RFC 0002 re-review
 - RFC 0002 SHA-256: `52cbbb4c89632ec21d0d0130c59bcd469fc4bee1dfcb62ee8f6df0b61705ad3d`
 - RFC 0002 plan SHA-256: `ceb8521b670b0a564fa27da1b8c57c9cfd56cc2071b68afd8bf1c966c6bf3e4c`
+- RFC 0003 SHA-256: `d43a6b1b4f040ab16aa3dde1f018e6b56757768a523e1ae0d203fc2696cfbe7f`
+- RFC 0003 plan SHA-256: `86b038ad119258843fa8896c49bfbc09503a92e3ba27f66212183223ca824547`
 
 ## Source and Contract Checks
 
@@ -37,9 +39,9 @@ PostgreSQL 16.4 full histories were applied from version zero for all four datab
 | Integration | 0 | 2 | 4 |
 
 - Each final cleanup down migration refused execution and directed operators to backup restoration.
-- Representative Assistant, Endpoint, and Web rows verified conversion of positive IDs to `user`, zero and negative IDs to `unknown` with null IDs, null creation to `unknown`, and null update attribution remaining null.
+- Representative Assistant, Endpoint, and Web rows verified direct conversion of positive legacy IDs to matching `user` actors, with null update attribution remaining null. Invalid null or non-positive legacy IDs fail before any backfill update runs.
 - Representative writes in Assistant, Endpoint, Web, and Integration verified that invalid actor pairs are rejected and creation actor changes are blocked by the database trigger.
-- `bash bin/verify-phase3-migrations.sh`: passed on PostgreSQL 16.4. Full histories reached Assistant 60, Endpoint 6, Web 12, and Integration 6. The final Web schema contained neither `service_identities` nor `system_identities`. Persisted migration metric rows were present with zero failed and remaining rows. The interruption proof preserved the first committed 10,000-row batch, resumed to 25,000 rows, and recorded `25000|0|0` for processed, failed, and remaining rows.
+- `bash bin/verify-phase3-migrations.sh`: passed on PostgreSQL 16.4. Full histories reached Assistant 60, Endpoint 6, Web 12, and Integration 6. The validator checked every audited table's direct-update inventory, actor-column coverage, validated constraints, call-context schema and rollback, organization credential security, registry dependency-safe rollback, invalid-source preflight behavior, and absence of migration procedures and metrics tables.
 - `PREVIOUS_RELEASE_REF=v3.0.0 bash bin/verify-phase3-rollback.sh`: passed. A four-database custom-format backup set was captured before cleanup, Web cleanup applied both versions 11 and 12, all four databases were restored together, restored active service/system registry linkage was verified, legacy read/write smoke tests passed, all prior `v3.0.0` service binaries built, and the restored prior Web binary reached its health endpoint.
 - Restored legacy-column counts were Assistant 78, Endpoint 20, Web 24, and Integration 0, matching the pre-cleanup schemas.
 
@@ -70,6 +72,13 @@ PostgreSQL 16.4 full histories were applied from version zero for all four datab
 
 Independent reviewer Hume approved the complete JWT-only implementation diff on 2026-08-22 with no critical or major findings after fixes for exact bigint decoding, non-service actor spoofing, and registry-aware rollback startup validation. The review record is preserved in `rfcs/0002-jwt-only-service-auth.review.md`.
 
-Generated protobuf and SDK changes are present in nested repositories, but those repositories are intentionally uncommitted because no commit authorization has been given. The nested-repository cleanliness and root-gitlink delivery command therefore remains pending.
+Generated protobuf and SDK changes are committed in their nested repositories and recorded by the root Phase 3 commit.
 
-Migration renumbering also remains gated on a release/environment-owner receipt confirming that no non-git environment applied the superseded local draft versions.
+Deployment of the simplified direct backfill remains gated on the release-owner approval recorded in `rfcs/0003-simplify-audit-backfill.operational-readiness.json`.
+
+## RFC 0003 Simplified Audit Backfill
+
+- Persisted migration metrics, stored backfill procedures, batch loops, and interruption-resume logic are removed.
+- Assistant, Endpoint, and Web legacy audit IDs map directly to `user` actor pairs; Integration history remains `unknown` because it has no legacy actor ID.
+- Go tests that parsed migration SQL, including the call-context migration-file test, are removed. Their contracts are covered by executable PostgreSQL validation.
+- RFC 0003 was independently challenged and approved before implementation; deployment remains blocked while its operational-readiness receipt is `pending`.

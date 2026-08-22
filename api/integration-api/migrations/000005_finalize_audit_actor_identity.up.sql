@@ -22,6 +22,3 @@ FOR EACH ROW EXECUTE FUNCTION public.reject_created_actor_change();
 CREATE TRIGGER audit_created_actor_immutable
 BEFORE UPDATE ON public.external_audit_metadata
 FOR EACH ROW EXECUTE FUNCTION public.reject_created_actor_change();
-
-
-DROP PROCEDURE public.backfill_integration_audit_actor_identity();

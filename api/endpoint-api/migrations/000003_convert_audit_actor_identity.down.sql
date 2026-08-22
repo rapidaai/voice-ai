@@ -1,1 +1,1 @@
-DROP PROCEDURE IF EXISTS public.backfill_endpoint_audit_actor_identity();
+-- Actor constraints are removed with the actor columns by the expansion rollback.

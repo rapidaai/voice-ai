@@ -3,6 +3,8 @@
 ## Preconditions
 
 - Record the exact Web, Endpoint, Assistant, and Integration release identifiers.
+- Confirm no affected Phase 3 migration version has been applied in any environment.
+- Confirm every Assistant, Endpoint, and Web legacy `created_by` value is positive and every non-null `updated_by` value is positive.
 - Confirm actor-capable binaries and clients are deployed everywhere before cleanup.
 - Confirm every database reports zero rows with a null `created_actor_type`.
 - Confirm actor-pair constraints and `audit_created_actor_immutable` triggers are valid on all 64 inventoried tables.
@@ -12,6 +14,8 @@
 ## Operational Limits
 
 - Set `lock_timeout` to five seconds for every migration session.
+- Record per-table row counts, production-sized rehearsal duration, approved maximum duration, backup identity, and rollback owner in `rfcs/0003-simplify-audit-backfill.operational-readiness.json`.
+- Keep writes fenced for the direct backfill and do not deploy while the operational-readiness receipt is pending.
 - Abort on lock timeout, replica lag above the deployment threshold, unexpected WAL growth, disk pressure, or any failed validation query.
 - Do not continue to the next database after any failed cleanup or verification step.
 
@@ -40,7 +44,7 @@
 For every table listed in `rfcs/0001-phase-3-audit-contract-inventory.json`:
 
 - `created_actor_type` is non-null and satisfies the actor-pair constraint.
-- `created_actor_id` is null only for `unknown` history.
+- `created_actor_id` equals the legacy user ID for Assistant, Endpoint, and Web history, and is null only for Integration's unattributable `unknown` history.
 - `updated_actor_type` and `updated_actor_id` are either both null or a valid pair.
 - Updating either creation actor column is rejected by `audit_created_actor_immutable`.
 - Legacy columns are absent after cleanup.
