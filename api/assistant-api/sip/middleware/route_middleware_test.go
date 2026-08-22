@@ -29,7 +29,7 @@ func TestRouteMiddleware_AgentRoute(t *testing.T) {
 
 	ctx := &sip_infra.SIPRequestContext{
 		CallID:       "call-agent",
-		RequestURI:   "sip:agent-42@sip.rapida.ai",
+		RequestURI:   "sip:agent-42;transport=tcp@sip.rapida.ai",
 		FromIdentity: "sip:caller@example.com",
 		ToIdentity:   "sip:assistant@example.com",
 	}

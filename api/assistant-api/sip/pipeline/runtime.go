@@ -242,7 +242,6 @@ func (d *Dispatcher) resolveSIPCallContext(session *sip_infra.Session, setup *Ca
 	}
 	return call, nil
 }
-
 func (d *Dispatcher) configureSIPTransfer(ctx context.Context, session *sip_infra.Session, sipConfig *sip_infra.Config, call *callcontext.CallContext, transferStreamer internal_type.SIPTransferStreamer) {
 	callID := session.GetCallID()
 	transferStreamer.SetTransferRequestHandler(func(targets []string, postTransferAction string) {

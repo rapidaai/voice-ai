@@ -76,26 +76,21 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 		}
 	}
 	return func(ctx *sip_infra.SIPRequestContext) error {
-		raw := strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(ctx.RequestURI), "sip:"), "sips:")
-		parts := strings.SplitN(raw, "@", 2)
-		if len(parts) == 0 || !validator.NotBlank(parts[0]) {
-			return &sip_infra.SIPError{Code: 404, Message: "No routable SIP user found in Request-URI", Err: sip_infra.ErrAuthRequired}
-		}
-		user := strings.TrimSpace(parts[0])
-		if idx := strings.IndexByte(user, ';'); idx >= 0 {
-			user = strings.TrimSpace(user[:idx])
-		}
-		if !validator.NotBlank(user) {
+		requestURIWithoutScheme := strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(ctx.RequestURI), "sip:"), "sips:")
+		routeUserWithParameters, _, _ := strings.Cut(requestURIWithoutScheme, "@")
+		routeUser, _, _ := strings.Cut(strings.TrimSpace(routeUserWithParameters), ";")
+		routeUser = strings.TrimSpace(routeUser)
+		if !validator.NotBlank(routeUser) {
 			return &sip_infra.SIPError{Code: 404, Message: "No routable SIP user found in Request-URI", Err: sip_infra.ErrAuthRequired}
 		}
 
 		routeKind := "did"
-		routeValue := user
-		if strings.HasPrefix(user, "agent-") {
+		routeValue := routeUser
+		if strings.HasPrefix(routeUser, "agent-") {
 			routeKind = "agent"
-			routeValue = strings.TrimSpace(user[len("agent-"):])
-		} else if strings.HasPrefix(user, "did-") {
-			routeValue = strings.TrimSpace(user[len("did-"):])
+			routeValue = strings.TrimSpace(routeUser[len("agent-"):])
+		} else if strings.HasPrefix(routeUser, "did-") {
+			routeValue = strings.TrimSpace(routeUser[len("did-"):])
 		}
 		if !validator.NotBlank(routeValue) || strings.Contains(routeValue, ":") {
 			return &sip_infra.SIPError{Code: 404, Message: "Invalid SIP route user", Err: sip_infra.ErrAuthRequired}
