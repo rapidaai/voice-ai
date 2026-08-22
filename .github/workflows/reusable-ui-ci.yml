@@ -36,6 +36,13 @@ jobs:
         working-directory: ui
         run: yarn test:theme-contract
 
+      - name: Test bundle-size checker
+        working-directory: ui
+        run: yarn test:bundle-size
+
+      - name: Test TypeScript baseline checker
+        working-directory: ui
+        run: yarn test:typescript-check
       - name: Check public assets
         working-directory: ui
         run: yarn check:public-assets
@@ -65,7 +72,6 @@ jobs:
           node-version: ${{ inputs.node-version }}
 
       - name: Run TypeScript
-        continue-on-error: true
         working-directory: ui
         run: yarn checkTs
 
@@ -112,3 +118,7 @@ jobs:
           CI: false
           DISABLE_ESLINT_PLUGIN: true
         run: yarn build
+
+      - name: Enforce bundle-size budgets
+        working-directory: ui
+        run: yarn check:bundle-size
