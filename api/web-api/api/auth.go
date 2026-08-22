@@ -583,22 +583,26 @@ func (wAuthApi *webAuthGRPCApi) ScopeAuthorize(c context.Context, irRequest *pro
 	response := &protos.ScopedAuthentication{Status: type_enums.RECORD_ACTIVE.String()}
 	var iAuth *types.Authentication
 	var scopeErr error
-	if irRequest.GetScope() == "project" {
+	switch irRequest.GetScope() {
+	case "project":
 		iAuth, scopeErr = auth.Scope(types.AuthTypeProject)
-	} else {
+	case "organization":
 		iAuth, scopeErr = auth.Scope(types.AuthTypeOrg)
+	default:
+		return nil, status.Error(codes.InvalidArgument, "scope must be project or organization")
 	}
 	if scopeErr != nil {
 		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
-	if irRequest.GetScope() == "project" {
+	switch irRequest.GetScope() {
+	case "project":
 		projectContext, err := iAuth.ProjectContext()
 		if err != nil {
 			return nil, err
 		}
 		response.OrganizationId = projectContext.OrganizationID
 		response.ProjectId = projectContext.ProjectID
-	} else {
+	case "organization":
 		organizationContext, err := iAuth.OrganizationContext()
 		if err != nil {
 			return nil, err

@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"testing"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/rapidaai/pkg/types"
@@ -118,5 +120,26 @@ func TestScopeAuthorizeRejectsWrongScope(t *testing.T) {
 	ctx := context.WithValue(context.Background(), types.CTX_, auth)
 	if _, err := (&webAuthGRPCApi{}).ScopeAuthorize(ctx, &protos.ScopeAuthorizeRequest{Scope: "project"}); err == nil {
 		t.Fatal("ScopeAuthorize() error = nil")
+	}
+}
+
+func TestScopeAuthorizeRejectsMalformedScope(t *testing.T) {
+	auth := &types.Authentication{
+		AuthType:          types.AuthTypeOrg,
+		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeOrganization, ID: 56},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: 99},
+	}
+	ctx := context.WithValue(context.Background(), types.CTX_, auth)
+
+	for _, scope := range []string{"", "service", "orgnaization"} {
+		t.Run(scope, func(t *testing.T) {
+			response, err := (&webAuthGRPCApi{}).ScopeAuthorize(ctx, &protos.ScopeAuthorizeRequest{Scope: scope})
+			if response != nil {
+				t.Fatalf("ScopeAuthorize() response = %v, want nil", response)
+			}
+			if status.Code(err) != codes.InvalidArgument {
+				t.Fatalf("ScopeAuthorize() error code = %v, want %v", status.Code(err), codes.InvalidArgument)
+			}
+		})
 	}
 }
