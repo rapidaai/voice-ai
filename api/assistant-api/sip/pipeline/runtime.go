@@ -73,7 +73,8 @@ func (runtime *sipPreparedCallRuntime) Close(_ context.Context) {
 	_ = runtime.streamer.Close()
 }
 
-func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, session *sip_infra.Session, setup *CallSetupResult, observer observability.Recorder, vaultCred interface{}, sipConfig *sip_infra.Config, direction, fromIdentity, toIdentity string) (*sipPreparedCallRuntime, error) {
+func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, stage sip_infra.SessionEstablishedPipeline, setup *CallSetupResult, observer observability.Recorder) (*sipPreparedCallRuntime, error) {
+	session := stage.Session
 	callID := session.GetCallID()
 	if session.IsEnded() {
 		d.logger.Warnw("Session already ended before call runtime preparation", "call_id", callID)
@@ -83,7 +84,7 @@ func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, session *sip_inf
 	resolvedCallContext := setup.CallContext
 	if resolvedCallContext == nil {
 		d.logger.Warnw("setup.CallContext missing - reconstructing from session", "call_id", callID)
-		resolvedCallContext = reconstructCallContext(auth, setup.AssistantID, setup.ConversationID, direction, callID, callID, fromIdentity, toIdentity)
+		resolvedCallContext = reconstructCallContext(auth, setup.AssistantID, setup.ConversationID, string(stage.Direction), callID, callID, stage.FromIdentity, stage.ToIdentity)
 		resolvedCallContext.AssistantProviderId = setup.AssistantProviderId
 		if setup.ProjectID != 0 {
 			resolvedCallContext.ProjectID = setup.ProjectID
@@ -120,10 +121,8 @@ func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, session *sip_inf
 	default:
 	}
 
-	var vaultCredential *protos.VaultCredential
-	if v, ok := vaultCred.(*protos.VaultCredential); ok {
-		vaultCredential = v
-	} else {
+	vaultCredential := stage.VaultCredential
+	if vaultCredential == nil {
 		vaultCredential = session.GetVaultCredential()
 	}
 	streamer, err := internal_telephony.New(
@@ -146,7 +145,7 @@ func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, session *sip_inf
 		return nil, fmt.Errorf("session_ended_after_streamer")
 	}
 
-	d.configureSIPTransfer(ctx, session, sipConfig, resolvedCallContext, streamer)
+	d.configureSIPTransfer(ctx, session, stage.Config, resolvedCallContext, streamer)
 	talker, err := internal_adapter.New(
 		internal_adapter.WithSource(utils.PhoneCall),
 		internal_adapter.WithContext(talkContext),
@@ -174,7 +173,7 @@ func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, session *sip_inf
 		cancelTalk:  cancelTalk,
 		streamer:    streamer,
 		talker:      talker,
-		direction:   direction,
+		direction:   string(stage.Direction),
 	}, nil
 }
 
