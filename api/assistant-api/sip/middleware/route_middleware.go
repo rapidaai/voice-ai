@@ -76,23 +76,17 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 		}
 	}
 	return func(ctx *sip_infra.SIPRequestContext) error {
-		user := ""
-		for _, uri := range []string{ctx.ToURI, ctx.FromURI} {
-			raw := strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(uri), "sip:"), "sips:")
-			parts := strings.SplitN(raw, "@", 2)
-			if len(parts) == 0 || !validator.NotBlank(parts[0]) {
-				continue
-			}
-			user = strings.TrimSpace(parts[0])
-			if idx := strings.IndexByte(user, ';'); idx >= 0 {
-				user = strings.TrimSpace(user[:idx])
-			}
-			if validator.NotBlank(user) {
-				break
-			}
+		raw := strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(ctx.RequestURI), "sip:"), "sips:")
+		parts := strings.SplitN(raw, "@", 2)
+		if len(parts) == 0 || !validator.NotBlank(parts[0]) {
+			return &sip_infra.SIPError{Code: 404, Message: "No routable SIP user found in Request-URI", Err: sip_infra.ErrAuthRequired}
+		}
+		user := strings.TrimSpace(parts[0])
+		if idx := strings.IndexByte(user, ';'); idx >= 0 {
+			user = strings.TrimSpace(user[:idx])
 		}
 		if !validator.NotBlank(user) {
-			return &sip_infra.SIPError{Code: 404, Message: "No routable SIP user found in SIP URI", Err: sip_infra.ErrAuthRequired}
+			return &sip_infra.SIPError{Code: 404, Message: "No routable SIP user found in Request-URI", Err: sip_infra.ErrAuthRequired}
 		}
 
 		routeKind := "did"

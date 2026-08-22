@@ -13,6 +13,7 @@ import {
   CreateAssistantAuthenticationPage,
   UpdateAssistantAuthenticationPage,
 } from '../index';
+import { AUTH_KEY_OPTIONS_BY_TYPE } from '../shared';
 import {
   CreateAssistantConfiguration,
   DeleteAssistantConfiguration,
@@ -329,6 +330,19 @@ jest.mock('@/app/components/carbon/url-table-cell', () => ({
 }));
 
 describe('CreateAssistantAuthenticationPage', () => {
+  it('uses the canonical assistant phone authentication key', () => {
+    expect(
+      AUTH_KEY_OPTIONS_BY_TYPE.client.find(
+        option => option.name === 'Assistant Phone',
+      ),
+    ).toEqual({ value: 'assistant_phone', name: 'Assistant Phone' });
+    expect(
+      AUTH_KEY_OPTIONS_BY_TYPE.client.some(
+        option => option.value === 'assistantPhone',
+      ),
+    ).toBe(false);
+  });
+
   const makeOption = (key: string, value: string) => ({
     getKey: () => key,
     getValue: () => value,

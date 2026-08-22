@@ -17,10 +17,11 @@ import (
 )
 
 type inboundInviteIdentity struct {
-	callID  string
-	fromTag string
-	fromURI string
-	toURI   string
+	callID       string
+	fromTag      string
+	requestURI   string
+	fromIdentity string
+	toIdentity   string
 }
 
 // Inbound owns the lifecycle for a single inbound SIP INVITE.
@@ -64,10 +65,11 @@ func inboundInviteIdentityFromRequest(request *sip.Request) (inboundInviteIdenti
 	}
 
 	return inboundInviteIdentity{
-		callID:  request.CallID().Value(),
-		fromTag: fromTag,
-		fromURI: request.From().Address.String(),
-		toURI:   request.To().Address.String(),
+		callID:       request.CallID().Value(),
+		fromTag:      fromTag,
+		requestURI:   request.Recipient.String(),
+		fromIdentity: request.From().Address.String(),
+		toIdentity:   request.To().Address.String(),
 	}, true
 }
 
@@ -320,7 +322,12 @@ func (inboundCall *Inbound) callInboundApplicationReadyHandler() error {
 	if applicationReadyHandler == nil {
 		return nil
 	}
-	return applicationReadyHandler(inboundCall.session, inboundCall.identity.fromURI, inboundCall.identity.toURI)
+	return applicationReadyHandler(
+		inboundCall.session,
+		inboundCall.identity.requestURI,
+		inboundCall.identity.fromIdentity,
+		inboundCall.identity.toIdentity,
+	)
 }
 
 // waitUntilAnswerReady applies the configured answer policy without changing call state.
@@ -425,7 +432,12 @@ func (inboundCall *Inbound) callInboundInviteHandler() error {
 	if inviteHandler == nil {
 		return nil
 	}
-	return inviteHandler(inboundCall.session, inboundCall.identity.fromURI, inboundCall.identity.toURI)
+	return inviteHandler(
+		inboundCall.session,
+		inboundCall.identity.requestURI,
+		inboundCall.identity.fromIdentity,
+		inboundCall.identity.toIdentity,
+	)
 }
 
 func (inboundCall *Inbound) cancelBeforeAnswer(reason LifecycleReason) bool {

@@ -45,8 +45,9 @@ func (s *Server) SetMiddlewares(middlewares []Middleware) {
 			infraCtx := &SIPRequestContext{
 				Method:          ctx.Method,
 				CallID:          ctx.CallID,
-				FromURI:         ctx.FromURI,
-				ToURI:           ctx.ToURI,
+				RequestURI:      ctx.RequestURI,
+				FromIdentity:    ctx.FromIdentity,
+				ToIdentity:      ctx.ToIdentity,
 				SDPInfo:         sdpInfoFromCore(ctx.SDPInfo),
 				APIKey:          ctx.APIKey,
 				AssistantID:     ctx.AssistantID,
@@ -104,13 +105,13 @@ func (s *Server) SessionCount() int {
 	return s.inner.SessionCount()
 }
 
-func (s *Server) SetOnApplicationReady(fn func(session *Session, fromURI, toURI string) error) {
+func (s *Server) SetOnApplicationReady(fn func(session *Session, requestURI, fromIdentity, toIdentity string) error) {
 	if fn == nil {
 		s.inner.SetOnApplicationReady(nil)
 		return
 	}
-	s.inner.SetOnApplicationReady(func(session *internal_core.Session, fromURI, toURI string) error {
-		return fn(wrapSession(session), fromURI, toURI)
+	s.inner.SetOnApplicationReady(func(session *internal_core.Session, requestURI, fromIdentity, toIdentity string) error {
+		return fn(wrapSession(session), requestURI, fromIdentity, toIdentity)
 	})
 }
 
@@ -124,13 +125,13 @@ func (s *Server) SetOnApplicationCleanup(fn func(session *Session)) {
 	})
 }
 
-func (s *Server) SetOnInvite(fn func(session *Session, fromURI, toURI string) error) {
+func (s *Server) SetOnInvite(fn func(session *Session, requestURI, fromIdentity, toIdentity string) error) {
 	if fn == nil {
 		s.inner.SetOnInvite(nil)
 		return
 	}
-	s.inner.SetOnInvite(func(session *internal_core.Session, fromURI, toURI string) error {
-		return fn(wrapSession(session), fromURI, toURI)
+	s.inner.SetOnInvite(func(session *internal_core.Session, requestURI, fromIdentity, toIdentity string) error {
+		return fn(wrapSession(session), requestURI, fromIdentity, toIdentity)
 	})
 }
 

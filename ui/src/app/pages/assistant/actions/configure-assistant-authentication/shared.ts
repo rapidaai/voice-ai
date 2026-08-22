@@ -43,7 +43,7 @@ export const AUTH_KEY_OPTIONS_BY_TYPE = {
   ],
   client: [
     { value: 'phone', name: 'Phone' },
-    { value: 'assistantPhone', name: 'Assistant Phone' },
+    { value: 'assistant_phone', name: 'Assistant Phone' },
     { value: 'direction', name: 'Direction' },
     { value: 'provider', name: 'Provider' },
     { value: 'providerCallId', name: 'Provider Call ID' },

@@ -301,7 +301,7 @@ func (outboundCall *Outbound) callOutboundInviteHandler(answerTime time.Time) er
 	info := outboundCall.session.GetInfo()
 	outboundCall.server.logger.Infow("Starting onInvite handler for outbound call",
 		"call_id", outboundCall.session.GetCallID())
-	if err := inviteHandler(outboundCall.session, info.LocalURI, info.RemoteURI); err != nil {
+	if err := inviteHandler(outboundCall.session, info.RemoteURI, info.LocalURI, info.RemoteURI); err != nil {
 		return err
 	}
 	outboundCall.server.logger.Infow("onInvite handler completed",
