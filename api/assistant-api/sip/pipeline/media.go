@@ -151,7 +151,7 @@ func (d *Dispatcher) prepareSession(ctx context.Context, v sip_infra.SessionEsta
 	var runtime PreparedCallRuntime
 	if v.Direction == sip_infra.CallDirectionInbound {
 		var err error
-		preparedRuntime, err := d.prepareSIPCallRuntime(ctx, v.Session, setup, observer, v.VaultCredential, v.Config, string(v.Direction))
+		preparedRuntime, err := d.prepareSIPCallRuntime(ctx, v.Session, setup, observer, v.VaultCredential, v.Config, string(v.Direction), v.FromIdentity, v.ToIdentity)
 		if err != nil {
 			observer.Close(ctx)
 			d.logger.Error("Pipeline: runtime preparation failed", "call_id", v.ID, "error", err)
@@ -527,7 +527,7 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 			return
 		}
 
-		runtime, err := d.prepareSIPCallRuntime(ctx, v.Session, setup, observer, v.VaultCredential, v.Config, string(v.Direction))
+		runtime, err := d.prepareSIPCallRuntime(ctx, v.Session, setup, observer, v.VaultCredential, v.Config, string(v.Direction), v.FromIdentity, v.ToIdentity)
 		if err != nil {
 			if v.Session.GetInfo().Direction == sip_infra.CallDirectionOutbound && !v.Session.IsEnded() {
 				state := v.Session.GetState()

@@ -73,14 +73,14 @@ func (runtime *sipPreparedCallRuntime) Close(_ context.Context) {
 	_ = runtime.streamer.Close()
 }
 
-func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, session *sip_infra.Session, setup *CallSetupResult, observer observability.Recorder, vaultCred interface{}, sipConfig *sip_infra.Config, direction string) (*sipPreparedCallRuntime, error) {
+func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, session *sip_infra.Session, setup *CallSetupResult, observer observability.Recorder, vaultCred interface{}, sipConfig *sip_infra.Config, direction, fromIdentity, toIdentity string) (*sipPreparedCallRuntime, error) {
 	callID := session.GetCallID()
 	if session.IsEnded() {
 		d.logger.Warnw("Session already ended before call runtime preparation", "call_id", callID)
 		return nil, fmt.Errorf("session_ended_before_start")
 	}
 	auth := session.GetAuth()
-	resolvedCallContext, err := d.resolveSIPCallContext(session, setup, direction)
+	resolvedCallContext, err := d.resolveSIPCallContext(session, setup, direction, fromIdentity, toIdentity)
 	if err != nil {
 		return nil, fmt.Errorf("resolve SIP call context: %w", err)
 	}
@@ -202,7 +202,7 @@ func inboundRuntimeReadyTimeout(config *sip_infra.Config) time.Duration {
 	return 30 * time.Second
 }
 
-func (d *Dispatcher) resolveSIPCallContext(session *sip_infra.Session, setup *CallSetupResult, direction string) (*callcontext.CallContext, error) {
+func (d *Dispatcher) resolveSIPCallContext(session *sip_infra.Session, setup *CallSetupResult, direction, fromIdentity, toIdentity string) (*callcontext.CallContext, error) {
 	callID := session.GetCallID()
 	if setup.CallContext != nil {
 		call := setup.CallContext
@@ -219,28 +219,28 @@ func (d *Dispatcher) resolveSIPCallContext(session *sip_infra.Session, setup *Ca
 	}
 
 	d.logger.Warnw("setup.CallContext missing - reconstructing from session", "call_id", callID)
-	info := session.GetInfo()
-	clientPhone := sip_infra.ExtractDIDFromURI(info.RemoteURI)
-	if clientPhone == "" {
-		clientPhone = info.RemoteURI
-	}
-	callContext := &callcontext.CallContext{
+	call := &callcontext.CallContext{
 		AssistantID:         setup.AssistantID,
 		ConversationID:      setup.ConversationID,
 		AssistantProviderId: setup.AssistantProviderId,
 		Direction:           direction,
 		Provider:            "sip",
-		CallerNumber:        clientPhone,
-		FromNumber:          sip_infra.ExtractDIDFromURI(info.LocalURI),
 		ChannelUUID:         callID,
 		ContextID:           callID,
 		ProjectID:           setup.ProjectID,
 		OrganizationID:      setup.OrganizationID,
 	}
-	if err := callContext.SetAuthentication(setup.Auth); err != nil {
+	if err := call.SetAuthentication(setup.Auth); err != nil {
 		return nil, err
 	}
-	return callContext, nil
+	if direction == string(sip_infra.CallDirectionOutbound) {
+		call.CallerNumber = toIdentity
+		call.FromNumber = fromIdentity
+	} else {
+		call.CallerNumber = fromIdentity
+		call.FromNumber = toIdentity
+	}
+	return call, nil
 }
 
 func (d *Dispatcher) configureSIPTransfer(ctx context.Context, session *sip_infra.Session, sipConfig *sip_infra.Config, call *callcontext.CallContext, transferStreamer internal_type.SIPTransferStreamer) {

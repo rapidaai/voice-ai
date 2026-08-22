@@ -43,11 +43,12 @@ const (
 //	RouteMiddleware → resolves assistant route, sets Auth and Assistant
 //	VaultMiddleware → fetches SIP config from vault, sets VaultCredential
 type SIPRequestContext struct {
-	Method  string // SIP method (INVITE, REGISTER, BYE, etc.)
-	CallID  string
-	FromURI string
-	ToURI   string
-	SDPInfo *SDPMediaInfo
+	Method       string // SIP method (INVITE, REGISTER, BYE, etc.)
+	CallID       string
+	RequestURI   string
+	FromIdentity string
+	ToIdentity   string
+	SDPInfo      *SDPMediaInfo
 
 	// Route/auth fields resolved by middleware.
 	APIKey      string
@@ -116,9 +117,9 @@ type Server struct {
 	middlewares []Middleware
 
 	// Event callbacks
-	onApplicationReady   func(session *Session, fromURI, toURI string) error
+	onApplicationReady   func(session *Session, requestURI, fromIdentity, toIdentity string) error
 	onApplicationCleanup func(session *Session)
-	onInvite             func(session *Session, fromURI, toURI string) error
+	onInvite             func(session *Session, requestURI, fromIdentity, toIdentity string) error
 	onBye                func(session *Session) error
 	onCancel             func(session *Session) error
 	onError              func(session *Session, err error)
@@ -470,7 +471,7 @@ func (s *Server) SessionCount() int {
 	return len(s.sessions)
 }
 
-func (s *Server) SetOnApplicationReady(fn func(session *Session, fromURI, toURI string) error) {
+func (s *Server) SetOnApplicationReady(fn func(session *Session, requestURI, fromIdentity, toIdentity string) error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.onApplicationReady = fn
@@ -483,7 +484,7 @@ func (s *Server) SetOnApplicationCleanup(fn func(session *Session)) {
 }
 
 // SetOnInvite sets the callback for answered INVITE requests.
-func (s *Server) SetOnInvite(fn func(session *Session, fromURI, toURI string) error) {
+func (s *Server) SetOnInvite(fn func(session *Session, requestURI, fromIdentity, toIdentity string) error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.onInvite = fn

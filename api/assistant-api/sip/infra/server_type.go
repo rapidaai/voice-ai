@@ -27,8 +27,9 @@ const (
 type SIPRequestContext struct {
 	Method          string
 	CallID          string
-	FromURI         string
-	ToURI           string
+	RequestURI      string
+	FromIdentity    string
+	ToIdentity      string
 	APIKey          string
 	AssistantID     string
 	Auth            *types.Authentication
@@ -132,8 +133,9 @@ func (c *ServerConfig) toCore() *internal_core.ServerConfig {
 			infraCtx := &SIPRequestContext{
 				Method:          ctx.Method,
 				CallID:          ctx.CallID,
-				FromURI:         ctx.FromURI,
-				ToURI:           ctx.ToURI,
+				RequestURI:      ctx.RequestURI,
+				FromIdentity:    ctx.FromIdentity,
+				ToIdentity:      ctx.ToIdentity,
 				SDPInfo:         sdpInfoFromCore(ctx.SDPInfo),
 				APIKey:          ctx.APIKey,
 				AssistantID:     ctx.AssistantID,

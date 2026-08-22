@@ -476,10 +476,6 @@ func ParseConfigFromVault(vaultCredential *protos.VaultCredential) (*Config, err
 	return &config, nil
 }
 
-func ExtractDIDFromURI(uri string) string {
-	return internal_core.ExtractDIDFromURI(uri)
-}
-
 func cloneMap(values map[string]interface{}) map[string]interface{} {
 	if len(values) == 0 {
 		return nil

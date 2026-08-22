@@ -229,8 +229,8 @@ func (m *SIPEngine) GetServer() *sip_infra.Server {
 	return m.server
 }
 
-func (m *SIPEngine) onApplicationReady(session *sip_infra.Session, fromURI, toURI string) error {
-	stage, err := m.sessionEstablishedStage(session, fromURI, toURI)
+func (m *SIPEngine) onApplicationReady(session *sip_infra.Session, requestURI, fromIdentity, toIdentity string) error {
+	stage, err := m.sessionEstablishedStage(session, requestURI, fromIdentity, toIdentity)
 	if err != nil {
 		return err
 	}
@@ -247,8 +247,8 @@ func (m *SIPEngine) onApplicationCleanup(session *sip_infra.Session) {
 	m.dispatcher.DiscardPreparedSession(m.ctx, session.GetCallID())
 }
 
-func (m *SIPEngine) onInvite(session *sip_infra.Session, fromURI, toURI string) error {
-	stage, err := m.sessionEstablishedStage(session, fromURI, toURI)
+func (m *SIPEngine) onInvite(session *sip_infra.Session, requestURI, fromIdentity, toIdentity string) error {
+	stage, err := m.sessionEstablishedStage(session, requestURI, fromIdentity, toIdentity)
 	if err != nil {
 		return err
 	}
@@ -262,7 +262,7 @@ func (m *SIPEngine) onInvite(session *sip_infra.Session, fromURI, toURI string) 
 	return nil
 }
 
-func (m *SIPEngine) sessionEstablishedStage(session *sip_infra.Session, fromURI, toURI string) (sip_infra.SessionEstablishedPipeline, error) {
+func (m *SIPEngine) sessionEstablishedStage(session *sip_infra.Session, requestURI, fromIdentity, toIdentity string) (sip_infra.SessionEstablishedPipeline, error) {
 	if session == nil {
 		return sip_infra.SessionEstablishedPipeline{}, fmt.Errorf("session is nil")
 	}
@@ -291,8 +291,9 @@ func (m *SIPEngine) sessionEstablishedStage(session *sip_infra.Session, fromURI,
 		Direction:       info.Direction,
 		AssistantID:     assistant.Id,
 		Auth:            auth,
-		FromURI:         fromURI,
-		ToURI:           toURI,
+		RequestURI:      requestURI,
+		FromIdentity:    fromIdentity,
+		ToIdentity:      toIdentity,
 		ConversationID:  session.GetConversationID(),
 	}, nil
 }

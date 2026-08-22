@@ -30,9 +30,9 @@ func (d *Dispatcher) createConversation(ctx context.Context, stage sip_infra.Ses
 		dirEnum = type_enums.DIRECTION_OUTBOUND
 	}
 
-	callerNumber := sip_infra.ExtractDIDFromURI(stage.FromURI)
-	if callerNumber == "" {
-		callerNumber = stage.FromURI
+	callerNumber := stage.FromIdentity
+	if stage.Direction == sip_infra.CallDirectionOutbound {
+		callerNumber = stage.ToIdentity
 	}
 
 	assistant := stage.Session.GetAssistant()
@@ -69,7 +69,7 @@ func (d *Dispatcher) ensureCallContext(ctx context.Context, stage sip_infra.Sess
 	if stage.Direction == sip_infra.CallDirectionOutbound {
 		contextID := stage.Session.GetContextID()
 		if contextID == "" {
-			return reconstructCallContext(stage.Auth, stage.AssistantID, conversationID, dirStr, callID, "", stage.FromURI, stage.ToURI)
+			return reconstructCallContext(stage.Auth, stage.AssistantID, conversationID, dirStr, callID, "", stage.FromIdentity, stage.ToIdentity)
 		}
 		if claimed, err := d.callContextStore.Claim(ctx, contextID); err == nil {
 			return claimed, nil
@@ -77,7 +77,7 @@ func (d *Dispatcher) ensureCallContext(ctx context.Context, stage sip_infra.Sess
 		if loaded, err := d.callContextStore.Get(ctx, contextID); err == nil {
 			return loaded, nil
 		}
-		return reconstructCallContext(stage.Auth, stage.AssistantID, conversationID, dirStr, callID, contextID, stage.FromURI, stage.ToURI)
+		return reconstructCallContext(stage.Auth, stage.AssistantID, conversationID, dirStr, callID, contextID, stage.FromIdentity, stage.ToIdentity)
 	}
 
 	callContext := &callcontext.CallContext{
@@ -85,8 +85,8 @@ func (d *Dispatcher) ensureCallContext(ctx context.Context, stage sip_infra.Sess
 		ConversationID: conversationID,
 		Direction:      dirStr,
 		Provider:       "sip",
-		CallerNumber:   extractDIDOrRaw(stage.FromURI),
-		FromNumber:     extractDIDOrRaw(stage.ToURI),
+		CallerNumber:   stage.FromIdentity,
+		FromNumber:     stage.ToIdentity,
 		ChannelUUID:    callID,
 	}
 	if err := callContext.SetAuthentication(stage.Auth); err != nil {
@@ -177,8 +177,8 @@ func reconstructCallContext(
 	direction string,
 	callID string,
 	contextID string,
-	fromURI string,
-	toURI string,
+	fromIdentity string,
+	toIdentity string,
 ) (*callcontext.CallContext, error) {
 	callContext := &callcontext.CallContext{
 		AssistantID:    assistantID,
@@ -192,21 +192,11 @@ func reconstructCallContext(
 		return nil, err
 	}
 	if direction == string(sip_infra.CallDirectionOutbound) {
-		callContext.CallerNumber = extractDIDOrRaw(toURI)
-		callContext.FromNumber = extractDIDOrRaw(fromURI)
+		callContext.CallerNumber = toIdentity
+		callContext.FromNumber = fromIdentity
 	} else {
-		callContext.CallerNumber = extractDIDOrRaw(fromURI)
-		callContext.FromNumber = extractDIDOrRaw(toURI)
+		callContext.CallerNumber = fromIdentity
+		callContext.FromNumber = toIdentity
 	}
 	return callContext, nil
-}
-
-func extractDIDOrRaw(uri string) string {
-	if uri == "" {
-		return ""
-	}
-	if did := sip_infra.ExtractDIDFromURI(uri); did != "" {
-		return did
-	}
-	return uri
 }
