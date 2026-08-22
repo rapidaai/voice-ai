@@ -698,11 +698,17 @@ func TestTransferRace_UserHangupCancelsDialAttempt(t *testing.T) {
 	assert.True(t, failedCalled.Load(), "OnFailed should fire when transfer cannot complete")
 }
 
-func TestExecuteTransfer_PassesParentContextToTransferBridgeLeg(t *testing.T) {
+func TestExecuteTransfer_NewLegUsesTransferTargetAndConfiguredCallerIdentity(t *testing.T) {
 	t.Parallel()
 
 	inbound := newTransferTestSession(t)
 	outbound := newTransferTestOutboundSession(t)
+	parentCall := &callcontext.CallContext{
+		CallerNumber: "sip:original-caller@example.com",
+		FromNumber:   "sip:original-assistant@sip.rapida.ai",
+	}
+	config := newTransferTestConfig()
+	config.CallerID = "transfer-assistant"
 
 	var capturedTarget string
 	var capturedFrom string
@@ -727,13 +733,17 @@ func TestExecuteTransfer_PassesParentContextToTransferBridgeLeg(t *testing.T) {
 	d.executeTransfer(context.Background(), sip_infra.TransferInitiatedPipeline{
 		ID:        inbound.GetCallID(),
 		Session:   inbound,
-		Targets:   []string{"918031405561", "918031405562"},
-		Config:    newTransferTestConfig(),
-		TargetURI: "918031405561",
+		Targets:   []string{"transfer-target", "fallback-target"},
+		Config:    config,
+		TargetURI: "transfer-target",
 	})
 
-	assert.Equal(t, "918031405561", capturedTarget)
-	assert.Equal(t, "917943446750", capturedFrom)
+	assert.Equal(t, "transfer-target", capturedTarget)
+	assert.Equal(t, "transfer-assistant", capturedFrom)
+	assert.NotEqual(t, parentCall.CallerNumber, capturedTarget)
+	assert.NotEqual(t, parentCall.FromNumber, capturedFrom)
+	assert.Equal(t, "sip:original-caller@example.com", parentCall.CallerNumber)
+	assert.Equal(t, "sip:original-assistant@sip.rapida.ai", parentCall.FromNumber)
 	assert.Equal(t, inbound.GetCallID(), capturedOptions.ParentCallID)
 	assert.Equal(t, 1, capturedOptions.Attempt)
 	assert.Equal(t, 2, capturedOptions.TotalAttempts)
