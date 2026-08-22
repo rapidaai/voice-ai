@@ -7,11 +7,13 @@
 package sip_pipeline
 
 import (
+	"context"
 	"testing"
 
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
 	"github.com/rapidaai/pkg/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestReconstructCallContextInboundPreservesSIPIdentities(t *testing.T) {
@@ -32,20 +34,34 @@ func TestReconstructCallContextInboundPreservesSIPIdentities(t *testing.T) {
 	assert.Equal(t, "sip:agent-42@sip.rapida.ai", call.FromNumber)
 }
 
-func TestReconstructCallContextOutboundPreservesResolvedIdentities(t *testing.T) {
+func TestEnsureCallContextOutboundFallbackPreservesResolvedRequestIdentities(t *testing.T) {
 	auth := &types.ProjectScope{}
+	session, err := sip_infra.NewSession(context.Background(), &sip_infra.SessionConfig{
+		Config: &sip_infra.Config{
+			Server:            "sip.example.com",
+			Port:              5060,
+			Transport:         sip_infra.TransportUDP,
+			RTPPortRangeStart: 10000,
+			RTPPortRangeEnd:   10020,
+		},
+		Direction: sip_infra.CallDirectionOutbound,
+		CallID:    "call-outbound",
+		Auth:      auth,
+	})
+	require.NoError(t, err)
+	dispatcher := &Dispatcher{}
 
-	call := reconstructCallContext(
-		auth,
-		42,
-		84,
-		string(sip_infra.CallDirectionOutbound),
-		"call-outbound",
-		"context-outbound",
-		"sip:assistant@example.com",
-		"sip:bob@example.net",
-	)
+	call, err := dispatcher.ensureCallContext(context.Background(), sip_infra.SessionEstablishedPipeline{
+		ID:           "call-outbound",
+		Session:      session,
+		Direction:    sip_infra.CallDirectionOutbound,
+		AssistantID:  42,
+		Auth:         auth,
+		FromIdentity: "assistant-line",
+		ToIdentity:   "customer-alias",
+	}, 84)
 
-	assert.Equal(t, "sip:bob@example.net", call.CallerNumber)
-	assert.Equal(t, "sip:assistant@example.com", call.FromNumber)
+	require.NoError(t, err)
+	assert.Equal(t, "customer-alias", call.CallerNumber)
+	assert.Equal(t, "assistant-line", call.FromNumber)
 }
