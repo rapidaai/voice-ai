@@ -445,3 +445,12 @@ func TestOutboundTypeConversions(t *testing.T) {
 		t.Fatalf("outbound invite identity conversion mismatch: %#v", request.toCore().Identity)
 	}
 }
+
+func TestOutboundTypeConversionsReturnWritableEmptyHeaders(t *testing.T) {
+	coreOutboundConfig := (OutboundConfig{}).toCore()
+
+	require.NotNil(t, coreOutboundConfig.Headers)
+	assert.Empty(t, coreOutboundConfig.Headers)
+	coreOutboundConfig.Headers["X-Test"] = "ok"
+	assert.Equal(t, "ok", coreOutboundConfig.Headers["X-Test"])
+}
