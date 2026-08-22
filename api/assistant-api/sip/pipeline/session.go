@@ -30,9 +30,9 @@ func (d *Dispatcher) createConversation(ctx context.Context, stage sip_infra.Ses
 		dirEnum = type_enums.DIRECTION_OUTBOUND
 	}
 
-	callerNumber := stage.FromIdentity
+	conversationIdentifier := stage.FromIdentity
 	if stage.Direction == sip_infra.CallDirectionOutbound {
-		callerNumber = stage.ToIdentity
+		conversationIdentifier = stage.ToIdentity
 	}
 
 	assistant := stage.Session.GetAssistant()
@@ -55,7 +55,7 @@ func (d *Dispatcher) createConversation(ctx context.Context, stage sip_infra.Ses
 		return 0, fmt.Errorf("assistant conversation service not configured")
 	}
 	conversation, err := d.assistantConversationService.CreateConversation(
-		ctx, stage.Auth, callerNumber, assistantID, assistantProviderID, dirEnum, utils.PhoneCall,
+		ctx, stage.Auth, conversationIdentifier, assistantID, assistantProviderID, dirEnum, utils.PhoneCall,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create conversation: %w", err)

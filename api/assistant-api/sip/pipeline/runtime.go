@@ -80,7 +80,28 @@ func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, session *sip_inf
 		return nil, fmt.Errorf("session_ended_before_start")
 	}
 	auth := session.GetAuth()
-	resolvedCallContext := d.resolveSIPCallContext(session, setup, direction, fromIdentity, toIdentity)
+	resolvedCallContext := setup.CallContext
+	if resolvedCallContext == nil {
+		d.logger.Warnw("setup.CallContext missing - reconstructing from session", "call_id", callID)
+		resolvedCallContext = reconstructCallContext(auth, setup.AssistantID, setup.ConversationID, direction, callID, callID, fromIdentity, toIdentity)
+		resolvedCallContext.AssistantProviderId = setup.AssistantProviderId
+		if setup.ProjectID != 0 {
+			resolvedCallContext.ProjectID = setup.ProjectID
+		}
+		if setup.OrganizationID != 0 {
+			resolvedCallContext.OrganizationID = setup.OrganizationID
+		}
+	} else {
+		if resolvedCallContext.AssistantProviderId == 0 {
+			resolvedCallContext.AssistantProviderId = setup.AssistantProviderId
+		}
+		if resolvedCallContext.ProjectID == 0 {
+			resolvedCallContext.ProjectID = setup.ProjectID
+		}
+		if resolvedCallContext.OrganizationID == 0 {
+			resolvedCallContext.OrganizationID = setup.OrganizationID
+		}
+	}
 	talkContext, cancelTalk := context.WithCancel(session.Context())
 
 	go func() {
@@ -197,46 +218,6 @@ func inboundRuntimeReadyTimeout(config *sip_infra.Config) time.Duration {
 		return config.InboundMaxRingDuration
 	}
 	return 30 * time.Second
-}
-
-func (d *Dispatcher) resolveSIPCallContext(session *sip_infra.Session, setup *CallSetupResult, direction, fromIdentity, toIdentity string) *callcontext.CallContext {
-	callID := session.GetCallID()
-	if setup.CallContext != nil {
-		call := setup.CallContext
-		if call.AssistantProviderId == 0 {
-			call.AssistantProviderId = setup.AssistantProviderId
-		}
-		if call.ProjectID == 0 {
-			call.ProjectID = setup.ProjectID
-		}
-		if call.OrganizationID == 0 {
-			call.OrganizationID = setup.OrganizationID
-		}
-		return call
-	}
-
-	d.logger.Warnw("setup.CallContext missing - reconstructing from session", "call_id", callID)
-	call := &callcontext.CallContext{
-		AssistantID:         setup.AssistantID,
-		ConversationID:      setup.ConversationID,
-		AssistantProviderId: setup.AssistantProviderId,
-		AuthToken:           setup.AuthToken,
-		AuthType:            setup.AuthType,
-		Direction:           direction,
-		Provider:            "sip",
-		ChannelUUID:         callID,
-		ContextID:           callID,
-		ProjectID:           setup.ProjectID,
-		OrganizationID:      setup.OrganizationID,
-	}
-	if direction == string(sip_infra.CallDirectionOutbound) {
-		call.CallerNumber = toIdentity
-		call.FromNumber = fromIdentity
-	} else {
-		call.CallerNumber = fromIdentity
-		call.FromNumber = toIdentity
-	}
-	return call
 }
 
 func (d *Dispatcher) configureSIPTransfer(ctx context.Context, session *sip_infra.Session, sipConfig *sip_infra.Config, call *callcontext.CallContext, transferStreamer internal_type.SIPTransferStreamer) {
