@@ -7,7 +7,6 @@
 package sip_infra
 
 import (
-	"encoding/json"
 	"errors"
 	"time"
 
@@ -474,40 +473,6 @@ func ParseConfigFromVault(vaultCredential *protos.VaultCredential) (*Config, err
 	}
 	config := configFromCore(coreConfig)
 	return &config, nil
-}
-
-func cloneMap(values map[string]interface{}) map[string]interface{} {
-	if len(values) == 0 {
-		return nil
-	}
-	copied := make(map[string]interface{}, len(values))
-	for key, value := range values {
-		copied[key] = value
-	}
-	return copied
-}
-
-func copyJSONCompatibleMap(raw map[string]string) map[string]string {
-	if len(raw) == 0 {
-		return nil
-	}
-	copied := make(map[string]string, len(raw))
-	for key, value := range raw {
-		copied[key] = value
-	}
-	return copied
-}
-
-func marshalJSONMap(value interface{}) map[string]interface{} {
-	raw, err := json.Marshal(value)
-	if err != nil {
-		return nil
-	}
-	var out map[string]interface{}
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return nil
-	}
-	return out
 }
 
 func isCoreSIPError(err error) (*internal_core.SIPError, bool) {
