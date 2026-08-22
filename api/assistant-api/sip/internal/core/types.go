@@ -606,27 +606,17 @@ func parseHeadersValue(value any) map[string]string {
 	return nil
 }
 
-// ExtractDIDFromURI extracts the user part from a SIP URI as a phone number (DID).
-// Strips URI parameters (e.g. ;user=phone) that some providers append.
+// ExtractDIDFromURI is retained for compatibility with the public SIP facade.
+// Deprecated: native SIP identity handling preserves parsed SIP addresses.
 func ExtractDIDFromURI(uri string) string {
 	raw := strings.TrimPrefix(strings.TrimPrefix(uri, "sip:"), "sips:")
-	parts := strings.SplitN(raw, "@", 2)
-	if len(parts) == 0 || parts[0] == "" {
+	user, _, _ := strings.Cut(raw, "@")
+	user, _, _ = strings.Cut(user, ";")
+	if user == "" || strings.Contains(user, ":") {
 		return ""
 	}
-	user := parts[0]
-	// Strip URI parameters (e.g. "+15551234567;user=phone" → "+15551234567")
-	if idx := strings.IndexByte(user, ';'); idx >= 0 {
-		user = user[:idx]
-	}
-	// Skip credential pairs (assistantID:apiKey)
-	if strings.Contains(user, ":") {
-		return ""
-	}
-	// Normalize to E.164: add "+" prefix for phone numbers
 	if len(user) > 5 && user[0] != '+' {
 		user = "+" + user
 	}
-
 	return user
 }

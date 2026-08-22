@@ -12,6 +12,8 @@ import (
 	"time"
 
 	internal_core "github.com/rapidaai/api/assistant-api/sip/internal/core"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConfigTypeConversionsPreserveFields(t *testing.T) {
@@ -249,8 +251,49 @@ func TestListenConfigAndServerConfigConversions(t *testing.T) {
 	}
 }
 
+func TestServerConfigMiddlewareConversionPreservesSIPIdentities(t *testing.T) {
+	var received *SIPRequestContext
+	serverConfig := (&ServerConfig{
+		Middlewares: []Middleware{func(ctx *SIPRequestContext) error {
+			received = ctx
+			ctx.AssistantID = "42"
+			return nil
+		}},
+	}).toCore()
+	require.Len(t, serverConfig.Middlewares, 1)
+
+	coreContext := &internal_core.SIPRequestContext{
+		RequestURI:   "sip:agent-42@sip.rapida.ai",
+		FromIdentity: "sip:alice@example.com;user=phone",
+		ToIdentity:   "sips:support@example.net",
+	}
+	err := serverConfig.Middlewares[0](coreContext)
+
+	require.NoError(t, err)
+	require.NotNil(t, received)
+	assert.Equal(t, "sip:agent-42@sip.rapida.ai", received.RequestURI)
+	assert.Equal(t, "sip:alice@example.com;user=phone", received.FromIdentity)
+	assert.Equal(t, "sips:support@example.net", received.ToIdentity)
+	assert.Equal(t, "sip:alice@example.com;user=phone", received.FromURI)
+	assert.Equal(t, "sips:support@example.net", received.ToURI)
+	assert.Equal(t, "42", coreContext.AssistantID)
+}
+
+func TestDeprecatedSIPCompatibilitySurface(t *testing.T) {
+	var _ func(*Server, func(*Session, string, string) error) = (*Server).SetOnApplicationReady
+	var _ func(*Server, func(*Session, string, string) error) = (*Server).SetOnInvite
+	var _ func(*Server, func(*Session, SIPRequestIdentity) error) = (*Server).SetOnApplicationReadyIdentity
+	var _ func(*Server, func(*Session, SIPRequestIdentity) error) = (*Server).SetOnInviteIdentity
+
+	assert.Equal(t, "+15551234567", ExtractDIDFromURI("sip:15551234567@example.com"))
+}
+
 func TestSIPRequestContextMiddleware(t *testing.T) {
-	requestContext := &SIPRequestContext{}
+	requestContext := &SIPRequestContext{
+		RequestURI:   "sip:agent-42@sip.rapida.ai",
+		FromIdentity: "sip:alice@example.com",
+		ToIdentity:   "sip:support@example.net",
+	}
 
 	var order []string
 	middlewares := []Middleware{
@@ -276,6 +319,11 @@ func TestSIPRequestContextMiddleware(t *testing.T) {
 	}
 	if requestContext.Config == nil || requestContext.Config.Server != "sip.example.com" {
 		t.Fatalf("unexpected middleware context: %#v", requestContext)
+	}
+	if requestContext.RequestURI != "sip:agent-42@sip.rapida.ai" ||
+		requestContext.FromIdentity != "sip:alice@example.com" ||
+		requestContext.ToIdentity != "sip:support@example.net" {
+		t.Fatalf("middleware changed SIP identities: %#v", requestContext)
 	}
 	expectedOrder := []string{"first", "second", "final"}
 	for i := range expectedOrder {
@@ -404,4 +452,10 @@ func TestOutboundTypeConversions(t *testing.T) {
 	if request.toCore().Identity.FromUser != "+15550002222" {
 		t.Fatalf("outbound invite identity conversion mismatch: %#v", request.toCore().Identity)
 	}
+}
+
+func TestOutboundTypeConversionsPreserveNilHeaders(t *testing.T) {
+	coreOutboundConfig := (OutboundConfig{}).toCore()
+
+	assert.Nil(t, coreOutboundConfig.Headers)
 }

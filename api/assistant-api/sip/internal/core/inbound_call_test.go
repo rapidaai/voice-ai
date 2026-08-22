@@ -33,15 +33,19 @@ func TestInboundCall_InvalidSDPRejectsWithoutSession(t *testing.T) {
 
 func TestInboundCall_InvalidIdentityRejectsWithoutSession(t *testing.T) {
 	cases := []struct {
-		name          string
-		callID        string
-		removeHeader  string
-		removeFromTag bool
+		name             string
+		callID           string
+		removeHeader     string
+		removeFromTag    bool
+		emptyFromAddress bool
+		emptyToAddress   bool
 	}{
 		{name: "missing call id", callID: "inbound-missing-call-id", removeHeader: "Call-ID"},
 		{name: "missing from", callID: "inbound-missing-from", removeHeader: "From"},
 		{name: "missing from tag", callID: "inbound-missing-from-tag", removeFromTag: true},
 		{name: "missing to", callID: "inbound-missing-to", removeHeader: "To"},
+		{name: "empty from address", callID: "inbound-empty-from-address", emptyFromAddress: true},
+		{name: "empty to address", callID: "inbound-empty-to-address", emptyToAddress: true},
 	}
 
 	for _, tc := range cases {
@@ -52,6 +56,12 @@ func TestInboundCall_InvalidIdentityRejectsWithoutSession(t *testing.T) {
 			}
 			if tc.removeFromTag && request.From() != nil && request.From().Params != nil {
 				delete(request.From().Params, "tag")
+			}
+			if tc.emptyFromAddress {
+				request.From().Address = sip.Uri{Scheme: "sip"}
+			}
+			if tc.emptyToAddress {
+				request.To().Address = sip.Uri{Scheme: "sip"}
 			}
 			transaction := newTestServerTx()
 
@@ -65,6 +75,20 @@ func TestInboundCall_InvalidIdentityRejectsWithoutSession(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestInboundInviteIdentityFromRequestPreservesRoutingAndPartyIdentities(t *testing.T) {
+	request := newInboundInviteRequest("identity-snapshot")
+	request.Recipient = sip.Uri{Scheme: "sip", User: "agent-42", Host: "sip.rapida.ai"}
+	request.From().Address = sip.Uri{Scheme: "sip", User: "alice", Host: "example.com"}
+	request.To().Address = sip.Uri{Scheme: "sips", User: "support", Host: "example.net"}
+
+	identity, ok := inboundInviteIdentityFromRequest(request)
+
+	require.True(t, ok)
+	assert.Equal(t, request.Recipient.String(), identity.requestURI)
+	assert.Equal(t, request.From().Address.String(), identity.fromIdentity)
+	assert.Equal(t, request.To().Address.String(), identity.toIdentity)
 }
 
 func TestInboundCall_ConfigRejectDoesNotCreateSession(t *testing.T) {
@@ -426,18 +450,27 @@ func TestInboundCall_ApplicationReadyBeforeAnswerAndMediaStart(t *testing.T) {
 	}})
 	phaseOrder := make([]string, 0, 2)
 	transaction := newActiveAckableTestServerTx()
-	server.SetOnApplicationReady(func(session *Session, _, _ string) error {
+	request := newInboundInviteRequest("inbound-ready-before-answer")
+	expectedRequestURI := request.Recipient.String()
+	expectedFromIdentity := request.From().Address.String()
+	expectedToIdentity := request.To().Address.String()
+	server.SetOnApplicationReady(func(session *Session, requestURI, fromIdentity, toIdentity string) error {
 		phaseOrder = append(phaseOrder, "application_ready")
 		assert.Equal(t, 180, transaction.lastStatus())
 		assert.Equal(t, InboundSetupPhaseMediaAllocated, session.GetInboundSetupPhase())
+		assert.Equal(t, expectedRequestURI, requestURI)
+		assert.Equal(t, expectedFromIdentity, fromIdentity)
+		assert.Equal(t, expectedToIdentity, toIdentity)
 		return nil
 	})
-	server.SetOnInvite(func(session *Session, _, _ string) error {
+	server.SetOnInvite(func(session *Session, requestURI, fromIdentity, toIdentity string) error {
 		phaseOrder = append(phaseOrder, "call_start")
 		assert.Equal(t, InboundSetupPhaseMediaFlowing, session.GetInboundSetupPhase())
+		assert.Equal(t, expectedRequestURI, requestURI)
+		assert.Equal(t, expectedFromIdentity, fromIdentity)
+		assert.Equal(t, expectedToIdentity, toIdentity)
 		return nil
 	})
-	request := newInboundInviteRequest("inbound-ready-before-answer")
 	transaction.PushACK(newACKRequest("inbound-ready-before-answer"))
 
 	server.handleInvite(request, transaction)
@@ -449,6 +482,126 @@ func TestInboundCall_ApplicationReadyBeforeAnswerAndMediaStart(t *testing.T) {
 	require.True(t, exists)
 	assert.Equal(t, CallStateConnected, session.GetState())
 	assert.Equal(t, InboundSetupPhaseMediaFlowing, session.GetInboundSetupPhase())
+}
+
+func TestInboundCall_ReInviteDoesNotReplaceInitialPartyIdentities(t *testing.T) {
+	server := newServerForCommandTests(t)
+	server.SetMiddlewares([]Middleware{func(ctx *SIPRequestContext) error {
+		ctx.Config = bridgeTestConfig()
+		return nil
+	}})
+	callbackCount := 0
+	var capturedFromIdentity string
+	var capturedToIdentity string
+	server.SetOnInvite(func(_ *Session, _, fromIdentity, toIdentity string) error {
+		callbackCount++
+		capturedFromIdentity = fromIdentity
+		capturedToIdentity = toIdentity
+		return nil
+	})
+
+	initialRequest := newInboundInviteRequest("inbound-reinvite-identity")
+	initialRequest.From().Address = sip.Uri{Scheme: "sip", User: "original-caller", Host: "example.com"}
+	initialRequest.To().Address = sip.Uri{Scheme: "sip", User: "original-assistant", Host: "sip.rapida.ai"}
+	initialTransaction := newActiveAckableTestServerTx()
+	initialTransaction.PushACK(newACKRequest("inbound-reinvite-identity"))
+	server.handleInvite(initialRequest, initialTransaction)
+
+	require.Equal(t, 1, callbackCount)
+	require.Equal(t, 200, initialTransaction.lastStatus())
+	session, exists := server.GetSession("inbound-reinvite-identity")
+	require.True(t, exists)
+
+	reInvite := newInboundDialogSDPRequest(t, session, sip.INVITE, validInboundOfferSDP())
+	reInvite.From().Address = sip.Uri{Scheme: "sip", User: "changed-caller", Host: "example.net"}
+	reInvite.To().Address = sip.Uri{Scheme: "sip", User: "changed-assistant", Host: "sip.example.net"}
+	reInviteTransaction := newTestServerTx()
+	server.handleInvite(reInvite, reInviteTransaction)
+
+	require.Equal(t, 200, reInviteTransaction.lastStatus())
+	assert.Equal(t, 1, callbackCount)
+	assert.Equal(t, "sip:original-caller@example.com", capturedFromIdentity)
+	assert.Equal(t, "sip:original-assistant@sip.rapida.ai", capturedToIdentity)
+}
+
+func TestInboundCall_InviteWithReplacesUsesNewDialogPartyIdentities(t *testing.T) {
+	server := newServerForCommandTests(t)
+	server.SetMiddlewares([]Middleware{func(ctx *SIPRequestContext) error {
+		ctx.Config = bridgeTestConfig()
+		return nil
+	}})
+	replacedSession := registerConnectedInboundDialogSession(t, server, "replaced-dialog")
+
+	callbackCount := 0
+	var capturedRequestURI string
+	var capturedFromIdentity string
+	var capturedToIdentity string
+	server.SetOnInvite(func(_ *Session, requestURI, fromIdentity, toIdentity string) error {
+		callbackCount++
+		capturedRequestURI = requestURI
+		capturedFromIdentity = fromIdentity
+		capturedToIdentity = toIdentity
+		return nil
+	})
+
+	replacementRequest := newInboundInviteRequest("replacement-dialog")
+	replacementRequest.Recipient = sip.Uri{Scheme: "sip", User: "agent-42", Host: "sip.rapida.ai"}
+	replacementRequest.From().Address = sip.Uri{Scheme: "sip", User: "replacement-caller", Host: "example.net"}
+	replacementRequest.To().Address = sip.Uri{Scheme: "sip", User: "replacement-assistant", Host: "sip.example.net"}
+	replacementRequest.AppendHeader(sip.NewHeader("Replaces", replacedSession.GetCallID()+";to-tag=to-tag;from-tag=from-tag"))
+	replacementTransaction := newActiveAckableTestServerTx()
+	replacementTransaction.PushACK(newACKRequest("replacement-dialog"))
+
+	server.handleInvite(replacementRequest, replacementTransaction)
+
+	require.Equal(t, 200, replacementTransaction.lastStatus())
+	assert.Equal(t, 1, callbackCount)
+	assert.Equal(t, replacementRequest.Recipient.String(), capturedRequestURI)
+	assert.Equal(t, "sip:replacement-caller@example.net", capturedFromIdentity)
+	assert.Equal(t, "sip:replacement-assistant@sip.example.net", capturedToIdentity)
+	_, replacedExists := server.GetSession("replaced-dialog")
+	_, replacementExists := server.GetSession("replacement-dialog")
+	assert.True(t, replacedExists)
+	assert.True(t, replacementExists)
+}
+
+func TestInboundCall_REFERDoesNotReplaceInitialPartyIdentities(t *testing.T) {
+	server := newServerForCommandTests(t)
+	server.SetMiddlewares([]Middleware{func(ctx *SIPRequestContext) error {
+		ctx.Config = bridgeTestConfig()
+		return nil
+	}})
+	callbackCount := 0
+	var capturedFromIdentity string
+	var capturedToIdentity string
+	server.SetOnInvite(func(_ *Session, _, fromIdentity, toIdentity string) error {
+		callbackCount++
+		capturedFromIdentity = fromIdentity
+		capturedToIdentity = toIdentity
+		return nil
+	})
+
+	initialRequest := newInboundInviteRequest("inbound-refer-identity")
+	initialRequest.From().Address = sip.Uri{Scheme: "sip", User: "original-caller", Host: "example.com"}
+	initialRequest.To().Address = sip.Uri{Scheme: "sip", User: "original-assistant", Host: "sip.rapida.ai"}
+	initialTransaction := newActiveAckableTestServerTx()
+	initialTransaction.PushACK(newACKRequest("inbound-refer-identity"))
+	server.handleInvite(initialRequest, initialTransaction)
+
+	require.Equal(t, 1, callbackCount)
+	session, exists := server.GetSession("inbound-refer-identity")
+	require.True(t, exists)
+
+	referRequest := newInboundDialogRequest(t, session, sip.REFER)
+	referRequest.AppendHeader(sip.NewHeader("Refer-To", "<sip:transfer-target@example.net>"))
+	referTransaction := newTestServerTx()
+	server.handleRefer(referRequest, referTransaction)
+
+	require.Equal(t, 603, referTransaction.lastStatus())
+	assert.Equal(t, 1, callbackCount)
+	assert.Equal(t, "sip:original-caller@example.com", capturedFromIdentity)
+	assert.Equal(t, "sip:original-assistant@sip.rapida.ai", capturedToIdentity)
+	assert.Equal(t, 1, server.SessionCount())
 }
 
 func TestInboundCall_ProvisionalResponsesBeforeAnswer(t *testing.T) {
@@ -509,7 +662,7 @@ func TestInboundCall_RetransmitsRingingUntilAnswer(t *testing.T) {
 		return nil
 	}})
 	applicationReady := make(chan struct{})
-	server.SetOnApplicationReady(func(_ *Session, _, _ string) error {
+	server.SetOnApplicationReady(func(_ *Session, _, _, _ string) error {
 		<-applicationReady
 		return nil
 	})
@@ -547,7 +700,7 @@ func TestInboundCall_WaitsForApplicationReadyBeforeAnswer(t *testing.T) {
 		return nil
 	}})
 	applicationReady := make(chan struct{})
-	server.SetOnApplicationReady(func(_ *Session, _, _ string) error {
+	server.SetOnApplicationReady(func(_ *Session, _, _, _ string) error {
 		<-applicationReady
 		return nil
 	})
@@ -625,7 +778,7 @@ func TestInboundCall_AnswersAfterApplicationReadyWithoutAssistantAudio(t *testin
 		return nil
 	}})
 	applicationReadyCalled := false
-	server.SetOnApplicationReady(func(_ *Session, _, _ string) error {
+	server.SetOnApplicationReady(func(_ *Session, _, _, _ string) error {
 		applicationReadyCalled = true
 		return nil
 	})
@@ -700,10 +853,10 @@ func TestInboundCall_ApplicationReadinessFailureRejectsBeforeAnswer(t *testing.T
 		ctx.Config = bridgeTestConfig()
 		return nil
 	}})
-	server.SetOnApplicationReady(func(_ *Session, _, _ string) error {
+	server.SetOnApplicationReady(func(_ *Session, _, _, _ string) error {
 		return errors.New("assistant not ready")
 	})
-	server.SetOnInvite(func(_ *Session, _, _ string) error {
+	server.SetOnInvite(func(_ *Session, _, _, _ string) error {
 		t.Fatal("onInvite should not run when application readiness fails")
 		return nil
 	})
@@ -730,14 +883,14 @@ func TestInboundCall_ACKTimeoutCleansPreparedApplication(t *testing.T) {
 	}})
 	cleanupCount := 0
 	var capturedSession *Session
-	server.SetOnApplicationReady(func(session *Session, _, _ string) error {
+	server.SetOnApplicationReady(func(session *Session, _, _, _ string) error {
 		capturedSession = session
 		return nil
 	})
 	server.SetOnApplicationCleanup(func(_ *Session) {
 		cleanupCount++
 	})
-	server.SetOnInvite(func(_ *Session, _, _ string) error {
+	server.SetOnInvite(func(_ *Session, _, _, _ string) error {
 		t.Fatal("onInvite should not run when ACK timeout fails")
 		return nil
 	})
@@ -976,10 +1129,11 @@ func loadInboundIdentity(t *testing.T, inboundCall *Inbound) {
 	require.NotNil(t, inboundCall.request.From())
 	require.NotNil(t, inboundCall.request.To())
 	inboundCall.identity = inboundInviteIdentity{
-		callID:  inboundCall.request.CallID().Value(),
-		fromTag: "fromtag",
-		fromURI: inboundCall.request.From().Address.String(),
-		toURI:   inboundCall.request.To().Address.String(),
+		callID:       inboundCall.request.CallID().Value(),
+		fromTag:      "fromtag",
+		requestURI:   inboundCall.request.Recipient.String(),
+		fromIdentity: inboundCall.request.From().Address.String(),
+		toIdentity:   inboundCall.request.To().Address.String(),
 	}
 	inboundCall.inviteKey = inboundInviteKey{callID: inboundCall.identity.callID, fromTag: inboundCall.identity.fromTag}
 }

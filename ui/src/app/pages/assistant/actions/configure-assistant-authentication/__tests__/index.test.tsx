@@ -13,6 +13,7 @@ import {
   CreateAssistantAuthenticationPage,
   UpdateAssistantAuthenticationPage,
 } from '../index';
+import { AUTH_KEY_OPTIONS_BY_TYPE } from '../shared';
 import {
   CreateAssistantConfiguration,
   DeleteAssistantConfiguration,
@@ -329,12 +330,22 @@ jest.mock('@/app/components/carbon/url-table-cell', () => ({
 }));
 
 describe('CreateAssistantAuthenticationPage', () => {
+  it('uses canonical client metadata keys', () => {
+    expect(AUTH_KEY_OPTIONS_BY_TYPE.client.map(option => option.value)).toEqual(
+      ['phone', 'assistant_phone', 'direction', 'channel', 'provider_call_id'],
+    );
+  });
+
   const makeOption = (key: string, value: string) => ({
     getKey: () => key,
     getValue: () => value,
   });
 
-  const getSuccessLoadResponse = (failBehavior = 'BLOCK', enabled = true) => ({
+  const getSuccessLoadResponse = (
+    failBehavior = 'BLOCK',
+    enabled = true,
+    body = '{"assistant.id":"assistantId","client.phone":"clientPhone"}',
+  ) => ({
     getSuccess: () => true,
     getDataList: () => [
       {
@@ -347,10 +358,7 @@ describe('CreateAssistantAuthenticationPage', () => {
           makeOption('http_method', 'POST'),
           makeOption('http_url', 'https://auth.example.com/loaded'),
           makeOption('http_headers', '{}'),
-          makeOption(
-            'http_body',
-            '{"assistant.id":"assistantId","client.phone":"clientPhone"}',
-          ),
+          makeOption('http_body', body),
           makeOption('fail_behavior', failBehavior),
           makeOption('timeout_ms', '5000'),
           makeOption(
@@ -429,6 +437,91 @@ describe('CreateAssistantAuthenticationPage', () => {
 
     expect(screen.getByText(/Mapping \(\d+\)/)).toBeInTheDocument();
     expect(lastField).toHaveValue('assistantPrompt');
+  });
+
+  it('submits canonical assistant and provider call identifiers', async () => {
+    render(<CreateAssistantAuthenticationPage />);
+    await waitUntilReady();
+
+    fireEvent.change(screen.getByTestId('assistant-auth-endpoint'), {
+      target: { value: 'https://auth.example.com/resolve' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add parameter' }));
+    fireEvent.change(screen.getByTestId('param-type-2'), {
+      target: { value: 'client' },
+    });
+    fireEvent.change(screen.getByTestId('param-key-2'), {
+      target: { value: 'assistant_phone' },
+    });
+    fireEvent.change(screen.getByTestId('param-val-2'), {
+      target: { value: 'assistantPhoneValue' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add parameter' }));
+    fireEvent.change(screen.getByTestId('param-type-3'), {
+      target: { value: 'client' },
+    });
+    fireEvent.change(screen.getByTestId('param-key-3'), {
+      target: { value: 'provider_call_id' },
+    });
+    fireEvent.change(screen.getByTestId('param-val-3'), {
+      target: { value: 'providerCallIdValue' },
+    });
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Save authentication' }),
+    );
+
+    await waitFor(() =>
+      expect(CreateAssistantConfiguration).toHaveBeenCalledTimes(1),
+    );
+    const request = (CreateAssistantConfiguration as jest.Mock).mock
+      .calls[0][1] as {
+      optionsList: Array<{ getKey: () => string; getValue: () => string }>;
+    };
+    const bodyOption = request.optionsList.find(
+      option => option.getKey() === 'http_body',
+    );
+    expect(JSON.parse(bodyOption?.getValue() || '{}')).toMatchObject({
+      'client.assistant_phone': 'assistantPhoneValue',
+      'client.provider_call_id': 'providerCallIdValue',
+    });
+  });
+
+  it('normalizes legacy client keys when updating an existing configuration', async () => {
+    (GetAllAssistantConfiguration as jest.Mock).mockResolvedValueOnce(
+      getSuccessLoadResponse(
+        'BLOCK',
+        true,
+        JSON.stringify({
+          'client.assistantPhone': 'legacyAssistant',
+          'client.assistant_phone': 'canonicalAssistant',
+          'client.providerCallId': 'legacyProviderCallId',
+        }),
+      ),
+    );
+
+    render(<UpdateAssistantAuthenticationPage />);
+    await waitUntilReady();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Save authentication' }),
+    );
+
+    await waitFor(() =>
+      expect(UpdateAssistantConfiguration).toHaveBeenCalledTimes(1),
+    );
+    const request = (UpdateAssistantConfiguration as jest.Mock).mock
+      .calls[0][1] as {
+      optionsList: Array<{ getKey: () => string; getValue: () => string }>;
+    };
+    const bodyOption = request.optionsList.find(
+      option => option.getKey() === 'http_body',
+    );
+    expect(JSON.parse(bodyOption?.getValue() || '{}')).toEqual({
+      'client.assistant_phone': 'canonicalAssistant',
+      'client.provider_call_id': 'legacyProviderCallId',
+    });
   });
 
   it('creates authentication when valid', async () => {

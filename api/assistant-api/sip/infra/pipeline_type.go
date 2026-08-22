@@ -23,8 +23,9 @@ type SessionEstablishedPipeline struct {
 	Direction       CallDirection
 	AssistantID     uint64
 	Auth            types.SimplePrinciple
-	FromURI         string
-	ToURI           string
+	RequestURI      string
+	FromIdentity    string
+	ToIdentity      string
 	ConversationID  uint64
 }
 
