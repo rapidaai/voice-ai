@@ -1,4 +1,5 @@
 service_name: "endpoint-api"
+service_id: 9005
 host: "0.0.0.0"
 port: 9005
 log_level: "debug"

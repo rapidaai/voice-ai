@@ -1,0 +1,45 @@
+{
+  "status": "blocked",
+  "reviewed_at": "2026-08-23T09:35:18Z",
+  "task_id": "task_7f4d043bcc91",
+  "dispatch_id": "ctx_9f361df55878",
+  "reviewer": "Independent Codex implementation reviewer",
+  "decision": "block",
+  "summary": "The RFC 0007 implementation correctly emits and reconstructs delegated actors, uses YAML service actor IDs, centralizes authentication errors, and preserves Python compatibility, but it breaks existing SIP flows that construct project authentication without a durable actor.",
+  "findings": [
+    {
+      "severity": "major",
+      "title": "Existing SIP authentication objects cannot pass the new mandatory actor validation",
+      "evidence": [
+        "pkg/clients/internal_client.go:155 requires auth.Actor() before every WithAuth, WithPlatform, or WithHttpAuth assertion is minted.",
+        "api/assistant-api/sip/middleware/route_middleware.go:181 constructs project authentication without ActorValue, and api/assistant-api/sip/middleware/vault_middleware.go:53 sends that value through VaultClient.GetCredential and InternalClient.WithAuth.",
+        "api/assistant-api/sip/registration/manager.go:94 constructs the same actorless project authentication, and api/assistant-api/sip/registration/register.go:67 passes it to VaultClient.GetCredential at line 79.",
+        "The focused SIP tests pass because these dependencies are mocked and therefore do not exercise the real InternalClient token-minting boundary."
+      ],
+      "impact": "Inbound SIP configuration and background SIP registration operations fail with ErrActorUnavailable before their downstream Web API calls, creating a production compatibility regression.",
+      "required_changes": [
+        "Inventory every production Authentication constructor that can reach an InternalClient method and ensure it supplies a truthful durable ActorValue.",
+        "For SIP-originated operations, represent the effective actor as the appropriate service or system identity from configuration unless a real project credential actor is available; do not substitute the project ID for a credential actor ID.",
+        "Expand the RFC implementation scope to include the affected SIP constructors and add tests that execute their outbound call through the real token-minting validation rather than only mocks."
+      ]
+    }
+  ],
+  "verified_behavior": [
+    "WithAuth, WithPlatform, and WithHttpAuth share createServiceScopeToken and emit delegated actor claims.",
+    "User, project, organization, service, and system claims are validated and reconstructed with CallerValue retaining the immediate service actor.",
+    "AppConfig.ServiceID is YAML-backed and the checked-in service configurations use positive distinct values.",
+    "Authentication-flow sentinel errors are declared in pkg/types/rapida_auth.go and tested with errors.Is.",
+    "The Python Document middleware ignores the optional delegated claims and continues to expose the outer service actor."
+  ],
+  "verification": {
+    "passed": [
+      "go test ./pkg/types ./pkg/authenticators ./pkg/clients/... ./pkg/middlewares ./api/web-api/config ./api/assistant-api/config ./api/endpoint-api/config ./api/integration-api/config",
+      "go test ./api/assistant-api/sip/...",
+      "make agent-finalize CHANGED_FILES=...",
+      "git diff --check"
+    ],
+    "not_run": [
+      "Python middleware test: pytest is not installed in the available Python or Pipenv environment"
+    ]
+  }
+}

@@ -17,6 +17,7 @@ import (
 
 const baseIntegrationYAML = `
 service_name: "Integration_Service"
+service_id: 9004
 host: "0.0.0.0"
 port: 9004
 secret: "rpd_pks"
@@ -109,6 +110,9 @@ func TestGetApplicationConfig(t *testing.T) {
 	if appConfig == nil {
 		t.Fatalf("appConfig is nil")
 	}
+	if appConfig.ServiceID != 9004 {
+		t.Fatalf("ServiceID = %d, want 9004", appConfig.ServiceID)
+	}
 
 	if appConfig.PostgresConfig.DBName != "integration_db" {
 		t.Errorf("Expected PostgresConfig.DBName to be 'integration_db', but got %v", appConfig.PostgresConfig.DBName)
@@ -136,5 +140,17 @@ func TestGetApplicationConfig(t *testing.T) {
 	}
 	if appConfig.Ui.Host != "http://localhost:3000" {
 		t.Errorf("Expected Ui.Host to be 'http://localhost:3000', but got %v", appConfig.Ui.Host)
+	}
+}
+
+func TestGetApplicationConfigRejectsMissingServiceID(t *testing.T) {
+	vConfig := viper.New()
+	vConfig.SetConfigType("yaml")
+	configYAML := strings.Replace(baseIntegrationYAML, "service_id: 9004\n", "", 1)
+	if err := vConfig.ReadConfig(strings.NewReader(configYAML)); err != nil {
+		t.Fatalf("ReadConfig returned an error: %v", err)
+	}
+	if _, err := GetApplicationConfig(vConfig); err == nil {
+		t.Fatal("GetApplicationConfig() error = nil")
 	}
 }

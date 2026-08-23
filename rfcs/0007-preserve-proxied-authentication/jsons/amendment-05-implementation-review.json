@@ -1,0 +1,60 @@
+{
+  "status": "blocked",
+  "reviewed_at": "2026-08-23T14:40:50Z",
+  "run_id": "run_a342a4f9f1cf",
+  "task_id": "task_0e17b1732fcb",
+  "dispatch_id": "ctx_9c06402f3683",
+  "reviewer": "Independent Codex implementation reviewer",
+  "implementation_owner": "RFC 0007 implementation owner",
+  "decision": "block",
+  "summary": "The authentication behavior is correct and the SIP actorless regression is resolved, but the current diff modifies two test files outside the exact confirmed RFC and amendment 05 allowed paths. Because this review was instructed to approve only with no critical, major, or minor findings, the unapproved scope expansion blocks approval until the files are removed or explicitly approved through a confirmed amendment.",
+  "evidence": {
+    "plan": "rfcs/0007-preserve-proxied-authentication/jsons/amendment-05-plan.json (SHA-256 312aaf4b3687c6762a2ec734318d547a56e9ad3a767d666b58079b05ca532429)",
+    "implementation": "Current working-tree changes listed by git status and git diff",
+    "verification": "Focused uncached Go tests, broader Go package tests, make agent-finalize, and git diff --check",
+    "diff": "git diff plus git ls-files --others --exclude-standard"
+  },
+  "orchestration": {
+    "run_id": "run_a342a4f9f1cf",
+    "task_id": "task_0e17b1732fcb",
+    "dispatch_id": "ctx_9c06402f3683"
+  },
+  "findings": [
+    {
+      "severity": "major",
+      "status": "open",
+      "title": "Implementation changes files outside the confirmed amendment scope",
+      "evidence": [
+        "rfcs/0007-preserve-proxied-authentication/jsons/amendment-05-plan.json lists api/assistant-api/sip/registration/manager_test.go as the only registration test path and does not authorize api/assistant-api/sip/registration/record_test.go or api/assistant-api/sip/sip_test.go.",
+        "The accepted RFC allowed-path list also omits api/assistant-api/sip/registration/record_test.go and api/assistant-api/sip/sip_test.go.",
+        "git diff shows record_test.go changed to add AssistantConfig service actor fixture data and sip_test.go changed to add TestSIPEngineUsesConfiguredServiceID."
+      ],
+      "impact": "The implementation does not match the exact scope approved by the amendment 05 challenge and confirmation gate, so the governed change cannot be approved as-is even though the runtime behavior and tests pass.",
+      "required_changes": [
+        "Either revert both out-of-scope test-file changes, or approve and confirm a follow-up amendment that explicitly adds the required test paths before retaining those changes.",
+        "If api/assistant-api/sip/sip_test.go remains, replace or justify the tautological field-value assertion with behavior that verifies SIPEngine wiring; otherwise remove it."
+      ]
+    }
+  ],
+  "verified_behavior": [
+    "SIP route authentication uses AuthTypeService and ActorTypeService with the Assistant service_id, rejects a missing or invalid actor, and retains organization and project scope.",
+    "SIP registration paths consistently use manager-owned service authentication, and the regression test passes through InternalClient.WithAuth, token extraction, and Authentication reconstruction.",
+    "No SIP path represents the project ID as a project credential actor ID.",
+    "WithAuth, WithPlatform, and WithHttpAuth share createServiceScopeToken and emit the effective actor together with tenant scope.",
+    "Go gRPC unary and stream middleware reconstruct the delegated effective actor while retaining the immediate service caller in CallerValue.",
+    "Authentication errors used by the changed token flow are centralized package sentinels and support errors.Is checks.",
+    "The accepted RFC, amendment plan, and challenge receipt hashes match the confirmed SHA-256 values."
+  ],
+  "verification": {
+    "passed": [
+      "go test ./api/assistant-api/sip/middleware ./api/assistant-api/sip/registration ./pkg/clients ./pkg/types ./pkg/middlewares ./pkg/authenticators ./api/web-api/api ./api/web-api/internal/service/vault ./api/web-api/config ./api/assistant-api/config ./api/endpoint-api/config ./api/integration-api/config",
+      "go test ./api/assistant-api/sip/...",
+      "go test -count=1 ./api/assistant-api/sip/middleware ./api/assistant-api/sip/registration ./pkg/clients ./pkg/types ./pkg/middlewares",
+      "make agent-finalize CHANGED_FILES=...",
+      "git diff --check"
+    ],
+    "not_run": [
+      "pytest -q api/document-api/tests/middlewares/test_jwt_authoriation_middleware.py: pytest is unavailable both directly and through the repository Pipenv environment"
+    ]
+  }
+}

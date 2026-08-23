@@ -82,8 +82,10 @@ func TestInternalClientCacheWithTTLRejectsNonPositiveTTL(t *testing.T) {
 
 func TestInternalClientCreateServiceScopeToken(t *testing.T) {
 	client := actorAwareInternalClient(t)
+	actor := types.ActorIdentity{Type: types.ActorTypeUser, ID: 5}
 	token, err := client.createServiceScopeToken(&types.Authentication{
 		AuthType:          types.AuthTypeUser,
+		ActorValue:        &actor,
 		UserValue:         &types.UserContext{UserID: 5},
 		OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
 		ProjectValue:      &types.ProjectContext{OrganizationID: 7, ProjectID: 11},
@@ -99,9 +101,16 @@ func TestInternalClientCreateServiceScopeToken(t *testing.T) {
 	if !ok || context.OrganizationID != 7 || context.UserID != nil || context.ProjectID == nil || *context.ProjectID != 11 {
 		t.Fatalf("DelegatedContext() = %+v, %v", context, ok)
 	}
-	actor, err := types.ResolveAuditActor(scope)
-	if err != nil || actor != (types.ActorIdentity{Type: types.ActorTypeService, ID: 41}) {
-		t.Fatalf("ResolveAuditActor() = %+v, %v", actor, err)
+	serviceActor, err := types.ResolveAuditActor(scope)
+	if err != nil || serviceActor != (types.ActorIdentity{Type: types.ActorTypeService, ID: 41}) {
+		t.Fatalf("ResolveAuditActor() = %+v, %v", serviceActor, err)
+	}
+	auth, err := scope.Authentication()
+	if err != nil {
+		t.Fatalf("Authentication() error = %v", err)
+	}
+	if effectiveActor, err := auth.Actor(); err != nil || effectiveActor != (types.ActorIdentity{Type: types.ActorTypeUser, ID: 5}) {
+		t.Fatalf("Actor() = %+v, %v", effectiveActor, err)
 	}
 }
 
@@ -113,6 +122,44 @@ func TestInternalClientCreateServiceScopeTokenRequiresOrganization(t *testing.T)
 	})
 	if !errors.Is(err, types.ErrOrganizationContextUnavailable) {
 		t.Fatalf("createServiceScopeToken() error = %v", err)
+	}
+}
+
+func TestInternalClientCreateServiceScopeTokenRejectsInvalidSourceAuthentication(t *testing.T) {
+	client := actorAwareInternalClient(t)
+	userActor := types.ActorIdentity{Type: types.ActorTypeUser, ID: 5}
+	serviceActor := types.ActorIdentity{Type: types.ActorTypeService, ID: 6}
+	tests := []struct {
+		name string
+		auth *types.Authentication
+	}{
+		{
+			name: "missing user context",
+			auth: &types.Authentication{AuthType: types.AuthTypeUser, ActorValue: &userActor, OrganizationValue: &types.OrganizationContext{OrganizationID: 7}},
+		},
+		{
+			name: "mismatched user context",
+			auth: &types.Authentication{AuthType: types.AuthTypeUser, ActorValue: &userActor, UserValue: &types.UserContext{UserID: 8}, OrganizationValue: &types.OrganizationContext{OrganizationID: 7}},
+		},
+		{
+			name: "service actor type mismatch",
+			auth: &types.Authentication{AuthType: types.AuthTypeService, ActorValue: &userActor, OrganizationValue: &types.OrganizationContext{OrganizationID: 7}},
+		},
+		{
+			name: "system actor type mismatch",
+			auth: &types.Authentication{AuthType: types.AuthTypeSystem, ActorValue: &serviceActor, OrganizationValue: &types.OrganizationContext{OrganizationID: 7}},
+		},
+		{
+			name: "system actor missing",
+			auth: &types.Authentication{AuthType: types.AuthTypeSystem, OrganizationValue: &types.OrganizationContext{OrganizationID: 7}},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := client.createServiceScopeToken(test.auth); err == nil {
+				t.Fatal("createServiceScopeToken() error = nil")
+			}
+		})
 	}
 }
 
@@ -134,14 +181,14 @@ func TestInternalClientCreateServiceScopeTokenRequiresActorAndSecret(t *testing.
 		AuthType:          types.AuthTypeOrg,
 		OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
 	}
-	t.Setenv("RAPIDA_SERVICE_ACTOR_ID", "")
-	if _, err := client.createServiceScopeToken(authentication); err == nil {
-		t.Fatal("createServiceScopeToken() error = nil without service actor ID")
+	client.cfg.ServiceID = 0
+	if _, err := client.createServiceScopeToken(authentication); !errors.Is(err, types.ErrServiceActorUnavailable) {
+		t.Fatalf("createServiceScopeToken() error = %v, want %v", err, types.ErrServiceActorUnavailable)
 	}
-	t.Setenv("RAPIDA_SERVICE_ACTOR_ID", "41")
+	client.cfg.ServiceID = 41
 	client.cfg.Secret = ""
-	if _, err := client.createServiceScopeToken(authentication); err == nil {
-		t.Fatal("createServiceScopeToken() error = nil without shared secret")
+	if _, err := client.createServiceScopeToken(authentication); !errors.Is(err, types.ErrServiceSecretUnavailable) {
+		t.Fatalf("createServiceScopeToken() error = %v, want %v", err, types.ErrServiceSecretUnavailable)
 	}
 }
 
@@ -158,8 +205,10 @@ func TestInternalClientWithAuthReturnsErrorWithoutContext(t *testing.T) {
 
 func TestInternalClientWithAuthAddsServiceAssertion(t *testing.T) {
 	client := actorAwareInternalClient(t)
+	actor := types.ActorIdentity{Type: types.ActorTypeOrganization, ID: 9}
 	authContext, err := client.WithAuth(context.Background(), &types.Authentication{
 		AuthType:          types.AuthTypeOrg,
+		ActorValue:        &actor,
 		OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
 	})
 	if err != nil {
@@ -168,6 +217,183 @@ func TestInternalClientWithAuthAddsServiceAssertion(t *testing.T) {
 	outgoingMetadata, ok := metadata.FromOutgoingContext(authContext)
 	if !ok || len(outgoingMetadata.Get(types.SERVICE_SCOPE_KEY)) != 1 {
 		t.Fatalf("WithAuth() metadata = %v, %v", outgoingMetadata, ok)
+	}
+	scope, err := types.ExtractServiceScope(outgoingMetadata.Get(types.SERVICE_SCOPE_KEY)[0], client.cfg.Secret)
+	if err != nil {
+		t.Fatalf("ExtractServiceScope() error = %v", err)
+	}
+	forwardedAuth, err := scope.Authentication()
+	if err != nil {
+		t.Fatalf("Authentication() error = %v", err)
+	}
+	if forwardedActor, err := forwardedAuth.Actor(); err != nil || forwardedActor != actor {
+		t.Fatalf("Actor() = %+v, %v; want %+v", forwardedActor, err, actor)
+	}
+}
+
+func TestInternalClientAllAuthenticationPathsDelegateActor(t *testing.T) {
+	client := actorAwareInternalClient(t)
+	actor := types.ActorIdentity{Type: types.ActorTypeUser, ID: 5}
+	auth := &types.Authentication{
+		AuthType:          types.AuthTypeUser,
+		ActorValue:        &actor,
+		UserValue:         &types.UserContext{UserID: 5},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
+	}
+	platformContext, err := client.WithPlatform(context.Background(), auth)
+	if err != nil {
+		t.Fatalf("WithPlatform() error = %v", err)
+	}
+	platformMetadata, _ := metadata.FromOutgoingContext(platformContext)
+	assertDelegatedActor(t, platformMetadata.Get(types.SERVICE_SCOPE_KEY)[0], client.cfg.Secret, actor)
+
+	request, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, err = client.WithHttpAuth(context.Background(), auth, request)
+	if err != nil {
+		t.Fatalf("WithHttpAuth() error = %v", err)
+	}
+	assertDelegatedActor(t, request.Header.Get("Authorization"), client.cfg.Secret, actor)
+}
+
+func TestInternalClientMultiHopAuthentication(t *testing.T) {
+	projectID := uint64(11)
+	tests := []struct {
+		name  string
+		actor types.ActorIdentity
+		auth  *types.Authentication
+	}{
+		{
+			name:  "user",
+			actor: types.ActorIdentity{Type: types.ActorTypeUser, ID: 5},
+			auth:  &types.Authentication{AuthType: types.AuthTypeUser, UserValue: &types.UserContext{UserID: 5}, OrganizationValue: &types.OrganizationContext{OrganizationID: 7}, ProjectValue: &types.ProjectContext{OrganizationID: 7, ProjectID: projectID}},
+		},
+		{
+			name:  "project",
+			actor: types.ActorIdentity{Type: types.ActorTypeProject, ID: 6},
+			auth:  &types.Authentication{AuthType: types.AuthTypeProject, OrganizationValue: &types.OrganizationContext{OrganizationID: 7}, ProjectValue: &types.ProjectContext{OrganizationID: 7, ProjectID: projectID}},
+		},
+		{
+			name:  "organization",
+			actor: types.ActorIdentity{Type: types.ActorTypeOrganization, ID: 8},
+			auth:  &types.Authentication{AuthType: types.AuthTypeOrg, OrganizationValue: &types.OrganizationContext{OrganizationID: 7}},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			test.auth.ActorValue = &test.actor
+			firstClient := actorAwareInternalClient(t)
+			firstToken, err := firstClient.createServiceScopeToken(test.auth)
+			if err != nil {
+				t.Fatal(err)
+			}
+			firstScope, err := types.ExtractServiceScope(firstToken, firstClient.cfg.Secret)
+			if err != nil {
+				t.Fatal(err)
+			}
+			forwardedAuth, err := firstScope.Authentication()
+			if err != nil {
+				t.Fatal(err)
+			}
+			secondClient := &internalClient{cfg: &config.AppConfig{Name: "integration-api", ServiceID: 42, Secret: "secret"}}
+			secondToken, err := secondClient.createServiceScopeToken(forwardedAuth)
+			if err != nil {
+				t.Fatal(err)
+			}
+			secondScope, err := types.ExtractServiceScope(secondToken, secondClient.cfg.Secret)
+			if err != nil {
+				t.Fatal(err)
+			}
+			secondAuth, err := secondScope.Authentication()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if actor, err := secondAuth.Actor(); err != nil || actor != test.actor {
+				t.Fatalf("Actor() = %+v, %v; want %+v", actor, err, test.actor)
+			}
+			if caller, err := secondAuth.Caller(); err != nil || caller != (types.ActorIdentity{Type: types.ActorTypeService, ID: 42}) {
+				t.Fatalf("Caller() = %+v, %v", caller, err)
+			}
+		})
+	}
+}
+
+func TestInternalClientMultiHopServiceAuthenticationRotatesCaller(t *testing.T) {
+	firstClient := actorAwareInternalClient(t)
+	serviceActor := types.ActorIdentity{Type: types.ActorTypeService, ID: 40}
+	serviceAuth := &types.Authentication{
+		AuthType:          types.AuthTypeService,
+		ActorValue:        &serviceActor,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
+	}
+	firstToken, err := firstClient.createServiceScopeToken(serviceAuth)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstScope, err := types.ExtractServiceScope(firstToken, firstClient.cfg.Secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reconstructedAuth, err := firstScope.Authentication()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if actor, err := reconstructedAuth.Actor(); err != nil || actor != serviceActor {
+		t.Fatalf("first Actor() = %+v, %v", actor, err)
+	}
+	if caller, err := reconstructedAuth.Caller(); err != nil || caller != (types.ActorIdentity{Type: types.ActorTypeService, ID: 41}) {
+		t.Fatalf("first Caller() = %+v, %v", caller, err)
+	}
+	secondClient := &internalClient{cfg: &config.AppConfig{Name: "integration-api", ServiceID: 42, Secret: "secret"}}
+	secondToken, err := secondClient.createServiceScopeToken(reconstructedAuth)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondScope, err := types.ExtractServiceScope(secondToken, secondClient.cfg.Secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondAuth, err := secondScope.Authentication()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if actor, err := secondAuth.Actor(); err != nil || actor != serviceActor {
+		t.Fatalf("second Actor() = %+v, %v", actor, err)
+	}
+	if caller, err := secondAuth.Caller(); err != nil || caller != (types.ActorIdentity{Type: types.ActorTypeService, ID: 42}) {
+		t.Fatalf("second Caller() = %+v, %v", caller, err)
+	}
+}
+
+func TestInternalClientSystemAuthenticationIsDelegated(t *testing.T) {
+	client := actorAwareInternalClient(t)
+	actor := types.ActorIdentity{Type: types.ActorTypeSystem, ID: 5}
+	token, err := client.createServiceScopeToken(&types.Authentication{
+		AuthType:          types.AuthTypeSystem,
+		ActorValue:        &actor,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertDelegatedActor(t, token, client.cfg.Secret, actor)
+}
+
+func assertDelegatedActor(t *testing.T, token, secret string, expected types.ActorIdentity) {
+	t.Helper()
+	scope, err := types.ExtractServiceScope(token, secret)
+	if err != nil {
+		t.Fatalf("ExtractServiceScope() error = %v", err)
+	}
+	auth, err := scope.Authentication()
+	if err != nil {
+		t.Fatalf("Authentication() error = %v", err)
+	}
+	actor, err := auth.Actor()
+	if err != nil || actor != expected {
+		t.Fatalf("Actor() = %+v, %v; want %+v", actor, err, expected)
 	}
 }
 
@@ -202,6 +428,5 @@ func TestInternalClientWithHttpAuthDoesNotMutateRequestOnAuthError(t *testing.T)
 
 func actorAwareInternalClient(t *testing.T) *internalClient {
 	t.Helper()
-	t.Setenv("RAPIDA_SERVICE_ACTOR_ID", "41")
-	return &internalClient{cfg: &config.AppConfig{Name: "assistant-api", Secret: "secret"}}
+	return &internalClient{cfg: &config.AppConfig{Name: "assistant-api", ServiceID: 41, Secret: "secret"}}
 }

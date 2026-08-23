@@ -87,6 +87,28 @@ func (authenticator *recordingServiceAuthenticator) Claim(_ context.Context, tok
 	}}, nil
 }
 
+type delegatedServiceAuthenticatorStub struct {
+	authType types.AuthType
+	actorID  uint64
+}
+
+func (stub delegatedServiceAuthenticatorStub) Claim(context.Context, string) (*types.PlainClaimPrinciple[*types.ServiceScope], error) {
+	organizationID := uint64(2)
+	projectID := uint64(3)
+	scope := &types.ServiceScope{
+		ActorId:           4,
+		Issuer:            "web-api",
+		Audience:          types.ServiceAssertionAudience,
+		DelegatedAuthType: stub.authType,
+		DelegatedActorId:  &stub.actorID,
+		OrganizationId:    &organizationID,
+	}
+	if stub.authType == types.AuthTypeUser || stub.authType == types.AuthTypeProject {
+		scope.ProjectId = &projectID
+	}
+	return &types.PlainClaimPrinciple[*types.ServiceScope]{Info: scope}, nil
+}
+
 type invalidActorUserPrinciple struct {
 	types.Principle
 }
@@ -277,6 +299,68 @@ func TestUserProjectAndServiceAuthenticationSuccessAcrossMissingTransports(t *te
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			if err := test.run(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestServiceAuthenticationRestoresDelegatedActorAcrossGRPC(t *testing.T) {
+	tests := []struct {
+		name      string
+		authType  types.AuthType
+		actorType types.ActorType
+	}{
+		{name: "user", authType: types.AuthTypeUser, actorType: types.ActorTypeUser},
+		{name: "project", authType: types.AuthTypeProject, actorType: types.ActorTypeProject},
+		{name: "organization", authType: types.AuthTypeOrg, actorType: types.ActorTypeOrganization},
+		{name: "service", authType: types.AuthTypeService, actorType: types.ActorTypeService},
+		{name: "system", authType: types.AuthTypeSystem, actorType: types.ActorTypeSystem},
+	}
+	assertAuthentication := func(t *testing.T, ctx context.Context, test struct {
+		name      string
+		authType  types.AuthType
+		actorType types.ActorType
+	}) {
+		t.Helper()
+		auth, err := types.Authorize(ctx)
+		if err != nil {
+			t.Fatalf("Authorize() error = %v", err)
+		}
+		if auth.Type() != test.authType {
+			t.Fatalf("Type() = %q, want %q", auth.Type(), test.authType)
+		}
+		actor, err := auth.Actor()
+		if err != nil || actor != (types.ActorIdentity{Type: test.actorType, ID: 5}) {
+			t.Fatalf("Actor() = %+v, %v", actor, err)
+		}
+		caller, err := auth.Caller()
+		if err != nil || caller != (types.ActorIdentity{Type: types.ActorTypeService, ID: 4}) {
+			t.Fatalf("Caller() = %+v, %v", caller, err)
+		}
+	}
+
+	for _, test := range tests {
+		t.Run(test.name+" unary", func(t *testing.T) {
+			_, err := NewServiceAuthenticatorUnaryServerMiddleware(
+				delegatedServiceAuthenticatorStub{authType: test.authType, actorID: 5}, nil,
+			)(incomingContext(types.SERVICE_SCOPE_KEY, "service"), nil, nil, func(ctx context.Context, _ any) (any, error) {
+				assertAuthentication(t, ctx, test)
+				return nil, nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+
+		t.Run(test.name+" stream", func(t *testing.T) {
+			err := NewServiceAuthenticatorStreamServerMiddleware(
+				delegatedServiceAuthenticatorStub{authType: test.authType, actorID: 5}, nil,
+			)(nil, &testServerStream{ctx: incomingContext(types.SERVICE_SCOPE_KEY, "service")}, nil, func(_ any, stream grpc.ServerStream) error {
+				assertAuthentication(t, stream.Context(), test)
+				return nil
+			})
+			if err != nil {
 				t.Fatal(err)
 			}
 		})

@@ -1,4 +1,5 @@
 service_name: "Integration_Service"
+service_id: 9004
 host: "0.0.0.0"
 port: 9004
 log_level: "debug"

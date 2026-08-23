@@ -46,21 +46,12 @@ func NewServiceAuthenticatorUnaryServerMiddleware(resolver types.ClaimAuthentica
 			}
 			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
-		actor, err := types.ResolveAuditActor(principle.Info)
+		auth, err := principle.Info.Authentication()
 		if err != nil {
 			if validator.NonNil(logger) {
 				logger.Errorf(serviceAuthInvalidAuditActorMessage)
 			}
 			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
-		}
-		delegatedContext, _ := principle.Info.DelegatedContext()
-		auth := &types.Authentication{
-			AuthType:          types.AuthTypeService,
-			ActorValue:        &actor,
-			OrganizationValue: &types.OrganizationContext{OrganizationID: delegatedContext.OrganizationID},
-		}
-		if validator.NonNil(delegatedContext.ProjectID) {
-			auth.ProjectValue = &types.ProjectContext{OrganizationID: delegatedContext.OrganizationID, ProjectID: *delegatedContext.ProjectID}
 		}
 		return handler(context.WithValue(ctx, types.CTX_, auth), req)
 	}
@@ -93,21 +84,12 @@ func NewServiceAuthenticatorStreamServerMiddleware(resolver types.ClaimAuthentic
 			}
 			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
-		actor, err := types.ResolveAuditActor(principle.Info)
+		auth, err := principle.Info.Authentication()
 		if err != nil {
 			if validator.NonNil(logger) {
 				logger.Errorf(serviceAuthInvalidAuditActorMessage)
 			}
 			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
-		}
-		delegatedContext, _ := principle.Info.DelegatedContext()
-		auth := &types.Authentication{
-			AuthType:          types.AuthTypeService,
-			ActorValue:        &actor,
-			OrganizationValue: &types.OrganizationContext{OrganizationID: delegatedContext.OrganizationID},
-		}
-		if validator.NonNil(delegatedContext.ProjectID) {
-			auth.ProjectValue = &types.ProjectContext{OrganizationID: delegatedContext.OrganizationID, ProjectID: *delegatedContext.ProjectID}
 		}
 		wrapped := middleware.WrapServerStream(stream)
 		wrapped.WrappedContext = context.WithValue(ctx, types.CTX_, auth)

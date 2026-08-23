@@ -7,7 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	assistant_config "github.com/rapidaai/api/assistant-api/config"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
+	app_config "github.com/rapidaai/config"
 	"github.com/rapidaai/pkg/commons"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -89,6 +91,11 @@ func newTestManager(t *testing.T) (*manager, *gorm.DB, context.Context) {
 	return &manager{
 		logger:   logger,
 		postgres: &testPostgresConnector{db: db},
+		assistantConfig: &assistant_config.AssistantConfig{AppConfig: app_config.AppConfig{
+			Name:      "assistant-api",
+			ServiceID: 9007,
+			Secret:    "secret",
+		}},
 	}, db, ctx
 }
 

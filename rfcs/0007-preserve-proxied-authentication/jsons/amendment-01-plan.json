@@ -1,0 +1,71 @@
+{
+  "rfc": "0007-preserve-proxied-authentication",
+  "amendment": 1,
+  "status": "ready-for-challenge",
+  "objective": "Preserve the originating authenticated actor across every shared InternalClient.WithAuth service hop using signed delegated identity claims rather than raw public credentials.",
+  "acceptance_criteria": [
+    "User, project credential, and organization credential actors survive internal service boundaries.",
+    "Service-originated calls remain attributed to the immediate calling service.",
+    "Raw public credentials are never forwarded by InternalClient.WithAuth.",
+    "Delegated actor identity and tenant scope are cryptographically bound to the service assertion.",
+    "Old service assertions without delegated actor claims remain valid as service authentication.",
+    "RAPIDA_service_id is restored as the configured service actor identity."
+  ],
+  "allowed_paths": [
+    "rfcs/0007-preserve-proxied-authentication.md",
+    "rfcs/0007-preserve-proxied-authentication/jsons/**",
+    "pkg/types/jwt.go",
+    "pkg/types/jwt_test.go",
+    "pkg/types/service_scope_principle.go",
+    "pkg/types/service_scope_principle_test.go",
+    "pkg/clients/internal_client.go",
+    "pkg/clients/internal_client_test.go",
+    "pkg/middlewares/service_authenticator_grpc_middleware.go",
+    "pkg/middlewares/service_authenticator_rpc_middleware.go",
+    "pkg/middlewares/authentication_middleware_test.go"
+  ],
+  "out_of_scope": [
+    "Raw public credential forwarding",
+    "Public API or protobuf changes",
+    "Database or migration changes",
+    "Service-specific client implementations",
+    "Delegated system actors without tenant scope"
+  ],
+  "ownership": {
+    "pkg/types": "Service assertion claims and effective authentication reconstruction",
+    "pkg/clients/internal_client.go": "Service assertion creation from the current authenticated actor",
+    "pkg/middlewares": "Receiver-side authenticated context reconstruction"
+  },
+  "principles": {
+    "kiss": "Extend the existing shared service assertion rather than changing every service client.",
+    "yagni": "Add only claims required to reconstruct the current authenticated actor.",
+    "single_ownership": "InternalClient creates delegated assertions and service middleware reconstructs authentication.",
+    "explicit_contracts": "Caller service identity, delegated actor identity, and tenant scope have separate validated claims.",
+    "fail_safe": "Partial, mismatched, unsupported, or malformed delegated claims are rejected.",
+    "observability": "Keep authentication failure logs safe and preserve existing tracing behavior.",
+    "least_privilege": "Propagate signed identity facts without propagating raw public credentials.",
+    "reversibility": "Roll back callers before receivers; no persistent data rollback is required."
+  },
+  "required_tests": [
+    "Service-only JWT compatibility",
+    "Delegated user JWT creation and reconstruction",
+    "Delegated project credential JWT creation and reconstruction",
+    "Delegated organization credential JWT creation and reconstruction",
+    "Malformed and partial delegated claim rejection",
+    "gRPC and HTTP middleware authentication reconstruction",
+    "Shared InternalClient actor propagation"
+  ],
+  "required_commands": [
+    "go test ./pkg/types ./pkg/authenticators ./pkg/clients/... ./pkg/middlewares",
+    "go test ./api/web-api/... ./api/assistant-api/... ./api/endpoint-api/... ./api/integration-api/...",
+    "make agent-finalize CHANGED_FILES=\"pkg/types/jwt.go,pkg/types/jwt_test.go,pkg/types/service_scope_principle.go,pkg/types/service_scope_principle_test.go,pkg/clients/internal_client.go,pkg/clients/internal_client_test.go,pkg/middlewares/service_authenticator_grpc_middleware.go,pkg/middlewares/service_authenticator_rpc_middleware.go,pkg/middlewares/authentication_middleware_test.go\"",
+    "git diff --check"
+  ],
+  "risks": [
+    "A holder of the shared application secret can assert delegated identities within the existing service trust boundary.",
+    "New callers are incompatible with old receivers if they require delegated actor reconstruction.",
+    "Incorrect claim validation could cross tenant or actor boundaries.",
+    "Audit attribution changes from intermediary service to originating actor for delegated requests."
+  ],
+  "rollback": "Deploy old callers before old receivers so delegated claims stop before receiver support is removed. No data rollback is required."
+}

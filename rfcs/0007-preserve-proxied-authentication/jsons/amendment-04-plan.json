@@ -1,0 +1,68 @@
+{
+  "rfc": "0007-preserve-proxied-authentication",
+  "amendment": 4,
+  "status": "ready-for-challenge",
+  "objective": "Always include the validated effective actor in service assertions, source the immediate service actor ID from YAML configuration, and centralize authentication errors in pkg/types/rapida_auth.go.",
+  "acceptance_criteria": [
+    "WithAuth, WithPlatform, and WithHttpAuth all use one service assertion creation path that includes the effective actor.",
+    "User, project, organization, service, and system actors are represented by delegated_auth_type and delegated_actor_id.",
+    "The outer actor_id identifies the immediate caller from AppConfig.ServiceID.",
+    "Go gRPC receivers reconstruct the effective actor and preserve the immediate caller separately.",
+    "Existing assertions without delegated claims remain valid.",
+    "Python Document API receiver changes are deferred.",
+    "Authentication errors introduced or used by this flow are declared in pkg/types/rapida_auth.go."
+  ],
+  "allowed_paths": [
+    "rfcs/0007-preserve-proxied-authentication.md",
+    "rfcs/0007-preserve-proxied-authentication/jsons/**",
+    "config/config.go",
+    "api/web-api/config/config_test.go",
+    "api/assistant-api/config/config_test.go",
+    "api/endpoint-api/config/config_test.go",
+    "api/integration-api/config/config_test.go",
+    "env/web.yml",
+    "env/assistant.yaml",
+    "env/endpoint.yml",
+    "env/integration.yml",
+    "docker/web-api/web.yml",
+    "docker/assistant-api/assistant.yml",
+    "docker/assistant-api/assistant.knowledge.yml",
+    "docker/endpoint-api/endpoint.yml",
+    "docker/integration-api/integration.yml",
+    "pkg/types/jwt.go",
+    "pkg/types/jwt_test.go",
+    "pkg/types/service_scope_principle.go",
+    "pkg/types/service_scope_principle_test.go",
+    "pkg/types/rapida_auth.go",
+    "pkg/clients/internal_client.go",
+    "pkg/clients/internal_client_test.go",
+    "pkg/middlewares/service_authenticator_grpc_middleware.go",
+    "pkg/middlewares/authentication_middleware_test.go",
+    "api/document-api/tests/middlewares/test_jwt_authoriation_middleware.py"
+  ],
+  "required_tests": [
+    "All authentication types are emitted and reconstructed correctly.",
+    "All three internal client authentication methods emit delegated actor claims.",
+    "Missing or invalid YAML service_id fails closed.",
+    "Multi-hop service authentication preserves the effective service actor while rotating the immediate caller.",
+    "Legacy service assertions without delegated claims remain valid.",
+    "Central authentication errors support errors.Is checks.",
+    "Python Document middleware accepts assertions containing optional delegated claims while treating them as service authentication."
+  ],
+  "service_ids": {
+    "web-api": 9001,
+    "integration-api": 9004,
+    "endpoint-api": 9005,
+    "assistant-api": 9007
+  },
+  "central_errors": [
+    "ErrInvalidServiceAssertion",
+    "ErrInvalidDelegatedIdentity",
+    "ErrUnsupportedDelegatedAuthentication",
+    "ErrAuthenticationContextMismatch",
+    "ErrServiceNameUnavailable",
+    "ErrServiceActorUnavailable",
+    "ErrServiceSecretUnavailable"
+  ],
+  "rollback": "Roll back the shared Go binaries and YAML service_id additions together. No persistent data rollback is required."
+}

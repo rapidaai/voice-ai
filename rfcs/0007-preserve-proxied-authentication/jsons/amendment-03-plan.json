@@ -1,0 +1,68 @@
+{
+  "rfc": "0007-preserve-proxied-authentication",
+  "amendment": 3,
+  "status": "ready-for-challenge",
+  "objective": "Preserve user, project, and organization actor identity across every Go gRPC call using InternalClient.WithAuth while retaining and rotating the immediate service caller identity.",
+  "acceptance_criteria": [
+    "User, project, and organization actors survive each Go gRPC WithAuth service hop.",
+    "Service and system authentication never become delegated identity claims.",
+    "Service-only multi-hop calls rotate the immediate service actor at every hop.",
+    "Authentication records both effective actor and immediate service caller for delegated requests.",
+    "Raw public credentials are never forwarded.",
+    "Old receivers ignore optional delegated claims without rejecting requests.",
+    "WithPlatform, WithHttpAuth, and Python Document authentication remain unchanged.",
+    "RAPIDA_service_id is restored as the service actor source."
+  ],
+  "allowed_paths": [
+    "rfcs/0007-preserve-proxied-authentication.md",
+    "rfcs/0007-preserve-proxied-authentication/jsons/**",
+    "pkg/types/jwt.go",
+    "pkg/types/jwt_test.go",
+    "pkg/types/service_scope_principle.go",
+    "pkg/types/service_scope_principle_test.go",
+    "pkg/types/rapida_auth.go",
+    "pkg/clients/internal_client.go",
+    "pkg/clients/internal_client_test.go",
+    "pkg/middlewares/service_authenticator_grpc_middleware.go",
+    "pkg/middlewares/authentication_middleware_test.go"
+  ],
+  "out_of_scope": [
+    "Raw public credential forwarding",
+    "InternalClient.WithPlatform",
+    "InternalClient.WithHttpAuth",
+    "Python Document API authentication",
+    "Public API or protobuf changes",
+    "Database or migration changes",
+    "Delegated service or system actors"
+  ],
+  "delegation_rules": {
+    "service": "Emit no delegated claims. Create a new assertion using the local RAPIDA_service_id so the immediate service actor rotates at each hop.",
+    "system": "Emit no delegated claims. System authentication is not supported as delegated identity.",
+    "user": "Emit delegated_auth_type=user and a positive delegated_actor_id. Organization is required and UserValue is derived from delegated_actor_id.",
+    "project": "Emit delegated_auth_type=project and a positive delegated_actor_id. Organization and project are required.",
+    "organization": "Emit delegated_auth_type=organization and a positive delegated_actor_id. Organization is required and project is forbidden."
+  },
+  "required_tests": [
+    "Service-only JWT compatibility",
+    "Delegated user, project, and organization token round trips",
+    "Partial, forged, mismatched, unsupported, service, and system delegated claim rejection",
+    "Unary and stream middleware reconstruction",
+    "Immediate caller identity preservation",
+    "Multi-hop effective actor preservation for user, project, and organization authentication",
+    "Multi-hop service-only immediate actor rotation",
+    "WithPlatform and WithHttpAuth service-only behavior"
+  ],
+  "required_commands": [
+    "go test ./pkg/types ./pkg/authenticators ./pkg/clients/... ./pkg/middlewares",
+    "go test ./api/web-api/... ./api/assistant-api/... ./api/endpoint-api/... ./api/integration-api/...",
+    "make agent-finalize CHANGED_FILES=\"pkg/types/jwt.go,pkg/types/jwt_test.go,pkg/types/service_scope_principle.go,pkg/types/service_scope_principle_test.go,pkg/types/rapida_auth.go,pkg/clients/internal_client.go,pkg/clients/internal_client_test.go,pkg/middlewares/service_authenticator_grpc_middleware.go,pkg/middlewares/authentication_middleware_test.go\"",
+    "git diff --check"
+  ],
+  "risks": [
+    "Any holder of the shared secret can assert delegated identities within the existing trust boundary.",
+    "Old receivers remain available but attribute new delegated requests to the calling service until upgraded.",
+    "Incorrect claim validation could cross actor or tenant boundaries.",
+    "Audit attribution changes from intermediary service to originating actor."
+  ],
+  "rollback": "Roll back the shared Go binaries normally. Unknown optional claims are ignored by RFC 0002 receivers, and no persistent data rollback is required."
+}

@@ -30,6 +30,7 @@ type middlewareOption struct {
 	assistantService       internal_services.AssistantService
 	vaultClient            web_client.VaultClient
 	applySIPConfigDefaults func(*sip_infra.Config)
+	ServiceID              uint64
 }
 
 func WithContext(ctx context.Context) func(*middlewareOption) {
@@ -65,6 +66,12 @@ func WithVaultClient(vaultClient web_client.VaultClient) func(*middlewareOption)
 func WithApplySIPConfigDefaults(applySIPConfigDefaults func(*sip_infra.Config)) func(*middlewareOption) {
 	return func(m *middlewareOption) {
 		m.applySIPConfigDefaults = applySIPConfigDefaults
+	}
+}
+
+func WithServiceID(ServiceID uint64) func(*middlewareOption) {
+	return func(m *middlewareOption) {
+		m.ServiceID = ServiceID
 	}
 }
 
@@ -178,8 +185,13 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 		}
 
 		ctx.AssistantID = strconv.FormatUint(assistantID, 10)
+		serviceActor := types.ActorIdentity{Type: types.ActorTypeService, ID: m.ServiceID}
+		if err := serviceActor.Validate(); err != nil {
+			return &sip_infra.SIPError{Code: 500, Message: "SIP service authentication is not configured", Err: types.ErrServiceActorUnavailable}
+		}
 		ctx.Auth = &types.Authentication{
-			AuthType:          types.AuthTypeProject,
+			AuthType:          types.AuthTypeService,
+			ActorValue:        &serviceActor,
 			OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 			ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
 		}

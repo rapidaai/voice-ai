@@ -29,7 +29,7 @@ func (m *manager) handleClaimOwnership(ctx context.Context, s ClaimOwnershipPipe
 	if err != nil {
 		rec.Outcome = OutcomeClaimError
 		m.logger.Warnw("Ownership claim failed", "did", rec.DID, "error", err)
-		auth := projectAuthentication(rec.OrganizationID, rec.ProjectID)
+		auth := m.serviceAuthentication(rec.OrganizationID, rec.ProjectID)
 		observer := m.observer(ctx, auth)
 		defer observer.Close(context.Background())
 		attributes := observability.Attributes{
@@ -91,7 +91,7 @@ func (m *manager) handleClaimOwnership(ctx context.Context, s ClaimOwnershipPipe
 	if err != nil {
 		rec.Outcome = OutcomeClaimError
 		m.logger.Warnw("Ownership claim failed", "did", rec.DID, "error", err)
-		auth := projectAuthentication(rec.OrganizationID, rec.ProjectID)
+		auth := m.serviceAuthentication(rec.OrganizationID, rec.ProjectID)
 		observer := m.observer(ctx, auth)
 		defer observer.Close(context.Background())
 		attributes := observability.Attributes{

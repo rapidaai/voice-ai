@@ -12,7 +12,48 @@ import (
 	"time"
 
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	"github.com/rapidaai/pkg/clients"
+	"github.com/rapidaai/pkg/types"
+	"google.golang.org/grpc/metadata"
 )
+
+func TestServiceAuthenticationMintsDelegatedServiceActor(t *testing.T) {
+	m, _, _ := newTestManager(t)
+	auth := m.serviceAuthentication(7, 11)
+	if auth.Type() != types.AuthTypeService {
+		t.Fatalf("Type() = %q, want %q", auth.Type(), types.AuthTypeService)
+	}
+	actor, err := auth.Actor()
+	if err != nil || actor != (types.ActorIdentity{Type: types.ActorTypeService, ID: 9007}) {
+		t.Fatalf("Actor() = %+v, %v", actor, err)
+	}
+
+	internalClient := clients.NewInternalClient(&m.assistantConfig.AppConfig, nil, nil)
+	outgoingContext, err := internalClient.WithAuth(context.Background(), auth)
+	if err != nil {
+		t.Fatalf("WithAuth() error = %v", err)
+	}
+	outgoingMetadata, ok := metadata.FromOutgoingContext(outgoingContext)
+	if !ok || len(outgoingMetadata.Get(types.SERVICE_SCOPE_KEY)) != 1 {
+		t.Fatalf("service scope metadata = %v", outgoingMetadata)
+	}
+	scope, err := types.ExtractServiceScope(outgoingMetadata.Get(types.SERVICE_SCOPE_KEY)[0], m.assistantConfig.Secret)
+	if err != nil {
+		t.Fatalf("ExtractServiceScope() error = %v", err)
+	}
+	forwardedAuth, err := scope.Authentication()
+	if err != nil {
+		t.Fatalf("Authentication() error = %v", err)
+	}
+	forwardedActor, err := forwardedAuth.Actor()
+	if err != nil || forwardedActor != actor {
+		t.Fatalf("Actor() = %+v, %v; want %+v", forwardedActor, err, actor)
+	}
+	projectContext, err := forwardedAuth.ProjectContext()
+	if err != nil || projectContext.OrganizationID != 7 || projectContext.ProjectID != 11 {
+		t.Fatalf("ProjectContext() = %+v, %v", projectContext, err)
+	}
+}
 
 func TestStartRunsImmediateReconcile(t *testing.T) {
 	m, db, _ := newTestManager(t)

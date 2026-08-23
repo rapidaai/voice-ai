@@ -91,9 +91,11 @@ func (m *manager) observer(ctx context.Context, auth *types.Authentication) obse
 	)
 }
 
-func projectAuthentication(organizationID, projectID uint64) *types.Authentication {
+func (m *manager) serviceAuthentication(organizationID, projectID uint64) *types.Authentication {
+	serviceActor := types.ActorIdentity{Type: types.ActorTypeService, ID: m.assistantConfig.ServiceID}
 	return &types.Authentication{
-		AuthType:          types.AuthTypeProject,
+		AuthType:          types.AuthTypeService,
+		ActorValue:        &serviceActor,
 		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
 	}

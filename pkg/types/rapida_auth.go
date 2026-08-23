@@ -62,12 +62,20 @@ type AuthenticationPrinciple interface {
 }
 
 var (
-	ErrUnauthenticated                = errors.New("authentication required")
-	ErrAuthenticationScopeNotAllowed  = errors.New("authentication scope is not allowed")
-	ErrActorUnavailable               = errors.New("actor identity is unavailable")
-	ErrUserContextUnavailable         = errors.New("user context is unavailable")
-	ErrOrganizationContextUnavailable = errors.New("organization context is unavailable")
-	ErrProjectContextUnavailable      = errors.New("project context is unavailable")
+	ErrUnauthenticated                    = errors.New("authentication required")
+	ErrAuthenticationScopeNotAllowed      = errors.New("authentication scope is not allowed")
+	ErrActorUnavailable                   = errors.New("actor identity is unavailable")
+	ErrCallerUnavailable                  = errors.New("caller identity is unavailable")
+	ErrUserContextUnavailable             = errors.New("user context is unavailable")
+	ErrOrganizationContextUnavailable     = errors.New("organization context is unavailable")
+	ErrProjectContextUnavailable          = errors.New("project context is unavailable")
+	ErrInvalidServiceAssertion            = errors.New("service assertion is invalid")
+	ErrInvalidDelegatedIdentity           = errors.New("delegated identity is invalid")
+	ErrUnsupportedDelegatedAuthentication = errors.New("delegated authentication type is unsupported")
+	ErrAuthenticationContextMismatch      = errors.New("authentication context does not match actor")
+	ErrServiceNameUnavailable             = errors.New("service name is unavailable")
+	ErrServiceActorUnavailable            = errors.New("service actor identity is unavailable")
+	ErrServiceSecretUnavailable           = errors.New("service secret is unavailable")
 )
 
 type UserContext struct {
@@ -81,6 +89,7 @@ type OrganizationContext struct {
 type Authentication struct {
 	AuthType          AuthType
 	ActorValue        *ActorIdentity
+	CallerValue       *ActorIdentity
 	UserValue         *UserContext
 	OrganizationValue *OrganizationContext
 	ProjectValue      *ProjectContext
@@ -129,6 +138,15 @@ func (auth *Authentication) Actor() (ActorIdentity, error) {
 		return ActorIdentity{}, ErrActorUnavailable
 	}
 	return *auth.ActorValue, nil
+}
+func (auth *Authentication) Caller() (ActorIdentity, error) {
+	if auth == nil || auth.CallerValue == nil || auth.CallerValue.Type != ActorTypeService {
+		return ActorIdentity{}, ErrCallerUnavailable
+	}
+	if err := auth.CallerValue.Validate(); err != nil {
+		return ActorIdentity{}, ErrCallerUnavailable
+	}
+	return *auth.CallerValue, nil
 }
 func (auth *Authentication) UserContext() (UserContext, error) {
 	if auth == nil || auth.UserValue == nil || auth.UserValue.UserID == 0 {

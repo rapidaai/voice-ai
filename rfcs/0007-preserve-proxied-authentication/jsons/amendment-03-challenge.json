@@ -1,0 +1,12 @@
+{
+  "status": "approved",
+  "reviewed_at": "2026-08-23T08:31:19Z",
+  "run_id": "run_a342a4f9f1cf",
+  "task_id": "task_66858fd6dbd6",
+  "dispatch_id": "ctx_71882c160782",
+  "reviewer": "Independent Codex plan challenger",
+  "rfc_file": "rfcs/0007-preserve-proxied-authentication.md",
+  "rfc_sha256": "8038086692f8da1fc5b4cc049e76b59351d6140f9ea5329275fda41e7bd8159a",
+  "decision": "approved",
+  "summary": "No critical or major findings remain. The design is limited to Go gRPC InternalClient.WithAuth calls, delegates only user, project, and organization actors, preserves immediate caller identity separately, rotates service-only caller identity at each hop, and excludes WithPlatform, WithHttpAuth, and Python Document API authentication."
+}

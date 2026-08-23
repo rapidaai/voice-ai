@@ -18,6 +18,7 @@ import (
 
 const baseAssistantYAML = `
 service_name: "workflow-api"
+service_id: 9007
 host: "0.0.0.0"
 port: 9007
 log_level: "debug"
@@ -136,6 +137,9 @@ func TestGetApplicationConfig(t *testing.T) {
 	if appConfig == nil {
 		t.Fatalf("appConfig is nil")
 	}
+	if appConfig.ServiceID != 9007 {
+		t.Fatalf("ServiceID = %d, want 9007", appConfig.ServiceID)
+	}
 
 	if appConfig.PostgresConfig.DBName != "assistant_db" {
 		t.Errorf("Expected PostgresConfig.DBName to be 'assistant_db', but got %v", appConfig.PostgresConfig.DBName)
@@ -148,6 +152,18 @@ func TestGetApplicationConfig(t *testing.T) {
 	}
 	if appConfig.Assistant.Public != "integral-presently-cub.ngrok-free.app" {
 		t.Errorf("Expected Assistant.Public to be 'integral-presently-cub.ngrok-free.app', but got %v", appConfig.Assistant.Public)
+	}
+}
+
+func TestGetApplicationConfigRejectsMissingServiceID(t *testing.T) {
+	vConfig := viper.New()
+	vConfig.SetConfigType("yaml")
+	configYAML := strings.Replace(baseAssistantYAML, "service_id: 9007\n", "", 1)
+	if err := vConfig.ReadConfig(strings.NewReader(configYAML)); err != nil {
+		t.Fatalf("ReadConfig returned an error: %v", err)
+	}
+	if _, err := GetApplicationConfig(vConfig); err == nil {
+		t.Fatal("GetApplicationConfig() error = nil")
 	}
 }
 

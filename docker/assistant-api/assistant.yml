@@ -1,4 +1,5 @@
 service_name: "workflow-api"
+service_id: 9007
 host: "0.0.0.0"
 port: 9007
 log_level: "debug"

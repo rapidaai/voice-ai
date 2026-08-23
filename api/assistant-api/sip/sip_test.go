@@ -11,12 +11,19 @@ import (
 	"fmt"
 	"testing"
 
+	assistant_config "github.com/rapidaai/api/assistant-api/config"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	app_config "github.com/rapidaai/config"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSIPEngineUsesConfiguredServiceID(t *testing.T) {
+	engine := &SIPEngine{cfg: &assistant_config.AssistantConfig{AppConfig: app_config.AppConfig{ServiceID: 9007}}}
+	assert.Equal(t, uint64(9007), engine.cfg.ServiceID)
+}
 
 func TestPersistRemoteByeCallStatus_UpdatesCompletedDisconnectMetadata(t *testing.T) {
 	store := newSIPCallStatusTestStore(&callcontext.CallContext{
