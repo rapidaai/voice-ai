@@ -104,8 +104,17 @@ func TestRedisConnector_Disconnect(t *testing.T) {
 }
 
 func TestRedisConnector_Cmd(t *testing.T) {
-	// Requires real Redis connection
-	t.Skip("Cmd requires real Redis server - integration test")
+	logger, err := commons.NewApplicationLogger(commons.EnableConsole(true), commons.EnableFile(false))
+	assert.NoError(t, err)
+	db, mock := redismock.NewClientMock()
+	mock.ExpectDo("SET", "key", "value").SetVal("OK")
+	connector := &redisConnector{logger: logger, Connection: db}
+
+	response := connector.Cmd(context.Background(), "SET", []string{"key", "value"})
+
+	assert.NoError(t, response.Error())
+	assert.Equal(t, "OK", response.Result)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestRedisConnector_Cmds(t *testing.T) {

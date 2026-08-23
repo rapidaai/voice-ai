@@ -121,12 +121,11 @@ func (redisC *redisConnector) IsConnected(ctx context.Context) bool {
 // May return the empty response if the key is not found in redis
 func (redisC *redisConnector) Cmd(ctx context.Context, cmd string, args []string) *RedisResponse {
 	start := time.Now()
-	new := make([]interface{}, len(args)+1)
-	new[0] = cmd
-	for i, arg := range args {
-		new[i+1] = arg
+	commandArgs := []interface{}{cmd}
+	for _, arg := range args {
+		commandArgs = append(commandArgs, arg)
 	}
-	exCmd := redisC.Connection.Do(ctx, new...)
+	exCmd := redisC.Connection.Do(ctx, commandArgs...)
 	val, err := exCmd.Result()
 	if err != nil {
 		redisC.logger.Errorf("error while executing cmd from redis cmd %v err %v", cmd, err)

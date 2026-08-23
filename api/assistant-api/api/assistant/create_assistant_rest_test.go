@@ -32,6 +32,22 @@ type createAssistantRestAssistantServiceStub struct {
 	createAssistantErr    error
 }
 
+func attachTestAuthentication(ginContext *gin.Context, auth *types.Authentication) {
+	ginContext.Request = ginContext.Request.WithContext(context.WithValue(ginContext.Request.Context(), types.CTX_, auth))
+}
+
+func testUserAuthentication(userID, organizationID, projectID uint64) *types.Authentication {
+	auth := &types.Authentication{
+		AuthType:          types.AuthTypeUser,
+		UserValue:         &types.UserContext{UserID: userID},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+	}
+	if projectID != 0 {
+		auth.ProjectValue = &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID}
+	}
+	return auth
+}
+
 func (s *createAssistantRestAssistantServiceStub) Get(context.Context, *types.Authentication, uint64, *uint64, *internal_services.GetAssistantOption) (*internal_assistant_entity.Assistant, error) {
 	return nil, errors.New("not implemented")
 }
