@@ -22,12 +22,12 @@ import (
 type conversationMetricServiceStub struct {
 	internal_services.AssistantConversationService
 
-	metricAuth           types.SimplePrinciple
+	metricAuth           *types.Authentication
 	metricAssistantID    uint64
 	metricConversationID uint64
 	metrics              []*protos.Metric
 
-	messageMetricAuth           types.SimplePrinciple
+	messageMetricAuth           *types.Authentication
 	messageMetricConversationID uint64
 	messageMetricMessageID      string
 	messageMetrics              []*protos.Metric
@@ -35,7 +35,7 @@ type conversationMetricServiceStub struct {
 
 func (s *conversationMetricServiceStub) CreateOrUpdateConversationMetrics(
 	_ context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantID uint64,
 	conversationID uint64,
 	metrics []*protos.Metric,
@@ -49,7 +49,7 @@ func (s *conversationMetricServiceStub) CreateOrUpdateConversationMetrics(
 
 func (s *conversationMetricServiceStub) CreateOrUpdateMessageMetrics(
 	_ context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	conversationID uint64,
 	messageID string,
 	metrics []*protos.Metric,
@@ -135,13 +135,11 @@ func TestCollectMetric_ForwardsMessageScopedRecords(t *testing.T) {
 	}
 }
 
-func testMetricAuth() *types.ServiceScope {
-	organizationID := uint64(1)
-	projectID := uint64(2)
-	userID := uint64(99)
-	return &types.ServiceScope{
-		UserId:         &userID,
-		OrganizationId: &organizationID,
-		ProjectId:      &projectID,
+func testMetricAuth() *types.Authentication {
+	return &types.Authentication{
+		AuthType:          types.AuthTypeService,
+		UserValue:         &types.UserContext{UserID: 99},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: 1},
+		ProjectValue:      &types.ProjectContext{OrganizationID: 1, ProjectID: 2},
 	}
 }

@@ -10,7 +10,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	pkg_errors "github.com/rapidaai/pkg/errors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +23,7 @@ func TestGetAssistantApiDeploymentRest_HappyPath(t *testing.T) {
 	context, _ := gin.CreateTestContext(recorder)
 	context.Request = httptest.NewRequest(http.MethodGet, "/v1/assistant-deployment/get-api-deployment/123", nil)
 	context.Params = gin.Params{{Key: "assistantId", Value: "123"}}
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.GetAssistantApiDeploymentRest(context)
 
@@ -49,7 +48,7 @@ func TestGetAssistantDebuggerDeploymentRest_HappyPath(t *testing.T) {
 	context, _ := gin.CreateTestContext(recorder)
 	context.Request = httptest.NewRequest(http.MethodGet, "/v1/assistant-deployment/get-debugger-deployment/123", nil)
 	context.Params = gin.Params{{Key: "assistantId", Value: "123"}}
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.GetAssistantDebuggerDeploymentRest(context)
 
@@ -72,7 +71,7 @@ func TestGetAssistantPhoneDeploymentRest_HappyPath(t *testing.T) {
 	context, _ := gin.CreateTestContext(recorder)
 	context.Request = httptest.NewRequest(http.MethodGet, "/v1/assistant-deployment/get-phone-deployment/123", nil)
 	context.Params = gin.Params{{Key: "assistantId", Value: "123"}}
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.GetAssistantPhoneDeploymentRest(context)
 
@@ -95,7 +94,7 @@ func TestGetAssistantWebpluginDeploymentRest_HappyPath(t *testing.T) {
 	context, _ := gin.CreateTestContext(recorder)
 	context.Request = httptest.NewRequest(http.MethodGet, "/v1/assistant-deployment/get-webplugin-deployment/123", nil)
 	context.Params = gin.Params{{Key: "assistantId", Value: "123"}}
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.GetAssistantWebpluginDeploymentRest(context)
 
@@ -118,7 +117,7 @@ func TestGetAssistantWhatsappDeploymentRest_HappyPath(t *testing.T) {
 	context, _ := gin.CreateTestContext(recorder)
 	context.Request = httptest.NewRequest(http.MethodGet, "/v1/assistant-deployment/get-whatsapp-deployment/123", nil)
 	context.Params = gin.Params{{Key: "assistantId", Value: "123"}}
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.GetAssistantWhatsappDeploymentRest(context)
 
@@ -141,7 +140,7 @@ func TestGetAssistantApiDeploymentRest_InvalidAssistantID(t *testing.T) {
 	context, _ := gin.CreateTestContext(recorder)
 	context.Request = httptest.NewRequest(http.MethodGet, "/v1/assistant-deployment/get-api-deployment/abc", nil)
 	context.Params = gin.Params{{Key: "assistantId", Value: "abc"}}
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.GetAssistantApiDeploymentRest(context)
 
@@ -176,7 +175,7 @@ func TestGetAssistantWebpluginDeploymentRest_GetDeploymentErrorDoesNotExposeInte
 	context, _ := gin.CreateTestContext(recorder)
 	context.Request = httptest.NewRequest(http.MethodGet, "/v1/assistant-deployment/get-webplugin-deployment/123", nil)
 	context.Params = gin.Params{{Key: "assistantId", Value: "123"}}
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.GetAssistantWebpluginDeploymentRest(context)
 
@@ -196,7 +195,7 @@ func TestGetAssistantWhatsappDeploymentRest_NotFoundReturnsSuccessWithNilData(t 
 	context, _ := gin.CreateTestContext(recorder)
 	context.Request = httptest.NewRequest(http.MethodGet, "/v1/assistant-deployment/get-whatsapp-deployment/123", nil)
 	context.Params = gin.Params{{Key: "assistantId", Value: "123"}}
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.GetAssistantWhatsappDeploymentRest(context)
 
@@ -221,7 +220,7 @@ func TestGetAllAssistantApiDeploymentRest_HappyPath(t *testing.T) {
 		nil,
 	)
 	context.Params = gin.Params{{Key: "assistantId", Value: "123"}}
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.GetAllAssistantApiDeploymentRest(context)
 
@@ -255,7 +254,7 @@ func TestGetAllAssistantPhoneDeploymentRest_InvalidPage(t *testing.T) {
 		nil,
 	)
 	context.Params = gin.Params{{Key: "assistantId", Value: "123"}}
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.GetAllAssistantPhoneDeploymentRest(context)
 

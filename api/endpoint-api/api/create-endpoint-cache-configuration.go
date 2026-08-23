@@ -7,7 +7,9 @@ package endpoint_api
 
 import (
 	"context"
-	"errors"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	internal_gorm "github.com/rapidaai/api/endpoint-api/internal/entity"
 	"github.com/rapidaai/pkg/types"
@@ -16,13 +18,13 @@ import (
 )
 
 func (endpointGRPCApi *endpointGRPCApi) CreateEndpointCacheConfiguration(ctx context.Context, eRequest *endpoint_grpc_api.CreateEndpointCacheConfigurationRequest) (*endpoint_grpc_api.CreateEndpointCacheConfigurationResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !iAuth.HasProject() {
-		endpointGRPCApi.logger.Errorf("unauthenticated request for invoke")
-		return utils.Error[endpoint_grpc_api.CreateEndpointCacheConfigurationResponse](
-			errors.New("unauthenticated request for CreateEndpointProviderModel"),
-			"Please provide valid service credentials to perform invoke, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
 	cec, err := endpointGRPCApi.endpointService.ConfigureEndpointCaching(ctx,

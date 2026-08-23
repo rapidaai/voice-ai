@@ -35,7 +35,7 @@ type Config struct {
 	Providers                     Provider
 	Exporters                     telemetry.Exporter
 	Key                           string
-	Auth                          types.SimplePrinciple
+	Auth                          *types.Authentication
 	AssistantID                   uint64
 	AssistantConfigurationService internal_services.AssistantConfigurationService
 }
@@ -47,7 +47,7 @@ type Collector struct {
 	initialized                   bool
 	mu                            sync.Mutex
 	key                           string
-	auth                          types.SimplePrinciple
+	auth                          *types.Authentication
 	assistantID                   uint64
 	assistantConfigurationService internal_services.AssistantConfigurationService
 	assistantCollectors           *observability.Collectors

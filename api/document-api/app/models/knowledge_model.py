@@ -56,6 +56,14 @@ class Audited(PostgresModel):
                           onupdate=func.current_timestamp())
 
 
+class ActorAudited(Audited):
+    __abstract__ = True
+    created_actor_type = Column(String(32), nullable=False)
+    created_actor_id = Column(BigInteger, nullable=False)
+    updated_actor_type = Column(String(32), nullable=True)
+    updated_actor_id = Column(BigInteger, nullable=True)
+
+
 class Knowledge(Audited):
     """
     Do not change that knowledge
@@ -70,13 +78,11 @@ class Knowledge(Audited):
     storage_namespace = Column(String(400), nullable=False)
 
 
-class KnowledgeEmbeddingModelOption(Audited):
+class KnowledgeEmbeddingModelOption(ActorAudited):
     __tablename__ = 'knowledge_embedding_model_options'
 
     id = Column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
     status = Column(String(50), nullable=False, default='ACTIVE')
-    created_by = Column(BigInteger, nullable=False)
-    updated_by = Column(BigInteger, nullable=True)
     key = Column(String(200), nullable=False)
     value = Column(Text, nullable=False)
     knowledge_id = Column(BigInteger, ForeignKey("knowledges.id"), nullable=False)
@@ -113,7 +119,7 @@ class KnowledgeDocumentProcessRule:
         return self.AUTOMATIC_RULES
 
 
-class KnowledgeDocument(Audited):
+class KnowledgeDocument(ActorAudited):
     """
     Do not change this model as same model is getting used in workflow-service to create knowledge documents
     Only read and update / as select query is not transactional can be locked for update.
@@ -134,8 +140,6 @@ class KnowledgeDocument(Audited):
     retrieval_count = Column(BigInteger, default=0)
     token_count = Column(BigInteger, default=0)
     word_count = Column(BigInteger, default=0)
-    created_by = Column(BigInteger, nullable=False)
-    updated_by = Column(BigInteger)
 
     indexing_latency = Column(Float, nullable=True)
     completed_at = Column(DateTime, nullable=True)
@@ -236,4 +240,3 @@ class KnowledgeDocumentSegment(Audited):
     completed_at = Column(DateTime, nullable=True)
     error = Column(Text, nullable=True)
     stopped_at = Column(DateTime, nullable=True)
-

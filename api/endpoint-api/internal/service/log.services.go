@@ -13,7 +13,7 @@ import (
 type EndpointLogService interface {
 	CreateEndpointLog(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		source utils.RapidaSource,
 		endpointId, endpointProviderModelId uint64,
 		logId uint64,
@@ -21,16 +21,16 @@ type EndpointLogService interface {
 	) (*internal_gorm.EndpointLog, error)
 	UpdateEndpointLog(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		logId uint64,
 		metrics []*protos.Metric,
 		timeTaken uint64,
 	) (*internal_gorm.EndpointLog, error)
 
 	GetAllEndpointLog(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		endpointId uint64,
 		criteria []*endpoint_grpc_api.Criteria, paginate *endpoint_grpc_api.Paginate) (int64, []*internal_gorm.EndpointLog, error)
-	GetEndpointLog(ctx context.Context, auth types.SimplePrinciple, logId, endpointId uint64) (*internal_gorm.EndpointLog, error)
-	GetAggregatedEndpointAnalytics(ctx context.Context, auth types.SimplePrinciple, endpointId uint64) *protos.AggregatedEndpointAnalytics
+	GetEndpointLog(ctx context.Context, auth *types.Authentication, logId, endpointId uint64) (*internal_gorm.EndpointLog, error)
+	GetAggregatedEndpointAnalytics(ctx context.Context, auth *types.Authentication, endpointId uint64) *protos.AggregatedEndpointAnalytics
 }

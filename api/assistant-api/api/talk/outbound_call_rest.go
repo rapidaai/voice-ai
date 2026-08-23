@@ -26,8 +26,8 @@ import (
 
 // CreatePhoneCallRest initiates an outbound phone call from the REST API.
 func (cApi *ConversationApi) CreatePhoneCallRest(c *gin.Context) {
-	auth, isAuthenticated := types.GetAuthPrinciple(c)
-	if !isAuthenticated {
+	auth, authErr := types.Authorize(c.Request.Context())
+	if authErr != nil {
 		c.JSON(pkg_errors.CreatePhoneCallUnauthenticated.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreatePhoneCallUnauthenticated.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -39,8 +39,13 @@ func (cApi *ConversationApi) CreatePhoneCallRest(c *gin.Context) {
 		})
 		return
 	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
+	if scopeErr != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": scopeErr.Error()})
+		return
+	}
 
-	observer := cApi.Observability(c, auth, observability.WithGracePeriod())
+	observer := cApi.Observability(c, iAuth, observability.WithGracePeriod())
 	defer observer.Close(context.Background())
 
 	var ir openapi.CreatePhoneCallRequest
@@ -175,7 +180,7 @@ func (cApi *ConversationApi) CreatePhoneCallRest(c *gin.Context) {
 
 	result := cApi.channelPipeline.Run(c, channel_pipeline.OutboundRequestedPipeline{
 		ID:          fmt.Sprintf("%d", assistant.GetAssistantId()),
-		Auth:        auth,
+		Auth:        iAuth,
 		AssistantID: assistant.GetAssistantId(),
 		Version:     assistant.GetVersion(),
 		ToPhone:     *ir.ToNumber,

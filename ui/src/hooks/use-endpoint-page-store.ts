@@ -11,7 +11,9 @@ import {
   CreateEndpointCacheConfigurationResponse,
   CreateEndpointRetryConfigurationResponse,
   Endpoint,
+  EndpointCacheConfiguration,
   EndpointProviderModel,
+  EndpointRetryConfiguration,
   GetAllEndpointResponse,
   GetEndpointResponse,
 } from '@rapidaai/react';
@@ -293,7 +295,7 @@ export const useEndpointPageStore = create<EndpointType>((set, get) => ({
     { name: 'P99 latency', key: 'getP99', visible: true },
     { name: 'Cost', key: 'getCost', visible: true },
     { name: 'Last activity', key: 'getMRR', visible: true },
-    { name: 'Owner', key: 'getCreatedBy', visible: true },
+    { name: 'Owner', key: 'getCreatedActor', visible: true },
     { name: 'Actions', key: 'action', visible: true },
   ],
 
@@ -493,7 +495,7 @@ export const useEndpointPageStore = create<EndpointType>((set, get) => ({
     token: string,
     userId: string,
     onError: (err: string) => void,
-    onSuccess: (e) => void,
+    onSuccess: (configuration: EndpointRetryConfiguration) => void,
   ) => {
     const afterCreateEndpointRetryConfiguration = (
       err: ServiceError | null,
@@ -508,7 +510,9 @@ export const useEndpointPageStore = create<EndpointType>((set, get) => ({
             get().onReloadEndpoint(rE);
           }
         }
-        onSuccess(rtc);
+        if (rtc) {
+          onSuccess(rtc);
+        }
       } else {
         let errorMessage = gur?.getError();
         if (errorMessage) {
@@ -560,14 +564,17 @@ export const useEndpointPageStore = create<EndpointType>((set, get) => ({
     token: string,
     userId: string,
     onError: (err: string) => void,
-    onSuccess: (e) => void,
+    onSuccess: (configuration: EndpointCacheConfiguration) => void,
   ) => {
     const afterCreateEndpointCacheConfiguration = (
       err: ServiceError | null,
       gur: CreateEndpointCacheConfigurationResponse | null,
     ) => {
       if (gur?.getSuccess()) {
-        onSuccess(gur.getData());
+        const cacheConfiguration = gur.getData();
+        if (cacheConfiguration) {
+          onSuccess(cacheConfiguration);
+        }
       } else {
         let errorMessage = gur?.getError();
         if (errorMessage) {

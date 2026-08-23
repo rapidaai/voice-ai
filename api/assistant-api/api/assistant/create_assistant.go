@@ -8,6 +8,8 @@ package assistant_api
 import (
 	"context"
 	"errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	agentkit "github.com/rapidaai/api/assistant-api/internal/llm/agentkit"
 	pkg_errors "github.com/rapidaai/pkg/errors"
@@ -21,52 +23,15 @@ import (
 
 // CreateAssistant implements assistant_api.AssistantServiceServer.
 func (assistantApi *assistantGrpcApi) CreateAssistant(ctx context.Context, cer *assistant_api.CreateAssistantRequest) (*assistant_api.GetAssistantResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated {
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	}
 
-		return &assistant_api.GetAssistantResponse{
-			Code:    pkg_errors.CreateAssistantUnauthenticated.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &assistant_api.Error{
-				ErrorCode:    uint64(pkg_errors.CreateAssistantUnauthenticated.Code),
-				ErrorMessage: pkg_errors.CreateAssistantUnauthenticated.Error,
-				HumanMessage: pkg_errors.CreateAssistantUnauthenticated.ErrorMessage,
-			},
-		}, errors.New(pkg_errors.CreateAssistantUnauthenticated.Error)
-	}
-	if !iAuth.HasUser() {
-		return &assistant_api.GetAssistantResponse{
-			Code:    pkg_errors.CreateAssistantMissingAuthScope.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &assistant_api.Error{
-				ErrorCode:    uint64(pkg_errors.CreateAssistantMissingAuthScope.Code),
-				ErrorMessage: pkg_errors.CreateAssistantMissingAuthScope.Error,
-				HumanMessage: pkg_errors.CreateAssistantMissingAuthScope.ErrorMessage,
-			},
-		}, errors.New(pkg_errors.CreateAssistantMissingAuthScope.Error)
-	}
-	if !iAuth.HasProject() {
-		return &assistant_api.GetAssistantResponse{
-			Code:    pkg_errors.CreateAssistantMissingAuthScope.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &assistant_api.Error{
-				ErrorCode:    uint64(pkg_errors.CreateAssistantMissingAuthScope.Code),
-				ErrorMessage: pkg_errors.CreateAssistantMissingAuthScope.Error,
-				HumanMessage: pkg_errors.CreateAssistantMissingAuthScope.ErrorMessage,
-			},
-		}, errors.New(pkg_errors.CreateAssistantMissingAuthScope.Error)
-	}
-	if !iAuth.HasOrganization() {
-		return &assistant_api.GetAssistantResponse{
-			Code:    pkg_errors.CreateAssistantMissingAuthScope.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &assistant_api.Error{
-				ErrorCode:    uint64(pkg_errors.CreateAssistantMissingAuthScope.Code),
-				ErrorMessage: pkg_errors.CreateAssistantMissingAuthScope.Error,
-				HumanMessage: pkg_errors.CreateAssistantMissingAuthScope.ErrorMessage,
-			},
-		}, errors.New(pkg_errors.CreateAssistantMissingAuthScope.Error)
-	}
 	if !validator.NotBlank(cer.GetName()) {
 		return &assistant_api.GetAssistantResponse{
 			Code:    pkg_errors.CreateAssistantMissingName.HTTPStatusCodeInt32(),

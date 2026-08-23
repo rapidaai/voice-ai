@@ -5,9 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	internal_connects "github.com/rapidaai/api/web-api/internal/connect"
@@ -51,9 +54,7 @@ type webAuthGRPCApi struct {
 	webAuthApi
 }
 
-var (
-	GOOGLE_STATE = "google"
-)
+var GOOGLE_STATE = "google"
 
 func NewAuthRPC(config *config.WebAppConfig, oauthCfg *config.OAuth2Config, logger commons.Logger, postgres connectors.PostgresConnector) *webAuthRPCApi {
 	return &webAuthRPCApi{
@@ -272,9 +273,9 @@ func (wAuthApi *webAuthGRPCApi) Authenticate(c context.Context, irRequest *proto
 				HumanMessage: "Your account is not activated yet. please activate before signin.",
 			}}, nil
 	}
-	auth := &protos.Authentication{}
-	utils.Cast(aUser.PlainAuthPrinciple(), auth)
-	return &protos.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
+	responseAuth := &protos.Authentication{}
+	utils.Cast(aUser.PlainAuthPrinciple(), responseAuth)
+	return &protos.AuthenticateResponse{Code: 200, Success: true, Data: responseAuth}, nil
 }
 
 /*
@@ -471,13 +472,24 @@ func (wAuthApi *webAuthGRPCApi) ForgotPassword(c context.Context, irRequest *pro
 }
 
 func (wAuthApi *webAuthGRPCApi) ChangePassword(c context.Context, irRequest *protos.ChangePasswordRequest) (*protos.ChangePasswordResponse, error) {
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
-	if !isAuthenticated {
-		wAuthApi.logger.Errorf("ChangePassword from grpc with unauthenticated request")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
-	currentAuth, err := wAuthApi.userService.Authenticate(c, iAuth.GetUserInfo().Email, irRequest.GetOldPassword())
+	userContext, err := iAuth.UserContext()
+	if err != nil {
+		return nil, err
+	}
+	user, err := wAuthApi.userService.GetUser(c, userContext.UserID)
+	if err != nil {
+		return nil, err
+	}
+	_, err = wAuthApi.userService.Authenticate(c, user.Email, irRequest.GetOldPassword())
 	if err != nil {
 		return &protos.ChangePasswordResponse{
 			Code:    400,
@@ -489,8 +501,7 @@ func (wAuthApi *webAuthGRPCApi) ChangePassword(c context.Context, irRequest *pro
 			}}, nil
 	}
 
-	//
-	_, err = wAuthApi.userService.UpdatePassword(c, *currentAuth.GetUserId(), irRequest.GetPassword())
+	_, err = wAuthApi.userService.UpdatePassword(c, userContext.UserID, irRequest.GetPassword())
 	if err != nil {
 		wAuthApi.logger.Errorf("unable to change password for user failed %v", err)
 		return &protos.ChangePasswordResponse{
@@ -542,38 +553,71 @@ func (wAuthApi *webAuthGRPCApi) CreatePassword(c context.Context, irRequest *pro
 
 func (wAuthApi *webAuthGRPCApi) Authorize(c context.Context, irRequest *protos.AuthorizeRequest) (*protos.AuthenticateResponse, error) {
 	wAuthApi.logger.Debugf("Authorize from grpc with requestPayload %v, %v", irRequest, c)
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
-	if !isAuthenticated {
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
 	}
-	aUser, err := wAuthApi.userService.AuthPrinciple(c, iAuth.GetUserInfo().Id)
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	}
+	userContext, err := iAuth.UserContext()
+	if err != nil {
+		return nil, err
+	}
+	aUser, err := wAuthApi.userService.AuthPrinciple(c, userContext.UserID)
 	if err != nil {
 		wAuthApi.logger.Errorf("unable to authorize the user %v", err)
 		return nil, err
 	}
-	auth := &protos.Authentication{}
-	utils.Cast(aUser.PlainAuthPrinciple(), auth)
-	return &protos.AuthenticateResponse{Code: 200, Success: true, Data: auth}, nil
+	responseAuth := &protos.Authentication{}
+	utils.Cast(aUser.PlainAuthPrinciple(), responseAuth)
+	return &protos.AuthenticateResponse{Code: 200, Success: true, Data: responseAuth}, nil
 }
 
 func (wAuthApi *webAuthGRPCApi) ScopeAuthorize(c context.Context, irRequest *protos.ScopeAuthorizeRequest) (*protos.ScopedAuthenticationResponse, error) {
-	if irRequest.GetScope() == "project" {
-		iAuth, isAuthenticated := types.GetScopePrincipleGRPC[*types.ProjectScope](c)
-		if !isAuthenticated {
-			return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	response := &protos.ScopedAuthentication{Status: type_enums.RECORD_ACTIVE.String()}
+	var iAuth *types.Authentication
+	var scopeErr error
+	switch irRequest.GetScope() {
+	case "project":
+		iAuth, scopeErr = auth.Scope(types.AuthTypeProject)
+	case "organization":
+		iAuth, scopeErr = auth.Scope(types.AuthTypeOrg)
+	default:
+		return nil, status.Error(codes.InvalidArgument, "scope must be project or organization")
+	}
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	}
+	switch irRequest.GetScope() {
+	case "project":
+		projectContext, err := iAuth.ProjectContext()
+		if err != nil {
+			return nil, err
 		}
-		auth := &protos.ScopedAuthentication{}
-		utils.Cast(iAuth, auth)
-		return &protos.ScopedAuthenticationResponse{Code: 200, Success: true, Data: auth}, nil
+		response.OrganizationId = projectContext.OrganizationID
+		response.ProjectId = projectContext.ProjectID
+	case "organization":
+		organizationContext, err := iAuth.OrganizationContext()
+		if err != nil {
+			return nil, err
+		}
+		response.OrganizationId = organizationContext.OrganizationID
 	}
-
-	iAuth, isAuthenticated := types.GetScopePrincipleGRPC[*types.OrganizationScope](c)
-	if !isAuthenticated {
-		return nil, errors.New("unauthenticated request")
+	actor, actorErr := iAuth.Actor()
+	if actorErr != nil {
+		return nil, status.Error(codes.PermissionDenied, actorErr.Error())
 	}
-	auth := &protos.ScopedAuthentication{}
-	utils.Cast(iAuth, auth)
-	return &protos.ScopedAuthenticationResponse{Code: 200, Success: true, Data: auth}, nil
+	actorType := string(actor.Type)
+	actorID := strconv.FormatUint(actor.ID, 10)
+	response.ActorType = &actorType
+	response.ActorId = &actorID
+	return &protos.ScopedAuthenticationResponse{Code: 200, Success: true, Data: response}, nil
 }
 
 func (wAuthApi *webAuthApi) VerifyToken(c context.Context, irRequest *protos.VerifyTokenRequest) (*protos.VerifyTokenResponse, error) {
@@ -590,12 +634,20 @@ func (wAuthApi *webAuthApi) VerifyToken(c context.Context, irRequest *protos.Ver
 
 func (wAuthApi *webAuthApi) GetUser(c context.Context, irRequest *protos.GetUserRequest) (*protos.GetUserResponse, error) {
 	wAuthApi.logger.Debugf("GetUser from grpc with requestPayload %v, %v", irRequest, c)
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
-	if !isAuthenticated {
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
-	user, err := wAuthApi.userService.GetUser(c, iAuth.GetUserInfo().Id)
+	userContext, err := iAuth.UserContext()
+	if err != nil {
+		return nil, err
+	}
+	user, err := wAuthApi.userService.GetUser(c, userContext.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -607,16 +659,24 @@ func (wAuthApi *webAuthApi) GetUser(c context.Context, irRequest *protos.GetUser
 
 func (wAuthApi *webAuthApi) UpdateUser(c context.Context, irRequest *protos.UpdateUserRequest) (*protos.UpdateUserResponse, error) {
 	wAuthApi.logger.Debugf("UpdateUser from grpc with requestPayload %v, %v", irRequest, c)
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
-	if !isAuthenticated {
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
 	if strings.TrimSpace(irRequest.GetName()) == "" {
 		return nil, errors.New("cannot give an empty name")
 	}
 
-	user, err := wAuthApi.userService.UpdateUser(c, iAuth, iAuth.GetUserInfo().Id, irRequest.Name)
+	userContext, err := iAuth.UserContext()
+	if err != nil {
+		return nil, err
+	}
+	user, err := wAuthApi.userService.UpdateUser(c, iAuth, userContext.UserID, irRequest.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -838,13 +898,21 @@ func (wAuthApi *webAuthGRPCApi) Google(c context.Context, irRequest *protos.Soci
 }
 
 func (wAuthApi *webAuthGRPCApi) GetAllUser(c context.Context, irRequest *protos.GetAllUserRequest) (*protos.GetAllUserResponse, error) {
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
-	if !isAuthenticated {
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
+	organizationContext, err := iAuth.OrganizationContext()
+	if err != nil {
+		return nil, err
+	}
 	cnt, allMembers, err := wAuthApi.userService.GetAllOrganizationMember(c,
-		iAuth.GetOrganizationRole().OrganizationId,
+		organizationContext.OrganizationID,
 		irRequest.GetCriterias(),
 		irRequest.GetPaginate(),
 	)

@@ -41,7 +41,7 @@ type Communication interface {
 	InternalCaller
 
 	// authentication
-	Auth() types.SimplePrinciple
+	Auth() *types.Authentication
 
 	// phone, debugger, sdk etc
 	GetSource() utils.RapidaSource

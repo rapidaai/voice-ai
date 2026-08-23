@@ -86,17 +86,16 @@ func newProjectAPITest(t *testing.T) (*webProjectGRPCApi, *gorm.DB, *testEmailer
 	require.NoError(t, err)
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger2Discard()})
 	require.NoError(t, err)
-	require.NoError(t, db.Exec(`CREATE TABLE organizations (id integer primary key, created_date datetime, updated_date datetime, status text, created_by integer, updated_by integer, name text, description text, size text, industry text, contact text)`).Error)
-	require.NoError(t, db.Exec(`CREATE TABLE projects (id integer primary key, created_date datetime, updated_date datetime, status text, created_by integer, updated_by integer, organization_id integer, name text, description text)`).Error)
-	require.NoError(t, db.Exec(`CREATE TABLE user_auths (id integer primary key, created_date datetime, updated_date datetime, status text, created_by integer, updated_by integer, name text, email text, password text, source text)`).Error)
-	require.NoError(t, db.Exec(`CREATE TABLE user_auth_tokens (id integer primary key, created_date datetime, updated_date datetime, status text, created_by integer, updated_by integer, user_auth_id integer, token_type text, token text, expire_at datetime)`).Error)
-	require.NoError(t, db.Exec(`CREATE TABLE user_organization_roles (id integer primary key, created_date datetime, updated_date datetime, status text, created_by integer, updated_by integer, user_auth_id integer, organization_id integer, role text, UNIQUE (user_auth_id, organization_id, status))`).Error)
-	require.NoError(t, db.Exec(`CREATE TABLE user_project_roles (id integer primary key, created_date datetime, updated_date datetime, status text, created_by integer, updated_by integer, user_auth_id integer, project_id integer, role text, UNIQUE (user_auth_id, project_id, status))`).Error)
+	require.NoError(t, db.Exec(`CREATE TABLE organizations (id integer primary key, created_date datetime, updated_date datetime, status text, created_actor_type text, created_actor_id integer, updated_actor_type text, updated_actor_id integer, name text, description text, size text, industry text, contact text)`).Error)
+	require.NoError(t, db.Exec(`CREATE TABLE projects (id integer primary key, created_date datetime, updated_date datetime, status text, created_actor_type text, created_actor_id integer, updated_actor_type text, updated_actor_id integer, organization_id integer, name text, description text)`).Error)
+	require.NoError(t, db.Exec(`CREATE TABLE user_auths (id integer primary key, created_date datetime, updated_date datetime, status text, created_actor_type text, created_actor_id integer, updated_actor_type text, updated_actor_id integer, name text, email text, password text, source text)`).Error)
+	require.NoError(t, db.Exec(`CREATE TABLE user_auth_tokens (id integer primary key, created_date datetime, updated_date datetime, status text, created_actor_type text, created_actor_id integer, updated_actor_type text, updated_actor_id integer, user_auth_id integer, token_type text, token text, expire_at datetime)`).Error)
+	require.NoError(t, db.Exec(`CREATE TABLE user_organization_roles (id integer primary key, created_date datetime, updated_date datetime, status text, created_actor_type text, created_actor_id integer, updated_actor_type text, updated_actor_id integer, user_auth_id integer, organization_id integer, role text, UNIQUE (user_auth_id, organization_id, status))`).Error)
+	require.NoError(t, db.Exec(`CREATE TABLE user_project_roles (id integer primary key, created_date datetime, updated_date datetime, status text, created_actor_type text, created_actor_id integer, updated_actor_type text, updated_actor_id integer, user_auth_id integer, project_id integer, role text, UNIQUE (user_auth_id, project_id, status))`).Error)
 	require.NoError(t, db.Create(&internal_entity.Organization{
 		Audited: gorm_models.Audited{Id: 10},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		Name:        "Acme",
 		Description: "Acme org",
@@ -106,8 +105,7 @@ func newProjectAPITest(t *testing.T) (*webProjectGRPCApi, *gorm.DB, *testEmailer
 	require.NoError(t, db.Create(&internal_entity.Organization{
 		Audited: gorm_models.Audited{Id: 20},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		Name:        "Other",
 		Description: "Other org",
@@ -117,8 +115,7 @@ func newProjectAPITest(t *testing.T) (*webProjectGRPCApi, *gorm.DB, *testEmailer
 	require.NoError(t, db.Create(&internal_entity.Project{
 		Audited: gorm_models.Audited{Id: 100},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		OrganizationId: 10,
 		Name:           "Alpha",
@@ -127,8 +124,7 @@ func newProjectAPITest(t *testing.T) (*webProjectGRPCApi, *gorm.DB, *testEmailer
 	require.NoError(t, db.Create(&internal_entity.Project{
 		Audited: gorm_models.Audited{Id: 101},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		OrganizationId: 10,
 		Name:           "Beta",
@@ -137,8 +133,7 @@ func newProjectAPITest(t *testing.T) (*webProjectGRPCApi, *gorm.DB, *testEmailer
 	require.NoError(t, db.Create(&internal_entity.Project{
 		Audited: gorm_models.Audited{Id: 200},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		OrganizationId: 20,
 		Name:           "Cross",
@@ -147,8 +142,7 @@ func newProjectAPITest(t *testing.T) (*webProjectGRPCApi, *gorm.DB, *testEmailer
 	require.NoError(t, db.Create(&internal_entity.Project{
 		Audited: gorm_models.Audited{Id: 300},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ARCHIEVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ARCHIEVE,
 		},
 		OrganizationId: 10,
 		Name:           "Archived",
@@ -213,8 +207,7 @@ func TestAddUserToProjectsAssignsExistingOrganizationUserProjectRoles(t *testing
 	require.NoError(t, db.Create(&internal_entity.UserAuth{
 		Audited: gorm_models.Audited{Id: 90},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		Name:     "Existing",
 		Email:    "existing-projects@example.com",
@@ -224,8 +217,7 @@ func TestAddUserToProjectsAssignsExistingOrganizationUserProjectRoles(t *testing
 	require.NoError(t, db.Create(&internal_entity.UserOrganizationRole{
 		Audited: gorm_models.Audited{Id: 91},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		UserAuthId:     90,
 		OrganizationId: 10,
@@ -262,8 +254,7 @@ func TestAddUserToProjectsRejectsExistingProjectMembership(t *testing.T) {
 	require.NoError(t, db.Create(&internal_entity.UserAuth{
 		Audited: gorm_models.Audited{Id: 88},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		Name:     "Existing Project Member",
 		Email:    "existing-project-member@example.com",
@@ -273,8 +264,7 @@ func TestAddUserToProjectsRejectsExistingProjectMembership(t *testing.T) {
 	require.NoError(t, db.Create(&internal_entity.UserOrganizationRole{
 		Audited: gorm_models.Audited{Id: 89},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		UserAuthId:     88,
 		OrganizationId: 10,
@@ -283,8 +273,7 @@ func TestAddUserToProjectsRejectsExistingProjectMembership(t *testing.T) {
 	require.NoError(t, db.Create(&internal_entity.UserProjectRole{
 		Audited: gorm_models.Audited{Id: 87},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		UserAuthId: 88,
 		ProjectId:  100,
@@ -315,8 +304,7 @@ func TestAddUserToProjectsRejectsUserOutsideOrganization(t *testing.T) {
 	require.NoError(t, db.Create(&internal_entity.UserAuth{
 		Audited: gorm_models.Audited{Id: 92},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		Name:     "Outside",
 		Email:    "outside@example.com",
@@ -326,8 +314,7 @@ func TestAddUserToProjectsRejectsUserOutsideOrganization(t *testing.T) {
 	require.NoError(t, db.Create(&internal_entity.UserOrganizationRole{
 		Audited: gorm_models.Audited{Id: 93},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		UserAuthId:     92,
 		OrganizationId: 20,
@@ -353,8 +340,7 @@ func TestAddUserToProjectsRejectsArchivedOrganizationUser(t *testing.T) {
 	require.NoError(t, db.Create(&internal_entity.UserAuth{
 		Audited: gorm_models.Audited{Id: 96},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ARCHIEVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ARCHIEVE,
 		},
 		Name:     "Archived Org User",
 		Email:    "archived-org-user@example.com",
@@ -364,8 +350,7 @@ func TestAddUserToProjectsRejectsArchivedOrganizationUser(t *testing.T) {
 	require.NoError(t, db.Create(&internal_entity.UserOrganizationRole{
 		Audited: gorm_models.Audited{Id: 97},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ARCHIEVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ARCHIEVE,
 		},
 		UserAuthId:     96,
 		OrganizationId: 10,
@@ -395,8 +380,7 @@ func TestAddUserToProjectsRejectsInvalidAssignmentsBeforeWrites(t *testing.T) {
 	require.NoError(t, db.Create(&internal_entity.UserAuth{
 		Audited: gorm_models.Audited{Id: 94},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		Name:     "Invalid Assignments",
 		Email:    "invalid-assignments@example.com",
@@ -406,8 +390,7 @@ func TestAddUserToProjectsRejectsInvalidAssignmentsBeforeWrites(t *testing.T) {
 	require.NoError(t, db.Create(&internal_entity.UserOrganizationRole{
 		Audited: gorm_models.Audited{Id: 95},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		UserAuthId:     94,
 		OrganizationId: 10,
@@ -498,8 +481,7 @@ func TestAddUserToProjectsProjectRoleFailureReturnsPayloadError(t *testing.T) {
 	require.NoError(t, db.Create(&internal_entity.UserAuth{
 		Audited: gorm_models.Audited{Id: 96},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		Name:     "Failure",
 		Email:    "failure@example.com",
@@ -509,8 +491,7 @@ func TestAddUserToProjectsProjectRoleFailureReturnsPayloadError(t *testing.T) {
 	require.NoError(t, db.Create(&internal_entity.UserOrganizationRole{
 		Audited: gorm_models.Audited{Id: 97},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		UserAuthId:     96,
 		OrganizationId: 10,
@@ -537,8 +518,7 @@ func TestDeleteUserFromProjectArchivesOnlySelectedProjectRole(t *testing.T) {
 	require.NoError(t, db.Create(&internal_entity.UserAuth{
 		Audited: gorm_models.Audited{Id: 130},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		Name:     "Delete Project",
 		Email:    "delete-project@example.com",
@@ -548,8 +528,7 @@ func TestDeleteUserFromProjectArchivesOnlySelectedProjectRole(t *testing.T) {
 	require.NoError(t, db.Create(&internal_entity.UserOrganizationRole{
 		Audited: gorm_models.Audited{Id: 131},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		UserAuthId:     130,
 		OrganizationId: 10,
@@ -558,8 +537,7 @@ func TestDeleteUserFromProjectArchivesOnlySelectedProjectRole(t *testing.T) {
 	require.NoError(t, db.Create(&internal_entity.UserProjectRole{
 		Audited: gorm_models.Audited{Id: 132},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		UserAuthId: 130,
 		ProjectId:  100,
@@ -568,8 +546,7 @@ func TestDeleteUserFromProjectArchivesOnlySelectedProjectRole(t *testing.T) {
 	require.NoError(t, db.Create(&internal_entity.UserProjectRole{
 		Audited: gorm_models.Audited{Id: 133},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		UserAuthId: 130,
 		ProjectId:  101,
@@ -606,8 +583,7 @@ func TestDeleteUserFromProjectRejectsAuthAndValidationFailures(t *testing.T) {
 	require.NoError(t, db.Create(&internal_entity.UserAuth{
 		Audited: gorm_models.Audited{Id: 140},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		Name:     "Project Delete Validation",
 		Email:    "project-delete-validation@example.com",
@@ -617,8 +593,7 @@ func TestDeleteUserFromProjectRejectsAuthAndValidationFailures(t *testing.T) {
 	require.NoError(t, db.Create(&internal_entity.UserOrganizationRole{
 		Audited: gorm_models.Audited{Id: 141},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		UserAuthId:     140,
 		OrganizationId: 10,

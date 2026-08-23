@@ -20,7 +20,7 @@ import (
 )
 
 type DeploymentServiceClient interface {
-	Invoke(ctx context.Context, auth types.SimplePrinciple, iRequest *endpoint_api.InvokeRequest) (*endpoint_api.InvokeResponse, error)
+	Invoke(ctx context.Context, auth *types.Authentication, iRequest *endpoint_api.InvokeRequest) (*endpoint_api.InvokeResponse, error)
 }
 
 type deploymentServiceClient struct {
@@ -50,8 +50,12 @@ func NewDeploymentServiceClientGRPC(config *config.AppConfig, logger commons.Log
 	}
 }
 
-func (dsc *deploymentServiceClient) Invoke(ctx context.Context, auth types.SimplePrinciple, iRequest *endpoint_api.InvokeRequest) (*endpoint_api.InvokeResponse, error) {
-	res, err := dsc.deploymentClient.Invoke(dsc.WithAuth(ctx, auth), iRequest)
+func (dsc *deploymentServiceClient) Invoke(ctx context.Context, auth *types.Authentication, iRequest *endpoint_api.InvokeRequest) (*endpoint_api.InvokeResponse, error) {
+	authContext, err := dsc.WithAuth(ctx, auth)
+	if err != nil {
+		return nil, err
+	}
+	res, err := dsc.deploymentClient.Invoke(authContext, iRequest)
 	if err != nil {
 		dsc.logger.Errorf("error while calling invoke endpoint %v", err)
 		return nil, err

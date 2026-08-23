@@ -35,7 +35,7 @@ func NewWithEnv(ctx context.Context, logger commons.Logger, config *assistant_co
 	return nil
 }
 
-func NewWithAssistantTelemetry(ctx context.Context, logger commons.Logger, auth types.SimplePrinciple, assistantID uint64, assistantConfigurationService internal_services.AssistantConfigurationService) observability.Collector {
+func NewWithAssistantTelemetry(ctx context.Context, logger commons.Logger, auth *types.Authentication, assistantID uint64, assistantConfigurationService internal_services.AssistantConfigurationService) observability.Collector {
 	collector, err := telemetry.New(ctx, telemetry.Config{
 		Logger:                        logger,
 		Auth:                          auth,
@@ -51,7 +51,7 @@ func NewWithAssistantTelemetry(ctx context.Context, logger commons.Logger, auth 
 	return collector
 }
 
-func NewWithWebhookConfiguration(ctx context.Context, logger commons.Logger, auth types.SimplePrinciple, assistantID uint64, assistantConfigurationService internal_services.AssistantConfigurationService, httpLogService internal_services.AssistantHTTPLogService) observability.Collector {
+func NewWithWebhookConfiguration(ctx context.Context, logger commons.Logger, auth *types.Authentication, assistantID uint64, assistantConfigurationService internal_services.AssistantConfigurationService, httpLogService internal_services.AssistantHTTPLogService) observability.Collector {
 	collector := webhook.New(ctx, webhook.Config{
 		Logger:                        logger,
 		Auth:                          auth,

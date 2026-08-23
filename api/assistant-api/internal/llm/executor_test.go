@@ -39,8 +39,8 @@ func (communication *factoryTestCommunication) DeploymentCaller() endpoint_clien
 	return nil
 }
 
-func (communication *factoryTestCommunication) Auth() types.SimplePrinciple {
-	return &types.PlainAuthPrinciple{}
+func (communication *factoryTestCommunication) Auth() *types.Authentication {
+	return &types.Authentication{}
 }
 
 func (communication *factoryTestCommunication) GetSource() utils.RapidaSource {

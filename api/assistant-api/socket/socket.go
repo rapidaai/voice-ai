@@ -156,10 +156,15 @@ func (m *audioSocketEngine) handleConnection(ctx context.Context, conn net.Conn)
 		m.logger.Warnw("AudioSocket failed to resolve call context", "contextId", contextID, "error", err)
 		return
 	}
+	auth, err := callContext.ToAuthentication()
+	if err != nil {
+		m.logger.Warnw("AudioSocket failed to reconstruct authentication", "contextId", contextID, "error", err)
+		return
+	}
 
 	observer := observability.New(
 		observability.WithLogger(m.logger),
-		observability.WithAuth(callContext.ToAuth()),
+		observability.WithAuth(auth),
 		observability.WithContext(ctx),
 		observability.WithCollectors(
 			observability_collector_conversationmetric.New(observability_collector_conversationmetric.Config{

@@ -130,7 +130,7 @@ func (opt *GetMessageOption) WithInjectMetadata(ij bool) *GetMessageOption {
 type AssistantConversationService interface {
 	//
 	GetAll(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		criterias []*workflow_api.Criteria,
 		paginate *workflow_api.Paginate,
@@ -141,20 +141,20 @@ type AssistantConversationService interface {
 	// comming from request adapter
 	// anotehr is CRM
 	GetConversation(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		assistantConversationId uint64,
 		opts *GetConversationOption) (*internal_conversation_entity.AssistantConversation, error)
 
 	Get(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		assistantConversationId uint64,
 		opts *GetConversationOption) (*internal_conversation_entity.AssistantConversation, error)
 
 	//
 	GetAllConversationMessage(context.Context,
-		types.SimplePrinciple,
+		*types.Authentication,
 		uint64,
 		[]*workflow_api.Criteria,
 		*workflow_api.Paginate,
@@ -162,7 +162,7 @@ type AssistantConversationService interface {
 
 	GetAllAssistantMessage(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		criterias []*workflow_api.Criteria,
 		paginate *workflow_api.Paginate,
@@ -170,14 +170,14 @@ type AssistantConversationService interface {
 
 	GetAllMessage(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		criterias []*workflow_api.Criteria,
 		paginate *workflow_api.Paginate,
 		ordering *workflow_api.Ordering, opts *GetMessageOption) (int64, []*internal_message_gorm.AssistantConversationMessage, error)
 
 	CreateCustomConversationMetric(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		assistantConversationId uint64,
 		metrics []*workflow_api.Metric,
@@ -185,7 +185,7 @@ type AssistantConversationService interface {
 
 	CreateConversationMessage(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		source utils.RapidaSource,
 		assistantId, assistantProviderModelId,
 		assistantConversationId uint64,
@@ -196,14 +196,14 @@ type AssistantConversationService interface {
 
 	CreateOrUpdateMessageMetadata(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantConversationId uint64,
 		assistantConversationMessageId string,
 		metadata []*protos.Metadata,
 	) ([]*internal_message_gorm.AssistantConversationMessageMetadata, error)
 
 	CreateOrUpdateMessageMetrics(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantConversationId uint64,
 		assistantConversationMessageId string,
 		metrics []*protos.Metric,
@@ -212,7 +212,7 @@ type AssistantConversationService interface {
 	//
 	CreateConversation(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		identifier string,
 		assistantId uint64,
 		assistantProviderModelId uint64,
@@ -222,14 +222,14 @@ type AssistantConversationService interface {
 
 	CreateOrUpdateConversationArgument(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		assistantConversationId uint64,
 		arguments map[string]interface{},
 	) ([]*internal_conversation_entity.AssistantConversationArgument, error)
 
 	CreateOrUpdateConversationOption(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		assistantConversationId uint64,
 		opts map[string]interface{}) ([]*internal_conversation_entity.AssistantConversationOption, error)
@@ -237,7 +237,7 @@ type AssistantConversationService interface {
 	//
 	CreateOrUpdateConversationMetrics(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		assistantConversationId uint64,
 		metrics []*protos.Metric,
@@ -245,7 +245,7 @@ type AssistantConversationService interface {
 
 	CreateOrUpdateConversationMetadata(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		assistantConversationId uint64,
 		metadata []*protos.Metadata,
@@ -253,7 +253,7 @@ type AssistantConversationService interface {
 
 	CreateConversationRecording(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		assistantId uint64,
 		assistantConversationId uint64,
 		user, assistant, conversation []byte,

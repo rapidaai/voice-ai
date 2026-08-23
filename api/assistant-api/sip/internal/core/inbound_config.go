@@ -20,7 +20,7 @@ import (
 // It owns middleware output and the answer policy derived from that config.
 type inboundConfig struct {
 	config          *Config
-	auth            types.SimplePrinciple
+	auth            *types.Authentication
 	assistant       *internal_assistant_entity.Assistant
 	vaultCredential *protos.VaultCredential
 	answerPolicy    InboundAnswerPolicy

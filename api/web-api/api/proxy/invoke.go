@@ -2,7 +2,9 @@ package web_proxy_api
 
 import (
 	"context"
-	"errors"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	endpoint_client "github.com/rapidaai/pkg/clients/endpoint"
 	protos "github.com/rapidaai/protos"
@@ -46,10 +48,13 @@ func (*webInvokeGRPCApi) Update(context.Context, *protos.UpdateRequest) (*protos
 
 func (endpointGRPCApi *webInvokeGRPCApi) Invoke(ctx context.Context, iRequest *protos.InvokeRequest) (*protos.InvokeResponse, error) {
 	endpointGRPCApi.logger.Debugf("invoking endpoint with context %v", ctx)
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated {
-		endpointGRPCApi.logger.Errorf("unauthenticated request to fork endpoint")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	return endpointGRPCApi.deployServiceClient.Invoke(ctx, iAuth, iRequest)
 }

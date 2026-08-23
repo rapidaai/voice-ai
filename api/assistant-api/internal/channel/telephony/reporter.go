@@ -90,7 +90,11 @@ func (d *OutboundDispatcher) NewStatusReporter(contextID string) internal_type.P
 		if update.CallStatus == callcontext.CallStatusRinging && currentCallContext.Status != callcontext.StatusPending {
 			return
 		}
-		auth := currentCallContext.ToAuth()
+		auth, err := currentCallContext.ToAuthentication()
+		if err != nil {
+			d.logger.Warnw("Failed to reconstruct outbound call authentication", "contextId", contextID, "error", err)
+			return
+		}
 		scope := observability.ConversationScope{
 			AssistantScope: observability.AssistantScope{AssistantID: currentCallContext.AssistantID},
 			ConversationID: currentCallContext.ConversationID,

@@ -52,7 +52,7 @@ func (v *vobizTelephony) AnswerXML(streamPath, statusCallbackPath string) (strin
 	return fmt.Sprintf(`<Response><Stream bidirectional="true" audioTrack="inbound" contentType="audio/x-mulaw;rate=8000" keepCallAlive="true" statusCallbackUrl="%s">%s</Stream></Response>`, fmt.Sprintf("https://%s/%s", v.appCfg.Assistant.Public, statusCallbackPath), fmt.Sprintf("wss://%s/%s", v.appCfg.Assistant.Public, streamPath)), nil
 }
 
-func (v *vobizTelephony) OutboundCall(ctx context.Context, auth types.SimplePrinciple, toPhone string, fromPhone string, assistant *internal_assistant_entity.Assistant, assistantConversationId uint64, vaultCredential *protos.VaultCredential, statusReporter internal_type.ProviderCallStatusReporter, opts utils.Option) (*internal_type.CallInfo, error) {
+func (v *vobizTelephony) OutboundCall(ctx context.Context, auth *types.Authentication, toPhone string, fromPhone string, assistant *internal_assistant_entity.Assistant, assistantConversationId uint64, vaultCredential *protos.VaultCredential, statusReporter internal_type.ProviderCallStatusReporter, opts utils.Option) (*internal_type.CallInfo, error) {
 	info := &internal_type.CallInfo{Provider: internal_vobiz.VobizProvider}
 	if err := ctx.Err(); err != nil {
 		info.Status = internal_type.TelephonyStatusFailed
@@ -155,7 +155,7 @@ func (v *vobizTelephony) OutboundCall(ctx context.Context, auth types.SimplePrin
 }
 
 // InboundCall answers an incoming call by returning the <Stream> XML.
-func (v *vobizTelephony) InboundCall(c *gin.Context, auth types.SimplePrinciple, assistantId uint64, clientNumber string, assistantConversationId uint64) error {
+func (v *vobizTelephony) InboundCall(c *gin.Context, auth *types.Authentication, assistantId uint64, clientNumber string, assistantConversationId uint64) error {
 	contextID, _ := c.Get("contextId")
 	ctxID := fmt.Sprintf("%v", contextID)
 	xml, err := v.AnswerXML(
@@ -223,7 +223,7 @@ func (v *vobizTelephony) ReceiveCall(c *gin.Context) (*internal_type.CallInfo, e
 	return info, nil
 }
 
-func (v *vobizTelephony) StatusCallback(c *gin.Context, auth types.SimplePrinciple, assistantId uint64, assistantConversationId uint64) (*internal_type.StatusInfo, error) {
+func (v *vobizTelephony) StatusCallback(c *gin.Context, auth *types.Authentication, assistantId uint64, assistantConversationId uint64) (*internal_type.StatusInfo, error) {
 	eventDetails := utils.Option{}
 	rawCallbackPayload := c.Request.URL.RawQuery
 	if len(c.Request.URL.Query()) > 0 {

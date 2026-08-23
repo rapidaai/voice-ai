@@ -26,8 +26,8 @@ import (
 
 // CreateBulkPhoneCallRest initiates outbound phone calls from the REST API.
 func (cApi *ConversationApi) CreateBulkPhoneCallRest(c *gin.Context) {
-	auth, isAuthenticated := types.GetAuthPrinciple(c)
-	if !isAuthenticated {
+	auth, authErr := types.Authorize(c.Request.Context())
+	if authErr != nil {
 		c.JSON(pkg_errors.CreateBulkPhoneCallUnauthenticated.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateBulkPhoneCallUnauthenticated.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -37,6 +37,11 @@ func (cApi *ConversationApi) CreateBulkPhoneCallRest(c *gin.Context) {
 				HumanMessage: utils.Ptr(pkg_errors.CreateBulkPhoneCallUnauthenticated.ErrorMessage),
 			},
 		})
+		return
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
+	if scopeErr != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": scopeErr.Error()})
 		return
 	}
 
@@ -69,7 +74,7 @@ func (cApi *ConversationApi) CreateBulkPhoneCallRest(c *gin.Context) {
 	}
 
 	conversations := make([]openapi.AssistantConversation, 0, len(*ir.PhoneCalls))
-	observer := cApi.Observability(c, auth, observability.WithGracePeriod())
+	observer := cApi.Observability(c, iAuth, observability.WithGracePeriod())
 	defer observer.Close(context.Background())
 	for _, phoneCall := range *ir.PhoneCalls {
 		if !validator.NonNil(phoneCall.ToNumber) || !validator.NotBlank(*phoneCall.ToNumber) {
@@ -143,7 +148,7 @@ func (cApi *ConversationApi) CreateBulkPhoneCallRest(c *gin.Context) {
 		}
 		result := cApi.channelPipeline.Run(c, channel_pipeline.OutboundRequestedPipeline{
 			ID:          fmt.Sprintf("%d", assistant.GetAssistantId()),
-			Auth:        auth,
+			Auth:        iAuth,
 			AssistantID: assistant.GetAssistantId(),
 			Version:     assistant.GetVersion(),
 			ToPhone:     *phoneCall.ToNumber,

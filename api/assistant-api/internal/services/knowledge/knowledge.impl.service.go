@@ -45,14 +45,18 @@ func NewKnowledgeService(config *config.AssistantConfig,
 
 func (knowledge *knowledgeService) GetAll(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate) (int64, *[]internal_knowledge_gorm.Knowledge, error) {
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return 0, nil, err
+	}
 	db := knowledge.postgres.DB(ctx)
 	var knowledges []internal_knowledge_gorm.Knowledge
 	var cnt int64
 	qry := db.Model(internal_knowledge_gorm.Knowledge{}).
-		Where("organization_id = ? AND status = ? And project_id = ?", *auth.GetCurrentOrganizationId(), type_enums.RECORD_ACTIVE.String(), *auth.GetCurrentProjectId())
+		Where("organization_id = ? AND status = ? And project_id = ?", projectContext.OrganizationID, type_enums.RECORD_ACTIVE.String(), projectContext.ProjectID)
 	for _, ct := range criterias {
 		switch ct.GetLogic() {
 		case "or":
@@ -79,20 +83,24 @@ func (knowledge *knowledgeService) GetAll(
 		}).
 		Find(&knowledges)
 	if tx.Error != nil {
-		knowledge.logger.Debugf("unable to find any knowledge for given project %v and organization  %v", *auth.GetCurrentProjectId(), *auth.GetCurrentOrganizationId())
+		knowledge.logger.Debugf("unable to find any knowledge for given project %v and organization  %v", projectContext.ProjectID, projectContext.OrganizationID)
 		return cnt, nil, tx.Error
 	}
 
 	return cnt, &knowledges, nil
 }
 
-func (knowledge *knowledgeService) Get(ctx context.Context, auth types.SimplePrinciple, knowledgeId uint64) (*internal_knowledge_gorm.Knowledge, error) {
+func (knowledge *knowledgeService) Get(ctx context.Context, auth *types.Authentication, knowledgeId uint64) (*internal_knowledge_gorm.Knowledge, error) {
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
 	db := knowledge.postgres.DB(ctx)
 	var _knowledge internal_knowledge_gorm.Knowledge
 	tx := db.
 		Preload("KnowledgeTag").
 		Preload("KnowledgeEmbeddingModelOptions").
-		Where("id = ? AND status = ? AND project_id = ? AND organization_id = ?", knowledgeId, type_enums.RECORD_ACTIVE.String(), *auth.GetCurrentProjectId(), *auth.GetCurrentOrganizationId()).First(&_knowledge)
+		Where("id = ? AND status = ? AND project_id = ? AND organization_id = ?", knowledgeId, type_enums.RECORD_ACTIVE.String(), projectContext.ProjectID, projectContext.OrganizationID).First(&_knowledge)
 	if tx.Error != nil {
 		return nil, tx.Error
 	}
@@ -100,23 +108,26 @@ func (knowledge *knowledgeService) Get(ctx context.Context, auth types.SimplePri
 }
 
 func (knowledge *knowledgeService) CreateOrUpdateKnowledgeTag(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	knowledgeId uint64,
 	tags []string,
 ) (*internal_knowledge_gorm.KnowledgeTag, error) {
-
+	if _, err := auth.Actor(); err != nil {
+		return nil, err
+	}
+	if _, err := auth.ProjectContext(); err != nil {
+		return nil, err
+	}
 	db := knowledge.postgres.DB(ctx)
 	knowledgeTag := &internal_knowledge_gorm.KnowledgeTag{
 		KnowledgeId: knowledgeId,
 		Tag:         tags,
-		CreatedBy:   *auth.GetUserId(),
-		UpdatedBy:   *auth.GetUserId(),
 	}
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "knowledge_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"tag",
-			"updated_by"}),
+		}),
 	}).Create(&knowledgeTag)
 
 	if tx.Error != nil {
@@ -126,25 +137,30 @@ func (knowledge *knowledgeService) CreateOrUpdateKnowledgeTag(ctx context.Contex
 	return knowledgeTag, nil
 }
 
-func (knowledge *knowledgeService) CreateKnowledge(ctx context.Context, auth types.SimplePrinciple,
+func (knowledge *knowledgeService) CreateKnowledge(ctx context.Context, auth *types.Authentication,
 	name string, description, visibility *string,
 	embeddingModelProviderName string,
 	embeddingModelOptions []*protos.Metadata,
 ) (*internal_knowledge_gorm.Knowledge, error) {
+	if _, err := auth.Actor(); err != nil {
+		return nil, err
+	}
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
 	db := knowledge.postgres.DB(ctx)
 	knowledgeId := gorm_generator.ID()
 	_knowledge := &internal_knowledge_gorm.Knowledge{
 		Audited: gorm_models.Audited{
 			Id: knowledgeId,
 		},
-		Name:           name,
-		ProjectId:      *auth.GetCurrentProjectId(),
-		OrganizationId: *auth.GetCurrentOrganizationId(),
-		Mutable: gorm_models.Mutable{
-			CreatedBy: *auth.GetUserId(),
-		},
+		Name:                       name,
+		ProjectId:                  projectContext.ProjectID,
+		OrganizationId:             projectContext.OrganizationID,
+		Mutable:                    gorm_models.Mutable{},
 		EmbeddingModelProviderName: embeddingModelProviderName,
-		StorageNamespace:           commons.KnowledgeIndex(knowledge.config.IsDevelopment(), *auth.GetCurrentOrganizationId(), *auth.GetCurrentProjectId(), knowledgeId),
+		StorageNamespace:           commons.KnowledgeIndex(knowledge.config.IsDevelopment(), projectContext.OrganizationID, projectContext.ProjectID, knowledgeId),
 	}
 
 	if visibility != nil {
@@ -166,9 +182,7 @@ func (knowledge *knowledgeService) CreateKnowledge(ctx context.Context, auth typ
 		modelOptions = append(modelOptions, &internal_knowledge_gorm.KnowledgeEmbeddingModelOption{
 			KnowledgeId: _knowledge.Id,
 			Mutable: gorm_models.Mutable{
-				CreatedBy: *auth.GetUserId(),
-				UpdatedBy: *auth.GetUserId(),
-				Status:    type_enums.RECORD_ACTIVE,
+				Status: type_enums.RECORD_ACTIVE,
 			},
 			Metadata: gorm_models.Metadata{
 				Key:   v.GetKey(),
@@ -180,7 +194,7 @@ func (knowledge *knowledgeService) CreateKnowledge(ctx context.Context, auth typ
 		Columns: []clause.Column{{Name: "knowledge_id"}, {Name: "key"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value",
-			"updated_by"}),
+		}),
 	}).Create(modelOptions)
 	_knowledge.KnowledgeEmbeddingModelOptions = modelOptions
 	if tx.Error != nil {
@@ -192,20 +206,25 @@ func (knowledge *knowledgeService) CreateKnowledge(ctx context.Context, auth typ
 }
 
 func (eService *knowledgeService) UpdateKnowledgeDetail(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	knowledgeId uint64,
 	name, description string) (*internal_knowledge_gorm.Knowledge, error) {
+	if _, err := auth.Actor(); err != nil {
+		return nil, err
+	}
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
 	db := eService.postgres.DB(ctx)
 	ed := &internal_knowledge_gorm.Knowledge{
 		Name:        name,
 		Description: description,
-		Mutable: gorm_models.Mutable{
-			UpdatedBy: *auth.GetUserId(),
-		},
+		Mutable:     gorm_models.Mutable{},
 	}
 	tx := db.Where("id = ? AND project_id = ? AND organization_id = ?", knowledgeId,
-		*auth.GetCurrentProjectId(),
-		*auth.GetCurrentOrganizationId(),
+		projectContext.ProjectID,
+		projectContext.OrganizationID,
 	).Clauses(clause.Returning{}).Updates(ed)
 	if tx.Error != nil {
 		eService.logger.Errorf("error while updating for assistant %v", tx.Error)
@@ -216,7 +235,7 @@ func (eService *knowledgeService) UpdateKnowledgeDetail(ctx context.Context,
 
 func (eService *knowledgeService) CreateLog(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	knowledgeId uint64,
 	retrievalMethod string,
 	topK uint32,
@@ -227,9 +246,13 @@ func (eService *knowledgeService) CreateLog(
 	status type_enums.RecordState,
 	request, response []byte,
 ) (*internal_knowledge_gorm.KnowledgeLog, error) {
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
-	s3Prefix := eService.ObjectPrefix(*auth.GetCurrentOrganizationId(), *auth.GetCurrentProjectId())
+	s3Prefix := eService.ObjectPrefix(projectContext.OrganizationID, projectContext.ProjectID)
 	_auditId := gorm_generator.ID()
 	utils.Go(ctx, func() {
 		key := eService.ObjectKey(s3Prefix, _auditId, "request.json")
@@ -254,8 +277,8 @@ func (eService *knowledgeService) CreateLog(
 		DocumentCount:   documentCount,
 		AdditionalData:  additionalData,
 		Organizational: gorm_models.Organizational{
-			ProjectId:      *auth.GetCurrentProjectId(),
-			OrganizationId: *auth.GetCurrentOrganizationId(),
+			ProjectId:      projectContext.ProjectID,
+			OrganizationId: projectContext.OrganizationID,
 		},
 		Mutable: gorm_models.Mutable{
 			Status: status,
@@ -273,13 +296,20 @@ func (eService *knowledgeService) CreateLog(
 
 func (eService *knowledgeService) GetLog(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	projectId uint64,
 	toolLogId uint64) (*internal_knowledge_gorm.KnowledgeLog, error) {
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
+	if projectId != projectContext.ProjectID {
+		return nil, fmt.Errorf("project context does not match requested project")
+	}
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	var wkg *internal_knowledge_gorm.KnowledgeLog
-	tx := db.Where("id = ? AND organization_id = ? AND project_id = ?", toolLogId, *auth.GetCurrentOrganizationId(), projectId).
+	tx := db.Where("id = ? AND organization_id = ? AND project_id = ?", toolLogId, projectContext.OrganizationID, projectContext.ProjectID).
 		First(&wkg)
 	if tx.Error != nil {
 		eService.logger.Benchmark("ToolService.GetLog", time.Since(start))
@@ -292,11 +322,18 @@ func (eService *knowledgeService) GetLog(
 
 func (eService *knowledgeService) GetAllLog(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	projectId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
 	order *protos.Ordering) (int64, []*internal_knowledge_gorm.KnowledgeLog, error) {
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return 0, nil, err
+	}
+	if projectId != projectContext.ProjectID {
+		return 0, nil, fmt.Errorf("project context does not match requested project")
+	}
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	var (
@@ -305,7 +342,7 @@ func (eService *knowledgeService) GetAllLog(
 	)
 	qry := db.Model(internal_knowledge_gorm.KnowledgeLog{})
 	qry.
-		Where("organization_id = ? AND project_id = ? ", *auth.GetCurrentOrganizationId(), projectId)
+		Where("organization_id = ? AND project_id = ? ", projectContext.OrganizationID, projectContext.ProjectID)
 	for _, ct := range criterias {
 		qry.Where(fmt.Sprintf("%s %s ?", ct.GetKey(), ct.GetLogic()), ct.GetValue())
 	}
@@ -340,9 +377,13 @@ func (eService *knowledgeService) ObjectKey(keyPrefix string, auditId uint64, ob
 
 func (eService *knowledgeService) GetLogObject(
 	ctx context.Context,
-	organizationId,
-	projectId, toolLogId uint64) (requestData []byte, responseData []byte, err error) {
-	keyPrefix := eService.ObjectPrefix(organizationId, projectId)
+	auth *types.Authentication,
+	toolLogId uint64) (requestData []byte, responseData []byte, err error) {
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, nil, err
+	}
+	keyPrefix := eService.ObjectPrefix(projectContext.OrganizationID, projectContext.ProjectID)
 	responseKey := eService.ObjectKey(keyPrefix, toolLogId, "response.json")
 	requestKey := eService.ObjectKey(keyPrefix, toolLogId, "request.json")
 

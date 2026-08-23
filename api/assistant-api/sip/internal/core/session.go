@@ -35,7 +35,7 @@ type SessionConfig struct {
 	CallID          string // Optional: if empty, a new UUID will be generated
 	Codec           *Codec
 	Logger          commons.Logger
-	Auth            types.SimplePrinciple                // Authentication principal
+	Auth            *types.Authentication                // Authentication principal
 	Assistant       *internal_assistant_entity.Assistant // Assistant entity
 	ConversationID  uint64                               // Conversation ID (outbound: set by channel pipeline)
 	ContextID       string                               // Call context ID (outbound: set by channel pipeline)
@@ -74,7 +74,7 @@ type Session struct {
 	metadata map[string]interface{}
 
 	// Authentication and authorization context - available in all session methods
-	auth            types.SimplePrinciple                // Authentication principal
+	auth            *types.Authentication                // Authentication principal
 	assistant       *internal_assistant_entity.Assistant // Assistant entity
 	conversationID  uint64                               // Conversation ID
 	contextID       string                               // Call context ID (outbound)
@@ -666,14 +666,14 @@ func (s *Session) Disconnect() {
 }
 
 // GetAuth returns the authentication principal for this session.
-func (s *Session) GetAuth() types.SimplePrinciple {
+func (s *Session) GetAuth() *types.Authentication {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.auth
 }
 
 // SetAuth sets the authentication principal for this session.
-func (s *Session) SetAuth(auth types.SimplePrinciple) {
+func (s *Session) SetAuth(auth *types.Authentication) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.auth = auth

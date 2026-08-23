@@ -9,40 +9,25 @@ import (
 	"github.com/rapidaai/pkg/commons"
 	plugins_types "github.com/rapidaai/pkg/plugins/types"
 	"github.com/rapidaai/pkg/types"
-	rapida_types "github.com/rapidaai/pkg/types"
 	vault_api "github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-type mockAuth struct{}
-
-func (m *mockAuth) GetUserId() *uint64                { return nil }
-func (m *mockAuth) GetCurrentOrganizationId() *uint64 { v := uint64(1); return &v }
-func (m *mockAuth) GetCurrentProjectId() *uint64      { v := uint64(1); return &v }
-func (m *mockAuth) HasUser() bool                     { return true }
-func (m *mockAuth) HasOrganization() bool             { return true }
-func (m *mockAuth) HasProject() bool                  { return true }
-func (m *mockAuth) IsAuthenticated() bool             { return true }
-func (m *mockAuth) GetCurrentToken() string           { return "t" }
-func (m *mockAuth) Type() types.AuthType              { return types.AuthTypeUser }
-
-var _ rapida_types.SimplePrinciple = (*mockAuth)(nil)
-
 type mockVault struct {
 	credential *vault_api.VaultCredential
 	err        error
 }
 
-func (m *mockVault) GetCredential(ctx context.Context, auth rapida_types.SimplePrinciple, vaultId uint64) (*vault_api.VaultCredential, error) {
+func (m *mockVault) GetCredential(ctx context.Context, auth *types.Authentication, vaultId uint64) (*vault_api.VaultCredential, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
 	return m.credential, nil
 }
 
-func (m *mockVault) GetOauth2Credential(ctx context.Context, auth rapida_types.SimplePrinciple, vaultId uint64) (*vault_api.VaultCredential, error) {
+func (m *mockVault) GetOauth2Credential(ctx context.Context, auth *types.Authentication, vaultId uint64) (*vault_api.VaultCredential, error) {
 	return nil, errors.New("not used")
 }
 
@@ -76,7 +61,7 @@ func TestPlugin_ExecuteSuccess(t *testing.T) {
 		Provider:  "noop",
 		Input:     map[string]interface{}{"to": "x@y.com"},
 		Config:    map[string]interface{}{"provider": "noop", "credential_id": float64(10)},
-	}, plugins_types.ExecuteDeps{VaultClient: vault, Logger: testLogger(t), Auth: &mockAuth{}})
+	}, plugins_types.ExecuteDeps{VaultClient: vault, Logger: testLogger(t), Auth: testAuthentication()})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Equal(t, plugins_types.StatusSuccess, result.Status)
@@ -92,7 +77,7 @@ func TestPlugin_ExecuteVaultFail(t *testing.T) {
 		Provider:  "noop",
 		Input:     map[string]interface{}{"to": "x@y.com"},
 		Config:    map[string]interface{}{"provider": "noop", "credential_id": float64(10)},
-	}, plugins_types.ExecuteDeps{VaultClient: vault, Logger: testLogger(t), Auth: &mockAuth{}})
+	}, plugins_types.ExecuteDeps{VaultClient: vault, Logger: testLogger(t), Auth: testAuthentication()})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Equal(t, plugins_types.StatusFail, result.Status)
@@ -113,7 +98,7 @@ func TestPlugin_ExecuteSendgridSuccess(t *testing.T) {
 			"text":    "world",
 		},
 		Config: map[string]interface{}{"provider": "sendgrid", "credential_id": float64(10)},
-	}, plugins_types.ExecuteDeps{VaultClient: vault, Logger: testLogger(t), Auth: &mockAuth{}})
+	}, plugins_types.ExecuteDeps{VaultClient: vault, Logger: testLogger(t), Auth: testAuthentication()})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Equal(t, plugins_types.StatusSuccess, result.Status)
@@ -132,8 +117,17 @@ func TestPlugin_ExecuteSendgridMissingInput(t *testing.T) {
 			"to": "user@example.com",
 		},
 		Config: map[string]interface{}{"provider": "sendgrid", "credential_id": float64(10)},
-	}, plugins_types.ExecuteDeps{VaultClient: vault, Logger: testLogger(t), Auth: &mockAuth{}})
+	}, plugins_types.ExecuteDeps{VaultClient: vault, Logger: testLogger(t), Auth: testAuthentication()})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Equal(t, plugins_types.StatusFail, result.Status)
+}
+
+func testAuthentication() *types.Authentication {
+	return &types.Authentication{
+		AuthType:          types.AuthTypeUser,
+		UserValue:         &types.UserContext{UserID: 1},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: 1},
+		ProjectValue:      &types.ProjectContext{OrganizationID: 1, ProjectID: 1},
+	}
 }

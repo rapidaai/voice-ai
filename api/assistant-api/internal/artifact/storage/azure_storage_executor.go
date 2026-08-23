@@ -39,7 +39,7 @@ type azureStorageExecutor struct {
 	logger        commons.Logger
 	configuration *internal_assistant_entity.AssistantConfiguration
 	caller        internal_type.InternalCaller
-	auth          types.SimplePrinciple
+	auth          *types.Authentication
 	onPacket      func(context.Context, ...internal_type.Packet) error
 }
 
@@ -69,7 +69,7 @@ func WithAzureStorageCaller(caller internal_type.InternalCaller) AzureStorageOpt
 	}
 }
 
-func WithAzureStorageAuth(auth types.SimplePrinciple) AzureStorageOption {
+func WithAzureStorageAuth(auth *types.Authentication) AzureStorageOption {
 	return func(executor *azureStorageExecutor) {
 		executor.auth = auth
 	}

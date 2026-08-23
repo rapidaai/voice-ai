@@ -27,7 +27,7 @@ func TestCollectorCreatesRequestLog(t *testing.T) {
 			AssistantScope: observability.AssistantScope{AssistantID: 10},
 			ConversationID: 20,
 		},
-		observability.Context{Auth: &types.ServiceScope{}},
+		observability.Context{Auth: &types.Authentication{}},
 		observability.RecordRequestLog{
 			Source:         "webhook",
 			SourceRefID:    30,
@@ -79,7 +79,7 @@ type recordingHTTPLogService struct {
 
 func (s *recordingHTTPLogService) CreateLog(
 	_ context.Context,
-	_ types.SimplePrinciple,
+	_ *types.Authentication,
 	source string,
 	sourceRefID uint64,
 	sourceEvent string,
@@ -108,18 +108,18 @@ func (s *recordingHTTPLogService) CreateLog(
 	return &internal_assistant_entity.AssistantHTTPLog{}, nil
 }
 
-func (s *recordingHTTPLogService) GetLog(context.Context, types.SimplePrinciple, uint64, uint64) (*internal_assistant_entity.AssistantHTTPLog, error) {
+func (s *recordingHTTPLogService) GetLog(context.Context, *types.Authentication, uint64, uint64) (*internal_assistant_entity.AssistantHTTPLog, error) {
 	return nil, nil
 }
 
-func (s *recordingHTTPLogService) GetAllLog(context.Context, types.SimplePrinciple, uint64, []*protos.Criteria, *protos.Paginate, *protos.Ordering) (int64, []*internal_assistant_entity.AssistantHTTPLog, error) {
+func (s *recordingHTTPLogService) GetAllLog(context.Context, *types.Authentication, uint64, []*protos.Criteria, *protos.Paginate, *protos.Ordering) (int64, []*internal_assistant_entity.AssistantHTTPLog, error) {
 	return 0, nil, nil
 }
 
-func (s *recordingHTTPLogService) GetLogObject(context.Context, uint64, uint64, uint64) ([]byte, []byte, error) {
+func (s *recordingHTTPLogService) GetLogObject(context.Context, *types.Authentication, uint64) ([]byte, []byte, error) {
 	return nil, nil, nil
 }
 
-func (s *recordingHTTPLogService) RetryLog(context.Context, types.SimplePrinciple, uint64, uint64) (*internal_assistant_entity.AssistantHTTPLog, error) {
+func (s *recordingHTTPLogService) RetryLog(context.Context, *types.Authentication, uint64, uint64) (*internal_assistant_entity.AssistantHTTPLog, error) {
 	return nil, nil
 }

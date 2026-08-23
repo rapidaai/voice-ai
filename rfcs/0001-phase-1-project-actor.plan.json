@@ -1,0 +1,120 @@
+{
+  "phase": "1A - project actor authentication foundation",
+  "acceptance_criteria": [
+    "Project-key authentication carries project_credentials.id into ProjectScope and never substitutes project_id or the raw key.",
+    "ActorIdentityProvider and ResolveAuditActor provide fail-closed actor resolution without extending SimplePrinciple.",
+    "User principles resolve to actor type user with the user ID; project principles resolve to actor type project with the credential ID.",
+    "Organization and service principles without stable durable identities do not implement a successful actor identity and resolve as unavailable.",
+    "ScopedAuthentication adds optional actorType and actorId fields without changing existing field numbers or behavior.",
+    "ScopeAuthorize cache keys are versioned and use an HMAC-SHA256 token fingerprint rather than the raw credential.",
+    "ScopeAuthorize cache writes use a bounded five-minute TTL, so pre-change entries are ignored and new entries cannot remain indefinitely.",
+    "Existing user, organization, project, and service authentication behavior remains compatible."
+  ],
+  "non_goals": [
+    "Database actor columns or migrations.",
+    "Dual-writing created_actor or updated_actor fields.",
+    "Creating organization_credentials or service identity registries.",
+    "Public resource createdActor or updatedActor fields.",
+    "SDK releases or UI actor rendering.",
+    "Changing non-ScopeAuthorize cache behavior."
+  ],
+  "allowed_paths": [
+    "rfcs/0001-actor-aware-audit-identity.md",
+    "rfcs/0001-phase-1-project-actor.plan.json",
+    "pkg/types/actor_identity.go",
+    "pkg/types/actor_identity_test.go",
+    "pkg/types/user_principle.go",
+    "pkg/types/project_scope_principle.go",
+    "pkg/types/project_scope_principle_test.go",
+    "pkg/types/org_scope_principle.go",
+    "pkg/types/org_scope_principle_test.go",
+    "pkg/types/service_scope_principle.go",
+    "pkg/types/service_scope_principle_test.go",
+    "api/web-api/internal/service/user/auth.type.go",
+    "api/web-api/internal/service/user/auth.type_test.go",
+    "api/web-api/internal/service/project/service.go",
+    "api/web-api/internal/service/project/service_test.go",
+    "api/web-api/api/auth.go",
+    "api/web-api/api/auth_test.go",
+    "pkg/authenticators/project_authenticator.go",
+    "pkg/authenticators/project_authenticator_test.go",
+    "pkg/clients/internal_client.go",
+    "pkg/clients/internal_client_test.go",
+    "pkg/clients/web/auth_client.go",
+    "pkg/clients/web/auth_client_test.go",
+    "protos/artifacts/web-api.proto",
+    "protos/web-api.pb.go",
+    "api/document-api/app/bridges/artifacts/protos/web_api_pb2.py",
+    "api/document-api/app/bridges/artifacts/protos/web_api_pb2.pyi"
+  ],
+  "out_of_scope_paths": [
+    "api/assistant-api/migrations/",
+    "api/endpoint-api/migrations/",
+    "api/web-api/migrations/",
+    "api/integration-api/migrations/",
+    "sdks/",
+    "ui/",
+    "protos/web-api_grpc.pb.go",
+    "api/document-api/app/bridges/artifacts/protos/web_api_pb2_grpc.py"
+  ],
+  "ownership": {
+    "pkg/types/": "actor-contract-implementer",
+    "api/web-api/internal/service/user/auth.type.go": "actor-contract-implementer",
+    "api/web-api/internal/service/user/auth.type_test.go": "actor-contract-implementer",
+    "api/web-api/internal/service/project/": "project-auth-implementer",
+    "api/web-api/api/auth.go": "project-auth-implementer",
+    "api/web-api/api/auth_test.go": "project-auth-implementer",
+    "pkg/authenticators/": "project-auth-implementer",
+    "pkg/clients/internal_client.go": "scope-cache-implementer",
+    "pkg/clients/internal_client_test.go": "scope-cache-implementer",
+    "pkg/clients/web/": "scope-cache-implementer",
+    "protos/artifacts/web-api.proto": "project-auth-implementer",
+    "protos/web-api.pb.go": "project-auth-implementer",
+    "api/document-api/app/bridges/artifacts/protos/web_api_pb2.py": "project-auth-implementer",
+    "api/document-api/app/bridges/artifacts/protos/web_api_pb2.pyi": "project-auth-implementer"
+  },
+  "principles": {
+    "kiss": "Add one companion actor contract, propagate the existing credential primary key, and version only the affected scope-auth cache.",
+    "yagni": "Defer persistence, dual write, organization/service provisioning, public APIs, SDK releases, and UI work.",
+    "single_source_of_truth": "project_credentials.id is the sole project actor identifier; project_id remains authorization scope only.",
+    "contracts": "Add optional actorType field 5 and actorId field 6, preserving every existing protobuf field number and authentication response behavior.",
+    "fail_safe": "Authenticated actor-aware callers without a durable identity return an explicit resolver error; no scope or compatibility user is guessed.",
+    "security": "Use HMAC-SHA256 with the configured internal secret for cache fingerprints; never log, persist, or cache the raw project credential as actor metadata.",
+    "observability": "Retain existing authentication error logging without credential material; cache versioning provides deterministic rollout behavior.",
+    "reversibility": "Retain the versioned HMAC cache-key behavior during code rollback or delete both legacy and Phase 1A ScopeAuthorize namespaces before restoring the old client. Never reactivate unbounded legacy entries."
+  },
+  "required_tests": [
+    "actor resolver user and project success paths",
+    "actor resolver unavailable and unsupported fallbacks",
+    "all concrete principle implementations and test doubles still compile",
+    "local web user authPrinciple implements ActorIdentityProvider in a same-package test",
+    "project credential query aliases id to credential_id",
+    "web ScopeAuthorize emits project actorType and actorId",
+    "remote project authenticator rejects non-project or malformed actor identity",
+    "legacy unversioned cache entries are ignored",
+    "scope-auth cache key contains no raw token and changes with token or scope",
+    "scope-auth cache SET uses bounded TTL",
+    "protobuf descriptor preserves fields 1 through 4 and adds optional fields 5 and 6"
+  ],
+  "required_commands": [
+    "protoc -I=./protos/artifacts --go_opt=module=github.com/rapidaai/protos --go_out=./protos ./protos/artifacts/web-api.proto",
+    "python3 -m grpc.tools.protoc -I ./protos/artifacts --pyi_out=./api/document-api/app/bridges/artifacts/protos --python_out=./api/document-api/app/bridges/artifacts/protos ./protos/artifacts/web-api.proto",
+    "go test ./pkg/types ./pkg/authenticators ./pkg/clients ./pkg/clients/web ./api/web-api/api ./api/web-api/internal/service/project ./api/web-api/internal/service/user",
+    "go test ./pkg/middlewares/... ./api/assistant-api/... ./api/endpoint-api/... ./api/integration-api/... ./api/web-api/...",
+    "git diff --check"
+  ],
+  "risks": [
+    "Reflection-based casting can omit actor fields unless ScopeAuthorize populates them explicitly.",
+    "Changing cache key format temporarily increases authentication service calls until versioned entries warm.",
+    "ActorIdentityProvider type assertions must cover both local authPrinciple and serialized PlainAuthPrinciple.",
+    "Generated protobuf artifacts can drift if commands regenerate unrelated files."
+  ],
+  "rollback": "Revert actor/protobuf propagation before schema work while retaining the versioned HMAC cache-key behavior. If the cache code must also be reverted, first delete legacy and Phase 1A ScopeAuthorize namespaces so unbounded pre-change entries cannot reactivate.",
+  "discussion": {
+    "planner": "codex-coordinator",
+    "challenger": "pending",
+    "decision": "pending",
+    "approved_by": "pending",
+    "open_blockers": []
+  }
+}

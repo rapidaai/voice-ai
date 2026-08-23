@@ -1,0 +1,259 @@
+{
+  "rfc": "0001-actor-aware-audit-identity",
+  "phase": "3",
+  "title": "Complete bigint actor rollout and legacy removal",
+  "status": "ready-for-challenge",
+  "inventory": "rfcs/0001-phase-3-audit-contract-inventory.json",
+  "supersedes": [
+    "The former independently gated dual-write phase",
+    "The former independently gated historical backfill phase",
+    "The former independently gated public contract phase",
+    "The former independently gated domain rollout phase",
+    "The former independently gated legacy cleanup phase"
+  ],
+  "objective": "Complete all actor persistence, historical conversion, writer and reader migration, public contract migration, audited-domain rollout, and legacy audit removal inside one approved Phase 3 while using ordered operational checkpoints to preserve data integrity and rollback safety.",
+  "prerequisites": [
+    "Phase 1 request Authentication migration is complete and repository production callers use Authorize, Scope, direct contexts, and Authentication.Actor.",
+    "The three unexecuted legacy-audited actor expansion migrations use PostgreSQL bigint actor IDs and retain legacy columns until final cleanup; Integration adds actor columns to external_audits and external_audit_metadata without legacy conversion.",
+    "The exact inventory of 83 administrative public mutation edges, six Assistant runtime persistence handlers, one Integration lifecycle persistence handler, canonical writers, 64 tables, protobufs, SDKs, UI, and known external consumers is accepted and digest-bound to this plan.",
+    "Organization credential, service identity, and system identity numeric ownership is implemented and independently verified before those actors may mutate audited resources.",
+    "SDK gitlinks and nested repositories have clean baselines or explicit owners and recorded starting SHAs before generated changes begin."
+  ],
+  "acceptance_criteria": [
+    "ActorIdentity.ID remains uint64 at Go and protobuf boundaries but every value is validated in the inclusive range 1 through 9223372036854775807 before persistence or signed propagation.",
+    "created_actor_id and updated_actor_id are PostgreSQL bigint columns in all 64 actor-audited tables, including Integration external_audits and external_audit_metadata.",
+    "Actor type and ID pair CHECK constraints allow only user, project, organization, service, system, and historical unknown values with valid nullability and positive IDs.",
+    "One shared PostgreSQL trigger function and 64 explicit table triggers prevent updates to created_actor_type and created_actor_id.",
+    "Historical conversion maps positive legacy IDs to user actors, maps null, zero, and negative creation values to unknown with null IDs, preserves null update attribution, and maps zero or negative update values to unknown with null IDs.",
+    "Historical conversion is bounded, resumable, idempotent, observable, and complete before legacy fallback or columns are removed.",
+    "Every canonical persistent mutation resolves a durable authenticated actor before persistence, writes actor fields transactionally, and fails before I/O when identity is absent, zero, out of range, or mismatched.",
+    "During the temporary migration checkpoint, user writes keep legacy and actor IDs equal while non-user writes use zero only in legacy compatibility fields; no compatibility user or scope ID is substituted.",
+    "Creation actor fields never change after insert; update, archive, disable, and soft-delete paths update only updated_actor_type and updated_actor_id.",
+    "Actor-capable readers prefer actor fields and remove legacy fallback only after conversion validation succeeds.",
+    "All Assistant, Endpoint, Web, Integration, organization credential, service, and system mutation paths complete in Phase 3.",
+    "The next major protobuf, SDK, and UI contract removes createdBy, updatedBy, createdUser, and updatedUser, reserves their protobuf numbers and names, and exposes uint64 createdActor and updatedActor identities with jstype=JS_STRING.",
+    "Final cleanup removes created_by and updated_by only after source validators, database validators, contract consumers, and rollback rehearsal pass.",
+    "Production cleanup runs under a write fence with stopped old writers, same-point database backups, explicit Web then Endpoint then Assistant ordering, per-database verification, and all-or-nothing traffic resumption."
+  ],
+  "identity_owners": {
+    "user": "Existing user_auths bigint ID owned by Web API.",
+    "project": "Existing project_credentials bigint ID owned by Web API; project ID remains authorization scope.",
+    "organization": "New organization_credentials bigint ID owned by Web API; key fingerprint and lifecycle are stored without raw secrets.",
+    "service": "New service_identities bigint ID owned by Web API; stable across signing-key rotation and transported in signed issuer/audience-bound service assertions.",
+    "system": "New system_identities bigint ID owned by Web API; configuration references the numeric ID and startup verifies service ownership."
+  },
+  "identity_lifecycle": [
+    "IDs use the existing 63-bit snowflake generator and must never exceed signed PostgreSQL bigint range.",
+    "Identity records are archived rather than hard-deleted and IDs are never reused.",
+    "Organization credential rotation preserves the credential entity ID when rotating secret material; creating a distinct credential creates a new actor ID.",
+    "Service signing-key rotation changes the key identifier but preserves the service identity ID.",
+    "Signed service assertions carry actor type, actor ID, issuer, audience, issued-at, expiry, and signing-key ID; receivers validate every field.",
+    "System identity configuration is owned by the registered service and cannot select another service's system actor."
+  ],
+  "checkpoints": [
+    {
+      "name": "inventory-and-identity",
+      "exit_criteria": [
+        "Exact inventory artifact is complete and reviewed.",
+        "Numeric organization, service, and system identity entities and authentication tests pass.",
+        "SDK and UI owners record clean starting SHAs and known external consumers are notified of the next major contract."
+      ]
+    },
+    {
+      "name": "additive-bigint-schema",
+      "exit_criteria": [
+        "All four full migration histories apply with bigint actor columns while legacy columns remain where they already exist.",
+        "No defaults, destructive drops, or table-wide conversion occur in the expansion migrations.",
+        "Representative schemas meet lock wait, WAL, disk, and replica-lag limits."
+      ]
+    },
+    {
+      "name": "actor-writers",
+      "exit_criteria": [
+        "Every inventoried canonical writer resolves and writes actor identity.",
+        "Missing actor failures prevent downstream persistence.",
+        "Creation actor immutability and temporary compatibility writes pass tests."
+      ]
+    },
+    {
+      "name": "historical-conversion",
+      "exit_criteria": [
+        "Every table reports zero remaining null creation actor types.",
+        "Positive, null, zero, and negative legacy values match the approved conversion policy.",
+        "CHECK constraints and creation-actor immutability triggers validate on all 64 tables."
+      ]
+    },
+    {
+      "name": "actor-readers-and-contracts",
+      "exit_criteria": [
+        "Readers and projections use actor fields without legacy fallback.",
+        "The next major protobuf, generated artifacts, SDKs, UI, and known consumers pass actor-only tests.",
+        "Removed protobuf field numbers and names are reserved."
+      ]
+    },
+    {
+      "name": "legacy-cleanup",
+      "exit_criteria": [
+        "Repository and database validators prove zero legacy dependencies.",
+        "Backup restoration and previous-release deployment are rehearsed.",
+        "The write fence is active, old binaries and mutation workers are stopped, cleanup migrations and actor-only binaries verify in order, and traffic resumes only after complete cross-service approval."
+      ]
+    }
+  ],
+  "database_constraints": {
+    "created_pair": "created actor is either unknown with null ID or a durable allowed type with ID between 1 and 9223372036854775807; after conversion created type is not null",
+    "updated_pair": "updated actor is either both null, unknown with null ID, or a durable allowed type with ID between 1 and 9223372036854775807",
+    "creation_immutability": "one shared trigger function rejects changes to created_actor_type or created_actor_id; each audited table has an explicitly named trigger",
+    "application_immutability": "shared model fields are create-only and update paths use explicit column allowlists"
+  },
+  "migration_execution": {
+    "coordinator": "Platform release coordinator",
+    "write_fence": "Drain public ingress, stop Web, Endpoint, Assistant, scheduled mutation workers, callback mutation workers, and direct internal mutation callers; verify no application sessions retain write-capable database roles before cleanup starts.",
+    "backup_consistency": "Capture and verify the named pre-maintenance backup set for Web, Integration, Endpoint, and Assistant after the write fence is active and before any cleanup migration runs.",
+    "cleanup_order": [
+      "Web database cleanup and verification",
+      "Endpoint database cleanup and verification",
+      "Assistant database cleanup and verification",
+      "Deploy actor-only Web, Endpoint, Assistant, and Integration binaries",
+      "Run cross-service mutation and read smoke tests",
+      "Lift the write fence"
+    ],
+    "transaction_strategy": "Each service cleanup migration is one service-local transaction with lock_timeout and statement_timeout. Historical conversion never runs in the cleanup transaction.",
+    "limits": "Production runbook records environment-specific maximum lock wait, statement duration, WAL growth, free disk floor, and replica lag; exceeding any limit aborts before the next service cleanup.",
+    "partial_failure": "Keep the write fence active and stop the sequence. Fix forward and reverify, or restore the complete named backup set for all four databases and deploy the previous complete release. Never restore only one database and resume traffic."
+  },
+  "ownership": {
+    "rfcs/": "coordinator and RFC author",
+    "pkg/types/": "authentication and actor identity owner",
+    "pkg/models/gorm/": "shared persistence contract owner",
+    "api/web-api/": "Web domain plus project, organization, service, and system identity owner",
+    "api/endpoint-api/": "Endpoint domain owner",
+    "api/assistant-api/": "Assistant and knowledge domain owner",
+    "api/integration-api/": "service assertion propagation owner",
+    "protos/": "protobuf source and generated Go artifact owner",
+    "sdks/go/": "Go SDK owner",
+    "sdks/nodejs/": "Node.js SDK owner",
+    "sdks/python/": "Python SDK owner",
+    "sdks/react/": "React SDK owner",
+    "sdks/react-widget/": "React widget owner",
+    "ui/": "UI actor rendering and contract owner",
+    "cmd/": "binary assembly and release fencing owner"
+  },
+  "allowed_paths": [
+    "rfcs/0001-*",
+    "pkg/types/**",
+    "pkg/models/gorm/**",
+    "pkg/clients/**",
+    "pkg/middlewares/**",
+    "api/assistant-api/**",
+    "api/endpoint-api/**",
+    "api/web-api/**",
+    "api/integration-api/**",
+    "cmd/assistant/**",
+    "cmd/endpoint/**",
+    "cmd/web/**",
+    "cmd/integration/**",
+    "protos/**",
+    "sdks/go/**",
+    "sdks/nodejs/**",
+    "sdks/python/**",
+    "sdks/react/**",
+    "sdks/react-widget/**",
+    "ui/**",
+    "bin/generate"
+  ],
+  "out_of_scope_paths": [
+    "docs/**",
+    "examples/**",
+    "Unrelated provider, telephony, speech, model, and infrastructure modules"
+  ],
+  "out_of_scope_behavior": [
+    "Immutable append-only audit event history",
+    "Event-time snapshots of actor display metadata",
+    "Guessing historical non-user identity from secrets, logs, scope IDs, or current ownership",
+    "Reusing removed protobuf numbers or JSON names",
+    "Permanent legacy compatibility after Phase 3 completes"
+  ],
+  "principles": {
+    "kiss": "One final actor-only model and one complete Phase 3; temporary migration behavior is explicit and deleted before completion.",
+    "yagni": "No global actor framework, reflection-based writer adapters, hidden context utilities, speculative actor indexes, or permanent feature switches.",
+    "single_ownership": "The resource-owning service writes audit identity and Web API owns durable numeric credential, service, and system identity records.",
+    "single_source_of_truth": "Authentication supplies actor identity, resource fields supply scope, and actor columns become the sole audit identity after cleanup.",
+    "explicit_contracts": "Bigint range, conversion rules, constraints, public version break, checkpoint exits, cleanup ordering, operational limits, and rollback are visible.",
+    "fail_safe": "New writes fail before persistence for missing, zero, out-of-range, unavailable, or type-mismatched actors; cleanup stops at the first failed limit or verification.",
+    "observability": "Metrics and logs cover actor type and non-secret ID, missing actor failures, unknown history, conversion progress, lock waits, WAL, disk, replica lag, and cleanup status.",
+    "least_privilege": "Actor projections remain tenant-authorized and no secret, raw token, key, unauthorized PII, or scope substitution is stored.",
+    "reversibility": "Additive checkpoints revert applications without data loss; final cleanup uses a write fence and same-point backup restoration rather than lossy down migrations.",
+    "open_source_readability": "Controllers authorize directly, services resolve direct actor and context contracts, migrations and inventories remain explicit, and no helper layer hides identity decisions."
+  },
+  "required_tests": [
+    "ActorIdentity positive bigint-range success and zero/out-of-range rejection for every actor type.",
+    "Existing snowflake generator maximum-range tests proving IDs fit signed PostgreSQL bigint.",
+    "Organization credential, service identity, and system identity entity lifecycle, archival, non-reuse, ownership, and signed assertion tests.",
+    "Exact inventory parity tests against controller routes, canonical writers, audited tables, protobuf sources, SDK roots, and UI references.",
+    "PostgreSQL full-history expansion tests proving bigint actor columns and preserved legacy columns.",
+    "Conversion tests for positive, null, zero, and negative legacy values, bounded resume, idempotency, counts, and failure checkpoints.",
+    "Database CHECK constraint tests for allowed types, positive range, unknown-null pairing, null update pairing, and invalid combinations.",
+    "Database trigger tests proving creation actor fields cannot change on all table families.",
+    "Same-package writer tests for user, project, organization, service, and system success where allowed; unavailable actor failure; transaction rollback; and immutable creation actor.",
+    "Reader tests for actor preference, temporary legacy fallback, fallback removal, unknown history, and projection authorization.",
+    "Protobuf tests proving new actor fields use uint64 and removed legacy numbers and names are reserved in the final major contract.",
+    "Generated artifact, SDK, React widget, and UI happy-path plus regression tests using each repository's existing commands.",
+    "Repository source-contract tests proving zero production legacy database/model access and no protobuf field declarations while permitting required reserved names.",
+    "PostgreSQL cleanup tests proving legacy-column absence and actor constraint preservation.",
+    "Runbook tests for write-fence enforcement, stopped old writers, per-service cleanup order, operational limit abort, full backup restore, previous-release deployment, and all-or-nothing traffic resumption."
+  ],
+  "required_commands": [
+    "python3 -m json.tool rfcs/0001-phase-3-complete-bigint-actor-rollout.plan.json",
+    "bin/generate",
+    "go test ./pkg/...",
+    "go test ./api/assistant-api/... ./api/endpoint-api/... ./api/web-api/... ./api/integration-api/...",
+    "go test ./cmd/assistant ./cmd/endpoint ./cmd/web ./cmd/integration",
+    "go vet ./pkg/... ./api/assistant-api/... ./api/endpoint-api/... ./api/web-api/... ./api/integration-api/... ./cmd/assistant ./cmd/endpoint ./cmd/web ./cmd/integration",
+    "(cd sdks/go && go test ./...)",
+    "(cd sdks/nodejs && npm test -- --runInBand && npm run build)",
+    "(cd sdks/python && pytest)",
+    "(cd sdks/react && npm run test:ci && npm run build)",
+    "(cd sdks/react-widget && npm test -- --runInBand && npm run build)",
+    "(cd ui && yarn test --watchAll=false && yarn checkTs && yarn build)",
+    "Run PostgreSQL 16 full migration histories for assistant, endpoint, web, and integration on positive/null/zero/negative fixtures where legacy fields exist; verify bigint types, conversion checkpoints, constraints, triggers, cleanup, and down-validation behavior.",
+    "Execute the documented backup-restore rehearsal: fence writes, capture the named four-database backup set, run cleanup migrations, restore all four databases, deploy the previous complete release, and pass legacy smoke tests before recording success.",
+    "test -z \"$(rg -l 'created_by|updated_by|CreatedBy|UpdatedBy' api pkg cmd --glob '!**/migrations/**' --glob '!**/*_test.go')\"",
+    "test -z \"$(rg -l '^[[:space:]]*(uint64|User)[[:space:]]+(createdBy|updatedBy|createdUser|updatedUser)[[:space:]]*=' protos/artifacts --glob '*.proto')\"",
+    "go test ./protos/... -run TestAuditActorContract",
+    "git diff --check"
+  ],
+  "risks": [
+    "The complete phase spans 64 tables, many writers and readers, six protobuf source files, generated artifacts, five SDK roots, UI, and unknown out-of-repository consumers.",
+    "Historical conversion and cleanup can create lock, WAL, disk, and replica-lag pressure.",
+    "A missed writer, reader, callback, background worker, or direct internal caller can fail after cleanup.",
+    "Organization, service, and system identity ownership introduces new control-plane entities and signed propagation contracts.",
+    "The final major contract removes fields used by older external clients and requires explicit release communication and consumer sign-off.",
+    "Dirty nested SDK repositories can conceal unrelated changes and invalidate generated-artifact evidence.",
+    "Restoring only one database after partial cleanup would create cross-service contract inconsistency.",
+    "A normal down migration cannot preserve non-user actor identity in user-only legacy columns."
+  ],
+  "rollback": "Before final cleanup, roll back actor-capable binaries while retaining additive actor columns and conversion checkpoints. During final cleanup, keep the global write fence active; on failure either fix forward and reverify or restore the complete named pre-maintenance backup set for Web, Integration, Endpoint, and Assistant, deploy the previous complete binaries, protobuf artifacts, SDKs, and UI, validate all databases and legacy audit behavior, and only then resume traffic. Never use lossy down migrations or a single-database restore as the primary production rollback.",
+  "discussion": {
+    "planner": "codex-coordinator",
+    "challenger": null,
+    "decision": "pending re-challenge",
+    "approved_by": null,
+    "approval_message": null,
+    "resolved_findings": [
+      "Bounded uint64-to-bigint range contract",
+      "Null, zero, and negative historical conversion",
+      "Numeric organization, service, and system identity ownership",
+      "Correct sdks/react-widget path and nested-repository ownership gate",
+      "Named coordinator, write fence, backup set, database order, operational limits, and partial-failure behavior",
+      "Next-major external contract boundary and consumer sign-off gate",
+      "Database type/ID constraints and creation-actor immutability triggers",
+      "Exact backup-restore rehearsal command requirement",
+      "One Phase 3 naming aligned with the RFC"
+    ],
+    "open_blockers": [
+      "Independent challenge approval of the revised exact RFC, plan, and inventory bytes",
+      "Exact-digest user confirmation"
+    ]
+  }
+}

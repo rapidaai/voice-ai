@@ -22,8 +22,8 @@ import (
 )
 
 type AuditServiceClient interface {
-	GetAuditLog(c context.Context, auth types.SimplePrinciple, auditId uint64) (*protos.GetAuditLogResponse, error)
-	GetAllAuditLog(c context.Context, auth types.SimplePrinciple, req *protos.GetAllAuditLogRequest) (*protos.GetAllAuditLogResponse, error)
+	GetAuditLog(c context.Context, auth *types.Authentication, auditId uint64) (*protos.GetAuditLogResponse, error)
+	GetAllAuditLog(c context.Context, auth *types.Authentication, req *protos.GetAllAuditLogRequest) (*protos.GetAllAuditLogResponse, error)
 }
 
 type auditServiceClient struct {
@@ -53,10 +53,14 @@ func NewAuditServiceClient(config *config.AppConfig, logger commons.Logger, redi
 	}
 }
 
-func (client *auditServiceClient) GetAuditLog(c context.Context, auth types.SimplePrinciple, auditId uint64) (*protos.GetAuditLogResponse, error) {
+func (client *auditServiceClient) GetAuditLog(c context.Context, auth *types.Authentication, auditId uint64) (*protos.GetAuditLogResponse, error) {
 	client.logger.Debugf("Calling to get audit log with org and project")
 	start := time.Now()
-	res, err := client.auditLoggingClient.GetAuditLog(client.WithAuth(c, auth), &protos.GetAuditLogRequest{
+	authContext, err := client.WithAuth(c, auth)
+	if err != nil {
+		return nil, err
+	}
+	res, err := client.auditLoggingClient.GetAuditLog(authContext, &protos.GetAuditLogRequest{
 		Id: auditId,
 	})
 	if err != nil {
@@ -66,10 +70,14 @@ func (client *auditServiceClient) GetAuditLog(c context.Context, auth types.Simp
 	client.logger.Debugf("Benchmarking: auditServiceClient.GetAuditLog time taken %v", time.Since(start))
 	return res, nil
 }
-func (client *auditServiceClient) GetAllAuditLog(c context.Context, auth types.SimplePrinciple, req *protos.GetAllAuditLogRequest) (*protos.GetAllAuditLogResponse, error) {
+func (client *auditServiceClient) GetAllAuditLog(c context.Context, auth *types.Authentication, req *protos.GetAllAuditLogRequest) (*protos.GetAllAuditLogResponse, error) {
 	client.logger.Debugf("Calling to get audit log with org and project")
 	start := time.Now()
-	res, err := client.auditLoggingClient.GetAllAuditLog(client.WithAuth(c, auth), req)
+	authContext, err := client.WithAuth(c, auth)
+	if err != nil {
+		return nil, err
+	}
+	res, err := client.auditLoggingClient.GetAllAuditLog(authContext, req)
 	if err != nil {
 		client.logger.Errorf("error while getting audit log error %v", err)
 		return nil, err

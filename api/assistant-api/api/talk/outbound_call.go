@@ -9,6 +9,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	channel_pipeline "github.com/rapidaai/api/assistant-api/internal/channel/pipeline"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
@@ -25,20 +27,16 @@ import (
 // Thin controller — pipeline handles: validate, load assistant, create conversation,
 // save context, create observer, dispatch. Controller just validates input and waits.
 func (cApi *ConversationGrpcApi) CreatePhoneCall(ctx context.Context, ir *protos.CreatePhoneCallRequest) (*protos.CreatePhoneCallResponse, error) {
-	auth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated {
-		return &protos.CreatePhoneCallResponse{
-			Code:    pkg_errors.CreatePhoneCallUnauthenticated.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.CreatePhoneCallUnauthenticated.Code),
-				ErrorMessage: pkg_errors.CreatePhoneCallUnauthenticated.Error,
-				HumanMessage: pkg_errors.CreatePhoneCallUnauthenticated.ErrorMessage,
-			},
-		}, errors.New(pkg_errors.CreatePhoneCallUnauthenticated.Error)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
-	observer := cApi.Observability(ctx, auth, observability.WithGracePeriod())
+	observer := cApi.Observability(ctx, iAuth, observability.WithGracePeriod())
 	defer observer.Close(context.Background())
 	_ = observer.Record(ctx, observability.Scope(observability.ProjectScope{}), observability.RecordLog{
 		Level:   observability.LevelInfo,
@@ -203,7 +201,7 @@ func (cApi *ConversationGrpcApi) CreatePhoneCall(ctx context.Context, ir *protos
 	// Pipeline handles the full outbound flow
 	result := cApi.channelPipeline.Run(ctx, channel_pipeline.OutboundRequestedPipeline{
 		ID:          fmt.Sprintf("%d", ir.GetAssistant().GetAssistantId()),
-		Auth:        auth,
+		Auth:        iAuth,
 		AssistantID: ir.GetAssistant().GetAssistantId(),
 		Version:     ir.GetAssistant().GetVersion(),
 		ToPhone:     ir.GetToNumber(),
@@ -256,17 +254,13 @@ func (cApi *ConversationGrpcApi) CreatePhoneCall(ctx context.Context, ir *protos
 
 // InitiateBulkAssistantTalk implements protos.TalkServiceServer.
 func (cApi *ConversationGrpcApi) CreateBulkPhoneCall(ctx context.Context, ir *protos.CreateBulkPhoneCallRequest) (*protos.CreateBulkPhoneCallResponse, error) {
-	auth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated {
-		return &protos.CreateBulkPhoneCallResponse{
-			Code:    pkg_errors.CreateBulkPhoneCallUnauthenticated.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.CreateBulkPhoneCallUnauthenticated.Code),
-				ErrorMessage: pkg_errors.CreateBulkPhoneCallUnauthenticated.Error,
-				HumanMessage: pkg_errors.CreateBulkPhoneCallUnauthenticated.ErrorMessage,
-			},
-		}, errors.New(pkg_errors.CreateBulkPhoneCallUnauthenticated.Error)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
 	if len(ir.GetPhoneCalls()) == 0 {
@@ -359,10 +353,10 @@ func (cApi *ConversationGrpcApi) CreateBulkPhoneCall(ctx context.Context, ir *pr
 			}, errors.New(pkg_errors.CreateBulkPhoneCallInvalidOptions.Error)
 		}
 
-		observer := cApi.Observability(ctx, auth, observability.WithGracePeriod())
+		observer := cApi.Observability(ctx, iAuth, observability.WithGracePeriod())
 		result := cApi.channelPipeline.Run(ctx, channel_pipeline.OutboundRequestedPipeline{
 			ID:          fmt.Sprintf("%d", phoneCall.GetAssistant().GetAssistantId()),
-			Auth:        auth,
+			Auth:        iAuth,
 			AssistantID: phoneCall.GetAssistant().GetAssistantId(),
 			Version:     phoneCall.GetAssistant().GetVersion(),
 			ToPhone:     phoneCall.GetToNumber(),

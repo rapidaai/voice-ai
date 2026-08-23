@@ -53,7 +53,7 @@ type SIPRequestContext struct {
 	APIKey      string
 	AssistantID string
 
-	Auth            types.SimplePrinciple
+	Auth            *types.Authentication
 	Assistant       *internal_assistant_entity.Assistant
 	VaultCredential *protos.VaultCredential
 	Config          *Config

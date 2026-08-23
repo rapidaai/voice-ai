@@ -91,7 +91,6 @@ class WordExtractor(BaseExtractor):
             #         size=0,
             #         extension=image_ext,
             #         mime_type=mime_type,
-            #         created_by=self.user_id,
             #         created_at=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),
             #         used=True,
             #         used_by=self.user_id,
@@ -172,4 +171,3 @@ class WordExtractor(BaseExtractor):
                 table = tables.pop(0)
                 content.append(self._table_to_markdown(table))
         return '\n'.join(content)
-

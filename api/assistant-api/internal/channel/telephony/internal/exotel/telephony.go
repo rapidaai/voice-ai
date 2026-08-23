@@ -96,7 +96,7 @@ func (exo *exotelTelephony) CatchAllStatusCallback(ctx *gin.Context) (*internal_
 	return callback.StatusInfo(), nil
 }
 
-func (exo *exotelTelephony) StatusCallback(c *gin.Context, auth types.SimplePrinciple, assistantId uint64, assistantConversationId uint64) (*internal_type.StatusInfo, error) {
+func (exo *exotelTelephony) StatusCallback(c *gin.Context, auth *types.Authentication, assistantId uint64, assistantConversationId uint64) (*internal_type.StatusInfo, error) {
 	eventDetails := utils.Option{}
 	rawCallbackPayload := c.Request.URL.RawQuery
 
@@ -197,7 +197,7 @@ func (exo *exotelTelephony) AppUrl(vaultCredential *protos.VaultCredential, opts
 
 func (exo *exotelTelephony) OutboundCall(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	toPhone string,
 	fromPhone string,
 	assistant *internal_assistant_entity.Assistant, assistantConversationId uint64,
@@ -345,7 +345,7 @@ func (exo *exotelTelephony) OutboundCall(
 	return info, nil
 }
 
-func (exo *exotelTelephony) InboundCall(c *gin.Context, auth types.SimplePrinciple, assistantId uint64, clientNumber string, assistantConversationId uint64) error {
+func (exo *exotelTelephony) InboundCall(c *gin.Context, auth *types.Authentication, assistantId uint64, clientNumber string, assistantConversationId uint64) error {
 	contextID, _ := c.Get("contextId")
 	ctxID := fmt.Sprintf("%v", contextID)
 

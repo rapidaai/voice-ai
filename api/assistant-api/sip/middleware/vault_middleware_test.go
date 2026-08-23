@@ -30,7 +30,11 @@ func TestVaultMiddleware_ResolvesSIPConfig(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	auth := &types.ProjectScope{ProjectId: &projectID, OrganizationId: &organizationID}
+	auth := &types.Authentication{
+		AuthType:          types.AuthTypeService,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
+	}
 	assistant := &internal_assistant_entity.Assistant{
 		AssistantPhoneDeployment: &internal_assistant_entity.AssistantPhoneDeployment{
 			AssistantDeploymentTelephony: internal_assistant_entity.AssistantDeploymentTelephony{
@@ -70,12 +74,12 @@ type routeTestVault struct {
 	credential       *protos.VaultCredential
 }
 
-func (v *routeTestVault) GetCredential(_ context.Context, _ types.SimplePrinciple, vaultID uint64) (*protos.VaultCredential, error) {
+func (v *routeTestVault) GetCredential(_ context.Context, _ *types.Authentication, vaultID uint64) (*protos.VaultCredential, error) {
 	v.requestedVaultID = vaultID
 	return v.credential, nil
 }
 
-func (v *routeTestVault) GetOauth2Credential(_ context.Context, _ types.SimplePrinciple, vaultID uint64) (*protos.VaultCredential, error) {
+func (v *routeTestVault) GetOauth2Credential(_ context.Context, _ *types.Authentication, vaultID uint64) (*protos.VaultCredential, error) {
 	v.requestedVaultID = vaultID
 	return v.credential, nil
 }

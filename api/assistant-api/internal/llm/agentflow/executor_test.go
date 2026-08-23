@@ -110,7 +110,7 @@ func (f *fakeCommunication) DeploymentCaller() endpoint_client.DeploymentService
 	return nil
 }
 
-func (f *fakeCommunication) Auth() types.SimplePrinciple { return &types.PlainAuthPrinciple{} }
+func (f *fakeCommunication) Auth() *types.Authentication { return &types.Authentication{} }
 
 func (f *fakeCommunication) GetSource() utils.RapidaSource { return utils.PhoneCall }
 

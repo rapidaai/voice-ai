@@ -68,7 +68,8 @@ async def index_document(
     authenticated_user: User = request.user
     project_id = authenticated_user.project_id
     organization_id = authenticated_user.organization_id
-    knowledge_service = KnowledgeService(postgres)
+    actor = authenticated_user.actor
+    knowledge_service = KnowledgeService(postgres, actor=actor)
 
     #
 
@@ -88,6 +89,7 @@ async def index_document(
                 knowledge_document=document,
                 integration_client=integration_client,
                 vault_client=vault_client,
+                actor=actor,
                 index_type="paragraph-index",
             )
 

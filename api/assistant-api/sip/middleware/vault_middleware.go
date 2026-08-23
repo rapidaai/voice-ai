@@ -76,8 +76,8 @@ func NewVaultMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 		}
 
 		var orgID uint64
-		if validator.NonNil(auth.GetCurrentOrganizationId()) {
-			orgID = *auth.GetCurrentOrganizationId()
+		if organizationContext, err := auth.OrganizationContext(); err == nil {
+			orgID = organizationContext.OrganizationID
 		}
 		m.logger.Infow("SIP request authenticated",
 			"call_id", ctx.CallID,

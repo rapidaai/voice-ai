@@ -64,12 +64,13 @@ func (d *Dispatcher) handleCallFailed(ctx context.Context, v sip_infra.CallFaile
 	callSetupResult := &CallSetupResult{
 		AssistantID:    assistant.Id,
 		ConversationID: conversationID,
+		Auth:           auth,
 	}
-	if auth.GetCurrentProjectId() != nil {
-		callSetupResult.ProjectID = *auth.GetCurrentProjectId()
-	}
-	if auth.GetCurrentOrganizationId() != nil {
-		callSetupResult.OrganizationID = *auth.GetCurrentOrganizationId()
+	if projectContext, err := auth.ProjectContext(); err == nil {
+		callSetupResult.OrganizationID = projectContext.OrganizationID
+		callSetupResult.ProjectID = projectContext.ProjectID
+	} else if organizationContext, err := auth.OrganizationContext(); err == nil {
+		callSetupResult.OrganizationID = organizationContext.OrganizationID
 	}
 
 	observer := d.createObserver(ctx, callSetupResult, auth)

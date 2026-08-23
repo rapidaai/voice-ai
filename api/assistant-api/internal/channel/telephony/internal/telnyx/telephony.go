@@ -61,7 +61,7 @@ func (tpc *telnyxTelephony) CatchAllStatusCallback(ctx *gin.Context) (*internal_
 
 // StatusCallback handles a status/event callback for a conversation.
 // Telnyx sends webhooks for call events like call.answered, call.hangup, etc.
-func (tpc *telnyxTelephony) StatusCallback(c *gin.Context, auth types.SimplePrinciple, assistantId uint64, assistantConversationId uint64) (*internal_type.StatusInfo, error) {
+func (tpc *telnyxTelephony) StatusCallback(c *gin.Context, auth *types.Authentication, assistantId uint64, assistantConversationId uint64) (*internal_type.StatusInfo, error) {
 	body, err := c.GetRawData()
 	if err != nil {
 		tpc.logger.Errorf("failed to read request body with error %+v", err)
@@ -145,7 +145,7 @@ func (tpc *telnyxTelephony) ReceiveCall(c *gin.Context) (*internal_type.CallInfo
 // POST to /v2/calls with connection_id, to, from, and stream_url.
 func (tpc *telnyxTelephony) OutboundCall(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	toPhone string,
 	fromPhone string,
 	assistant *internal_assistant_entity.Assistant,
@@ -352,7 +352,7 @@ func (tpc *telnyxTelephony) OutboundCall(
 
 // InboundCall instructs Telnyx to answer the inbound call and connect to our WebSocket.
 // Returns JSON response for Telnyx to execute streaming.start command.
-func (tpc *telnyxTelephony) InboundCall(c *gin.Context, auth types.SimplePrinciple, assistantId uint64, clientNumber string, assistantConversationId uint64) error {
+func (tpc *telnyxTelephony) InboundCall(c *gin.Context, auth *types.Authentication, assistantId uint64, clientNumber string, assistantConversationId uint64) error {
 	contextID, _ := c.Get("contextId")
 	ctxID := fmt.Sprintf("%v", contextID)
 

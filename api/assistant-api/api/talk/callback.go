@@ -50,7 +50,12 @@ func (cApi *ConversationApi) UnviersalCallback(c *gin.Context) {
 		return
 	}
 
-	auth := cc.ToAuth()
+	auth, err := cc.ToAuthentication()
+	if err != nil {
+		cApi.logger.Error("Failed to reconstruct call authentication")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event to process"})
+		return
+	}
 	observer := cApi.Observability(c, auth, observability.WithGracePeriod())
 	if err := observer.AddCollectors(collectors.NewWithWebhookConfiguration(c, cApi.logger, auth, cc.AssistantID, cApi.configurationService, cApi.httpLogService)); err != nil {
 		cApi.logger.Warnw("observability collector registration failed",
@@ -248,14 +253,20 @@ func (cApi *ConversationApi) CallbackByContext(c *gin.Context) {
 
 	cc, err := cApi.callContextStore.Get(c, contextID)
 	if err != nil {
-		cApi.logger.Errorf("failed to resolve call context %s for event callback: %v", contextID, err)
+		cApi.logger.Errorw("failed to resolve call context for event callback", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event to process"})
 		return
 	}
 
-	statusInfo, err := cApi.inboundDispatcher.HandleStatusCallback(c, cc.Provider, cc.ToAuth(), cc.AssistantID, cc.ConversationID)
+	auth, err := cc.ToAuthentication()
 	if err != nil {
-		cApi.logger.Errorf("status callback failed for context %s: %v", contextID, err)
+		cApi.logger.Error("Failed to reconstruct call authentication")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event to process"})
+		return
+	}
+	statusInfo, err := cApi.inboundDispatcher.HandleStatusCallback(c, cc.Provider, auth, cc.AssistantID, cc.ConversationID)
+	if err != nil {
+		cApi.logger.Errorw("status callback failed", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event to process"})
 		return
 	}
@@ -265,7 +276,6 @@ func (cApi *ConversationApi) CallbackByContext(c *gin.Context) {
 		return
 	}
 
-	auth := cc.ToAuth()
 	observer := cApi.Observability(c, auth, observability.WithGracePeriod())
 	if err := observer.AddCollectors(collectors.NewWithWebhookConfiguration(c, cApi.logger, auth, cc.AssistantID, cApi.configurationService, cApi.httpLogService)); err != nil {
 		cApi.logger.Warnw("observability collector registration failed",

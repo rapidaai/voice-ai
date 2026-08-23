@@ -1821,10 +1821,10 @@ components:
           $ref: "#/components/schemas/AssistantProviderAgentflow"
         assistantTag:
           $ref: "#/components/schemas/AssistantTag"
-        createdBy:
-          $ref: "./common.yaml#/components/schemas/Uint64String"
-        updatedBy:
-          $ref: "./common.yaml#/components/schemas/Uint64String"
+        createdActor:
+          $ref: "./common.yaml#/components/schemas/AuditActor"
+        updatedActor:
+          $ref: "./common.yaml#/components/schemas/AuditActor"
         createdDate:
           type: string
           format: date-time
@@ -2018,10 +2018,10 @@ components:
             $ref: "./common.yaml#/components/schemas/Metadata"
         status:
           type: string
-        createdBy:
-          $ref: "./common.yaml#/components/schemas/Uint64String"
-        updatedBy:
-          $ref: "./common.yaml#/components/schemas/Uint64String"
+        createdActor:
+          $ref: "./common.yaml#/components/schemas/AuditActor"
+        updatedActor:
+          $ref: "./common.yaml#/components/schemas/AuditActor"
         createdDate:
           type: string
           format: date-time

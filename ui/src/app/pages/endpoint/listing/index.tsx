@@ -44,7 +44,7 @@ const endpointColumnClassName: Record<string, string> = {
   getP99: 'min-w-32 whitespace-nowrap',
   getCost: 'min-w-28 whitespace-nowrap',
   getMRR: 'min-w-36 whitespace-nowrap',
-  getCreatedBy: 'min-w-32 whitespace-nowrap',
+  getCreatedActor: 'min-w-32 whitespace-nowrap',
   action: 'w-16 min-w-16 whitespace-nowrap',
 };
 
@@ -81,20 +81,23 @@ export function EndpointPage() {
     toast.error(err);
   }, []);
 
-  const onSuccess = useCallback((data: Endpoint[]) => {
+  const onSuccess = useCallback((_data: Endpoint[]) => {
     hideLoader();
   }, []);
 
-  const getEndpoints = useCallback((projectId, token, userId) => {
-    showLoader();
-    endpointActions.onGetAllEndpoint(
-      projectId,
-      token,
-      userId,
-      onError,
-      onSuccess,
-    );
-  }, []);
+  const getEndpoints = useCallback(
+    (projectId: string, token: string, userId: string) => {
+      showLoader();
+      endpointActions.onGetAllEndpoint(
+        projectId,
+        token,
+        userId,
+        onError,
+        onSuccess,
+      );
+    },
+    [],
+  );
 
   useEffect(() => {
     getEndpoints(projectId, token, userId);

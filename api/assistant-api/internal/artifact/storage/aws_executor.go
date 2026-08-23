@@ -38,7 +38,7 @@ type awsExecutor struct {
 	logger        commons.Logger
 	configuration *internal_assistant_entity.AssistantConfiguration
 	caller        internal_type.InternalCaller
-	auth          types.SimplePrinciple
+	auth          *types.Authentication
 	onPacket      func(context.Context, ...internal_type.Packet) error
 }
 
@@ -68,7 +68,7 @@ func WithAWSCaller(caller internal_type.InternalCaller) AWSOption {
 	}
 }
 
-func WithAWSAuth(auth types.SimplePrinciple) AWSOption {
+func WithAWSAuth(auth *types.Authentication) AWSOption {
 	return func(executor *awsExecutor) {
 		executor.auth = auth
 	}

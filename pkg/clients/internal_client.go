@@ -8,9 +8,12 @@ package clients
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"google.golang.org/grpc/metadata"
 
@@ -22,14 +25,15 @@ import (
 )
 
 type InternalClient interface {
-	WithPlatform(ctx context.Context, auth types.SimplePrinciple) context.Context
-	WithAuth(ctx context.Context, auth types.SimplePrinciple) context.Context
-	WithHttpAuth(c context.Context, auth types.SimplePrinciple, req *http.Request) *http.Request
+	WithPlatform(ctx context.Context, auth *types.Authentication) (context.Context, error)
+	WithAuth(ctx context.Context, auth *types.Authentication) (context.Context, error)
+	WithHttpAuth(c context.Context, auth *types.Authentication, req *http.Request) (*http.Request, error)
 
 	WithToken(ctx context.Context, token string, userId uint64) context.Context
 	WithScopeToken(c context.Context, token string, scope string) context.Context
 
 	Cache(c context.Context, key string, value interface{}) *connectors.RedisResponse
+	CacheWithTTL(c context.Context, key string, value interface{}, ttl time.Duration) *connectors.RedisResponse
 	Retrieve(c context.Context, key string) *connectors.RedisResponse
 	CacheKey(c context.Context, funcName string, key ...string) string
 }
@@ -51,7 +55,7 @@ func NewInternalClient(cfg *config.AppConfig, logger commons.Logger, redis conne
 func (ic *internalClient) WithToken(c context.Context, token string, userId uint64) context.Context {
 	md := metadata.New(map[string]string{
 		types.AUTHORIZATION_KEY: token,
-		types.AUTH_KEY:          strconv.Itoa(int(userId)),
+		types.AUTH_KEY:          strconv.FormatUint(userId, 10),
 	})
 	return metadata.NewOutgoingContext(c, md)
 }
@@ -69,21 +73,19 @@ func (ic *internalClient) WithScopeToken(c context.Context, token string, scope 
 	return metadata.NewOutgoingContext(c, md)
 }
 
-func (ic *internalClient) WithAuth(c context.Context, auth types.SimplePrinciple) context.Context {
-	token, err := types.CreateServiceScopeToken(auth, ic.cfg.Secret)
+func (ic *internalClient) WithAuth(c context.Context, auth *types.Authentication) (context.Context, error) {
+	token, err := ic.createServiceScopeToken(auth)
 	if err != nil {
-		ic.logger.Errorf("Unable to create jwt token for internal service communication %v", err)
-		return c
+		return nil, err
 	}
 	md := metadata.New(map[string]string{types.SERVICE_SCOPE_KEY: token})
-	return metadata.NewOutgoingContext(c, md)
+	return metadata.NewOutgoingContext(c, md), nil
 }
 
-func (ic *internalClient) WithPlatform(c context.Context, auth types.SimplePrinciple) context.Context {
-	token, err := types.CreateServiceScopeToken(auth, ic.cfg.Secret)
+func (ic *internalClient) WithPlatform(c context.Context, auth *types.Authentication) (context.Context, error) {
+	token, err := ic.createServiceScopeToken(auth)
 	if err != nil {
-		ic.logger.Errorf("Unable to create jwt token for internal service communication %v", err)
-		return c
+		return nil, err
 	}
 	_platform := map[string]string{
 		types.SERVICE_SCOPE_KEY: token,
@@ -104,22 +106,47 @@ func (ic *internalClient) WithPlatform(c context.Context, auth types.SimplePrinc
 		_platform[utils.HEADER_REGION_KEY] = region.Get()
 	}
 
-	return metadata.NewOutgoingContext(c, metadata.New(_platform))
+	return metadata.NewOutgoingContext(c, metadata.New(_platform)), nil
 }
 
-func (ic *internalClient) WithHttpAuth(c context.Context, auth types.SimplePrinciple, req *http.Request) *http.Request {
-	// Create the token using the provided auth and the client's secret
-	token, err := types.CreateServiceScopeToken(auth, ic.cfg.Secret)
+func (ic *internalClient) WithHttpAuth(c context.Context, auth *types.Authentication, req *http.Request) (*http.Request, error) {
+	token, err := ic.createServiceScopeToken(auth)
 	if err != nil {
-		ic.logger.Errorf("Unable to create JWT token for internal service communication: %v", err)
-		return req.WithContext(c) // Return the original request with context if token generation fails
+		return nil, err
 	}
-
-	// Add the token to the request header (assuming SERVICE_SCOPE_KEY is the header name)
 	req.Header.Set("Authorization", token)
+	return req.WithContext(c), nil
+}
 
-	// Return the modified request with the new token in the header
-	return req.WithContext(c)
+func (ic *internalClient) createServiceScopeToken(auth *types.Authentication) (string, error) {
+	organizationContext, err := auth.OrganizationContext()
+	if err != nil {
+		return "", err
+	}
+	delegatedContext := types.DelegatedContext{OrganizationID: organizationContext.OrganizationID}
+	if projectContext, projectErr := auth.ProjectContext(); projectErr == nil {
+		if projectContext.OrganizationID != organizationContext.OrganizationID {
+			return "", errors.New("project context organization does not match authentication organization")
+		}
+		delegatedContext.ProjectID = &projectContext.ProjectID
+	} else if !errors.Is(projectErr, types.ErrProjectContextUnavailable) {
+		return "", projectErr
+	}
+	if ic.cfg == nil || strings.TrimSpace(ic.cfg.Name) == "" {
+		return "", errors.New("service name is required for internal authentication")
+	}
+	serviceActorID, err := strconv.ParseUint(strings.TrimSpace(os.Getenv("RAPIDA_SERVICE_ACTOR_ID")), 10, 64)
+	if err != nil {
+		return "", errors.New("RAPIDA_SERVICE_ACTOR_ID must contain a positive bigint service identity")
+	}
+	if strings.TrimSpace(ic.cfg.Secret) == "" {
+		return "", errors.New("service secret is required for internal authentication")
+	}
+	return types.CreateServiceScopeToken(delegatedContext, types.ServiceAssertion{
+		ActorID: serviceActorID,
+		Issuer:  ic.cfg.Name,
+		TTL:     5 * time.Minute,
+	}, ic.cfg.Secret)
 }
 
 func (client *internalClient) Cache(c context.Context, key string, value interface{}) *connectors.RedisResponse {
@@ -129,6 +156,22 @@ func (client *internalClient) Cache(c context.Context, key string, value interfa
 		return nil
 	}
 	put := client.redis.Cmd(c, "SET", []string{key, string(data)})
+	if put != nil && put.Err != nil {
+		client.logger.Errorf("unable to set cache value with err %v for key %s", put, key)
+	}
+	return put
+}
+
+func (client *internalClient) CacheWithTTL(c context.Context, key string, value interface{}, ttl time.Duration) *connectors.RedisResponse {
+	if ttl <= 0 {
+		return &connectors.RedisResponse{Err: errors.New("cache TTL must be positive")}
+	}
+	data, err := json.Marshal(value)
+	if err != nil {
+		client.logger.Errorf("Unable to cache the record as value is not marshalable %s", err, key)
+		return &connectors.RedisResponse{Err: err}
+	}
+	put := client.redis.Cmd(c, "SET", []string{key, string(data), "EX", strconv.FormatInt(int64(ttl/time.Second), 10)})
 	if put != nil && put.Err != nil {
 		client.logger.Errorf("unable to set cache value with err %v for key %s", put, key)
 	}

@@ -7,8 +7,10 @@ import (
 	"context"
 	"errors"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	internal_callers "github.com/rapidaai/api/integration-api/internal/type"
-	"github.com/rapidaai/pkg/exceptions"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	integration_api "github.com/rapidaai/protos"
@@ -21,10 +23,17 @@ func (iApi *integrationApi) Embedding(c context.Context,
 	caller internal_callers.EmbeddingCaller,
 ) (*integration_api.EmbeddingResponse, error) {
 	iApi.logger.Infof("request for embedding %s", tag)
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	if !isAuthenticated || !iAuth.HasProject() {
-		iApi.logger.Errorf("unauthenticated request for embedding")
-		return exceptions.APIAuthenticationError[integration_api.EmbeddingResponse]()
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	}
+	projectContext, projectErr := iAuth.ProjectContext()
+	if projectErr != nil {
+		return nil, status.Error(codes.PermissionDenied, projectErr.Error())
 	}
 	requestId := iApi.RequestId()
 	if irRequest.AdditionalData == nil {
@@ -68,8 +77,8 @@ func (iApi *integrationApi) Embedding(c context.Context,
 		internal_callers.NewEmbeddingOptions(
 			requestId,
 			irRequest,
-			iApi.PreHook(c, iAuth, irRequest, requestId, tag),
-			iApi.PostHook(c, iAuth, irRequest, requestId, tag),
+			iApi.PreHook(c, projectContext, irRequest, requestId, tag),
+			iApi.PostHook(c, projectContext, irRequest, requestId, tag),
 		),
 	)
 	if err == nil {

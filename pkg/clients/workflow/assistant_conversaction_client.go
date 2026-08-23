@@ -20,8 +20,8 @@ import (
 )
 
 type AssistantConversationServiceClient interface {
-	GetAllAssistantConversation(c context.Context, auth types.SimplePrinciple, assistantId uint64, criteria []*assistant_api.Criteria, paginate *assistant_api.Paginate) (*assistant_api.Paginated, []*assistant_api.AssistantConversation, error)
-	GetAllConversationMessage(c context.Context, auth types.SimplePrinciple, assistantId, assistantConversationId uint64, criteria []*assistant_api.Criteria, paginate *assistant_api.Paginate) (*assistant_api.Paginated, []*assistant_api.AssistantConversationMessage, error)
+	GetAllAssistantConversation(c context.Context, auth *types.Authentication, assistantId uint64, criteria []*assistant_api.Criteria, paginate *assistant_api.Paginate) (*assistant_api.Paginated, []*assistant_api.AssistantConversation, error)
+	GetAllConversationMessage(c context.Context, auth *types.Authentication, assistantId, assistantConversationId uint64, criteria []*assistant_api.Criteria, paginate *assistant_api.Paginate) (*assistant_api.Paginated, []*assistant_api.AssistantConversationMessage, error)
 }
 
 type assistantConversationServiceClient struct {
@@ -44,9 +44,13 @@ func NewAssistantConversationServiceClientGRPC(config *config.AppConfig, logger 
 	}
 }
 
-func (client *assistantConversationServiceClient) GetAllAssistantConversation(c context.Context, auth types.SimplePrinciple, assistantId uint64, criteria []*assistant_api.Criteria, paginate *assistant_api.Paginate) (*assistant_api.Paginated, []*assistant_api.AssistantConversation, error) {
+func (client *assistantConversationServiceClient) GetAllAssistantConversation(c context.Context, auth *types.Authentication, assistantId uint64, criteria []*assistant_api.Criteria, paginate *assistant_api.Paginate) (*assistant_api.Paginated, []*assistant_api.AssistantConversation, error) {
 	client.logger.Debugf("get all assistant request")
-	res, err := client.assistantClient.GetAllAssistantConversation(client.WithAuth(c, auth),
+	authContext, err := client.WithAuth(c, auth)
+	if err != nil {
+		return nil, nil, err
+	}
+	res, err := client.assistantClient.GetAllAssistantConversation(authContext,
 		&assistant_api.GetAllAssistantConversationRequest{
 			AssistantId: assistantId,
 			Paginate:    paginate,
@@ -63,9 +67,13 @@ func (client *assistantConversationServiceClient) GetAllAssistantConversation(c 
 	return res.GetPaginated(), res.GetData(), nil
 }
 
-func (client *assistantConversationServiceClient) GetAllConversationMessage(c context.Context, auth types.SimplePrinciple, assistantId, assistantConversationId uint64, criteria []*assistant_api.Criteria, paginate *assistant_api.Paginate) (*assistant_api.Paginated, []*assistant_api.AssistantConversationMessage, error) {
+func (client *assistantConversationServiceClient) GetAllConversationMessage(c context.Context, auth *types.Authentication, assistantId, assistantConversationId uint64, criteria []*assistant_api.Criteria, paginate *assistant_api.Paginate) (*assistant_api.Paginated, []*assistant_api.AssistantConversationMessage, error) {
 	client.logger.Debugf("get all assistant request")
-	res, err := client.assistantClient.GetAllConversationMessage(client.WithAuth(c, auth),
+	authContext, err := client.WithAuth(c, auth)
+	if err != nil {
+		return nil, nil, err
+	}
+	res, err := client.assistantClient.GetAllConversationMessage(authContext,
 		&assistant_api.GetAllConversationMessageRequest{
 			AssistantId:             assistantId,
 			AssistantConversationId: assistantConversationId,

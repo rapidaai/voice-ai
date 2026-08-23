@@ -19,8 +19,8 @@ import (
 )
 
 func (deploymentApi *AssistantDeploymentApi) CreateAssistantPhoneDeploymentRest(c *gin.Context) {
-	auth, isAuthenticated := types.GetAuthPrinciple(c)
-	if !isAuthenticated {
+	auth, authErr := types.Authorize(c.Request.Context())
+	if authErr != nil {
 		c.JSON(pkg_errors.CreateAssistantPhoneDeploymentUnauthenticated.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantPhoneDeploymentUnauthenticated.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -32,7 +32,8 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantPhoneDeploymentRest(
 		})
 		return
 	}
-	if !auth.HasUser() || !auth.HasProject() || !auth.HasOrganization() {
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
 		c.JSON(pkg_errors.CreateAssistantPhoneDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantPhoneDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -239,7 +240,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantPhoneDeploymentRest(
 
 	deployment, err := deploymentApi.deploymentService.CreatePhoneDeployment(
 		c,
-		auth,
+		iAuth,
 		assistantId,
 		request.Greeting,
 		request.Mistake,

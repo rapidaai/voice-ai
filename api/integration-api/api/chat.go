@@ -5,7 +5,6 @@ package integration_api
 
 import (
 	"context"
-	"errors"
 	"io"
 	"strings"
 
@@ -27,12 +26,17 @@ func (iApi *integrationApi) Chat(
 	tag string,
 ) (*protos.ChatResponse, error) {
 	tag = strings.ToLower(tag)
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	if !isAuthenticated || !iAuth.HasProject() {
-		return utils.Error[protos.ChatResponse](
-			errors.New("unauthenticated request for chat"),
-			"Please provider valid service credentials to perfom invoke, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	}
+	projectContext, projectErr := iAuth.ProjectContext()
+	if projectErr != nil {
+		return nil, status.Error(codes.PermissionDenied, projectErr.Error())
 	}
 
 	if irRequest.AdditionalData == nil {
@@ -87,8 +91,8 @@ func (iApi *integrationApi) Chat(
 		internal_callers.NewChatOptions(
 			requestID,
 			irRequest,
-			iApi.PreHook(c, iAuth, irRequest, requestID, tag),
-			iApi.PostHook(c, iAuth, irRequest, requestID, tag),
+			iApi.PreHook(c, projectContext, irRequest, requestID, tag),
+			iApi.PostHook(c, projectContext, irRequest, requestID, tag),
 		),
 	)
 	if err != nil {
@@ -109,10 +113,17 @@ func (iApi *integrationApi) StreamChatBidirectionalUnified(
 	logger commons.Logger,
 	stream grpc.BidiStreamingServer[protos.StreamChatRequest, protos.StreamChatResponse],
 ) error {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(context)
-	if !isAuthenticated || !iAuth.HasProject() {
-		iApi.logger.Errorf("unauthenticated request for bidirectional stream chat")
-		return status.Error(codes.Unauthenticated, "Please provide valid service credentials to perform invoke.")
+	auth, authErr := types.Authorize(context)
+	if authErr != nil {
+		return status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return status.Error(codes.PermissionDenied, scopeErr.Error())
+	}
+	projectContext, projectErr := iAuth.ProjectContext()
+	if projectErr != nil {
+		return status.Error(codes.PermissionDenied, projectErr.Error())
 	}
 	var (
 		chatStream                internal_callers.ChatStream
@@ -257,8 +268,8 @@ func (iApi *integrationApi) StreamChatBidirectionalUnified(
 				internal_callers.NewChatStreamOptions(
 					requestID,
 					payload.Chat,
-					iApi.PreHook(stream.Context(), iAuth, auditRequest, requestID, payload.Chat.GetProviderName()),
-					iApi.PostHook(stream.Context(), iAuth, auditRequest, requestID, payload.Chat.GetProviderName()),
+					iApi.PreHook(stream.Context(), projectContext, auditRequest, requestID, payload.Chat.GetProviderName()),
+					iApi.PostHook(stream.Context(), projectContext, auditRequest, requestID, payload.Chat.GetProviderName()),
 				),
 				func(rID string, content *protos.Message) error {
 					return stream.Send(&protos.StreamChatResponse{

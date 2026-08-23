@@ -15,7 +15,6 @@ import (
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 )
@@ -65,11 +64,7 @@ func (m *manager) handleRegister(ctx context.Context, s RegisterPipeline) Pipeli
 	rec.ProjectID = assistant.ProjectId
 	rec.OrganizationID = assistant.OrganizationId
 
-	auth := &types.ProjectScope{
-		ProjectId:      &assistant.ProjectId,
-		OrganizationId: &assistant.OrganizationId,
-		Status:         type_enums.RECORD_ACTIVE.String(),
-	}
+	auth := projectAuthentication(assistant.OrganizationId, assistant.ProjectId)
 	observer := m.observer(ctx, auth)
 	defer observer.Close(context.Background())
 	scope := observability.AssistantScope{AssistantID: rec.AssistantID}

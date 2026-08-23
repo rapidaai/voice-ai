@@ -36,7 +36,7 @@ type SyncExecutor[I any, O any] interface {
 type AnalysisInput struct {
 	ContextID string
 	Arguments map[string]interface{}
-	Auth      types.SimplePrinciple
+	Auth      *types.Authentication
 }
 
 type AnalysisOutput struct {

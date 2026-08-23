@@ -1,0 +1,66 @@
+{
+  "rfc": "rfcs/0005-refine-authentication-middleware-contracts.md",
+  "scope": {
+    "allowed": [
+      "pkg/middlewares/**",
+      "cmd/assistant/wiring_test.go",
+      "cmd/assistant/authentication_middleware_test.go",
+      "cmd/endpoint/wiring_test.go",
+      "cmd/endpoint/authentication_middleware_test.go",
+      "cmd/integration/wiring_test.go",
+      "cmd/integration/authentication_middleware_test.go",
+      "cmd/web/wiring_test.go",
+      "cmd/web/authentication_middleware_test.go",
+      "rfcs/0005-refine-authentication-middleware-contracts.*"
+    ],
+    "out_of_scope": [
+      "service production wiring",
+      "authentication selection behavior",
+      "API handlers",
+      "database and migrations",
+      "UI and TypeScript"
+    ]
+  },
+  "acceptance_criteria": [
+    "AuthenticationError has exactly one string field named Error with JSON tag error",
+    "AuthenticationFailureMessage is an immutable exported constant with value Invalid authentication credentials and is shared by Gin and gRPC middleware",
+    "middleware uses validator.NotBlank after trimming, validator.NonZero for exact-empty and selected-project checks, validator.Between for user IDs, and validator.NonNil for nil-capable values",
+    "whitespace precedence, numeric boundaries, and typed-nil behavior have regression tests",
+    "middleware constructor behavior and service authentication policy remain unchanged",
+    "command authentication tests are named authentication_middleware_test.go",
+    "targeted and broad backend validation passes",
+    "independent read-only review approves the complete diff"
+  ],
+  "required_tests": [
+    "typed Gin authentication error body uses AuthenticationError and AuthenticationFailureMessage",
+    "existing credential success, rejection, conflict, absence, and precedence tests remain green",
+    "whitespace-only source values preserve current fallback and precedence behavior",
+    "user ID maximum boundary and selected project ID non-zero behavior remain unchanged",
+    "typed-nil resolver, principle, nested claim information, context identity, and logger paths fail safely",
+    "renamed command tests enforce the exact authentication middleware matrix and order"
+  ],
+  "risks": [
+    "validator substitution could accidentally change source precedence for whitespace-only values",
+    "typed-nil handling intentionally changes panic-prone inputs into normal nil behavior",
+    "renaming tests could omit a command package from validation"
+  ],
+  "rollback": "Revert the implementation commit; no schema, data, protocol, or configuration rollback is required.",
+  "principles": {
+    "kiss": "Reuse the existing validator package and one response type without adding middleware helpers.",
+    "yagni": "Do not redesign authentication or add new error codes.",
+    "ownership": "The middleware package owns its error response and validation contract.",
+    "explicit_contracts": "Expose the generic authentication failure message and typed HTTP body.",
+    "fail_safe": "Validation remains fail closed for any presented invalid credential.",
+    "observability": "Existing static redacted log messages remain unchanged.",
+    "least_privilege": "No credential class or service permission changes.",
+    "rollback": "Revert the code-only implementation commit."
+  },
+  "required_commands": [
+    "go test ./pkg/middlewares/... ./cmd/assistant ./cmd/endpoint ./cmd/integration ./cmd/web",
+    "go vet ./pkg/middlewares/... ./cmd/assistant ./cmd/endpoint ./cmd/integration ./cmd/web",
+    "go test ./pkg/... ./cmd/... ./api/assistant-api/... ./api/endpoint-api/... ./api/integration-api/... ./api/web-api/...",
+    "test -z \"$(rg -l 'authenticationFailureMessage' pkg/middlewares --glob '*.go')\"",
+    "test -z \"$(find cmd/assistant cmd/endpoint cmd/integration cmd/web -name 'wiring_test.go' -print)\"",
+    "git diff --check"
+  ]
+}

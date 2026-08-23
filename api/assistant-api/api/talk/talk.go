@@ -8,6 +8,8 @@ package assistant_talk_api
 import (
 	"context"
 	"errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/rapidaai/api/assistant-api/config"
 	internal_adapter "github.com/rapidaai/api/assistant-api/internal/adapters"
@@ -58,7 +60,7 @@ type ConversationGrpcApi struct {
 	ConversationApi
 }
 
-func (cApi *ConversationApi) Observability(ctx context.Context, auth types.SimplePrinciple, options ...observability.Option) observability.Recorder {
+func (cApi *ConversationApi) Observability(ctx context.Context, auth *types.Authentication, options ...observability.Option) observability.Recorder {
 	recorderOptions := []observability.Option{
 		observability.WithLogger(cApi.logger),
 		observability.WithAuth(auth),
@@ -190,10 +192,13 @@ func NewConversationApi(config *config.AssistantConfig, logger commons.Logger,
 // Returns:
 // - An error if any error occurs during the processing of the request.
 func (cApi *ConversationGrpcApi) AssistantTalk(stream assistant_api.TalkService_AssistantTalkServer) error {
-	auth, isAuthenticated := types.GetSimplePrincipleGRPC(stream.Context())
-	if !isAuthenticated {
-		cApi.logger.Errorf("unable to resolve the authentication object, please check the parameter for authentication")
-		return errors.New("unauthenticated request for messaging")
+	auth, authErr := types.Authorize(stream.Context())
+	if authErr != nil {
+		return status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
 	source, ok := utils.GetClientSource(stream.Context())
@@ -203,7 +208,7 @@ func (cApi *ConversationGrpcApi) AssistantTalk(stream assistant_api.TalkService_
 	}
 	observabilityRecorder := cApi.Observability(
 		stream.Context(),
-		auth,
+		iAuth,
 		observability.WithGracePeriod(),
 	)
 	defer observabilityRecorder.Close(context.Background())
@@ -213,7 +218,7 @@ func (cApi *ConversationGrpcApi) AssistantTalk(stream assistant_api.TalkService_
 		internal_grpc.WithLogger(cApi.logger),
 		internal_grpc.WithServer(stream),
 		internal_grpc.WithObserver(observabilityRecorder),
-		internal_grpc.WithAuth(auth),
+		internal_grpc.WithAuth(iAuth),
 		internal_grpc.WithAssistantConfigurationService(cApi.configurationService),
 		internal_grpc.WithHTTPLogService(cApi.httpLogService),
 		internal_grpc.WithAssistantToolService(cApi.assistantToolService),
@@ -239,14 +244,17 @@ func (cApi *ConversationGrpcApi) AssistantTalk(stream assistant_api.TalkService_
 		return err
 	}
 
-	return talker.Talk(stream.Context(), auth)
+	return talker.Talk(stream.Context(), iAuth)
 }
 
 func (cApi *ConversationGrpcApi) WebTalk(stream assistant_api.WebRTC_WebTalkServer) error {
-	auth, isAuthenticated := types.GetSimplePrincipleGRPC(stream.Context())
-	if !isAuthenticated {
-		cApi.logger.Errorf("unable to resolve the authentication object, please check the parameter for authentication")
-		return errors.New("unauthenticated request for messaging")
+	auth, authErr := types.Authorize(stream.Context())
+	if authErr != nil {
+		return status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
 	source, ok := utils.GetClientSource(stream.Context())
@@ -256,7 +264,7 @@ func (cApi *ConversationGrpcApi) WebTalk(stream assistant_api.WebRTC_WebTalkServ
 	}
 	observabilityRecorder := cApi.Observability(
 		stream.Context(),
-		auth,
+		iAuth,
 		observability.WithGracePeriod(),
 	)
 	defer observabilityRecorder.Close(context.Background())
@@ -267,7 +275,7 @@ func (cApi *ConversationGrpcApi) WebTalk(stream assistant_api.WebRTC_WebTalkServ
 		internal_webrtc.WithServer(stream),
 		internal_webrtc.WithServerConfig(cApi.cfg.WebRTCConfig),
 		internal_webrtc.WithObserver(observabilityRecorder),
-		internal_webrtc.WithAuth(auth),
+		internal_webrtc.WithAuth(iAuth),
 		internal_webrtc.WithAssistantConfigurationService(cApi.configurationService),
 		internal_webrtc.WithHTTPLogService(cApi.httpLogService),
 		internal_webrtc.WithAssistantToolService(cApi.assistantToolService),
@@ -293,5 +301,5 @@ func (cApi *ConversationGrpcApi) WebTalk(stream assistant_api.WebRTC_WebTalkServ
 		return err
 	}
 
-	return talker.Talk(stream.Context(), auth)
+	return talker.Talk(stream.Context(), iAuth)
 }

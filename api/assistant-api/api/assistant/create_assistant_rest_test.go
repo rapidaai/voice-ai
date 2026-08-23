@@ -32,43 +32,59 @@ type createAssistantRestAssistantServiceStub struct {
 	createAssistantErr    error
 }
 
-func (s *createAssistantRestAssistantServiceStub) Get(context.Context, types.SimplePrinciple, uint64, *uint64, *internal_services.GetAssistantOption) (*internal_assistant_entity.Assistant, error) {
+func attachTestAuthentication(ginContext *gin.Context, auth *types.Authentication) {
+	ginContext.Request = ginContext.Request.WithContext(context.WithValue(ginContext.Request.Context(), types.CTX_, auth))
+}
+
+func testUserAuthentication(userID, organizationID, projectID uint64) *types.Authentication {
+	auth := &types.Authentication{
+		AuthType:          types.AuthTypeUser,
+		UserValue:         &types.UserContext{UserID: userID},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+	}
+	if projectID != 0 {
+		auth.ProjectValue = &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID}
+	}
+	return auth
+}
+
+func (s *createAssistantRestAssistantServiceStub) Get(context.Context, *types.Authentication, uint64, *uint64, *internal_services.GetAssistantOption) (*internal_assistant_entity.Assistant, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *createAssistantRestAssistantServiceStub) GetAll(context.Context, types.SimplePrinciple, []*protos.Criteria, *protos.Paginate, *internal_services.GetAssistantOption) (int64, []*internal_assistant_entity.Assistant, error) {
+func (s *createAssistantRestAssistantServiceStub) GetAll(context.Context, *types.Authentication, []*protos.Criteria, *protos.Paginate, *internal_services.GetAssistantOption) (int64, []*internal_assistant_entity.Assistant, error) {
 	return 0, nil, errors.New("not implemented")
 }
 
-func (s *createAssistantRestAssistantServiceStub) GetAssistantDashboard(context.Context, types.SimplePrinciple, uint64, *timestamppb.Timestamp, *timestamppb.Timestamp) (*protos.AssistantDashboard, error) {
+func (s *createAssistantRestAssistantServiceStub) GetAssistantDashboard(context.Context, *types.Authentication, uint64, *timestamppb.Timestamp, *timestamppb.Timestamp) (*protos.AssistantDashboard, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *createAssistantRestAssistantServiceStub) GetAllAssistantProviderModel(context.Context, types.SimplePrinciple, uint64, []*protos.Criteria, *protos.Paginate) (int64, []*internal_assistant_entity.AssistantProviderModel, error) {
+func (s *createAssistantRestAssistantServiceStub) GetAllAssistantProviderModel(context.Context, *types.Authentication, uint64, []*protos.Criteria, *protos.Paginate) (int64, []*internal_assistant_entity.AssistantProviderModel, error) {
 	return 0, nil, errors.New("not implemented")
 }
 
-func (s *createAssistantRestAssistantServiceStub) GetAllAssistantProviderWebsocket(context.Context, types.SimplePrinciple, uint64, []*protos.Criteria, *protos.Paginate) (int64, []*internal_assistant_entity.AssistantProviderWebsocket, error) {
+func (s *createAssistantRestAssistantServiceStub) GetAllAssistantProviderWebsocket(context.Context, *types.Authentication, uint64, []*protos.Criteria, *protos.Paginate) (int64, []*internal_assistant_entity.AssistantProviderWebsocket, error) {
 	return 0, nil, errors.New("not implemented")
 }
 
-func (s *createAssistantRestAssistantServiceStub) GetAllAssistantProviderAgentkit(context.Context, types.SimplePrinciple, uint64, []*protos.Criteria, *protos.Paginate) (int64, []*internal_assistant_entity.AssistantProviderAgentkit, error) {
+func (s *createAssistantRestAssistantServiceStub) GetAllAssistantProviderAgentkit(context.Context, *types.Authentication, uint64, []*protos.Criteria, *protos.Paginate) (int64, []*internal_assistant_entity.AssistantProviderAgentkit, error) {
 	return 0, nil, errors.New("not implemented")
 }
 
-func (s *createAssistantRestAssistantServiceStub) GetAllAssistantProviderAgentflow(context.Context, types.SimplePrinciple, uint64, []*protos.Criteria, *protos.Paginate) (int64, []*internal_assistant_entity.AssistantProviderAgentflow, error) {
+func (s *createAssistantRestAssistantServiceStub) GetAllAssistantProviderAgentflow(context.Context, *types.Authentication, uint64, []*protos.Criteria, *protos.Paginate) (int64, []*internal_assistant_entity.AssistantProviderAgentflow, error) {
 	return 0, nil, errors.New("not implemented")
 }
 
-func (s *createAssistantRestAssistantServiceStub) UpdateAssistantVersion(context.Context, types.SimplePrinciple, uint64, type_enums.AssistantProvider, uint64) (*internal_assistant_entity.Assistant, error) {
+func (s *createAssistantRestAssistantServiceStub) UpdateAssistantVersion(context.Context, *types.Authentication, uint64, type_enums.AssistantProvider, uint64) (*internal_assistant_entity.Assistant, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *createAssistantRestAssistantServiceStub) UpdateAssistantDetail(context.Context, types.SimplePrinciple, uint64, string, string) (*internal_assistant_entity.Assistant, error) {
+func (s *createAssistantRestAssistantServiceStub) UpdateAssistantDetail(context.Context, *types.Authentication, uint64, string, string) (*internal_assistant_entity.Assistant, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *createAssistantRestAssistantServiceStub) CreateAssistant(_ context.Context, auth types.SimplePrinciple, name, description string, visibility string, source string, sourceIdentifier *uint64, language string) (*internal_assistant_entity.Assistant, error) {
+func (s *createAssistantRestAssistantServiceStub) CreateAssistant(_ context.Context, auth *types.Authentication, name, description string, visibility string, source string, sourceIdentifier *uint64, language string) (*internal_assistant_entity.Assistant, error) {
 	s.createAssistantCalled = true
 	if s.createAssistantErr != nil {
 		return nil, s.createAssistantErr
@@ -80,11 +96,11 @@ func (s *createAssistantRestAssistantServiceStub) CreateAssistant(_ context.Cont
 	}, nil
 }
 
-func (s *createAssistantRestAssistantServiceStub) DeleteAssistant(context.Context, types.SimplePrinciple, uint64) (*internal_assistant_entity.Assistant, error) {
+func (s *createAssistantRestAssistantServiceStub) DeleteAssistant(context.Context, *types.Authentication, uint64) (*internal_assistant_entity.Assistant, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *createAssistantRestAssistantServiceStub) CreateAssistantProviderModel(_ context.Context, _ types.SimplePrinciple, _ uint64, providerDescription string, _ string, _ string, _ []*protos.Metadata) (*internal_assistant_entity.AssistantProviderModel, error) {
+func (s *createAssistantRestAssistantServiceStub) CreateAssistantProviderModel(_ context.Context, _ *types.Authentication, _ uint64, providerDescription string, _ string, _ string, _ []*protos.Metadata) (*internal_assistant_entity.AssistantProviderModel, error) {
 	s.createProviderCalled = true
 	s.providerDescription = providerDescription
 	providerModel := &internal_assistant_entity.AssistantProviderModel{}
@@ -92,7 +108,7 @@ func (s *createAssistantRestAssistantServiceStub) CreateAssistantProviderModel(_
 	return providerModel, nil
 }
 
-func (s *createAssistantRestAssistantServiceStub) CreateAssistantProviderWebsocket(_ context.Context, _ types.SimplePrinciple, _ uint64, providerDescription string, _ string, _ map[string]string, _ map[string]string) (*internal_assistant_entity.AssistantProviderWebsocket, error) {
+func (s *createAssistantRestAssistantServiceStub) CreateAssistantProviderWebsocket(_ context.Context, _ *types.Authentication, _ uint64, providerDescription string, _ string, _ map[string]string, _ map[string]string) (*internal_assistant_entity.AssistantProviderWebsocket, error) {
 	s.createProviderCalled = true
 	s.providerDescription = providerDescription
 	websocketProvider := &internal_assistant_entity.AssistantProviderWebsocket{}
@@ -100,7 +116,7 @@ func (s *createAssistantRestAssistantServiceStub) CreateAssistantProviderWebsock
 	return websocketProvider, nil
 }
 
-func (s *createAssistantRestAssistantServiceStub) CreateAssistantProviderAgentkit(_ context.Context, _ types.SimplePrinciple, _ uint64, providerDescription string, _ string, _ string, _ map[string]string, _ *string, _ *string, _ *string, _ *uint32, _ *uint32, _ *uint32, _ *uint32, _ *uint32) (*internal_assistant_entity.AssistantProviderAgentkit, error) {
+func (s *createAssistantRestAssistantServiceStub) CreateAssistantProviderAgentkit(_ context.Context, _ *types.Authentication, _ uint64, providerDescription string, _ string, _ string, _ map[string]string, _ *string, _ *string, _ *string, _ *uint32, _ *uint32, _ *uint32, _ *uint32, _ *uint32) (*internal_assistant_entity.AssistantProviderAgentkit, error) {
 	s.createProviderCalled = true
 	s.providerDescription = providerDescription
 	agentkitProvider := &internal_assistant_entity.AssistantProviderAgentkit{}
@@ -108,7 +124,7 @@ func (s *createAssistantRestAssistantServiceStub) CreateAssistantProviderAgentki
 	return agentkitProvider, nil
 }
 
-func (s *createAssistantRestAssistantServiceStub) CreateAssistantProviderAgentflow(_ context.Context, _ types.SimplePrinciple, _ uint64, providerDescription string, _ string, _ map[string]interface{}) (*internal_assistant_entity.AssistantProviderAgentflow, error) {
+func (s *createAssistantRestAssistantServiceStub) CreateAssistantProviderAgentflow(_ context.Context, _ *types.Authentication, _ uint64, providerDescription string, _ string, _ map[string]interface{}) (*internal_assistant_entity.AssistantProviderAgentflow, error) {
 	s.createProviderCalled = true
 	s.providerDescription = providerDescription
 	agentflowProvider := &internal_assistant_entity.AssistantProviderAgentflow{}
@@ -116,35 +132,35 @@ func (s *createAssistantRestAssistantServiceStub) CreateAssistantProviderAgentfl
 	return agentflowProvider, nil
 }
 
-func (s *createAssistantRestAssistantServiceStub) AttachProviderModelToAssistant(context.Context, types.SimplePrinciple, uint64, type_enums.AssistantProvider, uint64) (*internal_assistant_entity.Assistant, error) {
+func (s *createAssistantRestAssistantServiceStub) AttachProviderModelToAssistant(context.Context, *types.Authentication, uint64, type_enums.AssistantProvider, uint64) (*internal_assistant_entity.Assistant, error) {
 	s.attachProviderCalled = true
 	return &internal_assistant_entity.Assistant{}, nil
 }
 
-func (s *createAssistantRestAssistantServiceStub) CreateOrUpdateAssistantTag(context.Context, types.SimplePrinciple, uint64, []string) (*internal_assistant_entity.AssistantTag, error) {
+func (s *createAssistantRestAssistantServiceStub) CreateOrUpdateAssistantTag(context.Context, *types.Authentication, uint64, []string) (*internal_assistant_entity.AssistantTag, error) {
 	s.createTagCalled = true
 	return &internal_assistant_entity.AssistantTag{}, nil
 }
 
 type createAssistantRestKnowledgeServiceStub struct{}
 
-func (s createAssistantRestKnowledgeServiceStub) Get(context.Context, types.SimplePrinciple, uint64, uint64) (*internal_assistant_entity.AssistantKnowledge, error) {
+func (s createAssistantRestKnowledgeServiceStub) Get(context.Context, *types.Authentication, uint64, uint64) (*internal_assistant_entity.AssistantKnowledge, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s createAssistantRestKnowledgeServiceStub) GetAll(context.Context, types.SimplePrinciple, uint64, []*protos.Criteria, *protos.Paginate) (int64, []*internal_assistant_entity.AssistantKnowledge, error) {
+func (s createAssistantRestKnowledgeServiceStub) GetAll(context.Context, *types.Authentication, uint64, []*protos.Criteria, *protos.Paginate) (int64, []*internal_assistant_entity.AssistantKnowledge, error) {
 	return 0, nil, errors.New("not implemented")
 }
 
-func (s createAssistantRestKnowledgeServiceStub) Create(context.Context, types.SimplePrinciple, uint64, uint64, gorm_types.RetrievalMethod, bool, float32, uint32, *uint64, *string, []*protos.Metadata) (*internal_assistant_entity.AssistantKnowledge, error) {
+func (s createAssistantRestKnowledgeServiceStub) Create(context.Context, *types.Authentication, uint64, uint64, gorm_types.RetrievalMethod, bool, float32, uint32, *uint64, *string, []*protos.Metadata) (*internal_assistant_entity.AssistantKnowledge, error) {
 	return &internal_assistant_entity.AssistantKnowledge{}, nil
 }
 
-func (s createAssistantRestKnowledgeServiceStub) Update(context.Context, types.SimplePrinciple, uint64, uint64, uint64, gorm_types.RetrievalMethod, bool, float32, uint32, *uint64, *string, []*protos.Metadata) (*internal_assistant_entity.AssistantKnowledge, error) {
+func (s createAssistantRestKnowledgeServiceStub) Update(context.Context, *types.Authentication, uint64, uint64, uint64, gorm_types.RetrievalMethod, bool, float32, uint32, *uint64, *string, []*protos.Metadata) (*internal_assistant_entity.AssistantKnowledge, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s createAssistantRestKnowledgeServiceStub) Delete(context.Context, types.SimplePrinciple, uint64, uint64) (*internal_assistant_entity.AssistantKnowledge, error) {
+func (s createAssistantRestKnowledgeServiceStub) Delete(context.Context, *types.Authentication, uint64, uint64) (*internal_assistant_entity.AssistantKnowledge, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -174,7 +190,7 @@ func TestCreateAssistantRest_HappyPath(t *testing.T) {
 	context, _ := gin.CreateTestContext(recorder)
 	context.Request = httptest.NewRequest(http.MethodPost, "/v1/assistant/create-assistant", bytes.NewReader(requestBody))
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createAssistantRestAuth())
+	attachTestAuthentication(context, createAssistantRestAuth())
 
 	assistantApi.CreateAssistantRest(context)
 
@@ -198,15 +214,11 @@ func TestCreateAssistantRest_MissingAuthScope(t *testing.T) {
 	context, _ := gin.CreateTestContext(recorder)
 	context.Request = httptest.NewRequest(http.MethodPost, "/v1/assistant/create-assistant", bytes.NewReader([]byte(`{}`)))
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), &types.PlainAuthPrinciple{
-		User:             types.UserInfo{Id: 11},
-		OrganizationRole: &types.OrganizaitonRole{OrganizationId: 22},
-	})
+	attachTestAuthentication(context, testUserAuthentication(11, 22, 0))
 
 	assistantApi.CreateAssistantRest(context)
 
-	require.Equal(t, http.StatusForbidden, recorder.Code)
-	assert.Contains(t, recorder.Body.String(), pkg_errors.CreateAssistantMissingAuthScope.Error)
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
 }
 
 func TestCreateAssistantRest_MissingName(t *testing.T) {
@@ -218,7 +230,7 @@ func TestCreateAssistantRest_MissingName(t *testing.T) {
 	context, _ := gin.CreateTestContext(recorder)
 	context.Request = httptest.NewRequest(http.MethodPost, "/v1/assistant/create-assistant", bytes.NewReader(requestBody))
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createAssistantRestAuth())
+	attachTestAuthentication(context, createAssistantRestAuth())
 
 	assistantApi.CreateAssistantRest(context)
 
@@ -239,7 +251,7 @@ func TestCreateAssistantRest_CreateAssistantErrorDoesNotExposeInternalError(t *t
 	context, _ := gin.CreateTestContext(recorder)
 	context.Request = httptest.NewRequest(http.MethodPost, "/v1/assistant/create-assistant", bytes.NewReader(requestBody))
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createAssistantRestAuth())
+	attachTestAuthentication(context, createAssistantRestAuth())
 
 	assistantApi.CreateAssistantRest(context)
 
@@ -268,7 +280,7 @@ func TestCreateAssistantRest_InvalidAgentkitCertificateDoesNotCreateAssistant(t 
 	context, _ := gin.CreateTestContext(recorder)
 	context.Request = httptest.NewRequest(http.MethodPost, "/v1/assistant/create-assistant", bytes.NewReader(requestBody))
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createAssistantRestAuth())
+	attachTestAuthentication(context, createAssistantRestAuth())
 
 	assistantApi.CreateAssistantRest(context)
 
@@ -300,14 +312,6 @@ func TestCreateAssistantRest_Unauthenticated(t *testing.T) {
 	assert.Contains(t, recorder.Body.String(), pkg_errors.CreateAssistantUnauthenticated.Error)
 }
 
-func createAssistantRestAuth() *types.PlainAuthPrinciple {
-	return &types.PlainAuthPrinciple{
-		User: types.UserInfo{Id: 11},
-		OrganizationRole: &types.OrganizaitonRole{
-			OrganizationId: 22,
-		},
-		CurrentProjectRole: &types.ProjectRole{
-			ProjectId: 33,
-		},
-	}
+func createAssistantRestAuth() *types.Authentication {
+	return testUserAuthentication(11, 22, 33)
 }

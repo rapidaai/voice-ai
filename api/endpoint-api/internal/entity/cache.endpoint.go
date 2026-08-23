@@ -30,6 +30,4 @@ type EndpointCaching struct {
 	CacheType      Cache   `json:"cacheType" gorm:"type:bigint;size:20;not null"`
 	ExpiryInterval uint64  `json:"expiryInterval" gorm:"type:bigint;size:20"`
 	MatchThreshold float32 `json:"matchThreshold" gorm:"type:float;size:20"`
-	CreatedBy      uint64  `json:"createdBy" gorm:"type:bigint;size:20;not null"`
-	UpdatedBy      uint64  `json:"updatedBy" gorm:"type:bigint;size:20;"`
 }

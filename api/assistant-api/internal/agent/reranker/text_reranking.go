@@ -31,7 +31,7 @@ func NewTextReranker(logger commons.Logger, cfg *config.AssistantConfig, redis c
 }
 
 func (qe *textReranker) Rerank(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	config *RerankingOption,
 	in []string, query string, additionalData map[string]string) (map[int32]string, error) {
 

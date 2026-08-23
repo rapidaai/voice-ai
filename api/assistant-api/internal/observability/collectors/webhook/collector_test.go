@@ -41,10 +41,7 @@ func TestCollector_SendsWebhookEventPayload(t *testing.T) {
 
 	organizationID := uint64(30)
 	projectID := uint64(40)
-	auth := &types.ServiceScope{
-		OrganizationId: &organizationID,
-		ProjectId:      &projectID,
-	}
+	auth := testServiceAuthentication(organizationID, projectID)
 	configurationService := &recordingAssistantConfigurationService{
 		configurations: []*internal_assistant_entity.AssistantConfiguration{
 			testWebhook(1, []string{observability.CallRinging.String()}, map[string]interface{}{
@@ -129,10 +126,7 @@ func TestCollector_SendsWebhookEventPayload(t *testing.T) {
 func TestNew_DoesNotLoadWebhooks(t *testing.T) {
 	organizationID := uint64(30)
 	projectID := uint64(40)
-	auth := &types.ServiceScope{
-		OrganizationId: &organizationID,
-		ProjectId:      &projectID,
-	}
+	auth := testServiceAuthentication(organizationID, projectID)
 	configurationService := &recordingAssistantConfigurationService{
 		configurations: []*internal_assistant_entity.AssistantConfiguration{
 			testWebhook(1, []string{observability.CallRinging.String()}, map[string]interface{}{WebhookOptionHTTPURLKey: "https://example.com/webhook"}),
@@ -163,10 +157,7 @@ func TestCollector_DefaultsTooLargeTimeoutSeconds(t *testing.T) {
 
 	organizationID := uint64(30)
 	projectID := uint64(40)
-	auth := &types.ServiceScope{
-		OrganizationId: &organizationID,
-		ProjectId:      &projectID,
-	}
+	auth := testServiceAuthentication(organizationID, projectID)
 	configurationService := &recordingAssistantConfigurationService{
 		configurations: []*internal_assistant_entity.AssistantConfiguration{
 			testWebhook(1, []string{observability.CallRinging.String()}, map[string]interface{}{
@@ -204,10 +195,7 @@ func TestCollector_DefaultsTooLargeTimeoutSeconds(t *testing.T) {
 func TestCollector_LoadsWebhooksOnce(t *testing.T) {
 	organizationID := uint64(30)
 	projectID := uint64(40)
-	auth := &types.ServiceScope{
-		OrganizationId: &organizationID,
-		ProjectId:      &projectID,
-	}
+	auth := testServiceAuthentication(organizationID, projectID)
 	configurationService := &recordingAssistantConfigurationService{
 		configurations: []*internal_assistant_entity.AssistantConfiguration{
 			testWebhook(1, []string{observability.CallFailed.String()}, map[string]interface{}{WebhookOptionHTTPURLKey: "https://example.com/webhook"}),
@@ -237,10 +225,7 @@ func TestCollector_LoadsWebhooksOnce(t *testing.T) {
 func TestCollector_IgnoresUnallowedWebhookEvent(t *testing.T) {
 	organizationID := uint64(30)
 	projectID := uint64(40)
-	auth := &types.ServiceScope{
-		OrganizationId: &organizationID,
-		ProjectId:      &projectID,
-	}
+	auth := testServiceAuthentication(organizationID, projectID)
 	configurationService := &recordingAssistantConfigurationService{
 		configurations: []*internal_assistant_entity.AssistantConfiguration{
 			testWebhook(1, []string{observability.CallFailed.String()}, map[string]interface{}{WebhookOptionHTTPURLKey: "https://example.com/webhook"}),
@@ -290,10 +275,7 @@ func TestCollector_ReturnsHTTPError(t *testing.T) {
 
 	organizationID := uint64(30)
 	projectID := uint64(40)
-	auth := &types.ServiceScope{
-		OrganizationId: &organizationID,
-		ProjectId:      &projectID,
-	}
+	auth := testServiceAuthentication(organizationID, projectID)
 	configurationService := &recordingAssistantConfigurationService{
 		configurations: []*internal_assistant_entity.AssistantConfiguration{
 			testWebhook(1, []string{observability.CallFailed.String()}, map[string]interface{}{WebhookOptionHTTPURLKey: server.URL}),
@@ -359,30 +341,30 @@ type recordingHTTPLogService struct {
 	calls []webhookHTTPLogCall
 }
 
-func (s *recordingAssistantConfigurationService) Get(context.Context, types.SimplePrinciple, uint64, uint64) (*internal_assistant_entity.AssistantConfiguration, error) {
+func (s *recordingAssistantConfigurationService) Get(context.Context, *types.Authentication, uint64, uint64) (*internal_assistant_entity.AssistantConfiguration, error) {
 	return nil, nil
 }
 
-func (s *recordingAssistantConfigurationService) GetAll(context.Context, types.SimplePrinciple, uint64, string, string, []*protos.Criteria, *protos.Paginate) (int64, []*internal_assistant_entity.AssistantConfiguration, error) {
+func (s *recordingAssistantConfigurationService) GetAll(context.Context, *types.Authentication, uint64, string, string, []*protos.Criteria, *protos.Paginate) (int64, []*internal_assistant_entity.AssistantConfiguration, error) {
 	s.getAllCalls++
 	return int64(len(s.configurations)), s.configurations, nil
 }
 
-func (s *recordingAssistantConfigurationService) Create(context.Context, types.SimplePrinciple, uint64, string, string, bool, []*protos.Metadata) (*internal_assistant_entity.AssistantConfiguration, error) {
+func (s *recordingAssistantConfigurationService) Create(context.Context, *types.Authentication, uint64, string, string, bool, []*protos.Metadata) (*internal_assistant_entity.AssistantConfiguration, error) {
 	return nil, nil
 }
 
-func (s *recordingAssistantConfigurationService) Update(context.Context, types.SimplePrinciple, uint64, uint64, string, string, bool, []*protos.Metadata) (*internal_assistant_entity.AssistantConfiguration, error) {
+func (s *recordingAssistantConfigurationService) Update(context.Context, *types.Authentication, uint64, uint64, string, string, bool, []*protos.Metadata) (*internal_assistant_entity.AssistantConfiguration, error) {
 	return nil, nil
 }
 
-func (s *recordingAssistantConfigurationService) Delete(context.Context, types.SimplePrinciple, uint64, uint64) (*internal_assistant_entity.AssistantConfiguration, error) {
+func (s *recordingAssistantConfigurationService) Delete(context.Context, *types.Authentication, uint64, uint64) (*internal_assistant_entity.AssistantConfiguration, error) {
 	return nil, nil
 }
 
 func (s *recordingHTTPLogService) CreateLog(
 	_ context.Context,
-	_ types.SimplePrinciple,
+	_ *types.Authentication,
 	source string,
 	sourceRefID uint64,
 	sourceEvent string,
@@ -413,19 +395,19 @@ func (s *recordingHTTPLogService) CreateLog(
 	return &internal_assistant_entity.AssistantHTTPLog{}, nil
 }
 
-func (s *recordingHTTPLogService) GetLog(context.Context, types.SimplePrinciple, uint64, uint64) (*internal_assistant_entity.AssistantHTTPLog, error) {
+func (s *recordingHTTPLogService) GetLog(context.Context, *types.Authentication, uint64, uint64) (*internal_assistant_entity.AssistantHTTPLog, error) {
 	return nil, nil
 }
 
-func (s *recordingHTTPLogService) GetAllLog(context.Context, types.SimplePrinciple, uint64, []*protos.Criteria, *protos.Paginate, *protos.Ordering) (int64, []*internal_assistant_entity.AssistantHTTPLog, error) {
+func (s *recordingHTTPLogService) GetAllLog(context.Context, *types.Authentication, uint64, []*protos.Criteria, *protos.Paginate, *protos.Ordering) (int64, []*internal_assistant_entity.AssistantHTTPLog, error) {
 	return 0, nil, nil
 }
 
-func (s *recordingHTTPLogService) GetLogObject(context.Context, uint64, uint64, uint64) ([]byte, []byte, error) {
+func (s *recordingHTTPLogService) GetLogObject(context.Context, *types.Authentication, uint64) ([]byte, []byte, error) {
 	return nil, nil, nil
 }
 
-func (s *recordingHTTPLogService) RetryLog(context.Context, types.SimplePrinciple, uint64, uint64) (*internal_assistant_entity.AssistantHTTPLog, error) {
+func (s *recordingHTTPLogService) RetryLog(context.Context, *types.Authentication, uint64, uint64) (*internal_assistant_entity.AssistantHTTPLog, error) {
 	return nil, nil
 }
 
@@ -441,4 +423,12 @@ func testLogger(t *testing.T) commons.Logger {
 		t.Fatalf("failed to create logger: %v", err)
 	}
 	return logger
+}
+
+func testServiceAuthentication(organizationID, projectID uint64) *types.Authentication {
+	return &types.Authentication{
+		AuthType:          types.AuthTypeService,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
+	}
 }

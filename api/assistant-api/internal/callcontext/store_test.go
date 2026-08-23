@@ -2,10 +2,12 @@ package internal_callcontext
 
 import (
 	"context"
+	"math"
 	"testing"
 	"time"
 
 	"github.com/rapidaai/pkg/commons"
+	"github.com/rapidaai/pkg/types"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -41,6 +43,9 @@ func newTestStore(t *testing.T) (Store, context.Context) {
 			organization_id BIGINT NOT NULL DEFAULT 0,
 			auth_token TEXT NOT NULL DEFAULT '',
 			auth_type TEXT NOT NULL DEFAULT '',
+			auth_user_id BIGINT,
+			auth_actor_type TEXT,
+			auth_actor_id INTEGER,
 			provider TEXT NOT NULL DEFAULT '',
 			direction TEXT NOT NULL DEFAULT '',
 			caller_number TEXT NOT NULL DEFAULT '',
@@ -136,7 +141,7 @@ func TestStoreSaveInitializesPendingContext(t *testing.T) {
 		ConversationID: 1001,
 		ProjectID:      22,
 		OrganizationID: 33,
-		AuthToken:      "service-token",
+		AuthType:       types.AuthTypeService.String(),
 		Provider:       "twilio",
 		Direction:      "outbound",
 		CallerNumber:   "+15550001111",
@@ -535,5 +540,48 @@ func TestStoreGetByChannelUUID(t *testing.T) {
 	}
 	if _, err := store.GetByChannelUUID(ctx, "vonage", 77, " "); err == nil {
 		t.Fatal("expected error for blank channel uuid")
+	}
+}
+
+func TestStoreAuthenticationSnapshotRoundTripDoesNotWriteLegacyToken(t *testing.T) {
+	store, ctx := newTestStore(t)
+	auth := &types.Authentication{
+		AuthType:          types.AuthTypeUser,
+		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeUser, ID: math.MaxInt64},
+		UserValue:         &types.UserContext{UserID: math.MaxInt64},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: 33},
+		ProjectValue:      &types.ProjectContext{OrganizationID: 33, ProjectID: 22},
+	}
+	callContext := &CallContext{AssistantID: 77, ConversationID: 1001, Provider: "sip", Direction: "outbound"}
+	if err := callContext.SetAuthentication(auth); err != nil {
+		t.Fatalf("SetAuthentication() error = %v", err)
+	}
+	contextID, err := store.Save(ctx, callContext)
+	if err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	stored, err := store.Get(ctx, contextID)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	reconstructed, err := stored.ToAuthentication()
+	if err != nil {
+		t.Fatalf("ToAuthentication() error = %v", err)
+	}
+	userContext, err := reconstructed.UserContext()
+	if err != nil || userContext.UserID != math.MaxInt64 {
+		t.Fatalf("UserContext() = %+v, %v", userContext, err)
+	}
+	actor, err := reconstructed.Actor()
+	if err != nil || actor.ID != math.MaxInt64 {
+		t.Fatalf("Actor() = %+v, %v", actor, err)
+	}
+	var authToken string
+	testStore := store.(*postgresStore)
+	if err := testStore.postgres.DB(ctx).Raw("SELECT auth_token FROM call_contexts WHERE context_id = ?", contextID).Scan(&authToken).Error; err != nil {
+		t.Fatalf("read legacy auth_token: %v", err)
+	}
+	if authToken != "" {
+		t.Fatalf("legacy auth_token = %q, want empty", authToken)
 	}
 }

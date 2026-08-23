@@ -8,6 +8,8 @@ package assistant_api
 import (
 	"context"
 	"errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	pkg_errors "github.com/rapidaai/pkg/errors"
 	"github.com/rapidaai/pkg/types"
@@ -20,29 +22,15 @@ func (assistantApi *assistantGrpcApi) DeleteAssistantConfiguration(
 	ctx context.Context,
 	req *protos.DeleteAssistantConfigurationRequest,
 ) (*protos.GetAssistantConfigurationResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated {
-		return &protos.GetAssistantConfigurationResponse{
-			Code:    pkg_errors.AssistantConfigurationUnauthenticated.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.AssistantConfigurationUnauthenticated.Code),
-				ErrorMessage: pkg_errors.AssistantConfigurationUnauthenticated.Error,
-				HumanMessage: pkg_errors.AssistantConfigurationUnauthenticated.ErrorMessage,
-			},
-		}, errors.New(pkg_errors.AssistantConfigurationUnauthenticated.Error)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
 	}
-	if !iAuth.HasUser() || !iAuth.HasProject() || !iAuth.HasOrganization() {
-		return &protos.GetAssistantConfigurationResponse{
-			Code:    pkg_errors.AssistantConfigurationMissingAuthScope.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.AssistantConfigurationMissingAuthScope.Code),
-				ErrorMessage: pkg_errors.AssistantConfigurationMissingAuthScope.Error,
-				HumanMessage: pkg_errors.AssistantConfigurationMissingAuthScope.ErrorMessage,
-			},
-		}, errors.New(pkg_errors.AssistantConfigurationMissingAuthScope.Error)
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
+
 	if !validator.NonZero(req.GetAssistantId()) {
 		return &protos.GetAssistantConfigurationResponse{
 			Code:    pkg_errors.AssistantConfigurationInvalidAssistantID.HTTPStatusCodeInt32(),

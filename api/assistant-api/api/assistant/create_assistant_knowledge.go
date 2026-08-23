@@ -7,7 +7,8 @@ package assistant_api
 
 import (
 	"context"
-	"errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/pkg/exceptions"
@@ -19,13 +20,13 @@ import (
 
 // CreateAssistantKnowledgeConfiguration implements assistant_api.AssistantServiceServer.
 func (assistantApi *assistantGrpcApi) CreateAssistantKnowledge(ctx context.Context, cepm *assistant_api.CreateAssistantKnowledgeRequest) (*assistant_api.GetAssistantKnowledgeResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !iAuth.HasProject() {
-		assistantApi.logger.Errorf("unauthenticated request for invoke")
-		return utils.Error[assistant_api.GetAssistantKnowledgeResponse](
-			errors.New("unauthenticated request for get assistant"),
-			"Please provider valid service credentials to perform CreateAssistantKnowledge, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	aK, err := assistantApi.assistantKnowledgeService.Create(
 		ctx,
@@ -54,7 +55,7 @@ func (assistantApi *assistantGrpcApi) CreateAssistantKnowledge(ctx context.Conte
 
 func (assistantApi *assistantGrpcApi) createAssistantKnowledge(
 	ctx context.Context,
-	iAuth types.SimplePrinciple,
+	iAuth *types.Authentication,
 	assistantId uint64, cepm *assistant_api.CreateAssistantKnowledgeRequest) (*internal_assistant_entity.AssistantKnowledge, error) {
 	return assistantApi.assistantKnowledgeService.Create(
 		ctx,

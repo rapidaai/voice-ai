@@ -9,36 +9,48 @@ package types
 Service scope
 */
 type ServiceScope struct {
-	UserId         *uint64 `json:"userId"`
+	ActorId        uint64  `json:"actorId"`
+	Issuer         string  `json:"issuer"`
+	Audience       string  `json:"audience"`
 	ProjectId      *uint64 `json:"projectId"`
 	OrganizationId *uint64 `json:"organizationId"`
 	CurrentToken   string  `json:"currentToken"`
 }
 
-func (ss *ServiceScope) GetUserId() *uint64 {
-	return ss.UserId
-}
-func (ss *ServiceScope) GetCurrentProjectId() *uint64 {
-	return ss.ProjectId
-}
-func (ss *ServiceScope) GetCurrentOrganizationId() *uint64 {
-	return ss.OrganizationId
+func (ss *ServiceScope) AuditActor() (ActorIdentity, bool) {
+	if ss == nil {
+		return ActorIdentity{}, false
+	}
+	actor := ActorIdentity{Type: ActorTypeService, ID: ss.ActorId}
+	return actor, actor.Validate() == nil
 }
 
-func (ss *ServiceScope) HasOrganization() bool {
-	return ss.GetCurrentOrganizationId() != nil
-}
-
-func (ss *ServiceScope) HasUser() bool {
-	return ss.GetUserId() != nil
-}
-
-func (ss *ServiceScope) HasProject() bool {
-	return ss.GetCurrentProjectId() != nil
+func (ss *ServiceScope) DelegatedContext() (DelegatedContext, bool) {
+	if ss.OrganizationId == nil {
+		return DelegatedContext{}, false
+	}
+	return normalizeDelegatedContext(DelegatedContext{
+		OrganizationID: *ss.OrganizationId,
+		ProjectID:      ss.ProjectId,
+	}, true)
 }
 
 func (ss *ServiceScope) IsAuthenticated() bool {
-	return (ss.HasUser() || ss.HasProject()) && ss.HasOrganization()
+	_, contextOK := ss.DelegatedContext()
+	_, actorOK := ss.AuditActor()
+	return contextOK && actorOK && ss.Issuer != "" && ss.Audience != ""
+}
+
+func (ss *ServiceScope) Scope(allowed ...AuthType) (AuthenticationPrinciple, error) {
+	if !ss.IsAuthenticated() {
+		return nil, ErrUnauthenticated
+	}
+	for _, authType := range allowed {
+		if authType == AuthTypeService {
+			return ss, nil
+		}
+	}
+	return nil, ErrAuthenticationScopeNotAllowed
 }
 
 func (ss *ServiceScope) GetCurrentToken() string {

@@ -7,11 +7,13 @@
 package internal_callcontext
 
 import (
+	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	gorm_generator "github.com/rapidaai/pkg/models/gorm/generators"
 	"github.com/rapidaai/pkg/types"
-	"github.com/rapidaai/pkg/utils"
 	"gorm.io/gorm"
 )
 
@@ -54,8 +56,10 @@ type CallContext struct {
 	ConversationID uint64    `json:"conversationId" gorm:"column:conversation_id;type:bigint;not null"`
 	ProjectID      uint64    `json:"projectId" gorm:"column:project_id;type:bigint;not null;default:0"`
 	OrganizationID uint64    `json:"organizationId" gorm:"column:organization_id;type:bigint;not null;default:0"`
-	AuthToken      string    `json:"-" gorm:"column:auth_token;type:text;not null;default:''"`
 	AuthType       string    `json:"authType" gorm:"column:auth_type;type:varchar(50);not null;default:''"`
+	AuthUserID     *uint64   `json:"authUserId,omitempty" gorm:"column:auth_user_id;type:bigint"`
+	AuthActorType  *string   `json:"authActorType,omitempty" gorm:"column:auth_actor_type;type:varchar(50)"`
+	AuthActorID    *uint64   `json:"authActorId,omitempty" gorm:"column:auth_actor_id;type:bigint"`
 	Provider       string    `json:"provider" gorm:"column:provider;type:varchar(50);not null;default:''"`
 	Direction      string    `json:"direction" gorm:"column:direction;type:varchar(20);not null;default:''"`
 	CallerNumber   string    `json:"callerNumber" gorm:"column:caller_number;type:varchar(50);not null;default:''"`
@@ -92,16 +96,67 @@ func (cc *CallContext) BeforeCreate(tx *gorm.DB) (err error) {
 	return nil
 }
 
-// ToAuth converts the CallContext into a SimplePrinciple for use in service calls.
-func (cc *CallContext) ToAuth() types.SimplePrinciple {
-	auth := &types.ServiceScope{
-		CurrentToken: cc.AuthToken,
+func (cc *CallContext) SetAuthentication(auth *types.Authentication) error {
+	if auth == nil || !auth.IsAuthenticated() {
+		return types.ErrUnauthenticated
 	}
-	if cc.ProjectID != 0 {
-		auth.ProjectId = utils.Ptr(cc.ProjectID)
+	actor, err := auth.Actor()
+	if err != nil {
+		return err
+	}
+
+	cc.AuthType = auth.AuthType.String()
+	cc.AuthUserID = nil
+	cc.OrganizationID = 0
+	cc.ProjectID = 0
+	cc.AuthActorType = nil
+	cc.AuthActorID = nil
+
+	if userContext, err := auth.UserContext(); err == nil {
+		cc.AuthUserID = &userContext.UserID
+	}
+	if organizationContext, err := auth.OrganizationContext(); err == nil {
+		cc.OrganizationID = organizationContext.OrganizationID
+	}
+	if projectContext, err := auth.ProjectContext(); err == nil {
+		cc.ProjectID = projectContext.ProjectID
+	}
+	actorType := string(actor.Type)
+	cc.AuthActorType = &actorType
+	cc.AuthActorID = &actor.ID
+	return nil
+}
+
+func (cc *CallContext) ToAuthentication() (*types.Authentication, error) {
+	if cc == nil {
+		return nil, types.ErrUnauthenticated
+	}
+
+	auth := &types.Authentication{AuthType: types.AuthType(cc.AuthType)}
+	if cc.AuthUserID != nil && *cc.AuthUserID != 0 {
+		auth.UserValue = &types.UserContext{UserID: *cc.AuthUserID}
 	}
 	if cc.OrganizationID != 0 {
-		auth.OrganizationId = utils.Ptr(cc.OrganizationID)
+		auth.OrganizationValue = &types.OrganizationContext{OrganizationID: cc.OrganizationID}
 	}
-	return auth
+	if cc.ProjectID != 0 {
+		auth.ProjectValue = &types.ProjectContext{OrganizationID: cc.OrganizationID, ProjectID: cc.ProjectID}
+	}
+	if !auth.IsAuthenticated() {
+		return nil, fmt.Errorf("call context authentication is invalid for auth type %q: %w", cc.AuthType, types.ErrUnauthenticated)
+	}
+
+	actorType := ""
+	if cc.AuthActorType != nil {
+		actorType = strings.TrimSpace(*cc.AuthActorType)
+	}
+	if actorType == "" || cc.AuthActorID == nil {
+		return nil, errors.New("call context authentication actor is incomplete")
+	}
+	auth.ActorValue = &types.ActorIdentity{Type: types.ActorType(actorType), ID: *cc.AuthActorID}
+	if _, err := auth.Actor(); err != nil {
+		return nil, fmt.Errorf("call context authentication actor is invalid: %w", err)
+	}
+
+	return auth, nil
 }

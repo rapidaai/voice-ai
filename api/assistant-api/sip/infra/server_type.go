@@ -31,7 +31,7 @@ type SIPRequestContext struct {
 	ToURI           string
 	APIKey          string
 	AssistantID     string
-	Auth            types.SimplePrinciple
+	Auth            *types.Authentication
 	SDPInfo         *SDPMediaInfo
 	Assistant       *internal_assistant_entity.Assistant
 	VaultCredential *protos.VaultCredential

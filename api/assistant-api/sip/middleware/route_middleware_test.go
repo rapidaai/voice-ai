@@ -42,6 +42,10 @@ func TestRouteMiddleware_AgentRoute(t *testing.T) {
 	assert.Equal(t, "42", ctx.AssistantID)
 	assert.NotNil(t, ctx.Auth)
 	assert.NotNil(t, ctx.Assistant)
+	projectContext, authErr := ctx.Auth.ProjectContext()
+	require.NoError(t, authErr)
+	assert.Equal(t, uint64(7), projectContext.ProjectID)
+	assert.Equal(t, uint64(8), projectContext.OrganizationID)
 }
 
 func TestRouteMiddleware_DIDRoute(t *testing.T) {
@@ -144,7 +148,7 @@ type routeTestAssistantService struct {
 	assistants map[uint64]*internal_assistant_entity.Assistant
 }
 
-func (s routeTestAssistantService) Get(_ context.Context, _ types.SimplePrinciple, assistantID uint64, _ *uint64, _ *internal_services.GetAssistantOption) (*internal_assistant_entity.Assistant, error) {
+func (s routeTestAssistantService) Get(_ context.Context, _ *types.Authentication, assistantID uint64, _ *uint64, _ *internal_services.GetAssistantOption) (*internal_assistant_entity.Assistant, error) {
 	assistant, ok := s.assistants[assistantID]
 	if !ok {
 		return nil, fmt.Errorf("assistant %d not found", assistantID)

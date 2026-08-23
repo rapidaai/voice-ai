@@ -54,6 +54,11 @@ class User(ABC, BaseModel):
     def organization_id(self):
         raise NotImplementedError("illegal authenticated user")
 
+    @property
+    @abstractmethod
+    def actor(self) -> dict:
+        raise NotImplementedError("illegal authenticated user")
+
 
 class AuthenticatedUser(User):
     user: Account
@@ -61,6 +66,8 @@ class AuthenticatedUser(User):
     organizationRole: OrganizationRole
     projectRoles: List[ProjectRole]
     currentProject: Optional[ProjectRole] = Field(None)
+    actorType: Optional[str] = None
+    actorId: Optional[int] = None
 
     def select_project(self, project_id: str) -> Optional[ProjectRole]:
         for project in self.projectRoles:
@@ -83,14 +90,24 @@ class AuthenticatedUser(User):
     def organization_id(self) -> int:
         return self.organizationRole.organizationId
 
+    @property
+    def actor(self) -> dict:
+        actor_type = self.actorType or "user"
+        actor_id = self.actorId or self.user.id
+        return _validated_actor(actor_type, actor_id)
+
 
 class InternalAuthenticatedUser(User):
-    userId: int
-    projectId: int
+    userId: Optional[int] = None
+    projectId: Optional[int] = None
     organizationId: int
+    actorType: Optional[str] = Field(default=None, alias="actor_type")
+    actorId: Optional[int] = Field(default=None, alias="actor_id")
 
     @property
     def user_id(self) -> int:
+        if self.userId is None:
+            raise InvalidAuthorizationTokenException("service authentication has no user identity")
         return self.userId
 
     @property
@@ -100,6 +117,14 @@ class InternalAuthenticatedUser(User):
     @property
     def organization_id(self) -> int:
         return self.organizationId
+
+    @property
+    def actor(self) -> dict:
+        if self.actorType is not None and self.actorId is not None:
+            return _validated_actor(self.actorType, self.actorId)
+        if self.userId is not None:
+            return _validated_actor("user", self.userId)
+        raise InvalidAuthorizationTokenException("authenticated request is missing actor identity")
 
 
 class AnonymousUser(User):
@@ -120,3 +145,17 @@ class AnonymousUser(User):
         raise InvalidAuthorizationTokenException(
             "anonymous user doen't have any attribute."
         )
+
+    @property
+    def actor(self) -> dict:
+        raise InvalidAuthorizationTokenException(
+            "anonymous user doesn't have an actor identity."
+        )
+
+
+def _validated_actor(actor_type: str, actor_id: int) -> dict:
+    if actor_type not in {"user", "project", "organization", "service", "system"}:
+        raise InvalidAuthorizationTokenException("unsupported actor type")
+    if actor_id <= 0 or actor_id > 9223372036854775807:
+        raise InvalidAuthorizationTokenException("actor id must be a positive bigint")
+    return {"type": actor_type, "id": actor_id}

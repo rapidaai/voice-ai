@@ -7,6 +7,7 @@ package types
 
 import (
 	"errors"
+	"math"
 	"time"
 
 	"github.com/rapidaai/pkg/utils"
@@ -89,7 +90,8 @@ func (aP *PlainAuthPrinciple) GetCurrentProjectRole() *ProjectRole {
 }
 
 func (aP *PlainAuthPrinciple) HasOrganization() bool {
-	return aP.OrganizationRole != nil
+	_, ok := aP.OrganizationContext()
+	return ok
 }
 
 func (aP *PlainAuthPrinciple) PlainAuthPrinciple() PlainAuthPrinciple {
@@ -97,7 +99,8 @@ func (aP *PlainAuthPrinciple) PlainAuthPrinciple() PlainAuthPrinciple {
 }
 
 func (aP *PlainAuthPrinciple) HasProject() bool {
-	return aP.GetCurrentProjectRole() != nil
+	_, ok := aP.ProjectContext()
+	return ok
 }
 
 func (aP *PlainAuthPrinciple) GetCurrentToken() string {
@@ -105,7 +108,8 @@ func (aP *PlainAuthPrinciple) GetCurrentToken() string {
 }
 
 func (aP *PlainAuthPrinciple) HasUser() bool {
-	return aP.GetUserInfo() != nil
+	_, ok := aP.UserIdentity()
+	return ok
 }
 
 func (aP *PlainAuthPrinciple) GetOrganizationRole() *OrganizaitonRole {
@@ -131,7 +135,21 @@ func (aP *PlainAuthPrinciple) IsFeatureEnabled(featureName string) bool {
 }
 
 func (aP *PlainAuthPrinciple) IsAuthenticated() bool {
-	return aP.HasOrganization() && aP.HasUser()
+	_, hasOrganization := aP.OrganizationContext()
+	_, hasUser := aP.UserIdentity()
+	return hasOrganization && hasUser
+}
+
+func (aP *PlainAuthPrinciple) Scope(allowed ...AuthType) (AuthenticationPrinciple, error) {
+	if !aP.IsAuthenticated() {
+		return nil, ErrUnauthenticated
+	}
+	for _, authType := range allowed {
+		if authType == AuthTypeUser {
+			return aP, nil
+		}
+	}
+	return nil, ErrAuthenticationScopeNotAllowed
 }
 
 func (aP *PlainAuthPrinciple) GetProjectRoles() []*ProjectRole {
@@ -146,8 +164,34 @@ func (aP *PlainAuthPrinciple) GetUserId() *uint64 {
 	return &aP.User.Id
 }
 
+func (aP *PlainAuthPrinciple) UserIdentity() (uint64, bool) {
+	if aP.User.Id == 0 {
+		return 0, false
+	}
+	return aP.User.Id, true
+}
+
+func (aP *PlainAuthPrinciple) AuditActor() (ActorIdentity, bool) {
+	userID, ok := aP.UserIdentity()
+	if !ok || userID > math.MaxInt64 {
+		return ActorIdentity{}, false
+	}
+	return ActorIdentity{Type: ActorTypeUser, ID: userID}, true
+}
+
 func (aP *PlainAuthPrinciple) GetCurrentOrganizationId() *uint64 {
+	if aP.OrganizationRole == nil || aP.OrganizationRole.OrganizationId == 0 {
+		return nil
+	}
 	return &aP.OrganizationRole.OrganizationId
+}
+
+func (aP *PlainAuthPrinciple) OrganizationContext() (uint64, bool) {
+	organizationID := aP.GetCurrentOrganizationId()
+	if organizationID == nil {
+		return 0, false
+	}
+	return *organizationID, true
 }
 
 func (aP *PlainAuthPrinciple) GetCurrentProjectId() *uint64 {
@@ -155,6 +199,18 @@ func (aP *PlainAuthPrinciple) GetCurrentProjectId() *uint64 {
 		return &aP.CurrentProjectRole.ProjectId
 	}
 	return nil
+}
+
+func (aP *PlainAuthPrinciple) ProjectContext() (ProjectContext, bool) {
+	organizationID, ok := aP.OrganizationContext()
+	if !ok {
+		return ProjectContext{}, false
+	}
+	projectID := aP.GetCurrentProjectId()
+	if projectID == nil {
+		return ProjectContext{}, false
+	}
+	return ProjectContext{OrganizationID: organizationID, ProjectID: *projectID}, true
 }
 
 func (aP *PlainAuthPrinciple) SwitchProject(projectId uint64) error {

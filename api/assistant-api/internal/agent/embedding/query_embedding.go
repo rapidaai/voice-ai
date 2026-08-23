@@ -33,7 +33,7 @@ func NewQueryEmbedding(logger commons.Logger, cfg *config.AssistantConfig, redis
 
 func (qe *defaultQueryEmbedding) TextQueryEmbedding(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	query string, opts *TextEmbeddingOption,
 ) (*protos.EmbeddingResponse, error) {
 

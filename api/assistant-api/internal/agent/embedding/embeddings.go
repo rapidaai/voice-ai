@@ -22,7 +22,7 @@ type TextEmbeddingOption struct {
 type QueryEmbedding interface {
 	TextQueryEmbedding(
 		ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		query string,
 		opts *TextEmbeddingOption) (*protos.EmbeddingResponse, error)
 }

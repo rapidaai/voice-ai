@@ -20,7 +20,7 @@ import (
 func TestCollectorCreatesAndUpdatesToolLog(t *testing.T) {
 	toolService := &recordingToolService{}
 	collector := New(Config{ToolService: toolService})
-	auth := &types.ServiceScope{}
+	auth := &types.Authentication{}
 
 	err := collector.Collect(
 		context.Background(),
@@ -103,29 +103,29 @@ type recordingToolService struct {
 	updateCalls []toolUpdateCall
 }
 
-func (s *recordingToolService) Get(context.Context, types.SimplePrinciple, uint64, uint64) (*internal_assistant_entity.AssistantTool, error) {
+func (s *recordingToolService) Get(context.Context, *types.Authentication, uint64, uint64) (*internal_assistant_entity.AssistantTool, error) {
 	return nil, nil
 }
 
-func (s *recordingToolService) GetAll(context.Context, types.SimplePrinciple, uint64, []*protos.Criteria, *protos.Paginate) (int64, []*internal_assistant_entity.AssistantTool, error) {
+func (s *recordingToolService) GetAll(context.Context, *types.Authentication, uint64, []*protos.Criteria, *protos.Paginate) (int64, []*internal_assistant_entity.AssistantTool, error) {
 	return 0, nil, nil
 }
 
-func (s *recordingToolService) Create(context.Context, types.SimplePrinciple, uint64, string, *string, map[string]interface{}, string, []*protos.Metadata) (*internal_assistant_entity.AssistantTool, error) {
+func (s *recordingToolService) Create(context.Context, *types.Authentication, uint64, string, *string, map[string]interface{}, string, []*protos.Metadata) (*internal_assistant_entity.AssistantTool, error) {
 	return nil, nil
 }
 
-func (s *recordingToolService) Update(context.Context, types.SimplePrinciple, uint64, uint64, string, *string, map[string]interface{}, string, []*protos.Metadata) (*internal_assistant_entity.AssistantTool, error) {
+func (s *recordingToolService) Update(context.Context, *types.Authentication, uint64, uint64, string, *string, map[string]interface{}, string, []*protos.Metadata) (*internal_assistant_entity.AssistantTool, error) {
 	return nil, nil
 }
 
-func (s *recordingToolService) Delete(context.Context, types.SimplePrinciple, uint64, uint64) (*internal_assistant_entity.AssistantTool, error) {
+func (s *recordingToolService) Delete(context.Context, *types.Authentication, uint64, uint64) (*internal_assistant_entity.AssistantTool, error) {
 	return nil, nil
 }
 
 func (s *recordingToolService) CreateLog(
 	_ context.Context,
-	_ types.SimplePrinciple,
+	_ *types.Authentication,
 	assistantID uint64,
 	conversationID uint64,
 	messageID string,
@@ -147,7 +147,7 @@ func (s *recordingToolService) CreateLog(
 
 func (s *recordingToolService) UpdateLog(
 	_ context.Context,
-	_ types.SimplePrinciple,
+	_ *types.Authentication,
 	toolCallID string,
 	conversationID uint64,
 	status type_enums.RecordState,
@@ -161,14 +161,14 @@ func (s *recordingToolService) UpdateLog(
 	return &internal_assistant_entity.AssistantToolLog{}, nil
 }
 
-func (s *recordingToolService) GetLog(context.Context, types.SimplePrinciple, uint64, uint64) (*internal_assistant_entity.AssistantToolLog, error) {
+func (s *recordingToolService) GetLog(context.Context, *types.Authentication, uint64, uint64) (*internal_assistant_entity.AssistantToolLog, error) {
 	return nil, nil
 }
 
-func (s *recordingToolService) GetAllLog(context.Context, types.SimplePrinciple, uint64, []*protos.Criteria, *protos.Paginate, *protos.Ordering) (int64, []*internal_assistant_entity.AssistantToolLog, error) {
+func (s *recordingToolService) GetAllLog(context.Context, *types.Authentication, uint64, []*protos.Criteria, *protos.Paginate, *protos.Ordering) (int64, []*internal_assistant_entity.AssistantToolLog, error) {
 	return 0, nil, nil
 }
 
-func (s *recordingToolService) GetLogObject(context.Context, uint64, uint64, uint64) ([]byte, []byte, error) {
+func (s *recordingToolService) GetLogObject(context.Context, *types.Authentication, uint64) ([]byte, []byte, error) {
 	return nil, nil, nil
 }

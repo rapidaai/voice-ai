@@ -2,6 +2,7 @@ package internal_user_service
 
 import (
 	"errors"
+	"math"
 
 	internal_entity "github.com/rapidaai/api/web-api/internal/entity"
 	"github.com/rapidaai/pkg/types"
@@ -112,22 +113,38 @@ func (aP *authPrinciple) SwitchProject(projectId uint64) error {
 	return nil
 }
 
-func (aP *authPrinciple) GetUserId() *uint64 {
-	return &aP.user.Id
+func (aP *authPrinciple) UserIdentity() (uint64, bool) {
+	if aP.user == nil || aP.user.Id == 0 {
+		return 0, false
+	}
+	return aP.user.Id, true
 }
 
-func (aP *authPrinciple) GetCurrentOrganizationId() *uint64 {
-	if aP.GetOrganizationRole() != nil {
-		return &aP.GetOrganizationRole().OrganizationId
+func (aP *authPrinciple) AuditActor() (types.ActorIdentity, bool) {
+	userID, ok := aP.UserIdentity()
+	if !ok || userID > math.MaxInt64 {
+		return types.ActorIdentity{}, false
 	}
-	return nil
+	return types.ActorIdentity{Type: types.ActorTypeUser, ID: userID}, true
 }
 
-func (aP *authPrinciple) GetCurrentProjectId() *uint64 {
-	if aP.currentProjectRole == nil {
-		return nil
+func (aP *authPrinciple) OrganizationContext() (uint64, bool) {
+	organizationRole := aP.GetOrganizationRole()
+	if organizationRole == nil || organizationRole.OrganizationId == 0 {
+		return 0, false
 	}
-	return &aP.currentProjectRole.ProjectId
+	return organizationRole.OrganizationId, true
+}
+
+func (aP *authPrinciple) ProjectContext() (types.ProjectContext, bool) {
+	organizationID, ok := aP.OrganizationContext()
+	if !ok || aP.currentProjectRole == nil || aP.currentProjectRole.ProjectId == 0 {
+		return types.ProjectContext{}, false
+	}
+	return types.ProjectContext{
+		OrganizationID: organizationID,
+		ProjectID:      aP.currentProjectRole.ProjectId,
+	}, true
 }
 
 func (aP *authPrinciple) GetCurrentProjectRole() *types.ProjectRole {
@@ -137,23 +154,10 @@ func (aP *authPrinciple) GetCurrentProjectRole() *types.ProjectRole {
 	return aP.currentProjectRole
 }
 
-// has an user
-func (aP *authPrinciple) HasUser() bool {
-	return aP.GetUserId() != nil
-}
-
-// has an org
-func (aP *authPrinciple) HasOrganization() bool {
-	return aP.GetCurrentOrganizationId() != nil
-}
-
-// has an project
-func (aP *authPrinciple) HasProject() bool {
-	return aP.GetCurrentProjectId() != nil
-}
-
 func (aP *authPrinciple) IsAuthenticated() bool {
-	return aP.HasOrganization() && aP.HasUser()
+	_, hasUser := aP.UserIdentity()
+	_, hasOrganization := aP.OrganizationContext()
+	return hasUser && hasOrganization
 }
 
 func (aP *authPrinciple) GetCurrentToken() string {

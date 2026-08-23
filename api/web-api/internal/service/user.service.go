@@ -15,19 +15,19 @@ type UserService interface {
 
 	Get(ctx context.Context, email string) (*internal_entity.UserAuth, error)
 	GetUser(ctx context.Context, userId uint64) (*internal_entity.UserAuth, error)
-	UpdateUser(ctx context.Context, auth types.Principle, userId uint64, name *string) (*internal_entity.UserAuth, error)
-	UpdateUserStatus(ctx context.Context, auth types.Principle, userId uint64, status type_enums.RecordState) error
+	UpdateUser(ctx context.Context, auth *types.Authentication, userId uint64, name *string) (*internal_entity.UserAuth, error)
+	UpdateUserStatus(ctx context.Context, auth *types.Authentication, userId uint64, status type_enums.RecordState) error
 	UpdatePassword(ctx context.Context, userId uint64, password string) (*internal_entity.UserAuth, error)
 	GetToken(ctx context.Context, tokenType string, token string) (*internal_entity.UserAuthToken, error)
 	Create(ctx context.Context, name string, email string, password string, status type_enums.RecordState, source *string) (types.Principle, error)
 	CreatePasswordToken(ctx context.Context, userId uint64) (*internal_entity.UserAuthToken, error)
 	//
-	CreateOrganizationRole(ctx context.Context, auth types.Principle, role string, userId uint64, orgnizationId uint64, status type_enums.RecordState) (*internal_entity.UserOrganizationRole, error)
-	CreateProjectRole(ctx context.Context, auth types.Principle, userId uint64, role string, projectId uint64, status type_enums.RecordState) (*internal_entity.UserProjectRole, error)
-	CreateProjectRoles(ctx context.Context, auth types.Principle, userId uint64, role string, projectIds []uint64, status type_enums.RecordState) ([]*internal_entity.UserProjectRole, error)
-	UpdateOrganizationRole(ctx context.Context, auth types.Principle, userId uint64, organizationId uint64, role string) error
-	ArchiveUserFromOrganization(ctx context.Context, auth types.Principle, userId uint64, organizationId uint64) error
-	ArchiveUserFromProject(ctx context.Context, auth types.Principle, userId uint64, projectId uint64) error
+	CreateOrganizationRole(ctx context.Context, auth *types.Authentication, role string, userId uint64, orgnizationId uint64, status type_enums.RecordState) (*internal_entity.UserOrganizationRole, error)
+	CreateProjectRole(ctx context.Context, auth *types.Authentication, userId uint64, role string, projectId uint64, status type_enums.RecordState) (*internal_entity.UserProjectRole, error)
+	CreateProjectRoles(ctx context.Context, auth *types.Authentication, userId uint64, role string, projectIds []uint64, status type_enums.RecordState) ([]*internal_entity.UserProjectRole, error)
+	UpdateOrganizationRole(ctx context.Context, auth *types.Authentication, userId uint64, organizationId uint64, role string) error
+	ArchiveUserFromOrganization(ctx context.Context, auth *types.Authentication, userId uint64, organizationId uint64) error
+	ArchiveUserFromProject(ctx context.Context, auth *types.Authentication, userId uint64, projectId uint64) error
 
 	//
 	ActivateAllProjectRoles(ctx context.Context, userId uint64) error

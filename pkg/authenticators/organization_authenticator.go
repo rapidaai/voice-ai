@@ -7,6 +7,9 @@ package authenticators
 
 import (
 	"context"
+	"fmt"
+	"math"
+	"strconv"
 	"time"
 
 	"github.com/rapidaai/config"
@@ -34,10 +37,18 @@ func (authenticator *organizationAuthenticator) Claim(ctx context.Context, claim
 	if err != nil {
 		return nil, err
 	}
+	if ath.GetActorType() != string(types.ActorTypeOrganization) {
+		return nil, fmt.Errorf("organization authentication returned actor type %q", ath.GetActorType())
+	}
+	credentialID, err := strconv.ParseUint(ath.GetActorId(), 10, 64)
+	if err != nil || credentialID == 0 || credentialID > math.MaxInt64 {
+		return nil, fmt.Errorf("organization authentication returned invalid actor id")
+	}
 
 	authenticator.logger.Debugf("Benchmarking: organizationAuthenticator.Claim time taken %v", time.Since(start))
 	return &types.PlainClaimPrinciple[*types.OrganizationScope]{
 		Info: &types.OrganizationScope{
+			CredentialId:   &credentialID,
 			OrganizationId: &ath.OrganizationId,
 			Status:         ath.GetStatus(),
 			CurrentToken:   claimToken,

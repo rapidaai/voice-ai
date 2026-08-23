@@ -9,6 +9,6 @@ import (
 )
 
 type NotificationService interface {
-	UpdateNotificationSetting(ctx context.Context, auth types.Principle, userAuthId uint64, settings []*protos.NotificationSetting) ([]*internal_entity.NotificationSetting, error)
-	GetAllNotificationSetting(ctx context.Context, auth types.Principle, userAuthId uint64) ([]*internal_entity.NotificationSetting, error)
+	UpdateNotificationSetting(ctx context.Context, auth *types.Authentication, userAuthId uint64, settings []*protos.NotificationSetting) ([]*internal_entity.NotificationSetting, error)
+	GetAllNotificationSetting(ctx context.Context, auth *types.Authentication, userAuthId uint64) ([]*internal_entity.NotificationSetting, error)
 }
