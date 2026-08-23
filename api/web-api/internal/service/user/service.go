@@ -112,7 +112,7 @@ func (aS *userService) getUserProjectRoles(ctx context.Context, userId uint64) [
 	return prjs
 }
 
-func (aS *userService) Create(ctx context.Context, name string, email string, password string, status type_enums.RecordState, source *string) (types.Principle, error) {
+func (aS *userService) Create(ctx context.Context, auth *types.Authentication, name string, email string, password string, status type_enums.RecordState, source *string) (types.Principle, error) {
 	db := aS.postgres.DB(ctx)
 	user := &internal_entity.UserAuth{
 		Name:     name,
@@ -125,12 +125,16 @@ func (aS *userService) Create(ctx context.Context, name string, email string, pa
 	if source != nil {
 		user.Source = *source
 	}
+	if auth != nil {
+		user.CreatedActorType = auth.Actor().Type.String()
+		user.CreatedActorID = auth.Actor().ID
+	}
 	tx := db.Save(user)
 	if err := tx.Error; err != nil {
 		aS.logger.Errorf("exception in DB transaction %v", tx.Error)
 		return nil, err
 	}
-	aTh, err := aS.CreateNewAuthToken(ctx, user.Id)
+	aTh, err := aS.CreateNewAuthToken(ctx, auth, user.Id)
 	if err != nil {
 		aS.logger.Errorf("exception in DB transaction %v", err)
 		return nil, err
@@ -187,7 +191,7 @@ func (aS *userService) Activate(ctx context.Context, userId uint64, name string,
 	return &authPrinciple{user: &ct, userAuthToken: aTh, userOrgRole: &rt, userProjectRoles: prjs}, nil
 }
 
-func (aS *userService) CreateNewAuthToken(ctx context.Context, userId uint64) (*internal_entity.UserAuthToken, error) {
+func (aS *userService) CreateNewAuthToken(ctx context.Context, auth *types.Authentication, userId uint64) (*internal_entity.UserAuthToken, error) {
 	db := aS.postgres.DB(ctx)
 	ct := &internal_entity.UserAuthToken{
 		UserAuthId: userId,
@@ -196,6 +200,10 @@ func (aS *userService) CreateNewAuthToken(ctx context.Context, userId uint64) (*
 		Mutable: gorm_models.Mutable{
 			Status: type_enums.RECORD_ACTIVE,
 		},
+	}
+	if auth != nil {
+		ct.CreatedActorType = auth.Actor().Type.String()
+		ct.CreatedActorID = auth.Actor().ID
 	}
 	tx := db.Save(ct)
 	if tx.Error != nil {
@@ -246,10 +254,6 @@ func (aS *userService) GetToken(ctx context.Context, tokenType string, token str
 }
 
 func (aS *userService) CreateOrganizationRole(ctx context.Context, auth *types.Authentication, role string, userId uint64, orgnizationId uint64, status type_enums.RecordState) (*internal_entity.UserOrganizationRole, error) {
-	_, authErr := auth.Scope(types.AuthTypeUser)
-	if authErr != nil {
-		return nil, authErr
-	}
 
 	db := aS.postgres.DB(ctx)
 	ct := &internal_entity.UserOrganizationRole{
@@ -257,7 +261,9 @@ func (aS *userService) CreateOrganizationRole(ctx context.Context, auth *types.A
 		Role:           role,
 		OrganizationId: orgnizationId,
 		Mutable: gorm_models.Mutable{
-			Status: status,
+			Status:           status,
+			CreatedActorType: auth.Actor().Type.String(),
+			CreatedActorID:   auth.Actor().ID,
 		},
 	}
 	tx := db.Clauses(clause.OnConflict{
@@ -267,7 +273,9 @@ func (aS *userService) CreateOrganizationRole(ctx context.Context, auth *types.A
 			{Name: "status"},
 		},
 		DoUpdates: clause.Assignments(map[string]interface{}{
-			"role": role,
+			"role":               role,
+			"updated_actor_type": auth.Actor().Type.String(),
+			"updated_actor_id":   auth.Actor().ID,
 		}),
 	}).Create(ct)
 	if tx.Error != nil {
@@ -278,16 +286,14 @@ func (aS *userService) CreateOrganizationRole(ctx context.Context, auth *types.A
 }
 
 func (aS *userService) UpdateOrganizationRole(ctx context.Context, auth *types.Authentication, userId uint64, organizationId uint64, role string) error {
-	_, authErr := auth.Scope(types.AuthTypeUser)
-	if authErr != nil {
-		return authErr
-	}
 
 	db := aS.postgres.DB(ctx)
 	tx := db.Model(&internal_entity.UserOrganizationRole{}).
 		Where("user_auth_id = ? AND organization_id = ? AND status IN ?", userId, organizationId, []string{type_enums.RECORD_ACTIVE.String(), type_enums.RECORD_INVITED.String()}).
 		Updates(map[string]interface{}{
-			"role": strings.ToLower(role),
+			"role":               strings.ToLower(role),
+			"updated_actor_type": auth.Actor().Type.String(),
+			"updated_actor_id":   auth.Actor().ID,
 		})
 	if tx.Error != nil {
 		aS.logger.Errorf("exception in DB transaction %v", tx.Error)
@@ -308,10 +314,6 @@ func (aS *userService) GetActiveOrInvitedProjectRole(ctx context.Context, userId
 }
 
 func (aS *userService) CreateProjectRole(ctx context.Context, auth *types.Authentication, userId uint64, role string, projectId uint64, status type_enums.RecordState) (*internal_entity.UserProjectRole, error) {
-	_, authErr := auth.Scope(types.AuthTypeUser)
-	if authErr != nil {
-		return nil, authErr
-	}
 
 	db := aS.postgres.DB(ctx)
 	projectRole := &internal_entity.UserProjectRole{
@@ -319,7 +321,9 @@ func (aS *userService) CreateProjectRole(ctx context.Context, auth *types.Authen
 		ProjectId:  projectId,
 		Role:       role,
 		Mutable: gorm_models.Mutable{
-			Status: status,
+			Status:           status,
+			CreatedActorType: auth.Actor().Type.String(),
+			CreatedActorID:   auth.Actor().ID,
 		},
 	}
 	tx := db.Clauses(clause.OnConflict{
@@ -329,7 +333,9 @@ func (aS *userService) CreateProjectRole(ctx context.Context, auth *types.Authen
 			{Name: "status"},
 		},
 		DoUpdates: clause.Assignments(map[string]interface{}{
-			"role": role,
+			"role":               role,
+			"updated_actor_type": auth.Actor().Type.String(),
+			"updated_actor_id":   auth.Actor().ID,
 		}),
 	}).Create(projectRole)
 	if tx.Error != nil {
@@ -340,10 +346,6 @@ func (aS *userService) CreateProjectRole(ctx context.Context, auth *types.Authen
 }
 
 func (aS *userService) CreateProjectRoles(ctx context.Context, auth *types.Authentication, userId uint64, role string, projectIds []uint64, status type_enums.RecordState) ([]*internal_entity.UserProjectRole, error) {
-	_, authErr := auth.Scope(types.AuthTypeUser)
-	if authErr != nil {
-		return nil, authErr
-	}
 
 	db := aS.postgres.DB(ctx)
 	projectRoles := make([]*internal_entity.UserProjectRole, 0, len(projectIds))
@@ -353,7 +355,9 @@ func (aS *userService) CreateProjectRoles(ctx context.Context, auth *types.Authe
 			ProjectId:  projectId,
 			Role:       role,
 			Mutable: gorm_models.Mutable{
-				Status: status,
+				Status:           status,
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
 			},
 		})
 	}
@@ -364,7 +368,9 @@ func (aS *userService) CreateProjectRoles(ctx context.Context, auth *types.Authe
 			{Name: "status"},
 		},
 		DoUpdates: clause.Assignments(map[string]interface{}{
-			"role": role,
+			"role":               role,
+			"updated_actor_type": auth.Actor().Type.String(),
+			"updated_actor_id":   auth.Actor().ID,
 		}),
 	}).Create(&projectRoles)
 	if tx.Error != nil {
@@ -375,10 +381,6 @@ func (aS *userService) CreateProjectRoles(ctx context.Context, auth *types.Authe
 }
 
 func (aS *userService) ArchiveUserFromOrganization(ctx context.Context, auth *types.Authentication, userId uint64, organizationId uint64) error {
-	_, authErr := auth.Scope(types.AuthTypeUser)
-	if authErr != nil {
-		return authErr
-	}
 
 	db := aS.postgres.DB(ctx)
 	tx := db.Begin()
@@ -391,7 +393,9 @@ func (aS *userService) ArchiveUserFromOrganization(ctx context.Context, auth *ty
 		Where("id = ?", userId).
 		Updates(&internal_entity.UserAuth{
 			Mutable: gorm_models.Mutable{
-				Status: type_enums.RECORD_ARCHIEVE,
+				Status:           type_enums.RECORD_ARCHIEVE,
+				UpdatedActorType: auth.Actor().Type.String(),
+				UpdatedActorID:   auth.Actor().ID,
 			},
 		}).Error; err != nil {
 		tx.Rollback()
@@ -402,7 +406,9 @@ func (aS *userService) ArchiveUserFromOrganization(ctx context.Context, auth *ty
 		Where("user_auth_id = ? AND organization_id = ? AND status IN ?", userId, organizationId, []string{type_enums.RECORD_ACTIVE.String(), type_enums.RECORD_INVITED.String()}).
 		Updates(&internal_entity.UserOrganizationRole{
 			Mutable: gorm_models.Mutable{
-				Status: type_enums.RECORD_ARCHIEVE,
+				Status:           type_enums.RECORD_ARCHIEVE,
+				UpdatedActorType: auth.Actor().Type.String(),
+				UpdatedActorID:   auth.Actor().ID,
 			},
 		}).Error; err != nil {
 		tx.Rollback()
@@ -413,7 +419,9 @@ func (aS *userService) ArchiveUserFromOrganization(ctx context.Context, auth *ty
 		Where("user_auth_id = ? AND status IN ?", userId, []string{type_enums.RECORD_ACTIVE.String(), type_enums.RECORD_INVITED.String()}).
 		Updates(&internal_entity.UserProjectRole{
 			Mutable: gorm_models.Mutable{
-				Status: type_enums.RECORD_ARCHIEVE,
+				Status:           type_enums.RECORD_ARCHIEVE,
+				UpdatedActorType: auth.Actor().Type.String(),
+				UpdatedActorID:   auth.Actor().ID,
 			},
 		}).Error; err != nil {
 		tx.Rollback()
@@ -425,17 +433,15 @@ func (aS *userService) ArchiveUserFromOrganization(ctx context.Context, auth *ty
 }
 
 func (aS *userService) ArchiveUserFromProject(ctx context.Context, auth *types.Authentication, userId uint64, projectId uint64) error {
-	_, authErr := auth.Scope(types.AuthTypeUser)
-	if authErr != nil {
-		return authErr
-	}
 
 	db := aS.postgres.DB(ctx)
 	tx := db.Model(&internal_entity.UserProjectRole{}).
 		Where("user_auth_id = ? AND project_id = ? AND status IN ?", userId, projectId, []string{type_enums.RECORD_ACTIVE.String(), type_enums.RECORD_INVITED.String()}).
 		Updates(&internal_entity.UserProjectRole{
 			Mutable: gorm_models.Mutable{
-				Status: type_enums.RECORD_ARCHIEVE,
+				Status:           type_enums.RECORD_ARCHIEVE,
+				UpdatedActorType: auth.Actor().Type.String(),
+				UpdatedActorID:   auth.Actor().ID,
 			},
 		})
 	if tx.Error != nil {
@@ -612,14 +618,13 @@ func (aS *userService) GetUser(ctx context.Context, userId uint64) (*internal_en
 }
 
 func (aS *userService) UpdateUser(ctx context.Context, auth *types.Authentication, userId uint64, name *string) (*internal_entity.UserAuth, error) {
-	_, authErr := auth.Scope(types.AuthTypeUser)
-	if authErr != nil {
-		return nil, authErr
-	}
 
 	db := aS.postgres.DB(ctx)
 	user := &internal_entity.UserAuth{
-		Mutable: gorm_models.Mutable{},
+		Mutable: gorm_models.Mutable{
+			UpdatedActorType: auth.Actor().Type.String(),
+			UpdatedActorID:   auth.Actor().ID,
+		},
 	}
 	if name != nil {
 		user.Name = *name
@@ -634,17 +639,15 @@ func (aS *userService) UpdateUser(ctx context.Context, auth *types.Authenticatio
 }
 
 func (aS *userService) UpdateUserStatus(ctx context.Context, auth *types.Authentication, userId uint64, status type_enums.RecordState) error {
-	_, authErr := auth.Scope(types.AuthTypeUser)
-	if authErr != nil {
-		return authErr
-	}
 
 	db := aS.postgres.DB(ctx)
 	tx := db.Model(&internal_entity.UserAuth{}).
 		Where("id = ?", userId).
 		Updates(&internal_entity.UserAuth{
 			Mutable: gorm_models.Mutable{
-				Status: status,
+				Status:           status,
+				UpdatedActorType: auth.Actor().Type.String(),
+				UpdatedActorID:   auth.Actor().ID,
 			},
 		})
 	if tx.Error != nil {
@@ -691,11 +694,15 @@ func (aS *userService) GetUsers(ctx context.Context, uIds []uint64, limit uint32
 	return u, nil
 }
 
-func (aS *userService) UpdatePassword(ctx context.Context, userId uint64, password string) (*internal_entity.UserAuth, error) {
+func (aS *userService) UpdatePassword(ctx context.Context, auth *types.Authentication, userId uint64, password string) (*internal_entity.UserAuth, error) {
 	db := aS.postgres.DB(ctx)
 	user := &internal_entity.UserAuth{
 		Mutable:  gorm_models.Mutable{},
 		Password: ciphers.Hash(password),
+	}
+	if auth != nil {
+		user.UpdatedActorType = auth.Actor().Type.String()
+		user.UpdatedActorID = auth.Actor().ID
 	}
 	tx := db.Where("id = ? ", userId).Updates(user)
 	if err := tx.Error; err != nil {

@@ -11,7 +11,6 @@ import (
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	gorm_model "github.com/rapidaai/pkg/models/gorm"
-	"github.com/rapidaai/pkg/types"
 )
 
 func TestAssistantConfigurationRestAllowsProjectScope(t *testing.T) {
@@ -51,10 +50,12 @@ func TestAssistantConfigurationRestAllowsProjectScope(t *testing.T) {
 func TestAssistantConfigurationOpenAPIIncludesAuditActors(t *testing.T) {
 	configuration := &internal_assistant_entity.AssistantConfiguration{
 		Audited: gorm_model.Audited{Id: 17},
-		Mutable: gorm_model.Mutable{ActorAudit: gorm_model.ActorAudit{
-			CreatedActor: &types.ActorIdentity{Type: types.ActorTypeService, ID: 41},
-			UpdatedActor: &types.ActorIdentity{Type: types.ActorTypeSystem, ID: 42},
-		}},
+		Mutable: gorm_model.Mutable{
+			CreatedActorType: "service",
+			CreatedActorID:   41,
+			UpdatedActorType: "system",
+			UpdatedActorID:   42,
+		},
 	}
 
 	result := assistantConfigurationOpenAPI(configuration)
@@ -69,9 +70,7 @@ func TestAssistantConfigurationOpenAPIIncludesAuditActors(t *testing.T) {
 
 func TestAssistantConfigurationOpenAPIOmitsInvalidAuditActor(t *testing.T) {
 	configuration := &internal_assistant_entity.AssistantConfiguration{
-		Mutable: gorm_model.Mutable{ActorAudit: gorm_model.ActorAudit{
-			CreatedActor: &types.ActorIdentity{Type: types.ActorTypeUnknown},
-		}},
+		Mutable: gorm_model.Mutable{CreatedActorType: "unknown"},
 	}
 
 	result := assistantConfigurationOpenAPI(configuration)

@@ -43,8 +43,8 @@ func TestOrganizationScopeRejectsMissingOrZeroContext(t *testing.T) {
 		if scope.IsAuthenticated() {
 			t.Fatal("IsAuthenticated() = true, want false")
 		}
-		if _, err := RequireOrganization(scope); err == nil {
-			t.Fatal("RequireOrganization() error = nil")
+		if _, ok := scope.OrganizationContext(); ok {
+			t.Fatal("OrganizationContext() ok = true")
 		}
 	}
 }

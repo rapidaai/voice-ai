@@ -1,0 +1,17 @@
+{
+  "status": "approved",
+  "reviewed_at": "2026-08-23",
+  "reviewer": "user",
+  "rfc_file": "rfcs/0008-explicit-audit-fields.md",
+  "decision": "approved",
+  "requirements": [
+    "Keep the model simple.",
+    "Populate CreatedActorType, CreatedActorID, UpdatedActorType, and UpdatedActorID explicitly at every create.",
+    "Populate updated actor columns explicitly at every update.",
+    "Remove audit_callbacks.go.",
+    "Remove audit_observability.go.",
+    "Remove RegisterAuditActorCallbacks from every service binary.",
+    "Remove hidden callback, hydration, and mutation behavior."
+  ],
+  "summary": "The user rejected the callback and hydration design and approved explicit audit column ownership at each database write site."
+}

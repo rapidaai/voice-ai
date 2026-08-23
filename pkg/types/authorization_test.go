@@ -7,8 +7,10 @@ import (
 )
 
 func TestAuthorize(t *testing.T) {
+	actor := ActorIdentity{Type: ActorTypeUser, ID: 1}
 	authentication := &Authentication{
 		AuthType:          AuthTypeUser,
+		ActorValue:        &actor,
 		UserValue:         &UserContext{UserID: 1},
 		OrganizationValue: &OrganizationContext{OrganizationID: 2},
 	}
@@ -50,8 +52,8 @@ func TestAuthenticationScopeAndContexts(t *testing.T) {
 	if _, err := auth.Scope(); !errors.Is(err, ErrAuthenticationScopeNotAllowed) {
 		t.Fatalf("Scope() error = %v", err)
 	}
-	if value, err := auth.Actor(); err != nil || value != actor {
-		t.Fatalf("Actor() = %+v, %v", value, err)
+	if value := auth.Actor(); value != actor {
+		t.Fatalf("Actor() = %+v", value)
 	}
 	if value, err := auth.UserContext(); err != nil || value.UserID != 1 {
 		t.Fatalf("UserContext() = %+v, %v", value, err)
@@ -66,8 +68,10 @@ func TestAuthenticationScopeAndContexts(t *testing.T) {
 
 func TestAuthenticationUnavailableValues(t *testing.T) {
 	auth := &Authentication{AuthType: AuthTypeOrg}
+	if actor := auth.Actor(); actor != (ActorIdentity{}) {
+		t.Fatalf("Actor() = %+v, want zero value", actor)
+	}
 	for name, run := range map[string]func() error{
-		"actor":        func() error { _, err := auth.Actor(); return err },
 		"user":         func() error { _, err := auth.UserContext(); return err },
 		"organization": func() error { _, err := auth.OrganizationContext(); return err },
 		"project":      func() error { _, err := auth.ProjectContext(); return err },

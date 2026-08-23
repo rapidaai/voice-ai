@@ -113,7 +113,9 @@ func (s *assistantHTTPLogService) CreateLog(
 			OrganizationId: projectContext.OrganizationID,
 		},
 		Mutable: gorm_models.Mutable{
-			Status: status,
+			Status:           status,
+			CreatedActorType: auth.Actor().Type.String(),
+			CreatedActorID:   auth.Actor().ID,
 		},
 	}
 

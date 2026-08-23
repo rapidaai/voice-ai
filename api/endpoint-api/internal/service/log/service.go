@@ -59,11 +59,24 @@ func (els *endpointLogService) CreateEndpointLog(
 		},
 		Status: type_enums.RECORD_IN_PROGRESS,
 	}
-	tx := db.Clauses(clause.OnConflict{
+	tx := db.Model(&internal_gorm.EndpointLog{}).Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"updated_date"}),
-	}).Create(&endpointLog)
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"updated_actor_type": auth.Actor().Type.String(),
+			"updated_actor_id":   auth.Actor().ID,
+			"updated_date":       time.Now(),
+		}),
+	}).Create(map[string]interface{}{
+		"id":                         endpointLog.Id,
+		"source":                     endpointLog.Source,
+		"endpoint_id":                endpointLog.EndpointId,
+		"endpoint_provider_model_id": endpointLog.EndpointProviderModelId,
+		"project_id":                 endpointLog.ProjectId,
+		"organization_id":            endpointLog.OrganizationId,
+		"status":                     endpointLog.Status,
+		"created_actor_type":         auth.Actor().Type.String(),
+		"created_actor_id":           auth.Actor().ID,
+	})
 	if tx.Error != nil {
 		return nil, tx.Error
 	}
@@ -103,13 +116,14 @@ func (els *endpointLogService) UpdateEndpointLog(
 		Status:    type_enums.RECORD_COMPLETE,
 		TimeTaken: timeTaken,
 	}
-	tx := db.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"time_taken",
-			"status",
-			"updated_date"}),
-	}).Create(&endpointLog)
+	tx := db.Model(&internal_gorm.EndpointLog{}).
+		Where("id = ? AND project_id = ? AND organization_id = ?", logId, projectContext.ProjectID, projectContext.OrganizationID).
+		Updates(map[string]interface{}{
+			"time_taken":         endpointLog.TimeTaken,
+			"status":             endpointLog.Status,
+			"updated_actor_type": auth.Actor().Type.String(),
+			"updated_actor_id":   auth.Actor().ID,
+		})
 	if tx.Error != nil {
 		return nil, tx.Error
 	}
@@ -137,6 +151,10 @@ func (els *endpointLogService) ApplyMetadata(
 	for k, mt := range metadata {
 		_meta := &internal_gorm.EndpointLogMetadata{
 			EndpointLogId: logId,
+			Mutable: gorm_models.Mutable{
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
+			},
 			Metadata: gorm_models.Metadata{
 				Key: k,
 			},
@@ -147,9 +165,10 @@ func (els *endpointLogService) ApplyMetadata(
 
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "endpoint_log_id"}, {Name: "key"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"value",
-			"updated_date"}),
+		DoUpdates: append(clause.AssignmentColumns([]string{"value", "updated_date"}),
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+		),
 	}).Create(&_metadatas)
 	if tx.Error != nil {
 		els.logger.Benchmark("els.ApplyMetadata", time.Since(start))
@@ -169,12 +188,15 @@ func (els *endpointLogService) ApplyOption(ctx context.Context,
 		els.logger.Warnf("error while updating options, empty set of options found")
 		return nil, nil
 	}
-
 	db := els.postgres.DB(ctx)
 	options := make([]*internal_gorm.EndpointLogOption, 0)
 	for k, o := range opts {
 		option := &internal_gorm.EndpointLogOption{
 			EndpointLogId: logId,
+			Mutable: gorm_models.Mutable{
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
+			},
 			Metadata: gorm_models.Metadata{
 				Key: k,
 			},
@@ -185,9 +207,10 @@ func (els *endpointLogService) ApplyOption(ctx context.Context,
 
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "endpoint_log_id"}, {Name: "key"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"value",
-			"updated_date"}),
+		DoUpdates: append(clause.AssignmentColumns([]string{"value", "updated_date"}),
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+		),
 	}).Create(&options)
 	if tx.Error != nil {
 		els.logger.Benchmark("els.ApplyOption", time.Since(start))
@@ -209,12 +232,15 @@ func (els *endpointLogService) ApplyArgument(ctx context.Context,
 		els.logger.Warnf("error while updating arguments, empty set of argument found")
 		return nil, nil
 	}
-
 	db := els.postgres.DB(ctx)
 	_arguments := make([]*internal_gorm.EndpointLogArgument, 0)
 	for k, arg := range arguments {
 		ag := &internal_gorm.EndpointLogArgument{
 			EndpointLogId: logId,
+			Mutable: gorm_models.Mutable{
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
+			},
 			Argument: gorm_models.Argument{
 				Name: k,
 			},
@@ -225,9 +251,10 @@ func (els *endpointLogService) ApplyArgument(ctx context.Context,
 
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "endpoint_log_id"}, {Name: "name"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"value",
-			"updated_date"}),
+		DoUpdates: append(clause.AssignmentColumns([]string{"value", "updated_date"}),
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+		),
 	}).Create(&_arguments)
 	if tx.Error != nil {
 		els.logger.Benchmark("els.ApplyArgument", time.Since(start))
@@ -255,6 +282,10 @@ func (els *endpointLogService) ApplyMetrics(
 	mtrs := make([]*internal_gorm.EndpointLogMetric, 0)
 	for _, mtr := range metrics {
 		_mtr := &internal_gorm.EndpointLogMetric{
+			Mutable: gorm_models.Mutable{
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
+			},
 			Metric: gorm_models.Metric{
 				Name:        mtr.GetName(),
 				Value:       mtr.GetValue(),
@@ -268,9 +299,10 @@ func (els *endpointLogService) ApplyMetrics(
 
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "endpoint_log_id"}, {Name: "name"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"value", "description",
-			"updated_date"}),
+		DoUpdates: append(clause.AssignmentColumns([]string{"value", "description", "updated_date"}),
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+		),
 	}).Create(&mtrs)
 	if tx.Error != nil {
 		els.logger.Benchmark("els.ApplyMetrics", time.Since(start))

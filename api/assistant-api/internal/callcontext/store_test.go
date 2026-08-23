@@ -572,9 +572,9 @@ func TestStoreAuthenticationSnapshotRoundTripDoesNotWriteLegacyToken(t *testing.
 	if err != nil || userContext.UserID != math.MaxInt64 {
 		t.Fatalf("UserContext() = %+v, %v", userContext, err)
 	}
-	actor, err := reconstructed.Actor()
-	if err != nil || actor.ID != math.MaxInt64 {
-		t.Fatalf("Actor() = %+v, %v", actor, err)
+	actor := reconstructed.Actor()
+	if actor.ID != math.MaxInt64 {
+		t.Fatalf("Actor() = %+v", actor)
 	}
 	var authToken string
 	testStore := store.(*postgresStore)

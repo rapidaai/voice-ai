@@ -65,20 +65,16 @@ func (oS *organizationService) Claim(ctx context.Context, claimToken string) (*t
 }
 
 func (oS *organizationService) Create(ctx context.Context, auth *types.Authentication, name string, size string, industry string) (*internal_entity.Organization, error) {
-	actor, err := authenticatedUserActor(auth)
-	if err != nil {
-		return nil, err
-	}
-	mutable := gorm_models.Mutable{Status: type_enums.RECORD_ACTIVE}
-	if err := mutable.SetCreatedActor(actor); err != nil {
-		return nil, err
-	}
 	db := oS.postgres.DB(ctx)
 	org := &internal_entity.Organization{
 		Name:     name,
 		Industry: industry,
 		Size:     size,
-		Mutable:  mutable,
+		Mutable: gorm_models.Mutable{
+			Status:           type_enums.RECORD_ACTIVE,
+			CreatedActorType: auth.Actor().Type.String(),
+			CreatedActorID:   auth.Actor().ID,
+		},
 	}
 	tx := db.Save(org)
 	if err := tx.Error; err != nil {
@@ -99,15 +95,11 @@ func (oS *organizationService) Get(ctx context.Context, organizationId uint64) (
 }
 
 func (oS *organizationService) Update(ctx context.Context, auth *types.Authentication, organizationId uint64, name *string, industry *string, email *string) (*internal_entity.Organization, error) {
-	actor, err := credentialActor(auth, organizationId)
-	if err != nil {
-		return nil, err
-	}
 	db := oS.postgres.DB(ctx)
 	updates := map[string]interface{}{
 		"status":             type_enums.RECORD_ACTIVE,
-		"updated_actor_type": string(actor.Type),
-		"updated_actor_id":   actor.ID,
+		"updated_actor_type": auth.Actor().Type.String(),
+		"updated_actor_id":   auth.Actor().ID,
 		"updated_date":       time.Now(),
 	}
 
@@ -133,10 +125,6 @@ func (oS *organizationService) CreateCredential(ctx context.Context, auth *types
 	if organizationId == 0 || organizationId > math.MaxInt64 || strings.TrimSpace(name) == "" {
 		return nil, "", errors.New("organization credential requires a valid organization and name")
 	}
-	actor, err := credentialActor(auth, organizationId)
-	if err != nil {
-		return nil, "", err
-	}
 	rawKey := types.ORG_KEY_PREFIX + ciphers.Token("organization")
 	fingerprint, err := oS.fingerprint(rawKey)
 	if err != nil {
@@ -146,10 +134,6 @@ func (oS *organizationService) CreateCredential(ctx context.Context, auth *types
 	if credentialID == 0 || credentialID > math.MaxInt64 {
 		return nil, "", errors.New("organization credential generated an invalid id")
 	}
-	mutable := gorm_models.Mutable{Status: type_enums.RECORD_ACTIVE}
-	if err := mutable.SetCreatedActor(actor); err != nil {
-		return nil, "", err
-	}
 	credential := &internal_entity.OrganizationCredential{
 		Audited: gorm_models.Audited{
 			Id: credentialID,
@@ -157,7 +141,11 @@ func (oS *organizationService) CreateCredential(ctx context.Context, auth *types
 		OrganizationId: organizationId,
 		Name:           strings.TrimSpace(name),
 		Key:            fingerprint,
-		Mutable:        mutable,
+		Mutable: gorm_models.Mutable{
+			Status:           type_enums.RECORD_ACTIVE,
+			CreatedActorType: auth.Actor().Type.String(),
+			CreatedActorID:   auth.Actor().ID,
+		},
 	}
 	if err := oS.postgres.DB(ctx).Create(credential).Error; err != nil {
 		return nil, "", err
@@ -167,10 +155,6 @@ func (oS *organizationService) CreateCredential(ctx context.Context, auth *types
 
 func (oS *organizationService) RotateCredential(ctx context.Context, auth *types.Authentication, organizationId, credentialId uint64) (*internal_entity.OrganizationCredential, string, error) {
 	if err := validCredentialIdentity(organizationId, credentialId); err != nil {
-		return nil, "", err
-	}
-	actor, err := credentialActor(auth, organizationId)
-	if err != nil {
 		return nil, "", err
 	}
 	rawKey := types.ORG_KEY_PREFIX + ciphers.Token("organization")
@@ -183,8 +167,8 @@ func (oS *organizationService) RotateCredential(ctx context.Context, auth *types
 		Where("id = ? AND organization_id = ? AND status = ?", credentialId, organizationId, type_enums.RECORD_ACTIVE).
 		Updates(map[string]interface{}{
 			"key":                fingerprint,
-			"updated_actor_type": string(actor.Type),
-			"updated_actor_id":   actor.ID,
+			"updated_actor_type": auth.Actor().Type.String(),
+			"updated_actor_id":   auth.Actor().ID,
 			"updated_date":       time.Now(),
 		})
 	if tx.Error != nil {
@@ -203,10 +187,6 @@ func (oS *organizationService) ArchiveCredential(ctx context.Context, auth *type
 	if err := validCredentialIdentity(organizationId, credentialId); err != nil {
 		return nil, err
 	}
-	actor, err := credentialActor(auth, organizationId)
-	if err != nil {
-		return nil, err
-	}
 	now := time.Now()
 	credential := &internal_entity.OrganizationCredential{}
 	tx := oS.postgres.DB(ctx).Model(credential).
@@ -214,8 +194,8 @@ func (oS *organizationService) ArchiveCredential(ctx context.Context, auth *type
 		Updates(map[string]interface{}{
 			"status":             type_enums.RECORD_ARCHIEVE,
 			"archived_date":      now,
-			"updated_actor_type": string(actor.Type),
-			"updated_actor_id":   actor.ID,
+			"updated_actor_type": auth.Actor().Type.String(),
+			"updated_actor_id":   auth.Actor().ID,
 			"updated_date":       now,
 		})
 	if tx.Error != nil {
@@ -237,39 +217,6 @@ func (oS *organizationService) fingerprint(rawKey string) (string, error) {
 	mac := hmac.New(sha256.New, oS.fingerprintKey)
 	_, _ = mac.Write([]byte(rawKey))
 	return hex.EncodeToString(mac.Sum(nil)), nil
-}
-
-func credentialActor(auth *types.Authentication, organizationId uint64) (types.ActorIdentity, error) {
-	actor, err := authenticatedUserActor(auth)
-	if err != nil {
-		return types.ActorIdentity{}, err
-	}
-	organizationContext, err := auth.OrganizationContext()
-	if err != nil {
-		return types.ActorIdentity{}, err
-	}
-	if organizationContext.OrganizationID != organizationId {
-		return types.ActorIdentity{}, errors.New("organization credential scope does not match authentication organization")
-	}
-	return actor, nil
-}
-
-func authenticatedUserActor(auth *types.Authentication) (types.ActorIdentity, error) {
-	if auth == nil {
-		return types.ActorIdentity{}, types.ErrActorUnavailable
-	}
-	if _, err := auth.Scope(types.AuthTypeUser); err != nil {
-		return types.ActorIdentity{}, err
-	}
-	actor, err := auth.Actor()
-	if err != nil {
-		return types.ActorIdentity{}, err
-	}
-	userContext, err := auth.UserContext()
-	if err != nil || userContext.UserID != actor.ID {
-		return types.ActorIdentity{}, types.ErrActorUnavailable
-	}
-	return actor, nil
 }
 
 func validCredentialIdentity(organizationId, credentialId uint64) error {

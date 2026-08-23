@@ -35,7 +35,6 @@ import (
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/middlewares"
-	gorm_models "github.com/rapidaai/pkg/models/gorm"
 )
 
 // wrapper for gin engine
@@ -221,9 +220,6 @@ func (app *AppRunner) Init(ctx context.Context) error {
 	err := app.Postgres.Connect(ctx)
 	if err != nil {
 		app.Logger.Error("error while connecting to postgres.", err)
-		return err
-	}
-	if err := gorm_models.RegisterAuditActorCallbacks(app.Postgres.DB(ctx)); err != nil {
 		return err
 	}
 	err = app.Redis.Connect(ctx)

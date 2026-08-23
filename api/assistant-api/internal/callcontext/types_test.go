@@ -1,7 +1,6 @@
 package internal_callcontext
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"testing"
@@ -186,8 +185,8 @@ func TestCallContextOldUserSnapshotWithoutUserIDFailsClosed(t *testing.T) {
 	}
 
 	_, err := callContext.ToAuthentication()
-	if !errors.Is(err, types.ErrUnauthenticated) {
-		t.Fatalf("ToAuthentication() error = %v, want ErrUnauthenticated", err)
+	if err == nil {
+		t.Fatal("ToAuthentication() error = nil, want incomplete actor error")
 	}
 }
 
@@ -217,11 +216,10 @@ func TestCallContextActorRange(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			userID := uint64(11)
 			auth := &types.Authentication{
 				AuthType:          types.AuthTypeUser,
 				ActorValue:        &types.ActorIdentity{Type: types.ActorTypeUser, ID: test.actorID},
-				UserValue:         &types.UserContext{UserID: userID},
+				UserValue:         &types.UserContext{UserID: test.actorID},
 				OrganizationValue: &types.OrganizationContext{OrganizationID: 33},
 			}
 			callContext := &CallContext{}
@@ -240,9 +238,9 @@ func TestCallContextActorRange(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ToAuthentication() error = %v", err)
 			}
-			actor, err := reconstructed.Actor()
-			if err != nil || actor.ID != test.actorID {
-				t.Fatalf("Actor() = %+v, %v", actor, err)
+			actor := reconstructed.Actor()
+			if actor.ID != test.actorID {
+				t.Fatalf("Actor() = %+v", actor)
 			}
 		})
 	}

@@ -150,13 +150,17 @@ func assertEndpointExplicitAuthenticationPattern(t *testing.T, fileSet *token.Fi
 
 func TestEndpointRPCAuthenticationErrors(t *testing.T) {
 	organizationID := uint64(2)
+	userActor := types.ActorIdentity{Type: types.ActorTypeUser, ID: 1}
+	organizationActor := types.ActorIdentity{Type: types.ActorTypeOrganization, ID: 3}
 	projectlessUserContext := context.WithValue(context.Background(), types.CTX_, &types.Authentication{
 		AuthType:          types.AuthTypeUser,
+		ActorValue:        &userActor,
 		UserValue:         &types.UserContext{UserID: 1},
 		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 	})
 	organizationContext := context.WithValue(context.Background(), types.CTX_, &types.Authentication{
 		AuthType:          types.AuthTypeOrg,
+		ActorValue:        &organizationActor,
 		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 	})
 
@@ -218,8 +222,10 @@ func TestEndpointRPCAuthenticationErrors(t *testing.T) {
 
 func TestOrganizationInvokeUsesPublicEndpointLookupPolicy(t *testing.T) {
 	organizationID := uint64(2)
+	actor := types.ActorIdentity{Type: types.ActorTypeOrganization, ID: 3}
 	ctx := context.WithValue(context.Background(), types.CTX_, &types.Authentication{
 		AuthType:          types.AuthTypeOrg,
+		ActorValue:        &actor,
 		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 	})
 	endpointService := &endpointLookupStub{}

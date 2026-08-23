@@ -138,7 +138,7 @@ func (webAuthApi *webAuthRPCApi) RegisterUser(c *gin.Context) {
 	cUser, err := webAuthApi.userService.Get(c, irRequest.Email)
 	if err != nil {
 		webAuthApi.logger.Debug("registering new user into the system.")
-		aUser, err := webAuthApi.userService.Create(c, irRequest.Name, irRequest.Email, irRequest.Password, type_enums.RECORD_ACTIVE, &source)
+		aUser, err := webAuthApi.userService.Create(c, nil, irRequest.Name, irRequest.Email, irRequest.Password, type_enums.RECORD_ACTIVE, &source)
 		if err != nil {
 			webAuthApi.logger.Errorf("registering new user failed with err %v", err)
 			c.JSON(500, commons.Response{
@@ -176,7 +176,7 @@ func (webAuthApi *webAuthRPCApi) RegisterUser(c *gin.Context) {
 	// if it's invited user then
 	if cUser.Status == type_enums.RECORD_INVITED {
 		// password need to fix
-		_, err := webAuthApi.userService.UpdatePassword(c, cUser.Id, irRequest.Password)
+		_, err := webAuthApi.userService.UpdatePassword(c, nil, cUser.Id, irRequest.Password)
 		if err != nil {
 			c.JSON(500, commons.Response{
 				Code:    500,
@@ -287,7 +287,7 @@ func (wAuthApi *webAuthGRPCApi) RegisterUser(c context.Context, irRequest *proto
 	cUser, err := wAuthApi.userService.Get(c, irRequest.Email)
 	source := "direct"
 	if err != nil {
-		aUser, err := wAuthApi.userService.Create(c, irRequest.Name, irRequest.Email, irRequest.GetPassword(), type_enums.RECORD_ACTIVE, &source)
+		aUser, err := wAuthApi.userService.Create(c, nil, irRequest.Name, irRequest.Email, irRequest.GetPassword(), type_enums.RECORD_ACTIVE, &source)
 		if err != nil {
 			wAuthApi.logger.Errorf("creation user failed with err %v", err)
 			return &protos.AuthenticateResponse{
@@ -333,7 +333,7 @@ func (wAuthApi *webAuthGRPCApi) RegisterUser(c context.Context, irRequest *proto
 	}
 	// if it's invited user then
 	if cUser.Status == type_enums.RECORD_INVITED {
-		_, err := wAuthApi.userService.UpdatePassword(c, cUser.Id, irRequest.GetPassword())
+		_, err := wAuthApi.userService.UpdatePassword(c, nil, cUser.Id, irRequest.GetPassword())
 		if err != nil {
 			wAuthApi.logger.Errorf("Error while updaing password for user %v", err)
 			return &protos.AuthenticateResponse{
@@ -501,7 +501,7 @@ func (wAuthApi *webAuthGRPCApi) ChangePassword(c context.Context, irRequest *pro
 			}}, nil
 	}
 
-	_, err = wAuthApi.userService.UpdatePassword(c, userContext.UserID, irRequest.GetPassword())
+	_, err = wAuthApi.userService.UpdatePassword(c, iAuth, userContext.UserID, irRequest.GetPassword())
 	if err != nil {
 		wAuthApi.logger.Errorf("unable to change password for user failed %v", err)
 		return &protos.ChangePasswordResponse{
@@ -533,7 +533,7 @@ func (wAuthApi *webAuthGRPCApi) CreatePassword(c context.Context, irRequest *pro
 			}}, nil
 	}
 
-	_, err = wAuthApi.userService.UpdatePassword(c, token.UserAuthId, irRequest.GetPassword())
+	_, err = wAuthApi.userService.UpdatePassword(c, nil, token.UserAuthId, irRequest.GetPassword())
 	if err != nil {
 		wAuthApi.logger.Errorf("unable to change password for user failed %v", err)
 		return &protos.CreatePasswordResponse{
@@ -609,14 +609,8 @@ func (wAuthApi *webAuthGRPCApi) ScopeAuthorize(c context.Context, irRequest *pro
 		}
 		response.OrganizationId = organizationContext.OrganizationID
 	}
-	actor, actorErr := iAuth.Actor()
-	if actorErr != nil {
-		return nil, status.Error(codes.PermissionDenied, actorErr.Error())
-	}
-	actorType := string(actor.Type)
-	actorID := strconv.FormatUint(actor.ID, 10)
-	response.ActorType = &actorType
-	response.ActorId = &actorID
+	response.ActorType = utils.Ptr(iAuth.Actor().Type.String())
+	response.ActorId = utils.Ptr(strconv.FormatUint(iAuth.Actor().ID, 10))
 	return &protos.ScopedAuthenticationResponse{Code: 200, Success: true, Data: response}, nil
 }
 
@@ -695,7 +689,7 @@ Oauth implementation block that will help us quickly login and sign up in our sy
 func (wAuthApi *webAuthApi) RegisterSocialUser(c context.Context, inf *internal_connects.OpenID) (*protos.AuthenticateResponse, error) {
 	cUser, err := wAuthApi.userService.Get(c, inf.Email)
 	if err != nil {
-		aUser, err := wAuthApi.userService.Create(c, inf.Name, inf.Email, inf.Token, type_enums.RECORD_ACTIVE, &inf.Source)
+		aUser, err := wAuthApi.userService.Create(c, nil, inf.Name, inf.Email, inf.Token, type_enums.RECORD_ACTIVE, &inf.Source)
 		if err != nil {
 			return &protos.AuthenticateResponse{
 				Code:    400,

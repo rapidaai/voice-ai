@@ -420,6 +420,10 @@ func (conversationService *assistantConversationService) CreateConversation(
 		AssistantProviderModelId: assistantProviderModelId,
 		Source:                   source,
 		Direction:                direction,
+		Mutable: gorm_models.Mutable{
+			CreatedActorType: auth.Actor().Type.String(),
+			CreatedActorID:   auth.Actor().ID,
+		},
 	}
 	tx := db.Create(&conversation)
 	if tx.Error != nil {
@@ -456,6 +460,10 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 				Key: mt.Key,
 			},
 			AssistantId: assistantId,
+			Mutable: gorm_models.Mutable{
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
+			},
 		}
 		_meta.SetValue(mt.Value)
 		_metadatas = append(_metadatas, _meta)
@@ -463,9 +471,10 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "assistant_conversation_id"}, {Name: "key"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"value",
-			"updated_date"}),
+		DoUpdates: append(clause.AssignmentColumns([]string{"value", "updated_date"}),
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+		),
 	}).Create(&_metadatas)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.CreateOrUpdateConversationMetadata", time.Since(start))
@@ -497,6 +506,10 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 				Key: k,
 			},
 			AssistantId: assistantId,
+			Mutable: gorm_models.Mutable{
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
+			},
 		}
 		option.SetValue(o)
 		options = append(options, option)
@@ -504,9 +517,10 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "assistant_conversation_id"}, {Name: "key"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"value",
-			"updated_date"}),
+		DoUpdates: append(clause.AssignmentColumns([]string{"value", "updated_date"}),
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+		),
 	}).Create(&options)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.CreateOrUpdateConversationOptions", time.Since(start))
@@ -539,6 +553,10 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 			Argument: gorm_models.Argument{
 				Name: k,
 			},
+			Mutable: gorm_models.Mutable{
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
+			},
 		}
 		ag.SetValue(arg)
 		_arguments = append(_arguments, ag)
@@ -546,9 +564,10 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "assistant_conversation_id"}, {Name: "name"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"value",
-			"updated_date"}),
+		DoUpdates: append(clause.AssignmentColumns([]string{"value", "updated_date"}),
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+		),
 	}).Create(&_arguments)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.ApplyConversationArgument", time.Since(start))
@@ -585,6 +604,10 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 			},
 			AssistantConversationId: assistantConversationId,
 			AssistantId:             assistantId,
+			Mutable: gorm_models.Mutable{
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
+			},
 		}
 
 		mtrs = append(mtrs, _mtr)
@@ -592,9 +615,10 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "assistant_conversation_id"}, {Name: "name"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"value", "description",
-			"updated_date"}),
+		DoUpdates: append(clause.AssignmentColumns([]string{"value", "description", "updated_date"}),
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+		),
 	}).Create(&mtrs)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.CreateOrUpdateConversationMetrics", time.Since(start))
@@ -625,6 +649,10 @@ func (conversationService *assistantConversationService) CreateCustomConversatio
 			},
 			AssistantId:             assistantId,
 			AssistantConversationId: assistantConversationId,
+			Mutable: gorm_models.Mutable{
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
+			},
 		}
 
 		mtrx = append(mtrx, metric)
@@ -632,9 +660,10 @@ func (conversationService *assistantConversationService) CreateCustomConversatio
 
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "assistant_conversation_id"}, {Name: "name"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"value", "description",
-			"updated_date"}),
+		DoUpdates: append(clause.AssignmentColumns([]string{"value", "description", "updated_date"}),
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+		),
 	}).Create(&mtrx)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.CreateCustomConversationMetric", time.Since(start))
@@ -698,6 +727,10 @@ func (conversationService *assistantConversationService) CreateConversationRecor
 		AssistantRecordingUrl:    assistantKey,
 		UserRecordingUrl:         userKey,
 		ConversationRecordingUrl: conversationKey,
+		Mutable: gorm_models.Mutable{
+			CreatedActorType: auth.Actor().Type.String(),
+			CreatedActorID:   auth.Actor().ID,
+		},
 	}
 	tx := db.Create(&conversationRecording)
 	if tx.Error != nil {

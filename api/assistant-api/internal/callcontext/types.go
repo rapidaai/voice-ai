@@ -14,6 +14,7 @@ import (
 
 	gorm_generator "github.com/rapidaai/pkg/models/gorm/generators"
 	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/utils"
 	"gorm.io/gorm"
 )
 
@@ -100,18 +101,7 @@ func (cc *CallContext) SetAuthentication(auth *types.Authentication) error {
 	if auth == nil || !auth.IsAuthenticated() {
 		return types.ErrUnauthenticated
 	}
-	actor, err := auth.Actor()
-	if err != nil {
-		return err
-	}
-
 	cc.AuthType = auth.AuthType.String()
-	cc.AuthUserID = nil
-	cc.OrganizationID = 0
-	cc.ProjectID = 0
-	cc.AuthActorType = nil
-	cc.AuthActorID = nil
-
 	if userContext, err := auth.UserContext(); err == nil {
 		cc.AuthUserID = &userContext.UserID
 	}
@@ -121,9 +111,8 @@ func (cc *CallContext) SetAuthentication(auth *types.Authentication) error {
 	if projectContext, err := auth.ProjectContext(); err == nil {
 		cc.ProjectID = projectContext.ProjectID
 	}
-	actorType := string(actor.Type)
-	cc.AuthActorType = &actorType
-	cc.AuthActorID = &actor.ID
+	cc.AuthActorType = utils.Ptr(auth.Actor().Type.String())
+	cc.AuthActorID = utils.Ptr(auth.Actor().ID)
 	return nil
 }
 
@@ -142,10 +131,6 @@ func (cc *CallContext) ToAuthentication() (*types.Authentication, error) {
 	if cc.ProjectID != 0 {
 		auth.ProjectValue = &types.ProjectContext{OrganizationID: cc.OrganizationID, ProjectID: cc.ProjectID}
 	}
-	if !auth.IsAuthenticated() {
-		return nil, fmt.Errorf("call context authentication is invalid for auth type %q: %w", cc.AuthType, types.ErrUnauthenticated)
-	}
-
 	actorType := ""
 	if cc.AuthActorType != nil {
 		actorType = strings.TrimSpace(*cc.AuthActorType)
@@ -154,8 +139,8 @@ func (cc *CallContext) ToAuthentication() (*types.Authentication, error) {
 		return nil, errors.New("call context authentication actor is incomplete")
 	}
 	auth.ActorValue = &types.ActorIdentity{Type: types.ActorType(actorType), ID: *cc.AuthActorID}
-	if _, err := auth.Actor(); err != nil {
-		return nil, fmt.Errorf("call context authentication actor is invalid: %w", err)
+	if !auth.IsAuthenticated() {
+		return nil, fmt.Errorf("call context authentication is invalid for auth type %q: %w", cc.AuthType, types.ErrUnauthenticated)
 	}
 
 	return auth, nil

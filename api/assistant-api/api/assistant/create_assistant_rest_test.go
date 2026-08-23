@@ -38,8 +38,10 @@ func attachTestAuthentication(ginContext *gin.Context, auth *types.Authenticatio
 }
 
 func testUserAuthentication(userID, organizationID, projectID uint64) *types.Authentication {
+	actor := types.ActorIdentity{Type: types.ActorTypeUser, ID: userID}
 	auth := &types.Authentication{
 		AuthType:          types.AuthTypeUser,
+		ActorValue:        &actor,
 		UserValue:         &types.UserContext{UserID: userID},
 		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 	}

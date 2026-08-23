@@ -8,7 +8,6 @@ package types
 import (
 	"context"
 	"errors"
-	"math"
 
 	"github.com/gin-gonic/gin"
 )
@@ -65,7 +64,6 @@ var (
 	ErrUnauthenticated                    = errors.New("authentication required")
 	ErrAuthenticationScopeNotAllowed      = errors.New("authentication scope is not allowed")
 	ErrActorUnavailable                   = errors.New("actor identity is unavailable")
-	ErrCallerUnavailable                  = errors.New("caller identity is unavailable")
 	ErrUserContextUnavailable             = errors.New("user context is unavailable")
 	ErrOrganizationContextUnavailable     = errors.New("organization context is unavailable")
 	ErrProjectContextUnavailable          = errors.New("project context is unavailable")
@@ -86,24 +84,29 @@ type OrganizationContext struct {
 	OrganizationID uint64
 }
 
+type ProjectContext struct {
+	OrganizationID uint64
+	ProjectID      uint64
+}
+
 type Authentication struct {
-	AuthType          AuthType
-	ActorValue        *ActorIdentity
-	CallerValue       *ActorIdentity
+	AuthType   AuthType
+	ActorValue *ActorIdentity
+
 	UserValue         *UserContext
 	OrganizationValue *OrganizationContext
 	ProjectValue      *ProjectContext
 }
 
 func (auth *Authentication) IsAuthenticated() bool {
-	if auth == nil {
+	if auth == nil || auth.ActorValue == nil || auth.ActorValue.Validate() != nil || auth.ActorValue.Type != ActorType(auth.AuthType) {
 		return false
 	}
 	switch auth.AuthType {
 	case AuthTypeUser:
-		_, userErr := auth.UserContext()
+		user, userErr := auth.UserContext()
 		_, organizationErr := auth.OrganizationContext()
-		return userErr == nil && organizationErr == nil
+		return userErr == nil && organizationErr == nil && user.UserID == auth.ActorValue.ID
 	case AuthTypeProject:
 		_, projectErr := auth.ProjectContext()
 		return projectErr == nil
@@ -111,8 +114,7 @@ func (auth *Authentication) IsAuthenticated() bool {
 		_, organizationErr := auth.OrganizationContext()
 		return organizationErr == nil
 	case AuthTypeSystem:
-		_, actorErr := auth.Actor()
-		return actorErr == nil
+		return true
 	default:
 		return false
 	}
@@ -130,23 +132,11 @@ func (auth *Authentication) Scope(allowed ...AuthType) (*Authentication, error) 
 	}
 	return nil, ErrAuthenticationScopeNotAllowed
 }
-func (auth *Authentication) Actor() (ActorIdentity, error) {
-	if auth == nil || auth.ActorValue == nil || !auth.ActorValue.Type.isDurable() || auth.ActorValue.ID == 0 || auth.ActorValue.ID > math.MaxInt64 {
-		return ActorIdentity{}, ErrActorUnavailable
+func (auth *Authentication) Actor() ActorIdentity {
+	if auth == nil || auth.ActorValue == nil {
+		return ActorIdentity{}
 	}
-	if auth.ActorValue.Type != ActorType(auth.AuthType) {
-		return ActorIdentity{}, ErrActorUnavailable
-	}
-	return *auth.ActorValue, nil
-}
-func (auth *Authentication) Caller() (ActorIdentity, error) {
-	if auth == nil || auth.CallerValue == nil || auth.CallerValue.Type != ActorTypeService {
-		return ActorIdentity{}, ErrCallerUnavailable
-	}
-	if err := auth.CallerValue.Validate(); err != nil {
-		return ActorIdentity{}, ErrCallerUnavailable
-	}
-	return *auth.CallerValue, nil
+	return *auth.ActorValue
 }
 func (auth *Authentication) UserContext() (UserContext, error) {
 	if auth == nil || auth.UserValue == nil || auth.UserValue.UserID == 0 {

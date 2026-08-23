@@ -2,6 +2,7 @@ package internal_notification_service
 
 import (
 	"context"
+	"time"
 
 	"gorm.io/gorm/clause"
 
@@ -28,10 +29,6 @@ type notificationService struct {
 }
 
 func (oS *notificationService) UpdateNotificationSetting(ctx context.Context, auth *types.Authentication, authId uint64, settings []*protos.NotificationSetting) ([]*internal_entity.NotificationSetting, error) {
-	_, err := auth.Scope(types.AuthTypeUser)
-	if err != nil {
-		return nil, err
-	}
 	db := oS.postgres.DB(ctx)
 	nts := make([]*internal_entity.NotificationSetting, 0)
 	for _, st := range settings {
@@ -41,15 +38,20 @@ func (oS *notificationService) UpdateNotificationSetting(ctx context.Context, au
 			Enabled:    st.GetEnabled(),
 			UserAuthId: authId,
 			Mutable: gorm_models.Mutable{
-				Status: type_enums.RECORD_ACTIVE,
+				Status:           type_enums.RECORD_ACTIVE,
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
 			},
 		})
 	}
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "channel"}, {Name: "event_type"}, {Name: "user_auth_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"enabled",
-			"updated_date"}),
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"enabled":            clause.Expr{SQL: "excluded.enabled"},
+			"updated_actor_type": auth.Actor().Type.String(),
+			"updated_actor_id":   auth.Actor().ID,
+			"updated_date":       time.Now(),
+		}),
 	}).Save(nts)
 	if err := tx.Error; err != nil {
 		return nil, err

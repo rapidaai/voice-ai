@@ -118,15 +118,18 @@ func (ic *internalClient) WithHttpAuth(c context.Context, auth *types.Authentica
 }
 
 func (ic *internalClient) createServiceScopeToken(auth *types.Authentication) (string, error) {
-	if auth == nil {
-		return "", types.ErrUnauthenticated
+	if _, err := auth.Scope(
+		types.AuthTypeUser,
+		types.AuthTypeProject,
+		types.AuthTypeOrg,
+		types.AuthTypeService,
+		types.AuthTypeSystem,
+	); err != nil {
+		return "", err
 	}
 	organizationContext, err := auth.OrganizationContext()
 	if err != nil {
 		return "", err
-	}
-	if !auth.IsAuthenticated() {
-		return "", types.ErrUnauthenticated
 	}
 	delegatedContext := types.DelegatedContext{OrganizationID: organizationContext.OrganizationID}
 	if projectContext, projectErr := auth.ProjectContext(); projectErr == nil {
@@ -152,20 +155,19 @@ func (ic *internalClient) createServiceScopeToken(auth *types.Authentication) (s
 		Issuer:  ic.cfg.Name,
 		TTL:     5 * time.Minute,
 	}
-	sourceActor, actorErr := auth.Actor()
-	if actorErr != nil {
-		return "", actorErr
-	}
 	if auth.Type() == types.AuthTypeUser {
 		userContext, userErr := auth.UserContext()
 		if userErr != nil {
 			return "", userErr
 		}
-		if userContext.UserID != sourceActor.ID {
+		if userContext.UserID != auth.Actor().ID {
 			return "", types.ErrAuthenticationContextMismatch
 		}
 	}
-	assertion.DelegatedActor = &sourceActor
+	assertion.DelegatedActor = &types.ActorIdentity{
+		Type: auth.Actor().Type,
+		ID:   auth.Actor().ID,
+	}
 	return types.CreateServiceScopeToken(delegatedContext, assertion, ic.cfg.Secret)
 }
 

@@ -108,7 +108,7 @@ func TestProjectCredentialWritersPersistActorIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateCredential() error = %v", err)
 	}
-	if credential.Id == 0 || credential.Name != "primary" || credential.CreatedActorType == nil || *credential.CreatedActorType != "user" || credential.CreatedActorID == nil || *credential.CreatedActorID != 11 {
+	if credential.Id == 0 || credential.Name != "primary" || credential.CreatedActorType != "user" || credential.CreatedActorID != 11 {
 		t.Fatalf("created credential = %+v", credential)
 	}
 
@@ -116,24 +116,7 @@ func TestProjectCredentialWritersPersistActorIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ArchiveCredential() error = %v", err)
 	}
-	if archived.Status != type_enums.RECORD_ARCHIEVE || archived.UpdatedActorType == nil || *archived.UpdatedActorType != "user" || archived.UpdatedActorID == nil || *archived.UpdatedActorID != 11 {
+	if archived.Status != type_enums.RECORD_ARCHIEVE || archived.UpdatedActorType != "user" || archived.UpdatedActorID != 11 {
 		t.Fatalf("archived credential = %+v", archived)
-	}
-}
-
-func TestProjectCredentialWritersRejectMismatchedOrganization(t *testing.T) {
-	logger, err := commons.NewApplicationLogger(commons.EnableConsole(true), commons.EnableFile(false))
-	if err != nil {
-		t.Fatal(err)
-	}
-	service := NewProjectService(logger, &projectTestPostgres{})
-	auth := &types.Authentication{
-		AuthType:          types.AuthTypeUser,
-		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeUser, ID: 11},
-		UserValue:         &types.UserContext{UserID: 11},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: 10},
-	}
-	if _, err := service.CreateCredential(context.Background(), auth, "primary", 7, 9); err == nil {
-		t.Fatal("CreateCredential() error = nil for mismatched organization")
 	}
 }

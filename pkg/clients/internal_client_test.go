@@ -109,18 +109,20 @@ func TestInternalClientCreateServiceScopeToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Authentication() error = %v", err)
 	}
-	if effectiveActor, err := auth.Actor(); err != nil || effectiveActor != (types.ActorIdentity{Type: types.ActorTypeUser, ID: 5}) {
-		t.Fatalf("Actor() = %+v, %v", effectiveActor, err)
+	if effectiveActor := auth.Actor(); effectiveActor != (types.ActorIdentity{Type: types.ActorTypeUser, ID: 5}) {
+		t.Fatalf("Actor() = %+v", effectiveActor)
 	}
 }
 
 func TestInternalClientCreateServiceScopeTokenRequiresOrganization(t *testing.T) {
 	client := actorAwareInternalClient(t)
+	actor := types.ActorIdentity{Type: types.ActorTypeUser, ID: 5}
 	_, err := client.createServiceScopeToken(&types.Authentication{
-		AuthType:  types.AuthTypeUser,
-		UserValue: &types.UserContext{UserID: 5},
+		AuthType:   types.AuthTypeUser,
+		ActorValue: &actor,
+		UserValue:  &types.UserContext{UserID: 5},
 	})
-	if !errors.Is(err, types.ErrOrganizationContextUnavailable) {
+	if !errors.Is(err, types.ErrUnauthenticated) {
 		t.Fatalf("createServiceScopeToken() error = %v", err)
 	}
 }
@@ -177,8 +179,10 @@ func TestInternalClientCreateServiceScopeTokenRejectsMismatchedProjectOrganizati
 
 func TestInternalClientCreateServiceScopeTokenRequiresActorAndSecret(t *testing.T) {
 	client := actorAwareInternalClient(t)
+	actor := types.ActorIdentity{Type: types.ActorTypeOrganization, ID: 7}
 	authentication := &types.Authentication{
 		AuthType:          types.AuthTypeOrg,
+		ActorValue:        &actor,
 		OrganizationValue: &types.OrganizationContext{OrganizationID: 7},
 	}
 	client.cfg.ServiceID = 0
@@ -195,7 +199,7 @@ func TestInternalClientCreateServiceScopeTokenRequiresActorAndSecret(t *testing.
 func TestInternalClientWithAuthReturnsErrorWithoutContext(t *testing.T) {
 	client := actorAwareInternalClient(t)
 	authContext, err := client.WithAuth(context.Background(), &types.Authentication{})
-	if !errors.Is(err, types.ErrOrganizationContextUnavailable) {
+	if !errors.Is(err, types.ErrUnauthenticated) {
 		t.Fatalf("WithAuth() error = %v", err)
 	}
 	if authContext != nil {
@@ -226,8 +230,8 @@ func TestInternalClientWithAuthAddsServiceAssertion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Authentication() error = %v", err)
 	}
-	if forwardedActor, err := forwardedAuth.Actor(); err != nil || forwardedActor != actor {
-		t.Fatalf("Actor() = %+v, %v; want %+v", forwardedActor, err, actor)
+	if forwardedActor := forwardedAuth.Actor(); forwardedActor != actor {
+		t.Fatalf("Actor() = %+v; want %+v", forwardedActor, actor)
 	}
 }
 
@@ -310,11 +314,8 @@ func TestInternalClientMultiHopAuthentication(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if actor, err := secondAuth.Actor(); err != nil || actor != test.actor {
-				t.Fatalf("Actor() = %+v, %v; want %+v", actor, err, test.actor)
-			}
-			if caller, err := secondAuth.Caller(); err != nil || caller != (types.ActorIdentity{Type: types.ActorTypeService, ID: 42}) {
-				t.Fatalf("Caller() = %+v, %v", caller, err)
+			if actor := secondAuth.Actor(); actor != test.actor {
+				t.Fatalf("Actor() = %+v; want %+v", actor, test.actor)
 			}
 		})
 	}
@@ -340,11 +341,8 @@ func TestInternalClientMultiHopServiceAuthenticationRotatesCaller(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if actor, err := reconstructedAuth.Actor(); err != nil || actor != serviceActor {
-		t.Fatalf("first Actor() = %+v, %v", actor, err)
-	}
-	if caller, err := reconstructedAuth.Caller(); err != nil || caller != (types.ActorIdentity{Type: types.ActorTypeService, ID: 41}) {
-		t.Fatalf("first Caller() = %+v, %v", caller, err)
+	if actor := reconstructedAuth.Actor(); actor != serviceActor {
+		t.Fatalf("first Actor() = %+v", actor)
 	}
 	secondClient := &internalClient{cfg: &config.AppConfig{Name: "integration-api", ServiceID: 42, Secret: "secret"}}
 	secondToken, err := secondClient.createServiceScopeToken(reconstructedAuth)
@@ -359,11 +357,8 @@ func TestInternalClientMultiHopServiceAuthenticationRotatesCaller(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if actor, err := secondAuth.Actor(); err != nil || actor != serviceActor {
-		t.Fatalf("second Actor() = %+v, %v", actor, err)
-	}
-	if caller, err := secondAuth.Caller(); err != nil || caller != (types.ActorIdentity{Type: types.ActorTypeService, ID: 42}) {
-		t.Fatalf("second Caller() = %+v, %v", caller, err)
+	if actor := secondAuth.Actor(); actor != serviceActor {
+		t.Fatalf("second Actor() = %+v", actor)
 	}
 }
 
@@ -391,16 +386,16 @@ func assertDelegatedActor(t *testing.T, token, secret string, expected types.Act
 	if err != nil {
 		t.Fatalf("Authentication() error = %v", err)
 	}
-	actor, err := auth.Actor()
-	if err != nil || actor != expected {
-		t.Fatalf("Actor() = %+v, %v; want %+v", actor, err, expected)
+	actor := auth.Actor()
+	if actor != expected {
+		t.Fatalf("Actor() = %+v; want %+v", actor, expected)
 	}
 }
 
 func TestInternalClientWithPlatformReturnsAuthError(t *testing.T) {
 	client := actorAwareInternalClient(t)
 	authContext, err := client.WithPlatform(context.Background(), &types.Authentication{})
-	if !errors.Is(err, types.ErrOrganizationContextUnavailable) {
+	if !errors.Is(err, types.ErrUnauthenticated) {
 		t.Fatalf("WithPlatform() error = %v", err)
 	}
 	if authContext != nil {
@@ -415,7 +410,7 @@ func TestInternalClientWithHttpAuthDoesNotMutateRequestOnAuthError(t *testing.T)
 		t.Fatal(err)
 	}
 	authenticatedRequest, err := client.WithHttpAuth(context.Background(), &types.Authentication{}, request)
-	if !errors.Is(err, types.ErrOrganizationContextUnavailable) {
+	if !errors.Is(err, types.ErrUnauthenticated) {
 		t.Fatalf("WithHttpAuth() error = %v", err)
 	}
 	if authenticatedRequest != nil {

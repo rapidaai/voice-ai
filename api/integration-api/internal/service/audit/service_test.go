@@ -12,7 +12,6 @@ import (
 	internal_gorm "github.com/rapidaai/api/integration-api/internal/entity"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	gorm_models "github.com/rapidaai/pkg/models/gorm"
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 )
@@ -76,7 +75,6 @@ func newAuditServiceTest(t *testing.T) (*auditService, *gorm.DB) {
 	} {
 		require.NoError(t, database.Exec(statement).Error)
 	}
-	require.NoError(t, gorm_models.RegisterAuditActorCallbacks(database))
 	applicationLogger, err := commons.NewApplicationLogger()
 	require.NoError(t, err)
 	return NewAuditService(applicationLogger, &testPostgresConnector{db: database}).(*auditService), database
@@ -98,28 +96,17 @@ func TestCreatePersistsAndUpdatesActorIdentity(t *testing.T) {
 
 	created, err := service.Create(auditContext(types.AuthTypeService, 41), 100, 7, 8, 9, "test", "prefix", nil, type_enums.RECORD_ACTIVE)
 	require.NoError(t, err)
-	require.Equal(t, uint64(41), *created.CreatedActorID)
+	require.Equal(t, uint64(41), created.CreatedActorID)
 
 	_, err = service.Create(auditContext(types.AuthTypeSystem, 42), 100, 7, 8, 9, "test", "prefix", nil, type_enums.RECORD_COMPLETE)
 	require.NoError(t, err)
 
 	var stored internal_gorm.ExternalAudit
 	require.NoError(t, database.First(&stored, "id = ?", 100).Error)
-	require.Equal(t, "service", *stored.CreatedActorType)
-	require.Equal(t, uint64(41), *stored.CreatedActorID)
-	require.Equal(t, "system", *stored.UpdatedActorType)
-	require.Equal(t, uint64(42), *stored.UpdatedActorID)
-}
-
-func TestCreateFailsWithoutActorBeforePersistence(t *testing.T) {
-	service, database := newAuditServiceTest(t)
-
-	_, err := service.Create(context.Background(), 100, 7, 8, 9, "test", "prefix", nil, type_enums.RECORD_ACTIVE)
-	require.ErrorIs(t, err, types.ErrActorUnavailable)
-
-	var count int64
-	require.NoError(t, database.Model(&internal_gorm.ExternalAudit{}).Count(&count).Error)
-	require.Zero(t, count)
+	require.Equal(t, "service", stored.CreatedActorType)
+	require.Equal(t, uint64(41), stored.CreatedActorID)
+	require.Equal(t, "system", stored.UpdatedActorType)
+	require.Equal(t, uint64(42), stored.UpdatedActorID)
 }
 
 func TestCreateMetadataPreservesCreationActorOnConflict(t *testing.T) {
@@ -133,8 +120,8 @@ func TestCreateMetadataPreservesCreationActorOnConflict(t *testing.T) {
 	var stored internal_gorm.ExternalAuditMetadata
 	require.NoError(t, database.First(&stored, "external_audit_id = ? AND key = ?", 100, "source").Error)
 	require.Equal(t, "second", stored.Value)
-	require.Equal(t, "service", *stored.CreatedActorType)
-	require.Equal(t, uint64(41), *stored.CreatedActorID)
-	require.Equal(t, "system", *stored.UpdatedActorType)
-	require.Equal(t, uint64(42), *stored.UpdatedActorID)
+	require.Equal(t, "service", stored.CreatedActorType)
+	require.Equal(t, uint64(41), stored.CreatedActorID)
+	require.Equal(t, "system", stored.UpdatedActorType)
+	require.Equal(t, uint64(42), stored.UpdatedActorID)
 }

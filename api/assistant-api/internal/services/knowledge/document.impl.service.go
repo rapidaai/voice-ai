@@ -139,9 +139,6 @@ func (knowledgeDocument *knowledgeDocumentService) CreateToolDocument(ctx contex
 	documentStructure string,
 	contents []*protos.DocumentContent,
 ) ([]*internal_knowledge_gorm.KnowledgeDocument, error) {
-	if _, err := auth.Actor(); err != nil {
-		return nil, err
-	}
 	projectContext, err := auth.ProjectContext()
 	if err != nil {
 		return nil, err
@@ -150,6 +147,10 @@ func (knowledgeDocument *knowledgeDocumentService) CreateToolDocument(ctx contex
 	allKnowledge := make([]*internal_knowledge_gorm.KnowledgeDocument, 0)
 	for _, cntnt := range contents {
 		allKnowledge = append(allKnowledge, &internal_knowledge_gorm.KnowledgeDocument{
+			ActorAudit: gorm_models.ActorAudit{
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
+			},
 			KnowledgeId:       knowledge.Id,
 			Name:              cntnt.GetName(),
 			ProjectId:         projectContext.ProjectID,
@@ -184,14 +185,7 @@ func (knowledgeDocument *knowledgeDocumentService) CreateManualDocument(
 	documentStructure string,
 	contents []*protos.DocumentContent,
 ) ([]*internal_knowledge_gorm.KnowledgeDocument, error) {
-	if _, err := auth.Actor(); err != nil {
-		return nil, err
-	}
 	projectContext, err := auth.ProjectContext()
-	if err != nil {
-		return nil, err
-	}
-	actor, err := auth.Actor()
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +199,7 @@ func (knowledgeDocument *knowledgeDocumentService) CreateManualDocument(
 			fileName := fmt.Sprintf("%d/%d/%d_%s%s",
 				projectContext.OrganizationID,
 				projectContext.ProjectID,
-				actor.ID,
+				auth.Actor().ID,
 				ciphers.RandomHash(KNOWLEDGE_DOCUMENT_PREFIX), path.Ext(cntnt.GetName()))
 
 			fileContent := cntnt.GetContent()
@@ -223,6 +217,10 @@ func (knowledgeDocument *knowledgeDocumentService) CreateManualDocument(
 			}
 
 			allKnowledge = append(allKnowledge, &internal_knowledge_gorm.KnowledgeDocument{
+				ActorAudit: gorm_models.ActorAudit{
+					CreatedActorType: auth.Actor().Type.String(),
+					CreatedActorID:   auth.Actor().ID,
+				},
 				KnowledgeId:       knowledge.Id,
 				Name:              cntnt.GetName(),
 				ProjectId:         projectContext.ProjectID,
@@ -253,6 +251,10 @@ func (knowledgeDocument *knowledgeDocumentService) CreateManualDocument(
 			}
 
 			allKnowledge = append(allKnowledge, &internal_knowledge_gorm.KnowledgeDocument{
+				ActorAudit: gorm_models.ActorAudit{
+					CreatedActorType: auth.Actor().Type.String(),
+					CreatedActorID:   auth.Actor().ID,
+				},
 				KnowledgeId:       knowledge.Id,
 				Name:              cntnt.GetName(),
 				ProjectId:         projectContext.ProjectID,

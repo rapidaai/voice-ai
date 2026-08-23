@@ -34,10 +34,6 @@ type assistantToolService struct {
 
 // CreateAssistantTool implements internal_services.AssistantToolService.
 func (eService *assistantToolService) Create(ctx context.Context, auth *types.Authentication, assistantId uint64, name string, description *string, fields map[string]interface{}, executionMethod string, options []*protos.Metadata) (*internal_assistant_entity.AssistantTool, error) {
-	if _, err := auth.Actor(); err != nil {
-		return nil, err
-	}
-
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 
@@ -54,7 +50,10 @@ func (eService *assistantToolService) Create(ctx context.Context, auth *types.Au
 	}
 
 	aTool := &internal_assistant_entity.AssistantTool{
-		Mutable:         gorm_models.Mutable{},
+		Mutable: gorm_models.Mutable{
+			CreatedActorType: auth.Actor().Type.String(),
+			CreatedActorID:   auth.Actor().ID,
+		},
 		AssistantId:     assistantId,
 		Name:            name,
 		Description:     description,
@@ -86,7 +85,9 @@ func (eService *assistantToolService) Delete(ctx context.Context, auth *types.Au
 	db := eService.postgres.DB(ctx)
 	aK := &internal_assistant_entity.AssistantTool{
 		Mutable: gorm_models.Mutable{
-			Status: type_enums.RECORD_ARCHIEVE,
+			Status:           type_enums.RECORD_ARCHIEVE,
+			UpdatedActorType: auth.Actor().Type.String(),
+			UpdatedActorID:   auth.Actor().ID,
 		},
 	}
 	tx := db.Where("id = ? AND assistant_id = ? ",
@@ -176,7 +177,10 @@ func (eService *assistantToolService) Update(ctx context.Context, auth *types.Au
 
 	//
 	aTool := &internal_assistant_entity.AssistantTool{
-		Mutable:         gorm_models.Mutable{},
+		Mutable: gorm_models.Mutable{
+			UpdatedActorType: auth.Actor().Type.String(),
+			UpdatedActorID:   auth.Actor().ID,
+		},
 		Name:            name,
 		Description:     description,
 		Fields:          fields,
@@ -219,7 +223,9 @@ func (eService *assistantToolService) markAllOptionsAsDeleted(
 	db := eService.postgres.DB(ctx)
 	tOptions := &internal_assistant_entity.AssistantToolOption{
 		Mutable: gorm_models.Mutable{
-			Status: type_enums.RECORD_ARCHIEVE,
+			Status:           type_enums.RECORD_ARCHIEVE,
+			UpdatedActorType: auth.Actor().Type.String(),
+			UpdatedActorID:   auth.Actor().ID,
 		},
 	}
 	tx := db.Where("assistant_tool_id = ? ",
@@ -252,7 +258,9 @@ func (eService *assistantToolService) CreateOrUpdateExecutionOption(
 				Value: mtr.GetValue(),
 			},
 			Mutable: gorm_models.Mutable{
-				Status: type_enums.RECORD_ACTIVE,
+				Status:           type_enums.RECORD_ACTIVE,
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
 			},
 			AssistantToolId: assistantToolId,
 		}
@@ -260,10 +268,13 @@ func (eService *assistantToolService) CreateOrUpdateExecutionOption(
 	}
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "key"}, {Name: "assistant_tool_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"status",
-			"value",
-			"updated_date"}),
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"status":             gorm.Expr("excluded.status"),
+			"value":              gorm.Expr("excluded.value"),
+			"updated_date":       gorm.Expr("CURRENT_TIMESTAMP"),
+			"updated_actor_type": auth.Actor().Type.String(),
+			"updated_actor_id":   auth.Actor().ID,
+		}),
 	}).Create(&mtrs)
 	if tx.Error != nil {
 		eService.logger.Benchmark("assistantService.CreateOrUpdateMetadata", time.Since(start))
@@ -322,7 +333,9 @@ func (eService *assistantToolService) CreateLog(
 			OrganizationId: projectContext.OrganizationID,
 		},
 		Mutable: gorm_models.Mutable{
-			Status: status,
+			Status:           status,
+			CreatedActorType: auth.Actor().Type.String(),
+			CreatedActorID:   auth.Actor().ID,
 		},
 	}
 	tx := db.Create(&toolLog)
@@ -356,8 +369,10 @@ func (eService *assistantToolService) UpdateLog(
 	})
 
 	tx := db.Model(&toolLog).Updates(map[string]interface{}{
-		"status":     status,
-		"time_taken": gorm.Expr("EXTRACT(EPOCH FROM (NOW() - created_date)) * 1000"),
+		"status":             status,
+		"time_taken":         gorm.Expr("EXTRACT(EPOCH FROM (NOW() - created_date)) * 1000"),
+		"updated_actor_type": auth.Actor().Type.String(),
+		"updated_actor_id":   auth.Actor().ID,
 	})
 	if tx.Error != nil {
 		eService.logger.Benchmark("eService.UpdateLog", time.Since(start))

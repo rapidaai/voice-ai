@@ -124,6 +124,7 @@ func newEndpointLogServiceTest(t *testing.T) (*endpointLogService, *gorm.DB) {
 func testAuth(userID, orgID, projectID uint64) *types.Authentication {
 	return &types.Authentication{
 		AuthType:          types.AuthTypeUser,
+		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeUser, ID: userID},
 		UserValue:         &types.UserContext{UserID: userID},
 		OrganizationValue: &types.OrganizationContext{OrganizationID: orgID},
 		ProjectValue:      &types.ProjectContext{OrganizationID: orgID, ProjectID: projectID},
@@ -150,6 +151,7 @@ func TestApplyMetadataAllowsProjectAuthWithoutFakeUser(t *testing.T) {
 	projectID := uint64(20)
 	auth := &types.Authentication{
 		AuthType:          types.AuthTypeProject,
+		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeProject, ID: projectID},
 		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
 	}
@@ -157,8 +159,10 @@ func TestApplyMetadataAllowsProjectAuthWithoutFakeUser(t *testing.T) {
 	metadata, err := service.ApplyMetadata(context.Background(), auth, 1, map[string]interface{}{"trace_id": "trace-1"})
 	require.NoError(t, err)
 	require.Len(t, metadata, 1)
-	require.Nil(t, metadata[0].CreatedActor)
-	require.Nil(t, metadata[0].UpdatedActor)
+	require.Equal(t, types.AuthTypeProject.String(), metadata[0].CreatedActorType)
+	require.Equal(t, projectID, metadata[0].CreatedActorID)
+	require.Empty(t, metadata[0].UpdatedActorType)
+	require.Zero(t, metadata[0].UpdatedActorID)
 }
 
 func TestGetEndpointLogPreloadsMetricsAndContext(t *testing.T) {

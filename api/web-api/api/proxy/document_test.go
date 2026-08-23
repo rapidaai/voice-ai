@@ -40,11 +40,13 @@ func documentProxyContext(auth *types.Authentication) context.Context {
 
 func TestIndexKnowledgeDocumentRejectsMissingProjectContext(t *testing.T) {
 	organizationID := uint64(11)
+	actor := types.ActorIdentity{Type: types.ActorTypeOrganization, ID: 31}
 	client := &fakeIndexerServiceClient{}
 	api := newDocumentProxyTest(t, client)
 
 	response, err := api.IndexKnowledgeDocument(documentProxyContext(&types.Authentication{
 		AuthType:          types.AuthTypeOrg,
+		ActorValue:        &actor,
 		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 	}), &protos.IndexKnowledgeDocumentRequest{})
 
@@ -59,8 +61,10 @@ func TestIndexKnowledgeDocumentRejectsMissingProjectContext(t *testing.T) {
 func TestIndexKnowledgeDocumentAcceptsProjectScope(t *testing.T) {
 	organizationID := uint64(11)
 	projectID := uint64(22)
+	actor := types.ActorIdentity{Type: types.ActorTypeProject, ID: 32}
 	auth := &types.Authentication{
 		AuthType:          types.AuthTypeProject,
+		ActorValue:        &actor,
 		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
 	}
@@ -80,8 +84,10 @@ func TestIndexKnowledgeDocumentAcceptsProjectScope(t *testing.T) {
 func TestIndexKnowledgeDocumentAcceptsDelegatedProjectContext(t *testing.T) {
 	organizationID := uint64(11)
 	projectID := uint64(22)
+	actor := types.ActorIdentity{Type: types.ActorTypeService, ID: 33}
 	auth := &types.Authentication{
 		AuthType:          types.AuthTypeService,
+		ActorValue:        &actor,
 		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
 	}

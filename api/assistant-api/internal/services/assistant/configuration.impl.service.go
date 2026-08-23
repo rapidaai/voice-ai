@@ -171,7 +171,9 @@ func (s *assistantConfigurationService) Create(
 			OrganizationId: projectContext.OrganizationID,
 		},
 		Mutable: gorm_models.Mutable{
-			Status: type_enums.RECORD_ACTIVE,
+			Status:           type_enums.RECORD_ACTIVE,
+			CreatedActorType: auth.Actor().Type.String(),
+			CreatedActorID:   auth.Actor().ID,
 		},
 	}
 
@@ -223,6 +225,8 @@ func (s *assistantConfigurationService) Update(
 			"configuration_type": internal_assistant_entity.AssistantConfigurationType(configurationType),
 			"provider":           provider,
 			"enabled":            enabled,
+			"updated_actor_type": auth.Actor().Type.String(),
+			"updated_actor_id":   auth.Actor().ID,
 		}
 		query := tx.WithContext(ctx).
 			Model(&internal_assistant_entity.AssistantConfiguration{}).
@@ -303,7 +307,9 @@ func (s *assistantConfigurationService) Delete(
 				type_enums.RECORD_ACTIVE,
 			).
 			Updates(map[string]interface{}{
-				"status": type_enums.RECORD_ARCHIEVE,
+				"status":             type_enums.RECORD_ARCHIEVE,
+				"updated_actor_type": auth.Actor().Type.String(),
+				"updated_actor_id":   auth.Actor().ID,
 			})
 		if query.Error != nil {
 			return query.Error
@@ -332,7 +338,9 @@ func (s *assistantConfigurationService) archiveOptions(
 		Model(&internal_assistant_entity.AssistantConfigurationOption{}).
 		Where("assistant_configuration_id = ? AND status = ?", configurationId, type_enums.RECORD_ACTIVE).
 		Updates(map[string]interface{}{
-			"status": type_enums.RECORD_ARCHIEVE,
+			"status":             type_enums.RECORD_ARCHIEVE,
+			"updated_actor_type": auth.Actor().Type.String(),
+			"updated_actor_id":   auth.Actor().ID,
 		}).Error
 }
 
@@ -356,7 +364,9 @@ func (s *assistantConfigurationService) createOptions(
 				Value: opt.GetValue(),
 			},
 			Mutable: gorm_models.Mutable{
-				Status: type_enums.RECORD_ACTIVE,
+				Status:           type_enums.RECORD_ACTIVE,
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
 			},
 		})
 	}
@@ -366,11 +376,14 @@ func (s *assistantConfigurationService) createOptions(
 			{Name: "key"},
 			{Name: "assistant_configuration_id"},
 		},
-		DoUpdates: clause.AssignmentColumns([]string{
+		DoUpdates: append(clause.AssignmentColumns([]string{
 			"value",
 			"status",
 			"updated_date",
 		}),
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+		),
 	}).Create(&out).Error; err != nil {
 		return nil, err
 	}

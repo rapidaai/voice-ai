@@ -122,6 +122,7 @@ func TestScopedAuthenticationActorFieldNumbers(t *testing.T) {
 func TestScopeAuthorizeRejectsWrongScope(t *testing.T) {
 	auth := &types.Authentication{
 		AuthType:          types.AuthTypeOrg,
+		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeOrganization, ID: 56},
 		OrganizationValue: &types.OrganizationContext{OrganizationID: 99},
 	}
 	ctx := context.WithValue(context.Background(), types.CTX_, auth)

@@ -1,0 +1,58 @@
+{
+  "rfc": "rfcs/0008-explicit-audit-fields.md",
+  "status": "proposed",
+  "created_at": "2026-08-23",
+  "problem": "Audit persistence has multiple owners and hidden context dependencies through global GORM callbacks.",
+  "acceptance_criteria": [
+    "No production code uses audit constructors, setters, update-map helpers, or actor hydration hooks.",
+    "Every audited create explicitly assigns created and updated actor type and ID columns.",
+    "Every audited update explicitly assigns updated actor type and ID columns.",
+    "No GORM audit callback remains registered.",
+    "Existing database and public API contracts remain compatible.",
+    "Missing or invalid actors fail before database execution.",
+    "Required tests and repository finalization pass."
+  ],
+  "allowed_paths": [
+    "pkg/models/gorm/",
+    "pkg/connectors/",
+    "cmd/assistant/assistant.go",
+    "cmd/endpoint/endpoint.go",
+    "cmd/integration/integration.go",
+    "cmd/web/web.go",
+    "api/assistant-api/internal/services/",
+    "api/endpoint-api/internal/service/",
+    "api/web-api/internal/service/",
+    "affected entity-to-protobuf conversion files",
+    "focused tests in changed packages",
+    "rfcs/0008-explicit-audit-fields/"
+  ],
+  "out_of_scope": [
+    "database migrations",
+    "generated protobuf and SDK files",
+    "unrelated authentication middleware",
+    "UI code"
+  ],
+  "risks": [
+    "A missed write site may persist null audit columns.",
+    "A missed update site may retain stale updated-actor values.",
+    "Removing hydration may break response conversion if a mapper still reads transient actor fields.",
+    "The migration cannot safely deploy partially after callback removal."
+  ],
+  "implementation_steps": [
+    "Inventory all creates and updates for models embedding Mutable.",
+    "Resolve actors from explicit authentication arguments at service boundaries.",
+    "Populate all create audit columns directly in model literals.",
+    "Populate update audit columns directly in update maps or models.",
+    "Convert response actors directly from persisted columns.",
+    "Remove callbacks, registration, hydration, and mutation helpers.",
+    "Run focused package tests and repository finalization."
+  ],
+  "verification_commands": [
+    "go test ./pkg/models/gorm ./pkg/connectors/...",
+    "go test ./api/assistant-api/internal/services/...",
+    "go test ./api/endpoint-api/internal/service/...",
+    "go test ./api/web-api/internal/service/...",
+    "make agent-finalize CHANGED_FILES=\"comma,separated,paths\""
+  ],
+  "rollback": "Revert the implementation commit as one unit. No database rollback is required."
+}

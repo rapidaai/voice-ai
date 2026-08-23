@@ -41,7 +41,8 @@ var _ VaultService = (*normalizedVaultService)(nil)
 func TestVaultServiceContractUsesNormalizedIdentityInputs(t *testing.T) {
 	service := &normalizedVaultService{}
 	projectContext := types.ProjectContext{OrganizationID: 11, ProjectID: 22}
-	auth := &types.Authentication{AuthType: types.AuthTypeUser}
+	actor := types.ActorIdentity{Type: types.ActorTypeUser, ID: 7}
+	auth := &types.Authentication{AuthType: types.AuthTypeUser, ActorValue: &actor}
 
 	if _, err := service.Create(context.Background(), auth, projectContext, "provider", "name", nil); err != nil {
 		t.Fatalf("Create() error = %v", err)

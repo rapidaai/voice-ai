@@ -5,6 +5,7 @@ package internal_audit_service
 
 import (
 	"context"
+	"time"
 
 	"gorm.io/gorm/clause"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
+	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 	integration_api "github.com/rapidaai/protos"
@@ -34,11 +36,16 @@ func NewAuditService(logger commons.Logger, postgres connectors.PostgresConnecto
 func (aS *auditService) Create(ctx context.Context,
 	requestId, organizationId, projectId, credentialId uint64, intName,
 	assetPrefix string, mertics []*protos.Metric, status type_enums.RecordState) (*internal_gorm.ExternalAudit, error) {
+	auth := ctx.Value(types.CTX_).(*types.Authentication)
 	db := aS.postgres.DB(ctx)
 
 	audit := &internal_gorm.ExternalAudit{
 		Audited: gorm_models.Audited{
 			Id: requestId,
+		},
+		ActorAudit: gorm_models.ActorAudit{
+			CreatedActorType: auth.Actor().Type.String(),
+			CreatedActorID:   auth.Actor().ID,
 		},
 		OrganizationId:  organizationId,
 		ProjectId:       projectId,
@@ -52,9 +59,14 @@ func (aS *auditService) Create(ctx context.Context,
 		audit.SetMetrics(mertics)
 	}
 
+	assignments := clause.AssignmentColumns([]string{"metrics", "response_status", "status", "time_taken", "updated_date"})
+	assignments = append(assignments,
+		clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
+		clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+	)
 	tx := db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"metrics", "response_status", "status", "time_taken", "updated_date", "updated_actor_type", "updated_actor_id"}),
+		DoUpdates: assignments,
 	}).Create(audit)
 	if tx.Error != nil {
 		aS.logger.Errorf("unable to insert into audit table %v", tx.Error)
@@ -65,6 +77,7 @@ func (aS *auditService) Create(ctx context.Context,
 
 func (aS *auditService) CreateMetadata(c context.Context, auditId uint64, metadata map[string]string) ([]*internal_gorm.ExternalAuditMetadata, error) {
 	if len(metadata) > 0 {
+		auth := c.Value(types.CTX_).(*types.Authentication)
 		db := aS.postgres.DB(c)
 		_metadata := make([]*internal_gorm.ExternalAuditMetadata, 0)
 		for k, v := range metadata {
@@ -72,11 +85,20 @@ func (aS *auditService) CreateMetadata(c context.Context, auditId uint64, metada
 				ExternalAuditId: auditId,
 				Key:             k,
 				Value:           v,
+				ActorAudit: gorm_models.ActorAudit{
+					CreatedActorType: auth.Actor().Type.String(),
+					CreatedActorID:   auth.Actor().ID,
+				},
 			})
 		}
+		assignments := clause.AssignmentColumns([]string{"value", "updated_date"})
+		assignments = append(assignments,
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+		)
 		tx := db.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "external_audit_id"}, {Name: "key"}},
-			DoUpdates: clause.AssignmentColumns([]string{"value", "updated_date", "updated_actor_type", "updated_actor_id"}),
+			DoUpdates: assignments,
 		}).Create(&_metadata)
 		if tx.Error != nil {
 			aS.logger.Errorf("error while updating model parameter %v", tx.Error)
@@ -89,6 +111,7 @@ func (aS *auditService) CreateMetadata(c context.Context, auditId uint64, metada
 
 func (aS *auditService) UpdateMetadata(c context.Context, auditId uint64, metadata map[string]string) ([]*internal_gorm.ExternalAuditMetadata, error) {
 	if len(metadata) > 0 {
+		auth := c.Value(types.CTX_).(*types.Authentication)
 		db := aS.postgres.DB(c)
 		_metadata := make([]*internal_gorm.ExternalAuditMetadata, 0)
 		for k, v := range metadata {
@@ -96,11 +119,20 @@ func (aS *auditService) UpdateMetadata(c context.Context, auditId uint64, metada
 				ExternalAuditId: auditId,
 				Key:             k,
 				Value:           v,
+				ActorAudit: gorm_models.ActorAudit{
+					CreatedActorType: auth.Actor().Type.String(),
+					CreatedActorID:   auth.Actor().ID,
+				},
 			})
 		}
 		tx := db.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "external_audit_id"}, {Name: "key"}},
-			DoUpdates: clause.AssignmentColumns([]string{"value", "updated_date", "updated_actor_type", "updated_actor_id"}),
+			Columns: []clause.Column{{Name: "external_audit_id"}, {Name: "key"}},
+			DoUpdates: clause.Assignments(map[string]interface{}{
+				"value":              clause.Expr{SQL: "excluded.value"},
+				"updated_date":       time.Now(),
+				"updated_actor_type": auth.Actor().Type.String(),
+				"updated_actor_id":   auth.Actor().ID,
+			}),
 		}).Create(&_metadata)
 		if tx.Error != nil {
 			aS.logger.Errorf("error while updating model parameter %v", tx.Error)
