@@ -491,10 +491,12 @@ func TestHandleInitializationCompleted_EmitsConversationWebhookRecord(t *testing
 				require.True(t, ok)
 				assert.Equal(t, "debugger", payload.Source)
 				assert.NotEmpty(t, payload.Identifier)
+				assert.Equal(t, type_enums.CONVERSATION_IN_PROGRESS.String(), payload.Status)
 			case observability.ConversationResume:
 				payload, ok := webhookPacket.Record.Payload.(observability.ConversationResumeWebhookPayload)
 				require.True(t, ok)
 				assert.Equal(t, "0", payload.MessageCount)
+				assert.Equal(t, type_enums.CONVERSATION_IN_PROGRESS.String(), payload.Status)
 			}
 		})
 	}
@@ -560,7 +562,8 @@ func TestHandleFinalizeConversation_RecordsCompletedWebhookBeforeClosingAnalysis
 			},
 		},
 		metadata: map[string]interface{}{
-			"customer_id": "customer-1",
+			"customer_id":                          "customer-1",
+			observability.MetadataDisconnectReason: "USER",
 		},
 		metrics: map[string]*protos.Metric{
 			"turn_count": {
@@ -609,7 +612,8 @@ func TestHandleFinalizeConversation_RecordsCompletedWebhookBeforeClosingAnalysis
 	payload, ok := webhookRecord.Payload.(observability.ConversationCompletedWebhookPayload)
 	require.True(t, ok)
 	assert.Equal(t, "conversation_completed", payload.Reason)
-	assert.Equal(t, "completed", payload.Status)
+	assert.Equal(t, type_enums.CONVERSATION_COMPLETE.String(), payload.Status)
+	assert.Equal(t, "USER", payload.DisconnectReason)
 	messagesPayload := payload.Messages
 	require.Len(t, messagesPayload, 2)
 	assert.Equal(t, "msg-user-1", messagesPayload[0]["id"])
@@ -662,7 +666,7 @@ func TestHandleFinalizeConversation_RecordsCompletedWebhookWithoutAnalysis(t *te
 	assert.Equal(t, observability.ConversationCompleted, webhookRecord.Event)
 	payload, ok := webhookRecord.Payload.(observability.ConversationCompletedWebhookPayload)
 	require.True(t, ok)
-	assert.Equal(t, "completed", payload.Status)
+	assert.Equal(t, type_enums.CONVERSATION_COMPLETE.String(), payload.Status)
 	select {
 	case envelope := <-requestor.channels.DataChannel():
 		assert.Equal(t, internal_type.PacketNameFinalizeAnalysisExecutor, envelope.Pkt.PacketName())
@@ -847,6 +851,8 @@ func TestHandleError_NonRecoverable_EmitsConversationErrorWebhookRecord(t *testi
 	payload, ok := webhookPacket.Record.Payload.(observability.ConversationErrorWebhookPayload)
 	require.True(t, ok)
 	assert.Equal(t, protos.ConversationDisconnection_DISCONNECTION_TYPE_ERROR.String(), payload.Reason)
+	assert.Equal(t, "error", payload.Status)
+	assert.Equal(t, protos.ConversationDisconnection_DISCONNECTION_TYPE_ERROR.String(), payload.DisconnectReason)
 	assert.Contains(t, payload.Message, "tts provider rejected credentials")
 }
 

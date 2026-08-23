@@ -74,6 +74,7 @@ func (d *Dispatcher) runSession(ctx context.Context, v SessionConnectedPipeline)
 				From:                 v.CallContext.FromNumber,
 				Direction:            v.CallContext.Direction,
 				ContextID:            contextID,
+				Status:               observability.MetricCallStatusInProgress,
 			},
 		},
 		observability.RecordLog{
@@ -157,6 +158,8 @@ func (d *Dispatcher) runSession(ctx context.Context, v SessionConnectedPipeline)
 					ContextID:            contextID,
 					Error:                err.Error(),
 					DurationMs:           fmt.Sprintf("%d", time.Since(startTime).Milliseconds()),
+					Status:               observability.MetricCallStatusFailed,
+					DisconnectReason:     protos.ConversationDisconnection_DISCONNECTION_TYPE_ERROR.String(),
 				},
 			})
 		v.Observer.Record(ctx,
@@ -207,6 +210,8 @@ func (d *Dispatcher) runSession(ctx context.Context, v SessionConnectedPipeline)
 				Direction:            v.CallContext.Direction,
 				ContextID:            contextID,
 				DurationMs:           fmt.Sprintf("%d", time.Since(startTime).Milliseconds()),
+				Status:               observability.MetricCallStatusComplete,
+				DisconnectReason:     v.CallContext.DisconnectReason,
 			},
 		},
 		observability.RecordMetric{

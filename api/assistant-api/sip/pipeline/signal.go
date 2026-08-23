@@ -115,11 +115,13 @@ func (d *Dispatcher) handleCallFailed(ctx context.Context, v sip_infra.CallFaile
 				V1WebhookPayloadBase: observability.NewV1WebhookPayload(map[string]interface{}{
 					"sip_code": fmt.Sprintf("%d", v.SIPCode),
 				}),
-				Provider:  "sip",
-				CallID:    v.ID,
-				Direction: string(v.Session.GetInfo().Direction),
-				ContextID: contextID,
-				Error:     errorMessage,
+				Provider:         "sip",
+				CallID:           v.ID,
+				Direction:        string(v.Session.GetInfo().Direction),
+				ContextID:        contextID,
+				Error:            errorMessage,
+				Status:           observability.MetricCallStatusFailed,
+				DisconnectReason: protos.ConversationDisconnection_DISCONNECTION_TYPE_ERROR.String(),
 			},
 		},
 		observability.RecordMetric{

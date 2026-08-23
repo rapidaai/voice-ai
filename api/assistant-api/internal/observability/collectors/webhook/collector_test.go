@@ -67,10 +67,11 @@ func TestCollector_SendsWebhookEventPayload(t *testing.T) {
 		Event:     observability.CallRinging,
 		ContextID: "call-context-1",
 		Payload: observability.CallRingingWebhookPayload{
-			V1WebhookPayloadBase: observability.NewV1WebhookPayload(map[string]interface{}{"status": "ringing"}),
+			V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
 			Provider:             "test",
 			CallID:               "call-1",
 			StatusEvent:          "ringing",
+			Status:               observability.MetricCallStatusRinging,
 		},
 	})
 	if err != nil {
@@ -85,11 +86,11 @@ func TestCollector_SendsWebhookEventPayload(t *testing.T) {
 		t.Fatalf("unexpected conversation payload: %+v", got)
 	}
 	dataPayload, ok := got["data"].(map[string]interface{})
-	if !ok || dataPayload["status_event"] != "ringing" || dataPayload["call_id"] != "call-1" || dataPayload["version"] != observability.WebhookPayloadVersionV1 {
+	if !ok || dataPayload["status_event"] != "ringing" || dataPayload["status"] != observability.MetricCallStatusRinging || dataPayload["call_id"] != "call-1" || dataPayload["version"] != observability.WebhookPayloadVersionV1 {
 		t.Fatalf("unexpected data payload: %+v", got)
 	}
 	extraPayload, ok := dataPayload["extra"].(map[string]interface{})
-	if !ok || extraPayload["status"] != "ringing" {
+	if !ok || len(extraPayload) != 0 {
 		t.Fatalf("unexpected data payload: %+v", got)
 	}
 	if got["event"] != observability.CallRinging.String() {
