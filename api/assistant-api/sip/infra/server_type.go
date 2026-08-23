@@ -25,28 +25,17 @@ const (
 )
 
 type SIPRequestContext struct {
-	Method       string
-	CallID       string
-	RequestURI   string
-	FromIdentity string
-	ToIdentity   string
-	// Deprecated: use FromIdentity.
-	FromURI string
-	// Deprecated: use ToIdentity.
+	Method          string
+	CallID          string
+	FromURI         string
 	ToURI           string
 	APIKey          string
 	AssistantID     string
-	Auth            types.SimplePrinciple
+	Auth            *types.Authentication
 	SDPInfo         *SDPMediaInfo
 	Assistant       *internal_assistant_entity.Assistant
 	VaultCredential *protos.VaultCredential
 	Config          *Config
-}
-
-type SIPRequestIdentity struct {
-	RequestURI   string
-	FromIdentity string
-	ToIdentity   string
 }
 
 type Middleware func(ctx *SIPRequestContext) error
@@ -143,11 +132,8 @@ func (c *ServerConfig) toCore() *internal_core.ServerConfig {
 			infraCtx := &SIPRequestContext{
 				Method:          ctx.Method,
 				CallID:          ctx.CallID,
-				RequestURI:      ctx.RequestURI,
-				FromIdentity:    ctx.FromIdentity,
-				ToIdentity:      ctx.ToIdentity,
-				FromURI:         ctx.FromIdentity,
-				ToURI:           ctx.ToIdentity,
+				FromURI:         ctx.FromURI,
+				ToURI:           ctx.ToURI,
 				SDPInfo:         sdpInfoFromCore(ctx.SDPInfo),
 				APIKey:          ctx.APIKey,
 				AssistantID:     ctx.AssistantID,

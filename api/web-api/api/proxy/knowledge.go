@@ -2,7 +2,9 @@ package web_proxy_api
 
 import (
 	"context"
-	"errors"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	knowledge_client "github.com/rapidaai/pkg/clients/workflow"
 	"github.com/rapidaai/pkg/utils"
@@ -43,19 +45,25 @@ func NewKnowledgeGRPC(config *config.WebAppConfig, logger commons.Logger, postgr
 
 // GetAllKnowledgeDocumentSegment implements protos.KnowledgeServiceServer.
 func (knowledge *webKnowledgeGRPCApi) GetAllKnowledgeDocumentSegment(c context.Context, iRequest *protos.GetAllKnowledgeDocumentSegmentRequest) (*protos.GetAllKnowledgeDocumentSegmentResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	if !isAuthenticated {
-		knowledge.logger.Errorf("unauthenticated request for get actvities")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	return knowledge.knowledgeClient.GetAllKnowledgeDocumentSegment(c, iAuth, iRequest)
 }
 
 func (knowledge *webKnowledgeGRPCApi) GetKnowledge(c context.Context, iRequest *protos.GetKnowledgeRequest) (*protos.GetKnowledgeResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	if !isAuthenticated {
-		knowledge.logger.Errorf("unauthenticated request for get actvities")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	_knowledge, err := knowledge.knowledgeClient.GetKnowledge(c, iAuth, iRequest)
 	if err != nil {
@@ -64,7 +72,6 @@ func (knowledge *webKnowledgeGRPCApi) GetKnowledge(c context.Context, iRequest *
 			"Unable to get your knowledge, please try again in sometime.")
 	}
 
-	_knowledge.CreatedUser = knowledge.GetUser(c, iAuth, _knowledge.GetCreatedBy())
 	return utils.Success[protos.GetKnowledgeResponse, *protos.Knowledge](_knowledge)
 }
 
@@ -74,10 +81,13 @@ func (knowledge *webKnowledgeGRPCApi) GetKnowledge(c context.Context, iRequest *
 /*
  */
 func (knowledge *webKnowledgeGRPCApi) GetAllKnowledge(c context.Context, iRequest *protos.GetAllKnowledgeRequest) (*protos.GetAllKnowledgeResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(c)
-	if !isAuthenticated {
-		knowledge.logger.Errorf("unauthenticated request for get actvities")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
 	_page, _knowledge, err := knowledge.knowledgeClient.GetAllKnowledge(c, iAuth, iRequest.GetCriterias(), iRequest.GetPaginate())
@@ -87,19 +97,19 @@ func (knowledge *webKnowledgeGRPCApi) GetAllKnowledge(c context.Context, iReques
 			"Unable to get your knowledge, please try again in sometime.")
 	}
 
-	for _, _ep := range _knowledge {
-		_ep.CreatedUser = knowledge.GetUser(c, iAuth, _ep.GetCreatedBy())
-	}
 	return utils.PaginatedSuccess[protos.GetAllKnowledgeResponse, []*protos.Knowledge](
 		_page.GetTotalItem(), _page.GetCurrentPage(),
 		_knowledge)
 }
 
 func (knowledge *webKnowledgeGRPCApi) CreateKnowledge(c context.Context, iRequest *protos.CreateKnowledgeRequest) (*protos.CreateKnowledgeResponse, error) {
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
-	if !isAuthenticated {
-		knowledge.logger.Errorf("unauthenticated request for get actvities")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	return knowledge.knowledgeClient.CreateKnowledge(c, iAuth, iRequest)
 }
@@ -107,75 +117,99 @@ func (knowledge *webKnowledgeGRPCApi) CreateKnowledge(c context.Context, iReques
 // CreateKnowledgeTag implements protos.KnowledgeServiceServer.
 func (knowledgeGRPCApi *webKnowledgeGRPCApi) CreateKnowledgeTag(ctx context.Context, iRequest *protos.CreateKnowledgeTagRequest) (*protos.GetKnowledgeResponse, error) {
 	knowledgeGRPCApi.logger.Debugf("Create knowledge provider model request %v, %v", iRequest, ctx)
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
-	if !isAuthenticated {
-		knowledgeGRPCApi.logger.Errorf("unauthenticated request to create knowledge tag")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	return knowledgeGRPCApi.knowledgeClient.CreateKnowledgeTag(ctx, iAuth, iRequest)
 }
 
 func (knowledgeGRPCApi *webKnowledgeGRPCApi) UpdateKnowledgeDetail(ctx context.Context, iRequest *protos.UpdateKnowledgeDetailRequest) (*protos.GetKnowledgeResponse, error) {
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
-	if !isAuthenticated {
-		knowledgeGRPCApi.logger.Errorf("unauthenticated request to create knowledge tag")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	return knowledgeGRPCApi.knowledgeClient.UpdateKnowledgeDetail(ctx, iAuth, iRequest)
 }
 
 func (knowledgeGRPCApi *webKnowledgeGRPCApi) CreateKnowledgeDocument(ctx context.Context, iRequest *protos.CreateKnowledgeDocumentRequest) (*protos.CreateKnowledgeDocumentResponse, error) {
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
-	if !isAuthenticated {
-		knowledgeGRPCApi.logger.Errorf("unauthenticated request to create knowledge document")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	return knowledgeGRPCApi.knowledgeClient.CreateKnowledgeDocument(ctx, iAuth, iRequest)
 }
 
 // GetAllKnowledgeDocument implements protos.KnowledgeServiceServer.
 func (knowledgeGRPCApi *webKnowledgeGRPCApi) GetAllKnowledgeDocument(ctx context.Context, iRequest *protos.GetAllKnowledgeDocumentRequest) (*protos.GetAllKnowledgeDocumentResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated {
-		knowledgeGRPCApi.logger.Errorf("unauthenticated request to get all knowledge document")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	return knowledgeGRPCApi.knowledgeClient.GetAllKnowledgeDocument(ctx, iAuth, iRequest)
 }
 
 // GetAllKnowledgeDocument implements protos.KnowledgeServiceServer.
 func (knowledgeGRPCApi *webKnowledgeGRPCApi) DeleteKnowledgeDocumentSegment(ctx context.Context, iRequest *protos.DeleteKnowledgeDocumentSegmentRequest) (*protos.BaseResponse, error) {
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
-	if !isAuthenticated {
-		knowledgeGRPCApi.logger.Errorf("unauthenticated request to delete knowledge document segment")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	return knowledgeGRPCApi.knowledgeClient.DeleteKnowledgeDocumentSegment(ctx, iAuth, iRequest)
 }
 
 // GetAllKnowledgeDocument implements protos.KnowledgeServiceServer.
 func (knowledgeGRPCApi *webKnowledgeGRPCApi) UpdateKnowledgeDocumentSegment(ctx context.Context, iRequest *protos.UpdateKnowledgeDocumentSegmentRequest) (*protos.BaseResponse, error) {
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
-	if !isAuthenticated {
-		knowledgeGRPCApi.logger.Errorf("unauthenticated request to update knowledge document segment")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	return knowledgeGRPCApi.knowledgeClient.UpdateKnowledgeDocumentSegment(ctx, iAuth, iRequest)
 }
 
 func (knowledgeGRPCApi *webKnowledgeGRPCApi) GetAllKnowledgeLog(ctx context.Context, iRequest *protos.GetAllKnowledgeLogRequest) (*protos.GetAllKnowledgeLogResponse, error) {
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
-	if !isAuthenticated {
-		knowledgeGRPCApi.logger.Errorf("unauthenticated request to GetAllKnowledgeLog")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	return knowledgeGRPCApi.knowledgeClient.GetAllKnowledgeLog(ctx, iAuth, iRequest)
 }
 func (knowledgeGRPCApi *webKnowledgeGRPCApi) GetKnowledgeLog(ctx context.Context, iRequest *protos.GetKnowledgeLogRequest) (*protos.GetKnowledgeLogResponse, error) {
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
-	if !isAuthenticated {
-		knowledgeGRPCApi.logger.Errorf("unauthenticated request to GetKnowledgeLog")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	return knowledgeGRPCApi.knowledgeClient.GetKnowledgeLog(ctx, iAuth, iRequest)
 }

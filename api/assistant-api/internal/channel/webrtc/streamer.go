@@ -84,7 +84,7 @@ type webrtcStreamer struct {
 
 	observer observability.Recorder
 
-	auth                 types.SimplePrinciple
+	auth                 *types.Authentication
 	configurationService internal_services.AssistantConfigurationService
 	httpLogService       internal_services.AssistantHTTPLogService
 	assistantToolService internal_services.AssistantToolService
@@ -96,7 +96,7 @@ type StreamerOptions struct {
 	GRPCStream           grpc.BidiStreamingServer[protos.WebTalkRequest, protos.WebTalkResponse]
 	ServerConfig         *assistant_config.WebRTCConfig
 	Observer             observability.Recorder
-	Auth                 types.SimplePrinciple
+	Auth                 *types.Authentication
 	ConfigurationService internal_services.AssistantConfigurationService
 	HTTPLogService       internal_services.AssistantHTTPLogService
 	AssistantToolService internal_services.AssistantToolService
@@ -134,7 +134,7 @@ func WithObserver(observer observability.Recorder) FuncOption {
 	}
 }
 
-func WithAuth(auth types.SimplePrinciple) FuncOption {
+func WithAuth(auth *types.Authentication) FuncOption {
 	return func(options *StreamerOptions) {
 		options.Auth = auth
 	}

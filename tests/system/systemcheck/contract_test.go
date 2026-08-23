@@ -185,7 +185,7 @@ func TestServiceImageDigestsRequireEveryLockKey(t *testing.T) {
 }
 
 func TestMigrationReportIncludesVersionAndDirty(t *testing.T) {
-	states := map[string]string{"web_db": "4|false", "integration_db": "1|false", "endpoint_db": "1|false", "assistant_db": "54|false"}
+	states := map[string]string{"web_db": "12|false", "integration_db": "6|false", "endpoint_db": "6|false", "assistant_db": "60|false"}
 	runner := func(_ context.Context, _ string, args []string, _ io.Reader, stdout, _ io.Writer, _ []string) error {
 		for index, arg := range args {
 			if arg == "-d" {
@@ -207,7 +207,7 @@ func TestMigrationReportIncludesVersionAndDirty(t *testing.T) {
 	if err := json.Unmarshal(data, &records); err != nil {
 		t.Fatal(err)
 	}
-	if len(records) != 4 || records[3].Version != 54 || records[3].ExpectedVersion != 54 || records[3].Dirty {
+	if len(records) != 4 || records[3].Version != 60 || records[3].ExpectedVersion != 60 || records[3].Dirty {
 		t.Fatalf("unexpected records: %#v", records)
 	}
 }
@@ -253,7 +253,7 @@ func TestMigrationReportSharedVolumeContract(t *testing.T) {
 		if !reflect.DeepEqual(args, expected) {
 			t.Fatalf("migration diagnostic args=%q want=%q", args, expected)
 		}
-		_, _ = io.WriteString(stdout, `[{"service":"web-api","version":4,"expectedVersion":4,"dirty":false},{"service":"integration-api","version":1,"expectedVersion":1,"dirty":false},{"service":"endpoint-api","version":1,"expectedVersion":1,"dirty":false},{"service":"assistant-api","version":54,"expectedVersion":54,"dirty":false}]`)
+		_, _ = io.WriteString(stdout, `[{"service":"web-api","version":12,"expectedVersion":12,"dirty":false},{"service":"integration-api","version":6,"expectedVersion":6,"dirty":false},{"service":"endpoint-api","version":6,"expectedVersion":6,"dirty":false},{"service":"assistant-api","version":60,"expectedVersion":60,"dirty":false}]`)
 		return nil
 	}
 	if _, err := collectMigrationReport(context.Background(), runner, composeWrapper, "ci-contract"); err != nil {

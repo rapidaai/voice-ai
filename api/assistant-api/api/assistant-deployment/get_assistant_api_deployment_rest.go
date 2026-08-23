@@ -18,8 +18,8 @@ import (
 )
 
 func (deploymentApi *AssistantDeploymentApi) GetAssistantApiDeploymentRest(c *gin.Context) {
-	auth, isAuthenticated := types.GetAuthPrinciple(c)
-	if !isAuthenticated {
+	auth, authErr := types.Authorize(c.Request.Context())
+	if authErr != nil {
 		c.JSON(pkg_errors.GetAssistantApiDeploymentUnauthenticated.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.GetAssistantApiDeploymentUnauthenticated.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -31,7 +31,8 @@ func (deploymentApi *AssistantDeploymentApi) GetAssistantApiDeploymentRest(c *gi
 		})
 		return
 	}
-	if !auth.HasUser() || !auth.HasProject() || !auth.HasOrganization() {
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
 		c.JSON(pkg_errors.GetAssistantApiDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.GetAssistantApiDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -58,7 +59,7 @@ func (deploymentApi *AssistantDeploymentApi) GetAssistantApiDeploymentRest(c *gi
 		return
 	}
 
-	deployment, err := deploymentApi.deploymentService.GetAssistantApiDeployment(c, auth, assistantId)
+	deployment, err := deploymentApi.deploymentService.GetAssistantApiDeployment(c, iAuth, assistantId)
 	if err != nil {
 		deploymentApi.logger.Errorf("unable to get assistant api deployment: %v", err)
 		c.JSON(pkg_errors.GetAssistantApiDeploymentGetDeployment.HTTPStatusCode, openapi.ErrorResponse{

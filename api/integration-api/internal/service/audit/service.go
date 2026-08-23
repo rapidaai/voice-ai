@@ -54,7 +54,7 @@ func (aS *auditService) Create(ctx context.Context,
 
 	tx := db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"metrics", "response_status", "status", "time_taken", "updated_date"}),
+		DoUpdates: clause.AssignmentColumns([]string{"metrics", "response_status", "status", "time_taken", "updated_date", "updated_actor_type", "updated_actor_id"}),
 	}).Create(audit)
 	if tx.Error != nil {
 		aS.logger.Errorf("unable to insert into audit table %v", tx.Error)
@@ -76,7 +76,7 @@ func (aS *auditService) CreateMetadata(c context.Context, auditId uint64, metada
 		}
 		tx := db.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "external_audit_id"}, {Name: "key"}},
-			DoUpdates: clause.AssignmentColumns([]string{"value"}),
+			DoUpdates: clause.AssignmentColumns([]string{"value", "updated_date", "updated_actor_type", "updated_actor_id"}),
 		}).Create(&_metadata)
 		if tx.Error != nil {
 			aS.logger.Errorf("error while updating model parameter %v", tx.Error)
@@ -100,7 +100,7 @@ func (aS *auditService) UpdateMetadata(c context.Context, auditId uint64, metada
 		}
 		tx := db.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "external_audit_id"}, {Name: "key"}},
-			DoUpdates: clause.AssignmentColumns([]string{"value"}),
+			DoUpdates: clause.AssignmentColumns([]string{"value", "updated_date", "updated_actor_type", "updated_actor_id"}),
 		}).Create(&_metadata)
 		if tx.Error != nil {
 			aS.logger.Errorf("error while updating model parameter %v", tx.Error)

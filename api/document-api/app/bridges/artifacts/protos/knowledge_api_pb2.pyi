@@ -89,7 +89,7 @@ class CreateKnowledgeTagRequest(_message.Message):
     def __init__(self, knowledgeId: _Optional[int] = ..., tags: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class KnowledgeDocument(_message.Message):
-    __slots__ = ("id", "knowledgeId", "language", "name", "description", "documentSource", "documentType", "documentSize", "documentPath", "indexStatus", "retrievalCount", "tokenCount", "wordCount", "DisplayStatus", "status", "createdBy", "createdUser", "updatedBy", "updatedUser", "createdDate", "updatedDate")
+    __slots__ = ("id", "knowledgeId", "language", "name", "description", "documentSource", "documentType", "documentSize", "documentPath", "indexStatus", "retrievalCount", "tokenCount", "wordCount", "DisplayStatus", "status", "createdActor", "updatedActor", "createdDate", "updatedDate")
     ID_FIELD_NUMBER: _ClassVar[int]
     KNOWLEDGEID_FIELD_NUMBER: _ClassVar[int]
     LANGUAGE_FIELD_NUMBER: _ClassVar[int]
@@ -105,10 +105,8 @@ class KnowledgeDocument(_message.Message):
     WORDCOUNT_FIELD_NUMBER: _ClassVar[int]
     DISPLAYSTATUS_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
-    CREATEDBY_FIELD_NUMBER: _ClassVar[int]
-    CREATEDUSER_FIELD_NUMBER: _ClassVar[int]
-    UPDATEDBY_FIELD_NUMBER: _ClassVar[int]
-    UPDATEDUSER_FIELD_NUMBER: _ClassVar[int]
+    CREATEDACTOR_FIELD_NUMBER: _ClassVar[int]
+    UPDATEDACTOR_FIELD_NUMBER: _ClassVar[int]
     CREATEDDATE_FIELD_NUMBER: _ClassVar[int]
     UPDATEDDATE_FIELD_NUMBER: _ClassVar[int]
     id: int
@@ -126,13 +124,11 @@ class KnowledgeDocument(_message.Message):
     wordCount: int
     DisplayStatus: str
     status: str
-    createdBy: int
-    createdUser: _common_pb2.User
-    updatedBy: int
-    updatedUser: _common_pb2.User
+    createdActor: _common_pb2.AuditActor
+    updatedActor: _common_pb2.AuditActor
     createdDate: _timestamp_pb2.Timestamp
     updatedDate: _timestamp_pb2.Timestamp
-    def __init__(self, id: _Optional[int] = ..., knowledgeId: _Optional[int] = ..., language: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., documentSource: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., documentType: _Optional[str] = ..., documentSize: _Optional[int] = ..., documentPath: _Optional[str] = ..., indexStatus: _Optional[str] = ..., retrievalCount: _Optional[int] = ..., tokenCount: _Optional[int] = ..., wordCount: _Optional[int] = ..., DisplayStatus: _Optional[str] = ..., status: _Optional[str] = ..., createdBy: _Optional[int] = ..., createdUser: _Optional[_Union[_common_pb2.User, _Mapping]] = ..., updatedBy: _Optional[int] = ..., updatedUser: _Optional[_Union[_common_pb2.User, _Mapping]] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, id: _Optional[int] = ..., knowledgeId: _Optional[int] = ..., language: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., documentSource: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., documentType: _Optional[str] = ..., documentSize: _Optional[int] = ..., documentPath: _Optional[str] = ..., indexStatus: _Optional[str] = ..., retrievalCount: _Optional[int] = ..., tokenCount: _Optional[int] = ..., wordCount: _Optional[int] = ..., DisplayStatus: _Optional[str] = ..., status: _Optional[str] = ..., createdActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., updatedActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class GetAllKnowledgeDocumentRequest(_message.Message):
     __slots__ = ("knowledgeId", "paginate", "criterias")

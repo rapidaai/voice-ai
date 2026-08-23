@@ -36,8 +36,7 @@ type KnowledgeDocument struct {
 	RetrievalCount uint64 `json:"retrievalCount" gorm:"type:bigint;size:20;default:0"`
 	TokenCount     uint64 `json:"tokenCount" gorm:"type:bigint;size:20;default:0"`
 	WordCount      uint64 `json:"wordCount" gorm:"type:bigint;size:20;default:0"`
-	CreatedBy      uint64 `json:"createdBy" gorm:"type:bigint;size:20;not null"`
-	UpdatedBy      uint64 `json:"updatedBy" gorm:"type:bigint;size:20;"`
+	gorm_model.ActorAudit
 
 	IndexingLatency      *float64               `gorm:"column:indexing_latency" json:"indexingLatency,omitempty"`
 	CompletedAt          gorm_model.TimeWrapper `gorm:"column:completed_at;default:null" json:"completedAt,omitempty"`
@@ -90,8 +89,7 @@ type KnowledgeDocumentProcessRule struct {
 	Mode                string               `gorm:"type:varchar(255);not null;default:'automatic'"`
 	Rules               gorm_types.StringMap `json:"metrics" gorm:"type:text;not null"`
 	//
-	CreatedBy uint64 `json:"createdBy" gorm:"type:bigint;size:20;not null"`
-	UpdatedBy uint64 `json:"updatedBy" gorm:"type:bigint;size:20;"`
+	gorm_model.ActorAudit
 }
 
 type KnowledgeDocumentSegment struct {

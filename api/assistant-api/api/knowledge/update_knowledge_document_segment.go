@@ -7,7 +7,8 @@ package knowledge_api
 
 import (
 	"context"
-	"errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
@@ -16,13 +17,13 @@ import (
 
 // UpdateKnowledgeDocumentSegment implements knowledge_api.KnowledgeServiceServer.
 func (knowledgeApi *knowledgeGrpcApi) UpdateKnowledgeDocumentSegment(ctx context.Context, dsr *knowledge_api.UpdateKnowledgeDocumentSegmentRequest) (*knowledge_api.BaseResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !iAuth.HasProject() {
-		knowledgeApi.logger.Errorf("unauthenticated request for invoke")
-		return utils.Error[knowledge_api.BaseResponse](
-			errors.New("unauthenticated request for update document segment"),
-			"Please provider valid service credentials to perfom invoke, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	_, err := knowledgeApi.knowledgeDocumentService.UpdateDocumentSegment(ctx,
 		iAuth,

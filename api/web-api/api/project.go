@@ -3,6 +3,8 @@ package web_api
 import (
 	"context"
 	"errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"time"
 
 	"github.com/rapidaai/api/web-api/config"
@@ -73,20 +75,27 @@ func NewProjectGRPC(config *config.WebAppConfig, logger commons.Logger, postgres
 }
 
 func (wProjectApi *webProjectGRPCApi) CreateProject(ctx context.Context, irRequest *protos.CreateProjectRequest) (*protos.CreateProjectResponse, error) {
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
-	if !isAuthenticated {
-		wProjectApi.logger.Errorf("CreateProject from grpc with unauthenticated request")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
 	}
-	currentOrgRole := iAuth.GetOrganizationRole()
-	if currentOrgRole == nil {
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	}
+	userContext, err := iAuth.UserContext()
+	if err != nil {
+		return nil, err
+	}
+	organizationContext, err := iAuth.OrganizationContext()
+	if err != nil {
 		wProjectApi.logger.Errorf("current org is null, you can't create project without an organization.")
 		return utils.Error[protos.CreateProjectResponse](
 			errors.New("you cannot create a project when you are not part of any organization"),
 			"Please create organization before creating a project.")
 	}
 
-	prj, err := wProjectApi.projectService.Create(ctx, iAuth, iAuth.GetOrganizationRole().OrganizationId, irRequest.GetProjectName(), irRequest.GetProjectDescription())
+	prj, err := wProjectApi.projectService.Create(ctx, iAuth, organizationContext.OrganizationID, irRequest.GetProjectName(), irRequest.GetProjectDescription())
 	if err != nil {
 		wProjectApi.logger.Errorf("projectService.Create from grpc with err %v", err)
 		return utils.Error[protos.CreateProjectResponse](
@@ -94,7 +103,7 @@ func (wProjectApi *webProjectGRPCApi) CreateProject(ctx context.Context, irReque
 			"Unable to create project for your organization, please try again in sometime")
 	}
 
-	_, err = wProjectApi.userService.CreateProjectRole(ctx, iAuth, iAuth.GetUserInfo().Id, type_enums.PROJECT_ROLE_ADMIN.String(), prj.Id, type_enums.RECORD_ACTIVE)
+	_, err = wProjectApi.userService.CreateProjectRole(ctx, iAuth, userContext.UserID, type_enums.PROJECT_ROLE_ADMIN.String(), prj.Id, type_enums.RECORD_ACTIVE)
 	if err != nil {
 		wProjectApi.logger.Errorf("userService.CreateProjectRole from grpc with err %v", err)
 		return utils.Error[protos.CreateProjectResponse](
@@ -112,14 +121,16 @@ func (wProjectApi *webProjectGRPCApi) CreateProject(ctx context.Context, irReque
 update project request
 */
 func (wProjectApi *webProjectGRPCApi) UpdateProject(ctx context.Context, irRequest *protos.UpdateProjectRequest) (*protos.UpdateProjectResponse, error) {
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
-	if !isAuthenticated {
-		wProjectApi.logger.Errorf("UpdateProject from grpc with unauthenticated request")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
-	currentOrgRole := iAuth.GetOrganizationRole()
-	if currentOrgRole == nil {
+	if _, err := iAuth.OrganizationContext(); err != nil {
 		wProjectApi.logger.Errorf("current org is not null, you can't create multiple organization at same time.")
 		return utils.Error[protos.UpdateProjectResponse](
 			errors.New("you cannot update a project when you are not part of any organization"),
@@ -142,14 +153,17 @@ func (wProjectApi *webProjectGRPCApi) UpdateProject(ctx context.Context, irReque
 	return utils.Success[protos.UpdateProjectResponse, *protos.Project](ot)
 }
 func (wProjectApi *webProjectGRPCApi) GetAllProject(ctx context.Context, irRequest *protos.GetAllProjectRequest) (*protos.GetAllProjectResponse, error) {
-	iAuth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
-	if !isAuthenticated {
-		wProjectApi.logger.Errorf("GetAllProject from grpc with unauthenticated request")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
-	currentOrgRole := iAuth.GetOrganizationRole()
-	if currentOrgRole == nil {
+	organizationContext, err := iAuth.OrganizationContext()
+	if err != nil {
 		wProjectApi.logger.Errorf("current org is not null, you can't create multiple organization at same time.")
 		return utils.Error[protos.GetAllProjectResponse](
 			errors.New("you are not part of any active organization"),
@@ -158,7 +172,7 @@ func (wProjectApi *webProjectGRPCApi) GetAllProject(ctx context.Context, irReque
 	}
 
 	cnt, prjs, err := wProjectApi.projectService.GetAll(ctx, iAuth,
-		currentOrgRole.OrganizationId, irRequest.GetCriterias(), irRequest.GetPaginate())
+		organizationContext.OrganizationID, irRequest.GetCriterias(), irRequest.GetPaginate())
 	if err != nil {
 		wProjectApi.logger.Errorf("projectService.GetAll from grpc with err %v", err)
 		return utils.Error[protos.GetAllProjectResponse](
@@ -192,10 +206,13 @@ func (wProjectApi *webProjectGRPCApi) GetAllProject(ctx context.Context, irReque
 }
 
 func (wProjectApi *webProjectGRPCApi) GetProject(ctx context.Context, irRequest *protos.GetProjectRequest) (*protos.GetProjectResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated {
-		wProjectApi.logger.Errorf("GetProject from grpc with unauthenticated request")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
 	if irRequest.GetProjectId() == 0 {
@@ -238,20 +255,24 @@ func (wProjectApi *webProjectGRPCApi) GetProject(ctx context.Context, irRequest 
 }
 
 func (wProjectApi *webProjectGRPCApi) AddUserToProjects(ctx context.Context, irRequest *protos.AddUserToProjectsRequest) (*protos.AddUserToProjectsResponse, error) {
-	auth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
-	if !isAuthenticated {
-		return &protos.AddUserToProjectsResponse{
-			Code:    pkg_errors.AddUserToProjectsUnauthenticated.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.AddUserToProjectsUnauthenticated.Code),
-				ErrorMessage: pkg_errors.AddUserToProjectsUnauthenticated.Error,
-				HumanMessage: pkg_errors.AddUserToProjectsUnauthenticated.ErrorMessage,
-			},
-		}, errors.New(pkg_errors.AddUserToProjectsUnauthenticated.Error)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
 	}
-	currentOrgRole := auth.GetOrganizationRole()
-	if currentOrgRole == nil {
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	}
+	userContext, err := iAuth.UserContext()
+	if err != nil {
+		return nil, err
+	}
+	organizationContext, err := iAuth.OrganizationContext()
+	if err != nil {
+		return nil, err
+	}
+	currentOrgRole, err := wProjectApi.userService.GetActiveOrInvitedOrganizationRoleForOrganization(ctx, userContext.UserID, organizationContext.OrganizationID)
+	if err != nil || currentOrgRole == nil {
 		return &protos.AddUserToProjectsResponse{
 			Code:    pkg_errors.AddUserToProjectsMissingOrganization.HTTPStatusCodeInt32(),
 			Success: false,
@@ -365,7 +386,7 @@ func (wProjectApi *webProjectGRPCApi) AddUserToProjects(ctx context.Context, irR
 		projectRoles[projectRole.GetProjectId()] = projectRole.GetProjectRole()
 	}
 
-	projects, err := wProjectApi.projectService.GetAllByOrganization(ctx, auth, currentOrgRole.OrganizationId, projectIds)
+	projects, err := wProjectApi.projectService.GetAllByOrganization(ctx, iAuth, currentOrgRole.OrganizationId, projectIds)
 	if err != nil {
 		wProjectApi.logger.Errorf("projectService.GetAllByOrganization from grpc with err %v", err)
 		return &protos.AddUserToProjectsResponse{
@@ -404,7 +425,7 @@ func (wProjectApi *webProjectGRPCApi) AddUserToProjects(ctx context.Context, irR
 	}
 
 	for _, projectRole := range irRequest.GetProjectRoles() {
-		_, err = wProjectApi.userService.CreateProjectRole(ctx, auth, eUser.Id, projectRole.GetProjectRole(), projectRole.GetProjectId(), org.Status)
+		_, err = wProjectApi.userService.CreateProjectRole(ctx, iAuth, eUser.Id, projectRole.GetProjectRole(), projectRole.GetProjectId(), org.Status)
 		if err != nil {
 			wProjectApi.logger.Errorf("unable to create project role err %v", err)
 			return &protos.AddUserToProjectsResponse{
@@ -437,20 +458,24 @@ func (wProjectApi *webProjectGRPCApi) AddUserToProjects(ctx context.Context, irR
 }
 
 func (wProjectApi *webProjectGRPCApi) DeleteUserFromProject(ctx context.Context, irRequest *protos.DeleteUserFromProjectRequest) (*protos.DeleteUserFromProjectResponse, error) {
-	auth, isAuthenticated := types.GetAuthPrincipleGPRC(ctx)
-	if !isAuthenticated {
-		return &protos.DeleteUserFromProjectResponse{
-			Code:    pkg_errors.DeleteUserFromProjectUnauthenticated.HTTPStatusCodeInt32(),
-			Success: false,
-			Error: &protos.Error{
-				ErrorCode:    uint64(pkg_errors.DeleteUserFromProjectUnauthenticated.Code),
-				ErrorMessage: pkg_errors.DeleteUserFromProjectUnauthenticated.Error,
-				HumanMessage: pkg_errors.DeleteUserFromProjectUnauthenticated.ErrorMessage,
-			},
-		}, errors.New(pkg_errors.DeleteUserFromProjectUnauthenticated.Error)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
 	}
-	currentOrgRole := auth.GetOrganizationRole()
-	if currentOrgRole == nil {
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	}
+	userContext, err := iAuth.UserContext()
+	if err != nil {
+		return nil, err
+	}
+	organizationContext, err := iAuth.OrganizationContext()
+	if err != nil {
+		return nil, err
+	}
+	currentOrgRole, err := wProjectApi.userService.GetActiveOrInvitedOrganizationRoleForOrganization(ctx, userContext.UserID, organizationContext.OrganizationID)
+	if err != nil || currentOrgRole == nil {
 		return &protos.DeleteUserFromProjectResponse{
 			Code:    pkg_errors.DeleteUserFromProjectMissingOrganization.HTTPStatusCodeInt32(),
 			Success: false,
@@ -523,7 +548,7 @@ func (wProjectApi *webProjectGRPCApi) DeleteUserFromProject(ctx context.Context,
 			},
 		}, nil
 	}
-	if _, err = wProjectApi.projectService.GetAllByOrganization(ctx, auth, currentOrgRole.OrganizationId, []uint64{irRequest.GetProjectId()}); err != nil {
+	if _, err = wProjectApi.projectService.GetAllByOrganization(ctx, iAuth, currentOrgRole.OrganizationId, []uint64{irRequest.GetProjectId()}); err != nil {
 		wProjectApi.logger.Errorf("projectService.GetAllByOrganization from grpc with err %v", err)
 		return &protos.DeleteUserFromProjectResponse{
 			Code:    pkg_errors.DeleteUserFromProjectInvalidProject.HTTPStatusCodeInt32(),
@@ -551,7 +576,7 @@ func (wProjectApi *webProjectGRPCApi) DeleteUserFromProject(ctx context.Context,
 		}, nil
 	}
 
-	if err = wProjectApi.userService.ArchiveUserFromProject(ctx, auth, eUser.GetId(), irRequest.GetProjectId()); err != nil {
+	if err = wProjectApi.userService.ArchiveUserFromProject(ctx, iAuth, eUser.GetId(), irRequest.GetProjectId()); err != nil {
 		wProjectApi.logger.Errorf("unable to archive user from project err %v", err)
 		return &protos.DeleteUserFromProjectResponse{
 			Code:    pkg_errors.DeleteUserFromProjectArchiveRole.HTTPStatusCodeInt32(),
@@ -577,12 +602,15 @@ if you are reading one of the example that you waste time writing code
 */
 func (wProjectApi *webProjectGRPCApi) ArchiveProject(c context.Context, irRequest *protos.ArchiveProjectRequest) (*protos.ArchiveProjectResponse, error) {
 	wProjectApi.logger.Debugf("ArchiveProjectRequest from grpc with requestPayload %v, %v", irRequest, c)
-	auth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
-	if !isAuthenticated {
-		wProjectApi.logger.Errorf("DeleteProviderCredential from grpc with unauthenticated request")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
 	}
-	if _, err := wProjectApi.projectService.Archive(c, auth, irRequest.Id); err != nil {
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	}
+	if _, err := wProjectApi.projectService.Archive(c, iAuth, irRequest.Id); err != nil {
 		wProjectApi.logger.Errorf("DeleteProviderCredential while archieving project")
 		return nil, err
 	}
@@ -590,14 +618,21 @@ func (wProjectApi *webProjectGRPCApi) ArchiveProject(c context.Context, irReques
 }
 
 func (wProjectApi *webProjectGRPCApi) CreateProjectCredential(c context.Context, irRequest *protos.CreateProjectCredentialRequest) (*protos.CreateProjectCredentialResponse, error) {
-	auth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
-	if !isAuthenticated {
-		wProjectApi.logger.Errorf("CreateProjectCredential from grpc with unauthenticated request")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
 	// name, key string, projectId, organizationId uint64
-	pc, err := wProjectApi.projectService.CreateCredential(c, auth, irRequest.GetName(), irRequest.GetProjectId(), auth.GetOrganizationRole().OrganizationId)
+	organizationContext, err := iAuth.OrganizationContext()
+	if err != nil {
+		return nil, err
+	}
+	pc, err := wProjectApi.projectService.CreateCredential(c, iAuth, irRequest.GetName(), irRequest.GetProjectId(), organizationContext.OrganizationID)
 	if err != nil {
 		return utils.Error[protos.CreateProjectCredentialResponse](
 			err,
@@ -613,18 +648,25 @@ func (wProjectApi *webProjectGRPCApi) CreateProjectCredential(c context.Context,
 }
 
 func (wProjectApi *webProjectGRPCApi) GetAllProjectCredential(c context.Context, irRequest *protos.GetAllProjectCredentialRequest) (*protos.GetAllProjectCredentialResponse, error) {
-	auth, isAuthenticated := types.GetAuthPrincipleGPRC(c)
-	if !isAuthenticated {
-		wProjectApi.logger.Errorf("CreateProjectCredential from grpc with unauthenticated request")
-		return nil, errors.New("unauthenticated request")
+	auth, authErr := types.Authorize(c)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
 	// name, key string, projectId, organizationId uint64
+	organizationContext, err := iAuth.OrganizationContext()
+	if err != nil {
+		return nil, err
+	}
 	cnt, allProjectCredential, err := wProjectApi.projectService.
 		GetAllCredential(
-			c, auth,
+			c, iAuth,
 			irRequest.GetProjectId(),
-			auth.GetOrganizationRole().OrganizationId,
+			organizationContext.OrganizationID,
 			irRequest.GetCriterias(), irRequest.GetPaginate())
 	if err != nil {
 		return utils.Error[protos.GetAllProjectCredentialResponse](

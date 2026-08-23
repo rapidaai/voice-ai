@@ -7,22 +7,23 @@ package endpoint_api
 
 import (
 	"context"
-	"errors"
 
 	internal_services "github.com/rapidaai/api/endpoint-api/internal/service"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	endpoint_grpc_api "github.com/rapidaai/protos"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func (endpointGRPCApi *endpointGRPCApi) UpdateEndpointDetail(ctx context.Context, eRequest *endpoint_grpc_api.UpdateEndpointDetailRequest) (*endpoint_grpc_api.GetEndpointResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !iAuth.HasProject() {
-		endpointGRPCApi.logger.Errorf("unauthenticated request for invoke")
-		return utils.Error[endpoint_grpc_api.GetEndpointResponse](
-			errors.New("unauthenticated request for UpdateEndpointDetail"),
-			"Please provider valid service credentials to perfom invoke, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	_, err := endpointGRPCApi.endpointService.UpdateEndpointDetail(ctx,
 		iAuth, eRequest.GetEndpointId(), eRequest.GetName(), &eRequest.Description)

@@ -1,0 +1,96 @@
+{
+  "rfc": "0002-jwt-only-service-auth",
+  "status": "ready-for-challenge",
+  "objective": "Replace RFC 0001 Phase 3 runtime service identity registry verification with short-lived shared-secret JWT validation for selected internal API calls.",
+  "acceptance_criteria": [
+    "Service delegation uses HS256 JWTs signed and verified with the existing application secret, which is distributed only to selected trusted service callers and receivers.",
+    "JWTs retain durable service actor ID, issuer, audience, issued-at, expiry, organization scope, and optional project scope.",
+    "Service JWT lifetime is at most five minutes and originating user identity is never forwarded.",
+    "No production runtime registry lookup, service/system identity API, or service/system identity table remains in the final schema.",
+    "Existing credential-selection boundaries continue to reject ambiguous credentials.",
+    "All Phase 3 audit persistence, migration, SDK, Document API, and UI behavior remains intact."
+  ],
+  "allowed_paths": [
+    "rfcs/0002-*",
+    "rfcs/0001-phase-3-verification.md",
+    "pkg/types/**",
+    "pkg/authenticators/**",
+    "pkg/clients/internal_client.go",
+    "pkg/clients/internal_client_test.go",
+    "pkg/auditidentity/**",
+    "cmd/assistant/**",
+    "cmd/endpoint/**",
+    "cmd/integration/**",
+    "cmd/web/**",
+    "api/web-api/api/**",
+    "api/web-api/internal/entity/audit_identity.go",
+    "api/web-api/internal/service/auditidentity/**",
+    "api/web-api/migrations/**",
+    "protos/**",
+    "sdks/go/**",
+    "sdks/python/**",
+    "sdks/nodejs/**",
+    "sdks/react/**"
+  ],
+  "out_of_scope": [
+    "Changes to user, project, or organization credential authentication",
+    "A new service credential CRUD API",
+    "A second per-route allowlist beyond the existing authentication boundary; possession of the shared secret is the explicit service trust boundary",
+    "Unrelated Document API provider-stub cleanup"
+  ],
+  "ownership": {
+    "pkg/types": "JWT signing and validation contract",
+    "pkg/authenticators": "Service JWT authentication",
+    "pkg/clients/internal_client.go": "Short-lived service JWT creation",
+    "cmd": "Authenticator wiring without registry dependencies",
+    "api/web-api and migrations": "Removal of the registry API and an append-only cleanup migration for registry tables",
+    "protos and SDKs": "Removal of registry RPCs while preserving actor fields"
+  },
+  "required_tests": [
+    "Go JWT and service-authenticator tests",
+    "Go package tests and vet",
+    "Protobuf generation and SDK tests/builds",
+    "Phase 3 migration and rollback validators",
+    "Phase 3 Document API and UI tests",
+    "Source scans for removed registry code, RPCs, tables, private-key configuration, and key IDs",
+    "Generated SDK checks that preserve actor fields and SDK-specific contracts"
+  ],
+  "required_commands": [
+    "go test ./pkg/types ./pkg/authenticators ./pkg/clients/... ./cmd/assistant ./cmd/endpoint ./cmd/integration ./cmd/web",
+    "go test ./pkg/... ./api/assistant-api/... ./api/endpoint-api/... ./api/web-api/... ./api/integration-api/... ./cmd/assistant ./cmd/endpoint ./cmd/web ./cmd/integration ./protos/...",
+    "go vet ./pkg/... ./api/assistant-api/... ./api/endpoint-api/... ./api/web-api/... ./api/integration-api/... ./cmd/assistant ./cmd/endpoint ./cmd/web ./cmd/integration ./protos/...",
+    "bash bin/artifacts-generate.sh",
+    "(cd sdks/go && go test ./...)",
+    "(cd sdks/python && /tmp/voice-ai-sdk-phase3/bin/python -m pytest -q)",
+    "(cd sdks/nodejs && npm test -- --runInBand && npm run build)",
+    "(cd sdks/react && npm run test:ci && npm run build)",
+    "(cd sdks/react-widget && npm test -- --runInBand && npm run build)",
+    "(cd ui && yarn test --watchAll=false --runInBand && yarn build)",
+    "PYTHONPATH=api/document-api /tmp/voice-ai-doc-phase3/bin/python -m pytest -q api/document-api/tests",
+    "bash bin/verify-phase3-migrations.sh",
+    "PREVIOUS_RELEASE_REF=v3.0.0 bash bin/verify-phase3-rollback.sh",
+    "! rg -n 'Validate(Service|System)Identity|ServiceIdentityVerifier|RAPIDA_SERVICE_PRIVATE_KEY|RAPIDA_SERVICE_KEY_ID|RAPIDA_SYSTEM_ACTOR_ID|RAPIDA_SYSTEM_ACTOR_NAME' api pkg cmd protos --glob '!**/*_test.go' --glob '!**/migrations/**' --glob '!**/bridges/artifacts/**'",
+    "test -f api/web-api/migrations/000012_remove_service_identity_registry.up.sql && test -f api/web-api/migrations/000012_remove_service_identity_registry.down.sql",
+    "git diff --check"
+  ],
+  "verification_assertions": {
+    "bin/verify-phase3-migrations.sh": "Must assert the final Web schema lacks service_identities and system_identities.",
+    "bin/verify-phase3-rollback.sh": "Must assert same-point backup restoration recovers service/system registry rows before prior-binary startup validation."
+  },
+  "principles": {
+    "kiss": "Use the existing JWT trust boundary without a registry service or database lookup.",
+    "yagni": "Do not add credential management APIs, identity tables, or key rotation infrastructure for selected internal calls.",
+    "single_ownership": "The configured caller owns its service actor ID; possession of the shared application secret is the explicit trust boundary.",
+    "explicit_contracts": "Algorithm, claims, audience, maximum lifetime, actor range, and delegated scope are validated explicitly.",
+    "fail_safe": "Invalid or ambiguous credentials are rejected before handlers run.",
+    "observability": "Existing safe authentication rejection logs remain authoritative; registry-only telemetry is removed.",
+    "least_privilege": "Only selected services receive the shared secret; service JWTs are emitted only by WithAuth, WithPlatform, and WithHttpAuth and contain no originating user identity.",
+    "reversibility": "Before cutover, retain previous binaries, all Ed25519 service key material and IDs, and the complete database backup. Rollback restores the backup and key configuration, verifies previous registry-based startup, then resumes traffic."
+  },
+  "risks": [
+    "Any holder of the shared application secret can mint any service actor and tenant claims; this is accepted because every holder is fully trusted within this internal boundary.",
+    "Application-secret rotation invalidates all outstanding service JWTs.",
+    "HS256 and EdDSA service tokens are incompatible, so all producers and consumers must be deployed atomically with internal traffic fenced.",
+    "The registry schema is removed through an append-only cleanup migration rather than rewriting migration history."
+  ]
+}

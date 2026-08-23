@@ -14,7 +14,6 @@ import (
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
-	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
@@ -132,11 +131,7 @@ func (m *manager) handleTransient(ctx context.Context, rec *Record, err error) {
 		m.logger.Errorw("SIP registration unreachable after max retries — will not retry",
 			"did", rec.DID, "assistant_id", rec.AssistantID, "retries", retry, "error", err)
 		statusUpdate.Status = StatusUnreachable
-		auth := &types.ProjectScope{
-			ProjectId:      &rec.ProjectID,
-			OrganizationId: &rec.OrganizationID,
-			Status:         type_enums.RECORD_ACTIVE.String(),
-		}
+		auth := projectAuthentication(rec.OrganizationID, rec.ProjectID)
 		observer := m.observer(ctx, auth)
 		defer observer.Close(context.Background())
 		attributes := observability.Attributes{
@@ -182,11 +177,7 @@ func (m *manager) handleTransient(ctx context.Context, rec *Record, err error) {
 
 	m.logger.Warnw("SIP registration failed (will retry)",
 		"did", rec.DID, "assistant_id", rec.AssistantID, "retry", retry, "error", err)
-	auth := &types.ProjectScope{
-		ProjectId:      &rec.ProjectID,
-		OrganizationId: &rec.OrganizationID,
-		Status:         type_enums.RECORD_ACTIVE.String(),
-	}
+	auth := projectAuthentication(rec.OrganizationID, rec.ProjectID)
 	observer := m.observer(ctx, auth)
 	defer observer.Close(context.Background())
 	attributes := observability.Attributes{

@@ -70,8 +70,10 @@ func newEndpointLogServiceTest(t *testing.T) (*endpointLogService, *gorm.DB) {
 			created_date datetime,
 			updated_date datetime,
 			status text,
-			created_by integer,
-			updated_by integer,
+			created_actor_type text,
+			created_actor_id integer,
+			updated_actor_type text,
+			updated_actor_id integer,
 			name text,
 			value text,
 			endpoint_log_id integer
@@ -81,8 +83,10 @@ func newEndpointLogServiceTest(t *testing.T) (*endpointLogService, *gorm.DB) {
 			created_date datetime,
 			updated_date datetime,
 			status text,
-			created_by integer,
-			updated_by integer,
+			created_actor_type text,
+			created_actor_id integer,
+			updated_actor_type text,
+			updated_actor_id integer,
 			key text,
 			value text,
 			endpoint_log_id integer
@@ -92,8 +96,10 @@ func newEndpointLogServiceTest(t *testing.T) (*endpointLogService, *gorm.DB) {
 			created_date datetime,
 			updated_date datetime,
 			status text,
-			created_by integer,
-			updated_by integer,
+			created_actor_type text,
+			created_actor_id integer,
+			updated_actor_type text,
+			updated_actor_id integer,
 			name text,
 			value text,
 			description text,
@@ -115,12 +121,44 @@ func newEndpointLogServiceTest(t *testing.T) (*endpointLogService, *gorm.DB) {
 	}, db
 }
 
-func testAuth(userID, orgID, projectID uint64) types.SimplePrinciple {
-	return &types.ServiceScope{
-		UserId:         &userID,
-		OrganizationId: &orgID,
-		ProjectId:      &projectID,
+func testAuth(userID, orgID, projectID uint64) *types.Authentication {
+	return &types.Authentication{
+		AuthType:          types.AuthTypeUser,
+		UserValue:         &types.UserContext{UserID: userID},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: orgID},
+		ProjectValue:      &types.ProjectContext{OrganizationID: orgID, ProjectID: projectID},
 	}
+}
+
+func TestEndpointLogServiceRequiresProjectCapability(t *testing.T) {
+	service, _ := newEndpointLogServiceTest(t)
+	organizationID := uint64(10)
+
+	_, err := service.GetEndpointLog(
+		context.Background(),
+		&types.Authentication{AuthType: types.AuthTypeOrg, OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID}},
+		1,
+		2,
+	)
+	require.Error(t, err)
+}
+
+func TestApplyMetadataAllowsProjectAuthWithoutFakeUser(t *testing.T) {
+	service, db := newEndpointLogServiceTest(t)
+	require.NoError(t, db.Exec("CREATE UNIQUE INDEX idx_endpoint_log_metadata_log_key ON endpoint_log_metadata(endpoint_log_id, key)").Error)
+	organizationID := uint64(10)
+	projectID := uint64(20)
+	auth := &types.Authentication{
+		AuthType:          types.AuthTypeProject,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
+	}
+
+	metadata, err := service.ApplyMetadata(context.Background(), auth, 1, map[string]interface{}{"trace_id": "trace-1"})
+	require.NoError(t, err)
+	require.Len(t, metadata, 1)
+	require.Nil(t, metadata[0].CreatedActor)
+	require.Nil(t, metadata[0].UpdatedActor)
 }
 
 func TestGetEndpointLogPreloadsMetricsAndContext(t *testing.T) {
@@ -141,8 +179,7 @@ func TestGetEndpointLogPreloadsMetricsAndContext(t *testing.T) {
 	require.NoError(t, db.Create(&internal_gorm.EndpointLogMetric{
 		Audited: gorm_models.Audited{Id: 101},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		Metric: gorm_models.Metric{
 			Name:        type_enums.TOTAL_TOKEN.String(),
@@ -154,8 +191,7 @@ func TestGetEndpointLogPreloadsMetricsAndContext(t *testing.T) {
 	require.NoError(t, db.Create(&internal_gorm.EndpointLogMetadata{
 		Audited: gorm_models.Audited{Id: 102},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		Metadata:      *gorm_models.NewMetadata("trace_id", "trace-1"),
 		EndpointLogId: 100,
@@ -163,8 +199,7 @@ func TestGetEndpointLogPreloadsMetricsAndContext(t *testing.T) {
 	require.NoError(t, db.Create(&internal_gorm.EndpointLogArgument{
 		Audited: gorm_models.Audited{Id: 103},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		Argument: gorm_models.Argument{
 			Name:  "prompt",

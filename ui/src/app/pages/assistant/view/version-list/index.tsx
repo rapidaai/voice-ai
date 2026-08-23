@@ -8,6 +8,7 @@ import { TableSection } from '@/app/components/sections/table-section';
 import { Pagination } from '@/app/components/carbon/pagination';
 import { toHumanReadableDateTime } from '@/utils/date';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
+import { auditActorLabel, createdAuditActor } from '@/utils/audit-actor';
 import {
   Tag,
   Button,
@@ -149,7 +150,7 @@ export function Version(props: VersionProps) {
           type: 'LLM',
           typeColor: 'blue' as const,
           description: m?.getDescription() || 'Initial assistant version',
-          createdBy: m?.getCreateduser()?.getName() || '',
+          createdBy: auditActorLabel(createdAuditActor(m)),
           createdDate: m?.getCreateddate(),
           deployType: 'MODEL',
         };
@@ -161,7 +162,7 @@ export function Version(props: VersionProps) {
           type: 'AgentKit',
           typeColor: 'purple' as const,
           description: a?.getDescription() || 'Initial assistant version',
-          createdBy: a?.getCreateduser()?.getName() || '',
+          createdBy: auditActorLabel(createdAuditActor(a)),
           createdDate: a?.getCreateddate(),
           deployType: 'AGENTKIT',
         };
@@ -173,7 +174,7 @@ export function Version(props: VersionProps) {
           type: 'WebSocket',
           typeColor: 'teal' as const,
           description: w?.getDescription() || 'Initial assistant version',
-          createdBy: w?.getCreateduser()?.getName() || '',
+          createdBy: auditActorLabel(createdAuditActor(w)),
           createdDate: w?.getCreateddate(),
           deployType: 'WEBSOCKET',
         };
@@ -185,7 +186,7 @@ export function Version(props: VersionProps) {
           type: 'Agentflow',
           typeColor: 'green' as const,
           description: a?.getDescription() || 'Initial assistant version',
-          createdBy: a?.getCreateduser()?.getName() || '',
+          createdBy: auditActorLabel(createdAuditActor(a)),
           createdDate: a?.getCreateddate(),
           deployType: 'AGENTFLOW',
         };

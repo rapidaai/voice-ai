@@ -47,6 +47,8 @@ async def __index_document(request, data: Dict):
         project_id = data.get("project_id")
         knowledge_id = data.get("knowledge_id")
         knowledge_document_id = data.get("knowledge_document_id")
+        actor_type = data.get("actor_type")
+        actor_id = data.get("actor_id")
 
         if not org_id:
             _log.error(
@@ -80,8 +82,11 @@ async def __index_document(request, data: Dict):
                 "status": "error",
                 "msg": f"Failed to start the knowledge dataset runner.  {knowledge_document_id}",
             }
+        if actor_type not in {"user", "project", "organization", "service", "system"} or not isinstance(actor_id, int) or actor_id <= 0 or actor_id > 9223372036854775807:
+            return {"status": "error", "msg": "Failed to start the knowledge dataset runner. actor identity is invalid"}
         start_at = time.perf_counter()
-        knowledge_service = KnowledgeService(postgres)
+        actor = {"type": actor_type, "id": actor_id}
+        knowledge_service = KnowledgeService(postgres, actor=actor)
         document = knowledge_service.get_knowledge_document(
             knowledge_id=knowledge_id,
             knowledge_document_id=knowledge_document_id,
@@ -103,6 +108,7 @@ async def __index_document(request, data: Dict):
                 knowledge_document=document,
                 integration_client=integration_client,
                 vault_client=vault_client,
+                actor=actor,
                 index_type="paragraph-index",
             ).run()
             end_at = time.perf_counter()

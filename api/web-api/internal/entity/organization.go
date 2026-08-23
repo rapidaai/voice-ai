@@ -36,9 +36,16 @@ type ProjectCredential struct {
 	gorm_model.Audited
 	gorm_model.Mutable
 	gorm_model.Organizational
-	Name        string   `json:"name" gorm:"type:string;size:200;not null"`
-	Key         string   `json:"key" gorm:"type:string;size:200;not null"`
-	CreatedUser UserAuth `json:"createdUser" gorm:"foreignKey:CreatedBy"`
+	Name string `json:"name" gorm:"type:string;size:200;not null"`
+	Key  string `json:"key" gorm:"type:string;size:200;not null"`
+}
+
+type OrganizationCredential struct {
+	gorm_model.Audited
+	gorm_model.Mutable
+	OrganizationId uint64 `json:"organizationId" gorm:"type:bigint;not null"`
+	Name           string `json:"name" gorm:"type:string;size:200;not null"`
+	Key            string `json:"key" gorm:"type:string;size:200;not null"`
 }
 
 type OAuthExternalConnect struct {

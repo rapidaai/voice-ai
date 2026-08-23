@@ -46,10 +46,15 @@ func NewAssistantConversationService(
 }
 
 func (conversationService *assistantConversationService) GetAll(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate, opts *internal_services.GetConversationOption) (int64, []*internal_conversation_entity.AssistantConversation, error) {
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return 0, nil, err
+	}
+
 	const numericMetricValuePattern = `^[0-9]+(\.[0-9]+)?$`
 
 	start := time.Now()
@@ -60,7 +65,7 @@ func (conversationService *assistantConversationService) GetAll(ctx context.Cont
 	)
 	qry := db.Model(internal_conversation_entity.AssistantConversation{})
 	qry = qry.
-		Where("assistant_id = ? AND organization_id = ? AND project_id = ?", assistantId, *auth.GetCurrentOrganizationId(), *auth.GetCurrentProjectId())
+		Where("assistant_id = ? AND organization_id = ? AND project_id = ?", assistantId, projectContext.OrganizationID, projectContext.ProjectID)
 
 	if opts != nil && opts.InjectMetric {
 		qry = qry.
@@ -247,10 +252,15 @@ func (conversationService *assistantConversationService) GetAll(ctx context.Cont
 }
 func (conversationService *assistantConversationService) Get(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	assistantConversationId uint64,
 	opts *internal_services.GetConversationOption) (*internal_conversation_entity.AssistantConversation, error) {
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
+
 	conversationService.logger.Debugf("assistantConversationService.Get with options %+v", opts)
 	start := time.Now()
 	db := conversationService.postgres.DB(ctx)
@@ -259,8 +269,8 @@ func (conversationService *assistantConversationService) Get(
 		Where("id = ? AND assistant_id = ? AND project_id = ? AND organization_id = ?",
 			assistantConversationId,
 			assistantId,
-			*auth.GetCurrentProjectId(),
-			*auth.GetCurrentOrganizationId())
+			projectContext.ProjectID,
+			projectContext.OrganizationID)
 
 	if opts != nil && opts.InjectMetric {
 		qry = qry.
@@ -337,10 +347,15 @@ func (conversationService *assistantConversationService) Get(
 
 func (conversationService *assistantConversationService) GetConversation(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	assistantConversationId uint64,
 	opts *internal_services.GetConversationOption) (*internal_conversation_entity.AssistantConversation, error) {
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
+
 	start := time.Now()
 	db := conversationService.postgres.DB(ctx)
 	var assistantConversation *internal_conversation_entity.AssistantConversation
@@ -348,8 +363,8 @@ func (conversationService *assistantConversationService) GetConversation(
 		Where("id = ? AND assistant_id = ? AND project_id = ? AND organization_id = ?",
 			assistantConversationId,
 			assistantId,
-			*auth.GetCurrentProjectId(),
-			*auth.GetCurrentOrganizationId())
+			projectContext.ProjectID,
+			projectContext.OrganizationID)
 
 	if opts != nil && opts.InjectMetric {
 		qry = qry.
@@ -383,26 +398,28 @@ func (conversationService *assistantConversationService) GetConversation(
 
 func (conversationService *assistantConversationService) CreateConversation(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	identifier string,
 	assistantId uint64,
 	assistantProviderModelId uint64,
 	direction type_enums.ConversationDirection, source utils.RapidaSource) (*internal_conversation_entity.AssistantConversation, error) {
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
+
 	start := time.Now()
 	db := conversationService.postgres.DB(ctx)
 	conversation := &internal_conversation_entity.AssistantConversation{
 		Organizational: gorm_models.Organizational{
-			ProjectId:      *auth.GetCurrentProjectId(),
-			OrganizationId: *auth.GetCurrentOrganizationId(),
+			ProjectId:      projectContext.ProjectID,
+			OrganizationId: projectContext.OrganizationID,
 		},
 		Identifier:               identifier,
 		AssistantId:              assistantId,
 		AssistantProviderModelId: assistantProviderModelId,
 		Source:                   source,
 		Direction:                direction,
-	}
-	if auth.GetUserId() != nil {
-		conversation.Mutable.CreatedBy = *auth.GetUserId()
 	}
 	tx := db.Create(&conversation)
 	if tx.Error != nil {
@@ -416,11 +433,12 @@ func (conversationService *assistantConversationService) CreateConversation(
 
 func (conversationService *assistantConversationService) CreateOrUpdateConversationMetadata(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId,
 	assistantConversationId uint64,
 	metadata []*protos.Metadata,
 ) ([]*internal_conversation_entity.AssistantConversationMetadata, error) {
+
 	start := time.Now()
 	//
 	if len(metadata) == 0 {
@@ -440,10 +458,6 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 			AssistantId: assistantId,
 		}
 		_meta.SetValue(mt.Value)
-		if auth.GetUserId() != nil {
-			_meta.UpdatedBy = *auth.GetUserId()
-			_meta.CreatedBy = *auth.GetUserId()
-		}
 		_metadatas = append(_metadatas, _meta)
 	}
 
@@ -451,7 +465,7 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 		Columns: []clause.Column{{Name: "assistant_conversation_id"}, {Name: "key"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value",
-			"updated_by", "updated_date"}),
+			"updated_date"}),
 	}).Create(&_metadatas)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.CreateOrUpdateConversationMetadata", time.Since(start))
@@ -463,10 +477,11 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 }
 
 func (conversationService *assistantConversationService) CreateOrUpdateConversationOption(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId,
 	assistantConversationId uint64,
 	opts map[string]interface{}) ([]*internal_conversation_entity.AssistantConversationOption, error) {
+
 	start := time.Now()
 	if len(opts) == 0 {
 		return nil, nil
@@ -484,10 +499,6 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 			AssistantId: assistantId,
 		}
 		option.SetValue(o)
-		if auth.GetUserId() != nil {
-			option.CreatedBy = *auth.GetUserId()
-			option.UpdatedBy = *auth.GetUserId()
-		}
 		options = append(options, option)
 	}
 
@@ -495,7 +506,7 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 		Columns: []clause.Column{{Name: "assistant_conversation_id"}, {Name: "key"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value",
-			"updated_by", "updated_date"}),
+			"updated_date"}),
 	}).Create(&options)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.CreateOrUpdateConversationOptions", time.Since(start))
@@ -508,11 +519,12 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 }
 
 func (conversationService *assistantConversationService) CreateOrUpdateConversationArgument(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId,
 	assistantConversationId uint64,
 	arguments map[string]interface{},
 ) ([]*internal_conversation_entity.AssistantConversationArgument, error) {
+
 	start := time.Now()
 	if len(arguments) == 0 {
 		return nil, nil
@@ -529,9 +541,6 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 			},
 		}
 		ag.SetValue(arg)
-		if auth.GetUserId() != nil {
-			ag.UpdatedBy = *auth.GetUserId()
-		}
 		_arguments = append(_arguments, ag)
 	}
 
@@ -539,7 +548,7 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 		Columns: []clause.Column{{Name: "assistant_conversation_id"}, {Name: "name"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value",
-			"updated_by", "updated_date"}),
+			"updated_date"}),
 	}).Create(&_arguments)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.ApplyConversationArgument", time.Since(start))
@@ -558,11 +567,12 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 **/
 func (conversationService *assistantConversationService) CreateOrUpdateConversationMetrics(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId,
 	assistantConversationId uint64,
 	metrics []*protos.Metric,
 ) ([]*internal_conversation_entity.AssistantConversationMetric, error) {
+
 	start := time.Now()
 	db := conversationService.postgres.DB(ctx)
 	mtrs := make([]*internal_conversation_entity.AssistantConversationMetric, 0)
@@ -577,10 +587,6 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 			AssistantId:             assistantId,
 		}
 
-		if auth.GetUserId() != nil {
-			_mtr.UpdatedBy = *auth.GetUserId()
-			_mtr.CreatedBy = *auth.GetUserId()
-		}
 		mtrs = append(mtrs, _mtr)
 	}
 
@@ -588,7 +594,7 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 		Columns: []clause.Column{{Name: "assistant_conversation_id"}, {Name: "name"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value", "description",
-			"updated_by", "updated_date"}),
+			"updated_date"}),
 	}).Create(&mtrs)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.CreateOrUpdateConversationMetrics", time.Since(start))
@@ -601,11 +607,12 @@ func (conversationService *assistantConversationService) CreateOrUpdateConversat
 
 func (conversationService *assistantConversationService) CreateCustomConversationMetric(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	assistantConversationId uint64,
 	metrics []*protos.Metric,
 ) ([]*internal_conversation_entity.AssistantConversationMetric, error) {
+
 	start := time.Now()
 	db := conversationService.postgres.DB(ctx)
 	mtrx := make([]*internal_conversation_entity.AssistantConversationMetric, 0)
@@ -620,10 +627,6 @@ func (conversationService *assistantConversationService) CreateCustomConversatio
 			AssistantConversationId: assistantConversationId,
 		}
 
-		if auth.GetUserId() != nil {
-			metric.UpdatedBy = *auth.GetUserId()
-			metric.CreatedBy = *auth.GetUserId()
-		}
 		mtrx = append(mtrx, metric)
 	}
 
@@ -631,7 +634,7 @@ func (conversationService *assistantConversationService) CreateCustomConversatio
 		Columns: []clause.Column{{Name: "assistant_conversation_id"}, {Name: "name"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"value", "description",
-			"updated_by", "updated_date"}),
+			"updated_date"}),
 	}).Create(&mtrx)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.CreateCustomConversationMetric", time.Since(start))
@@ -644,15 +647,20 @@ func (conversationService *assistantConversationService) CreateCustomConversatio
 
 func (conversationService *assistantConversationService) CreateConversationRecording(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId,
 	assistantConversationId uint64,
 	user, assistant, conversation []byte,
 ) (*internal_conversation_entity.AssistantConversationRecording, error) {
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
+
 	start := time.Now()
 	db := conversationService.postgres.DB(ctx)
 
-	s3Prefix := conversationService.ObjectPrefix(*auth.GetCurrentOrganizationId(), *auth.GetCurrentProjectId())
+	s3Prefix := conversationService.ObjectPrefix(projectContext.OrganizationID, projectContext.ProjectID)
 	recordingId := gorm_generator.ID()
 
 	userKey := conversationService.ObjectKey(s3Prefix, assistantConversationId, fmt.Sprintf("user-%d.wav", recordingId))
@@ -682,17 +690,14 @@ func (conversationService *assistantConversationService) CreateConversationRecor
 			Id: recordingId,
 		},
 		Organizational: gorm_models.Organizational{
-			ProjectId:      *auth.GetCurrentProjectId(),
-			OrganizationId: *auth.GetCurrentOrganizationId(),
+			ProjectId:      projectContext.ProjectID,
+			OrganizationId: projectContext.OrganizationID,
 		},
 		AssistantId:              assistantId,
 		AssistantConversationId:  assistantConversationId,
 		AssistantRecordingUrl:    assistantKey,
 		UserRecordingUrl:         userKey,
 		ConversationRecordingUrl: conversationKey,
-	}
-	if auth.GetUserId() != nil {
-		conversationRecording.Mutable.CreatedBy = *auth.GetUserId()
 	}
 	tx := db.Create(&conversationRecording)
 	if tx.Error != nil {

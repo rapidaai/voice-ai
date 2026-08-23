@@ -20,7 +20,7 @@ type SessionConfig struct {
 	CallID          string
 	Codec           *Codec
 	Logger          commons.Logger
-	Auth            types.SimplePrinciple
+	Auth            *types.Authentication
 	Assistant       *internal_assistant_entity.Assistant
 	ConversationID  uint64
 	ContextID       string

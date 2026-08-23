@@ -33,10 +33,9 @@ type SessionEstablishedPipeline struct {
 	VaultCredential *protos.VaultCredential
 	Direction       CallDirection
 	AssistantID     uint64
-	Auth            types.SimplePrinciple
-	RequestURI      string
-	FromIdentity    string
-	ToIdentity      string
+	Auth            *types.Authentication
+	FromURI         string
+	ToURI           string
 	ConversationID  uint64 // Non-zero for outbound (already created by channel pipeline)
 }
 

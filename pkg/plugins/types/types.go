@@ -16,7 +16,7 @@ const (
 type ExecuteDeps struct {
 	VaultClient web_client.VaultClient
 	Logger      commons.Logger
-	Auth        types.SimplePrinciple
+	Auth        *types.Authentication
 }
 
 type ExecuteRequest struct {

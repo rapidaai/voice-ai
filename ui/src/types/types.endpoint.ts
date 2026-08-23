@@ -1,4 +1,9 @@
-import { Endpoint, EndpointProviderModel } from '@rapidaai/react';
+import {
+  Endpoint,
+  EndpointCacheConfiguration,
+  EndpointProviderModel,
+  EndpointRetryConfiguration,
+} from '@rapidaai/react';
 import { ColumnarType } from './types.columnar';
 import { PaginatedType } from './types.paginated';
 
@@ -143,7 +148,7 @@ export type EndpointType = {
     token: string,
     userId: string,
     onError: (err: string) => void,
-    onSuccess: (e: Endpoint) => void,
+    onSuccess: (endpoint: Endpoint) => void,
   ) => void;
 
   /**
@@ -172,7 +177,7 @@ export type EndpointType = {
     token: string,
     userId: string,
     onError: (err: string) => void,
-    onSuccess: (e: Endpoint) => void,
+    onSuccess: (configuration: EndpointRetryConfiguration) => void,
   ) => void;
 
   /**
@@ -196,7 +201,7 @@ export type EndpointType = {
     token: string,
     userId: string,
     onError: (err: string) => void,
-    onSuccess: (e: Endpoint) => void,
+    onSuccess: (configuration: EndpointCacheConfiguration) => void,
   ) => void;
 
   /**

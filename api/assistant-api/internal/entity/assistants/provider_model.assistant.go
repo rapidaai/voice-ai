@@ -16,7 +16,7 @@ import (
 type AssistantProvider struct {
 	gorm_model.Audited
 	AssistantId uint64 `json:"assistantId" gorm:"type:bigint;size:20"`
-	CreatedBy   uint64 `json:"createdBy" gorm:"type:bigint;size:20;not null"`
+	gorm_model.ActorAudit
 	Status      string `json:"status" gorm:"type:string;size:50;not null;default:ACTIVE"`
 	Description string `json:"description" gorm:"type:string"`
 }

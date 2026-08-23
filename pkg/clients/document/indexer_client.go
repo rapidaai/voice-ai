@@ -22,7 +22,7 @@ import (
 )
 
 type IndexerServiceClient interface {
-	IndexKnowledgeDocument(ctx context.Context, auth types.SimplePrinciple,
+	IndexKnowledgeDocument(ctx context.Context, auth *types.Authentication,
 		in *protos.IndexKnowledgeDocumentRequest) (*protos.IndexKnowledgeDocumentResponse, error)
 }
 
@@ -45,7 +45,7 @@ func NewIndexerServiceClient(config *config.AppConfig, logger commons.Logger, re
 	}
 }
 
-func (client *indexerServiceClient) IndexKnowledgeDocument(ctx context.Context, auth types.SimplePrinciple, in *protos.IndexKnowledgeDocumentRequest) (*protos.IndexKnowledgeDocumentResponse, error) {
+func (client *indexerServiceClient) IndexKnowledgeDocument(ctx context.Context, auth *types.Authentication, in *protos.IndexKnowledgeDocumentRequest) (*protos.IndexKnowledgeDocumentResponse, error) {
 	reqBody, err := json.Marshal(in)
 	if err != nil {
 		client.logger.Errorf("unable to marshal request body: %v", err)
@@ -59,7 +59,12 @@ func (client *indexerServiceClient) IndexKnowledgeDocument(ctx context.Context, 
 		return nil, err
 	}
 
-	resp, err := client.client.Do(client.WithHttpAuth(ctx, auth, req))
+	authenticatedRequest, err := client.WithHttpAuth(ctx, auth, req)
+	if err != nil {
+		client.logger.Errorf("unable to authenticate request: %v", err)
+		return nil, err
+	}
+	resp, err := client.client.Do(authenticatedRequest)
 	if err != nil {
 		client.logger.Errorf("unable to send request: %v", err)
 		return nil, err

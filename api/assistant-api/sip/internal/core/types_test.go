@@ -200,6 +200,32 @@ func TestParseConfigFromVault_InvalidHeadersIgnored(t *testing.T) {
 	assert.Nil(t, cfg.CustomHeaders)
 }
 
+func TestExtractDIDFromURI_PhoneNumber(t *testing.T) {
+	did := ExtractDIDFromURI("sip:15551234567@pstn.twilio.com")
+	assert.Equal(t, "+15551234567", did)
+}
+
+func TestExtractDIDFromURI_AlreadyE164(t *testing.T) {
+	did := ExtractDIDFromURI("sip:+15551234567@pstn.twilio.com")
+	assert.Equal(t, "+15551234567", did)
+}
+
+func TestExtractDIDFromURI_SkipsCredentialPair(t *testing.T) {
+	did := ExtractDIDFromURI("sip:12345:apikey@host.com")
+	assert.Equal(t, "", did)
+}
+
+func TestExtractDIDFromURI_Empty(t *testing.T) {
+	did := ExtractDIDFromURI("")
+	assert.Equal(t, "", did)
+}
+
+func TestExtractDIDFromURI_ShortUser(t *testing.T) {
+	// Users with 5 or fewer chars don't get "+" prefix
+	did := ExtractDIDFromURI("sip:ext42@pbx.local")
+	assert.Equal(t, "ext42", did)
+}
+
 func TestApplyOperationalDefaults_FillsUnset(t *testing.T) {
 	cfg := &Config{Server: "host.com"}
 	cfg.ApplyOperationalDefaults(5060, TransportTCP, 10000, 20000)

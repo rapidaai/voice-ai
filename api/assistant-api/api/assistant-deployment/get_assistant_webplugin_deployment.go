@@ -7,23 +7,23 @@ package assistant_deployment_api
 
 import (
 	"context"
-	"errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
-	assistant_api "github.com/rapidaai/protos"
 	protos "github.com/rapidaai/protos"
 )
 
 // GetAssistantWebpluginDeployment implements protos.AssistantDeploymentServiceServer.
 func (deploymentApi *assistantDeploymentGrpcApi) GetAssistantWebpluginDeployment(ctx context.Context, getter *protos.GetAssistantDeploymentRequest) (*protos.GetAssistantWebpluginDeploymentResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || iAuth.GetCurrentProjectId() == nil {
-		deploymentApi.logger.Errorf("unauthenticated request for invoke")
-		return utils.Error[assistant_api.GetAssistantWebpluginDeploymentResponse](
-			errors.New("unauthenticated request for create assistant whatsapp deployment"),
-			"Please provider valid service credentials to perfom invoke, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	webpluginDeployment, err := deploymentApi.deploymentService.GetAssistantWebpluginDeployment(ctx, iAuth, getter.GetAssistantId())
 	if err != nil {

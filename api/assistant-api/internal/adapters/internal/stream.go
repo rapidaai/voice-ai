@@ -29,7 +29,7 @@ import (
 // Shutdown relies on Recv() returning an error (EOF or context-cancelled)
 // or a ConversationDisconnection message. All streamer implementations
 // guarantee one of these when the connection ends.
-func (t *genericRequestor) Talk(_ context.Context, auth types.SimplePrinciple) error {
+func (t *genericRequestor) Talk(_ context.Context, auth *types.Authentication) error {
 	totalTime := time.Now()
 	for {
 		req, err := t.streamer.Recv()
@@ -261,7 +261,7 @@ func (t *genericRequestor) Notify(ctx context.Context, actionDatas ...internal_t
 // The gRPC stream is already open by the time Connect is called; any init errors
 // are delivered to the client via InitializationFailedPacket → ConversationError
 // proto on the stream, not via this return value.
-func (r *genericRequestor) OnConnect(ctx context.Context, auth types.SimplePrinciple, config *protos.ConversationInitialization) {
+func (r *genericRequestor) OnConnect(ctx context.Context, auth *types.Authentication, config *protos.ConversationInitialization) {
 	if err := r.sessionLifecycle.Transition(adapter_lifecycle.EventConnectRequested); err != nil {
 		r.logger.Tracef(ctx, "connect ignored due to session lifecycle transition: %v", err)
 		return

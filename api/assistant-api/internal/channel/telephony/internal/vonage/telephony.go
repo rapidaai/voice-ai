@@ -90,7 +90,7 @@ func (vng *vonageTelephony) CatchAllStatusCallback(ctx *gin.Context) (*internal_
 	return callback.StatusInfo(), nil
 }
 
-func (vng *vonageTelephony) StatusCallback(c *gin.Context, auth types.SimplePrinciple, assistantId uint64, assistantConversationId uint64) (*internal_type.StatusInfo, error) {
+func (vng *vonageTelephony) StatusCallback(c *gin.Context, auth *types.Authentication, assistantId uint64, assistantConversationId uint64) (*internal_type.StatusInfo, error) {
 	var payload utils.Option
 	rawCallbackPayload := c.Request.URL.RawQuery
 	if len(c.Request.URL.Query()) > 0 {
@@ -126,7 +126,7 @@ func (vng *vonageTelephony) StatusCallback(c *gin.Context, auth types.SimplePrin
 
 func (vng *vonageTelephony) OutboundCall(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	toPhone string,
 	fromPhone string,
 	assistant *internal_assistant_entity.Assistant, assistantConversationId uint64,
@@ -228,7 +228,7 @@ func (vng *vonageTelephony) OutboundCall(
 	return info, nil
 }
 
-func (vng *vonageTelephony) InboundCall(c *gin.Context, auth types.SimplePrinciple, assistantId uint64, clientNumber string, assistantConversationId uint64) error {
+func (vng *vonageTelephony) InboundCall(c *gin.Context, auth *types.Authentication, assistantId uint64, clientNumber string, assistantConversationId uint64) error {
 	contextID, _ := c.Get("contextId")
 	ctxID := fmt.Sprintf("%v", contextID)
 

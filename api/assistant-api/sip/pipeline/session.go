@@ -30,9 +30,9 @@ func (d *Dispatcher) createConversation(ctx context.Context, stage sip_infra.Ses
 		dirEnum = type_enums.DIRECTION_OUTBOUND
 	}
 
-	conversationIdentifier := stage.FromIdentity
-	if stage.Direction == sip_infra.CallDirectionOutbound {
-		conversationIdentifier = stage.ToIdentity
+	callerNumber := sip_infra.ExtractDIDFromURI(stage.FromURI)
+	if callerNumber == "" {
+		callerNumber = stage.FromURI
 	}
 
 	assistant := stage.Session.GetAssistant()
@@ -55,7 +55,7 @@ func (d *Dispatcher) createConversation(ctx context.Context, stage sip_infra.Ses
 		return 0, fmt.Errorf("assistant conversation service not configured")
 	}
 	conversation, err := d.assistantConversationService.CreateConversation(
-		ctx, stage.Auth, conversationIdentifier, assistantID, assistantProviderID, dirEnum, utils.PhoneCall,
+		ctx, stage.Auth, callerNumber, assistantID, assistantProviderID, dirEnum, utils.PhoneCall,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create conversation: %w", err)
@@ -69,7 +69,7 @@ func (d *Dispatcher) ensureCallContext(ctx context.Context, stage sip_infra.Sess
 	if stage.Direction == sip_infra.CallDirectionOutbound {
 		contextID := stage.Session.GetContextID()
 		if contextID == "" {
-			return reconstructCallContext(stage.Auth, stage.AssistantID, conversationID, dirStr, callID, "", stage.FromIdentity, stage.ToIdentity), nil
+			return reconstructCallContext(stage.Auth, stage.AssistantID, conversationID, dirStr, callID, "", stage.FromURI, stage.ToURI)
 		}
 		if claimed, err := d.callContextStore.Claim(ctx, contextID); err == nil {
 			return claimed, nil
@@ -77,25 +77,20 @@ func (d *Dispatcher) ensureCallContext(ctx context.Context, stage sip_infra.Sess
 		if loaded, err := d.callContextStore.Get(ctx, contextID); err == nil {
 			return loaded, nil
 		}
-		return reconstructCallContext(stage.Auth, stage.AssistantID, conversationID, dirStr, callID, contextID, stage.FromIdentity, stage.ToIdentity), nil
+		return reconstructCallContext(stage.Auth, stage.AssistantID, conversationID, dirStr, callID, contextID, stage.FromURI, stage.ToURI)
 	}
 
 	callContext := &callcontext.CallContext{
 		AssistantID:    stage.AssistantID,
 		ConversationID: conversationID,
-		AuthToken:      stage.Auth.GetCurrentToken(),
-		AuthType:       stage.Auth.Type().String(),
 		Direction:      dirStr,
 		Provider:       "sip",
-		CallerNumber:   stage.FromIdentity,
-		FromNumber:     stage.ToIdentity,
+		CallerNumber:   extractDIDOrRaw(stage.FromURI),
+		FromNumber:     extractDIDOrRaw(stage.ToURI),
 		ChannelUUID:    callID,
 	}
-	if pid := stage.Auth.GetCurrentProjectId(); pid != nil {
-		callContext.ProjectID = *pid
-	}
-	if oid := stage.Auth.GetCurrentOrganizationId(); oid != nil {
-		callContext.OrganizationID = *oid
+	if err := callContext.SetAuthentication(stage.Auth); err != nil {
+		return nil, err
 	}
 	if assistant := stage.Session.GetAssistant(); assistant != nil {
 		callContext.AssistantProviderId = assistant.AssistantProviderId
@@ -125,26 +120,23 @@ func (d *Dispatcher) setupCall(ctx context.Context, stage sip_infra.SessionEstab
 		AssistantID:    stage.AssistantID,
 		ConversationID: conversationID,
 		CallContext:    cc,
+		Auth:           stage.Auth,
 	}
 	if assistant != nil {
 		result.AssistantID = assistant.Id
 		result.AssistantProviderId = assistant.AssistantProviderId
 	}
-	if stage.Auth != nil {
-		result.AuthToken = stage.Auth.GetCurrentToken()
-		result.AuthType = stage.Auth.Type().String()
-		if stage.Auth.GetCurrentProjectId() != nil {
-			result.ProjectID = *stage.Auth.GetCurrentProjectId()
-		}
-		if stage.Auth.GetCurrentOrganizationId() != nil {
-			result.OrganizationID = *stage.Auth.GetCurrentOrganizationId()
-		}
+	if projectContext, err := stage.Auth.ProjectContext(); err == nil {
+		result.OrganizationID = projectContext.OrganizationID
+		result.ProjectID = projectContext.ProjectID
+	} else if organizationContext, err := stage.Auth.OrganizationContext(); err == nil {
+		result.OrganizationID = organizationContext.OrganizationID
 	}
 
 	return result, nil
 }
 
-func (d *Dispatcher) createObserver(ctx context.Context, scope *CallSetupResult, auth types.SimplePrinciple) observability.Recorder {
+func (d *Dispatcher) createObserver(ctx context.Context, scope *CallSetupResult, auth *types.Authentication) observability.Recorder {
 	recorder := observability.New(
 		observability.WithLogger(d.logger),
 		observability.WithAuth(auth),
@@ -179,37 +171,42 @@ func (d *Dispatcher) createObserver(ctx context.Context, scope *CallSetupResult,
 }
 
 func reconstructCallContext(
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantID uint64,
 	conversationID uint64,
 	direction string,
 	callID string,
 	contextID string,
-	fromIdentity string,
-	toIdentity string,
-) *callcontext.CallContext {
+	fromURI string,
+	toURI string,
+) (*callcontext.CallContext, error) {
 	callContext := &callcontext.CallContext{
 		AssistantID:    assistantID,
 		ConversationID: conversationID,
-		AuthToken:      auth.GetCurrentToken(),
-		AuthType:       auth.Type().String(),
 		Direction:      direction,
 		Provider:       "sip",
 		ChannelUUID:    callID,
 		ContextID:      contextID,
 	}
+	if err := callContext.SetAuthentication(auth); err != nil {
+		return nil, err
+	}
 	if direction == string(sip_infra.CallDirectionOutbound) {
-		callContext.CallerNumber = toIdentity
-		callContext.FromNumber = fromIdentity
+		callContext.CallerNumber = extractDIDOrRaw(toURI)
+		callContext.FromNumber = extractDIDOrRaw(fromURI)
 	} else {
-		callContext.CallerNumber = fromIdentity
-		callContext.FromNumber = toIdentity
+		callContext.CallerNumber = extractDIDOrRaw(fromURI)
+		callContext.FromNumber = extractDIDOrRaw(toURI)
 	}
-	if pid := auth.GetCurrentProjectId(); pid != nil {
-		callContext.ProjectID = *pid
+	return callContext, nil
+}
+
+func extractDIDOrRaw(uri string) string {
+	if uri == "" {
+		return ""
 	}
-	if oid := auth.GetCurrentOrganizationId(); oid != nil {
-		callContext.OrganizationID = *oid
+	if did := sip_infra.ExtractDIDFromURI(uri); did != "" {
+		return did
 	}
-	return callContext
+	return uri
 }

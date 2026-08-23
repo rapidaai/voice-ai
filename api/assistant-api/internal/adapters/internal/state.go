@@ -85,7 +85,7 @@ func (gr *genericRequestor) textToSpeechTransformerConfig() (*internal_assistant
 	return nil, errors.New("audio is not enabled for the source")
 }
 
-func (dm *genericRequestor) Auth() types.SimplePrinciple {
+func (dm *genericRequestor) Auth() *types.Authentication {
 	return dm.auth
 }
 

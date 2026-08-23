@@ -7,6 +7,8 @@ package knowledge_api
 
 import (
 	"context"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/rapidaai/pkg/exceptions"
 	"github.com/rapidaai/pkg/types"
@@ -15,10 +17,13 @@ import (
 )
 
 func (knowledgeApi *knowledgeGrpcApi) GetAllKnowledgeLog(ctx context.Context, gaar *knowledge_api.GetAllKnowledgeLogRequest) (*knowledge_api.GetAllKnowledgeLogResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !iAuth.HasProject() {
-		knowledgeApi.logger.Errorf("unauthenticated request for invoke")
-		return exceptions.AuthenticationError[knowledge_api.GetAllKnowledgeLogResponse]()
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	cnt, epms, err := knowledgeApi.knowledgeService.GetAllLog(ctx,
 		iAuth,

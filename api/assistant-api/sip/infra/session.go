@@ -230,11 +230,11 @@ func (s *Session) Disconnect() {
 	s.inner.Disconnect()
 }
 
-func (s *Session) GetAuth() types.SimplePrinciple {
+func (s *Session) GetAuth() *types.Authentication {
 	return s.inner.GetAuth()
 }
 
-func (s *Session) SetAuth(auth types.SimplePrinciple) {
+func (s *Session) SetAuth(auth *types.Authentication) {
 	s.inner.SetAuth(auth)
 }
 

@@ -18,8 +18,8 @@ import (
 )
 
 func (deploymentApi *AssistantDeploymentApi) GetAssistantWebpluginDeploymentRest(c *gin.Context) {
-	auth, isAuthenticated := types.GetAuthPrinciple(c)
-	if !isAuthenticated {
+	auth, authErr := types.Authorize(c.Request.Context())
+	if authErr != nil {
 		c.JSON(pkg_errors.GetAssistantWebpluginDeploymentUnauthenticated.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.GetAssistantWebpluginDeploymentUnauthenticated.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -31,7 +31,8 @@ func (deploymentApi *AssistantDeploymentApi) GetAssistantWebpluginDeploymentRest
 		})
 		return
 	}
-	if !auth.HasUser() || !auth.HasProject() || !auth.HasOrganization() {
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	if scopeErr != nil {
 		c.JSON(pkg_errors.GetAssistantWebpluginDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.GetAssistantWebpluginDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
 			Success: utils.Ptr(false),
@@ -58,7 +59,7 @@ func (deploymentApi *AssistantDeploymentApi) GetAssistantWebpluginDeploymentRest
 		return
 	}
 
-	deployment, err := deploymentApi.deploymentService.GetAssistantWebpluginDeployment(c, auth, assistantId)
+	deployment, err := deploymentApi.deploymentService.GetAssistantWebpluginDeployment(c, iAuth, assistantId)
 	if err != nil {
 		deploymentApi.logger.Errorf("unable to get assistant webplugin deployment: %v", err)
 		c.JSON(pkg_errors.GetAssistantWebpluginDeploymentGetDeployment.HTTPStatusCode, openapi.ErrorResponse{

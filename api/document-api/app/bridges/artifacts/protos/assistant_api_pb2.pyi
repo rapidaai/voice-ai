@@ -16,7 +16,7 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class Assistant(_message.Message):
-    __slots__ = ("id", "status", "visibility", "source", "sourceIdentifier", "projectId", "organizationId", "assistantProvider", "assistantProviderId", "name", "description", "assistantProviderModel", "assistantProviderAgentkit", "assistantProviderWebsocket", "assistantProviderAgentflow", "assistantTag", "createdBy", "createdUser", "updatedBy", "updatedUser", "createdDate", "updatedDate", "debuggerDeployment", "phoneDeployment", "whatsappDeployment", "webPluginDeployment", "apiDeployment", "assistantConversations", "assistantTools", "assistantConfigurations")
+    __slots__ = ("id", "status", "visibility", "source", "sourceIdentifier", "projectId", "organizationId", "assistantProvider", "assistantProviderId", "name", "description", "assistantProviderModel", "assistantProviderAgentkit", "assistantProviderWebsocket", "assistantProviderAgentflow", "assistantTag", "createdActor", "updatedActor", "createdDate", "updatedDate", "debuggerDeployment", "phoneDeployment", "whatsappDeployment", "webPluginDeployment", "apiDeployment", "assistantConversations", "assistantTools", "assistantConfigurations")
     ID_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
     VISIBILITY_FIELD_NUMBER: _ClassVar[int]
@@ -33,10 +33,8 @@ class Assistant(_message.Message):
     ASSISTANTPROVIDERWEBSOCKET_FIELD_NUMBER: _ClassVar[int]
     ASSISTANTPROVIDERAGENTFLOW_FIELD_NUMBER: _ClassVar[int]
     ASSISTANTTAG_FIELD_NUMBER: _ClassVar[int]
-    CREATEDBY_FIELD_NUMBER: _ClassVar[int]
-    CREATEDUSER_FIELD_NUMBER: _ClassVar[int]
-    UPDATEDBY_FIELD_NUMBER: _ClassVar[int]
-    UPDATEDUSER_FIELD_NUMBER: _ClassVar[int]
+    CREATEDACTOR_FIELD_NUMBER: _ClassVar[int]
+    UPDATEDACTOR_FIELD_NUMBER: _ClassVar[int]
     CREATEDDATE_FIELD_NUMBER: _ClassVar[int]
     UPDATEDDATE_FIELD_NUMBER: _ClassVar[int]
     DEBUGGERDEPLOYMENT_FIELD_NUMBER: _ClassVar[int]
@@ -63,10 +61,8 @@ class Assistant(_message.Message):
     assistantProviderWebsocket: _assistant_provider_pb2.AssistantProviderWebsocket
     assistantProviderAgentflow: _assistant_provider_pb2.AssistantProviderAgentflow
     assistantTag: _common_pb2.Tag
-    createdBy: int
-    createdUser: _common_pb2.User
-    updatedBy: int
-    updatedUser: _common_pb2.User
+    createdActor: _common_pb2.AuditActor
+    updatedActor: _common_pb2.AuditActor
     createdDate: _timestamp_pb2.Timestamp
     updatedDate: _timestamp_pb2.Timestamp
     debuggerDeployment: _assistant_deployment_pb2.AssistantDebuggerDeployment
@@ -77,7 +73,7 @@ class Assistant(_message.Message):
     assistantConversations: _containers.RepeatedCompositeFieldContainer[_common_pb2.AssistantConversation]
     assistantTools: _containers.RepeatedCompositeFieldContainer[_assistant_tool_pb2.AssistantTool]
     assistantConfigurations: _containers.RepeatedCompositeFieldContainer[AssistantConfiguration]
-    def __init__(self, id: _Optional[int] = ..., status: _Optional[str] = ..., visibility: _Optional[str] = ..., source: _Optional[str] = ..., sourceIdentifier: _Optional[int] = ..., projectId: _Optional[int] = ..., organizationId: _Optional[int] = ..., assistantProvider: _Optional[str] = ..., assistantProviderId: _Optional[int] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., assistantProviderModel: _Optional[_Union[_assistant_provider_pb2.AssistantProviderModel, _Mapping]] = ..., assistantProviderAgentkit: _Optional[_Union[_assistant_provider_pb2.AssistantProviderAgentkit, _Mapping]] = ..., assistantProviderWebsocket: _Optional[_Union[_assistant_provider_pb2.AssistantProviderWebsocket, _Mapping]] = ..., assistantProviderAgentflow: _Optional[_Union[_assistant_provider_pb2.AssistantProviderAgentflow, _Mapping]] = ..., assistantTag: _Optional[_Union[_common_pb2.Tag, _Mapping]] = ..., createdBy: _Optional[int] = ..., createdUser: _Optional[_Union[_common_pb2.User, _Mapping]] = ..., updatedBy: _Optional[int] = ..., updatedUser: _Optional[_Union[_common_pb2.User, _Mapping]] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., debuggerDeployment: _Optional[_Union[_assistant_deployment_pb2.AssistantDebuggerDeployment, _Mapping]] = ..., phoneDeployment: _Optional[_Union[_assistant_deployment_pb2.AssistantPhoneDeployment, _Mapping]] = ..., whatsappDeployment: _Optional[_Union[_assistant_deployment_pb2.AssistantWhatsappDeployment, _Mapping]] = ..., webPluginDeployment: _Optional[_Union[_assistant_deployment_pb2.AssistantWebpluginDeployment, _Mapping]] = ..., apiDeployment: _Optional[_Union[_assistant_deployment_pb2.AssistantApiDeployment, _Mapping]] = ..., assistantConversations: _Optional[_Iterable[_Union[_common_pb2.AssistantConversation, _Mapping]]] = ..., assistantTools: _Optional[_Iterable[_Union[_assistant_tool_pb2.AssistantTool, _Mapping]]] = ..., assistantConfigurations: _Optional[_Iterable[_Union[AssistantConfiguration, _Mapping]]] = ...) -> None: ...
+    def __init__(self, id: _Optional[int] = ..., status: _Optional[str] = ..., visibility: _Optional[str] = ..., source: _Optional[str] = ..., sourceIdentifier: _Optional[int] = ..., projectId: _Optional[int] = ..., organizationId: _Optional[int] = ..., assistantProvider: _Optional[str] = ..., assistantProviderId: _Optional[int] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., assistantProviderModel: _Optional[_Union[_assistant_provider_pb2.AssistantProviderModel, _Mapping]] = ..., assistantProviderAgentkit: _Optional[_Union[_assistant_provider_pb2.AssistantProviderAgentkit, _Mapping]] = ..., assistantProviderWebsocket: _Optional[_Union[_assistant_provider_pb2.AssistantProviderWebsocket, _Mapping]] = ..., assistantProviderAgentflow: _Optional[_Union[_assistant_provider_pb2.AssistantProviderAgentflow, _Mapping]] = ..., assistantTag: _Optional[_Union[_common_pb2.Tag, _Mapping]] = ..., createdActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., updatedActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., debuggerDeployment: _Optional[_Union[_assistant_deployment_pb2.AssistantDebuggerDeployment, _Mapping]] = ..., phoneDeployment: _Optional[_Union[_assistant_deployment_pb2.AssistantPhoneDeployment, _Mapping]] = ..., whatsappDeployment: _Optional[_Union[_assistant_deployment_pb2.AssistantWhatsappDeployment, _Mapping]] = ..., webPluginDeployment: _Optional[_Union[_assistant_deployment_pb2.AssistantWebpluginDeployment, _Mapping]] = ..., apiDeployment: _Optional[_Union[_assistant_deployment_pb2.AssistantApiDeployment, _Mapping]] = ..., assistantConversations: _Optional[_Iterable[_Union[_common_pb2.AssistantConversation, _Mapping]]] = ..., assistantTools: _Optional[_Iterable[_Union[_assistant_tool_pb2.AssistantTool, _Mapping]]] = ..., assistantConfigurations: _Optional[_Iterable[_Union[AssistantConfiguration, _Mapping]]] = ...) -> None: ...
 
 class CreateAssistantRequest(_message.Message):
     __slots__ = ("assistantProvider", "assistantKnowledges", "assistantTools", "description", "visibility", "language", "source", "sourceIdentifier", "tags", "name")
@@ -144,7 +140,7 @@ class GetAllAssistantRequest(_message.Message):
     def __init__(self, paginate: _Optional[_Union[_common_pb2.Paginate, _Mapping]] = ..., criterias: _Optional[_Iterable[_Union[_common_pb2.Criteria, _Mapping]]] = ...) -> None: ...
 
 class AssistantConfiguration(_message.Message):
-    __slots__ = ("id", "assistantId", "projectId", "organizationId", "configurationType", "provider", "enabled", "options", "status", "createdBy", "updatedBy", "createdDate", "updatedDate")
+    __slots__ = ("id", "assistantId", "projectId", "organizationId", "configurationType", "provider", "enabled", "options", "status", "createdActor", "updatedActor", "createdDate", "updatedDate")
     ID_FIELD_NUMBER: _ClassVar[int]
     ASSISTANTID_FIELD_NUMBER: _ClassVar[int]
     PROJECTID_FIELD_NUMBER: _ClassVar[int]
@@ -154,8 +150,8 @@ class AssistantConfiguration(_message.Message):
     ENABLED_FIELD_NUMBER: _ClassVar[int]
     OPTIONS_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
-    CREATEDBY_FIELD_NUMBER: _ClassVar[int]
-    UPDATEDBY_FIELD_NUMBER: _ClassVar[int]
+    CREATEDACTOR_FIELD_NUMBER: _ClassVar[int]
+    UPDATEDACTOR_FIELD_NUMBER: _ClassVar[int]
     CREATEDDATE_FIELD_NUMBER: _ClassVar[int]
     UPDATEDDATE_FIELD_NUMBER: _ClassVar[int]
     id: int
@@ -167,11 +163,11 @@ class AssistantConfiguration(_message.Message):
     enabled: bool
     options: _containers.RepeatedCompositeFieldContainer[_common_pb2.Metadata]
     status: str
-    createdBy: int
-    updatedBy: int
+    createdActor: _common_pb2.AuditActor
+    updatedActor: _common_pb2.AuditActor
     createdDate: _timestamp_pb2.Timestamp
     updatedDate: _timestamp_pb2.Timestamp
-    def __init__(self, id: _Optional[int] = ..., assistantId: _Optional[int] = ..., projectId: _Optional[int] = ..., organizationId: _Optional[int] = ..., configurationType: _Optional[str] = ..., provider: _Optional[str] = ..., enabled: bool = ..., options: _Optional[_Iterable[_Union[_common_pb2.Metadata, _Mapping]]] = ..., status: _Optional[str] = ..., createdBy: _Optional[int] = ..., updatedBy: _Optional[int] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, id: _Optional[int] = ..., assistantId: _Optional[int] = ..., projectId: _Optional[int] = ..., organizationId: _Optional[int] = ..., configurationType: _Optional[str] = ..., provider: _Optional[str] = ..., enabled: bool = ..., options: _Optional[_Iterable[_Union[_common_pb2.Metadata, _Mapping]]] = ..., status: _Optional[str] = ..., createdActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., updatedActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class GetAssistantConfigurationRequest(_message.Message):
     __slots__ = ("id", "assistantId")

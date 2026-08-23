@@ -187,10 +187,11 @@ func TestRecorder_RecordInjectsAuthIntoObservationContext(t *testing.T) {
 	organizationID := uint64(7)
 	projectID := uint64(8)
 	userID := uint64(9)
-	auth := &types.ServiceScope{
-		UserId:         &userID,
-		OrganizationId: &organizationID,
-		ProjectId:      &projectID,
+	auth := &types.Authentication{
+		AuthType:          types.AuthTypeService,
+		UserValue:         &types.UserContext{UserID: userID},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
 	}
 	collector := &recordingCollector{key: "collector"}
 	recorder := New(
@@ -219,6 +220,30 @@ func TestRecorder_RecordInjectsAuthIntoObservationContext(t *testing.T) {
 	}
 	if observabilityGlobal := collector.scopes[0].GlobalScopeValue(); observabilityGlobal.OrganizationID != organizationID || observabilityGlobal.ProjectID != projectID {
 		t.Fatalf("unexpected global scope: %+v", observabilityGlobal)
+	}
+}
+
+func TestRecorder_UsesOrganizationOnlyDelegatedContext(t *testing.T) {
+	organizationID := uint64(7)
+	auth := &types.Authentication{
+		AuthType:          types.AuthTypeService,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+	}
+	collector := &recordingCollector{key: "collector"}
+	recorder := New(WithAuth(auth), WithCollector(collector))
+
+	if err := recorder.Record(context.Background(), ConversationScope{AssistantScope: AssistantScope{AssistantID: 1}, ConversationID: 2}, RecordMetric{Metrics: []*protos.Metric{{Name: MetricConversationStatus, Value: "ACTIVE"}}}); err != nil {
+		t.Fatalf("Record() error = %v", err)
+	}
+	if err := recorder.Close(context.Background()); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if err := waitForRecorderDone(t, recorder); err != nil {
+		t.Fatalf("recorder close error = %v", err)
+	}
+	global := collector.scopes[0].GlobalScopeValue()
+	if global.OrganizationID != organizationID || global.ProjectID != 0 {
+		t.Fatalf("global scope = %+v", global)
 	}
 }
 

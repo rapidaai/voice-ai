@@ -7,6 +7,8 @@ package types
 
 import (
 	"context"
+	"errors"
+	"math"
 
 	"github.com/gin-gonic/gin"
 )
@@ -31,6 +33,7 @@ type AuthType string
 const (
 	AuthTypeUser    AuthType = "user"
 	AuthTypeService AuthType = "service"
+	AuthTypeSystem  AuthType = "system"
 	AuthTypeProject AuthType = "project"
 	AuthTypeOrg     AuthType = "organization"
 )
@@ -52,35 +55,138 @@ type PlainClaimPrinciple[T SimplePrinciple] struct {
 	Info T `json:"info"`
 }
 
-/*
-An simple principle that can be used for passing and receiving the data
-*/
-type SimplePrinciple interface {
-	GetUserId() *uint64
-	// later will support the user can be part of multiple org
-	GetCurrentOrganizationId() *uint64
-	// current project context
-	GetCurrentProjectId() *uint64
-	// has an user
-	HasUser() bool
-	// has an org
-	HasOrganization() bool
-	// has an project
-	HasProject() bool
-	//
+type AuthenticationPrinciple interface {
 	IsAuthenticated() bool
-	//
 	GetCurrentToken() string
-	// type of the principle, can be used for checking the type in runtime and do type assertion
 	Type() AuthType
+}
+
+var (
+	ErrUnauthenticated                = errors.New("authentication required")
+	ErrAuthenticationScopeNotAllowed  = errors.New("authentication scope is not allowed")
+	ErrActorUnavailable               = errors.New("actor identity is unavailable")
+	ErrUserContextUnavailable         = errors.New("user context is unavailable")
+	ErrOrganizationContextUnavailable = errors.New("organization context is unavailable")
+	ErrProjectContextUnavailable      = errors.New("project context is unavailable")
+)
+
+type UserContext struct {
+	UserID uint64
+}
+
+type OrganizationContext struct {
+	OrganizationID uint64
+}
+
+type Authentication struct {
+	AuthType          AuthType
+	ActorValue        *ActorIdentity
+	UserValue         *UserContext
+	OrganizationValue *OrganizationContext
+	ProjectValue      *ProjectContext
+}
+
+func (auth *Authentication) IsAuthenticated() bool {
+	if auth == nil {
+		return false
+	}
+	switch auth.AuthType {
+	case AuthTypeUser:
+		_, userErr := auth.UserContext()
+		_, organizationErr := auth.OrganizationContext()
+		return userErr == nil && organizationErr == nil
+	case AuthTypeProject:
+		_, projectErr := auth.ProjectContext()
+		return projectErr == nil
+	case AuthTypeOrg, AuthTypeService:
+		_, organizationErr := auth.OrganizationContext()
+		return organizationErr == nil
+	case AuthTypeSystem:
+		_, actorErr := auth.Actor()
+		return actorErr == nil
+	default:
+		return false
+	}
+}
+func (auth *Authentication) GetCurrentToken() string { return "" }
+func (auth *Authentication) Type() AuthType          { return auth.AuthType }
+func (auth *Authentication) Scope(allowed ...AuthType) (*Authentication, error) {
+	if !auth.IsAuthenticated() {
+		return nil, ErrUnauthenticated
+	}
+	for _, authType := range allowed {
+		if authType == auth.AuthType {
+			return auth, nil
+		}
+	}
+	return nil, ErrAuthenticationScopeNotAllowed
+}
+func (auth *Authentication) Actor() (ActorIdentity, error) {
+	if auth == nil || auth.ActorValue == nil || !auth.ActorValue.Type.isDurable() || auth.ActorValue.ID == 0 || auth.ActorValue.ID > math.MaxInt64 {
+		return ActorIdentity{}, ErrActorUnavailable
+	}
+	if auth.ActorValue.Type != ActorType(auth.AuthType) {
+		return ActorIdentity{}, ErrActorUnavailable
+	}
+	return *auth.ActorValue, nil
+}
+func (auth *Authentication) UserContext() (UserContext, error) {
+	if auth == nil || auth.UserValue == nil || auth.UserValue.UserID == 0 {
+		return UserContext{}, ErrUserContextUnavailable
+	}
+	return *auth.UserValue, nil
+}
+func (auth *Authentication) OrganizationContext() (OrganizationContext, error) {
+	if auth == nil || auth.OrganizationValue == nil || auth.OrganizationValue.OrganizationID == 0 {
+		return OrganizationContext{}, ErrOrganizationContextUnavailable
+	}
+	return *auth.OrganizationValue, nil
+}
+func (auth *Authentication) ProjectContext() (ProjectContext, error) {
+	if auth == nil || auth.ProjectValue == nil || auth.ProjectValue.OrganizationID == 0 || auth.ProjectValue.ProjectID == 0 {
+		return ProjectContext{}, ErrProjectContextUnavailable
+	}
+	return *auth.ProjectValue, nil
+}
+
+func Authorize(ctx context.Context) (*Authentication, error) {
+	auth, ok := ctx.Value(CTX_).(*Authentication)
+	if !ok || auth == nil || !auth.IsAuthenticated() {
+		return nil, ErrUnauthenticated
+	}
+	return auth, nil
+}
+
+// SimplePrinciple is retained for source compatibility.
+// Deprecated: use Authentication for request authentication.
+type SimplePrinciple = AuthenticationPrinciple
+
+type UserIdentityProvider interface {
+	UserIdentity() (uint64, bool)
+}
+
+type OrganizationContextProvider interface {
+	OrganizationContext() (uint64, bool)
+}
+
+type ProjectContextProvider interface {
+	ProjectContext() (ProjectContext, bool)
+}
+
+type DelegatedContextProvider interface {
+	DelegatedContext() (DelegatedContext, bool)
 }
 
 /*
  A large principle
 */
 
+// Principle is retained for source compatibility with legacy authenticators.
+// Deprecated: use Authentication for request authentication.
 type Principle interface {
-	SimplePrinciple
+	AuthenticationPrinciple
+	UserIdentityProvider
+	OrganizationContextProvider
 	GetAuthToken() *AuthToken
 	GetOrganizationRole() *OrganizaitonRole
 	GetUserInfo() *UserInfo
@@ -92,6 +198,8 @@ type Principle interface {
 	GetFeaturePermission() []*FeaturePermission
 }
 
+// GetAuthPrincipleGPRC reads a legacy principle from context.
+// Deprecated: use Authorize.
 func GetAuthPrincipleGPRC(ctx context.Context) (Principle, bool) {
 	ath := ctx.Value(CTX_)
 	switch md := ath.(type) {
@@ -102,6 +210,8 @@ func GetAuthPrincipleGPRC(ctx context.Context) (Principle, bool) {
 	}
 }
 
+// GetScopePrincipleGRPC reads a legacy scoped principle from context.
+// Deprecated: use Authorize and Authentication.Scope.
 func GetScopePrincipleGRPC[T SimplePrinciple](ctx context.Context) (SimplePrinciple, bool) {
 	ath := ctx.Value(CTX_)
 	switch md := ath.(type) {

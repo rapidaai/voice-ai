@@ -48,6 +48,5 @@ type KnowledgeTag struct {
 	gorm_model.Audited
 	KnowledgeId uint64                 `json:"knowledgeId" gorm:"type:bigint;not null"`
 	Tag         gorm_types.StringArray `json:"tag" gorm:"type:string;size:200;not null"`
-	CreatedBy   uint64                 `json:"createdBy" gorm:"type:bigint;size:20;not null"`
-	UpdatedBy   uint64                 `json:"updatedBy" gorm:"type:bigint;size:20;"`
+	gorm_model.ActorAudit
 }

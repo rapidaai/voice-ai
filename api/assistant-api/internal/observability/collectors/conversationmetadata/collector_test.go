@@ -22,12 +22,12 @@ import (
 type conversationMetadataServiceStub struct {
 	internal_services.AssistantConversationService
 
-	metadataAuth           types.SimplePrinciple
+	metadataAuth           *types.Authentication
 	metadataAssistantID    uint64
 	metadataConversationID uint64
 	metadata               []*protos.Metadata
 
-	messageMetadataAuth           types.SimplePrinciple
+	messageMetadataAuth           *types.Authentication
 	messageMetadataConversationID uint64
 	messageMetadataMessageID      string
 	messageMetadata               []*protos.Metadata
@@ -35,7 +35,7 @@ type conversationMetadataServiceStub struct {
 
 func (s *conversationMetadataServiceStub) CreateOrUpdateConversationMetadata(
 	_ context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantID uint64,
 	conversationID uint64,
 	metadata []*protos.Metadata,
@@ -49,7 +49,7 @@ func (s *conversationMetadataServiceStub) CreateOrUpdateConversationMetadata(
 
 func (s *conversationMetadataServiceStub) CreateOrUpdateMessageMetadata(
 	_ context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	conversationID uint64,
 	messageID string,
 	metadata []*protos.Metadata,
@@ -148,13 +148,11 @@ func TestCollectMetadata_AssistantScopeUnsupported(t *testing.T) {
 	}
 }
 
-func testMetadataAuth() *types.ServiceScope {
-	organizationID := uint64(1)
-	projectID := uint64(2)
-	userID := uint64(99)
-	return &types.ServiceScope{
-		UserId:         &userID,
-		OrganizationId: &organizationID,
-		ProjectId:      &projectID,
+func testMetadataAuth() *types.Authentication {
+	return &types.Authentication{
+		AuthType:          types.AuthTypeService,
+		UserValue:         &types.UserContext{UserID: 99},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: 1},
+		ProjectValue:      &types.ProjectContext{OrganizationID: 1, ProjectID: 2},
 	}
 }

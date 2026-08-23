@@ -1,0 +1,13 @@
+{
+  "rfc": "rfcs/0005-refine-authentication-middleware-contracts.md",
+  "rfc_sha256": "d7c21cd242f2dbd412d570226d756563a0e2f89ccbc011eb2901e4056963152e",
+  "plan": "rfcs/0005-refine-authentication-middleware-contracts.plan.json",
+  "plan_sha256": "bdf2b3f02c96800869f8c03faa53862174e4c7501d7cf72c3f8ff82a7bcdcab7",
+  "challenger": "Hume",
+  "challenger_decision": "APPROVE",
+  "status": "approved",
+  "requested_at": "2026-08-23",
+  "approved_by": "user",
+  "approval_message": "Approved",
+  "approved_at": "2026-08-23"
+}

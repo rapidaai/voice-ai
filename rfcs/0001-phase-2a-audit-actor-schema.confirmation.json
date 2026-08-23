@@ -1,0 +1,13 @@
+{
+  "rfc": "rfcs/0001-actor-aware-audit-identity.md",
+  "status": "approved",
+  "approved_by": "user",
+  "approval_message": "Perfect update the rfc and execute it properly",
+  "approved_at": "2026-08-21",
+  "rfc_sha256": "2bf902dbce65abc99d887b1b207069f1c6746f85cd73349787ac22c155fc6988",
+  "plan": "rfcs/0001-phase-2a-audit-actor-schema.plan.json",
+  "plan_sha256": "dc110b6248ed212735ff73d8bc7790771b48a53e02bc837eafae5a368411845d",
+  "challenger": "Gibbs",
+  "challenger_decision": "APPROVE",
+  "implementation_scope": "Phase 2A nullable schema expansion only; no backfill, dual write, read cutover, indexes, constraints, or legacy-column removal"
+}

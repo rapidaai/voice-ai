@@ -91,7 +91,7 @@ func (a Attributes) Clone() Attributes {
 
 type Context struct {
 	TraceID string
-	Auth    types.SimplePrinciple
+	Auth    *types.Authentication
 }
 
 type GlobalScope struct {

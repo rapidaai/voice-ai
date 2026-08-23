@@ -82,13 +82,21 @@ func New(options ...ManagerOption) Manager {
 	return m
 }
 
-func (m *manager) observer(ctx context.Context, auth types.SimplePrinciple) observability.Recorder {
+func (m *manager) observer(ctx context.Context, auth *types.Authentication) observability.Recorder {
 	return observability.New(
 		observability.WithLogger(m.logger),
 		observability.WithAuth(auth),
 		observability.WithContext(ctx),
 		observability.WithCollectors(collectors.NewWithEnv(ctx, m.logger, m.assistantConfig)),
 	)
+}
+
+func projectAuthentication(organizationID, projectID uint64) *types.Authentication {
+	return &types.Authentication{
+		AuthType:          types.AuthTypeProject,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
+	}
 }
 
 // Start blocks running the periodic reconcile loop until ctx is cancelled.

@@ -14,8 +14,6 @@ type EndpointLogMetric struct {
 // CREATE TABLE endpoint_log_metrics (
 //     id BIGINT PRIMARY KEY NOT NULL,
 //     status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
-//     created_by BIGINT NOT NULL,
-//     updated_by BIGINT,
 //     created_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 //     updated_date TIMESTAMP DEFAULT NULL,
 //     name VARCHAR(200) NOT NULL,

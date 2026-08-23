@@ -635,7 +635,7 @@ func TestCollectDiagnosticsIncludesMigrationVersionAndDirty(t *testing.T) {
 		joined := strings.Join(args, " ")
 		switch {
 		case strings.Contains(joined, "--entrypoint cat"):
-			_, _ = io.WriteString(stdout, `[{"service":"web-api","version":4,"expectedVersion":4,"dirty":false},{"service":"integration-api","version":1,"expectedVersion":1,"dirty":false},{"service":"endpoint-api","version":1,"expectedVersion":1,"dirty":false},{"service":"assistant-api","version":54,"expectedVersion":54,"dirty":false}]`)
+			_, _ = io.WriteString(stdout, `[{"service":"web-api","version":12,"expectedVersion":12,"dirty":false},{"service":"integration-api","version":6,"expectedVersion":6,"dirty":false},{"service":"endpoint-api","version":6,"expectedVersion":6,"dirty":false},{"service":"assistant-api","version":60,"expectedVersion":60,"dirty":false}]`)
 		case strings.Contains(joined, " ps "):
 			_, _ = io.WriteString(stdout, `{"ExitCode":1,"Health":"unhealthy"}`)
 		case strings.Contains(joined, " logs "):
@@ -689,7 +689,7 @@ func TestCollectDiagnosticsUsesPinnedComposeWrapper(t *testing.T) {
 		switch {
 		case strings.Contains(joined, " run "):
 			seen["run"] = true
-			_, _ = io.WriteString(stdout, `[{"service":"web-api","version":4,"expectedVersion":4,"dirty":false},{"service":"integration-api","version":1,"expectedVersion":1,"dirty":false},{"service":"endpoint-api","version":1,"expectedVersion":1,"dirty":false},{"service":"assistant-api","version":54,"expectedVersion":54,"dirty":false}]`)
+			_, _ = io.WriteString(stdout, `[{"service":"web-api","version":12,"expectedVersion":12,"dirty":false},{"service":"integration-api","version":6,"expectedVersion":6,"dirty":false},{"service":"endpoint-api","version":6,"expectedVersion":6,"dirty":false},{"service":"assistant-api","version":60,"expectedVersion":60,"dirty":false}]`)
 		case strings.Contains(joined, " ps "):
 			seen["ps"] = true
 			_, _ = io.WriteString(stdout, `{"ExitCode":0,"Health":"healthy"}`)
@@ -808,7 +808,7 @@ func TestCollectDiagnosticsSanitizesBuildAndServiceData(t *testing.T) {
 		joined := strings.Join(args, " ")
 		switch {
 		case strings.Contains(joined, "--entrypoint cat"):
-			_, _ = io.WriteString(stdout, `[{"service":"web-api","version":4,"expectedVersion":4,"dirty":false},{"service":"integration-api","version":1,"expectedVersion":1,"dirty":false},{"service":"endpoint-api","version":1,"expectedVersion":1,"dirty":false},{"service":"assistant-api","version":54,"expectedVersion":54,"dirty":false}]`)
+			_, _ = io.WriteString(stdout, `[{"service":"web-api","version":12,"expectedVersion":12,"dirty":false},{"service":"integration-api","version":6,"expectedVersion":6,"dirty":false},{"service":"endpoint-api","version":6,"expectedVersion":6,"dirty":false},{"service":"assistant-api","version":60,"expectedVersion":60,"dirty":false}]`)
 		case strings.Contains(joined, " ps "):
 			_, _ = io.WriteString(stdout, `{"ExitCode":0,"Health":"healthy"}`)
 		case strings.Contains(joined, " logs "):

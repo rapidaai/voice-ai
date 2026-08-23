@@ -1,0 +1,13 @@
+{
+  "rfc": "rfcs/0001-actor-aware-audit-identity.md",
+  "status": "approved",
+  "approved_by": "user",
+  "approval_message": "Then start the implimentation",
+  "approved_at": "2026-08-21",
+  "rfc_sha256": "649a8c90c5aa113fb641bf1fa290a6b89dd72bd80ffe23a1497e7e24d8da0b25",
+  "plan": "rfcs/0001-phase-1c-authentication-boundary.plan.json",
+  "plan_sha256": "e651399e40a2549239f2bf3b121171b4140eab414d7b035240145893b2067bf7",
+  "challenger": "Gibbs",
+  "challenger_decision": "APPROVE",
+  "implementation_scope": "Endpoint-only authentication boundary, Authorize(ctx), Scope allowlists, and Endpoint controller migration"
+}

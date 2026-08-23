@@ -6,62 +6,124 @@
 package middlewares
 
 import (
+	"context"
+	"math"
+	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
-	// "github.com/rapidaai/pkg/models"
+	"github.com/rapidaai/pkg/validator"
 )
 
+// NewAuthenticationMiddleware authenticates user credentials.
 func NewAuthenticationMiddleware(resolver types.Authenticator, logger commons.Logger) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Get the token from the request header, URL param, or query param
-		// Query param is needed for WebSocket connections (browsers can't set custom WS headers)
-		authToken := c.Param(types.AUTHORIZATION_KEY)
-		if authToken == "" {
-			authToken = c.GetHeader(types.AUTHORIZATION_KEY)
+	return func(ctx *gin.Context) {
+		authToken := ctx.Param(types.AUTHORIZATION_KEY)
+		if !validator.NonZero(authToken) {
+			authToken = ctx.GetHeader(types.AUTHORIZATION_KEY)
 		}
-		if authToken == "" {
-			authToken = c.Query(types.AUTHORIZATION_KEY)
+		if !validator.NonZero(authToken) {
+			authToken = ctx.Query(types.AUTHORIZATION_KEY)
 		}
-		authId := c.GetHeader(types.AUTH_KEY)
-		if authId == "" {
-			authId = c.Param(types.AUTH_KEY)
+		authID := ctx.GetHeader(types.AUTH_KEY)
+		if !validator.NonZero(authID) {
+			authID = ctx.Param(types.AUTH_KEY)
 		}
-		if authId == "" {
-			authId = c.Query(types.AUTH_KEY)
+		if !validator.NonZero(authID) {
+			authID = ctx.Query(types.AUTH_KEY)
 		}
-		projectId := c.GetHeader(types.PROJECT_KEY)
-		if projectId == "" {
-			projectId = c.Param(types.PROJECT_KEY)
+		projectID := ctx.GetHeader(types.PROJECT_KEY)
+		if !validator.NonZero(projectID) {
+			projectID = ctx.Param(types.PROJECT_KEY)
 		}
-		if projectId == "" {
-			projectId = c.Query(types.PROJECT_KEY)
+		if !validator.NonZero(projectID) {
+			projectID = ctx.Query(types.PROJECT_KEY)
 		}
-		if authToken == "" {
-			c.Next() // Continue processing the request without authentication
+		authToken = strings.TrimSpace(authToken)
+		authID = strings.TrimSpace(authID)
+		projectID = strings.TrimSpace(projectID)
+		if !validator.NotBlank(authToken) && !validator.NotBlank(authID) && !validator.NotBlank(projectID) {
+			ctx.Next()
 			return
 		}
-		id, err := strconv.ParseUint(authId, 0, 64)
+		if validator.NonNil(ctx.Request.Context().Value(types.CTX_)) {
+			if validator.NonNil(logger) {
+				logger.Errorf(authenticationConflictMessage)
+			}
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, AuthenticationError{Error: AuthenticationFailureMessage})
+			return
+		}
+		if !validator.NonNil(resolver) {
+			if validator.NonNil(logger) {
+				logger.Errorf(userAuthNotSupportedMessage)
+			}
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, AuthenticationError{Error: AuthenticationFailureMessage})
+			return
+		}
+		if !validator.NotBlank(authToken) || !validator.NotBlank(authID) {
+			if validator.NonNil(logger) {
+				logger.Errorf(userAuthIncompleteMessage)
+			}
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, AuthenticationError{Error: AuthenticationFailureMessage})
+			return
+		}
+		userID, err := strconv.ParseUint(authID, 0, 64)
+		if err != nil || !validator.Between(userID, uint64(1), uint64(math.MaxInt64)) {
+			if validator.NonNil(logger) {
+				logger.Errorf(userAuthInvalidIDMessage)
+			}
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, AuthenticationError{Error: AuthenticationFailureMessage})
+			return
+		}
+		principle, err := resolver.Authorize(ctx.Request.Context(), authToken, userID)
+		if err != nil || !validator.NonNil(principle) || !principle.IsAuthenticated() {
+			if validator.NonNil(logger) {
+				logger.Errorf(userAuthRejectedMessage)
+			}
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, AuthenticationError{Error: AuthenticationFailureMessage})
+			return
+		}
+		if validator.NotBlank(projectID) {
+			selectedProjectID, err := strconv.ParseUint(projectID, 0, 64)
+			if err != nil || !validator.NonZero(selectedProjectID) {
+				if validator.NonNil(logger) {
+					logger.Errorf(userAuthInvalidProjectIDMessage)
+				}
+				ctx.AbortWithStatusJSON(http.StatusUnauthorized, AuthenticationError{Error: AuthenticationFailureMessage})
+				return
+			}
+			if err := principle.SwitchProject(selectedProjectID); err != nil {
+				if validator.NonNil(logger) {
+					logger.Errorf(userAuthProjectSelectionRejectedMessage)
+				}
+				ctx.AbortWithStatusJSON(http.StatusUnauthorized, AuthenticationError{Error: AuthenticationFailureMessage})
+				return
+			}
+		}
+		actor, err := types.ResolveAuditActor(principle)
 		if err != nil {
-			c.Next()
+			if validator.NonNil(logger) {
+				logger.Errorf(userAuthInvalidAuditActorMessage)
+			}
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, AuthenticationError{Error: AuthenticationFailureMessage})
 			return
 		}
-		auth, err := resolver.Authorize(c, authToken, id)
-		if err != nil {
-			logger.Errorf("unable to resolve auth token and id")
-			c.Next()
-			return
+		organizationID := principle.GetOrganizationRole().OrganizationId
+		auth := &types.Authentication{
+			AuthType:          types.AuthTypeUser,
+			ActorValue:        &actor,
+			UserValue:         &types.UserContext{UserID: principle.GetUserInfo().GetId()},
+			OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 		}
-		pid, err := strconv.ParseUint(projectId, 0, 64)
-		if err == nil {
-			auth.SwitchProject(pid)
+		if projectRole := principle.GetCurrentProjectRole(); validator.NonNil(projectRole) && validator.NonZero(projectRole.ProjectId) {
+			auth.ProjectValue = &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectRole.ProjectId}
 		}
-		// Attach the user information to the context
-		c.Set(string(types.CTX_), auth)
-		// Continue processing the request
-		c.Next()
+		requestContext := context.WithValue(ctx.Request.Context(), types.CTX_, auth)
+		ctx.Request = ctx.Request.WithContext(requestContext)
+		ctx.Next()
 	}
 }

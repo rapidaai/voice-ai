@@ -34,6 +34,7 @@ import (
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/middlewares"
+	gorm_models "github.com/rapidaai/pkg/models/gorm"
 )
 
 // wrapper for gin engine
@@ -72,22 +73,18 @@ func main() {
 
 	// init
 	authClient := web_client.NewAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)
+	userAuthenticator := authenticators.NewUserAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient)
+	projectAuthenticator := authenticators.NewProjectAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient)
+	organizationAuthenticator := authenticators.NewOrganizationAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient)
+	serviceAuthenticator := authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger)
 	appRunner.S = grpc.NewServer(
 		grpc.ChainStreamInterceptor(
 			middlewares.NewRequestLoggerStreamServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryStreamServerMiddleware(appRunner.Logger),
-			middlewares.NewServiceAuthenticatorStreamServerMiddleware(
-				authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Postgres),
-				appRunner.Logger,
-			),
-			middlewares.NewAuthenticationStreamServerMiddleware(
-				authenticators.NewUserAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient),
-				appRunner.Logger,
-			),
-			middlewares.NewProjectAuthenticatorStreamServerMiddleware(
-				authenticators.NewProjectAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient),
-				appRunner.Logger,
-			),
+			middlewares.NewAuthenticationStreamServerMiddleware(userAuthenticator, appRunner.Logger),
+			middlewares.NewProjectAuthenticatorStreamServerMiddleware(projectAuthenticator, appRunner.Logger),
+			middlewares.NewOrganizationAuthenticatorStreamServerMiddleware(organizationAuthenticator, appRunner.Logger),
+			middlewares.NewServiceAuthenticatorStreamServerMiddleware(serviceAuthenticator, appRunner.Logger),
 			middlewares.NewClientInformationStreamServerMiddleware(
 				appRunner.Logger,
 			),
@@ -95,18 +92,10 @@ func main() {
 		grpc.ChainUnaryInterceptor(
 			middlewares.NewRequestLoggerUnaryServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryUnaryServerMiddleware(appRunner.Logger),
-			middlewares.NewProjectAuthenticatorUnaryServerMiddleware(
-				authenticators.NewProjectAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient),
-				appRunner.Logger,
-			),
-			middlewares.NewAuthenticationUnaryServerMiddleware(
-				authenticators.NewUserAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient),
-				appRunner.Logger,
-			),
-			middlewares.NewServiceAuthenticatorUnaryServerMiddleware(
-				authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Postgres),
-				appRunner.Logger,
-			),
+			middlewares.NewAuthenticationUnaryServerMiddleware(userAuthenticator, appRunner.Logger),
+			middlewares.NewProjectAuthenticatorUnaryServerMiddleware(projectAuthenticator, appRunner.Logger),
+			middlewares.NewOrganizationAuthenticatorUnaryServerMiddleware(organizationAuthenticator, appRunner.Logger),
+			middlewares.NewServiceAuthenticatorUnaryServerMiddleware(serviceAuthenticator, appRunner.Logger),
 			middlewares.NewClientInformationUnaryServerMiddleware(
 				appRunner.Logger,
 			),
@@ -234,6 +223,9 @@ func (app *AppRunner) Init(ctx context.Context) error {
 	err := app.Postgres.Connect(ctx)
 	if err != nil {
 		app.Logger.Error("error while connecting to postgres.", err)
+		return err
+	}
+	if err := gorm_models.RegisterAuditActorCallbacks(app.Postgres.DB(ctx)); err != nil {
 		return err
 	}
 	err = app.Redis.Connect(ctx)

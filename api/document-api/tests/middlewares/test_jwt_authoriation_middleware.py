@@ -7,6 +7,7 @@ See LICENSE.md for details or contact sales@rapida.ai for commercial use.
 """
 import jwt
 import pytest
+import time
 
 try:
     from app.middlewares import JwtAuthorizationMiddleware  # noqa: F401
@@ -111,6 +112,110 @@ class TestStrictJWTAuthorizationMiddleware:
         j_response = response.json()
         assert j_response == {"test": "ok"}
 
+
+@pytest.mark.asyncio
+async def test_service_assertion_uses_shared_secret(test_app, async_test_client):
+    config = JwtConfig(secret_key="secret", strict=True, enable=True)
+    test_app.add_middleware(JwtAuthorizationMiddleware, config=config)
+
+    @test_app.get("/service")
+    async def service_request(request: Request):
+        return request.user.actor
+
+    now = int(time.time())
+    token = jwt.encode(
+        {
+            "actor_type": "service",
+            "actor_id": 41,
+            "iss": "assistant-api",
+            "aud": "rapida-internal",
+            "iat": now,
+            "exp": now + 60,
+            "organizationId": 7,
+        },
+        config.secret_key.get_secret_value(),
+        algorithm="HS256",
+    )
+    async_test_client.headers = {"authorization": token}
+    response = await async_test_client.get("/service")
+    assert response.status_code == 200
+    assert response.json() == {"type": "service", "id": 41}
+
+    rejected = jwt.encode(
+        {
+            "actor_type": "service",
+            "actor_id": 41,
+            "iss": "assistant-api",
+            "aud": "rapida-internal",
+            "iat": now,
+            "exp": now + 60,
+            "organizationId": 7,
+        },
+        "wrong-secret",
+        algorithm="HS256",
+    )
+    async_test_client.headers = {"authorization": rejected}
+    with pytest.raises(InvalidAuthorizationTokenException):
+        await async_test_client.get("/service")
+
+    long_lived_token = jwt.encode(
+        {
+            "actor_type": "service",
+            "actor_id": 41,
+            "iss": "assistant-api",
+            "aud": "rapida-internal",
+            "iat": now,
+            "exp": now + 301,
+            "organizationId": 7,
+        },
+        config.secret_key.get_secret_value(),
+        algorithm="HS256",
+    )
+    async_test_client.headers = {"authorization": long_lived_token}
+    with pytest.raises(InvalidAuthorizationTokenException):
+        await async_test_client.get("/service")
+
+    forwarded_user_token = jwt.encode(
+        {
+            "actor_type": "service",
+            "actor_id": 41,
+            "iss": "assistant-api",
+            "aud": "rapida-internal",
+            "iat": now,
+            "exp": now + 60,
+            "organizationId": 7,
+            "userId": 9,
+        },
+        config.secret_key.get_secret_value(),
+        algorithm="HS256",
+    )
+    async_test_client.headers = {"authorization": forwarded_user_token}
+    with pytest.raises(InvalidAuthorizationTokenException):
+        await async_test_client.get("/service")
+
+
+@pytest.mark.asyncio
+async def test_non_service_actor_cannot_bypass_service_validation(test_app, async_test_client):
+    config = JwtConfig(secret_key="secret", strict=True, enable=True)
+    test_app.add_middleware(JwtAuthorizationMiddleware, config=config)
+
+    @test_app.get("/actor")
+    async def actor_request(request: Request):
+        return request.user.actor
+
+    for actor_type in ("project", "organization", "system"):
+        token = jwt.encode(
+            {
+                "actor_type": actor_type,
+                "actor_id": 41,
+                "organizationId": 7,
+            },
+            config.secret_key.get_secret_value(),
+            algorithm="HS256",
+        )
+        async_test_client.headers = {"authorization": token}
+        with pytest.raises(InvalidAuthorizationTokenException):
+            await async_test_client.get("/actor")
 
 class TestLooseJWTAuthorizationMiddleware:
     config: JwtConfig = JwtConfig(secret_key="secret", strict=False, enable=True)

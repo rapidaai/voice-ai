@@ -11,6 +11,7 @@ import { VersionIndicator } from '@/app/components/indicators/version';
 import { IconOnlyButton } from '@/app/components/carbon/button';
 import { CopyButton } from '@/app/components/carbon/button/copy-button';
 import { cn } from '@/utils';
+import { auditActorLabel, createdAuditActor } from '@/utils/audit-actor';
 
 interface SingleEndpointProps {
   endpoint: Endpoint;
@@ -136,10 +137,10 @@ export const SingleEndpoint: FC<SingleEndpointProps> = ({ endpoint }) => {
           )}
         </TableCell>
       )}
-      {endpointAction.visibleColumn('getCreatedBy') && (
+      {endpointAction.visibleColumn('getCreatedActor') && (
         <TableCell className="text-sm">
           <span className="capitalize">
-            {providerModel?.getCreateduser()?.getName() || '-'}
+            {auditActorLabel(createdAuditActor(providerModel))}
           </span>
         </TableCell>
       )}

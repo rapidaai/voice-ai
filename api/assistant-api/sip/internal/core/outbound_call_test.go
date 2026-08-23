@@ -39,55 +39,6 @@ func TestNewOutboundCall_OwnsLifecycleDependencies(t *testing.T) {
 	assert.Equal(t, request, outboundCall.request)
 }
 
-func TestOutboundCallInviteHandlerUsesAuthoritativeRequestIdentity(t *testing.T) {
-	server := &Server{logger: bridgeTestLogger()}
-	request, err := NewOutboundInviteRequest(testOutboundConfig(), "customer-alias", "assistant-line")
-	require.NoError(t, err)
-	inviteRequest := sip.NewRequest(sip.INVITE, sip.Uri{
-		Scheme: "sip",
-		User:   request.Identity.ToUser,
-		Host:   request.Config.Address,
-		Port:   request.Config.Port,
-	})
-	session := &Session{info: SessionInfo{CallID: "outbound-authoritative-identity"}}
-	dialog := &outboundDialog{
-		dialogSession: &sipgo.DialogClientSession{
-			Dialog: sipgo.Dialog{InviteRequest: inviteRequest},
-		},
-	}
-
-	server.SetOnInvite(func(callbackSession *Session, requestURI, fromIdentity, toIdentity string) error {
-		assert.Same(t, session, callbackSession)
-		assert.Equal(t, inviteRequest.Recipient.String(), requestURI)
-		assert.Equal(t, "assistant-line", fromIdentity)
-		assert.Equal(t, "customer-alias", toIdentity)
-		return nil
-	})
-	outboundCall := NewOutbound(server, session, dialog, nil, request)
-
-	err = outboundCall.callOutboundInviteHandler(time.Now())
-
-	require.NoError(t, err)
-	assert.Empty(t, session.GetInfo().LocalURI)
-	assert.Empty(t, session.GetInfo().RemoteURI)
-}
-
-func TestOutboundCallInviteHandlerRejectsMissingInviteRequest(t *testing.T) {
-	server := &Server{logger: bridgeTestLogger()}
-	server.SetOnInvite(func(_ *Session, _, _, _ string) error {
-		t.Fatal("onInvite must not run without the outbound INVITE request")
-		return nil
-	})
-	request, err := NewOutboundInviteRequest(testOutboundConfig(), "customer-alias", "assistant-line")
-	require.NoError(t, err)
-	outboundCall := NewOutbound(server, &Session{info: SessionInfo{CallID: "missing-invite-request"}}, &outboundDialog{}, nil, request)
-
-	err = outboundCall.callOutboundInviteHandler(time.Now())
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "outbound INVITE request is unavailable")
-}
-
 func TestOutboundMediaApplyAnswerEnablesSymmetricRTPForPrivateSDPWhenConfigured(t *testing.T) {
 	rtpHandler := newTestRTPHandler()
 	media := &outboundMedia{

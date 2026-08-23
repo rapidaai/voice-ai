@@ -2,7 +2,9 @@ package internal_vault_service
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"gorm.io/gorm/clause"
 
@@ -29,17 +31,24 @@ func NewVaultService(logger commons.Logger, postgres connectors.PostgresConnecto
 }
 
 func (vs *vaultService) Create(ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
+	projectContext types.ProjectContext,
 	provider string,
 	name string, credential map[string]interface{}) (*internal_entity.Vault, error) {
+	actor, err := vaultActor(auth, projectContext)
+	if err != nil {
+		return nil, err
+	}
+	mutable := gorm_models.Mutable{}
+	if err := mutable.SetCreatedActor(actor); err != nil {
+		return nil, err
+	}
 	db := vs.postgres.DB(ctx)
 	vlt := &internal_entity.Vault{
-		Mutable: gorm_models.Mutable{
-			CreatedBy: *auth.GetUserId(),
-		},
+		Mutable: mutable,
 		Organizational: gorm_models.Organizational{
-			OrganizationId: *auth.GetCurrentOrganizationId(),
-			ProjectId:      *auth.GetCurrentProjectId(),
+			OrganizationId: projectContext.OrganizationID,
+			ProjectId:      projectContext.ProjectID,
 		},
 		Name:     name,
 		Provider: provider,
@@ -54,15 +63,19 @@ func (vs *vaultService) Create(ctx context.Context,
 	return vlt, nil
 }
 
-func (vS *vaultService) Delete(ctx context.Context, auth types.Principle, vaultId uint64) (*internal_entity.Vault, error) {
-	db := vS.postgres.DB(ctx)
-	vlt := &internal_entity.Vault{
-		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ARCHIEVE,
-			UpdatedBy: *auth.GetUserId(),
-		},
+func (vS *vaultService) Delete(ctx context.Context, auth *types.Authentication, projectContext types.ProjectContext, vaultId uint64) (*internal_entity.Vault, error) {
+	actor, err := vaultActor(auth, projectContext)
+	if err != nil {
+		return nil, err
 	}
-	tx := db.Where("id = ? AND organization_id = ? AND project_id = ?", vaultId, *auth.GetCurrentOrganizationId(), *auth.GetCurrentProjectId()).Clauses(clause.Returning{}).Updates(vlt)
+	db := vS.postgres.DB(ctx)
+	vlt := &internal_entity.Vault{}
+	tx := db.Model(vlt).Where("id = ? AND organization_id = ? AND project_id = ?", vaultId, projectContext.OrganizationID, projectContext.ProjectID).Clauses(clause.Returning{}).Updates(map[string]interface{}{
+		"status":             type_enums.RECORD_ARCHIEVE,
+		"updated_actor_type": string(actor.Type),
+		"updated_actor_id":   actor.ID,
+		"updated_date":       time.Now(),
+	})
 	if err := tx.Error; err != nil {
 		vS.logger.Debugf("unable to delete vault %v")
 		return nil, err
@@ -70,7 +83,32 @@ func (vS *vaultService) Delete(ctx context.Context, auth types.Principle, vaultI
 	return vlt, nil
 }
 
-func (vS *vaultService) GetAllOrganizationCredential(ctx context.Context, auth types.SimplePrinciple, criteria []*web_api.Criteria, paginate *web_api.Paginate) (int64, []*internal_entity.Vault, error) {
+func vaultActor(auth *types.Authentication, projectContext types.ProjectContext) (types.ActorIdentity, error) {
+	if auth == nil {
+		return types.ActorIdentity{}, types.ErrActorUnavailable
+	}
+	if _, err := auth.Scope(types.AuthTypeUser); err != nil {
+		return types.ActorIdentity{}, err
+	}
+	actor, err := auth.Actor()
+	if err != nil {
+		return types.ActorIdentity{}, err
+	}
+	userContext, err := auth.UserContext()
+	if err != nil || userContext.UserID != actor.ID {
+		return types.ActorIdentity{}, types.ErrActorUnavailable
+	}
+	authProject, err := auth.ProjectContext()
+	if err != nil {
+		return types.ActorIdentity{}, err
+	}
+	if authProject != projectContext {
+		return types.ActorIdentity{}, errors.New("vault scope does not match authentication project")
+	}
+	return actor, nil
+}
+
+func (vS *vaultService) GetAllOrganizationCredential(ctx context.Context, projectContext types.ProjectContext, criteria []*web_api.Criteria, paginate *web_api.Paginate) (int64, []*internal_entity.Vault, error) {
 	db := vS.postgres.DB(ctx)
 	var vaults []*internal_entity.Vault
 	var cnt int64
@@ -78,8 +116,8 @@ func (vS *vaultService) GetAllOrganizationCredential(ctx context.Context, auth t
 	qry := db.Model(internal_entity.Vault{})
 	qry.
 		Where("organization_id = ? AND project_id = ? AND status = ?",
-			*auth.GetCurrentOrganizationId(),
-			*auth.GetCurrentProjectId(), type_enums.RECORD_ACTIVE)
+			projectContext.OrganizationID,
+			projectContext.ProjectID, type_enums.RECORD_ACTIVE)
 	for _, ct := range criteria {
 		switch ct.GetLogic() {
 		case "or":
@@ -104,21 +142,21 @@ func (vS *vaultService) GetAllOrganizationCredential(ctx context.Context, auth t
 		}).Find(&vaults)
 
 	if tx.Error != nil {
-		vS.logger.Debugf("unable to find any vault %v", *auth.GetCurrentOrganizationId())
+		vS.logger.Debugf("unable to find any vault %v", projectContext.OrganizationID)
 		return cnt, nil, tx.Error
 	}
 
 	return cnt, vaults, nil
 }
 
-func (vS *vaultService) Get(ctx context.Context, auth types.SimplePrinciple, id uint64) (*internal_entity.Vault, error) {
+func (vS *vaultService) Get(ctx context.Context, projectContext types.ProjectContext, id uint64) (*internal_entity.Vault, error) {
 	db := vS.postgres.DB(ctx)
 	var vault internal_entity.Vault
 	tx := db.Where("id = ? AND status = ? AND organization_id = ? AND project_id = ?",
 		id,
 		type_enums.RECORD_ACTIVE.String(),
-		*auth.GetCurrentOrganizationId(),
-		*auth.GetCurrentProjectId(),
+		projectContext.OrganizationID,
+		projectContext.ProjectID,
 	).Last(&vault)
 	if tx.Error != nil {
 		vS.logger.Errorf("get credential error  %v", tx.Error)
@@ -127,13 +165,13 @@ func (vS *vaultService) Get(ctx context.Context, auth types.SimplePrinciple, id 
 	return &vault, nil
 }
 
-func (vS *vaultService) GetProviderCredential(ctx context.Context, auth types.SimplePrinciple, provider string) (*internal_entity.Vault, error) {
+func (vS *vaultService) GetProviderCredential(ctx context.Context, organizationID uint64, provider string) (*internal_entity.Vault, error) {
 	db := vS.postgres.DB(ctx)
 	var vault internal_entity.Vault
 	tx := db.Where("provider = ? AND status = ? AND organization_id = ?",
 		provider,
 		type_enums.RECORD_ACTIVE.String(),
-		*auth.GetCurrentOrganizationId(),
+		organizationID,
 	).Last(&vault)
 	if tx.Error != nil {
 		vS.logger.Errorf("get credential error  %v", tx.Error)

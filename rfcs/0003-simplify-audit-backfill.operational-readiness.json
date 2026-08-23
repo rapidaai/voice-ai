@@ -1,0 +1,12 @@
+{
+  "status": "pending",
+  "release_owner": null,
+  "approved_at": null,
+  "environment": null,
+  "table_row_counts": {},
+  "production_scale_rehearsal_duration_seconds": null,
+  "approved_maximum_duration_seconds": null,
+  "backup_identity": null,
+  "rollback_owner": null,
+  "writes_fenced": false
+}

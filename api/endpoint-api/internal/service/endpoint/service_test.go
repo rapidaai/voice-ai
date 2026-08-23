@@ -12,6 +12,7 @@ import (
 
 	"github.com/rapidaai/api/endpoint-api/config"
 	internal_gorm "github.com/rapidaai/api/endpoint-api/internal/entity"
+	internal_service "github.com/rapidaai/api/endpoint-api/internal/service"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
@@ -61,8 +62,10 @@ func newEndpointServiceTest(t *testing.T) (*endpointService, *gorm.DB) {
 			created_date datetime,
 			updated_date datetime,
 			status text,
-			created_by integer,
-			updated_by integer,
+			created_actor_type text,
+			created_actor_id integer,
+			updated_actor_type text,
+			updated_actor_id integer,
 			project_id integer,
 			organization_id integer,
 			name text,
@@ -79,8 +82,10 @@ func newEndpointServiceTest(t *testing.T) (*endpointService, *gorm.DB) {
 			created_date datetime,
 			updated_date datetime,
 			status text,
-			created_by integer,
-			updated_by integer,
+			created_actor_type text,
+			created_actor_id integer,
+			updated_actor_type text,
+			updated_actor_id integer,
 			endpoint_id integer,
 			description text,
 			request text,
@@ -91,8 +96,10 @@ func newEndpointServiceTest(t *testing.T) (*endpointService, *gorm.DB) {
 			created_date datetime,
 			updated_date datetime,
 			status text,
-			created_by integer,
-			updated_by integer,
+			created_actor_type text,
+			created_actor_id integer,
+			updated_actor_type text,
+			updated_actor_id integer,
 			key text,
 			value text,
 			endpoint_provider_model_id integer
@@ -102,8 +109,10 @@ func newEndpointServiceTest(t *testing.T) (*endpointService, *gorm.DB) {
 			created_date datetime,
 			updated_date datetime,
 			status text,
-			created_by integer,
-			updated_by integer,
+			created_actor_type text,
+			created_actor_id integer,
+			updated_actor_type text,
+			updated_actor_id integer,
 			endpoint_id integer,
 			retry_type text,
 			max_attempts integer,
@@ -116,8 +125,10 @@ func newEndpointServiceTest(t *testing.T) (*endpointService, *gorm.DB) {
 			created_date datetime,
 			updated_date datetime,
 			status text,
-			created_by integer,
-			updated_by integer,
+			created_actor_type text,
+			created_actor_id integer,
+			updated_actor_type text,
+			updated_actor_id integer,
 			endpoint_id integer,
 			cache_type text,
 			expiry_interval integer,
@@ -128,8 +139,10 @@ func newEndpointServiceTest(t *testing.T) (*endpointService, *gorm.DB) {
 			created_date datetime,
 			updated_date datetime,
 			status text,
-			created_by integer,
-			updated_by integer,
+			created_actor_type text,
+			created_actor_id integer,
+			updated_actor_type text,
+			updated_actor_id integer,
 			endpoint_id integer,
 			tag text
 		)`,
@@ -152,12 +165,96 @@ func newEndpointServiceTest(t *testing.T) (*endpointService, *gorm.DB) {
 	}, db
 }
 
-func testAuth(userID, orgID, projectID uint64) types.SimplePrinciple {
-	return &types.ServiceScope{
-		UserId:         &userID,
-		OrganizationId: &orgID,
-		ProjectId:      &projectID,
+func testAuth(userID, orgID, projectID uint64) *types.Authentication {
+	return &types.Authentication{
+		AuthType:          types.AuthTypeUser,
+		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeUser, ID: userID},
+		UserValue:         &types.UserContext{UserID: userID},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: orgID},
+		ProjectValue:      &types.ProjectContext{OrganizationID: orgID, ProjectID: projectID},
 	}
+}
+
+func TestEndpointServiceRequiresCapabilities(t *testing.T) {
+	service, _ := newEndpointServiceTest(t)
+	organizationID := uint64(10)
+	projectID := uint64(20)
+	projectlessUser := &types.Authentication{
+		AuthType:          types.AuthTypeUser,
+		UserValue:         &types.UserContext{UserID: 1},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+	}
+
+	_, err := service.Get(
+		context.Background(),
+		projectlessUser,
+		1,
+		nil,
+		internal_service.NewDefaultGetEndpointOption(),
+	)
+	require.Error(t, err)
+
+	_, _, err = service.GetAll(
+		context.Background(),
+		&types.Authentication{AuthType: types.AuthTypeOrg, OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID}},
+		nil,
+		&protos.Paginate{},
+	)
+	require.Error(t, err)
+
+	_, err = service.CreateEndpoint(
+		context.Background(),
+		&types.Authentication{AuthType: types.AuthTypeProject, OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID}, ProjectValue: &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID}},
+		"endpoint",
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+	require.Error(t, err)
+}
+
+func TestEndpointServiceInvokeLookupAllowsOrganizationForPublicEndpoint(t *testing.T) {
+	service, db := newEndpointServiceTest(t)
+	organizationID := uint64(10)
+	endpoint := insertEndpoint(t, db, 104, organizationID, 20, "public")
+	providerModel := &internal_gorm.EndpointProviderModel{
+		Audited:    gorm_models.Audited{Id: 204},
+		EndpointId: endpoint.Id,
+	}
+	require.NoError(t, db.Create(providerModel).Error)
+	require.NoError(t, db.Model(endpoint).Update("endpoint_provider_model_id", providerModel.Id).Error)
+
+	result, err := service.Get(
+		context.Background(),
+		&types.Authentication{AuthType: types.AuthTypeOrg, OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID}},
+		endpoint.Id,
+		nil,
+		internal_service.NewInvokeGetEndpointOption(),
+	)
+	require.NoError(t, err)
+	require.Equal(t, endpoint.Id, result.Id)
+}
+
+func TestEndpointServiceInvokeLookupRejectsOrganizationForPrivateEndpoint(t *testing.T) {
+	service, db := newEndpointServiceTest(t)
+	organizationID := uint64(10)
+	endpoint := insertEndpoint(t, db, 105, organizationID, 20, "private")
+	providerModel := &internal_gorm.EndpointProviderModel{
+		Audited:    gorm_models.Audited{Id: 205},
+		EndpointId: endpoint.Id,
+	}
+	require.NoError(t, db.Create(providerModel).Error)
+	require.NoError(t, db.Model(endpoint).Update("endpoint_provider_model_id", providerModel.Id).Error)
+
+	_, err := service.Get(
+		context.Background(),
+		&types.Authentication{AuthType: types.AuthTypeOrg, OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID}},
+		endpoint.Id,
+		nil,
+		internal_service.NewInvokeGetEndpointOption(),
+	)
+	require.Error(t, err)
 }
 
 func insertEndpoint(t *testing.T, db *gorm.DB, id, orgID, projectID uint64, visibility string) *internal_gorm.Endpoint {
@@ -165,8 +262,7 @@ func insertEndpoint(t *testing.T, db *gorm.DB, id, orgID, projectID uint64, visi
 	endpoint := &internal_gorm.Endpoint{
 		Audited: gorm_models.Audited{Id: id},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		Organizational: gorm_models.Organizational{
 			OrganizationId: orgID,
@@ -193,8 +289,7 @@ func TestGetAllEndpointProviderModelEnforcesEndpointOwnership(t *testing.T) {
 	require.NoError(t, db.Create(&internal_gorm.EndpointProviderModel{
 		Audited: gorm_models.Audited{Id: 201},
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ACTIVE,
-			CreatedBy: 1,
+			Status: type_enums.RECORD_ACTIVE,
 		},
 		EndpointId:                   endpoint.Id,
 		Description:                  "primary",

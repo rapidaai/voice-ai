@@ -20,7 +20,7 @@ import (
 // It owns middleware output and the answer policy derived from that config.
 type inboundConfig struct {
 	config          *Config
-	auth            types.SimplePrinciple
+	auth            *types.Authentication
 	assistant       *internal_assistant_entity.Assistant
 	vaultCredential *protos.VaultCredential
 	answerPolicy    InboundAnswerPolicy
@@ -47,12 +47,11 @@ func NewInboundConfig(server *Server, identity inboundInviteIdentity, mediaOffer
 	}
 
 	requestContext := &SIPRequestContext{
-		Method:       "INVITE",
-		CallID:       identity.callID,
-		RequestURI:   identity.requestURI,
-		FromIdentity: identity.fromIdentity,
-		ToIdentity:   identity.toIdentity,
-		SDPInfo:      mediaOffer.sdpInfo,
+		Method:  "INVITE",
+		CallID:  identity.callID,
+		FromURI: identity.fromURI,
+		ToURI:   identity.toURI,
+		SDPInfo: mediaOffer.sdpInfo,
 	}
 	for _, middleware := range middlewares {
 		if err := middleware(requestContext); err != nil {

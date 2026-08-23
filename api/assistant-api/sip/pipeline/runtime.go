@@ -28,7 +28,7 @@ import (
 type sipPreparedCallRuntime struct {
 	logger      commons.Logger
 	session     *sip_infra.Session
-	auth        types.SimplePrinciple
+	auth        *types.Authentication
 	callContext *callcontext.CallContext
 	talkContext context.Context
 	cancelTalk  context.CancelFunc
@@ -73,35 +73,16 @@ func (runtime *sipPreparedCallRuntime) Close(_ context.Context) {
 	_ = runtime.streamer.Close()
 }
 
-func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, stage sip_infra.SessionEstablishedPipeline, setup *CallSetupResult, observer observability.Recorder) (*sipPreparedCallRuntime, error) {
-	session := stage.Session
+func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, session *sip_infra.Session, setup *CallSetupResult, observer observability.Recorder, vaultCred interface{}, sipConfig *sip_infra.Config, direction string) (*sipPreparedCallRuntime, error) {
 	callID := session.GetCallID()
 	if session.IsEnded() {
 		d.logger.Warnw("Session already ended before call runtime preparation", "call_id", callID)
 		return nil, fmt.Errorf("session_ended_before_start")
 	}
 	auth := session.GetAuth()
-	resolvedCallContext := setup.CallContext
-	if resolvedCallContext == nil {
-		d.logger.Warnw("setup.CallContext missing - reconstructing from session", "call_id", callID)
-		resolvedCallContext = reconstructCallContext(auth, setup.AssistantID, setup.ConversationID, string(stage.Direction), callID, callID, stage.FromIdentity, stage.ToIdentity)
-		resolvedCallContext.AssistantProviderId = setup.AssistantProviderId
-		if setup.ProjectID != 0 {
-			resolvedCallContext.ProjectID = setup.ProjectID
-		}
-		if setup.OrganizationID != 0 {
-			resolvedCallContext.OrganizationID = setup.OrganizationID
-		}
-	} else {
-		if resolvedCallContext.AssistantProviderId == 0 {
-			resolvedCallContext.AssistantProviderId = setup.AssistantProviderId
-		}
-		if resolvedCallContext.ProjectID == 0 {
-			resolvedCallContext.ProjectID = setup.ProjectID
-		}
-		if resolvedCallContext.OrganizationID == 0 {
-			resolvedCallContext.OrganizationID = setup.OrganizationID
-		}
+	resolvedCallContext, err := d.resolveSIPCallContext(session, setup, direction)
+	if err != nil {
+		return nil, fmt.Errorf("resolve SIP call context: %w", err)
 	}
 	talkContext, cancelTalk := context.WithCancel(session.Context())
 
@@ -121,8 +102,10 @@ func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, stage sip_infra.
 	default:
 	}
 
-	vaultCredential := stage.VaultCredential
-	if vaultCredential == nil {
+	var vaultCredential *protos.VaultCredential
+	if v, ok := vaultCred.(*protos.VaultCredential); ok {
+		vaultCredential = v
+	} else {
 		vaultCredential = session.GetVaultCredential()
 	}
 	streamer, err := internal_telephony.New(
@@ -145,7 +128,7 @@ func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, stage sip_infra.
 		return nil, fmt.Errorf("session_ended_after_streamer")
 	}
 
-	d.configureSIPTransfer(ctx, session, stage.Config, resolvedCallContext, streamer)
+	d.configureSIPTransfer(ctx, session, sipConfig, resolvedCallContext, streamer)
 	talker, err := internal_adapter.New(
 		internal_adapter.WithSource(utils.PhoneCall),
 		internal_adapter.WithContext(talkContext),
@@ -173,7 +156,7 @@ func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, stage sip_infra.
 		cancelTalk:  cancelTalk,
 		streamer:    streamer,
 		talker:      talker,
-		direction:   string(stage.Direction),
+		direction:   direction,
 	}, nil
 }
 
@@ -217,6 +200,47 @@ func inboundRuntimeReadyTimeout(config *sip_infra.Config) time.Duration {
 		return config.InboundMaxRingDuration
 	}
 	return 30 * time.Second
+}
+
+func (d *Dispatcher) resolveSIPCallContext(session *sip_infra.Session, setup *CallSetupResult, direction string) (*callcontext.CallContext, error) {
+	callID := session.GetCallID()
+	if setup.CallContext != nil {
+		call := setup.CallContext
+		if call.AssistantProviderId == 0 {
+			call.AssistantProviderId = setup.AssistantProviderId
+		}
+		if call.ProjectID == 0 {
+			call.ProjectID = setup.ProjectID
+		}
+		if call.OrganizationID == 0 {
+			call.OrganizationID = setup.OrganizationID
+		}
+		return call, nil
+	}
+
+	d.logger.Warnw("setup.CallContext missing - reconstructing from session", "call_id", callID)
+	info := session.GetInfo()
+	clientPhone := sip_infra.ExtractDIDFromURI(info.RemoteURI)
+	if clientPhone == "" {
+		clientPhone = info.RemoteURI
+	}
+	callContext := &callcontext.CallContext{
+		AssistantID:         setup.AssistantID,
+		ConversationID:      setup.ConversationID,
+		AssistantProviderId: setup.AssistantProviderId,
+		Direction:           direction,
+		Provider:            "sip",
+		CallerNumber:        clientPhone,
+		FromNumber:          sip_infra.ExtractDIDFromURI(info.LocalURI),
+		ChannelUUID:         callID,
+		ContextID:           callID,
+		ProjectID:           setup.ProjectID,
+		OrganizationID:      setup.OrganizationID,
+	}
+	if err := callContext.SetAuthentication(setup.Auth); err != nil {
+		return nil, err
+	}
+	return callContext, nil
 }
 
 func (d *Dispatcher) configureSIPTransfer(ctx context.Context, session *sip_infra.Session, sipConfig *sip_infra.Config, call *callcontext.CallContext, transferStreamer internal_type.SIPTransferStreamer) {

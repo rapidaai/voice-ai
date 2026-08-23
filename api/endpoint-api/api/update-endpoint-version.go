@@ -12,17 +12,19 @@ import (
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	endpoint_grpc_api "github.com/rapidaai/protos"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func (endpointGRPCApi *endpointGRPCApi) UpdateEndpointVersion(ctx context.Context, cer *endpoint_grpc_api.UpdateEndpointVersionRequest) (*endpoint_grpc_api.UpdateEndpointVersionResponse, error) {
 	endpointGRPCApi.logger.Debugf("update endpoint version request %v, %v", cer, ctx)
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !iAuth.HasProject() {
-		endpointGRPCApi.logger.Errorf("unauthenticated request for UpdateEndpointVersion")
-		return utils.Error[endpoint_grpc_api.UpdateEndpointVersionResponse](
-			errors.New("unauthenticated request for updateendpointversion"),
-			"Please provider valid service credentials to perfom invoke, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
 	ep, err := endpointGRPCApi.endpointService.UpdateEndpointVersion(ctx,

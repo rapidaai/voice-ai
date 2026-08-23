@@ -10,7 +10,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	pkg_errors "github.com/rapidaai/pkg/errors"
-	"github.com/rapidaai/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -44,7 +43,7 @@ func TestCreateAssistantApiDeploymentRest_HappyPath(t *testing.T) {
 		bytes.NewReader(requestBody),
 	)
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.CreateAssistantApiDeploymentRest(context)
 
@@ -78,7 +77,7 @@ func TestCreateAssistantApiDeploymentRest_InvalidAudioProvider(t *testing.T) {
 		bytes.NewReader([]byte(`{"assistantId":"123","outputAudio":{"audioProvider":""}}`)),
 	)
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.CreateAssistantApiDeploymentRest(context)
 
@@ -111,7 +110,7 @@ func TestCreateAssistantWebpluginDeploymentRest_HappyPath(t *testing.T) {
 		bytes.NewReader(requestBody),
 	)
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.CreateAssistantWebpluginDeploymentRest(context)
 
@@ -148,7 +147,7 @@ func TestCreateAssistantWebpluginDeploymentRest_CreateDeploymentErrorDoesNotExpo
 		bytes.NewReader([]byte(`{"assistantId":"123"}`)),
 	)
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.CreateAssistantWebpluginDeploymentRest(context)
 
@@ -179,7 +178,7 @@ func TestCreateAssistantWhatsappDeploymentRest_HappyPath(t *testing.T) {
 		bytes.NewReader(requestBody),
 	)
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.CreateAssistantWhatsappDeploymentRest(context)
 
@@ -213,7 +212,7 @@ func TestCreateAssistantWhatsappDeploymentRest_MissingWhatsappProvider(t *testin
 		bytes.NewReader([]byte(`{"assistantId":"123","whatsappProviderName":""}`)),
 	)
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.CreateAssistantWhatsappDeploymentRest(context)
 

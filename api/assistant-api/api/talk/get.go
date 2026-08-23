@@ -7,12 +7,12 @@ package assistant_talk_api
 
 import (
 	"context"
-	"errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
-	assistant_api "github.com/rapidaai/protos"
 	protos "github.com/rapidaai/protos"
 )
 
@@ -28,12 +28,13 @@ Returns:
 - An error object, which will be nil if no error occurred.
 */
 func (cApi *ConversationGrpcApi) GetAllAssistantConversation(ctx context.Context, cer *protos.GetAllAssistantConversationRequest) (*protos.GetAllAssistantConversationResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated {
-		return utils.Error[assistant_api.GetAllAssistantConversationResponse](
-			errors.New("unauthenticated request for GetAllAssistantConversation"),
-			"Please provider valid service credentials to perfom invoke, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	cnt, acs, err := cApi.assistantConversationService.GetAll(ctx,
 		iAuth,
@@ -60,12 +61,13 @@ func (cApi *ConversationGrpcApi) GetAllAssistantConversation(ctx context.Context
 }
 
 func (cApi *ConversationGrpcApi) GetAllConversationMessage(ctx context.Context, cer *protos.GetAllConversationMessageRequest) (*protos.GetAllConversationMessageResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated {
-		return utils.Error[assistant_api.GetAllConversationMessageResponse](
-			errors.New("unauthenticated request for GetAllConversationMessageResponse"),
-			"Please provider valid service credentials to perfom invoke, read docs @ docs.rapida.ai",
-		)
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	cnt, acs, err := cApi.assistantConversationService.GetAllConversationMessage(
 		ctx,

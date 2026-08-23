@@ -21,7 +21,7 @@ import (
 )
 
 type ObservabilityServiceClient interface {
-	GetAllTelemetry(ctx context.Context, auth types.SimplePrinciple, in *protos.GetAllTelemetryRequest) (*protos.GetAllTelemetryResponse, error)
+	GetAllTelemetry(ctx context.Context, auth *types.Authentication, in *protos.GetAllTelemetryRequest) (*protos.GetAllTelemetryResponse, error)
 }
 
 type observabilityServiceClient struct {
@@ -44,9 +44,13 @@ func NewObservabilityServiceClientGRPC(config *config.AppConfig, logger commons.
 	}
 }
 
-func (client *observabilityServiceClient) GetAllTelemetry(ctx context.Context, auth types.SimplePrinciple, in *protos.GetAllTelemetryRequest) (*protos.GetAllTelemetryResponse, error) {
+func (client *observabilityServiceClient) GetAllTelemetry(ctx context.Context, auth *types.Authentication, in *protos.GetAllTelemetryRequest) (*protos.GetAllTelemetryResponse, error) {
 	start := time.Now()
-	res, err := client.observabilityClient.GetAllTelemetry(client.WithAuth(ctx, auth), in)
+	authContext, err := client.WithAuth(ctx, auth)
+	if err != nil {
+		return nil, err
+	}
+	res, err := client.observabilityClient.GetAllTelemetry(authContext, in)
 	if err != nil {
 		client.logger.Benchmark("Benchmarking: observabilityClient.GetAllTelemetry", time.Since(start))
 		client.logger.Errorf("error while calling GetAllTelemetry %v", err)

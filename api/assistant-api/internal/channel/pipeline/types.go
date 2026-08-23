@@ -24,7 +24,7 @@ type Pipeline interface {
 type CallReceivedPipeline struct {
 	ID          string
 	Provider    string
-	Auth        types.SimplePrinciple
+	Auth        *types.Authentication
 	AssistantID uint64
 	GinContext  *gin.Context
 	Observer    observability.Recorder
@@ -43,7 +43,7 @@ func (p CallReceivedPipeline) Validate() bool {
 type WebhookParsedPipeline struct {
 	ID          string
 	Provider    string
-	Auth        types.SimplePrinciple
+	Auth        *types.Authentication
 	AssistantID uint64
 	CallInfo    *internal_type.CallInfo
 	GinContext  *gin.Context
@@ -62,7 +62,7 @@ func (p WebhookParsedPipeline) Validate() bool {
 type AssistantResolvedPipeline struct {
 	ID          string
 	Provider    string
-	Auth        types.SimplePrinciple
+	Auth        *types.Authentication
 	AssistantID uint64
 	Assistant   *internal_assistant_entity.Assistant
 	CallInfo    *internal_type.CallInfo
@@ -83,7 +83,7 @@ func (p AssistantResolvedPipeline) Validate() bool {
 type ConversationCreatedPipeline struct {
 	ID             string
 	Provider       string
-	Auth           types.SimplePrinciple
+	Auth           *types.Authentication
 	AssistantID    uint64
 	Assistant      *internal_assistant_entity.Assistant
 	ConversationID uint64
@@ -107,7 +107,7 @@ func (p ConversationCreatedPipeline) Validate() bool {
 type ProviderAnsweringPipeline struct {
 	ID             string
 	Provider       string
-	Auth           types.SimplePrinciple
+	Auth           *types.Authentication
 	AssistantID    uint64
 	ConversationID uint64
 	ContextID      string
@@ -156,7 +156,7 @@ func (p SessionConnectedPipeline) Validate() bool {
 
 type SessionInitializedPipeline struct {
 	ID   string
-	Auth types.SimplePrinciple
+	Auth *types.Authentication
 }
 
 func (p SessionInitializedPipeline) CallID() string { return p.ID }
@@ -176,7 +176,7 @@ func (p CallActivePipeline) Validate() bool {
 
 type OutboundRequestedPipeline struct {
 	ID          string
-	Auth        types.SimplePrinciple
+	Auth        *types.Authentication
 	AssistantID uint64
 	Version     string
 	ToPhone     string

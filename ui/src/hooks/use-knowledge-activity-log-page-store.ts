@@ -169,8 +169,6 @@ export const useKnowledgeActivityLogPage = create<KnowledgeActivityLogType>(
     //     created_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     //     updated_date TIMESTAMP WITH TIME ZONE,
     //     status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
-    //     created_by BIGINT,
-    //     updated_by BIGINT,
     //     project_id BIGINT NOT NULL,
     //     organization_id BIGINT NOT NULL,
     //     knowledge_id BIGINT NOT NULL,

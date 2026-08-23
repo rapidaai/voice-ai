@@ -18,6 +18,7 @@ import (
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/storages"
+	"github.com/rapidaai/pkg/types"
 )
 
 const (
@@ -62,8 +63,7 @@ type CallSetupResult struct {
 	AssistantID         uint64
 	ConversationID      uint64
 	AssistantProviderId uint64
-	AuthToken           string
-	AuthType            string
+	Auth                *types.Authentication
 	ProjectID           uint64
 	OrganizationID      uint64
 	CallContext         *callcontext.CallContext

@@ -30,7 +30,7 @@ type options struct {
 	logger        commons.Logger
 	configuration *internal_assistant_entity.AssistantConfiguration
 	caller        internal_type.InternalCaller
-	auth          types.SimplePrinciple
+	auth          *types.Authentication
 	onPacket      func(context.Context, ...internal_type.Packet) error
 }
 
@@ -60,7 +60,7 @@ func WithCaller(caller internal_type.InternalCaller) Option {
 	}
 }
 
-func WithAuth(auth types.SimplePrinciple) Option {
+func WithAuth(auth *types.Authentication) Option {
 	return func(options *options) {
 		options.auth = auth
 	}

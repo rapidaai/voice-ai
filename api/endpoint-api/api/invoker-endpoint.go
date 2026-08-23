@@ -24,6 +24,8 @@ import (
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	invoker_api "github.com/rapidaai/protos"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type invokerApi struct {
@@ -60,9 +62,13 @@ func NewInvokerGRPCApi(config *config.EndpointConfig, logger commons.Logger,
 
 func (invokeApi *invokerGRPCApi) Invoke(ctx context.Context, iRequest *invoker_api.InvokeRequest) (*invoker_api.InvokeResponse, error) {
 	start := time.Now()
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated {
-		return utils.AuthenticateError[invoker_api.InvokeResponse]()
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeOrg, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
 	requestID := gorm_generator.ID()
@@ -89,7 +95,7 @@ func (invokeApi *invokerGRPCApi) Invoke(ctx context.Context, iRequest *invoker_a
 		iAuth,
 		iRequest.GetEndpoint().GetEndpointId(),
 		utils.GetVersionDefinition(iRequest.GetEndpoint().GetVersion()),
-		internal_services.NewGetEndpointOption())
+		internal_services.NewInvokeGetEndpointOption())
 
 	if err != nil {
 		return utils.ErrorWithCode[invoker_api.InvokeResponse](400, err, "Please check endpoint configuration and try again.")
@@ -193,17 +199,27 @@ func (invokeApi *invokerGRPCApi) Invoke(ctx context.Context, iRequest *invoker_a
 }
 
 func (endpoint *invokerGRPCApi) Probe(ctx context.Context, rpv *invoker_api.ProbeRequest) (*invoker_api.ProbeResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || iAuth.GetCurrentProjectId() == nil {
-		return utils.AuthenticateError[invoker_api.ProbeResponse]()
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
 	}
-	return nil, nil
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	}
+	_ = iAuth
+	return nil, status.Error(codes.Unimplemented, "Probe is not implemented")
 }
 
 func (endpoint *invokerGRPCApi) Update(ctx context.Context, ur *invoker_api.UpdateRequest) (*invoker_api.UpdateResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || iAuth.GetCurrentProjectId() == nil {
-		return utils.AuthenticateError[invoker_api.UpdateResponse]()
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
 	}
-	return nil, nil
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
+	}
+	_ = iAuth
+	return nil, status.Error(codes.Unimplemented, "Update is not implemented")
 }

@@ -62,8 +62,10 @@ func newTestManager(t *testing.T) (*manager, *gorm.DB, context.Context) {
 			key TEXT NOT NULL,
 			value TEXT NOT NULL,
 			status TEXT,
-			created_by BIGINT,
-			updated_by BIGINT,
+			created_actor_type TEXT,
+			created_actor_id BIGINT,
+			updated_actor_type TEXT,
+			updated_actor_id BIGINT,
 			updated_date DATETIME
 		)`,
 		`CREATE UNIQUE INDEX idx_adto_deployment_key
@@ -120,9 +122,9 @@ func insertSIPDeploymentWithOptions(t *testing.T, db *gorm.DB, deploymentID, ass
 	for k, v := range options {
 		if err := db.Exec(
 			`INSERT INTO assistant_deployment_telephony_options
-			 (assistant_deployment_telephony_id, key, value, status, created_by, updated_by)
-			 VALUES (?, ?, ?, ?, ?, ?)`,
-			deploymentID, k, v, "ACTIVE", 1, 1,
+			 (assistant_deployment_telephony_id, key, value, status, created_actor_type, created_actor_id, updated_actor_type, updated_actor_id)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			deploymentID, k, v, "ACTIVE", "user", 1, "user", 1,
 		).Error; err != nil {
 			t.Fatalf("failed creating option %s: %v", k, err)
 		}

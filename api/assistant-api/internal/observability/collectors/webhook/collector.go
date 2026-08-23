@@ -44,7 +44,7 @@ const (
 
 type Config struct {
 	Logger                        commons.Logger
-	Auth                          types.SimplePrinciple
+	Auth                          *types.Authentication
 	AssistantID                   uint64
 	AssistantConfigurationService internal_services.AssistantConfigurationService
 	HTTPLogService                internal_services.AssistantHTTPLogService
@@ -52,7 +52,7 @@ type Config struct {
 
 type Collector struct {
 	logger                        commons.Logger
-	auth                          types.SimplePrinciple
+	auth                          *types.Authentication
 	assistantID                   uint64
 	assistantConfigurationService internal_services.AssistantConfigurationService
 	httpLogService                internal_services.AssistantHTTPLogService

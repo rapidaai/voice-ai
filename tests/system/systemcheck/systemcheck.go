@@ -31,10 +31,10 @@ type migrationSpec struct {
 }
 
 var migrations = []migrationSpec{
-	{Service: "web-api", Database: "web_db", Head: 4},
-	{Service: "integration-api", Database: "integration_db", Head: 1},
-	{Service: "endpoint-api", Database: "endpoint_db", Head: 1},
-	{Service: "assistant-api", Database: "assistant_db", Head: 54},
+	{Service: "web-api", Database: "web_db", Head: 12},
+	{Service: "integration-api", Database: "integration_db", Head: 6},
+	{Service: "endpoint-api", Database: "endpoint_db", Head: 6},
+	{Service: "assistant-api", Database: "assistant_db", Head: 60},
 }
 
 var services = []struct {

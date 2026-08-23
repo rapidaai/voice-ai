@@ -20,21 +20,21 @@ import (
 )
 
 type KnowledgeServiceClient interface {
-	GetAllKnowledge(c context.Context, auth types.SimplePrinciple, criteria []*knowledge_api.Criteria, paginate *knowledge_api.Paginate) (*knowledge_api.Paginated, []*knowledge_api.Knowledge, error)
-	GetKnowledge(c context.Context, auth types.SimplePrinciple, knowledgeRequest *knowledge_api.GetKnowledgeRequest) (*knowledge_api.Knowledge, error)
-	CreateKnowledge(c context.Context, auth types.SimplePrinciple, knowledgeRequest *knowledge_api.CreateKnowledgeRequest) (*knowledge_api.CreateKnowledgeResponse, error)
-	CreateKnowledgeTag(c context.Context, auth types.SimplePrinciple, knowledgeRequest *knowledge_api.CreateKnowledgeTagRequest) (*knowledge_api.GetKnowledgeResponse, error)
-	UpdateKnowledgeDetail(c context.Context, auth types.SimplePrinciple, knowledgeRequest *knowledge_api.UpdateKnowledgeDetailRequest) (*knowledge_api.GetKnowledgeResponse, error)
+	GetAllKnowledge(c context.Context, auth *types.Authentication, criteria []*knowledge_api.Criteria, paginate *knowledge_api.Paginate) (*knowledge_api.Paginated, []*knowledge_api.Knowledge, error)
+	GetKnowledge(c context.Context, auth *types.Authentication, knowledgeRequest *knowledge_api.GetKnowledgeRequest) (*knowledge_api.Knowledge, error)
+	CreateKnowledge(c context.Context, auth *types.Authentication, knowledgeRequest *knowledge_api.CreateKnowledgeRequest) (*knowledge_api.CreateKnowledgeResponse, error)
+	CreateKnowledgeTag(c context.Context, auth *types.Authentication, knowledgeRequest *knowledge_api.CreateKnowledgeTagRequest) (*knowledge_api.GetKnowledgeResponse, error)
+	UpdateKnowledgeDetail(c context.Context, auth *types.Authentication, knowledgeRequest *knowledge_api.UpdateKnowledgeDetailRequest) (*knowledge_api.GetKnowledgeResponse, error)
 
-	CreateKnowledgeDocument(c context.Context, auth types.SimplePrinciple, knowledgeRequest *knowledge_api.CreateKnowledgeDocumentRequest) (*knowledge_api.CreateKnowledgeDocumentResponse, error)
-	GetAllKnowledgeDocument(c context.Context, auth types.SimplePrinciple, knowledgeRequest *knowledge_api.GetAllKnowledgeDocumentRequest) (*knowledge_api.GetAllKnowledgeDocumentResponse, error)
-	GetAllKnowledgeDocumentSegment(c context.Context, auth types.SimplePrinciple, knowledgeRequest *knowledge_api.GetAllKnowledgeDocumentSegmentRequest) (*knowledge_api.GetAllKnowledgeDocumentSegmentResponse, error)
+	CreateKnowledgeDocument(c context.Context, auth *types.Authentication, knowledgeRequest *knowledge_api.CreateKnowledgeDocumentRequest) (*knowledge_api.CreateKnowledgeDocumentResponse, error)
+	GetAllKnowledgeDocument(c context.Context, auth *types.Authentication, knowledgeRequest *knowledge_api.GetAllKnowledgeDocumentRequest) (*knowledge_api.GetAllKnowledgeDocumentResponse, error)
+	GetAllKnowledgeDocumentSegment(c context.Context, auth *types.Authentication, knowledgeRequest *knowledge_api.GetAllKnowledgeDocumentSegmentRequest) (*knowledge_api.GetAllKnowledgeDocumentSegmentResponse, error)
 
-	UpdateKnowledgeDocumentSegment(ctx context.Context, auth types.SimplePrinciple, dsr *knowledge_api.UpdateKnowledgeDocumentSegmentRequest) (*knowledge_api.BaseResponse, error)
-	DeleteKnowledgeDocumentSegment(ctx context.Context, auth types.SimplePrinciple, dsr *knowledge_api.DeleteKnowledgeDocumentSegmentRequest) (*knowledge_api.BaseResponse, error)
+	UpdateKnowledgeDocumentSegment(ctx context.Context, auth *types.Authentication, dsr *knowledge_api.UpdateKnowledgeDocumentSegmentRequest) (*knowledge_api.BaseResponse, error)
+	DeleteKnowledgeDocumentSegment(ctx context.Context, auth *types.Authentication, dsr *knowledge_api.DeleteKnowledgeDocumentSegmentRequest) (*knowledge_api.BaseResponse, error)
 
-	GetAllKnowledgeLog(ctx context.Context, auth types.SimplePrinciple, in *knowledge_api.GetAllKnowledgeLogRequest) (*knowledge_api.GetAllKnowledgeLogResponse, error)
-	GetKnowledgeLog(ctx context.Context, auth types.SimplePrinciple, in *knowledge_api.GetKnowledgeLogRequest) (*knowledge_api.GetKnowledgeLogResponse, error)
+	GetAllKnowledgeLog(ctx context.Context, auth *types.Authentication, in *knowledge_api.GetAllKnowledgeLogRequest) (*knowledge_api.GetAllKnowledgeLogResponse, error)
+	GetKnowledgeLog(ctx context.Context, auth *types.Authentication, in *knowledge_api.GetKnowledgeLogRequest) (*knowledge_api.GetKnowledgeLogResponse, error)
 }
 
 type knowledgeServiceClient struct {
@@ -66,9 +66,13 @@ func NewKnowledgeServiceClientGRPC(config *config.AppConfig, logger commons.Logg
 	}
 }
 
-func (client *knowledgeServiceClient) GetAllKnowledge(c context.Context, auth types.SimplePrinciple, criteria []*knowledge_api.Criteria, paginate *knowledge_api.Paginate) (*knowledge_api.Paginated, []*knowledge_api.Knowledge, error) {
+func (client *knowledgeServiceClient) GetAllKnowledge(c context.Context, auth *types.Authentication, criteria []*knowledge_api.Criteria, paginate *knowledge_api.Paginate) (*knowledge_api.Paginated, []*knowledge_api.Knowledge, error) {
 	client.logger.Debugf("get all knowledge request")
-	res, err := client.knowledgeClient.GetAllKnowledge(client.WithAuth(c, auth), &knowledge_api.GetAllKnowledgeRequest{
+	authContext, err := client.WithAuth(c, auth)
+	if err != nil {
+		return nil, nil, err
+	}
+	res, err := client.knowledgeClient.GetAllKnowledge(authContext, &knowledge_api.GetAllKnowledgeRequest{
 		Paginate:  paginate,
 		Criterias: criteria,
 	})
@@ -84,9 +88,13 @@ func (client *knowledgeServiceClient) GetAllKnowledge(c context.Context, auth ty
 	return res.GetPaginated(), res.GetData(), nil
 }
 
-func (client *knowledgeServiceClient) GetKnowledge(c context.Context, auth types.SimplePrinciple, knowledgeRequest *knowledge_api.GetKnowledgeRequest) (*knowledge_api.Knowledge, error) {
+func (client *knowledgeServiceClient) GetKnowledge(c context.Context, auth *types.Authentication, knowledgeRequest *knowledge_api.GetKnowledgeRequest) (*knowledge_api.Knowledge, error) {
 	client.logger.Debugf("get knowledge request")
-	res, err := client.knowledgeClient.GetKnowledge(client.WithAuth(c, auth), knowledgeRequest)
+	authContext, err := client.WithAuth(c, auth)
+	if err != nil {
+		return nil, err
+	}
+	res, err := client.knowledgeClient.GetKnowledge(authContext, knowledgeRequest)
 	if err != nil {
 		client.logger.Errorf("error while calling to get knowledge %v", err)
 		return nil, err
@@ -99,8 +107,12 @@ func (client *knowledgeServiceClient) GetKnowledge(c context.Context, auth types
 	return res.GetData(), nil
 }
 
-func (client *knowledgeServiceClient) CreateKnowledge(c context.Context, auth types.SimplePrinciple, knowledgeRequest *knowledge_api.CreateKnowledgeRequest) (*knowledge_api.CreateKnowledgeResponse, error) {
-	res, err := client.knowledgeClient.CreateKnowledge(client.WithAuth(c, auth), knowledgeRequest)
+func (client *knowledgeServiceClient) CreateKnowledge(c context.Context, auth *types.Authentication, knowledgeRequest *knowledge_api.CreateKnowledgeRequest) (*knowledge_api.CreateKnowledgeResponse, error) {
+	authContext, err := client.WithAuth(c, auth)
+	if err != nil {
+		return nil, err
+	}
+	res, err := client.knowledgeClient.CreateKnowledge(authContext, knowledgeRequest)
 	if err != nil {
 		client.logger.Errorf("error while calling CreateKnowledge %v", err)
 		return nil, err
@@ -108,8 +120,12 @@ func (client *knowledgeServiceClient) CreateKnowledge(c context.Context, auth ty
 	return res, nil
 }
 
-func (client *knowledgeServiceClient) CreateKnowledgeTag(c context.Context, auth types.SimplePrinciple, knowledgeRequest *knowledge_api.CreateKnowledgeTagRequest) (*knowledge_api.GetKnowledgeResponse, error) {
-	res, err := client.knowledgeClient.CreateKnowledgeTag(client.WithAuth(c, auth), knowledgeRequest)
+func (client *knowledgeServiceClient) CreateKnowledgeTag(c context.Context, auth *types.Authentication, knowledgeRequest *knowledge_api.CreateKnowledgeTagRequest) (*knowledge_api.GetKnowledgeResponse, error) {
+	authContext, err := client.WithAuth(c, auth)
+	if err != nil {
+		return nil, err
+	}
+	res, err := client.knowledgeClient.CreateKnowledgeTag(authContext, knowledgeRequest)
 	if err != nil {
 		client.logger.Errorf("error while calling CreateKnowledgeTag %v", err)
 		return nil, err
@@ -117,8 +133,12 @@ func (client *knowledgeServiceClient) CreateKnowledgeTag(c context.Context, auth
 	return res, nil
 }
 
-func (client *knowledgeServiceClient) UpdateKnowledgeDetail(c context.Context, auth types.SimplePrinciple, knowledgeRequest *knowledge_api.UpdateKnowledgeDetailRequest) (*knowledge_api.GetKnowledgeResponse, error) {
-	res, err := client.knowledgeClient.UpdateKnowledgeDetail(client.WithAuth(c, auth), knowledgeRequest)
+func (client *knowledgeServiceClient) UpdateKnowledgeDetail(c context.Context, auth *types.Authentication, knowledgeRequest *knowledge_api.UpdateKnowledgeDetailRequest) (*knowledge_api.GetKnowledgeResponse, error) {
+	authContext, err := client.WithAuth(c, auth)
+	if err != nil {
+		return nil, err
+	}
+	res, err := client.knowledgeClient.UpdateKnowledgeDetail(authContext, knowledgeRequest)
 	if err != nil {
 		client.logger.Errorf("error while calling CreateKnowledgeTag %v", err)
 		return nil, err
@@ -126,8 +146,12 @@ func (client *knowledgeServiceClient) UpdateKnowledgeDetail(c context.Context, a
 	return res, nil
 }
 
-func (client *knowledgeServiceClient) CreateKnowledgeDocument(c context.Context, auth types.SimplePrinciple, knowledgeRequest *knowledge_api.CreateKnowledgeDocumentRequest) (*knowledge_api.CreateKnowledgeDocumentResponse, error) {
-	res, err := client.knowledgeClient.CreateKnowledgeDocument(client.WithAuth(c, auth), knowledgeRequest)
+func (client *knowledgeServiceClient) CreateKnowledgeDocument(c context.Context, auth *types.Authentication, knowledgeRequest *knowledge_api.CreateKnowledgeDocumentRequest) (*knowledge_api.CreateKnowledgeDocumentResponse, error) {
+	authContext, err := client.WithAuth(c, auth)
+	if err != nil {
+		return nil, err
+	}
+	res, err := client.knowledgeClient.CreateKnowledgeDocument(authContext, knowledgeRequest)
 	if err != nil {
 		client.logger.Errorf("error while calling CreateKnowledgeDocument %v", err)
 		return nil, err
@@ -135,8 +159,12 @@ func (client *knowledgeServiceClient) CreateKnowledgeDocument(c context.Context,
 	return res, nil
 }
 
-func (client *knowledgeServiceClient) GetAllKnowledgeDocument(c context.Context, auth types.SimplePrinciple, knowledgeRequest *knowledge_api.GetAllKnowledgeDocumentRequest) (*knowledge_api.GetAllKnowledgeDocumentResponse, error) {
-	res, err := client.knowledgeClient.GetAllKnowledgeDocument(client.WithAuth(c, auth), knowledgeRequest)
+func (client *knowledgeServiceClient) GetAllKnowledgeDocument(c context.Context, auth *types.Authentication, knowledgeRequest *knowledge_api.GetAllKnowledgeDocumentRequest) (*knowledge_api.GetAllKnowledgeDocumentResponse, error) {
+	authContext, err := client.WithAuth(c, auth)
+	if err != nil {
+		return nil, err
+	}
+	res, err := client.knowledgeClient.GetAllKnowledgeDocument(authContext, knowledgeRequest)
 	if err != nil {
 		client.logger.Errorf("error while calling GetAllKnowledgeDocument %v", err)
 		return nil, err
@@ -144,8 +172,12 @@ func (client *knowledgeServiceClient) GetAllKnowledgeDocument(c context.Context,
 	return res, nil
 }
 
-func (client *knowledgeServiceClient) GetAllKnowledgeDocumentSegment(c context.Context, auth types.SimplePrinciple, knowledgeRequest *knowledge_api.GetAllKnowledgeDocumentSegmentRequest) (*knowledge_api.GetAllKnowledgeDocumentSegmentResponse, error) {
-	res, err := client.knowledgeClient.GetAllKnowledgeDocumentSegment(client.WithAuth(c, auth), knowledgeRequest)
+func (client *knowledgeServiceClient) GetAllKnowledgeDocumentSegment(c context.Context, auth *types.Authentication, knowledgeRequest *knowledge_api.GetAllKnowledgeDocumentSegmentRequest) (*knowledge_api.GetAllKnowledgeDocumentSegmentResponse, error) {
+	authContext, err := client.WithAuth(c, auth)
+	if err != nil {
+		return nil, err
+	}
+	res, err := client.knowledgeClient.GetAllKnowledgeDocumentSegment(authContext, knowledgeRequest)
 	if err != nil {
 		client.logger.Errorf("error while calling GetAllKnowledgeDocumentSegment %v", err)
 		return nil, err
@@ -153,16 +185,24 @@ func (client *knowledgeServiceClient) GetAllKnowledgeDocumentSegment(c context.C
 	return res, nil
 }
 
-func (client *knowledgeServiceClient) UpdateKnowledgeDocumentSegment(ctx context.Context, auth types.SimplePrinciple, dsr *knowledge_api.UpdateKnowledgeDocumentSegmentRequest) (*knowledge_api.BaseResponse, error) {
-	res, err := client.knowledgeClient.UpdateKnowledgeDocumentSegment(client.WithAuth(ctx, auth), dsr)
+func (client *knowledgeServiceClient) UpdateKnowledgeDocumentSegment(ctx context.Context, auth *types.Authentication, dsr *knowledge_api.UpdateKnowledgeDocumentSegmentRequest) (*knowledge_api.BaseResponse, error) {
+	authContext, err := client.WithAuth(ctx, auth)
+	if err != nil {
+		return nil, err
+	}
+	res, err := client.knowledgeClient.UpdateKnowledgeDocumentSegment(authContext, dsr)
 	if err != nil {
 		client.logger.Errorf("error while calling GetAllKnowledgeDocumentSegment %v", err)
 		return nil, err
 	}
 	return res, nil
 }
-func (client *knowledgeServiceClient) DeleteKnowledgeDocumentSegment(ctx context.Context, auth types.SimplePrinciple, dsr *knowledge_api.DeleteKnowledgeDocumentSegmentRequest) (*knowledge_api.BaseResponse, error) {
-	res, err := client.knowledgeClient.DeleteKnowledgeDocumentSegment(client.WithAuth(ctx, auth), dsr)
+func (client *knowledgeServiceClient) DeleteKnowledgeDocumentSegment(ctx context.Context, auth *types.Authentication, dsr *knowledge_api.DeleteKnowledgeDocumentSegmentRequest) (*knowledge_api.BaseResponse, error) {
+	authContext, err := client.WithAuth(ctx, auth)
+	if err != nil {
+		return nil, err
+	}
+	res, err := client.knowledgeClient.DeleteKnowledgeDocumentSegment(authContext, dsr)
 	if err != nil {
 		client.logger.Errorf("error while calling GetAllKnowledgeDocumentSegment %v", err)
 		return nil, err
@@ -170,8 +210,12 @@ func (client *knowledgeServiceClient) DeleteKnowledgeDocumentSegment(ctx context
 	return res, nil
 }
 
-func (client *knowledgeServiceClient) GetAllKnowledgeLog(ctx context.Context, auth types.SimplePrinciple, in *knowledge_api.GetAllKnowledgeLogRequest) (*knowledge_api.GetAllKnowledgeLogResponse, error) {
-	res, err := client.knowledgeClient.GetAllKnowledgeLog(client.WithAuth(ctx, auth), in)
+func (client *knowledgeServiceClient) GetAllKnowledgeLog(ctx context.Context, auth *types.Authentication, in *knowledge_api.GetAllKnowledgeLogRequest) (*knowledge_api.GetAllKnowledgeLogResponse, error) {
+	authContext, err := client.WithAuth(ctx, auth)
+	if err != nil {
+		return nil, err
+	}
+	res, err := client.knowledgeClient.GetAllKnowledgeLog(authContext, in)
 	if err != nil {
 		client.logger.Errorf("error while calling GetAllKnowledgeLog %v", err)
 		return nil, err
@@ -179,8 +223,12 @@ func (client *knowledgeServiceClient) GetAllKnowledgeLog(ctx context.Context, au
 	return res, nil
 }
 
-func (client *knowledgeServiceClient) GetKnowledgeLog(ctx context.Context, auth types.SimplePrinciple, in *knowledge_api.GetKnowledgeLogRequest) (*knowledge_api.GetKnowledgeLogResponse, error) {
-	res, err := client.knowledgeClient.GetKnowledgeLog(client.WithAuth(ctx, auth), in)
+func (client *knowledgeServiceClient) GetKnowledgeLog(ctx context.Context, auth *types.Authentication, in *knowledge_api.GetKnowledgeLogRequest) (*knowledge_api.GetKnowledgeLogResponse, error) {
+	authContext, err := client.WithAuth(ctx, auth)
+	if err != nil {
+		return nil, err
+	}
+	res, err := client.knowledgeClient.GetKnowledgeLog(authContext, in)
 	if err != nil {
 		client.logger.Errorf("error while calling GetKnowledgeLog %v", err)
 		return nil, err

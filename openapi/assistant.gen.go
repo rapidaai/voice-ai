@@ -18,7 +18,7 @@ type Assistant struct {
 	AssistantProviderWebsocket *AssistantProviderWebsocket `json:"assistantProviderWebsocket,omitempty"`
 	AssistantTag               *AssistantTag               `json:"assistantTag,omitempty"`
 	AssistantTools             *[]AssistantTool            `json:"assistantTools,omitempty"`
-	CreatedBy                  *Uint64String               `json:"createdBy,omitempty"`
+	CreatedActor               *AuditActor                 `json:"createdActor,omitempty"`
 	CreatedDate                *time.Time                  `json:"createdDate,omitempty"`
 	Description                *string                     `json:"description,omitempty"`
 	Id                         *Uint64String               `json:"id,omitempty"`
@@ -28,7 +28,7 @@ type Assistant struct {
 	Source                     *string                     `json:"source,omitempty"`
 	SourceIdentifier           *Uint64String               `json:"sourceIdentifier,omitempty"`
 	Status                     *string                     `json:"status,omitempty"`
-	UpdatedBy                  *Uint64String               `json:"updatedBy,omitempty"`
+	UpdatedActor               *AuditActor                 `json:"updatedActor,omitempty"`
 	UpdatedDate                *time.Time                  `json:"updatedDate,omitempty"`
 	Visibility                 *string                     `json:"visibility,omitempty"`
 }
@@ -55,7 +55,7 @@ type AssistantApiDeployment struct {
 type AssistantConfiguration struct {
 	AssistantId       *Uint64String `json:"assistantId,omitempty"`
 	ConfigurationType *string       `json:"configurationType,omitempty"`
-	CreatedBy         *Uint64String `json:"createdBy,omitempty"`
+	CreatedActor      *AuditActor   `json:"createdActor,omitempty"`
 	CreatedDate       *time.Time    `json:"createdDate,omitempty"`
 	Enabled           *bool         `json:"enabled,omitempty"`
 	Id                *Uint64String `json:"id,omitempty"`
@@ -64,7 +64,7 @@ type AssistantConfiguration struct {
 	ProjectId         *Uint64String `json:"projectId,omitempty"`
 	Provider          *string       `json:"provider,omitempty"`
 	Status            *string       `json:"status,omitempty"`
-	UpdatedBy         *Uint64String `json:"updatedBy,omitempty"`
+	UpdatedActor      *AuditActor   `json:"updatedActor,omitempty"`
 	UpdatedDate       *time.Time    `json:"updatedDate,omitempty"`
 }
 

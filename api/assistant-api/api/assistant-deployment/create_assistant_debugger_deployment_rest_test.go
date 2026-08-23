@@ -49,7 +49,7 @@ type createDebuggerDeploymentRestServiceStub struct {
 
 func (s *createDebuggerDeploymentRestServiceStub) CreateWhatsappDeployment(
 	_ context.Context,
-	_ types.SimplePrinciple,
+	_ *types.Authentication,
 	assistantId uint64,
 	greeting *string,
 	mistake *string,
@@ -102,7 +102,7 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateWhatsappDeployment(
 
 func (s *createDebuggerDeploymentRestServiceStub) CreatePhoneDeployment(
 	_ context.Context,
-	_ types.SimplePrinciple,
+	_ *types.Authentication,
 	assistantId uint64,
 	greeting *string,
 	mistake *string,
@@ -160,7 +160,7 @@ func (s *createDebuggerDeploymentRestServiceStub) CreatePhoneDeployment(
 
 func (s *createDebuggerDeploymentRestServiceStub) CreateApiDeployment(
 	_ context.Context,
-	_ types.SimplePrinciple,
+	_ *types.Authentication,
 	assistantId uint64,
 	greeting *string,
 	mistake *string,
@@ -207,7 +207,7 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateApiDeployment(
 
 func (s *createDebuggerDeploymentRestServiceStub) CreateDebuggerDeployment(
 	_ context.Context,
-	_ types.SimplePrinciple,
+	_ *types.Authentication,
 	assistantId uint64,
 	greeting, _ *string,
 	unclearInputTimeout *float64,
@@ -249,7 +249,7 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateDebuggerDeployment(
 
 func (s *createDebuggerDeploymentRestServiceStub) CreateWebPluginDeployment(
 	_ context.Context,
-	_ types.SimplePrinciple,
+	_ *types.Authentication,
 	assistantId uint64,
 	greeting *string,
 	mistake *string,
@@ -299,7 +299,7 @@ func (s *createDebuggerDeploymentRestServiceStub) CreateWebPluginDeployment(
 
 func (s *createDebuggerDeploymentRestServiceStub) GetAssistantApiDeployment(
 	_ context.Context,
-	_ types.SimplePrinciple,
+	_ *types.Authentication,
 	assistantId uint64,
 ) (*internal_assistant_entity.AssistantApiDeployment, error) {
 	s.getCalled = true
@@ -337,7 +337,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAssistantApiDeployment(
 
 func (s *createDebuggerDeploymentRestServiceStub) GetAssistantDebuggerDeployment(
 	_ context.Context,
-	_ types.SimplePrinciple,
+	_ *types.Authentication,
 	assistantId uint64,
 ) (*internal_assistant_entity.AssistantDebuggerDeployment, error) {
 	s.getCalled = true
@@ -364,7 +364,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAssistantDebuggerDeployment
 
 func (s *createDebuggerDeploymentRestServiceStub) GetAssistantPhoneDeployment(
 	_ context.Context,
-	_ types.SimplePrinciple,
+	_ *types.Authentication,
 	assistantId uint64,
 ) (*internal_assistant_entity.AssistantPhoneDeployment, error) {
 	s.getCalled = true
@@ -398,7 +398,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAssistantPhoneDeployment(
 
 func (s *createDebuggerDeploymentRestServiceStub) GetAssistantWebpluginDeployment(
 	_ context.Context,
-	_ types.SimplePrinciple,
+	_ *types.Authentication,
 	assistantId uint64,
 ) (*internal_assistant_entity.AssistantWebPluginDeployment, error) {
 	s.getCalled = true
@@ -426,7 +426,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAssistantWebpluginDeploymen
 
 func (s *createDebuggerDeploymentRestServiceStub) GetAssistantWhatsappDeployment(
 	_ context.Context,
-	_ types.SimplePrinciple,
+	_ *types.Authentication,
 	assistantId uint64,
 ) (*internal_assistant_entity.AssistantWhatsappDeployment, error) {
 	s.getCalled = true
@@ -460,7 +460,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAssistantWhatsappDeployment
 
 func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantApiDeployment(
 	_ context.Context,
-	_ types.SimplePrinciple,
+	_ *types.Authentication,
 	assistantId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
@@ -482,7 +482,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantApiDeployment(
 
 func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantDebuggerDeployment(
 	_ context.Context,
-	_ types.SimplePrinciple,
+	_ *types.Authentication,
 	assistantId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
@@ -504,7 +504,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantDebuggerDeploym
 
 func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantPhoneDeployment(
 	_ context.Context,
-	_ types.SimplePrinciple,
+	_ *types.Authentication,
 	assistantId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
@@ -526,7 +526,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantPhoneDeployment
 
 func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantWebpluginDeployment(
 	_ context.Context,
-	_ types.SimplePrinciple,
+	_ *types.Authentication,
 	assistantId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
@@ -548,7 +548,7 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantWebpluginDeploy
 
 func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantWhatsappDeployment(
 	_ context.Context,
-	_ types.SimplePrinciple,
+	_ *types.Authentication,
 	assistantId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
@@ -568,23 +568,23 @@ func (s *createDebuggerDeploymentRestServiceStub) GetAllAssistantWhatsappDeploym
 	return 1, []*internal_assistant_entity.AssistantWhatsappDeployment{deployment}, nil
 }
 
-func (s *createDebuggerDeploymentRestServiceStub) DisableAssistantApiDeployment(context.Context, types.SimplePrinciple, uint64) (*internal_assistant_entity.AssistantApiDeployment, error) {
+func (s *createDebuggerDeploymentRestServiceStub) DisableAssistantApiDeployment(context.Context, *types.Authentication, uint64) (*internal_assistant_entity.AssistantApiDeployment, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *createDebuggerDeploymentRestServiceStub) DisableAssistantDebuggerDeployment(context.Context, types.SimplePrinciple, uint64) (*internal_assistant_entity.AssistantDebuggerDeployment, error) {
+func (s *createDebuggerDeploymentRestServiceStub) DisableAssistantDebuggerDeployment(context.Context, *types.Authentication, uint64) (*internal_assistant_entity.AssistantDebuggerDeployment, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *createDebuggerDeploymentRestServiceStub) DisableAssistantPhoneDeployment(context.Context, types.SimplePrinciple, uint64) (*internal_assistant_entity.AssistantPhoneDeployment, error) {
+func (s *createDebuggerDeploymentRestServiceStub) DisableAssistantPhoneDeployment(context.Context, *types.Authentication, uint64) (*internal_assistant_entity.AssistantPhoneDeployment, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *createDebuggerDeploymentRestServiceStub) DisableAssistantWebpluginDeployment(context.Context, types.SimplePrinciple, uint64) (*internal_assistant_entity.AssistantWebPluginDeployment, error) {
+func (s *createDebuggerDeploymentRestServiceStub) DisableAssistantWebpluginDeployment(context.Context, *types.Authentication, uint64) (*internal_assistant_entity.AssistantWebPluginDeployment, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *createDebuggerDeploymentRestServiceStub) DisableAssistantWhatsappDeployment(context.Context, types.SimplePrinciple, uint64) (*internal_assistant_entity.AssistantWhatsappDeployment, error) {
+func (s *createDebuggerDeploymentRestServiceStub) DisableAssistantWhatsappDeployment(context.Context, *types.Authentication, uint64) (*internal_assistant_entity.AssistantWhatsappDeployment, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -613,7 +613,7 @@ func TestCreateAssistantDebuggerDeploymentRest_HappyPath(t *testing.T) {
 		bytes.NewReader(requestBody),
 	)
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.CreateAssistantDebuggerDeploymentRest(context)
 
@@ -670,10 +670,7 @@ func TestCreateAssistantDebuggerDeploymentRest_MissingAuthScope(t *testing.T) {
 		bytes.NewReader([]byte(`{"assistantId":"123"}`)),
 	)
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), &types.PlainAuthPrinciple{
-		User:             types.UserInfo{Id: 11},
-		OrganizationRole: &types.OrganizaitonRole{OrganizationId: 22},
-	})
+	attachTestAuthentication(context, testProjectAuthentication(22, 33))
 
 	deploymentApi.CreateAssistantDebuggerDeploymentRest(context)
 
@@ -693,7 +690,7 @@ func TestCreateAssistantDebuggerDeploymentRest_InvalidAssistantID(t *testing.T) 
 		bytes.NewReader([]byte(`{"assistantId":"abc"}`)),
 	)
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.CreateAssistantDebuggerDeploymentRest(context)
 
@@ -713,7 +710,7 @@ func TestCreateAssistantDebuggerDeploymentRest_InvalidAudioProvider(t *testing.T
 		bytes.NewReader([]byte(`{"assistantId":"123","inputAudio":{"audioProvider":""}}`)),
 	)
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.CreateAssistantDebuggerDeploymentRest(context)
 
@@ -733,7 +730,7 @@ func TestCreateAssistantDebuggerDeploymentRest_InvalidIdealTimeout(t *testing.T)
 		bytes.NewReader([]byte(`{"assistantId":"123","idealTimeout":4}`)),
 	)
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.CreateAssistantDebuggerDeploymentRest(context)
 
@@ -754,7 +751,7 @@ func TestCreateAssistantDebuggerDeploymentRest_InvalidUnclearInputTimeout(t *tes
 			bytes.NewReader([]byte(fmt.Sprintf(`{"assistantId":"123","unclearInputTimeout":%f}`, unclearInputTimeout))),
 		)
 		context.Request.Header.Set("Content-Type", "application/json")
-		context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+		attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 		deploymentApi.CreateAssistantDebuggerDeploymentRest(context)
 
@@ -775,7 +772,7 @@ func TestCreateAssistantDebuggerDeploymentRest_InvalidIdealTimeoutBackoff(t *tes
 		bytes.NewReader([]byte(`{"assistantId":"123","idealTimeoutBackoff":6}`)),
 	)
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.CreateAssistantDebuggerDeploymentRest(context)
 
@@ -795,7 +792,7 @@ func TestCreateAssistantDebuggerDeploymentRest_InvalidMaxSessionDuration(t *test
 		bytes.NewReader([]byte(`{"assistantId":"123","maxSessionDuration":179}`)),
 	)
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.CreateAssistantDebuggerDeploymentRest(context)
 
@@ -818,7 +815,7 @@ func TestCreateAssistantDebuggerDeploymentRest_CreateDeploymentErrorDoesNotExpos
 		bytes.NewReader([]byte(`{"assistantId":"123"}`)),
 	)
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set(string(types.CTX_), createDebuggerDeploymentRestAuth())
+	attachTestAuthentication(context, createDebuggerDeploymentRestAuth())
 
 	deploymentApi.CreateAssistantDebuggerDeploymentRest(context)
 
@@ -1057,16 +1054,8 @@ func newCreateDebuggerDeploymentGRPCApi(
 	}
 }
 
-func createDebuggerDeploymentRestAuth() *types.PlainAuthPrinciple {
-	return &types.PlainAuthPrinciple{
-		User: types.UserInfo{Id: 11},
-		OrganizationRole: &types.OrganizaitonRole{
-			OrganizationId: 22,
-		},
-		CurrentProjectRole: &types.ProjectRole{
-			ProjectId: 33,
-		},
-	}
+func createDebuggerDeploymentRestAuth() *types.Authentication {
+	return testUserAuthentication(11, 22, 33)
 }
 
 func createDebuggerDeploymentGRPCContext() context.Context {

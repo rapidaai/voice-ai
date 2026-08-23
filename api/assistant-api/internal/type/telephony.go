@@ -153,15 +153,15 @@ type ProviderCallStatusReporter func(update ProviderCallStatusUpdate)
 // The dispatcher is responsible for converting CallInfo/StatusInfo into telemetry.
 type Telephony interface {
 	// StatusCallback handles a status/event callback for a conversation.
-	StatusCallback(ctx *gin.Context, auth types.SimplePrinciple, assistantId, assistantConversationId uint64) (*StatusInfo, error)
+	StatusCallback(ctx *gin.Context, auth *types.Authentication, assistantId, assistantConversationId uint64) (*StatusInfo, error)
 	// CatchAllStatusCallback handles a catch-all event callback.
 	CatchAllStatusCallback(ctx *gin.Context) (*StatusInfo, error)
 	// ReceiveCall processes an incoming call webhook and returns structured call info.
 	ReceiveCall(c *gin.Context) (*CallInfo, error)
 	// OutboundCall places an outbound call and returns structured call info.
-	OutboundCall(ctx context.Context, auth types.SimplePrinciple, toPhone string, fromPhone string, assistant *internal_assistant_entity.Assistant, assistantConversationId uint64, vaultCredential *protos.VaultCredential, statusReporter ProviderCallStatusReporter, opts utils.Option) (*CallInfo, error)
+	OutboundCall(ctx context.Context, auth *types.Authentication, toPhone string, fromPhone string, assistant *internal_assistant_entity.Assistant, assistantConversationId uint64, vaultCredential *protos.VaultCredential, statusReporter ProviderCallStatusReporter, opts utils.Option) (*CallInfo, error)
 	// InboundCall instructs the provider to answer/connect the inbound call.
-	InboundCall(c *gin.Context, auth types.SimplePrinciple, assistantId uint64, clientNumber string, assistantConversationId uint64) error
+	InboundCall(c *gin.Context, auth *types.Authentication, assistantId uint64, clientNumber string, assistantConversationId uint64) error
 }
 
 // GetContextAnswerPath returns the contextId-based WebSocket path for media streaming.

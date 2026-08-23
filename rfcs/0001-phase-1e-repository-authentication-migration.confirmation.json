@@ -1,0 +1,15 @@
+{
+  "rfc": "rfcs/0001-actor-aware-audit-identity.md",
+  "status": "approved",
+  "approved_by": "user",
+  "approval_message": "sure let's do that",
+  "approved_at": "2026-08-21",
+  "rfc_sha256": "7e22cc464af4945490954a65b04ae029974b968c7d572508cf699fa7ca07c99c",
+  "plan": "rfcs/0001-phase-1e-repository-authentication-migration.plan.json",
+  "plan_sha256": "a5868f8c9ebe5bc64ee13a7b8e14a8ee91a08b2af54d752d4c0a6c14808940d3",
+  "policy_matrix": "rfcs/0001-phase-1e-auth-policy-matrix.json",
+  "policy_matrix_sha256": "020f7815e251066ae444ef6460cfe51794a50efa6b3c861a0ee5de1db699ff40",
+  "challenger": "Banach",
+  "challenger_decision": "APPROVE",
+  "implementation_scope": "Atomic repository-wide request Authentication migration with fail-closed clients and token-free Assistant snapshots"
+}

@@ -41,7 +41,7 @@ func NewAsteriskTelephony(config *config.AssistantConfig, logger commons.Logger)
 
 func (apt *asteriskTelephony) StatusCallback(
 	c *gin.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	assistantConversationId uint64,
 ) (*internal_type.StatusInfo, error) {
@@ -115,7 +115,7 @@ func (apt *asteriskTelephony) ReceiveCall(c *gin.Context) (*internal_type.CallIn
 
 func (apt *asteriskTelephony) OutboundCall(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	toPhone string,
 	fromPhone string,
 	assistant *internal_assistant_entity.Assistant, assistantConversationId uint64,
@@ -330,7 +330,7 @@ func (apt *asteriskTelephony) OutboundCall(
 
 func (apt *asteriskTelephony) InboundCall(
 	c *gin.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId uint64,
 	clientNumber string,
 	assistantConversationId uint64,

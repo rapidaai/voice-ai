@@ -38,4 +38,6 @@ change after confirmation requires another challenge and confirmation before imp
 
 | RFC | Title | Status |
 | --- | --- | --- |
-| [0001](0001-actor-aware-audit-identity.md) | Actor-Aware Audit Identity | Draft |
+| [0001](0001-actor-aware-audit-identity.md) | Actor-Aware Audit Identity | Accepted |
+| [0002](0002-jwt-only-service-auth.md) | JWT-Only Service Authentication | Accepted |
+| [0003](0003-simplify-audit-backfill.md) | Simplify Audit Actor Backfill Migrations | Accepted |

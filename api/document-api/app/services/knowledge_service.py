@@ -27,10 +27,11 @@ class KnowledgeService:
     # the attribute.
     postgres: PostgresConnector
 
-    def __init__(self, postgres: PostgresConnector):
+    def __init__(self, postgres: PostgresConnector, actor: Optional[dict] = None):
         # The line `session = db` in the `KnowledgeService` class constructor is initializing the `db`
         # attribute of the class with the value passed to the constructor.
         self.postgres = postgres
+        self.actor = actor
 
     def update_knowledge_document(
             self, knowledge_document_id: int, extra_update_params: Optional[dict] = None
@@ -49,9 +50,14 @@ class KnowledgeService:
 
             if not document:
                 raise DocumentNotFoundException(status_code=500)
+            updates = dict(extra_update_params or {})
+            if not self.actor:
+                raise ValueError("audit actor is required for knowledge document updates")
+            updates[KnowledgeDocument.updated_actor_type] = self.actor["type"]
+            updates[KnowledgeDocument.updated_actor_id] = self.actor["id"]
             session.query(KnowledgeDocument).filter(
                 KnowledgeDocument.id == knowledge_document_id
-            ).update(extra_update_params)
+            ).update(updates)
             session.commit()
 
     def get_knowledge_document(

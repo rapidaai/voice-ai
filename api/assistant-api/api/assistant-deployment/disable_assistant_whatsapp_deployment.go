@@ -7,6 +7,8 @@ package assistant_deployment_api
 
 import (
 	"context"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/rapidaai/pkg/exceptions"
 	"github.com/rapidaai/pkg/types"
@@ -15,10 +17,13 @@ import (
 )
 
 func (deploymentApi *assistantDeploymentGrpcApi) DisableAssistantWhatsappDeployment(ctx context.Context, req *assistant_api.GetAssistantDeploymentRequest) (*assistant_api.GetAssistantWhatsappDeploymentResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || iAuth.GetCurrentProjectId() == nil {
-		deploymentApi.logger.Errorf("unauthenticated request for disable assistant whatsapp deployment")
-		return exceptions.AuthenticationError[assistant_api.GetAssistantWhatsappDeploymentResponse]()
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
 	deployment, err := deploymentApi.deploymentService.DisableAssistantWhatsappDeployment(ctx, iAuth, req.GetAssistantId())

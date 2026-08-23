@@ -7,7 +7,6 @@
 package sip_infra
 
 import (
-	"maps"
 	"time"
 
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
@@ -63,7 +62,7 @@ type SIPAuthConfig struct {
 }
 
 type MakeCallOptions struct {
-	Auth               types.SimplePrinciple
+	Auth               *types.Authentication
 	Assistant          *internal_assistant_entity.Assistant
 	ConversationID     uint64
 	ContextID          string
@@ -90,7 +89,7 @@ type TransferBridgeCallOptions struct {
 	// TotalAttempts is the number of transfer targets available for this request.
 	TotalAttempts int
 	// Auth is the authenticated principal associated with the parent call.
-	Auth types.SimplePrinciple
+	Auth *types.Authentication
 	// Assistant is the assistant resolved for the parent call.
 	Assistant *internal_assistant_entity.Assistant
 	// ConversationID is the active parent assistant conversation.
@@ -151,7 +150,7 @@ func (c OutboundConfig) toCore() internal_core.OutboundConfig {
 			Password: c.Auth.Password,
 			Realm:    c.Auth.Realm,
 		},
-		Headers:             maps.Clone(c.Headers),
+		Headers:             copyJSONCompatibleMap(c.Headers),
 		RingingTimeout:      c.RingingTimeout,
 		MaxCallDuration:     c.MaxCallDuration,
 		MediaTimeoutInitial: c.MediaTimeoutInitial,
@@ -206,7 +205,7 @@ func (c *Config) ToOutboundConfig() OutboundConfig {
 			Password: coreOutbound.Auth.Password,
 			Realm:    coreOutbound.Auth.Realm,
 		},
-		Headers:             maps.Clone(coreOutbound.Headers),
+		Headers:             copyJSONCompatibleMap(coreOutbound.Headers),
 		RingingTimeout:      coreOutbound.RingingTimeout,
 		MaxCallDuration:     coreOutbound.MaxCallDuration,
 		MediaTimeoutInitial: coreOutbound.MediaTimeoutInitial,
@@ -231,7 +230,7 @@ func NewOutboundInviteRequest(cfg *Config, toUser string, fromUser string) (Outb
 				Password: coreRequest.Config.Auth.Password,
 				Realm:    coreRequest.Config.Auth.Realm,
 			},
-			Headers:         maps.Clone(coreRequest.Config.Headers),
+			Headers:         copyJSONCompatibleMap(coreRequest.Config.Headers),
 			RingingTimeout:  coreRequest.Config.RingingTimeout,
 			MaxCallDuration: coreRequest.Config.MaxCallDuration,
 		},

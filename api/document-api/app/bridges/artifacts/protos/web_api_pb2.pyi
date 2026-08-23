@@ -109,16 +109,20 @@ class Authentication(_message.Message):
     def __init__(self, user: _Optional[_Union[_common_pb2.User, _Mapping]] = ..., token: _Optional[_Union[Token, _Mapping]] = ..., organizationRole: _Optional[_Union[OrganizationRole, _Mapping]] = ..., projectRoles: _Optional[_Iterable[_Union[ProjectRole, _Mapping]]] = ..., featurePermissions: _Optional[_Iterable[_Union[FeaturePermission, _Mapping]]] = ..., billingPlan: _Optional[_Union[AuthBillingPlan, _Mapping]] = ...) -> None: ...
 
 class ScopedAuthentication(_message.Message):
-    __slots__ = ("userId", "organizationId", "projectId", "status")
+    __slots__ = ("userId", "organizationId", "projectId", "status", "actorType", "actorId")
     USERID_FIELD_NUMBER: _ClassVar[int]
     ORGANIZATIONID_FIELD_NUMBER: _ClassVar[int]
     PROJECTID_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
+    ACTORTYPE_FIELD_NUMBER: _ClassVar[int]
+    ACTORID_FIELD_NUMBER: _ClassVar[int]
     userId: int
     organizationId: int
     projectId: int
     status: str
-    def __init__(self, userId: _Optional[int] = ..., organizationId: _Optional[int] = ..., projectId: _Optional[int] = ..., status: _Optional[str] = ...) -> None: ...
+    actorType: str
+    actorId: str
+    def __init__(self, userId: _Optional[int] = ..., organizationId: _Optional[int] = ..., projectId: _Optional[int] = ..., status: _Optional[str] = ..., actorType: _Optional[str] = ..., actorId: _Optional[str] = ...) -> None: ...
 
 class AuthenticateResponse(_message.Message):
     __slots__ = ("code", "success", "data", "error")
@@ -595,30 +599,28 @@ class AddUserToProjectsResponse(_message.Message):
     def __init__(self, code: _Optional[int] = ..., success: bool = ..., data: _Optional[_Iterable[_Union[Project, _Mapping]]] = ..., error: _Optional[_Union[_common_pb2.Error, _Mapping]] = ...) -> None: ...
 
 class ProjectCredential(_message.Message):
-    __slots__ = ("id", "projectId", "organizationId", "name", "key", "status", "createdBy", "updatedBy", "createdDate", "updatedDate", "createdUser")
+    __slots__ = ("id", "projectId", "organizationId", "name", "key", "status", "createdActor", "updatedActor", "createdDate", "updatedDate")
     ID_FIELD_NUMBER: _ClassVar[int]
     PROJECTID_FIELD_NUMBER: _ClassVar[int]
     ORGANIZATIONID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     KEY_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
-    CREATEDBY_FIELD_NUMBER: _ClassVar[int]
-    UPDATEDBY_FIELD_NUMBER: _ClassVar[int]
+    CREATEDACTOR_FIELD_NUMBER: _ClassVar[int]
+    UPDATEDACTOR_FIELD_NUMBER: _ClassVar[int]
     CREATEDDATE_FIELD_NUMBER: _ClassVar[int]
     UPDATEDDATE_FIELD_NUMBER: _ClassVar[int]
-    CREATEDUSER_FIELD_NUMBER: _ClassVar[int]
     id: int
     projectId: int
     organizationId: int
     name: str
     key: str
     status: str
-    createdBy: int
-    updatedBy: int
+    createdActor: _common_pb2.AuditActor
+    updatedActor: _common_pb2.AuditActor
     createdDate: _timestamp_pb2.Timestamp
     updatedDate: _timestamp_pb2.Timestamp
-    createdUser: _common_pb2.User
-    def __init__(self, id: _Optional[int] = ..., projectId: _Optional[int] = ..., organizationId: _Optional[int] = ..., name: _Optional[str] = ..., key: _Optional[str] = ..., status: _Optional[str] = ..., createdBy: _Optional[int] = ..., updatedBy: _Optional[int] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., createdUser: _Optional[_Union[_common_pb2.User, _Mapping]] = ...) -> None: ...
+    def __init__(self, id: _Optional[int] = ..., projectId: _Optional[int] = ..., organizationId: _Optional[int] = ..., name: _Optional[str] = ..., key: _Optional[str] = ..., status: _Optional[str] = ..., createdActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., updatedActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class CreateProjectCredentialRequest(_message.Message):
     __slots__ = ("projectId", "name")

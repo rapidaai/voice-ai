@@ -1,0 +1,15 @@
+{
+  "rfc": "rfcs/0004-consolidate-authentication-middleware.md",
+  "rfc_sha256": "6558d41b0307f22e8b4b11f12ba5d2dac96e3c8d8f5b9d06f3deaf1f5a64259b",
+  "plan": "rfcs/0004-consolidate-authentication-middleware.plan.json",
+  "plan_sha256": "3c37afafdd0620bece3108cb6c3fd42179f34e63692c9d159923a0d2929a4a92",
+  "challenger": "Hume",
+  "challenger_decision": "APPROVE",
+  "status": "approved",
+  "requested_at": "2026-08-23",
+  "superseded_approval_message": "Approved",
+  "superseded_approval_date": "2026-08-23",
+  "approved_by": "user",
+  "approval_message": "Approved",
+  "approved_at": "2026-08-23"
+}

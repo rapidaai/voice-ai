@@ -7,6 +7,8 @@ package assistant_api
 
 import (
 	"context"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	"github.com/rapidaai/pkg/exceptions"
@@ -17,10 +19,13 @@ import (
 
 // GetAllAssistantMessage implements assistant_api.AssistantServiceServer.
 func (assistantApi *assistantGrpcApi) GetAllAssistantMessage(ctx context.Context, cepm *assistant_api.GetAllAssistantMessageRequest) (*assistant_api.GetAllAssistantMessageResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated || !iAuth.HasProject() {
-		assistantApi.logger.Errorf("unauthenticated request for invoke")
-		return exceptions.AuthenticationError[assistant_api.GetAllAssistantMessageResponse]()
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	cnt, epms, err := assistantApi.conversactionService.GetAllAssistantMessage(ctx,
 		iAuth,

@@ -35,6 +35,7 @@ import (
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/middlewares"
+	gorm_models "github.com/rapidaai/pkg/models/gorm"
 )
 
 // wrapper for gin engine
@@ -72,28 +73,26 @@ func main() {
 	}
 
 	// init
+	userAuthenticator := web_authenticators.GetUserAuthenticator(appRunner.Logger, appRunner.Postgres)
+	projectAuthenticator := web_authenticators.GetProjectAuthenticator(appRunner.Logger, appRunner.Postgres)
+	organizationAuthenticator := web_authenticators.GetOrganizationAuthenticator(appRunner.Logger, appRunner.Postgres, appRunner.Cfg.Secret)
+	serviceAuthenticator := authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger)
 	appRunner.S = grpc.NewServer(
 		grpc.ChainStreamInterceptor(
 			middlewares.NewRequestLoggerStreamServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryStreamServerMiddleware(appRunner.Logger),
-			middlewares.NewAuthenticationStreamServerMiddleware(
-				web_authenticators.GetUserAuthenticator(appRunner.Logger, appRunner.Postgres),
-				appRunner.Logger),
-			middlewares.NewProjectAuthenticatorStreamServerMiddleware(web_authenticators.GetProjectAuthenticator(appRunner.Logger, appRunner.Postgres),
-				appRunner.Logger),
+			middlewares.NewAuthenticationStreamServerMiddleware(userAuthenticator, appRunner.Logger),
+			middlewares.NewProjectAuthenticatorStreamServerMiddleware(projectAuthenticator, appRunner.Logger),
+			middlewares.NewOrganizationAuthenticatorStreamServerMiddleware(organizationAuthenticator, appRunner.Logger),
+			middlewares.NewServiceAuthenticatorStreamServerMiddleware(serviceAuthenticator, appRunner.Logger),
 		),
 		grpc.ChainUnaryInterceptor(
 			middlewares.NewRequestLoggerUnaryServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryUnaryServerMiddleware(appRunner.Logger),
-			middlewares.NewAuthenticationUnaryServerMiddleware(web_authenticators.GetUserAuthenticator(appRunner.Logger, appRunner.Postgres), appRunner.Logger),
-			middlewares.NewProjectAuthenticatorUnaryServerMiddleware(
-				web_authenticators.GetProjectAuthenticator(appRunner.Logger, appRunner.Postgres),
-				appRunner.Logger,
-			),
-			middlewares.NewServiceAuthenticatorUnaryServerMiddleware(
-				authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Postgres),
-				appRunner.Logger,
-			),
+			middlewares.NewAuthenticationUnaryServerMiddleware(userAuthenticator, appRunner.Logger),
+			middlewares.NewProjectAuthenticatorUnaryServerMiddleware(projectAuthenticator, appRunner.Logger),
+			middlewares.NewOrganizationAuthenticatorUnaryServerMiddleware(organizationAuthenticator, appRunner.Logger),
+			middlewares.NewServiceAuthenticatorUnaryServerMiddleware(serviceAuthenticator, appRunner.Logger),
 		),
 		grpc.MaxRecvMsgSize(commons.MaxRecvMsgSize), // 10 MB
 		grpc.MaxSendMsgSize(commons.MaxSendMsgSize), // 10 MB
@@ -224,6 +223,9 @@ func (app *AppRunner) Init(ctx context.Context) error {
 		app.Logger.Error("error while connecting to postgres.", err)
 		return err
 	}
+	if err := gorm_models.RegisterAuditActorCallbacks(app.Postgres.DB(ctx)); err != nil {
+		return err
+	}
 	err = app.Redis.Connect(ctx)
 	if err != nil {
 		app.Logger.Error("error while connecting to redis.", err)
@@ -263,6 +265,9 @@ func (g *AppRunner) AllMiddlewares() {
 	g.CorsMiddleware()
 	g.RequestLoggerMiddleware()
 	g.E.Use(middlewares.NewAuthenticationMiddleware(web_authenticators.GetUserAuthenticator(g.Logger, g.Postgres), g.Logger))
+	g.E.Use(middlewares.NewProjectAuthenticatorMiddleware(web_authenticators.GetProjectAuthenticator(g.Logger, g.Postgres), g.Logger))
+	g.E.Use(middlewares.NewOrganizationAuthenticatorMiddleware(web_authenticators.GetOrganizationAuthenticator(g.Logger, g.Postgres, g.Cfg.Secret), g.Logger))
+	g.E.Use(middlewares.NewServiceAuthenticatorMiddleware(authenticators.NewServiceAuthenticator(&g.Cfg.AppConfig, g.Logger), g.Logger))
 }
 
 // Recovery middleware

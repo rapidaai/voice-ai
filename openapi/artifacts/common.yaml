@@ -8,6 +8,19 @@ components:
     Uint64String:
       type: string
       pattern: "^[0-9]+$"
+    AuditActor:
+      type: object
+      required:
+        - type
+        - id
+      properties:
+        type:
+          type: string
+          enum: [user, project, organization, service, system, unknown]
+        id:
+          $ref: "#/components/schemas/Uint64String"
+        displayName:
+          type: string
     PlatformErrorCode:
       type: string
       pattern: "^[0-9]+$"
@@ -372,10 +385,10 @@ components:
           $ref: "#/components/schemas/Uint64String"
         source:
           type: string
-        createdBy:
-          $ref: "#/components/schemas/Uint64String"
-        updatedBy:
-          $ref: "#/components/schemas/Uint64String"
+        createdActor:
+          $ref: "#/components/schemas/AuditActor"
+        updatedActor:
+          $ref: "#/components/schemas/AuditActor"
         user:
           $ref: "#/components/schemas/User"
         assistantProviderModelId:

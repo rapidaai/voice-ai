@@ -10,7 +10,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -18,11 +17,10 @@ import (
 )
 
 type inboundInviteIdentity struct {
-	callID       string
-	fromTag      string
-	requestURI   string
-	fromIdentity string
-	toIdentity   string
+	callID  string
+	fromTag string
+	fromURI string
+	toURI   string
 }
 
 // Inbound owns the lifecycle for a single inbound SIP INVITE.
@@ -57,9 +55,7 @@ func inboundInviteIdentityFromRequest(request *sip.Request) (inboundInviteIdenti
 		request.CallID().Value() == "" ||
 		request.From() == nil ||
 		request.From().Params == nil ||
-		request.To() == nil ||
-		strings.TrimSpace(request.From().Address.Host) == "" ||
-		strings.TrimSpace(request.To().Address.Host) == "" {
+		request.To() == nil {
 		return inboundInviteIdentity{}, false
 	}
 	fromTag, ok := request.From().Params.Get("tag")
@@ -68,11 +64,10 @@ func inboundInviteIdentityFromRequest(request *sip.Request) (inboundInviteIdenti
 	}
 
 	return inboundInviteIdentity{
-		callID:       request.CallID().Value(),
-		fromTag:      fromTag,
-		requestURI:   request.Recipient.String(),
-		fromIdentity: request.From().Address.String(),
-		toIdentity:   request.To().Address.String(),
+		callID:  request.CallID().Value(),
+		fromTag: fromTag,
+		fromURI: request.From().Address.String(),
+		toURI:   request.To().Address.String(),
 	}, true
 }
 
@@ -325,12 +320,7 @@ func (inboundCall *Inbound) callInboundApplicationReadyHandler() error {
 	if applicationReadyHandler == nil {
 		return nil
 	}
-	return applicationReadyHandler(
-		inboundCall.session,
-		inboundCall.identity.requestURI,
-		inboundCall.identity.fromIdentity,
-		inboundCall.identity.toIdentity,
-	)
+	return applicationReadyHandler(inboundCall.session, inboundCall.identity.fromURI, inboundCall.identity.toURI)
 }
 
 // waitUntilAnswerReady applies the configured answer policy without changing call state.
@@ -435,12 +425,7 @@ func (inboundCall *Inbound) callInboundInviteHandler() error {
 	if inviteHandler == nil {
 		return nil
 	}
-	return inviteHandler(
-		inboundCall.session,
-		inboundCall.identity.requestURI,
-		inboundCall.identity.fromIdentity,
-		inboundCall.identity.toIdentity,
-	)
+	return inviteHandler(inboundCall.session, inboundCall.identity.fromURI, inboundCall.identity.toURI)
 }
 
 func (inboundCall *Inbound) cancelBeforeAnswer(reason LifecycleReason) bool {

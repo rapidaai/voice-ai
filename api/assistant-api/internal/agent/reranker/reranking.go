@@ -34,7 +34,7 @@ type RerankingOption struct {
 }
 type Reranking[O any] interface {
 	Rerank(ctx context.Context,
-		auth types.SimplePrinciple,
+		auth *types.Authentication,
 		config *RerankingOption,
 		in []O, query string, additionalData map[string]string) (map[int32]O, error)
 }

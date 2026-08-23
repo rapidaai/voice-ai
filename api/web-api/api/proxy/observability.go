@@ -7,13 +7,14 @@ package web_proxy_api
 
 import (
 	"context"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	web_api "github.com/rapidaai/api/web-api/api"
 	config "github.com/rapidaai/api/web-api/config"
 	workflow_client "github.com/rapidaai/pkg/clients/workflow"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
-	"github.com/rapidaai/pkg/exceptions"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 )
@@ -45,10 +46,13 @@ func NewObservabilityGRPC(config *config.WebAppConfig, logger commons.Logger, po
 }
 
 func (api *webObservabilityGRPCApi) GetAllTelemetry(ctx context.Context, request *protos.GetAllTelemetryRequest) (*protos.GetAllTelemetryResponse, error) {
-	iAuth, isAuthenticated := types.GetSimplePrincipleGRPC(ctx)
-	if !isAuthenticated {
-		api.logger.Errorf("unauthenticated request for GetAllTelemetry")
-		return exceptions.AuthenticationError[protos.GetAllTelemetryResponse]()
+	auth, authErr := types.Authorize(ctx)
+	if authErr != nil {
+		return nil, status.Error(codes.Unauthenticated, authErr.Error())
+	}
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject, types.AuthTypeService)
+	if scopeErr != nil {
+		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 	return api.observabilityClient.GetAllTelemetry(ctx, iAuth, request)
 }

@@ -33,7 +33,11 @@ type assistantToolService struct {
 }
 
 // CreateAssistantTool implements internal_services.AssistantToolService.
-func (eService *assistantToolService) Create(ctx context.Context, auth types.SimplePrinciple, assistantId uint64, name string, description *string, fields map[string]interface{}, executionMethod string, options []*protos.Metadata) (*internal_assistant_entity.AssistantTool, error) {
+func (eService *assistantToolService) Create(ctx context.Context, auth *types.Authentication, assistantId uint64, name string, description *string, fields map[string]interface{}, executionMethod string, options []*protos.Metadata) (*internal_assistant_entity.AssistantTool, error) {
+	if _, err := auth.Actor(); err != nil {
+		return nil, err
+	}
+
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 
@@ -50,9 +54,7 @@ func (eService *assistantToolService) Create(ctx context.Context, auth types.Sim
 	}
 
 	aTool := &internal_assistant_entity.AssistantTool{
-		Mutable: gorm_models.Mutable{
-			CreatedBy: *auth.GetUserId(),
-		},
+		Mutable:         gorm_models.Mutable{},
 		AssistantId:     assistantId,
 		Name:            name,
 		Description:     description,
@@ -78,13 +80,13 @@ func (eService *assistantToolService) Create(ctx context.Context, auth types.Sim
 }
 
 // DeleteAssistantTool implements internal_services.AssistantToolService.
-func (eService *assistantToolService) Delete(ctx context.Context, auth types.SimplePrinciple, toolId uint64, assistantId uint64) (*internal_assistant_entity.AssistantTool, error) {
+func (eService *assistantToolService) Delete(ctx context.Context, auth *types.Authentication, toolId uint64, assistantId uint64) (*internal_assistant_entity.AssistantTool, error) {
+
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	aK := &internal_assistant_entity.AssistantTool{
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ARCHIEVE,
-			UpdatedBy: *auth.GetUserId(),
+			Status: type_enums.RECORD_ARCHIEVE,
 		},
 	}
 	tx := db.Where("id = ? AND assistant_id = ? ",
@@ -100,7 +102,7 @@ func (eService *assistantToolService) Delete(ctx context.Context, auth types.Sim
 }
 
 // GetAllAssistantTool implements internal_services.AssistantToolService.
-func (eService *assistantToolService) GetAll(ctx context.Context, auth types.SimplePrinciple, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantTool, error) {
+func (eService *assistantToolService) GetAll(ctx context.Context, auth *types.Authentication, assistantId uint64, criterias []*protos.Criteria, paginate *protos.Paginate) (int64, []*internal_assistant_entity.AssistantTool, error) {
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	var (
@@ -136,7 +138,7 @@ func (eService *assistantToolService) GetAll(ctx context.Context, auth types.Sim
 }
 
 // GetAssistantTool implements internal_services.AssistantToolService.
-func (eService *assistantToolService) Get(ctx context.Context, auth types.SimplePrinciple, toolId uint64, assistantId uint64) (*internal_assistant_entity.AssistantTool, error) {
+func (eService *assistantToolService) Get(ctx context.Context, auth *types.Authentication, toolId uint64, assistantId uint64) (*internal_assistant_entity.AssistantTool, error) {
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	var aK *internal_assistant_entity.AssistantTool
@@ -154,9 +156,10 @@ func (eService *assistantToolService) Get(ctx context.Context, auth types.Simple
 }
 
 // UpdateAssistantTool implements internal_services.AssistantToolService.
-func (eService *assistantToolService) Update(ctx context.Context, auth types.SimplePrinciple,
+func (eService *assistantToolService) Update(ctx context.Context, auth *types.Authentication,
 	toolId uint64,
 	assistantId uint64, name string, description *string, fields map[string]interface{}, executionMethod string, options []*protos.Metadata) (*internal_assistant_entity.AssistantTool, error) {
+
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 
@@ -173,9 +176,7 @@ func (eService *assistantToolService) Update(ctx context.Context, auth types.Sim
 
 	//
 	aTool := &internal_assistant_entity.AssistantTool{
-		Mutable: gorm_models.Mutable{
-			UpdatedBy: *auth.GetUserId(),
-		},
+		Mutable:         gorm_models.Mutable{},
 		Name:            name,
 		Description:     description,
 		Fields:          fields,
@@ -211,15 +212,14 @@ func (eService *assistantToolService) Update(ctx context.Context, auth types.Sim
 
 func (eService *assistantToolService) markAllOptionsAsDeleted(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantToolId uint64,
 ) error {
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	tOptions := &internal_assistant_entity.AssistantToolOption{
 		Mutable: gorm_models.Mutable{
-			Status:    type_enums.RECORD_ARCHIEVE,
-			UpdatedBy: *auth.GetUserId(),
+			Status: type_enums.RECORD_ARCHIEVE,
 		},
 	}
 	tx := db.Where("assistant_tool_id = ? ",
@@ -237,10 +237,11 @@ func (eService *assistantToolService) markAllOptionsAsDeleted(
 
 func (eService *assistantToolService) CreateOrUpdateExecutionOption(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantToolId uint64,
 	metadata []*protos.Metadata,
 ) ([]*internal_assistant_entity.AssistantToolOption, error) {
+
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	mtrs := make([]*internal_assistant_entity.AssistantToolOption, 0)
@@ -255,10 +256,6 @@ func (eService *assistantToolService) CreateOrUpdateExecutionOption(
 			},
 			AssistantToolId: assistantToolId,
 		}
-		if auth.GetUserId() != nil {
-			_mtr.UpdatedBy = *auth.GetUserId()
-			_mtr.CreatedBy = *auth.GetUserId()
-		}
 		mtrs = append(mtrs, _mtr)
 	}
 	tx := db.Clauses(clause.OnConflict{
@@ -266,7 +263,7 @@ func (eService *assistantToolService) CreateOrUpdateExecutionOption(
 		DoUpdates: clause.AssignmentColumns([]string{
 			"status",
 			"value",
-			"updated_by", "updated_date"}),
+			"updated_date"}),
 	}).Create(&mtrs)
 	if tx.Error != nil {
 		eService.logger.Benchmark("assistantService.CreateOrUpdateMetadata", time.Since(start))
@@ -287,7 +284,7 @@ func NewAssistantToolService(logger commons.Logger, postgres connectors.Postgres
 
 func (eService *assistantToolService) CreateLog(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	assistantId, conversationId uint64,
 	messageId string,
 	toolCallId string,
@@ -295,9 +292,13 @@ func (eService *assistantToolService) CreateLog(
 	status type_enums.RecordState,
 	request []byte,
 ) (*internal_assistant_entity.AssistantToolLog, error) {
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
-	s3Prefix := eService.ObjectPrefix(*auth.GetCurrentOrganizationId(), *auth.GetCurrentProjectId())
+	s3Prefix := eService.ObjectPrefix(projectContext.OrganizationID, projectContext.ProjectID)
 	_auditId := gorm_generator.ID()
 
 	// store request in blob storage and log the key in db to avoid storing large request/response in db
@@ -317,8 +318,8 @@ func (eService *assistantToolService) CreateLog(
 		AssistantToolName:              toolName,
 		AssetPrefix:                    s3Prefix,
 		Organizational: gorm_models.Organizational{
-			ProjectId:      *auth.GetCurrentProjectId(),
-			OrganizationId: *auth.GetCurrentOrganizationId(),
+			ProjectId:      projectContext.ProjectID,
+			OrganizationId: projectContext.OrganizationID,
 		},
 		Mutable: gorm_models.Mutable{
 			Status: status,
@@ -336,7 +337,7 @@ func (eService *assistantToolService) CreateLog(
 
 func (eService *assistantToolService) UpdateLog(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	toolCallId string,
 	conversationId uint64,
 	status type_enums.RecordState,
@@ -369,14 +370,22 @@ func (eService *assistantToolService) UpdateLog(
 
 func (eService *assistantToolService) GetLog(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	projectId uint64,
 	toolLogId uint64) (*internal_assistant_entity.AssistantToolLog, error) {
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, err
+	}
+	if projectId != projectContext.ProjectID {
+		return nil, fmt.Errorf("project %d does not match authenticated project %d", projectId, projectContext.ProjectID)
+	}
+
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	var wkg *internal_assistant_entity.AssistantToolLog
 	tx := db.
-		Where("id = ? AND organization_id = ? AND project_id = ?", toolLogId, *auth.GetCurrentOrganizationId(), projectId).
+		Where("id = ? AND organization_id = ? AND project_id = ?", toolLogId, projectContext.OrganizationID, projectContext.ProjectID).
 		First(&wkg)
 	if tx.Error != nil {
 		eService.logger.Benchmark("ToolService.GetLog", time.Since(start))
@@ -389,11 +398,19 @@ func (eService *assistantToolService) GetLog(
 
 func (eService *assistantToolService) GetAllLog(
 	ctx context.Context,
-	auth types.SimplePrinciple,
+	auth *types.Authentication,
 	projectId uint64,
 	criterias []*protos.Criteria,
 	paginate *protos.Paginate,
 	order *protos.Ordering) (int64, []*internal_assistant_entity.AssistantToolLog, error) {
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return 0, nil, err
+	}
+	if projectId != projectContext.ProjectID {
+		return 0, nil, fmt.Errorf("project %d does not match authenticated project %d", projectId, projectContext.ProjectID)
+	}
+
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	var (
@@ -401,7 +418,7 @@ func (eService *assistantToolService) GetAllLog(
 		cnt      int64
 	)
 	qry := db.Model(internal_assistant_entity.AssistantToolLog{}).
-		Where("organization_id = ? AND project_id = ? ", *auth.GetCurrentOrganizationId(), projectId)
+		Where("organization_id = ? AND project_id = ? ", projectContext.OrganizationID, projectContext.ProjectID)
 	for _, ct := range criterias {
 		switch ct.GetKey() {
 		case "id":
@@ -492,9 +509,13 @@ func (eService *assistantToolService) ObjectKey(keyPrefix string, auditId uint64
 
 func (eService *assistantToolService) GetLogObject(
 	ctx context.Context,
-	organizationId,
-	projectId, toolLogId uint64) (requestData []byte, responseData []byte, err error) {
-	keyPrefix := eService.ObjectPrefix(organizationId, projectId)
+	auth *types.Authentication,
+	toolLogId uint64) (requestData []byte, responseData []byte, err error) {
+	projectContext, err := auth.ProjectContext()
+	if err != nil {
+		return nil, nil, err
+	}
+	keyPrefix := eService.ObjectPrefix(projectContext.OrganizationID, projectContext.ProjectID)
 	responseKey := eService.ObjectKey(keyPrefix, toolLogId, "response.json")
 	requestKey := eService.ObjectKey(keyPrefix, toolLogId, "request.json")
 

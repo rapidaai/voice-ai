@@ -65,16 +65,14 @@ class CreateEndpointResponse(_message.Message):
     def __init__(self, code: _Optional[int] = ..., success: bool = ..., data: _Optional[_Union[Endpoint, _Mapping]] = ..., error: _Optional[_Union[_common_pb2.Error, _Mapping]] = ...) -> None: ...
 
 class EndpointProviderModel(_message.Message):
-    __slots__ = ("id", "chatCompletePrompt", "modelProviderName", "endpointModelOptions", "status", "createdBy", "createdUser", "updatedBy", "updatedUser", "createdDate", "updatedDate", "endpointId", "description")
+    __slots__ = ("id", "chatCompletePrompt", "modelProviderName", "endpointModelOptions", "status", "createdActor", "updatedActor", "createdDate", "updatedDate", "endpointId", "description")
     ID_FIELD_NUMBER: _ClassVar[int]
     CHATCOMPLETEPROMPT_FIELD_NUMBER: _ClassVar[int]
     MODELPROVIDERNAME_FIELD_NUMBER: _ClassVar[int]
     ENDPOINTMODELOPTIONS_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
-    CREATEDBY_FIELD_NUMBER: _ClassVar[int]
-    CREATEDUSER_FIELD_NUMBER: _ClassVar[int]
-    UPDATEDBY_FIELD_NUMBER: _ClassVar[int]
-    UPDATEDUSER_FIELD_NUMBER: _ClassVar[int]
+    CREATEDACTOR_FIELD_NUMBER: _ClassVar[int]
+    UPDATEDACTOR_FIELD_NUMBER: _ClassVar[int]
     CREATEDDATE_FIELD_NUMBER: _ClassVar[int]
     UPDATEDDATE_FIELD_NUMBER: _ClassVar[int]
     ENDPOINTID_FIELD_NUMBER: _ClassVar[int]
@@ -84,15 +82,13 @@ class EndpointProviderModel(_message.Message):
     modelProviderName: str
     endpointModelOptions: _containers.RepeatedCompositeFieldContainer[_common_pb2.Metadata]
     status: str
-    createdBy: int
-    createdUser: _common_pb2.User
-    updatedBy: int
-    updatedUser: _common_pb2.User
+    createdActor: _common_pb2.AuditActor
+    updatedActor: _common_pb2.AuditActor
     createdDate: _timestamp_pb2.Timestamp
     updatedDate: _timestamp_pb2.Timestamp
     endpointId: int
     description: str
-    def __init__(self, id: _Optional[int] = ..., chatCompletePrompt: _Optional[_Union[_common_pb2.TextChatCompletePrompt, _Mapping]] = ..., modelProviderName: _Optional[str] = ..., endpointModelOptions: _Optional[_Iterable[_Union[_common_pb2.Metadata, _Mapping]]] = ..., status: _Optional[str] = ..., createdBy: _Optional[int] = ..., createdUser: _Optional[_Union[_common_pb2.User, _Mapping]] = ..., updatedBy: _Optional[int] = ..., updatedUser: _Optional[_Union[_common_pb2.User, _Mapping]] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., endpointId: _Optional[int] = ..., description: _Optional[str] = ...) -> None: ...
+    def __init__(self, id: _Optional[int] = ..., chatCompletePrompt: _Optional[_Union[_common_pb2.TextChatCompletePrompt, _Mapping]] = ..., modelProviderName: _Optional[str] = ..., endpointModelOptions: _Optional[_Iterable[_Union[_common_pb2.Metadata, _Mapping]]] = ..., status: _Optional[str] = ..., createdActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., updatedActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., endpointId: _Optional[int] = ..., description: _Optional[str] = ...) -> None: ...
 
 class AggregatedEndpointAnalytics(_message.Message):
     __slots__ = ("count", "totalInputCost", "totalOutputCost", "totalToken", "successCount", "errorCount", "p50Latency", "p99Latency", "lastActivity")
@@ -117,7 +113,7 @@ class AggregatedEndpointAnalytics(_message.Message):
     def __init__(self, count: _Optional[int] = ..., totalInputCost: _Optional[float] = ..., totalOutputCost: _Optional[float] = ..., totalToken: _Optional[int] = ..., successCount: _Optional[int] = ..., errorCount: _Optional[int] = ..., p50Latency: _Optional[float] = ..., p99Latency: _Optional[float] = ..., lastActivity: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class Endpoint(_message.Message):
-    __slots__ = ("id", "status", "visibility", "source", "sourceIdentifier", "projectId", "organizationId", "endpointProviderModelId", "endpointProviderModel", "endpointAnalytics", "endpointRetry", "endpointCaching", "endpointTag", "language", "organization", "name", "description", "createdDate", "updatedDate", "createdBy", "createdUser", "updatedBy", "updatedUser")
+    __slots__ = ("id", "status", "visibility", "source", "sourceIdentifier", "projectId", "organizationId", "endpointProviderModelId", "endpointProviderModel", "endpointAnalytics", "endpointRetry", "endpointCaching", "endpointTag", "language", "organization", "name", "description", "createdDate", "updatedDate", "createdActor", "updatedActor")
     ID_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
     VISIBILITY_FIELD_NUMBER: _ClassVar[int]
@@ -137,10 +133,8 @@ class Endpoint(_message.Message):
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
     CREATEDDATE_FIELD_NUMBER: _ClassVar[int]
     UPDATEDDATE_FIELD_NUMBER: _ClassVar[int]
-    CREATEDBY_FIELD_NUMBER: _ClassVar[int]
-    CREATEDUSER_FIELD_NUMBER: _ClassVar[int]
-    UPDATEDBY_FIELD_NUMBER: _ClassVar[int]
-    UPDATEDUSER_FIELD_NUMBER: _ClassVar[int]
+    CREATEDACTOR_FIELD_NUMBER: _ClassVar[int]
+    UPDATEDACTOR_FIELD_NUMBER: _ClassVar[int]
     id: int
     status: str
     visibility: str
@@ -160,11 +154,9 @@ class Endpoint(_message.Message):
     description: str
     createdDate: _timestamp_pb2.Timestamp
     updatedDate: _timestamp_pb2.Timestamp
-    createdBy: int
-    createdUser: _common_pb2.User
-    updatedBy: int
-    updatedUser: _common_pb2.User
-    def __init__(self, id: _Optional[int] = ..., status: _Optional[str] = ..., visibility: _Optional[str] = ..., source: _Optional[str] = ..., sourceIdentifier: _Optional[int] = ..., projectId: _Optional[int] = ..., organizationId: _Optional[int] = ..., endpointProviderModelId: _Optional[int] = ..., endpointProviderModel: _Optional[_Union[EndpointProviderModel, _Mapping]] = ..., endpointAnalytics: _Optional[_Union[AggregatedEndpointAnalytics, _Mapping]] = ..., endpointRetry: _Optional[_Union[EndpointRetryConfiguration, _Mapping]] = ..., endpointCaching: _Optional[_Union[EndpointCacheConfiguration, _Mapping]] = ..., endpointTag: _Optional[_Union[_common_pb2.Tag, _Mapping]] = ..., language: _Optional[str] = ..., organization: _Optional[_Union[_common_pb2.Organization, _Mapping]] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., createdBy: _Optional[int] = ..., createdUser: _Optional[_Union[_common_pb2.User, _Mapping]] = ..., updatedBy: _Optional[int] = ..., updatedUser: _Optional[_Union[_common_pb2.User, _Mapping]] = ...) -> None: ...
+    createdActor: _common_pb2.AuditActor
+    updatedActor: _common_pb2.AuditActor
+    def __init__(self, id: _Optional[int] = ..., status: _Optional[str] = ..., visibility: _Optional[str] = ..., source: _Optional[str] = ..., sourceIdentifier: _Optional[int] = ..., projectId: _Optional[int] = ..., organizationId: _Optional[int] = ..., endpointProviderModelId: _Optional[int] = ..., endpointProviderModel: _Optional[_Union[EndpointProviderModel, _Mapping]] = ..., endpointAnalytics: _Optional[_Union[AggregatedEndpointAnalytics, _Mapping]] = ..., endpointRetry: _Optional[_Union[EndpointRetryConfiguration, _Mapping]] = ..., endpointCaching: _Optional[_Union[EndpointCacheConfiguration, _Mapping]] = ..., endpointTag: _Optional[_Union[_common_pb2.Tag, _Mapping]] = ..., language: _Optional[str] = ..., organization: _Optional[_Union[_common_pb2.Organization, _Mapping]] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., createdDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updatedDate: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., createdActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., updatedActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ...) -> None: ...
 
 class CreateEndpointProviderModelRequest(_message.Message):
     __slots__ = ("endpointId", "endpointProviderModelAttribute")
@@ -273,36 +265,36 @@ class UpdateEndpointVersionResponse(_message.Message):
     def __init__(self, code: _Optional[int] = ..., success: bool = ..., data: _Optional[_Union[Endpoint, _Mapping]] = ..., error: _Optional[_Union[_common_pb2.Error, _Mapping]] = ...) -> None: ...
 
 class EndpointRetryConfiguration(_message.Message):
-    __slots__ = ("retryType", "maxAttempts", "delaySeconds", "exponentialBackoff", "retryables", "createdBy", "updatedBy")
+    __slots__ = ("retryType", "maxAttempts", "delaySeconds", "exponentialBackoff", "retryables", "createdActor", "updatedActor")
     RETRYTYPE_FIELD_NUMBER: _ClassVar[int]
     MAXATTEMPTS_FIELD_NUMBER: _ClassVar[int]
     DELAYSECONDS_FIELD_NUMBER: _ClassVar[int]
     EXPONENTIALBACKOFF_FIELD_NUMBER: _ClassVar[int]
     RETRYABLES_FIELD_NUMBER: _ClassVar[int]
-    CREATEDBY_FIELD_NUMBER: _ClassVar[int]
-    UPDATEDBY_FIELD_NUMBER: _ClassVar[int]
+    CREATEDACTOR_FIELD_NUMBER: _ClassVar[int]
+    UPDATEDACTOR_FIELD_NUMBER: _ClassVar[int]
     retryType: str
     maxAttempts: int
     delaySeconds: int
     exponentialBackoff: bool
     retryables: _containers.RepeatedScalarFieldContainer[str]
-    createdBy: int
-    updatedBy: int
-    def __init__(self, retryType: _Optional[str] = ..., maxAttempts: _Optional[int] = ..., delaySeconds: _Optional[int] = ..., exponentialBackoff: bool = ..., retryables: _Optional[_Iterable[str]] = ..., createdBy: _Optional[int] = ..., updatedBy: _Optional[int] = ...) -> None: ...
+    createdActor: _common_pb2.AuditActor
+    updatedActor: _common_pb2.AuditActor
+    def __init__(self, retryType: _Optional[str] = ..., maxAttempts: _Optional[int] = ..., delaySeconds: _Optional[int] = ..., exponentialBackoff: bool = ..., retryables: _Optional[_Iterable[str]] = ..., createdActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., updatedActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ...) -> None: ...
 
 class EndpointCacheConfiguration(_message.Message):
-    __slots__ = ("cacheType", "expiryInterval", "matchThreshold", "createdBy", "updatedBy")
+    __slots__ = ("cacheType", "expiryInterval", "matchThreshold", "createdActor", "updatedActor")
     CACHETYPE_FIELD_NUMBER: _ClassVar[int]
     EXPIRYINTERVAL_FIELD_NUMBER: _ClassVar[int]
     MATCHTHRESHOLD_FIELD_NUMBER: _ClassVar[int]
-    CREATEDBY_FIELD_NUMBER: _ClassVar[int]
-    UPDATEDBY_FIELD_NUMBER: _ClassVar[int]
+    CREATEDACTOR_FIELD_NUMBER: _ClassVar[int]
+    UPDATEDACTOR_FIELD_NUMBER: _ClassVar[int]
     cacheType: str
     expiryInterval: int
     matchThreshold: float
-    createdBy: int
-    updatedBy: int
-    def __init__(self, cacheType: _Optional[str] = ..., expiryInterval: _Optional[int] = ..., matchThreshold: _Optional[float] = ..., createdBy: _Optional[int] = ..., updatedBy: _Optional[int] = ...) -> None: ...
+    createdActor: _common_pb2.AuditActor
+    updatedActor: _common_pb2.AuditActor
+    def __init__(self, cacheType: _Optional[str] = ..., expiryInterval: _Optional[int] = ..., matchThreshold: _Optional[float] = ..., createdActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ..., updatedActor: _Optional[_Union[_common_pb2.AuditActor, _Mapping]] = ...) -> None: ...
 
 class CreateEndpointRetryConfigurationRequest(_message.Message):
     __slots__ = ("endpointId", "data")
