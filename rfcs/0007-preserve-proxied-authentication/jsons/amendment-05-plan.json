@@ -1,0 +1,38 @@
+{
+  "rfc": "0007-preserve-proxied-authentication",
+  "amendment": 5,
+  "status": "ready-for-challenge",
+  "objective": "Prevent SIP regressions by assigning the configured Assistant service actor to SIP-originated authentication before it reaches the shared internal token creator.",
+  "acceptance_criteria": [
+    "SIP route and registration authentication contains a durable ActorValue before any InternalClient call.",
+    "SIP-originated operations use AuthTypeService and ActorTypeService with the Assistant YAML service_id.",
+    "Resolved organization and project scope remain available to downstream authorization.",
+    "No project ID is represented as a project credential actor ID.",
+    "Tests exercise SIP authentication through InternalClient.WithAuth and verify the delegated service actor claims."
+  ],
+  "allowed_paths": [
+    "rfcs/0007-preserve-proxied-authentication.md",
+    "rfcs/0007-preserve-proxied-authentication/jsons/**",
+    "api/assistant-api/sip/sip.go",
+    "api/assistant-api/sip/middleware/route_middleware.go",
+    "api/assistant-api/sip/middleware/route_middleware_test.go",
+    "api/assistant-api/sip/registration/manager.go",
+    "api/assistant-api/sip/registration/owner.go",
+    "api/assistant-api/sip/registration/record.go",
+    "api/assistant-api/sip/registration/register.go",
+    "api/assistant-api/sip/registration/renewal.go",
+    "api/assistant-api/sip/registration/status.go",
+    "api/assistant-api/sip/registration/manager_test.go"
+  ],
+  "risks": [
+    "Changing synthetic SIP authentication from project to service could affect handlers that do not allow service authentication.",
+    "Missing Assistant service_id must fail closed rather than produce an invalid actor."
+  ],
+  "verification": [
+    "go test ./api/assistant-api/sip/middleware ./api/assistant-api/sip/registration ./pkg/clients ./pkg/types",
+    "go test ./api/web-api/api ./api/web-api/internal/service/vault",
+    "make agent-finalize CHANGED_FILES=...",
+    "git diff --check"
+  ],
+  "rollback": "Revert the SIP service-authentication constructors and restore the prior project-authentication construction together with this amendment."
+}

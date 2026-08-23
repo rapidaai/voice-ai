@@ -1,0 +1,15 @@
+{
+  "status": "approved",
+  "reviewed_at": "2026-08-23T14:59:24Z",
+  "run_id": "run_a342a4f9f1cf",
+  "task_id": "task_9d65bf8ea36c",
+  "dispatch_id": "ctx_4eda5307d734",
+  "reviewer": "Independent Codex plan challenger",
+  "rfc_file": "rfcs/0007-preserve-proxied-authentication.md",
+  "rfc_sha256": "f6623e0fcc6e632b71e50b5180dfb25af63d07fd343afa75d3ff7b7be2252377",
+  "plan_file": "rfcs/0007-preserve-proxied-authentication/jsons/amendment-06-plan.json",
+  "plan_sha256": "9957638253d3f1a223e3b112478dc71086db536e8b70a7fba0ff88c1c725d270",
+  "decision": "approved",
+  "findings": [],
+  "summary": "No critical, major, or minor findings remain. Amendment 06 is limited to authorizing api/assistant-api/sip/sip_test.go and api/assistant-api/sip/registration/record_test.go, resolving the governed file-inventory finding without changing production behavior or the amendment 05 authentication contract. The verification scope covers both affected Go packages, repository finalization, and diff integrity."
+}

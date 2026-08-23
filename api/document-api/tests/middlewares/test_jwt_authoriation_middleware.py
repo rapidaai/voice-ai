@@ -132,6 +132,8 @@ async def test_service_assertion_uses_shared_secret(test_app, async_test_client)
             "iat": now,
             "exp": now + 60,
             "organizationId": 7,
+            "delegated_auth_type": "user",
+            "delegated_actor_id": 99,
         },
         config.secret_key.get_secret_value(),
         algorithm="HS256",

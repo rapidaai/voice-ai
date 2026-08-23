@@ -1,0 +1,37 @@
+{
+  "status": "revise",
+  "reviewed_at": "2026-08-23",
+  "run_id": "run_a342a4f9f1cf",
+  "task_id": "task_c3d8920379ab",
+  "dispatch_id": "ctx_91b7c67535e1",
+  "reviewer_terminal": "term_174b8e1e-9c81-4136-8f24-e3580c11b4cc",
+  "subject": "REVISE: authentication propagation RFC",
+  "findings": [
+    {
+      "severity": "major",
+      "finding": "The draft forwarded raw public credentials while claiming to supersede only RFC 0002, although RFC 0001 also prohibits forwarding originating credentials.",
+      "resolution": "The RFC now explicitly amends RFC 0001 Goal 4 and RFC 0002 only for the transparent Web API Assistant proxy."
+    },
+    {
+      "severity": "major",
+      "finding": "Organization authentication was included although current Assistant handlers do not allow AuthTypeOrg and Assistant production changes were out of scope.",
+      "resolution": "Organization credential propagation was removed from goals and acceptance criteria and remains a non-goal."
+    },
+    {
+      "severity": "major",
+      "finding": "Opaque project and organization keys cannot be matched to Authentication before the downstream call without another trusted binding.",
+      "resolution": "The RFC requires local comparisons only for user and selected project identifiers. Opaque project keys are independently reauthenticated by Assistant API."
+    },
+    {
+      "severity": "major",
+      "finding": "Minting a Web API service assertion as a fallback can replace the originating service actor.",
+      "resolution": "Service-authenticated proxy calls must forward the validated service assertion and fail closed when it is absent."
+    },
+    {
+      "severity": "major",
+      "finding": "Current service assertions use cfg.Port although RFC 0002 and existing tests require RAPIDA_service_id.",
+      "resolution": "Restoration of RAPIDA_service_id and its tests is included in implementation scope and rollout ordering."
+    }
+  ],
+  "decision": "revise"
+}

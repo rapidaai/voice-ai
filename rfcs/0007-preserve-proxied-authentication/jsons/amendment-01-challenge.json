@@ -1,0 +1,16 @@
+{
+  "status": "revise",
+  "reviewed_at": "2026-08-23T08:21:31Z",
+  "run_id": "run_a342a4f9f1cf",
+  "task_id": "task_19483def03ad",
+  "dispatch_id": "ctx_d9b6ef38fb35",
+  "reviewer": "Independent Codex plan challenger",
+  "decision": "revise",
+  "findings": [
+    "Define a mixed-version rollout because current receivers reject legacy userId delegation and the same binaries both emit and receive service assertions.",
+    "Limit the change to WithAuth or include every HTTP and platform receiver, including Document API.",
+    "Preserve immediate calling-service identity separately from the effective originating actor.",
+    "Define required and forbidden claims for every supported delegated authentication type.",
+    "Add unary, stream, multi-hop, forged-claim, compatibility, and rollback tests."
+  ]
+}

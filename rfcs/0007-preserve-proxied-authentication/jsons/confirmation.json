@@ -1,0 +1,18 @@
+{
+  "status": "approved",
+  "run_id": "run_a342a4f9f1cf",
+  "task_id": "task_322d33ad5b66",
+  "challenge_task_id": "task_39b920e39ac7",
+  "challenge_receipt": "rfcs/0007-preserve-proxied-authentication/jsons/challenge.json",
+  "challenge_receipt_sha256": "1fef26ce26f853315b0cf7e8884bcd57b806fd664de54bf9eee697d950070b1c",
+  "gate_id": "gate_4d8c3ab8cda7",
+  "rfc_file": "rfcs/0007-preserve-proxied-authentication.md",
+  "rfc_sha256": "3d32ebddf9d4c164c54a76b6599a47a12bb32eea7f3dd80a557b266289aa0627",
+  "plan_file": "rfcs/0007-preserve-proxied-authentication/jsons/plan.json",
+  "plan_sha256": "5b251ca9f9f7b41dbe0c6fcae899cf01080e889117f99701e8bfd80f48b9deba",
+  "question": "Approve implementation of RFC rfcs/0007-preserve-proxied-authentication.md with SHA-256 3d32ebddf9d4c164c54a76b6599a47a12bb32eea7f3dd80a557b266289aa0627 after approved challenge task task_39b920e39ac7 with receipt SHA-256 1fef26ce26f853315b0cf7e8884bcd57b806fd664de54bf9eee697d950070b1c?",
+  "resolution": "approved",
+  "approved_by": "user",
+  "approved_at": "2026-08-23T08:06:14Z",
+  "runtime_timestamp_note": "Orca returned timezone-less UTC timestamps, so automated receipt collection rejected the otherwise resolved authoritative gate."
+}

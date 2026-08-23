@@ -131,7 +131,7 @@ func (m *manager) handleTransient(ctx context.Context, rec *Record, err error) {
 		m.logger.Errorw("SIP registration unreachable after max retries — will not retry",
 			"did", rec.DID, "assistant_id", rec.AssistantID, "retries", retry, "error", err)
 		statusUpdate.Status = StatusUnreachable
-		auth := projectAuthentication(rec.OrganizationID, rec.ProjectID)
+		auth := m.serviceAuthentication(rec.OrganizationID, rec.ProjectID)
 		observer := m.observer(ctx, auth)
 		defer observer.Close(context.Background())
 		attributes := observability.Attributes{
@@ -177,7 +177,7 @@ func (m *manager) handleTransient(ctx context.Context, rec *Record, err error) {
 
 	m.logger.Warnw("SIP registration failed (will retry)",
 		"did", rec.DID, "assistant_id", rec.AssistantID, "retry", retry, "error", err)
-	auth := projectAuthentication(rec.OrganizationID, rec.ProjectID)
+	auth := m.serviceAuthentication(rec.OrganizationID, rec.ProjectID)
 	observer := m.observer(ctx, auth)
 	defer observer.Close(context.Background())
 	attributes := observability.Attributes{

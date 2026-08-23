@@ -22,7 +22,7 @@ func (m *manager) RegistrationRenewed(ctx context.Context, event sip_infra.Regis
 	retryCount := 0
 	var assistant internal_assistant_entity.Assistant
 	if err := m.postgres.DB(ctx).Where("id = ?", event.AssistantID).First(&assistant).Error; err == nil {
-		auth := projectAuthentication(assistant.OrganizationId, assistant.ProjectId)
+		auth := m.serviceAuthentication(assistant.OrganizationId, assistant.ProjectId)
 		observer := m.observer(ctx, auth)
 		defer observer.Close(context.Background())
 		attributes := observability.Attributes{
@@ -63,7 +63,7 @@ func (m *manager) RegistrationRenewed(ctx context.Context, event sip_infra.Regis
 func (m *manager) RegistrationRenewalFailed(ctx context.Context, event sip_infra.RegistrationEvent) {
 	var assistant internal_assistant_entity.Assistant
 	if err := m.postgres.DB(ctx).Where("id = ?", event.AssistantID).First(&assistant).Error; err == nil {
-		auth := projectAuthentication(assistant.OrganizationId, assistant.ProjectId)
+		auth := m.serviceAuthentication(assistant.OrganizationId, assistant.ProjectId)
 		observer := m.observer(ctx, auth)
 		defer observer.Close(context.Background())
 		attributes := observability.Attributes{
@@ -113,7 +113,7 @@ func (m *manager) RegistrationRenewalFailed(ctx context.Context, event sip_infra
 func (m *manager) RegistrationExpired(ctx context.Context, event sip_infra.RegistrationEvent) {
 	var assistant internal_assistant_entity.Assistant
 	if err := m.postgres.DB(ctx).Where("id = ?", event.AssistantID).First(&assistant).Error; err == nil {
-		auth := projectAuthentication(assistant.OrganizationId, assistant.ProjectId)
+		auth := m.serviceAuthentication(assistant.OrganizationId, assistant.ProjectId)
 		observer := m.observer(ctx, auth)
 		defer observer.Close(context.Background())
 		attributes := observability.Attributes{
@@ -163,7 +163,7 @@ func (m *manager) RegistrationExpired(ctx context.Context, event sip_infra.Regis
 func (m *manager) RegistrationUnregisterFailed(ctx context.Context, event sip_infra.RegistrationEvent) {
 	var assistant internal_assistant_entity.Assistant
 	if err := m.postgres.DB(ctx).Where("id = ?", event.AssistantID).First(&assistant).Error; err == nil {
-		auth := projectAuthentication(assistant.OrganizationId, assistant.ProjectId)
+		auth := m.serviceAuthentication(assistant.OrganizationId, assistant.ProjectId)
 		observer := m.observer(ctx, auth)
 		defer observer.Close(context.Background())
 		attributes := observability.Attributes{

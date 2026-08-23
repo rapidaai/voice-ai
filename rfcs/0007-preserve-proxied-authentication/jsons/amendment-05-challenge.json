@@ -1,0 +1,15 @@
+{
+  "status": "approved",
+  "reviewed_at": "2026-08-23T09:42:57Z",
+  "run_id": "run_a342a4f9f1cf",
+  "task_id": "task_958a78f60e76",
+  "dispatch_id": "ctx_f036fc2c33d7",
+  "reviewer": "Independent Codex plan challenger",
+  "rfc_file": "rfcs/0007-preserve-proxied-authentication.md",
+  "rfc_sha256": "e917500140f95e5c7ef84afb1bffbfa0b81d45c0355aac861de9afe62f785041",
+  "plan_file": "rfcs/0007-preserve-proxied-authentication/jsons/amendment-05-plan.json",
+  "plan_sha256": "312aaf4b3687c6762a2ec734318d547a56e9ad3a767d666b58079b05ca532429",
+  "decision": "approved",
+  "findings": [],
+  "summary": "No critical, major, or minor findings remain. SIP route and registration work is truthfully classified as Assistant service-authenticated because it is initiated internally without a project credential, while organization and project scope remain available for authorization. The plan avoids fabricating project credential identity, uses the configured Assistant service_id as the durable effective actor, covers all affected construction and wiring files, and requires regression tests through the real InternalClient.WithAuth token boundary and downstream service authorization."
+}

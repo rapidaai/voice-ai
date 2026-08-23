@@ -1,0 +1,24 @@
+{
+  "rfc": "0007-preserve-proxied-authentication",
+  "amendment": 6,
+  "status": "ready-for-challenge",
+  "objective": "Correct the governed file inventory to include the two test files required by the approved SIP implementation and repository finalizer.",
+  "acceptance_criteria": [
+    "api/assistant-api/sip/sip_test.go is authorized to cover the changed sip.go package.",
+    "api/assistant-api/sip/registration/record_test.go is authorized to provide the shared registration manager service actor fixture.",
+    "No production behavior or contract changes beyond amendment 05 are introduced.",
+    "make agent-finalize passes with all changed backend directories covered."
+  ],
+  "allowed_paths": [
+    "rfcs/0007-preserve-proxied-authentication.md",
+    "rfcs/0007-preserve-proxied-authentication/jsons/**",
+    "api/assistant-api/sip/sip_test.go",
+    "api/assistant-api/sip/registration/record_test.go"
+  ],
+  "verification": [
+    "go test ./api/assistant-api/sip ./api/assistant-api/sip/registration",
+    "make agent-finalize CHANGED_FILES=...",
+    "git diff --check"
+  ],
+  "rollback": "Revert only the two test-file changes if the production SIP correction is reverted."
+}

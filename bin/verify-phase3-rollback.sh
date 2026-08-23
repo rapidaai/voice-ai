@@ -154,7 +154,7 @@ func main() {
 	}
 	defer database.Close()
 
-	serviceID := requiredUint64("RAPIDA_SERVICE_ACTOR_ID")
+	serviceID := requiredUint64("RAPIDA_service_id")
 	serviceName := strings.TrimSpace(os.Getenv("RAPIDA_SERVICE_ACTOR_NAME"))
 	keyID := strings.TrimSpace(os.Getenv("RAPIDA_SERVICE_KEY_ID"))
 	privateKeyPEM := strings.TrimSpace(os.Getenv("RAPIDA_SERVICE_PRIVATE_KEY"))
@@ -221,7 +221,7 @@ GO
 )
 
 DATABASE_URL="${base_url}/rollback_web_api?sslmode=disable" \
-RAPIDA_SERVICE_ACTOR_ID=9101 \
+RAPIDA_service_id=9101 \
 RAPIDA_SERVICE_ACTOR_NAME=rollback-service \
 RAPIDA_SERVICE_KEY_ID=rollback-key \
 RAPIDA_SERVICE_PRIVATE_KEY=$'-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIHx6UXaatRC9vlJO71owzGZ08Jc/vbHevsTRnEN5N40B\n-----END PRIVATE KEY-----' \

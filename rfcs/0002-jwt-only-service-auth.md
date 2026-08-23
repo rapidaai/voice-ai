@@ -24,7 +24,7 @@ The service JWT contains:
 - positive bigint `organizationId`
 - optional positive bigint `projectId`
 
-The caller obtains `actor_id` from `RAPIDA_SERVICE_ACTOR_ID` and signs with the existing application secret. The receiver verifies HS256, issuer presence, audience, issued-at, expiry, maximum lifetime, actor type, actor ID range, and delegated tenant scope before constructing authentication context. The signed actor and tenant claims are trusted because only the selected services receive that secret; compromise of any holder permits impersonation within this service-authentication boundary and is an explicitly accepted deployment risk.
+The caller obtains `actor_id` from `RAPIDA_service_id` and signs with the existing application secret. The receiver verifies HS256, issuer presence, audience, issued-at, expiry, maximum lifetime, actor type, actor ID range, and delegated tenant scope before constructing authentication context. The signed actor and tenant claims are trusted because only the selected services receive that secret; compromise of any holder permits impersonation within this service-authentication boundary and is an explicitly accepted deployment risk.
 
 The token must not contain or forward an originating user ID. Possession of the shared application secret is the service trust boundary. Rotation follows the existing application-secret deployment procedure.
 
@@ -39,7 +39,7 @@ Remove:
 
 Retain:
 
-- Durable `service` actor attribution using `RAPIDA_SERVICE_ACTOR_ID`.
+- Durable `service` actor attribution using `RAPIDA_service_id`.
 - Short-lived service JWTs and delegated organization/project scope.
 - Existing credential-selection rules that reject ambiguous credentials.
 - Audit persistence, migrations, UI actor display, and non-service Phase 3 behavior.

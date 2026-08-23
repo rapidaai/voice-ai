@@ -1,0 +1,69 @@
+{
+  "rfc": "0007-preserve-proxied-authentication",
+  "status": "ready-for-challenge",
+  "objective": "Preserve the originating public authentication actor and tenant scope across Web API proxy calls to Assistant API without forwarding unrelated metadata.",
+  "acceptance_criteria": [
+    "User-authenticated proxy calls reach Assistant API as the same user actor.",
+    "Project credential proxy calls preserve their original actor identities.",
+    "Service-originated proxy calls forward the validated service credential and never replace another service actor with the Web API actor.",
+    "Organization scope, optional project scope, and request ID are preserved.",
+    "Only the selected credential class and approved correlation metadata are forwarded.",
+    "Missing, mismatched, malformed, or conflicting credential metadata fails closed."
+  ],
+  "allowed_paths": [
+    "rfcs/0007-preserve-proxied-authentication.md",
+    "rfcs/0007-preserve-proxied-authentication/jsons/**",
+    "pkg/clients/workflow/**",
+    "pkg/clients/internal_client.go",
+    "pkg/clients/internal_client_test.go",
+    "api/web-api/api/proxy/**",
+    "pkg/middlewares/**/*_test.go"
+  ],
+  "out_of_scope": [
+    "UI changes",
+    "Assistant API production handler changes and organization credential enablement",
+    "Other service client authentication changes",
+    "Protobuf changes",
+    "Database or migration changes",
+    "Forwarding arbitrary incoming metadata"
+  ],
+  "ownership": {
+    "pkg/clients/workflow": "Downstream Assistant API authentication selection and forwarding",
+    "pkg/clients/internal_client.go": "Optional shared metadata construction primitive",
+    "api/web-api/api/proxy": "Proxy-level observable behavior tests",
+    "pkg/middlewares": "Authentication reconstruction test coverage"
+  },
+  "principles": {
+    "kiss": "Reuse Assistant API's existing public authentication middleware and forward only its established credential headers.",
+    "yagni": "Do not add new tokens, protobuf fields, configuration, or identity models.",
+    "single_ownership": "The workflow Assistant client owns conversion from inbound validated metadata to downstream metadata.",
+    "explicit_contracts": "Credential headers are selected by authenticated type and checked against the authenticated tenant context.",
+    "fail_safe": "Incomplete or conflicting credentials fail before a downstream call.",
+    "observability": "Forward the request ID without logging credentials.",
+    "least_privilege": "Forward an allowlist rather than all inbound metadata.",
+    "reversibility": "Revert the workflow client selection to service assertion creation; no persistent data rollback is needed."
+  },
+  "required_tests": [
+    "User credential forwarding success and mismatch rejection",
+    "Project credential forwarding success and downstream reauthentication",
+    "Service credential forwarding without actor substitution",
+    "RAPIDA_service_id service assertion creation",
+    "Request ID forwarding and unrelated metadata exclusion",
+    "Assistant middleware actor reconstruction",
+    "Web proxy downstream context behavior"
+  ],
+  "required_commands": [
+    "go test ./pkg/clients/workflow ./pkg/middlewares ./api/web-api/api/proxy ./api/assistant-api/api/assistant",
+    "go test ./pkg/clients/... ./api/web-api/api/... ./api/assistant-api/api/...",
+    "make agent-finalize CHANGED_FILES=\"pkg/clients/internal_client.go,pkg/clients/internal_client_test.go,pkg/clients/workflow/assistant_client.go,pkg/clients/workflow/assistant_client_test.go,api/web-api/api/proxy/assistant_test.go\"",
+    "git diff --check"
+  ],
+  "risks": [
+    "Forwarded credentials are bearer credentials and must never be logged or copied outside the Assistant API call.",
+    "Changing audit attribution from service to originating actor may alter authorization and audit results.",
+    "Credential metadata and authenticated context can diverge unless explicit consistency checks are enforced.",
+    "Existing internal callers must retain service assertion behavior.",
+    "The existing cfg.Port service actor regression must be corrected without widening the proxy credential scope."
+  ],
+  "rollback": "Revert the workflow Assistant client authentication selection to the existing service assertion path. No schema or data rollback is required."
+}

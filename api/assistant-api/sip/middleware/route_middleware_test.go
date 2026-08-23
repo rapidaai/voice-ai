@@ -36,6 +36,7 @@ func TestRouteMiddleware_AgentRoute(t *testing.T) {
 	middleware := NewRouteMiddleware(
 		WithContext(context.Background()),
 		WithLogger(newRouteTestLogger(t)),
+		WithServiceID(9007),
 		WithPostgres(routeTestPostgres{db: db}),
 		WithAssistantService(routeTestAssistantService{assistants: map[uint64]*internal_assistant_entity.Assistant{
 			42: newRouteTestAssistant(7),
@@ -47,6 +48,10 @@ func TestRouteMiddleware_AgentRoute(t *testing.T) {
 	assert.Equal(t, "42", ctx.AssistantID)
 	assert.NotNil(t, ctx.Auth)
 	assert.NotNil(t, ctx.Assistant)
+	assert.Equal(t, types.AuthTypeService, ctx.Auth.Type())
+	actor, actorErr := ctx.Auth.Actor()
+	require.NoError(t, actorErr)
+	assert.Equal(t, types.ActorIdentity{Type: types.ActorTypeService, ID: 9007}, actor)
 	projectContext, authErr := ctx.Auth.ProjectContext()
 	require.NoError(t, authErr)
 	assert.Equal(t, uint64(7), projectContext.ProjectID)
@@ -65,6 +70,7 @@ func TestRouteMiddleware_DIDRoute(t *testing.T) {
 	middleware := NewRouteMiddleware(
 		WithContext(context.Background()),
 		WithLogger(newRouteTestLogger(t)),
+		WithServiceID(9007),
 		WithPostgres(routeTestPostgres{db: db}),
 		WithAssistantService(routeTestAssistantService{assistants: map[uint64]*internal_assistant_entity.Assistant{
 			43: newRouteTestAssistant(9),
@@ -88,6 +94,7 @@ func TestRouteMiddleware_PlainDIDRoute(t *testing.T) {
 	middleware := NewRouteMiddleware(
 		WithContext(context.Background()),
 		WithLogger(newRouteTestLogger(t)),
+		WithServiceID(9007),
 		WithPostgres(routeTestPostgres{db: db}),
 		WithAssistantService(routeTestAssistantService{assistants: map[uint64]*internal_assistant_entity.Assistant{
 			44: newRouteTestAssistant(11),
@@ -98,6 +105,28 @@ func TestRouteMiddleware_PlainDIDRoute(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "44", ctx.AssistantID)
 	assert.NotNil(t, ctx.Assistant)
+}
+
+func TestRouteMiddleware_RejectsMissingServiceID(t *testing.T) {
+	db := newRouteTestDB(t)
+	require.NoError(t, db.Exec("INSERT INTO assistants (id, project_id, organization_id) VALUES (?, ?, ?)", 47, 17, 18).Error)
+
+	ctx := &sip_infra.SIPRequestContext{CallID: "call-missing-actor", RequestURI: "sip:agent-47@sip.rapida.ai"}
+	middleware := NewRouteMiddleware(
+		WithContext(context.Background()),
+		WithLogger(newRouteTestLogger(t)),
+		WithPostgres(routeTestPostgres{db: db}),
+		WithAssistantService(routeTestAssistantService{assistants: map[uint64]*internal_assistant_entity.Assistant{
+			47: newRouteTestAssistant(17),
+		}}),
+	)
+	err := middleware(ctx)
+
+	require.Error(t, err)
+	var sipErr *sip_infra.SIPError
+	require.ErrorAs(t, err, &sipErr)
+	assert.Equal(t, 500, sipErr.Code)
+	assert.ErrorIs(t, sipErr.Err, types.ErrServiceActorUnavailable)
 }
 
 func TestRouteMiddleware_DoesNotRouteFromIdentity(t *testing.T) {

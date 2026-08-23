@@ -62,7 +62,7 @@ PostgreSQL 16.4 full histories were applied from version zero for all four datab
 
 ## RFC 0002 JWT-Only Service Authentication
 
-- Service assertions now use HS256 with the existing application secret and `RAPIDA_SERVICE_ACTOR_ID`; private-key, public-key, and key-ID configuration is removed.
+- Service assertions now use HS256 with the existing application secret and `RAPIDA_service_id`; private-key, public-key, and key-ID configuration is removed.
 - Go tests cover success, wrong secret, wrong algorithm, expiry, excessive lifetime, invalid actor IDs, malformed delegated scope, and prohibited user forwarding.
 - Document API middleware verifies the same HS256 service contract, including audience, issuer presence, five-minute maximum lifetime, actor range, tenant scope, and absence of forwarded user identity.
 - Web registry RPC handlers, runtime verifiers, entity/service code, and generated contracts are removed.

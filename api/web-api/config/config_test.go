@@ -17,6 +17,7 @@ import (
 
 const baseWebYAML = `
 service_name: "web-api"
+service_id: 9001
 host: "0.0.0.0"
 port: 9001
 log_level: "debug"
@@ -113,6 +114,9 @@ func TestGetApplicationConfig(t *testing.T) {
 	if appConfig == nil {
 		t.Fatalf("appConfig is nil")
 	}
+	if appConfig.ServiceID != 9001 {
+		t.Fatalf("ServiceID = %d, want 9001", appConfig.ServiceID)
+	}
 
 	if appConfig.Name != "web-api" {
 		t.Errorf("Expected ServiceName to be 'web-api', but got %v", appConfig.Name)
@@ -144,5 +148,17 @@ func TestGetApplicationConfig(t *testing.T) {
 	}
 	if appConfig.Ui.Host != "http://localhost:3000" {
 		t.Errorf("Expected Ui.Host to be 'http://localhost:3000', but got %v", appConfig.Ui.Host)
+	}
+}
+
+func TestGetApplicationConfigRejectsMissingServiceID(t *testing.T) {
+	vConfig := viper.New()
+	vConfig.SetConfigType("yaml")
+	configYAML := strings.Replace(baseWebYAML, "service_id: 9001\n", "", 1)
+	if err := vConfig.ReadConfig(strings.NewReader(configYAML)); err != nil {
+		t.Fatalf("ReadConfig returned an error: %v", err)
+	}
+	if _, err := GetApplicationConfig(vConfig); err == nil {
+		t.Fatal("GetApplicationConfig() error = nil")
 	}
 }

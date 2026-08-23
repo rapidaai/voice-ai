@@ -64,7 +64,7 @@ func (m *manager) handleRegister(ctx context.Context, s RegisterPipeline) Pipeli
 	rec.ProjectID = assistant.ProjectId
 	rec.OrganizationID = assistant.OrganizationId
 
-	auth := projectAuthentication(assistant.OrganizationId, assistant.ProjectId)
+	auth := m.serviceAuthentication(assistant.OrganizationId, assistant.ProjectId)
 	observer := m.observer(ctx, auth)
 	defer observer.Close(context.Background())
 	scope := observability.AssistantScope{AssistantID: rec.AssistantID}

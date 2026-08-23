@@ -1,0 +1,16 @@
+{
+  "status": "approved",
+  "run_id": "run_a342a4f9f1cf",
+  "task_id": "task_cbcaf1b79b3a",
+  "challenge_task_id": "task_1a0ff8ac488b",
+  "challenge_receipt": "rfcs/0007-preserve-proxied-authentication/jsons/amendment-06-challenge.json",
+  "challenge_receipt_sha256": "3975e97f118d9fd4623a300761bf96bacafbf2fd71e25e56028a007dc6ca724f",
+  "gate_id": "gate_56a7963e001d",
+  "rfc_file": "rfcs/0007-preserve-proxied-authentication.md",
+  "rfc_sha256": "f6623e0fcc6e632b71e50b5180dfb25af63d07fd343afa75d3ff7b7be2252377",
+  "plan_file": "rfcs/0007-preserve-proxied-authentication/jsons/amendment-06-plan.json",
+  "plan_sha256": "9957638253d3f1a223e3b112478dc71086db536e8b70a7fba0ff88c1c725d270",
+  "resolution": "approved",
+  "approved_by": "user",
+  "approved_at": "2026-08-23T15:06:18+05:30"
+}

@@ -13,13 +13,14 @@ type ServiceHostConfig struct {
 
 type AppConfig struct {
 	//
-	Name     string `mapstructure:"service_name" validate:"required"`
-	Version  string `mapstructure:"version"`
-	Host     string `mapstructure:"host" validate:"required"`
-	Env      string `mapstructure:"env" validate:"required"`
-	Port     int    `mapstructure:"port" validate:"required"`
-	LogLevel string `mapstructure:"log_level" validate:"required"`
-	Secret   string `mapstructure:"secret" validate:"required"`
+	Name      string `mapstructure:"service_name" validate:"required"`
+	ServiceID uint64 `mapstructure:"service_id" validate:"required"`
+	Version   string `mapstructure:"version"`
+	Host      string `mapstructure:"host" validate:"required"`
+	Env       string `mapstructure:"env" validate:"required"`
+	Port      int    `mapstructure:"port" validate:"required"`
+	LogLevel  string `mapstructure:"log_level" validate:"required"`
+	Secret    string `mapstructure:"secret" validate:"required"`
 
 	Integration ServiceHostConfig `mapstructure:"integration"`
 	Endpoint    ServiceHostConfig `mapstructure:"endpoint"`

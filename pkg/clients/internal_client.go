@@ -118,34 +118,55 @@ func (ic *internalClient) WithHttpAuth(c context.Context, auth *types.Authentica
 }
 
 func (ic *internalClient) createServiceScopeToken(auth *types.Authentication) (string, error) {
+	if auth == nil {
+		return "", types.ErrUnauthenticated
+	}
 	organizationContext, err := auth.OrganizationContext()
 	if err != nil {
 		return "", err
 	}
+	if !auth.IsAuthenticated() {
+		return "", types.ErrUnauthenticated
+	}
 	delegatedContext := types.DelegatedContext{OrganizationID: organizationContext.OrganizationID}
 	if projectContext, projectErr := auth.ProjectContext(); projectErr == nil {
 		if projectContext.OrganizationID != organizationContext.OrganizationID {
-			return "", errors.New("project context organization does not match authentication organization")
+			return "", types.ErrAuthenticationContextMismatch
 		}
 		delegatedContext.ProjectID = &projectContext.ProjectID
 	} else if !errors.Is(projectErr, types.ErrProjectContextUnavailable) {
 		return "", projectErr
 	}
 	if ic.cfg == nil || strings.TrimSpace(ic.cfg.Name) == "" {
-		return "", errors.New("service name is required for internal authentication")
+		return "", types.ErrServiceNameUnavailable
 	}
-	serviceActorID, err := utils.IntToUint64(ic.cfg.Port)
-	if err != nil {
-		return "", errors.New("service ID must contain a positive bigint service identity")
+	ServiceID := ic.cfg.ServiceID
+	if ServiceID == 0 {
+		return "", types.ErrServiceActorUnavailable
 	}
 	if strings.TrimSpace(ic.cfg.Secret) == "" {
-		return "", errors.New("service secret is required for internal authentication")
+		return "", types.ErrServiceSecretUnavailable
 	}
-	return types.CreateServiceScopeToken(delegatedContext, types.ServiceAssertion{
-		ActorID: serviceActorID,
+	assertion := types.ServiceAssertion{
+		ActorID: ServiceID,
 		Issuer:  ic.cfg.Name,
 		TTL:     5 * time.Minute,
-	}, ic.cfg.Secret)
+	}
+	sourceActor, actorErr := auth.Actor()
+	if actorErr != nil {
+		return "", actorErr
+	}
+	if auth.Type() == types.AuthTypeUser {
+		userContext, userErr := auth.UserContext()
+		if userErr != nil {
+			return "", userErr
+		}
+		if userContext.UserID != sourceActor.ID {
+			return "", types.ErrAuthenticationContextMismatch
+		}
+	}
+	assertion.DelegatedActor = &sourceActor
+	return types.CreateServiceScopeToken(delegatedContext, assertion, ic.cfg.Secret)
 }
 
 func (client *internalClient) Cache(c context.Context, key string, value interface{}) *connectors.RedisResponse {

@@ -74,7 +74,7 @@ func (m *manager) loadRecords(ctx context.Context) ([]Record, error) {
 		did, _ := opts.GetString(OptKeyPhone)
 		if !validator.NotBlank(did) {
 			if assistant, ok := assistantByID[dep.AssistantId]; ok {
-				auth := projectAuthentication(assistant.OrganizationId, assistant.ProjectId)
+				auth := m.serviceAuthentication(assistant.OrganizationId, assistant.ProjectId)
 				observer := m.observer(ctx, auth)
 				attributes := observability.Attributes{
 					"assistant_id":   strconv.FormatUint(dep.AssistantId, 10),
@@ -118,7 +118,7 @@ func (m *manager) loadRecords(ctx context.Context) ([]Record, error) {
 		credentialID, err := opts.GetUint64(OptKeyCredentialID)
 		if err != nil {
 			if assistant, ok := assistantByID[dep.AssistantId]; ok {
-				auth := projectAuthentication(assistant.OrganizationId, assistant.ProjectId)
+				auth := m.serviceAuthentication(assistant.OrganizationId, assistant.ProjectId)
 				observer := m.observer(ctx, auth)
 				attributes := observability.Attributes{
 					"did":            did,
@@ -219,7 +219,7 @@ func (m *manager) loadRecords(ctx context.Context) ([]Record, error) {
 				didKey, winner.assistant, winner.deployment,
 			)
 			if loser.record.ProjectID != 0 && loser.record.OrganizationID != 0 {
-				auth := projectAuthentication(loser.record.OrganizationID, loser.record.ProjectID)
+				auth := m.serviceAuthentication(loser.record.OrganizationID, loser.record.ProjectID)
 				observer := m.observer(ctx, auth)
 				attributes := observability.Attributes{
 					"did":                  didKey,

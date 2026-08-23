@@ -1,0 +1,15 @@
+{
+  "status": "blocked",
+  "reviewed_at": "2026-08-23T08:24:08Z",
+  "run_id": "run_a342a4f9f1cf",
+  "task_id": "task_ce438bf60dae",
+  "dispatch_id": "ctx_dc699475e4f3",
+  "reviewer": "Independent Codex plan challenger",
+  "decision": "block",
+  "findings": [
+    "The delegation rule conflicts with the claim matrix for upstream service actors. User, project, and organization actors must be delegated, while service and system actors must never be delegated.",
+    "The all-service claim conflicts with excluding WithHttpAuth and Python Document authentication. The scope must choose either all Go gRPC WithAuth boundaries or every service transport.",
+    "The RFC contains a duplicated delegated_auth_type claim entry.",
+    "Verification must include a service-to-service multi-hop test proving that immediate service identity rotates without delegating a prior service actor."
+  ]
+}
