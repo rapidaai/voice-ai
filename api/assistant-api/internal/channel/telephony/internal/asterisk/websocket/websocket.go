@@ -118,7 +118,7 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 		Record:     aws.Record,
 	})
 
-	go aws.runWebSocketReader()
+	go aws.runWebSocketReader(aws.connection)
 	return aws, nil
 }
 
@@ -146,8 +146,7 @@ func (aws *asteriskWebsocketStreamer) sendOutputFrame(frame internal_telephony_m
 	return nil
 }
 
-func (aws *asteriskWebsocketStreamer) runWebSocketReader() {
-	conn := aws.connection
+func (aws *asteriskWebsocketStreamer) runWebSocketReader(conn *websocket.Conn) {
 	if conn == nil {
 		return
 	}

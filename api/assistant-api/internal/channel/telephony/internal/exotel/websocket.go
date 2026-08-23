@@ -100,12 +100,11 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 		OutputSink: exotel.sendOutputFrame,
 		Record:     exotel.Record,
 	})
-	go exotel.runWebSocketReader()
+	go exotel.runWebSocketReader(exotel.connection)
 	return exotel, nil
 }
 
-func (exotel *exotelWebsocketStreamer) runWebSocketReader() {
-	conn := exotel.connection
+func (exotel *exotelWebsocketStreamer) runWebSocketReader(conn *websocket.Conn) {
 	if conn == nil {
 		return
 	}

@@ -101,12 +101,11 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 		OutputSink: tws.sendOutputFrame,
 		Record:     tws.Record,
 	})
-	go tws.runWebSocketReader()
+	go tws.runWebSocketReader(tws.connection)
 	return tws, nil
 }
 
-func (tws *twilioWebsocketStreamer) runWebSocketReader() {
-	conn := tws.connection
+func (tws *twilioWebsocketStreamer) runWebSocketReader(conn *websocket.Conn) {
 	if conn == nil {
 		return
 	}

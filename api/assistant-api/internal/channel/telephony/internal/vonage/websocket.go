@@ -99,12 +99,11 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 		OutputSink:        vng.sendOutputFrame,
 		Record:            vng.Record,
 	})
-	go vng.runWebSocketReader()
+	go vng.runWebSocketReader(vng.connection)
 	return vng, nil
 }
 
-func (vng *vonageWebsocketStreamer) runWebSocketReader() {
-	conn := vng.connection
+func (vng *vonageWebsocketStreamer) runWebSocketReader(conn *websocket.Conn) {
 	if conn == nil {
 		return
 	}

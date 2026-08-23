@@ -1,0 +1,129 @@
+name: Reusable System CI
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  system-core:
+    name: System Core (stabilizing)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      COMPOSE_PROJECT_NAME: rapida-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      SYSTEM_BUILDER_NAME: rapida-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      SYSTEM_BASELINE_DIR: /tmp/rapida-system-baseline-${{ github.run_id }}-${{ github.run_attempt }}
+      SYSTEM_STATE_DIR: /tmp/rapida-system-state-${{ github.run_id }}-${{ github.run_attempt }}
+      SYSTEM_DIAGNOSTICS_DIR: ${{ github.workspace }}/system-diagnostics
+      EVENT_NAME: ${{ github.event_name }}
+      PULL_REQUEST_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Initialize 20-minute main budget
+        uses: ./.github/actions/system-test
+        with:
+          phase: initialize
+
+      - name: Validate pinned Compose and system contracts
+        uses: ./.github/actions/system-test
+        with:
+          phase: validate-contracts
+
+      - name: Validate native dependency contracts
+        uses: ./.github/actions/system-test
+        with:
+          phase: validate-native-locks
+
+      - name: Run system support regression gates
+        uses: ./.github/actions/system-test
+        with:
+          phase: validate-system-support
+
+      - name: Create Buildx builder
+        uses: ./.github/actions/system-test
+        with:
+          phase: create-builder
+
+      - name: Build system images
+        uses: ./.github/actions/system-test
+        with:
+          phase: build-images
+
+      - name: Run fresh migrations
+        uses: ./.github/actions/system-test
+        with:
+          phase: migrations
+
+      - name: Start system services
+        uses: ./.github/actions/system-test
+        with:
+          phase: start-services
+
+      - name: Check service health
+        uses: ./.github/actions/system-test
+        with:
+          phase: health
+
+      - name: Check UI and nginx
+        uses: ./.github/actions/system-test
+        with:
+          phase: ui-nginx
+
+      - name: Check assistant collection drift
+        uses: ./.github/actions/system-test
+        with:
+          phase: assistant-collection-drift
+
+      - name: Assistant smoke
+        uses: ./.github/actions/system-test
+        with:
+          phase: assistant-smoke
+
+      - name: Collect sanitized diagnostics
+        if: always()
+        shell: bash
+        run: timeout --signal=TERM --kill-after=10s 80s .github/actions/system-test/collect-diagnostics.sh
+
+      - name: Remove system stack, builder, and local cache
+        if: always()
+        shell: bash
+        run: timeout --signal=TERM --kill-after=10s 190s .github/actions/system-test/cleanup.sh
+
+      - name: Upload sanitized failure diagnostics
+        if: failure() && hashFiles('system-diagnostics/**') != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: system-core-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: system-diagnostics
+          if-no-files-found: error
+          retention-days: 7
+
+  contract-compatibility:
+    name: Contract Compatibility (stabilizing)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve target branch baseline
+        id: baseline
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PULL_REQUEST_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: scripts/contracts/materialize-baseline.sh "$RUNNER_TEMP/contract-baseline"
+
+      - name: Check OpenAPI and protobuf compatibility
+        shell: bash
+        run: scripts/contracts/check-compatibility.sh "${{ steps.baseline.outputs.directory }}"

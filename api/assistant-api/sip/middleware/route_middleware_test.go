@@ -27,7 +27,12 @@ func TestRouteMiddleware_AgentRoute(t *testing.T) {
 	db := newRouteTestDB(t)
 	require.NoError(t, db.Exec("INSERT INTO assistants (id, project_id, organization_id) VALUES (?, ?, ?)", 42, 7, 8).Error)
 
-	ctx := &sip_infra.SIPRequestContext{CallID: "call-agent", ToURI: "sip:agent-42@sip.rapida.ai"}
+	ctx := &sip_infra.SIPRequestContext{
+		CallID:       "call-agent",
+		RequestURI:   "sip:agent-42;transport=tcp@sip.rapida.ai",
+		FromIdentity: "sip:caller@example.com",
+		ToIdentity:   "sip:assistant@example.com",
+	}
 	middleware := NewRouteMiddleware(
 		WithContext(context.Background()),
 		WithLogger(newRouteTestLogger(t)),
@@ -46,6 +51,8 @@ func TestRouteMiddleware_AgentRoute(t *testing.T) {
 	require.NoError(t, authErr)
 	assert.Equal(t, uint64(7), projectContext.ProjectID)
 	assert.Equal(t, uint64(8), projectContext.OrganizationID)
+	assert.Equal(t, "sip:caller@example.com", ctx.FromIdentity)
+	assert.Equal(t, "sip:assistant@example.com", ctx.ToIdentity)
 }
 
 func TestRouteMiddleware_DIDRoute(t *testing.T) {
@@ -54,7 +61,7 @@ func TestRouteMiddleware_DIDRoute(t *testing.T) {
 	require.NoError(t, db.Exec("INSERT INTO assistant_phone_deployments (id, assistant_id, telephony_provider, status) VALUES (?, ?, ?, ?)", 100, 43, "sip", type_enums.RECORD_ACTIVE.String()).Error)
 	require.NoError(t, db.Exec("INSERT INTO assistant_deployment_telephony_options (assistant_deployment_telephony_id, key, value) VALUES (?, ?, ?)", 100, "phone", "+15551234567").Error)
 
-	ctx := &sip_infra.SIPRequestContext{CallID: "call-did", ToURI: "sip:did-+15551234567@sip.rapida.ai"}
+	ctx := &sip_infra.SIPRequestContext{CallID: "call-did", RequestURI: "sip:did-+15551234567@sip.rapida.ai"}
 	middleware := NewRouteMiddleware(
 		WithContext(context.Background()),
 		WithLogger(newRouteTestLogger(t)),
@@ -77,7 +84,7 @@ func TestRouteMiddleware_PlainDIDRoute(t *testing.T) {
 	require.NoError(t, db.Exec("INSERT INTO assistant_phone_deployments (id, assistant_id, telephony_provider, status) VALUES (?, ?, ?, ?)", 101, 44, "sip", type_enums.RECORD_ACTIVE.String()).Error)
 	require.NoError(t, db.Exec("INSERT INTO assistant_deployment_telephony_options (assistant_deployment_telephony_id, key, value) VALUES (?, ?, ?)", 101, "phone", "+15551234568").Error)
 
-	ctx := &sip_infra.SIPRequestContext{CallID: "call-plain", ToURI: "sip:+15551234568@sip.rapida.ai"}
+	ctx := &sip_infra.SIPRequestContext{CallID: "call-plain", RequestURI: "sip:+15551234568@sip.rapida.ai"}
 	middleware := NewRouteMiddleware(
 		WithContext(context.Background()),
 		WithLogger(newRouteTestLogger(t)),
@@ -93,11 +100,11 @@ func TestRouteMiddleware_PlainDIDRoute(t *testing.T) {
 	assert.NotNil(t, ctx.Assistant)
 }
 
-func TestRouteMiddleware_FallbackFromURI(t *testing.T) {
+func TestRouteMiddleware_DoesNotRouteFromIdentity(t *testing.T) {
 	db := newRouteTestDB(t)
 	require.NoError(t, db.Exec("INSERT INTO assistants (id, project_id, organization_id) VALUES (?, ?, ?)", 45, 13, 14).Error)
 
-	ctx := &sip_infra.SIPRequestContext{CallID: "call-from", FromURI: "sip:agent-45@sip.rapida.ai"}
+	ctx := &sip_infra.SIPRequestContext{CallID: "call-from", FromIdentity: "sip:agent-45@sip.rapida.ai"}
 	middleware := NewRouteMiddleware(
 		WithContext(context.Background()),
 		WithLogger(newRouteTestLogger(t)),
@@ -108,14 +115,40 @@ func TestRouteMiddleware_FallbackFromURI(t *testing.T) {
 	)
 	err := middleware(ctx)
 
-	require.NoError(t, err)
-	assert.Equal(t, "45", ctx.AssistantID)
-	assert.NotNil(t, ctx.Assistant)
+	require.Error(t, err)
+	var sipErr *sip_infra.SIPError
+	require.ErrorAs(t, err, &sipErr)
+	assert.Equal(t, 404, sipErr.Code)
+	assert.Empty(t, ctx.AssistantID)
+	assert.Nil(t, ctx.Assistant)
+}
+
+func TestRouteMiddleware_DoesNotRouteToIdentity(t *testing.T) {
+	db := newRouteTestDB(t)
+	require.NoError(t, db.Exec("INSERT INTO assistants (id, project_id, organization_id) VALUES (?, ?, ?)", 46, 15, 16).Error)
+
+	ctx := &sip_infra.SIPRequestContext{CallID: "call-to", ToIdentity: "sip:agent-46@sip.rapida.ai"}
+	middleware := NewRouteMiddleware(
+		WithContext(context.Background()),
+		WithLogger(newRouteTestLogger(t)),
+		WithPostgres(routeTestPostgres{db: db}),
+		WithAssistantService(routeTestAssistantService{assistants: map[uint64]*internal_assistant_entity.Assistant{
+			46: newRouteTestAssistant(15),
+		}}),
+	)
+	err := middleware(ctx)
+
+	require.Error(t, err)
+	var sipErr *sip_infra.SIPError
+	require.ErrorAs(t, err, &sipErr)
+	assert.Equal(t, 404, sipErr.Code)
+	assert.Empty(t, ctx.AssistantID)
+	assert.Nil(t, ctx.Assistant)
 }
 
 func TestRouteMiddleware_RejectsCredentialPair(t *testing.T) {
 	db := newRouteTestDB(t)
-	ctx := &sip_infra.SIPRequestContext{CallID: "call-invalid", ToURI: "sip:12345:apikey@sip.rapida.ai"}
+	ctx := &sip_infra.SIPRequestContext{CallID: "call-invalid", RequestURI: "sip:12345:apikey@sip.rapida.ai"}
 
 	middleware := NewRouteMiddleware(
 		WithContext(context.Background()),

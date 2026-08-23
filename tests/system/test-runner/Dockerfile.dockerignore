@@ -1,0 +1,12 @@
+**
+!go.mod
+!go.sum
+!tests/
+!tests/system/
+!tests/system/**/*.go
+!tests/system/test-runner/package.json
+!tests/system/test-runner/package-lock.json
+!openapi/
+!openapi/postman/
+!openapi/postman/assistant-api/
+!openapi/postman/assistant-api/assistant-api.smoke.postman_collection.json

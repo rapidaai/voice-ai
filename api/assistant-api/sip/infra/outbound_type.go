@@ -7,6 +7,7 @@
 package sip_infra
 
 import (
+	"maps"
 	"time"
 
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
@@ -150,7 +151,7 @@ func (c OutboundConfig) toCore() internal_core.OutboundConfig {
 			Password: c.Auth.Password,
 			Realm:    c.Auth.Realm,
 		},
-		Headers:             copyJSONCompatibleMap(c.Headers),
+		Headers:             maps.Clone(c.Headers),
 		RingingTimeout:      c.RingingTimeout,
 		MaxCallDuration:     c.MaxCallDuration,
 		MediaTimeoutInitial: c.MediaTimeoutInitial,
@@ -205,7 +206,7 @@ func (c *Config) ToOutboundConfig() OutboundConfig {
 			Password: coreOutbound.Auth.Password,
 			Realm:    coreOutbound.Auth.Realm,
 		},
-		Headers:             copyJSONCompatibleMap(coreOutbound.Headers),
+		Headers:             maps.Clone(coreOutbound.Headers),
 		RingingTimeout:      coreOutbound.RingingTimeout,
 		MaxCallDuration:     coreOutbound.MaxCallDuration,
 		MediaTimeoutInitial: coreOutbound.MediaTimeoutInitial,
@@ -230,7 +231,7 @@ func NewOutboundInviteRequest(cfg *Config, toUser string, fromUser string) (Outb
 				Password: coreRequest.Config.Auth.Password,
 				Realm:    coreRequest.Config.Auth.Realm,
 			},
-			Headers:         copyJSONCompatibleMap(coreRequest.Config.Headers),
+			Headers:         maps.Clone(coreRequest.Config.Headers),
 			RingingTimeout:  coreRequest.Config.RingingTimeout,
 			MaxCallDuration: coreRequest.Config.MaxCallDuration,
 		},

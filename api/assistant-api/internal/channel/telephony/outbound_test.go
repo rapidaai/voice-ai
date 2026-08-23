@@ -24,6 +24,8 @@ type outboundDispatcherTestStore struct {
 	callContext *callcontext.CallContext
 	lastStatus  callcontext.CallStatusUpdate
 	updateCount int
+	updated     chan struct{}
+	updatedOnce sync.Once
 }
 
 type outboundDispatcherConversationServiceStub struct {
@@ -152,6 +154,9 @@ func (s *outboundDispatcherTestStore) UpdateCallStatus(ctx context.Context, cont
 	s.callContext.ProviderStatusCode = status.ProviderStatusCode
 	if status.CallStatus == callcontext.CallStatusFailed || status.CallStatus == callcontext.CallStatusCancelled {
 		s.callContext.Status = callcontext.StatusFailed
+	}
+	if s.updated != nil {
+		s.updatedOnce.Do(func() { close(s.updated) })
 	}
 	return nil
 }
@@ -530,6 +535,7 @@ func TestOutboundDispatcher_MonitorConnectTimeoutUsesDurableFailureStatus(t *tes
 			Status:     callcontext.StatusPending,
 			CallStatus: callcontext.CallStatusNew,
 		},
+		updated: make(chan struct{}),
 	}
 	dispatcher := &OutboundDispatcher{
 		store:                  store,
@@ -539,31 +545,22 @@ func TestOutboundDispatcher_MonitorConnectTimeoutUsesDurableFailureStatus(t *tes
 
 	go dispatcher.monitorCallConnect(context.Background(), store.callContext.ContextID, store.callContext)
 
-	deadline := time.After(250 * time.Millisecond)
-	ticker := time.NewTicker(5 * time.Millisecond)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-deadline:
-			t.Fatal("expected answer monitor to persist no-answer after timeout")
-		case <-ticker.C:
-			if store.updateCount == 0 {
-				continue
-			}
-			if store.callContext.Status != callcontext.StatusFailed {
-				t.Fatalf("expected context failed, got %q", store.callContext.Status)
-			}
-			if store.lastStatus.FailureClass != internal_telephony_base.OutboundFailureClassNoAnswer {
-				t.Fatalf("expected no_answer failure class, got %q", store.lastStatus.FailureClass)
-			}
-			if store.lastStatus.DisconnectReason != internal_telephony_base.OutboundDisconnectReasonNoAnswer {
-				t.Fatalf("expected connect timeout disconnect reason, got %q", store.lastStatus.DisconnectReason)
-			}
-			if !store.lastStatus.Retryable {
-				t.Fatal("expected connect timeout to be retryable")
-			}
-			return
-		}
+	select {
+	case <-store.updated:
+	case <-time.After(250 * time.Millisecond):
+		t.Fatal("expected answer monitor to persist no-answer after timeout")
+	}
+	if store.callContext.Status != callcontext.StatusFailed {
+		t.Fatalf("expected context failed, got %q", store.callContext.Status)
+	}
+	if store.lastStatus.FailureClass != internal_telephony_base.OutboundFailureClassNoAnswer {
+		t.Fatalf("expected no_answer failure class, got %q", store.lastStatus.FailureClass)
+	}
+	if store.lastStatus.DisconnectReason != internal_telephony_base.OutboundDisconnectReasonNoAnswer {
+		t.Fatalf("expected connect timeout disconnect reason, got %q", store.lastStatus.DisconnectReason)
+	}
+	if !store.lastStatus.Retryable {
+		t.Fatal("expected connect timeout to be retryable")
 	}
 }
 
@@ -600,6 +597,7 @@ func TestOutboundDispatcher_MonitorConnectTimeoutSurvivesRequestCancellation(t *
 			Status:     callcontext.StatusPending,
 			CallStatus: callcontext.CallStatusNew,
 		},
+		updated: make(chan struct{}),
 	}
 	dispatcher := &OutboundDispatcher{
 		store:                  store,
@@ -612,25 +610,16 @@ func TestOutboundDispatcher_MonitorConnectTimeoutSurvivesRequestCancellation(t *
 
 	go dispatcher.monitorCallConnect(callMonitorContext, store.callContext.ContextID, store.callContext)
 
-	deadline := time.After(250 * time.Millisecond)
-	ticker := time.NewTicker(5 * time.Millisecond)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-deadline:
-			t.Fatal("expected answer monitor to persist no-answer after request context cancellation")
-		case <-ticker.C:
-			if store.updateCount == 0 {
-				continue
-			}
-			if store.callContext.FailureClass != internal_telephony_base.OutboundFailureClassNoAnswer {
-				t.Fatalf("expected no_answer failure class, got %q", store.callContext.FailureClass)
-			}
-			if store.callContext.DisconnectReason != internal_telephony_base.OutboundDisconnectReasonNoAnswer {
-				t.Fatalf("expected no_answer disconnect reason, got %q", store.callContext.DisconnectReason)
-			}
-			return
-		}
+	select {
+	case <-store.updated:
+	case <-time.After(250 * time.Millisecond):
+		t.Fatal("expected answer monitor to persist no-answer after request context cancellation")
+	}
+	if store.callContext.FailureClass != internal_telephony_base.OutboundFailureClassNoAnswer {
+		t.Fatalf("expected no_answer failure class, got %q", store.callContext.FailureClass)
+	}
+	if store.callContext.DisconnectReason != internal_telephony_base.OutboundDisconnectReasonNoAnswer {
+		t.Fatalf("expected no_answer disconnect reason, got %q", store.callContext.DisconnectReason)
 	}
 }
 

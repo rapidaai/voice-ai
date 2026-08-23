@@ -69,6 +69,7 @@ func (m *testToolExecutor) Close(context.Context) error { return nil }
 
 type testComm struct {
 	internal_type.Communication
+	mu                sync.Mutex
 	assistant         *internal_assistant_entity.Assistant
 	conversation      *internal_conversation_entity.AssistantConversation
 	integrationCaller integration_client.IntegrationServiceClient
@@ -78,6 +79,8 @@ type testComm struct {
 }
 
 func (m *testComm) OnPacket(_ context.Context, pkts ...internal_type.Packet) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.pkts = append(m.pkts, pkts...)
 	return nil
 }

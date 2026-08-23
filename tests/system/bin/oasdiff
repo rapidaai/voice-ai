@@ -1,0 +1,42 @@
+#!/bin/sh
+set -eu
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+lock_file="$script_dir/../tools.lock"
+read_lock() { sed -n "s/^$1=//p" "$lock_file"; }
+
+case "$(uname -s)-$(uname -m)" in
+    Linux-x86_64) platform=linux_amd64; checksum_key=oasdiff.linux-amd64.sha256 ;;
+    Darwin-arm64) platform=darwin_all; checksum_key=oasdiff.darwin-arm64.sha256 ;;
+    *) echo "unsupported oasdiff platform: $(uname -s)-$(uname -m)" >&2; exit 1 ;;
+esac
+
+version=$(read_lock oasdiff.version)
+expected=$(read_lock "$checksum_key")
+cache_root=${XDG_CACHE_HOME:-${HOME:-/tmp}/.cache}/rapida-ci-tools
+archive="$cache_root/oasdiff-$version-$platform.tar.gz"
+binary="$cache_root/oasdiff-$version-$platform"
+
+checksum() {
+    if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'; else shasum -a 256 "$1" | awk '{print $1}'; fi
+}
+
+if [ ! -f "$archive" ] || [ "$(checksum "$archive")" != "$expected" ]; then
+    mkdir -p "$cache_root"
+    temporary=$(mktemp "$cache_root/.oasdiff.XXXXXX")
+    trap 'rm -f "$temporary"' EXIT HUP INT TERM
+    curl --fail --silent --show-error --location "https://github.com/Tufin/oasdiff/releases/download/v$version/oasdiff_${version}_${platform}.tar.gz" --output "$temporary"
+    actual=$(checksum "$temporary")
+    [ "$actual" = "$expected" ] || { echo "oasdiff checksum mismatch: expected $expected, got $actual" >&2; exit 1; }
+    mv "$temporary" "$archive"
+    trap - EXIT HUP INT TERM
+fi
+
+temporary_dir=$(mktemp -d "$cache_root/.oasdiff-extract.XXXXXX")
+trap 'rm -rf "$temporary_dir"' EXIT HUP INT TERM
+tar -xzf "$archive" -C "$temporary_dir" oasdiff
+chmod 0755 "$temporary_dir/oasdiff"
+mv "$temporary_dir/oasdiff" "$binary"
+rm -rf "$temporary_dir"
+trap - EXIT HUP INT TERM
+exec "$binary" "$@"

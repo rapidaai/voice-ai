@@ -1,0 +1,3 @@
+#!/bin/sh
+set -eu
+exec go run ./tests/system/cmd/systemcheck service-image-digests "$@"

@@ -55,6 +55,7 @@ import {
   FailBehavior,
   fromApiFailBehavior,
   HttpMethod,
+  normalizeAuthenticationBody,
   toApiFailBehavior,
   toOptionMap,
 } from './shared';
@@ -151,7 +152,7 @@ const AuthenticationFormBase: FC<SharedAuthenticationFormProps> = ({
           setHeaders(optionMap[AUTH_OPTION_HEADERS]);
         }
         if (optionMap[AUTH_OPTION_BODY]) {
-          setBody(optionMap[AUTH_OPTION_BODY]);
+          setBody(normalizeAuthenticationBody(optionMap[AUTH_OPTION_BODY]));
         }
         if (optionMap[AUTH_OPTION_FAIL_BEHAVIOR]) {
           setFailBehavior(
@@ -296,7 +297,10 @@ const AuthenticationFormBase: FC<SharedAuthenticationFormProps> = ({
     addOption(AUTH_OPTION_METHOD, method);
     addOption(AUTH_OPTION_ENDPOINT, endpoint.trim());
     addOption(AUTH_OPTION_HEADERS, headers || DEFAULT_HEADERS);
-    addOption(AUTH_OPTION_BODY, body || DEFAULT_BODY);
+    addOption(
+      AUTH_OPTION_BODY,
+      normalizeAuthenticationBody(body || DEFAULT_BODY),
+    );
     addOption(AUTH_OPTION_FAIL_BEHAVIOR, toApiFailBehavior(failBehavior));
     addOption(AUTH_OPTION_TIMEOUT_MS, String(timeout));
     addOption(AUTH_OPTION_CONDITION, JSON.stringify(sourceConditions));
