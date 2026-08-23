@@ -110,5 +110,3 @@ export const ProviderContextProvider = ({
     </ProviderContext.Provider>
   );
 };
-
-export default ProviderContext;

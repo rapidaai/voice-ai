@@ -3,7 +3,6 @@ set -e
 
 BUILD_DIR="/app/build"
 CONFIG_FILE="/app/config.ui.json"
-
 # If a runtime config is mounted, inject it into the built JS bundle
 # by replacing the placeholder values that were baked at build time
 if [ -f "$CONFIG_FILE" ]; then

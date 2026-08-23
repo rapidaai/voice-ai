@@ -4,28 +4,37 @@ import {
   HeaderName,
   HeaderNavigation,
 } from '@carbon/react';
+import { useTheme } from '@/theme/theme-provider';
 
 export function GeneralFooter() {
+  const { theme } = useTheme();
+
   return (
     <Header
-      aria-label="Rapida Platform"
-      className="[inset-block-start:auto]! [inset-block-end:0]! border-gray-200! dark:border-gray-900! border-t!"
+      aria-label={`${theme.brand.name} Platform`}
+      className="[inset-block-start:auto]! [inset-block-end:0]! border-border-subtle! border-t!"
     >
-      <HeaderName href="#" prefix="Rapida">
+      <HeaderName href="#" prefix={theme.brand.name}>
         [Platform]
       </HeaderName>
-      <HeaderNavigation aria-label="Rapida [Platform]" className="">
-        <HeaderMenuItem href="https://app.rapida.ai/static/terms-conditions">
+      <HeaderNavigation
+        aria-label={`${theme.brand.name} [Platform]`}
+        className=""
+      >
+        <HeaderMenuItem href={theme.links.terms}>
           <span className="opacity-80">Terms and Conditions</span>
         </HeaderMenuItem>
-        <HeaderMenuItem href="https://app.rapida.ai/static/privacy-policy">
+        <HeaderMenuItem href={theme.links.privacy}>
           <span className="opacity-80">Privacy Policy</span>
         </HeaderMenuItem>
-        <HeaderMenuItem href="https://doc.rapida.ai">
+        <HeaderMenuItem href={theme.links.documentation}>
           <span className="opacity-80">Documentation</span>
         </HeaderMenuItem>
-        <HeaderMenuItem href="https://github.com/rapidaai/voice-ai">
-          <span className="opacity-80">Github</span>
+        <HeaderMenuItem href={theme.links.source}>
+          <span className="opacity-80">Source</span>
+        </HeaderMenuItem>
+        <HeaderMenuItem href={theme.links.support}>
+          <span className="opacity-80">Support</span>
         </HeaderMenuItem>
       </HeaderNavigation>
     </Header>
