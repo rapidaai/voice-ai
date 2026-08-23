@@ -17,47 +17,48 @@ import (
 
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/validator"
 )
 
 // NewProjectAuthenticatorUnaryServerMiddleware authenticates project credentials.
 func NewProjectAuthenticatorUnaryServerMiddleware(resolver types.ClaimAuthenticator[*types.ProjectScope], logger commons.Logger) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		apiKey := strings.TrimSpace(metadata.ExtractIncoming(ctx).Get(types.PROJECT_SCOPE_KEY))
-		if apiKey == "" {
+		if !validator.NotBlank(apiKey) {
 			return handler(ctx, req)
 		}
-		if ctx.Value(types.CTX_) != nil {
-			if logger != nil {
+		if validator.NonNil(ctx.Value(types.CTX_)) {
+			if validator.NonNil(logger) {
 				logger.Errorf(authenticationConflictMessage)
 			}
-			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
-		if resolver == nil {
-			if logger != nil {
+		if !validator.NonNil(resolver) {
+			if validator.NonNil(logger) {
 				logger.Errorf(projectAuthNotSupportedMessage)
 			}
-			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		apiKey = strings.TrimPrefix(apiKey, types.PROJECT_KEY_PREFIX)
-		if apiKey == "" {
-			if logger != nil {
+		if !validator.NotBlank(apiKey) {
+			if validator.NonNil(logger) {
 				logger.Errorf(projectAuthEmptyMessage)
 			}
-			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		principle, err := resolver.Claim(ctx, apiKey)
-		if err != nil || principle == nil || principle.Info == nil || !principle.Info.IsAuthenticated() {
-			if logger != nil {
+		if err != nil || !validator.NonNil(principle) || !validator.NonNil(principle.Info) || !principle.Info.IsAuthenticated() {
+			if validator.NonNil(logger) {
 				logger.Errorf(projectAuthRejectedMessage)
 			}
-			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		actor, err := types.ResolveAuditActor(principle.Info)
 		if err != nil {
-			if logger != nil {
+			if validator.NonNil(logger) {
 				logger.Errorf(projectAuthInvalidAuditActorMessage)
 			}
-			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		projectContext, _ := principle.Info.ProjectContext()
 		auth := &types.Authentication{
@@ -75,41 +76,41 @@ func NewProjectAuthenticatorStreamServerMiddleware(resolver types.ClaimAuthentic
 	return func(srv any, stream grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		ctx := stream.Context()
 		apiKey := strings.TrimSpace(metadata.ExtractIncoming(ctx).Get(types.PROJECT_SCOPE_KEY))
-		if apiKey == "" {
+		if !validator.NotBlank(apiKey) {
 			return handler(srv, stream)
 		}
-		if ctx.Value(types.CTX_) != nil {
-			if logger != nil {
+		if validator.NonNil(ctx.Value(types.CTX_)) {
+			if validator.NonNil(logger) {
 				logger.Errorf(authenticationConflictMessage)
 			}
-			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
-		if resolver == nil {
-			if logger != nil {
+		if !validator.NonNil(resolver) {
+			if validator.NonNil(logger) {
 				logger.Errorf(projectAuthNotSupportedMessage)
 			}
-			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		apiKey = strings.TrimPrefix(apiKey, types.PROJECT_KEY_PREFIX)
-		if apiKey == "" {
-			if logger != nil {
+		if !validator.NotBlank(apiKey) {
+			if validator.NonNil(logger) {
 				logger.Errorf(projectAuthEmptyMessage)
 			}
-			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		principle, err := resolver.Claim(ctx, apiKey)
-		if err != nil || principle == nil || principle.Info == nil || !principle.Info.IsAuthenticated() {
-			if logger != nil {
+		if err != nil || !validator.NonNil(principle) || !validator.NonNil(principle.Info) || !principle.Info.IsAuthenticated() {
+			if validator.NonNil(logger) {
 				logger.Errorf(projectAuthRejectedMessage)
 			}
-			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		actor, err := types.ResolveAuditActor(principle.Info)
 		if err != nil {
-			if logger != nil {
+			if validator.NonNil(logger) {
 				logger.Errorf(projectAuthInvalidAuditActorMessage)
 			}
-			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		projectContext, _ := principle.Info.ProjectContext()
 		auth := &types.Authentication{

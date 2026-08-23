@@ -14,51 +14,52 @@ import (
 
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/validator"
 )
 
 // NewServiceAuthenticatorMiddleware authenticates service credentials.
 func NewServiceAuthenticatorMiddleware(resolver types.ClaimAuthenticator[*types.ServiceScope], logger commons.Logger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		assertion := ctx.GetHeader(types.SERVICE_SCOPE_KEY)
-		if strings.TrimSpace(assertion) == "" {
+		if !validator.NotBlank(assertion) {
 			assertion = ctx.Query(types.SERVICE_SCOPE_KEY)
 		}
-		if strings.TrimSpace(assertion) == "" {
+		if !validator.NotBlank(assertion) {
 			assertion = ctx.Param(types.SERVICE_SCOPE_KEY)
 		}
 		assertion = strings.TrimSpace(assertion)
-		if assertion == "" {
+		if !validator.NotBlank(assertion) {
 			ctx.Next()
 			return
 		}
-		if ctx.Request.Context().Value(types.CTX_) != nil {
-			if logger != nil {
+		if validator.NonNil(ctx.Request.Context().Value(types.CTX_)) {
+			if validator.NonNil(logger) {
 				logger.Errorf(authenticationConflictMessage)
 			}
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": authenticationFailureMessage})
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, AuthenticationError{Error: AuthenticationFailureMessage})
 			return
 		}
-		if resolver == nil {
-			if logger != nil {
+		if !validator.NonNil(resolver) {
+			if validator.NonNil(logger) {
 				logger.Errorf(serviceAuthNotSupportedMessage)
 			}
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": authenticationFailureMessage})
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, AuthenticationError{Error: AuthenticationFailureMessage})
 			return
 		}
 		principle, err := resolver.Claim(ctx.Request.Context(), assertion)
-		if err != nil || principle == nil || principle.Info == nil || !principle.Info.IsAuthenticated() {
-			if logger != nil {
+		if err != nil || !validator.NonNil(principle) || !validator.NonNil(principle.Info) || !principle.Info.IsAuthenticated() {
+			if validator.NonNil(logger) {
 				logger.Errorf(serviceAuthRejectedMessage)
 			}
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": authenticationFailureMessage})
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, AuthenticationError{Error: AuthenticationFailureMessage})
 			return
 		}
 		actor, err := types.ResolveAuditActor(principle.Info)
 		if err != nil {
-			if logger != nil {
+			if validator.NonNil(logger) {
 				logger.Errorf(serviceAuthInvalidAuditActorMessage)
 			}
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": authenticationFailureMessage})
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, AuthenticationError{Error: AuthenticationFailureMessage})
 			return
 		}
 		delegatedContext, _ := principle.Info.DelegatedContext()
@@ -67,7 +68,7 @@ func NewServiceAuthenticatorMiddleware(resolver types.ClaimAuthenticator[*types.
 			ActorValue:        &actor,
 			OrganizationValue: &types.OrganizationContext{OrganizationID: delegatedContext.OrganizationID},
 		}
-		if delegatedContext.ProjectID != nil {
+		if validator.NonNil(delegatedContext.ProjectID) {
 			auth.ProjectValue = &types.ProjectContext{OrganizationID: delegatedContext.OrganizationID, ProjectID: *delegatedContext.ProjectID}
 		}
 		requestContext := context.WithValue(ctx.Request.Context(), types.CTX_, auth)

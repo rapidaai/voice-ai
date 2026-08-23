@@ -17,40 +17,41 @@ import (
 
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/validator"
 )
 
 // NewServiceAuthenticatorUnaryServerMiddleware authenticates service credentials.
 func NewServiceAuthenticatorUnaryServerMiddleware(resolver types.ClaimAuthenticator[*types.ServiceScope], logger commons.Logger) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		assertion := strings.TrimSpace(metadata.ExtractIncoming(ctx).Get(types.SERVICE_SCOPE_KEY))
-		if assertion == "" {
+		if !validator.NotBlank(assertion) {
 			return handler(ctx, req)
 		}
-		if ctx.Value(types.CTX_) != nil {
-			if logger != nil {
+		if validator.NonNil(ctx.Value(types.CTX_)) {
+			if validator.NonNil(logger) {
 				logger.Errorf(authenticationConflictMessage)
 			}
-			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
-		if resolver == nil {
-			if logger != nil {
+		if !validator.NonNil(resolver) {
+			if validator.NonNil(logger) {
 				logger.Errorf(serviceAuthNotSupportedMessage)
 			}
-			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		principle, err := resolver.Claim(ctx, assertion)
-		if err != nil || principle == nil || principle.Info == nil || !principle.Info.IsAuthenticated() {
-			if logger != nil {
+		if err != nil || !validator.NonNil(principle) || !validator.NonNil(principle.Info) || !principle.Info.IsAuthenticated() {
+			if validator.NonNil(logger) {
 				logger.Errorf(serviceAuthRejectedMessage)
 			}
-			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		actor, err := types.ResolveAuditActor(principle.Info)
 		if err != nil {
-			if logger != nil {
+			if validator.NonNil(logger) {
 				logger.Errorf(serviceAuthInvalidAuditActorMessage)
 			}
-			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		delegatedContext, _ := principle.Info.DelegatedContext()
 		auth := &types.Authentication{
@@ -58,7 +59,7 @@ func NewServiceAuthenticatorUnaryServerMiddleware(resolver types.ClaimAuthentica
 			ActorValue:        &actor,
 			OrganizationValue: &types.OrganizationContext{OrganizationID: delegatedContext.OrganizationID},
 		}
-		if delegatedContext.ProjectID != nil {
+		if validator.NonNil(delegatedContext.ProjectID) {
 			auth.ProjectValue = &types.ProjectContext{OrganizationID: delegatedContext.OrganizationID, ProjectID: *delegatedContext.ProjectID}
 		}
 		return handler(context.WithValue(ctx, types.CTX_, auth), req)
@@ -70,34 +71,34 @@ func NewServiceAuthenticatorStreamServerMiddleware(resolver types.ClaimAuthentic
 	return func(srv any, stream grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		ctx := stream.Context()
 		assertion := strings.TrimSpace(metadata.ExtractIncoming(ctx).Get(types.SERVICE_SCOPE_KEY))
-		if assertion == "" {
+		if !validator.NotBlank(assertion) {
 			return handler(srv, stream)
 		}
-		if ctx.Value(types.CTX_) != nil {
-			if logger != nil {
+		if validator.NonNil(ctx.Value(types.CTX_)) {
+			if validator.NonNil(logger) {
 				logger.Errorf(authenticationConflictMessage)
 			}
-			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
-		if resolver == nil {
-			if logger != nil {
+		if !validator.NonNil(resolver) {
+			if validator.NonNil(logger) {
 				logger.Errorf(serviceAuthNotSupportedMessage)
 			}
-			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		principle, err := resolver.Claim(ctx, assertion)
-		if err != nil || principle == nil || principle.Info == nil || !principle.Info.IsAuthenticated() {
-			if logger != nil {
+		if err != nil || !validator.NonNil(principle) || !validator.NonNil(principle.Info) || !principle.Info.IsAuthenticated() {
+			if validator.NonNil(logger) {
 				logger.Errorf(serviceAuthRejectedMessage)
 			}
-			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		actor, err := types.ResolveAuditActor(principle.Info)
 		if err != nil {
-			if logger != nil {
+			if validator.NonNil(logger) {
 				logger.Errorf(serviceAuthInvalidAuditActorMessage)
 			}
-			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		delegatedContext, _ := principle.Info.DelegatedContext()
 		auth := &types.Authentication{
@@ -105,7 +106,7 @@ func NewServiceAuthenticatorStreamServerMiddleware(resolver types.ClaimAuthentic
 			ActorValue:        &actor,
 			OrganizationValue: &types.OrganizationContext{OrganizationID: delegatedContext.OrganizationID},
 		}
-		if delegatedContext.ProjectID != nil {
+		if validator.NonNil(delegatedContext.ProjectID) {
 			auth.ProjectValue = &types.ProjectContext{OrganizationID: delegatedContext.OrganizationID, ProjectID: *delegatedContext.ProjectID}
 		}
 		wrapped := middleware.WrapServerStream(stream)

@@ -17,40 +17,41 @@ import (
 
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/validator"
 )
 
 // NewOrganizationAuthenticatorUnaryServerMiddleware authenticates organization credentials.
 func NewOrganizationAuthenticatorUnaryServerMiddleware(resolver types.ClaimAuthenticator[*types.OrganizationScope], logger commons.Logger) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		apiKey := strings.TrimSpace(metadata.ExtractIncoming(ctx).Get(types.ORG_SCOPE_KEY))
-		if apiKey == "" {
+		if !validator.NotBlank(apiKey) {
 			return handler(ctx, req)
 		}
-		if ctx.Value(types.CTX_) != nil {
-			if logger != nil {
+		if validator.NonNil(ctx.Value(types.CTX_)) {
+			if validator.NonNil(logger) {
 				logger.Errorf(authenticationConflictMessage)
 			}
-			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
-		if resolver == nil {
-			if logger != nil {
+		if !validator.NonNil(resolver) {
+			if validator.NonNil(logger) {
 				logger.Errorf(organizationAuthNotSupportedMessage)
 			}
-			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		principle, err := resolver.Claim(ctx, apiKey)
-		if err != nil || principle == nil || principle.Info == nil || !principle.Info.IsAuthenticated() {
-			if logger != nil {
+		if err != nil || !validator.NonNil(principle) || !validator.NonNil(principle.Info) || !principle.Info.IsAuthenticated() {
+			if validator.NonNil(logger) {
 				logger.Errorf(organizationAuthRejectedMessage)
 			}
-			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		actor, err := types.ResolveAuditActor(principle.Info)
 		if err != nil {
-			if logger != nil {
+			if validator.NonNil(logger) {
 				logger.Errorf(organizationAuthInvalidAuditActorMessage)
 			}
-			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		organizationID, _ := principle.Info.OrganizationContext()
 		auth := &types.Authentication{
@@ -67,34 +68,34 @@ func NewOrganizationAuthenticatorStreamServerMiddleware(resolver types.ClaimAuth
 	return func(srv any, stream grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		ctx := stream.Context()
 		apiKey := strings.TrimSpace(metadata.ExtractIncoming(ctx).Get(types.ORG_SCOPE_KEY))
-		if apiKey == "" {
+		if !validator.NotBlank(apiKey) {
 			return handler(srv, stream)
 		}
-		if ctx.Value(types.CTX_) != nil {
-			if logger != nil {
+		if validator.NonNil(ctx.Value(types.CTX_)) {
+			if validator.NonNil(logger) {
 				logger.Errorf(authenticationConflictMessage)
 			}
-			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
-		if resolver == nil {
-			if logger != nil {
+		if !validator.NonNil(resolver) {
+			if validator.NonNil(logger) {
 				logger.Errorf(organizationAuthNotSupportedMessage)
 			}
-			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		principle, err := resolver.Claim(ctx, apiKey)
-		if err != nil || principle == nil || principle.Info == nil || !principle.Info.IsAuthenticated() {
-			if logger != nil {
+		if err != nil || !validator.NonNil(principle) || !validator.NonNil(principle.Info) || !principle.Info.IsAuthenticated() {
+			if validator.NonNil(logger) {
 				logger.Errorf(organizationAuthRejectedMessage)
 			}
-			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		actor, err := types.ResolveAuditActor(principle.Info)
 		if err != nil {
-			if logger != nil {
+			if validator.NonNil(logger) {
 				logger.Errorf(organizationAuthInvalidAuditActorMessage)
 			}
-			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		organizationID, _ := principle.Info.OrganizationContext()
 		auth := &types.Authentication{

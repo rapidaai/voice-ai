@@ -1,7 +1,11 @@
 package middlewares
 
+type AuthenticationError struct {
+	Error string `json:"error"`
+}
+
 const (
-	authenticationFailureMessage             = "Invalid authentication credentials"
+	AuthenticationFailureMessage             = "Invalid authentication credentials"
 	authenticationConflictMessage            = "Authentication credential conflicts with an existing identity"
 	userAuthNotSupportedMessage              = "User credential is not supported"
 	userAuthIncompleteMessage                = "User credential is incomplete"

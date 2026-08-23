@@ -2,12 +2,14 @@ package middlewares
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -45,21 +47,26 @@ func (authenticator *organizationAuthenticatorStub) Claim(_ context.Context, tok
 }
 
 type recordingUserAuthenticator struct {
-	token  string
-	userID uint64
+	token      string
+	userID     uint64
+	projectIDs []uint64
 }
 
 func (authenticator *recordingUserAuthenticator) Authorize(_ context.Context, token string, userID uint64) (types.Principle, error) {
 	authenticator.token = token
 	authenticator.userID = userID
+	projectIDs := authenticator.projectIDs
+	if len(projectIDs) == 0 {
+		projectIDs = []uint64{10, 20, 30}
+	}
+	projectRoles := make([]*types.ProjectRole, 0, len(projectIDs))
+	for _, projectID := range projectIDs {
+		projectRoles = append(projectRoles, &types.ProjectRole{ProjectId: projectID})
+	}
 	return &types.PlainAuthPrinciple{
 		User:             types.UserInfo{Id: userID},
 		OrganizationRole: &types.OrganizaitonRole{OrganizationId: 2},
-		ProjectRoles: []*types.ProjectRole{
-			{ProjectId: 10},
-			{ProjectId: 20},
-			{ProjectId: 30},
-		},
+		ProjectRoles:     projectRoles,
 	}, nil
 }
 
@@ -96,6 +103,32 @@ func (invalidActorUserAuthenticator) Authorize(context.Context, string, uint64) 
 
 func (invalidActorUserAuthenticator) AuthPrinciple(context.Context, uint64) (types.Principle, error) {
 	return invalidActorUserPrinciple{Principle: testUserPrinciple()}, nil
+}
+
+type typedNilUserAuthenticator struct {
+	types.Authenticator
+}
+
+type nilPrincipleUserAuthenticator struct{}
+
+func (nilPrincipleUserAuthenticator) Authorize(context.Context, string, uint64) (types.Principle, error) {
+	var principle *types.PlainAuthPrinciple
+	return principle, nil
+}
+
+func (nilPrincipleUserAuthenticator) AuthPrinciple(context.Context, uint64) (types.Principle, error) {
+	var principle *types.PlainAuthPrinciple
+	return principle, nil
+}
+
+type nilProjectInfoAuthenticator struct{}
+
+func (nilProjectInfoAuthenticator) Claim(context.Context, string) (*types.PlainClaimPrinciple[*types.ProjectScope], error) {
+	return &types.PlainClaimPrinciple[*types.ProjectScope]{}, nil
+}
+
+type typedNilLogger struct {
+	commons.Logger
 }
 
 func TestOrganizationAuthenticationSupportsEveryTransport(t *testing.T) {
@@ -628,5 +661,157 @@ func TestAuthenticationLogsExcludeCredentialValues(t *testing.T) {
 	}
 	if strings.Contains(string(logData), malicious) || strings.Contains(string(logData), "FORGED") {
 		t.Fatalf("credential value was written to logs: %s", logData)
+	}
+}
+
+func TestAuthenticationFailureUsesExportedTypedResponse(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	engine.Use(NewAuthenticationMiddleware(nil, nil))
+	engine.GET("/test", func(ctx *gin.Context) { ctx.Status(http.StatusNoContent) })
+	request := httptest.NewRequest(http.MethodGet, "/test", nil)
+	request.Header.Set(types.AUTHORIZATION_KEY, "token")
+	request.Header.Set(types.AUTH_KEY, "1")
+	recorder := httptest.NewRecorder()
+	engine.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnauthorized)
+	}
+	var response AuthenticationError
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Error != AuthenticationFailureMessage {
+		t.Fatalf("error = %q, want %q", response.Error, AuthenticationFailureMessage)
+	}
+
+	_, err := NewAuthenticationUnaryServerMiddleware(nil, nil)(
+		incomingContext(types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "1"), nil, nil,
+		func(context.Context, any) (any, error) { return nil, nil },
+	)
+	if status.Code(err) != codes.Unauthenticated || status.Convert(err).Message() != AuthenticationFailureMessage {
+		t.Fatalf("gRPC error = %v", err)
+	}
+}
+
+func TestAuthenticationValidationHandlesTypedNilValues(t *testing.T) {
+	t.Run("resolver", func(t *testing.T) {
+		var resolver *typedNilUserAuthenticator
+		_, err := NewAuthenticationUnaryServerMiddleware(resolver, nil)(
+			incomingContext(types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "1"), nil, nil,
+			func(context.Context, any) (any, error) { return nil, nil },
+		)
+		if status.Code(err) != codes.Unauthenticated {
+			t.Fatalf("status = %v, want %v", status.Code(err), codes.Unauthenticated)
+		}
+	})
+
+	t.Run("principle", func(t *testing.T) {
+		_, err := NewAuthenticationUnaryServerMiddleware(nilPrincipleUserAuthenticator{}, nil)(
+			incomingContext(types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "1"), nil, nil,
+			func(context.Context, any) (any, error) { return nil, nil },
+		)
+		if status.Code(err) != codes.Unauthenticated {
+			t.Fatalf("status = %v, want %v", status.Code(err), codes.Unauthenticated)
+		}
+	})
+
+	t.Run("claim info", func(t *testing.T) {
+		_, err := NewProjectAuthenticatorUnaryServerMiddleware(nilProjectInfoAuthenticator{}, nil)(
+			incomingContext(types.PROJECT_SCOPE_KEY, "project"), nil, nil,
+			func(context.Context, any) (any, error) { return nil, nil },
+		)
+		if status.Code(err) != codes.Unauthenticated {
+			t.Fatalf("status = %v, want %v", status.Code(err), codes.Unauthenticated)
+		}
+	})
+
+	t.Run("context", func(t *testing.T) {
+		var existingAuthentication *types.Authentication
+		ctx := context.WithValue(incomingContext(types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "1"), types.CTX_, existingAuthentication)
+		handlerCalled := false
+		_, err := NewAuthenticationUnaryServerMiddleware(userAuthenticatorStub{}, nil)(ctx, nil, nil, func(context.Context, any) (any, error) {
+			handlerCalled = true
+			return nil, nil
+		})
+		if err != nil || !handlerCalled {
+			t.Fatalf("error = %v, handlerCalled = %t", err, handlerCalled)
+		}
+	})
+
+	t.Run("logger", func(t *testing.T) {
+		var logger *typedNilLogger
+		_, err := NewAuthenticationUnaryServerMiddleware(nil, logger)(
+			incomingContext(types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "1"), nil, nil,
+			func(context.Context, any) (any, error) { return nil, nil },
+		)
+		if status.Code(err) != codes.Unauthenticated {
+			t.Fatalf("status = %v, want %v", status.Code(err), codes.Unauthenticated)
+		}
+	})
+}
+
+func TestUserGinWhitespacePathRetainsPrecedence(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	resolver := &recordingUserAuthenticator{}
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/test", nil)
+	ctx.Request.Header.Set(types.AUTHORIZATION_KEY, "header-token")
+	ctx.Request.Header.Set(types.AUTH_KEY, "1")
+	ctx.Params = gin.Params{{Key: types.AUTHORIZATION_KEY, Value: " "}}
+
+	NewAuthenticationMiddleware(resolver, nil)(ctx)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnauthorized)
+	}
+	if resolver.token != "" {
+		t.Fatalf("resolver token = %q, want no authentication attempt", resolver.token)
+	}
+}
+
+func TestUserIdentifierBoundariesRemainUnchanged(t *testing.T) {
+	maximumUserID := uint64(math.MaxInt64)
+	resolver := &recordingUserAuthenticator{}
+	_, err := NewAuthenticationUnaryServerMiddleware(resolver, nil)(
+		incomingContext(types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "9223372036854775807"), nil, nil,
+		func(context.Context, any) (any, error) { return nil, nil },
+	)
+	if err != nil || resolver.userID != maximumUserID {
+		t.Fatalf("maximum user ID error = %v, userID = %d", err, resolver.userID)
+	}
+
+	_, err = NewAuthenticationUnaryServerMiddleware(resolver, nil)(
+		incomingContext(types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "9223372036854775808"), nil, nil,
+		func(context.Context, any) (any, error) { return nil, nil },
+	)
+	if status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("overflow user ID status = %v", status.Code(err))
+	}
+
+	largeProjectID := uint64(math.MaxInt64) + 1
+	projectResolver := &recordingUserAuthenticator{projectIDs: []uint64{largeProjectID}}
+	_, err = NewAuthenticationUnaryServerMiddleware(projectResolver, nil)(
+		incomingContext(
+			types.AUTHORIZATION_KEY, "token",
+			types.AUTH_KEY, "1",
+			types.PROJECT_KEY, strconv.FormatUint(largeProjectID, 10),
+		), nil, nil,
+		func(ctx context.Context, _ any) (any, error) {
+			authentication, authErr := types.Authorize(ctx)
+			if authErr != nil {
+				return nil, authErr
+			}
+			projectContext, projectErr := authentication.ProjectContext()
+			if projectErr != nil || projectContext.ProjectID != largeProjectID {
+				t.Fatalf("project context = %+v, error = %v", projectContext, projectErr)
+			}
+			return nil, nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("large project ID error = %v", err)
 	}
 }

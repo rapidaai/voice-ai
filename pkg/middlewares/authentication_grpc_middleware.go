@@ -19,6 +19,7 @@ import (
 
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/validator"
 )
 
 // NewAuthenticationUnaryServerMiddleware authenticates user credentials.
@@ -28,62 +29,62 @@ func NewAuthenticationUnaryServerMiddleware(resolver types.Authenticator, logger
 		authToken := strings.TrimSpace(incoming.Get(types.AUTHORIZATION_KEY))
 		authID := strings.TrimSpace(incoming.Get(types.AUTH_KEY))
 		projectID := strings.TrimSpace(incoming.Get(types.PROJECT_KEY))
-		if authToken == "" && authID == "" && projectID == "" {
+		if !validator.NotBlank(authToken) && !validator.NotBlank(authID) && !validator.NotBlank(projectID) {
 			return handler(ctx, req)
 		}
-		if ctx.Value(types.CTX_) != nil {
-			if logger != nil {
+		if validator.NonNil(ctx.Value(types.CTX_)) {
+			if validator.NonNil(logger) {
 				logger.Errorf(authenticationConflictMessage)
 			}
-			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
-		if resolver == nil {
-			if logger != nil {
+		if !validator.NonNil(resolver) {
+			if validator.NonNil(logger) {
 				logger.Errorf(userAuthNotSupportedMessage)
 			}
-			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
-		if authToken == "" || authID == "" {
-			if logger != nil {
+		if !validator.NotBlank(authToken) || !validator.NotBlank(authID) {
+			if validator.NonNil(logger) {
 				logger.Errorf(userAuthIncompleteMessage)
 			}
-			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		userID, err := strconv.ParseUint(authID, 0, 64)
-		if err != nil || userID == 0 || userID > math.MaxInt64 {
-			if logger != nil {
+		if err != nil || !validator.Between(userID, uint64(1), uint64(math.MaxInt64)) {
+			if validator.NonNil(logger) {
 				logger.Errorf(userAuthInvalidIDMessage)
 			}
-			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		principle, err := resolver.Authorize(ctx, authToken, userID)
-		if err != nil || principle == nil || !principle.IsAuthenticated() {
-			if logger != nil {
+		if err != nil || !validator.NonNil(principle) || !principle.IsAuthenticated() {
+			if validator.NonNil(logger) {
 				logger.Errorf(userAuthRejectedMessage)
 			}
-			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
-		if projectID != "" {
+		if validator.NotBlank(projectID) {
 			selectedProjectID, err := strconv.ParseUint(projectID, 0, 64)
-			if err != nil || selectedProjectID == 0 {
-				if logger != nil {
+			if err != nil || !validator.NonZero(selectedProjectID) {
+				if validator.NonNil(logger) {
 					logger.Errorf(userAuthInvalidProjectIDMessage)
 				}
-				return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+				return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 			}
 			if err := principle.SwitchProject(selectedProjectID); err != nil {
-				if logger != nil {
+				if validator.NonNil(logger) {
 					logger.Errorf(userAuthProjectSelectionRejectedMessage)
 				}
-				return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+				return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 			}
 		}
 		actor, err := types.ResolveAuditActor(principle)
 		if err != nil {
-			if logger != nil {
+			if validator.NonNil(logger) {
 				logger.Errorf(userAuthInvalidAuditActorMessage)
 			}
-			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		organizationID := principle.GetOrganizationRole().OrganizationId
 		auth := &types.Authentication{
@@ -92,7 +93,7 @@ func NewAuthenticationUnaryServerMiddleware(resolver types.Authenticator, logger
 			UserValue:         &types.UserContext{UserID: principle.GetUserInfo().GetId()},
 			OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 		}
-		if projectRole := principle.GetCurrentProjectRole(); projectRole != nil && projectRole.ProjectId > 0 {
+		if projectRole := principle.GetCurrentProjectRole(); validator.NonNil(projectRole) && validator.NonZero(projectRole.ProjectId) {
 			auth.ProjectValue = &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectRole.ProjectId}
 		}
 		return handler(context.WithValue(ctx, types.CTX_, auth), req)
@@ -107,62 +108,62 @@ func NewAuthenticationStreamServerMiddleware(resolver types.Authenticator, logge
 		authToken := strings.TrimSpace(incoming.Get(types.AUTHORIZATION_KEY))
 		authID := strings.TrimSpace(incoming.Get(types.AUTH_KEY))
 		projectID := strings.TrimSpace(incoming.Get(types.PROJECT_KEY))
-		if authToken == "" && authID == "" && projectID == "" {
+		if !validator.NotBlank(authToken) && !validator.NotBlank(authID) && !validator.NotBlank(projectID) {
 			return handler(srv, stream)
 		}
-		if ctx.Value(types.CTX_) != nil {
-			if logger != nil {
+		if validator.NonNil(ctx.Value(types.CTX_)) {
+			if validator.NonNil(logger) {
 				logger.Errorf(authenticationConflictMessage)
 			}
-			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
-		if resolver == nil {
-			if logger != nil {
+		if !validator.NonNil(resolver) {
+			if validator.NonNil(logger) {
 				logger.Errorf(userAuthNotSupportedMessage)
 			}
-			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
-		if authToken == "" || authID == "" {
-			if logger != nil {
+		if !validator.NotBlank(authToken) || !validator.NotBlank(authID) {
+			if validator.NonNil(logger) {
 				logger.Errorf(userAuthIncompleteMessage)
 			}
-			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		userID, err := strconv.ParseUint(authID, 0, 64)
-		if err != nil || userID == 0 || userID > math.MaxInt64 {
-			if logger != nil {
+		if err != nil || !validator.Between(userID, uint64(1), uint64(math.MaxInt64)) {
+			if validator.NonNil(logger) {
 				logger.Errorf(userAuthInvalidIDMessage)
 			}
-			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		principle, err := resolver.Authorize(ctx, authToken, userID)
-		if err != nil || principle == nil || !principle.IsAuthenticated() {
-			if logger != nil {
+		if err != nil || !validator.NonNil(principle) || !principle.IsAuthenticated() {
+			if validator.NonNil(logger) {
 				logger.Errorf(userAuthRejectedMessage)
 			}
-			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
-		if projectID != "" {
+		if validator.NotBlank(projectID) {
 			selectedProjectID, err := strconv.ParseUint(projectID, 0, 64)
-			if err != nil || selectedProjectID == 0 {
-				if logger != nil {
+			if err != nil || !validator.NonZero(selectedProjectID) {
+				if validator.NonNil(logger) {
 					logger.Errorf(userAuthInvalidProjectIDMessage)
 				}
-				return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+				return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 			}
 			if err := principle.SwitchProject(selectedProjectID); err != nil {
-				if logger != nil {
+				if validator.NonNil(logger) {
 					logger.Errorf(userAuthProjectSelectionRejectedMessage)
 				}
-				return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+				return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 			}
 		}
 		actor, err := types.ResolveAuditActor(principle)
 		if err != nil {
-			if logger != nil {
+			if validator.NonNil(logger) {
 				logger.Errorf(userAuthInvalidAuditActorMessage)
 			}
-			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		organizationID := principle.GetOrganizationRole().OrganizationId
 		auth := &types.Authentication{
@@ -171,7 +172,7 @@ func NewAuthenticationStreamServerMiddleware(resolver types.Authenticator, logge
 			UserValue:         &types.UserContext{UserID: principle.GetUserInfo().GetId()},
 			OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 		}
-		if projectRole := principle.GetCurrentProjectRole(); projectRole != nil && projectRole.ProjectId > 0 {
+		if projectRole := principle.GetCurrentProjectRole(); validator.NonNil(projectRole) && validator.NonZero(projectRole.ProjectId) {
 			auth.ProjectValue = &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectRole.ProjectId}
 		}
 		wrapped := middleware.WrapServerStream(stream)
