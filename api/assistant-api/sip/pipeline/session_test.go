@@ -16,10 +16,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestReconstructCallContextInboundPreservesSIPIdentities(t *testing.T) {
-	auth := &types.ProjectScope{}
+func newIdentityTestAuthentication() *types.Authentication {
+	organizationID := uint64(7)
+	projectID := uint64(8)
+	serviceID := uint64(9)
+	return &types.Authentication{
+		AuthType:          types.AuthTypeService,
+		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeService, ID: serviceID},
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
+	}
+}
 
-	call := reconstructCallContext(
+func TestReconstructCallContextInboundPreservesSIPIdentities(t *testing.T) {
+	auth := newIdentityTestAuthentication()
+
+	call, err := reconstructCallContext(
 		auth,
 		42,
 		84,
@@ -29,13 +41,14 @@ func TestReconstructCallContextInboundPreservesSIPIdentities(t *testing.T) {
 		"sip:alice@example.com;user=phone",
 		"sip:agent-42@sip.rapida.ai",
 	)
+	require.NoError(t, err)
 
 	assert.Equal(t, "sip:alice@example.com;user=phone", call.CallerNumber)
 	assert.Equal(t, "sip:agent-42@sip.rapida.ai", call.FromNumber)
 }
 
 func TestEnsureCallContextOutboundFallbackPreservesResolvedRequestIdentities(t *testing.T) {
-	auth := &types.ProjectScope{}
+	auth := newIdentityTestAuthentication()
 	session, err := sip_infra.NewSession(context.Background(), &sip_infra.SessionConfig{
 		Config: &sip_infra.Config{
 			Server:            "sip.example.com",

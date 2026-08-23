@@ -80,6 +80,7 @@ func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, stage sip_infra.
 		d.logger.Warnw("Session already ended before call runtime preparation", "call_id", callID)
 		return nil, fmt.Errorf("session_ended_before_start")
 	}
+	auth := session.GetAuth()
 	resolvedCallContext, err := d.resolveSIPCallContext(
 		session,
 		setup,
