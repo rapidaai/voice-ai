@@ -507,6 +507,11 @@ func checkEndpoint(ctx context.Context, client *http.Client, url, requiredKey st
 
 const defaultAssetPattern = `(?:src|href)=["']([^"']*/static/[^"']+\.[a-f0-9]{8,}\.[^"']*)["']`
 
+const (
+	uiReadinessTimeout  = 30 * time.Second
+	uiReadinessInterval = time.Second
+)
+
 type stringListFlag []string
 
 func (values *stringListFlag) String() string {
@@ -587,7 +592,14 @@ func checkUI(ctx context.Context, client *http.Client, baseURL, assetPattern str
 	if err != nil {
 		return err
 	}
-	body, err := getOK(ctx, client, baseURL+"/")
+	readinessCtx, cancel := context.WithTimeout(ctx, uiReadinessTimeout)
+	defer cancel()
+	var body []byte
+	err = retry(readinessCtx, uiReadinessInterval, func() error {
+		var requestErr error
+		body, requestErr = getOK(readinessCtx, client, baseURL+"/")
+		return requestErr
+	})
 	if err != nil {
 		return fmt.Errorf("nginx UI entry: %w", err)
 	}

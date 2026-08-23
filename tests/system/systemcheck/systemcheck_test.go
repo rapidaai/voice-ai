@@ -238,6 +238,55 @@ func TestCheckUIFetchesHashedAsset(t *testing.T) {
 	}
 }
 
+func TestCheckUIRetriesUntilSPAIsReady(t *testing.T) {
+	var requests int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			requests++
+			if requests == 1 {
+				http.Error(w, "starting", http.StatusBadGateway)
+				return
+			}
+			_, _ = io.WriteString(w, `<script src="/static/js/main.1234abcd.js"></script>`)
+			return
+		}
+		if r.URL.Path == "/static/js/main.1234abcd.js" {
+			_, _ = io.WriteString(w, "asset")
+			return
+		}
+		if serveHTTPRouteContract(w, r) {
+			return
+		}
+		writeGRPCWebResponse(w, "0", "response")
+	}))
+	defer server.Close()
+
+	client := proxyRouteClient(server.Client(), map[string]string{
+		talkProxyUpstream: server.URL,
+		webProxyUpstream:  server.URL,
+	})
+	if err := checkUI(context.Background(), client, server.URL, defaultAssetPattern, workflowProxyRouteArguments(), workflowHTTPRouteArguments()); err != nil {
+		t.Fatal(err)
+	}
+	if requests != 2 {
+		t.Fatalf("UI entry requests=%d want=2", requests)
+	}
+}
+
+func TestCheckUIStopsRetryingWhenReadinessDeadlineExpires(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "starting", http.StatusBadGateway)
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	err := checkUI(ctx, server.Client(), server.URL, defaultAssetPattern, workflowProxyRouteArguments(), workflowHTTPRouteArguments())
+	if err == nil || !strings.Contains(err.Error(), "deadline exceeded") {
+		t.Fatalf("expected bounded readiness failure, got %v", err)
+	}
+}
+
 func TestCheckUIRejectsArbitraryProxy404(t *testing.T) {
 	backend := httptest.NewServer(http.NotFoundHandler())
 	defer backend.Close()

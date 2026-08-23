@@ -157,8 +157,9 @@ func New(opts ...Option) (*agentkitExecutor, error) {
 		return nil, fmt.Errorf("%w: %w", ErrAgentkitInitializationOpenTalkStream, err)
 	}
 
+	connection := executor.connection
 	utils.Go(executor.ctx, func() {
-		executor.Read(executor.ctx, options.communication, executor.connection)
+		executor.Read(executor.ctx, options.communication, connection)
 	})
 
 	if err := executor.connection.Send(&protos.TalkInput{

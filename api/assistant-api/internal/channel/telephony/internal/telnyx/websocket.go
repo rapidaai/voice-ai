@@ -111,12 +111,11 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 		Record:     tws.Record,
 	})
 
-	go tws.runWebSocketReader()
+	go tws.runWebSocketReader(tws.connection)
 	return tws, nil
 }
 
-func (tws *telnyxWebsocketStreamer) runWebSocketReader() {
-	conn := tws.connection
+func (tws *telnyxWebsocketStreamer) runWebSocketReader(conn *websocket.Conn) {
 	if conn == nil {
 		return
 	}

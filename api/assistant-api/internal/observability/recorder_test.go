@@ -18,6 +18,7 @@ import (
 )
 
 type recordingCollector struct {
+	mu          sync.Mutex
 	key         string
 	contexts    []Context
 	scopes      []Scope
@@ -39,6 +40,8 @@ func (c *recordingCollector) Key() string {
 }
 
 func (c *recordingCollector) Collect(_ context.Context, scope Scope, observationContext Context, record Record) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.contexts = append(c.contexts, observationContext)
 	c.scopes = append(c.scopes, scope)
 	switch typed := record.(type) {
@@ -60,6 +63,12 @@ func (c *recordingCollector) Collect(_ context.Context, scope Scope, observation
 		c.requestLogs = append(c.requestLogs, typed)
 	}
 	return c.collectErr
+}
+
+func (c *recordingCollector) eventCount() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.events)
 }
 
 func (c *recordingCollector) Close(context.Context) error {
@@ -755,7 +764,7 @@ func TestRecorder_CollectorWorkersDoNotBlockEachOther(t *testing.T) {
 		t.Fatal("timed out waiting for blocking collector")
 	}
 	deadline := time.After(time.Second)
-	for len(fast.events) == 0 {
+	for fast.eventCount() == 0 {
 		select {
 		case <-deadline:
 			t.Fatal("fast collector did not receive event while slow collector was blocked")

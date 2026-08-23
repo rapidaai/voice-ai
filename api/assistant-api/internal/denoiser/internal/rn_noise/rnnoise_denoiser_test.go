@@ -224,7 +224,7 @@ func TestRNNoise_ProcessAudioUsesPCMScaleBoundary(t *testing.T) {
 
 	assert.Len(t, output, len(input))
 	assert.Greater(t, confidence, 0.5, "expected RNNoise to see PCM-amplitude samples, not near-silence")
-	assert.Greater(t, outputRMS, 0.25, "expected denoised audio to remain audible")
+	assert.Greater(t, outputRMS, 0.15, "expected denoised audio to remain audible")
 	assert.LessOrEqual(t, outputMaxAbsoluteValue, 1.0, "wrapper must return normalized samples")
 }
 

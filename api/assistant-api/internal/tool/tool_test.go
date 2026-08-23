@@ -8,6 +8,7 @@ package internal_tool
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -57,7 +58,7 @@ func (m *mockCommunication) OnPacket(ctx context.Context, pkts ...internal_type.
 // and pushes a result via communication.OnPacket.
 type stubToolCaller struct {
 	name   string
-	called bool
+	called atomic.Bool
 }
 
 func (s *stubToolCaller) Id() uint64                                      { return 1 }
@@ -65,7 +66,7 @@ func (s *stubToolCaller) Name() string                                    { retu
 func (s *stubToolCaller) Definition() (*protos.FunctionDefinition, error) { return nil, nil }
 func (s *stubToolCaller) ExecutionMethod() string                         { return "stub" }
 func (s *stubToolCaller) Call(ctx context.Context, contextID, toolId string, args map[string]interface{}, communication internal_type.Communication) {
-	s.called = true
+	s.called.Store(true)
 	communication.OnPacket(ctx, internal_type.LLMToolCallPacket{
 		ToolID: toolId, Name: s.name, ContextID: contextID, Arguments: internal_tool.StringifyArgs(args),
 	})
@@ -123,7 +124,7 @@ func TestExecute_KnownTool_EmitsToolCallEventAndDelegatesToCaller(t *testing.T) 
 	executor.ExecuteAll(context.Background(), "ctx-2", []*protos.ToolCall{call}, comm)
 	time.Sleep(50 * time.Millisecond)
 
-	assert.True(t, stub.called, "expected stub Call() to be invoked")
+	assert.True(t, stub.called.Load(), "expected stub Call() to be invoked")
 
 	pkts := collector.all()
 	require.Len(t, pkts, 2, "expected LLMToolCallPacket + LLMToolResultPacket")
@@ -158,7 +159,7 @@ func TestExecute_MalformedArguments_FallsBackToRaw(t *testing.T) {
 	executor.ExecuteAll(context.Background(), "ctx-3", []*protos.ToolCall{call}, comm)
 	time.Sleep(50 * time.Millisecond)
 
-	assert.True(t, stub.called)
+	assert.True(t, stub.called.Load())
 
 	pkts := collector.all()
 	require.GreaterOrEqual(t, len(pkts), 1)
