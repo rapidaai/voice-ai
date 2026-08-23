@@ -16,6 +16,9 @@
 ## RFC
 
 - Reserved path:
+- JSON artifact directory: `rfcs/NNNN-short-name/jsons/`
+- Plan artifact: `jsons/plan.json`
+- Challenge receipt: `jsons/challenge.json`
 - RFC author:
 - Exact reviewed SHA-256:
 - Confirmation gate / receipt:

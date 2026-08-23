@@ -99,7 +99,7 @@ Out of scope:
 
 ## Risks and Mitigations
 
-- Direct updates can hold locks longer than batched updates. Deployment therefore runs with writes fenced in the existing Phase 3 maintenance window after the release owner records per-table row counts, the production-sized rehearsal duration, the approved maximum duration, backup identity, and rollback owner in `rfcs/0003-simplify-audit-backfill.operational-readiness.json`. A pending or absent receipt blocks deployment, not implementation or commit.
+- Direct updates can hold locks longer than batched updates. Deployment therefore runs with writes fenced in the existing Phase 3 maintenance window after the release owner records per-table row counts, the production-sized rehearsal duration, the approved maximum duration, backup identity, and rollback owner in `rfcs/0003-simplify-audit-backfill/jsons/operational-readiness.json`. A pending or absent receipt blocks deployment, not implementation or commit.
 - Rewriting an already-applied migration would be unsafe. Implementation is conditional on these migration versions remaining unshipped.
 - Invalid legacy IDs now stop migration before updates begin instead of becoming `unknown`. This is intentional fail-closed behavior and the validator includes a rejection case.
 - Integration history cannot be attributed to a user because no legacy user identity exists; retaining `unknown` avoids fabricating identity.

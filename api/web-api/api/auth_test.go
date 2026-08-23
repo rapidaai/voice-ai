@@ -11,8 +11,15 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/utils"
 	protos "github.com/rapidaai/protos"
 )
+
+func TestPaginationCountConversion(t *testing.T) {
+	if _, err := utils.Int64ToUint32(int64(math.MaxUint32) + 1); err == nil {
+		t.Fatal("expected pagination count overflow error")
+	}
+}
 
 func TestScopeAuthorizeIncludesProjectActor(t *testing.T) {
 	actor := types.ActorIdentity{Type: types.ActorTypeProject, ID: 55}

@@ -1,23 +1,20 @@
-# Codex Hooks Automation (Parity)
+# Codex Validation Utilities
 
-Codex does not use Claude hook config directly, but this folder mirrors the same automation checks for parity.
+Codex does not run these checks automatically. They are explicit validation utilities,
+mirrored with Claude for parity.
 
 Included scripts:
 
-- `track_changed_files.py` (session-scoped edit tracking)
-- `post_tool_test_hint.py`
 - `validate_changed_tests.py`
 - `run_required_tests.py`
-- `enforce_completion.py` (sequenced blocking completion gate)
 
-Usage example:
+Preferred usage:
 
 ```bash
-python3 .codex/hooks/validate_changed_tests.py </dev/null
-python3 .codex/hooks/run_required_tests.py </dev/null
+make agent-finalize CHANGED_FILES="api/example/service.go,api/example/service_test.go"
 ```
 
-## Scoped file mode (recommended for subagents)
+## Scoped file mode
 
 To avoid checking unrelated worktree files, pass changed files explicitly:
 
@@ -31,9 +28,8 @@ HOOK_CHANGED_FILES=$'api/assistant-api/internal/denoiser/denoiser.go\napi/assist
 python3 .codex/hooks/run_required_tests.py </dev/null
 ```
 
-Resolution order inside hooks:
+Resolution order inside validation utilities:
 1. `HOOK_CHANGED_FILES` env var
 2. paths parsed from hook stdin JSON payload
-3. session-scoped paths recorded by `track_changed_files.py`
 
 Repository-wide `git diff` is intentionally not used because worktrees may contain unrelated local or parallel-agent changes.

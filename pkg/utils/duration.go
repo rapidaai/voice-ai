@@ -6,6 +6,7 @@
 package utils
 
 import (
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -37,7 +38,11 @@ func GetDuration(value interface{}) *time.Duration {
 		duration := time.Duration(v) * time.Second
 		return &duration
 	case uint64:
-		duration := time.Duration(v) * time.Second
+		seconds, err := Uint64ToInt64(v)
+		if err != nil || seconds > int64(math.MaxInt64/time.Second) {
+			return nil
+		}
+		duration := time.Duration(seconds) * time.Second
 		return &duration
 	default:
 		return nil

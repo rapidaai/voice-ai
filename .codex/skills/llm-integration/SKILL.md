@@ -43,9 +43,9 @@ Out of scope:
 
 ## Governed lifecycle
 
-- Non-trivial work follows `understand -> plan -> challenge -> approve -> implement -> verify -> independent review -> ship` from `DEVELOPMENT_PROCESS.md`.
+- Classify work as Fast, Standard, or Governed using `DEVELOPMENT_PROCESS.md`; use the full gated lifecycle only for Governed work.
 - This skill operates only in its assigned phase and path ownership; it may not approve its own plan or code review.
-- Implementation starts only from a coordinator-attested approved plan with explicit allowed paths, owners, tests, commands, and rollback.
+- Governed implementation starts only from a coordinator-attested approved plan; Fast and Standard work follows its lighter documented lifecycle.
 - Return changed-file and verification evidence to the coordinator, then route the complete verified diff to the read-only `code-reviewer`.
 
 ## Validation commands

@@ -1,3 +1,3 @@
 display_name: System Understanding
 short_description: Code-grounded planning skill for integration work before implementation.
-default_prompt: Use the system-understanding skill for planning only. Produce acceptance criteria, non-goals, exact allowed and out-of-scope paths, explicit owners, principle decisions, required tests and commands, risks, and rollback. Mark the plan pending for an independent plan-challenger; do not implement or self-approve.
+default_prompt: Use the system-understanding skill for planning only. Classify the task as Fast, Standard, or Governed from DEVELOPMENT_PROCESS.md and produce only the evidence required by that tier. Require an independent plan challenge and pending decision only for Governed work; do not implement or self-approve.

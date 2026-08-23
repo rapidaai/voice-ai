@@ -16,7 +16,7 @@ find .codex/skills -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort >
 find .claude/skills -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort >"$tmp_dir/claude-skills"
 diff -u "$tmp_dir/codex-skills" "$tmp_dir/claude-skills" >/dev/null || fail "Codex and Claude skill names differ"
 
-common_hooks="hook_state.py track_changed_files.py enforce_completion.py post_tool_test_hint.py validate_changed_tests.py run_required_tests.py"
+common_hooks="validate_changed_tests.py run_required_tests.py"
 for hook in $common_hooks; do
   cmp -s ".codex/hooks/$hook" ".claude/hooks/$hook" || fail "hook parity drift: $hook"
 done
@@ -54,8 +54,9 @@ done <"$tmp_dir/codex-skills"
 for root in .codex .claude; do
   for role in backend-implementation backend-unit-tests ui-implementation ui-unit-tests; do
     role_file="$root/agents/$role.md"
-    grep -q '^Governed lifecycle:' "$role_file" || fail "missing lifecycle contract in $role_file"
-    grep -q 'completion hooks can track' "$role_file" || fail "missing tracked-edit rule in $role_file"
+    grep -q '^Lifecycle:' "$role_file" || fail "missing lifecycle contract in $role_file"
+    grep -q 'canonical repository-wide code writing rules in `AGENTS.md`' "$role_file" || fail "missing canonical code rules reference in $role_file"
+    grep -q 'make agent-finalize' "$role_file" || fail "missing explicit finalization rule in $role_file"
     grep -q 'Never approve or review your own' "$role_file" || fail "missing reviewer separation in $role_file"
   done
   grep -q '^tools: Read,Glob,Grep,LS$' "$root/agents/code-reviewer.md" || fail "code reviewer must remain read-only in $root"
@@ -71,36 +72,40 @@ import sys
 
 settings = json.load(open(sys.argv[1], encoding="utf-8"))
 hooks = settings.get("hooks", {})
-required = {"PostToolUse", "SubagentStop", "Stop"}
-missing = required - hooks.keys()
-if missing:
-    raise SystemExit(f"missing Claude hook events: {sorted(missing)}")
-post = hooks["PostToolUse"]
-if not post or post[0].get("matcher") != "Edit|MultiEdit|Write|NotebookEdit":
-    raise SystemExit("Claude PostToolUse matcher is not aligned")
-commands = [
-    hook.get("command", "")
-    for event in required
-    for group in hooks[event]
-    for hook in group.get("hooks", [])
-]
-for expected in ("track_changed_files.py", "post_tool_test_hint.py", "enforce_completion.py"):
-    if not any(expected in command for command in commands):
-        raise SystemExit(f"missing Claude hook command: {expected}")
+for event in ("PostToolUse", "SubagentStop", "Stop"):
+    if hooks.get(event):
+        raise SystemExit(f"automatic Claude hook must remain disabled: {event}")
 PY
 
 python3 -m py_compile .codex/hooks/*.py .claude/hooks/*.py
+test -x bin/agent-finalize || fail "bin/agent-finalize must be executable"
+test -x bin/orca-rfc-release || fail "bin/orca-rfc-release must be executable"
+test -x bin/validate-rfc-layout || fail "bin/validate-rfc-layout must be executable"
+grep -q '^agent-finalize:' Makefile || fail "missing agent-finalize Make target"
+grep -q '^orca-rfc-release:' Makefile || fail "missing orca-rfc-release Make target"
+grep -q '^validate-rfc-layout:' Makefile || fail "missing validate-rfc-layout Make target"
+test "$(grep -c 'golangci-lint run --allow-serial-runners' bin/pre-commit-go)" -eq 2 || fail "golangci-lint hooks must serialize concurrent runners"
+python3 - "$repo_root/.pre-commit-config.yaml" <<'PY'
+import sys
 
-state_dir="$tmp_dir/hook-state"
-backend_payload='{"session_id":"alignment","agent_id":"backend","tool_input":{"file_path":"api/example/service.go"}}'
-backend_test_payload='{"session_id":"alignment","agent_id":"backend","tool_input":{"file_path":"api/example/service_test.go"}}'
-stop_payload='{"session_id":"alignment","agent_id":"backend"}'
+text = open(sys.argv[1], encoding="utf-8").read()
+security_hook = text.split("- id: go-security-scan", 1)[1].split("- id:", 1)[0]
+if "require_serial: true" not in security_hook:
+    raise SystemExit("go-security-scan must disable parallel pre-commit batching")
+PY
 
-printf '%s' "$backend_payload" | AGENT_HOOK_STATE_DIR="$state_dir" python3 .codex/hooks/track_changed_files.py >/dev/null
-if printf '%s' "$stop_payload" | AGENT_HOOK_STATE_DIR="$state_dir" python3 .codex/hooks/validate_changed_tests.py >/dev/null 2>&1; then
-  fail "hook state accepted backend code without a test"
+if HOOK_CHANGED_FILES='api/example/service.go' python3 .codex/hooks/validate_changed_tests.py >/dev/null 2>&1; then
+  fail "explicit validation accepted backend code without a test"
 fi
-printf '%s' "$backend_test_payload" | AGENT_HOOK_STATE_DIR="$state_dir" python3 .codex/hooks/track_changed_files.py >/dev/null
-printf '%s' "$stop_payload" | AGENT_HOOK_STATE_DIR="$state_dir" python3 .codex/hooks/validate_changed_tests.py >/dev/null
+HOOK_CHANGED_FILES='api/example/service.go,api/example/service_test.go' \
+  python3 .codex/hooks/validate_changed_tests.py >/dev/null
+
+if HOOK_CHANGED_FILES='api/example/service.go,pkg/example/service_test.go' \
+  python3 .codex/hooks/validate_changed_tests.py >/dev/null 2>&1; then
+  fail "explicit validation accepted a backend test from the wrong package"
+fi
+
+CHANGED_FILES='AGENTS.md,DEVELOPMENT_PROCESS.md' AGENT_TEST_TIMEOUT_SECONDS=5 \
+  bash bin/agent-finalize >/dev/null
 
 echo "agent tooling validation passed"

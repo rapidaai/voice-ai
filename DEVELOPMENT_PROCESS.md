@@ -1,14 +1,42 @@
 # Development Process
 
-This repository uses a principle-driven, multi-agent lifecycle designed for Orca worktrees.
+This repository uses a risk-tiered development lifecycle designed for Orca worktrees.
 
-## Non-negotiable Gates
+## Workflow Tiers
 
-The required sequence is:
+Choose the lightest safe workflow before creating tasks or agents.
+
+### Fast
+
+Use for documentation, comments, formatting, generated-file refreshes, test-only work,
+and isolated low-risk fixes with no public contract, schema, security, concurrency,
+deployment, or data impact.
+
+`understand -> implement -> targeted verification`
+
+### Standard
+
+This is the default for ordinary feature and bug-fix work contained within one service or
+component.
+
+`understand -> concise plan -> implement -> targeted verification -> review`
+
+The plan can live in the task or PR. An RFC, plan signature, and Orca decision gate are
+not required. Production behavior changes receive independent review before merge.
+
+### Governed
+
+Use only for public API/protocol changes, authentication or authorization, schema or data
+migrations, cross-service contracts, irreversible operations, high-risk rollouts, or an
+explicitly requested RFC.
 
 `understand -> plan -> draft RFC -> challenge -> confirm -> implement -> verify -> review -> ship`
 
-No agent may collapse planning, implementation, verification, and final code review into one self-approved action for a non-trivial change.
+No agent may collapse planning, implementation, verification, and final code review into
+one self-approved action in the Governed tier.
+
+If classification is uncertain, use Standard and document the uncertainty. Escalate to
+Governed only when a listed trigger is discovered.
 
 ## Roles
 
@@ -33,6 +61,7 @@ No agent may collapse planning, implementation, verification, and final code rev
 
 ### Implementer
 
+- Follows the canonical engineering principles and code writing rules in `AGENTS.md`.
 - Owns only assigned files or modules.
 - Implements the approved plan without silently expanding scope.
 - Adds or updates behavior-focused tests with the production change.
@@ -51,7 +80,7 @@ No agent may collapse planning, implementation, verification, and final code rev
 - Reviews correctness, simplicity, ownership, contracts, compatibility, concurrency, resource lifecycle, failure behavior, security, observability, tests, and rollback safety.
 - Blocks shipping for unresolved critical or major findings.
 
-## Task Contract
+## Governed Task Contract
 
 Before implementation, the approved plan must contain:
 
@@ -67,6 +96,11 @@ Before implementation, the approved plan must contain:
 - Reserved RFC path and the exact accepted RFC SHA-256.
 - RFC confirmation gate receipt with Run, Task, Gate, question, resolution, and timestamps.
 
+Create RFCs from `rfcs/TEMPLATE.md`. Keep the RFC Markdown at
+`rfcs/NNNN-short-name.md` and store every related JSON artifact under
+`rfcs/NNNN-short-name/jsons/`. The standard initial names are `plan.json`,
+`challenge.json`, and `confirmation.json`; use `amendment-NN-*.json` for later changes.
+
 The RFC author drafts only the coordinator-reserved path. The challenger reviews the
 exact plan and RFC bytes. After all findings are resolved, the final challenged bytes
 must already contain the sole metadata line `- Status: Accepted`. The coordinator then
@@ -74,25 +108,39 @@ creates a gate whose question includes the RFC path and SHA-256 without editing 
 Implementation may start only after that gate resolves to `approved`. Any
 subsequent RFC byte change requires a new challenge and confirmation.
 
+Plan/RFC revision and implementation/review correction loops are limited to two rounds.
+After two unsuccessful rounds, mark the task blocked and escalate the unresolved decision
+to the user or technical owner. Do not silently create another worker attempt.
+
 The approved plan is stored as a separate JSON artifact. Its SHA-256 and a coordinator-generated HMAC are recorded in the cumulative lifecycle envelope, and every gate verifies that the envelope plan still matches that artifact. The HMAC signs `<run_id>:<plan_sha256>` using `DEVELOPMENT_GATE_KEY`. That key belongs only to the coordinator or CI gate runner and must not be exposed to implementation or review workers.
 
 After approving the plan, the coordinator creates the attestation:
 
 ```bash
-DEVELOPMENT_GATE_KEY="..." make sign-approved-plan RUN_ID="<orca-run-id>" PLAN="<approved-plan.json>"
+DEVELOPMENT_GATE_KEY="..." make sign-approved-plan RUN_ID="<orca-run-id>" \
+  PLAN="rfcs/NNNN-short-name/jsons/plan.json"
 ```
 
 Workers produce evidence envelopes; the coordinator or CI gate runner executes lifecycle hooks with the key.
 
 Use `.codex/orchestrator/templates/task-plan.md` or the equivalent `.claude` template.
 
-## Orca Workflow
+## Orca Governed Workflow
 
-Start a governed Run from an Orca-managed terminal:
+Use Orca orchestration only for Governed work or when supervised coordination is explicitly
+needed. Fast and Standard work should use the normal agent flow without creating a Run DAG.
+
+Start a Governed Run from an Orca-managed terminal:
 
 ```bash
 make orca-development-run OBJECTIVE="describe the desired outcome" AGENT=codex
   RFC="rfcs/NNNN-short-name.md"
+```
+
+If a Run is abandoned before its confirmation gate is created, release its reservation:
+
+```bash
+make orca-rfc-release RFC="rfcs/NNNN-short-name.md"
 ```
 
 The command creates the Orca Run and dependent planning, RFC-authoring, and challenge
@@ -104,15 +152,16 @@ confirmation task. No implementation task is created yet:
 
 ```bash
 make orca-confirm-rfc-create RUN_ID="<run>" CHALLENGE_TASK_ID="<challenge-task>" \
-  CHALLENGE_RECEIPT="<approved-challenge.json>" RFC="rfcs/NNNN-short-name.md"
+  CHALLENGE_RECEIPT="rfcs/NNNN-short-name/jsons/challenge.json" RFC="rfcs/NNNN-short-name.md"
 ```
 
 After the gate resolves, collect the authoritative receipt before starting a worker:
 
 ```bash
 make orca-confirm-rfc-collect RUN_ID="<run>" TASK_ID="<confirmation-task>" \
-  CHALLENGE_TASK_ID="<challenge-task>" CHALLENGE_RECEIPT="<approved-challenge.json>" \
-  GATE_ID="<gate>" RFC="rfcs/NNNN-short-name.md" RECEIPT="<receipt.json>"
+  CHALLENGE_TASK_ID="<challenge-task>" \
+  CHALLENGE_RECEIPT="rfcs/NNNN-short-name/jsons/challenge.json" \
+  GATE_ID="<gate>" RFC="rfcs/NNNN-short-name.md"
 ```
 
 Generate the development panel from a lifecycle envelope:
@@ -140,6 +189,11 @@ The panel displays stage readiness, principle decisions, ownership, exact verifi
 9. Dispatch the code reviewer only after verification passes.
 10. Route findings to the original implementation owner and re-verify fixes.
 11. Ship only after the final review decision is `approved`.
+
+For coordinator waits, process the complete delivery, acknowledge its delivery ID, and
+release or deliberately reuse each settled worker before waiting again. Never retry a task
+because a wait window timed out; inspect worker state first. Do not exceed two failed
+attempts or correction rounds without escalating.
 
 The final review envelope must include the Orca Run, review Task, and review Dispatch identifiers. Reviewer identity comes from the execution metadata, while implementation ownership comes from the coordinator-attested approved-plan artifact.
 

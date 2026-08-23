@@ -303,7 +303,8 @@ assert module.resolve_orca_command() == ["/path with spaces/orca", "--environmen
 PY
 
 rfc_fixture_root="$output_dir/rfc-confirmation"
-mkdir -p "$rfc_fixture_root/rfcs"
+artifact_dir="$rfc_fixture_root/rfcs/0042-confirmation-test/jsons"
+mkdir -p "$artifact_dir"
 cat >"$rfc_fixture_root/rfcs/0042-confirmation-test.md" <<'EOF'
 # RFC 0042: Confirmation Test
 
@@ -314,7 +315,7 @@ cat >"$rfc_fixture_root/rfcs/0042-confirmation-test.md" <<'EOF'
 Exercise the exact-digest confirmation contract.
 EOF
 rfc_digest="$(shasum -a 256 "$rfc_fixture_root/rfcs/0042-confirmation-test.md" | awk '{print $1}')"
-challenge_receipt="$rfc_fixture_root/challenge-receipt.json"
+challenge_receipt="$artifact_dir/challenge.json"
 cat >"$challenge_receipt" <<EOF
 {
   "run_id": "run_test",
@@ -360,8 +361,38 @@ RFC_FIXTURE="$rfc_fixture_root/rfcs/0042-confirmation-test.md" CHALLENGE_RECEIPT
 ORCA_CLI_COMMAND="$mock_orca" python3 "$repo_root/bin/orca-confirm-rfc" \
   --repo-root "$rfc_fixture_root" collect --run run_test --task task_confirm \
   --challenge-task task_challenge --challenge-receipt "$challenge_receipt" --gate gate_confirm \
-  --rfc rfcs/0042-confirmation-test.md --output "$output_dir/rfc-receipt.json"
-grep -q '"resolution": "approved"' "$output_dir/rfc-receipt.json"
+  --rfc rfcs/0042-confirmation-test.md >/dev/null
+grep -q '"resolution": "approved"' "$artifact_dir/confirmation.json"
+
+printf '%s\n' '{"unexpected":"replacement"}' >"$artifact_dir/confirmation.json"
+if RFC_FIXTURE="$rfc_fixture_root/rfcs/0042-confirmation-test.md" CHALLENGE_RECEIPT_DIGEST="$challenge_receipt_digest" \
+  ORCA_CLI_COMMAND="$mock_orca" python3 "$repo_root/bin/orca-confirm-rfc" \
+  --repo-root "$rfc_fixture_root" collect --run run_test --task task_confirm \
+  --challenge-task task_challenge --challenge-receipt "$challenge_receipt" --gate gate_confirm \
+  --rfc rfcs/0042-confirmation-test.md >/dev/null 2>&1; then
+  echo "Confirmation receipt unexpectedly overwrote an existing artifact." >&2
+  exit 1
+fi
+printf '%s\n' '{"resolution":"approved"}' >"$artifact_dir/confirmation.json"
+
+if RFC_FIXTURE="$rfc_fixture_root/rfcs/0042-confirmation-test.md" CHALLENGE_RECEIPT_DIGEST="$challenge_receipt_digest" \
+  ORCA_CLI_COMMAND="$mock_orca" python3 "$repo_root/bin/orca-confirm-rfc" \
+  --repo-root "$rfc_fixture_root" collect --run run_test --task task_confirm \
+  --challenge-task task_challenge --challenge-receipt "$challenge_receipt" --gate gate_confirm \
+  --rfc rfcs/0042-confirmation-test.md --output "$output_dir/outside.json" >/dev/null 2>&1; then
+  echo "Confirmation receipt unexpectedly wrote outside the RFC artifact directory." >&2
+  exit 1
+fi
+
+cp "$challenge_receipt" "$output_dir/outside-challenge.json"
+if RFC_FIXTURE="$rfc_fixture_root/rfcs/0042-confirmation-test.md" CHALLENGE_RECEIPT_DIGEST="$challenge_receipt_digest" \
+  ORCA_CLI_COMMAND="$mock_orca" python3 "$repo_root/bin/orca-confirm-rfc" \
+  --repo-root "$rfc_fixture_root" create --run run_test --challenge-task task_challenge \
+  --challenge-receipt "$output_dir/outside-challenge.json" --rfc rfcs/0042-confirmation-test.md \
+  >/dev/null 2>&1; then
+  echo "Challenge receipt unexpectedly loaded outside the RFC artifact directory." >&2
+  exit 1
+fi
 
 cp "$rfc_fixture_root/rfcs/0042-confirmation-test.md" "$output_dir/original-rfc.md"
 sed -i.bak 's/Confirmation Test/Changed Confirmation Test/' "$rfc_fixture_root/rfcs/0042-confirmation-test.md"
@@ -373,6 +404,7 @@ if RFC_FIXTURE="$output_dir/original-rfc.md" CHALLENGE_RECEIPT_DIGEST="$challeng
   echo "Changed RFC digest unexpectedly reused an old confirmation gate." >&2
   exit 1
 fi
+cp "$output_dir/original-rfc.md" "$rfc_fixture_root/rfcs/0042-confirmation-test.md"
 
 for gate_case in wrong_run wrong_task pending rejected bad_timestamp; do
   case "$gate_case" in
@@ -393,7 +425,7 @@ for gate_case in wrong_run wrong_task pending rejected bad_timestamp; do
   fi
 done
 
-python3 - "$challenge_receipt" "$output_dir/rejected-challenge.json" <<'PY'
+python3 - "$challenge_receipt" "$artifact_dir/rejected-challenge.json" <<'PY'
 import json
 import sys
 
@@ -404,7 +436,7 @@ PY
 if RFC_FIXTURE="$rfc_fixture_root/rfcs/0042-confirmation-test.md" CHALLENGE_RECEIPT_DIGEST="$challenge_receipt_digest" ORCA_CLI_COMMAND="$mock_orca" \
   python3 "$repo_root/bin/orca-confirm-rfc" --repo-root "$rfc_fixture_root" create \
   --run run_test --challenge-task task_challenge \
-  --challenge-receipt "$output_dir/rejected-challenge.json" \
+  --challenge-receipt "$artifact_dir/rejected-challenge.json" \
   --rfc rfcs/0042-confirmation-test.md >/dev/null 2>&1; then
   echo "Non-approved challenge receipt unexpectedly created a confirmation gate." >&2
   exit 1
@@ -518,6 +550,16 @@ if (
   echo "Linked worktree reused a repository-wide RFC reservation." >&2
   exit 1
 fi
+(
+  cd "$reservation_repo"
+  bash "$repo_root/bin/orca-rfc-release" rfcs/0050-shared-lock.md >/dev/null
+)
+(
+  cd "$reservation_linked"
+  ORCA_CLI_COMMAND="$run_mock" ORCA_RUN_LOG="$output_dir/reservation-linked-retry.log" \
+    bash "$repo_root/bin/orca-development-run" "reserve after release" codex rfcs/0050-shared-lock.md \
+    >/dev/null
+)
 python3 - "$run_log" <<'PY'
 import json
 import sys

@@ -4,6 +4,7 @@ set -euo pipefail
 objective="${1:-}"
 planner_agent="${2:-}"
 rfc_path="${3:-}"
+rfc_artifact_dir="${rfc_path%.md}/jsons"
 
 if [[ -z "$objective" || -z "$planner_agent" || -z "$rfc_path" ]]; then
   echo "Usage: $0 <objective> <planner-agent> <reserved-rfc-path>" >&2
@@ -31,6 +32,7 @@ reservation_name="${rfc_path#rfcs/}"
 reservation_lock="$reservation_root/$reservation_name.lock"
 if ! mkdir "$reservation_lock" 2>/dev/null; then
   echo "RFC path is already reserved by another Run: $rfc_path" >&2
+  echo "If that Run was abandoned, release it with: make orca-rfc-release RFC='$rfc_path'" >&2
   exit 2
 fi
 reservation_active=1
@@ -55,6 +57,8 @@ if ! command -v "${orca_cmd[0]}" >/dev/null 2>&1; then
   echo "Orca CLI is not installed or not on PATH." >&2
   exit 1
 fi
+
+echo "Starting Governed workflow. Use the normal agent flow for Fast or Standard work." >&2
 
 run_orca() {
   "${orca_cmd[@]}" "$@"
@@ -134,16 +138,16 @@ create_task() {
 
 planner_task="$(create_task \
   "Understand and plan" \
-  "Investigate: $objective. Use the task-planner role and task-plan template. Do not edit repository files. Produce verified context, acceptance criteria, non-goals, explicit path ownership, principle decisions, risks, exact verification commands, and open questions. Hand the completed plan to the RFC author; do not approve it.")"
+  "Investigate: $objective. Use the task-planner role and task-plan template. Do not edit repository files. Produce verified context, acceptance criteria, non-goals, explicit path ownership, principle decisions, risks, exact verification commands, and open questions. The coordinator will store the plan at $rfc_artifact_dir/plan.json. Hand the completed plan to the RFC author; do not approve it.")"
 
 rfc_task="$(create_task \
   "Draft reserved RFC" \
-  "Draft and revise the RFC for: $objective. Use the rfc-author role. The only path you may create or edit is $rfc_path, which the coordinator reserved for this run. Translate the completed plan into exact RFC bytes with contracts, alternatives, migration, testing, observability, rollback, and open decisions. Before final challenge approval, set the sole metadata status line to '- Status: Accepted'. Do not edit the RFC index." \
+  "Draft and revise the RFC for: $objective. Use rfcs/TEMPLATE.md and the rfc-author role. The only path you may create or edit is $rfc_path, which the coordinator reserved for this run. Translate the completed plan into exact RFC bytes with contracts, alternatives, migration, testing, observability, rollback, and open decisions. Before final challenge approval, set the sole metadata status line to '- Status: Accepted'. Do not edit the RFC index or write JSON outside $rfc_artifact_dir/." \
   "[\"$planner_task\"]")"
 
 challenger_task="$(create_task \
   "Challenge exact plan and RFC" \
-  "Independently challenge the completed plan and the exact RFC at $rfc_path for: $objective. Use the plan-challenger role and remain read-only. Verify the RFC matches the plan, identify a simpler solution, ownership conflicts, missing contracts, unsafe failure paths, weak tests, and rollout risks. Return approve, revise, or block with evidence. Approval applies only to the reviewed RFC bytes; any later RFC change requires another challenge and confirmation." \
+  "Independently challenge the completed plan and the exact RFC at $rfc_path for: $objective. Use the plan-challenger role and remain read-only. Verify the RFC matches the plan, identify a simpler solution, ownership conflicts, missing contracts, unsafe failure paths, weak tests, and rollout risks. Return approve, revise, or block with evidence. The coordinator stores an approval receipt at $rfc_artifact_dir/challenge.json. Approval applies only to the reviewed RFC bytes; any later RFC change requires another challenge and confirmation. Allow at most two revision rounds, then block and escalate unresolved decisions." \
   "[\"$rfc_task\"]")"
 
 planner_response="$(run_orca orchestration worker-start \
@@ -167,13 +171,13 @@ tasks must not be created until the challenged RFC is confirmed and committed as
 the governance baseline.
 
 After the RFC author and challenger finish, create the exact-digest confirmation gate:
-  make orca-confirm-rfc-create RUN_ID="$run_id" CHALLENGE_TASK_ID="$challenger_task" RFC="$rfc_path" CHALLENGE_RECEIPT="<challenge-receipt.json>"
+  make orca-confirm-rfc-create RUN_ID="$run_id" CHALLENGE_TASK_ID="$challenger_task" RFC="$rfc_path" CHALLENGE_RECEIPT="$rfc_artifact_dir/challenge.json"
 
 After the gate is resolved, collect the receipt and record the governance baseline:
-  make orca-confirm-rfc-collect RUN_ID="$run_id" TASK_ID="<confirmation-task-id>" CHALLENGE_TASK_ID="$challenger_task" CHALLENGE_RECEIPT="<challenge-receipt.json>" RFC="$rfc_path" GATE_ID="<gate-id>" RECEIPT="<confirmation-receipt.json>"
-  git add "$rfc_path" <approved-plan.json> <confirmation-receipt.json>
+  make orca-confirm-rfc-collect RUN_ID="$run_id" TASK_ID="<confirmation-task-id>" CHALLENGE_TASK_ID="$challenger_task" CHALLENGE_RECEIPT="$rfc_artifact_dir/challenge.json" RFC="$rfc_path" GATE_ID="<gate-id>"
+  git add "$rfc_path" "$rfc_artifact_dir/plan.json" "$rfc_artifact_dir/challenge.json" "$rfc_artifact_dir/confirmation.json"
   git commit -m "docs: accept RFC for $objective"
-  DEVELOPMENT_GATE_KEY="..." make sign-approved-plan RUN_ID="$run_id" PLAN="<approved-plan.json>" BASE_REF="<governance-commit>"
+  DEVELOPMENT_GATE_KEY="..." make sign-approved-plan RUN_ID="$run_id" PLAN="$rfc_artifact_dir/plan.json" BASE_REF="<governance-commit>"
 
 Only after the receipt and governance baseline are preserved may the coordinator create
 implementation, verification, and review tasks.

@@ -202,7 +202,15 @@ func (wProjectApi *webProjectGRPCApi) GetAllProject(ctx context.Context, irReque
 			})
 		}
 	}
-	return utils.PaginatedSuccess[protos.GetAllProjectResponse, []*protos.Project](uint32(cnt), irRequest.GetPaginate().GetPage(), out)
+	totalItem, err := utils.Int64ToUint32(cnt)
+	if err != nil {
+		wProjectApi.logger.Errorf("invalid project count %d: %v", cnt, err)
+		return utils.Error[protos.GetAllProjectResponse](
+			err,
+			"Unable to get the projects, please try again in sometime.",
+		)
+	}
+	return utils.PaginatedSuccess[protos.GetAllProjectResponse, []*protos.Project](totalItem, irRequest.GetPaginate().GetPage(), out)
 }
 
 func (wProjectApi *webProjectGRPCApi) GetProject(ctx context.Context, irRequest *protos.GetProjectRequest) (*protos.GetProjectResponse, error) {
@@ -680,9 +688,17 @@ func (wProjectApi *webProjectGRPCApi) GetAllProjectCredential(c context.Context,
 	if err != nil {
 		wProjectApi.logger.Errorf("unable to cast project credential to proto object %v", err)
 	}
+	totalItem, err := utils.Int64ToUint32(cnt)
+	if err != nil {
+		wProjectApi.logger.Errorf("invalid project credential count %d: %v", cnt, err)
+		return utils.Error[protos.GetAllProjectCredentialResponse](
+			err,
+			"Unable to get all the project credentials, please try again in sometime.",
+		)
+	}
 
 	return utils.PaginatedSuccess[protos.GetAllProjectCredentialResponse, []*protos.ProjectCredential](
-		uint32(cnt),
+		totalItem,
 		irRequest.GetPaginate().GetPage(),
 		out)
 }

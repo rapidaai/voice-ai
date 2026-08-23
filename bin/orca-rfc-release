@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+rfc_path="${1:-}"
+
+if [[ "$rfc_path" == /* || ! "$rfc_path" =~ ^rfcs/[0-9]{4}-[a-z0-9]+([a-z0-9-]*[a-z0-9])?\.md$ ]]; then
+  echo "Usage: $0 rfcs/NNNN-short-name.md" >&2
+  exit 2
+fi
+
+git_common_dir="$(git rev-parse --git-common-dir 2>/dev/null || true)"
+if [[ -z "$git_common_dir" ]]; then
+  echo "RFC reservation release requires a Git worktree." >&2
+  exit 1
+fi
+
+reservation_root="$git_common_dir/orca-rfc-reservations"
+reservation_lock="$reservation_root/${rfc_path#rfcs/}.lock"
+
+if [[ ! -d "$reservation_lock" ]]; then
+  echo "No RFC reservation exists for $rfc_path."
+  exit 0
+fi
+
+if ! rmdir "$reservation_lock"; then
+  echo "RFC reservation is not an empty lock directory: $reservation_lock" >&2
+  exit 1
+fi
+
+echo "Released RFC reservation for $rfc_path."

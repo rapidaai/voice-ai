@@ -1,28 +1,26 @@
-# Claude Hooks Automation
+# Claude Validation Utilities
 
-This folder contains command hooks wired from `.claude/settings.json`.
-
-## Installed hooks
-
-- `PostToolUse`:
-  - `track_changed_files.py` for Edit/Write/NotebookEdit events
-  - `post_tool_test_hint.py` (non-blocking reminder)
-- `SubagentStop`:
-  - `enforce_completion.py` (sequenced blocking gate)
-- `Stop`:
-  - `enforce_completion.py` (sequenced blocking gate)
+This folder contains explicit validation utilities. `.claude/settings.json` intentionally
+does not run edit-time or stop-time hooks because hidden tests can trap agents in repeated
+completion attempts.
 
 ## Behavior
 
 - If UI source changes under `ui/src/`, at least one UI unit test change is required.
 - If backend Go source changes under `api/`, `pkg/`, or `cmd/`, at least one `*_test.go` change is required.
-- On stop/subagent-stop, required tests are executed:
+- When explicitly finalized, required tests are executed:
   - `cd ui && yarn test providers` for UI changes
   - `go test ./<changed-go-package-dir>` for backend changes
 
-Hook scripts return `2` to block completion when checks fail.
+Run validation once with an explicit file scope:
 
-## Scoped file mode (recommended for subagents)
+```bash
+make agent-finalize CHANGED_FILES="api/example/service.go,api/example/service_test.go" AGENT_ROOT=.claude
+```
+
+Strict validation returns `2` when checks fail. It never runs automatically during agent exit.
+
+## Scoped file mode
 
 To avoid checking unrelated worktree files, pass changed files explicitly:
 
@@ -36,9 +34,8 @@ HOOK_CHANGED_FILES=$'api/assistant-api/internal/denoiser/denoiser.go\napi/assist
 python3 .claude/hooks/run_required_tests.py </dev/null
 ```
 
-Resolution order inside hooks:
+Resolution order inside validation utilities:
 1. `HOOK_CHANGED_FILES` env var
 2. paths parsed from hook stdin JSON payload
-3. session-scoped paths recorded by `track_changed_files.py`
 
 Repository-wide `git diff` is intentionally not used because worktrees may contain unrelated local or parallel-agent changes.

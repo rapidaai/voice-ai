@@ -67,6 +67,12 @@ func TestDurationToString(t *testing.T) {
 	}
 }
 
+func TestDurationToStringNegative(t *testing.T) {
+	if result := DurationToString(-time.Nanosecond); result != "-1" {
+		t.Fatalf("expected -1, got %s", result)
+	}
+}
+
 func TestToJson(t *testing.T) {
 	type TestStruct struct {
 		Name string `json:"name"`

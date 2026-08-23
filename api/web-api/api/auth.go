@@ -939,12 +939,20 @@ func (wAuthApi *webAuthGRPCApi) GetAllUser(c context.Context, irRequest *protos.
 			CreatedDate: timestamppb.New(time.Time(member.Member.CreatedDate)),
 		}
 	}
+	totalItem, err := utils.Int64ToUint32(cnt)
+	if err != nil {
+		wAuthApi.logger.Errorf("invalid organization member count %d: %v", cnt, err)
+		return utils.Error[protos.GetAllUserResponse](
+			err,
+			"Unable to get all the users for the organization, please try again in sometime.",
+		)
+	}
 	return &protos.GetAllUserResponse{
 		Code:    200,
 		Success: true,
 		Data:    out,
 		Paginated: &protos.Paginated{
-			TotalItem:   uint32(cnt),
+			TotalItem:   totalItem,
 			CurrentPage: irRequest.GetPaginate().GetPage(),
 		},
 	}, nil

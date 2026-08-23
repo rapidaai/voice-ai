@@ -16,7 +16,7 @@ Validate local setup:
 find .claude/skills -maxdepth 2 -type d | sort
 make validate-development-process
 make validate-agent-tooling
-python3 .claude/hooks/validate_changed_tests.py </dev/null
+make agent-finalize CHANGED_FILES="api/example/service.go,api/example/service_test.go" AGENT_ROOT=.claude
 ```
 
 ## Install in this repository
@@ -60,7 +60,7 @@ Lifecycle hook contracts, templates, and the runner are available at `.claude/or
 DEVELOPMENT_GATE_KEY="<coordinator-key>" python3 .claude/orchestrator/scripts/hook-run.py --stage pre-implementation --input .claude/orchestrator/examples/lifecycle-input.json --output /tmp/hook-out.json
 ```
 
-Required lifecycle:
+Governed lifecycle:
 
 `understand -> plan -> discuss -> approve -> implement -> verify -> independent code review -> ship`
 
@@ -73,13 +73,13 @@ make orca-panel PANEL_INPUT="path/to/lifecycle-input.json"
 make orca-panel-open PANEL_INPUT="path/to/lifecycle-input.json"
 ```
 
-Standard Claude automation config is now committed in:
+Claude validation configuration is committed in:
 
-- `.claude/settings.json` (hooks)
-- `.claude/hooks/` (hook commands)
+- `.claude/settings.json` (automatic completion hooks intentionally disabled)
+- `.claude/hooks/` (explicit validation commands)
 - `.claude/agents/` (subagents for UI/backend implementation and tests)
 
-Use `make validate-development-toolkit` to validate lifecycle gates, skill packaging, agent role contracts, Claude hook wiring, hook parity, and tracked-file enforcement together.
+Use `make validate-development-toolkit` to validate lifecycle gates, skill packaging, agent role contracts, non-blocking Claude settings, hook parity, and scoped validation together.
 
 ## References
 

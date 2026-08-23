@@ -6,11 +6,22 @@ import subprocess
 import sys
 from pathlib import Path
 
-from hook_state import read_tracked_files
-
-
 def _run(cmd: list[str], cwd: str | None = None) -> tuple[int, str]:
-    out = subprocess.run(cmd, cwd=cwd, check=False, capture_output=True, text=True)
+    timeout_seconds = int(os.environ.get("AGENT_TEST_TIMEOUT_SECONDS", "300"))
+    try:
+        out = subprocess.run(
+            cmd,
+            cwd=cwd,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout.decode(errors="replace") if isinstance(exc.stdout, bytes) else (exc.stdout or "")
+        stderr = exc.stderr.decode(errors="replace") if isinstance(exc.stderr, bytes) else (exc.stderr or "")
+        output = stdout + stderr
+        return 124, f"Timed out after {timeout_seconds}s\n{output}"
     text = (out.stdout or "") + (out.stderr or "")
     return out.returncode, text
 
@@ -79,7 +90,7 @@ def _paths_from_env(repo_root: str) -> list[str]:
 
 
 def _changed_files(stdin_raw: str) -> list[str]:
-    """Resolve explicitly scoped files, then session-scoped edit records.
+    """Resolve only explicitly scoped files.
 
     Never fall back to repository-wide git diff because the worktree may contain
     unrelated user or agent changes.
@@ -93,7 +104,7 @@ def _changed_files(stdin_raw: str) -> list[str]:
     payload_files = _paths_from_stdin_payload(stdin_raw, repo_root)
     if payload_files:
         return payload_files
-    return read_tracked_files(stdin_raw, repo_root)
+    return []
 
 
 def _backend_dirs(changed: list[str]) -> list[str]:

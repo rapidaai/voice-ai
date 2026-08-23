@@ -496,7 +496,11 @@ func StringToAny(value string) (*anypb.Any, error) {
 }
 
 func ToIntAny(value int) *anypb.Any {
-	v, _ := Int32ToAny(int32(value))
+	converted, err := IntToInt32(value)
+	if err != nil {
+		return nil
+	}
+	v, _ := Int32ToAny(converted)
 	return v
 }
 
@@ -548,7 +552,11 @@ func InterfaceToAnyValue(v interface{}) (*anypb.Any, error) {
 	case float64:
 		return Float64ToAny(val)
 	case int:
-		return Int32ToAny(int32(val))
+		converted, err := IntToInt32(val)
+		if err != nil {
+			return nil, err
+		}
+		return Int32ToAny(converted)
 	case int32:
 		return Int32ToAny(val)
 	case int64:

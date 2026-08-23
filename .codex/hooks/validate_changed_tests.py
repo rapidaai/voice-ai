@@ -6,9 +6,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-from hook_state import read_tracked_files
-
-
 def _run(cmd: list[str]) -> str:
     out = subprocess.run(cmd, check=False, capture_output=True, text=True)
     return out.stdout.strip()
@@ -77,7 +74,7 @@ def _paths_from_env(repo_root: str) -> list[str]:
 
 
 def _changed_files(stdin_raw: str) -> list[str]:
-    """Resolve explicitly scoped files, then session-scoped edit records.
+    """Resolve only explicitly scoped files.
 
     Never fall back to repository-wide git diff because the worktree may contain
     unrelated user or agent changes.
@@ -91,7 +88,7 @@ def _changed_files(stdin_raw: str) -> list[str]:
     payload_files = _paths_from_stdin_payload(stdin_raw, repo_root)
     if payload_files:
         return payload_files
-    return read_tracked_files(stdin_raw, repo_root)
+    return []
 
 
 def _is_ui_code(path: str) -> bool:
@@ -133,9 +130,14 @@ def main() -> int:
         errors.append(
             "UI code changed but no UI unit test changed. Add/update tests under ui/src with .test/.spec naming."
         )
-    if backend_code_changed and not backend_tests_changed:
+    backend_test_dirs = {str(Path(path).parent) for path in backend_tests_changed}
+    missing_backend_test_dirs = sorted(
+        {str(Path(path).parent) for path in backend_code_changed} - backend_test_dirs
+    )
+    if missing_backend_test_dirs:
         errors.append(
-            "Backend Go code changed but no *_test.go changed. Add/update backend unit tests in corresponding package."
+            "Backend Go code changed without a *_test.go change in: "
+            + ", ".join(missing_backend_test_dirs)
         )
 
     result = {
@@ -144,6 +146,7 @@ def main() -> int:
         "ui_tests_changed": ui_tests_changed,
         "backend_code_changed": backend_code_changed,
         "backend_tests_changed": backend_tests_changed,
+        "missing_backend_test_dirs": missing_backend_test_dirs,
         "errors": errors,
     }
     print(json.dumps(result, indent=2))

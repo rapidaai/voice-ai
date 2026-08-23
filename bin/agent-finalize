@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+agent_root="${AGENT_ROOT:-.codex}"
+changed_files="${CHANGED_FILES:-}"
+
+if [[ "$agent_root" != ".codex" && "$agent_root" != ".claude" ]]; then
+  echo "AGENT_ROOT must be .codex or .claude." >&2
+  exit 2
+fi
+
+if [[ -z "$changed_files" ]]; then
+  echo "Usage: make agent-finalize CHANGED_FILES='path/a.go,path/a_test.go' [AGENT_ROOT=.codex]" >&2
+  exit 2
+fi
+
+HOOK_CHANGED_FILES="$changed_files" \
+python3 "$agent_root/hooks/validate_changed_tests.py" </dev/null
+
+HOOK_CHANGED_FILES="$changed_files" \
+python3 "$agent_root/hooks/run_required_tests.py" </dev/null

@@ -153,7 +153,7 @@ case "$cmd" in
   lint)
     ensure_go_cache
     ensure_golangci_lint_cache
-    CGO_ENABLED=0 golangci-lint run --timeout=5m --build-tags=nocgo "${GO_CI_PACKAGES[@]}"
+    CGO_ENABLED=0 golangci-lint run --allow-serial-runners --timeout=5m --build-tags=nocgo "${GO_CI_PACKAGES[@]}"
     ;;
 
   vet)
@@ -185,7 +185,7 @@ case "$cmd" in
       exit 0
     fi
 
-    CGO_ENABLED=0 golangci-lint run --timeout=5m --build-tags=nocgo --enable-only gosec "${packages[@]}"
+    CGO_ENABLED=0 golangci-lint run --allow-serial-runners --timeout=5m --build-tags=nocgo --enable-only gosec "${packages[@]}"
     ;;
 
   build)

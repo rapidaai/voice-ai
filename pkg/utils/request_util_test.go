@@ -41,6 +41,13 @@ func TestErrorWithCode(t *testing.T) {
 	}
 }
 
+func TestJustErrorHandlesNegativeCode(t *testing.T) {
+	result := JustError(-1, errors.New("test"), "message")
+	if result.GetErrorCode() != 0 {
+		t.Fatalf("expected error code 0, got %d", result.GetErrorCode())
+	}
+}
+
 func TestPaginatedSuccess(t *testing.T) {
 	data := map[string]string{"key": "value"}
 	result, err := PaginatedSuccess[map[string]interface{}, map[string]string](100, 1, data)

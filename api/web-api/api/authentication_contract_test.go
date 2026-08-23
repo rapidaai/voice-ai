@@ -30,7 +30,7 @@ func TestWebRPCAuthenticationContract(t *testing.T) {
 		t.Fatal("resolve test path")
 	}
 	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(testFile), "../../.."))
-	data, err := os.ReadFile(filepath.Join(repositoryRoot, "rfcs/0001-phase-1e-auth-policy-matrix.json"))
+	data, err := os.ReadFile(filepath.Join(repositoryRoot, "rfcs/0001-actor-aware-audit-identity/jsons/phase-1e-auth-policy-matrix.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

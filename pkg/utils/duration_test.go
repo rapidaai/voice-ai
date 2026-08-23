@@ -6,6 +6,7 @@
 package utils
 
 import (
+	"math"
 	"testing"
 	"time"
 )
@@ -21,6 +22,7 @@ func TestGetDuration(t *testing.T) {
 		{name: "zero string", in: "0", want: durationPtr(0)},
 		{name: "float seconds", in: float64(2), want: durationPtr(2 * time.Second)},
 		{name: "int seconds", in: 3, want: durationPtr(3 * time.Second)},
+		{name: "uint64 overflow", in: uint64(math.MaxInt64), want: nil},
 		{name: "blank string", in: " ", want: nil},
 		{name: "invalid string", in: "bad", want: nil},
 		{name: "unsupported", in: true, want: nil},

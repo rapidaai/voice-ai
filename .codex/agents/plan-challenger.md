@@ -27,3 +27,4 @@ from the exact accepted RFC bytes reviewed. `revise` and `block` must not emit a
 approval receipt.
 
 You may not approve a plan or RFC you authored. Record reasons and required revisions explicitly. Any RFC byte change invalidates the decision and requires another challenge.
+After two unsuccessful revision rounds, return `block` with the unresolved decisions instead of requesting another revision.

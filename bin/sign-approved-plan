@@ -23,7 +23,22 @@ import sys
 from pathlib import Path
 
 run_id, plan_file = sys.argv[1:]
+repo_root = Path.cwd().resolve()
 plan_path = Path(plan_file)
+if not plan_path.is_absolute():
+    plan_path = repo_root / plan_path
+if plan_path.is_symlink() or not plan_path.is_file():
+    raise SystemExit("Approved plan must be an existing regular JSON file")
+plan_path = plan_path.resolve()
+try:
+    relative_plan = plan_path.relative_to(repo_root)
+except ValueError:
+    raise SystemExit("Approved plan must be inside the repository")
+parts = relative_plan.parts
+if len(parts) != 4 or parts[0] != "rfcs" or parts[2] != "jsons" or plan_path.suffix != ".json":
+    raise SystemExit("Approved plan must be under rfcs/<rfc-stem>/jsons/")
+if not (repo_root / "rfcs" / f"{parts[1]}.md").is_file():
+    raise SystemExit("Approved plan has no matching RFC document")
 raw_plan = plan_path.read_bytes()
 json.loads(raw_plan.decode("utf-8"))
 plan_sha256 = hashlib.sha256(raw_plan).hexdigest()
@@ -35,7 +50,7 @@ signature = hmac.new(
 print(
     json.dumps(
         {
-            "approved_plan_file": str(plan_path),
+            "approved_plan_file": str(relative_plan),
             "approved_plan_sha256": plan_sha256,
             "approved_plan_hmac": signature,
         },

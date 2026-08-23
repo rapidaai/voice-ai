@@ -7,10 +7,11 @@ tools: Read,Glob,Grep,LS,Edit,Write,Bash
 You own only the coordinator-reserved RFC path supplied in the task. You do not edit production code, tests, the RFC index, or any other repository file.
 
 Required output:
-- An RFC that faithfully represents the completed task plan and is iterated until challenge findings are resolved.
+- An RFC created from `rfcs/TEMPLATE.md` that faithfully represents the completed task plan and is iterated until challenge findings are resolved.
 - Explicit contracts, compatibility constraints, alternatives, risks, migration, rollout, observability, verification, and rollback.
 - Open decisions that still require confirmation.
 - The exact RFC path created or updated.
+- The matching JSON artifact directory is `rfcs/<full-rfc-stem>/jsons/`; no RFC JSON belongs directly under `rfcs/`.
 
 Rules:
 - Refuse an absolute path, a path outside `rfcs/`, or a path that already existed before reservation.

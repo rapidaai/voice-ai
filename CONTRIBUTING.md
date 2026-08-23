@@ -96,7 +96,7 @@ Install the repository hooks once after cloning:
 
 The pre-commit hook checks merge-conflict markers, private keys, common secret tokens, JSON syntax, shell syntax, Go formatting, and `go mod tidy`.
 
-The pre-push hook runs CI-safe Go gates that currently pass in this repository: `go vet` and Linux builds for `web-api`, `integration-api`, and `endpoint-api`. The stricter `golangci-lint`, import-order formatter, and full Go test hooks are available as manual checks while the existing lint/test baseline is cleaned up. The `assistant-api` package is intentionally excluded from these local pre-push checks because it needs external CGO libraries; Docker/CI validation covers that surface.
+The pre-push hook runs CI-safe Go gates that currently pass in this repository: `go vet` and Linux builds for `web-api`, `integration-api`, and `endpoint-api`. The stricter `golangci-lint`, import-order formatter, and full Go test hooks are available as manual checks while the existing lint/test baseline is cleaned up. Concurrent lint and security hook invocations wait for the active lint process instead of failing on its cache lock. The `assistant-api` package is intentionally excluded from these local pre-push checks because it needs external CGO libraries; Docker/CI validation covers that surface.
 
 Useful manual commands:
 

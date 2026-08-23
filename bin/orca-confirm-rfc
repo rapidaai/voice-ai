@@ -92,6 +92,29 @@ def load_rfc(repo_root: Path, relative_path: str) -> tuple[Path, bytes, str]:
     return resolved, raw, hashlib.sha256(raw).hexdigest()
 
 
+def artifact_directory(repo_root: Path, rfc_file: str) -> Path:
+    root = repo_root.resolve()
+    rfc_support_directory = root / Path(rfc_file).with_suffix("")
+    json_directory = rfc_support_directory / "jsons"
+    if rfc_support_directory.is_symlink() or json_directory.is_symlink():
+        fail("RFC artifact directory must not be a symlink")
+    return json_directory.resolve()
+
+
+def artifact_path(repo_root: Path, rfc_file: str, value: str, label: str) -> Path:
+    candidate = Path(value)
+    if not candidate.is_absolute():
+        candidate = repo_root.resolve() / candidate
+    if candidate.is_symlink():
+        fail(f"{label} must not be a symlink")
+    resolved = candidate.resolve()
+    expected_directory = artifact_directory(repo_root, rfc_file)
+    if resolved.parent != expected_directory or resolved.suffix != ".json":
+        relative_directory = expected_directory.relative_to(repo_root.resolve())
+        fail(f"{label} must be a JSON file directly under {relative_directory}")
+    return resolved
+
+
 def confirmation_question(rfc_path: str, digest: str, challenge_task: str, challenge_receipt_sha256: str) -> str:
     return (
         f"Approve implementation of RFC {rfc_path} with SHA-256 {digest} after approved "
@@ -99,8 +122,15 @@ def confirmation_question(rfc_path: str, digest: str, challenge_task: str, chall
     )
 
 
-def load_challenge_receipt(path: str, run_id: str, challenge_task: str, rfc_file: str, digest: str) -> tuple[dict, str]:
-    receipt_path = Path(path)
+def load_challenge_receipt(
+    repo_root: Path,
+    path: str,
+    run_id: str,
+    challenge_task: str,
+    rfc_file: str,
+    digest: str,
+) -> tuple[dict, str]:
+    receipt_path = artifact_path(repo_root, rfc_file, path, "Challenge receipt")
     if receipt_path.is_symlink() or not receipt_path.is_file():
         fail("Challenge receipt must be an existing regular JSON file")
     raw = receipt_path.read_bytes()
@@ -151,9 +181,10 @@ def parse_timestamp(value: object, field: str) -> str:
 
 
 def create(args: argparse.Namespace) -> None:
-    _, _, digest = load_rfc(Path(args.repo_root), args.rfc)
+    repo_root = Path(args.repo_root)
+    _, _, digest = load_rfc(repo_root, args.rfc)
     _, challenge_receipt_sha256 = load_challenge_receipt(
-        args.challenge_receipt, args.run, args.challenge_task, args.rfc, digest
+        repo_root, args.challenge_receipt, args.run, args.challenge_task, args.rfc, digest
     )
     question = confirmation_question(args.rfc, digest, args.challenge_task, challenge_receipt_sha256)
     task_payload = run_orca(
@@ -218,9 +249,10 @@ def create(args: argparse.Namespace) -> None:
 
 
 def collect(args: argparse.Namespace) -> None:
-    _, _, digest = load_rfc(Path(args.repo_root), args.rfc)
+    repo_root = Path(args.repo_root)
+    _, _, digest = load_rfc(repo_root, args.rfc)
     challenge_receipt, challenge_receipt_sha256 = load_challenge_receipt(
-        args.challenge_receipt, args.run, args.challenge_task, args.rfc, digest
+        repo_root, args.challenge_receipt, args.run, args.challenge_task, args.rfc, digest
     )
     expected_question = confirmation_question(
         args.rfc, digest, args.challenge_task, challenge_receipt_sha256
@@ -264,12 +296,19 @@ def collect(args: argparse.Namespace) -> None:
         "rfc_file": args.rfc,
     }
     rendered = json.dumps(receipt, indent=2, sort_keys=True) + "\n"
-    if args.output:
-        output = Path(args.output)
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(rendered, encoding="utf-8")
+    output_value = args.output or str(Path(args.rfc).with_suffix("") / "jsons" / "confirmation.json")
+    output = artifact_path(repo_root, args.rfc, output_value, "Confirmation receipt")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    if output.exists():
+        existing = output.read_text(encoding="utf-8")
+        if existing != rendered:
+            fail(
+                "Confirmation receipt already exists with different content; "
+                "use a new amendment-specific JSON filename"
+            )
     else:
-        print(rendered, end="")
+        output.write_text(rendered, encoding="utf-8")
+    print(output.relative_to(repo_root.resolve()))
 
 
 def parser() -> argparse.ArgumentParser:

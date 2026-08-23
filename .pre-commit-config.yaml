@@ -104,6 +104,7 @@ repos:
         name: Scan changed Go packages for security issues
         entry: bash bin/pre-commit-go security
         language: system
+        require_serial: true
         files: \.go$
         exclude: ^(protos/|sdks/|vendor/)
         pass_filenames: true

@@ -27,14 +27,16 @@ func AuthenticateError[R any]() (*R, error) {
 }
 
 func JustError(code int32, err error, humanMessage string) *web_api.Error {
+	errorCode, _ := IntToUint64(int(code))
 	return &web_api.Error{
-		ErrorCode:    uint64(code),
+		ErrorCode:    errorCode,
 		ErrorMessage: err.Error(),
 		HumanMessage: humanMessage,
 	}
 }
 
 func ErrorWithCode[R any](code int32, err error, humanMessage string) (*R, error) {
+	errorCode, _ := IntToUint64(int(code))
 	data := struct {
 		Code    int32
 		Success bool
@@ -43,7 +45,7 @@ func ErrorWithCode[R any](code int32, err error, humanMessage string) (*R, error
 		Code:    code,
 		Success: false,
 		Error: &web_api.Error{
-			ErrorCode:    uint64(code),
+			ErrorCode:    errorCode,
 			ErrorMessage: err.Error(),
 			HumanMessage: humanMessage,
 		}}

@@ -106,6 +106,7 @@ func TestOption_GetUint32(t *testing.T) {
 	m := Option{
 		"uint32":  uint32(42),
 		"uint64":  uint64(43),
+		"uint":    uint(46),
 		"float64": 44.0,
 		"string":  "45",
 	}
@@ -118,6 +119,7 @@ func TestOption_GetUint32(t *testing.T) {
 	}{
 		{"uint32", "uint32", 42, false},
 		{"uint64", "uint64", 43, false},
+		{"uint", "uint", 46, false},
 		{"float64", "float64", 44, false},
 		{"string", "string", 45, false},
 		{"not found", "missing", 0, true},

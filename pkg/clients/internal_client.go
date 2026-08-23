@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -135,9 +134,9 @@ func (ic *internalClient) createServiceScopeToken(auth *types.Authentication) (s
 	if ic.cfg == nil || strings.TrimSpace(ic.cfg.Name) == "" {
 		return "", errors.New("service name is required for internal authentication")
 	}
-	serviceActorID, err := strconv.ParseUint(strings.TrimSpace(os.Getenv("RAPIDA_SERVICE_ACTOR_ID")), 10, 64)
+	serviceActorID, err := utils.IntToUint64(ic.cfg.Port)
 	if err != nil {
-		return "", errors.New("RAPIDA_SERVICE_ACTOR_ID must contain a positive bigint service identity")
+		return "", errors.New("service ID must contain a positive bigint service identity")
 	}
 	if strings.TrimSpace(ic.cfg.Secret) == "" {
 		return "", errors.New("service secret is required for internal authentication")

@@ -39,7 +39,7 @@ func IntToString(v uint64) string {
 }
 
 func DurationToString(v time.Duration) string {
-	return IntToString(uint64(v))
+	return Int64ToString(int64(v))
 }
 
 func ToJson(obj interface{}) map[string]interface{} {

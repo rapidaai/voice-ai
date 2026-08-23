@@ -1,3 +1,3 @@
 display_name: VAD Integration
 short_description: Provider-scoped VAD integration with strict separation from EOS internals.
-default_prompt: Use the vad-integration skill from a coordinator-attested approved plan. Respect assigned ownership, keep EOS internals untouched, preserve frame, interruption, cleanup, and benchmark contracts, run every declared command plus strict validation with --provider, and return evidence for independent code review; do not self-approve.
+default_prompt: Use the vad-integration skill under the Fast, Standard, or Governed tier selected from DEVELOPMENT_PROCESS.md. Respect assigned ownership, keep EOS internals untouched, preserve frame, interruption, cleanup, and benchmark contracts, run focused validation, require coordinator attestation only for Governed work, and do not self-approve.

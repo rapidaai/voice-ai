@@ -6,6 +6,8 @@
 package utils
 
 import (
+	"math"
+	"strconv"
 	"testing"
 
 	"google.golang.org/protobuf/types/known/anypb"
@@ -93,6 +95,19 @@ func TestToIntAny(t *testing.T) {
 	}
 	if result != 42 {
 		t.Errorf("expected 42, got %v", result)
+	}
+}
+
+func TestIntAnyRejectsInt32Overflow(t *testing.T) {
+	if strconv.IntSize < 64 {
+		t.Skip("int32 overflow value requires a 64-bit int")
+	}
+	value := int64(math.MaxInt32) + 1
+	if anyValue := ToIntAny(int(value)); anyValue != nil {
+		t.Fatal("expected nil for int32 overflow")
+	}
+	if _, err := InterfaceToAnyValue(int(value)); err == nil {
+		t.Fatal("expected error for int32 overflow")
 	}
 }
 

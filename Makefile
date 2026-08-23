@@ -14,7 +14,7 @@
         push-rapida-golang-bookworm push-rapida-golang-alpine push-rapida-alpine \
         push-rapida-debian-slim push-rapida-node-alpine push-rapida-python \
         test-tts-integration test-stt-integration test-transformer-integration \
-        validate-development-process validate-agent-tooling validate-development-toolkit sign-approved-plan orca-development-run orca-confirm-rfc-create orca-confirm-rfc-collect orca-panel orca-panel-open doctor
+        validate-development-process validate-agent-tooling validate-rfc-layout validate-development-toolkit agent-finalize sign-approved-plan orca-development-run orca-rfc-release orca-confirm-rfc-create orca-confirm-rfc-collect orca-panel orca-panel-open doctor
 
 COMPOSE           := DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose -f docker-compose.yml
 COMPOSE_KNOWLEDGE := DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose -f docker-compose.yml -f docker-compose.knowledge.yml
@@ -785,22 +785,33 @@ validate-development-process:
 validate-agent-tooling:
 	@bash bin/validate-agent-tooling
 
-validate-development-toolkit: validate-development-process validate-agent-tooling
+validate-rfc-layout:
+	@python3 bin/validate-rfc-layout
+
+validate-development-toolkit: validate-development-process validate-agent-tooling validate-rfc-layout
+
+agent-finalize:
+	@test -n "$(CHANGED_FILES)" || (echo "Usage: make agent-finalize CHANGED_FILES='path/a.go,path/a_test.go' [AGENT_ROOT=.codex]" && exit 2)
+	@AGENT_ROOT="$(or $(AGENT_ROOT),.codex)" CHANGED_FILES="$(CHANGED_FILES)" bash bin/agent-finalize
 
 sign-approved-plan:
-	@test -n "$(RUN_ID)" -a -n "$(PLAN)" || (echo "Usage: DEVELOPMENT_GATE_KEY=... make sign-approved-plan RUN_ID='<orca-run-id>' PLAN='<approved-plan.json>'" && exit 2)
+	@test -n "$(RUN_ID)" -a -n "$(PLAN)" || (echo "Usage: DEVELOPMENT_GATE_KEY=... make sign-approved-plan RUN_ID='<orca-run-id>' PLAN='rfcs/NNNN-name/jsons/plan.json'" && exit 2)
 	@bash bin/sign-approved-plan "$(RUN_ID)" "$(PLAN)"
 
 orca-development-run:
 	@test -n "$(OBJECTIVE)" -a -n "$(RFC)" || (echo "Usage: make orca-development-run OBJECTIVE='task objective' RFC='rfcs/NNNN-name.md' [AGENT=codex]" && exit 2)
 	@bash bin/orca-development-run "$(OBJECTIVE)" "$(or $(AGENT),codex)" "$(RFC)"
 
+orca-rfc-release:
+	@test -n "$(RFC)" || (echo "Usage: make orca-rfc-release RFC='rfcs/NNNN-name.md'" && exit 2)
+	@bash bin/orca-rfc-release "$(RFC)"
+
 orca-confirm-rfc-create:
-	@test -n "$(RUN_ID)" -a -n "$(CHALLENGE_TASK_ID)" -a -n "$(CHALLENGE_RECEIPT)" -a -n "$(RFC)" || (echo "Usage: make orca-confirm-rfc-create RUN_ID=... CHALLENGE_TASK_ID=... CHALLENGE_RECEIPT=... RFC=rfcs/NNNN-name.md" && exit 2)
+	@test -n "$(RUN_ID)" -a -n "$(CHALLENGE_TASK_ID)" -a -n "$(CHALLENGE_RECEIPT)" -a -n "$(RFC)" || (echo "Usage: make orca-confirm-rfc-create RUN_ID=... CHALLENGE_TASK_ID=... CHALLENGE_RECEIPT=rfcs/NNNN-name/jsons/challenge.json RFC=rfcs/NNNN-name.md" && exit 2)
 	@python3 bin/orca-confirm-rfc create --run "$(RUN_ID)" --challenge-task "$(CHALLENGE_TASK_ID)" --challenge-receipt "$(CHALLENGE_RECEIPT)" --rfc "$(RFC)"
 
 orca-confirm-rfc-collect:
-	@test -n "$(RUN_ID)" -a -n "$(TASK_ID)" -a -n "$(CHALLENGE_TASK_ID)" -a -n "$(CHALLENGE_RECEIPT)" -a -n "$(GATE_ID)" -a -n "$(RFC)" || (echo "Usage: make orca-confirm-rfc-collect RUN_ID=... TASK_ID=... CHALLENGE_TASK_ID=... CHALLENGE_RECEIPT=... GATE_ID=... RFC=rfcs/NNNN-name.md [RECEIPT=...]" && exit 2)
+	@test -n "$(RUN_ID)" -a -n "$(TASK_ID)" -a -n "$(CHALLENGE_TASK_ID)" -a -n "$(CHALLENGE_RECEIPT)" -a -n "$(GATE_ID)" -a -n "$(RFC)" || (echo "Usage: make orca-confirm-rfc-collect RUN_ID=... TASK_ID=... CHALLENGE_TASK_ID=... CHALLENGE_RECEIPT=rfcs/NNNN-name/jsons/challenge.json GATE_ID=... RFC=rfcs/NNNN-name.md [RECEIPT=rfcs/NNNN-name/jsons/confirmation.json]" && exit 2)
 	@python3 bin/orca-confirm-rfc collect --run "$(RUN_ID)" --task "$(TASK_ID)" --challenge-task "$(CHALLENGE_TASK_ID)" --challenge-receipt "$(CHALLENGE_RECEIPT)" --gate "$(GATE_ID)" --rfc "$(RFC)" $(if $(RECEIPT),--output "$(RECEIPT)",)
 
 orca-panel:

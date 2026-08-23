@@ -164,8 +164,16 @@ func (wVault *webVaultGRPCApi) GetAllOrganizationCredential(c context.Context, i
 	for _, c := range out {
 		c.Value = nil
 	}
+	totalItem, err := utils.Int64ToUint32(cnt)
+	if err != nil {
+		wVault.logger.Errorf("invalid provider credential count %d: %v", cnt, err)
+		return utils.Error[protos.GetAllOrganizationCredentialResponse](
+			err,
+			"Unable to get provider credentials, please try again",
+		)
+	}
 	return utils.PaginatedSuccess[protos.GetAllOrganizationCredentialResponse, []*protos.VaultCredential](
-		uint32(cnt),
+		totalItem,
 		irRequest.GetPaginate().GetPage(),
 		out)
 }

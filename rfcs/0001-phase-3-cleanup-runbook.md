@@ -14,7 +14,7 @@
 ## Operational Limits
 
 - Set `lock_timeout` to five seconds for every migration session.
-- Record per-table row counts, production-sized rehearsal duration, approved maximum duration, backup identity, and rollback owner in `rfcs/0003-simplify-audit-backfill.operational-readiness.json`.
+- Record per-table row counts, production-sized rehearsal duration, approved maximum duration, backup identity, and rollback owner in `rfcs/0003-simplify-audit-backfill/jsons/operational-readiness.json`.
 - Keep writes fenced for the direct backfill and do not deploy while the operational-readiness receipt is pending.
 - Abort on lock timeout, replica lag above the deployment threshold, unexpected WAL growth, disk pressure, or any failed validation query.
 - Do not continue to the next database after any failed cleanup or verification step.
@@ -41,7 +41,7 @@
 
 ## Database Verification
 
-For every table listed in `rfcs/0001-phase-3-audit-contract-inventory.json`:
+For every table listed in `rfcs/0001-actor-aware-audit-identity/jsons/phase-3-audit-contract-inventory.json`:
 
 - `created_actor_type` is non-null and satisfies the actor-pair constraint.
 - `created_actor_id` equals the legacy user ID for Assistant, Endpoint, and Web history, and is null only for Integration's unattributable `unknown` history.

@@ -520,7 +520,7 @@ version is supported only until the announced Phase 3 maintenance boundary.
 - Identify the owning service, table, response message, and current audit behavior.
 - Add golden compatibility tests before changing contracts.
 
-The accepted inventory is `rfcs/0001-phase-3-audit-contract-inventory.json`. It records
+The accepted inventory is `rfcs/0001-actor-aware-audit-identity/jsons/phase-3-audit-contract-inventory.json`. It records
 83 administrative public mutation edges, six Assistant runtime persistence handlers, one
 Integration lifecycle persistence handler, their canonical
 writers and derived writes, the 64 actor-audited tables, six canonical protobuf sources, five

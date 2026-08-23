@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+import json
+import sys
+from pathlib import Path
+
+
+REQUIRED_TEMPLATE_HEADINGS = (
+    "## Summary",
+    "## Context",
+    "## Goals",
+    "## Non-Goals",
+    "## Scope and Ownership",
+    "## Proposed Design",
+    "## Contracts and Compatibility",
+    "## Failure and Recovery",
+    "## Security and Privacy",
+    "## Observability",
+    "## Data and Migration",
+    "## Rollout",
+    "## Rollback",
+    "## Alternatives Considered",
+    "## Testing and Verification",
+    "## Acceptance Criteria",
+    "## Open Questions",
+    "## Challenge Resolution",
+    "## Artifact Index",
+    "## Decision Log",
+)
+
+
+def main() -> int:
+    repository = Path(__file__).resolve().parent.parent
+    rfc_root = repository / "rfcs"
+    errors: list[str] = []
+
+    template = rfc_root / "TEMPLATE.md"
+    if not template.is_file():
+        errors.append("missing rfcs/TEMPLATE.md")
+    else:
+        text = template.read_text(encoding="utf-8")
+        for heading in REQUIRED_TEMPLATE_HEADINGS:
+            if heading not in text:
+                errors.append(f"RFC template is missing heading: {heading}")
+
+    for json_file in sorted(rfc_root.rglob("*.json")):
+        relative = json_file.relative_to(repository)
+        if json_file.is_symlink():
+            errors.append(f"RFC JSON must not be a symlink: {relative}")
+            continue
+        parts = relative.parts
+        if len(parts) != 4 or parts[0] != "rfcs" or parts[2] != "jsons":
+            errors.append(f"RFC JSON must match rfcs/<rfc-stem>/jsons/<name>.json: {relative}")
+            continue
+        rfc_file = rfc_root / f"{parts[1]}.md"
+        if not rfc_file.is_file():
+            errors.append(f"RFC JSON has no matching RFC document: {relative}")
+        try:
+            json.loads(json_file.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            errors.append(f"RFC JSON is invalid: {relative}: {exc}")
+
+    if errors:
+        print("RFC layout validation failed:", file=sys.stderr)
+        for error in errors:
+            print(f"- {error}", file=sys.stderr)
+        return 1
+
+    print("RFC layout validation passed")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -199,8 +199,12 @@ func (m Option) GetUint32(key string) (uint32, error) {
 			return 0, fmt.Errorf("uint64 value exceeds uint32 range for %q", key)
 		}
 		return uint32(t), nil
-	case uint16, uint8, uint:
-		return uint32(t.(uint)), nil
+	case uint16:
+		return uint32(t), nil
+	case uint8:
+		return uint32(t), nil
+	case uint:
+		return UintToUint32(t)
 	case int64, int32, int16, int8, int:
 		i := reflect.ValueOf(t).Int()
 		if i < 0 || i > math.MaxUint32 {

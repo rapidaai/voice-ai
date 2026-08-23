@@ -11,7 +11,7 @@
 
 ## Source and Contract Checks
 
-- `python3 -m json.tool rfcs/0001-phase-3-complete-bigint-actor-rollout.plan.json`: passed.
+- `python3 -m json.tool rfcs/0001-actor-aware-audit-identity/jsons/phase-3-complete-bigint-actor-rollout.plan.json`: passed.
 - Production-source scan for `created_by`, `updated_by`, `CreatedBy`, and `UpdatedBy`, excluding migrations, tests, and generated protobuf files: passed with zero matches.
 - Protobuf declaration scan for `createdBy`, `updatedBy`, `createdUser`, and `updatedUser`: passed with zero active declarations.
 - `go test ./protos/... -run TestAuditActorContract`: passed.
@@ -74,7 +74,7 @@ Independent reviewer Hume approved the complete JWT-only implementation diff on 
 
 Generated protobuf and SDK changes are committed in their nested repositories and recorded by the root Phase 3 commit.
 
-Deployment of the simplified direct backfill remains gated on the release-owner approval recorded in `rfcs/0003-simplify-audit-backfill.operational-readiness.json`.
+Deployment of the simplified direct backfill remains gated on the release-owner approval recorded in `rfcs/0003-simplify-audit-backfill/jsons/operational-readiness.json`.
 
 ## RFC 0003 Simplified Audit Backfill
 
