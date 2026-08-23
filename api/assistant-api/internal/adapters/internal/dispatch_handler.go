@@ -1151,6 +1151,8 @@ func (h requestorDispatchHandler) HandleError(ctx context.Context, p internal_ty
 						Source:               fmt.Sprintf("%v", h.r.source),
 						Reason:               protos.ConversationDisconnection_DISCONNECTION_TYPE_ERROR.String(),
 						Message:              p.ErrMessage(),
+						Status:               "error",
+						DisconnectReason:     protos.ConversationDisconnection_DISCONNECTION_TYPE_ERROR.String(),
 					},
 				},
 			},
@@ -3462,6 +3464,7 @@ func (h requestorDispatchHandler) HandleInitializationCompleted(ctx context.Cont
 		Source:               fmt.Sprintf("%v", h.r.source),
 		Identifier:           h.r.identifier(p.Config),
 		MessageCount:         fmt.Sprintf("%d", len(h.r.GetHistories())),
+		Status:               type_enums.CONVERSATION_IN_PROGRESS.String(),
 	}
 	if p.Config.GetAssistantConversationId() == 0 {
 		event = utils.ConversationBegin
@@ -3470,6 +3473,7 @@ func (h requestorDispatchHandler) HandleInitializationCompleted(ctx context.Cont
 			V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
 			Source:               fmt.Sprintf("%v", h.r.source),
 			Identifier:           h.r.identifier(p.Config),
+			Status:               type_enums.CONVERSATION_IN_PROGRESS.String(),
 		}
 	}
 	h.r.OnPacket(ctx, internal_type.ObservabilityEventRecordPacket{
@@ -3777,6 +3781,7 @@ func (h requestorDispatchHandler) HandleFinalizeConversation(ctx context.Context
 			Description: "Status of current conversation",
 		}
 	}
+	conversationStatus := h.r.metrics[type_enums.CONVERSATION_STATUS.String()].GetValue()
 	assistant, assistantErr := h.r.Assistant()
 	conversation, conversationErr := h.r.Conversation()
 	if h.r.observabilityRecorder != nil && assistantErr == nil && conversationErr == nil {
@@ -3795,6 +3800,7 @@ func (h requestorDispatchHandler) HandleFinalizeConversation(ctx context.Context
 		for key, value := range h.r.metadata {
 			metadataPayload[key] = value
 		}
+		disconnectReason, _ := metadataPayload[observability.MetadataDisconnectReason].(string)
 		metricsPayload := make([]map[string]interface{}, 0, len(h.r.metrics))
 		for _, metric := range h.r.metrics {
 			if metric == nil {
@@ -3820,7 +3826,8 @@ func (h requestorDispatchHandler) HandleFinalizeConversation(ctx context.Context
 					V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
 					Source:               fmt.Sprintf("%v", h.r.source),
 					Reason:               "conversation_completed",
-					Status:               "completed",
+					Status:               conversationStatus,
+					DisconnectReason:     disconnectReason,
 					Messages:             messagesPayload,
 					Metadata:             metadataPayload,
 					Metrics:              metricsPayload,

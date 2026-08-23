@@ -80,6 +80,7 @@ func (d *Dispatcher) runInboundCall(ctx context.Context, v CallReceivedPipeline)
 				To:                   callInfo.CallerNumber,
 				From:                 callInfo.FromNumber,
 				Direction:            "inbound",
+				Status:               observability.MetricCallStatusInProgress,
 			},
 		})
 
@@ -107,6 +108,8 @@ func (d *Dispatcher) runInboundCall(ctx context.Context, v CallReceivedPipeline)
 					Direction:            "inbound",
 					Stage:                "assistant_load",
 					Error:                err.Error(),
+					Status:               observability.MetricCallStatusFailed,
+					DisconnectReason:     protos.ConversationDisconnection_DISCONNECTION_TYPE_ERROR.String(),
 				},
 			},
 			observability.RecordMetric{
@@ -151,6 +154,8 @@ func (d *Dispatcher) runInboundCall(ctx context.Context, v CallReceivedPipeline)
 					Direction:            "inbound",
 					Stage:                "conversation_create",
 					Error:                err.Error(),
+					Status:               observability.MetricCallStatusFailed,
+					DisconnectReason:     protos.ConversationDisconnection_DISCONNECTION_TYPE_ERROR.String(),
 				},
 			},
 			observability.RecordMetric{
@@ -205,6 +210,8 @@ func (d *Dispatcher) runInboundCall(ctx context.Context, v CallReceivedPipeline)
 					ContextID:            contextID,
 					Stage:                "call_context_save",
 					Error:                err.Error(),
+					Status:               observability.MetricCallStatusFailed,
+					DisconnectReason:     protos.ConversationDisconnection_DISCONNECTION_TYPE_ERROR.String(),
 				},
 			},
 			observability.RecordMetadata{
@@ -345,6 +352,8 @@ func (d *Dispatcher) runInboundCall(ctx context.Context, v CallReceivedPipeline)
 					ContextID:            contextID,
 					Stage:                "provider_answer",
 					Error:                err.Error(),
+					Status:               observability.MetricCallStatusFailed,
+					DisconnectReason:     protos.ConversationDisconnection_DISCONNECTION_TYPE_ERROR.String(),
 				},
 			},
 			observability.RecordMetadata{
@@ -384,6 +393,7 @@ func (d *Dispatcher) runInboundCall(ctx context.Context, v CallReceivedPipeline)
 				From:                 callInfo.FromNumber,
 				Direction:            "inbound",
 				ContextID:            contextID,
+				Status:               observability.MetricCallStatusInProgress,
 			},
 		})
 

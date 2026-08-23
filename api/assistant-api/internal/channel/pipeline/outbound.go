@@ -60,6 +60,8 @@ func (d *Dispatcher) runOutbound(ctx context.Context, v OutboundRequestedPipelin
 				Direction:            "outbound",
 				Stage:                "assistant_load",
 				Error:                err.Error(),
+				Status:               observability.MetricCallStatusFailed,
+				DisconnectReason:     protos.ConversationDisconnection_DISCONNECTION_TYPE_ERROR.String(),
 			},
 		}, observability.RecordMetric{
 			Metrics: observability.CallStatusMetric(observability.MetricCallStatusFailed, err.Error()),
@@ -87,6 +89,8 @@ func (d *Dispatcher) runOutbound(ctx context.Context, v OutboundRequestedPipelin
 					Direction:            "outbound",
 					Stage:                "phone_deployment",
 					Error:                "Please check phone deployment not enabled",
+					Status:               observability.MetricCallStatusFailed,
+					DisconnectReason:     protos.ConversationDisconnection_DISCONNECTION_TYPE_ERROR.String(),
 				},
 			},
 			observability.RecordMetric{
@@ -122,6 +126,8 @@ func (d *Dispatcher) runOutbound(ctx context.Context, v OutboundRequestedPipelin
 						Direction:            "outbound",
 						Stage:                "from_phone_resolve",
 						Error:                err.Error(),
+						Status:               observability.MetricCallStatusFailed,
+						DisconnectReason:     protos.ConversationDisconnection_DISCONNECTION_TYPE_ERROR.String(),
 					},
 				},
 				observability.RecordMetric{
@@ -156,6 +162,8 @@ func (d *Dispatcher) runOutbound(ctx context.Context, v OutboundRequestedPipelin
 					Direction:            "outbound",
 					Stage:                "conversation_create",
 					Error:                err.Error(),
+					Status:               observability.MetricCallStatusFailed,
+					DisconnectReason:     protos.ConversationDisconnection_DISCONNECTION_TYPE_ERROR.String(),
 				},
 			},
 			observability.RecordMetric{
@@ -241,6 +249,8 @@ func (d *Dispatcher) runOutbound(ctx context.Context, v OutboundRequestedPipelin
 					ContextID:            contextID,
 					Stage:                "call_context_save",
 					Error:                err.Error(),
+					Status:               observability.MetricCallStatusFailed,
+					DisconnectReason:     protos.ConversationDisconnection_DISCONNECTION_TYPE_ERROR.String(),
 				},
 			},
 			observability.RecordMetadata{
@@ -296,6 +306,7 @@ func (d *Dispatcher) runOutbound(ctx context.Context, v OutboundRequestedPipelin
 				From:                 fromPhone,
 				Direction:            "outbound",
 				ContextID:            contextID,
+				Status:               observability.MetricCallStatusInProgress,
 			},
 		})
 
@@ -337,6 +348,8 @@ func (d *Dispatcher) runOutbound(ctx context.Context, v OutboundRequestedPipelin
 					ContextID:            contextID,
 					Stage:                "provider_dispatch",
 					Error:                err.Error(),
+					Status:               observability.MetricCallStatusFailed,
+					DisconnectReason:     protos.ConversationDisconnection_DISCONNECTION_TYPE_ERROR.String(),
 				},
 			},
 			observability.RecordMetadata{
@@ -382,6 +395,7 @@ func (d *Dispatcher) runOutbound(ctx context.Context, v OutboundRequestedPipelin
 				Direction:   "outbound",
 				ContextID:   contextID,
 				StatusEvent: callInfo.StatusInfo.Event.String(),
+				Status:      observability.MetricCallStatusInProgress,
 			},
 		})
 
