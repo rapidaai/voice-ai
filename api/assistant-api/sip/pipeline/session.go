@@ -25,6 +25,12 @@ import (
 )
 
 func (d *Dispatcher) createConversation(ctx context.Context, stage sip_infra.SessionEstablishedPipeline) (uint64, error) {
+	if stage.Auth == nil {
+		return 0, types.ErrUnauthenticated
+	}
+	if _, err := stage.Auth.Actor(); err != nil {
+		return 0, err
+	}
 	dirEnum := type_enums.DIRECTION_INBOUND
 	if stage.Direction == sip_infra.CallDirectionOutbound {
 		dirEnum = type_enums.DIRECTION_OUTBOUND
