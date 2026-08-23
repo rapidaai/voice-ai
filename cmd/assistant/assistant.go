@@ -86,13 +86,10 @@ func main() {
 		grpc.ChainStreamInterceptor(
 			middlewares.NewRequestLoggerStreamServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryStreamServerMiddleware(appRunner.Logger),
-			middlewares.NewAuthenticationBoundaryStreamServerMiddleware(
-				userAuthenticator,
-				projectAuthenticator,
-				organizationAuthenticator,
-				serviceAuthenticator,
-				appRunner.Logger,
-			),
+			middlewares.NewAuthenticationStreamServerMiddleware(userAuthenticator, appRunner.Logger),
+			middlewares.NewProjectAuthenticatorStreamServerMiddleware(projectAuthenticator, appRunner.Logger),
+			middlewares.NewOrganizationAuthenticatorStreamServerMiddleware(organizationAuthenticator, appRunner.Logger),
+			middlewares.NewServiceAuthenticatorStreamServerMiddleware(serviceAuthenticator, appRunner.Logger),
 			middlewares.NewClientInformationStreamServerMiddleware(
 				appRunner.Logger,
 			),
@@ -100,13 +97,10 @@ func main() {
 		grpc.ChainUnaryInterceptor(
 			middlewares.NewRequestLoggerUnaryServerMiddleware(appRunner.Cfg.AppConfig.Name, appRunner.Logger),
 			middlewares.NewRecoveryUnaryServerMiddleware(appRunner.Logger),
-			middlewares.NewAuthenticationBoundaryUnaryServerMiddleware(
-				userAuthenticator,
-				projectAuthenticator,
-				organizationAuthenticator,
-				serviceAuthenticator,
-				appRunner.Logger,
-			),
+			middlewares.NewAuthenticationUnaryServerMiddleware(userAuthenticator, appRunner.Logger),
+			middlewares.NewProjectAuthenticatorUnaryServerMiddleware(projectAuthenticator, appRunner.Logger),
+			middlewares.NewOrganizationAuthenticatorUnaryServerMiddleware(organizationAuthenticator, appRunner.Logger),
+			middlewares.NewServiceAuthenticatorUnaryServerMiddleware(serviceAuthenticator, appRunner.Logger),
 			middlewares.NewClientInformationUnaryServerMiddleware(
 				appRunner.Logger,
 			),
@@ -348,13 +342,10 @@ func (g *AppRunner) RecoveryMiddleware() {
 
 func (g *AppRunner) AuthenticationMiddleware() {
 	authClient := web_client.NewAuthenticator(&g.Cfg.AppConfig, g.Logger, g.Redis)
-	g.E.Use(middlewares.NewAuthenticationBoundaryMiddleware(
-		authenticators.NewUserAuthenticator(&g.Cfg.AppConfig, g.Logger, authClient),
-		authenticators.NewProjectAuthenticator(&g.Cfg.AppConfig, g.Logger, authClient),
-		authenticators.NewOrganizationAuthenticator(&g.Cfg.AppConfig, g.Logger, authClient),
-		authenticators.NewServiceAuthenticator(&g.Cfg.AppConfig, g.Logger),
-		g.Logger,
-	))
+	g.E.Use(middlewares.NewAuthenticationMiddleware(authenticators.NewUserAuthenticator(&g.Cfg.AppConfig, g.Logger, authClient), g.Logger))
+	g.E.Use(middlewares.NewProjectAuthenticatorMiddleware(authenticators.NewProjectAuthenticator(&g.Cfg.AppConfig, g.Logger, authClient), g.Logger))
+	g.E.Use(middlewares.NewOrganizationAuthenticatorMiddleware(authenticators.NewOrganizationAuthenticator(&g.Cfg.AppConfig, g.Logger, authClient), g.Logger))
+	g.E.Use(middlewares.NewServiceAuthenticatorMiddleware(authenticators.NewServiceAuthenticator(&g.Cfg.AppConfig, g.Logger), g.Logger))
 }
 
 func (g *AppRunner) CorsMiddleware() {

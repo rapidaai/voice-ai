@@ -9,11 +9,21 @@ import (
 	"testing"
 )
 
-func TestGRPCUsesCoordinatingAuthenticationBoundary(t *testing.T) {
+func TestGRPCUsesExplicitAuthenticationMiddlewareOrder(t *testing.T) {
 	file := parseCommandSource(t, "integration.go")
 
-	assertOnlyAuthenticationBoundary(t, interceptorChain(t, file, "ChainUnaryInterceptor"), "NewAuthenticationBoundaryUnaryServerMiddleware")
-	assertOnlyAuthenticationBoundary(t, interceptorChain(t, file, "ChainStreamInterceptor"), "NewAuthenticationBoundaryStreamServerMiddleware")
+	assertAuthenticationMiddlewareOrder(t, interceptorChain(t, file, "ChainUnaryInterceptor"), []string{
+		"NewAuthenticationUnaryServerMiddleware",
+		"NewProjectAuthenticatorUnaryServerMiddleware",
+		"NewOrganizationAuthenticatorUnaryServerMiddleware",
+		"NewServiceAuthenticatorUnaryServerMiddleware",
+	})
+	assertAuthenticationMiddlewareOrder(t, interceptorChain(t, file, "ChainStreamInterceptor"), []string{
+		"NewAuthenticationStreamServerMiddleware",
+		"NewProjectAuthenticatorStreamServerMiddleware",
+		"NewOrganizationAuthenticatorStreamServerMiddleware",
+		"NewServiceAuthenticatorStreamServerMiddleware",
+	})
 }
 
 func parseCommandSource(t *testing.T, name string) *ast.File {
@@ -64,33 +74,25 @@ func callName(call *ast.CallExpr) string {
 	}
 }
 
-func assertOnlyAuthenticationBoundary(t *testing.T, chain []string, boundary string) {
+func assertAuthenticationMiddlewareOrder(t *testing.T, chain []string, expected []string) {
 	t.Helper()
-	if middlewareIndex(chain, boundary) < 0 {
-		t.Fatalf("%s not found in %v", boundary, chain)
-	}
-	legacy := []string{
-		"NewCredentialConflictUnaryServerMiddleware",
-		"NewCredentialConflictStreamServerMiddleware",
-		"NewServiceAuthenticatorUnaryServerMiddleware",
-		"NewServiceAuthenticatorStreamServerMiddleware",
-		"NewProjectAuthenticatorUnaryServerMiddleware",
-		"NewProjectAuthenticatorStreamServerMiddleware",
-		"NewAuthenticationUnaryServerMiddleware",
-		"NewAuthenticationStreamServerMiddleware",
-	}
-	for _, middleware := range legacy {
-		if middlewareIndex(chain, middleware) >= 0 {
-			t.Errorf("legacy middleware %s found in %v", middleware, chain)
+	actual := make([]string, 0, len(expected))
+	for _, middleware := range chain {
+		switch middleware {
+		case "NewAuthenticationUnaryServerMiddleware", "NewProjectAuthenticatorUnaryServerMiddleware", "NewOrganizationAuthenticatorUnaryServerMiddleware", "NewServiceAuthenticatorUnaryServerMiddleware",
+			"NewAuthenticationStreamServerMiddleware", "NewProjectAuthenticatorStreamServerMiddleware", "NewOrganizationAuthenticatorStreamServerMiddleware", "NewServiceAuthenticatorStreamServerMiddleware":
+			actual = append(actual, middleware)
+		case "NewAuthenticationBoundaryUnaryServerMiddleware", "NewAuthenticationBoundaryStreamServerMiddleware",
+			"NewCredentialConflictUnaryServerMiddleware", "NewCredentialConflictStreamServerMiddleware":
+			t.Fatalf("forbidden middleware %s found in %v", middleware, chain)
 		}
 	}
-}
-
-func middlewareIndex(chain []string, middleware string) int {
-	for index, candidate := range chain {
-		if candidate == middleware {
-			return index
+	if len(actual) != len(expected) {
+		t.Fatalf("authentication middleware = %v, want %v", actual, expected)
+	}
+	for index := range expected {
+		if actual[index] != expected[index] {
+			t.Fatalf("authentication middleware = %v, want %v", actual, expected)
 		}
 	}
-	return -1
 }

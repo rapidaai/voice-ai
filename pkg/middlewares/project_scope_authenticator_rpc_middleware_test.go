@@ -21,9 +21,10 @@ import (
 )
 
 type projectScopeClaimAuthenticatorStub struct {
-	lastToken string
-	callCount int
-	err       error
+	lastToken    string
+	callCount    int
+	err          error
+	credentialID uint64
 }
 
 func (s *projectScopeClaimAuthenticatorStub) Claim(
@@ -37,8 +38,13 @@ func (s *projectScopeClaimAuthenticatorStub) Claim(
 	}
 	projectID := uint64(1)
 	orgID := uint64(1)
+	credentialID := s.credentialID
+	if credentialID == 0 {
+		credentialID = 1
+	}
 	return &types.PlainClaimPrinciple[*types.ProjectScope]{
 		Info: &types.ProjectScope{
+			CredentialId:   &credentialID,
 			ProjectId:      &projectID,
 			OrganizationId: &orgID,
 			Status:         type_enums.RECORD_ACTIVE.String(),
@@ -53,8 +59,8 @@ func TestNewProjectAuthenticatorMiddleware_HeaderToken(t *testing.T) {
 	engine := gin.New()
 	engine.Use(NewProjectAuthenticatorMiddleware(resolver, nil))
 	engine.GET("/test", func(c *gin.Context) {
-		_, ok := c.Get(string(types.CTX_))
-		c.JSON(http.StatusOK, gin.H{"hasAuth": ok})
+		_, err := types.Authorize(c.Request.Context())
+		c.JSON(http.StatusOK, gin.H{"hasAuth": err == nil})
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
@@ -92,8 +98,8 @@ func TestNewProjectAuthenticatorMiddleware_QueryFallback(t *testing.T) {
 	engine := gin.New()
 	engine.Use(NewProjectAuthenticatorMiddleware(resolver, nil))
 	engine.GET("/test", func(c *gin.Context) {
-		_, ok := c.Get(string(types.CTX_))
-		c.JSON(http.StatusOK, gin.H{"hasAuth": ok})
+		_, err := types.Authorize(c.Request.Context())
+		c.JSON(http.StatusOK, gin.H{"hasAuth": err == nil})
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test?x-api-key=query-token", nil)
@@ -112,8 +118,8 @@ func TestNewProjectAuthenticatorMiddleware_HeaderPrecedenceOverQuery(t *testing.
 	engine := gin.New()
 	engine.Use(NewProjectAuthenticatorMiddleware(resolver, nil))
 	engine.GET("/test", func(c *gin.Context) {
-		_, ok := c.Get(string(types.CTX_))
-		c.JSON(http.StatusOK, gin.H{"hasAuth": ok})
+		_, err := types.Authorize(c.Request.Context())
+		c.JSON(http.StatusOK, gin.H{"hasAuth": err == nil})
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test?x-api-key=query-token", nil)
@@ -133,8 +139,8 @@ func TestNewProjectAuthenticatorMiddleware_BlankHeaderFallsBackToQuery(t *testin
 	engine := gin.New()
 	engine.Use(NewProjectAuthenticatorMiddleware(resolver, nil))
 	engine.GET("/test", func(c *gin.Context) {
-		_, ok := c.Get(string(types.CTX_))
-		c.JSON(http.StatusOK, gin.H{"hasAuth": ok})
+		_, err := types.Authorize(c.Request.Context())
+		c.JSON(http.StatusOK, gin.H{"hasAuth": err == nil})
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test?x-api-key=query-token", nil)
@@ -154,8 +160,8 @@ func TestNewProjectAuthenticatorMiddleware_NoToken(t *testing.T) {
 	engine := gin.New()
 	engine.Use(NewProjectAuthenticatorMiddleware(resolver, nil))
 	engine.GET("/test", func(c *gin.Context) {
-		_, ok := c.Get(string(types.CTX_))
-		c.JSON(http.StatusOK, gin.H{"hasAuth": ok})
+		_, err := types.Authorize(c.Request.Context())
+		c.JSON(http.StatusOK, gin.H{"hasAuth": err == nil})
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)

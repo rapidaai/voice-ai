@@ -12,57 +12,112 @@ import (
 	middleware "github.com/grpc-ecosystem/go-grpc-middleware/v2"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/metadata"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
 )
 
-// NewProjectAuthenticatorUnaryServerMiddleware authenticates only project credentials.
-// Deprecated: use NewAuthenticationBoundaryUnaryServerMiddleware.
+// NewProjectAuthenticatorUnaryServerMiddleware authenticates project credentials.
 func NewProjectAuthenticatorUnaryServerMiddleware(resolver types.ClaimAuthenticator[*types.ProjectScope], logger commons.Logger) grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		apiKey := metadata.ExtractIncoming(ctx).Get(types.PROJECT_SCOPE_KEY)
-		if strings.TrimSpace(apiKey) == "" {
+	return func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		apiKey := strings.TrimSpace(metadata.ExtractIncoming(ctx).Get(types.PROJECT_SCOPE_KEY))
+		if apiKey == "" {
 			return handler(ctx, req)
 		}
-		apiKey = strings.TrimPrefix(strings.TrimSpace(apiKey), types.PROJECT_KEY_PREFIX)
-		if apiKey == "" {
-			logAuthenticationFailure(logger, "project credential is empty")
-			return nil, grpcAuthenticationError()
+		if ctx.Value(types.CTX_) != nil {
+			if logger != nil {
+				logger.Errorf(authenticationConflictMessage)
+			}
+			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
 		}
-		auth, err := resolver.Claim(ctx, apiKey)
+		if resolver == nil {
+			if logger != nil {
+				logger.Errorf(projectAuthNotSupportedMessage)
+			}
+			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+		}
+		apiKey = strings.TrimPrefix(apiKey, types.PROJECT_KEY_PREFIX)
+		if apiKey == "" {
+			if logger != nil {
+				logger.Errorf(projectAuthEmptyMessage)
+			}
+			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+		}
+		principle, err := resolver.Claim(ctx, apiKey)
+		if err != nil || principle == nil || principle.Info == nil || !principle.Info.IsAuthenticated() {
+			if logger != nil {
+				logger.Errorf(projectAuthRejectedMessage)
+			}
+			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+		}
+		actor, err := types.ResolveAuditActor(principle.Info)
 		if err != nil {
-			logAuthenticationFailure(logger, "project credential was rejected")
-			return nil, grpcAuthenticationError()
+			if logger != nil {
+				logger.Errorf(projectAuthInvalidAuditActorMessage)
+			}
+			return nil, status.Error(codes.Unauthenticated, authenticationFailureMessage)
+		}
+		projectContext, _ := principle.Info.ProjectContext()
+		auth := &types.Authentication{
+			AuthType:          types.AuthTypeProject,
+			ActorValue:        &actor,
+			OrganizationValue: &types.OrganizationContext{OrganizationID: projectContext.OrganizationID},
+			ProjectValue:      &projectContext,
 		}
 		return handler(context.WithValue(ctx, types.CTX_, auth), req)
 	}
 }
 
-// NewProjectAuthenticatorStreamServerMiddleware authenticates only project credentials.
-// Deprecated: use NewAuthenticationBoundaryStreamServerMiddleware.
+// NewProjectAuthenticatorStreamServerMiddleware authenticates project credentials.
 func NewProjectAuthenticatorStreamServerMiddleware(resolver types.ClaimAuthenticator[*types.ProjectScope], logger commons.Logger) grpc.StreamServerInterceptor {
-	return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	return func(srv any, stream grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		ctx := stream.Context()
-		apiKey := metadata.ExtractIncoming(ctx).Get(types.PROJECT_SCOPE_KEY)
-		if strings.TrimSpace(apiKey) == "" {
-			wrapped := middleware.WrapServerStream(stream)
-			wrapped.WrappedContext = ctx
-			return handler(srv, wrapped)
-		}
-
-		// mutating api keys
-		apiKey = strings.TrimPrefix(strings.TrimSpace(apiKey), types.PROJECT_KEY_PREFIX)
+		apiKey := strings.TrimSpace(metadata.ExtractIncoming(ctx).Get(types.PROJECT_SCOPE_KEY))
 		if apiKey == "" {
-			logAuthenticationFailure(logger, "project credential is empty")
-			return grpcAuthenticationError()
+			return handler(srv, stream)
 		}
-		auth, err := resolver.Claim(ctx, apiKey)
+		if ctx.Value(types.CTX_) != nil {
+			if logger != nil {
+				logger.Errorf(authenticationConflictMessage)
+			}
+			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+		}
+		if resolver == nil {
+			if logger != nil {
+				logger.Errorf(projectAuthNotSupportedMessage)
+			}
+			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+		}
+		apiKey = strings.TrimPrefix(apiKey, types.PROJECT_KEY_PREFIX)
+		if apiKey == "" {
+			if logger != nil {
+				logger.Errorf(projectAuthEmptyMessage)
+			}
+			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+		}
+		principle, err := resolver.Claim(ctx, apiKey)
+		if err != nil || principle == nil || principle.Info == nil || !principle.Info.IsAuthenticated() {
+			if logger != nil {
+				logger.Errorf(projectAuthRejectedMessage)
+			}
+			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
+		}
+		actor, err := types.ResolveAuditActor(principle.Info)
 		if err != nil {
-			logAuthenticationFailure(logger, "project credential was rejected")
-			return grpcAuthenticationError()
+			if logger != nil {
+				logger.Errorf(projectAuthInvalidAuditActorMessage)
+			}
+			return status.Error(codes.Unauthenticated, authenticationFailureMessage)
 		}
-
+		projectContext, _ := principle.Info.ProjectContext()
+		auth := &types.Authentication{
+			AuthType:          types.AuthTypeProject,
+			ActorValue:        &actor,
+			OrganizationValue: &types.OrganizationContext{OrganizationID: projectContext.OrganizationID},
+			ProjectValue:      &projectContext,
+		}
 		wrapped := middleware.WrapServerStream(stream)
 		wrapped.WrappedContext = context.WithValue(ctx, types.CTX_, auth)
 		return handler(srv, wrapped)

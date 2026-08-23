@@ -16,18 +16,18 @@ import (
 	"github.com/rapidaai/pkg/types"
 )
 
-// NewOrganizationAuthenticatorMiddleware authenticates organization credentials.
-func NewOrganizationAuthenticatorMiddleware(resolver types.ClaimAuthenticator[*types.OrganizationScope], logger commons.Logger) gin.HandlerFunc {
+// NewServiceAuthenticatorMiddleware authenticates service credentials.
+func NewServiceAuthenticatorMiddleware(resolver types.ClaimAuthenticator[*types.ServiceScope], logger commons.Logger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		apiKey := ctx.GetHeader(types.ORG_SCOPE_KEY)
-		if strings.TrimSpace(apiKey) == "" {
-			apiKey = ctx.Query(types.ORG_SCOPE_KEY)
+		assertion := ctx.GetHeader(types.SERVICE_SCOPE_KEY)
+		if strings.TrimSpace(assertion) == "" {
+			assertion = ctx.Query(types.SERVICE_SCOPE_KEY)
 		}
-		if strings.TrimSpace(apiKey) == "" {
-			apiKey = ctx.Param(types.ORG_SCOPE_KEY)
+		if strings.TrimSpace(assertion) == "" {
+			assertion = ctx.Param(types.SERVICE_SCOPE_KEY)
 		}
-		apiKey = strings.TrimSpace(apiKey)
-		if apiKey == "" {
+		assertion = strings.TrimSpace(assertion)
+		if assertion == "" {
 			ctx.Next()
 			return
 		}
@@ -40,15 +40,15 @@ func NewOrganizationAuthenticatorMiddleware(resolver types.ClaimAuthenticator[*t
 		}
 		if resolver == nil {
 			if logger != nil {
-				logger.Errorf(organizationAuthNotSupportedMessage)
+				logger.Errorf(serviceAuthNotSupportedMessage)
 			}
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": authenticationFailureMessage})
 			return
 		}
-		principle, err := resolver.Claim(ctx.Request.Context(), apiKey)
+		principle, err := resolver.Claim(ctx.Request.Context(), assertion)
 		if err != nil || principle == nil || principle.Info == nil || !principle.Info.IsAuthenticated() {
 			if logger != nil {
-				logger.Errorf(organizationAuthRejectedMessage)
+				logger.Errorf(serviceAuthRejectedMessage)
 			}
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": authenticationFailureMessage})
 			return
@@ -56,16 +56,19 @@ func NewOrganizationAuthenticatorMiddleware(resolver types.ClaimAuthenticator[*t
 		actor, err := types.ResolveAuditActor(principle.Info)
 		if err != nil {
 			if logger != nil {
-				logger.Errorf(organizationAuthInvalidAuditActorMessage)
+				logger.Errorf(serviceAuthInvalidAuditActorMessage)
 			}
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": authenticationFailureMessage})
 			return
 		}
-		organizationID, _ := principle.Info.OrganizationContext()
+		delegatedContext, _ := principle.Info.DelegatedContext()
 		auth := &types.Authentication{
-			AuthType:          types.AuthTypeOrg,
+			AuthType:          types.AuthTypeService,
 			ActorValue:        &actor,
-			OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+			OrganizationValue: &types.OrganizationContext{OrganizationID: delegatedContext.OrganizationID},
+		}
+		if delegatedContext.ProjectID != nil {
+			auth.ProjectValue = &types.ProjectContext{OrganizationID: delegatedContext.OrganizationID, ProjectID: *delegatedContext.ProjectID}
 		}
 		requestContext := context.WithValue(ctx.Request.Context(), types.CTX_, auth)
 		ctx.Request = ctx.Request.WithContext(requestContext)

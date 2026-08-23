@@ -52,7 +52,7 @@ func (cApi *ConversationApi) UnviersalCallback(c *gin.Context) {
 
 	auth, err := cc.ToAuthentication()
 	if err != nil {
-		cApi.logger.Errorf("failed to reconstruct call authentication: %v", err)
+		cApi.logger.Error("Failed to reconstruct call authentication")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event to process"})
 		return
 	}
@@ -260,7 +260,7 @@ func (cApi *ConversationApi) CallbackByContext(c *gin.Context) {
 
 	auth, err := cc.ToAuthentication()
 	if err != nil {
-		cApi.logger.Errorw("failed to reconstruct call authentication", "error", err)
+		cApi.logger.Error("Failed to reconstruct call authentication")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event to process"})
 		return
 	}

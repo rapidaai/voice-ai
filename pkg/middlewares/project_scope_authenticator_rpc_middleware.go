@@ -6,6 +6,8 @@
 package middlewares
 
 import (
+	"context"
+	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -14,28 +16,68 @@ import (
 	"github.com/rapidaai/pkg/types"
 )
 
-// NewProjectAuthenticatorMiddleware authenticates only project credentials.
-// Deprecated: use NewAuthenticationBoundaryMiddleware.
+// NewProjectAuthenticatorMiddleware authenticates project credentials.
 func NewProjectAuthenticatorMiddleware(resolver types.ClaimAuthenticator[*types.ProjectScope], logger commons.Logger) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		authToken := ginProjectCredential(c)
-		if strings.TrimSpace(authToken) == "" {
-			c.Next()
+	return func(ctx *gin.Context) {
+		apiKey := ctx.GetHeader(types.PROJECT_SCOPE_KEY)
+		if strings.TrimSpace(apiKey) == "" {
+			apiKey = ctx.Query(types.PROJECT_SCOPE_KEY)
+		}
+		if strings.TrimSpace(apiKey) == "" {
+			apiKey = ctx.Param(types.PROJECT_SCOPE_KEY)
+		}
+		apiKey = strings.TrimSpace(apiKey)
+		if apiKey == "" {
+			ctx.Next()
 			return
 		}
-		authToken = strings.TrimPrefix(strings.TrimSpace(authToken), types.PROJECT_KEY_PREFIX)
-		if authToken == "" {
-			logAuthenticationFailure(logger, "project credential is empty")
-			abortGinAuthentication(c)
+		if ctx.Request.Context().Value(types.CTX_) != nil {
+			if logger != nil {
+				logger.Errorf(authenticationConflictMessage)
+			}
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": authenticationFailureMessage})
 			return
 		}
-		auth, err := resolver.Claim(c, authToken)
+		if resolver == nil {
+			if logger != nil {
+				logger.Errorf(projectAuthNotSupportedMessage)
+			}
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": authenticationFailureMessage})
+			return
+		}
+		apiKey = strings.TrimPrefix(apiKey, types.PROJECT_KEY_PREFIX)
+		if apiKey == "" {
+			if logger != nil {
+				logger.Errorf(projectAuthEmptyMessage)
+			}
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": authenticationFailureMessage})
+			return
+		}
+		principle, err := resolver.Claim(ctx.Request.Context(), apiKey)
+		if err != nil || principle == nil || principle.Info == nil || !principle.Info.IsAuthenticated() {
+			if logger != nil {
+				logger.Errorf(projectAuthRejectedMessage)
+			}
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": authenticationFailureMessage})
+			return
+		}
+		actor, err := types.ResolveAuditActor(principle.Info)
 		if err != nil {
-			logAuthenticationFailure(logger, "project credential was rejected")
-			abortGinAuthentication(c)
+			if logger != nil {
+				logger.Errorf(projectAuthInvalidAuditActorMessage)
+			}
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": authenticationFailureMessage})
 			return
 		}
-		c.Set(string(types.CTX_), auth)
-		c.Next()
+		projectContext, _ := principle.Info.ProjectContext()
+		auth := &types.Authentication{
+			AuthType:          types.AuthTypeProject,
+			ActorValue:        &actor,
+			OrganizationValue: &types.OrganizationContext{OrganizationID: projectContext.OrganizationID},
+			ProjectValue:      &projectContext,
+		}
+		requestContext := context.WithValue(ctx.Request.Context(), types.CTX_, auth)
+		ctx.Request = ctx.Request.WithContext(requestContext)
+		ctx.Next()
 	}
 }

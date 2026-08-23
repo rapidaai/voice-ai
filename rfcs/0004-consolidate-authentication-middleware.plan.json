@@ -1,0 +1,90 @@
+{
+  "rfc": "rfcs/0004-consolidate-authentication-middleware.md",
+  "title": "Separate authentication middleware by credential class",
+  "status": "planned",
+  "objective": "Resolve review feedback with direct user, project, organization, and service middleware so each service explicitly selects enabled authentication mechanisms.",
+  "verified_facts": [
+    "The current branch introduced parallel Boundary constructors and a combined dependency container.",
+    "The repository already has user, project, organization, and service credential-specific middleware, but transport coverage is incomplete.",
+    "Multiple independently installed authenticators can overwrite the shared CTX_ value unless they reject an existing authenticated identity.",
+    "Credential selection and transport failures were distributed through small helper functions.",
+    "CodeQL reports callback logging of an error containing persisted or request-derived authentication data."
+  ],
+  "acceptance_criteria": [
+    "User, project, organization, and service each have direct Gin, unary gRPC, and stream gRPC middleware constructors.",
+    "Existing constructor signatures remain unchanged; organization stream and service Gin constructors are the only new credential-specific APIs.",
+    "No Boundary, AuthenticationDependencies, credential-conflict constructor, private middleware wrapper, shared authentication function, credential-presence struct, count/class method, per-credential Gin reader, or response/log helper remains.",
+    "Each middleware ignores absent credentials, fails closed for malformed or rejected presented credentials, constructs the correct Authentication actor and scope, and rejects an already authenticated request before overwriting CTX_.",
+    "Service command wiring explicitly installs only the credential middleware classes that service accepts.",
+    "Assistant and Web install user, project, organization, and service middleware in that order for Gin, unary gRPC, and stream gRPC; Endpoint and Integration install the same ordered list for unary and stream gRPC and install no Gin authentication chain.",
+    "Gin source precedence remains exact: authorization path then header then query; x-auth-id and x-project-id header then path then query; scoped credentials header then query then path.",
+    "HTTP and gRPC failures use the capitalized generic message Invalid authentication credentials.",
+    "All middleware log messages begin with a capital letter and never include credential values.",
+    "Callback authentication reconstruction failures use a static capitalized log message without attaching the reconstruction error."
+  ],
+  "allowed_paths": [
+    "rfcs/",
+    "pkg/middlewares/",
+    "cmd/assistant/",
+    "cmd/endpoint/",
+    "cmd/integration/",
+    "cmd/web/",
+    "api/assistant-api/api/talk/"
+  ],
+  "out_of_scope_paths": [
+    "pkg/connectors/",
+    "api/endpoint-api/",
+    "api/integration-api/",
+    "api/web-api/",
+    "ui/",
+    "protos/",
+    "sdks/",
+    "docs/",
+    "examples/"
+  ],
+  "ownership": {
+    "rfcs/": "coordinator",
+    "pkg/middlewares/": "middleware implementation owner",
+    "cmd/": "transport wiring owner",
+    "api/assistant-api/api/talk/": "callback security owner"
+  },
+  "required_tests": [
+    "Every credential class has Gin, unary, and stream success and rejection coverage.",
+    "Every credential middleware rejects an existing authenticated context when its own credential is presented.",
+    "Composed Gin, unary, and stream chains reject two presented credential classes in both normal and reversed middleware order before invoking handlers.",
+    "No-credential requests pass through every middleware variant.",
+    "Gin precedence tests cover user token, auth ID, selected project ID, project credential, organization credential, and service credential.",
+    "Gin, unary, and stream log-capture tests prove malicious credential values are absent from rejection and conflict logs.",
+    "Command wiring tests assert the exact per-service transport matrix and user-project-organization-service order, and reject Boundary and credential-conflict middleware.",
+    "Callback log tests prove malicious authentication metadata is absent."
+  ],
+  "required_commands": [
+    "go test ./pkg/middlewares/...",
+    "go test ./cmd/assistant ./cmd/endpoint ./cmd/integration ./cmd/web",
+    "go test ./api/assistant-api/api/talk",
+    "go test ./pkg/... ./cmd/... ./api/assistant-api/... ./api/endpoint-api/... ./api/integration-api/... ./api/web-api/...",
+    "go vet ./pkg/middlewares/... ./cmd/assistant ./cmd/endpoint ./cmd/integration ./cmd/web ./api/assistant-api/api/talk",
+    "git diff --check"
+  ],
+  "delivery_gates": [
+    "GitHub CodeQL analysis passes for the pushed commit.",
+    "GitHub aggregate CI Success check passes for the pushed commit."
+  ],
+  "principles": {
+    "kiss": "Expose one direct middleware per credential class and let service wiring state policy.",
+    "yagni": "Do not add dependency containers, policy registries, wrapper constructors, or generic authentication frameworks.",
+    "single_ownership": "Each credential middleware owns only its credential class; command wiring owns which classes a service accepts.",
+    "explicit_contracts": "Constructor names and service wiring make accepted credential classes visible.",
+    "fail_safe": "Presented invalid credentials and multiple enabled credentials fail before handlers run.",
+    "observability": "Capitalized failure categories remain actionable without credential or callback-derived values.",
+    "least_privilege": "A service authenticates only credential classes whose middleware it explicitly installs.",
+    "reversibility": "The change is code-only and can be reverted without schema or data rollback."
+  },
+  "risks": [
+    "Missing middleware in a command chain intentionally disables that credential class and must be caught by wiring tests.",
+    "Incorrect interceptor order must not permit a second credential to overwrite the first authenticated identity.",
+    "Adding transport parity can accidentally alter source precedence or legacy fail-open behavior.",
+    "Direct implementations duplicate small transport mechanics, so shared constants and complete tests are required to prevent message drift."
+  ],
+  "rollback": "Revert the implementation commit to restore the prior Boundary implementation and command wiring. No persisted state changes are involved."
+}

@@ -29,122 +29,6 @@ func incomingContext(values ...string) context.Context {
 	return grpcmetadata.NewIncomingContext(context.Background(), grpcmetadata.Pairs(values...))
 }
 
-func TestCredentialConflictUnaryRejectsEveryPair(t *testing.T) {
-	tests := []struct {
-		name   string
-		values []string
-	}{
-		{name: "user and project", values: []string{types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "1", types.PROJECT_SCOPE_KEY, "key"}},
-		{name: "user and organization", values: []string{types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "1", types.ORG_SCOPE_KEY, "organization"}},
-		{name: "user and service", values: []string{types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "1", types.SERVICE_SCOPE_KEY, "service"}},
-		{name: "project and organization", values: []string{types.PROJECT_SCOPE_KEY, "key", types.ORG_SCOPE_KEY, "organization"}},
-		{name: "project and service", values: []string{types.PROJECT_SCOPE_KEY, "key", types.SERVICE_SCOPE_KEY, "service"}},
-		{name: "organization and service", values: []string{types.ORG_SCOPE_KEY, "organization", types.SERVICE_SCOPE_KEY, "service"}},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			handlerCalled := false
-			_, err := NewCredentialConflictUnaryServerMiddleware(nil)(
-				incomingContext(test.values...),
-				nil,
-				nil,
-				func(context.Context, any) (any, error) {
-					handlerCalled = true
-					return nil, nil
-				},
-			)
-			if status.Code(err) != codes.Unauthenticated {
-				t.Fatalf("status.Code(error) = %v, want %v", status.Code(err), codes.Unauthenticated)
-			}
-			if handlerCalled {
-				t.Fatal("handler called for conflicting credentials")
-			}
-		})
-	}
-}
-
-func TestCredentialConflictUnaryAllowsSingleAndNoCredential(t *testing.T) {
-	tests := []struct {
-		name   string
-		values []string
-	}{
-		{name: "none"},
-		{name: "user", values: []string{types.AUTHORIZATION_KEY, "token", types.AUTH_KEY, "1"}},
-		{name: "project", values: []string{types.PROJECT_SCOPE_KEY, "key"}},
-		{name: "organization", values: []string{types.ORG_SCOPE_KEY, "organization"}},
-		{name: "service", values: []string{types.SERVICE_SCOPE_KEY, "service"}},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			handlerCalled := false
-			_, err := NewCredentialConflictUnaryServerMiddleware(nil)(
-				incomingContext(test.values...),
-				nil,
-				nil,
-				func(context.Context, any) (any, error) {
-					handlerCalled = true
-					return nil, nil
-				},
-			)
-			if err != nil {
-				t.Fatalf("middleware error = %v", err)
-			}
-			if !handlerCalled {
-				t.Fatal("handler not called")
-			}
-		})
-	}
-}
-
-func TestCredentialConflictStreamRejectsConflictingCredentials(t *testing.T) {
-	handlerCalled := false
-	err := NewCredentialConflictStreamServerMiddleware(nil)(
-		nil,
-		&testServerStream{ctx: incomingContext(
-			types.PROJECT_SCOPE_KEY, "key",
-			types.SERVICE_SCOPE_KEY, "service",
-		)},
-		nil,
-		func(any, grpc.ServerStream) error {
-			handlerCalled = true
-			return nil
-		},
-	)
-	if status.Code(err) != codes.Unauthenticated {
-		t.Fatalf("status.Code(error) = %v, want %v", status.Code(err), codes.Unauthenticated)
-	}
-	if handlerCalled {
-		t.Fatal("handler called for conflicting credentials")
-	}
-}
-
-func TestCredentialConflictGinRejectsUserAndProject(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	engine := gin.New()
-	engine.Use(NewCredentialConflictMiddleware(nil))
-	handlerCalled := false
-	engine.GET("/test", func(ctx *gin.Context) {
-		handlerCalled = true
-		ctx.Status(http.StatusOK)
-	})
-
-	request := httptest.NewRequest(http.MethodGet, "/test", nil)
-	request.Header.Set(types.AUTHORIZATION_KEY, "token")
-	request.Header.Set(types.AUTH_KEY, "1")
-	request.Header.Set(types.PROJECT_SCOPE_KEY, "key")
-	recorder := httptest.NewRecorder()
-	engine.ServeHTTP(recorder, request)
-
-	if recorder.Code != http.StatusUnauthorized {
-		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnauthorized)
-	}
-	if handlerCalled {
-		t.Fatal("handler called for conflicting credentials")
-	}
-}
-
 type userAuthenticatorStub struct {
 	err error
 }
@@ -194,8 +78,8 @@ func TestUserUnaryAcceptsCredentialWithoutProject(t *testing.T) {
 		nil,
 		func(ctx context.Context, _ any) (any, error) {
 			handlerCalled = true
-			if _, ok := types.GetAuthPrincipleGPRC(ctx); !ok {
-				t.Fatal("authenticated user principle missing from unary context")
+			if _, err := types.Authorize(ctx); err != nil {
+				t.Fatalf("authenticated request missing from unary context: %v", err)
 			}
 			return nil, nil
 		},
@@ -216,8 +100,8 @@ func TestUserStreamAcceptsCredentialWithoutProject(t *testing.T) {
 		nil,
 		func(_ any, stream grpc.ServerStream) error {
 			handlerCalled = true
-			if _, ok := types.GetAuthPrincipleGPRC(stream.Context()); !ok {
-				t.Fatal("authenticated user principle missing from stream context")
+			if _, err := types.Authorize(stream.Context()); err != nil {
+				t.Fatalf("authenticated request missing from stream context: %v", err)
 			}
 			return nil
 		},
@@ -344,7 +228,8 @@ func TestProjectStreamRejectsResolverFailure(t *testing.T) {
 }
 
 type serviceScopeClaimAuthenticatorStub struct {
-	err error
+	err     error
+	actorID uint64
 }
 
 func (stub serviceScopeClaimAuthenticatorStub) Claim(
@@ -354,10 +239,14 @@ func (stub serviceScopeClaimAuthenticatorStub) Claim(
 	if stub.err != nil {
 		return nil, stub.err
 	}
+	actorID := stub.actorID
+	if actorID == 0 {
+		actorID = 4
+	}
 	organizationID := uint64(2)
 	return &types.PlainClaimPrinciple[*types.ServiceScope]{
 		Info: &types.ServiceScope{
-			ActorId:        4,
+			ActorId:        actorID,
 			Issuer:         "assistant-api",
 			Audience:       types.ServiceAssertionAudience,
 			OrganizationId: &organizationID,
