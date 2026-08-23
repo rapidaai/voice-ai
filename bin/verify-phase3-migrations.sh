@@ -98,16 +98,12 @@ assert_update_inventory() {
   done
 }
 
-assert_preflight_inventory() {
+assert_direct_update_migration() {
   local file="$1"
-  shift
-  local expected_count="$#"
-  local actual_count
-  actual_count="$(grep -Ec 'EXISTS \(SELECT 1 FROM public\.[a-z0-9_]+' "${file}")"
-  assert_equal "${actual_count}" "${expected_count}" "${file} preflight count"
-  for table in "$@"; do
-    assert_equal "$(grep -Ec "EXISTS \\(SELECT 1 FROM public\\.${table} WHERE" "${file}")" "1" "${file} preflight inventory for ${table}"
-  done
+  if rg -ni '^[[:space:]]*(DO\b|SET[[:space:]]+lock_timeout\b|RESET[[:space:]]+lock_timeout\b|RAISE[[:space:]]+EXCEPTION\b)|EXISTS[[:space:]]*\([[:space:]]*SELECT' "${file}"; then
+    echo "${file} contains an obsolete validation or lock wrapper" >&2
+    exit 1
+  fi
 }
 
 assistant_tables=(
@@ -149,23 +145,20 @@ assert_static_contracts() {
   assert_update_inventory "${repository_root}/api/endpoint-api/migrations/000004_run_audit_actor_backfill.up.sql" "${endpoint_tables[@]}"
   assert_update_inventory "${repository_root}/api/integration-api/migrations/000004_run_audit_actor_backfill.up.sql" "${integration_tables[@]}"
   assert_update_inventory "${repository_root}/api/web-api/migrations/000009_run_audit_actor_backfill.up.sql" "${web_tables[@]}"
-  assert_preflight_inventory "${repository_root}/api/assistant-api/migrations/000058_run_audit_actor_backfill.up.sql" "${assistant_tables[@]}"
-  assert_preflight_inventory "${repository_root}/api/endpoint-api/migrations/000004_run_audit_actor_backfill.up.sql" "${endpoint_tables[@]}"
-  assert_preflight_inventory "${repository_root}/api/web-api/migrations/000009_run_audit_actor_backfill.up.sql" "${web_tables[@]}"
+  assert_direct_update_migration "${repository_root}/api/assistant-api/migrations/000058_run_audit_actor_backfill.up.sql"
+  assert_direct_update_migration "${repository_root}/api/endpoint-api/migrations/000004_run_audit_actor_backfill.up.sql"
+  assert_direct_update_migration "${repository_root}/api/integration-api/migrations/000004_run_audit_actor_backfill.up.sql"
+  assert_direct_update_migration "${repository_root}/api/web-api/migrations/000009_run_audit_actor_backfill.up.sql"
 
   for file in \
     "${repository_root}/api/assistant-api/migrations/000055_expand_audit_actor_identity.up.sql" \
     "${repository_root}/api/assistant-api/migrations/000055_expand_audit_actor_identity.down.sql" \
-    "${repository_root}/api/assistant-api/migrations/000058_run_audit_actor_backfill.up.sql" \
     "${repository_root}/api/endpoint-api/migrations/000002_expand_audit_actor_identity.up.sql" \
     "${repository_root}/api/endpoint-api/migrations/000002_expand_audit_actor_identity.down.sql" \
-    "${repository_root}/api/endpoint-api/migrations/000004_run_audit_actor_backfill.up.sql" \
     "${repository_root}/api/integration-api/migrations/000002_expand_audit_actor_identity.up.sql" \
     "${repository_root}/api/integration-api/migrations/000002_expand_audit_actor_identity.down.sql" \
-    "${repository_root}/api/integration-api/migrations/000004_run_audit_actor_backfill.up.sql" \
     "${repository_root}/api/web-api/migrations/000005_expand_audit_actor_identity.up.sql" \
     "${repository_root}/api/web-api/migrations/000005_expand_audit_actor_identity.down.sql" \
-    "${repository_root}/api/web-api/migrations/000009_run_audit_actor_backfill.up.sql" \
     "${repository_root}/api/web-api/migrations/000007_create_service_and_system_identities.up.sql" \
     "${repository_root}/api/web-api/migrations/000007_create_service_and_system_identities.down.sql"; do
     assert_lock_timeout_pair "${file}"
@@ -233,14 +226,8 @@ assert_final_actor_contracts() {
         AND conname IN ('audit_created_actor_pair', 'audit_updated_actor_pair')
         AND convalidated
     ) <> 2
-    OR (
-      SELECT count(*)
-      FROM pg_trigger
-      WHERE tgrelid = to_regclass('public.' || expected.table_name)
-        AND tgname = 'audit_created_actor_immutable'
-        AND NOT tgisinternal
-    ) <> 1;")"
-  assert_equal "${invalid}" "0" "${database} actor constraints and triggers"
+    ;")"
+  assert_equal "${invalid}" "0" "${database} actor constraints"
 }
 
 verify_expansion() {
@@ -285,6 +272,8 @@ verify_history() {
   assert_equal "$(psql_exec "${database}" -Atc "SELECT count(*) FROM pg_constraint WHERE connamespace='public'::regnamespace AND conname LIKE 'audit_%_actor_pair' AND NOT convalidated;")" "0" "${service} unvalidated actor constraints"
   assert_equal "$(psql_exec "${database}" -Atc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name='${migration_metrics_table}';")" "0" "${service} migration metrics table"
   assert_equal "$(psql_exec "${database}" -Atc "SELECT count(*) FROM pg_proc JOIN pg_namespace ON pg_namespace.oid=pg_proc.pronamespace WHERE pg_namespace.nspname='public' AND pg_proc.proname LIKE 'backfill_%_audit_actor_identity';")" "0" "${service} backfill procedures"
+  assert_equal "$(psql_exec "${database}" -Atc "SELECT count(*) FROM pg_trigger WHERE tgname='audit_created_actor_immutable' AND NOT tgisinternal;")" "0" "${service} creation actor immutability triggers"
+  assert_equal "$(psql_exec "${database}" -Atc "SELECT count(*) FROM pg_proc JOIN pg_namespace ON pg_namespace.oid=pg_proc.pronamespace WHERE pg_namespace.nspname='public' AND pg_proc.proname='reject_created_actor_change';")" "0" "${service} creation actor immutability function"
   assert_actor_columns "${database}" "$@"
   assert_final_actor_contracts "${database}" "$@"
 
@@ -293,7 +282,6 @@ verify_history() {
   fi
   if [[ "${service}" == "web-api" ]]; then
     assert_actor_columns "${database}" organization_credentials
-    assert_equal "$(psql_exec "${database}" -Atc "SELECT count(*) FROM pg_trigger WHERE tgrelid='public.organization_credentials'::regclass AND tgname='audit_created_actor_immutable' AND NOT tgisinternal;")" "1" "web-api organization credential immutability trigger"
     assert_equal "$(psql_exec "${database}" -Atc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('service_identities','system_identities');")" "0" "web-api registry tables"
     assert_equal "$(psql_exec "${database}" -Atc "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='organization_credentials' AND column_name IN ('raw_key','plain_key','secret','private_key');")" "0" "web-api raw credential columns"
     assert_equal "$(psql_exec "${database}" -Atc "SELECT count(*) FROM pg_constraint WHERE conrelid='public.organization_credentials'::regclass AND contype='u' AND pg_get_constraintdef(oid) LIKE '%(key)%';")" "1" "web-api organization credential key uniqueness"
@@ -350,15 +338,15 @@ verify_user_backfill() {
 verify_backfill_data() {
   verify_user_backfill \
     assistant-api 57 1 \
-    "INSERT INTO public.assistant_conversation_recordings (id, project_id, organization_id, assistant_id, assistant_conversation_id, assistant_recording_url, user_recording_url, created_by, updated_by) VALUES (1, 1, 1, 1, 1, 'one', 'one', 101, NULL), (2, 1, 1, 1, 2, 'two', 'two', 102, 103);" \
-    "SELECT string_agg(created_actor_type || ':' || created_actor_id || ':' || coalesce(updated_actor_type, 'null') || ':' || coalesce(updated_actor_id::text, 'null'), ',' ORDER BY id) FROM public.assistant_conversation_recordings;" \
-    "user:101:null:null,user:102:user:103"
+    "INSERT INTO public.assistant_conversation_recordings (id, project_id, organization_id, assistant_id, assistant_conversation_id, assistant_recording_url, user_recording_url, created_by, updated_by) VALUES (1, 1, 1, 1, 1, 'one', 'one', 101, NULL), (2, 1, 1, 1, 2, 'two', 'two', 102, 103), (3, 1, 1, 1, 3, 'three', 'three', NULL, NULL);" \
+    "SELECT string_agg(created_actor_type || ':' || coalesce(created_actor_id::text, 'null') || ':' || coalesce(updated_actor_type, 'null') || ':' || coalesce(updated_actor_id::text, 'null'), ',' ORDER BY id) FROM public.assistant_conversation_recordings;" \
+    "user:101:null:null,user:102:user:103,user:null:null:null"
 
   verify_user_backfill \
     endpoint-api 3 1 \
-    "INSERT INTO public.endpoint_provider_models (id, created_by, updated_by) VALUES (1, 201, NULL), (2, 202, 203);" \
-    "SELECT string_agg(created_actor_type || ':' || created_actor_id || ':' || coalesce(updated_actor_type, 'null') || ':' || coalesce(updated_actor_id::text, 'null'), ',' ORDER BY id) FROM public.endpoint_provider_models;" \
-    "user:201:null:null,user:202:user:203"
+    "INSERT INTO public.endpoint_provider_models (id, created_by, updated_by) VALUES (1, 201, NULL), (2, 202, 203), (3, NULL, NULL);" \
+    "SELECT string_agg(created_actor_type || ':' || coalesce(created_actor_id::text, 'null') || ':' || coalesce(updated_actor_type, 'null') || ':' || coalesce(updated_actor_id::text, 'null'), ',' ORDER BY id) FROM public.endpoint_provider_models;" \
+    "user:201:null:null,user:202:user:203,user:null:null:null"
 
   verify_user_backfill \
     web-api 8 1 \
@@ -376,12 +364,13 @@ verify_backfill_data() {
   assert_equal "$(psql_exec "${database}" -Atc "SELECT created_actor_type || ':' || coalesce(created_actor_id::text, 'null') FROM public.external_audits WHERE id=1;")" "unknown:null" "integration-api historical actor backfill"
 }
 
-verify_invalid_case() {
+verify_constraint_rollback() {
   local service="$1"
-  local pre_run_version="$2"
-  local insert_sql="$3"
-  local untouched_sql="$4"
-  local database="phase3_invalid_${service//-/_}"
+  local case_name="$2"
+  local pre_run_version="$3"
+  local insert_sql="$4"
+  local untouched_sql="$5"
+  local database="phase3_invalid_${service//-/_}_${case_name}"
   local migrations="${repository_root}/api/${service}/migrations"
   local database_url="${base_url}/${database}?sslmode=disable"
   create_database "${database}"
@@ -391,36 +380,49 @@ verify_invalid_case() {
     echo "${service} invalid legacy IDs unexpectedly migrated" >&2
     exit 1
   fi
-  assert_equal "$(psql_exec "${database}" -Atc "${untouched_sql}")" "0" "${service} preflight partial update count"
+  assert_equal "$(psql_exec "${database}" -Atc "${untouched_sql}")" "0" "${service} ${case_name} cross-table rollback"
 }
 
-verify_invalid_preflights() {
-  verify_invalid_case assistant-api 57 \
-    "INSERT INTO public.assistant_conversation_recordings (id, project_id, organization_id, assistant_id, assistant_conversation_id, assistant_recording_url, user_recording_url, created_by, updated_by) VALUES (1, 1, 1, 1, 1, 'valid', 'valid', 401, NULL), (2, 1, 1, 1, 2, 'null-created', 'null-created', NULL, NULL);" \
-    "SELECT count(*) FROM public.assistant_conversation_recordings WHERE created_actor_type IS NOT NULL OR created_actor_id IS NOT NULL OR updated_actor_type IS NOT NULL OR updated_actor_id IS NOT NULL;"
-  verify_invalid_case endpoint-api 3 \
-    "INSERT INTO public.endpoint_provider_models (id, created_by, updated_by) VALUES (1, 501, NULL), (2, 0, NULL);" \
-    "SELECT count(*) FROM public.endpoint_provider_models WHERE created_actor_type IS NOT NULL OR created_actor_id IS NOT NULL OR updated_actor_type IS NOT NULL OR updated_actor_id IS NOT NULL;"
-  verify_invalid_case web-api 8 \
-    "INSERT INTO public.organizations (id, name, description, size, industry, contact, created_by, updated_by) VALUES (1, 'valid', 'valid', 'valid', 'valid', 'valid', 601, 602), (2, 'invalid', 'invalid', 'invalid', 'invalid', 'invalid', 603, -1);" \
-    "SELECT count(*) FROM public.organizations WHERE created_actor_type IS NOT NULL OR created_actor_id IS NOT NULL OR updated_actor_type IS NOT NULL OR updated_actor_id IS NOT NULL;"
+verify_constraint_rollbacks() {
+  verify_constraint_rollback assistant-api zero 57 \
+    "INSERT INTO public.assistant_api_deployments (id, created_by, assistant_id) VALUES (1, 401, 1); INSERT INTO public.assistant_conversation_recordings (id, project_id, organization_id, assistant_id, assistant_conversation_id, assistant_recording_url, user_recording_url, created_by) VALUES (2, 1, 1, 1, 2, 'zero', 'zero', 0);" \
+    "SELECT count(*) FROM public.assistant_api_deployments WHERE created_actor_type IS NOT NULL OR created_actor_id IS NOT NULL OR updated_actor_type IS NOT NULL OR updated_actor_id IS NOT NULL;"
+  verify_constraint_rollback assistant-api negative 57 \
+    "INSERT INTO public.assistant_api_deployments (id, created_by, assistant_id) VALUES (1, 402, 1); INSERT INTO public.assistant_conversation_recordings (id, project_id, organization_id, assistant_id, assistant_conversation_id, assistant_recording_url, user_recording_url, created_by) VALUES (2, 1, 1, 1, 2, 'negative', 'negative', -1);" \
+    "SELECT count(*) FROM public.assistant_api_deployments WHERE created_actor_type IS NOT NULL OR created_actor_id IS NOT NULL OR updated_actor_type IS NOT NULL OR updated_actor_id IS NOT NULL;"
+  verify_constraint_rollback endpoint-api zero 3 \
+    "INSERT INTO public.endpoint_cachings (id, endpoint_id, cache_type, created_by) VALUES (1, 1, 'valid', 501); INSERT INTO public.endpoint_provider_models (id, created_by) VALUES (2, 0);" \
+    "SELECT count(*) FROM public.endpoint_cachings WHERE created_actor_type IS NOT NULL OR created_actor_id IS NOT NULL OR updated_actor_type IS NOT NULL OR updated_actor_id IS NOT NULL;"
+  verify_constraint_rollback endpoint-api negative 3 \
+    "INSERT INTO public.endpoint_cachings (id, endpoint_id, cache_type, created_by) VALUES (1, 1, 'valid', 502); INSERT INTO public.endpoint_provider_models (id, created_by) VALUES (2, -1);" \
+    "SELECT count(*) FROM public.endpoint_cachings WHERE created_actor_type IS NOT NULL OR created_actor_id IS NOT NULL OR updated_actor_type IS NOT NULL OR updated_actor_id IS NOT NULL;"
+  verify_constraint_rollback web-api zero 8 \
+    "INSERT INTO public.notification_settings (id, created_by, updated_by, user_auth_id, event_type, channel) VALUES (1, 601, 602, 1, 'valid', 'email'); INSERT INTO public.organizations (id, name, description, size, industry, contact, created_by, updated_by) VALUES (2, 'zero', 'zero', 'zero', 'zero', 'zero', 603, 0);" \
+    "SELECT count(*) FROM public.notification_settings WHERE created_actor_type IS NOT NULL OR created_actor_id IS NOT NULL OR updated_actor_type IS NOT NULL OR updated_actor_id IS NOT NULL;"
+  verify_constraint_rollback web-api negative 8 \
+    "INSERT INTO public.notification_settings (id, created_by, updated_by, user_auth_id, event_type, channel) VALUES (1, 604, 605, 1, 'valid', 'email'); INSERT INTO public.organizations (id, name, description, size, industry, contact, created_by, updated_by) VALUES (2, 'negative', 'negative', 'negative', 'negative', 'negative', 606, -1);" \
+    "SELECT count(*) FROM public.notification_settings WHERE created_actor_type IS NOT NULL OR created_actor_id IS NOT NULL OR updated_actor_type IS NOT NULL OR updated_actor_id IS NOT NULL;"
 }
 
 verify_final_actor_behavior() {
   psql_exec phase3_assistant_api -c "INSERT INTO public.assistant_conversation_recordings (id, project_id, organization_id, assistant_id, assistant_conversation_id, assistant_recording_url, user_recording_url, created_actor_type, created_actor_id) VALUES (801, 1, 1, 1, 1, 'assistant', 'user', 'user', 1);" >/dev/null
-  expect_psql_failure phase3_assistant_api "UPDATE public.assistant_conversation_recordings SET created_actor_id=2 WHERE id=801;"
+  psql_exec phase3_assistant_api -c "UPDATE public.assistant_conversation_recordings SET created_actor_type='user', created_actor_id=2 WHERE id=801;" >/dev/null
+  assert_equal "$(psql_exec phase3_assistant_api -Atc "SELECT created_actor_type || ':' || created_actor_id FROM public.assistant_conversation_recordings WHERE id=801;")" "user:2" "assistant-api updateable creation actor"
   expect_psql_failure phase3_assistant_api "UPDATE public.assistant_conversation_recordings SET updated_actor_type='user', updated_actor_id=0 WHERE id=801;"
 
   psql_exec phase3_endpoint_api -c "INSERT INTO public.endpoint_provider_models (id, created_actor_type, created_actor_id) VALUES (801, 'user', 1);" >/dev/null
-  expect_psql_failure phase3_endpoint_api "UPDATE public.endpoint_provider_models SET created_actor_id=2 WHERE id=801;"
+  psql_exec phase3_endpoint_api -c "UPDATE public.endpoint_provider_models SET created_actor_type='user', created_actor_id=2 WHERE id=801;" >/dev/null
+  assert_equal "$(psql_exec phase3_endpoint_api -Atc "SELECT created_actor_type || ':' || created_actor_id FROM public.endpoint_provider_models WHERE id=801;")" "user:2" "endpoint-api updateable creation actor"
   expect_psql_failure phase3_endpoint_api "UPDATE public.endpoint_provider_models SET updated_actor_type='user', updated_actor_id=0 WHERE id=801;"
 
   psql_exec phase3_web_api -c "INSERT INTO public.organizations (id, name, description, size, industry, contact, created_actor_type, created_actor_id) VALUES (801, 'runtime', 'runtime', 'runtime', 'runtime', 'runtime', 'user', 1);" >/dev/null
-  expect_psql_failure phase3_web_api "UPDATE public.organizations SET created_actor_id=2 WHERE id=801;"
+  psql_exec phase3_web_api -c "UPDATE public.organizations SET created_actor_type='user', created_actor_id=2 WHERE id=801;" >/dev/null
+  assert_equal "$(psql_exec phase3_web_api -Atc "SELECT created_actor_type || ':' || created_actor_id FROM public.organizations WHERE id=801;")" "user:2" "web-api updateable creation actor"
   expect_psql_failure phase3_web_api "UPDATE public.organizations SET updated_actor_type='user', updated_actor_id=0 WHERE id=801;"
 
   psql_exec phase3_integration_api -c "INSERT INTO public.external_audits (id, integration_name, asset_prefix, response_status, time_taken, credential_id, project_id, organization_id, status, metrics, created_actor_type, created_actor_id) VALUES (801, 'runtime', 'runtime', 0, 0, 1, 1, 1, 'active', '[]', 'service', 1);" >/dev/null
-  expect_psql_failure phase3_integration_api "UPDATE public.external_audits SET created_actor_id=2 WHERE id=801;"
+  psql_exec phase3_integration_api -c "UPDATE public.external_audits SET created_actor_type='user', created_actor_id=2 WHERE id=801;" >/dev/null
+  assert_equal "$(psql_exec phase3_integration_api -Atc "SELECT created_actor_type || ':' || created_actor_id FROM public.external_audits WHERE id=801;")" "user:2" "integration-api updateable creation actor"
   expect_psql_failure phase3_integration_api "UPDATE public.external_audits SET updated_actor_type='user', updated_actor_id=0 WHERE id=801;"
 }
 
@@ -470,7 +472,7 @@ verify_history endpoint-api 6 "${endpoint_tables[@]}"
 verify_history web-api 12 "${web_tables[@]}"
 verify_history integration-api 6 "${integration_tables[@]}"
 verify_backfill_data
-verify_invalid_preflights
+verify_constraint_rollbacks
 verify_final_actor_behavior
 verify_callcontext_rollback
 verify_web_security_migrations
