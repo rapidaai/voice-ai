@@ -31,7 +31,7 @@ func (deploymentApi *AssistantDeploymentApi) GetAssistantWebpluginDeploymentRest
 		})
 		return
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
 	if scopeErr != nil {
 		c.JSON(pkg_errors.GetAssistantWebpluginDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.GetAssistantWebpluginDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
@@ -59,7 +59,7 @@ func (deploymentApi *AssistantDeploymentApi) GetAssistantWebpluginDeploymentRest
 		return
 	}
 
-	deployment, err := deploymentApi.deploymentService.GetAssistantWebpluginDeployment(c, iAuth, assistantId)
+	deployment, err := deploymentApi.deploymentService.GetAssistantWebpluginDeployment(c.Request.Context(), iAuth, assistantId)
 	if err != nil {
 		deploymentApi.logger.Errorf("unable to get assistant webplugin deployment: %v", err)
 		c.JSON(pkg_errors.GetAssistantWebpluginDeploymentGetDeployment.HTTPStatusCode, openapi.ErrorResponse{

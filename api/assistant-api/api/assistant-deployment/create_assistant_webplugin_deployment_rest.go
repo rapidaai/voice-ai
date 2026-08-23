@@ -32,7 +32,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantWebpluginDeploymentR
 		})
 		return
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
 	if scopeErr != nil {
 		c.JSON(pkg_errors.CreateAssistantWebpluginDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantWebpluginDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
@@ -216,7 +216,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantWebpluginDeploymentR
 		suggestions = *request.Suggestion
 	}
 	deployment, err := deploymentApi.deploymentService.CreateWebPluginDeployment(
-		c,
+		c.Request.Context(),
 		iAuth,
 		assistantId,
 		request.Greeting,

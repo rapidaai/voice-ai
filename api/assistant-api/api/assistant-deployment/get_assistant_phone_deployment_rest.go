@@ -31,7 +31,7 @@ func (deploymentApi *AssistantDeploymentApi) GetAssistantPhoneDeploymentRest(c *
 		})
 		return
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
 	if scopeErr != nil {
 		c.JSON(pkg_errors.GetAssistantPhoneDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.GetAssistantPhoneDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
@@ -59,7 +59,7 @@ func (deploymentApi *AssistantDeploymentApi) GetAssistantPhoneDeploymentRest(c *
 		return
 	}
 
-	deployment, err := deploymentApi.deploymentService.GetAssistantPhoneDeployment(c, iAuth, assistantId)
+	deployment, err := deploymentApi.deploymentService.GetAssistantPhoneDeployment(c.Request.Context(), iAuth, assistantId)
 	if err != nil {
 		deploymentApi.logger.Errorf("unable to get assistant phone deployment: %v", err)
 		c.JSON(pkg_errors.GetAssistantPhoneDeploymentGetDeployment.HTTPStatusCode, openapi.ErrorResponse{

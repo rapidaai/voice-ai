@@ -80,7 +80,7 @@ audiosocket:
 sip:
   server: "0.0.0.0"
   instance_id: "assistant-01"
-  external_ip: "192.168.1.10"
+  external_ip: "192.168.1.8"
   port: 5070
   transport: "udp"
   rtp_port_range_start: 10000

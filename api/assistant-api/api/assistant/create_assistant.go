@@ -8,6 +8,7 @@ package assistant_api
 import (
 	"context"
 	"errors"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -27,7 +28,7 @@ func (assistantApi *assistantGrpcApi) CreateAssistant(ctx context.Context, cer *
 	if authErr != nil {
 		return nil, status.Error(codes.Unauthenticated, authErr.Error())
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
 	if scopeErr != nil {
 		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}

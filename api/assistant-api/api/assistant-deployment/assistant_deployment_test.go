@@ -24,8 +24,10 @@ func testUserAuthentication(userID, organizationID, projectID uint64) *types.Aut
 }
 
 func testProjectAuthentication(organizationID, projectID uint64) *types.Authentication {
+	actor := types.ActorIdentity{Type: types.ActorTypeProject, ID: projectID}
 	return &types.Authentication{
 		AuthType:          types.AuthTypeProject,
+		ActorValue:        &actor,
 		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
 	}

@@ -56,20 +56,40 @@ REQUEST_EXAMPLES: dict[str, dict[str, Any]] = {
     "CreateAssistantConfigurationRequest": {
         "assistantId": "{{assistantId}}",
         "configurationType": "webhook",
-        "provider": "custom",
+        "provider": "http",
         "enabled": True,
         "options": [
-            {"key": "url", "value": "https://example.com/webhook"},
-            {"key": "method", "value": "POST"},
+            {"key": "http_method", "value": "POST"},
+            {"key": "http_url", "value": "https://api.example.com/webhook"},
+            {
+                "key": "http_headers",
+                "value": '{"Authorization":"Bearer {{webhookToken}}","X-Webhook-Source":"postman"}',
+            },
+            {"key": "retry_status_codes", "value": '["50X"]'},
+            {"key": "max_retry_count", "value": "2"},
+            {"key": "timeout_seconds", "value": "220"},
+            {"key": "assistant_events", "value": '["webrtc.connected"]'},
+            {"key": "execution_priority", "value": "4"},
+            {"key": "description", "value": "Postman webhook configuration"},
         ],
     },
     "UpdateAssistantConfigurationRequest": {
         "configurationType": "webhook",
-        "provider": "custom",
+        "provider": "http",
         "enabled": True,
         "options": [
-            {"key": "url", "value": "https://example.com/webhook"},
-            {"key": "method", "value": "POST"},
+            {"key": "http_method", "value": "POST"},
+            {"key": "http_url", "value": "https://hooks.example.com/incoming"},
+            {"key": "http_headers", "value": '{"X-Webhook-Version":"2"}'},
+            {"key": "retry_status_codes", "value": '["40X","50X"]'},
+            {"key": "max_retry_count", "value": "3"},
+            {"key": "timeout_seconds", "value": "180"},
+            {
+                "key": "assistant_events",
+                "value": '["conversation.begin","webrtc.reconnecting"]',
+            },
+            {"key": "execution_priority", "value": "1"},
+            {"key": "description", "value": "Updated Postman webhook configuration"},
         ],
     },
     "CreateAssistantDebuggerDeploymentRequest": {
@@ -188,14 +208,165 @@ REQUEST_EXAMPLES: dict[str, dict[str, Any]] = {
 }
 
 
+CONFIGURATION_VARIANTS: list[dict[str, Any]] = [
+    {
+        "label": "Webhook",
+        "configurationType": "webhook",
+        "provider": "http",
+        "variable": "webhookConfigurationId",
+        "create": copy.deepcopy(REQUEST_EXAMPLES["CreateAssistantConfigurationRequest"]),
+        "update": copy.deepcopy(REQUEST_EXAMPLES["UpdateAssistantConfigurationRequest"]),
+    },
+    {
+        "label": "Storage",
+        "configurationType": "storage",
+        "provider": "aws",
+        "variable": "storageConfigurationId",
+        "create": {
+            "assistantId": "{{assistantId}}",
+            "configurationType": "storage",
+            "provider": "aws",
+            "enabled": True,
+            "options": [
+                {"key": "rapida.credential_id", "value": "{{storageCredentialId}}"},
+                {"key": "s3_bucket_name", "value": "rapida-assistant-recordings"},
+                {"key": "prefix", "value": "postman/recordings"},
+                {
+                    "key": "files_to_push",
+                    "value": '["recording.conversation","recording.user","recording.assistant"]',
+                },
+            ],
+        },
+        "update": {
+            "configurationType": "storage",
+            "provider": "aws",
+            "enabled": True,
+            "options": [
+                {"key": "rapida.credential_id", "value": "{{storageCredentialId}}"},
+                {"key": "s3_bucket_name", "value": "rapida-assistant-recordings-archive"},
+                {"key": "prefix", "value": "postman/archive"},
+                {
+                    "key": "files_to_push",
+                    "value": '["recording.conversation","recording.assistant"]',
+                },
+            ],
+        },
+    },
+    {
+        "label": "Authentication",
+        "configurationType": "authentication",
+        "provider": "http",
+        "variable": "authenticationConfigurationId",
+        "create": {
+            "assistantId": "{{assistantId}}",
+            "configurationType": "authentication",
+            "provider": "http",
+            "enabled": True,
+            "options": [
+                {"key": "http_method", "value": "POST"},
+                {"key": "http_url", "value": "https://auth.example.com/resolve"},
+                {"key": "http_headers", "value": '{"X-Auth-Source":"postman"}'},
+                {
+                    "key": "http_body",
+                    "value": '{"assistant.id":"assistantId","client.phone":"clientPhone"}',
+                },
+                {"key": "fail_behavior", "value": "BLOCK"},
+                {"key": "timeout_ms", "value": "5000"},
+                {
+                    "key": "authentication.condition",
+                    "value": '[{"key":"source","condition":"=","value":"all"}]',
+                },
+            ],
+        },
+        "update": {
+            "configurationType": "authentication",
+            "provider": "http",
+            "enabled": True,
+            "options": [
+                {"key": "http_method", "value": "POST"},
+                {"key": "http_url", "value": "https://auth.example.com/v2/resolve"},
+                {
+                    "key": "http_headers",
+                    "value": '{"X-Auth-Source":"postman","X-Auth-Version":"2"}',
+                },
+                {
+                    "key": "http_body",
+                    "value": '{"assistant.id":"assistantId","client.phone":"clientPhone","conversation.id":"conversationId"}',
+                },
+                {"key": "fail_behavior", "value": "DO_NOTHING"},
+                {"key": "timeout_ms", "value": "7500"},
+                {
+                    "key": "authentication.condition",
+                    "value": '[{"key":"source","condition":"=","value":"phone"}]',
+                },
+            ],
+        },
+    },
+    {
+        "label": "Analysis",
+        "configurationType": "analysis",
+        "provider": "endpoint",
+        "variable": "analysisConfigurationId",
+        "create": {
+            "assistantId": "{{assistantId}}",
+            "configurationType": "analysis",
+            "provider": "endpoint",
+            "enabled": True,
+            "options": [
+                {"key": "name", "value": "Post-call conversation analysis"},
+                {"key": "description", "value": "Summarize the completed conversation"},
+                {"key": "execution_priority", "value": "0"},
+                {"key": "endpoint_id", "value": "{{analysisEndpointId}}"},
+                {"key": "endpoint_version", "value": "latest"},
+                {
+                    "key": "endpoint_parameters",
+                    "value": '{"conversation.messages":"messages","assistant.name":"assistantName"}',
+                },
+                {
+                    "key": "analysis.condition",
+                    "value": '[{"key":"conversation_mode","condition":"=","value":"voice"}]',
+                },
+            ],
+        },
+        "update": {
+            "configurationType": "analysis",
+            "provider": "endpoint",
+            "enabled": True,
+            "options": [
+                {"key": "name", "value": "Updated conversation analysis"},
+                {"key": "description", "value": "Analyze voice and text conversations"},
+                {"key": "execution_priority", "value": "3"},
+                {"key": "endpoint_id", "value": "{{analysisEndpointId}}"},
+                {"key": "endpoint_version", "value": "latest"},
+                {
+                    "key": "endpoint_parameters",
+                    "value": '{"conversation.id":"conversationId","assistant.name":"assistantName"}',
+                },
+                {
+                    "key": "analysis.condition",
+                    "value": '[{"key":"conversation_mode","condition":"=","value":"text"}]',
+                },
+            ],
+        },
+    },
+]
+
+
 COLLECTION_VARIABLES: list[dict[str, str]] = [
     {"key": "baseUrl", "value": "http://localhost:9007", "type": "string"},
-    {"key": "authToken", "value": "", "type": "string"},
+    {"key": "apiKey", "value": "", "type": "string"},
     {"key": "authId", "value": "", "type": "string"},
     {"key": "projectId", "value": "", "type": "string"},
     {"key": "assistantId", "value": "1", "type": "string"},
-    {"key": "configurationId", "value": "1", "type": "string"},
+    {"key": "webhookConfigurationId", "value": "1", "type": "string"},
+    {"key": "storageConfigurationId", "value": "1", "type": "string"},
+    {"key": "authenticationConfigurationId", "value": "1", "type": "string"},
+    {"key": "analysisConfigurationId", "value": "1", "type": "string"},
     {"key": "apiDeploymentId", "value": "1", "type": "string"},
+    {"key": "debuggerDeploymentId", "value": "1", "type": "string"},
+    {"key": "phoneDeploymentId", "value": "1", "type": "string"},
+    {"key": "webpluginDeploymentId", "value": "1", "type": "string"},
+    {"key": "whatsappDeploymentId", "value": "1", "type": "string"},
     {"key": "page", "value": "1", "type": "string"},
     {"key": "pageSize", "value": "20", "type": "string"},
     {"key": "sourceIdentifier", "value": "1", "type": "string"},
@@ -206,6 +377,9 @@ COLLECTION_VARIABLES: list[dict[str, str]] = [
     {"key": "whatsappProviderName", "value": "twilio", "type": "string"},
     {"key": "callerId", "value": "+15551234567", "type": "string"},
     {"key": "whatsappBusinessNumber", "value": "+15551234567", "type": "string"},
+    {"key": "webhookToken", "value": "replace-with-webhook-token", "type": "string"},
+    {"key": "storageCredentialId", "value": "1", "type": "string"},
+    {"key": "analysisEndpointId", "value": "1", "type": "string"},
 ]
 
 
@@ -221,6 +395,185 @@ def success_tests() -> list[str]:
         "pm.test('success is true', function () {",
         "  pm.expect(jsonData.success).to.eql(true);",
         "});",
+    ]
+
+
+def configuration_option_tests(body: dict[str, Any], message: str) -> list[str]:
+    expected_options = {
+        option["key"]: option["value"] for option in body.get("options", [])
+    }
+    return [
+        f"pm.test({json.dumps(message)}, function () {{",
+        "  const data = jsonData.data || {};",
+        "  const optionMap = new Map((data.options || []).map(option => [option.key, option.value]));",
+        f"  const expectedOptions = {json.dumps(expected_options)};",
+        "  Object.entries(expectedOptions).forEach(function ([key, value]) {",
+        "    pm.expect(optionMap.get(key), key).to.eql(pm.variables.replaceIn(value));",
+        "  });",
+        "});",
+    ]
+
+
+def configuration_smoke_steps(
+    start: int,
+    variant: dict[str, Any],
+) -> list[dict[str, Any]]:
+    label = variant["label"]
+    configuration_type = variant["configurationType"]
+    provider = variant["provider"]
+    variable = variant["variable"]
+    create_body = variant["create"]
+    update_body = variant["update"]
+    return [
+        {
+            "name": f"{start:02d} Create {label} Configuration",
+            "operationId": "createAssistantConfiguration",
+            "body": create_body,
+            "tests": [
+                *success_tests(),
+                f"pm.test('{label.lower()} configuration is created', function () {{",
+                "  const data = jsonData.data || {};",
+                "  pm.expect(data.assistantId).to.eql(pm.collectionVariables.get('assistantId'));",
+                f"  pm.expect(data.configurationType).to.eql('{configuration_type}');",
+                f"  pm.expect(data.provider).to.eql('{provider}');",
+                "  pm.expect(data.enabled).to.eql(true);",
+                "  pm.expect(data.id).to.exist;",
+                "});",
+                *configuration_option_tests(
+                    create_body,
+                    f"{label.lower()} create options match the UI payload",
+                ),
+                "if (jsonData.data && jsonData.data.id) {",
+                f"  pm.collectionVariables.set('{variable}', String(jsonData.data.id));",
+                "}",
+            ],
+        },
+        {
+            "name": f"{start + 1:02d} Get {label} Configuration",
+            "operationId": "getAssistantConfiguration",
+            "configurationVariable": variable,
+            "tests": [
+                *success_tests(),
+                f"pm.test('get returns created {label.lower()} configuration', function () {{",
+                "  const data = jsonData.data || {};",
+                f"  pm.expect(data.id).to.eql(pm.collectionVariables.get('{variable}'));",
+                "  pm.expect(data.assistantId).to.eql(pm.collectionVariables.get('assistantId'));",
+                f"  pm.expect(data.configurationType).to.eql('{configuration_type}');",
+                f"  pm.expect(data.provider).to.eql('{provider}');",
+                "});",
+                *configuration_option_tests(
+                    create_body,
+                    f"{label.lower()} get returns the create options",
+                ),
+            ],
+        },
+        {
+            "name": f"{start + 2:02d} Update {label} Configuration",
+            "operationId": "updateAssistantConfiguration",
+            "configurationVariable": variable,
+            "body": update_body,
+            "tests": [
+                *success_tests(),
+                f"pm.test('{label.lower()} configuration is updated', function () {{",
+                "  const data = jsonData.data || {};",
+                f"  pm.expect(data.id).to.eql(pm.collectionVariables.get('{variable}'));",
+                f"  pm.expect(data.configurationType).to.eql('{configuration_type}');",
+                f"  pm.expect(data.provider).to.eql('{provider}');",
+                "  pm.expect(data.enabled).to.eql(true);",
+                "});",
+                *configuration_option_tests(
+                    update_body,
+                    f"{label.lower()} update options match the UI payload",
+                ),
+            ],
+        },
+        {
+            "name": f"{start + 3:02d} Get Updated {label} Configuration",
+            "operationId": "getAssistantConfiguration",
+            "configurationVariable": variable,
+            "tests": [
+                *success_tests(),
+                f"pm.test('get returns updated {label.lower()} configuration', function () {{",
+                "  const data = jsonData.data || {};",
+                f"  pm.expect(data.id).to.eql(pm.collectionVariables.get('{variable}'));",
+                f"  pm.expect(data.configurationType).to.eql('{configuration_type}');",
+                f"  pm.expect(data.provider).to.eql('{provider}');",
+                "});",
+                *configuration_option_tests(
+                    update_body,
+                    f"{label.lower()} get returns the updated options",
+                ),
+            ],
+        },
+    ]
+
+
+def delete_configuration_smoke_step(
+    number: int,
+    variant: dict[str, Any],
+) -> dict[str, Any]:
+    label = variant["label"]
+    variable = variant["variable"]
+    return {
+        "name": f"{number:02d} Delete {label} Configuration",
+        "operationId": "deleteAssistantConfiguration",
+        "configurationVariable": variable,
+        "tests": [
+            *success_tests(),
+            f"pm.test('deleted {label.lower()} configuration is returned', function () {{",
+            "  const data = jsonData.data || {};",
+            f"  pm.expect(data.id).to.eql(pm.collectionVariables.get('{variable}'));",
+            "});",
+        ],
+    }
+
+
+def deployment_smoke_steps(
+    start: int,
+    label: str,
+    operation_fragment: str,
+    variable: str,
+) -> list[dict[str, Any]]:
+    deployment_name = label.lower()
+    return [
+        {
+            "name": f"{start:02d} Create {label} Deployment",
+            "operationId": f"createAssistant{operation_fragment}Deployment",
+            "tests": [
+                *success_tests(),
+                f"pm.test('{deployment_name} deployment is created', function () {{",
+                "  const data = jsonData.data || {};",
+                "  pm.expect(data.assistantId).to.eql(pm.collectionVariables.get('assistantId'));",
+                "  pm.expect(data.id).to.exist;",
+                "});",
+                "if (jsonData.data && jsonData.data.id) {",
+                f"  pm.collectionVariables.set('{variable}', String(jsonData.data.id));",
+                "}",
+            ],
+        },
+        {
+            "name": f"{start + 1:02d} Get Latest {label} Deployment",
+            "operationId": f"getAssistant{operation_fragment}Deployment",
+            "tests": [
+                *success_tests(),
+                f"pm.test('latest {deployment_name} deployment matches created deployment', function () {{",
+                "  const data = jsonData.data || {};",
+                f"  pm.expect(data.id).to.eql(pm.collectionVariables.get('{variable}'));",
+                "  pm.expect(data.assistantId).to.eql(pm.collectionVariables.get('assistantId'));",
+                "});",
+            ],
+        },
+        {
+            "name": f"{start + 2:02d} List {label} Deployments",
+            "operationId": f"getAllAssistant{operation_fragment}Deployment",
+            "tests": [
+                *success_tests(),
+                f"pm.test('list includes created {deployment_name} deployment', function () {{",
+                "  const ids = (jsonData.data || []).map(item => String(item.id));",
+                f"  pm.expect(ids).to.include(pm.collectionVariables.get('{variable}'));",
+                "});",
+            ],
+        },
     ]
 
 
@@ -240,129 +593,33 @@ SMOKE_FLOW_STEPS: list[dict[str, Any]] = [
             "}",
         ],
     },
+    *configuration_smoke_steps(2, CONFIGURATION_VARIANTS[0]),
+    *configuration_smoke_steps(6, CONFIGURATION_VARIANTS[1]),
+    *configuration_smoke_steps(10, CONFIGURATION_VARIANTS[2]),
+    *configuration_smoke_steps(14, CONFIGURATION_VARIANTS[3]),
     {
-        "name": "02 Create Configuration",
-        "operationId": "createAssistantConfiguration",
-        "tests": [
-            *success_tests(),
-            "pm.test('configuration is created for assistant', function () {",
-            "  const data = jsonData.data || {};",
-            "  pm.expect(data.assistantId).to.eql(pm.collectionVariables.get('assistantId'));",
-            "  pm.expect(data.configurationType).to.eql('webhook');",
-            "  pm.expect(data.provider).to.eql('custom');",
-            "});",
-            "if (jsonData.data && jsonData.data.id) {",
-            "  pm.collectionVariables.set('configurationId', String(jsonData.data.id));",
-            "}",
-        ],
-    },
-    {
-        "name": "03 Get Configuration",
-        "operationId": "getAssistantConfiguration",
-        "tests": [
-            *success_tests(),
-            "pm.test('get returns created configuration', function () {",
-            "  const data = jsonData.data || {};",
-            "  pm.expect(data.id).to.eql(pm.collectionVariables.get('configurationId'));",
-            "  pm.expect(data.assistantId).to.eql(pm.collectionVariables.get('assistantId'));",
-            "  pm.expect(data.provider).to.eql('custom');",
-            "});",
-        ],
-    },
-    {
-        "name": "04 List Configurations",
+        "name": "18 List Configurations",
         "operationId": "getAllAssistantConfiguration",
         "tests": [
             *success_tests(),
-            "pm.test('list includes created configuration', function () {",
+            "pm.test('list includes all created configurations', function () {",
             "  const ids = (jsonData.data || []).map(item => String(item.id));",
-            "  pm.expect(ids).to.include(pm.collectionVariables.get('configurationId'));",
-            "});",
-        ],
-    },
-    {
-        "name": "05 Update Configuration",
-        "operationId": "updateAssistantConfiguration",
-        "body": {
-            "configurationType": "webhook",
-            "provider": "custom-v2",
-            "enabled": False,
-            "options": [
-                {"key": "url", "value": "https://example.com/webhook-v2"},
+            *[
+                f"  pm.expect(ids).to.include(pm.collectionVariables.get('{variant['variable']}'));"
+                for variant in CONFIGURATION_VARIANTS
             ],
-        },
-        "tests": [
-            *success_tests(),
-            "pm.test('configuration is updated', function () {",
-            "  const data = jsonData.data || {};",
-            "  pm.expect(data.id).to.eql(pm.collectionVariables.get('configurationId'));",
-            "  pm.expect(data.provider).to.eql('custom-v2');",
-            "  pm.expect(data.enabled).to.eql(false);",
             "});",
         ],
     },
-    {
-        "name": "06 Get Updated Configuration",
-        "operationId": "getAssistantConfiguration",
-        "tests": [
-            *success_tests(),
-            "pm.test('get returns updated configuration', function () {",
-            "  const data = jsonData.data || {};",
-            "  pm.expect(data.id).to.eql(pm.collectionVariables.get('configurationId'));",
-            "  pm.expect(data.provider).to.eql('custom-v2');",
-            "  pm.expect(data.enabled).to.eql(false);",
-            "});",
-        ],
-    },
-    {
-        "name": "07 Create API Deployment",
-        "operationId": "createAssistantApiDeployment",
-        "tests": [
-            *success_tests(),
-            "pm.test('api deployment is created', function () {",
-            "  const data = jsonData.data || {};",
-            "  pm.expect(data.assistantId).to.eql(pm.collectionVariables.get('assistantId'));",
-            "  pm.expect(data.greeting).to.eql('Hello, how can I help you today?');",
-            "});",
-            "if (jsonData.data && jsonData.data.id) {",
-            "  pm.collectionVariables.set('apiDeploymentId', String(jsonData.data.id));",
-            "}",
-        ],
-    },
-    {
-        "name": "08 Get Latest API Deployment",
-        "operationId": "getAssistantApiDeployment",
-        "tests": [
-            *success_tests(),
-            "pm.test('latest api deployment matches created deployment', function () {",
-            "  const data = jsonData.data || {};",
-            "  pm.expect(data.id).to.eql(pm.collectionVariables.get('apiDeploymentId'));",
-            "  pm.expect(data.assistantId).to.eql(pm.collectionVariables.get('assistantId'));",
-            "});",
-        ],
-    },
-    {
-        "name": "09 List API Deployments",
-        "operationId": "getAllAssistantApiDeployment",
-        "tests": [
-            *success_tests(),
-            "pm.test('list includes created api deployment', function () {",
-            "  const ids = (jsonData.data || []).map(item => String(item.id));",
-            "  pm.expect(ids).to.include(pm.collectionVariables.get('apiDeploymentId'));",
-            "});",
-        ],
-    },
-    {
-        "name": "10 Delete Configuration",
-        "operationId": "deleteAssistantConfiguration",
-        "tests": [
-            *success_tests(),
-            "pm.test('deleted configuration is returned', function () {",
-            "  const data = jsonData.data || {};",
-            "  pm.expect(data.id).to.eql(pm.collectionVariables.get('configurationId'));",
-            "});",
-        ],
-    },
+    *deployment_smoke_steps(19, "API", "Api", "apiDeploymentId"),
+    *deployment_smoke_steps(22, "Debugger", "Debugger", "debuggerDeploymentId"),
+    *deployment_smoke_steps(25, "Phone", "Phone", "phoneDeploymentId"),
+    *deployment_smoke_steps(28, "Webplugin", "Webplugin", "webpluginDeploymentId"),
+    *deployment_smoke_steps(31, "WhatsApp", "Whatsapp", "whatsappDeploymentId"),
+    *[
+        delete_configuration_smoke_step(34 + index, variant)
+        for index, variant in enumerate(CONFIGURATION_VARIANTS)
+    ],
 ]
 
 
@@ -473,6 +730,7 @@ def main() -> int:
 
 def build_collection(ctx: OpenApiContext) -> dict[str, Any]:
     spec = ctx.root
+    operation_index = index_operations(spec)
     folders: dict[str, dict[str, Any]] = {
         "Assistant": {"name": "Assistant", "item": []},
         "Assistant Configurations": {"name": "Assistant Configurations", "item": []},
@@ -495,6 +753,11 @@ def build_collection(ctx: OpenApiContext) -> dict[str, Any]:
             group = group_for(path, operation["operationId"])
             if group[0] == "Assistant Deployments":
                 deployment_folders[group[1]]["item"].append(item)
+            elif (
+                group[0] == "Assistant Configurations"
+                and operation["operationId"] != "getAllAssistantConfiguration"
+            ):
+                continue
             else:
                 folders[group[0]]["item"].append(item)
 
@@ -502,6 +765,9 @@ def build_collection(ctx: OpenApiContext) -> dict[str, Any]:
         sort_items(folder["item"])
     for folder in folders["Assistant Deployments"]["item"]:
         sort_items(folder["item"])
+    folders["Assistant Configurations"]["item"].extend(
+        build_configuration_collection_folders(ctx, operation_index)
+    )
 
     return {
         "info": {
@@ -516,8 +782,8 @@ def build_collection(ctx: OpenApiContext) -> dict[str, Any]:
         "auth": {
             "type": "apikey",
             "apikey": [
-                {"key": "key", "value": "authorization", "type": "string"},
-                {"key": "value", "value": "{{authToken}}", "type": "string"},
+                {"key": "key", "value": "x-api-key", "type": "string"},
+                {"key": "value", "value": "{{apiKey}}", "type": "string"},
                 {"key": "in", "value": "header", "type": "string"},
             ],
         },
@@ -563,8 +829,8 @@ def build_smoke_collection(ctx: OpenApiContext) -> dict[str, Any]:
         "auth": {
             "type": "apikey",
             "apikey": [
-                {"key": "key", "value": "authorization", "type": "string"},
-                {"key": "value", "value": "{{authToken}}", "type": "string"},
+                {"key": "key", "value": "x-api-key", "type": "string"},
+                {"key": "value", "value": "{{apiKey}}", "type": "string"},
                 {"key": "in", "value": "header", "type": "string"},
             ],
         },
@@ -592,6 +858,12 @@ def build_smoke_flow(
         path, method, operation = operation_index[step["operationId"]]
         item = build_item(ctx, path, method, operation)
         item["name"] = step["name"]
+        if "configurationVariable" in step:
+            replace_item_variable(
+                item,
+                "configurationId",
+                step["configurationVariable"],
+            )
         item["event"] = [
             {
                 "listen": "test",
@@ -609,6 +881,66 @@ def build_smoke_flow(
             }
         items.append(item)
     return items
+
+
+def build_configuration_collection_folders(
+    ctx: OpenApiContext,
+    operation_index: dict[str, tuple[str, str, dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    folders = []
+    operation_ids = [
+        "createAssistantConfiguration",
+        "getAssistantConfiguration",
+        "updateAssistantConfiguration",
+        "deleteAssistantConfiguration",
+    ]
+    for variant in CONFIGURATION_VARIANTS:
+        items = []
+        for operation_id in operation_ids:
+            path, method, operation = operation_index[operation_id]
+            item = build_item(ctx, path, method, operation)
+            action = {
+                "createAssistantConfiguration": "Create",
+                "getAssistantConfiguration": "Get",
+                "updateAssistantConfiguration": "Update",
+                "deleteAssistantConfiguration": "Delete",
+            }[operation_id]
+            item["name"] = f"{action} {variant['label']} Configuration"
+            replace_item_variable(item, "configurationId", variant["variable"])
+            if operation_id == "createAssistantConfiguration":
+                set_item_body(item, variant["create"])
+                item["event"] = capture_variable_event(
+                    variant["variable"],
+                    f"{variant['label'].lower()} configuration id",
+                )
+            elif operation_id == "updateAssistantConfiguration":
+                set_item_body(item, variant["update"])
+            items.append(item)
+        folders.append({"name": variant["label"], "item": items})
+    return folders
+
+
+def set_item_body(item: dict[str, Any], body: dict[str, Any]) -> None:
+    item["request"]["body"] = {
+        "mode": "raw",
+        "raw": json.dumps(body, indent=2),
+        "options": {"raw": {"language": "json"}},
+    }
+
+
+def replace_item_variable(item: Any, old: str, new: str) -> None:
+    if isinstance(item, dict):
+        for key, value in item.items():
+            if isinstance(value, str):
+                item[key] = value.replace(f"{{{{{old}}}}}", f"{{{{{new}}}}}")
+            else:
+                replace_item_variable(value, old, new)
+    elif isinstance(item, list):
+        for index, value in enumerate(item):
+            if isinstance(value, str):
+                item[index] = value.replace(f"{{{{{old}}}}}", f"{{{{{new}}}}}")
+            else:
+                replace_item_variable(value, old, new)
 
 
 def sort_items(items: list[dict[str, Any]]) -> None:
@@ -717,7 +1049,7 @@ def query_value(name: str, schema: dict[str, Any]) -> str:
     if name == "configurationType":
         return "webhook"
     if name == "provider":
-        return "custom"
+        return "http"
     return sample_scalar(schema, name)
 
 
@@ -869,6 +1201,10 @@ def capture_events(operation_id: str) -> list[dict[str, Any]]:
     if operation_id not in capture_map:
         return []
     variable, label = capture_map[operation_id]
+    return capture_variable_event(variable, label)
+
+
+def capture_variable_event(variable: str, label: str) -> list[dict[str, Any]]:
     return [
         {
             "listen": "test",

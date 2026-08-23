@@ -31,7 +31,7 @@ func (deploymentApi *AssistantDeploymentApi) GetAssistantDebuggerDeploymentRest(
 		})
 		return
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
 	if scopeErr != nil {
 		c.JSON(pkg_errors.GetAssistantDebuggerDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.GetAssistantDebuggerDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
@@ -59,7 +59,7 @@ func (deploymentApi *AssistantDeploymentApi) GetAssistantDebuggerDeploymentRest(
 		return
 	}
 
-	deployment, err := deploymentApi.deploymentService.GetAssistantDebuggerDeployment(c, iAuth, assistantId)
+	deployment, err := deploymentApi.deploymentService.GetAssistantDebuggerDeployment(c.Request.Context(), iAuth, assistantId)
 	if err != nil {
 		deploymentApi.logger.Errorf("unable to get assistant debugger deployment: %v", err)
 		c.JSON(pkg_errors.GetAssistantDebuggerDeploymentGetDeployment.HTTPStatusCode, openapi.ErrorResponse{

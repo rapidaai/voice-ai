@@ -34,20 +34,27 @@ npx --yes newman run openapi/postman/assistant-api/assistant-api.smoke.postman_c
   --folder "Smoke Flow" \
   --bail \
   --env-var baseUrl=http://localhost:9007 \
-  --env-var authToken="$AUTH_TOKEN" \
-  --env-var authId="$AUTH_ID" \
-  --env-var projectId="$PROJECT_ID"
+  --env-var apiKey="$API_KEY"
 ```
 
-`authToken` must be the raw Rapida auth token without a `Bearer ` prefix. The assistant API also requires the authenticated user ID in `x-auth-id` and the selected project ID in `x-project-id`.
+`apiKey` must be the raw project API key without a prefix. The collection sends it
+through the `x-api-key` header, which establishes project scope without requiring
+`x-auth-id` or `x-project-id` values.
 
-The assistant-api smoke flow runs:
+The assistant-api smoke flow runs all OpenAPI-managed REST operations:
 
 1. Create assistant and capture `assistantId`
-2. Create configuration and capture `configurationId`
-3. Get/list/update/get/delete configuration
-4. Create API deployment and capture `apiDeploymentId`
-5. Get/list API deployments
+2. Create/get/update/get webhook configuration using the UI option fields
+3. Create/get/update/get storage configuration using AWS destination fields
+4. Create/get/update/get HTTP authentication configuration
+5. Create/get/update/get endpoint analysis configuration
+6. List all configurations and verify every captured configuration ID
+7. Create/get/list API, debugger, phone, webplugin, and WhatsApp deployments
+8. Delete webhook, storage, authentication, and analysis configurations
+
+The customer collection groups webhook, storage, authentication, and analysis
+requests separately. Set `storageCredentialId` and `analysisEndpointId` to real
+resource IDs when the downstream runtime will execute those configurations.
 
 ## Regeneration
 

@@ -32,7 +32,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantDebuggerDeploymentRe
 		})
 		return
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
 	if scopeErr != nil {
 		c.JSON(pkg_errors.CreateAssistantDebuggerDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantDebuggerDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
@@ -212,7 +212,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantDebuggerDeploymentRe
 	}
 
 	deployment, err := deploymentApi.deploymentService.CreateDebuggerDeployment(
-		c,
+		c.Request.Context(),
 		iAuth,
 		assistantId,
 		request.Greeting,

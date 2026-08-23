@@ -65,6 +65,25 @@ func TestCreateAssistantApiDeploymentRest_HappyPath(t *testing.T) {
 	assert.Equal(t, false, data["greetingInterruptible"])
 }
 
+func TestCreateAssistantApiDeploymentRest_AllowsProjectScope(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	deploymentApi := newCreateDebuggerDeploymentRestApi(t, &createDebuggerDeploymentRestServiceStub{})
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(
+		http.MethodPost,
+		"/v1/assistant-deployment/create-api-deployment",
+		bytes.NewReader([]byte(`{}`)),
+	)
+	context.Request.Header.Set("Content-Type", "application/json")
+	attachTestAuthentication(context, testProjectAuthentication(22, 33))
+
+	deploymentApi.CreateAssistantApiDeploymentRest(context)
+
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+}
+
 func TestCreateAssistantApiDeploymentRest_InvalidAudioProvider(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	deploymentApi := newCreateDebuggerDeploymentRestApi(t, &createDebuggerDeploymentRestServiceStub{})

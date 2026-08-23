@@ -10,12 +10,12 @@
     "apikey": [
       {
         "key": "key",
-        "value": "authorization",
+        "value": "x-api-key",
         "type": "string"
       },
       {
         "key": "value",
-        "value": "{{authToken}}",
+        "value": "{{apiKey}}",
         "type": "string"
       },
       {
@@ -48,7 +48,7 @@
       "type": "string"
     },
     {
-      "key": "authToken",
+      "key": "apiKey",
       "value": "",
       "type": "string"
     },
@@ -68,12 +68,47 @@
       "type": "string"
     },
     {
-      "key": "configurationId",
+      "key": "webhookConfigurationId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "storageConfigurationId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "authenticationConfigurationId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "analysisConfigurationId",
       "value": "1",
       "type": "string"
     },
     {
       "key": "apiDeploymentId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "debuggerDeploymentId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "phoneDeploymentId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "webpluginDeploymentId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "whatsappDeploymentId",
       "value": "1",
       "type": "string"
     },
@@ -125,6 +160,21 @@
     {
       "key": "whatsappBusinessNumber",
       "value": "+15551234567",
+      "type": "string"
+    },
+    {
+      "key": "webhookToken",
+      "value": "replace-with-webhook-token",
+      "type": "string"
+    },
+    {
+      "key": "storageCredentialId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "analysisEndpointId",
+      "value": "1",
       "type": "string"
     }
   ],
@@ -200,68 +250,6 @@
       "name": "Assistant Configurations",
       "item": [
         {
-          "name": "Create Configuration",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "x-auth-id",
-                "value": "{{authId}}"
-              },
-              {
-                "key": "x-project-id",
-                "value": "{{projectId}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/v1/assistant/configurations",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "v1",
-                "assistant",
-                "configurations"
-              ]
-            },
-            "description": "Create assistant configuration\n\nOpenAPI operationId: `createAssistantConfiguration`.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"assistantId\": \"{{assistantId}}\",\n  \"configurationType\": \"webhook\",\n  \"provider\": \"custom\",\n  \"enabled\": true,\n  \"options\": [\n    {\n      \"key\": \"url\",\n      \"value\": \"https://example.com/webhook\"\n    },\n    {\n      \"key\": \"method\",\n      \"value\": \"POST\"\n    }\n  ]\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "let jsonData = {};",
-                  "try { jsonData = pm.response.json(); } catch (e) {}",
-                  "if (jsonData && jsonData.data && jsonData.data.id) {",
-                  "  pm.collectionVariables.set('configurationId', String(jsonData.data.id));",
-                  "  console.log('Captured configuration id: ' + jsonData.data.id);",
-                  "}"
-                ]
-              }
-            }
-          ]
-        },
-        {
           "name": "List Configurations",
           "request": {
             "method": "GET",
@@ -299,7 +287,7 @@
                 },
                 {
                   "key": "provider",
-                  "value": "custom",
+                  "value": "http",
                   "description": "Optional query parameter.",
                   "disabled": true
                 },
@@ -320,122 +308,744 @@
           "response": []
         },
         {
-          "name": "Get Configuration",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "x-auth-id",
-                "value": "{{authId}}"
-              },
-              {
-                "key": "x-project-id",
-                "value": "{{projectId}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{configurationId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "v1",
-                "assistant",
-                "configurations",
-                "{{assistantId}}",
-                "{{configurationId}}"
-              ]
-            },
-            "description": "Get assistant configuration\n\nOpenAPI operationId: `getAssistantConfiguration`."
-          },
-          "response": []
-        },
-        {
-          "name": "Update Configuration",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "x-auth-id",
-                "value": "{{authId}}"
-              },
-              {
-                "key": "x-project-id",
-                "value": "{{projectId}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{configurationId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "v1",
-                "assistant",
-                "configurations",
-                "{{assistantId}}",
-                "{{configurationId}}"
-              ]
-            },
-            "description": "Update assistant configuration\n\nOpenAPI operationId: `updateAssistantConfiguration`.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"configurationType\": \"webhook\",\n  \"provider\": \"custom\",\n  \"enabled\": true,\n  \"options\": [\n    {\n      \"key\": \"url\",\n      \"value\": \"https://example.com/webhook\"\n    },\n    {\n      \"key\": \"method\",\n      \"value\": \"POST\"\n    }\n  ]\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
+          "name": "Webhook",
+          "item": [
+            {
+              "name": "Create Webhook Configuration",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-auth-id",
+                    "value": "{{authId}}"
+                  },
+                  {
+                    "key": "x-project-id",
+                    "value": "{{projectId}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant/configurations",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant",
+                    "configurations"
+                  ]
+                },
+                "description": "Create assistant configuration\n\nOpenAPI operationId: `createAssistantConfiguration`.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"assistantId\": \"{{assistantId}}\",\n  \"configurationType\": \"webhook\",\n  \"provider\": \"http\",\n  \"enabled\": true,\n  \"options\": [\n    {\n      \"key\": \"http_method\",\n      \"value\": \"POST\"\n    },\n    {\n      \"key\": \"http_url\",\n      \"value\": \"https://api.example.com/webhook\"\n    },\n    {\n      \"key\": \"http_headers\",\n      \"value\": \"{\\\"Authorization\\\":\\\"Bearer {{webhookToken}}\\\",\\\"X-Webhook-Source\\\":\\\"postman\\\"}\"\n    },\n    {\n      \"key\": \"retry_status_codes\",\n      \"value\": \"[\\\"50X\\\"]\"\n    },\n    {\n      \"key\": \"max_retry_count\",\n      \"value\": \"2\"\n    },\n    {\n      \"key\": \"timeout_seconds\",\n      \"value\": \"220\"\n    },\n    {\n      \"key\": \"assistant_events\",\n      \"value\": \"[\\\"webrtc.connected\\\"]\"\n    },\n    {\n      \"key\": \"execution_priority\",\n      \"value\": \"4\"\n    },\n    {\n      \"key\": \"description\",\n      \"value\": \"Postman webhook configuration\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 }
-              }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Delete Configuration",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
               },
-              {
-                "key": "x-auth-id",
-                "value": "{{authId}}"
-              },
-              {
-                "key": "x-project-id",
-                "value": "{{projectId}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{configurationId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "v1",
-                "assistant",
-                "configurations",
-                "{{assistantId}}",
-                "{{configurationId}}"
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "let jsonData = {};",
+                      "try { jsonData = pm.response.json(); } catch (e) {}",
+                      "if (jsonData && jsonData.data && jsonData.data.id) {",
+                      "  pm.collectionVariables.set('webhookConfigurationId', String(jsonData.data.id));",
+                      "  console.log('Captured webhook configuration id: ' + jsonData.data.id);",
+                      "}"
+                    ]
+                  }
+                }
               ]
             },
-            "description": "Delete assistant configuration\n\nOpenAPI operationId: `deleteAssistantConfiguration`."
-          },
-          "response": []
+            {
+              "name": "Get Webhook Configuration",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-auth-id",
+                    "value": "{{authId}}"
+                  },
+                  {
+                    "key": "x-project-id",
+                    "value": "{{projectId}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{webhookConfigurationId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant",
+                    "configurations",
+                    "{{assistantId}}",
+                    "{{webhookConfigurationId}}"
+                  ]
+                },
+                "description": "Get assistant configuration\n\nOpenAPI operationId: `getAssistantConfiguration`."
+              },
+              "response": []
+            },
+            {
+              "name": "Update Webhook Configuration",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-auth-id",
+                    "value": "{{authId}}"
+                  },
+                  {
+                    "key": "x-project-id",
+                    "value": "{{projectId}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{webhookConfigurationId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant",
+                    "configurations",
+                    "{{assistantId}}",
+                    "{{webhookConfigurationId}}"
+                  ]
+                },
+                "description": "Update assistant configuration\n\nOpenAPI operationId: `updateAssistantConfiguration`.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"configurationType\": \"webhook\",\n  \"provider\": \"http\",\n  \"enabled\": true,\n  \"options\": [\n    {\n      \"key\": \"http_method\",\n      \"value\": \"POST\"\n    },\n    {\n      \"key\": \"http_url\",\n      \"value\": \"https://hooks.example.com/incoming\"\n    },\n    {\n      \"key\": \"http_headers\",\n      \"value\": \"{\\\"X-Webhook-Version\\\":\\\"2\\\"}\"\n    },\n    {\n      \"key\": \"retry_status_codes\",\n      \"value\": \"[\\\"40X\\\",\\\"50X\\\"]\"\n    },\n    {\n      \"key\": \"max_retry_count\",\n      \"value\": \"3\"\n    },\n    {\n      \"key\": \"timeout_seconds\",\n      \"value\": \"180\"\n    },\n    {\n      \"key\": \"assistant_events\",\n      \"value\": \"[\\\"conversation.begin\\\",\\\"webrtc.reconnecting\\\"]\"\n    },\n    {\n      \"key\": \"execution_priority\",\n      \"value\": \"1\"\n    },\n    {\n      \"key\": \"description\",\n      \"value\": \"Updated Postman webhook configuration\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Webhook Configuration",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-auth-id",
+                    "value": "{{authId}}"
+                  },
+                  {
+                    "key": "x-project-id",
+                    "value": "{{projectId}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{webhookConfigurationId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant",
+                    "configurations",
+                    "{{assistantId}}",
+                    "{{webhookConfigurationId}}"
+                  ]
+                },
+                "description": "Delete assistant configuration\n\nOpenAPI operationId: `deleteAssistantConfiguration`."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Storage",
+          "item": [
+            {
+              "name": "Create Storage Configuration",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-auth-id",
+                    "value": "{{authId}}"
+                  },
+                  {
+                    "key": "x-project-id",
+                    "value": "{{projectId}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant/configurations",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant",
+                    "configurations"
+                  ]
+                },
+                "description": "Create assistant configuration\n\nOpenAPI operationId: `createAssistantConfiguration`.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"assistantId\": \"{{assistantId}}\",\n  \"configurationType\": \"storage\",\n  \"provider\": \"aws\",\n  \"enabled\": true,\n  \"options\": [\n    {\n      \"key\": \"rapida.credential_id\",\n      \"value\": \"{{storageCredentialId}}\"\n    },\n    {\n      \"key\": \"s3_bucket_name\",\n      \"value\": \"rapida-assistant-recordings\"\n    },\n    {\n      \"key\": \"prefix\",\n      \"value\": \"postman/recordings\"\n    },\n    {\n      \"key\": \"files_to_push\",\n      \"value\": \"[\\\"recording.conversation\\\",\\\"recording.user\\\",\\\"recording.assistant\\\"]\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "let jsonData = {};",
+                      "try { jsonData = pm.response.json(); } catch (e) {}",
+                      "if (jsonData && jsonData.data && jsonData.data.id) {",
+                      "  pm.collectionVariables.set('storageConfigurationId', String(jsonData.data.id));",
+                      "  console.log('Captured storage configuration id: ' + jsonData.data.id);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get Storage Configuration",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-auth-id",
+                    "value": "{{authId}}"
+                  },
+                  {
+                    "key": "x-project-id",
+                    "value": "{{projectId}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{storageConfigurationId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant",
+                    "configurations",
+                    "{{assistantId}}",
+                    "{{storageConfigurationId}}"
+                  ]
+                },
+                "description": "Get assistant configuration\n\nOpenAPI operationId: `getAssistantConfiguration`."
+              },
+              "response": []
+            },
+            {
+              "name": "Update Storage Configuration",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-auth-id",
+                    "value": "{{authId}}"
+                  },
+                  {
+                    "key": "x-project-id",
+                    "value": "{{projectId}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{storageConfigurationId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant",
+                    "configurations",
+                    "{{assistantId}}",
+                    "{{storageConfigurationId}}"
+                  ]
+                },
+                "description": "Update assistant configuration\n\nOpenAPI operationId: `updateAssistantConfiguration`.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"configurationType\": \"storage\",\n  \"provider\": \"aws\",\n  \"enabled\": true,\n  \"options\": [\n    {\n      \"key\": \"rapida.credential_id\",\n      \"value\": \"{{storageCredentialId}}\"\n    },\n    {\n      \"key\": \"s3_bucket_name\",\n      \"value\": \"rapida-assistant-recordings-archive\"\n    },\n    {\n      \"key\": \"prefix\",\n      \"value\": \"postman/archive\"\n    },\n    {\n      \"key\": \"files_to_push\",\n      \"value\": \"[\\\"recording.conversation\\\",\\\"recording.assistant\\\"]\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Storage Configuration",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-auth-id",
+                    "value": "{{authId}}"
+                  },
+                  {
+                    "key": "x-project-id",
+                    "value": "{{projectId}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{storageConfigurationId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant",
+                    "configurations",
+                    "{{assistantId}}",
+                    "{{storageConfigurationId}}"
+                  ]
+                },
+                "description": "Delete assistant configuration\n\nOpenAPI operationId: `deleteAssistantConfiguration`."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Authentication",
+          "item": [
+            {
+              "name": "Create Authentication Configuration",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-auth-id",
+                    "value": "{{authId}}"
+                  },
+                  {
+                    "key": "x-project-id",
+                    "value": "{{projectId}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant/configurations",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant",
+                    "configurations"
+                  ]
+                },
+                "description": "Create assistant configuration\n\nOpenAPI operationId: `createAssistantConfiguration`.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"assistantId\": \"{{assistantId}}\",\n  \"configurationType\": \"authentication\",\n  \"provider\": \"http\",\n  \"enabled\": true,\n  \"options\": [\n    {\n      \"key\": \"http_method\",\n      \"value\": \"POST\"\n    },\n    {\n      \"key\": \"http_url\",\n      \"value\": \"https://auth.example.com/resolve\"\n    },\n    {\n      \"key\": \"http_headers\",\n      \"value\": \"{\\\"X-Auth-Source\\\":\\\"postman\\\"}\"\n    },\n    {\n      \"key\": \"http_body\",\n      \"value\": \"{\\\"assistant.id\\\":\\\"assistantId\\\",\\\"client.phone\\\":\\\"clientPhone\\\"}\"\n    },\n    {\n      \"key\": \"fail_behavior\",\n      \"value\": \"BLOCK\"\n    },\n    {\n      \"key\": \"timeout_ms\",\n      \"value\": \"5000\"\n    },\n    {\n      \"key\": \"authentication.condition\",\n      \"value\": \"[{\\\"key\\\":\\\"source\\\",\\\"condition\\\":\\\"=\\\",\\\"value\\\":\\\"all\\\"}]\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "let jsonData = {};",
+                      "try { jsonData = pm.response.json(); } catch (e) {}",
+                      "if (jsonData && jsonData.data && jsonData.data.id) {",
+                      "  pm.collectionVariables.set('authenticationConfigurationId', String(jsonData.data.id));",
+                      "  console.log('Captured authentication configuration id: ' + jsonData.data.id);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get Authentication Configuration",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-auth-id",
+                    "value": "{{authId}}"
+                  },
+                  {
+                    "key": "x-project-id",
+                    "value": "{{projectId}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{authenticationConfigurationId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant",
+                    "configurations",
+                    "{{assistantId}}",
+                    "{{authenticationConfigurationId}}"
+                  ]
+                },
+                "description": "Get assistant configuration\n\nOpenAPI operationId: `getAssistantConfiguration`."
+              },
+              "response": []
+            },
+            {
+              "name": "Update Authentication Configuration",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-auth-id",
+                    "value": "{{authId}}"
+                  },
+                  {
+                    "key": "x-project-id",
+                    "value": "{{projectId}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{authenticationConfigurationId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant",
+                    "configurations",
+                    "{{assistantId}}",
+                    "{{authenticationConfigurationId}}"
+                  ]
+                },
+                "description": "Update assistant configuration\n\nOpenAPI operationId: `updateAssistantConfiguration`.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"configurationType\": \"authentication\",\n  \"provider\": \"http\",\n  \"enabled\": true,\n  \"options\": [\n    {\n      \"key\": \"http_method\",\n      \"value\": \"POST\"\n    },\n    {\n      \"key\": \"http_url\",\n      \"value\": \"https://auth.example.com/v2/resolve\"\n    },\n    {\n      \"key\": \"http_headers\",\n      \"value\": \"{\\\"X-Auth-Source\\\":\\\"postman\\\",\\\"X-Auth-Version\\\":\\\"2\\\"}\"\n    },\n    {\n      \"key\": \"http_body\",\n      \"value\": \"{\\\"assistant.id\\\":\\\"assistantId\\\",\\\"client.phone\\\":\\\"clientPhone\\\",\\\"conversation.id\\\":\\\"conversationId\\\"}\"\n    },\n    {\n      \"key\": \"fail_behavior\",\n      \"value\": \"DO_NOTHING\"\n    },\n    {\n      \"key\": \"timeout_ms\",\n      \"value\": \"7500\"\n    },\n    {\n      \"key\": \"authentication.condition\",\n      \"value\": \"[{\\\"key\\\":\\\"source\\\",\\\"condition\\\":\\\"=\\\",\\\"value\\\":\\\"phone\\\"}]\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Authentication Configuration",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-auth-id",
+                    "value": "{{authId}}"
+                  },
+                  {
+                    "key": "x-project-id",
+                    "value": "{{projectId}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{authenticationConfigurationId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant",
+                    "configurations",
+                    "{{assistantId}}",
+                    "{{authenticationConfigurationId}}"
+                  ]
+                },
+                "description": "Delete assistant configuration\n\nOpenAPI operationId: `deleteAssistantConfiguration`."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Analysis",
+          "item": [
+            {
+              "name": "Create Analysis Configuration",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-auth-id",
+                    "value": "{{authId}}"
+                  },
+                  {
+                    "key": "x-project-id",
+                    "value": "{{projectId}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant/configurations",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant",
+                    "configurations"
+                  ]
+                },
+                "description": "Create assistant configuration\n\nOpenAPI operationId: `createAssistantConfiguration`.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"assistantId\": \"{{assistantId}}\",\n  \"configurationType\": \"analysis\",\n  \"provider\": \"endpoint\",\n  \"enabled\": true,\n  \"options\": [\n    {\n      \"key\": \"name\",\n      \"value\": \"Post-call conversation analysis\"\n    },\n    {\n      \"key\": \"description\",\n      \"value\": \"Summarize the completed conversation\"\n    },\n    {\n      \"key\": \"execution_priority\",\n      \"value\": \"0\"\n    },\n    {\n      \"key\": \"endpoint_id\",\n      \"value\": \"{{analysisEndpointId}}\"\n    },\n    {\n      \"key\": \"endpoint_version\",\n      \"value\": \"latest\"\n    },\n    {\n      \"key\": \"endpoint_parameters\",\n      \"value\": \"{\\\"conversation.messages\\\":\\\"messages\\\",\\\"assistant.name\\\":\\\"assistantName\\\"}\"\n    },\n    {\n      \"key\": \"analysis.condition\",\n      \"value\": \"[{\\\"key\\\":\\\"conversation_mode\\\",\\\"condition\\\":\\\"=\\\",\\\"value\\\":\\\"voice\\\"}]\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "let jsonData = {};",
+                      "try { jsonData = pm.response.json(); } catch (e) {}",
+                      "if (jsonData && jsonData.data && jsonData.data.id) {",
+                      "  pm.collectionVariables.set('analysisConfigurationId', String(jsonData.data.id));",
+                      "  console.log('Captured analysis configuration id: ' + jsonData.data.id);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get Analysis Configuration",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-auth-id",
+                    "value": "{{authId}}"
+                  },
+                  {
+                    "key": "x-project-id",
+                    "value": "{{projectId}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{analysisConfigurationId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant",
+                    "configurations",
+                    "{{assistantId}}",
+                    "{{analysisConfigurationId}}"
+                  ]
+                },
+                "description": "Get assistant configuration\n\nOpenAPI operationId: `getAssistantConfiguration`."
+              },
+              "response": []
+            },
+            {
+              "name": "Update Analysis Configuration",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-auth-id",
+                    "value": "{{authId}}"
+                  },
+                  {
+                    "key": "x-project-id",
+                    "value": "{{projectId}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{analysisConfigurationId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant",
+                    "configurations",
+                    "{{assistantId}}",
+                    "{{analysisConfigurationId}}"
+                  ]
+                },
+                "description": "Update assistant configuration\n\nOpenAPI operationId: `updateAssistantConfiguration`.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"configurationType\": \"analysis\",\n  \"provider\": \"endpoint\",\n  \"enabled\": true,\n  \"options\": [\n    {\n      \"key\": \"name\",\n      \"value\": \"Updated conversation analysis\"\n    },\n    {\n      \"key\": \"description\",\n      \"value\": \"Analyze voice and text conversations\"\n    },\n    {\n      \"key\": \"execution_priority\",\n      \"value\": \"3\"\n    },\n    {\n      \"key\": \"endpoint_id\",\n      \"value\": \"{{analysisEndpointId}}\"\n    },\n    {\n      \"key\": \"endpoint_version\",\n      \"value\": \"latest\"\n    },\n    {\n      \"key\": \"endpoint_parameters\",\n      \"value\": \"{\\\"conversation.id\\\":\\\"conversationId\\\",\\\"assistant.name\\\":\\\"assistantName\\\"}\"\n    },\n    {\n      \"key\": \"analysis.condition\",\n      \"value\": \"[{\\\"key\\\":\\\"conversation_mode\\\",\\\"condition\\\":\\\"=\\\",\\\"value\\\":\\\"text\\\"}]\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Analysis Configuration",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-auth-id",
+                    "value": "{{authId}}"
+                  },
+                  {
+                    "key": "x-project-id",
+                    "value": "{{projectId}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/assistant/configurations/{{assistantId}}/{{analysisConfigurationId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "assistant",
+                    "configurations",
+                    "{{assistantId}}",
+                    "{{analysisConfigurationId}}"
+                  ]
+                },
+                "description": "Delete assistant configuration\n\nOpenAPI operationId: `deleteAssistantConfiguration`."
+              },
+              "response": []
+            }
+          ]
         }
       ]
     },

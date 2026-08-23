@@ -658,9 +658,10 @@ func TestCreateAssistantDebuggerDeploymentRest_Unauthenticated(t *testing.T) {
 	assert.Contains(t, recorder.Body.String(), pkg_errors.CreateAssistantDebuggerDeploymentUnauthenticated.Error)
 }
 
-func TestCreateAssistantDebuggerDeploymentRest_MissingAuthScope(t *testing.T) {
+func TestCreateAssistantDebuggerDeploymentRest_ProjectScope(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	deploymentApi := newCreateDebuggerDeploymentRestApi(t, &createDebuggerDeploymentRestServiceStub{})
+	service := &createDebuggerDeploymentRestServiceStub{}
+	deploymentApi := newCreateDebuggerDeploymentRestApi(t, service)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -674,8 +675,8 @@ func TestCreateAssistantDebuggerDeploymentRest_MissingAuthScope(t *testing.T) {
 
 	deploymentApi.CreateAssistantDebuggerDeploymentRest(context)
 
-	require.Equal(t, http.StatusForbidden, recorder.Code)
-	assert.Contains(t, recorder.Body.String(), pkg_errors.CreateAssistantDebuggerDeploymentMissingAuthScope.Error)
+	require.Equal(t, http.StatusOK, recorder.Code)
+	assert.True(t, service.createCalled)
 }
 
 func TestCreateAssistantDebuggerDeploymentRest_InvalidAssistantID(t *testing.T) {

@@ -74,7 +74,7 @@ func (cApi *ConversationApi) CreateBulkPhoneCallRest(c *gin.Context) {
 	}
 
 	conversations := make([]openapi.AssistantConversation, 0, len(*ir.PhoneCalls))
-	observer := cApi.Observability(c, iAuth, observability.WithGracePeriod())
+	observer := cApi.Observability(c.Request.Context(), iAuth, observability.WithGracePeriod())
 	defer observer.Close(context.Background())
 	for _, phoneCall := range *ir.PhoneCalls {
 		if !validator.NonNil(phoneCall.ToNumber) || !validator.NotBlank(*phoneCall.ToNumber) {
@@ -146,7 +146,7 @@ func (cApi *ConversationApi) CreateBulkPhoneCallRest(c *gin.Context) {
 			})
 			return
 		}
-		result := cApi.channelPipeline.Run(c, channel_pipeline.OutboundRequestedPipeline{
+		result := cApi.channelPipeline.Run(c.Request.Context(), channel_pipeline.OutboundRequestedPipeline{
 			ID:          fmt.Sprintf("%d", assistant.GetAssistantId()),
 			Auth:        iAuth,
 			AssistantID: assistant.GetAssistantId(),

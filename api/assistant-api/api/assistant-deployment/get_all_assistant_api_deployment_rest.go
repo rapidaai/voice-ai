@@ -33,7 +33,7 @@ func (deploymentApi *AssistantDeploymentApi) GetAllAssistantApiDeploymentRest(c 
 		})
 		return
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
 	if scopeErr != nil {
 		c.JSON(pkg_errors.GetAllAssistantApiDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.GetAllAssistantApiDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
@@ -127,7 +127,7 @@ func (deploymentApi *AssistantDeploymentApi) GetAllAssistantApiDeploymentRest(c 
 		}
 	}
 
-	totalItems, deployments, err := deploymentApi.deploymentService.GetAllAssistantApiDeployment(c, iAuth, assistantId, criterias, paginate)
+	totalItems, deployments, err := deploymentApi.deploymentService.GetAllAssistantApiDeployment(c.Request.Context(), iAuth, assistantId, criterias, paginate)
 	if err != nil {
 		deploymentApi.logger.Errorf("unable to get all assistant api deployments: %v", err)
 		c.JSON(pkg_errors.GetAllAssistantApiDeploymentGetDeployment.HTTPStatusCode, openapi.ErrorResponse{

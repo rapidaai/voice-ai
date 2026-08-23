@@ -30,6 +30,7 @@ type createAssistantRestAssistantServiceStub struct {
 	createTagCalled       bool
 	providerDescription   string
 	createAssistantErr    error
+	createContextAuthErr  error
 }
 
 func attachTestAuthentication(ginContext *gin.Context, auth *types.Authentication) {
@@ -46,6 +47,16 @@ func testUserAuthentication(userID, organizationID, projectID uint64) *types.Aut
 		auth.ProjectValue = &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID}
 	}
 	return auth
+}
+
+func testProjectAuthentication(organizationID, projectID uint64) *types.Authentication {
+	actor := types.ActorIdentity{Type: types.ActorTypeProject, ID: projectID}
+	return &types.Authentication{
+		AuthType:          types.AuthTypeProject,
+		ActorValue:        &actor,
+		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+		ProjectValue:      &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID},
+	}
 }
 
 func (s *createAssistantRestAssistantServiceStub) Get(context.Context, *types.Authentication, uint64, *uint64, *internal_services.GetAssistantOption) (*internal_assistant_entity.Assistant, error) {
@@ -84,8 +95,9 @@ func (s *createAssistantRestAssistantServiceStub) UpdateAssistantDetail(context.
 	return nil, errors.New("not implemented")
 }
 
-func (s *createAssistantRestAssistantServiceStub) CreateAssistant(_ context.Context, auth *types.Authentication, name, description string, visibility string, source string, sourceIdentifier *uint64, language string) (*internal_assistant_entity.Assistant, error) {
+func (s *createAssistantRestAssistantServiceStub) CreateAssistant(ctx context.Context, auth *types.Authentication, name, description string, visibility string, source string, sourceIdentifier *uint64, language string) (*internal_assistant_entity.Assistant, error) {
 	s.createAssistantCalled = true
+	_, s.createContextAuthErr = types.Authorize(ctx)
 	if s.createAssistantErr != nil {
 		return nil, s.createAssistantErr
 	}
@@ -196,6 +208,7 @@ func TestCreateAssistantRest_HappyPath(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, recorder.Code)
 	assert.True(t, assistantService.createAssistantCalled)
+	require.NoError(t, assistantService.createContextAuthErr)
 	assert.True(t, assistantService.createProviderCalled)
 	assert.True(t, assistantService.attachProviderCalled)
 	assert.True(t, assistantService.createTagCalled)
@@ -204,6 +217,40 @@ func TestCreateAssistantRest_HappyPath(t *testing.T) {
 	var response map[string]interface{}
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
 	assert.Equal(t, true, response["success"])
+}
+
+func TestCreateAssistantRest_ProjectScope(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	assistantService := &createAssistantRestAssistantServiceStub{}
+	assistantApi := &assistantApi{
+		assistantService:          assistantService,
+		assistantKnowledgeService: createAssistantRestKnowledgeServiceStub{},
+	}
+	requestBody := []byte(`{
+		"name": "Project Assistant",
+		"assistantProvider": {
+			"model": {
+				"modelProviderName": "openai",
+				"template": {
+					"prompt": [{"role": "system", "content": "Help users"}]
+				}
+			}
+		}
+	}`)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodPost, "/v1/assistant/create-assistant", bytes.NewReader(requestBody))
+	context.Request.Header.Set("Content-Type", "application/json")
+	attachTestAuthentication(context, testProjectAuthentication(22, 33))
+
+	assistantApi.CreateAssistantRest(context)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	assert.True(t, assistantService.createAssistantCalled)
+	require.NoError(t, assistantService.createContextAuthErr)
+	assert.True(t, assistantService.createProviderCalled)
+	assert.True(t, assistantService.attachProviderCalled)
 }
 
 func TestCreateAssistantRest_MissingAuthScope(t *testing.T) {

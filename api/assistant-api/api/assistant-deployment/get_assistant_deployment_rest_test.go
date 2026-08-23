@@ -39,6 +39,21 @@ func TestGetAssistantApiDeploymentRest_HappyPath(t *testing.T) {
 	assert.Equal(t, "twilio", inputAudio["audioProvider"])
 }
 
+func TestGetAssistantApiDeploymentRest_AllowsProjectScope(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	deploymentApi := newCreateDebuggerDeploymentRestApi(t, &createDebuggerDeploymentRestServiceStub{})
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/v1/assistant-deployment/get-api-deployment/invalid", nil)
+	context.Params = gin.Params{{Key: "assistantId", Value: "invalid"}}
+	attachTestAuthentication(context, testProjectAuthentication(22, 33))
+
+	deploymentApi.GetAssistantApiDeploymentRest(context)
+
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+}
+
 func TestGetAssistantDebuggerDeploymentRest_HappyPath(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	service := &createDebuggerDeploymentRestServiceStub{}
@@ -239,6 +254,21 @@ func TestGetAllAssistantApiDeploymentRest_HappyPath(t *testing.T) {
 	paginated := response["paginated"].(map[string]interface{})
 	assert.Equal(t, float64(1), paginated["totalItem"])
 	assert.Equal(t, float64(2), paginated["currentPage"])
+}
+
+func TestGetAllAssistantApiDeploymentRest_AllowsProjectScope(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	deploymentApi := newCreateDebuggerDeploymentRestApi(t, &createDebuggerDeploymentRestServiceStub{})
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/v1/assistant-deployment/get-all-api-deployment/invalid", nil)
+	context.Params = gin.Params{{Key: "assistantId", Value: "invalid"}}
+	attachTestAuthentication(context, testProjectAuthentication(22, 33))
+
+	deploymentApi.GetAllAssistantApiDeploymentRest(context)
+
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
 }
 
 func TestGetAllAssistantPhoneDeploymentRest_InvalidPage(t *testing.T) {

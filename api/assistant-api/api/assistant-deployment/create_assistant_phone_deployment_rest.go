@@ -32,7 +32,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantPhoneDeploymentRest(
 		})
 		return
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
 	if scopeErr != nil {
 		c.JSON(pkg_errors.CreateAssistantPhoneDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantPhoneDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
@@ -239,7 +239,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantPhoneDeploymentRest(
 	}
 
 	deployment, err := deploymentApi.deploymentService.CreatePhoneDeployment(
-		c,
+		c.Request.Context(),
 		iAuth,
 		assistantId,
 		request.Greeting,

@@ -36,7 +36,7 @@ func (assistantApi *assistantApi) CreateAssistantRest(c *gin.Context) {
 		})
 		return
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
 	if scopeErr != nil {
 		c.JSON(pkg_errors.CreateAssistantMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantMissingAuthScope.HTTPStatusCodeInt32()),
@@ -408,7 +408,7 @@ func (assistantApi *assistantApi) CreateAssistantRest(c *gin.Context) {
 		sourceIdentifier = &parsedSourceIdentifier
 	}
 
-	assistant, err := assistantApi.assistantService.CreateAssistant(c, iAuth, createAssistantRequest.Name, description, visibility, source, sourceIdentifier, language)
+	assistant, err := assistantApi.assistantService.CreateAssistant(c.Request.Context(), iAuth, createAssistantRequest.Name, description, visibility, source, sourceIdentifier, language)
 	if err != nil {
 
 		c.JSON(pkg_errors.CreateAssistantCreateAssistant.HTTPStatusCode, openapi.ErrorResponse{
@@ -458,7 +458,7 @@ func (assistantApi *assistantApi) CreateAssistantRest(c *gin.Context) {
 			}
 		}
 		providerModel, err := assistantApi.assistantService.CreateAssistantProviderModel(
-			c, iAuth, assistant.Id, providerDescription, template, modelProviderRequest.ModelProviderName, modelOptions,
+			c.Request.Context(), iAuth, assistant.Id, providerDescription, template, modelProviderRequest.ModelProviderName, modelOptions,
 		)
 		if err != nil {
 
@@ -473,7 +473,7 @@ func (assistantApi *assistantApi) CreateAssistantRest(c *gin.Context) {
 			})
 			return
 		}
-		if _, err = assistantApi.assistantService.AttachProviderModelToAssistant(c, iAuth, assistant.Id, type_enums.MODEL, providerModel.Id); err != nil {
+		if _, err = assistantApi.assistantService.AttachProviderModelToAssistant(c.Request.Context(), iAuth, assistant.Id, type_enums.MODEL, providerModel.Id); err != nil {
 
 			c.JSON(pkg_errors.CreateAssistantAttachProviderModel.HTTPStatusCode, openapi.ErrorResponse{
 				Code:    utils.Ptr(pkg_errors.CreateAssistantAttachProviderModel.HTTPStatusCodeInt32()),
@@ -495,7 +495,7 @@ func (assistantApi *assistantApi) CreateAssistantRest(c *gin.Context) {
 			metadata = *agentkitProviderRequest.Metadata
 		}
 		agentkitProvider, err := assistantApi.assistantService.CreateAssistantProviderAgentkit(
-			c, iAuth, assistant.Id, providerDescription, agentkitProviderRequest.AgentKitUrl, agentkitCertificate, metadata,
+			c.Request.Context(), iAuth, assistant.Id, providerDescription, agentkitProviderRequest.AgentKitUrl, agentkitCertificate, metadata,
 			agentkitTransportSecurity, agentkitTLSVerification, agentkitTLSServerName, agentkitConnectTimeoutMs, agentkitKeepaliveTimeMs,
 			agentkitKeepaliveTimeoutMs, agentkitMaxRecvMessageBytes, agentkitMaxSendMessageBytes,
 		)
@@ -512,7 +512,7 @@ func (assistantApi *assistantApi) CreateAssistantRest(c *gin.Context) {
 			})
 			return
 		}
-		if _, err = assistantApi.assistantService.AttachProviderModelToAssistant(c, iAuth, assistant.Id, type_enums.AGENTKIT, agentkitProvider.Id); err != nil {
+		if _, err = assistantApi.assistantService.AttachProviderModelToAssistant(c.Request.Context(), iAuth, assistant.Id, type_enums.AGENTKIT, agentkitProvider.Id); err != nil {
 
 			c.JSON(pkg_errors.CreateAssistantAttachProviderAgentkit.HTTPStatusCode, openapi.ErrorResponse{
 				Code:    utils.Ptr(pkg_errors.CreateAssistantAttachProviderAgentkit.HTTPStatusCodeInt32()),
@@ -538,7 +538,7 @@ func (assistantApi *assistantApi) CreateAssistantRest(c *gin.Context) {
 			connectionParameters = *websocketProviderRequest.ConnectionParameters
 		}
 		websocketProvider, err := assistantApi.assistantService.CreateAssistantProviderWebsocket(
-			c, iAuth, assistant.Id, providerDescription, websocketProviderRequest.WebsocketUrl, headers, connectionParameters,
+			c.Request.Context(), iAuth, assistant.Id, providerDescription, websocketProviderRequest.WebsocketUrl, headers, connectionParameters,
 		)
 		if err != nil {
 
@@ -553,7 +553,7 @@ func (assistantApi *assistantApi) CreateAssistantRest(c *gin.Context) {
 			})
 			return
 		}
-		if _, err = assistantApi.assistantService.AttachProviderModelToAssistant(c, iAuth, assistant.Id, type_enums.WEBSOCKET, websocketProvider.Id); err != nil {
+		if _, err = assistantApi.assistantService.AttachProviderModelToAssistant(c.Request.Context(), iAuth, assistant.Id, type_enums.WEBSOCKET, websocketProvider.Id); err != nil {
 
 			c.JSON(pkg_errors.CreateAssistantAttachProviderWebsocket.HTTPStatusCode, openapi.ErrorResponse{
 				Code:    utils.Ptr(pkg_errors.CreateAssistantAttachProviderWebsocket.HTTPStatusCodeInt32()),
@@ -571,7 +571,7 @@ func (assistantApi *assistantApi) CreateAssistantRest(c *gin.Context) {
 	if hasAgentflowProvider {
 		agentflowProviderRequest := assistantProviderRequest.Agentflow
 		agentflowProvider, err := assistantApi.assistantService.CreateAssistantProviderAgentflow(
-			c, iAuth, assistant.Id, providerDescription, agentflowProviderRequest.SchemaVersion, agentflowProviderRequest.Definition,
+			c.Request.Context(), iAuth, assistant.Id, providerDescription, agentflowProviderRequest.SchemaVersion, agentflowProviderRequest.Definition,
 		)
 		if err != nil {
 
@@ -586,7 +586,7 @@ func (assistantApi *assistantApi) CreateAssistantRest(c *gin.Context) {
 			})
 			return
 		}
-		if _, err = assistantApi.assistantService.AttachProviderModelToAssistant(c, iAuth, assistant.Id, type_enums.AGENTFLOW, agentflowProvider.Id); err != nil {
+		if _, err = assistantApi.assistantService.AttachProviderModelToAssistant(c.Request.Context(), iAuth, assistant.Id, type_enums.AGENTFLOW, agentflowProvider.Id); err != nil {
 
 			c.JSON(pkg_errors.CreateAssistantAttachProviderModel.HTTPStatusCode, openapi.ErrorResponse{
 				Code:    utils.Ptr(pkg_errors.CreateAssistantAttachProviderModel.HTTPStatusCodeInt32()),
@@ -630,7 +630,7 @@ func (assistantApi *assistantApi) CreateAssistantRest(c *gin.Context) {
 				executionMethod = *assistantToolRequest.ExecutionMethod
 			}
 			if _, err := assistantApi.assistantToolService.Create(
-				c, iAuth, assistant.Id, toolName, assistantToolRequest.Description, fields, executionMethod, toolOptions,
+				c.Request.Context(), iAuth, assistant.Id, toolName, assistantToolRequest.Description, fields, executionMethod, toolOptions,
 			); err != nil {
 				assistantApi.logger.Errorf("%s with error %+v", pkg_errors.CreateAssistantCreateTools.ErrorMessage, err)
 			}
@@ -706,7 +706,7 @@ func (assistantApi *assistantApi) CreateAssistantRest(c *gin.Context) {
 				retrievalMethod = *assistantKnowledgeRequest.RetrievalMethod
 			}
 			if _, err := assistantApi.assistantKnowledgeService.Create(
-				c,
+				c.Request.Context(),
 				iAuth,
 				assistant.Id,
 				knowledgeID,
@@ -727,7 +727,7 @@ func (assistantApi *assistantApi) CreateAssistantRest(c *gin.Context) {
 	if validator.NonNil(createAssistantRequest.Tags) {
 		tags = *createAssistantRequest.Tags
 	}
-	if _, err = assistantApi.assistantService.CreateOrUpdateAssistantTag(c, iAuth, assistant.Id, tags); err != nil {
+	if _, err = assistantApi.assistantService.CreateOrUpdateAssistantTag(c.Request.Context(), iAuth, assistant.Id, tags); err != nil {
 
 		c.JSON(pkg_errors.CreateAssistantCreateTags.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantCreateTags.HTTPStatusCodeInt32()),

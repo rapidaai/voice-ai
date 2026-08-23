@@ -31,7 +31,7 @@ func (deploymentApi *AssistantDeploymentApi) GetAssistantWhatsappDeploymentRest(
 		})
 		return
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
 	if scopeErr != nil {
 		c.JSON(pkg_errors.GetAssistantWhatsappDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.GetAssistantWhatsappDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
@@ -59,7 +59,7 @@ func (deploymentApi *AssistantDeploymentApi) GetAssistantWhatsappDeploymentRest(
 		return
 	}
 
-	deployment, err := deploymentApi.deploymentService.GetAssistantWhatsappDeployment(c, iAuth, assistantId)
+	deployment, err := deploymentApi.deploymentService.GetAssistantWhatsappDeployment(c.Request.Context(), iAuth, assistantId)
 	if err != nil {
 		deploymentApi.logger.Errorf("unable to get assistant whatsapp deployment: %v", err)
 		c.JSON(pkg_errors.GetAssistantWhatsappDeploymentGetDeployment.HTTPStatusCode, openapi.ErrorResponse{

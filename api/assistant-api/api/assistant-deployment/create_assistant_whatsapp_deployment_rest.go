@@ -32,7 +32,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantWhatsappDeploymentRe
 		})
 		return
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
 	if scopeErr != nil {
 		c.JSON(pkg_errors.CreateAssistantWhatsappDeploymentMissingAuthScope.HTTPStatusCode, openapi.ErrorResponse{
 			Code:    utils.Ptr(pkg_errors.CreateAssistantWhatsappDeploymentMissingAuthScope.HTTPStatusCodeInt32()),
@@ -151,7 +151,7 @@ func (deploymentApi *AssistantDeploymentApi) CreateAssistantWhatsappDeploymentRe
 	}
 
 	deployment, err := deploymentApi.deploymentService.CreateWhatsappDeployment(
-		c,
+		c.Request.Context(),
 		iAuth,
 		assistantId,
 		request.Greeting,

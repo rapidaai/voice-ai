@@ -12,12 +12,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/metric"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -32,10 +28,6 @@ import (
 const (
 	scopeAuthorizationCacheVersion = "v2"
 	scopeAuthorizationCacheTTL     = 5 * time.Minute
-)
-
-var (
-	authActorCacheMeter, _ = otel.Meter("github.com/rapidaai/pkg/clients/web/auth").Int64Counter("rapida.auth.actor_cache")
 )
 
 type authServiceClient struct {
@@ -126,9 +118,6 @@ func (client *authServiceClient) ScopeAuthorize(c context.Context, scopeToken st
 		err = validateScopedAuthentication(data, scopeType)
 	}
 	if err != nil {
-		recordActorCacheResult(c, client.cfg, scopeType, "miss")
-		client.logger.Errorf("Failed to parse cached data: %v", err)
-
 		// Call the vault service to fetch data
 		res, err := client.authClient.ScopeAuthorize(client.WithScopeToken(c, scopeToken, scopeType), &web_api.ScopeAuthorizeRequest{
 			Scope: scopeType,
@@ -159,28 +148,9 @@ func (client *authServiceClient) ScopeAuthorize(c context.Context, scopeToken st
 			return nil, errors.New(errMsg)
 		}
 	}
-	if err == nil {
-		recordActorCacheResult(c, client.cfg, scopeType, "hit")
-	}
-
 	// Log benchmarking information
 	client.logger.Benchmark("Benchmarking: AuthClient.ScopeAuthorize", time.Since(start))
 	return data, nil
-}
-
-func recordActorCacheResult(ctx context.Context, cfg *config.AppConfig, scopeType, result string) {
-	if authActorCacheMeter == nil {
-		return
-	}
-	serviceName := "unknown"
-	if cfg != nil && strings.TrimSpace(cfg.Name) != "" {
-		serviceName = strings.TrimSpace(cfg.Name)
-	}
-	authActorCacheMeter.Add(ctx, 1, metric.WithAttributes(
-		attribute.String("service.name", serviceName),
-		attribute.String("auth.scope_type", scopeType),
-		attribute.String("cache.result", result),
-	))
 }
 
 func validateScopedAuthentication(authentication *web_api.ScopedAuthentication, scopeType string) error {
