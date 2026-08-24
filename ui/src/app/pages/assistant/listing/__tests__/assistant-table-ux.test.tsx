@@ -91,7 +91,11 @@ const makeAssistant = (overrides: Record<string, any> = {}) =>
     getWebplugindeployment: () => null,
     getPhonedeployment: () => null,
     getUpdateddate: () => makeTimestamp(400),
-    getCreatedactor: () => ({ getType: () => 'user', getId: () => '42', getDisplayname: () => 'Prashant' }),
+    getCreatedactor: () => ({
+      getType: () => 'user',
+      getId: () => '42',
+      getDisplayname: () => 'Prashant',
+    }),
     ...overrides,
   }) as any;
 
@@ -134,7 +138,8 @@ describe('assistant listing table UX', () => {
     expect(screen.queryByText('billing')).not.toBeInTheDocument();
     expect(screen.getByText('+1')).toBeInTheDocument();
     expect(screen.getByText('date:400')).toBeInTheDocument();
-    expect(screen.getByText('Prashant')).toBeInTheDocument();
+    expect(screen.queryByText('Prashant')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('cell')).toHaveLength(9);
   });
 
   it('keeps assistants without deployments actionable from the table row', () => {
@@ -156,7 +161,6 @@ describe('assistant listing table UX', () => {
     expect(screen.getByText('Not configured')).toBeInTheDocument();
     expect(screen.getByText('prompt')).toBeInTheDocument();
     expect(screen.getAllByText('-')).toHaveLength(3);
-    expect(screen.getByText('—')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Set up deployment' }));
     expect(mockGoToManageAssistant).toHaveBeenCalledWith('assistant-1');
