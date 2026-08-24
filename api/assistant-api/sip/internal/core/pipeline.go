@@ -35,8 +35,7 @@ type SessionEstablishedPipeline struct {
 	AssistantID     uint64
 	Auth            *types.Authentication
 	RequestURI      string
-	FromIdentity    string
-	ToIdentity      string
+	CallAddress     CallAddress
 	ConversationID  uint64 // Non-zero for outbound (already created by channel pipeline)
 }
 

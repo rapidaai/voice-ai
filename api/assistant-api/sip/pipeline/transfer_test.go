@@ -124,20 +124,20 @@ func newTransferTestConfig() *sip_infra.Config {
 
 func newTransferTestSession(t *testing.T) *sip_infra.Session {
 	t.Helper()
-	s, err := sip_infra.NewSession(context.Background(), &sip_infra.SessionConfig{
-		Config:    newTransferTestConfig(),
-		Direction: sip_infra.CallDirectionInbound,
-	})
+	s, err := sip_infra.NewSession(context.Background(),
+		sip_infra.WithSessionConfig(newTransferTestConfig()),
+		sip_infra.WithSessionDirection(sip_infra.CallDirectionInbound),
+	)
 	require.NoError(t, err)
 	return s
 }
 
 func newTransferTestOutboundSession(t *testing.T) *sip_infra.Session {
 	t.Helper()
-	s, err := sip_infra.NewSession(context.Background(), &sip_infra.SessionConfig{
-		Config:    newTransferTestConfig(),
-		Direction: sip_infra.CallDirectionOutbound,
-	})
+	s, err := sip_infra.NewSession(context.Background(),
+		sip_infra.WithSessionConfig(newTransferTestConfig()),
+		sip_infra.WithSessionDirection(sip_infra.CallDirectionOutbound),
+	)
 	require.NoError(t, err)
 	return s
 }

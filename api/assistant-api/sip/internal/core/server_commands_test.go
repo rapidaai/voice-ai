@@ -234,13 +234,12 @@ func validInboundOfferSDP() string {
 
 func newTestSession(t *testing.T, callID string, dir CallDirection) *Session {
 	t.Helper()
-	s, err := NewSession(context.Background(), &SessionConfig{
-		Config:    bridgeTestConfig(),
-		Direction: dir,
-		CallID:    callID,
-		Codec:     &CodecPCMU,
-		Logger:    bridgeTestLogger(),
-	})
+	s, err := NewSession(context.Background(),
+		WithSessionConfig(bridgeTestConfig()),
+		WithSessionDirection(dir),
+		WithSessionCallID(callID),
+		WithSessionCodec(&CodecPCMU),
+	)
 	require.NoError(t, err)
 	return s
 }

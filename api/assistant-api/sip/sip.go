@@ -293,8 +293,7 @@ func (m *SIPEngine) sessionEstablishedStage(session *sip_infra.Session, identity
 		AssistantID:     assistant.Id,
 		Auth:            auth,
 		RequestURI:      identity.RequestURI,
-		FromIdentity:    identity.FromIdentity,
-		ToIdentity:      identity.ToIdentity,
+		CallAddress:     identity.CallAddress,
 		ConversationID:  session.GetConversationID(),
 	}, nil
 }

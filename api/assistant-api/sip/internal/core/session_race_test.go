@@ -28,10 +28,10 @@ func testSessionConfig() *Config {
 
 func newInboundTestSession(t *testing.T) *Session {
 	t.Helper()
-	s, err := NewSession(context.Background(), &SessionConfig{
-		Config:    testSessionConfig(),
-		Direction: CallDirectionInbound,
-	})
+	s, err := NewSession(context.Background(),
+		WithSessionConfig(testSessionConfig()),
+		WithSessionDirection(CallDirectionInbound),
+	)
 	require.NoError(t, err)
 	return s
 }

@@ -127,18 +127,17 @@ func (s *Server) applyOutboundLegMetadata(session *Session, opts outboundCallLeg
 }
 
 func (s *Server) createAndRegisterOutboundSession(ctx context.Context, cfg *Config, callID string, opts MakeCallOptions) (*Session, error) {
-	session, err := NewSession(ctx, &SessionConfig{
-		Config:          cfg,
-		Direction:       CallDirectionOutbound,
-		CallID:          callID,
-		Codec:           &CodecPCMU,
-		Logger:          s.logger,
-		Auth:            opts.Auth,
-		Assistant:       opts.Assistant,
-		ConversationID:  opts.ConversationID,
-		ContextID:       opts.ContextID,
-		VaultCredential: opts.VaultCredential,
-	})
+	session, err := NewSession(ctx,
+		WithSessionConfig(cfg),
+		WithSessionDirection(CallDirectionOutbound),
+		WithSessionCallID(callID),
+		WithSessionCodec(&CodecPCMU),
+		WithSessionAuth(opts.Auth),
+		WithSessionAssistant(opts.Assistant),
+		WithSessionConversationID(opts.ConversationID),
+		WithSessionContextID(opts.ContextID),
+		WithSessionVaultCredential(opts.VaultCredential),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create outbound session: %w", err)
 	}

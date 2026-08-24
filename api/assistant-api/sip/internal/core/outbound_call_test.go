@@ -22,6 +22,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func newOutboundSessionForTest(t *testing.T, config *Config, callID string) *Session {
+	t.Helper()
+	session, err := NewSession(context.Background(),
+		WithSessionConfig(config),
+		WithSessionDirection(CallDirectionOutbound),
+		WithSessionCallID(callID),
+	)
+	require.NoError(t, err)
+	return session
+}
+
 func TestNewOutboundCall_OwnsLifecycleDependencies(t *testing.T) {
 	server := &Server{}
 	session := &Session{}
@@ -56,11 +67,11 @@ func TestOutboundCallInviteHandlerUsesAuthoritativeRequestIdentity(t *testing.T)
 		},
 	}
 
-	server.SetOnInvite(func(callbackSession *Session, requestURI, fromIdentity, toIdentity string) error {
+	server.SetOnInvite(func(callbackSession *Session, requestURI string, callAddress CallAddress) error {
 		assert.Same(t, session, callbackSession)
 		assert.Equal(t, inviteRequest.Recipient.String(), requestURI)
-		assert.Equal(t, "assistant-line", fromIdentity)
-		assert.Equal(t, "customer-alias", toIdentity)
+		assert.Equal(t, "assistant-line", callAddress.From)
+		assert.Equal(t, "customer-alias", callAddress.To)
 		return nil
 	})
 	outboundCall := NewOutbound(server, session, dialog, nil, request)
@@ -74,7 +85,7 @@ func TestOutboundCallInviteHandlerUsesAuthoritativeRequestIdentity(t *testing.T)
 
 func TestOutboundCallInviteHandlerRejectsMissingInviteRequest(t *testing.T) {
 	server := &Server{logger: bridgeTestLogger()}
-	server.SetOnInvite(func(_ *Session, _, _, _ string) error {
+	server.SetOnInvite(func(_ *Session, _ string, _ CallAddress) error {
 		t.Fatal("onInvite must not run without the outbound INVITE request")
 		return nil
 	})
@@ -199,13 +210,7 @@ func TestOutboundCall_PreAnswerLifecycleCancelSendsSIPCancel(t *testing.T) {
 	}
 	cfg := testOutboundConfig()
 	cfg.InviteTimeout = time.Minute
-	session, err := NewSession(context.Background(), &SessionConfig{
-		Config:    cfg,
-		Direction: CallDirectionOutbound,
-		CallID:    dialogSession.InviteRequest.CallID().Value(),
-		Logger:    server.logger,
-	})
-	require.NoError(t, err)
+	session := newOutboundSessionForTest(t, cfg, dialogSession.InviteRequest.CallID().Value())
 	session.SetDialogClientSession(dialogSession)
 	server.registerSession(session, session.GetCallID())
 
@@ -276,13 +281,7 @@ func TestOutboundCall_RingingTimeoutSendsLifecycleCancel(t *testing.T) {
 	}
 	cfg := testOutboundConfig()
 	cfg.InviteTimeout = 20 * time.Millisecond
-	session, err := NewSession(context.Background(), &SessionConfig{
-		Config:    cfg,
-		Direction: CallDirectionOutbound,
-		CallID:    dialogSession.InviteRequest.CallID().Value(),
-		Logger:    server.logger,
-	})
-	require.NoError(t, err)
+	session := newOutboundSessionForTest(t, cfg, dialogSession.InviteRequest.CallID().Value())
 	session.SetDialogClientSession(dialogSession)
 	server.registerSession(session, session.GetCallID())
 
@@ -356,13 +355,7 @@ func TestOutboundCall_RemoteBusyReportsFailure(t *testing.T) {
 	}
 	cfg := testOutboundConfig()
 	cfg.InviteTimeout = time.Minute
-	session, err := NewSession(context.Background(), &SessionConfig{
-		Config:    cfg,
-		Direction: CallDirectionOutbound,
-		CallID:    dialogSession.InviteRequest.CallID().Value(),
-		Logger:    server.logger,
-	})
-	require.NoError(t, err)
+	session := newOutboundSessionForTest(t, cfg, dialogSession.InviteRequest.CallID().Value())
 	session.SetDialogClientSession(dialogSession)
 	server.registerSession(session, session.GetCallID())
 
@@ -426,13 +419,7 @@ func TestOutboundCall_AnsweredSDPFailureSendsBYENotCancel(t *testing.T) {
 	}
 	cfg := testOutboundConfig()
 	cfg.InviteTimeout = time.Minute
-	session, err := NewSession(context.Background(), &SessionConfig{
-		Config:    cfg,
-		Direction: CallDirectionOutbound,
-		CallID:    dialogSession.InviteRequest.CallID().Value(),
-		Logger:    server.logger,
-	})
-	require.NoError(t, err)
+	session := newOutboundSessionForTest(t, cfg, dialogSession.InviteRequest.CallID().Value())
 	session.SetDialogClientSession(dialogSession)
 	session.SetRTPHandler(newTestRTPHandler())
 	server.registerSession(session, session.GetCallID())
@@ -489,13 +476,7 @@ func TestOutboundCall_ApplicationFailureRecordsFailure(t *testing.T) {
 		lifecycles: make(map[string]*CallLifecycle),
 	}
 	cfg := testOutboundConfig()
-	session, err := NewSession(context.Background(), &SessionConfig{
-		Config:    cfg,
-		Direction: CallDirectionOutbound,
-		CallID:    "call-application-failure",
-		Logger:    server.logger,
-	})
-	require.NoError(t, err)
+	session := newOutboundSessionForTest(t, cfg, "call-application-failure")
 	session.SetState(CallStateConnected)
 	session.SetOutboundDialogPhase(OutboundDialogPhaseConfirmed)
 	server.registerSession(session, session.GetCallID())
@@ -535,13 +516,7 @@ func TestOutboundCall_MediaTimeoutWithoutReceivedRTPFails(t *testing.T) {
 		lifecycles: make(map[string]*CallLifecycle),
 	}
 	cfg := testOutboundConfig()
-	session, err := NewSession(context.Background(), &SessionConfig{
-		Config:    cfg,
-		Direction: CallDirectionOutbound,
-		CallID:    "call-media-timeout-no-rtp",
-		Logger:    server.logger,
-	})
-	require.NoError(t, err)
+	session := newOutboundSessionForTest(t, cfg, "call-media-timeout-no-rtp")
 	session.SetState(CallStateConnected)
 	session.SetOutboundDialogPhase(OutboundDialogPhaseConfirmed)
 	session.SetRTPHandler(&RTPHandler{})
@@ -571,13 +546,7 @@ func TestOutboundCall_MediaTimeoutAfterReceivedRTPEndsCompleted(t *testing.T) {
 		lifecycles: make(map[string]*CallLifecycle),
 	}
 	cfg := testOutboundConfig()
-	session, err := NewSession(context.Background(), &SessionConfig{
-		Config:    cfg,
-		Direction: CallDirectionOutbound,
-		CallID:    "call-media-timeout-established",
-		Logger:    server.logger,
-	})
-	require.NoError(t, err)
+	session := newOutboundSessionForTest(t, cfg, "call-media-timeout-established")
 	session.SetState(CallStateConnected)
 	session.SetOutboundDialogPhase(OutboundDialogPhaseConfirmed)
 	rtpHandler := &RTPHandler{}

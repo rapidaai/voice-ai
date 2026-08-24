@@ -31,7 +31,7 @@ func (s *Server) handleBye(req *sip.Request, tx sip.ServerTransaction) {
 		return
 	}
 
-	disconnectMetadata := parseSIPDisconnectMetadata(req)
+	disconnectMetadata := NewSIPReason(req).DisconnectMetadata()
 	session.SetDisconnectMetadata(disconnectMetadata)
 
 	if session.GetInfo().Direction == CallDirectionOutbound {

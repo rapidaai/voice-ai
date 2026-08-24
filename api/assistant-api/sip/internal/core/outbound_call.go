@@ -304,11 +304,16 @@ func (outboundCall *Outbound) callOutboundInviteHandler(answerTime time.Time) er
 	if inviteRequest == nil {
 		return fmt.Errorf("outbound INVITE request is unavailable")
 	}
+	callAddress := NewCallAddress(inviteRequest)
+	callAddress.From = outboundCall.request.Identity.FromUser
+	callAddress.To = outboundCall.request.Identity.ToUser
+	if callAddress.ToURI == "" {
+		callAddress.ToURI = inviteRequest.Recipient.String()
+	}
 	if err := inviteHandler(
 		outboundCall.session,
 		inviteRequest.Recipient.String(),
-		outboundCall.request.Identity.FromUser,
-		outboundCall.request.Identity.ToUser,
+		callAddress,
 	); err != nil {
 		return err
 	}

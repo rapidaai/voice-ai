@@ -1,0 +1,85 @@
+{
+  "status": "changes_requested",
+  "decision": "not_approved",
+  "reviewed_at": "2026-08-24",
+  "critical_findings": [],
+  "major_findings": [
+    {
+      "id": "major-1-address-contract",
+      "summary": "The shared telephony model does not currently represent wire-level From and To as independent values.",
+      "details": "CallInfo exposes role-based CallerNumber and an overloaded FromNumber. Its comments define CallerNumber as the client for both directions and FromNumber only as the outbound origin, while inbound providers also use FromNumber for the destination or assistant number. The RFC requires actual telephony.from_phone and telephony.to_phone across every provider, but does not define the model change and provider-by-provider source mapping needed to preserve wire direction without role inference.",
+      "paths": [
+        "api/assistant-api/internal/type/telephony.go",
+        "api/assistant-api/internal/channel/telephony/inbound.go",
+        "api/assistant-api/internal/channel/telephony/outbound.go",
+        "api/assistant-api/internal/channel/telephony/internal/base/base.go",
+        "api/assistant-api/internal/channel/telephony/internal/asterisk/telephony.go",
+        "api/assistant-api/internal/channel/telephony/internal/exotel/telephony.go",
+        "api/assistant-api/internal/channel/telephony/internal/telnyx/telephony.go",
+        "api/assistant-api/internal/channel/telephony/internal/twilio/telephony.go",
+        "api/assistant-api/internal/channel/telephony/internal/vobiz/telephony.go",
+        "api/assistant-api/internal/channel/telephony/internal/vonage/telephony.go",
+        "api/assistant-api/internal/channel/telephony/internal/sip/telephony.go"
+      ],
+      "required_resolution": "Define explicit FromPhone and ToPhone ownership in the shared call contract, inventory each inbound and outbound provider mapping, and specify behavior when a provider does not supply one side. CallAddress remains authoritative for native SIP."
+    },
+    {
+      "id": "major-2-incomplete-consumer-scope",
+      "summary": "The allowed implementation scope omits backend conversation filtering that is hard-coded to the removed client.* keys.",
+      "details": "The RFC includes conversation UI changes but excludes the service query implementation that resolves direction, channel, call ID, codec, sample rate, context ID, phone, and assistant phone filters. Updating only metadata production and UI selectors would leave conversation searches querying obsolete keys.",
+      "paths": [
+        "api/assistant-api/internal/services/assistant/conversaction.impl.service.go",
+        "ui/src/app/pages/assistant/view/conversations/session-query-search.tsx",
+        "ui/src/app/pages/assistant/view/conversations/session-list.helpers.ts",
+        "api/assistant-api/internal/observability/conversation.go"
+      ],
+      "required_resolution": "Add the conversation service implementation and focused tests to allowed scope, and define whether historical conversations containing client.* remain searchable or are intentionally unsupported."
+    },
+    {
+      "id": "major-3-sip-header-exposure",
+      "summary": "The proposed telephony.headers source is too broad for an authentication payload contract.",
+      "details": "Explicit UI mapping limits accidental transmission, but once selected the complete captured header map is sent to an external authentication endpoint. Excluding only Authorization and Proxy-Authorization does not address identity, routing, challenge, vendor, or custom headers that may contain credentials or personal data. The RFC has no allowlist, configurable selection, size limit, or logging and persistence constraints for this map.",
+      "paths": [
+        "api/assistant-api/sip/internal/core/inbound_call.go",
+        "api/assistant-api/internal/channel/telephony/internal/sip/streamer.go",
+        "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+        "api/assistant-api/internal/authentication/http/executor.go",
+        "ui/src/app/pages/assistant/actions/configure-assistant-authentication/shared.ts"
+      ],
+      "required_resolution": "Replace the unrestricted header map with an explicit safe allowlist or individually selected header sources, define case and repeated-header behavior, cap transmitted size, and add tests proving credential and identity-sensitive headers cannot be forwarded unintentionally."
+    },
+    {
+      "id": "major-4-breaking-consumer-inventory",
+      "summary": "Removing telephony-owned client.* keys affects more than authentication and the RFC does not fully specify those runtime compatibility consequences.",
+      "details": "The same keys are exposed as prompt variables, persisted conversation metadata, observability constants, display fields, and search filters. Existing assistant prompts and saved authentication mappings will silently resolve missing values. Declaring a breaking change is insufficient without an exhaustive consumer inventory, explicit release boundary, and tests proving genuine client.* metadata remains unaffected.",
+      "paths": [
+        "ui/src/utils/prompt-reserved-variables.ts",
+        "ui/src/app/components/prompt-editor/suggestions.test.ts",
+        "api/assistant-api/internal/observability/conversation.go",
+        "api/assistant-api/internal/services/assistant/conversaction.impl.service.go",
+        "api/assistant-api/internal/variable/namespace/registry.go",
+        "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+        "ui/src/app/pages/assistant/actions/configure-assistant-authentication/shared.ts"
+      ],
+      "required_resolution": "Document the complete removal inventory and release/migration behavior, update allowed paths and tests for every consumer, and state whether stored configurations and prompts are rejected, migrated, or intentionally allowed to resolve absent values."
+    }
+  ],
+  "minor_findings": [
+    {
+      "id": "minor-1-provider-name",
+      "summary": "The RFC uses telephony.provider while the removed contract uses client.channel; the semantic rename should be explicit in UI labels, filters, and observability constants."
+    },
+    {
+      "id": "minor-2-test-matrix",
+      "summary": "The test plan should name every provider and both directions where supported instead of relying on a shared base test to prove provider-specific From and To mappings."
+    }
+  ],
+  "required_before_rechallenge": [
+    "Revise the RFC and plan JSON to define an explicit provider-neutral FromPhone and ToPhone contract.",
+    "Add missing backend conversation query paths and tests to implementation scope.",
+    "Replace unrestricted SIP header forwarding with a least-privilege contract.",
+    "Complete the breaking-change consumer inventory and migration or release behavior.",
+    "Provide a provider-by-provider inbound and outbound verification matrix."
+  ],
+  "independence_note": "The dispatched independent challenger could not execute because its provider account reported an insufficient credit balance. This conservative non-approval was recorded rather than falsely approving an unchallenged governed change."
+}

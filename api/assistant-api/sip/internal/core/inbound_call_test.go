@@ -87,8 +87,32 @@ func TestInboundInviteIdentityFromRequestPreservesRoutingAndPartyIdentities(t *t
 
 	require.True(t, ok)
 	assert.Equal(t, request.Recipient.String(), identity.requestURI)
-	assert.Equal(t, request.From().Address.String(), identity.fromIdentity)
-	assert.Equal(t, request.To().Address.String(), identity.toIdentity)
+	assert.Equal(t, "alice", identity.callAddress.From)
+	assert.Equal(t, "support", identity.callAddress.To)
+	assert.Equal(t, request.From().Address.String(), identity.callAddress.FromURI)
+	assert.Equal(t, request.To().Address.String(), identity.callAddress.ToURI)
+}
+
+func TestNewCallAddressCapturesHeadersWithoutCredentials(t *testing.T) {
+	request := newInboundInviteRequest("identity-headers")
+	request.AppendHeader(sip.NewHeader("X-Original-Called-Number", "+14155550200"))
+	request.AppendHeader(sip.NewHeader("X-Original-Called-Number", "+14155550300"))
+	request.AppendHeader(sip.NewHeader("Authorization", "secret"))
+	request.AppendHeader(sip.NewHeader("Proxy-Authorization", "proxy-secret"))
+
+	address := NewCallAddress(request)
+
+	assert.Equal(t, request.From().Address.User, address.From)
+	assert.Equal(t, request.To().Address.User, address.To)
+	assert.Equal(t, request.From().Address.String(), address.FromURI)
+	assert.Equal(t, request.To().Address.String(), address.ToURI)
+	assert.Equal(t, "+14155550200,+14155550300", address.Headers["x-original-called-number"])
+	assert.NotContains(t, address.Headers, "authorization")
+	assert.NotContains(t, address.Headers, "proxy-authorization")
+}
+
+func TestNewCallAddressHandlesNilRequest(t *testing.T) {
+	assert.Equal(t, CallAddress{}, NewCallAddress(nil))
 }
 
 func TestInboundCall_ConfigRejectDoesNotCreateSession(t *testing.T) {
@@ -452,23 +476,20 @@ func TestInboundCall_ApplicationReadyBeforeAnswerAndMediaStart(t *testing.T) {
 	transaction := newActiveAckableTestServerTx()
 	request := newInboundInviteRequest("inbound-ready-before-answer")
 	expectedRequestURI := request.Recipient.String()
-	expectedFromIdentity := request.From().Address.String()
-	expectedToIdentity := request.To().Address.String()
-	server.SetOnApplicationReady(func(session *Session, requestURI, fromIdentity, toIdentity string) error {
+	expectedCallAddress := NewCallAddress(request)
+	server.SetOnApplicationReady(func(session *Session, requestURI string, callAddress CallAddress) error {
 		phaseOrder = append(phaseOrder, "application_ready")
 		assert.Equal(t, 180, transaction.lastStatus())
 		assert.Equal(t, InboundSetupPhaseMediaAllocated, session.GetInboundSetupPhase())
 		assert.Equal(t, expectedRequestURI, requestURI)
-		assert.Equal(t, expectedFromIdentity, fromIdentity)
-		assert.Equal(t, expectedToIdentity, toIdentity)
+		assert.Equal(t, expectedCallAddress, callAddress)
 		return nil
 	})
-	server.SetOnInvite(func(session *Session, requestURI, fromIdentity, toIdentity string) error {
+	server.SetOnInvite(func(session *Session, requestURI string, callAddress CallAddress) error {
 		phaseOrder = append(phaseOrder, "call_start")
 		assert.Equal(t, InboundSetupPhaseMediaFlowing, session.GetInboundSetupPhase())
 		assert.Equal(t, expectedRequestURI, requestURI)
-		assert.Equal(t, expectedFromIdentity, fromIdentity)
-		assert.Equal(t, expectedToIdentity, toIdentity)
+		assert.Equal(t, expectedCallAddress, callAddress)
 		return nil
 	})
 	transaction.PushACK(newACKRequest("inbound-ready-before-answer"))
@@ -493,10 +514,10 @@ func TestInboundCall_ReInviteDoesNotReplaceInitialPartyIdentities(t *testing.T) 
 	callbackCount := 0
 	var capturedFromIdentity string
 	var capturedToIdentity string
-	server.SetOnInvite(func(_ *Session, _, fromIdentity, toIdentity string) error {
+	server.SetOnInvite(func(_ *Session, _ string, callAddress CallAddress) error {
 		callbackCount++
-		capturedFromIdentity = fromIdentity
-		capturedToIdentity = toIdentity
+		capturedFromIdentity = callAddress.FromURI
+		capturedToIdentity = callAddress.ToURI
 		return nil
 	})
 
@@ -536,11 +557,11 @@ func TestInboundCall_InviteWithReplacesUsesNewDialogPartyIdentities(t *testing.T
 	var capturedRequestURI string
 	var capturedFromIdentity string
 	var capturedToIdentity string
-	server.SetOnInvite(func(_ *Session, requestURI, fromIdentity, toIdentity string) error {
+	server.SetOnInvite(func(_ *Session, requestURI string, callAddress CallAddress) error {
 		callbackCount++
 		capturedRequestURI = requestURI
-		capturedFromIdentity = fromIdentity
-		capturedToIdentity = toIdentity
+		capturedFromIdentity = callAddress.FromURI
+		capturedToIdentity = callAddress.ToURI
 		return nil
 	})
 
@@ -574,10 +595,10 @@ func TestInboundCall_REFERDoesNotReplaceInitialPartyIdentities(t *testing.T) {
 	callbackCount := 0
 	var capturedFromIdentity string
 	var capturedToIdentity string
-	server.SetOnInvite(func(_ *Session, _, fromIdentity, toIdentity string) error {
+	server.SetOnInvite(func(_ *Session, _ string, callAddress CallAddress) error {
 		callbackCount++
-		capturedFromIdentity = fromIdentity
-		capturedToIdentity = toIdentity
+		capturedFromIdentity = callAddress.FromURI
+		capturedToIdentity = callAddress.ToURI
 		return nil
 	})
 
@@ -662,7 +683,7 @@ func TestInboundCall_RetransmitsRingingUntilAnswer(t *testing.T) {
 		return nil
 	}})
 	applicationReady := make(chan struct{})
-	server.SetOnApplicationReady(func(_ *Session, _, _, _ string) error {
+	server.SetOnApplicationReady(func(_ *Session, _ string, _ CallAddress) error {
 		<-applicationReady
 		return nil
 	})
@@ -700,7 +721,7 @@ func TestInboundCall_WaitsForApplicationReadyBeforeAnswer(t *testing.T) {
 		return nil
 	}})
 	applicationReady := make(chan struct{})
-	server.SetOnApplicationReady(func(_ *Session, _, _, _ string) error {
+	server.SetOnApplicationReady(func(_ *Session, _ string, _ CallAddress) error {
 		<-applicationReady
 		return nil
 	})
@@ -778,7 +799,7 @@ func TestInboundCall_AnswersAfterApplicationReadyWithoutAssistantAudio(t *testin
 		return nil
 	}})
 	applicationReadyCalled := false
-	server.SetOnApplicationReady(func(_ *Session, _, _, _ string) error {
+	server.SetOnApplicationReady(func(_ *Session, _ string, _ CallAddress) error {
 		applicationReadyCalled = true
 		return nil
 	})
@@ -853,10 +874,10 @@ func TestInboundCall_ApplicationReadinessFailureRejectsBeforeAnswer(t *testing.T
 		ctx.Config = bridgeTestConfig()
 		return nil
 	}})
-	server.SetOnApplicationReady(func(_ *Session, _, _, _ string) error {
+	server.SetOnApplicationReady(func(_ *Session, _ string, _ CallAddress) error {
 		return errors.New("assistant not ready")
 	})
-	server.SetOnInvite(func(_ *Session, _, _, _ string) error {
+	server.SetOnInvite(func(_ *Session, _ string, _ CallAddress) error {
 		t.Fatal("onInvite should not run when application readiness fails")
 		return nil
 	})
@@ -883,14 +904,14 @@ func TestInboundCall_ACKTimeoutCleansPreparedApplication(t *testing.T) {
 	}})
 	cleanupCount := 0
 	var capturedSession *Session
-	server.SetOnApplicationReady(func(session *Session, _, _, _ string) error {
+	server.SetOnApplicationReady(func(session *Session, _ string, _ CallAddress) error {
 		capturedSession = session
 		return nil
 	})
 	server.SetOnApplicationCleanup(func(_ *Session) {
 		cleanupCount++
 	})
-	server.SetOnInvite(func(_ *Session, _, _, _ string) error {
+	server.SetOnInvite(func(_ *Session, _ string, _ CallAddress) error {
 		t.Fatal("onInvite should not run when ACK timeout fails")
 		return nil
 	})
@@ -1129,11 +1150,10 @@ func loadInboundIdentity(t *testing.T, inboundCall *Inbound) {
 	require.NotNil(t, inboundCall.request.From())
 	require.NotNil(t, inboundCall.request.To())
 	inboundCall.identity = inboundInviteIdentity{
-		callID:       inboundCall.request.CallID().Value(),
-		fromTag:      "fromtag",
-		requestURI:   inboundCall.request.Recipient.String(),
-		fromIdentity: inboundCall.request.From().Address.String(),
-		toIdentity:   inboundCall.request.To().Address.String(),
+		callID:      inboundCall.request.CallID().Value(),
+		fromTag:     "fromtag",
+		requestURI:  inboundCall.request.Recipient.String(),
+		callAddress: NewCallAddress(inboundCall.request),
 	}
 	inboundCall.inviteKey = inboundInviteKey{callID: inboundCall.identity.callID, fromTag: inboundCall.identity.fromTag}
 }
@@ -1153,15 +1173,15 @@ func loadInboundMediaOffer(t *testing.T, inboundCall *Inbound) {
 
 func createInboundSessionForTest(t *testing.T, inboundCall *Inbound) {
 	t.Helper()
-	session, err := NewSession(inboundCall.server.ctx, &SessionConfig{
-		Config:          inboundCall.resolvedConfig.config,
-		Direction:       CallDirectionInbound,
-		CallID:          inboundCall.identity.callID,
-		Codec:           inboundCall.mediaOffer.negotiatedCodec,
-		Auth:            inboundCall.resolvedConfig.auth,
-		Assistant:       inboundCall.resolvedConfig.assistant,
-		VaultCredential: inboundCall.resolvedConfig.vaultCredential,
-	})
+	session, err := NewSession(inboundCall.server.ctx,
+		WithSessionConfig(inboundCall.resolvedConfig.config),
+		WithSessionDirection(CallDirectionInbound),
+		WithSessionCallID(inboundCall.identity.callID),
+		WithSessionCodec(inboundCall.mediaOffer.negotiatedCodec),
+		WithSessionAuth(inboundCall.resolvedConfig.auth),
+		WithSessionAssistant(inboundCall.resolvedConfig.assistant),
+		WithSessionVaultCredential(inboundCall.resolvedConfig.vaultCredential),
+	)
 	require.NoError(t, err)
 	inboundCall.session = session
 }

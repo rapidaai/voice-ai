@@ -13,9 +13,11 @@ import (
 
 	assistant_config "github.com/rapidaai/api/assistant-api/config"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
+	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
 	app_config "github.com/rapidaai/config"
 	"github.com/rapidaai/pkg/commons"
+	"github.com/rapidaai/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,6 +25,40 @@ import (
 func TestSIPEngineUsesConfiguredServiceID(t *testing.T) {
 	engine := &SIPEngine{cfg: &assistant_config.AssistantConfig{AppConfig: app_config.AppConfig{ServiceID: 9007}}}
 	assert.Equal(t, uint64(9007), engine.cfg.ServiceID)
+}
+
+func TestSessionEstablishedStagePreservesCallAddress(t *testing.T) {
+	auth := &types.Authentication{}
+	session, err := sip_infra.NewSession(context.Background(),
+		sip_infra.WithSessionConfig(&sip_infra.Config{
+			Server:            "127.0.0.1",
+			Port:              5060,
+			RTPPortRangeStart: 10000,
+			RTPPortRangeEnd:   10020,
+		}),
+		sip_infra.WithSessionDirection(sip_infra.CallDirectionInbound),
+		sip_infra.WithSessionCallID("call-address"),
+		sip_infra.WithSessionAuth(auth),
+		sip_infra.WithSessionAssistant(&internal_assistant_entity.Assistant{}),
+	)
+	require.NoError(t, err)
+	address := sip_infra.CallAddress{
+		From:    "+14155550100",
+		To:      "agent-42",
+		FromURI: "sip:+14155550100@carrier.example.com",
+		ToURI:   "sip:agent-42@sip.rapida.ai",
+		Headers: map[string]string{"x-original-called-number": "+14155550200"},
+	}
+
+	stage, err := (&SIPEngine{}).sessionEstablishedStage(session, sip_infra.SIPRequestIdentity{
+		RequestURI:  "sip:agent-42@sip.rapida.ai",
+		CallAddress: address,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, address, stage.CallAddress)
+	assert.Empty(t, stage.FromIdentity)
+	assert.Empty(t, stage.ToIdentity)
 }
 
 func TestPersistRemoteByeCallStatus_UpdatesCompletedDisconnectMetadata(t *testing.T) {
@@ -130,17 +166,17 @@ func (s *sipCallStatusTestStore) UpdateCallStatus(_ context.Context, contextID s
 
 func newSIPCallStatusTestSession(t *testing.T, contextID string) *sip_infra.Session {
 	t.Helper()
-	session, err := sip_infra.NewSession(context.Background(), &sip_infra.SessionConfig{
-		Config: &sip_infra.Config{
+	session, err := sip_infra.NewSession(context.Background(),
+		sip_infra.WithSessionConfig(&sip_infra.Config{
 			Server:            "127.0.0.1",
 			Port:              5060,
 			RTPPortRangeStart: 10000,
 			RTPPortRangeEnd:   10020,
-		},
-		Direction: sip_infra.CallDirectionOutbound,
-		CallID:    "sip-call-id",
-		ContextID: contextID,
-	})
+		}),
+		sip_infra.WithSessionDirection(sip_infra.CallDirectionOutbound),
+		sip_infra.WithSessionCallID("sip-call-id"),
+		sip_infra.WithSessionContextID(contextID),
+	)
 	require.NoError(t, err)
 	return session
 }

@@ -72,14 +72,14 @@ func (s *Server) recordRejectedInboundInvite(request *sip.Request, response *sip
 	if s.rejectedInvites == nil {
 		s.rejectedInvites = make(map[inboundInviteKey]inboundRejectedInvite)
 	}
-	if len(s.rejectedInvites) >= maxInboundRejectedInvites {
+	if len(s.rejectedInvites) >= MaxInboundRejectedInvites {
 		s.pruneRejectedInboundInvitesLocked(now)
 	}
 	s.rejectedInvites[key] = inboundRejectedInvite{
 		statusCode:     response.StatusCode,
 		reason:         response.Reason,
 		includeContact: response.Contact() != nil,
-		expiresAt:      now.Add(inboundRejectedInviteTTL),
+		expiresAt:      now.Add(InboundRejectedInviteTTL),
 	}
 	s.mu.Unlock()
 }
@@ -90,12 +90,12 @@ func (s *Server) pruneRejectedInboundInvitesLocked(now time.Time) {
 			delete(s.rejectedInvites, key)
 		}
 	}
-	if len(s.rejectedInvites) < maxInboundRejectedInvites {
+	if len(s.rejectedInvites) < MaxInboundRejectedInvites {
 		return
 	}
 	for key := range s.rejectedInvites {
 		delete(s.rejectedInvites, key)
-		if len(s.rejectedInvites) < maxInboundRejectedInvites {
+		if len(s.rejectedInvites) < MaxInboundRejectedInvites {
 			return
 		}
 	}

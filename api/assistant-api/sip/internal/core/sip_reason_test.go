@@ -9,34 +9,41 @@ package core
 import (
 	"testing"
 
+	"github.com/emiago/sipgo/sip"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestParseSIPReasonHeader_Q850NormalClearing(t *testing.T) {
-	metadata := parseSIPReasonHeader(`Q.850;cause=16;text="Normal call clearing"`)
+func requestWithReason(value string) *sip.Request {
+	request := sip.NewRequest(sip.BYE, sip.Uri{Host: "example.com"})
+	request.AppendHeader(sip.NewHeader("Reason", value))
+	return request
+}
+
+func TestSIPReason_Q850NormalClearing(t *testing.T) {
+	metadata := NewSIPReason(requestWithReason(`Q.850;cause=16;text="Normal call clearing"`)).DisconnectMetadata()
 
 	assert.Equal(t, DisconnectReasonNormalClearing, metadata.Reason)
 	assert.Equal(t, 16, metadata.ProviderStatusCode)
 	assert.Equal(t, "Normal call clearing", metadata.Text)
 }
 
-func TestParseSIPReasonHeader_SIPBusy(t *testing.T) {
-	metadata := parseSIPReasonHeader(`SIP;cause=486;text="Busy Here"`)
+func TestSIPReason_SIPBusy(t *testing.T) {
+	metadata := NewSIPReason(requestWithReason(`SIP;cause=486;text="Busy Here"`)).DisconnectMetadata()
 
 	assert.Equal(t, DisconnectReasonBusy, metadata.Reason)
 	assert.Equal(t, 486, metadata.ProviderStatusCode)
 	assert.Equal(t, "Busy Here", metadata.Text)
 }
 
-func TestParseSIPReasonHeader_QuotedTextWithSemicolon(t *testing.T) {
-	metadata := parseSIPReasonHeader(`Q.850;cause=41;text="Temporary failure; upstream"`)
+func TestSIPReason_QuotedTextWithSemicolon(t *testing.T) {
+	metadata := NewSIPReason(requestWithReason(`Q.850;cause=41;text="Temporary failure; upstream"`)).DisconnectMetadata()
 
 	assert.Equal(t, DisconnectReasonNetworkFailure, metadata.Reason)
 	assert.Equal(t, "Temporary failure; upstream", metadata.Text)
 }
 
-func TestParseSIPDisconnectMetadata_DefaultsToRemoteHangup(t *testing.T) {
-	metadata := parseSIPDisconnectMetadata(nil)
+func TestSIPReason_DefaultsToRemoteHangup(t *testing.T) {
+	metadata := NewSIPReason(nil).DisconnectMetadata()
 
 	assert.Equal(t, DisconnectReasonRemoteHangup, metadata.Reason)
 	assert.Zero(t, metadata.ProviderStatusCode)

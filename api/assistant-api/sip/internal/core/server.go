@@ -16,58 +16,9 @@ import (
 
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
-	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_outbound "github.com/rapidaai/api/assistant-api/sip/internal/outbound"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
-	"github.com/rapidaai/protos"
 )
-
-// ServerState represents the state of the SIP server
-type ServerState int32
-
-const (
-	ServerStateCreated ServerState = iota
-	ServerStateRunning
-	ServerStateStopped
-
-	inboundRejectedInviteTTL  = time.Minute
-	maxInboundRejectedInvites = 1024
-)
-
-// SIPRequestContext contains information about an incoming SIP request.
-// Used by the middleware chain to resolve config for every SIP request.
-//
-// Middleware enriches this context as it flows through the chain:
-//
-//	RouteMiddleware → resolves assistant route, sets Auth and Assistant
-//	VaultMiddleware → fetches SIP config from vault, sets VaultCredential
-type SIPRequestContext struct {
-	Method       string // SIP method (INVITE, REGISTER, BYE, etc.)
-	CallID       string
-	RequestURI   string
-	FromIdentity string
-	ToIdentity   string
-	SDPInfo      *SDPMediaInfo
-
-	// Route/auth fields resolved by middleware.
-	APIKey      string
-	AssistantID string
-
-	Auth            *types.Authentication
-	Assistant       *internal_assistant_entity.Assistant
-	VaultCredential *protos.VaultCredential
-	Config          *Config
-}
-
-// Middleware processes a SIP request context and mutates it in place.
-// Returning nil continues to the next middleware by index. Returning an error
-// stops execution.
-//
-// Example chain for INVITE:
-//
-//	RouteMiddleware → VaultMiddleware
-type Middleware func(ctx *SIPRequestContext) error
 
 // Server wraps sipgo for handling SIP signaling.
 type Server struct {
@@ -117,9 +68,9 @@ type Server struct {
 	middlewares []Middleware
 
 	// Event callbacks
-	onApplicationReady   func(session *Session, requestURI, fromIdentity, toIdentity string) error
+	onApplicationReady   func(session *Session, requestURI string, callAddress CallAddress) error
 	onApplicationCleanup func(session *Session)
-	onInvite             func(session *Session, requestURI, fromIdentity, toIdentity string) error
+	onInvite             func(session *Session, requestURI string, callAddress CallAddress) error
 	onBye                func(session *Session) error
 	onCancel             func(session *Session) error
 	onError              func(session *Session, err error)
@@ -471,7 +422,7 @@ func (s *Server) SessionCount() int {
 	return len(s.sessions)
 }
 
-func (s *Server) SetOnApplicationReady(fn func(session *Session, requestURI, fromIdentity, toIdentity string) error) {
+func (s *Server) SetOnApplicationReady(fn func(session *Session, requestURI string, callAddress CallAddress) error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.onApplicationReady = fn
@@ -484,7 +435,7 @@ func (s *Server) SetOnApplicationCleanup(fn func(session *Session)) {
 }
 
 // SetOnInvite sets the callback for answered INVITE requests.
-func (s *Server) SetOnInvite(fn func(session *Session, requestURI, fromIdentity, toIdentity string) error) {
+func (s *Server) SetOnInvite(fn func(session *Session, requestURI string, callAddress CallAddress) error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.onInvite = fn

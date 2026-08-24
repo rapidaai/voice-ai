@@ -263,19 +263,25 @@ func TestServerConfigMiddlewareConversionPreservesSIPIdentities(t *testing.T) {
 	require.Len(t, serverConfig.Middlewares, 1)
 
 	coreContext := &internal_core.SIPRequestContext{
-		RequestURI:   "sip:agent-42@sip.rapida.ai",
-		FromIdentity: "sip:alice@example.com;user=phone",
-		ToIdentity:   "sips:support@example.net",
+		RequestURI: "sip:agent-42@sip.rapida.ai",
+		CallAddress: internal_core.CallAddress{
+			From:    "+14155550100",
+			To:      "agent-42",
+			FromURI: "sip:+14155550100@carrier.example.com",
+			ToURI:   "sip:agent-42@sip.rapida.ai",
+			Headers: map[string]string{"x-original-called-number": "+14155550200"},
+		},
 	}
 	err := serverConfig.Middlewares[0](coreContext)
 
 	require.NoError(t, err)
 	require.NotNil(t, received)
 	assert.Equal(t, "sip:agent-42@sip.rapida.ai", received.RequestURI)
-	assert.Equal(t, "sip:alice@example.com;user=phone", received.FromIdentity)
-	assert.Equal(t, "sips:support@example.net", received.ToIdentity)
-	assert.Equal(t, "sip:alice@example.com;user=phone", received.FromURI)
-	assert.Equal(t, "sips:support@example.net", received.ToURI)
+	assert.Equal(t, coreContext.CallAddress.FromURI, received.FromIdentity)
+	assert.Equal(t, coreContext.CallAddress.ToURI, received.ToIdentity)
+	assert.Equal(t, coreContext.CallAddress.FromURI, received.FromURI)
+	assert.Equal(t, coreContext.CallAddress.ToURI, received.ToURI)
+	assert.Equal(t, coreContext.CallAddress, received.CallAddress)
 	assert.Equal(t, "42", coreContext.AssistantID)
 }
 
@@ -284,15 +290,17 @@ func TestDeprecatedSIPCompatibilitySurface(t *testing.T) {
 	var _ func(*Server, func(*Session, string, string) error) = (*Server).SetOnInvite
 	var _ func(*Server, func(*Session, SIPRequestIdentity) error) = (*Server).SetOnApplicationReadyIdentity
 	var _ func(*Server, func(*Session, SIPRequestIdentity) error) = (*Server).SetOnInviteIdentity
-
-	assert.Equal(t, "+15551234567", ExtractDIDFromURI("sip:15551234567@example.com"))
 }
 
 func TestSIPRequestContextMiddleware(t *testing.T) {
 	requestContext := &SIPRequestContext{
-		RequestURI:   "sip:agent-42@sip.rapida.ai",
-		FromIdentity: "sip:alice@example.com",
-		ToIdentity:   "sip:support@example.net",
+		RequestURI: "sip:agent-42@sip.rapida.ai",
+		CallAddress: CallAddress{
+			From:    "alice",
+			To:      "support",
+			FromURI: "sip:alice@example.com",
+			ToURI:   "sip:support@example.net",
+		},
 	}
 
 	var order []string
@@ -321,8 +329,8 @@ func TestSIPRequestContextMiddleware(t *testing.T) {
 		t.Fatalf("unexpected middleware context: %#v", requestContext)
 	}
 	if requestContext.RequestURI != "sip:agent-42@sip.rapida.ai" ||
-		requestContext.FromIdentity != "sip:alice@example.com" ||
-		requestContext.ToIdentity != "sip:support@example.net" {
+		requestContext.CallAddress.FromURI != "sip:alice@example.com" ||
+		requestContext.CallAddress.ToURI != "sip:support@example.net" {
 		t.Fatalf("middleware changed SIP identities: %#v", requestContext)
 	}
 	expectedOrder := []string{"first", "second", "final"}

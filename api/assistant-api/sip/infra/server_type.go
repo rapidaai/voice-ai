@@ -24,15 +24,20 @@ const (
 	ServerStateStopped
 )
 
+type CallAddress = internal_core.CallAddress
+
 type SIPRequestContext struct {
-	Method       string
-	CallID       string
-	RequestURI   string
+	Method      string
+	CallID      string
+	RequestURI  string
+	CallAddress CallAddress
+	// Deprecated: derived from CallAddress.FromURI. Do not write.
 	FromIdentity string
-	ToIdentity   string
-	// Deprecated: use FromIdentity.
+	// Deprecated: derived from CallAddress.ToURI. Do not write.
+	ToIdentity string
+	// Deprecated: derived from CallAddress.FromURI. Do not write.
 	FromURI string
-	// Deprecated: use ToIdentity.
+	// Deprecated: derived from CallAddress.ToURI. Do not write.
 	ToURI           string
 	APIKey          string
 	AssistantID     string
@@ -44,9 +49,12 @@ type SIPRequestContext struct {
 }
 
 type SIPRequestIdentity struct {
-	RequestURI   string
+	RequestURI  string
+	CallAddress CallAddress
+	// Deprecated: derived from CallAddress.FromURI. Do not write.
 	FromIdentity string
-	ToIdentity   string
+	// Deprecated: derived from CallAddress.ToURI. Do not write.
+	ToIdentity string
 }
 
 type Middleware func(ctx *SIPRequestContext) error
@@ -144,10 +152,11 @@ func (c *ServerConfig) toCore() *internal_core.ServerConfig {
 				Method:          ctx.Method,
 				CallID:          ctx.CallID,
 				RequestURI:      ctx.RequestURI,
-				FromIdentity:    ctx.FromIdentity,
-				ToIdentity:      ctx.ToIdentity,
-				FromURI:         ctx.FromIdentity,
-				ToURI:           ctx.ToIdentity,
+				FromIdentity:    ctx.CallAddress.FromURI,
+				ToIdentity:      ctx.CallAddress.ToURI,
+				FromURI:         ctx.CallAddress.FromURI,
+				ToURI:           ctx.CallAddress.ToURI,
+				CallAddress:     ctx.CallAddress,
 				SDPInfo:         sdpInfoFromCore(ctx.SDPInfo),
 				APIKey:          ctx.APIKey,
 				AssistantID:     ctx.AssistantID,

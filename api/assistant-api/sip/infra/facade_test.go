@@ -35,18 +35,18 @@ func TestDefaultSDPConfigUsesCurrentCoreShape(t *testing.T) {
 }
 
 func TestSessionFacadeConvertsPhaseAndCodec(t *testing.T) {
-	session, err := NewSession(context.Background(), &SessionConfig{
-		Config: &Config{
+	session, err := NewSession(context.Background(),
+		WithSessionConfig(&Config{
 			Server:            "sip.example.com",
 			Port:              5060,
 			Transport:         TransportUDP,
 			RTPPortRangeStart: 30000,
 			RTPPortRangeEnd:   30100,
-		},
-		Direction: CallDirectionInbound,
-		CallID:    "facade-call",
-		Codec:     &CodecPCMA,
-	})
+		}),
+		WithSessionDirection(CallDirectionInbound),
+		WithSessionCallID("facade-call"),
+		WithSessionCodec(&CodecPCMA),
+	)
 	if err != nil {
 		t.Fatalf("expected session facade to create core-backed session: %v", err)
 	}

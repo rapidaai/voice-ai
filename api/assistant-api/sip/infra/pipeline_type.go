@@ -24,9 +24,12 @@ type SessionEstablishedPipeline struct {
 	AssistantID     uint64
 	Auth            *types.Authentication
 	RequestURI      string
-	FromIdentity    string
-	ToIdentity      string
-	ConversationID  uint64
+	CallAddress     CallAddress
+	// Deprecated: derived from CallAddress.From. Do not write.
+	FromIdentity string
+	// Deprecated: derived from CallAddress.To. Do not write.
+	ToIdentity     string
+	ConversationID uint64
 }
 
 func (p SessionEstablishedPipeline) CallID() string { return p.ID }

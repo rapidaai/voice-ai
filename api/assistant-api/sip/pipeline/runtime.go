@@ -85,8 +85,8 @@ func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, stage sip_infra.
 		session,
 		setup,
 		string(stage.Direction),
-		stage.FromIdentity,
-		stage.ToIdentity,
+		stage.CallAddress.From,
+		stage.CallAddress.To,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("resolve SIP call context: %w", err)
