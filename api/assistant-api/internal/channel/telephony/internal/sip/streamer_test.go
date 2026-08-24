@@ -96,16 +96,16 @@ func newTestSIPStreamerWithCollector(t *testing.T) (*Streamer, *testSIPCollector
 
 func newTestInboundSIPSession(t *testing.T, callID string) *sip_infra.Session {
 	t.Helper()
-	session, err := sip_infra.NewSession(context.Background(), &sip_infra.SessionConfig{
-		Config: &sip_infra.Config{
+	session, err := sip_infra.NewSession(context.Background(),
+		sip_infra.WithSessionConfig(&sip_infra.Config{
 			Server:            "127.0.0.1",
 			Port:              5060,
 			RTPPortRangeStart: 10000,
 			RTPPortRangeEnd:   10100,
-		},
-		Direction: sip_infra.CallDirectionInbound,
-		CallID:    callID,
-	})
+		}),
+		sip_infra.WithSessionDirection(sip_infra.CallDirectionInbound),
+		sip_infra.WithSessionCallID(callID),
+	)
 	require.NoError(t, err)
 	return session
 }
