@@ -1,0 +1,26 @@
+{
+  "rfc": "rfcs/0010-remove-call-status-event.md",
+  "status": "approved",
+  "objective": "Stop assigning provider_status_reporter to the source field of provider reporter ringing webhooks.",
+  "acceptance_criteria": [
+    "Provider status reporter ringing webhook construction does not assign Source.",
+    "The CallRingingWebhookPayload schema remains unchanged.",
+    "Serialized reporter ringing webhooks retain status=ringing and omit status_event.",
+    "Focused tests and repository finalization pass."
+  ],
+  "allowed_paths": [
+    "api/assistant-api/internal/channel/telephony/reporter.go",
+    "api/assistant-api/internal/channel/telephony/reporter_test.go",
+    "rfcs/0010-remove-call-status-event.md",
+    "rfcs/0010-remove-call-status-event/jsons/"
+  ],
+  "risks": [
+    "Consumers observing the provider_status_reporter source value will receive an empty source value from this producer.",
+    "Changing the payload field itself would exceed the requested scope."
+  ],
+  "verification_commands": [
+    "go test ./api/assistant-api/internal/channel/telephony",
+    "make agent-finalize CHANGED_FILES=\"api/assistant-api/internal/channel/telephony/reporter.go,api/assistant-api/internal/channel/telephony/reporter_test.go,rfcs/0010-remove-call-status-event.md,rfcs/0010-remove-call-status-event/jsons/amendment-01-plan.json,rfcs/0010-remove-call-status-event/jsons/amendment-01-challenge.json,rfcs/0010-remove-call-status-event/jsons/amendment-01-confirmation.json\""
+  ],
+  "rollback": "Restore Source: provider_status_reporter in the provider status reporter ringing webhook construction."
+}

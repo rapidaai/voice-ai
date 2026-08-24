@@ -36,6 +36,9 @@ func TestProviderStatusWebhookLifecycleFields(t *testing.T) {
 	if fields["status"] != observability.WebhookCallStatusRinging.String() {
 		t.Fatalf("status = %v, want %q", fields["status"], observability.WebhookCallStatusRinging)
 	}
+	if fields["source"] != "" {
+		t.Fatalf("source = %v, want empty", fields["source"])
+	}
 	if _, exists := fields["status_event"]; exists {
 		t.Fatalf("ringing webhook should not include status_event: %+v", fields)
 	}

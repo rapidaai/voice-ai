@@ -7,7 +7,8 @@
 ## Summary
 
 Remove `status_event` from version 1 call webhook payloads. The typed `status` field is
-the single source of truth for the call lifecycle state.
+the single source of truth for the call lifecycle state. Provider status reporter ringing
+webhooks also stop assigning `source` to `provider_status_reporter`.
 
 ## Problem
 
@@ -30,6 +31,7 @@ interpret for the same lifecycle transition.
 
 - Remove `status_event` from call webhook JSON.
 - Keep typed `status` as the sole public lifecycle field.
+- Stop assigning `provider_status_reporter` to the ringing webhook `source` field.
 - Preserve internal telephony event mapping and metric labels.
 - Keep all other webhook fields and event names unchanged.
 
@@ -70,8 +72,10 @@ The Assistant API webhook contract owner owns all writable files for this change
 ## Proposed Design
 
 Delete `StatusEvent` from the three call webhook payload structs and remove every
-assignment at their construction sites. Update focused tests to assert that serialized
-call webhook payloads do not contain `status_event`.
+assignment at their construction sites. Remove the provider status reporter's
+`Source: "provider_status_reporter"` assignment without changing the payload type. Update
+focused tests to assert that serialized call webhook payloads do not contain
+`status_event` and that reporter ringing payloads do not carry that source value.
 
 No replacement field, conversion function, compatibility alias, or feature flag is
 introduced. Internal telephony events remain available to routing and metrics before the
@@ -81,7 +85,9 @@ public webhook payload is constructed.
 
 The version 1 JSON payload stops emitting `status_event` for `call.ringing`,
 `call.outbound_dispatched`, and `call.failed`. The `status` field and its typed values do
-not change. This is intentionally accepted as a development-phase contract change.
+not change. Ringing webhooks created by the provider status reporter stop carrying the
+`provider_status_reporter` source value. This is intentionally accepted as a
+development-phase contract change.
 
 ## Failure and Recovery
 
@@ -133,6 +139,8 @@ one revert. No persistent-data rollback is required.
 - [ ] No call webhook JSON contains `status_event`.
 - [ ] Internal telephony event parsing and call metric labels remain unchanged.
 - [ ] Existing call webhook `status` values remain unchanged.
+- [ ] Provider status reporter ringing webhooks do not set `source` to
+  `provider_status_reporter`.
 - [ ] Focused tests and repository finalization pass.
 
 ## Challenge Resolution
@@ -146,9 +154,13 @@ labels remain unchanged, and no compatibility bridge or version 2 payload is req
 - `jsons/plan.json`: approved implementation plan.
 - `jsons/challenge.json`: approved contract-owner challenge receipt.
 - `jsons/confirmation.json`: exact-digest implementation gate pending.
+- `jsons/amendment-01-plan.json`: source-removal amendment plan.
+- `jsons/amendment-01-challenge.json`: approved contract-owner amendment challenge.
+- `jsons/amendment-01-confirmation.json`: amendment exact-digest gate pending.
 
 ## Decision Log
 
 | Date | Decision | Owner | Evidence |
 | --- | --- | --- | --- |
 | 2026-08-24 | Remove `status_event` during development | Webhook contract owner | User instruction |
+| 2026-08-24 | Remove the provider status reporter source value | Webhook contract owner | User instruction |

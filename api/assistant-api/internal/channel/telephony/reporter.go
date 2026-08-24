@@ -166,7 +166,6 @@ func (d *OutboundDispatcher) NewStatusReporter(contextID string) internal_type.P
 						From:      currentCallContext.FromNumber,
 						Direction: observability.WebhookCallDirectionOutbound,
 						ContextID: currentCallContext.ContextID,
-						Source:    "provider_status_reporter",
 						Status:    observability.WebhookCallStatusRinging,
 					},
 				},
