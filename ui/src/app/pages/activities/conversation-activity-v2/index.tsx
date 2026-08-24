@@ -67,6 +67,7 @@ import {
   parseTraceFilterQuery,
   telemetryRecordToTimelineDocument,
   getTraceFilterValues,
+  getTelemetryPagesToFetch,
 } from './utils';
 import type { TraceFilterToken } from './utils';
 
@@ -1051,14 +1052,16 @@ export const ListingPage = () => {
     const fetchTelemetry = async () => {
       setIsLoading(true);
       const shouldMergeRequests = requestCriteriaSets.length > 1;
-      const requestPage = shouldMergeRequests ? 1 : page;
-      const requestPageSize = shouldMergeRequests ? page * pageSize : pageSize;
+      const requestPages = getTelemetryPagesToFetch(page, shouldMergeRequests);
 
-      const createTelemetryRequest = (criteria: Criteria[]) => {
+      const createTelemetryRequest = (
+        criteria: Criteria[],
+        requestPage: number,
+      ) => {
         const request = new GetAllTelemetryRequest();
         const paginate = new Paginate();
         paginate.setPage(requestPage);
-        paginate.setPagesize(requestPageSize);
+        paginate.setPagesize(pageSize);
         request.setPaginate(paginate);
         request.setCriteriasList(criteria);
 
@@ -1070,21 +1073,26 @@ export const ListingPage = () => {
       };
 
       try {
-        const responses = await Promise.all(
+        const responseGroups = await Promise.all(
           requestCriteriaSets.map(criteria =>
-            GetAllTelemetry(
-              connectionConfig,
-              createTelemetryRequest(criteria),
-              ConnectionConfig.WithDebugger({
-                authorization: token,
-                userId: authId,
-                projectId,
-              }),
+            Promise.all(
+              requestPages.map(requestPage =>
+                GetAllTelemetry(
+                  connectionConfig,
+                  createTelemetryRequest(criteria, requestPage),
+                  ConnectionConfig.WithDebugger({
+                    authorization: token,
+                    userId: authId,
+                    projectId,
+                  }),
+                ),
+              ),
             ),
           ),
         );
         if (!active) return;
 
+        const responses = responseGroups.flat();
         const failedResponse = responses.find(
           response => !response.getSuccess(),
         );
@@ -1112,11 +1120,12 @@ export const ListingPage = () => {
         setDocuments(nextDocuments);
         setTotalItem(
           shouldMergeRequests
-            ? responses.reduce(
-                (total, response) =>
+            ? responseGroups.reduce(
+                (total, responseGroup) =>
                   total +
-                  (response.getPaginated()?.getTotalitem() ||
-                    response.getDataList().length),
+                  (responseGroup[0]?.getPaginated()?.getTotalitem() ||
+                    responseGroup[0]?.getDataList().length ||
+                    0),
                 0,
               )
             : responses[0]?.getPaginated()?.getTotalitem() ||

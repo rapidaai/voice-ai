@@ -3,6 +3,7 @@ package adapter_internal
 import (
 	"context"
 	"io"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -10,6 +11,7 @@ import (
 	adapter_channel "github.com/rapidaai/api/assistant-api/internal/adapters/channel"
 	adapter_lifecycle "github.com/rapidaai/api/assistant-api/internal/adapters/lifecycle"
 	internal_conversation_entity "github.com/rapidaai/api/assistant-api/internal/entity/conversations"
+	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
@@ -78,6 +80,35 @@ func TestTalk_RecvErrorBeforeInitialization_ReturnsNil(t *testing.T) {
 	err := r.Talk(context.Background(), nil)
 	require.NoError(t, err)
 	assert.Equal(t, 1, streamer.recvCall)
+}
+
+func TestOnCallCompletion_EmitsConversationDurationInMilliseconds(t *testing.T) {
+	r := &genericRequestor{
+		assistantConversation: &internal_conversation_entity.AssistantConversation{},
+		messageLifecycle:      adapter_lifecycle.NewMessageLifecycle(),
+		channels:              adapter_channel.NewRequestorChannels(),
+	}
+	r.assistantConversation.Id = 42
+
+	r.OnCallCompletion(time.Now().Add(-2 * time.Second))
+
+	envelope := <-r.channels.BackgroundChannel()
+	packet, ok := envelope.Pkt.(internal_type.ObservabilityMetricRecordPacket)
+	require.True(t, ok)
+
+	metrics := make(map[string]*protos.Metric, len(packet.Record.Metrics))
+	for _, metric := range packet.Record.Metrics {
+		metrics[metric.GetName()] = metric
+	}
+
+	durationMetric := metrics[observability.MetricConversationDuration]
+	require.NotNil(t, durationMetric)
+	assert.NotContains(t, metrics, "duration")
+
+	durationMs, err := strconv.ParseInt(durationMetric.GetValue(), 10, 64)
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, durationMs, int64(1900))
+	assert.Less(t, durationMs, int64(3000))
 }
 
 func TestTalk_BuffersPacketsBeforeInitialization(t *testing.T) {

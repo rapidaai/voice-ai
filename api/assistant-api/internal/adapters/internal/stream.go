@@ -202,24 +202,16 @@ func (t *genericRequestor) OnCallCompletion(startTime time.Time) {
 			Description: "Status of current conversation",
 		}
 	}
-	t.metrics[type_enums.CONVERSATION_DURATION.String()] = &protos.Metric{
-		Name:        type_enums.CONVERSATION_DURATION.String(),
-		Value:       fmt.Sprintf("%d", duration),
-		Description: "Conversation duration from first message to end",
-	}
+
 	t.OnPacket(context.Background(),
 		internal_type.ObservabilityMetricRecordPacket{
 			ContextID: fmt.Sprintf("%d", conv.Id),
 			Scope:     internal_type.ObservabilityRecordScopeConversation,
 			Record: observability.NewConversationMetricRecord([]*protos.Metric{
+				t.metrics[type_enums.CONVERSATION_STATUS.String()],
 				{
-					Name:        type_enums.CONVERSATION_STATUS.String(),
-					Value:       t.metrics[type_enums.CONVERSATION_STATUS.String()].GetValue(),
-					Description: t.metrics[type_enums.CONVERSATION_STATUS.String()].GetDescription(),
-				},
-				{
-					Name:        type_enums.CONVERSATION_DURATION.String(),
-					Value:       fmt.Sprintf("%d", duration),
+					Name:        observability.MetricConversationDuration,
+					Value:       fmt.Sprintf("%d", duration.Milliseconds()),
 					Description: "Conversation duration from first message to end",
 				},
 			}),

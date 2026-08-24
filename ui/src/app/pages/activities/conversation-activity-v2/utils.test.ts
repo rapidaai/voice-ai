@@ -12,6 +12,7 @@ import {
   dedupeTraceFilters,
   formatDateTime,
   getDocumentComponent,
+  getTelemetryPagesToFetch,
   getTraceFilterValues,
   matchesTraceFilters,
   parseTraceFilterQuery,
@@ -67,6 +68,14 @@ const observabilityRecord = (metric: any) =>
 describe('conversation activity v2 telemetry utilities', () => {
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  it('fetches every preceding page when combining filter requests', () => {
+    expect(getTelemetryPagesToFetch(2, true)).toEqual([1, 2]);
+  });
+
+  it('fetches only the selected page for a single request', () => {
+    expect(getTelemetryPagesToFetch(2, false)).toEqual([2]);
   });
 
   it('formats trace occurrence dates with the shared table contract', () => {

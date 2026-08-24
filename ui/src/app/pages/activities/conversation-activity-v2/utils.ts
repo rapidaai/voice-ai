@@ -443,6 +443,16 @@ export const getDocumentComponent = (doc: TimelineDocument): string => {
 
 export type TraceFilterSource = 'facet' | 'query';
 
+export const getTelemetryPagesToFetch = (
+  page: number,
+  shouldMergeRequests: boolean,
+): number[] => {
+  const requestedPage = Math.max(1, page);
+  if (!shouldMergeRequests) return [requestedPage];
+
+  return Array.from({ length: requestedPage }, (_, index) => index + 1);
+};
+
 export type TraceFilterToken = {
   criteriaKey: string;
   fieldKey: string;
