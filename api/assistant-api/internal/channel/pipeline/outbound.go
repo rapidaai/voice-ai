@@ -388,14 +388,13 @@ func (d *Dispatcher) runOutbound(ctx context.Context, v OutboundRequestedPipelin
 				V1WebhookPayloadBase: observability.NewV1WebhookPayload(map[string]interface{}{
 					"provider_response": callInfo.StatusInfo.Payload,
 				}),
-				Provider:    assistant.AssistantPhoneDeployment.TelephonyProvider,
-				CallID:      callInfo.ChannelUUID,
-				To:          v.ToPhone,
-				From:        fromPhone,
-				Direction:   observability.WebhookCallDirectionOutbound,
-				ContextID:   contextID,
-				StatusEvent: callInfo.StatusInfo.Event.String(),
-				Status:      observability.WebhookCallStatusInProgress,
+				Provider:  assistant.AssistantPhoneDeployment.TelephonyProvider,
+				CallID:    callInfo.ChannelUUID,
+				To:        v.ToPhone,
+				From:      fromPhone,
+				Direction: observability.WebhookCallDirectionOutbound,
+				ContextID: contextID,
+				Status:    observability.WebhookCallStatusInProgress,
 			},
 		})
 

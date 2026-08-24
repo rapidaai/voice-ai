@@ -7,6 +7,7 @@
 package assistant_talk_api
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
@@ -21,5 +22,17 @@ func TestCallbackWebhookLifecycleFields(t *testing.T) {
 	}
 	if payload.Status != observability.WebhookCallStatusFailed || payload.DisconnectReason != observability.WebhookCallDisconnectReasonProviderFailed {
 		t.Fatalf("unexpected callback lifecycle fields: %+v", payload)
+	}
+
+	serialized, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("Marshal() error = %v", err)
+	}
+	var fields map[string]interface{}
+	if err := json.Unmarshal(serialized, &fields); err != nil {
+		t.Fatalf("Unmarshal() error = %v", err)
+	}
+	if _, exists := fields["status_event"]; exists {
+		t.Fatalf("callback webhook should not include status_event: %+v", fields)
 	}
 }

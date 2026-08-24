@@ -7,6 +7,7 @@
 package channel_pipeline
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
@@ -26,5 +27,18 @@ func TestPipelineCallWebhookLifecycleFields(t *testing.T) {
 	}
 	if ended.Status != observability.WebhookCallStatusCompleted || ended.DisconnectReason != observability.WebhookCallDisconnectReasonRemoteHangup {
 		t.Fatalf("unexpected ended lifecycle fields: %+v", ended)
+	}
+
+	dispatched := observability.CallOutboundDispatchedWebhookPayload{Status: observability.WebhookCallStatusInProgress}
+	serialized, err := json.Marshal(dispatched)
+	if err != nil {
+		t.Fatalf("Marshal() error = %v", err)
+	}
+	var fields map[string]interface{}
+	if err := json.Unmarshal(serialized, &fields); err != nil {
+		t.Fatalf("Unmarshal() error = %v", err)
+	}
+	if _, exists := fields["status_event"]; exists {
+		t.Fatalf("outbound dispatched webhook should not include status_event: %+v", fields)
 	}
 }

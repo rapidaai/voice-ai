@@ -87,15 +87,14 @@ type CallReceivedWebhookPayload struct {
 type CallRingingWebhookPayload struct {
 	V1WebhookPayloadBase
 
-	Provider    string               `json:"provider"`
-	CallID      string               `json:"call_id"`
-	To          string               `json:"to"`
-	From        string               `json:"from"`
-	Direction   WebhookCallDirection `json:"direction"`
-	ContextID   string               `json:"context_id"`
-	Source      string               `json:"source"`
-	StatusEvent string               `json:"status_event"`
-	Status      WebhookCallStatus    `json:"status"`
+	Provider  string               `json:"provider"`
+	CallID    string               `json:"call_id"`
+	To        string               `json:"to"`
+	From      string               `json:"from"`
+	Direction WebhookCallDirection `json:"direction"`
+	ContextID string               `json:"context_id"`
+	Source    string               `json:"source"`
+	Status    WebhookCallStatus    `json:"status"`
 }
 
 type CallProviderAnsweredWebhookPayload struct {
@@ -121,7 +120,6 @@ type CallFailedWebhookPayload struct {
 	ContextID        string                      `json:"context_id,omitempty"`
 	Stage            string                      `json:"stage,omitempty"`
 	Source           string                      `json:"source,omitempty"`
-	StatusEvent      string                      `json:"status_event,omitempty"`
 	Error            string                      `json:"error,omitempty"`
 	DurationMs       string                      `json:"duration_ms,omitempty"`
 	Status           WebhookCallStatus           `json:"status"`
@@ -168,14 +166,13 @@ type CallOutboundRequestedWebhookPayload struct {
 type CallOutboundDispatchedWebhookPayload struct {
 	V1WebhookPayloadBase
 
-	Provider    string               `json:"provider"`
-	CallID      string               `json:"call_id"`
-	To          string               `json:"to"`
-	From        string               `json:"from"`
-	Direction   WebhookCallDirection `json:"direction"`
-	ContextID   string               `json:"context_id"`
-	StatusEvent string               `json:"status_event"`
-	Status      WebhookCallStatus    `json:"status"`
+	Provider  string               `json:"provider"`
+	CallID    string               `json:"call_id"`
+	To        string               `json:"to"`
+	From      string               `json:"from"`
+	Direction WebhookCallDirection `json:"direction"`
+	ContextID string               `json:"context_id"`
+	Status    WebhookCallStatus    `json:"status"`
 }
 
 type ConversationBeginWebhookPayload struct {

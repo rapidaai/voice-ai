@@ -1,0 +1,37 @@
+{
+  "rfc": "rfcs/0010-remove-call-status-event.md",
+  "status": "approved",
+  "objective": "Remove status_event from version 1 call webhooks and keep status as the sole public lifecycle field.",
+  "acceptance_criteria": [
+    "No call webhook payload type exposes StatusEvent.",
+    "No call webhook JSON contains status_event.",
+    "Internal telephony event parsing and call metric labels remain unchanged.",
+    "Existing call webhook status values remain unchanged.",
+    "Focused tests and repository finalization pass."
+  ],
+  "allowed_paths": [
+    "api/assistant-api/internal/observability/webhook.go",
+    "api/assistant-api/internal/observability/webhook_test.go",
+    "api/assistant-api/internal/observability/recorder_test.go",
+    "api/assistant-api/internal/observability/collectors/webhook/collector_test.go",
+    "api/assistant-api/api/talk/callback.go",
+    "api/assistant-api/api/talk/callback_webhook_test.go",
+    "api/assistant-api/internal/channel/pipeline/outbound.go",
+    "api/assistant-api/internal/channel/pipeline/webhook_test.go",
+    "api/assistant-api/internal/channel/telephony/reporter.go",
+    "api/assistant-api/internal/channel/telephony/reporter_test.go",
+    "rfcs/0010-remove-call-status-event/",
+    "rfcs/0010-remove-call-status-event.md"
+  ],
+  "risks": [
+    "Webhook consumers reading status_event must switch to status.",
+    "A missed producer assignment will fail compilation.",
+    "A missed assertion could leave stale contract expectations."
+  ],
+  "verification_commands": [
+    "go test ./api/assistant-api/internal/observability ./api/assistant-api/internal/observability/collectors/webhook",
+    "go test ./api/assistant-api/api/talk ./api/assistant-api/internal/channel/pipeline ./api/assistant-api/internal/channel/telephony",
+    "make agent-finalize CHANGED_FILES=\"comma,separated,paths\""
+  ],
+  "rollback": "Restore the three StatusEvent fields, producer assignments, and focused test expectations in one revert."
+}
