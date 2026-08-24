@@ -1,0 +1,28 @@
+{
+  "status": "passed",
+  "run_id": "run_987eb743b44b",
+  "task_id": "task_21618a96575d",
+  "dispatch_id": "ctx_5e9880774a8d",
+  "verifier": "Codex verification worker",
+  "completed_at": "2026-08-24T18:47:53Z",
+  "commands": [
+    {
+      "cmd": "go test ./api/assistant-api/internal/observability",
+      "exit_code": 0
+    },
+    {
+      "cmd": "go test ./api/assistant-api/internal/observability/collectors/webhook",
+      "exit_code": 0
+    },
+    {
+      "cmd": "go test ./api/assistant-api/api/talk ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/channel/pipeline ./api/assistant-api/internal/channel/telephony ./api/assistant-api/internal/channel/webrtc/... ./api/assistant-api/sip/pipeline",
+      "exit_code": 0,
+      "notes": "Only non-failing duplicate rpath and onnxruntime linker warnings were emitted."
+    },
+    {
+      "cmd": "make agent-finalize CHANGED_FILES=\"api/assistant-api/internal/observability/webhook.go,api/assistant-api/internal/observability/webhook_test.go,api/assistant-api/internal/observability/collectors/webhook/collector_test.go\"",
+      "exit_code": 0
+    }
+  ],
+  "findings": []
+}

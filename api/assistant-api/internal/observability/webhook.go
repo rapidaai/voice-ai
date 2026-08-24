@@ -77,7 +77,7 @@ type CallReceivedWebhookPayload struct {
 	V1WebhookPayloadBase
 
 	Provider  string               `json:"provider"`
-	CallID    string               `json:"call_id"`
+	CallID    string               `json:"callId"`
 	To        string               `json:"to"`
 	From      string               `json:"from"`
 	Direction WebhookCallDirection `json:"direction"`
@@ -88,11 +88,11 @@ type CallRingingWebhookPayload struct {
 	V1WebhookPayloadBase
 
 	Provider  string               `json:"provider"`
-	CallID    string               `json:"call_id"`
+	CallID    string               `json:"callId"`
 	To        string               `json:"to"`
 	From      string               `json:"from"`
 	Direction WebhookCallDirection `json:"direction"`
-	ContextID string               `json:"context_id"`
+	ContextID string               `json:"contextId"`
 	Source    string               `json:"source"`
 	Status    WebhookCallStatus    `json:"status"`
 }
@@ -101,11 +101,11 @@ type CallProviderAnsweredWebhookPayload struct {
 	V1WebhookPayloadBase
 
 	Provider  string               `json:"provider"`
-	CallID    string               `json:"call_id"`
+	CallID    string               `json:"callId"`
 	To        string               `json:"to"`
 	From      string               `json:"from"`
 	Direction WebhookCallDirection `json:"direction"`
-	ContextID string               `json:"context_id"`
+	ContextID string               `json:"contextId"`
 	Status    WebhookCallStatus    `json:"status"`
 }
 
@@ -113,28 +113,28 @@ type CallFailedWebhookPayload struct {
 	V1WebhookPayloadBase
 
 	Provider         string                      `json:"provider,omitempty"`
-	CallID           string                      `json:"call_id,omitempty"`
+	CallID           string                      `json:"callId,omitempty"`
 	To               string                      `json:"to,omitempty"`
 	From             string                      `json:"from,omitempty"`
 	Direction        WebhookCallDirection        `json:"direction,omitempty"`
-	ContextID        string                      `json:"context_id,omitempty"`
+	ContextID        string                      `json:"contextId,omitempty"`
 	Stage            string                      `json:"stage,omitempty"`
 	Source           string                      `json:"source,omitempty"`
 	Error            string                      `json:"error,omitempty"`
-	DurationMs       string                      `json:"duration_ms,omitempty"`
+	DurationMs       string                      `json:"durationMs,omitempty"`
 	Status           WebhookCallStatus           `json:"status"`
-	DisconnectReason WebhookCallDisconnectReason `json:"disconnect_reason,omitempty"`
+	DisconnectReason WebhookCallDisconnectReason `json:"disconnectReason,omitempty"`
 }
 
 type CallStartedWebhookPayload struct {
 	V1WebhookPayloadBase
 
 	Provider  string               `json:"provider"`
-	CallID    string               `json:"call_id"`
+	CallID    string               `json:"callId"`
 	To        string               `json:"to"`
 	From      string               `json:"from"`
 	Direction WebhookCallDirection `json:"direction"`
-	ContextID string               `json:"context_id"`
+	ContextID string               `json:"contextId"`
 	Status    WebhookCallStatus    `json:"status"`
 }
 
@@ -142,14 +142,14 @@ type CallEndedWebhookPayload struct {
 	V1WebhookPayloadBase
 
 	Provider         string                      `json:"provider"`
-	CallID           string                      `json:"call_id"`
+	CallID           string                      `json:"callId"`
 	To               string                      `json:"to"`
 	From             string                      `json:"from"`
 	Direction        WebhookCallDirection        `json:"direction"`
-	ContextID        string                      `json:"context_id"`
-	DurationMs       string                      `json:"duration_ms"`
+	ContextID        string                      `json:"contextId"`
+	DurationMs       string                      `json:"durationMs"`
 	Status           WebhookCallStatus           `json:"status"`
-	DisconnectReason WebhookCallDisconnectReason `json:"disconnect_reason,omitempty"`
+	DisconnectReason WebhookCallDisconnectReason `json:"disconnectReason,omitempty"`
 }
 
 type CallOutboundRequestedWebhookPayload struct {
@@ -159,7 +159,7 @@ type CallOutboundRequestedWebhookPayload struct {
 	To        string               `json:"to"`
 	From      string               `json:"from"`
 	Direction WebhookCallDirection `json:"direction"`
-	ContextID string               `json:"context_id"`
+	ContextID string               `json:"contextId"`
 	Status    WebhookCallStatus    `json:"status"`
 }
 
@@ -167,11 +167,11 @@ type CallOutboundDispatchedWebhookPayload struct {
 	V1WebhookPayloadBase
 
 	Provider  string               `json:"provider"`
-	CallID    string               `json:"call_id"`
+	CallID    string               `json:"callId"`
 	To        string               `json:"to"`
 	From      string               `json:"from"`
 	Direction WebhookCallDirection `json:"direction"`
-	ContextID string               `json:"context_id"`
+	ContextID string               `json:"contextId"`
 	Status    WebhookCallStatus    `json:"status"`
 }
 
@@ -188,7 +188,7 @@ type ConversationResumeWebhookPayload struct {
 
 	Source       string `json:"source"`
 	Identifier   string `json:"identifier"`
-	MessageCount string `json:"message_count"`
+	MessageCount string `json:"messageCount"`
 	Status       string `json:"status"`
 }
 
@@ -198,7 +198,7 @@ type ConversationCompletedWebhookPayload struct {
 	Source           string                   `json:"source"`
 	Reason           string                   `json:"reason"`
 	Status           string                   `json:"status"`
-	DisconnectReason string                   `json:"disconnect_reason,omitempty"`
+	DisconnectReason string                   `json:"disconnectReason,omitempty"`
 	Messages         []map[string]interface{} `json:"messages"`
 	Metadata         map[string]interface{}   `json:"metadata"`
 	Metrics          []map[string]interface{} `json:"metrics"`
@@ -211,23 +211,23 @@ type ConversationErrorWebhookPayload struct {
 	Reason           string `json:"reason"`
 	Message          string `json:"message"`
 	Status           string `json:"status"`
-	DisconnectReason string `json:"disconnect_reason,omitempty"`
+	DisconnectReason string `json:"disconnectReason,omitempty"`
 }
 
 type WebRTCConnectedWebhookPayload struct {
 	V1WebhookPayloadBase
 
-	SessionID           string `json:"session_id"`
-	MediaSessionID      uint64 `json:"media_session_id"`
-	ICELatencyMs        int64  `json:"ice_latency_ms"`
-	PeerConnectionState string `json:"peer_connection_state"`
+	SessionID           string `json:"sessionId"`
+	MediaSessionID      uint64 `json:"mediaSessionId"`
+	ICELatencyMs        int64  `json:"iceLatencyMs"`
+	PeerConnectionState string `json:"peerConnectionState"`
 }
 
 type WebRTCAudioTrackReceivedWebhookPayload struct {
 	V1WebhookPayloadBase
 
-	SessionID      string `json:"session_id"`
-	MediaSessionID uint64 `json:"media_session_id"`
+	SessionID      string `json:"sessionId"`
+	MediaSessionID uint64 `json:"mediaSessionId"`
 	Codec          string `json:"codec"`
 }
 
@@ -235,21 +235,21 @@ type WebRTCReconnectingWebhookPayload struct {
 	V1WebhookPayloadBase
 
 	Type           string `json:"type"`
-	SessionID      string `json:"session_id"`
-	MediaSessionID uint64 `json:"media_session_id"`
+	SessionID      string `json:"sessionId"`
+	MediaSessionID uint64 `json:"mediaSessionId"`
 	Reason         string `json:"reason"`
-	RestartAttempt uint64 `json:"restart_attempt"`
-	RestartLimit   uint64 `json:"restart_limit"`
+	RestartAttempt uint64 `json:"restartAttempt"`
+	RestartLimit   uint64 `json:"restartLimit"`
 }
 
 type WebRTCFailedWebhookPayload struct {
 	V1WebhookPayloadBase
 
 	Type                string `json:"type"`
-	SessionID           string `json:"session_id"`
-	MediaSessionID      uint64 `json:"media_session_id,omitempty"`
+	SessionID           string `json:"sessionId"`
+	MediaSessionID      uint64 `json:"mediaSessionId,omitempty"`
 	Reason              string `json:"reason"`
-	PeerConnectionState string `json:"peer_connection_state,omitempty"`
+	PeerConnectionState string `json:"peerConnectionState,omitempty"`
 	Error               string `json:"error,omitempty"`
 	Fallback            string `json:"fallback,omitempty"`
 }
@@ -258,10 +258,10 @@ type WebRTCDisconnectedWebhookPayload struct {
 	V1WebhookPayloadBase
 
 	Type                string `json:"type,omitempty"`
-	SessionID           string `json:"session_id"`
-	MediaSessionID      uint64 `json:"media_session_id"`
+	SessionID           string `json:"sessionId"`
+	MediaSessionID      uint64 `json:"mediaSessionId"`
 	Reason              string `json:"reason"`
-	PeerConnectionState string `json:"peer_connection_state,omitempty"`
+	PeerConnectionState string `json:"peerConnectionState,omitempty"`
 }
 
 func NewV1WebhookPayload(extra map[string]interface{}) V1WebhookPayloadBase {

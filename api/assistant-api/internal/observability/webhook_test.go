@@ -59,13 +59,118 @@ func TestAssistantWebhookPayloadLifecycleFields(t *testing.T) {
 				t.Fatalf("status_event should be omitted: %+v", payload)
 			}
 			if testCase.disconnectReason == "" {
+				if _, exists := payload["disconnectReason"]; exists {
+					t.Fatalf("disconnectReason should be omitted: %+v", payload)
+				}
 				if _, exists := payload["disconnect_reason"]; exists {
 					t.Fatalf("disconnect_reason should be omitted: %+v", payload)
 				}
 				return
 			}
-			if payload["disconnect_reason"] != testCase.disconnectReason {
-				t.Fatalf("disconnect_reason = %v, want %q", payload["disconnect_reason"], testCase.disconnectReason)
+			if payload["disconnectReason"] != testCase.disconnectReason {
+				t.Fatalf("disconnectReason = %v, want %q", payload["disconnectReason"], testCase.disconnectReason)
+			}
+			if _, exists := payload["disconnect_reason"]; exists {
+				t.Fatalf("disconnect_reason should be omitted: %+v", payload)
+			}
+		})
+	}
+}
+
+func TestWebhookPayloadJSONFieldNames(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name          string
+		payload       V1WebhookPayload
+		presentFields map[string]interface{}
+		absentFields  []string
+	}{
+		{
+			name: "call payload uses camelcase lifecycle keys",
+			payload: CallFailedWebhookPayload{
+				V1WebhookPayloadBase: NewV1WebhookPayload(nil),
+				CallID:               "call-1",
+				ContextID:            "ctx-1",
+				DurationMs:           "1200",
+				Status:               WebhookCallStatusFailed,
+				DisconnectReason:     WebhookCallDisconnectReasonProviderFailed,
+			},
+			presentFields: map[string]interface{}{
+				"callId":           "call-1",
+				"contextId":        "ctx-1",
+				"durationMs":       "1200",
+				"disconnectReason": WebhookCallDisconnectReasonProviderFailed.String(),
+			},
+			absentFields: []string{"call_id", "context_id", "duration_ms", "disconnect_reason"},
+		},
+		{
+			name: "conversation payload uses camelcase message count",
+			payload: ConversationResumeWebhookPayload{
+				V1WebhookPayloadBase: NewV1WebhookPayload(nil),
+				MessageCount:         "3",
+				Status:               "in_progress",
+			},
+			presentFields: map[string]interface{}{"messageCount": "3"},
+			absentFields:  []string{"message_count"},
+		},
+		{
+			name: "webrtc payload uses camelcase session identifiers",
+			payload: WebRTCConnectedWebhookPayload{
+				V1WebhookPayloadBase: NewV1WebhookPayload(nil),
+				SessionID:            "session-1",
+				MediaSessionID:       42,
+				ICELatencyMs:         15,
+				PeerConnectionState:  "connected",
+			},
+			presentFields: map[string]interface{}{
+				"sessionId":           "session-1",
+				"mediaSessionId":      float64(42),
+				"iceLatencyMs":        float64(15),
+				"peerConnectionState": "connected",
+			},
+			absentFields: []string{"session_id", "media_session_id", "ice_latency_ms", "peer_connection_state"},
+		},
+		{
+			name: "webrtc payload uses camelcase restart counters",
+			payload: WebRTCReconnectingWebhookPayload{
+				V1WebhookPayloadBase: NewV1WebhookPayload(nil),
+				SessionID:            "session-2",
+				MediaSessionID:       84,
+				RestartAttempt:       2,
+				RestartLimit:         5,
+			},
+			presentFields: map[string]interface{}{
+				"restartAttempt": float64(2),
+				"restartLimit":   float64(5),
+			},
+			absentFields: []string{"restart_attempt", "restart_limit"},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			serialized, err := json.Marshal(testCase.payload)
+			if err != nil {
+				t.Fatalf("Marshal() error = %v", err)
+			}
+
+			var payload map[string]interface{}
+			if err := json.Unmarshal(serialized, &payload); err != nil {
+				t.Fatalf("Unmarshal() error = %v", err)
+			}
+
+			for key, want := range testCase.presentFields {
+				if payload[key] != want {
+					t.Fatalf("%s = %v, want %v", key, payload[key], want)
+				}
+			}
+			for _, key := range testCase.absentFields {
+				if _, exists := payload[key]; exists {
+					t.Fatalf("%s should be omitted: %+v", key, payload)
+				}
 			}
 		})
 	}
