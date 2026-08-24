@@ -49,18 +49,18 @@ func TestReconstructCallContextInboundPreservesSIPIdentities(t *testing.T) {
 
 func TestEnsureCallContextOutboundFallbackPreservesResolvedRequestIdentities(t *testing.T) {
 	auth := newIdentityTestAuthentication()
-	session, err := sip_infra.NewSession(context.Background(), &sip_infra.SessionConfig{
-		Config: &sip_infra.Config{
+	session, err := sip_infra.NewSession(context.Background(),
+		sip_infra.WithSessionConfig(&sip_infra.Config{
 			Server:            "sip.example.com",
 			Port:              5060,
 			Transport:         sip_infra.TransportUDP,
 			RTPPortRangeStart: 10000,
 			RTPPortRangeEnd:   10020,
-		},
-		Direction: sip_infra.CallDirectionOutbound,
-		CallID:    "call-outbound",
-		Auth:      auth,
-	})
+		}),
+		sip_infra.WithSessionDirection(sip_infra.CallDirectionOutbound),
+		sip_infra.WithSessionCallID("call-outbound"),
+		sip_infra.WithSessionAuth(auth),
+	)
 	require.NoError(t, err)
 	dispatcher := &Dispatcher{}
 

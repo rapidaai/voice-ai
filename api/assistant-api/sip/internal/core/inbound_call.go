@@ -85,15 +85,15 @@ func newInboundSession(
 	setupPhase InboundSetupPhase,
 	setupTimings InboundSetupTimings,
 ) (*Session, *inboundFailure) {
-	session, err := NewSession(ctx, &SessionConfig{
-		Config:          resolvedConfig.config,
-		Direction:       CallDirectionInbound,
-		CallID:          identity.callID,
-		Codec:           mediaOffer.negotiatedCodec,
-		Auth:            resolvedConfig.auth,
-		Assistant:       resolvedConfig.assistant,
-		VaultCredential: resolvedConfig.vaultCredential,
-	})
+	session, err := NewSession(ctx,
+		WithSessionConfig(resolvedConfig.config),
+		WithSessionDirection(CallDirectionInbound),
+		WithSessionCallID(identity.callID),
+		WithSessionCodec(mediaOffer.negotiatedCodec),
+		WithSessionAuth(resolvedConfig.auth),
+		WithSessionAssistant(resolvedConfig.assistant),
+		WithSessionVaultCredential(resolvedConfig.vaultCredential),
+	)
 	if err != nil {
 		sessionErr := fmt.Errorf("failed to create inbound session: %w", err)
 		failure := newInboundSessionFailure(sessionErr)

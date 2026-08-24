@@ -10,109 +10,15 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
-	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_outbound "github.com/rapidaai/api/assistant-api/sip/internal/outbound"
 	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
-	"github.com/rapidaai/protos"
 )
-
-// ServerState represents the state of the SIP server
-type ServerState int32
-
-const (
-	ServerStateCreated ServerState = iota
-	ServerStateRunning
-	ServerStateStopped
-
-	inboundRejectedInviteTTL  = time.Minute
-	maxInboundRejectedInvites = 1024
-)
-
-// CallAddress contains the SIP parties and non-credential headers received with a call.
-// From and To are URI users. Header names are lowercase and repeated values preserve arrival order.
-type CallAddress struct {
-	From    string
-	To      string
-	FromURI string
-	ToURI   string
-	Headers map[string]string
-}
-
-// NewCallAddress reads the parties and non-credential headers from a SIP request.
-func NewCallAddress(request *sip.Request) CallAddress {
-	if request == nil {
-		return CallAddress{}
-	}
-
-	address := CallAddress{Headers: make(map[string]string)}
-	if from := request.From(); from != nil {
-		address.From = strings.TrimSpace(from.Address.User)
-		address.FromURI = from.Address.String()
-	}
-	if to := request.To(); to != nil {
-		address.To = strings.TrimSpace(to.Address.User)
-		address.ToURI = to.Address.String()
-	}
-
-	for _, header := range request.Headers() {
-		if header == nil {
-			continue
-		}
-		name := strings.ToLower(strings.TrimSpace(header.Name()))
-		if name == "" || name == "authorization" || name == "proxy-authorization" {
-			continue
-		}
-		value := strings.TrimSpace(header.Value())
-		if previous := address.Headers[name]; previous != "" {
-			address.Headers[name] = previous + "," + value
-		} else {
-			address.Headers[name] = value
-		}
-	}
-
-	return address
-}
-
-// SIPRequestContext contains information about an incoming SIP request.
-// Used by the middleware chain to resolve config for every SIP request.
-//
-// Middleware enriches this context as it flows through the chain:
-//
-//	RouteMiddleware → resolves assistant route, sets Auth and Assistant
-//	VaultMiddleware → fetches SIP config from vault, sets VaultCredential
-type SIPRequestContext struct {
-	Method      string // SIP method (INVITE, REGISTER, BYE, etc.)
-	CallID      string
-	RequestURI  string
-	CallAddress CallAddress
-	SDPInfo     *SDPMediaInfo
-
-	// Route/auth fields resolved by middleware.
-	APIKey      string
-	AssistantID string
-
-	Auth            *types.Authentication
-	Assistant       *internal_assistant_entity.Assistant
-	VaultCredential *protos.VaultCredential
-	Config          *Config
-}
-
-// Middleware processes a SIP request context and mutates it in place.
-// Returning nil continues to the next middleware by index. Returning an error
-// stops execution.
-//
-// Example chain for INVITE:
-//
-//	RouteMiddleware → VaultMiddleware
-type Middleware func(ctx *SIPRequestContext) error
 
 // Server wraps sipgo for handling SIP signaling.
 type Server struct {

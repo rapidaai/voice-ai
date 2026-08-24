@@ -1173,15 +1173,15 @@ func loadInboundMediaOffer(t *testing.T, inboundCall *Inbound) {
 
 func createInboundSessionForTest(t *testing.T, inboundCall *Inbound) {
 	t.Helper()
-	session, err := NewSession(inboundCall.server.ctx, &SessionConfig{
-		Config:          inboundCall.resolvedConfig.config,
-		Direction:       CallDirectionInbound,
-		CallID:          inboundCall.identity.callID,
-		Codec:           inboundCall.mediaOffer.negotiatedCodec,
-		Auth:            inboundCall.resolvedConfig.auth,
-		Assistant:       inboundCall.resolvedConfig.assistant,
-		VaultCredential: inboundCall.resolvedConfig.vaultCredential,
-	})
+	session, err := NewSession(inboundCall.server.ctx,
+		WithSessionConfig(inboundCall.resolvedConfig.config),
+		WithSessionDirection(CallDirectionInbound),
+		WithSessionCallID(inboundCall.identity.callID),
+		WithSessionCodec(inboundCall.mediaOffer.negotiatedCodec),
+		WithSessionAuth(inboundCall.resolvedConfig.auth),
+		WithSessionAssistant(inboundCall.resolvedConfig.assistant),
+		WithSessionVaultCredential(inboundCall.resolvedConfig.vaultCredential),
+	)
 	require.NoError(t, err)
 	inboundCall.session = session
 }

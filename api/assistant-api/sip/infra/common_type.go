@@ -473,9 +473,3 @@ func ParseConfigFromVault(vaultCredential *protos.VaultCredential) (*Config, err
 	config := configFromCore(coreConfig)
 	return &config, nil
 }
-
-// ExtractDIDFromURI is retained for downstream compatibility.
-// Deprecated: native SIP identity handling preserves parsed SIP addresses.
-func ExtractDIDFromURI(uri string) string {
-	return internal_core.ExtractDIDFromURI(uri)
-}

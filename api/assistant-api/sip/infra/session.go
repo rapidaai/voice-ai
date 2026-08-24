@@ -16,8 +16,8 @@ import (
 	"github.com/rapidaai/protos"
 )
 
-func NewSession(ctx context.Context, cfg *SessionConfig) (*Session, error) {
-	inner, err := internal_core.NewSession(ctx, cfg.toCore())
+func NewSession(ctx context.Context, opts ...SessionOption) (*Session, error) {
+	inner, err := internal_core.NewSession(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}

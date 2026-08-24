@@ -30,15 +30,15 @@ func newPipelineTestLogger(t *testing.T) commons.Logger {
 
 func newPipelineTestSession(t *testing.T) *sip_infra.Session {
 	t.Helper()
-	s, err := sip_infra.NewSession(context.Background(), &sip_infra.SessionConfig{
-		Config: &sip_infra.Config{
+	s, err := sip_infra.NewSession(context.Background(),
+		sip_infra.WithSessionConfig(&sip_infra.Config{
 			Server:            "127.0.0.1",
 			Port:              5060,
 			RTPPortRangeStart: 10000,
 			RTPPortRangeEnd:   10020,
-		},
-		Direction: sip_infra.CallDirectionInbound,
-	})
+		}),
+		sip_infra.WithSessionDirection(sip_infra.CallDirectionInbound),
+	)
 	require.NoError(t, err)
 	return s
 }

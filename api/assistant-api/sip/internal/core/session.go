@@ -17,35 +17,13 @@ import (
 	"github.com/emiago/sipgo"
 	"github.com/google/uuid"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
-	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 )
 
-// Session channel buffer sizes
-const (
-	eventBufferSize = 50
-	errorBufferSize = 10
-)
-
-// SessionConfig holds configuration for creating a session
-type SessionConfig struct {
-	Config          *Config
-	Direction       CallDirection
-	CallID          string // Optional: if empty, a new UUID will be generated
-	Codec           *Codec
-	Logger          commons.Logger
-	Auth            *types.Authentication                // Authentication principal
-	Assistant       *internal_assistant_entity.Assistant // Assistant entity
-	ConversationID  uint64                               // Conversation ID (outbound: set by channel pipeline)
-	ContextID       string                               // Call context ID (outbound: set by channel pipeline)
-	VaultCredential *protos.VaultCredential              // Vault-resolved SIP provider credential
-}
-
 // Session manages a single SIP call session
 type Session struct {
-	mu     sync.RWMutex
-	logger commons.Logger
+	mu sync.RWMutex
 
 	info   SessionInfo
 	config *Config
@@ -112,60 +90,91 @@ type Session struct {
 	onEnded func(session *Session)
 }
 
-// NewSession creates a new SIP session
-func NewSession(ctx context.Context, cfg *SessionConfig) (*Session, error) {
-	if cfg.Config == nil {
-		return nil, fmt.Errorf("%w: config is required", ErrInvalidConfig)
-	}
-	// Outbound identity/auth is validated before the INVITE is built.
-	if cfg.Direction == CallDirectionOutbound {
-		if err := cfg.Config.Validate(); err != nil {
-			return nil, err
-		}
-	} else {
-		if err := cfg.Config.ValidateRTP(); err != nil {
-			return nil, err
-		}
-	}
+type SessionOption func(*Session)
 
+func WithSessionConfig(config *Config) SessionOption {
+	return func(session *Session) { session.config = config }
+}
+
+func WithSessionDirection(direction CallDirection) SessionOption {
+	return func(session *Session) { session.info.Direction = direction }
+}
+
+func WithSessionCallID(callID string) SessionOption {
+	return func(session *Session) { session.info.CallID = callID }
+}
+
+func WithSessionCodec(codec *Codec) SessionOption {
+	return func(session *Session) {
+		if codec == nil {
+			return
+		}
+		session.negotiatedCodec = codec
+		session.info.Codec = codec.Name
+		session.info.SampleRate = int(codec.ClockRate)
+	}
+}
+
+func WithSessionAuth(auth *types.Authentication) SessionOption {
+	return func(session *Session) { session.auth = auth }
+}
+
+func WithSessionAssistant(assistant *internal_assistant_entity.Assistant) SessionOption {
+	return func(session *Session) { session.assistant = assistant }
+}
+
+func WithSessionConversationID(conversationID uint64) SessionOption {
+	return func(session *Session) { session.conversationID = conversationID }
+}
+
+func WithSessionContextID(contextID string) SessionOption {
+	return func(session *Session) { session.contextID = contextID }
+}
+
+func WithSessionVaultCredential(vaultCredential *protos.VaultCredential) SessionOption {
+	return func(session *Session) { session.vaultCredential = vaultCredential }
+}
+
+// NewSession creates a new SIP session.
+func NewSession(ctx context.Context, opts ...SessionOption) (*Session, error) {
 	sessionCtx, cancel := context.WithCancel(ctx)
-
-	callID := cfg.CallID
-	if callID == "" {
-		callID = uuid.New().String()
-	}
-
-	codec := cfg.Codec
-	if codec == nil {
-		codec = &CodecPCMU
-	}
-
 	session := &Session{
-		logger: cfg.Logger,
 		info: SessionInfo{
-			CallID:     callID,
+			CallID:     uuid.New().String(),
 			LocalTag:   uuid.New().String()[:8],
 			State:      CallStateInitializing,
-			Direction:  cfg.Direction,
 			StartTime:  time.Now(),
-			Codec:      codec.Name,
-			SampleRate: int(codec.ClockRate),
+			Codec:      CodecPCMU.Name,
+			SampleRate: int(CodecPCMU.ClockRate),
 		},
-		config:           cfg.Config,
 		ctx:              sessionCtx,
 		cancel:           cancel,
-		eventChan:        make(chan Event, eventBufferSize),
-		errorChan:        make(chan error, errorBufferSize),
-		negotiatedCodec:  codec,
-		auth:             cfg.Auth,
-		assistant:        cfg.Assistant,
-		conversationID:   cfg.ConversationID,
-		contextID:        cfg.ContextID,
-		vaultCredential:  cfg.VaultCredential,
+		eventChan:        make(chan Event, SessionEventBufferSize),
+		errorChan:        make(chan error, SessionErrorBufferSize),
+		negotiatedCodec:  &CodecPCMU,
 		byeReceived:      make(chan struct{}),
 		initialACKSignal: make(chan struct{}),
 	}
-	if cfg.Direction == CallDirectionOutbound {
+	for _, opt := range opts {
+		if opt != nil {
+			opt(session)
+		}
+	}
+	if session.config == nil {
+		cancel()
+		return nil, fmt.Errorf("%w: config is required", ErrInvalidConfig)
+	}
+	// Outbound identity/auth is validated before the INVITE is built.
+	if session.info.Direction == CallDirectionOutbound {
+		if err := session.config.Validate(); err != nil {
+			cancel()
+			return nil, err
+		}
+	} else if err := session.config.ValidateRTP(); err != nil {
+		cancel()
+		return nil, err
+	}
+	if session.info.Direction == CallDirectionOutbound {
 		session.outboundDialogPhase = OutboundDialogPhaseInviting
 	}
 
@@ -197,12 +206,6 @@ func (s *Session) SetState(state CallState) {
 
 	// Validate state transitions
 	if !s.isValidTransition(previousState, state) {
-		if s.logger != nil {
-			s.logger.Warnw("Invalid state transition",
-				"call_id", s.info.CallID,
-				"from", previousState,
-				"to", state)
-		}
 		return
 	}
 
@@ -229,12 +232,6 @@ func (s *Session) SetState(state CallState) {
 		s.emitEvent(EventTypeRinging, nil)
 	}
 
-	if s.logger != nil {
-		s.logger.Debugw("Session state changed",
-			"call_id", s.info.CallID,
-			"from", previousState,
-			"to", state)
-	}
 }
 
 // isValidTransition checks if a state transition is valid
@@ -448,13 +445,10 @@ func (s *Session) SetRTPHandler(handler *RTPHandler) {
 		return
 	}
 	s.rtpHandler = handler
-	callID := s.info.CallID
 	s.mu.Unlock()
 
 	if previous != nil {
-		if err := previous.Stop(); err != nil && s.logger != nil {
-			s.logger.Warnw("Error stopping replaced RTP handler", "error", err, "call_id", callID)
-		}
+		_ = previous.Stop()
 	}
 }
 
@@ -769,9 +763,7 @@ func (s *Session) End() {
 	s.rtpHandler = nil
 	s.mu.Unlock()
 	if rtpHandler != nil {
-		if err := rtpHandler.Stop(); err != nil && s.logger != nil {
-			s.logger.Warnw("Error stopping RTP handler", "error", err, "call_id", s.info.CallID)
-		}
+		_ = rtpHandler.Stop()
 	}
 
 	// Cancel context — unblocks anything waiting on session.Context()
@@ -782,12 +774,6 @@ func (s *Session) End() {
 	s.mu.RUnlock()
 	if !terminal {
 		s.SetState(CallStateEnded)
-	}
-
-	if s.logger != nil {
-		s.logger.Info("Session ended",
-			"call_id", s.info.CallID,
-			"duration", s.info.GetDuration())
 	}
 
 	s.mu.RLock()

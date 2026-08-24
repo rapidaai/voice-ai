@@ -7,14 +7,15 @@
 package core
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/emiago/sipgo/sip"
+	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
+	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 )
 
@@ -37,6 +38,98 @@ var (
 	ErrInboundAnswerPolicyTimeout = errors.New("inbound answer policy timeout")
 	ErrBridgeLifecycleRejected    = errors.New("bridge lifecycle transition rejected")
 )
+
+// ServerState represents the state of the SIP server.
+type ServerState int32
+
+const (
+	ServerStateCreated ServerState = iota
+	ServerStateRunning
+	ServerStateStopped
+
+	InboundRejectedInviteTTL  = time.Minute
+	MaxInboundRejectedInvites = 1024
+	SessionEventBufferSize    = 50
+	SessionErrorBufferSize    = 10
+)
+
+// CallAddress contains the SIP parties and non-credential headers received with a call.
+// From and To are URI users. Header names are lowercase and repeated values preserve arrival order.
+type CallAddress struct {
+	From    string
+	To      string
+	FromURI string
+	ToURI   string
+	Headers map[string]string
+}
+
+// NewCallAddress reads the parties and non-credential headers from a SIP request.
+func NewCallAddress(request *sip.Request) CallAddress {
+	if request == nil {
+		return CallAddress{}
+	}
+
+	address := CallAddress{Headers: make(map[string]string)}
+	if from := request.From(); from != nil {
+		address.From = strings.TrimSpace(from.Address.User)
+		address.FromURI = from.Address.String()
+	}
+	if to := request.To(); to != nil {
+		address.To = strings.TrimSpace(to.Address.User)
+		address.ToURI = to.Address.String()
+	}
+
+	for _, header := range request.Headers() {
+		if header == nil {
+			continue
+		}
+		name := strings.ToLower(strings.TrimSpace(header.Name()))
+		if name == "" || name == "authorization" || name == "proxy-authorization" {
+			continue
+		}
+		value := strings.TrimSpace(header.Value())
+		if previous := address.Headers[name]; previous != "" {
+			address.Headers[name] = previous + "," + value
+		} else {
+			address.Headers[name] = value
+		}
+	}
+
+	return address
+}
+
+// SIPRequestContext contains information about an incoming SIP request.
+// Used by the middleware chain to resolve config for every SIP request.
+//
+// Middleware enriches this context as it flows through the chain:
+//
+//	RouteMiddleware → resolves assistant route, sets Auth and Assistant
+//	VaultMiddleware → fetches SIP config from vault, sets VaultCredential
+type SIPRequestContext struct {
+	Method      string // SIP method (INVITE, REGISTER, BYE, etc.)
+	CallID      string
+	RequestURI  string
+	CallAddress CallAddress
+	SDPInfo     *SDPMediaInfo
+
+	// Route/auth fields resolved by middleware.
+	APIKey      string
+	AssistantID string
+
+	Auth            *types.Authentication
+	Assistant       *internal_assistant_entity.Assistant
+	VaultCredential *protos.VaultCredential
+	Config          *Config
+}
+
+// Middleware processes a SIP request context and mutates it in place.
+// Returning nil continues to the next middleware by index. Returning an error
+// stops execution.
+//
+// Example chain for INVITE:
+//
+//	RouteMiddleware → VaultMiddleware
+type Middleware func(ctx *SIPRequestContext) error
 
 // SIPError adds operation and call context to SIP failures.
 type SIPError struct {
@@ -497,126 +590,62 @@ func ParseConfigFromVault(vaultCredential *protos.VaultCredential) (*Config, err
 		return nil, fmt.Errorf("vault credential is required")
 	}
 
-	credMap := vaultCredential.GetValue().AsMap()
+	options := utils.Option(vaultCredential.GetValue().AsMap())
 	cfg := &Config{}
 
-	if sipURI, ok := stringValue(credMap, "sip_uri"); ok {
-		cfg.Server, cfg.Port = parseHostPort(sipURI, cfg.Port)
-	}
+	for _, key := range []string{"sip_uri", "host", "host_port"} {
+		value, err := options.GetString(key)
+		if err != nil || strings.TrimSpace(value) == "" {
+			continue
+		}
 
-	if host, ok := stringValue(credMap, "host"); ok {
-		cfg.Server, cfg.Port = parseHostPort(host, cfg.Port)
+		raw := strings.TrimSpace(value)
+		if !strings.HasPrefix(raw, "sip:") && !strings.HasPrefix(raw, "sips:") {
+			raw = "sip:" + raw
+		}
+		var uri sip.Uri
+		if err := sip.ParseUri(raw, &uri); err == nil && uri.Host != "" {
+			cfg.Server = uri.Host
+			if uri.Port > 0 && uri.Port <= 65535 {
+				cfg.Port = uri.Port
+			}
+		}
 	}
-	if host, ok := stringValue(credMap, "host_port"); ok {
-		cfg.Server, cfg.Port = parseHostPort(host, cfg.Port)
-	}
-	if server, ok := stringValue(credMap, "sip_server"); ok {
-		cfg.Server = server
+	if server, err := options.GetString("sip_server"); err == nil && strings.TrimSpace(server) != "" {
+		cfg.Server = strings.TrimSpace(server)
 	}
 	if cfg.Port <= 0 {
-		cfg.Port = parsePortValue(credMap["sip_port"])
+		if port, err := options.GetUint32("sip_port"); err == nil && port > 0 && port <= 65535 {
+			cfg.Port = int(port)
+		}
 	}
-	if username, ok := stringValue(credMap, "user"); ok {
-		cfg.Username = username
+	if username, err := options.GetString("user"); err == nil && strings.TrimSpace(username) != "" {
+		cfg.Username = strings.TrimSpace(username)
 	}
-	if username, ok := stringValue(credMap, "sip_username"); ok {
-		cfg.Username = username
+	if username, err := options.GetString("sip_username"); err == nil && strings.TrimSpace(username) != "" {
+		cfg.Username = strings.TrimSpace(username)
 	}
-	if password, ok := stringValue(credMap, "password"); ok {
-		cfg.Password = password
+	if password, err := options.GetString("password"); err == nil && strings.TrimSpace(password) != "" {
+		cfg.Password = strings.TrimSpace(password)
 	}
-	if password, ok := stringValue(credMap, "sip_password"); ok {
-		cfg.Password = password
+	if password, err := options.GetString("sip_password"); err == nil && strings.TrimSpace(password) != "" {
+		cfg.Password = strings.TrimSpace(password)
 	}
-	if realm, ok := stringValue(credMap, "sip_realm"); ok {
-		cfg.Realm = realm
+	if realm, err := options.GetString("sip_realm"); err == nil && strings.TrimSpace(realm) != "" {
+		cfg.Realm = strings.TrimSpace(realm)
 	}
-	if domain, ok := stringValue(credMap, "sip_domain"); ok {
-		cfg.Domain = domain
+	if domain, err := options.GetString("sip_domain"); err == nil && strings.TrimSpace(domain) != "" {
+		cfg.Domain = strings.TrimSpace(domain)
 	}
-	if callerID, ok := stringValue(credMap, "sip_caller_id"); ok {
-		cfg.CallerID = callerID
+	if callerID, err := options.GetString("sip_caller_id"); err == nil && strings.TrimSpace(callerID) != "" {
+		cfg.CallerID = strings.TrimSpace(callerID)
 	}
-	if headers := parseHeadersValue(credMap["headers"]); len(headers) > 0 {
+	if headers, err := options.GetStringMap("headers"); err == nil && len(headers) > 0 {
 		cfg.CustomHeaders = headers
 	}
-	if headers := parseHeadersValue(credMap["sip_headers"]); len(headers) > 0 {
+	if headers, err := options.GetStringMap("sip_headers"); err == nil && len(headers) > 0 {
 		cfg.CustomHeaders = headers
 	}
 
 	return cfg, nil
-}
-
-func stringValue(values map[string]interface{}, key string) (string, bool) {
-	value, ok := values[key].(string)
-	if !ok {
-		return "", false
-	}
-	value = strings.TrimSpace(value)
-	return value, value != ""
-}
-
-func parseHostPort(value string, currentPort int) (string, int) {
-	raw := strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(value), "sips:"), "sip:")
-	host, portStr, err := net.SplitHostPort(raw)
-	if err != nil {
-		return raw, currentPort
-	}
-	if port, err := strconv.Atoi(portStr); err == nil && port > 0 && port <= 65535 {
-		return host, port
-	}
-	return host, currentPort
-}
-
-func parsePortValue(v any) int {
-	switch p := v.(type) {
-	case float64:
-		if int(p) > 0 && int(p) <= 65535 {
-			return int(p)
-		}
-	case string:
-		if port, err := strconv.Atoi(p); err == nil && port > 0 && port <= 65535 {
-			return port
-		}
-	}
-	return 0
-}
-
-func parseHeadersValue(value any) map[string]string {
-	switch headers := value.(type) {
-	case map[string]interface{}:
-		parsed := make(map[string]string, len(headers))
-		for name, value := range headers {
-			if stringValue, ok := value.(string); ok {
-				parsed[name] = stringValue
-			}
-		}
-		if len(parsed) > 0 {
-			return parsed
-		}
-	case string:
-		if strings.TrimSpace(headers) == "" {
-			return nil
-		}
-		parsed := make(map[string]string)
-		if err := json.Unmarshal([]byte(headers), &parsed); err == nil && len(parsed) > 0 {
-			return parsed
-		}
-	}
-	return nil
-}
-
-// ExtractDIDFromURI is retained for compatibility with the public SIP facade.
-// Deprecated: native SIP identity handling preserves parsed SIP addresses.
-func ExtractDIDFromURI(uri string) string {
-	raw := strings.TrimPrefix(strings.TrimPrefix(uri, "sip:"), "sips:")
-	user, _, _ := strings.Cut(raw, "@")
-	user, _, _ = strings.Cut(user, ";")
-	if user == "" || strings.Contains(user, ":") {
-		return ""
-	}
-	if len(user) > 5 && user[0] != '+' {
-		user = "+" + user
-	}
-	return user
 }

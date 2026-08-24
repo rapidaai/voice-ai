@@ -290,8 +290,6 @@ func TestDeprecatedSIPCompatibilitySurface(t *testing.T) {
 	var _ func(*Server, func(*Session, string, string) error) = (*Server).SetOnInvite
 	var _ func(*Server, func(*Session, SIPRequestIdentity) error) = (*Server).SetOnApplicationReadyIdentity
 	var _ func(*Server, func(*Session, SIPRequestIdentity) error) = (*Server).SetOnInviteIdentity
-
-	assert.Equal(t, "+15551234567", ExtractDIDFromURI("sip:15551234567@example.com"))
 }
 
 func TestSIPRequestContextMiddleware(t *testing.T) {

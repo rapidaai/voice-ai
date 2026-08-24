@@ -68,12 +68,11 @@ func bridgeTestConfig() *Config {
 // newBridgeTestSession creates a session with an in-memory RTP handler attached.
 func newBridgeTestSession(t *testing.T, direction CallDirection, codec *Codec) (*Session, *RTPHandler) {
 	t.Helper()
-	s, err := NewSession(context.Background(), &SessionConfig{
-		Config:    bridgeTestConfig(),
-		Direction: direction,
-		Codec:     codec,
-		Logger:    bridgeTestLogger(),
-	})
+	s, err := NewSession(context.Background(),
+		WithSessionConfig(bridgeTestConfig()),
+		WithSessionDirection(direction),
+		WithSessionCodec(codec),
+	)
 	require.NoError(t, err)
 	s.SetState(CallStateConnected)
 	rtp := newTestRTPHandler()

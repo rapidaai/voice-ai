@@ -29,18 +29,18 @@ func TestSIPEngineUsesConfiguredServiceID(t *testing.T) {
 
 func TestSessionEstablishedStagePreservesCallAddress(t *testing.T) {
 	auth := &types.Authentication{}
-	session, err := sip_infra.NewSession(context.Background(), &sip_infra.SessionConfig{
-		Config: &sip_infra.Config{
+	session, err := sip_infra.NewSession(context.Background(),
+		sip_infra.WithSessionConfig(&sip_infra.Config{
 			Server:            "127.0.0.1",
 			Port:              5060,
 			RTPPortRangeStart: 10000,
 			RTPPortRangeEnd:   10020,
-		},
-		Direction: sip_infra.CallDirectionInbound,
-		CallID:    "call-address",
-		Auth:      auth,
-		Assistant: &internal_assistant_entity.Assistant{},
-	})
+		}),
+		sip_infra.WithSessionDirection(sip_infra.CallDirectionInbound),
+		sip_infra.WithSessionCallID("call-address"),
+		sip_infra.WithSessionAuth(auth),
+		sip_infra.WithSessionAssistant(&internal_assistant_entity.Assistant{}),
+	)
 	require.NoError(t, err)
 	address := sip_infra.CallAddress{
 		From:    "+14155550100",
@@ -166,17 +166,17 @@ func (s *sipCallStatusTestStore) UpdateCallStatus(_ context.Context, contextID s
 
 func newSIPCallStatusTestSession(t *testing.T, contextID string) *sip_infra.Session {
 	t.Helper()
-	session, err := sip_infra.NewSession(context.Background(), &sip_infra.SessionConfig{
-		Config: &sip_infra.Config{
+	session, err := sip_infra.NewSession(context.Background(),
+		sip_infra.WithSessionConfig(&sip_infra.Config{
 			Server:            "127.0.0.1",
 			Port:              5060,
 			RTPPortRangeStart: 10000,
 			RTPPortRangeEnd:   10020,
-		},
-		Direction: sip_infra.CallDirectionOutbound,
-		CallID:    "sip-call-id",
-		ContextID: contextID,
-	})
+		}),
+		sip_infra.WithSessionDirection(sip_infra.CallDirectionOutbound),
+		sip_infra.WithSessionCallID("sip-call-id"),
+		sip_infra.WithSessionContextID(contextID),
+	)
 	require.NoError(t, err)
 	return session
 }
