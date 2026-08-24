@@ -1,0 +1,81 @@
+{
+  "status": "changes_requested",
+  "decision": "not_approved",
+  "reviewed_at": "2026-08-24",
+  "reviewer": "independent plan challenger",
+  "rfc_file": "rfcs/0010-sip-call-address-authentication.md",
+  "rfc_sha256": "d9890e085a9497980c2a5c53dcb5bb69c2242fd64ebddcb9298e347ec0de586d",
+  "plan_file": "rfcs/0010-sip-call-address-authentication/jsons/plan.json",
+  "plan_sha256": "16c242a582a31195094f4e05202a0eee0d53da653447bd336db2cd1f0ad93eb0",
+  "critical_findings": [],
+  "major_findings": [
+    {
+      "id": "major-1-provider-contract-matrix",
+      "summary": "The provider mapping and test matrix are still not explicit enough to prove the FromPhone and ToPhone contract for every provider and supported direction.",
+      "details": "The RFC now defines independent CallInfo FromPhone and ToPhone fields and correct wire-direction semantics, resolving the shared-contract portion of the prior finding. However, the provider section names only Exotel and Twilio inbound mappings, groups Asterisk, Telnyx, Vobiz, and Vonage as other providers, and groups every outbound implementation under one statement. The test section similarly uses where each direction is supported without recording which directions are supported or the exact source fields and expected omissions. Current provider implementations differ materially in inbound field names and outbound CallInfo population, so this leaves implementation and verification decisions implicit.",
+      "paths": [
+        "rfcs/0010-sip-call-address-authentication.md",
+        "rfcs/0010-sip-call-address-authentication/jsons/plan.json",
+        "api/assistant-api/internal/channel/telephony/internal/asterisk/telephony.go",
+        "api/assistant-api/internal/channel/telephony/internal/exotel/telephony.go",
+        "api/assistant-api/internal/channel/telephony/internal/telnyx/telephony.go",
+        "api/assistant-api/internal/channel/telephony/internal/twilio/telephony.go",
+        "api/assistant-api/internal/channel/telephony/internal/vobiz/telephony.go",
+        "api/assistant-api/internal/channel/telephony/internal/vonage/telephony.go",
+        "api/assistant-api/internal/channel/telephony/internal/sip/telephony.go"
+      ],
+      "required_resolution": "Add a provider-by-provider matrix covering inbound and outbound support, the exact source for FromPhone and ToPhone, omission behavior, and the exact provider test case required for each supported direction."
+    },
+    {
+      "id": "major-2-backend-query-verification",
+      "summary": "Backend conversation query translation is now in production scope but has no corresponding allowed test path or explicit verification case.",
+      "details": "The RFC correctly adds conversaction.impl.service.go and defines new filters as intentionally unsupported for historical client.* metadata. The plan does not allow a test file in api/assistant-api/internal/services/assistant, does not require a test that proves each telephony.* query key selects the matching metadata key, and provides no focused service test command. This violates the repository requirement that changed backend behavior include package-level test coverage and leaves the previously missed query behavior unverifiable.",
+      "paths": [
+        "rfcs/0010-sip-call-address-authentication/jsons/plan.json",
+        "api/assistant-api/internal/services/assistant/conversaction.impl.service.go",
+        "api/assistant-api/internal/services/assistant"
+      ],
+      "required_resolution": "Allow a focused assistant-service test file, specify success and unsupported-historical-key cases for the new telephony query translation, and add the exact package test command."
+    },
+    {
+      "id": "major-3-breaking-consumer-inventory",
+      "summary": "The breaking-change inventory remains incomplete and the allowed paths cannot update all tests and generated examples that encode the removed keys.",
+      "details": "The RFC identifies runtime metadata, authentication UI, prompt suggestions, conversation display, and filters, but does not enumerate all concrete consumers. Repository search also finds prompt-editor and configuration tests outside the allowed UI paths, plus the Postman collection generator and generated collections containing the old default authentication body. The plan's broad assertion that no telephony-owned client.* key remains cannot be satisfied without distinguishing historical migration fixtures from active consumers and including every active source and required test path.",
+      "paths": [
+        "rfcs/0010-sip-call-address-authentication.md",
+        "rfcs/0010-sip-call-address-authentication/jsons/plan.json",
+        "ui/src/app/components/prompt-editor/suggestions.test.ts",
+        "ui/src/app/components/configuration/config-prompt/index.test.tsx",
+        "openapi/scripts/generate_assistant_postman_collection.py",
+        "openapi/postman/assistant-api/assistant-api.postman_collection.json",
+        "openapi/postman/assistant-api/assistant-api.smoke.postman_collection.json"
+      ],
+      "required_resolution": "Add an explicit active-consumer inventory, classify historical fixtures that intentionally retain client.* text, include all affected source and test paths, and refresh generated API examples through their generator if the old authentication default is part of this contract."
+    },
+    {
+      "id": "major-4-unaccepted-review-bytes",
+      "summary": "The challenged RFC and plan are still marked Draft, so these exact bytes cannot receive governed approval.",
+      "details": "The repository process requires the final challenged RFC bytes to contain the sole metadata status line Status: Accepted before approval. The RFC has Status: Draft, the plan has status draft, and the challenge-resolution section is pending. Approval of these bytes would bypass the exact-digest gate contract.",
+      "paths": [
+        "rfcs/0010-sip-call-address-authentication.md",
+        "rfcs/0010-sip-call-address-authentication/jsons/plan.json",
+        "DEVELOPMENT_PROCESS.md"
+      ],
+      "required_resolution": "Resolve the content findings, mark the final RFC and plan accepted as required by the governed workflow, update the challenge-resolution and artifact index, then submit the exact revised bytes for challenge."
+    }
+  ],
+  "resolved_prior_findings": [
+    {
+      "id": "major-1-address-contract",
+      "resolution": "The RFC now explicitly adds CallInfo FromPhone and ToPhone, assigns wire-direction semantics, forbids role-based reconstruction, and defines omission behavior. Provider-by-provider completeness remains separately blocked."
+    },
+    {
+      "id": "major-2-incomplete-consumer-scope",
+      "resolution": "The backend conversation query implementation is now an allowed production path and historical client.* records are explicitly unsupported by new filters. Test scope remains separately blocked."
+    },
+    {
+      "id": "major-3-sip-header-exposure",
+      "resolution": "SIP headers are removed from authentication metadata and the native SIP contract is limited to phone and URI fields."
+    }
+  ]
+}

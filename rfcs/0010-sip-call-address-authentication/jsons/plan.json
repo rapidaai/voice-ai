@@ -1,0 +1,74 @@
+{
+  "status": "draft",
+  "objective": "Replace telephony-owned client.* metadata and authentication sources with provider-neutral telephony.* fields, including SIP-only URI details.",
+  "acceptance_criteria": [
+    "All telephony providers publish telephony.from_phone and telephony.to_phone when their runtime supplies those values.",
+    "Native SIP publishes telephony.from_uri and telephony.to_uri from CallAddress without exposing SIP headers.",
+    "Telephony client.* keys are no longer emitted, resolved as aliases, or selectable in the authentication UI.",
+    "Non-telephony client.* metadata remains supported.",
+    "Authentication mappings resolve telephony.* sources to configured payload keys.",
+    "Required backend and UI tests plus make agent-finalize pass."
+  ],
+  "allowed_paths": [
+    "rfcs/0010-sip-call-address-authentication.md",
+    "rfcs/0010-sip-call-address-authentication/jsons/**",
+    "api/assistant-api/internal/type/telephony.go",
+    "api/assistant-api/internal/channel/telephony/**",
+    "api/assistant-api/sip/pipeline/runtime.go",
+    "api/assistant-api/internal/observability/conversation.go",
+    "api/assistant-api/internal/services/assistant/conversaction.impl.service.go",
+    "api/assistant-api/internal/variable/namespace/registry.go",
+    "api/assistant-api/internal/variable/**/*_test.go",
+    "api/assistant-api/internal/adapters/internal/*_test.go",
+    "ui/src/app/pages/assistant/actions/configure-assistant-authentication/**",
+    "ui/src/app/pages/assistant/view/conversations/**",
+    "ui/src/utils/prompt-reserved-variables.ts"
+  ],
+  "out_of_scope_paths": [
+    "protos/**",
+    "migrations/**",
+    "api/assistant-api/internal/authentication/http/**",
+    "api/assistant-api/internal/transformer/**",
+    "api/integration-api/**"
+  ],
+  "ownership": {
+    "provider CallInfo": "owns explicit provider-supplied FromPhone and ToPhone values",
+    "base telephony streamer": "owns common telephony initialization metadata",
+    "native SIP streamer": "adds authoritative CallAddress URI fields without exposing headers",
+    "variable registry": "owns telephony.* resolution",
+    "authentication UI": "owns source selection and persisted mapping presentation",
+    "conversation UI": "owns telephony metadata display and filters"
+  },
+  "principles": {
+    "single_source_of_truth": "Each provider supplies one party-address state; metadata is a transport projection.",
+    "breaking_change": "No client.* compatibility aliases or dual writes are retained for telephony fields.",
+    "least_privilege": "SIP headers remain internal and are not available to authentication.",
+    "scope": "Genuine client-device metadata remains under client.*."
+  },
+  "risks": [
+    "Existing saved authentication mappings using telephony client.* keys stop resolving.",
+    "Previously persisted conversations retain old keys and may not appear in new filters.",
+    "Provider-specific inbound payloads may omit a reliable destination number.",
+    "From and To can be reversed if role-based call context fields are interpreted incorrectly.",
+    "Existing prompts and saved mappings using removed telephony client.* keys resolve absent until manually updated."
+  ],
+  "required_tests": [
+    "Base initialization covers inbound and outbound telephony From and To.",
+    "Native SIP initialization includes URI values and excludes all headers.",
+    "The telephony namespace resolves scalar and map values.",
+    "Authentication dispatch maps telephony.* sources to payload keys.",
+    "UI selection, defaults, conversation display, and filters use telephony.*.",
+    "No telephony-owned client.* key remains in runtime, prompt suggestions, filters, or authentication UI paths."
+  ],
+  "required_commands": [
+    "go test ./api/assistant-api/internal/channel/telephony/...",
+    "go test ./api/assistant-api/internal/variable/...",
+    "go test ./api/assistant-api/internal/adapters/internal",
+    "go test ./api/assistant-api/internal/observability",
+    "go test ./api/assistant-api/sip/pipeline",
+    "cd ui && yarn test --watchAll=false --runInBand --runTestsByPath src/app/pages/assistant/actions/configure-assistant-authentication/__tests__/index.test.tsx",
+    "git diff --check",
+    "make agent-finalize CHANGED_FILES=\"comma-separated changed paths\""
+  ],
+  "rollback": "Revert backend and UI together. No schema rollback is required, but mappings created with telephony.* will not resolve on the reverted version."
+}
