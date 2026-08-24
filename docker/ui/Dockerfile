@@ -17,7 +17,7 @@ COPY ui/ ./
 ARG EDITION
 COPY docker/ui/config.*.json /tmp/configs/
 RUN if [ -n "$EDITION" ] && [ -f "/tmp/configs/config.${EDITION}.json" ]; then \
-      cp "/tmp/configs/config.${EDITION}.json" src/configs/config.development.json; \
+      cp "/tmp/configs/config.${EDITION}.json" src/configs/config.production.json; \
     fi
 
 RUN yarn checkTs && yarn build:docker
