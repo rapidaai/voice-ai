@@ -59,13 +59,9 @@ func TestCreateAndExtractServiceScopeTokenWithDelegatedActors(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Authentication() error = %v", err)
 			}
-			actor, err := auth.Actor()
-			if err != nil || actor != test.actor {
-				t.Fatalf("Actor() = %+v, %v; want %+v", actor, err, test.actor)
-			}
-			caller, err := auth.Caller()
-			if err != nil || caller != (ActorIdentity{Type: ActorTypeService, ID: 41}) {
-				t.Fatalf("Caller() = %+v, %v", caller, err)
+			actor := auth.Actor()
+			if actor != test.actor {
+				t.Fatalf("Actor() = %+v; want %+v", actor, test.actor)
 			}
 		})
 	}

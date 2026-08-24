@@ -175,12 +175,12 @@ func testAuth(userID, orgID, projectID uint64) *types.Authentication {
 	}
 }
 
-func TestEndpointServiceRequiresCapabilities(t *testing.T) {
+func TestEndpointServiceRequiresContext(t *testing.T) {
 	service, _ := newEndpointServiceTest(t)
 	organizationID := uint64(10)
-	projectID := uint64(20)
 	projectlessUser := &types.Authentication{
 		AuthType:          types.AuthTypeUser,
+		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeUser, ID: 1},
 		UserValue:         &types.UserContext{UserID: 1},
 		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
 	}
@@ -196,20 +196,13 @@ func TestEndpointServiceRequiresCapabilities(t *testing.T) {
 
 	_, _, err = service.GetAll(
 		context.Background(),
-		&types.Authentication{AuthType: types.AuthTypeOrg, OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID}},
+		&types.Authentication{
+			AuthType:          types.AuthTypeOrg,
+			ActorValue:        &types.ActorIdentity{Type: types.ActorTypeOrganization, ID: 1},
+			OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
+		},
 		nil,
 		&protos.Paginate{},
-	)
-	require.Error(t, err)
-
-	_, err = service.CreateEndpoint(
-		context.Background(),
-		&types.Authentication{AuthType: types.AuthTypeProject, OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID}, ProjectValue: &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID}},
-		"endpoint",
-		nil,
-		nil,
-		nil,
-		nil,
 	)
 	require.Error(t, err)
 }

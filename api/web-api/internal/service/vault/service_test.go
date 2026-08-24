@@ -67,10 +67,10 @@ func TestVaultServiceUsesNormalizedIdentityContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	if vault.CreatedActor == nil || vault.CreatedActor.ID != 73 || vault.CreatedActor.Type != types.ActorTypeUser || vault.OrganizationId != 81 || vault.ProjectId != 92 {
-		t.Fatalf("Create() identity context = actor:%+v organization:%d project:%d", vault.CreatedActor, vault.OrganizationId, vault.ProjectId)
+	if vault.OrganizationId != 81 || vault.ProjectId != 92 {
+		t.Fatalf("Create() identity context = organization:%d project:%d", vault.OrganizationId, vault.ProjectId)
 	}
-	if vault.CreatedActorType == nil || *vault.CreatedActorType != "user" || vault.CreatedActorID == nil || *vault.CreatedActorID != 73 {
+	if vault.CreatedActorType != "user" || vault.CreatedActorID != 73 {
 		t.Fatalf("Create() actor = %v/%v", vault.CreatedActorType, vault.CreatedActorID)
 	}
 

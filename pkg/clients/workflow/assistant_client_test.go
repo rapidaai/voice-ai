@@ -17,7 +17,7 @@ func TestAssistantServiceClientStopsBeforeGRPCOnAuthError(t *testing.T) {
 		InternalClient: clients.NewInternalClient(&config.AppConfig{Secret: "secret"}, nil, nil),
 	}
 	_, err := client.GetAssistant(context.Background(), &types.Authentication{}, &protos.GetAssistantRequest{})
-	if !errors.Is(err, types.ErrOrganizationContextUnavailable) {
+	if !errors.Is(err, types.ErrUnauthenticated) {
 		t.Fatalf("GetAssistant() error = %v", err)
 	}
 }
@@ -32,7 +32,7 @@ func TestKnowledgeServiceClientStopsBeforeGRPCOnAuthError(t *testing.T) {
 		logger:         logger,
 	}
 	_, err = client.GetKnowledge(context.Background(), &types.Authentication{}, &protos.GetKnowledgeRequest{})
-	if !errors.Is(err, types.ErrOrganizationContextUnavailable) {
+	if !errors.Is(err, types.ErrUnauthenticated) {
 		t.Fatalf("GetKnowledge() error = %v", err)
 	}
 }
@@ -42,7 +42,7 @@ func TestObservabilityServiceClientStopsBeforeGRPCOnAuthError(t *testing.T) {
 		InternalClient: clients.NewInternalClient(&config.AppConfig{Secret: "secret"}, nil, nil),
 	}
 	_, err := client.GetAllTelemetry(context.Background(), &types.Authentication{}, &protos.GetAllTelemetryRequest{})
-	if !errors.Is(err, types.ErrOrganizationContextUnavailable) {
+	if !errors.Is(err, types.ErrUnauthenticated) {
 		t.Fatalf("GetAllTelemetry() error = %v", err)
 	}
 }

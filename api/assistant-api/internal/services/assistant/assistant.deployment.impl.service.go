@@ -58,7 +58,9 @@ func (eService assistantDeploymentService) CreateWebPluginDeployment(
 		AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
 			AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 				Mutable: gorm_models.Mutable{
-					Status: type_enums.RECORD_ACTIVE,
+					Status:           type_enums.RECORD_ACTIVE,
+					CreatedActorType: auth.Actor().Type.String(),
+					CreatedActorID:   auth.Actor().ID,
 				},
 				AssistantId: assistantId,
 			},
@@ -75,7 +77,7 @@ func (eService assistantDeploymentService) CreateWebPluginDeployment(
 		Suggestion: suggestion,
 	}
 
-	if err := eService.archiveDeploymentRecords(ctx, db, &internal_assistant_entity.AssistantWebPluginDeployment{}, assistantId); err != nil {
+	if err := eService.archiveDeploymentRecords(ctx, db, auth, &internal_assistant_entity.AssistantWebPluginDeployment{}, assistantId); err != nil {
 		return nil, err
 	}
 
@@ -105,7 +107,9 @@ func (eService assistantDeploymentService) createAssistantDeploymentAudio(
 	db := eService.postgres.DB(ctx)
 	deployment := &internal_assistant_entity.AssistantDeploymentAudio{
 		Mutable: gorm_models.Mutable{
-			Status: type_enums.RecordState(audioConfig.GetStatus()),
+			Status:           type_enums.RecordState(audioConfig.GetStatus()),
+			CreatedActorType: auth.Actor().Type.String(),
+			CreatedActorID:   auth.Actor().ID,
 		},
 		AudioType:             audioType,
 		AssistantDeploymentId: deploymentId,
@@ -126,7 +130,9 @@ func (eService assistantDeploymentService) createAssistantDeploymentAudio(
 		audioDeploymentOptions = append(audioDeploymentOptions, &internal_assistant_entity.AssistantDeploymentAudioOption{
 			AssistantDeploymentAudioId: deployment.Id,
 			Mutable: gorm_models.Mutable{
-				Status: type_enums.RecordState(audioConfig.GetStatus()),
+				Status:           type_enums.RecordState(audioConfig.GetStatus()),
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
 			},
 			Metadata: gorm_models.Metadata{
 				Key:   v.GetKey(),
@@ -136,9 +142,12 @@ func (eService assistantDeploymentService) createAssistantDeploymentAudio(
 	}
 	tx = db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "assistant_deployment_audio_id"}, {Name: "key"}},
-		DoUpdates: clause.AssignmentColumns([]string{
+		DoUpdates: append(clause.AssignmentColumns([]string{
 			"value",
 		}),
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+		),
 	}).Create(audioDeploymentOptions)
 	if tx.Error != nil {
 		eService.logger.Errorf("unable to create deployment audio config metadata for assistant wiht error %v", tx.Error)
@@ -165,7 +174,9 @@ func (eService assistantDeploymentService) CreateDebuggerDeployment(
 		AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
 			AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 				Mutable: gorm_models.Mutable{
-					Status: type_enums.RECORD_ACTIVE,
+					Status:           type_enums.RECORD_ACTIVE,
+					CreatedActorType: auth.Actor().Type.String(),
+					CreatedActorID:   auth.Actor().ID,
 				},
 				AssistantId: assistantId,
 			},
@@ -181,7 +192,7 @@ func (eService assistantDeploymentService) CreateDebuggerDeployment(
 		},
 	}
 
-	if err := eService.archiveDeploymentRecords(ctx, db, &internal_assistant_entity.AssistantDebuggerDeployment{}, assistantId); err != nil {
+	if err := eService.archiveDeploymentRecords(ctx, db, auth, &internal_assistant_entity.AssistantDebuggerDeployment{}, assistantId); err != nil {
 		return nil, err
 	}
 
@@ -218,7 +229,9 @@ func (eService assistantDeploymentService) CreateApiDeployment(
 		AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
 			AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 				Mutable: gorm_models.Mutable{
-					Status: type_enums.RECORD_ACTIVE,
+					Status:           type_enums.RECORD_ACTIVE,
+					CreatedActorType: auth.Actor().Type.String(),
+					CreatedActorID:   auth.Actor().ID,
 				},
 				AssistantId: assistantId,
 			},
@@ -234,7 +247,7 @@ func (eService assistantDeploymentService) CreateApiDeployment(
 		},
 	}
 
-	if err := eService.archiveDeploymentRecords(ctx, db, &internal_assistant_entity.AssistantApiDeployment{}, assistantId); err != nil {
+	if err := eService.archiveDeploymentRecords(ctx, db, auth, &internal_assistant_entity.AssistantApiDeployment{}, assistantId); err != nil {
 		return nil, err
 	}
 
@@ -272,7 +285,9 @@ func (eService assistantDeploymentService) CreateWhatsappDeployment(
 		AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
 			AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 				Mutable: gorm_models.Mutable{
-					Status: type_enums.RECORD_ACTIVE,
+					Status:           type_enums.RECORD_ACTIVE,
+					CreatedActorType: auth.Actor().Type.String(),
+					CreatedActorID:   auth.Actor().ID,
 				},
 				AssistantId: assistantId,
 			},
@@ -291,7 +306,7 @@ func (eService assistantDeploymentService) CreateWhatsappDeployment(
 		},
 	}
 
-	if err := eService.archiveDeploymentRecords(ctx, db, &internal_assistant_entity.AssistantWhatsappDeployment{}, assistantId); err != nil {
+	if err := eService.archiveDeploymentRecords(ctx, db, auth, &internal_assistant_entity.AssistantWhatsappDeployment{}, assistantId); err != nil {
 		return nil, err
 	}
 
@@ -311,7 +326,9 @@ func (eService assistantDeploymentService) CreateWhatsappDeployment(
 		whatsappOpts = append(whatsappOpts, &internal_assistant_entity.AssistantDeploymentWhatsappOption{
 			AssistantDeploymentWhatsappId: deployment.Id,
 			Mutable: gorm_models.Mutable{
-				Status: type_enums.RECORD_ACTIVE,
+				Status:           type_enums.RECORD_ACTIVE,
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
 			},
 			Metadata: gorm_models.Metadata{
 				Key:   v.GetKey(),
@@ -321,9 +338,12 @@ func (eService assistantDeploymentService) CreateWhatsappDeployment(
 	}
 	tx = db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "assistant_deployment_whatsapp_id"}, {Name: "key"}},
-		DoUpdates: clause.AssignmentColumns([]string{
+		DoUpdates: append(clause.AssignmentColumns([]string{
 			"value",
 		}),
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+		),
 	}).Create(whatsappOpts)
 	if tx.Error != nil {
 		eService.logger.Errorf("unable to create whatsapp options for assistant wiht error %v", tx.Error)
@@ -352,7 +372,9 @@ func (eService assistantDeploymentService) CreatePhoneDeployment(
 		AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
 			AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 				Mutable: gorm_models.Mutable{
-					Status: type_enums.RECORD_ACTIVE,
+					Status:           type_enums.RECORD_ACTIVE,
+					CreatedActorType: auth.Actor().Type.String(),
+					CreatedActorID:   auth.Actor().ID,
 				},
 				AssistantId: assistantId,
 			},
@@ -371,7 +393,7 @@ func (eService assistantDeploymentService) CreatePhoneDeployment(
 		},
 	}
 
-	if err := eService.archiveDeploymentRecords(ctx, db, &internal_assistant_entity.AssistantPhoneDeployment{}, assistantId); err != nil {
+	if err := eService.archiveDeploymentRecords(ctx, db, auth, &internal_assistant_entity.AssistantPhoneDeployment{}, assistantId); err != nil {
 		return nil, err
 	}
 
@@ -398,7 +420,9 @@ func (eService assistantDeploymentService) CreatePhoneDeployment(
 		phoneOpts = append(phoneOpts, &internal_assistant_entity.AssistantDeploymentTelephonyOption{
 			AssistantDeploymentTelephonyId: deployment.Id,
 			Mutable: gorm_models.Mutable{
-				Status: type_enums.RECORD_ACTIVE,
+				Status:           type_enums.RECORD_ACTIVE,
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
 			},
 			Metadata: gorm_models.Metadata{
 				Key:   v.GetKey(),
@@ -409,9 +433,12 @@ func (eService assistantDeploymentService) CreatePhoneDeployment(
 
 	tx = db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "assistant_deployment_telephony_id"}, {Name: "key"}},
-		DoUpdates: clause.AssignmentColumns([]string{
+		DoUpdates: append(clause.AssignmentColumns([]string{
 			"value",
 		}),
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+		),
 	}).Create(phoneOpts)
 	if tx.Error != nil {
 		eService.logger.Errorf("unable to create telephony options for assistant wiht error %v", tx.Error)
@@ -721,7 +748,7 @@ func (eService assistantDeploymentService) DisableAssistantApiDeployment(ctx con
 			return getTx.Error
 		}
 
-		if err := eService.archiveDeploymentRecords(ctx, tx, &internal_assistant_entity.AssistantApiDeployment{}, assistantId); err != nil {
+		if err := eService.archiveDeploymentRecords(ctx, tx, auth, &internal_assistant_entity.AssistantApiDeployment{}, assistantId); err != nil {
 			return err
 		}
 
@@ -729,7 +756,9 @@ func (eService assistantDeploymentService) DisableAssistantApiDeployment(ctx con
 			AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
 				AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 					Mutable: gorm_models.Mutable{
-						Status: type_enums.RECORD_INACTIVE,
+						Status:           type_enums.RECORD_INACTIVE,
+						CreatedActorType: auth.Actor().Type.String(),
+						CreatedActorID:   auth.Actor().ID,
 					},
 					AssistantId: assistantId,
 				},
@@ -780,7 +809,7 @@ func (eService assistantDeploymentService) DisableAssistantDebuggerDeployment(ct
 			return getTx.Error
 		}
 
-		if err := eService.archiveDeploymentRecords(ctx, tx, &internal_assistant_entity.AssistantDebuggerDeployment{}, assistantId); err != nil {
+		if err := eService.archiveDeploymentRecords(ctx, tx, auth, &internal_assistant_entity.AssistantDebuggerDeployment{}, assistantId); err != nil {
 			return err
 		}
 
@@ -788,7 +817,9 @@ func (eService assistantDeploymentService) DisableAssistantDebuggerDeployment(ct
 			AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
 				AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 					Mutable: gorm_models.Mutable{
-						Status: type_enums.RECORD_INACTIVE,
+						Status:           type_enums.RECORD_INACTIVE,
+						CreatedActorType: auth.Actor().Type.String(),
+						CreatedActorID:   auth.Actor().ID,
 					},
 					AssistantId: assistantId,
 				},
@@ -840,7 +871,7 @@ func (eService assistantDeploymentService) DisableAssistantPhoneDeployment(ctx c
 			return getTx.Error
 		}
 
-		if err := eService.archiveDeploymentRecords(ctx, tx, &internal_assistant_entity.AssistantPhoneDeployment{}, assistantId); err != nil {
+		if err := eService.archiveDeploymentRecords(ctx, tx, auth, &internal_assistant_entity.AssistantPhoneDeployment{}, assistantId); err != nil {
 			return err
 		}
 
@@ -848,7 +879,9 @@ func (eService assistantDeploymentService) DisableAssistantPhoneDeployment(ctx c
 			AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
 				AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 					Mutable: gorm_models.Mutable{
-						Status: type_enums.RECORD_INACTIVE,
+						Status:           type_enums.RECORD_INACTIVE,
+						CreatedActorType: auth.Actor().Type.String(),
+						CreatedActorID:   auth.Actor().ID,
 					},
 					AssistantId: assistantId,
 				},
@@ -883,7 +916,9 @@ func (eService assistantDeploymentService) DisableAssistantPhoneDeployment(ctx c
 				phoneOpts = append(phoneOpts, &internal_assistant_entity.AssistantDeploymentTelephonyOption{
 					AssistantDeploymentTelephonyId: created.Id,
 					Mutable: gorm_models.Mutable{
-						Status: type_enums.RECORD_ACTIVE,
+						Status:           type_enums.RECORD_ACTIVE,
+						CreatedActorType: auth.Actor().Type.String(),
+						CreatedActorID:   auth.Actor().ID,
 					},
 					Metadata: gorm_models.Metadata{
 						Key:   v.Key,
@@ -922,7 +957,7 @@ func (eService assistantDeploymentService) DisableAssistantWebpluginDeployment(c
 			return getTx.Error
 		}
 
-		if err := eService.archiveDeploymentRecords(ctx, tx, &internal_assistant_entity.AssistantWebPluginDeployment{}, assistantId); err != nil {
+		if err := eService.archiveDeploymentRecords(ctx, tx, auth, &internal_assistant_entity.AssistantWebPluginDeployment{}, assistantId); err != nil {
 			return err
 		}
 
@@ -930,7 +965,9 @@ func (eService assistantDeploymentService) DisableAssistantWebpluginDeployment(c
 			AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
 				AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 					Mutable: gorm_models.Mutable{
-						Status: type_enums.RECORD_INACTIVE,
+						Status:           type_enums.RECORD_INACTIVE,
+						CreatedActorType: auth.Actor().Type.String(),
+						CreatedActorID:   auth.Actor().ID,
 					},
 					AssistantId: assistantId,
 				},
@@ -979,7 +1016,7 @@ func (eService assistantDeploymentService) DisableAssistantWhatsappDeployment(ct
 			return getTx.Error
 		}
 
-		if err := eService.archiveDeploymentRecords(ctx, tx, &internal_assistant_entity.AssistantWhatsappDeployment{}, assistantId); err != nil {
+		if err := eService.archiveDeploymentRecords(ctx, tx, auth, &internal_assistant_entity.AssistantWhatsappDeployment{}, assistantId); err != nil {
 			return err
 		}
 
@@ -987,7 +1024,9 @@ func (eService assistantDeploymentService) DisableAssistantWhatsappDeployment(ct
 			AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
 				AssistantDeployment: internal_assistant_entity.AssistantDeployment{
 					Mutable: gorm_models.Mutable{
-						Status: type_enums.RECORD_INACTIVE,
+						Status:           type_enums.RECORD_INACTIVE,
+						CreatedActorType: auth.Actor().Type.String(),
+						CreatedActorID:   auth.Actor().ID,
 					},
 					AssistantId: assistantId,
 				},
@@ -1014,7 +1053,9 @@ func (eService assistantDeploymentService) DisableAssistantWhatsappDeployment(ct
 				whatsappOpts = append(whatsappOpts, &internal_assistant_entity.AssistantDeploymentWhatsappOption{
 					AssistantDeploymentWhatsappId: created.Id,
 					Mutable: gorm_models.Mutable{
-						Status: type_enums.RECORD_ACTIVE,
+						Status:           type_enums.RECORD_ACTIVE,
+						CreatedActorType: auth.Actor().Type.String(),
+						CreatedActorID:   auth.Actor().ID,
 					},
 					Metadata: gorm_models.Metadata{
 						Key:   v.Key,
@@ -1032,12 +1073,14 @@ func (eService assistantDeploymentService) DisableAssistantWhatsappDeployment(ct
 	return out, err
 }
 
-func (eService assistantDeploymentService) archiveDeploymentRecords(ctx context.Context, db *gorm.DB, model interface{}, assistantId uint64) error {
+func (eService assistantDeploymentService) archiveDeploymentRecords(ctx context.Context, db *gorm.DB, auth *types.Authentication, model interface{}, assistantId uint64) error {
 	return db.WithContext(ctx).
 		Model(model).
 		Where("assistant_id = ? AND status IN ?", assistantId, []type_enums.RecordState{type_enums.RECORD_ACTIVE, type_enums.RECORD_INACTIVE}).
 		Updates(map[string]interface{}{
-			"status": type_enums.RECORD_ARCHIEVE,
+			"status":             type_enums.RECORD_ARCHIEVE,
+			"updated_actor_type": auth.Actor().Type.String(),
+			"updated_actor_id":   auth.Actor().ID,
 		}).Error
 }
 

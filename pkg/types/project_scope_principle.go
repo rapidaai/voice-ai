@@ -46,8 +46,9 @@ func (ss *ProjectScope) IsActive() bool {
 }
 
 func (ss *ProjectScope) IsAuthenticated() bool {
-	_, ok := ss.ProjectContext()
-	return ok && ss.IsActive()
+	_, projectOK := ss.ProjectContext()
+	_, actorOK := ss.AuditActor()
+	return projectOK && actorOK && ss.IsActive()
 }
 
 func (ss *ProjectScope) Scope(allowed ...AuthType) (AuthenticationPrinciple, error) {

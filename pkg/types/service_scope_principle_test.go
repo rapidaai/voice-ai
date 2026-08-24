@@ -68,13 +68,9 @@ func TestServiceScopeAuthenticationUsesDelegatedActor(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Authentication() error = %v", err)
 			}
-			actor, err := auth.Actor()
-			if err != nil || actor != (ActorIdentity{Type: test.actorType, ID: actorID}) {
-				t.Fatalf("Actor() = %+v, %v", actor, err)
-			}
-			caller, err := auth.Caller()
-			if err != nil || caller != (ActorIdentity{Type: ActorTypeService, ID: 4}) {
-				t.Fatalf("Caller() = %+v, %v", caller, err)
+			actor := auth.Actor()
+			if actor != (ActorIdentity{Type: test.actorType, ID: actorID}) {
+				t.Fatalf("Actor() = %+v", actor)
 			}
 			if auth.Type() != test.authType {
 				t.Fatalf("Type() = %q, want %q", auth.Type(), test.authType)
@@ -95,17 +91,13 @@ func TestServiceScopeAuthenticationUsesImmediateServiceActor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Authentication() error = %v", err)
 	}
-	actor, err := auth.Actor()
-	if err != nil || actor != (ActorIdentity{Type: ActorTypeService, ID: 4}) {
-		t.Fatalf("Actor() = %+v, %v", actor, err)
-	}
-	caller, err := auth.Caller()
-	if err != nil || caller != actor {
-		t.Fatalf("Caller() = %+v, %v; want %+v", caller, err, actor)
+	actor := auth.Actor()
+	if actor != (ActorIdentity{Type: ActorTypeService, ID: 4}) {
+		t.Fatalf("Actor() = %+v", actor)
 	}
 }
 
-func TestServiceScopeRejectsMalformedDelegatedContext(t *testing.T) {
+func TestServiceScopeRejectsInvalidAuthentication(t *testing.T) {
 	zero := uint64(0)
 	organizationID := uint64(2)
 	for _, scope := range []*ServiceScope{
@@ -118,9 +110,6 @@ func TestServiceScopeRejectsMalformedDelegatedContext(t *testing.T) {
 	} {
 		if scope.IsAuthenticated() {
 			t.Fatal("IsAuthenticated() = true, want false")
-		}
-		if _, err := ResolveDelegatedContext(scope); err == nil {
-			t.Fatal("ResolveDelegatedContext() error = nil")
 		}
 	}
 }

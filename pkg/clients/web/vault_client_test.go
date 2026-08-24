@@ -24,7 +24,7 @@ func TestVaultServiceClientGetOauth2CredentialStopsOnAuthError(t *testing.T) {
 		InternalClient: clients.NewInternalClient(&config.AppConfig{Secret: "secret"}, nil, nil),
 	}
 	_, err := client.GetOauth2Credential(context.Background(), &types.Authentication{}, 1)
-	if !errors.Is(err, types.ErrOrganizationContextUnavailable) {
+	if !errors.Is(err, types.ErrUnauthenticated) {
 		t.Fatalf("GetOauth2Credential() error = %v", err)
 	}
 }

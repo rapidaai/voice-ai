@@ -161,7 +161,7 @@ func (orgG *webOrganizationGRPCApi) InviteUserToOrganization(ctx context.Context
 	if err != nil {
 		source := "invited-by-other"
 		parts := strings.Split(irRequest.GetEmail(), "@")
-		_, err := orgG.userService.Create(ctx, parts[0], irRequest.GetEmail(), ciphers.RandomHash("rpd_"), type_enums.RECORD_INVITED, &source)
+		_, err := orgG.userService.Create(ctx, iAuth, parts[0], irRequest.GetEmail(), ciphers.RandomHash("rpd_"), type_enums.RECORD_INVITED, &source)
 		if err != nil {
 			orgG.logger.Errorf("unable to create user for invite err %v", err)
 			return &protos.InviteUserToOrganizationResponse{

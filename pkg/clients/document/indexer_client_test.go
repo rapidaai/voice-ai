@@ -23,7 +23,7 @@ func TestIndexerServiceClientStopsBeforeHTTPOnAuthError(t *testing.T) {
 		logger:         logger,
 	}
 	_, err = client.IndexKnowledgeDocument(context.Background(), &types.Authentication{}, &protos.IndexKnowledgeDocumentRequest{})
-	if !errors.Is(err, types.ErrOrganizationContextUnavailable) {
+	if !errors.Is(err, types.ErrUnauthenticated) {
 		t.Fatalf("IndexKnowledgeDocument() error = %v", err)
 	}
 }

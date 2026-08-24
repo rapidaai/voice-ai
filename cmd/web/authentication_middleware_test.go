@@ -26,6 +26,17 @@ func TestGRPCUsesExplicitAuthenticationMiddlewareOrder(t *testing.T) {
 	})
 }
 
+func TestInitDoesNotRegisterAuditActorCallbacks(t *testing.T) {
+	file := parseCommandSource(t, "web.go")
+	ast.Inspect(file, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if ok && callName(call) == "RegisterAuditActorCallbacks" {
+			t.Fatal("Init registers removed audit actor callbacks")
+		}
+		return true
+	})
+}
+
 func TestHTTPUsesExplicitAuthenticationMiddlewareOrder(t *testing.T) {
 	file := parseCommandSource(t, "web.go")
 	middleware := make([]string, 0, 4)

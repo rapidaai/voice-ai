@@ -23,9 +23,9 @@ func TestServiceAuthenticationMintsDelegatedServiceActor(t *testing.T) {
 	if auth.Type() != types.AuthTypeService {
 		t.Fatalf("Type() = %q, want %q", auth.Type(), types.AuthTypeService)
 	}
-	actor, err := auth.Actor()
-	if err != nil || actor != (types.ActorIdentity{Type: types.ActorTypeService, ID: 9007}) {
-		t.Fatalf("Actor() = %+v, %v", actor, err)
+	actor := auth.Actor()
+	if actor != (types.ActorIdentity{Type: types.ActorTypeService, ID: 9007}) {
+		t.Fatalf("Actor() = %+v", actor)
 	}
 
 	internalClient := clients.NewInternalClient(&m.assistantConfig.AppConfig, nil, nil)
@@ -45,9 +45,9 @@ func TestServiceAuthenticationMintsDelegatedServiceActor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Authentication() error = %v", err)
 	}
-	forwardedActor, err := forwardedAuth.Actor()
-	if err != nil || forwardedActor != actor {
-		t.Fatalf("Actor() = %+v, %v; want %+v", forwardedActor, err, actor)
+	forwardedActor := forwardedAuth.Actor()
+	if forwardedActor != actor {
+		t.Fatalf("Actor() = %+v; want %+v", forwardedActor, actor)
 	}
 	projectContext, err := forwardedAuth.ProjectContext()
 	if err != nil || projectContext.OrganizationID != 7 || projectContext.ProjectID != 11 {
@@ -128,6 +128,37 @@ func TestRegistrationRenewalFailedWritesDurableMetadata(t *testing.T) {
 	}
 	if retryCount := getOptionValue(t, db, 5001, OptKeySIPRetry); retryCount != "3" {
 		t.Fatalf("expected retry count 3, got %s", retryCount)
+	}
+	var insertedAudit struct {
+		CreatedActorType string
+		CreatedActorID   uint64
+	}
+	if err := db.Table("assistant_deployment_telephony_options").
+		Select("created_actor_type, created_actor_id").
+		Where("assistant_deployment_telephony_id = ? AND key = ?", 5001, OptKeySIPFailureClass).
+		Scan(&insertedAudit).Error; err != nil {
+		t.Fatalf("failed loading created actor: %v", err)
+	}
+	if insertedAudit.CreatedActorType != types.ActorTypeService.String() || insertedAudit.CreatedActorID != 9007 {
+		t.Fatalf("created actor = %q/%d", insertedAudit.CreatedActorType, insertedAudit.CreatedActorID)
+	}
+	var updatedAudit struct {
+		CreatedActorType string
+		CreatedActorID   uint64
+		UpdatedActorType string
+		UpdatedActorID   uint64
+	}
+	if err := db.Table("assistant_deployment_telephony_options").
+		Select("created_actor_type, created_actor_id, updated_actor_type, updated_actor_id").
+		Where("assistant_deployment_telephony_id = ? AND key = ?", 5001, OptKeySIPStatus).
+		Scan(&updatedAudit).Error; err != nil {
+		t.Fatalf("failed loading updated actor: %v", err)
+	}
+	if updatedAudit.CreatedActorType != types.ActorTypeUser.String() || updatedAudit.CreatedActorID != 1 {
+		t.Fatalf("created actor changed to %q/%d", updatedAudit.CreatedActorType, updatedAudit.CreatedActorID)
+	}
+	if updatedAudit.UpdatedActorType != types.ActorTypeService.String() || updatedAudit.UpdatedActorID != 9007 {
+		t.Fatalf("updated actor = %q/%d", updatedAudit.UpdatedActorType, updatedAudit.UpdatedActorID)
 	}
 }
 

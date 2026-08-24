@@ -3,6 +3,7 @@ package types
 import (
 	"errors"
 	"math"
+	"reflect"
 )
 
 type ActorType string
@@ -19,6 +20,10 @@ const (
 type ActorIdentity struct {
 	Type ActorType `json:"type"`
 	ID   uint64    `json:"id"`
+}
+
+func (actorType ActorType) String() string {
+	return string(actorType)
 }
 
 type ActorIdentityProvider interface {
@@ -48,6 +53,23 @@ func ResolveAuditActor(auth AuthenticationPrinciple) (ActorIdentity, error) {
 		return ActorIdentity{}, errors.New("audit actor type does not match authenticated principle type")
 	}
 	return actor, nil
+}
+
+func requireAuthenticated(auth AuthenticationPrinciple) error {
+	if auth == nil || isNilAuthenticationPrinciple(auth) || !auth.IsAuthenticated() {
+		return errors.New("authenticated principle is required")
+	}
+	return nil
+}
+
+func isNilAuthenticationPrinciple(auth AuthenticationPrinciple) bool {
+	value := reflect.ValueOf(auth)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return value.IsNil()
+	default:
+		return false
+	}
 }
 
 func (actorType ActorType) isDurable() bool {

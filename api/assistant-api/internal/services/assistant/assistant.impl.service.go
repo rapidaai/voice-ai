@@ -56,6 +56,10 @@ func (eService *assistantService) CreateAssistantProviderWebsocket(ctx context.C
 	db := eService.postgres.DB(ctx)
 	epm := &internal_assistant_entity.AssistantProviderWebsocket{
 		AssistantProvider: internal_assistant_entity.AssistantProvider{
+			ActorAudit: gorm_models.ActorAudit{
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
+			},
 			Description: description,
 			AssistantId: assistantId,
 		},
@@ -94,6 +98,10 @@ func (eService *assistantService) CreateAssistantProviderAgentkit(ctx context.Co
 	db := eService.postgres.DB(ctx)
 	epm := &internal_assistant_entity.AssistantProviderAgentkit{
 		AssistantProvider: internal_assistant_entity.AssistantProvider{
+			ActorAudit: gorm_models.ActorAudit{
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
+			},
 			Description: description,
 			AssistantId: assistantId,
 		},
@@ -131,6 +139,10 @@ func (eService *assistantService) CreateAssistantProviderAgentflow(ctx context.C
 	db := eService.postgres.DB(ctx)
 	epm := &internal_assistant_entity.AssistantProviderAgentflow{
 		AssistantProvider: internal_assistant_entity.AssistantProvider{
+			ActorAudit: gorm_models.ActorAudit{
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
+			},
 			Description: description,
 			AssistantId: assistantId,
 		},
@@ -157,7 +169,9 @@ func (eService *assistantService) DeleteAssistant(ctx context.Context, auth *typ
 	db := eService.postgres.DB(ctx)
 	ed := &internal_assistant_entity.Assistant{
 		Mutable: gorm_models.Mutable{
-			Status: type_enums.RECORD_ARCHIEVE,
+			Status:           type_enums.RECORD_ARCHIEVE,
+			UpdatedActorType: auth.Actor().Type.String(),
+			UpdatedActorID:   auth.Actor().ID,
 		},
 	}
 	tx := db.Where("id = ? AND project_id = ? AND organization_id = ?", assistantId,
@@ -571,7 +585,10 @@ func (eService *assistantService) UpdateAssistantVersion(ctx context.Context,
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	ed := &internal_assistant_entity.Assistant{
-		Mutable:             gorm_models.Mutable{},
+		Mutable: gorm_models.Mutable{
+			UpdatedActorType: auth.Actor().Type.String(),
+			UpdatedActorID:   auth.Actor().ID,
+		},
 		AssistantProvider:   assistantProvider,
 		AssistantProviderId: assistantProviderId,
 	}
@@ -866,7 +883,9 @@ func (eService *assistantService) CreateAssistant(ctx context.Context,
 	db := eService.postgres.DB(ctx)
 	ep := &internal_assistant_entity.Assistant{
 		Mutable: gorm_models.Mutable{
-			Status: type_enums.RECORD_ACTIVE,
+			Status:           type_enums.RECORD_ACTIVE,
+			CreatedActorType: auth.Actor().Type.String(),
+			CreatedActorID:   auth.Actor().ID,
 		},
 		Organizational: gorm_models.Organizational{
 			ProjectId:      projectContext.ProjectID,
@@ -904,7 +923,10 @@ func (eService *assistantService) UpdateAssistantDetail(ctx context.Context,
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	ed := &internal_assistant_entity.Assistant{
-		Mutable:     gorm_models.Mutable{},
+		Mutable: gorm_models.Mutable{
+			UpdatedActorType: auth.Actor().Type.String(),
+			UpdatedActorID:   auth.Actor().ID,
+		},
 		Name:        name,
 		Description: description,
 	}
@@ -936,6 +958,10 @@ func (eService *assistantService) CreateAssistantProviderModel(
 	db := eService.postgres.DB(ctx)
 	epm := &internal_assistant_entity.AssistantProviderModel{
 		AssistantProvider: internal_assistant_entity.AssistantProvider{
+			ActorAudit: gorm_models.ActorAudit{
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
+			},
 			Description: description,
 		},
 		AssistantId:       assistantId,
@@ -957,7 +983,9 @@ func (eService *assistantService) CreateAssistantProviderModel(
 		modelOptions = append(modelOptions, &internal_assistant_entity.AssistantProviderModelOption{
 			AssistantProviderModelId: epm.Id,
 			Mutable: gorm_models.Mutable{
-				Status: type_enums.RECORD_ACTIVE,
+				Status:           type_enums.RECORD_ACTIVE,
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
 			},
 			Metadata: gorm_models.Metadata{
 				Key:   v.GetKey(),
@@ -967,9 +995,12 @@ func (eService *assistantService) CreateAssistantProviderModel(
 	}
 	tx = db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "assistant_provider_model_id"}, {Name: "key"}},
-		DoUpdates: clause.AssignmentColumns([]string{
+		DoUpdates: append(clause.AssignmentColumns([]string{
 			"value",
 		}),
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+		),
 	}).Create(modelOptions)
 	if tx.Error != nil {
 		eService.logger.Errorf("unable to create model options with error %v", tx.Error)
@@ -993,6 +1024,10 @@ func (eService *assistantService) AttachProviderModelToAssistant(ctx context.Con
 	start := time.Now()
 	db := eService.postgres.DB(ctx)
 	ed := &internal_assistant_entity.Assistant{
+		Mutable: gorm_models.Mutable{
+			UpdatedActorType: auth.Actor().Type.String(),
+			UpdatedActorID:   auth.Actor().ID,
+		},
 		AssistantProvider:   providerType,
 		AssistantProviderId: assistantProviderId,
 	}
@@ -1021,12 +1056,19 @@ func (eService *assistantService) CreateOrUpdateAssistantTag(ctx context.Context
 	assistantTag := &internal_assistant_entity.AssistantTag{
 		AssistantId: assistantId,
 		Tag:         tags,
+		ActorAudit: gorm_models.ActorAudit{
+			CreatedActorType: auth.Actor().Type.String(),
+			CreatedActorID:   auth.Actor().ID,
+		},
 	}
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "assistant_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{
+		DoUpdates: append(clause.AssignmentColumns([]string{
 			"tag",
 		}),
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+		),
 	}).Create(&assistantTag)
 
 	if tx.Error != nil {

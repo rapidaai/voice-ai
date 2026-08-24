@@ -58,6 +58,17 @@ func TestGinAuthenticationMiddlewareOrder(t *testing.T) {
 	})
 }
 
+func TestInitDoesNotRegisterAuditActorCallbacks(t *testing.T) {
+	file := parseCommandSource(t, "assistant.go")
+	ast.Inspect(file, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if ok && callName(call) == "RegisterAuditActorCallbacks" {
+			t.Fatal("Init registers removed audit actor callbacks")
+		}
+		return true
+	})
+}
+
 func parseCommandSource(t *testing.T, name string) *ast.File {
 	t.Helper()
 	_, testFile, _, ok := runtime.Caller(0)

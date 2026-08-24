@@ -71,7 +71,7 @@ func TestCollector_SendsWebhookEventPayload(t *testing.T) {
 			Provider:             "test",
 			CallID:               "call-1",
 			StatusEvent:          "ringing",
-			Status:               observability.MetricCallStatusRinging,
+			Status:               observability.WebhookCallStatusRinging,
 		},
 	})
 	if err != nil {
@@ -86,7 +86,7 @@ func TestCollector_SendsWebhookEventPayload(t *testing.T) {
 		t.Fatalf("unexpected conversation payload: %+v", got)
 	}
 	dataPayload, ok := got["data"].(map[string]interface{})
-	if !ok || dataPayload["status_event"] != "ringing" || dataPayload["status"] != observability.MetricCallStatusRinging || dataPayload["call_id"] != "call-1" || dataPayload["version"] != observability.WebhookPayloadVersionV1 {
+	if !ok || dataPayload["status_event"] != "ringing" || dataPayload["status"] != observability.WebhookCallStatusRinging.String() || dataPayload["call_id"] != "call-1" || dataPayload["version"] != observability.WebhookPayloadVersionV1 {
 		t.Fatalf("unexpected data payload: %+v", got)
 	}
 	extraPayload, ok := dataPayload["extra"].(map[string]interface{})
@@ -294,7 +294,8 @@ func TestCollector_ReturnsHTTPError(t *testing.T) {
 		Event: observability.CallFailed,
 		Payload: observability.CallFailedWebhookPayload{
 			V1WebhookPayloadBase: observability.NewV1WebhookPayload(nil),
-			Reason:               "failed",
+			Status:               observability.WebhookCallStatusFailed,
+			DisconnectReason:     observability.WebhookCallDisconnectReasonProviderFailed,
 		},
 	})
 	if err == nil {

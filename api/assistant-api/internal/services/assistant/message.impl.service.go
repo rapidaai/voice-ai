@@ -411,7 +411,10 @@ func (conversationService *assistantConversationService) CreateConversationMessa
 		Source:                   source.Get(),
 		Role:                     role,
 		Body:                     message,
-		Mutable:                  gorm_models.Mutable{},
+		Mutable: gorm_models.Mutable{
+			CreatedActorType: auth.Actor().Type.String(),
+			CreatedActorID:   auth.Actor().ID,
+		},
 	}
 	tx := db.Create(&conversationMessage)
 	if tx.Error != nil {
@@ -443,6 +446,10 @@ func (conversationService *assistantConversationService) CreateOrUpdateMessageMe
 				Key:   m.GetKey(),
 				Value: m.GetValue(),
 			},
+			Mutable: gorm_models.Mutable{
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
+			},
 		}
 		_mtdata = append(_mtdata, _mtd)
 	}
@@ -451,9 +458,10 @@ func (conversationService *assistantConversationService) CreateOrUpdateMessageMe
 	}
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "key"}, {Name: "assistant_conversation_message_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"value",
-			"updated_date"}),
+		DoUpdates: append(clause.AssignmentColumns([]string{"value", "updated_date"}),
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+		),
 	}).Create(&_mtdata)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.CreateOrUpdateMessageMetadata", time.Since(start))
@@ -489,6 +497,10 @@ func (conversationService *assistantConversationService) CreateOrUpdateMessageMe
 			},
 			AssistantConversationId:        assistantConversationId,
 			AssistantConversationMessageId: assistantConversationMessageId,
+			Mutable: gorm_models.Mutable{
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
+			},
 		}
 		mtrs = append(mtrs, _mtr)
 	}
@@ -499,9 +511,10 @@ func (conversationService *assistantConversationService) CreateOrUpdateMessageMe
 
 	tx := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "name"}, {Name: "assistant_conversation_message_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"value", "description",
-			"updated_date"}),
+		DoUpdates: append(clause.AssignmentColumns([]string{"value", "description", "updated_date"}),
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_type"}, Value: auth.Actor().Type.String()},
+			clause.Assignment{Column: clause.Column{Name: "updated_actor_id"}, Value: auth.Actor().ID},
+		),
 	}).Create(&mtrs)
 	if tx.Error != nil {
 		conversationService.logger.Benchmark("conversationService.CreateOrUpdateMessageMetrics", time.Since(start))

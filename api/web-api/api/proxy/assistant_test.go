@@ -105,8 +105,10 @@ func newAssistantProxyTest(t *testing.T, client assistant_client.AssistantServic
 }
 
 func assistantProxyContext() context.Context {
+	actor := types.ActorIdentity{Type: types.ActorTypeUser, ID: 1}
 	return context.WithValue(context.Background(), types.CTX_, &types.Authentication{
 		AuthType:          types.AuthTypeUser,
+		ActorValue:        &actor,
 		UserValue:         &types.UserContext{UserID: 1},
 		OrganizationValue: &types.OrganizationContext{OrganizationID: 10},
 	})

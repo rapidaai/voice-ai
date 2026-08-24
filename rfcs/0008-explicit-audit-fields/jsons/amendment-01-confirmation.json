@@ -1,0 +1,14 @@
+{
+  "status": "approved",
+  "rfc_file": "rfcs/0008-explicit-audit-fields.md",
+  "rfc_sha256": "f371fca0aa28423493a5f2b9e5a68d38e0bdb0c35553724f7e87e0b4b6d8c56a",
+  "plan_file": "rfcs/0008-explicit-audit-fields/jsons/amendment-01-plan.json",
+  "plan_sha256": "111c24ffa0fc60630e986e9775220acaf0293b2732512942798c814cfe6ca613",
+  "challenge_receipt": "rfcs/0008-explicit-audit-fields/jsons/amendment-01-challenge.json",
+  "challenge_receipt_sha256": "a5cf013f0372d95aab7b9f85b6ccac5d3387738c68355a2615c7ea550b0d00a6",
+  "question": "Approve implementation of amended RFC rfcs/0008-explicit-audit-fields.md with SHA-256 f371fca0aa28423493a5f2b9e5a68d38e0bdb0c35553724f7e87e0b4b6d8c56a?",
+  "resolution": "approved",
+  "approved_by": "user",
+  "approval_message": "Approved.",
+  "approved_at": "2026-08-23"
+}

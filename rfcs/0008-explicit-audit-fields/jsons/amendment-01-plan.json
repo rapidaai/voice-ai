@@ -1,0 +1,28 @@
+{
+  "rfc": "rfcs/0008-explicit-audit-fields.md",
+  "amendment": 1,
+  "status": "ready-for-confirmation",
+  "objective": "Separate create and update audit ownership and make Authentication.Actor a direct accessor after authentication validation.",
+  "acceptance_criteria": [
+    "Create operations set only CreatedActorType and CreatedActorID.",
+    "Update operations set only UpdatedActorType and UpdatedActorID.",
+    "Authentication.IsAuthenticated validates the durable actor for every authentication type.",
+    "Authentication.Scope rejects authentication with a missing or invalid actor.",
+    "Authentication.Actor returns ActorIdentity without an error result.",
+    "Service writes access actor values directly after authentication or scope validation."
+  ],
+  "affected_paths": [
+    "pkg/types/rapida_auth.go",
+    "pkg/types and client call sites of Authentication.Actor",
+    "all audited service create and update paths",
+    "rfcs/0008-explicit-audit-fields.md"
+  ],
+  "verification_commands": [
+    "go test ./pkg/types ./pkg/clients/... ./pkg/middlewares",
+    "go test ./api/assistant-api/internal/services/...",
+    "go test ./api/endpoint-api/internal/service/...",
+    "go test ./api/web-api/internal/service/...",
+    "go test ./api/integration-api/internal/service/...",
+    "make agent-finalize CHANGED_FILES=\"comma,separated,paths\""
+  ]
+}

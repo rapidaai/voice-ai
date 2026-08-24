@@ -59,7 +59,9 @@ func (eService *assistantKnowledgeService) Create(ctx context.Context, auth *typ
 		RerankerEnable:  rerankEnabled,
 		TopK:            topK,
 		Mutable: gorm_models.Mutable{
-			Status: type_enums.RECORD_ACTIVE,
+			Status:           type_enums.RECORD_ACTIVE,
+			CreatedActorType: auth.Actor().Type.String(),
+			CreatedActorID:   auth.Actor().ID,
 		},
 	}
 
@@ -84,7 +86,9 @@ func (eService *assistantKnowledgeService) Create(ctx context.Context, auth *typ
 		modelOptions = append(modelOptions, &internal_assistant_entity.AssistantKnowledgeRerankerOption{
 			AssistantKnowledgeId: assistantKnowledgeConfig.Id,
 			Mutable: gorm_models.Mutable{
-				Status: type_enums.RECORD_ACTIVE,
+				Status:           type_enums.RECORD_ACTIVE,
+				CreatedActorType: auth.Actor().Type.String(),
+				CreatedActorID:   auth.Actor().ID,
 			},
 			Metadata: gorm_models.Metadata{
 				Key:   v.GetKey(),
@@ -94,8 +98,10 @@ func (eService *assistantKnowledgeService) Create(ctx context.Context, auth *typ
 	}
 	tx = db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "assistant_provider_model_id"}, {Name: "key"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"value",
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"value":              gorm.Expr("excluded.value"),
+			"updated_actor_type": auth.Actor().Type.String(),
+			"updated_actor_id":   auth.Actor().ID,
 		}),
 	}).Create(modelOptions)
 	if tx.Error != nil {
@@ -114,7 +120,9 @@ func (eService *assistantKnowledgeService) Delete(ctx context.Context, auth *typ
 	db := eService.postgres.DB(ctx)
 	aK := &internal_assistant_entity.AssistantKnowledge{
 		Mutable: gorm_models.Mutable{
-			Status: type_enums.RECORD_ARCHIEVE,
+			Status:           type_enums.RECORD_ARCHIEVE,
+			UpdatedActorType: auth.Actor().Type.String(),
+			UpdatedActorID:   auth.Actor().ID,
 		},
 	}
 	tx := db.Where("id = ? AND assistant_id = ? ",
@@ -207,7 +215,10 @@ func (eService *assistantKnowledgeService) Update(ctx context.Context, auth *typ
 		ScoreThreshold:  scoreThreshold,
 		RerankerEnable:  rerankEnabled,
 		TopK:            topK,
-		Mutable:         gorm_models.Mutable{},
+		Mutable: gorm_models.Mutable{
+			UpdatedActorType: auth.Actor().Type.String(),
+			UpdatedActorID:   auth.Actor().ID,
+		},
 	}
 	if rerankEnabled {
 		aK.RerankerModelProviderId = rerankerProviderModelId

@@ -1,0 +1,14 @@
+{
+  "status": "approved",
+  "reviewed_at": "2026-08-23",
+  "reviewer": "user",
+  "rfc_file": "rfcs/0008-explicit-audit-fields.md",
+  "decision": "approved",
+  "requirements": [
+    "Create operations populate only created actor type and ID.",
+    "Update operations populate only updated actor type and ID.",
+    "Authentication.IsAuthenticated and Scope own actor validation.",
+    "Authentication.Actor returns an actor directly without an error.",
+    "Services access actor fields directly from auth.Actor()."
+  ]
+}

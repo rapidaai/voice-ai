@@ -17,7 +17,7 @@ func TestIntegrationServiceClientStopsBeforeGRPCOnAuthError(t *testing.T) {
 		InternalClient: clients.NewInternalClient(&config.AppConfig{Secret: "secret"}, nil, nil),
 	}
 	_, err := client.Chat(context.Background(), &types.Authentication{}, "provider", &protos.ChatRequest{})
-	if !errors.Is(err, types.ErrOrganizationContextUnavailable) {
+	if !errors.Is(err, types.ErrUnauthenticated) {
 		t.Fatalf("Chat() error = %v", err)
 	}
 }
@@ -32,7 +32,7 @@ func TestAuditServiceClientStopsBeforeGRPCOnAuthError(t *testing.T) {
 		logger:         logger,
 	}
 	_, err = client.GetAuditLog(context.Background(), &types.Authentication{}, 1)
-	if !errors.Is(err, types.ErrOrganizationContextUnavailable) {
+	if !errors.Is(err, types.ErrUnauthenticated) {
 		t.Fatalf("GetAuditLog() error = %v", err)
 	}
 }

@@ -45,14 +45,16 @@ func TestProjectScopeRejectsMissingOrZeroContext(t *testing.T) {
 	organizationID := uint64(1)
 	projectID := uint64(2)
 	tests := []struct {
-		name  string
-		scope *ProjectScope
+		name              string
+		scope             *ProjectScope
+		hasProjectContext bool
 	}{
 		{name: "missing organization", scope: &ProjectScope{ProjectId: &projectID, Status: active}},
 		{name: "zero organization", scope: &ProjectScope{ProjectId: &projectID, OrganizationId: &zero, Status: active}},
 		{name: "missing project", scope: &ProjectScope{OrganizationId: &organizationID, Status: active}},
 		{name: "zero project", scope: &ProjectScope{ProjectId: &zero, OrganizationId: &organizationID, Status: active}},
-		{name: "inactive", scope: &ProjectScope{ProjectId: &projectID, OrganizationId: &organizationID}},
+		{name: "missing credential", scope: &ProjectScope{ProjectId: &projectID, OrganizationId: &organizationID, Status: active}, hasProjectContext: true},
+		{name: "inactive", scope: &ProjectScope{CredentialId: &organizationID, ProjectId: &projectID, OrganizationId: &organizationID}, hasProjectContext: true},
 	}
 
 	for _, test := range tests {
@@ -60,8 +62,8 @@ func TestProjectScopeRejectsMissingOrZeroContext(t *testing.T) {
 			if test.scope.IsAuthenticated() {
 				t.Fatal("IsAuthenticated() = true, want false")
 			}
-			if _, err := RequireProject(test.scope); err == nil {
-				t.Fatal("RequireProject() error = nil")
+			if _, ok := test.scope.ProjectContext(); ok != test.hasProjectContext {
+				t.Fatalf("ProjectContext() ok = %v, want %v", ok, test.hasProjectContext)
 			}
 		})
 	}

@@ -8,6 +8,62 @@ package observability
 
 const WebhookPayloadVersionV1 = "1"
 
+// WebhookCallStatus identifies the lifecycle state of a call.
+type WebhookCallStatus string
+
+const (
+	WebhookCallStatusPending    WebhookCallStatus = "pending"
+	WebhookCallStatusRinging    WebhookCallStatus = "ringing"
+	WebhookCallStatusInProgress WebhookCallStatus = "in_progress"
+	WebhookCallStatusCompleted  WebhookCallStatus = "completed"
+	WebhookCallStatusFailed     WebhookCallStatus = "failed"
+	WebhookCallStatusCancelled  WebhookCallStatus = "cancelled"
+)
+
+func (s WebhookCallStatus) String() string {
+	return string(s)
+}
+
+// WebhookCallDirection identifies the direction of a call.
+type WebhookCallDirection string
+
+const (
+	WebhookCallDirectionInbound  WebhookCallDirection = "inbound"
+	WebhookCallDirectionOutbound WebhookCallDirection = "outbound"
+)
+
+func (d WebhookCallDirection) String() string {
+	return string(d)
+}
+
+// WebhookCallDisconnectReason identifies why a call terminated.
+type WebhookCallDisconnectReason string
+
+const (
+	WebhookCallDisconnectReasonUnknown              WebhookCallDisconnectReason = "unknown"
+	WebhookCallDisconnectReasonRemoteHangup         WebhookCallDisconnectReason = "remote_hangup"
+	WebhookCallDisconnectReasonAssistantEnded       WebhookCallDisconnectReason = "assistant_ended"
+	WebhookCallDisconnectReasonToolEnded            WebhookCallDisconnectReason = "tool_ended"
+	WebhookCallDisconnectReasonTransferred          WebhookCallDisconnectReason = "transferred"
+	WebhookCallDisconnectReasonIdleTimeout          WebhookCallDisconnectReason = "idle_timeout"
+	WebhookCallDisconnectReasonMaxDuration          WebhookCallDisconnectReason = "max_duration"
+	WebhookCallDisconnectReasonNoAnswer             WebhookCallDisconnectReason = "no_answer"
+	WebhookCallDisconnectReasonBusy                 WebhookCallDisconnectReason = "busy"
+	WebhookCallDisconnectReasonRejected             WebhookCallDisconnectReason = "rejected"
+	WebhookCallDisconnectReasonCancelled            WebhookCallDisconnectReason = "cancelled"
+	WebhookCallDisconnectReasonAuthenticationFailed WebhookCallDisconnectReason = "authentication_failed"
+	WebhookCallDisconnectReasonConfigurationFailed  WebhookCallDisconnectReason = "configuration_failed"
+	WebhookCallDisconnectReasonProviderFailed       WebhookCallDisconnectReason = "provider_failed"
+	WebhookCallDisconnectReasonNetworkFailed        WebhookCallDisconnectReason = "network_failed"
+	WebhookCallDisconnectReasonMediaFailed          WebhookCallDisconnectReason = "media_failed"
+	WebhookCallDisconnectReasonCapacityExceeded     WebhookCallDisconnectReason = "capacity_exceeded"
+	WebhookCallDisconnectReasonInternalError        WebhookCallDisconnectReason = "internal_error"
+)
+
+func (r WebhookCallDisconnectReason) String() string {
+	return string(r)
+}
+
 type V1WebhookPayload interface {
 	isV1WebhookPayload()
 }
@@ -20,108 +76,106 @@ type V1WebhookPayloadBase struct {
 type CallReceivedWebhookPayload struct {
 	V1WebhookPayloadBase
 
-	Provider  string `json:"provider"`
-	CallID    string `json:"call_id"`
-	To        string `json:"to"`
-	From      string `json:"from"`
-	Direction string `json:"direction"`
-	Status    string `json:"status"`
+	Provider  string               `json:"provider"`
+	CallID    string               `json:"call_id"`
+	To        string               `json:"to"`
+	From      string               `json:"from"`
+	Direction WebhookCallDirection `json:"direction"`
+	Status    WebhookCallStatus    `json:"status"`
 }
 
 type CallRingingWebhookPayload struct {
 	V1WebhookPayloadBase
 
-	Provider    string `json:"provider"`
-	CallID      string `json:"call_id"`
-	To          string `json:"to"`
-	From        string `json:"from"`
-	Direction   string `json:"direction"`
-	ContextID   string `json:"context_id"`
-	Source      string `json:"source"`
-	StatusEvent string `json:"status_event"`
-	Status      string `json:"status"`
+	Provider    string               `json:"provider"`
+	CallID      string               `json:"call_id"`
+	To          string               `json:"to"`
+	From        string               `json:"from"`
+	Direction   WebhookCallDirection `json:"direction"`
+	ContextID   string               `json:"context_id"`
+	Source      string               `json:"source"`
+	StatusEvent string               `json:"status_event"`
+	Status      WebhookCallStatus    `json:"status"`
 }
 
 type CallProviderAnsweredWebhookPayload struct {
 	V1WebhookPayloadBase
 
-	Provider  string `json:"provider"`
-	CallID    string `json:"call_id"`
-	To        string `json:"to"`
-	From      string `json:"from"`
-	Direction string `json:"direction"`
-	ContextID string `json:"context_id"`
-	Status    string `json:"status"`
+	Provider  string               `json:"provider"`
+	CallID    string               `json:"call_id"`
+	To        string               `json:"to"`
+	From      string               `json:"from"`
+	Direction WebhookCallDirection `json:"direction"`
+	ContextID string               `json:"context_id"`
+	Status    WebhookCallStatus    `json:"status"`
 }
 
 type CallFailedWebhookPayload struct {
 	V1WebhookPayloadBase
 
-	Provider         string `json:"provider,omitempty"`
-	CallID           string `json:"call_id,omitempty"`
-	To               string `json:"to,omitempty"`
-	From             string `json:"from,omitempty"`
-	Direction        string `json:"direction,omitempty"`
-	ContextID        string `json:"context_id,omitempty"`
-	Stage            string `json:"stage,omitempty"`
-	Source           string `json:"source,omitempty"`
-	StatusEvent      string `json:"status_event,omitempty"`
-	Error            string `json:"error,omitempty"`
-	Reason           string `json:"reason,omitempty"`
-	DurationMs       string `json:"duration_ms,omitempty"`
-	Status           string `json:"status"`
-	DisconnectReason string `json:"disconnect_reason,omitempty"`
+	Provider         string                      `json:"provider,omitempty"`
+	CallID           string                      `json:"call_id,omitempty"`
+	To               string                      `json:"to,omitempty"`
+	From             string                      `json:"from,omitempty"`
+	Direction        WebhookCallDirection        `json:"direction,omitempty"`
+	ContextID        string                      `json:"context_id,omitempty"`
+	Stage            string                      `json:"stage,omitempty"`
+	Source           string                      `json:"source,omitempty"`
+	StatusEvent      string                      `json:"status_event,omitempty"`
+	Error            string                      `json:"error,omitempty"`
+	DurationMs       string                      `json:"duration_ms,omitempty"`
+	Status           WebhookCallStatus           `json:"status"`
+	DisconnectReason WebhookCallDisconnectReason `json:"disconnect_reason,omitempty"`
 }
 
 type CallStartedWebhookPayload struct {
 	V1WebhookPayloadBase
 
-	Provider  string `json:"provider"`
-	CallID    string `json:"call_id"`
-	To        string `json:"to"`
-	From      string `json:"from"`
-	Direction string `json:"direction"`
-	ContextID string `json:"context_id"`
-	Status    string `json:"status"`
+	Provider  string               `json:"provider"`
+	CallID    string               `json:"call_id"`
+	To        string               `json:"to"`
+	From      string               `json:"from"`
+	Direction WebhookCallDirection `json:"direction"`
+	ContextID string               `json:"context_id"`
+	Status    WebhookCallStatus    `json:"status"`
 }
 
 type CallEndedWebhookPayload struct {
 	V1WebhookPayloadBase
 
-	Provider         string `json:"provider"`
-	CallID           string `json:"call_id"`
-	To               string `json:"to"`
-	From             string `json:"from"`
-	Direction        string `json:"direction"`
-	ContextID        string `json:"context_id"`
-	DurationMs       string `json:"duration_ms"`
-	Reason           string `json:"reason,omitempty"`
-	Status           string `json:"status"`
-	DisconnectReason string `json:"disconnect_reason,omitempty"`
+	Provider         string                      `json:"provider"`
+	CallID           string                      `json:"call_id"`
+	To               string                      `json:"to"`
+	From             string                      `json:"from"`
+	Direction        WebhookCallDirection        `json:"direction"`
+	ContextID        string                      `json:"context_id"`
+	DurationMs       string                      `json:"duration_ms"`
+	Status           WebhookCallStatus           `json:"status"`
+	DisconnectReason WebhookCallDisconnectReason `json:"disconnect_reason,omitempty"`
 }
 
 type CallOutboundRequestedWebhookPayload struct {
 	V1WebhookPayloadBase
 
-	Provider  string `json:"provider"`
-	To        string `json:"to"`
-	From      string `json:"from"`
-	Direction string `json:"direction"`
-	ContextID string `json:"context_id"`
-	Status    string `json:"status"`
+	Provider  string               `json:"provider"`
+	To        string               `json:"to"`
+	From      string               `json:"from"`
+	Direction WebhookCallDirection `json:"direction"`
+	ContextID string               `json:"context_id"`
+	Status    WebhookCallStatus    `json:"status"`
 }
 
 type CallOutboundDispatchedWebhookPayload struct {
 	V1WebhookPayloadBase
 
-	Provider    string `json:"provider"`
-	CallID      string `json:"call_id"`
-	To          string `json:"to"`
-	From        string `json:"from"`
-	Direction   string `json:"direction"`
-	ContextID   string `json:"context_id"`
-	StatusEvent string `json:"status_event"`
-	Status      string `json:"status"`
+	Provider    string               `json:"provider"`
+	CallID      string               `json:"call_id"`
+	To          string               `json:"to"`
+	From        string               `json:"from"`
+	Direction   WebhookCallDirection `json:"direction"`
+	ContextID   string               `json:"context_id"`
+	StatusEvent string               `json:"status_event"`
+	Status      WebhookCallStatus    `json:"status"`
 }
 
 type ConversationBeginWebhookPayload struct {

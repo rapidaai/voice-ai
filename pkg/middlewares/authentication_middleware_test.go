@@ -330,13 +330,9 @@ func TestServiceAuthenticationRestoresDelegatedActorAcrossGRPC(t *testing.T) {
 		if auth.Type() != test.authType {
 			t.Fatalf("Type() = %q, want %q", auth.Type(), test.authType)
 		}
-		actor, err := auth.Actor()
-		if err != nil || actor != (types.ActorIdentity{Type: test.actorType, ID: 5}) {
-			t.Fatalf("Actor() = %+v, %v", actor, err)
-		}
-		caller, err := auth.Caller()
-		if err != nil || caller != (types.ActorIdentity{Type: types.ActorTypeService, ID: 4}) {
-			t.Fatalf("Caller() = %+v, %v", caller, err)
+		actor := auth.Actor()
+		if actor != (types.ActorIdentity{Type: test.actorType, ID: 5}) {
+			t.Fatalf("Actor() = %+v", actor)
 		}
 	}
 

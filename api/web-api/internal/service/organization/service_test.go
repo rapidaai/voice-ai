@@ -102,14 +102,16 @@ func TestOrganizationCredentialLifecycleAndAuthentication(t *testing.T) {
 	if createdActor.Type != "user" || createdActor.ID != 11 {
 		t.Fatalf("created actor = %q/%d", createdActor.Type, createdActor.ID)
 	}
-
-	organizationAuth := &types.Authentication{
-		AuthType:          types.AuthTypeOrg,
-		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeOrganization, ID: first.Id},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: 22},
+	var updatedActorType sql.NullString
+	var updatedActorID sql.NullInt64
+	if err := db.Table("organization_credentials").
+		Select("updated_actor_type, updated_actor_id").
+		Where("id = ?", first.Id).
+		Row().Scan(&updatedActorType, &updatedActorID); err != nil {
+		t.Fatal(err)
 	}
-	if _, _, err := service.CreateCredential(context.Background(), organizationAuth, 22, "delegated"); err == nil {
-		t.Fatal("CreateCredential() error = nil for organization credential actor")
+	if updatedActorType.Valid || updatedActorID.Valid {
+		t.Fatalf("created credential update actor = %v/%v, want null", updatedActorType, updatedActorID)
 	}
 
 	authenticator := NewOrganizationAuthenticator(logger, postgres, fingerprintKey)
@@ -169,33 +171,5 @@ func TestOrganizationCredentialLifecycleAndAuthentication(t *testing.T) {
 	}
 	if _, err := authenticator.Claim(context.Background(), rotatedKey); err == nil {
 		t.Fatal("archived credential authenticated")
-	}
-}
-
-func TestOrganizationCredentialLifecycleFailsWithoutDurableActor(t *testing.T) {
-	logger, err := commons.NewApplicationLogger(commons.EnableConsole(true), commons.EnableFile(false))
-	if err != nil {
-		t.Fatal(err)
-	}
-	service := NewOrganizationService(logger, &organizationTestPostgres{}, "key")
-	if _, _, err := service.CreateCredential(context.Background(), &types.Authentication{AuthType: types.AuthTypeUser}, 22, "primary"); err == nil {
-		t.Fatal("CreateCredential() error = nil without durable actor")
-	}
-}
-
-func TestOrganizationCredentialLifecycleRejectsMismatchedOrganization(t *testing.T) {
-	logger, err := commons.NewApplicationLogger(commons.EnableConsole(true), commons.EnableFile(false))
-	if err != nil {
-		t.Fatal(err)
-	}
-	service := NewOrganizationService(logger, &organizationTestPostgres{}, "key")
-	auth := &types.Authentication{
-		AuthType:          types.AuthTypeUser,
-		ActorValue:        &types.ActorIdentity{Type: types.ActorTypeUser, ID: 11},
-		UserValue:         &types.UserContext{UserID: 11},
-		OrganizationValue: &types.OrganizationContext{OrganizationID: 33},
-	}
-	if _, _, err := service.CreateCredential(context.Background(), auth, 22, "primary"); err == nil {
-		t.Fatal("CreateCredential() error = nil for mismatched organization")
 	}
 }

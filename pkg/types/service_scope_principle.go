@@ -7,6 +7,12 @@ package types
 
 import "fmt"
 
+type DelegatedContext struct {
+	UserID         *uint64
+	OrganizationID uint64
+	ProjectID      *uint64
+}
+
 /*
 Service scope
 */
@@ -56,7 +62,6 @@ func (ss *ServiceScope) Authentication() (*Authentication, error) {
 	auth := &Authentication{
 		AuthType:          AuthTypeService,
 		ActorValue:        &caller,
-		CallerValue:       &caller,
 		OrganizationValue: &OrganizationContext{OrganizationID: delegatedContext.OrganizationID},
 	}
 	if delegatedContext.ProjectID != nil {
@@ -96,6 +101,36 @@ func (ss *ServiceScope) Authentication() (*Authentication, error) {
 		return nil, ErrUnauthenticated
 	}
 	return auth, nil
+}
+
+func normalizeDelegatedContext(context DelegatedContext, provided bool) (DelegatedContext, bool) {
+	if !provided || context.OrganizationID == 0 {
+		return DelegatedContext{}, false
+	}
+	userID, ok := normalizeOptionalID(context.UserID)
+	if !ok {
+		return DelegatedContext{}, false
+	}
+	projectID, ok := normalizeOptionalID(context.ProjectID)
+	if !ok {
+		return DelegatedContext{}, false
+	}
+	return DelegatedContext{
+		UserID:         userID,
+		OrganizationID: context.OrganizationID,
+		ProjectID:      projectID,
+	}, true
+}
+
+func normalizeOptionalID(id *uint64) (*uint64, bool) {
+	if id == nil {
+		return nil, true
+	}
+	if *id == 0 {
+		return nil, false
+	}
+	value := *id
+	return &value, true
 }
 
 func (ss *ServiceScope) Scope(allowed ...AuthType) (AuthenticationPrinciple, error) {

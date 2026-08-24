@@ -440,7 +440,7 @@ func TestRecorder_RecordWebhook_FansOut(t *testing.T) {
 			V1WebhookPayloadBase: NewV1WebhookPayload(nil),
 			Provider:             "test",
 			CallID:               "call-1",
-			Direction:            "inbound",
+			Direction:            WebhookCallDirectionInbound,
 		},
 	})
 	if err != nil {
@@ -549,7 +549,7 @@ func TestRecorder_RecordSnapshotsMutablePayloads(t *testing.T) {
 		}),
 		Provider:    "test",
 		CallID:      "call-1",
-		Direction:   "outbound",
+		Direction:   WebhookCallDirectionOutbound,
 		StatusEvent: "ringing",
 	}
 	toolRequestPayload := []byte("tool-request-before")

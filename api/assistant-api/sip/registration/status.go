@@ -14,6 +14,7 @@ import (
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
+	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
@@ -88,14 +89,23 @@ func (m *manager) upsertOption(ctx context.Context, deploymentID uint64, key, va
 	db := m.postgres.DB(ctx)
 	opt := &internal_assistant_entity.AssistantDeploymentTelephonyOption{
 		AssistantDeploymentTelephonyId: deploymentID,
+		Mutable: gorm_models.Mutable{
+			CreatedActorType: types.ActorTypeService.String(),
+			CreatedActorID:   m.assistantConfig.ServiceID,
+		},
 		Metadata: gorm_models.Metadata{
 			Key:   key,
 			Value: value,
 		},
 	}
 	if err := db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "assistant_deployment_telephony_id"}, {Name: "key"}},
-		DoUpdates: clause.AssignmentColumns([]string{"value", "updated_date"}),
+		Columns: []clause.Column{{Name: "assistant_deployment_telephony_id"}, {Name: "key"}},
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"value":              clause.Expr{SQL: "excluded.value"},
+			"updated_date":       time.Now(),
+			"updated_actor_type": types.ActorTypeService.String(),
+			"updated_actor_id":   m.assistantConfig.ServiceID,
+		}),
 	}).Create(opt).Error; err != nil {
 		m.logger.Warnw("Failed to upsert deployment option",
 			"deployment_id", deploymentID, "key", key, "error", err)

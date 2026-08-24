@@ -22,7 +22,7 @@ func TestEndpointServiceClientStopsBeforeGRPCOnAuthError(t *testing.T) {
 		logger:         logger,
 	}
 	_, err = client.GetEndpoint(context.Background(), &types.Authentication{}, &endpoint_api.GetEndpointRequest{})
-	if !errors.Is(err, types.ErrOrganizationContextUnavailable) {
+	if !errors.Is(err, types.ErrUnauthenticated) {
 		t.Fatalf("GetEndpoint() error = %v", err)
 	}
 }
@@ -32,7 +32,7 @@ func TestDeploymentServiceClientStopsBeforeGRPCOnAuthError(t *testing.T) {
 		InternalClient: clients.NewInternalClient(&config.AppConfig{Secret: "secret"}, nil, nil),
 	}
 	_, err := client.Invoke(context.Background(), &types.Authentication{}, &endpoint_api.InvokeRequest{})
-	if !errors.Is(err, types.ErrOrganizationContextUnavailable) {
+	if !errors.Is(err, types.ErrUnauthenticated) {
 		t.Fatalf("Invoke() error = %v", err)
 	}
 }

@@ -16,10 +16,10 @@ func TestProviderStatusWebhookLifecycleFields(t *testing.T) {
 	t.Parallel()
 
 	payload := observability.CallFailedWebhookPayload{
-		Status:           observability.MetricCallStatusCancelled,
-		DisconnectReason: "outbound_cancelled",
+		Status:           observability.WebhookCallStatusCancelled,
+		DisconnectReason: observability.WebhookCallDisconnectReasonCancelled,
 	}
-	if payload.Status != observability.MetricCallStatusCancelled || payload.DisconnectReason != "outbound_cancelled" {
+	if payload.Status != observability.WebhookCallStatusCancelled || payload.DisconnectReason != observability.WebhookCallDisconnectReasonCancelled {
 		t.Fatalf("unexpected provider status lifecycle fields: %+v", payload)
 	}
 }
