@@ -22,17 +22,17 @@ import (
 
 func newMediaPortTestSession(t *testing.T) *sip_infra.Session {
 	t.Helper()
-	session, err := sip_infra.NewSession(context.Background(), &sip_infra.SessionConfig{
-		Config: &sip_infra.Config{
+	session, err := sip_infra.NewSession(context.Background(),
+		sip_infra.WithSessionConfig(&sip_infra.Config{
 			Server:            "127.0.0.1",
 			Port:              5060,
 			RTPPortRangeStart: 10000,
 			RTPPortRangeEnd:   10010,
-		},
-		Direction: sip_infra.CallDirectionInbound,
-		CallID:    "media-port-test",
-		Codec:     &sip_infra.CodecPCMU,
-	})
+		}),
+		sip_infra.WithSessionDirection(sip_infra.CallDirectionInbound),
+		sip_infra.WithSessionCallID("media-port-test"),
+		sip_infra.WithSessionCodec(&sip_infra.CodecPCMU),
+	)
 	require.NoError(t, err)
 	return session
 }

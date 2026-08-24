@@ -50,6 +50,17 @@ func TestNewOutboundCall_OwnsLifecycleDependencies(t *testing.T) {
 	assert.Equal(t, request, outboundCall.request)
 }
 
+func TestOutboundDialogInviteRejectsEmptyCallID(t *testing.T) {
+	request, err := NewOutboundInviteRequest(testOutboundConfig(), "+15551234567", "+15557654321")
+	require.NoError(t, err)
+	dialog := NewOutboundDialog(&Server{}, &Session{}, request)
+
+	err = dialog.Invite(context.Background(), "test-sdp")
+
+	require.ErrorIs(t, err, ErrInvalidConfig)
+	assert.Contains(t, err.Error(), "outbound call ID is required")
+}
+
 func TestOutboundCallInviteHandlerUsesAuthoritativeRequestIdentity(t *testing.T) {
 	server := &Server{logger: bridgeTestLogger()}
 	request, err := NewOutboundInviteRequest(testOutboundConfig(), "customer-alias", "assistant-line")

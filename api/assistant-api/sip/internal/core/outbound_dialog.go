@@ -41,6 +41,10 @@ func (dialog *outboundDialog) Invite(ctx context.Context, sdpOffer string) error
 	if err := dialog.request.Validate(); err != nil {
 		return err
 	}
+	callID := dialog.session.GetCallID()
+	if callID == "" {
+		return fmt.Errorf("%w: outbound call ID is required", ErrInvalidConfig)
+	}
 
 	recipient := sip.Uri{
 		Scheme: internal_outbound.SIPScheme(internal_outbound.Transport(dialog.request.Config.Transport)),
@@ -59,7 +63,7 @@ func (dialog *outboundDialog) Invite(ctx context.Context, sdpOffer string) error
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 	}
-	callIDHeader := sip.CallIDHeader(dialog.session.GetCallID())
+	callIDHeader := sip.CallIDHeader(callID)
 	inviteHeaders = append(inviteHeaders, &callIDHeader)
 
 	dialogSession, err := dialog.server.dialogClientCache.Invite(ctx, recipient, []byte(sdpOffer), inviteHeaders...)

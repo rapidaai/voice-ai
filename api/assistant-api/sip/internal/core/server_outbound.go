@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 )
 
@@ -53,7 +54,8 @@ func (s *Server) prepareOutboundCallLeg(ctx context.Context, cfg *Config, toUser
 		return nil, err
 	}
 
-	session, err := s.createAndRegisterOutboundSession(callLifecycleContext, cfg, "", opts.makeCallOptions)
+	callID := uuid.New().String()
+	session, err := s.createAndRegisterOutboundSession(callLifecycleContext, cfg, callID, opts.makeCallOptions)
 	if err != nil {
 		return nil, err
 	}
