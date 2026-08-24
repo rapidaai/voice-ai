@@ -35,9 +35,9 @@ export const ROLE_OPTIONS: FilterOption[] = [
 export const METRIC_NAME_OPTIONS: FilterOption[] = [
   { id: 'all', text: 'All metrics' },
   { id: 'status', text: 'status' },
-  { id: 'duration', text: 'duration' },
-  { id: 'stt_duration', text: 'stt_duration' },
-  { id: 'tts_duration', text: 'tts_duration' },
+  { id: 'conversation.duration_ms', text: 'conversation.duration_ms' },
+  { id: 'stt.duration_ms', text: 'stt.duration_ms' },
+  { id: 'tts.duration_ms', text: 'tts.duration_ms' },
   { id: 'call.duration_ms', text: 'call.duration_ms' },
   { id: 'call.status', text: 'call.status' },
   { id: 'call.price', text: 'call.price' },
@@ -83,6 +83,16 @@ export const METRIC_NAME_OPTIONS: FilterOption[] = [
   { id: 'tts.discard_chunk_count', text: 'tts.discard_chunk_count' },
   { id: 'agent.ttft_ms', text: 'agent.ttft_ms' },
   { id: 'agent.trt_ms', text: 'agent.trt_ms' },
+  { id: 'agent.total_token', text: 'agent.total_token' },
+  {
+    id: 'agent.cached_content_token',
+    text: 'agent.cached_content_token',
+  },
+  { id: 'agent.cost', text: 'agent.cost' },
+  { id: 'agent.input_cost', text: 'agent.input_cost' },
+  { id: 'agent.output_cost', text: 'agent.output_cost' },
+  { id: 'agent.llm_request_id', text: 'agent.llm_request_id' },
+  { id: 'agent.token_pre_second', text: 'agent.token_pre_second' },
 ];
 
 export const COMPONENT_OPTIONS: FilterOption[] = [
