@@ -1,0 +1,13 @@
+{
+  "status": "approved",
+  "reviewed_at": "2026-08-24",
+  "reviewer": "webhook contract owner",
+  "rfc_file": "rfcs/0010-remove-call-status-event.md",
+  "decision": "approved",
+  "requirements": [
+    "Remove Source: provider_status_reporter from the provider status reporter ringing webhook construction.",
+    "Keep the existing CallRingingWebhookPayload schema unchanged.",
+    "Preserve status and status_event removal behavior."
+  ],
+  "approval_message": "remove Kept Source: provider_status_reporter because it predates this PR and exists in the merge base"
+}

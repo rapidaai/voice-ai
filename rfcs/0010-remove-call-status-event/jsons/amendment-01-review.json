@@ -1,0 +1,12 @@
+{
+  "status": "implemented",
+  "reviewed_at": "2026-08-24",
+  "source_review_comment_id": 3844201239,
+  "decision": "accepted_by_contract_owner",
+  "resolution": "Removed Source: provider_status_reporter from provider status reporter ringing webhook construction after amendment 01 exact-digest confirmation.",
+  "verification": [
+    "The reporter webhook test asserts status=ringing.",
+    "The reporter webhook test asserts source is empty.",
+    "The reporter webhook test asserts status_event is absent."
+  ]
+}

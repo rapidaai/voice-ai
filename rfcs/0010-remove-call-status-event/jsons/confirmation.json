@@ -1,0 +1,14 @@
+{
+  "status": "approved",
+  "rfc_file": "rfcs/0010-remove-call-status-event.md",
+  "rfc_sha256": "a88a0075e2699cde60ad087b4748dbefe25d960c84a141fd879bf25cdd1f1536",
+  "plan_file": "rfcs/0010-remove-call-status-event/jsons/plan.json",
+  "plan_sha256": "2ce59f8ecefc0f9aa6fe4fdc129776c950e8f32763d6ec75717e29154a8fc2e9",
+  "challenge_receipt": "rfcs/0010-remove-call-status-event/jsons/challenge.json",
+  "challenge_receipt_sha256": "2a522321c0511b402fffb0ce43b7f03526c78bf85e99fd33d98b9567d15b5e40",
+  "question": "Approve implementation of RFC rfcs/0010-remove-call-status-event.md with SHA-256 a88a0075e2699cde60ad087b4748dbefe25d960c84a141fd879bf25cdd1f1536?",
+  "resolution": "approved",
+  "approved_by": "user",
+  "approval_message": "confirm",
+  "approved_at": "2026-08-24"
+}

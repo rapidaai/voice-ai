@@ -1,0 +1,14 @@
+{
+  "status": "approved",
+  "reviewed_at": "2026-08-24",
+  "reviewer": "webhook contract owner",
+  "rfc_file": "rfcs/0010-remove-call-status-event.md",
+  "decision": "approved",
+  "requirements": [
+    "Remove status_event from version 1 call webhook payloads.",
+    "Keep status as the sole public lifecycle field.",
+    "Preserve internal telephony event parsing and metric labels.",
+    "Do not add a compatibility bridge because the contract is still in development."
+  ],
+  "approval_message": "approve"
+}

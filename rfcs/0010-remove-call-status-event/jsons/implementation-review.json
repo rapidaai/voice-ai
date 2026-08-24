@@ -1,0 +1,30 @@
+{
+  "status": "findings_addressed",
+  "reviewed_at": "2026-08-24",
+  "reviewer": "coderabbitai[bot]",
+  "review_id": 5008692533,
+  "pull_request": 246,
+  "findings": [
+    {
+      "comment_id": 3844201222,
+      "severity": "minor",
+      "decision": "accepted",
+      "resolution": "Added serialized status value assertions to the callback, outbound pipeline, and telephony reporter webhook tests while retaining status_event absence assertions."
+    },
+    {
+      "comment_id": 3844201239,
+      "severity": "major",
+      "decision": "rejected",
+      "resolution": "The provider_status_reporter source assignment exists in merge base 2074a850048bd883a962278b6450d35a2b9639bf and was not added by this change. Removing it would violate the RFC requirement to leave other webhook fields unchanged."
+    },
+    {
+      "comment_id": 3844201248,
+      "severity": "major",
+      "decision": "partially_accepted",
+      "resolution": "Added verification and implementation review artifacts. The accepted RFC remains unchanged because its exact SHA-256 is recorded by the approved confirmation receipt and repository policy requires a new challenge and confirmation for any byte change. The confirmation artifact itself records approved status."
+    }
+  ],
+  "verification_evidence": "rfcs/0010-remove-call-status-event/jsons/verification.json",
+  "confirmation_evidence": "rfcs/0010-remove-call-status-event/jsons/confirmation.json",
+  "remote_rereview": "pending"
+}

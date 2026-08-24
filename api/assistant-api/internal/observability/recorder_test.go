@@ -547,10 +547,9 @@ func TestRecorder_RecordSnapshotsMutablePayloads(t *testing.T) {
 			"list":   webhookListPayload,
 			"bytes":  webhookBytesPayload,
 		}),
-		Provider:    "test",
-		CallID:      "call-1",
-		Direction:   WebhookCallDirectionOutbound,
-		StatusEvent: "ringing",
+		Provider:  "test",
+		CallID:    "call-1",
+		Direction: WebhookCallDirectionOutbound,
 	}
 	toolRequestPayload := []byte("tool-request-before")
 	toolResponsePayload := []byte("tool-response-before")
