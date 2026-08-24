@@ -1,0 +1,34 @@
+{
+  "rfc": "rfcs/0009-call-webhook-status-and-disconnect-reason.md",
+  "status": "approved",
+  "objective": "Use typed call webhook status, direction, and disconnect reason values while removing the duplicate reason field.",
+  "acceptance_criteria": [
+    "All call webhook status fields use WebhookCallStatus.",
+    "All call webhook direction fields use WebhookCallDirection.",
+    "Terminal call webhook disconnect fields use WebhookCallDisconnectReason.",
+    "CallFailedWebhookPayload and CallEndedWebhookPayload do not expose reason.",
+    "Every producer assigns approved enum constants inline without mapping helpers.",
+    "Focused tests and repository finalization pass."
+  ],
+  "allowed_paths": [
+    "api/assistant-api/internal/observability/webhook.go",
+    "api/assistant-api/internal/observability/webhook_test.go",
+    "api/assistant-api/api/talk/callback.go",
+    "api/assistant-api/internal/channel/pipeline/",
+    "api/assistant-api/internal/channel/telephony/reporter.go",
+    "api/assistant-api/sip/pipeline/",
+    "focused tests in each changed package",
+    "rfcs/0009-call-webhook-status-and-disconnect-reason/"
+  ],
+  "risks": [
+    "Removing reason can break webhook consumers that still read it.",
+    "Lowercase status values can break consumers expecting uppercase call status values.",
+    "An incorrect inline mapping can hide the actual terminal cause."
+  ],
+  "verification_commands": [
+    "go test ./api/assistant-api/internal/observability",
+    "go test ./api/assistant-api/api/talk ./api/assistant-api/internal/channel/pipeline ./api/assistant-api/internal/channel/telephony ./api/assistant-api/sip/pipeline",
+    "make agent-finalize CHANGED_FILES=\"comma,separated,paths\""
+  ],
+  "rollback": "Revert the call webhook enum migration and restore the reason fields as one change."
+}

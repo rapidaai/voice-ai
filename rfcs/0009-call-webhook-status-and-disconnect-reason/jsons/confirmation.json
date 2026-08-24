@@ -1,0 +1,14 @@
+{
+  "status": "approved",
+  "rfc_file": "rfcs/0009-call-webhook-status-and-disconnect-reason.md",
+  "rfc_sha256": "008ccf1b6f5ab7172dbfa67d9f5ebc8a3a51703c403dd65dc091b6eb85601cea",
+  "plan_file": "rfcs/0009-call-webhook-status-and-disconnect-reason/jsons/plan.json",
+  "plan_sha256": "1304302a26b59f15d069e67d65bc81db497bd2d226b84347f79790439ac8508c",
+  "challenge_receipt": "rfcs/0009-call-webhook-status-and-disconnect-reason/jsons/challenge.json",
+  "challenge_receipt_sha256": "02961b07b2521c1aa326ca63b2e89c223f7a2c34275955743ae143c2ece0caa5",
+  "question": "Approve implementation of RFC rfcs/0009-call-webhook-status-and-disconnect-reason.md with SHA-256 008ccf1b6f5ab7172dbfa67d9f5ebc8a3a51703c403dd65dc091b6eb85601cea?",
+  "resolution": "approved",
+  "approved_by": "user",
+  "approval_message": "confirm",
+  "approved_at": "2026-08-23"
+}

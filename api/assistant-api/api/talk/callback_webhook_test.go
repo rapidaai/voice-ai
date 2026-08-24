@@ -16,10 +16,10 @@ func TestCallbackWebhookLifecycleFields(t *testing.T) {
 	t.Parallel()
 
 	payload := observability.CallFailedWebhookPayload{
-		Status:           observability.MetricCallStatusFailed,
-		DisconnectReason: "busy",
+		Status:           observability.WebhookCallStatusFailed,
+		DisconnectReason: observability.WebhookCallDisconnectReasonProviderFailed,
 	}
-	if payload.Status != observability.MetricCallStatusFailed || payload.DisconnectReason != "busy" {
+	if payload.Status != observability.WebhookCallStatusFailed || payload.DisconnectReason != observability.WebhookCallDisconnectReasonProviderFailed {
 		t.Fatalf("unexpected callback lifecycle fields: %+v", payload)
 	}
 }

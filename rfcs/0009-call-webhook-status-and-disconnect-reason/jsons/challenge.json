@@ -1,0 +1,15 @@
+{
+  "status": "approved",
+  "reviewed_at": "2026-08-23",
+  "reviewer": "webhook contract owner",
+  "rfc_file": "rfcs/0009-call-webhook-status-and-disconnect-reason.md",
+  "decision": "approved",
+  "requirements": [
+    "Use the names WebhookCallDisconnectReason, WebhookCallStatus, and WebhookCallDirection.",
+    "Remove the duplicate reason field from terminal call webhook payloads.",
+    "Use typed status, direction, and disconnect reason fields.",
+    "Assign enum values inline without adding mapping logic.",
+    "Ask before choosing any mapping that is not explicit."
+  ],
+  "approval_message": "Yes i think"
+}
