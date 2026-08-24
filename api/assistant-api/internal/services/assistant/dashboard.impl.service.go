@@ -183,7 +183,7 @@ SELECT
 	COALESCE(AVG(message_metric_values.stt_latency_value), 0) AS average_stt_ms,
 	COALESCE(AVG(message_metric_values.eos_latency_value), 0) AS average_eos_ms,
 	COALESCE(AVG(message_metric_values.tts_latency_value), 0) AS average_tts_ms,
-	COALESCE(AVG(message_metric_values.llm_latency_value), 0) AS average_llm_ms,
+	COALESCE(AVG(message_metric_values.agent_ttft_value), 0) AS average_agent_ttft_ms,
 	COALESCE(SUM(message_metric_values.total_token_value), 0) AS total_tokens
 FROM assistant_conversation_messages
 JOIN assistant_conversations
@@ -194,7 +194,7 @@ LEFT JOIN (
 		MAX(CASE WHEN name = ? THEN value::double precision END) AS stt_latency_value,
 		MAX(CASE WHEN name = ? THEN value::double precision END) AS eos_latency_value,
 		MAX(CASE WHEN name = ? THEN value::double precision END) AS tts_latency_value,
-		MAX(CASE WHEN name = ? THEN value::double precision END) AS llm_latency_value,
+		MAX(CASE WHEN name = ? THEN value::double precision END) AS agent_ttft_value,
 		MAX(CASE WHEN name = ? THEN value::double precision END) AS total_token_value
 	FROM assistant_conversation_message_metrics
 	WHERE name IN (?, ?, ?, ?, ?)
@@ -209,24 +209,24 @@ WHERE %s
 		observability.MetricSTTLatencyMs,
 		observability.MetricEOSLatencyMs,
 		observability.MetricTTSLatencyMs,
-		observability.MetricAgentLatencyMs,
+		observability.MetricAgentTTFTMs,
 		observability.MetricAgentTotalToken,
 		observability.MetricSTTLatencyMs,
 		observability.MetricEOSLatencyMs,
 		observability.MetricTTSLatencyMs,
-		observability.MetricAgentLatencyMs,
+		observability.MetricAgentTTFTMs,
 		observability.MetricAgentTotalToken,
 	)
 	messageSummaryArguments = append(messageSummaryArguments, queryFilters.messageArguments...)
 
 	messageSummaryRow := struct {
-		TotalMessages uint32
-		UserMessages  uint32
-		AverageSttMs  float64
-		AverageEosMs  float64
-		AverageTtsMs  float64
-		AverageLlmMs  float64
-		TotalTokens   float64
+		TotalMessages      uint32
+		UserMessages       uint32
+		AverageSttMs       float64
+		AverageEosMs       float64
+		AverageTtsMs       float64
+		AverageAgentTTFTMs float64
+		TotalTokens        float64
 	}{}
 	if err := database.Raw(messageSummaryQuery, messageSummaryArguments...).Scan(&messageSummaryRow).Error; err != nil {
 		assistantService.logger.Errorf("unable to get assistant dashboard message summary %v", err)
@@ -236,7 +236,7 @@ WHERE %s
 		SttMs: messageSummaryRow.AverageSttMs,
 		EosMs: messageSummaryRow.AverageEosMs,
 		TtsMs: messageSummaryRow.AverageTtsMs,
-		LlmMs: messageSummaryRow.AverageLlmMs,
+		LlmMs: messageSummaryRow.AverageAgentTTFTMs,
 	}, messageSummaryRow.TotalMessages, messageSummaryRow.UserMessages, messageSummaryRow.TotalTokens, nil
 }
 
@@ -381,11 +381,11 @@ func (assistantService *assistantService) getAssistantDashboardBuckets(
 		observability.MetricSTTLatencyMs,
 		observability.MetricEOSLatencyMs,
 		observability.MetricTTSLatencyMs,
-		observability.MetricAgentLatencyMs,
+		observability.MetricAgentTTFTMs,
 		observability.MetricSTTLatencyMs,
 		observability.MetricEOSLatencyMs,
 		observability.MetricTTSLatencyMs,
-		observability.MetricAgentLatencyMs,
+		observability.MetricAgentTTFTMs,
 	)
 	bucketQueryArguments = append(bucketQueryArguments, queryFilters.messageArguments...)
 
@@ -396,7 +396,7 @@ SELECT
 	COALESCE(AVG(message_metric_values.stt_latency_value), 0) AS average_stt_ms,
 	COALESCE(AVG(message_metric_values.eos_latency_value), 0) AS average_eos_ms,
 	COALESCE(AVG(message_metric_values.tts_latency_value), 0) AS average_tts_ms,
-	COALESCE(AVG(message_metric_values.llm_latency_value), 0) AS average_llm_ms
+	COALESCE(AVG(message_metric_values.agent_ttft_value), 0) AS average_agent_ttft_ms
 FROM assistant_conversation_messages
 JOIN assistant_conversations
 	ON assistant_conversations.id = assistant_conversation_messages.assistant_conversation_id
@@ -406,7 +406,7 @@ LEFT JOIN (
 		MAX(CASE WHEN name = ? THEN value::double precision END) AS stt_latency_value,
 		MAX(CASE WHEN name = ? THEN value::double precision END) AS eos_latency_value,
 		MAX(CASE WHEN name = ? THEN value::double precision END) AS tts_latency_value,
-		MAX(CASE WHEN name = ? THEN value::double precision END) AS llm_latency_value
+		MAX(CASE WHEN name = ? THEN value::double precision END) AS agent_ttft_value
 	FROM assistant_conversation_message_metrics
 	WHERE name IN (?, ?, ?, ?)
 	GROUP BY assistant_conversation_message_id
@@ -418,12 +418,12 @@ ORDER BY bucket_index ASC
 `, messageWhereClause)
 
 	bucketRows := []struct {
-		BucketIndex  int64
-		MessageCount uint32
-		AverageSttMs float64
-		AverageEosMs float64
-		AverageTtsMs float64
-		AverageLlmMs float64
+		BucketIndex        int64
+		MessageCount       uint32
+		AverageSttMs       float64
+		AverageEosMs       float64
+		AverageTtsMs       float64
+		AverageAgentTTFTMs float64
 	}{}
 	if err := database.Raw(bucketQuery, bucketQueryArguments...).Scan(&bucketRows).Error; err != nil {
 		assistantService.logger.Errorf("unable to get assistant dashboard buckets %v", err)
@@ -437,7 +437,7 @@ ORDER BY bucket_index ASC
 			SttLatencyMs: bucketRow.AverageSttMs,
 			EosLatencyMs: bucketRow.AverageEosMs,
 			TtsLatencyMs: bucketRow.AverageTtsMs,
-			LlmLatencyMs: bucketRow.AverageLlmMs,
+			LlmLatencyMs: bucketRow.AverageAgentTTFTMs,
 		}
 	}
 

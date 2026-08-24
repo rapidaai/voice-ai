@@ -41,7 +41,7 @@ export type TelemetryRow =
 export type LatencyMetricName =
   | 'stt.latency_ms'
   | 'tts.latency_ms'
-  | 'agent.latency_ms'
+  | 'agent.ttft_ms'
   | 'eos.latency_ms';
 
 export type LatencyMetricDocument = {
@@ -140,9 +140,9 @@ export const LATENCY_METRIC_META: Record<
     color: '#7c3aed',
     fillOpacity: 0.38,
   },
-  'agent.latency_ms': {
-    label: 'Agent Latency',
-    shortLabel: 'Agent',
+  'agent.ttft_ms': {
+    label: 'Agent Time to First Token',
+    shortLabel: 'Agent TTFT',
     color: '#10b981',
     fillOpacity: 0.3,
   },
@@ -157,7 +157,7 @@ export const LATENCY_METRIC_META: Record<
 export const LATENCY_STACK_ORDER: LatencyMetricName[] = [
   'stt.latency_ms',
   'eos.latency_ms',
-  'agent.latency_ms',
+  'agent.ttft_ms',
   'tts.latency_ms',
 ];
 
@@ -267,7 +267,7 @@ export function formatDateTime(d: Date): string {
 const isLatencyMetricName = (name: string): name is LatencyMetricName =>
   name === 'stt.latency_ms' ||
   name === 'tts.latency_ms' ||
-  name === 'agent.latency_ms' ||
+  name === 'agent.ttft_ms' ||
   name === 'eos.latency_ms';
 
 export const buildLatencySeries = (

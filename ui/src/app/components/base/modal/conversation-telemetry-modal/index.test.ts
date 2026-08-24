@@ -130,7 +130,7 @@ describe('conversation telemetry structured criteria helpers', () => {
     ).toBe(true);
   });
 
-  it('builds latency series with stt/tts/agent/eos metrics merged by context', () => {
+  it('builds latency series with stt/tts/agent TTFT/eos metrics merged by context', () => {
     const series = buildLatencySeries([
       {
         timestampMs: 2000,
@@ -146,7 +146,8 @@ describe('conversation telemetry structured criteria helpers', () => {
         contextId: 'ctx-1',
         conversationId: 'conv-1',
         metrics: [
-          { name: 'agent.latency_ms', value: '30' },
+          { name: 'agent.latency_ms', value: '300' },
+          { name: 'agent.ttft_ms', value: '30' },
           { name: 'eos.latency_ms', value: '40' },
         ],
       },
@@ -160,28 +161,41 @@ describe('conversation telemetry structured criteria helpers', () => {
         timestampMs: 2200,
         contextId: 'ctx-3',
         conversationId: 'conv-1',
+        metrics: [{ name: 'agent.ttft_ms', value: '15' }],
+      },
+      {
+        timestampMs: 2300,
+        contextId: 'ctx-4',
+        conversationId: 'conv-1',
         metrics: [{ name: 'agent.total_token', value: '100' }],
       },
     ]);
 
-    expect(series).toHaveLength(2);
+    expect(series).toHaveLength(3);
 
     expect(series[0]).toMatchObject({
       contextId: 'ctx-1',
       conversationId: 'conv-1',
       'stt.latency_ms': 10,
       'tts.latency_ms': 20,
-      'agent.latency_ms': 30,
+      'agent.ttft_ms': 30,
       'eos.latency_ms': 40,
       sequence: 1,
       timestampMs: 1900,
     });
+    expect(series[0]).not.toHaveProperty('agent.latency_ms');
 
     expect(series[1]).toMatchObject({
       contextId: 'ctx-2',
       conversationId: 'conv-1',
       'stt.latency_ms': 5,
       sequence: 2,
+    });
+    expect(series[2]).toMatchObject({
+      contextId: 'ctx-3',
+      conversationId: 'conv-1',
+      'agent.ttft_ms': 15,
+      sequence: 3,
     });
   });
 });
