@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -35,6 +36,51 @@ const (
 	maxInboundRejectedInvites = 1024
 )
 
+// CallAddress contains the SIP parties and non-credential headers received with a call.
+// From and To are URI users. Header names are lowercase and repeated values preserve arrival order.
+type CallAddress struct {
+	From    string
+	To      string
+	FromURI string
+	ToURI   string
+	Headers map[string]string
+}
+
+// NewCallAddress reads the parties and non-credential headers from a SIP request.
+func NewCallAddress(request *sip.Request) CallAddress {
+	if request == nil {
+		return CallAddress{}
+	}
+
+	address := CallAddress{Headers: make(map[string]string)}
+	if from := request.From(); from != nil {
+		address.From = strings.TrimSpace(from.Address.User)
+		address.FromURI = from.Address.String()
+	}
+	if to := request.To(); to != nil {
+		address.To = strings.TrimSpace(to.Address.User)
+		address.ToURI = to.Address.String()
+	}
+
+	for _, header := range request.Headers() {
+		if header == nil {
+			continue
+		}
+		name := strings.ToLower(strings.TrimSpace(header.Name()))
+		if name == "" || name == "authorization" || name == "proxy-authorization" {
+			continue
+		}
+		value := strings.TrimSpace(header.Value())
+		if previous := address.Headers[name]; previous != "" {
+			address.Headers[name] = previous + "," + value
+		} else {
+			address.Headers[name] = value
+		}
+	}
+
+	return address
+}
+
 // SIPRequestContext contains information about an incoming SIP request.
 // Used by the middleware chain to resolve config for every SIP request.
 //
@@ -43,12 +89,11 @@ const (
 //	RouteMiddleware → resolves assistant route, sets Auth and Assistant
 //	VaultMiddleware → fetches SIP config from vault, sets VaultCredential
 type SIPRequestContext struct {
-	Method       string // SIP method (INVITE, REGISTER, BYE, etc.)
-	CallID       string
-	RequestURI   string
-	FromIdentity string
-	ToIdentity   string
-	SDPInfo      *SDPMediaInfo
+	Method      string // SIP method (INVITE, REGISTER, BYE, etc.)
+	CallID      string
+	RequestURI  string
+	CallAddress CallAddress
+	SDPInfo     *SDPMediaInfo
 
 	// Route/auth fields resolved by middleware.
 	APIKey      string
@@ -117,9 +162,9 @@ type Server struct {
 	middlewares []Middleware
 
 	// Event callbacks
-	onApplicationReady   func(session *Session, requestURI, fromIdentity, toIdentity string) error
+	onApplicationReady   func(session *Session, requestURI string, callAddress CallAddress) error
 	onApplicationCleanup func(session *Session)
-	onInvite             func(session *Session, requestURI, fromIdentity, toIdentity string) error
+	onInvite             func(session *Session, requestURI string, callAddress CallAddress) error
 	onBye                func(session *Session) error
 	onCancel             func(session *Session) error
 	onError              func(session *Session, err error)
@@ -471,7 +516,7 @@ func (s *Server) SessionCount() int {
 	return len(s.sessions)
 }
 
-func (s *Server) SetOnApplicationReady(fn func(session *Session, requestURI, fromIdentity, toIdentity string) error) {
+func (s *Server) SetOnApplicationReady(fn func(session *Session, requestURI string, callAddress CallAddress) error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.onApplicationReady = fn
@@ -484,7 +529,7 @@ func (s *Server) SetOnApplicationCleanup(fn func(session *Session)) {
 }
 
 // SetOnInvite sets the callback for answered INVITE requests.
-func (s *Server) SetOnInvite(fn func(session *Session, requestURI, fromIdentity, toIdentity string) error) {
+func (s *Server) SetOnInvite(fn func(session *Session, requestURI string, callAddress CallAddress) error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.onInvite = fn

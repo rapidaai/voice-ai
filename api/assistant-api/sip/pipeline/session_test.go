@@ -65,13 +65,15 @@ func TestEnsureCallContextOutboundFallbackPreservesResolvedRequestIdentities(t *
 	dispatcher := &Dispatcher{}
 
 	call, err := dispatcher.ensureCallContext(context.Background(), sip_infra.SessionEstablishedPipeline{
-		ID:           "call-outbound",
-		Session:      session,
-		Direction:    sip_infra.CallDirectionOutbound,
-		AssistantID:  42,
-		Auth:         auth,
-		FromIdentity: "assistant-line",
-		ToIdentity:   "customer-alias",
+		ID:          "call-outbound",
+		Session:     session,
+		Direction:   sip_infra.CallDirectionOutbound,
+		AssistantID: 42,
+		Auth:        auth,
+		CallAddress: sip_infra.CallAddress{
+			From: "assistant-line",
+			To:   "customer-alias",
+		},
 	}, 84)
 
 	require.NoError(t, err)

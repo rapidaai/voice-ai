@@ -30,9 +30,9 @@ func (d *Dispatcher) createConversation(ctx context.Context, stage sip_infra.Ses
 		dirEnum = type_enums.DIRECTION_OUTBOUND
 	}
 
-	conversationIdentifier := stage.FromIdentity
+	conversationIdentifier := stage.CallAddress.From
 	if stage.Direction == sip_infra.CallDirectionOutbound {
-		conversationIdentifier = stage.ToIdentity
+		conversationIdentifier = stage.CallAddress.To
 	}
 
 	assistant := stage.Session.GetAssistant()
@@ -69,7 +69,7 @@ func (d *Dispatcher) ensureCallContext(ctx context.Context, stage sip_infra.Sess
 	if stage.Direction == sip_infra.CallDirectionOutbound {
 		contextID := stage.Session.GetContextID()
 		if contextID == "" {
-			return reconstructCallContext(stage.Auth, stage.AssistantID, conversationID, dirStr, callID, "", stage.FromIdentity, stage.ToIdentity)
+			return reconstructCallContext(stage.Auth, stage.AssistantID, conversationID, dirStr, callID, "", stage.CallAddress.From, stage.CallAddress.To)
 		}
 		if claimed, err := d.callContextStore.Claim(ctx, contextID); err == nil {
 			return claimed, nil
@@ -77,7 +77,7 @@ func (d *Dispatcher) ensureCallContext(ctx context.Context, stage sip_infra.Sess
 		if loaded, err := d.callContextStore.Get(ctx, contextID); err == nil {
 			return loaded, nil
 		}
-		return reconstructCallContext(stage.Auth, stage.AssistantID, conversationID, dirStr, callID, contextID, stage.FromIdentity, stage.ToIdentity)
+		return reconstructCallContext(stage.Auth, stage.AssistantID, conversationID, dirStr, callID, contextID, stage.CallAddress.From, stage.CallAddress.To)
 	}
 
 	callContext := &callcontext.CallContext{
@@ -85,8 +85,8 @@ func (d *Dispatcher) ensureCallContext(ctx context.Context, stage sip_infra.Sess
 		ConversationID: conversationID,
 		Direction:      dirStr,
 		Provider:       "sip",
-		CallerNumber:   stage.FromIdentity,
-		FromNumber:     stage.ToIdentity,
+		CallerNumber:   stage.CallAddress.From,
+		FromNumber:     stage.CallAddress.To,
 		ChannelUUID:    callID,
 	}
 	if err := callContext.SetAuthentication(stage.Auth); err != nil {

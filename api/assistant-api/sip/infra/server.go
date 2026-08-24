@@ -46,10 +46,11 @@ func (s *Server) SetMiddlewares(middlewares []Middleware) {
 				Method:          ctx.Method,
 				CallID:          ctx.CallID,
 				RequestURI:      ctx.RequestURI,
-				FromIdentity:    ctx.FromIdentity,
-				ToIdentity:      ctx.ToIdentity,
-				FromURI:         ctx.FromIdentity,
-				ToURI:           ctx.ToIdentity,
+				FromIdentity:    ctx.CallAddress.FromURI,
+				ToIdentity:      ctx.CallAddress.ToURI,
+				FromURI:         ctx.CallAddress.FromURI,
+				ToURI:           ctx.CallAddress.ToURI,
+				CallAddress:     ctx.CallAddress,
 				SDPInfo:         sdpInfoFromCore(ctx.SDPInfo),
 				APIKey:          ctx.APIKey,
 				AssistantID:     ctx.AssistantID,
@@ -114,8 +115,8 @@ func (s *Server) SetOnApplicationReady(fn func(session *Session, fromURI, toURI 
 		s.inner.SetOnApplicationReady(nil)
 		return
 	}
-	s.inner.SetOnApplicationReady(func(session *internal_core.Session, requestURI, fromIdentity, toIdentity string) error {
-		return fn(wrapSession(session), fromIdentity, toIdentity)
+	s.inner.SetOnApplicationReady(func(session *internal_core.Session, _ string, callAddress internal_core.CallAddress) error {
+		return fn(wrapSession(session), callAddress.FromURI, callAddress.ToURI)
 	})
 }
 
@@ -125,11 +126,12 @@ func (s *Server) SetOnApplicationReadyIdentity(fn func(session *Session, identit
 		s.inner.SetOnApplicationReady(nil)
 		return
 	}
-	s.inner.SetOnApplicationReady(func(session *internal_core.Session, requestURI, fromIdentity, toIdentity string) error {
+	s.inner.SetOnApplicationReady(func(session *internal_core.Session, requestURI string, callAddress internal_core.CallAddress) error {
 		return fn(wrapSession(session), SIPRequestIdentity{
 			RequestURI:   requestURI,
-			FromIdentity: fromIdentity,
-			ToIdentity:   toIdentity,
+			CallAddress:  callAddress,
+			FromIdentity: callAddress.FromURI,
+			ToIdentity:   callAddress.ToURI,
 		})
 	})
 }
@@ -151,8 +153,8 @@ func (s *Server) SetOnInvite(fn func(session *Session, fromURI, toURI string) er
 		s.inner.SetOnInvite(nil)
 		return
 	}
-	s.inner.SetOnInvite(func(session *internal_core.Session, requestURI, fromIdentity, toIdentity string) error {
-		return fn(wrapSession(session), fromIdentity, toIdentity)
+	s.inner.SetOnInvite(func(session *internal_core.Session, _ string, callAddress internal_core.CallAddress) error {
+		return fn(wrapSession(session), callAddress.FromURI, callAddress.ToURI)
 	})
 }
 
@@ -162,11 +164,12 @@ func (s *Server) SetOnInviteIdentity(fn func(session *Session, identity SIPReque
 		s.inner.SetOnInvite(nil)
 		return
 	}
-	s.inner.SetOnInvite(func(session *internal_core.Session, requestURI, fromIdentity, toIdentity string) error {
+	s.inner.SetOnInvite(func(session *internal_core.Session, requestURI string, callAddress internal_core.CallAddress) error {
 		return fn(wrapSession(session), SIPRequestIdentity{
 			RequestURI:   requestURI,
-			FromIdentity: fromIdentity,
-			ToIdentity:   toIdentity,
+			CallAddress:  callAddress,
+			FromIdentity: callAddress.FromURI,
+			ToIdentity:   callAddress.ToURI,
 		})
 	})
 }

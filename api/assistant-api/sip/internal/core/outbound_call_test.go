@@ -56,11 +56,11 @@ func TestOutboundCallInviteHandlerUsesAuthoritativeRequestIdentity(t *testing.T)
 		},
 	}
 
-	server.SetOnInvite(func(callbackSession *Session, requestURI, fromIdentity, toIdentity string) error {
+	server.SetOnInvite(func(callbackSession *Session, requestURI string, callAddress CallAddress) error {
 		assert.Same(t, session, callbackSession)
 		assert.Equal(t, inviteRequest.Recipient.String(), requestURI)
-		assert.Equal(t, "assistant-line", fromIdentity)
-		assert.Equal(t, "customer-alias", toIdentity)
+		assert.Equal(t, "assistant-line", callAddress.From)
+		assert.Equal(t, "customer-alias", callAddress.To)
 		return nil
 	})
 	outboundCall := NewOutbound(server, session, dialog, nil, request)
@@ -74,7 +74,7 @@ func TestOutboundCallInviteHandlerUsesAuthoritativeRequestIdentity(t *testing.T)
 
 func TestOutboundCallInviteHandlerRejectsMissingInviteRequest(t *testing.T) {
 	server := &Server{logger: bridgeTestLogger()}
-	server.SetOnInvite(func(_ *Session, _, _, _ string) error {
+	server.SetOnInvite(func(_ *Session, _ string, _ CallAddress) error {
 		t.Fatal("onInvite must not run without the outbound INVITE request")
 		return nil
 	})

@@ -18,11 +18,10 @@ import (
 )
 
 type inboundInviteIdentity struct {
-	callID       string
-	fromTag      string
-	requestURI   string
-	fromIdentity string
-	toIdentity   string
+	callID      string
+	fromTag     string
+	requestURI  string
+	callAddress CallAddress
 }
 
 // Inbound owns the lifecycle for a single inbound SIP INVITE.
@@ -66,13 +65,13 @@ func inboundInviteIdentityFromRequest(request *sip.Request) (inboundInviteIdenti
 	if !ok || fromTag == "" {
 		return inboundInviteIdentity{}, false
 	}
+	callAddress := NewCallAddress(request)
 
 	return inboundInviteIdentity{
-		callID:       request.CallID().Value(),
-		fromTag:      fromTag,
-		requestURI:   request.Recipient.String(),
-		fromIdentity: request.From().Address.String(),
-		toIdentity:   request.To().Address.String(),
+		callID:      request.CallID().Value(),
+		fromTag:     fromTag,
+		requestURI:  request.Recipient.String(),
+		callAddress: callAddress,
 	}, true
 }
 
@@ -328,8 +327,7 @@ func (inboundCall *Inbound) callInboundApplicationReadyHandler() error {
 	return applicationReadyHandler(
 		inboundCall.session,
 		inboundCall.identity.requestURI,
-		inboundCall.identity.fromIdentity,
-		inboundCall.identity.toIdentity,
+		inboundCall.identity.callAddress,
 	)
 }
 
@@ -438,8 +436,7 @@ func (inboundCall *Inbound) callInboundInviteHandler() error {
 	return inviteHandler(
 		inboundCall.session,
 		inboundCall.identity.requestURI,
-		inboundCall.identity.fromIdentity,
-		inboundCall.identity.toIdentity,
+		inboundCall.identity.callAddress,
 	)
 }
 
