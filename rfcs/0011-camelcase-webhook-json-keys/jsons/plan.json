@@ -1,0 +1,174 @@
+{
+  "role": "task-planner",
+  "template": ".codex/orchestrator/templates/task-plan.md",
+  "rfc": "rfcs/0011-camelcase-webhook-json-keys.md",
+  "status": "planned",
+  "objective": "Change only Rapida-owned Assistant API webhook JSON payload field names from snake_case to lowerCamelCase before first release.",
+  "context": {
+    "task": "Investigate a pre-release webhook contract change that converts Rapida-owned Assistant API webhook JSON payload keys to lowerCamelCase without changing event names, enum values, configuration option keys, REST contracts, database schema, or unrelated provider payloads.",
+    "verified_current_behavior": [
+      "The public Assistant API webhook payload structs live in api/assistant-api/internal/observability/webhook.go, and snake_case JSON tags remain on call, conversation, and WebRTC payload fields such as call_id, context_id, duration_ms, disconnect_reason, message_count, session_id, media_session_id, ice_latency_ms, peer_connection_state, restart_attempt, and restart_limit.",
+      "The webhook collector in api/assistant-api/internal/observability/collectors/webhook/collector.go sends the typed payload directly under the top-level data field and does not rename payload keys, so changing JSON tags in webhook.go is the authoritative contract change point.",
+      "Call, conversation, and WebRTC producers construct typed payloads with Go field names like CallID, ContextID, DurationMs, DisconnectReason, SessionID, and MediaSessionID. Those producers do not depend on serialized JSON key spellings.",
+      "Focused serialization assertions currently live in api/assistant-api/internal/observability/webhook_test.go and api/assistant-api/internal/observability/collectors/webhook/collector_test.go. Additional package tests in api/talk, internal/adapters/internal, internal/channel/pipeline, internal/channel/telephony, internal/channel/webrtc, and sip/pipeline compile and pass against the shared payload types without asserting snake_case payload keys.",
+      "Baseline verification on the current tree passed: go test ./api/assistant-api/internal/observability, go test ./api/assistant-api/internal/observability/collectors/webhook, go test ./api/assistant-api/api/talk ./api/assistant-api/internal/channel/pipeline ./api/assistant-api/internal/channel/telephony ./api/assistant-api/sip/pipeline, and make agent-finalize CHANGED_FILES=\"api/assistant-api/internal/observability/webhook.go,api/assistant-api/internal/observability/webhook_test.go,api/assistant-api/internal/observability/collectors/webhook/collector_test.go\"."
+    ],
+    "problem": "The current webhook payload contract still emits snake_case field names from webhook.go. The requested pre-release contract change is to emit lowerCamelCase only for Rapida-owned Assistant API webhook payload fields while leaving every non-webhook or non-Rapida contract unchanged.",
+    "assumptions": [
+      "Because this is explicitly before first release, no compatibility alias, version bump, or dual-field bridge is required.",
+      "The change is limited to outgoing Assistant API webhook payload serialization. Internal observability attributes, metrics, request-log snapshots, webhook option keys, and telephony/provider callback payload formats stay unchanged.",
+      "The RFC author can copy this artifact into rfcs/0011-camelcase-webhook-json-keys/jsons/plan.json without additional schema transformation."
+    ],
+    "open_questions": [],
+    "field_mapping": [
+      "call_id -> callId",
+      "context_id -> contextId",
+      "duration_ms -> durationMs",
+      "disconnect_reason -> disconnectReason",
+      "message_count -> messageCount",
+      "session_id -> sessionId",
+      "media_session_id -> mediaSessionId",
+      "ice_latency_ms -> iceLatencyMs",
+      "peer_connection_state -> peerConnectionState",
+      "restart_attempt -> restartAttempt",
+      "restart_limit -> restartLimit"
+    ]
+  },
+  "acceptance": {
+    "criteria": [
+      "Every Rapida-owned Assistant API webhook payload field defined in api/assistant-api/internal/observability/webhook.go uses lowerCamelCase JSON tags instead of snake_case for outbound serialization.",
+      "Webhook event names, enum string values, payload version, payload shape ownership, configuration option keys, REST contracts, database schema, and unrelated provider payloads remain unchanged.",
+      "The webhook collector continues to wrap the typed payload under top-level assistant, conversation, data, and event fields without introducing top-level context_id/contextId or any custom remapping layer.",
+      "Focused serialization tests assert the new lowerCamelCase field names and prove the old snake_case keys are absent from serialized webhook payload JSON.",
+      "Focused collector tests assert that emitted webhook request bodies carry lowerCamelCase keys inside data and continue omitting the observability context identifier from the top-level envelope.",
+      "Targeted tests and make agent-finalize pass for the final changed-file list."
+    ],
+    "non_goals": [
+      "Do not change webhook event names such as call.ringing or call.failed.",
+      "Do not change enum values such as in_progress, provider_failed, or remote_hangup.",
+      "Do not change webhook configuration option keys such as http_url, http_headers, max_retry_count, retry_status_codes, or timeout_seconds.",
+      "Do not change REST request or response payloads, OpenAPI files, protobuf contracts, or database schema.",
+      "Do not change telephony provider callback payload parsing, provider-specific request bodies, SIP payload types, or other non-webhook snake_case JSON contracts.",
+      "Do not add a v2 webhook payload, a feature flag, a compatibility alias, a translation helper, or a custom marshaler."
+    ]
+  },
+  "rfc_metadata": {
+    "reserved_path": "rfcs/0011-camelcase-webhook-json-keys.md",
+    "json_artifact_directory": "rfcs/0011-camelcase-webhook-json-keys/jsons/",
+    "plan_artifact": "rfcs/0011-camelcase-webhook-json-keys/jsons/plan.json",
+    "challenge_receipt": "rfcs/0011-camelcase-webhook-json-keys/jsons/challenge.json",
+    "rfc_author": "pending coordinator assignment",
+    "exact_reviewed_sha256": "pending",
+    "confirmation_gate_receipt": "pending"
+  },
+  "scope_and_ownership": {
+    "owned_paths": [
+      {
+        "path": "api/assistant-api/internal/observability/webhook.go",
+        "owner": "Assistant API webhook contract owner",
+        "responsibility": "Authoritative webhook payload type definitions and JSON field tags."
+      },
+      {
+        "path": "api/assistant-api/internal/observability/webhook_test.go",
+        "owner": "Assistant API webhook contract owner",
+        "responsibility": "Focused payload serialization assertions for call, conversation, and WebRTC webhook structs."
+      },
+      {
+        "path": "api/assistant-api/internal/observability/collectors/webhook/collector_test.go",
+        "owner": "Assistant API webhook collector owner",
+        "responsibility": "End-to-end collector request-body assertions for serialized webhook payload JSON."
+      }
+    ],
+    "allowed_paths": [
+      "api/assistant-api/internal/observability/webhook.go",
+      "api/assistant-api/internal/observability/webhook_test.go",
+      "api/assistant-api/internal/observability/collectors/webhook/collector_test.go",
+      "rfcs/0011-camelcase-webhook-json-keys/",
+      "rfcs/0011-camelcase-webhook-json-keys.md"
+    ],
+    "out_of_scope_paths": [
+      "api/assistant-api/internal/observability/collectors/webhook/collector.go",
+      "api/assistant-api/api/talk/callback.go",
+      "api/assistant-api/internal/channel/pipeline/",
+      "api/assistant-api/internal/channel/telephony/reporter.go",
+      "api/assistant-api/sip/pipeline/",
+      "api/assistant-api/internal/channel/telephony/internal/**",
+      "api/assistant-api/sip/internal/**",
+      "openapi/**",
+      "protos/**",
+      "ui/**",
+      "database migrations and entity schemas"
+    ]
+  },
+  "principle_decisions": {
+    "kiss_smallest_complete_solution": "Change JSON tags only in api/assistant-api/internal/observability/webhook.go and update the two focused serialization/collector test files. The collector already serializes the typed payload directly, so no helper, adapter, or producer rewrite is needed.",
+    "yagni_rejected_alternatives": [
+      "Rejected a custom map-rekeying layer in the collector because webhook.go already owns the public payload contract.",
+      "Rejected adding parallel snake_case and lowerCamelCase fields because the task explicitly targets a pre-release contract change.",
+      "Rejected broad search-and-replace across api/assistant-api because many snake_case tags belong to provider payloads, REST contracts, request-log snapshots, and internal transport/config types that must not change."
+    ],
+    "single_source_of_truth": "The JSON tags on the typed webhook payload structs in webhook.go remain the single source of truth for public webhook field names.",
+    "explicit_contracts_and_compatibility": "Only webhook field names change. Event names, enum values, top-level assistant/conversation/data/event envelope fields, version string, and omitempty behavior stay as-is.",
+    "failure_safety_and_cleanup": "Focused tests must assert both the presence of new lowerCamelCase keys and the absence of the old snake_case keys so regressions fail loudly.",
+    "security_and_least_privilege": "No new data is exposed. The change is naming-only within already emitted webhook payloads.",
+    "observability": "Internal observability attributes and metrics keep their existing snake_case/internal key conventions because they are not part of the outbound webhook contract.",
+    "rollback_disablement_or_migration": "Revert the JSON tag changes and corresponding test expectations in one change. No data or schema rollback is required."
+  },
+  "implementation_plan": [
+    "Edit api/assistant-api/internal/observability/webhook.go and convert only the webhook payload JSON tags listed in the field mapping from snake_case to lowerCamelCase.",
+    "Update api/assistant-api/internal/observability/webhook_test.go to assert lowerCamelCase keys like disconnectReason, messageCount, sessionId, mediaSessionId, iceLatencyMs, peerConnectionState, restartAttempt, and restartLimit, and to assert the old snake_case keys are absent.",
+    "Update api/assistant-api/internal/observability/collectors/webhook/collector_test.go so the serialized data payload assertion expects callId instead of call_id while keeping all envelope and context omission expectations unchanged.",
+    "Run the targeted package tests plus make agent-finalize using the final changed-file list."
+  ],
+  "risks": [
+    "Webhook consumers that already read snake_case field names will break if they are not ready for the pre-release lowerCamelCase contract.",
+    "A partial tag update could leave some payload families mixed between snake_case and lowerCamelCase if tests do not cover every affected struct family.",
+    "A broad edit outside webhook.go could accidentally change provider payloads, webhook option keys, or other snake_case contracts that the task explicitly protects.",
+    "If conversation or WebRTC payloads are intentionally excluded by product decision, converting all webhook.go payloads would widen scope beyond the intended release slice."
+  ],
+  "verification": {
+    "required_test_categories": [
+      "Webhook payload serialization tests for call, conversation, and WebRTC payload structs in api/assistant-api/internal/observability.",
+      "Webhook collector request-body assertions in api/assistant-api/internal/observability/collectors/webhook.",
+      "Compilation and package-level regression coverage for payload producers in api/talk, internal/adapters/internal, internal/channel/pipeline, internal/channel/telephony, internal/channel/webrtc, and sip/pipeline."
+    ],
+    "exact_commands": [
+      "go test ./api/assistant-api/internal/observability",
+      "go test ./api/assistant-api/internal/observability/collectors/webhook",
+      "go test ./api/assistant-api/api/talk ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/channel/pipeline ./api/assistant-api/internal/channel/telephony ./api/assistant-api/internal/channel/webrtc/... ./api/assistant-api/sip/pipeline",
+      "make agent-finalize CHANGED_FILES=\"api/assistant-api/internal/observability/webhook.go,api/assistant-api/internal/observability/webhook_test.go,api/assistant-api/internal/observability/collectors/webhook/collector_test.go\""
+    ],
+    "baseline_results": [
+      {
+        "cmd": "go test ./api/assistant-api/internal/observability",
+        "exit_code": 0
+      },
+      {
+        "cmd": "go test ./api/assistant-api/internal/observability/collectors/webhook",
+        "exit_code": 0
+      },
+      {
+        "cmd": "go test ./api/assistant-api/api/talk ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/channel/pipeline ./api/assistant-api/internal/channel/telephony ./api/assistant-api/internal/channel/webrtc/... ./api/assistant-api/sip/pipeline",
+        "exit_code": 0,
+        "notes": "The linker emitted duplicate rpath and duplicate onnxruntime library warnings during test binary linking, but all listed packages passed."
+      },
+      {
+        "cmd": "make agent-finalize CHANGED_FILES=\"api/assistant-api/internal/observability/webhook.go,api/assistant-api/internal/observability/webhook_test.go,api/assistant-api/internal/observability/collectors/webhook/collector_test.go\"",
+        "exit_code": 0,
+        "notes": "The hook reported the expected backend code/test file pairing and ran the required observability package tests successfully."
+      }
+    ]
+  },
+  "discussion": {
+    "planner": "Verified the payload contract definition, collector serialization path, affected test coverage, baseline package tests, and prospective finalize command without editing repository files.",
+    "challenger": "pending",
+    "blocking_concerns": [
+      "None."
+    ],
+    "resolutions": [
+      "Scope includes all Rapida-owned webhook payload structs in webhook.go. Verification now explicitly covers conversation producers in internal/adapters/internal and WebRTC producers in internal/channel/webrtc."
+    ],
+    "decision": "pending",
+    "approved_by": ""
+  }
+}

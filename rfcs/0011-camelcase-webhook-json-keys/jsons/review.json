@@ -1,0 +1,11 @@
+{
+  "status": "approved",
+  "decision": "approved",
+  "run_id": "run_987eb743b44b",
+  "task_id": "task_fc4e584d9b68",
+  "dispatch_id": "ctx_846c464087a1",
+  "reviewer": "Codex code reviewer",
+  "reviewed_at": "2026-08-24T18:51:44Z",
+  "findings": [],
+  "summary": "No critical or major findings. The production change is limited to Rapida-owned webhook JSON tags, with event names, enum values, configuration keys, REST/OpenAPI contracts, database schema, and provider payloads unchanged."
+}

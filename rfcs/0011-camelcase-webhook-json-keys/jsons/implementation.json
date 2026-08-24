@@ -1,0 +1,16 @@
+{
+  "status": "completed",
+  "run_id": "run_987eb743b44b",
+  "task_id": "task_8381e7f2e3bd",
+  "dispatch_id": "ctx_078cd5f3e520",
+  "implementer": "Codex implementation worker",
+  "completed_at": "2026-08-24T18:43:23Z",
+  "rfc_file": "rfcs/0011-camelcase-webhook-json-keys.md",
+  "rfc_sha256": "00af7a934e7ff6cbc6e64b4c886c3390fca9bea691006094f6e0f9303a797206",
+  "changed_files": [
+    "api/assistant-api/internal/observability/webhook.go",
+    "api/assistant-api/internal/observability/webhook_test.go",
+    "api/assistant-api/internal/observability/collectors/webhook/collector_test.go"
+  ],
+  "summary": "Changed only Rapida-owned webhook payload JSON tags from snake_case to lowerCamelCase and updated focused tests to require the new keys and reject the old keys."
+}

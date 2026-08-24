@@ -1,0 +1,12 @@
+{
+  "status": "revise",
+  "reviewed_at": "2026-08-24",
+  "reviewer": "independent plan challenger",
+  "rfc_file": "rfcs/0011-camelcase-webhook-json-keys.md",
+  "rfc_sha256": "00af7a934e7ff6cbc6e64b4c886c3390fca9bea691006094f6e0f9303a797206",
+  "decision": "revise",
+  "findings": [
+    "The widened producer verification command was present, but the plan baseline evidence still recorded the older narrower command."
+  ],
+  "resolution": "The widened command was run successfully and the baseline evidence was updated to match the declared verification command."
+}

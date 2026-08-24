@@ -1,0 +1,11 @@
+{
+  "status": "revise",
+  "reviewed_at": "2026-08-24",
+  "reviewer": "independent plan challenger",
+  "rfc_file": "rfcs/0011-camelcase-webhook-json-keys.md",
+  "decision": "revise",
+  "findings": [
+    "The RFC covered call, conversation, and WebRTC webhook payloads, but the producer regression command omitted the conversation producers in api/assistant-api/internal/adapters/internal and WebRTC producers in api/assistant-api/internal/channel/webrtc."
+  ],
+  "resolution": "Expand verification only to include the omitted producer packages. Production write scope remains unchanged."
+}
