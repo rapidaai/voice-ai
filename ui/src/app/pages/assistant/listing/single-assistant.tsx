@@ -9,7 +9,6 @@ import { RecordStatusIndicator } from '@/app/components/carbon/record-status-ind
 import { IconOnlyButton } from '@/app/components/carbon/button';
 import { CopyButton } from '@/app/components/carbon/button/copy-button';
 import { VersionIndicator } from '@/app/components/indicators/version';
-import { auditActorLabel, createdAuditActor } from '@/utils/audit-actor';
 
 const SingleAssistant: FC<{ assistant: Assistant }> = ({ assistant }) => {
   const gn = useGlobalNavigation();
@@ -18,7 +17,6 @@ const SingleAssistant: FC<{ assistant: Assistant }> = ({ assistant }) => {
   const tags = assistant.getAssistanttag()?.getTagList() ?? [];
   const visibleTags = tags.slice(0, 2);
   const overflowTagCount = Math.max(tags.length - visibleTags.length, 0);
-  const owner = auditActorLabel(createdAuditActor(assistant));
   const hasDeployment = hasAssistantDeployment(assistant);
 
   return (
@@ -144,10 +142,6 @@ const SingleAssistant: FC<{ assistant: Assistant }> = ({ assistant }) => {
         {assistant.getUpdateddate()
           ? toHumanReadableDateTime(assistant.getUpdateddate()!)
           : '-'}
-      </TableCell>
-
-      <TableCell className="text-sm">
-        <span className="capitalize">{owner || '-'}</span>
       </TableCell>
     </TableRow>
   );

@@ -51,7 +51,6 @@ const assistantColumnClassName: Record<string, string> = {
   actions: 'w-28 min-w-28 whitespace-nowrap',
   tags: 'min-w-40 whitespace-nowrap',
   updated: 'min-w-36 whitespace-nowrap',
-  owner: 'min-w-32 whitespace-nowrap',
 };
 
 const assistantColumns = [
@@ -64,7 +63,6 @@ const assistantColumns = [
   { name: 'Actions', key: 'actions' },
   { name: 'Tags', key: 'tags' },
   { name: 'Updated', key: 'updated' },
-  { name: 'Owner', key: 'owner' },
 ];
 
 const assistantSkeletonCellWidth: Record<string, string> = {
@@ -77,7 +75,6 @@ const assistantSkeletonCellWidth: Record<string, string> = {
   actions: '96px',
   tags: '116px',
   updated: '128px',
-  owner: '84px',
 };
 
 const formatQuerySearchValue = (key: string, value: string): string =>
@@ -182,7 +179,7 @@ export function AssistantPage() {
         />
       ) : assistantAction.assistants &&
         assistantAction.assistants.length > 0 ? (
-        <div className="overflow-auto flex-1">
+        <div className="no-scrollbar overflow-auto flex-1">
           <Table>
             <TableHead>
               <TableRow>
@@ -266,7 +263,10 @@ function AssistantTableSkeleton({ rowCount }: { rowCount: number }) {
   const rows = Array.from({ length: rowCount }, (_, index) => index);
 
   return (
-    <div className="overflow-auto flex-1" aria-label="Loading assistants">
+    <div
+      className="no-scrollbar overflow-auto flex-1"
+      aria-label="Loading assistants"
+    >
       <Table>
         <TableHead>
           <TableRow>

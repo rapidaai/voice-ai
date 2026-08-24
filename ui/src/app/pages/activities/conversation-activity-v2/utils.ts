@@ -11,6 +11,7 @@ import type {
   ObservabilityMetricRecord,
   ObservabilityRecord,
 } from '@rapidaai/react';
+import { toHumanReadableDateTimeFromDate } from '@/utils/date';
 
 const MIN_VISIBLE_WIDTH_PCT = 0.75;
 
@@ -985,7 +986,7 @@ export const formatTime = (value: string): string => {
 export const formatDateTime = (value: string | number): string => {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return String(value);
-  return date.toUTCString();
+  return toHumanReadableDateTimeFromDate(date);
 };
 
 export const sampleTimelineDocuments: TimelineDocument[] = [
