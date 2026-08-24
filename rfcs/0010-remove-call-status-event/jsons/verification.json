@@ -1,0 +1,26 @@
+{
+  "status": "passed",
+  "verified_at": "2026-08-24",
+  "scope": "Review correction for serialized call webhook lifecycle assertions.",
+  "commands": [
+    {
+      "command": "go test ./api/assistant-api/api/talk ./api/assistant-api/internal/channel/pipeline ./api/assistant-api/internal/channel/telephony",
+      "exit_code": 0,
+      "result": "passed"
+    },
+    {
+      "command": "make agent-finalize CHANGED_FILES=\"api/assistant-api/api/talk/callback_webhook_test.go,api/assistant-api/internal/channel/pipeline/webhook_test.go,api/assistant-api/internal/channel/telephony/reporter_test.go\"",
+      "exit_code": 0,
+      "result": "passed"
+    }
+  ],
+  "coverage": [
+    "Callback failed webhook serializes status=failed and omits status_event.",
+    "Outbound dispatched webhook serializes status=in_progress and omits status_event.",
+    "Provider reporter ringing webhook serializes status=ringing and omits status_event."
+  ],
+  "notes": [
+    "The talk package emitted existing duplicate native linker path warnings.",
+    "No test or finalization failures occurred."
+  ]
+}

@@ -38,6 +38,9 @@ func TestPipelineCallWebhookLifecycleFields(t *testing.T) {
 	if err := json.Unmarshal(serialized, &fields); err != nil {
 		t.Fatalf("Unmarshal() error = %v", err)
 	}
+	if fields["status"] != observability.WebhookCallStatusInProgress.String() {
+		t.Fatalf("status = %v, want %q", fields["status"], observability.WebhookCallStatusInProgress)
+	}
 	if _, exists := fields["status_event"]; exists {
 		t.Fatalf("outbound dispatched webhook should not include status_event: %+v", fields)
 	}
