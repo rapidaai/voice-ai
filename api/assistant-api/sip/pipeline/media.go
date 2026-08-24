@@ -269,7 +269,7 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 							ContextID:        contextID,
 							DurationMs:       fmt.Sprintf("%d", durationMs),
 							Status:           observability.WebhookCallStatusFailed,
-							DisconnectReason: observability.WebhookCallDisconnectReasonMediaFailed,
+							DisconnectReason: observability.WebhookCallDisconnectReasonInternalError,
 						},
 					},
 					observability.RecordMetric{

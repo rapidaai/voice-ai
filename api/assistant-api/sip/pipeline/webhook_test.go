@@ -15,11 +15,19 @@ import (
 func TestSIPWebhookLifecycleFields(t *testing.T) {
 	t.Parallel()
 
-	payload := observability.CallEndedWebhookPayload{
+	endedPayload := observability.CallEndedWebhookPayload{
 		Status:           observability.WebhookCallStatusCompleted,
 		DisconnectReason: observability.WebhookCallDisconnectReasonAssistantEnded,
 	}
-	if payload.Status != observability.WebhookCallStatusCompleted || payload.DisconnectReason != observability.WebhookCallDisconnectReasonAssistantEnded {
-		t.Fatalf("unexpected SIP lifecycle fields: %+v", payload)
+	if endedPayload.Status != observability.WebhookCallStatusCompleted || endedPayload.DisconnectReason != observability.WebhookCallDisconnectReasonAssistantEnded {
+		t.Fatalf("unexpected SIP ended lifecycle fields: %+v", endedPayload)
+	}
+
+	failedPayload := observability.CallFailedWebhookPayload{
+		Status:           observability.WebhookCallStatusFailed,
+		DisconnectReason: observability.WebhookCallDisconnectReasonInternalError,
+	}
+	if failedPayload.Status != observability.WebhookCallStatusFailed || failedPayload.DisconnectReason != observability.WebhookCallDisconnectReasonInternalError {
+		t.Fatalf("unexpected SIP failed lifecycle fields: %+v", failedPayload)
 	}
 }
