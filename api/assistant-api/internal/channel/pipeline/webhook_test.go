@@ -15,16 +15,16 @@ import (
 func TestPipelineCallWebhookLifecycleFields(t *testing.T) {
 	t.Parallel()
 
-	started := observability.CallStartedWebhookPayload{Status: observability.MetricCallStatusInProgress}
-	if started.Status != observability.MetricCallStatusInProgress {
+	started := observability.CallStartedWebhookPayload{Status: observability.WebhookCallStatusInProgress}
+	if started.Status != observability.WebhookCallStatusInProgress {
 		t.Fatalf("started status = %q", started.Status)
 	}
 
 	ended := observability.CallEndedWebhookPayload{
-		Status:           observability.MetricCallStatusComplete,
-		DisconnectReason: "remote_hangup",
+		Status:           observability.WebhookCallStatusCompleted,
+		DisconnectReason: observability.WebhookCallDisconnectReasonRemoteHangup,
 	}
-	if ended.Status != observability.MetricCallStatusComplete || ended.DisconnectReason != "remote_hangup" {
+	if ended.Status != observability.WebhookCallStatusCompleted || ended.DisconnectReason != observability.WebhookCallDisconnectReasonRemoteHangup {
 		t.Fatalf("unexpected ended lifecycle fields: %+v", ended)
 	}
 }

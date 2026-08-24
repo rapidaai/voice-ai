@@ -19,15 +19,16 @@ func TestAssistantWebhookPayloadLifecycleFields(t *testing.T) {
 		payload          V1WebhookPayload
 		status           string
 		disconnectReason string
+		omitReason       bool
 	}{
-		{name: "call received", payload: CallReceivedWebhookPayload{V1WebhookPayloadBase: NewV1WebhookPayload(nil), Status: MetricCallStatusInProgress}, status: MetricCallStatusInProgress},
-		{name: "call ringing", payload: CallRingingWebhookPayload{V1WebhookPayloadBase: NewV1WebhookPayload(nil), Status: MetricCallStatusRinging}, status: MetricCallStatusRinging},
-		{name: "call provider answered", payload: CallProviderAnsweredWebhookPayload{V1WebhookPayloadBase: NewV1WebhookPayload(nil), Status: MetricCallStatusInProgress}, status: MetricCallStatusInProgress},
-		{name: "call outbound requested", payload: CallOutboundRequestedWebhookPayload{V1WebhookPayloadBase: NewV1WebhookPayload(nil), Status: MetricCallStatusInProgress}, status: MetricCallStatusInProgress},
-		{name: "call outbound dispatched", payload: CallOutboundDispatchedWebhookPayload{V1WebhookPayloadBase: NewV1WebhookPayload(nil), Status: MetricCallStatusInProgress}, status: MetricCallStatusInProgress},
-		{name: "call started", payload: CallStartedWebhookPayload{V1WebhookPayloadBase: NewV1WebhookPayload(nil), Status: MetricCallStatusInProgress}, status: MetricCallStatusInProgress},
-		{name: "call ended", payload: CallEndedWebhookPayload{V1WebhookPayloadBase: NewV1WebhookPayload(nil), Status: MetricCallStatusComplete, DisconnectReason: "remote_hangup"}, status: MetricCallStatusComplete, disconnectReason: "remote_hangup"},
-		{name: "call failed", payload: CallFailedWebhookPayload{V1WebhookPayloadBase: NewV1WebhookPayload(nil), Status: MetricCallStatusFailed, DisconnectReason: "no_answer"}, status: MetricCallStatusFailed, disconnectReason: "no_answer"},
+		{name: "call received", payload: CallReceivedWebhookPayload{V1WebhookPayloadBase: NewV1WebhookPayload(nil), Direction: WebhookCallDirectionInbound, Status: WebhookCallStatusInProgress}, status: WebhookCallStatusInProgress.String(), omitReason: true},
+		{name: "call ringing", payload: CallRingingWebhookPayload{V1WebhookPayloadBase: NewV1WebhookPayload(nil), Direction: WebhookCallDirectionOutbound, Status: WebhookCallStatusRinging}, status: WebhookCallStatusRinging.String(), omitReason: true},
+		{name: "call provider answered", payload: CallProviderAnsweredWebhookPayload{V1WebhookPayloadBase: NewV1WebhookPayload(nil), Direction: WebhookCallDirectionInbound, Status: WebhookCallStatusInProgress}, status: WebhookCallStatusInProgress.String(), omitReason: true},
+		{name: "call outbound requested", payload: CallOutboundRequestedWebhookPayload{V1WebhookPayloadBase: NewV1WebhookPayload(nil), Direction: WebhookCallDirectionOutbound, Status: WebhookCallStatusPending}, status: WebhookCallStatusPending.String(), omitReason: true},
+		{name: "call outbound dispatched", payload: CallOutboundDispatchedWebhookPayload{V1WebhookPayloadBase: NewV1WebhookPayload(nil), Direction: WebhookCallDirectionOutbound, Status: WebhookCallStatusInProgress}, status: WebhookCallStatusInProgress.String(), omitReason: true},
+		{name: "call started", payload: CallStartedWebhookPayload{V1WebhookPayloadBase: NewV1WebhookPayload(nil), Direction: WebhookCallDirectionInbound, Status: WebhookCallStatusInProgress}, status: WebhookCallStatusInProgress.String(), omitReason: true},
+		{name: "call ended", payload: CallEndedWebhookPayload{V1WebhookPayloadBase: NewV1WebhookPayload(nil), Direction: WebhookCallDirectionInbound, Status: WebhookCallStatusCompleted, DisconnectReason: WebhookCallDisconnectReasonRemoteHangup}, status: WebhookCallStatusCompleted.String(), disconnectReason: WebhookCallDisconnectReasonRemoteHangup.String(), omitReason: true},
+		{name: "call failed", payload: CallFailedWebhookPayload{V1WebhookPayloadBase: NewV1WebhookPayload(nil), Direction: WebhookCallDirectionOutbound, Status: WebhookCallStatusFailed, DisconnectReason: WebhookCallDisconnectReasonNoAnswer}, status: WebhookCallStatusFailed.String(), disconnectReason: WebhookCallDisconnectReasonNoAnswer.String(), omitReason: true},
 		{name: "conversation begin", payload: ConversationBeginWebhookPayload{V1WebhookPayloadBase: NewV1WebhookPayload(nil), Status: "in_progress"}, status: "in_progress"},
 		{name: "conversation resume", payload: ConversationResumeWebhookPayload{V1WebhookPayloadBase: NewV1WebhookPayload(nil), Status: "in_progress"}, status: "in_progress"},
 		{name: "conversation completed", payload: ConversationCompletedWebhookPayload{V1WebhookPayloadBase: NewV1WebhookPayload(nil), Status: "complete", DisconnectReason: "USER"}, status: "complete", disconnectReason: "USER"},
@@ -50,6 +51,9 @@ func TestAssistantWebhookPayloadLifecycleFields(t *testing.T) {
 			if payload["status"] != testCase.status {
 				t.Fatalf("status = %v, want %q", payload["status"], testCase.status)
 			}
+			if _, exists := payload["reason"]; testCase.omitReason && exists {
+				t.Fatalf("reason should be omitted: %+v", payload)
+			}
 			if testCase.disconnectReason == "" {
 				if _, exists := payload["disconnect_reason"]; exists {
 					t.Fatalf("disconnect_reason should be omitted: %+v", payload)
@@ -60,5 +64,19 @@ func TestAssistantWebhookPayloadLifecycleFields(t *testing.T) {
 				t.Fatalf("disconnect_reason = %v, want %q", payload["disconnect_reason"], testCase.disconnectReason)
 			}
 		})
+	}
+}
+
+func TestWebhookCallEnums(t *testing.T) {
+	t.Parallel()
+
+	if WebhookCallStatusCompleted.String() != "completed" {
+		t.Fatalf("completed status = %q", WebhookCallStatusCompleted)
+	}
+	if WebhookCallDirectionOutbound.String() != "outbound" {
+		t.Fatalf("outbound direction = %q", WebhookCallDirectionOutbound)
+	}
+	if WebhookCallDisconnectReasonProviderFailed.String() != "provider_failed" {
+		t.Fatalf("provider failure reason = %q", WebhookCallDisconnectReasonProviderFailed)
 	}
 }

@@ -16,10 +16,10 @@ func TestSIPWebhookLifecycleFields(t *testing.T) {
 	t.Parallel()
 
 	payload := observability.CallEndedWebhookPayload{
-		Status:           observability.MetricCallStatusComplete,
-		DisconnectReason: "normal_clearing",
+		Status:           observability.WebhookCallStatusCompleted,
+		DisconnectReason: observability.WebhookCallDisconnectReasonAssistantEnded,
 	}
-	if payload.Status != observability.MetricCallStatusComplete || payload.DisconnectReason != "normal_clearing" {
+	if payload.Status != observability.WebhookCallStatusCompleted || payload.DisconnectReason != observability.WebhookCallDisconnectReasonAssistantEnded {
 		t.Fatalf("unexpected SIP lifecycle fields: %+v", payload)
 	}
 }
