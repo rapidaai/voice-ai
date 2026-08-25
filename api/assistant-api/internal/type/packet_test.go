@@ -54,3 +54,10 @@ func TestObservabilityMetricRecordPacket_IsAsync(t *testing.T) {
 		t.Fatal("expected ObservabilityMetricRecordPacket IsAsync to return true")
 	}
 }
+
+func TestSpeechToTextAudioPacket_IsSynchronous(t *testing.T) {
+	var packet any = SpeechToTextAudioPacket{}
+	if _, ok := packet.(AsyncPacket); ok {
+		t.Fatal("expected SpeechToTextAudioPacket to preserve ingress ordering")
+	}
+}

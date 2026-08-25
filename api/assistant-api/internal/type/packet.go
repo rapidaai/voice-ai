@@ -235,7 +235,6 @@ type SpeechToTextAudioPacket struct {
 func (f SpeechToTextAudioPacket) ContextId() string      { return f.ContextID }
 func (f SpeechToTextAudioPacket) PacketName() PacketName { return PacketNameSpeechToTextAudio }
 func (f SpeechToTextAudioPacket) Content() []byte        { return f.Audio }
-func (f SpeechToTextAudioPacket) IsAsync() bool          { return true }
 
 // DenoiseAudioPacket carries raw user audio to be denoised before entering the pipeline.
 type DenoiseAudioPacket struct {
