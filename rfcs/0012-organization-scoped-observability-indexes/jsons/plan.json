@@ -2,113 +2,44 @@
   "rfc": "rfcs/0012-organization-scoped-observability-indexes.md",
   "artifact": "rfcs/0012-organization-scoped-observability-indexes/jsons/plan.json",
   "status": "draft",
-  "decision": "pending",
+  "decision": "pending_independent_challenge",
   "created_at": "2026-08-25",
   "updated_at": "2026-08-25",
-  "revision": 1,
-  "objective": "Route all OpenSearch observability records into organization-scoped UTC daily indexes so an external cron can archive complete indexes using organization-specific schedules.",
+  "objective": "Add organization ID to every daily OpenSearch observability index name, using global when organization ID is unavailable.",
   "classification": {
     "tier": "Governed",
-    "reason": "The index name is an operational contract with an external archive cron, and archival may lead to irreversible removal from active storage."
+    "reason": "The index name is an operational contract consumed by an external archival process."
   },
   "verified_current_behavior": [
-    "The timeline collector writes all record kinds to <prefix>-YYYYMMDD and stores organizationId inside each document.",
-    "The telemetry OpenSearch exporter writes logs, events, and metrics to <prefix>-<kind>-YYYYMMDD and stores OrganizationID inside each document.",
-    "The observability recorder resolves OrganizationID from project or organization authentication context when available.",
-    "Telemetry reads use rapida-logs-*, rapida-events-*, and rapida-metrics-* wildcard patterns that match both current and proposed layouts.",
-    "OpenSearch indexes are currently selected in bulk metadata and are not explicitly created by these writers."
-  ],
-  "assumptions": [
-    "The external cron, not assistant-api, owns index archival and any later source-index removal.",
-    "Retention may differ for each organization.",
-    "Daily UTC indexes provide the required archival granularity.",
-    "Records without organization context must remain writable for backward compatibility.",
-    "The external archive cron can repeatedly scan eligible dates and produce idempotent or versioned archive artifacts for late writes."
-  ],
-  "open_questions": [
-    {
-      "question": "Who owns confirmation that the external archive cron supports both old and new index layouts?",
-      "owner": "Operations owner"
-    },
-    {
-      "question": "What hard active-shard threshold has the OpenSearch operator approved?",
-      "owner": "OpenSearch operator"
-    },
-    {
-      "question": "What maximum event lateness and archive grace period has the archive cron owner approved?",
-      "owner": "Operations owner"
-    },
-    {
-      "question": "How long must the archive cron retain compatibility with old shared indexes?",
-      "owner": "Operations owner"
-    },
-    {
-      "question": "Which current record producers are legitimately allowed to emit with organization ID zero?",
-      "owner": "Observability maintainers"
-    }
+    "The timeline collector writes all supported record kinds to <prefix>-YYYYMMDD.",
+    "The telemetry OpenSearch exporter writes logs, events, and metrics to <prefix>-<kind>-YYYYMMDD.",
+    "Both writers already receive organization ID and preserve it in indexed documents.",
+    "Telemetry readers use wildcard patterns that match both current and proposed names.",
+    "Index creation occurs through existing bulk write behavior."
   ],
   "acceptance_criteria": [
-    "Timeline records use <prefix>-org-<organization-segment>-YYYYMMDD.",
-    "Telemetry logs use <prefix>-logs-org-<organization-segment>-YYYYMMDD.",
-    "Telemetry events use <prefix>-events-org-<organization-segment>-YYYYMMDD.",
-    "Telemetry metrics use <prefix>-metrics-org-<organization-segment>-YYYYMMDD.",
-    "A nonzero organization identifier is formatted as an unsigned base-10 integer.",
-    "A zero organization identifier is formatted as global and emits a warning without payload data.",
-    "The date comes from record occurrence time and is formatted in UTC.",
-    "Default and custom prefixes retain their current meaning.",
-    "Organization identifiers remain in indexed documents.",
-    "Existing wildcard telemetry reads include old and new names.",
-    "Application code does not own archive, close, delete, or restore operations.",
-    "Focused tests and repository finalization checks pass.",
-    "The archive cron owner confirms unambiguous mixed-layout compatibility before rollout.",
-    "Late eligible indexes are re-archived and verified before source removal.",
-    "Operational readiness records measured and projected shard counts, a hard threshold, maximum event lateness, and archive grace period.",
+    "Timeline uses <prefix>-<organization-segment>-YYYYMMDD.",
+    "Logs use <prefix>-logs-<organization-segment>-YYYYMMDD.",
+    "Events use <prefix>-events-<organization-segment>-YYYYMMDD.",
+    "Metrics use <prefix>-metrics-<organization-segment>-YYYYMMDD.",
+    "Nonzero organization IDs use unsigned base-10 formatting.",
+    "Organization ID zero uses global.",
+    "Dates remain based on occurrence time and formatted in UTC.",
+    "Custom prefixes remain supported.",
+    "Organization IDs remain present inside documents.",
+    "Existing wildcard reads cover old and new layouts.",
+    "No archive lifecycle behavior is added to the application.",
+    "Focused tests and make agent-finalize pass.",
     "No unresolved critical or major review findings remain."
   ],
   "non_goals": [
     "Implement or configure the archive cron.",
-    "Define organization retention periods.",
-    "Add OpenSearch Index State Management.",
-    "Create index templates or explicit index creation calls.",
-    "Rename, reindex, migrate, or delete existing indexes.",
-    "Change observability payload schemas, APIs, protobufs, or database schemas.",
-    "Change OpenSearch connector behavior."
-  ],
-  "scope_and_ownership": [
-    {
-      "path": "pkg/telemetry/opensearch_index.go",
-      "owner": "implementation owner",
-      "responsibility": "Single source of truth for organization-scoped UTC daily index names."
-    },
-    {
-      "path": "pkg/telemetry/opensearch_index_test.go",
-      "owner": "implementation owner",
-      "responsibility": "Index-name contract tests."
-    },
-    {
-      "path": "pkg/telemetry/providers/opensearch.go",
-      "owner": "implementation owner",
-      "responsibility": "Route log, event, and metric records using organization-scoped names."
-    },
-    {
-      "path": "pkg/telemetry/providers/opensearch_test.go",
-      "owner": "implementation owner",
-      "responsibility": "Verify exporter bulk metadata and document scope."
-    },
-    {
-      "path": "api/assistant-api/internal/observability/collectors/timeline/collector.go",
-      "owner": "implementation owner",
-      "responsibility": "Route all timeline record kinds using organization-scoped names."
-    },
-    {
-      "path": "api/assistant-api/internal/observability/collectors/timeline/collector_test.go",
-      "owner": "implementation owner",
-      "responsibility": "Verify timeline bulk metadata, fallback behavior, UTC dates, and document scope."
-    }
+    "Add retention configuration or OpenSearch lifecycle policies.",
+    "Explicitly create, archive, close, restore, or delete indexes.",
+    "Migrate or rename existing indexes.",
+    "Change document schemas, APIs, protobufs, databases, or connector behavior."
   ],
   "allowed_paths": [
-    "pkg/telemetry/opensearch_index.go",
-    "pkg/telemetry/opensearch_index_test.go",
     "pkg/telemetry/providers/opensearch.go",
     "pkg/telemetry/providers/opensearch_test.go",
     "api/assistant-api/internal/observability/collectors/timeline/collector.go",
@@ -119,87 +50,88 @@
   "out_of_scope_paths": [
     "pkg/connectors/",
     "api/assistant-api/api/observability/",
-    "OpenSearch deployment and cluster configuration",
-    "External archive cron source and deployment",
+    "OpenSearch cluster configuration",
+    "External archive cron",
     "Existing OpenSearch indexes"
   ],
+  "ownership": [
+    {
+      "paths": [
+        "pkg/telemetry/providers/opensearch.go",
+        "pkg/telemetry/providers/opensearch_test.go"
+      ],
+      "owner": "telemetry exporter implementation owner"
+    },
+    {
+      "paths": [
+        "api/assistant-api/internal/observability/collectors/timeline/collector.go",
+        "api/assistant-api/internal/observability/collectors/timeline/collector_test.go"
+      ],
+      "owner": "timeline collector implementation owner"
+    },
+    {
+      "paths": [
+        "rfcs/0012-organization-scoped-observability-indexes.md",
+        "rfcs/0012-organization-scoped-observability-indexes/jsons/"
+      ],
+      "owner": "RFC coordinator"
+    }
+  ],
   "design": {
-    "smallest_complete_solution": "Add one shared index-name function and use it in the two existing OpenSearch observability writers.",
-    "timeline_contract": "<prefix>-org-<organization-segment>-<UTC YYYYMMDD>",
-    "telemetry_contract": "<prefix>-<kind>-org-<organization-segment>-<UTC YYYYMMDD>",
-    "organization_segment": "Unsigned base-10 organization identifier, or global when OrganizationID is zero.",
-    "date_source": "Record occurrence timestamp, falling back to the current time when zero, always formatted in UTC. The cron repeatedly rescans eligible dates and re-archives indexes recreated by late writes.",
-    "index_creation": "Unchanged. Existing bulk indexing behavior selects or automatically creates the destination index.",
-    "read_compatibility": "Unchanged telemetry wildcard patterns continue to match old and new layouts."
+    "timeline_contract": "<prefix>-<organization-segment>-<UTC YYYYMMDD>",
+    "telemetry_contract": "<prefix>-<kind>-<organization-segment>-<UTC YYYYMMDD>",
+    "organization_segment": "Unsigned base-10 organization ID, or global when OrganizationID is zero.",
+    "date_source": "Existing record occurrence time behavior, with current UTC time used when occurrence time is zero.",
+    "implementation": "Change only the existing private index-name functions and their call sites.",
+    "cron_contract": "The external cron parses relative to exact configured prefixes and supports old and new layouts during rollout."
   },
   "principle_decisions": {
-    "kiss": "Change only deterministic index routing and its tests. Do not add lifecycle workers, connector APIs, or storage policies.",
-    "yagni": "Do not add configurable index formats, retention values, archive clients, aliases, or migration tooling.",
-    "single_source_of_truth": "One shared function owns the organization and UTC date suffix contract.",
-    "ownership": "Application writers own index selection. The external cron owns archive lifecycle operations.",
-    "compatibility": "Preserve prefixes, document fields, bulk behavior, and wildcard reads. Leave old indexes untouched.",
-    "failure_safety": "Use an explicit org-global segment with a warning for missing organization context, preserve bulk error behavior, require unambiguous cron mixed-layout parsing, and require repeated handling of indexes recreated by late writes.",
-    "security": "Retain document-level organization scope and do not broaden OpenSearch permissions in application code.",
-    "observability": "Use existing bulk failure logs and verify routing through bulk metadata tests."
+    "kiss": "Modify only the two existing OpenSearch writers and their focused tests.",
+    "yagni": "Do not add shared packages, new configuration, lifecycle workers, connector APIs, policies, templates, or migrations.",
+    "single_source_of_truth": "Each existing writer remains the owner of its established prefix and record-kind naming.",
+    "compatibility": "Preserve document fields, bulk behavior, custom prefixes, UTC dates, wildcard reads, and all existing indexes.",
+    "failure_safety": "Use global instead of dropping records when organization context is missing.",
+    "rollback": "Roll back the application binary. Both layouts remain readable through existing wildcard patterns."
   },
   "risks": [
     {
-      "risk": "Organization-by-day indexes can significantly increase index and shard counts.",
-      "mitigation": "Require measured and projected shard counts plus an operator-approved hard threshold in operational-readiness.json before rollout."
+      "risk": "Organization-by-day routing increases the number of indexes and shards.",
+      "disposition": "Accepted as an operational consequence of organization-specific archival. Capacity monitoring remains an operator responsibility."
     },
     {
-      "risk": "The archive cron may parse only the old shared layout.",
-      "mitigation": "Use an explicit org marker, provide parser fixtures, deploy and dry-run mixed-layout parsing before writer changes, and skip any unclassified index."
+      "risk": "Custom prefixes can contain hyphens or numeric tokens.",
+      "disposition": "The archive cron must strip the exact configured prefix before parsing organization and date suffixes."
     },
     {
-      "risk": "Organization scope may be absent for infrastructure-level records.",
-      "mitigation": "Route zero OrganizationID to an explicit org-global segment, emit a warning, inventory legitimate global producers, and define its retention separately."
+      "risk": "Records without organization context share the global index.",
+      "disposition": "Accepted to preserve observability delivery. The global index has its own cron handling."
     },
     {
-      "risk": "An index organization segment could disagree with the document organizationId.",
-      "mitigation": "Derive both from the same scope object and assert both values in focused tests and rollout sampling."
-    },
-    {
-      "risk": "A late record can recreate an old-date index after the cron archived it.",
-      "mitigation": "Require repeated eligible-date scans, versioned or idempotent archive output, archive verification before source removal, and an approved lateness and grace window."
+      "risk": "Late records can write to an old date index.",
+      "disposition": "Existing occurrence-time routing is preserved. Repeated archival handling remains owned by the external cron."
     }
   ],
   "rollout": [
-    "Update and dry-run the archive cron against both layouts using the explicit org marker.",
-    "Deploy the application routing change.",
-    "Verify all index kinds, organization segments, UTC dates, and document scope values.",
-    "Verify existing telemetry reads and dashboards across both layouts.",
-    "Record capacity, parser, lateness, grace-period, and exact cron command evidence in operational-readiness.json.",
-    "Enable organization-specific archive schedules only after verification."
-  ],
-  "rollback": "Roll back the application binary to restore shared daily names. Existing wildcard readers continue to match both layouts. Disable new-layout archival first if the cron cannot safely process mixed names. Already archived indexes remain owned by the cron recovery procedure.",
-  "required_test_categories": [
-    "Shared index-name contract",
-    "Nonzero organization identifier",
-    "Global fallback and warning",
-    "UTC and zero-time behavior",
-    "Default and custom prefixes",
-    "Timeline routing for every supported record kind",
-    "Telemetry routing for logs, events, and metrics",
-    "Organization identifier preservation in documents",
-    "Wildcard read compatibility",
-    "Bulk error propagation",
-    "Archive parser fixtures for old and new default and custom prefixes"
+    "Update the external cron to recognize old and new layouts using exact configured prefixes.",
+    "Deploy application changes.",
+    "Verify index names and matching document organization IDs.",
+    "Verify existing wildcard reads and dashboards.",
+    "Enable organization-specific archival."
   ],
   "verification_commands": [
-    "go test ./pkg/telemetry/...",
+    "go test ./pkg/telemetry/providers/...",
     "go test ./api/assistant-api/internal/observability/collectors/timeline/...",
     "go test ./api/assistant-api/api/observability/...",
-    "make agent-finalize CHANGED_FILES=\"pkg/telemetry/opensearch_index.go,pkg/telemetry/opensearch_index_test.go,pkg/telemetry/providers/opensearch.go,pkg/telemetry/providers/opensearch_test.go,api/assistant-api/internal/observability/collectors/timeline/collector.go,api/assistant-api/internal/observability/collectors/timeline/collector_test.go\""
+    "make agent-finalize CHANGED_FILES=\"pkg/telemetry/providers/opensearch.go,pkg/telemetry/providers/opensearch_test.go,api/assistant-api/internal/observability/collectors/timeline/collector.go,api/assistant-api/internal/observability/collectors/timeline/collector_test.go\""
   ],
+  "open_questions": [],
   "governance": {
     "reserved_path": "rfcs/0012-organization-scoped-observability-indexes.md",
-    "challenge_status": "round_1_revise",
+    "run_id": "run_7664265d945b",
+    "initial_challenge_task_id": "task_35da35309890",
+    "challenge_status": "round_2_pending",
     "confirmation_status": "pending",
     "accepted_rfc_sha256": null,
-    "run_id": "run_7664265d945b",
-    "task_id": "task_35da35309890",
-    "gate_id": null,
     "implementation_authorized": false
   }
 }

@@ -4,79 +4,58 @@
 - Owner: Observability maintainers
 - Created: 2026-08-25
 - Updated: 2026-08-25
-- Reviewers: Independent plan challenger (pending), operations owner for the archive cron (pending)
+- Reviewers: Independent plan challenger (pending)
 
 ## Summary
 
-Include the organization identifier and UTC calendar date in every OpenSearch index name
-written by the assistant observability timeline collector and the shared telemetry
-OpenSearch exporter. The new physical index boundary allows an external cron process to
-archive complete indexes according to organization-specific retention schedules without
-running document-level queries.
+Add the organization identifier to every daily OpenSearch index written by the assistant
+observability timeline collector and the shared telemetry OpenSearch exporter. When no
+organization identifier is available, use the literal `global`.
 
-The application remains responsible only for selecting the destination index and writing
-records. Index archival, deletion after archival, restore procedures, and retention
-configuration remain owned by the external cron and its operators.
+The application changes only index naming. An external cron owns index archival and any
+retention-specific behavior.
 
 ## Context
 
-The timeline collector currently writes every organization into a shared daily index named
-`rapida-timeline-YYYYMMDD`. Its index name is generated in
-`api/assistant-api/internal/observability/collectors/timeline/collector.go`, while the
-organization identifier is already available through `observability.Scope` and is stored
-inside each indexed document.
+The timeline collector currently writes records to `<prefix>-YYYYMMDD`. The telemetry
+OpenSearch exporter writes logs, events, and metrics to
+`<prefix>-<kind>-YYYYMMDD`. Both writers already receive an organization identifier and
+store it inside the indexed document, but neither includes it in the index name.
 
-The shared telemetry OpenSearch exporter currently writes logs, events, and metrics into
-`rapida-logs-YYYYMMDD`, `rapida-events-YYYYMMDD`, and
-`rapida-metrics-YYYYMMDD`. The exporter receives `telemetry.Scope.OrganizationID` and
-stores it in each document, but it does not include that value in the index name.
+Retention differs by organization. The external archive cron therefore needs complete
+indexes that belong to one organization and one UTC date.
 
-The existing telemetry read API searches wildcard patterns `rapida-logs-*`,
-`rapida-events-*`, and `rapida-metrics-*`. Those patterns match both the current names and
-the proposed names, so the reader does not require a compatibility change.
-
-An external cron will archive observability indexes. Retention can differ by organization,
-which means a shared daily index is not a sufficient archival boundary. Document-level
-filtering, copying, and deletion would add failure modes and would not be index archival.
+Existing telemetry readers search `rapida-logs-*`, `rapida-events-*`, and
+`rapida-metrics-*`. Those patterns match both current and proposed names.
 
 ## Goals
 
-- Route every timeline record to a daily index scoped to its organization.
-- Route every OpenSearch telemetry log, event, and metric to a daily index scoped to its
-  organization.
-- Preserve UTC date partitioning and existing configurable index prefixes.
-- Preserve organization and project identifiers inside indexed documents.
-- Keep existing wildcard telemetry reads compatible with old and new index names.
-- Provide a deterministic fallback index for records without organization context.
-- Give the external archive cron an index-level organization and date boundary.
+- Add organization ID to timeline, log, event, and metric index names.
+- Use `global` when organization ID is zero or unavailable.
+- Preserve existing prefixes, UTC daily rotation, document bodies, and bulk behavior.
+- Keep existing telemetry wildcard reads compatible.
+- Leave archival ownership with the external cron.
 
 ## Non-Goals
 
-- Implementing or scheduling the external archive cron.
-- Defining organization retention periods or archive destinations.
-- Deleting, closing, snapshotting, restoring, or migrating OpenSearch indexes.
-- Renaming, reindexing, or backfilling existing observability indexes.
-- Adding OpenSearch Index State Management policies or index templates.
-- Changing observability document mappings, JSON fields, record identifiers, or payloads.
-- Changing telemetry API request or response contracts.
-- Changing OpenSearch connector behavior or automatic index creation settings.
+- Implementing or configuring the archive cron.
+- Adding retention settings, OpenSearch policies, templates, or cleanup workers.
+- Explicitly creating, deleting, closing, snapshotting, or restoring indexes.
+- Migrating or renaming existing indexes.
+- Changing document schemas, APIs, protobufs, databases, or OpenSearch connector behavior.
 
 ## Scope and Ownership
 
 ### Allowed Paths
 
-- `pkg/telemetry/opensearch_index.go` - implementation owner; shared organization and UTC
-  date index-name contract.
-- `pkg/telemetry/opensearch_index_test.go` - implementation owner; contract tests for index
-  naming.
 - `pkg/telemetry/providers/opensearch.go` - implementation owner; log, event, and metric
-  routing.
+  index naming.
 - `pkg/telemetry/providers/opensearch_test.go` - implementation owner; exporter routing
-  tests.
+  coverage.
 - `api/assistant-api/internal/observability/collectors/timeline/collector.go` -
-  implementation owner; timeline routing.
+  implementation owner; timeline index naming.
 - `api/assistant-api/internal/observability/collectors/timeline/collector_test.go` -
-  implementation owner; timeline routing tests.
+  implementation owner; timeline routing coverage.
 - `rfcs/0012-organization-scoped-observability-indexes.md` - RFC owner.
 - `rfcs/0012-organization-scoped-observability-indexes/jsons/` - governance artifact owner.
 
@@ -84,284 +63,204 @@ filtering, copying, and deletion would add failure modes and would not be index 
 
 - `pkg/connectors/`
 - `api/assistant-api/api/observability/`
-- OpenSearch deployment and cluster configuration.
-- External archive cron source, configuration, deployment, and credentials.
-- Existing OpenSearch indexes and stored documents.
+- OpenSearch cluster and deployment configuration.
+- External archive cron source and configuration.
+- Existing OpenSearch indexes.
 
 ## Proposed Design
 
-Add one shared telemetry function that constructs a daily OpenSearch index name from an
-already-resolved prefix, an organization identifier, and an occurrence timestamp. This
-function is the single source of truth for the organization and date suffix used by both
-writers.
+Change the two existing private index-name functions. Do not introduce a new package,
+configuration option, connector method, background worker, or index lifecycle component.
 
-The naming contract is versioned with an explicit `org` marker so the archive cron can
-distinguish it from every existing shared index, including indexes whose custom prefix ends
-with a numeric token or the word `global`:
+Timeline index names become:
 
 ```text
-<resolved-prefix>-org-<organization-segment>-<UTC YYYYMMDD>
+<prefix>-<organization-segment>-<UTC YYYYMMDD>
 ```
 
-For a nonzero organization identifier, `organization-segment` is the base-10 unsigned
-integer value. For a zero organization identifier, `organization-segment` is `global`.
-
-Timeline examples:
+Examples:
 
 ```text
-rapida-timeline-org-42-20260825
-custom-timeline-org-42-20260825
-rapida-timeline-org-global-20260825
+rapida-timeline-42-20260825
+custom-timeline-42-20260825
+rapida-timeline-global-20260825
 ```
 
-The timeline collector passes its configured `indexPrefix` directly to the shared naming
-function together with `scope.GlobalScopeValue().OrganizationID` and the record occurrence
-time.
-
-Telemetry exporter examples:
+Telemetry index names become:
 
 ```text
-rapida-logs-org-42-20260825
-rapida-events-org-42-20260825
-rapida-metrics-org-42-20260825
-custom-logs-org-42-20260825
+<prefix>-<kind>-<organization-segment>-<UTC YYYYMMDD>
 ```
 
-The exporter first resolves its configured root prefix, appends the existing record kind
-segment, and passes that result to the shared naming function together with
-`scope.OrganizationID` and the record occurrence time.
+Examples:
 
-If the occurrence timestamp is zero, the shared naming function uses the current time. It
-always formats the date in UTC. No writer performs index existence checks or explicit index
-creation as part of this change. The existing OpenSearch bulk behavior remains unchanged.
+```text
+rapida-logs-42-20260825
+rapida-events-42-20260825
+rapida-metrics-42-20260825
+custom-logs-42-20260825
+```
 
-The index date continues to use record occurrence time to preserve existing partitioning
-semantics. The archive cron must scan for eligible indexes on every run and must treat an
-eligible index that reappears because of a late record as new archival work. Archive output
-must be versioned or otherwise idempotent so a repeated archive does not overwrite a prior
-verified artifact. The cron must remove an active index only after the current archive copy
-has been verified. The maximum expected event lateness and the corresponding archive grace
-period remain rollout inputs that must be recorded before this RFC can be accepted.
+For a nonzero organization ID, `organization-segment` is its unsigned base-10 value. For
+organization ID zero, it is `global`.
+
+The date continues to come from the record occurrence time. A zero occurrence time falls
+back to the current time, and formatting remains UTC. OpenSearch index creation continues
+to occur through the existing bulk write behavior.
+
+The archive cron must use the exact configured prefix when parsing names. After removing
+that prefix, it reads the final segment as the UTC date and the preceding segment as the
+organization. This avoids interpreting a token inside a custom prefix as the organization.
 
 ## Contracts and Compatibility
 
-- Timeline index names change from `<prefix>-YYYYMMDD` to
-  `<prefix>-org-<organization-segment>-YYYYMMDD`.
-- Telemetry index names change from `<prefix>-<kind>-YYYYMMDD` to
-  `<prefix>-<kind>-org-<organization-segment>-YYYYMMDD`.
-- `organization-segment` is a base-10 organization identifier or the literal `global` when
-  the identifier is zero.
-- Dates remain eight decimal digits in UTC using the existing `YYYYMMDD` format.
-- Existing custom prefix behavior remains unchanged before the new suffix.
-- Existing wildcard telemetry readers remain compatible because `rapida-logs-*`,
-  `rapida-events-*`, and `rapida-metrics-*` match both formats.
-- Existing indexes remain readable and are not renamed or modified.
-- The archive cron must identify the new layout by the literal `org` marker, parse the date
-  from the final hyphen-delimited segment, and parse the organization from the immediately
-  preceding segment. It must separately define handling for the `global` segment.
-- The archive cron must support both old and new names during the compatibility window.
-- Old shared names must never be interpreted as organization-scoped names. If the cron
-  cannot classify a name unambiguously, it must report and skip the index without removing
-  it from active storage.
-- No public API, protobuf, database schema, or observability document schema changes.
+- Timeline changes from `<prefix>-YYYYMMDD` to
+  `<prefix>-<organization-segment>-YYYYMMDD`.
+- Logs change from `<prefix>-logs-YYYYMMDD` to
+  `<prefix>-logs-<organization-segment>-YYYYMMDD`.
+- Events change from `<prefix>-events-YYYYMMDD` to
+  `<prefix>-events-<organization-segment>-YYYYMMDD`.
+- Metrics change from `<prefix>-metrics-YYYYMMDD` to
+  `<prefix>-metrics-<organization-segment>-YYYYMMDD`.
+- Existing index prefixes remain unchanged.
+- Existing document fields, including organization ID, remain unchanged.
+- Existing wildcard readers continue matching old and new names.
+- Existing indexes are not modified or migrated.
+- The archive cron must support old and new layouts during rollout and must use the exact
+  configured prefix rather than guessing prefix boundaries.
 
 ## Failure and Recovery
 
-- A zero organization identifier routes to an explicit `org-global` index instead of
-  silently creating an index for numeric organization zero. The writer emits a warning with
-  record kind and scope type, without payload data, whenever this fallback is used.
-- Invalid or blank custom prefixes retain existing behavior and are outside this change.
-- Bulk write errors retain the existing propagation and logging behavior.
-- A deployment rollback resumes the previous shared index naming. Readers continue to
-  search both layouts through existing wildcard patterns.
-- The external cron must not archive an index unless its full name matches the approved
-  prefix, organization segment, and date grammar.
-- The external cron must not treat a failed or partial archive as permission to remove the
-  source index. That behavior is outside this repository but is a rollout prerequisite.
-- The external cron must rescan all eligible dates on every run so an old-date index
-  recreated by a late record is archived again.
+- Missing organization context routes to the explicit `global` segment so observability
+  writes are not dropped.
+- Existing bulk error propagation and logging remain unchanged.
+- Rollback restores the prior shared index format without rewriting data.
+- Old and new indexes can coexist and remain queryable through existing wildcard readers.
+- Archive failures and late-arriving records remain owned by the external cron.
 
 ## Security and Privacy
 
-- Organization identifiers are already present in observability documents. Adding the
-  identifier to the index name does not introduce a new class of tenant identifier.
-- OpenSearch credentials and permissions remain unchanged.
-- The application must continue writing the organization identifier into each document so
-  index routing can be audited against document scope.
-- Index naming provides a physical archival boundary but does not replace query-time or
-  OpenSearch authorization controls.
-- Archive cron permissions should be limited to matching observability index prefixes and
-  the required archive operations. Cron permission changes are outside this RFC's code
-  scope.
+- Organization IDs already exist in observability documents. Including them in index names
+  does not add new tenant data.
+- OpenSearch credentials and permissions do not change.
+- Physical index separation supports archival boundaries but does not replace query-time
+  authorization.
 
 ## Observability
 
-- Existing bulk write failure logs remain the primary application diagnostic.
-- A warning identifies every write routed to `org-global` so operators can distinguish
-  expected infrastructure records from missing tenant context.
-- Tests inspect bulk metadata to prove that each record is routed to the expected physical
-  index.
-- Operators can list indexes by prefix and organization segment to verify rollout.
-- No new application metric or log is required because this change only alters deterministic
-  routing metadata.
+- Existing bulk failure logs remain unchanged.
+- Tests inspect bulk metadata to verify destination index names.
+- Operators can list indexes using the existing prefixes to verify rollout.
 
 ## Data and Migration
 
-No database schema or document migration is required.
-
-Existing indexes retain their current names and contents. New application versions begin
-writing to organization-scoped daily indexes immediately after deployment. During the
-compatibility window, OpenSearch therefore contains both old shared indexes and new
-organization-scoped indexes.
-
-The external archive cron must recognize both layouts until all old shared indexes have
-passed the maximum supported retention period and have been archived under the existing
-operational process.
+No database or document migration is required. Existing shared indexes remain unchanged.
+New writes use organization-scoped indexes after deployment.
 
 ## Rollout
 
-1. Update the archive cron parser and dry-run validation to recognize both old and new index
-   layouts by the literal `org` marker. Do not enable new archival actions yet.
-2. Deploy the application index-routing change.
-3. Verify that timeline, log, event, and metric writes create organization-scoped daily
-   indexes and retain matching organization identifiers in their documents.
-4. Verify that telemetry reads and dashboards continue to find both old and new indexes.
-5. Record the current active primary and replica shard counts, the projected peak from the
-   organization count and retention horizon, the operator-approved hard threshold, the
-   maximum expected event lateness, and the archive grace period in
-   `jsons/operational-readiness.json`.
-6. Enable organization-specific archive schedules in the cron after the new names are
-   observed and validated.
-7. Stop rollout if organization-scoped indexes are missing, organization IDs disagree with
-   document scope, wildcard reads omit either layout, the cron cannot classify an index,
-   late writes are not re-archived, or index growth reaches the approved threshold.
+1. Update the external cron to recognize both old and new index names using its exact
+   configured prefixes.
+2. Deploy the application change.
+3. Confirm new timeline, log, event, and metric indexes contain the expected organization
+   segment and UTC date.
+4. Confirm sampled documents contain the same organization ID as their index name.
+5. Confirm existing telemetry reads and dashboards include both layouts.
+6. Enable organization-specific archival in the external cron.
+
+Stop rollout if index names contain the wrong organization, records disappear from existing
+queries, or OpenSearch rejects writes.
 
 ## Rollback
 
-Roll back the application binary to restore the previous shared daily index names. No data
-rewrite is required. Existing wildcard readers continue to include indexes produced before,
-during, and after rollback.
+Roll back the application binary. New writes return to the previous shared daily index
+names. No data rewrite is required, and existing wildcard readers continue matching both
+layouts.
 
-Disable archival of the new organization-scoped pattern before rollback if the cron cannot
-safely process a mixed layout. Indexes already archived by the external cron are not
-restored by this application rollback and remain governed by the cron's recovery process.
-
-The cron must continue rescanning eligible dates after rollback until the final
-organization-scoped index has passed the maximum lateness and archive grace windows.
+The external cron must continue recognizing both layouts until old and new indexes have
+completed their configured archive lifecycle.
 
 ## Alternatives Considered
 
-- Keep shared daily indexes and filter by `organizationId` during archival. Rejected because
-  it requires document-level copy and removal rather than atomic index archival.
-- Use OpenSearch Index State Management. Rejected because retention and archival are owned
-  by an external cron.
-- Add an application cleanup worker. Rejected because the application does not own archive
-  scheduling or lifecycle operations.
-- Create one index per retention tier. Rejected because organization retention schedules can
-  differ independently and the archive cron requires an organization boundary.
-- Add organization identifiers only to timeline indexes. Rejected because logs, events, and
-  metrics require the same independent archival behavior.
-- Duplicate index formatting in each writer. Rejected because index naming is an operational
-  contract and should have one source of truth.
+- Shared indexes with document-level archival were rejected because the cron needs to
+  archive complete indexes independently by organization.
+- OpenSearch Index State Management was rejected because the external cron owns archival.
+- An application cleanup worker was rejected because the application does not own archive
+  lifecycle operations.
+- A shared naming package was rejected because two small private formatting functions are
+  simpler and avoid adding a new public API.
+- A literal `org` marker was rejected because the cron already owns exact configured
+  prefixes and can parse the final organization and date segments directly.
 
 ## Testing and Verification
 
-Required test categories:
+Required tests:
 
-- Shared index-name contract for nonzero organization identifiers.
-- Explicit `global` fallback for organization identifier zero.
-- Warning emission when the `global` fallback is used.
-- UTC conversion and zero-time fallback.
-- Default and custom prefix preservation.
-- Timeline log, event, metric, metadata, and usage routing through the organization-scoped
-  name.
-- Telemetry log, event, and metric routing through organization-scoped names.
-- Preservation of organization identifiers inside documents.
-- Existing wildcard telemetry query compatibility through focused API tests or direct
-  assertion of unchanged patterns.
-- Existing bulk error propagation.
-- Old and new default and custom-prefix parser fixtures supplied by the archive cron owner.
+- Timeline default prefix with a nonzero organization ID.
+- Timeline custom prefix with a nonzero organization ID.
+- Timeline `global` fallback.
+- Telemetry log, event, and metric names with a nonzero organization ID.
+- Telemetry `global` fallback for every supported record kind.
+- UTC date behavior.
+- Organization ID preservation inside indexed documents.
+- Existing bulk error behavior.
 
-Exact verification commands:
+Exact commands:
 
 ```bash
-go test ./pkg/telemetry/...
+go test ./pkg/telemetry/providers/...
 go test ./api/assistant-api/internal/observability/collectors/timeline/...
 go test ./api/assistant-api/api/observability/...
-make agent-finalize CHANGED_FILES="pkg/telemetry/opensearch_index.go,pkg/telemetry/opensearch_index_test.go,pkg/telemetry/providers/opensearch.go,pkg/telemetry/providers/opensearch_test.go,api/assistant-api/internal/observability/collectors/timeline/collector.go,api/assistant-api/internal/observability/collectors/timeline/collector_test.go"
+make agent-finalize CHANGED_FILES="pkg/telemetry/providers/opensearch.go,pkg/telemetry/providers/opensearch_test.go,api/assistant-api/internal/observability/collectors/timeline/collector.go,api/assistant-api/internal/observability/collectors/timeline/collector_test.go"
 ```
-
-Operational verification before enabling archival:
-
-```text
-curl -fsS "$OPENSEARCH_URL/_cat/indices/rapida-*?h=index,pri,rep,docs.count,store.size&format=json"
-curl -fsS "$OPENSEARCH_URL/_cluster/health?level=indices"
-curl -fsS -H 'Content-Type: application/json' "$OPENSEARCH_URL/rapida-*-org-*-*/_search" -d '{"size":100,"_source":["organizationId"],"query":{"match_all":{}}}'
-go test ./api/assistant-api/api/observability/... -run TestGetAllTelemetry
-```
-
-The archive cron owner must add its environment-specific dry-run and archive verification
-commands to `jsons/operational-readiness.json`. That artifact must also record parser
-fixtures for old and new default and custom prefixes, the approved shard threshold, the
-measured shard counts, the maximum lateness, and the archive grace period. Absence of this
-evidence blocks rollout.
 
 ## Acceptance Criteria
 
-- [ ] Timeline records use `<prefix>-org-<organization-segment>-YYYYMMDD`.
-- [ ] Telemetry logs use `<prefix>-logs-org-<organization-segment>-YYYYMMDD`.
-- [ ] Telemetry events use `<prefix>-events-org-<organization-segment>-YYYYMMDD`.
-- [ ] Telemetry metrics use `<prefix>-metrics-org-<organization-segment>-YYYYMMDD`.
-- [ ] Nonzero organization identifiers use their base-10 representation.
-- [ ] Zero organization identifiers use the literal `global`.
-- [ ] Writes using the `global` fallback emit a warning without payload data.
-- [ ] Dates are derived from record occurrence time and formatted in UTC.
-- [ ] Existing custom prefixes remain supported.
-- [ ] Organization identifiers remain present in indexed documents.
-- [ ] Existing telemetry wildcard reads cover old and new index layouts.
-- [ ] No application code lists, archives, closes, or deletes indexes.
+- [ ] Timeline uses `<prefix>-<organization-segment>-YYYYMMDD`.
+- [ ] Logs use `<prefix>-logs-<organization-segment>-YYYYMMDD`.
+- [ ] Events use `<prefix>-events-<organization-segment>-YYYYMMDD`.
+- [ ] Metrics use `<prefix>-metrics-<organization-segment>-YYYYMMDD`.
+- [ ] Nonzero organization IDs use unsigned base-10 formatting.
+- [ ] Organization ID zero uses `global`.
+- [ ] Dates remain based on occurrence time and formatted in UTC.
+- [ ] Custom prefixes remain supported.
+- [ ] Organization IDs remain present in documents.
+- [ ] Existing wildcard reads cover old and new layouts.
+- [ ] No archive lifecycle behavior is added to the application.
 - [ ] Focused tests and `make agent-finalize` pass.
-- [ ] The archive cron owner confirms mixed-layout support before rollout.
-- [ ] The archive cron proves ambiguous names are skipped, late eligible indexes are
-  re-archived, and archive verification precedes source removal.
-- [ ] Operational readiness records measured and projected shard counts, a hard capacity
-  threshold, maximum event lateness, and archive grace period.
 - [ ] No unresolved critical or major review findings remain.
 
 ## Open Questions
 
-- Who owns the external archive cron compatibility confirmation?
-- What hard active-shard threshold has the OpenSearch operator approved?
-- What maximum event lateness and archive grace period has the archive cron owner approved?
-- How long must the cron retain compatibility with the old shared index layout?
-- Which current record producers are legitimately allowed to emit with organization ID zero?
+None.
 
 ## Challenge Resolution
 
-Challenge round 1 returned `REVISE` for ambiguous mixed-layout parsing, missing shard
-capacity gates, undefined late-write behavior, unconstrained zero-organization routing, and
-insufficient operational commands. This revision adds the explicit `org` marker, safe
-classification rules, repeated late-index archival requirements, zero-organization
-warnings, and an operational-readiness artifact contract. Operator-owned values and exact
-cron commands remain unresolved, so the RFC remains `Draft` and requires another
-independent challenge after those inputs are recorded.
+Challenge round 1 requested an unambiguous archive parser contract and additional external
+cron operational controls. The user selected the smaller application contract: append the
+organization ID, use `global` when unavailable, and leave all archival behavior with the
+cron. This revision requires the cron to parse names relative to exact configured prefixes,
+which resolves custom-prefix ambiguity without adding another index-name segment. The RFC
+requires a second independent challenge before acceptance.
 
 ## Artifact Index
 
-- `rfcs/0012-organization-scoped-observability-indexes/jsons/plan.json` - initial task plan;
-  revised after challenge round 1.
+- `rfcs/0012-organization-scoped-observability-indexes/jsons/plan.json` - current complete
+  task plan; challenge round 2 pending.
 - `rfcs/0012-organization-scoped-observability-indexes/jsons/challenge.json` - challenge
   round 1 receipt; decision `revise`.
+- `rfcs/0012-organization-scoped-observability-indexes/jsons/amendment-01-plan.json` - user
+  decision and reduced-scope amendment.
+- `rfcs/0012-organization-scoped-observability-indexes/jsons/amendment-01-challenge.json` -
+  not created; reserved for challenge round 2.
 - `rfcs/0012-organization-scoped-observability-indexes/jsons/confirmation.json` - not created;
-  reserved for the exact-digest confirmation receipt.
-- `rfcs/0012-organization-scoped-observability-indexes/jsons/operational-readiness.json` -
-  not created; required before rollout.
+  reserved for exact-digest confirmation.
 
 ## Decision Log
 
 | Date | Decision | Owner | Evidence |
 | --- | --- | --- | --- |
-| 2026-08-25 | Use organization-scoped UTC daily indexes for all OpenSearch observability writers | User and RFC owner | `jsons/plan.json` |
-| 2026-08-25 | Keep archive lifecycle ownership in the external cron | User and RFC owner | `jsons/plan.json` |
-| 2026-08-25 | Keep the RFC in Draft pending independent challenge and exact-digest confirmation | RFC owner | Governed workflow requirement |
-| 2026-08-25 | Add an explicit `org` marker and operational safety gates | RFC owner | `jsons/challenge.json` |
+| 2026-08-25 | Use organization-scoped UTC daily indexes for all OpenSearch observability writers | User | Conversation and `jsons/plan.json` |
+| 2026-08-25 | Use `global` when organization ID is unavailable | User | Conversation and `jsons/amendment-01-plan.json` |
+| 2026-08-25 | Keep implementation limited to adding organization to existing names | User | Conversation and `jsons/amendment-01-plan.json` |
+| 2026-08-25 | Keep archive lifecycle ownership in the external cron | User | Conversation and `jsons/plan.json` |
