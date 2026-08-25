@@ -568,11 +568,17 @@ func TestEveryAuthenticationMiddlewarePassesWithoutCredentials(t *testing.T) {
 	}
 }
 
-func TestAuthenticationChainsRejectConflictsInEitherOrder(t *testing.T) {
+func TestAuthenticationChainsRespectConfiguredPrecedence(t *testing.T) {
 	for _, reverse := range []bool{false, true} {
 		name := "normal"
+		expectedHTTPStatus := http.StatusUnauthorized
+		expectedGRPCStatus := codes.Unauthenticated
+		expectedHandlerCalled := false
 		if reverse {
 			name = "reversed"
+			expectedHTTPStatus = http.StatusNoContent
+			expectedGRPCStatus = codes.OK
+			expectedHandlerCalled = true
 		}
 		t.Run("gin "+name, func(t *testing.T) {
 			gin.SetMode(gin.TestMode)
@@ -595,7 +601,7 @@ func TestAuthenticationChainsRejectConflictsInEitherOrder(t *testing.T) {
 			request.Header.Set(types.PROJECT_SCOPE_KEY, "project")
 			recorder := httptest.NewRecorder()
 			engine.ServeHTTP(recorder, request)
-			if recorder.Code != http.StatusUnauthorized || handlerCalled {
+			if recorder.Code != expectedHTTPStatus || handlerCalled != expectedHandlerCalled {
 				t.Fatalf("status = %d, handlerCalled = %t", recorder.Code, handlerCalled)
 			}
 		})
@@ -615,7 +621,7 @@ func TestAuthenticationChainsRejectConflictsInEitherOrder(t *testing.T) {
 						return nil, nil
 					})
 				})
-			if status.Code(err) != codes.Unauthenticated || handlerCalled {
+			if status.Code(err) != expectedGRPCStatus || handlerCalled != expectedHandlerCalled {
 				t.Fatalf("status = %v, handlerCalled = %t", status.Code(err), handlerCalled)
 			}
 		})
@@ -635,7 +641,7 @@ func TestAuthenticationChainsRejectConflictsInEitherOrder(t *testing.T) {
 					return nil
 				})
 			})
-			if status.Code(err) != codes.Unauthenticated || handlerCalled {
+			if status.Code(err) != expectedGRPCStatus || handlerCalled != expectedHandlerCalled {
 				t.Fatalf("status = %v, handlerCalled = %t", status.Code(err), handlerCalled)
 			}
 		})

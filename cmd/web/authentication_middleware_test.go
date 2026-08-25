@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestGRPCUsesExplicitAuthenticationMiddlewareOrder(t *testing.T) {
+func TestGRPCUsesUserFirstAuthenticationMiddlewareOrder(t *testing.T) {
 	file := parseCommandSource(t, "web.go")
 
 	assertAuthenticationMiddlewareOrder(t, interceptorChain(t, file, "ChainUnaryInterceptor"), []string{

@@ -2,7 +2,7 @@ module github.com/rapidaai
 
 go 1.25.13
 
-replace github.com/vonage/vonage-go-sdk => github.com/iamprashant/vonage-go-sdk v0.0.0-20251001095859-c473c1750cbd
+replace github.com/vonage/vonage-go-sdk => github.com/iamprashant/vonage-go-sdk v0.0.0-20260825145654-e6cefd481a6a
 
 require (
 	cloud.google.com/go/auth v0.18.1
@@ -28,7 +28,7 @@ require (
 	github.com/go-playground/validator/v10 v10.26.0
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/go-resty/resty/v2 v2.13.1
-	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.19.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
@@ -133,7 +133,6 @@ require (
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/gobwas/ws v1.3.2 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
-	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
