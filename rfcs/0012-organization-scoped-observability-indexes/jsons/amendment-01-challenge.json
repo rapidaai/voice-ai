@@ -1,0 +1,30 @@
+{
+  "rfc": "rfcs/0012-organization-scoped-observability-indexes.md",
+  "plan": "rfcs/0012-organization-scoped-observability-indexes/jsons/plan.json",
+  "amendment": 1,
+  "round": 2,
+  "decision": "revise",
+  "reviewed_at": "2026-08-25",
+  "reviewed_rfc_sha256": "540a48bf4c0a901e3929f413a18874dc3dfc3912b619bfb8835f3e24f221fc48",
+  "reviewed_plan_sha256": "c1ca351a8072b0999e00c2cba77f247ef718610c4695aebf20bc46f6a09398fd",
+  "review_mode": "independent read-only fallback reviewer after Orca worker launch failures",
+  "findings": [
+    {
+      "severity": "major",
+      "finding": "The exact reviewed RFC remained Draft and the plan remained pending, so the bytes were not eligible for approval.",
+      "required_change": "Set the final challenge-ready RFC status to Accepted and update the plan state before another review."
+    },
+    {
+      "severity": "major",
+      "finding": "The external cron compatibility prerequisite lacks a named owner, executable verification command, and evidence artifact.",
+      "required_change": "Define concrete pre-deployment evidence that the cron recognizes old and new layouts using exact configured prefixes."
+    }
+  ],
+  "cycle_limit": {
+    "maximum": 2,
+    "completed": 2,
+    "result": "blocked",
+    "reason": "DEVELOPMENT_PROCESS.md requires escalation after two unsuccessful plan or RFC correction cycles."
+  },
+  "implementation_authorized": false
+}

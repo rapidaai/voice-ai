@@ -1,8 +1,8 @@
 {
   "rfc": "rfcs/0012-organization-scoped-observability-indexes.md",
   "artifact": "rfcs/0012-organization-scoped-observability-indexes/jsons/plan.json",
-  "status": "draft",
-  "decision": "pending_independent_challenge",
+  "status": "blocked",
+  "decision": "blocked_after_two_revision_cycles",
   "created_at": "2026-08-25",
   "updated_at": "2026-08-25",
   "objective": "Add organization ID to every daily OpenSearch observability index name, using global when organization ID is unavailable.",
@@ -129,9 +129,10 @@
     "reserved_path": "rfcs/0012-organization-scoped-observability-indexes.md",
     "run_id": "run_7664265d945b",
     "initial_challenge_task_id": "task_35da35309890",
-    "challenge_status": "round_2_pending",
+    "challenge_status": "round_2_revise",
     "confirmation_status": "pending",
     "accepted_rfc_sha256": null,
-    "implementation_authorized": false
+    "implementation_authorized": false,
+    "blocking_reason": "Two RFC challenge cycles returned revise. DEVELOPMENT_PROCESS.md requires escalation instead of another revision cycle."
   }
 }
