@@ -1,0 +1,53 @@
+{
+  "rfc": "rfcs/0012-organization-scoped-observability-indexes.md",
+  "plan": "rfcs/0012-organization-scoped-observability-indexes/jsons/plan.json",
+  "round": 1,
+  "decision": "revise",
+  "reviewed_at": "2026-08-25",
+  "reviewed_rfc_sha256": "b20afeca0d1b564cee1f39cb2253c01a2a509ed346dfbce2036c99e74750c765",
+  "reviewed_plan_sha256": "4f21da9d277a3b8ffe52a341608b9b59c020a6f76b87cacbbc9f68e1bc143a94",
+  "run_id": "run_7664265d945b",
+  "task_id": "task_35da35309890",
+  "dispatch_id": "ctx_c1b84adcac22",
+  "review_mode": "independent read-only Orca worker",
+  "lifecycle_status": "worker_done content delivered but settlement rejected because the worker omitted its dispatch capability",
+  "findings": [
+    {
+      "severity": "P0",
+      "finding": "The proposed mixed-layout grammar is ambiguous when a custom timeline prefix ends in a numeric token or global.",
+      "required_change": "Add an unambiguous versioned marker or define an exact prefix registry and parser contract, add old and new parser fixtures, and prohibit removal when classification is uncertain.",
+      "resolution": "The revision adds a literal org marker, requires parser fixtures, and requires unknown names to be reported and skipped."
+    },
+    {
+      "severity": "P1",
+      "finding": "Organization-by-day index growth lacks quantified capacity limits and operator evidence.",
+      "required_change": "Record current and projected shard counts, retention horizon, a hard threshold, monitoring commands, named operator approval, and artifact evidence.",
+      "resolution": "The revision requires these values and commands in operational-readiness.json before rollout. Values remain open pending operator input."
+    },
+    {
+      "severity": "P1",
+      "finding": "Occurrence-time routing can recreate an already archived old-date index when records arrive late.",
+      "required_change": "Define maximum lateness, archive grace period, and safe re-archive recovery.",
+      "resolution": "The revision requires repeated eligible-date scans, versioned or idempotent archive output, verification before source removal, and approved lateness and grace values. Values remain open pending operator input."
+    },
+    {
+      "severity": "P1",
+      "finding": "Zero OrganizationID fallback silently mixes records without identifying legitimate global producers.",
+      "required_change": "Inventory legitimate global producers and reject or observably alert on unexpected tenant records.",
+      "resolution": "The revision uses org-global, requires a warning without payload data, and keeps the producer inventory open pending maintainer input."
+    },
+    {
+      "severity": "P2",
+      "finding": "Operational verification lacks exact cron, inventory, health, consistency, rollback, and stop-condition commands.",
+      "required_change": "Add executable verification commands and resolve every open question before acceptance.",
+      "resolution": "The revision adds OpenSearch inventory, health, consistency, and reader verification commands and requires environment-specific cron commands in operational-readiness.json."
+    }
+  ],
+  "remaining_blockers": [
+    "The OpenSearch operator must provide and approve the hard active-shard threshold.",
+    "The archive cron owner must provide exact dry-run and archive verification commands.",
+    "The archive cron owner must approve maximum event lateness and archive grace period.",
+    "Observability maintainers must identify legitimate zero-organization producers.",
+    "A second independent challenge must review the revised exact bytes."
+  ]
+}
