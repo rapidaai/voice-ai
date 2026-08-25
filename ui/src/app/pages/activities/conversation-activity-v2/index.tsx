@@ -66,8 +66,7 @@ import {
   matchesTimelineSearch,
   parseTraceFilterQuery,
   telemetryRecordToTimelineDocument,
-  getTraceFilterValues,
-  getTelemetryPagesToFetch,
+  getTraceFilterRequestValue,
 } from './utils';
 import type { TraceFilterToken } from './utils';
 
@@ -155,12 +154,12 @@ const createRequestCriteria = (
   value: string | number | undefined,
   logic = '=',
 ): Criteria | null => {
-  const normalizedValue = String(value ?? '').trim();
-  if (!normalizedValue) return null;
+  const requestValue = String(value ?? '').trim();
+  if (!requestValue) return null;
 
   const criteria = new Criteria();
   criteria.setKey(key);
-  criteria.setValue(normalizedValue);
+  criteria.setValue(requestValue);
   criteria.setLogic(logic);
   return criteria;
 };
@@ -274,27 +273,7 @@ const getFacetTraceFilters = (filters: TraceFilterState): TraceFilterToken[] =>
       : null,
   ]);
 
-const getRequestTraceFilterSets = (
-  filters: TraceFilterToken[],
-): TraceFilterToken[][] =>
-  filters.reduce<TraceFilterToken[][]>(
-    (sets, filter) => {
-      const filterValues = getTraceFilterValues(filter);
-      if (filterValues.length <= 1) {
-        return sets.map(set => [...set, filter]);
-      }
-
-      return sets.flatMap(set =>
-        filterValues.map(filterValue => [
-          ...set,
-          { ...filter, value: filterValue },
-        ]),
-      );
-    },
-    [[]],
-  );
-
-const getRequestCriteriaSets = ({
+const getRequestCriteria = ({
   dateRange,
   freeText,
   filters,
@@ -302,40 +281,29 @@ const getRequestCriteriaSets = ({
   dateRange: TraceFilterState['dateRange'];
   filters: TraceFilterToken[];
   freeText: string;
-}): Criteria[][] =>
-  getRequestTraceFilterSets(filters).map(filterSet => {
-    const criteria: Array<Criteria | null> = [
-      createRequestCriteria('search', freeText, 'match'),
-      ...filterSet.map(filter =>
-        createRequestCriteria(filter.criteriaKey, filter.value, filter.logic),
+}): Criteria[] => {
+  const criteria: Array<Criteria | null> = [
+    createRequestCriteria('search', freeText, 'match'),
+    ...filters.map(filter =>
+      createRequestCriteria(
+        filter.criteriaKey,
+        getTraceFilterRequestValue(filter),
+        filter.logic,
       ),
-    ];
+    ),
+  ];
 
-    if (dateRange) {
-      const endDate = new Date(dateRange[1]);
-      endDate.setHours(23, 59, 59, 999);
-      criteria.push(
-        createRequestCriteria('timestamp', dateRange[0].toISOString(), '>='),
-        createRequestCriteria('timestamp', endDate.toISOString(), '<='),
-      );
-    }
+  if (dateRange) {
+    const endDate = new Date(dateRange[1]);
+    endDate.setHours(23, 59, 59, 999);
+    criteria.push(
+      createRequestCriteria('timestamp', dateRange[0].toISOString(), '>='),
+      createRequestCriteria('timestamp', endDate.toISOString(), '<='),
+    );
+  }
 
-    return criteria.filter((item): item is Criteria => Boolean(item));
-  });
-
-const mergeTimelineDocuments = (documents: TimelineDocument[]) =>
-  Array.from(
-    documents
-      .reduce((documentsById, document) => {
-        documentsById.set(document.id, document);
-        return documentsById;
-      }, new Map<string, TimelineDocument>())
-      .values(),
-  ).sort(
-    (left, right) =>
-      new Date(right.occurredAt).getTime() -
-      new Date(left.occurredAt).getTime(),
-  );
+  return criteria.filter((item): item is Criteria => Boolean(item));
+};
 
 const getMetricValues = (document: TimelineDocument): MetricValue[] =>
   (
@@ -1025,9 +993,9 @@ export const ListingPage = () => {
     setRefreshKey(key => key + 1);
   }, [queryFilters, searchParamsKey]);
 
-  const requestCriteriaSets = useMemo(
+  const requestCriteria = useMemo(
     () =>
-      getRequestCriteriaSets({
+      getRequestCriteria({
         dateRange: appliedFilters.dateRange,
         filters: appliedTraceFilters,
         freeText: appliedQuery.freeText,
@@ -1051,19 +1019,14 @@ export const ListingPage = () => {
 
     const fetchTelemetry = async () => {
       setIsLoading(true);
-      const shouldMergeRequests = requestCriteriaSets.length > 1;
-      const requestPages = getTelemetryPagesToFetch(page, shouldMergeRequests);
 
-      const createTelemetryRequest = (
-        criteria: Criteria[],
-        requestPage: number,
-      ) => {
+      const createTelemetryRequest = () => {
         const request = new GetAllTelemetryRequest();
         const paginate = new Paginate();
-        paginate.setPage(requestPage);
+        paginate.setPage(page);
         paginate.setPagesize(pageSize);
         request.setPaginate(paginate);
-        request.setCriteriasList(criteria);
+        request.setCriteriasList(requestCriteria);
 
         const order = new Ordering();
         order.setColumn('occurredAt');
@@ -1073,63 +1036,32 @@ export const ListingPage = () => {
       };
 
       try {
-        const responseGroups = await Promise.all(
-          requestCriteriaSets.map(criteria =>
-            Promise.all(
-              requestPages.map(requestPage =>
-                GetAllTelemetry(
-                  connectionConfig,
-                  createTelemetryRequest(criteria, requestPage),
-                  ConnectionConfig.WithDebugger({
-                    authorization: token,
-                    userId: authId,
-                    projectId,
-                  }),
-                ),
-              ),
-            ),
-          ),
+        const response = await GetAllTelemetry(
+          connectionConfig,
+          createTelemetryRequest(),
+          ConnectionConfig.WithDebugger({
+            authorization: token,
+            userId: authId,
+            projectId,
+          }),
         );
         if (!active) return;
 
-        const responses = responseGroups.flat();
-        const failedResponse = responses.find(
-          response => !response.getSuccess(),
-        );
-        if (failedResponse) {
+        if (!response.getSuccess()) {
           const message =
-            failedResponse.getError()?.getHumanmessage() ||
-            TRACE_LOAD_ERROR_MESSAGE;
+            response.getError()?.getHumanmessage() || TRACE_LOAD_ERROR_MESSAGE;
           toast.error(message);
           return;
         }
 
-        const mergedDocuments = mergeTimelineDocuments(
-          responses.flatMap(
-            response =>
-              response
-                .getDataList()
-                .map(telemetryRecordToTimelineDocument)
-                .filter(Boolean) as TimelineDocument[],
-          ),
-        );
-        const nextDocuments = shouldMergeRequests
-          ? mergedDocuments.slice((page - 1) * pageSize, page * pageSize)
-          : mergedDocuments;
+        const nextDocuments = response
+          .getDataList()
+          .map(telemetryRecordToTimelineDocument)
+          .filter(Boolean) as TimelineDocument[];
 
         setDocuments(nextDocuments);
         setTotalItem(
-          shouldMergeRequests
-            ? responseGroups.reduce(
-                (total, responseGroup) =>
-                  total +
-                  (responseGroup[0]?.getPaginated()?.getTotalitem() ||
-                    responseGroup[0]?.getDataList().length ||
-                    0),
-                0,
-              )
-            : responses[0]?.getPaginated()?.getTotalitem() ||
-                nextDocuments.length,
+          response.getPaginated()?.getTotalitem() || nextDocuments.length,
         );
       } catch (error) {
         if (!active) return;
@@ -1145,15 +1077,7 @@ export const ListingPage = () => {
     return () => {
       active = false;
     };
-  }, [
-    authId,
-    page,
-    pageSize,
-    projectId,
-    refreshKey,
-    requestCriteriaSets,
-    token,
-  ]);
+  }, [authId, page, pageSize, projectId, refreshKey, requestCriteria, token]);
 
   const filteredDocuments = useMemo(
     () =>

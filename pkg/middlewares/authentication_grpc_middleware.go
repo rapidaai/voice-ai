@@ -29,7 +29,7 @@ func NewAuthenticationUnaryServerMiddleware(resolver types.Authenticator, logger
 		authToken := strings.TrimSpace(incoming.Get(types.AUTHORIZATION_KEY))
 		authID := strings.TrimSpace(incoming.Get(types.AUTH_KEY))
 		projectID := strings.TrimSpace(incoming.Get(types.PROJECT_KEY))
-		if !validator.NotBlank(authToken) && !validator.NotBlank(authID) && !validator.NotBlank(projectID) {
+		if validator.NotBlank(authToken) || validator.NotBlank(authID) {
 			return handler(ctx, req)
 		}
 		if validator.NonNil(ctx.Value(types.CTX_)) {
@@ -108,7 +108,7 @@ func NewAuthenticationStreamServerMiddleware(resolver types.Authenticator, logge
 		authToken := strings.TrimSpace(incoming.Get(types.AUTHORIZATION_KEY))
 		authID := strings.TrimSpace(incoming.Get(types.AUTH_KEY))
 		projectID := strings.TrimSpace(incoming.Get(types.PROJECT_KEY))
-		if !validator.NotBlank(authToken) && !validator.NotBlank(authID) && !validator.NotBlank(projectID) {
+		if validator.NotBlank(authToken) || validator.NotBlank(authID) {
 			return handler(srv, stream)
 		}
 		if validator.NonNil(ctx.Value(types.CTX_)) {

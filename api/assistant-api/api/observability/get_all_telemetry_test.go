@@ -149,6 +149,40 @@ func TestTelemetryQueryPartsSupportsCanonicalCriteriaKeys(t *testing.T) {
 	}
 }
 
+func TestTelemetryQueryPartsSupportsMultipleComponents(t *testing.T) {
+	parts := mustTelemetryQueryParts(t, 1, 2)
+
+	parts.applyCriteria([]*protos.Criteria{
+		telemetryCriteria("component", "stt, tts"),
+	})
+
+	wantFilter := map[string]interface{}{
+		"bool": map[string]interface{}{
+			"should": []interface{}{
+				telemetryExactStringFilter("component", "stt"),
+				telemetryExactStringFilter("component", "tts"),
+			},
+			"minimum_should_match": 1,
+		},
+	}
+	if !reflect.DeepEqual(parts.filter[2], wantFilter) {
+		t.Fatalf("component filter = %#v, want %#v", parts.filter[2], wantFilter)
+	}
+}
+
+func TestTelemetryQueryPartsPreservesSingleComponent(t *testing.T) {
+	parts := mustTelemetryQueryParts(t, 1, 2)
+
+	parts.applyCriteria([]*protos.Criteria{
+		telemetryCriteria("component", "stt"),
+	})
+
+	wantFilter := telemetryExactStringFilter("component", "stt")
+	if !reflect.DeepEqual(parts.filter[2], wantFilter) {
+		t.Fatalf("component filter = %#v, want %#v", parts.filter[2], wantFilter)
+	}
+}
+
 func TestTelemetryQueryPartsSupportsTimestampLogic(t *testing.T) {
 	parts := mustTelemetryQueryParts(t, 1, 2)
 

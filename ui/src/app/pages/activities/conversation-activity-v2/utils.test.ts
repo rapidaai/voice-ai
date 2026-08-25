@@ -12,7 +12,7 @@ import {
   dedupeTraceFilters,
   formatDateTime,
   getDocumentComponent,
-  getTelemetryPagesToFetch,
+  getTraceFilterRequestValue,
   getTraceFilterValues,
   matchesTraceFilters,
   parseTraceFilterQuery,
@@ -70,26 +70,22 @@ describe('conversation activity v2 telemetry utilities', () => {
     jest.restoreAllMocks();
   });
 
-  it('fetches every preceding page when combining filter requests', () => {
-    expect(getTelemetryPagesToFetch(2, true)).toEqual([1, 2]);
-  });
+  it('sends component multi-select values in one server filter', () => {
+    const filter = parseTraceFilterQuery('component:stt,tts').filters[0];
 
-  it('fetches only the selected page for a single request', () => {
-    expect(getTelemetryPagesToFetch(2, false)).toEqual([2]);
+    expect(getTraceFilterRequestValue(filter)).toBe('stt,tts');
   });
 
   it('formats trace occurrence dates with the shared table contract', () => {
-    jest
-      .spyOn(Intl.DateTimeFormat.prototype, 'formatToParts')
-      .mockReturnValue([
-        { type: 'weekday', value: 'Mon' },
-        { type: 'day', value: '24' },
-        { type: 'month', value: 'Aug' },
-        { type: 'year', value: '2026' },
-        { type: 'hour', value: '16' },
-        { type: 'minute', value: '24' },
-        { type: 'second', value: '11' },
-      ]);
+    jest.spyOn(Intl.DateTimeFormat.prototype, 'formatToParts').mockReturnValue([
+      { type: 'weekday', value: 'Mon' },
+      { type: 'day', value: '24' },
+      { type: 'month', value: 'Aug' },
+      { type: 'year', value: '2026' },
+      { type: 'hour', value: '16' },
+      { type: 'minute', value: '24' },
+      { type: 'second', value: '11' },
+    ]);
 
     expect(formatDateTime('2026-08-24T10:54:11.000Z')).toBe(
       'Mon, 24 Aug 2026 16:24:11',

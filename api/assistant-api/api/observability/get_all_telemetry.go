@@ -39,6 +39,35 @@ func telemetryExactStringFilter(field string, value string) map[string]interface
 	}
 }
 
+func telemetryExactStringListFilter(field string, value string) map[string]interface{} {
+	items := strings.Split(value, ",")
+	values := make([]string, 0, len(items))
+	for _, item := range items {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		values = append(values, item)
+	}
+	if len(values) == 0 {
+		return telemetryExactStringFilter(field, value)
+	}
+	if len(values) == 1 {
+		return telemetryExactStringFilter(field, values[0])
+	}
+
+	should := make([]interface{}, 0, len(values))
+	for _, item := range values {
+		should = append(should, telemetryExactStringFilter(field, item))
+	}
+	return map[string]interface{}{
+		"bool": map[string]interface{}{
+			"should":               should,
+			"minimum_should_match": 1,
+		},
+	}
+}
+
 func telemetryAnyExactStringFilter(fields []string, value string) map[string]interface{} {
 	should := make([]interface{}, 0, len(fields))
 	for _, field := range fields {
@@ -135,7 +164,9 @@ func (parts *telemetryQueryParts) applyCriteria(criteriaList []*protos.Criteria)
 				parts.indices = []string{"rapida-metrics-*"}
 				parts.filter = append(parts.filter, telemetryExactStringFilter("kind", "metric"))
 			}
-		case "id", "scope", "event", "component", "name", "level":
+		case "component":
+			parts.filter = append(parts.filter, telemetryExactStringListFilter(key, value))
+		case "id", "scope", "event", "name", "level":
 			parts.filter = append(parts.filter, telemetryExactStringFilter(key, value))
 		case "assistantId":
 			parts.filter = append(parts.filter, telemetryExactStringFilter("scopeAttributes.assistantId", value))

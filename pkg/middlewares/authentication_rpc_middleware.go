@@ -46,7 +46,7 @@ func NewAuthenticationMiddleware(resolver types.Authenticator, logger commons.Lo
 		authToken = strings.TrimSpace(authToken)
 		authID = strings.TrimSpace(authID)
 		projectID = strings.TrimSpace(projectID)
-		if !validator.NotBlank(authToken) && !validator.NotBlank(authID) && !validator.NotBlank(projectID) {
+		if validator.NotBlank(authToken) || validator.NotBlank(authID) {
 			ctx.Next()
 			return
 		}
