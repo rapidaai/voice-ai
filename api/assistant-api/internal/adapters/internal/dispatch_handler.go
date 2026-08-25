@@ -137,50 +137,59 @@ func (h requestorDispatchHandler) HandleUserText(ctx context.Context, vl interna
 
 func (h requestorDispatchHandler) HandleUserAudio(ctx context.Context, vl internal_type.UserAudioReceivedPacket) {
 	if h.r.denoiserExecutor != nil {
-		h.r.OnPacket(ctx,
-			internal_type.DenoiseAudioPacket{ContextID: vl.ContextID, Audio: vl.Audio},
-		)
+		h.r.OnPacket(ctx, internal_type.DenoiseAudioPacket{ContextID: vl.ContextID, Audio: vl.Audio})
 		return
 	}
-	if h.r.vadExecutor != nil {
-		h.r.OnPacket(ctx,
-			internal_type.VadAudioPacket{ContextID: vl.ContextID, Audio: vl.Audio})
+
+	if h.r.speechToTextTransformer != nil {
+		h.r.OnPacket(ctx, internal_type.SpeechToTextAudioPacket{ContextID: vl.ContextID, Audio: vl.Audio})
 	}
-	h.r.OnPacket(ctx,
-		internal_type.SpeechToTextAudioPacket{ContextID: vl.ContextID, Audio: vl.Audio},
-		internal_type.EndOfSpeechAudioPacket{ContextID: vl.ContextID, Audio: vl.Audio},
-	)
+
+	if h.r.vadExecutor != nil {
+		h.r.OnPacket(ctx, internal_type.VadAudioPacket{ContextID: vl.ContextID, Audio: vl.Audio})
+	}
+
+	if h.r.endOfSpeechExecutor != nil {
+		h.r.OnPacket(ctx, internal_type.EndOfSpeechAudioPacket{ContextID: vl.ContextID, Audio: vl.Audio})
+	}
+
 }
 
 func (h requestorDispatchHandler) HandleEndOfSpeechAudio(ctx context.Context, vl internal_type.EndOfSpeechAudioPacket) {
 	if h.r.endOfSpeechExecutor != nil {
-		_ = h.r.endOfSpeechExecutor.Execute(ctx, vl)
+		h.r.endOfSpeechExecutor.Execute(ctx, vl)
 	}
 }
 
 func (h requestorDispatchHandler) HandleSpeechToTextAudio(ctx context.Context, vl internal_type.SpeechToTextAudioPacket) {
 	if h.r.speechToTextTransformer != nil {
-		_ = h.r.speechToTextTransformer.Transform(ctx, vl)
+		h.r.speechToTextTransformer.Transform(ctx, vl)
 	}
 }
 
 func (h requestorDispatchHandler) HandleDenoise(ctx context.Context, vl internal_type.DenoiseAudioPacket) {
-	_ = h.r.denoiserExecutor.Execute(ctx, vl)
+	if h.r.denoiserExecutor != nil {
+		h.r.denoiserExecutor.Execute(ctx, vl)
+	}
 }
 
 func (h requestorDispatchHandler) HandleDenoisedAudio(ctx context.Context, vl internal_type.DenoisedAudioPacket) {
-	if h.r.vadExecutor != nil {
-		h.r.OnPacket(ctx,
-			internal_type.VadAudioPacket{ContextID: vl.ContextID, Audio: vl.Audio})
+	if h.r.speechToTextTransformer != nil {
+		h.r.OnPacket(ctx, internal_type.SpeechToTextAudioPacket{ContextID: vl.ContextID, Audio: vl.Audio})
 	}
-	h.r.OnPacket(ctx,
-		internal_type.SpeechToTextAudioPacket{ContextID: vl.ContextID, Audio: vl.Audio},
-		internal_type.EndOfSpeechAudioPacket{ContextID: vl.ContextID, Audio: vl.Audio},
-	)
+	if h.r.vadExecutor != nil {
+		h.r.OnPacket(ctx, internal_type.VadAudioPacket{ContextID: vl.ContextID, Audio: vl.Audio})
+	}
+	if h.r.endOfSpeechExecutor != nil {
+		h.r.OnPacket(ctx, internal_type.EndOfSpeechAudioPacket{ContextID: vl.ContextID, Audio: vl.Audio})
+	}
 }
 
 func (h requestorDispatchHandler) HandleVadAudio(ctx context.Context, vl internal_type.VadAudioPacket) {
-	_ = h.r.vadExecutor.Execute(ctx, internal_type.UserAudioReceivedPacket{ContextID: vl.ContextID, Audio: vl.Audio})
+	if h.r.vadExecutor != nil {
+		h.r.vadExecutor.Execute(ctx, internal_type.UserAudioReceivedPacket{ContextID: vl.ContextID, Audio: vl.Audio})
+	}
+
 }
 func (h requestorDispatchHandler) HandleSpeechToText(ctx context.Context, p internal_type.SpeechToTextPacket) {
 	if !validator.NotBlank(p.Script) && !p.Interim {
@@ -403,7 +412,7 @@ func (h requestorDispatchHandler) HandleUserInput(ctx context.Context, p interna
 	)
 
 	if h.r.assistantExecutor != nil {
-		_ = h.r.messageLifecycle.AssistantGenerating(contextID)
+		h.r.messageLifecycle.AssistantGenerating(contextID)
 		utils.Go(ctx, func() {
 			if err := h.r.assistantExecutor.Execute(ctx, h.r, p); err != nil {
 				h.r.OnPacket(ctx, internal_type.LLMErrorPacket{ContextID: contextID, Error: err})
@@ -468,7 +477,7 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 		case internal_type.InterruptionEventStart:
 			if bargeInTrigger == internal_options.BargeInTriggerWord {
 				if h.r.endOfSpeechExecutor != nil {
-					_ = h.r.endOfSpeechExecutor.Execute(ctx, p)
+					h.r.endOfSpeechExecutor.Execute(ctx, p)
 				}
 				h.r.OnPacket(ctx, internal_type.SpeechToTextStartPacket{ContextID: p.ContextID})
 				return
@@ -477,7 +486,7 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 			messageState := h.r.messageLifecycle.State()
 			switch messageState {
 			case adapter_lifecycle.MessageStateUserIdle:
-				_ = h.r.messageLifecycle.UserSpeaking(p.ContextID)
+				h.r.messageLifecycle.UserSpeaking(p.ContextID)
 			case adapter_lifecycle.MessageStateUserListening,
 				adapter_lifecycle.MessageStateUserSpeaking,
 				adapter_lifecycle.MessageStateUserThinking:
