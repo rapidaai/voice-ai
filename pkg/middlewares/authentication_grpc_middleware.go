@@ -25,18 +25,16 @@ import (
 // NewAuthenticationUnaryServerMiddleware authenticates user credentials.
 func NewAuthenticationUnaryServerMiddleware(resolver types.Authenticator, logger commons.Logger) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		if validator.NonNil(ctx.Value(types.CTX_)) {
+			return handler(ctx, req)
+		}
 		incoming := metadata.ExtractIncoming(ctx)
 		authToken := strings.TrimSpace(incoming.Get(types.AUTHORIZATION_KEY))
 		authID := strings.TrimSpace(incoming.Get(types.AUTH_KEY))
 		projectID := strings.TrimSpace(incoming.Get(types.PROJECT_KEY))
-		if validator.NotBlank(authToken) || validator.NotBlank(authID) {
+
+		if !validator.NotBlank(authToken) && !validator.NotBlank(authID) {
 			return handler(ctx, req)
-		}
-		if validator.NonNil(ctx.Value(types.CTX_)) {
-			if validator.NonNil(logger) {
-				logger.Errorf(authenticationConflictMessage)
-			}
-			return nil, status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		if !validator.NonNil(resolver) {
 			if validator.NonNil(logger) {
@@ -104,18 +102,15 @@ func NewAuthenticationUnaryServerMiddleware(resolver types.Authenticator, logger
 func NewAuthenticationStreamServerMiddleware(resolver types.Authenticator, logger commons.Logger) grpc.StreamServerInterceptor {
 	return func(srv any, stream grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		ctx := stream.Context()
+		if validator.NonNil(ctx.Value(types.CTX_)) {
+			return handler(srv, stream)
+		}
 		incoming := metadata.ExtractIncoming(ctx)
 		authToken := strings.TrimSpace(incoming.Get(types.AUTHORIZATION_KEY))
 		authID := strings.TrimSpace(incoming.Get(types.AUTH_KEY))
 		projectID := strings.TrimSpace(incoming.Get(types.PROJECT_KEY))
-		if validator.NotBlank(authToken) || validator.NotBlank(authID) {
+		if !validator.NotBlank(authToken) && !validator.NotBlank(authID) {
 			return handler(srv, stream)
-		}
-		if validator.NonNil(ctx.Value(types.CTX_)) {
-			if validator.NonNil(logger) {
-				logger.Errorf(authenticationConflictMessage)
-			}
-			return status.Error(codes.Unauthenticated, AuthenticationFailureMessage)
 		}
 		if !validator.NonNil(resolver) {
 			if validator.NonNil(logger) {

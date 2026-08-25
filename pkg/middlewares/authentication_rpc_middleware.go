@@ -22,6 +22,10 @@ import (
 // NewAuthenticationMiddleware authenticates user credentials.
 func NewAuthenticationMiddleware(resolver types.Authenticator, logger commons.Logger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
+		if validator.NonNil(ctx.Request.Context().Value(types.CTX_)) {
+			ctx.Next()
+			return
+		}
 		authToken := ctx.Param(types.AUTHORIZATION_KEY)
 		if !validator.NonZero(authToken) {
 			authToken = ctx.GetHeader(types.AUTHORIZATION_KEY)
@@ -46,15 +50,8 @@ func NewAuthenticationMiddleware(resolver types.Authenticator, logger commons.Lo
 		authToken = strings.TrimSpace(authToken)
 		authID = strings.TrimSpace(authID)
 		projectID = strings.TrimSpace(projectID)
-		if !validator.NotBlank(authToken) || !validator.NotBlank(authID) {
+		if !validator.NotBlank(authToken) && !validator.NotBlank(authID) {
 			ctx.Next()
-			return
-		}
-		if validator.NonNil(ctx.Request.Context().Value(types.CTX_)) {
-			if validator.NonNil(logger) {
-				logger.Errorf(authenticationConflictMessage)
-			}
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, AuthenticationError{Error: AuthenticationFailureMessage})
 			return
 		}
 		if !validator.NonNil(resolver) {
