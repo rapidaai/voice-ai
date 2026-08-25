@@ -13,9 +13,11 @@ import (
 func newDispatchPolicyTestRequestor() *genericRequestor {
 	channels := adapter_channel.NewRequestorChannels()
 	return &genericRequestor{
-		channels:         channels,
-		dispatchRoute:    adapter_router.NewDispatchRoute(adapter_router.NewRoutePolicy(), channels),
-		sessionLifecycle: adapter_lifecycle.NewSessionLifecycleWithState(adapter_lifecycle.StateReady),
+		channels:                channels,
+		dispatchRoute:           adapter_router.NewDispatchRoute(adapter_router.NewRoutePolicy(), channels),
+		sessionLifecycle:        adapter_lifecycle.NewSessionLifecycleWithState(adapter_lifecycle.StateReady),
+		speechToTextTransformer: noopSpeechToTextTransformer{},
+		endOfSpeechExecutor:     &recordingEOSExecutor{},
 	}
 }
 

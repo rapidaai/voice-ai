@@ -150,7 +150,9 @@ func TestInitializeBehavior_GreetingInterruptibleOption_ControlsAudioBlock(t *te
 		t.Run(testCase.name, func(t *testing.T) {
 			requestorChannels := adapter_channel.NewRequestorChannels()
 			requestor := &genericRequestor{
-				source: utils.Debugger,
+				source:                  utils.Debugger,
+				speechToTextTransformer: noopSpeechToTextTransformer{},
+				endOfSpeechExecutor:     &recordingEOSExecutor{},
 				assistant: &internal_assistant_entity.Assistant{
 					AssistantDebuggerDeployment: &internal_assistant_entity.AssistantDebuggerDeployment{
 						AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
@@ -274,8 +276,10 @@ func TestInitializeBehavior_NonInterruptibleGreeting_BlocksAudioAndAcceptsAfterT
 	streamer := &streamTestStreamer{}
 	requestorChannels := adapter_channel.NewRequestorChannels()
 	requestor := &genericRequestor{
-		source:   utils.Debugger,
-		streamer: streamer,
+		source:                  utils.Debugger,
+		streamer:                streamer,
+		speechToTextTransformer: noopSpeechToTextTransformer{},
+		endOfSpeechExecutor:     &recordingEOSExecutor{},
 		assistant: &internal_assistant_entity.Assistant{
 			AssistantDebuggerDeployment: &internal_assistant_entity.AssistantDebuggerDeployment{
 				AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
@@ -333,8 +337,10 @@ func TestInitializeBehavior_NonInterruptibleGreeting_TextInputDoesNotKeepAudioBl
 	streamer := &streamTestStreamer{}
 	requestorChannels := adapter_channel.NewRequestorChannels()
 	requestor := &genericRequestor{
-		source:   utils.Debugger,
-		streamer: streamer,
+		source:                  utils.Debugger,
+		streamer:                streamer,
+		speechToTextTransformer: noopSpeechToTextTransformer{},
+		endOfSpeechExecutor:     &recordingEOSExecutor{},
 		assistant: &internal_assistant_entity.Assistant{
 			AssistantDebuggerDeployment: &internal_assistant_entity.AssistantDebuggerDeployment{
 				AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{

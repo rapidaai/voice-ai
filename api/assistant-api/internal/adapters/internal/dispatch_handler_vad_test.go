@@ -22,6 +22,28 @@ type blockingVADExecutor struct {
 	releaseCh chan struct{}
 }
 
+type noopDenoiserExecutor struct{}
+
+func (noopDenoiserExecutor) Name() string {
+	return "noop-denoiser"
+}
+
+func (noopDenoiserExecutor) Options() utils.Option {
+	return nil
+}
+
+func (noopDenoiserExecutor) Arguments() (map[string]string, error) {
+	return nil, nil
+}
+
+func (noopDenoiserExecutor) Execute(context.Context, internal_type.DenoiseAudioPacket) error {
+	return nil
+}
+
+func (noopDenoiserExecutor) Close(context.Context) error {
+	return nil
+}
+
 func (b *blockingVADExecutor) Name() string {
 	return "blocking-vad"
 }
@@ -153,4 +175,55 @@ func TestHandleVadAudio_ExecuteIsSynchronous(t *testing.T) {
 	case <-time.After(250 * time.Millisecond):
 		t.Fatal("expected HandleVadAudio to return after Execute unblocks")
 	}
+}
+
+func TestHandleUserAudio_QueuesSpeechToTextBeforeVAD(t *testing.T) {
+	r := newDispatchHandlerVADTestRequestor(t)
+	r.speechToTextTransformer = noopSpeechToTextTransformer{}
+	r.vadExecutor = &blockingVADExecutor{}
+	r.endOfSpeechExecutor = &recordingEOSExecutor{}
+	h := requestorDispatchHandler{r: r}
+
+	h.HandleUserAudio(t.Context(), internal_type.UserAudioReceivedPacket{
+		ContextID: "ctx-user-audio",
+		Audio:     []byte{1, 2},
+	})
+
+	require.Equal(t, internal_type.PacketNameSpeechToTextAudio, (<-r.channels.IngressChannel()).Pkt.PacketName())
+	require.Equal(t, internal_type.PacketNameVadAudio, (<-r.channels.IngressChannel()).Pkt.PacketName())
+	require.Equal(t, internal_type.PacketNameEndOfSpeechAudio, (<-r.channels.IngressChannel()).Pkt.PacketName())
+}
+
+func TestHandleDenoisedAudio_QueuesSpeechToTextBeforeVAD(t *testing.T) {
+	r := newDispatchHandlerVADTestRequestor(t)
+	r.speechToTextTransformer = noopSpeechToTextTransformer{}
+	r.vadExecutor = &blockingVADExecutor{}
+	r.endOfSpeechExecutor = &recordingEOSExecutor{}
+	h := requestorDispatchHandler{r: r}
+
+	h.HandleDenoisedAudio(t.Context(), internal_type.DenoisedAudioPacket{
+		ContextID: "ctx-denoised-audio",
+		Audio:     []byte{1, 2},
+	})
+
+	require.Equal(t, internal_type.PacketNameSpeechToTextAudio, (<-r.channels.IngressChannel()).Pkt.PacketName())
+	require.Equal(t, internal_type.PacketNameVadAudio, (<-r.channels.IngressChannel()).Pkt.PacketName())
+	require.Equal(t, internal_type.PacketNameEndOfSpeechAudio, (<-r.channels.IngressChannel()).Pkt.PacketName())
+}
+
+func TestHandleUserAudio_WithDenoiserQueuesOnlyDenoise(t *testing.T) {
+	r := newDispatchHandlerVADTestRequestor(t)
+	r.denoiserExecutor = noopDenoiserExecutor{}
+	r.speechToTextTransformer = noopSpeechToTextTransformer{}
+	r.vadExecutor = &blockingVADExecutor{}
+	r.endOfSpeechExecutor = &recordingEOSExecutor{}
+	h := requestorDispatchHandler{r: r}
+
+	h.HandleUserAudio(t.Context(), internal_type.UserAudioReceivedPacket{
+		ContextID: "ctx-user-audio",
+		Audio:     []byte{1, 2},
+	})
+
+	require.Equal(t, internal_type.PacketNameDenoiseAudio, (<-r.channels.IngressChannel()).Pkt.PacketName())
+	require.Empty(t, r.channels.IngressChannel())
 }
