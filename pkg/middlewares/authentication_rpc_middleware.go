@@ -46,7 +46,7 @@ func NewAuthenticationMiddleware(resolver types.Authenticator, logger commons.Lo
 		authToken = strings.TrimSpace(authToken)
 		authID = strings.TrimSpace(authID)
 		projectID = strings.TrimSpace(projectID)
-		if validator.NotBlank(authToken) || validator.NotBlank(authID) {
+		if !validator.NotBlank(authToken) || !validator.NotBlank(authID) {
 			ctx.Next()
 			return
 		}
@@ -64,6 +64,7 @@ func NewAuthenticationMiddleware(resolver types.Authenticator, logger commons.Lo
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, AuthenticationError{Error: AuthenticationFailureMessage})
 			return
 		}
+
 		if !validator.NotBlank(authToken) || !validator.NotBlank(authID) {
 			if validator.NonNil(logger) {
 				logger.Errorf(userAuthIncompleteMessage)
