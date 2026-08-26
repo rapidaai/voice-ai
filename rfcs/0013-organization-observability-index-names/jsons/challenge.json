@@ -1,0 +1,14 @@
+{
+  "round": 1,
+  "decision": "revise",
+  "reviewed_at": "2026-08-26",
+  "reviewed_rfc_sha256": "7d63b6b235f6aff381c76974916c8dcee468fed7d27ce74b2cd9d18603db31ba",
+  "reviewed_plan_sha256": "dae584c5212fe884982862565a24e58c372af8fb13ac2a25b84558334fee0518",
+  "findings": [
+    "Complete the Governed plan contract.",
+    "Record index and shard growth as an operational risk.",
+    "Require named cron compatibility evidence before production rollout.",
+    "Enumerate required test cases."
+  ],
+  "resolution": "RFC and plan revised without expanding production code scope."
+}
