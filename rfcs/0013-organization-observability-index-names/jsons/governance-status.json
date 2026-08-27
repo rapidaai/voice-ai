@@ -21,6 +21,11 @@
     "task_id": "task_b63df23a6aef",
     "gate_id": "gate_c6e52dd4502f"
   },
+  "authorization": {
+    "receipt": "rfcs/0013-organization-observability-index-names/jsons/authorization.json",
+    "authorized_by": "user",
+    "authorization_message": "Create authorize my RFC as my approval and commit"
+  },
   "implementation_authorized": true,
   "precedence": "This artifact and the referenced receipts are authoritative for final governance state. The RFC and plan remain immutable inputs to the exact-digest confirmation."
 }
