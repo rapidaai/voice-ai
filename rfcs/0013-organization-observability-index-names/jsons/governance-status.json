@@ -1,0 +1,26 @@
+{
+  "rfc": "rfcs/0013-organization-observability-index-names.md",
+  "status": "accepted",
+  "recorded_at": "2026-08-27",
+  "purpose": "Record the authoritative post-confirmation governance state without changing the exact-digest-approved RFC or plan bytes.",
+  "immutable_snapshots": {
+    "rfc_sha256": "67e3d51612f2caf10ad1bb26164b5c0ec6d665d73b61e4a27fed547443cd1a0d",
+    "plan_sha256": "8a31a15b372578207d439590351db36bc4ba9f856db9053d13a5b7daa15dc94d",
+    "note": "Pending fields in these snapshots describe their pre-gate state and are superseded by the receipts below."
+  },
+  "challenge": {
+    "receipt": "rfcs/0013-organization-observability-index-names/jsons/amendment-01-challenge.json",
+    "round": 2,
+    "decision": "approve",
+    "result": "No unresolved critical or major findings."
+  },
+  "confirmation": {
+    "receipt": "rfcs/0013-organization-observability-index-names/jsons/confirmation.json",
+    "resolution": "approved",
+    "run_id": "run_7664265d945b",
+    "task_id": "task_b63df23a6aef",
+    "gate_id": "gate_c6e52dd4502f"
+  },
+  "implementation_authorized": true,
+  "precedence": "This artifact and the referenced receipts are authoritative for final governance state. The RFC and plan remain immutable inputs to the exact-digest confirmation."
+}
