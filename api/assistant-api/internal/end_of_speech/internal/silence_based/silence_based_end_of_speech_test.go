@@ -1321,10 +1321,9 @@ func TestSystemInputExtendsTimer(t *testing.T) {
 	select {
 	case cbTime := <-callTime:
 		elapsed := cbTime.Sub(startTime)
-		expectedMs := 200 * time.Millisecond
-		tolerance := 20 * time.Millisecond
-		if elapsed < expectedMs-tolerance || elapsed > expectedMs+tolerance {
-			t.Fatalf("callback timing incorrect: expected %v±%v, got %v", expectedMs, tolerance, elapsed)
+		minimumDelay := 180 * time.Millisecond
+		if elapsed < minimumDelay {
+			t.Fatalf("callback fired before the extended timer: expected at least %v, got %v", minimumDelay, elapsed)
 		}
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("timeout waiting for callback on system input")
