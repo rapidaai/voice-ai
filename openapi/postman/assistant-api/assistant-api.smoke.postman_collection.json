@@ -37,6 +37,11 @@
       "type": "string"
     },
     {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
       "key": "authId",
       "value": "",
       "type": "string"
@@ -176,6 +181,10 @@
                 "value": "application/json"
               },
               {
+                "key": "authorization",
+                "value": "{{authToken}}"
+              },
+              {
                 "key": "x-auth-id",
                 "value": "{{authId}}"
               },
@@ -248,6 +257,10 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "authorization",
+                "value": "{{authToken}}"
               },
               {
                 "key": "x-auth-id",
@@ -335,6 +348,10 @@
                 "value": "application/json"
               },
               {
+                "key": "authorization",
+                "value": "{{authToken}}"
+              },
+              {
                 "key": "x-auth-id",
                 "value": "{{authId}}"
               },
@@ -403,6 +420,10 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "authorization",
+                "value": "{{authToken}}"
               },
               {
                 "key": "x-auth-id",
@@ -488,6 +509,10 @@
                 "value": "application/json"
               },
               {
+                "key": "authorization",
+                "value": "{{authToken}}"
+              },
+              {
                 "key": "x-auth-id",
                 "value": "{{authId}}"
               },
@@ -555,6 +580,10 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "authorization",
+                "value": "{{authToken}}"
               },
               {
                 "key": "x-auth-id",
@@ -642,6 +671,10 @@
                 "value": "application/json"
               },
               {
+                "key": "authorization",
+                "value": "{{authToken}}"
+              },
+              {
                 "key": "x-auth-id",
                 "value": "{{authId}}"
               },
@@ -710,6 +743,10 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "authorization",
+                "value": "{{authToken}}"
               },
               {
                 "key": "x-auth-id",
@@ -795,6 +832,10 @@
                 "value": "application/json"
               },
               {
+                "key": "authorization",
+                "value": "{{authToken}}"
+              },
+              {
                 "key": "x-auth-id",
                 "value": "{{authId}}"
               },
@@ -862,6 +903,10 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "authorization",
+                "value": "{{authToken}}"
               },
               {
                 "key": "x-auth-id",
@@ -949,6 +994,10 @@
                 "value": "application/json"
               },
               {
+                "key": "authorization",
+                "value": "{{authToken}}"
+              },
+              {
                 "key": "x-auth-id",
                 "value": "{{authId}}"
               },
@@ -1017,6 +1066,10 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "authorization",
+                "value": "{{authToken}}"
               },
               {
                 "key": "x-auth-id",
@@ -1102,6 +1155,10 @@
                 "value": "application/json"
               },
               {
+                "key": "authorization",
+                "value": "{{authToken}}"
+              },
+              {
                 "key": "x-auth-id",
                 "value": "{{authId}}"
               },
@@ -1169,6 +1226,10 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "authorization",
+                "value": "{{authToken}}"
               },
               {
                 "key": "x-auth-id",
@@ -1256,6 +1317,10 @@
                 "value": "application/json"
               },
               {
+                "key": "authorization",
+                "value": "{{authToken}}"
+              },
+              {
                 "key": "x-auth-id",
                 "value": "{{authId}}"
               },
@@ -1324,6 +1389,10 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "authorization",
+                "value": "{{authToken}}"
               },
               {
                 "key": "x-auth-id",
@@ -1409,6 +1478,10 @@
                 "value": "application/json"
               },
               {
+                "key": "authorization",
+                "value": "{{authToken}}"
+              },
+              {
                 "key": "x-auth-id",
                 "value": "{{authId}}"
               },
@@ -1476,6 +1549,10 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "authorization",
+                "value": "{{authToken}}"
               },
               {
                 "key": "x-auth-id",
@@ -1563,6 +1640,10 @@
                 "value": "application/json"
               },
               {
+                "key": "authorization",
+                "value": "{{authToken}}"
+              },
+              {
                 "key": "x-auth-id",
                 "value": "{{authId}}"
               },
@@ -1637,6 +1718,10 @@
                 "value": "application/json"
               },
               {
+                "key": "authorization",
+                "value": "{{authToken}}"
+              },
+              {
                 "key": "x-auth-id",
                 "value": "{{authId}}"
               },
@@ -1694,6 +1779,10 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "authorization",
+                "value": "{{authToken}}"
               },
               {
                 "key": "x-auth-id",
@@ -1772,6 +1861,10 @@
                 "value": "application/json"
               },
               {
+                "key": "authorization",
+                "value": "{{authToken}}"
+              },
+              {
                 "key": "x-auth-id",
                 "value": "{{authId}}"
               },
@@ -1846,6 +1939,10 @@
                 "value": "application/json"
               },
               {
+                "key": "authorization",
+                "value": "{{authToken}}"
+              },
+              {
                 "key": "x-auth-id",
                 "value": "{{authId}}"
               },
@@ -1903,6 +2000,10 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "authorization",
+                "value": "{{authToken}}"
               },
               {
                 "key": "x-auth-id",
@@ -1981,6 +2082,10 @@
                 "value": "application/json"
               },
               {
+                "key": "authorization",
+                "value": "{{authToken}}"
+              },
+              {
                 "key": "x-auth-id",
                 "value": "{{authId}}"
               },
@@ -2055,6 +2160,10 @@
                 "value": "application/json"
               },
               {
+                "key": "authorization",
+                "value": "{{authToken}}"
+              },
+              {
                 "key": "x-auth-id",
                 "value": "{{authId}}"
               },
@@ -2112,6 +2221,10 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "authorization",
+                "value": "{{authToken}}"
               },
               {
                 "key": "x-auth-id",
@@ -2190,6 +2303,10 @@
                 "value": "application/json"
               },
               {
+                "key": "authorization",
+                "value": "{{authToken}}"
+              },
+              {
                 "key": "x-auth-id",
                 "value": "{{authId}}"
               },
@@ -2264,6 +2381,10 @@
                 "value": "application/json"
               },
               {
+                "key": "authorization",
+                "value": "{{authToken}}"
+              },
+              {
                 "key": "x-auth-id",
                 "value": "{{authId}}"
               },
@@ -2321,6 +2442,10 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "authorization",
+                "value": "{{authToken}}"
               },
               {
                 "key": "x-auth-id",
@@ -2399,6 +2524,10 @@
                 "value": "application/json"
               },
               {
+                "key": "authorization",
+                "value": "{{authToken}}"
+              },
+              {
                 "key": "x-auth-id",
                 "value": "{{authId}}"
               },
@@ -2473,6 +2602,10 @@
                 "value": "application/json"
               },
               {
+                "key": "authorization",
+                "value": "{{authToken}}"
+              },
+              {
                 "key": "x-auth-id",
                 "value": "{{authId}}"
               },
@@ -2530,6 +2663,10 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "authorization",
+                "value": "{{authToken}}"
               },
               {
                 "key": "x-auth-id",
@@ -2608,6 +2745,10 @@
                 "value": "application/json"
               },
               {
+                "key": "authorization",
+                "value": "{{authToken}}"
+              },
+              {
                 "key": "x-auth-id",
                 "value": "{{authId}}"
               },
@@ -2665,6 +2806,10 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "authorization",
+                "value": "{{authToken}}"
               },
               {
                 "key": "x-auth-id",
@@ -2726,6 +2871,10 @@
                 "value": "application/json"
               },
               {
+                "key": "authorization",
+                "value": "{{authToken}}"
+              },
+              {
                 "key": "x-auth-id",
                 "value": "{{authId}}"
               },
@@ -2783,6 +2932,10 @@
               {
                 "key": "Accept",
                 "value": "application/json"
+              },
+              {
+                "key": "authorization",
+                "value": "{{authToken}}"
               },
               {
                 "key": "x-auth-id",

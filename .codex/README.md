@@ -9,14 +9,15 @@ Prerequisites:
 - Python package `jsonschema`
 - `go`
 - `yarn` (for UI-related checks)
+- `just`
 
 Validate local setup:
 
 ```bash
 find .codex/skills -maxdepth 2 -type d | sort
-make validate-development-process
-make validate-agent-tooling
-make agent-finalize CHANGED_FILES="api/example/service.go,api/example/service_test.go"
+just validate-development-process
+just validate-agent-tooling
+just agent-finalize "api/example/service.go,api/example/service_test.go"
 ```
 
 ## Install in another repository
@@ -63,8 +64,8 @@ The final `post-review` gate rejects self-review and unresolved critical or majo
 Render or open the Orca development panel:
 
 ```bash
-make orca-panel PANEL_INPUT="path/to/lifecycle-input.json"
-make orca-panel-open PANEL_INPUT="path/to/lifecycle-input.json"
+just orca-panel "path/to/lifecycle-input.json"
+just orca-panel-open "path/to/lifecycle-input.json"
 ```
 
 Parity assets for subagent/hook workflow are available in:
@@ -72,7 +73,7 @@ Parity assets for subagent/hook workflow are available in:
 - `.codex/agents/`
 - `.codex/hooks/`
 
-Use `make validate-development-toolkit` to validate lifecycle gates, skill packaging, agent role contracts, non-blocking Claude settings, hook parity, and scoped validation together.
+Use `just validate-development-toolkit` to validate lifecycle gates, skill packaging, agent role contracts, non-blocking Claude settings, hook parity, and scoped validation together.
 
 Codex-standard repo guidance is defined in root `AGENTS.md`.
 Custom project subagent profiles are defined in `.codex/agents/*.md`.

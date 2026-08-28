@@ -167,7 +167,9 @@ func TestMediaPort_AssistantAudioReachesRTPOutput(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for delivered assistant recording")
 	}
-	assert.False(t, mediaPort.session.GetInboundSetupTimings().FirstAssistantAudioSentAt.IsZero())
+	require.Eventually(t, func() bool {
+		return !mediaPort.session.GetInboundSetupTimings().FirstAssistantAudioSentAt.IsZero()
+	}, time.Second, 10*time.Millisecond)
 }
 
 func TestMediaPort_StartInputDoesNotStartAssistantOutput(t *testing.T) {

@@ -339,6 +339,13 @@ type bridgeResult struct {
 	err    error
 }
 
+func requireBridgeConnected(t *testing.T, inbound, outbound *Session) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		return inbound.GetState() == CallStateBridgeConnected && outbound.GetState() == CallStateBridgeConnected
+	}, time.Second, 10*time.Millisecond)
+}
+
 func TestBridgeTransfer_ContextCancellation(t *testing.T) {
 	t.Parallel()
 	srv := bridgeTestServer()
@@ -353,7 +360,7 @@ func TestBridgeTransfer_ContextCancellation(t *testing.T) {
 		done <- bridgeResult{r, err}
 	}()
 
-	time.Sleep(10 * time.Millisecond)
+	requireBridgeConnected(t, inbound, outbound)
 	cancel()
 
 	select {
@@ -385,9 +392,7 @@ func TestBridgeTransfer_OwnsBridgeLifecycle(t *testing.T) {
 		done <- bridgeResult{reason: reason, err: err}
 	}()
 
-	require.Eventually(t, func() bool {
-		return inbound.GetState() == CallStateBridgeConnected && outbound.GetState() == CallStateBridgeConnected
-	}, time.Second, 10*time.Millisecond)
+	requireBridgeConnected(t, inbound, outbound)
 	cancel()
 
 	select {
@@ -429,7 +434,7 @@ func TestBridgeTransfer_InboundByeEndsBridge(t *testing.T) {
 		done <- bridgeResult{r, err}
 	}()
 
-	time.Sleep(10 * time.Millisecond)
+	requireBridgeConnected(t, inbound, outbound)
 	inbound.NotifyBye()
 
 	select {
@@ -455,7 +460,7 @@ func TestBridgeTransfer_OutboundByeEndsBridge(t *testing.T) {
 		done <- bridgeResult{r, err}
 	}()
 
-	time.Sleep(10 * time.Millisecond)
+	requireBridgeConnected(t, inbound, outbound)
 	outbound.NotifyBye()
 
 	select {
@@ -482,7 +487,7 @@ func TestBridgeTransfer_SessionEndTerminatesBridge(t *testing.T) {
 		done <- bridgeResult{r, err}
 	}()
 
-	time.Sleep(10 * time.Millisecond)
+	requireBridgeConnected(t, inbound, outbound)
 	inbound.End()
 
 	select {
@@ -584,8 +589,7 @@ func TestBridgeTransfer_OnlyEndsOutboundSession(t *testing.T) {
 		done <- bridgeResult{r, err}
 	}()
 
-	// Give the bridge goroutines time to start
-	time.Sleep(10 * time.Millisecond)
+	requireBridgeConnected(t, inbound, outbound)
 
 	// Simulate the transfer target ending the call through session lifecycle.
 	outbound.End()
@@ -615,7 +619,7 @@ func TestBridgeTransfer_InboundBye_DoesNotEndEitherSession(t *testing.T) {
 		done <- bridgeResult{r, err}
 	}()
 
-	time.Sleep(10 * time.Millisecond)
+	requireBridgeConnected(t, inbound, outbound)
 	inbound.NotifyBye()
 
 	select {

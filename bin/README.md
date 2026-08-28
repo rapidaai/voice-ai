@@ -1,7 +1,7 @@
 # `/bins`
 
 Scripts to perform various build, install, analysis, etc operations.
-These scripts keep the root level Makefile small and simple.
+These scripts back the modular recipes under `just/`.
 
 Development governance helpers:
 

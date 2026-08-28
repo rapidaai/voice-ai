@@ -10,7 +10,7 @@ if [[ "$agent_root" != ".codex" && "$agent_root" != ".claude" ]]; then
 fi
 
 if [[ -z "$changed_files" ]]; then
-  echo "Usage: make agent-finalize CHANGED_FILES='path/a.go,path/a_test.go' [AGENT_ROOT=.codex]" >&2
+  echo "Usage: just agent-finalize 'path/a.go,path/a_test.go' [agent-root]" >&2
   exit 2
 fi
 

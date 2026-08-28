@@ -1,6 +1,3 @@
-compose.version=2.24.4
-compose.linux-amd64.sha256=b506272a7f34ea056e36ba23e83593c491fd8419b0ed30ecacc42fe2eee8c964
-compose.darwin-arm64.sha256=e5d7dd8f0cccbbb729200cc1bf7fbf626cda79e36689ee8b4fd3d878cbbb09d9
 buf.version=1.72.0
 buf.linux-amd64.sha256=8720830e26a733da55bb89bcd3cb44849c0965fc0c44fb5d691cccdc64dca5af
 buf.darwin-arm64.sha256=5176f23a6118b9978de1340c3e3301a4ed0d48e16a669510be44b4c355170d57

@@ -59,5 +59,6 @@ githooks/
 *.md
 !api/**/migrations/**
 docker-compose*.yml
-Makefile
+justfile
+just/
 buf.yaml

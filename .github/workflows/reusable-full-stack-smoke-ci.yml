@@ -1,0 +1,64 @@
+name: Reusable Full Stack Smoke CI
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  full-stack-smoke:
+    name: Build Services and Run Smoke Tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      COMPOSE_PROJECT_NAME: rapida-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+      SMOKE_AUTH_TOKEN: ci-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+      SMOKE_DIAGNOSTICS_DIR: ${{ github.workspace }}/smoke-diagnostics
+      SMOKE_REPORTS_DIR: ${{ github.workspace }}/smoke-reports
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Set up Just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3
+        with:
+          just-version: "1.58.0"
+
+      - name: Set smoke cache scope
+        shell: bash
+        run: |
+          cache_scope=$(git ls-files -s -- docker-compose.yml docker-compose.ci.yml docker go.mod go.sum ui/yarn.lock tests/smoke \
+            | sha256sum \
+            | cut -d ' ' -f 1)
+          echo "SMOKE_CACHE_SCOPE=full-stack-$cache_scope" >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+        with:
+          name: rapida-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          driver: docker-container
+          install: true
+
+      - name: Run full-stack smoke CI
+        run: just ci-smoke
+
+      - name: Upload smoke test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: full-stack-smoke-reports-${{ github.run_id }}-${{ github.run_attempt }}
+          path: smoke-reports
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload failure diagnostics
+        if: failure() && hashFiles('smoke-diagnostics/**') != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: full-stack-smoke-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: smoke-diagnostics
+          if-no-files-found: error
+          retention-days: 7

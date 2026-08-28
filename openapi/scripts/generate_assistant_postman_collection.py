@@ -355,6 +355,7 @@ CONFIGURATION_VARIANTS: list[dict[str, Any]] = [
 COLLECTION_VARIABLES: list[dict[str, str]] = [
     {"key": "baseUrl", "value": "http://localhost:9007", "type": "string"},
     {"key": "apiKey", "value": "", "type": "string"},
+    {"key": "authToken", "value": "", "type": "string"},
     {"key": "authId", "value": "", "type": "string"},
     {"key": "projectId", "value": "", "type": "string"},
     {"key": "assistantId", "value": "1", "type": "string"},
@@ -996,6 +997,7 @@ def build_item(
 def build_headers(operation: dict[str, Any]) -> list[dict[str, str]]:
     headers = [
         {"key": "Accept", "value": "application/json"},
+        {"key": "authorization", "value": "{{authToken}}"},
         {"key": "x-auth-id", "value": "{{authId}}"},
         {"key": "x-project-id", "value": "{{projectId}}"},
     ]

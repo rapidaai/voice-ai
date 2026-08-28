@@ -4,7 +4,7 @@ set -Eeuo pipefail
 baseline_directory=${1:?usage: check-compatibility.sh BASELINE_DIRECTORY}
 current_openapi_directory=openapi/artifacts
 baseline_openapi_directory=${baseline_directory}/openapi/artifacts
-generator=$(pwd)/tests/system/cmd/protobuf-descriptor/main.go
+generator=$(pwd)/scripts/contracts/protobuf-descriptor/main.go
 working_directory=$(mktemp -d "${RUNNER_TEMP:-/tmp}/contract-compatibility.XXXXXX")
 current_protobuf_image=${working_directory}/current-protos.binpb
 baseline_protobuf_image=${working_directory}/baseline-protos.binpb
@@ -28,8 +28,8 @@ for required_file in \
   }
 done
 
-test -x ./tests/system/bin/buf
-test -x ./tests/system/bin/oasdiff
+test -x ./scripts/contracts/bin/buf
+test -x ./scripts/contracts/bin/oasdiff
 compgen -G 'protos/*.go' >/dev/null || {
   echo "Missing current tracked protobuf Go files" >&2
   exit 1
@@ -39,14 +39,12 @@ compgen -G "${baseline_directory}/protos/*.go" >/dev/null || {
   exit 1
 }
 
-go run ./tests/system/cmd/systemcheck openapi-parse "${current_openapi_directory}"
-go run ./tests/system/cmd/systemcheck openapi-parse "${baseline_openapi_directory}"
 python3 openapi/scripts/generate_assistant_postman_collection.py --check
 
-./tests/system/bin/oasdiff breaking \
+./scripts/contracts/bin/oasdiff breaking \
   "${baseline_openapi_directory}/assistant-api.yaml" \
   "${current_openapi_directory}/assistant-api.yaml"
-./tests/system/bin/oasdiff breaking \
+./scripts/contracts/bin/oasdiff breaking \
   "${baseline_openapi_directory}/talk-api.yaml" \
   "${current_openapi_directory}/talk-api.yaml"
 
@@ -70,5 +68,5 @@ if [[ -n ${GITHUB_STEP_SUMMARY:-} ]]; then
   } >> "${GITHUB_STEP_SUMMARY}"
 fi
 
-./tests/system/bin/buf breaking "${current_protobuf_image}" \
+./scripts/contracts/bin/buf breaking "${current_protobuf_image}" \
   --against "${baseline_protobuf_image}"

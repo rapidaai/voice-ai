@@ -3,7 +3,7 @@
 ## Environment choice
 
 - Recommended path: Docker
-- Why: repository Makefile and compose files provide first-class startup flow.
+- Why: repository Just recipes and compose files provide first-class startup flow.
 
 ## Prerequisites
 
@@ -12,16 +12,16 @@
 
 ## Docker workflow
 
-- Setup/build: `make setup-local && make build-all`
-- Run: `make up-all`
-- Knowledge mode: `make up-all-with-knowledge`
-- Stop: `make down-all`
+- Setup/build: `just setup-local build-all`
+- Run: `just up-all`
+- Knowledge mode: `just up-all-with-knowledge`
+- Stop: `just down-all`
 
 ## Non-docker workflow
 
-- Dependencies: `make deps` (or `make deps-knowledge`)
-- APIs: `make run-web`, `make run-assistant`, `make run-endpoint`, `make run-integration`
-- UI: `make run-ui`
+- Dependencies: `just deps` (or `just deps-knowledge`)
+- APIs: `just run-web`, `just run-assistant`, `just run-endpoint`, `just run-integration`
+- UI: `just run-ui`
 
 ## Health checks
 
@@ -35,9 +35,9 @@
 ## Troubleshooting
 
 - Port conflict: identify with `lsof -i :<port>` and stop conflicting process.
-- Service crash: inspect `make logs-all` and `docker compose ps`.
+- Service crash: inspect `just logs-all` and `docker compose ps`.
 
 ## Verification evidence
 
-- Commands executed: `make help`, `make up-all`, `docker compose ps`
+- Commands executed: `just --list`, `just up-all`, `docker compose ps`
 - Output summary: services reachable on expected ports.

@@ -13,7 +13,7 @@ Provide accurate local setup/run instructions based on this repository's actual 
 
 In scope:
 - local run documentation and runbook changes
-- command mapping from `README.md`, `Makefile`, and compose files
+- command mapping from `README.md`, `justfile`, `just/`, and compose files
 - prerequisites and troubleshooting guidance
 
 Out of scope:
@@ -23,7 +23,7 @@ Out of scope:
 ## Source-of-truth files
 
 - `README.md`
-- `Makefile`
+- `justfile` and `just/*.just`
 - `docker-compose.yml`
 - `docker-compose.knowledge.yml`
 
@@ -44,10 +44,10 @@ Out of scope:
 
 ## Validation commands
 
-- `make help`
-- `make up-all`
-- `make up-all-with-knowledge`
-- `make deps`
+- `just --list`
+- `just up-all`
+- `just up-all-with-knowledge`
+- `just deps`
 - `docker compose ps`
 
 ## References

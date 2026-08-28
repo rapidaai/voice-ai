@@ -1,5 +1,5 @@
 {
-  "name": "rapida-system-test-runner",
+  "name": "rapida-smoke-runner",
   "private": true,
   "version": "1.0.0",
   "dependencies": {

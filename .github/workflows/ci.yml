@@ -1,4 +1,4 @@
-name: CI
+name: Build, Test, and Smoke
 
 on:
   pull_request:
@@ -39,32 +39,31 @@ jobs:
     name: Repository
     uses: ./.github/workflows/reusable-repository-ci.yml
     with:
+      go-version: "1.25.13"
       node-version: "22"
 
   docker:
     name: Docker
     uses: ./.github/workflows/reusable-docker-ci.yml
 
-  # Stabilization lanes report independently until the RFC graduation thresholds
-  # are met. They intentionally remain outside ci-success, and Docker CI remains.
   assistant-native:
-    name: Assistant Native (stabilizing)
+    name: Assistant Native Runtime Verification
     uses: ./.github/workflows/reusable-assistant-native-ci.yml
 
-  system:
-    name: System (stabilizing)
-    uses: ./.github/workflows/reusable-system-ci.yml
+  smoke:
+    name: Full Stack Smoke Tests
+    uses: ./.github/workflows/reusable-full-stack-smoke-ci.yml
 
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    # Graduation: add each lane only after its RFC sample passes. When system
-    # graduates, remove docker here and remove the standalone docker job above.
     needs:
       - go
       - ui
       - repository
       - docker
+      - assistant-native
+      - smoke
     if: always()
     steps:
       - name: Check all jobs passed
@@ -90,4 +89,6 @@ jobs:
             echo "| UI | ${{ needs.ui.result }} |"
             echo "| Repository | ${{ needs.repository.result }} |"
             echo "| Docker | ${{ needs.docker.result }} |"
+            echo "| Assistant Native Runtime Verification | ${{ needs.assistant-native.result }} |"
+            echo "| Full Stack Smoke Tests | ${{ needs.smoke.result }} |"
           } >> "$GITHUB_STEP_SUMMARY"

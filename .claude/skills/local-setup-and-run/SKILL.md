@@ -13,7 +13,7 @@ Provide accurate, repo-grounded local run instructions for both Docker and non-D
 
 In scope:
 - setup/run documentation and runbook updates
-- command verification based on `README.md`, `Makefile`, `docker-compose.yml`, and `docker-compose.knowledge.yml`
+- command verification based on `README.md`, `justfile`, `just/`, `docker-compose.yml`, and `docker-compose.knowledge.yml`
 - prerequisites and dependency matrix guidance
 
 Out of scope:
@@ -23,7 +23,7 @@ Out of scope:
 ## Source of truth files
 
 - `README.md`
-- `Makefile`
+- `justfile` and `just/*.just`
 - `docker-compose.yml`
 - `docker-compose.knowledge.yml`
 - env templates under `docker/*/*.env` (when present)
@@ -40,7 +40,7 @@ Out of scope:
 ## Defaults to minimize interruptions
 
 - Prefer Docker flow as default recommendation.
-- Use Makefile targets when available.
+- Use Just recipes when available.
 - If non-Docker dependencies are missing, call them out explicitly (PostgreSQL/Redis/OpenSearch).
 
 ## Governed lifecycle
@@ -52,8 +52,8 @@ Out of scope:
 
 ## Validation commands
 
-- `make help`
-- `make up-all`
-- `make up-all-with-knowledge`
-- `make deps && make run-web` (example non-Docker path)
+- `just --list`
+- `just up-all`
+- `just up-all-with-knowledge`
+- `just deps run-web` (example non-Docker path)
 - `docker compose ps`

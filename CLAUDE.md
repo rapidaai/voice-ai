@@ -11,16 +11,16 @@ Rapida is an open-source, Go-based microservices platform for voice AI orchestra
 ### Docker (primary development workflow)
 
 ```bash
-make setup-local        # Create data directories (run once)
-make build-all          # Build all Docker images
-make up-all             # Start all services
-make down-all           # Stop all services
-make logs-all           # Tail logs for all services
-make logs-assistant     # Tail logs for a specific service
-make rebuild-assistant  # Rebuild and restart a specific service (no cache)
-make status             # Show container status and ports
-make clean              # Remove containers, volumes, and images
-make deps               # Start only infrastructure (postgres, redis, opensearch)
+just setup-local        # Create data directories (run once)
+just build-all          # Build all Docker images
+just up-all             # Start all services
+just down-all           # Stop all services
+just logs-all           # Tail logs for all services
+just logs-assistant     # Tail logs for a specific service
+just rebuild-assistant  # Rebuild and restart a specific service (no cache)
+just status             # Show container status and ports
+just clean              # Remove containers, volumes, and images
+just deps               # Start only infrastructure (postgres and redis)
 ```
 
 ### Local (without Docker)

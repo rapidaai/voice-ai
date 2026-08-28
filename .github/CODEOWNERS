@@ -21,7 +21,8 @@
 
 /docker/ @rapida/devops
 /.github/ @rapida/devops
-/Makefile @rapida/devops
+/justfile @rapida/devops
+/just/ @rapida/devops
 /docker-compose.yml @rapida/devops
 
 # Documentation

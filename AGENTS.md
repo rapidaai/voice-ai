@@ -45,7 +45,7 @@ Sequence: `understand -> plan -> draft RFC -> challenge -> confirm -> implement 
 
 - UI behavior changes in `ui/src/**` include focused UI tests using existing local patterns.
 - Backend behavior changes in `api/**`, `pkg/**`, or `cmd/**` include corresponding `*_test.go` coverage in each changed package.
-- Run validation explicitly with `make agent-finalize CHANGED_FILES="comma,separated,paths"`; completion hooks must not run tests or block agent exit.
+- Run validation explicitly with `just agent-finalize "comma,separated,paths"`; completion hooks must not run tests or block agent exit.
 - Ship only with passing required checks and no unresolved critical or major review findings.
 
 See `DEVELOPMENT_PROCESS.md` for role responsibilities and the Orca workflow.
