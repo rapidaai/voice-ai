@@ -29,9 +29,9 @@ services:
     ports: !reset []
     build:
       cache_from:
-        - type=gha,scope=${SMOKE_CACHE_SCOPE:?SMOKE_CACHE_SCOPE is required}-ui
+        - type=gha,scope=${CI_STACK_CACHE_SCOPE:?CI_STACK_CACHE_SCOPE is required}-ui
       cache_to:
-        - type=gha,scope=${SMOKE_CACHE_SCOPE:?SMOKE_CACHE_SCOPE is required}-ui,mode=max
+        - type=gha,scope=${CI_STACK_CACHE_SCOPE:?CI_STACK_CACHE_SCOPE is required}-ui,mode=max
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://127.0.0.1:3000/"]
       interval: 5s
@@ -45,9 +45,9 @@ services:
     command: ["./web-api", "-skip-migration"]
     build:
       cache_from:
-        - type=gha,scope=${SMOKE_CACHE_SCOPE:?SMOKE_CACHE_SCOPE is required}-web-api
+        - type=gha,scope=${CI_STACK_CACHE_SCOPE:?CI_STACK_CACHE_SCOPE is required}-web-api
       cache_to:
-        - type=gha,scope=${SMOKE_CACHE_SCOPE:?SMOKE_CACHE_SCOPE is required}-web-api,mode=max
+        - type=gha,scope=${CI_STACK_CACHE_SCOPE:?CI_STACK_CACHE_SCOPE is required}-web-api,mode=max
     volumes:
       - smoke-assets:/app/rapida-data/assets
 
@@ -57,9 +57,9 @@ services:
     command: ["./integration-api", "-skip-migration"]
     build:
       cache_from:
-        - type=gha,scope=${SMOKE_CACHE_SCOPE:?SMOKE_CACHE_SCOPE is required}-integration-api
+        - type=gha,scope=${CI_STACK_CACHE_SCOPE:?CI_STACK_CACHE_SCOPE is required}-integration-api
       cache_to:
-        - type=gha,scope=${SMOKE_CACHE_SCOPE:?SMOKE_CACHE_SCOPE is required}-integration-api,mode=max
+        - type=gha,scope=${CI_STACK_CACHE_SCOPE:?CI_STACK_CACHE_SCOPE is required}-integration-api,mode=max
     volumes:
       - smoke-assets:/app/rapida-data/assets
 
@@ -69,9 +69,9 @@ services:
     command: ["./endpoint-api", "-skip-migration"]
     build:
       cache_from:
-        - type=gha,scope=${SMOKE_CACHE_SCOPE:?SMOKE_CACHE_SCOPE is required}-endpoint-api
+        - type=gha,scope=${CI_STACK_CACHE_SCOPE:?CI_STACK_CACHE_SCOPE is required}-endpoint-api
       cache_to:
-        - type=gha,scope=${SMOKE_CACHE_SCOPE:?SMOKE_CACHE_SCOPE is required}-endpoint-api,mode=max
+        - type=gha,scope=${CI_STACK_CACHE_SCOPE:?CI_STACK_CACHE_SCOPE is required}-endpoint-api,mode=max
     volumes:
       - smoke-assets:/app/rapida-data/assets
 
@@ -81,9 +81,9 @@ services:
     command: ["./assistant-api", "-skip-migration"]
     build:
       cache_from:
-        - type=gha,scope=${SMOKE_CACHE_SCOPE:?SMOKE_CACHE_SCOPE is required}-assistant-api
+        - type=gha,scope=${CI_STACK_CACHE_SCOPE:?CI_STACK_CACHE_SCOPE is required}-assistant-api
       cache_to:
-        - type=gha,scope=${SMOKE_CACHE_SCOPE:?SMOKE_CACHE_SCOPE is required}-assistant-api,mode=max
+        - type=gha,scope=${CI_STACK_CACHE_SCOPE:?CI_STACK_CACHE_SCOPE is required}-assistant-api,mode=max
     volumes:
       - smoke-assets:/app/rapida-data/assets
 
@@ -135,23 +135,23 @@ services:
     networks:
       - api-network
 
-  smoke-runner:
-    image: rapida-smoke-runner:ci
+  test-runner:
+    image: rapida-ci-test-runner:ci
     platform: linux/amd64
     build:
       context: .
       dockerfile: tests/smoke/Dockerfile
       cache_from:
-        - type=gha,scope=${SMOKE_CACHE_SCOPE:?SMOKE_CACHE_SCOPE is required}-smoke-runner
+        - type=gha,scope=${CI_STACK_CACHE_SCOPE:?CI_STACK_CACHE_SCOPE is required}-test-runner
       cache_to:
-        - type=gha,scope=${SMOKE_CACHE_SCOPE:?SMOKE_CACHE_SCOPE is required}-smoke-runner,mode=max
+        - type=gha,scope=${CI_STACK_CACHE_SCOPE:?CI_STACK_CACHE_SCOPE is required}-test-runner,mode=max
     environment:
       PGPASSWORD: rapida_db_password
-      SMOKE_AUTH_TOKEN: ${SMOKE_AUTH_TOKEN:?SMOKE_AUTH_TOKEN is required}
+      CI_STACK_AUTH_TOKEN: ${CI_STACK_AUTH_TOKEN:?CI_STACK_AUTH_TOKEN is required}
     tmpfs:
       - /run/secrets:mode=0700,uid=1000,gid=1000
     volumes:
-      - ${SMOKE_REPORTS_DIR:-./smoke-reports}:/reports
+      - ${CI_STACK_REPORTS_DIR:-./ci-stack-reports}:/reports
       - ./api/web-api/migrations:/workspace/migrations/web-api:ro
       - ./api/integration-api/migrations:/workspace/migrations/integration-api:ro
       - ./api/endpoint-api/migrations:/workspace/migrations/endpoint-api:ro

@@ -1,7 +1,17 @@
 go_ci_packages := "./api/web-api/... ./api/integration-api/... ./api/endpoint-api/... ./pkg/... ./cmd/web/... ./cmd/integration/... ./cmd/endpoint/... ./config/..."
 
-# Run every required CI lane locally.
-ci: ci-doctor ci-check ci-repository ci-go ci-ui ci-contracts ci-assistant-native ci-smoke
+# Run every required CI stage locally in production order.
+ci: ci-doctor ci-basics ci-docker ci-single-service ci-integration ci-smoke
+
+# Run repository, Go, UI, and contract checks.
+ci-basics: ci-check ci-repository ci-go ci-ui ci-contracts
+
+# Build every application Docker image.
+ci-docker:
+    bash just/ci-stack.sh build
+
+# Verify the assistant service with its native runtime dependencies.
+ci-single-service: ci-assistant-native
 
 # Validate CI prerequisites without requiring unused host ports.
 ci-doctor:
@@ -18,7 +28,7 @@ ci-check:
     bash just/shellcheck.sh
     ./bin/check-go-version-consistency
     python3 openapi/scripts/generate_assistant_postman_collection.py --check
-    SMOKE_CACHE_SCOPE=local SMOKE_AUTH_TOKEN=local SMOKE_REPORTS_DIR="${PWD}/smoke-reports" docker compose -f docker-compose.yml -f docker-compose.ci.yml config --quiet
+    CI_STACK_CACHE_SCOPE=local CI_STACK_AUTH_TOKEN=local CI_STACK_REPORTS_DIR="${PWD}/smoke-reports" docker compose -f docker-compose.yml -f docker-compose.ci.yml config --quiet
     just validate-development-toolkit
 
 # Run repository policy, commit-message, and filesystem security checks.
@@ -111,6 +121,10 @@ ci-contracts baseline="":
 ci-assistant-native:
     bash just/ci-assistant-native.sh
 
-# Build every service, start the stack, and run smoke tests.
+# Build every service and verify migrations, readiness, routing, and UI delivery.
+ci-integration:
+    bash just/ci-stack.sh integration
+
+# Build every service and run user-facing API smoke tests.
 ci-smoke:
-    bash just/ci-smoke.sh
+    bash just/ci-stack.sh smoke

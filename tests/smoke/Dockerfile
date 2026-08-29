@@ -7,12 +7,12 @@ WORKDIR /workspace
 COPY tests/smoke/package.json tests/smoke/package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-COPY tests/smoke/run.sh /usr/local/bin/run-smoke-tests
+COPY tests/smoke/run.sh /usr/local/bin/run-ci-tests
 COPY openapi/postman/assistant-api/assistant-api.smoke.postman_collection.json /workspace/openapi/postman/assistant-api/assistant-api.smoke.postman_collection.json
 
-RUN chmod 0755 /usr/local/bin/run-smoke-tests && \
+RUN chmod 0755 /usr/local/bin/run-ci-tests && \
     mkdir -p /reports && \
     chown node:node /reports
 
 USER node
-ENTRYPOINT ["run-smoke-tests"]
+ENTRYPOINT ["run-ci-tests"]

@@ -4,7 +4,8 @@ set -eu
 readonly readiness_key='PSQL psql://postgres:5432'
 readonly collection='/workspace/openapi/postman/assistant-api/assistant-api.smoke.postman_collection.json'
 readonly report_directory="${REPORT_DIRECTORY:-/reports}"
-readonly smoke_auth_token="${SMOKE_AUTH_TOKEN:?SMOKE_AUTH_TOKEN is required}"
+readonly ci_auth_token="${CI_STACK_AUTH_TOKEN:?CI_STACK_AUTH_TOKEN is required}"
+readonly mode="${1:-smoke}"
 
 temporary_directory=$(mktemp -d)
 trap 'rm -rf "$temporary_directory"' EXIT HUP INT TERM
@@ -103,46 +104,64 @@ DELETE FROM user_auths WHERE id = 1;
 INSERT INTO organizations (id,name,description,size,industry,contact,status,created_actor_type) VALUES (1,'CI','CI','1','CI','ci@example.invalid','ACTIVE','unknown');
 INSERT INTO projects (id,organization_id,name,description,status,created_actor_type) VALUES (1,1,'CI','CI','ACTIVE','unknown');
 INSERT INTO user_auths (id,name,email,password,status,source,created_actor_type) VALUES (1,'CI','ci@example.invalid','unused','ACTIVE','direct','unknown');
-INSERT INTO user_auth_tokens (id,user_auth_id,token_type,token,expire_at,status,created_actor_type) VALUES (1,1,'auth-token','$smoke_auth_token',now()+interval '1 hour','ACTIVE','unknown');
+INSERT INTO user_auth_tokens (id,user_auth_id,token_type,token,expire_at,status,created_actor_type) VALUES (1,1,'auth-token','$ci_auth_token',now()+interval '1 hour','ACTIVE','unknown');
 INSERT INTO user_organization_roles (id,user_auth_id,organization_id,role,status,created_actor_type) VALUES (1,1,1,'owner','ACTIVE','unknown');
 INSERT INTO user_project_roles (id,project_id,user_auth_id,role,status,created_actor_type) VALUES (1,1,1,'owner','ACTIVE','unknown');
 SQL
 }
 
-mkdir -p "$report_directory"
+run_integration_checks() {
+  redis_response=$(redis-cli -h redis ping)
+  [ "$redis_response" = 'PONG' ] || {
+    printf 'redis integration check failed: %s\n' "$redis_response" >&2
+    exit 1
+  }
+  pg_isready -h postgres -U rapida_user -d web_db
 
-redis_response=$(redis-cli -h redis ping)
-[ "$redis_response" = 'PONG' ] || {
-  printf 'redis smoke failed: %s\n' "$redis_response" >&2
-  exit 1
+  check_migration web-api web_db /workspace/migrations/web-api
+  check_migration integration-api integration_db /workspace/migrations/integration-api
+  check_migration endpoint-api endpoint_db /workspace/migrations/endpoint-api
+  check_migration assistant-api assistant_db /workspace/migrations/assistant-api
+
+  for service in web-api:9001 integration-api:9004 endpoint-api:9005 assistant-api:9007; do
+    service_name=${service%%:*}
+    port=${service##*:}
+    retry_json "$service_name health" "http://$service_name:$port/healthz/" \
+      '.code == 200 and .success == true and .data.healthy == true'
+    retry_json "$service_name readiness" "http://$service_name:$port/readiness/" \
+      ".code == 200 and .success == true and .data[\"$readiness_key\"] == true"
+  done
+
+  check_ui
+  echo 'All service integration checks passed'
 }
-pg_isready -h postgres -U rapida_user -d web_db
 
-check_migration web-api web_db /workspace/migrations/web-api
-check_migration integration-api integration_db /workspace/migrations/integration-api
-check_migration endpoint-api endpoint_db /workspace/migrations/endpoint-api
-check_migration assistant-api assistant_db /workspace/migrations/assistant-api
+run_smoke_tests() {
+  mkdir -p "$report_directory"
+  seed_assistant_smoke
 
-for service in web-api:9001 integration-api:9004 endpoint-api:9005 assistant-api:9007; do
-  name=${service%%:*}
-  port=${service##*:}
-  retry_json "$name health" "http://$name:$port/healthz/" \
-    '.code == 200 and .success == true and .data.healthy == true'
-  retry_json "$name readiness" "http://$name:$port/readiness/" \
-    ".code == 200 and .success == true and .data[\"$readiness_key\"] == true"
-done
+  ./node_modules/.bin/newman run "$collection" \
+    --folder 'Smoke Flow' \
+    --bail \
+    --env-var baseUrl=http://assistant-api:9007 \
+    --env-var authToken="$ci_auth_token" \
+    --env-var authId=1 \
+    --env-var projectId=1 \
+    --reporters cli,junit \
+    --reporter-junit-export "$report_directory/assistant-smoke.xml"
 
-check_ui
-seed_assistant_smoke
+  echo 'All smoke tests passed'
+}
 
-./node_modules/.bin/newman run "$collection" \
-  --folder 'Smoke Flow' \
-  --bail \
-  --env-var baseUrl=http://assistant-api:9007 \
-  --env-var authToken="$smoke_auth_token" \
-  --env-var authId=1 \
-  --env-var projectId=1 \
-  --reporters cli,junit \
-  --reporter-junit-export "$report_directory/assistant-smoke.xml"
-
-echo 'All full-stack smoke tests passed'
+case "$mode" in
+  integration)
+    run_integration_checks
+    ;;
+  smoke)
+    run_smoke_tests
+    ;;
+  *)
+    printf 'unsupported test mode: %s\n' "$mode" >&2
+    exit 2
+    ;;
+esac

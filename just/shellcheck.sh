@@ -7,7 +7,7 @@ files=(
   just/ci-contracts.sh
   just/ci-go-lint.sh
   just/ci-security.sh
-  just/ci-smoke.sh
+  just/ci-stack.sh
   just/doctor.sh
   just/require-docker.sh
   just/shellcheck.sh

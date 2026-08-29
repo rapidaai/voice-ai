@@ -258,7 +258,8 @@ Run the same repository checks locally:
 
 ```bash
 just ci-fast        # Go, UI, contracts, workflow, and tooling checks
-just ci-smoke       # Build and smoke-test the complete Docker stack
+just ci-integration # Build and verify the complete Docker stack
+just ci-smoke       # Run API smoke tests against the complete stack
 just ci             # Run every CI lane, including security and native-runtime checks
 ```
 

@@ -1,4 +1,4 @@
-name: Build, Test, and Smoke
+name: Continuous Integration
 
 on:
   pull_request:
@@ -21,49 +21,55 @@ env:
   NODE_VERSION: "22"
 
 jobs:
-  go:
-    name: Go
+  basics-go:
+    name: 01 Basics - Go
     uses: ./.github/workflows/reusable-go-ci.yml
     secrets: inherit
     with:
       go-version: "1.25.13"
 
-  ui:
-    name: UI
+  basics-ui:
+    name: 01 Basics - UI
     uses: ./.github/workflows/reusable-ui-ci.yml
     secrets: inherit
     with:
       node-version: "22"
 
-  repository:
-    name: Repository
+  basics-repository:
+    name: 01 Basics - Repository
     uses: ./.github/workflows/reusable-repository-ci.yml
     with:
       go-version: "1.25.13"
       node-version: "22"
 
   docker:
-    name: Docker
+    name: 02 Docker Images
+    needs:
+      - basics-go
+      - basics-ui
+      - basics-repository
     uses: ./.github/workflows/reusable-docker-ci.yml
 
-  assistant-native:
-    name: Assistant Native Runtime Verification
+  single-service:
+    name: 03 Single Service Verification
+    needs: docker
     uses: ./.github/workflows/reusable-assistant-native-ci.yml
 
-  smoke:
-    name: Full Stack Smoke Tests
-    uses: ./.github/workflows/reusable-full-stack-smoke-ci.yml
+  end-to-end:
+    name: 04 End-to-End Verification
+    needs: single-service
+    uses: ./.github/workflows/reusable-end-to-end-ci.yml
 
   ci-success:
-    name: CI Success
+    name: 05 CI Complete
     runs-on: ubuntu-latest
     needs:
-      - go
-      - ui
-      - repository
+      - basics-go
+      - basics-ui
+      - basics-repository
       - docker
-      - assistant-native
-      - smoke
+      - single-service
+      - end-to-end
     if: always()
     steps:
       - name: Check all jobs passed
@@ -85,10 +91,10 @@ jobs:
             echo ""
             echo "| Area | Result |"
             echo "|------|--------|"
-            echo "| Go | ${{ needs.go.result }} |"
-            echo "| UI | ${{ needs.ui.result }} |"
-            echo "| Repository | ${{ needs.repository.result }} |"
-            echo "| Docker | ${{ needs.docker.result }} |"
-            echo "| Assistant Native Runtime Verification | ${{ needs.assistant-native.result }} |"
-            echo "| Full Stack Smoke Tests | ${{ needs.smoke.result }} |"
+            echo "| 01 Basics - Go | ${{ needs.basics-go.result }} |"
+            echo "| 01 Basics - UI | ${{ needs.basics-ui.result }} |"
+            echo "| 01 Basics - Repository | ${{ needs.basics-repository.result }} |"
+            echo "| 02 Docker Images | ${{ needs.docker.result }} |"
+            echo "| 03 Single Service Verification | ${{ needs.single-service.result }} |"
+            echo "| 04 End-to-End Verification | ${{ needs.end-to-end.result }} |"
           } >> "$GITHUB_STEP_SUMMARY"
