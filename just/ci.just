@@ -28,7 +28,7 @@ ci-check:
     bash just/shellcheck.sh
     ./bin/check-go-version-consistency
     python3 openapi/scripts/generate_assistant_postman_collection.py --check
-    CI_STACK_CACHE_SCOPE=local CI_STACK_AUTH_TOKEN=local CI_STACK_REPORTS_DIR="${PWD}/smoke-reports" docker compose -f docker-compose.yml -f docker-compose.ci.yml config --quiet
+    CI_STACK_CACHE_SCOPE=local CI_STACK_AUTH_TOKEN=local CI_STACK_PROJECT_API_KEY=local CI_STACK_REPORTS_DIR="${PWD}/smoke-reports" docker compose -f docker-compose.yml -f docker-compose.ci.yml config --quiet
     just validate-development-toolkit
 
 # Run repository policy, commit-message, and filesystem security checks.
@@ -125,6 +125,6 @@ ci-assistant-native:
 ci-integration:
     bash just/ci-stack.sh integration
 
-# Build every service and run user-facing API smoke tests.
+# Build every service and run REST and SDK smoke tests with all supported authentication methods.
 ci-smoke:
     bash just/ci-stack.sh smoke

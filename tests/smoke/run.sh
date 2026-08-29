@@ -5,6 +5,7 @@ readonly readiness_key='PSQL psql://postgres:5432'
 readonly collection='/workspace/openapi/postman/assistant-api/assistant-api.smoke.postman_collection.json'
 readonly report_directory="${REPORT_DIRECTORY:-/reports}"
 readonly ci_auth_token="${CI_STACK_AUTH_TOKEN:?CI_STACK_AUTH_TOKEN is required}"
+readonly ci_project_api_key="${CI_STACK_PROJECT_API_KEY:?CI_STACK_PROJECT_API_KEY is required}"
 readonly mode="${1:-smoke}"
 
 temporary_directory=$(mktemp -d)
@@ -98,11 +99,13 @@ seed_assistant_smoke() {
 DELETE FROM user_project_roles WHERE id = 1;
 DELETE FROM user_organization_roles WHERE id = 1;
 DELETE FROM user_auth_tokens WHERE id = 1;
+DELETE FROM project_credentials WHERE id = 1;
 DELETE FROM projects WHERE id = 1;
 DELETE FROM organizations WHERE id = 1;
 DELETE FROM user_auths WHERE id = 1;
 INSERT INTO organizations (id,name,description,size,industry,contact,status,created_actor_type) VALUES (1,'CI','CI','1','CI','ci@example.invalid','ACTIVE','unknown');
 INSERT INTO projects (id,organization_id,name,description,status,created_actor_type) VALUES (1,1,'CI','CI','ACTIVE','unknown');
+INSERT INTO project_credentials (id,organization_id,project_id,name,key,status,created_actor_type) VALUES (1,1,1,'CI project API key','$ci_project_api_key','ACTIVE','unknown');
 INSERT INTO user_auths (id,name,email,password,status,source,created_actor_type) VALUES (1,'CI','ci@example.invalid','unused','ACTIVE','direct','unknown');
 INSERT INTO user_auth_tokens (id,user_auth_id,token_type,token,expire_at,status,created_actor_type) VALUES (1,1,'auth-token','$ci_auth_token',now()+interval '1 hour','ACTIVE','unknown');
 INSERT INTO user_organization_roles (id,user_auth_id,organization_id,role,status,created_actor_type) VALUES (1,1,1,'owner','ACTIVE','unknown');
@@ -140,15 +143,32 @@ run_smoke_tests() {
   mkdir -p "$report_directory"
   seed_assistant_smoke
 
+  echo 'Running full assistant REST smoke flow with project API key authentication'
   ./node_modules/.bin/newman run "$collection" \
     --folder 'Smoke Flow' \
     --bail \
     --env-var baseUrl=http://assistant-api:9007 \
+    --env-var apiKey="$ci_project_api_key" \
+    --env-var authToken= \
+    --env-var authId= \
+    --env-var projectId= \
+    --reporters cli,junit \
+    --reporter-junit-export "$report_directory/assistant-smoke-api-key.xml"
+
+  echo 'Running full assistant REST smoke flow with personal access token authentication'
+  ./node_modules/.bin/newman run "$collection" \
+    --folder 'Smoke Flow' \
+    --bail \
+    --env-var baseUrl=http://assistant-api:9007 \
+    --env-var apiKey= \
     --env-var authToken="$ci_auth_token" \
     --env-var authId=1 \
     --env-var projectId=1 \
     --reporters cli,junit \
-    --reporter-junit-export "$report_directory/assistant-smoke.xml"
+    --reporter-junit-export "$report_directory/assistant-smoke-pat.xml"
+
+  echo 'Running released Node SDK smoke tests with both authentication methods'
+  node /workspace/sdk-smoke.js
 
   echo 'All smoke tests passed'
 }

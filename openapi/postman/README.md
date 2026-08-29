@@ -41,6 +41,11 @@ npx --yes newman run openapi/postman/assistant-api/assistant-api.smoke.postman_c
 through the `x-api-key` header, which establishes project scope without requiring
 `x-auth-id` or `x-project-id` values.
 
+The CI smoke runner executes the complete collection twice. The first run uses the
+project API key. The second run uses a personal access token through `authorization`,
+`x-auth-id`, and `x-project-id`. It then calls the assistant gRPC API with the pinned
+`@rapidaai/nodejs` release using both authentication methods.
+
 The assistant-api smoke flow runs all OpenAPI-managed REST operations:
 
 1. Create assistant and capture `assistantId`

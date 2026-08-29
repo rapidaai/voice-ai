@@ -148,6 +148,7 @@ services:
     environment:
       PGPASSWORD: rapida_db_password
       CI_STACK_AUTH_TOKEN: ${CI_STACK_AUTH_TOKEN:?CI_STACK_AUTH_TOKEN is required}
+      CI_STACK_PROJECT_API_KEY: ${CI_STACK_PROJECT_API_KEY:?CI_STACK_PROJECT_API_KEY is required}
     tmpfs:
       - /run/secrets:mode=0700,uid=1000,gid=1000
     volumes:

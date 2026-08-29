@@ -14,6 +14,7 @@ jobs:
     env:
       COMPOSE_PROJECT_NAME: rapida-integration-${{ github.run_id }}-${{ github.run_attempt }}
       CI_STACK_AUTH_TOKEN: ci-integration-${{ github.run_id }}-${{ github.run_attempt }}
+      CI_STACK_PROJECT_API_KEY: ci-integration-project-${{ github.run_id }}-${{ github.run_attempt }}
       CI_STACK_CACHE_SCOPE: end-to-end-${{ github.run_id }}-${{ github.run_attempt }}
       CI_STACK_DIAGNOSTICS_DIR: ${{ github.workspace }}/integration-diagnostics
       CI_STACK_REPORTS_DIR: ${{ github.workspace }}/integration-reports
@@ -55,6 +56,7 @@ jobs:
     env:
       COMPOSE_PROJECT_NAME: rapida-smoke-${{ github.run_id }}-${{ github.run_attempt }}
       CI_STACK_AUTH_TOKEN: ci-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+      CI_STACK_PROJECT_API_KEY: ci-smoke-project-${{ github.run_id }}-${{ github.run_attempt }}
       CI_STACK_CACHE_SCOPE: end-to-end-${{ github.run_id }}-${{ github.run_attempt }}
       CI_STACK_DIAGNOSTICS_DIR: ${{ github.workspace }}/smoke-diagnostics
       CI_STACK_REPORTS_DIR: ${{ github.workspace }}/smoke-reports
@@ -76,7 +78,7 @@ jobs:
           driver: docker-container
           install: true
 
-      - name: Run smoke tests
+      - name: Run REST and SDK smoke tests
         run: just ci-smoke
 
       - name: Upload smoke reports

@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "dependencies": {
+    "@rapidaai/nodejs": "1.1.1-beta.1",
     "newman": "6.2.1"
   },
   "overrides": {
