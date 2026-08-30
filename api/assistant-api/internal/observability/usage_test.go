@@ -9,7 +9,25 @@ package observability
 import (
 	"testing"
 	"time"
+
+	"github.com/rapidaai/pkg/types"
 )
+
+func TestUsageTypesMatchProductUsageRegistry(t *testing.T) {
+	want := map[string]string{
+		UsageConversationSTTDuration:     string(types.ProductUsageSTTDuration),
+		UsageConversationTTSDuration:     string(types.ProductUsageTTSDuration),
+		UsageConversationVADDuration:     string(types.ProductUsageVADDuration),
+		UsageConversationEOSDuration:     string(types.ProductUsageEOSDuration),
+		UsageConversationDenoiseDuration: string(types.ProductUsageDenoiseDuration),
+		UsageConversationLLMDuration:     string(types.ProductUsageLLMDuration),
+	}
+	for usageType, registeredType := range want {
+		if usageType != registeredType {
+			t.Fatalf("usage type %q does not match registry value %q", usageType, registeredType)
+		}
+	}
+}
 
 func TestNewUsageRecord(t *testing.T) {
 	record := NewUsageRecord(ComponentAgent, "openai", 123*time.Millisecond)

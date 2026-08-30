@@ -193,3 +193,103 @@ var BillingService_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "billing-api.proto",
 }
+
+const (
+	ProductUsageService_CreateProductUsages_FullMethodName = "/billing_api.ProductUsageService/CreateProductUsages"
+)
+
+// ProductUsageServiceClient is the client API for ProductUsageService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type ProductUsageServiceClient interface {
+	CreateProductUsages(ctx context.Context, in *CreateProductUsagesRequest, opts ...grpc.CallOption) (*CreateProductUsagesResponse, error)
+}
+
+type productUsageServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewProductUsageServiceClient(cc grpc.ClientConnInterface) ProductUsageServiceClient {
+	return &productUsageServiceClient{cc}
+}
+
+func (c *productUsageServiceClient) CreateProductUsages(ctx context.Context, in *CreateProductUsagesRequest, opts ...grpc.CallOption) (*CreateProductUsagesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateProductUsagesResponse)
+	err := c.cc.Invoke(ctx, ProductUsageService_CreateProductUsages_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ProductUsageServiceServer is the server API for ProductUsageService service.
+// All implementations should embed UnimplementedProductUsageServiceServer
+// for forward compatibility.
+type ProductUsageServiceServer interface {
+	CreateProductUsages(context.Context, *CreateProductUsagesRequest) (*CreateProductUsagesResponse, error)
+}
+
+// UnimplementedProductUsageServiceServer should be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedProductUsageServiceServer struct{}
+
+func (UnimplementedProductUsageServiceServer) CreateProductUsages(context.Context, *CreateProductUsagesRequest) (*CreateProductUsagesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateProductUsages not implemented")
+}
+func (UnimplementedProductUsageServiceServer) testEmbeddedByValue() {}
+
+// UnsafeProductUsageServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ProductUsageServiceServer will
+// result in compilation errors.
+type UnsafeProductUsageServiceServer interface {
+	mustEmbedUnimplementedProductUsageServiceServer()
+}
+
+func RegisterProductUsageServiceServer(s grpc.ServiceRegistrar, srv ProductUsageServiceServer) {
+	// If the following call pancis, it indicates UnimplementedProductUsageServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&ProductUsageService_ServiceDesc, srv)
+}
+
+func _ProductUsageService_CreateProductUsages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateProductUsagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductUsageServiceServer).CreateProductUsages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductUsageService_CreateProductUsages_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductUsageServiceServer).CreateProductUsages(ctx, req.(*CreateProductUsagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// ProductUsageService_ServiceDesc is the grpc.ServiceDesc for ProductUsageService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var ProductUsageService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "billing_api.ProductUsageService",
+	HandlerType: (*ProductUsageServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "CreateProductUsages",
+			Handler:    _ProductUsageService_CreateProductUsages_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "billing-api.proto",
+}

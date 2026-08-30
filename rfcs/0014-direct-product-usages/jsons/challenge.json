@@ -1,0 +1,12 @@
+{
+  "status": "rejected",
+  "reviewed_at": "2026-08-29",
+  "reviewed_rfc_sha256": "d706a20c481d6d75ce3f93e31150bd99c560c4b6edcf1f8aba0aeafdd0e965b1",
+  "reviewed_plan_sha256": "e3ae14995960eed3d95a4be476a72b1ac8e653a18b8a7aa858e6b1ae40e4b48e",
+  "findings": [
+    "Collector registration did not cover every supported recorder construction path.",
+    "Usage type and unit lacked one authoritative mapping.",
+    "Usage ID uniqueness was global rather than tenant-scoped.",
+    "Smoke coverage did not invoke product usage ingestion."
+  ]
+}

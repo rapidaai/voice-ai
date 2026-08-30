@@ -1,0 +1,13 @@
+{
+  "recorded_at": "2026-08-30",
+  "delivery": "direct best effort gRPC",
+  "timeout": "5s",
+  "retry": "none",
+  "durable_replay": false,
+  "accepted_risk": "A failed direct RPC can lose usage because an outbox is outside this scope.",
+  "rollback": [
+    "Disable assistant billing collector registration.",
+    "Roll back assistant deployment before web-api deployment.",
+    "Retain product_usages unless data removal is separately approved."
+  ]
+}

@@ -13,6 +13,7 @@ import (
 	assistant_config "github.com/rapidaai/api/assistant-api/config"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	"github.com/rapidaai/config"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/configs"
 	gorm_model "github.com/rapidaai/pkg/models/gorm"
@@ -61,6 +62,50 @@ func TestNew_SkipsUnknownDefaultTelemetryType(t *testing.T) {
 	})
 	if collector != nil {
 		t.Fatalf("expected no collector, got %T", collector)
+	}
+}
+
+func TestNewWithEnv_AddsBillingWhenWebHostConfigured(t *testing.T) {
+	collector := NewWithEnv(context.Background(), testLogger(t), &assistant_config.AssistantConfig{
+		AppConfig: config.AppConfig{
+			Name:      "assistant-api",
+			ServiceID: 1,
+			Secret:    "secret",
+			Web:       config.ServiceHostConfig{Host: "passthrough:///web-api"},
+		},
+	})
+	if collector == nil {
+		t.Fatal("expected billing collector")
+	}
+	if collector.Key() != "billing" {
+		t.Fatalf("collector key = %q, want billing", collector.Key())
+	}
+	if err := collector.Close(context.Background()); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+}
+
+func TestNewWithEnv_ComposesTelemetryAndBilling(t *testing.T) {
+	collector := NewWithEnv(context.Background(), testLogger(t), &assistant_config.AssistantConfig{
+		AppConfig: config.AppConfig{
+			Name:      "assistant-api",
+			ServiceID: 1,
+			Secret:    "secret",
+			Web:       config.ServiceHostConfig{Host: "passthrough:///web-api"},
+		},
+		TelemetryConfig: &configs.TelemetryConfig{
+			TelemetryType: string(configs.LOGGING),
+			Logging:       &configs.TelemetryLoggingConfig{},
+		},
+	})
+	if collector == nil {
+		t.Fatal("expected composite collector")
+	}
+	if collector.Key() != "collectors" {
+		t.Fatalf("collector key = %q, want collectors", collector.Key())
+	}
+	if err := collector.Close(context.Background()); err != nil {
+		t.Fatalf("Close() error = %v", err)
 	}
 }
 
