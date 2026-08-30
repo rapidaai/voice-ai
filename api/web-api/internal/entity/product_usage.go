@@ -11,7 +11,6 @@ type ProductUsage struct {
 	gorm_model.Mutable
 	gorm_model.Organizational
 
-	UsageID    string    `json:"usageId" gorm:"column:usage_id;type:varchar(36);not null"`
 	UsageType  string    `json:"usageType" gorm:"column:usage_type;type:varchar(100);not null"`
 	Usages     int64     `json:"usages" gorm:"type:bigint;not null"`
 	Unit       string    `json:"unit" gorm:"type:varchar(32);not null"`

@@ -46,21 +46,26 @@ func TestProductUsageContract(t *testing.T) {
 	if service == nil {
 		t.Fatal("ProductUsageService descriptor is missing")
 	}
-	method := service.Methods().ByName("CreateProductUsages")
-	if method == nil {
-		t.Fatal("CreateProductUsages descriptor is missing")
+	for _, methodName := range []protoreflect.Name{"CreateProductUsage", "GetProductUsages", "GetOrganizationUsages"} {
+		if service.Methods().ByName(methodName) == nil {
+			t.Fatalf("%s descriptor is missing", methodName)
+		}
 	}
 	usage := file.Messages().ByName("ProductUsage")
 	if usage == nil {
 		t.Fatal("ProductUsage descriptor is missing")
 	}
 	for name, number := range map[protoreflect.Name]protoreflect.FieldNumber{
-		"usageId": 1, "usageType": 2, "usages": 3, "unit": 4, "occurredAt": 5,
+		"id": 1, "projectId": 2, "usageType": 3, "usages": 4, "unit": 5, "occurredAt": 6,
 	} {
 		field := usage.Fields().ByName(name)
 		if field == nil || field.Number() != number {
 			t.Errorf("ProductUsage.%s number = %v, want %d", name, field, number)
 		}
+	}
+	createRequest := file.Messages().ByName("CreateProductUsageRequest")
+	if createRequest == nil || createRequest.Fields().ByName("id") != nil {
+		t.Fatalf("CreateProductUsageRequest must exist without an id field")
 	}
 	quota := file.Messages().ByName("BillingPlanQuota")
 	if field := quota.Fields().ByName("unit"); field == nil || field.Number() != 4 {

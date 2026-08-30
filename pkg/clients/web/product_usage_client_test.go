@@ -3,9 +3,7 @@ package web_client
 import (
 	"context"
 	"errors"
-	"io"
 	"testing"
-	"time"
 
 	"google.golang.org/grpc"
 
@@ -29,116 +27,86 @@ func (client *productUsageInternalClientStub) WithAuth(ctx context.Context, auth
 }
 
 type productUsageGRPCClientStub struct {
-	request     *protos.CreateProductUsagesRequest
-	response    *protos.CreateProductUsagesResponse
-	err         error
-	contextKey  any
-	hasAuth     bool
-	deadline    time.Time
-	hasDeadline bool
+	request    *protos.CreateProductUsageRequest
+	response   *protos.GetProductUsageResponse
+	err        error
+	contextKey any
+	hasAuth    bool
 }
 
-func (client *productUsageGRPCClientStub) CreateProductUsages(ctx context.Context, request *protos.CreateProductUsagesRequest, _ ...grpc.CallOption) (*protos.CreateProductUsagesResponse, error) {
+func (client *productUsageGRPCClientStub) CreateProductUsage(ctx context.Context, request *protos.CreateProductUsageRequest, _ ...grpc.CallOption) (*protos.GetProductUsageResponse, error) {
 	client.request = request
 	client.hasAuth, _ = ctx.Value(client.contextKey).(bool)
-	client.deadline, client.hasDeadline = ctx.Deadline()
 	return client.response, client.err
 }
 
-type productUsageCloserStub struct {
-	closed bool
+func (client *productUsageGRPCClientStub) GetProductUsages(context.Context, *protos.GetProductUsagesRequest, ...grpc.CallOption) (*protos.GetUsagesResponse, error) {
+	return nil, errors.New("not implemented")
 }
 
-func (closer *productUsageCloserStub) Close() error {
-	closer.closed = true
-	return nil
+func (client *productUsageGRPCClientStub) GetOrganizationUsages(context.Context, *protos.GetOrganizationUsagesRequest, ...grpc.CallOption) (*protos.GetUsagesResponse, error) {
+	return nil, errors.New("not implemented")
 }
 
-func TestProductUsageClientCreatesAuthenticatedRequestWithDeadline(t *testing.T) {
+func TestProductUsageClientCreatesAuthenticatedRequest(t *testing.T) {
 	contextKey := struct{}{}
 	internalClient := &productUsageInternalClientStub{contextKey: contextKey}
 	grpcClient := &productUsageGRPCClientStub{
 		contextKey: contextKey,
-		response:   &protos.CreateProductUsagesResponse{Success: true, CreatedCount: 1},
+		response:   &protos.GetProductUsageResponse{Success: true, Data: &protos.ProductUsage{Id: 42}},
 	}
 	client := &productUsageServiceClient{
-		InternalClient: internalClient,
-		client:         grpcClient,
-		connection:     io.NopCloser(nilReader{}),
-		timeout:        productUsageRequestTimeout,
+		InternalClient:     internalClient,
+		logger:             testLogger(t),
+		productUsageClient: grpcClient,
 	}
 	auth := &types.Authentication{}
-	usage := &protos.ProductUsage{UsageId: "usage-1", UsageType: "stt_duration", Usages: 10, Unit: "nanosecond"}
-	startedAt := time.Now()
-
-	response, err := client.CreateProductUsages(context.Background(), auth, []*protos.ProductUsage{usage})
+	request := &protos.CreateProductUsageRequest{UsageType: "stt_duration", Usages: 10, Unit: "nanosecond"}
+	response, err := client.CreateProductUsage(context.Background(), auth, request)
 	if err != nil {
-		t.Fatalf("CreateProductUsages() error = %v", err)
+		t.Fatalf("CreateProductUsage() error = %v", err)
 	}
-	if response.GetCreatedCount() != 1 {
-		t.Fatalf("CreateProductUsages() created count = %d", response.GetCreatedCount())
+	if response.GetData().GetId() != 42 {
+		t.Fatalf("CreateProductUsage() response ID = %d", response.GetData().GetId())
 	}
 	if internalClient.auth != auth {
-		t.Fatal("CreateProductUsages() did not forward authentication")
+		t.Fatal("CreateProductUsage() did not forward authentication")
 	}
 	if !grpcClient.hasAuth {
-		t.Fatal("CreateProductUsages() did not use authenticated context")
+		t.Fatal("CreateProductUsage() did not use authenticated context")
 	}
-	if !grpcClient.hasDeadline {
-		t.Fatal("CreateProductUsages() did not set a deadline")
-	}
-	deadlineWindow := grpcClient.deadline.Sub(startedAt)
-	if deadlineWindow < productUsageRequestTimeout-time.Second || deadlineWindow > productUsageRequestTimeout+time.Second {
-		t.Fatalf("CreateProductUsages() deadline window = %v", deadlineWindow)
-	}
-	if len(grpcClient.request.GetUsages()) != 1 || grpcClient.request.GetUsages()[0] != usage {
-		t.Fatalf("CreateProductUsages() request = %+v", grpcClient.request)
+	if grpcClient.request != request {
+		t.Fatalf("CreateProductUsage() request = %+v", grpcClient.request)
 	}
 }
 
 func TestProductUsageClientReturnsGRPCError(t *testing.T) {
 	expectedErr := errors.New("unavailable")
 	client := &productUsageServiceClient{
-		InternalClient: &productUsageInternalClientStub{},
-		client:         &productUsageGRPCClientStub{err: expectedErr},
-		timeout:        productUsageRequestTimeout,
+		InternalClient:     &productUsageInternalClientStub{},
+		logger:             testLogger(t),
+		productUsageClient: &productUsageGRPCClientStub{err: expectedErr},
 	}
 
-	_, err := client.CreateProductUsages(context.Background(), &types.Authentication{}, nil)
+	_, err := client.CreateProductUsage(context.Background(), &types.Authentication{}, nil)
 	if !errors.Is(err, expectedErr) {
-		t.Fatalf("CreateProductUsages() error = %v", err)
+		t.Fatalf("CreateProductUsage() error = %v", err)
 	}
 }
 
-func TestProductUsageClientRejectsUnsuccessfulResponse(t *testing.T) {
+func TestProductUsageClientReturnsServiceResponse(t *testing.T) {
+	want := &protos.GetProductUsageResponse{Error: &protos.Error{HumanMessage: "usage rejected"}}
 	client := &productUsageServiceClient{
-		InternalClient: &productUsageInternalClientStub{},
-		client: &productUsageGRPCClientStub{response: &protos.CreateProductUsagesResponse{
-			Error: &protos.Error{HumanMessage: "usage rejected"},
-		}},
-		timeout: productUsageRequestTimeout,
+		InternalClient:     &productUsageInternalClientStub{},
+		logger:             testLogger(t),
+		productUsageClient: &productUsageGRPCClientStub{response: want},
 	}
 
-	_, err := client.CreateProductUsages(context.Background(), &types.Authentication{}, nil)
-	if err == nil || err.Error() != "create product usages: usage rejected" {
-		t.Fatalf("CreateProductUsages() error = %v", err)
+	got, err := client.CreateProductUsage(context.Background(), &types.Authentication{}, nil)
+	if err != nil {
+		t.Fatalf("CreateProductUsage() error = %v", err)
 	}
-}
-
-func TestProductUsageClientClose(t *testing.T) {
-	closer := &productUsageCloserStub{}
-	client := &productUsageServiceClient{connection: closer}
-
-	if err := client.Close(); err != nil {
-		t.Fatalf("Close() error = %v", err)
+	if got != want {
+		t.Fatalf("CreateProductUsage() response = %v, want %v", got, want)
 	}
-	if !closer.closed {
-		t.Fatal("Close() did not close connection")
-	}
-}
-
-type nilReader struct{}
-
-func (nilReader) Read([]byte) (int, error) {
-	return 0, io.EOF
 }

@@ -18,21 +18,15 @@ import (
 )
 
 type usagePublisherStub struct {
-	auth   *types.Authentication
-	usages []*protos.ProductUsage
-	err    error
-	closed bool
+	auth  *types.Authentication
+	usage *protos.CreateProductUsageRequest
+	err   error
 }
 
-func (stub *usagePublisherStub) CreateProductUsages(_ context.Context, auth *types.Authentication, usages []*protos.ProductUsage) (*protos.CreateProductUsagesResponse, error) {
+func (stub *usagePublisherStub) CreateProductUsage(_ context.Context, auth *types.Authentication, usage *protos.CreateProductUsageRequest) (*protos.GetProductUsageResponse, error) {
 	stub.auth = auth
-	stub.usages = usages
-	return &protos.CreateProductUsagesResponse{Success: true}, stub.err
-}
-
-func (stub *usagePublisherStub) Close() error {
-	stub.closed = true
-	return nil
+	stub.usage = usage
+	return &protos.GetProductUsageResponse{Success: true, Data: &protos.ProductUsage{Id: 42}}, stub.err
 }
 
 func TestCollector_ForwardsUsageRecord(t *testing.T) {
@@ -57,11 +51,11 @@ func TestCollector_ForwardsUsageRecord(t *testing.T) {
 	if publisher.auth != auth {
 		t.Fatal("expected authentication to be forwarded")
 	}
-	if len(publisher.usages) != 1 {
-		t.Fatalf("expected one usage record, got %d", len(publisher.usages))
+	if publisher.usage == nil {
+		t.Fatal("expected one usage record")
 	}
-	got := publisher.usages[0]
-	if got.GetUsageId() != "usage-1" || got.GetUsageType() != observability.UsageConversationSTTDuration {
+	got := publisher.usage
+	if got.GetUsageType() != observability.UsageConversationSTTDuration {
 		t.Fatalf("unexpected usage record: %+v", got)
 	}
 	if got.GetUsages() != int64(2*time.Second) {
@@ -91,7 +85,7 @@ func TestCollector_ReturnsPublisherError(t *testing.T) {
 	}
 }
 
-func TestCollector_GeneratesUsageID(t *testing.T) {
+func TestCollector_PublishesUsageWithoutClientID(t *testing.T) {
 	publisher := &usagePublisherStub{}
 	collector := New(publisher)
 
@@ -103,8 +97,8 @@ func TestCollector_GeneratesUsageID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Collect() error = %v", err)
 	}
-	if len(publisher.usages) != 1 || publisher.usages[0].GetUsageId() == "" {
-		t.Fatal("Collect() did not generate usage ID")
+	if publisher.usage == nil {
+		t.Fatal("Collect() did not publish usage")
 	}
 }
 
@@ -120,8 +114,8 @@ func TestCollector_RejectsUnsupportedUsageType(t *testing.T) {
 	if !errors.Is(err, types.ErrInvalidProductUsage) {
 		t.Fatalf("Collect() error = %v", err)
 	}
-	if len(publisher.usages) != 0 {
-		t.Fatalf("publisher received %d usages", len(publisher.usages))
+	if publisher.usage != nil {
+		t.Fatalf("publisher received usage: %+v", publisher.usage)
 	}
 }
 
@@ -132,19 +126,13 @@ func TestCollector_IgnoresNonUsageRecord(t *testing.T) {
 	if err := collector.Collect(context.Background(), observability.ProjectScope{}, observability.Context{}, observability.RecordLog{}); err != nil {
 		t.Fatalf("Collect() error = %v", err)
 	}
-	if len(publisher.usages) != 0 {
-		t.Fatalf("publisher received %d usages", len(publisher.usages))
+	if publisher.usage != nil {
+		t.Fatalf("publisher received usage: %+v", publisher.usage)
 	}
 }
 
-func TestCollector_ClosesPublisher(t *testing.T) {
-	publisher := &usagePublisherStub{}
-	collector := New(publisher)
-
-	if err := collector.Close(context.Background()); err != nil {
+func TestCollector_CloseIsNoop(t *testing.T) {
+	if err := New(&usagePublisherStub{}).Close(context.Background()); err != nil {
 		t.Fatalf("Close() error = %v", err)
-	}
-	if !publisher.closed {
-		t.Fatal("Close() did not close publisher")
 	}
 }

@@ -8,11 +8,6 @@ package web_client
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"io"
-	"strings"
-	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -24,64 +19,38 @@ import (
 	"github.com/rapidaai/protos"
 )
 
-const productUsageRequestTimeout = 5 * time.Second
-
 type ProductUsageClient interface {
-	CreateProductUsages(context.Context, *types.Authentication, []*protos.ProductUsage) (*protos.CreateProductUsagesResponse, error)
-	Close() error
+	CreateProductUsage(context.Context, *types.Authentication, *protos.CreateProductUsageRequest) (*protos.GetProductUsageResponse, error)
 }
 
 type productUsageServiceClient struct {
 	clients.InternalClient
-	client     protos.ProductUsageServiceClient
-	connection io.Closer
-	timeout    time.Duration
+	cfg                *config.AppConfig
+	logger             commons.Logger
+	productUsageClient protos.ProductUsageServiceClient
 }
 
-func NewProductUsageServiceClientGRPC(cfg *config.AppConfig, logger commons.Logger) (ProductUsageClient, error) {
-	if cfg == nil || strings.TrimSpace(cfg.Web.Host) == "" {
-		return nil, errors.New("product usage client requires web service host")
-	}
-	connection, err := grpc.NewClient(cfg.Web.Host, grpc.WithTransportCredentials(insecure.NewCredentials()))
+func NewProductUsageServiceClientGRPC(config *config.AppConfig, logger commons.Logger) ProductUsageClient {
+	connection, err := grpc.NewClient(config.Web.Host, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return nil, fmt.Errorf("create product usage connection: %w", err)
+		logger.Fatalf("Unable to create connection %v", err)
 	}
 	return &productUsageServiceClient{
-		InternalClient: clients.NewInternalClient(cfg, logger, nil),
-		client:         protos.NewProductUsageServiceClient(connection),
-		connection:     connection,
-		timeout:        productUsageRequestTimeout,
-	}, nil
+		InternalClient:     clients.NewInternalClient(config, logger, nil),
+		cfg:                config,
+		logger:             logger,
+		productUsageClient: protos.NewProductUsageServiceClient(connection),
+	}
 }
 
-func (client *productUsageServiceClient) CreateProductUsages(ctx context.Context, auth *types.Authentication, usages []*protos.ProductUsage) (*protos.CreateProductUsagesResponse, error) {
-	requestContext, cancel := context.WithTimeout(ctx, client.timeout)
-	defer cancel()
-
-	authContext, err := client.WithAuth(requestContext, auth)
+func (client productUsageServiceClient) CreateProductUsage(ctx context.Context, auth *types.Authentication, request *protos.CreateProductUsageRequest) (*protos.GetProductUsageResponse, error) {
+	authContext, err := client.WithAuth(ctx, auth)
 	if err != nil {
-		return nil, fmt.Errorf("authorize product usage request: %w", err)
+		return nil, err
 	}
-	response, err := client.client.CreateProductUsages(authContext, &protos.CreateProductUsagesRequest{Usages: usages})
+	response, err := client.productUsageClient.CreateProductUsage(authContext, request)
 	if err != nil {
-		return nil, fmt.Errorf("create product usages: %w", err)
+		client.logger.Errorf("Unable to create product usage %+v", err)
 	}
-	if response == nil {
-		return nil, errors.New("create product usages: empty response")
-	}
-	if !response.GetSuccess() {
-		message := "request failed"
-		if response.GetError() != nil && strings.TrimSpace(response.GetError().GetHumanMessage()) != "" {
-			message = response.GetError().GetHumanMessage()
-		}
-		return nil, fmt.Errorf("create product usages: %s", message)
-	}
-	return response, nil
-}
-
-func (client *productUsageServiceClient) Close() error {
-	if client == nil || client.connection == nil {
-		return nil
-	}
-	return client.connection.Close()
+	return response, err
 }

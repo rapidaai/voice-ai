@@ -9,10 +9,8 @@ package billing
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/validator"
@@ -21,8 +19,7 @@ import (
 )
 
 type Publisher interface {
-	CreateProductUsages(context.Context, *types.Authentication, []*protos.ProductUsage) (*protos.CreateProductUsagesResponse, error)
-	Close() error
+	CreateProductUsage(context.Context, *types.Authentication, *protos.CreateProductUsageRequest) (*protos.GetProductUsageResponse, error)
 }
 
 type Collector struct {
@@ -58,20 +55,15 @@ func (c *Collector) Collect(ctx context.Context, _ observability.Scope, observat
 		return fmt.Errorf("product usage %q must be greater than zero", usageType)
 	}
 
-	usageID := strings.TrimSpace(usage.ID)
-	if usageID == "" {
-		usageID = uuid.NewString()
-	}
-	_, err := c.publisher.CreateProductUsages(ctx, observationContext.Auth, []*protos.ProductUsage{{
-		UsageId:    usageID,
+	_, err := c.publisher.CreateProductUsage(ctx, observationContext.Auth, &protos.CreateProductUsageRequest{
 		UsageType:  usageType,
 		Usages:     usage.Duration.Nanoseconds(),
 		Unit:       unit,
 		OccurredAt: timestamppb.New(usage.OccurredAt.Truncate(time.Microsecond)),
-	}})
+	})
 	return err
 }
 
 func (c *Collector) Close(context.Context) error {
-	return c.publisher.Close()
+	return nil
 }

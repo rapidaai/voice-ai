@@ -39,12 +39,9 @@ func NewWithEnv(ctx context.Context, logger commons.Logger, config *assistant_co
 	}
 
 	if config.Web.Host != "" {
-		publisher, err := web_client.NewProductUsageServiceClientGRPC(&config.AppConfig, logger)
-		if err == nil {
-			configuredCollectors = append(configuredCollectors, billing.New(publisher))
-		} else if logger != nil {
-			logger.Warnf("unable to create billing collector: %v", err)
-		}
+		configuredCollectors = append(configuredCollectors, billing.New(
+			web_client.NewProductUsageServiceClientGRPC(&config.AppConfig, logger),
+		))
 	}
 
 	switch len(configuredCollectors) {

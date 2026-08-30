@@ -6,8 +6,11 @@ import (
 	"testing"
 	"time"
 
+	internal_entity "github.com/rapidaai/api/web-api/internal/entity"
 	"github.com/rapidaai/pkg/connectors"
+	gorm_model "github.com/rapidaai/pkg/models/gorm"
 	"github.com/rapidaai/pkg/types"
+	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -46,22 +49,20 @@ func newProductUsageServiceTest(t *testing.T) (Service, *gorm.DB) {
 		status text not null
 	)`).Error)
 	require.NoError(t, database.Exec(`CREATE TABLE product_usages (
-		id integer primary key,
+		id integer primary key autoincrement,
 		organization_id integer not null,
 		project_id integer not null,
-		usage_id text not null,
 		usage_type text not null,
 		usages integer not null,
 		unit text not null,
 		occurred_at datetime not null,
-		created_date datetime not null,
+		created_date datetime default current_timestamp not null,
 		updated_date datetime,
-		status text not null,
+		status text default 'ACTIVE' not null,
 		created_actor_type text not null,
 		created_actor_id integer not null,
 		updated_actor_type text,
-		updated_actor_id integer,
-		unique (organization_id, project_id, usage_id)
+		updated_actor_id integer
 	)`).Error)
 	require.NoError(t, database.Exec(`INSERT INTO projects (id, organization_id, status) VALUES
 		(100, 10, 'ACTIVE'),
@@ -79,10 +80,9 @@ func productUsageAuth(authType types.AuthType, organizationID, projectID, actorI
 			ID:   actorID,
 		},
 		OrganizationValue: &types.OrganizationContext{OrganizationID: organizationID},
-		ProjectValue: &types.ProjectContext{
-			OrganizationID: organizationID,
-			ProjectID:      projectID,
-		},
+	}
+	if projectID > 0 {
+		auth.ProjectValue = &types.ProjectContext{OrganizationID: organizationID, ProjectID: projectID}
 	}
 	if authType == types.AuthTypeUser {
 		auth.UserValue = &types.UserContext{UserID: actorID}
@@ -90,95 +90,141 @@ func productUsageAuth(authType types.AuthType, organizationID, projectID, actorI
 	return auth
 }
 
-func productUsageInput(usageID string, quantity int64) *protos.ProductUsage {
-	return &protos.ProductUsage{
-		UsageId:    usageID,
+func productUsageInput(quantity int64, occurredAt time.Time) *protos.CreateProductUsageRequest {
+	return &protos.CreateProductUsageRequest{
 		UsageType:  string(types.ProductUsageSTTDuration),
 		Usages:     quantity,
 		Unit:       string(types.ProductUsageUnitNanosecond),
-		OccurredAt: timestamppb.New(time.Date(2026, time.August, 29, 10, 30, 0, 123456789, time.FixedZone("test", 5*60*60+30*60))),
+		OccurredAt: timestamppb.New(occurredAt),
 	}
 }
 
-func TestCreateProductUsagesCreatesAndCountsExactDuplicates(t *testing.T) {
+func insertProductUsage(t *testing.T, database *gorm.DB, organizationID, projectID uint64, usageType string, usages int64, occurredAt time.Time) internal_entity.ProductUsage {
+	t.Helper()
+	usage := internal_entity.ProductUsage{
+		Mutable: gorm_model.Mutable{
+			Status:           type_enums.RECORD_ACTIVE,
+			CreatedActorType: types.AuthTypeUser.String(),
+			CreatedActorID:   1,
+		},
+		Organizational: gorm_model.Organizational{
+			OrganizationId: organizationID,
+			ProjectId:      projectID,
+		},
+		UsageType:  usageType,
+		Usages:     usages,
+		Unit:       string(types.ProductUsageUnitNanosecond),
+		OccurredAt: occurredAt,
+	}
+	require.NoError(t, database.Create(&usage).Error)
+	return usage
+}
+
+func TestCreateProductUsageGeneratesIDAndAllowsRepeatedEvents(t *testing.T) {
 	service, database := newProductUsageServiceTest(t)
 	auth := productUsageAuth(types.AuthTypeUser, 10, 100, 1)
-	usage := productUsageInput("550e8400-e29b-41d4-a716-446655440000", 25)
+	request := productUsageInput(25, time.Date(2026, time.August, 29, 10, 30, 0, 123456789, time.FixedZone("test", 5*60*60+30*60)))
 
-	result, err := service.CreateProductUsages(context.Background(), auth, []*protos.ProductUsage{usage, usage})
+	first, err := service.CreateProductUsage(context.Background(), auth, request)
 	require.NoError(t, err)
-	require.Equal(t, Result{CreatedCount: 1, DuplicateCount: 1}, result)
-
-	var stored struct {
-		OrganizationID   uint64
-		ProjectID        uint64
-		UsageID          string
-		Usages           int64
-		CreatedActorType string
-		CreatedActorID   uint64
-		OccurredAt       time.Time
-	}
-	require.NoError(t, database.Table("product_usages").Take(&stored).Error)
-	require.Equal(t, uint64(10), stored.OrganizationID)
-	require.Equal(t, uint64(100), stored.ProjectID)
-	require.Equal(t, usage.GetUsageId(), stored.UsageID)
-	require.Equal(t, int64(25), stored.Usages)
-	require.Equal(t, types.AuthTypeUser.String(), stored.CreatedActorType)
-	require.Equal(t, uint64(1), stored.CreatedActorID)
-	require.Equal(t, stored.OccurredAt.Truncate(time.Microsecond), stored.OccurredAt)
-
-	result, err = service.CreateProductUsages(context.Background(), auth, []*protos.ProductUsage{usage})
-	require.NoError(t, err)
-	require.Equal(t, Result{DuplicateCount: 1}, result)
-}
-
-func TestCreateProductUsagesRollsBackConflictingBatch(t *testing.T) {
-	service, database := newProductUsageServiceTest(t)
-	auth := productUsageAuth(types.AuthTypeProject, 10, 100, 501)
-	existing := productUsageInput("550e8400-e29b-41d4-a716-446655440001", 10)
-	_, err := service.CreateProductUsages(context.Background(), auth, []*protos.ProductUsage{existing})
+	second, err := service.CreateProductUsage(context.Background(), auth, request)
 	require.NoError(t, err)
 
-	newUsage := productUsageInput("550e8400-e29b-41d4-a716-446655440002", 20)
-	conflicting := productUsageInput(existing.GetUsageId(), 11)
-	_, err = service.CreateProductUsages(context.Background(), auth, []*protos.ProductUsage{newUsage, conflicting})
-	require.ErrorIs(t, err, ErrUsageConflict)
+	require.NotZero(t, first.Id)
+	require.NotZero(t, second.Id)
+	require.NotEqual(t, first.Id, second.Id)
+	require.Equal(t, uint64(10), first.OrganizationId)
+	require.Equal(t, uint64(100), first.ProjectId)
+	require.Equal(t, int64(25), first.Usages)
+	require.Equal(t, types.AuthTypeUser.String(), first.CreatedActorType)
+	require.Equal(t, uint64(1), first.CreatedActorID)
+	require.Equal(t, request.GetOccurredAt().AsTime().UTC().Truncate(time.Microsecond), first.OccurredAt)
 
 	var count int64
 	require.NoError(t, database.Table("product_usages").Count(&count).Error)
-	require.Equal(t, int64(1), count)
-}
-
-func TestCreateProductUsagesScopesUsageIDToProject(t *testing.T) {
-	service, database := newProductUsageServiceTest(t)
-	usage := productUsageInput("550e8400-e29b-41d4-a716-446655440003", 10)
-
-	_, err := service.CreateProductUsages(context.Background(), productUsageAuth(types.AuthTypeUser, 10, 100, 1), []*protos.ProductUsage{usage})
-	require.NoError(t, err)
-	_, err = service.CreateProductUsages(context.Background(), productUsageAuth(types.AuthTypeProject, 10, 101, 502), []*protos.ProductUsage{usage})
-	require.NoError(t, err)
-
-	var count int64
-	require.NoError(t, database.Table("product_usages").Where("usage_id = ?", usage.GetUsageId()).Count(&count).Error)
 	require.Equal(t, int64(2), count)
 }
 
-func TestCreateProductUsagesValidatesInputAndProjectOwnership(t *testing.T) {
+func TestCreateProductUsageValidatesInputAndProjectOwnership(t *testing.T) {
 	service, _ := newProductUsageServiceTest(t)
 	auth := productUsageAuth(types.AuthTypeService, 10, 100, 601)
+	occurredAt := time.Date(2026, time.August, 29, 5, 0, 0, 0, time.UTC)
 
-	invalidQuantity := productUsageInput("550e8400-e29b-41d4-a716-446655440004", 0)
-	_, err := service.CreateProductUsages(context.Background(), auth, []*protos.ProductUsage{invalidQuantity})
+	_, err := service.CreateProductUsage(context.Background(), auth, productUsageInput(0, occurredAt))
 	require.ErrorIs(t, err, ErrInvalidRequest)
 
-	invalidUnit := productUsageInput("550e8400-e29b-41d4-a716-446655440005", 1)
+	invalidUnit := productUsageInput(1, occurredAt)
 	invalidUnit.Unit = "second"
-	_, err = service.CreateProductUsages(context.Background(), auth, []*protos.ProductUsage{invalidUnit})
+	_, err = service.CreateProductUsage(context.Background(), auth, invalidUnit)
 	require.ErrorIs(t, err, ErrInvalidRequest)
 
-	_, err = service.CreateProductUsages(context.Background(), productUsageAuth(types.AuthTypeUser, 20, 100, 1), []*protos.ProductUsage{productUsageInput("550e8400-e29b-41d4-a716-446655440006", 1)})
+	_, err = service.CreateProductUsage(context.Background(), productUsageAuth(types.AuthTypeUser, 20, 100, 1), productUsageInput(1, occurredAt))
 	require.ErrorIs(t, err, ErrProjectMismatch)
 
-	_, err = service.CreateProductUsages(context.Background(), auth, nil)
+	_, err = service.CreateProductUsage(context.Background(), auth, nil)
 	require.True(t, errors.Is(err, ErrInvalidRequest))
+}
+
+func TestGetProductUsagesScopesTypeTenantCriteriaAndPagination(t *testing.T) {
+	service, database := newProductUsageServiceTest(t)
+	base := time.Date(2026, time.August, 29, 5, 0, 0, 0, time.UTC)
+	first := insertProductUsage(t, database, 10, 100, string(types.ProductUsageSTTDuration), 10, base)
+	second := insertProductUsage(t, database, 10, 100, string(types.ProductUsageSTTDuration), 20, base.Add(time.Minute))
+	insertProductUsage(t, database, 10, 100, string(types.ProductUsageLLMDuration), 30, base.Add(2*time.Minute))
+	insertProductUsage(t, database, 10, 101, string(types.ProductUsageSTTDuration), 40, base.Add(3*time.Minute))
+	insertProductUsage(t, database, 20, 200, string(types.ProductUsageSTTDuration), 50, base.Add(4*time.Minute))
+
+	count, usages, err := service.GetProductUsages(
+		context.Background(),
+		productUsageAuth(types.AuthTypeUser, 10, 100, 1),
+		string(types.ProductUsageSTTDuration),
+		[]*protos.Criteria{{Key: "usages", Logic: ">=", Value: "10"}},
+		&protos.Paginate{Page: 2, PageSize: 1},
+	)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), count)
+	require.Len(t, usages, 1)
+	require.Equal(t, first.Id, usages[0].Id)
+	require.NotEqual(t, second.Id, usages[0].Id)
+}
+
+func TestGetProductUsagesRequiresSupportedUsageType(t *testing.T) {
+	service, _ := newProductUsageServiceTest(t)
+	auth := productUsageAuth(types.AuthTypeProject, 10, 100, 501)
+
+	_, _, err := service.GetProductUsages(context.Background(), auth, "", nil, nil)
+	require.ErrorIs(t, err, ErrInvalidRequest)
+	_, _, err = service.GetProductUsages(context.Background(), auth, "unsupported", nil, nil)
+	require.ErrorIs(t, err, ErrInvalidRequest)
+}
+
+func TestGetOrganizationUsagesSpansProjectsWithoutCrossingTenant(t *testing.T) {
+	service, database := newProductUsageServiceTest(t)
+	base := time.Date(2026, time.August, 29, 5, 0, 0, 0, time.UTC)
+	insertProductUsage(t, database, 10, 100, string(types.ProductUsageSTTDuration), 10, base)
+	wanted := insertProductUsage(t, database, 10, 101, string(types.ProductUsageLLMDuration), 20, base.Add(time.Minute))
+	insertProductUsage(t, database, 20, 200, string(types.ProductUsageLLMDuration), 30, base.Add(2*time.Minute))
+
+	count, usages, err := service.GetOrganizationUsages(
+		context.Background(),
+		productUsageAuth(types.AuthTypeOrg, 10, 0, 700),
+		[]*protos.Criteria{{Key: "usageType", Value: string(types.ProductUsageLLMDuration)}},
+		&protos.Paginate{Page: 1, PageSize: 10},
+	)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+	require.Len(t, usages, 1)
+	require.Equal(t, wanted.Id, usages[0].Id)
+	require.Equal(t, uint64(101), usages[0].ProjectId)
+}
+
+func TestGetOrganizationUsagesRejectsUnsafeCriteria(t *testing.T) {
+	service, _ := newProductUsageServiceTest(t)
+	_, _, err := service.GetOrganizationUsages(
+		context.Background(),
+		productUsageAuth(types.AuthTypeUser, 10, 0, 1),
+		[]*protos.Criteria{{Key: "organization_id OR 1=1", Value: "10"}},
+		nil,
+	)
+	require.ErrorIs(t, err, ErrInvalidRequest)
 }

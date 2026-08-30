@@ -13,6 +13,7 @@ import (
 	assistant_config "github.com/rapidaai/api/assistant-api/config"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/billing"
 	"github.com/rapidaai/config"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/configs"
@@ -79,6 +80,9 @@ func TestNewWithEnv_AddsBillingWhenWebHostConfigured(t *testing.T) {
 	}
 	if collector.Key() != "billing" {
 		t.Fatalf("collector key = %q, want billing", collector.Key())
+	}
+	if _, ok := collector.(*billing.Collector); !ok {
+		t.Fatalf("collector type = %T, want *billing.Collector", collector)
 	}
 	if err := collector.Close(context.Background()); err != nil {
 		t.Fatalf("Close() error = %v", err)

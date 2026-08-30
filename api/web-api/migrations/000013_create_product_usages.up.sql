@@ -2,7 +2,6 @@ CREATE TABLE public.product_usages (
     id bigint PRIMARY KEY CHECK (id > 0),
     organization_id bigint NOT NULL CHECK (organization_id > 0),
     project_id bigint NOT NULL CHECK (project_id > 0),
-    usage_id character varying(36) NOT NULL,
     usage_type character varying(100) NOT NULL,
     usages bigint NOT NULL CHECK (usages > 0),
     unit character varying(32) NOT NULL,
@@ -24,16 +23,11 @@ CREATE TABLE public.product_usages (
             updated_actor_type IN ('user', 'project', 'organization', 'service', 'system') AND
             updated_actor_id > 0
         )
-    ),
-    CONSTRAINT product_usages_tenant_usage_id_key UNIQUE (
-        organization_id,
-        project_id,
-        usage_id
     )
 );
 
 CREATE INDEX product_usages_project_type_occurred_at_idx
-    ON public.product_usages (project_id, usage_type, occurred_at);
+    ON public.product_usages (organization_id, project_id, usage_type, occurred_at DESC, id DESC);
 
 CREATE INDEX product_usages_organization_type_occurred_at_idx
-    ON public.product_usages (organization_id, usage_type, occurred_at);
+    ON public.product_usages (organization_id, occurred_at DESC, id DESC);
