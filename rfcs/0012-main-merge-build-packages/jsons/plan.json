@@ -1,0 +1,77 @@
+{
+  "rfc": "rfcs/0012-main-merge-build-packages.md",
+  "status": "proposed",
+  "objective": "Exclude deprecated document-api from CI, make local just ci self-contained, and create tag-aligned GitHub prerelease packages after successful main branch CI.",
+  "acceptance_criteria": [
+    "CI-facing service matrices and scripts contain no document-api service.",
+    "The deprecated document-api source and local knowledge profile remain unchanged.",
+    "just ci does not require globally installed jsonschema, PyYAML, commitlint, or shellcheck.",
+    "Interactive changed-test hooks do not wait for EOF.",
+    "A successful push CI run on main creates one build-YYYYMMDD-<short-sha> tag for the merge commit.",
+    "A GitHub prerelease for the build tag contains packages for web-api, integration-api, endpoint-api, assistant-api, and ui plus SHA256SUMS.",
+    "Failed CI and pull-request CI runs create no tags or releases.",
+    "Reruns reuse a matching tag and never move a conflicting tag.",
+    "just ci and repository finalization pass."
+  ],
+  "allowed_paths": [
+    ".github/workflows/package.yml",
+    ".github/workflows/tag-and-package-services.yml",
+    ".github/workflows/workflow-lint.yml",
+    ".github/actions/package-assistant-service/**",
+    ".github/actions/package-go-service/action.yml",
+    ".github/actions/package-directory/action.yml",
+    "just/ci.just",
+    "just/ci-commitlint.sh",
+    "just/ci-contracts.sh",
+    "just/ci-stack.sh",
+    "just/ci-python.sh",
+    "just/requirements-ci.txt",
+    "just/ci-service-boundaries.sh",
+    "just/shellcheck.sh",
+    ".codex/hooks/validate_changed_tests.py",
+    ".claude/hooks/validate_changed_tests.py",
+    ".codex/README.md",
+    ".claude/README.md",
+    "README.md",
+    "rfcs/0012-main-merge-build-packages/**",
+    "rfcs/0012-main-merge-build-packages.md"
+  ],
+  "out_of_scope_paths": [
+    "api/document-api/**",
+    "docker/document-api/**",
+    "docker-compose.knowledge.yml",
+    "env/document.yaml",
+    "protos/**",
+    "sdks/**",
+    "api/assistant-api/**",
+    "api/web-api/**",
+    "docker-compose.yml",
+    "deploy/**"
+  ],
+  "ownership": {
+    "CI service boundary": "just/ci-service-boundaries.sh",
+    "local Python tooling": "just/ci-python.sh and just/requirements-ci.txt",
+    "local shell tooling": "just/shellcheck.sh and CI callers",
+    "merge tag": ".github/workflows/tag-and-package-services.yml",
+    "service packages": ".github/workflows/package.yml and package composite actions",
+    "changed-test hook input": ".codex/hooks/validate_changed_tests.py and .claude/hooks/validate_changed_tests.py"
+  },
+  "risks": [
+    "A write-enabled workflow could tag untrusted code unless restricted to successful push CI on main.",
+    "A rerun could create a conflicting tag unless tag creation is idempotent.",
+    "The assistant package can be large because native libraries and model assets must remain deployable.",
+    "Local dependency bootstrapping can become non-reproducible unless versions are pinned.",
+    "A broad document-api text check could incorrectly reject non-CI compatibility files."
+  ],
+  "verification_commands": [
+    "just ci-check",
+    "env -u NODE_PATH just ci-commitlint",
+    "env PATH=/usr/bin:/bin:/usr/sbin:/sbin just ci-check",
+    "python3 .codex/hooks/validate_changed_tests.py </dev/null",
+    "python3 .claude/hooks/validate_changed_tests.py </dev/null",
+    "go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color",
+    "just ci",
+    "make agent-finalize CHANGED_FILES=\"comma,separated,paths\""
+  ],
+  "rollback": "Revert the tag orchestrator, reusable packaging changes, and local CI wrappers. Delete an incorrect prerelease and matching build tag only after verifying that no downstream release consumes them."
+}

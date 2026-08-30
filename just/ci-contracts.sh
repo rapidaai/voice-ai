@@ -14,6 +14,6 @@ trap 'if [[ -n "$temporary_directory" ]]; then rm -rf "$temporary_directory"; fi
 
 go test ./scripts/contracts/protobuf-descriptor
 bash -n scripts/contracts/check-compatibility.sh scripts/contracts/materialize-baseline.sh
-shellcheck scripts/contracts/check-compatibility.sh scripts/contracts/materialize-baseline.sh \
+bash just/shellcheck.sh scripts/contracts/check-compatibility.sh scripts/contracts/materialize-baseline.sh \
   scripts/contracts/bin/buf scripts/contracts/bin/oasdiff
 scripts/contracts/check-compatibility.sh "$baseline_directory"

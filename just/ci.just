@@ -26,10 +26,11 @@ ci-check:
     go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
     bash -n just/*.sh scripts/contracts/*.sh
     bash just/shellcheck.sh
+    bash just/ci-service-boundaries.sh
     ./bin/check-go-version-consistency
-    python3 openapi/scripts/generate_assistant_postman_collection.py --check
+    bash just/ci-python.sh openapi/scripts/generate_assistant_postman_collection.py --check
     CI_STACK_CACHE_SCOPE=local CI_STACK_AUTH_TOKEN=local CI_STACK_PROJECT_API_KEY=local CI_STACK_REPORTS_DIR="${PWD}/smoke-reports" docker compose -f docker-compose.yml -f docker-compose.ci.yml config --quiet
-    just validate-development-toolkit
+    PATH="$(bash just/ci-python.sh --bin-dir):$PATH" just validate-development-toolkit
 
 # Run repository policy, commit-message, and filesystem security checks.
 ci-repository: ci-license ci-commitlint ci-security

@@ -6,7 +6,7 @@ This repository keeps Codex skills at `.codex/skills/`.
 
 Prerequisites:
 - `python3`
-- Python package `jsonschema`
+- Python packages used by CI are installed in a cache-scoped virtual environment.
 - `go`
 - `yarn` (for UI-related checks)
 - `just`

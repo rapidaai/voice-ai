@@ -116,6 +116,23 @@ just down-all
 
 ## Development
 
+### Continuous Integration and Build Packages
+
+Run the same required checks used by pull requests from the repository root:
+
+```bash
+just ci
+```
+
+The command bootstraps its pinned Python, commitlint, and shellcheck tooling in local cache
+directories. Docker remains required for image, integration, and smoke-test stages.
+
+After `Continuous Integration` succeeds for a push to `main`, GitHub creates an immutable
+tag named `build-YYYYMMDD-<short-merge-commit-sha>`. The matching GitHub prerelease
+contains packages for `web-api`, `integration-api`, `endpoint-api`, `assistant-api`, and
+`ui`, plus a `SHA256SUMS` file. The deprecated `document-api` is intentionally excluded
+from CI and release packaging.
+
 ### Work on Specific Services
 
 ```bash

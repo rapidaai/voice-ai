@@ -18,4 +18,5 @@ npm_prefix=${XDG_CACHE_HOME:-$HOME/.cache}/rapida-ci-tools/npm
 mkdir -p "$npm_prefix"
 npm install --global --prefix "$npm_prefix" \
   @commitlint/cli@21.2.2 @commitlint/config-conventional@21.2.2
-"$npm_prefix/bin/commitlint" --from "$base_sha" --to HEAD --verbose
+NODE_PATH="$npm_prefix/lib/node_modules${NODE_PATH:+:$NODE_PATH}" \
+  "$npm_prefix/bin/commitlint" --from "$base_sha" --to HEAD --verbose

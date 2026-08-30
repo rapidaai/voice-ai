@@ -4,8 +4,36 @@ on:
   push:
     tags:
       - "v*"
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref or commit to package.
+        required: true
+        type: string
+      release-tag:
+        description: Tag included in package artifact names.
+        required: true
+        type: string
+      publish-release:
+        description: Create or update a GitHub prerelease with the packages.
+        required: false
+        default: false
+        type: boolean
   workflow_dispatch:
     inputs:
+      ref:
+        description: Git ref or commit to package.
+        required: false
+        default: ""
+      release-tag:
+        description: Tag included in package artifact names.
+        required: false
+        default: ""
+      publish-release:
+        description: Create or update a GitHub prerelease.
+        required: false
+        default: false
+        type: boolean
       goos:
         description: Target GOOS for Go service packages.
         required: false
@@ -21,11 +49,15 @@ permissions:
 env:
   GO_VERSION: "1.25.13"
   NODE_VERSION: "22"
+  PACKAGE_REF: ${{ inputs.ref || github.ref }}
+  PACKAGE_TAG: ${{ inputs.release-tag || github.ref_name || github.sha }}
 
 jobs:
   go-services:
     name: Package ${{ matrix.service }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -40,8 +72,11 @@ jobs:
             command: ./cmd/endpoint/endpoint.go
             binary: endpoint-api
     steps:
-      - name: Checkout code
+      - name: Checkout tagged source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.PACKAGE_REF }}
+          persist-credentials: false
 
       - name: Package ${{ matrix.service }}
         uses: ./.github/actions/package-go-service
@@ -49,18 +84,41 @@ jobs:
           service: ${{ matrix.service }}
           command: ${{ matrix.command }}
           binary: ${{ matrix.binary }}
-          artifact-name: ${{ matrix.service }}-${{ github.sha }}
+          artifact-name: ${{ matrix.service }}-${{ env.PACKAGE_TAG }}
+          package-tag: ${{ env.PACKAGE_TAG }}
           go-version: ${{ env.GO_VERSION }}
-          goos: ${{ github.event.inputs.goos || 'linux' }}
-          goarch: ${{ github.event.inputs.goarch || 'amd64' }}
+          goos: ${{ inputs.goos || 'linux' }}
+          goarch: ${{ inputs.goarch || 'amd64' }}
           cgo-enabled: "0"
+
+  assistant-api:
+    name: Package assistant-api
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.PACKAGE_REF }}
+          persist-credentials: false
+
+      - name: Package assistant-api
+        uses: ./.github/actions/package-assistant-service
+        with:
+          package-tag: ${{ env.PACKAGE_TAG }}
 
   ui:
     name: Package ui
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - name: Checkout code
+      - name: Checkout tagged source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.PACKAGE_REF }}
+          persist-credentials: false
 
       - name: Set up UI
         uses: ./.github/actions/setup-ui
@@ -86,24 +144,84 @@ jobs:
         uses: ./.github/actions/package-directory
         with:
           source-directory: ui/build
-          package-name: ui-build
-          artifact-name: ui-build-${{ github.sha }}
+          package-name: ui
+          artifact-name: ui-${{ env.PACKAGE_TAG }}
+          package-tag: ${{ env.PACKAGE_TAG }}
+
+  release:
+    name: Publish GitHub prerelease
+    if: inputs.publish-release
+    needs:
+      - go-services
+      - assistant-api
+      - ui
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Download service packages
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: '*-${{ env.PACKAGE_TAG }}'
+          path: release-assets
+          merge-multiple: true
+
+      - name: Generate checksums
+        working-directory: release-assets
+        run: |
+          set -euo pipefail
+          test "$(find . -maxdepth 1 -type f -name '*.tar.gz' | wc -l | tr -d ' ')" -eq 5
+          sha256sum ./*.tar.gz > SHA256SUMS
+
+      - name: Create or update prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag='${{ env.PACKAGE_TAG }}'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" release-assets/* --clobber
+          else
+            gh release create "$tag" release-assets/* \
+              --prerelease \
+              --verify-tag \
+              --title "$tag" \
+              --notes "Automated service packages for commit ${{ env.PACKAGE_REF }}."
+          fi
 
   summary:
     name: Package Summary
     runs-on: ubuntu-latest
     needs:
       - go-services
+      - assistant-api
       - ui
+      - release
     if: always()
     steps:
+      - name: Verify package results
+        run: |
+          set -euo pipefail
+          test '${{ needs.go-services.result }}' = success
+          test '${{ needs.assistant-api.result }}' = success
+          test '${{ needs.ui.result }}' = success
+          if [ '${{ inputs.publish-release }}' = true ]; then
+            test '${{ needs.release.result }}' = success
+          fi
+
       - name: Write summary
         run: |
           {
             echo "## Package Results"
             echo ""
-            echo "| Package group | Result |"
-            echo "|---------------|--------|"
+            echo "| Package | Result |"
+            echo "|---------|--------|"
             echo "| Go services | ${{ needs.go-services.result }} |"
+            echo "| assistant-api | ${{ needs.assistant-api.result }} |"
             echo "| ui | ${{ needs.ui.result }} |"
+            echo "| GitHub prerelease | ${{ needs.release.result }} |"
+            echo "| Source | \`${{ env.PACKAGE_REF }}\` |"
+            echo "| Tag | \`${{ env.PACKAGE_TAG }}\` |"
           } >> "$GITHUB_STEP_SUMMARY"

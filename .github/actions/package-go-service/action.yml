@@ -14,6 +14,9 @@ inputs:
   artifact-name:
     description: Uploaded artifact name.
     required: true
+  package-tag:
+    description: Tag included in the package file name.
+    required: true
   go-version:
     description: Go version to install.
     required: true
@@ -53,13 +56,14 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        tar czf "dist/${{ inputs.service }}.tar.gz" -C "dist/${{ inputs.service }}" .
-        ls -lh "dist/${{ inputs.service }}.tar.gz"
+        package="dist/${{ inputs.service }}-${{ inputs.package-tag }}.tar.gz"
+        tar czf "$package" -C "dist/${{ inputs.service }}" .
+        ls -lh "$package"
 
     - name: Upload package
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       with:
         name: ${{ inputs.artifact-name }}
-        path: dist/${{ inputs.service }}.tar.gz
+        path: dist/${{ inputs.service }}-${{ inputs.package-tag }}.tar.gz
         if-no-files-found: error
         retention-days: 14

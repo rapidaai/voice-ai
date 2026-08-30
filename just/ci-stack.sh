@@ -41,10 +41,10 @@ chmod 0777 "$CI_STACK_REPORTS_DIR"
 
 "${compose[@]}" config --quiet
 bash -n tests/smoke/run.sh
-shellcheck tests/smoke/run.sh
+bash just/shellcheck.sh tests/smoke/run.sh
 ./bin/check-go-version-consistency
 ./docker/assistant-api/scripts/verify-native-deps.sh docker/assistant-api/native-deps.lock
-python3 openapi/scripts/generate_assistant_postman_collection.py --check
+bash just/ci-python.sh openapi/scripts/generate_assistant_postman_collection.py --check
 
 "${compose[@]}" --progress plain build 2>&1 | tee "$CI_STACK_DIAGNOSTICS_DIR/build.log"
 if [[ "$mode" == build ]]; then
