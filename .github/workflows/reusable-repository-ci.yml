@@ -3,6 +3,10 @@ name: Reusable Repository CI
 on:
   workflow_call:
     inputs:
+      go-version:
+        description: Go version to install.
+        required: true
+        type: string
       node-version:
         description: Node.js version to install.
         required: true
@@ -64,3 +68,35 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: "0"
           ignore-unfixed: true
+
+  contract-compatibility:
+    name: API Contract Compatibility
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3
+        with:
+          just-version: "1.58.0"
+
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+        with:
+          go-version: ${{ inputs.go-version }}
+
+      - name: Resolve target branch baseline
+        id: baseline
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PULL_REQUEST_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: scripts/contracts/materialize-baseline.sh "$RUNNER_TEMP/contract-baseline"
+
+      - name: Check OpenAPI and protobuf compatibility
+        run: just ci-contracts "${{ steps.baseline.outputs.directory }}"

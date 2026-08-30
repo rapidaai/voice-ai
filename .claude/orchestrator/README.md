@@ -59,15 +59,15 @@ Templates:
 Create the corresponding Orca Run, task DAG, approval gate, and planner worker with:
 
 ```bash
-make orca-development-run OBJECTIVE="describe the desired outcome" \
-  RFC="rfcs/NNNN-short-name.md" AGENT=claude
+just orca-development-run "describe the desired outcome" \
+  "rfcs/NNNN-short-name.md" claude
 ```
 
 Use this only when a Governed trigger from `DEVELOPMENT_PROCESS.md` applies. It creates
 only the planner, RFC-author, and challenger tasks and starts the planner.
 After the exact challenged RFC bytes contain `- Status: Accepted`, use
-`make orca-confirm-rfc-create` to create a dedicated confirmation task and exact-digest gate. Use
-`make orca-confirm-rfc-collect` to verify the resolved gate and write its receipt before
+`just orca-confirm-rfc-create` to create a dedicated confirmation task and exact-digest gate. Use
+`just orca-confirm-rfc-collect` to verify the resolved gate and write its receipt before
 creating or starting implementation tasks.
 
 All RFC-related JSON inputs and outputs must be direct children of

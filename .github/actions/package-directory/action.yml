@@ -11,6 +11,9 @@ inputs:
   artifact-name:
     description: Uploaded artifact name.
     required: true
+  package-tag:
+    description: Tag included in the package file name.
+    required: true
 
 runs:
   using: composite
@@ -21,13 +24,14 @@ runs:
         set -euo pipefail
         test -d "${{ inputs.source-directory }}"
         mkdir -p dist
-        tar czf "dist/${{ inputs.package-name }}.tar.gz" -C "${{ inputs.source-directory }}" .
-        ls -lh "dist/${{ inputs.package-name }}.tar.gz"
+        package="dist/${{ inputs.package-name }}-${{ inputs.package-tag }}.tar.gz"
+        tar czf "$package" -C "${{ inputs.source-directory }}" .
+        ls -lh "$package"
 
     - name: Upload package
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       with:
         name: ${{ inputs.artifact-name }}
-        path: dist/${{ inputs.package-name }}.tar.gz
+        path: dist/${{ inputs.package-name }}-${{ inputs.package-tag }}.tar.gz
         if-no-files-found: error
         retention-days: 14

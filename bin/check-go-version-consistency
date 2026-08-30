@@ -75,8 +75,7 @@ expect_match ".github/workflows/ci.yml" "go-version: \"${GO_VERSION}\""
 expect_match ".github/workflows/package.yml" "GO_VERSION: \"${GO_VERSION}\""
 expect_match ".github/workflows/docker-publish-base.yml" "rapida-golang:${GO_VERSION}-alpine"
 expect_match ".github/workflows/docker-publish-base.yml" "rapida-golang:${GO_VERSION}-bookworm"
-expect_match "Makefile" "rapida-golang:${GO_VERSION}-alpine"
-expect_match "Makefile" "rapida-golang:${GO_VERSION}-bookworm"
+expect_line "just/images.just" "go_version := \"${GO_VERSION}\""
 
 if [ "$failed" -ne 0 ]; then
   echo "Update all Go and rapida-golang version references to ${GO_VERSION}." >&2

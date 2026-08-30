@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestGRPCAuthenticationMiddlewareOrder(t *testing.T) {
+func TestGRPCUsesUserFirstAuthenticationMiddlewareOrder(t *testing.T) {
 	file := parseCommandSource(t, "endpoint.go")
 
 	assertAuthenticationMiddlewareOrder(t, interceptorChain(t, file, "ChainUnaryInterceptor"), []string{

@@ -63,6 +63,8 @@ Rapida is written in **Go**, using the highly optimized [gRPC](https://github.co
 ## Prerequisites
 
 - **Docker** & **Docker Compose** ([Install](https://www.docker.com/))
+- **Just** command runner ([Install](https://github.com/casey/just#installation))
+- **Go 1.25.13**, **Node.js 22**, and **Yarn 1.22.22** for `just ci`
 - **16GB+ RAM** (for all services)
 
 ---
@@ -76,16 +78,16 @@ Get all services running in 4 commands:
 git clone https://github.com/rapidaai/voice-ai.git && cd voice-ai
 
 # Setup & build
-make setup-local && make build-all
+just setup-local build-all
 
 # Start all services
-make up-all
+just up-all
 
 # View running services
 docker compose ps
 ```
 
-**Services Ready (`make up-all`):**
+**Services Ready (`just up-all`):**
 
 - UI: <http://localhost:3000>
 - API Gateway (nginx): <http://localhost:8080>
@@ -97,7 +99,7 @@ docker compose ps
 To include knowledge services (OpenSearch + Document API), run:
 
 ```bash
-make up-all-with-knowledge
+just up-all-with-knowledge
 ```
 
 Then:
@@ -107,48 +109,65 @@ Then:
 **Stop services:**
 
 ```bash
-make down-all
+just down-all
 ```
 
 ---
 
 ## Development
 
+### Continuous Integration and Build Packages
+
+Run the same required checks used by pull requests from the repository root:
+
+```bash
+just ci
+```
+
+The command bootstraps its pinned Python, commitlint, and shellcheck tooling in local cache
+directories. Docker remains required for image, integration, and smoke-test stages.
+
+After `Continuous Integration` succeeds for a push to `main`, GitHub creates an immutable
+tag named `build-YYYYMMDD-<short-merge-commit-sha>`. The matching GitHub prerelease
+contains packages for `web-api`, `integration-api`, `endpoint-api`, `assistant-api`, and
+`ui`, plus a `SHA256SUMS` file. The deprecated `document-api` is intentionally excluded
+from CI and release packaging.
+
 ### Work on Specific Services
 
 ```bash
 # Start only database
-make up-db
+just up-db
 
 # Start only UI
-make up-ui
+just up-ui
 
 # Start only Assistant API
-make up-assistant
+just up-assistant
 
 # List all start commands
-make help
+just --list
 ```
 
 ### View Logs
 
 ```bash
 # All services
-make logs-all
+just logs-all
 
 # Specific service
-make logs-web
-make logs-assistant
+just logs-web
+just logs-assistant
 ```
 
 ### Rebuild After Code Changes
 
 ```bash
 # Rebuild and restart one service
-make rebuild-assistant
+just rebuild-assistant
 
 # Rebuild all
-make rebuild-all
+just rebuild-all
 ```
 
 ### Configure Services
@@ -220,7 +239,7 @@ kill -9 <PID>    # Kill it
 **Services won't start:**
 
 ```bash
-make logs-all    # Check logs
+just logs-all    # Check logs
 docker compose ps  # Verify status
 ```
 
@@ -231,10 +250,10 @@ docker compose ps  # Verify status
 docker compose exec postgres psql -U rapida -d web_db -c "SELECT 1"
 
 # Reset everything
-make clean
-make setup-local
-make build-all
-make up-all
+just clean
+just setup-local
+just build-all
+just up-all
 ```
 
 ---
@@ -242,14 +261,23 @@ make up-all
 ## All Commands
 
 ```bash
-make help          # Show all available commands
-make setup-local   # Create data directories
-make build-all     # Build all Docker images
-make up-all        # Start all services
-make down-all      # Stop all services
-make logs-all      # View all logs
-make clean         # Remove containers & volumes
-make restart-all   # Restart all services
+just --list         # Show all available commands
+just setup-local    # Create data directories
+just build-all      # Build all Docker images
+just up-all         # Start all services
+just down-all       # Stop all services
+just logs-all       # View all logs
+just clean          # Remove containers & volumes
+just restart-all    # Restart all services
+```
+
+Run the same repository checks locally:
+
+```bash
+just ci-fast        # Go, UI, contracts, workflow, and tooling checks
+just ci-integration # Build and verify the complete Docker stack
+just ci-smoke       # Run API smoke tests against the complete stack
+just ci             # Run every CI lane, including security and native-runtime checks
 ```
 
 ---

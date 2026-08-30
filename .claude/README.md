@@ -6,17 +6,18 @@ This repository includes Claude skills in `.claude/skills/`.
 
 Prerequisites:
 - `python3`
-- Python package `jsonschema`
+- Python packages used by CI are installed in a cache-scoped virtual environment.
 - `go`
 - `yarn` (for UI-related checks)
+- `just`
 
 Validate local setup:
 
 ```bash
 find .claude/skills -maxdepth 2 -type d | sort
-make validate-development-process
-make validate-agent-tooling
-make agent-finalize CHANGED_FILES="api/example/service.go,api/example/service_test.go" AGENT_ROOT=.claude
+just validate-development-process
+just validate-agent-tooling
+just agent-finalize "api/example/service.go,api/example/service_test.go" .claude
 ```
 
 ## Install in this repository
@@ -69,8 +70,8 @@ The final `post-review` gate rejects self-review and unresolved critical or majo
 Render or open the Orca development panel:
 
 ```bash
-make orca-panel PANEL_INPUT="path/to/lifecycle-input.json"
-make orca-panel-open PANEL_INPUT="path/to/lifecycle-input.json"
+just orca-panel "path/to/lifecycle-input.json"
+just orca-panel-open "path/to/lifecycle-input.json"
 ```
 
 Claude validation configuration is committed in:
@@ -79,7 +80,7 @@ Claude validation configuration is committed in:
 - `.claude/hooks/` (explicit validation commands)
 - `.claude/agents/` (subagents for UI/backend implementation and tests)
 
-Use `make validate-development-toolkit` to validate lifecycle gates, skill packaging, agent role contracts, non-blocking Claude settings, hook parity, and scoped validation together.
+Use `just validate-development-toolkit` to validate lifecycle gates, skill packaging, agent role contracts, non-blocking Claude settings, hook parity, and scoped validation together.
 
 ## References
 

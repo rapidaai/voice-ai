@@ -290,7 +290,7 @@ describe('listing page create CTAs', () => {
       'min-w-28',
       'whitespace-nowrap',
     );
-    expect(screen.getAllByTestId('skeleton-text')).toHaveLength(70);
+    expect(screen.getAllByTestId('skeleton-text')).toHaveLength(60);
     expect(screen.getAllByTestId('skeleton-placeholder')).toHaveLength(100);
     expect(
       screen.getByRole('button', { name: 'Create new assistant' }),

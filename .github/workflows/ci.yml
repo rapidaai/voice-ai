@@ -1,4 +1,4 @@
-name: CI
+name: Continuous Integration
 
 on:
   pull_request:
@@ -21,50 +21,55 @@ env:
   NODE_VERSION: "22"
 
 jobs:
-  go:
-    name: Go
+  basics-go:
+    name: 01 Basics - Go
     uses: ./.github/workflows/reusable-go-ci.yml
     secrets: inherit
     with:
       go-version: "1.25.13"
 
-  ui:
-    name: UI
+  basics-ui:
+    name: 01 Basics - UI
     uses: ./.github/workflows/reusable-ui-ci.yml
     secrets: inherit
     with:
       node-version: "22"
 
-  repository:
-    name: Repository
+  basics-repository:
+    name: 01 Basics - Repository
     uses: ./.github/workflows/reusable-repository-ci.yml
     with:
+      go-version: "1.25.13"
       node-version: "22"
 
   docker:
-    name: Docker
+    name: 02 Docker Images
+    needs:
+      - basics-go
+      - basics-ui
+      - basics-repository
     uses: ./.github/workflows/reusable-docker-ci.yml
 
-  # Stabilization lanes report independently until the RFC graduation thresholds
-  # are met. They intentionally remain outside ci-success, and Docker CI remains.
-  assistant-native:
-    name: Assistant Native (stabilizing)
+  single-service:
+    name: 03 Single Service Verification
+    needs: docker
     uses: ./.github/workflows/reusable-assistant-native-ci.yml
 
-  system:
-    name: System (stabilizing)
-    uses: ./.github/workflows/reusable-system-ci.yml
+  end-to-end:
+    name: 04 End-to-End Verification
+    needs: single-service
+    uses: ./.github/workflows/reusable-end-to-end-ci.yml
 
   ci-success:
-    name: CI Success
+    name: 05 CI Complete
     runs-on: ubuntu-latest
-    # Graduation: add each lane only after its RFC sample passes. When system
-    # graduates, remove docker here and remove the standalone docker job above.
     needs:
-      - go
-      - ui
-      - repository
+      - basics-go
+      - basics-ui
+      - basics-repository
       - docker
+      - single-service
+      - end-to-end
     if: always()
     steps:
       - name: Check all jobs passed
@@ -86,8 +91,10 @@ jobs:
             echo ""
             echo "| Area | Result |"
             echo "|------|--------|"
-            echo "| Go | ${{ needs.go.result }} |"
-            echo "| UI | ${{ needs.ui.result }} |"
-            echo "| Repository | ${{ needs.repository.result }} |"
-            echo "| Docker | ${{ needs.docker.result }} |"
+            echo "| 01 Basics - Go | ${{ needs.basics-go.result }} |"
+            echo "| 01 Basics - UI | ${{ needs.basics-ui.result }} |"
+            echo "| 01 Basics - Repository | ${{ needs.basics-repository.result }} |"
+            echo "| 02 Docker Images | ${{ needs.docker.result }} |"
+            echo "| 03 Single Service Verification | ${{ needs.single-service.result }} |"
+            echo "| 04 End-to-End Verification | ${{ needs.end-to-end.result }} |"
           } >> "$GITHUB_STEP_SUMMARY"

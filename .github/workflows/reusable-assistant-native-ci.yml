@@ -1,4 +1,4 @@
-name: Reusable Assistant Native CI
+name: Reusable Assistant Native Runtime Verification
 
 on:
   workflow_call:
@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   assistant-native:
-    name: Assistant Native
+    name: Native Dependencies, Race, and Vulnerability Checks
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:

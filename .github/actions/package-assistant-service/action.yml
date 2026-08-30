@@ -1,0 +1,40 @@
+name: Package assistant service
+description: Build the assistant runtime image and upload it as a compressed Docker archive.
+
+inputs:
+  package-tag:
+    description: Tag used for the image and uploaded artifact.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Build assistant package
+      shell: bash
+      run: |
+        set -euo pipefail
+        context=$(mktemp -d "${RUNNER_TEMP}/assistant-package-context.XXXXXX")
+        trap 'rm -rf "$context"' EXIT
+
+        git ls-files -z | tar --null -T - -cf - | tar -xf - -C "$context"
+        rm -f "$context/.dockerignore"
+
+        docker build \
+          --file "$context/docker/assistant-api/Dockerfile" \
+          --platform linux/amd64 \
+          --target runtime \
+          --tag "rapidaai/assistant-api:${{ inputs.package-tag }}" \
+          "$context"
+        mkdir -p dist
+        package="dist/assistant-api-${{ inputs.package-tag }}.tar.gz"
+        docker save "rapidaai/assistant-api:${{ inputs.package-tag }}" | gzip > "$package"
+        test -s "$package"
+        ls -lh "$package"
+
+    - name: Upload assistant package
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: assistant-api-${{ inputs.package-tag }}
+        path: dist/assistant-api-${{ inputs.package-tag }}.tar.gz
+        if-no-files-found: error
+        retention-days: 14

@@ -12,6 +12,12 @@ license-check-and-add.json
 .cache
 # Integration test credentials (never commit real API keys)
 **/integration_config.yaml
+/smoke-reports/
+/smoke-diagnostics/
+/coverage.out
+/bin/web-api
+/bin/integration-api
+/bin/endpoint-api
 
 .codex
 .claude

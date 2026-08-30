@@ -56,7 +56,7 @@ for root in .codex .claude; do
     role_file="$root/agents/$role.md"
     grep -q '^Lifecycle:' "$role_file" || fail "missing lifecycle contract in $role_file"
     grep -q 'canonical repository-wide code writing rules in `AGENTS.md`' "$role_file" || fail "missing canonical code rules reference in $role_file"
-    grep -q 'make agent-finalize' "$role_file" || fail "missing explicit finalization rule in $role_file"
+    grep -q 'just agent-finalize' "$role_file" || fail "missing explicit finalization rule in $role_file"
     grep -q 'Never approve or review your own' "$role_file" || fail "missing reviewer separation in $role_file"
   done
   grep -q '^tools: Read,Glob,Grep,LS$' "$root/agents/code-reviewer.md" || fail "code reviewer must remain read-only in $root"
@@ -81,9 +81,11 @@ python3 -m py_compile .codex/hooks/*.py .claude/hooks/*.py
 test -x bin/agent-finalize || fail "bin/agent-finalize must be executable"
 test -x bin/orca-rfc-release || fail "bin/orca-rfc-release must be executable"
 test -x bin/validate-rfc-layout || fail "bin/validate-rfc-layout must be executable"
-grep -q '^agent-finalize:' Makefile || fail "missing agent-finalize Make target"
-grep -q '^orca-rfc-release:' Makefile || fail "missing orca-rfc-release Make target"
-grep -q '^validate-rfc-layout:' Makefile || fail "missing validate-rfc-layout Make target"
+test -f justfile || fail "missing root justfile"
+test -f just/development.just || fail "missing development recipes"
+grep -q '^agent-finalize ' just/development.just || fail "missing agent-finalize Just recipe"
+grep -q '^orca-rfc-release ' just/development.just || fail "missing orca-rfc-release Just recipe"
+grep -q '^validate-rfc-layout:' just/development.just || fail "missing validate-rfc-layout Just recipe"
 test "$(grep -c 'golangci-lint run --allow-serial-runners' bin/pre-commit-go)" -eq 2 || fail "golangci-lint hooks must serialize concurrent runners"
 python3 - "$repo_root/.pre-commit-config.yaml" <<'PY'
 import sys

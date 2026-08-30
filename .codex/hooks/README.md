@@ -11,7 +11,7 @@ Included scripts:
 Preferred usage:
 
 ```bash
-make agent-finalize CHANGED_FILES="api/example/service.go,api/example/service_test.go"
+just agent-finalize "api/example/service.go,api/example/service_test.go"
 ```
 
 ## Scoped file mode

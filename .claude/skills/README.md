@@ -26,7 +26,7 @@ Each skill contains:
 - `examples/sample.md` (expected output shape)
 - `scripts/validate.sh` (local skill self-check)
 
-Claude packaging intentionally uses `template.md` and enterprise policy files. Semantic lifecycle parity with Codex is enforced by `make validate-agent-tooling`, not by requiring identical directory trees.
+Claude packaging intentionally uses `template.md` and enterprise policy files. Semantic lifecycle parity with Codex is enforced by `just validate-agent-tooling`, not by requiring identical directory trees.
 
 ## Enterprise standards
 
@@ -55,7 +55,7 @@ Notes:
 - strict mode allows only skill files, factory files, contract files, and the specified provider folder scope.
 - EOS strict mode rejects edits under VAD internals; VAD strict mode rejects edits under EOS internals.
 
-Every skill participates in the governed lifecycle and hands implementation evidence to an independent reviewer. Run `make validate-development-toolkit` before shipping toolkit changes.
+Every skill participates in the governed lifecycle and hands implementation evidence to an independent reviewer. Run `just validate-development-toolkit` before shipping toolkit changes.
 
 ## Skill list
 

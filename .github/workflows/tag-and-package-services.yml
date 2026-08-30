@@ -1,0 +1,128 @@
+name: Tag and Package Services
+
+on:
+  workflow_run:
+    workflows:
+      - Continuous Integration
+    branches:
+      - main
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Commit on main to tag and package.
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tag-and-package-${{ github.event.workflow_run.head_sha || inputs.commit || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Create build tag
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      source-sha: ${{ steps.metadata.outputs.source-sha }}
+      build-tag: ${{ steps.metadata.outputs.build-tag }}
+    steps:
+      - name: Resolve source commit
+        id: source
+        env:
+          DISPATCH_COMMIT: ${{ inputs.commit }}
+          WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          if [ '${{ github.event_name }}' = workflow_run ]; then
+            source_sha=$WORKFLOW_RUN_SHA
+          elif [ -n "$DISPATCH_COMMIT" ]; then
+            source_sha=$DISPATCH_COMMIT
+          else
+            source_sha='${{ github.sha }}'
+          fi
+          echo "source-sha=$source_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout source commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ steps.source.outputs.source-sha }}
+          fetch-depth: 0
+
+      - name: Validate main branch commit
+        env:
+          SOURCE_SHA: ${{ steps.source.outputs.source-sha }}
+        run: |
+          set -euo pipefail
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+
+      - name: Resolve build metadata
+        id: metadata
+        env:
+          SOURCE_SHA: ${{ steps.source.outputs.source-sha }}
+        run: |
+          set -euo pipefail
+          source_sha=$(git rev-parse "$SOURCE_SHA^{commit}")
+          short_sha=$(git rev-parse --short=7 "$source_sha")
+          commit_epoch=$(git show -s --format=%ct "$source_sha")
+          commit_date=$(date -u -d "@$commit_epoch" +%Y%m%d)
+          echo "source-sha=$source_sha" >> "$GITHUB_OUTPUT"
+          echo "build-tag=build-${commit_date}-${short_sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Create immutable build tag
+        env:
+          BUILD_TAG: ${{ steps.metadata.outputs.build-tag }}
+          SOURCE_SHA: ${{ steps.metadata.outputs.source-sha }}
+        run: |
+          set -euo pipefail
+          remote_target=$(git ls-remote --tags origin "refs/tags/$BUILD_TAG^{}" | awk '{print $1}')
+          if [ -z "$remote_target" ]; then
+            remote_target=$(git ls-remote --tags origin "refs/tags/$BUILD_TAG" | awk '{print $1}')
+          fi
+
+          if [ -n "$remote_target" ]; then
+            test "$remote_target" = "$SOURCE_SHA" || {
+              echo "Tag $BUILD_TAG already points to $remote_target, not $SOURCE_SHA." >&2
+              exit 1
+            }
+            echo "Tag $BUILD_TAG already points to $SOURCE_SHA."
+            exit
+          fi
+
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git tag -a "$BUILD_TAG" "$SOURCE_SHA" -m "Build $BUILD_TAG"
+          git push origin "refs/tags/$BUILD_TAG"
+
+      - name: Write tag summary
+        run: |
+          {
+            echo "## Build Tag"
+            echo ""
+            echo "- Source CI run: ${{ github.event.workflow_run.html_url || 'manual dispatch' }}"
+            echo "- Commit: \`${{ steps.metadata.outputs.source-sha }}\`"
+            echo "- Tag: \`${{ steps.metadata.outputs.build-tag }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  package:
+    name: Package tagged services
+    needs: tag
+    permissions:
+      actions: read
+      contents: write
+    uses: ./.github/workflows/package.yml
+    with:
+      ref: ${{ needs.tag.outputs.source-sha }}
+      release-tag: ${{ needs.tag.outputs.build-tag }}
+      publish-release: true

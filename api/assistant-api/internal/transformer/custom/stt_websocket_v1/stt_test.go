@@ -604,6 +604,7 @@ func TestSpeechToText_AudioRequestContextStaysBoundToAudioPacket(t *testing.T) {
 	)
 
 	audioWritten := make(chan struct{}, 1)
+	releaseServer := make(chan struct{})
 	upgrader := websocket.Upgrader{}
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		conn, err := upgrader.Upgrade(writer, request, nil)
@@ -632,8 +633,10 @@ func TestSpeechToText_AudioRequestContextStaysBoundToAudioPacket(t *testing.T) {
 		case audioWritten <- struct{}{}:
 		default:
 		}
+		<-releaseServer
 	}))
 	defer server.Close()
+	defer close(releaseServer)
 
 	baseURL := strings.Replace(server.URL, "http://", "ws://", 1)
 	collector := &sttPacketCollector{}

@@ -32,7 +32,7 @@ reservation_name="${rfc_path#rfcs/}"
 reservation_lock="$reservation_root/$reservation_name.lock"
 if ! mkdir "$reservation_lock" 2>/dev/null; then
   echo "RFC path is already reserved by another Run: $rfc_path" >&2
-  echo "If that Run was abandoned, release it with: make orca-rfc-release RFC='$rfc_path'" >&2
+  echo "If that Run was abandoned, release it with: just orca-rfc-release '$rfc_path'" >&2
   exit 2
 fi
 reservation_active=1
@@ -171,13 +171,13 @@ tasks must not be created until the challenged RFC is confirmed and committed as
 the governance baseline.
 
 After the RFC author and challenger finish, create the exact-digest confirmation gate:
-  make orca-confirm-rfc-create RUN_ID="$run_id" CHALLENGE_TASK_ID="$challenger_task" RFC="$rfc_path" CHALLENGE_RECEIPT="$rfc_artifact_dir/challenge.json"
+  just orca-confirm-rfc-create "$run_id" "$challenger_task" "$rfc_artifact_dir/challenge.json" "$rfc_path"
 
 After the gate is resolved, collect the receipt and record the governance baseline:
-  make orca-confirm-rfc-collect RUN_ID="$run_id" TASK_ID="<confirmation-task-id>" CHALLENGE_TASK_ID="$challenger_task" CHALLENGE_RECEIPT="$rfc_artifact_dir/challenge.json" RFC="$rfc_path" GATE_ID="<gate-id>"
+  just orca-confirm-rfc-collect "$run_id" "<confirmation-task-id>" "$challenger_task" "$rfc_artifact_dir/challenge.json" "<gate-id>" "$rfc_path"
   git add "$rfc_path" "$rfc_artifact_dir/plan.json" "$rfc_artifact_dir/challenge.json" "$rfc_artifact_dir/confirmation.json"
   git commit -m "docs: accept RFC for $objective"
-  DEVELOPMENT_GATE_KEY="..." make sign-approved-plan RUN_ID="$run_id" PLAN="$rfc_artifact_dir/plan.json" BASE_REF="<governance-commit>"
+  DEVELOPMENT_GATE_KEY="..." BASE_REF="<governance-commit>" just sign-approved-plan "$run_id" "$rfc_artifact_dir/plan.json"
 
 Only after the receipt and governance baseline are preserved may the coordinator create
 implementation, verification, and review tasks.

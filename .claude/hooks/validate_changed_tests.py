@@ -117,7 +117,7 @@ def _is_backend_test(path: str) -> bool:
 
 
 def main() -> int:
-    raw = sys.stdin.read()
+    raw = "" if sys.stdin.isatty() else sys.stdin.read()
     changed = _changed_files(raw)
 
     ui_code_changed = [f for f in changed if _is_ui_code(f)]

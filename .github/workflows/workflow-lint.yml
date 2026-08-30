@@ -6,6 +6,8 @@ on:
       - .github/actions/**
       - .github/dependabot.yml
       - .github/workflows/**
+      - justfile
+      - just/**
   push:
     branches:
       - main
@@ -14,6 +16,8 @@ on:
       - .github/actions/**
       - .github/dependabot.yml
       - .github/workflows/**
+      - justfile
+      - just/**
   workflow_dispatch:
 
 permissions:
@@ -41,5 +45,14 @@ jobs:
       - name: Install actionlint
         run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 
-      - name: Lint workflows
-        run: actionlint -color
+      - name: Set up Just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3
+        with:
+          just-version: "1.58.0"
+
+      - name: Lint workflows and recipes
+        run: |
+          actionlint -color
+          just --fmt --check
+          bash -n just/*.sh
+          shellcheck just/*.sh

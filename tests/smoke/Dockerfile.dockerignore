@@ -1,0 +1,10 @@
+**
+!tests/
+!tests/smoke/
+!tests/smoke/package.json
+!tests/smoke/package-lock.json
+!tests/smoke/run.sh
+!openapi/
+!openapi/postman/
+!openapi/postman/assistant-api/
+!openapi/postman/assistant-api/assistant-api.smoke.postman_collection.json

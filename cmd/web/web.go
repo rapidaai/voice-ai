@@ -80,20 +80,18 @@ func main() {
 		grpc.ChainStreamInterceptor(
 			middlewares.NewRequestLoggerStreamServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryStreamServerMiddleware(appRunner.Logger),
+			middlewares.NewAuthenticationStreamServerMiddleware(userAuthenticator, appRunner.Logger),
 			middlewares.NewProjectAuthenticatorStreamServerMiddleware(projectAuthenticator, appRunner.Logger),
 			middlewares.NewOrganizationAuthenticatorStreamServerMiddleware(organizationAuthenticator, appRunner.Logger),
 			middlewares.NewServiceAuthenticatorStreamServerMiddleware(serviceAuthenticator, appRunner.Logger),
-
-			middlewares.NewAuthenticationStreamServerMiddleware(userAuthenticator, appRunner.Logger),
 		),
 		grpc.ChainUnaryInterceptor(
 			middlewares.NewRequestLoggerUnaryServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryUnaryServerMiddleware(appRunner.Logger),
+			middlewares.NewAuthenticationUnaryServerMiddleware(userAuthenticator, appRunner.Logger),
 			middlewares.NewProjectAuthenticatorUnaryServerMiddleware(projectAuthenticator, appRunner.Logger),
 			middlewares.NewOrganizationAuthenticatorUnaryServerMiddleware(organizationAuthenticator, appRunner.Logger),
 			middlewares.NewServiceAuthenticatorUnaryServerMiddleware(serviceAuthenticator, appRunner.Logger),
-
-			middlewares.NewAuthenticationUnaryServerMiddleware(userAuthenticator, appRunner.Logger),
 		),
 		grpc.MaxRecvMsgSize(commons.MaxRecvMsgSize), // 10 MB
 		grpc.MaxSendMsgSize(commons.MaxSendMsgSize), // 10 MB

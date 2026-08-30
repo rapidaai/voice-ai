@@ -2,19 +2,19 @@
 
 ## Recommended path: Docker
 
-- `make setup-local && make build-all`
-- `make up-all`
+- `just setup-local build-all`
+- `just up-all`
 - verify with `docker compose ps`
 
 ## Knowledge mode (optional)
 
-- `make up-all-with-knowledge`
+- `just up-all-with-knowledge`
 
 ## Non-docker path
 
-- dependencies: `make deps` (or `make deps-knowledge`)
-- run APIs: `make run-web`, `make run-assistant`, `make run-endpoint`, `make run-integration`
-- run UI: `make run-ui`
+- dependencies: `just deps` (or `just deps-knowledge`)
+- run APIs: `just run-web`, `just run-assistant`, `just run-endpoint`, `just run-integration`
+- run UI: `just run-ui`
 
 ## Health checks
 
@@ -28,4 +28,4 @@
 ## Troubleshooting
 
 - Ports in use: `lsof -i :<port>`
-- Service failures: `make logs-all`, `docker compose ps`
+- Service failures: `just logs-all`, `docker compose ps`

@@ -117,8 +117,8 @@ The approved plan is stored as a separate JSON artifact. Its SHA-256 and a coord
 After approving the plan, the coordinator creates the attestation:
 
 ```bash
-DEVELOPMENT_GATE_KEY="..." make sign-approved-plan RUN_ID="<orca-run-id>" \
-  PLAN="rfcs/NNNN-short-name/jsons/plan.json"
+DEVELOPMENT_GATE_KEY="..." just sign-approved-plan \
+  "<orca-run-id>" "rfcs/NNNN-short-name/jsons/plan.json"
 ```
 
 Workers produce evidence envelopes; the coordinator or CI gate runner executes lifecycle hooks with the key.
@@ -133,14 +133,14 @@ needed. Fast and Standard work should use the normal agent flow without creating
 Start a Governed Run from an Orca-managed terminal:
 
 ```bash
-make orca-development-run OBJECTIVE="describe the desired outcome" AGENT=codex
-  RFC="rfcs/NNNN-short-name.md"
+just orca-development-run "describe the desired outcome" \
+  "rfcs/NNNN-short-name.md" codex
 ```
 
 If a Run is abandoned before its confirmation gate is created, release its reservation:
 
 ```bash
-make orca-rfc-release RFC="rfcs/NNNN-short-name.md"
+just orca-rfc-release "rfcs/NNNN-short-name.md"
 ```
 
 The command creates the Orca Run and dependent planning, RFC-authoring, and challenge
@@ -151,29 +151,27 @@ After challenge approval, the coordinator creates the exact-digest gate on a ded
 confirmation task. No implementation task is created yet:
 
 ```bash
-make orca-confirm-rfc-create RUN_ID="<run>" CHALLENGE_TASK_ID="<challenge-task>" \
-  CHALLENGE_RECEIPT="rfcs/NNNN-short-name/jsons/challenge.json" RFC="rfcs/NNNN-short-name.md"
+just orca-confirm-rfc-create "<run>" "<challenge-task>" \
+  "rfcs/NNNN-short-name/jsons/challenge.json" "rfcs/NNNN-short-name.md"
 ```
 
 After the gate resolves, collect the authoritative receipt before starting a worker:
 
 ```bash
-make orca-confirm-rfc-collect RUN_ID="<run>" TASK_ID="<confirmation-task>" \
-  CHALLENGE_TASK_ID="<challenge-task>" \
-  CHALLENGE_RECEIPT="rfcs/NNNN-short-name/jsons/challenge.json" \
-  GATE_ID="<gate>" RFC="rfcs/NNNN-short-name.md"
+just orca-confirm-rfc-collect "<run>" "<confirmation-task>" "<challenge-task>" \
+  "rfcs/NNNN-short-name/jsons/challenge.json" "<gate>" "rfcs/NNNN-short-name.md"
 ```
 
 Generate the development panel from a lifecycle envelope:
 
 ```bash
-make orca-panel PANEL_INPUT="path/to/lifecycle-input.json"
+just orca-panel "path/to/lifecycle-input.json"
 ```
 
 Open it as a browser tab in the active Orca worktree:
 
 ```bash
-make orca-panel-open PANEL_INPUT="path/to/lifecycle-input.json"
+just orca-panel-open "path/to/lifecycle-input.json"
 ```
 
 The panel displays stage readiness, principle decisions, ownership, exact verification commands, review findings, final-gate issues, and Orca Run/Task/Dispatch provenance. With `DEVELOPMENT_GATE_KEY` available to the coordinator, it also executes the final gate and shows trusted ship readiness.

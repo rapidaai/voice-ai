@@ -2,7 +2,7 @@
 # rapidaai/rapida-debian:bookworm-slim
 # Extends debian:bookworm-slim with common runtime deps and rapida-app user pre-configured.
 # Published to: docker.io/rapidaai/rapida-debian:bookworm-slim
-# Rebuild + push only when Debian version changes: make push-rapida-debian-slim
+# Rebuild + push only when Debian version changes: just push-rapida-debian-slim
 FROM debian:bookworm-slim
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \

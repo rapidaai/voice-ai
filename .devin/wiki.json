@@ -43,7 +43,7 @@
         },
         {
             "title": "Troubleshooting & Commands",
-            "purpose": "Quick reference for common issues, Makefile commands, and debugging steps",
+            "purpose": "Quick reference for common issues, Just recipes, and debugging steps",
             "page_notes": [
                 {
                     "content": "Concise troubleshooting guide in the README."

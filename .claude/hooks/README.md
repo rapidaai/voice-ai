@@ -15,7 +15,7 @@ completion attempts.
 Run validation once with an explicit file scope:
 
 ```bash
-make agent-finalize CHANGED_FILES="api/example/service.go,api/example/service_test.go" AGENT_ROOT=.claude
+just agent-finalize "api/example/service.go,api/example/service_test.go" .claude
 ```
 
 Strict validation returns `2` when checks fail. It never runs automatically during agent exit.
