@@ -29,5 +29,5 @@ if command -v shellcheck >/dev/null 2>&1; then
   exit
 fi
 
-docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck-alpine:v0.11.0 \
+docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck-alpine@sha256:9955be09ea7f0dbf7ae942ac1f2094355bb30d96fffba0ec09f5432207544002 \
   shellcheck "${files[@]}"

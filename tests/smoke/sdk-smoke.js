@@ -6,6 +6,7 @@ const {
 } = require("@rapidaai/nodejs");
 
 const assistantEndpoint = "assistant-api:9007";
+// Smoke credentials are run-scoped and stay inside the isolated Compose network.
 
 function createRequest() {
   const paginate = new Paginate();

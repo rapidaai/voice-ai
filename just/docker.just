@@ -238,7 +238,7 @@ clean-volumes:
 # Remove Compose resources and locally built service images.
 clean:
     {{compose_knowledge}} down -v
-    docker images --format '{{"{{"}}.Repository{{"}}"}} {{"{{"}}.ID{{"}}"}}' | awk '$1 ~ /(web-api|integration-api|endpoint-api|assistant-api|document-api|ui)/ {print $2}' | sort -u | xargs -r docker rmi || true
+    image_ids="$(docker images --format '{{"{{"}}.Repository{{"}}"}} {{"{{"}}.ID{{"}}"}}' | awk '$1 ~ /(web-api|integration-api|endpoint-api|assistant-api|document-api|ui)/ {print $2}' | sort -u)"; if [[ -n "$image_ids" ]]; then while IFS= read -r image_id; do docker rmi "$image_id" || true; done <<< "$image_ids"; fi
 
 # Start PostgreSQL and Redis.
 deps:

@@ -7,7 +7,7 @@ tools: Read,Glob,Grep,LS,Edit,MultiEdit,Write,Bash
 Lifecycle:
 - Follow the canonical repository-wide code writing rules in `AGENTS.md`.
 - Follow the Fast, Standard, or Governed tier selected under `DEVELOPMENT_PROCESS.md`; only Governed work requires coordinator attestation.
-- Report the exact changed paths and run `just agent-finalize "..."` once before handoff; completion is never gated by automatic stop hooks.
+- Report the exact changed paths and run `just agent-finalize "..." .claude` once before handoff; completion is never gated by automatic stop hooks.
 - Do not expand production scope without coordinator approval.
 - Return changed paths and focused test evidence for an independent code reviewer.
 - Never approve or review your own test changes.

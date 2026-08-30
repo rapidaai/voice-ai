@@ -21,15 +21,30 @@ export CI_STACK_REPORTS_DIR=${CI_STACK_REPORTS_DIR:-$PWD/ci-stack-reports}
 
 compose=(docker compose -f docker-compose.yml -f docker-compose.ci.yml)
 
+redact_diagnostics() {
+  local secret=$1
+  [[ -n "$secret" ]] || return
+
+  SECRET_TO_REDACT="$secret" python3 - "$CI_STACK_DIAGNOSTICS_DIR" <<'PY'
+import os
+import pathlib
+import sys
+
+secret = os.environ["SECRET_TO_REDACT"].encode()
+for path in pathlib.Path(sys.argv[1]).iterdir():
+    if path.is_file():
+        path.write_bytes(path.read_bytes().replace(secret, b"[REDACTED]"))
+PY
+}
+
 cleanup() {
   status=$?
   if ((status != 0)); then
     mkdir -p "$CI_STACK_DIAGNOSTICS_DIR"
     "${compose[@]}" ps --all > "$CI_STACK_DIAGNOSTICS_DIR/compose-ps.txt" 2>&1 || true
     "${compose[@]}" logs --no-color > "$CI_STACK_DIAGNOSTICS_DIR/compose.log" 2>&1 || true
-    sed -i.bak "s/${CI_STACK_AUTH_TOKEN}/[REDACTED]/g" "$CI_STACK_DIAGNOSTICS_DIR"/* 2>/dev/null || true
-    sed -i.bak "s/${CI_STACK_PROJECT_API_KEY}/[REDACTED]/g" "$CI_STACK_DIAGNOSTICS_DIR"/* 2>/dev/null || true
-    rm -f "$CI_STACK_DIAGNOSTICS_DIR"/*.bak
+    redact_diagnostics "$CI_STACK_AUTH_TOKEN" || status=1
+    redact_diagnostics "$CI_STACK_PROJECT_API_KEY" || status=1
   fi
   "${compose[@]}" down --volumes --remove-orphans --timeout 30 || true
   exit "$status"
