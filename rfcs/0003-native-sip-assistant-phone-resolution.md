@@ -1,13 +1,15 @@
-# RFC 0003: Native SIP Party Identity Resolution
+# RFC 0003: Native SIP Party Identity and Phone Resolution
 
-- Status: Accepted
+- Status: Draft
 - Date: 2026-08-22
+- Updated: 2026-08-31
 - Owners: Assistant API Native SIP, Assistant Authentication
 - Reviewers: SIP, Telephony, UI, Security, and SRE owners
 
 ## Abstract
 
-This RFC defines how native SIP resolves and propagates the two parties of a call.
+This RFC defines how native SIP captures exact party URIs and resolves phone values for the two
+parties of a call.
 
 SIP provides three different addressing concepts that MUST remain separate:
 
@@ -15,26 +17,29 @@ SIP provides three different addressing concepts that MUST remain separate:
 - The `From` header identifies the logical initiator.
 - The `To` header identifies the logical recipient.
 
-Rapida MUST capture the `From` and `To` header addresses from the dialog-forming SIP request
-and preserve them without phone-number validation, normalization, or DID inference.
+Rapida MUST capture the `From` and `To` header addresses from the dialog-forming SIP request as
+exact URI values. It MUST keep those URI values separate from the phone values used by call
+context and assistant authentication.
 
-For inbound calls:
+For inbound calls after Amendment 01:
 
-- `client.phone` is the `From` header address.
-- `client.assistant_phone` is the `To` header address.
+- `client.phone` is the resolved caller phone from the `From` address user.
+- `client.assistant_phone` is the resolved assistant phone from the validated DID route, active
+  SIP phone deployment, or dialable `To` address user.
 
 For outbound calls:
 
 - `client.phone` is the resolved remote destination.
 - `client.assistant_phone` is the resolved local originating identity.
 
-Request-URI is used only for routing. It MUST NOT populate either party identity.
+Request-URI remains a routing input. A validated DID route MAY supply the assistant phone value,
+but MUST NOT replace either captured SIP URI.
 
 This contract applies equally when the dialog-forming request represents a direct call, a new
 call created after `REFER`, or a replacement/transfer INVITE. Each new SIP dialog resolves its
 own parties from its own dialog-forming request.
 
-This RFC changes only native SIP identity handling and assistant-authentication UI keys.
+This RFC changes only native SIP identity and phone handling and assistant-authentication UI keys.
 Other telephony providers, public APIs, protobuf contracts, and database schemas remain
 compatible. Existing exported Go symbols receive deprecated adapters for at least one release.
 
@@ -46,6 +51,198 @@ This document is a design proposal. Implementation MUST NOT begin while its stat
 Before implementation, the final RFC bytes MUST pass independent challenge and exact-digest
 confirmation according to `DEVELOPMENT_PROCESS.md`. Any byte change after confirmation
 requires another challenge and confirmation.
+
+## Amendment 01: Separate SIP URIs and Phone Values
+
+This amendment supersedes the original requirements that stored complete SIP identities in
+the existing phone-named fields. Native SIP needs both the exact SIP party addresses and the
+resolved phone values without changing the existing `CallAddress` shape or introducing new
+persistence fields.
+
+### Revised Call Address Contract
+
+The existing `CallAddress` fields remain canonical and MUST have these meanings:
+
+```go
+type CallAddress struct {
+    From    string
+    To      string
+    FromURI string
+    ToURI   string
+    Headers map[string]string
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `FromURI` | Exact `request.From().Address.String()` value for the dialog-forming request. |
+| `ToURI` | Exact `request.To().Address.String()` value for the dialog-forming request. |
+| `From` | Resolved caller phone value without the URI scheme, host, port, parameters, or headers. |
+| `To` | Resolved assistant phone value without the URI scheme, host, port, parameters, or headers. |
+
+`From` and `To` MUST remain the phone fields. They MUST NOT be renamed, marked deprecated, or
+replaced by additional phone fields. `FromURI` and `ToURI` MUST remain the exact SIP identity
+fields.
+
+### Phone Value Rules
+
+A phone value is a dialable address value, not a SIP URI and not an assistant routing alias.
+For a SIP address user to qualify as a phone value, it MUST contain one or more ASCII digits with
+an optional single leading `+`. The implementation MUST preserve the selected phone value exactly
+except for surrounding whitespace. In particular, it MUST preserve a leading `+`, a leading `0`,
+and the existing international or national dialing form.
+
+The implementation MUST NOT place any of the following in `From` or `To`:
+
+- a `sip:` or `sips:` URI;
+- a URI host, port, parameter, or header;
+- an `agent-<assistant-id>` routing alias; or
+- a `did-` routing prefix.
+
+When no phone value can be resolved, the corresponding phone field MUST be empty. The
+implementation MUST NOT copy a non-phone URI user into a phone field.
+
+### Inbound Resolution
+
+For each dialog-forming inbound INVITE:
+
+1. Capture `FromURI` from `request.From().Address.String()`.
+2. Capture `ToURI` from `request.To().Address.String()`.
+3. Resolve `From` from the `From` address user when it is a dialable phone value.
+4. Resolve the route using Request-URI under the existing tenant and deployment checks.
+5. Resolve `To` using the first applicable trusted source:
+   1. For a DID route, use the DID value that matched the active SIP phone deployment.
+   2. For an agent route, use the active SIP phone deployment's `phone` option.
+   3. Otherwise, use the `To` address user when it is a dialable phone value.
+6. If no trusted phone value is available, leave `To` empty.
+
+The routing middleware owns `To` enrichment because it already owns the validated association
+between the route, assistant, tenant, and active phone deployment. SIP core owns the immutable
+URI capture and the initial `From` phone extraction.
+
+Custom headers such as `P-Called-Party-ID`, `Diversion`, and
+`X-Original-Called-Number` are outside this amendment. They MUST NOT affect authentication
+until a separate trusted-proxy contract defines which ingress peers and headers are trusted.
+
+### Outbound Resolution
+
+For outbound calls:
+
+- `From` is the resolved local phone value supplied by the phone deployment or outbound call
+  configuration.
+- `To` is the resolved remote destination phone value.
+- `FromURI` and `ToURI` are the exact addresses used by the generated dialog-forming INVITE.
+
+SIP response headers and later in-dialog requests MUST NOT replace these initial values.
+
+### Call Context and Authentication Mapping
+
+The existing call context mapping remains unchanged and now carries phone values only:
+
+| Direction | `CallContext.CallerNumber` | `CallContext.FromNumber` |
+| --- | --- | --- |
+| Inbound | `CallAddress.From` | `CallAddress.To` |
+| Outbound | `CallAddress.To` | `CallAddress.From` |
+
+The existing authentication metadata mapping also remains unchanged:
+
+| Metadata key | Value |
+| --- | --- |
+| `client.phone` | Direction-aware remote phone value. |
+| `client.assistant_phone` | Direction-aware assistant phone value. |
+
+This amendment does not add URI values to authentication metadata. URI values remain available
+through native SIP session and pipeline state for signaling, transfer handling, diagnostics,
+and future explicitly approved consumers.
+
+### Compatibility and Scope
+
+This amendment intentionally avoids:
+
+- renaming `CallAddress.From` or `CallAddress.To`;
+- adding `FromPhone` or `ToPhone` fields;
+- changing protobuf, REST, SDK, or UI contracts;
+- changing non-SIP telephony providers;
+- adding call-context database columns; and
+- reading untrusted SIP headers as phone values.
+
+Existing consumers of `CallContext.CallerNumber`, `CallContext.FromNumber`, `client.phone`, and
+`client.assistant_phone` retain their historical expectation that these values are phone values.
+Native SIP URI consumers MUST use `CallAddress.FromURI` and `CallAddress.ToURI`.
+
+### Amendment Implementation Plan
+
+1. Update SIP core tests to assert exact URI capture and phone-only `From` and `To` values.
+2. Add one small phone-value parser beside `NewCallAddress`; it returns an empty value for
+   non-phone URI users and preserves accepted dialable values unchanged.
+3. Update route middleware to set `CallAddress.To` from the validated DID route or active SIP
+   deployment phone after assistant resolution.
+4. Keep pipeline call-context assignment from `CallAddress.From` and `CallAddress.To`.
+5. Verify outbound call construction populates all four fields consistently.
+6. Verify direct, transferred, referred, and replacement dialogs resolve their own four-field
+   snapshot.
+7. Verify authentication templates receive phone values and never receive `agent-<id>` aliases.
+
+### Amendment Failure Behavior
+
+| Condition | Required behavior |
+| --- | --- |
+| Missing or malformed From header | Preserve existing SIP request rejection behavior. |
+| From URI user is not a phone value | Keep `FromURI`; leave `From` empty. |
+| DID route matches an active deployment | Set `To` to the matched deployment phone value. |
+| Agent route has an active deployment phone | Set `To` to that configured phone value. |
+| Agent route has no configured phone | Keep `ToURI`; leave `To` empty and emit a structured warning without raw identity values. |
+| To URI user is an assistant alias | Never copy the alias into `To`. |
+| Transfer creates a new dialog | Resolve all four fields from the new dialog and its validated route. |
+
+### Amendment Testing and Verification
+
+Required test coverage:
+
+- full `FromURI` and `ToURI` preservation;
+- numeric, `+`-prefixed, and leading-zero phone values;
+- non-phone From users producing an empty `From`;
+- DID routes populating `To` from the matched phone;
+- agent routes populating `To` from the active deployment phone;
+- agent routes without a deployment phone leaving `To` empty;
+- authentication resolving `client.phone` and `client.assistant_phone` from phone fields;
+- URI values remaining available through core and infra boundaries;
+- independent identity resolution for transfer and replacement dialogs; and
+- unchanged behavior for non-SIP providers.
+
+Required commands:
+
+```bash
+env GOCACHE=/private/tmp/voice-ai-gocache go test ./api/assistant-api/sip/internal/core
+env GOCACHE=/private/tmp/voice-ai-gocache go test ./api/assistant-api/sip/infra
+env GOCACHE=/private/tmp/voice-ai-gocache go test ./api/assistant-api/sip/middleware
+env GOCACHE=/private/tmp/voice-ai-gocache go test ./api/assistant-api/sip/pipeline
+env GOCACHE=/private/tmp/voice-ai-gocache go test ./api/assistant-api/internal/channel/telephony/internal/base
+env GOCACHE=/private/tmp/voice-ai-gocache go test ./api/assistant-api/internal/adapters/internal
+git diff --check
+just agent-finalize "api/assistant-api/sip/internal/core,api/assistant-api/sip/infra,api/assistant-api/sip/middleware,api/assistant-api/sip/pipeline,api/assistant-api/internal/channel/telephony/internal/base,api/assistant-api/internal/adapters/internal"
+```
+
+### Amendment Acceptance Criteria
+
+1. `CallAddress` continues to expose exactly `From`, `To`, `FromURI`, `ToURI`, and `Headers`.
+2. `FromURI` and `ToURI` preserve the exact parsed SIP header addresses.
+3. `From` and `To` contain phone values only and never contain SIP URIs or assistant aliases.
+4. An inbound DID route sets `To` to the validated deployment phone.
+5. An inbound agent route sets `To` to the active SIP deployment phone when configured.
+6. Missing phone information produces an empty phone field rather than a fabricated value.
+7. `client.phone` resolves from the direction-aware remote phone value.
+8. `client.assistant_phone` resolves from the direction-aware assistant phone value.
+9. URI values remain available to native SIP signaling and transfer code.
+10. No database, protobuf, REST, SDK, UI, or non-SIP provider change is introduced.
+11. Required tests pass with no unresolved critical or major review findings.
+12. Final amended RFC bytes receive exact-digest confirmation before implementation begins.
+
+### Amendment Rollback
+
+Revert the SIP core phone extraction and route enrichment together. No database rollback or
+data repair is required because this amendment changes only transient native SIP call state and
+the values emitted for new conversations.
 
 ## Conformance Language
 
@@ -875,6 +1072,12 @@ Rejected for this RFC. Their existing resolution contracts remain unchanged.
 - `api/assistant-api/internal/channel/telephony/internal/base/base.go`
 - `ui/src/app/pages/assistant/actions/configure-assistant-authentication/shared.ts`
 
+## Artifact Index
+
+| Artifact | Purpose | Status |
+| --- | --- | --- |
+| `rfcs/0003-native-sip-assistant-phone-resolution/jsons/amendment-01-plan.json` | Plan for separating exact SIP URIs from resolved phone values. | Draft |
+
 ## Decision Log
 
 | Date | Decision | Rationale |
@@ -887,3 +1090,4 @@ Rejected for this RFC. Their existing resolution contracts remain unchanged.
 | 2026-08-22 | Normalize legacy UI authentication keys without runtime aliases. | Existing configurations become valid when edited while runtime metadata remains singular. |
 | 2026-08-22 | Retain deprecated exported SIP adapters for at least one release. | Preserve downstream Go compatibility while moving internal code to explicit identity contracts. |
 | 2026-08-22 | Make no non-SIP provider changes. | This RFC addresses native SIP only. |
+| 2026-08-31 | Draft Amendment 01 with separate URI and phone semantics. | Keep the existing `CallAddress` shape while preventing assistant route aliases from reaching phone metadata. |

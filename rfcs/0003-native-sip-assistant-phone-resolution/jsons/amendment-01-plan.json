@@ -1,0 +1,113 @@
+{
+  "amendment": "01 - separate SIP URIs and phone values",
+  "status": "draft",
+  "problem_statement": "Native SIP currently copies the To URI user into CallAddress.To. Agent routes therefore expose agent-<assistant-id> through client.assistant_phone instead of the assistant deployment phone.",
+  "verified_context": [
+    "CallAddress already contains From, To, FromURI, ToURI, and Headers.",
+    "SIP core captures complete parsed addresses in FromURI and ToURI.",
+    "The inbound pipeline maps CallAddress.From to CallerNumber and CallAddress.To to FromNumber.",
+    "The telephony streamer maps CallerNumber to client.phone and FromNumber to client.assistant_phone.",
+    "Route middleware already validates DID routes against active SIP phone deployments and loads the assistant phone deployment for agent routes."
+  ],
+  "acceptance_criteria": [
+    "CallAddress retains the existing From, To, FromURI, ToURI, and Headers fields without adding replacement phone fields.",
+    "FromURI and ToURI preserve exact parsed SIP header addresses.",
+    "From and To contain phone values only and never contain SIP URIs, did- prefixes, or agent routing aliases.",
+    "Inbound DID routes set To from the validated deployment phone value.",
+    "Inbound agent routes set To from the active SIP deployment phone when configured.",
+    "Missing phone information leaves the corresponding phone field empty.",
+    "client.phone and client.assistant_phone resolve from the direction-aware phone fields.",
+    "Transfer and replacement dialogs resolve an independent four-field snapshot.",
+    "No database, protobuf, REST, SDK, UI, or non-SIP provider change is introduced."
+  ],
+  "non_goals": [
+    "Rename CallAddress.From or CallAddress.To.",
+    "Add FromPhone or ToPhone fields.",
+    "Use arbitrary SIP headers as trusted phone sources.",
+    "Apply E.164 conversion or country-code inference.",
+    "Change non-SIP telephony providers."
+  ],
+  "allowed_paths": [
+    "rfcs/0003-native-sip-assistant-phone-resolution.md",
+    "rfcs/0003-native-sip-assistant-phone-resolution/jsons/",
+    "api/assistant-api/sip/internal/core/",
+    "api/assistant-api/sip/infra/",
+    "api/assistant-api/sip/middleware/",
+    "api/assistant-api/sip/pipeline/",
+    "api/assistant-api/internal/channel/telephony/internal/base/",
+    "api/assistant-api/internal/adapters/internal/"
+  ],
+  "out_of_scope_paths": [
+    "api/assistant-api/migrations/",
+    "protos/",
+    "openapi/",
+    "sdks/",
+    "ui/",
+    "non-SIP telephony provider packages"
+  ],
+  "ownership": {
+    "rfcs/0003-native-sip-assistant-phone-resolution.md": "rfc-author",
+    "rfcs/0003-native-sip-assistant-phone-resolution/jsons/": "rfc-coordinator",
+    "api/assistant-api/sip/internal/core/": "sip-implementation-owner",
+    "api/assistant-api/sip/infra/": "sip-implementation-owner",
+    "api/assistant-api/sip/middleware/": "sip-routing-owner",
+    "api/assistant-api/sip/pipeline/": "sip-pipeline-owner",
+    "api/assistant-api/internal/channel/telephony/internal/base/": "telephony-metadata-owner",
+    "api/assistant-api/internal/adapters/internal/": "authentication-integration-owner"
+  },
+  "design": {
+    "from_uri": "Exact parsed From header address.",
+    "to_uri": "Exact parsed To header address.",
+    "from": "Caller phone extracted from the From address user when dialable.",
+    "to": "Assistant phone resolved from the validated DID route, active SIP deployment phone, or dialable To address user.",
+    "metadata": "Existing client.phone and client.assistant_phone mappings remain unchanged."
+  },
+  "principles": {
+    "kiss": "Reuse the existing CallAddress fields and current call-context metadata path.",
+    "yagni": "Do not add phone fields, persistence columns, protobuf fields, UI fields, or trusted-header policy.",
+    "single_ownership": "SIP core owns URI capture and caller phone parsing; route middleware owns assistant phone enrichment.",
+    "single_source_of_truth": "The validated route and active SIP deployment determine the assistant phone.",
+    "fail_safe": "Unknown or non-phone values produce empty phone fields rather than aliases or fabricated numbers.",
+    "observability": "Record resolution source and missing-phone reason without logging raw SIP identities or phone values.",
+    "least_privilege": "Only tenant-scoped route and deployment data may populate the assistant phone.",
+    "reversibility": "Revert core extraction and route enrichment together; no stored data rollback is required."
+  },
+  "risks": [
+    "Changing client.assistant_phone from a SIP identity to a phone value changes authentication request behavior for native SIP.",
+    "An agent route may not have an active deployment phone, producing an empty assistant phone.",
+    "A permissive phone parser could misclassify SIP aliases as phone values.",
+    "Transfer code could accidentally reuse the previous dialog phone values.",
+    "Using caller-controlled SIP headers could permit authentication spoofing, so custom headers remain excluded."
+  ],
+  "required_tests": [
+    "SIP core exact URI capture and phone-only From and To extraction",
+    "DID route assistant phone resolution",
+    "agent route deployment phone resolution",
+    "missing deployment phone fallback",
+    "outbound four-field construction",
+    "transfer and replacement dialog isolation",
+    "call-context direction mapping",
+    "authentication variable resolution",
+    "non-SIP regression coverage"
+  ],
+  "required_commands": [
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test ./api/assistant-api/sip/internal/core",
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test ./api/assistant-api/sip/infra",
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test ./api/assistant-api/sip/middleware",
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test ./api/assistant-api/sip/pipeline",
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test ./api/assistant-api/internal/channel/telephony/internal/base",
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test ./api/assistant-api/internal/adapters/internal",
+    "git diff --check",
+    "just agent-finalize \"api/assistant-api/sip/internal/core,api/assistant-api/sip/infra,api/assistant-api/sip/middleware,api/assistant-api/sip/pipeline,api/assistant-api/internal/channel/telephony/internal/base,api/assistant-api/internal/adapters/internal\""
+  ],
+  "rollback": "Revert the SIP core phone extraction and route enrichment in one change. Existing persistence and external schemas require no rollback.",
+  "discussion": {
+    "planner": "codex",
+    "challenger": "pending",
+    "decision": "pending",
+    "approved_by": "pending",
+    "open_blockers": [
+      "Independent challenge and exact-digest confirmation are required before implementation."
+    ]
+  }
+}
