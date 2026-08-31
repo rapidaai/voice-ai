@@ -14,6 +14,7 @@ const metric = (name: string, value: string): Metric => {
 describe('conversation message helpers', () => {
   it('returns expected visual metadata for known and unknown roles', () => {
     expect(getRoleVisual('assistant').label).toBe('Assistant');
+    expect(getRoleVisual('rapida').label).toBe('Assistant');
     expect(getRoleVisual('user').shortLabel).toBe('U');
     expect(getRoleVisual('custom').shortLabel).toBe('C');
   });

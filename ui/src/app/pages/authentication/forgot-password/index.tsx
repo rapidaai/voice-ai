@@ -11,12 +11,15 @@ import { PrimaryButton } from '@/app/components/carbon/button';
 import { Notification } from '@/app/components/carbon/notification';
 import { ArrowRight } from '@carbon/icons-react';
 import { Link } from '@carbon/react';
+import { useTheme } from '@/theme/theme-provider';
 
 export function ForgotPasswordPage() {
+  const { theme } = useTheme();
   const { register, handleSubmit } = useForm();
   const { loading, showLoader, hideLoader } = useRapidaStore();
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const supportContact = theme.links.support.replace(/^mailto:/, '');
 
   const afterForgotPassword = useCallback(
     (err: ServiceError | null, fpr: ForgotPasswordResponse | null) => {
@@ -27,7 +30,7 @@ export function ForgotPasswordPage() {
       if (fpr?.getSuccess()) {
         setError('');
         setSuccessMessage(
-          "Thanks! An email was sent that will ask you to click on a link to verify that you own this account. If you don't get the email, please contact support@rapida.ai.",
+          `Thanks! An email was sent that will ask you to click on a link to verify that you own this account. If you don't get the email, please contact support at ${supportContact}.`,
         );
       } else {
         let errorMessage = fpr?.getError();
@@ -37,7 +40,7 @@ export function ForgotPasswordPage() {
         return;
       }
     },
-    [],
+    [hideLoader, supportContact],
   );
 
   const onForgotPassword = data => {
@@ -64,7 +67,7 @@ export function ForgotPasswordPage() {
             required
             autoComplete="email"
             disabled={loading}
-            placeholder="eg: john@rapida.ai"
+            placeholder="eg: john@example.com"
             {...register('email')}
           />
           {error && (

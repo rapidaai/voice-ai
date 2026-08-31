@@ -26,8 +26,7 @@ import { Text } from '@/app/components/carbon/text';
 import { ArrowLeft } from '@carbon/icons-react';
 import { TextArea } from '@/app/components/carbon/form';
 import { CustomerOptions } from '@/app/components/navigation/actionable-header';
-import { RapidaIcon } from '@/app/components/Icon/Rapida';
-import { RapidaTextIcon } from '@/app/components/Icon/RapidaText';
+import { BrandedLogo } from '@/app/components/brand/branded-logo';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -613,9 +612,9 @@ export const VoiceAgentDebugger: FC<{
   const metricCount = Object.keys(metrics).length;
 
   const deployment = assistant
-    ? (debug
+    ? ((debug
         ? assistant.getDebuggerdeployment()
-        : assistant.getApideployment()) ?? null
+        : assistant.getApideployment()) ?? null)
     : null;
   const stt = deployment?.getInputaudio() ?? null;
   const tts = deployment?.getOutputaudio() ?? null;
@@ -809,10 +808,13 @@ const AssistantPlaceholder: FC<{
 };
 
 export const PreviewAgentHeader: FC = () => (
-  <header className="flex h-12 shrink-0 items-center justify-between border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-    <div className="flex min-w-0 items-center gap-2 px-4 text-blue-600 dark:text-blue-500">
-      <RapidaIcon className="h-6 w-6 shrink-0" />
-      <RapidaTextIcon className="h-5 shrink-0" />
+  <header className="flex h-12 shrink-0 items-center justify-between border-b border-border-subtle bg-shell">
+    <div className="flex min-w-0 items-center px-4">
+      <BrandedLogo
+        variant="full"
+        className="h-6 w-auto max-w-[12rem] object-left"
+        textClassName="text-base"
+      />
     </div>
     <CustomerOptions showProjectSelector={false} />
   </header>

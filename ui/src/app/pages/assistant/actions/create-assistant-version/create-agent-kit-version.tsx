@@ -426,7 +426,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
             body: (
               <>
                 <DocNoticeBlock
-                  docUrl="https://doc.rapida.ai/assistants/create-new-version"
+                  docPath="/assistants/create-new-version"
                   linkText="Read docs"
                 >
                   New versions of the assistant will not be deployed

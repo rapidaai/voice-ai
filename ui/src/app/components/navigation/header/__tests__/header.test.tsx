@@ -7,9 +7,9 @@ import { Header } from '../index';
 
 const theme = developmentConfig.theme as unknown as ThemeManifest;
 
-const renderHeader = (ariaLabel?: string) =>
+const renderHeader = (ariaLabel?: string, renderTheme: ThemeManifest = theme) =>
   render(
-    <ThemeProvider theme={theme}>
+    <ThemeProvider theme={renderTheme}>
       <Header aria-label={ariaLabel} />
     </ThemeProvider>,
   );
@@ -42,5 +42,19 @@ describe('Header', () => {
       'aria-label',
       'Project navigation',
     );
+  });
+
+  it('falls back to configured brand text when no logo is configured', () => {
+    renderHeader(undefined, {
+      ...theme,
+      brand: {
+        ...theme.brand,
+        name: 'Tenant Voice',
+        logos: undefined,
+      },
+    });
+
+    expect(screen.getByText('Tenant Voice')).toBeInTheDocument();
+    expect(screen.queryByAltText('Rapida AI')).not.toBeInTheDocument();
   });
 });

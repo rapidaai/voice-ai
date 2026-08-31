@@ -306,7 +306,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
             body: (
               <>
                 <DocNoticeBlock
-                  docUrl="https://doc.rapida.ai/assistants/create-new-version"
+                  docPath="/assistants/create-new-version"
                   linkText="Read docs"
                 >
                   New versions of the assistant will not be deployed
@@ -325,7 +325,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
 
                   {/* Prompt template section */}
                   <div className="flex flex-col gap-6">
-                    <DocNoticeBlock docUrl="https://doc.rapida.ai/assistants/prompt-templating">
+                    <DocNoticeBlock docPath="/assistants/prompt-templating">
                       Prompt variables and system arguments are resolved at
                       runtime. Read the prompt templating guide before creating
                       the version.

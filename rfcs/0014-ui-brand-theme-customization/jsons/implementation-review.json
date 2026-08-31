@@ -1,0 +1,33 @@
+{
+  "reviewer": "Carson",
+  "review_type": "independent implementation review",
+  "status": "findings_resolved",
+  "findings": [
+    {
+      "severity": "major",
+      "summary": "Contract checker missed lowercase tenant-visible brand literals.",
+      "resolution": "Added lowercase brand literal detection while avoiding SDK package names and route path segments, and removed the reported visible lowercase copy."
+    },
+    {
+      "severity": "major",
+      "summary": "Brand literal allowlist skipped whole files and masked tenant-visible copy.",
+      "resolution": "Changed the allowlist to exact literals per file, removed reported tenant-visible copies, and retained only documented technical or legacy literals."
+    },
+    {
+      "severity": "major",
+      "summary": "Onboarding desktop logo selected the resolved mode logo for a dark brand panel.",
+      "resolution": "Added a colorMode override to BrandedLogo and used the dark full logo on the onboarding desktop brand panel."
+    },
+    {
+      "severity": "minor",
+      "summary": "Theme documentation did not describe the new brand literal scan and allowlist.",
+      "resolution": "Updated ui/THEMING.md with the scan set, exclusions, and exact-literal allowlist policy."
+    }
+  ],
+  "verification_after_resolution": [
+    "cd ui && yarn test:theme-contract",
+    "cd ui && yarn check:theme-contract",
+    "cd ui && yarn test --watchAll=false --runTestsByPath src/app/components/navigation/header/__tests__/header.test.tsx src/app/components/navigation/sidebar/__tests__/sidebar-shell.test.tsx src/app/routes/__tests__/onborading.test.tsx src/app/pages/authentication/__tests__/sign-in-sign-up.test.tsx src/app/pages/preview-agent/voice-agent/text/conversations/__tests__/conversation-messages.test.tsx src/app/pages/assistant/view/conversations/conversation-messages.helpers.test.ts",
+    "cd ui && yarn checkTs"
+  ]
+}

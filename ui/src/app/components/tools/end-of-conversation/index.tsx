@@ -16,8 +16,8 @@ export const ConfigureEndOfConversation: FC<ConfigureToolProps> = ({
         toolDefinition={toolDefinition}
         onChangeToolDefinition={onChangeToolDefinition}
         inputClass={inputClass}
-        documentationUrl="https://doc.rapida.ai/assistants/tools/add-end-of-conversation-tool"
-        documentationTitle="Know more about End of Conversation that can be supported by rapida"
+        documentationPath="/assistants/tools/add-end-of-conversation-tool"
+        documentationTitle="Know more about supported End of Conversation behavior"
       />
     )}
   </>

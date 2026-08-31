@@ -17,6 +17,7 @@ import { PrimaryButton } from '@/app/components/carbon/button';
 import { Notification } from '@/app/components/carbon/notification';
 import { ArrowRight } from '@carbon/icons-react';
 import { Link, PasswordInput } from '@carbon/react';
+import { useTheme } from '@/theme/theme-provider';
 
 interface CustomizedState {
   email: string;
@@ -24,6 +25,7 @@ interface CustomizedState {
 
 export function SignUpPage() {
   const workspace = useWorkspace();
+  const { theme } = useTheme();
   const { setAuthentication } = useContext(AuthContext);
   const location = useLocation();
   const locationState = location?.state as CustomizedState;
@@ -130,7 +132,7 @@ export function SignUpPage() {
               type="email"
               required
               autoComplete="email"
-              placeholder="eg: john@rapida.ai"
+              placeholder="eg: john@example.com"
               {...register('email', { required: 'Please enter email' })}
             />
             <PasswordInput
@@ -162,11 +164,11 @@ export function SignUpPage() {
         <Stack gap={2}>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             By signing up, you agree to the{' '}
-            <Link href="/static/terms-conditions" target="_blank" inline>
+            <Link href={theme.links.terms} target="_blank" inline>
               Terms and Conditions
             </Link>{' '}
             and{' '}
-            <Link href="/static/privacy-policy" target="_blank" inline>
+            <Link href={theme.links.privacy} target="_blank" inline>
               Privacy Policy
             </Link>
             .

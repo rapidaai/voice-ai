@@ -11,6 +11,13 @@ const mockNavigate = jest.fn();
 const mockShowLoader = jest.fn();
 const mockHideLoader = jest.fn();
 const mockGoTo = jest.fn();
+const mockTheme = {
+  links: {
+    terms: 'https://example.com/terms',
+    privacy: 'https://example.com/privacy',
+    support: 'mailto:support@example.com',
+  },
+};
 
 let mockSearchParams = new URLSearchParams();
 let mockLocationState: any = undefined;
@@ -83,6 +90,10 @@ jest.mock('@/hooks/use-global-navigator', () => ({
   }),
 }));
 
+jest.mock('@/theme/theme-provider', () => ({
+  useTheme: () => ({ theme: mockTheme }),
+}));
+
 jest.mock('@/configs', () => ({
   connectionConfig: {},
 }));
@@ -109,9 +120,14 @@ jest.mock('@/app/components/carbon/notification', () => ({
 }));
 
 jest.mock('@/app/components/carbon/button', () => ({
-  PrimaryButton: ({ children, isLoading: _i, renderIcon: _r, hasIconOnly: _h, iconDescription: _d, ...props }: any) => (
-    <button {...props}>{children}</button>
-  ),
+  PrimaryButton: ({
+    children,
+    isLoading: _i,
+    renderIcon: _r,
+    hasIconOnly: _h,
+    iconDescription: _d,
+    ...props
+  }: any) => <button {...props}>{children}</button>,
 }));
 
 jest.mock('@carbon/react', () => ({
@@ -185,8 +201,8 @@ describe('Authentication pages', () => {
 
     renderWithAuth(<SignInPage />, setAuthentication);
 
-    fireEvent.change(screen.getByPlaceholderText('eg: john@rapida.ai'), {
-      target: { value: 'john@rapida.ai' },
+    fireEvent.change(screen.getByPlaceholderText('eg: john@example.com'), {
+      target: { value: 'john@example.com' },
     });
     fireEvent.change(screen.getByPlaceholderText('******'), {
       target: { value: 'secret' },
@@ -213,10 +229,9 @@ describe('Authentication pages', () => {
       'href',
       '/auth/signup',
     );
-    expect(screen.getByRole('link', { name: "Can't sign in?" })).toHaveAttribute(
-      'href',
-      '/auth/forgot-password',
-    );
+    expect(
+      screen.getByRole('link', { name: "Can't sign in?" }),
+    ).toHaveAttribute('href', '/auth/forgot-password');
     expect(screen.getByTestId('social-buttons')).toBeInTheDocument();
   });
 
@@ -255,7 +270,7 @@ describe('Authentication pages', () => {
   });
 
   it('sign-up prefills email from location state and submits register', async () => {
-    mockLocationState = { email: 'prefilled@rapida.ai' };
+    mockLocationState = { email: 'prefilled@example.com' };
     mockParams = { next: '/workspace/overview' };
 
     const setAuthentication = jest.fn((_auth, cb) => cb());
@@ -271,10 +286,10 @@ describe('Authentication pages', () => {
     renderWithAuth(<SignUpPage />, setAuthentication);
 
     const emailInput = screen.getByPlaceholderText(
-      'eg: john@rapida.ai',
+      'eg: john@example.com',
     ) as HTMLInputElement;
     await waitFor(() => {
-      expect(emailInput.value).toBe('prefilled@rapida.ai');
+      expect(emailInput.value).toBe('prefilled@example.com');
     });
 
     fireEvent.change(screen.getByPlaceholderText('eg: John Doe'), {
@@ -308,11 +323,10 @@ describe('Authentication pages', () => {
     );
     expect(
       screen.getByRole('link', { name: 'Terms and Conditions' }),
-    ).toHaveAttribute('href', '/static/terms-conditions');
-    expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute(
-      'href',
-      '/static/privacy-policy',
-    );
+    ).toHaveAttribute('href', mockTheme.links.terms);
+    expect(
+      screen.getByRole('link', { name: 'Privacy Policy' }),
+    ).toHaveAttribute('href', mockTheme.links.privacy);
   });
 
   it('sign-up shows API human error message on register failure', async () => {
@@ -330,8 +344,8 @@ describe('Authentication pages', () => {
     fireEvent.change(screen.getByPlaceholderText('eg: John Doe'), {
       target: { value: 'John Doe' },
     });
-    fireEvent.change(screen.getByPlaceholderText('eg: john@rapida.ai'), {
-      target: { value: 'john@rapida.ai' },
+    fireEvent.change(screen.getByPlaceholderText('eg: john@example.com'), {
+      target: { value: 'john@example.com' },
     });
     fireEvent.change(screen.getByPlaceholderText('********'), {
       target: { value: 'secret' },

@@ -7,10 +7,13 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import {
+  BRAND_LITERAL_ALLOWLIST,
   SHELL_CONTRACTS,
   THEME_CONFIG_PATHS,
   checkThemeContract,
+  findHardcodedBrandLiterals,
   findHardcodedColorUtilities,
+  validateBrandLiterals,
   validateLegacyThemeRemoval,
   validateShellSource,
   validateSingleSourceTheme,
@@ -234,4 +237,66 @@ test('allows external script elements in the public index', context => {
   );
 
   assert.deepEqual(validateSingleSourceTheme(repoRoot), []);
+});
+
+test('finds hardcoded brand literals in renderable UI source', () => {
+  const source = `
+    const title = "Rapida AI";
+    const lower = "supported by rapida";
+    const docs = "https://doc.rapida.ai/assistants";
+    const cdn = "https://cdn-01.rapida.ai/script.js";
+    const support = "support@rapida.ai";
+  `;
+
+  assert.deepEqual(findHardcodedBrandLiterals(source), [
+    'Rapida AI',
+    'cdn-01.rapida.ai',
+    'doc.rapida.ai',
+    'rapida',
+    'support@rapida.ai',
+  ]);
+});
+
+test('rejects brand literals from scanned UI files', context => {
+  const repoRoot = createFixtureRepo(context);
+  writeFixtureFile(
+    repoRoot,
+    'ui/src/app/pages/dashboard.tsx',
+    'export const title = "Rapida AI";\n',
+  );
+  writeFixtureFile(
+    repoRoot,
+    'ui/src/app/pages/dashboard.test.tsx',
+    'expect("Rapida AI").toBeTruthy();\n',
+  );
+
+  assert.deepEqual(validateBrandLiterals(repoRoot), [
+    'ui/src/app/pages/dashboard.tsx: hardcoded brand literal is not allowed: Rapida AI',
+  ]);
+});
+
+test('allowlisted files still reject unlisted brand literals', context => {
+  const repoRoot = createFixtureRepo(context);
+  writeFixtureFile(
+    repoRoot,
+    'ui/src/app/pages/main/web-dashboard/index.tsx',
+    `
+      export const feed = "https://cdn-01.rapida.ai/web/feed.json";
+      export const title = "Rapida AI";
+    `,
+  );
+
+  assert.deepEqual(validateBrandLiterals(repoRoot), [
+    'ui/src/app/pages/main/web-dashboard/index.tsx: hardcoded brand literal is not allowed: Rapida AI',
+  ]);
+});
+
+test('documents every brand literal allowlist entry with a reason', () => {
+  for (const [sourcePath, entry] of Object.entries(BRAND_LITERAL_ALLOWLIST)) {
+    assert.match(sourcePath, /^ui\/src\/app\/.+\.(?:ts|tsx)$/);
+    assert.ok(Array.isArray(entry.literals));
+    assert.ok(entry.literals.length > 0);
+    assert.equal(typeof entry.reason, 'string');
+    assert.ok(entry.reason.length > 20);
+  }
 });

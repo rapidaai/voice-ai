@@ -155,7 +155,7 @@ export const ConfigPrompt: FC<IPromptProps> = ({
             >
               <div className="w-full flex items-center justify-between gap-2 text-left">
                 <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-gray-500 dark:text-gray-400">
-                  Rapida Reserved Variables
+                  Reserved Variables
                 </span>
                 <ChevronDown
                   className={`h-4 w-4 text-gray-500 transition-transform ${showReservedVariables ? 'rotate-180' : ''}`}
@@ -163,7 +163,7 @@ export const ConfigPrompt: FC<IPromptProps> = ({
                 />
               </div>
               <InputHelper className="mt-1">
-                These variables are preserved and replaced by Rapida at runtime.
+                These variables are preserved and replaced at runtime.
               </InputHelper>
             </button>
 
@@ -238,8 +238,8 @@ export const ConfigPrompt: FC<IPromptProps> = ({
           </div>
           {showRuntimeReplacementHint && !hideArgumentRuntimeHint && (
             <InputHelper className="mb-2">
-              Add only your template-specific variables here. Rapida reserved
-              variables are preserved and replaced at runtime.
+              Add only your template-specific variables here. Reserved variables
+              are preserved and replaced at runtime.
             </InputHelper>
           )}
           <div className="text-sm grid bg-light-background dark:bg-gray-950 w-full border border-gray-300 dark:border-gray-700 divide-y divide-gray-300 dark:divide-gray-700">

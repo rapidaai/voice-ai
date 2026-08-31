@@ -1,0 +1,32 @@
+{
+  "rfc": "rfcs/0014-ui-brand-theme-customization.md",
+  "created": "2026-08-31",
+  "reviewer": "independent challenger",
+  "recommendation": "revise",
+  "findings": [
+    {
+      "severity": "major",
+      "finding": "Open questions for ui/public/LLMs.txt and direct static legal page access were implementation-shaping and blocked approval."
+    },
+    {
+      "severity": "major",
+      "finding": "Governance state was inconsistent because the RFC status was Accepted while challenge resolution was pending and the plan was marked accepted-candidate."
+    },
+    {
+      "severity": "major",
+      "finding": "The CONFIG.theme source-of-truth acceptance criterion was too broad to verify without a concrete scan boundary and allowlist policy."
+    },
+    {
+      "severity": "minor",
+      "finding": "The shared logo component was optional even though several surfaces require the same fallback contract."
+    }
+  ],
+  "resolution": [
+    "Chose neutral ui/public/LLMs.txt for the first implementation.",
+    "Chose to keep direct static legal routes accessible while tenant-visible navigation uses configured legal links.",
+    "Added a bounded brand scan contract and explicit allowlist policy.",
+    "Made BrandedLogo required for tenant-visible brand rendering in shell, onboarding, and preview surfaces.",
+    "Updated Challenge Resolution to record the round 1 outcome and resolutions."
+  ],
+  "next_step": "Rerun independent challenge on revised RFC bytes."
+}

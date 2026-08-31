@@ -121,6 +121,14 @@ yarn test --watchAll=false --runInBand
 yarn build
 ```
 
+The theme contract check also scans renderable UI source for hardcoded Rapida
+brand literals. The scan covers `ui/src/app/**/*.ts`, `ui/src/app/**/*.tsx`,
+`ui/src/theme/**/*.ts`, `ui/src/theme/**/*.tsx`, and `ui/public/LLMs.txt`, while
+excluding tests, provider catalogs, and generated style output. Exceptions are
+declared in `scripts/check-theme-contract.mjs` as exact literals with a short
+reason. Do not skip an entire file for branding unless every allowed literal is
+listed there.
+
 Schema changes require incrementing `schemaVersion`, updating the config
 validator and every deployable config together, and documenting the migration
 here. Invalid theme configuration fails closed before React renders and shows a

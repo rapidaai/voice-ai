@@ -54,7 +54,7 @@
             "documentation": "https://doc.rapida.ai",
             "source": "https://github.com/rapidaai/voice-ai",
             "support": "mailto:prashant@rapida.ai",
-            "terms": "/static/terms-and-conditions",
+            "terms": "/static/terms-conditions",
             "privacy": "/static/privacy-policy"
         },
         "defaultMode": "system",

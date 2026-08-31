@@ -10,12 +10,12 @@ import {
 jest.mock('../../common', () => ({
   ToolDefinitionForm: ({
     documentationTitle,
-    documentationUrl,
+    documentationPath,
     toolDefinition,
   }: any) => (
     <div>
       <div data-testid="doc-title">{documentationTitle}</div>
-      <div data-testid="doc-url">{documentationUrl}</div>
+      <div data-testid="doc-path">{documentationPath}</div>
       <div data-testid="tool-name">{toolDefinition?.name}</div>
     </div>
   ),
@@ -43,10 +43,10 @@ describe('end-of-conversation tool', () => {
     );
 
     expect(screen.getByTestId('doc-title')).toHaveTextContent(
-      'Know more about End of Conversation that can be supported by rapida',
+      'Know more about supported End of Conversation behavior',
     );
-    expect(screen.getByTestId('doc-url')).toHaveTextContent(
-      'https://doc.rapida.ai/assistants/tools/add-end-of-conversation-tool',
+    expect(screen.getByTestId('doc-path')).toHaveTextContent(
+      '/assistants/tools/add-end-of-conversation-tool',
     );
     expect(screen.getByTestId('tool-name')).toHaveTextContent(
       'end_conversation',

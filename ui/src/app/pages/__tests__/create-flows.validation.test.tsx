@@ -7,6 +7,9 @@ import { CreateEndpointPage } from '@/app/pages/endpoint/actions/create-endpoint
 import { CreateNewVersionEndpointPage } from '@/app/pages/endpoint/actions/create-endpoint-version';
 import { CreateAssistantPage } from '@/app/pages/assistant/actions/create-assistant';
 import { CreateVersionAssistantPage } from '@/app/pages/assistant/actions/create-assistant-version';
+import developmentConfig from '@/configs/config.development.json';
+import { ThemeProvider } from '@/theme/theme-provider';
+import { ThemeManifest } from '@/theme/types';
 import {
   CreateEndpointProviderModel,
   ForgotPassword,
@@ -279,8 +282,21 @@ const getLatestConfigPromptProps = () =>
 const getLatestTextProviderProps = () =>
   mockTextProvider.mock.calls[mockTextProvider.mock.calls.length - 1]?.[0];
 
+const theme = developmentConfig.theme as unknown as ThemeManifest;
+
+const renderWithTheme = (component: React.ReactElement) =>
+  render(<ThemeProvider theme={theme}>{component}</ThemeProvider>);
+
 describe('Requested create/update flow pages', () => {
   beforeEach(() => {
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: jest.fn().mockReturnValue({
+        matches: false,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+      }),
+    });
     jest.clearAllMocks();
     mockParams = {};
     mockConfigPrompt.mockClear();
@@ -313,8 +329,8 @@ describe('Requested create/update flow pages', () => {
       cb(null, { getSuccess: () => true });
     });
 
-    render(<ForgotPasswordPage />);
-    fireEvent.change(screen.getByPlaceholderText('eg: john@rapida.ai'), {
+    renderWithTheme(<ForgotPasswordPage />);
+    fireEvent.change(screen.getByPlaceholderText('eg: john@example.com'), {
       target: { value: 'user@x.com' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Send Email' }));
@@ -458,7 +474,7 @@ describe('Requested create/update flow pages', () => {
   });
 
   it('create assistant blocks continue when prompt content is empty', () => {
-    render(<CreateAssistantPage />);
+    renderWithTheme(<CreateAssistantPage />);
     const assistantConfigPrompt = getLatestConfigPromptProps();
     expect(assistantConfigPrompt.showRuntimeReplacementHint).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
@@ -468,7 +484,7 @@ describe('Requested create/update flow pages', () => {
   });
 
   it('create assistant moves forward after prompt content edit', () => {
-    render(<CreateAssistantPage />);
+    renderWithTheme(<CreateAssistantPage />);
 
     const assistantConfigPrompt = getLatestConfigPromptProps();
     act(() => {
@@ -484,7 +500,7 @@ describe('Requested create/update flow pages', () => {
   });
 
   it('create assistant validates using changed provider', () => {
-    render(<CreateAssistantPage />);
+    renderWithTheme(<CreateAssistantPage />);
 
     const assistantTextProviderProps = getLatestTextProviderProps();
     act(() => {
