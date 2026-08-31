@@ -1,0 +1,23 @@
+{
+  "rfc": "rfcs/0012-organization-scoped-observability-indexes.md",
+  "amendment": 1,
+  "status": "pending_challenge",
+  "requested_by": "user",
+  "requested_at": "2026-08-25",
+  "request": "Keep the implementation simple: add organization ID to every observability index and use global when it is unavailable.",
+  "changes": [
+    "Use <prefix>-<organization-segment>-YYYYMMDD for timeline indexes.",
+    "Use <prefix>-<kind>-<organization-segment>-YYYYMMDD for log, event, and metric indexes.",
+    "Use global when OrganizationID is zero.",
+    "Limit production changes to the two existing writers and their tests.",
+    "Keep archive behavior and operational scheduling outside the application."
+  ],
+  "challenge_round_1_disposition": [
+    "Resolve custom-prefix ambiguity by requiring the cron to parse relative to exact configured prefixes.",
+    "Accept organization-by-day index growth as a reviewed operational tradeoff.",
+    "Preserve occurrence-time routing and leave repeated archival of late indexes with the cron.",
+    "Preserve records without organization context in a global index."
+  ],
+  "implementation_authorized": false,
+  "next_gate": "Independent challenge round 2 of the exact revised RFC and plan bytes."
+}

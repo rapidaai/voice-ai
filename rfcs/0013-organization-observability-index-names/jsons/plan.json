@@ -1,0 +1,141 @@
+{
+  "rfc": "rfcs/0013-organization-observability-index-names.md",
+  "status": "accepted_pending_final_challenge",
+  "decision": "pending_final_challenge",
+  "created_at": "2026-08-26",
+  "updated_at": "2026-08-26",
+  "objective": "Add organization ID or global to every daily OpenSearch observability index name.",
+  "supersedes": "rfcs/0012-organization-scoped-observability-indexes.md",
+  "verified_system_context": [
+    "The timeline collector owns index formatting for all timeline record kinds.",
+    "The telemetry OpenSearch exporter owns index formatting for logs, events, and metrics.",
+    "Both writers already receive organization ID and preserve it in documents.",
+    "Telemetry readers use wildcard patterns that match old and new names.",
+    "Bulk write and automatic index creation behavior remain unchanged."
+  ],
+  "acceptance_criteria": [
+    "Timeline, logs, events, and metrics include organization ID before the UTC date.",
+    "Organization ID zero uses global.",
+    "Custom prefixes and document organization fields remain unchanged.",
+    "Existing wildcard readers require no code change.",
+    "Focused tests and finalization pass.",
+    "Release owner records archive-cron dry-run evidence before production rollout.",
+    "No critical or major review findings remain."
+  ],
+  "non_goals": [
+    "Archive cron implementation or configuration",
+    "Retention or lifecycle behavior",
+    "OpenSearch policy or template changes",
+    "Configuration or connector changes",
+    "Existing index migration"
+  ],
+  "allowed_paths": [
+    "pkg/telemetry/providers/opensearch.go",
+    "pkg/telemetry/providers/opensearch_test.go",
+    "api/assistant-api/internal/observability/collectors/timeline/collector.go",
+    "api/assistant-api/internal/observability/collectors/timeline/collector_test.go",
+    "rfcs/0013-organization-observability-index-names.md",
+    "rfcs/0013-organization-observability-index-names/jsons/"
+  ],
+  "out_of_scope_paths": [
+    "pkg/connectors/",
+    "api/assistant-api/api/observability/",
+    "api/integration-api/",
+    "env/",
+    "deployments/",
+    "External archive cron repository",
+    "Existing OpenSearch indexes"
+  ],
+  "ownership": [
+    {
+      "paths": [
+        "pkg/telemetry/providers/opensearch.go",
+        "pkg/telemetry/providers/opensearch_test.go"
+      ],
+      "owner": "telemetry exporter implementation owner"
+    },
+    {
+      "paths": [
+        "api/assistant-api/internal/observability/collectors/timeline/collector.go",
+        "api/assistant-api/internal/observability/collectors/timeline/collector_test.go"
+      ],
+      "owner": "timeline collector implementation owner"
+    },
+    {
+      "paths": [
+        "rfcs/0013-organization-observability-index-names.md",
+        "rfcs/0013-organization-observability-index-names/jsons/"
+      ],
+      "owner": "RFC coordinator"
+    },
+    {
+      "paths": [
+        "production archive-cron compatibility evidence"
+      ],
+      "owner": "release owner"
+    }
+  ],
+  "design": {
+    "timeline": "<prefix>-<organization-segment>-<UTC YYYYMMDD>",
+    "telemetry": "<prefix>-<kind>-<organization-segment>-<UTC YYYYMMDD>",
+    "organization_segment": "Unsigned base-10 organization ID or global for zero",
+    "date_source": "Existing occurrence-time behavior with current UTC fallback for zero timestamps",
+    "implementation": "Modify existing private functions and call sites only"
+  },
+  "principle_decisions": {
+    "kiss": "Change only two production files and their existing tests.",
+    "yagni": "Do not add helpers, configuration, policies, templates, migrations, or lifecycle workers.",
+    "single_source_of_truth": "Organization ID comes from the existing scope object used to populate the document.",
+    "compatibility": "Preserve custom prefixes, UTC dates, documents, bulk behavior, wildcard reads, and existing indexes.",
+    "failure_safety": "Use global when organization context is absent instead of dropping records.",
+    "security": "Do not change credentials, permissions, or tenant fields."
+  },
+  "risks": [
+    {
+      "risk": "Per-organization daily indexes increase index and shard count.",
+      "disposition": "Accepted for organization-level archival. Release owner monitors cluster health and existing shard limits."
+    },
+    {
+      "risk": "The external cron may not recognize new names.",
+      "disposition": "Release owner attaches dry-run evidence for old and new names before production deployment."
+    },
+    {
+      "risk": "Organization ID zero combines records in global indexes.",
+      "disposition": "Accepted to preserve observability delivery when context is unavailable."
+    },
+    {
+      "risk": "Late records can target an old occurrence date.",
+      "disposition": "Existing behavior is preserved and archive lifecycle remains externally owned."
+    }
+  ],
+  "required_test_categories": [
+    "Timeline organization and global indexes",
+    "Log organization and global indexes",
+    "Event organization and global indexes",
+    "Metric organization and global indexes",
+    "Custom prefix",
+    "UTC occurrence date and zero-time fallback",
+    "Document organization ID preservation",
+    "Bulk error propagation",
+    "Unchanged wildcard readers"
+  ],
+  "verification_commands": [
+    "go test ./pkg/telemetry/providers/...",
+    "go test ./api/assistant-api/internal/observability/collectors/timeline/...",
+    "go test ./api/assistant-api/api/observability/...",
+    "make agent-finalize CHANGED_FILES=\"pkg/telemetry/providers/opensearch.go,pkg/telemetry/providers/opensearch_test.go,api/assistant-api/internal/observability/collectors/timeline/collector.go,api/assistant-api/internal/observability/collectors/timeline/collector_test.go\""
+  ],
+  "rollout": [
+    "Release owner records archive-cron dry-run evidence for old and new names.",
+    "Deploy writer changes.",
+    "Verify index names, document organization IDs, wildcard readers, cluster health, and index count."
+  ],
+  "rollback": "Roll back the application binary. Shared names resume and wildcard readers continue matching both layouts.",
+  "governance": {
+    "accepted_rfc_sha256": "67e3d51612f2caf10ad1bb26164b5c0ec6d665d73b61e4a27fed547443cd1a0d",
+    "challenge_round_1": "revise",
+    "challenge_round_2": "pending",
+    "confirmation_gate": "pending",
+    "implementation_authorized": false
+  }
+}

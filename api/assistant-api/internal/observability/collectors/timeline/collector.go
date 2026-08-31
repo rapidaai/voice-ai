@@ -68,31 +68,32 @@ func (c *Collector) Collect(ctx context.Context, scope observability.Scope, _ ob
 	if !validator.NonNil(c) || !validator.NonNil(c.opensearch) {
 		return nil
 	}
+	organizationID := scope.GlobalScopeValue().OrganizationID
 	switch typed := record.(type) {
 	case observability.RecordLog:
 		doc := newDocument("log", scope, typed.ID, typed.OccurredAt)
 		doc.Level = string(typed.Level)
 		doc.Title = typed.Message
 		doc.Attributes = typed.Attributes.Clone()
-		return c.bulk(ctx, c.index(doc.OccurredAt), doc)
+		return c.bulk(ctx, c.index(organizationID, doc.OccurredAt), doc)
 	case observability.RecordEvent:
 		doc := newDocument("event", scope, typed.ID, typed.OccurredAt)
 		doc.Name = typed.Event.String()
 		doc.Component = typed.Component.String()
 		doc.Attributes = typed.Attributes.Clone()
-		return c.bulk(ctx, c.index(doc.OccurredAt), doc)
+		return c.bulk(ctx, c.index(organizationID, doc.OccurredAt), doc)
 	case observability.RecordMetric:
 		doc := newDocument("metric", scope, typed.ID, typed.OccurredAt)
 		doc.Attributes = typed.Attributes.Clone()
-		return c.bulk(ctx, c.index(doc.OccurredAt), doc)
+		return c.bulk(ctx, c.index(organizationID, doc.OccurredAt), doc)
 	case observability.RecordMetadata:
 		doc := newDocument("metadata", scope, typed.ID, typed.OccurredAt)
-		return c.bulk(ctx, c.index(doc.OccurredAt), doc)
+		return c.bulk(ctx, c.index(organizationID, doc.OccurredAt), doc)
 	case observability.RecordUsage:
 		doc := newDocument("usage", scope, typed.ID, typed.OccurredAt)
 		doc.Component = typed.Component.String()
 		doc.Attributes = typed.Attributes.Clone()
-		return c.bulk(ctx, c.index(doc.OccurredAt), doc)
+		return c.bulk(ctx, c.index(organizationID, doc.OccurredAt), doc)
 	default:
 		return nil
 	}
@@ -122,11 +123,15 @@ func openSearchConnector(ctx context.Context, cfg Config) (connectors.OpenSearch
 	return openSearch, nil
 }
 
-func (c *Collector) index(at time.Time) string {
+func (c *Collector) index(organizationID uint64, at time.Time) string {
 	if at.IsZero() {
 		at = time.Now().UTC()
 	}
-	return c.indexPrefix + "-" + at.UTC().Format("20060102")
+	organization := "global"
+	if organizationID != 0 {
+		organization = strconv.FormatUint(organizationID, 10)
+	}
+	return c.indexPrefix + "-" + organization + "-" + at.UTC().Format("20060102")
 }
 
 func (c *Collector) bulk(ctx context.Context, index string, doc document) error {

@@ -63,6 +63,11 @@ func TestOpenSearchExporter_ExportsContextToDocuments(t *testing.T) {
 		telemetry.EventRecord{ID: "event-1", Context: trace, Event: "session.streamer_created", Component: "session", OccurredAt: now},
 		telemetry.MetricRecord{ID: "metric-1", Context: trace, Name: "duration", Value: "1", OccurredAt: now},
 	}
+	expectedIndices := []string{
+		`"test-logs-20-20260607"`,
+		`"test-events-20-20260607"`,
+		`"test-metrics-20-20260607"`,
+	}
 	for _, record := range records {
 		if err := exporter.Export(context.Background(), scope, record); err != nil {
 			t.Fatalf("Export returned error: %v", err)
@@ -72,7 +77,7 @@ func TestOpenSearchExporter_ExportsContextToDocuments(t *testing.T) {
 	if len(opensearch.bodies) != len(records) {
 		t.Fatalf("expected %d bulk bodies, got %d", len(records), len(opensearch.bodies))
 	}
-	for _, body := range opensearch.bodies {
+	for index, body := range opensearch.bodies {
 		lines := strings.Split(strings.TrimSpace(body), "\n")
 		if len(lines) != 2 {
 			t.Fatalf("expected bulk metadata+document lines, got %d", len(lines))
@@ -85,6 +90,41 @@ func TestOpenSearchExporter_ExportsContextToDocuments(t *testing.T) {
 		}
 		if doc.Context["traceId"] != "trace-1" {
 			t.Fatalf("unexpected trace id: %s", doc.Context["traceId"])
+		}
+		if !strings.Contains(lines[0], expectedIndices[index]) {
+			t.Fatalf("unexpected bulk metadata line: %s", lines[0])
+		}
+	}
+}
+
+func TestOpenSearchExporter_UsesGlobalIndexWithoutOrganization(t *testing.T) {
+	opensearch := &openSearchConnectorStub{}
+	exporter := NewOpenSearchExporter(nil, OpenSearchConfig{IndexPrefix: "test"}, opensearch)
+	now := time.Date(2026, 6, 7, 12, 0, 0, 0, time.UTC)
+
+	records := []telemetry.Record{
+		telemetry.LogRecord{ID: "log-1", OccurredAt: now},
+		telemetry.EventRecord{ID: "event-1", OccurredAt: now},
+		telemetry.MetricRecord{ID: "metric-1", OccurredAt: now},
+	}
+	expectedIndices := []string{
+		`"test-logs-global-20260607"`,
+		`"test-events-global-20260607"`,
+		`"test-metrics-global-20260607"`,
+	}
+
+	for _, record := range records {
+		if err := exporter.Export(context.Background(), telemetry.Scope{}, record); err != nil {
+			t.Fatalf("Export returned error: %v", err)
+		}
+	}
+
+	if len(opensearch.bodies) != len(records) {
+		t.Fatalf("expected %d bulk bodies, got %d", len(records), len(opensearch.bodies))
+	}
+	for index, body := range opensearch.bodies {
+		if !strings.Contains(body, expectedIndices[index]) {
+			t.Fatalf("unexpected bulk body: %s", body)
 		}
 	}
 }
