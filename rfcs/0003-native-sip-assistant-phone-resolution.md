@@ -194,15 +194,23 @@ and is not the validated route source.
 For a DID route, middleware MUST:
 
 1. Resolve the route value from Request-URI.
-2. Match that exact route value to the `phone` option of an active SIP phone deployment.
-3. Verify the matched phone value satisfies the phone grammar.
-4. Resolve the assistant and tenant from that same deployment record.
-5. Set `CallAddress.To` to the matched phone value.
+2. Query all active SIP phone deployment records whose `phone` option exactly matches that route
+   value.
+3. Reject zero matches using the existing route-not-found behavior.
+4. Reject more than one match as ambiguous configuration before selecting an assistant, project,
+   organization, or authentication context.
+5. Verify the single matched phone value satisfies the phone grammar.
+6. Resolve the assistant and tenant from that same unique deployment record.
+7. Set `CallAddress.To` to the matched phone value.
 
 No second deployment lookup or fallback is permitted after a DID match.
 
 If the matched stored phone is invalid, middleware MUST reject the request as an internal
 configuration failure and emit bounded diagnostics.
+
+Duplicate DID matches MUST fail closed even when the matching records belong to the same
+assistant, different assistants in one tenant, or assistants in different tenants. Database row
+order MUST NOT influence route selection.
 
 ### Agent Route
 
@@ -318,6 +326,7 @@ variable.
 | Missing mandatory From or To header | Preserve existing SIP rejection behavior. |
 | From user fails phone grammar | Preserve `FromURI`; leave `From` empty. |
 | DID route is not found | Reject using existing route-not-found behavior. |
+| DID route matches multiple active deployments | Reject as ambiguous configuration before selecting tenant or assistant. |
 | DID route stored phone is invalid | Reject as internal configuration failure. |
 | Agent route has no active SIP phone deployment | Accept route; leave `To` empty. |
 | Agent route has no phone option | Accept route; leave `To` empty. |
@@ -395,10 +404,12 @@ before rollout.
 
 ### Phase 2: Route Resolution
 
-1. Preserve the current DID route lookup and set `CallAddress.To` from the matched phone option.
-2. Add deterministic active SIP deployment and phone-option selection for agent routes.
-3. Remove any inbound `To` header phone fallback.
-4. Add invalid, missing, and ambiguous configuration tests.
+1. Replace the single-row DID lookup with a bounded query that detects zero, one, or multiple
+   active deployment matches before selecting tenant or assistant.
+2. Set `CallAddress.To` only from the single validated DID match.
+3. Add deterministic active SIP deployment and phone-option selection for agent routes.
+4. Remove any inbound `To` header phone fallback.
+5. Add invalid, missing, duplicate, and ambiguous configuration tests.
 
 ### Phase 3: Boundary Propagation
 
@@ -436,6 +447,8 @@ Required tests include:
   multiple-plus values;
 - inbound `To` initialized empty before routing;
 - DID route phone enrichment;
+- duplicate DID matches across assistants in one tenant failing closed;
+- duplicate DID matches across tenants failing closed before authentication context creation;
 - agent route phone enrichment;
 - missing, invalid, and ambiguous deployment behavior;
 - middleware enrichment propagation through infra and core;
@@ -510,20 +523,25 @@ requires persisted URI fields.
 2. `FromURI` and `ToURI` preserve exact parsed SIP addresses for each dialog-forming request.
 3. `From` and `To` contain only values matching `^\+?[0-9]+$` or are empty.
 4. Inbound `From` comes only from the valid From address user.
-5. Inbound `To` comes only from a validated DID route or a deterministic active SIP deployment.
+5. Inbound `To` comes only from exactly one validated DID route match or a deterministic active
+   SIP deployment.
 6. Inbound `To` never comes from the `To` header user or custom headers.
-7. Agent routes with missing deployment phone data leave `To` empty.
-8. Invalid or ambiguous agent deployment state fails closed.
-9. Route-enriched `To` reaches session establishment and call-context construction.
-10. URI fields remain unchanged across middleware, infra, core, and pipeline boundaries.
-11. Outbound aliases remain valid signaling values but produce empty phone fields.
-12. `client.phone` and `client.assistant_phone` receive direction-aware phone values only.
-13. New transfer, referral, and replacement dialogs resolve independent four-field snapshots.
-14. Resolution observability uses bounded source and result values without raw identities.
-15. No database, protobuf, REST, SDK, UI, or non-SIP provider change is introduced.
-16. Required tests and `just agent-finalize` pass.
-17. Independent review reports no unresolved critical or major findings.
-18. Final RFC bytes receive exact-digest confirmation before implementation begins.
+7. Zero DID matches return route not found, while multiple active DID matches fail closed before
+   tenant or assistant selection.
+8. Duplicate DID tests cover different assistants in one tenant and assistants in different
+   tenants.
+9. Agent routes with missing deployment phone data leave `To` empty.
+10. Invalid or ambiguous agent deployment state fails closed.
+11. Route-enriched `To` reaches session establishment and call-context construction.
+12. URI fields remain unchanged across middleware, infra, core, and pipeline boundaries.
+13. Outbound aliases remain valid signaling values but produce empty phone fields.
+14. `client.phone` and `client.assistant_phone` receive direction-aware phone values only.
+15. New transfer, referral, and replacement dialogs resolve independent four-field snapshots.
+16. Resolution observability uses bounded source and result values without raw identities.
+17. No database, protobuf, REST, SDK, UI, or non-SIP provider change is introduced.
+18. Required tests and `just agent-finalize` pass.
+19. Independent review reports no unresolved critical or major findings.
+20. Final RFC bytes receive exact-digest confirmation before implementation begins.
 
 ## Open Questions
 
@@ -537,14 +555,20 @@ revision resolves them by replacing the conflicting legacy contract, removing th
 defining exact phone grammar and outbound behavior, and completing observability and rollback
 requirements.
 
+Amendment review round two returned `BLOCK` because DID routing did not reject duplicate active
+deployment matches. The owner approved a fresh governed run. This revision requires exactly one
+DID match and rejects duplicates before tenant, assistant, or authentication selection.
+
 ## Artifact Index
 
 | Artifact | Purpose | Status |
 | --- | --- | --- |
 | `rfcs/0003-native-sip-assistant-phone-resolution/jsons/amendment-01-plan.json` | Approved-plan candidate for the amended contract. | Revised |
 | `rfcs/0003-native-sip-assistant-phone-resolution/jsons/amendment-01-challenge-round-01.json` | First independent challenge and revision findings. | Resolved |
-| `rfcs/0003-native-sip-assistant-phone-resolution/jsons/amendment-01-challenge.json` | Independent exact-byte challenge receipt. | Pending |
-| `rfcs/0003-native-sip-assistant-phone-resolution/jsons/amendment-01-confirmation.json` | Exact-digest confirmation receipt. | Pending |
+| `rfcs/0003-native-sip-assistant-phone-resolution/jsons/amendment-01-challenge-round-02.json` | Final blocked challenge from the first governed run. | Escalated |
+| `rfcs/0003-native-sip-assistant-phone-resolution/jsons/amendment-02-plan.json` | Fresh-run plan for exact-one DID routing. | Accepted candidate |
+| `rfcs/0003-native-sip-assistant-phone-resolution/jsons/amendment-02-challenge.json` | Independent exact-byte challenge receipt. | Pending |
+| `rfcs/0003-native-sip-assistant-phone-resolution/jsons/amendment-02-confirmation.json` | Exact-digest confirmation receipt. | Pending |
 
 ## Decision Log
 
@@ -556,3 +580,4 @@ requirements.
 | 2026-08-31 | Use `^\+?[0-9]+$` as the phone grammar. | Provide one deterministic rule without country inference. |
 | 2026-08-31 | Leave outbound phone fields empty for SIP aliases. | Preserve valid signaling while keeping metadata truthful. |
 | 2026-08-31 | Require explicit middleware enrichment propagation. | Prevent validated assistant phone data from being discarded before pipeline setup. |
+| 2026-08-31 | Require exactly one active DID deployment match. | Prevent database order from routing a duplicate DID to the wrong assistant or tenant. |

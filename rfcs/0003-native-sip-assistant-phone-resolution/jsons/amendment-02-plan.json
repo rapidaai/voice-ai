@@ -1,0 +1,97 @@
+{
+  "amendment": "02 - fail closed on duplicate active DID routes",
+  "status": "accepted_candidate",
+  "owner_approval": {
+    "decision": "approved",
+    "approved_at": "2026-08-31",
+    "scope": "Start a fresh governed run requiring exactly one active SIP deployment match for each DID route."
+  },
+  "problem_statement": "The phone option value is not globally unique across active SIP deployments. A single-row DID lookup can therefore select an arbitrary assistant and tenant when duplicate active records exist.",
+  "acceptance_criteria": [
+    "A DID route query evaluates all active SIP deployment matches before selecting tenant or assistant.",
+    "Zero matches return route not found.",
+    "Exactly one match supplies tenant, assistant, and CallAddress.To.",
+    "Multiple matches fail closed as ambiguous configuration before authentication context creation.",
+    "Database row order cannot affect DID route selection.",
+    "Duplicate DID tests cover different assistants in one tenant and assistants in different tenants.",
+    "No schema migration or uniqueness constraint is introduced.",
+    "All URI and phone separation requirements from the rewritten RFC remain unchanged."
+  ],
+  "non_goals": [
+    "Add a database uniqueness constraint for phone option values.",
+    "Choose one duplicate record by creation date, identifier, tenant, or database order.",
+    "Expose duplicate tenant or assistant details to the SIP caller.",
+    "Change agent-route selection rules.",
+    "Expand the previously approved implementation scope."
+  ],
+  "allowed_paths": [
+    "rfcs/0003-native-sip-assistant-phone-resolution.md",
+    "rfcs/0003-native-sip-assistant-phone-resolution/jsons/",
+    "api/assistant-api/sip/internal/core/",
+    "api/assistant-api/sip/infra/",
+    "api/assistant-api/sip/middleware/",
+    "api/assistant-api/sip/pipeline/",
+    "api/assistant-api/internal/channel/telephony/internal/base/",
+    "api/assistant-api/internal/adapters/internal/"
+  ],
+  "out_of_scope_paths": [
+    "api/assistant-api/migrations/",
+    "protos/",
+    "openapi/",
+    "sdks/",
+    "ui/",
+    "non-SIP telephony provider packages"
+  ],
+  "ownership": {
+    "rfcs/0003-native-sip-assistant-phone-resolution.md": "rfc-author",
+    "rfcs/0003-native-sip-assistant-phone-resolution/jsons/": "rfc-coordinator",
+    "api/assistant-api/sip/middleware/": "sip-routing-owner",
+    "remaining_allowed_paths": "owners defined by amendment-01-plan.json"
+  },
+  "design": {
+    "did_lookup": "Query active SIP deployments and phone options for the exact route value with a result limit sufficient to distinguish zero, one, and multiple matches.",
+    "zero_matches": "Return existing route-not-found behavior.",
+    "one_match": "Validate the phone grammar, resolve scope from that record, and set CallAddress.To.",
+    "multiple_matches": "Return a generic ambiguous-configuration SIP failure before creating authentication context or loading an assistant.",
+    "observability": "Emit route_kind=did and phone_result=ambiguous without raw phone, tenant, assistant, or URI values."
+  },
+  "principles": {
+    "kiss": "Detect at most two DID matches because only zero, one, or multiple affects behavior.",
+    "yagni": "Do not add a schema constraint or repair existing records in this change.",
+    "single_ownership": "Route middleware owns duplicate detection before scope selection.",
+    "single_source_of_truth": "The complete active DID match set determines whether routing is safe.",
+    "fail_safe": "Any duplicate active DID state rejects the call rather than selecting a record.",
+    "observability": "Report only bounded ambiguity state and route kind.",
+    "least_privilege": "No tenant or assistant context is chosen until uniqueness is proven.",
+    "reversibility": "Revert the bounded lookup and duplicate tests with the complete SIP implementation."
+  },
+  "risks": [
+    "Existing duplicate DID configuration will begin failing closed instead of routing nondeterministically.",
+    "An unbounded query could waste resources, so implementation should fetch no more than two matches.",
+    "Creating authentication context before duplicate detection would preserve the cross-tenant risk.",
+    "Diagnostic logs could leak tenant or phone data unless bounded attributes are enforced."
+  ],
+  "required_tests": [
+    "zero DID matches return route not found",
+    "one DID match resolves the expected assistant and tenant",
+    "two active matches for different assistants in one tenant fail closed",
+    "two active matches across tenants fail closed before authentication context creation",
+    "inactive duplicate records do not create ambiguity",
+    "duplicate failure observability contains no raw phone, tenant, assistant, or URI values"
+  ],
+  "required_commands": [
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test ./api/assistant-api/sip/middleware",
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test ./api/assistant-api/sip/internal/core ./api/assistant-api/sip/infra ./api/assistant-api/sip/pipeline",
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test ./api/assistant-api/internal/channel/telephony/internal/base ./api/assistant-api/internal/adapters/internal",
+    "git diff --check",
+    "just agent-finalize \"api/assistant-api/sip/internal/core,api/assistant-api/sip/infra,api/assistant-api/sip/middleware,api/assistant-api/sip/pipeline,api/assistant-api/internal/channel/telephony/internal/base,api/assistant-api/internal/adapters/internal\""
+  ],
+  "rollback": "Revert duplicate detection together with the complete SIP URI and phone implementation. No schema rollback or data repair is required.",
+  "discussion": {
+    "planner": "codex-coordinator",
+    "challenger": "pending",
+    "decision": "pending",
+    "approved_by": "repository-owner",
+    "open_blockers": []
+  }
+}
