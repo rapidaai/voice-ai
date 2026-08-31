@@ -140,22 +140,6 @@ export const CustomerOptions: FC<{
           <li className="cds--switcher__item--divider">
             <span className="uppercase!">Resources</span>
           </li>
-          <SwitcherItem
-            aria-label="Documentation"
-            href={theme.links.documentation}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </SwitcherItem>
-          <SwitcherItem
-            aria-label="Source"
-            href={theme.links.source}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Source
-          </SwitcherItem>
           <SwitcherItem aria-label="Support" href={theme.links.support}>
             Support
           </SwitcherItem>
