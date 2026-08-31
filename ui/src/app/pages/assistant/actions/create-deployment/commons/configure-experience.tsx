@@ -12,6 +12,7 @@ import {
   Toggle,
 } from '@carbon/react';
 import { Information } from '@carbon/icons-react';
+import { useDocumentationUrl } from '@/theme/documentation-url';
 
 export interface ExperienceConfig {
   greeting?: string;
@@ -25,9 +26,6 @@ export interface ExperienceConfig {
   idleTimeoutBackoffTimes?: string;
   suggestions?: string[];
 }
-
-const EXPERIENCE_DOCS_URL =
-  'https://doc.rapida.ai/assistants/configuration/experience';
 
 const ERROR_MESSAGE_OPTIONS = [
   'Sorry, something went wrong. Please try again.',
@@ -62,6 +60,9 @@ export const ConfigureExperience: FC<{
   experienceConfig: ExperienceConfig;
   setExperienceConfig: (config: ExperienceConfig) => void;
 }> = ({ experienceConfig, setExperienceConfig }) => {
+  const experienceDocsUrl = useDocumentationUrl(
+    '/assistants/configuration/experience',
+  );
   const update = (field: keyof ExperienceConfig, value: string) =>
     setExperienceConfig({ ...experienceConfig, [field]: value });
   const updateBoolean = (field: keyof ExperienceConfig, value: boolean) =>
@@ -87,7 +88,7 @@ export const ConfigureExperience: FC<{
             <Button
               kind="primary"
               size="sm"
-              href={EXPERIENCE_DOCS_URL}
+              href={experienceDocsUrl}
               target="_blank"
               rel="noreferrer"
             >

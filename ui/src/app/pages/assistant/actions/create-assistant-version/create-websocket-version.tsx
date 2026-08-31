@@ -3,10 +3,7 @@ import { useRapidaStore } from '@/hooks';
 import { useCredential } from '@/hooks/use-credential';
 import { useParams } from 'react-router-dom';
 import { Helmet } from '@/app/components/helmet';
-import {
-  PrimaryButton,
-  SecondaryButton,
-} from '@/app/components/carbon/button';
+import { PrimaryButton, SecondaryButton } from '@/app/components/carbon/button';
 import { ButtonSet } from '@carbon/react';
 import { TabForm } from '@/app/components/form/tab-form';
 import { FieldSet } from '@/app/components/form/fieldset';
@@ -229,12 +226,14 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
               'Set up a new WebSocket connection to the server where your agent is running.',
             actions: [
               <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
-                <SecondaryButton size="lg"
+                <SecondaryButton
+                  size="lg"
                   onClick={() => showDialog(navigator.goBack)}
                 >
                   Cancel
                 </SecondaryButton>
-                <PrimaryButton size="lg"
+                <PrimaryButton
+                  size="lg"
                   onClick={() => {
                     if (validateWebsocket()) {
                       setActiveTab('commit-assistant');
@@ -247,7 +246,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
             ],
             body: (
               <>
-                <DocNoticeBlock docUrl="https://doc.rapida.ai/assistants/create-new-version">
+                <DocNoticeBlock docPath="/assistants/create-new-version">
                   Please note that new versions of the assistant will not be
                   deployed automatically.
                 </DocNoticeBlock>
@@ -295,12 +294,14 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
               'Provide a clear description of the changes made in this version to help others understand what has been updated.',
             actions: [
               <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
-                <SecondaryButton size="lg"
+                <SecondaryButton
+                  size="lg"
                   onClick={() => showDialog(navigator.goBack)}
                 >
                   Cancel
                 </SecondaryButton>
-                <PrimaryButton size="lg"
+                <PrimaryButton
+                  size="lg"
                   onClick={() => {
                     createProviderModel();
                   }}
@@ -311,7 +312,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
             ],
             body: (
               <>
-                <DocNoticeBlock docUrl="https://doc.rapida.ai/assistants/create-new-version">
+                <DocNoticeBlock docPath="/assistants/create-new-version">
                   Please note that new versions of the assistant will not be
                   deployed automatically.
                 </DocNoticeBlock>

@@ -65,7 +65,7 @@ const PromptEditor = ({
                 label: item.label,
                 kind: monaco.languages.CompletionItemKind.Variable,
                 insertText: item.insertText,
-                detail: 'Rapida reserved variable',
+                detail: 'Reserved variable',
                 documentation: {
                   value: item.description,
                 },

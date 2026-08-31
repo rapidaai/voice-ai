@@ -1,10 +1,7 @@
 import { FC, useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast/headless';
 import { Helmet } from '@/app/components/helmet';
-import {
-  PrimaryButton,
-  SecondaryButton,
-} from '@/app/components/carbon/button';
+import { PrimaryButton, SecondaryButton } from '@/app/components/carbon/button';
 import { ButtonSet } from '@carbon/react';
 import { TabForm } from '@/app/components/form/tab-form';
 import ConfirmDialog from '@/app/components/base/modal/confirm-ui';
@@ -297,7 +294,10 @@ export const CreateNewVersionEndpointPage: FC = () => {
             code: 'choose-model',
             body: (
               <>
-                <DocNoticeBlock docUrl="https://doc.rapida.ai/endpoint/create-new-version" linkText="Read docs">
+                <DocNoticeBlock
+                  docPath="/endpoint/create-new-version"
+                  linkText="Read docs"
+                >
                   New versions of the endpoint will not be deployed
                   automatically. You must promote them manually.
                 </DocNoticeBlock>
@@ -327,12 +327,11 @@ export const CreateNewVersionEndpointPage: FC = () => {
             ),
             actions: [
               <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
-                <SecondaryButton size="lg"
-                  onClick={() => setIsShow(true)}
-                >
+                <SecondaryButton size="lg" onClick={() => setIsShow(true)}>
                   Cancel
                 </SecondaryButton>
-                <PrimaryButton size="lg"
+                <PrimaryButton
+                  size="lg"
                   isLoading={loading}
                   onClick={onvalidateEndpointInstruction}
                 >
@@ -349,12 +348,11 @@ export const CreateNewVersionEndpointPage: FC = () => {
               'Write a brief note describing what changed in this version.',
             actions: [
               <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
-                <SecondaryButton size="lg"
-                  onClick={() => setIsShow(true)}
-                >
+                <SecondaryButton size="lg" onClick={() => setIsShow(true)}>
                   Cancel
                 </SecondaryButton>
-                <PrimaryButton size="lg"
+                <PrimaryButton
+                  size="lg"
                   isLoading={loading}
                   onClick={() => {
                     createEndpointProviderModel();
@@ -377,7 +375,8 @@ export const CreateNewVersionEndpointPage: FC = () => {
                     />
                     <InputHelper>
                       Summarize the changes made to the endpoint, highlight key
-                      updates, and specify why these modifications are necessary.
+                      updates, and specify why these modifications are
+                      necessary.
                     </InputHelper>
                   </FieldSet>
                 </div>

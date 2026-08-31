@@ -1,6 +1,6 @@
 # RFC 0014: UI Brand and Theme Customization
 
-- Status: Draft
+- Status: Accepted
 - Owner: UI Platform
 - Created: 2026-08-31
 - Updated: 2026-08-31
@@ -54,8 +54,7 @@ new UI code.
 - Ensure UI navigation, page metadata, auth links, legal/support links, and
   documentation links use configured theme links or explicit neutral fallback
   behavior.
-- Remove direct Rapida logo component usage from tenant-visible UI surfaces when
-  configured logos exist.
+- Remove direct Rapida logo component usage from tenant-visible UI surfaces.
 - Add automated checks that catch new hardcoded Rapida brand literals in UI code
   outside an explicit allowlist.
 - Preserve existing default Rapida appearance for the stock config files.
@@ -119,12 +118,12 @@ implementation. The current fields are sufficient for the requested UI scope:
 - `theme.colors.light`
 - `theme.colors.dark`
 
-Introduce a small shared branded logo component only if it removes repeated
-logo selection code across header, sidebar, onboarding, and preview surfaces.
-The component should accept a full or compact variant, read `useTheme()`, choose
-the asset for the resolved mode, and fall back to text from `theme.brand.name`
-when no logo is configured. It must not fall back to embedded Rapida SVGs on
-tenant-visible surfaces.
+Introduce a shared `BrandedLogo` component for tenant-visible brand rendering in
+header, sidebar, onboarding, preview header, and preview chat. The component
+accepts a full or compact variant, reads `useTheme()`, chooses the asset for the
+resolved mode, and falls back to text from `theme.brand.name` when no logo is
+configured. It must not fall back to embedded Rapida SVGs on tenant-visible
+surfaces.
 
 Update preview call and chat surfaces to use the same brand contract:
 
@@ -148,15 +147,31 @@ points to them. White-label navigation must not point users to Rapida legal copy
 unless the selected config explicitly chooses those links.
 
 Static UI-shipped metadata such as `ui/public/LLMs.txt` must not be a second
-hand-maintained brand source. It should either be made neutral or generated from
-the selected build config. The preferred first implementation is neutral content
-unless product explicitly requires branded generated metadata.
+hand-maintained brand source. The first implementation makes this file neutral
+and removes Rapida-specific names, URLs, and author links. If product later
+requires branded AI metadata, a separate change can generate it from the
+selected UI config.
+
+Built-in static legal pages remain directly accessible for existing local
+routes, but tenant-visible navigation must use `theme.links.terms` and
+`theme.links.privacy`. White-label deployments that do not want bundled Rapida
+legal copy exposed through direct URLs can override those routes or remove the
+pages in a later, separate routing policy change.
 
 Extend `ui/scripts/check-theme-contract.mjs` to catch new hardcoded UI brand
-literals. The check should scan UI source and selected public metadata, ignore
-default config values, ignore tests where literal assertions are intentional,
-and ignore technical identifiers that are not user-visible branding. The
-allowlist must be explicit and small.
+literals inside this bounded scan set:
+
+- `ui/src/app/**/*.tsx`
+- `ui/src/app/**/*.ts`
+- `ui/src/theme/**/*.ts`
+- `ui/src/theme/**/*.tsx`
+- `ui/public/LLMs.txt`
+
+The scan excludes tests, provider catalogs, deployable config defaults, icon
+component definitions, generated files, package metadata, and non-rendered type
+or store names. Any remaining exception must be listed in an explicit allowlist
+with a short non-branding justification in the checker source or its adjacent
+test fixtures.
 
 ## Contracts and Compatibility
 
@@ -262,8 +277,9 @@ Focused UI tests must include:
 
 ## Acceptance Criteria
 
-- [ ] `CONFIG.theme` is the only source for tenant-visible UI brand name, logo,
-  favicon, primary color, docs links, legal links, and support link.
+- [ ] Inside the bounded brand scan set, `CONFIG.theme` is the only source for
+  tenant-visible UI brand name, logo, favicon, primary color, docs links, legal
+  links, and support link, except documented non-branding allowlist entries.
 - [ ] Preview call and preview chat pages no longer import or render Rapida logo
   components directly.
 - [ ] Assistant preview chat uses `theme.brand.name` for the assistant-side
@@ -279,20 +295,26 @@ Focused UI tests must include:
 
 ## Open Questions
 
-- Should `ui/public/LLMs.txt` become neutral, be removed, or be generated from
-  the selected UI config?
-- Should built-in static legal pages remain accessible for direct URLs in
-  white-label builds, or should those routes redirect to configured legal links?
 - Should UI package metadata icons in `ui/package.json` be included in a later
   desktop packaging scope?
 
 ## Challenge Resolution
 
-Pending independent plan challenge.
+- Round 1 recommendation was `revise`.
+- Resolved major finding: `ui/public/LLMs.txt` will become neutral in the first
+  implementation.
+- Resolved major finding: built-in static legal pages remain directly
+  accessible, while tenant-visible navigation must use configured legal links.
+- Resolved major finding: the brand-source acceptance criterion now has a
+  bounded scan set and an explicit allowlist policy.
+- Resolved minor finding: `BrandedLogo` is now required for tenant-visible
+  brand rendering in shell, onboarding, and preview surfaces.
 
 ## Artifact Index
 
-- `jsons/plan.json` - Initial UI-only implementation plan. Draft.
+- `jsons/plan.json` - Initial UI-only implementation plan. Accepted candidate.
+- `jsons/challenge.json` - Round 1 independent challenge. Resolved.
+- `jsons/challenge-02.json` - Round 2 independent challenge. Approved.
 
 ## Decision Log
 

@@ -6,10 +6,7 @@ import { useCreateKnowledgePageStore } from '@/hooks/use-create-knowledge-page-s
 import { useCallback, useEffect, useState } from 'react';
 import { useCredential } from '@/hooks/use-credential';
 import { useRapidaStore } from '@/hooks/use-rapida-store';
-import {
-  PrimaryButton,
-  SecondaryButton,
-} from '@/app/components/carbon/button';
+import { PrimaryButton, SecondaryButton } from '@/app/components/carbon/button';
 import { ButtonSet } from '@carbon/react';
 import { KnowledgeDocument } from '@rapidaai/react';
 import { TabForm } from '@/app/components/form/tab-form';
@@ -77,9 +74,7 @@ export function CreateKnowledgePage() {
 
   const createKnowledge = () => {
     if (name.trim() === '') {
-      setErrorMessage(
-        'Please provide a name for your knowledge base.',
-      );
+      setErrorMessage('Please provide a name for your knowledge base.');
       return;
     }
     setErrorMessage('');
@@ -147,7 +142,7 @@ export function CreateKnowledgePage() {
             code: 'configure-embedding',
             body: (
               <>
-                <DocNoticeBlock docUrl="https://doc.rapida.ai/knowledge/overview">
+                <DocNoticeBlock docPath="/knowledge/overview">
                   A knowledge base is a curated collection of documents grouped
                   by domain or topic. The embedding provider controls how your
                   documents are vectorised for semantic retrieval.
@@ -167,14 +162,10 @@ export function CreateKnowledgePage() {
             ),
             actions: [
               <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
-                <SecondaryButton size="lg"
-                  onClick={() => setIsShow(true)}
-                >
+                <SecondaryButton size="lg" onClick={() => setIsShow(true)}>
                   Cancel
                 </SecondaryButton>
-                <PrimaryButton size="lg"
-                  onClick={onValidateEmbedding}
-                >
+                <PrimaryButton size="lg" onClick={onValidateEmbedding}>
                   Define knowledge profile
                 </PrimaryButton>
               </ButtonSet>,
@@ -268,12 +259,11 @@ export function CreateKnowledgePage() {
             ),
             actions: [
               <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
-                <SecondaryButton size="lg"
-                  onClick={() => setIsShow(true)}
-                >
+                <SecondaryButton size="lg" onClick={() => setIsShow(true)}>
                   Cancel
                 </SecondaryButton>
-                <PrimaryButton size="lg"
+                <PrimaryButton
+                  size="lg"
                   onClick={createKnowledge}
                   isLoading={loading}
                 >
@@ -290,14 +280,16 @@ export function CreateKnowledgePage() {
             body: <ManualFile />,
             actions: [
               <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
-                <SecondaryButton size="lg"
+                <SecondaryButton
+                  size="lg"
                   onClick={() => {
                     if (knowledge?.getId()) goToKnowledge(knowledge?.getId());
                   }}
                 >
                   Skip
                 </SecondaryButton>
-                <PrimaryButton size="lg"
+                <PrimaryButton
+                  size="lg"
                   onClick={createKnowledgeDocument}
                   isLoading={loading}
                 >

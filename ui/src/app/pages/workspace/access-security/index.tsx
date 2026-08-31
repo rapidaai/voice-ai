@@ -2,8 +2,12 @@ import React, { useState } from 'react';
 import { Switch } from '@headlessui/react';
 import { Helmet } from '@/app/components/helmet';
 import { DescriptiveHeading } from '@/app/components/heading/descriptive-heading';
+import { useDocumentationUrl } from '@/theme/documentation-url';
+
 export function AccessSecurityPage() {
   const [enabled, setEnabled] = useState(true);
+  const documentationUrl = useDocumentationUrl();
+
   return (
     <>
       <Helmet title="Organization Security"></Helmet>
@@ -25,7 +29,7 @@ export function AccessSecurityPage() {
                 organization's identity provider (SSO).
               </p>
               <a
-                href="https://docs.rapida.ai"
+                href={documentationUrl}
                 className="text-blue-600 dark:text-blue-400 text-sm flex items-center"
               >
                 Read the support documentation

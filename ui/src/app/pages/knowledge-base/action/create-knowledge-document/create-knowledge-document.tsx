@@ -4,10 +4,7 @@ import { useCredential } from '@/hooks/use-credential';
 import { useRapidaStore } from '@/hooks/use-rapida-store';
 import { KnowledgeDocument } from '@rapidaai/react';
 import { useCreateKnowledgeDocumentPageStore } from '@/hooks/use-create-knowledge-document-page-store';
-import {
-  PrimaryButton,
-  SecondaryButton,
-} from '@/app/components/carbon/button';
+import { PrimaryButton, SecondaryButton } from '@/app/components/carbon/button';
 import { ButtonSet } from '@carbon/react';
 import { ManualFile } from '@/app/pages/knowledge-base/action/components/datasource-uploader/manual-file';
 import { useGlobalNavigation } from '@/hooks/use-global-navigator';
@@ -66,7 +63,7 @@ export function CreateKnowledgeDocumentPage() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <DocNoticeBlock docUrl="https://doc.rapida.ai/knowledge/overview">
+      <DocNoticeBlock docPath="/knowledge/overview">
         Upload your text files (e.g., .txt, .doc, .docx, .pdf). Maximum file
         size: 10 MB per file.
       </DocNoticeBlock>
@@ -78,8 +75,11 @@ export function CreateKnowledgeDocumentPage() {
       <div className="flex items-center justify-between px-6 pb-6">
         <ErrorMessage message={errorMessage} className="rounded-none!" />
         <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
-          <SecondaryButton size="lg" onClick={() => goBack()}>Cancel</SecondaryButton>
-          <PrimaryButton size="lg"
+          <SecondaryButton size="lg" onClick={() => goBack()}>
+            Cancel
+          </SecondaryButton>
+          <PrimaryButton
+            size="lg"
             isLoading={loading}
             onClick={onCreateKnowledgeDocument}
           >

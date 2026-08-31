@@ -2,10 +2,7 @@ import { useState } from 'react';
 import { Helmet } from '@/app/components/helmet';
 import { useRapidaStore } from '@/hooks';
 import { TabForm } from '@/app/components/form/tab-form';
-import {
-  PrimaryButton,
-  SecondaryButton,
-} from '@/app/components/carbon/button';
+import { PrimaryButton, SecondaryButton } from '@/app/components/carbon/button';
 import { ButtonSet } from '@carbon/react';
 import {
   Assistant,
@@ -37,8 +34,12 @@ import { Globe } from 'lucide-react';
 import { APiParameter } from '@/app/components/external-api/api-parameter';
 import { connectionConfig } from '@/configs';
 import toast from 'react-hot-toast';
+import { useDocumentationUrl } from '@/theme/documentation-url';
+import { useTheme } from '@/theme/theme-provider';
 
 export function CreateWebsocket() {
+  const { theme } = useTheme();
+  const assistantDocsUrl = useDocumentationUrl('/assistants/overview');
   const { authId, token, projectId } = useCurrentCredential();
   const {
     goToAssistant,
@@ -196,12 +197,12 @@ export function CreateWebsocket() {
                 <YellowNoticeBlock className="flex items-center">
                   <Info className="shrink-0 w-4 h-4" />
                   <div className="ms-3 text-sm font-medium">
-                    Connect your external AI agent to Rapida using a WebSocket
-                    endpoint.
+                    Connect your external AI agent to {theme.brand.name} using a
+                    WebSocket endpoint.
                   </div>
                   <a
                     target="_blank"
-                    href="https://doc.rapida.ai/assistants/overview"
+                    href={assistantDocsUrl}
                     className="h-7 flex items-center font-medium hover:underline ml-auto text-yellow-600"
                     rel="noreferrer"
                   >
@@ -250,12 +251,14 @@ export function CreateWebsocket() {
             ),
             actions: [
               <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
-                <SecondaryButton size="lg"
+                <SecondaryButton
+                  size="lg"
                   onClick={() => showDialog(navigator.goBack)}
                 >
                   Cancel
                 </SecondaryButton>
-                <PrimaryButton size="lg"
+                <PrimaryButton
+                  size="lg"
                   isLoading={loading}
                   onClick={() => {
                     if (validateWebsocket()) setActiveTab('define-assistant');
@@ -273,12 +276,14 @@ export function CreateWebsocket() {
               'Provide the name, a brief description, and relevant tags for your assistant to help identify and categorize it.',
             actions: [
               <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
-                <SecondaryButton size="lg"
+                <SecondaryButton
+                  size="lg"
                   onClick={() => showDialog(navigator.goBack)}
                 >
                   Cancel
                 </SecondaryButton>
-                <PrimaryButton size="lg"
+                <PrimaryButton
+                  size="lg"
                   isLoading={loading}
                   onClick={createAssistant}
                 >
@@ -327,14 +332,16 @@ export function CreateWebsocket() {
             code: 'deployment',
             actions: [
               <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
-                <SecondaryButton size="lg"
+                <SecondaryButton
+                  size="lg"
                   onClick={() => {
                     if (assistant) goToAssistant(assistant.getId());
                   }}
                 >
                   Skip
                 </SecondaryButton>
-                <PrimaryButton size="lg"
+                <PrimaryButton
+                  size="lg"
                   isLoading={loading}
                   onClick={() => {
                     if (assistant) goToAssistant(assistant.getId());
@@ -354,7 +361,7 @@ export function CreateWebsocket() {
                   </div>
                   <a
                     target="_blank"
-                    href="https://doc.rapida.ai/assistants/overview"
+                    href={assistantDocsUrl}
                     className="h-7 flex items-center font-medium hover:underline ml-auto text-yellow-600"
                     rel="noreferrer"
                   >

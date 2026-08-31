@@ -9,9 +9,7 @@
     },
     "analytics": {
         "dsn": "https://15153cb4befe6a0ae4249f10ff87c0b6@o4506771747831808.ingest.sentry.io/4506771748945920",
-        "tracePropagationTargets": [
-            "^https:\\/\\/rapida\\.ai\\/api"
-        ]
+        "tracePropagationTargets": ["^https:\\/\\/rapida\\.ai\\/api"]
     },
     "workspace": {
         "domain": "rapida.ai",
@@ -60,7 +58,7 @@
             "documentation": "https://doc.rapida.ai",
             "source": "https://github.com/rapidaai/voice-ai",
             "support": "mailto:prashant@rapida.ai",
-            "terms": "/static/terms-and-conditions",
+            "terms": "/static/terms-conditions",
             "privacy": "/static/privacy-policy"
         },
         "defaultMode": "system",

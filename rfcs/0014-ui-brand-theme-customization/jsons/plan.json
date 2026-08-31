@@ -1,6 +1,6 @@
 {
   "rfc": "rfcs/0014-ui-brand-theme-customization.md",
-  "status": "draft",
+  "status": "accepted-candidate",
   "created": "2026-08-31",
   "owner": "UI Platform",
   "classification": "Governed",
@@ -76,7 +76,7 @@
     }
   ],
   "acceptance_criteria": [
-    "CONFIG.theme is the only source for tenant-visible UI brand name, logo, favicon, primary color, docs links, legal links, and support link.",
+    "Inside the bounded brand scan set, CONFIG.theme is the only source for tenant-visible UI brand name, logo, favicon, primary color, docs links, legal links, and support link, except documented non-branding allowlist entries.",
     "Preview call and preview chat pages no longer import or render Rapida logo components directly.",
     "Assistant preview chat uses theme.brand.name for the assistant-side display name.",
     "Missing logo config falls back to configured brand text, not Rapida SVGs.",
@@ -98,10 +98,11 @@
     "Keep the current build-time CONFIG.theme model.",
     "Use existing ThemeManifest fields without a schema version change.",
     "Move preview header and preview chat brand rendering to useTheme.",
-    "Replace tenant-visible Rapida SVG fallbacks with configured brand text fallback.",
+    "Add a shared BrandedLogo component and replace tenant-visible Rapida SVG fallbacks with configured brand text fallback.",
     "Route docs, legal, support, and source links through theme.links where those links are UI-owned.",
-    "Make public UI metadata neutral or generate it from selected config.",
-    "Extend the theme contract checker with an explicit allowlist for non-brand technical identifiers."
+    "Make ui/public/LLMs.txt neutral for the first implementation.",
+    "Keep built-in static legal pages directly accessible, but route tenant-visible navigation through theme.links.terms and theme.links.privacy.",
+    "Extend the theme contract checker over the bounded brand scan set with an explicit allowlist for non-brand technical identifiers."
   ],
   "risks": [
     {
@@ -116,6 +117,32 @@
       "risk": "Broken configured logo assets degrade visual quality.",
       "mitigation": "Use configured alt text and brand text fallback."
     }
+  ],
+  "brand_scan_contract": {
+    "included_paths": [
+      "ui/src/app/**/*.tsx",
+      "ui/src/app/**/*.ts",
+      "ui/src/theme/**/*.ts",
+      "ui/src/theme/**/*.tsx",
+      "ui/public/LLMs.txt"
+    ],
+    "excluded_paths": [
+      "tests",
+      "provider catalogs",
+      "deployable config defaults",
+      "icon component definitions",
+      "generated files",
+      "package metadata",
+      "non-rendered type or store names"
+    ],
+    "allowlist_policy": "Every exception requires a short non-branding justification in the checker source or adjacent test fixtures."
+  },
+  "challenge_resolution": [
+    "Round 1 recommended revise.",
+    "ui/public/LLMs.txt will become neutral in the first implementation.",
+    "Built-in static legal pages remain directly accessible, while tenant-visible navigation must use configured legal links.",
+    "The brand-source acceptance criterion now has a bounded scan set and explicit allowlist policy.",
+    "BrandedLogo is required for tenant-visible brand rendering in shell, onboarding, and preview surfaces."
   ],
   "rollback": "Revert UI component, public metadata, config, documentation, and theme contract checker changes. No backend or data rollback is required.",
   "verification_commands": [

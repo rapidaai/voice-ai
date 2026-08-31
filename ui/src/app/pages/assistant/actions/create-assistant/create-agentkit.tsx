@@ -327,7 +327,7 @@ export function CreateAgentKit() {
             body: (
               <>
                 <DocNoticeBlock
-                  docUrl="https://doc.rapida.ai/assistants/overview"
+                  docPath="/assistants/overview"
                   linkText="Read docs"
                 >
                   Deploy your agent on-premises with the Rapida orchestration
@@ -669,7 +669,7 @@ export function CreateAgentKit() {
             body: (
               <>
                 <DocNoticeBlock
-                  docUrl="https://doc.rapida.ai/assistants/overview"
+                  docPath="/assistants/overview"
                   linkText="Read docs"
                 >
                   Choose how you'd like to start engaging with users and add

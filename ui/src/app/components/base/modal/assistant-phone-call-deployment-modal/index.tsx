@@ -242,8 +242,8 @@ const SipIntegrationInstructions: FC<{
       >
         <InputHelper>
           {inboundRegistrationEnabled
-            ? 'Inbound registration is enabled. Use this DNS as the default Rapida SIP target.'
-            : 'Point your SIP trunk / PBX outbound proxy to this address. Rapida accepts SIP INVITE and establishes an RTP media session directly.'}
+            ? 'Inbound registration is enabled. Use this DNS as the default SIP target.'
+            : 'Point your SIP trunk / PBX outbound proxy to this address. The service accepts SIP INVITE and establishes an RTP media session directly.'}
         </InputHelper>
       </CodeRow>
 

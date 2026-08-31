@@ -1,25 +1,35 @@
 import { ModalProps } from '@/app/components/base/modal';
-import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/app/components/carbon/modal';
+import {
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+} from '@/app/components/carbon/modal';
 import { FC, HTMLAttributes, memo } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { PrimaryButton, SecondaryButton } from '@/app/components/carbon/button';
 import { CodeHighlighting } from '@/app/components/code-highlighting';
 import { DeploymentSectionHeader } from '@/app/components/base/modal/deployment-modal-primitives';
+import { useDocumentationUrl } from '@/theme/documentation-url';
 
 interface AssistantInstructionDialogProps
-  extends ModalProps,
-    HTMLAttributes<HTMLDivElement> {
+  extends ModalProps, HTMLAttributes<HTMLDivElement> {
   assistantId: string;
 }
 
 export const AssistantWebwidgetDeploymentDialog: FC<AssistantInstructionDialogProps> =
   memo(({ assistantId, modalOpen, setModalOpen }) => {
+    const documentationUrl = useDocumentationUrl();
+
     return (
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} size="md">
-        <ModalHeader onClose={() => setModalOpen(false)} title="Deployment completed">
+        <ModalHeader
+          onClose={() => setModalOpen(false)}
+          title="Deployment completed"
+        >
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            Add the following snippets to your website to start
-            receiving messages.
+            Add the following snippets to your website to start receiving
+            messages.
           </p>
         </ModalHeader>
 
@@ -47,7 +57,7 @@ window.chatbotConfig = {
   layout: "docked-right",
   position: "bottom-right",
   showLauncher: true,
-  name: "Rapida Assistant",
+  name: "Assistant",
   theme: {
     mode: "light",
   },
@@ -64,9 +74,7 @@ window.chatbotConfig = {
           <PrimaryButton
             size="lg"
             type="button"
-            onClick={() =>
-              window.open('https://doc.rapida.ai', '_blank')
-            }
+            onClick={() => window.open(documentationUrl, '_blank')}
           >
             <span>View Documentation</span>
             <ExternalLink className="w-4 h-4 ml-1" strokeWidth={1.5} />
