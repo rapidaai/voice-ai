@@ -53,8 +53,8 @@ const (
 	SessionErrorBufferSize    = 10
 )
 
-// CallAddress contains the SIP parties and non-credential headers received with a call.
-// From and To are URI users. Header names are lowercase and repeated values preserve arrival order.
+// CallAddress contains exact SIP parties, resolved phone values, and non-credential headers.
+// Header names are lowercase and repeated values preserve arrival order.
 type CallAddress struct {
 	From    string
 	To      string
@@ -63,7 +63,49 @@ type CallAddress struct {
 	Headers map[string]string
 }
 
-// NewCallAddress reads the parties and non-credential headers from a SIP request.
+func parsePhone(value string) (string, bool) {
+	value = strings.Trim(value, " \t\r\n\v\f")
+	if value == "" {
+		return "", false
+	}
+
+	digits := value
+	if digits[0] == '+' {
+		digits = digits[1:]
+	}
+	if digits == "" {
+		return "", false
+	}
+	for _, character := range digits {
+		if character < '0' || character > '9' {
+			return "", false
+		}
+	}
+	return value, true
+}
+
+func phoneInputResult(value, phone string) string {
+	if strings.Trim(value, " \t\r\n\v\f") == "" {
+		return "missing"
+	}
+	if phone == "" {
+		return "not_phone"
+	}
+	return "resolved"
+}
+
+// SetToPhone sets To only when value satisfies the native SIP phone grammar.
+func (address *CallAddress) SetToPhone(value string) bool {
+	phone, ok := parsePhone(value)
+	if !ok {
+		address.To = ""
+		return false
+	}
+	address.To = phone
+	return true
+}
+
+// NewCallAddress reads an inbound party snapshot and non-credential headers.
 func NewCallAddress(request *sip.Request) CallAddress {
 	if request == nil {
 		return CallAddress{}
@@ -71,11 +113,10 @@ func NewCallAddress(request *sip.Request) CallAddress {
 
 	address := CallAddress{Headers: make(map[string]string)}
 	if from := request.From(); from != nil {
-		address.From = strings.TrimSpace(from.Address.User)
 		address.FromURI = from.Address.String()
+		address.From, _ = parsePhone(from.Address.User)
 	}
 	if to := request.To(); to != nil {
-		address.To = strings.TrimSpace(to.Address.User)
 		address.ToURI = to.Address.String()
 	}
 
@@ -95,6 +136,13 @@ func NewCallAddress(request *sip.Request) CallAddress {
 		}
 	}
 
+	return address
+}
+
+func newOutboundCallAddress(request *sip.Request, fromUser, toUser string) CallAddress {
+	address := NewCallAddress(request)
+	address.From, _ = parsePhone(fromUser)
+	address.To, _ = parsePhone(toUser)
 	return address
 }
 

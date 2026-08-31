@@ -257,6 +257,7 @@ func TestServerConfigMiddlewareConversionPreservesSIPIdentities(t *testing.T) {
 		Middlewares: []Middleware{func(ctx *SIPRequestContext) error {
 			received = ctx
 			ctx.AssistantID = "42"
+			require.True(t, ctx.CallAddress.SetToPhone("+14155550200"))
 			return nil
 		}},
 	}).toCore()
@@ -266,7 +267,7 @@ func TestServerConfigMiddlewareConversionPreservesSIPIdentities(t *testing.T) {
 		RequestURI: "sip:agent-42@sip.rapida.ai",
 		CallAddress: internal_core.CallAddress{
 			From:    "+14155550100",
-			To:      "agent-42",
+			To:      "",
 			FromURI: "sip:+14155550100@carrier.example.com",
 			ToURI:   "sip:agent-42@sip.rapida.ai",
 			Headers: map[string]string{"x-original-called-number": "+14155550200"},
@@ -281,8 +282,28 @@ func TestServerConfigMiddlewareConversionPreservesSIPIdentities(t *testing.T) {
 	assert.Equal(t, coreContext.CallAddress.ToURI, received.ToIdentity)
 	assert.Equal(t, coreContext.CallAddress.FromURI, received.FromURI)
 	assert.Equal(t, coreContext.CallAddress.ToURI, received.ToURI)
-	assert.Equal(t, coreContext.CallAddress, received.CallAddress)
+	assert.Equal(t, "+14155550200", coreContext.CallAddress.To)
+	assert.Equal(t, received.CallAddress, coreContext.CallAddress)
 	assert.Equal(t, "42", coreContext.AssistantID)
+}
+
+func TestServerConfigMiddlewareConversionRejectsIdentityMutation(t *testing.T) {
+	serverConfig := (&ServerConfig{
+		Middlewares: []Middleware{func(ctx *SIPRequestContext) error {
+			ctx.CallAddress.FromURI = "sip:attacker@example.com"
+			return nil
+		}},
+	}).toCore()
+	coreContext := &internal_core.SIPRequestContext{CallAddress: internal_core.CallAddress{
+		From:    "+14155550100",
+		FromURI: "sip:+14155550100@carrier.example.com",
+		ToURI:   "sip:agent-42@sip.rapida.ai",
+	}}
+
+	err := serverConfig.Middlewares[0](coreContext)
+
+	require.Error(t, err)
+	assert.Equal(t, "sip:+14155550100@carrier.example.com", coreContext.CallAddress.FromURI)
 }
 
 func TestDeprecatedSIPCompatibilitySurface(t *testing.T) {

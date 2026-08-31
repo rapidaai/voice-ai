@@ -28,7 +28,7 @@ func newIdentityTestAuthentication() *types.Authentication {
 	}
 }
 
-func TestReconstructCallContextInboundPreservesSIPIdentities(t *testing.T) {
+func TestReconstructCallContextInboundMapsPhoneValues(t *testing.T) {
 	auth := newIdentityTestAuthentication()
 
 	call, err := reconstructCallContext(
@@ -38,16 +38,16 @@ func TestReconstructCallContextInboundPreservesSIPIdentities(t *testing.T) {
 		string(sip_infra.CallDirectionInbound),
 		"call-inbound",
 		"context-inbound",
-		"sip:alice@example.com;user=phone",
-		"sip:agent-42@sip.rapida.ai",
+		"07249994778",
+		"+447249994778",
 	)
 	require.NoError(t, err)
 
-	assert.Equal(t, "sip:alice@example.com;user=phone", call.CallerNumber)
-	assert.Equal(t, "sip:agent-42@sip.rapida.ai", call.FromNumber)
+	assert.Equal(t, "07249994778", call.CallerNumber)
+	assert.Equal(t, "+447249994778", call.FromNumber)
 }
 
-func TestEnsureCallContextOutboundFallbackPreservesResolvedRequestIdentities(t *testing.T) {
+func TestEnsureCallContextOutboundFallbackMapsPhoneValues(t *testing.T) {
 	auth := newIdentityTestAuthentication()
 	session, err := sip_infra.NewSession(context.Background(),
 		sip_infra.WithSessionConfig(&sip_infra.Config{
@@ -71,12 +71,45 @@ func TestEnsureCallContextOutboundFallbackPreservesResolvedRequestIdentities(t *
 		AssistantID: 42,
 		Auth:        auth,
 		CallAddress: sip_infra.CallAddress{
-			From: "assistant-line",
-			To:   "customer-alias",
+			From: "+15557654321",
+			To:   "+15551234567",
 		},
 	}, 84)
 
 	require.NoError(t, err)
-	assert.Equal(t, "customer-alias", call.CallerNumber)
-	assert.Equal(t, "assistant-line", call.FromNumber)
+	assert.Equal(t, "+15551234567", call.CallerNumber)
+	assert.Equal(t, "+15557654321", call.FromNumber)
+}
+
+func TestEnsureCallContextOutboundFallbackKeepsAliasPhonesEmpty(t *testing.T) {
+	auth := newIdentityTestAuthentication()
+	session, err := sip_infra.NewSession(context.Background(),
+		sip_infra.WithSessionConfig(&sip_infra.Config{
+			Server:            "sip.example.com",
+			Port:              5060,
+			Transport:         sip_infra.TransportUDP,
+			RTPPortRangeStart: 10000,
+			RTPPortRangeEnd:   10020,
+		}),
+		sip_infra.WithSessionDirection(sip_infra.CallDirectionOutbound),
+		sip_infra.WithSessionCallID("call-outbound-alias"),
+		sip_infra.WithSessionAuth(auth),
+	)
+	require.NoError(t, err)
+
+	call, err := (&Dispatcher{}).ensureCallContext(context.Background(), sip_infra.SessionEstablishedPipeline{
+		ID:          "call-outbound-alias",
+		Session:     session,
+		Direction:   sip_infra.CallDirectionOutbound,
+		AssistantID: 42,
+		Auth:        auth,
+		CallAddress: sip_infra.CallAddress{
+			FromURI: "sip:assistant-line@sip.example.com",
+			ToURI:   "sip:customer-alias@sip.example.com",
+		},
+	}, 84)
+
+	require.NoError(t, err)
+	assert.Empty(t, call.CallerNumber)
+	assert.Empty(t, call.FromNumber)
 }

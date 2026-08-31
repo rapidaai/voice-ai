@@ -78,11 +78,13 @@ func TestOutboundCallInviteHandlerUsesAuthoritativeRequestIdentity(t *testing.T)
 		},
 	}
 
+	var capturedAddress CallAddress
 	server.SetOnInvite(func(callbackSession *Session, requestURI string, callAddress CallAddress) error {
 		assert.Same(t, session, callbackSession)
 		assert.Equal(t, inviteRequest.Recipient.String(), requestURI)
-		assert.Equal(t, "assistant-line", callAddress.From)
-		assert.Equal(t, "customer-alias", callAddress.To)
+		assert.Empty(t, callAddress.From)
+		assert.Empty(t, callAddress.To)
+		capturedAddress = callAddress
 		return nil
 	})
 	outboundCall := NewOutbound(server, session, dialog, nil, request)
@@ -92,6 +94,51 @@ func TestOutboundCallInviteHandlerUsesAuthoritativeRequestIdentity(t *testing.T)
 	require.NoError(t, err)
 	assert.Empty(t, session.GetInfo().LocalURI)
 	assert.Empty(t, session.GetInfo().RemoteURI)
+	assert.Equal(t, capturedAddress, session.GetCallAddress())
+}
+
+func TestOutboundCallInviteHandlerPreservesPhoneInputs(t *testing.T) {
+	server := &Server{logger: bridgeTestLogger()}
+	request, err := NewOutboundInviteRequest(testOutboundConfig(), " +15551234567 ", " 07249994778 ")
+	require.NoError(t, err)
+	inviteRequest := sip.NewRequest(sip.INVITE, sip.Uri{
+		Scheme: "sip",
+		User:   request.Identity.ToUser,
+		Host:   request.Config.Address,
+		Port:   request.Config.Port,
+	})
+	session := &Session{info: SessionInfo{CallID: "outbound-phone-identity"}}
+	dialog := &outboundDialog{dialogSession: &sipgo.DialogClientSession{Dialog: sipgo.Dialog{InviteRequest: inviteRequest}}}
+
+	server.SetOnInvite(func(_ *Session, _ string, callAddress CallAddress) error {
+		assert.Equal(t, "07249994778", callAddress.From)
+		assert.Equal(t, "+15551234567", callAddress.To)
+		return nil
+	})
+
+	err = NewOutbound(server, session, dialog, nil, request).callOutboundInviteHandler(time.Now())
+
+	require.NoError(t, err)
+	assert.Equal(t, "07249994778", session.GetCallAddress().From)
+	assert.Equal(t, "+15551234567", session.GetCallAddress().To)
+}
+
+func TestTransferLegCallAddressDoesNotInheritParentIdentity(t *testing.T) {
+	request, err := NewOutboundInviteRequest(testOutboundConfig(), "transfer-target", "transfer-assistant")
+	require.NoError(t, err)
+	inviteRequest := sip.NewRequest(sip.INVITE, sip.Uri{
+		Scheme: "sip",
+		User:   request.Identity.ToUser,
+		Host:   request.Config.Address,
+		Port:   request.Config.Port,
+	})
+
+	address := newOutboundCallAddress(inviteRequest, request.Identity.FromUser, request.Identity.ToUser)
+
+	assert.Empty(t, address.From)
+	assert.Empty(t, address.To)
+	assert.NotContains(t, address.FromURI, "parent-caller")
+	assert.NotContains(t, address.ToURI, "parent-assistant")
 }
 
 func TestOutboundCallInviteHandlerRejectsMissingInviteRequest(t *testing.T) {

@@ -87,10 +87,45 @@ func TestInboundInviteIdentityFromRequestPreservesRoutingAndPartyIdentities(t *t
 
 	require.True(t, ok)
 	assert.Equal(t, request.Recipient.String(), identity.requestURI)
-	assert.Equal(t, "alice", identity.callAddress.From)
-	assert.Equal(t, "support", identity.callAddress.To)
+	assert.Empty(t, identity.callAddress.From)
+	assert.Empty(t, identity.callAddress.To)
 	assert.Equal(t, request.From().Address.String(), identity.callAddress.FromURI)
 	assert.Equal(t, request.To().Address.String(), identity.callAddress.ToURI)
+}
+
+func TestNewCallAddressAcceptsOnlyPhoneFromUser(t *testing.T) {
+	tests := []struct {
+		name     string
+		fromUser string
+		expected string
+	}{
+		{name: "national", fromUser: "07249994778", expected: "07249994778"},
+		{name: "international", fromUser: "+447249994778", expected: "+447249994778"},
+		{name: "surrounding ascii whitespace", fromUser: " \t+15551234567\r\n", expected: "+15551234567"},
+		{name: "empty", fromUser: "", expected: ""},
+		{name: "plus only", fromUser: "+", expected: ""},
+		{name: "multiple plus", fromUser: "++1555", expected: ""},
+		{name: "embedded whitespace", fromUser: "+1555 1234", expected: ""},
+		{name: "punctuation", fromUser: "+1-555-1234", expected: ""},
+		{name: "uri parameter", fromUser: "+1555;user=phone", expected: ""},
+		{name: "letters", fromUser: "agent-42", expected: ""},
+		{name: "unicode digits", fromUser: "１２３４", expected: ""},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := newInboundInviteRequest("phone-grammar")
+			request.From().Address.User = test.fromUser
+			request.To().Address.User = "+15557654321"
+
+			address := NewCallAddress(request)
+
+			assert.Equal(t, test.expected, address.From)
+			assert.Empty(t, address.To)
+			assert.Equal(t, request.From().Address.String(), address.FromURI)
+			assert.Equal(t, request.To().Address.String(), address.ToURI)
+		})
+	}
 }
 
 func TestNewCallAddressCapturesHeadersWithoutCredentials(t *testing.T) {
@@ -102,8 +137,8 @@ func TestNewCallAddressCapturesHeadersWithoutCredentials(t *testing.T) {
 
 	address := NewCallAddress(request)
 
-	assert.Equal(t, request.From().Address.User, address.From)
-	assert.Equal(t, request.To().Address.User, address.To)
+	assert.Empty(t, address.From)
+	assert.Empty(t, address.To)
 	assert.Equal(t, request.From().Address.String(), address.FromURI)
 	assert.Equal(t, request.To().Address.String(), address.ToURI)
 	assert.Equal(t, "+14155550200,+14155550300", address.Headers["x-original-called-number"])
@@ -469,6 +504,7 @@ func TestInboundCall_CancelBeforeSessionCreationStopsSetup(t *testing.T) {
 func TestInboundCall_ApplicationReadyBeforeAnswerAndMediaStart(t *testing.T) {
 	server := newServerForCommandTests(t)
 	server.SetMiddlewares([]Middleware{func(ctx *SIPRequestContext) error {
+		require.True(t, ctx.CallAddress.SetToPhone("+15557654321"))
 		ctx.Config = bridgeTestConfig()
 		return nil
 	}})
@@ -477,6 +513,7 @@ func TestInboundCall_ApplicationReadyBeforeAnswerAndMediaStart(t *testing.T) {
 	request := newInboundInviteRequest("inbound-ready-before-answer")
 	expectedRequestURI := request.Recipient.String()
 	expectedCallAddress := NewCallAddress(request)
+	require.True(t, expectedCallAddress.SetToPhone("+15557654321"))
 	server.SetOnApplicationReady(func(session *Session, requestURI string, callAddress CallAddress) error {
 		phaseOrder = append(phaseOrder, "application_ready")
 		assert.Equal(t, 180, transaction.lastStatus())
@@ -503,6 +540,7 @@ func TestInboundCall_ApplicationReadyBeforeAnswerAndMediaStart(t *testing.T) {
 	require.True(t, exists)
 	assert.Equal(t, CallStateConnected, session.GetState())
 	assert.Equal(t, InboundSetupPhaseMediaFlowing, session.GetInboundSetupPhase())
+	assert.Equal(t, expectedCallAddress, session.GetCallAddress())
 }
 
 func TestInboundCall_ReInviteDoesNotReplaceInitialPartyIdentities(t *testing.T) {

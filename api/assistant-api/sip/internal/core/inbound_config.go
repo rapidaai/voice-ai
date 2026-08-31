@@ -23,6 +23,7 @@ type inboundConfig struct {
 	auth            *types.Authentication
 	assistant       *internal_assistant_entity.Assistant
 	vaultCredential *protos.VaultCredential
+	callAddress     CallAddress
 	answerPolicy    InboundAnswerPolicy
 	setupPhase      InboundSetupPhase
 }
@@ -99,6 +100,7 @@ func NewInboundConfig(server *Server, identity inboundInviteIdentity, mediaOffer
 		auth:            requestContext.Auth,
 		assistant:       requestContext.Assistant,
 		vaultCredential: requestContext.VaultCredential,
+		callAddress:     requestContext.CallAddress,
 		setupPhase:      InboundSetupPhaseAuthenticated,
 	}
 	if resolvedConfig.assistant != nil {

@@ -89,6 +89,7 @@ func newInboundSession(
 		WithSessionConfig(resolvedConfig.config),
 		WithSessionDirection(CallDirectionInbound),
 		WithSessionCallID(identity.callID),
+		WithSessionCallAddress(identity.callAddress),
 		WithSessionCodec(mediaOffer.negotiatedCodec),
 		WithSessionAuth(resolvedConfig.auth),
 		WithSessionAssistant(resolvedConfig.assistant),
@@ -115,6 +116,12 @@ func (inboundCall *Inbound) HandleInvite() {
 		return
 	}
 	inboundCall.identity = identity
+	if inboundCall.server.logger != nil {
+		inboundCall.server.logger.Infow("SIP: inbound phone resolution",
+			"call_id", identity.callID,
+			"phone_source", "from_header_user",
+			"phone_result", phoneInputResult(inboundCall.request.From().Address.User, identity.callAddress.From))
+	}
 	inboundCall.inviteKey = inboundInviteKey{callID: identity.callID, fromTag: identity.fromTag}
 	setupPhase := InboundSetupPhaseInviteReceived
 	setupTimings := InboundSetupTimings{InviteReceivedAt: time.Now()}
@@ -184,6 +191,7 @@ func (inboundCall *Inbound) HandleInvite() {
 		return
 	}
 	inboundCall.resolvedConfig = resolvedConfig
+	inboundCall.identity.callAddress = resolvedConfig.callAddress
 	setupPhase = inboundCall.resolvedConfig.setupPhase
 	if inboundCall.server.isInviteCancelled(inboundCall.inviteKey) {
 		inboundCall.server.terminatePendingInvite(inboundCall.inviteKey, 487)

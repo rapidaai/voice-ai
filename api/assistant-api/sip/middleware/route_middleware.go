@@ -110,6 +110,7 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 		var assistantID uint64
 		var projectID uint64
 		var organizationID uint64
+		var resolvedPhone string
 		if routeKind == "agent" {
 			parsedAssistantID, err := strconv.ParseUint(routeValue, 10, 64)
 			if err != nil {
@@ -146,29 +147,94 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 			assistantID = parsedAssistantID
 			projectID = result.ProjectID
 			organizationID = result.OrganizationID
+
+			type deploymentResult struct {
+				ID uint64
+			}
+			var deployments []deploymentResult
+			tx = db.Table("assistant_phone_deployments").
+				Select("id").
+				Where("assistant_id = ?", assistantID).
+				Where("telephony_provider = ? AND status = ?", "sip", type_enums.RECORD_ACTIVE).
+				Limit(2).
+				Find(&deployments)
+			if tx.Error != nil {
+				logPhoneResolution(m.logger, ctx.CallID, routeKind, "agent_deployment", "invalid")
+				return &sip_infra.SIPError{Code: 500, Message: "Failed to resolve SIP phone configuration", Err: sip_infra.ErrInvalidConfig}
+			}
+			if len(deployments) > 1 {
+				logPhoneResolution(m.logger, ctx.CallID, routeKind, "agent_deployment", "ambiguous")
+				return &sip_infra.SIPError{Code: 500, Message: "Ambiguous SIP phone configuration", Err: sip_infra.ErrInvalidConfig}
+			}
+			if len(deployments) == 0 {
+				logPhoneResolution(m.logger, ctx.CallID, routeKind, "agent_deployment", "missing")
+			} else {
+				type phoneOptionResult struct {
+					Value string
+				}
+				var phoneOptions []phoneOptionResult
+				tx = db.Table("assistant_deployment_telephony_options").
+					Select("value").
+					Where("assistant_deployment_telephony_id = ? AND key = ?", deployments[0].ID, "phone").
+					Limit(2).
+					Find(&phoneOptions)
+				if tx.Error != nil {
+					logPhoneResolution(m.logger, ctx.CallID, routeKind, "agent_deployment", "invalid")
+					return &sip_infra.SIPError{Code: 500, Message: "Failed to resolve SIP phone configuration", Err: sip_infra.ErrInvalidConfig}
+				}
+				if len(phoneOptions) > 1 {
+					logPhoneResolution(m.logger, ctx.CallID, routeKind, "agent_deployment", "ambiguous")
+					return &sip_infra.SIPError{Code: 500, Message: "Ambiguous SIP phone configuration", Err: sip_infra.ErrInvalidConfig}
+				}
+				if len(phoneOptions) == 0 || !validator.NotBlank(phoneOptions[0].Value) {
+					logPhoneResolution(m.logger, ctx.CallID, routeKind, "agent_deployment", "missing")
+				} else {
+					candidateAddress := ctx.CallAddress
+					if !candidateAddress.SetToPhone(phoneOptions[0].Value) {
+						logPhoneResolution(m.logger, ctx.CallID, routeKind, "agent_deployment", "invalid")
+						return &sip_infra.SIPError{Code: 500, Message: "Invalid SIP phone configuration", Err: sip_infra.ErrInvalidConfig}
+					}
+					resolvedPhone = candidateAddress.To
+					logPhoneResolution(m.logger, ctx.CallID, routeKind, "agent_deployment", "resolved")
+				}
+			}
 		} else {
 			type didLookupResult struct {
 				AssistantID    uint64
 				ProjectID      uint64
 				OrganizationID uint64
+				Phone          string
 			}
-			var result didLookupResult
+			var results []didLookupResult
 			tx := db.Model(&internal_assistant_entity.Assistant{}).
-				Select("assistants.id AS assistant_id, assistants.project_id, assistants.organization_id").
+				Select("assistants.id AS assistant_id, assistants.project_id, assistants.organization_id, o.value AS phone").
 				Joins("JOIN assistant_phone_deployments apd ON apd.assistant_id = assistants.id").
 				Joins("JOIN assistant_deployment_telephony_options o ON o.assistant_deployment_telephony_id = apd.id").
 				Where("apd.telephony_provider = ? AND apd.status = ?", "sip", type_enums.RECORD_ACTIVE).
 				Where("o.key = ?", "phone").
 				Where("o.value = ?", routeValue).
-				First(&result)
+				Limit(2).
+				Find(&results)
 			if tx.Error != nil {
-				m.logger.Warnw("SIP: DID route lookup failed",
-					"call_id", ctx.CallID,
-					"route_kind", routeKind,
-					"result", "not_found",
-					"error", tx.Error)
+				logPhoneResolution(m.logger, ctx.CallID, routeKind, "did_route", "invalid")
+				return &sip_infra.SIPError{Code: 500, Message: "Failed to resolve SIP route", Err: sip_infra.ErrInvalidConfig}
+			}
+			if len(results) == 0 {
+				logPhoneResolution(m.logger, ctx.CallID, routeKind, "did_route", "missing")
 				return &sip_infra.SIPError{Code: 404, Message: "No assistant found for this SIP route", Err: sip_infra.ErrAuthRequired}
 			}
+			if len(results) > 1 {
+				logPhoneResolution(m.logger, ctx.CallID, routeKind, "did_route", "ambiguous")
+				return &sip_infra.SIPError{Code: 500, Message: "Ambiguous SIP route configuration", Err: sip_infra.ErrInvalidConfig}
+			}
+			result := results[0]
+			candidateAddress := ctx.CallAddress
+			if !candidateAddress.SetToPhone(result.Phone) {
+				logPhoneResolution(m.logger, ctx.CallID, routeKind, "did_route", "invalid")
+				return &sip_infra.SIPError{Code: 500, Message: "Invalid SIP phone configuration", Err: sip_infra.ErrInvalidConfig}
+			}
+			resolvedPhone = candidateAddress.To
+			logPhoneResolution(m.logger, ctx.CallID, routeKind, "did_route", "resolved")
 			assistantID = result.AssistantID
 			projectID = result.ProjectID
 			organizationID = result.OrganizationID
@@ -183,6 +249,7 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 				"organization_id", organizationID)
 			return &sip_infra.SIPError{Code: 404, Message: "No assistant found for this SIP route", Err: sip_infra.ErrAuthRequired}
 		}
+		ctx.CallAddress.To = resolvedPhone
 
 		ctx.AssistantID = strconv.FormatUint(assistantID, 10)
 		serviceActor := types.ActorIdentity{Type: types.ActorTypeService, ID: m.ServiceID}
@@ -223,4 +290,15 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 
 		return nil
 	}
+}
+
+func logPhoneResolution(logger commons.Logger, callID, routeKind, phoneSource, phoneResult string) {
+	if logger == nil {
+		return
+	}
+	logger.Infow("SIP: inbound phone resolution",
+		"call_id", callID,
+		"route_kind", routeKind,
+		"phone_source", phoneSource,
+		"phone_result", phoneResult)
 }

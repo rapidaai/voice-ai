@@ -25,9 +25,10 @@ import (
 type Session struct {
 	mu sync.RWMutex
 
-	info   SessionInfo
-	config *Config
-	ended  atomic.Bool
+	info    SessionInfo
+	config  *Config
+	address CallAddress
+	ended   atomic.Bool
 
 	ctx       context.Context
 	cancel    context.CancelFunc
@@ -102,6 +103,10 @@ func WithSessionDirection(direction CallDirection) SessionOption {
 
 func WithSessionCallID(callID string) SessionOption {
 	return func(session *Session) { session.info.CallID = callID }
+}
+
+func WithSessionCallAddress(address CallAddress) SessionOption {
+	return func(session *Session) { session.address = address }
 }
 
 func WithSessionCodec(codec *Codec) SessionOption {
@@ -195,6 +200,18 @@ func (s *Session) GetCallID() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.info.CallID
+}
+
+func (s *Session) GetCallAddress() CallAddress {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.address
+}
+
+func (s *Session) SetCallAddress(address CallAddress) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.address = address
 }
 
 // SetState updates the session state with proper state machine transitions

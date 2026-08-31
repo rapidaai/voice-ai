@@ -37,6 +37,7 @@ func (s *Server) SetMiddlewares(middlewares []Middleware) {
 		}
 		current := middleware
 		coreMiddlewares = append(coreMiddlewares, func(ctx *internal_core.SIPRequestContext) error {
+			originalCallAddress := ctx.CallAddress
 			var config *Config
 			if ctx.Config != nil {
 				converted := configFromCore(ctx.Config)
@@ -60,6 +61,16 @@ func (s *Server) SetMiddlewares(middlewares []Middleware) {
 				Config:          config,
 			}
 			err := current(infraCtx)
+			if infraCtx.CallAddress.From != originalCallAddress.From ||
+				infraCtx.CallAddress.FromURI != originalCallAddress.FromURI ||
+				infraCtx.CallAddress.ToURI != originalCallAddress.ToURI {
+				return &internal_core.SIPError{
+					Code:    500,
+					Message: "SIP middleware changed immutable call address fields",
+					Err:     internal_core.ErrInvalidConfig,
+				}
+			}
+			ctx.CallAddress = infraCtx.CallAddress
 			ctx.APIKey = infraCtx.APIKey
 			ctx.AssistantID = infraCtx.AssistantID
 			ctx.Auth = infraCtx.Auth

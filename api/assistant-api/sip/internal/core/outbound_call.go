@@ -304,12 +304,25 @@ func (outboundCall *Outbound) callOutboundInviteHandler(answerTime time.Time) er
 	if inviteRequest == nil {
 		return fmt.Errorf("outbound INVITE request is unavailable")
 	}
-	callAddress := NewCallAddress(inviteRequest)
-	callAddress.From = outboundCall.request.Identity.FromUser
-	callAddress.To = outboundCall.request.Identity.ToUser
+	callAddress := newOutboundCallAddress(
+		inviteRequest,
+		outboundCall.request.Identity.FromUser,
+		outboundCall.request.Identity.ToUser,
+	)
+	if outboundCall.server.logger != nil {
+		outboundCall.server.logger.Infow("SIP: outbound phone resolution",
+			"call_id", outboundCall.session.GetCallID(),
+			"phone_source", "outbound_local_input",
+			"phone_result", phoneInputResult(outboundCall.request.Identity.FromUser, callAddress.From))
+		outboundCall.server.logger.Infow("SIP: outbound phone resolution",
+			"call_id", outboundCall.session.GetCallID(),
+			"phone_source", "outbound_remote_input",
+			"phone_result", phoneInputResult(outboundCall.request.Identity.ToUser, callAddress.To))
+	}
 	if callAddress.ToURI == "" {
 		callAddress.ToURI = inviteRequest.Recipient.String()
 	}
+	outboundCall.session.SetCallAddress(callAddress)
 	if err := inviteHandler(
 		outboundCall.session,
 		inviteRequest.Recipient.String(),
