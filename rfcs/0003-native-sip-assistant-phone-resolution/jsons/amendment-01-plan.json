@@ -1,30 +1,32 @@
 {
-  "amendment": "01 - separate SIP URIs and phone values",
-  "status": "draft",
-  "problem_statement": "Native SIP currently copies the To URI user into CallAddress.To. Agent routes therefore expose agent-<assistant-id> through client.assistant_phone instead of the assistant deployment phone.",
+  "amendment": "01 - native SIP URI and phone resolution",
+  "status": "accepted_candidate",
+  "problem_statement": "Native SIP can copy an agent route alias into CallAddress.To and then into client.assistant_phone. Exact SIP addresses and phone values need separate, deterministic semantics while preserving the existing CallAddress shape.",
   "verified_context": [
     "CallAddress already contains From, To, FromURI, ToURI, and Headers.",
     "SIP core captures complete parsed addresses in FromURI and ToURI.",
-    "The inbound pipeline maps CallAddress.From to CallerNumber and CallAddress.To to FromNumber.",
+    "Inbound pipeline maps CallAddress.From to CallerNumber and CallAddress.To to FromNumber.",
     "The telephony streamer maps CallerNumber to client.phone and FromNumber to client.assistant_phone.",
-    "Route middleware already validates DID routes against active SIP phone deployments and loads the assistant phone deployment for agent routes."
+    "DID route middleware already validates an exact phone option against an active SIP deployment.",
+    "Middleware CallAddress enrichment currently requires explicit propagation back through infra and core before session establishment."
   ],
   "acceptance_criteria": [
-    "CallAddress retains the existing From, To, FromURI, ToURI, and Headers fields without adding replacement phone fields.",
-    "FromURI and ToURI preserve exact parsed SIP header addresses.",
-    "From and To contain phone values only and never contain SIP URIs, did- prefixes, or agent routing aliases.",
-    "Inbound DID routes set To from the validated deployment phone value.",
-    "Inbound agent routes set To from the active SIP deployment phone when configured.",
-    "Missing phone information leaves the corresponding phone field empty.",
-    "client.phone and client.assistant_phone resolve from the direction-aware phone fields.",
-    "Transfer and replacement dialogs resolve an independent four-field snapshot.",
+    "CallAddress retains From, To, FromURI, ToURI, and Headers without replacement phone fields.",
+    "FromURI and ToURI preserve exact parsed SIP addresses.",
+    "From and To contain only values matching ^\\+?[0-9]+$ or are empty.",
+    "Inbound From comes only from a valid From address user.",
+    "Inbound To comes only from a validated DID route or deterministic active SIP deployment selection.",
+    "Caller-controlled To headers and custom headers never populate inbound To.",
+    "Route-enriched To propagates through infra and core into session and pipeline state.",
+    "Outbound SIP aliases remain valid signaling values and produce empty phone fields.",
+    "client.phone and client.assistant_phone resolve from direction-aware phone fields only.",
     "No database, protobuf, REST, SDK, UI, or non-SIP provider change is introduced."
   ],
   "non_goals": [
-    "Rename CallAddress.From or CallAddress.To.",
+    "Rename or mark CallAddress.From or CallAddress.To deprecated.",
     "Add FromPhone or ToPhone fields.",
-    "Use arbitrary SIP headers as trusted phone sources.",
-    "Apply E.164 conversion or country-code inference.",
+    "Use caller-controlled SIP headers as phone sources.",
+    "Convert phone values to E.164 or infer country codes.",
     "Change non-SIP telephony providers."
   ],
   "allowed_paths": [
@@ -48,46 +50,52 @@
   "ownership": {
     "rfcs/0003-native-sip-assistant-phone-resolution.md": "rfc-author",
     "rfcs/0003-native-sip-assistant-phone-resolution/jsons/": "rfc-coordinator",
-    "api/assistant-api/sip/internal/core/": "sip-implementation-owner",
-    "api/assistant-api/sip/infra/": "sip-implementation-owner",
+    "api/assistant-api/sip/internal/core/": "sip-core-owner",
+    "api/assistant-api/sip/infra/": "sip-infra-owner",
     "api/assistant-api/sip/middleware/": "sip-routing-owner",
     "api/assistant-api/sip/pipeline/": "sip-pipeline-owner",
     "api/assistant-api/internal/channel/telephony/internal/base/": "telephony-metadata-owner",
     "api/assistant-api/internal/adapters/internal/": "authentication-integration-owner"
   },
   "design": {
-    "from_uri": "Exact parsed From header address.",
-    "to_uri": "Exact parsed To header address.",
-    "from": "Caller phone extracted from the From address user when dialable.",
-    "to": "Assistant phone resolved from the validated DID route, active SIP deployment phone, or dialable To address user.",
+    "from_uri": "Exact parsed From header address and immutable after capture.",
+    "to_uri": "Exact parsed To header address and immutable after capture.",
+    "from": "Trimmed From address user only when it matches ^\\+?[0-9]+$; otherwise empty.",
+    "to_inbound_did": "The exact phone option matched by the validated active SIP DID route.",
+    "to_inbound_agent": "The single valid phone option from exactly one active SIP phone deployment for the routed assistant; otherwise empty or rejected according to the RFC.",
+    "outbound": "Authoritative local and remote inputs populate phone fields only when they match the phone grammar; generated URI fields remain exact.",
     "metadata": "Existing client.phone and client.assistant_phone mappings remain unchanged."
   },
   "principles": {
-    "kiss": "Reuse the existing CallAddress fields and current call-context metadata path.",
-    "yagni": "Do not add phone fields, persistence columns, protobuf fields, UI fields, or trusted-header policy.",
-    "single_ownership": "SIP core owns URI capture and caller phone parsing; route middleware owns assistant phone enrichment.",
-    "single_source_of_truth": "The validated route and active SIP deployment determine the assistant phone.",
-    "fail_safe": "Unknown or non-phone values produce empty phone fields rather than aliases or fabricated numbers.",
-    "observability": "Record resolution source and missing-phone reason without logging raw SIP identities or phone values.",
-    "least_privilege": "Only tenant-scoped route and deployment data may populate the assistant phone.",
-    "reversibility": "Revert core extraction and route enrichment together; no stored data rollback is required."
+    "kiss": "Reuse the existing CallAddress and call-context metadata path.",
+    "yagni": "Do not add phone fields, persistence columns, external schemas, UI fields, or trusted-header policy.",
+    "single_ownership": "SIP core owns capture and parsing, route middleware owns inbound assistant phone resolution, infra owns propagation, and pipeline owns direction mapping.",
+    "single_source_of_truth": "Tenant-scoped route and active SIP deployment data are the only inbound assistant phone sources.",
+    "fail_safe": "Unknown phone values remain empty and ambiguous or invalid trusted configuration is rejected.",
+    "observability": "Emit bounded phone_source and phone_result values without raw URIs or phone values.",
+    "least_privilege": "Caller-controlled To and custom headers cannot affect authentication phone metadata.",
+    "reversibility": "Revert the complete implementation as one code-only change; no stored data repair is required."
   },
   "risks": [
-    "Changing client.assistant_phone from a SIP identity to a phone value changes authentication request behavior for native SIP.",
-    "An agent route may not have an active deployment phone, producing an empty assistant phone.",
-    "A permissive phone parser could misclassify SIP aliases as phone values.",
-    "Transfer code could accidentally reuse the previous dialog phone values.",
-    "Using caller-controlled SIP headers could permit authentication spoofing, so custom headers remain excluded."
+    "Changing client.assistant_phone from an agent alias to a phone value changes native SIP authentication payload behavior.",
+    "Agent routes without active phone deployment data produce an omitted assistant phone.",
+    "Ambiguous deployments must be rejected rather than selected by database order.",
+    "Middleware enrichment can be lost unless infra and core propagation are changed together.",
+    "Outbound SIP aliases need empty phone metadata without breaking signaling.",
+    "Transfer code can leak prior dialog state unless every new leg creates its own snapshot."
   ],
   "required_tests": [
-    "SIP core exact URI capture and phone-only From and To extraction",
-    "DID route assistant phone resolution",
-    "agent route deployment phone resolution",
-    "missing deployment phone fallback",
-    "outbound four-field construction",
-    "transfer and replacement dialog isolation",
-    "call-context direction mapping",
+    "exact URI capture and immutability",
+    "positive and negative phone grammar cases",
+    "inbound To empty before route resolution",
+    "DID route phone resolution",
+    "agent route missing, valid, invalid, and ambiguous deployment resolution",
+    "infra and core enrichment propagation",
+    "inbound and outbound call-context mapping",
+    "outbound alias signaling with empty phone fields",
+    "transfer, referral, and replacement dialog isolation",
     "authentication variable resolution",
+    "bounded observability without raw values",
     "non-SIP regression coverage"
   ],
   "required_commands": [
@@ -100,14 +108,12 @@
     "git diff --check",
     "just agent-finalize \"api/assistant-api/sip/internal/core,api/assistant-api/sip/infra,api/assistant-api/sip/middleware,api/assistant-api/sip/pipeline,api/assistant-api/internal/channel/telephony/internal/base,api/assistant-api/internal/adapters/internal\""
   ],
-  "rollback": "Revert the SIP core phone extraction and route enrichment in one change. Existing persistence and external schemas require no rollback.",
+  "rollback": "Revert core parsing, route resolution, infra and core propagation, outbound construction, transfer behavior, observability, and tests together. No database rollback or data repair is required.",
   "discussion": {
-    "planner": "codex",
-    "challenger": "pending",
+    "planner": "codex-coordinator",
+    "challenger": "pending-round-2",
     "decision": "pending",
     "approved_by": "pending",
-    "open_blockers": [
-      "Independent challenge and exact-digest confirmation are required before implementation."
-    ]
+    "open_blockers": []
   }
 }
