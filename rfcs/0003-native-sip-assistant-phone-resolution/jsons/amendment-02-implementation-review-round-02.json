@@ -1,0 +1,22 @@
+{
+  "run_id": "run_624cf2072cd4",
+  "task_id": "task_7fa757cea74b",
+  "dispatch_id": "ctx_780050a91d1f",
+  "reviewed_base": "4ae013de312eccd5bf49dbf614b10a6766e5efeb",
+  "reviewed_head": "88c0a912023d8dc0fbf94930fcf0a0ed65314031",
+  "decision": "APPROVE",
+  "completed_at": "2026-09-02T11:08:53Z",
+  "critical_findings": 0,
+  "major_findings": 0,
+  "verification": [
+    "go test -count=1 ./api/assistant-api/sip/internal/core",
+    "go test -count=1 ./api/assistant-api/sip/infra",
+    "go test -count=1 ./api/assistant-api/sip/middleware",
+    "go test -count=1 ./api/assistant-api/sip/pipeline",
+    "go test -count=1 ./api/assistant-api/internal/channel/telephony/internal/base",
+    "go test -count=1 ./api/assistant-api/internal/adapters/internal",
+    "git diff --check 4ae013de..88c0a912",
+    "just agent-finalize for all changed implementation and test paths"
+  ],
+  "report_path": "/tmp/task_7fa757cea74b/final-review.md"
+}
