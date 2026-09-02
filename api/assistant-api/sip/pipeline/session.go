@@ -72,9 +72,11 @@ func (d *Dispatcher) ensureCallContext(ctx context.Context, stage sip_infra.Sess
 			return reconstructCallContext(stage.Auth, stage.AssistantID, conversationID, dirStr, callID, "", stage.CallAddress.From, stage.CallAddress.To)
 		}
 		if claimed, err := d.callContextStore.Claim(ctx, contextID); err == nil {
+			setCallContextPhoneValues(claimed, dirStr, stage.CallAddress.From, stage.CallAddress.To)
 			return claimed, nil
 		}
 		if loaded, err := d.callContextStore.Get(ctx, contextID); err == nil {
+			setCallContextPhoneValues(loaded, dirStr, stage.CallAddress.From, stage.CallAddress.To)
 			return loaded, nil
 		}
 		return reconstructCallContext(stage.Auth, stage.AssistantID, conversationID, dirStr, callID, contextID, stage.CallAddress.From, stage.CallAddress.To)
@@ -177,8 +179,8 @@ func reconstructCallContext(
 	direction string,
 	callID string,
 	contextID string,
-	fromIdentity string,
-	toIdentity string,
+	fromPhone string,
+	toPhone string,
 ) (*callcontext.CallContext, error) {
 	callContext := &callcontext.CallContext{
 		AssistantID:    assistantID,
@@ -191,12 +193,19 @@ func reconstructCallContext(
 	if err := callContext.SetAuthentication(auth); err != nil {
 		return nil, err
 	}
-	if direction == string(sip_infra.CallDirectionOutbound) {
-		callContext.CallerNumber = toIdentity
-		callContext.FromNumber = fromIdentity
-	} else {
-		callContext.CallerNumber = fromIdentity
-		callContext.FromNumber = toIdentity
-	}
+	setCallContextPhoneValues(callContext, direction, fromPhone, toPhone)
 	return callContext, nil
+}
+
+func setCallContextPhoneValues(callContext *callcontext.CallContext, direction, fromPhone, toPhone string) {
+	if callContext == nil {
+		return
+	}
+	if direction == string(sip_infra.CallDirectionOutbound) {
+		callContext.CallerNumber = toPhone
+		callContext.FromNumber = fromPhone
+	} else {
+		callContext.CallerNumber = fromPhone
+		callContext.FromNumber = toPhone
+	}
 }
