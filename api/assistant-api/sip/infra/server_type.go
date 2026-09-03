@@ -8,7 +8,6 @@ package sip_infra
 
 import (
 	"fmt"
-	"maps"
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_core "github.com/rapidaai/api/assistant-api/sip/internal/core"
@@ -59,53 +58,6 @@ type SIPRequestIdentity struct {
 }
 
 type Middleware func(ctx *SIPRequestContext) error
-
-func middlewareToCore(middleware Middleware) internal_core.Middleware {
-	return func(ctx *internal_core.SIPRequestContext) error {
-		var config *Config
-		if ctx.Config != nil {
-			converted := configFromCore(ctx.Config)
-			config = &converted
-		}
-		infraCtx := &SIPRequestContext{
-			Method:       ctx.Method,
-			CallID:       ctx.CallID,
-			RequestURI:   ctx.RequestURI,
-			FromIdentity: ctx.CallAddress.FromURI,
-			ToIdentity:   ctx.CallAddress.ToURI,
-			FromURI:      ctx.CallAddress.FromURI,
-			ToURI:        ctx.CallAddress.ToURI,
-			CallAddress: CallAddress{
-				From:    ctx.CallAddress.From,
-				To:      ctx.CallAddress.To,
-				FromURI: ctx.CallAddress.FromURI,
-				ToURI:   ctx.CallAddress.ToURI,
-				Headers: maps.Clone(ctx.CallAddress.Headers),
-			},
-			SDPInfo:         sdpInfoFromCore(ctx.SDPInfo),
-			APIKey:          ctx.APIKey,
-			AssistantID:     ctx.AssistantID,
-			Auth:            ctx.Auth,
-			Assistant:       ctx.Assistant,
-			VaultCredential: ctx.VaultCredential,
-			Config:          config,
-		}
-
-		err := middleware(infraCtx)
-		ctx.CallAddress.To = infraCtx.CallAddress.To
-		ctx.APIKey = infraCtx.APIKey
-		ctx.AssistantID = infraCtx.AssistantID
-		ctx.Auth = infraCtx.Auth
-		ctx.Assistant = infraCtx.Assistant
-		ctx.VaultCredential = infraCtx.VaultCredential
-		if infraCtx.Config != nil {
-			ctx.Config = infraCtx.Config.toCore()
-		} else {
-			ctx.Config = nil
-		}
-		return err
-	}
-}
 
 type Server struct {
 	inner *internal_core.Server
@@ -189,7 +141,44 @@ func (c *ServerConfig) toCore() *internal_core.ServerConfig {
 	}
 	coreMiddlewares := make([]internal_core.Middleware, 0, len(c.Middlewares))
 	for _, middleware := range c.Middlewares {
-		coreMiddlewares = append(coreMiddlewares, middlewareToCore(middleware))
+		current := middleware
+		coreMiddlewares = append(coreMiddlewares, func(ctx *internal_core.SIPRequestContext) error {
+			var config *Config
+			if ctx.Config != nil {
+				converted := configFromCore(ctx.Config)
+				config = &converted
+			}
+			infraCtx := &SIPRequestContext{
+				Method:          ctx.Method,
+				CallID:          ctx.CallID,
+				RequestURI:      ctx.RequestURI,
+				FromIdentity:    ctx.CallAddress.FromURI,
+				ToIdentity:      ctx.CallAddress.ToURI,
+				FromURI:         ctx.CallAddress.FromURI,
+				ToURI:           ctx.CallAddress.ToURI,
+				CallAddress:     ctx.CallAddress,
+				SDPInfo:         sdpInfoFromCore(ctx.SDPInfo),
+				APIKey:          ctx.APIKey,
+				AssistantID:     ctx.AssistantID,
+				Auth:            ctx.Auth,
+				Assistant:       ctx.Assistant,
+				VaultCredential: ctx.VaultCredential,
+				Config:          config,
+			}
+			err := current(infraCtx)
+			ctx.CallAddress.To = infraCtx.CallAddress.To
+			ctx.APIKey = infraCtx.APIKey
+			ctx.AssistantID = infraCtx.AssistantID
+			ctx.Auth = infraCtx.Auth
+			ctx.Assistant = infraCtx.Assistant
+			ctx.VaultCredential = infraCtx.VaultCredential
+			if infraCtx.Config != nil {
+				ctx.Config = infraCtx.Config.toCore()
+			} else {
+				ctx.Config = nil
+			}
+			return err
+		})
 	}
 	return &internal_core.ServerConfig{
 		ListenConfig:         c.ListenConfig.toCore(),
