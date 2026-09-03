@@ -15,10 +15,10 @@ import (
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	internal_assistant_service "github.com/rapidaai/api/assistant-api/internal/services/assistant"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
 	sip_middleware "github.com/rapidaai/api/assistant-api/sip/middleware"
 	sip_pipeline "github.com/rapidaai/api/assistant-api/sip/pipeline"
 	sip_registration "github.com/rapidaai/api/assistant-api/sip/registration"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	web_client "github.com/rapidaai/pkg/clients/web"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
@@ -32,7 +32,7 @@ type SIPEngine struct {
 	cfg    *config.AssistantConfig
 	logger commons.Logger
 	mu     sync.RWMutex
-	server *sip_infra.Server
+	server *sip_runtime.Server
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -52,7 +52,7 @@ type SIPEngine struct {
 	callContextStore             callcontext.Store
 
 	// Registration client for maintaining SIP REGISTER with external providers.
-	registrationClient *sip_infra.RegistrationClient
+	registrationClient *sip_runtime.RegistrationClient
 
 	// Distributed registration manager — runs the GetRecord -> ClaimOwner ->
 	// Register -> UpdateStatus pipeline, sharded across instances by externalIP.
@@ -86,15 +86,15 @@ func NewSIPEngine(config *config.AssistantConfig, logger commons.Logger,
 	}
 }
 
-func (m *SIPEngine) listenConfig() *sip_infra.ListenConfig {
-	transportType := sip_infra.TransportUDP
+func (m *SIPEngine) listenConfig() *sip_runtime.ListenConfig {
+	transportType := sip_runtime.TransportUDP
 	switch m.cfg.SIPConfig.Transport {
 	case "tcp":
-		transportType = sip_infra.TransportTCP
+		transportType = sip_runtime.TransportTCP
 	case "tls":
-		transportType = sip_infra.TransportTLS
+		transportType = sip_runtime.TransportTLS
 	}
-	return &sip_infra.ListenConfig{
+	return &sip_runtime.ListenConfig{
 		Address:                 m.cfg.SIPConfig.Server,
 		ExternalIP:              m.cfg.SIPConfig.ExternalIP,
 		AllowLoopbackExternalIP: m.cfg.SIPConfig.AllowLoopbackExternalIP,
@@ -107,7 +107,7 @@ func (m *SIPEngine) listenConfig() *sip_infra.ListenConfig {
 // assistant from the SIP route user in the To-URI:
 func (m *SIPEngine) Connect(ctx context.Context) error {
 	m.ctx, m.cancel = context.WithCancel(ctx)
-	server, err := sip_infra.NewServer(m.ctx, &sip_infra.ServerConfig{
+	server, err := sip_runtime.NewServer(m.ctx, &sip_runtime.ServerConfig{
 		ListenConfig:         m.listenConfig(),
 		Logger:               m.logger,
 		RTPPortRangeStart:    m.cfg.SIPConfig.RTPPortRangeStart,
@@ -119,7 +119,7 @@ func (m *SIPEngine) Connect(ctx context.Context) error {
 		return fmt.Errorf("failed to create SIP server: %w", err)
 	}
 	server.SetMiddlewares(
-		[]sip_infra.Middleware{
+		[]sip_runtime.Middleware{
 			sip_middleware.NewRouteMiddleware(
 				sip_middleware.WithContext(m.ctx),
 				sip_middleware.WithLogger(m.logger),
@@ -135,13 +135,13 @@ func (m *SIPEngine) Connect(ctx context.Context) error {
 			),
 		},
 	)
-	server.SetOnApplicationReadyIdentity(m.onApplicationReady)
+	server.SetOnApplicationReady(m.onApplicationReady)
 	server.SetOnApplicationCleanup(m.onApplicationCleanup)
-	server.SetOnInviteIdentity(m.onInvite)
+	server.SetOnInvite(m.onInvite)
 	server.SetOnBye(m.onBye)
 	server.SetOnCancel(m.onCancel)
 	server.SetOnError(m.onError)
-	m.registrationClient = sip_infra.NewRegistrationClient(server.Client(), server.GetListenConfig(), m.logger)
+	m.registrationClient = sip_runtime.NewRegistrationClient(server.Client(), server.GetListenConfig(), m.logger)
 	m.regManager = sip_registration.New(
 		sip_registration.WithLogger(m.logger),
 		sip_registration.WithPostgres(m.postgres),
@@ -189,20 +189,20 @@ func (m *SIPEngine) Connect(ctx context.Context) error {
 // transport, RTP range, timeouts, inbound answer policy) onto a per-DID vault
 // config. Passed to the registration manager as an injection point so the
 // registration package stays decoupled from the assistant-api config types.
-func (m *SIPEngine) applySIPOperationalDefaults(c *sip_infra.Config) {
+func (m *SIPEngine) applySIPOperationalDefaults(c *sip_runtime.Config) {
 	if m.cfg == nil || m.cfg.SIPConfig == nil {
 		return
 	}
 	m.applySIPConfigDefaults(c)
 }
 
-func (m *SIPEngine) applySIPConfigDefaults(c *sip_infra.Config) {
+func (m *SIPEngine) applySIPConfigDefaults(c *sip_runtime.Config) {
 	if c == nil || m.cfg == nil || m.cfg.SIPConfig == nil {
 		return
 	}
 	c.ApplyOperationalDefaults(
 		m.cfg.SIPConfig.Port,
-		sip_infra.Transport(m.cfg.SIPConfig.Transport),
+		sip_runtime.Transport(m.cfg.SIPConfig.Transport),
 		m.cfg.SIPConfig.RTPPortRangeStart,
 		m.cfg.SIPConfig.RTPPortRangeEnd,
 	)
@@ -217,21 +217,21 @@ func (m *SIPEngine) applySIPConfigDefaults(c *sip_infra.Config) {
 	)
 	inboundConfig := m.cfg.SIPConfig.Inbound
 	c.ApplyInboundAnswerDefaults(
-		sip_infra.InboundAnswerMode(inboundConfig.AnswerMode),
+		sip_runtime.InboundAnswerMode(inboundConfig.AnswerMode),
 		inboundConfig.MinRingDuration,
 		inboundConfig.MaxRingDuration,
 		inboundConfig.ACKTimeout,
 	)
 }
 
-func (m *SIPEngine) GetServer() *sip_infra.Server {
+func (m *SIPEngine) GetServer() *sip_runtime.Server {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.server
 }
 
-func (m *SIPEngine) onApplicationReady(session *sip_infra.Session, identity sip_infra.SIPRequestIdentity) error {
-	stage, err := m.sessionEstablishedStage(session, identity)
+func (m *SIPEngine) onApplicationReady(session *sip_runtime.Session, requestURI string, callAddress sip_runtime.CallAddress) error {
+	stage, err := m.sessionEstablishedStage(session, requestURI, callAddress)
 	if err != nil {
 		return err
 	}
@@ -241,50 +241,50 @@ func (m *SIPEngine) onApplicationReady(session *sip_infra.Session, identity sip_
 	return m.dispatcher.PrepareSession(m.ctx, stage)
 }
 
-func (m *SIPEngine) onApplicationCleanup(session *sip_infra.Session) {
+func (m *SIPEngine) onApplicationCleanup(session *sip_runtime.Session) {
 	if m.dispatcher == nil || session == nil {
 		return
 	}
 	m.dispatcher.DiscardPreparedSession(m.ctx, session.GetCallID())
 }
 
-func (m *SIPEngine) onInvite(session *sip_infra.Session, identity sip_infra.SIPRequestIdentity) error {
-	stage, err := m.sessionEstablishedStage(session, identity)
+func (m *SIPEngine) onInvite(session *sip_runtime.Session, requestURI string, callAddress sip_runtime.CallAddress) error {
+	stage, err := m.sessionEstablishedStage(session, requestURI, callAddress)
 	if err != nil {
 		return err
 	}
 	if m.dispatcher == nil {
 		return fmt.Errorf("SIP dispatcher not initialized")
 	}
-	if stage.Direction == sip_infra.CallDirectionInbound {
+	if stage.Direction == sip_runtime.CallDirectionInbound {
 		return m.dispatcher.StartPreparedSession(m.ctx, stage)
 	}
 	m.dispatcher.OnPipeline(m.ctx, stage)
 	return nil
 }
 
-func (m *SIPEngine) sessionEstablishedStage(session *sip_infra.Session, identity sip_infra.SIPRequestIdentity) (sip_infra.SessionEstablishedPipeline, error) {
+func (m *SIPEngine) sessionEstablishedStage(session *sip_runtime.Session, requestURI string, callAddress sip_runtime.CallAddress) (sip_pipeline.SessionEstablishedPipeline, error) {
 	if session == nil {
-		return sip_infra.SessionEstablishedPipeline{}, fmt.Errorf("session is nil")
+		return sip_pipeline.SessionEstablishedPipeline{}, fmt.Errorf("session is nil")
 	}
 	info := session.GetInfo()
 	callID := info.CallID
 
 	if session.IsEnded() {
-		return sip_infra.SessionEstablishedPipeline{}, fmt.Errorf("session already ended")
+		return sip_pipeline.SessionEstablishedPipeline{}, fmt.Errorf("session already ended")
 	}
 
 	auth := session.GetAuth()
 	if auth == nil {
-		return sip_infra.SessionEstablishedPipeline{}, fmt.Errorf("missing auth on session %s", callID)
+		return sip_pipeline.SessionEstablishedPipeline{}, fmt.Errorf("missing auth on session %s", callID)
 	}
 
 	assistant := session.GetAssistant()
 	if assistant == nil {
-		return sip_infra.SessionEstablishedPipeline{}, fmt.Errorf("missing assistant context on session %s", callID)
+		return sip_pipeline.SessionEstablishedPipeline{}, fmt.Errorf("missing assistant context on session %s", callID)
 	}
 
-	return sip_infra.SessionEstablishedPipeline{
+	return sip_pipeline.SessionEstablishedPipeline{
 		ID:              callID,
 		Session:         session,
 		Config:          session.GetConfig(),
@@ -292,19 +292,19 @@ func (m *SIPEngine) sessionEstablishedStage(session *sip_infra.Session, identity
 		Direction:       info.Direction,
 		AssistantID:     assistant.Id,
 		Auth:            auth,
-		RequestURI:      identity.RequestURI,
-		CallAddress:     identity.CallAddress,
+		RequestURI:      requestURI,
+		CallAddress:     callAddress,
 		ConversationID:  session.GetConversationID(),
 	}, nil
 }
 
-func (m *SIPEngine) onBye(session *sip_infra.Session) error {
+func (m *SIPEngine) onBye(session *sip_runtime.Session) error {
 	disconnectMetadata := session.GetDisconnectMetadata()
 	m.persistRemoteByeCallStatus(session, disconnectMetadata)
 	return nil
 }
 
-func (m *SIPEngine) persistRemoteByeCallStatus(session *sip_infra.Session, metadata sip_infra.DisconnectMetadata) {
+func (m *SIPEngine) persistRemoteByeCallStatus(session *sip_runtime.Session, metadata sip_runtime.DisconnectMetadata) {
 	if m.callContextStore == nil || session == nil {
 		return
 	}
@@ -335,7 +335,7 @@ func (m *SIPEngine) persistRemoteByeCallStatus(session *sip_infra.Session, metad
 		return
 	}
 	if metadata.Reason == "" {
-		metadata.Reason = sip_infra.DisconnectReasonRemoteHangup
+		metadata.Reason = sip_runtime.DisconnectReasonRemoteHangup
 	}
 	if err := m.callContextStore.UpdateCallStatus(context.Background(), contextID, callcontext.CallStatusUpdate{
 		CallStatus:         callcontext.CallStatusCompleted,
@@ -359,15 +359,15 @@ func callContextHasTerminalFailure(callContext *callcontext.CallContext) bool {
 		callContext.CallStatus == "cancelled"
 }
 
-func (m *SIPEngine) onCancel(session *sip_infra.Session) error {
+func (m *SIPEngine) onCancel(session *sip_runtime.Session) error {
 	return nil
 }
 
 // onError handles SIP-level errors by emitting a CallFailedPipeline event.
 // The pipeline handler (signal.go) creates the observer and persists metrics.
-func (m *SIPEngine) onError(session *sip_infra.Session, callErr error) {
+func (m *SIPEngine) onError(session *sip_runtime.Session, callErr error) {
 	m.logger.Warnw("SIP error", "call_id", session.GetCallID(), "error", callErr)
-	m.dispatcher.OnPipeline(m.ctx, sip_infra.CallFailedPipeline{
+	m.dispatcher.OnPipeline(m.ctx, sip_pipeline.CallFailedPipeline{
 		ID:      session.GetCallID(),
 		Session: session,
 		Error:   callErr,

@@ -13,12 +13,12 @@ import (
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 )
 
-func (m *manager) RegistrationRenewed(ctx context.Context, event sip_infra.RegistrationEvent) {
+func (m *manager) RegistrationRenewed(ctx context.Context, event sip_runtime.RegistrationEvent) {
 	retryCount := 0
 	var assistant internal_assistant_entity.Assistant
 	if err := m.postgres.DB(ctx).Where("id = ?", event.AssistantID).First(&assistant).Error; err == nil {
@@ -60,7 +60,7 @@ func (m *manager) RegistrationRenewed(ctx context.Context, event sip_infra.Regis
 	})
 }
 
-func (m *manager) RegistrationRenewalFailed(ctx context.Context, event sip_infra.RegistrationEvent) {
+func (m *manager) RegistrationRenewalFailed(ctx context.Context, event sip_runtime.RegistrationEvent) {
 	var assistant internal_assistant_entity.Assistant
 	if err := m.postgres.DB(ctx).Where("id = ?", event.AssistantID).First(&assistant).Error; err == nil {
 		auth := m.serviceAuthentication(assistant.OrganizationId, assistant.ProjectId)
@@ -110,7 +110,7 @@ func (m *manager) RegistrationRenewalFailed(ctx context.Context, event sip_infra
 	m.writeRegistrationStatus(ctx, event.DeploymentID, m.registrationStatusUpdateFromEvent(event, StatusActive))
 }
 
-func (m *manager) RegistrationExpired(ctx context.Context, event sip_infra.RegistrationEvent) {
+func (m *manager) RegistrationExpired(ctx context.Context, event sip_runtime.RegistrationEvent) {
 	var assistant internal_assistant_entity.Assistant
 	if err := m.postgres.DB(ctx).Where("id = ?", event.AssistantID).First(&assistant).Error; err == nil {
 		auth := m.serviceAuthentication(assistant.OrganizationId, assistant.ProjectId)
@@ -160,7 +160,7 @@ func (m *manager) RegistrationExpired(ctx context.Context, event sip_infra.Regis
 	m.releaseOwner(ctx, event.DID)
 }
 
-func (m *manager) RegistrationUnregisterFailed(ctx context.Context, event sip_infra.RegistrationEvent) {
+func (m *manager) RegistrationUnregisterFailed(ctx context.Context, event sip_runtime.RegistrationEvent) {
 	var assistant internal_assistant_entity.Assistant
 	if err := m.postgres.DB(ctx).Where("id = ?", event.AssistantID).First(&assistant).Error; err == nil {
 		auth := m.serviceAuthentication(assistant.OrganizationId, assistant.ProjectId)
@@ -208,7 +208,7 @@ func (m *manager) RegistrationUnregisterFailed(ctx context.Context, event sip_in
 	m.writeRegistrationStatus(ctx, event.DeploymentID, m.registrationStatusUpdateFromEvent(event, StatusActive))
 }
 
-func (m *manager) registrationStatusUpdateFromEvent(event sip_infra.RegistrationEvent, status RegistrationStatus) RegistrationStatusUpdate {
+func (m *manager) registrationStatusUpdateFromEvent(event sip_runtime.RegistrationEvent, status RegistrationStatus) RegistrationStatusUpdate {
 	return RegistrationStatusUpdate{
 		Status:        status,
 		Error:         registrationEventError(event),
@@ -223,7 +223,7 @@ func (m *manager) registrationStatusUpdateFromEvent(event sip_infra.Registration
 	}
 }
 
-func registrationEventError(event sip_infra.RegistrationEvent) string {
+func registrationEventError(event sip_runtime.RegistrationEvent) string {
 	if event.Error == nil {
 		return ""
 	}

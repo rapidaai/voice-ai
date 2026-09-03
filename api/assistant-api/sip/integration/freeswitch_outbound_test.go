@@ -12,7 +12,7 @@ import (
 	"context"
 	"testing"
 
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,13 +25,13 @@ func TestFreeSWITCHOutboundUsernamePassword(t *testing.T) {
 		harness.sipConfig,
 		trunk.answerUser,
 		trunk.fromUser,
-		sip_infra.MakeCallOptions{},
+		sip_runtime.MakeCallOptions{},
 	)
 	require.NoErrorf(t, err, "outbound call to %s failed", freeSWITCHOutboundTargetDescription(harness.config, trunk.answerUser))
 	require.NotNil(t, session)
 
-	waitForCallState(t, session, sip_infra.CallStateConnected, callSetupTimeout)
-	require.NoError(t, harness.server.EndCallWithReason(session, sip_infra.LifecycleReasonEndCall))
+	waitForCallState(t, session, sip_runtime.CallStateConnected, callSetupTimeout)
+	require.NoError(t, harness.server.EndCallWithReason(session, sip_runtime.LifecycleReasonEndCall))
 	waitForTerminalCallState(t, session, callTeardownTimeout)
 }
 
@@ -45,14 +45,14 @@ func TestFreeSWITCHOutboundRequestContextCancellationDoesNotCancelCall(t *testin
 		harness.sipConfig,
 		trunk.answerUser,
 		trunk.fromUser,
-		sip_infra.MakeCallOptions{},
+		sip_runtime.MakeCallOptions{},
 	)
 	require.NoErrorf(t, err, "outbound call to %s failed", freeSWITCHOutboundTargetDescription(harness.config, trunk.answerUser))
 	require.NotNil(t, session)
 	cancelRequest()
 
-	waitForCallState(t, session, sip_infra.CallStateConnected, callSetupTimeout)
-	require.NoError(t, harness.server.EndCallWithReason(session, sip_infra.LifecycleReasonEndCall))
+	waitForCallState(t, session, sip_runtime.CallStateConnected, callSetupTimeout)
+	require.NoError(t, harness.server.EndCallWithReason(session, sip_runtime.LifecycleReasonEndCall))
 	waitForTerminalCallState(t, session, callTeardownTimeout)
 }
 
@@ -72,13 +72,13 @@ func TestFreeSWITCHOutboundUsernamePasswordHeaders(t *testing.T) {
 		harness.sipConfig,
 		trunk.headerAssertUser,
 		trunk.fromUser,
-		sip_infra.MakeCallOptions{},
+		sip_runtime.MakeCallOptions{},
 	)
 	require.NoErrorf(t, err, "outbound call to %s failed", freeSWITCHOutboundTargetDescription(harness.config, trunk.headerAssertUser))
 	require.NotNil(t, session)
 
-	waitForCallState(t, session, sip_infra.CallStateConnected, callSetupTimeout)
-	require.NoError(t, harness.server.EndCallWithReason(session, sip_infra.LifecycleReasonEndCall))
+	waitForCallState(t, session, sip_runtime.CallStateConnected, callSetupTimeout)
+	require.NoError(t, harness.server.EndCallWithReason(session, sip_runtime.LifecycleReasonEndCall))
 	waitForTerminalCallState(t, session, callTeardownTimeout)
 }
 
@@ -94,13 +94,13 @@ func TestFreeSWITCHOutboundCancelBeforeAnswer(t *testing.T) {
 		harness.sipConfig,
 		trunk.ringOnlyUser,
 		trunk.fromUser,
-		sip_infra.MakeCallOptions{},
+		sip_runtime.MakeCallOptions{},
 	)
 	require.NoErrorf(t, err, "outbound call to %s failed", freeSWITCHOutboundTargetDescription(harness.config, trunk.ringOnlyUser))
 	require.NotNil(t, session)
 
-	waitForCallState(t, session, sip_infra.CallStateRinging, callSetupTimeout)
-	require.NoError(t, harness.server.CancelCall(session, sip_infra.LifecycleReasonOutboundCancelledBeforeAnswer))
+	waitForCallState(t, session, sip_runtime.CallStateRinging, callSetupTimeout)
+	require.NoError(t, harness.server.CancelCall(session, sip_runtime.LifecycleReasonOutboundCancelledBeforeAnswer))
 	waitForTerminalCallState(t, session, callTeardownTimeout)
-	require.Equal(t, sip_infra.CallStateCancelled, session.GetInfo().State)
+	require.Equal(t, sip_runtime.CallStateCancelled, session.GetInfo().State)
 }

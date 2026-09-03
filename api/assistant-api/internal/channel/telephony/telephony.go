@@ -19,7 +19,7 @@ import (
 	internal_vobiz_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/vobiz"
 	internal_vonage_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/vonage"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/commons"
 )
 
@@ -76,5 +76,5 @@ func GetTelephony(at Telephony, cfg *config.AssistantConfig, logger commons.Logg
 
 // TelephonyOption configures optional dependencies for telephony providers.
 type TelephonyOption struct {
-	SIPServer *sip_infra.Server
+	SIPServer *sip_runtime.Server
 }

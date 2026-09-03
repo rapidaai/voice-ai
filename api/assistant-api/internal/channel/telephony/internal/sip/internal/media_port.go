@@ -16,7 +16,7 @@ import (
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -25,8 +25,8 @@ import (
 type MediaPortConfig struct {
 	Context    context.Context
 	Logger     commons.Logger
-	Session    *sip_infra.Session
-	RTPHandler *sip_infra.RTPHandler
+	Session    *sip_runtime.Session
+	RTPHandler rtpHandler
 	Resampler  internal_type.AudioResampler
 	StreamSink func(internal_type.Stream)
 	Record     func(...observability.Record) error
@@ -35,8 +35,8 @@ type MediaPortConfig struct {
 type MediaPort struct {
 	logger commons.Logger
 
-	session        *sip_infra.Session
-	rtpHandler     *sip_infra.RTPHandler
+	session        *sip_runtime.Session
+	rtpHandler     rtpHandler
 	audioProcessor *AudioProcessor
 	mediaSession   *internal_telephony_media.MediaSession
 	streamSink     func(internal_type.Stream)
@@ -62,10 +62,10 @@ func NewMediaPort(config MediaPortConfig) (*MediaPort, error) {
 		if config.Session != nil {
 			callID = config.Session.GetCallID()
 		}
-		return nil, sip_infra.NewSIPError("NewMediaPort", callID, "session has no RTP handler", sip_infra.ErrRTPNotInitialized)
+		return nil, sip_runtime.NewSIPError("NewMediaPort", callID, "session has no RTP handler", sip_runtime.ErrRTPNotInitialized)
 	}
 	if config.Session == nil {
-		return nil, sip_infra.NewSIPError("NewMediaPort", "", "session is required", sip_infra.ErrRTPNotInitialized)
+		return nil, sip_runtime.NewSIPError("NewMediaPort", "", "session is required", sip_runtime.ErrRTPNotInitialized)
 	}
 	portContext := config.Context
 	if portContext == nil {
@@ -102,7 +102,7 @@ func NewMediaPort(config MediaPortConfig) (*MediaPort, error) {
 	return mediaPort, nil
 }
 
-func resolveAmbientConfig(sipSession *sip_infra.Session) *internal_ambient.Config {
+func resolveAmbientConfig(sipSession *sip_runtime.Session) *internal_ambient.Config {
 	if sipSession == nil {
 		return nil
 	}
@@ -346,7 +346,7 @@ func (port *MediaPort) sendPipelineUserAudio(userPCM16k []byte, receivedAt time.
 
 func (port *MediaPort) deliverAssistantFrame(outputFrame internal_telephony_media.AssistantOutputFrame) error {
 	if port == nil || port.closed.Load() {
-		return sip_infra.ErrSessionClosed
+		return sip_runtime.ErrSessionClosed
 	}
 	providerAudio, err := port.audioProcessor.encodeAssistantOutputFrame(outputFrame.ProviderAudio)
 	if err != nil {
@@ -380,7 +380,7 @@ func (port *MediaPort) deliverAssistantFrame(outputFrame internal_telephony_medi
 				},
 			})
 		}
-		if errors.Is(err, sip_infra.ErrRTPOutputQueueFull) {
+		if errors.Is(err, sip_runtime.ErrRTPOutputQueueFull) {
 			return port.audioProcessor.rtpOutputQueueFullError()
 		}
 		return err
@@ -399,7 +399,7 @@ func (port *MediaPort) recordDeliveredAssistantAudio(assistantPCM16k []byte) {
 			Time:  timestamppb.Now(),
 		})
 	}
-	if port.session == nil || port.session.GetInfo().Direction != sip_infra.CallDirectionInbound {
+	if port.session == nil || port.session.GetInfo().Direction != sip_runtime.CallDirectionInbound {
 		return
 	}
 	if port.session.MarkInboundFirstAssistantAudioSent() && port.record != nil {

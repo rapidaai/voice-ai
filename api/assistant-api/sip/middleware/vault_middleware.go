@@ -11,33 +11,33 @@ import (
 	"fmt"
 	"strings"
 
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/validator"
 )
 
-func NewVaultMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware {
+func NewVaultMiddleware(options ...func(*middlewareOption)) sip_runtime.Middleware {
 	m := &middlewareOption{ctx: context.Background()}
 	for _, option := range options {
 		if validator.NonNil(option) {
 			option(m)
 		}
 	}
-	return func(ctx *sip_infra.SIPRequestContext) error {
+	return func(ctx *sip_runtime.SIPRequestContext) error {
 		auth := ctx.Auth
 		assistant := ctx.Assistant
 
 		if !validator.NonNil(auth) || !validator.NonNil(assistant) {
-			return &sip_infra.SIPError{Code: 500, Message: "Middleware chain incomplete", Err: sip_infra.ErrInvalidConfig}
+			return &sip_runtime.SIPError{Code: 500, Message: "Middleware chain incomplete", Err: sip_runtime.ErrInvalidConfig}
 		}
 		if !validator.NonNil(assistant.AssistantPhoneDeployment) {
 			m.logger.Error("SIP: failed to resolve config",
 				"call_id", ctx.CallID,
 				"method", ctx.Method,
 				"error", "assistant has no phone deployment configured")
-			return &sip_infra.SIPError{Code: 500, Message: "Failed to resolve SIP configuration", Err: sip_infra.ErrInvalidConfig}
+			return &sip_runtime.SIPError{Code: 500, Message: "Failed to resolve SIP configuration", Err: sip_runtime.ErrInvalidConfig}
 		}
 		if !validator.NonNil(m.vaultClient) {
-			return &sip_infra.SIPError{Code: 500, Message: "SIP vault resolver not configured", Err: sip_infra.ErrInvalidConfig}
+			return &sip_runtime.SIPError{Code: 500, Message: "SIP vault resolver not configured", Err: sip_runtime.ErrInvalidConfig}
 		}
 
 		opts := assistant.AssistantPhoneDeployment.GetOptions()
@@ -47,7 +47,7 @@ func NewVaultMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 				"call_id", ctx.CallID,
 				"method", ctx.Method,
 				"error", fmt.Errorf("no credential_id in phone deployment: %w", err))
-			return &sip_infra.SIPError{Code: 500, Message: "Failed to resolve SIP configuration", Err: sip_infra.ErrInvalidConfig}
+			return &sip_runtime.SIPError{Code: 500, Message: "Failed to resolve SIP configuration", Err: sip_runtime.ErrInvalidConfig}
 		}
 
 		vaultCred, err := m.vaultClient.GetCredential(m.ctx, auth, credentialID)
@@ -56,16 +56,16 @@ func NewVaultMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 				"call_id", ctx.CallID,
 				"method", ctx.Method,
 				"error", fmt.Errorf("failed to fetch vault credential %d: %w", credentialID, err))
-			return &sip_infra.SIPError{Code: 500, Message: "Failed to resolve SIP configuration", Err: sip_infra.ErrInvalidConfig}
+			return &sip_runtime.SIPError{Code: 500, Message: "Failed to resolve SIP configuration", Err: sip_runtime.ErrInvalidConfig}
 		}
 
-		sipConfig, err := sip_infra.ParseConfigFromVault(vaultCred)
+		sipConfig, err := sip_runtime.ParseConfigFromVault(vaultCred)
 		if err != nil {
 			m.logger.Error("SIP: failed to resolve config",
 				"call_id", ctx.CallID,
 				"method", ctx.Method,
 				"error", fmt.Errorf("failed to parse SIP config from vault: %w", err))
-			return &sip_infra.SIPError{Code: 500, Message: "Failed to resolve SIP configuration", Err: sip_infra.ErrInvalidConfig}
+			return &sip_runtime.SIPError{Code: 500, Message: "Failed to resolve SIP configuration", Err: sip_runtime.ErrInvalidConfig}
 		}
 
 		if did, err := opts.GetString("phone"); err == nil && validator.NotBlank(did) {

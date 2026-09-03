@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,49 +30,30 @@ func newIdentityTestAuthentication() *types.Authentication {
 	}
 }
 
-func TestReconstructCallContextInboundMapsPhoneValues(t *testing.T) {
-	auth := newIdentityTestAuthentication()
-
-	call, err := reconstructCallContext(
-		auth,
-		42,
-		84,
-		string(sip_infra.CallDirectionInbound),
-		"call-inbound",
-		"context-inbound",
-		"07249994778",
-		"+447249994778",
-	)
-	require.NoError(t, err)
-
-	assert.Equal(t, "07249994778", call.CallerNumber)
-	assert.Equal(t, "+447249994778", call.FromNumber)
-}
-
 func TestEnsureCallContextOutboundFallbackMapsPhoneValues(t *testing.T) {
 	auth := newIdentityTestAuthentication()
-	session, err := sip_infra.NewSession(context.Background(),
-		sip_infra.WithSessionConfig(&sip_infra.Config{
+	session, err := sip_runtime.NewSession(context.Background(),
+		sip_runtime.WithSessionConfig(&sip_runtime.Config{
 			Server:            "sip.example.com",
 			Port:              5060,
-			Transport:         sip_infra.TransportUDP,
+			Transport:         sip_runtime.TransportUDP,
 			RTPPortRangeStart: 10000,
 			RTPPortRangeEnd:   10020,
 		}),
-		sip_infra.WithSessionDirection(sip_infra.CallDirectionOutbound),
-		sip_infra.WithSessionCallID("call-outbound"),
-		sip_infra.WithSessionAuth(auth),
+		sip_runtime.WithSessionDirection(sip_runtime.CallDirectionOutbound),
+		sip_runtime.WithSessionCallID("call-outbound"),
+		sip_runtime.WithSessionAuth(auth),
 	)
 	require.NoError(t, err)
 	dispatcher := &Dispatcher{}
 
-	call, err := dispatcher.ensureCallContext(context.Background(), sip_infra.SessionEstablishedPipeline{
+	call, err := dispatcher.ensureCallContext(context.Background(), SessionEstablishedPipeline{
 		ID:          "call-outbound",
 		Session:     session,
-		Direction:   sip_infra.CallDirectionOutbound,
+		Direction:   sip_runtime.CallDirectionOutbound,
 		AssistantID: 42,
 		Auth:        auth,
-		CallAddress: sip_infra.CallAddress{
+		CallAddress: sip_runtime.CallAddress{
 			From: "+15557654321",
 			To:   "+15551234567",
 		},
@@ -81,31 +62,37 @@ func TestEnsureCallContextOutboundFallbackMapsPhoneValues(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "+15551234567", call.CallerNumber)
 	assert.Equal(t, "+15557654321", call.FromNumber)
+	assert.Equal(t, uint64(7), call.OrganizationID)
+	assert.Equal(t, uint64(8), call.ProjectID)
+	require.NotNil(t, call.AuthActorType)
+	assert.Equal(t, string(types.ActorTypeService), *call.AuthActorType)
+	require.NotNil(t, call.AuthActorID)
+	assert.Equal(t, uint64(9), *call.AuthActorID)
 }
 
 func TestEnsureCallContextOutboundFallbackKeepsAliasPhonesEmpty(t *testing.T) {
 	auth := newIdentityTestAuthentication()
-	session, err := sip_infra.NewSession(context.Background(),
-		sip_infra.WithSessionConfig(&sip_infra.Config{
+	session, err := sip_runtime.NewSession(context.Background(),
+		sip_runtime.WithSessionConfig(&sip_runtime.Config{
 			Server:            "sip.example.com",
 			Port:              5060,
-			Transport:         sip_infra.TransportUDP,
+			Transport:         sip_runtime.TransportUDP,
 			RTPPortRangeStart: 10000,
 			RTPPortRangeEnd:   10020,
 		}),
-		sip_infra.WithSessionDirection(sip_infra.CallDirectionOutbound),
-		sip_infra.WithSessionCallID("call-outbound-alias"),
-		sip_infra.WithSessionAuth(auth),
+		sip_runtime.WithSessionDirection(sip_runtime.CallDirectionOutbound),
+		sip_runtime.WithSessionCallID("call-outbound-alias"),
+		sip_runtime.WithSessionAuth(auth),
 	)
 	require.NoError(t, err)
 
-	call, err := (&Dispatcher{}).ensureCallContext(context.Background(), sip_infra.SessionEstablishedPipeline{
+	call, err := (&Dispatcher{}).ensureCallContext(context.Background(), SessionEstablishedPipeline{
 		ID:          "call-outbound-alias",
 		Session:     session,
-		Direction:   sip_infra.CallDirectionOutbound,
+		Direction:   sip_runtime.CallDirectionOutbound,
 		AssistantID: 42,
 		Auth:        auth,
-		CallAddress: sip_infra.CallAddress{
+		CallAddress: sip_runtime.CallAddress{
 			FromURI: "sip:assistant-line@sip.example.com",
 			ToURI:   "sip:customer-alias@sip.example.com",
 		},
@@ -125,7 +112,7 @@ func TestEnsureCallContextOutboundClaimedContextUsesCallAddressPhones(t *testing
 		AssistantID:    91,
 		ConversationID: 92,
 		Provider:       "sip",
-		Direction:      string(sip_infra.CallDirectionOutbound),
+		Direction:      string(sip_runtime.CallDirectionOutbound),
 		CallerNumber:   "customer-alias",
 		FromNumber:     "assistant-alias",
 		ChannelUUID:    "stored-channel-id",
@@ -133,13 +120,13 @@ func TestEnsureCallContextOutboundClaimedContextUsesCallAddressPhones(t *testing
 	store := &outboundContextTestStore{claimResult: stored}
 	dispatcher := &Dispatcher{callContextStore: store}
 
-	call, err := dispatcher.ensureCallContext(context.Background(), sip_infra.SessionEstablishedPipeline{
+	call, err := dispatcher.ensureCallContext(context.Background(), SessionEstablishedPipeline{
 		ID:          "call-claimed-context",
 		Session:     session,
-		Direction:   sip_infra.CallDirectionOutbound,
+		Direction:   sip_runtime.CallDirectionOutbound,
 		AssistantID: 42,
 		Auth:        auth,
-		CallAddress: sip_infra.CallAddress{
+		CallAddress: sip_runtime.CallAddress{
 			From: "+15557654321",
 			To:   "+15551234567",
 		},
@@ -165,7 +152,7 @@ func TestEnsureCallContextOutboundLoadedContextClearsAliasPhones(t *testing.T) {
 		AssistantID:    101,
 		ConversationID: 102,
 		Provider:       "sip",
-		Direction:      string(sip_infra.CallDirectionOutbound),
+		Direction:      string(sip_runtime.CallDirectionOutbound),
 		CallerNumber:   "customer-alias",
 		FromNumber:     "assistant-alias",
 		ChannelUUID:    "loaded-channel-id",
@@ -176,13 +163,13 @@ func TestEnsureCallContextOutboundLoadedContextClearsAliasPhones(t *testing.T) {
 	}
 	dispatcher := &Dispatcher{callContextStore: store}
 
-	call, err := dispatcher.ensureCallContext(context.Background(), sip_infra.SessionEstablishedPipeline{
+	call, err := dispatcher.ensureCallContext(context.Background(), SessionEstablishedPipeline{
 		ID:          "call-loaded-context",
 		Session:     session,
-		Direction:   sip_infra.CallDirectionOutbound,
+		Direction:   sip_runtime.CallDirectionOutbound,
 		AssistantID: 42,
 		Auth:        auth,
-		CallAddress: sip_infra.CallAddress{
+		CallAddress: sip_runtime.CallAddress{
 			FromURI: "sip:assistant-alias@sip.example.com",
 			ToURI:   "sip:customer-alias@sip.example.com",
 		},
@@ -199,20 +186,20 @@ func TestEnsureCallContextOutboundLoadedContextClearsAliasPhones(t *testing.T) {
 	assert.Equal(t, 1, store.getCalls)
 }
 
-func newOutboundContextTestSession(t *testing.T, auth *types.Authentication, contextID string) *sip_infra.Session {
+func newOutboundContextTestSession(t *testing.T, auth *types.Authentication, contextID string) *sip_runtime.Session {
 	t.Helper()
-	session, err := sip_infra.NewSession(context.Background(),
-		sip_infra.WithSessionConfig(&sip_infra.Config{
+	session, err := sip_runtime.NewSession(context.Background(),
+		sip_runtime.WithSessionConfig(&sip_runtime.Config{
 			Server:            "sip.example.com",
 			Port:              5060,
-			Transport:         sip_infra.TransportUDP,
+			Transport:         sip_runtime.TransportUDP,
 			RTPPortRangeStart: 10000,
 			RTPPortRangeEnd:   10020,
 		}),
-		sip_infra.WithSessionDirection(sip_infra.CallDirectionOutbound),
-		sip_infra.WithSessionCallID("call-"+contextID),
-		sip_infra.WithSessionContextID(contextID),
-		sip_infra.WithSessionAuth(auth),
+		sip_runtime.WithSessionDirection(sip_runtime.CallDirectionOutbound),
+		sip_runtime.WithSessionCallID("call-"+contextID),
+		sip_runtime.WithSessionContextID(contextID),
+		sip_runtime.WithSessionAuth(auth),
 	)
 	require.NoError(t, err)
 	return session

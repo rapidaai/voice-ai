@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,14 +20,14 @@ func TestFreeSWITCHInboundRemoteByeNormalClearing(t *testing.T) {
 	inboundConfig := loadRegistrationInboundConfig(t)
 	harness := newFreeSWITCHHarness(t, inboundConfig.sipCredentialConfig)
 	registrationClient := harness.registrationClient()
-	answeredSessions := make(chan *sip_infra.Session, 1)
-	remoteByeSessions := make(chan *sip_infra.Session, 1)
+	answeredSessions := make(chan *sip_runtime.Session, 1)
+	remoteByeSessions := make(chan *sip_runtime.Session, 1)
 
-	harness.server.SetOnInviteIdentity(func(session *sip_infra.Session, _ sip_infra.SIPRequestIdentity) error {
+	harness.server.SetOnInvite(func(session *sip_runtime.Session, _ string, _ sip_runtime.CallAddress) error {
 		answeredSessions <- session
 		return nil
 	})
-	harness.server.SetOnBye(func(session *sip_infra.Session) error {
+	harness.server.SetOnBye(func(session *sip_runtime.Session) error {
 		remoteByeSessions <- session
 		return nil
 	})
@@ -39,7 +39,7 @@ func TestFreeSWITCHInboundRemoteByeNormalClearing(t *testing.T) {
 	})
 
 	session := receiveInboundSession(t, answeredSessions, callSetupTimeout)
-	waitForCallState(t, session, sip_infra.CallStateConnected, callSetupTimeout)
+	waitForCallState(t, session, sip_runtime.CallStateConnected, callSetupTimeout)
 
 	harness.hangupFreeSWITCHCallWithCause(freeSWITCHCallUUID, "NORMAL_CLEARING")
 	remoteByeSession := receiveInboundSession(t, remoteByeSessions, callTeardownTimeout)
@@ -49,8 +49,8 @@ func TestFreeSWITCHInboundRemoteByeNormalClearing(t *testing.T) {
 	metadata := session.GetDisconnectMetadata()
 	require.NotEmpty(t, metadata.Reason)
 	require.Contains(t, []string{
-		sip_infra.DisconnectReasonNormalClearing,
-		sip_infra.DisconnectReasonRemoteHangup,
+		sip_runtime.DisconnectReasonNormalClearing,
+		sip_runtime.DisconnectReasonRemoteHangup,
 	}, metadata.Reason)
 }
 
@@ -58,9 +58,9 @@ func TestFreeSWITCHSystemDisconnectSendsBye(t *testing.T) {
 	inboundConfig := loadRegistrationInboundConfig(t)
 	harness := newFreeSWITCHHarness(t, inboundConfig.sipCredentialConfig)
 	registrationClient := harness.registrationClient()
-	answeredSessions := make(chan *sip_infra.Session, 1)
+	answeredSessions := make(chan *sip_runtime.Session, 1)
 
-	harness.server.SetOnInviteIdentity(func(session *sip_infra.Session, _ sip_infra.SIPRequestIdentity) error {
+	harness.server.SetOnInvite(func(session *sip_runtime.Session, _ string, _ sip_runtime.CallAddress) error {
 		answeredSessions <- session
 		return nil
 	})
@@ -72,9 +72,9 @@ func TestFreeSWITCHSystemDisconnectSendsBye(t *testing.T) {
 	})
 
 	session := receiveInboundSession(t, answeredSessions, callSetupTimeout)
-	waitForCallState(t, session, sip_infra.CallStateConnected, callSetupTimeout)
+	waitForCallState(t, session, sip_runtime.CallStateConnected, callSetupTimeout)
 
-	require.NoError(t, harness.server.EndCallWithReason(session, sip_infra.LifecycleReasonEndCall))
+	require.NoError(t, harness.server.EndCallWithReason(session, sip_runtime.LifecycleReasonEndCall))
 	waitForTerminalCallState(t, session, callTeardownTimeout)
 	require.Eventually(t, func() bool {
 		return !harness.freeSWITCHCallExists(freeSWITCHCallUUID)

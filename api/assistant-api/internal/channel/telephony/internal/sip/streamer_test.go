@@ -9,7 +9,7 @@ import (
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
@@ -94,46 +94,46 @@ func newTestSIPStreamerWithCollector(t *testing.T) (*Streamer, *testSIPCollector
 	}, collector
 }
 
-func newTestInboundSIPSession(t *testing.T, callID string) *sip_infra.Session {
+func newTestInboundSIPSession(t *testing.T, callID string) *sip_runtime.Session {
 	t.Helper()
-	session, err := sip_infra.NewSession(context.Background(),
-		sip_infra.WithSessionConfig(&sip_infra.Config{
+	session, err := sip_runtime.NewSession(context.Background(),
+		sip_runtime.WithSessionConfig(&sip_runtime.Config{
 			Server:            "127.0.0.1",
 			Port:              5060,
 			RTPPortRangeStart: 10000,
 			RTPPortRangeEnd:   10100,
 		}),
-		sip_infra.WithSessionDirection(sip_infra.CallDirectionInbound),
-		sip_infra.WithSessionCallID(callID),
+		sip_runtime.WithSessionDirection(sip_runtime.CallDirectionInbound),
+		sip_runtime.WithSessionCallID(callID),
 	)
 	require.NoError(t, err)
 	return session
 }
 
 type fakeSIPLifecycleController struct {
-	endReasons []sip_infra.LifecycleReason
+	endReasons []sip_runtime.LifecycleReason
 }
 
-func (f *fakeSIPLifecycleController) TransitionCall(session *sip_infra.Session, next sip_infra.CallState, _ sip_infra.LifecycleReason) bool {
+func (f *fakeSIPLifecycleController) TransitionCall(session *sip_runtime.Session, next sip_runtime.CallState, _ sip_runtime.LifecycleReason) bool {
 	session.SetState(next)
 	return true
 }
 
-func (f *fakeSIPLifecycleController) EndCallWithReason(session *sip_infra.Session, reason sip_infra.LifecycleReason) error {
+func (f *fakeSIPLifecycleController) EndCallWithReason(session *sip_runtime.Session, reason sip_runtime.LifecycleReason) error {
 	f.endReasons = append(f.endReasons, reason)
-	session.SetState(sip_infra.CallStateEnded)
+	session.SetState(sip_runtime.CallStateEnded)
 	session.ClearOnDisconnect()
 	session.End()
 	return nil
 }
 
-func (f *fakeSIPLifecycleController) FailCall(session *sip_infra.Session, reason sip_infra.LifecycleReason, _ error) error {
-	session.SetState(sip_infra.CallStateFailed)
+func (f *fakeSIPLifecycleController) FailCall(session *sip_runtime.Session, reason sip_runtime.LifecycleReason, _ error) error {
+	session.SetState(sip_runtime.CallStateFailed)
 	return f.EndCallWithReason(session, reason)
 }
 
-func (f *fakeSIPLifecycleController) CancelCall(session *sip_infra.Session, reason sip_infra.LifecycleReason) error {
-	session.SetState(sip_infra.CallStateCancelled)
+func (f *fakeSIPLifecycleController) CancelCall(session *sip_runtime.Session, reason sip_runtime.LifecycleReason) error {
+	session.SetState(sip_runtime.CallStateCancelled)
 	return f.EndCallWithReason(session, reason)
 }
 
@@ -205,9 +205,9 @@ func TestSend_InboundAssistantAudioMarksReadyBeforeOutputActivated(t *testing.T)
 }
 
 func TestShouldEndSessionOnClose_SkipsPreAnswerStates(t *testing.T) {
-	assert.False(t, shouldEndSessionOnClose(sip_infra.CallStateInitializing))
-	assert.False(t, shouldEndSessionOnClose(sip_infra.CallStateRinging))
-	assert.True(t, shouldEndSessionOnClose(sip_infra.CallStateConnected))
+	assert.False(t, shouldEndSessionOnClose(sip_runtime.CallStateInitializing))
+	assert.False(t, shouldEndSessionOnClose(sip_runtime.CallStateRinging))
+	assert.True(t, shouldEndSessionOnClose(sip_runtime.CallStateConnected))
 }
 
 func TestSend_ConversationDisconnection_RecordsEventAndClosesStreamer(t *testing.T) {
@@ -242,7 +242,7 @@ func TestSend_ConversationDisconnection_RecordsEventAndClosesStreamer(t *testing
 		t.Fatal("expected streamer context to be cancelled after disconnect")
 	}
 
-	require.Equal(t, []sip_infra.LifecycleReason{sip_infra.LifecycleReasonStreamerEndSession}, lifecycle.endReasons)
+	require.Equal(t, []sip_runtime.LifecycleReason{sip_runtime.LifecycleReasonStreamerEndSession}, lifecycle.endReasons)
 }
 
 func TestRecordTransferDurationMetric_RecordsCallTransferMetric(t *testing.T) {

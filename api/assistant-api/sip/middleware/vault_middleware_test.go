@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	gorm_model "github.com/rapidaai/pkg/models/gorm"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
@@ -51,12 +51,12 @@ func TestVaultMiddleware_ResolvesSIPConfig(t *testing.T) {
 		WithContext(context.Background()),
 		WithLogger(newRouteTestLogger(t)),
 		WithVaultClient(vault),
-		WithApplySIPConfigDefaults(func(config *sip_infra.Config) {
+		WithApplySIPConfigDefaults(func(config *sip_runtime.Config) {
 			config.Port = 5090
 		}),
 	)
 
-	ctx := &sip_infra.SIPRequestContext{CallID: "call-vault", Method: "INVITE"}
+	ctx := &sip_runtime.SIPRequestContext{CallID: "call-vault", Method: "INVITE"}
 	ctx.Auth = auth
 	ctx.Assistant = assistant
 	err = middleware(ctx)

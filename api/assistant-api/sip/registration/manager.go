@@ -15,7 +15,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/config"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	"github.com/rapidaai/api/assistant-api/internal/observability/collectors"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	web_client "github.com/rapidaai/pkg/clients/web"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
@@ -43,8 +43,8 @@ type manager struct {
 	postgres        connectors.PostgresConnector
 	redis           *redis.Client
 	vault           web_client.VaultClient
-	regClient       *sip_infra.RegistrationClient
-	opDefaults      func(*sip_infra.Config)
+	regClient       *sip_runtime.RegistrationClient
+	opDefaults      func(*sip_runtime.Config)
 	assistantConfig *config.AssistantConfig
 	instanceID      string
 }

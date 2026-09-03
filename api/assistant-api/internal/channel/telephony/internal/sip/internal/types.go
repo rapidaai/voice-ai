@@ -14,7 +14,7 @@ import (
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 )
 
 const (
@@ -57,14 +57,24 @@ var (
 	ErrSIPServerNotRunning            = errors.New("SIP server not running")
 	ErrProviderAudioConversionFailed  = errors.New("audio conversion to 16kHz linear16 failed")
 	ErrAssistantAudioConversionFailed = errors.New("audio conversion to mulaw 8kHz failed")
-	ErrRTPOutputQueueFull             = sip_infra.ErrRTPOutputQueueFull
+	ErrRTPOutputQueueFull             = sip_runtime.ErrRTPOutputQueueFull
 )
 
 type AudioProcessorConfig struct {
-	RTPHandler *sip_infra.RTPHandler
+	RTPHandler rtpHandler
 	Resampler  internal_type.AudioResampler
 	PushInput  func(internal_type.Stream)
 	Record     func(...observability.Record) error
 	Ringtone   string
 	Ambient    *internal_ambient.Config
+}
+
+type rtpHandler interface {
+	internal_type.SIPRTPBridgeTarget
+	AudioIn() <-chan []byte
+	ClearFallbackAudioSource()
+	FlushAudioOut()
+	GetCodec() *sip_runtime.Codec
+	LocalAddr() (string, int)
+	SetFallbackAudioSource(sip_runtime.RTPFallbackAudioSource)
 }

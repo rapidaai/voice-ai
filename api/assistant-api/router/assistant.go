@@ -13,7 +13,7 @@ import (
 	observabilityApi "github.com/rapidaai/api/assistant-api/api/observability"
 	assistantTalkApi "github.com/rapidaai/api/assistant-api/api/talk"
 	"github.com/rapidaai/api/assistant-api/config"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	workflow_api "github.com/rapidaai/protos"
@@ -97,7 +97,7 @@ func AssistantConversationApiRoute(
 	Postgres connectors.PostgresConnector,
 	Redis connectors.RedisConnector,
 	Opensearch connectors.OpenSearchConnector,
-	sipServer *sip_infra.Server,
+	sipServer *sip_runtime.Server,
 ) {
 	workflow_api.RegisterTalkServiceServer(S,
 		assistantTalkApi.NewConversationGRPCApi(Cfg,
@@ -124,7 +124,7 @@ func TalkApiRoute(
 	postgres connectors.PostgresConnector,
 	redis connectors.RedisConnector,
 	opensearch connectors.OpenSearchConnector,
-	sipServer *sip_infra.Server,
+	sipServer *sip_runtime.Server,
 ) {
 	apiv1 := engine.Group("v1/talk")
 	talkRpcApi := assistantTalkApi.NewConversationApi(cfg, logger, postgres, redis, opensearch, opensearch, sipServer)

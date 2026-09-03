@@ -21,7 +21,7 @@ import (
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
@@ -31,10 +31,10 @@ import (
 type sipTelephony struct {
 	appCfg       *config.AssistantConfig
 	logger       commons.Logger
-	sharedServer *sip_infra.Server
+	sharedServer *sip_runtime.Server
 }
 
-func NewSIPTelephony(cfg *config.AssistantConfig, logger commons.Logger, sipServer *sip_infra.Server) (internal_type.Telephony, error) {
+func NewSIPTelephony(cfg *config.AssistantConfig, logger commons.Logger, sipServer *sip_runtime.Server) (internal_type.Telephony, error) {
 	return &sipTelephony{
 		appCfg:       cfg,
 		logger:       logger,
@@ -42,8 +42,8 @@ func NewSIPTelephony(cfg *config.AssistantConfig, logger commons.Logger, sipServ
 	}, nil
 }
 
-func (t *sipTelephony) parseConfig(vaultCredential *protos.VaultCredential) (*sip_infra.Config, error) {
-	cfg, err := sip_infra.ParseConfigFromVault(vaultCredential)
+func (t *sipTelephony) parseConfig(vaultCredential *protos.VaultCredential) (*sip_runtime.Config, error) {
+	cfg, err := sip_runtime.ParseConfigFromVault(vaultCredential)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func (t *sipTelephony) parseConfig(vaultCredential *protos.VaultCredential) (*si
 	if t.appCfg.SIPConfig != nil {
 		cfg.ApplyOperationalDefaults(
 			t.appCfg.SIPConfig.Port,
-			sip_infra.Transport(t.appCfg.SIPConfig.Transport),
+			sip_runtime.Transport(t.appCfg.SIPConfig.Transport),
 			t.appCfg.SIPConfig.RTPPortRangeStart,
 			t.appCfg.SIPConfig.RTPPortRangeEnd,
 		)
@@ -67,7 +67,7 @@ func (t *sipTelephony) parseConfig(vaultCredential *protos.VaultCredential) (*si
 			t.appCfg.SIPConfig.MediaTimeout,
 		)
 		cfg.ApplyInboundAnswerDefaults(
-			sip_infra.InboundAnswerMode(t.appCfg.SIPConfig.Inbound.AnswerMode),
+			sip_runtime.InboundAnswerMode(t.appCfg.SIPConfig.Inbound.AnswerMode),
 			t.appCfg.SIPConfig.Inbound.MinRingDuration,
 			t.appCfg.SIPConfig.Inbound.MaxRingDuration,
 			t.appCfg.SIPConfig.Inbound.ACKTimeout,
@@ -200,7 +200,7 @@ func (t *sipTelephony) OutboundCall(
 		}
 	}
 
-	session, err := t.sharedServer.MakeCall(ctx, cfg, toPhone, fromUser, sip_infra.MakeCallOptions{
+	session, err := t.sharedServer.MakeCall(ctx, cfg, toPhone, fromUser, sip_runtime.MakeCallOptions{
 		Auth:               auth,
 		Assistant:          assistant,
 		ConversationID:     assistantConversationId,
@@ -227,7 +227,7 @@ func (t *sipTelephony) OutboundCall(
 		ChannelUUID: session.GetCallID(),
 		Status:      internal_type.TelephonyStatusSuccess,
 		StatusInfo: internal_type.StatusInfo{
-			Event: internal_sip.StatusEvent(string(sip_infra.OutboundCallStatusInitiated)),
+			Event: internal_sip.StatusEvent(string(sip_runtime.OutboundCallStatusInitiated)),
 			Payload: map[string]interface{}{
 				"to":              toPhone,
 				"from":            fromUser,
@@ -237,7 +237,7 @@ func (t *sipTelephony) OutboundCall(
 			},
 		},
 		Extra: map[string]string{
-			observability.MetricCallStatus: string(sip_infra.OutboundCallStatusInitiated),
+			observability.MetricCallStatus: string(sip_runtime.OutboundCallStatusInitiated),
 		},
 	}, nil
 }

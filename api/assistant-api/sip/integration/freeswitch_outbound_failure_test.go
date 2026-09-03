@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,7 +23,7 @@ func TestFreeSWITCHOutboundBusy(t *testing.T) {
 
 	assertFreeSWITCHOutboundFailure(t, harness, endpoints.busyUser, expectedOutboundFailure{
 		class:      "busy",
-		reason:     sip_infra.LifecycleReasonOutboundRejected.String(),
+		reason:     sip_runtime.LifecycleReasonOutboundRejected.String(),
 		statusCode: 486,
 	})
 }
@@ -35,7 +35,7 @@ func TestFreeSWITCHOutboundNoAnswer(t *testing.T) {
 
 	assertFreeSWITCHOutboundFailure(t, harness, endpoints.noAnswerUser, expectedOutboundFailure{
 		class:      "no_answer",
-		reason:     sip_infra.LifecycleReasonOutboundNoAnswer.String(),
+		reason:     sip_runtime.LifecycleReasonOutboundNoAnswer.String(),
 		statusCode: 0,
 		retryable:  true,
 	})
@@ -47,7 +47,7 @@ func TestFreeSWITCHOutboundRejected(t *testing.T) {
 
 	assertFreeSWITCHOutboundFailure(t, harness, endpoints.rejectedUser, expectedOutboundFailure{
 		class:      "rejected",
-		reason:     sip_infra.LifecycleReasonOutboundRejected.String(),
+		reason:     sip_runtime.LifecycleReasonOutboundRejected.String(),
 		statusCode: 603,
 	})
 }
@@ -58,7 +58,7 @@ func TestFreeSWITCHOutboundUnavailable(t *testing.T) {
 
 	assertFreeSWITCHOutboundFailure(t, harness, endpoints.unavailableUser, expectedOutboundFailure{
 		class:      "unavailable",
-		reason:     sip_infra.LifecycleReasonOutboundUnavailable.String(),
+		reason:     sip_runtime.LifecycleReasonOutboundUnavailable.String(),
 		statusCode: 480,
 		retryable:  true,
 	})
@@ -70,7 +70,7 @@ func TestFreeSWITCHOutboundMediaRejected(t *testing.T) {
 
 	assertFreeSWITCHOutboundFailure(t, harness, endpoints.mediaRejectUser, expectedOutboundFailure{
 		class:      "media",
-		reason:     sip_infra.LifecycleReasonOutboundMediaRejected.String(),
+		reason:     sip_runtime.LifecycleReasonOutboundMediaRejected.String(),
 		statusCode: 488,
 	})
 }
@@ -91,12 +91,12 @@ func assertFreeSWITCHOutboundFailure(t *testing.T, harness *freeSWITCHHarness, t
 		harness.sipConfig,
 		toUser,
 		harness.sipConfig.Username,
-		sip_infra.MakeCallOptions{CallStatusObserver: statusRecorder.Record},
+		sip_runtime.MakeCallOptions{CallStatusObserver: statusRecorder.Record},
 	)
 	require.NoErrorf(t, err, "outbound failure scenario %s did not create a SIP session", freeSWITCHOutboundTargetDescription(harness.config, toUser))
 	require.NotNil(t, session)
 
-	waitForCallState(t, session, sip_infra.CallStateFailed, callTeardownTimeout)
+	waitForCallState(t, session, sip_runtime.CallStateFailed, callTeardownTimeout)
 	waitForTerminalCallState(t, session, callTeardownTimeout)
 
 	status := statusRecorder.LastStatus(t, "failed")

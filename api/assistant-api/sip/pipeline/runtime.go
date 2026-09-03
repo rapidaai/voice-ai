@@ -17,8 +17,7 @@ import (
 	internal_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
-	"github.com/rapidaai/pkg/commons"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -26,21 +25,17 @@ import (
 )
 
 type sipPreparedCallRuntime struct {
-	logger      commons.Logger
-	session     *sip_infra.Session
+	session     *sip_runtime.Session
 	auth        *types.Authentication
-	callContext *callcontext.CallContext
 	talkContext context.Context
 	cancelTalk  context.CancelFunc
 	streamer    internal_type.SIPStreamer
 	talker      internal_type.Talking
-	direction   string
 	talkDone    chan error
 }
 
 func (runtime *sipPreparedCallRuntime) Start(_ context.Context) error {
 	if runtime.session.IsEnded() {
-		runtime.logger.Warnw("Session already ended before runtime start", "call_id", runtime.session.GetCallID())
 		return fmt.Errorf("session_ended_before_start")
 	}
 	runtime.streamer.StartAssistantOutput()
@@ -51,16 +46,7 @@ func (runtime *sipPreparedCallRuntime) Start(_ context.Context) error {
 }
 
 func (runtime *sipPreparedCallRuntime) runTalker() error {
-	runtime.logger.Infow("SIP call started",
-		"call_id", runtime.session.GetCallID(),
-		"assistant_id", runtime.callContext.AssistantID,
-		"conversation_id", runtime.callContext.ConversationID,
-		"direction", runtime.direction)
-	if err := runtime.talker.Talk(runtime.talkContext, runtime.auth); err != nil {
-		runtime.logger.Warnw("SIP talker exited", "error", err, "call_id", runtime.session.GetCallID())
-	}
-	runtime.logger.Infow("SIP call ended", "call_id", runtime.session.GetCallID())
-	return nil
+	return runtime.talker.Talk(runtime.talkContext, runtime.auth)
 }
 
 func (runtime *sipPreparedCallRuntime) Close(_ context.Context) {
@@ -73,11 +59,9 @@ func (runtime *sipPreparedCallRuntime) Close(_ context.Context) {
 	_ = runtime.streamer.Close()
 }
 
-func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, stage sip_infra.SessionEstablishedPipeline, setup *CallSetupResult, observer observability.Recorder) (*sipPreparedCallRuntime, error) {
+func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, stage SessionEstablishedPipeline, setup *CallSetupResult, observer observability.Recorder) (*sipPreparedCallRuntime, error) {
 	session := stage.Session
-	callID := session.GetCallID()
 	if session.IsEnded() {
-		d.logger.Warnw("Session already ended before call runtime preparation", "call_id", callID)
 		return nil, fmt.Errorf("session_ended_before_start")
 	}
 	auth := session.GetAuth()
@@ -104,7 +88,6 @@ func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, stage sip_infra.
 	select {
 	case <-session.ByeReceived():
 		cancelTalk()
-		d.logger.Infow("BYE received before call runtime preparation", "call_id", callID)
 		return nil, fmt.Errorf("bye_before_start")
 	default:
 	}
@@ -124,7 +107,6 @@ func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, stage sip_infra.
 	)
 	if err != nil {
 		cancelTalk()
-		d.logger.Error("Failed to create SIP streamer", "error", err, "call_id", callID)
 		return nil, fmt.Errorf("streamer_failed: %w", err)
 	}
 	if session.IsEnded() {
@@ -149,19 +131,15 @@ func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, stage sip_infra.
 	if err != nil {
 		cancelTalk()
 		_ = streamer.Close()
-		d.logger.Error("Failed to create SIP talker", "error", err, "call_id", callID)
 		return nil, fmt.Errorf("talker_failed: %w", err)
 	}
 	return &sipPreparedCallRuntime{
-		logger:      d.logger,
 		session:     session,
 		auth:        auth,
-		callContext: resolvedCallContext,
 		talkContext: talkContext,
 		cancelTalk:  cancelTalk,
 		streamer:    streamer,
 		talker:      talker,
-		direction:   string(stage.Direction),
 	}, nil
 }
 
@@ -200,14 +178,14 @@ func (runtime *sipPreparedCallRuntime) StartBeforeAnswer(ctx context.Context, ti
 	}
 }
 
-func inboundRuntimeReadyTimeout(config *sip_infra.Config) time.Duration {
+func inboundRuntimeReadyTimeout(config *sip_runtime.Config) time.Duration {
 	if config != nil && config.InboundMaxRingDuration > 0 {
 		return config.InboundMaxRingDuration
 	}
 	return 30 * time.Second
 }
 
-func (d *Dispatcher) resolveSIPCallContext(session *sip_infra.Session, setup *CallSetupResult, direction, fromIdentity, toIdentity string) (*callcontext.CallContext, error) {
+func (d *Dispatcher) resolveSIPCallContext(session *sip_runtime.Session, setup *CallSetupResult, direction, fromIdentity, toIdentity string) (*callcontext.CallContext, error) {
 	callID := session.GetCallID()
 	if setup.CallContext != nil {
 		call := setup.CallContext
@@ -223,7 +201,6 @@ func (d *Dispatcher) resolveSIPCallContext(session *sip_infra.Session, setup *Ca
 		return call, nil
 	}
 
-	d.logger.Warnw("setup.CallContext missing - reconstructing from session", "call_id", callID)
 	call := &callcontext.CallContext{
 		AssistantID:         setup.AssistantID,
 		ConversationID:      setup.ConversationID,
@@ -238,7 +215,7 @@ func (d *Dispatcher) resolveSIPCallContext(session *sip_infra.Session, setup *Ca
 	if err := call.SetAuthentication(setup.Auth); err != nil {
 		return nil, err
 	}
-	if direction == string(sip_infra.CallDirectionOutbound) {
+	if direction == string(sip_runtime.CallDirectionOutbound) {
 		call.CallerNumber = toIdentity
 		call.FromNumber = fromIdentity
 	} else {
@@ -247,7 +224,7 @@ func (d *Dispatcher) resolveSIPCallContext(session *sip_infra.Session, setup *Ca
 	}
 	return call, nil
 }
-func (d *Dispatcher) configureSIPTransfer(ctx context.Context, session *sip_infra.Session, sipConfig *sip_infra.Config, call *callcontext.CallContext, transferStreamer internal_type.SIPTransferStreamer) {
+func (d *Dispatcher) configureSIPTransfer(ctx context.Context, session *sip_runtime.Session, sipConfig *sip_runtime.Config, call *callcontext.CallContext, transferStreamer internal_type.SIPTransferStreamer) {
 	callID := session.GetCallID()
 	transferStreamer.SetTransferRequestHandler(func(targets []string, postTransferAction string) {
 		toolID, _ := session.GetMetadata("tool_id")
@@ -283,7 +260,7 @@ func (d *Dispatcher) configureSIPTransfer(ctx context.Context, session *sip_infr
 				Time: timestamppb.Now(),
 			})
 		}
-		d.OnPipeline(ctx, sip_infra.TransferInitiatedPipeline{
+		d.OnPipeline(ctx, TransferInitiatedPipeline{
 			ID:                 callID,
 			Session:            session,
 			TargetURI:          primaryTarget,
@@ -300,7 +277,7 @@ func (d *Dispatcher) configureSIPTransfer(ctx context.Context, session *sip_infr
 					"total":      strconv.Itoa(total),
 				})
 			},
-			OnConnected: func(outboundRTP *sip_infra.RTPHandler) {
+			OnConnected: func(outboundRTP *sip_runtime.RTPHandler) {
 				outputCodecName := ""
 				if outboundRTP != nil {
 					if codec := outboundRTP.GetCodec(); codec != nil {
@@ -334,7 +311,7 @@ func (d *Dispatcher) configureSIPTransfer(ctx context.Context, session *sip_infr
 			OnTeardown: func() {
 				transferStreamer.DisconnectTransferMedia()
 				durationMs := ""
-				if d, ok := session.GetMetadata(sip_infra.MetadataBridgeTransferDuration); ok {
+				if d, ok := session.GetMetadata(sip_runtime.MetadataBridgeTransferDuration); ok {
 					if duration, ok := d.(string); ok && duration != "" {
 						if parsed, err := time.ParseDuration(duration); err == nil {
 							durationMs = strconv.FormatInt(parsed.Milliseconds(), 10)
@@ -350,7 +327,7 @@ func (d *Dispatcher) configureSIPTransfer(ctx context.Context, session *sip_infr
 					"duration_ms": durationMs,
 				})
 				if toolIDStr != "" {
-					status, _ := session.GetMetadata(sip_infra.MetadataBridgeTransferStatus)
+					status, _ := session.GetMetadata(sip_runtime.MetadataBridgeTransferStatus)
 					statusStr, _ := status.(string)
 					transferStreamer.SendTransferToolResult(toolCtxIDStr, toolIDStr, "transfer_call", protos.ToolCallAction_TOOL_CALL_ACTION_TRANSFER_CONVERSATION, map[string]string{
 						"status":      statusStr,

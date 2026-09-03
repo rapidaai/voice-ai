@@ -11,7 +11,6 @@ import (
 	"fmt"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
 )
@@ -20,18 +19,20 @@ import (
 // metric so the conversation is not left indeterminate. This handles early
 // failures (outbound call rejected, setup error) that occur before the main
 // SessionEstablished pipeline creates its own observer.
-func (d *Dispatcher) handleCallFailed(ctx context.Context, v sip_infra.CallFailedPipeline) {
+func (d *Dispatcher) handleCallFailed(ctx context.Context, v CallFailedPipeline) {
 	if !validator.NonNil(v.Session) {
-		d.logger.Warnw("SIP call failed observability skipped: session missing",
+		d.logger.Warnw("Cannot record failed SIP call",
 			"call_id", v.ID,
+			"missing", "session",
 			"error", fmt.Sprintf("%v", v.Error),
 			"sip_code", v.SIPCode)
 		return
 	}
 	auth := v.Session.GetAuth()
 	if !validator.NonNil(auth) {
-		d.logger.Warnw("SIP call failed observability skipped: auth missing",
+		d.logger.Warnw("Cannot record failed SIP call",
 			"call_id", v.ID,
+			"missing", "authentication",
 			"error", fmt.Sprintf("%v", v.Error),
 			"sip_code", v.SIPCode)
 		return
@@ -39,8 +40,9 @@ func (d *Dispatcher) handleCallFailed(ctx context.Context, v sip_infra.CallFaile
 
 	assistant := v.Session.GetAssistant()
 	if !validator.NonNil(assistant) {
-		d.logger.Warnw("SIP call failed observability skipped: assistant missing",
+		d.logger.Warnw("Cannot record failed SIP call",
 			"call_id", v.ID,
+			"missing", "assistant",
 			"error", fmt.Sprintf("%v", v.Error),
 			"sip_code", v.SIPCode)
 		return
@@ -48,8 +50,9 @@ func (d *Dispatcher) handleCallFailed(ctx context.Context, v sip_infra.CallFaile
 
 	conversationID := v.Session.GetConversationID()
 	if !validator.NonZero(conversationID) {
-		d.logger.Warnw("SIP call failed observability skipped: conversation missing",
+		d.logger.Warnw("Cannot record failed SIP call",
 			"call_id", v.ID,
+			"missing", "conversation",
 			"assistant_id", assistant.Id,
 			"error", fmt.Sprintf("%v", v.Error),
 			"sip_code", v.SIPCode)

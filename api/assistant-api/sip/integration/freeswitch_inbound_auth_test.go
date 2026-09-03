@@ -12,7 +12,7 @@ import (
 	"context"
 	"testing"
 
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,7 +24,7 @@ func TestFreeSWITCHRegistrationUsernamePassword(t *testing.T) {
 	registerContext, cancelRegister := context.WithTimeout(context.Background(), callSetupTimeout)
 	defer cancelRegister()
 
-	registration := &sip_infra.Registration{
+	registration := &sip_runtime.Registration{
 		DID:         inboundConfig.registeredDID,
 		Config:      harness.sipConfig,
 		AssistantID: 1001,

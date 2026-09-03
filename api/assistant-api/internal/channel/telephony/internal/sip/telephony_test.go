@@ -10,7 +10,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/config"
 	internal_sip "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/sip/internal"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -247,7 +247,7 @@ func TestParseConfig_AppliesPlatformTimeouts(t *testing.T) {
 func TestParseConfig_AppliesInboundAnswerPolicyDefaults(t *testing.T) {
 	telephony := newSIPTelephonyForTest()
 	telephony.appCfg.SIPConfig.Inbound = config.SIPInboundConfig{
-		AnswerMode:      string(sip_infra.InboundAnswerModeAfterMinRingDuration),
+		AnswerMode:      string(sip_runtime.InboundAnswerModeAfterMinRingDuration),
 		MinRingDuration: 50 * time.Millisecond,
 		MaxRingDuration: 5 * time.Second,
 		ACKTimeout:      2 * time.Second,
@@ -261,7 +261,7 @@ func TestParseConfig_AppliesInboundAnswerPolicyDefaults(t *testing.T) {
 		t.Fatalf("parseConfig() error = %v", err)
 	}
 
-	if cfg.InboundAnswerMode != sip_infra.InboundAnswerModeAfterMinRingDuration {
+	if cfg.InboundAnswerMode != sip_runtime.InboundAnswerModeAfterMinRingDuration {
 		t.Fatalf("expected inbound answer mode from app config, got %q", cfg.InboundAnswerMode)
 	}
 	if cfg.InboundMinRingDuration != 50*time.Millisecond ||

@@ -14,18 +14,18 @@ import (
 	"time"
 
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/stretchr/testify/require"
 )
 
-func waitForCallState(t *testing.T, session *sip_infra.Session, expected sip_infra.CallState, timeout time.Duration) {
+func waitForCallState(t *testing.T, session *sip_runtime.Session, expected sip_runtime.CallState, timeout time.Duration) {
 	t.Helper()
 	require.Eventuallyf(t, func() bool {
 		return session.GetInfo().State == expected
 	}, timeout, 50*time.Millisecond, "expected call %s to reach state %s, current state is %s", session.GetCallID(), expected, session.GetInfo().State)
 }
 
-func waitForTerminalCallState(t *testing.T, session *sip_infra.Session, timeout time.Duration) {
+func waitForTerminalCallState(t *testing.T, session *sip_runtime.Session, timeout time.Duration) {
 	t.Helper()
 	require.Eventuallyf(t, func() bool {
 		return session.GetInfo().State.IsTerminal()
@@ -61,7 +61,7 @@ func (r *integrationOutboundStatusRecorder) LastStatus(t *testing.T, callStatus 
 	return internal_type.ProviderCallStatusUpdate{}
 }
 
-func receiveInboundSession(t *testing.T, sessions <-chan *sip_infra.Session, timeout time.Duration) *sip_infra.Session {
+func receiveInboundSession(t *testing.T, sessions <-chan *sip_runtime.Session, timeout time.Duration) *sip_runtime.Session {
 	t.Helper()
 	select {
 	case session := <-sessions:
