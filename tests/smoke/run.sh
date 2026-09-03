@@ -113,6 +113,87 @@ INSERT INTO user_project_roles (id,project_id,user_auth_id,role,status,created_a
 SQL
 }
 
+seed_telephony_callback_contexts() {
+  psql -v ON_ERROR_STOP=1 -h postgres -U rapida_user -d assistant_db >/dev/null <<SQL
+DELETE FROM call_contexts WHERE context_id LIKE 'ci-project-%' OR context_id LIKE 'ci-pat-%';
+INSERT INTO call_contexts (id,context_id,assistant_id,conversation_id,project_id,organization_id,auth_type,auth_user_id,auth_actor_type,auth_actor_id,provider,direction) VALUES
+  (7000001,'ci-project-twilio',1,1,1,1,'project',NULL,'project',1,'twilio','outbound'),
+  (7000002,'ci-project-exotel',1,1,1,1,'project',NULL,'project',1,'exotel','outbound'),
+  (7000003,'ci-project-vonage',1,1,1,1,'project',NULL,'project',1,'vonage','outbound'),
+  (7000004,'ci-project-telnyx',1,1,1,1,'project',NULL,'project',1,'telnyx','outbound'),
+  (7000005,'ci-project-asterisk',1,1,1,1,'project',NULL,'project',1,'asterisk','outbound'),
+  (7000006,'ci-project-sip',1,1,1,1,'project',NULL,'project',1,'sip','outbound'),
+  (7000007,'ci-project-vobiz',1,1,1,1,'project',NULL,'project',1,'vobiz','outbound'),
+  (7000008,'ci-pat-twilio',1,1,1,1,'user',1,'user',1,'twilio','outbound'),
+  (7000009,'ci-pat-exotel',1,1,1,1,'user',1,'user',1,'exotel','outbound'),
+  (7000010,'ci-pat-vonage',1,1,1,1,'user',1,'user',1,'vonage','outbound'),
+  (7000011,'ci-pat-telnyx',1,1,1,1,'user',1,'user',1,'telnyx','outbound'),
+  (7000012,'ci-pat-asterisk',1,1,1,1,'user',1,'user',1,'asterisk','outbound'),
+  (7000013,'ci-pat-sip',1,1,1,1,'user',1,'user',1,'sip','outbound'),
+  (7000014,'ci-pat-vobiz',1,1,1,1,'user',1,'user',1,'vobiz','outbound');
+SQL
+}
+
+check_telephony_callback() {
+  callback_auth=$1
+  callback_provider=$2
+  callback_method=$3
+  callback_payload=$4
+  callback_content_type=$5
+  callback_context_id="ci-$callback_auth-$callback_provider"
+  callback_body_file="$temporary_directory/$callback_context_id.body"
+  callback_url="http://assistant-api:9007/v1/talk/$callback_provider/ctx/$callback_context_id/event"
+
+  if [ "$callback_method" = 'GET' ]; then
+    callback_status=$(curl --silent --show-error --output "$callback_body_file" --write-out '%{http_code}' \
+      "$callback_url?$callback_payload")
+  else
+    callback_status=$(curl --silent --show-error --output "$callback_body_file" --write-out '%{http_code}' \
+      --request POST --header "Content-Type: $callback_content_type" --data "$callback_payload" "$callback_url")
+  fi
+
+  case "$callback_status" in
+    2??) ;;
+    *)
+      printf '%s callback with %s auth returned HTTP %s: ' "$callback_provider" "$callback_auth" "$callback_status" >&2
+      cat "$callback_body_file" >&2
+      return 1
+      ;;
+  esac
+
+  callback_call_status=$(psql -v ON_ERROR_STOP=1 -h postgres -U rapida_user -d assistant_db -Atc \
+    "SELECT call_status FROM call_contexts WHERE context_id = '$callback_context_id'")
+  if [ "$callback_call_status" != 'completed' ]; then
+    printf '%s callback with %s auth stored status %s; expected completed\n' \
+      "$callback_provider" "$callback_auth" "$callback_call_status" >&2
+    return 1
+  fi
+  printf '%s callback with %s auth passed\n' "$callback_provider" "$callback_auth"
+}
+
+run_telephony_callback_smoke() {
+  seed_telephony_callback_contexts
+
+  for callback_auth in project pat; do
+    check_telephony_callback "$callback_auth" twilio POST \
+      'CallSid=twilio-call&CallStatus=completed' 'application/x-www-form-urlencoded'
+    check_telephony_callback "$callback_auth" exotel POST \
+      'CallSid=exotel-call&Status=completed' 'application/x-www-form-urlencoded'
+    check_telephony_callback "$callback_auth" vonage GET \
+      'status=completed&uuid=vonage-call&duration=1' ''
+    check_telephony_callback "$callback_auth" telnyx POST \
+      '{"data":{"event_type":"call.hangup","payload":{"call_control_id":"telnyx-call"}}}' 'application/json'
+    check_telephony_callback "$callback_auth" asterisk POST \
+      '{"type":"ChannelDestroyed","channel":{"id":"asterisk-call"},"cause":16,"cause_txt":"NORMAL_CLEARING"}' 'application/json'
+    check_telephony_callback "$callback_auth" sip POST \
+      '{"event":"completed","call_id":"sip-call"}' 'application/json'
+    check_telephony_callback "$callback_auth" vobiz POST \
+      'Event=Hangup&CallUUID=vobiz-call&CallStatus=completed' 'application/x-www-form-urlencoded'
+  done
+
+  echo 'All authenticated telephony callback smoke tests passed'
+}
+
 run_integration_checks() {
   redis_response=$(redis-cli -h redis ping)
   [ "$redis_response" = 'PONG' ] || {
@@ -169,6 +250,9 @@ run_smoke_tests() {
 
   echo 'Running released Node SDK smoke tests with both authentication methods'
   node /workspace/sdk-smoke.js
+
+  echo 'Running telephony callback smoke tests with stored project and PAT authentication'
+  run_telephony_callback_smoke
 
   echo 'All smoke tests passed'
 }
