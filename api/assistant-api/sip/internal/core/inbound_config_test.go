@@ -61,3 +61,26 @@ func TestNewInboundConfigClassifiesMiddlewareErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestNewInboundConfigPopulatesLegacyIdentityFields(t *testing.T) {
+	var requestContext *SIPRequestContext
+	server := &Server{middlewares: []Middleware{func(ctx *SIPRequestContext) error {
+		requestContext = ctx
+		return nil
+	}}}
+	identity := inboundInviteIdentity{
+		callAddress: CallAddress{
+			FromURI: "sip:+14155550100@carrier.example.com",
+			ToURI:   "sip:agent-42@sip.rapida.ai",
+		},
+	}
+
+	_, failure := NewInboundConfig(server, identity, inboundMediaOffer{})
+
+	require.NotNil(t, requestContext)
+	assert.Equal(t, requestContext.CallAddress.FromURI, requestContext.FromIdentity)
+	assert.Equal(t, requestContext.CallAddress.ToURI, requestContext.ToIdentity)
+	assert.Equal(t, requestContext.CallAddress.FromURI, requestContext.FromURI)
+	assert.Equal(t, requestContext.CallAddress.ToURI, requestContext.ToURI)
+	assert.NotNil(t, failure)
+}

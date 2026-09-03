@@ -243,30 +243,34 @@ func TestListenConfigAndServerConfigConversions(t *testing.T) {
 		t.Fatalf("listen config round-trip mismatch: %#v", roundTripListenConfig)
 	}
 
-	serverConfig := (&ServerConfig{
+	var serverConfig *internal_core.ServerConfig = &ServerConfig{
 		ListenConfig:      listenConfig,
 		RTPPortRangeStart: 30000,
 		RTPPortRangeEnd:   30100,
-	}).toCore()
+	}
 	if serverConfig.ListenConfig.Address != listenConfig.Address || serverConfig.RTPPortRangeStart != 30000 {
 		t.Fatalf("server config conversion mismatch: %#v", serverConfig)
 	}
 }
 
-func TestServerConfigMiddlewareConversionPreservesSIPIdentities(t *testing.T) {
+func TestServerConfigMiddlewareAliasPreservesSIPIdentities(t *testing.T) {
 	var received *SIPRequestContext
-	serverConfig := (&ServerConfig{
+	var serverConfig *internal_core.ServerConfig = &ServerConfig{
 		Middlewares: []Middleware{func(ctx *SIPRequestContext) error {
 			received = ctx
 			ctx.AssistantID = "42"
 			ctx.CallAddress.To = "+14155550200"
 			return nil
 		}},
-	}).toCore()
+	}
 	require.Len(t, serverConfig.Middlewares, 1)
 
 	coreContext := &internal_core.SIPRequestContext{
-		RequestURI: "sip:agent-42@sip.rapida.ai",
+		RequestURI:   "sip:agent-42@sip.rapida.ai",
+		FromIdentity: "sip:+14155550100@carrier.example.com",
+		ToIdentity:   "sip:agent-42@sip.rapida.ai",
+		FromURI:      "sip:+14155550100@carrier.example.com",
+		ToURI:        "sip:agent-42@sip.rapida.ai",
 		CallAddress: internal_core.CallAddress{
 			From:    "+14155550100",
 			To:      "",

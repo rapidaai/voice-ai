@@ -26,6 +26,15 @@ func TestServerUseSymmetricRTPForRemoteIP(t *testing.T) {
 	require.False(t, (&Server{}).useSymmetricRTPForRemoteIP("10.0.0.10"))
 }
 
+func TestServerSetMiddlewaresSkipsNil(t *testing.T) {
+	server := &Server{}
+	middleware := func(*SIPRequestContext) error { return nil }
+
+	server.SetMiddlewares([]Middleware{nil, middleware})
+
+	require.Len(t, server.middlewares, 1)
+}
+
 func validServerConfigForValidation() *ServerConfig {
 	return &ServerConfig{
 		ListenConfig: &ListenConfig{

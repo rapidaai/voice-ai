@@ -70,3 +70,23 @@ func TestSessionFacadeConvertsPhaseAndCodec(t *testing.T) {
 		t.Fatalf("expected inbound direction, got %q", info.Direction)
 	}
 }
+
+func TestSessionFacadeUsesCoreEventChannel(t *testing.T) {
+	session, err := NewSession(context.Background(),
+		WithSessionCallID("facade-events"),
+		WithSessionConfig(&Config{
+			Server:            "sip.example.com",
+			Port:              5060,
+			Transport:         TransportUDP,
+			RTPPortRangeStart: 30000,
+			RTPPortRangeEnd:   30100,
+		}),
+	)
+	if err != nil {
+		t.Fatalf("expected session facade to create core-backed session: %v", err)
+	}
+
+	if session.Events() != session.inner.Events() {
+		t.Fatal("expected session facade to expose the core event channel")
+	}
+}

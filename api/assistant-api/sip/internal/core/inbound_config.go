@@ -48,11 +48,15 @@ func NewInboundConfig(server *Server, identity inboundInviteIdentity, mediaOffer
 	}
 
 	requestContext := &SIPRequestContext{
-		Method:      "INVITE",
-		CallID:      identity.callID,
-		RequestURI:  identity.requestURI,
-		CallAddress: identity.callAddress,
-		SDPInfo:     mediaOffer.sdpInfo,
+		Method:       "INVITE",
+		CallID:       identity.callID,
+		RequestURI:   identity.requestURI,
+		CallAddress:  identity.callAddress,
+		FromIdentity: identity.callAddress.FromURI,
+		ToIdentity:   identity.callAddress.ToURI,
+		FromURI:      identity.callAddress.FromURI,
+		ToURI:        identity.callAddress.ToURI,
+		SDPInfo:      mediaOffer.sdpInfo,
 	}
 	for _, middleware := range middlewares {
 		if err := middleware(requestContext); err != nil {

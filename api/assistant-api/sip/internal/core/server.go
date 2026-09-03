@@ -404,9 +404,15 @@ func (s *Server) Stop() {
 //	    []Middleware{RouteMiddleware, VaultMiddleware},
 //	)
 func (s *Server) SetMiddlewares(middlewares []Middleware) {
+	filtered := make([]Middleware, 0, len(middlewares))
+	for _, middleware := range middlewares {
+		if middleware != nil {
+			filtered = append(filtered, middleware)
+		}
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.middlewares = append([]Middleware(nil), middlewares...)
+	s.middlewares = filtered
 }
 
 // IsRunning returns true if the server is running

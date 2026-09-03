@@ -75,19 +75,19 @@ func (s *Session) GetNegotiatedCodec() *Codec {
 }
 
 func (s *Session) SetOutboundDialogPhase(phase OutboundDialogPhase) {
-	s.inner.SetOutboundDialogPhase(internal_core.OutboundDialogPhase(phase))
+	s.inner.SetOutboundDialogPhase(phase)
 }
 
 func (s *Session) GetOutboundDialogPhase() OutboundDialogPhase {
-	return OutboundDialogPhase(s.inner.GetOutboundDialogPhase())
+	return s.inner.GetOutboundDialogPhase()
 }
 
 func (s *Session) SetInboundSetupPhase(phase InboundSetupPhase) {
-	s.inner.SetInboundSetupPhase(internal_core.InboundSetupPhase(phase))
+	s.inner.SetInboundSetupPhase(phase)
 }
 
 func (s *Session) GetInboundSetupPhase() InboundSetupPhase {
-	return InboundSetupPhase(s.inner.GetInboundSetupPhase())
+	return s.inner.GetInboundSetupPhase()
 }
 
 func (s *Session) MarkInboundAssistantAudioReady() bool {
@@ -115,19 +115,7 @@ func (s *Session) GetRTPHandler() *RTPHandler {
 }
 
 func (s *Session) Events() <-chan Event {
-	out := make(chan Event)
-	go func() {
-		defer close(out)
-		for event := range s.inner.Events() {
-			out <- Event{
-				Type:      EventType(event.Type),
-				CallID:    event.CallID,
-				Timestamp: event.Timestamp,
-				Data:      event.Data,
-			}
-		}
-	}()
-	return out
+	return s.inner.Events()
 }
 
 func (s *Session) Errors() <-chan error {
@@ -263,12 +251,7 @@ func (s *Session) GetVaultCredential() *protos.VaultCredential {
 }
 
 func (s *Session) SendEvent(event Event) {
-	s.inner.SendEvent(internal_core.Event{
-		Type:      internal_core.EventType(event.Type),
-		CallID:    event.CallID,
-		Timestamp: event.Timestamp,
-		Data:      event.Data,
-	})
+	s.inner.SendEvent(event)
 }
 
 func (s *Session) SendError(err error) {

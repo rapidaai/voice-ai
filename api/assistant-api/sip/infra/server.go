@@ -14,7 +14,7 @@ import (
 )
 
 func NewServer(ctx context.Context, cfg *ServerConfig) (*Server, error) {
-	inner, err := internal_core.NewServer(ctx, cfg.toCore())
+	inner, err := internal_core.NewServer(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -30,43 +30,7 @@ func (s *Server) Stop() {
 }
 
 func (s *Server) SetMiddlewares(middlewares []Middleware) {
-	coreMiddlewares := make([]internal_core.Middleware, 0, len(middlewares))
-	for _, middleware := range middlewares {
-		if middleware == nil {
-			continue
-		}
-		current := middleware
-		coreMiddlewares = append(coreMiddlewares, func(ctx *internal_core.SIPRequestContext) error {
-			config := cloneConfig(ctx.Config)
-			infraCtx := &SIPRequestContext{
-				Method:          ctx.Method,
-				CallID:          ctx.CallID,
-				RequestURI:      ctx.RequestURI,
-				FromIdentity:    ctx.CallAddress.FromURI,
-				ToIdentity:      ctx.CallAddress.ToURI,
-				FromURI:         ctx.CallAddress.FromURI,
-				ToURI:           ctx.CallAddress.ToURI,
-				CallAddress:     ctx.CallAddress,
-				SDPInfo:         sdpInfoFromCore(ctx.SDPInfo),
-				APIKey:          ctx.APIKey,
-				AssistantID:     ctx.AssistantID,
-				Auth:            ctx.Auth,
-				Assistant:       ctx.Assistant,
-				VaultCredential: ctx.VaultCredential,
-				Config:          config,
-			}
-			err := current(infraCtx)
-			ctx.CallAddress.To = infraCtx.CallAddress.To
-			ctx.APIKey = infraCtx.APIKey
-			ctx.AssistantID = infraCtx.AssistantID
-			ctx.Auth = infraCtx.Auth
-			ctx.Assistant = infraCtx.Assistant
-			ctx.VaultCredential = infraCtx.VaultCredential
-			ctx.Config = cloneConfig(infraCtx.Config)
-			return err
-		})
-	}
-	s.inner.SetMiddlewares(coreMiddlewares)
+	s.inner.SetMiddlewares(middlewares)
 }
 
 func (s *Server) IsRunning() bool {

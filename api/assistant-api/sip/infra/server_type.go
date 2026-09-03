@@ -6,13 +6,7 @@
 
 package sip_infra
 
-import (
-	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
-	internal_core "github.com/rapidaai/api/assistant-api/sip/internal/core"
-	"github.com/rapidaai/pkg/commons"
-	"github.com/rapidaai/pkg/types"
-	"github.com/rapidaai/protos"
-)
+import internal_core "github.com/rapidaai/api/assistant-api/sip/internal/core"
 
 type ServerState = internal_core.ServerState
 
@@ -24,27 +18,7 @@ const (
 
 type CallAddress = internal_core.CallAddress
 
-type SIPRequestContext struct {
-	Method      string
-	CallID      string
-	RequestURI  string
-	CallAddress CallAddress
-	// Deprecated: derived from CallAddress.FromURI. Do not write.
-	FromIdentity string
-	// Deprecated: derived from CallAddress.ToURI. Do not write.
-	ToIdentity string
-	// Deprecated: derived from CallAddress.FromURI. Do not write.
-	FromURI string
-	// Deprecated: derived from CallAddress.ToURI. Do not write.
-	ToURI           string
-	APIKey          string
-	AssistantID     string
-	Auth            *types.Authentication
-	SDPInfo         *SDPMediaInfo
-	Assistant       *internal_assistant_entity.Assistant
-	VaultCredential *protos.VaultCredential
-	Config          *Config
-}
+type SIPRequestContext = internal_core.SIPRequestContext
 
 type SIPRequestIdentity struct {
 	RequestURI  string
@@ -55,7 +29,7 @@ type SIPRequestIdentity struct {
 	ToIdentity string
 }
 
-type Middleware func(ctx *SIPRequestContext) error
+type Middleware = internal_core.Middleware
 
 type Server struct {
 	inner *internal_core.Server
@@ -63,67 +37,7 @@ type Server struct {
 
 type ListenConfig = internal_core.ListenConfig
 
-type ServerConfig struct {
-	ListenConfig         *ListenConfig
-	Middlewares          []Middleware
-	Logger               commons.Logger
-	RTPPortRangeStart    int
-	RTPPortRangeEnd      int
-	SymmetricRTP         bool
-	IgnoreLocalAddrInSDP bool
-}
-
-func (c *ServerConfig) Validate() error {
-	return c.toCore().Validate()
-}
-
-func (c *ServerConfig) toCore() *internal_core.ServerConfig {
-	if c == nil {
-		return nil
-	}
-	coreMiddlewares := make([]internal_core.Middleware, 0, len(c.Middlewares))
-	for _, middleware := range c.Middlewares {
-		current := middleware
-		coreMiddlewares = append(coreMiddlewares, func(ctx *internal_core.SIPRequestContext) error {
-			config := cloneConfig(ctx.Config)
-			infraCtx := &SIPRequestContext{
-				Method:          ctx.Method,
-				CallID:          ctx.CallID,
-				RequestURI:      ctx.RequestURI,
-				FromIdentity:    ctx.CallAddress.FromURI,
-				ToIdentity:      ctx.CallAddress.ToURI,
-				FromURI:         ctx.CallAddress.FromURI,
-				ToURI:           ctx.CallAddress.ToURI,
-				CallAddress:     ctx.CallAddress,
-				SDPInfo:         sdpInfoFromCore(ctx.SDPInfo),
-				APIKey:          ctx.APIKey,
-				AssistantID:     ctx.AssistantID,
-				Auth:            ctx.Auth,
-				Assistant:       ctx.Assistant,
-				VaultCredential: ctx.VaultCredential,
-				Config:          config,
-			}
-			err := current(infraCtx)
-			ctx.CallAddress.To = infraCtx.CallAddress.To
-			ctx.APIKey = infraCtx.APIKey
-			ctx.AssistantID = infraCtx.AssistantID
-			ctx.Auth = infraCtx.Auth
-			ctx.Assistant = infraCtx.Assistant
-			ctx.VaultCredential = infraCtx.VaultCredential
-			ctx.Config = cloneConfig(infraCtx.Config)
-			return err
-		})
-	}
-	return &internal_core.ServerConfig{
-		ListenConfig:         c.ListenConfig,
-		Middlewares:          coreMiddlewares,
-		Logger:               c.Logger,
-		RTPPortRangeStart:    c.RTPPortRangeStart,
-		RTPPortRangeEnd:      c.RTPPortRangeEnd,
-		SymmetricRTP:         c.SymmetricRTP,
-		IgnoreLocalAddrInSDP: c.IgnoreLocalAddrInSDP,
-	}
-}
+type ServerConfig = internal_core.ServerConfig
 
 func cloneConfig(config *Config) *internal_core.Config {
 	if config == nil {

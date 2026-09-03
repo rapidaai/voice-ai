@@ -147,7 +147,15 @@ type SIPRequestContext struct {
 	CallID      string
 	RequestURI  string
 	CallAddress CallAddress
-	SDPInfo     *SDPMediaInfo
+	// Deprecated: derived from CallAddress.FromURI. Do not write.
+	FromIdentity string
+	// Deprecated: derived from CallAddress.ToURI. Do not write.
+	ToIdentity string
+	// Deprecated: derived from CallAddress.FromURI. Do not write.
+	FromURI string
+	// Deprecated: derived from CallAddress.ToURI. Do not write.
+	ToURI   string
+	SDPInfo *SDPMediaInfo
 
 	// Route/auth fields resolved by middleware.
 	APIKey      string
