@@ -18,20 +18,20 @@ import (
 	observability_collector_requestlog "github.com/rapidaai/api/assistant-api/internal/observability/collectors/requestlog"
 	observability_collector_toollog "github.com/rapidaai/api/assistant-api/internal/observability/collectors/toollog"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 )
 
-func (d *Dispatcher) createConversation(ctx context.Context, stage sip_infra.SessionEstablishedPipeline) (uint64, error) {
+func (d *Dispatcher) createConversation(ctx context.Context, stage sip_runtime.SessionEstablishedPipeline) (uint64, error) {
 	dirEnum := type_enums.DIRECTION_INBOUND
-	if stage.Direction == sip_infra.CallDirectionOutbound {
+	if stage.Direction == sip_runtime.CallDirectionOutbound {
 		dirEnum = type_enums.DIRECTION_OUTBOUND
 	}
 
 	conversationIdentifier := stage.CallAddress.From
-	if stage.Direction == sip_infra.CallDirectionOutbound {
+	if stage.Direction == sip_runtime.CallDirectionOutbound {
 		conversationIdentifier = stage.CallAddress.To
 	}
 
@@ -63,10 +63,10 @@ func (d *Dispatcher) createConversation(ctx context.Context, stage sip_infra.Ses
 	return conversation.Id, nil
 }
 
-func (d *Dispatcher) ensureCallContext(ctx context.Context, stage sip_infra.SessionEstablishedPipeline, conversationID uint64) (*callcontext.CallContext, error) {
+func (d *Dispatcher) ensureCallContext(ctx context.Context, stage sip_runtime.SessionEstablishedPipeline, conversationID uint64) (*callcontext.CallContext, error) {
 	callID := stage.Session.GetCallID()
 	dirStr := string(stage.Direction)
-	if stage.Direction == sip_infra.CallDirectionOutbound {
+	if stage.Direction == sip_runtime.CallDirectionOutbound {
 		contextID := stage.Session.GetContextID()
 		if contextID == "" {
 			return reconstructCallContext(stage.Auth, stage.AssistantID, conversationID, dirStr, callID, "", stage.CallAddress.From, stage.CallAddress.To)
@@ -107,7 +107,7 @@ func (d *Dispatcher) ensureCallContext(ctx context.Context, stage sip_infra.Sess
 	return callContext, nil
 }
 
-func (d *Dispatcher) setupCall(ctx context.Context, stage sip_infra.SessionEstablishedPipeline, conversationID uint64, cc *callcontext.CallContext) (*CallSetupResult, error) {
+func (d *Dispatcher) setupCall(ctx context.Context, stage sip_runtime.SessionEstablishedPipeline, conversationID uint64, cc *callcontext.CallContext) (*CallSetupResult, error) {
 	assistant := stage.Session.GetAssistant()
 	if assistant == nil && d.assistantService != nil {
 		var err error
@@ -201,7 +201,7 @@ func setCallContextPhoneValues(callContext *callcontext.CallContext, direction, 
 	if callContext == nil {
 		return
 	}
-	if direction == string(sip_infra.CallDirectionOutbound) {
+	if direction == string(sip_runtime.CallDirectionOutbound) {
 		callContext.CallerNumber = toPhone
 		callContext.FromNumber = fromPhone
 	} else {

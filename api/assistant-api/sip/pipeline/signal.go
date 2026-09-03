@@ -11,7 +11,7 @@ import (
 	"fmt"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
 )
@@ -20,7 +20,7 @@ import (
 // metric so the conversation is not left indeterminate. This handles early
 // failures (outbound call rejected, setup error) that occur before the main
 // SessionEstablished pipeline creates its own observer.
-func (d *Dispatcher) handleCallFailed(ctx context.Context, v sip_infra.CallFailedPipeline) {
+func (d *Dispatcher) handleCallFailed(ctx context.Context, v sip_runtime.CallFailedPipeline) {
 	if !validator.NonNil(v.Session) {
 		d.logger.Warnw("SIP call failed observability skipped: session missing",
 			"call_id", v.ID,

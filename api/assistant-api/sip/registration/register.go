@@ -14,7 +14,7 @@ import (
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 )
@@ -115,7 +115,7 @@ func (m *manager) handleRegister(ctx context.Context, s RegisterPipeline) Pipeli
 		return nil
 	}
 
-	sipConfig, err := sip_infra.ParseConfigFromVault(vaultCred)
+	sipConfig, err := sip_runtime.ParseConfigFromVault(vaultCred)
 	if err != nil {
 		rec.Outcome = OutcomeConfigError
 		m.logger.Warnw("Failed to parse SIP config for registration",
@@ -188,7 +188,7 @@ func (m *manager) handleRegister(ctx context.Context, s RegisterPipeline) Pipeli
 		},
 	)
 
-	regErr := m.regClient.Register(ctx, &sip_infra.Registration{
+	regErr := m.regClient.Register(ctx, &sip_runtime.Registration{
 		DID:          rec.DID,
 		Config:       sipConfig,
 		DeploymentID: rec.DeploymentID,
@@ -322,7 +322,7 @@ func (m *manager) registrationStatusUpdateFromError(err error) RegistrationStatu
 		OwnerInstance: m.instanceID,
 	}
 
-	var registrationError *sip_infra.RegistrationError
+	var registrationError *sip_runtime.RegistrationError
 	if errors.As(err, &registrationError) {
 		statusUpdate.FailureClass = registrationError.Class
 		statusUpdate.FailureReason = registrationError.Reason
@@ -333,11 +333,11 @@ func (m *manager) registrationStatusUpdateFromError(err error) RegistrationStatu
 	switch {
 	case statusUpdate.FailureClass == RegistrationFailureClassConfig:
 		statusUpdate.Status = StatusConfigError
-	case statusUpdate.FailureClass == RegistrationFailureClassAuth || errors.Is(err, sip_infra.ErrAuthFailed):
+	case statusUpdate.FailureClass == RegistrationFailureClassAuth || errors.Is(err, sip_runtime.ErrAuthFailed):
 		statusUpdate.Status = StatusFailed
 		statusUpdate.FailureClass = RegistrationFailureClassAuth
 		statusUpdate.FailureReason = RegistrationFailureReasonAuthFailed
-	case statusUpdate.FailureClass == RegistrationFailureClassRejected || errors.Is(err, sip_infra.ErrPermanentFailure):
+	case statusUpdate.FailureClass == RegistrationFailureClassRejected || errors.Is(err, sip_runtime.ErrPermanentFailure):
 		statusUpdate.Status = StatusRejected
 		statusUpdate.FailureClass = RegistrationFailureClassRejected
 		statusUpdate.FailureReason = RegistrationFailureReasonRegistrarRejected

@@ -24,7 +24,7 @@ import (
 	observability_collector_conversationmetric "github.com/rapidaai/api/assistant-api/internal/observability/collectors/conversationmetric"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	internal_assistant_service "github.com/rapidaai/api/assistant-api/internal/services/assistant"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	web_client "github.com/rapidaai/pkg/clients/web"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
@@ -87,7 +87,7 @@ func newConversationApiCore(cfg *config.AssistantConfig, logger commons.Logger,
 	postgres connectors.PostgresConnector,
 	redis connectors.RedisConnector,
 	opensearch connectors.OpenSearchConnector,
-	sipServer *sip_infra.Server,
+	sipServer *sip_runtime.Server,
 ) *ConversationApi {
 	store := callcontext.NewStore(postgres, logger)
 	vaultClient := web_client.NewVaultClientGRPC(&cfg.AppConfig, logger, redis)
@@ -153,7 +153,7 @@ func NewConversationGRPCApi(config *config.AssistantConfig, logger commons.Logge
 	redis connectors.RedisConnector,
 	opensearch connectors.OpenSearchConnector,
 	vectordb connectors.VectorConnector,
-	sipServer *sip_infra.Server,
+	sipServer *sip_runtime.Server,
 ) assistant_api.TalkServiceServer {
 	return &ConversationGrpcApi{*newConversationApiCore(config, logger, postgres, redis, opensearch, sipServer)}
 }
@@ -163,7 +163,7 @@ func NewWebRtcApi(config *config.AssistantConfig, logger commons.Logger,
 	redis connectors.RedisConnector,
 	opensearch connectors.OpenSearchConnector,
 	vectordb connectors.VectorConnector,
-	sipServer *sip_infra.Server,
+	sipServer *sip_runtime.Server,
 ) assistant_api.WebRTCServer {
 	return &ConversationGrpcApi{*newConversationApiCore(config, logger, postgres, redis, opensearch, sipServer)}
 }
@@ -178,7 +178,7 @@ func NewConversationApi(config *config.AssistantConfig, logger commons.Logger,
 	redis connectors.RedisConnector,
 	opensearch connectors.OpenSearchConnector,
 	vectordb connectors.VectorConnector,
-	sipServer *sip_infra.Server,
+	sipServer *sip_runtime.Server,
 ) *ConversationApi {
 	return newConversationApiCore(config, logger, postgres, redis, opensearch, sipServer)
 }

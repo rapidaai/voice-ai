@@ -12,7 +12,7 @@ import (
 	"context"
 	"testing"
 
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -114,14 +114,14 @@ func loadSIPCredentialConfig(t *testing.T) sipCredentialConfig {
 
 func registerFreeSWITCHInboundDID(
 	t *testing.T,
-	registrationClient *sip_infra.RegistrationClient,
+	registrationClient *sip_runtime.RegistrationClient,
 	inboundConfig registrationInboundConfig,
-	sipConfig *sip_infra.Config,
+	sipConfig *sip_runtime.Config,
 ) {
 	t.Helper()
 	registerContext, cancelRegister := context.WithTimeout(context.Background(), callSetupTimeout)
 	defer cancelRegister()
-	require.NoError(t, registrationClient.Register(registerContext, &sip_infra.Registration{
+	require.NoError(t, registrationClient.Register(registerContext, &sip_runtime.Registration{
 		DID:         inboundConfig.registeredDID,
 		Config:      sipConfig,
 		AssistantID: 1001,

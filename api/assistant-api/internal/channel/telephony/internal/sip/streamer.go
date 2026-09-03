@@ -18,7 +18,7 @@ import (
 	internal_sip "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/sip/internal"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 )
@@ -30,8 +30,8 @@ type Streamer struct {
 	closed                atomic.Bool
 	assistantOutputActive atomic.Bool
 
-	session   *sip_infra.Session
-	lifecycle sip_infra.LifecycleController
+	session   *sip_runtime.Session
+	lifecycle sip_runtime.LifecycleController
 	mediaPort *internal_sip.MediaPort
 
 	outputMu                    sync.Mutex
@@ -47,8 +47,8 @@ type assistantAudioFrame struct {
 type StreamerOptions struct {
 	Context         context.Context
 	Logger          commons.Logger
-	Session         *sip_infra.Session
-	Lifecycle       sip_infra.LifecycleController
+	Session         *sip_runtime.Session
+	Lifecycle       sip_runtime.LifecycleController
 	CallContext     *callcontext.CallContext
 	VaultCredential *protos.VaultCredential
 	Observer        observability.Recorder
@@ -68,13 +68,13 @@ func WithLogger(logger commons.Logger) FuncOption {
 	}
 }
 
-func WithSession(session *sip_infra.Session) FuncOption {
+func WithSession(session *sip_runtime.Session) FuncOption {
 	return func(options *StreamerOptions) {
 		options.Session = session
 	}
 }
 
-func WithLifecycle(lifecycle sip_infra.LifecycleController) FuncOption {
+func WithLifecycle(lifecycle sip_runtime.LifecycleController) FuncOption {
 	return func(options *StreamerOptions) {
 		options.Lifecycle = lifecycle
 	}
@@ -185,7 +185,7 @@ func New(opts ...FuncOption) (internal_type.SIPCallStreamer, error) {
 
 	s.session = options.Session
 	s.lifecycle = options.Lifecycle
-	isInbound := options.Session.GetInfo().Direction == sip_infra.CallDirectionInbound
+	isInbound := options.Session.GetInfo().Direction == sip_runtime.CallDirectionInbound
 	if !isInbound {
 		s.assistantOutputActive.Store(true)
 	}
@@ -269,7 +269,7 @@ func (s *Streamer) Context() context.Context {
 
 func (s *Streamer) Send(response internal_type.Stream) error {
 	if s.closed.Load() {
-		return sip_infra.ErrSessionClosed
+		return sip_runtime.ErrSessionClosed
 	}
 	switch data := response.(type) {
 	case *protos.ConversationInitialization:
@@ -376,7 +376,7 @@ func (s *Streamer) Send(response internal_type.Stream) error {
 			ringtone := data.GetArgs()["ringtone"]
 			s.mu.RLock()
 			if s.session != nil {
-				s.session.SetMetadata(sip_infra.MetadataBridgeTransferTarget, strings.Join(targets, commons.SEPARATOR))
+				s.session.SetMetadata(sip_runtime.MetadataBridgeTransferTarget, strings.Join(targets, commons.SEPARATOR))
 				s.session.SetMetadata("tool_id", data.GetToolId())
 				s.session.SetMetadata("tool_context_id", data.GetId())
 			}
@@ -457,7 +457,7 @@ func (s *Streamer) markAssistantAudioReady(audio []byte) {
 	s.mu.RLock()
 	session := s.session
 	s.mu.RUnlock()
-	if session == nil || session.GetInfo().Direction != sip_infra.CallDirectionInbound {
+	if session == nil || session.GetInfo().Direction != sip_runtime.CallDirectionInbound {
 		return
 	}
 	if session.MarkInboundAssistantAudioReady() {
@@ -485,7 +485,7 @@ func (s *Streamer) EnterTransferMode(targets []string, postTransferAction, ringt
 	s.mu.RUnlock()
 
 	if session != nil {
-		s.transitionCall(session, sip_infra.CallStateTransferring, sip_infra.LifecycleReasonTransferModeStarted)
+		s.transitionCall(session, sip_runtime.CallStateTransferring, sip_runtime.LifecycleReasonTransferModeStarted)
 	}
 
 	if callback != nil {
@@ -503,7 +503,7 @@ func (s *Streamer) ResumeAssistant() {
 	s.mu.RUnlock()
 
 	if session != nil {
-		s.transitionCall(session, sip_infra.CallStateConnected, sip_infra.LifecycleReasonTransferModeEnded)
+		s.transitionCall(session, sip_runtime.CallStateConnected, sip_runtime.LifecycleReasonTransferModeEnded)
 	}
 
 	_ = s.Record(observability.RecordEvent{
@@ -579,7 +579,7 @@ func (s *Streamer) endSession() {
 	session := s.session
 	s.mu.RUnlock()
 	if session != nil {
-		s.endCall(session, sip_infra.LifecycleReasonStreamerEndSession)
+		s.endCall(session, sip_runtime.LifecycleReasonStreamerEndSession)
 	}
 }
 
@@ -634,7 +634,7 @@ func (s *Streamer) Close() error {
 	s.mu.RUnlock()
 
 	if session != nil && shouldEndSessionOnClose(session.GetState()) {
-		s.endCall(session, sip_infra.LifecycleReasonStreamerClosed)
+		s.endCall(session, sip_runtime.LifecycleReasonStreamerClosed)
 	}
 
 	_ = s.Record(observability.RecordLog{
@@ -648,16 +648,16 @@ func (s *Streamer) Close() error {
 	return nil
 }
 
-func shouldEndSessionOnClose(state sip_infra.CallState) bool {
+func shouldEndSessionOnClose(state sip_runtime.CallState) bool {
 	switch state {
-	case sip_infra.CallStateInitializing, sip_infra.CallStateRinging, sip_infra.CallStateCancelled, sip_infra.CallStateFailed, sip_infra.CallStateEnded:
+	case sip_runtime.CallStateInitializing, sip_runtime.CallStateRinging, sip_runtime.CallStateCancelled, sip_runtime.CallStateFailed, sip_runtime.CallStateEnded:
 		return false
 	default:
 		return true
 	}
 }
 
-func (s *Streamer) transitionCall(session *sip_infra.Session, next sip_infra.CallState, reason sip_infra.LifecycleReason) {
+func (s *Streamer) transitionCall(session *sip_runtime.Session, next sip_runtime.CallState, reason sip_runtime.LifecycleReason) {
 	if s.lifecycle == nil {
 		_ = s.Record(observability.RecordLog{
 			Level:   observability.LevelError,
@@ -675,7 +675,7 @@ func (s *Streamer) transitionCall(session *sip_infra.Session, next sip_infra.Cal
 	s.lifecycle.TransitionCall(session, next, reason)
 }
 
-func (s *Streamer) endCall(session *sip_infra.Session, reason sip_infra.LifecycleReason) {
+func (s *Streamer) endCall(session *sip_runtime.Session, reason sip_runtime.LifecycleReason) {
 	if s.lifecycle == nil {
 		_ = s.Record(observability.RecordLog{
 			Level:   observability.LevelError,

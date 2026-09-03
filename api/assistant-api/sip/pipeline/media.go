@@ -13,19 +13,19 @@ import (
 	"time"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/protos"
 )
 
 type preparedSession struct {
-	stage    sip_infra.SessionEstablishedPipeline
+	stage    sip_runtime.SessionEstablishedPipeline
 	setup    *CallSetupResult
 	observer observability.Recorder
 	runtime  PreparedCallRuntime
 }
 
 type sessionPreparationError struct {
-	reason sip_infra.LifecycleReason
+	reason sip_runtime.LifecycleReason
 	err    error
 }
 
@@ -33,11 +33,11 @@ func (e *sessionPreparationError) Error() string {
 	return e.err.Error()
 }
 
-func newSessionPreparationError(reason sip_infra.LifecycleReason, err error) *sessionPreparationError {
+func newSessionPreparationError(reason sip_runtime.LifecycleReason, err error) *sessionPreparationError {
 	return &sessionPreparationError{reason: reason, err: err}
 }
 
-func (d *Dispatcher) handleSessionEstablished(ctx context.Context, stage sip_infra.SessionEstablishedPipeline) {
+func (d *Dispatcher) handleSessionEstablished(ctx context.Context, stage sip_runtime.SessionEstablishedPipeline) {
 	prepared, err := d.prepareSession(ctx, stage)
 	if err != nil {
 		d.logger.Error("Pipeline: session preparation failed", "call_id", stage.ID, "error", err)
@@ -47,7 +47,7 @@ func (d *Dispatcher) handleSessionEstablished(ctx context.Context, stage sip_inf
 	d.startPreparedSession(ctx, prepared)
 }
 
-func (d *Dispatcher) PrepareSession(ctx context.Context, stage sip_infra.SessionEstablishedPipeline) error {
+func (d *Dispatcher) PrepareSession(ctx context.Context, stage sip_runtime.SessionEstablishedPipeline) error {
 	prepared, err := d.prepareSession(ctx, stage)
 	if err != nil {
 		return err
@@ -58,7 +58,7 @@ func (d *Dispatcher) PrepareSession(ctx context.Context, stage sip_infra.Session
 	return nil
 }
 
-func (d *Dispatcher) StartPreparedSession(ctx context.Context, stage sip_infra.SessionEstablishedPipeline) error {
+func (d *Dispatcher) StartPreparedSession(ctx context.Context, stage sip_runtime.SessionEstablishedPipeline) error {
 	prepared := d.popPreparedSession(stage.ID)
 	if prepared == nil {
 		return fmt.Errorf("prepared SIP session not found for call %s", stage.ID)
@@ -83,7 +83,7 @@ func (d *Dispatcher) popPreparedSession(callID string) *preparedSession {
 	return prepared
 }
 
-func (d *Dispatcher) prepareSession(ctx context.Context, stage sip_infra.SessionEstablishedPipeline) (*preparedSession, error) {
+func (d *Dispatcher) prepareSession(ctx context.Context, stage sip_runtime.SessionEstablishedPipeline) (*preparedSession, error) {
 	d.logger.Infow("Pipeline: SessionEstablished",
 		"call_id", stage.ID,
 		"direction", stage.Direction,
@@ -96,7 +96,7 @@ func (d *Dispatcher) prepareSession(ctx context.Context, stage sip_infra.Session
 		conversationID, err = d.createConversation(ctx, stage)
 		if err != nil {
 			d.logger.Error("Pipeline: create conversation failed", "call_id", stage.ID, "error", err)
-			return nil, newSessionPreparationError(sip_infra.LifecycleReasonPipelineConversationFailed, err)
+			return nil, newSessionPreparationError(sip_runtime.LifecycleReasonPipelineConversationFailed, err)
 		}
 		stage.Session.SetConversationID(conversationID)
 	}
@@ -104,13 +104,13 @@ func (d *Dispatcher) prepareSession(ctx context.Context, stage sip_infra.Session
 	cc, err := d.ensureCallContext(ctx, stage, conversationID)
 	if err != nil {
 		d.logger.Error("Pipeline: ensure call context failed", "call_id", stage.ID, "error", err)
-		return nil, newSessionPreparationError(sip_infra.LifecycleReasonPipelineSetupFailed, err)
+		return nil, newSessionPreparationError(sip_runtime.LifecycleReasonPipelineSetupFailed, err)
 	}
 
 	setup, err := d.setupCall(ctx, stage, conversationID, cc)
 	if err != nil {
 		d.logger.Error("Pipeline: call setup failed", "call_id", stage.ID, "error", err)
-		return nil, newSessionPreparationError(sip_infra.LifecycleReasonPipelineSetupFailed, err)
+		return nil, newSessionPreparationError(sip_runtime.LifecycleReasonPipelineSetupFailed, err)
 	}
 
 	observer := d.createObserver(ctx, setup, stage.Auth)
@@ -149,19 +149,19 @@ func (d *Dispatcher) prepareSession(ctx context.Context, stage sip_infra.Session
 		},
 	)
 	var runtime PreparedCallRuntime
-	if stage.Direction == sip_infra.CallDirectionInbound {
+	if stage.Direction == sip_runtime.CallDirectionInbound {
 		var err error
 		preparedRuntime, err := d.prepareSIPCallRuntime(ctx, stage, setup, observer)
 		if err != nil {
 			observer.Close(ctx)
 			d.logger.Error("Pipeline: runtime preparation failed", "call_id", stage.ID, "error", err)
-			return nil, newSessionPreparationError(sip_infra.LifecycleReasonPipelineSetupFailed, err)
+			return nil, newSessionPreparationError(sip_runtime.LifecycleReasonPipelineSetupFailed, err)
 		}
 		if err := preparedRuntime.StartBeforeAnswer(ctx, inboundRuntimeReadyTimeout(stage.Config)); err != nil {
 			preparedRuntime.Close(ctx)
 			observer.Close(ctx)
 			d.logger.Error("Pipeline: runtime pre-answer start failed", "call_id", stage.ID, "error", err)
-			return nil, newSessionPreparationError(sip_infra.LifecycleReasonPipelineSetupFailed, err)
+			return nil, newSessionPreparationError(sip_runtime.LifecycleReasonPipelineSetupFailed, err)
 		}
 		runtime = preparedRuntime
 	}
@@ -284,15 +284,15 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 						}},
 					})
 				observer.Close(ctx)
-				d.endCall(stage.Session, sip_infra.LifecycleReasonPipelineCallEnd)
+				d.endCall(stage.Session, sip_runtime.LifecycleReasonPipelineCallEnd)
 			}
 		}()
 		if prepared.runtime != nil {
 			if err := prepared.runtime.Start(ctx); err != nil {
-				if targetVal, ok := stage.Session.GetMetadata(sip_infra.MetadataBridgeTransferTarget); ok {
+				if targetVal, ok := stage.Session.GetMetadata(sip_runtime.MetadataBridgeTransferTarget); ok {
 					if target, ok := targetVal.(string); ok && target != "" {
 						transferStatus := "failed"
-						if statusVal, ok := stage.Session.GetMetadata(sip_infra.MetadataBridgeTransferStatus); ok {
+						if statusVal, ok := stage.Session.GetMetadata(sip_runtime.MetadataBridgeTransferStatus); ok {
 							if s, ok := statusVal.(string); ok {
 								transferStatus = s
 							}
@@ -359,7 +359,7 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 								}},
 							})
 						observer.Close(ctx)
-						d.endCall(stage.Session, sip_infra.LifecycleReasonPipelineCallEnd)
+						d.endCall(stage.Session, sip_runtime.LifecycleReasonPipelineCallEnd)
 						return
 					}
 				}
@@ -411,13 +411,13 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 						}},
 					})
 				observer.Close(ctx)
-				d.endCall(stage.Session, sip_infra.LifecycleReasonPipelineCallEnd)
+				d.endCall(stage.Session, sip_runtime.LifecycleReasonPipelineCallEnd)
 				return
 			}
-			if targetVal, ok := stage.Session.GetMetadata(sip_infra.MetadataBridgeTransferTarget); ok {
+			if targetVal, ok := stage.Session.GetMetadata(sip_runtime.MetadataBridgeTransferTarget); ok {
 				if target, ok := targetVal.(string); ok && target != "" {
 					transferStatus := "failed"
-					if statusVal, ok := stage.Session.GetMetadata(sip_infra.MetadataBridgeTransferStatus); ok {
+					if statusVal, ok := stage.Session.GetMetadata(sip_runtime.MetadataBridgeTransferStatus); ok {
 						if s, ok := statusVal.(string); ok {
 							transferStatus = s
 						}
@@ -478,7 +478,7 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 							}},
 						})
 					observer.Close(ctx)
-					d.endCall(stage.Session, sip_infra.LifecycleReasonPipelineCallEnd)
+					d.endCall(stage.Session, sip_runtime.LifecycleReasonPipelineCallEnd)
 					return
 				}
 			}
@@ -527,22 +527,22 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 					}},
 				})
 			observer.Close(ctx)
-			d.endCall(stage.Session, sip_infra.LifecycleReasonPipelineCallEnd)
+			d.endCall(stage.Session, sip_runtime.LifecycleReasonPipelineCallEnd)
 			return
 		}
 
 		runtime, err := d.prepareSIPCallRuntime(ctx, stage, setup, observer)
 		if err != nil {
-			if stage.Session.GetInfo().Direction == sip_infra.CallDirectionOutbound && !stage.Session.IsEnded() {
+			if stage.Session.GetInfo().Direction == sip_runtime.CallDirectionOutbound && !stage.Session.IsEnded() {
 				state := stage.Session.GetState()
-				if state != sip_infra.CallStateTransferring && state != sip_infra.CallStateBridgeConnected {
-					d.endCall(stage.Session, sip_infra.LifecycleReasonPipelineTalkCompleted)
+				if state != sip_runtime.CallStateTransferring && state != sip_runtime.CallStateBridgeConnected {
+					d.endCall(stage.Session, sip_runtime.LifecycleReasonPipelineTalkCompleted)
 				}
 			}
-			if targetVal, ok := stage.Session.GetMetadata(sip_infra.MetadataBridgeTransferTarget); ok {
+			if targetVal, ok := stage.Session.GetMetadata(sip_runtime.MetadataBridgeTransferTarget); ok {
 				if target, ok := targetVal.(string); ok && target != "" {
 					transferStatus := "failed"
-					if statusVal, ok := stage.Session.GetMetadata(sip_infra.MetadataBridgeTransferStatus); ok {
+					if statusVal, ok := stage.Session.GetMetadata(sip_runtime.MetadataBridgeTransferStatus); ok {
 						if s, ok := statusVal.(string); ok {
 							transferStatus = s
 						}
@@ -609,7 +609,7 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 							}},
 						})
 					observer.Close(ctx)
-					d.endCall(stage.Session, sip_infra.LifecycleReasonPipelineCallEnd)
+					d.endCall(stage.Session, sip_runtime.LifecycleReasonPipelineCallEnd)
 					return
 				}
 			}
@@ -661,20 +661,20 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 					}},
 				})
 			observer.Close(ctx)
-			d.endCall(stage.Session, sip_infra.LifecycleReasonPipelineCallEnd)
+			d.endCall(stage.Session, sip_runtime.LifecycleReasonPipelineCallEnd)
 			return
 		}
 		if err := runtime.Start(ctx); err != nil {
-			if stage.Session.GetInfo().Direction == sip_infra.CallDirectionOutbound && !stage.Session.IsEnded() {
+			if stage.Session.GetInfo().Direction == sip_runtime.CallDirectionOutbound && !stage.Session.IsEnded() {
 				state := stage.Session.GetState()
-				if state != sip_infra.CallStateTransferring && state != sip_infra.CallStateBridgeConnected {
-					d.endCall(stage.Session, sip_infra.LifecycleReasonPipelineTalkCompleted)
+				if state != sip_runtime.CallStateTransferring && state != sip_runtime.CallStateBridgeConnected {
+					d.endCall(stage.Session, sip_runtime.LifecycleReasonPipelineTalkCompleted)
 				}
 			}
-			if targetVal, ok := stage.Session.GetMetadata(sip_infra.MetadataBridgeTransferTarget); ok {
+			if targetVal, ok := stage.Session.GetMetadata(sip_runtime.MetadataBridgeTransferTarget); ok {
 				if target, ok := targetVal.(string); ok && target != "" {
 					transferStatus := "failed"
-					if statusVal, ok := stage.Session.GetMetadata(sip_infra.MetadataBridgeTransferStatus); ok {
+					if statusVal, ok := stage.Session.GetMetadata(sip_runtime.MetadataBridgeTransferStatus); ok {
 						if s, ok := statusVal.(string); ok {
 							transferStatus = s
 						}
@@ -741,7 +741,7 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 							}},
 						})
 					observer.Close(ctx)
-					d.endCall(stage.Session, sip_infra.LifecycleReasonPipelineCallEnd)
+					d.endCall(stage.Session, sip_runtime.LifecycleReasonPipelineCallEnd)
 					return
 				}
 			}
@@ -793,19 +793,19 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 					}},
 				})
 			observer.Close(ctx)
-			d.endCall(stage.Session, sip_infra.LifecycleReasonPipelineCallEnd)
+			d.endCall(stage.Session, sip_runtime.LifecycleReasonPipelineCallEnd)
 			return
 		}
-		if stage.Session.GetInfo().Direction == sip_infra.CallDirectionOutbound && !stage.Session.IsEnded() {
+		if stage.Session.GetInfo().Direction == sip_runtime.CallDirectionOutbound && !stage.Session.IsEnded() {
 			state := stage.Session.GetState()
-			if state != sip_infra.CallStateTransferring && state != sip_infra.CallStateBridgeConnected {
-				d.endCall(stage.Session, sip_infra.LifecycleReasonPipelineTalkCompleted)
+			if state != sip_runtime.CallStateTransferring && state != sip_runtime.CallStateBridgeConnected {
+				d.endCall(stage.Session, sip_runtime.LifecycleReasonPipelineTalkCompleted)
 			}
 		}
-		if targetVal, ok := stage.Session.GetMetadata(sip_infra.MetadataBridgeTransferTarget); ok {
+		if targetVal, ok := stage.Session.GetMetadata(sip_runtime.MetadataBridgeTransferTarget); ok {
 			if target, ok := targetVal.(string); ok && target != "" {
 				transferStatus := "failed"
-				if statusVal, ok := stage.Session.GetMetadata(sip_infra.MetadataBridgeTransferStatus); ok {
+				if statusVal, ok := stage.Session.GetMetadata(sip_runtime.MetadataBridgeTransferStatus); ok {
 					if s, ok := statusVal.(string); ok {
 						transferStatus = s
 					}
@@ -870,7 +870,7 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 						}},
 					})
 				observer.Close(ctx)
-				d.endCall(stage.Session, sip_infra.LifecycleReasonPipelineCallEnd)
+				d.endCall(stage.Session, sip_runtime.LifecycleReasonPipelineCallEnd)
 				return
 			}
 		}
@@ -920,7 +920,7 @@ func (d *Dispatcher) startPreparedSession(ctx context.Context, prepared *prepare
 				}},
 			})
 		observer.Close(ctx)
-		d.endCall(stage.Session, sip_infra.LifecycleReasonPipelineCallEnd)
+		d.endCall(stage.Session, sip_runtime.LifecycleReasonPipelineCallEnd)
 	}()
 }
 
@@ -934,10 +934,10 @@ func (p *preparedSession) Close(ctx context.Context) {
 	p.observer.Close(ctx)
 }
 
-func sessionPreparationReason(err error) sip_infra.LifecycleReason {
+func sessionPreparationReason(err error) sip_runtime.LifecycleReason {
 	var preparationErr *sessionPreparationError
 	if errors.As(err, &preparationErr) {
 		return preparationErr.reason
 	}
-	return sip_infra.LifecycleReasonPipelineSetupFailed
+	return sip_runtime.LifecycleReasonPipelineSetupFailed
 }

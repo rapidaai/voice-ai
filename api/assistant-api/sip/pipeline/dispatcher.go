@@ -14,7 +14,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/config"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/storages"
@@ -29,7 +29,7 @@ const (
 
 type callEnvelope struct {
 	ctx context.Context
-	p   sip_infra.Pipeline
+	p   sip_runtime.Pipeline
 }
 
 // Dispatcher routes SIP pipeline stages to priority-based channel goroutines.
@@ -76,7 +76,7 @@ type PreparedCallRuntime interface {
 
 type DispatcherOptions struct {
 	Logger                       commons.Logger
-	Server                       *sip_infra.Server
+	Server                       *sip_runtime.Server
 	TransferServer               TransferServer
 	AssistantConfig              *config.AssistantConfig
 	AssistantService             internal_services.AssistantService
@@ -99,7 +99,7 @@ func WithLogger(logger commons.Logger) DispatcherOption {
 	}
 }
 
-func WithServer(server *sip_infra.Server) DispatcherOption {
+func WithServer(server *sip_runtime.Server) DispatcherOption {
 	return func(options *DispatcherOptions) {
 		options.Server = server
 	}
@@ -180,9 +180,9 @@ func WithStorage(storage storages.Storage) DispatcherOption {
 // TransferServer is the minimal SIP infra surface required by transfer orchestration.
 // It enables deterministic tests by allowing fake implementations.
 type TransferServer interface {
-	sip_infra.LifecycleController
-	MakeTransferBridgeCall(ctx context.Context, cfg *sip_infra.Config, toURI, fromURI string, opts sip_infra.TransferBridgeCallOptions) (*sip_infra.Session, error)
-	BridgeTransfer(ctx context.Context, inbound, outbound *sip_infra.Session, onOperatorAudio func([]byte)) (sip_infra.BridgeEndReason, error)
+	sip_runtime.LifecycleController
+	MakeTransferBridgeCall(ctx context.Context, cfg *sip_runtime.Config, toURI, fromURI string, opts sip_runtime.TransferBridgeCallOptions) (*sip_runtime.Session, error)
+	BridgeTransfer(ctx context.Context, inbound, outbound *sip_runtime.Session, onOperatorAudio func([]byte)) (sip_runtime.BridgeEndReason, error)
 }
 
 func New(opts ...DispatcherOption) *Dispatcher {
@@ -216,7 +216,7 @@ func New(opts ...DispatcherOption) *Dispatcher {
 	}
 }
 
-func (d *Dispatcher) transitionCall(session *sip_infra.Session, next sip_infra.CallState, reason sip_infra.LifecycleReason) bool {
+func (d *Dispatcher) transitionCall(session *sip_runtime.Session, next sip_runtime.CallState, reason sip_runtime.LifecycleReason) bool {
 	if d.server == nil {
 		d.logger.Warnw("SIP lifecycle transition skipped: server unavailable",
 			"call_id", session.GetCallID(),
@@ -227,7 +227,7 @@ func (d *Dispatcher) transitionCall(session *sip_infra.Session, next sip_infra.C
 	return d.server.TransitionCall(session, next, reason)
 }
 
-func (d *Dispatcher) endCall(session *sip_infra.Session, reason sip_infra.LifecycleReason) {
+func (d *Dispatcher) endCall(session *sip_runtime.Session, reason sip_runtime.LifecycleReason) {
 	if d.server == nil {
 		d.logger.Warnw("SIP lifecycle end skipped: server unavailable",
 			"call_id", session.GetCallID(),
@@ -249,16 +249,16 @@ func (d *Dispatcher) Start(ctx context.Context) {
 	d.logger.Infow("SIP pipeline dispatcher started")
 }
 
-func (d *Dispatcher) OnPipeline(ctx context.Context, stages ...sip_infra.Pipeline) {
+func (d *Dispatcher) OnPipeline(ctx context.Context, stages ...sip_runtime.Pipeline) {
 	for _, s := range stages {
 		e := callEnvelope{ctx: ctx, p: s}
 		switch s.(type) {
-		case sip_infra.TransferInitiatedPipeline,
-			sip_infra.TransferConnectedPipeline,
-			sip_infra.TransferFailedPipeline,
-			sip_infra.CallFailedPipeline:
+		case sip_runtime.TransferInitiatedPipeline,
+			sip_runtime.TransferConnectedPipeline,
+			sip_runtime.TransferFailedPipeline,
+			sip_runtime.CallFailedPipeline:
 			d.signalCh <- e
-		case sip_infra.SessionEstablishedPipeline:
+		case sip_runtime.SessionEstablishedPipeline:
 			d.mediaCh <- e
 		default:
 			d.logger.Warnw("OnPipeline: unrouted type", "type", fmt.Sprintf("%T", s))
@@ -289,17 +289,17 @@ func (d *Dispatcher) drain(ch chan callEnvelope) {
 	}
 }
 
-func (d *Dispatcher) dispatch(ctx context.Context, p sip_infra.Pipeline) {
+func (d *Dispatcher) dispatch(ctx context.Context, p sip_runtime.Pipeline) {
 	switch v := p.(type) {
-	case sip_infra.SessionEstablishedPipeline:
+	case sip_runtime.SessionEstablishedPipeline:
 		d.handleSessionEstablished(ctx, v)
-	case sip_infra.TransferInitiatedPipeline:
+	case sip_runtime.TransferInitiatedPipeline:
 		d.handleTransferInitiated(ctx, v)
-	case sip_infra.TransferConnectedPipeline:
+	case sip_runtime.TransferConnectedPipeline:
 		d.handleTransferConnected(ctx, v)
-	case sip_infra.TransferFailedPipeline:
+	case sip_runtime.TransferFailedPipeline:
 		d.handleTransferFailed(ctx, v)
-	case sip_infra.CallFailedPipeline:
+	case sip_runtime.CallFailedPipeline:
 		d.handleCallFailed(ctx, v)
 	default:
 		d.logger.Warnw("dispatch: unknown pipeline type", "type", fmt.Sprintf("%T", p))

@@ -9,18 +9,16 @@ package internal_sip
 import (
 	"context"
 	"errors"
-	"reflect"
 	"sync"
 	"testing"
 	"time"
-	"unsafe"
 
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -108,42 +106,60 @@ func (r *pushRecorder) get() []internal_type.Stream {
 // Helpers
 // ---------------------------------------------------------------------------
 
-func testRTPHandler(t *testing.T, codec *sip_infra.Codec) *sip_infra.RTPHandler {
-	t.Helper()
-	h := &sip_infra.RTPHandler{}
+type fakeRTPHandler struct {
+	codec    *sip_runtime.Codec
+	audioIn  chan []byte
+	audioOut chan []byte
+	fallback sip_runtime.RTPFallbackAudioSource
+}
 
-	effectiveCodec := codec
-	if effectiveCodec == nil {
-		effectiveCodec = &sip_infra.CodecPCMU
+func newTestRTPHandler(codec *sip_runtime.Codec) *fakeRTPHandler {
+	if codec == nil {
+		codec = &sip_runtime.CodecPCMU
 	}
-
-	setUnexportedField(t, h, "codec", effectiveCodec)
-	setUnexportedField(t, h, "audioInChan", make(chan []byte, 100))
-	setUnexportedField(t, h, "audioOutChan", make(chan []byte, 100))
-	setUnexportedField(t, h, "flushAudioCh", make(chan struct{}, 1))
-
-	return h
+	return &fakeRTPHandler{
+		codec:    codec,
+		audioIn:  make(chan []byte, 100),
+		audioOut: make(chan []byte, 100),
+	}
 }
 
-func rtpAudioOutLen(t *testing.T, handler *sip_infra.RTPHandler) int {
+func (h *fakeRTPHandler) AudioIn() <-chan []byte       { return h.audioIn }
+func (h *fakeRTPHandler) GetCodec() *sip_runtime.Codec { return h.codec }
+func (h *fakeRTPHandler) LocalAddr() (string, int)     { return "", 0 }
+func (h *fakeRTPHandler) SetFallbackAudioSource(source sip_runtime.RTPFallbackAudioSource) {
+	h.fallback = source
+}
+func (h *fakeRTPHandler) ClearFallbackAudioSource() { h.fallback = nil }
+func (h *fakeRTPHandler) FlushAudioOut() {
+	for {
+		select {
+		case <-h.audioOut:
+		default:
+			return
+		}
+	}
+}
+func (h *fakeRTPHandler) EnqueueAudio(audio []byte) error {
+	select {
+	case h.audioOut <- audio:
+		return nil
+	default:
+		return sip_runtime.ErrRTPOutputQueueFull
+	}
+}
+
+func testRTPHandler(t *testing.T, codec *sip_runtime.Codec) *fakeRTPHandler {
 	t.Helper()
-	rv := reflect.ValueOf(handler).Elem()
-	field := rv.FieldByName("audioOutChan")
-	require.True(t, field.IsValid(), "audioOutChan field not found")
-	return field.Len()
+	return newTestRTPHandler(codec)
 }
 
-func setUnexportedField(t *testing.T, obj interface{}, field string, val interface{}) {
+func rtpAudioOutLen(t *testing.T, handler *fakeRTPHandler) int {
 	t.Helper()
-	rv := reflect.ValueOf(obj)
-	require.Equal(t, reflect.Ptr, rv.Kind(), "obj must be a pointer")
-	fv := rv.Elem().FieldByName(field)
-	require.True(t, fv.IsValid(), "field %s not found", field)
-	target := reflect.NewAt(fv.Type(), unsafe.Pointer(fv.UnsafeAddr())).Elem()
-	target.Set(reflect.ValueOf(val))
+	return len(handler.audioOut)
 }
 
-func newTestAudioProcessor(t *testing.T, codec *sip_infra.Codec, resampler internal_type.AudioResampler, recorder *pushRecorder) *AudioProcessor {
+func newTestAudioProcessor(t *testing.T, codec *sip_runtime.Codec, resampler internal_type.AudioResampler, recorder *pushRecorder) *AudioProcessor {
 	t.Helper()
 	rtp := testRTPHandler(t, codec)
 	return NewAudioProcessor(AudioProcessorConfig{
@@ -163,7 +179,7 @@ func TestProcessProviderAudioFrame_EmitsBridgeImmediatelyAndBuffersPipelineAudio
 	for i := range resampledAudio {
 		resampledAudio[i] = byte(i)
 	}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{out: resampledAudio}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{out: resampledAudio}, rec)
 	receivedAt := time.Now()
 
 	firstFrame, err := proc.ProcessProviderAudioFrame(internal_telephony_media.ProviderAudioFrame{
@@ -187,7 +203,7 @@ func TestProcessProviderAudioFrame_EmitsBridgeImmediatelyAndBuffersPipelineAudio
 func TestProcessProviderAudioFrame_PCMUDecodesToLinearBeforeResample(t *testing.T) {
 	rec := &pushRecorder{}
 	resampler := &captureResampler{out: []byte{0x01, 0x02, 0x03}}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, resampler, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, resampler, rec)
 
 	input := make([]byte, MulawFrameSize)
 	for i := range input {
@@ -208,7 +224,7 @@ func TestProcessProviderAudioFrame_PCMUDecodesToLinearBeforeResample(t *testing.
 func TestProcessProviderAudioFrame_PCMADecodesToLinearBeforeResample(t *testing.T) {
 	rec := &pushRecorder{}
 	resampler := &captureResampler{out: []byte{0x04, 0x05, 0x06}}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMA, resampler, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMA, resampler, rec)
 
 	input := make([]byte, MulawFrameSize)
 	for i := range input {
@@ -228,7 +244,7 @@ func TestProcessProviderAudioFrame_PCMADecodesToLinearBeforeResample(t *testing.
 
 func TestProcessProviderAudioFrame_ResamplerError(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{err: errors.New("resample failed")}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{err: errors.New("resample failed")}, rec)
 
 	inputFrame, err := proc.ProcessProviderAudioFrame(internal_telephony_media.ProviderAudioFrame{
 		Audio: make([]byte, MulawFrameSize),
@@ -245,7 +261,7 @@ func TestProcessProviderAudioFrame_ResamplerError(t *testing.T) {
 
 func TestProcessAssistantAudio_BuffersAssistantPCM16kFrames(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{}, rec)
 	proc.ambientMixer = nil
 
 	audio := make([]byte, BridgeOutputFrameSize*2)
@@ -268,14 +284,14 @@ func TestProcessAssistantAudio_BuffersAssistantPCM16kFrames(t *testing.T) {
 
 func TestProcessAssistantAudio_BridgeActiveDoesNotRecordNormalOutput(t *testing.T) {
 	rec := &pushRecorder{}
-	rtp := testRTPHandler(t, &sip_infra.CodecPCMU)
+	rtp := testRTPHandler(t, &sip_runtime.CodecPCMU)
 	proc := NewAudioProcessor(AudioProcessorConfig{
 		RTPHandler: rtp,
 		Resampler:  &mockResampler{},
 		PushInput:  rec.push,
 	})
-	bridgeRTP := testRTPHandler(t, &sip_infra.CodecPCMU)
-	proc.ConnectTransferMedia(bridgeRTP, &sip_infra.CodecPCMU, sip_infra.CodecPCMU.Name)
+	bridgeRTP := testRTPHandler(t, &sip_runtime.CodecPCMU)
+	proc.ConnectTransferMedia(bridgeRTP, &sip_runtime.CodecPCMU, sip_runtime.CodecPCMU.Name)
 
 	require.NoError(t, proc.ProcessAssistantAudio(make([]byte, BridgeOutputFrameSize), false))
 
@@ -287,7 +303,7 @@ func TestProcessAssistantAudio_BridgeActiveDoesNotRecordNormalOutput(t *testing.
 
 func TestProcessAssistantAudio_TransferActiveDoesNotRecordNormalOutput(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{}, rec)
 	proc.SetTransferActive(true)
 
 	require.NoError(t, proc.ProcessAssistantAudio(make([]byte, BridgeOutputFrameSize), false))
@@ -300,7 +316,7 @@ func TestProcessAssistantAudio_TransferActiveDoesNotRecordNormalOutput(t *testin
 
 func TestEncodeAssistantOutputFrame_PCMAConvertsToAlaw(t *testing.T) {
 	rec := &pushRecorder{}
-	rtp := testRTPHandler(t, &sip_infra.CodecPCMA)
+	rtp := testRTPHandler(t, &sip_runtime.CodecPCMA)
 	resampledAudio := []byte{0xFF, 0x7F}
 	proc := NewAudioProcessor(AudioProcessorConfig{
 		RTPHandler: rtp,
@@ -315,7 +331,7 @@ func TestEncodeAssistantOutputFrame_PCMAConvertsToAlaw(t *testing.T) {
 
 func TestConvertOutputAudio_PCMAConvertsResampledMulaw(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMA, &mockResampler{out: []byte{0xFF, 0x7F}}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMA, &mockResampler{out: []byte{0xFF, 0x7F}}, rec)
 
 	convertedAudio, err := proc.convertOutputAudio([]byte{1, 2})
 	require.NoError(t, err)
@@ -324,7 +340,7 @@ func TestConvertOutputAudio_PCMAConvertsResampledMulaw(t *testing.T) {
 
 func TestEncodeAssistantOutputFrame_ResamplerError(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{err: errors.New("fail")}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{err: errors.New("fail")}, rec)
 
 	_, err := proc.encodeAssistantOutputFrame(make([]byte, BridgeOutputFrameSize))
 	require.Error(t, err)
@@ -333,7 +349,7 @@ func TestEncodeAssistantOutputFrame_ResamplerError(t *testing.T) {
 
 func TestProcessAssistantAudio_NextOutputFrameKeepsPipelineAudio(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{}, rec)
 	proc.ambientMixer = nil
 
 	assistantAudio := make([]byte, BridgeOutputFrameSize)
@@ -352,7 +368,7 @@ func TestProcessAssistantAudio_NextOutputFrameKeepsPipelineAudio(t *testing.T) {
 
 func TestIdleOutputFrame_SilentDuringTransfer(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{}, rec)
 	proc.SetTransferActive(true)
 
 	outputFrame, ok := proc.IdleOutputFrame()
@@ -362,7 +378,7 @@ func TestIdleOutputFrame_SilentDuringTransfer(t *testing.T) {
 
 func TestComplete_PadsPartialFrameWithLinearSilence(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{}, rec)
 	proc.ambientMixer = nil
 
 	require.NoError(t, proc.ProcessAssistantAudio([]byte{0x01}, true))
@@ -381,7 +397,7 @@ func TestComplete_PadsPartialFrameWithLinearSilence(t *testing.T) {
 
 func TestClearOutputBuffer_ResetsBuffer(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{}, rec)
 
 	require.NoError(t, proc.ProcessAssistantAudio(make([]byte, BridgeOutputFrameSize), false))
 
@@ -395,7 +411,7 @@ func TestClearOutputBuffer_ResetsBuffer(t *testing.T) {
 
 func TestClearOutputBuffer_PreservesInputBuffer(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{out: make([]byte, BridgeOutputFrameSize)}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{out: make([]byte, BridgeOutputFrameSize)}, rec)
 
 	inputFrame, err := proc.ProcessProviderAudioFrame(internal_telephony_media.ProviderAudioFrame{Audio: make([]byte, MulawFrameSize)})
 	require.NoError(t, err)
@@ -409,7 +425,7 @@ func TestClearOutputBuffer_PreservesInputBuffer(t *testing.T) {
 
 func TestClearInputBuffer_ResetsInputBuffer(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{out: make([]byte, BridgeOutputFrameSize)}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{out: make([]byte, BridgeOutputFrameSize)}, rec)
 
 	inputFrame, err := proc.ProcessProviderAudioFrame(internal_telephony_media.ProviderAudioFrame{Audio: make([]byte, MulawFrameSize)})
 	require.NoError(t, err)
@@ -423,7 +439,7 @@ func TestClearInputBuffer_ResetsInputBuffer(t *testing.T) {
 
 func TestRTPOutputQueueFullError_ReturnsStructuredError(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{}, rec)
 
 	err := proc.rtpOutputQueueFullError()
 
@@ -437,7 +453,7 @@ func TestRTPOutputQueueFullError_ReturnsStructuredError(t *testing.T) {
 
 func TestForwardUserAudio_NoBridge_ReturnsFalse(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{}, rec)
 
 	audio := []byte{0x01, 0x02, 0x03}
 	result := proc.ForwardUserAudio(audio)
@@ -446,15 +462,15 @@ func TestForwardUserAudio_NoBridge_ReturnsFalse(t *testing.T) {
 
 func TestForwardUserAudio_BridgeActive_ReturnsTrue(t *testing.T) {
 	rec := &pushRecorder{}
-	rtp := testRTPHandler(t, &sip_infra.CodecPCMU)
+	rtp := testRTPHandler(t, &sip_runtime.CodecPCMU)
 	proc := NewAudioProcessor(AudioProcessorConfig{
 		RTPHandler: rtp,
 		Resampler:  &mockResampler{},
 		PushInput:  rec.push,
 	})
 
-	bridgeRTP := testRTPHandler(t, &sip_infra.CodecPCMU)
-	proc.ConnectTransferMedia(bridgeRTP, &sip_infra.CodecPCMU, sip_infra.CodecPCMU.Name)
+	bridgeRTP := testRTPHandler(t, &sip_runtime.CodecPCMU)
+	proc.ConnectTransferMedia(bridgeRTP, &sip_runtime.CodecPCMU, sip_runtime.CodecPCMU.Name)
 
 	audio := []byte{0x01, 0x02, 0x03}
 	result := proc.ForwardUserAudio(audio)
@@ -464,7 +480,7 @@ func TestForwardUserAudio_BridgeActive_ReturnsTrue(t *testing.T) {
 	select {
 	case queued := <-proc.bridgeUserCh:
 		assert.Equal(t, audio, queued.audio)
-		assert.Equal(t, sip_infra.CodecPCMU.Name, queued.codecName)
+		assert.Equal(t, sip_runtime.CodecPCMU.Name, queued.codecName)
 	case <-time.After(time.Second):
 		t.Fatal("expected audio on bridgeUserCh")
 	}
@@ -472,15 +488,15 @@ func TestForwardUserAudio_BridgeActive_ReturnsTrue(t *testing.T) {
 
 func TestForwardUserAudio_BridgeActive_SuccessPath(t *testing.T) {
 	rec := &pushRecorder{}
-	rtp := testRTPHandler(t, &sip_infra.CodecPCMU)
+	rtp := testRTPHandler(t, &sip_runtime.CodecPCMU)
 	proc := NewAudioProcessor(AudioProcessorConfig{
 		RTPHandler: rtp,
 		Resampler:  &mockResampler{},
 		PushInput:  rec.push,
 	})
 
-	bridgeRTP := testRTPHandler(t, &sip_infra.CodecPCMU)
-	proc.ConnectTransferMedia(bridgeRTP, &sip_infra.CodecPCMU, sip_infra.CodecPCMU.Name)
+	bridgeRTP := testRTPHandler(t, &sip_runtime.CodecPCMU)
+	proc.ConnectTransferMedia(bridgeRTP, &sip_runtime.CodecPCMU, sip_runtime.CodecPCMU.Name)
 
 	audio := []byte{0xAA, 0xBB, 0xCC}
 	// ForwardUserAudio enqueues bridge RTP and records only after enqueue succeeds.
@@ -490,7 +506,7 @@ func TestForwardUserAudio_BridgeActive_SuccessPath(t *testing.T) {
 	select {
 	case queued := <-proc.bridgeUserCh:
 		assert.Equal(t, audio, queued.audio, "raw audio should be queued to bridgeUserCh")
-		assert.Equal(t, sip_infra.CodecPCMU.Name, queued.codecName)
+		assert.Equal(t, sip_runtime.CodecPCMU.Name, queued.codecName)
 	case <-time.After(time.Second):
 		t.Fatal("expected audio on bridgeUserCh")
 	}
@@ -498,16 +514,16 @@ func TestForwardUserAudio_BridgeActive_SuccessPath(t *testing.T) {
 
 func TestForwardUserAudio_WithTranscode_PCMU_to_PCMA(t *testing.T) {
 	rec := &pushRecorder{}
-	rtp := testRTPHandler(t, &sip_infra.CodecPCMU)
+	rtp := testRTPHandler(t, &sip_runtime.CodecPCMU)
 	proc := NewAudioProcessor(AudioProcessorConfig{
 		RTPHandler: rtp,
 		Resampler:  &mockResampler{},
 		PushInput:  rec.push,
 	})
 
-	bridgeRTP := testRTPHandler(t, &sip_infra.CodecPCMA)
+	bridgeRTP := testRTPHandler(t, &sip_runtime.CodecPCMA)
 	// User has PCMU, bridge target has PCMA — need transcode
-	proc.ConnectTransferMedia(bridgeRTP, &sip_infra.CodecPCMU, sip_infra.CodecPCMA.Name)
+	proc.ConnectTransferMedia(bridgeRTP, &sip_runtime.CodecPCMU, sip_runtime.CodecPCMA.Name)
 
 	audio := make([]byte, 160)
 	for i := range audio {
@@ -523,7 +539,7 @@ func TestForwardUserAudio_WithTranscode_PCMU_to_PCMA(t *testing.T) {
 	select {
 	case queued := <-proc.bridgeUserCh:
 		assert.Equal(t, audio, queued.audio, "raw audio should go to bridgeUserCh without transcoding")
-		assert.Equal(t, sip_infra.CodecPCMU.Name, queued.codecName)
+		assert.Equal(t, sip_runtime.CodecPCMU.Name, queued.codecName)
 	case <-time.After(time.Second):
 		t.Fatal("expected raw audio on bridgeUserCh")
 	}
@@ -531,19 +547,19 @@ func TestForwardUserAudio_WithTranscode_PCMU_to_PCMA(t *testing.T) {
 
 func TestForwardUserAudio_Backpressure_DropsAudio(t *testing.T) {
 	rec := &pushRecorder{}
-	rtp := testRTPHandler(t, &sip_infra.CodecPCMU)
+	rtp := testRTPHandler(t, &sip_runtime.CodecPCMU)
 	proc := NewAudioProcessor(AudioProcessorConfig{
 		RTPHandler: rtp,
 		Resampler:  &mockResampler{},
 		PushInput:  rec.push,
 	})
 
-	bridgeRTP := testRTPHandler(t, &sip_infra.CodecPCMU)
-	proc.ConnectTransferMedia(bridgeRTP, &sip_infra.CodecPCMU, sip_infra.CodecPCMU.Name)
+	bridgeRTP := testRTPHandler(t, &sip_runtime.CodecPCMU)
+	proc.ConnectTransferMedia(bridgeRTP, &sip_runtime.CodecPCMU, sip_runtime.CodecPCMU.Name)
 
 	// Fill bridgeUserCh to capacity
 	for i := 0; i < AudioChannelSize; i++ {
-		proc.bridgeUserCh <- bridgeRecordingFrame{audio: []byte{byte(i)}, codecName: sip_infra.CodecPCMU.Name}
+		proc.bridgeUserCh <- bridgeRecordingFrame{audio: []byte{byte(i)}, codecName: sip_runtime.CodecPCMU.Name}
 	}
 
 	// Should not block even though channel is full
@@ -564,7 +580,7 @@ func TestForwardUserAudio_Backpressure_DropsAudio(t *testing.T) {
 func TestForwardUserAudio_DoesNotRecordWhenBridgeRTPQueueFull(t *testing.T) {
 	rec := &pushRecorder{}
 	records := make(chan observability.Record, 2)
-	rtp := testRTPHandler(t, &sip_infra.CodecPCMU)
+	rtp := testRTPHandler(t, &sip_runtime.CodecPCMU)
 	proc := NewAudioProcessor(AudioProcessorConfig{
 		RTPHandler: rtp,
 		Resampler:  &mockResampler{},
@@ -576,11 +592,11 @@ func TestForwardUserAudio_DoesNotRecordWhenBridgeRTPQueueFull(t *testing.T) {
 			return nil
 		},
 	})
-	bridgeRTP := testRTPHandler(t, &sip_infra.CodecPCMU)
+	bridgeRTP := testRTPHandler(t, &sip_runtime.CodecPCMU)
 	for i := 0; i < 100; i++ {
 		require.NoError(t, bridgeRTP.EnqueueAudio([]byte{byte(i)}))
 	}
-	proc.ConnectTransferMedia(bridgeRTP, &sip_infra.CodecPCMU, sip_infra.CodecPCMU.Name)
+	proc.ConnectTransferMedia(bridgeRTP, &sip_runtime.CodecPCMU, sip_runtime.CodecPCMU.Name)
 
 	assert.True(t, proc.ForwardUserAudio([]byte{0xaa}))
 
@@ -606,7 +622,7 @@ func TestForwardUserAudio_DoesNotRecordWhenBridgeRTPQueueFull(t *testing.T) {
 
 func TestRecordTransferOperatorAudio_QueuesAudio(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{}, rec)
 
 	audio := []byte{0x10, 0x20, 0x30}
 	proc.RecordTransferOperatorAudio(audio)
@@ -614,7 +630,7 @@ func TestRecordTransferOperatorAudio_QueuesAudio(t *testing.T) {
 	select {
 	case queued := <-proc.bridgeOperatorCh:
 		assert.Equal(t, audio, queued.audio)
-		assert.Equal(t, sip_infra.CodecPCMU.Name, queued.codecName)
+		assert.Equal(t, sip_runtime.CodecPCMU.Name, queued.codecName)
 	case <-time.After(time.Second):
 		t.Fatal("expected audio on bridgeOperatorCh")
 	}
@@ -622,11 +638,11 @@ func TestRecordTransferOperatorAudio_QueuesAudio(t *testing.T) {
 
 func TestRecordTransferOperatorAudio_Backpressure_DropsAudio(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{}, rec)
 
 	// Fill channel
 	for i := 0; i < AudioChannelSize; i++ {
-		proc.bridgeOperatorCh <- bridgeRecordingFrame{audio: []byte{byte(i)}, codecName: sip_infra.CodecPCMU.Name}
+		proc.bridgeOperatorCh <- bridgeRecordingFrame{audio: []byte{byte(i)}, codecName: sip_runtime.CodecPCMU.Name}
 	}
 
 	// Should not block
@@ -650,30 +666,30 @@ func TestRecordTransferOperatorAudio_Backpressure_DropsAudio(t *testing.T) {
 
 func TestConnectTransferMedia_ActivatesBridge(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{}, rec)
 
 	assert.False(t, proc.IsBridgeActive())
 
-	bridgeRTP := testRTPHandler(t, &sip_infra.CodecPCMU)
-	proc.ConnectTransferMedia(bridgeRTP, &sip_infra.CodecPCMU, sip_infra.CodecPCMU.Name)
+	bridgeRTP := testRTPHandler(t, &sip_runtime.CodecPCMU)
+	proc.ConnectTransferMedia(bridgeRTP, &sip_runtime.CodecPCMU, sip_runtime.CodecPCMU.Name)
 
 	assert.True(t, proc.IsBridgeActive())
 }
 
 func TestConnectTransferMedia_NilRTP_DoesNotActivate(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{}, rec)
 
-	proc.ConnectTransferMedia(nil, &sip_infra.CodecPCMU, sip_infra.CodecPCMU.Name)
+	proc.ConnectTransferMedia(nil, &sip_runtime.CodecPCMU, sip_runtime.CodecPCMU.Name)
 	assert.False(t, proc.IsBridgeActive())
 }
 
 func TestDisconnectTransferMedia_DeactivatesBridge(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{}, rec)
 
-	bridgeRTP := testRTPHandler(t, &sip_infra.CodecPCMU)
-	proc.ConnectTransferMedia(bridgeRTP, &sip_infra.CodecPCMU, sip_infra.CodecPCMU.Name)
+	bridgeRTP := testRTPHandler(t, &sip_runtime.CodecPCMU)
+	proc.ConnectTransferMedia(bridgeRTP, &sip_runtime.CodecPCMU, sip_runtime.CodecPCMU.Name)
 	assert.True(t, proc.IsBridgeActive())
 
 	proc.DisconnectTransferMedia()
@@ -690,10 +706,10 @@ func TestDisconnectTransferMedia_DeactivatesBridge(t *testing.T) {
 // panic. Run with `-race` for full coverage.
 func TestForwardUserAudio_ConcurrentClear(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{}, rec)
 
-	bridgeRTP := testRTPHandler(t, &sip_infra.CodecPCMU)
-	proc.ConnectTransferMedia(bridgeRTP, &sip_infra.CodecPCMU, sip_infra.CodecPCMU.Name)
+	bridgeRTP := testRTPHandler(t, &sip_runtime.CodecPCMU)
+	proc.ConnectTransferMedia(bridgeRTP, &sip_runtime.CodecPCMU, sip_runtime.CodecPCMU.Name)
 
 	const writers = 8
 	const iters = 200
@@ -732,15 +748,15 @@ func TestForwardUserAudio_ConcurrentClear(t *testing.T) {
 
 func TestConnectTransferMedia_MatchingCodecs_NoTranscode(t *testing.T) {
 	rec := &pushRecorder{}
-	rtp := testRTPHandler(t, &sip_infra.CodecPCMU)
+	rtp := testRTPHandler(t, &sip_runtime.CodecPCMU)
 	proc := NewAudioProcessor(AudioProcessorConfig{
 		RTPHandler: rtp,
 		Resampler:  &mockResampler{},
 		PushInput:  rec.push,
 	})
 
-	bridgeRTP := testRTPHandler(t, &sip_infra.CodecPCMU)
-	proc.ConnectTransferMedia(bridgeRTP, &sip_infra.CodecPCMU, sip_infra.CodecPCMU.Name)
+	bridgeRTP := testRTPHandler(t, &sip_runtime.CodecPCMU)
+	proc.ConnectTransferMedia(bridgeRTP, &sip_runtime.CodecPCMU, sip_runtime.CodecPCMU.Name)
 
 	// With matching codecs, bridgeUserCh should receive the original audio unchanged
 	// (the raw audio IS the same as what goes to outRTP when no transcode is needed).
@@ -751,7 +767,7 @@ func TestConnectTransferMedia_MatchingCodecs_NoTranscode(t *testing.T) {
 	select {
 	case queued := <-proc.bridgeUserCh:
 		assert.Equal(t, audio, queued.audio, "matching codecs should not alter raw audio")
-		assert.Equal(t, sip_infra.CodecPCMU.Name, queued.codecName)
+		assert.Equal(t, sip_runtime.CodecPCMU.Name, queued.codecName)
 	case <-time.After(time.Second):
 		t.Fatal("expected audio on bridgeUserCh")
 	}
@@ -759,16 +775,16 @@ func TestConnectTransferMedia_MatchingCodecs_NoTranscode(t *testing.T) {
 
 func TestConnectTransferMedia_PCMA_to_PCMU_Transcode(t *testing.T) {
 	rec := &pushRecorder{}
-	rtp := testRTPHandler(t, &sip_infra.CodecPCMA)
+	rtp := testRTPHandler(t, &sip_runtime.CodecPCMA)
 	proc := NewAudioProcessor(AudioProcessorConfig{
 		RTPHandler: rtp,
 		Resampler:  &mockResampler{},
 		PushInput:  rec.push,
 	})
 
-	bridgeRTP := testRTPHandler(t, &sip_infra.CodecPCMU)
+	bridgeRTP := testRTPHandler(t, &sip_runtime.CodecPCMU)
 	// inCodec=PCMA, outCodec=PCMU means A-law → µ-law transcode for outRTP
-	proc.ConnectTransferMedia(bridgeRTP, &sip_infra.CodecPCMA, sip_infra.CodecPCMU.Name)
+	proc.ConnectTransferMedia(bridgeRTP, &sip_runtime.CodecPCMA, sip_runtime.CodecPCMU.Name)
 
 	audio := make([]byte, 160)
 	for i := range audio {
@@ -781,7 +797,7 @@ func TestConnectTransferMedia_PCMA_to_PCMU_Transcode(t *testing.T) {
 	select {
 	case queued := <-proc.bridgeUserCh:
 		assert.Equal(t, audio, queued.audio, "bridgeUserCh should get raw untranscoded audio")
-		assert.Equal(t, sip_infra.CodecPCMA.Name, queued.codecName)
+		assert.Equal(t, sip_runtime.CodecPCMA.Name, queued.codecName)
 	case <-time.After(time.Second):
 		t.Fatal("expected raw audio on bridgeUserCh")
 	}
@@ -793,7 +809,7 @@ func TestConnectTransferMedia_PCMA_to_PCMU_Transcode(t *testing.T) {
 
 func TestRingback_UsesRTPFallbackSourceWithoutQueueProducer(t *testing.T) {
 	rec := &pushRecorder{}
-	rtp := testRTPHandler(t, &sip_infra.CodecPCMU)
+	rtp := testRTPHandler(t, &sip_runtime.CodecPCMU)
 	proc := NewAudioProcessor(AudioProcessorConfig{
 		RTPHandler: rtp,
 		Resampler:  &mockResampler{},
@@ -813,7 +829,7 @@ func TestRingback_UsesRTPFallbackSourceWithoutQueueProducer(t *testing.T) {
 
 func TestRunBridgeRecorder_ExitsOnContextCancel(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{}, rec)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -835,7 +851,7 @@ func TestRunBridgeRecorder_ExitsOnContextCancel(t *testing.T) {
 
 func TestRunBridgeRecorder_UserAudio_PushesConversationBridgeUserAudio(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{}, rec)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -844,7 +860,7 @@ func TestRunBridgeRecorder_UserAudio_PushesConversationBridgeUserAudio(t *testin
 
 	// Send user audio
 	audio := []byte{0x01, 0x02, 0x03}
-	proc.bridgeUserCh <- bridgeRecordingFrame{audio: audio, codecName: sip_infra.CodecPCMU.Name}
+	proc.bridgeUserCh <- bridgeRecordingFrame{audio: audio, codecName: sip_runtime.CodecPCMU.Name}
 
 	// Wait for pushInput to be called
 	require.Eventually(t, func() bool {
@@ -862,7 +878,7 @@ func TestRunBridgeRecorder_UserAudio_PushesConversationBridgeUserAudio(t *testin
 
 func TestRunBridgeRecorder_UserAudio_DecodesPCMARecording(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMA, &mockResampler{}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMA, &mockResampler{}, rec)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -870,7 +886,7 @@ func TestRunBridgeRecorder_UserAudio_DecodesPCMARecording(t *testing.T) {
 	go proc.RunBridgeRecorder(ctx)
 
 	audio := []byte{0xD5, 0xD4, 0xD3}
-	proc.bridgeUserCh <- bridgeRecordingFrame{audio: audio, codecName: sip_infra.CodecPCMA.Name}
+	proc.bridgeUserCh <- bridgeRecordingFrame{audio: audio, codecName: sip_runtime.CodecPCMA.Name}
 
 	require.Eventually(t, func() bool {
 		return len(rec.get()) >= 1
@@ -886,7 +902,7 @@ func TestRunBridgeRecorder_UserAudio_DecodesPCMARecording(t *testing.T) {
 
 func TestRunBridgeRecorder_OperatorAudio_PushesConversationBridgeOperatorAudio(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{}, rec)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -895,7 +911,7 @@ func TestRunBridgeRecorder_OperatorAudio_PushesConversationBridgeOperatorAudio(t
 
 	// Send operator audio
 	audio := []byte{0x10, 0x20, 0x30}
-	proc.bridgeOperatorCh <- bridgeRecordingFrame{audio: audio, codecName: sip_infra.CodecPCMU.Name}
+	proc.bridgeOperatorCh <- bridgeRecordingFrame{audio: audio, codecName: sip_runtime.CodecPCMU.Name}
 
 	require.Eventually(t, func() bool {
 		return len(rec.get()) >= 1
@@ -912,9 +928,9 @@ func TestRunBridgeRecorder_OperatorAudio_PushesConversationBridgeOperatorAudio(t
 
 func TestRunBridgeRecorder_OperatorAudio_DecodesConnectedBridgeCodec(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{}, rec)
-	bridgeRTP := testRTPHandler(t, &sip_infra.CodecPCMA)
-	proc.ConnectTransferMedia(bridgeRTP, &sip_infra.CodecPCMU, sip_infra.CodecPCMA.Name)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{}, rec)
+	bridgeRTP := testRTPHandler(t, &sip_runtime.CodecPCMA)
+	proc.ConnectTransferMedia(bridgeRTP, &sip_runtime.CodecPCMU, sip_runtime.CodecPCMA.Name)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -938,15 +954,15 @@ func TestRunBridgeRecorder_OperatorAudio_DecodesConnectedBridgeCodec(t *testing.
 
 func TestRunBridgeRecorder_ResamplerError_DoesNotPush(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{err: errors.New("fail")}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{err: errors.New("fail")}, rec)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	go proc.RunBridgeRecorder(ctx)
 
-	proc.bridgeUserCh <- bridgeRecordingFrame{audio: []byte{0x01}, codecName: sip_infra.CodecPCMU.Name}
-	proc.bridgeOperatorCh <- bridgeRecordingFrame{audio: []byte{0x02}, codecName: sip_infra.CodecPCMU.Name}
+	proc.bridgeUserCh <- bridgeRecordingFrame{audio: []byte{0x01}, codecName: sip_runtime.CodecPCMU.Name}
+	proc.bridgeOperatorCh <- bridgeRecordingFrame{audio: []byte{0x02}, codecName: sip_runtime.CodecPCMU.Name}
 
 	// Give it time to process
 	time.Sleep(50 * time.Millisecond)
@@ -961,7 +977,7 @@ func TestRunBridgeRecorder_ResamplerError_DoesNotPush(t *testing.T) {
 
 func TestNewAudioProcessor_InitializesChannels(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{}, rec)
 
 	assert.NotNil(t, proc.inputBuffer)
 	assert.NotNil(t, proc.bridgeUserCh)
@@ -974,7 +990,7 @@ func TestNewAudioProcessor_InitializesChannels(t *testing.T) {
 func TestApplyAmbient_NoPrimary_WithAmbientConfig_ProducesFrame(t *testing.T) {
 	rec := &pushRecorder{}
 	proc := NewAudioProcessor(AudioProcessorConfig{
-		RTPHandler: testRTPHandler(t, &sip_infra.CodecPCMU),
+		RTPHandler: testRTPHandler(t, &sip_runtime.CodecPCMU),
 		Resampler:  &mockResampler{},
 		PushInput:  rec.push,
 		Ambient: &internal_ambient.Config{
@@ -992,7 +1008,7 @@ func TestApplyAmbient_NoPrimary_WithAmbientConfig_ProducesFrame(t *testing.T) {
 func TestApplyAmbient_NoPrimary_NoAmbient_ReturnsNil(t *testing.T) {
 	rec := &pushRecorder{}
 	proc := NewAudioProcessor(AudioProcessorConfig{
-		RTPHandler: testRTPHandler(t, &sip_infra.CodecPCMU),
+		RTPHandler: testRTPHandler(t, &sip_runtime.CodecPCMU),
 		Resampler:  &mockResampler{},
 		PushInput:  rec.push,
 	})
@@ -1003,7 +1019,7 @@ func TestApplyAmbient_NoPrimary_NoAmbient_ReturnsNil(t *testing.T) {
 
 func TestApplyAmbient_PrimaryWithNoAmbient_ReturnsInput(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{}, rec)
 
 	frame := []byte{1, 2, 3}
 	assert.Equal(t, frame, proc.applyAmbient(frame))
@@ -1011,7 +1027,7 @@ func TestApplyAmbient_PrimaryWithNoAmbient_ReturnsInput(t *testing.T) {
 
 func TestApplyAmbient_MixErrorReturnsInput(t *testing.T) {
 	rec := &pushRecorder{}
-	proc := newTestAudioProcessor(t, &sip_infra.CodecPCMU, &mockResampler{}, rec)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{}, rec)
 	proc.ambientMixer = &mockAmbientMixer{err: errors.New("mix failed")}
 
 	frame := []byte{1, 2, 3}
@@ -1022,16 +1038,10 @@ func TestApplyAmbient_MixErrorReturnsInput(t *testing.T) {
 // Benchmarks — hot-path audio processing (called every 20ms per RTP packet)
 // ---------------------------------------------------------------------------
 
-func benchAudioProcessor(b *testing.B, codec *sip_infra.Codec) *AudioProcessor {
+func benchAudioProcessor(b *testing.B, codec *sip_runtime.Codec) *AudioProcessor {
 	b.Helper()
-	rtp := &sip_infra.RTPHandler{}
-	setUnexportedFieldBench(b, rtp, "codec", codec)
-	setUnexportedFieldBench(b, rtp, "audioInChan", make(chan []byte, 100))
-	setUnexportedFieldBench(b, rtp, "audioOutChan", make(chan []byte, 100))
-	setUnexportedFieldBench(b, rtp, "flushAudioCh", make(chan struct{}, 1))
-
 	return NewAudioProcessor(AudioProcessorConfig{
-		RTPHandler: rtp,
+		RTPHandler: newTestRTPHandler(codec),
 		Resampler:  &mockResampler{},
 		PushInput:  func(internal_type.Stream) {},
 	})
@@ -1039,7 +1049,7 @@ func benchAudioProcessor(b *testing.B, codec *sip_infra.Codec) *AudioProcessor {
 
 // BenchmarkProcessProviderAudioFrame_PCMU measures the per-packet input processing for PCMU.
 func BenchmarkProcessProviderAudioFrame_PCMU(b *testing.B) {
-	proc := benchAudioProcessor(b, &sip_infra.CodecPCMU)
+	proc := benchAudioProcessor(b, &sip_runtime.CodecPCMU)
 	frame := make([]byte, MulawFrameSize)
 
 	b.ResetTimer()
@@ -1051,7 +1061,7 @@ func BenchmarkProcessProviderAudioFrame_PCMU(b *testing.B) {
 
 // BenchmarkProcessProviderAudioFrame_PCMA measures the per-packet input processing for PCMA.
 func BenchmarkProcessProviderAudioFrame_PCMA(b *testing.B) {
-	proc := benchAudioProcessor(b, &sip_infra.CodecPCMA)
+	proc := benchAudioProcessor(b, &sip_runtime.CodecPCMA)
 	frame := make([]byte, MulawFrameSize)
 	for i := range frame {
 		frame[i] = 0xD5
@@ -1066,7 +1076,7 @@ func BenchmarkProcessProviderAudioFrame_PCMA(b *testing.B) {
 
 // BenchmarkProcessAssistantAudio measures output buffering throughput.
 func BenchmarkProcessAssistantAudio(b *testing.B) {
-	proc := benchAudioProcessor(b, &sip_infra.CodecPCMU)
+	proc := benchAudioProcessor(b, &sip_runtime.CodecPCMU)
 	frame := make([]byte, BridgeOutputFrameSize)
 
 	b.ResetTimer()
@@ -1081,7 +1091,7 @@ func BenchmarkProcessAssistantAudio(b *testing.B) {
 
 // BenchmarkForwardUserAudio_NoBridge measures the no-bridge fast-exit path.
 func BenchmarkForwardUserAudio_NoBridge(b *testing.B) {
-	proc := benchAudioProcessor(b, &sip_infra.CodecPCMU)
+	proc := benchAudioProcessor(b, &sip_runtime.CodecPCMU)
 	frame := make([]byte, MulawFrameSize)
 
 	b.ResetTimer()
@@ -1093,24 +1103,15 @@ func BenchmarkForwardUserAudio_NoBridge(b *testing.B) {
 
 // BenchmarkForwardUserAudio_BridgeActive measures the bridge forwarding hot path.
 func BenchmarkForwardUserAudio_BridgeActive(b *testing.B) {
-	rtp := &sip_infra.RTPHandler{}
-	setUnexportedFieldBench(b, rtp, "codec", &sip_infra.CodecPCMU)
-	setUnexportedFieldBench(b, rtp, "audioInChan", make(chan []byte, 100))
-	setUnexportedFieldBench(b, rtp, "audioOutChan", make(chan []byte, 100))
-	setUnexportedFieldBench(b, rtp, "flushAudioCh", make(chan struct{}, 1))
-
-	bridgeRTP := &sip_infra.RTPHandler{}
-	setUnexportedFieldBench(b, bridgeRTP, "codec", &sip_infra.CodecPCMU)
-	setUnexportedFieldBench(b, bridgeRTP, "audioInChan", make(chan []byte, 100))
-	setUnexportedFieldBench(b, bridgeRTP, "audioOutChan", make(chan []byte, 100))
-	setUnexportedFieldBench(b, bridgeRTP, "flushAudioCh", make(chan struct{}, 1))
+	rtp := newTestRTPHandler(&sip_runtime.CodecPCMU)
+	bridgeRTP := newTestRTPHandler(&sip_runtime.CodecPCMU)
 
 	proc := NewAudioProcessor(AudioProcessorConfig{
 		RTPHandler: rtp,
 		Resampler:  &mockResampler{},
 		PushInput:  func(internal_type.Stream) {},
 	})
-	proc.ConnectTransferMedia(bridgeRTP, &sip_infra.CodecPCMU, sip_infra.CodecPCMU.Name)
+	proc.ConnectTransferMedia(bridgeRTP, &sip_runtime.CodecPCMU, sip_runtime.CodecPCMU.Name)
 
 	frame := make([]byte, MulawFrameSize)
 
@@ -1132,18 +1133,4 @@ func BenchmarkForwardUserAudio_BridgeActive(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = proc.ForwardUserAudio(frame)
 	}
-}
-
-func setUnexportedFieldBench(b *testing.B, obj interface{}, field string, val interface{}) {
-	b.Helper()
-	rv := reflect.ValueOf(obj)
-	if rv.Kind() != reflect.Ptr {
-		b.Fatalf("obj must be a pointer")
-	}
-	fv := rv.Elem().FieldByName(field)
-	if !fv.IsValid() {
-		b.Fatalf("field %s not found", field)
-	}
-	target := reflect.NewAt(fv.Type(), unsafe.Pointer(fv.UnsafeAddr())).Elem()
-	target.Set(reflect.ValueOf(val))
 }

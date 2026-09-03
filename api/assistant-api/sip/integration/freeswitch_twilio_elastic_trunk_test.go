@@ -12,7 +12,7 @@ import (
 	"context"
 	"testing"
 
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,29 +30,29 @@ func TestFreeSWITCHTwilioElasticTrunkOutbound(t *testing.T) {
 		harness.sipConfig,
 		twilioProfile.outboundUser,
 		twilioProfile.fromUser,
-		sip_infra.MakeCallOptions{},
+		sip_runtime.MakeCallOptions{},
 	)
 	require.NoErrorf(t, err, "Twilio-style outbound call to %s failed", freeSWITCHOutboundTargetDescription(harness.config, twilioProfile.outboundUser))
 	require.NotNil(t, session)
 
-	waitForCallState(t, session, sip_infra.CallStateConnected, callSetupTimeout)
-	require.NoError(t, harness.server.EndCallWithReason(session, sip_infra.LifecycleReasonEndCall))
+	waitForCallState(t, session, sip_runtime.CallStateConnected, callSetupTimeout)
+	require.NoError(t, harness.server.EndCallWithReason(session, sip_runtime.LifecycleReasonEndCall))
 	waitForTerminalCallState(t, session, callTeardownTimeout)
 }
 
 func TestFreeSWITCHTwilioElasticTrunkInbound(t *testing.T) {
 	twilioProfile := loadTwilioElasticTrunkConfig(t)
 	harness := newFreeSWITCHHarness(t, twilioProfile.sipCredentialConfig)
-	answeredSessions := make(chan *sip_infra.Session, 1)
-	remoteByeSessions := make(chan *sip_infra.Session, 1)
+	answeredSessions := make(chan *sip_runtime.Session, 1)
+	remoteByeSessions := make(chan *sip_runtime.Session, 1)
 
-	harness.server.SetOnInviteIdentity(func(session *sip_infra.Session, identity sip_infra.SIPRequestIdentity) error {
-		require.Contains(t, identity.FromIdentity, freeSWITCHUser(twilioProfile.callerUser))
-		require.Contains(t, identity.ToIdentity, freeSWITCHUser(twilioProfile.inboundDID))
+	harness.server.SetOnInvite(func(session *sip_runtime.Session, _ string, callAddress sip_runtime.CallAddress) error {
+		require.Contains(t, callAddress.FromURI, freeSWITCHUser(twilioProfile.callerUser))
+		require.Contains(t, callAddress.ToURI, freeSWITCHUser(twilioProfile.inboundDID))
 		answeredSessions <- session
 		return nil
 	})
-	harness.server.SetOnBye(func(session *sip_infra.Session) error {
+	harness.server.SetOnBye(func(session *sip_runtime.Session) error {
 		remoteByeSessions <- session
 		return nil
 	})
@@ -63,9 +63,9 @@ func TestFreeSWITCHTwilioElasticTrunkInbound(t *testing.T) {
 	})
 
 	session := receiveInboundSession(t, answeredSessions, callSetupTimeout)
-	require.Equal(t, sip_infra.CallDirectionInbound, session.GetInfo().Direction)
-	require.Equal(t, sip_infra.InboundSetupPhaseMediaFlowing, session.GetInboundSetupPhase())
-	waitForCallState(t, session, sip_infra.CallStateConnected, callSetupTimeout)
+	require.Equal(t, sip_runtime.CallDirectionInbound, session.GetInfo().Direction)
+	require.Equal(t, sip_runtime.InboundSetupPhaseMediaFlowing, session.GetInboundSetupPhase())
+	waitForCallState(t, session, sip_runtime.CallStateConnected, callSetupTimeout)
 
 	harness.hangupFreeSWITCHCall(freeSWITCHCallUUID)
 	remoteByeSession := receiveInboundSession(t, remoteByeSessions, callTeardownTimeout)

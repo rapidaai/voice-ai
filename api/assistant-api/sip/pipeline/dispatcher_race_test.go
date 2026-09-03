@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/stretchr/testify/require"
 )
@@ -28,16 +28,16 @@ func newPipelineTestLogger(t *testing.T) commons.Logger {
 	return l
 }
 
-func newPipelineTestSession(t *testing.T) *sip_infra.Session {
+func newPipelineTestSession(t *testing.T) *sip_runtime.Session {
 	t.Helper()
-	s, err := sip_infra.NewSession(context.Background(),
-		sip_infra.WithSessionConfig(&sip_infra.Config{
+	s, err := sip_runtime.NewSession(context.Background(),
+		sip_runtime.WithSessionConfig(&sip_runtime.Config{
 			Server:            "127.0.0.1",
 			Port:              5060,
 			RTPPortRangeStart: 10000,
 			RTPPortRangeEnd:   10020,
 		}),
-		sip_infra.WithSessionDirection(sip_infra.CallDirectionInbound),
+		sip_runtime.WithSessionDirection(sip_runtime.CallDirectionInbound),
 	)
 	require.NoError(t, err)
 	return s
@@ -53,15 +53,15 @@ func TestHandleSessionEstablished_ConversationErrorEndsSession(t *testing.T) {
 	)
 
 	s := newPipelineTestSession(t)
-	d.handleSessionEstablished(context.Background(), sip_infra.SessionEstablishedPipeline{
+	d.handleSessionEstablished(context.Background(), sip_runtime.SessionEstablishedPipeline{
 		ID:          "call-setup-fail",
 		Session:     s,
-		Direction:   sip_infra.CallDirectionInbound,
+		Direction:   sip_runtime.CallDirectionInbound,
 		AssistantID: 1,
 	})
 
 	require.Eventually(t, s.IsEnded, 2*time.Second, 10*time.Millisecond)
-	require.Equal(t, []sip_infra.LifecycleReason{sip_infra.LifecycleReasonPipelineConversationFailed}, transferServer.lifecycleEndReasons())
+	require.Equal(t, []sip_runtime.LifecycleReason{sip_runtime.LifecycleReasonPipelineConversationFailed}, transferServer.lifecycleEndReasons())
 }
 
 func TestDispatcherBackpressureAndTeardownStress(t *testing.T) {
@@ -82,10 +82,10 @@ func TestDispatcherBackpressureAndTeardownStress(t *testing.T) {
 
 	for i := 0; i < calls; i++ {
 		s := newPipelineTestSession(t)
-		d.OnPipeline(ctx, sip_infra.SessionEstablishedPipeline{
+		d.OnPipeline(ctx, sip_runtime.SessionEstablishedPipeline{
 			ID:          fmt.Sprintf("call-%d", i),
 			Session:     s,
-			Direction:   sip_infra.CallDirectionInbound,
+			Direction:   sip_runtime.CallDirectionInbound,
 			AssistantID: 1,
 		})
 	}

@@ -24,7 +24,7 @@ import (
 	internal_vonage_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/vonage"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 )
@@ -37,8 +37,8 @@ type StreamerOptions struct {
 	AudioSocketWriter *bufio.Writer
 
 	Context      context.Context
-	SIPSession   *sip_infra.Session
-	SIPLifecycle sip_infra.LifecycleController
+	SIPSession   *sip_runtime.Session
+	SIPLifecycle sip_runtime.LifecycleController
 	Observer     observability.Recorder
 }
 
@@ -61,7 +61,7 @@ func WithAudioSocketStreamer(conn net.Conn, reader *bufio.Reader, writer *bufio.
 }
 
 // WithSIPStreamer configures SIP session-owned media transport.
-func WithSIPStreamer(ctx context.Context, session *sip_infra.Session, lifecycle sip_infra.LifecycleController) StreamerFuncOption {
+func WithSIPStreamer(ctx context.Context, session *sip_runtime.Session, lifecycle sip_runtime.LifecycleController) StreamerFuncOption {
 	return func(streamerOptions *StreamerOptions) {
 		streamerOptions.Context = ctx
 		streamerOptions.SIPSession = session
@@ -163,8 +163,8 @@ func (at Telephony) NewStreamer(
 type SIPStreamerOptions struct {
 	Context         context.Context
 	Logger          commons.Logger
-	Session         *sip_infra.Session
-	Lifecycle       sip_infra.LifecycleController
+	Session         *sip_runtime.Session
+	Lifecycle       sip_runtime.LifecycleController
 	CallContext     *callcontext.CallContext
 	VaultCredential *protos.VaultCredential
 	Observer        observability.Recorder
@@ -184,13 +184,13 @@ func WithSIPLogger(logger commons.Logger) SIPStreamerFuncOption {
 	}
 }
 
-func WithSIPSession(session *sip_infra.Session) SIPStreamerFuncOption {
+func WithSIPSession(session *sip_runtime.Session) SIPStreamerFuncOption {
 	return func(options *SIPStreamerOptions) {
 		options.Session = session
 	}
 }
 
-func WithSIPLifecycle(lifecycle sip_infra.LifecycleController) SIPStreamerFuncOption {
+func WithSIPLifecycle(lifecycle sip_runtime.LifecycleController) SIPStreamerFuncOption {
 	return func(options *SIPStreamerOptions) {
 		options.Lifecycle = lifecycle
 	}

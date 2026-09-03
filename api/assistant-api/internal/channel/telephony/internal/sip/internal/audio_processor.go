@@ -21,7 +21,7 @@ import (
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/protos"
 	"github.com/zaf/g711"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -43,7 +43,7 @@ type bridgeRecordingFrame struct {
 // and ringback generation.
 type AudioProcessor struct {
 	resampler  internal_type.AudioResampler
-	rtpHandler *sip_infra.RTPHandler
+	rtpHandler rtpHandler
 	pushInput  func(internal_type.Stream)
 	record     func(...observability.Record) error
 
@@ -99,13 +99,13 @@ func NewAudioProcessor(cfg AudioProcessorConfig) *AudioProcessor {
 	return p
 }
 
-func (p *AudioProcessor) currentCodec() *sip_infra.Codec {
+func (p *AudioProcessor) currentCodec() *sip_runtime.Codec {
 	if p.rtpHandler == nil {
-		return &sip_infra.CodecPCMU
+		return &sip_runtime.CodecPCMU
 	}
 	codec := p.rtpHandler.GetCodec()
 	if codec == nil {
-		return &sip_infra.CodecPCMU
+		return &sip_runtime.CodecPCMU
 	}
 	return codec
 }
@@ -139,7 +139,7 @@ func decodeG711ToLinear8k(audioData []byte, codecName string) []byte {
 		return nil
 	}
 	switch codecName {
-	case sip_infra.CodecPCMA.Name:
+	case sip_runtime.CodecPCMA.Name:
 		return g711.DecodeAlaw(audioData)
 	default:
 		return g711.DecodeUlaw(audioData)
@@ -158,7 +158,7 @@ func (p *AudioProcessor) convertOutputAudio(audioData []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if p.currentCodec().Name == sip_infra.CodecPCMA.Name {
+	if p.currentCodec().Name == sip_runtime.CodecPCMA.Name {
 		convertedAudio = internal_audio.UlawToAlaw(convertedAudio)
 	}
 	return convertedAudio, nil
@@ -257,7 +257,7 @@ func (p *AudioProcessor) applyAmbient(chunk []byte) []byte {
 	var primaryPCM []byte
 	if len(chunk) > 0 {
 		switch codec.Name {
-		case sip_infra.CodecPCMA.Name:
+		case sip_runtime.CodecPCMA.Name:
 			primaryPCM = g711.DecodeAlaw(chunk)
 		default:
 			primaryPCM = g711.DecodeUlaw(chunk)
@@ -268,7 +268,7 @@ func (p *AudioProcessor) applyAmbient(chunk []byte) []byte {
 		return chunk
 	}
 	switch codec.Name {
-	case sip_infra.CodecPCMA.Name:
+	case sip_runtime.CodecPCMA.Name:
 		return g711.EncodeAlaw(mixedPCM)
 	default:
 		return g711.EncodeUlaw(mixedPCM)
@@ -314,11 +314,11 @@ func (p *AudioProcessor) IsBridgeActive() bool {
 	return p.bridge.Load() != nil
 }
 
-func (p *AudioProcessor) ConnectTransferMedia(target internal_type.SIPRTPBridgeTarget, inputCodec *sip_infra.Codec, outputCodecName string) {
+func (p *AudioProcessor) ConnectTransferMedia(target internal_type.SIPRTPBridgeTarget, inputCodec *sip_runtime.Codec, outputCodecName string) {
 	if target == nil {
 		return
 	}
-	inputCodecName := sip_infra.CodecPCMU.Name
+	inputCodecName := sip_runtime.CodecPCMU.Name
 	if inputCodec != nil && inputCodec.Name != "" {
 		inputCodecName = inputCodec.Name
 	}
@@ -331,9 +331,9 @@ func (p *AudioProcessor) ConnectTransferMedia(target internal_type.SIPRTPBridgeT
 		outputCodecName: outputCodecName,
 	}
 	if inputCodecName != outputCodecName {
-		if inputCodecName == sip_infra.CodecPCMA.Name && outputCodecName == sip_infra.CodecPCMU.Name {
+		if inputCodecName == sip_runtime.CodecPCMA.Name && outputCodecName == sip_runtime.CodecPCMU.Name {
 			state.forwardingTranscode = internal_audio.AlawToUlaw
-		} else if inputCodecName == sip_infra.CodecPCMU.Name && outputCodecName == sip_infra.CodecPCMA.Name {
+		} else if inputCodecName == sip_runtime.CodecPCMU.Name && outputCodecName == sip_runtime.CodecPCMA.Name {
 			state.forwardingTranscode = internal_audio.UlawToAlaw
 		}
 	}
@@ -363,7 +363,7 @@ func (p *AudioProcessor) ForwardUserAudio(audioData []byte) bool {
 	}
 	if err := state.outputTarget.EnqueueAudio(audioData); err != nil {
 		dropped := p.droppedBridgeFrames.Add(1)
-		if p.record != nil && errors.Is(err, sip_infra.ErrRTPOutputQueueFull) && (dropped == 1 || dropped%100 == 0) {
+		if p.record != nil && errors.Is(err, sip_runtime.ErrRTPOutputQueueFull) && (dropped == 1 || dropped%100 == 0) {
 			_ = p.record(observability.RecordLog{
 				Level:   observability.LevelError,
 				Message: "SIP bridge audio output queue full",
@@ -386,7 +386,7 @@ func (p *AudioProcessor) ForwardUserAudio(audioData []byte) bool {
 
 // RecordTransferOperatorAudio queues transfer target audio for recording.
 func (p *AudioProcessor) RecordTransferOperatorAudio(audio []byte) {
-	codecName := sip_infra.CodecPCMU.Name
+	codecName := sip_runtime.CodecPCMU.Name
 	if state := p.bridge.Load(); state != nil && state.outputCodecName != "" {
 		codecName = state.outputCodecName
 	}
@@ -470,7 +470,7 @@ func (p *AudioProcessor) nextRingbackFrame(frameSize int) []byte {
 	if len(frame) == 0 {
 		frame, p.ringbackOffset = internal_audio.GenerateRingbackMulawFrame(p.ringbackOffset)
 	}
-	if codec.Name == sip_infra.CodecPCMA.Name {
+	if codec.Name == sip_runtime.CodecPCMA.Name {
 		frame = internal_audio.UlawToAlaw(frame)
 	}
 	return frame

@@ -14,39 +14,33 @@ import (
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func newMediaPortTestSession(t *testing.T) *sip_infra.Session {
+func newMediaPortTestSession(t *testing.T) *sip_runtime.Session {
 	t.Helper()
-	session, err := sip_infra.NewSession(context.Background(),
-		sip_infra.WithSessionConfig(&sip_infra.Config{
+	session, err := sip_runtime.NewSession(context.Background(),
+		sip_runtime.WithSessionConfig(&sip_runtime.Config{
 			Server:            "127.0.0.1",
 			Port:              5060,
 			RTPPortRangeStart: 10000,
 			RTPPortRangeEnd:   10010,
 		}),
-		sip_infra.WithSessionDirection(sip_infra.CallDirectionInbound),
-		sip_infra.WithSessionCallID("media-port-test"),
-		sip_infra.WithSessionCodec(&sip_infra.CodecPCMU),
+		sip_runtime.WithSessionDirection(sip_runtime.CallDirectionInbound),
+		sip_runtime.WithSessionCallID("media-port-test"),
+		sip_runtime.WithSessionCodec(&sip_runtime.CodecPCMU),
 	)
 	require.NoError(t, err)
 	return session
 }
 
-func newMediaPortTestRTP(t *testing.T) (*sip_infra.RTPHandler, chan []byte, chan []byte) {
+func newMediaPortTestRTP(t *testing.T) (*fakeRTPHandler, chan []byte, chan []byte) {
 	t.Helper()
-	rtpHandler := &sip_infra.RTPHandler{}
-	audioIn := make(chan []byte, 100)
-	audioOut := make(chan []byte, 100)
-	setUnexportedField(t, rtpHandler, "codec", &sip_infra.CodecPCMU)
-	setUnexportedField(t, rtpHandler, "audioInChan", audioIn)
-	setUnexportedField(t, rtpHandler, "audioOutChan", audioOut)
-	setUnexportedField(t, rtpHandler, "flushAudioCh", make(chan struct{}, 1))
-	return rtpHandler, audioIn, audioOut
+	rtpHandler := newTestRTPHandler(&sip_runtime.CodecPCMU)
+	return rtpHandler, rtpHandler.audioIn, rtpHandler.audioOut
 }
 
 type mediaPortTestResampler struct{}
@@ -288,7 +282,7 @@ func TestMediaPort_ConnectTransferMediaForwardsCallerAudio(t *testing.T) {
 
 	mediaPort.Start()
 	defer func() { require.NoError(t, mediaPort.Close()) }()
-	mediaPort.ConnectTransferMedia(bridgeRTP, sip_infra.CodecPCMU.Name)
+	mediaPort.ConnectTransferMedia(bridgeRTP, sip_runtime.CodecPCMU.Name)
 	audioIn <- []byte{0x01, 0x02, 0x03}
 
 	select {
@@ -331,6 +325,6 @@ func TestMediaPort_DeliverAssistantFrameAfterCloseReturnsSessionClosed(t *testin
 		err := mediaPort.deliverAssistantFrame(internal_telephony_media.AssistantOutputFrame{
 			ProviderAudio: make([]byte, BridgeOutputFrameSize),
 		})
-		assert.ErrorIs(t, err, sip_infra.ErrSessionClosed)
+		assert.ErrorIs(t, err, sip_runtime.ErrSessionClosed)
 	})
 }
