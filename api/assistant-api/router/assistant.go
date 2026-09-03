@@ -146,5 +146,9 @@ func TalkApiRoute(
 		apiv1.GET("/:telephony/ctx/:contextId", talkRpcApi.CallTalkerByContext)
 		apiv1.GET("/:telephony/ctx/:contextId/event", talkRpcApi.CallbackByContext)
 		apiv1.POST("/:telephony/ctx/:contextId/event", talkRpcApi.CallbackByContext)
+
+		// answer document fetch — the provider's answer_url fetches its <Stream> answer XML.
+		apiv1.GET("/:telephony/ctx/:contextId/answer", talkRpcApi.CallAnswerByContext)
+		apiv1.POST("/:telephony/ctx/:contextId/answer", talkRpcApi.CallAnswerByContext)
 	}
 }
