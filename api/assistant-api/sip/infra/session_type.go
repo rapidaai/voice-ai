@@ -16,11 +16,11 @@ import (
 type SessionOption = internal_core.SessionOption
 
 func WithSessionConfig(config *Config) SessionOption {
-	return internal_core.WithSessionConfig(config.toCore())
+	return internal_core.WithSessionConfig(cloneConfig(config))
 }
 
 func WithSessionDirection(direction CallDirection) SessionOption {
-	return internal_core.WithSessionDirection(direction.toCore())
+	return internal_core.WithSessionDirection(direction)
 }
 
 func WithSessionCallID(callID string) SessionOption {
@@ -28,7 +28,7 @@ func WithSessionCallID(callID string) SessionOption {
 }
 
 func WithSessionCodec(codec *Codec) SessionOption {
-	return internal_core.WithSessionCodec(codec.toCore())
+	return internal_core.WithSessionCodec(codecToCore(codec))
 }
 
 func WithSessionAuth(auth *types.Authentication) SessionOption {

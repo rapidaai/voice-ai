@@ -6,11 +6,13 @@
 
 package sip_infra
 
-type BridgeEndReason int
+import internal_core "github.com/rapidaai/api/assistant-api/sip/internal/core"
+
+type BridgeEndReason = internal_core.BridgeEndReason
 
 const (
-	BridgeEndInboundBye BridgeEndReason = iota
-	BridgeEndOutboundBye
-	BridgeEndContext
-	BridgeEndTimeout
+	BridgeEndInboundBye  = internal_core.BridgeEndInboundBye
+	BridgeEndOutboundBye = internal_core.BridgeEndOutboundBye
+	BridgeEndContext     = internal_core.BridgeEndContext
+	BridgeEndTimeout     = internal_core.BridgeEndTimeout
 )

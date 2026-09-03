@@ -14,31 +14,14 @@ import (
 	"github.com/rapidaai/pkg/commons"
 )
 
-func (r *Registration) Validate() error {
-	return r.toCore().Validate()
-}
-
-func (r *Registration) toCore() *internal_core.Registration {
-	if r == nil {
-		return nil
-	}
-	return &internal_core.Registration{
-		DID:          r.DID,
-		Config:       r.Config.toCore(),
-		DeploymentID: r.DeploymentID,
-		AssistantID:  r.AssistantID,
-		ExpiresIn:    r.ExpiresIn,
-	}
-}
-
 func NewRegistrationClient(client *sipgo.Client, listenConfig *ListenConfig, logger commons.Logger) *RegistrationClient {
 	return &RegistrationClient{
-		inner: internal_core.NewRegistrationClient(client, listenConfig.toCore(), logger),
+		inner: internal_core.NewRegistrationClient(client, listenConfig, logger),
 	}
 }
 
 func (rc *RegistrationClient) Register(ctx context.Context, reg *Registration) error {
-	return rc.inner.Register(ctx, reg.toCore())
+	return rc.inner.Register(ctx, reg)
 }
 
 func (rc *RegistrationClient) SetObserver(observer RegistrationObserver) {

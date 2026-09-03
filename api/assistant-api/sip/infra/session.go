@@ -39,7 +39,7 @@ func (s *Session) unwrap() *internal_core.Session {
 }
 
 func (s *Session) GetInfo() SessionInfo {
-	return sessionInfoFromCore(s.inner.GetInfo())
+	return s.inner.GetInfo()
 }
 
 func (s *Session) GetCallID() string {
@@ -47,7 +47,7 @@ func (s *Session) GetCallID() string {
 }
 
 func (s *Session) SetState(state CallState) {
-	s.inner.SetState(state.toCore())
+	s.inner.SetState(state)
 }
 
 func (s *Session) SetRemoteRTP(addr string, port int) {
@@ -99,7 +99,7 @@ func (s *Session) MarkInboundFirstAssistantAudioSent() bool {
 }
 
 func (s *Session) GetInboundSetupTimings() InboundSetupTimings {
-	return inboundSetupTimingsFromCore(s.inner.GetInboundSetupTimings())
+	return s.inner.GetInboundSetupTimings()
 }
 
 func (s *Session) GetInboundLatencyMetrics() map[string]int64 {
@@ -292,11 +292,11 @@ func (s *Session) NotifyBye() {
 }
 
 func (s *Session) SetDisconnectMetadata(metadata DisconnectMetadata) {
-	s.inner.SetDisconnectMetadata(metadata.toCore())
+	s.inner.SetDisconnectMetadata(metadata)
 }
 
 func (s *Session) GetDisconnectMetadata() DisconnectMetadata {
-	return disconnectMetadataFromCore(s.inner.GetDisconnectMetadata())
+	return s.inner.GetDisconnectMetadata()
 }
 
 func (s *Session) ByeReceived() <-chan struct{} {
@@ -308,12 +308,11 @@ func (s *Session) GetConfig() *Config {
 	if coreConfig == nil {
 		return nil
 	}
-	config := configFromCore(coreConfig)
-	return &config
+	return cloneConfig(coreConfig)
 }
 
 func (s *Session) GetState() CallState {
-	return callStateFromCore(s.inner.GetState())
+	return s.inner.GetState()
 }
 
 func (s *Session) GetRTPStats() *RTPStats {
@@ -321,6 +320,6 @@ func (s *Session) GetRTPStats() *RTPStats {
 	if stats == nil {
 		return nil
 	}
-	out := rtpStatsFromCore(*stats)
+	out := *stats
 	return &out
 }

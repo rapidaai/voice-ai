@@ -6,12 +6,7 @@
 
 package sip_infra
 
-import (
-	"time"
-
-	internal_core "github.com/rapidaai/api/assistant-api/sip/internal/core"
-	"github.com/rapidaai/pkg/commons"
-)
+import internal_core "github.com/rapidaai/api/assistant-api/sip/internal/core"
 
 type RTPPacket struct {
 	Version        uint8
@@ -26,7 +21,7 @@ type RTPPacket struct {
 	Payload        []byte
 }
 
-type RTPFallbackAudioSource func(frameSize int) []byte
+type RTPFallbackAudioSource = internal_core.RTPFallbackAudioSource
 
 type RTPHandler struct {
 	inner *internal_core.RTPHandler
@@ -38,39 +33,4 @@ type RTPHandler struct {
 	fallbackSource RTPFallbackAudioSource
 }
 
-type RTPConfig struct {
-	LocalIP     string
-	LocalPort   int
-	PayloadType uint8
-	ClockRate   uint32
-	Logger      commons.Logger
-
-	RTPPortRangeStart int
-	RTPPortRangeEnd   int
-	SymmetricRTP      bool
-
-	MediaTimeoutInitial time.Duration
-	MediaTimeout        time.Duration
-}
-
-func (c *RTPConfig) Validate() error {
-	return c.toCore().Validate()
-}
-
-func (c *RTPConfig) toCore() *internal_core.RTPConfig {
-	if c == nil {
-		return nil
-	}
-	return &internal_core.RTPConfig{
-		LocalIP:             c.LocalIP,
-		LocalPort:           c.LocalPort,
-		PayloadType:         c.PayloadType,
-		ClockRate:           c.ClockRate,
-		Logger:              c.Logger,
-		RTPPortRangeStart:   c.RTPPortRangeStart,
-		RTPPortRangeEnd:     c.RTPPortRangeEnd,
-		SymmetricRTP:        c.SymmetricRTP,
-		MediaTimeoutInitial: c.MediaTimeoutInitial,
-		MediaTimeout:        c.MediaTimeout,
-	}
-}
+type RTPConfig = internal_core.RTPConfig

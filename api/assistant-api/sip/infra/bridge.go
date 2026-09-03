@@ -9,6 +9,5 @@ package sip_infra
 import "context"
 
 func (s *Server) BridgeTransfer(ctx context.Context, inbound, outbound *Session, onOperatorAudio func([]byte)) (BridgeEndReason, error) {
-	reason, err := s.inner.BridgeTransfer(ctx, inbound.unwrap(), outbound.unwrap(), onOperatorAudio)
-	return BridgeEndReason(reason), err
+	return s.inner.BridgeTransfer(ctx, inbound.unwrap(), outbound.unwrap(), onOperatorAudio)
 }

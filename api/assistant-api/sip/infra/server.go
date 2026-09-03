@@ -37,11 +37,7 @@ func (s *Server) SetMiddlewares(middlewares []Middleware) {
 		}
 		current := middleware
 		coreMiddlewares = append(coreMiddlewares, func(ctx *internal_core.SIPRequestContext) error {
-			var config *Config
-			if ctx.Config != nil {
-				converted := configFromCore(ctx.Config)
-				config = &converted
-			}
+			config := cloneConfig(ctx.Config)
 			infraCtx := &SIPRequestContext{
 				Method:          ctx.Method,
 				CallID:          ctx.CallID,
@@ -66,11 +62,7 @@ func (s *Server) SetMiddlewares(middlewares []Middleware) {
 			ctx.Auth = infraCtx.Auth
 			ctx.Assistant = infraCtx.Assistant
 			ctx.VaultCredential = infraCtx.VaultCredential
-			if infraCtx.Config != nil {
-				ctx.Config = infraCtx.Config.toCore()
-			} else {
-				ctx.Config = nil
-			}
+			ctx.Config = cloneConfig(infraCtx.Config)
 			return err
 		})
 	}
@@ -82,11 +74,11 @@ func (s *Server) IsRunning() bool {
 }
 
 func (s *Server) NegotiatedSDPConfig(localIP string, rtpPort int, codec *Codec) *SDPConfig {
-	return sdpConfigFromCore(s.inner.NegotiatedSDPConfig(localIP, rtpPort, codec.toCore()))
+	return sdpConfigFromCore(s.inner.NegotiatedSDPConfig(localIP, rtpPort, codecToCore(codec)))
 }
 
 func (s *Server) GenerateSDP(config *SDPConfig) string {
-	return s.inner.GenerateSDP(config.toCore())
+	return s.inner.GenerateSDP(sdpConfigToCore(config))
 }
 
 func (s *Server) ParseSDP(sdpBody []byte) (*SDPMediaInfo, error) {
@@ -102,7 +94,7 @@ func (s *Server) Client() *sipgo.Client {
 }
 
 func (s *Server) GetListenConfig() *ListenConfig {
-	return listenConfigFromCore(s.inner.GetListenConfig())
+	return s.inner.GetListenConfig()
 }
 
 func (s *Server) SessionCount() int {
@@ -206,5 +198,5 @@ func (s *Server) SetOnError(fn func(session *Session, err error)) {
 }
 
 func (s *Server) HealthSnapshot() ServerHealthSnapshot {
-	return serverHealthSnapshotFromCore(s.inner.HealthSnapshot())
+	return s.inner.HealthSnapshot()
 }

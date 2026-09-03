@@ -8,26 +8,4 @@ package sip_infra
 
 import internal_core "github.com/rapidaai/api/assistant-api/sip/internal/core"
 
-type ServerHealthSnapshot struct {
-	Ready                   bool
-	Reason                  string
-	State                   ServerState
-	ActiveCalls             int
-	RTPPortsInUse           int
-	RTPPortBindAttempts     uint64
-	RTPPortBindFailures     uint64
-	RTPPortRangeExhaustions uint64
-}
-
-func serverHealthSnapshotFromCore(snapshot internal_core.ServerHealthSnapshot) ServerHealthSnapshot {
-	return ServerHealthSnapshot{
-		Ready:                   snapshot.Ready,
-		Reason:                  snapshot.Reason,
-		State:                   ServerState(snapshot.State),
-		ActiveCalls:             snapshot.ActiveCalls,
-		RTPPortsInUse:           snapshot.RTPPortsInUse,
-		RTPPortBindAttempts:     snapshot.RTPPortBindAttempts,
-		RTPPortBindFailures:     snapshot.RTPPortBindFailures,
-		RTPPortRangeExhaustions: snapshot.RTPPortRangeExhaustions,
-	}
-}
+type ServerHealthSnapshot = internal_core.ServerHealthSnapshot

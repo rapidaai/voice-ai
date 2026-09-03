@@ -58,6 +58,9 @@ type SDPMediaInfo struct {
 // IsHold returns true if the SDP indicates a hold condition.
 // Hold is signalled by: direction=sendonly/inactive, or connection IP 0.0.0.0 (RFC 3264)
 func (s *SDPMediaInfo) IsHold() bool {
+	if s == nil {
+		return false
+	}
 	if s.Direction == SDPDirectionSendOnly || s.Direction == SDPDirectionInactive {
 		return true
 	}

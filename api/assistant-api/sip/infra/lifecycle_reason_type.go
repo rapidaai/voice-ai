@@ -8,77 +8,72 @@ package sip_infra
 
 import internal_core "github.com/rapidaai/api/assistant-api/sip/internal/core"
 
-type LifecycleReason string
+type LifecycleReason = internal_core.LifecycleReason
 
 const (
-	LifecycleReasonEndCall                        LifecycleReason = "end_call"
-	LifecycleReasonSessionEnd                     LifecycleReason = "session_end"
-	LifecycleReasonServerStop                     LifecycleReason = "server_stop"
-	LifecycleReasonRemoteBye                      LifecycleReason = "remote_bye"
-	LifecycleReasonCancelReceived                 LifecycleReason = "cancel_received"
-	LifecycleReasonInviteCancelled                LifecycleReason = "invite_cancelled"
-	LifecycleReasonInviteCancelledBeforeAnswer    LifecycleReason = "invite_cancelled_before_answer"
-	LifecycleReasonInboundInviteReceived          LifecycleReason = "inbound_invite_received"
-	LifecycleReasonInboundAuthenticated           LifecycleReason = "inbound_authenticated"
-	LifecycleReasonInboundRouted                  LifecycleReason = "inbound_routed"
-	LifecycleReasonInboundInviteRinging           LifecycleReason = "inbound_invite_ringing"
-	LifecycleReasonInboundMediaAllocated          LifecycleReason = "inbound_media_allocated"
-	LifecycleReasonInboundApplicationReady        LifecycleReason = "inbound_application_ready"
-	LifecycleReasonInboundAnswerPolicyReady       LifecycleReason = "inbound_answer_policy_ready"
-	LifecycleReasonInboundInviteAnswered          LifecycleReason = "inbound_invite_answered"
-	LifecycleReasonInboundInviteFailed            LifecycleReason = "inbound_invite_failed"
-	LifecycleReasonInboundInviteACKReceived       LifecycleReason = "inbound_invite_ack_received"
-	LifecycleReasonInboundMediaFlowing            LifecycleReason = "inbound_media_flowing"
-	LifecycleReasonInboundFirstRTPReceived        LifecycleReason = "inbound_first_rtp_received"
-	LifecycleReasonInboundAssistantAudioReady     LifecycleReason = "inbound_assistant_audio_ready"
-	LifecycleReasonInboundFirstAssistantAudioSent LifecycleReason = "inbound_first_assistant_audio_sent"
-	LifecycleReasonInboundReinviteACKReceived     LifecycleReason = "inbound_reinvite_ack_received"
-	LifecycleReasonInboundReinviteSDPRejected     LifecycleReason = "inbound_reinvite_sdp_rejected"
-	LifecycleReasonInboundUpdateSDPRejected       LifecycleReason = "inbound_update_sdp_rejected"
-	LifecycleReasonInboundACKTimeout              LifecycleReason = "inbound_ack_timeout"
-	LifecycleReasonInboundAnswerPolicyTimeout     LifecycleReason = "inbound_answer_policy_timeout"
-	LifecycleReasonInboundLateACK                 LifecycleReason = "inbound_late_ack"
-	LifecycleReasonPipelineCallbacksMissing       LifecycleReason = "pipeline_callbacks_missing"
-	LifecycleReasonPipelineConversationMissing    LifecycleReason = "pipeline_conversation_missing"
-	LifecycleReasonPipelineConversationFailed     LifecycleReason = "pipeline_conversation_failed"
-	LifecycleReasonPipelineSetupFailed            LifecycleReason = "pipeline_setup_failed"
-	LifecycleReasonPipelineTalkCompleted          LifecycleReason = "pipeline_talk_completed"
-	LifecycleReasonPipelineCallEnd                LifecycleReason = "pipeline_call_end"
-	LifecycleReasonStreamerEndSession             LifecycleReason = "streamer_end_session"
-	LifecycleReasonStreamerClosed                 LifecycleReason = "streamer_closed"
-	LifecycleReasonOutboundCancelledBeforeAnswer  LifecycleReason = "outbound_cancelled_before_answer"
-	LifecycleReasonOutboundSetupFailure           LifecycleReason = "outbound_setup_failure"
-	LifecycleReasonOutboundProgressRinging        LifecycleReason = "outbound_progress_ringing"
-	LifecycleReasonOutboundWaitAnswerFailed       LifecycleReason = "outbound_wait_answer_failed"
-	LifecycleReasonOutboundAuthFailed             LifecycleReason = "outbound_auth_failed"
-	LifecycleReasonOutboundNoAnswer               LifecycleReason = "outbound_no_answer"
-	LifecycleReasonOutboundUnavailable            LifecycleReason = "outbound_unavailable"
-	LifecycleReasonOutboundRejected               LifecycleReason = "outbound_rejected"
-	LifecycleReasonOutboundMediaRejected          LifecycleReason = "outbound_media_rejected"
-	LifecycleReasonOutboundUpstreamFailure        LifecycleReason = "outbound_upstream_failure"
-	LifecycleReasonOutboundTrunkCapacity          LifecycleReason = "outbound_trunk_capacity"
-	LifecycleReasonOutboundNetworkFailure         LifecycleReason = "outbound_network_failure"
-	LifecycleReasonOutboundACKSent                LifecycleReason = "outbound_ack_sent"
-	LifecycleReasonOutboundAnswerSDPFailed        LifecycleReason = "outbound_answer_sdp_failed"
-	LifecycleReasonOutboundACKFailed              LifecycleReason = "outbound_ack_failed"
-	LifecycleReasonOutboundMaxDuration            LifecycleReason = "outbound_max_duration"
-	LifecycleReasonOutboundTeardownTimeout        LifecycleReason = "outbound_teardown_timeout"
-	LifecycleReasonBridgeSetupFailed              LifecycleReason = "bridge_setup_failed"
-	LifecycleReasonBridgeTransferStarted          LifecycleReason = "bridge_transfer_started"
-	LifecycleReasonBridgeMediaConnected           LifecycleReason = "bridge_media_connected"
-	LifecycleReasonBridgeRTPUnavailable           LifecycleReason = "bridge_rtp_unavailable"
-	LifecycleReasonTransferModeStarted            LifecycleReason = "transfer_mode_started"
-	LifecycleReasonTransferModeEnded              LifecycleReason = "transfer_mode_ended"
-	LifecycleReasonTransferOutboundEnded          LifecycleReason = "transfer_outbound_ended"
+	LifecycleReasonEndCall                        = internal_core.LifecycleReasonEndCall
+	LifecycleReasonSessionEnd                     = internal_core.LifecycleReasonSessionEnd
+	LifecycleReasonServerStop                     = internal_core.LifecycleReasonServerStop
+	LifecycleReasonRemoteBye                      = internal_core.LifecycleReasonRemoteBye
+	LifecycleReasonCancelReceived                 = internal_core.LifecycleReasonCancelReceived
+	LifecycleReasonInviteCancelled                = internal_core.LifecycleReasonInviteCancelled
+	LifecycleReasonInviteCancelledBeforeAnswer    = internal_core.LifecycleReasonInviteCancelledBeforeAnswer
+	LifecycleReasonInboundInviteReceived          = internal_core.LifecycleReasonInboundInviteReceived
+	LifecycleReasonInboundAuthenticated           = internal_core.LifecycleReasonInboundAuthenticated
+	LifecycleReasonInboundRouted                  = internal_core.LifecycleReasonInboundRouted
+	LifecycleReasonInboundInviteRinging           = internal_core.LifecycleReasonInboundInviteRinging
+	LifecycleReasonInboundMediaAllocated          = internal_core.LifecycleReasonInboundMediaAllocated
+	LifecycleReasonInboundApplicationReady        = internal_core.LifecycleReasonInboundApplicationReady
+	LifecycleReasonInboundAnswerPolicyReady       = internal_core.LifecycleReasonInboundAnswerPolicyReady
+	LifecycleReasonInboundInviteAnswered          = internal_core.LifecycleReasonInboundInviteAnswered
+	LifecycleReasonInboundInviteFailed            = internal_core.LifecycleReasonInboundInviteFailed
+	LifecycleReasonInboundInviteACKReceived       = internal_core.LifecycleReasonInboundInviteACKReceived
+	LifecycleReasonInboundMediaFlowing            = internal_core.LifecycleReasonInboundMediaFlowing
+	LifecycleReasonInboundMediaFailed             = internal_core.LifecycleReasonInboundMediaFailed
+	LifecycleReasonInboundMediaTimeout            = internal_core.LifecycleReasonInboundMediaTimeout
+	LifecycleReasonInboundFirstRTPReceived        = internal_core.LifecycleReasonInboundFirstRTPReceived
+	LifecycleReasonInboundAssistantAudioReady     = internal_core.LifecycleReasonInboundAssistantAudioReady
+	LifecycleReasonInboundFirstAssistantAudioSent = internal_core.LifecycleReasonInboundFirstAssistantAudioSent
+	LifecycleReasonInboundReinviteACKReceived     = internal_core.LifecycleReasonInboundReinviteACKReceived
+	LifecycleReasonInboundReinviteSDPRejected     = internal_core.LifecycleReasonInboundReinviteSDPRejected
+	LifecycleReasonInboundUpdateSDPRejected       = internal_core.LifecycleReasonInboundUpdateSDPRejected
+	LifecycleReasonInboundACKTimeout              = internal_core.LifecycleReasonInboundACKTimeout
+	LifecycleReasonInboundAnswerPolicyTimeout     = internal_core.LifecycleReasonInboundAnswerPolicyTimeout
+	LifecycleReasonInboundLateACK                 = internal_core.LifecycleReasonInboundLateACK
+	LifecycleReasonPipelineCallbacksMissing       = internal_core.LifecycleReasonPipelineCallbacksMissing
+	LifecycleReasonPipelineConversationMissing    = internal_core.LifecycleReasonPipelineConversationMissing
+	LifecycleReasonPipelineConversationFailed     = internal_core.LifecycleReasonPipelineConversationFailed
+	LifecycleReasonPipelineSetupFailed            = internal_core.LifecycleReasonPipelineSetupFailed
+	LifecycleReasonPipelineTalkCompleted          = internal_core.LifecycleReasonPipelineTalkCompleted
+	LifecycleReasonPipelineCallEnd                = internal_core.LifecycleReasonPipelineCallEnd
+	LifecycleReasonStreamerEndSession             = internal_core.LifecycleReasonStreamerEndSession
+	LifecycleReasonStreamerClosed                 = internal_core.LifecycleReasonStreamerClosed
+	LifecycleReasonOutboundCancelledBeforeAnswer  = internal_core.LifecycleReasonOutboundCancelledBeforeAnswer
+	LifecycleReasonOutboundSetupFailure           = internal_core.LifecycleReasonOutboundSetupFailure
+	LifecycleReasonOutboundProgressRinging        = internal_core.LifecycleReasonOutboundProgressRinging
+	LifecycleReasonOutboundWaitAnswerFailed       = internal_core.LifecycleReasonOutboundWaitAnswerFailed
+	LifecycleReasonOutboundAuthFailed             = internal_core.LifecycleReasonOutboundAuthFailed
+	LifecycleReasonOutboundNoAnswer               = internal_core.LifecycleReasonOutboundNoAnswer
+	LifecycleReasonOutboundUnavailable            = internal_core.LifecycleReasonOutboundUnavailable
+	LifecycleReasonOutboundRejected               = internal_core.LifecycleReasonOutboundRejected
+	LifecycleReasonOutboundMediaRejected          = internal_core.LifecycleReasonOutboundMediaRejected
+	LifecycleReasonOutboundMediaTimeout           = internal_core.LifecycleReasonOutboundMediaTimeout
+	LifecycleReasonOutboundUpstreamFailure        = internal_core.LifecycleReasonOutboundUpstreamFailure
+	LifecycleReasonOutboundTrunkCapacity          = internal_core.LifecycleReasonOutboundTrunkCapacity
+	LifecycleReasonOutboundNetworkFailure         = internal_core.LifecycleReasonOutboundNetworkFailure
+	LifecycleReasonOutboundACKSent                = internal_core.LifecycleReasonOutboundACKSent
+	LifecycleReasonOutboundAnswerSDPFailed        = internal_core.LifecycleReasonOutboundAnswerSDPFailed
+	LifecycleReasonOutboundACKFailed              = internal_core.LifecycleReasonOutboundACKFailed
+	LifecycleReasonOutboundMaxDuration            = internal_core.LifecycleReasonOutboundMaxDuration
+	LifecycleReasonOutboundTeardownTimeout        = internal_core.LifecycleReasonOutboundTeardownTimeout
+	LifecycleReasonBridgeSetupFailed              = internal_core.LifecycleReasonBridgeSetupFailed
+	LifecycleReasonBridgeTransferStarted          = internal_core.LifecycleReasonBridgeTransferStarted
+	LifecycleReasonBridgeMediaConnected           = internal_core.LifecycleReasonBridgeMediaConnected
+	LifecycleReasonBridgeRTPUnavailable           = internal_core.LifecycleReasonBridgeRTPUnavailable
+	LifecycleReasonTransferModeStarted            = internal_core.LifecycleReasonTransferModeStarted
+	LifecycleReasonTransferModeEnded              = internal_core.LifecycleReasonTransferModeEnded
+	LifecycleReasonTransferOutboundEnded          = internal_core.LifecycleReasonTransferOutboundEnded
 )
-
-func (r LifecycleReason) String() string {
-	return string(r)
-}
-
-func (r LifecycleReason) toCore() internal_core.LifecycleReason {
-	return internal_core.LifecycleReason(r)
-}
 
 type LifecycleController interface {
 	TransitionCall(session *Session, next CallState, reason LifecycleReason) bool

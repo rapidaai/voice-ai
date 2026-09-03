@@ -111,6 +111,9 @@ type ListenConfig struct {
 // ExternalIP must be explicitly configured (SIP__EXTERNAL_IP) for production use.
 // Falls back to Address only if ExternalIP is not set.
 func (c *ListenConfig) GetExternalIP() string {
+	if c == nil {
+		return ""
+	}
 	if c.ExternalIP != "" {
 		return c.ExternalIP
 	}
@@ -123,11 +126,17 @@ func (c *ListenConfig) GetExternalIP() string {
 // the external IP is only advertised in SDP so the remote peer knows
 // where to send its RTP packets.
 func (c *ListenConfig) GetBindAddress() string {
+	if c == nil {
+		return ""
+	}
 	return c.Address
 }
 
 // GetListenAddr returns the address to listen on
 func (c *ListenConfig) GetListenAddr() string {
+	if c == nil {
+		return ""
+	}
 	return fmt.Sprintf("%s:%d", c.Address, c.Port)
 }
 

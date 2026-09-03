@@ -9,7 +9,7 @@ package sip_infra
 import "context"
 
 func (s *Server) MakeCall(ctx context.Context, cfg *Config, toUser, fromUser string, opts MakeCallOptions) (*Session, error) {
-	session, err := s.inner.MakeCall(ctx, cfg.toCore(), toUser, fromUser, opts.toCore())
+	session, err := s.inner.MakeCall(ctx, cfg, toUser, fromUser, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -17,7 +17,7 @@ func (s *Server) MakeCall(ctx context.Context, cfg *Config, toUser, fromUser str
 }
 
 func (s *Server) MakeTransferBridgeCall(ctx context.Context, cfg *Config, toUser, fromUser string, opts TransferBridgeCallOptions) (*Session, error) {
-	session, err := s.inner.MakeTransferBridgeCall(ctx, cfg.toCore(), toUser, fromUser, opts.toCore())
+	session, err := s.inner.MakeTransferBridgeCall(ctx, cfg, toUser, fromUser, opts)
 	if err != nil {
 		return nil, err
 	}

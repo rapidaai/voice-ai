@@ -209,6 +209,23 @@ func TestApplyOperationalDefaults_FillsUnset(t *testing.T) {
 	assert.Equal(t, 20000, cfg.RTPPortRangeEnd)
 }
 
+func TestConfigDefaultMethodsAllowNilReceiver(t *testing.T) {
+	var config *Config
+
+	config.ApplyOperationalDefaults(5060, TransportUDP, 30000, 30100)
+	config.ApplyTimeoutDefaults(time.Second, 2*time.Second, 3*time.Second)
+	config.ApplyMediaTimeoutDefaults(4*time.Second, 5*time.Second)
+	config.ApplyInboundAnswerDefaults(InboundAnswerModeImmediate, time.Second, 2*time.Second, 3*time.Second)
+}
+
+func TestNilSDPMediaInfoIsNotHold(t *testing.T) {
+	var mediaInfo *SDPMediaInfo
+
+	if mediaInfo.IsHold() {
+		t.Fatal("nil SDP media info should not report hold")
+	}
+}
+
 func TestApplyOperationalDefaults_DoesNotOverwrite(t *testing.T) {
 	cfg := &Config{
 		Server:            "host.com",

@@ -8,12 +8,7 @@ package sip_infra
 
 import internal_core "github.com/rapidaai/api/assistant-api/sip/internal/core"
 
-type Codec struct {
-	Name        string
-	PayloadType uint8
-	ClockRate   uint32
-	Channels    int
-}
+type Codec = internal_core.Codec
 
 var (
 	CodecPCMU           = codecValueFromCore(internal_core.CodecPCMU)
@@ -24,7 +19,7 @@ var (
 
 var SupportedCodecs = []Codec{CodecPCMU, CodecPCMA}
 
-type SDPDirection string
+type SDPDirection = internal_core.SDPDirection
 
 const (
 	SDPDirectionSendRecv SDPDirection = "sendrecv"
@@ -33,31 +28,8 @@ const (
 	SDPDirectionInactive SDPDirection = "inactive"
 )
 
-type SDPMediaInfo struct {
-	ConnectionIP   string
-	AudioPort      int
-	PayloadTypes   []uint8
-	PreferredCodec *Codec
-	Direction      SDPDirection
-}
-
-func (s *SDPMediaInfo) IsHold() bool {
-	if s == nil {
-		return false
-	}
-	return s.Direction == SDPDirectionSendOnly ||
-		s.Direction == SDPDirectionInactive ||
-		s.ConnectionIP == "0.0.0.0"
-}
-
-type SDPConfig struct {
-	SessionID   string
-	SessionName string
-	LocalIP     string
-	RTPPort     int
-	Codecs      []Codec
-	PTime       int
-}
+type SDPMediaInfo = internal_core.SDPMediaInfo
+type SDPConfig = internal_core.SDPConfig
 
 func DefaultSDPConfig(localIP string, rtpPort int) *SDPConfig {
 	coreConfig := internal_core.DefaultSDPConfig(localIP, rtpPort)
@@ -91,7 +63,7 @@ func codecValueFromCore(codec internal_core.Codec) Codec {
 	}
 }
 
-func (codec *Codec) toCore() *internal_core.Codec {
+func codecToCore(codec *Codec) *internal_core.Codec {
 	if codec == nil {
 		return nil
 	}
@@ -130,7 +102,7 @@ func sdpConfigFromCore(config *internal_core.SDPConfig) *SDPConfig {
 	}
 }
 
-func (config *SDPConfig) toCore() *internal_core.SDPConfig {
+func sdpConfigToCore(config *SDPConfig) *internal_core.SDPConfig {
 	if config == nil {
 		return nil
 	}
@@ -161,7 +133,7 @@ func codecsToCore(codecs []Codec) []internal_core.Codec {
 	}
 	result := make([]internal_core.Codec, 0, len(codecs))
 	for _, codec := range codecs {
-		result = append(result, *codec.toCore())
+		result = append(result, *codecToCore(&codec))
 	}
 	return result
 }

@@ -7,8 +7,6 @@
 package sip_infra
 
 import (
-	"fmt"
-
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_core "github.com/rapidaai/api/assistant-api/sip/internal/core"
 	"github.com/rapidaai/pkg/commons"
@@ -16,12 +14,12 @@ import (
 	"github.com/rapidaai/protos"
 )
 
-type ServerState int32
+type ServerState = internal_core.ServerState
 
 const (
-	ServerStateCreated ServerState = iota
-	ServerStateRunning
-	ServerStateStopped
+	ServerStateCreated = internal_core.ServerStateCreated
+	ServerStateRunning = internal_core.ServerStateRunning
+	ServerStateStopped = internal_core.ServerStateStopped
 )
 
 type CallAddress = internal_core.CallAddress
@@ -63,63 +61,7 @@ type Server struct {
 	inner *internal_core.Server
 }
 
-type ListenConfig struct {
-	Address                 string    `json:"address" mapstructure:"address"`
-	ExternalIP              string    `json:"external_ip" mapstructure:"external_ip"`
-	AllowLoopbackExternalIP bool      `json:"allow_loopback_external_ip" mapstructure:"allow_loopback_external_ip"`
-	Port                    int       `json:"port" mapstructure:"port"`
-	Transport               Transport `json:"transport" mapstructure:"transport"`
-}
-
-func (c *ListenConfig) GetExternalIP() string {
-	if c == nil {
-		return ""
-	}
-	if c.ExternalIP != "" {
-		return c.ExternalIP
-	}
-	return c.Address
-}
-
-func (c *ListenConfig) GetBindAddress() string {
-	if c == nil {
-		return ""
-	}
-	return c.Address
-}
-
-func (c *ListenConfig) GetListenAddr() string {
-	if c == nil {
-		return ""
-	}
-	return fmt.Sprintf("%s:%d", c.Address, c.Port)
-}
-
-func (c *ListenConfig) toCore() *internal_core.ListenConfig {
-	if c == nil {
-		return nil
-	}
-	return &internal_core.ListenConfig{
-		Address:                 c.Address,
-		ExternalIP:              c.ExternalIP,
-		AllowLoopbackExternalIP: c.AllowLoopbackExternalIP,
-		Port:                    c.Port,
-		Transport:               internal_core.Transport(c.Transport),
-	}
-}
-
-func listenConfigFromCore(config *internal_core.ListenConfig) *ListenConfig {
-	if config == nil {
-		return nil
-	}
-	return &ListenConfig{
-		Address:                 config.Address,
-		ExternalIP:              config.ExternalIP,
-		AllowLoopbackExternalIP: config.AllowLoopbackExternalIP,
-		Port:                    config.Port,
-		Transport:               Transport(config.Transport),
-	}
-}
+type ListenConfig = internal_core.ListenConfig
 
 type ServerConfig struct {
 	ListenConfig         *ListenConfig
@@ -143,11 +85,7 @@ func (c *ServerConfig) toCore() *internal_core.ServerConfig {
 	for _, middleware := range c.Middlewares {
 		current := middleware
 		coreMiddlewares = append(coreMiddlewares, func(ctx *internal_core.SIPRequestContext) error {
-			var config *Config
-			if ctx.Config != nil {
-				converted := configFromCore(ctx.Config)
-				config = &converted
-			}
+			config := cloneConfig(ctx.Config)
 			infraCtx := &SIPRequestContext{
 				Method:          ctx.Method,
 				CallID:          ctx.CallID,
@@ -172,16 +110,12 @@ func (c *ServerConfig) toCore() *internal_core.ServerConfig {
 			ctx.Auth = infraCtx.Auth
 			ctx.Assistant = infraCtx.Assistant
 			ctx.VaultCredential = infraCtx.VaultCredential
-			if infraCtx.Config != nil {
-				ctx.Config = infraCtx.Config.toCore()
-			} else {
-				ctx.Config = nil
-			}
+			ctx.Config = cloneConfig(infraCtx.Config)
 			return err
 		})
 	}
 	return &internal_core.ServerConfig{
-		ListenConfig:         c.ListenConfig.toCore(),
+		ListenConfig:         c.ListenConfig,
 		Middlewares:          coreMiddlewares,
 		Logger:               c.Logger,
 		RTPPortRangeStart:    c.RTPPortRangeStart,
@@ -189,4 +123,12 @@ func (c *ServerConfig) toCore() *internal_core.ServerConfig {
 		SymmetricRTP:         c.SymmetricRTP,
 		IgnoreLocalAddrInSDP: c.IgnoreLocalAddrInSDP,
 	}
+}
+
+func cloneConfig(config *Config) *internal_core.Config {
+	if config == nil {
+		return nil
+	}
+	cloned := *config
+	return &cloned
 }

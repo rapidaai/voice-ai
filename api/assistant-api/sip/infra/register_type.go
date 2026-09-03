@@ -58,13 +58,7 @@ type RegistrationEvent = internal_core.RegistrationEvent
 type RegistrationObserver = internal_core.RegistrationObserver
 type RegistrationSnapshot = internal_core.RegistrationSnapshot
 
-type Registration struct {
-	DID          string
-	Config       *Config
-	DeploymentID uint64
-	AssistantID  uint64
-	ExpiresIn    uint32
-}
+type Registration = internal_core.Registration
 
 type RegistrationClient struct {
 	inner *internal_core.RegistrationClient

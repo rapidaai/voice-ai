@@ -14,7 +14,7 @@ import (
 )
 
 func NewRTPHandler(ctx context.Context, config *RTPConfig) (*RTPHandler, error) {
-	inner, err := internal_core.NewRTPHandler(ctx, config.toCore())
+	inner, err := internal_core.NewRTPHandler(ctx, config)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (h *RTPHandler) SetFallbackAudioSource(source RTPFallbackAudioSource) {
 		return
 	}
 	if h.inner != nil {
-		h.inner.SetFallbackAudioSource(internal_core.RTPFallbackAudioSource(source))
+		h.inner.SetFallbackAudioSource(source)
 		return
 	}
 	h.fallbackSource = source
@@ -174,7 +174,7 @@ func (h *RTPHandler) SetCodec(codec *Codec) {
 		return
 	}
 	if h.inner != nil {
-		h.inner.SetCodec(codec.toCore())
+		h.inner.SetCodec(codecToCore(codec))
 		return
 	}
 	h.codec = codec
@@ -195,7 +195,7 @@ func (h *RTPHandler) GetDetailedStats() RTPStats {
 		return RTPStats{}
 	}
 	if h.inner != nil {
-		return rtpStatsFromCore(h.inner.GetDetailedStats())
+		return h.inner.GetDetailedStats()
 	}
 	return RTPStats{}
 }

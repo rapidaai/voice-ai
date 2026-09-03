@@ -16,33 +16,33 @@ func (s *Server) EndCall(session *Session) error {
 }
 
 func (s *Server) TransitionCall(session *Session, next CallState, reason LifecycleReason) bool {
-	return s.inner.TransitionCall(session.unwrap(), next.toCore(), reason.toCore())
+	return s.inner.TransitionCall(session.unwrap(), next, reason)
 }
 
 func (s *Server) EndCallWithReason(session *Session, reason LifecycleReason) error {
-	return s.inner.EndCallWithReason(session.unwrap(), reason.toCore())
+	return s.inner.EndCallWithReason(session.unwrap(), reason)
 }
 
 func (s *Server) FailCall(session *Session, reason LifecycleReason, err error) error {
-	return s.inner.FailCall(session.unwrap(), reason.toCore(), err)
+	return s.inner.FailCall(session.unwrap(), reason, err)
 }
 
 func (s *Server) CancelCall(session *Session, reason LifecycleReason) error {
-	return s.inner.CancelCall(session.unwrap(), reason.toCore())
+	return s.inner.CancelCall(session.unwrap(), reason)
 }
 
 func (s *Server) ConnectInboundCall(session *Session, reason LifecycleReason) bool {
-	return s.inner.ConnectInboundCall(session.unwrap(), reason.toCore())
+	return s.inner.ConnectInboundCall(session.unwrap(), reason)
 }
 
 func (s *Server) CancelInboundCall(session *Session, reason LifecycleReason) error {
-	return s.inner.CancelInboundCall(session.unwrap(), reason.toCore())
+	return s.inner.CancelInboundCall(session.unwrap(), reason)
 }
 
 func (s *Server) FailInboundCall(session *Session, reason LifecycleReason, err error) error {
-	return s.inner.FailInboundCall(session.unwrap(), reason.toCore(), err)
+	return s.inner.FailInboundCall(session.unwrap(), reason, err)
 }
 
 func (s *Server) EndInboundCall(session *Session, reason LifecycleReason) error {
-	return s.inner.EndInboundCall(session.unwrap(), reason.toCore())
+	return s.inner.EndInboundCall(session.unwrap(), reason)
 }

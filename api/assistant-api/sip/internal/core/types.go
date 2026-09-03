@@ -253,6 +253,9 @@ func (c *Config) Validate() error {
 
 // ApplyOperationalDefaults fills unset platform-owned SIP runtime settings.
 func (c *Config) ApplyOperationalDefaults(port int, transport Transport, rtpStart, rtpEnd int) {
+	if c == nil {
+		return
+	}
 	if c.Port <= 0 && port > 0 {
 		c.Port = port
 	}
@@ -268,6 +271,9 @@ func (c *Config) ApplyOperationalDefaults(port int, transport Transport, rtpStar
 }
 
 func (c *Config) ApplyTimeoutDefaults(registerTimeout, inviteTimeout, sessionTimeout time.Duration) {
+	if c == nil {
+		return
+	}
 	if c.RegisterTimeout <= 0 && registerTimeout > 0 {
 		c.RegisterTimeout = registerTimeout
 	}
@@ -280,6 +286,9 @@ func (c *Config) ApplyTimeoutDefaults(registerTimeout, inviteTimeout, sessionTim
 }
 
 func (c *Config) ApplyMediaTimeoutDefaults(initialTimeout, mediaTimeout time.Duration) {
+	if c == nil {
+		return
+	}
 	if c.MediaTimeoutInitial <= 0 && initialTimeout > 0 {
 		c.MediaTimeoutInitial = initialTimeout
 	}
@@ -294,6 +303,9 @@ func (c *Config) ApplyInboundAnswerDefaults(
 	maxRingDuration time.Duration,
 	ackTimeout time.Duration,
 ) {
+	if c == nil {
+		return
+	}
 	if c.InboundAnswerMode == "" && mode != "" {
 		c.InboundAnswerMode = mode
 	}

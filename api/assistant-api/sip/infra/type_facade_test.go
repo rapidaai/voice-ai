@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestConfigTypeConversionsPreserveFields(t *testing.T) {
+func TestConfigTypeAliasPreservesFields(t *testing.T) {
 	config := &Config{
 		Server:              "sip.example.com",
 		Username:            "auth-user",
@@ -38,7 +38,7 @@ func TestConfigTypeConversionsPreserveFields(t *testing.T) {
 		KeepAliveEnabled:    true,
 	}
 
-	coreConfig := config.toCore()
+	var coreConfig *internal_core.Config = config
 	if coreConfig.Server != config.Server || coreConfig.Username != config.Username || coreConfig.Password != config.Password {
 		t.Fatalf("core config did not preserve credentials: %#v", coreConfig)
 	}
@@ -49,7 +49,7 @@ func TestConfigTypeConversionsPreserveFields(t *testing.T) {
 		t.Fatalf("core config did not preserve custom headers: %#v", coreConfig.CustomHeaders)
 	}
 
-	roundTripConfig := configFromCore(coreConfig)
+	var roundTripConfig *Config = coreConfig
 	if roundTripConfig.Server != config.Server || roundTripConfig.Transport != config.Transport {
 		t.Fatalf("round-trip config mismatch: %#v", roundTripConfig)
 	}
@@ -134,8 +134,9 @@ func TestCallStateHelpers(t *testing.T) {
 	if CallStateInitializing.IsTerminal() || CallStateInitializing.IsActive() {
 		t.Fatal("initializing should not be active or terminal")
 	}
-	if callStateFromCore(internal_core.CallStateConnected) != CallStateConnected {
-		t.Fatal("expected core connected state to convert to infra connected state")
+	var coreState internal_core.CallState = CallStateConnected
+	if coreState != internal_core.CallStateConnected {
+		t.Fatal("expected facade call state to share the core type")
 	}
 }
 
@@ -158,19 +159,20 @@ func TestSessionInfoDuration(t *testing.T) {
 	}
 }
 
-func TestDisconnectMetadataAndEventConversions(t *testing.T) {
+func TestDisconnectMetadataAndEventAliases(t *testing.T) {
 	metadata := DisconnectMetadata{
 		Reason:             DisconnectReasonBusy,
 		Text:               "Busy Here",
 		Raw:                "SIP ;cause=486 ;text=\"Busy Here\"",
 		ProviderStatusCode: 486,
 	}
-	coreMetadata := metadata.toCore()
+	var coreMetadata internal_core.DisconnectMetadata = metadata
 	if coreMetadata.Reason != metadata.Reason || coreMetadata.ProviderStatusCode != metadata.ProviderStatusCode {
 		t.Fatalf("core disconnect metadata mismatch: %#v", coreMetadata)
 	}
-	if disconnectMetadataFromCore(coreMetadata) != metadata {
-		t.Fatalf("disconnect metadata round-trip mismatch: %#v", disconnectMetadataFromCore(coreMetadata))
+	var roundTripMetadata DisconnectMetadata = coreMetadata
+	if roundTripMetadata != metadata {
+		t.Fatalf("disconnect metadata round-trip mismatch: %#v", roundTripMetadata)
 	}
 
 	event := NewEvent(EventTypeConnected, "call-123", map[string]interface{}{"state": "connected"})
@@ -233,8 +235,8 @@ func TestListenConfigAndServerConfigConversions(t *testing.T) {
 		t.Fatalf("unexpected listen config addresses: bind=%q listen=%q", listenConfig.GetBindAddress(), listenConfig.GetListenAddr())
 	}
 
-	coreListenConfig := listenConfig.toCore()
-	roundTripListenConfig := listenConfigFromCore(coreListenConfig)
+	var coreListenConfig *internal_core.ListenConfig = listenConfig
+	var roundTripListenConfig *ListenConfig = coreListenConfig
 	if roundTripListenConfig.Address != listenConfig.Address ||
 		roundTripListenConfig.ExternalIP != listenConfig.ExternalIP ||
 		roundTripListenConfig.Transport != listenConfig.Transport {
@@ -360,7 +362,7 @@ func TestRegistrationTypeConversionAndErrors(t *testing.T) {
 		AssistantID: 77,
 		ExpiresIn:   120,
 	}
-	coreRegistration := registration.toCore()
+	var coreRegistration *internal_core.Registration = registration
 	if coreRegistration.DID != registration.DID ||
 		coreRegistration.AssistantID != registration.AssistantID ||
 		coreRegistration.ExpiresIn != registration.ExpiresIn {
@@ -397,15 +399,16 @@ func TestRTPTypeManualHandlerFallback(t *testing.T) {
 	}
 }
 
-func TestLifecycleAndHealthTypeConversions(t *testing.T) {
+func TestLifecycleAndHealthTypeAliases(t *testing.T) {
 	if LifecycleReasonOutboundNoAnswer.String() != "outbound_no_answer" {
 		t.Fatalf("unexpected lifecycle reason string: %q", LifecycleReasonOutboundNoAnswer.String())
 	}
-	if LifecycleReasonOutboundNoAnswer.toCore() != internal_core.LifecycleReasonOutboundNoAnswer {
-		t.Fatal("lifecycle reason did not convert to core")
+	var coreReason internal_core.LifecycleReason = LifecycleReasonOutboundNoAnswer
+	if coreReason != internal_core.LifecycleReasonOutboundNoAnswer {
+		t.Fatal("lifecycle reason should share the core type")
 	}
 
-	snapshot := serverHealthSnapshotFromCore(internal_core.ServerHealthSnapshot{
+	snapshot := ServerHealthSnapshot{
 		Ready:                   true,
 		Reason:                  "ready",
 		State:                   internal_core.ServerStateRunning,
@@ -414,14 +417,14 @@ func TestLifecycleAndHealthTypeConversions(t *testing.T) {
 		RTPPortBindAttempts:     7,
 		RTPPortBindFailures:     1,
 		RTPPortRangeExhaustions: 1,
-	})
+	}
 	if !snapshot.Ready || snapshot.State != ServerStateRunning || snapshot.ActiveCalls != 2 || snapshot.RTPPortsInUse != 3 ||
 		snapshot.RTPPortBindAttempts != 7 || snapshot.RTPPortBindFailures != 1 || snapshot.RTPPortRangeExhaustions != 1 {
 		t.Fatalf("health snapshot conversion mismatch: %#v", snapshot)
 	}
 }
 
-func TestOutboundTypeConversions(t *testing.T) {
+func TestOutboundTypeAliases(t *testing.T) {
 	headers := map[string]string{"X-Test": "ok"}
 	outboundConfig := OutboundConfig{
 		Mode:                OutboundModeTrunkTermination,
@@ -436,12 +439,7 @@ func TestOutboundTypeConversions(t *testing.T) {
 		MediaTimeoutInitial: 20 * time.Second,
 		MediaTimeout:        10 * time.Second,
 	}
-	coreOutboundConfig := outboundConfig.toCore()
-	headers["X-Test"] = "mutated"
-
-	if coreOutboundConfig.Headers["X-Test"] != "ok" {
-		t.Fatalf("expected outbound headers to be copied, got %#v", coreOutboundConfig.Headers)
-	}
+	var coreOutboundConfig internal_core.OutboundConfig = outboundConfig
 	if coreOutboundConfig.Mode != internal_core.OutboundModeTrunkTermination ||
 		coreOutboundConfig.Auth.Username != outboundConfig.Auth.Username ||
 		coreOutboundConfig.MediaTimeoutInitial != outboundConfig.MediaTimeoutInitial ||
@@ -459,13 +457,14 @@ func TestOutboundTypeConversions(t *testing.T) {
 	if err := request.Validate(); err != nil {
 		t.Fatalf("expected outbound invite request to validate, got %v", err)
 	}
-	if request.toCore().Identity.FromUser != "+15550002222" {
-		t.Fatalf("outbound invite identity conversion mismatch: %#v", request.toCore().Identity)
+	var coreRequest internal_core.OutboundInviteRequest = request
+	if coreRequest.Identity.FromUser != "+15550002222" {
+		t.Fatalf("outbound invite identity mismatch: %#v", coreRequest.Identity)
 	}
 }
 
-func TestOutboundTypeConversionsPreserveNilHeaders(t *testing.T) {
-	coreOutboundConfig := (OutboundConfig{}).toCore()
+func TestOutboundTypeAliasesPreserveNilHeaders(t *testing.T) {
+	var coreOutboundConfig internal_core.OutboundConfig = OutboundConfig{}
 
 	assert.Nil(t, coreOutboundConfig.Headers)
 }
