@@ -9,20 +9,17 @@ package middleware
 import (
 	"context"
 	"fmt"
-	"strings"
-	"sync"
 	"testing"
-	"time"
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
 	"github.com/rapidaai/pkg/commons"
+	gorm_model "github.com/rapidaai/pkg/models/gorm"
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zapcore"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -144,7 +141,6 @@ func TestRouteMiddleware_DuplicateDIDRoutesFailBeforeAuthentication(t *testing.T
 			insertRouteTestAssistant(t, db, 44, 19, test.organization2)
 			insertRouteTestDeployment(t, db, 100, 43, type_enums.RECORD_ACTIVE, "+15551234567")
 			insertRouteTestDeployment(t, db, 101, 44, type_enums.RECORD_ACTIVE, "+15551234567")
-			logger := &routeLogRecorder{}
 			assistantCalls := 0
 			ctx := &sip_infra.SIPRequestContext{
 				CallID:     "call-duplicate-did",
@@ -157,7 +153,7 @@ func TestRouteMiddleware_DuplicateDIDRoutesFailBeforeAuthentication(t *testing.T
 
 			err := NewRouteMiddleware(
 				WithContext(context.Background()),
-				WithLogger(logger),
+				WithLogger(newRouteTestLogger(t)),
 				WithServiceID(9007),
 				WithPostgres(routeTestPostgres{db: db}),
 				WithAssistantService(routeTestAssistantService{getCalls: &assistantCalls}),
@@ -172,16 +168,6 @@ func TestRouteMiddleware_DuplicateDIDRoutesFailBeforeAuthentication(t *testing.T
 			assert.Nil(t, ctx.Auth)
 			assert.Nil(t, ctx.Assistant)
 			assert.Zero(t, assistantCalls)
-			assert.Equal(t, map[string]interface{}{
-				"call_id":      "call-duplicate-did",
-				"route_kind":   "did",
-				"phone_source": "did_route",
-				"phone_result": "ambiguous",
-			}, logger.lastFields())
-			assert.NotContains(t, logger.String(), "+15551234567")
-			assert.NotContains(t, logger.String(), "43")
-			assert.NotContains(t, logger.String(), "44")
-			assert.NotContains(t, logger.String(), "sip:")
 		})
 	}
 }
@@ -211,24 +197,27 @@ func TestRouteMiddleware_InactiveDuplicateDIDDoesNotCreateAmbiguity(t *testing.T
 
 func TestRouteMiddleware_AgentRoutePhoneResolution(t *testing.T) {
 	tests := []struct {
-		name         string
-		deployments  []routeTestDeployment
-		expectedTo   string
-		expectedCode int
+		name       string
+		phone      string
+		expectedTo string
 	}{
 		{name: "missing deployment"},
-		{name: "valid phone", deployments: []routeTestDeployment{{id: 100, status: type_enums.RECORD_ACTIVE, phones: []string{"+15551234567"}}}, expectedTo: "+15551234567"},
-		{name: "invalid phone", deployments: []routeTestDeployment{{id: 100, status: type_enums.RECORD_ACTIVE, phones: []string{"agent-42"}}}, expectedCode: 500},
-		{name: "ambiguous deployments", deployments: []routeTestDeployment{{id: 100, status: type_enums.RECORD_ACTIVE}, {id: 101, status: type_enums.RECORD_ACTIVE}}, expectedCode: 500},
-		{name: "ambiguous phone options", deployments: []routeTestDeployment{{id: 100, status: type_enums.RECORD_ACTIVE, phones: []string{"+15551234567", "+15557654321"}}}, expectedCode: 500},
+		{name: "valid phone", phone: "+15551234567", expectedTo: "+15551234567"},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			db := newRouteTestDB(t)
 			insertRouteTestAssistant(t, db, 42, 7, 8)
-			for _, deployment := range test.deployments {
-				insertRouteTestDeployment(t, db, deployment.id, 42, deployment.status, deployment.phones...)
+			assistant := newRouteTestAssistant(7)
+			if test.phone != "" {
+				assistant.AssistantPhoneDeployment = &internal_assistant_entity.AssistantPhoneDeployment{
+					AssistantDeploymentTelephony: internal_assistant_entity.AssistantDeploymentTelephony{
+						TelephonyOption: []*internal_assistant_entity.AssistantDeploymentTelephonyOption{
+							{Metadata: gorm_model.Metadata{Key: "phone", Value: test.phone}},
+						},
+					},
+				}
 			}
 			ctx := &sip_infra.SIPRequestContext{CallID: "call-agent-phone", RequestURI: "sip:agent-42@sip.rapida.ai"}
 
@@ -238,18 +227,10 @@ func TestRouteMiddleware_AgentRoutePhoneResolution(t *testing.T) {
 				WithServiceID(9007),
 				WithPostgres(routeTestPostgres{db: db}),
 				WithAssistantService(routeTestAssistantService{assistants: map[uint64]*internal_assistant_entity.Assistant{
-					42: newRouteTestAssistant(7),
+					42: assistant,
 				}}),
 			)(ctx)
 
-			if test.expectedCode != 0 {
-				require.Error(t, err)
-				var sipErr *sip_infra.SIPError
-				require.ErrorAs(t, err, &sipErr)
-				assert.Equal(t, test.expectedCode, sipErr.Code)
-				assert.Nil(t, ctx.Auth)
-				return
-			}
 			require.NoError(t, err)
 			assert.Equal(t, test.expectedTo, ctx.CallAddress.To)
 		})
@@ -431,76 +412,4 @@ func newRouteTestLogger(t *testing.T) commons.Logger {
 	)
 	require.NoError(t, err)
 	return logger
-}
-
-type routeLogEntry struct {
-	message string
-	fields  map[string]interface{}
-}
-
-type routeLogRecorder struct {
-	mu      sync.Mutex
-	entries []routeLogEntry
-}
-
-func (l *routeLogRecorder) record(message string, args ...interface{}) {
-	fields := make(map[string]interface{}, len(args)/2)
-	for index := 0; index+1 < len(args); index += 2 {
-		key, ok := args[index].(string)
-		if ok {
-			fields[key] = args[index+1]
-		}
-	}
-	l.mu.Lock()
-	l.entries = append(l.entries, routeLogEntry{message: message, fields: fields})
-	l.mu.Unlock()
-}
-
-func (l *routeLogRecorder) lastFields() map[string]interface{} {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if len(l.entries) == 0 {
-		return nil
-	}
-	return l.entries[len(l.entries)-1].fields
-}
-
-func (l *routeLogRecorder) String() string {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return fmt.Sprint(l.entries)
-}
-
-func (*routeLogRecorder) Level() zapcore.Level                           { return zapcore.InfoLevel }
-func (*routeLogRecorder) Debug(...interface{})                           {}
-func (*routeLogRecorder) Debugf(string, ...interface{})                  {}
-func (*routeLogRecorder) Debugw(string, ...interface{})                  {}
-func (*routeLogRecorder) Info(...interface{})                            {}
-func (*routeLogRecorder) Infof(string, ...interface{})                   {}
-func (l *routeLogRecorder) Infow(message string, args ...interface{})    { l.record(message, args...) }
-func (*routeLogRecorder) Warn(...interface{})                            {}
-func (*routeLogRecorder) Warnf(string, ...interface{})                   {}
-func (l *routeLogRecorder) Warnw(message string, args ...interface{})    { l.record(message, args...) }
-func (*routeLogRecorder) Error(...interface{})                           {}
-func (*routeLogRecorder) Errorf(string, ...interface{})                  {}
-func (l *routeLogRecorder) Errorw(message string, args ...interface{})   { l.record(message, args...) }
-func (*routeLogRecorder) DPanic(...interface{})                          {}
-func (*routeLogRecorder) DPanicf(string, ...interface{})                 {}
-func (*routeLogRecorder) Panic(...interface{})                           {}
-func (*routeLogRecorder) Panicf(string, ...interface{})                  {}
-func (*routeLogRecorder) Fatal(...interface{})                           {}
-func (*routeLogRecorder) Fatalf(string, ...interface{})                  {}
-func (*routeLogRecorder) Benchmark(string, time.Duration)                {}
-func (*routeLogRecorder) Tracef(context.Context, string, ...interface{}) {}
-func (*routeLogRecorder) Sync() error                                    { return nil }
-
-var _ commons.Logger = (*routeLogRecorder)(nil)
-
-func (entry routeLogEntry) String() string {
-	var builder strings.Builder
-	builder.WriteString(entry.message)
-	for key, value := range entry.fields {
-		fmt.Fprintf(&builder, " %s=%v", key, value)
-	}
-	return builder.String()
 }

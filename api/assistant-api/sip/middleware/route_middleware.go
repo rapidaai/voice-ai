@@ -110,7 +110,6 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 		var assistantID uint64
 		var projectID uint64
 		var organizationID uint64
-		var resolvedPhone string
 		if routeKind == "agent" {
 			parsedAssistantID, err := strconv.ParseUint(routeValue, 10, 64)
 			if err != nil {
@@ -147,57 +146,6 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 			assistantID = parsedAssistantID
 			projectID = result.ProjectID
 			organizationID = result.OrganizationID
-
-			type deploymentResult struct {
-				ID uint64
-			}
-			var deployments []deploymentResult
-			tx = db.Table("assistant_phone_deployments").
-				Select("id").
-				Where("assistant_id = ?", assistantID).
-				Where("telephony_provider = ? AND status = ?", "sip", type_enums.RECORD_ACTIVE).
-				Limit(2).
-				Find(&deployments)
-			if tx.Error != nil {
-				logPhoneResolution(m.logger, ctx.CallID, routeKind, "agent_deployment", "invalid")
-				return &sip_infra.SIPError{Code: 500, Message: "Failed to resolve SIP phone configuration", Err: sip_infra.ErrInvalidConfig}
-			}
-			if len(deployments) > 1 {
-				logPhoneResolution(m.logger, ctx.CallID, routeKind, "agent_deployment", "ambiguous")
-				return &sip_infra.SIPError{Code: 500, Message: "Ambiguous SIP phone configuration", Err: sip_infra.ErrInvalidConfig}
-			}
-			if len(deployments) == 0 {
-				logPhoneResolution(m.logger, ctx.CallID, routeKind, "agent_deployment", "missing")
-			} else {
-				type phoneOptionResult struct {
-					Value string
-				}
-				var phoneOptions []phoneOptionResult
-				tx = db.Table("assistant_deployment_telephony_options").
-					Select("value").
-					Where("assistant_deployment_telephony_id = ? AND key = ?", deployments[0].ID, "phone").
-					Limit(2).
-					Find(&phoneOptions)
-				if tx.Error != nil {
-					logPhoneResolution(m.logger, ctx.CallID, routeKind, "agent_deployment", "invalid")
-					return &sip_infra.SIPError{Code: 500, Message: "Failed to resolve SIP phone configuration", Err: sip_infra.ErrInvalidConfig}
-				}
-				if len(phoneOptions) > 1 {
-					logPhoneResolution(m.logger, ctx.CallID, routeKind, "agent_deployment", "ambiguous")
-					return &sip_infra.SIPError{Code: 500, Message: "Ambiguous SIP phone configuration", Err: sip_infra.ErrInvalidConfig}
-				}
-				if len(phoneOptions) == 0 || !validator.NotBlank(phoneOptions[0].Value) {
-					logPhoneResolution(m.logger, ctx.CallID, routeKind, "agent_deployment", "missing")
-				} else {
-					phone, ok := sip_infra.ParsePhone(phoneOptions[0].Value)
-					if !ok {
-						logPhoneResolution(m.logger, ctx.CallID, routeKind, "agent_deployment", "invalid")
-						return &sip_infra.SIPError{Code: 500, Message: "Invalid SIP phone configuration", Err: sip_infra.ErrInvalidConfig}
-					}
-					resolvedPhone = phone
-					logPhoneResolution(m.logger, ctx.CallID, routeKind, "agent_deployment", "resolved")
-				}
-			}
 		} else {
 			type didLookupResult struct {
 				AssistantID    uint64
@@ -216,25 +164,17 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 				Limit(2).
 				Find(&results)
 			if tx.Error != nil {
-				logPhoneResolution(m.logger, ctx.CallID, routeKind, "did_route", "invalid")
 				return &sip_infra.SIPError{Code: 500, Message: "Failed to resolve SIP route", Err: sip_infra.ErrInvalidConfig}
 			}
 			if len(results) == 0 {
-				logPhoneResolution(m.logger, ctx.CallID, routeKind, "did_route", "missing")
 				return &sip_infra.SIPError{Code: 404, Message: "No assistant found for this SIP route", Err: sip_infra.ErrAuthRequired}
 			}
 			if len(results) > 1 {
-				logPhoneResolution(m.logger, ctx.CallID, routeKind, "did_route", "ambiguous")
+				m.logger.Warnw("SIP: ambiguous DID route", "call_id", ctx.CallID, "route_kind", routeKind)
 				return &sip_infra.SIPError{Code: 500, Message: "Ambiguous SIP route configuration", Err: sip_infra.ErrInvalidConfig}
 			}
 			result := results[0]
-			phone, ok := sip_infra.ParsePhone(result.Phone)
-			if !ok {
-				logPhoneResolution(m.logger, ctx.CallID, routeKind, "did_route", "invalid")
-				return &sip_infra.SIPError{Code: 500, Message: "Invalid SIP phone configuration", Err: sip_infra.ErrInvalidConfig}
-			}
-			resolvedPhone = phone
-			logPhoneResolution(m.logger, ctx.CallID, routeKind, "did_route", "resolved")
+			ctx.CallAddress.To = strings.TrimSpace(result.Phone)
 			assistantID = result.AssistantID
 			projectID = result.ProjectID
 			organizationID = result.OrganizationID
@@ -249,8 +189,6 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 				"organization_id", organizationID)
 			return &sip_infra.SIPError{Code: 404, Message: "No assistant found for this SIP route", Err: sip_infra.ErrAuthRequired}
 		}
-		ctx.CallAddress.To = resolvedPhone
-
 		ctx.AssistantID = strconv.FormatUint(assistantID, 10)
 		serviceActor := types.ActorIdentity{Type: types.ActorTypeService, ID: m.ServiceID}
 		if err := serviceActor.Validate(); err != nil {
@@ -280,6 +218,12 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 		if authErr != nil || !validator.NonZero(assistant.ProjectId) || projectContext.ProjectID != assistant.ProjectId {
 			return &sip_infra.SIPError{Code: 403, Message: "API key does not have access to this assistant", Err: sip_infra.ErrAuthRequired}
 		}
+		if routeKind == "agent" && assistant.AssistantPhoneDeployment != nil {
+			phone, err := assistant.AssistantPhoneDeployment.GetOptions().GetString("phone")
+			if err == nil {
+				ctx.CallAddress.To = strings.TrimSpace(phone)
+			}
+		}
 		ctx.Assistant = assistant
 
 		m.logger.Infow("SIP: routed inbound call",
@@ -290,15 +234,4 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 
 		return nil
 	}
-}
-
-func logPhoneResolution(logger commons.Logger, callID, routeKind, phoneSource, phoneResult string) {
-	if logger == nil {
-		return
-	}
-	logger.Infow("SIP: inbound phone resolution",
-		"call_id", callID,
-		"route_kind", routeKind,
-		"phone_source", phoneSource,
-		"phone_result", phoneResult)
 }

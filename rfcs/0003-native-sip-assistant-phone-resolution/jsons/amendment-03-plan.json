@@ -1,20 +1,22 @@
 {
-  "amendment": "03 - preserve infra boundary and single call-address ownership",
+  "amendment": "03 - preserve middleware patterns and call-address ownership",
   "status": "accepted_candidate",
   "owner_approval": {
     "decision": "approved",
     "approved_at": "2026-09-03",
     "scope": "Review the implementation from the infra boundary and correct pattern-breaking ownership changes."
   },
-  "problem_statement": "The first implementation copied every CallAddress field back from public middleware and duplicated the address in Session state. That breaks the existing thin-facade pattern and creates competing owners for immutable dialog identity.",
+  "problem_statement": "The first implementation copied every CallAddress field back from public middleware, duplicated the address in Session state, and added separate agent deployment queries instead of using the assistant already loaded for the vault middleware. That breaks established middleware patterns and creates competing owners.",
   "acceptance_criteria": [
     "Infra presents a defensive CallAddress snapshot to middleware.",
     "Only CallAddress.To, the route middleware-owned enrichment, is copied back to core.",
     "Middleware mutations to From, FromURI, ToURI, or Headers do not alter core-owned capture state.",
     "The accepted inbound configuration carries the enriched CallAddress into the dialog identity.",
     "Session does not store or expose a duplicate CallAddress.",
+    "Agent routes read the phone option from the assistant service result already loaded with phone deployment injection.",
+    "Agent routes do not run separate deployment or option queries.",
     "Application-ready, invite, session-established, and pipeline callbacks receive the dialog identity snapshot.",
-    "Existing phone parsing, route resolution, outbound mapping, and metadata behavior remain unchanged."
+    "SIP URI users and outbound inputs retain phone parsing, while trusted deployment values are trimmed directly."
   ],
   "allowed_paths": [
     "rfcs/0003-native-sip-assistant-phone-resolution.md",
@@ -26,7 +28,7 @@
   ],
   "ownership": {
     "core": "Owns captured CallAddress fields and the accepted dialog identity.",
-    "middleware": "May resolve and set only CallAddress.To.",
+    "middleware": "May resolve and set only CallAddress.To, using the assistant service result for agent routes.",
     "infra": "Creates a defensive middleware view and copies only To back to core.",
     "session": "Owns call lifecycle and runtime dependencies, not dialog address state.",
     "pipeline": "Consumes the callback CallAddress without consulting Session for address data."
@@ -34,14 +36,16 @@
   "risks": [
     "A shallow Headers copy would still let middleware mutate core-owned data.",
     "Keeping Session CallAddress accessors would preserve duplicate ownership.",
-    "Copying the whole middleware CallAddress back would allow accidental identity replacement."
+    "Copying the whole middleware CallAddress back would allow accidental identity replacement.",
+    "Querying agent deployment tables separately would duplicate the assistant service ownership used by vault middleware."
   ],
   "required_tests": [
     "infra middleware conversion propagates CallAddress.To",
     "infra middleware conversion isolates From, FromURI, ToURI, and Headers",
     "inbound callbacks receive route-enriched To from accepted dialog identity",
     "outbound callbacks receive phone fields derived from authoritative outbound inputs",
-    "pipeline maps callback phone values by direction"
+    "pipeline maps callback phone values by direction",
+    "agent route phone tests use the injected assistant deployment rather than database fixture queries"
   ],
   "required_commands": [
     "env GOCACHE=/private/tmp/voice-ai-gocache go test -count=1 ./api/assistant-api/sip/infra",

@@ -161,8 +161,8 @@ The parser MUST reject:
 - Unicode digits; and
 - route aliases such as `agent-42` or `did-+15551234567`.
 
-Trusted route and deployment phone values MUST pass the same grammar before entering
-`CallAddress.To`.
+Trusted route and deployment phone values are validated when configured and are trimmed before
+entering `CallAddress.To`.
 
 ### Request-URI
 
@@ -199,14 +199,10 @@ For a DID route, middleware MUST:
 3. Reject zero matches using the existing route-not-found behavior.
 4. Reject more than one match as ambiguous configuration before selecting an assistant, project,
    organization, or authentication context.
-5. Verify the single matched phone value satisfies the phone grammar.
-6. Resolve the assistant and tenant from that same unique deployment record.
-7. Set `CallAddress.To` to the matched phone value.
+5. Resolve the assistant and tenant from that same unique deployment record.
+6. Set `CallAddress.To` to the trimmed matched phone value.
 
 No second deployment lookup or fallback is permitted after a DID match.
-
-If the matched stored phone is invalid, middleware MUST reject the request as an internal
-configuration failure and emit bounded diagnostics.
 
 Duplicate DID matches MUST fail closed even when the matching records belong to the same
 assistant, different assistants in one tenant, or assistants in different tenants. Database row
@@ -214,19 +210,15 @@ order MUST NOT influence route selection.
 
 ### Agent Route
 
-For an `agent-<assistant-id>` route, middleware MUST resolve the assistant first, then query its
-active SIP phone deployments and phone options within the resolved tenant.
+For an `agent-<assistant-id>` route, middleware MUST resolve the assistant using the existing
+assistant service with phone deployment injection, matching the dependency flow used by the
+vault middleware.
 
 The selection contract is:
 
-- Exactly one active SIP phone deployment with exactly one non-empty `phone` option: validate
-  the value and set `CallAddress.To`.
-- No active SIP phone deployment or no phone option: accept the agent route and leave
+- An injected `phone` option: trim the value and set `CallAddress.To`.
+- No injected phone deployment or no phone option: accept the agent route and leave
   `CallAddress.To` empty.
-- More than one active SIP phone deployment or more than one phone option for the selected
-  deployment: reject the request as ambiguous configuration.
-- A selected phone option that fails the phone grammar: reject the request as invalid
-  configuration.
 
 Middleware MUST NOT use the `To` header user or a custom SIP header as a fallback.
 
@@ -329,11 +321,8 @@ variable.
 | From user fails phone grammar | Preserve `FromURI`; leave `From` empty. |
 | DID route is not found | Reject using existing route-not-found behavior. |
 | DID route matches multiple active deployments | Reject as ambiguous configuration before selecting tenant or assistant. |
-| DID route stored phone is invalid | Reject as internal configuration failure. |
 | Agent route has no active SIP phone deployment | Accept route; leave `To` empty. |
 | Agent route has no phone option | Accept route; leave `To` empty. |
-| Agent route has ambiguous active SIP deployments or phone options | Reject as ambiguous configuration. |
-| Agent deployment phone fails grammar | Reject as invalid configuration. |
 | Outbound local input fails grammar | Continue valid SIP signaling; leave `From` empty. |
 | Outbound destination input fails grammar | Continue valid SIP signaling; leave `To` empty. |
 | Propagation attempts to modify a URI field | Treat as an implementation defect and fail the affected test or invariant check. |
@@ -354,7 +343,7 @@ configuration is corrected.
 
 ## Observability
 
-Phone resolution MUST emit bounded attributes only.
+Phone resolution diagnostics, when emitted, MUST use bounded attributes only.
 
 Allowed `phone_source` values:
 
@@ -410,9 +399,10 @@ before rollout.
 1. Replace the single-row DID lookup with a bounded query that detects zero, one, or multiple
    active deployment matches before selecting tenant or assistant.
 2. Set `CallAddress.To` only from the single validated DID match.
-3. Add deterministic active SIP deployment and phone-option selection for agent routes.
+3. Read the agent route phone from the assistant service result already requested with phone
+   deployment injection.
 4. Remove any inbound `To` header phone fallback.
-5. Add invalid, missing, duplicate, and ambiguous configuration tests.
+5. Add missing agent phone and duplicate DID tests.
 
 ### Phase 3: Boundary Propagation
 
@@ -536,7 +526,7 @@ requires persisted URI fields.
 8. Duplicate DID tests cover different assistants in one tenant and assistants in different
    tenants.
 9. Agent routes with missing deployment phone data leave `To` empty.
-10. Invalid or ambiguous agent deployment state fails closed.
+10. Agent routes use the phone deployment already loaded by the assistant service.
 11. Route-enriched `To` reaches session establishment and call-context construction.
 12. URI fields remain unchanged across middleware, infra, core, and pipeline boundaries.
 13. Outbound aliases remain valid signaling values but produce empty phone fields.

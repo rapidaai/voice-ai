@@ -27,11 +27,6 @@ const (
 
 type CallAddress = internal_core.CallAddress
 
-// ParsePhone returns a trimmed phone value accepted by native SIP metadata.
-func ParsePhone(value string) (string, bool) {
-	return internal_core.ParsePhone(value)
-}
-
 type SIPRequestContext struct {
 	Method      string
 	CallID      string
