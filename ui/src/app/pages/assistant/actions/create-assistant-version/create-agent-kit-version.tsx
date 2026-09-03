@@ -35,6 +35,7 @@ import { Select } from '@/app/components/form/select';
 import { APiParameter } from '@/app/components/external-api/api-parameter';
 import { CodeEditor } from '@/app/components/form/editor/code-editor';
 import toast from 'react-hot-toast/headless';
+import { useTheme } from '@/theme/theme-provider';
 
 const TRANSPORT_SECURITY_OPTIONS = [
   { name: 'Default', value: '' },
@@ -85,6 +86,7 @@ export function CreateAgentKitVersion() {
  * @returns
  */
 const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
+  const { theme } = useTheme();
   const [userId, token, projectId] = useCredential();
   const [activeTab, setActiveTab] = useState('change-assistant');
   const navigator = useGlobalNavigation();
@@ -401,8 +403,7 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
           {
             code: 'change-assistant',
             name: 'Connect configuration',
-            description:
-              'Provide the connection configuration for your Rapida AgentKit setup.',
+            description: `Provide the connection configuration for your ${theme.brand.name} AgentKit setup.`,
             actions: [
               <ButtonSet className="!w-full [&>button]:!flex-1 [&>button]:!max-w-none">
                 <SecondaryButton
@@ -445,8 +446,8 @@ const CreateNewVersion: FC<{ assistantId: string }> = ({ assistantId }) => {
                             <Information size={14} />
                           </ToggletipButton>
                           <ToggletipContent>
-                            The gRPC server address where your Rapida AgentKit
-                            is running.
+                            The gRPC server address where your{' '}
+                            {theme.brand.name} AgentKit is running.
                           </ToggletipContent>
                         </Toggletip>
                       </div>

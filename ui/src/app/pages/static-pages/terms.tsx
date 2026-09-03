@@ -1,6 +1,11 @@
 import { FlexBox } from '@/app/components/container/flex-box';
+import { useTheme } from '@/theme/theme-provider';
 
 export function TermsPage() {
+  const { theme } = useTheme();
+  const brandName = theme.brand.name;
+  const supportContact = theme.links.support.replace(/^mailto:/, '');
+
   return (
     <FlexBox>
       <div className="relative mx-auto pt-20 pb-24 max-w-6xl px-8 md:px-20">
@@ -12,7 +17,7 @@ export function TermsPage() {
           <article className="relative mt-10 prose prose-base max-w-none! dark:prose-invert prose-slate">
             <p className="text-lg">
               These Terms of Service ("Terms") govern your access to and use of
-              the Rapida.AI platform ("Platform"). By accessing or using the
+              the {brandName} platform ("Platform"). By accessing or using the
               Platform, you agree to be bound by these Terms.
             </p>
             <section id="definitions">
@@ -30,8 +35,8 @@ export function TermsPage() {
                 </div>
                 <div className="text-lg">
                   <h3 className="text-lg">3. Service</h3>
-                  "Service" means the Rapida.AI platform, including all features
-                  and functionalities.
+                  "Service" means the {brandName} platform, including all
+                  features and functionalities.
                 </div>
               </div>
             </section>
@@ -93,18 +98,18 @@ export function TermsPage() {
                 </h3>
                 <div className="text-lg">
                   <p>
-                    Rapida.AI owns all intellectual property rights in and to
+                    {brandName} owns all intellectual property rights in and to
                     the Platform.
                   </p>
                   <p>
-                    You grant Rapida.AI a non-exclusive, worldwide, royalty-free
-                    license to use, reproduce, modify, publish, and distribute
-                    your Content in connection with the provision of the
-                    Service.
+                    You grant {brandName} a non-exclusive, worldwide,
+                    royalty-free license to use, reproduce, modify, publish, and
+                    distribute your Content in connection with the provision of
+                    the Service.
                   </p>
                   <p>
                     You retain all ownership rights in your Content, but you
-                    agree that Rapida.AI may use your Content for marketing or
+                    agree that {brandName} may use your Content for marketing or
                     promotional purposes.
                   </p>
                 </div>
@@ -144,11 +149,11 @@ export function TermsPage() {
                 </h3>
                 <div className="text-lg">
                   <p>
-                    RAPIDA.AI SHALL NOT BE LIABLE FOR ANY DIRECT, INDIRECT,
-                    INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES
-                    ARISING OUT OF OR IN CONNECTION WITH YOUR USE OF THE
-                    SERVICE, EVEN IF RAPIDA.AI HAS BEEN ADVISED OF THE
-                    POSSIBILITY OF SUCH DAMAGES.
+                    {brandName.toUpperCase()} SHALL NOT BE LIABLE FOR ANY
+                    DIRECT, INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR
+                    PUNITIVE DAMAGES ARISING OUT OF OR IN CONNECTION WITH YOUR
+                    USE OF THE SERVICE, EVEN IF {brandName.toUpperCase()} HAS
+                    BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
                   </p>
                 </div>
               </div>
@@ -161,14 +166,14 @@ export function TermsPage() {
                 <div className="text-lg">
                   <p>
                     These Terms will remain in effect until terminated by either
-                    you or Rapida.AI.
+                    you or {brandName}.
                   </p>
                   <p>
                     You may terminate these Terms at any time by discontinuing
                     your use of the Service.
                   </p>
                   <p>
-                    Rapida.AI may terminate these Terms at any time for any
+                    {brandName} may terminate these Terms at any time for any
                     reason, with or without notice.
                   </p>
                 </div>
@@ -209,7 +214,7 @@ export function TermsPage() {
                 <div className="text-lg">
                   <p>
                     These Terms constitute the entire agreement between you and
-                    Rapida.AI with respect to the subject matter hereof and
+                    {brandName} with respect to the subject matter hereof and
                     supersede all prior or contemporaneous communications,
                     representations, or agreements, whether oral or written.
                   </p>
@@ -245,7 +250,7 @@ export function TermsPage() {
                 <h3 className="text-2xl font-semibold mb-2">Amendment</h3>
                 <div className="text-lg">
                   <p>
-                    Rapida.AI may amend these Terms at any time by posting the
+                    {brandName} may amend these Terms at any time by posting the
                     amended Terms on the Platform. You are responsible for
                     periodically reviewing the Terms. Your continued use of the
                     Platform after the amended Terms are posted will be deemed
@@ -261,11 +266,8 @@ export function TermsPage() {
                   <p>
                     If you have any questions about these Terms, please contact
                     us at{' '}
-                    <a
-                      href="mailto:support@rapida.ai"
-                      className="text-blue-500"
-                    >
-                      support@rapida.ai
+                    <a href={theme.links.support} className="text-blue-500">
+                      {supportContact}
                     </a>
                     .
                   </p>
