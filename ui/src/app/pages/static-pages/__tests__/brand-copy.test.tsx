@@ -68,16 +68,18 @@ describe('static legal page brand copy', () => {
     expect(document.body).not.toHaveTextContent('Rapida');
   });
 
-  it('renders terms copy from the configured brand and support link', () => {
+  it('keeps terms copy tied to the Rapida legal entity and support link', () => {
     renderWithTheme(<TermsPage />);
 
     expect(document.body).toHaveTextContent(
+      'the Rapida.AI platform ("Platform")',
+    );
+    expect(document.body).toHaveTextContent('RAPIDA.AI SHALL NOT BE LIABLE');
+    expect(
+      screen.getByRole('link', { name: 'support@rapida.ai' }),
+    ).toHaveAttribute('href', 'mailto:support@rapida.ai');
+    expect(document.body).not.toHaveTextContent(
       'the Acme Voice platform ("Platform")',
     );
-    expect(document.body).toHaveTextContent('ACME VOICE SHALL NOT BE LIABLE');
-    expect(
-      screen.getByRole('link', { name: 'help@acme.example' }),
-    ).toHaveAttribute('href', 'mailto:help@acme.example');
-    expect(document.body).not.toHaveTextContent('Rapida');
   });
 });

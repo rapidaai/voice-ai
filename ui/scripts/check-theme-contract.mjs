@@ -72,6 +72,10 @@ export const BRAND_LITERAL_ALLOWLIST = Object.freeze({
     reason:
       'SDK package and client class names are external developer API identifiers',
   },
+  'ui/src/app/pages/static-pages/terms.tsx': {
+    literals: ['Rapida.AI', 'support@rapida.ai'],
+    reason: 'terms of service must identify the Rapida legal entity',
+  },
   'ui/src/app/pages/main/web-dashboard/index.tsx': {
     literals: ['cdn-01.rapida.ai'],
     reason: 'dashboard content feed URL is a technical asset source',
