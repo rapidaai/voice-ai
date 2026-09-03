@@ -115,12 +115,6 @@ func (inboundCall *Inbound) HandleInvite() {
 		return
 	}
 	inboundCall.identity = identity
-	if inboundCall.server.logger != nil {
-		inboundCall.server.logger.Infow("SIP: inbound phone resolution",
-			"call_id", identity.callID,
-			"phone_source", "from_header_user",
-			"phone_result", phoneInputResult(inboundCall.request.From().Address.User, identity.callAddress.From))
-	}
 	inboundCall.inviteKey = inboundInviteKey{callID: identity.callID, fromTag: identity.fromTag}
 	setupPhase := InboundSetupPhaseInviteReceived
 	setupTimings := InboundSetupTimings{InviteReceivedAt: time.Now()}
@@ -244,10 +238,6 @@ func (inboundCall *Inbound) HandleInvite() {
 	}
 	inboundCall.session.SetInboundSetupPhase(InboundSetupPhaseRingingSent)
 	inboundCall.session.MarkInboundSetupTimestamp(InboundSetupPhaseRingingSent, time.Now())
-	inboundCall.server.logger.Infow("Inbound SIP setup phase",
-		"call_id", inboundCall.identity.callID,
-		"phase", InboundSetupPhaseRingingSent,
-		"reason", LifecycleReasonInboundInviteRinging)
 	inboundCall.server.TransitionCall(inboundCall.session, CallStateRinging, LifecycleReasonInboundInviteRinging)
 
 	inboundCall.media = NewInboundMedia(inboundCall.server, inboundCall.session, inboundCall.mediaOffer)
@@ -276,10 +266,6 @@ func (inboundCall *Inbound) HandleInvite() {
 		return
 	}
 	inboundCall.session.SetInboundSetupPhase(InboundSetupPhaseAnswerReady)
-	inboundCall.server.logger.Infow("Inbound SIP setup phase",
-		"call_id", inboundCall.identity.callID,
-		"phase", InboundSetupPhaseAnswerReady,
-		"reason", LifecycleReasonInboundAnswerPolicyReady)
 	if inboundCall.cancelBeforeAnswer(LifecycleReasonInviteCancelledBeforeAnswer) {
 		return
 	}
@@ -396,10 +382,6 @@ func (inboundCall *Inbound) answerInboundInvite() (bool, *inboundFailure) {
 			finalResponseSent = true
 			inboundCall.session.SetInboundSetupPhase(InboundSetupPhaseAnswered)
 			inboundCall.session.MarkInboundSetupTimestamp(InboundSetupPhaseAnswered, answeredAt)
-			inboundCall.server.logger.Infow("Inbound SIP setup phase",
-				"call_id", inboundCall.identity.callID,
-				"phase", InboundSetupPhaseAnswered,
-				"reason", LifecycleReasonInboundInviteAnswered)
 		},
 	)
 	if err == nil {

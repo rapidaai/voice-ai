@@ -540,6 +540,9 @@ func TestInboundCall_ApplicationReadyBeforeAnswerAndMediaStart(t *testing.T) {
 	require.True(t, exists)
 	assert.Equal(t, CallStateConnected, session.GetState())
 	assert.Equal(t, InboundSetupPhaseMediaFlowing, session.GetInboundSetupPhase())
+	timings := session.GetInboundSetupTimings()
+	assert.False(t, timings.RingingSentAt.IsZero())
+	assert.False(t, timings.AnsweredAt.IsZero())
 }
 
 func TestInboundCall_ReInviteDoesNotReplaceInitialPartyIdentities(t *testing.T) {
