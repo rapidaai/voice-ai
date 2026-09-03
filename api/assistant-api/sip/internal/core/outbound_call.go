@@ -322,7 +322,6 @@ func (outboundCall *Outbound) callOutboundInviteHandler(answerTime time.Time) er
 	if callAddress.ToURI == "" {
 		callAddress.ToURI = inviteRequest.Recipient.String()
 	}
-	outboundCall.session.SetCallAddress(callAddress)
 	if err := inviteHandler(
 		outboundCall.session,
 		inviteRequest.Recipient.String(),

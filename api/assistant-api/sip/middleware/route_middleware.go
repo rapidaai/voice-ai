@@ -189,12 +189,12 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 				if len(phoneOptions) == 0 || !validator.NotBlank(phoneOptions[0].Value) {
 					logPhoneResolution(m.logger, ctx.CallID, routeKind, "agent_deployment", "missing")
 				} else {
-					candidateAddress := ctx.CallAddress
-					if !candidateAddress.SetToPhone(phoneOptions[0].Value) {
+					phone, ok := sip_infra.ParsePhone(phoneOptions[0].Value)
+					if !ok {
 						logPhoneResolution(m.logger, ctx.CallID, routeKind, "agent_deployment", "invalid")
 						return &sip_infra.SIPError{Code: 500, Message: "Invalid SIP phone configuration", Err: sip_infra.ErrInvalidConfig}
 					}
-					resolvedPhone = candidateAddress.To
+					resolvedPhone = phone
 					logPhoneResolution(m.logger, ctx.CallID, routeKind, "agent_deployment", "resolved")
 				}
 			}
@@ -228,12 +228,12 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 				return &sip_infra.SIPError{Code: 500, Message: "Ambiguous SIP route configuration", Err: sip_infra.ErrInvalidConfig}
 			}
 			result := results[0]
-			candidateAddress := ctx.CallAddress
-			if !candidateAddress.SetToPhone(result.Phone) {
+			phone, ok := sip_infra.ParsePhone(result.Phone)
+			if !ok {
 				logPhoneResolution(m.logger, ctx.CallID, routeKind, "did_route", "invalid")
 				return &sip_infra.SIPError{Code: 500, Message: "Invalid SIP phone configuration", Err: sip_infra.ErrInvalidConfig}
 			}
-			resolvedPhone = candidateAddress.To
+			resolvedPhone = phone
 			logPhoneResolution(m.logger, ctx.CallID, routeKind, "did_route", "resolved")
 			assistantID = result.AssistantID
 			projectID = result.ProjectID

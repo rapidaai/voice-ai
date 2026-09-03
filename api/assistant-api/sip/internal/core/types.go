@@ -63,7 +63,8 @@ type CallAddress struct {
 	Headers map[string]string
 }
 
-func parsePhone(value string) (string, bool) {
+// ParsePhone returns a trimmed phone value when it matches the native SIP phone grammar.
+func ParsePhone(value string) (string, bool) {
 	value = strings.Trim(value, " \t\r\n\v\f")
 	if value == "" {
 		return "", false
@@ -94,17 +95,6 @@ func phoneInputResult(value, phone string) string {
 	return "resolved"
 }
 
-// SetToPhone sets To only when value satisfies the native SIP phone grammar.
-func (address *CallAddress) SetToPhone(value string) bool {
-	phone, ok := parsePhone(value)
-	if !ok {
-		address.To = ""
-		return false
-	}
-	address.To = phone
-	return true
-}
-
 // NewCallAddress reads an inbound party snapshot and non-credential headers.
 func NewCallAddress(request *sip.Request) CallAddress {
 	if request == nil {
@@ -114,7 +104,7 @@ func NewCallAddress(request *sip.Request) CallAddress {
 	address := CallAddress{Headers: make(map[string]string)}
 	if from := request.From(); from != nil {
 		address.FromURI = from.Address.String()
-		address.From, _ = parsePhone(from.Address.User)
+		address.From, _ = ParsePhone(from.Address.User)
 	}
 	if to := request.To(); to != nil {
 		address.ToURI = to.Address.String()
@@ -141,8 +131,8 @@ func NewCallAddress(request *sip.Request) CallAddress {
 
 func newOutboundCallAddress(request *sip.Request, fromUser, toUser string) CallAddress {
 	address := NewCallAddress(request)
-	address.From, _ = parsePhone(fromUser)
-	address.To, _ = parsePhone(toUser)
+	address.From, _ = ParsePhone(fromUser)
+	address.To, _ = ParsePhone(toUser)
 	return address
 }
 

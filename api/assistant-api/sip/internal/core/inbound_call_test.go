@@ -504,7 +504,7 @@ func TestInboundCall_CancelBeforeSessionCreationStopsSetup(t *testing.T) {
 func TestInboundCall_ApplicationReadyBeforeAnswerAndMediaStart(t *testing.T) {
 	server := newServerForCommandTests(t)
 	server.SetMiddlewares([]Middleware{func(ctx *SIPRequestContext) error {
-		require.True(t, ctx.CallAddress.SetToPhone("+15557654321"))
+		ctx.CallAddress.To = "+15557654321"
 		ctx.Config = bridgeTestConfig()
 		return nil
 	}})
@@ -513,7 +513,7 @@ func TestInboundCall_ApplicationReadyBeforeAnswerAndMediaStart(t *testing.T) {
 	request := newInboundInviteRequest("inbound-ready-before-answer")
 	expectedRequestURI := request.Recipient.String()
 	expectedCallAddress := NewCallAddress(request)
-	require.True(t, expectedCallAddress.SetToPhone("+15557654321"))
+	expectedCallAddress.To = "+15557654321"
 	server.SetOnApplicationReady(func(session *Session, requestURI string, callAddress CallAddress) error {
 		phaseOrder = append(phaseOrder, "application_ready")
 		assert.Equal(t, 180, transaction.lastStatus())
@@ -540,7 +540,6 @@ func TestInboundCall_ApplicationReadyBeforeAnswerAndMediaStart(t *testing.T) {
 	require.True(t, exists)
 	assert.Equal(t, CallStateConnected, session.GetState())
 	assert.Equal(t, InboundSetupPhaseMediaFlowing, session.GetInboundSetupPhase())
-	assert.Equal(t, expectedCallAddress, session.GetCallAddress())
 }
 
 func TestInboundCall_ReInviteDoesNotReplaceInitialPartyIdentities(t *testing.T) {

@@ -46,10 +46,6 @@ func (s *Session) GetCallID() string {
 	return s.inner.GetCallID()
 }
 
-func (s *Session) GetCallAddress() CallAddress {
-	return s.inner.GetCallAddress()
-}
-
 func (s *Session) SetState(state CallState) {
 	s.inner.SetState(state.toCore())
 }

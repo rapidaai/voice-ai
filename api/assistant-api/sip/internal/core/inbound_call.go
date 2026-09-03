@@ -89,7 +89,6 @@ func newInboundSession(
 		WithSessionConfig(resolvedConfig.config),
 		WithSessionDirection(CallDirectionInbound),
 		WithSessionCallID(identity.callID),
-		WithSessionCallAddress(identity.callAddress),
 		WithSessionCodec(mediaOffer.negotiatedCodec),
 		WithSessionAuth(resolvedConfig.auth),
 		WithSessionAssistant(resolvedConfig.assistant),

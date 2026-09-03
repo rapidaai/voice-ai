@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-08-22
-- Updated: 2026-08-31
+- Updated: 2026-09-03
 - Owners: Assistant API Native SIP, Assistant Authentication
 - Reviewers: SIP, Telephony, UI, Security, and SRE owners
 
@@ -97,8 +97,8 @@ only native SIP component allowed to resolve the inbound assistant phone.
 
 ### Allowed Paths
 
-- `api/assistant-api/sip/internal/core/` owns URI capture, phone parsing, immutable dialog state,
-  and outbound call-address construction.
+- `api/assistant-api/sip/internal/core/` owns URI capture, phone parsing, accepted inbound
+  call-address state, and outbound call-address construction.
 - `api/assistant-api/sip/infra/` owns propagation between public middleware context and core
   middleware context.
 - `api/assistant-api/sip/middleware/` owns route validation and inbound assistant phone
@@ -236,10 +236,12 @@ Route enrichment MUST survive every boundary between middleware and session esta
 
 1. Infra builds the middleware context with the captured `CallAddress`.
 2. Middleware may set only `context.CallAddress.To` after successful route validation.
-3. Infra copies the complete enriched `CallAddress` back to the core middleware result.
-4. Core stores the enriched `CallAddress` in the accepted inbound configuration and session.
+3. Infra copies only the middleware-owned `CallAddress.To` value back to the core middleware
+   result. The captured `From`, `FromURI`, `ToURI`, and `Headers` remain owned by core.
+4. Core stores the enriched `CallAddress` in the accepted inbound configuration and transfers it
+   to the accepted inbound identity. Session state MUST NOT duplicate the call address.
 5. Application-ready, invite, session-established, and pipeline callbacks receive the enriched
-   `CallAddress`.
+   `CallAddress` from the dialog identity.
 6. Pipeline call-context construction reads the enriched `From` and `To` values.
 
 Tests MUST prove both phone enrichment propagation and URI immutability across the infra and core
@@ -396,7 +398,8 @@ before rollout.
 
 ### Phase 1: Core Capture and Phone Parser
 
-1. Define one unexported phone parser beside `NewCallAddress` using the exact grammar.
+1. Define one phone parser beside `NewCallAddress` using the exact grammar and expose it through
+   the existing infra facade for route validation.
 2. Capture exact `FromURI` and `ToURI` values.
 3. Populate inbound `From` only from a valid From address user.
 4. Initialize inbound `To` as empty.
@@ -413,10 +416,12 @@ before rollout.
 
 ### Phase 3: Boundary Propagation
 
-1. Return the middleware-enriched `CallAddress` through the infra adapter.
-2. Store it in core inbound configuration and session state.
-3. Pass it unchanged to application and pipeline callbacks.
-4. Add infra and core parity tests proving `To` propagation and URI immutability.
+1. Return only the middleware-enriched `CallAddress.To` through the infra adapter.
+2. Keep captured URI, caller phone, and header ownership in core without a second session copy.
+3. Store the enriched value in core inbound configuration and transfer it to the accepted dialog
+   identity.
+4. Pass the identity snapshot unchanged to application and pipeline callbacks.
+5. Add infra and core parity tests proving `To` propagation and captured-field isolation.
 
 ### Phase 4: Pipeline and Metadata
 
