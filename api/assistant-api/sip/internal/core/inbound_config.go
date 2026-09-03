@@ -56,6 +56,19 @@ func NewInboundConfig(server *Server, identity inboundInviteIdentity, mediaOffer
 	}
 	for _, middleware := range middlewares {
 		if err := middleware(requestContext); err != nil {
+			if errors.Is(err, ErrInvalidConfig) {
+				configErr := fmt.Errorf("SIP middleware failed: %w", err)
+				return inboundConfig{}, &inboundFailure{
+					statusCode:      500,
+					class:           inboundFailureConfig,
+					responseClass:   internal_inbound.FailureConfig,
+					reason:          configErr.Error(),
+					termination:     CallTermination{Result: CallTerminationServerError, Reason: "inbound_config"},
+					lifecycleReason: LifecycleReasonInboundInviteFailed,
+					err:             configErr,
+				}
+			}
+
 			var sipErr *SIPError
 			if errors.As(err, &sipErr) && sipErr.Code > 0 {
 				authErr := fmt.Errorf("%w: %s", ErrAuthRequired, sipErr.Message)

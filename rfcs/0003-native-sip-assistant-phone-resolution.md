@@ -305,8 +305,8 @@ For the example that motivated this RFC, an inbound agent route produces:
 
 ```json
 {
-  "assistantPhone": "<active SIP deployment phone>",
-  "clientPhone": "07249994778"
+  "client.assistant_phone": "<active SIP deployment phone>",
+  "client.phone": "07249994778"
 }
 ```
 
