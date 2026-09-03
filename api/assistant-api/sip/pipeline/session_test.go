@@ -30,25 +30,6 @@ func newIdentityTestAuthentication() *types.Authentication {
 	}
 }
 
-func TestReconstructCallContextInboundMapsPhoneValues(t *testing.T) {
-	auth := newIdentityTestAuthentication()
-
-	call, err := reconstructCallContext(
-		auth,
-		42,
-		84,
-		string(sip_runtime.CallDirectionInbound),
-		"call-inbound",
-		"context-inbound",
-		"07249994778",
-		"+447249994778",
-	)
-	require.NoError(t, err)
-
-	assert.Equal(t, "07249994778", call.CallerNumber)
-	assert.Equal(t, "+447249994778", call.FromNumber)
-}
-
 func TestEnsureCallContextOutboundFallbackMapsPhoneValues(t *testing.T) {
 	auth := newIdentityTestAuthentication()
 	session, err := sip_runtime.NewSession(context.Background(),
@@ -66,7 +47,7 @@ func TestEnsureCallContextOutboundFallbackMapsPhoneValues(t *testing.T) {
 	require.NoError(t, err)
 	dispatcher := &Dispatcher{}
 
-	call, err := dispatcher.ensureCallContext(context.Background(), sip_runtime.SessionEstablishedPipeline{
+	call, err := dispatcher.ensureCallContext(context.Background(), SessionEstablishedPipeline{
 		ID:          "call-outbound",
 		Session:     session,
 		Direction:   sip_runtime.CallDirectionOutbound,
@@ -81,6 +62,12 @@ func TestEnsureCallContextOutboundFallbackMapsPhoneValues(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "+15551234567", call.CallerNumber)
 	assert.Equal(t, "+15557654321", call.FromNumber)
+	assert.Equal(t, uint64(7), call.OrganizationID)
+	assert.Equal(t, uint64(8), call.ProjectID)
+	require.NotNil(t, call.AuthActorType)
+	assert.Equal(t, string(types.ActorTypeService), *call.AuthActorType)
+	require.NotNil(t, call.AuthActorID)
+	assert.Equal(t, uint64(9), *call.AuthActorID)
 }
 
 func TestEnsureCallContextOutboundFallbackKeepsAliasPhonesEmpty(t *testing.T) {
@@ -99,7 +86,7 @@ func TestEnsureCallContextOutboundFallbackKeepsAliasPhonesEmpty(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	call, err := (&Dispatcher{}).ensureCallContext(context.Background(), sip_runtime.SessionEstablishedPipeline{
+	call, err := (&Dispatcher{}).ensureCallContext(context.Background(), SessionEstablishedPipeline{
 		ID:          "call-outbound-alias",
 		Session:     session,
 		Direction:   sip_runtime.CallDirectionOutbound,
@@ -133,7 +120,7 @@ func TestEnsureCallContextOutboundClaimedContextUsesCallAddressPhones(t *testing
 	store := &outboundContextTestStore{claimResult: stored}
 	dispatcher := &Dispatcher{callContextStore: store}
 
-	call, err := dispatcher.ensureCallContext(context.Background(), sip_runtime.SessionEstablishedPipeline{
+	call, err := dispatcher.ensureCallContext(context.Background(), SessionEstablishedPipeline{
 		ID:          "call-claimed-context",
 		Session:     session,
 		Direction:   sip_runtime.CallDirectionOutbound,
@@ -176,7 +163,7 @@ func TestEnsureCallContextOutboundLoadedContextClearsAliasPhones(t *testing.T) {
 	}
 	dispatcher := &Dispatcher{callContextStore: store}
 
-	call, err := dispatcher.ensureCallContext(context.Background(), sip_runtime.SessionEstablishedPipeline{
+	call, err := dispatcher.ensureCallContext(context.Background(), SessionEstablishedPipeline{
 		ID:          "call-loaded-context",
 		Session:     session,
 		Direction:   sip_runtime.CallDirectionOutbound,

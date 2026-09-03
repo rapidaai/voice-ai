@@ -11,7 +11,6 @@ import (
 	"fmt"
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
-	internal_inbound "github.com/rapidaai/api/assistant-api/sip/internal/inbound"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 )
@@ -28,9 +27,9 @@ type inboundConfig struct {
 	setupPhase      InboundSetupPhase
 }
 
-// NewInboundConfig runs inbound middleware and returns a call-ready config.
+// newInboundConfig runs inbound middleware and returns a call-ready config.
 // Failures are already mapped to the SIP response and SLI dimensions.
-func NewInboundConfig(server *Server, identity inboundInviteIdentity, mediaOffer inboundMediaOffer) (inboundConfig, *inboundFailure) {
+func newInboundConfig(server *Server, identity inboundInviteIdentity, mediaOffer inboundMediaOffer) (inboundConfig, *inboundFailure) {
 	server.mu.RLock()
 	middlewares := append([]Middleware(nil), server.middlewares...)
 	server.mu.RUnlock()
@@ -39,7 +38,7 @@ func NewInboundConfig(server *Server, identity inboundInviteIdentity, mediaOffer
 		return inboundConfig{}, &inboundFailure{
 			statusCode:      500,
 			class:           inboundFailureConfig,
-			responseClass:   internal_inbound.FailureConfig,
+			responseClass:   inboundFailureConfig,
 			reason:          err.Error(),
 			termination:     CallTermination{Result: CallTerminationServerError, Reason: "inbound_config"},
 			lifecycleReason: LifecycleReasonInboundInviteFailed,
@@ -61,7 +60,7 @@ func NewInboundConfig(server *Server, identity inboundInviteIdentity, mediaOffer
 				return inboundConfig{}, &inboundFailure{
 					statusCode:      500,
 					class:           inboundFailureConfig,
-					responseClass:   internal_inbound.FailureConfig,
+					responseClass:   inboundFailureConfig,
 					reason:          configErr.Error(),
 					termination:     CallTermination{Result: CallTerminationServerError, Reason: "inbound_config"},
 					lifecycleReason: LifecycleReasonInboundInviteFailed,
@@ -75,7 +74,7 @@ func NewInboundConfig(server *Server, identity inboundInviteIdentity, mediaOffer
 				return inboundConfig{}, &inboundFailure{
 					statusCode:      sipErr.Code,
 					class:           inboundFailureAuthRequired,
-					responseClass:   internal_inbound.FailureAuth,
+					responseClass:   inboundFailureAuth,
 					reason:          authErr.Error(),
 					termination:     CallTermination{Result: CallTerminationClientError, Reason: "inbound_auth_required"},
 					lifecycleReason: LifecycleReasonInboundInviteFailed,
@@ -87,7 +86,7 @@ func NewInboundConfig(server *Server, identity inboundInviteIdentity, mediaOffer
 			return inboundConfig{}, &inboundFailure{
 				statusCode:      500,
 				class:           inboundFailureConfig,
-				responseClass:   internal_inbound.FailureConfig,
+				responseClass:   inboundFailureConfig,
 				reason:          configErr.Error(),
 				termination:     CallTermination{Result: CallTerminationServerError, Reason: "inbound_config"},
 				lifecycleReason: LifecycleReasonInboundInviteFailed,
@@ -100,7 +99,7 @@ func NewInboundConfig(server *Server, identity inboundInviteIdentity, mediaOffer
 		return inboundConfig{}, &inboundFailure{
 			statusCode:      500,
 			class:           inboundFailureConfig,
-			responseClass:   internal_inbound.FailureConfig,
+			responseClass:   inboundFailureConfig,
 			reason:          err.Error(),
 			termination:     CallTermination{Result: CallTerminationServerError, Reason: "inbound_config"},
 			lifecycleReason: LifecycleReasonInboundInviteFailed,

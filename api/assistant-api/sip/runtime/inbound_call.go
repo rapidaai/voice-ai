@@ -145,7 +145,7 @@ func (inboundCall *Inbound) HandleInvite() {
 		return
 	}
 
-	mediaOffer, mediaFailure := NewInboundMediaOffer(
+	mediaOffer, mediaFailure := newInboundMediaOffer(
 		inboundCall.server,
 		inboundCall.request,
 		"inbound INVITE",
@@ -153,7 +153,7 @@ func (inboundCall *Inbound) HandleInvite() {
 		false,
 	)
 	if mediaFailure != nil {
-		inboundCall.server.RejectInboundInvite(
+		inboundCall.server.rejectInboundInvite(
 			inboundCall.request,
 			inboundCall.transaction,
 			inboundCall.identity.callID,
@@ -170,9 +170,9 @@ func (inboundCall *Inbound) HandleInvite() {
 		return
 	}
 
-	resolvedConfig, configFailure := NewInboundConfig(inboundCall.server, inboundCall.identity, inboundCall.mediaOffer)
+	resolvedConfig, configFailure := newInboundConfig(inboundCall.server, inboundCall.identity, inboundCall.mediaOffer)
 	if configFailure != nil {
-		inboundCall.server.RejectInboundInvite(
+		inboundCall.server.rejectInboundInvite(
 			inboundCall.request,
 			inboundCall.transaction,
 			inboundCall.identity.callID,
@@ -200,7 +200,7 @@ func (inboundCall *Inbound) HandleInvite() {
 		setupTimings,
 	)
 	if sessionFailure != nil {
-		inboundCall.server.RejectInboundInvite(
+		inboundCall.server.rejectInboundInvite(
 			inboundCall.request,
 			inboundCall.transaction,
 			inboundCall.identity.callID,
@@ -218,7 +218,7 @@ func (inboundCall *Inbound) HandleInvite() {
 		return
 	}
 
-	dialog, dialogFailure := NewInboundDialog(
+	dialog, dialogFailure := newInboundDialog(
 		inboundCall.server,
 		inboundCall.session,
 		inboundCall.request,
@@ -240,7 +240,7 @@ func (inboundCall *Inbound) HandleInvite() {
 	inboundCall.session.MarkInboundSetupTimestamp(InboundSetupPhaseRingingSent, time.Now())
 	inboundCall.server.TransitionCall(inboundCall.session, CallStateRinging, LifecycleReasonInboundInviteRinging)
 
-	inboundCall.media = NewInboundMedia(inboundCall.server, inboundCall.session, inboundCall.mediaOffer)
+	inboundCall.media = newInboundMedia(inboundCall.server, inboundCall.session, inboundCall.mediaOffer)
 	if err := inboundCall.media.Prepare(); err != nil {
 		inboundCall.failBeforeAnswer(newInboundRTPUnavailableFailure(err, LifecycleReasonInboundInviteFailed))
 		return

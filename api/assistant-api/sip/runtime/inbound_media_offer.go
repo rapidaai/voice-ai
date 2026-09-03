@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/emiago/sipgo/sip"
-	internal_inbound "github.com/rapidaai/api/assistant-api/sip/internal/inbound"
 )
 
 // inboundMediaOffer is the validated remote SDP offer for inbound media.
@@ -22,9 +21,9 @@ type inboundMediaOffer struct {
 	negotiatedCodec *Codec
 }
 
-// NewInboundMediaOffer validates the remote SDP offer and negotiates audio.
+// newInboundMediaOffer validates the remote SDP offer and negotiates audio.
 // Call setup receives inboundFailure so it can reject SIP with the right class.
-func NewInboundMediaOffer(
+func newInboundMediaOffer(
 	server *Server,
 	request *sip.Request,
 	requestName string,
@@ -38,7 +37,7 @@ func NewInboundMediaOffer(
 			return inboundMediaOffer{}, &inboundFailure{
 				statusCode:      415,
 				class:           inboundFailureUnsupportedMedia,
-				responseClass:   internal_inbound.FailureMedia,
+				responseClass:   inboundFailureMedia,
 				reason:          err.Error(),
 				termination:     CallTermination{Result: CallTerminationClientError, Reason: "inbound_unsupported_media"},
 				lifecycleReason: lifecycleReason,
@@ -49,12 +48,12 @@ func NewInboundMediaOffer(
 		if semicolon := strings.Index(contentType, ";"); semicolon >= 0 {
 			contentType = strings.TrimSpace(contentType[:semicolon])
 		}
-		if contentType != internal_inbound.SDPContentType {
+		if contentType != sdpContentType {
 			err := fmt.Errorf("%w: unsupported %s media type %q", ErrSDPParseFailed, requestName, contentTypeHeader.Value())
 			return inboundMediaOffer{}, &inboundFailure{
 				statusCode:      415,
 				class:           inboundFailureUnsupportedMedia,
-				responseClass:   internal_inbound.FailureMedia,
+				responseClass:   inboundFailureMedia,
 				reason:          err.Error(),
 				termination:     CallTermination{Result: CallTerminationClientError, Reason: "inbound_unsupported_media"},
 				lifecycleReason: lifecycleReason,
@@ -69,7 +68,7 @@ func NewInboundMediaOffer(
 		return inboundMediaOffer{}, &inboundFailure{
 			statusCode:      400,
 			class:           inboundFailureMedia,
-			responseClass:   internal_inbound.FailureMedia,
+			responseClass:   inboundFailureMedia,
 			reason:          err.Error(),
 			termination:     CallTermination{Result: CallTerminationClientError, Reason: "inbound_sdp_error"},
 			lifecycleReason: lifecycleReason,
@@ -82,7 +81,7 @@ func NewInboundMediaOffer(
 		return inboundMediaOffer{}, &inboundFailure{
 			statusCode:      400,
 			class:           inboundFailureMedia,
-			responseClass:   internal_inbound.FailureMedia,
+			responseClass:   inboundFailureMedia,
 			reason:          err.Error(),
 			termination:     CallTermination{Result: CallTerminationClientError, Reason: "inbound_sdp_error"},
 			lifecycleReason: lifecycleReason,
@@ -94,7 +93,7 @@ func NewInboundMediaOffer(
 		return inboundMediaOffer{}, &inboundFailure{
 			statusCode:      400,
 			class:           inboundFailureMedia,
-			responseClass:   internal_inbound.FailureMedia,
+			responseClass:   inboundFailureMedia,
 			reason:          err.Error(),
 			termination:     CallTermination{Result: CallTerminationClientError, Reason: "inbound_sdp_error"},
 			lifecycleReason: lifecycleReason,
@@ -107,7 +106,7 @@ func NewInboundMediaOffer(
 		return inboundMediaOffer{}, &inboundFailure{
 			statusCode:      400,
 			class:           inboundFailureMedia,
-			responseClass:   internal_inbound.FailureMedia,
+			responseClass:   inboundFailureMedia,
 			reason:          err.Error(),
 			termination:     CallTermination{Result: CallTerminationClientError, Reason: "inbound_sdp_error"},
 			lifecycleReason: lifecycleReason,
@@ -119,7 +118,7 @@ func NewInboundMediaOffer(
 		return inboundMediaOffer{}, &inboundFailure{
 			statusCode:      488,
 			class:           inboundFailureUnsupportedMedia,
-			responseClass:   internal_inbound.FailureMedia,
+			responseClass:   inboundFailureMedia,
 			reason:          err.Error(),
 			termination:     CallTermination{Result: CallTerminationClientError, Reason: "inbound_unsupported_media"},
 			lifecycleReason: lifecycleReason,
@@ -131,7 +130,7 @@ func NewInboundMediaOffer(
 		return inboundMediaOffer{}, &inboundFailure{
 			statusCode:      400,
 			class:           inboundFailureMedia,
-			responseClass:   internal_inbound.FailureMedia,
+			responseClass:   inboundFailureMedia,
 			reason:          err.Error(),
 			termination:     CallTermination{Result: CallTerminationClientError, Reason: "inbound_sdp_error"},
 			lifecycleReason: lifecycleReason,
@@ -143,7 +142,7 @@ func NewInboundMediaOffer(
 		return inboundMediaOffer{}, &inboundFailure{
 			statusCode:      488,
 			class:           inboundFailureUnsupportedMedia,
-			responseClass:   internal_inbound.FailureMedia,
+			responseClass:   inboundFailureMedia,
 			reason:          err.Error(),
 			termination:     CallTermination{Result: CallTerminationClientError, Reason: "inbound_unsupported_media"},
 			lifecycleReason: lifecycleReason,
@@ -156,7 +155,7 @@ func NewInboundMediaOffer(
 		return inboundMediaOffer{}, &inboundFailure{
 			statusCode:      488,
 			class:           inboundFailureUnsupportedMedia,
-			responseClass:   internal_inbound.FailureMedia,
+			responseClass:   inboundFailureMedia,
 			reason:          err.Error(),
 			termination:     CallTermination{Result: CallTerminationClientError, Reason: "inbound_unsupported_media"},
 			lifecycleReason: lifecycleReason,

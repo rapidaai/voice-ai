@@ -28,8 +28,8 @@ type inboundMedia struct {
 	started      bool
 }
 
-// NewInboundMedia creates the inbound media preparer for a SIP INVITE.
-func NewInboundMedia(server *Server, session *Session, mediaOffer inboundMediaOffer) *inboundMedia {
+// newInboundMedia creates the inbound media preparer for a SIP INVITE.
+func newInboundMedia(server *Server, session *Session, mediaOffer inboundMediaOffer) *inboundMedia {
 	return &inboundMedia{
 		server:     server,
 		session:    session,

@@ -53,7 +53,7 @@ func TestHandleSessionEstablished_ConversationErrorEndsSession(t *testing.T) {
 	)
 
 	s := newPipelineTestSession(t)
-	d.handleSessionEstablished(context.Background(), sip_runtime.SessionEstablishedPipeline{
+	d.handleSessionEstablished(context.Background(), SessionEstablishedPipeline{
 		ID:          "call-setup-fail",
 		Session:     s,
 		Direction:   sip_runtime.CallDirectionInbound,
@@ -82,7 +82,7 @@ func TestDispatcherBackpressureAndTeardownStress(t *testing.T) {
 
 	for i := 0; i < calls; i++ {
 		s := newPipelineTestSession(t)
-		d.OnPipeline(ctx, sip_runtime.SessionEstablishedPipeline{
+		d.OnPipeline(ctx, SessionEstablishedPipeline{
 			ID:          fmt.Sprintf("call-%d", i),
 			Session:     s,
 			Direction:   sip_runtime.CallDirectionInbound,

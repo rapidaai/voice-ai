@@ -49,7 +49,6 @@ const (
 
 	InboundRejectedInviteTTL  = time.Minute
 	MaxInboundRejectedInvites = 1024
-	SessionErrorBufferSize    = 10
 )
 
 // CallAddress contains exact SIP parties, resolved phone values, and non-credential headers.

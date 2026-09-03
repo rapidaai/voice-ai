@@ -14,6 +14,7 @@ import (
 	assistant_config "github.com/rapidaai/api/assistant-api/config"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
+	sip_pipeline "github.com/rapidaai/api/assistant-api/sip/pipeline"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	app_config "github.com/rapidaai/config"
 	"github.com/rapidaai/pkg/commons"
@@ -50,7 +51,8 @@ func TestSessionEstablishedStagePreservesCallAddress(t *testing.T) {
 		Headers: map[string]string{"x-original-called-number": "+14155550200"},
 	}
 
-	stage, err := (&SIPEngine{}).sessionEstablishedStage(session, "sip:agent-42@sip.rapida.ai", address)
+	var stage sip_pipeline.SessionEstablishedPipeline
+	stage, err = (&SIPEngine{}).sessionEstablishedStage(session, "sip:agent-42@sip.rapida.ai", address)
 
 	require.NoError(t, err)
 	assert.Equal(t, address, stage.CallAddress)

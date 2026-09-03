@@ -263,28 +263,28 @@ func (m *SIPEngine) onInvite(session *sip_runtime.Session, requestURI string, ca
 	return nil
 }
 
-func (m *SIPEngine) sessionEstablishedStage(session *sip_runtime.Session, requestURI string, callAddress sip_runtime.CallAddress) (sip_runtime.SessionEstablishedPipeline, error) {
+func (m *SIPEngine) sessionEstablishedStage(session *sip_runtime.Session, requestURI string, callAddress sip_runtime.CallAddress) (sip_pipeline.SessionEstablishedPipeline, error) {
 	if session == nil {
-		return sip_runtime.SessionEstablishedPipeline{}, fmt.Errorf("session is nil")
+		return sip_pipeline.SessionEstablishedPipeline{}, fmt.Errorf("session is nil")
 	}
 	info := session.GetInfo()
 	callID := info.CallID
 
 	if session.IsEnded() {
-		return sip_runtime.SessionEstablishedPipeline{}, fmt.Errorf("session already ended")
+		return sip_pipeline.SessionEstablishedPipeline{}, fmt.Errorf("session already ended")
 	}
 
 	auth := session.GetAuth()
 	if auth == nil {
-		return sip_runtime.SessionEstablishedPipeline{}, fmt.Errorf("missing auth on session %s", callID)
+		return sip_pipeline.SessionEstablishedPipeline{}, fmt.Errorf("missing auth on session %s", callID)
 	}
 
 	assistant := session.GetAssistant()
 	if assistant == nil {
-		return sip_runtime.SessionEstablishedPipeline{}, fmt.Errorf("missing assistant context on session %s", callID)
+		return sip_pipeline.SessionEstablishedPipeline{}, fmt.Errorf("missing assistant context on session %s", callID)
 	}
 
-	return sip_runtime.SessionEstablishedPipeline{
+	return sip_pipeline.SessionEstablishedPipeline{
 		ID:              callID,
 		Session:         session,
 		Config:          session.GetConfig(),
@@ -367,7 +367,7 @@ func (m *SIPEngine) onCancel(session *sip_runtime.Session) error {
 // The pipeline handler (signal.go) creates the observer and persists metrics.
 func (m *SIPEngine) onError(session *sip_runtime.Session, callErr error) {
 	m.logger.Warnw("SIP error", "call_id", session.GetCallID(), "error", callErr)
-	m.dispatcher.OnPipeline(m.ctx, sip_runtime.CallFailedPipeline{
+	m.dispatcher.OnPipeline(m.ctx, sip_pipeline.CallFailedPipeline{
 		ID:      session.GetCallID(),
 		Session: session,
 		Error:   callErr,

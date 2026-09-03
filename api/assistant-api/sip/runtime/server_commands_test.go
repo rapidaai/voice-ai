@@ -14,7 +14,6 @@ import (
 
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
-	internal_inbound "github.com/rapidaai/api/assistant-api/sip/internal/inbound"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -201,7 +200,7 @@ func newInboundInviteRequest(callID string) *sip.Request {
 	req.AppendHeader(&sip.ContactHeader{
 		Address: sip.Uri{Scheme: "sip", User: "alice", Host: "127.0.0.1", Port: 5060},
 	})
-	req.AppendHeader(sip.NewHeader("Content-Type", internal_inbound.SDPContentType))
+	req.AppendHeader(sip.NewHeader("Content-Type", sdpContentType))
 	req.SetBody([]byte(validInboundOfferSDP()))
 	return req
 }
@@ -211,7 +210,7 @@ func newDialogSDPRequest(method sip.RequestMethod, callID string, sdpBody string
 	if fromHeader := req.From(); fromHeader != nil {
 		fromHeader.Params.Add("tag", "fromtag")
 	}
-	req.AppendHeader(sip.NewHeader("Content-Type", internal_inbound.SDPContentType))
+	req.AppendHeader(sip.NewHeader("Content-Type", sdpContentType))
 	req.SetBody([]byte(sdpBody))
 	return req
 }
@@ -299,7 +298,7 @@ func newInboundDialogRequest(t *testing.T, session *Session, method sip.RequestM
 func newInboundDialogSDPRequest(t *testing.T, session *Session, method sip.RequestMethod, sdpBody string) *sip.Request {
 	t.Helper()
 	request := newInboundDialogRequest(t, session, method)
-	request.AppendHeader(sip.NewHeader("Content-Type", internal_inbound.SDPContentType))
+	request.AppendHeader(sip.NewHeader("Content-Type", sdpContentType))
 	request.SetBody([]byte(sdpBody))
 	return request
 }

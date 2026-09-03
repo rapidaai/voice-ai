@@ -14,7 +14,6 @@ import (
 
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
-	internal_inbound "github.com/rapidaai/api/assistant-api/sip/internal/inbound"
 )
 
 // inboundDialog owns SIP dialog responses for an inbound INVITE.
@@ -34,7 +33,7 @@ type inboundDialog struct {
 	ringingStopped       chan struct{}
 }
 
-func NewInboundDialog(
+func newInboundDialog(
 	server *Server,
 	session *Session,
 	request *sip.Request,
@@ -46,7 +45,7 @@ func NewInboundDialog(
 		return nil, &inboundFailure{
 			statusCode:      500,
 			class:           inboundFailureDialog,
-			responseClass:   internal_inbound.FailureDialog,
+			responseClass:   inboundFailureDialog,
 			reason:          err.Error(),
 			termination:     CallTermination{Result: CallTerminationServerError, Reason: "inbound_dialog"},
 			lifecycleReason: LifecycleReasonInboundInviteFailed,
@@ -60,7 +59,7 @@ func NewInboundDialog(
 		return nil, &inboundFailure{
 			statusCode:      500,
 			class:           inboundFailureDialog,
-			responseClass:   internal_inbound.FailureDialog,
+			responseClass:   inboundFailureDialog,
 			reason:          dialogErr.Error(),
 			termination:     CallTermination{Result: CallTerminationServerError, Reason: "inbound_dialog"},
 			lifecycleReason: LifecycleReasonInboundInviteFailed,

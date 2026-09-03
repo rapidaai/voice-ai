@@ -24,7 +24,7 @@ import (
 	"github.com/rapidaai/pkg/utils"
 )
 
-func (d *Dispatcher) createConversation(ctx context.Context, stage sip_runtime.SessionEstablishedPipeline) (uint64, error) {
+func (d *Dispatcher) createConversation(ctx context.Context, stage SessionEstablishedPipeline) (uint64, error) {
 	dirEnum := type_enums.DIRECTION_INBOUND
 	if stage.Direction == sip_runtime.CallDirectionOutbound {
 		dirEnum = type_enums.DIRECTION_OUTBOUND
@@ -63,33 +63,48 @@ func (d *Dispatcher) createConversation(ctx context.Context, stage sip_runtime.S
 	return conversation.Id, nil
 }
 
-func (d *Dispatcher) ensureCallContext(ctx context.Context, stage sip_runtime.SessionEstablishedPipeline, conversationID uint64) (*callcontext.CallContext, error) {
-	callID := stage.Session.GetCallID()
-	dirStr := string(stage.Direction)
+func (d *Dispatcher) ensureCallContext(ctx context.Context, stage SessionEstablishedPipeline, conversationID uint64) (*callcontext.CallContext, error) {
 	if stage.Direction == sip_runtime.CallDirectionOutbound {
 		contextID := stage.Session.GetContextID()
-		if contextID == "" {
-			return reconstructCallContext(stage.Auth, stage.AssistantID, conversationID, dirStr, callID, "", stage.CallAddress.From, stage.CallAddress.To)
+		if contextID != "" {
+			if claimed, err := d.callContextStore.Claim(ctx, contextID); err == nil && claimed != nil {
+				claimed.Direction = string(stage.Direction)
+				claimed.CallerNumber = stage.CallAddress.To
+				claimed.FromNumber = stage.CallAddress.From
+				return claimed, nil
+			}
+			if loaded, err := d.callContextStore.Get(ctx, contextID); err == nil && loaded != nil {
+				loaded.Direction = string(stage.Direction)
+				loaded.CallerNumber = stage.CallAddress.To
+				loaded.FromNumber = stage.CallAddress.From
+				return loaded, nil
+			}
 		}
-		if claimed, err := d.callContextStore.Claim(ctx, contextID); err == nil {
-			setCallContextPhoneValues(claimed, dirStr, stage.CallAddress.From, stage.CallAddress.To)
-			return claimed, nil
+
+		callContext := &callcontext.CallContext{
+			AssistantID:    stage.AssistantID,
+			ConversationID: conversationID,
+			Direction:      string(stage.Direction),
+			Provider:       "sip",
+			CallerNumber:   stage.CallAddress.To,
+			FromNumber:     stage.CallAddress.From,
+			ChannelUUID:    stage.Session.GetCallID(),
+			ContextID:      contextID,
 		}
-		if loaded, err := d.callContextStore.Get(ctx, contextID); err == nil {
-			setCallContextPhoneValues(loaded, dirStr, stage.CallAddress.From, stage.CallAddress.To)
-			return loaded, nil
+		if err := callContext.SetAuthentication(stage.Auth); err != nil {
+			return nil, err
 		}
-		return reconstructCallContext(stage.Auth, stage.AssistantID, conversationID, dirStr, callID, contextID, stage.CallAddress.From, stage.CallAddress.To)
+		return callContext, nil
 	}
 
 	callContext := &callcontext.CallContext{
 		AssistantID:    stage.AssistantID,
 		ConversationID: conversationID,
-		Direction:      dirStr,
+		Direction:      string(stage.Direction),
 		Provider:       "sip",
 		CallerNumber:   stage.CallAddress.From,
 		FromNumber:     stage.CallAddress.To,
-		ChannelUUID:    callID,
+		ChannelUUID:    stage.Session.GetCallID(),
 	}
 	if err := callContext.SetAuthentication(stage.Auth); err != nil {
 		return nil, err
@@ -98,16 +113,14 @@ func (d *Dispatcher) ensureCallContext(ctx context.Context, stage sip_runtime.Se
 		callContext.AssistantProviderId = assistant.AssistantProviderId
 	}
 	if _, err := d.callContextStore.Save(ctx, callContext); err != nil {
-		d.logger.Warnw("failed to persist inbound call context — continuing in-memory", "call_id", callID, "error", err)
+		d.logger.Warnw("Failed to persist inbound SIP call context", "call_id", stage.Session.GetCallID(), "error", err)
 		return callContext, nil
 	}
-	if _, err := d.callContextStore.Claim(ctx, callContext.ContextID); err != nil {
-		d.logger.Debugw("inbound claim non-fatal", "call_id", callID, "error", err)
-	}
+	_, _ = d.callContextStore.Claim(ctx, callContext.ContextID)
 	return callContext, nil
 }
 
-func (d *Dispatcher) setupCall(ctx context.Context, stage sip_runtime.SessionEstablishedPipeline, conversationID uint64, cc *callcontext.CallContext) (*CallSetupResult, error) {
+func (d *Dispatcher) setupCall(ctx context.Context, stage SessionEstablishedPipeline, conversationID uint64, cc *callcontext.CallContext) (*CallSetupResult, error) {
 	assistant := stage.Session.GetAssistant()
 	if assistant == nil && d.assistantService != nil {
 		var err error
@@ -139,7 +152,7 @@ func (d *Dispatcher) setupCall(ctx context.Context, stage sip_runtime.SessionEst
 }
 
 func (d *Dispatcher) createObserver(ctx context.Context, scope *CallSetupResult, auth *types.Authentication) observability.Recorder {
-	recorder := observability.New(
+	return observability.New(
 		observability.WithLogger(d.logger),
 		observability.WithAuth(auth),
 		observability.WithGlobalScope(observability.GlobalScope{
@@ -169,43 +182,4 @@ func (d *Dispatcher) createObserver(ctx context.Context, scope *CallSetupResult,
 			collectors.NewWithEnv(ctx, d.logger, d.assistantConfig),
 		),
 	)
-	return recorder
-}
-
-func reconstructCallContext(
-	auth *types.Authentication,
-	assistantID uint64,
-	conversationID uint64,
-	direction string,
-	callID string,
-	contextID string,
-	fromPhone string,
-	toPhone string,
-) (*callcontext.CallContext, error) {
-	callContext := &callcontext.CallContext{
-		AssistantID:    assistantID,
-		ConversationID: conversationID,
-		Direction:      direction,
-		Provider:       "sip",
-		ChannelUUID:    callID,
-		ContextID:      contextID,
-	}
-	if err := callContext.SetAuthentication(auth); err != nil {
-		return nil, err
-	}
-	setCallContextPhoneValues(callContext, direction, fromPhone, toPhone)
-	return callContext, nil
-}
-
-func setCallContextPhoneValues(callContext *callcontext.CallContext, direction, fromPhone, toPhone string) {
-	if callContext == nil {
-		return
-	}
-	if direction == string(sip_runtime.CallDirectionOutbound) {
-		callContext.CallerNumber = toPhone
-		callContext.FromNumber = fromPhone
-	} else {
-		callContext.CallerNumber = fromPhone
-		callContext.FromNumber = toPhone
-	}
 }

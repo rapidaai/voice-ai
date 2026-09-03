@@ -42,3 +42,30 @@ func TestNewSessionRequiresConfig(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidConfig)
 	assert.Nil(t, session)
 }
+
+func TestSessionTerminalStateIsImmutable(t *testing.T) {
+	tests := []struct {
+		name  string
+		state CallState
+	}{
+		{name: "ended", state: CallStateEnded},
+		{name: "failed", state: CallStateFailed},
+		{name: "cancelled", state: CallStateCancelled},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			session, err := NewSession(context.Background(),
+				WithSessionConfig(testSessionConfig()),
+				WithSessionDirection(CallDirectionInbound),
+			)
+			require.NoError(t, err)
+
+			session.SetState(test.state)
+			session.SetState(CallStateConnected)
+			session.SetState(CallStateEnded)
+
+			assert.Equal(t, test.state, session.GetState())
+		})
+	}
+}

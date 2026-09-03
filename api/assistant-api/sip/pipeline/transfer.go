@@ -8,23 +8,22 @@ package sip_pipeline
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 )
 
-func (d *Dispatcher) handleTransferInitiated(ctx context.Context, v sip_runtime.TransferInitiatedPipeline) {
+func (d *Dispatcher) handleTransferInitiated(ctx context.Context, v TransferInitiatedPipeline) {
 	go d.executeTransfer(ctx, v)
 }
 
-func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_runtime.TransferInitiatedPipeline) {
-	d.logger.Infow("Pipeline: transfer_initiated",
+func (d *Dispatcher) executeTransfer(ctx context.Context, v TransferInitiatedPipeline) {
+	d.logger.Infow("SIP transfer initiated",
 		"call_id", v.ID, "target", v.TargetURI)
 
 	if d.server == nil {
-		d.logger.Errorw("Pipeline: transfer_failed — SIP server not available",
+		d.logger.Errorw("SIP transfer failed",
 			"call_id", v.ID, "target", v.TargetURI, "reason", "server_nil")
 		v.Session.SetMetadata(sip_runtime.MetadataBridgeTransferStatus, "failed")
 		if v.OnFailed != nil {
@@ -33,15 +32,24 @@ func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_runtime.Transfer
 		return
 	}
 
-	cfg := v.Config
-	if cfg == nil {
-		cfg = v.Session.GetConfig()
+	config := v.Config
+	if config == nil {
+		config = v.Session.GetConfig()
 	}
+	if config == nil {
+		d.logger.Errorw("SIP transfer failed", "call_id", v.ID, "target", v.TargetURI, "reason", "config_missing")
+		v.Session.SetMetadata(sip_runtime.MetadataBridgeTransferStatus, "failed")
+		if v.OnFailed != nil {
+			v.OnFailed()
+		}
+		return
+	}
+	transferConfig := *config
 
-	if cfg.CallerID == "" {
+	if transferConfig.CallerID == "" {
 		if assistant := v.Session.GetAssistant(); assistant != nil && assistant.AssistantPhoneDeployment != nil {
 			if did, err := assistant.AssistantPhoneDeployment.GetOptions().GetString("phone"); err == nil && did != "" {
-				cfg.CallerID = strings.TrimPrefix(did, "+")
+				transferConfig.CallerID = strings.TrimPrefix(did, "+")
 			}
 		}
 	}
@@ -53,9 +61,10 @@ func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_runtime.Transfer
 
 	var outboundSession *sip_runtime.Session
 	var connectedTarget string
+	var lastError error
 	for i, target := range targets {
 		attempt := i + 1
-		d.logger.Infow("Pipeline: transfer_attempt",
+		d.logger.Debugw("SIP transfer attempt",
 			"call_id", v.ID, "target", target,
 			"attempt", attempt, "total", len(targets))
 
@@ -66,7 +75,7 @@ func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_runtime.Transfer
 		// Each target gets its own bridge timeout. Transfer policy remains here;
 		// SIP infra owns only the outbound B-leg lifecycle.
 		perTargetCtx, perTargetCancel := context.WithTimeout(v.Session.Context(), sip_runtime.BridgeCallTimeout)
-		session, err := d.server.MakeTransferBridgeCall(perTargetCtx, cfg, target, cfg.CallerID, sip_runtime.TransferBridgeCallOptions{
+		session, err := d.server.MakeTransferBridgeCall(perTargetCtx, &transferConfig, target, transferConfig.CallerID, sip_runtime.TransferBridgeCallOptions{
 			ParentCallID:    v.Session.GetCallID(),
 			Attempt:         attempt,
 			TotalAttempts:   len(targets),
@@ -82,8 +91,9 @@ func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_runtime.Transfer
 			connectedTarget = target
 			break
 		}
+		lastError = err
 
-		d.logger.Warnw("Pipeline: transfer_target_failed",
+		d.logger.Debugw("SIP transfer attempt failed",
 			"call_id", v.ID, "target", target,
 			"attempt", attempt, "error", err)
 
@@ -94,40 +104,31 @@ func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_runtime.Transfer
 	}
 
 	if outboundSession == nil {
-		d.logger.Errorw("Pipeline: transfer_failed — all targets exhausted",
-			"call_id", v.ID, "targets", targets)
+		d.logger.Warnw("SIP transfer failed",
+			"call_id", v.ID,
+			"targets", targets,
+			"error", lastError)
 		v.Session.SetMetadata(sip_runtime.MetadataBridgeTransferStatus, "failed")
 		if v.OnFailed != nil {
 			v.OnFailed()
 		}
-		d.OnPipeline(ctx, sip_runtime.TransferFailedPipeline{
-			ID:     v.ID,
-			Error:  fmt.Errorf("all %d transfer targets failed", len(targets)),
-			Reason: "outbound_failed",
-		})
 		return
 	}
 
 	v.TargetURI = connectedTarget
 	outboundCallID := outboundSession.GetCallID()
 
-	d.logger.Infow("Pipeline: transfer_connected",
-		"call_id", v.ID,
-		"outbound_call_id", outboundCallID,
-		"target", v.TargetURI)
-
 	// Store outbound call ID in session metadata for observability
 	v.Session.SetMetadata(sip_runtime.MetadataBridgeTransferOutboundCallID, outboundCallID)
+	d.logger.Infow("SIP transfer connected",
+		"call_id", v.ID,
+		"outbound_call_id", outboundCallID,
+		"target", connectedTarget,
+		"codec", outboundSession.GetInfo().Codec)
 
 	if v.OnConnected != nil {
 		v.OnConnected(outboundSession.GetRTPHandler())
 	}
-
-	d.OnPipeline(ctx, sip_runtime.TransferConnectedPipeline{
-		ID:              v.ID,
-		InboundSession:  v.Session,
-		OutboundSession: outboundSession,
-	})
 
 	// Track bridge duration from the moment the transfer target answered
 	bridgeStart := time.Now()
@@ -136,7 +137,7 @@ func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_runtime.Transfer
 	bridgeDuration := time.Since(bridgeStart)
 
 	if err != nil {
-		d.logger.Errorw("Pipeline: transfer_completed — bridge failed",
+		d.logger.Errorw("SIP transfer bridge failed",
 			"call_id", v.ID,
 			"target", v.TargetURI,
 			"outbound_call_id", outboundCallID,
@@ -146,7 +147,7 @@ func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_runtime.Transfer
 		v.Session.SetMetadata(sip_runtime.MetadataBridgeTransferStatus, "failed")
 		v.Session.SetMetadata(sip_runtime.MetadataBridgeTransferDuration, bridgeDuration.String())
 	} else {
-		d.logger.Infow("Pipeline: transfer_completed",
+		d.logger.Infow("SIP transfer completed",
 			"call_id", v.ID,
 			"target", v.TargetURI,
 			"outbound_call_id", outboundCallID,
@@ -174,54 +175,5 @@ func (d *Dispatcher) executeTransfer(ctx context.Context, v sip_runtime.Transfer
 	}
 	if v.OnResumeAI != nil {
 		v.OnResumeAI()
-	}
-}
-
-func (d *Dispatcher) handleTransferConnected(ctx context.Context, v sip_runtime.TransferConnectedPipeline) {
-	outboundInfo := v.OutboundSession.GetInfo()
-	d.logger.Infow("Pipeline: transfer_connected",
-		"call_id", v.ID,
-		"outbound_call_id", v.OutboundSession.GetCallID(),
-		"target_uri", outboundInfo.RemoteURI,
-		"codec", outboundInfo.Codec)
-}
-
-func (d *Dispatcher) handleTransferFailed(ctx context.Context, v sip_runtime.TransferFailedPipeline) {
-	// Categorize the failure for structured alerting
-	category := categorizeTransferError(v.Reason, v.Error)
-	d.logger.Warnw("Pipeline: transfer_failed",
-		"call_id", v.ID,
-		"reason", v.Reason,
-		"category", category,
-		"error", v.Error)
-}
-
-// categorizeTransferError maps raw transfer failure reasons into high-level
-// categories for structured logging and alerting. Categories:
-//   - "setup": server unavailable or config errors before dialing
-//   - "network": outbound call could not be placed (timeout, DNS, network)
-//   - "rejected": callee rejected the call (busy, declined)
-//   - "bridge": bridge was established but broke during media relay
-//   - "unknown": could not determine category
-func categorizeTransferError(reason string, err error) string {
-	switch {
-	case reason == "server_nil" || reason == "config_error":
-		return "setup"
-	case reason == "outbound_failed":
-		if err != nil {
-			errMsg := err.Error()
-			if strings.Contains(errMsg, "timeout") || strings.Contains(errMsg, "deadline") {
-				return "network"
-			}
-			if strings.Contains(errMsg, "486") || strings.Contains(errMsg, "603") ||
-				strings.Contains(errMsg, "busy") || strings.Contains(errMsg, "declined") {
-				return "rejected"
-			}
-		}
-		return "network"
-	case reason == "bridge_failed":
-		return "bridge"
-	default:
-		return "unknown"
 	}
 }

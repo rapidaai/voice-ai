@@ -13,7 +13,6 @@ import (
 
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
-	internal_inbound "github.com/rapidaai/api/assistant-api/sip/internal/inbound"
 )
 
 // GetSession returns the session for a call ID.
@@ -88,7 +87,7 @@ func (s *Server) CancelCall(session *Session, reason LifecycleReason) error {
 	return s.cancelPendingInvite(session, reason)
 }
 
-func (s *Server) RejectInboundInvite(req *sip.Request, tx sip.ServerTransaction, callID string, statusCode int, failureClass internal_inbound.FailureClass, reason LifecycleReason, err error) {
+func (s *Server) rejectInboundInvite(req *sip.Request, tx sip.ServerTransaction, callID string, statusCode int, failureClass inboundFailureClass, reason LifecycleReason, err error) {
 	if callID != "" {
 		s.recordDetachedInboundReject(callID, reason)
 	}

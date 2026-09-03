@@ -6,14 +6,16 @@
 
 package sip_runtime
 
-import internal_inbound "github.com/rapidaai/api/assistant-api/sip/internal/inbound"
+const sdpContentType = "application/sdp"
 
 type inboundFailureClass string
 
 const (
 	inboundFailureConfig           inboundFailureClass = "config"
+	inboundFailureAuth             inboundFailureClass = "auth"
 	inboundFailureAuthRequired     inboundFailureClass = "auth_required"
 	inboundFailureMedia            inboundFailureClass = "media"
+	inboundFailureRTP              inboundFailureClass = "rtp"
 	inboundFailureUnsupportedMedia inboundFailureClass = "unsupported_media"
 	inboundFailureRTPUnavailable   inboundFailureClass = "rtp_unavailable"
 	inboundFailureMediaTimeout     inboundFailureClass = "media_timeout"
@@ -29,7 +31,7 @@ const (
 type inboundFailure struct {
 	statusCode      int
 	class           inboundFailureClass
-	responseClass   internal_inbound.FailureClass
+	responseClass   inboundFailureClass
 	reason          string
 	termination     CallTermination
 	retryable       bool
@@ -55,7 +57,7 @@ func newInboundSessionFailure(err error) inboundFailure {
 	return inboundFailure{
 		statusCode:      500,
 		class:           inboundFailureSetup,
-		responseClass:   internal_inbound.FailureSetup,
+		responseClass:   inboundFailureSetup,
 		reason:          err.Error(),
 		termination:     CallTermination{Result: CallTerminationServerError, Reason: "inbound_setup"},
 		lifecycleReason: LifecycleReasonInboundInviteFailed,
@@ -67,7 +69,7 @@ func newInboundDialogFailure(statusCode int, err error) inboundFailure {
 	return inboundFailure{
 		statusCode:      statusCode,
 		class:           inboundFailureDialog,
-		responseClass:   internal_inbound.FailureDialog,
+		responseClass:   inboundFailureDialog,
 		reason:          err.Error(),
 		termination:     CallTermination{Result: CallTerminationServerError, Reason: "inbound_dialog"},
 		lifecycleReason: LifecycleReasonInboundInviteFailed,
@@ -79,7 +81,7 @@ func newInboundRTPUnavailableFailure(err error, lifecycleReason LifecycleReason)
 	return inboundFailure{
 		statusCode:      503,
 		class:           inboundFailureRTPUnavailable,
-		responseClass:   internal_inbound.FailureRTP,
+		responseClass:   inboundFailureRTP,
 		reason:          err.Error(),
 		termination:     CallTermination{Result: CallTerminationServerError, Reason: "inbound_rtp_unavailable"},
 		lifecycleReason: lifecycleReason,
@@ -90,7 +92,7 @@ func newInboundRTPUnavailableFailure(err error, lifecycleReason LifecycleReason)
 func newInboundApplicationFailure(err error) inboundFailure {
 	return inboundFailure{
 		class:           inboundFailureApplication,
-		responseClass:   internal_inbound.FailureSetup,
+		responseClass:   inboundFailureSetup,
 		reason:          err.Error(),
 		termination:     CallTermination{Result: CallTerminationServerError, Reason: "inbound_application"},
 		lifecycleReason: LifecycleReasonPipelineSetupFailed,
@@ -102,7 +104,7 @@ func newInboundNoAnswerFailure(err error) inboundFailure {
 	return inboundFailure{
 		statusCode:      408,
 		class:           inboundFailureNoAnswer,
-		responseClass:   internal_inbound.FailureSetup,
+		responseClass:   inboundFailureSetup,
 		reason:          err.Error(),
 		termination:     CallTermination{Result: CallTerminationClientError, Reason: "inbound_no_answer"},
 		lifecycleReason: LifecycleReasonInboundAnswerPolicyTimeout,
@@ -113,7 +115,7 @@ func newInboundNoAnswerFailure(err error) inboundFailure {
 func newInboundNoACKFailure(err error) inboundFailure {
 	return inboundFailure{
 		class:           inboundFailureNoACK,
-		responseClass:   internal_inbound.FailureDialog,
+		responseClass:   inboundFailureDialog,
 		reason:          err.Error(),
 		termination:     CallTermination{Result: CallTerminationServerError, Reason: "inbound_no_ack"},
 		retryable:       true,
@@ -125,7 +127,7 @@ func newInboundNoACKFailure(err error) inboundFailure {
 func newInboundMediaTimeoutFailure() inboundFailure {
 	return inboundFailure{
 		class:           inboundFailureMediaTimeout,
-		responseClass:   internal_inbound.FailureRTP,
+		responseClass:   inboundFailureRTP,
 		reason:          ErrRTPMediaTimeout.Error(),
 		termination:     CallTermination{Result: CallTerminationServerError, Reason: "inbound_media_timeout"},
 		retryable:       true,

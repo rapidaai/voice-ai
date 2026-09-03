@@ -9,7 +9,6 @@ package sip_runtime
 import (
 	"testing"
 
-	internal_inbound "github.com/rapidaai/api/assistant-api/sip/internal/inbound"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +18,7 @@ func TestNewInboundConfigClassifiesMiddlewareErrors(t *testing.T) {
 		name              string
 		middlewareError   error
 		wantClass         inboundFailureClass
-		wantResponseClass internal_inbound.FailureClass
+		wantResponseClass inboundFailureClass
 		wantResult        CallTerminationResult
 		wantReason        string
 		wantError         error
@@ -28,7 +27,7 @@ func TestNewInboundConfigClassifiesMiddlewareErrors(t *testing.T) {
 			name:              "invalid configuration",
 			middlewareError:   &SIPError{Code: 500, Message: "route resolver unavailable", Err: ErrInvalidConfig},
 			wantClass:         inboundFailureConfig,
-			wantResponseClass: internal_inbound.FailureConfig,
+			wantResponseClass: inboundFailureConfig,
 			wantResult:        CallTerminationServerError,
 			wantReason:        "inbound_config",
 			wantError:         ErrInvalidConfig,
@@ -37,7 +36,7 @@ func TestNewInboundConfigClassifiesMiddlewareErrors(t *testing.T) {
 			name:              "authentication required",
 			middlewareError:   &SIPError{Code: 403, Message: "forbidden", Err: ErrAuthRequired},
 			wantClass:         inboundFailureAuthRequired,
-			wantResponseClass: internal_inbound.FailureAuth,
+			wantResponseClass: inboundFailureAuth,
 			wantResult:        CallTerminationClientError,
 			wantReason:        "inbound_auth_required",
 			wantError:         ErrAuthRequired,
@@ -50,7 +49,7 @@ func TestNewInboundConfigClassifiesMiddlewareErrors(t *testing.T) {
 				return test.middlewareError
 			}}}
 
-			_, failure := NewInboundConfig(server, inboundInviteIdentity{}, inboundMediaOffer{})
+			_, failure := newInboundConfig(server, inboundInviteIdentity{}, inboundMediaOffer{})
 
 			require.NotNil(t, failure)
 			assert.Equal(t, test.wantClass, failure.class)
@@ -75,7 +74,7 @@ func TestNewInboundConfigPopulatesCallAddress(t *testing.T) {
 		},
 	}
 
-	_, failure := NewInboundConfig(server, identity, inboundMediaOffer{})
+	_, failure := newInboundConfig(server, identity, inboundMediaOffer{})
 
 	require.NotNil(t, requestContext)
 	assert.Equal(t, identity.callAddress, requestContext.CallAddress)

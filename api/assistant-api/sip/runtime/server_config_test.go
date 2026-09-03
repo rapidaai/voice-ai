@@ -18,6 +18,31 @@ func TestServerConfigValidate_AcceptsSocketOwnedRTPConfig(t *testing.T) {
 	require.NoError(t, cfg.Validate())
 }
 
+func TestServerConfigValidateRejectsNil(t *testing.T) {
+	var config *ServerConfig
+
+	require.Error(t, config.Validate())
+}
+
+func TestNewServerRejectsNilConfig(t *testing.T) {
+	server, err := NewServer(nil, nil)
+
+	require.Error(t, err)
+	require.Nil(t, server)
+}
+
+func TestServerGetListenConfigReturnsCopy(t *testing.T) {
+	server := &Server{listenConfig: &ListenConfig{Address: "127.0.0.1", Port: 5060}}
+
+	config := server.GetListenConfig()
+	config.Address = "0.0.0.0"
+	config.Port = 5090
+
+	stored := server.GetListenConfig()
+	require.Equal(t, "127.0.0.1", stored.Address)
+	require.Equal(t, 5060, stored.Port)
+}
+
 func TestServerUseSymmetricRTPForRemoteIP(t *testing.T) {
 	require.True(t, (&Server{symmetricRTP: true}).useSymmetricRTPForRemoteIP("203.0.113.10"))
 	require.True(t, (&Server{ignoreLocalAddrInSDP: true}).useSymmetricRTPForRemoteIP("10.0.0.10"))

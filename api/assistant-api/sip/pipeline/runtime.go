@@ -18,7 +18,6 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
-	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -26,21 +25,17 @@ import (
 )
 
 type sipPreparedCallRuntime struct {
-	logger      commons.Logger
 	session     *sip_runtime.Session
 	auth        *types.Authentication
-	callContext *callcontext.CallContext
 	talkContext context.Context
 	cancelTalk  context.CancelFunc
 	streamer    internal_type.SIPStreamer
 	talker      internal_type.Talking
-	direction   string
 	talkDone    chan error
 }
 
 func (runtime *sipPreparedCallRuntime) Start(_ context.Context) error {
 	if runtime.session.IsEnded() {
-		runtime.logger.Warnw("Session already ended before runtime start", "call_id", runtime.session.GetCallID())
 		return fmt.Errorf("session_ended_before_start")
 	}
 	runtime.streamer.StartAssistantOutput()
@@ -51,16 +46,7 @@ func (runtime *sipPreparedCallRuntime) Start(_ context.Context) error {
 }
 
 func (runtime *sipPreparedCallRuntime) runTalker() error {
-	runtime.logger.Infow("SIP call started",
-		"call_id", runtime.session.GetCallID(),
-		"assistant_id", runtime.callContext.AssistantID,
-		"conversation_id", runtime.callContext.ConversationID,
-		"direction", runtime.direction)
-	if err := runtime.talker.Talk(runtime.talkContext, runtime.auth); err != nil {
-		runtime.logger.Warnw("SIP talker exited", "error", err, "call_id", runtime.session.GetCallID())
-	}
-	runtime.logger.Infow("SIP call ended", "call_id", runtime.session.GetCallID())
-	return nil
+	return runtime.talker.Talk(runtime.talkContext, runtime.auth)
 }
 
 func (runtime *sipPreparedCallRuntime) Close(_ context.Context) {
@@ -73,11 +59,9 @@ func (runtime *sipPreparedCallRuntime) Close(_ context.Context) {
 	_ = runtime.streamer.Close()
 }
 
-func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, stage sip_runtime.SessionEstablishedPipeline, setup *CallSetupResult, observer observability.Recorder) (*sipPreparedCallRuntime, error) {
+func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, stage SessionEstablishedPipeline, setup *CallSetupResult, observer observability.Recorder) (*sipPreparedCallRuntime, error) {
 	session := stage.Session
-	callID := session.GetCallID()
 	if session.IsEnded() {
-		d.logger.Warnw("Session already ended before call runtime preparation", "call_id", callID)
 		return nil, fmt.Errorf("session_ended_before_start")
 	}
 	auth := session.GetAuth()
@@ -104,7 +88,6 @@ func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, stage sip_runtim
 	select {
 	case <-session.ByeReceived():
 		cancelTalk()
-		d.logger.Infow("BYE received before call runtime preparation", "call_id", callID)
 		return nil, fmt.Errorf("bye_before_start")
 	default:
 	}
@@ -124,7 +107,6 @@ func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, stage sip_runtim
 	)
 	if err != nil {
 		cancelTalk()
-		d.logger.Error("Failed to create SIP streamer", "error", err, "call_id", callID)
 		return nil, fmt.Errorf("streamer_failed: %w", err)
 	}
 	if session.IsEnded() {
@@ -149,19 +131,15 @@ func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, stage sip_runtim
 	if err != nil {
 		cancelTalk()
 		_ = streamer.Close()
-		d.logger.Error("Failed to create SIP talker", "error", err, "call_id", callID)
 		return nil, fmt.Errorf("talker_failed: %w", err)
 	}
 	return &sipPreparedCallRuntime{
-		logger:      d.logger,
 		session:     session,
 		auth:        auth,
-		callContext: resolvedCallContext,
 		talkContext: talkContext,
 		cancelTalk:  cancelTalk,
 		streamer:    streamer,
 		talker:      talker,
-		direction:   string(stage.Direction),
 	}, nil
 }
 
@@ -223,7 +201,6 @@ func (d *Dispatcher) resolveSIPCallContext(session *sip_runtime.Session, setup *
 		return call, nil
 	}
 
-	d.logger.Warnw("setup.CallContext missing - reconstructing from session", "call_id", callID)
 	call := &callcontext.CallContext{
 		AssistantID:         setup.AssistantID,
 		ConversationID:      setup.ConversationID,
@@ -283,7 +260,7 @@ func (d *Dispatcher) configureSIPTransfer(ctx context.Context, session *sip_runt
 				Time: timestamppb.Now(),
 			})
 		}
-		d.OnPipeline(ctx, sip_runtime.TransferInitiatedPipeline{
+		d.OnPipeline(ctx, TransferInitiatedPipeline{
 			ID:                 callID,
 			Session:            session,
 			TargetURI:          primaryTarget,

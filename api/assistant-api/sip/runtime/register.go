@@ -89,7 +89,7 @@ type RegistrationClient struct {
 func NewRegistrationClient(client *sipgo.Client, listenConfig *ListenConfig, logger commons.Logger) *RegistrationClient {
 	return &RegistrationClient{
 		client:        client,
-		listenConfig:  listenConfig,
+		listenConfig:  cloneListenConfig(listenConfig),
 		logger:        logger,
 		registrations: make(map[string]*activeRegistration),
 	}

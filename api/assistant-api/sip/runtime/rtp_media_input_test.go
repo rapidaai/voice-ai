@@ -8,6 +8,7 @@ package sip_runtime
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"net"
 	"testing"
@@ -16,6 +17,96 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestRTPHandler_ParseRTPPacketRejectsMalformedHeaders(t *testing.T) {
+	tests := []struct {
+		name string
+		data []byte
+	}{
+		{
+			name: "truncated CSRC list",
+			data: []byte{0x81, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1},
+		},
+		{
+			name: "missing extension header",
+			data: []byte{0x90, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1},
+		},
+		{
+			name: "truncated extension payload",
+			data: []byte{0x90, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1},
+		},
+		{
+			name: "zero padding length",
+			data: []byte{0xA0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0},
+		},
+		{
+			name: "padding exceeds payload",
+			data: []byte{0xA0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 2},
+		},
+	}
+
+	handler := newTestRTPHandler()
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			packet, err := handler.parseRTPPacket(test.data)
+			require.Error(t, err)
+			assert.Nil(t, packet)
+		})
+	}
+}
+
+func TestRTPHandler_ParseRTPPacketPreservesCSRCValues(t *testing.T) {
+	data := make([]byte, rtpHeaderSize+8+1)
+	data[0] = 0x82
+	data[1] = CodecPCMU.PayloadType
+	binary.BigEndian.PutUint32(data[12:16], 1001)
+	binary.BigEndian.PutUint32(data[16:20], 1002)
+	data[20] = 0xFF
+
+	packet, err := newTestRTPHandler().parseRTPPacket(data)
+
+	require.NoError(t, err)
+	assert.Equal(t, []uint32{1001, 1002}, packet.CSRC)
+	assert.Equal(t, []byte{0xFF}, packet.Payload)
+}
+
+func TestRTPHandler_GetRemoteAddrReturnsCopy(t *testing.T) {
+	handler := newTestRTPHandler()
+	handler.SetRemoteAddr("127.0.0.1", 9000)
+
+	address := handler.GetRemoteAddr()
+	require.NotNil(t, address)
+	address.IP[0] = 10
+	address.Port = 10000
+
+	stored := handler.GetRemoteAddr()
+	require.NotNil(t, stored)
+	assert.Equal(t, "127.0.0.1", stored.IP.String())
+	assert.Equal(t, 9000, stored.Port)
+}
+
+func TestNewRTPHandlerDoesNotMutateConfig(t *testing.T) {
+	config := &RTPConfig{
+		LocalIP:           "127.0.0.1",
+		RTPPortRangeStart: 20000,
+		RTPPortRangeEnd:   20999,
+		PayloadType:       CodecPCMU.PayloadType,
+	}
+
+	handler, err := NewRTPHandler(context.Background(), config)
+	require.NoError(t, err)
+	defer handler.Stop()
+
+	assert.Zero(t, config.ClockRate)
+	assert.Zero(t, config.MediaTimeoutInitial)
+	assert.Zero(t, config.MediaTimeout)
+}
+
+func TestRTPConfigValidateRejectsNil(t *testing.T) {
+	var config *RTPConfig
+
+	require.Error(t, config.Validate())
+}
 
 func TestRTPHandler_ProcessInboundRTPPacketDropsNonAudioPayload(t *testing.T) {
 	handler := newTestRTPHandler()
@@ -282,6 +373,61 @@ func TestRTPHandler_RemoteAddressStaysFromSDPWhenSymmetricRTPDisabled(t *testing
 	require.NotNil(t, remote)
 	assert.Equal(t, "127.0.0.1", remote.IP.String())
 	assert.Equal(t, 9, remote.Port)
+}
+
+func TestRTPHandler_DropsOversizedDatagramAndContinuesReceiving(t *testing.T) {
+	reserved, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
+	require.NoError(t, err)
+	port := reserved.LocalAddr().(*net.UDPAddr).Port
+	require.NoError(t, reserved.Close())
+
+	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
+		LocalIP:           "127.0.0.1",
+		RTPPortRangeStart: port,
+		RTPPortRangeEnd:   port,
+		PayloadType:       CodecPCMU.PayloadType,
+		ClockRate:         CodecPCMU.ClockRate,
+	})
+	require.NoError(t, err)
+	defer handler.Stop()
+	handler.Start()
+
+	sender, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
+	require.NoError(t, err)
+	defer sender.Close()
+	destination := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port}
+
+	oversized := handler.serializeRTPPacket(&RTPPacket{
+		Version:        rtpVersion,
+		PayloadType:    CodecPCMU.PayloadType,
+		SequenceNumber: 1,
+		Timestamp:      160,
+		SSRC:           1234,
+		Payload:        make([]byte, rtpPacketMaxSize-rtpHeaderSize+1),
+	})
+	_, err = sender.WriteToUDP(oversized, destination)
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		return handler.GetDetailedStats().PacketsDropped == 1
+	}, time.Second, 10*time.Millisecond)
+
+	valid := handler.serializeRTPPacket(&RTPPacket{
+		Version:        rtpVersion,
+		PayloadType:    CodecPCMU.PayloadType,
+		SequenceNumber: 2,
+		Timestamp:      320,
+		SSRC:           1234,
+		Payload:        []byte{0xFF},
+	})
+	_, err = sender.WriteToUDP(valid, destination)
+	require.NoError(t, err)
+
+	select {
+	case audio := <-handler.AudioIn():
+		assert.Equal(t, []byte{0xFF}, audio)
+	case <-time.After(time.Second):
+		t.Fatal("expected valid RTP after oversized datagram")
+	}
 }
 
 func TestRTPHandler_MediaTimeoutUsesInitialWindow(t *testing.T) {

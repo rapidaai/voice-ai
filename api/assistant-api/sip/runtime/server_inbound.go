@@ -55,7 +55,7 @@ func (s *Server) handleReInvite(req *sip.Request, tx sip.ServerTransaction, sess
 		"call_id", callID,
 		"sdp_body", string(req.Body()))
 
-	mediaOffer, failure := NewInboundMediaOffer(
+	mediaOffer, failure := newInboundMediaOffer(
 		s,
 		req,
 		"re-INVITE",
@@ -290,7 +290,7 @@ func (s *Server) handleUpdate(req *sip.Request, tx sip.ServerTransaction) {
 	}
 
 	if body := req.Body(); len(body) > 0 {
-		mediaOffer, failure := NewInboundMediaOffer(
+		mediaOffer, failure := newInboundMediaOffer(
 			s,
 			req,
 			"UPDATE",

@@ -22,9 +22,12 @@ import (
 
 // Server wraps sipgo for handling SIP signaling.
 type Server struct {
-	mu     sync.RWMutex
-	logger commons.Logger
-	state  atomic.Int32
+	mu          sync.RWMutex
+	lifecycleMu sync.Mutex
+	logger      commons.Logger
+	state       atomic.Int32
+	listenerWG  sync.WaitGroup
+	closeOnce   sync.Once
 
 	userAgent    *sipgo.UserAgent
 	server       *sipgo.Server
@@ -162,6 +165,9 @@ type ServerConfig struct {
 
 // Validate validates the server configuration
 func (c *ServerConfig) Validate() error {
+	if c == nil {
+		return fmt.Errorf("server config is required")
+	}
 	if c.ListenConfig == nil {
 		return fmt.Errorf("listen config is required")
 	}
@@ -189,19 +195,17 @@ func NewServer(ctx context.Context, cfg *ServerConfig) (*Server, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, NewSIPError("NewServer", "", "configuration validation failed", err)
 	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
 	serverCtx, cancel := context.WithCancel(ctx)
+	listenConfig := cloneListenConfig(cfg.ListenConfig)
 
 	ua, err := sipgo.NewUA(
 		sipgo.WithUserAgent(internal_outbound.SIPUserAgent),
 		sipgo.WithUserAgentTransactionLayerOptions(
-			sip.WithTransactionLayerUnhandledResponseHandler(func(r *sip.Response) {
-				// Absorb retransmissions silently — these are expected when
-				// the remote side retransmits responses before the transaction completes
-				cfg.Logger.Debugw("Unhandled SIP response (retransmission)",
-					"status", r.StatusCode,
-					"reason", r.Reason)
-			}),
+			sip.WithTransactionLayerUnhandledResponseHandler(func(*sip.Response) {}),
 		),
 	)
 	if err != nil {
@@ -212,38 +216,30 @@ func NewServer(ctx context.Context, cfg *ServerConfig) (*Server, error) {
 	server, err := sipgo.NewServer(ua)
 	if err != nil {
 		cancel()
+		_ = ua.Close()
 		return nil, NewSIPError("NewServer", "", "failed to create SIP server", err)
 	}
 
-	// Log full ListenConfig so config issues are immediately visible
-	resolvedIP := cfg.ListenConfig.GetExternalIP()
-	cfg.Logger.Infow("SIP server config",
-		"bind_address", cfg.ListenConfig.Address,
-		"external_ip_config", cfg.ListenConfig.ExternalIP,
-		"external_ip_resolved", resolvedIP,
-		"port", cfg.ListenConfig.Port,
-		"transport", cfg.ListenConfig.Transport)
-	if resolvedIP == "" || resolvedIP == "0.0.0.0" || resolvedIP == "::" {
-		cfg.Logger.Warn("SIP ExternalIP not configured — SDP will advertise bind address which may be unroutable. Set SIP__EXTERNAL_IP in config.")
-	}
+	resolvedIP := listenConfig.GetExternalIP()
 
 	// Use the external/public IP for SIP Via/Contact headers so remote peers can reach us
 	clientOpts := []sipgo.ClientOption{
 		sipgo.WithClientHostname(resolvedIP),
 	}
-	if cfg.ListenConfig.Port > 0 {
-		clientOpts = append(clientOpts, sipgo.WithClientPort(cfg.ListenConfig.Port))
+	if listenConfig.Port > 0 {
+		clientOpts = append(clientOpts, sipgo.WithClientPort(listenConfig.Port))
 	}
 
 	client, err := sipgo.NewClient(ua, clientOpts...)
 	if err != nil {
 		cancel()
+		_ = ua.Close()
 		return nil, NewSIPError("NewServer", "", "failed to create SIP client", err)
 	}
 
 	// Build the Contact header used for outbound dialog sessions.
 	// Uses the external IP so the remote side can route subsequent requests back to us.
-	contactHDR := cfg.ListenConfig.SIPContactHeader()
+	contactHDR := listenConfig.SIPContactHeader()
 
 	// Create dialog client cache — routes incoming BYE/re-INVITE for outbound dialogs
 	// to the correct DialogClientSession. This is essential for proper dialog lifecycle:
@@ -261,7 +257,7 @@ func NewServer(ctx context.Context, cfg *ServerConfig) (*Server, error) {
 		userAgent:                        ua,
 		server:                           server,
 		client:                           client,
-		listenConfig:                     cfg.ListenConfig,
+		listenConfig:                     listenConfig,
 		rtpPortRangeStart:                cfg.RTPPortRangeStart,
 		rtpPortRangeEnd:                  cfg.RTPPortRangeEnd,
 		symmetricRTP:                     cfg.SymmetricRTP,
@@ -341,6 +337,9 @@ func (s *Server) registerHandlers() {
 
 // Start begins listening for SIP traffic
 func (s *Server) Start() error {
+	s.lifecycleMu.Lock()
+	defer s.lifecycleMu.Unlock()
+
 	if !s.state.CompareAndSwap(int32(ServerStateCreated), int32(ServerStateRunning)) {
 		return fmt.Errorf("server is not in created state")
 	}
@@ -351,27 +350,68 @@ func (s *Server) Start() error {
 		transport = "udp"
 	}
 
+	ready := make(chan struct{})
+	result := make(chan error, 1)
+	var listenerReady atomic.Bool
+	listenCtx := context.WithValue(s.ctx, sipgo.ListenReadyCtxKey, sipgo.ListenReadyFuncCtxValue(func(string, string) {
+		listenerReady.Store(true)
+		close(ready)
+	}))
+
+	s.listenerWG.Add(1)
 	go func() {
-		err := s.server.ListenAndServe(s.ctx, transport, listenAddr)
-		if err != nil && s.state.Load() == int32(ServerStateRunning) {
+		err := s.server.ListenAndServe(listenCtx, transport, listenAddr)
+		result <- err
+		s.listenerWG.Done()
+		if !listenerReady.Load() {
+			return
+		}
+		if err != nil && s.ctx.Err() == nil {
 			s.logger.Errorw("SIP server stopped unexpectedly",
 				"error", err,
 				"address", listenAddr)
-			s.state.Store(int32(ServerStateStopped))
 		}
+		s.Stop()
 	}()
 
-	s.logger.Infow("SIP server started (multi-tenant)",
-		"address", listenAddr,
-		"transport", transport)
-
-	return nil
+	select {
+	case <-ready:
+		s.logger.Infow("SIP server started",
+			"address", listenAddr,
+			"transport", transport)
+		return nil
+	case err := <-result:
+		s.state.CompareAndSwap(int32(ServerStateRunning), int32(ServerStateStopped))
+		if s.cancel != nil {
+			s.cancel()
+		}
+		s.closeTransport()
+		s.listenerWG.Wait()
+		if err == nil {
+			err = fmt.Errorf("listener stopped before becoming ready")
+		}
+		return NewSIPError("Start", "", "failed to start SIP listener", err)
+	case <-s.ctx.Done():
+		s.state.CompareAndSwap(int32(ServerStateRunning), int32(ServerStateStopped))
+		s.closeTransport()
+		s.listenerWG.Wait()
+		return NewSIPError("Start", "", "SIP listener startup cancelled", s.ctx.Err())
+	}
 }
 
 // Stop stops the SIP server gracefully
 func (s *Server) Stop() {
-	if !s.state.CompareAndSwap(int32(ServerStateRunning), int32(ServerStateStopped)) {
-		return // Already stopped or not running
+	s.lifecycleMu.Lock()
+	defer s.lifecycleMu.Unlock()
+
+	for {
+		state := ServerState(s.state.Load())
+		if state == ServerStateStopped {
+			return
+		}
+		if s.state.CompareAndSwap(int32(state), int32(ServerStateStopped)) {
+			break
+		}
 	}
 
 	s.logger.Infow("Stopping SIP server")
@@ -393,7 +433,18 @@ func (s *Server) Stop() {
 		_ = s.EndCallWithReason(session, LifecycleReasonServerStop)
 	}
 
+	s.closeTransport()
+	s.listenerWG.Wait()
+
 	s.logger.Infow("SIP server stopped", "sessions_ended", len(sessions))
+}
+
+func (s *Server) closeTransport() {
+	s.closeOnce.Do(func() {
+		if s.userAgent != nil {
+			_ = s.userAgent.Close()
+		}
+	})
 }
 
 // SetMiddlewares sets the ordered middleware list for all SIP requests.
@@ -427,7 +478,15 @@ func (s *Server) Client() *sipgo.Client {
 
 // ListenConfig returns the shared server listen configuration.
 func (s *Server) GetListenConfig() *ListenConfig {
-	return s.listenConfig
+	return cloneListenConfig(s.listenConfig)
+}
+
+func cloneListenConfig(config *ListenConfig) *ListenConfig {
+	if config == nil {
+		return nil
+	}
+	clone := *config
+	return &clone
 }
 
 // SessionCount returns the number of active sessions

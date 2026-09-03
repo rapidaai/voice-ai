@@ -8,7 +8,6 @@ package sip_runtime
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -84,40 +83,6 @@ func TestSessionConcurrentEndAndSetState(t *testing.T) {
 			}
 		}()
 	}
-
-	close(start)
-	wg.Wait()
-
-	require.True(t, s.IsEnded())
-}
-
-func TestSessionConcurrentErrorSendAndEnd(t *testing.T) {
-	t.Parallel()
-
-	s := newInboundTestSession(t)
-
-	var wg sync.WaitGroup
-	start := make(chan struct{})
-
-	for i := 0; i < 8; i++ {
-		wg.Add(1)
-		go func(worker int) {
-			defer wg.Done()
-			<-start
-			for j := 0; j < 1000; j++ {
-				s.SendError(errors.New("test error"))
-			}
-		}(i)
-	}
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		<-start
-		for i := 0; i < 50; i++ {
-			s.End()
-		}
-	}()
 
 	close(start)
 	wg.Wait()

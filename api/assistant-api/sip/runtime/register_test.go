@@ -15,6 +15,18 @@ import (
 	"github.com/emiago/sipgo/sip"
 )
 
+func TestNewRegistrationClientCopiesListenConfig(t *testing.T) {
+	listenConfig := &ListenConfig{Address: "127.0.0.1", Port: 5060}
+	client := NewRegistrationClient(nil, listenConfig, nil)
+
+	listenConfig.Address = "0.0.0.0"
+	listenConfig.Port = 5090
+
+	if client.listenConfig.Address != "127.0.0.1" || client.listenConfig.Port != 5060 {
+		t.Fatalf("registration client retained caller-owned listen config: %+v", client.listenConfig)
+	}
+}
+
 func TestRegistrationValidationErrorClassifiesMissingFields(t *testing.T) {
 	tests := []struct {
 		name           string

@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/emiago/sipgo/sip"
-	internal_inbound "github.com/rapidaai/api/assistant-api/sip/internal/inbound"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -250,7 +249,7 @@ func TestInboundCall_DialogCreationFailureRespondsAndFailsSession(t *testing.T) 
 	assert.True(t, failedSession.IsEnded())
 	assert.Equal(t, CallStateFailed, failedSession.GetState())
 	assertSessionMetadata(t, failedSession, "sip.failure_class", string(inboundFailureDialog))
-	assertSessionMetadata(t, failedSession, "sip.failure_response_class", string(internal_inbound.FailureDialog))
+	assertSessionMetadata(t, failedSession, "sip.failure_response_class", string(inboundFailureDialog))
 	assertSessionMetadata(t, failedSession, "sip.sli_result", string(CallTerminationServerError))
 	assertSessionMetadata(t, failedSession, "sip.sli_reason", "inbound_dialog")
 	assertSessionMetadata(t, failedSession, "sip.failure_status_code", 500)
@@ -967,7 +966,7 @@ func TestInboundCall_ACKTimeoutCleansPreparedApplication(t *testing.T) {
 	assert.True(t, capturedSession.IsEnded())
 	assert.Equal(t, CallStateFailed, capturedSession.GetState())
 	assertSessionMetadata(t, capturedSession, "sip.failure_class", string(inboundFailureNoACK))
-	assertSessionMetadata(t, capturedSession, "sip.failure_response_class", string(internal_inbound.FailureDialog))
+	assertSessionMetadata(t, capturedSession, "sip.failure_response_class", string(inboundFailureDialog))
 	assertSessionMetadata(t, capturedSession, "sip.sli_result", string(CallTerminationServerError))
 	assertSessionMetadata(t, capturedSession, "sip.sli_reason", "inbound_no_ack")
 	assertNoSessionMetadata(t, capturedSession, "sip.failure_status_code")
@@ -1103,7 +1102,7 @@ func TestInboundCall_FinalResponseMediaTimeoutEndsCall(t *testing.T) {
 	assert.Equal(t, CallStateEnded, session.GetState())
 	assert.Equal(t, 1, cleanupCalls)
 	assertSessionMetadata(t, session, "sip.failure_class", string(inboundFailureMediaTimeout))
-	assertSessionMetadata(t, session, "sip.failure_response_class", string(internal_inbound.FailureRTP))
+	assertSessionMetadata(t, session, "sip.failure_response_class", string(inboundFailureRTP))
 	assertSessionMetadata(t, session, "sip.failure_reason", ErrRTPMediaTimeout.Error())
 	assertSessionMetadata(t, session, "sip.sli_result", string(CallTerminationServerError))
 	assertSessionMetadata(t, session, "sip.sli_reason", "inbound_media_timeout")
@@ -1200,7 +1199,7 @@ func loadInboundIdentity(t *testing.T, inboundCall *Inbound) {
 
 func loadInboundMediaOffer(t *testing.T, inboundCall *Inbound) {
 	t.Helper()
-	mediaOffer, failure := NewInboundMediaOffer(
+	mediaOffer, failure := newInboundMediaOffer(
 		inboundCall.server,
 		inboundCall.request,
 		"inbound INVITE",
@@ -1228,7 +1227,7 @@ func createInboundSessionForTest(t *testing.T, inboundCall *Inbound) {
 
 func createInboundDialogForTest(t *testing.T, inboundCall *Inbound) {
 	t.Helper()
-	dialog, failure := NewInboundDialog(
+	dialog, failure := newInboundDialog(
 		inboundCall.server,
 		inboundCall.session,
 		inboundCall.request,

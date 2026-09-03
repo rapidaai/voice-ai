@@ -182,26 +182,20 @@ func (f *fakeSIPTransferStreamer) SendTransferEvent(event internal_type.Stream) 
 	f.events = append(f.events, event)
 }
 
-// =============================================================================
-// Pipeline routing — TransferInitiated/Connected/Failed routed correctly
-// =============================================================================
-
-func TestDispatcher_RoutesTransferStages(t *testing.T) {
+func TestDispatcherRoutesTransferInitiated(t *testing.T) {
 	t.Parallel()
 
 	var failedCount atomic.Int32
 
 	d := New(WithLogger(newPipelineTestLogger(t)))
-	d.Start(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	d.Start(ctx)
 
-	// Override dispatch to count routing (we can't easily override handlers,
-	// but we can verify the pipeline reaches dispatch by checking logs/state)
-	// For this test, verify the stages compile and are routable by the dispatcher.
 	s := newTransferTestSession(t)
 
-	// Test that OnPipeline doesn't panic for new stage types
-	d.OnPipeline(context.Background(),
-		sip_runtime.TransferInitiatedPipeline{
+	d.OnPipeline(ctx,
+		TransferInitiatedPipeline{
 			ID:          "test-transfer",
 			Session:     s,
 			TargetURI:   "918031405561",
@@ -211,26 +205,9 @@ func TestDispatcher_RoutesTransferStages(t *testing.T) {
 		},
 	)
 
-	d.OnPipeline(context.Background(),
-		sip_runtime.TransferConnectedPipeline{
-			ID:              "test-transfer",
-			InboundSession:  s,
-			OutboundSession: newTransferTestSession(t),
-		},
-	)
-
-	d.OnPipeline(context.Background(),
-		sip_runtime.TransferFailedPipeline{
-			ID:     "test-transfer",
-			Reason: "test_failure",
-		},
-	)
-
-	// Allow dispatcher goroutines to process
-	time.Sleep(100 * time.Millisecond)
-
-	// TransferInitiated's OnFailed should fire (nil server)
-	assert.True(t, failedCount.Load() > 0, "OnFailed should be called when server is nil")
+	require.Eventually(t, func() bool {
+		return failedCount.Load() > 0
+	}, time.Second, 10*time.Millisecond)
 }
 
 func TestConfigureSIPTransfer_OnTeardownRecordsTransferDurationMetric(t *testing.T) {
@@ -248,11 +225,11 @@ func TestConfigureSIPTransfer_OnTeardownRecordsTransferDurationMetric(t *testing
 	require.NotNil(t, streamer.handler)
 	streamer.handler([]string{"918031405561"}, "resume_ai")
 
-	var stage sip_runtime.TransferInitiatedPipeline
+	var stage TransferInitiatedPipeline
 	select {
 	case envelope := <-d.signalCh:
 		var ok bool
-		stage, ok = envelope.p.(sip_runtime.TransferInitiatedPipeline)
+		stage, ok = envelope.p.(TransferInitiatedPipeline)
 		require.True(t, ok, "expected TransferInitiatedPipeline, got %T", envelope.p)
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for transfer stage")
@@ -286,7 +263,7 @@ func TestHandleTransferInitiated_OnFailedCalled(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		d.executeTransfer(context.Background(), sip_runtime.TransferInitiatedPipeline{
+		d.executeTransfer(context.Background(), TransferInitiatedPipeline{
 			ID:        s.GetCallID(),
 			Session:   s,
 			TargetURI: "918031405561",
@@ -335,7 +312,7 @@ func TestHandleTransferInitiated_CallerIDResolution(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		d.executeTransfer(context.Background(), sip_runtime.TransferInitiatedPipeline{
+		d.executeTransfer(context.Background(), TransferInitiatedPipeline{
 			ID:        s.GetCallID(),
 			Session:   s,
 			TargetURI: "918031405561",
@@ -351,45 +328,8 @@ func TestHandleTransferInitiated_CallerIDResolution(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// TransferConnected / TransferFailed handlers don't panic
-// =============================================================================
-
-func TestHandleTransferConnected_NoPanic(t *testing.T) {
-	t.Parallel()
-
-	d := New(WithLogger(newPipelineTestLogger(t)))
-
-	s := newTransferTestSession(t)
-	outbound := newTransferTestSession(t)
-
-	// Should not panic
-	d.handleTransferConnected(context.Background(), sip_runtime.TransferConnectedPipeline{
-		ID:              "test-connected",
-		InboundSession:  s,
-		OutboundSession: outbound,
-	})
-}
-
-func TestHandleTransferFailed_NoPanic(t *testing.T) {
-	t.Parallel()
-
-	d := New(WithLogger(newPipelineTestLogger(t)))
-
-	d.handleTransferFailed(context.Background(), sip_runtime.TransferFailedPipeline{
-		ID:     "test-failed",
-		Reason: "busy",
-	})
-}
-
-// =============================================================================
-// Pipeline stage types — verify CallID()
-// =============================================================================
-
 func TestTransferPipelineStages_CallID(t *testing.T) {
-	assert.Equal(t, "call-1", sip_runtime.TransferInitiatedPipeline{ID: "call-1"}.CallID())
-	assert.Equal(t, "call-2", sip_runtime.TransferConnectedPipeline{ID: "call-2"}.CallID())
-	assert.Equal(t, "call-3", sip_runtime.TransferFailedPipeline{ID: "call-3"}.CallID())
+	assert.Equal(t, "call-1", TransferInitiatedPipeline{ID: "call-1"}.CallID())
 }
 
 // =============================================================================
@@ -413,7 +353,7 @@ func TestHandleTransferInitiated_OnTeardownNotCalledOnFailure(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		d.executeTransfer(context.Background(), sip_runtime.TransferInitiatedPipeline{
+		d.executeTransfer(context.Background(), TransferInitiatedPipeline{
 			ID:        s.GetCallID(),
 			Session:   s,
 			TargetURI: "918031405561",
@@ -441,7 +381,7 @@ func TestTransferInitiatedPipeline_HasOnTeardownField(t *testing.T) {
 	// Compile-time contract: TransferInitiatedPipeline must have an OnTeardown field.
 	// If the field is removed or renamed, this test fails at compile time.
 	var called bool
-	p := sip_runtime.TransferInitiatedPipeline{
+	p := TransferInitiatedPipeline{
 		ID:         "contract-test",
 		OnFailed:   func() {},
 		OnTeardown: func() { called = true },
@@ -474,7 +414,7 @@ func TestHandleTransferInitiated_FailureMetadata(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		d.executeTransfer(context.Background(), sip_runtime.TransferInitiatedPipeline{
+		d.executeTransfer(context.Background(), TransferInitiatedPipeline{
 			ID:        s.GetCallID(),
 			Session:   s,
 			TargetURI: "918031405561",
@@ -502,142 +442,6 @@ func TestHandleTransferInitiated_FailureMetadata(t *testing.T) {
 	_, ok = s.GetMetadata(sip_runtime.MetadataBridgeTransferDuration)
 	assert.False(t, ok, "MetadataBridgeTransferDuration should NOT be set on early failure")
 }
-
-// =============================================================================
-// categorizeTransferError — classification logic
-// =============================================================================
-
-func TestCategorizeTransferError(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name     string
-		reason   string
-		err      error
-		expected string
-	}{
-		{
-			name:     "server nil",
-			reason:   "server_nil",
-			err:      nil,
-			expected: "setup",
-		},
-		{
-			name:     "config error",
-			reason:   "config_error",
-			err:      errors.New("invalid config"),
-			expected: "setup",
-		},
-		{
-			name:     "outbound failed with timeout",
-			reason:   "outbound_failed",
-			err:      errors.New("context deadline exceeded"),
-			expected: "network",
-		},
-		{
-			name:     "outbound failed with timeout keyword",
-			reason:   "outbound_failed",
-			err:      errors.New("dial timeout after 30s"),
-			expected: "network",
-		},
-		{
-			name:     "outbound failed with busy",
-			reason:   "outbound_failed",
-			err:      errors.New("SIP 486 Busy Here"),
-			expected: "rejected",
-		},
-		{
-			name:     "outbound failed with 603 declined",
-			reason:   "outbound_failed",
-			err:      errors.New("received 603 Decline"),
-			expected: "rejected",
-		},
-		{
-			name:     "outbound failed generic",
-			reason:   "outbound_failed",
-			err:      errors.New("connection refused"),
-			expected: "network",
-		},
-		{
-			name:     "outbound failed nil error",
-			reason:   "outbound_failed",
-			err:      nil,
-			expected: "network",
-		},
-		{
-			name:     "bridge failed",
-			reason:   "bridge_failed",
-			err:      errors.New("RTP relay error"),
-			expected: "bridge",
-		},
-		{
-			name:     "unknown reason",
-			reason:   "something_else",
-			err:      nil,
-			expected: "unknown",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := categorizeTransferError(tt.reason, tt.err)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-// =============================================================================
-// handleTransferConnected — does not panic, logs with remote URI
-// =============================================================================
-
-func TestHandleTransferConnected_RichLogging(t *testing.T) {
-	t.Parallel()
-
-	d := New(WithLogger(newPipelineTestLogger(t)))
-
-	s := newTransferTestSession(t)
-	outbound := newTransferTestSession(t)
-
-	// Should not panic even with minimal session info
-	d.handleTransferConnected(context.Background(), sip_runtime.TransferConnectedPipeline{
-		ID:              "test-connected",
-		InboundSession:  s,
-		OutboundSession: outbound,
-	})
-}
-
-// =============================================================================
-// handleTransferFailed — categorization in logs
-// =============================================================================
-
-func TestHandleTransferFailed_WithCategory(t *testing.T) {
-	t.Parallel()
-
-	d := New(WithLogger(newPipelineTestLogger(t)))
-
-	// Should not panic with various error types
-	d.handleTransferFailed(context.Background(), sip_runtime.TransferFailedPipeline{
-		ID:     "test-fail-timeout",
-		Error:  errors.New("context deadline exceeded"),
-		Reason: "outbound_failed",
-	})
-
-	d.handleTransferFailed(context.Background(), sip_runtime.TransferFailedPipeline{
-		ID:     "test-fail-busy",
-		Error:  errors.New("486 Busy Here"),
-		Reason: "outbound_failed",
-	})
-
-	d.handleTransferFailed(context.Background(), sip_runtime.TransferFailedPipeline{
-		ID:     "test-fail-nil-err",
-		Error:  nil,
-		Reason: "server_nil",
-	})
-}
-
-// =============================================================================
-// Metadata constants — verify keys are distinct
-// =============================================================================
 
 func TestMetadataKeyConstants_Distinct(t *testing.T) {
 	keys := []string{
@@ -676,7 +480,7 @@ func TestTransferRace_UserHangupCancelsDialAttempt(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		d.executeTransfer(context.Background(), sip_runtime.TransferInitiatedPipeline{
+		d.executeTransfer(context.Background(), TransferInitiatedPipeline{
 			ID:        inbound.GetCallID(),
 			Session:   inbound,
 			TargetURI: "918031405561",
@@ -708,9 +512,11 @@ func TestExecuteTransfer_NewLegUsesTransferTargetAndConfiguredCallerIdentity(t *
 
 	var capturedTarget string
 	var capturedFrom string
+	var capturedConfig *sip_runtime.Config
 	var capturedOptions sip_runtime.TransferBridgeCallOptions
 	srv := &fakeTransferServer{
-		makeTransferBridgeCallFn: func(_ context.Context, _ *sip_runtime.Config, target, from string, opts sip_runtime.TransferBridgeCallOptions) (*sip_runtime.Session, error) {
+		makeTransferBridgeCallFn: func(_ context.Context, config *sip_runtime.Config, target, from string, opts sip_runtime.TransferBridgeCallOptions) (*sip_runtime.Session, error) {
+			capturedConfig = config
 			capturedTarget = target
 			capturedFrom = from
 			capturedOptions = opts
@@ -726,7 +532,7 @@ func TestExecuteTransfer_NewLegUsesTransferTargetAndConfiguredCallerIdentity(t *
 		WithTransferServer(srv),
 	)
 
-	d.executeTransfer(context.Background(), sip_runtime.TransferInitiatedPipeline{
+	d.executeTransfer(context.Background(), TransferInitiatedPipeline{
 		ID:        inbound.GetCallID(),
 		Session:   inbound,
 		Targets:   []string{"transfer-target", "fallback-target"},
@@ -736,6 +542,8 @@ func TestExecuteTransfer_NewLegUsesTransferTargetAndConfiguredCallerIdentity(t *
 
 	assert.Equal(t, "transfer-target", capturedTarget)
 	assert.Equal(t, "transfer-assistant", capturedFrom)
+	assert.NotSame(t, config, capturedConfig)
+	assert.Equal(t, config.CallerID, capturedConfig.CallerID)
 	assert.Equal(t, inbound.GetCallID(), capturedOptions.ParentCallID)
 	assert.Equal(t, 1, capturedOptions.Attempt)
 	assert.Equal(t, 2, capturedOptions.TotalAttempts)
@@ -771,7 +579,7 @@ func TestExecuteTransfer_DoesNotOwnBridgeConnectedState(t *testing.T) {
 		WithTransferServer(srv),
 	)
 
-	d.executeTransfer(context.Background(), sip_runtime.TransferInitiatedPipeline{
+	d.executeTransfer(context.Background(), TransferInitiatedPipeline{
 		ID:        inbound.GetCallID(),
 		Session:   inbound,
 		TargetURI: "918031405561",
@@ -818,7 +626,7 @@ func TestTransferRace_AIDisconnectContextTeardownAllLegs(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		d.executeTransfer(ctx, sip_runtime.TransferInitiatedPipeline{
+		d.executeTransfer(ctx, TransferInitiatedPipeline{
 			ID:        inbound.GetCallID(),
 			Session:   inbound,
 			TargetURI: "918031405561",
@@ -874,7 +682,7 @@ func TestTransferRace_OperatorDisconnectResumesAI(t *testing.T) {
 		WithTransferServer(srv),
 	)
 
-	d.executeTransfer(context.Background(), sip_runtime.TransferInitiatedPipeline{
+	d.executeTransfer(context.Background(), TransferInitiatedPipeline{
 		ID:        inbound.GetCallID(),
 		Session:   inbound,
 		TargetURI: "918031405561",
@@ -925,7 +733,7 @@ func TestTransferRace_ConcurrentCallerEndAndBridgeComplete(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		d.executeTransfer(context.Background(), sip_runtime.TransferInitiatedPipeline{
+		d.executeTransfer(context.Background(), TransferInitiatedPipeline{
 			ID:        inbound.GetCallID(),
 			Session:   inbound,
 			TargetURI: "918031405561",

@@ -29,9 +29,8 @@ type Session struct {
 	config *Config
 	ended  atomic.Bool
 
-	ctx       context.Context
-	cancel    context.CancelFunc
-	errorChan chan error
+	ctx    context.Context
+	cancel context.CancelFunc
 
 	// RTP handling
 	rtpHandler    *RTPHandler
@@ -148,7 +147,6 @@ func NewSession(ctx context.Context, opts ...SessionOption) (*Session, error) {
 		},
 		ctx:              sessionCtx,
 		cancel:           cancel,
-		errorChan:        make(chan error, SessionErrorBufferSize),
 		negotiatedCodec:  &CodecPCMU,
 		byeReceived:      make(chan struct{}),
 		initialACKSignal: make(chan struct{}),
@@ -228,14 +226,14 @@ func (s *Session) SetState(state CallState) {
 
 // isValidTransition checks if a state transition is valid
 func (s *Session) isValidTransition(from, to CallState) bool {
-	// Allow any transition to terminal cleanup states.
-	if to == CallStateEnded || to == CallStateFailed || to == CallStateCancelled {
-		return true
-	}
-
-	// Prevent transitions from terminal states
+	// Terminal states are immutable.
 	if from.IsTerminal() {
 		return false
+	}
+
+	// Allow active states to transition to terminal cleanup states.
+	if to == CallStateEnded || to == CallStateFailed || to == CallStateCancelled {
+		return true
 	}
 
 	// Define valid transitions
@@ -438,11 +436,6 @@ func (s *Session) GetRTPHandler() *RTPHandler {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.rtpHandler
-}
-
-// Errors returns the error channel
-func (s *Session) Errors() <-chan error {
-	return s.errorChan
 }
 
 // Context returns the session context
@@ -688,17 +681,6 @@ func (s *Session) GetVaultCredential() *protos.VaultCredential {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.vaultCredential
-}
-
-// SendError sends an error to the error channel (non-blocking).
-func (s *Session) SendError(err error) {
-	if s.ended.Load() {
-		return
-	}
-	select {
-	case s.errorChan <- err:
-	default:
-	}
 }
 
 // End terminates the SIP session gracefully. This is the single teardown function —

@@ -29,11 +29,10 @@ const (
 
 type callEnvelope struct {
 	ctx context.Context
-	p   sip_runtime.Pipeline
+	p   Pipeline
 }
 
 // Dispatcher routes SIP pipeline stages to priority-based channel goroutines.
-// Stateless — no per-call state stored on the Dispatcher.
 type Dispatcher struct {
 	logger commons.Logger
 
@@ -216,26 +215,15 @@ func New(opts ...DispatcherOption) *Dispatcher {
 	}
 }
 
-func (d *Dispatcher) transitionCall(session *sip_runtime.Session, next sip_runtime.CallState, reason sip_runtime.LifecycleReason) bool {
-	if d.server == nil {
-		d.logger.Warnw("SIP lifecycle transition skipped: server unavailable",
-			"call_id", session.GetCallID(),
-			"to", next,
-			"reason", reason)
-		return false
-	}
-	return d.server.TransitionCall(session, next, reason)
-}
-
 func (d *Dispatcher) endCall(session *sip_runtime.Session, reason sip_runtime.LifecycleReason) {
 	if d.server == nil {
-		d.logger.Warnw("SIP lifecycle end skipped: server unavailable",
+		d.logger.Warnw("Cannot end SIP call: server unavailable",
 			"call_id", session.GetCallID(),
 			"reason", reason)
 		return
 	}
 	if err := d.server.EndCallWithReason(session, reason); err != nil {
-		d.logger.Warnw("SIP lifecycle end failed",
+		d.logger.Warnw("Failed to end SIP call",
 			"call_id", session.GetCallID(),
 			"reason", reason,
 			"error", err)
@@ -246,22 +234,18 @@ func (d *Dispatcher) Start(ctx context.Context) {
 	go d.runDispatcher(ctx, d.signalCh)
 	go d.runDispatcher(ctx, d.setupCh)
 	go d.runDispatcher(ctx, d.mediaCh)
-	d.logger.Infow("SIP pipeline dispatcher started")
 }
 
-func (d *Dispatcher) OnPipeline(ctx context.Context, stages ...sip_runtime.Pipeline) {
+func (d *Dispatcher) OnPipeline(ctx context.Context, stages ...Pipeline) {
 	for _, s := range stages {
-		e := callEnvelope{ctx: ctx, p: s}
 		switch s.(type) {
-		case sip_runtime.TransferInitiatedPipeline,
-			sip_runtime.TransferConnectedPipeline,
-			sip_runtime.TransferFailedPipeline,
-			sip_runtime.CallFailedPipeline:
-			d.signalCh <- e
-		case sip_runtime.SessionEstablishedPipeline:
-			d.mediaCh <- e
+		case TransferInitiatedPipeline,
+			CallFailedPipeline:
+			d.signalCh <- callEnvelope{ctx: ctx, p: s}
+		case SessionEstablishedPipeline:
+			d.mediaCh <- callEnvelope{ctx: ctx, p: s}
 		default:
-			d.logger.Warnw("OnPipeline: unrouted type", "type", fmt.Sprintf("%T", s))
+			d.logger.Warnw("Ignoring unsupported SIP pipeline stage", "stage_type", fmt.Sprintf("%T", s))
 		}
 	}
 }
@@ -289,19 +273,13 @@ func (d *Dispatcher) drain(ch chan callEnvelope) {
 	}
 }
 
-func (d *Dispatcher) dispatch(ctx context.Context, p sip_runtime.Pipeline) {
+func (d *Dispatcher) dispatch(ctx context.Context, p Pipeline) {
 	switch v := p.(type) {
-	case sip_runtime.SessionEstablishedPipeline:
+	case SessionEstablishedPipeline:
 		d.handleSessionEstablished(ctx, v)
-	case sip_runtime.TransferInitiatedPipeline:
+	case TransferInitiatedPipeline:
 		d.handleTransferInitiated(ctx, v)
-	case sip_runtime.TransferConnectedPipeline:
-		d.handleTransferConnected(ctx, v)
-	case sip_runtime.TransferFailedPipeline:
-		d.handleTransferFailed(ctx, v)
-	case sip_runtime.CallFailedPipeline:
+	case CallFailedPipeline:
 		d.handleCallFailed(ctx, v)
-	default:
-		d.logger.Warnw("dispatch: unknown pipeline type", "type", fmt.Sprintf("%T", p))
 	}
 }
