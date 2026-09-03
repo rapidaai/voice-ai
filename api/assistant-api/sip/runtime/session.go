@@ -31,7 +31,6 @@ type Session struct {
 
 	ctx       context.Context
 	cancel    context.CancelFunc
-	eventChan chan Event
 	errorChan chan error
 
 	// RTP handling
@@ -149,7 +148,6 @@ func NewSession(ctx context.Context, opts ...SessionOption) (*Session, error) {
 		},
 		ctx:              sessionCtx,
 		cancel:           cancel,
-		eventChan:        make(chan Event, SessionEventBufferSize),
 		errorChan:        make(chan error, SessionErrorBufferSize),
 		negotiatedCodec:  &CodecPCMU,
 		byeReceived:      make(chan struct{}),
@@ -215,21 +213,15 @@ func (s *Session) SetState(state CallState) {
 	case CallStateConnected:
 		now := time.Now()
 		s.info.ConnectedTime = &now
-		s.emitEvent(EventTypeConnected, nil)
 	case CallStateEnded:
 		now := time.Now()
 		s.info.EndTime = &now
-		s.emitEvent(EventTypeBye, nil)
 	case CallStateFailed:
 		now := time.Now()
 		s.info.EndTime = &now
-		s.emitEvent(EventTypeError, nil)
 	case CallStateCancelled:
 		now := time.Now()
 		s.info.EndTime = &now
-		s.emitEvent(EventTypeCancel, nil)
-	case CallStateRinging:
-		s.emitEvent(EventTypeRinging, nil)
 	}
 
 }
@@ -267,17 +259,6 @@ func (s *Session) isValidTransition(from, to CallState) bool {
 		}
 	}
 	return false
-}
-
-// emitEvent sends an event to the event channel (non-blocking).
-// Safe to call during End() — the recover guard handles closed channel.
-func (s *Session) emitEvent(eventType EventType, data map[string]interface{}) {
-	event := NewEvent(eventType, s.info.CallID, data)
-	defer func() { recover() }()
-	select {
-	case s.eventChan <- event:
-	default:
-	}
 }
 
 // SetRemoteRTP sets the remote RTP address after SDP negotiation
@@ -457,11 +438,6 @@ func (s *Session) GetRTPHandler() *RTPHandler {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.rtpHandler
-}
-
-// Events returns the event channel
-func (s *Session) Events() <-chan Event {
-	return s.eventChan
 }
 
 // Errors returns the error channel
@@ -712,17 +688,6 @@ func (s *Session) GetVaultCredential() *protos.VaultCredential {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.vaultCredential
-}
-
-// SendEvent sends an event notification (non-blocking).
-func (s *Session) SendEvent(event Event) {
-	if s.ended.Load() {
-		return
-	}
-	select {
-	case s.eventChan <- event:
-	default:
-	}
 }
 
 // SendError sends an error to the error channel (non-blocking).

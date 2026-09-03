@@ -49,7 +49,6 @@ const (
 
 	InboundRejectedInviteTTL  = time.Minute
 	MaxInboundRejectedInvites = 1024
-	SessionEventBufferSize    = 50
 	SessionErrorBufferSize    = 10
 )
 
@@ -530,20 +529,6 @@ func (s *SessionInfo) GetDuration() time.Duration {
 	return 0
 }
 
-type EventType string
-
-const (
-	EventTypeInvite     EventType = "invite"
-	EventTypeRinging    EventType = "ringing"
-	EventTypeConnected  EventType = "connected"
-	EventTypeBye        EventType = "bye"
-	EventTypeCancel     EventType = "cancel"
-	EventTypeDTMF       EventType = "dtmf"
-	EventTypeError      EventType = "error"
-	EventTypeRTPStarted EventType = "rtp_started"
-	EventTypeRTPStopped EventType = "rtp_stopped"
-)
-
 const (
 	// BridgeCallTimeout is the maximum time to wait for the transfer target to answer.
 	BridgeCallTimeout = 30 * time.Second
@@ -584,13 +569,6 @@ const (
 	PostTransferActionResumeAI = "resume_ai"
 )
 
-type Event struct {
-	Type      EventType              `json:"type"`
-	CallID    string                 `json:"call_id"`
-	Timestamp time.Time              `json:"timestamp"`
-	Data      map[string]interface{} `json:"data,omitempty"`
-}
-
 const (
 	DisconnectReasonRemoteHangup   = "remote_hangup"
 	DisconnectReasonNormalClearing = "normal_clearing"
@@ -607,20 +585,6 @@ type DisconnectMetadata struct {
 	Text               string
 	Raw                string
 	ProviderStatusCode int
-}
-
-func NewEvent(eventType EventType, callID string, data map[string]interface{}) Event {
-	return Event{
-		Type:      eventType,
-		CallID:    callID,
-		Timestamp: time.Now(),
-		Data:      data,
-	}
-}
-
-type DTMFEvent struct {
-	Digit    string `json:"digit"`
-	Duration int    `json:"duration_ms"`
 }
 
 type RTPStats struct {

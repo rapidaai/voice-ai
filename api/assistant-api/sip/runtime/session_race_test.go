@@ -91,7 +91,7 @@ func TestSessionConcurrentEndAndSetState(t *testing.T) {
 	require.True(t, s.IsEnded())
 }
 
-func TestSessionConcurrentSendAndEnd(t *testing.T) {
+func TestSessionConcurrentErrorSendAndEnd(t *testing.T) {
 	t.Parallel()
 
 	s := newInboundTestSession(t)
@@ -105,10 +105,6 @@ func TestSessionConcurrentSendAndEnd(t *testing.T) {
 			defer wg.Done()
 			<-start
 			for j := 0; j < 1000; j++ {
-				s.SendEvent(NewEvent(EventTypeConnected, s.GetCallID(), map[string]interface{}{
-					"worker": worker,
-					"iter":   j,
-				}))
 				s.SendError(errors.New("test error"))
 			}
 		}(i)
