@@ -74,28 +74,12 @@ export const BRAND_LITERAL_ALLOWLIST = Object.freeze({
   },
   'ui/src/app/pages/static-pages/terms.tsx': {
     literals: ['Rapida.AI', 'support@rapida.ai'],
-    reason:
-      'legacy direct legal route content remains outside tenant-visible navigation',
-  },
-  'ui/src/app/pages/static-pages/privacy.tsx': {
-    literals: ['Rapida', 'Rapida.AI', 'support@rapida.ai'],
-    reason:
-      'legacy direct legal route content remains outside tenant-visible navigation',
+    reason: 'terms of service must identify the Rapida legal entity',
   },
   'ui/src/app/pages/main/web-dashboard/index.tsx': {
     literals: ['cdn-01.rapida.ai'],
     reason: 'dashboard content feed URL is a technical asset source',
   },
-  'ui/src/app/pages/assistant/actions/create-assistant/create-agentkit.tsx': {
-    literals: ['Rapida'],
-    reason:
-      'AgentKit and orchestration names are deployment product identifiers',
-  },
-  'ui/src/app/pages/assistant/actions/create-assistant-version/create-agent-kit-version.tsx':
-    {
-      literals: ['Rapida'],
-      reason: 'AgentKit name is a deployment product identifier',
-    },
   'ui/src/app/pages/assistant/view/conversations/conversation-messages.helpers.ts':
     {
       literals: ['rapida'],

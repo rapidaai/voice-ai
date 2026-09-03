@@ -32,6 +32,7 @@ import { InputHelper } from '@/app/components/input-helper';
 import { CodeEditor } from '@/app/components/form/editor/code-editor';
 import toast from 'react-hot-toast/headless';
 import { SectionDivider } from '@/app/components/blocks/section-divider';
+import { useTheme } from '@/theme/theme-provider';
 
 const TRANSPORT_SECURITY_OPTIONS = [
   { name: 'Default', value: '' },
@@ -54,6 +55,7 @@ const DEFAULT_MAX_RECV_MESSAGE_MB = 16;
 const DEFAULT_MAX_SEND_MESSAGE_MB = 16;
 
 export function CreateAgentKit() {
+  const { theme } = useTheme();
   const { authId, token, projectId } = useCurrentCredential();
   const {
     goToAssistant,
@@ -330,8 +332,8 @@ export function CreateAgentKit() {
                   docPath="/assistants/overview"
                   linkText="Read docs"
                 >
-                  Deploy your agent on-premises with the Rapida orchestration
-                  engine via AgentkitConnection.
+                  Deploy your agent on-premises with the {theme.brand.name}{' '}
+                  orchestration engine via AgentkitConnection.
                 </DocNoticeBlock>
                 <div className="px-8 pt-6 pb-8 max-w-4xl flex flex-col gap-8">
                   {/* Connection section */}
@@ -347,8 +349,8 @@ export function CreateAgentKit() {
                         }}
                       />
                       <InputHelper>
-                        The gRPC server address where your Rapida AgentKit is
-                        running.
+                        The gRPC server address where your {theme.brand.name}{' '}
+                        AgentKit is running.
                       </InputHelper>
                     </FieldSet>
                   </div>

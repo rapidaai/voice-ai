@@ -1,6 +1,11 @@
 import { FlexBox } from '@/app/components/container/flex-box';
+import { useTheme } from '@/theme/theme-provider';
 
 export function PrivacyPage() {
+  const { theme } = useTheme();
+  const brandName = theme.brand.name;
+  const supportContact = theme.links.support.replace(/^mailto:/, '');
+
   return (
     <FlexBox>
       <div className="relative mx-auto pt-20 pb-24 max-w-6xl px-8 md:px-20 ">
@@ -13,8 +18,8 @@ export function PrivacyPage() {
         <main>
           <article className="relative mt-10 prose prose-base max-w-none! dark:prose-invert prose-slate">
             <p className="text-lg">
-              Rapida.AI ("Rapida", "we", "us", or "our") respects the privacy of
-              its customers ("Customers") and is committed to protecting the
+              {brandName} ("we", "us", or "our") respects the privacy of its
+              customers ("Customers") and is committed to protecting the
               confidentiality and security of their data. This Privacy Policy
               describes the types of information we collect, how we use it, and
               with whom we share it. It also outlines your choices regarding
@@ -27,15 +32,15 @@ export function PrivacyPage() {
                 </h3>
                 <div className="text-lg">
                   <h3 className="text-lg">1. Customer Account Information</h3>
-                  When you create a Rapida account, we collect information such
-                  as your company name, contact information (name, email
-                  address, phone number), and billing details.
+                  When you create an account on {brandName}, we collect
+                  information such as your company name, contact information
+                  (name, email address, phone number), and billing details.
                 </div>
                 <div className="text-lg">
                   <h3 className="text-lg">2. Usage Data</h3> We may collect data
-                  about your use of the Rapida platform, such as the types of
-                  Generative AI models you integrate with, and the features you
-                  use. This data is used to improve our services and provide
+                  about your use of the {brandName} platform, such as the types
+                  of Generative AI models you integrate with, and the features
+                  you use. This data is used to improve our services and provide
                   insights into customer behaviour.
                 </div>
               </div>
@@ -47,10 +52,11 @@ export function PrivacyPage() {
                 </h3>
                 <div className="text-lg">
                   <h3 className="text-lg">1. Log Data</h3> We may collect
-                  standard log information when you use the Rapida platform,
-                  such as your IP address, browser type, access times, and pages
-                  viewed. This data is used for troubleshooting, security
-                  purposes, and to understand how our platform is being used.
+                  standard log information when you use the {brandName}{' '}
+                  platform, such as your IP address, browser type, access times,
+                  and pages viewed. This data is used for troubleshooting,
+                  security purposes, and to understand how our platform is being
+                  used.
                 </div>
               </div>
             </section>
@@ -60,18 +66,21 @@ export function PrivacyPage() {
                   How We Use Your Information
                 </h3>
                 <ul className="list-disc list-inside mb-4 text-lg">
-                  <li>Provide, operate, and maintain the Rapida platform.</li>
                   <li>
-                    Improve and personalize your experience with the Rapida
+                    Provide, operate, and maintain the {brandName} platform.
+                  </li>
+                  <li>
+                    Improve and personalize your experience with the {brandName}
                     platform.
                   </li>
                   <li>
-                    Develop new features and functionalities for the Rapida
+                    Develop new features and functionalities for the {brandName}
                     platform.
                   </li>
                   <li>
-                    Send you important information about the Rapida platform,
-                    such as updates, service changes, and security alerts.
+                    Send you important information about the {brandName}{' '}
+                    platform, such as updates, service changes, and security
+                    alerts.
                   </li>
                   <li>Comply with legal and regulatory requirements.</li>
                 </ul>
@@ -102,8 +111,8 @@ export function PrivacyPage() {
                 <div className="text-lg">
                   <h3 className="text-lg">1. Service Providers</h3>
                   We may share your information with third-party service
-                  providers who help us operate the Rapida platform, such as
-                  data storage providers or customer support providers. These
+                  providers who help us operate the {brandName} platform, such
+                  as data storage providers or customer support providers. These
                   service providers are contractually obligated to keep your
                   information confidential and secure.
                 </div>
@@ -132,8 +141,8 @@ export function PrivacyPage() {
                   <h3 className="text-lg">2. Contact Us</h3> If you have any
                   questions about this Privacy Policy or your information,
                   please contact us at{' '}
-                  <a href="mailto:support@rapida.ai" className="text-blue-500">
-                    support@rapida.ai
+                  <a href={theme.links.support} className="text-blue-500">
+                    {supportContact}
                   </a>
                 </div>
               </div>
@@ -144,11 +153,11 @@ export function PrivacyPage() {
                   International Transfers
                 </h3>
                 <div className="text-lg">
-                  Rapida.AI is a global company, and your information may be
+                  {brandName} is a global company, and your information may be
                   transferred to and processed in countries other than your own.
                   These countries may have different data protection laws than
-                  your own. By using the Rapida platform, you consent to the
-                  transfer of your information to these countries.
+                  your own. By using the {brandName} platform, you consent to
+                  the transfer of your information to these countries.
                 </div>
               </div>
             </section>
@@ -159,9 +168,9 @@ export function PrivacyPage() {
                   Children's Privacy
                 </h3>
                 <div className="text-lg">
-                  The Rapida platform is not intended for children under the age
-                  of 18. We do not knowingly collect personal information from
-                  children under 18.
+                  The {brandName} platform is not intended for children under
+                  the age of 18. We do not knowingly collect personal
+                  information from children under 18.
                 </div>
               </div>
             </section>
@@ -185,8 +194,8 @@ export function PrivacyPage() {
                 <div className="text-lg">
                   If you have any questions about this Privacy Policy, please
                   contact us at{' '}
-                  <a href="mailto:support@rapida.ai" className="text-blue-500">
-                    support@rapida.ai
+                  <a href={theme.links.support} className="text-blue-500">
+                    {supportContact}
                   </a>
                 </div>
               </div>
