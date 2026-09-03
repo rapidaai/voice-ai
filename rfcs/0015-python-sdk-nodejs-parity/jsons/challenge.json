@@ -1,0 +1,26 @@
+{
+  "rfc": "rfcs/0015-python-sdk-nodejs-parity.md",
+  "created": "2026-09-03",
+  "reviewer": "independent challenger",
+  "recommendation": "revise",
+  "findings": [
+    {
+      "severity": "major",
+      "finding": "The plan authorized a broader generated-protocol tree and two nested gitlinks while the tracked implementation scope contains one protocol gitlink and generated *_pb2* outputs."
+    },
+    {
+      "severity": "major",
+      "finding": "The RFC required generated .pyi distribution checks but did not authorize pyproject.toml to package those files."
+    },
+    {
+      "severity": "minor",
+      "finding": "The challenger reported a Node revision mismatch, but coordinator verification with git ls-tree HEAD sdks/nodejs confirms the parent tree pins 5faa0e000bf0dc9a6b4c14b4f2cbe095258ee91d. The RFC should state parent-tree evidence explicitly."
+    }
+  ],
+  "resolution": [
+    "Narrow the plan and RFC to the tracked rapida/clients/protos/artifacts gitlink and generated *_pb2.py, *_pb2.pyi, and *_pb2_grpc.py outputs.",
+    "Authorize pyproject.toml package-data changes to ship generated .pyi files without changing the release version.",
+    "State that the parent repository tree pins Node.js at 5faa0e000bf0dc9a6b4c14b4f2cbe095258ee91d and preserve the exact git ls-tree command as evidence."
+  ],
+  "next_step": "Revise the RFC and rerun the same independent challenger on the new exact bytes."
+}

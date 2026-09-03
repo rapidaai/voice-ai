@@ -1,0 +1,15 @@
+{
+  "challenge_receipt_sha256": "d699b95a087b7ba26867641797c9a5399f9fda0472412e53df89d2bab6057cb0",
+  "challenge_reviewer": "independent challenger",
+  "challenge_reviewed_at": "2026-09-03T14:24:53Z",
+  "challenge_task_id": "task_3275c0394ed2",
+  "confirmed_sha256": "2815fe98f1576efacae1faac6971b5f3b3c1cd9be89ce38cea964b6223ab8e53",
+  "created_at": "2026-09-03T14:25:34Z",
+  "gate_id": "gate_5554cbfe81cc",
+  "question": "Approve implementation of RFC rfcs/0015-python-sdk-nodejs-parity.md with SHA-256 2815fe98f1576efacae1faac6971b5f3b3c1cd9be89ce38cea964b6223ab8e53 after approved challenge task task_3275c0394ed2 with receipt SHA-256 d699b95a087b7ba26867641797c9a5399f9fda0472412e53df89d2bab6057cb0?",
+  "resolution": "approved",
+  "resolved_at": "2026-09-03T17:17:04Z",
+  "rfc_file": "rfcs/0015-python-sdk-nodejs-parity.md",
+  "run_id": "run_19323b92c979",
+  "task_id": "task_2887da6913f9"
+}

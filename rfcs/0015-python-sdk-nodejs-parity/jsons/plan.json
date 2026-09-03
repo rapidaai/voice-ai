@@ -1,0 +1,97 @@
+{
+  "objective": "Bring sdks/python AgentKit and public exports to behavioral parity with pinned sdks/nodejs commit 5faa0e000bf0dc9a6b4c14b4f2cbe095258ee91d.",
+  "classification": "Governed",
+  "problem": "The Python SDK only exposes the legacy AgentKit server and helpers. The pinned Node.js SDK also exposes AgentKit V2 with per-conversation agents, routing, packet helpers, middleware, health checks, observability, and related protocol exports.",
+  "verified_context": {
+    "node_revision": "5faa0e000bf0dc9a6b4c14b4f2cbe095258ee91d",
+    "python_revision": "a58d3836c7e70184e07236829214443dd5304a87",
+    "node_protocol_revision": "2ac388cd67cddf34141f89182e1f14ae258303d7",
+    "python_protocol_revision": "d389a0d27efefd5a37821c4b3d79818dedb9465a",
+    "constraint": "The Node protocol revision is not currently fetchable from the configured nested remote, so implementation must not hand-edit generated files and must stop if the exact protocol source cannot be obtained."
+  },
+  "acceptance_criteria": [
+    "Python provides a backward-compatible legacy AgentKit server with Node-equivalent middleware, gRPC health, optional HTTP health, TLS, lifecycle, status, and idempotent stop behavior.",
+    "Python provides AgentKit V2 with one conversation and routed agent instance per stream, isolated state, ordered packet handling, lifecycle hooks, response helpers, control helpers, and reliable cleanup.",
+    "Python provides Node-equivalent AgentKit observability records with default lifecycle instrumentation, disablement, correlation attributes, UTC timestamps, and isolated telemetry failures.",
+    "Python exports the AgentKit runtime and required protocol types without removing existing public imports.",
+    "Focused and full Python tests, type checks, formatting checks, package build, and repository finalization pass."
+  ],
+  "non_goals": [
+    "Modify sdks/nodejs or its nested generated-proto checkout.",
+    "Add unrelated Python client wrappers solely because Node.js has them.",
+    "Change server-side protocols beyond the exact Node.js artifact revision.",
+    "Redesign authentication, implement application LLM logic, or add deployment configuration.",
+    "Add dependencies unless existing grpc, protobuf, and Python standard-library support is insufficient."
+  ],
+  "allowed_paths": {
+    "sdks/python/rapida/clients/protos/artifacts": "protocol source gitlink owner",
+    "sdks/python/rapida/clients/protos/*_pb2.py": "generated protocol message output owner",
+    "sdks/python/rapida/clients/protos/*_pb2.pyi": "generated protocol typing output owner",
+    "sdks/python/rapida/clients/protos/*_pb2_grpc.py": "generated protocol service output owner",
+    "sdks/python/rapida/agentkit/__init__.py": "legacy AgentKit server owner",
+    "sdks/python/rapida/agentkit/v2.py": "AgentKit V2 runtime owner",
+    "sdks/python/rapida/__init__.py": "public export owner",
+    "sdks/python/tests/agentkit": "AgentKit behavior test owner",
+    "sdks/python/tests/test_proto_imports.py": "generated import test owner",
+    "sdks/python/tests/test_public_exports.py": "public export test owner",
+    "sdks/python/README.md": "SDK documentation owner",
+    "sdks/python/pyproject.toml": "package data owner for shipping generated .pyi files; version remains unchanged"
+  },
+  "out_of_scope_paths": [
+    "sdks/nodejs/**",
+    "api/**",
+    "ui/**",
+    "pkg/**",
+    "cmd/**",
+    "other SDK and example submodules"
+  ],
+  "design": [
+    "Update the tracked Python protocol gitlink at rapida/clients/protos/artifacts to the exact Node.js protocol revision and regenerate required Python outputs from source.",
+    "Keep legacy server ownership in rapida.agentkit and extend it directly with ordered middleware and health behavior.",
+    "Add one rapida.agentkit.v2 module containing typed payloads, AgentConversation, Agent, AgentRunner, and V2Agent.",
+    "Use the existing synchronous grpc.Server and standard-library HTTP server. Do not add an asynchronous runtime or new dependency.",
+    "Preserve existing Python names and add documented Pythonic APIs that match Node.js behavior rather than TypeScript syntax."
+  ],
+  "principles": {
+    "KISS": "Mirror the Node.js module split, reuse generated messages, and keep stream ownership linear and synchronous.",
+    "YAGNI": "Do not add routing predicates, retry frameworks, buffering policies, telemetry backends, or configuration absent from the pinned Node.js contract."
+  },
+  "risks": [
+    "Generated protocol field or enum drift can silently break wire compatibility.",
+    "Per-stream workers, queues, or health servers can leak or reorder output if ownership is unclear.",
+    "Health bypass can weaken authentication if it matches more than the exact health RPC.",
+    "Exception details or metadata can leak secrets.",
+    "Scalar conversion, bytes versus text fields, timestamps, and correlation attributes can differ across languages.",
+    "Legacy imports can regress while adding the V2 surface."
+  ],
+  "security": [
+    "Bypass middleware only for the exact standard gRPC health method.",
+    "Do not log or return authentication tokens or arbitrary exception details.",
+    "Fail startup rather than silently downgrading requested TLS.",
+    "Bind HTTP health only to explicitly configured host and port."
+  ],
+  "data_migration": "None.",
+  "rollback": "Revert the single Python SDK submodule commit, including nested protocol gitlinks and generated outputs. No server-side or persistent-data rollback is required.",
+  "verification_commands": [
+    "cd sdks/python && pipenv sync --dev",
+    "cd sdks/python && bash bin/artifacts-generate.sh",
+    "cd sdks/python && pipenv run pytest -q tests/agentkit/test_agentkit.py tests/agentkit/test_v2.py tests/test_proto_imports.py tests/test_public_exports.py",
+    "cd sdks/python && pipenv run pytest -q",
+    "cd sdks/python && pipenv run mypy rapida --exclude=artifacts --ignore-missing-imports --cache-dir=/dev/null",
+    "cd sdks/python && pipenv run black --check rapida tests",
+    "git diff --check",
+    "cd sdks/python && python -m build",
+    "just agent-finalize \"sdks/python\""
+  ],
+  "baseline_evidence": "Python tests are not currently runnable because the development dependencies are not installed. The Node.js nested protocol revision also failed to fetch from its configured remote.",
+  "resolved_decisions": {
+    "naming": "Use Pythonic method names while exporting equivalent public runtime and protocol types.",
+    "execution_model": "Use synchronous hooks and grpc.Server semantics for the first parity release.",
+    "http_health": "Include the optional HTTP health endpoint because it is part of the pinned Node.js AgentKit contract.",
+    "export_scope": "Export AgentKit-related protocol types only; unrelated Node.js client parity is excluded.",
+    "typing_package_data": "Ship generated .pyi files by adding them to rapida.clients.protos package data.",
+    "release_metadata": "Do not bump the package version unless separately requested by the release owner."
+  },
+  "requires_independent_challenge": true,
+  "requires_confirmation_before_implementation": true
+}

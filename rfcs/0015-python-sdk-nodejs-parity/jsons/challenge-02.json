@@ -1,0 +1,20 @@
+{
+  "run_id": "run_19323b92c979",
+  "task_id": "task_3275c0394ed2",
+  "decision": "approved",
+  "rfc_file": "rfcs/0015-python-sdk-nodejs-parity.md",
+  "rfc_sha256": "2815fe98f1576efacae1faac6971b5f3b3c1cd9be89ce38cea964b6223ab8e53",
+  "reviewed_at": "2026-09-03T14:24:53Z",
+  "rfc": "rfcs/0015-python-sdk-nodejs-parity.md",
+  "created": "2026-09-03",
+  "reviewer": "independent challenger",
+  "recommendation": "approve",
+  "findings": [],
+  "resolved_prior_findings": [
+    "Parent-tree pin evidence explicitly confirms sdks/nodejs at 5faa0e000bf0dc9a6b4c14b4f2cbe095258ee91d.",
+    "Generated scope is limited to the tracked protocol gitlink and generated *_pb2.py, *_pb2.pyi, and *_pb2_grpc.py outputs.",
+    "sdks/python/pyproject.toml is authorized only to package generated .pyi files without a version bump."
+  ],
+  "status_line_check": "The RFC bytes contain exactly one metadata status line: - Status: Accepted.",
+  "next_step": "Create the exact-digest confirmation gate before implementation."
+}
