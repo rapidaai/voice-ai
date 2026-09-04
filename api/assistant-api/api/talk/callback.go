@@ -135,7 +135,7 @@ func (cApi *ConversationApi) UnviersalCallback(c *gin.Context) {
 				ConversationID: cc.ConversationID,
 			},
 			observability.RecordMetric{
-				Metrics: observability.CallStatusMetric(observability.MetricCallStatusFailed, statusInfo.Error.Reason),
+				Metrics: failedCallbackMetrics(statusInfo.Error.Reason),
 			})
 		if validator.NotBlank(statusInfo.Error.Reason) {
 			observer.Record(c,
@@ -355,7 +355,7 @@ func (cApi *ConversationApi) CallbackByContext(c *gin.Context) {
 				ConversationID: cc.ConversationID,
 			},
 			observability.RecordMetric{
-				Metrics: observability.CallStatusMetric(observability.MetricCallStatusFailed, statusInfo.Error.Reason),
+				Metrics: failedCallbackMetrics(statusInfo.Error.Reason),
 			})
 		if validator.NotBlank(statusInfo.Error.Reason) {
 			observer.Record(c, observability.ConversationScope{
@@ -456,4 +456,13 @@ func (cApi *ConversationApi) CallbackByContext(c *gin.Context) {
 		cApi.logger.Warnf("failed to close callback observability recorder: %v", err)
 	}
 	c.Status(http.StatusCreated)
+}
+
+func failedCallbackMetrics(reason string) []*protos.Metric {
+	metrics := observability.CallStatusMetric(observability.MetricCallStatusFailed, reason)
+	return append(metrics, &protos.Metric{
+		Name:        observability.MetricConversationStatus,
+		Value:       observability.MetricCallStatusFailed,
+		Description: reason,
+	})
 }

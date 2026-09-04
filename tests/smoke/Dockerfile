@@ -9,9 +9,11 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 COPY tests/smoke/run.sh /usr/local/bin/run-ci-tests
 COPY tests/smoke/sdk-smoke.js /workspace/sdk-smoke.js
+COPY tests/integration/telephony /workspace/tests/integration/telephony
 COPY openapi/postman/assistant-api/assistant-api.smoke.postman_collection.json /workspace/openapi/postman/assistant-api/assistant-api.smoke.postman_collection.json
 
 RUN chmod 0755 /usr/local/bin/run-ci-tests && \
+    find /workspace/tests/integration/telephony -name run.sh -exec chmod 0755 {} + && \
     mkdir -p /reports && \
     chown node:node /reports
 

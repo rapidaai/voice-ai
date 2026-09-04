@@ -264,6 +264,9 @@ case "$mode" in
   smoke)
     run_smoke_tests
     ;;
+  telephony-callbacks)
+    /workspace/tests/integration/telephony/callbacks/run.sh
+    ;;
   *)
     printf 'unsupported test mode: %s\n' "$mode" >&2
     exit 2

@@ -15,6 +15,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/config"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	channel_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony"
+	"github.com/rapidaai/api/assistant-api/internal/observability"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
@@ -263,5 +264,28 @@ func TestCallbackByContextRejectsInvalidStoredAuthenticationForEveryProvider(t *
 				t.Fatalf("unexpected updates: %+v", store.updates)
 			}
 		})
+	}
+}
+
+func TestFailedCallbackMetricsIncludesCallAndConversationStatus(t *testing.T) {
+	metrics := failedCallbackMetrics("busy")
+	if len(metrics) != 2 {
+		t.Fatalf("metric count = %d, want 2", len(metrics))
+	}
+
+	values := make(map[string]string, len(metrics))
+	descriptions := make(map[string]string, len(metrics))
+	for _, metric := range metrics {
+		values[metric.GetName()] = metric.GetValue()
+		descriptions[metric.GetName()] = metric.GetDescription()
+	}
+
+	for _, name := range []string{observability.MetricCallStatus, observability.MetricConversationStatus} {
+		if values[name] != observability.MetricCallStatusFailed {
+			t.Errorf("metric %q = %q, want %q", name, values[name], observability.MetricCallStatusFailed)
+		}
+		if descriptions[name] != "busy" {
+			t.Errorf("metric %q description = %q, want busy", name, descriptions[name])
+		}
 	}
 }

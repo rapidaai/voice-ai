@@ -4,6 +4,9 @@
 !tests/smoke/package.json
 !tests/smoke/package-lock.json
 !tests/smoke/run.sh
+!tests/integration/
+!tests/integration/telephony/
+!tests/integration/telephony/**
 !openapi/
 !openapi/postman/
 !openapi/postman/assistant-api/
