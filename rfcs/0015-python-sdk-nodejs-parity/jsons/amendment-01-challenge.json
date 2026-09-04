@@ -1,0 +1,18 @@
+{
+  "run_id": "run_19323b92c979",
+  "task_id": "task_ec00220eb7c2",
+  "decision": "approved",
+  "rfc_file": "rfcs/0015-python-sdk-nodejs-parity.md",
+  "rfc_sha256": "92c101969ef34e6434cd2cfd8141e34e6d73e7a165b8d933b9a2bc1cfa56a212",
+  "reviewed_at": "2026-09-03T17:30:21Z",
+  "reviewer": "independent challenger",
+  "findings": [],
+  "evidence": [
+    "The unavailable target fetch is preserved in amendment-01-fetch-evidence.json.",
+    "Candidate revision 820666fda038215717d9636e63411fcb8779d0c7 and the recorded AgentKit and observability blobs exist locally.",
+    "Candidate AgentKit oneofs and field numbers match the pinned Node generated bindings.",
+    "Selective generation, no unrelated generated churn, and rollback are explicit.",
+    "The RFC contains exactly one - Status: Accepted metadata line."
+  ],
+  "next_step": "Create exact-digest confirmation for the amended RFC before implementation."
+}

@@ -1,0 +1,32 @@
+{
+  "reason": "The confirmed protocol revision 2ac388cd67cddf34141f89182e1f14ae258303d7 is not advertised or fetchable from either configured internal-bridge remote.",
+  "decision": "Use available internal-bridge revision 820666fda038215717d9636e63411fcb8779d0c7 as the Python protocol source, but generate only agentkit.proto and observability-api.proto outputs.",
+  "evidence": {
+    "unavailable_fetch": "Both lexatic/internal-bridge and rapidaai/internal-bridge reject direct fetch of 2ac388cd67cddf34141f89182e1f14ae258303d7 as not our ref.",
+    "candidate_revision": "820666fda038215717d9636e63411fcb8779d0c7",
+    "agentkit_blob": "7bd94e1b70ef3a08f8a30e1cdc1b0269b0c39807",
+    "observability_blob": "ab06b72d70568e2f6d48afeb348e81055c793668",
+    "agentkit_last_change": "c97dee7 feat: added packet control in agentkit",
+    "observability_last_change": "a4b87e8 feat(telemetry): added new telemetry page with more detail",
+    "wire_check": "Candidate AgentKit oneof field numbers match the pinned Node generated bindings: TalkInput 1-9 and TalkOutput 9-17, including observability=16 and control=17."
+  },
+  "scope_change": [
+    "Permit the tracked Python protocol gitlink to move to 820666fda038215717d9636e63411fcb8779d0c7.",
+    "Run grpc_tools.protoc selectively for agentkit.proto and observability-api.proto instead of the broad bin/artifacts-generate.sh script.",
+    "Reject and remove any generated output outside agentkit_pb2*, observability_api_pb2*, and required import/package-data changes."
+  ],
+  "unchanged_contracts": [
+    "The pinned Node.js generated bindings remain the behavioral and wire-contract source of truth.",
+    "No unrelated protocol binding may change.",
+    "Generated files remain generator-owned and must not be hand-edited.",
+    "All original compatibility, testing, rollback, and review requirements remain."
+  ],
+  "verification_additions": [
+    "Compare candidate agentkit.proto field numbers and oneofs to sdks/nodejs/src/clients/protos/agentkit_pb.js and agentkit_pb.d.ts.",
+    "Verify git diff under rapida/clients/protos contains only agentkit_pb2.py, agentkit_pb2.pyi, agentkit_pb2_grpc.py, observability_api_pb2.py, observability_api_pb2.pyi, and observability_api_pb2_grpc.py.",
+    "Run focused import and descriptor tests that assert AgentKit field numbers and observability record kinds."
+  ],
+  "rollback": "Restore the Python protocol gitlink to d389a0d27efefd5a37821c4b3d79818dedb9465a and revert the selectively generated files.",
+  "requires_independent_challenge": true,
+  "requires_confirmation_before_implementation": true
+}

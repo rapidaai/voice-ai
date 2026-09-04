@@ -1,0 +1,31 @@
+{
+  "recorded_at": "2026-09-03T17:30:00Z",
+  "target_revision": "2ac388cd67cddf34141f89182e1f14ae258303d7",
+  "candidate_revision": "820666fda038215717d9636e63411fcb8779d0c7",
+  "checks": [
+    {
+      "command": "git -C sdks/nodejs/src/clients/protos/artifacts -c url.https://github.com/.insteadOf=git@github.com: fetch --all --tags --prune",
+      "result": "completed; target object remained absent"
+    },
+    {
+      "command": "git -C sdks/nodejs/src/clients/protos/artifacts cat-file -t 2ac388cd67cddf34141f89182e1f14ae258303d7",
+      "exit_code": 128,
+      "stderr": "fatal: git cat-file: could not get object info"
+    },
+    {
+      "command": "git -C sdks/nodejs/src/clients/protos/artifacts fetch https://github.com/rapidaai/internal-bridge.git 2ac388cd67cddf34141f89182e1f14ae258303d7",
+      "exit_code": 128,
+      "stderr": "fatal: remote error: upload-pack: not our ref 2ac388cd67cddf34141f89182e1f14ae258303d7"
+    },
+    {
+      "command": "git -C sdks/nodejs/src/clients/protos/artifacts cat-file -t 820666fda038215717d9636e63411fcb8779d0c7",
+      "result": "commit"
+    }
+  ],
+  "schema_evidence": {
+    "agentkit_proto_blob": "7bd94e1b70ef3a08f8a30e1cdc1b0269b0c39807",
+    "observability_proto_blob": "ab06b72d70568e2f6d48afeb348e81055c793668",
+    "node_talk_input_fields": "initialization=1, configuration=2, user=3, interruption=4, metadata=5, metric=6, toolCall=7, toolCallResult=8, assistant=9",
+    "node_talk_output_fields": "initialization=9, interruption=10, user=11, assistant=12, toolCall=13, toolCallResult=14, error=15, observability=16, control=17"
+  }
+}

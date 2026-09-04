@@ -14,9 +14,11 @@ behavioral parity with the Node.js SDK pinned at commit
 
 The change preserves the existing Python AgentKit API, adds the Node.js V2
 conversation and routing model using Python conventions, and refreshes generated
-Python protocol bindings from the exact protocol revision used by the pinned
-Node.js SDK. Implementation remains blocked until the protocol source is
-available and the governed confirmation gate approves these exact RFC bytes.
+Python protocol bindings from tracked internal-bridge revision
+`820666fda038215717d9636e63411fcb8779d0c7` for `agentkit.proto` and
+`observability-api.proto` only. The pinned Node.js generated bindings remain
+the behavioral and wire-contract source of truth, and unrelated generated churn
+is prohibited.
 
 ## Context
 
@@ -60,11 +62,31 @@ lacks user, observability, and control variants. Python also has no generated
 `observability_api_pb2` module or `ConversationControl` message.
 
 The required Node.js protocol object is not present in either currently checked
-out nested protocol repository, so implementation must stop rather than
-reconstruct or hand-edit generated bindings if the exact source revision cannot
-be fetched. The path `sdks/python/rapida/artifacts/internal` appears in the
-Python SDK's `.gitmodules` file but is not tracked in its current tree; it is not
-part of this change unless a separately approved amendment restores it.
+out nested protocol repository. Both configured internal-bridge remotes reject
+direct fetch of `2ac388cd67cddf34141f89182e1f14ae258303d7` as not their ref, so
+Python generation uses tracked internal-bridge revision
+`820666fda038215717d9636e63411fcb8779d0c7` instead. The path
+`sdks/python/rapida/artifacts/internal` appears in the Python SDK's
+`.gitmodules` file but is not tracked in its current tree; it is not part of
+this change unless a separately approved amendment restores it.
+
+### Protocol Source Evidence
+
+- Unavailable fetch evidence: both `lexatic/internal-bridge` and
+  `rapidaai/internal-bridge` reject direct fetch of
+  `2ac388cd67cddf34141f89182e1f14ae258303d7` as not their ref.
+- Tracked fallback revision:
+  `820666fda038215717d9636e63411fcb8779d0c7`.
+- `agentkit.proto` blob at the fallback revision:
+  `7bd94e1b70ef3a08f8a30e1cdc1b0269b0c39807`.
+- `observability-api.proto` blob at the fallback revision:
+  `ab06b72d70568e2f6d48afeb348e81055c793668`.
+- Last relevant protocol changes at the fallback revision: `c97dee7` for
+  AgentKit packet control and `a4b87e8` for observability telemetry detail.
+- Wire check: the fallback `agentkit.proto` matches the pinned Node.js
+  generated bindings for AgentKit oneof field numbers. `TalkInput` uses fields
+  1 through 9, and `TalkOutput` uses fields 9 through 17, including
+  `observability=16` and `control=17`.
 
 Baseline Python tests were not executed successfully during planning. Direct
 `python -m pytest` used Python 3.14 without pytest installed, and `pipenv run
@@ -79,7 +101,10 @@ dependencies. This is an environment limitation, not passing baseline evidence.
   observability behavior.
 - Add ordered generic middleware and standard gRPC and optional HTTP health
   behavior to the existing Python server.
-- Generate Python bindings from the exact pinned Node.js protocol source.
+- Generate only the Python AgentKit and observability bindings from tracked
+  internal-bridge revision `820666fda038215717d9636e63411fcb8779d0c7`, while
+  treating the pinned Node.js generated bindings as the behavioral and
+  wire-contract source of truth.
 - Export the AgentKit runtime and required AgentKit protocol types from both
   `rapida.agentkit` and the package root where appropriate.
 - Provide focused, full-suite, type, format, package, and repository validation.
@@ -88,8 +113,8 @@ dependencies. This is an environment limitation, not passing baseline evidence.
 
 - Modify `sdks/nodejs` or its nested generated-protocol checkout.
 - Add unrelated Python client wrappers solely because Node.js exports them.
-- Change server-side protocol definitions beyond the exact pinned protocol
-  revision.
+- Change server-side protocol definitions beyond the pinned Node.js generated
+  contract.
 - Redesign authentication or authorization.
 - Implement application LLM, tool execution, or conversation business logic.
 - Add deployment manifests or Kubernetes resources.
@@ -103,13 +128,19 @@ dependencies. This is an environment limitation, not passing baseline evidence.
 ### Allowed Paths
 
 - `sdks/python/rapida/clients/protos/artifacts` - protocol source gitlink owner;
-  may move only to the exact Node.js protocol revision.
-- `sdks/python/rapida/clients/protos/*_pb2.py` - generated Python message output
-  owner; no manual edits.
-- `sdks/python/rapida/clients/protos/*_pb2.pyi` - generated Python type output
-  owner; no manual edits.
-- `sdks/python/rapida/clients/protos/*_pb2_grpc.py` - generated Python gRPC
+  may move only to `820666fda038215717d9636e63411fcb8779d0c7`.
+- `sdks/python/rapida/clients/protos/agentkit_pb2.py` - generated Python
+  message output owner; no manual edits.
+- `sdks/python/rapida/clients/protos/agentkit_pb2.pyi` - generated Python type
   output owner; no manual edits.
+- `sdks/python/rapida/clients/protos/agentkit_pb2_grpc.py` - generated Python
+  gRPC output owner; no manual edits.
+- `sdks/python/rapida/clients/protos/observability_api_pb2.py` - generated
+  Python message output owner; no manual edits.
+- `sdks/python/rapida/clients/protos/observability_api_pb2.pyi` - generated
+  Python type output owner; no manual edits.
+- `sdks/python/rapida/clients/protos/observability_api_pb2_grpc.py` -
+  generated Python gRPC output owner; no manual edits.
 - `sdks/python/rapida/agentkit/__init__.py` - legacy AgentKit server,
   middleware, health, compatibility exports, and lifecycle owner.
 - `sdks/python/rapida/agentkit/v2.py` - AgentKit V2 conversation, agent,
@@ -126,8 +157,9 @@ dependencies. This is an environment limitation, not passing baseline evidence.
 
 No other generated path or gitlink is in scope. The implementation owner must
 reject churn outside the single tracked
-`sdks/python/rapida/clients/protos/artifacts` gitlink and generated
-`*_pb2.py`, `*_pb2.pyi`, and `*_pb2_grpc.py` outputs.
+`sdks/python/rapida/clients/protos/artifacts` gitlink, the three
+`agentkit_pb2*` outputs, the three `observability_api_pb2*` outputs, and any
+required package-data wiring for generated `.pyi` files.
 
 ### Out-of-Scope Paths
 
@@ -145,12 +177,17 @@ reject churn outside the single tracked
 
 ### Protocol Source and Generated Bindings
 
-1. Fetch and verify protocol commit
-   `2ac388cd67cddf34141f89182e1f14ae258303d7` from the configured protocol
-   source.
-2. Update only `sdks/python/rapida/clients/protos/artifacts` to that exact commit.
-3. Run `sdks/python/bin/artifacts-generate.sh` rather than editing generated
-   files.
+1. Record the failed fetch evidence for
+   `2ac388cd67cddf34141f89182e1f14ae258303d7` and verify tracked internal-bridge
+   commit `820666fda038215717d9636e63411fcb8779d0c7` plus the referenced
+   `agentkit.proto` and `observability-api.proto` blobs.
+2. Update only `sdks/python/rapida/clients/protos/artifacts` to
+   `820666fda038215717d9636e63411fcb8779d0c7`.
+3. Run selective `grpc_tools.protoc` generation only for
+   `agentkit.proto` and `observability-api.proto`, then apply the existing
+   import-rewrite step only to those regenerated outputs. The broad
+   `sdks/python/bin/artifacts-generate.sh` script is prohibited for this RFC
+   because it deletes and regenerates unrelated bindings.
 4. Confirm the generated AgentKit contract includes:
    - `TalkInput` variants for initialization, configuration, user,
      interruption, metadata, metric, tool call, tool-call result, and assistant.
@@ -158,9 +195,10 @@ reject churn outside the single tracked
      tool call, tool-call result, error, observability, and control.
    - `ConversationControl` actions and controlled packet types.
    - Observability log, event, metric, wrapper, and record-kind messages.
-5. Review the generated diff and retain only changes caused by the exact source
-   and repository generator within `*_pb2.py`, `*_pb2.pyi`, and
-   `*_pb2_grpc.py`.
+5. Review the generated diff and retain only changes in
+   `agentkit_pb2.py`, `agentkit_pb2.pyi`, `agentkit_pb2_grpc.py`,
+   `observability_api_pb2.py`, `observability_api_pb2.pyi`, and
+   `observability_api_pb2_grpc.py`, plus any required `.pyi` packaging updates.
 
 ### Legacy AgentKit Server
 
@@ -268,7 +306,8 @@ camelCase method aliases merely to reproduce TypeScript syntax.
 - New V2 hooks and send helpers are synchronous in the first release to match
   the established Python server execution model.
 - Generated field numbers, oneof membership, enum values, and service paths must
-  exactly match protocol revision `2ac388cd67cddf34141f89182e1f14ae258303d7`.
+  exactly match the pinned Node.js generated bindings, even though Python
+  generation uses tracked revision `820666fda038215717d9636e63411fcb8779d0c7`.
 - Public Python names follow Python conventions while providing the same
   behavior and protocol coverage as the pinned Node.js API.
 - No existing root export may be removed or shadowed.
@@ -278,8 +317,9 @@ camelCase method aliases merely to reproduce TypeScript syntax.
 
 ## Failure and Recovery
 
-- Missing protocol source blocks generation and implementation. Generated files
-  must never be reconstructed by hand.
+- Missing fallback protocol source or descriptor mismatch against the pinned
+  Node.js generated bindings blocks generation and implementation. Generated
+  files must never be reconstructed by hand.
 - Invalid or unsupported inbound packets do not corrupt conversation state and
   do not reorder later valid packets.
 - Missing initialization without a default route produces a deterministic error.
@@ -331,10 +371,13 @@ bindings. It does not modify persistent schemas or stored data.
 
 ## Rollout
 
-1. Obtain and verify protocol source revision
-   `2ac388cd67cddf34141f89182e1f14ae258303d7`.
-2. Update the single tracked Python protocol gitlink and regenerate only the
-   required `*_pb2.py`, `*_pb2.pyi`, and `*_pb2_grpc.py` bindings.
+1. Record the unavailable-fetch evidence for
+   `2ac388cd67cddf34141f89182e1f14ae258303d7` and verify fallback revision
+   `820666fda038215717d9636e63411fcb8779d0c7`.
+2. Update the single tracked Python protocol gitlink and regenerate only
+   `agentkit_pb2.py`, `agentkit_pb2.pyi`, `agentkit_pb2_grpc.py`,
+   `observability_api_pb2.py`, `observability_api_pb2.pyi`, and
+   `observability_api_pb2_grpc.py`.
 3. Review generated descriptors against the pinned Node.js AgentKit fields and
    enum values before handwritten work proceeds.
 4. Implement and test legacy middleware and health behavior without removing
@@ -345,26 +388,31 @@ bindings. It does not modify persistent schemas or stored data.
    repository finalization.
 8. Obtain independent verification and code review before release.
 
-Rollout stops if the exact protocol commit cannot be obtained, generated
-descriptors differ from the pinned Node.js contract, existing imports fail,
-stream ordering or cleanup tests fail, middleware permits rejected calls, health
-status is inaccurate, or any required validation fails.
+Rollout stops if the fallback revision no longer reproduces the pinned Node.js
+contract, any unrelated generated file changes appear, existing imports fail,
+stream ordering or cleanup tests fail, middleware permits rejected calls,
+health status is inaccurate, or any required validation fails.
 
 ## Rollback
 
-Revert the single Python SDK implementation commit, including the protocol
-gitlink, generated bindings, AgentKit runtime, exports, tests, documentation,
-and any `pyproject.toml` package-data change for generated `.pyi` files. No
-server-side or persistent-data rollback is required. If runtime disablement is
-needed before package rollback, consumers can continue using the preserved
-legacy `AgentKitAgent` and omit V2, middleware, and HTTP health options.
+Restore the Python protocol gitlink to
+`d389a0d27efefd5a37821c4b3d79818dedb9465a` and revert the selectively
+generated `agentkit_pb2*` and `observability_api_pb2*` files, then revert the
+single Python SDK implementation commit containing AgentKit runtime, exports,
+tests, documentation, and any `pyproject.toml` package-data change for
+generated `.pyi` files. No server-side or persistent-data rollback is
+required. If runtime disablement is needed before package rollback, consumers
+can continue using the preserved legacy `AgentKitAgent` and omit V2,
+middleware, and HTTP health options.
 
 ## Alternatives Considered
 
 - Hand-edit Python generated protobuf files. Rejected because generated files
   are not authoritative and manual edits risk wire drift.
-- Generate from a nearby or current protocol revision. Rejected because parity
-  is explicitly pinned to the Node.js artifact revision.
+- Generate every Python binding from a nearby or current protocol revision.
+  Rejected because parity remains pinned to the Node.js generated contract, and
+  this amendment allows only the minimal tracked fallback needed for
+  `agentkit.proto` and `observability-api.proto`.
 - Replace the existing Python server with `grpc.aio`. Rejected because it would
   break the established synchronous lifecycle and add migration complexity not
   required for first parity.
@@ -385,9 +433,11 @@ Prepare the Python development environment:
 
 Regenerate and inspect protocol output:
 
-- `cd sdks/python && bash bin/artifacts-generate.sh`
+- `cd sdks/python && python3 -m grpc.tools.protoc -I ./rapida/clients/protos/artifacts --pyi_out=./rapida/clients/protos --python_out=./rapida/clients/protos --grpc_python_out=./rapida/clients/protos ./rapida/clients/protos/artifacts/agentkit.proto ./rapida/clients/protos/artifacts/observability-api.proto`
+- `cd sdks/python && sed -i.bak -E '/^import [a-zA-Z0-9_]+_pb2/ s|import ([a-zA-Z0-9_]+_pb2)|import rapida.clients.protos.\\1|' rapida/clients/protos/agentkit_pb2.py rapida/clients/protos/agentkit_pb2.pyi rapida/clients/protos/agentkit_pb2_grpc.py rapida/clients/protos/observability_api_pb2.py rapida/clients/protos/observability_api_pb2.pyi rapida/clients/protos/observability_api_pb2_grpc.py`
+- `cd sdks/python && rm -f rapida/clients/protos/agentkit_pb2.py.bak rapida/clients/protos/agentkit_pb2.pyi.bak rapida/clients/protos/agentkit_pb2_grpc.py.bak rapida/clients/protos/observability_api_pb2.py.bak rapida/clients/protos/observability_api_pb2.pyi.bak rapida/clients/protos/observability_api_pb2_grpc.py.bak`
 - `git -C sdks/python diff --stat`
-- `git -C sdks/python diff -- rapida/clients/protos/*_pb2.py rapida/clients/protos/*_pb2.pyi rapida/clients/protos/*_pb2_grpc.py`
+- `git -C sdks/python diff -- rapida/clients/protos/agentkit_pb2.py rapida/clients/protos/agentkit_pb2.pyi rapida/clients/protos/agentkit_pb2_grpc.py rapida/clients/protos/observability_api_pb2.py rapida/clients/protos/observability_api_pb2.pyi rapida/clients/protos/observability_api_pb2_grpc.py`
 
 Run focused behavior and export tests:
 
@@ -432,14 +482,19 @@ Focused tests must cover:
   legacy names and required new AgentKit protocol names.
 - Wheel and source distribution contents include the V2 module, generated
   protocol bindings, and generated `.pyi` files.
+- Descriptor tests assert AgentKit field numbers against the pinned Node.js
+  generated bindings and cover observability record kinds.
 
 ## Acceptance Criteria
 
 - [ ] The Python artifact gitlink exactly matches
-  `2ac388cd67cddf34141f89182e1f14ae258303d7`, and all generated bindings come
-  from that source through the repository generator.
+  `820666fda038215717d9636e63411fcb8779d0c7`, and only
+  `agentkit_pb2.py`, `agentkit_pb2.pyi`, `agentkit_pb2_grpc.py`,
+  `observability_api_pb2.py`, `observability_api_pb2.pyi`, and
+  `observability_api_pb2_grpc.py` are regenerated from that source.
 - [ ] Python `TalkInput`, `TalkOutput`, `ConversationControl`, and observability
-  descriptors match the pinned Node.js field numbers, oneofs, and enum values.
+  descriptors match the pinned Node.js field numbers, oneofs, enum values, and
+  service definitions.
 - [ ] Existing AgentKit public imports and legacy helper behavior remain valid.
 - [ ] Generic middleware runs in order, fails closed, supports explicit
   rejection, and bypasses only the exact standard health RPC.
@@ -471,14 +526,15 @@ no version bump unless separately requested.
 
 ## Challenge Resolution
 
-Independent challenge in `jsons/challenge.json` recommended revision. This
-accepted candidate resolves the recorded findings by stating the parent-tree pin
-evidence from `git ls-tree HEAD sdks/nodejs sdks/python`, narrowing generated
-scope to the single tracked `rapida/clients/protos/artifacts` gitlink plus
-generated `*_pb2.py`, `*_pb2.pyi`, and `*_pb2_grpc.py` files, and authorizing
-`sdks/python/pyproject.toml` only to package generated `.pyi` files without a
-version bump. Implementation remains prohibited until the challenger approves
-these exact bytes and the coordinator completes the confirmation gate.
+Independent challenge in `jsons/challenge.json` identified the missing protocol
+source as a blocker. Accepted amendment `jsons/amendment-01-plan.json` resolves
+that blocker by recording failed fetch evidence for
+`2ac388cd67cddf34141f89182e1f14ae258303d7`, selecting tracked fallback revision
+`820666fda038215717d9636e63411fcb8779d0c7`, and constraining regeneration to
+`agentkit.proto` and `observability-api.proto` only. This candidate also keeps
+the pinned Node.js generated bindings as the behavioral and wire-contract
+source of truth, narrows generated scope to six Python outputs plus any
+required `.pyi` packaging change, and prohibits unrelated generated churn.
 
 ## Artifact Index
 
@@ -486,15 +542,20 @@ these exact bytes and the coordinator completes the confirmation gate.
   implementation plan. Accepted candidate.
 - `rfcs/0015-python-sdk-nodejs-parity/jsons/challenge.json` - Independent
   challenge findings requiring this revision.
+- `rfcs/0015-python-sdk-nodejs-parity/jsons/amendment-01-plan.json` -
+  Accepted amendment replacing the unavailable protocol source with tracked
+  fallback revision `820666fda038215717d9636e63411fcb8779d0c7` and selective
+  AgentKit plus observability generation.
 
 ## Decision Log
 
 | Date | Decision | Owner | Evidence |
 | --- | --- | --- | --- |
 | 2026-09-03 | Use Governed lifecycle because this changes public API and generated protocol contracts. | Coordinator | `jsons/plan.json`, `DEVELOPMENT_PROCESS.md` |
-| 2026-09-03 | Use Node.js commit `5faa0e000bf0dc9a6b4c14b4f2cbe095258ee91d` and its protocol gitlink `2ac388cd67cddf34141f89182e1f14ae258303d7` as the parity source. | Python SDK maintainers | Gitlink inspection and `git ls-tree HEAD sdks/nodejs sdks/python` |
+| 2026-09-03 | Keep Node.js commit `5faa0e000bf0dc9a6b4c14b4f2cbe095258ee91d` and its generated bindings as the parity source of truth, but generate Python AgentKit and observability bindings from tracked internal-bridge revision `820666fda038215717d9636e63411fcb8779d0c7` because protocol revision `2ac388cd67cddf34141f89182e1f14ae258303d7` is unavailable from configured remotes. | Python SDK maintainers | `git ls-tree HEAD sdks/nodejs sdks/python`, failed fetch evidence, `jsons/amendment-01-plan.json` |
 | 2026-09-03 | Preserve the synchronous Python server and expose Pythonic V2 methods. | Python SDK maintainers | `jsons/plan.json` |
 | 2026-09-03 | Preserve legacy auth exports and adapt them to one generic middleware path. | Python SDK maintainers | `jsons/plan.json` |
 | 2026-09-03 | Exclude the untracked `rapida/artifacts/internal` path from implementation scope. | RFC author | Python SDK tree and `.gitmodules` inspection |
-| 2026-09-03 | Limit generated protocol scope to one tracked gitlink and generated `*_pb2.py`, `*_pb2.pyi`, and `*_pb2_grpc.py` files. | RFC author | `jsons/challenge.json`, `jsons/plan.json` |
+| 2026-09-03 | Limit generated protocol scope to one tracked gitlink, the three `agentkit_pb2*` outputs, the three `observability_api_pb2*` outputs, and any required `.pyi` package-data wiring. | RFC author | `jsons/challenge.json`, `jsons/plan.json`, `jsons/amendment-01-plan.json` |
 | 2026-09-03 | Allow `sdks/python/pyproject.toml` changes only to package generated `.pyi` files and never to bump the version for this RFC. | RFC author | `jsons/challenge.json`, `jsons/plan.json` |
+| 2026-09-03 | Require selective `grpc_tools.protoc` generation only for `agentkit.proto` and `observability-api.proto`, and reject unrelated generated churn. | RFC author | `jsons/amendment-01-plan.json` |
