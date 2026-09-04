@@ -85,7 +85,8 @@ send_post_callback() {
   content_type=$3
   payload=$4
   response_file="$temporary_directory/$context_id.response"
-  http_status=$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
+  http_status=$(curl --silent --show-error --connect-timeout 2 --max-time 10 \
+    --output "$response_file" --write-out '%{http_code}' \
     --request POST --header "Content-Type: $content_type" --data-binary "$payload" \
     "$assistant_api_url/v1/talk/$provider/ctx/$context_id/event")
 
@@ -97,7 +98,8 @@ send_get_callback() {
   context_id=$2
   query_string=$3
   response_file="$temporary_directory/$context_id.response"
-  http_status=$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
+  http_status=$(curl --silent --show-error --connect-timeout 2 --max-time 10 \
+    --output "$response_file" --write-out '%{http_code}' \
     "$assistant_api_url/v1/talk/$provider/ctx/$context_id/event?$query_string")
 
   assert_callback_accepted "$provider" "$http_status" "$response_file"

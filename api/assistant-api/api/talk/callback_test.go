@@ -9,21 +9,65 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rapidaai/api/assistant-api/config"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	channel_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony"
+	internal_conversation_entity "github.com/rapidaai/api/assistant-api/internal/entity/conversations"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/protos"
 )
 
 type callbackCallContextStore struct {
 	callContext *callcontext.CallContext
 	updates     []callcontext.CallStatusUpdate
+}
+
+type callbackConversationServiceStub struct {
+	internal_services.AssistantConversationService
+
+	mu             sync.Mutex
+	metrics        []*protos.Metric
+	metricRecorded chan struct{}
+	metricOnce     sync.Once
+}
+
+func (service *callbackConversationServiceStub) CreateOrUpdateConversationMetrics(
+	_ context.Context,
+	_ *types.Authentication,
+	_ uint64,
+	_ uint64,
+	metrics []*protos.Metric,
+) ([]*internal_conversation_entity.AssistantConversationMetric, error) {
+	service.mu.Lock()
+	service.metrics = append(service.metrics, metrics...)
+	service.mu.Unlock()
+	service.metricOnce.Do(func() { close(service.metricRecorded) })
+	return nil, nil
+}
+
+func (service *callbackConversationServiceStub) CreateOrUpdateConversationMetadata(
+	context.Context,
+	*types.Authentication,
+	uint64,
+	uint64,
+	[]*protos.Metadata,
+) ([]*internal_conversation_entity.AssistantConversationMetadata, error) {
+	return nil, nil
+}
+
+func (service *callbackConversationServiceStub) recordedMetrics() []*protos.Metric {
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	return append([]*protos.Metric(nil), service.metrics...)
 }
 
 func (store *callbackCallContextStore) Save(context.Context, *callcontext.CallContext) (string, error) {
@@ -269,6 +313,94 @@ func TestCallbackByContextRejectsInvalidStoredAuthenticationForEveryProvider(t *
 
 func TestFailedCallbackMetricsIncludesCallAndConversationStatus(t *testing.T) {
 	metrics := failedCallbackMetrics("busy")
+	assertFailedStatusMetrics(t, metrics, "busy")
+}
+
+func TestFailedCallbacksPersistCallAndConversationStatus(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	logger, err := commons.NewApplicationLogger(commons.EnableConsole(false))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name   string
+		target string
+		params gin.Params
+		invoke func(*ConversationApi, *gin.Context)
+	}{
+		{
+			name:   "context callback",
+			target: "/callback",
+			params: gin.Params{{Key: "contextId", Value: "callback-context"}},
+			invoke: (*ConversationApi).CallbackByContext,
+		},
+		{
+			name:   "catch-all callback",
+			target: "/callback?CallSid=twilio-call&CallStatus=busy",
+			params: gin.Params{{Key: "telephony", Value: "twilio"}, {Key: "assistantId", Value: "11"}},
+			invoke: (*ConversationApi).UnviersalCallback,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actorType := types.ActorTypeProject.String()
+			actorID := uint64(41)
+			store := &callbackCallContextStore{callContext: &callcontext.CallContext{
+				ContextID:      "callback-context",
+				AssistantID:    11,
+				ConversationID: 22,
+				ProjectID:      21,
+				OrganizationID: 20,
+				AuthType:       types.AuthTypeProject.String(),
+				AuthActorType:  &actorType,
+				AuthActorID:    &actorID,
+				Provider:       "twilio",
+				Direction:      "outbound",
+			}}
+			conversationService := &callbackConversationServiceStub{metricRecorded: make(chan struct{})}
+			api := &ConversationApi{
+				cfg:                          &config.AssistantConfig{},
+				logger:                       logger,
+				callContextStore:             store,
+				assistantConversationService: conversationService,
+				inboundDispatcher: channel_telephony.NewInboundDispatcher(
+					channel_telephony.WithConfig(&config.AssistantConfig{}),
+					channel_telephony.WithLogger(logger),
+				),
+			}
+
+			requestBody := strings.NewReader("CallSid=twilio-call&CallStatus=busy")
+			if test.name == "catch-all callback" {
+				requestBody = strings.NewReader("")
+			}
+			recorder := httptest.NewRecorder()
+			ginContext, _ := gin.CreateTestContext(recorder)
+			ginContext.Request = httptest.NewRequest(http.MethodPost, test.target, requestBody)
+			ginContext.Request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			ginContext.Params = test.params
+
+			test.invoke(api, ginContext)
+
+			if recorder.Code < http.StatusOK || recorder.Code >= http.StatusMultipleChoices {
+				t.Fatalf("status = %d, want 2xx", recorder.Code)
+			}
+			if len(store.updates) != 1 || store.updates[0].CallStatus != callcontext.CallStatusFailed {
+				t.Fatalf("updates = %+v, want one failed update", store.updates)
+			}
+			select {
+			case <-conversationService.metricRecorded:
+			case <-time.After(2 * time.Second):
+				t.Fatal("timed out waiting for callback metrics")
+			}
+			assertFailedStatusMetrics(t, conversationService.recordedMetrics(), "busy")
+		})
+	}
+}
+
+func assertFailedStatusMetrics(t *testing.T, metrics []*protos.Metric, reason string) {
+	t.Helper()
 	if len(metrics) != 2 {
 		t.Fatalf("metric count = %d, want 2", len(metrics))
 	}
@@ -284,8 +416,8 @@ func TestFailedCallbackMetricsIncludesCallAndConversationStatus(t *testing.T) {
 		if values[name] != observability.MetricCallStatusFailed {
 			t.Errorf("metric %q = %q, want %q", name, values[name], observability.MetricCallStatusFailed)
 		}
-		if descriptions[name] != "busy" {
-			t.Errorf("metric %q description = %q, want busy", name, descriptions[name])
+		if descriptions[name] != reason {
+			t.Errorf("metric %q description = %q, want %q", name, descriptions[name], reason)
 		}
 	}
 }
