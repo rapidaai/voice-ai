@@ -25,8 +25,9 @@ import { Tabs } from '@/app/components/carbon/tabs';
 import { Text } from '@/app/components/carbon/text';
 import { ArrowLeft } from '@carbon/icons-react';
 import { TextArea } from '@/app/components/carbon/form';
-import { CustomerOptions } from '@/app/components/navigation/actionable-header';
-import { BrandedLogo } from '@/app/components/brand/branded-logo';
+import { PreviewAgentHeader } from './preview-agent-header';
+
+export { PreviewAgentHeader } from './preview-agent-header';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -806,19 +807,6 @@ const AssistantPlaceholder: FC<{
     </div>
   );
 };
-
-export const PreviewAgentHeader: FC = () => (
-  <header className="flex h-12 shrink-0 items-center justify-between border-b border-border-subtle bg-shell">
-    <div className="flex min-w-0 items-center px-4">
-      <BrandedLogo
-        variant="full"
-        className="h-6 w-auto max-w-[12rem] object-left"
-        textClassName="text-base"
-      />
-    </div>
-    <CustomerOptions showProjectSelector={false} />
-  </header>
-);
 
 const DebuggerScrollArea: FC<{ children: React.ReactNode }> = ({
   children,

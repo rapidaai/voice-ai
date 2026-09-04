@@ -1,6 +1,31 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import developmentConfig from '@/configs/config.development.json';
+import { ThemeProvider } from '@/theme/theme-provider';
+import { ThemeManifest } from '@/theme/types';
 import { ConversationMessages } from '../index';
+
+const theme = developmentConfig.theme as unknown as ThemeManifest;
+
+const tenantTheme: ThemeManifest = {
+  ...theme,
+  id: 'tenant-voice',
+  brand: {
+    ...theme.brand,
+    name: 'Tenant Voice',
+    logos: {
+      full: {
+        light: '/tenant/full-light.svg',
+        dark: '/tenant/full-dark.svg',
+      },
+      compact: {
+        light: '/tenant/compact-light.svg',
+        dark: '/tenant/compact-dark.svg',
+      },
+    },
+  },
+  defaultMode: 'light',
+};
 
 jest.mock('@uiw/react-markdown-preview', () => ({
   __esModule: true,
@@ -21,27 +46,6 @@ jest.mock('@/hooks/use-credential', () => ({
 
 jest.mock('react-router-dom', () => ({
   useSearchParams: () => [new URLSearchParams()],
-}));
-
-jest.mock('@/theme/theme-provider', () => ({
-  useTheme: () => ({
-    resolvedMode: 'light',
-    theme: {
-      brand: {
-        name: 'Tenant Voice',
-        logos: {
-          full: {
-            light: '/tenant/full-light.svg',
-            dark: '/tenant/full-dark.svg',
-          },
-          compact: {
-            light: '/tenant/compact-light.svg',
-            dark: '/tenant/compact-dark.svg',
-          },
-        },
-      },
-    },
-  }),
 }));
 
 jest.mock('@rapidaai/react', () => ({
@@ -74,8 +78,23 @@ jest.mock('@rapidaai/react', () => ({
 }));
 
 describe('ConversationMessages', () => {
+  beforeEach(() => {
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: jest.fn().mockReturnValue({
+        matches: false,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+      }),
+    });
+  });
+
   it('renders assistant identity from the configured theme', () => {
-    render(<ConversationMessages vag={{} as any} />);
+    render(
+      <ThemeProvider theme={tenantTheme}>
+        <ConversationMessages vag={{} as any} />
+      </ThemeProvider>,
+    );
 
     expect(screen.getByText('Tenant Voice')).toBeInTheDocument();
     expect(screen.getByAltText('Tenant Voice')).toHaveAttribute(
