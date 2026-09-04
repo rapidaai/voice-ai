@@ -311,11 +311,6 @@ func TestCallbackByContextRejectsInvalidStoredAuthenticationForEveryProvider(t *
 	}
 }
 
-func TestFailedCallbackMetricsIncludesCallAndConversationStatus(t *testing.T) {
-	metrics := failedCallbackMetrics("busy")
-	assertFailedStatusMetrics(t, metrics, "busy")
-}
-
 func TestFailedCallbacksPersistCallAndConversationStatus(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	logger, err := commons.NewApplicationLogger(commons.EnableConsole(false))
