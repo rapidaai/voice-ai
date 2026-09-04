@@ -53,17 +53,17 @@ DELETE FROM call_contexts WHERE conversation_id IN ($conversation_ids);
 DELETE FROM assistant_conversations WHERE id IN ($conversation_ids);
 INSERT INTO assistant_conversations (
   id, identifier, assistant_id, assistant_provider_model_id, name,
-  project_id, organization_id, source, created_by, status, direction,
+  project_id, organization_id, source, status, direction,
   created_actor_type, created_actor_id
 ) VALUES
-  (7100001, 'ci-callback-twilio', 1, 1, 'Twilio callback integration', 1, 1, 'TELEPHONY', 1, 'ACTIVE', 'OUTBOUND', 'project', 1),
-  (7100002, 'ci-callback-exotel-busy', 1, 1, 'Exotel busy callback integration', 1, 1, 'TELEPHONY', 1, 'ACTIVE', 'OUTBOUND', 'project', 1),
-  (7100003, 'ci-callback-exotel-no-answer', 1, 1, 'Exotel no-answer callback integration', 1, 1, 'TELEPHONY', 1, 'ACTIVE', 'OUTBOUND', 'project', 1),
-  (7100004, 'ci-callback-vonage', 1, 1, 'Vonage callback integration', 1, 1, 'TELEPHONY', 1, 'ACTIVE', 'OUTBOUND', 'project', 1),
-  (7100005, 'ci-callback-telnyx', 1, 1, 'Telnyx callback integration', 1, 1, 'TELEPHONY', 1, 'ACTIVE', 'OUTBOUND', 'project', 1),
-  (7100006, 'ci-callback-asterisk', 1, 1, 'Asterisk callback integration', 1, 1, 'TELEPHONY', 1, 'ACTIVE', 'OUTBOUND', 'project', 1),
-  (7100007, 'ci-callback-sip', 1, 1, 'SIP callback integration', 1, 1, 'TELEPHONY', 1, 'ACTIVE', 'OUTBOUND', 'project', 1),
-  (7100008, 'ci-callback-vobiz', 1, 1, 'Vobiz callback integration', 1, 1, 'TELEPHONY', 1, 'ACTIVE', 'OUTBOUND', 'project', 1);
+  (7100001, 'ci-callback-twilio', 1, 1, 'Twilio callback integration', 1, 1, 'TELEPHONY', 'ACTIVE', 'OUTBOUND', 'project', 1),
+  (7100002, 'ci-callback-exotel-busy', 1, 1, 'Exotel busy callback integration', 1, 1, 'TELEPHONY', 'ACTIVE', 'OUTBOUND', 'project', 1),
+  (7100003, 'ci-callback-exotel-no-answer', 1, 1, 'Exotel no-answer callback integration', 1, 1, 'TELEPHONY', 'ACTIVE', 'OUTBOUND', 'project', 1),
+  (7100004, 'ci-callback-vonage', 1, 1, 'Vonage callback integration', 1, 1, 'TELEPHONY', 'ACTIVE', 'OUTBOUND', 'project', 1),
+  (7100005, 'ci-callback-telnyx', 1, 1, 'Telnyx callback integration', 1, 1, 'TELEPHONY', 'ACTIVE', 'OUTBOUND', 'project', 1),
+  (7100006, 'ci-callback-asterisk', 1, 1, 'Asterisk callback integration', 1, 1, 'TELEPHONY', 'ACTIVE', 'OUTBOUND', 'project', 1),
+  (7100007, 'ci-callback-sip', 1, 1, 'SIP callback integration', 1, 1, 'TELEPHONY', 'ACTIVE', 'OUTBOUND', 'project', 1),
+  (7100008, 'ci-callback-vobiz', 1, 1, 'Vobiz callback integration', 1, 1, 'TELEPHONY', 'ACTIVE', 'OUTBOUND', 'project', 1);
 INSERT INTO call_contexts (
   id, context_id, assistant_id, conversation_id, project_id, organization_id,
   auth_type, auth_actor_type, auth_actor_id, provider, direction
