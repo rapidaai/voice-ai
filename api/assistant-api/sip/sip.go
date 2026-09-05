@@ -19,6 +19,7 @@ import (
 	sip_middleware "github.com/rapidaai/api/assistant-api/sip/middleware"
 	sip_pipeline "github.com/rapidaai/api/assistant-api/sip/pipeline"
 	sip_registration "github.com/rapidaai/api/assistant-api/sip/registration"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	web_client "github.com/rapidaai/pkg/clients/web"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
@@ -50,6 +51,7 @@ type SIPEngine struct {
 	httpLogService               internal_services.AssistantHTTPLogService
 	vaultClient                  web_client.VaultClient
 	callContextStore             callcontext.Store
+	rapidaClient                 *rapida_client.RapidaClient
 
 	// Registration client for maintaining SIP REGISTER with external providers.
 	registrationClient *sip_infra.RegistrationClient
@@ -66,7 +68,8 @@ func NewSIPEngine(config *config.AssistantConfig, logger commons.Logger,
 	postgres connectors.PostgresConnector,
 	redis connectors.RedisConnector,
 	opensearch connectors.OpenSearchConnector,
-	vectordb connectors.VectorConnector) *SIPEngine {
+	vectordb connectors.VectorConnector,
+	rapidaClient *rapida_client.RapidaClient) *SIPEngine {
 	fileStorage := storage_files.NewStorage(config.AssetStoreConfig, logger)
 	return &SIPEngine{
 		cfg:                          config,
@@ -83,6 +86,7 @@ func NewSIPEngine(config *config.AssistantConfig, logger commons.Logger,
 		storage:                      fileStorage,
 		vaultClient:                  web_client.NewVaultClientGRPC(&config.AppConfig, logger, redis),
 		callContextStore:             callcontext.NewStore(postgres, logger),
+		rapidaClient:                 rapidaClient,
 	}
 }
 
@@ -151,6 +155,7 @@ func (m *SIPEngine) Connect(ctx context.Context) error {
 		sip_registration.WithAssistantConfig(m.cfg),
 		sip_registration.WithSIPConfig(m.cfg.SIPConfig),
 		sip_registration.WithApplyOpDefaults(m.applySIPOperationalDefaults),
+		sip_registration.WithRapidaClient(m.rapidaClient),
 	)
 
 	m.dispatcher = sip_pipeline.New(
@@ -167,6 +172,7 @@ func (m *SIPEngine) Connect(ctx context.Context) error {
 		sip_pipeline.WithOpenSearch(m.opensearch),
 		sip_pipeline.WithRedis(m.redis),
 		sip_pipeline.WithStorage(m.storage),
+		sip_pipeline.WithRapidaClient(m.rapidaClient),
 	)
 	m.dispatcher.Start(m.ctx)
 

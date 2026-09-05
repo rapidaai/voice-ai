@@ -16,11 +16,19 @@ import (
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
 	app_config "github.com/rapidaai/config"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSIPEngineRetainsRapidaClient(t *testing.T) {
+	client := &rapida_client.RapidaClient{}
+	engine := &SIPEngine{rapidaClient: client}
+
+	require.Same(t, client, engine.rapidaClient)
+}
 
 func TestSIPEngineUsesConfiguredServiceID(t *testing.T) {
 	engine := &SIPEngine{cfg: &assistant_config.AssistantConfig{AppConfig: app_config.AppConfig{ServiceID: 9007}}}

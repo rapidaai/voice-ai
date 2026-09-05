@@ -10,9 +10,9 @@ import (
 	"errors"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	"github.com/rapidaai/api/assistant-api/internal/observability/collectors"
 	observability_collector_requestlog "github.com/rapidaai/api/assistant-api/internal/observability/collectors/requestlog"
 	observability_collector_toollog "github.com/rapidaai/api/assistant-api/internal/observability/collectors/toollog"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/webhook"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
@@ -147,7 +147,13 @@ func (uds *unidirectionalStreamer) Recv() (internal_type.Stream, error) {
 					Logger:      uds.logger,
 					ToolService: uds.assistantToolService,
 				}),
-				collectors.NewWithWebhookConfiguration(uds.ctx, uds.logger, uds.auth, assistantID, uds.configurationService, uds.httpLogService)); err != nil {
+				webhook.New(uds.ctx, webhook.Config{
+					Logger:                        uds.logger,
+					Auth:                          uds.auth,
+					AssistantID:                   assistantID,
+					AssistantConfigurationService: uds.configurationService,
+					HTTPLogService:                uds.httpLogService,
+				})); err != nil {
 				uds.logger.Warnw("observability collector registration failed",
 					"component", "grpc",
 					"operation", "add_assistant_collectors",

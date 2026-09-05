@@ -26,13 +26,13 @@ import (
 
 // RapidaClient owns the internal service clients and their connections.
 type RapidaClient struct {
-	Authentication web_client.AuthClient
-	Vault          web_client.VaultClient
-	Project        web_client.ProjectClient
-	ProductUsage   web_client.ProductUsageClient
-	Integration    integration_client.IntegrationServiceClient
-	Deployment     endpoint_client.DeploymentServiceClient
-	Indexer        document_client.IndexerServiceClient
+	Authentication     web_client.AuthClient
+	Vault              web_client.VaultClient
+	Project            web_client.ProjectClient
+	ProductUsageClient web_client.ProductUsageClient
+	Integration        integration_client.IntegrationServiceClient
+	Deployment         endpoint_client.DeploymentServiceClient
+	Indexer            document_client.IndexerServiceClient
 
 	connections []*grpc.ClientConn
 	closeOnce   sync.Once
@@ -110,7 +110,7 @@ func New(cfg *config.AppConfig, logger commons.Logger, redis connectors.RedisCon
 		redis,
 		protos.NewProjectServiceClient(projectConnection),
 	)
-	client.ProductUsage = web_client.NewProductUsageClientWithClient(
+	client.ProductUsageClient = web_client.NewProductUsageClientWithClient(
 		cfg,
 		logger,
 		protos.NewProductUsageServiceClient(productUsageConnection),

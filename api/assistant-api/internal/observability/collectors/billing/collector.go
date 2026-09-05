@@ -12,26 +12,26 @@ import (
 	"time"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	web_client "github.com/rapidaai/pkg/clients/web"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-type Publisher interface {
-	CreateProductUsage(context.Context, *types.Authentication, *protos.CreateProductUsageRequest) (*protos.GetProductUsageResponse, error)
-	Close() error
+type Config struct {
+	ProductUsageClient web_client.ProductUsageClient
 }
 
 type Collector struct {
-	publisher Publisher
+	productUsageClient web_client.ProductUsageClient
 }
 
-func New(publisher Publisher) observability.Collector {
-	if !validator.NonNil(publisher) {
+func New(config Config) observability.Collector {
+	if !validator.NonNil(config.ProductUsageClient) {
 		return observability.NoopCollector{}
 	}
-	return &Collector{publisher: publisher}
+	return &Collector{productUsageClient: config.ProductUsageClient}
 }
 
 func (c *Collector) Key() string {
@@ -56,7 +56,7 @@ func (c *Collector) Collect(ctx context.Context, _ observability.Scope, observat
 		return fmt.Errorf("product usage %q must be greater than zero", usageType)
 	}
 
-	_, err := c.publisher.CreateProductUsage(ctx, observationContext.Auth, &protos.CreateProductUsageRequest{
+	_, err := c.productUsageClient.CreateProductUsage(ctx, observationContext.Auth, &protos.CreateProductUsageRequest{
 		UsageType:  usageType,
 		Usages:     usage.Duration.Nanoseconds(),
 		Unit:       unit,
@@ -66,5 +66,5 @@ func (c *Collector) Collect(ctx context.Context, _ observability.Scope, observat
 }
 
 func (c *Collector) Close(context.Context) error {
-	return c.publisher.Close()
+	return nil
 }

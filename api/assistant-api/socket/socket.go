@@ -23,11 +23,13 @@ import (
 	channel_pipeline "github.com/rapidaai/api/assistant-api/internal/channel/pipeline"
 	channel_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	"github.com/rapidaai/api/assistant-api/internal/observability/collectors"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/billing"
 	observability_collector_conversationmetadata "github.com/rapidaai/api/assistant-api/internal/observability/collectors/conversationmetadata"
 	observability_collector_conversationmetric "github.com/rapidaai/api/assistant-api/internal/observability/collectors/conversationmetric"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/telemetry"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	internal_assistant_service "github.com/rapidaai/api/assistant-api/internal/services/assistant"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	web_client "github.com/rapidaai/pkg/clients/web"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
@@ -54,12 +56,14 @@ type audioSocketEngine struct {
 	configurationService         internal_services.AssistantConfigurationService
 	httpLogService               internal_services.AssistantHTTPLogService
 	assistantToolService         internal_services.AssistantToolService
+	rapidaClient                 *rapida_client.RapidaClient
 }
 
 func NewAudioSocketEngine(cfg *config.AssistantConfig, logger commons.Logger,
 	postgres connectors.PostgresConnector,
 	redis connectors.RedisConnector,
 	opensearch connectors.OpenSearchConnector,
+	rapidaClient *rapida_client.RapidaClient,
 ) *audioSocketEngine {
 	fileStorage := storage_files.NewStorage(cfg.AssetStoreConfig, logger)
 	return &audioSocketEngine{
@@ -75,6 +79,7 @@ func NewAudioSocketEngine(cfg *config.AssistantConfig, logger commons.Logger,
 		configurationService:         internal_assistant_service.NewAssistantConfigurationService(logger, postgres),
 		httpLogService:               internal_assistant_service.NewAssistantHTTPLogService(logger, postgres, fileStorage),
 		assistantToolService:         internal_assistant_service.NewAssistantToolService(logger, postgres, fileStorage),
+		rapidaClient:                 rapidaClient,
 	}
 }
 
@@ -161,21 +166,26 @@ func (m *audioSocketEngine) handleConnection(ctx context.Context, conn net.Conn)
 		m.logger.Warnw("AudioSocket failed to reconstruct authentication", "contextId", contextID, "error", err)
 		return
 	}
+	configuredCollectors := []observability.Collector{
+		observability_collector_conversationmetric.New(observability_collector_conversationmetric.Config{
+			Logger:              m.logger,
+			ConversationService: m.assistantConversationService,
+		}),
+		observability_collector_conversationmetadata.New(observability_collector_conversationmetadata.Config{
+			Logger:              m.logger,
+			ConversationService: m.assistantConversationService,
+		}),
+	}
+	configuredCollectors = append(configuredCollectors, telemetry.NewWithAssistantConfig(ctx, m.logger, m.cfg)...)
+	configuredCollectors = append(configuredCollectors, billing.New(billing.Config{
+		ProductUsageClient: m.rapidaClient.ProductUsageClient,
+	}))
 
 	observer := observability.New(
 		observability.WithLogger(m.logger),
 		observability.WithAuth(auth),
 		observability.WithContext(ctx),
-		observability.WithCollectors(
-			observability_collector_conversationmetric.New(observability_collector_conversationmetric.Config{
-				Logger:              m.logger,
-				ConversationService: m.assistantConversationService,
-			}),
-			observability_collector_conversationmetadata.New(observability_collector_conversationmetadata.Config{
-				Logger:              m.logger,
-				ConversationService: m.assistantConversationService,
-			}),
-			collectors.NewWithEnv(ctx, m.logger, m.cfg)),
+		observability.WithCollectors(configuredCollectors...),
 		observability.WithGracePeriod(),
 	)
 	defer observer.Close(context.Background())

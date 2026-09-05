@@ -14,6 +14,7 @@ import (
 	assistantTalkApi "github.com/rapidaai/api/assistant-api/api/talk"
 	"github.com/rapidaai/api/assistant-api/config"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	workflow_api "github.com/rapidaai/protos"
@@ -98,6 +99,7 @@ func AssistantConversationApiRoute(
 	Redis connectors.RedisConnector,
 	Opensearch connectors.OpenSearchConnector,
 	sipServer *sip_infra.Server,
+	rapidaClient *rapida_client.RapidaClient,
 ) {
 	workflow_api.RegisterTalkServiceServer(S,
 		assistantTalkApi.NewConversationGRPCApi(Cfg,
@@ -107,6 +109,7 @@ func AssistantConversationApiRoute(
 			Opensearch,
 			Opensearch,
 			sipServer,
+			rapidaClient,
 		))
 	workflow_api.RegisterWebRTCServer(S,
 		assistantTalkApi.NewWebRtcApi(Cfg,
@@ -116,6 +119,7 @@ func AssistantConversationApiRoute(
 			Opensearch,
 			Opensearch,
 			sipServer,
+			rapidaClient,
 		))
 }
 
@@ -125,9 +129,10 @@ func TalkApiRoute(
 	redis connectors.RedisConnector,
 	opensearch connectors.OpenSearchConnector,
 	sipServer *sip_infra.Server,
+	rapidaClient *rapida_client.RapidaClient,
 ) {
 	apiv1 := engine.Group("v1/talk")
-	talkRpcApi := assistantTalkApi.NewConversationApi(cfg, logger, postgres, redis, opensearch, opensearch, sipServer)
+	talkRpcApi := assistantTalkApi.NewConversationApi(cfg, logger, postgres, redis, opensearch, opensearch, sipServer, rapidaClient)
 	{
 		apiv1.POST("/create-phone-call", talkRpcApi.CreatePhoneCallRest)
 		apiv1.POST("/create-bulk-phone-call", talkRpcApi.CreateBulkPhoneCallRest)

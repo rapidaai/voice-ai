@@ -299,9 +299,9 @@ func (app *AppRunner) Close(ctx context.Context) {
 func (g *AppRunner) AllRouters(ctx context.Context) error {
 	router.AssistantApiRoute(g.Cfg, g.S, g.E, g.Logger, g.Postgres, g.Redis, g.Opensearch)
 	router.HealthCheckRoutes(g.Cfg, g.E, g.Logger, g.Postgres)
-	router.AssistantConversationApiRoute(g.Cfg, g.S, g.Logger, g.Postgres, g.Redis, g.Opensearch, g.SIP)
+	router.AssistantConversationApiRoute(g.Cfg, g.S, g.Logger, g.Postgres, g.Redis, g.Opensearch, g.SIP, g.Clients)
 	router.AssistantDeploymentApiRoute(g.Cfg, g.S, g.E, g.Logger, g.Postgres)
-	router.TalkApiRoute(g.Cfg, g.E, g.Logger, g.Postgres, g.Redis, g.Opensearch, g.SIP)
+	router.TalkApiRoute(g.Cfg, g.E, g.Logger, g.Postgres, g.Redis, g.Opensearch, g.SIP, g.Clients)
 	if g.Opensearch != nil {
 		router.KnowledgeApiRoute(g.Cfg, g.S, g.Logger, g.Postgres, g.Redis, g.Opensearch)
 		router.DocumentApiRoute(g.Cfg, g.S, g.Logger, g.Postgres, g.Redis, g.Opensearch)
@@ -314,7 +314,7 @@ func (app *AppRunner) AllEngine(ctx context.Context) error {
 
 	// SIP is optional and only started if configured. It listens for SIP calls from telephony providers for both inbound call handling and outbound call dispatch.
 	if app.Cfg.SIPConfig != nil {
-		sipManager := assistant_sip.NewSIPEngine(app.Cfg, app.Logger, app.Postgres, app.Redis, app.Opensearch, app.Opensearch)
+		sipManager := assistant_sip.NewSIPEngine(app.Cfg, app.Logger, app.Postgres, app.Redis, app.Opensearch, app.Opensearch, app.Clients)
 		if err := sipManager.Connect(ctx); err != nil {
 			app.Logger.Errorf("Failed to start SIP server: %v", err)
 			return err
@@ -323,7 +323,7 @@ func (app *AppRunner) AllEngine(ctx context.Context) error {
 		app.Closeable = append(app.Closeable, sipManager.Disconnect)
 	}
 	if app.Cfg.AudioSocketConfig != nil {
-		socketEngine := assistant_socket.NewAudioSocketEngine(app.Cfg, app.Logger, app.Postgres, app.Redis, app.Opensearch)
+		socketEngine := assistant_socket.NewAudioSocketEngine(app.Cfg, app.Logger, app.Postgres, app.Redis, app.Opensearch, app.Clients)
 		if err := socketEngine.Connect(ctx); err != nil {
 			return err
 		}

@@ -14,8 +14,10 @@ import (
 
 	"github.com/rapidaai/api/assistant-api/config"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	"github.com/rapidaai/api/assistant-api/internal/observability/collectors"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/billing"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/telemetry"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	web_client "github.com/rapidaai/pkg/clients/web"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
@@ -47,6 +49,7 @@ type manager struct {
 	opDefaults      func(*sip_infra.Config)
 	assistantConfig *config.AssistantConfig
 	instanceID      string
+	rapidaClient    *rapida_client.RapidaClient
 }
 
 // New wires the dependencies and resolves a stable instance identity
@@ -70,6 +73,7 @@ func New(options ...ManagerOption) Manager {
 		instanceID:      managerOptions.Sip.InstanceID,
 		opDefaults:      managerOptions.ApplyOpDefaults,
 		assistantConfig: managerOptions.AssistantConfig,
+		rapidaClient:    managerOptions.RapidaClient,
 	}
 	if managerOptions.RegistrationClient != nil {
 		managerOptions.RegistrationClient.SetObserver(m)
@@ -83,11 +87,15 @@ func New(options ...ManagerOption) Manager {
 }
 
 func (m *manager) observer(ctx context.Context, auth *types.Authentication) observability.Recorder {
+	configuredCollectors := telemetry.NewWithAssistantConfig(ctx, m.logger, m.assistantConfig)
+	configuredCollectors = append(configuredCollectors, billing.New(billing.Config{
+		ProductUsageClient: m.rapidaClient.ProductUsageClient,
+	}))
 	return observability.New(
 		observability.WithLogger(m.logger),
 		observability.WithAuth(auth),
 		observability.WithContext(ctx),
-		observability.WithCollectors(collectors.NewWithEnv(ctx, m.logger, m.assistantConfig)),
+		observability.WithCollectors(configuredCollectors...),
 	)
 }
 

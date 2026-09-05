@@ -13,9 +13,9 @@ import (
 
 	webrtc_internal "github.com/rapidaai/api/assistant-api/internal/channel/webrtc/internal"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	"github.com/rapidaai/api/assistant-api/internal/observability/collectors"
 	observability_collector_requestlog "github.com/rapidaai/api/assistant-api/internal/observability/collectors/requestlog"
 	observability_collector_toollog "github.com/rapidaai/api/assistant-api/internal/observability/collectors/toollog"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/webhook"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
@@ -206,7 +206,13 @@ func (s *webrtcStreamer) runGrpcReader() {
 					Logger:      s.Logger,
 					ToolService: s.assistantToolService,
 				}),
-				collectors.NewWithWebhookConfiguration(s.Ctx, s.Logger, s.auth, assistantID, s.configurationService, s.httpLogService),
+				webhook.New(s.Ctx, webhook.Config{
+					Logger:                        s.Logger,
+					Auth:                          s.auth,
+					AssistantID:                   assistantID,
+					AssistantConfigurationService: s.configurationService,
+					HTTPLogService:                s.httpLogService,
+				}),
 			); err != nil {
 				s.Logger.Warnw("observability collector registration failed",
 					"component", "webrtc",

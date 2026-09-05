@@ -17,28 +17,25 @@ import (
 	"github.com/rapidaai/protos"
 )
 
-type usagePublisherStub struct {
-	auth       *types.Authentication
-	usage      *protos.CreateProductUsageRequest
-	err        error
-	closeErr   error
-	closeCalls int
+type productUsageClientStub struct {
+	auth  *types.Authentication
+	usage *protos.CreateProductUsageRequest
+	err   error
 }
 
-func (stub *usagePublisherStub) CreateProductUsage(_ context.Context, auth *types.Authentication, usage *protos.CreateProductUsageRequest) (*protos.GetProductUsageResponse, error) {
+func (stub *productUsageClientStub) CreateProductUsage(_ context.Context, auth *types.Authentication, usage *protos.CreateProductUsageRequest) (*protos.GetProductUsageResponse, error) {
 	stub.auth = auth
 	stub.usage = usage
 	return &protos.GetProductUsageResponse{Success: true, Data: &protos.ProductUsage{Id: 42}}, stub.err
 }
 
-func (stub *usagePublisherStub) Close() error {
-	stub.closeCalls++
-	return stub.closeErr
+func (stub *productUsageClientStub) Close() error {
+	return nil
 }
 
 func TestCollector_ForwardsUsageRecord(t *testing.T) {
-	publisher := &usagePublisherStub{}
-	collector := New(publisher)
+	productUsageClient := &productUsageClientStub{}
+	collector := New(Config{ProductUsageClient: productUsageClient})
 	now := time.Date(2026, 6, 5, 10, 0, 0, 123456789, time.UTC)
 	auth := &types.Authentication{}
 
@@ -55,13 +52,13 @@ func TestCollector_ForwardsUsageRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CollectUsage returned error: %v", err)
 	}
-	if publisher.auth != auth {
+	if productUsageClient.auth != auth {
 		t.Fatal("expected authentication to be forwarded")
 	}
-	if publisher.usage == nil {
+	if productUsageClient.usage == nil {
 		t.Fatal("expected one usage record")
 	}
-	got := publisher.usage
+	got := productUsageClient.usage
 	if got.GetUsageType() != observability.UsageConversationSTTDuration {
 		t.Fatalf("unexpected usage record: %+v", got)
 	}
@@ -79,7 +76,7 @@ func TestCollector_ForwardsUsageRecord(t *testing.T) {
 
 func TestCollector_ReturnsPublisherError(t *testing.T) {
 	publishErr := errors.New("publish failed")
-	collector := New(&usagePublisherStub{err: publishErr})
+	collector := New(Config{ProductUsageClient: &productUsageClientStub{err: publishErr}})
 
 	err := collector.Collect(context.Background(), observability.AssistantScope{AssistantID: 10}, observability.Context{}, observability.RecordUsage{
 		ID:         "usage-1",
@@ -93,8 +90,8 @@ func TestCollector_ReturnsPublisherError(t *testing.T) {
 }
 
 func TestCollector_PublishesUsageWithoutClientID(t *testing.T) {
-	publisher := &usagePublisherStub{}
-	collector := New(publisher)
+	productUsageClient := &productUsageClientStub{}
+	collector := New(Config{ProductUsageClient: productUsageClient})
 
 	err := collector.Collect(context.Background(), observability.ProjectScope{}, observability.Context{}, observability.RecordUsage{
 		Component:  observability.ComponentName(observability.UsageConversationVADDuration),
@@ -104,14 +101,14 @@ func TestCollector_PublishesUsageWithoutClientID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Collect() error = %v", err)
 	}
-	if publisher.usage == nil {
+	if productUsageClient.usage == nil {
 		t.Fatal("Collect() did not publish usage")
 	}
 }
 
 func TestCollector_RejectsUnsupportedUsageType(t *testing.T) {
-	publisher := &usagePublisherStub{}
-	collector := New(publisher)
+	productUsageClient := &productUsageClientStub{}
+	collector := New(Config{ProductUsageClient: productUsageClient})
 
 	err := collector.Collect(context.Background(), observability.ProjectScope{}, observability.Context{}, observability.RecordUsage{
 		Component:  observability.ComponentUsage,
@@ -121,32 +118,25 @@ func TestCollector_RejectsUnsupportedUsageType(t *testing.T) {
 	if !errors.Is(err, types.ErrInvalidProductUsage) {
 		t.Fatalf("Collect() error = %v", err)
 	}
-	if publisher.usage != nil {
-		t.Fatalf("publisher received usage: %+v", publisher.usage)
+	if productUsageClient.usage != nil {
+		t.Fatalf("product usage client received usage: %+v", productUsageClient.usage)
 	}
 }
 
 func TestCollector_IgnoresNonUsageRecord(t *testing.T) {
-	publisher := &usagePublisherStub{}
-	collector := New(publisher)
+	productUsageClient := &productUsageClientStub{}
+	collector := New(Config{ProductUsageClient: productUsageClient})
 
 	if err := collector.Collect(context.Background(), observability.ProjectScope{}, observability.Context{}, observability.RecordLog{}); err != nil {
 		t.Fatalf("Collect() error = %v", err)
 	}
-	if publisher.usage != nil {
-		t.Fatalf("publisher received usage: %+v", publisher.usage)
+	if productUsageClient.usage != nil {
+		t.Fatalf("product usage client received usage: %+v", productUsageClient.usage)
 	}
 }
 
-func TestCollector_ClosesPublisher(t *testing.T) {
-	expectedErr := errors.New("close failed")
-	publisher := &usagePublisherStub{closeErr: expectedErr}
-
-	err := New(publisher).Close(context.Background())
-	if !errors.Is(err, expectedErr) {
-		t.Fatalf("Close() error = %v, want %v", err, expectedErr)
-	}
-	if publisher.closeCalls != 1 {
-		t.Fatalf("Close() calls = %d, want 1", publisher.closeCalls)
+func TestCollector_CloseDoesNotCloseProductUsageClient(t *testing.T) {
+	if err := New(Config{ProductUsageClient: &productUsageClientStub{}}).Close(context.Background()); err != nil {
+		t.Fatalf("Close() error = %v", err)
 	}
 }

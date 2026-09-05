@@ -45,6 +45,9 @@ func TestInitInitializesRapidaClient(t *testing.T) {
 	if app.Clients == nil {
 		t.Fatal("Init() did not initialize RapidaClient")
 	}
+	if app.Clients.ProductUsageClient == nil {
+		t.Fatal("Init() did not initialize ProductUsageClient")
+	}
 	if len(app.Closeable) != 1 {
 		t.Fatalf("Closeable count = %d, want 1", len(app.Closeable))
 	}

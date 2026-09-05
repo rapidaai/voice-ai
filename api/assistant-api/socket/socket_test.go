@@ -13,7 +13,18 @@ import (
 	"encoding/hex"
 	"strings"
 	"testing"
+
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 )
+
+func TestAudioSocketEngineRetainsRapidaClient(t *testing.T) {
+	client := &rapida_client.RapidaClient{}
+	engine := &audioSocketEngine{rapidaClient: client}
+
+	if engine.rapidaClient != client {
+		t.Fatal("audioSocketEngine did not retain RapidaClient")
+	}
+}
 
 func TestReadContextID_HappyPath(t *testing.T) {
 	engine := &audioSocketEngine{}

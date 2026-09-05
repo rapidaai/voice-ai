@@ -6,8 +6,16 @@ import (
 	"go/token"
 	"testing"
 
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/stretchr/testify/require"
 )
+
+func TestConversationApiRetainsRapidaClient(t *testing.T) {
+	client := &rapida_client.RapidaClient{}
+	api := &ConversationApi{rapidaClient: client}
+
+	require.Same(t, client, api.rapidaClient)
+}
 
 func TestOutboundRestPropagatesRequestContext(t *testing.T) {
 	t.Helper()

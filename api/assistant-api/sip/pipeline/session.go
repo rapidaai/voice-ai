@@ -12,11 +12,13 @@ import (
 
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	"github.com/rapidaai/api/assistant-api/internal/observability/collectors"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/billing"
 	observability_collector_conversationmetadata "github.com/rapidaai/api/assistant-api/internal/observability/collectors/conversationmetadata"
 	observability_collector_conversationmetric "github.com/rapidaai/api/assistant-api/internal/observability/collectors/conversationmetric"
 	observability_collector_requestlog "github.com/rapidaai/api/assistant-api/internal/observability/collectors/requestlog"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/telemetry"
 	observability_collector_toollog "github.com/rapidaai/api/assistant-api/internal/observability/collectors/toollog"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/webhook"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
 	"github.com/rapidaai/pkg/types"
@@ -137,6 +139,35 @@ func (d *Dispatcher) setupCall(ctx context.Context, stage sip_infra.SessionEstab
 }
 
 func (d *Dispatcher) createObserver(ctx context.Context, scope *CallSetupResult, auth *types.Authentication) observability.Recorder {
+	configuredCollectors := []observability.Collector{
+		observability_collector_conversationmetric.New(observability_collector_conversationmetric.Config{
+			Logger:              d.logger,
+			ConversationService: d.assistantConversationService,
+		}),
+		observability_collector_conversationmetadata.New(observability_collector_conversationmetadata.Config{
+			Logger:              d.logger,
+			ConversationService: d.assistantConversationService,
+		}),
+		observability_collector_requestlog.New(observability_collector_requestlog.Config{
+			Logger:         d.logger,
+			HTTPLogService: d.httpLogService,
+		}),
+		observability_collector_toollog.New(observability_collector_toollog.Config{
+			Logger:      d.logger,
+			ToolService: d.assistantToolService,
+		}),
+		webhook.New(ctx, webhook.Config{
+			Logger:                        d.logger,
+			Auth:                          auth,
+			AssistantID:                   scope.AssistantID,
+			AssistantConfigurationService: d.configurationService,
+			HTTPLogService:                d.httpLogService,
+		}),
+	}
+	configuredCollectors = append(configuredCollectors, telemetry.NewWithAssistantConfig(ctx, d.logger, d.assistantConfig)...)
+	configuredCollectors = append(configuredCollectors, billing.New(billing.Config{
+		ProductUsageClient: d.rapidaClient.ProductUsageClient,
+	}))
 	recorder := observability.New(
 		observability.WithLogger(d.logger),
 		observability.WithAuth(auth),
@@ -146,26 +177,7 @@ func (d *Dispatcher) createObserver(ctx context.Context, scope *CallSetupResult,
 		}),
 		observability.WithContext(ctx),
 		observability.WithGracePeriod(),
-		observability.WithCollectors(
-			observability_collector_conversationmetric.New(observability_collector_conversationmetric.Config{
-				Logger:              d.logger,
-				ConversationService: d.assistantConversationService,
-			}),
-			observability_collector_conversationmetadata.New(observability_collector_conversationmetadata.Config{
-				Logger:              d.logger,
-				ConversationService: d.assistantConversationService,
-			}),
-			observability_collector_requestlog.New(observability_collector_requestlog.Config{
-				Logger:         d.logger,
-				HTTPLogService: d.httpLogService,
-			}),
-			observability_collector_toollog.New(observability_collector_toollog.Config{
-				Logger:      d.logger,
-				ToolService: d.assistantToolService,
-			}),
-			collectors.NewWithWebhookConfiguration(ctx, d.logger, auth, scope.AssistantID, d.configurationService, d.httpLogService),
-			collectors.NewWithEnv(ctx, d.logger, d.assistantConfig),
-		),
+		observability.WithCollectors(configuredCollectors...),
 	)
 	return recorder
 }

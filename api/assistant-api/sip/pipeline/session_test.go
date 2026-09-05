@@ -11,10 +11,18 @@ import (
 	"testing"
 
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestWithRapidaClient(t *testing.T) {
+	client := &rapida_client.RapidaClient{}
+	dispatcher := New(WithRapidaClient(client))
+
+	require.Same(t, client, dispatcher.rapidaClient)
+}
 
 func newIdentityTestAuthentication() *types.Authentication {
 	organizationID := uint64(7)

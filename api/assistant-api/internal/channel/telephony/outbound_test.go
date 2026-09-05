@@ -14,11 +14,21 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 )
+
+func TestWithOutboundRapidaClient(t *testing.T) {
+	client := &rapida_client.RapidaClient{}
+	dispatcher := NewOutboundDispatcher(WithOutboundRapidaClient(client))
+
+	if dispatcher.rapidaClient != client {
+		t.Fatal("NewOutboundDispatcher() did not retain RapidaClient")
+	}
+}
 
 type outboundDispatcherTestStore struct {
 	callContext *callcontext.CallContext
@@ -320,6 +330,7 @@ func TestOutboundDispatcher_StatusReporterRecordsTerminalObservability(t *testin
 		store:               store,
 		logger:              newOutboundDispatcherTestLogger(t),
 		conversationService: service,
+		rapidaClient:        &rapida_client.RapidaClient{},
 	}
 	statusReporter := dispatcher.NewStatusReporter(store.callContext.ContextID)
 
@@ -426,6 +437,7 @@ func TestOutboundDispatcher_StatusReporterRecordsRingingProgressObservability(t 
 		store:               store,
 		logger:              newOutboundDispatcherTestLogger(t),
 		conversationService: service,
+		rapidaClient:        &rapida_client.RapidaClient{},
 	}
 	statusReporter := dispatcher.NewStatusReporter(store.callContext.ContextID)
 
@@ -479,6 +491,7 @@ func TestOutboundDispatcher_StatusReporterSkipsRingingWhenContextClaimed(t *test
 		store:               store,
 		logger:              newOutboundDispatcherTestLogger(t),
 		conversationService: service,
+		rapidaClient:        &rapida_client.RapidaClient{},
 	}
 	statusReporter := dispatcher.NewStatusReporter(store.callContext.ContextID)
 

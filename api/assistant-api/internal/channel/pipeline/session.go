@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	"github.com/rapidaai/api/assistant-api/internal/observability/collectors"
 	observability_collector_requestlog "github.com/rapidaai/api/assistant-api/internal/observability/collectors/requestlog"
 	observability_collector_toollog "github.com/rapidaai/api/assistant-api/internal/observability/collectors/toollog"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/webhook"
 	"github.com/rapidaai/protos"
 )
 
@@ -38,7 +38,13 @@ func (d *Dispatcher) runSession(ctx context.Context, v SessionConnectedPipeline)
 			Logger:      d.logger,
 			ToolService: d.assistantToolService,
 		}),
-		collectors.NewWithWebhookConfiguration(ctx, d.logger, auth, v.CallContext.AssistantID, d.configurationService, d.httpLogService),
+		webhook.New(ctx, webhook.Config{
+			Logger:                        d.logger,
+			Auth:                          auth,
+			AssistantID:                   v.CallContext.AssistantID,
+			AssistantConfigurationService: d.configurationService,
+			HTTPLogService:                d.httpLogService,
+		}),
 	)
 
 	v.Observer.Record(ctx,

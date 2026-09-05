@@ -12,7 +12,9 @@ import (
 	"testing"
 	"time"
 
+	assistant_config "github.com/rapidaai/api/assistant-api/config"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	"github.com/rapidaai/pkg/configs"
 	telemetry "github.com/rapidaai/pkg/telemetry"
 	"github.com/rapidaai/protos"
 )
@@ -24,6 +26,39 @@ type exporterStub struct {
 	scopes  []telemetry.Scope
 	closed  bool
 	err     error
+}
+
+func TestNewWithAssistantConfig_ReturnsConfiguredCollector(t *testing.T) {
+	collectors := NewWithAssistantConfig(context.Background(), nil, &assistant_config.AssistantConfig{
+		TelemetryConfig: &configs.TelemetryConfig{
+			TelemetryType: string(configs.LOGGING),
+			Logging:       &configs.TelemetryLoggingConfig{},
+		},
+	})
+	if len(collectors) != 1 {
+		t.Fatalf("expected one collector, got %d", len(collectors))
+	}
+	if collectors[0].Key() != "telemetry:logging" {
+		t.Fatalf("unexpected collector key: %q", collectors[0].Key())
+	}
+}
+
+func TestNewWithAssistantConfig_ReturnsEmptyWithoutTelemetry(t *testing.T) {
+	if collectors := NewWithAssistantConfig(context.Background(), nil, nil); len(collectors) != 0 {
+		t.Fatalf("expected no collectors, got %d", len(collectors))
+	}
+	if collectors := NewWithAssistantConfig(context.Background(), nil, &assistant_config.AssistantConfig{}); len(collectors) != 0 {
+		t.Fatalf("expected no collectors, got %d", len(collectors))
+	}
+}
+
+func TestNewWithAssistantConfig_ReturnsEmptyForUnsupportedTelemetry(t *testing.T) {
+	collectors := NewWithAssistantConfig(context.Background(), nil, &assistant_config.AssistantConfig{
+		TelemetryConfig: &configs.TelemetryConfig{TelemetryType: "unsupported"},
+	})
+	if len(collectors) != 0 {
+		t.Fatalf("expected no collectors, got %d", len(collectors))
+	}
 }
 
 func (e *exporterStub) Export(_ context.Context, scope telemetry.Scope, rec telemetry.Record) error {

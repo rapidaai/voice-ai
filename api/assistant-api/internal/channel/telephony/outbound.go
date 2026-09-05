@@ -16,6 +16,7 @@ import (
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	web_client "github.com/rapidaai/pkg/clients/web"
 	"github.com/rapidaai/pkg/commons"
 )
@@ -32,6 +33,7 @@ type OutboundDispatcherOptions struct {
 	ConfigurationService internal_services.AssistantConfigurationService
 	HTTPLogService       internal_services.AssistantHTTPLogService
 	TelephonyOption      TelephonyOption
+	RapidaClient         *rapida_client.RapidaClient
 }
 
 type OutboundDispatcherFuncOption func(*OutboundDispatcherOptions)
@@ -90,6 +92,12 @@ func WithOutboundTelephonyOption(telephonyOpt TelephonyOption) OutboundDispatche
 	}
 }
 
+func WithOutboundRapidaClient(client *rapida_client.RapidaClient) OutboundDispatcherFuncOption {
+	return func(options *OutboundDispatcherOptions) {
+		options.RapidaClient = client
+	}
+}
+
 type OutboundDispatcher struct {
 	cfg                    *config.AssistantConfig
 	store                  callcontext.Store
@@ -100,6 +108,7 @@ type OutboundDispatcher struct {
 	configurationService   internal_services.AssistantConfigurationService
 	httpLogService         internal_services.AssistantHTTPLogService
 	telephonyOpt           TelephonyOption
+	rapidaClient           *rapida_client.RapidaClient
 	outboundConnectTimeout time.Duration
 }
 
@@ -118,6 +127,7 @@ func NewOutboundDispatcher(opts ...OutboundDispatcherFuncOption) *OutboundDispat
 		configurationService:   options.ConfigurationService,
 		httpLogService:         options.HTTPLogService,
 		telephonyOpt:           options.TelephonyOption,
+		rapidaClient:           options.RapidaClient,
 		outboundConnectTimeout: defaultOutboundConnectTimeout,
 	}
 }

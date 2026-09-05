@@ -16,7 +16,7 @@ func TestNewCreatesSeparateConnections(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = client.Close(context.Background()) })
 
-	if client.Authentication == nil || client.Vault == nil || client.Project == nil || client.ProductUsage == nil {
+	if client.Authentication == nil || client.Vault == nil || client.Project == nil || client.ProductUsageClient == nil {
 		t.Fatal("web clients were not initialized")
 	}
 	if client.Integration == nil || client.Deployment == nil || client.Indexer == nil {
