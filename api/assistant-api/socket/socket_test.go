@@ -11,9 +11,65 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"strings"
 	"testing"
+
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 )
+
+func TestAudioSocketEngineRetainsRapidaClient(t *testing.T) {
+	client := &rapida_client.RapidaClient{}
+	engine := &audioSocketEngine{rapidaClient: client}
+
+	if engine.rapidaClient != client {
+		t.Fatal("audioSocketEngine did not retain RapidaClient")
+	}
+}
+
+func TestAudioSocketBillingUsesProductUsage(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "socket.go", nil, 0)
+	if err != nil {
+		t.Fatalf("parse socket.go: %v", err)
+	}
+
+	found := false
+	ast.Inspect(file, func(node ast.Node) bool {
+		selector, ok := node.(*ast.SelectorExpr)
+		if ok && selector.Sel.Name == "ProductUsage" {
+			found = true
+		}
+		return true
+	})
+	if !found {
+		t.Fatal("audio socket billing does not use RapidaClient.ProductUsage")
+	}
+}
+
+func TestAudioSocketTalkerReceivesRapidaClient(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "socket.go", nil, 0)
+	if err != nil {
+		t.Fatalf("parse socket.go: %v", err)
+	}
+
+	found := false
+	ast.Inspect(file, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		selector, ok := call.Fun.(*ast.SelectorExpr)
+		if ok && selector.Sel.Name == "WithRapidaClient" {
+			found = true
+		}
+		return true
+	})
+	if !found {
+		t.Fatal("audio socket talker does not receive RapidaClient")
+	}
+}
 
 func TestReadContextID_HappyPath(t *testing.T) {
 	engine := &audioSocketEngine{}

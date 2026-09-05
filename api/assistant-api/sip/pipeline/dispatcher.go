@@ -15,6 +15,7 @@ import (
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/storages"
@@ -57,6 +58,7 @@ type Dispatcher struct {
 	opensearch                   connectors.OpenSearchConnector
 	redis                        connectors.RedisConnector
 	storage                      storages.Storage
+	rapidaClient                 *rapida_client.RapidaClient
 }
 
 type CallSetupResult struct {
@@ -89,6 +91,7 @@ type DispatcherOptions struct {
 	OpenSearch                   connectors.OpenSearchConnector
 	Redis                        connectors.RedisConnector
 	Storage                      storages.Storage
+	RapidaClient                 *rapida_client.RapidaClient
 }
 
 type DispatcherOption func(*DispatcherOptions)
@@ -177,6 +180,12 @@ func WithStorage(storage storages.Storage) DispatcherOption {
 	}
 }
 
+func WithRapidaClient(client *rapida_client.RapidaClient) DispatcherOption {
+	return func(options *DispatcherOptions) {
+		options.RapidaClient = client
+	}
+}
+
 // TransferServer is the minimal SIP infra surface required by transfer orchestration.
 // It enables deterministic tests by allowing fake implementations.
 type TransferServer interface {
@@ -209,6 +218,7 @@ func New(opts ...DispatcherOption) *Dispatcher {
 		opensearch:                   options.OpenSearch,
 		redis:                        options.Redis,
 		storage:                      options.Storage,
+		rapidaClient:                 options.RapidaClient,
 		signalCh:                     make(chan callEnvelope, signalChSize),
 		setupCh:                      make(chan callEnvelope, setupChSize),
 		mediaCh:                      make(chan callEnvelope, mediaChSize),

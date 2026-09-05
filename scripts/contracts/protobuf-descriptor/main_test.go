@@ -8,7 +8,10 @@ import (
 	"testing"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
+
+	"github.com/rapidaai/protos"
 )
 
 func TestRepositoryDescriptorSetIsSortedAndComplete(t *testing.T) {
@@ -34,6 +37,39 @@ func TestRepositoryDescriptorSetIsSortedAndComplete(t *testing.T) {
 		if !seen[required] {
 			t.Errorf("missing descriptor %q", required)
 		}
+	}
+}
+
+func TestProductUsageContract(t *testing.T) {
+	file := protos.File_billing_api_proto
+	service := file.Services().ByName("ProductUsageService")
+	if service == nil {
+		t.Fatal("ProductUsageService descriptor is missing")
+	}
+	for _, methodName := range []protoreflect.Name{"CreateProductUsage", "GetProductUsages", "GetOrganizationUsages"} {
+		if service.Methods().ByName(methodName) == nil {
+			t.Fatalf("%s descriptor is missing", methodName)
+		}
+	}
+	usage := file.Messages().ByName("ProductUsage")
+	if usage == nil {
+		t.Fatal("ProductUsage descriptor is missing")
+	}
+	for name, number := range map[protoreflect.Name]protoreflect.FieldNumber{
+		"id": 1, "projectId": 2, "usageType": 3, "usages": 4, "unit": 5, "occurredAt": 6,
+	} {
+		field := usage.Fields().ByName(name)
+		if field == nil || field.Number() != number {
+			t.Errorf("ProductUsage.%s number = %v, want %d", name, field, number)
+		}
+	}
+	createRequest := file.Messages().ByName("CreateProductUsageRequest")
+	if createRequest == nil || createRequest.Fields().ByName("id") != nil {
+		t.Fatalf("CreateProductUsageRequest must exist without an id field")
+	}
+	quota := file.Messages().ByName("BillingPlanQuota")
+	if field := quota.Fields().ByName("unit"); field == nil || field.Number() != 4 {
+		t.Fatalf("BillingPlanQuota.unit descriptor = %v", field)
 	}
 }
 

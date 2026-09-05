@@ -14,9 +14,10 @@ import (
 
 	"github.com/rapidaai/api/assistant-api/config"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	"github.com/rapidaai/api/assistant-api/internal/observability/collectors"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/billing"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/telemetry"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
-	web_client "github.com/rapidaai/pkg/clients/web"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/types"
@@ -42,11 +43,11 @@ type manager struct {
 	logger          commons.Logger
 	postgres        connectors.PostgresConnector
 	redis           *redis.Client
-	vault           web_client.VaultClient
 	regClient       *sip_infra.RegistrationClient
 	opDefaults      func(*sip_infra.Config)
 	assistantConfig *config.AssistantConfig
 	instanceID      string
+	rapidaClient    *rapida_client.RapidaClient
 }
 
 // New wires the dependencies and resolves a stable instance identity
@@ -65,11 +66,11 @@ func New(options ...ManagerOption) Manager {
 		logger:          managerOptions.Logger,
 		postgres:        managerOptions.Postgres,
 		redis:           managerOptions.Redis.GetConnection(),
-		vault:           managerOptions.Vault,
 		regClient:       managerOptions.RegistrationClient,
 		instanceID:      managerOptions.Sip.InstanceID,
 		opDefaults:      managerOptions.ApplyOpDefaults,
 		assistantConfig: managerOptions.AssistantConfig,
+		rapidaClient:    managerOptions.RapidaClient,
 	}
 	if managerOptions.RegistrationClient != nil {
 		managerOptions.RegistrationClient.SetObserver(m)
@@ -83,11 +84,15 @@ func New(options ...ManagerOption) Manager {
 }
 
 func (m *manager) observer(ctx context.Context, auth *types.Authentication) observability.Recorder {
+	configuredCollectors := telemetry.NewWithAssistantConfig(ctx, m.logger, m.assistantConfig)
+	configuredCollectors = append(configuredCollectors, billing.New(billing.Config{
+		ProductUsageClient: m.rapidaClient.ProductUsage,
+	}))
 	return observability.New(
 		observability.WithLogger(m.logger),
 		observability.WithAuth(auth),
 		observability.WithContext(ctx),
-		observability.WithCollectors(collectors.NewWithEnv(ctx, m.logger, m.assistantConfig)),
+		observability.WithCollectors(configuredCollectors...),
 	)
 }
 

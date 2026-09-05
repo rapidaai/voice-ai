@@ -1,0 +1,36 @@
+{
+  "rfc": "rfcs/0014-direct-product-usages.md",
+  "recorded_at": "2026-08-30",
+  "contract": [
+    "protos/artifacts/billing-api.proto",
+    "protos/billing-api.pb.go",
+    "protos/billing-api_grpc.pb.go"
+  ],
+  "web_api": [
+    "api/web-api/api/product_usage.go",
+    "api/web-api/internal/entity/product_usage.go",
+    "api/web-api/internal/service/productusage/service.go",
+    "api/web-api/migrations/000013_create_product_usages.up.sql",
+    "api/web-api/migrations/000013_create_product_usages.down.sql",
+    "api/web-api/router/web.go"
+  ],
+  "assistant_api": [
+    "api/assistant-api/internal/observability/collectors/billing/collector.go",
+    "api/assistant-api/internal/observability/collectors/collector.go",
+    "api/assistant-api/internal/observability/usage.go",
+    "pkg/clients/web/product_usage_client.go",
+    "pkg/types/product_usage.go"
+  ],
+  "system_tests": [
+    "tests/smoke/product-usage/main.go",
+    "tests/smoke/run.sh",
+    "tests/smoke/Dockerfile",
+    "tests/smoke/Dockerfile.dockerignore",
+    ".github/actions/system-test/system-phase.sh"
+  ],
+  "excluded": [
+    "SDK generation",
+    "Durable outbox",
+    "Assistant, conversation, and message billing attribution"
+  ]
+}

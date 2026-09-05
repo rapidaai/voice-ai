@@ -7,11 +7,20 @@
 package channel_pipeline
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/webhook"
 )
+
+func TestWebhookCollectorWithoutDependenciesIsNoop(t *testing.T) {
+	collector := webhook.New(context.Background(), webhook.Config{})
+	if _, ok := collector.(observability.NoopCollector); !ok {
+		t.Fatalf("expected no-op collector, got %T", collector)
+	}
+}
 
 func TestPipelineCallWebhookLifecycleFields(t *testing.T) {
 	t.Parallel()

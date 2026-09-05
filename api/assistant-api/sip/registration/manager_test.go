@@ -13,9 +13,20 @@ import (
 
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
 	"github.com/rapidaai/pkg/clients"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/types"
 	"google.golang.org/grpc/metadata"
 )
+
+func TestWithRapidaClient(t *testing.T) {
+	client := &rapida_client.RapidaClient{}
+	var options ManagerOptions
+	WithRapidaClient(client)(&options)
+
+	if options.RapidaClient != client {
+		t.Fatal("WithRapidaClient() did not retain RapidaClient")
+	}
+}
 
 func TestServiceAuthenticationMintsDelegatedServiceActor(t *testing.T) {
 	m, _, _ := newTestManager(t)

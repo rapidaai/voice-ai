@@ -10,9 +10,9 @@ import (
 	"context"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	"github.com/rapidaai/api/assistant-api/internal/observability/collectors"
 	observability_collector_requestlog "github.com/rapidaai/api/assistant-api/internal/observability/collectors/requestlog"
 	observability_collector_toollog "github.com/rapidaai/api/assistant-api/internal/observability/collectors/toollog"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/webhook"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	type_enums "github.com/rapidaai/pkg/types/enums"
@@ -31,7 +31,13 @@ func (d *Dispatcher) runInboundCall(ctx context.Context, v CallReceivedPipeline)
 				Logger:      d.logger,
 				ToolService: d.assistantToolService,
 			}),
-			collectors.NewWithWebhookConfiguration(ctx, d.logger, v.Auth, v.AssistantID, d.configurationService, d.httpLogService),
+			webhook.New(ctx, webhook.Config{
+				Logger:                        d.logger,
+				Auth:                          v.Auth,
+				AssistantID:                   v.AssistantID,
+				AssistantConfigurationService: d.configurationService,
+				HTTPLogService:                d.httpLogService,
+			}),
 		)
 
 	callInfo, err := d.inboundDispatcher.ReceiveCall(v.GinContext, v.Provider)

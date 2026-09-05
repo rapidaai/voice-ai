@@ -6,15 +6,19 @@
 
 package observability
 
-import "time"
+import (
+	"time"
+
+	"github.com/rapidaai/pkg/types"
+)
 
 const (
-	UsageConversationSTTDuration     = "stt_duration"
-	UsageConversationTTSDuration     = "tts_duration"
-	UsageConversationVADDuration     = "vad_duration"
-	UsageConversationEOSDuration     = "eos_duration"
-	UsageConversationDenoiseDuration = "denoise_duration"
-	UsageConversationLLMDuration     = "llm_duration"
+	UsageConversationSTTDuration     = string(types.ProductUsageSTTDuration)
+	UsageConversationTTSDuration     = string(types.ProductUsageTTSDuration)
+	UsageConversationVADDuration     = string(types.ProductUsageVADDuration)
+	UsageConversationEOSDuration     = string(types.ProductUsageEOSDuration)
+	UsageConversationDenoiseDuration = string(types.ProductUsageDenoiseDuration)
+	UsageConversationLLMDuration     = string(types.ProductUsageLLMDuration)
 )
 
 func NewSTTDurationUsageRecord(provider string, duration time.Duration, attr Attributes) RecordUsage {

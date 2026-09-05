@@ -19,13 +19,14 @@ import (
 	channel_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony"
 	internal_webrtc "github.com/rapidaai/api/assistant-api/internal/channel/webrtc"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	"github.com/rapidaai/api/assistant-api/internal/observability/collectors"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/billing"
 	observability_collector_conversationmetadata "github.com/rapidaai/api/assistant-api/internal/observability/collectors/conversationmetadata"
 	observability_collector_conversationmetric "github.com/rapidaai/api/assistant-api/internal/observability/collectors/conversationmetric"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/telemetry"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	internal_assistant_service "github.com/rapidaai/api/assistant-api/internal/services/assistant"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
-	web_client "github.com/rapidaai/pkg/clients/web"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/storages"
@@ -52,8 +53,7 @@ type ConversationApi struct {
 	configurationService         internal_services.AssistantConfigurationService
 	httpLogService               internal_services.AssistantHTTPLogService
 	assistantToolService         internal_services.AssistantToolService
-	vaultClient                  web_client.VaultClient
-	authClient                   web_client.AuthClient
+	rapidaClient                 *rapida_client.RapidaClient
 }
 
 type ConversationGrpcApi struct {
@@ -61,21 +61,25 @@ type ConversationGrpcApi struct {
 }
 
 func (cApi *ConversationApi) Observability(ctx context.Context, auth *types.Authentication, options ...observability.Option) observability.Recorder {
+	configuredCollectors := []observability.Collector{
+		observability_collector_conversationmetric.New(observability_collector_conversationmetric.Config{
+			Logger:              cApi.logger,
+			ConversationService: cApi.assistantConversationService,
+		}),
+		observability_collector_conversationmetadata.New(observability_collector_conversationmetadata.Config{
+			Logger:              cApi.logger,
+			ConversationService: cApi.assistantConversationService,
+		}),
+	}
+	configuredCollectors = append(configuredCollectors, telemetry.NewWithAssistantConfig(ctx, cApi.logger, cApi.cfg)...)
+	configuredCollectors = append(configuredCollectors, billing.New(billing.Config{
+		ProductUsageClient: cApi.rapidaClient.ProductUsage,
+	}))
 	recorderOptions := []observability.Option{
 		observability.WithLogger(cApi.logger),
 		observability.WithAuth(auth),
 		observability.WithContext(ctx),
-		observability.WithCollectors(
-			observability_collector_conversationmetric.New(observability_collector_conversationmetric.Config{
-				Logger:              cApi.logger,
-				ConversationService: cApi.assistantConversationService,
-			}),
-			observability_collector_conversationmetadata.New(observability_collector_conversationmetadata.Config{
-				Logger:              cApi.logger,
-				ConversationService: cApi.assistantConversationService,
-			}),
-			collectors.NewWithEnv(ctx, cApi.logger, cApi.cfg),
-		),
+		observability.WithCollectors(configuredCollectors...),
 	}
 	recorderOptions = append(recorderOptions, options...)
 	return observability.New(recorderOptions...)
@@ -88,9 +92,9 @@ func newConversationApiCore(cfg *config.AssistantConfig, logger commons.Logger,
 	redis connectors.RedisConnector,
 	opensearch connectors.OpenSearchConnector,
 	sipServer *sip_infra.Server,
+	rapidaClient *rapida_client.RapidaClient,
 ) *ConversationApi {
 	store := callcontext.NewStore(postgres, logger)
-	vaultClient := web_client.NewVaultClientGRPC(&cfg.AppConfig, logger, redis)
 	assistantService := internal_assistant_service.NewAssistantService(cfg, logger, postgres, opensearch)
 	fileStorage := storage_files.NewStorage(cfg.AssetStoreConfig, logger)
 	conversationService := internal_assistant_service.NewAssistantConversationService(logger, postgres, fileStorage)
@@ -101,7 +105,7 @@ func newConversationApiCore(cfg *config.AssistantConfig, logger commons.Logger,
 		channel_telephony.WithConfig(cfg),
 		channel_telephony.WithLogger(logger),
 		channel_telephony.WithStore(store),
-		channel_telephony.WithVaultClient(vaultClient),
+		channel_telephony.WithVaultClient(rapidaClient.Vault),
 		channel_telephony.WithAssistantService(assistantService),
 		channel_telephony.WithConversationService(conversationService),
 		channel_telephony.WithTelephonyOption(channel_telephony.TelephonyOption{SIPServer: sipServer}),
@@ -110,12 +114,13 @@ func newConversationApiCore(cfg *config.AssistantConfig, logger commons.Logger,
 		channel_telephony.WithOutboundConfig(cfg),
 		channel_telephony.WithOutboundLogger(logger),
 		channel_telephony.WithOutboundStore(store),
-		channel_telephony.WithOutboundVaultClient(vaultClient),
+		channel_telephony.WithOutboundVaultClient(rapidaClient.Vault),
 		channel_telephony.WithOutboundAssistantService(assistantService),
 		channel_telephony.WithOutboundConversationService(conversationService),
 		channel_telephony.WithOutboundAssistantConfigurationService(configurationService),
 		channel_telephony.WithOutboundHTTPLogService(httpLogService),
 		channel_telephony.WithOutboundTelephonyOption(channel_telephony.TelephonyOption{SIPServer: sipServer}),
+		channel_telephony.WithOutboundRapidaClient(rapidaClient),
 	)
 	cApi := &ConversationApi{
 		cfg:                          cfg,
@@ -132,8 +137,7 @@ func newConversationApiCore(cfg *config.AssistantConfig, logger commons.Logger,
 		httpLogService:               httpLogService,
 		assistantToolService:         assistantToolService,
 		storage:                      fileStorage,
-		vaultClient:                  vaultClient,
-		authClient:                   web_client.NewAuthenticator(&cfg.AppConfig, logger, redis),
+		rapidaClient:                 rapidaClient,
 		channelPipeline: channel_pipeline.NewDispatcher(
 			channel_pipeline.WithLogger(logger),
 			channel_pipeline.WithInboundDispatcher(inbound),
@@ -154,8 +158,9 @@ func NewConversationGRPCApi(config *config.AssistantConfig, logger commons.Logge
 	opensearch connectors.OpenSearchConnector,
 	vectordb connectors.VectorConnector,
 	sipServer *sip_infra.Server,
+	rapidaClient *rapida_client.RapidaClient,
 ) assistant_api.TalkServiceServer {
-	return &ConversationGrpcApi{*newConversationApiCore(config, logger, postgres, redis, opensearch, sipServer)}
+	return &ConversationGrpcApi{*newConversationApiCore(config, logger, postgres, redis, opensearch, sipServer, rapidaClient)}
 }
 
 func NewWebRtcApi(config *config.AssistantConfig, logger commons.Logger,
@@ -164,8 +169,9 @@ func NewWebRtcApi(config *config.AssistantConfig, logger commons.Logger,
 	opensearch connectors.OpenSearchConnector,
 	vectordb connectors.VectorConnector,
 	sipServer *sip_infra.Server,
+	rapidaClient *rapida_client.RapidaClient,
 ) assistant_api.WebRTCServer {
-	return &ConversationGrpcApi{*newConversationApiCore(config, logger, postgres, redis, opensearch, sipServer)}
+	return &ConversationGrpcApi{*newConversationApiCore(config, logger, postgres, redis, opensearch, sipServer, rapidaClient)}
 }
 
 // Pipeline returns the channel pipeline dispatcher for use by external engines (e.g. AudioSocket).
@@ -179,8 +185,9 @@ func NewConversationApi(config *config.AssistantConfig, logger commons.Logger,
 	opensearch connectors.OpenSearchConnector,
 	vectordb connectors.VectorConnector,
 	sipServer *sip_infra.Server,
+	rapidaClient *rapida_client.RapidaClient,
 ) *ConversationApi {
-	return newConversationApiCore(config, logger, postgres, redis, opensearch, sipServer)
+	return newConversationApiCore(config, logger, postgres, redis, opensearch, sipServer, rapidaClient)
 }
 
 // AssistantTalk handles incoming assistant talk requests.
@@ -231,6 +238,7 @@ func (cApi *ConversationGrpcApi) AssistantTalk(stream assistant_api.TalkService_
 		internal_adapter.WithSource(source),
 		internal_adapter.WithContext(stream.Context()),
 		internal_adapter.WithConfig(cApi.cfg),
+		internal_adapter.WithRapidaClient(cApi.rapidaClient),
 		internal_adapter.WithLogger(cApi.logger),
 		internal_adapter.WithPostgres(cApi.postgres),
 		internal_adapter.WithOpenSearch(cApi.opensearch),
@@ -288,6 +296,7 @@ func (cApi *ConversationGrpcApi) WebTalk(stream assistant_api.WebRTC_WebTalkServ
 		internal_adapter.WithSource(source),
 		internal_adapter.WithContext(stream.Context()),
 		internal_adapter.WithConfig(cApi.cfg),
+		internal_adapter.WithRapidaClient(cApi.rapidaClient),
 		internal_adapter.WithLogger(cApi.logger),
 		internal_adapter.WithPostgres(cApi.postgres),
 		internal_adapter.WithOpenSearch(cApi.opensearch),

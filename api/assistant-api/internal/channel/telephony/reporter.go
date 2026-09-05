@@ -14,9 +14,11 @@ import (
 
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	"github.com/rapidaai/api/assistant-api/internal/observability/collectors"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/billing"
 	observability_collector_conversationmetadata "github.com/rapidaai/api/assistant-api/internal/observability/collectors/conversationmetadata"
 	observability_collector_conversationmetric "github.com/rapidaai/api/assistant-api/internal/observability/collectors/conversationmetric"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/telemetry"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/webhook"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
@@ -99,23 +101,35 @@ func (d *OutboundDispatcher) NewStatusReporter(contextID string) internal_type.P
 			AssistantScope: observability.AssistantScope{AssistantID: currentCallContext.AssistantID},
 			ConversationID: currentCallContext.ConversationID,
 		}
+		configuredCollectors := []observability.Collector{
+			observability_collector_conversationmetric.New(observability_collector_conversationmetric.Config{
+				Logger:              d.logger,
+				ConversationService: d.conversationService,
+			}),
+			observability_collector_conversationmetadata.New(observability_collector_conversationmetadata.Config{
+				Logger:              d.logger,
+				ConversationService: d.conversationService,
+			}),
+		}
+		configuredCollectors = append(configuredCollectors, telemetry.NewWithAssistantConfig(ctx, d.logger, d.cfg)...)
+		configuredCollectors = append(configuredCollectors,
+			billing.New(billing.Config{
+				ProductUsageClient: d.rapidaClient.ProductUsage,
+			}),
+			webhook.New(ctx, webhook.Config{
+				Logger:                        d.logger,
+				Auth:                          auth,
+				AssistantID:                   currentCallContext.AssistantID,
+				AssistantConfigurationService: d.configurationService,
+				HTTPLogService:                d.httpLogService,
+			}),
+		)
 		observer := observability.New(
 			observability.WithLogger(d.logger),
 			observability.WithAuth(auth),
 			observability.WithContext(ctx),
 			observability.WithCustomGracePeriod(2*time.Second),
-			observability.WithCollectors(
-				observability_collector_conversationmetric.New(observability_collector_conversationmetric.Config{
-					Logger:              d.logger,
-					ConversationService: d.conversationService,
-				}),
-				observability_collector_conversationmetadata.New(observability_collector_conversationmetadata.Config{
-					Logger:              d.logger,
-					ConversationService: d.conversationService,
-				}),
-				collectors.NewWithEnv(ctx, d.logger, d.cfg),
-				collectors.NewWithWebhookConfiguration(ctx, d.logger, auth, currentCallContext.AssistantID, d.configurationService, d.httpLogService),
-			),
+			observability.WithCollectors(configuredCollectors...),
 		)
 		defer observer.Close(ctx)
 		if update.CallStatus == callcontext.CallStatusRinging {

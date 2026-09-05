@@ -1,0 +1,19 @@
+{
+  "status": "confirmed",
+  "created_at": "2026-08-30",
+  "confirmed_by": "technical_owner_and_merged_contract_review",
+  "merged_contract_commit": "820666fda038215717d9636e63411fcb8779d0c7",
+  "changes": [
+    "CreateProductUsage accepts one usage with explicit fields and no caller-provided id.",
+    "The database assigns the bigint product usage id returned in GetProductUsageResponse.",
+    "GetProductUsages returns project-scoped usages for a usage type.",
+    "GetOrganizationUsages returns organization-scoped usages across projects.",
+    "GetUsagesResponse is shared by both list RPCs.",
+    "UUID idempotency and duplicate counters are removed."
+  ],
+  "unchanged": [
+    "Tenant ownership remains authentication-derived.",
+    "Assistant delivery remains direct best effort gRPC without an outbox.",
+    "No SDK changes are included."
+  ]
+}

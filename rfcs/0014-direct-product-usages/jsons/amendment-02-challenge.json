@@ -1,0 +1,9 @@
+{
+  "status": "approved",
+  "reviewed_at": "2026-08-30",
+  "review_source": "rapidaai/internal-bridge pull request 2",
+  "review_threads_resolved": true,
+  "critical_findings": [],
+  "major_findings": [],
+  "decision": "approve merged singular-create and read-query contract"
+}

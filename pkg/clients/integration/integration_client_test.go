@@ -12,6 +12,19 @@ import (
 	"github.com/rapidaai/protos"
 )
 
+type unifiedProviderGRPCClientStub struct {
+	protos.UnifiedProviderServiceClient
+}
+
+func TestNewIntegrationServiceClientWithClientUsesProvidedGRPCClient(t *testing.T) {
+	grpcClient := &unifiedProviderGRPCClientStub{}
+	client := NewIntegrationServiceClientWithClient(&config.AppConfig{}, nil, nil, grpcClient)
+
+	if client.(*integrationServiceClient).unifiedClient != grpcClient {
+		t.Fatal("NewIntegrationServiceClientWithClient() did not retain the provided gRPC client")
+	}
+}
+
 func TestIntegrationServiceClientStopsBeforeGRPCOnAuthError(t *testing.T) {
 	client := &integrationServiceClient{
 		InternalClient: clients.NewInternalClient(&config.AppConfig{Secret: "secret"}, nil, nil),

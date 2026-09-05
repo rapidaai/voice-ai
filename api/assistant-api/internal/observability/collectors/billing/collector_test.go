@@ -13,30 +13,39 @@ import (
 	"time"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/protos"
 )
 
-type usagePublisherStub struct {
-	records []Usage
-	err     error
+type productUsageClientStub struct {
+	auth  *types.Authentication
+	usage *protos.CreateProductUsageRequest
+	err   error
+	calls int
 }
 
-func (s *usagePublisherStub) PublishUsage(_ context.Context, usage Usage) error {
-	s.records = append(s.records, usage)
-	return s.err
+func (stub *productUsageClientStub) CreateProductUsage(_ context.Context, auth *types.Authentication, usage *protos.CreateProductUsageRequest) (*protos.GetProductUsageResponse, error) {
+	stub.calls++
+	stub.auth = auth
+	stub.usage = usage
+	return &protos.GetProductUsageResponse{Success: true, Data: &protos.ProductUsage{Id: 42}}, stub.err
+}
+
+func (stub *productUsageClientStub) Close() error {
+	return nil
 }
 
 func TestCollector_ForwardsUsageRecord(t *testing.T) {
-	publisher := &usagePublisherStub{}
-	collector := New(publisher)
-	now := time.Date(2026, 6, 5, 10, 0, 0, 0, time.UTC)
+	productUsageClient := &productUsageClientStub{}
+	collector := New(Config{ProductUsageClient: productUsageClient})
+	now := time.Date(2026, 6, 5, 10, 0, 0, 123456789, time.UTC)
+	auth := &types.Authentication{}
 
-	scope := observability.ConversationScope{
-		AssistantScope: observability.AssistantScope{AssistantID: 10},
-		ConversationID: 20,
-	}
-	err := collector.Collect(context.Background(), scope, observability.Context{}, observability.RecordUsage{
+	err := collector.Collect(context.Background(), observability.ConversationScope{
+		AssistantScope: observability.AssistantScope{AssistantID: 10}, ConversationID: 20,
+	}, observability.Context{Auth: auth}, observability.RecordUsage{
 		ID:         "usage-1",
-		Component:  observability.ComponentUsage,
+		Component:  observability.ComponentName(observability.UsageConversationSTTDuration),
 		Provider:   "deepgram",
 		Duration:   2 * time.Second,
 		Attributes: observability.Attributes{"source": "stt"},
@@ -45,28 +54,112 @@ func TestCollector_ForwardsUsageRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CollectUsage returned error: %v", err)
 	}
-	if len(publisher.records) != 1 {
-		t.Fatalf("expected one usage record, got %d", len(publisher.records))
+	if productUsageClient.auth != auth {
+		t.Fatal("expected authentication to be forwarded")
 	}
-	got := publisher.records[0]
-	if got.ID != "usage-1" || got.Component != observability.ComponentUsage || got.Provider != "deepgram" {
+	if productUsageClient.usage == nil {
+		t.Fatal("expected one usage record")
+	}
+	got := productUsageClient.usage
+	if got.GetUsageType() != observability.UsageConversationSTTDuration {
 		t.Fatalf("unexpected usage record: %+v", got)
 	}
-	gotScope, ok := got.Scope.(observability.ConversationScope)
-	if !ok {
-		t.Fatalf("unexpected scope type: %T", got.Scope)
+	if got.GetUsages() != int64(2*time.Second) {
+		t.Fatalf("unexpected usage quantity: %d", got.GetUsages())
 	}
-	if gotScope.ConversationScopeID() != 20 {
-		t.Fatalf("unexpected scope: %+v", got.Scope)
+	if got.GetUnit() != string(types.ProductUsageUnitNanosecond) {
+		t.Fatalf("unexpected usage unit: %q", got.GetUnit())
+	}
+	wantOccurredAt := now.Truncate(time.Microsecond)
+	if !got.GetOccurredAt().AsTime().Equal(wantOccurredAt) {
+		t.Fatalf("unexpected occurredAt: %s", got.GetOccurredAt().AsTime())
 	}
 }
 
 func TestCollector_ReturnsPublisherError(t *testing.T) {
 	publishErr := errors.New("publish failed")
-	collector := New(&usagePublisherStub{err: publishErr})
+	collector := New(Config{ProductUsageClient: &productUsageClientStub{err: publishErr}})
 
-	err := collector.Collect(context.Background(), observability.AssistantScope{AssistantID: 10}, observability.Context{}, observability.RecordUsage{})
+	err := collector.Collect(context.Background(), observability.AssistantScope{AssistantID: 10}, observability.Context{}, observability.RecordUsage{
+		ID:         "usage-1",
+		Component:  observability.ComponentName(observability.UsageConversationTTSDuration),
+		Duration:   time.Second,
+		OccurredAt: time.Now(),
+	})
 	if !errors.Is(err, publishErr) {
 		t.Fatalf("expected publish error, got %v", err)
+	}
+}
+
+func TestCollector_RejectsNonPositiveDurationWithoutPublishing(t *testing.T) {
+	for _, duration := range []time.Duration{0, -time.Nanosecond} {
+		t.Run(duration.String(), func(t *testing.T) {
+			productUsageClient := &productUsageClientStub{}
+			collector := New(Config{ProductUsageClient: productUsageClient})
+
+			err := collector.Collect(context.Background(), observability.ProjectScope{}, observability.Context{}, observability.RecordUsage{
+				Component: observability.ComponentName(observability.UsageConversationSTTDuration),
+				Duration:  duration,
+			})
+
+			if err == nil {
+				t.Fatal("Collect() error = nil, want non-positive duration error")
+			}
+			if productUsageClient.calls != 0 {
+				t.Fatalf("CreateProductUsage() calls = %d, want 0", productUsageClient.calls)
+			}
+		})
+	}
+}
+
+func TestCollector_PublishesUsageWithoutClientID(t *testing.T) {
+	productUsageClient := &productUsageClientStub{}
+	collector := New(Config{ProductUsageClient: productUsageClient})
+
+	err := collector.Collect(context.Background(), observability.ProjectScope{}, observability.Context{}, observability.RecordUsage{
+		Component:  observability.ComponentName(observability.UsageConversationVADDuration),
+		Duration:   time.Second,
+		OccurredAt: time.Now(),
+	})
+	if err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if productUsageClient.usage == nil {
+		t.Fatal("Collect() did not publish usage")
+	}
+}
+
+func TestCollector_RejectsUnsupportedUsageType(t *testing.T) {
+	productUsageClient := &productUsageClientStub{}
+	collector := New(Config{ProductUsageClient: productUsageClient})
+
+	err := collector.Collect(context.Background(), observability.ProjectScope{}, observability.Context{}, observability.RecordUsage{
+		Component:  observability.ComponentUsage,
+		Duration:   time.Second,
+		OccurredAt: time.Now(),
+	})
+	if !errors.Is(err, types.ErrInvalidProductUsage) {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if productUsageClient.usage != nil {
+		t.Fatalf("product usage client received usage: %+v", productUsageClient.usage)
+	}
+}
+
+func TestCollector_IgnoresNonUsageRecord(t *testing.T) {
+	productUsageClient := &productUsageClientStub{}
+	collector := New(Config{ProductUsageClient: productUsageClient})
+
+	if err := collector.Collect(context.Background(), observability.ProjectScope{}, observability.Context{}, observability.RecordLog{}); err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if productUsageClient.usage != nil {
+		t.Fatalf("product usage client received usage: %+v", productUsageClient.usage)
+	}
+}
+
+func TestCollector_CloseDoesNotCloseProductUsageClient(t *testing.T) {
+	if err := New(Config{ProductUsageClient: &productUsageClientStub{}}).Close(context.Background()); err != nil {
+		t.Fatalf("Close() error = %v", err)
 	}
 }

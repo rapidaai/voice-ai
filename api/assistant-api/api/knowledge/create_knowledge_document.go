@@ -58,11 +58,18 @@ func (knowledgeApi *knowledgeGrpcApi) CreateKnowledgeDocument(ctx context.Contex
 		for _, doc := range _kn {
 			docIds = append(docIds, doc.Id)
 		}
-		knowledgeApi.indexerServiceClient.IndexKnowledgeDocument(ctx, iAuth,
+		_, err = knowledgeApi.rapidaClient.Indexer.IndexKnowledgeDocument(ctx, iAuth,
 			&knowledge_api.IndexKnowledgeDocumentRequest{
 				KnowledgeId:         kd.Id,
 				KnowledgeDocumentId: docIds,
 			})
+		if err != nil {
+			knowledgeApi.logger.Errorf("unable to index knowledge document with error %v", err)
+			return utils.Error[knowledge_api.CreateKnowledgeDocumentResponse](
+				err,
+				"Unable to index Knowledge Document, please try again later.",
+			)
+		}
 	case knowledge_api.CreateKnowledgeDocumentRequest_DOCUMENT_SOURCE_TOOL:
 		knowledgeApi.logger.Debugf("calling for create tool document")
 		_kn, err = knowledgeApi.knowledgeDocumentService.CreateToolDocument(ctx, iAuth,

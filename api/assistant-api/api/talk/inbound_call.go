@@ -126,6 +126,7 @@ func (cApi *ConversationApi) CallTalkerByContext(c *gin.Context) {
 		internal_adapter.WithSource(utils.PhoneCall),
 		internal_adapter.WithContext(c),
 		internal_adapter.WithConfig(cApi.cfg),
+		internal_adapter.WithRapidaClient(cApi.rapidaClient),
 		internal_adapter.WithLogger(cApi.logger),
 		internal_adapter.WithPostgres(cApi.postgres),
 		internal_adapter.WithOpenSearch(cApi.opensearch),

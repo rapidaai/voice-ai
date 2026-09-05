@@ -47,7 +47,11 @@ func NewAuthenticator(config *config.AppConfig, logger commons.Logger, redis con
 	if err != nil {
 		logger.Fatalf("Unable to create connection %v", err)
 	}
-	authClient := web_api.NewAuthenticationServiceClient(conn)
+	return NewAuthenticatorWithClient(config, logger, redis, web_api.NewAuthenticationServiceClient(conn))
+}
+
+// NewAuthenticatorWithClient creates an authentication client using the provided gRPC client.
+func NewAuthenticatorWithClient(config *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector, authClient web_api.AuthenticationServiceClient) AuthClient {
 	return &authServiceClient{
 		clients.NewInternalClient(config, logger, redis),
 		config,

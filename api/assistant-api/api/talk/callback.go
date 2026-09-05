@@ -13,7 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	"github.com/rapidaai/api/assistant-api/internal/observability/collectors"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/webhook"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
@@ -57,7 +57,13 @@ func (cApi *ConversationApi) UnviersalCallback(c *gin.Context) {
 		return
 	}
 	observer := cApi.Observability(c, auth, observability.WithGracePeriod())
-	if err := observer.AddCollectors(collectors.NewWithWebhookConfiguration(c, cApi.logger, auth, cc.AssistantID, cApi.configurationService, cApi.httpLogService)); err != nil {
+	if err := observer.AddCollectors(webhook.New(c, webhook.Config{
+		Logger:                        cApi.logger,
+		Auth:                          auth,
+		AssistantID:                   cc.AssistantID,
+		AssistantConfigurationService: cApi.configurationService,
+		HTTPLogService:                cApi.httpLogService,
+	})); err != nil {
 		cApi.logger.Warnw("observability collector registration failed",
 			"component", "callback",
 			"operation", "add_assistant_collectors",
@@ -281,7 +287,13 @@ func (cApi *ConversationApi) CallbackByContext(c *gin.Context) {
 	}
 
 	observer := cApi.Observability(c, auth, observability.WithGracePeriod())
-	if err := observer.AddCollectors(collectors.NewWithWebhookConfiguration(c, cApi.logger, auth, cc.AssistantID, cApi.configurationService, cApi.httpLogService)); err != nil {
+	if err := observer.AddCollectors(webhook.New(c, webhook.Config{
+		Logger:                        cApi.logger,
+		Auth:                          auth,
+		AssistantID:                   cc.AssistantID,
+		AssistantConfigurationService: cApi.configurationService,
+		HTTPLogService:                cApi.httpLogService,
+	})); err != nil {
 		cApi.logger.Warnw("observability collector registration failed",
 			"component", "callback",
 			"operation", "add_assistant_collectors",

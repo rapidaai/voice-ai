@@ -13,6 +13,7 @@ import (
 	adapter_internal "github.com/rapidaai/api/assistant-api/internal/adapters/internal"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/storages"
@@ -20,16 +21,17 @@ import (
 )
 
 type TalkerOptions struct {
-	Source     utils.RapidaSource
-	Context    context.Context
-	Config     *config.AssistantConfig
-	Logger     commons.Logger
-	Postgres   connectors.PostgresConnector
-	OpenSearch connectors.OpenSearchConnector
-	Redis      connectors.RedisConnector
-	Storage    storages.Storage
-	Streamer   internal_type.Streamer
-	Observer   observability.Recorder
+	Source       utils.RapidaSource
+	Context      context.Context
+	Config       *config.AssistantConfig
+	RapidaClient *rapida_client.RapidaClient
+	Logger       commons.Logger
+	Postgres     connectors.PostgresConnector
+	OpenSearch   connectors.OpenSearchConnector
+	Redis        connectors.RedisConnector
+	Storage      storages.Storage
+	Streamer     internal_type.Streamer
+	Observer     observability.Recorder
 }
 
 type FuncOption func(*TalkerOptions)
@@ -49,6 +51,12 @@ func WithContext(ctx context.Context) FuncOption {
 func WithConfig(config *config.AssistantConfig) FuncOption {
 	return func(options *TalkerOptions) {
 		options.Config = config
+	}
+}
+
+func WithRapidaClient(client *rapida_client.RapidaClient) FuncOption {
+	return func(options *TalkerOptions) {
+		options.RapidaClient = client
 	}
 }
 
@@ -103,6 +111,7 @@ func New(opts ...FuncOption) (internal_type.Talking, error) {
 	return adapter_internal.NewGenericRequestor(
 		options.Context,
 		options.Config,
+		options.RapidaClient,
 		options.Logger,
 		options.Source,
 		options.Postgres,

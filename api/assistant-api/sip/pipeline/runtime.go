@@ -138,6 +138,7 @@ func (d *Dispatcher) prepareSIPCallRuntime(ctx context.Context, stage sip_infra.
 		internal_adapter.WithSource(utils.PhoneCall),
 		internal_adapter.WithContext(talkContext),
 		internal_adapter.WithConfig(d.assistantConfig),
+		internal_adapter.WithRapidaClient(d.rapidaClient),
 		internal_adapter.WithLogger(d.logger),
 		internal_adapter.WithPostgres(d.postgres),
 		internal_adapter.WithOpenSearch(d.opensearch),

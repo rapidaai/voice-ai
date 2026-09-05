@@ -9,9 +9,19 @@ import (
 	"strings"
 	"testing"
 
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestWithRapidaClient(t *testing.T) {
+	client := &rapida_client.RapidaClient{}
+	var options TalkerOptions
+
+	WithRapidaClient(client)(&options)
+
+	assert.Same(t, client, options.RapidaClient)
+}
 
 // Tests for DebuggerIdentifier helper function
 func TestDebuggerIdentifier_Format(t *testing.T) {

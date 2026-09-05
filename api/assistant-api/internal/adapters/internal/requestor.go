@@ -32,6 +32,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/watchdog"
 	endpoint_client "github.com/rapidaai/pkg/clients/endpoint"
 	integration_client "github.com/rapidaai/pkg/clients/integration"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	web_client "github.com/rapidaai/pkg/clients/web"
 
 	//
@@ -76,10 +77,7 @@ type genericRequestor struct {
 	textReranker  internal_agent_rerankers.TextReranking
 
 	observabilityRecorder observability.Recorder
-	// integration client
-	vaultClient       web_client.VaultClient
-	integrationClient integration_client.IntegrationServiceClient
-	deploymentClient  endpoint_client.DeploymentServiceClient
+	rapidaClient          *rapida_client.RapidaClient
 
 	// interaction/session lifecycle owners.
 	messageLifecycle adapter_lifecycle.MessageLifecycle
@@ -134,6 +132,7 @@ type genericRequestor struct {
 func NewGenericRequestor(
 	ctx context.Context,
 	config *config.AssistantConfig,
+	rapidaClient *rapida_client.RapidaClient,
 	logger commons.Logger, source utils.RapidaSource,
 	postgres connectors.PostgresConnector, opensearch connectors.OpenSearchConnector,
 	redis connectors.RedisConnector, storage storages.Storage, streamer internal_type.Streamer,
@@ -160,10 +159,7 @@ func NewGenericRequestor(
 		queryEmbedder: internal_agent_embeddings.NewQueryEmbedding(logger, config, redis),
 		textReranker:  internal_agent_rerankers.NewTextReranker(logger, config, redis),
 
-		// clients
-		integrationClient: integration_client.NewIntegrationServiceClientGRPC(&config.AppConfig, logger, redis),
-		deploymentClient:  endpoint_client.NewDeploymentServiceClientGRPC(&config.AppConfig, logger, redis),
-		vaultClient:       web_client.NewVaultClientGRPC(&config.AppConfig, logger, redis),
+		rapidaClient: rapidaClient,
 
 		observabilityRecorder: observer,
 
@@ -275,16 +271,16 @@ func (talking *genericRequestor) ResumeConversation(ctx context.Context, assista
 }
 
 func (talking *genericRequestor) IntegrationCaller() integration_client.IntegrationServiceClient {
-	return talking.integrationClient
+	return talking.rapidaClient.Integration
 
 }
 
 func (talking *genericRequestor) VaultCaller() web_client.VaultClient {
-	return talking.vaultClient
+	return talking.rapidaClient.Vault
 }
 
 func (talking *genericRequestor) DeploymentCaller() endpoint_client.DeploymentServiceClient {
-	return talking.deploymentClient
+	return talking.rapidaClient.Deployment
 }
 
 func (talking *genericRequestor) GetKnowledge(ctx context.Context, knowledgeId uint64) (*internal_knowledge_gorm.Knowledge, error) {

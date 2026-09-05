@@ -11,7 +11,7 @@ import (
 
 	"github.com/rapidaai/api/assistant-api/config"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
-	web_client "github.com/rapidaai/pkg/clients/web"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 )
@@ -146,11 +146,11 @@ type ManagerOptions struct {
 	Logger             commons.Logger
 	Postgres           connectors.PostgresConnector
 	Redis              connectors.RedisConnector
-	Vault              web_client.VaultClient
 	RegistrationClient *sip_infra.RegistrationClient
 	AssistantConfig    *config.AssistantConfig
 	Sip                *config.SIPConfig
 	ApplyOpDefaults    func(*sip_infra.Config)
+	RapidaClient       *rapida_client.RapidaClient
 }
 
 type ManagerOption func(*ManagerOptions)
@@ -170,12 +170,6 @@ func WithPostgres(postgres connectors.PostgresConnector) ManagerOption {
 func WithRedis(redis connectors.RedisConnector) ManagerOption {
 	return func(options *ManagerOptions) {
 		options.Redis = redis
-	}
-}
-
-func WithVault(vault web_client.VaultClient) ManagerOption {
-	return func(options *ManagerOptions) {
-		options.Vault = vault
 	}
 }
 
@@ -200,5 +194,11 @@ func WithSIPConfig(sipConfig *config.SIPConfig) ManagerOption {
 func WithApplyOpDefaults(applyOpDefaults func(*sip_infra.Config)) ManagerOption {
 	return func(options *ManagerOptions) {
 		options.ApplyOpDefaults = applyOpDefaults
+	}
+}
+
+func WithRapidaClient(client *rapida_client.RapidaClient) ManagerOption {
+	return func(options *ManagerOptions) {
+		options.RapidaClient = client
 	}
 }

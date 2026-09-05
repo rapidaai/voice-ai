@@ -23,12 +23,20 @@ import (
 	channel_base "github.com/rapidaai/api/assistant-api/internal/channel/base"
 	webrtc_internal "github.com/rapidaai/api/assistant-api/internal/channel/webrtc/internal"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/webhook"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
 )
+
+func TestWebhookCollectorWithoutDependenciesIsNoop(t *testing.T) {
+	collector := webhook.New(context.Background(), webhook.Config{})
+	if _, ok := collector.(observability.NoopCollector); !ok {
+		t.Fatalf("expected no-op collector, got %T", collector)
+	}
+}
 
 func newTestLogger(t *testing.T) commons.Logger {
 	t.Helper()

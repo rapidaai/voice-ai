@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	assistant_config "github.com/rapidaai/api/assistant-api/config"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
@@ -52,6 +53,27 @@ type Collector struct {
 	assistantConfigurationService internal_services.AssistantConfigurationService
 	assistantCollectors           *observability.Collectors
 	assistantCollectorsLoaded     bool
+}
+
+func NewWithAssistantConfig(ctx context.Context, logger commons.Logger, assistantConfig *assistant_config.AssistantConfig) []observability.Collector {
+	if assistantConfig == nil || assistantConfig.TelemetryConfig == nil || assistantConfig.TelemetryConfig.Type() == "" {
+		return nil
+	}
+
+	collector, err := New(ctx, Config{
+		Logger: logger,
+		Providers: Provider{
+			Name:    string(assistantConfig.TelemetryConfig.Type()),
+			Options: assistantConfig.TelemetryConfig.ToMap(),
+		},
+	})
+	if err != nil {
+		if logger != nil {
+			logger.Warnf("unable to create telemetry collector: %v", err)
+		}
+		return nil
+	}
+	return []observability.Collector{collector}
 }
 
 func New(ctx context.Context, cfg Config) (observability.Collector, error) {

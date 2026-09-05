@@ -8,13 +8,58 @@ package sip_pipeline
 
 import (
 	"context"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"testing"
 
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestWithRapidaClient(t *testing.T) {
+	client := &rapida_client.RapidaClient{}
+	dispatcher := New(WithRapidaClient(client))
+
+	require.Same(t, client, dispatcher.rapidaClient)
+}
+
+func TestSessionBillingUsesProductUsage(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "session.go", nil, 0)
+	require.NoError(t, err)
+
+	found := false
+	ast.Inspect(file, func(node ast.Node) bool {
+		selector, ok := node.(*ast.SelectorExpr)
+		if ok && selector.Sel.Name == "ProductUsage" {
+			found = true
+		}
+		return true
+	})
+	require.True(t, found, "SIP billing does not use RapidaClient.ProductUsage")
+}
+
+func TestSIPTalkerReceivesRapidaClient(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "runtime.go", nil, 0)
+	require.NoError(t, err)
+
+	found := false
+	ast.Inspect(file, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		selector, ok := call.Fun.(*ast.SelectorExpr)
+		if ok && selector.Sel.Name == "WithRapidaClient" {
+			found = true
+		}
+		return true
+	})
+	require.True(t, found, "SIP talker does not receive RapidaClient")
+}
 
 func newIdentityTestAuthentication() *types.Authentication {
 	organizationID := uint64(7)

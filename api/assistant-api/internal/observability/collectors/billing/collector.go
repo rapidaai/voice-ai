@@ -8,55 +8,61 @@ package billing
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	web_client "github.com/rapidaai/pkg/clients/web"
+	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/validator"
+	"github.com/rapidaai/protos"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-type Usage struct {
-	ID         string
-	Scope      observability.Scope
-	Component  observability.ComponentName
-	Provider   string
-	Duration   time.Duration
-	Attributes observability.Attributes
-	OccurredAt time.Time
-}
-
-type Publisher interface {
-	PublishUsage(ctx context.Context, usage Usage) error
+type Config struct {
+	ProductUsageClient web_client.ProductUsageClient
 }
 
 type Collector struct {
-	publisher Publisher
+	productUsageClient web_client.ProductUsageClient
 }
 
-func New(publisher Publisher) observability.Collector {
-	if !validator.NonNil(publisher) {
+func New(config Config) observability.Collector {
+	if !validator.NonNil(config.ProductUsageClient) {
 		return observability.NoopCollector{}
 	}
-	return &Collector{publisher: publisher}
+	return &Collector{productUsageClient: config.ProductUsageClient}
 }
 
 func (c *Collector) Key() string {
 	return "billing"
 }
 
-func (c *Collector) Collect(ctx context.Context, scope observability.Scope, _ observability.Context, record observability.Record) error {
+func (c *Collector) Collect(ctx context.Context, _ observability.Scope, observationContext observability.Context, record observability.Record) error {
 	usage, ok := record.(observability.RecordUsage)
 	if !ok {
 		return nil
 	}
-	return c.publisher.PublishUsage(ctx, Usage{
-		ID:         usage.ID,
-		Scope:      scope,
-		Component:  usage.Component,
-		Provider:   usage.Provider,
-		Duration:   usage.Duration,
-		Attributes: usage.Attributes.Clone(),
-		OccurredAt: usage.OccurredAt,
+
+	usageType := usage.Component.String()
+	unit, ok := types.ProductUsageUnitFor(usageType)
+	if !ok {
+		return types.ValidateProductUsage(usageType, "")
+	}
+	if err := types.ValidateProductUsage(usageType, unit); err != nil {
+		return err
+	}
+	if usage.Duration <= 0 {
+		return fmt.Errorf("product usage %q must be greater than zero", usageType)
+	}
+
+	_, err := c.productUsageClient.CreateProductUsage(ctx, observationContext.Auth, &protos.CreateProductUsageRequest{
+		UsageType:  usageType,
+		Usages:     usage.Duration.Nanoseconds(),
+		Unit:       unit,
+		OccurredAt: timestamppb.New(usage.OccurredAt.Truncate(time.Microsecond)),
 	})
+	return err
 }
 
 func (c *Collector) Close(context.Context) error {

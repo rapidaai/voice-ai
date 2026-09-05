@@ -1,0 +1,9 @@
+{
+  "status": "approved",
+  "reviewed_at": "2026-08-29",
+  "reviewed_rfc_sha256": "c2f587ad40682d5496f43338aaedb2026339bfb716363372a37b7c87eb1b9a70",
+  "reviewed_plan_sha256": "353836642ba0759df002b7e895489c0f37fdb135a91f9b49b3ca1d4e94c28304",
+  "critical_findings": [],
+  "major_findings": [],
+  "decision": "approve"
+}

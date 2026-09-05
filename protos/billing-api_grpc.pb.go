@@ -193,3 +193,179 @@ var BillingService_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "billing-api.proto",
 }
+
+const (
+	ProductUsageService_CreateProductUsage_FullMethodName    = "/billing_api.ProductUsageService/CreateProductUsage"
+	ProductUsageService_GetProductUsages_FullMethodName      = "/billing_api.ProductUsageService/GetProductUsages"
+	ProductUsageService_GetOrganizationUsages_FullMethodName = "/billing_api.ProductUsageService/GetOrganizationUsages"
+)
+
+// ProductUsageServiceClient is the client API for ProductUsageService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type ProductUsageServiceClient interface {
+	CreateProductUsage(ctx context.Context, in *CreateProductUsageRequest, opts ...grpc.CallOption) (*GetProductUsageResponse, error)
+	GetProductUsages(ctx context.Context, in *GetProductUsagesRequest, opts ...grpc.CallOption) (*GetUsagesResponse, error)
+	GetOrganizationUsages(ctx context.Context, in *GetOrganizationUsagesRequest, opts ...grpc.CallOption) (*GetUsagesResponse, error)
+}
+
+type productUsageServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewProductUsageServiceClient(cc grpc.ClientConnInterface) ProductUsageServiceClient {
+	return &productUsageServiceClient{cc}
+}
+
+func (c *productUsageServiceClient) CreateProductUsage(ctx context.Context, in *CreateProductUsageRequest, opts ...grpc.CallOption) (*GetProductUsageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetProductUsageResponse)
+	err := c.cc.Invoke(ctx, ProductUsageService_CreateProductUsage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *productUsageServiceClient) GetProductUsages(ctx context.Context, in *GetProductUsagesRequest, opts ...grpc.CallOption) (*GetUsagesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetUsagesResponse)
+	err := c.cc.Invoke(ctx, ProductUsageService_GetProductUsages_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *productUsageServiceClient) GetOrganizationUsages(ctx context.Context, in *GetOrganizationUsagesRequest, opts ...grpc.CallOption) (*GetUsagesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetUsagesResponse)
+	err := c.cc.Invoke(ctx, ProductUsageService_GetOrganizationUsages_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ProductUsageServiceServer is the server API for ProductUsageService service.
+// All implementations should embed UnimplementedProductUsageServiceServer
+// for forward compatibility.
+type ProductUsageServiceServer interface {
+	CreateProductUsage(context.Context, *CreateProductUsageRequest) (*GetProductUsageResponse, error)
+	GetProductUsages(context.Context, *GetProductUsagesRequest) (*GetUsagesResponse, error)
+	GetOrganizationUsages(context.Context, *GetOrganizationUsagesRequest) (*GetUsagesResponse, error)
+}
+
+// UnimplementedProductUsageServiceServer should be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedProductUsageServiceServer struct{}
+
+func (UnimplementedProductUsageServiceServer) CreateProductUsage(context.Context, *CreateProductUsageRequest) (*GetProductUsageResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateProductUsage not implemented")
+}
+func (UnimplementedProductUsageServiceServer) GetProductUsages(context.Context, *GetProductUsagesRequest) (*GetUsagesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetProductUsages not implemented")
+}
+func (UnimplementedProductUsageServiceServer) GetOrganizationUsages(context.Context, *GetOrganizationUsagesRequest) (*GetUsagesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetOrganizationUsages not implemented")
+}
+func (UnimplementedProductUsageServiceServer) testEmbeddedByValue() {}
+
+// UnsafeProductUsageServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ProductUsageServiceServer will
+// result in compilation errors.
+type UnsafeProductUsageServiceServer interface {
+	mustEmbedUnimplementedProductUsageServiceServer()
+}
+
+func RegisterProductUsageServiceServer(s grpc.ServiceRegistrar, srv ProductUsageServiceServer) {
+	// If the following call pancis, it indicates UnimplementedProductUsageServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&ProductUsageService_ServiceDesc, srv)
+}
+
+func _ProductUsageService_CreateProductUsage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateProductUsageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductUsageServiceServer).CreateProductUsage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductUsageService_CreateProductUsage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductUsageServiceServer).CreateProductUsage(ctx, req.(*CreateProductUsageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProductUsageService_GetProductUsages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetProductUsagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductUsageServiceServer).GetProductUsages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductUsageService_GetProductUsages_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductUsageServiceServer).GetProductUsages(ctx, req.(*GetProductUsagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProductUsageService_GetOrganizationUsages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOrganizationUsagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductUsageServiceServer).GetOrganizationUsages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductUsageService_GetOrganizationUsages_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductUsageServiceServer).GetOrganizationUsages(ctx, req.(*GetOrganizationUsagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// ProductUsageService_ServiceDesc is the grpc.ServiceDesc for ProductUsageService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var ProductUsageService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "billing_api.ProductUsageService",
+	HandlerType: (*ProductUsageServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "CreateProductUsage",
+			Handler:    _ProductUsageService_CreateProductUsage_Handler,
+		},
+		{
+			MethodName: "GetProductUsages",
+			Handler:    _ProductUsageService_GetProductUsages_Handler,
+		},
+		{
+			MethodName: "GetOrganizationUsages",
+			Handler:    _ProductUsageService_GetOrganizationUsages_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "billing-api.proto",
+}

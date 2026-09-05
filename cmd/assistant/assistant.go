@@ -30,7 +30,7 @@ import (
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
 	assistant_socket "github.com/rapidaai/api/assistant-api/socket"
 	"github.com/rapidaai/pkg/authenticators"
-	web_client "github.com/rapidaai/pkg/clients/web"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/middlewares"
@@ -49,6 +49,7 @@ type AppRunner struct {
 	Postgres   connectors.PostgresConnector
 	Redis      connectors.RedisConnector
 	Opensearch connectors.OpenSearchConnector
+	Clients    *rapida_client.RapidaClient
 	Closeable  []func(context.Context) error
 }
 
@@ -74,12 +75,16 @@ func main() {
 		appRunner.Logger.Errorf("Warning: Migration failed: %v", err)
 		panic(err)
 	}
+	if err := appRunner.Init(ctx); err != nil {
+		appRunner.Close(ctx)
+		panic(err)
+	}
+	defer appRunner.Close(ctx)
 
 	// init
-	authClient := web_client.NewAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Redis)
-	userAuthenticator := authenticators.NewUserAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient)
-	projectAuthenticator := authenticators.NewProjectAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient)
-	organizationAuthenticator := authenticators.NewOrganizationAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, authClient)
+	userAuthenticator := authenticators.NewUserAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Clients.Authentication)
+	projectAuthenticator := authenticators.NewProjectAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Clients.Authentication)
+	organizationAuthenticator := authenticators.NewOrganizationAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger, appRunner.Clients.Authentication)
 	serviceAuthenticator := authenticators.NewServiceAuthenticator(&appRunner.Cfg.AppConfig, appRunner.Logger)
 	appRunner.S = grpc.NewServer(
 		grpc.ChainStreamInterceptor(
@@ -112,10 +117,6 @@ func main() {
 		grpc.MaxSendMsgSize(commons.MaxSendMsgSize), // 10 MB
 	)
 
-	if err := appRunner.Init(ctx); err != nil {
-		panic(err)
-	}
-
 	// add all engine which required to run in same application like grpc server, http server, socket server etc.
 	appRunner.AllEngine(ctx)
 
@@ -132,7 +133,6 @@ func main() {
 		panic(err)
 	}
 
-	defer appRunner.Close(ctx)
 	cmuxListener := cmux.New(listener)
 	http2GRPCFilteredListener := cmuxListener.Match(cmux.HTTP2())
 	grpcFilteredListener := cmuxListener.Match(
@@ -272,6 +272,13 @@ func (app *AppRunner) Init(ctx context.Context) error {
 		app.Closeable = append(app.Closeable, app.Opensearch.Disconnect)
 	}
 
+	clients, err := rapida_client.New(&app.Cfg.AppConfig, app.Logger, app.Redis)
+	if err != nil {
+		return fmt.Errorf("initialize internal clients: %w", err)
+	}
+	app.Clients = clients
+	app.Closeable = append(app.Closeable, app.Clients.Close)
+
 	return nil
 }
 
@@ -292,12 +299,12 @@ func (app *AppRunner) Close(ctx context.Context) {
 func (g *AppRunner) AllRouters(ctx context.Context) error {
 	router.AssistantApiRoute(g.Cfg, g.S, g.E, g.Logger, g.Postgres, g.Redis, g.Opensearch)
 	router.HealthCheckRoutes(g.Cfg, g.E, g.Logger, g.Postgres)
-	router.AssistantConversationApiRoute(g.Cfg, g.S, g.Logger, g.Postgres, g.Redis, g.Opensearch, g.SIP)
+	router.AssistantConversationApiRoute(g.Cfg, g.S, g.Logger, g.Postgres, g.Redis, g.Opensearch, g.SIP, g.Clients)
 	router.AssistantDeploymentApiRoute(g.Cfg, g.S, g.E, g.Logger, g.Postgres)
-	router.TalkApiRoute(g.Cfg, g.E, g.Logger, g.Postgres, g.Redis, g.Opensearch, g.SIP)
+	router.TalkApiRoute(g.Cfg, g.E, g.Logger, g.Postgres, g.Redis, g.Opensearch, g.SIP, g.Clients)
 	if g.Opensearch != nil {
-		router.KnowledgeApiRoute(g.Cfg, g.S, g.Logger, g.Postgres, g.Redis, g.Opensearch)
-		router.DocumentApiRoute(g.Cfg, g.S, g.Logger, g.Postgres, g.Redis, g.Opensearch)
+		router.KnowledgeApiRoute(g.Cfg, g.S, g.Logger, g.Postgres, g.Redis, g.Opensearch, g.Clients)
+		router.DocumentApiRoute(g.Cfg, g.S, g.Logger, g.Postgres, g.Redis, g.Opensearch, g.Clients)
 	}
 	return nil
 }
@@ -307,7 +314,7 @@ func (app *AppRunner) AllEngine(ctx context.Context) error {
 
 	// SIP is optional and only started if configured. It listens for SIP calls from telephony providers for both inbound call handling and outbound call dispatch.
 	if app.Cfg.SIPConfig != nil {
-		sipManager := assistant_sip.NewSIPEngine(app.Cfg, app.Logger, app.Postgres, app.Redis, app.Opensearch, app.Opensearch)
+		sipManager := assistant_sip.NewSIPEngine(app.Cfg, app.Logger, app.Postgres, app.Redis, app.Opensearch, app.Opensearch, app.Clients)
 		if err := sipManager.Connect(ctx); err != nil {
 			app.Logger.Errorf("Failed to start SIP server: %v", err)
 			return err
@@ -316,7 +323,7 @@ func (app *AppRunner) AllEngine(ctx context.Context) error {
 		app.Closeable = append(app.Closeable, sipManager.Disconnect)
 	}
 	if app.Cfg.AudioSocketConfig != nil {
-		socketEngine := assistant_socket.NewAudioSocketEngine(app.Cfg, app.Logger, app.Postgres, app.Redis, app.Opensearch)
+		socketEngine := assistant_socket.NewAudioSocketEngine(app.Cfg, app.Logger, app.Postgres, app.Redis, app.Opensearch, app.Clients)
 		if err := socketEngine.Connect(ctx); err != nil {
 			return err
 		}
@@ -341,10 +348,9 @@ func (g *AppRunner) RecoveryMiddleware() {
 }
 
 func (g *AppRunner) AuthenticationMiddleware() {
-	authClient := web_client.NewAuthenticator(&g.Cfg.AppConfig, g.Logger, g.Redis)
-	g.E.Use(middlewares.NewAuthenticationMiddleware(authenticators.NewUserAuthenticator(&g.Cfg.AppConfig, g.Logger, authClient), g.Logger))
-	g.E.Use(middlewares.NewProjectAuthenticatorMiddleware(authenticators.NewProjectAuthenticator(&g.Cfg.AppConfig, g.Logger, authClient), g.Logger))
-	g.E.Use(middlewares.NewOrganizationAuthenticatorMiddleware(authenticators.NewOrganizationAuthenticator(&g.Cfg.AppConfig, g.Logger, authClient), g.Logger))
+	g.E.Use(middlewares.NewAuthenticationMiddleware(authenticators.NewUserAuthenticator(&g.Cfg.AppConfig, g.Logger, g.Clients.Authentication), g.Logger))
+	g.E.Use(middlewares.NewProjectAuthenticatorMiddleware(authenticators.NewProjectAuthenticator(&g.Cfg.AppConfig, g.Logger, g.Clients.Authentication), g.Logger))
+	g.E.Use(middlewares.NewOrganizationAuthenticatorMiddleware(authenticators.NewOrganizationAuthenticator(&g.Cfg.AppConfig, g.Logger, g.Clients.Authentication), g.Logger))
 	g.E.Use(middlewares.NewServiceAuthenticatorMiddleware(authenticators.NewServiceAuthenticator(&g.Cfg.AppConfig, g.Logger), g.Logger))
 }
 

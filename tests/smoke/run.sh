@@ -96,6 +96,7 @@ check_ui() {
 
 seed_assistant_smoke() {
   psql -v ON_ERROR_STOP=1 -h postgres -U rapida_user -d web_db >/dev/null <<SQL
+DELETE FROM product_usages WHERE organization_id = 1;
 DELETE FROM user_project_roles WHERE id = 1;
 DELETE FROM user_organization_roles WHERE id = 1;
 DELETE FROM user_auth_tokens WHERE id = 1;
@@ -111,6 +112,19 @@ INSERT INTO user_auth_tokens (id,user_auth_id,token_type,token,expire_at,status,
 INSERT INTO user_organization_roles (id,user_auth_id,organization_id,role,status,created_actor_type) VALUES (1,1,1,'owner','ACTIVE','unknown');
 INSERT INTO user_project_roles (id,project_id,user_auth_id,role,status,created_actor_type) VALUES (1,1,1,'owner','ACTIVE','unknown');
 SQL
+}
+
+check_product_usage() {
+  product-usage-smoke
+
+  actor_counts=$(psql -v ON_ERROR_STOP=1 -h postgres -U rapida_user -d web_db -Atc \
+    "SELECT created_actor_type || '|' || count(*) FROM product_usages WHERE organization_id = 1 AND project_id = 1 AND usage_type = 'llm_duration' AND usages = 1000000000 AND unit = 'nanosecond' GROUP BY created_actor_type ORDER BY created_actor_type")
+  expected_actor_counts=$(printf 'project|1\nuser|1')
+  if [ "$actor_counts" != "$expected_actor_counts" ]; then
+    printf 'product usage persistence check returned %s\n' "$actor_counts" >&2
+    return 1
+  fi
+  echo 'Product usage smoke passed for personal access token and project API key'
 }
 
 seed_telephony_callback_contexts() {
@@ -250,6 +264,9 @@ run_smoke_tests() {
 
   echo 'Running released Node SDK smoke tests with both authentication methods'
   node /workspace/sdk-smoke.js
+
+  echo 'Running product usage smoke tests with both authentication methods'
+  check_product_usage
 
   echo 'Running telephony callback smoke tests with stored project and PAT authentication'
   run_telephony_callback_smoke

@@ -8,10 +8,32 @@ package channel_telephony
 
 import (
 	"encoding/json"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"testing"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 )
+
+func TestReporterBillingUsesProductUsage(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "reporter.go", nil, 0)
+	if err != nil {
+		t.Fatalf("parse reporter.go: %v", err)
+	}
+
+	found := false
+	ast.Inspect(file, func(node ast.Node) bool {
+		selector, ok := node.(*ast.SelectorExpr)
+		if ok && selector.Sel.Name == "ProductUsage" {
+			found = true
+		}
+		return true
+	})
+	if !found {
+		t.Fatal("telephony billing does not use RapidaClient.ProductUsage")
+	}
+}
 
 func TestProviderStatusWebhookLifecycleFields(t *testing.T) {
 	t.Parallel()

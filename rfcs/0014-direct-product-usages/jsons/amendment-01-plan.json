@@ -1,0 +1,11 @@
+{
+  "status": "ready_for_rechallenge",
+  "created_at": "2026-08-29",
+  "rfc": "rfcs/0014-direct-product-usages.md",
+  "resolutions": [
+    "Register billing in collectors.NewWithEnv, which every current runtime recorder uses.",
+    "Add one shared usage type to unit registry and reject unknown or mismatched values.",
+    "Use the unique key organization_id, project_id, usage_id.",
+    "Add product-usage-smoke that invokes the RPC with PAT and project credentials and verifies stored rows."
+  ]
+}

@@ -25,7 +25,7 @@ func (iApi *indexerApi) IndexKnowledgeDocument(ctx context.Context, cer *knowled
 		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
-	return iApi.indexerServiceClient.IndexKnowledgeDocument(ctx, iAuth,
+	return iApi.rapidaClient.Indexer.IndexKnowledgeDocument(ctx, iAuth,
 		&knowledge_api.IndexKnowledgeDocumentRequest{
 			KnowledgeId:         cer.GetKnowledgeId(),
 			KnowledgeDocumentId: cer.GetKnowledgeDocumentId(),

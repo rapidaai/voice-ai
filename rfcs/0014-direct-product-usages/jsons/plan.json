@@ -1,0 +1,29 @@
+{
+  "rfc": "rfcs/0014-direct-product-usages.md",
+  "status": "approved",
+  "classification": "governed",
+  "objective": "Directly publish assistant product usage to a project-scoped audited web-api ledger using the current credential model and no outbox.",
+  "acceptance_criteria": [
+    "CreateProductUsage accepts usageType, positive integer usages, unit, and occurredAt and returns the server-assigned record ID.",
+    "The product_usages entity embeds Audited, Mutable, and Organizational.",
+    "Tenant IDs come only from authenticated context.",
+    "The billing collector sends no assistant, conversation, message, provider, or arbitrary attribute fields.",
+    "Repeated requests create independent usage rows because callers do not provide an idempotency key.",
+    "One shared registry rejects unknown usage types and mismatched units.",
+    "Every supported recorder path receives billing through explicit collector configuration using the process-owned product usage client.",
+    "Timestamp comparison uses microsecond precision.",
+    "PAT and project-key smoke modes directly create and verify usage rows.",
+    "No SDK or outbox changes are made."
+  ],
+  "accepted_tradeoffs": [
+    "A failed direct RPC may lose usage because this scope explicitly excludes durable replay.",
+    "Billing enforcement remains disabled until operations accept observed delivery reliability."
+  ],
+  "verification_commands": [
+    "go test ./api/web-api/api ./api/web-api/internal/service/productusage",
+    "go test ./api/assistant-api/internal/observability/collectors/billing ./pkg/clients/web",
+    "go test ./scripts/contracts/protobuf-descriptor",
+    "tests/smoke/run.sh product-usage-smoke",
+    "just agent-finalize \"$(git diff --name-only --diff-filter=ACMR HEAD | paste -sd, -)\""
+  ]
+}

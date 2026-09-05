@@ -40,7 +40,11 @@ func NewVaultClientGRPC(cfg *config.AppConfig, logger commons.Logger, redis conn
 	if err != nil {
 		logger.Errorf("Unable to create connection for vault api %v", err)
 	}
-	vaultClient := vault_api.NewVaultServiceClient(conn)
+	return NewVaultClientWithClient(cfg, logger, redis, vault_api.NewVaultServiceClient(conn))
+}
+
+// NewVaultClientWithClient creates a vault client using the provided gRPC client.
+func NewVaultClientWithClient(cfg *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector, vaultClient vault_api.VaultServiceClient) VaultClient {
 	return &vaultServiceClient{
 		clients.NewInternalClient(cfg, logger, redis),
 		cfg,

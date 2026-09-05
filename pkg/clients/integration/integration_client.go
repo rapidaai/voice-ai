@@ -45,11 +45,16 @@ func NewIntegrationServiceClientGRPC(config *config.AppConfig, logger commons.Lo
 	if err != nil {
 		logger.Fatalf("Unable to create connection %v", err)
 	}
+	return NewIntegrationServiceClientWithClient(config, logger, redis, protos.NewUnifiedProviderServiceClient(lightConnection))
+}
+
+// NewIntegrationServiceClientWithClient creates an integration client using the provided gRPC client.
+func NewIntegrationServiceClientWithClient(config *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector, unifiedClient protos.UnifiedProviderServiceClient) IntegrationServiceClient {
 	return &integrationServiceClient{
 		InternalClient: clients.NewInternalClient(config, logger, redis),
 		cfg:            config,
 		logger:         logger,
-		unifiedClient:  protos.NewUnifiedProviderServiceClient(lightConnection),
+		unifiedClient:  unifiedClient,
 	}
 }
 

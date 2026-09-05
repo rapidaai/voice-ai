@@ -1,0 +1,14 @@
+{
+  "status": "confirmed",
+  "confirmed_at": "2026-09-05",
+  "confirmed_by": "technical_owner",
+  "rfc_sha256": "b46cf652457ef00c9f3e2d5fe2d710788fc4693c0740be6a1829b0ff92189f71",
+  "plan_sha256": "59fbdd4c759c3a09eb95764102f011f8becade091ac85fc6b89ec1fbb77f4533",
+  "amendment_plan": "rfcs/0014-direct-product-usages/jsons/amendment-02-plan.json",
+  "amendment_challenge": "rfcs/0014-direct-product-usages/jsons/amendment-02-challenge.json",
+  "amendment_challenge_sha256": "4e940374d7cf7f826b652b2dceb71194b717a0f426c999450bddfab07eb93591",
+  "amendment_review": "rfcs/0014-direct-product-usages/jsons/amendment-02-review.json",
+  "amendment_review_sha256": "9eed892a5c72d4f61554705e4b70020bf6761bc9b49dc0e8032cb68598d0b43f",
+  "merged_contract_commit": "820666fda038215717d9636e63411fcb8779d0c7",
+  "confirmation": "Review reconciliation approved by the technical owner; the contract remains unchanged from Amendment 02."
+}

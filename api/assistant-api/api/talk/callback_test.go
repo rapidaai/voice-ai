@@ -21,6 +21,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
@@ -97,7 +98,8 @@ func TestUniversalCallbackDoesNotLogPersistedAuthenticationMetadata(t *testing.T
 	maliciousContextID := "context-id\nFORGED LOG ENTRY"
 	maliciousAuthType := "invalid-auth-type\nFORGED AUTH LOG ENTRY"
 	api := &ConversationApi{
-		logger: logger,
+		logger:       logger,
+		rapidaClient: &rapida_client.RapidaClient{},
 		callContextStore: &callbackCallContextStore{
 			callContext: &callcontext.CallContext{ContextID: maliciousContextID, AuthType: maliciousAuthType},
 		},
@@ -153,7 +155,8 @@ func TestCallbackByContextDoesNotLogUserProvidedContextID(t *testing.T) {
 	maliciousContextID := "context-id\nFORGED LOG ENTRY"
 	maliciousAuthType := "invalid-auth-type\nFORGED AUTH LOG ENTRY"
 	api := &ConversationApi{
-		logger: logger,
+		logger:       logger,
+		rapidaClient: &rapida_client.RapidaClient{},
 		callContextStore: &callbackCallContextStore{
 			callContext: &callcontext.CallContext{ContextID: maliciousContextID, AuthType: maliciousAuthType},
 		},
@@ -235,6 +238,7 @@ func TestCallbackByContextRestoresAuthenticationForEveryProvider(t *testing.T) {
 				api := &ConversationApi{
 					cfg:              &config.AssistantConfig{},
 					logger:           logger,
+					rapidaClient:     &rapida_client.RapidaClient{},
 					callContextStore: store,
 					inboundDispatcher: channel_telephony.NewInboundDispatcher(
 						channel_telephony.WithConfig(&config.AssistantConfig{}),
@@ -287,6 +291,7 @@ func TestCallbackByContextRejectsInvalidStoredAuthenticationForEveryProvider(t *
 			}}
 			api := &ConversationApi{
 				logger:           logger,
+				rapidaClient:     &rapida_client.RapidaClient{},
 				callContextStore: store,
 				inboundDispatcher: channel_telephony.NewInboundDispatcher(
 					channel_telephony.WithConfig(&config.AssistantConfig{}),
@@ -358,6 +363,7 @@ func TestFailedCallbacksPersistCallAndConversationStatus(t *testing.T) {
 			api := &ConversationApi{
 				cfg:                          &config.AssistantConfig{},
 				logger:                       logger,
+				rapidaClient:                 &rapida_client.RapidaClient{},
 				callContextStore:             store,
 				assistantConversationService: conversationService,
 				inboundDispatcher: channel_telephony.NewInboundDispatcher(

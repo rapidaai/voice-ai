@@ -1,0 +1,16 @@
+{
+  "status": "approved",
+  "reviewed_at": "2026-08-30",
+  "merged_contract_commit": "820666fda038215717d9636e63411fcb8779d0c7",
+  "critical_findings": [],
+  "major_findings": [],
+  "verified": [
+    "Singular create uses server-assigned audited bigint IDs.",
+    "Project usage queries are scoped to authenticated organization and project.",
+    "Organization usage queries exclude project credentials and remain organization-scoped.",
+    "Criteria columns and operators are allowlisted and values are parameterized.",
+    "Assistant publishing uses the merged singular request contract.",
+    "PAT and project credential smoke coverage uses server-returned IDs."
+  ],
+  "decision": "approve"
+}
