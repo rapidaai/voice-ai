@@ -303,8 +303,8 @@ func (g *AppRunner) AllRouters(ctx context.Context) error {
 	router.AssistantDeploymentApiRoute(g.Cfg, g.S, g.E, g.Logger, g.Postgres)
 	router.TalkApiRoute(g.Cfg, g.E, g.Logger, g.Postgres, g.Redis, g.Opensearch, g.SIP, g.Clients)
 	if g.Opensearch != nil {
-		router.KnowledgeApiRoute(g.Cfg, g.S, g.Logger, g.Postgres, g.Redis, g.Opensearch)
-		router.DocumentApiRoute(g.Cfg, g.S, g.Logger, g.Postgres, g.Redis, g.Opensearch)
+		router.KnowledgeApiRoute(g.Cfg, g.S, g.Logger, g.Postgres, g.Redis, g.Opensearch, g.Clients)
+		router.DocumentApiRoute(g.Cfg, g.S, g.Logger, g.Postgres, g.Redis, g.Opensearch, g.Clients)
 	}
 	return nil
 }

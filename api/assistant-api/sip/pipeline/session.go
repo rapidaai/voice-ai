@@ -166,7 +166,7 @@ func (d *Dispatcher) createObserver(ctx context.Context, scope *CallSetupResult,
 	}
 	configuredCollectors = append(configuredCollectors, telemetry.NewWithAssistantConfig(ctx, d.logger, d.assistantConfig)...)
 	configuredCollectors = append(configuredCollectors, billing.New(billing.Config{
-		ProductUsageClient: d.rapidaClient.ProductUsageClient,
+		ProductUsageClient: d.rapidaClient.ProductUsage,
 	}))
 	recorder := observability.New(
 		observability.WithLogger(d.logger),

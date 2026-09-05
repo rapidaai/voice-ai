@@ -114,7 +114,7 @@ func (d *OutboundDispatcher) NewStatusReporter(contextID string) internal_type.P
 		configuredCollectors = append(configuredCollectors, telemetry.NewWithAssistantConfig(ctx, d.logger, d.cfg)...)
 		configuredCollectors = append(configuredCollectors,
 			billing.New(billing.Config{
-				ProductUsageClient: d.rapidaClient.ProductUsageClient,
+				ProductUsageClient: d.rapidaClient.ProductUsage,
 			}),
 			webhook.New(ctx, webhook.Config{
 				Logger:                        d.logger,

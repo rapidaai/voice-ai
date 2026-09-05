@@ -17,6 +17,23 @@ func TestConversationApiRetainsRapidaClient(t *testing.T) {
 	require.Same(t, client, api.rapidaClient)
 }
 
+func TestConversationApiDoesNotConstructInternalClients(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "talk.go", nil, 0)
+	require.NoError(t, err)
+
+	ast.Inspect(file, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		selector, ok := call.Fun.(*ast.SelectorExpr)
+		if ok && (selector.Sel.Name == "NewVaultClientGRPC" || selector.Sel.Name == "NewAuthenticator") {
+			t.Fatalf("controller constructs internal client with %s", selector.Sel.Name)
+		}
+		return true
+	})
+}
+
 func TestOutboundRestPropagatesRequestContext(t *testing.T) {
 	t.Helper()
 

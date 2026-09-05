@@ -14,7 +14,7 @@ import (
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
-	web_client "github.com/rapidaai/pkg/clients/web"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/types"
@@ -28,7 +28,7 @@ type middlewareOption struct {
 	logger                 commons.Logger
 	postgres               connectors.PostgresConnector
 	assistantService       internal_services.AssistantService
-	vaultClient            web_client.VaultClient
+	rapidaClient           *rapida_client.RapidaClient
 	applySIPConfigDefaults func(*sip_infra.Config)
 	ServiceID              uint64
 }
@@ -57,9 +57,9 @@ func WithAssistantService(assistantService internal_services.AssistantService) f
 	}
 }
 
-func WithVaultClient(vaultClient web_client.VaultClient) func(*middlewareOption) {
+func WithRapidaClient(client *rapida_client.RapidaClient) func(*middlewareOption) {
 	return func(m *middlewareOption) {
-		m.vaultClient = vaultClient
+		m.rapidaClient = client
 	}
 }
 

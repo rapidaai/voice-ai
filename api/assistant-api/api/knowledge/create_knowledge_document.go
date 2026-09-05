@@ -58,7 +58,7 @@ func (knowledgeApi *knowledgeGrpcApi) CreateKnowledgeDocument(ctx context.Contex
 		for _, doc := range _kn {
 			docIds = append(docIds, doc.Id)
 		}
-		knowledgeApi.indexerServiceClient.IndexKnowledgeDocument(ctx, iAuth,
+		knowledgeApi.rapidaClient.Indexer.IndexKnowledgeDocument(ctx, iAuth,
 			&knowledge_api.IndexKnowledgeDocumentRequest{
 				KnowledgeId:         kd.Id,
 				KnowledgeDocumentId: docIds,

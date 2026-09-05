@@ -9,6 +9,9 @@ package assistant_sip
 import (
 	"context"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"testing"
 
 	assistant_config "github.com/rapidaai/api/assistant-api/config"
@@ -28,6 +31,23 @@ func TestSIPEngineRetainsRapidaClient(t *testing.T) {
 	engine := &SIPEngine{rapidaClient: client}
 
 	require.Same(t, client, engine.rapidaClient)
+}
+
+func TestSIPEngineDoesNotConstructInternalClients(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "sip.go", nil, 0)
+	require.NoError(t, err)
+
+	ast.Inspect(file, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		selector, ok := call.Fun.(*ast.SelectorExpr)
+		if ok && selector.Sel.Name == "NewVaultClientGRPC" {
+			t.Fatal("SIP engine constructs a Vault client")
+		}
+		return true
+	})
 }
 
 func TestSIPEngineUsesConfiguredServiceID(t *testing.T) {

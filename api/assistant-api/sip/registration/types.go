@@ -12,7 +12,6 @@ import (
 	"github.com/rapidaai/api/assistant-api/config"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
-	web_client "github.com/rapidaai/pkg/clients/web"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 )
@@ -147,7 +146,6 @@ type ManagerOptions struct {
 	Logger             commons.Logger
 	Postgres           connectors.PostgresConnector
 	Redis              connectors.RedisConnector
-	Vault              web_client.VaultClient
 	RegistrationClient *sip_infra.RegistrationClient
 	AssistantConfig    *config.AssistantConfig
 	Sip                *config.SIPConfig
@@ -172,12 +170,6 @@ func WithPostgres(postgres connectors.PostgresConnector) ManagerOption {
 func WithRedis(redis connectors.RedisConnector) ManagerOption {
 	return func(options *ManagerOptions) {
 		options.Redis = redis
-	}
-}
-
-func WithVault(vault web_client.VaultClient) ManagerOption {
-	return func(options *ManagerOptions) {
-		options.Vault = vault
 	}
 }
 

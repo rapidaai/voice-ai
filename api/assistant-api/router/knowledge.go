@@ -8,6 +8,7 @@ package assistant_router
 import (
 	knowledgeApi "github.com/rapidaai/api/assistant-api/api/knowledge"
 	"github.com/rapidaai/api/assistant-api/config"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	workflow_api "github.com/rapidaai/protos"
@@ -21,6 +22,7 @@ func KnowledgeApiRoute(
 	Postgres connectors.PostgresConnector,
 	Redis connectors.RedisConnector,
 	Opensearch connectors.OpenSearchConnector,
+	rapidaClient *rapida_client.RapidaClient,
 ) {
 	workflow_api.RegisterKnowledgeServiceServer(S,
 		knowledgeApi.NewKnowledgeGRPCApi(Cfg,
@@ -28,6 +30,7 @@ func KnowledgeApiRoute(
 			Postgres,
 			Redis,
 			Opensearch,
+			rapidaClient,
 		))
 }
 
@@ -38,6 +41,7 @@ func DocumentApiRoute(
 	Postgres connectors.PostgresConnector,
 	Redis connectors.RedisConnector,
 	Opensearch connectors.OpenSearchConnector,
+	rapidaClient *rapida_client.RapidaClient,
 
 ) {
 	workflow_api.RegisterDocumentServiceServer(S,
@@ -46,5 +50,6 @@ func DocumentApiRoute(
 			Postgres,
 			Redis,
 			Opensearch,
+			rapidaClient,
 		))
 }

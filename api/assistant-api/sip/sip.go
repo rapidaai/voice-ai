@@ -20,7 +20,6 @@ import (
 	sip_pipeline "github.com/rapidaai/api/assistant-api/sip/pipeline"
 	sip_registration "github.com/rapidaai/api/assistant-api/sip/registration"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
-	web_client "github.com/rapidaai/pkg/clients/web"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/storages"
@@ -49,7 +48,6 @@ type SIPEngine struct {
 	deploymentService            internal_services.AssistantDeploymentService
 	configurationService         internal_services.AssistantConfigurationService
 	httpLogService               internal_services.AssistantHTTPLogService
-	vaultClient                  web_client.VaultClient
 	callContextStore             callcontext.Store
 	rapidaClient                 *rapida_client.RapidaClient
 
@@ -84,7 +82,6 @@ func NewSIPEngine(config *config.AssistantConfig, logger commons.Logger,
 		configurationService:         internal_assistant_service.NewAssistantConfigurationService(logger, postgres),
 		httpLogService:               internal_assistant_service.NewAssistantHTTPLogService(logger, postgres, fileStorage),
 		storage:                      fileStorage,
-		vaultClient:                  web_client.NewVaultClientGRPC(&config.AppConfig, logger, redis),
 		callContextStore:             callcontext.NewStore(postgres, logger),
 		rapidaClient:                 rapidaClient,
 	}
@@ -134,7 +131,7 @@ func (m *SIPEngine) Connect(ctx context.Context) error {
 			sip_middleware.NewVaultMiddleware(
 				sip_middleware.WithContext(m.ctx),
 				sip_middleware.WithLogger(m.logger),
-				sip_middleware.WithVaultClient(m.vaultClient),
+				sip_middleware.WithRapidaClient(m.rapidaClient),
 				sip_middleware.WithApplySIPConfigDefaults(m.applySIPConfigDefaults),
 			),
 		},
@@ -150,7 +147,6 @@ func (m *SIPEngine) Connect(ctx context.Context) error {
 		sip_registration.WithLogger(m.logger),
 		sip_registration.WithPostgres(m.postgres),
 		sip_registration.WithRedis(m.redis),
-		sip_registration.WithVault(m.vaultClient),
 		sip_registration.WithRegistrationClient(m.registrationClient),
 		sip_registration.WithAssistantConfig(m.cfg),
 		sip_registration.WithSIPConfig(m.cfg.SIPConfig),

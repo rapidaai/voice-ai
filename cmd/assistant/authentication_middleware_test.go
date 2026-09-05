@@ -45,8 +45,8 @@ func TestInitInitializesRapidaClient(t *testing.T) {
 	if app.Clients == nil {
 		t.Fatal("Init() did not initialize RapidaClient")
 	}
-	if app.Clients.ProductUsageClient == nil {
-		t.Fatal("Init() did not initialize ProductUsageClient")
+	if app.Clients.ProductUsage == nil {
+		t.Fatal("Init() did not initialize ProductUsage")
 	}
 	if len(app.Closeable) != 1 {
 		t.Fatalf("Closeable count = %d, want 1", len(app.Closeable))
@@ -132,6 +132,35 @@ func TestInitDoesNotRegisterAuditActorCallbacks(t *testing.T) {
 		}
 		return true
 	})
+}
+
+func TestAllRoutersPassesRapidaClientToKnowledgeRoutes(t *testing.T) {
+	file := parseCommandSource(t, "assistant.go")
+	wanted := map[string]bool{
+		"KnowledgeApiRoute": false,
+		"DocumentApiRoute":  false,
+	}
+
+	ast.Inspect(file, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		name := callName(call)
+		if _, ok := wanted[name]; !ok || len(call.Args) == 0 {
+			return true
+		}
+		selector, ok := call.Args[len(call.Args)-1].(*ast.SelectorExpr)
+		identifier, identifierOK := selector.X.(*ast.Ident)
+		wanted[name] = ok && identifierOK && identifier.Name == "g" && selector.Sel.Name == "Clients"
+		return true
+	})
+
+	for name, found := range wanted {
+		if !found {
+			t.Fatalf("%s does not receive g.Clients", name)
+		}
+	}
 }
 
 func parseCommandSource(t *testing.T, name string) *ast.File {

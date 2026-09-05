@@ -9,7 +9,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/config"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	internal_knowledge_service "github.com/rapidaai/api/assistant-api/internal/services/knowledge"
-	document_client "github.com/rapidaai/pkg/clients/document"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	storage_files "github.com/rapidaai/pkg/storages/file-storage"
@@ -22,8 +22,8 @@ type indexerApi struct {
 	postgres                 connectors.PostgresConnector
 	redis                    connectors.RedisConnector
 	knowledgeService         internal_services.KnowledgeService
-	indexerServiceClient     document_client.IndexerServiceClient
 	knowledgeDocumentService internal_services.KnowledgeDocumentService
+	rapidaClient             *rapida_client.RapidaClient
 }
 
 type indexerGrpcApi struct {
@@ -34,6 +34,7 @@ func NewDocumentGRPCApi(config *config.AssistantConfig, logger commons.Logger,
 	postgres connectors.PostgresConnector,
 	redis connectors.RedisConnector,
 	opensearch connectors.OpenSearchConnector,
+	rapidaClient *rapida_client.RapidaClient,
 ) knowledge_api.DocumentServiceServer {
 	return &indexerGrpcApi{
 		indexerApi{
@@ -43,7 +44,7 @@ func NewDocumentGRPCApi(config *config.AssistantConfig, logger commons.Logger,
 			redis:                    redis,
 			knowledgeService:         internal_knowledge_service.NewKnowledgeService(config, logger, postgres, storage_files.NewStorage(config.AssetStoreConfig, logger)),
 			knowledgeDocumentService: internal_knowledge_service.NewKnowledgeDocumentService(config, logger, postgres, opensearch),
-			indexerServiceClient:     document_client.NewIndexerServiceClient(&config.AppConfig, logger, redis),
+			rapidaClient:             rapidaClient,
 		},
 	}
 }

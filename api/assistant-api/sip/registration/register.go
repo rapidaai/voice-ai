@@ -76,7 +76,7 @@ func (m *manager) handleRegister(ctx context.Context, s RegisterPipeline) Pipeli
 		"owner":         m.instanceID,
 	}
 
-	vaultCred, err := m.vault.GetCredential(ctx, auth, rec.CredentialID)
+	vaultCred, err := m.rapidaClient.Vault.GetCredential(ctx, auth, rec.CredentialID)
 	if err != nil {
 		rec.Outcome = OutcomeConfigError
 		m.logger.Warnw("Failed to fetch vault credential for registration",

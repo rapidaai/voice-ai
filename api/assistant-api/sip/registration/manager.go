@@ -18,7 +18,6 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/telemetry"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
-	web_client "github.com/rapidaai/pkg/clients/web"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	"github.com/rapidaai/pkg/types"
@@ -44,7 +43,6 @@ type manager struct {
 	logger          commons.Logger
 	postgres        connectors.PostgresConnector
 	redis           *redis.Client
-	vault           web_client.VaultClient
 	regClient       *sip_infra.RegistrationClient
 	opDefaults      func(*sip_infra.Config)
 	assistantConfig *config.AssistantConfig
@@ -68,7 +66,6 @@ func New(options ...ManagerOption) Manager {
 		logger:          managerOptions.Logger,
 		postgres:        managerOptions.Postgres,
 		redis:           managerOptions.Redis.GetConnection(),
-		vault:           managerOptions.Vault,
 		regClient:       managerOptions.RegistrationClient,
 		instanceID:      managerOptions.Sip.InstanceID,
 		opDefaults:      managerOptions.ApplyOpDefaults,
@@ -89,7 +86,7 @@ func New(options ...ManagerOption) Manager {
 func (m *manager) observer(ctx context.Context, auth *types.Authentication) observability.Recorder {
 	configuredCollectors := telemetry.NewWithAssistantConfig(ctx, m.logger, m.assistantConfig)
 	configuredCollectors = append(configuredCollectors, billing.New(billing.Config{
-		ProductUsageClient: m.rapidaClient.ProductUsageClient,
+		ProductUsageClient: m.rapidaClient.ProductUsage,
 	}))
 	return observability.New(
 		observability.WithLogger(m.logger),

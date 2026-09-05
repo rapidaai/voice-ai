@@ -8,6 +8,9 @@ package sip_pipeline
 
 import (
 	"context"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"testing"
 
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
@@ -22,6 +25,21 @@ func TestWithRapidaClient(t *testing.T) {
 	dispatcher := New(WithRapidaClient(client))
 
 	require.Same(t, client, dispatcher.rapidaClient)
+}
+
+func TestSessionBillingUsesProductUsage(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "session.go", nil, 0)
+	require.NoError(t, err)
+
+	found := false
+	ast.Inspect(file, func(node ast.Node) bool {
+		selector, ok := node.(*ast.SelectorExpr)
+		if ok && selector.Sel.Name == "ProductUsage" {
+			found = true
+		}
+		return true
+	})
+	require.True(t, found, "SIP billing does not use RapidaClient.ProductUsage")
 }
 
 func newIdentityTestAuthentication() *types.Authentication {

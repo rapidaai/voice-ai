@@ -178,7 +178,7 @@ func (m *audioSocketEngine) handleConnection(ctx context.Context, conn net.Conn)
 	}
 	configuredCollectors = append(configuredCollectors, telemetry.NewWithAssistantConfig(ctx, m.logger, m.cfg)...)
 	configuredCollectors = append(configuredCollectors, billing.New(billing.Config{
-		ProductUsageClient: m.rapidaClient.ProductUsageClient,
+		ProductUsageClient: m.rapidaClient.ProductUsage,
 	}))
 
 	observer := observability.New(

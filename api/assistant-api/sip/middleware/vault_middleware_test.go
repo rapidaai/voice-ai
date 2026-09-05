@@ -12,6 +12,7 @@ import (
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	gorm_model "github.com/rapidaai/pkg/models/gorm"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
@@ -50,7 +51,7 @@ func TestVaultMiddleware_ResolvesSIPConfig(t *testing.T) {
 	middleware := NewVaultMiddleware(
 		WithContext(context.Background()),
 		WithLogger(newRouteTestLogger(t)),
-		WithVaultClient(vault),
+		WithRapidaClient(&rapida_client.RapidaClient{Vault: vault}),
 		WithApplySIPConfigDefaults(func(config *sip_infra.Config) {
 			config.Port = 5090
 		}),

@@ -36,7 +36,7 @@ func NewVaultMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 				"error", "assistant has no phone deployment configured")
 			return &sip_infra.SIPError{Code: 500, Message: "Failed to resolve SIP configuration", Err: sip_infra.ErrInvalidConfig}
 		}
-		if !validator.NonNil(m.vaultClient) {
+		if !validator.NonNil(m.rapidaClient) || !validator.NonNil(m.rapidaClient.Vault) {
 			return &sip_infra.SIPError{Code: 500, Message: "SIP vault resolver not configured", Err: sip_infra.ErrInvalidConfig}
 		}
 
@@ -50,7 +50,7 @@ func NewVaultMiddleware(options ...func(*middlewareOption)) sip_infra.Middleware
 			return &sip_infra.SIPError{Code: 500, Message: "Failed to resolve SIP configuration", Err: sip_infra.ErrInvalidConfig}
 		}
 
-		vaultCred, err := m.vaultClient.GetCredential(m.ctx, auth, credentialID)
+		vaultCred, err := m.rapidaClient.Vault.GetCredential(m.ctx, auth, credentialID)
 		if err != nil {
 			m.logger.Error("SIP: failed to resolve config",
 				"call_id", ctx.CallID,
