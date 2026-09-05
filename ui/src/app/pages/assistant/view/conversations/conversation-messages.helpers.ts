@@ -11,8 +11,8 @@ export const getRoleVisual = (role: string): RoleVisual => {
   const normalized = role.toLowerCase();
   if (normalized === 'rapida') {
     return {
-      label: 'Rapida',
-      shortLabel: 'R',
+      label: 'Assistant',
+      shortLabel: 'A',
       toneClassName:
         'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
     };

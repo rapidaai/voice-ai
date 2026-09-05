@@ -124,7 +124,7 @@ export const ConfigureTransferCall: FC<ConfigureToolProps> = ({
               <SelectItem value="ring-ring" text="ring-ring" />
               <SelectItem value="transfer-music" text="transfer-music" />
             </Select>
-              <Slider
+            <Slider
               id="transfer-delay"
               labelText={
                 <span className="inline-flex items-center gap-1">
@@ -154,8 +154,8 @@ export const ConfigureTransferCall: FC<ConfigureToolProps> = ({
           toolDefinition={toolDefinition}
           onChangeToolDefinition={onChangeToolDefinition}
           inputClass={inputClass}
-          documentationUrl="https://doc.rapida.ai/assistants/tools/add-transfer-call-tool"
-          documentationTitle="Know more about Transfer Call that can be supported by rapida"
+          documentationPath="/assistants/tools/add-transfer-call-tool"
+          documentationTitle="Know more about supported Transfer Call behavior"
         />
       )}
     </>

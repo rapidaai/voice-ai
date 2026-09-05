@@ -165,6 +165,23 @@ func Authorize(ctx context.Context) (*Authentication, error) {
 	return auth, nil
 }
 
+// AuthorizeUser returns valid user authentication without requiring organization context.
+func AuthorizeUser(ctx context.Context) (*Authentication, error) {
+	auth, ok := ctx.Value(CTX_).(*Authentication)
+	if !ok || auth == nil || auth.AuthType != AuthTypeUser {
+		return nil, ErrUnauthenticated
+	}
+	userContext, err := auth.UserContext()
+	if err != nil {
+		return nil, ErrUnauthenticated
+	}
+	actor := auth.Actor()
+	if actor.Validate() != nil || actor.Type != ActorTypeUser || actor.ID != userContext.UserID {
+		return nil, ErrUnauthenticated
+	}
+	return auth, nil
+}
+
 // SimplePrinciple is retained for source compatibility.
 // Deprecated: use Authentication for request authentication.
 type SimplePrinciple = AuthenticationPrinciple

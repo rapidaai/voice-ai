@@ -16,7 +16,14 @@ import { AuthContext } from '@/context/auth-context';
 import { PageHeaderBlock } from '@/app/components/blocks/page-header-block';
 import { PageTitleBlock } from '@/app/components/blocks/page-title-block';
 import { PageTitleWithCount } from '@/app/components/blocks/page-title-with-count';
-import { Add, Renew, View, ViewOff, Copy, Checkmark } from '@carbon/icons-react';
+import {
+  Add,
+  Renew,
+  View,
+  ViewOff,
+  Copy,
+  Checkmark,
+} from '@carbon/icons-react';
 import { connectionConfig } from '@/configs';
 import { toHumanReadableDate } from '@/utils/date';
 import { DocNoticeBlock } from '@/app/components/container/message/notice-block/doc-notice-block';
@@ -151,9 +158,9 @@ export function ProjectCredentialPage() {
           </button>
         </div>
       </PageHeaderBlock>
-      <DocNoticeBlock docUrl="https://doc.rapida.ai/integrations/rapida-credentials">
+      <DocNoticeBlock docPath="/integrations/rapida-credentials">
         These are project-specific keys. They are used to authenticate and
-        interact with the Rapida service for this particular project.
+        interact with the platform service for this particular project.
       </DocNoticeBlock>
       {ourKeys && ourKeys.length > 0 ? (
         <section className="grid content-start grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 grow shrink-0 m-4">
@@ -224,22 +231,14 @@ const CredentialCard: FC<{ credential: ProjectCredential }> = ({
               onClick={() => setIsVisible(!isVisible)}
               title={isVisible ? 'Hide' : 'Show'}
             >
-              {isVisible ? (
-                <ViewOff size={16} />
-              ) : (
-                <View size={16} />
-              )}
+              {isVisible ? <ViewOff size={16} /> : <View size={16} />}
             </GhostButton>
             <GhostButton
               size="md"
               onClick={() => copyToClipboard(credential.getKey())}
               title="Copy"
             >
-              {isCopied ? (
-                <Checkmark size={16} />
-              ) : (
-                <Copy size={16} />
-              )}
+              {isCopied ? <Checkmark size={16} /> : <Copy size={16} />}
             </GhostButton>
           </div>
         </div>
@@ -282,9 +281,9 @@ export function PersonalCredentialPage() {
           <PageTitleBlock>Personal Tokens</PageTitleBlock>
         </div>
       </PageHeaderBlock>
-      <DocNoticeBlock docUrl="https://doc.rapida.ai/integrations/rapida-credentials">
-        These are your personal access tokens. They are used to authenticate
-        and interact with the Rapida service across all your projects.
+      <DocNoticeBlock docPath="/integrations/rapida-credentials">
+        These are your personal access tokens. They are used to authenticate and
+        interact with the platform service across all your projects.
       </DocNoticeBlock>
       <section className="grid content-start grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 grow shrink-0 m-4">
         <BaseCard>
@@ -309,18 +308,14 @@ export function PersonalCredentialPage() {
                     onClick={() => setIsVisible(!isVisible)}
                     title={isVisible ? 'Hide' : 'Show'}
                   >
-                    {isVisible ? (
-                      <ViewOff size={16} />
-                    ) : (
-                      <View size={16} />
-                    )}
+                    {isVisible ? <ViewOff size={16} /> : <View size={16} />}
                   </GhostButton>
-                  <GhostButton size="md" onClick={() => copyToClipboard(token)} title="Copy">
-                    {isCopied ? (
-                      <Checkmark size={16} />
-                    ) : (
-                      <Copy size={16} />
-                    )}
+                  <GhostButton
+                    size="md"
+                    onClick={() => copyToClipboard(token)}
+                    title="Copy"
+                  >
+                    {isCopied ? <Checkmark size={16} /> : <Copy size={16} />}
                   </GhostButton>
                 </div>
               </div>

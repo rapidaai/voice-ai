@@ -135,7 +135,11 @@ func (cApi *ConversationApi) UnviersalCallback(c *gin.Context) {
 				ConversationID: cc.ConversationID,
 			},
 			observability.RecordMetric{
-				Metrics: observability.CallStatusMetric(observability.MetricCallStatusFailed, statusInfo.Error.Reason),
+				Metrics: append(observability.CallStatusMetric(observability.MetricCallStatusFailed, statusInfo.Error.Reason), &protos.Metric{
+					Name:        observability.MetricConversationStatus,
+					Value:       observability.MetricCallStatusFailed,
+					Description: statusInfo.Error.Reason,
+				}),
 			})
 		if validator.NotBlank(statusInfo.Error.Reason) {
 			observer.Record(c,
@@ -355,7 +359,11 @@ func (cApi *ConversationApi) CallbackByContext(c *gin.Context) {
 				ConversationID: cc.ConversationID,
 			},
 			observability.RecordMetric{
-				Metrics: observability.CallStatusMetric(observability.MetricCallStatusFailed, statusInfo.Error.Reason),
+				Metrics: append(observability.CallStatusMetric(observability.MetricCallStatusFailed, statusInfo.Error.Reason), &protos.Metric{
+					Name:        observability.MetricConversationStatus,
+					Value:       observability.MetricCallStatusFailed,
+					Description: statusInfo.Error.Reason,
+				}),
 			})
 		if validator.NotBlank(statusInfo.Error.Reason) {
 			observer.Record(c, observability.ConversationScope{

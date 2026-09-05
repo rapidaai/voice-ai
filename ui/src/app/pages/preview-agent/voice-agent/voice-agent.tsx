@@ -25,9 +25,9 @@ import { Tabs } from '@/app/components/carbon/tabs';
 import { Text } from '@/app/components/carbon/text';
 import { ArrowLeft } from '@carbon/icons-react';
 import { TextArea } from '@/app/components/carbon/form';
-import { CustomerOptions } from '@/app/components/navigation/actionable-header';
-import { RapidaIcon } from '@/app/components/Icon/Rapida';
-import { RapidaTextIcon } from '@/app/components/Icon/RapidaText';
+import { PreviewAgentHeader } from './preview-agent-header';
+
+export { PreviewAgentHeader } from './preview-agent-header';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -613,9 +613,9 @@ export const VoiceAgentDebugger: FC<{
   const metricCount = Object.keys(metrics).length;
 
   const deployment = assistant
-    ? (debug
+    ? ((debug
         ? assistant.getDebuggerdeployment()
-        : assistant.getApideployment()) ?? null
+        : assistant.getApideployment()) ?? null)
     : null;
   const stt = deployment?.getInputaudio() ?? null;
   const tts = deployment?.getOutputaudio() ?? null;
@@ -807,16 +807,6 @@ const AssistantPlaceholder: FC<{
     </div>
   );
 };
-
-export const PreviewAgentHeader: FC = () => (
-  <header className="flex h-12 shrink-0 items-center justify-between border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-    <div className="flex min-w-0 items-center gap-2 px-4 text-blue-600 dark:text-blue-500">
-      <RapidaIcon className="h-6 w-6 shrink-0" />
-      <RapidaTextIcon className="h-5 shrink-0" />
-    </div>
-    <CustomerOptions showProjectSelector={false} />
-  </header>
-);
 
 const DebuggerScrollArea: FC<{ children: React.ReactNode }> = ({
   children,

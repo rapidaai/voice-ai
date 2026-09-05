@@ -113,7 +113,7 @@ export const AccountSetting = () => {
               <Input
                 disabled
                 value={user?.email}
-                placeholder="eg: john@rapida.ai"
+                placeholder="eg: john@example.com"
               ></Input>
             </FieldSet>
           </div>
@@ -158,7 +158,9 @@ export const AccountSetting = () => {
             </FieldSet>
           </div>
           <div className="flex-col gap-6">
-            <PrimaryButton size="md" renderIcon={ChevronRight}
+            <PrimaryButton
+              size="md"
+              renderIcon={ChevronRight}
               type="submit"
               form="account-settings-form"
               isLoading={loading}

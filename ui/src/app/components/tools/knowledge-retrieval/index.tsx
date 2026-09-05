@@ -128,7 +128,7 @@ export const ConfigureKnowledgeRetrieval: FC<ConfigureToolProps> = ({
           toolDefinition={toolDefinition}
           onChangeToolDefinition={onChangeToolDefinition}
           inputClass={inputClass}
-          documentationUrl="https://doc.rapida.ai/assistants/tools/add-knowledge-tool"
+          documentationPath="/assistants/tools/add-knowledge-tool"
         />
       )}
     </>

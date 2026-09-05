@@ -1,0 +1,159 @@
+{
+  "rfc": "rfcs/0014-ui-brand-theme-customization.md",
+  "status": "accepted-candidate",
+  "created": "2026-08-31",
+  "owner": "UI Platform",
+  "classification": "Governed",
+  "objective": "Complete UI-only brand and theme customization by making tenant-visible UI surfaces use CONFIG.theme for brand identity, links, assets, and primary colors.",
+  "inferred_integration_type": "ui",
+  "defaults": {
+    "brand_source": "CONFIG.theme",
+    "selected_configs": [
+      "ui/src/configs/config.development.json",
+      "ui/src/configs/config.production.json",
+      "docker/ui/config.community.json",
+      "docker/ui/config.enterprise.json",
+      "docker/ui/config.local.json",
+      "docker/ui/config.local-knowledge.json"
+    ],
+    "runtime_model": "build-time bundled UI config",
+    "fallback_behavior": "use configured brand text when a logo asset is absent"
+  },
+  "accepted_scope": {
+    "allowed_paths": [
+      "ui/src/theme/",
+      "ui/src/configs/",
+      "docker/ui/config.*.json",
+      "ui/src/app/components/",
+      "ui/src/app/pages/",
+      "ui/src/app/routes/",
+      "ui/public/",
+      "ui/scripts/check-theme-contract.mjs",
+      "ui/scripts/check-theme-contract.test.mjs",
+      "ui/THEMING.md"
+    ],
+    "out_of_scope_paths": [
+      "api/**",
+      "pkg/clients/external/emailer/**",
+      "pkg/configs/emailer_config.go",
+      "cmd/**",
+      "protos/**",
+      "README.md",
+      "LICENSE.md",
+      "SECURITY.md",
+      "package manager lockfiles",
+      "generated artifacts"
+    ]
+  },
+  "verified_context": [
+    {
+      "path": "ui/src/index.tsx",
+      "finding": "React is already wrapped with ThemeProvider using CONFIG.theme."
+    },
+    {
+      "path": "ui/src/theme/theme-provider.tsx",
+      "finding": "ThemeProvider applies data-brand, data-color-mode, favicon, theme color, and brand CSS variables."
+    },
+    {
+      "path": "ui/src/app/components/navigation/header/index.tsx",
+      "finding": "Header uses configured full logo when present but falls back to Rapida SVG components."
+    },
+    {
+      "path": "ui/src/app/components/navigation/sidebar/index.tsx",
+      "finding": "Sidebar uses configured full or compact logo when present but falls back to Rapida SVG components."
+    },
+    {
+      "path": "ui/src/app/pages/preview-agent/voice-agent/voice-agent.tsx",
+      "finding": "Preview header imports and renders RapidaIcon and RapidaTextIcon directly."
+    },
+    {
+      "path": "ui/src/app/pages/preview-agent/voice-agent/text/conversations/index.tsx",
+      "finding": "Preview chat renders a Rapida icon and the assistant-side display name Rapida."
+    },
+    {
+      "path": "ui/scripts/check-theme-contract.mjs",
+      "finding": "Theme contract checks deployable theme config and shell colors, but not broader user-visible brand literals."
+    }
+  ],
+  "acceptance_criteria": [
+    "Inside the bounded brand scan set, CONFIG.theme is the only source for tenant-visible UI brand name, logo, favicon, primary color, docs links, legal links, and support link, except documented non-branding allowlist entries.",
+    "Preview call and preview chat pages no longer import or render Rapida logo components directly.",
+    "Assistant preview chat uses theme.brand.name for the assistant-side display name.",
+    "Missing logo config falls back to configured brand text, not Rapida SVGs.",
+    "UI navigation and auth surfaces use configured legal and support links.",
+    "Hardcoded Rapida brand literals in UI source are either removed or listed in a documented allowlist with a non-branding justification.",
+    "UI contract tests fail when new tenant-visible hardcoded Rapida brand literals are added.",
+    "Default deployable configs retain the current Rapida AI appearance.",
+    "Backend email branding remains unchanged and explicitly out of scope."
+  ],
+  "non_goals": [
+    "Backend email subjects, sender identity, and body templates.",
+    "Go module paths, generated clients, protobuf package names, npm package names, import paths, and internal metadata keys.",
+    "Product or legal rewording beyond removing unintended UI hardcoding.",
+    "Provider catalog branding, provider names, and third-party provider logos.",
+    "Runtime tenant switching without rebuilding the selected UI bundle.",
+    "Authentication, authorization, API, database, or deployment contract changes."
+  ],
+  "implementation_outline": [
+    "Keep the current build-time CONFIG.theme model.",
+    "Use existing ThemeManifest fields without a schema version change.",
+    "Move preview header and preview chat brand rendering to useTheme.",
+    "Add a shared BrandedLogo component and replace tenant-visible Rapida SVG fallbacks with configured brand text fallback.",
+    "Route docs, legal, support, and source links through theme.links where those links are UI-owned.",
+    "Make ui/public/LLMs.txt neutral for the first implementation.",
+    "Keep built-in static legal pages directly accessible, but route tenant-visible navigation through theme.links.terms and theme.links.privacy.",
+    "Extend the theme contract checker over the bounded brand scan set with an explicit allowlist for non-brand technical identifiers."
+  ],
+  "risks": [
+    {
+      "risk": "The brand literal scanner may flag technical identifiers that are not tenant-visible.",
+      "mitigation": "Use a narrow allowlist and focus scanning on UI source and selected public metadata."
+    },
+    {
+      "risk": "Static legal pages contain product-specific legal text.",
+      "mitigation": "Use configured legal links for navigation and decide whether direct routes remain accessible before acceptance."
+    },
+    {
+      "risk": "Broken configured logo assets degrade visual quality.",
+      "mitigation": "Use configured alt text and brand text fallback."
+    }
+  ],
+  "brand_scan_contract": {
+    "included_paths": [
+      "ui/src/app/**/*.tsx",
+      "ui/src/app/**/*.ts",
+      "ui/src/theme/**/*.ts",
+      "ui/src/theme/**/*.tsx",
+      "ui/public/LLMs.txt"
+    ],
+    "excluded_paths": [
+      "tests",
+      "provider catalogs",
+      "deployable config defaults",
+      "icon component definitions",
+      "generated files",
+      "package metadata",
+      "non-rendered type or store names"
+    ],
+    "allowlist_policy": "Every exception requires a short non-branding justification in the checker source or adjacent test fixtures."
+  },
+  "challenge_resolution": [
+    "Round 1 recommended revise.",
+    "ui/public/LLMs.txt will become neutral in the first implementation.",
+    "Built-in static legal pages remain directly accessible, while tenant-visible navigation must use configured legal links.",
+    "The brand-source acceptance criterion now has a bounded scan set and explicit allowlist policy.",
+    "BrandedLogo is required for tenant-visible brand rendering in shell, onboarding, and preview surfaces."
+  ],
+  "rollback": "Revert UI component, public metadata, config, documentation, and theme contract checker changes. No backend or data rollback is required.",
+  "verification_commands": [
+    "cd ui && yarn check:theme-contract",
+    "cd ui && yarn test:theme-contract",
+    "cd ui && yarn lint",
+    "cd ui && yarn checkTs",
+    "cd ui && yarn test --watchAll=false --runInBand",
+    "cd ui && yarn build",
+    "just agent-finalize \"ui/src,ui/public,ui/scripts,ui/THEMING.md,docker/ui\""
+  ],
+  "requires_independent_challenge": true,
+  "requires_confirmation_before_implementation": true
+}

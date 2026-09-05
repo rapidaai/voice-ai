@@ -1,0 +1,15 @@
+{
+  "status": "authorized",
+  "rfc": "rfcs/0013-organization-observability-index-names.md",
+  "plan": "rfcs/0013-organization-observability-index-names/jsons/plan.json",
+  "authorized_by": "user",
+  "authorization_message": "Create authorize my RFC as my approval and commit",
+  "authorized_at": "2026-08-27T16:30:28Z",
+  "rfc_sha256": "67e3d51612f2caf10ad1bb26164b5c0ec6d665d73b61e4a27fed547443cd1a0d",
+  "plan_sha256": "8a31a15b372578207d439590351db36bc4ba9f856db9053d13a5b7daa15dc94d",
+  "challenge_receipt": "rfcs/0013-organization-observability-index-names/jsons/amendment-01-challenge.json",
+  "challenge_receipt_sha256": "8b858829b9315923e21e1f59ff6eefaf4910e1a8180dc6f134b1800849d24b88",
+  "confirmation_receipt": "rfcs/0013-organization-observability-index-names/jsons/confirmation.json",
+  "confirmation_receipt_sha256": "87950c673ff2e36de64a920a4db1ca294647a711a9f2ffff63297fdf3afaf71a",
+  "implementation_authorized": true
+}

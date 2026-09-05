@@ -1,5 +1,5 @@
 import { Tooltip } from '@/app/components/base/tooltip';
-import { RapidaIcon } from '@/app/components/Icon/Rapida';
+import { BrandedLogo } from '@/app/components/brand/branded-logo';
 import { TextImage } from '@/app/components/text-image';
 import { toHumanReadableRelativeTimeFromDate } from '@/utils/date';
 import {
@@ -17,11 +17,13 @@ import { useCurrentCredential } from '@/hooks/use-credential';
 import { MessageFeedbackDialog } from '@/app/components/base/modal/message-feedback-modal';
 import MarkdownPreview from '@uiw/react-markdown-preview';
 import { cn } from '@/utils';
+import { useTheme } from '@/theme/theme-provider';
 
 export const ConversationMessages: FC<{ vag: VoiceAgent }> = ({ vag }) => {
   const messages = useAgentMessages(vag);
   const [searchParams] = useSearchParams();
   const { user } = useCurrentCredential();
+  const { theme } = useTheme();
   const queryName = searchParams.get('name');
   const ctrRef = useRef<HTMLDivElement>(null);
   /**
@@ -70,8 +72,12 @@ export const ConversationMessages: FC<{ vag: VoiceAgent }> = ({ vag }) => {
               {isUser ? (
                 <TextImage name={user?.name || queryName || 'user'} size={10} />
               ) : (
-                <div className="bg-blue-600 w-10 h-10 flex items-center justify-center rounded-xs">
-                  <RapidaIcon className="text-white h-full w-full p-1.5" />
+                <div className="bg-primary text-on-primary w-10 h-10 flex items-center justify-center rounded-xs">
+                  <BrandedLogo
+                    variant="compact"
+                    className="h-full w-full p-1.5 object-contain text-on-primary"
+                    textClassName="px-1 text-center text-[10px] leading-tight"
+                  />
                 </div>
               )}
             </div>
@@ -79,7 +85,7 @@ export const ConversationMessages: FC<{ vag: VoiceAgent }> = ({ vag }) => {
             {/* HEADER */}
             <div className="flex items-baseline gap-2">
               <div className="text-md font-semibold">
-                {isUser ? user?.name || queryName || 'User' : 'Rapida'}
+                {isUser ? user?.name || queryName || 'User' : theme.brand.name}
               </div>
               <span className="text-sm opacity-70">
                 {toHumanReadableRelativeTimeFromDate(group.items[0].time)}

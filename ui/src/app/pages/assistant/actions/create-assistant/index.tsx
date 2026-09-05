@@ -67,12 +67,14 @@ import {
   AssistantTemplate,
   ConfigureAssistantTemplateDialog,
 } from '@/app/components/base/modal/configure-assistant-template-modal';
+import { useTheme } from '@/theme/theme-provider';
 
 /**
  *
  * @returns
  */
 export function CreateAssistantPage() {
+  const { theme } = useTheme();
   /**
    * credentils and authentication parameters
    */
@@ -439,10 +441,10 @@ export function CreateAssistantPage() {
             body: (
               <>
                 <DocNoticeBlock
-                  docUrl="https://doc.rapida.ai/assistants/overview"
+                  docPath="/assistants/overview"
                   linkText="Read docs"
                 >
-                  Rapida Assistant enables you to deploy intelligent
+                  {theme.brand.name} enables you to deploy intelligent
                   conversational agents across multiple channels.
                 </DocNoticeBlock>
                 <div className="px-8 pt-6 pb-8 max-w-4xl flex flex-col gap-8">
@@ -486,7 +488,7 @@ export function CreateAssistantPage() {
                   {/* Prompt template section */}
                   <div className="flex flex-col gap-6">
                     <SectionDivider label="Prompt Template" />
-                    <DocNoticeBlock docUrl="https://doc.rapida.ai/assistants/prompt-templating">
+                    <DocNoticeBlock docPath="/assistants/prompt-templating">
                       Prompt variables and system arguments are resolved at
                       runtime. Read the prompt templating guide before
                       finalizing your instruction.

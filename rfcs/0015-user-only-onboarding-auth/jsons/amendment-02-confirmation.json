@@ -1,0 +1,12 @@
+{
+  "run": "chore-partial-auth-fixes",
+  "task": "replace middleware opt-in with controller-owned user authorization",
+  "gate": "rfc-0015-amendment-02-exact-digest-confirmation",
+  "question": "Approve rfcs/0015-user-only-onboarding-auth/jsons/amendment-02-controller-owned-user-authorization.json at SHA-256 71b8591c434b0e6e989b77368143c29f5ea7df5ae35209c1c32aaf5392b62912?",
+  "resolution": "approved",
+  "approved_by": "user",
+  "approval_message": "confirm",
+  "approved_at": "2026-09-05",
+  "amendment_sha256": "71b8591c434b0e6e989b77368143c29f5ea7df5ae35209c1c32aaf5392b62912",
+  "open_blockers": []
+}

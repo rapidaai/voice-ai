@@ -108,7 +108,7 @@ export function SignInPage() {
             type="email"
             required
             autoComplete="email"
-            placeholder="eg: john@rapida.ai"
+            placeholder="eg: john@example.com"
             {...register('email')}
           />
           <PasswordInput

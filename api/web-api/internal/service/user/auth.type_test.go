@@ -118,6 +118,19 @@ func TestAuthPrincipleProjectContextOptional(t *testing.T) {
 	}
 }
 
+func TestAuthPrincipleRequiresOrganization(t *testing.T) {
+	user := &internal_entity.UserAuth{}
+	user.Id = 73
+	principle := &authPrinciple{user: user}
+
+	if principle.IsAuthenticated() {
+		t.Fatal("IsAuthenticated() = true without organization")
+	}
+	if _, ok := principle.OrganizationContext(); ok {
+		t.Fatal("OrganizationContext() ok = true without organization")
+	}
+}
+
 func TestUserServicePersistsProvidedAuditActor(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {

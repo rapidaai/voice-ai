@@ -34,7 +34,7 @@ const sourceConfig: Record<
   'rapida-app': {
     tagType: 'blue',
     icon: <Application size={16} />,
-    label: 'Rapida App',
+    label: 'App',
   },
   'node-sdk': { tagType: 'green', icon: <Code size={16} />, label: 'Node SDK' },
   'go-sdk': { tagType: 'cyan', icon: <Code size={16} />, label: 'Go SDK' },

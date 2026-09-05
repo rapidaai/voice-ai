@@ -12,6 +12,9 @@
 !tests/smoke/run.sh
 !tests/smoke/product-usage/
 !tests/smoke/product-usage/*.go
+!tests/integration/
+!tests/integration/telephony/
+!tests/integration/telephony/**
 !openapi/
 !openapi/postman/
 !openapi/postman/assistant-api/

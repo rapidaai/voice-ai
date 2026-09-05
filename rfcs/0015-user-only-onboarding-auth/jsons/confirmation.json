@@ -1,0 +1,14 @@
+{
+  "run": "chore-partial-auth-fixes",
+  "task": "allow authenticated users without an organization to create their first organization",
+  "gate": "rfc-0015-exact-digest-confirmation",
+  "question": "Approve implementation of rfcs/0015-user-only-onboarding-auth.md at SHA-256 893af9b4a8292407149f5311782b137d6e8a74326fd88d0fc5fcd1535062c637?",
+  "resolution": "approved",
+  "approved_by": "user",
+  "approval_message": "Confirm",
+  "approved_at": "2026-09-04",
+  "rfc_sha256": "893af9b4a8292407149f5311782b137d6e8a74326fd88d0fc5fcd1535062c637",
+  "plan_sha256": "b57747806d4a1f6e6176080541df2fabde6407b13887be7e9ff6aa0865ba5875",
+  "challenge_sha256": "0551f209a8b492d64acd0db8d70e6d5d928738ab1769a0b37a25f56cbdad284f",
+  "open_blockers": []
+}

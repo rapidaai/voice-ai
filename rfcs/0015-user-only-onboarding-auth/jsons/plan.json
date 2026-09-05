@@ -1,0 +1,94 @@
+{
+  "rfc": "rfcs/0015-user-only-onboarding-auth.md",
+  "status": "challenged",
+  "created_at": "2026-09-04",
+  "problem": "A valid newly registered user has no organization role, but web-api authentication currently requires organization context. Middleware and CreateOrganization therefore reject the onboarding request as unauthenticated.",
+  "verified_context": [
+    "api/web-api/internal/service/user/service.go returns a valid user and token even when no active organization role exists.",
+    "api/web-api/internal/service/user/auth.type.go requires both user and organization context in IsAuthenticated.",
+    "pkg/middlewares/authentication_rpc_middleware.go and pkg/middlewares/authentication_grpc_middleware.go require an authenticated principal and always construct organization context.",
+    "pkg/types/rapida_auth.go requires organization context for AuthTypeUser in the existing Authorize path.",
+    "api/web-api/api/organization.go uses the existing Authorize path before creating the first organization."
+  ],
+  "acceptance_criteria": [
+    "Valid user-only credentials reach REST and gRPC CreateOrganization only in web-api.",
+    "The created owner role uses the authenticated user ID.",
+    "Existing Authorize behavior still rejects user-only context for every unchanged endpoint.",
+    "Default user middleware behavior remains unchanged outside cmd/web.",
+    "Users with an existing organization remain unable to create another organization.",
+    "Missing, malformed, mismatched, and non-user authentication remain rejected."
+  ],
+  "non_goals": [
+    "No UI changes.",
+    "No token issuance changes.",
+    "No protobuf or database changes.",
+    "No default middleware behavior change for services other than web-api.",
+    "No relaxation of organization authorization outside CreateOrganization.",
+    "No support for multiple organizations per user."
+  ],
+  "allowed_paths": {
+    "api/web-api/internal/service/user/auth.type.go": "authentication implementer",
+    "api/web-api/internal/service/user/auth_type_test.go": "authentication implementer",
+    "pkg/middlewares/user_authentication.go": "authentication implementer",
+    "pkg/middlewares/authentication_grpc_middleware.go": "authentication implementer",
+    "pkg/middlewares/authentication_rpc_middleware.go": "authentication implementer",
+    "pkg/middlewares/authentication_middleware_test.go": "authentication implementer",
+    "cmd/web/web.go": "authentication implementer",
+    "cmd/web/authentication_middleware_test.go": "authentication implementer",
+    "api/web-api/api/organization.go": "authentication implementer",
+    "api/web-api/api/organization_test.go": "authentication implementer",
+    "rfcs/0015-user-only-onboarding-auth.md": "coordinator",
+    "rfcs/0015-user-only-onboarding-auth/jsons/": "coordinator and reviewers"
+  },
+  "out_of_scope": [
+    "pkg/types/**",
+    "ui/src/**",
+    "protos/**",
+    "database migrations",
+    "runtime behavior of assistant-api, endpoint-api, and integration-api",
+    "non-user authentication middleware",
+    "handlers outside organization creation"
+  ],
+  "principles": {
+    "kiss": "Add one opt-in middleware option and one private web-api authorization helper.",
+    "yagni": "Do not introduce onboarding tokens, route-specific credential verification, feature flags, schemas, or new services.",
+    "single_source_of_truth": "The verified web-api user principal remains the sole source of user identity; organization context remains optional until membership exists.",
+    "explicit_contracts": "Default middleware and Authorize continue to require organization-bearing user authorization. Only cmd/web opts into user-only context construction.",
+    "fail_safe": "Only CreateOrganization consumes user-only authentication through a private helper. Every unchanged endpoint retains the existing Authorize requirement.",
+    "least_privilege": "No organization or project context is synthesized for a user without membership.",
+    "reversibility": "All behavior changes can be reverted together without data migration."
+  },
+  "required_tests": [
+    "local user principal authenticates with user identity alone",
+    "default user middleware rejects user-only principal",
+    "opt-in user middleware accepts user-only principal across Gin, unary gRPC, and stream gRPC",
+    "Authorize rejects user-only request authentication",
+    "private organization onboarding helper accepts matching user-only request authentication",
+    "private organization onboarding helper rejects mismatched and non-user request authentication",
+    "REST and gRPC CreateOrganization accept user-only authentication",
+    "CreateOrganization rejects existing organization context"
+  ],
+  "required_commands": [
+    "gofmt -w <changed Go files>",
+    "go test ./pkg/middlewares ./api/web-api/internal/service/user ./api/web-api/api ./cmd/web",
+    "go test ./pkg/... ./api/web-api/...",
+    "git diff --check",
+    "just agent-finalize \"api/web-api/internal/service/user/auth.type.go,api/web-api/internal/service/user/auth_type_test.go,pkg/middlewares/user_authentication.go,pkg/middlewares/authentication_grpc_middleware.go,pkg/middlewares/authentication_rpc_middleware.go,pkg/middlewares/authentication_middleware_test.go,cmd/web/web.go,cmd/web/authentication_middleware_test.go,api/web-api/api/organization.go,api/web-api/api/organization_test.go,rfcs/0015-user-only-onboarding-auth.md,rfcs/0015-user-only-onboarding-auth/jsons/plan.json,rfcs/0015-user-only-onboarding-auth/jsons/challenge.json,rfcs/0015-user-only-onboarding-auth/jsons/confirmation.json\""
+  ],
+  "risks": [
+    "The web-api-local principal semantics change, so default middleware must explicitly retain the organization requirement unless opted in.",
+    "Middleware could accidentally synthesize zero organization context, causing full authorization to pass incorrectly.",
+    "Any change under pkg/types would widen shared contracts and is explicitly excluded.",
+    "REST and gRPC handlers could diverge if only one uses the private onboarding authorization helper."
+  ],
+  "rollback": "Revert the web principal, middleware option, cmd/web opt-in, and organization handler changes together. No schema or data rollback is needed.",
+  "discussion": {
+    "planner": "codex",
+    "challenger": "user",
+    "decision": "revise completed, final confirmation pending",
+    "approved_by": "pending",
+    "open_blockers": [
+      "Exact RFC SHA-256 confirmation is required before implementation."
+    ]
+  }
+}

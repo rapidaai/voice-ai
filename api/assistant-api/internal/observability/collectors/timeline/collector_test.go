@@ -107,7 +107,7 @@ func TestCollector_PushesEventDocumentToOpenSearchBulk(t *testing.T) {
 	if len(lines) != 2 {
 		t.Fatalf("expected bulk metadata+document lines, got %d", len(lines))
 	}
-	if !strings.Contains(lines[0], `"rapida-timeline-20260605"`) || !strings.Contains(lines[0], `"evt-1"`) {
+	if !strings.Contains(lines[0], `"rapida-timeline-1-20260605"`) || !strings.Contains(lines[0], `"evt-1"`) {
 		t.Fatalf("unexpected bulk metadata line: %s", lines[0])
 	}
 
@@ -144,7 +144,7 @@ func TestCollector_UsesCustomIndexPrefix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CollectMetric returned error: %v", err)
 	}
-	if !strings.Contains(opensearch.bodies[0], `"custom-timeline-20260605"`) {
+	if !strings.Contains(opensearch.bodies[0], `"custom-timeline-global-20260605"`) {
 		t.Fatalf("unexpected bulk body: %s", opensearch.bodies[0])
 	}
 }

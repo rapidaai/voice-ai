@@ -1,19 +1,24 @@
 package middlewares
 
+import "errors"
+
 type AuthenticationError struct {
 	Error string `json:"error"`
 }
 
+var (
+	errUserAuthNotSupported             = errors.New("User credential is not supported")
+	errUserAuthIncomplete               = errors.New("User credential is incomplete")
+	errUserAuthInvalidID                = errors.New("User credential has invalid auth id")
+	errUserAuthRejected                 = errors.New("User credential was rejected")
+	errUserAuthInvalidProjectID         = errors.New("User credential has invalid project id")
+	errUserAuthProjectSelectionRejected = errors.New("User credential project selection was rejected")
+	errUserAuthInvalidAuditActor        = errors.New("User credential has invalid audit actor")
+)
+
 const (
 	AuthenticationFailureMessage             = "Invalid authentication credentials"
 	authenticationConflictMessage            = "Authentication credential conflicts with an existing identity"
-	userAuthNotSupportedMessage              = "User credential is not supported"
-	userAuthIncompleteMessage                = "User credential is incomplete"
-	userAuthInvalidIDMessage                 = "User credential has invalid auth id"
-	userAuthRejectedMessage                  = "User credential was rejected"
-	userAuthInvalidProjectIDMessage          = "User credential has invalid project id"
-	userAuthProjectSelectionRejectedMessage  = "User credential project selection was rejected"
-	userAuthInvalidAuditActorMessage         = "User credential has invalid audit actor"
 	projectAuthNotSupportedMessage           = "Project credential is not supported"
 	projectAuthEmptyMessage                  = "Project credential is empty"
 	projectAuthRejectedMessage               = "Project credential was rejected"

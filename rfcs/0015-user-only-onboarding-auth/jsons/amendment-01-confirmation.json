@@ -1,0 +1,12 @@
+{
+  "run": "chore-partial-auth-fixes",
+  "task": "update the web-api authentication contract test for the CreateOrganization exception",
+  "gate": "rfc-0015-amendment-01-exact-digest-confirmation",
+  "question": "Approve rfcs/0015-user-only-onboarding-auth/jsons/amendment-01-auth-contract-test.json at SHA-256 a35dacde2128300996683c1b98bfe8736f564fce4f7ca4cf622a22589c42824f?",
+  "resolution": "approved",
+  "approved_by": "user",
+  "approval_message": "a35dacde2128300996683c1b98bfe8736f564fce4f7ca4cf622a22589c42824f",
+  "approved_at": "2026-09-04",
+  "amendment_sha256": "a35dacde2128300996683c1b98bfe8736f564fce4f7ca4cf622a22589c42824f",
+  "open_blockers": []
+}

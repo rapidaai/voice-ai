@@ -227,7 +227,7 @@ export const CreateTool: FC<{ assistantId: string }> = ({ assistantId }) => {
                     <ToolDefinitionForm
                       toolDefinition={toolDefinition}
                       onChangeToolDefinition={setToolDefinition}
-                      documentationUrl="https://doc.rapida.ai/assistants/tools"
+                      documentationPath="/assistants/tools"
                     />
                   ),
                 },

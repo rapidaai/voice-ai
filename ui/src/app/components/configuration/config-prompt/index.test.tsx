@@ -64,16 +64,16 @@ describe('ConfigPrompt argument hints', () => {
     );
 
     expect(
-      screen.getByRole('button', { name: /Rapida Reserved Variables/i }),
+      screen.getByRole('button', { name: /Reserved Variables/i }),
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        /These variables are preserved and replaced by Rapida at runtime/i,
+        /These variables are preserved and replaced at runtime/i,
       ),
     ).toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole('button', { name: /Rapida Reserved Variables/i }),
+      screen.getByRole('button', { name: /Reserved Variables/i }),
     );
 
     expect(screen.getByText(/Runtime value/i)).toBeInTheDocument();
@@ -98,7 +98,7 @@ describe('ConfigPrompt argument hints', () => {
   it('does not show runtime argument hint text when hints are not provided', () => {
     render(<ConfigPrompt existingPrompt={basePrompt} onChange={() => {}} />);
     expect(
-      screen.queryByText(/Rapida Reserved Variables/i),
+      screen.queryByText(/Reserved Variables/i),
     ).not.toBeInTheDocument();
   });
 
@@ -117,7 +117,7 @@ describe('ConfigPrompt argument hints', () => {
     expect(screen.getByText('Arguments')).toBeInTheDocument();
     expect(
       screen.getByText(
-        /Rapida reserved variables are preserved and replaced at runtime/i,
+        /Reserved variables are preserved and replaced at runtime/i,
       ),
     ).toBeInTheDocument();
     expect(

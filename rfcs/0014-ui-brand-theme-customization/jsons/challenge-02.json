@@ -1,0 +1,15 @@
+{
+  "rfc": "rfcs/0014-ui-brand-theme-customization.md",
+  "created": "2026-08-31",
+  "reviewer": "independent challenger",
+  "recommendation": "approve",
+  "findings": [],
+  "resolved_prior_findings": [
+    "ui/public/LLMs.txt decision is explicit: make it neutral in first implementation.",
+    "Static legal route behavior is explicit: direct routes may remain, tenant-visible navigation must use configured links.",
+    "Brand-source acceptance is bounded by a concrete scan set and allowlist policy.",
+    "BrandedLogo is required for tenant-visible brand surfaces."
+  ],
+  "status_line_check": "The RFC bytes contain the sole metadata status line '- Status: Accepted'.",
+  "next_step": "Create exact-digest confirmation before implementation."
+}

@@ -3,6 +3,7 @@ import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { TryChatComplete } from '@/app/pages/endpoint/view/try-playground/experiment-prompt/try-chat-complete';
 import { Helmet } from '@/app/components/helmet';
 import { Launch } from '@carbon/icons-react';
+import { useDocumentationUrl } from '@/theme/documentation-url';
 
 const overviewSections = [
   {
@@ -65,6 +66,8 @@ export function Playground(props: {
   currentEndpoint: Endpoint;
   currentEndpointProviderModel: EndpointProviderModel;
 }) {
+  const apiReferenceUrl = useDocumentationUrl('/api-reference/endpoint/invoke');
+
   return (
     <PanelGroup direction="horizontal" className="grow">
       <Helmet title={props.currentEndpoint.getName()} />
@@ -85,7 +88,7 @@ export function Playground(props: {
           </p>
           <a
             target="_blank"
-            href="https://doc.rapida.ai/api-reference/endpoint/invoke"
+            href={apiReferenceUrl}
             className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
             rel="noreferrer"
           >

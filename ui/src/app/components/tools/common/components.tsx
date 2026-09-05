@@ -22,13 +22,13 @@ import { parseJsonParameters, stringifyParameters } from './hooks';
 
 interface DocumentationNoticeProps {
   title?: string;
-  documentationUrl: string;
+  documentationPath: string;
 }
 
 export const DocumentationNotice: FC<DocumentationNoticeProps> = ({
-  title = 'Know more about knowledge tool definition that can be supported by rapida',
-  documentationUrl,
-}) => <DocNoticeBlock docUrl={documentationUrl}>{title}</DocNoticeBlock>;
+  title = 'Know more about supported knowledge tool definitions',
+  documentationPath,
+}) => <DocNoticeBlock docPath={documentationPath}>{title}</DocNoticeBlock>;
 
 // ============================================================================
 // Tool Definition Form
@@ -38,7 +38,7 @@ interface ToolDefinitionFormProps {
   toolDefinition: ToolDefinition;
   onChangeToolDefinition: (value: ToolDefinition) => void;
   inputClass?: string;
-  documentationUrl?: string;
+  documentationPath?: string;
   documentationTitle?: string;
 }
 
@@ -46,7 +46,7 @@ export const ToolDefinitionForm: FC<ToolDefinitionFormProps> = ({
   toolDefinition,
   onChangeToolDefinition,
   inputClass,
-  documentationUrl = 'https://doc.rapida.ai/assistants/overview',
+  documentationPath = '/assistants/overview',
   documentationTitle,
 }) => {
   const llmTooltip =
@@ -56,7 +56,7 @@ export const ToolDefinitionForm: FC<ToolDefinitionFormProps> = ({
     <div>
       <DocumentationNotice
         title={documentationTitle}
-        documentationUrl={documentationUrl}
+        documentationPath={documentationPath}
       />
       <div className="px-6 pb-6 mt-4 max-w-6xl">
         <Stack gap={6}>
@@ -289,16 +289,14 @@ export const AssistantMappingTable = <
       onChange([...parameters, createNewParameter()]);
       return;
     }
-    onChange(
-      [
-        ...parameters,
-        {
-          type: defaultNewType,
-          key: getDefaultKey(defaultNewType),
-          value: '',
-        } as TItem,
-      ],
-    );
+    onChange([
+      ...parameters,
+      {
+        type: defaultNewType,
+        key: getDefaultKey(defaultNewType),
+        value: '',
+      } as TItem,
+    ]);
   }, [parameters, onChange, createNewParameter, defaultNewType, getDefaultKey]);
 
   return (

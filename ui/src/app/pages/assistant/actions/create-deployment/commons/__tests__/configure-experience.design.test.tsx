@@ -1,11 +1,15 @@
 import React from 'react';
 import { render } from '@testing-library/react';
+import developmentConfig from '@/configs/config.development.json';
+import { ThemeProvider } from '@/theme/theme-provider';
+import { ThemeManifest } from '@/theme/types';
 import {
   ConfigureExperience,
   DEFAULT_IDEAL_TIMEOUT,
 } from '../configure-experience';
 
 const mockSlider = jest.fn();
+const theme = developmentConfig.theme as unknown as ThemeManifest;
 
 jest.mock('@/app/components/carbon/form', () => ({
   Stack: ({ children }: any) => <div>{children}</div>,
@@ -49,15 +53,25 @@ jest.mock('@carbon/react', () => ({
 
 describe('ConfigureExperience', () => {
   beforeEach(() => {
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: jest.fn().mockReturnValue({
+        matches: false,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+      }),
+    });
     mockSlider.mockClear();
   });
 
   it('defaults idle timeout to 10 seconds within backend validation limits', () => {
     render(
-      <ConfigureExperience
-        experienceConfig={{}}
-        setExperienceConfig={jest.fn()}
-      />,
+      <ThemeProvider theme={theme}>
+        <ConfigureExperience
+          experienceConfig={{}}
+          setExperienceConfig={jest.fn()}
+        />
+      </ThemeProvider>,
     );
 
     const idleTimeoutSlider = mockSlider.mock.calls

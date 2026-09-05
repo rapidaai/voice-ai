@@ -8,6 +8,7 @@ import {
 } from '@/app/pages/user-onboarding';
 import { ProgressIndicator, ProgressStep, Tag } from '@carbon/react';
 import { useTheme } from '@/theme/theme-provider';
+import { BrandedLogo } from '@/app/components/brand/branded-logo';
 
 // ── Step definitions ──────────────────────────────────────────────────────────
 
@@ -44,7 +45,7 @@ const FEATURES = [
 
 export function OnboardingLayout() {
   const location = useLocation();
-  const { theme, resolvedMode } = useTheme();
+  const { theme } = useTheme();
 
   const currentStep =
     STEPS.find(s => location.pathname.includes(s.path))?.step ?? 1;
@@ -65,17 +66,12 @@ export function OnboardingLayout() {
 
         {/* Logo */}
         <div className="relative px-10 pt-10">
-          {theme.brand.logos ? (
-            <img
-              src={theme.brand.logos.full.dark}
-              alt={theme.brand.name}
-              className="h-8"
-            />
-          ) : (
-            <span className="text-lg font-semibold text-foreground">
-              {theme.brand.name}
-            </span>
-          )}
+          <BrandedLogo
+            variant="full"
+            colorMode="dark"
+            className="h-8"
+            textClassName="text-lg text-foreground"
+          />
         </div>
 
         {/* Tagline + feature highlights */}
@@ -112,17 +108,11 @@ export function OnboardingLayout() {
       <main className="flex-1 flex flex-col min-w-0">
         {/* Mobile header */}
         <div className="lg:hidden flex items-center justify-between px-6 py-4 border-b border-border-subtle">
-          {theme.brand.logos ? (
-            <img
-              src={theme.brand.logos.compact[resolvedMode]}
-              alt={theme.brand.name}
-              className="h-7 w-7 object-contain"
-            />
-          ) : (
-            <span className="font-semibold text-primary">
-              {theme.brand.name}
-            </span>
-          )}
+          <BrandedLogo
+            variant="compact"
+            className="h-7 w-7"
+            textClassName="text-sm"
+          />
           <Tag size="sm" type="blue">
             Step {currentStep} of {STEPS.length}
           </Tag>

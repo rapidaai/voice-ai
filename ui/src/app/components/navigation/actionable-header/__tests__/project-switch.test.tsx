@@ -164,7 +164,7 @@ describe('Actionable header project switcher', () => {
     expect(screen.queryByLabelText('Select a Project')).not.toBeInTheDocument();
   });
 
-  it('renders resource links without branding in the account panel', () => {
+  it('renders configured account links without documentation or source', () => {
     render(
       <AuthContext.Provider value={{}}>
         <CustomerOptions />
@@ -176,14 +176,8 @@ describe('Actionable header project switcher', () => {
     expect(
       screen.queryByRole('img', { name: 'Acme Voice' }),
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Documentation')).toHaveAttribute(
-      'href',
-      mockTheme.links.documentation,
-    );
-    expect(screen.getByLabelText('Source')).toHaveAttribute(
-      'href',
-      mockTheme.links.source,
-    );
+    expect(screen.queryByLabelText('Documentation')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Source')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Support')).toHaveAttribute(
       'href',
       mockTheme.links.support,

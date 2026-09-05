@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -70,7 +71,7 @@ func NewOpenSearchExporterFromOptions(
 	}, nil
 }
 
-func (e *OpenSearchExporter) index(kind string, occurredAt time.Time) string {
+func (e *OpenSearchExporter) index(kind string, organizationID uint64, occurredAt time.Time) string {
 	prefix := "rapida"
 	if strings.TrimSpace(e.config.IndexPrefix) != "" {
 		prefix = strings.TrimSpace(e.config.IndexPrefix)
@@ -78,19 +79,23 @@ func (e *OpenSearchExporter) index(kind string, occurredAt time.Time) string {
 	if occurredAt.IsZero() {
 		occurredAt = time.Now().UTC()
 	}
-	return prefix + "-" + kind + "-" + occurredAt.UTC().Format("20060102")
+	organization := "global"
+	if organizationID != 0 {
+		organization = strconv.FormatUint(organizationID, 10)
+	}
+	return prefix + "-" + kind + "-" + organization + "-" + occurredAt.UTC().Format("20060102")
 }
 
-func (e *OpenSearchExporter) logIndex(occurredAt time.Time) string {
-	return e.index("logs", occurredAt)
+func (e *OpenSearchExporter) logIndex(organizationID uint64, occurredAt time.Time) string {
+	return e.index("logs", organizationID, occurredAt)
 }
 
-func (e *OpenSearchExporter) eventIndex(occurredAt time.Time) string {
-	return e.index("events", occurredAt)
+func (e *OpenSearchExporter) eventIndex(organizationID uint64, occurredAt time.Time) string {
+	return e.index("events", organizationID, occurredAt)
 }
 
-func (e *OpenSearchExporter) metricIndex(occurredAt time.Time) string {
-	return e.index("metrics", occurredAt)
+func (e *OpenSearchExporter) metricIndex(organizationID uint64, occurredAt time.Time) string {
+	return e.index("metrics", organizationID, occurredAt)
 }
 
 type opensearchEventDoc struct {
@@ -160,7 +165,7 @@ func (e *OpenSearchExporter) Export(ctx context.Context, scope telemetry.Scope, 
 			Attributes:      typed.Attributes,
 			OccurredAt:      occurredAt,
 		}
-		return e.bulk(ctx, e.logIndex(doc.OccurredAt), doc.ID, doc)
+		return e.bulk(ctx, e.logIndex(doc.OrganizationID, doc.OccurredAt), doc.ID, doc)
 	case telemetry.EventRecord:
 		occurredAt := typed.OccurredAt
 		if occurredAt.IsZero() {
@@ -183,7 +188,7 @@ func (e *OpenSearchExporter) Export(ctx context.Context, scope telemetry.Scope, 
 			Attributes:      typed.Attributes,
 			OccurredAt:      occurredAt,
 		}
-		return e.bulk(ctx, e.eventIndex(doc.OccurredAt), doc.ID, doc)
+		return e.bulk(ctx, e.eventIndex(doc.OrganizationID, doc.OccurredAt), doc.ID, doc)
 	case telemetry.MetricRecord:
 		occurredAt := typed.OccurredAt
 		if occurredAt.IsZero() {
@@ -207,7 +212,7 @@ func (e *OpenSearchExporter) Export(ctx context.Context, scope telemetry.Scope, 
 			Attributes:      typed.Attributes,
 			OccurredAt:      occurredAt,
 		}
-		return e.bulk(ctx, e.metricIndex(doc.OccurredAt), doc.ID, doc)
+		return e.bulk(ctx, e.metricIndex(doc.OrganizationID, doc.OccurredAt), doc.ID, doc)
 	default:
 		return nil
 	}
