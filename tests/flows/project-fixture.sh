@@ -94,7 +94,10 @@ SELECT
      AND created_actor_id = :'fixture_id'),
   (SELECT count(*) FROM assistant_provider_models
    WHERE assistant_id IN (SELECT id FROM assistants WHERE project_id = :'project_id')
-     AND model_provider_name IN ('openai', 'anthropic')),
+     AND model_provider_name = 'openai'),
+  (SELECT count(*) FROM assistant_provider_models
+   WHERE assistant_id IN (SELECT id FROM assistants WHERE project_id = :'project_id')
+     AND model_provider_name = 'anthropic'),
   (SELECT count(*) FROM assistant_provider_agentkits
    WHERE assistant_id IN (SELECT id FROM assistants WHERE project_id = :'project_id')
      AND url = 'agentkit:50051'),
@@ -106,7 +109,7 @@ SELECT
      AND schema_version = '1.0');
 SQL
 )
-  if [ "$counts" != '1|2|1|1|1' ]; then
+  if [ "$counts" != '1|1|1|1|1|1' ]; then
     printf 'unexpected assistant provider counts: %s\n' "$counts" >&2
     return 1
   fi
