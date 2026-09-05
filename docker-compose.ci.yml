@@ -147,6 +147,7 @@ services:
         - type=gha,scope=${CI_STACK_CACHE_SCOPE:?CI_STACK_CACHE_SCOPE is required}-test-runner,mode=max
     environment:
       PGPASSWORD: rapida_db_password
+      GITHUB_ACTIONS: ${GITHUB_ACTIONS:-false}
       CI_STACK_AUTH_TOKEN: ${CI_STACK_AUTH_TOKEN:?CI_STACK_AUTH_TOKEN is required}
       CI_STACK_PROJECT_API_KEY: ${CI_STACK_PROJECT_API_KEY:?CI_STACK_PROJECT_API_KEY is required}
     tmpfs:
