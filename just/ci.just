@@ -1,7 +1,7 @@
 go_ci_packages := "./api/web-api/... ./api/integration-api/... ./api/endpoint-api/... ./pkg/... ./cmd/web/... ./cmd/integration/... ./cmd/endpoint/... ./config/..."
 
 # Run every required CI stage locally in production order.
-ci: ci-doctor ci-basics ci-docker ci-single-service ci-integration ci-smoke ci-telephony-callbacks
+ci: ci-doctor ci-basics ci-docker ci-single-service ci-integration ci-smoke ci-flows ci-telephony-callbacks
 
 # Run repository, Go, UI, and contract checks.
 ci-basics: ci-check ci-repository ci-go ci-ui ci-contracts
@@ -129,6 +129,13 @@ ci-integration:
 # Build every service and run REST and SDK smoke tests with all supported authentication methods.
 ci-smoke:
     bash just/ci-stack.sh smoke
+
+# Run complete user workflows locally against the public SDK.
+flows:
+    bash just/ci-stack.sh flows
+
+# Run complete user workflows in CI.
+ci-flows: flows
 
 # Run provider callback integration tests against the complete service stack.
 ci-telephony-callbacks:

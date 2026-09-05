@@ -14,6 +14,7 @@ files=(
   docker-compose.ci.yml
   just/ci.just
   just/ci-stack.sh
+  tests/flows
   tests/smoke
 )
 
