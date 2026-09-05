@@ -130,9 +130,12 @@ ci-integration:
 ci-smoke:
     bash just/ci-stack.sh smoke
 
-# Run complete user workflows against the public SDK.
-ci-flows:
+# Run complete user workflows locally against the public SDK.
+flows:
     bash just/ci-stack.sh flows
+
+# Run complete user workflows in CI.
+ci-flows: flows
 
 # Run provider callback integration tests against the complete service stack.
 ci-telephony-callbacks:

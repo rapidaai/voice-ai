@@ -16,7 +16,13 @@ The onboarding flow has no REST variant because organization and project creatio
 
 Vault credential updates are not included because the current Vault service and released SDKs do not expose an update operation. They expose create, get/list, and archive/delete operations only.
 
-Run all flows in the CI stack with:
+Run all flows locally with:
+
+```sh
+just flows
+```
+
+CI uses the equivalent command:
 
 ```sh
 just ci-flows
