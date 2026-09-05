@@ -16,6 +16,9 @@ else
     just/doctor.sh
     just/require-docker.sh
     just/shellcheck.sh
+    tests/flows/run.sh
+    tests/flows/*/run.sh
+    tests/flows/*/*/run.sh
     tests/smoke/run.sh
     scripts/contracts/check-compatibility.sh
     scripts/contracts/materialize-baseline.sh

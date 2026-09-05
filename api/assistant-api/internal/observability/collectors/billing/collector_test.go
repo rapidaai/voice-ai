@@ -21,9 +21,11 @@ type productUsageClientStub struct {
 	auth  *types.Authentication
 	usage *protos.CreateProductUsageRequest
 	err   error
+	calls int
 }
 
 func (stub *productUsageClientStub) CreateProductUsage(_ context.Context, auth *types.Authentication, usage *protos.CreateProductUsageRequest) (*protos.GetProductUsageResponse, error) {
+	stub.calls++
 	stub.auth = auth
 	stub.usage = usage
 	return &protos.GetProductUsageResponse{Success: true, Data: &protos.ProductUsage{Id: 42}}, stub.err
@@ -86,6 +88,27 @@ func TestCollector_ReturnsPublisherError(t *testing.T) {
 	})
 	if !errors.Is(err, publishErr) {
 		t.Fatalf("expected publish error, got %v", err)
+	}
+}
+
+func TestCollector_RejectsNonPositiveDurationWithoutPublishing(t *testing.T) {
+	for _, duration := range []time.Duration{0, -time.Nanosecond} {
+		t.Run(duration.String(), func(t *testing.T) {
+			productUsageClient := &productUsageClientStub{}
+			collector := New(Config{ProductUsageClient: productUsageClient})
+
+			err := collector.Collect(context.Background(), observability.ProjectScope{}, observability.Context{}, observability.RecordUsage{
+				Component: observability.ComponentName(observability.UsageConversationSTTDuration),
+				Duration:  duration,
+			})
+
+			if err == nil {
+				t.Fatal("Collect() error = nil, want non-positive duration error")
+			}
+			if productUsageClient.calls != 0 {
+				t.Fatalf("CreateProductUsage() calls = %d, want 0", productUsageClient.calls)
+			}
+		})
 	}
 }
 

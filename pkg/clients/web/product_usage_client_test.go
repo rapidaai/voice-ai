@@ -18,10 +18,14 @@ type productUsageInternalClientStub struct {
 	clients.InternalClient
 	auth       *types.Authentication
 	contextKey any
+	err        error
 }
 
 func (client *productUsageInternalClientStub) WithAuth(ctx context.Context, auth *types.Authentication) (context.Context, error) {
 	client.auth = auth
+	if client.err != nil {
+		return nil, client.err
+	}
 	if client.contextKey == nil {
 		return ctx, nil
 	}
@@ -34,6 +38,7 @@ type productUsageGRPCClientStub struct {
 	err        error
 	contextKey any
 	hasAuth    bool
+	calls      int
 }
 
 type productUsageConnectionStub struct {
@@ -47,6 +52,7 @@ func (connection *productUsageConnectionStub) Close() error {
 }
 
 func (client *productUsageGRPCClientStub) CreateProductUsage(ctx context.Context, request *protos.CreateProductUsageRequest, _ ...grpc.CallOption) (*protos.GetProductUsageResponse, error) {
+	client.calls++
 	client.request = request
 	client.hasAuth, _ = ctx.Value(client.contextKey).(bool)
 	return client.response, client.err
@@ -112,6 +118,24 @@ func TestProductUsageClientReturnsGRPCError(t *testing.T) {
 	_, err := client.CreateProductUsage(context.Background(), &types.Authentication{}, nil)
 	if !errors.Is(err, expectedErr) {
 		t.Fatalf("CreateProductUsage() error = %v", err)
+	}
+}
+
+func TestProductUsageClientReturnsAuthenticationErrorWithoutCallingGRPC(t *testing.T) {
+	expectedErr := errors.New("authentication failed")
+	grpcClient := &productUsageGRPCClientStub{}
+	client := &productUsageServiceClient{
+		InternalClient:     &productUsageInternalClientStub{err: expectedErr},
+		logger:             testLogger(t),
+		productUsageClient: grpcClient,
+	}
+
+	_, err := client.CreateProductUsage(context.Background(), &types.Authentication{}, nil)
+	if !errors.Is(err, expectedErr) {
+		t.Fatalf("CreateProductUsage() error = %v, want %v", err, expectedErr)
+	}
+	if grpcClient.calls != 0 {
+		t.Fatalf("CreateProductUsage() calls = %d, want 0", grpcClient.calls)
 	}
 }
 

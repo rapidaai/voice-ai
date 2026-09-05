@@ -1,16 +1,16 @@
 {
   "rfc": "rfcs/0014-direct-product-usages.md",
-  "status": "awaiting_rechallenge",
+  "status": "approved",
   "classification": "governed",
   "objective": "Directly publish assistant product usage to a project-scoped audited web-api ledger using the current credential model and no outbox.",
   "acceptance_criteria": [
-    "CreateProductUsages accepts usageId, usageType, positive integer usages, unit, and occurredAt.",
+    "CreateProductUsage accepts usageType, positive integer usages, unit, and occurredAt and returns the server-assigned record ID.",
     "The product_usages entity embeds Audited, Mutable, and Organizational.",
     "Tenant IDs come only from authenticated context.",
     "The billing collector sends no assistant, conversation, message, provider, or arbitrary attribute fields.",
-    "Exact duplicates are idempotent within a project, conflicting duplicates fail, and the same usage ID is independent across projects.",
+    "Repeated requests create independent usage rows because callers do not provide an idempotency key.",
     "One shared registry rejects unknown usage types and mismatched units.",
-    "Every supported recorder path receives billing through collectors.NewWithEnv.",
+    "Every supported recorder path receives billing through explicit collector configuration using the process-owned product usage client.",
     "Timestamp comparison uses microsecond precision.",
     "PAT and project-key smoke modes directly create and verify usage rows.",
     "No SDK or outbox changes are made."
@@ -22,8 +22,8 @@
   "verification_commands": [
     "go test ./api/web-api/api ./api/web-api/internal/service/productusage",
     "go test ./api/assistant-api/internal/observability/collectors/billing ./pkg/clients/web",
-    "go test ./tests/system/cmd/protobuf-descriptor ./tests/system/systemcheck",
-    "go run ./tests/system/cmd/systemcheck product-usage-smoke --web-address localhost:9001 --postgres-host localhost --auth-mode both",
-    "make agent-finalize CHANGED_FILES=\"$(git diff --name-only --diff-filter=ACMR HEAD | paste -sd, -)\""
+    "go test ./scripts/contracts/protobuf-descriptor",
+    "tests/smoke/run.sh product-usage-smoke",
+    "just agent-finalize \"$(git diff --name-only --diff-filter=ACMR HEAD | paste -sd, -)\""
   ]
 }

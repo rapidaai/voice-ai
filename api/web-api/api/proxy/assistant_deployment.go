@@ -276,7 +276,7 @@ func (w *webAssistantDeploymentGRPCApi) CreateAssistantPhoneDeployment(c context
 	if authErr != nil {
 		return nil, status.Error(codes.Unauthenticated, authErr.Error())
 	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
+	iAuth, scopeErr := auth.Scope(types.AuthTypeUser, types.AuthTypeProject)
 	if scopeErr != nil {
 		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}

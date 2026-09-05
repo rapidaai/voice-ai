@@ -284,6 +284,9 @@ case "$mode" in
   telephony-callbacks)
     /workspace/tests/integration/telephony/callbacks/run.sh
     ;;
+  flows)
+    /workspace/tests/flows/run.sh
+    ;;
   *)
     printf 'unsupported test mode: %s\n' "$mode" >&2
     exit 2

@@ -22,9 +22,10 @@
     "pkg/types/product_usage.go"
   ],
   "system_tests": [
-    "tests/system/systemcheck/systemcheck.go",
-    "tests/system/test-runner/Dockerfile",
-    "tests/system/test-runner/Dockerfile.dockerignore",
+    "tests/smoke/product-usage/main.go",
+    "tests/smoke/run.sh",
+    "tests/smoke/Dockerfile",
+    "tests/smoke/Dockerfile.dockerignore",
     ".github/actions/system-test/system-phase.sh"
   ],
   "excluded": [
