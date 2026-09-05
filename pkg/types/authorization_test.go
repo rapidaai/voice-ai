@@ -37,6 +37,46 @@ func TestAuthorize(t *testing.T) {
 	}
 }
 
+func TestAuthorizeUser(t *testing.T) {
+	userAuthentication := func(actorID, userID uint64) *Authentication {
+		return &Authentication{
+			AuthType:   AuthTypeUser,
+			ActorValue: &ActorIdentity{Type: ActorTypeUser, ID: actorID},
+			UserValue:  &UserContext{UserID: userID},
+		}
+	}
+	tests := []struct {
+		name string
+		auth *Authentication
+		ok   bool
+	}{
+		{name: "user only", auth: userAuthentication(1, 1), ok: true},
+		{name: "user with organization", auth: &Authentication{AuthType: AuthTypeUser, ActorValue: &ActorIdentity{Type: ActorTypeUser, ID: 1}, UserValue: &UserContext{UserID: 1}, OrganizationValue: &OrganizationContext{OrganizationID: 2}}, ok: true},
+		{name: "missing authentication"},
+		{name: "missing actor", auth: &Authentication{AuthType: AuthTypeUser, UserValue: &UserContext{UserID: 1}}},
+		{name: "mismatched user", auth: userAuthentication(1, 2)},
+		{name: "non-user", auth: &Authentication{AuthType: AuthTypeOrg, ActorValue: &ActorIdentity{Type: ActorTypeOrganization, ID: 2}, OrganizationValue: &OrganizationContext{OrganizationID: 2}}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			if test.auth != nil {
+				ctx = context.WithValue(ctx, CTX_, test.auth)
+			}
+			auth, err := AuthorizeUser(ctx)
+			if test.ok {
+				if err != nil || auth != test.auth {
+					t.Fatalf("AuthorizeUser() = %v, %v", auth, err)
+				}
+				return
+			}
+			if !errors.Is(err, ErrUnauthenticated) {
+				t.Fatalf("AuthorizeUser() error = %v, want %v", err, ErrUnauthenticated)
+			}
+		})
+	}
+}
+
 func TestAuthenticationScopeAndContexts(t *testing.T) {
 	actor := ActorIdentity{Type: ActorTypeUser, ID: 1}
 	auth := &Authentication{

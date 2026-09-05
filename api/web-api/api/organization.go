@@ -81,16 +81,10 @@ func NewOrganizationGRPC(config *config.WebAppConfig, logger commons.Logger,
 }
 
 func (orgR *webOrganizationRPCApi) CreateOrganization(c *gin.Context) {
-	auth, authErr := types.Authorize(c.Request.Context())
+	iAuth, authErr := types.AuthorizeUser(c.Request.Context())
 	if authErr != nil {
 		_ = c.Error(status.Error(codes.Unauthenticated, authErr.Error()))
 		c.AbortWithStatusJSON(401, "illegal request.")
-		return
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		_ = c.Error(status.Error(codes.PermissionDenied, scopeErr.Error()))
-		c.AbortWithStatusJSON(403, "illegal request.")
 		return
 	}
 	userContext, authErr := iAuth.UserContext()
@@ -142,13 +136,9 @@ func (orgR *webOrganizationRPCApi) CreateOrganization(c *gin.Context) {
 For creation of organization and
 */
 func (orgG *webOrganizationGRPCApi) CreateOrganization(c context.Context, irRequest *protos.CreateOrganizationRequest) (*protos.CreateOrganizationResponse, error) {
-	auth, authErr := types.Authorize(c)
+	iAuth, authErr := types.AuthorizeUser(c)
 	if authErr != nil {
 		return nil, status.Error(codes.Unauthenticated, authErr.Error())
-	}
-	iAuth, scopeErr := auth.Scope(types.AuthTypeUser)
-	if scopeErr != nil {
-		return nil, status.Error(codes.PermissionDenied, scopeErr.Error())
 	}
 
 	userContext, err := iAuth.UserContext()

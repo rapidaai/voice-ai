@@ -1,0 +1,17 @@
+{
+  "rfc": "rfcs/0015-user-only-onboarding-auth.md",
+  "status": "accepted_pending_confirmation",
+  "created_at": "2026-09-04",
+  "reason": "The existing web-api AST authentication contract test requires every handler to call types.Authorize followed by Scope. CreateOrganization intentionally uses the RFC-approved private user-only authorization helper, so the test must recognize this single exception.",
+  "allowed_path_addition": {
+    "api/web-api/api/authentication_contract_test.go": "authentication implementer"
+  },
+  "implementation": "Keep the existing matrix and explicit authorization assertions unchanged for every handler except REST and gRPC CreateOrganization. For those two methods, require a direct call to authorizeOrganizationCreator and reject types.Authorize usage as the accepted contract.",
+  "risk": "An overly broad exemption could weaken policy coverage.",
+  "mitigation": "Match the exact file and handler name and assert the private onboarding helper call directly.",
+  "challenger": "user",
+  "challenge_basis": "The user required a minimal clean change with no impact on other services. Updating the focused policy test is smaller and safer than restructuring production handlers to satisfy an obsolete syntax assertion.",
+  "open_blockers": [
+    "Exact amendment SHA-256 confirmation is required before editing the additional test file."
+  ]
+}

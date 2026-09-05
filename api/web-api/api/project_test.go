@@ -6,9 +6,11 @@ package web_api
 import (
 	"context"
 	"testing"
+	"time"
 
 	web_config "github.com/rapidaai/api/web-api/config"
 	internal_entity "github.com/rapidaai/api/web-api/internal/entity"
+	internal_organization_service "github.com/rapidaai/api/web-api/internal/service/organization"
 	internal_project_service "github.com/rapidaai/api/web-api/internal/service/project"
 	internal_user_service "github.com/rapidaai/api/web-api/internal/service/user"
 	app_config "github.com/rapidaai/config"
@@ -17,11 +19,15 @@ import (
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
 	pkg_errors "github.com/rapidaai/pkg/errors"
+	"github.com/rapidaai/pkg/middlewares"
 	gorm_models "github.com/rapidaai/pkg/models/gorm"
 	"github.com/rapidaai/pkg/types"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -200,6 +206,71 @@ func ownerContext(role string) context.Context {
 			OrganizationName: "Acme",
 		},
 	})
+}
+
+func TestOnboardingCreatesOrganizationBeforeProject(t *testing.T) {
+	projectAPI, db, _ := newProjectAPITest(t)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	userID := uint64(500)
+	token := "onboarding-token"
+	require.NoError(t, db.Create(&internal_entity.UserAuth{
+		Audited:  gorm_models.Audited{Id: userID},
+		Mutable:  gorm_models.Mutable{Status: type_enums.RECORD_ACTIVE},
+		Name:     "Onboarding User",
+		Email:    "onboarding@example.com",
+		Password: "hash",
+		Source:   "direct",
+	}).Error)
+	require.NoError(t, db.Create(&internal_entity.UserAuthToken{
+		Audited:    gorm_models.Audited{Id: 501},
+		Mutable:    gorm_models.Mutable{Status: type_enums.RECORD_ACTIVE},
+		UserAuthId: userID,
+		TokenType:  "auth-token",
+		Token:      token,
+		ExpireAt:   time.Now().Add(time.Hour),
+	}).Error)
+
+	authenticator := internal_user_service.NewAuthenticator(projectAPI.logger, projectAPI.postgres)
+	authenticate := middlewares.NewAuthenticationUnaryServerMiddleware(authenticator, projectAPI.logger)
+	requestContext := func() context.Context {
+		return metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+			types.AUTHORIZATION_KEY, token,
+			types.AUTH_KEY, "500",
+		))
+	}
+
+	_, err = authenticate(requestContext(), &protos.CreateProjectRequest{ProjectName: "First Project"}, nil, func(ctx context.Context, request any) (any, error) {
+		return projectAPI.CreateProject(ctx, request.(*protos.CreateProjectRequest))
+	})
+	require.Equal(t, codes.Unauthenticated, status.Code(err))
+
+	organizationAPI := &webOrganizationGRPCApi{webOrganizationApi: webOrganizationApi{
+		logger:              projectAPI.logger,
+		postgres:            projectAPI.postgres,
+		organizationService: internal_organization_service.NewOrganizationService(projectAPI.logger, projectAPI.postgres),
+		userService:         projectAPI.userService,
+	}}
+	organizationResponse, err := authenticate(requestContext(), &protos.CreateOrganizationRequest{
+		OrganizationName:     "Onboarding Organization",
+		OrganizationSize:     "small",
+		OrganizationIndustry: "software",
+	}, nil, func(ctx context.Context, request any) (any, error) {
+		return organizationAPI.CreateOrganization(ctx, request.(*protos.CreateOrganizationRequest))
+	})
+	require.NoError(t, err)
+	require.True(t, organizationResponse.(*protos.CreateOrganizationResponse).GetSuccess())
+
+	projectDescription := "Created after onboarding"
+	projectResponse, err := authenticate(requestContext(), &protos.CreateProjectRequest{
+		ProjectName:        "First Project",
+		ProjectDescription: &projectDescription,
+	}, nil, func(ctx context.Context, request any) (any, error) {
+		return projectAPI.CreateProject(ctx, request.(*protos.CreateProjectRequest))
+	})
+	require.NoError(t, err)
+	require.True(t, projectResponse.(*protos.CreateProjectResponse).GetSuccess())
 }
 
 func TestAddUserToProjectsAssignsExistingOrganizationUserProjectRoles(t *testing.T) {
