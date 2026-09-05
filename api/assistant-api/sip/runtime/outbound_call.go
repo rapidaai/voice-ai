@@ -17,6 +17,7 @@ import (
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/validator"
 )
 
 // Outbound owns the lifecycle for a single outbound SIP call.
@@ -304,21 +305,14 @@ func (outboundCall *Outbound) callOutboundInviteHandler(answerTime time.Time) er
 	if inviteRequest == nil {
 		return fmt.Errorf("outbound INVITE request is unavailable")
 	}
-	callAddress := newOutboundCallAddress(
-		inviteRequest,
-		outboundCall.request.Identity.FromUser,
-		outboundCall.request.Identity.ToUser,
-	)
-	if outboundCall.server.logger != nil {
-		outboundCall.server.logger.Infow("SIP: outbound phone resolution",
-			"call_id", outboundCall.session.GetCallID(),
-			"phone_source", "outbound_local_input",
-			"phone_result", phoneInputResult(outboundCall.request.Identity.FromUser, callAddress.From))
-		outboundCall.server.logger.Infow("SIP: outbound phone resolution",
-			"call_id", outboundCall.session.GetCallID(),
-			"phone_source", "outbound_remote_input",
-			"phone_result", phoneInputResult(outboundCall.request.Identity.ToUser, callAddress.To))
+	callAddress := NewCallAddress(inviteRequest)
+	if validator.Phone(outboundCall.request.Identity.FromUser) {
+		callAddress.From = outboundCall.request.Identity.FromUser
 	}
+	if validator.Phone(outboundCall.request.Identity.ToUser) {
+		callAddress.To = outboundCall.request.Identity.ToUser
+	}
+
 	if callAddress.ToURI == "" {
 		callAddress.ToURI = inviteRequest.Recipient.String()
 	}

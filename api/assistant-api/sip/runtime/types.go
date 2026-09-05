@@ -9,6 +9,7 @@ package sip_runtime
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
 )
 
@@ -37,6 +39,13 @@ var (
 	ErrInboundInviteCancelled     = errors.New("inbound INVITE cancelled")
 	ErrInboundAnswerPolicyTimeout = errors.New("inbound answer policy timeout")
 	ErrBridgeLifecycleRejected    = errors.New("bridge lifecycle transition rejected")
+	ErrInvalidCallRoute           = errors.New("invalid SIP call route")
+	ErrMiddlewareChainIncomplete  = errors.New("SIP middleware chain incomplete")
+	ErrPhoneDeploymentRequired    = errors.New("SIP phone deployment is required")
+	ErrVaultResolverRequired      = errors.New("SIP vault resolver is required")
+	ErrCredentialIDRequired       = errors.New("SIP credential ID is required")
+	ErrVaultCredentialResolution  = errors.New("SIP vault credential resolution failed")
+	ErrVaultConfigInvalid         = errors.New("SIP vault configuration is invalid")
 )
 
 // ServerState represents the state of the SIP server.
@@ -61,35 +70,27 @@ type CallAddress struct {
 	Headers map[string]string
 }
 
-func parsePhone(value string) (string, bool) {
-	value = strings.Trim(value, " \t\r\n\v\f")
-	if value == "" {
-		return "", false
-	}
-
-	digits := value
-	if digits[0] == '+' {
-		digits = digits[1:]
-	}
-	if digits == "" {
-		return "", false
-	}
-	for _, character := range digits {
-		if character < '0' || character > '9' {
-			return "", false
-		}
-	}
-	return value, true
+// CallRoute identifies the route encoded in an inbound SIP Request-URI.
+type CallRoute interface {
+	Kind() string
 }
 
-func phoneInputResult(value, phone string) string {
-	if strings.Trim(value, " \t\r\n\v\f") == "" {
-		return "missing"
-	}
-	if phone == "" {
-		return "not_phone"
-	}
-	return "resolved"
+// AgentCallRoute identifies an assistant-targeted SIP route.
+type AgentCallRoute struct {
+	AssistantID uint64
+}
+
+func (AgentCallRoute) Kind() string {
+	return "agent"
+}
+
+// DIDCallRoute identifies a phone-number-targeted SIP route.
+type DIDCallRoute struct {
+	DID string
+}
+
+func (DIDCallRoute) Kind() string {
+	return "did"
 }
 
 // NewCallAddress reads an inbound party snapshot and non-credential headers.
@@ -101,7 +102,9 @@ func NewCallAddress(request *sip.Request) CallAddress {
 	address := CallAddress{Headers: make(map[string]string)}
 	if from := request.From(); from != nil {
 		address.FromURI = from.Address.String()
-		address.From, _ = parsePhone(from.Address.User)
+		if validator.Phone(from.Address.User) {
+			address.From = from.Address.User
+		}
 	}
 	if to := request.To(); to != nil {
 		address.ToURI = to.Address.String()
@@ -126,13 +129,6 @@ func NewCallAddress(request *sip.Request) CallAddress {
 	return address
 }
 
-func newOutboundCallAddress(request *sip.Request, fromUser, toUser string) CallAddress {
-	address := NewCallAddress(request)
-	address.From, _ = parsePhone(fromUser)
-	address.To, _ = parsePhone(toUser)
-	return address
-}
-
 // SIPRequestContext contains information about an incoming SIP request.
 // Used by the middleware chain to resolve config for every SIP request.
 //
@@ -147,14 +143,45 @@ type SIPRequestContext struct {
 	CallAddress CallAddress
 	SDPInfo     *SDPMediaInfo
 
-	// Route/auth fields resolved by middleware.
-	APIKey      string
-	AssistantID string
-
 	Auth            *types.Authentication
 	Assistant       *internal_assistant_entity.Assistant
 	VaultCredential *protos.VaultCredential
 	Config          *Config
+}
+
+// ResolveRoute resolves the route encoded in the SIP Request-URI.
+func (c *SIPRequestContext) ResolveRoute() (CallRoute, error) {
+	if c == nil {
+		return nil, ErrInvalidCallRoute
+	}
+
+	requestURI := strings.TrimSpace(c.RequestURI)
+	requestURI = strings.TrimPrefix(strings.TrimPrefix(requestURI, "sip:"), "sips:")
+	routeUserWithParameters, _, _ := strings.Cut(requestURI, "@")
+	routeUser, _, _ := strings.Cut(strings.TrimSpace(routeUserWithParameters), ";")
+	routeUser = strings.TrimSpace(routeUser)
+	if routeUser == "" {
+		return nil, ErrInvalidCallRoute
+	}
+
+	if strings.HasPrefix(routeUser, "agent-") {
+		routeValue := strings.TrimSpace(routeUser[len("agent-"):])
+		if routeValue == "" || strings.Contains(routeValue, ":") {
+			return nil, ErrInvalidCallRoute
+		}
+		assistantID, err := strconv.ParseUint(routeValue, 10, 64)
+		if err != nil || assistantID == 0 {
+			return nil, ErrInvalidCallRoute
+		}
+		return AgentCallRoute{AssistantID: assistantID}, nil
+	}
+	if strings.HasPrefix(routeUser, "did-") {
+		routeUser = strings.TrimSpace(routeUser[len("did-"):])
+	}
+	if !validator.Phone(routeUser) {
+		return nil, ErrInvalidCallRoute
+	}
+	return DIDCallRoute{DID: routeUser}, nil
 }
 
 // Middleware processes a SIP request context and mutates it in place.

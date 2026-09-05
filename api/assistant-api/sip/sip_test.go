@@ -51,6 +51,27 @@ func TestSIPEngineDoesNotConstructInternalClients(t *testing.T) {
 	})
 }
 
+func TestSIPEngineDoesNotPassPostgresToMiddleware(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "sip.go", nil, 0)
+	require.NoError(t, err)
+
+	ast.Inspect(file, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		selector, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok || selector.Sel.Name != "WithPostgres" {
+			return true
+		}
+		packageName, ok := selector.X.(*ast.Ident)
+		if ok && packageName.Name == "sip_middleware" {
+			t.Fatal("SIP engine passes PostgreSQL to middleware")
+		}
+		return true
+	})
+}
+
 func TestSIPEngineUsesConfiguredServiceID(t *testing.T) {
 	engine := &SIPEngine{cfg: &assistant_config.AssistantConfig{AppConfig: app_config.AppConfig{ServiceID: 9007}}}
 	assert.Equal(t, uint64(9007), engine.cfg.ServiceID)

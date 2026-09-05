@@ -21,6 +21,46 @@ func makeVaultCredential(m map[string]interface{}) *protos.VaultCredential {
 	return &protos.VaultCredential{Value: s}
 }
 
+func TestSIPRequestContextResolveRoute(t *testing.T) {
+	tests := []struct {
+		name       string
+		requestURI string
+		expected   CallRoute
+		expectsErr bool
+	}{
+		{name: "agent", requestURI: "sip:agent-42@sip.rapida.ai", expected: AgentCallRoute{AssistantID: 42}},
+		{name: "agent parameters", requestURI: "sip:agent-42;transport=tcp@sip.rapida.ai", expected: AgentCallRoute{AssistantID: 42}},
+		{name: "prefixed DID", requestURI: "sips:did-+15551234567@sip.rapida.ai", expected: DIDCallRoute{DID: "+15551234567"}},
+		{name: "plain DID", requestURI: "sip:+15551234568@sip.rapida.ai", expected: DIDCallRoute{DID: "+15551234568"}},
+		{name: "invalid assistant", requestURI: "sip:agent-invalid@sip.rapida.ai", expectsErr: true},
+		{name: "zero assistant", requestURI: "sip:agent-0@sip.rapida.ai", expectsErr: true},
+		{name: "invalid DID", requestURI: "sip:did-+1-555@sip.rapida.ai", expectsErr: true},
+		{name: "empty", requestURI: "", expectsErr: true},
+		{name: "credential pair", requestURI: "sip:12345:apikey@sip.rapida.ai", expectsErr: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := &SIPRequestContext{RequestURI: test.requestURI}
+			actual, err := ctx.ResolveRoute()
+			if test.expectsErr {
+				require.ErrorIs(t, err, ErrInvalidCallRoute)
+				assert.Nil(t, actual)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.expected, actual)
+		})
+	}
+}
+
+func TestSIPRequestContextResolveRouteNilContext(t *testing.T) {
+	var ctx *SIPRequestContext
+	route, err := ctx.ResolveRoute()
+	require.ErrorIs(t, err, ErrInvalidCallRoute)
+	assert.Nil(t, route)
+}
+
 func TestParseConfigFromVault_NilCredential(t *testing.T) {
 	_, err := ParseConfigFromVault(nil)
 	require.Error(t, err)

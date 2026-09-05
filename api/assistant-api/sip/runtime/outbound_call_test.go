@@ -18,6 +18,7 @@ import (
 	"github.com/emiago/sipgo/sip"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	internal_outbound "github.com/rapidaai/api/assistant-api/sip/internal/outbound"
+	"github.com/rapidaai/pkg/validator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -128,7 +129,13 @@ func TestTransferLegCallAddressDoesNotInheritParentIdentity(t *testing.T) {
 		Port:   request.Config.Port,
 	})
 
-	address := newOutboundCallAddress(inviteRequest, request.Identity.FromUser, request.Identity.ToUser)
+	address := NewCallAddress(inviteRequest)
+	if validator.Phone(request.Identity.FromUser) {
+		address.From = request.Identity.FromUser
+	}
+	if validator.Phone(request.Identity.ToUser) {
+		address.To = request.Identity.ToUser
+	}
 
 	assert.Empty(t, address.From)
 	assert.Empty(t, address.To)

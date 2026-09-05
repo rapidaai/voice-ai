@@ -48,6 +48,12 @@ func NewDefaultGetAssistantOption() *GetAssistantOption {
 }
 
 type AssistantService interface {
+	GetAssistantWithPhoneDeploymentByDID(ctx context.Context,
+		did string) (*internal_assistant_entity.Assistant, error)
+
+	GetAssistantWithPhoneDeploymentById(ctx context.Context,
+		agentId uint64) (*internal_assistant_entity.Assistant, error)
+
 	Get(ctx context.Context,
 		auth *types.Authentication,
 		assistantId uint64,

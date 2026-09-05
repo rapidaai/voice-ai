@@ -124,7 +124,6 @@ func (m *SIPEngine) Connect(ctx context.Context) error {
 			sip_middleware.NewRouteMiddleware(
 				sip_middleware.WithContext(m.ctx),
 				sip_middleware.WithLogger(m.logger),
-				sip_middleware.WithPostgres(m.postgres),
 				sip_middleware.WithAssistantService(m.assistantService),
 				sip_middleware.WithServiceID(m.cfg.ServiceID),
 			),

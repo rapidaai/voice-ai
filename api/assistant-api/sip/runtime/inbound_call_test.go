@@ -100,7 +100,7 @@ func TestNewCallAddressAcceptsOnlyPhoneFromUser(t *testing.T) {
 	}{
 		{name: "national", fromUser: "07249994778", expected: "07249994778"},
 		{name: "international", fromUser: "+447249994778", expected: "+447249994778"},
-		{name: "surrounding ascii whitespace", fromUser: " \t+15551234567\r\n", expected: "+15551234567"},
+		{name: "surrounding ascii whitespace", fromUser: " \t+15551234567\r\n", expected: ""},
 		{name: "empty", fromUser: "", expected: ""},
 		{name: "plus only", fromUser: "+", expected: ""},
 		{name: "multiple plus", fromUser: "++1555", expected: ""},

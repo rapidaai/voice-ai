@@ -95,7 +95,6 @@ func TestFreeSWITCHInboundRouteAuthenticationCompleteFlow(t *testing.T) {
 				sip_middleware.NewRouteMiddleware(
 					sip_middleware.WithContext(context.Background()),
 					sip_middleware.WithLogger(harness.logger),
-					sip_middleware.WithPostgres(integrationPostgres{db: database}),
 					sip_middleware.WithAssistantService(integrationAssistantService{assistants: map[uint64]*internal_assistant_entity.Assistant{
 						test.assistantID: assistant,
 					}}),
@@ -143,7 +142,7 @@ func TestFreeSWITCHInboundRouteAuthenticationCompleteFlow(t *testing.T) {
 
 			resolved := receiveSIPRequestContext(t, routeContext, callSetupTimeout)
 			require.Equal(t, test.phone, resolved.CallAddress.To)
-			require.Equal(t, fmt.Sprint(test.assistantID), resolved.AssistantID)
+			require.Equal(t, test.assistantID, resolved.Assistant.Id)
 			require.NotNil(t, resolved.Auth)
 			require.Same(t, assistant, resolved.Assistant)
 			require.Same(t, vaultCredential, resolved.VaultCredential)
@@ -232,6 +231,29 @@ type integrationAssistantService struct {
 	assistants map[uint64]*internal_assistant_entity.Assistant
 }
 
+func (s integrationAssistantService) GetAssistantWithPhoneDeploymentById(
+	_ context.Context,
+	agentId uint64,
+) (*internal_assistant_entity.Assistant, error) {
+	return s.assistant(agentId)
+}
+
+func (s integrationAssistantService) GetAssistantWithPhoneDeploymentByDID(
+	_ context.Context,
+	did string,
+) (*internal_assistant_entity.Assistant, error) {
+	for assistantID, assistant := range s.assistants {
+		if assistant.AssistantPhoneDeployment == nil {
+			continue
+		}
+		phone, err := assistant.AssistantPhoneDeployment.GetOptions().GetString("phone")
+		if err == nil && phone == did {
+			return s.assistant(assistantID)
+		}
+	}
+	return nil, fmt.Errorf("assistant for DID %s not found", did)
+}
+
 func (s integrationAssistantService) Get(
 	_ context.Context,
 	_ *types.Authentication,
@@ -239,6 +261,10 @@ func (s integrationAssistantService) Get(
 	_ *uint64,
 	_ *internal_services.GetAssistantOption,
 ) (*internal_assistant_entity.Assistant, error) {
+	return s.assistant(assistantID)
+}
+
+func (s integrationAssistantService) assistant(assistantID uint64) (*internal_assistant_entity.Assistant, error) {
 	assistant, ok := s.assistants[assistantID]
 	if !ok {
 		return nil, fmt.Errorf("assistant %d not found", assistantID)

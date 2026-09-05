@@ -70,17 +70,56 @@ func TestVaultMiddleware_ResolvesSIPConfig(t *testing.T) {
 	assert.Same(t, vault.credential, ctx.VaultCredential)
 }
 
+func TestVaultMiddleware_ReturnsCredentialIDError(t *testing.T) {
+	ctx := &sip_runtime.SIPRequestContext{
+		Auth: &types.Authentication{},
+		Assistant: &internal_assistant_entity.Assistant{
+			AssistantPhoneDeployment: &internal_assistant_entity.AssistantPhoneDeployment{},
+		},
+	}
+	err := NewVaultMiddleware(WithRapidaClient(&rapida_client.RapidaClient{Vault: &routeTestVault{}}))(ctx)
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, sip_runtime.ErrInvalidConfig)
+	assert.ErrorIs(t, err, sip_runtime.ErrCredentialIDRequired)
+}
+
+func TestVaultMiddleware_DoesNotMutateContextWhenVaultConfigIsInvalid(t *testing.T) {
+	ctx := &sip_runtime.SIPRequestContext{
+		Auth: &types.Authentication{},
+		Assistant: &internal_assistant_entity.Assistant{
+			AssistantPhoneDeployment: &internal_assistant_entity.AssistantPhoneDeployment{
+				AssistantDeploymentTelephony: internal_assistant_entity.AssistantDeploymentTelephony{
+					TelephonyOption: []*internal_assistant_entity.AssistantDeploymentTelephonyOption{
+						{Metadata: gorm_model.Metadata{Key: "rapida.credential_id", Value: "77"}},
+					},
+				},
+			},
+		},
+	}
+	err := NewVaultMiddleware(WithRapidaClient(&rapida_client.RapidaClient{
+		Vault: &routeTestVault{credential: &protos.VaultCredential{Id: 77}},
+	}))(ctx)
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, sip_runtime.ErrInvalidConfig)
+	assert.ErrorIs(t, err, sip_runtime.ErrVaultConfigInvalid)
+	assert.Nil(t, ctx.VaultCredential)
+	assert.Nil(t, ctx.Config)
+}
+
 type routeTestVault struct {
 	requestedVaultID uint64
 	credential       *protos.VaultCredential
+	err              error
 }
 
 func (v *routeTestVault) GetCredential(_ context.Context, _ *types.Authentication, vaultID uint64) (*protos.VaultCredential, error) {
 	v.requestedVaultID = vaultID
-	return v.credential, nil
+	return v.credential, v.err
 }
 
 func (v *routeTestVault) GetOauth2Credential(_ context.Context, _ *types.Authentication, vaultID uint64) (*protos.VaultCredential, error) {
 	v.requestedVaultID = vaultID
-	return v.credential, nil
+	return v.credential, v.err
 }
