@@ -2672,7 +2672,8 @@
         "organization"
       ],
       "allowed_auth_types": [
-        "user"
+        "user",
+        "project"
       ],
       "required_contexts": [
         "user",
@@ -2726,7 +2727,8 @@
         "organization"
       ],
       "allowed_auth_types": [
-        "user"
+        "user",
+        "project"
       ],
       "required_contexts": [
         "user",
@@ -3310,7 +3312,8 @@
         "organization"
       ],
       "allowed_auth_types": [
-        "user"
+        "user",
+        "project"
       ],
       "required_contexts": [
         "user",
