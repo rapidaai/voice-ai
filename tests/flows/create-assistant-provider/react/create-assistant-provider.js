@@ -41,7 +41,15 @@ async function createAssistant(connection, auth) {
 
   const response = await CreateAssistant(connection, request, auth);
   requireSuccess(response, "assistant creation");
-  return response.getData()?.getId();
+  const assistant = response.getData();
+  if (
+    !assistant?.getId()
+    || assistant.getOrganizationid() !== requireValue("FLOW_FIXTURE_ID")
+    || assistant.getProjectid() !== requireValue("FLOW_PROJECT_ID")
+  ) {
+    throw new Error("assistant creation returned unexpected ownership data");
+  }
+  return assistant.getId();
 }
 
 async function main() {

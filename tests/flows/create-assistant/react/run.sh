@@ -6,7 +6,7 @@ script_directory=$(cd "$(dirname "$0")" && pwd)
 . "$script_directory/../../project-fixture.sh"
 
 export FLOW_FIXTURE_ID='8100102'
-export FLOW_PROJECT_ID='8100102'
+export FLOW_PROJECT_ID='8101102'
 export FLOW_EMAIL='ci-flow-create-assistant-react@example.invalid'
 export FLOW_TOKEN='ci-flow-create-assistant-react-token'
 export FLOW_ORGANIZATION='CI Create Assistant React Organization'

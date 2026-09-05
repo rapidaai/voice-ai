@@ -84,8 +84,14 @@ SQL
 
 verify_assistant_provider_fixture() {
   counts=$(psql -v ON_ERROR_STOP=1 -At -F '|' -h postgres -U rapida_user -d assistant_db \
-    -v project_id="$FLOW_PROJECT_ID" <<'SQL'
+    -v project_id="$FLOW_PROJECT_ID" \
+    -v fixture_id="$FLOW_FIXTURE_ID" <<'SQL'
 SELECT
+  (SELECT count(*) FROM assistants
+   WHERE project_id = :'project_id'
+     AND organization_id = :'fixture_id'
+     AND created_actor_type = 'user'
+     AND created_actor_id = :'fixture_id'),
   (SELECT count(*) FROM assistant_provider_models
    WHERE assistant_id IN (SELECT id FROM assistants WHERE project_id = :'project_id')
      AND model_provider_name IN ('openai', 'anthropic')),
@@ -100,7 +106,7 @@ SELECT
      AND schema_version = '1.0');
 SQL
 )
-  if [ "$counts" != '2|1|1|1' ]; then
+  if [ "$counts" != '1|2|1|1|1' ]; then
     printf 'unexpected assistant provider counts: %s\n' "$counts" >&2
     return 1
   fi
