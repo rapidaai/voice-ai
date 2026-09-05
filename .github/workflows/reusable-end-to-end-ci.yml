@@ -140,3 +140,45 @@ jobs:
           path: telephony-callback-diagnostics
           if-no-files-found: error
           retention-days: 7
+
+  flows:
+    name: User Flows
+    needs: smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      COMPOSE_PROJECT_NAME: rapida-flows-${{ github.run_id }}-${{ github.run_attempt }}
+      CI_STACK_AUTH_TOKEN: ci-flows-${{ github.run_id }}-${{ github.run_attempt }}
+      CI_STACK_PROJECT_API_KEY: ci-flows-project-${{ github.run_id }}-${{ github.run_attempt }}
+      CI_STACK_CACHE_SCOPE: end-to-end-${{ github.run_id }}-${{ github.run_attempt }}
+      CI_STACK_DIAGNOSTICS_DIR: ${{ github.workspace }}/flow-diagnostics
+      CI_STACK_REPORTS_DIR: ${{ github.workspace }}/flow-reports
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Set up Just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3
+        with:
+          just-version: "1.58.0"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+        with:
+          name: rapida-flows-${{ github.run_id }}-${{ github.run_attempt }}
+          driver: docker-container
+          install: true
+
+      - name: Run user flows
+        run: just ci-flows
+
+      - name: Upload flow diagnostics
+        if: failure() && hashFiles('flow-diagnostics/**') != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: flow-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: flow-diagnostics
+          if-no-files-found: error
+          retention-days: 7

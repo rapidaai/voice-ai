@@ -4,6 +4,8 @@
 !tests/smoke/package.json
 !tests/smoke/package-lock.json
 !tests/smoke/run.sh
+!tests/flows/
+!tests/flows/**
 !tests/integration/
 !tests/integration/telephony/
 !tests/integration/telephony/**

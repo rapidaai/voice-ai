@@ -1,0 +1,18 @@
+# End-to-End Flows
+
+Flows are grouped first by user journey and then by public client. Every client directory has its own executable `run.sh`, fixture setup, assertions, and cleanup so it can run independently.
+
+Current matrix:
+
+| Flow | Node.js SDK | React SDK | REST |
+| --- | --- | --- | --- |
+| Sign in | Yes | Yes | Yes |
+| Sign up, create organization, create project | Yes | Yes | Not available |
+
+The onboarding flow has no REST variant because organization and project creation are currently exposed through gRPC and gRPC-web only.
+
+Run all flows in the CI stack with:
+
+```sh
+just ci-flows
+```

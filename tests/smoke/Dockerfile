@@ -7,12 +7,17 @@ WORKDIR /workspace
 COPY tests/smoke/package.json tests/smoke/package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
+COPY tests/flows/package.json tests/flows/package-lock.json /workspace/tests/flows/
+RUN npm ci --omit=dev --prefix /workspace/tests/flows && npm cache clean --force
+
 COPY tests/smoke/run.sh /usr/local/bin/run-ci-tests
 COPY tests/smoke/sdk-smoke.js /workspace/sdk-smoke.js
+COPY tests/flows /workspace/tests/flows
 COPY tests/integration/telephony /workspace/tests/integration/telephony
 COPY openapi/postman/assistant-api/assistant-api.smoke.postman_collection.json /workspace/openapi/postman/assistant-api/assistant-api.smoke.postman_collection.json
 
 RUN chmod 0755 /usr/local/bin/run-ci-tests && \
+    find /workspace/tests/flows -name run.sh -exec chmod 0755 {} + && \
     find /workspace/tests/integration/telephony -name run.sh -exec chmod 0755 {} + && \
     mkdir -p /reports && \
     chown node:node /reports
