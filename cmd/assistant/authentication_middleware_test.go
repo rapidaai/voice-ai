@@ -1,13 +1,75 @@
 package main
 
 import (
+	"context"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	assistant_config "github.com/rapidaai/api/assistant-api/config"
+	"github.com/rapidaai/config"
+	rapida_client "github.com/rapidaai/pkg/clients/rapida"
+	"github.com/rapidaai/pkg/commons"
 )
+
+func TestAppRunnerRetainsRapidaClient(t *testing.T) {
+	clients := &rapida_client.RapidaClient{}
+	app := AppRunner{Clients: clients}
+
+	if app.Clients != clients {
+		t.Fatal("AppRunner did not retain the Rapida client")
+	}
+}
+
+func TestInitInitializesRapidaClient(t *testing.T) {
+	logger, err := commons.NewApplicationLogger(commons.EnableConsole(true), commons.EnableFile(false))
+	if err != nil {
+		t.Fatalf("NewApplicationLogger() error = %v", err)
+	}
+	app := AppRunner{
+		Cfg: &assistant_config.AssistantConfig{AppConfig: config.AppConfig{
+			Web:         config.ServiceHostConfig{Host: "passthrough:///web-api"},
+			Integration: config.ServiceHostConfig{Host: "passthrough:///integration-api"},
+			Endpoint:    config.ServiceHostConfig{Host: "passthrough:///endpoint-api"},
+			Document:    config.ServiceHostConfig{Host: "http://document-api"},
+		}},
+		Logger: logger,
+	}
+
+	if err := app.Init(context.Background()); err != nil {
+		t.Fatalf("Init() error = %v", err)
+	}
+	if app.Clients == nil {
+		t.Fatal("Init() did not initialize RapidaClient")
+	}
+	if len(app.Closeable) != 1 {
+		t.Fatalf("Closeable count = %d, want 1", len(app.Closeable))
+	}
+	app.Close(context.Background())
+}
+
+func TestCloseUsesRegistrationOrder(t *testing.T) {
+	logger, err := commons.NewApplicationLogger(commons.EnableConsole(true), commons.EnableFile(false))
+	if err != nil {
+		t.Fatalf("NewApplicationLogger() error = %v", err)
+	}
+	var closed []int
+	app := AppRunner{
+		Logger: logger,
+		Closeable: []func(context.Context) error{
+			func(context.Context) error { closed = append(closed, 1); return nil },
+			func(context.Context) error { closed = append(closed, 2); return nil },
+		},
+	}
+
+	app.Close(context.Background())
+	if len(closed) != 2 || closed[0] != 1 || closed[1] != 2 {
+		t.Fatalf("close order = %v, want [1 2]", closed)
+	}
+}
 
 func TestGRPCUsesUserFirstAuthenticationMiddlewareOrder(t *testing.T) {
 	file := parseCommandSource(t, "assistant.go")

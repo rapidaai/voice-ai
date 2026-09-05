@@ -9,7 +9,21 @@ import (
 	"github.com/rapidaai/config"
 	"github.com/rapidaai/pkg/clients"
 	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/protos"
 )
+
+type vaultGRPCClientStub struct {
+	protos.VaultServiceClient
+}
+
+func TestNewVaultClientWithClientUsesProvidedGRPCClient(t *testing.T) {
+	grpcClient := &vaultGRPCClientStub{}
+	client := NewVaultClientWithClient(&config.AppConfig{}, nil, nil, grpcClient)
+
+	if client.(*vaultServiceClient).vaultClient != grpcClient {
+		t.Fatal("NewVaultClientWithClient() did not retain the provided gRPC client")
+	}
+}
 
 func TestVaultServiceClientGetCredentialRequiresOrganization(t *testing.T) {
 	client := &vaultServiceClient{}

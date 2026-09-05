@@ -34,12 +34,16 @@ func NewProjectServiceClientGRPC(config *config.AppConfig, logger commons.Logger
 	if err != nil {
 		logger.Fatalf("Unable to create connection %v", err)
 	}
-	providerClient := project_api.NewProjectServiceClient(conn)
+	return NewProjectClientWithClient(config, logger, redis, project_api.NewProjectServiceClient(conn))
+}
+
+// NewProjectClientWithClient creates a project client using the provided gRPC client.
+func NewProjectClientWithClient(config *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector, projectClient project_api.ProjectServiceClient) ProjectClient {
 	return &projectServiceClient{
 		InternalClient: clients.NewInternalClient(config, logger, redis),
 		cfg:            config,
 		logger:         logger,
-		projectClient:  providerClient,
+		projectClient:  projectClient,
 	}
 }
 

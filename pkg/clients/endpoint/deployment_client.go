@@ -42,11 +42,16 @@ func NewDeploymentServiceClientGRPC(config *config.AppConfig, logger commons.Log
 	if err != nil {
 		logger.Errorf("Unable to create connection %v", err)
 	}
+	return NewDeploymentServiceClientWithClient(config, logger, redis, endpoint_api.NewDeploymentClient(conn))
+}
+
+// NewDeploymentServiceClientWithClient creates a deployment client using the provided gRPC client.
+func NewDeploymentServiceClientWithClient(config *config.AppConfig, logger commons.Logger, redis connectors.RedisConnector, deploymentClient endpoint_api.DeploymentClient) DeploymentServiceClient {
 	return &deploymentServiceClient{
 		InternalClient:   clients.NewInternalClient(config, logger, redis),
 		cfg:              config,
 		logger:           logger,
-		deploymentClient: endpoint_api.NewDeploymentClient(conn),
+		deploymentClient: deploymentClient,
 	}
 }
 

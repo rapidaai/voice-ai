@@ -57,6 +57,15 @@ func testLogger(t *testing.T) commons.Logger {
 	return logger
 }
 
+func TestNewAuthenticatorWithClientUsesProvidedGRPCClient(t *testing.T) {
+	grpcClient := &scopeAuthGRPCClient{}
+	client := NewAuthenticatorWithClient(&config.AppConfig{}, nil, nil, grpcClient)
+
+	if client.(*authServiceClient).authClient != grpcClient {
+		t.Fatal("NewAuthenticatorWithClient() did not retain the provided gRPC client")
+	}
+}
+
 func TestScopeAuthorizationCacheKeyUsesVersionedHMAC(t *testing.T) {
 	internal := &scopeAuthInternalClient{}
 	client := &authServiceClient{InternalClient: internal, cfg: &config.AppConfig{Secret: "cache-secret"}}

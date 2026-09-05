@@ -18,15 +18,22 @@ import (
 )
 
 type usagePublisherStub struct {
-	auth  *types.Authentication
-	usage *protos.CreateProductUsageRequest
-	err   error
+	auth       *types.Authentication
+	usage      *protos.CreateProductUsageRequest
+	err        error
+	closeErr   error
+	closeCalls int
 }
 
 func (stub *usagePublisherStub) CreateProductUsage(_ context.Context, auth *types.Authentication, usage *protos.CreateProductUsageRequest) (*protos.GetProductUsageResponse, error) {
 	stub.auth = auth
 	stub.usage = usage
 	return &protos.GetProductUsageResponse{Success: true, Data: &protos.ProductUsage{Id: 42}}, stub.err
+}
+
+func (stub *usagePublisherStub) Close() error {
+	stub.closeCalls++
+	return stub.closeErr
 }
 
 func TestCollector_ForwardsUsageRecord(t *testing.T) {
@@ -131,8 +138,15 @@ func TestCollector_IgnoresNonUsageRecord(t *testing.T) {
 	}
 }
 
-func TestCollector_CloseIsNoop(t *testing.T) {
-	if err := New(&usagePublisherStub{}).Close(context.Background()); err != nil {
-		t.Fatalf("Close() error = %v", err)
+func TestCollector_ClosesPublisher(t *testing.T) {
+	expectedErr := errors.New("close failed")
+	publisher := &usagePublisherStub{closeErr: expectedErr}
+
+	err := New(publisher).Close(context.Background())
+	if !errors.Is(err, expectedErr) {
+		t.Fatalf("Close() error = %v, want %v", err, expectedErr)
+	}
+	if publisher.closeCalls != 1 {
+		t.Fatalf("Close() calls = %d, want 1", publisher.closeCalls)
 	}
 }

@@ -20,6 +20,7 @@ import (
 
 type Publisher interface {
 	CreateProductUsage(context.Context, *types.Authentication, *protos.CreateProductUsageRequest) (*protos.GetProductUsageResponse, error)
+	Close() error
 }
 
 type Collector struct {
@@ -65,5 +66,5 @@ func (c *Collector) Collect(ctx context.Context, _ observability.Scope, observat
 }
 
 func (c *Collector) Close(context.Context) error {
-	return nil
+	return c.publisher.Close()
 }

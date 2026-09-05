@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc"
 
+	"github.com/rapidaai/config"
 	"github.com/rapidaai/pkg/clients"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
@@ -32,6 +34,16 @@ type productUsageGRPCClientStub struct {
 	err        error
 	contextKey any
 	hasAuth    bool
+}
+
+type productUsageConnectionStub struct {
+	err    error
+	closed bool
+}
+
+func (connection *productUsageConnectionStub) Close() error {
+	connection.closed = true
+	return connection.err
 }
 
 func (client *productUsageGRPCClientStub) CreateProductUsage(ctx context.Context, request *protos.CreateProductUsageRequest, _ ...grpc.CallOption) (*protos.GetProductUsageResponse, error) {
@@ -80,6 +92,15 @@ func TestProductUsageClientCreatesAuthenticatedRequest(t *testing.T) {
 	}
 }
 
+func TestNewProductUsageClientWithClientUsesProvidedGRPCClient(t *testing.T) {
+	grpcClient := &productUsageGRPCClientStub{}
+	client := NewProductUsageClientWithClient(&config.AppConfig{}, nil, grpcClient)
+
+	if client.(*productUsageServiceClient).productUsageClient != grpcClient {
+		t.Fatal("NewProductUsageClientWithClient() did not retain the provided gRPC client")
+	}
+}
+
 func TestProductUsageClientReturnsGRPCError(t *testing.T) {
 	expectedErr := errors.New("unavailable")
 	client := &productUsageServiceClient{
@@ -109,4 +130,50 @@ func TestProductUsageClientReturnsServiceResponse(t *testing.T) {
 	if got != want {
 		t.Fatalf("CreateProductUsage() response = %v, want %v", got, want)
 	}
+}
+
+func TestProductUsageClientBoundsRequestDuration(t *testing.T) {
+	contextKey := struct{}{}
+	client := &productUsageServiceClient{
+		InternalClient: &productUsageInternalClientStub{contextKey: contextKey},
+		logger:         testLogger(t),
+		requestTimeout: time.Millisecond,
+		productUsageClient: productUsageGRPCClientFunc(func(ctx context.Context, _ *protos.CreateProductUsageRequest, _ ...grpc.CallOption) (*protos.GetProductUsageResponse, error) {
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}),
+	}
+
+	_, err := client.CreateProductUsage(context.Background(), &types.Authentication{}, nil)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("CreateProductUsage() error = %v, want deadline exceeded", err)
+	}
+}
+
+func TestProductUsageClientClosesConnection(t *testing.T) {
+	expectedErr := errors.New("close failed")
+	connection := &productUsageConnectionStub{err: expectedErr}
+	client := &productUsageServiceClient{connection: connection}
+
+	err := client.Close()
+	if !errors.Is(err, expectedErr) {
+		t.Fatalf("Close() error = %v, want %v", err, expectedErr)
+	}
+	if !connection.closed {
+		t.Fatal("Close() did not close the connection")
+	}
+}
+
+type productUsageGRPCClientFunc func(context.Context, *protos.CreateProductUsageRequest, ...grpc.CallOption) (*protos.GetProductUsageResponse, error)
+
+func (call productUsageGRPCClientFunc) CreateProductUsage(ctx context.Context, request *protos.CreateProductUsageRequest, options ...grpc.CallOption) (*protos.GetProductUsageResponse, error) {
+	return call(ctx, request, options...)
+}
+
+func (productUsageGRPCClientFunc) GetProductUsages(context.Context, *protos.GetProductUsagesRequest, ...grpc.CallOption) (*protos.GetUsagesResponse, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (productUsageGRPCClientFunc) GetOrganizationUsages(context.Context, *protos.GetOrganizationUsagesRequest, ...grpc.CallOption) (*protos.GetUsagesResponse, error) {
+	return nil, errors.New("not implemented")
 }
