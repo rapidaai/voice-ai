@@ -5,11 +5,11 @@ global.innerWidth = 1920;
 global.innerHeight = 1080;
 global.location = { href: "http://localhost/" };
 global.document = { referrer: "" };
-global.navigator = {
-  cookieEnabled: false,
-  doNotTrack: null,
-  hardwareConcurrency: 1,
-  language: "en-US",
-  platform: "node",
-  userAgent: "node",
-};
+Object.defineProperties(global.navigator, {
+  cookieEnabled: { configurable: true, value: false },
+  doNotTrack: { configurable: true, value: null },
+  hardwareConcurrency: { configurable: true, value: 1 },
+  language: { configurable: true, value: "en-US" },
+  platform: { configurable: true, value: "node" },
+  userAgent: { configurable: true, value: "node" },
+});
