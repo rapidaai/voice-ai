@@ -43,10 +43,11 @@ const (
 type RegistrationFailureReason string
 
 const (
-	RegistrationFailureReasonMissingDID              RegistrationFailureReason = "missing_did"
-	RegistrationFailureReasonMissingCredentialID     RegistrationFailureReason = "missing_credential_id"
-	RegistrationFailureReasonDuplicateDID            RegistrationFailureReason = "duplicate_did"
-	RegistrationFailureReasonAssistantNotFound       RegistrationFailureReason = "assistant_not_found"
+	RegistrationFailureReasonMissingDID          RegistrationFailureReason = "missing_did"
+	RegistrationFailureReasonMissingCredentialID RegistrationFailureReason = "missing_credential_id"
+	RegistrationFailureReasonDuplicateDID        RegistrationFailureReason = "duplicate_did"
+	RegistrationFailureReasonAssistantNotFound   RegistrationFailureReason = "assistant_not_found"
+	// #nosec G101, this is a registration state enum, not a credential.
 	RegistrationFailureReasonVaultCredentialNotFound RegistrationFailureReason = "vault_credential_not_found"
 	RegistrationFailureReasonInvalidSIPConfig        RegistrationFailureReason = "invalid_sip_config"
 	RegistrationFailureReasonMissingSIPServer        RegistrationFailureReason = "missing_sip_server"

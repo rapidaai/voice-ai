@@ -196,6 +196,7 @@ func (buffer *rtpInputJitterBuffer) droppedPackets() uint64 {
 }
 
 func rtpSequenceDistance(sequenceNumber uint16, expectedSequence uint16) int {
+	// #nosec G115, RTP sequence distance intentionally uses signed 16-bit wrap.
 	return int(int16(sequenceNumber - expectedSequence))
 }
 

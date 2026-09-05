@@ -35,6 +35,8 @@ type OutboundMediaAnswer struct {
 	negotiatedCodec *Codec
 	remoteIP        string
 	remotePort      int
+	remoteRTCPIP    string
+	remoteRTCPPort  int
 }
 
 // NewOutboundMedia creates the outbound RTP preparer for a SIP call.
@@ -60,7 +62,6 @@ func (media *outboundMedia) Prepare() error {
 		RTPPortRangeEnd:     media.server.rtpPortRangeEnd,
 		PayloadType:         CodecPCMU.PayloadType,
 		ClockRate:           CodecPCMU.ClockRate,
-		Logger:              media.server.logger,
 		MediaTimeoutInitial: media.request.Config.MediaTimeoutInitial,
 		MediaTimeout:        media.request.Config.MediaTimeout,
 		SymmetricRTP:        media.server.symmetricRTP,
@@ -82,7 +83,9 @@ func (media *outboundMedia) SDPOffer() (string, error) {
 	if media.rtpHandler == nil {
 		return "", ErrOutboundMediaNotPrepared
 	}
-	return media.server.GenerateSDP(DefaultSDPConfig(media.externalIP, media.localRTPPort)), nil
+	config := DefaultSDPConfig(media.externalIP, media.localRTPPort)
+	config.RTCPPort = media.rtpHandler.LocalRTCPPort()
+	return media.server.GenerateSDP(config), nil
 }
 
 func NewOutboundMediaAnswer(server *Server, dialog *outboundDialog) (OutboundMediaAnswer, error) {
@@ -93,12 +96,6 @@ func NewOutboundMediaAnswer(server *Server, dialog *outboundDialog) (OutboundMed
 	body := dialog.InviteResponse().Body()
 	if len(body) == 0 {
 		return OutboundMediaAnswer{}, fmt.Errorf("%w: outbound 200 OK SDP body is missing", ErrSDPParseFailed)
-	}
-
-	if server.logger != nil {
-		server.logger.Debugw("Outbound call 200 OK SDP answer",
-			"call_id", dialog.session.GetCallID(),
-			"sdp_body", string(body))
 	}
 
 	sdpInfo, err := server.ParseSDP(body)
@@ -116,6 +113,8 @@ func NewOutboundMediaAnswer(server *Server, dialog *outboundDialog) (OutboundMed
 		negotiatedCodec: sdpInfo.PreferredCodec,
 		remoteIP:        sdpInfo.ConnectionIP,
 		remotePort:      sdpInfo.AudioPort,
+		remoteRTCPIP:    sdpInfo.RTCPIP,
+		remoteRTCPPort:  sdpInfo.RTCPPort,
 	}, nil
 }
 
@@ -127,6 +126,13 @@ func (media *outboundMedia) ApplyAnswer(answer OutboundMediaAnswer) error {
 		media.rtpHandler.SetSymmetricRTP(media.server.useSymmetricRTPForRemoteIP(answer.remoteIP))
 	}
 	media.rtpHandler.SetRemoteAddr(answer.remoteIP, answer.remotePort)
+	if answer.remoteRTCPPort > 0 {
+		rtcpIP := answer.remoteRTCPIP
+		if rtcpIP == "" {
+			rtcpIP = answer.remoteIP
+		}
+		media.rtpHandler.SetRemoteRTCPAddr(rtcpIP, answer.remoteRTCPPort)
+	}
 	media.rtpHandler.SetCodec(answer.negotiatedCodec)
 	media.session.SetRemoteRTP(answer.remoteIP, answer.remotePort)
 	if answer.negotiatedCodec != nil {

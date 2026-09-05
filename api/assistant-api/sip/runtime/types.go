@@ -614,13 +614,43 @@ type DisconnectMetadata struct {
 }
 
 type RTPStats struct {
-	PacketsSent     uint64        `json:"packets_sent"`
-	PacketsReceived uint64        `json:"packets_received"`
-	BytesSent       uint64        `json:"bytes_sent"`
-	BytesReceived   uint64        `json:"bytes_received"`
-	PacketsLost     uint64        `json:"packets_lost"`
-	PacketsDropped  uint64        `json:"packets_dropped"`
-	Jitter          time.Duration `json:"jitter"`
+	PacketsSent                    uint64        `json:"packets_sent"`
+	PacketsReceived                uint64        `json:"packets_received"`
+	PacketsDelivered               uint64        `json:"packets_delivered"`
+	BytesSent                      uint64        `json:"bytes_sent"`
+	BytesReceived                  uint64        `json:"bytes_received"`
+	PacketsLost                    uint64        `json:"packets_lost"`
+	PacketsDropped                 uint64        `json:"packets_dropped"`
+	AudioInputDropped              uint64        `json:"audio_input_dropped"`
+	InboundQuality                 string        `json:"inbound_quality"`
+	InboundQualityScore            uint8         `json:"inbound_quality_score"`
+	InboundQualityWindow           time.Duration `json:"inbound_quality_window"`
+	InboundWindowPacketsReceived   uint64        `json:"inbound_window_packets_received"`
+	InboundWindowPacketsDelivered  uint64        `json:"inbound_window_packets_delivered"`
+	InboundWindowPacketsLost       uint64        `json:"inbound_window_packets_lost"`
+	InboundWindowPacketsDropped    uint64        `json:"inbound_window_packets_dropped"`
+	InboundWindowAudioInputDropped uint64        `json:"inbound_window_audio_input_dropped"`
+	InboundLossRate                float64       `json:"inbound_loss_rate"`
+	InboundDropRate                float64       `json:"inbound_drop_rate"`
+	InboundDeliveryRate            float64       `json:"inbound_delivery_rate"`
+	RTCPEnabled                    bool          `json:"rtcp_enabled"`
+	LocalRTCPPort                  int           `json:"local_rtcp_port"`
+	RemoteRTCPPort                 int           `json:"remote_rtcp_port"`
+	RTCPPacketsSent                uint64        `json:"rtcp_packets_sent"`
+	RTCPPacketsReceived            uint64        `json:"rtcp_packets_received"`
+	RTCPReportsSent                uint64        `json:"rtcp_reports_sent"`
+	RTCPSenderReportsSent          uint64        `json:"rtcp_sender_reports_sent"`
+	RTCPReceiverReportsSent        uint64        `json:"rtcp_receiver_reports_sent"`
+	RTCPSenderReportsReceived      uint64        `json:"rtcp_sender_reports_received"`
+	RTCPReceiverReportsReceived    uint64        `json:"rtcp_receiver_reports_received"`
+	RTCPFractionLost               uint8         `json:"rtcp_fraction_lost"`
+	RTCPPacketsLost                uint32        `json:"rtcp_packets_lost"`
+	RTCPJitter                     uint32        `json:"rtcp_jitter"`
+	RTCPRemoteFractionLost         uint8         `json:"rtcp_remote_fraction_lost"`
+	RTCPRemotePacketsLost          uint32        `json:"rtcp_remote_packets_lost"`
+	RTCPRemoteJitter               uint32        `json:"rtcp_remote_jitter"`
+	RTCPRoundTripTime              time.Duration `json:"rtcp_round_trip_time"`
+	Jitter                         time.Duration `json:"jitter"`
 }
 
 // ParseConfigFromVault extracts provider-owned SIP settings from vault.

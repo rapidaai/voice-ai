@@ -94,8 +94,44 @@ func TestCheckedIntegerConversions(t *testing.T) {
 	if _, err := Uint64ToInt64(uint64(math.MaxInt64) + 1); err == nil {
 		t.Fatal("expected uint64 to int64 overflow error")
 	}
+	if value, err := Uint64ToUint32(math.MaxUint32); err != nil || value != math.MaxUint32 {
+		t.Fatalf("Uint64ToUint32() = %d, %v", value, err)
+	}
+	if _, err := Uint64ToUint32(uint64(math.MaxUint32) + 1); err == nil {
+		t.Fatal("expected uint64 to uint32 overflow error")
+	}
+	if value, err := Int64ToUint64(math.MaxInt64); err != nil || value != math.MaxInt64 {
+		t.Fatalf("Int64ToUint64() = %d, %v", value, err)
+	}
+	if _, err := Int64ToUint64(-1); err == nil {
+		t.Fatal("expected int64 to uint64 signedness error")
+	}
+	if value, err := Uint32ToInt(42); err != nil || value != 42 {
+		t.Fatalf("Uint32ToInt() = %d, %v", value, err)
+	}
+	if value := Uint32ToInt64(math.MaxUint32); value != math.MaxUint32 {
+		t.Fatalf("Uint32ToInt64() = %d", value)
+	}
+	if value, err := Uint32ToUint8(math.MaxUint8); err != nil || value != math.MaxUint8 {
+		t.Fatalf("Uint32ToUint8() = %d, %v", value, err)
+	}
+	if _, err := Uint32ToUint8(uint32(math.MaxUint8) + 1); err == nil {
+		t.Fatal("expected uint32 to uint8 overflow error")
+	}
 	if value, err := UintToUint32(uint(math.MaxUint32)); err != nil || value != math.MaxUint32 {
 		t.Fatalf("UintToUint32() = %d, %v", value, err)
+	}
+	if value, err := IntToUint32(math.MaxInt32); err != nil || value != math.MaxInt32 {
+		t.Fatalf("IntToUint32() = %d, %v", value, err)
+	}
+	if _, err := IntToUint32(-1); err == nil {
+		t.Fatal("expected int to uint32 signedness error")
+	}
+	if value, err := IntToUint8(math.MaxUint8); err != nil || value != math.MaxUint8 {
+		t.Fatalf("IntToUint8() = %d, %v", value, err)
+	}
+	if _, err := IntToUint8(math.MaxUint8 + 1); err == nil {
+		t.Fatal("expected int to uint8 overflow error")
 	}
 	if value, err := IntToInt32(math.MaxInt32); err != nil || value != math.MaxInt32 {
 		t.Fatalf("IntToInt32() = %d, %v", value, err)
