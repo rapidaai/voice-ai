@@ -48,7 +48,6 @@ func (media *inboundMedia) Prepare() error {
 		RTPPortRangeEnd:     media.server.rtpPortRangeEnd,
 		PayloadType:         media.mediaOffer.negotiatedCodec.PayloadType,
 		ClockRate:           media.mediaOffer.negotiatedCodec.ClockRate,
-		Logger:              media.server.logger,
 		MediaTimeoutInitial: media.session.config.MediaTimeoutInitial,
 		MediaTimeout:        media.session.config.MediaTimeout,
 		SymmetricRTP:        media.server.useSymmetricRTPForRemoteIP(media.mediaOffer.sdpInfo.ConnectionIP),
@@ -60,6 +59,13 @@ func (media *inboundMedia) Prepare() error {
 
 	_, media.localRTPPort = rtpHandler.LocalAddr()
 	rtpHandler.SetRemoteAddr(media.mediaOffer.sdpInfo.ConnectionIP, media.mediaOffer.sdpInfo.AudioPort)
+	if media.mediaOffer.sdpInfo.RTCPPort > 0 {
+		rtcpIP := media.mediaOffer.sdpInfo.RTCPIP
+		if rtcpIP == "" {
+			rtcpIP = media.mediaOffer.sdpInfo.ConnectionIP
+		}
+		rtpHandler.SetRemoteRTCPAddr(rtcpIP, media.mediaOffer.sdpInfo.RTCPPort)
+	}
 	rtpHandler.SetCodec(media.mediaOffer.negotiatedCodec)
 	rtpHandler.SetOnFirstPacket(func() {
 		if media.session != nil {
@@ -105,9 +111,13 @@ func (media *inboundMedia) Start(onMediaTimeout func()) error {
 }
 
 func (media *inboundMedia) SDPConfig() *SDPConfig {
-	return media.server.NegotiatedSDPConfig(
+	config := media.server.NegotiatedSDPConfig(
 		media.externalIP,
 		media.localRTPPort,
 		media.mediaOffer.negotiatedCodec,
 	)
+	if media.rtpHandler != nil {
+		config.RTCPPort = media.rtpHandler.LocalRTCPPort()
+	}
+	return config
 }

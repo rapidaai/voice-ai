@@ -1,0 +1,388 @@
+package sip_runtime
+
+import (
+	"encoding/binary"
+	"errors"
+	"fmt"
+	"net"
+	"sync"
+	"time"
+
+	"github.com/pion/rtcp"
+	"github.com/rapidaai/pkg/utils"
+)
+
+const (
+	rtcpPortOffset               = 1
+	rtcpReadBufferSize           = 1500
+	rtcpWriteBufferSize          = 1500
+	rtcpReportInterval           = 5 * time.Second
+	rtcpReadTimeout              = time.Second
+	rtcpCNAMEFormat              = "rapida-%08x@%s"
+	rtcpNanoseconds              = 1000000000
+	rtcpNanosecondsUint64        = 1000000000
+	rtcpNTPUnixOffset            = 2208988800
+	rtcpNTPFractionUnit          = 1 << 32
+	rtcpCompactUnit              = 65536
+	rtcpMaxUint8                 = 255
+	rtcpMaxUint32                = 1<<32 - 1
+	rtcpMaxUint32Int64           = 1<<32 - 1
+	rtpSequenceCycle             = 1 << 16
+	rtpSequenceRolloverThreshold = 1 << 15
+)
+
+type rtpRTCPReceptionStats struct {
+	mu sync.Mutex
+
+	started          bool
+	baseSequence     uint32
+	highestSequence  uint32
+	receivedPackets  uint32
+	reportExpected   uint32
+	reportReceived   uint32
+	previousSequence uint16
+	sequenceCycles   uint32
+
+	previousTransit int64
+	jitter          float64
+
+	lastSenderReport           uint32
+	lastSenderReportReceivedAt time.Time
+	lastRemoteFractionLost     uint8
+	lastRemotePacketsLost      uint32
+	lastRemoteJitter           uint32
+	roundTripTime              time.Duration
+}
+
+type rtpRTCPReceptionSnapshot struct {
+	FractionLost      uint8
+	PacketsLost       uint32
+	Jitter            uint32
+	RemoteLoss        uint8
+	RemotePacketsLost uint32
+	RemoteJitter      uint32
+	RoundTripTime     time.Duration
+}
+
+func (h *RTPHandler) receiveRTCPLoop() {
+	buf := make([]byte, rtcpReadBufferSize)
+	for {
+		select {
+		case <-h.ctx.Done():
+			return
+		default:
+		}
+		if !h.running.Load() {
+			return
+		}
+		if err := h.rtcpConn.SetReadDeadline(time.Now().Add(rtcpReadTimeout)); err != nil {
+			continue
+		}
+		n, remoteAddr, err := h.rtcpConn.ReadFromUDP(buf)
+		if err != nil {
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				continue
+			}
+			if errors.Is(err, net.ErrClosed) {
+				continue
+			}
+			continue
+		}
+		if remoteAddr != nil {
+			h.mu.Lock()
+			if h.remoteRTCPAddr == nil || (h.symmetricRTP && !h.remoteRTCPSignaled) {
+				h.remoteRTCPAddr = cloneUDPAddr(remoteAddr)
+			}
+			h.mu.Unlock()
+		}
+		packets, err := rtcp.Unmarshal(buf[:n])
+		if err != nil {
+			continue
+		}
+		now := time.Now()
+		receivedRTCPPackets := 0
+		for _, packet := range packets {
+			receivedRTCPPackets += h.recordRTCPPacket(packet, now)
+		}
+		if packetCount, convertErr := utils.IntToUint64(receivedRTCPPackets); convertErr == nil {
+			h.rtcpPacketsReceived.Add(packetCount)
+		}
+	}
+}
+
+func (h *RTPHandler) sendRTCPReportsLoop() {
+	ticker := time.NewTicker(rtcpReportInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-h.ctx.Done():
+			return
+		case now := <-ticker.C:
+			_ = h.sendRTCPReport(now)
+		}
+	}
+}
+
+func (h *RTPHandler) sendRTCPReport(now time.Time) error {
+	if h == nil || h.rtcpConn == nil {
+		return nil
+	}
+
+	h.mu.RLock()
+	remoteRTCPAddr := cloneUDPAddr(h.remoteRTCPAddr)
+	localIP := h.localIP
+	ssrc := h.ssrc
+	timestamp := h.timestamp
+	h.mu.RUnlock()
+	if remoteRTCPAddr == nil {
+		return nil
+	}
+
+	reports := make([]rtcp.ReceptionReport, 0, 1)
+	if remoteSSRC := h.remoteSSRC.Load(); remoteSSRC != 0 {
+		reports = append(reports, h.rtcpReception.receptionReport(remoteSSRC, now))
+	}
+
+	var compoundPacket rtcp.CompoundPacket
+	packetsSent := h.packetsSent.Load()
+	if packetsSent > 0 {
+		packetCount, _ := utils.Uint64ToUint32(min(packetsSent, rtcpMaxUint32))
+		octetCount, _ := utils.Uint64ToUint32(min(h.bytesSent.Load(), rtcpMaxUint32))
+		compoundPacket = rtcp.CompoundPacket{
+			&rtcp.SenderReport{
+				SSRC:        ssrc,
+				NTPTime:     rtcpNTP(now),
+				RTPTime:     timestamp,
+				PacketCount: packetCount,
+				OctetCount:  octetCount,
+				Reports:     reports,
+			},
+			rtcp.NewCNAMESourceDescription(ssrc, fmt.Sprintf(rtcpCNAMEFormat, ssrc, localIP)),
+		}
+	} else {
+		compoundPacket = rtcp.CompoundPacket{
+			&rtcp.ReceiverReport{
+				SSRC:    ssrc,
+				Reports: reports,
+			},
+			rtcp.NewCNAMESourceDescription(ssrc, fmt.Sprintf(rtcpCNAMEFormat, ssrc, localIP)),
+		}
+	}
+
+	data, err := compoundPacket.Marshal()
+	if err != nil {
+		return err
+	}
+	if _, err := h.rtcpConn.WriteToUDP(data, remoteRTCPAddr); err != nil {
+		return err
+	}
+	if packetCount, convertErr := utils.IntToUint64(len(compoundPacket)); convertErr == nil {
+		h.rtcpPacketsSent.Add(packetCount)
+	}
+	h.rtcpReportsSent.Add(1)
+	if packetsSent > 0 {
+		h.rtcpSenderReportsSent.Add(1)
+	} else {
+		h.rtcpReceiverReportsSent.Add(1)
+	}
+	return nil
+}
+
+func (h *RTPHandler) recordRTCPPacket(packet rtcp.Packet, receivedAt time.Time) int {
+	switch typedPacket := packet.(type) {
+	case *rtcp.CompoundPacket:
+		receivedRTCPPackets := 0
+		for _, innerPacket := range *typedPacket {
+			receivedRTCPPackets += h.recordRTCPPacket(innerPacket, receivedAt)
+		}
+		return receivedRTCPPackets
+	case *rtcp.SenderReport:
+		h.rtcpSenderReportsReceived.Add(1)
+		h.rtcpReception.recordSenderReport(typedPacket, receivedAt)
+		return 1
+	case *rtcp.ReceiverReport:
+		h.rtcpReceiverReportsReceived.Add(1)
+		h.rtcpReception.recordReceiverReport(typedPacket, h.ssrc, receivedAt)
+		return 1
+	}
+	return 1
+}
+
+func (s *rtpRTCPReceptionStats) recordRTP(packet *RTPPacket, clockRate uint32, arrivedAt time.Time) {
+	if packet == nil {
+		return
+	}
+	if clockRate == 0 {
+		clockRate = rtpDefaultClockRate
+	}
+
+	arrivalTimestamp := arrivedAt.UnixNano() * int64(clockRate) / rtcpNanoseconds
+	transit := arrivalTimestamp - int64(packet.Timestamp)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.started {
+		sequence := uint32(packet.SequenceNumber)
+		s.started = true
+		s.baseSequence = sequence
+		s.highestSequence = sequence
+		s.previousSequence = packet.SequenceNumber
+		s.previousTransit = transit
+		s.receivedPackets = 1
+		return
+	}
+
+	if packet.SequenceNumber < s.previousSequence && s.previousSequence-packet.SequenceNumber > rtpSequenceRolloverThreshold {
+		s.sequenceCycles += rtpSequenceCycle
+	}
+	extendedSequence := s.sequenceCycles | uint32(packet.SequenceNumber)
+	if extendedSequence > s.highestSequence {
+		s.highestSequence = extendedSequence
+	}
+	s.previousSequence = packet.SequenceNumber
+	s.receivedPackets++
+
+	transitDelta := transit - s.previousTransit
+	if transitDelta < 0 {
+		transitDelta = -transitDelta
+	}
+	s.previousTransit = transit
+	s.jitter += (float64(transitDelta) - s.jitter) / 16
+}
+
+func (s *rtpRTCPReceptionStats) recordSenderReport(report *rtcp.SenderReport, receivedAt time.Time) {
+	if report == nil || report.NTPTime == 0 {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var ntpBytes [8]byte
+	binary.BigEndian.PutUint64(ntpBytes[:], report.NTPTime)
+	s.lastSenderReport = binary.BigEndian.Uint32(ntpBytes[2:6])
+	s.lastSenderReportReceivedAt = receivedAt
+}
+
+func (s *rtpRTCPReceptionStats) recordReceiverReport(report *rtcp.ReceiverReport, localSSRC uint32, receivedAt time.Time) {
+	if report == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, receptionReport := range report.Reports {
+		if receptionReport.SSRC != localSSRC {
+			continue
+		}
+		s.lastRemoteFractionLost = receptionReport.FractionLost
+		s.lastRemotePacketsLost = receptionReport.TotalLost
+		s.lastRemoteJitter = receptionReport.Jitter
+		s.roundTripTime = 0
+		if receptionReport.LastSenderReport == 0 || receptionReport.Delay == 0 {
+			continue
+		}
+		rttUnits := rtcpCompactNTP(receivedAt) - receptionReport.LastSenderReport - receptionReport.Delay
+		durationUnits := utils.Uint32ToInt64(rttUnits)
+		s.roundTripTime = time.Duration(durationUnits) * time.Second / rtcpCompactUnit
+	}
+}
+
+func (s *rtpRTCPReceptionStats) receptionReport(ssrc uint32, now time.Time) rtcp.ReceptionReport {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	expected := uint32(0)
+	if s.started && s.highestSequence >= s.baseSequence {
+		expected = s.highestSequence - s.baseSequence + 1
+	}
+	packetsLost := uint32(0)
+	if expected > s.receivedPackets {
+		packetsLost = expected - s.receivedPackets
+	}
+
+	expectedInterval := expected - s.reportExpected
+	receivedInterval := s.receivedPackets - s.reportReceived
+	lostInterval := uint32(0)
+	if expectedInterval > receivedInterval {
+		lostInterval = expectedInterval - receivedInterval
+	}
+	fractionLost := uint8(0)
+	if expectedInterval > 0 && lostInterval > 0 {
+		fractionLost, _ = utils.Uint32ToUint8(min((lostInterval<<8)/expectedInterval, rtcpMaxUint8))
+	}
+	s.reportExpected = expected
+	s.reportReceived = s.receivedPackets
+
+	delay := uint32(0)
+	if !s.lastSenderReportReceivedAt.IsZero() {
+		delayUnits := now.Sub(s.lastSenderReportReceivedAt).Nanoseconds() * rtcpCompactUnit / rtcpNanoseconds
+		if delayUnits > rtcpMaxUint32Int64 {
+			delay = ^uint32(0)
+		} else if delayUnits > 0 {
+			delay, _ = utils.Int64ToUint32(delayUnits)
+		}
+	}
+
+	return rtcp.ReceptionReport{
+		SSRC:               ssrc,
+		FractionLost:       fractionLost,
+		TotalLost:          packetsLost,
+		LastSequenceNumber: s.highestSequence,
+		Jitter:             uint32(s.jitter),
+		LastSenderReport:   s.lastSenderReport,
+		Delay:              delay,
+	}
+}
+
+func (s *rtpRTCPReceptionStats) snapshot() rtpRTCPReceptionSnapshot {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	expected := uint32(0)
+	if s.started && s.highestSequence >= s.baseSequence {
+		expected = s.highestSequence - s.baseSequence + 1
+	}
+	packetsLost := uint32(0)
+	if expected > s.receivedPackets {
+		packetsLost = expected - s.receivedPackets
+	}
+	fractionLost := uint8(0)
+	if expected > 0 && packetsLost > 0 {
+		fractionLost, _ = utils.Uint32ToUint8(min((packetsLost<<8)/expected, rtcpMaxUint8))
+	}
+
+	return rtpRTCPReceptionSnapshot{
+		FractionLost:      fractionLost,
+		PacketsLost:       packetsLost,
+		Jitter:            uint32(s.jitter),
+		RemoteLoss:        s.lastRemoteFractionLost,
+		RemotePacketsLost: s.lastRemotePacketsLost,
+		RemoteJitter:      s.lastRemoteJitter,
+		RoundTripTime:     s.roundTripTime,
+	}
+}
+
+func rtcpNTP(t time.Time) uint64 {
+	if t.Before(time.Unix(0, 0)) {
+		return 0
+	}
+	seconds, err := utils.Int64ToUint64(t.Unix())
+	if err != nil {
+		return 0
+	}
+	fraction, err := utils.IntToUint64(t.Nanosecond())
+	if err != nil {
+		return 0
+	}
+	seconds += rtcpNTPUnixOffset
+	fraction = fraction * rtcpNTPFractionUnit / rtcpNanosecondsUint64
+	return seconds<<32 | fraction
+}
+
+func rtcpCompactNTP(t time.Time) uint32 {
+	var ntpBytes [8]byte
+	binary.BigEndian.PutUint64(ntpBytes[:], rtcpNTP(t))
+	return binary.BigEndian.Uint32(ntpBytes[2:6])
+}

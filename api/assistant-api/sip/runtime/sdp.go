@@ -10,6 +10,15 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/rapidaai/pkg/utils"
+)
+
+const (
+	sdpConnectionIPPrefix = "c=IN IP4 "
+	sdpAudioPrefix        = "m=audio "
+	sdpRTPMapPrefix       = "a=rtpmap:"
+	sdpRTCPPrefix         = "a=rtcp:"
 )
 
 // Codec represents an audio codec with its RTP configuration
@@ -50,6 +59,8 @@ const (
 type SDPMediaInfo struct {
 	ConnectionIP   string
 	AudioPort      int
+	RTCPIP         string
+	RTCPPort       int
 	PayloadTypes   []uint8
 	PreferredCodec *Codec
 	Direction      SDPDirection // sendrecv, sendonly, recvonly, inactive
@@ -76,6 +87,7 @@ type SDPConfig struct {
 	SessionName string
 	LocalIP     string
 	RTPPort     int
+	RTCPPort    int
 	Codecs      []Codec
 	PTime       int // Packetization time in milliseconds
 }
@@ -114,7 +126,7 @@ func (s *Server) NegotiatedSDPConfig(localIP string, rtpPort int, codec *Codec) 
 // GenerateSDP creates an SDP body for SIP responses.
 // Always includes telephone-event (PT 101) per RFC 4733. Nearly all SIP
 // endpoints (Asterisk, FreeSWITCH, Zoiper, Twilio) require telephone-event
-// in the m= line — without it, they report "remote codecs: None" and refuse
+// in the m= line. Without it, they report "remote codecs: None" and refuse
 // to bridge/accept media even when audio codecs match.
 func (s *Server) GenerateSDP(cfg *SDPConfig) string {
 	var sb strings.Builder
@@ -134,7 +146,7 @@ func (s *Server) GenerateSDP(cfg *SDPConfig) string {
 	// Time (0 0 = session is permanent)
 	sb.WriteString("t=0 0\r\n")
 
-	// Media Description — build payload type list: audio codecs + telephone-event (101)
+	// Media description: build payload type list with audio codecs and telephone-event (101)
 	payloadTypes := make([]string, 0, len(cfg.Codecs)+1)
 	for _, codec := range cfg.Codecs {
 		payloadTypes = append(payloadTypes, strconv.Itoa(int(codec.PayloadType)))
@@ -152,6 +164,9 @@ func (s *Server) GenerateSDP(cfg *SDPConfig) string {
 		payloadTypes = append(payloadTypes, strconv.Itoa(int(CodecTelephoneEvent.PayloadType)))
 	}
 	sb.WriteString(fmt.Sprintf("m=audio %d RTP/AVP %s\r\n", cfg.RTPPort, strings.Join(payloadTypes, " ")))
+	if cfg.RTCPPort > 0 {
+		sb.WriteString(fmt.Sprintf("a=rtcp:%d IN IP4 %s\r\n", cfg.RTCPPort, cfg.LocalIP))
+	}
 
 	// Codec attributes (rtpmap for each audio codec)
 	for _, codec := range cfg.Codecs {
@@ -193,11 +208,11 @@ func (s *Server) ParseSDP(sdpBody []byte) (*SDPMediaInfo, error) {
 		line = strings.TrimSuffix(line, "\r")
 
 		switch {
-		case strings.HasPrefix(line, "c=IN IP4 "):
+		case strings.HasPrefix(line, sdpConnectionIPPrefix):
 			// Connection line: c=IN IP4 192.168.1.5
-			info.ConnectionIP = strings.TrimSpace(strings.TrimPrefix(line, "c=IN IP4 "))
+			info.ConnectionIP = strings.TrimSpace(strings.TrimPrefix(line, sdpConnectionIPPrefix))
 
-		case strings.HasPrefix(line, "m=audio "):
+		case strings.HasPrefix(line, sdpAudioPrefix):
 			// Media line: m=audio 10000 RTP/AVP 0 8 101
 			parts := strings.Fields(line)
 			if len(parts) >= 3 {
@@ -208,12 +223,27 @@ func (s *Server) ParseSDP(sdpBody []byte) (*SDPMediaInfo, error) {
 				for i := 3; i < len(parts); i++ {
 					pt, err := strconv.Atoi(parts[i])
 					if err == nil && pt >= 0 && pt <= 127 {
-						info.PayloadTypes = append(info.PayloadTypes, uint8(pt))
+						payloadType, convertErr := utils.IntToUint8(pt)
+						if convertErr == nil {
+							info.PayloadTypes = append(info.PayloadTypes, payloadType)
+						}
 					}
 				}
 			}
 
-		case strings.HasPrefix(line, "a=rtpmap:"):
+		case strings.HasPrefix(line, sdpRTCPPrefix):
+			parts := strings.Fields(strings.TrimPrefix(line, sdpRTCPPrefix))
+			if len(parts) >= 1 {
+				port, err := strconv.Atoi(parts[0])
+				if err == nil && port > 0 && port <= rtpMaxPort {
+					info.RTCPPort = port
+				}
+			}
+			if len(parts) >= 4 && parts[1] == "IN" && parts[2] == "IP4" {
+				info.RTCPIP = parts[3]
+			}
+
+		case strings.HasPrefix(line, sdpRTPMapPrefix):
 			// RTP map: a=rtpmap:0 PCMU/8000
 			// We use this to confirm codec selection
 
@@ -234,7 +264,7 @@ func (s *Server) ParseSDP(sdpBody []byte) (*SDPMediaInfo, error) {
 	}
 
 	// Determine preferred codec based on first matching payload type.
-	// Skip telephone-event (PT 101) — it is not an audio codec.
+	// Skip telephone-event (PT 101). It is not an audio codec.
 	for _, pt := range info.PayloadTypes {
 		if pt == CodecTelephoneEvent.PayloadType {
 			continue // telephone-event is not an audio codec
@@ -248,6 +278,9 @@ func (s *Server) ParseSDP(sdpBody []byte) (*SDPMediaInfo, error) {
 		if info.PreferredCodec != nil {
 			break
 		}
+	}
+	if info.RTCPPort > 0 && info.RTCPIP == "" {
+		info.RTCPIP = info.ConnectionIP
 	}
 
 	return info, nil
