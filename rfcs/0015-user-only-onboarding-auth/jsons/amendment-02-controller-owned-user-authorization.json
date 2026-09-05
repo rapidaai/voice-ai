@@ -1,0 +1,54 @@
+{
+  "rfc": "rfcs/0015-user-only-onboarding-auth.md",
+  "status": "accepted_pending_confirmation",
+  "created_at": "2026-09-05",
+  "reason": "The user rejected service-level middleware opt-in because controllers should define whether user identity or full organization-bearing authorization is required.",
+  "decision": "Add types.AuthorizeUser for valid user identity with optional organization context. Keep types.Authorize unchanged for full contextual authorization. User middleware always authenticates valid user credentials and attaches available user, organization, and project contexts. Controllers choose the required authorization function.",
+  "allowed_paths": {
+    "pkg/types/rapida_auth.go": "authentication implementer",
+    "pkg/types/authorization_test.go": "authentication implementer",
+    "pkg/middlewares/authentication_option.go": "authentication implementer",
+    "pkg/middlewares/authentication_grpc_middleware.go": "authentication implementer",
+    "pkg/middlewares/authentication_rpc_middleware.go": "authentication implementer",
+    "pkg/middlewares/authentication_middleware_test.go": "authentication implementer",
+    "api/web-api/internal/service/user/auth.type.go": "authentication implementer",
+    "api/web-api/internal/service/user/auth.type_test.go": "authentication implementer",
+    "cmd/web/web.go": "authentication implementer",
+    "cmd/web/authentication_middleware_test.go": "authentication implementer",
+    "api/web-api/api/organization.go": "authentication implementer",
+    "api/web-api/api/organization_test.go": "authentication implementer",
+    "api/web-api/api/authentication_contract_test.go": "authentication implementer"
+  },
+  "implementation": [
+    "Add types.AuthorizeUser, validating AuthTypeUser, a valid user actor, user context, and matching actor and user IDs without requiring organization context.",
+    "Keep types.Authorize and Authentication.IsAuthenticated unchanged.",
+    "Remove AllowUserWithoutOrganization and restore all user middleware constructor signatures.",
+    "Make user middleware validate the resolved user identity and audit actor independently of principle.IsAuthenticated.",
+    "Attach organization and project contexts only when supplied by the authenticated principle.",
+    "Revert the web-api-local authPrinciple.IsAuthenticated change because middleware no longer uses organization-bearing principle authorization as identity validation.",
+    "Use types.AuthorizeUser only in REST and gRPC CreateOrganization.",
+    "Keep CreateProject and all existing protected controllers on types.Authorize."
+  ],
+  "security": [
+    "No credentials continues to pass through so public controllers such as signup remain public.",
+    "Invalid or incomplete supplied credentials remain rejected by middleware.",
+    "AuthorizeUser rejects non-user authentication, invalid actors, missing user context, and actor or user mismatches.",
+    "Existing controllers retain organization-bearing authorization because types.Authorize is unchanged."
+  ],
+  "tests": [
+    "AuthorizeUser accepts user-only and organization-bearing user authentication.",
+    "AuthorizeUser rejects missing, malformed, mismatched, and non-user authentication.",
+    "User middleware accepts valid user-only principles by default across Gin, unary gRPC, and stream gRPC.",
+    "User middleware rejects invalid user identity and audit actor.",
+    "CreateOrganization uses AuthorizeUser.",
+    "CreateProject remains organization-required through Authorize.",
+    "Assistant, endpoint, integration, and web command tests pass."
+  ],
+  "rollback": "Revert amendment 02 changes together to restore the confirmed middleware opt-in implementation.",
+  "challenger": "user",
+  "challenge_message": "Controller should define if it needs authentication. Signup does not need it. Use AuthorizeUser for user-only authorization.",
+  "approval_message": "sure do this",
+  "open_blockers": [
+    "Exact amendment SHA-256 confirmation is required before implementation."
+  ]
+}

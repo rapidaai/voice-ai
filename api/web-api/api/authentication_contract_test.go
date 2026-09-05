@@ -73,6 +73,10 @@ func TestWebRPCAuthenticationContract(t *testing.T) {
 				continue
 			}
 			seen[function.Name.Name]++
+			if filename == "api/web-api/api/organization.go" && function.Name.Name == "CreateOrganization" {
+				assertOrganizationOnboardingAuthenticationPattern(t, filename, function)
+				continue
+			}
 			scopes := map[string]struct{}{}
 			ast.Inspect(function.Body, func(node ast.Node) bool {
 				call, ok := node.(*ast.CallExpr)
@@ -112,6 +116,18 @@ func TestWebRPCAuthenticationContract(t *testing.T) {
 				t.Errorf("%s:%s not found", filename, handler)
 			}
 		}
+	}
+}
+
+func assertOrganizationOnboardingAuthenticationPattern(t *testing.T, filename string, function *ast.FuncDecl) {
+	t.Helper()
+	statements := function.Body.List
+	if len(statements) < 2 || !matchesAssignment(statements[0], token.DEFINE, []string{"iAuth", "authErr"}, "types", "AuthorizeUser", "") {
+		t.Errorf("%s:%s does not use types.AuthorizeUser", filename, function.Name.Name)
+		return
+	}
+	if !matchesErrorCheck(statements[1], "authErr") {
+		t.Errorf("%s:%s does not check authErr immediately", filename, function.Name.Name)
 	}
 }
 

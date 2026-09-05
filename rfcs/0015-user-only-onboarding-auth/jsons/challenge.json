@@ -1,0 +1,17 @@
+{
+  "rfc": "rfcs/0015-user-only-onboarding-auth.md",
+  "challenger": "user",
+  "challenged_at": "2026-09-04",
+  "decision": "approve",
+  "finding": "The fix must be minimal and clean and must not change authentication behavior in other services.",
+  "resolution": [
+    "Removed all proposed pkg/types changes.",
+    "Kept the shared middleware default organization requirement.",
+    "Added an explicit middleware option enabled only by cmd/web.",
+    "Kept user-only authorization private to api/web-api CreateOrganization.",
+    "Added tests proving default middleware behavior remains unchanged."
+  ],
+  "open_blockers": [
+    "Exact RFC SHA-256 confirmation is required before implementation."
+  ]
+}

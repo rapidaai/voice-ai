@@ -52,6 +52,35 @@ type recordingUserAuthenticator struct {
 	projectIDs []uint64
 }
 
+type userOnlyPrinciple struct {
+	types.Principle
+}
+
+func (principle *userOnlyPrinciple) AuditActor() (types.ActorIdentity, bool) {
+	userID, ok := principle.UserIdentity()
+	if !ok {
+		return types.ActorIdentity{}, false
+	}
+	return types.ActorIdentity{Type: types.ActorTypeUser, ID: userID}, true
+}
+
+type userOnlyAuthenticator struct {
+	userID uint64
+}
+
+func (authenticator userOnlyAuthenticator) Authorize(_ context.Context, _ string, userID uint64) (types.Principle, error) {
+	if authenticator.userID != 0 {
+		userID = authenticator.userID
+	}
+	return &userOnlyPrinciple{Principle: &types.PlainAuthPrinciple{
+		User: types.UserInfo{Id: userID},
+	}}, nil
+}
+
+func (userOnlyAuthenticator) AuthPrinciple(context.Context, uint64) (types.Principle, error) {
+	return nil, errors.New("not used")
+}
+
 func (authenticator *recordingUserAuthenticator) Authorize(_ context.Context, token string, userID uint64) (types.Principle, error) {
 	authenticator.token = token
 	authenticator.userID = userID
@@ -303,6 +332,85 @@ func TestUserProjectAndServiceAuthenticationSuccessAcrossMissingTransports(t *te
 			}
 		})
 	}
+}
+
+func TestUserAuthenticationWithoutOrganization(t *testing.T) {
+	assertUserOnlyAuthentication := func(t *testing.T, ctx context.Context) {
+		t.Helper()
+		if _, err := types.Authorize(ctx); !errors.Is(err, types.ErrUnauthenticated) {
+			t.Fatalf("Authorize() error = %v, want %v", err, types.ErrUnauthenticated)
+		}
+		auth, ok := ctx.Value(types.CTX_).(*types.Authentication)
+		if !ok || auth == nil {
+			t.Fatal("user-only authentication missing from context")
+		}
+		userContext, err := auth.UserContext()
+		if err != nil || userContext.UserID != 1 {
+			t.Fatalf("UserContext() = %+v, %v", userContext, err)
+		}
+		if _, err := auth.OrganizationContext(); !errors.Is(err, types.ErrOrganizationContextUnavailable) {
+			t.Fatalf("OrganizationContext() error = %v", err)
+		}
+	}
+
+	t.Run("rejects mismatched user", func(t *testing.T) {
+		_, err := NewAuthenticationUnaryServerMiddleware(userOnlyAuthenticator{userID: 2}, nil)(
+			incomingContext(types.AUTHORIZATION_KEY, "user", types.AUTH_KEY, "1"), nil, nil,
+			func(context.Context, any) (any, error) {
+				t.Fatal("handler called")
+				return nil, nil
+			},
+		)
+		if status.Code(err) != codes.Unauthenticated {
+			t.Fatalf("status = %v, want %v", status.Code(err), codes.Unauthenticated)
+		}
+	})
+
+	t.Run("gin", func(t *testing.T) {
+		gin.SetMode(gin.TestMode)
+		engine := gin.New()
+		engine.Use(NewAuthenticationMiddleware(userOnlyAuthenticator{}, nil))
+		engine.GET("/test", func(ctx *gin.Context) {
+			assertUserOnlyAuthentication(t, ctx.Request.Context())
+			ctx.Status(http.StatusNoContent)
+		})
+		request := httptest.NewRequest(http.MethodGet, "/test", nil)
+		request.Header.Set(types.AUTHORIZATION_KEY, "user")
+		request.Header.Set(types.AUTH_KEY, "1")
+		recorder := httptest.NewRecorder()
+		engine.ServeHTTP(recorder, request)
+		if recorder.Code != http.StatusNoContent {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNoContent)
+		}
+	})
+
+	t.Run("unary", func(t *testing.T) {
+		_, err := NewAuthenticationUnaryServerMiddleware(userOnlyAuthenticator{}, nil)(
+			incomingContext(types.AUTHORIZATION_KEY, "user", types.AUTH_KEY, "1"), nil, nil,
+			func(ctx context.Context, _ any) (any, error) {
+				assertUserOnlyAuthentication(t, ctx)
+				return nil, nil
+			},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("stream", func(t *testing.T) {
+		err := NewAuthenticationStreamServerMiddleware(userOnlyAuthenticator{}, nil)(
+			nil,
+			&testServerStream{ctx: incomingContext(types.AUTHORIZATION_KEY, "user", types.AUTH_KEY, "1")},
+			nil,
+			func(_ any, stream grpc.ServerStream) error {
+				assertUserOnlyAuthentication(t, stream.Context())
+				return nil
+			},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
 }
 
 func TestServiceAuthenticationRestoresDelegatedActorAcrossGRPC(t *testing.T) {
