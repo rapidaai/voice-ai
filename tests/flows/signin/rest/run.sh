@@ -4,6 +4,7 @@ set -eu
 readonly flow_email='ci-flow-signin-rest@example.invalid'
 readonly flow_password='ci-flow-signin-password'
 readonly flow_token='ci-flow-signin-rest-token'
+readonly flow_id='8100003'
 readonly web_endpoint="${WEB_API_REST_ENDPOINT:-http://web-api:9001}"
 temporary_directory=$(mktemp -d)
 
@@ -27,19 +28,20 @@ cleanup_data
 psql -v ON_ERROR_STOP=1 -h postgres -U rapida_user -d web_db \
   -v flow_email="$flow_email" \
   -v flow_password="$flow_password" \
-  -v flow_token="$flow_token" >/dev/null <<'SQL'
+  -v flow_token="$flow_token" \
+  -v flow_id="$flow_id" >/dev/null <<'SQL'
 WITH created_user AS (
   INSERT INTO user_auths (
-    name, email, password, status, source, created_actor_type
+    id, name, email, password, status, source, created_actor_type
   ) VALUES (
-    'CI REST Signin Flow', :'flow_email', md5(:'flow_password'), 'ACTIVE', 'direct', 'unknown'
+    :'flow_id', 'CI REST Signin Flow', :'flow_email', md5(:'flow_password'), 'ACTIVE', 'direct', 'unknown'
   )
   RETURNING id
 )
 INSERT INTO user_auth_tokens (
-  user_auth_id, token_type, token, expire_at, status, created_actor_type
+  id, user_auth_id, token_type, token, expire_at, status, created_actor_type
 )
-SELECT id, 'auth-token', :'flow_token', now() + interval '1 hour', 'ACTIVE', 'unknown'
+SELECT :'flow_id', id, 'auth-token', :'flow_token', now() + interval '1 hour', 'ACTIVE', 'unknown'
 FROM created_user;
 SQL
 

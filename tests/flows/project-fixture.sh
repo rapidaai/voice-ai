@@ -81,3 +81,27 @@ INSERT INTO user_project_roles (
 );
 SQL
 }
+
+verify_assistant_provider_fixture() {
+  counts=$(psql -v ON_ERROR_STOP=1 -At -F '|' -h postgres -U rapida_user -d assistant_db \
+    -v project_id="$FLOW_PROJECT_ID" <<'SQL'
+SELECT
+  (SELECT count(*) FROM assistant_provider_models
+   WHERE assistant_id IN (SELECT id FROM assistants WHERE project_id = :'project_id')
+     AND model_provider_name IN ('openai', 'anthropic')),
+  (SELECT count(*) FROM assistant_provider_agentkits
+   WHERE assistant_id IN (SELECT id FROM assistants WHERE project_id = :'project_id')
+     AND url = 'agentkit:50051'),
+  (SELECT count(*) FROM assistant_provider_websockets
+   WHERE assistant_id IN (SELECT id FROM assistants WHERE project_id = :'project_id')
+     AND url = 'wss://example.invalid/agent'),
+  (SELECT count(*) FROM assistant_provider_agentflows
+   WHERE assistant_id IN (SELECT id FROM assistants WHERE project_id = :'project_id')
+     AND schema_version = '1.0');
+SQL
+)
+  if [ "$counts" != '2|1|1|1' ]; then
+    printf 'unexpected assistant provider counts: %s\n' "$counts" >&2
+    return 1
+  fi
+}

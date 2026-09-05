@@ -1,6 +1,4 @@
-global.window = globalThis;
-global.self = globalThis;
-global.navigator = { userAgent: "node" };
+require("../../react-environment");
 
 const {
   ConnectionConfig,

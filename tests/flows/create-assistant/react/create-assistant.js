@@ -1,6 +1,4 @@
-global.window = globalThis;
-global.self = globalThis;
-global.navigator = { userAgent: "node" };
+require("../../react-environment");
 
 const {
   ConnectionConfig,
@@ -9,7 +7,7 @@ const {
   CreateAssistantRequest,
 } = require("@rapidaai/react");
 
-const assistantEndpoint = process.env.ASSISTANT_API_REACT_ENDPOINT || "http://assistant-api:9007";
+const webEndpoint = process.env.WEB_API_REACT_ENDPOINT || "http://web-api:9001";
 
 function requireValue(name) {
   const value = process.env[name];
@@ -33,7 +31,7 @@ async function main() {
     AuthId: requireValue("FLOW_FIXTURE_ID"),
     ProjectId: requireValue("FLOW_PROJECT_ID"),
   });
-  const connection = new ConnectionConfig({ assistant: assistantEndpoint }, true);
+  const connection = new ConnectionConfig({ web: webEndpoint }, true);
 
   const providerModel = new CreateAssistantProviderRequest.CreateAssistantProviderModel();
   providerModel.setModelprovidername("openai");
