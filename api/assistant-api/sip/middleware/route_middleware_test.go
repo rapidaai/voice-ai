@@ -184,19 +184,21 @@ func TestRouteMiddleware_InactiveDuplicateDIDDoesNotCreateAmbiguity(t *testing.T
 
 func TestRouteMiddleware_AgentRoutePhoneResolution(t *testing.T) {
 	tests := []struct {
-		name       string
-		phone      string
-		expectedTo string
-		wantError  bool
+		name          string
+		hasDeployment bool
+		phone         string
+		expectedTo    string
+		wantError     bool
 	}{
 		{name: "missing deployment", wantError: true},
-		{name: "valid phone", phone: "+15551234567", expectedTo: "+15551234567"},
+		{name: "missing phone", hasDeployment: true, wantError: true},
+		{name: "valid phone", hasDeployment: true, phone: "+15551234567", expectedTo: "+15551234567"},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			assistant := newRouteTestAssistant(7, 8)
-			if test.phone != "" {
+			if test.hasDeployment {
 				assistant.AssistantPhoneDeployment = &internal_assistant_entity.AssistantPhoneDeployment{
 					AssistantDeploymentTelephony: internal_assistant_entity.AssistantDeploymentTelephony{
 						TelephonyOption: []*internal_assistant_entity.AssistantDeploymentTelephonyOption{

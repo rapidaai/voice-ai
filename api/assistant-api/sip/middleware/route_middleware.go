@@ -110,9 +110,10 @@ func (m *middlewareOption) resolveAgentCallRoute(ctx *sip_runtime.SIPRequestCont
 		return &sip_runtime.SIPError{Code: 500, Message: "Failed to resolve SIP configuration", Err: sip_runtime.ErrInvalidConfig}
 	}
 	phone, err := assistant.AssistantPhoneDeployment.GetOptions().GetString("phone")
-	if err == nil {
-		ctx.CallAddress.To = strings.TrimSpace(phone)
+	if err != nil || !validator.NotBlank(phone) {
+		return &sip_runtime.SIPError{Code: 500, Message: "Failed to resolve SIP configuration", Err: sip_runtime.ErrInvalidConfig}
 	}
+	ctx.CallAddress.To = strings.TrimSpace(phone)
 	ctx.Assistant = assistant
 
 	return nil
