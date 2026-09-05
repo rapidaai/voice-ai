@@ -42,6 +42,25 @@ func TestSessionBillingUsesProductUsage(t *testing.T) {
 	require.True(t, found, "SIP billing does not use RapidaClient.ProductUsage")
 }
 
+func TestSIPTalkerReceivesRapidaClient(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "runtime.go", nil, 0)
+	require.NoError(t, err)
+
+	found := false
+	ast.Inspect(file, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		selector, ok := call.Fun.(*ast.SelectorExpr)
+		if ok && selector.Sel.Name == "WithRapidaClient" {
+			found = true
+		}
+		return true
+	})
+	require.True(t, found, "SIP talker does not receive RapidaClient")
+}
+
 func newIdentityTestAuthentication() *types.Authentication {
 	organizationID := uint64(7)
 	projectID := uint64(8)

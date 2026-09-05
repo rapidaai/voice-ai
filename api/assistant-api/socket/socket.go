@@ -205,6 +205,7 @@ func (m *audioSocketEngine) handleConnection(ctx context.Context, conn net.Conn)
 		internal_adapter.WithSource(utils.PhoneCall),
 		internal_adapter.WithContext(ctx),
 		internal_adapter.WithConfig(m.cfg),
+		internal_adapter.WithRapidaClient(m.rapidaClient),
 		internal_adapter.WithLogger(m.logger),
 		internal_adapter.WithPostgres(m.postgres),
 		internal_adapter.WithOpenSearch(m.opensearch),

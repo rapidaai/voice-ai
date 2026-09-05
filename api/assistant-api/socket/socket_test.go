@@ -48,6 +48,29 @@ func TestAudioSocketBillingUsesProductUsage(t *testing.T) {
 	}
 }
 
+func TestAudioSocketTalkerReceivesRapidaClient(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "socket.go", nil, 0)
+	if err != nil {
+		t.Fatalf("parse socket.go: %v", err)
+	}
+
+	found := false
+	ast.Inspect(file, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		selector, ok := call.Fun.(*ast.SelectorExpr)
+		if ok && selector.Sel.Name == "WithRapidaClient" {
+			found = true
+		}
+		return true
+	})
+	if !found {
+		t.Fatal("audio socket talker does not receive RapidaClient")
+	}
+}
+
 func TestReadContextID_HappyPath(t *testing.T) {
 	engine := &audioSocketEngine{}
 
