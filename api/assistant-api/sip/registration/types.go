@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/rapidaai/api/assistant-api/config"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
@@ -60,39 +60,39 @@ func isTerminalRegistrationStatus(status RegistrationStatus) bool {
 	}
 }
 
-type RegistrationFailureClass = sip_infra.RegistrationFailureClass
+type RegistrationFailureClass = sip_runtime.RegistrationFailureClass
 
 const (
-	RegistrationFailureClassConfig     = sip_infra.RegistrationFailureClassConfig
-	RegistrationFailureClassAuth       = sip_infra.RegistrationFailureClassAuth
-	RegistrationFailureClassRejected   = sip_infra.RegistrationFailureClassRejected
-	RegistrationFailureClassTransient  = sip_infra.RegistrationFailureClassTransient
-	RegistrationFailureClassNetwork    = sip_infra.RegistrationFailureClassNetwork
-	RegistrationFailureClassOwnership  = sip_infra.RegistrationFailureClassOwnership
-	RegistrationFailureClassDuplicate  = sip_infra.RegistrationFailureClassDuplicate
-	RegistrationFailureClassRenewal    = sip_infra.RegistrationFailureClassRenewal
-	RegistrationFailureClassUnregister = sip_infra.RegistrationFailureClassUnregister
+	RegistrationFailureClassConfig     = sip_runtime.RegistrationFailureClassConfig
+	RegistrationFailureClassAuth       = sip_runtime.RegistrationFailureClassAuth
+	RegistrationFailureClassRejected   = sip_runtime.RegistrationFailureClassRejected
+	RegistrationFailureClassTransient  = sip_runtime.RegistrationFailureClassTransient
+	RegistrationFailureClassNetwork    = sip_runtime.RegistrationFailureClassNetwork
+	RegistrationFailureClassOwnership  = sip_runtime.RegistrationFailureClassOwnership
+	RegistrationFailureClassDuplicate  = sip_runtime.RegistrationFailureClassDuplicate
+	RegistrationFailureClassRenewal    = sip_runtime.RegistrationFailureClassRenewal
+	RegistrationFailureClassUnregister = sip_runtime.RegistrationFailureClassUnregister
 )
 
-type RegistrationFailureReason = sip_infra.RegistrationFailureReason
+type RegistrationFailureReason = sip_runtime.RegistrationFailureReason
 
 const (
-	RegistrationFailureReasonMissingDID              = sip_infra.RegistrationFailureReasonMissingDID
-	RegistrationFailureReasonMissingCredentialID     = sip_infra.RegistrationFailureReasonMissingCredentialID
-	RegistrationFailureReasonDuplicateDID            = sip_infra.RegistrationFailureReasonDuplicateDID
-	RegistrationFailureReasonAssistantNotFound       = sip_infra.RegistrationFailureReasonAssistantNotFound
-	RegistrationFailureReasonVaultCredentialNotFound = sip_infra.RegistrationFailureReasonVaultCredentialNotFound
-	RegistrationFailureReasonInvalidSIPConfig        = sip_infra.RegistrationFailureReasonInvalidSIPConfig
-	RegistrationFailureReasonMissingSIPServer        = sip_infra.RegistrationFailureReasonMissingSIPServer
-	RegistrationFailureReasonOwnershipClaimFailed    = sip_infra.RegistrationFailureReasonOwnershipClaimFailed
-	RegistrationFailureReasonAuthFailed              = sip_infra.RegistrationFailureReasonAuthFailed
-	RegistrationFailureReasonRegistrarRejected       = sip_infra.RegistrationFailureReasonRegistrarRejected
-	RegistrationFailureReasonRegistrarUnreachable    = sip_infra.RegistrationFailureReasonRegistrarUnreachable
-	RegistrationFailureReasonTransportError          = sip_infra.RegistrationFailureReasonTransportError
-	RegistrationFailureReasonRegisterTimeout         = sip_infra.RegistrationFailureReasonRegisterTimeout
-	RegistrationFailureReasonRenewalFailed           = sip_infra.RegistrationFailureReasonRenewalFailed
-	RegistrationFailureReasonUnregisterFailed        = sip_infra.RegistrationFailureReasonUnregisterFailed
-	RegistrationFailureReasonInvalidContactAddress   = sip_infra.RegistrationFailureReasonInvalidContactAddress
+	RegistrationFailureReasonMissingDID              = sip_runtime.RegistrationFailureReasonMissingDID
+	RegistrationFailureReasonMissingCredentialID     = sip_runtime.RegistrationFailureReasonMissingCredentialID
+	RegistrationFailureReasonDuplicateDID            = sip_runtime.RegistrationFailureReasonDuplicateDID
+	RegistrationFailureReasonAssistantNotFound       = sip_runtime.RegistrationFailureReasonAssistantNotFound
+	RegistrationFailureReasonVaultCredentialNotFound = sip_runtime.RegistrationFailureReasonVaultCredentialNotFound
+	RegistrationFailureReasonInvalidSIPConfig        = sip_runtime.RegistrationFailureReasonInvalidSIPConfig
+	RegistrationFailureReasonMissingSIPServer        = sip_runtime.RegistrationFailureReasonMissingSIPServer
+	RegistrationFailureReasonOwnershipClaimFailed    = sip_runtime.RegistrationFailureReasonOwnershipClaimFailed
+	RegistrationFailureReasonAuthFailed              = sip_runtime.RegistrationFailureReasonAuthFailed
+	RegistrationFailureReasonRegistrarRejected       = sip_runtime.RegistrationFailureReasonRegistrarRejected
+	RegistrationFailureReasonRegistrarUnreachable    = sip_runtime.RegistrationFailureReasonRegistrarUnreachable
+	RegistrationFailureReasonTransportError          = sip_runtime.RegistrationFailureReasonTransportError
+	RegistrationFailureReasonRegisterTimeout         = sip_runtime.RegistrationFailureReasonRegisterTimeout
+	RegistrationFailureReasonRenewalFailed           = sip_runtime.RegistrationFailureReasonRenewalFailed
+	RegistrationFailureReasonUnregisterFailed        = sip_runtime.RegistrationFailureReasonUnregisterFailed
+	RegistrationFailureReasonInvalidContactAddress   = sip_runtime.RegistrationFailureReasonInvalidContactAddress
 )
 
 // RegistrationStatusUpdate is the single durable write contract for registration visibility.
@@ -146,10 +146,10 @@ type ManagerOptions struct {
 	Logger             commons.Logger
 	Postgres           connectors.PostgresConnector
 	Redis              connectors.RedisConnector
-	RegistrationClient *sip_infra.RegistrationClient
+	RegistrationClient *sip_runtime.RegistrationClient
 	AssistantConfig    *config.AssistantConfig
 	Sip                *config.SIPConfig
-	ApplyOpDefaults    func(*sip_infra.Config)
+	ApplyOpDefaults    func(*sip_runtime.Config)
 	RapidaClient       *rapida_client.RapidaClient
 }
 
@@ -173,7 +173,7 @@ func WithRedis(redis connectors.RedisConnector) ManagerOption {
 	}
 }
 
-func WithRegistrationClient(registrationClient *sip_infra.RegistrationClient) ManagerOption {
+func WithRegistrationClient(registrationClient *sip_runtime.RegistrationClient) ManagerOption {
 	return func(options *ManagerOptions) {
 		options.RegistrationClient = registrationClient
 	}
@@ -191,7 +191,7 @@ func WithSIPConfig(sipConfig *config.SIPConfig) ManagerOption {
 	}
 }
 
-func WithApplyOpDefaults(applyOpDefaults func(*sip_infra.Config)) ManagerOption {
+func WithApplyOpDefaults(applyOpDefaults func(*sip_runtime.Config)) ManagerOption {
 	return func(options *ManagerOptions) {
 		options.ApplyOpDefaults = applyOpDefaults
 	}

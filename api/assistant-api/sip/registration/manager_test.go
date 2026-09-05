@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/clients"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/types"
@@ -68,7 +68,7 @@ func TestServiceAuthenticationMintsDelegatedServiceActor(t *testing.T) {
 
 func TestStartRunsImmediateReconcile(t *testing.T) {
 	m, db, _ := newTestManager(t)
-	m.regClient = sip_infra.NewRegistrationClient(nil, &sip_infra.ListenConfig{}, m.logger)
+	m.regClient = sip_runtime.NewRegistrationClient(nil, &sip_runtime.ListenConfig{}, m.logger)
 
 	insertSIPDeploymentWithOptions(t, db, 4001, 801, map[string]string{
 		OptKeyCredentialID: "101",
@@ -113,10 +113,10 @@ func TestRegistrationRenewalFailedWritesDurableMetadata(t *testing.T) {
 	m, db, ctx := newTestManager(t)
 	insertSIPDeployment(t, db, 5001, 901, "+14155550120", StatusActive)
 
-	m.RegistrationRenewalFailed(ctx, sip_infra.RegistrationEvent{
+	m.RegistrationRenewalFailed(ctx, sip_runtime.RegistrationEvent{
 		DID:           "+14155550120",
 		DeploymentID:  5001,
-		Error:         sip_infra.ErrRegistrationFailed,
+		Error:         sip_runtime.ErrRegistrationFailed,
 		FailureClass:  RegistrationFailureClassRenewal,
 		FailureReason: RegistrationFailureReasonRenewalFailed,
 		StatusCode:    503,
@@ -176,16 +176,16 @@ func TestRegistrationRenewalFailedWritesDurableMetadata(t *testing.T) {
 func TestRegistrationRenewedClearsFailureMetadata(t *testing.T) {
 	m, db, ctx := newTestManager(t)
 	insertSIPDeployment(t, db, 5002, 902, "+14155550121", StatusActive)
-	m.RegistrationRenewalFailed(ctx, sip_infra.RegistrationEvent{
+	m.RegistrationRenewalFailed(ctx, sip_runtime.RegistrationEvent{
 		DID:           "+14155550121",
 		DeploymentID:  5002,
-		Error:         sip_infra.ErrRegistrationFailed,
+		Error:         sip_runtime.ErrRegistrationFailed,
 		FailureClass:  RegistrationFailureClassRenewal,
 		FailureReason: RegistrationFailureReasonRenewalFailed,
 		RetryCount:    2,
 	})
 
-	m.RegistrationRenewed(ctx, sip_infra.RegistrationEvent{
+	m.RegistrationRenewed(ctx, sip_runtime.RegistrationEvent{
 		DID:          "+14155550121",
 		DeploymentID: 5002,
 	})
@@ -205,10 +205,10 @@ func TestRegistrationExpiredMarksUnreachable(t *testing.T) {
 	m, db, ctx := newTestManager(t)
 	insertSIPDeployment(t, db, 5003, 903, "+14155550122", StatusActive)
 
-	m.RegistrationExpired(ctx, sip_infra.RegistrationEvent{
+	m.RegistrationExpired(ctx, sip_runtime.RegistrationEvent{
 		DID:           "+14155550122",
 		DeploymentID:  5003,
-		Error:         sip_infra.ErrRegistrationFailed,
+		Error:         sip_runtime.ErrRegistrationFailed,
 		FailureClass:  RegistrationFailureClassRenewal,
 		FailureReason: RegistrationFailureReasonRenewalFailed,
 		RetryCount:    10,

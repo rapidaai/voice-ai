@@ -10,17 +10,17 @@ import (
 	"fmt"
 	"testing"
 
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 )
 
 func TestRegistrationStatusUpdateFromError_PreservesTypedClassification(t *testing.T) {
 	m := &manager{instanceID: "test-instance"}
-	err := fmt.Errorf("%w: %w", sip_infra.ErrRegistrationFailed, &sip_infra.RegistrationError{
+	err := fmt.Errorf("%w: %w", sip_runtime.ErrRegistrationFailed, &sip_runtime.RegistrationError{
 		Class:      RegistrationFailureClassRejected,
 		Reason:     RegistrationFailureReasonRegistrarRejected,
 		StatusCode: 403,
 		StatusText: "Forbidden",
-		Cause:      sip_infra.ErrPermanentFailure,
+		Cause:      sip_runtime.ErrPermanentFailure,
 	})
 
 	update := m.registrationStatusUpdateFromError(err)
@@ -44,7 +44,7 @@ func TestRegistrationStatusUpdateFromError_PreservesTypedClassification(t *testi
 func TestRegistrationStatusUpdateFromError_ClassifiesLegacyAuthError(t *testing.T) {
 	m := &manager{instanceID: "test-instance"}
 
-	update := m.registrationStatusUpdateFromError(sip_infra.ErrAuthFailed)
+	update := m.registrationStatusUpdateFromError(sip_runtime.ErrAuthFailed)
 	if update.Status != StatusFailed {
 		t.Fatalf("expected status=%s, got %s", StatusFailed, update.Status)
 	}
