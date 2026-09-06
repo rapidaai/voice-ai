@@ -47,13 +47,6 @@ func (s *Server) MakeTransferBridgeCall(ctx context.Context, cfg *Config, toUser
 
 type BridgeEndReason int
 
-const (
-	BridgeEndInboundBye  BridgeEndReason = iota // caller hung up
-	BridgeEndOutboundBye                        // operator/transfer target hung up
-	BridgeEndContext                            // context cancelled
-	BridgeEndTimeout                            // safety timeout
-)
-
 // BridgeTransfer forwards operator audio to the caller and observes bridge teardown.
 // The caller owns session cleanup so streamer-side bridge sends can drain first.
 func (s *Server) BridgeTransfer(ctx context.Context, inbound, outbound *Session, onOperatorAudio func([]byte)) (BridgeEndReason, error) {

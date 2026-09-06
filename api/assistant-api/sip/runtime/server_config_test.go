@@ -18,6 +18,32 @@ func TestServerConfigValidate_AcceptsSocketOwnedRTPConfig(t *testing.T) {
 	require.NoError(t, cfg.Validate())
 }
 
+func TestServerConfigValidate_AcceptsUnlimitedCallAdmission(t *testing.T) {
+	cfg := validServerConfigForValidation()
+	cfg.MaxConcurrentCalls = 0
+
+	require.NoError(t, cfg.Validate())
+}
+
+func TestServerConfigValidate_RejectsNegativeCallAdmission(t *testing.T) {
+	cfg := validServerConfigForValidation()
+	cfg.MaxConcurrentCalls = -1
+
+	require.Error(t, cfg.Validate())
+}
+
+func TestServerConfigValidate_RejectsPartialCallRateAdmission(t *testing.T) {
+	cfg := validServerConfigForValidation()
+	cfg.CallAdmissionCPS = 1
+
+	require.Error(t, cfg.Validate())
+
+	cfg = validServerConfigForValidation()
+	cfg.CallAdmissionBurst = 1
+
+	require.Error(t, cfg.Validate())
+}
+
 func TestServerConfigValidateRejectsNil(t *testing.T) {
 	var config *ServerConfig
 

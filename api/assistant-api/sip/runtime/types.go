@@ -7,7 +7,6 @@
 package sip_runtime
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -21,44 +20,8 @@ import (
 	"github.com/rapidaai/protos"
 )
 
-var (
-	ErrInvalidConfig              = errors.New("invalid SIP configuration")
-	ErrSessionNotFound            = errors.New("SIP session not found")
-	ErrSessionClosed              = errors.New("SIP session is closed")
-	ErrRTPNotInitialized          = errors.New("RTP handler not initialized")
-	ErrRTPHandlerStopped          = errors.New("RTP handler is stopped")
-	ErrRTPMediaTimeout            = errors.New("RTP media timeout")
-	ErrRTPOutputQueueFull         = errors.New("RTP output queue is full")
-	ErrRTPPortRangeExhausted      = errors.New("no RTP ports available")
-	ErrSDPParseFailed             = errors.New("failed to parse SDP")
-	ErrCodecNotSupported          = errors.New("codec not supported")
-	ErrConnectionFailed           = errors.New("SIP connection failed")
-	ErrAuthRequired               = errors.New("SIP auth required but credentials are missing")
-	ErrOutboundFromUserRequired   = errors.New("outbound From user is required")
-	ErrInboundACKTimeout          = errors.New("inbound ACK timeout")
-	ErrInboundInviteCancelled     = errors.New("inbound INVITE cancelled")
-	ErrInboundAnswerPolicyTimeout = errors.New("inbound answer policy timeout")
-	ErrBridgeLifecycleRejected    = errors.New("bridge lifecycle transition rejected")
-	ErrInvalidCallRoute           = errors.New("invalid SIP call route")
-	ErrMiddlewareChainIncomplete  = errors.New("SIP middleware chain incomplete")
-	ErrPhoneDeploymentRequired    = errors.New("SIP phone deployment is required")
-	ErrVaultResolverRequired      = errors.New("SIP vault resolver is required")
-	ErrCredentialIDRequired       = errors.New("SIP credential ID is required")
-	ErrVaultCredentialResolution  = errors.New("SIP vault credential resolution failed")
-	ErrVaultConfigInvalid         = errors.New("SIP vault configuration is invalid")
-)
-
 // ServerState represents the state of the SIP server.
 type ServerState int32
-
-const (
-	ServerStateCreated ServerState = iota
-	ServerStateRunning
-	ServerStateStopped
-
-	InboundRejectedInviteTTL  = time.Minute
-	MaxInboundRejectedInvites = 1024
-)
 
 // CallAddress contains exact SIP parties, resolved phone values, and non-credential headers.
 // Header names are lowercase and repeated values preserve arrival order.
@@ -193,6 +156,26 @@ func (c *SIPRequestContext) ResolveRoute() (CallRoute, error) {
 //	RouteMiddleware → VaultMiddleware
 type Middleware func(ctx *SIPRequestContext) error
 
+// RTPAddress identifies an RTP or RTCP network endpoint.
+type RTPAddress struct {
+	// IP is the endpoint IP address.
+	IP string
+
+	// Port is the endpoint UDP port.
+	Port int
+}
+
+func (address RTPAddress) String() string {
+	if address.IP == "" && address.Port == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%s:%d", address.IP, address.Port)
+}
+
+func (address RTPAddress) Validate() bool {
+	return !utils.IsEmpty(address.IP) && validator.Between(address.Port, 1, rtpMaxPort)
+}
+
 // SIPError adds operation and call context to SIP failures.
 type SIPError struct {
 	Op      string
@@ -219,12 +202,6 @@ func NewSIPError(op, callID, message string, err error) *SIPError {
 
 type Transport string
 
-const (
-	TransportUDP Transport = "udp"
-	TransportTCP Transport = "tcp"
-	TransportTLS Transport = "tls"
-)
-
 func (t Transport) String() string {
 	return string(t)
 }
@@ -236,6 +213,85 @@ func (t Transport) IsValid() bool {
 	default:
 		return false
 	}
+}
+
+// RTPConfig holds the socket, codec, timeout, and packet timing settings for an RTP handler.
+type RTPConfig struct {
+	// LocalAddress is the local RTP endpoint used to bind the RTP socket. A zero port chooses from the configured range.
+	LocalAddress RTPAddress
+
+	// PayloadType is the RTP payload type used to select the initial codec.
+	PayloadType uint8
+
+	// ClockRate is the RTP clock rate for the initial codec. Zero defaults to G.711 8 kHz.
+	ClockRate uint32
+
+	// RTPPortRangeStart is the first candidate RTP port when LocalAddress.Port is zero.
+	RTPPortRangeStart int
+
+	// RTPPortRangeEnd is the last candidate RTP port when LocalAddress.Port is zero.
+	RTPPortRangeEnd int
+
+	// SymmetricRTP sends RTP back to the source address observed on inbound RTP packets.
+	SymmetricRTP bool
+
+	// MediaTimeoutInitial is the maximum wait for the first inbound RTP packet.
+	MediaTimeoutInitial time.Duration
+
+	// MediaTimeout is the maximum gap allowed after inbound RTP has started.
+	MediaTimeout time.Duration
+
+	// PacketizationTime is the expected inbound packet duration used by the jitter buffer.
+	PacketizationTime time.Duration
+
+	// portStats records RTP port allocation counters owned by the server.
+	portStats *RTPPortStats
+}
+
+// Validate validates the RTP handler configuration and fills runtime defaults.
+func (c *RTPConfig) Validate() error {
+	if !validator.NonNil(c) {
+		return errRTPConfigRequired
+	}
+	if utils.IsEmpty(c.LocalAddress.IP) {
+		return errRTPLocalAddressIPRequired
+	}
+	if !validator.Between(c.LocalAddress.Port, 0, rtpMaxPort) {
+		return fmt.Errorf(rtpErrorIntFormat, errRTPInvalidLocalAddressPort, c.LocalAddress.Port)
+	}
+	if c.LocalAddress.Port == 0 {
+		if !validator.Between(c.RTPPortRangeStart, 1, rtpMaxPort) ||
+			!validator.Between(c.RTPPortRangeEnd, 1, rtpMaxPort) {
+			if c.RTPPortRangeStart <= 0 || c.RTPPortRangeEnd <= 0 {
+				return errRTPPortRangeRequired
+			}
+			if c.RTPPortRangeStart > c.RTPPortRangeEnd {
+				return errRTPPortRangeInvalidOrder
+			}
+			return fmt.Errorf(rtpErrorMaxPortFormat, errRTPPortRangeValue, rtpMaxPort)
+		}
+		if c.RTPPortRangeStart > c.RTPPortRangeEnd {
+			return errRTPPortRangeInvalidOrder
+		}
+	}
+	if c.ClockRate == 0 {
+		c.ClockRate = rtpDefaultClockRate
+	}
+	if c.MediaTimeoutInitial <= 0 {
+		c.MediaTimeoutInitial = rtpMediaTimeoutInitial
+	}
+	if c.MediaTimeout <= 0 {
+		c.MediaTimeout = rtpMediaTimeout
+	}
+	if c.PacketizationTime <= 0 {
+		c.PacketizationTime = rtpDefaultPacketizationTime
+	}
+	if c.PacketizationTime < rtpMinPacketizationTime ||
+		c.PacketizationTime > rtpMaxPacketizationTime ||
+		c.PacketizationTime%time.Millisecond != 0 {
+		return fmt.Errorf(rtpErrorIntFormat, errRTPInvalidPacketizationTime, c.PacketizationTime.Milliseconds())
+	}
+	return nil
 }
 
 // Config combines provider SIP settings from vault with platform runtime settings.
@@ -354,11 +410,6 @@ func (c *Config) EffectiveRegisterTimeout() time.Duration {
 
 type InboundAnswerMode string
 
-const (
-	InboundAnswerModeImmediate            InboundAnswerMode = "answer_immediately"
-	InboundAnswerModeAfterMinRingDuration InboundAnswerMode = "answer_after_min_ring_ms"
-)
-
 func (m InboundAnswerMode) IsValid() bool {
 	switch m {
 	case "", InboundAnswerModeImmediate, InboundAnswerModeAfterMinRingDuration:
@@ -450,19 +501,6 @@ func (c *Config) GetListenAddr() string {
 
 type CallState string
 
-const (
-	CallStateInitializing    CallState = "initializing"
-	CallStateRinging         CallState = "ringing"
-	CallStateConnected       CallState = "connected"
-	CallStateOnHold          CallState = "on_hold"
-	CallStateTransferring    CallState = "transferring"
-	CallStateBridgeConnected CallState = "bridge_connected"
-	CallStateEnding          CallState = "ending"
-	CallStateEnded           CallState = "ended"
-	CallStateFailed          CallState = "failed"
-	CallStateCancelled       CallState = "cancelled"
-)
-
 func (s CallState) String() string {
 	return string(s)
 }
@@ -477,26 +515,7 @@ func (s CallState) IsActive() bool {
 
 type CallDirection string
 
-const (
-	CallDirectionInbound  CallDirection = "inbound"
-	CallDirectionOutbound CallDirection = "outbound"
-)
-
 type InboundSetupPhase string
-
-const (
-	InboundSetupPhaseInviteReceived   InboundSetupPhase = "invite_received"
-	InboundSetupPhaseTryingSent       InboundSetupPhase = "trying_sent"
-	InboundSetupPhaseRingingSent      InboundSetupPhase = "ringing_sent"
-	InboundSetupPhaseAuthenticated    InboundSetupPhase = "authenticated"
-	InboundSetupPhaseRouted           InboundSetupPhase = "routed"
-	InboundSetupPhaseMediaAllocated   InboundSetupPhase = "media_allocated"
-	InboundSetupPhaseApplicationReady InboundSetupPhase = "application_ready"
-	InboundSetupPhaseAnswerReady      InboundSetupPhase = "answer_ready"
-	InboundSetupPhaseAnswered         InboundSetupPhase = "answered"
-	InboundSetupPhaseACKConfirmed     InboundSetupPhase = "ack_confirmed"
-	InboundSetupPhaseMediaFlowing     InboundSetupPhase = "media_flowing"
-)
 
 type InboundSetupTimings struct {
 	InviteReceivedAt           time.Time
@@ -555,57 +574,6 @@ func (s *SessionInfo) GetDuration() time.Duration {
 	return 0
 }
 
-const (
-	// BridgeCallTimeout is the maximum time to wait for the transfer target to answer.
-	BridgeCallTimeout = 30 * time.Second
-
-	// BridgeSafetyTimeout tears down the bridge if neither side hangs up.
-	BridgeSafetyTimeout = 5 * time.Minute
-
-	// MetadataBridgeTransferTarget is the session metadata key set by the streamer
-	// when a TRANSFER_CONVERSATION directive is received. The engine reads this
-	// after Talk() returns to orchestrate the bridge.
-	MetadataBridgeTransferTarget = "bridge_transfer_target"
-
-	// MetadataBridgeTransferStatus is set by executeBridgeTransfer to indicate
-	// the outcome. Values: "completed" or "failed". Read by media.go to emit
-	// the correct transfer event.
-	MetadataBridgeTransferStatus = "bridge_transfer_status"
-
-	// MetadataBridgeTransferDuration holds the bridge duration as a string
-	// (time.Duration.String()). Set after BridgeTransfer returns.
-	MetadataBridgeTransferDuration = "bridge_transfer_duration"
-
-	// MetadataBridgeTransferOutboundCallID holds the SIP Call-ID of the
-	// outbound (B-leg) call created for the transfer.
-	MetadataBridgeTransferOutboundCallID = "bridge_transfer_outbound_call_id"
-
-	// MetadataDisconnectReason holds the normalized terminal disconnect reason.
-	MetadataDisconnectReason = "disconnect_reason"
-
-	// MetadataDisconnectRawReason holds the raw provider Reason header.
-	MetadataDisconnectRawReason = "disconnect_raw_reason"
-
-	// PostTransferActionEndCall ends the inbound caller's session when the
-	// operator (transfer target) hangs up.
-	PostTransferActionEndCall = "end_call"
-
-	// PostTransferActionResumeAI hands the caller back to the AI when the
-	// operator (transfer target) hangs up.
-	PostTransferActionResumeAI = "resume_ai"
-)
-
-const (
-	DisconnectReasonRemoteHangup   = "remote_hangup"
-	DisconnectReasonNormalClearing = "normal_clearing"
-	DisconnectReasonBusy           = "busy"
-	DisconnectReasonNoAnswer       = "no_answer"
-	DisconnectReasonRejected       = "rejected"
-	DisconnectReasonCancelled      = "cancelled"
-	DisconnectReasonNetworkFailure = "network_failure"
-	DisconnectReasonRemoteError    = "remote_error"
-)
-
 type DisconnectMetadata struct {
 	Reason             string
 	Text               string
@@ -614,13 +582,51 @@ type DisconnectMetadata struct {
 }
 
 type RTPStats struct {
-	PacketsSent     uint64        `json:"packets_sent"`
-	PacketsReceived uint64        `json:"packets_received"`
-	BytesSent       uint64        `json:"bytes_sent"`
-	BytesReceived   uint64        `json:"bytes_received"`
-	PacketsLost     uint64        `json:"packets_lost"`
-	PacketsDropped  uint64        `json:"packets_dropped"`
-	Jitter          time.Duration `json:"jitter"`
+	PacketsSent                    uint64        `json:"packets_sent"`
+	PacketsReceived                uint64        `json:"packets_received"`
+	PacketsDelivered               uint64        `json:"packets_delivered"`
+	BytesSent                      uint64        `json:"bytes_sent"`
+	BytesReceived                  uint64        `json:"bytes_received"`
+	PacketsLost                    uint64        `json:"packets_lost"`
+	PacketsDropped                 uint64        `json:"packets_dropped"`
+	AudioInputDropped              uint64        `json:"audio_input_dropped"`
+	NetworkPacketsLost             uint64        `json:"network_packets_lost"`
+	LateOrDuplicatePackets         uint64        `json:"late_or_duplicate_packets"`
+	InvalidPackets                 uint64        `json:"invalid_packets"`
+	JitterBufferResyncDropped      uint64        `json:"jitter_buffer_resync_dropped"`
+	RTPIngressQueueDropped         uint64        `json:"rtp_ingress_queue_dropped"`
+	SilenceSuppressionFrames       uint64        `json:"silence_suppression_frames"`
+	LastRTPReceivedAt              time.Time     `json:"last_rtp_received_at,omitempty"`
+	LastAudioDeliveredAt           time.Time     `json:"last_audio_delivered_at,omitempty"`
+	InboundQuality                 string        `json:"inbound_quality"`
+	InboundQualityScore            uint8         `json:"inbound_quality_score"`
+	InboundQualityWindow           time.Duration `json:"inbound_quality_window"`
+	InboundWindowPacketsReceived   uint64        `json:"inbound_window_packets_received"`
+	InboundWindowPacketsDelivered  uint64        `json:"inbound_window_packets_delivered"`
+	InboundWindowPacketsLost       uint64        `json:"inbound_window_packets_lost"`
+	InboundWindowPacketsDropped    uint64        `json:"inbound_window_packets_dropped"`
+	InboundWindowAudioInputDropped uint64        `json:"inbound_window_audio_input_dropped"`
+	InboundLossRate                float64       `json:"inbound_loss_rate"`
+	InboundDropRate                float64       `json:"inbound_drop_rate"`
+	InboundDeliveryRate            float64       `json:"inbound_delivery_rate"`
+	RTCPEnabled                    bool          `json:"rtcp_enabled"`
+	LocalRTCPPort                  int           `json:"local_rtcp_port"`
+	RemoteRTCPPort                 int           `json:"remote_rtcp_port"`
+	RTCPPacketsSent                uint64        `json:"rtcp_packets_sent"`
+	RTCPPacketsReceived            uint64        `json:"rtcp_packets_received"`
+	RTCPReportsSent                uint64        `json:"rtcp_reports_sent"`
+	RTCPSenderReportsSent          uint64        `json:"rtcp_sender_reports_sent"`
+	RTCPReceiverReportsSent        uint64        `json:"rtcp_receiver_reports_sent"`
+	RTCPSenderReportsReceived      uint64        `json:"rtcp_sender_reports_received"`
+	RTCPReceiverReportsReceived    uint64        `json:"rtcp_receiver_reports_received"`
+	RTCPFractionLost               uint8         `json:"rtcp_fraction_lost"`
+	RTCPPacketsLost                uint32        `json:"rtcp_packets_lost"`
+	RTCPJitter                     uint32        `json:"rtcp_jitter"`
+	RTCPRemoteFractionLost         uint8         `json:"rtcp_remote_fraction_lost"`
+	RTCPRemotePacketsLost          uint32        `json:"rtcp_remote_packets_lost"`
+	RTCPRemoteJitter               uint32        `json:"rtcp_remote_jitter"`
+	RTCPRoundTripTime              time.Duration `json:"rtcp_round_trip_time"`
+	Jitter                         time.Duration `json:"jitter"`
 }
 
 // ParseConfigFromVault extracts provider-owned SIP settings from vault.

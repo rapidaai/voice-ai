@@ -54,11 +54,29 @@ func (s *Server) prepareOutboundCallLeg(ctx context.Context, cfg *Config, toUser
 		return nil, err
 	}
 
-	callID := uuid.New().String()
-	session, err := s.createAndRegisterOutboundSession(callLifecycleContext, cfg, callID, opts.makeCallOptions)
+	releaseAdmission, err := s.acquireNewCallAdmission()
 	if err != nil {
 		return nil, err
 	}
+	admissionReleasePending := true
+	defer func() {
+		if admissionReleasePending {
+			releaseAdmission()
+		}
+	}()
+
+	callID := uuid.New().String()
+	session, err := s.createAndRegisterOutboundSession(
+		callLifecycleContext,
+		cfg,
+		callID,
+		opts.makeCallOptions,
+		true,
+	)
+	if err != nil {
+		return nil, err
+	}
+	admissionReleasePending = false
 	s.applyOutboundLegMetadata(session, opts)
 
 	media := NewOutboundMedia(s, session, request)
@@ -128,7 +146,13 @@ func (s *Server) applyOutboundLegMetadata(session *Session, opts outboundCallLeg
 	}
 }
 
-func (s *Server) createAndRegisterOutboundSession(ctx context.Context, cfg *Config, callID string, opts MakeCallOptions) (*Session, error) {
+func (s *Server) createAndRegisterOutboundSession(
+	ctx context.Context,
+	cfg *Config,
+	callID string,
+	opts MakeCallOptions,
+	releaseAdmissionOnEnd bool,
+) (*Session, error) {
 	session, err := NewSession(ctx,
 		WithSessionConfig(cfg),
 		WithSessionDirection(CallDirectionOutbound),
@@ -143,6 +167,6 @@ func (s *Server) createAndRegisterOutboundSession(ctx context.Context, cfg *Conf
 	if err != nil {
 		return nil, fmt.Errorf("failed to create outbound session: %w", err)
 	}
-	s.registerSession(session, session.GetCallID())
+	s.registerSessionWithAdmission(session, session.GetCallID(), releaseAdmissionOnEnd)
 	return session, nil
 }

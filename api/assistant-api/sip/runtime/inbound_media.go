@@ -6,15 +6,6 @@
 
 package sip_runtime
 
-import (
-	"errors"
-)
-
-var (
-	ErrInboundMediaNotPrepared = errors.New("inbound media is not prepared")
-	ErrInboundMediaNoSession   = errors.New("inbound media requires a session")
-)
-
 // inboundMedia prepares RTP for an inbound INVITE and configures it before
 // the session adopts the handler. Session.End owns final RTP teardown.
 type inboundMedia struct {
@@ -23,8 +14,7 @@ type inboundMedia struct {
 	mediaOffer inboundMediaOffer
 
 	rtpHandler   *RTPHandler
-	localRTPPort int
-	externalIP   string
+	localAddress RTPAddress
 	started      bool
 }
 
@@ -43,24 +33,26 @@ func (media *inboundMedia) Prepare() error {
 	}
 
 	rtpHandler, err := NewRTPHandler(media.server.ctx, &RTPConfig{
-		LocalIP:             media.server.listenConfig.GetBindAddress(),
+		LocalAddress:        RTPAddress{IP: media.server.listenConfig.GetBindAddress()},
 		RTPPortRangeStart:   media.server.rtpPortRangeStart,
 		RTPPortRangeEnd:     media.server.rtpPortRangeEnd,
 		PayloadType:         media.mediaOffer.negotiatedCodec.PayloadType,
 		ClockRate:           media.mediaOffer.negotiatedCodec.ClockRate,
-		Logger:              media.server.logger,
 		MediaTimeoutInitial: media.session.config.MediaTimeoutInitial,
 		MediaTimeout:        media.session.config.MediaTimeout,
-		SymmetricRTP:        media.server.useSymmetricRTPForRemoteIP(media.mediaOffer.sdpInfo.ConnectionIP),
+		PacketizationTime:   media.mediaOffer.sdpInfo.PacketizationDuration(),
+		SymmetricRTP:        media.server.useSymmetricRTPForRemoteIP(media.mediaOffer.sdpInfo.RTPAddress.IP),
 		portStats:           media.server.rtpPortStats,
 	})
 	if err != nil {
 		return err
 	}
 
-	_, media.localRTPPort = rtpHandler.LocalAddr()
-	rtpHandler.SetRemoteAddr(media.mediaOffer.sdpInfo.ConnectionIP, media.mediaOffer.sdpInfo.AudioPort)
-	rtpHandler.SetCodec(media.mediaOffer.negotiatedCodec)
+	localRTPAddress := rtpHandler.LocalAddress()
+	rtpHandler.setRemoteMediaAddress(remoteMediaAddress{
+		remoteRTPAddress:  media.mediaOffer.sdpInfo.RTPAddress,
+		remoteRTCPAddress: media.mediaOffer.sdpInfo.RTCPAddress,
+	})
 	rtpHandler.SetOnFirstPacket(func() {
 		if media.session != nil {
 			media.session.MarkInboundFirstRTPReceived()
@@ -68,10 +60,10 @@ func (media *inboundMedia) Prepare() error {
 	})
 
 	media.rtpHandler = rtpHandler
-	media.externalIP = media.server.listenConfig.GetExternalIP()
+	media.localAddress = RTPAddress{IP: media.server.listenConfig.GetExternalIP(), Port: localRTPAddress.Port}
 
-	media.session.SetRemoteRTP(media.mediaOffer.sdpInfo.ConnectionIP, media.mediaOffer.sdpInfo.AudioPort)
-	media.session.SetLocalRTP(media.externalIP, media.localRTPPort)
+	media.session.SetRemoteRTPAddress(media.mediaOffer.sdpInfo.RTPAddress)
+	media.session.SetLocalRTPAddress(media.localAddress)
 	media.session.SetNegotiatedCodec(media.mediaOffer.negotiatedCodec.Name, int(media.mediaOffer.negotiatedCodec.ClockRate))
 	media.session.SetRTPHandler(rtpHandler)
 	return nil
@@ -105,9 +97,10 @@ func (media *inboundMedia) Start(onMediaTimeout func()) error {
 }
 
 func (media *inboundMedia) SDPConfig() *SDPConfig {
-	return media.server.NegotiatedSDPConfig(
-		media.externalIP,
-		media.localRTPPort,
-		media.mediaOffer.negotiatedCodec,
-	)
+	config := media.server.NegotiatedSDPConfig(media.localAddress, media.mediaOffer.negotiatedCodec)
+	if media.rtpHandler != nil {
+		config.RTCPPort = media.rtpHandler.LocalRTCPPort()
+	}
+	config.PTime = sdpDefaultPTimeMS
+	return config
 }

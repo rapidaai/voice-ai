@@ -8,12 +8,6 @@ package sip_runtime
 
 type CallTerminationResult string
 
-const (
-	CallTerminationSuccess     CallTerminationResult = "success"
-	CallTerminationClientError CallTerminationResult = "client_error"
-	CallTerminationServerError CallTerminationResult = "server_error"
-)
-
 type CallTermination struct {
 	Result CallTerminationResult
 	Reason string

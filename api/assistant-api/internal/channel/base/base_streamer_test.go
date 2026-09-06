@@ -100,6 +100,48 @@ func TestInputRoutesNormalMessages(t *testing.T) {
 	}
 }
 
+func TestInputTracksCriticalDropWhenChannelFull(t *testing.T) {
+	streamer := newTestStreamer(t)
+
+	for range cap(streamer.CriticalCh) + 1 {
+		streamer.Input(&protos.ConversationDisconnection{})
+	}
+
+	stats := streamer.DropStats()
+	assert.Equal(t, uint64(1), stats.CriticalInputDropped)
+	assert.Zero(t, stats.NormalInputDropped)
+	assert.Zero(t, stats.LowInputDropped)
+	assert.Zero(t, stats.OutputDropped)
+}
+
+func TestInputTracksNormalDropWhenChannelFull(t *testing.T) {
+	streamer := newTestStreamer(t)
+
+	for range cap(streamer.InputCh) + 1 {
+		streamer.Input(&protos.ConversationUserMessage{})
+	}
+
+	stats := streamer.DropStats()
+	assert.Equal(t, uint64(1), stats.NormalInputDropped)
+	assert.Zero(t, stats.CriticalInputDropped)
+	assert.Zero(t, stats.LowInputDropped)
+	assert.Zero(t, stats.OutputDropped)
+}
+
+func TestInputTracksLowPriorityDropWhenChannelFull(t *testing.T) {
+	streamer := newTestStreamer(t)
+
+	for range cap(streamer.LowCh) + 1 {
+		streamer.Input(&protos.ConversationEvent{Name: "health"})
+	}
+
+	stats := streamer.DropStats()
+	assert.Equal(t, uint64(1), stats.LowInputDropped)
+	assert.Zero(t, stats.CriticalInputDropped)
+	assert.Zero(t, stats.NormalInputDropped)
+	assert.Zero(t, stats.OutputDropped)
+}
+
 func TestOutputRoutesToOutputChannel(t *testing.T) {
 	streamer := newTestStreamer(t)
 	msg := &protos.ConversationAssistantMessage{}
@@ -112,6 +154,20 @@ func TestOutputRoutesToOutputChannel(t *testing.T) {
 	default:
 		t.Fatal("expected message on OutputCh")
 	}
+}
+
+func TestOutputTracksDropWhenChannelFull(t *testing.T) {
+	streamer := newTestStreamer(t)
+
+	for range cap(streamer.OutputCh) + 1 {
+		streamer.Output(&protos.ConversationAssistantMessage{})
+	}
+
+	stats := streamer.DropStats()
+	assert.Equal(t, uint64(1), stats.OutputDropped)
+	assert.Zero(t, stats.CriticalInputDropped)
+	assert.Zero(t, stats.NormalInputDropped)
+	assert.Zero(t, stats.LowInputDropped)
 }
 
 func TestDisconnectIsIdempotent(t *testing.T) {

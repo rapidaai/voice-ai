@@ -102,6 +102,19 @@ func TestMediaPort_StartForwardsProviderAudio(t *testing.T) {
 	}, time.Second, 10*time.Millisecond)
 }
 
+func TestMediaPort_LocalAddrReturnsRTPAddress(t *testing.T) {
+	mediaPort, _, _ := newMediaPortForTest(t, nil)
+	mediaPort.rtpHandler.(*fakeRTPHandler).localAddress = sip_runtime.RTPAddress{
+		IP:   "127.0.0.1",
+		Port: 12000,
+	}
+
+	localIP, localPort := mediaPort.LocalAddr()
+
+	assert.Equal(t, "127.0.0.1", localIP)
+	assert.Equal(t, 12000, localPort)
+}
+
 func TestMediaPort_ProviderAudioRecordsBeforePipelineAudio(t *testing.T) {
 	streams := make(chan internal_type.Stream, 4)
 	mediaPort, audioIn, _ := newMediaPortForTest(t, func(stream internal_type.Stream) {

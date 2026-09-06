@@ -20,28 +20,34 @@ import (
 
 func TestRTPHandler_ParseRTPPacketRejectsMalformedHeaders(t *testing.T) {
 	tests := []struct {
-		name string
-		data []byte
+		name    string
+		data    []byte
+		wantErr error
 	}{
 		{
-			name: "truncated CSRC list",
-			data: []byte{0x81, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1},
+			name:    "truncated CSRC list",
+			data:    []byte{0x81, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1},
+			wantErr: errRTPPacketShortCSRCHeader,
 		},
 		{
-			name: "missing extension header",
-			data: []byte{0x90, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1},
+			name:    "missing extension header",
+			data:    []byte{0x90, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1},
+			wantErr: errRTPPacketShortExtension,
 		},
 		{
-			name: "truncated extension payload",
-			data: []byte{0x90, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1},
+			name:    "truncated extension payload",
+			data:    []byte{0x90, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1},
+			wantErr: errRTPPacketShortExtensionPayload,
 		},
 		{
-			name: "zero padding length",
-			data: []byte{0xA0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0},
+			name:    "zero padding length",
+			data:    []byte{0xA0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0},
+			wantErr: errRTPInvalidPaddingLength,
 		},
 		{
-			name: "padding exceeds payload",
-			data: []byte{0xA0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 2},
+			name:    "padding exceeds payload",
+			data:    []byte{0xA0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 2},
+			wantErr: errRTPInvalidPaddingLength,
 		},
 	}
 
@@ -50,6 +56,7 @@ func TestRTPHandler_ParseRTPPacketRejectsMalformedHeaders(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			packet, err := handler.parseRTPPacket(test.data)
 			require.Error(t, err)
+			assert.ErrorIs(t, err, test.wantErr)
 			assert.Nil(t, packet)
 		})
 	}
@@ -72,7 +79,7 @@ func TestRTPHandler_ParseRTPPacketPreservesCSRCValues(t *testing.T) {
 
 func TestRTPHandler_GetRemoteAddrReturnsCopy(t *testing.T) {
 	handler := newTestRTPHandler()
-	handler.SetRemoteAddr("127.0.0.1", 9000)
+	handler.SetRemoteAddress(RTPAddress{IP: "127.0.0.1", Port: 9000})
 
 	address := handler.GetRemoteAddr()
 	require.NotNil(t, address)
@@ -87,7 +94,7 @@ func TestRTPHandler_GetRemoteAddrReturnsCopy(t *testing.T) {
 
 func TestNewRTPHandlerDoesNotMutateConfig(t *testing.T) {
 	config := &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: 20000,
 		RTPPortRangeEnd:   20999,
 		PayloadType:       CodecPCMU.PayloadType,
@@ -102,57 +109,307 @@ func TestNewRTPHandlerDoesNotMutateConfig(t *testing.T) {
 	assert.Zero(t, config.MediaTimeout)
 }
 
-func TestRTPConfigValidateRejectsNil(t *testing.T) {
-	var config *RTPConfig
+func TestNewRTPHandlerInitializesInputPacketizationTime(t *testing.T) {
+	reserved, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
+	require.NoError(t, err)
+	port := reserved.LocalAddr().(*net.UDPAddr).Port
+	require.NoError(t, reserved.Close())
 
-	require.Error(t, config.Validate())
+	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
+		RTPPortRangeStart: port,
+		RTPPortRangeEnd:   port,
+		PayloadType:       CodecPCMU.PayloadType,
+		ClockRate:         CodecPCMU.ClockRate,
+		PacketizationTime: 30 * time.Millisecond,
+	})
+	require.NoError(t, err)
+	defer handler.Stop()
+
+	handler.mu.RLock()
+	inputJitter := handler.inputJitter
+	handler.mu.RUnlock()
+	require.NotNil(t, inputJitter)
+	assert.Equal(t, 30*time.Millisecond, inputJitter.playoutTimeout())
 }
 
-func TestRTPHandler_ProcessInboundRTPPacketDropsNonAudioPayload(t *testing.T) {
-	handler := newTestRTPHandler()
-	handler.codec = &CodecPCMU
-	handler.inputJitter = newRTPInputJitterBuffer(&CodecPCMU)
+func TestRTPHandler_ReceiveLoopDropsNonAudioPayload(t *testing.T) {
+	reserved, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
+	require.NoError(t, err)
+	port := reserved.LocalAddr().(*net.UDPAddr).Port
+	require.NoError(t, reserved.Close())
 
-	audioPayloads, acceptedAudio := handler.processInboundRTPPacket(&RTPPacket{
+	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
+		RTPPortRangeStart: port,
+		RTPPortRangeEnd:   port,
+		PayloadType:       CodecPCMU.PayloadType,
+		ClockRate:         CodecPCMU.ClockRate,
+	})
+	require.NoError(t, err)
+	defer handler.Stop()
+	handler.Start()
+
+	sender, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
+	require.NoError(t, err)
+	defer sender.Close()
+
+	_, err = sender.WriteToUDP(handler.serializeRTPPacket(&RTPPacket{
+		Version:        rtpVersion,
 		PayloadType:    101,
 		SequenceNumber: 1,
 		Timestamp:      0,
 		Payload:        []byte{0x01},
-	})
+	}), &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
+	require.NoError(t, err)
 
-	assert.False(t, acceptedAudio)
-	assert.Empty(t, audioPayloads)
-	assert.Equal(t, uint64(1), handler.GetDetailedStats().PacketsDropped)
+	require.Eventually(t, func() bool {
+		stats := handler.GetDetailedStats()
+		return stats.PacketsReceived == 1 &&
+			stats.PacketsDropped == 1 &&
+			stats.InvalidPackets == 1 &&
+			stats.PacketsLost == 0 &&
+			stats.PacketsDelivered == 0
+	}, time.Second, 10*time.Millisecond)
+
+	select {
+	case audio := <-handler.AudioIn():
+		t.Fatalf("unexpected audio payload: %v", audio)
+	default:
+	}
 }
 
-func TestRTPHandler_ProcessInboundRTPPacketAcceptsNegotiatedAudioPayload(t *testing.T) {
-	handler := newTestRTPHandler()
-	handler.codec = &CodecPCMA
-	handler.inputJitter = newRTPInputJitterBuffer(&CodecPCMA)
+func TestRTPHandler_ReceiveLoopAcceptsNegotiatedAudioPayload(t *testing.T) {
+	reserved, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
+	require.NoError(t, err)
+	port := reserved.LocalAddr().(*net.UDPAddr).Port
+	require.NoError(t, reserved.Close())
 
-	audioPayloads, acceptedAudio := handler.processInboundRTPPacket(&RTPPacket{
+	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
+		RTPPortRangeStart: port,
+		RTPPortRangeEnd:   port,
+		PayloadType:       CodecPCMA.PayloadType,
+		ClockRate:         CodecPCMA.ClockRate,
+	})
+	require.NoError(t, err)
+	defer handler.Stop()
+	handler.Start()
+
+	sender, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
+	require.NoError(t, err)
+	defer sender.Close()
+
+	_, err = sender.WriteToUDP(handler.serializeRTPPacket(&RTPPacket{
+		Version:        rtpVersion,
 		PayloadType:    CodecPCMA.PayloadType,
 		SequenceNumber: 1,
 		Timestamp:      0,
 		Payload:        []byte{0xD5},
-	})
+	}), &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
+	require.NoError(t, err)
 
-	require.True(t, acceptedAudio)
-	assert.Equal(t, [][]byte{{0xD5}}, audioPayloads)
-	assert.Zero(t, handler.GetDetailedStats().PacketsDropped)
+	select {
+	case audio := <-handler.AudioIn():
+		assert.Equal(t, []byte{0xD5}, audio)
+	case <-time.After(time.Second):
+		t.Fatal("expected negotiated audio payload")
+	}
+
+	stats := handler.GetDetailedStats()
+	assert.Equal(t, uint64(1), stats.PacketsDelivered)
+	assert.Zero(t, stats.PacketsDropped)
 }
 
-func TestRTPHandler_WriteInboundAudioPayloadsCountsInputQueueDrops(t *testing.T) {
+func TestRTPHandler_ReceiveLoopResetsInputJitterOnSSRCChange(t *testing.T) {
+	reserved, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
+	require.NoError(t, err)
+	port := reserved.LocalAddr().(*net.UDPAddr).Port
+	require.NoError(t, reserved.Close())
+
+	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
+		RTPPortRangeStart: port,
+		RTPPortRangeEnd:   port,
+		PayloadType:       CodecPCMU.PayloadType,
+		ClockRate:         CodecPCMU.ClockRate,
+		PacketizationTime: 20 * time.Millisecond,
+	})
+	require.NoError(t, err)
+	defer handler.Stop()
+	handler.Start()
+
+	sender, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
+	require.NoError(t, err)
+	defer sender.Close()
+
+	first := handler.serializeRTPPacket(&RTPPacket{
+		Version:        rtpVersion,
+		PayloadType:    CodecPCMU.PayloadType,
+		SequenceNumber: 1,
+		Timestamp:      0,
+		SSRC:           1111,
+		Payload:        []byte{0x01},
+	})
+	_, err = sender.WriteToUDP(first, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
+	require.NoError(t, err)
+
+	select {
+	case audio := <-handler.AudioIn():
+		assert.Equal(t, []byte{0x01}, audio)
+	case <-time.After(time.Second):
+		t.Fatal("expected first SSRC audio")
+	}
+
+	second := handler.serializeRTPPacket(&RTPPacket{
+		Version:        rtpVersion,
+		PayloadType:    CodecPCMU.PayloadType,
+		SequenceNumber: 1,
+		Timestamp:      0,
+		SSRC:           2222,
+		Payload:        []byte{0x02},
+	})
+	_, err = sender.WriteToUDP(second, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
+	require.NoError(t, err)
+
+	select {
+	case audio := <-handler.AudioIn():
+		assert.Equal(t, []byte{0x02}, audio)
+	case <-time.After(time.Second):
+		t.Fatal("expected second SSRC audio")
+	}
+
+	stats := handler.GetDetailedStats()
+	assert.Equal(t, uint64(2), stats.PacketsDelivered)
+	assert.Zero(t, stats.LateOrDuplicatePackets)
+}
+
+func TestRTPHandler_EnqueueInboundAudioCountsInputQueueDrops(t *testing.T) {
 	handler := newTestRTPHandler()
 	handler.codec = &CodecPCMU
-	handler.inputJitter = newRTPInputJitterBuffer(&CodecPCMU)
+	handler.inputJitter = newRTPInputJitterBuffer(&CodecPCMU, rtpDefaultPacketizationTime)
 	handler.audioInChan = make(chan []byte, 1)
 	handler.audioInChan <- []byte{0x01}
 
-	stopped := handler.writeInboundAudioPayloads([][]byte{{0x02}}, 2)
+	stopped, enqueued := handler.enqueueInboundAudio([][]byte{{0x02}})
 
 	assert.False(t, stopped)
-	assert.Equal(t, uint64(1), handler.GetDetailedStats().PacketsDropped)
+	assert.True(t, enqueued)
+	assert.Equal(t, []byte{0x02}, <-handler.audioInChan)
+	stats := handler.GetDetailedStats()
+	assert.Equal(t, uint64(1), stats.PacketsDelivered)
+	assert.Equal(t, uint64(1), stats.PacketsDropped)
+	assert.Equal(t, uint64(1), stats.AudioInputDropped)
+	assert.Equal(t, uint64(1), stats.RTPIngressQueueDropped)
+	assert.Zero(t, stats.PacketsLost)
+	assert.Zero(t, stats.NetworkPacketsLost)
+	assert.True(t, stats.LastRTPReceivedAt.IsZero())
+	assert.False(t, stats.LastAudioDeliveredAt.IsZero())
+}
+
+func TestRTPHandler_EnqueueInboundAudioReportsEnqueueState(t *testing.T) {
+	handler := newTestRTPHandler()
+	handler.audioInChan = make(chan []byte, 1)
+	handler.audioInChan <- []byte{0x01}
+
+	stopped, enqueued := handler.enqueueInboundAudio([][]byte{{0x02}})
+
+	assert.False(t, stopped)
+	assert.True(t, enqueued)
+	assert.Equal(t, []byte{0x02}, <-handler.audioInChan)
+	stats := handler.GetDetailedStats()
+	assert.Equal(t, uint64(1), stats.PacketsDelivered)
+	assert.Equal(t, uint64(1), stats.PacketsDropped)
+	assert.Equal(t, uint64(1), stats.AudioInputDropped)
+	assert.Equal(t, uint64(1), stats.RTPIngressQueueDropped)
+	assert.Zero(t, stats.NetworkPacketsLost)
+
+	stopped, enqueued = handler.enqueueInboundAudio([][]byte{{0x03}})
+
+	assert.False(t, stopped)
+	assert.True(t, enqueued)
+	stats = handler.GetDetailedStats()
+	assert.Equal(t, uint64(2), stats.PacketsDelivered)
+	assert.Equal(t, uint64(1), stats.PacketsDropped)
+	assert.Equal(t, uint64(1), stats.AudioInputDropped)
+	assert.Equal(t, uint64(1), stats.RTPIngressQueueDropped)
+	assert.Zero(t, stats.NetworkPacketsLost)
+}
+
+func TestRTPHandler_DetailedStatsSeparateTransportAndDeliveryLiveness(t *testing.T) {
+	handler := newTestRTPHandler()
+	handler.audioInChan = make(chan []byte, 1)
+
+	handler.markInboundRTPReceived(time.Now())
+
+	stats := handler.GetDetailedStats()
+	assert.False(t, stats.LastRTPReceivedAt.IsZero())
+	assert.True(t, stats.LastAudioDeliveredAt.IsZero())
+
+	stopped, enqueued := handler.enqueueInboundAudio([][]byte{{0x01}})
+
+	require.False(t, stopped)
+	require.True(t, enqueued)
+	stats = handler.GetDetailedStats()
+	assert.False(t, stats.LastRTPReceivedAt.IsZero())
+	assert.False(t, stats.LastAudioDeliveredAt.IsZero())
+}
+
+func TestRTPHandler_EnqueueInboundAudioReportsPartialEnqueue(t *testing.T) {
+	handler := newTestRTPHandler()
+	handler.audioInChan = make(chan []byte, 1)
+	handler.inboundQuality.recordReceived(time.Now(), 2)
+
+	stopped, enqueued := handler.enqueueInboundAudio([][]byte{{0x01}, {0x02}})
+
+	assert.False(t, stopped)
+	assert.True(t, enqueued)
+	assert.Equal(t, []byte{0x02}, <-handler.audioInChan)
+	stats := handler.GetDetailedStats()
+	assert.Equal(t, uint64(2), stats.PacketsDelivered)
+	assert.Equal(t, uint64(1), stats.PacketsDropped)
+	assert.Equal(t, uint64(1), stats.AudioInputDropped)
+	assert.Equal(t, uint64(1), stats.RTPIngressQueueDropped)
+	assert.Zero(t, stats.NetworkPacketsLost)
+	assert.Equal(t, rtpInboundQualityPoor, stats.InboundQuality)
+	assert.Equal(t, uint64(2), stats.InboundWindowPacketsReceived)
+	assert.Equal(t, uint64(2), stats.InboundWindowPacketsDelivered)
+	assert.Equal(t, uint64(1), stats.InboundWindowAudioInputDropped)
+	assert.InDelta(t, 0.5, stats.InboundLossRate, 0.0001)
+	assert.InDelta(t, 1.0/3.0, stats.InboundDropRate, 0.0001)
+	assert.InDelta(t, 2.0/3.0, stats.InboundDeliveryRate, 0.0001)
+}
+
+func TestRTPHandler_DetailedStatsSeparateInboundDropCategories(t *testing.T) {
+	handler := newTestRTPHandler()
+	buffer := newRTPInputJitterBuffer(&CodecPCMU, rtpDefaultPacketizationTime)
+	handler.inputJitter = buffer
+	handler.audioInChan = make(chan []byte, 1)
+	handler.audioInChan <- []byte{0x01}
+
+	require.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(1, 0, 0x01)))
+	require.Len(t, buffer.push(testRTPInputPacket(2, 640, 0x02)), 4)
+	assert.Empty(t, buffer.push(testRTPInputPacket(4, 960, 0x04)))
+	require.Len(t, buffer.flushOnPlayoutTimeout(), 2)
+	assert.Empty(t, buffer.push(testRTPInputPacket(4, 960, 0x09)))
+	assert.Empty(t, buffer.push(testRTPInputPacket(6, 1120, 0x06)))
+	require.Equal(t, [][]byte{{0x10}}, buffer.push(testRTPInputPacket(1000, 159840, 0x10)))
+
+	handler.packetsDropped.Add(1)
+	handler.invalidPackets.Add(1)
+	stopped, enqueued := handler.enqueueInboundAudio([][]byte{{0x02}})
+	require.False(t, stopped)
+	require.True(t, enqueued)
+
+	stats := handler.GetDetailedStats()
+	assert.Equal(t, uint64(1), stats.PacketsLost)
+	assert.Equal(t, uint64(1), stats.NetworkPacketsLost)
+	assert.Equal(t, uint64(1), stats.LateOrDuplicatePackets)
+	assert.Equal(t, uint64(1), stats.InvalidPackets)
+	assert.Equal(t, uint64(1), stats.JitterBufferResyncDropped)
+	assert.Equal(t, uint64(1), stats.RTPIngressQueueDropped)
+	assert.Equal(t, uint64(3), stats.SilenceSuppressionFrames)
+	assert.Equal(t, uint64(4), stats.PacketsDropped)
 }
 
 func TestRTPHandler_StopOwnsLoopShutdownBeforeClosingChannels(t *testing.T) {
@@ -163,7 +420,7 @@ func TestRTPHandler_StopOwnsLoopShutdownBeforeClosingChannels(t *testing.T) {
 		defer handler.loops.Done()
 		close(loopStarted)
 		<-handler.ctx.Done()
-		_ = handler.writeInboundAudioPayloads([][]byte{{0xFF}}, 1)
+		_, _ = handler.enqueueInboundAudio([][]byte{{0xFF}})
 	}()
 
 	<-loopStarted
@@ -188,14 +445,14 @@ func TestRTPHandler_StopOwnsLoopShutdownBeforeClosingChannels(t *testing.T) {
 
 func TestRTPHandler_StopClosesUnstartedSocket(t *testing.T) {
 	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: 20000,
 		RTPPortRangeEnd:   20999,
 		PayloadType:       CodecPCMU.PayloadType,
 		ClockRate:         CodecPCMU.ClockRate,
 	})
 	require.NoError(t, err)
-	_, port := handler.LocalAddr()
+	port := handler.LocalAddress().Port
 
 	require.NoError(t, handler.Stop())
 	require.NoError(t, handler.Stop())
@@ -215,7 +472,7 @@ func TestRTPHandler_OwnsBoundPortUntilStop(t *testing.T) {
 	require.NoError(t, reserved.Close())
 
 	first, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: port,
 		RTPPortRangeEnd:   port,
 		PayloadType:       CodecPCMU.PayloadType,
@@ -224,7 +481,7 @@ func TestRTPHandler_OwnsBoundPortUntilStop(t *testing.T) {
 	require.NoError(t, err)
 
 	second, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: port,
 		RTPPortRangeEnd:   port,
 		PayloadType:       CodecPCMU.PayloadType,
@@ -237,7 +494,7 @@ func TestRTPHandler_OwnsBoundPortUntilStop(t *testing.T) {
 	require.NoError(t, first.Stop())
 
 	third, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: port,
 		RTPPortRangeEnd:   port,
 		PayloadType:       CodecPCMU.PayloadType,
@@ -255,7 +512,7 @@ func TestRTPHandler_UpdatesPortStatsForBindLifecycleAndExhaustion(t *testing.T) 
 
 	stats := &RTPPortStats{}
 	first, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: port,
 		RTPPortRangeEnd:   port,
 		PayloadType:       CodecPCMU.PayloadType,
@@ -268,7 +525,7 @@ func TestRTPHandler_UpdatesPortStatsForBindLifecycleAndExhaustion(t *testing.T) 
 	assert.Equal(t, uint64(0), stats.bindFailures.Load())
 
 	second, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: port,
 		RTPPortRangeEnd:   port,
 		PayloadType:       CodecPCMU.PayloadType,
@@ -294,7 +551,7 @@ func TestRTPHandler_SymmetricRTPUpdatesRemoteAddressFromPacketSource(t *testing.
 	require.NoError(t, reserved.Close())
 
 	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: port,
 		RTPPortRangeEnd:   port,
 		PayloadType:       CodecPCMU.PayloadType,
@@ -304,7 +561,7 @@ func TestRTPHandler_SymmetricRTPUpdatesRemoteAddressFromPacketSource(t *testing.
 	require.NoError(t, err)
 	defer handler.Stop()
 
-	handler.SetRemoteAddr("127.0.0.1", 9)
+	handler.SetRemoteAddress(RTPAddress{IP: "127.0.0.1", Port: 9})
 	handler.Start()
 
 	sender, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
@@ -336,7 +593,7 @@ func TestRTPHandler_RemoteAddressStaysFromSDPWhenSymmetricRTPDisabled(t *testing
 	require.NoError(t, reserved.Close())
 
 	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: port,
 		RTPPortRangeEnd:   port,
 		PayloadType:       CodecPCMU.PayloadType,
@@ -346,7 +603,7 @@ func TestRTPHandler_RemoteAddressStaysFromSDPWhenSymmetricRTPDisabled(t *testing
 	require.NoError(t, err)
 	defer handler.Stop()
 
-	handler.SetRemoteAddr("127.0.0.1", 9)
+	handler.SetRemoteAddress(RTPAddress{IP: "127.0.0.1", Port: 9})
 	handler.Start()
 
 	sender, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
@@ -382,7 +639,7 @@ func TestRTPHandler_DropsOversizedDatagramAndContinuesReceiving(t *testing.T) {
 	require.NoError(t, reserved.Close())
 
 	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: port,
 		RTPPortRangeEnd:   port,
 		PayloadType:       CodecPCMU.PayloadType,
@@ -432,7 +689,7 @@ func TestRTPHandler_DropsOversizedDatagramAndContinuesReceiving(t *testing.T) {
 
 func TestRTPHandler_MediaTimeoutUsesInitialWindow(t *testing.T) {
 	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:             "127.0.0.1",
+		LocalAddress:        RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart:   20000,
 		RTPPortRangeEnd:     20999,
 		PayloadType:         CodecPCMU.PayloadType,
@@ -460,7 +717,7 @@ func TestRTPHandler_MediaTimeoutUsesInitialWindow(t *testing.T) {
 
 func TestRTPHandler_MediaTimeoutUsesRegularWindowAfterAudio(t *testing.T) {
 	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:             "127.0.0.1",
+		LocalAddress:        RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart:   20000,
 		RTPPortRangeEnd:     20999,
 		PayloadType:         CodecPCMU.PayloadType,
@@ -473,7 +730,7 @@ func TestRTPHandler_MediaTimeoutUsesRegularWindowAfterAudio(t *testing.T) {
 
 	handler.EnableMediaTimeout(true)
 	time.Sleep(30 * time.Millisecond)
-	handler.markInboundAudioPacketReceived()
+	handler.markInboundRTPReceived(time.Now())
 
 	select {
 	case <-handler.MediaTimeout():
@@ -490,7 +747,7 @@ func TestRTPHandler_MediaTimeoutUsesRegularWindowAfterAudio(t *testing.T) {
 
 func TestRTPHandler_MediaTimeoutStaysOpenWhileAudioFlows(t *testing.T) {
 	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:             "127.0.0.1",
+		LocalAddress:        RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart:   20000,
 		RTPPortRangeEnd:     20999,
 		PayloadType:         CodecPCMU.PayloadType,
@@ -504,7 +761,7 @@ func TestRTPHandler_MediaTimeoutStaysOpenWhileAudioFlows(t *testing.T) {
 	handler.EnableMediaTimeout(true)
 
 	for i := 0; i < 5; i++ {
-		handler.markInboundAudioPacketReceived()
+		handler.markInboundRTPReceived(time.Now())
 		select {
 		case <-handler.MediaTimeout():
 			t.Fatal("media timeout fired while audio was flowing")
@@ -527,20 +784,4 @@ func TestRTPHandler_EnqueueAudioReportsBackpressureAndStopped(t *testing.T) {
 	err = handler.EnqueueAudio([]byte{0x01})
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, ErrRTPHandlerStopped))
-}
-
-func TestRTPHandler_NextOutputChunkUsesFallbackOnlyWhenQueueIsEmpty(t *testing.T) {
-	handler := newTestRTPHandler()
-	handler.SetFallbackAudioSource(func(frameSize int) []byte {
-		return []byte{0x11, 0x22}
-	})
-	silence := []byte{0xff, 0xff}
-
-	pendingAudio := []byte{0x33, 0x44}
-	assert.Equal(t, []byte{0x33, 0x44}, handler.nextOutputChunk(&pendingAudio, 2, silence))
-
-	assert.Equal(t, []byte{0x11, 0x22}, handler.nextOutputChunk(&pendingAudio, 2, silence))
-
-	handler.ClearFallbackAudioSource()
-	assert.Equal(t, silence, handler.nextOutputChunk(&pendingAudio, 2, silence))
 }

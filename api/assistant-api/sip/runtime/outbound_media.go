@@ -7,13 +7,8 @@
 package sip_runtime
 
 import (
-	"errors"
 	"fmt"
-)
-
-var (
-	ErrOutboundMediaNotPrepared = errors.New("outbound media is not prepared")
-	ErrOutboundMediaNoSession   = errors.New("outbound media requires a session")
+	"time"
 )
 
 // outboundMedia prepares RTP for an outbound call and configures it before
@@ -24,17 +19,17 @@ type outboundMedia struct {
 	request OutboundInviteRequest
 
 	rtpHandler   *RTPHandler
-	localRTPPort int
-	externalIP   string
+	localAddress RTPAddress
 	started      bool
 }
 
 // OutboundMediaAnswer is the validated remote SDP answer from outbound 200 OK.
 // It is parsed before ACK so the call can fail cleanly if media is unusable.
 type OutboundMediaAnswer struct {
-	negotiatedCodec *Codec
-	remoteIP        string
-	remotePort      int
+	negotiatedCodec   *Codec
+	remoteAddress     RTPAddress
+	remoteRTCPAddress RTPAddress
+	packetizationTime time.Duration
 }
 
 // NewOutboundMedia creates the outbound RTP preparer for a SIP call.
@@ -55,12 +50,11 @@ func (media *outboundMedia) Prepare() error {
 	}
 
 	rtpHandler, err := NewRTPHandler(media.server.ctx, &RTPConfig{
-		LocalIP:             media.server.listenConfig.GetBindAddress(),
+		LocalAddress:        RTPAddress{IP: media.server.listenConfig.GetBindAddress()},
 		RTPPortRangeStart:   media.server.rtpPortRangeStart,
 		RTPPortRangeEnd:     media.server.rtpPortRangeEnd,
 		PayloadType:         CodecPCMU.PayloadType,
 		ClockRate:           CodecPCMU.ClockRate,
-		Logger:              media.server.logger,
 		MediaTimeoutInitial: media.request.Config.MediaTimeoutInitial,
 		MediaTimeout:        media.request.Config.MediaTimeout,
 		SymmetricRTP:        media.server.symmetricRTP,
@@ -70,10 +64,10 @@ func (media *outboundMedia) Prepare() error {
 		return err
 	}
 
-	_, media.localRTPPort = rtpHandler.LocalAddr()
 	media.rtpHandler = rtpHandler
-	media.externalIP = media.server.listenConfig.GetExternalIP()
-	media.session.SetLocalRTP(media.externalIP, media.localRTPPort)
+	localRTPAddress := rtpHandler.LocalAddress()
+	media.localAddress = RTPAddress{IP: media.server.listenConfig.GetExternalIP(), Port: localRTPAddress.Port}
+	media.session.SetLocalRTPAddress(media.localAddress)
 	media.session.SetRTPHandler(rtpHandler)
 	return nil
 }
@@ -82,7 +76,9 @@ func (media *outboundMedia) SDPOffer() (string, error) {
 	if media.rtpHandler == nil {
 		return "", ErrOutboundMediaNotPrepared
 	}
-	return media.server.GenerateSDP(DefaultSDPConfig(media.externalIP, media.localRTPPort)), nil
+	config := DefaultSDPConfig(media.localAddress)
+	config.RTCPPort = media.rtpHandler.LocalRTCPPort()
+	return media.server.GenerateSDP(config), nil
 }
 
 func NewOutboundMediaAnswer(server *Server, dialog *outboundDialog) (OutboundMediaAnswer, error) {
@@ -95,17 +91,11 @@ func NewOutboundMediaAnswer(server *Server, dialog *outboundDialog) (OutboundMed
 		return OutboundMediaAnswer{}, fmt.Errorf("%w: outbound 200 OK SDP body is missing", ErrSDPParseFailed)
 	}
 
-	if server.logger != nil {
-		server.logger.Debugw("Outbound call 200 OK SDP answer",
-			"call_id", dialog.session.GetCallID(),
-			"sdp_body", string(body))
-	}
-
 	sdpInfo, err := server.ParseSDP(body)
 	if err != nil {
 		return OutboundMediaAnswer{}, fmt.Errorf("%w: %v", ErrSDPParseFailed, err)
 	}
-	if sdpInfo.ConnectionIP == "" || sdpInfo.AudioPort <= 0 {
+	if sdpInfo.RTPAddress.IP == "" || sdpInfo.RTPAddress.Port <= 0 {
 		return OutboundMediaAnswer{}, fmt.Errorf("%w: outbound answer missing RTP address", ErrSDPParseFailed)
 	}
 	if sdpInfo.PreferredCodec == nil {
@@ -113,9 +103,10 @@ func NewOutboundMediaAnswer(server *Server, dialog *outboundDialog) (OutboundMed
 	}
 
 	return OutboundMediaAnswer{
-		negotiatedCodec: sdpInfo.PreferredCodec,
-		remoteIP:        sdpInfo.ConnectionIP,
-		remotePort:      sdpInfo.AudioPort,
+		negotiatedCodec:   sdpInfo.PreferredCodec,
+		remoteAddress:     sdpInfo.RTPAddress,
+		remoteRTCPAddress: sdpInfo.RTCPAddress,
+		packetizationTime: sdpInfo.PacketizationDuration(),
 	}, nil
 }
 
@@ -124,11 +115,14 @@ func (media *outboundMedia) ApplyAnswer(answer OutboundMediaAnswer) error {
 		return ErrOutboundMediaNotPrepared
 	}
 	if media.server != nil {
-		media.rtpHandler.SetSymmetricRTP(media.server.useSymmetricRTPForRemoteIP(answer.remoteIP))
+		media.rtpHandler.SetSymmetricRTP(media.server.useSymmetricRTPForRemoteIP(answer.remoteAddress.IP))
 	}
-	media.rtpHandler.SetRemoteAddr(answer.remoteIP, answer.remotePort)
-	media.rtpHandler.SetCodec(answer.negotiatedCodec)
-	media.session.SetRemoteRTP(answer.remoteIP, answer.remotePort)
+	media.rtpHandler.setRemoteMediaAddress(remoteMediaAddress{
+		remoteRTPAddress:  answer.remoteAddress,
+		remoteRTCPAddress: answer.remoteRTCPAddress,
+	})
+	media.rtpHandler.SetInboundMediaFormat(answer.negotiatedCodec, answer.packetizationTime)
+	media.session.SetRemoteRTPAddress(answer.remoteAddress)
 	if answer.negotiatedCodec != nil {
 		media.session.SetNegotiatedCodec(answer.negotiatedCodec.Name, int(answer.negotiatedCodec.ClockRate))
 	}
@@ -175,11 +169,11 @@ func (media *outboundMedia) Stop() {
 	_ = rtpHandler.Stop()
 }
 
-func (media *outboundMedia) LocalAddr() (string, int) {
+func (media *outboundMedia) LocalAddress() RTPAddress {
 	if media == nil || media.rtpHandler == nil {
-		return "", 0
+		return RTPAddress{}
 	}
-	return media.rtpHandler.LocalAddr()
+	return media.rtpHandler.LocalAddress()
 }
 
 func (media *outboundMedia) RemoteAddrConfigured() bool {

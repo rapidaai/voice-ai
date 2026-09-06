@@ -8,7 +8,9 @@ package sip_runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/emiago/sipgo"
@@ -99,7 +101,11 @@ func (s *Server) rejectInboundInvite(req *sip.Request, tx sip.ServerTransaction,
 			"reason", reason,
 			"error", err)
 	}
-	response := s.sendResponse(tx, req, statusCode)
+	var headers []sip.Header
+	if statusCode == 503 && (errors.Is(err, ErrSIPCallCapacityExceeded) || errors.Is(err, ErrSIPCallRateExceeded)) {
+		headers = append(headers, sip.NewHeader(sipHeaderRetryAfter, strconv.Itoa(sipCapacityRetryAfterSeconds)))
+	}
+	response := s.sendResponseWithHeaders(tx, req, statusCode, headers...)
 	s.recordRejectedInboundInvite(req, response)
 }
 
@@ -236,6 +242,108 @@ func (s *Server) removeSession(callID string) {
 	s.mu.Unlock()
 }
 
+type callAdmissionClock interface {
+	Now() time.Time
+}
+
+type systemCallAdmissionClock struct{}
+
+func (systemCallAdmissionClock) Now() time.Time {
+	return time.Now()
+}
+
+func (s *Server) acquireNewCallAdmission() (func(), error) {
+	if !s.tryAcquireCallSlot() {
+		s.callCapacityRejects.Add(1)
+		return nil, ErrSIPCallCapacityExceeded
+	}
+	if !s.tryAcquireCallSetupRate() {
+		s.releaseCallSlot()
+		s.callRateRejects.Add(1)
+		return nil, ErrSIPCallRateExceeded
+	}
+	return func() { s.releaseCallSlot() }, nil
+}
+
+// CallAdmissionStats reports SIP call admission state and rejection counts.
+type CallAdmissionStats struct {
+	ActiveCalls        int64  `json:"active_calls"`
+	CapacityRejections uint64 `json:"capacity_rejections"`
+	RateRejections     uint64 `json:"rate_rejections"`
+}
+
+// CallAdmissionStats returns a lock-free snapshot of call admission counters.
+func (s *Server) CallAdmissionStats() CallAdmissionStats {
+	if s == nil {
+		return CallAdmissionStats{}
+	}
+	return CallAdmissionStats{
+		ActiveCalls:        s.activeCallAdmissions.Load(),
+		CapacityRejections: s.callCapacityRejects.Load(),
+		RateRejections:     s.callRateRejects.Load(),
+	}
+}
+
+func (s *Server) tryAcquireCallSetupRate() bool {
+	if s == nil || s.callAdmissionCPS <= 0 || s.callAdmissionBurst <= 0 {
+		return true
+	}
+	s.callAdmissionMu.Lock()
+	defer s.callAdmissionMu.Unlock()
+
+	if s.callAdmissionClock == nil {
+		s.callAdmissionClock = systemCallAdmissionClock{}
+	}
+	now := s.callAdmissionClock.Now()
+	if s.callAdmissionLast.IsZero() {
+		s.callAdmissionLast = now
+		if s.callAdmissionTokens <= 0 {
+			s.callAdmissionTokens = float64(s.callAdmissionBurst)
+		}
+	} else if now.After(s.callAdmissionLast) {
+		s.callAdmissionTokens += now.Sub(s.callAdmissionLast).Seconds() * float64(s.callAdmissionCPS)
+		if burst := float64(s.callAdmissionBurst); s.callAdmissionTokens > burst {
+			s.callAdmissionTokens = burst
+		}
+		s.callAdmissionLast = now
+	}
+	if s.callAdmissionTokens < 1 {
+		return false
+	}
+	s.callAdmissionTokens--
+	return true
+}
+
+func (s *Server) tryAcquireCallSlot() bool {
+	if s == nil || s.maxConcurrentCalls <= 0 {
+		return true
+	}
+	for {
+		activeCalls := s.activeCallAdmissions.Load()
+		if activeCalls >= s.maxConcurrentCalls {
+			return false
+		}
+		if s.activeCallAdmissions.CompareAndSwap(activeCalls, activeCalls+1) {
+			return true
+		}
+	}
+}
+
+func (s *Server) releaseCallSlot() {
+	if s == nil || s.maxConcurrentCalls <= 0 {
+		return
+	}
+	for {
+		activeCalls := s.activeCallAdmissions.Load()
+		if activeCalls <= 0 {
+			return
+		}
+		if s.activeCallAdmissions.CompareAndSwap(activeCalls, activeCalls-1) {
+			return
+		}
+	}
+}
+
 func (s *Server) getOrCreateLifecycle(session *Session) *CallLifecycle {
 	if session == nil {
 		return nil
@@ -307,13 +415,17 @@ func (s *Server) beginEnding(session *Session, reason string) {
 	_ = s.transitionLifecycle(session, CallStateEnding, reason)
 }
 
-func (s *Server) setPendingInvite(key inboundInviteKey, req *sip.Request, tx sip.ServerTransaction) {
+func (s *Server) setPendingInviteIfAbsent(key inboundInviteKey, req *sip.Request, tx sip.ServerTransaction) bool {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.pendingInvites == nil {
 		s.pendingInvites = make(map[inboundInviteKey]*pendingInvite)
 	}
+	if _, exists := s.pendingInvites[key]; exists {
+		return false
+	}
 	s.pendingInvites[key] = &pendingInvite{req: req, tx: tx}
-	s.mu.Unlock()
+	return true
 }
 
 func (s *Server) clearPendingInvite(key inboundInviteKey) {
@@ -397,6 +509,10 @@ func (s *Server) notifyError(session *Session, err error) {
 
 // registerSession registers a session and installs disconnect cleanup.
 func (s *Server) registerSession(session *Session, callID string) {
+	s.registerSessionWithAdmission(session, callID, false)
+}
+
+func (s *Server) registerSessionWithAdmission(session *Session, callID string, releaseAdmissionOnEnd bool) {
 	initialState := session.GetState()
 	lifecycle := newCallLifecycle(callID, initialState, s.logger)
 
@@ -409,6 +525,9 @@ func (s *Server) registerSession(session *Session, callID string) {
 			sess.SetOutboundDialogPhase(OutboundDialogPhaseTerminated)
 		}
 		s.removeSession(callID)
+		if releaseAdmissionOnEnd {
+			s.releaseCallSlot()
+		}
 	})
 	s.mu.Lock()
 	if s.lifecycles == nil {

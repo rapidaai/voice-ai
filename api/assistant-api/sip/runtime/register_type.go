@@ -8,58 +8,15 @@ package sip_runtime
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/rapidaai/pkg/validator"
 )
 
-// Registration errors
-var (
-	ErrRegistrationFailed  = errors.New("SIP registration failed")
-	ErrRegistrationExpired = errors.New("SIP registration expired")
-	ErrDIDNotRegistered    = errors.New("DID is not registered")
-	ErrMissingDID          = errors.New("DID is required for registration")
-	ErrMissingServer       = errors.New("SIP server is required for registration")
-	ErrAuthFailed          = errors.New("SIP authentication failed")
-	ErrPermanentFailure    = errors.New("SIP registration permanently rejected")
-)
-
 type RegistrationFailureClass string
 
-const (
-	RegistrationFailureClassConfig     RegistrationFailureClass = "config"
-	RegistrationFailureClassAuth       RegistrationFailureClass = "auth"
-	RegistrationFailureClassRejected   RegistrationFailureClass = "rejected"
-	RegistrationFailureClassTransient  RegistrationFailureClass = "transient"
-	RegistrationFailureClassNetwork    RegistrationFailureClass = "network"
-	RegistrationFailureClassOwnership  RegistrationFailureClass = "ownership"
-	RegistrationFailureClassDuplicate  RegistrationFailureClass = "duplicate"
-	RegistrationFailureClassRenewal    RegistrationFailureClass = "renewal"
-	RegistrationFailureClassUnregister RegistrationFailureClass = "unregister"
-)
-
 type RegistrationFailureReason string
-
-const (
-	RegistrationFailureReasonMissingDID              RegistrationFailureReason = "missing_did"
-	RegistrationFailureReasonMissingCredentialID     RegistrationFailureReason = "missing_credential_id"
-	RegistrationFailureReasonDuplicateDID            RegistrationFailureReason = "duplicate_did"
-	RegistrationFailureReasonAssistantNotFound       RegistrationFailureReason = "assistant_not_found"
-	RegistrationFailureReasonVaultCredentialNotFound RegistrationFailureReason = "vault_credential_not_found"
-	RegistrationFailureReasonInvalidSIPConfig        RegistrationFailureReason = "invalid_sip_config"
-	RegistrationFailureReasonMissingSIPServer        RegistrationFailureReason = "missing_sip_server"
-	RegistrationFailureReasonOwnershipClaimFailed    RegistrationFailureReason = "ownership_claim_failed"
-	RegistrationFailureReasonAuthFailed              RegistrationFailureReason = "auth_failed"
-	RegistrationFailureReasonRegistrarRejected       RegistrationFailureReason = "registrar_rejected"
-	RegistrationFailureReasonRegistrarUnreachable    RegistrationFailureReason = "registrar_unreachable"
-	RegistrationFailureReasonTransportError          RegistrationFailureReason = "transport_error"
-	RegistrationFailureReasonRegisterTimeout         RegistrationFailureReason = "register_timeout"
-	RegistrationFailureReasonRenewalFailed           RegistrationFailureReason = "renewal_failed"
-	RegistrationFailureReasonUnregisterFailed        RegistrationFailureReason = "unregister_failed"
-	RegistrationFailureReasonInvalidContactAddress   RegistrationFailureReason = "invalid_contact_address"
-)
 
 type RegistrationError struct {
 	Class      RegistrationFailureClass

@@ -46,6 +46,9 @@ type SIPConfig struct {
 	MediaTimeoutInitial     time.Duration    `mapstructure:"media_timeout_initial"`
 	MediaTimeout            time.Duration    `mapstructure:"media_timeout"`
 	OutboundHealthGate      *bool            `mapstructure:"outbound_health_gate"`
+	MaxConcurrentCalls      int              `mapstructure:"max_concurrent_calls"`
+	CallAdmissionCPS        int              `mapstructure:"call_admission_cps"`
+	CallAdmissionBurst      int              `mapstructure:"call_admission_burst"`
 	Inbound                 SIPInboundConfig `mapstructure:"inbound"`
 }
 

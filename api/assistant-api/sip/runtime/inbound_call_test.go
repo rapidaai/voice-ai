@@ -9,6 +9,7 @@ package sip_runtime
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -90,6 +91,33 @@ func TestInboundInviteIdentityFromRequestPreservesRoutingAndPartyIdentities(t *t
 	assert.Empty(t, identity.callAddress.To)
 	assert.Equal(t, request.From().Address.String(), identity.callAddress.FromURI)
 	assert.Equal(t, request.To().Address.String(), identity.callAddress.ToURI)
+}
+
+func TestInboundMediaSDPConfigUsesLocalPacketization(t *testing.T) {
+	server := newServerForCommandTests(t)
+	request := newInboundInviteRequest("inbound-answer-ptime")
+	request.SetBody([]byte(strings.Replace(
+		validInboundOfferSDP(),
+		"a=sendrecv\r\n",
+		"a=sendrecv\r\na=ptime:30\r\n",
+		1,
+	)))
+	mediaOffer, failure := newInboundMediaOffer(
+		server,
+		request,
+		"inbound INVITE",
+		LifecycleReasonInboundInviteFailed,
+		false,
+	)
+	require.Nil(t, failure)
+	media := newInboundMedia(server, newTestSession(t, "inbound-answer-ptime", CallDirectionInbound), mediaOffer)
+	media.localAddress = RTPAddress{IP: "127.0.0.1", Port: 20000}
+
+	sdpConfig := media.SDPConfig()
+
+	require.NotNil(t, sdpConfig)
+	assert.Equal(t, sdpDefaultPTimeMS, sdpConfig.PTime)
+	assert.Equal(t, 30*time.Millisecond, mediaOffer.sdpInfo.PacketizationDuration())
 }
 
 func TestNewCallAddressAcceptsOnlyPhoneFromUser(t *testing.T) {
@@ -1022,7 +1050,7 @@ func TestInboundCall_CancelAfterSessionRegistrationEndsLifecycle(t *testing.T) {
 	inboundCall.resolvedConfig = inboundConfig{config: bridgeTestConfig()}
 	createInboundSessionForTest(t, inboundCall)
 	server.registerSession(inboundCall.session, inboundCall.identity.callID)
-	server.setPendingInvite(inboundCall.inviteKey, request, transaction)
+	require.True(t, server.setPendingInviteIfAbsent(inboundCall.inviteKey, request, transaction))
 	server.markInviteCancelled(inboundCall.inviteKey)
 
 	cancelled := server.terminatePendingInvite(inboundCall.inviteKey, 487)
@@ -1049,10 +1077,10 @@ func TestInboundCall_CancelAfterRTPOwnershipEndsSession(t *testing.T) {
 	loadInboundMediaOffer(t, inboundCall)
 	inboundCall.resolvedConfig = inboundConfig{config: bridgeTestConfig()}
 	createInboundSessionForTest(t, inboundCall)
-	inboundCall.session.SetLocalRTP("127.0.0.1", 19000)
+	inboundCall.session.SetLocalRTPAddress(RTPAddress{IP: "127.0.0.1", Port: 19000})
 	inboundCall.session.SetRTPHandler(&RTPHandler{})
 	server.registerSession(inboundCall.session, inboundCall.identity.callID)
-	server.setPendingInvite(inboundCall.inviteKey, request, transaction)
+	require.True(t, server.setPendingInviteIfAbsent(inboundCall.inviteKey, request, transaction))
 	server.markInviteCancelled(inboundCall.inviteKey)
 
 	cancelled := server.terminatePendingInvite(inboundCall.inviteKey, 487)
@@ -1075,7 +1103,7 @@ func TestInboundCall_FinalResponseMediaTimeoutEndsCall(t *testing.T) {
 
 	callID := "inbound-final-response-media-timeout"
 	session := newTestSession(t, callID, CallDirectionInbound)
-	session.SetLocalRTP("127.0.0.1", 19000)
+	session.SetLocalRTPAddress(RTPAddress{IP: "127.0.0.1", Port: 19000})
 	session.SetRTPHandler(newTestRTPHandler())
 	server.registerSession(session, callID)
 	require.True(t, server.TransitionCall(session, CallStateRinging, LifecycleReasonInboundInviteRinging))
@@ -1255,6 +1283,19 @@ func inboundOfferSDPWithMedia(ip string, port int, payloadTypes string) string {
 		mediaLine += " " + payloadTypes
 	}
 	return inboundOfferSDPWithRawMedia(ip, mediaLine)
+}
+
+func inboundOfferSDPWithRTCP(remoteRTPAddress RTPAddress, remoteRTCPAddress RTPAddress) string {
+	return "v=0\r\n" +
+		"o=caller 1 1 IN IP4 127.0.0.1\r\n" +
+		"s=call\r\n" +
+		"c=IN IP4 " + remoteRTPAddress.IP + "\r\n" +
+		"t=0 0\r\n" +
+		"m=audio " + fmt.Sprintf("%d RTP/AVP 0 101", remoteRTPAddress.Port) + "\r\n" +
+		"a=rtpmap:0 PCMU/8000\r\n" +
+		"a=rtpmap:101 telephone-event/8000\r\n" +
+		"a=rtcp:" + fmt.Sprintf("%d IN IP4 %s", remoteRTCPAddress.Port, remoteRTCPAddress.IP) + "\r\n" +
+		"a=sendrecv\r\n"
 }
 
 func inboundOfferSDPWithoutConnection() string {

@@ -247,8 +247,8 @@ func registerConnectedInboundSession(t *testing.T, s *Server, callID string) *Se
 	t.Helper()
 
 	session := newTestSession(t, callID, CallDirectionInbound)
-	session.SetLocalRTP("127.0.0.1", 18000)
-	session.SetRemoteRTP("127.0.0.1", 19000)
+	session.SetLocalRTPAddress(RTPAddress{IP: "127.0.0.1", Port: 18000})
+	session.SetRemoteRTPAddress(RTPAddress{IP: "127.0.0.1", Port: 19000})
 	s.registerSession(session, callID)
 	require.True(t, s.TransitionCall(session, CallStateRinging, LifecycleReasonInboundInviteRinging))
 	require.True(t, s.TransitionCall(session, CallStateConnected, LifecycleReasonInboundInviteAnswered))
@@ -266,7 +266,7 @@ func registerConnectedInboundDialogSession(t *testing.T, s *Server, callID strin
 	loadInboundMediaOffer(t, inboundCall)
 	inboundCall.resolvedConfig = inboundConfig{config: bridgeTestConfig()}
 	createInboundSessionForTest(t, inboundCall)
-	inboundCall.session.SetRemoteRTP("127.0.0.1", 19000)
+	inboundCall.session.SetRemoteRTPAddress(RTPAddress{IP: "127.0.0.1", Port: 19000})
 	s.registerSession(inboundCall.session, inboundCall.identity.callID)
 	createInboundDialogForTest(t, inboundCall)
 	require.True(t, s.TransitionCall(inboundCall.session, CallStateRinging, LifecycleReasonInboundInviteRinging))
@@ -567,7 +567,7 @@ func TestSIPCommand_CANCEL_PendingInvite_Sends200And487(t *testing.T) {
 
 	inviteReq := newSIPRequest(sip.INVITE, "call-cancel-pending")
 	inviteTx := newTestServerTx()
-	s.setPendingInvite(inboundInviteKey{callID: "call-cancel-pending", fromTag: "fromtag"}, inviteReq, inviteTx)
+	require.True(t, s.setPendingInviteIfAbsent(inboundInviteKey{callID: "call-cancel-pending", fromTag: "fromtag"}, inviteReq, inviteTx))
 
 	cancelReq := newSIPRequest(sip.CANCEL, "call-cancel-pending")
 	cancelTx := newTestServerTx()
@@ -618,6 +618,35 @@ func TestSIPCommand_REINVITE_HoldSDPAccepted(t *testing.T) {
 	assert.Equal(t, 200, tx.lastStatus())
 	assert.Equal(t, "127.0.0.1:19000", session.GetInfo().RemoteRTPAddress)
 	assert.Equal(t, uint64(1), session.ReInviteACKCount())
+}
+
+func TestSIPCommand_REINVITE_AppliesExplicitRTCPAddress(t *testing.T) {
+	s := newServerForCommandTests(t)
+	session := registerConnectedInboundDialogSession(t, s, "call-reinvite-rtcp")
+	rtpHandler := newTestRTPHandler()
+	rtpHandler.SetRemoteAddress(RTPAddress{IP: "127.0.0.1", Port: 19000})
+	session.SetRTPHandler(rtpHandler)
+	req := newInboundDialogSDPRequest(t, session, sip.INVITE, inboundOfferSDPWithRTCP(
+		RTPAddress{IP: "127.0.0.1", Port: 20000},
+		RTPAddress{IP: "198.51.100.10", Port: 23000},
+	))
+	tx := newAckableTestServerTx()
+	ackRequest := newInboundDialogRequest(t, session, sip.ACK)
+	tx.PushACK(ackRequest)
+
+	s.handleInvite(req, tx)
+
+	require.NotEmpty(t, tx.responses)
+	assert.Equal(t, 200, tx.lastStatus())
+	assert.Equal(t, "127.0.0.1:20000", session.GetInfo().RemoteRTPAddress)
+	assert.Equal(t, 23000, rtpHandler.GetDetailedStats().RemoteRTCPPort)
+	rtpHandler.mu.RLock()
+	remoteRTCPAddress := cloneUDPAddr(rtpHandler.remoteRTCPAddr)
+	remoteRTCPSignaled := rtpHandler.remoteRTCPSignaled
+	rtpHandler.mu.RUnlock()
+	require.NotNil(t, remoteRTCPAddress)
+	assert.True(t, remoteRTCPSignaled)
+	assert.Equal(t, "198.51.100.10", remoteRTCPAddress.IP.String())
 }
 
 func TestSIPCommand_REINVITE_ACKTimeoutReturnsAfter200(t *testing.T) {
@@ -711,6 +740,33 @@ func TestSIPCommand_UPDATE_UnsupportedCodecRejects488(t *testing.T) {
 
 	require.NotEmpty(t, tx.responses)
 	assert.Equal(t, 488, tx.lastStatus())
+}
+
+func TestSIPCommand_UPDATE_AppliesExplicitRTCPAddress(t *testing.T) {
+	s := newServerForCommandTests(t)
+	session := registerConnectedInboundDialogSession(t, s, "call-update-rtcp")
+	rtpHandler := newTestRTPHandler()
+	rtpHandler.SetRemoteAddress(RTPAddress{IP: "127.0.0.1", Port: 19000})
+	session.SetRTPHandler(rtpHandler)
+	req := newInboundDialogSDPRequest(t, session, sip.UPDATE, inboundOfferSDPWithRTCP(
+		RTPAddress{IP: "127.0.0.1", Port: 21000},
+		RTPAddress{IP: "198.51.100.20", Port: 24000},
+	))
+	tx := newTestServerTx()
+
+	s.handleUpdate(req, tx)
+
+	require.NotEmpty(t, tx.responses)
+	assert.Equal(t, 200, tx.lastStatus())
+	assert.Equal(t, "127.0.0.1:21000", session.GetInfo().RemoteRTPAddress)
+	assert.Equal(t, 24000, rtpHandler.GetDetailedStats().RemoteRTCPPort)
+	rtpHandler.mu.RLock()
+	remoteRTCPAddress := cloneUDPAddr(rtpHandler.remoteRTCPAddr)
+	remoteRTCPSignaled := rtpHandler.remoteRTCPSignaled
+	rtpHandler.mu.RUnlock()
+	require.NotNil(t, remoteRTCPAddress)
+	assert.True(t, remoteRTCPSignaled)
+	assert.Equal(t, "198.51.100.20", remoteRTCPAddress.IP.String())
 }
 
 func TestRegisterSession_RemoveHappensOnEndNotDisconnect(t *testing.T) {
@@ -950,7 +1006,7 @@ func TestServerStopEndsSessionsThroughSessionCleanup(t *testing.T) {
 	s.state.Store(int32(ServerStateRunning))
 
 	session := newTestSession(t, "call-server-stop-rtp", CallDirectionInbound)
-	session.SetLocalRTP("127.0.0.1", 19000)
+	session.SetLocalRTPAddress(RTPAddress{IP: "127.0.0.1", Port: 19000})
 	s.registerSession(session, "call-server-stop-rtp")
 
 	require.True(t, s.TransitionCall(session, CallStateConnected, LifecycleReasonInboundInviteACKReceived))
