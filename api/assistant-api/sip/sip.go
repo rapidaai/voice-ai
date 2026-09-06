@@ -115,6 +115,9 @@ func (m *SIPEngine) Connect(ctx context.Context) error {
 		RTPPortRangeEnd:      m.cfg.SIPConfig.RTPPortRangeEnd,
 		SymmetricRTP:         m.cfg.SIPConfig.SymmetricRTP,
 		IgnoreLocalAddrInSDP: m.cfg.SIPConfig.IgnoreLocalAddrInSDP,
+		MaxConcurrentCalls:   m.cfg.SIPConfig.MaxConcurrentCalls,
+		CallAdmissionCPS:     m.cfg.SIPConfig.CallAdmissionCPS,
+		CallAdmissionBurst:   m.cfg.SIPConfig.CallAdmissionBurst,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create SIP server: %w", err)

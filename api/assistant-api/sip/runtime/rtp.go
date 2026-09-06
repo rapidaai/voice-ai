@@ -24,17 +24,19 @@ import (
 
 // RTP constants
 const (
-	rtpVersion             = 2
-	rtpHeaderSize          = 12
-	rtpDefaultClockRate    = 8000
-	rtpMaxPort             = 65535
-	rtpReadBufferSize      = 65536
-	rtpWriteBufferSize     = 65536
-	rtpPacketMaxSize       = 1500
-	rtpPacketInterval      = 20 * time.Millisecond
-	rtpInputPlayoutTimeout = rtpPacketInterval
-	rtpMediaTimeoutInitial = 30 * time.Second
-	rtpMediaTimeout        = 15 * time.Second
+	rtpVersion                  = 2
+	rtpHeaderSize               = 12
+	rtpDefaultClockRate         = 8000
+	rtpMaxPort                  = 65535
+	rtpReadBufferSize           = 65536
+	rtpWriteBufferSize          = 65536
+	rtpPacketMaxSize            = 1500
+	rtpPacketInterval           = 20 * time.Millisecond
+	rtpDefaultPacketizationTime = 20 * time.Millisecond
+	rtpMinPacketizationTime     = 5 * time.Millisecond
+	rtpMaxPacketizationTime     = 60 * time.Millisecond
+	rtpMediaTimeoutInitial      = 30 * time.Second
+	rtpMediaTimeout             = 15 * time.Second
 
 	// Audio channel buffer sizes
 	rtpAudioInBufferSize  = 100
@@ -62,6 +64,7 @@ var (
 	errRTPInvalidConfig               = errors.New("invalid configuration")
 	errRTPInvalidLocalPort            = errors.New("invalid local_port")
 	errRTPInvalidPacketLength         = errors.New("invalid packet length")
+	errRTPInvalidPacketizationTime    = errors.New("invalid packetization time")
 	errRTPInvalidPaddingLength        = errors.New("invalid rtp padding length")
 	errRTPLocalIPRequired             = errors.New("local_ip is required")
 	errRTPPacketShortCSRCHeader       = errors.New("packet shorter than csrc header")
@@ -109,11 +112,12 @@ type RTPHandler struct {
 	portStats          *RTPPortStats
 
 	// RTP state
-	ssrc           uint32
-	sequenceNumber uint16
-	timestamp      uint32
-	codec          *Codec
-	remoteSSRC     atomic.Uint32
+	ssrc                   uint32
+	sequenceNumber         uint16
+	timestamp              uint32
+	codec                  *Codec
+	inputPacketizationTime time.Duration
+	remoteSSRC             atomic.Uint32
 
 	// Audio channels
 	audioInChan  chan []byte
@@ -135,12 +139,13 @@ type RTPHandler struct {
 	inputCloseOnce   sync.Once
 	timeoutCloseOnce sync.Once
 
-	mediaTimeoutCh      chan struct{}
-	mediaTimeoutKick    chan struct{}
-	mediaTimeoutStart   atomic.Int64
-	mediaTimeoutInitial atomic.Int64
-	mediaTimeoutGeneral atomic.Int64
-	lastPacketTime      atomic.Int64
+	mediaTimeoutCh       chan struct{}
+	mediaTimeoutKick     chan struct{}
+	mediaTimeoutStart    atomic.Int64
+	mediaTimeoutInitial  atomic.Int64
+	mediaTimeoutGeneral  atomic.Int64
+	lastRTPReceivedAt    atomic.Int64
+	lastAudioDeliveredAt atomic.Int64
 
 	// Statistics
 	packetsSent                 atomic.Uint64
@@ -148,6 +153,7 @@ type RTPHandler struct {
 	packetsDelivered            atomic.Uint64
 	packetsDropped              atomic.Uint64
 	audioInputDropped           atomic.Uint64
+	invalidPackets              atomic.Uint64
 	bytesReceived               atomic.Uint64
 	bytesSent                   atomic.Uint64
 	inboundQuality              rtpInboundQuality
@@ -185,6 +191,7 @@ type RTPConfig struct {
 
 	MediaTimeoutInitial time.Duration
 	MediaTimeout        time.Duration
+	PacketizationTime   time.Duration
 
 	portStats *RTPPortStats
 }
@@ -224,7 +231,19 @@ func (c *RTPConfig) Validate() error {
 	if c.MediaTimeout <= 0 {
 		c.MediaTimeout = rtpMediaTimeout
 	}
+	if c.PacketizationTime <= 0 {
+		c.PacketizationTime = rtpDefaultPacketizationTime
+	}
+	if !validRTPPacketizationTime(c.PacketizationTime) {
+		return fmt.Errorf(rtpErrorIntFormat, errRTPInvalidPacketizationTime, c.PacketizationTime.Milliseconds())
+	}
 	return nil
+}
+
+func validRTPPacketizationTime(packetizationTime time.Duration) bool {
+	return packetizationTime >= rtpMinPacketizationTime &&
+		packetizationTime <= rtpMaxPacketizationTime &&
+		packetizationTime%time.Millisecond == 0
 }
 
 // NewRTPHandler creates a new RTP handler for direct audio transport
@@ -352,22 +371,23 @@ func NewRTPHandler(ctx context.Context, config *RTPConfig) (*RTPHandler, error) 
 	ssrc := binary.BigEndian.Uint32(ssrcSeed[:])
 
 	handler := &RTPHandler{
-		conn:             conn,
-		rtcpConn:         rtcpConn,
-		localIP:          localAddr.IP.String(),
-		localPort:        localAddr.Port,
-		symmetricRTP:     config.SymmetricRTP,
-		portStats:        config.portStats,
-		ssrc:             ssrc,
-		codec:            codec,
-		audioInChan:      make(chan []byte, rtpAudioInBufferSize),
-		audioOutChan:     make(chan []byte, rtpAudioOutBufferSize),
-		inputJitter:      newRTPInputJitterBuffer(codec),
-		flushAudioCh:     make(chan struct{}, 1),
-		ctx:              handlerCtx,
-		cancel:           cancel,
-		mediaTimeoutCh:   make(chan struct{}),
-		mediaTimeoutKick: make(chan struct{}, 1),
+		conn:                   conn,
+		rtcpConn:               rtcpConn,
+		localIP:                localAddr.IP.String(),
+		localPort:              localAddr.Port,
+		symmetricRTP:           config.SymmetricRTP,
+		portStats:              config.portStats,
+		ssrc:                   ssrc,
+		codec:                  codec,
+		inputPacketizationTime: config.PacketizationTime,
+		audioInChan:            make(chan []byte, rtpAudioInBufferSize),
+		audioOutChan:           make(chan []byte, rtpAudioOutBufferSize),
+		inputJitter:            newRTPInputJitterBuffer(codec, config.PacketizationTime),
+		flushAudioCh:           make(chan struct{}, 1),
+		ctx:                    handlerCtx,
+		cancel:                 cancel,
+		mediaTimeoutCh:         make(chan struct{}),
+		mediaTimeoutKick:       make(chan struct{}, 1),
 	}
 	handler.mediaTimeoutInitial.Store(int64(config.MediaTimeoutInitial))
 	handler.mediaTimeoutGeneral.Store(int64(config.MediaTimeout))
@@ -556,7 +576,7 @@ func (h *RTPHandler) mediaTimeoutLoop() {
 			continue
 		}
 
-		lastPacketNano := h.lastPacketTime.Load()
+		lastPacketNano := h.lastRTPReceivedAt.Load()
 		initial := time.Duration(h.mediaTimeoutInitial.Load())
 		general := time.Duration(h.mediaTimeoutGeneral.Load())
 		if initial <= 0 {
@@ -769,15 +789,31 @@ func (h *RTPHandler) SetCodec(codec *Codec) {
 	if codec == nil {
 		return
 	}
+	h.mu.RLock()
+	packetizationTime := h.inputPacketizationTime
+	h.mu.RUnlock()
+	h.SetInboundMediaFormat(codec, packetizationTime)
+}
+
+func (h *RTPHandler) SetInboundMediaFormat(codec *Codec, packetizationTime time.Duration) {
+	if codec == nil {
+		codec = &CodecPCMU
+	}
+	if !validRTPPacketizationTime(packetizationTime) {
+		packetizationTime = rtpDefaultPacketizationTime
+	}
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	h.codec = codec
+	h.inputPacketizationTime = packetizationTime
 	h.codecVersion++
 	if h.inputJitter == nil {
-		h.inputJitter = newRTPInputJitterBuffer(codec)
+		h.inputJitter = newRTPInputJitterBuffer(codec, packetizationTime)
 	} else {
-		h.inputJitter.reset(codec)
+		h.inputJitter.reset(codec, packetizationTime)
 	}
+	h.mu.Unlock()
+
+	h.rtcpReception.resetRTP(codec.ClockRate)
 }
 
 func (h *RTPHandler) receiveLoop() {
@@ -794,7 +830,17 @@ func (h *RTPHandler) receiveLoop() {
 			return
 		}
 
-		if deadlineErr := h.conn.SetReadDeadline(time.Now().Add(rtpInputPlayoutTimeout)); deadlineErr != nil {
+		playoutTimeout := rtpDefaultPacketizationTime
+		h.mu.RLock()
+		inputJitter := h.inputJitter
+		if inputJitter == nil && validRTPPacketizationTime(h.inputPacketizationTime) {
+			playoutTimeout = h.inputPacketizationTime
+		}
+		h.mu.RUnlock()
+		if inputJitter != nil {
+			playoutTimeout = inputJitter.playoutTimeout()
+		}
+		if deadlineErr := h.conn.SetReadDeadline(time.Now().Add(playoutTimeout)); deadlineErr != nil {
 			continue
 		}
 		n, remoteAddr, err := h.conn.ReadFromUDP(buf)
@@ -826,12 +872,14 @@ func (h *RTPHandler) receiveLoop() {
 
 		if n > rtpPacketMaxSize {
 			h.packetsDropped.Add(1)
+			h.invalidPackets.Add(1)
 			h.inboundQuality.recordDropped(time.Now(), 1)
 			continue
 		}
 
 		if n < rtpHeaderSize {
 			h.packetsDropped.Add(1)
+			h.invalidPackets.Add(1)
 			h.inboundQuality.recordDropped(time.Now(), 1)
 			continue
 		}
@@ -839,6 +887,7 @@ func (h *RTPHandler) receiveLoop() {
 		packet, err := h.parseRTPPacket(buf[:n])
 		if err != nil {
 			h.packetsDropped.Add(1)
+			h.invalidPackets.Add(1)
 			h.inboundQuality.recordDropped(time.Now(), 1)
 			continue
 		}
@@ -862,20 +911,26 @@ func (h *RTPHandler) receiveLoop() {
 
 		h.mu.RLock()
 		codec := h.codec
-		inputJitter := h.inputJitter
+		inputJitter = h.inputJitter
+		inputPacketizationTime := h.inputPacketizationTime
 		h.mu.RUnlock()
 		if codec == nil {
 			codec = &CodecPCMU
 		}
 		if packet.PayloadType != codec.PayloadType {
 			h.packetsDropped.Add(1)
+			h.invalidPackets.Add(1)
 			h.inboundQuality.recordDropped(time.Now(), 1)
 			continue
 		}
 
 		arrivedAt := time.Now()
 		h.inboundQuality.recordReceived(arrivedAt, 1)
-		h.remoteSSRC.Store(packet.SSRC)
+		h.markInboundRTPReceived(arrivedAt)
+		previousSSRC := h.remoteSSRC.Swap(packet.SSRC)
+		if previousSSRC != 0 && previousSSRC != packet.SSRC && inputJitter != nil {
+			inputJitter.reset(codec, inputPacketizationTime)
+		}
 		h.rtcpReception.recordRTP(packet, codec.ClockRate, arrivedAt)
 		payloads := [][]byte{packet.Payload}
 		if inputJitter != nil {
@@ -884,10 +939,7 @@ func (h *RTPHandler) receiveLoop() {
 			payloads = inputJitter.push(packet)
 			h.recordInboundJitterDeltas(inputJitter, lostBefore, droppedBefore)
 		}
-		stopped, enqueued := h.enqueueInboundAudio(payloads)
-		if enqueued {
-			h.markInboundAudioPacketReceived()
-		}
+		stopped, _ := h.enqueueInboundAudio(payloads)
 		if stopped {
 			return
 		}
@@ -915,11 +967,35 @@ func (h *RTPHandler) enqueueInboundAudio(payloads [][]byte) (bool, bool) {
 		case h.audioInChan <- payload:
 			enqueued = true
 			h.packetsDelivered.Add(1)
-			h.inboundQuality.recordDelivered(time.Now(), 1)
+			deliveredAt := time.Now()
+			h.inboundQuality.recordDelivered(deliveredAt, 1)
+			h.markInboundAudioDelivered(deliveredAt)
 		default:
-			h.audioInputDropped.Add(1)
-			h.packetsDropped.Add(1)
-			h.inboundQuality.recordAudioInputDropped(time.Now(), 1)
+			droppedOldest := false
+			select {
+			case <-h.audioInChan:
+				droppedOldest = true
+				h.audioInputDropped.Add(1)
+				h.packetsDropped.Add(1)
+				h.inboundQuality.recordAudioInputDropped(time.Now(), 1)
+			default:
+			}
+			select {
+			case <-h.ctx.Done():
+				return true, enqueued
+			case h.audioInChan <- payload:
+				enqueued = true
+				h.packetsDelivered.Add(1)
+				deliveredAt := time.Now()
+				h.inboundQuality.recordDelivered(deliveredAt, 1)
+				h.markInboundAudioDelivered(deliveredAt)
+			default:
+				if !droppedOldest {
+					h.audioInputDropped.Add(1)
+					h.packetsDropped.Add(1)
+					h.inboundQuality.recordAudioInputDropped(time.Now(), 1)
+				}
+			}
 		}
 	}
 	return false, enqueued
@@ -943,10 +1019,14 @@ func (h *RTPHandler) notifyFirstPacketReceived() {
 	}
 }
 
-func (h *RTPHandler) markInboundAudioPacketReceived() {
-	h.lastPacketTime.Store(time.Now().UnixNano())
+func (h *RTPHandler) markInboundRTPReceived(receivedAt time.Time) {
+	h.lastRTPReceivedAt.Store(receivedAt.UnixNano())
 	h.notifyFirstPacketReceived()
 	h.kickMediaTimeoutLoop()
+}
+
+func (h *RTPHandler) markInboundAudioDelivered(deliveredAt time.Time) {
+	h.lastAudioDeliveredAt.Store(deliveredAt.UnixNano())
 }
 
 func (h *RTPHandler) sendLoop() {
@@ -1219,6 +1299,9 @@ func (h *RTPHandler) GetStats() (sent, received uint64) {
 func (h *RTPHandler) GetDetailedStats() RTPStats {
 	var packetsLost uint64
 	var jitterDropped uint64
+	var lateOrDuplicatePackets uint64
+	var resyncDroppedPackets uint64
+	var silenceSuppressionFrames uint64
 	h.mu.RLock()
 	inputJitter := h.inputJitter
 	remoteRTCPPort := 0
@@ -1229,6 +1312,18 @@ func (h *RTPHandler) GetDetailedStats() RTPStats {
 	if inputJitter != nil {
 		packetsLost = inputJitter.lostPackets()
 		jitterDropped = inputJitter.droppedPackets()
+		lateOrDuplicatePackets = inputJitter.lateOrDuplicatePackets()
+		resyncDroppedPackets = inputJitter.resyncDroppedPackets()
+		silenceSuppressionFrames = inputJitter.silenceSuppressionFrameCount()
+	}
+	queueDropped := h.audioInputDropped.Load()
+	lastRTPReceivedAt := time.Time{}
+	if receivedAt := h.lastRTPReceivedAt.Load(); receivedAt > 0 {
+		lastRTPReceivedAt = time.Unix(0, receivedAt)
+	}
+	lastAudioDeliveredAt := time.Time{}
+	if deliveredAt := h.lastAudioDeliveredAt.Load(); deliveredAt > 0 {
+		lastAudioDeliveredAt = time.Unix(0, deliveredAt)
 	}
 	quality := h.inboundQuality.snapshot(time.Now())
 	rtcpReception := h.rtcpReception.snapshot()
@@ -1240,7 +1335,15 @@ func (h *RTPHandler) GetDetailedStats() RTPStats {
 		BytesReceived:                  h.bytesReceived.Load(),
 		PacketsLost:                    packetsLost,
 		PacketsDropped:                 h.packetsDropped.Load() + jitterDropped,
-		AudioInputDropped:              h.audioInputDropped.Load(),
+		AudioInputDropped:              queueDropped,
+		NetworkPacketsLost:             packetsLost,
+		LateOrDuplicatePackets:         lateOrDuplicatePackets,
+		InvalidPackets:                 h.invalidPackets.Load(),
+		JitterBufferResyncDropped:      resyncDroppedPackets,
+		RTPIngressQueueDropped:         queueDropped,
+		SilenceSuppressionFrames:       silenceSuppressionFrames,
+		LastRTPReceivedAt:              lastRTPReceivedAt,
+		LastAudioDeliveredAt:           lastAudioDeliveredAt,
 		InboundQuality:                 quality.quality,
 		InboundQualityScore:            quality.score,
 		InboundQualityWindow:           quality.window,
@@ -1269,5 +1372,6 @@ func (h *RTPHandler) GetDetailedStats() RTPStats {
 		RTCPRemotePacketsLost:          rtcpReception.RemotePacketsLost,
 		RTCPRemoteJitter:               rtcpReception.RemoteJitter,
 		RTCPRoundTripTime:              rtcpReception.RoundTripTime,
+		Jitter:                         rtcpReception.JitterDuration,
 	}
 }

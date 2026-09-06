@@ -73,6 +73,9 @@ sip:
   server: "0.0.0.0"
   instance_id: "assistant-test-01"
   port: 5070
+  max_concurrent_calls: 42
+  call_admission_cps: 7
+  call_admission_burst: 11
   inbound:
     answer_mode: "answer_immediately"
     min_ring_duration: 0s
@@ -120,6 +123,15 @@ func TestInitConfig(t *testing.T) {
 	}
 	if appConfig.SIPConfig.Inbound.ACKTimeout.String() != "5s" {
 		t.Errorf("Expected nested SIP inbound ack timeout 5s, got %s", appConfig.SIPConfig.Inbound.ACKTimeout)
+	}
+	if appConfig.SIPConfig.MaxConcurrentCalls != 42 {
+		t.Errorf("Expected SIP max concurrent calls 42, got %d", appConfig.SIPConfig.MaxConcurrentCalls)
+	}
+	if appConfig.SIPConfig.CallAdmissionCPS != 7 {
+		t.Errorf("Expected SIP call admission cps 7, got %d", appConfig.SIPConfig.CallAdmissionCPS)
+	}
+	if appConfig.SIPConfig.CallAdmissionBurst != 11 {
+		t.Errorf("Expected SIP call admission burst 11, got %d", appConfig.SIPConfig.CallAdmissionBurst)
 	}
 }
 

@@ -39,6 +39,16 @@ type Server struct {
 	symmetricRTP         bool
 	ignoreLocalAddrInSDP bool
 	rtpPortStats         *RTPPortStats
+	maxConcurrentCalls   int64
+	activeCallAdmissions atomic.Int64
+	callCapacityRejects  atomic.Uint64
+	callRateRejects      atomic.Uint64
+	callAdmissionCPS     int64
+	callAdmissionBurst   int64
+	callAdmissionClock   callAdmissionClock
+	callAdmissionMu      sync.Mutex
+	callAdmissionTokens  float64
+	callAdmissionLast    time.Time
 
 	// Outbound dialog cache — routes incoming BYE/re-INVITE to the correct
 	// DialogClientSession. Without this, BYE from the remote side is handled
@@ -97,6 +107,7 @@ type inboundRejectedInvite struct {
 	statusCode     int
 	reason         string
 	includeContact bool
+	retryAfter     string
 	expiresAt      time.Time
 }
 
@@ -161,6 +172,9 @@ type ServerConfig struct {
 	RTPPortRangeEnd      int  // End of RTP port range, inclusive.
 	SymmetricRTP         bool // Updates the remote RTP target from received packet sources.
 	IgnoreLocalAddrInSDP bool // Enables symmetric RTP when SDP advertises a private remote address.
+	MaxConcurrentCalls   int  // Zero preserves unlimited call admission.
+	CallAdmissionCPS     int  // Calls per second allowed for new call setup. Zero disables burst admission.
+	CallAdmissionBurst   int  // Maximum burst size for new call setup. Zero disables burst admission.
 }
 
 // Validate validates the server configuration
@@ -185,6 +199,21 @@ func (c *ServerConfig) Validate() error {
 	}
 	if c.RTPPortRangeStart > c.RTPPortRangeEnd {
 		return fmt.Errorf("rtp_port_range_start must be less than or equal to rtp_port_range_end")
+	}
+	if c.MaxConcurrentCalls < 0 {
+		return fmt.Errorf("max_concurrent_calls must be greater than or equal to zero")
+	}
+	if c.CallAdmissionCPS < 0 {
+		return fmt.Errorf("call_admission_cps must be greater than or equal to zero")
+	}
+	if c.CallAdmissionBurst < 0 {
+		return fmt.Errorf("call_admission_burst must be greater than or equal to zero")
+	}
+	if c.CallAdmissionCPS > 0 && c.CallAdmissionBurst == 0 {
+		return fmt.Errorf("call_admission_burst is required when call_admission_cps is set")
+	}
+	if c.CallAdmissionBurst > 0 && c.CallAdmissionCPS == 0 {
+		return fmt.Errorf("call_admission_cps is required when call_admission_burst is set")
 	}
 	return nil
 }
@@ -263,6 +292,11 @@ func NewServer(ctx context.Context, cfg *ServerConfig) (*Server, error) {
 		symmetricRTP:                     cfg.SymmetricRTP,
 		ignoreLocalAddrInSDP:             cfg.IgnoreLocalAddrInSDP,
 		rtpPortStats:                     &RTPPortStats{},
+		maxConcurrentCalls:               int64(cfg.MaxConcurrentCalls),
+		callAdmissionCPS:                 int64(cfg.CallAdmissionCPS),
+		callAdmissionBurst:               int64(cfg.CallAdmissionBurst),
+		callAdmissionClock:               systemCallAdmissionClock{},
+		callAdmissionTokens:              float64(cfg.CallAdmissionBurst),
 		dialogClientCache:                dialogClientCache,
 		dialogServerCache:                dialogServerCache,
 		middlewares:                      append([]Middleware(nil), cfg.Middlewares...),

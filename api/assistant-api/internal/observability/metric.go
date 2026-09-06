@@ -30,6 +30,10 @@ const (
 	MetricSIPRegistrationStatus  = "sip.registration.status"
 	MetricICELatencyMs           = "webrtc.ice_latency_ms"
 	MetricWebRTCOutputQueueDrops = "webrtc.output_queue_dropped_frames"
+	MetricStreamerCriticalDrops  = "streamer.input_critical_queue_drops"
+	MetricStreamerNormalDrops    = "streamer.input_normal_queue_drops"
+	MetricStreamerLowDrops       = "streamer.input_low_queue_drops"
+	MetricStreamerOutputDrops    = "streamer.output_queue_drops"
 )
 
 // Current call.status metric values.

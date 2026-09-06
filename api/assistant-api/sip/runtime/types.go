@@ -46,6 +46,8 @@ var (
 	ErrCredentialIDRequired       = errors.New("SIP credential ID is required")
 	ErrVaultCredentialResolution  = errors.New("SIP vault credential resolution failed")
 	ErrVaultConfigInvalid         = errors.New("SIP vault configuration is invalid")
+	ErrSIPCallCapacityExceeded    = errors.New("SIP call capacity exceeded")
+	ErrSIPCallRateExceeded        = errors.New("SIP call setup rate exceeded")
 )
 
 // ServerState represents the state of the SIP server.
@@ -622,6 +624,14 @@ type RTPStats struct {
 	PacketsLost                    uint64        `json:"packets_lost"`
 	PacketsDropped                 uint64        `json:"packets_dropped"`
 	AudioInputDropped              uint64        `json:"audio_input_dropped"`
+	NetworkPacketsLost             uint64        `json:"network_packets_lost"`
+	LateOrDuplicatePackets         uint64        `json:"late_or_duplicate_packets"`
+	InvalidPackets                 uint64        `json:"invalid_packets"`
+	JitterBufferResyncDropped      uint64        `json:"jitter_buffer_resync_dropped"`
+	RTPIngressQueueDropped         uint64        `json:"rtp_ingress_queue_dropped"`
+	SilenceSuppressionFrames       uint64        `json:"silence_suppression_frames"`
+	LastRTPReceivedAt              time.Time     `json:"last_rtp_received_at,omitempty"`
+	LastAudioDeliveredAt           time.Time     `json:"last_audio_delivered_at,omitempty"`
 	InboundQuality                 string        `json:"inbound_quality"`
 	InboundQualityScore            uint8         `json:"inbound_quality_score"`
 	InboundQualityWindow           time.Duration `json:"inbound_quality_window"`

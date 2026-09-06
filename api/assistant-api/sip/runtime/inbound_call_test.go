@@ -9,6 +9,7 @@ package sip_runtime
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -90,6 +91,34 @@ func TestInboundInviteIdentityFromRequestPreservesRoutingAndPartyIdentities(t *t
 	assert.Empty(t, identity.callAddress.To)
 	assert.Equal(t, request.From().Address.String(), identity.callAddress.FromURI)
 	assert.Equal(t, request.To().Address.String(), identity.callAddress.ToURI)
+}
+
+func TestInboundMediaSDPConfigUsesLocalPacketization(t *testing.T) {
+	server := newServerForCommandTests(t)
+	request := newInboundInviteRequest("inbound-answer-ptime")
+	request.SetBody([]byte(strings.Replace(
+		validInboundOfferSDP(),
+		"a=sendrecv\r\n",
+		"a=sendrecv\r\na=ptime:30\r\n",
+		1,
+	)))
+	mediaOffer, failure := newInboundMediaOffer(
+		server,
+		request,
+		"inbound INVITE",
+		LifecycleReasonInboundInviteFailed,
+		false,
+	)
+	require.Nil(t, failure)
+	media := newInboundMedia(server, newTestSession(t, "inbound-answer-ptime", CallDirectionInbound), mediaOffer)
+	media.externalIP = "127.0.0.1"
+	media.localRTPPort = 20000
+
+	sdpConfig := media.SDPConfig()
+
+	require.NotNil(t, sdpConfig)
+	assert.Equal(t, sdpDefaultPTimeMS, sdpConfig.PTime)
+	assert.Equal(t, 30*time.Millisecond, mediaOffer.sdpInfo.PacketizationDuration())
 }
 
 func TestNewCallAddressAcceptsOnlyPhoneFromUser(t *testing.T) {
@@ -1022,7 +1051,7 @@ func TestInboundCall_CancelAfterSessionRegistrationEndsLifecycle(t *testing.T) {
 	inboundCall.resolvedConfig = inboundConfig{config: bridgeTestConfig()}
 	createInboundSessionForTest(t, inboundCall)
 	server.registerSession(inboundCall.session, inboundCall.identity.callID)
-	server.setPendingInvite(inboundCall.inviteKey, request, transaction)
+	require.True(t, server.setPendingInviteIfAbsent(inboundCall.inviteKey, request, transaction))
 	server.markInviteCancelled(inboundCall.inviteKey)
 
 	cancelled := server.terminatePendingInvite(inboundCall.inviteKey, 487)
@@ -1052,7 +1081,7 @@ func TestInboundCall_CancelAfterRTPOwnershipEndsSession(t *testing.T) {
 	inboundCall.session.SetLocalRTP("127.0.0.1", 19000)
 	inboundCall.session.SetRTPHandler(&RTPHandler{})
 	server.registerSession(inboundCall.session, inboundCall.identity.callID)
-	server.setPendingInvite(inboundCall.inviteKey, request, transaction)
+	require.True(t, server.setPendingInviteIfAbsent(inboundCall.inviteKey, request, transaction))
 	server.markInviteCancelled(inboundCall.inviteKey)
 
 	cancelled := server.terminatePendingInvite(inboundCall.inviteKey, 487)

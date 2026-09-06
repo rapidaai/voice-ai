@@ -9,6 +9,7 @@ package sip_runtime
 import (
 	"errors"
 	"fmt"
+	"time"
 )
 
 var (
@@ -32,11 +33,12 @@ type outboundMedia struct {
 // OutboundMediaAnswer is the validated remote SDP answer from outbound 200 OK.
 // It is parsed before ACK so the call can fail cleanly if media is unusable.
 type OutboundMediaAnswer struct {
-	negotiatedCodec *Codec
-	remoteIP        string
-	remotePort      int
-	remoteRTCPIP    string
-	remoteRTCPPort  int
+	negotiatedCodec   *Codec
+	remoteIP          string
+	remotePort        int
+	remoteRTCPIP      string
+	remoteRTCPPort    int
+	packetizationTime time.Duration
 }
 
 // NewOutboundMedia creates the outbound RTP preparer for a SIP call.
@@ -110,11 +112,12 @@ func NewOutboundMediaAnswer(server *Server, dialog *outboundDialog) (OutboundMed
 	}
 
 	return OutboundMediaAnswer{
-		negotiatedCodec: sdpInfo.PreferredCodec,
-		remoteIP:        sdpInfo.ConnectionIP,
-		remotePort:      sdpInfo.AudioPort,
-		remoteRTCPIP:    sdpInfo.RTCPIP,
-		remoteRTCPPort:  sdpInfo.RTCPPort,
+		negotiatedCodec:   sdpInfo.PreferredCodec,
+		remoteIP:          sdpInfo.ConnectionIP,
+		remotePort:        sdpInfo.AudioPort,
+		remoteRTCPIP:      sdpInfo.RTCPIP,
+		remoteRTCPPort:    sdpInfo.RTCPPort,
+		packetizationTime: sdpInfo.PacketizationDuration(),
 	}, nil
 }
 
@@ -133,7 +136,7 @@ func (media *outboundMedia) ApplyAnswer(answer OutboundMediaAnswer) error {
 		}
 		media.rtpHandler.SetRemoteRTCPAddr(rtcpIP, answer.remoteRTCPPort)
 	}
-	media.rtpHandler.SetCodec(answer.negotiatedCodec)
+	media.rtpHandler.SetInboundMediaFormat(answer.negotiatedCodec, answer.packetizationTime)
 	media.session.SetRemoteRTP(answer.remoteIP, answer.remotePort)
 	if answer.negotiatedCodec != nil {
 		media.session.SetNegotiatedCodec(answer.negotiatedCodec.Name, int(answer.negotiatedCodec.ClockRate))

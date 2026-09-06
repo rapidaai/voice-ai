@@ -45,6 +45,9 @@ func (s *Server) replayRejectedInboundInvite(request *sip.Request, transaction s
 		contactHeader := s.listenConfig.SIPContactHeader()
 		response.AppendHeader(&contactHeader)
 	}
+	if rejectedInvite.retryAfter != "" {
+		response.AppendHeader(sip.NewHeader(sipHeaderRetryAfter, rejectedInvite.retryAfter))
+	}
 	if err := transaction.Respond(response); err != nil {
 		s.logger.Errorw("Failed to replay cached inbound INVITE rejection",
 			"error", err,
@@ -68,6 +71,10 @@ func (s *Server) recordRejectedInboundInvite(request *sip.Request, response *sip
 	now := time.Now()
 	key := inboundInviteKey{callID: request.CallID().Value(), fromTag: fromTag}
 
+	retryAfter := ""
+	if header := response.GetHeader(sipHeaderRetryAfter); header != nil {
+		retryAfter = header.Value()
+	}
 	s.mu.Lock()
 	if s.rejectedInvites == nil {
 		s.rejectedInvites = make(map[inboundInviteKey]inboundRejectedInvite)
@@ -79,6 +86,7 @@ func (s *Server) recordRejectedInboundInvite(request *sip.Request, response *sip
 		statusCode:     response.StatusCode,
 		reason:         response.Reason,
 		includeContact: response.Contact() != nil,
+		retryAfter:     retryAfter,
 		expiresAt:      now.Add(InboundRejectedInviteTTL),
 	}
 	s.mu.Unlock()

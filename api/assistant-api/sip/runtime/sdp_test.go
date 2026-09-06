@@ -2,6 +2,7 @@ package sip_runtime
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -71,4 +72,57 @@ func TestParseSDPDefaultsRTCPIPToConnectionIP(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "127.0.0.1", info.RTCPIP)
 	assert.Equal(t, 19001, info.RTCPPort)
+}
+
+func TestParseSDPParsesPTime(t *testing.T) {
+	info, err := (&Server{}).ParseSDP([]byte(
+		"v=0\r\n" +
+			"o=carrier 1 1 IN IP4 127.0.0.1\r\n" +
+			"s=call\r\n" +
+			"c=IN IP4 127.0.0.1\r\n" +
+			"t=0 0\r\n" +
+			"m=audio 19000 RTP/AVP 0 101\r\n" +
+			"a=ptime:30\r\n" +
+			"a=rtpmap:0 PCMU/8000\r\n" +
+			"a=sendrecv\r\n",
+	))
+
+	require.NoError(t, err)
+	assert.Equal(t, 30, info.PTime)
+	assert.Equal(t, 30*time.Millisecond, info.PacketizationDuration())
+}
+
+func TestParseSDPDefaultsPTimeWhenOmitted(t *testing.T) {
+	info, err := (&Server{}).ParseSDP([]byte(
+		"v=0\r\n" +
+			"o=carrier 1 1 IN IP4 127.0.0.1\r\n" +
+			"s=call\r\n" +
+			"c=IN IP4 127.0.0.1\r\n" +
+			"t=0 0\r\n" +
+			"m=audio 19000 RTP/AVP 0 101\r\n" +
+			"a=rtpmap:0 PCMU/8000\r\n" +
+			"a=sendrecv\r\n",
+	))
+
+	require.NoError(t, err)
+	assert.Equal(t, sdpDefaultPTimeMS, info.PTime)
+	assert.Equal(t, rtpDefaultPacketizationTime, info.PacketizationDuration())
+}
+
+func TestParseSDPDefaultsPTimeWhenMalformed(t *testing.T) {
+	info, err := (&Server{}).ParseSDP([]byte(
+		"v=0\r\n" +
+			"o=carrier 1 1 IN IP4 127.0.0.1\r\n" +
+			"s=call\r\n" +
+			"c=IN IP4 127.0.0.1\r\n" +
+			"t=0 0\r\n" +
+			"m=audio 19000 RTP/AVP 0 101\r\n" +
+			"a=ptime:not-a-number\r\n" +
+			"a=rtpmap:0 PCMU/8000\r\n" +
+			"a=sendrecv\r\n",
+	))
+
+	require.NoError(t, err)
+	assert.Equal(t, sdpDefaultPTimeMS, info.PTime)
+	assert.Equal(t, rtpDefaultPacketizationTime, info.PacketizationDuration())
 }

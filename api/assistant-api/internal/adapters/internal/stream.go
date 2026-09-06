@@ -11,6 +11,7 @@ import (
 	"time"
 
 	adapter_lifecycle "github.com/rapidaai/api/assistant-api/internal/adapters/lifecycle"
+	channel_base "github.com/rapidaai/api/assistant-api/internal/channel/base"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/types"
@@ -203,18 +204,47 @@ func (t *genericRequestor) OnCallCompletion(startTime time.Time) {
 		}
 	}
 
+	completionMetrics := []*protos.Metric{
+		t.metrics[type_enums.CONVERSATION_STATUS.String()],
+		{
+			Name:        observability.MetricConversationDuration,
+			Value:       fmt.Sprintf("%d", duration.Milliseconds()),
+			Description: "Conversation duration from first message to end",
+		},
+	}
+	if dropStatsProvider, ok := t.streamer.(interface {
+		DropStats() channel_base.StreamerDropStats
+	}); ok {
+		dropStats := dropStatsProvider.DropStats()
+		completionMetrics = append(completionMetrics,
+			&protos.Metric{
+				Name:        observability.MetricStreamerCriticalDrops,
+				Value:       fmt.Sprintf("%d", dropStats.CriticalInputDropped),
+				Description: "Critical input messages dropped by streamer queue",
+			},
+			&protos.Metric{
+				Name:        observability.MetricStreamerNormalDrops,
+				Value:       fmt.Sprintf("%d", dropStats.NormalInputDropped),
+				Description: "Normal input messages dropped by streamer queue",
+			},
+			&protos.Metric{
+				Name:        observability.MetricStreamerLowDrops,
+				Value:       fmt.Sprintf("%d", dropStats.LowInputDropped),
+				Description: "Low priority input messages dropped by streamer queue",
+			},
+			&protos.Metric{
+				Name:        observability.MetricStreamerOutputDrops,
+				Value:       fmt.Sprintf("%d", dropStats.OutputDropped),
+				Description: "Output messages dropped by streamer queue",
+			},
+		)
+	}
+
 	t.OnPacket(context.Background(),
 		internal_type.ObservabilityMetricRecordPacket{
 			ContextID: fmt.Sprintf("%d", conv.Id),
 			Scope:     internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.NewConversationMetricRecord([]*protos.Metric{
-				t.metrics[type_enums.CONVERSATION_STATUS.String()],
-				{
-					Name:        observability.MetricConversationDuration,
-					Value:       fmt.Sprintf("%d", duration.Milliseconds()),
-					Description: "Conversation duration from first message to end",
-				},
-			}),
+			Record:    observability.NewConversationMetricRecord(completionMetrics),
 		},
 		internal_type.ObservabilityEventRecordPacket{
 			ContextID: t.GetID(),

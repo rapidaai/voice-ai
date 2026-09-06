@@ -106,6 +106,9 @@ func TestCheckedIntegerConversions(t *testing.T) {
 	if _, err := Int64ToUint64(-1); err == nil {
 		t.Fatal("expected int64 to uint64 signedness error")
 	}
+	if value, err := Int64ToInt(42); err != nil || value != 42 {
+		t.Fatalf("Int64ToInt() = %d, %v", value, err)
+	}
 	if value, err := Uint32ToInt(42); err != nil || value != 42 {
 		t.Fatalf("Uint32ToInt() = %d, %v", value, err)
 	}

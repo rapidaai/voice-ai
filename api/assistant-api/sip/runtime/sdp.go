@@ -10,8 +10,10 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/rapidaai/pkg/utils"
+	"github.com/rapidaai/pkg/validator"
 )
 
 const (
@@ -19,6 +21,10 @@ const (
 	sdpAudioPrefix        = "m=audio "
 	sdpRTPMapPrefix       = "a=rtpmap:"
 	sdpRTCPPrefix         = "a=rtcp:"
+	sdpPTimePrefix        = "a=ptime:"
+	sdpDefaultPTimeMS     = 20
+	sdpMinPTimeMS         = 5
+	sdpMaxPTimeMS         = 60
 )
 
 // Codec represents an audio codec with its RTP configuration
@@ -63,6 +69,7 @@ type SDPMediaInfo struct {
 	RTCPPort       int
 	PayloadTypes   []uint8
 	PreferredCodec *Codec
+	PTime          int
 	Direction      SDPDirection // sendrecv, sendonly, recvonly, inactive
 }
 
@@ -79,6 +86,13 @@ func (s *SDPMediaInfo) IsHold() bool {
 		return true
 	}
 	return false
+}
+
+func (s *SDPMediaInfo) PacketizationDuration() time.Duration {
+	if s == nil || !validator.Between(s.PTime, sdpMinPTimeMS, sdpMaxPTimeMS) {
+		return rtpDefaultPacketizationTime
+	}
+	return time.Duration(s.PTime) * time.Millisecond
 }
 
 // SDPConfig holds configuration for SDP generation
@@ -197,6 +211,7 @@ func (s *Server) ParseSDP(sdpBody []byte) (*SDPMediaInfo, error) {
 
 	info := &SDPMediaInfo{
 		PayloadTypes: make([]uint8, 0),
+		PTime:        sdpDefaultPTimeMS,
 		Direction:    SDPDirectionSendRecv, // default per RFC 3264
 	}
 
@@ -241,6 +256,12 @@ func (s *Server) ParseSDP(sdpBody []byte) (*SDPMediaInfo, error) {
 			}
 			if len(parts) >= 4 && parts[1] == "IN" && parts[2] == "IP4" {
 				info.RTCPIP = parts[3]
+			}
+
+		case strings.HasPrefix(line, sdpPTimePrefix):
+			ptime, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(line, sdpPTimePrefix)))
+			if err == nil && validator.Between(ptime, sdpMinPTimeMS, sdpMaxPTimeMS) {
+				info.PTime = ptime
 			}
 
 		case strings.HasPrefix(line, sdpRTPMapPrefix):

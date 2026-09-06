@@ -194,6 +194,84 @@ func TestRTPHandlerRecordsCompoundRTCPPacketCount(t *testing.T) {
 	assert.Equal(t, 2, handler.recordRTCPPacket(&compound, time.Now()))
 }
 
+func TestRTPHandlerPopulatesStableRTPJitter(t *testing.T) {
+	handler := newTestRTPHandler()
+	base := time.Unix(1_700_000_000, 0)
+
+	handler.rtcpReception.recordRTP(testRTCPRTPPacket(1, 0, 99), CodecPCMU.ClockRate, base)
+	handler.rtcpReception.recordRTP(testRTCPRTPPacket(2, 160, 99), CodecPCMU.ClockRate, base.Add(20*time.Millisecond))
+	handler.rtcpReception.recordRTP(testRTCPRTPPacket(3, 320, 99), CodecPCMU.ClockRate, base.Add(40*time.Millisecond))
+
+	stats := handler.GetDetailedStats()
+	assert.Zero(t, stats.RTCPJitter)
+	assert.Zero(t, stats.Jitter)
+}
+
+func TestRTPHandlerPopulatesVariableRTPJitter(t *testing.T) {
+	handler := newTestRTPHandler()
+	base := time.Unix(1_700_000_000, 0)
+
+	handler.rtcpReception.recordRTP(testRTCPRTPPacket(1, 0, 99), CodecPCMU.ClockRate, base)
+	handler.rtcpReception.recordRTP(testRTCPRTPPacket(2, 160, 99), CodecPCMU.ClockRate, base.Add(30*time.Millisecond))
+
+	stats := handler.GetDetailedStats()
+	assert.Equal(t, uint32(5), stats.RTCPJitter)
+	assert.Equal(t, 625*time.Microsecond, stats.Jitter)
+}
+
+func TestRTPHandlerRTPJitterIgnoresReorderedPackets(t *testing.T) {
+	handler := newTestRTPHandler()
+	base := time.Unix(1_700_000_000, 0)
+
+	handler.rtcpReception.recordRTP(testRTCPRTPPacket(1, 0, 99), CodecPCMU.ClockRate, base)
+	handler.rtcpReception.recordRTP(testRTCPRTPPacket(2, 160, 99), CodecPCMU.ClockRate, base.Add(20*time.Millisecond))
+	handler.rtcpReception.recordRTP(testRTCPRTPPacket(4, 480, 99), CodecPCMU.ClockRate, base.Add(60*time.Millisecond))
+	handler.rtcpReception.recordRTP(testRTCPRTPPacket(3, 320, 99), CodecPCMU.ClockRate, base.Add(time.Second))
+
+	stats := handler.GetDetailedStats()
+	assert.Zero(t, stats.RTCPJitter)
+	assert.Zero(t, stats.Jitter)
+}
+
+func TestRTPHandlerRTPJitterResetsOnSSRCChange(t *testing.T) {
+	handler := newTestRTPHandler()
+	base := time.Unix(1_700_000_000, 0)
+
+	handler.rtcpReception.recordRTP(testRTCPRTPPacket(1, 0, 99), CodecPCMU.ClockRate, base)
+	handler.rtcpReception.recordRTP(testRTCPRTPPacket(2, 160, 99), CodecPCMU.ClockRate, base.Add(30*time.Millisecond))
+	require.NotZero(t, handler.GetDetailedStats().Jitter)
+
+	handler.rtcpReception.recordRTP(testRTCPRTPPacket(1, 0, 100), CodecPCMU.ClockRate, base.Add(time.Second))
+
+	stats := handler.GetDetailedStats()
+	assert.Zero(t, stats.RTCPJitter)
+	assert.Zero(t, stats.Jitter)
+}
+
+func TestRTPHandlerRTPJitterResetsOnMediaFormatChange(t *testing.T) {
+	handler := newTestRTPHandler()
+	handler.codec = &CodecPCMU
+	base := time.Unix(1_700_000_000, 0)
+
+	handler.rtcpReception.recordRTP(testRTCPRTPPacket(1, 0, 99), CodecPCMU.ClockRate, base)
+	handler.rtcpReception.recordRTP(testRTCPRTPPacket(2, 160, 99), CodecPCMU.ClockRate, base.Add(30*time.Millisecond))
+	require.NotZero(t, handler.GetDetailedStats().Jitter)
+
+	handler.SetInboundMediaFormat(&CodecPCMU, rtpDefaultPacketizationTime)
+
+	stats := handler.GetDetailedStats()
+	assert.Zero(t, stats.RTCPJitter)
+	assert.Zero(t, stats.Jitter)
+}
+
+func testRTCPRTPPacket(sequenceNumber uint16, timestamp uint32, ssrc uint32) *RTPPacket {
+	return &RTPPacket{
+		SequenceNumber: sequenceNumber,
+		Timestamp:      timestamp,
+		SSRC:           ssrc,
+	}
+}
+
 func reserveUDPPortPair(t *testing.T) (int, int) {
 	t.Helper()
 

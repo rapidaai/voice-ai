@@ -72,6 +72,45 @@ func TestSIPEngineDoesNotPassPostgresToMiddleware(t *testing.T) {
 	})
 }
 
+func TestSIPEnginePassesCallAdmissionConfigToRuntime(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "sip.go", nil, 0)
+	require.NoError(t, err)
+
+	expectedFields := map[string]bool{
+		"MaxConcurrentCalls": false,
+		"CallAdmissionCPS":   false,
+		"CallAdmissionBurst": false,
+	}
+
+	ast.Inspect(file, func(node ast.Node) bool {
+		composite, ok := node.(*ast.CompositeLit)
+		if !ok {
+			return true
+		}
+		selector, ok := composite.Type.(*ast.SelectorExpr)
+		if !ok || selector.Sel.Name != "ServerConfig" {
+			return true
+		}
+		for _, element := range composite.Elts {
+			keyValue, ok := element.(*ast.KeyValueExpr)
+			if !ok {
+				continue
+			}
+			field, ok := keyValue.Key.(*ast.Ident)
+			if ok {
+				if _, exists := expectedFields[field.Name]; exists {
+					expectedFields[field.Name] = true
+				}
+			}
+		}
+		return false
+	})
+
+	for field, found := range expectedFields {
+		assert.True(t, found, "runtime ServerConfig missing %s", field)
+	}
+}
+
 func TestSIPEngineUsesConfiguredServiceID(t *testing.T) {
 	engine := &SIPEngine{cfg: &assistant_config.AssistantConfig{AppConfig: app_config.AppConfig{ServiceID: 9007}}}
 	assert.Equal(t, uint64(9007), engine.cfg.ServiceID)

@@ -567,7 +567,7 @@ func TestSIPCommand_CANCEL_PendingInvite_Sends200And487(t *testing.T) {
 
 	inviteReq := newSIPRequest(sip.INVITE, "call-cancel-pending")
 	inviteTx := newTestServerTx()
-	s.setPendingInvite(inboundInviteKey{callID: "call-cancel-pending", fromTag: "fromtag"}, inviteReq, inviteTx)
+	require.True(t, s.setPendingInviteIfAbsent(inboundInviteKey{callID: "call-cancel-pending", fromTag: "fromtag"}, inviteReq, inviteTx))
 
 	cancelReq := newSIPRequest(sip.CANCEL, "call-cancel-pending")
 	cancelTx := newTestServerTx()

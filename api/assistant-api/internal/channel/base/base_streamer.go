@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
@@ -39,6 +40,19 @@ type BaseStreamer struct {
 	InputCh    chan internal_type.Stream
 	LowCh      chan internal_type.Stream
 	OutputCh   chan internal_type.Stream
+
+	criticalInputDropped atomic.Uint64
+	normalInputDropped   atomic.Uint64
+	lowInputDropped      atomic.Uint64
+	outputDropped        atomic.Uint64
+}
+
+// StreamerDropStats reports messages dropped by BaseStreamer priority queues.
+type StreamerDropStats struct {
+	CriticalInputDropped uint64
+	NormalInputDropped   uint64
+	LowInputDropped      uint64
+	OutputDropped        uint64
 }
 
 // NewBaseStreamer creates transport channels with default capacities.
@@ -72,6 +86,7 @@ func (s *BaseStreamer) Input(msg internal_type.Stream) {
 		select {
 		case s.CriticalCh <- msg:
 		default:
+			s.criticalInputDropped.Add(1)
 			if s.Logger != nil {
 				s.Logger.Warnw("Critical input channel full, dropping message", "type", fmt.Sprintf("%T", msg))
 			}
@@ -82,6 +97,7 @@ func (s *BaseStreamer) Input(msg internal_type.Stream) {
 		select {
 		case s.LowCh <- msg:
 		default:
+			s.lowInputDropped.Add(1)
 			if s.Logger != nil {
 				s.Logger.Warnw("Low input channel full, dropping message", "type", fmt.Sprintf("%T", msg))
 			}
@@ -90,6 +106,7 @@ func (s *BaseStreamer) Input(msg internal_type.Stream) {
 		select {
 		case s.InputCh <- msg:
 		default:
+			s.normalInputDropped.Add(1)
 			if s.Logger != nil {
 				s.Logger.Warnw("Normal input channel full, dropping message", "type", fmt.Sprintf("%T", msg))
 			}
@@ -101,9 +118,23 @@ func (s *BaseStreamer) Output(msg internal_type.Stream) {
 	select {
 	case s.OutputCh <- msg:
 	default:
+		s.outputDropped.Add(1)
 		if s.Logger != nil {
 			s.Logger.Warnw("Output channel full, dropping message", "type", fmt.Sprintf("%T", msg))
 		}
+	}
+}
+
+// DropStats returns a lock-free snapshot of BaseStreamer queue drops.
+func (s *BaseStreamer) DropStats() StreamerDropStats {
+	if s == nil {
+		return StreamerDropStats{}
+	}
+	return StreamerDropStats{
+		CriticalInputDropped: s.criticalInputDropped.Load(),
+		NormalInputDropped:   s.normalInputDropped.Load(),
+		LowInputDropped:      s.lowInputDropped.Load(),
+		OutputDropped:        s.outputDropped.Load(),
 	}
 }
 

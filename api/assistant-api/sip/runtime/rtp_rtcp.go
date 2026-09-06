@@ -34,6 +34,8 @@ const (
 type rtpRTCPReceptionStats struct {
 	mu sync.Mutex
 
+	ssrc             uint32
+	clockRate        uint32
 	started          bool
 	baseSequence     uint32
 	highestSequence  uint32
@@ -58,6 +60,7 @@ type rtpRTCPReceptionSnapshot struct {
 	FractionLost      uint8
 	PacketsLost       uint32
 	Jitter            uint32
+	JitterDuration    time.Duration
 	RemoteLoss        uint8
 	RemotePacketsLost uint32
 	RemoteJitter      uint32
@@ -217,20 +220,18 @@ func (s *rtpRTCPReceptionStats) recordRTP(packet *RTPPacket, clockRate uint32, a
 		clockRate = rtpDefaultClockRate
 	}
 
-	arrivalTimestamp := arrivedAt.UnixNano() * int64(clockRate) / rtcpNanoseconds
-	transit := arrivalTimestamp - int64(packet.Timestamp)
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if !s.started {
+	if !s.started || s.ssrc != packet.SSRC {
+		s.resetRTPLocked(packet.SSRC, clockRate)
 		sequence := uint32(packet.SequenceNumber)
 		s.started = true
 		s.baseSequence = sequence
 		s.highestSequence = sequence
 		s.previousSequence = packet.SequenceNumber
-		s.previousTransit = transit
 		s.receivedPackets = 1
+		s.previousTransit = rtpTransit(packet, clockRate, arrivedAt)
 		return
 	}
 
@@ -238,18 +239,62 @@ func (s *rtpRTCPReceptionStats) recordRTP(packet *RTPPacket, clockRate uint32, a
 		s.sequenceCycles += rtpSequenceCycle
 	}
 	extendedSequence := s.sequenceCycles | uint32(packet.SequenceNumber)
+	isLatePacket := extendedSequence <= s.highestSequence
 	if extendedSequence > s.highestSequence {
 		s.highestSequence = extendedSequence
 	}
 	s.previousSequence = packet.SequenceNumber
 	s.receivedPackets++
+	if isLatePacket {
+		return
+	}
 
+	transit := rtpTransit(packet, clockRate, arrivedAt)
 	transitDelta := transit - s.previousTransit
 	if transitDelta < 0 {
 		transitDelta = -transitDelta
 	}
 	s.previousTransit = transit
 	s.jitter += (float64(transitDelta) - s.jitter) / 16
+}
+
+func (s *rtpRTCPReceptionStats) resetRTP(clockRate uint32) {
+	if clockRate == 0 {
+		clockRate = rtpDefaultClockRate
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.resetRTPLocked(0, clockRate)
+}
+
+func (s *rtpRTCPReceptionStats) resetRTPLocked(ssrc uint32, clockRate uint32) {
+	s.ssrc = ssrc
+	s.clockRate = clockRate
+	s.started = false
+	s.baseSequence = 0
+	s.highestSequence = 0
+	s.receivedPackets = 0
+	s.reportExpected = 0
+	s.reportReceived = 0
+	s.previousSequence = 0
+	s.sequenceCycles = 0
+	s.previousTransit = 0
+	s.jitter = 0
+}
+
+func rtpTransit(packet *RTPPacket, clockRate uint32, arrivedAt time.Time) int64 {
+	clockRateInt := utils.Uint32ToInt64(clockRate)
+	arrivalSeconds := arrivedAt.Unix() * clockRateInt
+	arrivalNanoseconds, err := utils.IntToUint64(arrivedAt.Nanosecond())
+	if err != nil {
+		return 0
+	}
+	arrivalFraction, err := utils.Uint64ToInt64(arrivalNanoseconds * uint64(clockRate) / rtcpNanosecondsUint64)
+	if err != nil {
+		return 0
+	}
+	packetTimestamp := utils.Uint32ToInt64(packet.Timestamp)
+	return arrivalSeconds + arrivalFraction - packetTimestamp
 }
 
 func (s *rtpRTCPReceptionStats) recordSenderReport(report *rtcp.SenderReport, receivedAt time.Time) {
@@ -353,15 +398,32 @@ func (s *rtpRTCPReceptionStats) snapshot() rtpRTCPReceptionSnapshot {
 		fractionLost, _ = utils.Uint32ToUint8(min((packetsLost<<8)/expected, rtcpMaxUint8))
 	}
 
+	jitter := uint32(s.jitter)
 	return rtpRTCPReceptionSnapshot{
 		FractionLost:      fractionLost,
 		PacketsLost:       packetsLost,
-		Jitter:            uint32(s.jitter),
+		Jitter:            jitter,
+		JitterDuration:    rtpJitterDuration(jitter, s.clockRate),
 		RemoteLoss:        s.lastRemoteFractionLost,
 		RemotePacketsLost: s.lastRemotePacketsLost,
 		RemoteJitter:      s.lastRemoteJitter,
 		RoundTripTime:     s.roundTripTime,
 	}
+}
+
+func rtpJitterDuration(jitter uint32, clockRate uint32) time.Duration {
+	if jitter == 0 {
+		return 0
+	}
+	if clockRate == 0 {
+		clockRate = rtpDefaultClockRate
+	}
+	nanoseconds := uint64(jitter) * rtcpNanosecondsUint64 / uint64(clockRate)
+	duration, err := utils.Uint64ToInt64(nanoseconds)
+	if err != nil {
+		return 0
+	}
+	return time.Duration(duration)
 }
 
 func rtcpNTP(t time.Time) uint64 {

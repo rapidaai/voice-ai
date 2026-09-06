@@ -122,15 +122,17 @@ func (inboundCall *Inbound) HandleInvite() {
 	if inboundCall.server.replayRejectedInboundInvite(inboundCall.request, inboundCall.transaction) {
 		return
 	}
-
-	setupTimings.TryingSentAt = time.Now()
-	inboundCall.server.sendResponse(inboundCall.transaction, inboundCall.request, 100)
-
-	inboundCall.server.setPendingInvite(inboundCall.inviteKey, inboundCall.request, inboundCall.transaction)
+	if !inboundCall.server.setPendingInviteIfAbsent(inboundCall.inviteKey, inboundCall.request, inboundCall.transaction) {
+		inboundCall.server.sendResponse(inboundCall.transaction, inboundCall.request, 100)
+		return
+	}
 	defer func() {
 		inboundCall.server.clearPendingInvite(inboundCall.inviteKey)
 		inboundCall.server.clearInviteCancelled(inboundCall.inviteKey)
 	}()
+
+	setupTimings.TryingSentAt = time.Now()
+	inboundCall.server.sendResponse(inboundCall.transaction, inboundCall.request, 100)
 
 	inboundCall.server.mu.RLock()
 	existingSession, isReInvite := inboundCall.server.sessions[inboundCall.identity.callID]
@@ -144,6 +146,26 @@ func (inboundCall *Inbound) HandleInvite() {
 		inboundCall.server.terminatePendingInvite(inboundCall.inviteKey, 487)
 		return
 	}
+
+	releaseAdmission, err := inboundCall.server.acquireNewCallAdmission()
+	if err != nil {
+		inboundCall.server.rejectInboundInvite(
+			inboundCall.request,
+			inboundCall.transaction,
+			inboundCall.identity.callID,
+			503,
+			inboundFailureSetup,
+			LifecycleReasonInboundInviteFailed,
+			err,
+		)
+		return
+	}
+	admissionReleasePending := true
+	defer func() {
+		if admissionReleasePending {
+			releaseAdmission()
+		}
+	}()
 
 	mediaOffer, mediaFailure := newInboundMediaOffer(
 		inboundCall.server,
@@ -211,7 +233,8 @@ func (inboundCall *Inbound) HandleInvite() {
 	}
 	inboundCall.session = session
 
-	inboundCall.server.registerSession(inboundCall.session, inboundCall.identity.callID)
+	inboundCall.server.registerSessionWithAdmission(inboundCall.session, inboundCall.identity.callID, true)
+	admissionReleasePending = false
 	if inboundCall.cancelBeforeAnswer(LifecycleReasonInviteCancelled) {
 		return
 	}

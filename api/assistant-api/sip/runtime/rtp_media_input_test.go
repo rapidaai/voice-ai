@@ -109,6 +109,30 @@ func TestNewRTPHandlerDoesNotMutateConfig(t *testing.T) {
 	assert.Zero(t, config.MediaTimeout)
 }
 
+func TestNewRTPHandlerInitializesInputPacketizationTime(t *testing.T) {
+	reserved, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
+	require.NoError(t, err)
+	port := reserved.LocalAddr().(*net.UDPAddr).Port
+	require.NoError(t, reserved.Close())
+
+	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
+		LocalIP:           "127.0.0.1",
+		RTPPortRangeStart: port,
+		RTPPortRangeEnd:   port,
+		PayloadType:       CodecPCMU.PayloadType,
+		ClockRate:         CodecPCMU.ClockRate,
+		PacketizationTime: 30 * time.Millisecond,
+	})
+	require.NoError(t, err)
+	defer handler.Stop()
+
+	handler.mu.RLock()
+	inputJitter := handler.inputJitter
+	handler.mu.RUnlock()
+	require.NotNil(t, inputJitter)
+	assert.Equal(t, 30*time.Millisecond, inputJitter.playoutTimeout())
+}
+
 func TestRTPConfigValidateRejectsNil(t *testing.T) {
 	var config *RTPConfig
 
@@ -191,6 +215,8 @@ func TestRTPHandler_ReceiveLoopDropsNonAudioPayload(t *testing.T) {
 		stats := handler.GetDetailedStats()
 		return stats.PacketsReceived == 1 &&
 			stats.PacketsDropped == 1 &&
+			stats.InvalidPackets == 1 &&
+			stats.PacketsLost == 0 &&
 			stats.PacketsDelivered == 0
 	}, time.Second, 10*time.Millisecond)
 
@@ -243,21 +269,90 @@ func TestRTPHandler_ReceiveLoopAcceptsNegotiatedAudioPayload(t *testing.T) {
 	assert.Zero(t, stats.PacketsDropped)
 }
 
+func TestRTPHandler_ReceiveLoopResetsInputJitterOnSSRCChange(t *testing.T) {
+	reserved, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
+	require.NoError(t, err)
+	port := reserved.LocalAddr().(*net.UDPAddr).Port
+	require.NoError(t, reserved.Close())
+
+	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
+		LocalIP:           "127.0.0.1",
+		RTPPortRangeStart: port,
+		RTPPortRangeEnd:   port,
+		PayloadType:       CodecPCMU.PayloadType,
+		ClockRate:         CodecPCMU.ClockRate,
+		PacketizationTime: 20 * time.Millisecond,
+	})
+	require.NoError(t, err)
+	defer handler.Stop()
+	handler.Start()
+
+	sender, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
+	require.NoError(t, err)
+	defer sender.Close()
+
+	first := handler.serializeRTPPacket(&RTPPacket{
+		Version:        rtpVersion,
+		PayloadType:    CodecPCMU.PayloadType,
+		SequenceNumber: 1,
+		Timestamp:      0,
+		SSRC:           1111,
+		Payload:        []byte{0x01},
+	})
+	_, err = sender.WriteToUDP(first, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
+	require.NoError(t, err)
+
+	select {
+	case audio := <-handler.AudioIn():
+		assert.Equal(t, []byte{0x01}, audio)
+	case <-time.After(time.Second):
+		t.Fatal("expected first SSRC audio")
+	}
+
+	second := handler.serializeRTPPacket(&RTPPacket{
+		Version:        rtpVersion,
+		PayloadType:    CodecPCMU.PayloadType,
+		SequenceNumber: 1,
+		Timestamp:      0,
+		SSRC:           2222,
+		Payload:        []byte{0x02},
+	})
+	_, err = sender.WriteToUDP(second, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
+	require.NoError(t, err)
+
+	select {
+	case audio := <-handler.AudioIn():
+		assert.Equal(t, []byte{0x02}, audio)
+	case <-time.After(time.Second):
+		t.Fatal("expected second SSRC audio")
+	}
+
+	stats := handler.GetDetailedStats()
+	assert.Equal(t, uint64(2), stats.PacketsDelivered)
+	assert.Zero(t, stats.LateOrDuplicatePackets)
+}
+
 func TestRTPHandler_EnqueueInboundAudioCountsInputQueueDrops(t *testing.T) {
 	handler := newTestRTPHandler()
 	handler.codec = &CodecPCMU
-	handler.inputJitter = newRTPInputJitterBuffer(&CodecPCMU)
+	handler.inputJitter = newRTPInputJitterBuffer(&CodecPCMU, rtpDefaultPacketizationTime)
 	handler.audioInChan = make(chan []byte, 1)
 	handler.audioInChan <- []byte{0x01}
 
 	stopped, enqueued := handler.enqueueInboundAudio([][]byte{{0x02}})
 
 	assert.False(t, stopped)
-	assert.False(t, enqueued)
+	assert.True(t, enqueued)
+	assert.Equal(t, []byte{0x02}, <-handler.audioInChan)
 	stats := handler.GetDetailedStats()
-	assert.Equal(t, uint64(0), stats.PacketsDelivered)
+	assert.Equal(t, uint64(1), stats.PacketsDelivered)
 	assert.Equal(t, uint64(1), stats.PacketsDropped)
 	assert.Equal(t, uint64(1), stats.AudioInputDropped)
+	assert.Equal(t, uint64(1), stats.RTPIngressQueueDropped)
+	assert.Zero(t, stats.PacketsLost)
+	assert.Zero(t, stats.NetworkPacketsLost)
+	assert.True(t, stats.LastRTPReceivedAt.IsZero())
+	assert.False(t, stats.LastAudioDeliveredAt.IsZero())
 }
 
 func TestRTPHandler_EnqueueInboundAudioReportsEnqueueState(t *testing.T) {
@@ -268,21 +363,44 @@ func TestRTPHandler_EnqueueInboundAudioReportsEnqueueState(t *testing.T) {
 	stopped, enqueued := handler.enqueueInboundAudio([][]byte{{0x02}})
 
 	assert.False(t, stopped)
-	assert.False(t, enqueued)
+	assert.True(t, enqueued)
+	assert.Equal(t, []byte{0x02}, <-handler.audioInChan)
 	stats := handler.GetDetailedStats()
-	assert.Equal(t, uint64(0), stats.PacketsDelivered)
+	assert.Equal(t, uint64(1), stats.PacketsDelivered)
 	assert.Equal(t, uint64(1), stats.PacketsDropped)
 	assert.Equal(t, uint64(1), stats.AudioInputDropped)
+	assert.Equal(t, uint64(1), stats.RTPIngressQueueDropped)
+	assert.Zero(t, stats.NetworkPacketsLost)
 
-	<-handler.audioInChan
 	stopped, enqueued = handler.enqueueInboundAudio([][]byte{{0x03}})
 
 	assert.False(t, stopped)
 	assert.True(t, enqueued)
 	stats = handler.GetDetailedStats()
-	assert.Equal(t, uint64(1), stats.PacketsDelivered)
+	assert.Equal(t, uint64(2), stats.PacketsDelivered)
 	assert.Equal(t, uint64(1), stats.PacketsDropped)
 	assert.Equal(t, uint64(1), stats.AudioInputDropped)
+	assert.Equal(t, uint64(1), stats.RTPIngressQueueDropped)
+	assert.Zero(t, stats.NetworkPacketsLost)
+}
+
+func TestRTPHandler_DetailedStatsSeparateTransportAndDeliveryLiveness(t *testing.T) {
+	handler := newTestRTPHandler()
+	handler.audioInChan = make(chan []byte, 1)
+
+	handler.markInboundRTPReceived(time.Now())
+
+	stats := handler.GetDetailedStats()
+	assert.False(t, stats.LastRTPReceivedAt.IsZero())
+	assert.True(t, stats.LastAudioDeliveredAt.IsZero())
+
+	stopped, enqueued := handler.enqueueInboundAudio([][]byte{{0x01}})
+
+	require.False(t, stopped)
+	require.True(t, enqueued)
+	stats = handler.GetDetailedStats()
+	assert.False(t, stats.LastRTPReceivedAt.IsZero())
+	assert.False(t, stats.LastAudioDeliveredAt.IsZero())
 }
 
 func TestRTPHandler_EnqueueInboundAudioReportsPartialEnqueue(t *testing.T) {
@@ -294,17 +412,52 @@ func TestRTPHandler_EnqueueInboundAudioReportsPartialEnqueue(t *testing.T) {
 
 	assert.False(t, stopped)
 	assert.True(t, enqueued)
+	assert.Equal(t, []byte{0x02}, <-handler.audioInChan)
 	stats := handler.GetDetailedStats()
-	assert.Equal(t, uint64(1), stats.PacketsDelivered)
+	assert.Equal(t, uint64(2), stats.PacketsDelivered)
 	assert.Equal(t, uint64(1), stats.PacketsDropped)
 	assert.Equal(t, uint64(1), stats.AudioInputDropped)
+	assert.Equal(t, uint64(1), stats.RTPIngressQueueDropped)
+	assert.Zero(t, stats.NetworkPacketsLost)
 	assert.Equal(t, rtpInboundQualityPoor, stats.InboundQuality)
 	assert.Equal(t, uint64(2), stats.InboundWindowPacketsReceived)
-	assert.Equal(t, uint64(1), stats.InboundWindowPacketsDelivered)
+	assert.Equal(t, uint64(2), stats.InboundWindowPacketsDelivered)
 	assert.Equal(t, uint64(1), stats.InboundWindowAudioInputDropped)
 	assert.InDelta(t, 0.5, stats.InboundLossRate, 0.0001)
-	assert.InDelta(t, 0.5, stats.InboundDropRate, 0.0001)
-	assert.InDelta(t, 0.5, stats.InboundDeliveryRate, 0.0001)
+	assert.InDelta(t, 1.0/3.0, stats.InboundDropRate, 0.0001)
+	assert.InDelta(t, 2.0/3.0, stats.InboundDeliveryRate, 0.0001)
+}
+
+func TestRTPHandler_DetailedStatsSeparateInboundDropCategories(t *testing.T) {
+	handler := newTestRTPHandler()
+	buffer := newRTPInputJitterBuffer(&CodecPCMU, rtpDefaultPacketizationTime)
+	handler.inputJitter = buffer
+	handler.audioInChan = make(chan []byte, 1)
+	handler.audioInChan <- []byte{0x01}
+
+	require.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(1, 0, 0x01)))
+	require.Len(t, buffer.push(testRTPInputPacket(2, 640, 0x02)), 4)
+	assert.Empty(t, buffer.push(testRTPInputPacket(4, 960, 0x04)))
+	require.Len(t, buffer.flushOnPlayoutTimeout(), 2)
+	assert.Empty(t, buffer.push(testRTPInputPacket(4, 960, 0x09)))
+	assert.Empty(t, buffer.push(testRTPInputPacket(6, 1120, 0x06)))
+	require.Equal(t, [][]byte{{0x10}}, buffer.push(testRTPInputPacket(1000, 159840, 0x10)))
+
+	handler.packetsDropped.Add(1)
+	handler.invalidPackets.Add(1)
+	stopped, enqueued := handler.enqueueInboundAudio([][]byte{{0x02}})
+	require.False(t, stopped)
+	require.True(t, enqueued)
+
+	stats := handler.GetDetailedStats()
+	assert.Equal(t, uint64(1), stats.PacketsLost)
+	assert.Equal(t, uint64(1), stats.NetworkPacketsLost)
+	assert.Equal(t, uint64(1), stats.LateOrDuplicatePackets)
+	assert.Equal(t, uint64(1), stats.InvalidPackets)
+	assert.Equal(t, uint64(1), stats.JitterBufferResyncDropped)
+	assert.Equal(t, uint64(1), stats.RTPIngressQueueDropped)
+	assert.Equal(t, uint64(3), stats.SilenceSuppressionFrames)
+	assert.Equal(t, uint64(4), stats.PacketsDropped)
 }
 
 func TestRTPHandler_StopOwnsLoopShutdownBeforeClosingChannels(t *testing.T) {
@@ -625,7 +778,7 @@ func TestRTPHandler_MediaTimeoutUsesRegularWindowAfterAudio(t *testing.T) {
 
 	handler.EnableMediaTimeout(true)
 	time.Sleep(30 * time.Millisecond)
-	handler.markInboundAudioPacketReceived()
+	handler.markInboundRTPReceived(time.Now())
 
 	select {
 	case <-handler.MediaTimeout():
@@ -656,7 +809,7 @@ func TestRTPHandler_MediaTimeoutStaysOpenWhileAudioFlows(t *testing.T) {
 	handler.EnableMediaTimeout(true)
 
 	for i := 0; i < 5; i++ {
-		handler.markInboundAudioPacketReceived()
+		handler.markInboundRTPReceived(time.Now())
 		select {
 		case <-handler.MediaTimeout():
 			t.Fatal("media timeout fired while audio was flowing")

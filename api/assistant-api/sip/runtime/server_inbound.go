@@ -18,6 +18,8 @@ const (
 	defaultInboundFinalResponseRetryInitial = 500 * time.Millisecond
 	defaultInboundFinalResponseRetryMax     = 4 * time.Second
 	defaultInboundRingingInterval           = time.Second
+	sipHeaderRetryAfter                     = "Retry-After"
+	sipCapacityRetryAfterSeconds            = 1
 )
 
 func (s *Server) handleInvite(req *sip.Request, tx sip.ServerTransaction) {
@@ -97,13 +99,15 @@ func (s *Server) handleReInvite(req *sip.Request, tx sip.ServerTransaction, sess
 		if currentCodec == nil || currentCodec.PayloadType != negotiatedCodec.PayloadType {
 			rtpHandler := session.GetRTPHandler()
 			if rtpHandler != nil {
-				rtpHandler.SetCodec(negotiatedCodec)
+				rtpHandler.SetInboundMediaFormat(negotiatedCodec, sdpInfo.PacketizationDuration())
 			}
 			session.SetNegotiatedCodec(negotiatedCodec.Name, int(negotiatedCodec.ClockRate))
 			s.logger.Infow("Codec updated from re-INVITE",
 				"call_id", callID,
 				"new_codec", negotiatedCodec.Name,
 				"payload_type", negotiatedCodec.PayloadType)
+		} else if rtpHandler := session.GetRTPHandler(); rtpHandler != nil {
+			rtpHandler.SetInboundMediaFormat(negotiatedCodec, sdpInfo.PacketizationDuration())
 		}
 	} else {
 		s.logger.Infow("re-INVITE indicates hold — keeping current RTP target",
@@ -328,13 +332,15 @@ func (s *Server) handleUpdate(req *sip.Request, tx sip.ServerTransaction) {
 			if currentCodec == nil || currentCodec.PayloadType != negotiatedCodec.PayloadType {
 				rtpHandler := session.GetRTPHandler()
 				if rtpHandler != nil {
-					rtpHandler.SetCodec(negotiatedCodec)
+					rtpHandler.SetInboundMediaFormat(negotiatedCodec, sdpInfo.PacketizationDuration())
 				}
 				session.SetNegotiatedCodec(negotiatedCodec.Name, int(negotiatedCodec.ClockRate))
 				s.logger.Infow("Codec updated from UPDATE",
 					"call_id", callID,
 					"new_codec", negotiatedCodec.Name,
 					"payload_type", negotiatedCodec.PayloadType)
+			} else if rtpHandler := session.GetRTPHandler(); rtpHandler != nil {
+				rtpHandler.SetInboundMediaFormat(negotiatedCodec, sdpInfo.PacketizationDuration())
 			}
 		} else {
 			s.logger.Infow("UPDATE indicates hold — keeping current RTP target",
@@ -541,10 +547,24 @@ func (s *Server) handleUnknownRequest(req *sip.Request, tx sip.ServerTransaction
 }
 
 func (s *Server) sendResponse(tx sip.ServerTransaction, req *sip.Request, statusCode int) *sip.Response {
+	return s.sendResponseWithHeaders(tx, req, statusCode)
+}
+
+func (s *Server) sendResponseWithHeaders(
+	tx sip.ServerTransaction,
+	req *sip.Request,
+	statusCode int,
+	headers ...sip.Header,
+) *sip.Response {
 	resp := sip.NewResponseFromRequest(req, statusCode, "", nil)
 	if req != nil && req.Method == sip.INVITE && statusCode >= 200 && resp.Contact() == nil && s.listenConfig != nil {
 		contactHeader := s.listenConfig.SIPContactHeader()
 		resp.AppendHeader(&contactHeader)
+	}
+	for _, header := range headers {
+		if header != nil {
+			resp.AppendHeader(header)
+		}
 	}
 	if err := tx.Respond(resp); err != nil {
 		callID := ""
