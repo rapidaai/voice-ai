@@ -156,6 +156,26 @@ func (c *SIPRequestContext) ResolveRoute() (CallRoute, error) {
 //	RouteMiddleware → VaultMiddleware
 type Middleware func(ctx *SIPRequestContext) error
 
+// RTPAddress identifies an RTP or RTCP network endpoint.
+type RTPAddress struct {
+	// IP is the endpoint IP address.
+	IP string
+
+	// Port is the endpoint UDP port.
+	Port int
+}
+
+func (address RTPAddress) String() string {
+	if address.IP == "" && address.Port == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%s:%d", address.IP, address.Port)
+}
+
+func (address RTPAddress) Validate() bool {
+	return !utils.IsEmpty(address.IP) && validator.Between(address.Port, 1, rtpMaxPort)
+}
+
 // SIPError adds operation and call context to SIP failures.
 type SIPError struct {
 	Op      string
@@ -197,11 +217,8 @@ func (t Transport) IsValid() bool {
 
 // RTPConfig holds the socket, codec, timeout, and packet timing settings for an RTP handler.
 type RTPConfig struct {
-	// LocalIP is the local interface IP address used to bind the RTP socket.
-	LocalIP string
-
-	// LocalPort is the exact local RTP port to bind. Zero means choose from the configured range.
-	LocalPort int
+	// LocalAddress is the local RTP endpoint used to bind the RTP socket. A zero port chooses from the configured range.
+	LocalAddress RTPAddress
 
 	// PayloadType is the RTP payload type used to select the initial codec.
 	PayloadType uint8
@@ -209,10 +226,10 @@ type RTPConfig struct {
 	// ClockRate is the RTP clock rate for the initial codec. Zero defaults to G.711 8 kHz.
 	ClockRate uint32
 
-	// RTPPortRangeStart is the first candidate RTP port when LocalPort is zero.
+	// RTPPortRangeStart is the first candidate RTP port when LocalAddress.Port is zero.
 	RTPPortRangeStart int
 
-	// RTPPortRangeEnd is the last candidate RTP port when LocalPort is zero.
+	// RTPPortRangeEnd is the last candidate RTP port when LocalAddress.Port is zero.
 	RTPPortRangeEnd int
 
 	// SymmetricRTP sends RTP back to the source address observed on inbound RTP packets.
@@ -236,13 +253,13 @@ func (c *RTPConfig) Validate() error {
 	if !validator.NonNil(c) {
 		return errRTPConfigRequired
 	}
-	if utils.IsEmpty(c.LocalIP) {
-		return errRTPLocalIPRequired
+	if utils.IsEmpty(c.LocalAddress.IP) {
+		return errRTPLocalAddressIPRequired
 	}
-	if !validator.Between(c.LocalPort, 0, rtpMaxPort) {
-		return fmt.Errorf(rtpErrorIntFormat, errRTPInvalidLocalPort, c.LocalPort)
+	if !validator.Between(c.LocalAddress.Port, 0, rtpMaxPort) {
+		return fmt.Errorf(rtpErrorIntFormat, errRTPInvalidLocalAddressPort, c.LocalAddress.Port)
 	}
-	if c.LocalPort == 0 {
+	if c.LocalAddress.Port == 0 {
 		if !validator.Between(c.RTPPortRangeStart, 1, rtpMaxPort) ||
 			!validator.Between(c.RTPPortRangeEnd, 1, rtpMaxPort) {
 			if c.RTPPortRangeStart <= 0 || c.RTPPortRangeEnd <= 0 {

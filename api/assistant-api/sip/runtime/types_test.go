@@ -76,27 +76,26 @@ func TestRTPConfigValidateReturnsSentinelErrors(t *testing.T) {
 		{
 			name:    "missing local ip",
 			config:  &RTPConfig{},
-			wantErr: errRTPLocalIPRequired,
+			wantErr: errRTPLocalAddressIPRequired,
 		},
 		{
 			name: "blank local ip",
 			config: &RTPConfig{
-				LocalIP: " ",
+				LocalAddress: RTPAddress{IP: " "},
 			},
-			wantErr: errRTPLocalIPRequired,
+			wantErr: errRTPLocalAddressIPRequired,
 		},
 		{
 			name: "invalid local port",
 			config: &RTPConfig{
-				LocalIP:   "127.0.0.1",
-				LocalPort: rtpMaxPort + 1,
+				LocalAddress: RTPAddress{IP: "127.0.0.1", Port: rtpMaxPort + 1},
 			},
-			wantErr: errRTPInvalidLocalPort,
+			wantErr: errRTPInvalidLocalAddressPort,
 		},
 		{
 			name: "missing port range",
 			config: &RTPConfig{
-				LocalIP: "127.0.0.1",
+				LocalAddress: RTPAddress{IP: "127.0.0.1"},
 			},
 			wantErr: errRTPPortRangeRequired,
 		},

@@ -9,7 +9,6 @@ package sip_runtime
 import (
 	"context"
 	"fmt"
-	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -33,10 +32,9 @@ type Session struct {
 	cancel context.CancelFunc
 
 	// RTP handling
-	rtpHandler    *RTPHandler
-	rtpLocalPort  int
-	rtpRemoteAddr string
-	rtpRemotePort int
+	rtpHandler       *RTPHandler
+	rtpLocalAddress  RTPAddress
+	rtpRemoteAddress RTPAddress
 
 	// Codec negotiation result
 	negotiatedCodec *Codec
@@ -61,11 +59,11 @@ type Session struct {
 	byeReceivedOnce    sync.Once
 	disconnectMetadata DisconnectMetadata
 
-	// Outbound dialog session — stored so BYE/re-INVITE handlers can access it.
+	// Outbound dialog session, stored so BYE/re-INVITE handlers can access it.
 	// nil for inbound calls.
 	dialogClientSession *sipgo.DialogClientSession
 
-	// Inbound dialog session — stored so we can send BYE when ending an inbound call.
+	// Inbound dialog session, stored so we can send BYE when ending an inbound call.
 	// nil for outbound calls.
 	dialogServerSession    *sipgo.DialogServerSession
 	initialACKReceived     bool
@@ -75,7 +73,7 @@ type Session struct {
 	reInviteACKCount       uint64
 
 	// onDisconnect is called via Disconnect() to perform transport-level call teardown
-	// (e.g., sending SIP BYE). NOT called by End() — the caller must invoke
+	// (e.g., sending SIP BYE). NOT called by End(), the caller must invoke
 	// Disconnect() explicitly before End() if a SIP BYE should be sent.
 	// Set by the server that owns this session.
 	onDisconnect func(session *Session)
@@ -259,44 +257,41 @@ func (s *Session) isValidTransition(from, to CallState) bool {
 	return false
 }
 
-// SetRemoteRTP sets the remote RTP address after SDP negotiation
-func (s *Session) SetRemoteRTP(addr string, port int) {
+// SetRemoteRTPAddress sets the remote RTP address after SDP negotiation.
+func (s *Session) SetRemoteRTPAddress(address RTPAddress) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.rtpRemoteAddr = addr
-	s.rtpRemotePort = port
-	s.info.RemoteRTPAddress = fmt.Sprintf("%s:%d", addr, port)
+	s.rtpRemoteAddress = address
+	s.info.RemoteRTPAddress = address.String()
 }
 
-// SetLocalRTP sets the local RTP address
-func (s *Session) SetLocalRTP(addr string, port int) {
+// SetLocalRTPAddress sets the local RTP address.
+func (s *Session) SetLocalRTPAddress(address RTPAddress) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.rtpLocalPort = port
-	s.info.LocalRTPAddress = fmt.Sprintf("%s:%d", addr, port)
+	s.rtpLocalAddress = address
+	s.info.LocalRTPAddress = address.String()
 }
 
-// GetLocalRTP returns the local RTP IP and port for this session.
-func (s *Session) GetLocalRTP() (string, int) {
+// LocalRTPAddress returns the local RTP address for this session.
+func (s *Session) LocalRTPAddress() RTPAddress {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	// Parse IP from the stored LocalRTPAddress ("ip:port" format)
-	addr := s.info.LocalRTPAddress
-	if addr == "" {
-		return "", s.rtpLocalPort
-	}
-	host, _, err := net.SplitHostPort(addr)
-	if err != nil {
-		return addr, s.rtpLocalPort
-	}
-	return host, s.rtpLocalPort
+	return s.rtpLocalAddress
+}
+
+// RemoteRTPAddress returns the remote RTP address for this session.
+func (s *Session) RemoteRTPAddress() RTPAddress {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.rtpRemoteAddress
 }
 
 // GetRTPLocalPort returns the local RTP port bound for this session.
 func (s *Session) GetRTPLocalPort() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.rtpLocalPort
+	return s.rtpLocalAddress.Port
 }
 
 // SetNegotiatedCodec sets the negotiated codec
@@ -616,7 +611,7 @@ func (s *Session) SetOnEnded(fn func(session *Session)) {
 
 // Disconnect performs transport-level call teardown by invoking the onDisconnect callback.
 // This sends a SIP BYE (or equivalent) to the remote party before local cleanup.
-// Safe to call multiple times — the callback is cleared after first invocation.
+// Safe to call multiple times. The callback is cleared after first invocation.
 func (s *Session) Disconnect() {
 	s.mu.Lock()
 	fn := s.onDisconnect
@@ -683,7 +678,7 @@ func (s *Session) GetVaultCredential() *protos.VaultCredential {
 	return s.vaultCredential
 }
 
-// End terminates the SIP session gracefully. This is the single teardown function —
+// End terminates the SIP session gracefully. This is the single teardown function.
 // all triggers (BYE, pipeline end, streamer close) route here. Owns all side effects:
 // 1. Send BYE via onDisconnect callback
 // 2. Stop RTP
@@ -713,7 +708,7 @@ func (s *Session) End() {
 		_ = rtpHandler.Stop()
 	}
 
-	// Cancel context — unblocks anything waiting on session.Context()
+	// Cancel context to unblock anything waiting on session.Context().
 	s.cancel()
 
 	s.mu.RLock()
@@ -747,7 +742,7 @@ func (s *Session) IsEnded() bool {
 }
 
 // NotifyBye signals that a SIP BYE has been received for this session.
-// This is safe to call multiple times — only the first call has effect.
+// This is safe to call multiple times. Only the first call has effect.
 // It does NOT end the session; it merely notifies listeners (e.g., startCall)
 // that a BYE was received so they can shut down gracefully.
 func (s *Session) NotifyBye() {

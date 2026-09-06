@@ -37,7 +37,7 @@ func (s *Server) handleReInvite(req *sip.Request, tx sip.ServerTransaction, sess
 		return
 	}
 
-	// If no SDP body, this is a session refresh (RFC 4028) — just respond with our SDP
+	// If no SDP body, this is a session refresh (RFC 4028), so respond with our SDP.
 	if len(req.Body()) == 0 {
 		s.logger.Debugw("re-INVITE with no SDP body (session refresh)", "call_id", callID)
 		s.respondWithCurrentSDP(tx, req, session)
@@ -64,30 +64,28 @@ func (s *Server) handleReInvite(req *sip.Request, tx sip.ServerTransaction, sess
 	s.logger.Debugw("re-INVITE SDP parsed",
 		"call_id", callID,
 		"sdp_direction", string(sdpInfo.Direction),
-		"sdp_ip", sdpInfo.ConnectionIP,
-		"sdp_port", sdpInfo.AudioPort,
+		"sdp_ip", sdpInfo.RTPAddress.IP,
+		"sdp_port", sdpInfo.RTPAddress.Port,
 		"is_hold", sdpInfo.IsHold())
 
 	// Only update remote RTP when SDP indicates active media (not hold).
 	// Hold signals:
-	//   - 0.0.0.0 connection IP (RFC 3264 §8.4) — used by Asterisk, FreeSWITCH
-	//   - sendonly / inactive direction — used by Twilio, Telnyx, Vonage
+	//   - 0.0.0.0 connection IP (RFC 3264 §8.4), used by Asterisk, FreeSWITCH
+	//   - sendonly / inactive direction, used by Twilio, Telnyx, Vonage
 	// During hold we keep the previous remote RTP address so audio resumes correctly.
 	if !sdpInfo.IsHold() {
 		rtpHandler := session.GetRTPHandler()
-		if rtpHandler != nil && sdpInfo.ConnectionIP != "" && sdpInfo.AudioPort > 0 {
-			rtpHandler.SetSymmetricRTP(s.useSymmetricRTPForRemoteIP(sdpInfo.ConnectionIP))
+		if rtpHandler != nil && sdpInfo.RTPAddress.IP != "" && sdpInfo.RTPAddress.Port > 0 {
+			rtpHandler.SetSymmetricRTP(s.useSymmetricRTPForRemoteIP(sdpInfo.RTPAddress.IP))
 			rtpHandler.setRemoteMediaAddress(remoteMediaAddress{
-				remoteRTPIPAddress:  sdpInfo.ConnectionIP,
-				remoteRTPPort:       sdpInfo.AudioPort,
-				remoteRTCPIPAddress: sdpInfo.RTCPIP,
-				remoteRTCPPort:      sdpInfo.RTCPPort,
+				remoteRTPAddress:  sdpInfo.RTPAddress,
+				remoteRTCPAddress: sdpInfo.RTCPAddress,
 			})
-			session.SetRemoteRTP(sdpInfo.ConnectionIP, sdpInfo.AudioPort)
+			session.SetRemoteRTPAddress(sdpInfo.RTPAddress)
 			s.logger.Debugw("Updated remote RTP from re-INVITE",
 				"call_id", callID,
-				"remote_rtp_ip", sdpInfo.ConnectionIP,
-				"remote_rtp_port", sdpInfo.AudioPort)
+				"remote_rtp_ip", sdpInfo.RTPAddress.IP,
+				"remote_rtp_port", sdpInfo.RTPAddress.Port)
 		}
 
 		negotiatedCodec := mediaOffer.negotiatedCodec
@@ -106,10 +104,10 @@ func (s *Server) handleReInvite(req *sip.Request, tx sip.ServerTransaction, sess
 			rtpHandler.SetInboundMediaFormat(negotiatedCodec, sdpInfo.PacketizationDuration())
 		}
 	} else {
-		s.logger.Infow("re-INVITE indicates hold — keeping current RTP target",
+		s.logger.Infow("re-INVITE indicates hold, keeping current RTP target",
 			"call_id", callID,
 			"sdp_direction", string(sdpInfo.Direction),
-			"sdp_ip", sdpInfo.ConnectionIP)
+			"sdp_ip", sdpInfo.RTPAddress.IP)
 	}
 
 	// Always respond with our SDP (sendrecv) to signal we're ready for media.
@@ -126,12 +124,12 @@ func (s *Server) handleReInvite(req *sip.Request, tx sip.ServerTransaction, sess
 // multiple codecs in a re-INVITE answer confuses Asterisk/FreeSWITCH and can cause
 // immediate call teardown ("remote codecs: None" in the peer's logs).
 func (s *Server) respondWithCurrentSDP(tx sip.ServerTransaction, req *sip.Request, session *Session) {
-	localIP, localPort := session.GetLocalRTP()
-	if localIP == "" {
-		localIP = s.listenConfig.GetExternalIP()
+	localAddress := session.LocalRTPAddress()
+	if localAddress.IP == "" {
+		localAddress.IP = s.listenConfig.GetExternalIP()
 	}
 	codec := session.GetNegotiatedCodec()
-	sdpConfig := s.NegotiatedSDPConfig(localIP, localPort, codec)
+	sdpConfig := s.NegotiatedSDPConfig(localAddress, codec)
 	sdpBody := s.GenerateSDP(sdpConfig)
 	if req.Method == sip.INVITE {
 		session.BeginReInviteACKWait()
@@ -229,7 +227,7 @@ func (s *Server) handleCancel(req *sip.Request, tx sip.ServerTransaction) {
 		}
 	}
 
-	// CANCEL is for an unanswered INVITE — clear onDisconnect so End()
+	// CANCEL is for an unanswered INVITE, clear onDisconnect so End()
 	// does not attempt to send BYE (no dialog established yet).
 	if exists {
 		_ = s.CancelInboundCall(session, LifecycleReasonCancelReceived)
@@ -306,26 +304,24 @@ func (s *Server) handleUpdate(req *sip.Request, tx sip.ServerTransaction) {
 		s.logger.Debugw("UPDATE SDP parsed",
 			"call_id", callID,
 			"sdp_direction", string(sdpInfo.Direction),
-			"sdp_ip", sdpInfo.ConnectionIP,
-			"sdp_port", sdpInfo.AudioPort,
+			"sdp_ip", sdpInfo.RTPAddress.IP,
+			"sdp_port", sdpInfo.RTPAddress.Port,
 			"is_hold", sdpInfo.IsHold())
 
 		// Only update remote RTP for active media (not hold)
 		if !sdpInfo.IsHold() {
 			rtpHandler := session.GetRTPHandler()
-			if rtpHandler != nil && sdpInfo.ConnectionIP != "" && sdpInfo.AudioPort > 0 {
-				rtpHandler.SetSymmetricRTP(s.useSymmetricRTPForRemoteIP(sdpInfo.ConnectionIP))
+			if rtpHandler != nil && sdpInfo.RTPAddress.IP != "" && sdpInfo.RTPAddress.Port > 0 {
+				rtpHandler.SetSymmetricRTP(s.useSymmetricRTPForRemoteIP(sdpInfo.RTPAddress.IP))
 				rtpHandler.setRemoteMediaAddress(remoteMediaAddress{
-					remoteRTPIPAddress:  sdpInfo.ConnectionIP,
-					remoteRTPPort:       sdpInfo.AudioPort,
-					remoteRTCPIPAddress: sdpInfo.RTCPIP,
-					remoteRTCPPort:      sdpInfo.RTCPPort,
+					remoteRTPAddress:  sdpInfo.RTPAddress,
+					remoteRTCPAddress: sdpInfo.RTCPAddress,
 				})
-				session.SetRemoteRTP(sdpInfo.ConnectionIP, sdpInfo.AudioPort)
+				session.SetRemoteRTPAddress(sdpInfo.RTPAddress)
 				s.logger.Debugw("Updated remote RTP from UPDATE",
 					"call_id", callID,
-					"remote_rtp_ip", sdpInfo.ConnectionIP,
-					"remote_rtp_port", sdpInfo.AudioPort)
+					"remote_rtp_ip", sdpInfo.RTPAddress.IP,
+					"remote_rtp_port", sdpInfo.RTPAddress.Port)
 			}
 
 			negotiatedCodec := mediaOffer.negotiatedCodec
@@ -344,10 +340,10 @@ func (s *Server) handleUpdate(req *sip.Request, tx sip.ServerTransaction) {
 				rtpHandler.SetInboundMediaFormat(negotiatedCodec, sdpInfo.PacketizationDuration())
 			}
 		} else {
-			s.logger.Infow("UPDATE indicates hold — keeping current RTP target",
+			s.logger.Infow("UPDATE indicates hold, keeping current RTP target",
 				"call_id", callID,
 				"sdp_direction", string(sdpInfo.Direction),
-				"sdp_ip", sdpInfo.ConnectionIP)
+				"sdp_ip", sdpInfo.RTPAddress.IP)
 		}
 
 		s.respondWithCurrentSDP(tx, req, session)
@@ -462,7 +458,7 @@ func (s *Server) handleNotify(req *sip.Request, tx sip.ServerTransaction) {
 
 // handleRefer processes SIP REFER requests (RFC 3515).
 // Inbound REFER (provider-initiated transfer) is declined. The platform supports
-// transfer via B2BUA bridge (INVITE-based), triggered by the LLM tool — not REFER.
+// transfer via B2BUA bridge (INVITE-based), triggered by the LLM tool, not REFER.
 func (s *Server) handleRefer(req *sip.Request, tx sip.ServerTransaction) {
 	callID := req.CallID().Value()
 	referTo := ""
@@ -520,7 +516,7 @@ func (s *Server) handleUnknownRequest(req *sip.Request, tx sip.ServerTransaction
 	if inDialog {
 		// In-dialog: accept unknown methods to keep the dialog alive.
 		// Rejecting with 405 causes Asterisk/FreeSWITCH/Twilio to tear down the call.
-		s.logger.Warnw("Unhandled SIP method for active session — accepting to keep dialog alive",
+		s.logger.Warnw("Unhandled SIP method for active session, accepting to keep dialog alive",
 			"method", method,
 			"call_id", callID,
 			"from", fromUser)
@@ -538,7 +534,7 @@ func (s *Server) handleUnknownRequest(req *sip.Request, tx sip.ServerTransaction
 				s.logger.Errorw("Failed to send 489 response", "error", err)
 			}
 		} else {
-			s.logger.Warnw("Unknown SIP method received (no session) — rejecting",
+			s.logger.Warnw("Unknown SIP method received (no session), rejecting",
 				"method", method,
 				"call_id", callID,
 				"from", fromUser)

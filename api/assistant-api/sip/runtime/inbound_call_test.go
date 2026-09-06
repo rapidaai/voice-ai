@@ -111,8 +111,7 @@ func TestInboundMediaSDPConfigUsesLocalPacketization(t *testing.T) {
 	)
 	require.Nil(t, failure)
 	media := newInboundMedia(server, newTestSession(t, "inbound-answer-ptime", CallDirectionInbound), mediaOffer)
-	media.externalIP = "127.0.0.1"
-	media.localRTPPort = 20000
+	media.localAddress = RTPAddress{IP: "127.0.0.1", Port: 20000}
 
 	sdpConfig := media.SDPConfig()
 
@@ -1078,7 +1077,7 @@ func TestInboundCall_CancelAfterRTPOwnershipEndsSession(t *testing.T) {
 	loadInboundMediaOffer(t, inboundCall)
 	inboundCall.resolvedConfig = inboundConfig{config: bridgeTestConfig()}
 	createInboundSessionForTest(t, inboundCall)
-	inboundCall.session.SetLocalRTP("127.0.0.1", 19000)
+	inboundCall.session.SetLocalRTPAddress(RTPAddress{IP: "127.0.0.1", Port: 19000})
 	inboundCall.session.SetRTPHandler(&RTPHandler{})
 	server.registerSession(inboundCall.session, inboundCall.identity.callID)
 	require.True(t, server.setPendingInviteIfAbsent(inboundCall.inviteKey, request, transaction))
@@ -1104,7 +1103,7 @@ func TestInboundCall_FinalResponseMediaTimeoutEndsCall(t *testing.T) {
 
 	callID := "inbound-final-response-media-timeout"
 	session := newTestSession(t, callID, CallDirectionInbound)
-	session.SetLocalRTP("127.0.0.1", 19000)
+	session.SetLocalRTPAddress(RTPAddress{IP: "127.0.0.1", Port: 19000})
 	session.SetRTPHandler(newTestRTPHandler())
 	server.registerSession(session, callID)
 	require.True(t, server.TransitionCall(session, CallStateRinging, LifecycleReasonInboundInviteRinging))
@@ -1286,16 +1285,16 @@ func inboundOfferSDPWithMedia(ip string, port int, payloadTypes string) string {
 	return inboundOfferSDPWithRawMedia(ip, mediaLine)
 }
 
-func inboundOfferSDPWithRTCP(remoteRTPIPAddress string, remoteRTPPort int, remoteRTCPIPAddress string, remoteRTCPPort int) string {
+func inboundOfferSDPWithRTCP(remoteRTPAddress RTPAddress, remoteRTCPAddress RTPAddress) string {
 	return "v=0\r\n" +
 		"o=caller 1 1 IN IP4 127.0.0.1\r\n" +
 		"s=call\r\n" +
-		"c=IN IP4 " + remoteRTPIPAddress + "\r\n" +
+		"c=IN IP4 " + remoteRTPAddress.IP + "\r\n" +
 		"t=0 0\r\n" +
-		"m=audio " + fmt.Sprintf("%d RTP/AVP 0 101", remoteRTPPort) + "\r\n" +
+		"m=audio " + fmt.Sprintf("%d RTP/AVP 0 101", remoteRTPAddress.Port) + "\r\n" +
 		"a=rtpmap:0 PCMU/8000\r\n" +
 		"a=rtpmap:101 telephone-event/8000\r\n" +
-		"a=rtcp:" + fmt.Sprintf("%d IN IP4 %s", remoteRTCPPort, remoteRTCPIPAddress) + "\r\n" +
+		"a=rtcp:" + fmt.Sprintf("%d IN IP4 %s", remoteRTCPAddress.Port, remoteRTCPAddress.IP) + "\r\n" +
 		"a=sendrecv\r\n"
 }
 

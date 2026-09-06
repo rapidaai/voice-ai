@@ -15,10 +15,9 @@ func TestRTPHandlerBindsRTCPCompanionPort(t *testing.T) {
 	rtpPort, rtcpPort := reserveUDPPortPair(t)
 
 	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:     "127.0.0.1",
-		LocalPort:   rtpPort,
-		PayloadType: CodecPCMU.PayloadType,
-		ClockRate:   CodecPCMU.ClockRate,
+		LocalAddress: RTPAddress{IP: "127.0.0.1", Port: rtpPort},
+		PayloadType:  CodecPCMU.PayloadType,
+		ClockRate:    CodecPCMU.ClockRate,
 	})
 	require.NoError(t, err)
 	defer handler.Stop()
@@ -39,10 +38,9 @@ func TestRTPHandlerContinuesWhenRTCPCompanionPortUnavailable(t *testing.T) {
 	defer blocker.Close()
 
 	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:     "127.0.0.1",
-		LocalPort:   rtpPort,
-		PayloadType: CodecPCMU.PayloadType,
-		ClockRate:   CodecPCMU.ClockRate,
+		LocalAddress: RTPAddress{IP: "127.0.0.1", Port: rtpPort},
+		PayloadType:  CodecPCMU.PayloadType,
+		ClockRate:    CodecPCMU.ClockRate,
 	})
 	require.NoError(t, err)
 	defer handler.Stop()
@@ -55,10 +53,8 @@ func TestRTPHandlerSetRemoteMediaAddressAppliesExplicitRTCPAddress(t *testing.T)
 	handler := newTestRTPHandler()
 
 	handler.setRemoteMediaAddress(remoteMediaAddress{
-		remoteRTPIPAddress:  "127.0.0.1",
-		remoteRTPPort:       20000,
-		remoteRTCPIPAddress: "198.51.100.10",
-		remoteRTCPPort:      23000,
+		remoteRTPAddress:  RTPAddress{IP: "127.0.0.1", Port: 20000},
+		remoteRTCPAddress: RTPAddress{IP: "198.51.100.10", Port: 23000},
 	})
 
 	remoteRTPAddress := handler.GetRemoteAddr()
@@ -80,8 +76,7 @@ func TestRTPHandlerSetRemoteMediaAddressFallsBackToCompanionRTCPPort(t *testing.
 	handler := newTestRTPHandler()
 
 	handler.setRemoteMediaAddress(remoteMediaAddress{
-		remoteRTPIPAddress: "127.0.0.1",
-		remoteRTPPort:      20000,
+		remoteRTPAddress: RTPAddress{IP: "127.0.0.1", Port: 20000},
 	})
 
 	assert.Equal(t, 20001, handler.GetDetailedStats().RemoteRTCPPort)
@@ -104,17 +99,16 @@ func TestRTPHandlerSendsRTCPReportWithInboundReceptionStats(t *testing.T) {
 	defer remoteRTCP.Close()
 
 	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:     "127.0.0.1",
-		LocalPort:   rtpPort,
-		PayloadType: CodecPCMU.PayloadType,
-		ClockRate:   CodecPCMU.ClockRate,
+		LocalAddress: RTPAddress{IP: "127.0.0.1", Port: rtpPort},
+		PayloadType:  CodecPCMU.PayloadType,
+		ClockRate:    CodecPCMU.ClockRate,
 	})
 	require.NoError(t, err)
 	defer handler.Stop()
 
 	remoteRTCPPort := remoteRTCP.LocalAddr().(*net.UDPAddr).Port
-	handler.SetRemoteAddr("127.0.0.1", 9)
-	handler.SetRemoteRTCPAddr("127.0.0.1", remoteRTCPPort)
+	handler.SetRemoteAddress(RTPAddress{IP: "127.0.0.1", Port: 9})
+	handler.SetRemoteRTCPAddress(RTPAddress{IP: "127.0.0.1", Port: remoteRTCPPort})
 	handler.remoteSSRC.Store(1234)
 
 	now := time.Unix(1_700_000_000, 0)

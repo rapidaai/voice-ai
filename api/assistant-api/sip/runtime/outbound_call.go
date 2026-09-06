@@ -265,11 +265,11 @@ func (outboundCall *Outbound) startOutboundMedia(mediaAnswer OutboundMediaAnswer
 		}
 	}
 
-	localIP, localPort := outboundCall.media.LocalAddr()
+	localAddress := outboundCall.media.LocalAddress()
 	outboundCall.server.logger.Infow("RTP started (pre-ACK)",
 		"call_id", outboundCall.session.GetCallID(),
-		"local_rtp", fmt.Sprintf("%s:%d", localIP, localPort),
-		"remote_rtp", fmt.Sprintf("%s:%d", mediaAnswer.remoteIP, mediaAnswer.remotePort),
+		"local_rtp", localAddress.String(),
+		"remote_rtp", mediaAnswer.remoteAddress.String(),
 		"remote_addr_set", outboundCall.media.RemoteAddrConfigured(),
 		"elapsed_since_200ok_ms", time.Since(answerTime).Milliseconds())
 	return nil
