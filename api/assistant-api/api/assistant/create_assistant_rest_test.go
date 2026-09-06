@@ -65,6 +65,14 @@ func (s *createAssistantRestAssistantServiceStub) Get(context.Context, *types.Au
 	return nil, errors.New("not implemented")
 }
 
+func (s *createAssistantRestAssistantServiceStub) GetAssistantWithPhoneDeploymentById(context.Context, uint64) (*internal_assistant_entity.Assistant, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *createAssistantRestAssistantServiceStub) GetAssistantWithPhoneDeploymentByDID(context.Context, string) (*internal_assistant_entity.Assistant, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (s *createAssistantRestAssistantServiceStub) GetAll(context.Context, *types.Authentication, []*protos.Criteria, *protos.Paginate, *internal_services.GetAssistantOption) (int64, []*internal_assistant_entity.Assistant, error) {
 	return 0, nil, errors.New("not implemented")
 }

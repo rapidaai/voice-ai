@@ -7,7 +7,7 @@
 package sip_registration
 
 // Pipeline is the base interface for every step in the registration pipeline.
-// Mirrors the typed Pipeline pattern of sip/infra/pipeline.go: concrete types
+// Mirrors the typed Pipeline pattern of sip/runtime/pipeline.go: concrete types
 // carry their own payload, the manager's dispatch() switches on type to
 // invoke the matching handler, and handlers return the next Pipeline (or nil
 // to stop) — chains form without explicit wiring.

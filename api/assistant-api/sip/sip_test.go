@@ -17,7 +17,8 @@ import (
 	assistant_config "github.com/rapidaai/api/assistant-api/config"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_pipeline "github.com/rapidaai/api/assistant-api/sip/pipeline"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	app_config "github.com/rapidaai/config"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
@@ -50,6 +51,66 @@ func TestSIPEngineDoesNotConstructInternalClients(t *testing.T) {
 	})
 }
 
+func TestSIPEngineDoesNotPassPostgresToMiddleware(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "sip.go", nil, 0)
+	require.NoError(t, err)
+
+	ast.Inspect(file, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		selector, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok || selector.Sel.Name != "WithPostgres" {
+			return true
+		}
+		packageName, ok := selector.X.(*ast.Ident)
+		if ok && packageName.Name == "sip_middleware" {
+			t.Fatal("SIP engine passes PostgreSQL to middleware")
+		}
+		return true
+	})
+}
+
+func TestSIPEnginePassesCallAdmissionConfigToRuntime(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "sip.go", nil, 0)
+	require.NoError(t, err)
+
+	expectedFields := map[string]bool{
+		"MaxConcurrentCalls": false,
+		"CallAdmissionCPS":   false,
+		"CallAdmissionBurst": false,
+	}
+
+	ast.Inspect(file, func(node ast.Node) bool {
+		composite, ok := node.(*ast.CompositeLit)
+		if !ok {
+			return true
+		}
+		selector, ok := composite.Type.(*ast.SelectorExpr)
+		if !ok || selector.Sel.Name != "ServerConfig" {
+			return true
+		}
+		for _, element := range composite.Elts {
+			keyValue, ok := element.(*ast.KeyValueExpr)
+			if !ok {
+				continue
+			}
+			field, ok := keyValue.Key.(*ast.Ident)
+			if ok {
+				if _, exists := expectedFields[field.Name]; exists {
+					expectedFields[field.Name] = true
+				}
+			}
+		}
+		return false
+	})
+
+	for field, found := range expectedFields {
+		assert.True(t, found, "runtime ServerConfig missing %s", field)
+	}
+}
+
 func TestSIPEngineUsesConfiguredServiceID(t *testing.T) {
 	engine := &SIPEngine{cfg: &assistant_config.AssistantConfig{AppConfig: app_config.AppConfig{ServiceID: 9007}}}
 	assert.Equal(t, uint64(9007), engine.cfg.ServiceID)
@@ -57,20 +118,20 @@ func TestSIPEngineUsesConfiguredServiceID(t *testing.T) {
 
 func TestSessionEstablishedStagePreservesCallAddress(t *testing.T) {
 	auth := &types.Authentication{}
-	session, err := sip_infra.NewSession(context.Background(),
-		sip_infra.WithSessionConfig(&sip_infra.Config{
+	session, err := sip_runtime.NewSession(context.Background(),
+		sip_runtime.WithSessionConfig(&sip_runtime.Config{
 			Server:            "127.0.0.1",
 			Port:              5060,
 			RTPPortRangeStart: 10000,
 			RTPPortRangeEnd:   10020,
 		}),
-		sip_infra.WithSessionDirection(sip_infra.CallDirectionInbound),
-		sip_infra.WithSessionCallID("call-address"),
-		sip_infra.WithSessionAuth(auth),
-		sip_infra.WithSessionAssistant(&internal_assistant_entity.Assistant{}),
+		sip_runtime.WithSessionDirection(sip_runtime.CallDirectionInbound),
+		sip_runtime.WithSessionCallID("call-address"),
+		sip_runtime.WithSessionAuth(auth),
+		sip_runtime.WithSessionAssistant(&internal_assistant_entity.Assistant{}),
 	)
 	require.NoError(t, err)
-	address := sip_infra.CallAddress{
+	address := sip_runtime.CallAddress{
 		From:    "+14155550100",
 		To:      "agent-42",
 		FromURI: "sip:+14155550100@carrier.example.com",
@@ -78,15 +139,11 @@ func TestSessionEstablishedStagePreservesCallAddress(t *testing.T) {
 		Headers: map[string]string{"x-original-called-number": "+14155550200"},
 	}
 
-	stage, err := (&SIPEngine{}).sessionEstablishedStage(session, sip_infra.SIPRequestIdentity{
-		RequestURI:  "sip:agent-42@sip.rapida.ai",
-		CallAddress: address,
-	})
+	var stage sip_pipeline.SessionEstablishedPipeline
+	stage, err = (&SIPEngine{}).sessionEstablishedStage(session, "sip:agent-42@sip.rapida.ai", address)
 
 	require.NoError(t, err)
 	assert.Equal(t, address, stage.CallAddress)
-	assert.Empty(t, stage.FromIdentity)
-	assert.Empty(t, stage.ToIdentity)
 }
 
 func TestPersistRemoteByeCallStatus_UpdatesCompletedDisconnectMetadata(t *testing.T) {
@@ -101,15 +158,15 @@ func TestPersistRemoteByeCallStatus_UpdatesCompletedDisconnectMetadata(t *testin
 	}
 	session := newSIPCallStatusTestSession(t, "ctx-bye")
 
-	engine.persistRemoteByeCallStatus(session, sip_infra.DisconnectMetadata{
-		Reason:             sip_infra.DisconnectReasonNormalClearing,
+	engine.persistRemoteByeCallStatus(session, sip_runtime.DisconnectMetadata{
+		Reason:             sip_runtime.DisconnectReasonNormalClearing,
 		ProviderStatusCode: 16,
 	})
 
 	require.NotNil(t, store.lastStatus)
 	assert.Equal(t, callcontext.StatusCompleted, store.callContext.Status)
 	assert.Equal(t, callcontext.CallStatusCompleted, store.lastStatus.CallStatus)
-	assert.Equal(t, sip_infra.DisconnectReasonNormalClearing, store.lastStatus.DisconnectReason)
+	assert.Equal(t, sip_runtime.DisconnectReasonNormalClearing, store.lastStatus.DisconnectReason)
 	assert.Equal(t, 16, store.lastStatus.ProviderStatusCode)
 }
 
@@ -125,8 +182,8 @@ func TestPersistRemoteByeCallStatus_DoesNotDowngradeFailure(t *testing.T) {
 	}
 	session := newSIPCallStatusTestSession(t, "ctx-failed")
 
-	engine.persistRemoteByeCallStatus(session, sip_infra.DisconnectMetadata{
-		Reason: sip_infra.DisconnectReasonRemoteHangup,
+	engine.persistRemoteByeCallStatus(session, sip_runtime.DisconnectMetadata{
+		Reason: sip_runtime.DisconnectReasonRemoteHangup,
 	})
 
 	assert.Nil(t, store.lastStatus)
@@ -192,18 +249,18 @@ func (s *sipCallStatusTestStore) UpdateCallStatus(_ context.Context, contextID s
 	return nil
 }
 
-func newSIPCallStatusTestSession(t *testing.T, contextID string) *sip_infra.Session {
+func newSIPCallStatusTestSession(t *testing.T, contextID string) *sip_runtime.Session {
 	t.Helper()
-	session, err := sip_infra.NewSession(context.Background(),
-		sip_infra.WithSessionConfig(&sip_infra.Config{
+	session, err := sip_runtime.NewSession(context.Background(),
+		sip_runtime.WithSessionConfig(&sip_runtime.Config{
 			Server:            "127.0.0.1",
 			Port:              5060,
 			RTPPortRangeStart: 10000,
 			RTPPortRangeEnd:   10020,
 		}),
-		sip_infra.WithSessionDirection(sip_infra.CallDirectionOutbound),
-		sip_infra.WithSessionCallID("sip-call-id"),
-		sip_infra.WithSessionContextID(contextID),
+		sip_runtime.WithSessionDirection(sip_runtime.CallDirectionOutbound),
+		sip_runtime.WithSessionCallID("sip-call-id"),
+		sip_runtime.WithSessionContextID(contextID),
 	)
 	require.NoError(t, err)
 	return session

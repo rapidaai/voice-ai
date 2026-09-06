@@ -20,7 +20,7 @@ import (
 	internal_conversation_entity "github.com/rapidaai/api/assistant-api/internal/entity/conversations"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
@@ -243,7 +243,7 @@ func TestCallbackByContextRestoresAuthenticationForEveryProvider(t *testing.T) {
 					inboundDispatcher: channel_telephony.NewInboundDispatcher(
 						channel_telephony.WithConfig(&config.AssistantConfig{}),
 						channel_telephony.WithLogger(logger),
-						channel_telephony.WithTelephonyOption(channel_telephony.TelephonyOption{SIPServer: &sip_infra.Server{}}),
+						channel_telephony.WithTelephonyOption(channel_telephony.TelephonyOption{SIPServer: &sip_runtime.Server{}}),
 					),
 				}
 
@@ -296,7 +296,7 @@ func TestCallbackByContextRejectsInvalidStoredAuthenticationForEveryProvider(t *
 				inboundDispatcher: channel_telephony.NewInboundDispatcher(
 					channel_telephony.WithConfig(&config.AssistantConfig{}),
 					channel_telephony.WithLogger(logger),
-					channel_telephony.WithTelephonyOption(channel_telephony.TelephonyOption{SIPServer: &sip_infra.Server{}}),
+					channel_telephony.WithTelephonyOption(channel_telephony.TelephonyOption{SIPServer: &sip_runtime.Server{}}),
 				),
 			}
 			recorder := httptest.NewRecorder()

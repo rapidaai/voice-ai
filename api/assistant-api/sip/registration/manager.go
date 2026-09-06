@@ -16,7 +16,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/billing"
 	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/telemetry"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/connectors"
@@ -43,8 +43,8 @@ type manager struct {
 	logger          commons.Logger
 	postgres        connectors.PostgresConnector
 	redis           *redis.Client
-	regClient       *sip_infra.RegistrationClient
-	opDefaults      func(*sip_infra.Config)
+	regClient       *sip_runtime.RegistrationClient
+	opDefaults      func(*sip_runtime.Config)
 	assistantConfig *config.AssistantConfig
 	instanceID      string
 	rapidaClient    *rapida_client.RapidaClient

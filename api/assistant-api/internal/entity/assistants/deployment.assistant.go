@@ -31,7 +31,8 @@ type AssistantDeploymentTelephonyOption struct {
 	gorm_model.Audited
 	gorm_model.Mutable
 	gorm_model.Metadata
-	AssistantDeploymentTelephonyId uint64 `json:"assistantDeploymentTelephonyId" gorm:"type:bigint;size:20"`
+	AssistantDeploymentTelephonyId uint64                    `json:"assistantDeploymentTelephonyId" gorm:"type:bigint;size:20"`
+	AssistantPhoneDeployment       *AssistantPhoneDeployment `json:"-" gorm:"foreignKey:AssistantDeploymentTelephonyId;references:Id"`
 }
 
 type AssistantDeploymentWhatsapp struct {
@@ -108,6 +109,7 @@ type AssistantWebPluginDeployment struct {
 type AssistantPhoneDeployment struct {
 	AssistantDeploymentBehavior
 	AssistantDeploymentTelephony
+	Assistant   *Assistant                `json:"-" gorm:"foreignKey:AssistantId;references:Id"`
 	InputAudio  *AssistantDeploymentAudio `json:"inputAudio"  gorm:"foreignKey:AssistantDeploymentId"`
 	OutputAudio *AssistantDeploymentAudio `json:"outputAudio"  gorm:"foreignKey:AssistantDeploymentId"`
 }

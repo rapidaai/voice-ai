@@ -1,0 +1,49 @@
+{
+  "rfc": "rfcs/0003-native-sip-assistant-phone-resolution.md",
+  "plan": "rfcs/0003-native-sip-assistant-phone-resolution/jsons/amendment-01-plan.json",
+  "reviewed_commit": "8cba869114285207f5c6a408a6427c6f88bae8fd",
+  "rfc_sha256": "2767db095c96123b99bd355643db156552a91ac6270393ed3f1628c35e5a1693",
+  "plan_sha256": "b8ca4cc7839b9b849581aea11e0b2d2ffe684a22c766b863d4897e0cb14dcc58",
+  "run_id": "run_1c54fb2726ed",
+  "task_id": "task_ddce0dd6dddc",
+  "dispatch_id": "ctx_4237396208bb",
+  "reviewer": "independent-codex-worker",
+  "reviewed_at": "2026-08-31T13:44:53Z",
+  "decision": "revise",
+  "report_sha256": "2f24f4e81530e37b72cda4026b639d0353742a8c882b6c196d5f656724233cfa",
+  "findings": [
+    {
+      "severity": "major",
+      "summary": "The amended RFC retained contradictory normative requirements from the original contract."
+    },
+    {
+      "severity": "major",
+      "summary": "The inbound To header fallback allowed a caller-controlled value to reach authentication metadata."
+    },
+    {
+      "severity": "major",
+      "summary": "The plan omitted propagation of middleware phone enrichment through infra and core boundaries."
+    },
+    {
+      "severity": "major",
+      "summary": "Active SIP deployment selection and ambiguity handling were not deterministic."
+    },
+    {
+      "severity": "major",
+      "summary": "Outbound phone-only behavior for aliases and invalid values was unspecified."
+    },
+    {
+      "severity": "moderate",
+      "summary": "The phone grammar was ambiguous."
+    },
+    {
+      "severity": "moderate",
+      "summary": "Observability requirements lacked bounded values and testable privacy constraints."
+    },
+    {
+      "severity": "moderate",
+      "summary": "Rollback scope omitted propagation, outbound, transfer, and observability changes."
+    }
+  ],
+  "resolution": "RFC and plan were rewritten as one coherent contract for round-two challenge."
+}

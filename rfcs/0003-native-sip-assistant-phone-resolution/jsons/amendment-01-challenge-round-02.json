@@ -1,0 +1,30 @@
+{
+  "rfc": "rfcs/0003-native-sip-assistant-phone-resolution.md",
+  "plan": "rfcs/0003-native-sip-assistant-phone-resolution/jsons/amendment-01-plan.json",
+  "reviewed_commit": "9fbc4f99",
+  "rfc_sha256": "45d6047bbe68e18c4bb8da1275abdffff7cf0e0d82954ce5d376a1567726c847",
+  "plan_sha256": "42ccad5e021e3ab89ceac233b7d0e760bbbc36aad6553d6be5dd1397addb6520",
+  "run_id": "run_1c54fb2726ed",
+  "task_id": "task_6a24d4b9deb4",
+  "dispatch_id": "ctx_40b96fd21828",
+  "reviewer": "independent-codex-worker",
+  "reviewed_at": "2026-08-31T16:19:20Z",
+  "decision": "block",
+  "report_sha256": "24c97b8bdec2a6af267b37dbd5da7bff8de66bcb69d1045f435c66799fae144c",
+  "finding": {
+    "severity": "critical",
+    "summary": "A DID route can match multiple active SIP deployments because no database invariant prevents duplicate phone values and the current lookup selects an arbitrary record.",
+    "risk": "Nondeterministic duplicate DID selection can route a call and authentication metadata to the wrong assistant or tenant.",
+    "required_resolution": [
+      "Require exactly one active SIP deployment match for a DID route value.",
+      "Reject zero matches as route not found.",
+      "Reject multiple matches as ambiguous configuration before selecting tenant or assistant.",
+      "Add duplicate DID tests across assistants and tenants."
+    ]
+  },
+  "cycle_limit": {
+    "used": 2,
+    "maximum": 2,
+    "result": "Implementation and confirmation are blocked pending owner escalation and a fresh governed run."
+  }
+}

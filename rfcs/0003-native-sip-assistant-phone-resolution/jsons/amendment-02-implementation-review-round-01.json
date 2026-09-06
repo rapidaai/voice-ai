@@ -1,0 +1,17 @@
+{
+  "run_id": "run_624cf2072cd4",
+  "task_id": "task_7919ab511ffa",
+  "dispatch_id": "ctx_c81f2d4d19ac",
+  "reviewed_base": "4ae013de312eccd5bf49dbf614b10a6766e5efeb",
+  "reviewed_head": "7c831a66414cfe2125226633aaa61671befa685b",
+  "decision": "REVISE",
+  "completed_at": "2026-09-02T10:53:49Z",
+  "findings": [
+    {
+      "severity": "major",
+      "summary": "Claimed or loaded outbound call contexts retained pre-SIP alias values instead of the authoritative phone-only CallAddress values.",
+      "resolution": "Reconcile CallerNumber and FromNumber from the direction-aware CallAddress snapshot on both Claim and Get paths, with regression coverage."
+    }
+  ],
+  "report_path": "/tmp/task_7919ab511ffa/final-review.md"
+}

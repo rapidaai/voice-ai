@@ -27,7 +27,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/config"
 	router "github.com/rapidaai/api/assistant-api/router"
 	assistant_sip "github.com/rapidaai/api/assistant-api/sip"
-	sip_infra "github.com/rapidaai/api/assistant-api/sip/infra"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	assistant_socket "github.com/rapidaai/api/assistant-api/socket"
 	"github.com/rapidaai/pkg/authenticators"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
@@ -43,7 +43,7 @@ import (
 type AppRunner struct {
 	E          *gin.Engine
 	S          *grpc.Server
-	SIP        *sip_infra.Server
+	SIP        *sip_runtime.Server
 	Cfg        *config.AssistantConfig
 	Logger     commons.Logger
 	Postgres   connectors.PostgresConnector

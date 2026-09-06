@@ -143,6 +143,32 @@ func TestEmail(t *testing.T) {
 	}
 }
 
+func TestPhone(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  bool
+	}{
+		{name: "international", value: "+15551234567", want: true},
+		{name: "national", value: "15551234567", want: true},
+		{name: "empty", value: "", want: false},
+		{name: "whitespace", value: " +15551234567 ", want: false},
+		{name: "plus only", value: "+", want: false},
+		{name: "multiple plus", value: "++1555", want: false},
+		{name: "punctuation", value: "+1-555-1234", want: false},
+		{name: "letters", value: "agent-42", want: false},
+		{name: "unicode digits", value: "１２３４", want: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := Phone(test.value); got != test.want {
+				t.Fatalf("Phone(%q) = %v, want %v", test.value, got, test.want)
+			}
+		})
+	}
+}
+
 func TestAllNonZero(t *testing.T) {
 	if !AllNonZero(uint64(1), uint64(2)) {
 		t.Fatal("expected all values to be non-zero")

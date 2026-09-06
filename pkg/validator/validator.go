@@ -11,11 +11,14 @@ import (
 	"math"
 	"net/mail"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/rapidaai/protos"
 )
+
+var phonePattern = regexp.MustCompile(`^\+?[0-9]+$`)
 
 type numeric interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64 |
@@ -72,6 +75,11 @@ func Between[T numeric](value, min, max T) bool {
 func Email(value string) bool {
 	parsedEmail, err := mail.ParseAddress(value)
 	return err == nil && parsedEmail.Address == value && parsedEmail.Name == ""
+}
+
+// Phone returns true when value contains only ASCII digits with an optional leading plus.
+func Phone(value string) bool {
+	return phonePattern.MatchString(value)
 }
 
 // AllNonZero returns true when every provided value is not its zero value.

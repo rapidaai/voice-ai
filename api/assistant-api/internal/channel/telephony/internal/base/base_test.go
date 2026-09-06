@@ -110,6 +110,29 @@ func TestCreateConnectionRequest_OmitsEmptyOptionalFields(t *testing.T) {
 	require.Equal(t, "ctx-1", metadataString(t, md, "client.context_id"))
 }
 
+func TestCreateConnectionRequest_EmitsResolvedPhoneValuesOnly(t *testing.T) {
+	cc := &callcontext.CallContext{
+		Direction:    "inbound",
+		Provider:     "sip",
+		CallerNumber: "07249994778",
+		FromNumber:   "+447249994778",
+	}
+	base := New(newTestLogger(t), cc, nil, nil)
+
+	req := base.CreateConnectionRequest()
+	metadata, err := utils.AnyMapToInterfaceMap(req.GetMetadata())
+	require.NoError(t, err)
+
+	require.Equal(t, "07249994778", metadataString(t, metadata, "client.phone"))
+	require.Equal(t, "+447249994778", metadataString(t, metadata, "client.assistant_phone"))
+	for _, value := range metadata {
+		if stringValue, ok := value.(string); ok {
+			require.NotContains(t, stringValue, "sip:")
+			require.NotContains(t, stringValue, "agent-")
+		}
+	}
+}
+
 func TestRecord_PassesRecordsThrough(t *testing.T) {
 	cc := &callcontext.CallContext{
 		AssistantID:    1,

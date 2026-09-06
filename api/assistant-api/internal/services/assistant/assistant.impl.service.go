@@ -230,6 +230,60 @@ func (eService *assistantService) GetAllAssistantTool(ctx context.Context, auth 
 
 }
 
+func (eService *assistantService) GetAssistantWithPhoneDeploymentByDID(
+	ctx context.Context,
+	did string,
+) (*internal_assistant_entity.Assistant, error) {
+	db := eService.postgres.DB(ctx)
+	var telephonyOption *internal_assistant_entity.AssistantDeploymentTelephonyOption
+	tx := db.
+		Preload("AssistantPhoneDeployment").
+		Preload("AssistantPhoneDeployment.Assistant").
+		Preload("AssistantPhoneDeployment.TelephonyOption", "key IN ?", []string{"phone", "rapida.credential_id"}).
+		Joins("JOIN assistant_phone_deployments ON assistant_phone_deployments.id = assistant_deployment_telephony_options.assistant_deployment_telephony_id").
+		Joins("JOIN assistants ON assistants.id = assistant_phone_deployments.assistant_id").
+		Where("assistant_deployment_telephony_options.key = ? AND assistant_deployment_telephony_options.value = ?", "phone", did).
+		Where("assistant_phone_deployments.telephony_provider = ? AND assistant_phone_deployments.status = ?", "sip", type_enums.RECORD_ACTIVE.String()).
+		Where("assistants.status = ?", type_enums.RECORD_ACTIVE.String()).
+		Order("assistant_deployment_telephony_options.created_date DESC").
+		Order("assistant_deployment_telephony_options.id DESC").
+		First(&telephonyOption)
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+
+	deployment := telephonyOption.AssistantPhoneDeployment
+	if deployment == nil || deployment.Assistant == nil {
+		return nil, gorm.ErrRecordNotFound
+	}
+	assistant := deployment.Assistant
+	assistant.AssistantPhoneDeployment = deployment
+	return assistant, nil
+}
+
+func (eService *assistantService) GetAssistantWithPhoneDeploymentById(
+	ctx context.Context,
+	agentId uint64,
+) (*internal_assistant_entity.Assistant, error) {
+	var deployment *internal_assistant_entity.AssistantPhoneDeployment
+	tx := eService.postgres.DB(ctx).
+		Preload("Assistant", "status = ?", type_enums.RECORD_ACTIVE.String()).
+		Preload("TelephonyOption").
+		Where("assistant_id = ? AND telephony_provider = ? AND status = ?", agentId, "sip", type_enums.RECORD_ACTIVE.String()).
+		Order("created_date DESC").
+		Order("id DESC").
+		First(&deployment)
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+	if deployment.Assistant == nil {
+		return nil, gorm.ErrRecordNotFound
+	}
+	assistant := deployment.Assistant
+	assistant.AssistantPhoneDeployment = deployment
+	return assistant, nil
+}
+
 func (eService *assistantService) Get(ctx context.Context,
 	auth *types.Authentication,
 	assistantId uint64,
