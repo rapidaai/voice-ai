@@ -12,7 +12,7 @@ import (
 
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
-	internal_audio_resampler "github.com/rapidaai/api/assistant-api/internal/audio/resampler"
+	resampler_soxr "github.com/rapidaai/api/assistant-api/internal/audio/resampler/soxr"
 	internal_channel_input "github.com/rapidaai/api/assistant-api/internal/channel/input"
 	internal_telephony_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
@@ -54,10 +54,10 @@ type AudioProcessor struct {
 }
 
 func NewAudioProcessor(logger commons.Logger) (*AudioProcessor, error) {
-	resampler, err := internal_audio_resampler.GetResampler(logger)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrResamplerCreateFailed, err)
-	}
+	resampler := resampler_soxr.New(
+		resampler_soxr.WithLogger(logger),
+		resampler_soxr.WithHighQuality(),
+	)
 
 	audioProcessor := &AudioProcessor{
 		logger:             logger,

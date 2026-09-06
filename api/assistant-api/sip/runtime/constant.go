@@ -355,14 +355,12 @@ const (
 	rtpErrorSizeHeaderFormat = "%w: size=%d header=%d"
 )
 
-// RTP input jitter buffer constants bound reordering and inferred packet duration.
+// RTP input jitter buffer constants bound reordering and missing audio duration.
 const (
-	rtpInputReorderWindow              = 80 * time.Millisecond
-	rtpInputMaxLossGap                 = 500 * time.Millisecond
-	rtpInputMaxSilenceGap              = 500 * time.Millisecond
-	rtpInputBufferedPacketMapCapacity  = 5
-	rtpInputPacketizationStablePackets = 2
-	rtpInputNanosecondsPerSecond       = 1000000000
+	rtpInputReorderWindow             = 80 * time.Millisecond
+	rtpInputMaxLossGap                = 500 * time.Millisecond
+	rtpInputMaxSilenceGap             = 500 * time.Millisecond
+	rtpInputBufferedPacketMapCapacity = 5
 )
 
 // RTP inbound quality constants define rolling quality thresholds and labels.

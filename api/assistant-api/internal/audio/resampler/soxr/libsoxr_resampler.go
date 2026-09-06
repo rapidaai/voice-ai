@@ -3,7 +3,7 @@
 //
 // Licensed under GPL-2.0 with Rapida Additional Terms.
 // See LICENSE.md or contact sales@rapida.ai for commercial usage.
-package internal_resampler_soxr
+package resampler_soxr
 
 import (
 	"encoding/binary"
@@ -31,17 +31,57 @@ type cachedEngine struct {
 // so the filter state is continuous for streaming audio.
 type libsoxrResampler struct {
 	logger  commons.Logger
+	quality resampling.QualityPreset
 	engines sync.Map // key "srcRate/dstRate" → *cachedEngine
 }
 
-// NewLibsoxrAudioResampler creates a new audio resampler.
-func NewLibsoxrAudioResampler(logger commons.Logger) internal_type.AudioResampler {
-	return &libsoxrResampler{logger: logger}
+type options struct {
+	logger  commons.Logger
+	quality resampling.QualityPreset
+}
+
+type Option func(*options)
+
+// WithLogger sets the resampler logger.
+func WithLogger(logger commons.Logger) Option {
+	return func(options *options) {
+		options.logger = logger
+	}
+}
+
+// WithHighQuality selects the higher-quality streaming filter.
+func WithHighQuality() Option {
+	return func(options *options) {
+		options.quality = resampling.QualityHigh
+	}
+}
+
+// WithQuickQuality selects the low-latency streaming filter.
+func WithQuickQuality() Option {
+	return func(options *options) {
+		options.quality = resampling.QualityQuick
+	}
+}
+
+// New creates a streaming audio resampler with high-quality output by default.
+func New(options ...Option) internal_type.AudioResampler {
+	config := newOptions(options)
+	return &libsoxrResampler{logger: config.logger, quality: config.quality}
+}
+
+func newOptions(opts []Option) options {
+	config := options{quality: resampling.QualityHigh}
+	for _, option := range opts {
+		if option != nil {
+			option(&config)
+		}
+	}
+	return config
 }
 
 // Resample converts audio data using high-quality resampling.
 // The polyphase FIR engine is cached per rate-pair and reused across calls
-// so filter state is continuous — no per-chunk startup transients.
+// so filter state is continuous without per-chunk startup transients.
 func (r *libsoxrResampler) Resample(
 	data []byte,
 	source, target *protos.AudioConfig,
@@ -137,7 +177,7 @@ func (r *libsoxrResampler) getOrCreateEngine(srcRate, dstRate uint32) (*cachedEn
 		OutputRate: float64(dstRate),
 		Channels:   1, // Process() is mono-only; multi-channel needs ProcessMulti
 		EnableSIMD: true,
-		Quality:    resampling.QualitySpec{Preset: resampling.QualityHigh},
+		Quality:    resampling.QualitySpec{Preset: r.quality},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("resampler init failed: %w", err)

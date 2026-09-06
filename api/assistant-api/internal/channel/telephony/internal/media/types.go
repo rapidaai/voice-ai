@@ -74,7 +74,7 @@ type ProviderAudioFrame struct {
 	ReceivedAt time.Time
 }
 
-// InputAudioFrame separates immediate bridge audio from thresholded AI input.
+// InputAudioFrame separates recording audio from realtime AI input.
 type InputAudioFrame struct {
 	BridgeAudio   []byte
 	PipelineAudio []byte

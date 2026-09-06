@@ -175,6 +175,11 @@ func TestMediaSession_HandleProviderAudioFrame_EmitsBridgeAndPipelineAudio(t *te
 	if !userAudio.Time.AsTime().Equal(receivedAt) {
 		t.Fatalf("user time=%s want=%s", userAudio.Time.AsTime(), receivedAt)
 	}
+	select {
+	case stream := <-streams:
+		t.Fatalf("unexpected extra stream %T", stream)
+	default:
+	}
 }
 
 func TestMediaSession_HandleProviderAudioFrame_UsesServerTimeWhenMissing(t *testing.T) {

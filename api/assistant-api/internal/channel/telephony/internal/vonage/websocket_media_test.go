@@ -106,7 +106,7 @@ func TestHandleMediaEvent_EmitsBridgeUserAudio(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case stream := <-vonageStreamer.InputCh:
+	case stream := <-vonageStreamer.LowCh:
 		bridgeAudio, ok := stream.(*protos.ConversationBridgeUserAudio)
 		require.True(t, ok, "expected bridge user audio, got %T", stream)
 		assert.NotEmpty(t, bridgeAudio.GetAudio())

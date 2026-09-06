@@ -15,6 +15,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
+	"github.com/rapidaai/pkg/commons"
 )
 
 const (
@@ -30,7 +31,6 @@ const (
 
 	Linear16BytesPerMs    = 32
 	BridgeOutputFrameSize = Linear16BytesPerMs * 20
-	InputBufferThreshold  = Linear16BytesPerMs * 40
 )
 
 type OutboundFailureReason string
@@ -62,8 +62,7 @@ var (
 
 type AudioProcessorConfig struct {
 	RTPHandler rtpHandler
-	Resampler  internal_type.AudioResampler
-	PushInput  func(internal_type.Stream)
+	Logger     commons.Logger
 	Record     func(...observability.Record) error
 	Ringtone   string
 	Ambient    *internal_ambient.Config
@@ -71,7 +70,7 @@ type AudioProcessorConfig struct {
 
 type rtpHandler interface {
 	internal_type.SIPRTPBridgeTarget
-	AudioIn() <-chan []byte
+	AudioIn() <-chan sip_runtime.InboundAudioFrame
 	ClearFallbackAudioSource()
 	FlushAudioOut()
 	GetCodec() *sip_runtime.Codec

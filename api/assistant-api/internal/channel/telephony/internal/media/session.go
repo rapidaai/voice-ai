@@ -305,20 +305,17 @@ func (mediaSession *MediaSession) emitInputAudioFrame(inputFrame InputAudioFrame
 		Message: &protos.ConversationUserMessage_Audio{Audio: inputFrame.PipelineAudio},
 		Time:    timestamppb.New(receivedAt),
 	}
-	if mediaSession.emitStream(userAudio) {
-		return
-	}
+	mediaSession.emitStream(userAudio)
 }
 
-func (mediaSession *MediaSession) emitStream(stream internal_type.Stream) bool {
+func (mediaSession *MediaSession) emitStream(stream internal_type.Stream) {
 	mediaSession.sinkMu.RLock()
 	streamSink := mediaSession.streamSink
 	mediaSession.sinkMu.RUnlock()
 	if streamSink == nil {
-		return false
+		return
 	}
 	streamSink(stream)
-	return true
 }
 
 func (mediaSession *MediaSession) storeCurrentOutputFrame(outputFrame AssistantOutputFrame) {

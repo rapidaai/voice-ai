@@ -19,7 +19,7 @@ import (
 	pionwebrtc "github.com/pion/webrtc/v4"
 	assistant_config "github.com/rapidaai/api/assistant-api/config"
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
-	internal_audio_resampler "github.com/rapidaai/api/assistant-api/internal/audio/resampler"
+	resampler_soxr "github.com/rapidaai/api/assistant-api/internal/audio/resampler/soxr"
 	channel_base "github.com/rapidaai/api/assistant-api/internal/channel/base"
 	webrtc_internal "github.com/rapidaai/api/assistant-api/internal/channel/webrtc/internal"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
@@ -96,11 +96,17 @@ func newTestStreamer(t *testing.T) *webrtcStreamer {
 	logger := newTestLogger(t)
 	opusCodec, err := webrtc_internal.NewOpusCodec()
 	require.NoError(t, err)
-	resampler, err := internal_audio_resampler.GetResampler(logger)
-	require.NoError(t, err)
+	resampler := resampler_soxr.New(
+		resampler_soxr.WithLogger(logger),
+		resampler_soxr.WithHighQuality(),
+	)
 
 	return &webrtcStreamer{
-		BaseStreamer:     channel_base.NewBaseStreamerWithChannelCapacity(logger, 16, 16),
+		BaseStreamer: channel_base.New(
+			channel_base.WithLogger(logger),
+			channel_base.WithInputChannelCapacity(16),
+			channel_base.WithOutputChannelCapacity(16),
+		),
 		peerConfig:       webrtc_internal.DefaultConfig(),
 		sessionID:        "test-session",
 		resampler:        resampler,
@@ -896,7 +902,11 @@ func TestHandleConfigurationMessage_TextToAudioStartsNegotiation(t *testing.T) {
 func TestHandleConfigurationMessage_TextStopsAudioNegotiationBeforeAudioConnected(t *testing.T) {
 	t.Parallel()
 	s := newTestStreamer(t)
-	s.BaseStreamer = channel_base.NewBaseStreamerWithChannelCapacity(s.Logger, 64, 64)
+	s.BaseStreamer = channel_base.New(
+		channel_base.WithLogger(s.Logger),
+		channel_base.WithInputChannelCapacity(64),
+		channel_base.WithOutputChannelCapacity(64),
+	)
 	s.currentMode = protos.StreamMode_STREAM_MODE_TEXT
 
 	s.handleConfigurationMessage(protos.StreamMode_STREAM_MODE_AUDIO)
@@ -1596,7 +1606,11 @@ func TestWebRTCOperation_QueuesICERestartRetryWhenOfferPending(t *testing.T) {
 func TestWebRTCRepeatedAudioModeToggles_NoDuplicateReadersNoDeadlock(t *testing.T) {
 	t.Parallel()
 	s := newTestStreamer(t)
-	s.BaseStreamer = channel_base.NewBaseStreamerWithChannelCapacity(s.Logger, 128, 128)
+	s.BaseStreamer = channel_base.New(
+		channel_base.WithLogger(s.Logger),
+		channel_base.WithInputChannelCapacity(128),
+		channel_base.WithOutputChannelCapacity(128),
+	)
 	t.Cleanup(s.Cancel)
 
 	for i := 0; i < 5; i++ {
@@ -1612,7 +1626,11 @@ func TestWebRTCRepeatedAudioModeToggles_NoDuplicateReadersNoDeadlock(t *testing.
 func TestWebRTCSequentialTextAudioModeSwitchSoak_LeavesTextStable(t *testing.T) {
 	t.Parallel()
 	s := newTestStreamer(t)
-	s.BaseStreamer = channel_base.NewBaseStreamerWithChannelCapacity(s.Logger, 512, 512)
+	s.BaseStreamer = channel_base.New(
+		channel_base.WithLogger(s.Logger),
+		channel_base.WithInputChannelCapacity(512),
+		channel_base.WithOutputChannelCapacity(512),
+	)
 	t.Cleanup(s.Cancel)
 
 	const switchCount = 25
@@ -1639,7 +1657,11 @@ func TestWebRTCSequentialTextAudioModeSwitchSoak_LeavesTextStable(t *testing.T) 
 
 func TestWebRTCConcurrentTextAudioModeSwitchRace_LeavesValidState(t *testing.T) {
 	s := newTestStreamer(t)
-	s.BaseStreamer = channel_base.NewBaseStreamerWithChannelCapacity(s.Logger, 1024, 1024)
+	s.BaseStreamer = channel_base.New(
+		channel_base.WithLogger(s.Logger),
+		channel_base.WithInputChannelCapacity(1024),
+		channel_base.WithOutputChannelCapacity(1024),
+	)
 	t.Cleanup(s.Cancel)
 
 	const workerCount = 2
@@ -2204,7 +2226,7 @@ func TestAudioBuffer_InputEmitsBridgeAudioAndFramedUserAudio(t *testing.T) {
 
 	s.bufferAndSendInput(audio, inputAudioReceivedAt)
 
-	bridgeAudio, ok := (<-s.InputCh).(*protos.ConversationBridgeUserAudio)
+	bridgeAudio, ok := (<-s.LowCh).(*protos.ConversationBridgeUserAudio)
 	require.True(t, ok)
 	assert.Equal(t, audio, bridgeAudio.GetAudio())
 	assert.Equal(t, inputAudioReceivedAt, bridgeAudio.GetTime().AsTime())
@@ -2671,7 +2693,7 @@ func TestConsumeFrame_TracksWriteFailureWithoutRecordingAssistantAudio(t *testin
 	assert.False(t, s.mediaHealthState.LastAssistantFrameWriteFailureAt.IsZero())
 
 	select {
-	case msg := <-s.InputCh:
+	case msg := <-s.LowCh:
 		t.Fatalf("failed assistant frame should not be recorded, got %T", msg)
 	default:
 	}
@@ -2693,7 +2715,7 @@ func TestConsumeFrame_DropsStalePacedMediaSession(t *testing.T) {
 	assert.Zero(t, s.mediaHealthState.AssistantFrameWriteFailures)
 
 	select {
-	case msg := <-s.InputCh:
+	case msg := <-s.LowCh:
 		t.Fatalf("stale assistant frame should not be recorded, got %T", msg)
 	default:
 	}
@@ -2726,7 +2748,7 @@ func TestConsumeFrame_TracksLastAssistantFrameSentAt(t *testing.T) {
 	assert.False(t, lastSentAt.IsZero())
 
 	select {
-	case msg := <-s.InputCh:
+	case msg := <-s.LowCh:
 		bridge, ok := msg.(*protos.ConversationBridgeOperatorAudio)
 		require.True(t, ok, "expected ConversationBridgeOperatorAudio, got %T", msg)
 		assert.Equal(t, assistantPCM16k, bridge.GetAudio())

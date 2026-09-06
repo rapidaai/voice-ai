@@ -3,7 +3,7 @@
 //
 // Licensed under GPL-2.0 with Rapida Additional Terms.
 // See LICENSE.md or contact sales@rapida.ai for commercial usage.
-package internal_resampler_soxr
+package resampler_soxr
 
 import (
 	"encoding/binary"
@@ -16,6 +16,7 @@ import (
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	resampling "github.com/tphakala/go-audio-resampler"
 )
 
 func newTestLogger(t testing.TB) commons.Logger {
@@ -31,7 +32,7 @@ func newTestLogger(t testing.TB) commons.Logger {
 }
 
 func newTestResampler(t testing.TB) *libsoxrResampler {
-	r := NewLibsoxrAudioResampler(newTestLogger(t))
+	r := New(WithLogger(newTestLogger(t)), WithHighQuality())
 	res, ok := r.(*libsoxrResampler)
 	require.True(t, ok)
 	return res
@@ -39,10 +40,58 @@ func newTestResampler(t testing.TB) *libsoxrResampler {
 
 // TestNewAudioResampler validates resampler creation
 func TestNewAudioResampler(t *testing.T) {
-	r := NewLibsoxrAudioResampler(newTestLogger(t))
+	r := New(WithLogger(newTestLogger(t)))
 	assert.NotNil(t, r)
-	_, ok := r.(*libsoxrResampler)
+	resampler, ok := r.(*libsoxrResampler)
 	assert.True(t, ok)
+	assert.Equal(t, resampling.QualityHigh, resampler.quality)
+}
+
+func TestNewAudioResamplerAppliesQuickQuality(t *testing.T) {
+	r := New(WithLogger(newTestLogger(t)), WithQuickQuality())
+	resampler, ok := r.(*libsoxrResampler)
+	require.True(t, ok)
+	assert.Equal(t, resampling.QualityQuick, resampler.quality)
+}
+
+func TestNewChunkAppliesOptions(t *testing.T) {
+	resampler := NewChunk(WithLogger(newTestLogger(t)), WithQuickQuality())
+	chunk, ok := resampler.(*chunkResampler)
+	require.True(t, ok)
+	assert.NotNil(t, chunk.logger)
+	assert.Equal(t, resampling.QualityQuick, chunk.quality)
+}
+
+func TestRealtimeAudioResamplerEmitsEachSpeechFrameImmediately(tester *testing.T) {
+	resampler := New(WithLogger(newTestLogger(tester)), WithQuickQuality())
+	source := internal_audio.NewLinear8khzMonoAudioConfig()
+	target := internal_audio.NewLinear16khzMonoAudioConfig()
+
+	for frameIndex := 0; frameIndex < 4; frameIndex++ {
+		input := generateLinear16Data(160)
+		output, err := resampler.Resample(input, source, target)
+		require.NoError(tester, err)
+		require.Len(tester, output, 640)
+	}
+}
+
+func TestRealtimeAudioResamplerInstancesKeepIndependentState(tester *testing.T) {
+	source := internal_audio.NewLinear8khzMonoAudioConfig()
+	target := internal_audio.NewLinear16khzMonoAudioConfig()
+	firstInput := generateLinear16Data(160)
+	secondInput := make([]byte, len(firstInput))
+
+	first := New(WithLogger(newTestLogger(tester)), WithQuickQuality())
+	second := New(WithLogger(newTestLogger(tester)), WithQuickQuality())
+	reference := New(WithLogger(newTestLogger(tester)), WithQuickQuality())
+
+	_, err := first.Resample(firstInput, source, target)
+	require.NoError(tester, err)
+	got, err := second.Resample(secondInput, source, target)
+	require.NoError(tester, err)
+	want, err := reference.Resample(secondInput, source, target)
+	require.NoError(tester, err)
+	require.Equal(tester, want, got)
 }
 
 // TestResampleNoConversion tests when source and target are identical

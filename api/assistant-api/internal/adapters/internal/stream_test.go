@@ -10,7 +10,6 @@ import (
 
 	adapter_channel "github.com/rapidaai/api/assistant-api/internal/adapters/channel"
 	adapter_lifecycle "github.com/rapidaai/api/assistant-api/internal/adapters/lifecycle"
-	channel_base "github.com/rapidaai/api/assistant-api/internal/channel/base"
 	internal_conversation_entity "github.com/rapidaai/api/assistant-api/internal/entity/conversations"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
@@ -65,13 +64,20 @@ func (s *streamTestStreamer) NotifyMode(mode protos.StreamMode) {
 	s.modes = append(s.modes, mode)
 }
 
-type streamTestDropStatsStreamer struct {
-	*streamTestStreamer
-	stats channel_base.StreamerDropStats
-}
-
-func (s *streamTestDropStatsStreamer) DropStats() channel_base.StreamerDropStats {
-	return s.stats
+func TestOnCallCompletionReportsCleanup(tester *testing.T) {
+	channels := adapter_channel.NewRequestorChannels()
+	requestor := &genericRequestor{
+		assistantConversation: &internal_conversation_entity.AssistantConversation{},
+		messageLifecycle:      adapter_lifecycle.NewMessageLifecycle(),
+		channels:              channels,
+	}
+	requestor.assistantConversation.Id = 42
+	requestor.OnCallCompletion(time.Now())
+	require.Len(tester, channels.BackgroundChannel(), 2)
+	<-channels.BackgroundChannel()
+	packet, ok := (<-channels.BackgroundChannel()).Pkt.(internal_type.ObservabilityEventRecordPacket)
+	require.True(tester, ok)
+	require.Equal(tester, "0", packet.Record.Attributes["messages"])
 }
 
 func TestTalk_RecvErrorBeforeInitialization_ReturnsNil(t *testing.T) {
@@ -119,38 +125,6 @@ func TestOnCallCompletion_EmitsConversationDurationInMilliseconds(t *testing.T) 
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, durationMs, int64(1900))
 	assert.Less(t, durationMs, int64(3000))
-}
-
-func TestOnCallCompletion_EmitsStreamerDropStats(t *testing.T) {
-	r := &genericRequestor{
-		streamer: &streamTestDropStatsStreamer{
-			streamTestStreamer: &streamTestStreamer{},
-			stats: channel_base.StreamerDropStats{
-				CriticalInputDropped: 1,
-				NormalInputDropped:   2,
-				LowInputDropped:      3,
-				OutputDropped:        4,
-			},
-		},
-		assistantConversation: &internal_conversation_entity.AssistantConversation{},
-		messageLifecycle:      adapter_lifecycle.NewMessageLifecycle(),
-		channels:              adapter_channel.NewRequestorChannels(),
-	}
-	r.assistantConversation.Id = 42
-
-	r.OnCallCompletion(time.Now())
-
-	envelope := <-r.channels.BackgroundChannel()
-	packet, ok := envelope.Pkt.(internal_type.ObservabilityMetricRecordPacket)
-	require.True(t, ok)
-	metrics := make(map[string]string, len(packet.Record.Metrics))
-	for _, metric := range packet.Record.Metrics {
-		metrics[metric.GetName()] = metric.GetValue()
-	}
-	assert.Equal(t, "1", metrics[observability.MetricStreamerCriticalDrops])
-	assert.Equal(t, "2", metrics[observability.MetricStreamerNormalDrops])
-	assert.Equal(t, "3", metrics[observability.MetricStreamerLowDrops])
-	assert.Equal(t, "4", metrics[observability.MetricStreamerOutputDrops])
 }
 
 func TestTalk_BuffersPacketsBeforeInitialization(t *testing.T) {

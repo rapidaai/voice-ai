@@ -145,7 +145,7 @@ func newTestTwilioStreamer(t *testing.T) (*twilioWebsocketStreamer, func()) {
 		streamID:   "test-stream",
 		connection: conn,
 	}
-	// Note: we do NOT start runWebSocketReader — tests exercise Send only.
+	// Do not start runWebSocketReader because these tests exercise Send only.
 	return tws, cleanup
 }
 
@@ -201,7 +201,7 @@ func TestHandleMediaEvent_EmitsBridgeUserAudio(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case stream := <-tws.InputCh:
+	case stream := <-tws.LowCh:
 		bridgeAudio, ok := stream.(*protos.ConversationBridgeUserAudio)
 		require.True(t, ok, "expected bridge user audio, got %T", stream)
 		assert.NotEmpty(t, bridgeAudio.GetAudio())

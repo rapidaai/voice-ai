@@ -50,9 +50,16 @@ func newTestProcessor(t *testing.T, silenceByte byte, frameSize int) *AudioProce
 }
 
 func TestNewAudioProcessor_HappyPath(t *testing.T) {
-	audioProcessor := newTestProcessor(t, 0x00, 320)
-	if audioProcessor == nil {
-		t.Fatal("expected non-nil processor")
+	audioProcessor, err := NewAudioProcessor(nil, AudioProcessorConfig{
+		AsteriskConfig:   &protos.AudioConfig{},
+		DownstreamConfig: &protos.AudioConfig{},
+		FrameSize:        320,
+	})
+	if err != nil {
+		t.Fatalf("NewAudioProcessor error: %v", err)
+	}
+	if audioProcessor.resampler == nil {
+		t.Fatal("expected resampler")
 	}
 	if audioProcessor.GetOptimalFrameSize() != 320 {
 		t.Errorf("expected frame size 320, got %d", audioProcessor.GetOptimalFrameSize())

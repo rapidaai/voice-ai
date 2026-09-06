@@ -7,6 +7,7 @@ package channel
 
 import (
 	"context"
+	"sync"
 
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 )
@@ -84,6 +85,7 @@ type RequestorChannels struct {
 	ingressCh       chan Envelope
 	ingressPauseCh  chan struct{}
 	ingressPausedCh chan struct{}
+	ingressWriteMu  sync.Mutex
 
 	// egressCh carries outbound assistant-side packets:
 	// LLM deltas/done, TTS text/audio/end, and output error/control events.
@@ -135,6 +137,13 @@ func (c *RequestorChannels) OnBootstrap(e Envelope) {
 
 // OnIngress routes an envelope to the ingress channel.
 func (c *RequestorChannels) OnIngress(e Envelope) {
+	if e.Ctx != nil && e.Ctx.Err() != nil {
+		return
+	}
+
+	c.ingressWriteMu.Lock()
+	defer c.ingressWriteMu.Unlock()
+
 	select {
 	case <-c.ingressPauseCh:
 		return
@@ -142,15 +151,17 @@ func (c *RequestorChannels) OnIngress(e Envelope) {
 	}
 
 	select {
-	case <-c.ingressPauseCh:
+	case c.ingressCh <- e:
 		return
+	default:
+	}
+	select {
+	case <-c.ingressCh:
+	default:
+	}
+	select {
 	case c.ingressCh <- e:
 	default:
-		c.FlushIngress()
-		select {
-		case <-c.ingressPauseCh:
-		case c.ingressCh <- e:
-		}
 	}
 }
 
@@ -207,10 +218,17 @@ func (c *RequestorChannels) RunIngress(ctx context.Context, onEnvelope func(Enve
 }
 
 func (c *RequestorChannels) PauseIngress(ctx context.Context, onPaused func()) {
+	c.ingressWriteMu.Lock()
 	if c.ingressPauseCh != nil {
-		close(c.ingressPauseCh)
+		select {
+		case <-c.ingressPauseCh:
+		default:
+			close(c.ingressPauseCh)
+		}
 	}
 	c.FlushIngress()
+	c.ingressWriteMu.Unlock()
+
 	if c.ingressPausedCh != nil {
 		select {
 		case <-ctx.Done():

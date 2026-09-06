@@ -193,7 +193,6 @@ func New(opts ...FuncOption) (internal_type.SIPCallStreamer, error) {
 		Context:    s.Ctx,
 		Logger:     options.Logger,
 		Session:    options.Session,
-		Resampler:  s.Resampler(),
 		StreamSink: s.Input,
 		Record:     s.Record,
 	})

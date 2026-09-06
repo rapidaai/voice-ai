@@ -190,6 +190,9 @@ func TestSpeechToText_WebsocketFlow_JSONRequestRules(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
+	typedTransformer, ok := transformer.(*speechToText)
+	require.True(t, ok)
+	require.NotNil(t, typedTransformer.resampler)
 	require.NoError(t, transformer.Initialize())
 	require.NoError(t, transformer.Transform(context.Background(), internal_type.TurnChangePacket{ContextID: "ctx-1"}))
 	require.NoError(t, transformer.Transform(context.Background(), internal_type.SpeechToTextEndPacket{ContextID: "ctx-1"}))

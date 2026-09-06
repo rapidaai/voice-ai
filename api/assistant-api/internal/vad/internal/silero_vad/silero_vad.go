@@ -15,7 +15,7 @@ import (
 	"time"
 
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
-	internal_audio_resampler "github.com/rapidaai/api/assistant-api/internal/audio/resampler"
+	resampler_linear "github.com/rapidaai/api/assistant-api/internal/audio/resampler/linear"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_options "github.com/rapidaai/api/assistant-api/internal/options"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
@@ -148,26 +148,9 @@ func New(opts ...Option) (internal_type.VoiceActivityDetectorExecutor, error) {
 		}
 		return nil, fmt.Errorf("failed to create silero detector: %w", err)
 	}
-	converter, err := internal_audio_resampler.GetConverter(options.logger)
-	if err != nil {
-		detector.Destroy()
-		if options.onPacket != nil {
-			_ = options.onPacket(options.ctx, internal_type.ObservabilityLogRecordPacket{
-				Scope: internal_type.ObservabilityRecordScopeConversation,
-				Record: observability.RecordLog{
-					Level:   observability.LevelError,
-					Message: fmt.Sprintf("%s: error while initialization %s", vadName, err.Error()),
-					Attributes: observability.Attributes{
-						"component": observability.ComponentVAD.String(),
-						"provider":  vadName,
-						"options":   observability.AttributeValue(options.options),
-					},
-					OccurredAt: time.Now(),
-				},
-			})
-		}
-		return nil, fmt.Errorf("failed to create audio converter: %w", err)
-	}
+	converter := resampler_linear.NewConverter(
+		resampler_linear.WithLogger(options.logger),
+	)
 
 	svad := &SileroVAD{
 		logger:       options.logger,

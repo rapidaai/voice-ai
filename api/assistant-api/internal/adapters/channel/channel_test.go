@@ -9,6 +9,40 @@ import (
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 )
 
+func TestRequestorChannels_OverflowEvictsOldestPacket(tester *testing.T) {
+	channels := NewRequestorChannels()
+	capacity := cap(channels.IngressChannel())
+	for index := 0; index < capacity; index++ {
+		var packet internal_type.Packet = internal_type.UserAudioReceivedPacket{ContextID: "queued", Audio: []byte{1, 2}}
+		if index%2 == 0 {
+			packet = internal_type.SpeechToTextPacket{ContextID: "queued", Script: "retained"}
+		}
+		channels.OnIngress(Envelope{Ctx: context.Background(), Pkt: packet})
+	}
+	channels.OnIngress(Envelope{Ctx: context.Background(), Pkt: internal_type.UserAudioReceivedPacket{ContextID: "latest", Audio: []byte{3, 4}}})
+	if len(channels.IngressChannel()) != capacity {
+		tester.Fatal("overflow must replace only the oldest packet")
+	}
+	for index := 0; index < capacity-1; index++ {
+		if packet := (<-channels.IngressChannel()).Pkt; packet.ContextId() != "queued" {
+			tester.Fatal("unexpected retained packet")
+		}
+	}
+	if packet := (<-channels.IngressChannel()).Pkt; packet.ContextId() != "latest" {
+		tester.Fatal("latest packet was not retained")
+	}
+}
+
+func TestRequestorChannels_CancelledIngressIsNotOverload(tester *testing.T) {
+	channels := NewRequestorChannels()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	channels.OnIngress(Envelope{Ctx: ctx, Pkt: internal_type.UserAudioReceivedPacket{}})
+	if len(channels.IngressChannel()) != 0 {
+		tester.Fatal("cancelled input should not be admitted")
+	}
+}
+
 func recvEnvelope(t *testing.T, ch chan Envelope) Envelope {
 	t.Helper()
 	select {
@@ -135,7 +169,7 @@ func TestRequestorChannels_FlushAll(t *testing.T) {
 	}
 }
 
-func TestRequestorChannels_OnIngressWhenFull_FlushesOldQueueAndKeepsLatest(t *testing.T) {
+func TestRequestorChannels_OnIngressWhenFull_EvictsOldestPacket(t *testing.T) {
 	chs := &RequestorChannels{
 		controlChannel: make(chan Envelope, 1),
 		bootstrapCh:    make(chan Envelope, 1),
@@ -147,16 +181,18 @@ func TestRequestorChannels_OnIngressWhenFull_FlushesOldQueueAndKeepsLatest(t *te
 	chs.OnIngress(Envelope{Ctx: context.Background(), Pkt: internal_type.UserTextReceivedPacket{ContextID: "old-1"}})
 	chs.OnIngress(Envelope{Ctx: context.Background(), Pkt: internal_type.UserTextReceivedPacket{ContextID: "old-2"}})
 
-	// Channel is full now. OnIngress should flush old queued packets and keep latest.
 	chs.OnIngress(Envelope{Ctx: context.Background(), Pkt: internal_type.UserTextReceivedPacket{ContextID: "new"}})
 
-	if got := len(chs.IngressChannel()); got != 1 {
-		t.Fatalf("expected ingress len=1 after overflow reset, got %d", got)
+	if got := len(chs.IngressChannel()); got != 2 {
+		t.Fatalf("expected bounded ingress queue, got %d", got)
 	}
 
 	env := recvEnvelope(t, chs.IngressChannel())
-	if env.Pkt.ContextId() != "new" {
-		t.Fatalf("expected latest packet to remain after overflow reset, got %s", env.Pkt.ContextId())
+	if env.Pkt.ContextId() != "old-2" {
+		t.Fatalf("expected second-oldest packet, got %s", env.Pkt.ContextId())
+	}
+	if got := recvEnvelope(t, chs.IngressChannel()).Pkt.ContextId(); got != "new" {
+		t.Fatalf("expected latest packet, got %s", got)
 	}
 }
 
@@ -171,7 +207,10 @@ func TestRequestorChannels_OnIngressOverflow_ThenRefillsInOrder(t *testing.T) {
 
 	chs.OnIngress(Envelope{Ctx: context.Background(), Pkt: internal_type.UserTextReceivedPacket{ContextID: "old-1"}})
 	chs.OnIngress(Envelope{Ctx: context.Background(), Pkt: internal_type.UserTextReceivedPacket{ContextID: "old-2"}})
-	chs.OnIngress(Envelope{Ctx: context.Background(), Pkt: internal_type.UserTextReceivedPacket{ContextID: "new-1"}}) // overflow reset
+	chs.OnIngress(Envelope{Ctx: context.Background(), Pkt: internal_type.UserTextReceivedPacket{ContextID: "latest"}})
+	_ = recvEnvelope(t, chs.IngressChannel())
+	_ = recvEnvelope(t, chs.IngressChannel())
+	chs.OnIngress(Envelope{Ctx: context.Background(), Pkt: internal_type.UserTextReceivedPacket{ContextID: "new-1"}})
 	chs.OnIngress(Envelope{Ctx: context.Background(), Pkt: internal_type.UserTextReceivedPacket{ContextID: "new-2"}})
 
 	if got := len(chs.IngressChannel()); got != 2 {
@@ -258,8 +297,46 @@ func TestRequestorChannels_OnIngress_ConcurrentWritersNoDeadlock(t *testing.T) {
 		t.Fatalf("concurrent OnIngress writers did not complete")
 	}
 
-	if len(chs.IngressChannel()) == 0 {
-		t.Fatalf("expected at least one ingress packet after concurrent writes")
+	if got := len(chs.IngressChannel()); got != cap(chs.IngressChannel()) {
+		t.Fatalf("expected full ingress queue after concurrent writes, got %d", got)
+	}
+}
+
+func TestRequestorChannels_PauseIngressRejectsConcurrentWriters(t *testing.T) {
+	chs := NewRequestorChannels()
+	start := make(chan struct{})
+
+	var writers sync.WaitGroup
+	for index := 0; index < 256; index++ {
+		writers.Add(1)
+		go func() {
+			defer writers.Done()
+			<-start
+			chs.OnIngress(Envelope{
+				Ctx: context.Background(),
+				Pkt: internal_type.UserTextReceivedPacket{ContextID: "concurrent"},
+			})
+		}()
+	}
+
+	paused := make(chan struct{})
+	go func() {
+		<-start
+		chs.PauseIngress(context.Background(), func() {
+			close(paused)
+		})
+	}()
+
+	close(start)
+	writers.Wait()
+	select {
+	case <-paused:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for ingress pause")
+	}
+
+	if got := len(chs.IngressChannel()); got != 0 {
+		t.Fatalf("expected no ingress packets after pause, got %d", got)
 	}
 }
 

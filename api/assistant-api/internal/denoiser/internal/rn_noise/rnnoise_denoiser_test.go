@@ -78,6 +78,10 @@ func TestRnnoiseDenoiser_ObservabilityInitRecords(t *testing.T) {
 	)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, denoiser.Close(t.Context())) })
+	typedDenoiser, ok := denoiser.(*rnnoiseDenoiser)
+	require.True(t, ok)
+	require.NotNil(t, typedDenoiser.audioResampler)
+	require.NotNil(t, typedDenoiser.audioConverter)
 
 	var initMetric internal_type.ObservabilityMetricRecordPacket
 	var initLog internal_type.ObservabilityLogRecordPacket

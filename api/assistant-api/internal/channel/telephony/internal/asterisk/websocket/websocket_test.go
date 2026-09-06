@@ -79,10 +79,10 @@ func newTestStreamer(t *testing.T) *asteriskWebsocketStreamer {
 	require.NoError(t, err)
 	return &asteriskWebsocketStreamer{
 		BaseTelephonyStreamer: internal_telephony_base.BaseTelephonyStreamer{
-			BaseStreamer: channel_base.NewBaseStreamer(logger),
+			BaseStreamer: channel_base.New(channel_base.WithLogger(logger)),
 		},
-		// connection is nil — sendCommand returns nil, Cancel skips close
-		// audioProcessor is nil — stopAudioProcessing is a no-op (audioCancel is nil)
+		// connection is nil, so sendCommand returns nil and Cancel skips close.
+		// audioProcessor is nil, so stopAudioProcessing is a no-op.
 	}
 }
 
@@ -133,7 +133,7 @@ func TestHandleAudioData_EmitsBridgeUserAudio(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case stream := <-asteriskStreamer.InputCh:
+	case stream := <-asteriskStreamer.LowCh:
 		bridgeAudio, ok := stream.(*protos.ConversationBridgeUserAudio)
 		require.True(t, ok, "expected bridge user audio, got %T", stream)
 		assert.NotEmpty(t, bridgeAudio.GetAudio())

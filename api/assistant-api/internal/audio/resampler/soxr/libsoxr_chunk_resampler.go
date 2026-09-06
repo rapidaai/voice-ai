@@ -3,7 +3,7 @@
 //
 // Licensed under GPL-2.0 with Rapida Additional Terms.
 // See LICENSE.md or contact sales@rapida.ai for commercial usage.
-package internal_resampler_soxr
+package resampler_soxr
 
 import (
 	"fmt"
@@ -20,15 +20,18 @@ import (
 // resampler, but treats each call as a bounded audio buffer and flushes before
 // returning. This is for preprocessing stages that must preserve per-call
 // duration.
-type libsoxrChunkResampler struct {
-	logger commons.Logger
+type chunkResampler struct {
+	logger  commons.Logger
+	quality resampling.QualityPreset
 }
 
-func NewLibsoxrChunkAudioResampler(logger commons.Logger) internal_type.AudioResampler {
-	return &libsoxrChunkResampler{logger: logger}
+// NewChunk creates a stateless resampler for independent audio buffers.
+func NewChunk(options ...Option) internal_type.AudioResampler {
+	config := newOptions(options)
+	return &chunkResampler{logger: config.logger, quality: config.quality}
 }
 
-func (r *libsoxrChunkResampler) Resample(data []byte, source, target *protos.AudioConfig) ([]byte, error) {
+func (r *chunkResampler) Resample(data []byte, source, target *protos.AudioConfig) ([]byte, error) {
 	if source == nil || target == nil {
 		return nil, fmt.Errorf("source and target configs are required")
 	}
@@ -58,7 +61,7 @@ func (r *libsoxrChunkResampler) Resample(data []byte, source, target *protos.Aud
 			pcm16ToFloat64(pcm),
 			float64(source.SampleRate),
 			float64(target.SampleRate),
-			resampling.QualityHigh,
+			r.quality,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("resample failed: %w", err)

@@ -14,6 +14,9 @@ func TestAudioProcessor_AmbientConfigureAndIdleOutputFrame(t *testing.T) {
 	if audioProcessor.ambientMixer == nil {
 		t.Fatal("expected ambient mixer to be initialized")
 	}
+	if audioProcessor.resampler == nil {
+		t.Fatal("expected resampler")
+	}
 
 	err = audioProcessor.ConfigureAmbient(internal_ambient.NewConfig(internal_ambient.ProfileCafe, 18))
 	if err != nil {

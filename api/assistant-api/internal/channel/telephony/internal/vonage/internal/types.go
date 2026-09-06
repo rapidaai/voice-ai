@@ -63,7 +63,6 @@ var (
 	ErrInboundFromMissing          = errors.New("missing or empty 'from' query parameter")
 
 	ErrAudioProcessorInitFailed = errors.New("failed to initialize Vonage audio processor")
-	ErrResamplerCreateFailed    = errors.New("failed to create resampler")
 )
 
 const (

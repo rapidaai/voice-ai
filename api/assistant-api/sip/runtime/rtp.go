@@ -62,7 +62,7 @@ type RTPHandler struct {
 	remoteSSRC             atomic.Uint32
 
 	// Audio channels
-	audioInChan  chan []byte
+	audioInChan  chan InboundAudioFrame
 	audioOutChan chan []byte
 	inputJitter  *rtpInputJitterBuffer
 	outputSource RTPFallbackAudioSource
@@ -258,7 +258,7 @@ func NewRTPHandler(ctx context.Context, config *RTPConfig) (*RTPHandler, error) 
 		ssrc:                   ssrc,
 		codec:                  codec,
 		inputPacketizationTime: config.PacketizationTime,
-		audioInChan:            make(chan []byte, rtpAudioInBufferSize),
+		audioInChan:            make(chan InboundAudioFrame, rtpAudioInBufferSize),
 		audioOutChan:           make(chan []byte, rtpAudioOutBufferSize),
 		inputJitter:            newRTPInputJitterBuffer(codec, config.PacketizationTime),
 		flushAudioCh:           make(chan struct{}, 1),
@@ -375,9 +375,52 @@ func (h *RTPHandler) Stop() error {
 	}
 
 	h.loops.Wait()
+	h.flushPendingInboundAudio()
 	h.closeInboundChannel()
 
 	return err
+}
+
+func (h *RTPHandler) flushPendingInboundAudio() {
+	h.mu.RLock()
+	inputJitter := h.inputJitter
+	h.mu.RUnlock()
+	if inputJitter == nil {
+		return
+	}
+
+	lostBefore := inputJitter.lostPackets()
+	droppedBefore := inputJitter.droppedPackets()
+	frames := inputJitter.flushPending()
+	h.recordInboundJitterDeltas(inputJitter, lostBefore, droppedBefore)
+	for _, frame := range frames {
+		select {
+		case h.audioInChan <- frame:
+			h.packetsDelivered.Add(1)
+			deliveredAt := time.Now()
+			h.inboundQuality.recordDelivered(deliveredAt, 1)
+			h.markInboundAudioDelivered(deliveredAt)
+		default:
+			select {
+			case <-h.audioInChan:
+				h.audioInputDropped.Add(1)
+				h.packetsDropped.Add(1)
+				h.inboundQuality.recordAudioInputDropped(time.Now(), 1)
+			default:
+			}
+			select {
+			case h.audioInChan <- frame:
+				h.packetsDelivered.Add(1)
+				deliveredAt := time.Now()
+				h.inboundQuality.recordDelivered(deliveredAt, 1)
+				h.markInboundAudioDelivered(deliveredAt)
+			default:
+				h.audioInputDropped.Add(1)
+				h.packetsDropped.Add(1)
+				h.inboundQuality.recordAudioInputDropped(time.Now(), 1)
+			}
+		}
+	}
 }
 
 func (h *RTPHandler) MediaTimeout() <-chan struct{} {
@@ -602,8 +645,8 @@ func (h *RTPHandler) LocalRTCPPort() int {
 	return 0
 }
 
-// AudioIn returns the channel for received audio
-func (h *RTPHandler) AudioIn() <-chan []byte {
+// AudioIn returns RTP audio released by the input jitter buffer.
+func (h *RTPHandler) AudioIn() <-chan InboundAudioFrame {
 	return h.audioInChan
 }
 
@@ -730,45 +773,34 @@ func (h *RTPHandler) receiveLoop() {
 			return
 		}
 
-		playoutTimeout := rtpDefaultPacketizationTime
 		h.mu.RLock()
 		inputJitter := h.inputJitter
-		if inputJitter == nil &&
-			h.inputPacketizationTime >= rtpMinPacketizationTime &&
-			h.inputPacketizationTime <= rtpMaxPacketizationTime &&
-			h.inputPacketizationTime%time.Millisecond == 0 {
-			playoutTimeout = h.inputPacketizationTime
-		}
 		h.mu.RUnlock()
+		now := time.Now()
+		deadline := now.Add(rtpDefaultPacketizationTime)
 		if inputJitter != nil {
-			playoutTimeout = inputJitter.playoutTimeout()
+			lostBefore := inputJitter.lostPackets()
+			droppedBefore := inputJitter.droppedPackets()
+			frames := inputJitter.flushExpired(now)
+			h.recordInboundJitterDeltas(inputJitter, lostBefore, droppedBefore)
+			if stopped, _ := h.enqueueInboundAudio(frames); stopped {
+				return
+			}
+			if pendingDeadline := inputJitter.nextDeadline(); !pendingDeadline.IsZero() {
+				deadline = pendingDeadline
+			}
 		}
-		if deadlineErr := h.conn.SetReadDeadline(time.Now().Add(playoutTimeout)); deadlineErr != nil {
-			continue
+		if deadlineErr := h.conn.SetReadDeadline(deadline); deadlineErr != nil {
+			return
 		}
 		n, remoteAddr, err := h.conn.ReadFromUDP(buf)
 
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				h.mu.RLock()
-				inputJitter := h.inputJitter
-				h.mu.RUnlock()
-				if inputJitter != nil {
-					lostBefore := inputJitter.lostPackets()
-					droppedBefore := inputJitter.droppedPackets()
-					payloads := inputJitter.flushOnPlayoutTimeout()
-					h.recordInboundJitterDeltas(inputJitter, lostBefore, droppedBefore)
-					if stopped, _ := h.enqueueInboundAudio(payloads); stopped {
-						return
-					}
-				}
-				if h.ctx.Err() != nil {
-					return
-				}
 				continue
 			}
 			if errors.Is(err, net.ErrClosed) {
-				continue
+				return
 			}
 			continue
 		}
@@ -820,7 +852,9 @@ func (h *RTPHandler) receiveLoop() {
 		if codec == nil {
 			codec = &CodecPCMU
 		}
-		if packet.PayloadType != codec.PayloadType {
+		isAudio := packet.PayloadType == codec.PayloadType
+		isTelephoneEvent := packet.PayloadType == CodecTelephoneEvent.PayloadType && len(packet.Payload) >= 4 && len(packet.Payload)%4 == 0
+		if (!isAudio && !isTelephoneEvent) || len(packet.Payload) == 0 {
 			h.packetsDropped.Add(1)
 			h.invalidPackets.Add(1)
 			h.inboundQuality.recordDropped(time.Now(), 1)
@@ -828,21 +862,30 @@ func (h *RTPHandler) receiveLoop() {
 		}
 
 		arrivedAt := time.Now()
+		hadRTP := h.lastRTPReceivedAt.Load() != 0
+		if isTelephoneEvent && hadRTP && h.remoteSSRC.Load() != packet.SSRC {
+			continue
+		}
 		h.inboundQuality.recordReceived(arrivedAt, 1)
 		h.markInboundRTPReceived(arrivedAt)
 		previousSSRC := h.remoteSSRC.Swap(packet.SSRC)
-		if previousSSRC != 0 && previousSSRC != packet.SSRC && inputJitter != nil {
+		if hadRTP && previousSSRC != packet.SSRC && inputJitter != nil {
+			lostBefore := inputJitter.lostPackets()
+			droppedBefore := inputJitter.droppedPackets()
 			inputJitter.reset(codec, inputPacketizationTime)
+			h.recordInboundJitterDeltas(inputJitter, lostBefore, droppedBefore)
 		}
 		h.rtcpReception.recordRTP(packet, codec.ClockRate, arrivedAt)
-		payloads := [][]byte{packet.Payload}
+		var frames []InboundAudioFrame
 		if inputJitter != nil {
 			lostBefore := inputJitter.lostPackets()
 			droppedBefore := inputJitter.droppedPackets()
-			payloads = inputJitter.push(packet)
+			frames = inputJitter.push(packet, arrivedAt)
 			h.recordInboundJitterDeltas(inputJitter, lostBefore, droppedBefore)
+		} else if isAudio {
+			frames = []InboundAudioFrame{{Audio: packet.Payload, ReceivedAt: arrivedAt}}
 		}
-		stopped, _ := h.enqueueInboundAudio(payloads)
+		stopped, _ := h.enqueueInboundAudio(frames)
 		if stopped {
 			return
 		}
@@ -861,13 +904,13 @@ func (h *RTPHandler) recordInboundJitterDeltas(inputJitter *rtpInputJitterBuffer
 	}
 }
 
-func (h *RTPHandler) enqueueInboundAudio(payloads [][]byte) (bool, bool) {
+func (h *RTPHandler) enqueueInboundAudio(frames []InboundAudioFrame) (bool, bool) {
 	enqueued := false
-	for _, payload := range payloads {
+	for _, frame := range frames {
 		select {
 		case <-h.ctx.Done():
 			return true, enqueued
-		case h.audioInChan <- payload:
+		case h.audioInChan <- frame:
 			enqueued = true
 			h.packetsDelivered.Add(1)
 			deliveredAt := time.Now()
@@ -886,7 +929,7 @@ func (h *RTPHandler) enqueueInboundAudio(payloads [][]byte) (bool, bool) {
 			select {
 			case <-h.ctx.Done():
 				return true, enqueued
-			case h.audioInChan <- payload:
+			case h.audioInChan <- frame:
 				enqueued = true
 				h.packetsDelivered.Add(1)
 				deliveredAt := time.Now()

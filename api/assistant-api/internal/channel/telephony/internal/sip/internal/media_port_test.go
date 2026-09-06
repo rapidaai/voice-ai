@@ -37,26 +37,17 @@ func newMediaPortTestSession(t *testing.T) *sip_runtime.Session {
 	return session
 }
 
-func newMediaPortTestRTP(t *testing.T) (*fakeRTPHandler, chan []byte, chan []byte) {
+func newMediaPortTestRTP(t *testing.T) (*fakeRTPHandler, chan sip_runtime.InboundAudioFrame, chan []byte) {
 	t.Helper()
 	rtpHandler := newTestRTPHandler(&sip_runtime.CodecPCMU)
 	return rtpHandler, rtpHandler.audioIn, rtpHandler.audioOut
-}
-
-type mediaPortTestResampler struct{}
-
-func (mediaPortTestResampler) Resample(_ []byte, _, to *protos.AudioConfig) ([]byte, error) {
-	if to.GetSampleRate() == 8000 {
-		return make([]byte, MulawFrameSize), nil
-	}
-	return make([]byte, BridgeOutputFrameSize), nil
 }
 
 func newMediaPortForTest(
 	t *testing.T,
 	streamSink func(internal_type.Stream),
 	recorders ...func(...observability.Record) error,
-) (*MediaPort, chan []byte, chan []byte) {
+) (*MediaPort, chan sip_runtime.InboundAudioFrame, chan []byte) {
 	t.Helper()
 	rtpHandler, audioIn, audioOut := newMediaPortTestRTP(t)
 	var record func(...observability.Record) error
@@ -67,7 +58,6 @@ func newMediaPortForTest(
 		Context:    context.Background(),
 		Session:    newMediaPortTestSession(t),
 		RTPHandler: rtpHandler,
-		Resampler:  mediaPortTestResampler{},
 		StreamSink: streamSink,
 		Record:     record,
 	})
@@ -85,7 +75,7 @@ func TestMediaPort_StartForwardsProviderAudio(t *testing.T) {
 	defer func() { require.NoError(t, mediaPort.Close()) }()
 
 	for i := 0; i < 2; i++ {
-		audioIn <- make([]byte, MulawFrameSize)
+		audioIn <- sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()}
 	}
 
 	require.Eventually(t, func() bool {
@@ -93,13 +83,79 @@ func TestMediaPort_StartForwardsProviderAudio(t *testing.T) {
 			select {
 			case stream := <-streams:
 				if userMessage, ok := stream.(*protos.ConversationUserMessage); ok {
-					return len(userMessage.GetAudio()) == InputBufferThreshold
+					return len(userMessage.GetAudio()) == BridgeOutputFrameSize
 				}
 			default:
 				return false
 			}
 		}
 	}, time.Second, 10*time.Millisecond)
+}
+
+func TestMediaPort_SeparatesRecognitionAndRecordingDelivery(tester *testing.T) {
+	rtpHandler, audioIn, _ := newMediaPortTestRTP(tester)
+	realtime := make(chan internal_type.Stream, 1)
+	recording := make(chan internal_type.Stream, 1)
+	mediaPort, err := NewMediaPort(MediaPortConfig{
+		Context:    context.Background(),
+		Session:    newMediaPortTestSession(tester),
+		RTPHandler: rtpHandler,
+		StreamSink: func(stream internal_type.Stream) {
+			switch stream.(type) {
+			case *protos.ConversationBridgeUserAudio:
+				recording <- stream
+			default:
+				realtime <- stream
+			}
+		},
+	})
+	require.NoError(tester, err)
+	mediaPort.StartInput()
+	tester.Cleanup(func() { require.NoError(tester, mediaPort.Close()) })
+
+	audioIn <- sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()}
+
+	select {
+	case stream := <-realtime:
+		require.IsType(tester, &protos.ConversationUserMessage{}, stream)
+	case <-time.After(time.Second):
+		tester.Fatal("recognition audio was not delivered")
+	}
+	select {
+	case stream := <-recording:
+		require.IsType(tester, &protos.ConversationBridgeUserAudio{}, stream)
+	case <-time.After(time.Second):
+		tester.Fatal("recording audio was not delivered")
+	}
+}
+
+func TestMediaPort_PreservesRTPFrameReceivedAt(tester *testing.T) {
+	streams := make(chan internal_type.Stream, 4)
+	mediaPort, audioIn, _ := newMediaPortForTest(tester, func(stream internal_type.Stream) {
+		streams <- stream
+	})
+	mediaPort.StartInput()
+	tester.Cleanup(func() { require.NoError(tester, mediaPort.Close()) })
+
+	receivedAt := time.Unix(123, 456)
+	audioIn <- sip_runtime.InboundAudioFrame{
+		Audio:      make([]byte, MulawFrameSize),
+		ReceivedAt: receivedAt,
+	}
+
+	for range 2 {
+		select {
+		case stream := <-streams:
+			switch message := stream.(type) {
+			case *protos.ConversationUserMessage:
+				require.Equal(tester, receivedAt.UnixNano(), message.GetTime().AsTime().UnixNano())
+				return
+			}
+		case <-time.After(time.Second):
+			tester.Fatal("provider audio was not delivered")
+		}
+	}
+	tester.Fatal("user audio was not delivered")
 }
 
 func TestMediaPort_LocalAddrReturnsRTPAddress(t *testing.T) {
@@ -125,7 +181,7 @@ func TestMediaPort_ProviderAudioRecordsBeforePipelineAudio(t *testing.T) {
 	defer func() { require.NoError(t, mediaPort.Close()) }()
 
 	for i := 0; i < 2; i++ {
-		audioIn <- make([]byte, MulawFrameSize)
+		audioIn <- sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()}
 	}
 
 	var bridgeUserAudioCount int
@@ -140,7 +196,7 @@ func TestMediaPort_ProviderAudioRecordsBeforePipelineAudio(t *testing.T) {
 						t.Fatalf("unexpected bridge user audio length: %d", len(message.GetAudio()))
 					}
 				case *protos.ConversationUserMessage:
-					return bridgeUserAudioCount == 2 && len(message.GetAudio()) == InputBufferThreshold
+					return bridgeUserAudioCount == 1 && len(message.GetAudio()) == BridgeOutputFrameSize
 				}
 			default:
 				return false
@@ -260,7 +316,7 @@ func TestMediaPort_TransferModeSuppressesAssistantAudio(t *testing.T) {
 	require.NoError(t, mediaPort.Close())
 }
 
-func TestMediaPort_InterruptPreservesBufferedInput(t *testing.T) {
+func TestMediaPort_InterruptPreservesInputAudio(t *testing.T) {
 	streams := make(chan internal_type.Stream, 8)
 	mediaPort, audioIn, _ := newMediaPortForTest(t, func(stream internal_type.Stream) {
 		streams <- stream
@@ -268,16 +324,21 @@ func TestMediaPort_InterruptPreservesBufferedInput(t *testing.T) {
 
 	mediaPort.Start()
 	defer func() { require.NoError(t, mediaPort.Close()) }()
-	audioIn <- make([]byte, MulawFrameSize)
+	audioIn <- sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()}
 	mediaPort.HandleInterrupt()
-	audioIn <- make([]byte, MulawFrameSize)
+	audioIn <- sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()}
 
+	receivedAudioCount := 0
 	require.Eventually(t, func() bool {
 		for {
 			select {
 			case stream := <-streams:
 				if userMessage, ok := stream.(*protos.ConversationUserMessage); ok {
-					return len(userMessage.GetAudio()) == InputBufferThreshold
+					require.Len(t, userMessage.GetAudio(), BridgeOutputFrameSize)
+					receivedAudioCount++
+					if receivedAudioCount == 2 {
+						return true
+					}
 				}
 			default:
 				return false
@@ -296,7 +357,7 @@ func TestMediaPort_ConnectTransferMediaForwardsCallerAudio(t *testing.T) {
 	mediaPort.Start()
 	defer func() { require.NoError(t, mediaPort.Close()) }()
 	mediaPort.ConnectTransferMedia(bridgeRTP, sip_runtime.CodecPCMU.Name)
-	audioIn <- []byte{0x01, 0x02, 0x03}
+	audioIn <- sip_runtime.InboundAudioFrame{Audio: []byte{0x01, 0x02, 0x03}, ReceivedAt: time.Now()}
 
 	select {
 	case frame := <-bridgeAudioOut:

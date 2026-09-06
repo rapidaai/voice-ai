@@ -57,6 +57,16 @@ func metadataString(t *testing.T, md map[string]interface{}, key string) string 
 	return s
 }
 
+func TestNewInitializesBaseStreamer(t *testing.T) {
+	logger := newTestLogger(t)
+	base := New(logger, &callcontext.CallContext{}, nil, nil)
+	t.Cleanup(base.Cancel)
+
+	require.Same(t, logger, base.Logger)
+	require.NotNil(t, base.InputCh)
+	require.NotNil(t, base.OutputCh)
+}
+
 func TestCreateConnectionRequest_EmitsAllClientKeys(t *testing.T) {
 	cc := &callcontext.CallContext{
 		AssistantID:    1,
@@ -85,7 +95,7 @@ func TestCreateConnectionRequest_EmitsAllClientKeys(t *testing.T) {
 }
 
 func TestCreateConnectionRequest_OmitsEmptyOptionalFields(t *testing.T) {
-	// CallerNumber / FromNumber empty (defensive — e.g. degraded fallback path).
+	// CallerNumber / FromNumber empty, such as during a degraded fallback path.
 	cc := &callcontext.CallContext{
 		Direction: "inbound",
 		Provider:  "sip",

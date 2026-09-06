@@ -10,7 +10,7 @@ import (
 	"encoding/base64"
 	"strings"
 
-	internal_audio_resampler "github.com/rapidaai/api/assistant-api/internal/audio/resampler"
+	resampler_soxr "github.com/rapidaai/api/assistant-api/internal/audio/resampler/soxr"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	channel_base "github.com/rapidaai/api/assistant-api/internal/channel/base"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
@@ -29,7 +29,7 @@ type BaseTelephonyStreamer struct {
 	channel_base.BaseStreamer
 
 	// callCtx holds IDs and metadata from the call setup phase (Redis).
-	// Replaces separate assistant/conversation entity references — the
+	// Replaces separate assistant/conversation entity references. The
 	// streamer only needs IDs, not full DB entities.
 	callCtx *callcontext.CallContext
 
@@ -51,9 +51,12 @@ func New(
 	vaultCred *protos.VaultCredential,
 	observer observability.Recorder,
 ) BaseTelephonyStreamer {
-	resampler, _ := internal_audio_resampler.GetResampler(logger)
+	resampler := resampler_soxr.New(
+		resampler_soxr.WithLogger(logger),
+		resampler_soxr.WithHighQuality(),
+	)
 	return BaseTelephonyStreamer{
-		BaseStreamer:    channel_base.NewBaseStreamer(logger),
+		BaseStreamer:    channel_base.New(channel_base.WithLogger(logger)),
 		callCtx:         cc,
 		resampler:       resampler,
 		encoder:         base64.StdEncoding,
@@ -107,7 +110,7 @@ func (base *BaseTelephonyStreamer) Record(records ...observability.Record) error
 
 // CreateConnectionRequest builds the initial ConversationInitialization message.
 // Carries non-empty client.* metadata in the init payload so the requestor's
-// in-memory state is populated at connect time — avoids races with downstream
+// in-memory state is populated at connect time. This avoids races with downstream
 // metadata writes that only persist to DB. Empty fields are omitted so they
 // can't overwrite previously-stored values during resume.
 func (base *BaseTelephonyStreamer) CreateConnectionRequest() *protos.ConversationInitialization {

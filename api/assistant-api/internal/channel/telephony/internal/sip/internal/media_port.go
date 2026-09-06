@@ -10,7 +10,6 @@ import (
 	"context"
 	"errors"
 	"sync/atomic"
-	"time"
 
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
@@ -27,7 +26,6 @@ type MediaPortConfig struct {
 	Logger     commons.Logger
 	Session    *sip_runtime.Session
 	RTPHandler rtpHandler
-	Resampler  internal_type.AudioResampler
 	StreamSink func(internal_type.Stream)
 	Record     func(...observability.Record) error
 }
@@ -83,8 +81,7 @@ func NewMediaPort(config MediaPortConfig) (*MediaPort, error) {
 	}
 	mediaPort.audioProcessor = NewAudioProcessor(AudioProcessorConfig{
 		RTPHandler: rtpHandler,
-		Resampler:  config.Resampler,
-		PushInput:  config.StreamSink,
+		Logger:     config.Logger,
 		Record:     config.Record,
 		Ringtone:   DefaultRingtone,
 		Ambient:    resolveAmbientConfig(config.Session),
@@ -94,10 +91,8 @@ func NewMediaPort(config MediaPortConfig) (*MediaPort, error) {
 		Logger:      config.Logger,
 		MediaEngine: mediaPort.audioProcessor,
 		StreamSink:  config.StreamSink,
-		OutputSink: func(frame internal_telephony_media.AssistantOutputFrame) error {
-			return mediaPort.deliverAssistantFrame(frame)
-		},
-		Record: config.Record,
+		OutputSink:  mediaPort.deliverAssistantFrame,
+		Record:      config.Record,
 	})
 	return mediaPort, nil
 }
@@ -158,7 +153,7 @@ func (port *MediaPort) StartBridgeRecorder() {
 	if !port.bridgeRecorderStarted.CompareAndSwap(false, true) {
 		return
 	}
-	go port.audioProcessor.RunBridgeRecorder(port.ctx)
+	go port.audioProcessor.RunBridgeRecorder(port.ctx, port.streamSink)
 }
 
 func (port *MediaPort) Close() error {
@@ -210,7 +205,6 @@ func (port *MediaPort) EnterTransferMode(ringtone string) bool {
 		return false
 	}
 	port.audioProcessor.SetTransferActive(true)
-	port.audioProcessor.ClearInputBuffer()
 	port.audioProcessor.ClearOutputBuffer()
 	port.audioProcessor.SetRingtone(ringtone)
 	port.audioProcessor.StartRingback()
@@ -283,17 +277,20 @@ func (port *MediaPort) forwardIncomingAudio() {
 		select {
 		case <-port.ctx.Done():
 			return
-		case audioData, ok := <-audioIn:
+		case frame, ok := <-audioIn:
 			if !ok {
 				return
 			}
-			if port.audioProcessor.ForwardUserAudio(audioData) {
+			if port.audioProcessor.ForwardUserAudio(frame.Audio) {
 				continue
 			}
 			if port.transferActive.Load() {
 				continue
 			}
-			if err := port.handleProviderAudioFrame(audioData, time.Now()); err != nil && port.record != nil {
+			if err := port.mediaSession.HandleProviderAudioFrame(internal_telephony_media.ProviderAudioFrame{
+				Audio:      frame.Audio,
+				ReceivedAt: frame.ReceivedAt,
+			}); err != nil && port.record != nil {
 				_ = port.record(observability.RecordLog{
 					Level:   observability.LevelError,
 					Message: "SIP provider audio processing failed",
@@ -307,42 +304,6 @@ func (port *MediaPort) forwardIncomingAudio() {
 			}
 		}
 	}
-}
-
-func (port *MediaPort) handleProviderAudioFrame(providerAudio []byte, receivedAt time.Time) error {
-	if receivedAt.IsZero() {
-		receivedAt = time.Now()
-	}
-	inputFrame, err := port.audioProcessor.ProcessProviderAudioFrame(internal_telephony_media.ProviderAudioFrame{
-		Audio:      providerAudio,
-		ReceivedAt: receivedAt,
-	})
-	if err != nil {
-		return err
-	}
-	port.recordReceivedUserAudio(inputFrame.BridgeAudio, receivedAt)
-	port.sendPipelineUserAudio(inputFrame.PipelineAudio, receivedAt)
-	return nil
-}
-
-func (port *MediaPort) recordReceivedUserAudio(userPCM16k []byte, receivedAt time.Time) {
-	if len(userPCM16k) == 0 || port.streamSink == nil {
-		return
-	}
-	port.streamSink(&protos.ConversationBridgeUserAudio{
-		Audio: userPCM16k,
-		Time:  timestamppb.New(receivedAt),
-	})
-}
-
-func (port *MediaPort) sendPipelineUserAudio(userPCM16k []byte, receivedAt time.Time) {
-	if len(userPCM16k) == 0 || port.streamSink == nil {
-		return
-	}
-	port.streamSink(&protos.ConversationUserMessage{
-		Message: &protos.ConversationUserMessage_Audio{Audio: userPCM16k},
-		Time:    timestamppb.New(receivedAt),
-	})
 }
 
 func (port *MediaPort) deliverAssistantFrame(outputFrame internal_telephony_media.AssistantOutputFrame) error {

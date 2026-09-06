@@ -210,6 +210,51 @@ func TestShouldEndSessionOnClose_SkipsPreAnswerStates(t *testing.T) {
 	assert.True(t, shouldEndSessionOnClose(sip_runtime.CallStateConnected))
 }
 
+func TestNew_RoutesBridgeRecordingOutsideRealtimeInput(t *testing.T) {
+	logger, err := commons.NewApplicationLogger()
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	session := newTestInboundSIPSession(t, "sip-recording-routing")
+	session.SetRTPHandler(&sip_runtime.RTPHandler{})
+	stream, err := New(
+		WithContext(ctx),
+		WithLogger(logger),
+		WithSession(session),
+		WithLifecycle(&fakeSIPLifecycleController{}),
+		WithCallContext(&callcontext.CallContext{}),
+	)
+	require.NoError(t, err)
+	streamer := stream.(*Streamer)
+	t.Cleanup(func() { require.NoError(t, streamer.Close()) })
+	select {
+	case message := <-streamer.CriticalCh:
+		_, ok := message.(*protos.ConversationInitialization)
+		require.True(t, ok, "expected conversation initialization, got %T", message)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for conversation initialization")
+	}
+
+	streamer.mediaPort.StartBridgeRecorder()
+	streamer.mediaPort.RecordTransferOperatorAudio(make([]byte, 160))
+
+	select {
+	case message := <-streamer.LowCh:
+		recording, ok := message.(*protos.ConversationBridgeOperatorAudio)
+		require.True(t, ok, "expected bridge operator recording, got %T", message)
+		require.Len(t, recording.GetAudio(), 640)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for bridge recording")
+	}
+
+	select {
+	case message := <-streamer.InputCh:
+		t.Fatalf("recording must not occupy realtime input queue; got %T", message)
+	default:
+	}
+}
+
 func TestSend_ConversationDisconnection_RecordsEventAndClosesStreamer(t *testing.T) {
 	s, collector := newTestSIPStreamerWithCollector(t)
 	session := newTestInboundSIPSession(t, "sip-streamer-disconnect")
@@ -222,7 +267,7 @@ func TestSend_ConversationDisconnection_RecordsEventAndClosesStreamer(t *testing
 	})
 	require.NoError(t, err)
 
-	// Server-initiated Send no longer requeues the disconnect onto CriticalCh —
+	// Server-initiated Send no longer requeues the disconnect onto CriticalCh.
 	// the server callsite already knows the reason. The talker exits via the
 	// Recv-err path once Close cancels s.Ctx.
 	select {

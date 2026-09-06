@@ -3,7 +3,7 @@
 //
 // Licensed under GPL-2.0 with Rapida Additional Terms.
 // See LICENSE.md or contact sales@rapida.ai for commercial usage.
-package internal_resampler_default
+package resampler_linear
 
 import (
 	"encoding/binary"
@@ -15,22 +15,42 @@ import (
 	"github.com/zaf/g711"
 )
 
-// AudioResampler handles audio resampling operations
-type audioResampler struct {
+// linearResampler converts formats, channel counts, and sample rates.
+type linearResampler struct {
 	logger commons.Logger
 }
 
-// NewAudioResampler creates a new audio resampler instance
-func NewDefaultAudioResampler(logger commons.Logger) internal_type.AudioResampler {
-	return &audioResampler{logger: logger}
+type Option func(*linearResampler)
+
+// WithLogger sets the resampler logger.
+func WithLogger(logger commons.Logger) Option {
+	return func(resampler *linearResampler) {
+		resampler.logger = logger
+	}
 }
 
-func NewDefaultAudioConverter(logger commons.Logger) internal_type.AudioConverter {
-	return &audioResampler{logger: logger}
+// New creates a linear-interpolation audio resampler.
+func New(options ...Option) internal_type.AudioResampler {
+	return newLinearResampler(options...)
+}
+
+// NewConverter creates an audio sample converter.
+func NewConverter(options ...Option) internal_type.AudioConverter {
+	return newLinearResampler(options...)
+}
+
+func newLinearResampler(options ...Option) *linearResampler {
+	resampler := &linearResampler{}
+	for _, option := range options {
+		if option != nil {
+			option(resampler)
+		}
+	}
+	return resampler
 }
 
 // Resample converts audio data from source format to target format
-func (r *audioResampler) Resample(data []byte, source, target *protos.AudioConfig) ([]byte, error) {
+func (r *linearResampler) Resample(data []byte, source, target *protos.AudioConfig) ([]byte, error) {
 
 	// Early return only if sample rate, channels, AND format all match
 	if source.SampleRate == target.SampleRate &&
@@ -61,7 +81,7 @@ func (r *audioResampler) Resample(data []byte, source, target *protos.AudioConfi
 }
 
 // ConvertToFloat32Samples converts byte audio data to float32 samples
-func (r *audioResampler) ConvertToFloat32Samples(data []byte, config *protos.AudioConfig) ([]float32, error) {
+func (r *linearResampler) ConvertToFloat32Samples(data []byte, config *protos.AudioConfig) ([]float32, error) {
 	float64Samples, err := r.decodeToFloat64(data, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode to float64: %w", err)
@@ -81,7 +101,7 @@ func (r *audioResampler) ConvertToFloat32Samples(data []byte, config *protos.Aud
 }
 
 // ConvertToByteSamples converts float32 samples to byte audio data
-func (r *audioResampler) ConvertToByteSamples(samples []float32, config *protos.AudioConfig) ([]byte, error) {
+func (r *linearResampler) ConvertToByteSamples(samples []float32, config *protos.AudioConfig) ([]byte, error) {
 	float64Samples := make([]float64, len(samples))
 	for i, sample := range samples {
 		float64Samples[i] = float64(sample)
@@ -91,8 +111,8 @@ func (r *audioResampler) ConvertToByteSamples(samples []float32, config *protos.
 
 // -------------------- Decode / Encode --------------------
 
-// decodeToFloat64 converts audio bytes to normalized float64 samples
-func (r *audioResampler) decodeToFloat64(data []byte, config *protos.AudioConfig) ([]float64, error) {
+// decodeToFloat64 converts audio bytes to unit-range float64 samples.
+func (r *linearResampler) decodeToFloat64(data []byte, config *protos.AudioConfig) ([]float64, error) {
 	switch config.GetAudioFormat() {
 	case protos.AudioConfig_LINEAR16:
 		return r.decodePCM16ToFloat64(data), nil
@@ -103,8 +123,8 @@ func (r *audioResampler) decodeToFloat64(data []byte, config *protos.AudioConfig
 	}
 }
 
-// encodeFromFloat64 converts normalized float64 samples to audio bytes
-func (r *audioResampler) encodeFromFloat64(samples []float64, config *protos.AudioConfig) ([]byte, error) {
+// encodeFromFloat64 converts unit-range float64 samples to audio bytes.
+func (r *linearResampler) encodeFromFloat64(samples []float64, config *protos.AudioConfig) ([]byte, error) {
 	switch config.GetAudioFormat() {
 	case protos.AudioConfig_LINEAR16:
 		return r.encodeFloat64ToPCM16(samples), nil
@@ -117,7 +137,7 @@ func (r *audioResampler) encodeFromFloat64(samples []float64, config *protos.Aud
 
 // -------------------- PCM16 --------------------
 
-func (r *audioResampler) decodePCM16ToFloat64(data []byte) []float64 {
+func (r *linearResampler) decodePCM16ToFloat64(data []byte) []float64 {
 	samples := make([]float64, len(data)/2)
 	for i := 0; i < len(samples); i++ {
 		sample := int16(binary.LittleEndian.Uint16(data[i*2 : i*2+2]))
@@ -126,7 +146,7 @@ func (r *audioResampler) decodePCM16ToFloat64(data []byte) []float64 {
 	return samples
 }
 
-func (r *audioResampler) encodeFloat64ToPCM16(samples []float64) []byte {
+func (r *linearResampler) encodeFloat64ToPCM16(samples []float64) []byte {
 	data := make([]byte, len(samples)*2)
 	const maxInt16 = 32767.0
 
@@ -145,7 +165,7 @@ func (r *audioResampler) encodeFloat64ToPCM16(samples []float64) []byte {
 // -------------------- μ-law (G.711) --------------------
 
 // mu-law (8-bit) → linear PCM16 → float64
-func (r *audioResampler) decodeMuLawToFloat64(data []byte) []float64 {
+func (r *linearResampler) decodeMuLawToFloat64(data []byte) []float64 {
 	pcm := g711.DecodeUlaw(data)
 
 	// g711.DecodeUlaw returns PCM16 bytes (2 bytes per sample)
@@ -159,7 +179,7 @@ func (r *audioResampler) decodeMuLawToFloat64(data []byte) []float64 {
 }
 
 // float64 → linear PCM16 → mu-law (8-bit)
-func (r *audioResampler) encodeFloat64ToMuLaw(samples []float64) []byte {
+func (r *linearResampler) encodeFloat64ToMuLaw(samples []float64) []byte {
 	pcmBytes := make([]byte, len(samples)*2)
 
 	for i, sample := range samples {
@@ -183,7 +203,7 @@ func (r *audioResampler) encodeFloat64ToMuLaw(samples []float64) []byte {
 // -------------------- Resampling & Channels --------------------
 
 // resampleFloat64 performs linear interpolation resampling
-func (r *audioResampler) resampleFloat64(samples []float64, sourceSR, targetSR uint32) []float64 {
+func (r *linearResampler) resampleFloat64(samples []float64, sourceSR, targetSR uint32) []float64 {
 	if sourceSR == targetSR {
 		return samples
 	}
@@ -208,7 +228,7 @@ func (r *audioResampler) resampleFloat64(samples []float64, sourceSR, targetSR u
 }
 
 // convertChannels handles mono/stereo conversion
-func (r *audioResampler) convertChannels(samples []float64, sourceChannels, targetChannels uint32) []float64 {
+func (r *linearResampler) convertChannels(samples []float64, sourceChannels, targetChannels uint32) []float64 {
 	if sourceChannels == targetChannels {
 		return samples
 	}

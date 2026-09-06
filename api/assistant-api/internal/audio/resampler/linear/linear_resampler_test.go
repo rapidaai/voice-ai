@@ -3,7 +3,7 @@
 //
 // Licensed under GPL-2.0 with Rapida Additional Terms.
 // See LICENSE.md or contact sales@rapida.ai for commercial usage.
-package internal_resampler_default
+package resampler_linear
 
 import (
 	"encoding/binary"
@@ -30,18 +30,23 @@ func newTestLogger(t testing.TB) commons.Logger {
 	return logger
 }
 
-func newTestResampler(t testing.TB) *audioResampler {
-	r := NewDefaultAudioResampler(newTestLogger(t))
-	res, ok := r.(*audioResampler)
+func newTestResampler(t testing.TB) *linearResampler {
+	r := New(WithLogger(newTestLogger(t)))
+	res, ok := r.(*linearResampler)
 	require.True(t, ok)
 	return res
 }
 
-// TestNewAudioResampler validates resampler creation
-func TestNewAudioResampler(t *testing.T) {
-	r := NewDefaultAudioResampler(newTestLogger(t))
-	assert.NotNil(t, r)
-	_, ok := r.(*audioResampler)
+func TestNewAppliesOptions(t *testing.T) {
+	logger := newTestLogger(t)
+	resampler, ok := New(WithLogger(logger)).(*linearResampler)
+	require.True(t, ok)
+	assert.Equal(t, logger, resampler.logger)
+}
+
+func TestNewConverterCreatesLinearConverter(t *testing.T) {
+	converter := NewConverter(WithLogger(newTestLogger(t)))
+	_, ok := converter.(*linearResampler)
 	assert.True(t, ok)
 }
 
@@ -126,7 +131,7 @@ func TestConvertToFloat32Samples(t *testing.T) {
 				assert.Len(t, samples, 3)
 				for i, s := range samples {
 					assert.True(t, s > 0, "sample %d should be positive", i)
-					assert.True(t, s <= 1.0, "sample %d should be normalized", i)
+					assert.True(t, s <= 1.0, "sample %d should be within the unit range", i)
 				}
 			},
 		},
@@ -137,7 +142,7 @@ func TestConvertToFloat32Samples(t *testing.T) {
 				assert.Len(t, samples, 3)
 				for i, s := range samples {
 					assert.True(t, s < 0, "sample %d should be negative", i)
-					assert.True(t, s >= -1.0, "sample %d should be normalized", i)
+					assert.True(t, s >= -1.0, "sample %d should be within the unit range", i)
 				}
 			},
 		},
@@ -349,23 +354,23 @@ func TestEdgeCases(t *testing.T) {
 	resampler := newTestResampler(t)
 	tests := []struct {
 		name     string
-		testFunc func(*testing.T, *audioResampler)
+		testFunc func(*testing.T, *linearResampler)
 	}{
-		{"single sample", func(t *testing.T, r *audioResampler) {
+		{"single sample", func(t *testing.T, r *linearResampler) {
 			config := internal_audio.NewLinear16khzMonoAudioConfig()
 			data := []byte{0x00, 0x01}
 			samples, err := r.ConvertToFloat32Samples(data, config)
 			require.NoError(t, err)
 			assert.Len(t, samples, 1)
 		}},
-		{"very large data", func(t *testing.T, r *audioResampler) {
+		{"very large data", func(t *testing.T, r *linearResampler) {
 			config := internal_audio.NewLinear16khzMonoAudioConfig()
 			data := generateLinear16Data(1000000)
 			samples, err := r.ConvertToFloat32Samples(data, config)
 			require.NoError(t, err)
 			assert.Equal(t, 1000000, len(samples))
 		}},
-		{"alternating channels", func(t *testing.T, r *audioResampler) {
+		{"alternating channels", func(t *testing.T, r *linearResampler) {
 			source := &protos.AudioConfig{SampleRate: 16000, AudioFormat: protos.AudioConfig_LINEAR16, Channels: 2}
 			target := &protos.AudioConfig{SampleRate: 16000, AudioFormat: protos.AudioConfig_LINEAR16, Channels: 1}
 			data := generateLinear16Data(2000)
