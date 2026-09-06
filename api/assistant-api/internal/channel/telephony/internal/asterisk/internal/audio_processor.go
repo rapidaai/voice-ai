@@ -67,19 +67,17 @@ type AudioProcessor struct {
 }
 
 func NewAudioProcessor(logger commons.Logger, cfg AudioProcessorConfig) (*AudioProcessor, error) {
-	resampler := resampler_soxr.New(
-		resampler_soxr.WithLogger(logger),
-		resampler_soxr.WithHighQuality(),
-	)
-
 	frameSize := cfg.FrameSize
 	if frameSize <= 0 {
 		frameSize = defaultFrameSize
 	}
 
 	audioProcessor := &AudioProcessor{
-		logger:             logger,
-		resampler:          resampler,
+		logger: logger,
+		resampler: resampler_soxr.New(
+			resampler_soxr.WithLogger(logger),
+			resampler_soxr.WithHighQuality(),
+		),
 		asteriskConfig:     cfg.AsteriskConfig,
 		downstreamConfig:   cfg.DownstreamConfig,
 		silenceByte:        cfg.SilenceByte,

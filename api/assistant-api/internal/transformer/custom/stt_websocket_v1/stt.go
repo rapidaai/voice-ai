@@ -85,19 +85,18 @@ func NewSpeechToText(
 		}
 		return nil, err
 	}
-	resampler := resampler_soxr.New(
-		resampler_soxr.WithLogger(logger),
-		resampler_soxr.WithHighQuality(),
-	)
 	transformerContext, cancel := context.WithCancel(ctx)
 	return &speechToText{
-		config:            config,
-		engine:            config.newEngine(),
-		ctx:               transformerContext,
-		cancel:            cancel,
-		logger:            logger,
-		onPacket:          onPacket,
-		resampler:         resampler,
+		config:   config,
+		engine:   config.newEngine(),
+		ctx:      transformerContext,
+		cancel:   cancel,
+		logger:   logger,
+		onPacket: onPacket,
+		resampler: resampler_soxr.New(
+			resampler_soxr.WithLogger(logger),
+			resampler_soxr.WithHighQuality(),
+		),
 		sourceAudioConfig: internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG,
 		targetAudioConfig: &protos.AudioConfig{
 			SampleRate:  uint32(config.SampleRate),

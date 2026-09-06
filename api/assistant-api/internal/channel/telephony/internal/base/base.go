@@ -51,14 +51,13 @@ func New(
 	vaultCred *protos.VaultCredential,
 	observer observability.Recorder,
 ) BaseTelephonyStreamer {
-	resampler := resampler_soxr.New(
-		resampler_soxr.WithLogger(logger),
-		resampler_soxr.WithHighQuality(),
-	)
 	return BaseTelephonyStreamer{
-		BaseStreamer:    channel_base.New(channel_base.WithLogger(logger)),
-		callCtx:         cc,
-		resampler:       resampler,
+		BaseStreamer: channel_base.New(channel_base.WithLogger(logger)),
+		callCtx:      cc,
+		resampler: resampler_soxr.New(
+			resampler_soxr.WithLogger(logger),
+			resampler_soxr.WithHighQuality(),
+		),
 		encoder:         base64.StdEncoding,
 		vaultCredential: vaultCred,
 		observer:        observer,

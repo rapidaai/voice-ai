@@ -163,11 +163,6 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 	for _, opt := range opts {
 		opt(&options)
 	}
-	resampler := resampler_soxr.New(
-		resampler_soxr.WithLogger(options.Logger),
-		resampler_soxr.WithHighQuality(),
-	)
-
 	opusCodec, err := webrtc_internal.NewOpusCodec()
 	if err != nil {
 		_ = options.Observer.Record(options.Context, observability.ProjectScope{}, observability.RecordLog{
@@ -238,8 +233,11 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 		}
 	}
 	ambientMixer, err := internal_ambient.NewLoopMixer(internal_ambient.MixerSpec{
-		Logger:            options.Logger,
-		Resampler:         resampler,
+		Logger: options.Logger,
+		Resampler: resampler_soxr.New(
+			resampler_soxr.WithLogger(options.Logger),
+			resampler_soxr.WithHighQuality(),
+		),
 		TargetAudioConfig: internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG,
 		FrameBytes:        webrtc_internal.WebRTCOutputPCM16kFrameBytes,
 	})
@@ -270,11 +268,14 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 			channel_base.WithInputChannelCapacity(webrtc_internal.InputChannelSize),
 			channel_base.WithOutputChannelCapacity(webrtc_internal.OutputChannelSize),
 		),
-		peerConfig:           peerConfig,
-		serverConfig:         options.ServerConfig,
-		grpcStream:           options.GRPCStream,
-		sessionID:            uuid.New().String(),
-		resampler:            resampler,
+		peerConfig:   peerConfig,
+		serverConfig: options.ServerConfig,
+		grpcStream:   options.GRPCStream,
+		sessionID:    uuid.New().String(),
+		resampler: resampler_soxr.New(
+			resampler_soxr.WithLogger(options.Logger),
+			resampler_soxr.WithHighQuality(),
+		),
 		opusCodec:            opusCodec,
 		currentMode:          protos.StreamMode_STREAM_MODE_TEXT,
 		sessionState:         webrtc_internal.SessionState{Scope: observability.ProjectScope{}},

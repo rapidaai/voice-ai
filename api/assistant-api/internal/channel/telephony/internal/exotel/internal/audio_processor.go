@@ -37,14 +37,12 @@ type AudioProcessor struct {
 
 // NewAudioProcessor creates a new Exotel audio processor
 func NewAudioProcessor(logger commons.Logger) (*AudioProcessor, error) {
-	resampler := resampler_soxr.New(
-		resampler_soxr.WithLogger(logger),
-		resampler_soxr.WithHighQuality(),
-	)
-
 	audioProcessor := &AudioProcessor{
-		logger:             logger,
-		resampler:          resampler,
+		logger: logger,
+		resampler: resampler_soxr.New(
+			resampler_soxr.WithLogger(logger),
+			resampler_soxr.WithHighQuality(),
+		),
 		exotelConfig:       internal_audio.NewLinear8khzMonoAudioConfig(),
 		downstreamConfig:   internal_audio.NewLinear16khzMonoAudioConfig(),
 		inputBuffer:        internal_channel_input.NewBytesInputBuffer(InputBufferThreshold * 2),

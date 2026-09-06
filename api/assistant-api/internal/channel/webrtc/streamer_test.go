@@ -96,20 +96,18 @@ func newTestStreamer(t *testing.T) *webrtcStreamer {
 	logger := newTestLogger(t)
 	opusCodec, err := webrtc_internal.NewOpusCodec()
 	require.NoError(t, err)
-	resampler := resampler_soxr.New(
-		resampler_soxr.WithLogger(logger),
-		resampler_soxr.WithHighQuality(),
-	)
-
 	return &webrtcStreamer{
 		BaseStreamer: channel_base.New(
 			channel_base.WithLogger(logger),
 			channel_base.WithInputChannelCapacity(16),
 			channel_base.WithOutputChannelCapacity(16),
 		),
-		peerConfig:       webrtc_internal.DefaultConfig(),
-		sessionID:        "test-session",
-		resampler:        resampler,
+		peerConfig: webrtc_internal.DefaultConfig(),
+		sessionID:  "test-session",
+		resampler: resampler_soxr.New(
+			resampler_soxr.WithLogger(logger),
+			resampler_soxr.WithHighQuality(),
+		),
 		opusCodec:        opusCodec,
 		currentMode:      protos.StreamMode_STREAM_MODE_TEXT,
 		sessionState:     webrtc_internal.SessionState{Scope: observability.ProjectScope{}},
