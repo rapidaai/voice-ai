@@ -1286,6 +1286,19 @@ func inboundOfferSDPWithMedia(ip string, port int, payloadTypes string) string {
 	return inboundOfferSDPWithRawMedia(ip, mediaLine)
 }
 
+func inboundOfferSDPWithRTCP(remoteRTPIPAddress string, remoteRTPPort int, remoteRTCPIPAddress string, remoteRTCPPort int) string {
+	return "v=0\r\n" +
+		"o=caller 1 1 IN IP4 127.0.0.1\r\n" +
+		"s=call\r\n" +
+		"c=IN IP4 " + remoteRTPIPAddress + "\r\n" +
+		"t=0 0\r\n" +
+		"m=audio " + fmt.Sprintf("%d RTP/AVP 0 101", remoteRTPPort) + "\r\n" +
+		"a=rtpmap:0 PCMU/8000\r\n" +
+		"a=rtpmap:101 telephone-event/8000\r\n" +
+		"a=rtcp:" + fmt.Sprintf("%d IN IP4 %s", remoteRTCPPort, remoteRTCPIPAddress) + "\r\n" +
+		"a=sendrecv\r\n"
+}
+
 func inboundOfferSDPWithoutConnection() string {
 	return "v=0\r\n" +
 		"o=caller 1 1 IN IP4 127.0.0.1\r\n" +

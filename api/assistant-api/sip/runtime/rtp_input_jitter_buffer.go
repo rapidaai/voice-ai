@@ -14,15 +14,6 @@ import (
 	"github.com/rapidaai/pkg/utils"
 )
 
-const (
-	rtpInputReorderWindow              = 80 * time.Millisecond
-	rtpInputMaxLossGap                 = 500 * time.Millisecond
-	rtpInputMaxSilenceGap              = 500 * time.Millisecond
-	rtpInputBufferedPacketMapCapacity  = 5
-	rtpInputPacketizationStablePackets = 2
-	rtpInputNanosecondsPerSecond       = 1000000000
-)
-
 type rtpInputJitterBuffer struct {
 	mu sync.Mutex
 
@@ -65,7 +56,9 @@ func (buffer *rtpInputJitterBuffer) reset(codec *Codec, packetizationTime time.D
 	if codec.ClockRate == 0 {
 		codec = &CodecPCMU
 	}
-	if !validRTPPacketizationTime(packetizationTime) {
+	if packetizationTime < rtpMinPacketizationTime ||
+		packetizationTime > rtpMaxPacketizationTime ||
+		packetizationTime%time.Millisecond != 0 {
 		packetizationTime = rtpDefaultPacketizationTime
 	}
 	ptimeMS, err := utils.Int64ToUint64(packetizationTime.Milliseconds())
@@ -337,7 +330,9 @@ func (buffer *rtpInputJitterBuffer) playoutTimeout() time.Duration {
 	}
 	buffer.mu.Lock()
 	defer buffer.mu.Unlock()
-	if !validRTPPacketizationTime(buffer.packetizationTime) {
+	if buffer.packetizationTime < rtpMinPacketizationTime ||
+		buffer.packetizationTime > rtpMaxPacketizationTime ||
+		buffer.packetizationTime%time.Millisecond != 0 {
 		return rtpDefaultPacketizationTime
 	}
 	return buffer.packetizationTime
@@ -345,7 +340,9 @@ func (buffer *rtpInputJitterBuffer) playoutTimeout() time.Duration {
 
 func (buffer *rtpInputJitterBuffer) framesForDuration(limit time.Duration) int {
 	packetizationTime := buffer.packetizationTime
-	if !validRTPPacketizationTime(packetizationTime) {
+	if packetizationTime < rtpMinPacketizationTime ||
+		packetizationTime > rtpMaxPacketizationTime ||
+		packetizationTime%time.Millisecond != 0 {
 		packetizationTime = rtpDefaultPacketizationTime
 	}
 	frames64 := int64(limit / packetizationTime)

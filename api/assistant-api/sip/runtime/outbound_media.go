@@ -7,14 +7,8 @@
 package sip_runtime
 
 import (
-	"errors"
 	"fmt"
 	"time"
-)
-
-var (
-	ErrOutboundMediaNotPrepared = errors.New("outbound media is not prepared")
-	ErrOutboundMediaNoSession   = errors.New("outbound media requires a session")
 )
 
 // outboundMedia prepares RTP for an outbound call and configures it before
@@ -128,14 +122,12 @@ func (media *outboundMedia) ApplyAnswer(answer OutboundMediaAnswer) error {
 	if media.server != nil {
 		media.rtpHandler.SetSymmetricRTP(media.server.useSymmetricRTPForRemoteIP(answer.remoteIP))
 	}
-	media.rtpHandler.SetRemoteAddr(answer.remoteIP, answer.remotePort)
-	if answer.remoteRTCPPort > 0 {
-		rtcpIP := answer.remoteRTCPIP
-		if rtcpIP == "" {
-			rtcpIP = answer.remoteIP
-		}
-		media.rtpHandler.SetRemoteRTCPAddr(rtcpIP, answer.remoteRTCPPort)
-	}
+	media.rtpHandler.setRemoteMediaAddress(remoteMediaAddress{
+		remoteRTPIPAddress:  answer.remoteIP,
+		remoteRTPPort:       answer.remotePort,
+		remoteRTCPIPAddress: answer.remoteRTCPIP,
+		remoteRTCPPort:      answer.remoteRTCPPort,
+	})
 	media.rtpHandler.SetInboundMediaFormat(answer.negotiatedCodec, answer.packetizationTime)
 	media.session.SetRemoteRTP(answer.remoteIP, answer.remotePort)
 	if answer.negotiatedCodec != nil {

@@ -9,7 +9,6 @@ package sip_runtime
 import (
 	"time"
 
-	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/types"
@@ -18,45 +17,15 @@ import (
 
 type OutboundMode string
 
-const (
-	OutboundModeTrunkTermination OutboundMode = "trunk_termination"
-)
-
 type OutboundLegPurpose string
 
-const (
-	OutboundLegPurposePrimary        OutboundLegPurpose = "primary_outbound_call"
-	OutboundLegPurposeTransferBridge OutboundLegPurpose = "transfer_bridge_call"
-)
-
 type OutboundDialogPhase string
-
-const (
-	OutboundDialogPhaseInviting   OutboundDialogPhase = "inviting"
-	OutboundDialogPhaseProceeding OutboundDialogPhase = "proceeding"
-	OutboundDialogPhaseAnswered   OutboundDialogPhase = "answered"
-	OutboundDialogPhaseConfirmed  OutboundDialogPhase = "confirmed"
-	OutboundDialogPhaseTerminated OutboundDialogPhase = "terminated"
-)
 
 func (p OutboundDialogPhase) IsPreAnswer() bool {
 	return p == OutboundDialogPhaseInviting || p == OutboundDialogPhaseProceeding
 }
 
-const (
-	defaultOutboundRingingTimeout = 60 * time.Second
-)
-
 type OutboundCallStatus string
-
-const (
-	OutboundCallStatusInitiated OutboundCallStatus = callcontext.CallStatusInitiated
-	OutboundCallStatusRinging   OutboundCallStatus = callcontext.CallStatusRinging
-	OutboundCallStatusAnswered  OutboundCallStatus = callcontext.CallStatusAnswered
-	OutboundCallStatusFailed    OutboundCallStatus = callcontext.CallStatusFailed
-	OutboundCallStatusCompleted OutboundCallStatus = callcontext.CallStatusCompleted
-	OutboundCallStatusCancelled OutboundCallStatus = callcontext.CallStatusCancelled
-)
 
 type SIPAuthConfig struct {
 	Username string
@@ -128,16 +97,6 @@ type OutboundInviteRequest struct {
 	Config   OutboundConfig
 	Identity OutboundCallIdentity
 }
-
-const (
-	MetadataOutboundLegPurpose           = "outbound_leg_purpose"
-	MetadataOutboundParentCallID         = "outbound_parent_call_id"
-	MetadataOutboundParentContextID      = "outbound_parent_context_id"
-	MetadataOutboundParentConversationID = "outbound_parent_conversation_id"
-	MetadataOutboundTransferTarget       = "outbound_transfer_target"
-	MetadataOutboundTransferAttempt      = "outbound_transfer_attempt"
-	MetadataOutboundTransferTotal        = "outbound_transfer_total"
-)
 
 func (c OutboundConfig) EffectiveRingingTimeout() time.Duration {
 	if c.RingingTimeout > 0 {

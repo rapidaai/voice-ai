@@ -23,14 +23,6 @@ import (
 	"github.com/rapidaai/pkg/validator"
 )
 
-const (
-	defaultRegisterExpiry      uint32 = 3600 // seconds
-	renewalFraction                   = 0.8  // re-register at 80% of expiry
-	defaultRegisterTimeout            = 10 * time.Second
-	renewRetryInterval                = 30 * time.Second
-	maxRegistrationExpiryGrace        = 60 * time.Second
-)
-
 // Registration describes a SIP registration to be maintained with an external registrar.
 type Registration struct {
 	DID          string  // Phone number / DID being registered (e.g., "+15551234567")

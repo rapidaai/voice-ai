@@ -6,27 +6,7 @@
 
 package sip_runtime
 
-const sdpContentType = "application/sdp"
-
 type inboundFailureClass string
-
-const (
-	inboundFailureConfig           inboundFailureClass = "config"
-	inboundFailureAuth             inboundFailureClass = "auth"
-	inboundFailureAuthRequired     inboundFailureClass = "auth_required"
-	inboundFailureMedia            inboundFailureClass = "media"
-	inboundFailureRTP              inboundFailureClass = "rtp"
-	inboundFailureUnsupportedMedia inboundFailureClass = "unsupported_media"
-	inboundFailureRTPUnavailable   inboundFailureClass = "rtp_unavailable"
-	inboundFailureMediaTimeout     inboundFailureClass = "media_timeout"
-	inboundFailureDialog           inboundFailureClass = "dialog"
-	inboundFailureNoAnswer         inboundFailureClass = "no_answer"
-	inboundFailureNoACK            inboundFailureClass = "no_ack"
-	inboundFailureApplication      inboundFailureClass = "application"
-	inboundFailureSetup            inboundFailureClass = "setup"
-	inboundFailureCancelled        inboundFailureClass = "cancelled"
-	inboundFailureUnknown          inboundFailureClass = "unknown"
-)
 
 type inboundFailure struct {
 	statusCode      int

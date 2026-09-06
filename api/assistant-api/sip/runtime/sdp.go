@@ -16,17 +16,6 @@ import (
 	"github.com/rapidaai/pkg/validator"
 )
 
-const (
-	sdpConnectionIPPrefix = "c=IN IP4 "
-	sdpAudioPrefix        = "m=audio "
-	sdpRTPMapPrefix       = "a=rtpmap:"
-	sdpRTCPPrefix         = "a=rtcp:"
-	sdpPTimePrefix        = "a=ptime:"
-	sdpDefaultPTimeMS     = 20
-	sdpMinPTimeMS         = 5
-	sdpMaxPTimeMS         = 60
-)
-
 // Codec represents an audio codec with its RTP configuration
 type Codec struct {
 	Name        string
@@ -53,13 +42,6 @@ var SupportedCodecs = []Codec{CodecPCMU, CodecPCMA}
 
 // SDPDirection represents the media direction attribute in SDP
 type SDPDirection string
-
-const (
-	SDPDirectionSendRecv SDPDirection = "sendrecv"
-	SDPDirectionSendOnly SDPDirection = "sendonly"
-	SDPDirectionRecvOnly SDPDirection = "recvonly"
-	SDPDirectionInactive SDPDirection = "inactive"
-)
 
 // SDPMediaInfo contains parsed media information from SDP
 type SDPMediaInfo struct {
