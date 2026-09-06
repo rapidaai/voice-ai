@@ -19,63 +19,6 @@ import (
 	"time"
 
 	"github.com/rapidaai/pkg/utils"
-	"github.com/rapidaai/pkg/validator"
-)
-
-// RTP constants
-const (
-	rtpVersion                  = 2
-	rtpHeaderSize               = 12
-	rtpDefaultClockRate         = 8000
-	rtpMaxPort                  = 65535
-	rtpReadBufferSize           = 65536
-	rtpWriteBufferSize          = 65536
-	rtpPacketMaxSize            = 1500
-	rtpPacketInterval           = 20 * time.Millisecond
-	rtpDefaultPacketizationTime = 20 * time.Millisecond
-	rtpMinPacketizationTime     = 5 * time.Millisecond
-	rtpMaxPacketizationTime     = 60 * time.Millisecond
-	rtpMediaTimeoutInitial      = 30 * time.Second
-	rtpMediaTimeout             = 15 * time.Second
-
-	// Audio channel buffer sizes
-	rtpAudioInBufferSize  = 100
-	rtpAudioOutBufferSize = 100
-)
-
-const (
-	rtpNetworkUDP4 = "udp4"
-	rtpNetworkUDP6 = "udp6"
-)
-
-const (
-	rtpNewHandlerOperation = "NewRTPHandler"
-
-	rtpErrorIntFormat        = "%w: %d"
-	rtpErrorMaxPortFormat    = "%w: max=%d"
-	rtpErrorPortRangeFormat  = "%w: range=%d-%d tried=%d"
-	rtpErrorSizeHeaderFormat = "%w: size=%d header=%d"
-)
-
-var (
-	errRTPConfigRequired              = errors.New("rtp config is required")
-	errRTPCreateSSRC                  = errors.New("failed to create rtp ssrc")
-	errRTPCreateSocket                = errors.New("failed to create rtp socket")
-	errRTPInvalidConfig               = errors.New("invalid configuration")
-	errRTPInvalidLocalPort            = errors.New("invalid local_port")
-	errRTPInvalidPacketLength         = errors.New("invalid packet length")
-	errRTPInvalidPacketizationTime    = errors.New("invalid packetization time")
-	errRTPInvalidPaddingLength        = errors.New("invalid rtp padding length")
-	errRTPLocalIPRequired             = errors.New("local_ip is required")
-	errRTPPacketShortCSRCHeader       = errors.New("packet shorter than csrc header")
-	errRTPPacketShortExtension        = errors.New("packet shorter than rtp extension header")
-	errRTPPacketShortExtensionPayload = errors.New("packet shorter than rtp extension payload")
-	errRTPPacketTooSmall              = errors.New("packet too small")
-	errRTPPaddingNoPayload            = errors.New("rtp padding has no payload")
-	errRTPPortRangeInvalidOrder       = errors.New("rtp_port_range_start must be less than or equal to rtp_port_range_end")
-	errRTPPortRangeRequired           = errors.New("rtp port range is required when local_port is not specified")
-	errRTPPortRangeValue              = errors.New("rtp port range exceeds max port")
-	errRTPUnsupportedVersion          = errors.New("unsupported rtp version")
 )
 
 // RTPPacket represents an RTP packet
@@ -178,72 +121,11 @@ type RTPPortStats struct {
 	rangeExhaustions atomic.Uint64
 }
 
-// RTPConfig holds configuration for RTP handler
-type RTPConfig struct {
-	LocalIP     string
-	LocalPort   int
-	PayloadType uint8  // 0 = PCMU, 8 = PCMA
-	ClockRate   uint32 // 8000 for G.711
-
-	RTPPortRangeStart int
-	RTPPortRangeEnd   int
-	SymmetricRTP      bool
-
-	MediaTimeoutInitial time.Duration
-	MediaTimeout        time.Duration
-	PacketizationTime   time.Duration
-
-	portStats *RTPPortStats
-}
-
-// Validate validates the RTP configuration
-func (c *RTPConfig) Validate() error {
-	if !validator.NonNil(c) {
-		return errRTPConfigRequired
-	}
-	if utils.IsEmpty(c.LocalIP) {
-		return errRTPLocalIPRequired
-	}
-	if !validator.Between(c.LocalPort, 0, rtpMaxPort) {
-		return fmt.Errorf(rtpErrorIntFormat, errRTPInvalidLocalPort, c.LocalPort)
-	}
-	if c.LocalPort == 0 {
-		if !validator.Between(c.RTPPortRangeStart, 1, rtpMaxPort) ||
-			!validator.Between(c.RTPPortRangeEnd, 1, rtpMaxPort) {
-			if c.RTPPortRangeStart <= 0 || c.RTPPortRangeEnd <= 0 {
-				return errRTPPortRangeRequired
-			}
-			if c.RTPPortRangeStart > c.RTPPortRangeEnd {
-				return errRTPPortRangeInvalidOrder
-			}
-			return fmt.Errorf(rtpErrorMaxPortFormat, errRTPPortRangeValue, rtpMaxPort)
-		}
-		if c.RTPPortRangeStart > c.RTPPortRangeEnd {
-			return errRTPPortRangeInvalidOrder
-		}
-	}
-	if c.ClockRate == 0 {
-		c.ClockRate = rtpDefaultClockRate
-	}
-	if c.MediaTimeoutInitial <= 0 {
-		c.MediaTimeoutInitial = rtpMediaTimeoutInitial
-	}
-	if c.MediaTimeout <= 0 {
-		c.MediaTimeout = rtpMediaTimeout
-	}
-	if c.PacketizationTime <= 0 {
-		c.PacketizationTime = rtpDefaultPacketizationTime
-	}
-	if !validRTPPacketizationTime(c.PacketizationTime) {
-		return fmt.Errorf(rtpErrorIntFormat, errRTPInvalidPacketizationTime, c.PacketizationTime.Milliseconds())
-	}
-	return nil
-}
-
-func validRTPPacketizationTime(packetizationTime time.Duration) bool {
-	return packetizationTime >= rtpMinPacketizationTime &&
-		packetizationTime <= rtpMaxPacketizationTime &&
-		packetizationTime%time.Millisecond == 0
+type remoteMediaAddress struct {
+	remoteRTPIPAddress  string
+	remoteRTPPort       int
+	remoteRTCPIPAddress string
+	remoteRTCPPort      int
 }
 
 // NewRTPHandler creates a new RTP handler for direct audio transport
@@ -552,8 +434,7 @@ func (h *RTPHandler) mediaTimeoutLoop() {
 		return
 	}
 
-	const disabledPark = time.Hour
-	timer := time.NewTimer(disabledPark)
+	timer := time.NewTimer(rtpMediaTimeoutDisabledPark)
 	defer timer.Stop()
 
 	for {
@@ -572,7 +453,7 @@ func (h *RTPHandler) mediaTimeoutLoop() {
 				default:
 				}
 			}
-			timer.Reset(disabledPark)
+			timer.Reset(rtpMediaTimeoutDisabledPark)
 			continue
 		}
 
@@ -628,20 +509,42 @@ func (h *RTPHandler) IsRunning() bool {
 
 // SetRemoteAddr sets the remote RTP endpoint used by the handler's UDP socket.
 func (h *RTPHandler) SetRemoteAddr(ip string, port int) {
+	h.setRemoteMediaAddress(remoteMediaAddress{
+		remoteRTPIPAddress: ip,
+		remoteRTPPort:      port,
+	})
+}
+
+func (h *RTPHandler) setRemoteMediaAddress(address remoteMediaAddress) {
+	if h == nil {
+		return
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	parsedIP := net.ParseIP(ip)
+	parsedRemoteRTPIPAddress := net.ParseIP(address.remoteRTPIPAddress)
 	h.remoteAddr = &net.UDPAddr{
-		IP:   parsedIP,
-		Port: port,
+		IP:   parsedRemoteRTPIPAddress,
+		Port: address.remoteRTPPort,
 	}
 	h.remoteRTCPSignaled = false
 	h.remoteRTCPAddr = nil
-	if port > 0 && port < rtpMaxPort {
+	if address.remoteRTCPPort > 0 && address.remoteRTCPPort <= rtpMaxPort {
+		remoteRTCPIPAddress := address.remoteRTCPIPAddress
+		if remoteRTCPIPAddress == "" {
+			remoteRTCPIPAddress = address.remoteRTPIPAddress
+		}
 		h.remoteRTCPAddr = &net.UDPAddr{
-			IP:   append(net.IP(nil), parsedIP...),
-			Port: port + rtcpPortOffset,
+			IP:   net.ParseIP(remoteRTCPIPAddress),
+			Port: address.remoteRTCPPort,
+		}
+		h.remoteRTCPSignaled = true
+		return
+	}
+	if address.remoteRTPPort > 0 && address.remoteRTPPort < rtpMaxPort {
+		h.remoteRTCPAddr = &net.UDPAddr{
+			IP:   append(net.IP(nil), parsedRemoteRTPIPAddress...),
+			Port: address.remoteRTPPort + rtcpPortOffset,
 		}
 	}
 }
@@ -799,7 +702,9 @@ func (h *RTPHandler) SetInboundMediaFormat(codec *Codec, packetizationTime time.
 	if codec == nil {
 		codec = &CodecPCMU
 	}
-	if !validRTPPacketizationTime(packetizationTime) {
+	if packetizationTime < rtpMinPacketizationTime ||
+		packetizationTime > rtpMaxPacketizationTime ||
+		packetizationTime%time.Millisecond != 0 {
 		packetizationTime = rtpDefaultPacketizationTime
 	}
 	h.mu.Lock()
@@ -833,7 +738,10 @@ func (h *RTPHandler) receiveLoop() {
 		playoutTimeout := rtpDefaultPacketizationTime
 		h.mu.RLock()
 		inputJitter := h.inputJitter
-		if inputJitter == nil && validRTPPacketizationTime(h.inputPacketizationTime) {
+		if inputJitter == nil &&
+			h.inputPacketizationTime >= rtpMinPacketizationTime &&
+			h.inputPacketizationTime <= rtpMaxPacketizationTime &&
+			h.inputPacketizationTime%time.Millisecond == 0 {
 			playoutTimeout = h.inputPacketizationTime
 		}
 		h.mu.RUnlock()

@@ -51,6 +51,49 @@ func TestRTPHandlerContinuesWhenRTCPCompanionPortUnavailable(t *testing.T) {
 	assert.False(t, handler.GetDetailedStats().RTCPEnabled)
 }
 
+func TestRTPHandlerSetRemoteMediaAddressAppliesExplicitRTCPAddress(t *testing.T) {
+	handler := newTestRTPHandler()
+
+	handler.setRemoteMediaAddress(remoteMediaAddress{
+		remoteRTPIPAddress:  "127.0.0.1",
+		remoteRTPPort:       20000,
+		remoteRTCPIPAddress: "198.51.100.10",
+		remoteRTCPPort:      23000,
+	})
+
+	remoteRTPAddress := handler.GetRemoteAddr()
+	require.NotNil(t, remoteRTPAddress)
+	assert.Equal(t, "127.0.0.1", remoteRTPAddress.IP.String())
+	assert.Equal(t, 20000, remoteRTPAddress.Port)
+	assert.Equal(t, 23000, handler.GetDetailedStats().RemoteRTCPPort)
+
+	handler.mu.RLock()
+	remoteRTCPAddress := cloneUDPAddr(handler.remoteRTCPAddr)
+	remoteRTCPSignaled := handler.remoteRTCPSignaled
+	handler.mu.RUnlock()
+	require.NotNil(t, remoteRTCPAddress)
+	assert.True(t, remoteRTCPSignaled)
+	assert.Equal(t, "198.51.100.10", remoteRTCPAddress.IP.String())
+}
+
+func TestRTPHandlerSetRemoteMediaAddressFallsBackToCompanionRTCPPort(t *testing.T) {
+	handler := newTestRTPHandler()
+
+	handler.setRemoteMediaAddress(remoteMediaAddress{
+		remoteRTPIPAddress: "127.0.0.1",
+		remoteRTPPort:      20000,
+	})
+
+	assert.Equal(t, 20001, handler.GetDetailedStats().RemoteRTCPPort)
+	handler.mu.RLock()
+	remoteRTCPAddress := cloneUDPAddr(handler.remoteRTCPAddr)
+	remoteRTCPSignaled := handler.remoteRTCPSignaled
+	handler.mu.RUnlock()
+	require.NotNil(t, remoteRTCPAddress)
+	assert.False(t, remoteRTCPSignaled)
+	assert.Equal(t, "127.0.0.1", remoteRTCPAddress.IP.String())
+}
+
 func TestRTPHandlerSendsRTCPReportWithInboundReceptionStats(t *testing.T) {
 	rtpPort, _ := reserveUDPPortPair(t)
 	remoteRTCP, err := net.ListenUDP("udp4", &net.UDPAddr{
@@ -182,6 +225,56 @@ func TestRTPHandlerClearsRTTWhenReceiverReportHasNoDelay(t *testing.T) {
 	}, receivedAt.Add(time.Second))
 
 	assert.Zero(t, handler.GetDetailedStats().RTCPRoundTripTime)
+}
+
+func TestRTPHandlerClearsRTCPFeedbackOnSSRCChange(t *testing.T) {
+	handler := newTestRTPHandler()
+	handler.ssrc = 5678
+	receivedAt := time.Unix(1_700_000_000, 0)
+	delay := uint32((20 * time.Millisecond).Nanoseconds() * rtcpCompactUnit / rtcpNanoseconds)
+
+	handler.rtcpReception.recordRTP(testRTCPRTPPacket(1, 0, 111), CodecPCMU.ClockRate, receivedAt)
+	handler.recordRTCPPacket(&rtcp.SenderReport{
+		NTPTime: rtcpNTP(receivedAt),
+	}, receivedAt)
+	handler.recordRTCPPacket(&rtcp.ReceiverReport{
+		Reports: []rtcp.ReceptionReport{
+			{
+				SSRC:             handler.ssrc,
+				FractionLost:     32,
+				TotalLost:        2,
+				Jitter:           7,
+				LastSenderReport: rtcpCompactNTP(receivedAt.Add(-100 * time.Millisecond)),
+				Delay:            delay,
+			},
+		},
+	}, receivedAt)
+
+	stats := handler.GetDetailedStats()
+	require.Equal(t, uint8(32), stats.RTCPRemoteFractionLost)
+	require.Equal(t, uint32(2), stats.RTCPRemotePacketsLost)
+	require.Equal(t, uint32(7), stats.RTCPRemoteJitter)
+	require.NotZero(t, stats.RTCPRoundTripTime)
+	handler.rtcpReception.mu.Lock()
+	lastSenderReport := handler.rtcpReception.lastSenderReport
+	lastSenderReportReceivedAt := handler.rtcpReception.lastSenderReportReceivedAt
+	handler.rtcpReception.mu.Unlock()
+	require.NotZero(t, lastSenderReport)
+	require.False(t, lastSenderReportReceivedAt.IsZero())
+
+	handler.rtcpReception.recordRTP(testRTCPRTPPacket(1, 0, 222), CodecPCMU.ClockRate, receivedAt.Add(time.Second))
+
+	stats = handler.GetDetailedStats()
+	assert.Zero(t, stats.RTCPRemoteFractionLost)
+	assert.Zero(t, stats.RTCPRemotePacketsLost)
+	assert.Zero(t, stats.RTCPRemoteJitter)
+	assert.Zero(t, stats.RTCPRoundTripTime)
+	handler.rtcpReception.mu.Lock()
+	lastSenderReport = handler.rtcpReception.lastSenderReport
+	lastSenderReportReceivedAt = handler.rtcpReception.lastSenderReportReceivedAt
+	handler.rtcpReception.mu.Unlock()
+	assert.Zero(t, lastSenderReport)
+	assert.True(t, lastSenderReportReceivedAt.IsZero())
 }
 
 func TestRTPHandlerRecordsCompoundRTCPPacketCount(t *testing.T) {

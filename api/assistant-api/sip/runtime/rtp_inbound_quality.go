@@ -5,18 +5,6 @@ import (
 	"time"
 )
 
-const (
-	rtpInboundQualityWindow       = 5 * time.Second
-	rtpInboundQualityGoodLossRate = 0.05
-	rtpInboundQualityPoorLossRate = 0.12
-
-	rtpInboundQualityUnknown   = "unknown"
-	rtpInboundQualityExcellent = "excellent"
-	rtpInboundQualityGood      = "good"
-	rtpInboundQualityPoor      = "poor"
-	rtpInboundQualityLost      = "lost"
-)
-
 type rtpInboundQuality struct {
 	mu sync.Mutex
 

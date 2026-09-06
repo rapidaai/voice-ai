@@ -19,24 +19,6 @@ import (
 
 type OutboundFailureClass string
 
-const (
-	OutboundFailureAuthRequired    OutboundFailureClass = "auth_required"
-	OutboundFailureSetup           OutboundFailureClass = "setup"
-	OutboundFailureForbidden       OutboundFailureClass = "forbidden"
-	OutboundFailureNotFound        OutboundFailureClass = "not_found"
-	OutboundFailureNoAnswer        OutboundFailureClass = "no_answer"
-	OutboundFailureUnavailable     OutboundFailureClass = "unavailable"
-	OutboundFailureBusy            OutboundFailureClass = "busy"
-	OutboundFailureRejected        OutboundFailureClass = "rejected"
-	OutboundFailureUpstreamFailure OutboundFailureClass = "upstream_failure"
-	OutboundFailureTrunkCapacity   OutboundFailureClass = "trunk_capacity"
-	OutboundFailureNetwork         OutboundFailureClass = "network"
-	OutboundFailureCancelled       OutboundFailureClass = "cancelled"
-	OutboundFailureMedia           OutboundFailureClass = "media"
-	OutboundFailureApplication     OutboundFailureClass = "application"
-	OutboundFailureUnknown         OutboundFailureClass = "unknown"
-)
-
 type OutboundFailure struct {
 	StatusCode      int
 	Class           OutboundFailureClass

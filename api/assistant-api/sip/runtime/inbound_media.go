@@ -6,15 +6,6 @@
 
 package sip_runtime
 
-import (
-	"errors"
-)
-
-var (
-	ErrInboundMediaNotPrepared = errors.New("inbound media is not prepared")
-	ErrInboundMediaNoSession   = errors.New("inbound media requires a session")
-)
-
 // inboundMedia prepares RTP for an inbound INVITE and configures it before
 // the session adopts the handler. Session.End owns final RTP teardown.
 type inboundMedia struct {
@@ -59,14 +50,12 @@ func (media *inboundMedia) Prepare() error {
 	}
 
 	_, media.localRTPPort = rtpHandler.LocalAddr()
-	rtpHandler.SetRemoteAddr(media.mediaOffer.sdpInfo.ConnectionIP, media.mediaOffer.sdpInfo.AudioPort)
-	if media.mediaOffer.sdpInfo.RTCPPort > 0 {
-		rtcpIP := media.mediaOffer.sdpInfo.RTCPIP
-		if rtcpIP == "" {
-			rtcpIP = media.mediaOffer.sdpInfo.ConnectionIP
-		}
-		rtpHandler.SetRemoteRTCPAddr(rtcpIP, media.mediaOffer.sdpInfo.RTCPPort)
-	}
+	rtpHandler.setRemoteMediaAddress(remoteMediaAddress{
+		remoteRTPIPAddress:  media.mediaOffer.sdpInfo.ConnectionIP,
+		remoteRTPPort:       media.mediaOffer.sdpInfo.AudioPort,
+		remoteRTCPIPAddress: media.mediaOffer.sdpInfo.RTCPIP,
+		remoteRTCPPort:      media.mediaOffer.sdpInfo.RTCPPort,
+	})
 	rtpHandler.SetOnFirstPacket(func() {
 		if media.session != nil {
 			media.session.MarkInboundFirstRTPReceived()

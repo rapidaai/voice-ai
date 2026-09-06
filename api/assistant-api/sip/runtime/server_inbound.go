@@ -13,15 +13,6 @@ import (
 	"github.com/emiago/sipgo/sip"
 )
 
-const (
-	defaultInboundACKTimeout                = 5 * time.Second
-	defaultInboundFinalResponseRetryInitial = 500 * time.Millisecond
-	defaultInboundFinalResponseRetryMax     = 4 * time.Second
-	defaultInboundRingingInterval           = time.Second
-	sipHeaderRetryAfter                     = "Retry-After"
-	sipCapacityRetryAfterSeconds            = 1
-)
-
 func (s *Server) handleInvite(req *sip.Request, tx sip.ServerTransaction) {
 	NewInbound(s, req, tx).HandleInvite()
 }
@@ -86,7 +77,12 @@ func (s *Server) handleReInvite(req *sip.Request, tx sip.ServerTransaction, sess
 		rtpHandler := session.GetRTPHandler()
 		if rtpHandler != nil && sdpInfo.ConnectionIP != "" && sdpInfo.AudioPort > 0 {
 			rtpHandler.SetSymmetricRTP(s.useSymmetricRTPForRemoteIP(sdpInfo.ConnectionIP))
-			rtpHandler.SetRemoteAddr(sdpInfo.ConnectionIP, sdpInfo.AudioPort)
+			rtpHandler.setRemoteMediaAddress(remoteMediaAddress{
+				remoteRTPIPAddress:  sdpInfo.ConnectionIP,
+				remoteRTPPort:       sdpInfo.AudioPort,
+				remoteRTCPIPAddress: sdpInfo.RTCPIP,
+				remoteRTCPPort:      sdpInfo.RTCPPort,
+			})
 			session.SetRemoteRTP(sdpInfo.ConnectionIP, sdpInfo.AudioPort)
 			s.logger.Debugw("Updated remote RTP from re-INVITE",
 				"call_id", callID,
@@ -319,7 +315,12 @@ func (s *Server) handleUpdate(req *sip.Request, tx sip.ServerTransaction) {
 			rtpHandler := session.GetRTPHandler()
 			if rtpHandler != nil && sdpInfo.ConnectionIP != "" && sdpInfo.AudioPort > 0 {
 				rtpHandler.SetSymmetricRTP(s.useSymmetricRTPForRemoteIP(sdpInfo.ConnectionIP))
-				rtpHandler.SetRemoteAddr(sdpInfo.ConnectionIP, sdpInfo.AudioPort)
+				rtpHandler.setRemoteMediaAddress(remoteMediaAddress{
+					remoteRTPIPAddress:  sdpInfo.ConnectionIP,
+					remoteRTPPort:       sdpInfo.AudioPort,
+					remoteRTCPIPAddress: sdpInfo.RTCPIP,
+					remoteRTCPPort:      sdpInfo.RTCPPort,
+				})
 				session.SetRemoteRTP(sdpInfo.ConnectionIP, sdpInfo.AudioPort)
 				s.logger.Debugw("Updated remote RTP from UPDATE",
 					"call_id", callID,

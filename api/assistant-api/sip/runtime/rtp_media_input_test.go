@@ -133,54 +133,6 @@ func TestNewRTPHandlerInitializesInputPacketizationTime(t *testing.T) {
 	assert.Equal(t, 30*time.Millisecond, inputJitter.playoutTimeout())
 }
 
-func TestRTPConfigValidateRejectsNil(t *testing.T) {
-	var config *RTPConfig
-
-	assert.ErrorIs(t, config.Validate(), errRTPConfigRequired)
-}
-
-func TestRTPConfigValidateReturnsSentinelErrors(t *testing.T) {
-	tests := []struct {
-		name    string
-		config  *RTPConfig
-		wantErr error
-	}{
-		{
-			name:    "missing local ip",
-			config:  &RTPConfig{},
-			wantErr: errRTPLocalIPRequired,
-		},
-		{
-			name: "blank local ip",
-			config: &RTPConfig{
-				LocalIP: " ",
-			},
-			wantErr: errRTPLocalIPRequired,
-		},
-		{
-			name: "invalid local port",
-			config: &RTPConfig{
-				LocalIP:   "127.0.0.1",
-				LocalPort: rtpMaxPort + 1,
-			},
-			wantErr: errRTPInvalidLocalPort,
-		},
-		{
-			name: "missing port range",
-			config: &RTPConfig{
-				LocalIP: "127.0.0.1",
-			},
-			wantErr: errRTPPortRangeRequired,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			assert.ErrorIs(t, test.config.Validate(), test.wantErr)
-		})
-	}
-}
-
 func TestRTPHandler_ReceiveLoopDropsNonAudioPayload(t *testing.T) {
 	reserved, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
 	require.NoError(t, err)

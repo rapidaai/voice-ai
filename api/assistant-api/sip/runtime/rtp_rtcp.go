@@ -12,25 +12,6 @@ import (
 	"github.com/rapidaai/pkg/utils"
 )
 
-const (
-	rtcpPortOffset               = 1
-	rtcpReadBufferSize           = 1500
-	rtcpWriteBufferSize          = 1500
-	rtcpReportInterval           = 5 * time.Second
-	rtcpReadTimeout              = time.Second
-	rtcpCNAMEFormat              = "rapida-%08x@%s"
-	rtcpNanoseconds              = 1000000000
-	rtcpNanosecondsUint64        = 1000000000
-	rtcpNTPUnixOffset            = 2208988800
-	rtcpNTPFractionUnit          = 1 << 32
-	rtcpCompactUnit              = 65536
-	rtcpMaxUint8                 = 255
-	rtcpMaxUint32                = 1<<32 - 1
-	rtcpMaxUint32Int64           = 1<<32 - 1
-	rtpSequenceCycle             = 1 << 16
-	rtpSequenceRolloverThreshold = 1 << 15
-)
-
 type rtpRTCPReceptionStats struct {
 	mu sync.Mutex
 
@@ -280,6 +261,12 @@ func (s *rtpRTCPReceptionStats) resetRTPLocked(ssrc uint32, clockRate uint32) {
 	s.sequenceCycles = 0
 	s.previousTransit = 0
 	s.jitter = 0
+	s.lastSenderReport = 0
+	s.lastSenderReportReceivedAt = time.Time{}
+	s.lastRemoteFractionLost = 0
+	s.lastRemotePacketsLost = 0
+	s.lastRemoteJitter = 0
+	s.roundTripTime = 0
 }
 
 func rtpTransit(packet *RTPPacket, clockRate uint32, arrivedAt time.Time) int64 {
