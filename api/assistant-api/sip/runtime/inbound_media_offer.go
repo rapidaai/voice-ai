@@ -88,7 +88,7 @@ func newInboundMediaOffer(
 			err:             err,
 		}
 	}
-	if strings.TrimSpace(sdpInfo.ConnectionIP) == "" {
+	if strings.TrimSpace(sdpInfo.RTPAddress.IP) == "" {
 		err := fmt.Errorf("%w: inbound offer missing RTP address", ErrSDPParseFailed)
 		return inboundMediaOffer{}, &inboundFailure{
 			statusCode:      400,
@@ -100,9 +100,9 @@ func newInboundMediaOffer(
 			err:             err,
 		}
 	}
-	remoteIP := net.ParseIP(sdpInfo.ConnectionIP)
+	remoteIP := net.ParseIP(sdpInfo.RTPAddress.IP)
 	if remoteIP == nil {
-		err := fmt.Errorf("%w: inbound offer invalid RTP address %q", ErrSDPParseFailed, sdpInfo.ConnectionIP)
+		err := fmt.Errorf("%w: inbound offer invalid RTP address %q", ErrSDPParseFailed, sdpInfo.RTPAddress.IP)
 		return inboundMediaOffer{}, &inboundFailure{
 			statusCode:      400,
 			class:           inboundFailureMedia,
@@ -114,7 +114,7 @@ func newInboundMediaOffer(
 		}
 	}
 	if remoteIP.IsUnspecified() && !allowDisabledRTPAddress {
-		err := fmt.Errorf("%w: inbound offer disabled RTP address %q", ErrSDPParseFailed, sdpInfo.ConnectionIP)
+		err := fmt.Errorf("%w: inbound offer disabled RTP address %q", ErrSDPParseFailed, sdpInfo.RTPAddress.IP)
 		return inboundMediaOffer{}, &inboundFailure{
 			statusCode:      488,
 			class:           inboundFailureUnsupportedMedia,
@@ -125,8 +125,8 @@ func newInboundMediaOffer(
 			err:             err,
 		}
 	}
-	if sdpInfo.AudioPort <= 0 || sdpInfo.AudioPort > 65535 {
-		err := fmt.Errorf("%w: inbound offer invalid RTP port %d", ErrSDPParseFailed, sdpInfo.AudioPort)
+	if sdpInfo.RTPAddress.Port <= 0 || sdpInfo.RTPAddress.Port > 65535 {
+		err := fmt.Errorf("%w: inbound offer invalid RTP port %d", ErrSDPParseFailed, sdpInfo.RTPAddress.Port)
 		return inboundMediaOffer{}, &inboundFailure{
 			statusCode:      400,
 			class:           inboundFailureMedia,

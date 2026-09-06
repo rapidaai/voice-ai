@@ -45,8 +45,7 @@ type RTPHandler struct {
 
 	conn      *net.UDPConn
 	rtcpConn  *net.UDPConn
-	localIP   string
-	localPort int
+	localAddr RTPAddress
 
 	remoteAddr         *net.UDPAddr
 	remoteRTCPAddr     *net.UDPAddr
@@ -122,10 +121,8 @@ type RTPPortStats struct {
 }
 
 type remoteMediaAddress struct {
-	remoteRTPIPAddress  string
-	remoteRTPPort       int
-	remoteRTCPIPAddress string
-	remoteRTCPPort      int
+	remoteRTPAddress  RTPAddress
+	remoteRTCPAddress RTPAddress
 }
 
 // NewRTPHandler creates a new RTP handler for direct audio transport
@@ -144,10 +141,10 @@ func NewRTPHandler(ctx context.Context, config *RTPConfig) (*RTPHandler, error) 
 
 	handlerCtx, cancel := context.WithCancel(ctx)
 
-	ip := net.ParseIP(config.LocalIP)
+	ip := net.ParseIP(config.LocalAddress.IP)
 	addr := &net.UDPAddr{
 		IP:   ip,
-		Port: config.LocalPort,
+		Port: config.LocalAddress.Port,
 	}
 
 	// Use "udp4" explicitly for IPv4 addresses to prevent Go from creating an
@@ -164,7 +161,7 @@ func NewRTPHandler(ctx context.Context, config *RTPConfig) (*RTPHandler, error) 
 	if config.portStats != nil {
 		config.portStats.bindAttempts.Add(1)
 	}
-	if config.LocalPort > 0 {
+	if config.LocalAddress.Port > 0 {
 		conn, err = net.ListenUDP(network, addr)
 	} else {
 		portCount := config.RTPPortRangeEnd - config.RTPPortRangeStart + 1
@@ -255,8 +252,7 @@ func NewRTPHandler(ctx context.Context, config *RTPConfig) (*RTPHandler, error) 
 	handler := &RTPHandler{
 		conn:                   conn,
 		rtcpConn:               rtcpConn,
-		localIP:                localAddr.IP.String(),
-		localPort:              localAddr.Port,
+		localAddr:              RTPAddress{IP: localAddr.IP.String(), Port: localAddr.Port},
 		symmetricRTP:           config.SymmetricRTP,
 		portStats:              config.portStats,
 		ssrc:                   ssrc,
@@ -507,11 +503,10 @@ func (h *RTPHandler) IsRunning() bool {
 	return h.running.Load()
 }
 
-// SetRemoteAddr sets the remote RTP endpoint used by the handler's UDP socket.
-func (h *RTPHandler) SetRemoteAddr(ip string, port int) {
+// SetRemoteAddress sets the remote RTP endpoint used by the handler's UDP socket.
+func (h *RTPHandler) SetRemoteAddress(address RTPAddress) {
 	h.setRemoteMediaAddress(remoteMediaAddress{
-		remoteRTPIPAddress: ip,
-		remoteRTPPort:      port,
+		remoteRTPAddress: address,
 	})
 }
 
@@ -522,44 +517,44 @@ func (h *RTPHandler) setRemoteMediaAddress(address remoteMediaAddress) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	parsedRemoteRTPIPAddress := net.ParseIP(address.remoteRTPIPAddress)
+	parsedRemoteRTPIPAddress := net.ParseIP(address.remoteRTPAddress.IP)
 	h.remoteAddr = &net.UDPAddr{
 		IP:   parsedRemoteRTPIPAddress,
-		Port: address.remoteRTPPort,
+		Port: address.remoteRTPAddress.Port,
 	}
 	h.remoteRTCPSignaled = false
 	h.remoteRTCPAddr = nil
-	if address.remoteRTCPPort > 0 && address.remoteRTCPPort <= rtpMaxPort {
-		remoteRTCPIPAddress := address.remoteRTCPIPAddress
-		if remoteRTCPIPAddress == "" {
-			remoteRTCPIPAddress = address.remoteRTPIPAddress
-		}
+	remoteRTCPAddress := address.remoteRTCPAddress
+	if !remoteRTCPAddress.Validate() {
+		remoteRTCPAddress.IP = address.remoteRTPAddress.IP
+	}
+	if remoteRTCPAddress.Validate() {
 		h.remoteRTCPAddr = &net.UDPAddr{
-			IP:   net.ParseIP(remoteRTCPIPAddress),
-			Port: address.remoteRTCPPort,
+			IP:   net.ParseIP(remoteRTCPAddress.IP),
+			Port: remoteRTCPAddress.Port,
 		}
 		h.remoteRTCPSignaled = true
 		return
 	}
-	if address.remoteRTPPort > 0 && address.remoteRTPPort < rtpMaxPort {
+	if address.remoteRTPAddress.Port > 0 && address.remoteRTPAddress.Port < rtpMaxPort {
 		h.remoteRTCPAddr = &net.UDPAddr{
 			IP:   append(net.IP(nil), parsedRemoteRTPIPAddress...),
-			Port: address.remoteRTPPort + rtcpPortOffset,
+			Port: address.remoteRTPAddress.Port + rtcpPortOffset,
 		}
 	}
 }
 
-// SetRemoteRTCPAddr sets the remote RTCP endpoint advertised by SDP.
-func (h *RTPHandler) SetRemoteRTCPAddr(ip string, port int) {
-	if h == nil || port <= 0 || port > rtpMaxPort {
+// SetRemoteRTCPAddress sets the remote RTCP endpoint advertised by SDP.
+func (h *RTPHandler) SetRemoteRTCPAddress(address RTPAddress) {
+	if h == nil || !address.Validate() {
 		return
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	h.remoteRTCPAddr = &net.UDPAddr{
-		IP:   net.ParseIP(ip),
-		Port: port,
+		IP:   net.ParseIP(address.IP),
+		Port: address.Port,
 	}
 	h.remoteRTCPSignaled = true
 }
@@ -589,11 +584,11 @@ func cloneUDPAddr(address *net.UDPAddr) *net.UDPAddr {
 	return &clone
 }
 
-// LocalAddr returns the local RTP address
-func (h *RTPHandler) LocalAddr() (string, int) {
+// LocalAddress returns the local RTP address.
+func (h *RTPHandler) LocalAddress() RTPAddress {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	return h.localIP, h.localPort
+	return h.localAddr
 }
 
 // LocalRTCPPort returns the local RTCP port, or zero when RTCP is disabled.

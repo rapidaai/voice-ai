@@ -247,8 +247,8 @@ func registerConnectedInboundSession(t *testing.T, s *Server, callID string) *Se
 	t.Helper()
 
 	session := newTestSession(t, callID, CallDirectionInbound)
-	session.SetLocalRTP("127.0.0.1", 18000)
-	session.SetRemoteRTP("127.0.0.1", 19000)
+	session.SetLocalRTPAddress(RTPAddress{IP: "127.0.0.1", Port: 18000})
+	session.SetRemoteRTPAddress(RTPAddress{IP: "127.0.0.1", Port: 19000})
 	s.registerSession(session, callID)
 	require.True(t, s.TransitionCall(session, CallStateRinging, LifecycleReasonInboundInviteRinging))
 	require.True(t, s.TransitionCall(session, CallStateConnected, LifecycleReasonInboundInviteAnswered))
@@ -266,7 +266,7 @@ func registerConnectedInboundDialogSession(t *testing.T, s *Server, callID strin
 	loadInboundMediaOffer(t, inboundCall)
 	inboundCall.resolvedConfig = inboundConfig{config: bridgeTestConfig()}
 	createInboundSessionForTest(t, inboundCall)
-	inboundCall.session.SetRemoteRTP("127.0.0.1", 19000)
+	inboundCall.session.SetRemoteRTPAddress(RTPAddress{IP: "127.0.0.1", Port: 19000})
 	s.registerSession(inboundCall.session, inboundCall.identity.callID)
 	createInboundDialogForTest(t, inboundCall)
 	require.True(t, s.TransitionCall(inboundCall.session, CallStateRinging, LifecycleReasonInboundInviteRinging))
@@ -624,9 +624,12 @@ func TestSIPCommand_REINVITE_AppliesExplicitRTCPAddress(t *testing.T) {
 	s := newServerForCommandTests(t)
 	session := registerConnectedInboundDialogSession(t, s, "call-reinvite-rtcp")
 	rtpHandler := newTestRTPHandler()
-	rtpHandler.SetRemoteAddr("127.0.0.1", 19000)
+	rtpHandler.SetRemoteAddress(RTPAddress{IP: "127.0.0.1", Port: 19000})
 	session.SetRTPHandler(rtpHandler)
-	req := newInboundDialogSDPRequest(t, session, sip.INVITE, inboundOfferSDPWithRTCP("127.0.0.1", 20000, "198.51.100.10", 23000))
+	req := newInboundDialogSDPRequest(t, session, sip.INVITE, inboundOfferSDPWithRTCP(
+		RTPAddress{IP: "127.0.0.1", Port: 20000},
+		RTPAddress{IP: "198.51.100.10", Port: 23000},
+	))
 	tx := newAckableTestServerTx()
 	ackRequest := newInboundDialogRequest(t, session, sip.ACK)
 	tx.PushACK(ackRequest)
@@ -743,9 +746,12 @@ func TestSIPCommand_UPDATE_AppliesExplicitRTCPAddress(t *testing.T) {
 	s := newServerForCommandTests(t)
 	session := registerConnectedInboundDialogSession(t, s, "call-update-rtcp")
 	rtpHandler := newTestRTPHandler()
-	rtpHandler.SetRemoteAddr("127.0.0.1", 19000)
+	rtpHandler.SetRemoteAddress(RTPAddress{IP: "127.0.0.1", Port: 19000})
 	session.SetRTPHandler(rtpHandler)
-	req := newInboundDialogSDPRequest(t, session, sip.UPDATE, inboundOfferSDPWithRTCP("127.0.0.1", 21000, "198.51.100.20", 24000))
+	req := newInboundDialogSDPRequest(t, session, sip.UPDATE, inboundOfferSDPWithRTCP(
+		RTPAddress{IP: "127.0.0.1", Port: 21000},
+		RTPAddress{IP: "198.51.100.20", Port: 24000},
+	))
 	tx := newTestServerTx()
 
 	s.handleUpdate(req, tx)
@@ -1000,7 +1006,7 @@ func TestServerStopEndsSessionsThroughSessionCleanup(t *testing.T) {
 	s.state.Store(int32(ServerStateRunning))
 
 	session := newTestSession(t, "call-server-stop-rtp", CallDirectionInbound)
-	session.SetLocalRTP("127.0.0.1", 19000)
+	session.SetLocalRTPAddress(RTPAddress{IP: "127.0.0.1", Port: 19000})
 	s.registerSession(session, "call-server-stop-rtp")
 
 	require.True(t, s.TransitionCall(session, CallStateConnected, LifecycleReasonInboundInviteACKReceived))

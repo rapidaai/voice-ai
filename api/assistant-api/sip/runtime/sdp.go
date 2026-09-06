@@ -45,10 +45,8 @@ type SDPDirection string
 
 // SDPMediaInfo contains parsed media information from SDP
 type SDPMediaInfo struct {
-	ConnectionIP   string
-	AudioPort      int
-	RTCPIP         string
-	RTCPPort       int
+	RTPAddress     RTPAddress
+	RTCPAddress    RTPAddress
 	PayloadTypes   []uint8
 	PreferredCodec *Codec
 	PTime          int
@@ -64,7 +62,7 @@ func (s *SDPMediaInfo) IsHold() bool {
 	if s.Direction == SDPDirectionSendOnly || s.Direction == SDPDirectionInactive {
 		return true
 	}
-	if s.ConnectionIP == "0.0.0.0" {
+	if s.RTPAddress.IP == "0.0.0.0" {
 		return true
 	}
 	return false
@@ -79,24 +77,22 @@ func (s *SDPMediaInfo) PacketizationDuration() time.Duration {
 
 // SDPConfig holds configuration for SDP generation
 type SDPConfig struct {
-	SessionID   string
-	SessionName string
-	LocalIP     string
-	RTPPort     int
-	RTCPPort    int
-	Codecs      []Codec
-	PTime       int // Packetization time in milliseconds
+	SessionID    string
+	SessionName  string
+	LocalAddress RTPAddress
+	RTCPPort     int
+	Codecs       []Codec
+	PTime        int // Packetization time in milliseconds
 }
 
 // DefaultSDPConfig returns a default SDP configuration
-func DefaultSDPConfig(localIP string, rtpPort int) *SDPConfig {
+func DefaultSDPConfig(localAddress RTPAddress) *SDPConfig {
 	return &SDPConfig{
-		SessionID:   "0",
-		SessionName: "Rapida Voice AI",
-		LocalIP:     localIP,
-		RTPPort:     rtpPort,
-		Codecs:      SupportedCodecs,
-		PTime:       20,
+		SessionID:    "0",
+		SessionName:  "Rapida Voice AI",
+		LocalAddress: localAddress,
+		Codecs:       SupportedCodecs,
+		PTime:        20,
 	}
 }
 
@@ -105,17 +101,16 @@ func DefaultSDPConfig(localIP string, rtpPort int) *SDPConfig {
 // and any post-answer SDP where a codec has already been agreed upon.
 // Advertising multiple codecs in a response confuses some PBXes (Asterisk,
 // FreeSWITCH) because it looks like a new offer instead of a confirmation.
-func (s *Server) NegotiatedSDPConfig(localIP string, rtpPort int, codec *Codec) *SDPConfig {
+func (s *Server) NegotiatedSDPConfig(localAddress RTPAddress, codec *Codec) *SDPConfig {
 	if codec == nil {
 		codec = &CodecPCMU
 	}
 	return &SDPConfig{
-		SessionID:   "0",
-		SessionName: "Rapida Voice AI",
-		LocalIP:     localIP,
-		RTPPort:     rtpPort,
-		Codecs:      []Codec{*codec},
-		PTime:       20,
+		SessionID:    "0",
+		SessionName:  "Rapida Voice AI",
+		LocalAddress: localAddress,
+		Codecs:       []Codec{*codec},
+		PTime:        20,
 	}
 }
 
@@ -131,13 +126,13 @@ func (s *Server) GenerateSDP(cfg *SDPConfig) string {
 	sb.WriteString("v=0\r\n")
 
 	// Origin: o=<username> <sess-id> <sess-version> <nettype> <addrtype> <unicast-address>
-	sb.WriteString(fmt.Sprintf("o=rapida %s 0 IN IP4 %s\r\n", cfg.SessionID, cfg.LocalIP))
+	sb.WriteString(fmt.Sprintf("o=rapida %s 0 IN IP4 %s\r\n", cfg.SessionID, cfg.LocalAddress.IP))
 
 	// Session Name
 	sb.WriteString(fmt.Sprintf("s=%s\r\n", cfg.SessionName))
 
 	// Connection Information
-	sb.WriteString(fmt.Sprintf("c=IN IP4 %s\r\n", cfg.LocalIP))
+	sb.WriteString(fmt.Sprintf("c=IN IP4 %s\r\n", cfg.LocalAddress.IP))
 
 	// Time (0 0 = session is permanent)
 	sb.WriteString("t=0 0\r\n")
@@ -159,9 +154,9 @@ func (s *Server) GenerateSDP(cfg *SDPConfig) string {
 	if !hasTelEvent {
 		payloadTypes = append(payloadTypes, strconv.Itoa(int(CodecTelephoneEvent.PayloadType)))
 	}
-	sb.WriteString(fmt.Sprintf("m=audio %d RTP/AVP %s\r\n", cfg.RTPPort, strings.Join(payloadTypes, " ")))
+	sb.WriteString(fmt.Sprintf("m=audio %d RTP/AVP %s\r\n", cfg.LocalAddress.Port, strings.Join(payloadTypes, " ")))
 	if cfg.RTCPPort > 0 {
-		sb.WriteString(fmt.Sprintf("a=rtcp:%d IN IP4 %s\r\n", cfg.RTCPPort, cfg.LocalIP))
+		sb.WriteString(fmt.Sprintf("a=rtcp:%d IN IP4 %s\r\n", cfg.RTCPPort, cfg.LocalAddress.IP))
 	}
 
 	// Codec attributes (rtpmap for each audio codec)
@@ -207,7 +202,7 @@ func (s *Server) ParseSDP(sdpBody []byte) (*SDPMediaInfo, error) {
 		switch {
 		case strings.HasPrefix(line, sdpConnectionIPPrefix):
 			// Connection line: c=IN IP4 192.168.1.5
-			info.ConnectionIP = strings.TrimSpace(strings.TrimPrefix(line, sdpConnectionIPPrefix))
+			info.RTPAddress.IP = strings.TrimSpace(strings.TrimPrefix(line, sdpConnectionIPPrefix))
 
 		case strings.HasPrefix(line, sdpAudioPrefix):
 			// Media line: m=audio 10000 RTP/AVP 0 8 101
@@ -215,7 +210,7 @@ func (s *Server) ParseSDP(sdpBody []byte) (*SDPMediaInfo, error) {
 			if len(parts) >= 3 {
 				port, err := strconv.Atoi(parts[1])
 				if err == nil {
-					info.AudioPort = port
+					info.RTPAddress.Port = port
 				}
 				for i := 3; i < len(parts); i++ {
 					pt, err := strconv.Atoi(parts[i])
@@ -233,11 +228,11 @@ func (s *Server) ParseSDP(sdpBody []byte) (*SDPMediaInfo, error) {
 			if len(parts) >= 1 {
 				port, err := strconv.Atoi(parts[0])
 				if err == nil && port > 0 && port <= rtpMaxPort {
-					info.RTCPPort = port
+					info.RTCPAddress.Port = port
 				}
 			}
 			if len(parts) >= 4 && parts[1] == "IN" && parts[2] == "IP4" {
-				info.RTCPIP = parts[3]
+				info.RTCPAddress.IP = parts[3]
 			}
 
 		case strings.HasPrefix(line, sdpPTimePrefix):
@@ -282,8 +277,8 @@ func (s *Server) ParseSDP(sdpBody []byte) (*SDPMediaInfo, error) {
 			break
 		}
 	}
-	if info.RTCPPort > 0 && info.RTCPIP == "" {
-		info.RTCPIP = info.ConnectionIP
+	if !info.RTCPAddress.Validate() {
+		info.RTCPAddress.IP = info.RTPAddress.IP
 	}
 
 	return info, nil

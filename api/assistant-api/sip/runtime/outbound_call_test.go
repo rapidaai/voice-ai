@@ -169,8 +169,7 @@ func TestOutboundMediaApplyAnswerEnablesSymmetricRTPForPrivateSDPWhenConfigured(
 
 	err := media.ApplyAnswer(OutboundMediaAnswer{
 		negotiatedCodec: &CodecPCMU,
-		remoteIP:        "10.0.0.10",
-		remotePort:      40000,
+		remoteAddress:   RTPAddress{IP: "10.0.0.10", Port: 40000},
 	})
 
 	require.NoError(t, err)
@@ -200,8 +199,7 @@ func TestNewOutboundMediaAnswer_ParsesSDP(t *testing.T) {
 	mediaAnswer, err := NewOutboundMediaAnswer(server, dialog)
 
 	require.NoError(t, err)
-	assert.Equal(t, "127.0.0.1", mediaAnswer.remoteIP)
-	assert.Equal(t, 19000, mediaAnswer.remotePort)
+	assert.Equal(t, RTPAddress{IP: "127.0.0.1", Port: 19000}, mediaAnswer.remoteAddress)
 	require.NotNil(t, mediaAnswer.negotiatedCodec)
 	assert.Equal(t, CodecPCMU.Name, mediaAnswer.negotiatedCodec.Name)
 }

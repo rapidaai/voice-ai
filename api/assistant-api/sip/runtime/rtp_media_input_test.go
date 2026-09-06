@@ -79,7 +79,7 @@ func TestRTPHandler_ParseRTPPacketPreservesCSRCValues(t *testing.T) {
 
 func TestRTPHandler_GetRemoteAddrReturnsCopy(t *testing.T) {
 	handler := newTestRTPHandler()
-	handler.SetRemoteAddr("127.0.0.1", 9000)
+	handler.SetRemoteAddress(RTPAddress{IP: "127.0.0.1", Port: 9000})
 
 	address := handler.GetRemoteAddr()
 	require.NotNil(t, address)
@@ -94,7 +94,7 @@ func TestRTPHandler_GetRemoteAddrReturnsCopy(t *testing.T) {
 
 func TestNewRTPHandlerDoesNotMutateConfig(t *testing.T) {
 	config := &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: 20000,
 		RTPPortRangeEnd:   20999,
 		PayloadType:       CodecPCMU.PayloadType,
@@ -116,7 +116,7 @@ func TestNewRTPHandlerInitializesInputPacketizationTime(t *testing.T) {
 	require.NoError(t, reserved.Close())
 
 	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: port,
 		RTPPortRangeEnd:   port,
 		PayloadType:       CodecPCMU.PayloadType,
@@ -140,7 +140,7 @@ func TestRTPHandler_ReceiveLoopDropsNonAudioPayload(t *testing.T) {
 	require.NoError(t, reserved.Close())
 
 	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: port,
 		RTPPortRangeEnd:   port,
 		PayloadType:       CodecPCMU.PayloadType,
@@ -186,7 +186,7 @@ func TestRTPHandler_ReceiveLoopAcceptsNegotiatedAudioPayload(t *testing.T) {
 	require.NoError(t, reserved.Close())
 
 	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: port,
 		RTPPortRangeEnd:   port,
 		PayloadType:       CodecPCMA.PayloadType,
@@ -228,7 +228,7 @@ func TestRTPHandler_ReceiveLoopResetsInputJitterOnSSRCChange(t *testing.T) {
 	require.NoError(t, reserved.Close())
 
 	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: port,
 		RTPPortRangeEnd:   port,
 		PayloadType:       CodecPCMU.PayloadType,
@@ -445,14 +445,14 @@ func TestRTPHandler_StopOwnsLoopShutdownBeforeClosingChannels(t *testing.T) {
 
 func TestRTPHandler_StopClosesUnstartedSocket(t *testing.T) {
 	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: 20000,
 		RTPPortRangeEnd:   20999,
 		PayloadType:       CodecPCMU.PayloadType,
 		ClockRate:         CodecPCMU.ClockRate,
 	})
 	require.NoError(t, err)
-	_, port := handler.LocalAddr()
+	port := handler.LocalAddress().Port
 
 	require.NoError(t, handler.Stop())
 	require.NoError(t, handler.Stop())
@@ -472,7 +472,7 @@ func TestRTPHandler_OwnsBoundPortUntilStop(t *testing.T) {
 	require.NoError(t, reserved.Close())
 
 	first, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: port,
 		RTPPortRangeEnd:   port,
 		PayloadType:       CodecPCMU.PayloadType,
@@ -481,7 +481,7 @@ func TestRTPHandler_OwnsBoundPortUntilStop(t *testing.T) {
 	require.NoError(t, err)
 
 	second, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: port,
 		RTPPortRangeEnd:   port,
 		PayloadType:       CodecPCMU.PayloadType,
@@ -494,7 +494,7 @@ func TestRTPHandler_OwnsBoundPortUntilStop(t *testing.T) {
 	require.NoError(t, first.Stop())
 
 	third, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: port,
 		RTPPortRangeEnd:   port,
 		PayloadType:       CodecPCMU.PayloadType,
@@ -512,7 +512,7 @@ func TestRTPHandler_UpdatesPortStatsForBindLifecycleAndExhaustion(t *testing.T) 
 
 	stats := &RTPPortStats{}
 	first, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: port,
 		RTPPortRangeEnd:   port,
 		PayloadType:       CodecPCMU.PayloadType,
@@ -525,7 +525,7 @@ func TestRTPHandler_UpdatesPortStatsForBindLifecycleAndExhaustion(t *testing.T) 
 	assert.Equal(t, uint64(0), stats.bindFailures.Load())
 
 	second, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: port,
 		RTPPortRangeEnd:   port,
 		PayloadType:       CodecPCMU.PayloadType,
@@ -551,7 +551,7 @@ func TestRTPHandler_SymmetricRTPUpdatesRemoteAddressFromPacketSource(t *testing.
 	require.NoError(t, reserved.Close())
 
 	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: port,
 		RTPPortRangeEnd:   port,
 		PayloadType:       CodecPCMU.PayloadType,
@@ -561,7 +561,7 @@ func TestRTPHandler_SymmetricRTPUpdatesRemoteAddressFromPacketSource(t *testing.
 	require.NoError(t, err)
 	defer handler.Stop()
 
-	handler.SetRemoteAddr("127.0.0.1", 9)
+	handler.SetRemoteAddress(RTPAddress{IP: "127.0.0.1", Port: 9})
 	handler.Start()
 
 	sender, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
@@ -593,7 +593,7 @@ func TestRTPHandler_RemoteAddressStaysFromSDPWhenSymmetricRTPDisabled(t *testing
 	require.NoError(t, reserved.Close())
 
 	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: port,
 		RTPPortRangeEnd:   port,
 		PayloadType:       CodecPCMU.PayloadType,
@@ -603,7 +603,7 @@ func TestRTPHandler_RemoteAddressStaysFromSDPWhenSymmetricRTPDisabled(t *testing
 	require.NoError(t, err)
 	defer handler.Stop()
 
-	handler.SetRemoteAddr("127.0.0.1", 9)
+	handler.SetRemoteAddress(RTPAddress{IP: "127.0.0.1", Port: 9})
 	handler.Start()
 
 	sender, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
@@ -639,7 +639,7 @@ func TestRTPHandler_DropsOversizedDatagramAndContinuesReceiving(t *testing.T) {
 	require.NoError(t, reserved.Close())
 
 	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:           "127.0.0.1",
+		LocalAddress:      RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart: port,
 		RTPPortRangeEnd:   port,
 		PayloadType:       CodecPCMU.PayloadType,
@@ -689,7 +689,7 @@ func TestRTPHandler_DropsOversizedDatagramAndContinuesReceiving(t *testing.T) {
 
 func TestRTPHandler_MediaTimeoutUsesInitialWindow(t *testing.T) {
 	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:             "127.0.0.1",
+		LocalAddress:        RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart:   20000,
 		RTPPortRangeEnd:     20999,
 		PayloadType:         CodecPCMU.PayloadType,
@@ -717,7 +717,7 @@ func TestRTPHandler_MediaTimeoutUsesInitialWindow(t *testing.T) {
 
 func TestRTPHandler_MediaTimeoutUsesRegularWindowAfterAudio(t *testing.T) {
 	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:             "127.0.0.1",
+		LocalAddress:        RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart:   20000,
 		RTPPortRangeEnd:     20999,
 		PayloadType:         CodecPCMU.PayloadType,
@@ -747,7 +747,7 @@ func TestRTPHandler_MediaTimeoutUsesRegularWindowAfterAudio(t *testing.T) {
 
 func TestRTPHandler_MediaTimeoutStaysOpenWhileAudioFlows(t *testing.T) {
 	handler, err := NewRTPHandler(context.Background(), &RTPConfig{
-		LocalIP:             "127.0.0.1",
+		LocalAddress:        RTPAddress{IP: "127.0.0.1"},
 		RTPPortRangeStart:   20000,
 		RTPPortRangeEnd:     20999,
 		PayloadType:         CodecPCMU.PayloadType,

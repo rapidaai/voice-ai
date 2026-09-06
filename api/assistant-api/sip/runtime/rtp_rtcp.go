@@ -115,7 +115,7 @@ func (h *RTPHandler) sendRTCPReport(now time.Time) error {
 
 	h.mu.RLock()
 	remoteRTCPAddr := cloneUDPAddr(h.remoteRTCPAddr)
-	localIP := h.localIP
+	localAddress := h.localAddr
 	ssrc := h.ssrc
 	timestamp := h.timestamp
 	h.mu.RUnlock()
@@ -142,7 +142,7 @@ func (h *RTPHandler) sendRTCPReport(now time.Time) error {
 				OctetCount:  octetCount,
 				Reports:     reports,
 			},
-			rtcp.NewCNAMESourceDescription(ssrc, fmt.Sprintf(rtcpCNAMEFormat, ssrc, localIP)),
+			rtcp.NewCNAMESourceDescription(ssrc, fmt.Sprintf(rtcpCNAMEFormat, ssrc, localAddress.IP)),
 		}
 	} else {
 		compoundPacket = rtcp.CompoundPacket{
@@ -150,7 +150,7 @@ func (h *RTPHandler) sendRTCPReport(now time.Time) error {
 				SSRC:    ssrc,
 				Reports: reports,
 			},
-			rtcp.NewCNAMESourceDescription(ssrc, fmt.Sprintf(rtcpCNAMEFormat, ssrc, localIP)),
+			rtcp.NewCNAMESourceDescription(ssrc, fmt.Sprintf(rtcpCNAMEFormat, ssrc, localAddress.IP)),
 		}
 	}
 

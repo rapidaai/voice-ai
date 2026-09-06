@@ -10,13 +10,12 @@ import (
 
 func TestGenerateSDPIncludesRTCPWhenConfigured(t *testing.T) {
 	sdp := (&Server{}).GenerateSDP(&SDPConfig{
-		SessionID:   "1",
-		SessionName: "call",
-		LocalIP:     "127.0.0.1",
-		RTPPort:     19000,
-		RTCPPort:    19001,
-		Codecs:      []Codec{CodecPCMU},
-		PTime:       20,
+		SessionID:    "1",
+		SessionName:  "call",
+		LocalAddress: RTPAddress{IP: "127.0.0.1", Port: 19000},
+		RTCPPort:     19001,
+		Codecs:       []Codec{CodecPCMU},
+		PTime:        20,
 	})
 
 	assert.Contains(t, sdp, "a=rtcp:19001 IN IP4 127.0.0.1\r\n")
@@ -24,12 +23,11 @@ func TestGenerateSDPIncludesRTCPWhenConfigured(t *testing.T) {
 
 func TestGenerateSDPOmitsRTCPWhenUnavailable(t *testing.T) {
 	sdp := (&Server{}).GenerateSDP(&SDPConfig{
-		SessionID:   "1",
-		SessionName: "call",
-		LocalIP:     "127.0.0.1",
-		RTPPort:     19000,
-		Codecs:      []Codec{CodecPCMU},
-		PTime:       20,
+		SessionID:    "1",
+		SessionName:  "call",
+		LocalAddress: RTPAddress{IP: "127.0.0.1", Port: 19000},
+		Codecs:       []Codec{CodecPCMU},
+		PTime:        20,
 	})
 
 	assert.NotContains(t, sdp, "a=rtcp:")
@@ -50,10 +48,8 @@ func TestParseSDPParsesRTCPAttribute(t *testing.T) {
 	))
 
 	require.NoError(t, err)
-	assert.Equal(t, "127.0.0.1", info.ConnectionIP)
-	assert.Equal(t, 19000, info.AudioPort)
-	assert.Equal(t, "198.51.100.10", info.RTCPIP)
-	assert.Equal(t, 19001, info.RTCPPort)
+	assert.Equal(t, RTPAddress{IP: "127.0.0.1", Port: 19000}, info.RTPAddress)
+	assert.Equal(t, RTPAddress{IP: "198.51.100.10", Port: 19001}, info.RTCPAddress)
 }
 
 func TestParseSDPDefaultsRTCPIPToConnectionIP(t *testing.T) {
@@ -70,8 +66,7 @@ func TestParseSDPDefaultsRTCPIPToConnectionIP(t *testing.T) {
 	))
 
 	require.NoError(t, err)
-	assert.Equal(t, "127.0.0.1", info.RTCPIP)
-	assert.Equal(t, 19001, info.RTCPPort)
+	assert.Equal(t, RTPAddress{IP: "127.0.0.1", Port: 19001}, info.RTCPAddress)
 }
 
 func TestParseSDPParsesPTime(t *testing.T) {
