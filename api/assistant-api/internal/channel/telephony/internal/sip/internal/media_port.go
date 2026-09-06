@@ -263,7 +263,8 @@ func (port *MediaPort) LocalAddr() (string, int) {
 	if port == nil || port.rtpHandler == nil {
 		return "", 0
 	}
-	return port.rtpHandler.LocalAddr()
+	address := port.rtpHandler.LocalAddress()
+	return address.IP, address.Port
 }
 
 func (port *MediaPort) CodecName() string {

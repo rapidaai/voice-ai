@@ -75,6 +75,6 @@ type rtpHandler interface {
 	ClearFallbackAudioSource()
 	FlushAudioOut()
 	GetCodec() *sip_runtime.Codec
-	LocalAddr() (string, int)
+	LocalAddress() sip_runtime.RTPAddress
 	SetFallbackAudioSource(sip_runtime.RTPFallbackAudioSource)
 }

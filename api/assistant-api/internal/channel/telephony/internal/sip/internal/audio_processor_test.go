@@ -107,10 +107,11 @@ func (r *pushRecorder) get() []internal_type.Stream {
 // ---------------------------------------------------------------------------
 
 type fakeRTPHandler struct {
-	codec    *sip_runtime.Codec
-	audioIn  chan []byte
-	audioOut chan []byte
-	fallback sip_runtime.RTPFallbackAudioSource
+	codec        *sip_runtime.Codec
+	audioIn      chan []byte
+	audioOut     chan []byte
+	fallback     sip_runtime.RTPFallbackAudioSource
+	localAddress sip_runtime.RTPAddress
 }
 
 func newTestRTPHandler(codec *sip_runtime.Codec) *fakeRTPHandler {
@@ -126,7 +127,9 @@ func newTestRTPHandler(codec *sip_runtime.Codec) *fakeRTPHandler {
 
 func (h *fakeRTPHandler) AudioIn() <-chan []byte       { return h.audioIn }
 func (h *fakeRTPHandler) GetCodec() *sip_runtime.Codec { return h.codec }
-func (h *fakeRTPHandler) LocalAddr() (string, int)     { return "", 0 }
+func (h *fakeRTPHandler) LocalAddress() sip_runtime.RTPAddress {
+	return h.localAddress
+}
 func (h *fakeRTPHandler) SetFallbackAudioSource(source sip_runtime.RTPFallbackAudioSource) {
 	h.fallback = source
 }
