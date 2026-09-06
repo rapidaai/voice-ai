@@ -1,0 +1,12 @@
+{
+  "rfc": "0016-interruption-lifecycle",
+  "date": "2026-09-06",
+  "owner": "repository maintainer",
+  "decision": "Align with the current design and permit a minimal internal STT utterance sequence",
+  "constraints": [
+    "Do not add pause IDs, response IDs or output epochs",
+    "Do not change the Streamer interface",
+    "Do not expose the utterance sequence through public protocols or configuration",
+    "Keep pause, continue and flush as internal streamer output capabilities"
+  ]
+}

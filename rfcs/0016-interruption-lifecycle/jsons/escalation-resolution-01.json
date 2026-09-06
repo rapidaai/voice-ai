@@ -1,0 +1,14 @@
+{
+  "rfc": "rfcs/0016-interruption-lifecycle.md",
+  "date": "2026-09-06",
+  "reason": "Two challenge cycles produced unresolved interruption and playback decisions",
+  "authority": "repository maintainer",
+  "decision": "Pause the active response on overlapping VAD, then use overlap-scoped STT to confirm permanent stop or resume",
+  "required_behavior": {
+    "candidate": "VAD captures and pauses one active response without rotating context or cancelling generation",
+    "confirmed_interruption": "Stop the captured response, invalidate matching work, rotate context once and release held STT",
+    "false_interruption": "Discard filler-only overlap STT and resume the same captured response",
+    "ambiguous": "Permanently stop and preserve user input"
+  },
+  "authorization": "Authorizes one maintainer-directed RFC amendment and final independent challenge; does not authorize production implementation"
+}

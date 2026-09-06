@@ -1,0 +1,32 @@
+{
+  "rfc": "rfcs/0016-interruption-lifecycle.md",
+  "artifact_path": "rfcs/0016-interruption-lifecycle/jsons/adaptive-provider-assessment.json",
+  "run_id": "run_94aeb7c54726",
+  "task_id": "task_f81c53ade6ff",
+  "dispatch_id": "ctx_554cead933f8",
+  "status": "provider_selection_required",
+  "recommended_immediate_scope": "Ship activity/decision separation and VAD compatibility with adaptive mode disabled until a deployable provider is approved",
+  "provider_contract": {
+    "method": "Decide(context.Context, OverlapInput) (OverlapResult, error)",
+    "audio": "Bounded immutable 16 kHz mono signed PCM overlap window",
+    "correlation": ["context_id", "response_id", "segment_id", "overlap_id", "revision"],
+    "result": ["interruption", "backchannel", "inconclusive"],
+    "negative_rule": "Only a completed-segment negative result may classify backchannel",
+    "ownership": "Provider performs inference only; coordinator owns policy, transcript disposition and context transition"
+  },
+  "existing_service_assessment": {
+    "eos": "Not suitable; determines user turn completion, not overlap intent",
+    "chat": "Possible transcript-only experiment, but waits for STT and has audit retention implications",
+    "custom_chat": "Not suitable for tunneling binary acoustic inference",
+    "dedicated_internal_audio_provider": "Best semantic fit after endpoint and operational ownership are approved"
+  },
+  "required_approval": [
+    "Deployable model and endpoint",
+    "Credential and tenant ownership",
+    "Region and retention policy",
+    "Maximum audio prefix/window and deletion behavior",
+    "Measured latency and absolute decision deadline",
+    "Timeout, malformed-result and unavailable-provider fallback"
+  ],
+  "approval": false
+}

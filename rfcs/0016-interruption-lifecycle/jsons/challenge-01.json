@@ -1,0 +1,30 @@
+{
+  "rfc": "rfcs/0016-interruption-lifecycle.md",
+  "artifact_path": "rfcs/0016-interruption-lifecycle/jsons/challenge-01.json",
+  "run_id": "run_94aeb7c54726",
+  "task_id": "task_7b1c6be211ca",
+  "dispatch_id": "ctx_ab827f555ccf",
+  "reviewed_rfc_sha256": "7017ffc62cc5fbbda9f375a3da0e247f0683e69eb97fc0feb05d938aa080b0d2",
+  "reviewed_plan_sha256": "e755e50ee2a12df987fa86f9cd3cf007e8b871b3e24967d2ae4cb889722f2940",
+  "outcome": "revision_required",
+  "critical_findings": [],
+  "major_findings": [
+    "STT lacks immutable segment identity and timestamps, so delayed transcripts can be assigned to a newer overlap",
+    "STT-first arrival and final-after-negative can bypass or undo the overlap gate",
+    "VAD and legacy word modes lack one complete AND-based eligibility table",
+    "Gate overflow, timeout and final-below-threshold precedence are contradictory",
+    "Lifecycle commitment and transcript replay lack one exactly-once resolution claim",
+    "Output paths lose response identity and cannot yet prove local playout lifecycle",
+    "EOS can receive evidence and commit while adaptive classification is pending",
+    "Wall-clock delay after VAD start does not prove observed voiced duration"
+  ],
+  "minor_findings": [
+    "Pause/recovery defaults were exposed before their milestone semantics exist",
+    "Legacy key precedence, exact file inventory and verification commands were incomplete"
+  ],
+  "resolution": {
+    "status": "draft_corrected_pending_second_challenge",
+    "artifact": "rfcs/0016-interruption-lifecycle/jsons/amendment-02-plan.json"
+  },
+  "approval": false
+}

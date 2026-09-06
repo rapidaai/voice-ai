@@ -1,0 +1,50 @@
+{
+  "rfc": "0016-interruption-lifecycle",
+  "date": "2026-09-06",
+  "run_id": "run_94aeb7c54726",
+  "task_id": "task_e99b2c7a6a4b",
+  "dispatch_id": "ctx_c6e990b6b33d",
+  "decision": "not_approved",
+  "reviewed_bytes": {
+    "rfc_sha256": "c9df17c6c5bbc321bba59fb1385bd7e439e920457bb788b478c03a73450d8910",
+    "plan_sha256": "0532932461dc08a989c050c7a9827900b781b5378b061f3900a6f3d2faa1e0be",
+    "sole_status_line": "- Status: Accepted"
+  },
+  "severity_counts": {
+    "critical": 0,
+    "major": 4,
+    "minor": 1
+  },
+  "major_findings": [
+    {
+      "id": "C1",
+      "title": "Candidate retirement and output actions are not one ordered transition",
+      "detail": "Candidate A can close and unlock, candidate B can pause, and A can then send identifier-free continue that resumes B.",
+      "required_decision": "Serialize candidate claim and its local output action before another candidate starts."
+    },
+    {
+      "id": "C2",
+      "title": "Joined timer callbacks can execute unbounded work",
+      "detail": "Commit actions include provider interruption, notification and channel publication that can block, so session finalization cannot safely join the whole callback.",
+      "required_decision": "Limit the joined callback to bounded local state and move blocking work to an independently owned lifetime."
+    },
+    {
+      "id": "C3",
+      "title": "Reset-before-replay lacks implementation scope",
+      "detail": "Existing EOS interruption returns before reset completes, while the RFC does not authorize the EOS and TTS owner changes needed for a completion barrier.",
+      "required_decision": "Add explicit EOS and TTS reset ownership or remove held STT replay from the first implementation."
+    },
+    {
+      "id": "C4",
+      "title": "Continuous STT callbacks lack immutable utterance attribution",
+      "detail": "A delayed result reads mutable current provider state and can be labeled as the next utterance even when packets contain a sequence field.",
+      "required_decision": "Implement provider-level immutable result attribution or disable transcript-based early commitment when provenance is unproved."
+    }
+  ],
+  "resolved_from_challenge_04": [
+    "Private output-control errors are observable",
+    "Direct text and word-trigger commits are explicit",
+    "Streamer-local output admission and notification-only public interruption are defined"
+  ],
+  "next_action": "Stop under the governed correction limit and obtain a maintainer decision between a VAD-only first release and broader STT, EOS and TTS ownership changes."
+}
