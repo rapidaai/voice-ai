@@ -32,8 +32,8 @@ func TestNewOutboundInviteRequest_TrunkTermination(t *testing.T) {
 
 	assert.Equal(t, OutboundModeTrunkTermination, request.Config.Mode)
 	assert.Equal(t, "trunk.example.com", request.Config.Address)
-	assert.Equal(t, "+15551234567", request.Identity.ToUser)
-	assert.Equal(t, "+15557654321", request.Identity.FromUser)
+	assert.Equal(t, "+15551234567", request.Address.To)
+	assert.Equal(t, "+15557654321", request.Address.From)
 	assert.Equal(t, "auth-user", request.Config.Auth.Username)
 }
 

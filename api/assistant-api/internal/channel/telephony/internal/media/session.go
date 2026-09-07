@@ -8,7 +8,6 @@ package internal_telephony_media
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
@@ -55,7 +54,6 @@ func (mediaSession *MediaSession) Start() {
 	mediaSession.sinkMu.RUnlock()
 	if hasOutputSink {
 		go mediaSession.runFrameOutputSender()
-		go mediaSession.runOutputHealthReporter(mediaSession.mediaEngine)
 	}
 }
 
@@ -98,8 +96,8 @@ func (mediaSession *MediaSession) HandleInterrupt() {
 	if mediaSession == nil || !mediaSession.hasMediaEngine() {
 		return
 	}
-	mediaSession.mediaEngine.ClearOutputBuffer()
 	mediaSession.outputFrameMu.Lock()
+	mediaSession.mediaEngine.ClearOutputBuffer()
 	mediaSession.currentOutputFrame = AssistantOutputFrame{}
 	mediaSession.hasCurrentOutputFrame = false
 	mediaSession.outputFrameMu.Unlock()
@@ -144,63 +142,6 @@ func (mediaSession *MediaSession) hasMediaEngine() bool {
 	return mediaSession.mediaEngine != nil
 }
 
-func (mediaSession *MediaSession) runOutputHealthReporter(mediaEngine MediaEngine) {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-
-	var previousSnapshot internal_output.HealthSnapshot
-	for {
-		select {
-		case <-mediaSession.ctx.Done():
-			return
-		case <-ticker.C:
-		}
-
-		healthSnapshot := mediaEngine.OutputHealthSnapshot()
-		if healthSnapshot.Ticks == previousSnapshot.Ticks {
-			continue
-		}
-
-		if mediaSession.record != nil {
-			_ = mediaSession.record(observability.RecordLog{
-				Level:   observability.LevelDebug,
-				Message: "Telephony output pacer health",
-				Attributes: observability.Attributes{
-					"component":     observability.ComponentCall.String(),
-					"ticks":         fmt.Sprintf("%d", healthSnapshot.Ticks),
-					"late_ticks":    fmt.Sprintf("%d", healthSnapshot.LateTicks),
-					"active_ticks":  fmt.Sprintf("%d", healthSnapshot.ActiveTicks),
-					"idle_ticks":    fmt.Sprintf("%d", healthSnapshot.IdleTicks),
-					"send_errors":   fmt.Sprintf("%d", healthSnapshot.SendErrors),
-					"idle_ratio":    fmt.Sprintf("%.4f", healthSnapshot.IdleRatio),
-					"health_status": "output_pacer_health",
-				},
-			})
-		}
-
-		if healthSnapshot.SendErrors > previousSnapshot.SendErrors {
-			if mediaSession.record != nil {
-				_ = mediaSession.record(observability.RecordLog{
-					Level:   observability.LevelError,
-					Message: "Telephony output send error",
-					Attributes: observability.Attributes{
-						"component":          observability.ComponentCall.String(),
-						"send_errors_delta":  fmt.Sprintf("%d", healthSnapshot.SendErrors-previousSnapshot.SendErrors),
-						"total_send_errors":  fmt.Sprintf("%d", healthSnapshot.SendErrors),
-						"ticks":              fmt.Sprintf("%d", healthSnapshot.Ticks),
-						"late_ticks":         fmt.Sprintf("%d", healthSnapshot.LateTicks),
-						"active_ticks":       fmt.Sprintf("%d", healthSnapshot.ActiveTicks),
-						"idle_ticks":         fmt.Sprintf("%d", healthSnapshot.IdleTicks),
-						"idle_ratio":         fmt.Sprintf("%.4f", healthSnapshot.IdleRatio),
-						"output_error_state": "output_send_error",
-					},
-				})
-			}
-		}
-		previousSnapshot = healthSnapshot
-	}
-}
-
 func (mediaSession *MediaSession) runFrameOutputSender() {
 	frameDuration := 20 * time.Millisecond
 	if duration := mediaSession.mediaEngine.OutputFrameDuration(); duration > 0 {
@@ -211,7 +152,6 @@ func (mediaSession *MediaSession) runFrameOutputSender() {
 		FrameDuration: frameDuration,
 		Provider:      mediaSession,
 		Consumer:      mediaSession,
-		Health:        mediaSession.mediaEngine,
 	}).Run(mediaSession.ctx)
 }
 
@@ -219,11 +159,14 @@ func (mediaSession *MediaSession) NextFrame() []byte {
 	if mediaSession.mediaEngine == nil {
 		return nil
 	}
+	mediaSession.outputFrameMu.Lock()
+	defer mediaSession.outputFrameMu.Unlock()
 	outputFrame, ok := mediaSession.mediaEngine.NextOutputFrame()
 	if !ok || len(outputFrame.ProviderAudio) == 0 {
 		return nil
 	}
-	mediaSession.storeCurrentOutputFrame(outputFrame)
+	mediaSession.currentOutputFrame = outputFrame
+	mediaSession.hasCurrentOutputFrame = true
 	return outputFrame.ProviderAudio
 }
 
@@ -231,37 +174,38 @@ func (mediaSession *MediaSession) IdleFrame() []byte {
 	if mediaSession.mediaEngine == nil {
 		return nil
 	}
+	mediaSession.outputFrameMu.Lock()
+	defer mediaSession.outputFrameMu.Unlock()
 	outputFrame, ok := mediaSession.mediaEngine.IdleOutputFrame()
 	if !ok || len(outputFrame.ProviderAudio) == 0 {
 		return nil
 	}
 	outputFrame.Idle = true
-	mediaSession.storeCurrentOutputFrame(outputFrame)
+	mediaSession.currentOutputFrame = outputFrame
+	mediaSession.hasCurrentOutputFrame = true
 	return outputFrame.ProviderAudio
 }
 
-func (mediaSession *MediaSession) ConsumeFrame(providerAudio []byte) error {
-	mediaSession.outputFrameMu.Lock()
-	outputFrame := mediaSession.currentOutputFrame
-	hasCurrentOutputFrame := mediaSession.hasCurrentOutputFrame
-	mediaSession.currentOutputFrame = AssistantOutputFrame{}
-	mediaSession.hasCurrentOutputFrame = false
-	mediaSession.outputFrameMu.Unlock()
-
-	if !hasCurrentOutputFrame {
-		outputFrame = AssistantOutputFrame{ProviderAudio: providerAudio}
-	}
-	if len(outputFrame.ProviderAudio) == 0 {
-		outputFrame.ProviderAudio = providerAudio
-	}
-
+func (mediaSession *MediaSession) ConsumeFrame(_ []byte) error {
 	mediaSession.sinkMu.RLock()
 	outputSink := mediaSession.outputSink
 	mediaSession.sinkMu.RUnlock()
 	if outputSink == nil {
 		return nil
 	}
-	if err := outputSink(outputFrame); err != nil {
+
+	mediaSession.outputFrameMu.Lock()
+	outputFrame := mediaSession.currentOutputFrame
+	hasCurrentOutputFrame := mediaSession.hasCurrentOutputFrame
+	mediaSession.currentOutputFrame = AssistantOutputFrame{}
+	mediaSession.hasCurrentOutputFrame = false
+	if !hasCurrentOutputFrame {
+		mediaSession.outputFrameMu.Unlock()
+		return nil
+	}
+	err := outputSink(outputFrame)
+	mediaSession.outputFrameMu.Unlock()
+	if err != nil {
 		if mediaSession.record != nil {
 			_ = mediaSession.record(observability.RecordLog{
 				Level:   observability.LevelError,
@@ -305,25 +249,15 @@ func (mediaSession *MediaSession) emitInputAudioFrame(inputFrame InputAudioFrame
 		Message: &protos.ConversationUserMessage_Audio{Audio: inputFrame.PipelineAudio},
 		Time:    timestamppb.New(receivedAt),
 	}
-	if mediaSession.emitStream(userAudio) {
-		return
-	}
+	mediaSession.emitStream(userAudio)
 }
 
-func (mediaSession *MediaSession) emitStream(stream internal_type.Stream) bool {
+func (mediaSession *MediaSession) emitStream(stream internal_type.Stream) {
 	mediaSession.sinkMu.RLock()
 	streamSink := mediaSession.streamSink
 	mediaSession.sinkMu.RUnlock()
 	if streamSink == nil {
-		return false
+		return
 	}
 	streamSink(stream)
-	return true
-}
-
-func (mediaSession *MediaSession) storeCurrentOutputFrame(outputFrame AssistantOutputFrame) {
-	mediaSession.outputFrameMu.Lock()
-	mediaSession.currentOutputFrame = outputFrame
-	mediaSession.hasCurrentOutputFrame = true
-	mediaSession.outputFrameMu.Unlock()
 }

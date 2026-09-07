@@ -26,7 +26,7 @@ import (
 	assistant_config "github.com/rapidaai/api/assistant-api/config"
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
-	internal_audio_resampler "github.com/rapidaai/api/assistant-api/internal/audio/resampler"
+	resampler_soxr "github.com/rapidaai/api/assistant-api/internal/audio/resampler/soxr"
 	channel_base "github.com/rapidaai/api/assistant-api/internal/channel/base"
 	internal_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	webrtc_internal "github.com/rapidaai/api/assistant-api/internal/channel/webrtc/internal"
@@ -163,29 +163,6 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 	for _, opt := range opts {
 		opt(&options)
 	}
-	resampler, err := internal_audio_resampler.GetResampler(options.Logger)
-	if err != nil {
-		_ = options.Observer.Record(options.Context, observability.ProjectScope{}, observability.RecordLog{
-			Level:   observability.LevelError,
-			Message: "WebRTC streamer initialization failed",
-			Attributes: observability.Attributes{
-				"component": observability.ComponentWebRTC.String(),
-				"stage":     "resampler",
-				"error":     err.Error(),
-			},
-		})
-		_ = options.Observer.Record(options.Context, observability.ProjectScope{}, observability.RecordEvent{
-			Component: observability.ComponentWebRTC,
-			Event:     observability.WebRTCFailed,
-			Attributes: observability.Attributes{
-				"component": observability.ComponentWebRTC.String(),
-				"stage":     "resampler",
-				"error":     err.Error(),
-			},
-		})
-		return nil, fmt.Errorf("failed to create resampler: %w", err)
-	}
-
 	opusCodec, err := webrtc_internal.NewOpusCodec()
 	if err != nil {
 		_ = options.Observer.Record(options.Context, observability.ProjectScope{}, observability.RecordLog{
@@ -256,8 +233,11 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 		}
 	}
 	ambientMixer, err := internal_ambient.NewLoopMixer(internal_ambient.MixerSpec{
-		Logger:            options.Logger,
-		Resampler:         resampler,
+		Logger: options.Logger,
+		Resampler: resampler_soxr.New(
+			resampler_soxr.WithLogger(options.Logger),
+			resampler_soxr.WithHighQuality(),
+		),
 		TargetAudioConfig: internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG,
 		FrameBytes:        webrtc_internal.WebRTCOutputPCM16kFrameBytes,
 	})
@@ -283,16 +263,19 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 		return nil, fmt.Errorf("failed to create ambient mixer: %w", err)
 	}
 	s := &webrtcStreamer{
-		BaseStreamer: channel_base.NewBaseStreamerWithChannelCapacity(
-			options.Logger,
-			webrtc_internal.InputChannelSize,
-			webrtc_internal.OutputChannelSize,
+		BaseStreamer: channel_base.New(
+			channel_base.WithLogger(options.Logger),
+			channel_base.WithInputChannelCapacity(webrtc_internal.InputChannelSize),
+			channel_base.WithOutputChannelCapacity(webrtc_internal.OutputChannelSize),
 		),
-		peerConfig:           peerConfig,
-		serverConfig:         options.ServerConfig,
-		grpcStream:           options.GRPCStream,
-		sessionID:            uuid.New().String(),
-		resampler:            resampler,
+		peerConfig:   peerConfig,
+		serverConfig: options.ServerConfig,
+		grpcStream:   options.GRPCStream,
+		sessionID:    uuid.New().String(),
+		resampler: resampler_soxr.New(
+			resampler_soxr.WithLogger(options.Logger),
+			resampler_soxr.WithHighQuality(),
+		),
 		opusCodec:            opusCodec,
 		currentMode:          protos.StreamMode_STREAM_MODE_TEXT,
 		sessionState:         webrtc_internal.SessionState{Scope: observability.ProjectScope{}},

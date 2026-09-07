@@ -8,7 +8,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rapidaai/api/assistant-api/config"
-	internal_sip "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/sip/internal"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/commons"
@@ -192,8 +191,8 @@ func TestParseConfig_DefaultsOutboundTo5060WhenVaultPortMissing(t *testing.T) {
 		t.Fatalf("parseConfig() error = %v", err)
 	}
 
-	if cfg.Port != internal_sip.DefaultOutboundSIPPort {
-		t.Fatalf("expected default outbound SIP port %d, got %d", internal_sip.DefaultOutboundSIPPort, cfg.Port)
+	if cfg.Port != DefaultOutboundSIPPort {
+		t.Fatalf("expected default outbound SIP port %d, got %d", DefaultOutboundSIPPort, cfg.Port)
 	}
 }
 

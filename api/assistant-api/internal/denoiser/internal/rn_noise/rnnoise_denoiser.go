@@ -11,7 +11,8 @@ import (
 	"time"
 
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
-	internal_audio_resampler "github.com/rapidaai/api/assistant-api/internal/audio/resampler"
+	resampler_linear "github.com/rapidaai/api/assistant-api/internal/audio/resampler/linear"
+	resampler_soxr "github.com/rapidaai/api/assistant-api/internal/audio/resampler/soxr"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
@@ -102,49 +103,16 @@ func New(opts ...Option) (internal_type.VoiceDenoiserExecutor, error) {
 		}
 		return nil, err
 	}
-	resampler, err := internal_audio_resampler.GetChunkResampler(options.logger)
-	if err != nil {
-		_ = options.onPacket(options.ctx, internal_type.ObservabilityLogRecordPacket{
-			Scope: internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.RecordLog{
-				Level:   observability.LevelError,
-				Message: fmt.Sprintf("%s: error while initialization %s", rnNoiseDenoiserName, err.Error()),
-				Attributes: observability.Attributes{
-					"component":  observability.ComponentDenoise.String(),
-					"provider":   rnNoiseDenoiserName,
-					"options":    observability.AttributeValue(options.options),
-					"error":      err.Error(),
-					"error_type": fmt.Sprintf("%T", err),
-				},
-				OccurredAt: time.Now(),
-			},
-		})
-		return nil, err
-	}
-	converter, err := internal_audio_resampler.GetConverter(options.logger)
-	if err != nil {
-		_ = options.onPacket(options.ctx, internal_type.ObservabilityLogRecordPacket{
-			Scope: internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.RecordLog{
-				Level:   observability.LevelError,
-				Message: fmt.Sprintf("%s: error while initialization %s", rnNoiseDenoiserName, err.Error()),
-				Attributes: observability.Attributes{
-					"component":  observability.ComponentDenoise.String(),
-					"provider":   rnNoiseDenoiserName,
-					"options":    observability.AttributeValue(options.options),
-					"error":      err.Error(),
-					"error_type": fmt.Sprintf("%T", err),
-				},
-				OccurredAt: time.Now(),
-			},
-		})
-		return nil, err
-	}
 
 	d := &rnnoiseDenoiser{
-		audioResampler: resampler,
-		audioConverter: converter,
-		rnNoise:        rn,
+		audioResampler: resampler_soxr.NewChunk(
+			resampler_soxr.WithLogger(options.logger),
+			resampler_soxr.WithQuickQuality(),
+		),
+		audioConverter: resampler_linear.NewConverter(
+			resampler_linear.WithLogger(options.logger),
+		),
+		rnNoise: rn,
 		denoiserConfig: &protos.AudioConfig{
 			SampleRate:  48000,
 			AudioFormat: protos.AudioConfig_LINEAR16,

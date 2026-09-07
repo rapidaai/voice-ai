@@ -1,4 +1,4 @@
-package internal_sip
+package internal_sip_telephony
 
 import (
 	"embed"

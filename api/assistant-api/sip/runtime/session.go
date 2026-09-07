@@ -796,17 +796,3 @@ func (s *Session) GetState() CallState {
 	defer s.mu.RUnlock()
 	return s.info.State
 }
-
-// GetRTPStats returns RTP statistics if available
-func (s *Session) GetRTPStats() *RTPStats {
-	s.mu.RLock()
-	rtpHandler := s.rtpHandler
-	s.mu.RUnlock()
-
-	if rtpHandler == nil {
-		return nil
-	}
-
-	stats := rtpHandler.GetDetailedStats()
-	return &stats
-}

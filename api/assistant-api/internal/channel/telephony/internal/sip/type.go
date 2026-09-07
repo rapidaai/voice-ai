@@ -4,7 +4,7 @@
 // Licensed under GPL-2.0 with Rapida Additional Terms.
 // See LICENSE.md or contact sales@rapida.ai for commercial usage.
 
-package internal_sip
+package internal_sip_telephony
 
 import (
 	"errors"
@@ -15,6 +15,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
+	"github.com/rapidaai/pkg/commons"
 )
 
 const (
@@ -30,7 +31,6 @@ const (
 
 	Linear16BytesPerMs    = 32
 	BridgeOutputFrameSize = Linear16BytesPerMs * 20
-	InputBufferThreshold  = Linear16BytesPerMs * 40
 )
 
 type OutboundFailureReason string
@@ -57,13 +57,11 @@ var (
 	ErrSIPServerNotRunning            = errors.New("SIP server not running")
 	ErrProviderAudioConversionFailed  = errors.New("audio conversion to 16kHz linear16 failed")
 	ErrAssistantAudioConversionFailed = errors.New("audio conversion to mulaw 8kHz failed")
-	ErrRTPOutputQueueFull             = sip_runtime.ErrRTPOutputQueueFull
 )
 
 type AudioProcessorConfig struct {
 	RTPHandler rtpHandler
-	Resampler  internal_type.AudioResampler
-	PushInput  func(internal_type.Stream)
+	Logger     commons.Logger
 	Record     func(...observability.Record) error
 	Ringtone   string
 	Ambient    *internal_ambient.Config
@@ -71,10 +69,7 @@ type AudioProcessorConfig struct {
 
 type rtpHandler interface {
 	internal_type.SIPRTPBridgeTarget
-	AudioIn() <-chan []byte
-	ClearFallbackAudioSource()
-	FlushAudioOut()
 	GetCodec() *sip_runtime.Codec
 	LocalAddress() sip_runtime.RTPAddress
-	SetFallbackAudioSource(sip_runtime.RTPFallbackAudioSource)
+	SetInboundAudioSink(func(sip_runtime.InboundAudioFrame))
 }

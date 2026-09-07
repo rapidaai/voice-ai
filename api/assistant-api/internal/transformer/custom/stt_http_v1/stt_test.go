@@ -130,6 +130,7 @@ func TestSpeechToText_HTTPFlow_FlushesBufferedSpeechOnVADEnd(t *testing.T) {
 
 	typedTransformer, ok := transformer.(*speechToText)
 	require.True(t, ok)
+	require.NotNil(t, typedTransformer.resampler)
 	typedTransformer.httpClient = server.Client()
 
 	require.NoError(t, transformer.Initialize())

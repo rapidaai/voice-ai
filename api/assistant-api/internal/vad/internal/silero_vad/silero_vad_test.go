@@ -88,6 +88,7 @@ func TestNew_DefaultThreshold(t *testing.T) {
 	vad := newSileroOrSkip(t, -1, callback)
 
 	assert.NotNil(t, vad.detector)
+	assert.NotNil(t, vad.converter)
 }
 
 func TestSileroVAD_Name(t *testing.T) {

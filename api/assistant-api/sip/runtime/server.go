@@ -16,7 +16,6 @@ import (
 
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
-	internal_outbound "github.com/rapidaai/api/assistant-api/sip/internal/outbound"
 	"github.com/rapidaai/pkg/commons"
 )
 
@@ -155,11 +154,7 @@ func (c *ListenConfig) GetListenAddr() string {
 }
 
 func (c *ListenConfig) SIPContactHeader() sip.ContactHeader {
-	return internal_outbound.BuildContactHeader(internal_outbound.ContactConfig{
-		ExternalIP: c.GetExternalIP(),
-		Port:       c.Port,
-		Transport:  internal_outbound.Transport(c.Transport),
-	})
+	return buildContactHeader(c)
 }
 
 // ServerConfig holds configuration for creating a SIP server
@@ -232,7 +227,7 @@ func NewServer(ctx context.Context, cfg *ServerConfig) (*Server, error) {
 	listenConfig := cloneListenConfig(cfg.ListenConfig)
 
 	ua, err := sipgo.NewUA(
-		sipgo.WithUserAgent(internal_outbound.SIPUserAgent),
+		sipgo.WithUserAgent(sipUserAgent),
 		sipgo.WithUserAgentTransactionLayerOptions(
 			sip.WithTransactionLayerUnhandledResponseHandler(func(*sip.Response) {}),
 		),

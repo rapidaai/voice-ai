@@ -10,22 +10,23 @@ package channel_base
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
-	"sync/atomic"
 
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/channel"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
-	defaultInputChannelCapacity  = 100
+	defaultInputChannelCapacity  = 1000
 	defaultOutputChannelCapacity = 500
 	criticalChannelCapacity      = 16
-	observabilityChannelCapacity = 512
+	lowPriorityChannelCapacity   = 512
 )
 
 // BaseStreamer owns common stream channels and lifecycle. Media buffering,
@@ -37,80 +38,124 @@ type BaseStreamer struct {
 	Cancel     context.CancelFunc
 	Closed     bool
 	CriticalCh chan internal_type.Stream
-	InputCh    chan internal_type.Stream
+	InputCh    *channel.Channel[internal_type.Stream]
 	LowCh      chan internal_type.Stream
 	OutputCh   chan internal_type.Stream
-
-	criticalInputDropped atomic.Uint64
-	normalInputDropped   atomic.Uint64
-	lowInputDropped      atomic.Uint64
-	outputDropped        atomic.Uint64
 }
 
-// StreamerDropStats reports messages dropped by BaseStreamer priority queues.
-type StreamerDropStats struct {
-	CriticalInputDropped uint64
-	NormalInputDropped   uint64
-	LowInputDropped      uint64
-	OutputDropped        uint64
+type options struct {
+	logger                commons.Logger
+	inputChannelCapacity  int
+	outputChannelCapacity int
 }
 
-// NewBaseStreamer creates transport channels with default capacities.
-func NewBaseStreamer(logger commons.Logger) BaseStreamer {
-	return NewBaseStreamerWithChannelCapacity(logger, defaultInputChannelCapacity, defaultOutputChannelCapacity)
+type Option func(*options)
+
+// WithLogger sets the streamer logger.
+func WithLogger(logger commons.Logger) Option {
+	return func(options *options) {
+		options.logger = logger
+	}
 }
 
-// NewBaseStreamerWithChannelCapacity creates transport channels with caller-defined capacities.
-func NewBaseStreamerWithChannelCapacity(
-	logger commons.Logger,
-	inputChannelCapacity int,
-	outputChannelCapacity int,
-) BaseStreamer {
+// WithInputChannelCapacity sets the realtime input queue capacity.
+func WithInputChannelCapacity(capacity int) Option {
+	return func(options *options) {
+		options.inputChannelCapacity = capacity
+	}
+}
+
+// WithOutputChannelCapacity sets the output queue capacity.
+func WithOutputChannelCapacity(capacity int) Option {
+	return func(options *options) {
+		options.outputChannelCapacity = capacity
+	}
+}
+
+// New creates transport channels from caller-provided options.
+func New(opts ...Option) BaseStreamer {
+	options := options{
+		inputChannelCapacity:  defaultInputChannelCapacity,
+		outputChannelCapacity: defaultOutputChannelCapacity,
+	}
+	for _, option := range opts {
+		if option != nil {
+			option(&options)
+		}
+	}
+	if options.inputChannelCapacity <= 0 {
+		options.inputChannelCapacity = defaultInputChannelCapacity
+	}
+	if options.outputChannelCapacity <= 0 {
+		options.outputChannelCapacity = defaultOutputChannelCapacity
+	}
 	ctx, cancel := context.WithCancel(context.Background())
+	inputCh, err := channel.New[internal_type.Stream](channel.Config{
+		CapacityPolicy: channel.FixedCapacity(options.inputChannelCapacity),
+		OverflowPolicy: channel.ReplaceOldestWhenFull,
+	})
+	if err != nil {
+		panic(err)
+	}
 	return BaseStreamer{
-		Logger:     logger,
+		Logger:     options.logger,
 		Ctx:        ctx,
 		Cancel:     cancel,
 		CriticalCh: make(chan internal_type.Stream, criticalChannelCapacity),
-		InputCh:    make(chan internal_type.Stream, inputChannelCapacity),
-		LowCh:      make(chan internal_type.Stream, observabilityChannelCapacity),
-		OutputCh:   make(chan internal_type.Stream, outputChannelCapacity),
+		InputCh:    inputCh,
+		LowCh:      make(chan internal_type.Stream, lowPriorityChannelCapacity),
+		OutputCh:   make(chan internal_type.Stream, options.outputChannelCapacity),
 	}
 }
 
 // Input routes messages into priority channels consumed by Recv.
 func (s *BaseStreamer) Input(msg internal_type.Stream) {
-	switch msg.(type) {
+	switch message := msg.(type) {
 	case *protos.ConversationDisconnection,
-		*protos.ConversationToolCallResult:
+		*protos.ConversationToolCallResult,
+		*protos.ConversationInitialization,
+		*protos.ConversationConfiguration,
+		*protos.ConversationError:
 		select {
 		case s.CriticalCh <- msg:
 		default:
-			s.criticalInputDropped.Add(1)
 			if s.Logger != nil {
 				s.Logger.Warnw("Critical input channel full, dropping message", "type", fmt.Sprintf("%T", msg))
 			}
 		}
+		return
+	case *protos.ConversationUserMessage:
+		if _, isAudio := message.Message.(*protos.ConversationUserMessage_Audio); !isAudio {
+			select {
+			case s.CriticalCh <- msg:
+			default:
+				if s.Logger != nil {
+					s.Logger.Warnw("Critical input channel full, dropping message", "type", fmt.Sprintf("%T", msg))
+				}
+			}
+			return
+		}
 	case *protos.ConversationEvent,
 		*protos.ConversationMetric,
-		*protos.ConversationMetadata:
+		*protos.ConversationMetadata,
+		*protos.ConversationBridgeUserAudio,
+		*protos.ConversationBridgeOperatorAudio:
 		select {
 		case s.LowCh <- msg:
 		default:
-			s.lowInputDropped.Add(1)
 			if s.Logger != nil {
 				s.Logger.Warnw("Low input channel full, dropping message", "type", fmt.Sprintf("%T", msg))
 			}
 		}
-	default:
-		select {
-		case s.InputCh <- msg:
-		default:
-			s.normalInputDropped.Add(1)
-			if s.Logger != nil {
-				s.Logger.Warnw("Normal input channel full, dropping message", "type", fmt.Sprintf("%T", msg))
-			}
-		}
+		return
+	}
+
+	result, err := s.InputCh.Send(s.Ctx, msg)
+	if err != nil {
+		return
+	}
+	if result.Status == channel.ReplacedOldest && s.Logger != nil {
+		s.Logger.Warnw("Input channel full, replacing oldest audio", "type", fmt.Sprintf("%T", result.Discarded))
 	}
 }
 
@@ -118,26 +163,11 @@ func (s *BaseStreamer) Output(msg internal_type.Stream) {
 	select {
 	case s.OutputCh <- msg:
 	default:
-		s.outputDropped.Add(1)
 		if s.Logger != nil {
 			s.Logger.Warnw("Output channel full, dropping message", "type", fmt.Sprintf("%T", msg))
 		}
 	}
 }
-
-// DropStats returns a lock-free snapshot of BaseStreamer queue drops.
-func (s *BaseStreamer) DropStats() StreamerDropStats {
-	if s == nil {
-		return StreamerDropStats{}
-	}
-	return StreamerDropStats{
-		CriticalInputDropped: s.criticalInputDropped.Load(),
-		NormalInputDropped:   s.normalInputDropped.Load(),
-		LowInputDropped:      s.lowInputDropped.Load(),
-		OutputDropped:        s.outputDropped.Load(),
-	}
-}
-
 func (s *BaseStreamer) Disconnect(reason protos.ConversationDisconnection_DisconnectionType) *protos.ConversationDisconnection {
 	s.Mu.Lock()
 	alreadyClosed := s.Closed
@@ -157,41 +187,39 @@ func (s *BaseStreamer) Context() context.Context {
 }
 
 func (s *BaseStreamer) Recv() (internal_type.Stream, error) {
-	select {
-	case msg, ok := <-s.CriticalCh:
-		if !ok {
-			return nil, io.EOF
+	for {
+		select {
+		case msg, ok := <-s.CriticalCh:
+			if !ok {
+				return nil, io.EOF
+			}
+			return msg, nil
+		default:
 		}
-		return msg, nil
-	default:
-	}
 
-	select {
-	case msg, ok := <-s.InputCh:
-		if !ok {
+		msg, err := s.InputCh.TryReceive()
+		if err == nil {
+			return msg, nil
+		}
+		if errors.Is(err, channel.ErrClosed) {
 			return nil, io.EOF
 		}
-		return msg, nil
-	default:
-	}
 
-	select {
-	case msg, ok := <-s.CriticalCh:
-		if !ok {
+		select {
+		case msg, ok := <-s.CriticalCh:
+			if !ok {
+				return nil, io.EOF
+			}
+			return msg, nil
+		case <-s.InputCh.Ready():
+			continue
+		case msg, ok := <-s.LowCh:
+			if !ok {
+				return nil, io.EOF
+			}
+			return msg, nil
+		case <-s.Ctx.Done():
 			return nil, io.EOF
 		}
-		return msg, nil
-	case msg, ok := <-s.InputCh:
-		if !ok {
-			return nil, io.EOF
-		}
-		return msg, nil
-	case msg, ok := <-s.LowCh:
-		if !ok {
-			return nil, io.EOF
-		}
-		return msg, nil
-	case <-s.Ctx.Done():
-		return nil, io.EOF
 	}
 }
