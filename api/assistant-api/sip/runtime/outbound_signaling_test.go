@@ -4,7 +4,7 @@
 // Licensed under GPL-2.0 with Rapida Additional Terms.
 // See LICENSE.md or contact sales@rapida.ai for commercial usage.
 
-package outbound
+package sip_runtime
 
 import (
 	"testing"
@@ -24,7 +24,7 @@ func TestBuildInviteHeaders_Deterministic(t *testing.T) {
 		"P-Asserted-Identity": "bad-override",
 	}
 
-	headers, err := BuildInviteHeaders(request)
+	headers, err := buildInviteHeaders(request)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{
@@ -36,7 +36,7 @@ func TestBuildInviteHeaders_Deterministic(t *testing.T) {
 		"X-Zeta",
 	}, headerNames(headers))
 	assert.Equal(t, outboundAllowHeaderValue, headers[2].Value())
-	assert.Equal(t, SIPUserAgent, headers[3].Value())
+	assert.Equal(t, sipUserAgent, headers[3].Value())
 	assert.Equal(t, "first", headers[4].Value())
 	assert.Equal(t, "last", headers[5].Value())
 }
@@ -47,7 +47,7 @@ func TestBuildInviteHeaders_AllowsRouteHeader(t *testing.T) {
 		"Route": "<sip:proxy.example.com;lr>",
 	}
 
-	headers, err := BuildInviteHeaders(request)
+	headers, err := buildInviteHeaders(request)
 	require.NoError(t, err)
 
 	require.Len(t, headers, 5)
@@ -69,7 +69,8 @@ func TestBuildContactHeader_Transport(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			contact := BuildContactHeader(ContactConfig{
+			contact := buildContactHeader(&ListenConfig{
+				Address:    "0.0.0.0",
 				ExternalIP: "203.0.113.10",
 				Port:       5061,
 				Transport:  tc.transport,
@@ -98,22 +99,23 @@ func TestNormalizeDialogRouteSet_UsesRecordRoute(t *testing.T) {
 	inviteResponse.AppendHeader(sip.NewHeader("Record-Route", "<sip:p1.example.com;lr>"))
 	dialogSession := testDialogClientSession(inviteRequest, inviteResponse)
 
-	NormalizeDialogRouteSet(dialogSession)
+	normalizeDialogRouteSet(dialogSession)
 
 	assert.Empty(t, inviteRequest.GetHeaders("Route"))
 }
 
-func testInviteRequest() InviteRequest {
-	return InviteRequest{
-		Config: Config{
+func testInviteRequest() OutboundInviteRequest {
+	return OutboundInviteRequest{
+		Config: OutboundConfig{
+			Mode:      OutboundModeTrunkTermination,
 			Address:   "trunk.example.com",
 			Port:      5060,
 			Transport: TransportUDP,
 			Domain:    "example.com",
 		},
-		Identity: Identity{
-			ToUser:   "+15551234567",
-			FromUser: "+15557654321",
+		Address: CallAddress{
+			To:   "+15551234567",
+			From: "+15557654321",
 		},
 	}
 }

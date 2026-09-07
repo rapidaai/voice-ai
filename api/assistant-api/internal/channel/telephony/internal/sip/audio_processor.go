@@ -75,7 +75,6 @@ type AudioProcessor struct {
 
 	ambientMixer internal_ambient.Mixer
 
-	outputHealth        *internal_telephony_output.HealthStats
 	droppedBridgeFrames atomic.Uint64
 	transferActive      atomic.Bool
 }
@@ -89,7 +88,6 @@ func NewAudioProcessor(cfg AudioProcessorConfig) *AudioProcessor {
 		bridgeOutputBuffer:   internal_telephony_output.NewBytesFrameBuffer(BridgeOutputFrameSize * 8),
 		bridgeUserCh:         make(chan bridgeRecordingFrame, AudioChannelSize),
 		bridgeOperatorCh:     make(chan bridgeRecordingFrame, AudioChannelSize),
-		outputHealth:         internal_telephony_output.NewHealthStats(),
 	}
 	p.SetRingtone(cfg.Ringtone)
 	ambientMixer, err := internal_ambient.NewLoopMixer(internal_ambient.MixerSpec{
@@ -254,19 +252,6 @@ func (p *AudioProcessor) ClearOutputBuffer() {
 	defer p.outputMu.Unlock()
 	p.providerOutputBuffer.Clear()
 	p.bridgeOutputBuffer.Clear()
-}
-
-func (p *AudioProcessor) OutputHealthSnapshot() internal_telephony_output.HealthSnapshot {
-	if p.outputHealth == nil {
-		return internal_telephony_output.HealthSnapshot{}
-	}
-	return p.outputHealth.Snapshot()
-}
-
-func (p *AudioProcessor) OnTickHealth(event internal_telephony_output.TickHealth) {
-	if p.outputHealth != nil {
-		p.outputHealth.OnTickHealth(event)
-	}
 }
 
 func (p *AudioProcessor) OutputFrameDuration() time.Duration {

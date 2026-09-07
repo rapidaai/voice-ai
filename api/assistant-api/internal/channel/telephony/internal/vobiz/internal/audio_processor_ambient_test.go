@@ -17,6 +17,9 @@ func TestAudioProcessor_AmbientConfigureAndIdleOutputFrame(t *testing.T) {
 	if audioProcessor.resampler == nil {
 		t.Fatal("expected resampler")
 	}
+	if audioProcessor.OutputFrameDuration() != ChunkDuration {
+		t.Fatalf("unexpected output frame duration: got=%s want=%s", audioProcessor.OutputFrameDuration(), ChunkDuration)
+	}
 
 	err = audioProcessor.ConfigureAmbient(internal_ambient.NewConfig(internal_ambient.ProfileCafe, 18))
 	if err != nil {

@@ -85,8 +85,8 @@ func (outboundCall *Outbound) Connect() (time.Time, error) {
 		"assistant_id", assistantID,
 		"conversation_id", outboundCall.session.GetConversationID(),
 		"mode", outboundCall.request.Config.Mode,
-		"to_user", outboundCall.request.Identity.ToUser,
-		"from_user", outboundCall.request.Identity.FromUser,
+		"to_user", outboundCall.request.Address.To,
+		"from_user", outboundCall.request.Address.From,
 		"trunk_address", outboundCall.request.Config.Address,
 		"ringing_timeout_ms", ringingTimeout.Milliseconds(),
 		"auth_username", outboundConfig.Auth.Username,
@@ -306,11 +306,11 @@ func (outboundCall *Outbound) callOutboundInviteHandler(answerTime time.Time) er
 		return fmt.Errorf("outbound INVITE request is unavailable")
 	}
 	callAddress := NewCallAddress(inviteRequest)
-	if validator.Phone(outboundCall.request.Identity.FromUser) {
-		callAddress.From = outboundCall.request.Identity.FromUser
+	if validator.Phone(outboundCall.request.Address.From) {
+		callAddress.From = outboundCall.request.Address.From
 	}
-	if validator.Phone(outboundCall.request.Identity.ToUser) {
-		callAddress.To = outboundCall.request.Identity.ToUser
+	if validator.Phone(outboundCall.request.Address.To) {
+		callAddress.To = outboundCall.request.Address.To
 	}
 
 	if callAddress.ToURI == "" {

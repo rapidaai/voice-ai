@@ -16,7 +16,6 @@ import (
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	channel_base "github.com/rapidaai/api/assistant-api/internal/channel/base"
-	internal_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
 	"github.com/rapidaai/pkg/commons"
@@ -63,12 +62,6 @@ func (engine *fakeAsteriskMediaEngine) ConfigureAmbient(_ internal_ambient.Confi
 func (engine *fakeAsteriskMediaEngine) OutputFrameDuration() time.Duration {
 	return 20 * time.Millisecond
 }
-
-func (engine *fakeAsteriskMediaEngine) OutputHealthSnapshot() internal_output.HealthSnapshot {
-	return internal_output.HealthSnapshot{}
-}
-
-func (engine *fakeAsteriskMediaEngine) OnTickHealth(_ internal_output.TickHealth) {}
 
 // newTestStreamer creates a minimal asteriskWebsocketStreamer for unit testing.
 // It has no real WebSocket connection and no AudioProcessor, so transport-level

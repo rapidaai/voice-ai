@@ -7,7 +7,6 @@ import (
 
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
-	internal_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
 	"github.com/rapidaai/pkg/commons"
@@ -54,12 +53,6 @@ func (engine *fakeVonageMediaEngine) ConfigureAmbient(_ internal_ambient.Config)
 func (engine *fakeVonageMediaEngine) OutputFrameDuration() time.Duration {
 	return 20 * time.Millisecond
 }
-
-func (engine *fakeVonageMediaEngine) OutputHealthSnapshot() internal_output.HealthSnapshot {
-	return internal_output.HealthSnapshot{}
-}
-
-func (engine *fakeVonageMediaEngine) OnTickHealth(_ internal_output.TickHealth) {}
 
 func TestNewVonageWebsocketStreamer_WiresMediaSession(t *testing.T) {
 	logger, _ := commons.NewApplicationLogger()

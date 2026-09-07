@@ -12,6 +12,8 @@ import (
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 )
 
+const sipUserAgent = "RapidaVoiceAI"
+
 // Server state constants describe the process-level SIP server lifecycle.
 const (
 	ServerStateCreated ServerState = iota

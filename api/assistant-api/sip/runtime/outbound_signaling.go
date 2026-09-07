@@ -4,7 +4,7 @@
 // Licensed under GPL-2.0 with Rapida Additional Terms.
 // See LICENSE.md or contact sales@rapida.ai for commercial usage.
 
-package outbound
+package sip_runtime
 
 import (
 	"context"
@@ -18,8 +18,8 @@ import (
 
 const outboundAllowHeaderValue = "INVITE, ACK, CANCEL, BYE, NOTIFY, REFER, MESSAGE, OPTIONS, INFO, SUBSCRIBE"
 
-func BuildInviteHeaders(request InviteRequest) ([]sip.Header, error) {
-	fromHeader, err := BuildFromHeader(request)
+func buildInviteHeaders(request OutboundInviteRequest) ([]sip.Header, error) {
+	fromHeader, err := buildFromHeader(request)
 	if err != nil {
 		return nil, err
 	}
@@ -28,33 +28,33 @@ func BuildInviteHeaders(request InviteRequest) ([]sip.Header, error) {
 	if fromDomain == "" {
 		fromDomain = request.Config.Address
 	}
-	scheme := SIPScheme(request.Config.Transport)
-	fromUser := strings.TrimSpace(request.Identity.FromUser)
+	scheme := sipScheme(request.Config.Transport)
+	fromUser := strings.TrimSpace(request.Address.From)
 
 	headers := []sip.Header{
 		fromHeader,
 		sip.NewHeader("P-Asserted-Identity", "<"+scheme+":"+fromUser+"@"+fromDomain+">"),
 		sip.NewHeader("Allow", outboundAllowHeaderValue),
-		sip.NewHeader("User-Agent", SIPUserAgent),
+		sip.NewHeader("User-Agent", sipUserAgent),
 	}
 	headers = append(headers, sortedCustomHeaders(request.Config.Headers)...)
 	return headers, nil
 }
 
-func BuildFromHeader(request InviteRequest) (*sip.FromHeader, error) {
+func buildFromHeader(request OutboundInviteRequest) (*sip.FromHeader, error) {
 	fromDomain := request.Config.Domain
 	if fromDomain == "" {
 		fromDomain = request.Config.Address
 	}
-	fromUser := strings.TrimSpace(request.Identity.FromUser)
+	fromUser := strings.TrimSpace(request.Address.From)
 	if fromUser == "" {
-		return nil, ErrFromUserRequired
+		return nil, ErrOutboundFromUserRequired
 	}
 
 	fromHeader := &sip.FromHeader{
 		DisplayName: fromUser,
 		Address: sip.Uri{
-			Scheme: SIPScheme(request.Config.Transport),
+			Scheme: sipScheme(request.Config.Transport),
 			User:   fromUser,
 			Host:   fromDomain,
 		},
@@ -64,10 +64,10 @@ func BuildFromHeader(request InviteRequest) (*sip.FromHeader, error) {
 	return fromHeader, nil
 }
 
-func BuildContactHeader(config ContactConfig) sip.ContactHeader {
+func buildContactHeader(config *ListenConfig) sip.ContactHeader {
 	contactURI := sip.Uri{
-		Scheme: SIPScheme(config.Transport),
-		Host:   config.ExternalIP,
+		Scheme: sipScheme(config.Transport),
+		Host:   config.GetExternalIP(),
 		Port:   config.Port,
 	}
 	if config.Transport == TransportTCP || config.Transport == TransportTLS {
@@ -77,14 +77,14 @@ func BuildContactHeader(config ContactConfig) sip.ContactHeader {
 	return sip.ContactHeader{Address: contactURI}
 }
 
-func SIPScheme(transport Transport) string {
+func sipScheme(transport Transport) string {
 	if transport == TransportTLS {
 		return "sips"
 	}
 	return "sip"
 }
 
-func NormalizeDialogRouteSet(dialogSession *sipgo.DialogClientSession) {
+func normalizeDialogRouteSet(dialogSession *sipgo.DialogClientSession) {
 	if dialogSession == nil || dialogSession.InviteRequest == nil || dialogSession.InviteResponse == nil {
 		return
 	}
@@ -95,7 +95,7 @@ func NormalizeDialogRouteSet(dialogSession *sipgo.DialogClientSession) {
 	}
 }
 
-func NewAckRequest(inviteRequest *sip.Request, inviteResponse *sip.Response) *sip.Request {
+func newAckRequest(inviteRequest *sip.Request, inviteResponse *sip.Response) *sip.Request {
 	recipient := &inviteRequest.Recipient
 	if contact := inviteResponse.Contact(); contact != nil {
 		recipient = &contact.Address
@@ -109,14 +109,14 @@ func NewAckRequest(inviteRequest *sip.Request, inviteResponse *sip.Response) *si
 	if contact := inviteRequest.Contact(); contact != nil {
 		ackRequest.AppendHeader(sip.HeaderClone(contact))
 	}
-	ackRequest.AppendHeader(sip.NewHeader("User-Agent", SIPUserAgent))
+	ackRequest.AppendHeader(sip.NewHeader("User-Agent", sipUserAgent))
 	ackRequest.SetTransport(inviteRequest.Transport())
 	ackRequest.SetSource(inviteRequest.Source())
 	ackRequest.Laddr = inviteRequest.Laddr
 	return ackRequest
 }
 
-func NewByeRequest(inviteRequest *sip.Request, inviteResponse *sip.Response) *sip.Request {
+func newByeRequest(inviteRequest *sip.Request, inviteResponse *sip.Response) *sip.Request {
 	recipient := &inviteRequest.Recipient
 	if contact := inviteResponse.Contact(); contact != nil {
 		recipient = &contact.Address
@@ -126,14 +126,14 @@ func NewByeRequest(inviteRequest *sip.Request, inviteResponse *sip.Response) *si
 	byeRequest.SipVersion = inviteRequest.SipVersion
 	sip.CopyHeaders("Route", inviteRequest, byeRequest)
 	appendDialogHeaders(byeRequest, inviteRequest, inviteResponse, sip.BYE)
-	byeRequest.AppendHeader(sip.NewHeader("User-Agent", SIPUserAgent))
+	byeRequest.AppendHeader(sip.NewHeader("User-Agent", sipUserAgent))
 	byeRequest.SetTransport(inviteRequest.Transport())
 	byeRequest.SetSource(inviteRequest.Source())
 	byeRequest.Laddr = inviteRequest.Laddr
 	return byeRequest
 }
 
-func NewCancelRequest(inviteRequest *sip.Request) *sip.Request {
+func newCancelRequest(inviteRequest *sip.Request) *sip.Request {
 	cancelRequest := sip.NewRequest(sip.CANCEL, inviteRequest.Recipient)
 	cancelRequest.SipVersion = inviteRequest.SipVersion
 	if via := inviteRequest.Via(); via != nil {
@@ -157,18 +157,18 @@ func NewCancelRequest(inviteRequest *sip.Request) *sip.Request {
 		}
 	}
 	sip.CopyHeaders("Route", inviteRequest, cancelRequest)
-	cancelRequest.AppendHeader(sip.NewHeader("User-Agent", SIPUserAgent))
+	cancelRequest.AppendHeader(sip.NewHeader("User-Agent", sipUserAgent))
 	cancelRequest.SetTransport(inviteRequest.Transport())
 	cancelRequest.SetSource(inviteRequest.Source())
 	cancelRequest.Laddr = inviteRequest.Laddr
 	return cancelRequest
 }
 
-func SendCancel(ctx context.Context, dialogSession *sipgo.DialogClientSession, inviteRequest *sip.Request) (*sip.Response, error) {
+func sendCancel(ctx context.Context, dialogSession *sipgo.DialogClientSession, inviteRequest *sip.Request) (*sip.Response, error) {
 	if dialogSession == nil || dialogSession.UA == nil || dialogSession.UA.Client == nil || inviteRequest == nil {
 		return nil, fmt.Errorf("outbound invite dialog is not available")
 	}
-	cancelRequest := NewCancelRequest(inviteRequest)
+	cancelRequest := newCancelRequest(inviteRequest)
 	return dialogSession.UA.Client.Do(ctx, cancelRequest, func(client *sipgo.Client, request *sip.Request) error {
 		return nil
 	})

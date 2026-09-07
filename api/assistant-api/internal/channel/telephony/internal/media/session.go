@@ -8,7 +8,6 @@ package internal_telephony_media
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
@@ -55,7 +54,6 @@ func (mediaSession *MediaSession) Start() {
 	mediaSession.sinkMu.RUnlock()
 	if hasOutputSink {
 		go mediaSession.runFrameOutputSender()
-		go mediaSession.runOutputHealthReporter(mediaSession.mediaEngine)
 	}
 }
 
@@ -144,63 +142,6 @@ func (mediaSession *MediaSession) hasMediaEngine() bool {
 	return mediaSession.mediaEngine != nil
 }
 
-func (mediaSession *MediaSession) runOutputHealthReporter(mediaEngine MediaEngine) {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-
-	var previousSnapshot internal_output.HealthSnapshot
-	for {
-		select {
-		case <-mediaSession.ctx.Done():
-			return
-		case <-ticker.C:
-		}
-
-		healthSnapshot := mediaEngine.OutputHealthSnapshot()
-		if healthSnapshot.Ticks == previousSnapshot.Ticks {
-			continue
-		}
-
-		if mediaSession.record != nil {
-			_ = mediaSession.record(observability.RecordLog{
-				Level:   observability.LevelDebug,
-				Message: "Telephony output pacer health",
-				Attributes: observability.Attributes{
-					"component":     observability.ComponentCall.String(),
-					"ticks":         fmt.Sprintf("%d", healthSnapshot.Ticks),
-					"late_ticks":    fmt.Sprintf("%d", healthSnapshot.LateTicks),
-					"active_ticks":  fmt.Sprintf("%d", healthSnapshot.ActiveTicks),
-					"idle_ticks":    fmt.Sprintf("%d", healthSnapshot.IdleTicks),
-					"send_errors":   fmt.Sprintf("%d", healthSnapshot.SendErrors),
-					"idle_ratio":    fmt.Sprintf("%.4f", healthSnapshot.IdleRatio),
-					"health_status": "output_pacer_health",
-				},
-			})
-		}
-
-		if healthSnapshot.SendErrors > previousSnapshot.SendErrors {
-			if mediaSession.record != nil {
-				_ = mediaSession.record(observability.RecordLog{
-					Level:   observability.LevelError,
-					Message: "Telephony output send error",
-					Attributes: observability.Attributes{
-						"component":          observability.ComponentCall.String(),
-						"send_errors_delta":  fmt.Sprintf("%d", healthSnapshot.SendErrors-previousSnapshot.SendErrors),
-						"total_send_errors":  fmt.Sprintf("%d", healthSnapshot.SendErrors),
-						"ticks":              fmt.Sprintf("%d", healthSnapshot.Ticks),
-						"late_ticks":         fmt.Sprintf("%d", healthSnapshot.LateTicks),
-						"active_ticks":       fmt.Sprintf("%d", healthSnapshot.ActiveTicks),
-						"idle_ticks":         fmt.Sprintf("%d", healthSnapshot.IdleTicks),
-						"idle_ratio":         fmt.Sprintf("%.4f", healthSnapshot.IdleRatio),
-						"output_error_state": "output_send_error",
-					},
-				})
-			}
-		}
-		previousSnapshot = healthSnapshot
-	}
-}
-
 func (mediaSession *MediaSession) runFrameOutputSender() {
 	frameDuration := 20 * time.Millisecond
 	if duration := mediaSession.mediaEngine.OutputFrameDuration(); duration > 0 {
@@ -211,7 +152,6 @@ func (mediaSession *MediaSession) runFrameOutputSender() {
 		FrameDuration: frameDuration,
 		Provider:      mediaSession,
 		Consumer:      mediaSession,
-		Health:        mediaSession.mediaEngine,
 	}).Run(mediaSession.ctx)
 }
 

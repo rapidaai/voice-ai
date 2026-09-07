@@ -62,8 +62,6 @@ type AudioProcessor struct {
 
 	xoffActive bool
 	xoffMu     sync.Mutex
-
-	outputHealth *internal_telephony_output.HealthStats
 }
 
 func NewAudioProcessor(logger commons.Logger, cfg AudioProcessorConfig) (*AudioProcessor, error) {
@@ -85,7 +83,6 @@ func NewAudioProcessor(logger commons.Logger, cfg AudioProcessorConfig) (*AudioP
 		inputBuffer:        internal_channel_input.NewBytesInputBuffer(inputBufferThreshold * 2),
 		outputBuffer:       internal_telephony_output.NewBytesFrameBuffer(frameSize * 8),
 		bridgeOutputBuffer: internal_telephony_output.NewBytesFrameBuffer(bridgeOutputFrameSize * 8),
-		outputHealth:       internal_telephony_output.NewHealthStats(),
 	}
 	audioProcessor.silenceFrame = audioProcessor.createSilenceFrame(frameSize, audioProcessor.silenceByte)
 
@@ -217,19 +214,6 @@ func normalizeOptimalFrameSize(frameSize int) int {
 
 func (audioProcessor *AudioProcessor) OutputFrameDuration() time.Duration {
 	return chunkDuration
-}
-
-func (audioProcessor *AudioProcessor) OnTickHealth(event internal_telephony_output.TickHealth) {
-	if audioProcessor.outputHealth != nil {
-		audioProcessor.outputHealth.OnTickHealth(event)
-	}
-}
-
-func (audioProcessor *AudioProcessor) OutputHealthSnapshot() internal_telephony_output.HealthSnapshot {
-	if audioProcessor.outputHealth == nil {
-		return internal_telephony_output.HealthSnapshot{}
-	}
-	return audioProcessor.outputHealth.Snapshot()
 }
 
 func (audioProcessor *AudioProcessor) NextOutputFrame() (internal_telephony_media.AssistantOutputFrame, bool) {

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
-	internal_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/protos"
@@ -78,12 +77,6 @@ func (mediaEngine *fakeMediaEngine) OutputFrameDuration() time.Duration {
 	}
 	return mediaEngine.frameDuration
 }
-
-func (mediaEngine *fakeMediaEngine) OutputHealthSnapshot() internal_output.HealthSnapshot {
-	return internal_output.HealthSnapshot{}
-}
-
-func (mediaEngine *fakeMediaEngine) OnTickHealth(_ internal_output.TickHealth) {}
 
 func mustAnyValue(t *testing.T, value *structpb.Value) *anypb.Any {
 	t.Helper()

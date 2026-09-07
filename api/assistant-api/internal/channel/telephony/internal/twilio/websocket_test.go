@@ -17,7 +17,6 @@ import (
 	"github.com/gorilla/websocket"
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
-	internal_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
 	internal_twilio "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/twilio/internal"
@@ -83,12 +82,6 @@ func (engine *fakeTwilioMediaEngine) ConfigureAmbient(_ internal_ambient.Config)
 func (engine *fakeTwilioMediaEngine) OutputFrameDuration() time.Duration {
 	return 20 * time.Millisecond
 }
-
-func (engine *fakeTwilioMediaEngine) OutputHealthSnapshot() internal_output.HealthSnapshot {
-	return internal_output.HealthSnapshot{}
-}
-
-func (engine *fakeTwilioMediaEngine) OnTickHealth(_ internal_output.TickHealth) {}
 
 // testWSPair creates a connected WebSocket client/server pair for unit tests.
 // The server side is discarded; only the client *websocket.Conn is returned.

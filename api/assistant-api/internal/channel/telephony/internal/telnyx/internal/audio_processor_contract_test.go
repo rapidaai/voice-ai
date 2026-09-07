@@ -30,7 +30,6 @@ func newTestAudioProcessor(resamplerOutput []byte, resamplerErr error) *AudioPro
 		inputBuffer:        newInputBufferForTest(),
 		outputBuffer:       newOutputBufferForTest(OutputChunkSize * 8),
 		bridgeOutputBuffer: newOutputBufferForTest(BridgeOutputFrameSize * 8),
-		outputHealth:       nil,
 	}
 	audioProcessor.silenceFrame = audioProcessor.createSilenceFrame()
 	return audioProcessor

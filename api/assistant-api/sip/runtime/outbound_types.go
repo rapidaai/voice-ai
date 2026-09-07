@@ -88,14 +88,9 @@ type OutboundConfig struct {
 	MediaTimeout        time.Duration
 }
 
-type OutboundCallIdentity struct {
-	ToUser   string
-	FromUser string
-}
-
 type OutboundInviteRequest struct {
-	Config   OutboundConfig
-	Identity OutboundCallIdentity
+	Config  OutboundConfig
+	Address CallAddress
 }
 
 func (c OutboundConfig) EffectiveRingingTimeout() time.Duration {

@@ -43,7 +43,6 @@ func newTestProcessor(t *testing.T, silenceByte byte, frameSize int) *AudioProce
 		inputBuffer:        internal_channel_input.NewBytesInputBuffer(inputBufferThreshold * 2),
 		outputBuffer:       internal_channel_output.NewBytesFrameBuffer(frameSize * 8),
 		bridgeOutputBuffer: internal_channel_output.NewBytesFrameBuffer(bridgeOutputFrameSize * 8),
-		outputHealth:       internal_channel_output.NewHealthStats(),
 	}
 	audioProcessor.silenceFrame = audioProcessor.createSilenceFrame(frameSize, silenceByte)
 	return audioProcessor
@@ -363,25 +362,4 @@ func TestXOFF_ConcurrentAccess(t *testing.T) {
 		}()
 	}
 	waitGroup.Wait()
-}
-
-func TestAudioProcessor_OutputHealthObserverRecordsTicks(t *testing.T) {
-	audioProcessor := newTestProcessor(t, 0xFF, 160)
-
-	audioProcessor.OnTickHealth(internal_channel_output.TickHealth{Active: true})
-	audioProcessor.OnTickHealth(internal_channel_output.TickHealth{Idle: true, SendError: true})
-
-	stats := audioProcessor.OutputHealthSnapshot()
-	if stats.Ticks != 2 {
-		t.Fatalf("ticks=%d want=2", stats.Ticks)
-	}
-	if stats.ActiveTicks != 1 {
-		t.Fatalf("activeTicks=%d want=1", stats.ActiveTicks)
-	}
-	if stats.IdleTicks != 1 {
-		t.Fatalf("idleTicks=%d want=1", stats.IdleTicks)
-	}
-	if stats.SendErrors != 1 {
-		t.Fatalf("sendErrors=%d want=1", stats.SendErrors)
-	}
 }

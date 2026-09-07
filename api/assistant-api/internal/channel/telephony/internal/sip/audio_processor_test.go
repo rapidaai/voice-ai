@@ -1037,6 +1037,7 @@ func TestNewAudioProcessor_InitializesChannels(t *testing.T) {
 	assert.NotNil(t, proc.bridgeOperatorCh)
 	assert.Equal(t, AudioChannelSize, cap(proc.bridgeUserCh))
 	assert.Equal(t, AudioChannelSize, cap(proc.bridgeOperatorCh))
+	assert.Equal(t, ChunkDuration, proc.OutputFrameDuration())
 	assert.False(t, proc.IsBridgeActive())
 }
 

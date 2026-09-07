@@ -17,7 +17,6 @@ import (
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
-	internal_outbound "github.com/rapidaai/api/assistant-api/sip/internal/outbound"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -68,7 +67,7 @@ func TestOutboundCallInviteHandlerUsesAuthoritativeRequestIdentity(t *testing.T)
 	require.NoError(t, err)
 	inviteRequest := sip.NewRequest(sip.INVITE, sip.Uri{
 		Scheme: "sip",
-		User:   request.Identity.ToUser,
+		User:   request.Address.To,
 		Host:   request.Config.Address,
 		Port:   request.Config.Port,
 	})
@@ -101,7 +100,7 @@ func TestOutboundCallInviteHandlerPreservesPhoneInputs(t *testing.T) {
 	require.NoError(t, err)
 	inviteRequest := sip.NewRequest(sip.INVITE, sip.Uri{
 		Scheme: "sip",
-		User:   request.Identity.ToUser,
+		User:   request.Address.To,
 		Host:   request.Config.Address,
 		Port:   request.Config.Port,
 	})
@@ -124,17 +123,17 @@ func TestTransferLegCallAddressDoesNotInheritParentIdentity(t *testing.T) {
 	require.NoError(t, err)
 	inviteRequest := sip.NewRequest(sip.INVITE, sip.Uri{
 		Scheme: "sip",
-		User:   request.Identity.ToUser,
+		User:   request.Address.To,
 		Host:   request.Config.Address,
 		Port:   request.Config.Port,
 	})
 
 	address := NewCallAddress(inviteRequest)
-	if validator.Phone(request.Identity.FromUser) {
-		address.From = request.Identity.FromUser
+	if validator.Phone(request.Address.From) {
+		address.From = request.Address.From
 	}
-	if validator.Phone(request.Identity.ToUser) {
-		address.To = request.Identity.ToUser
+	if validator.Phone(request.Address.To) {
+		address.To = request.Address.To
 	}
 
 	assert.Empty(t, address.From)
@@ -298,7 +297,7 @@ func TestOutboundCall_PreAnswerLifecycleCancelSendsSIPCancel(t *testing.T) {
 	inviteRequest := requester.inviteRequest()
 	require.NotNil(t, cancelRequest)
 	require.NotNil(t, inviteRequest)
-	assert.Equal(t, internal_outbound.SIPUserAgent, cancelRequest.GetHeader("User-Agent").Value())
+	assert.Equal(t, sipUserAgent, cancelRequest.GetHeader("User-Agent").Value())
 	require.NotNil(t, cancelRequest.MaxForwards())
 	require.NotNil(t, cancelRequest.CSeq())
 	assert.Equal(t, sip.CANCEL, cancelRequest.CSeq().MethodName)
@@ -363,7 +362,7 @@ func TestOutboundCall_RingingTimeoutSendsLifecycleCancel(t *testing.T) {
 	}, time.Second, 10*time.Millisecond)
 	cancelRequest := requester.cancelRequest()
 	require.NotNil(t, cancelRequest)
-	assert.Equal(t, internal_outbound.SIPUserAgent, cancelRequest.GetHeader("User-Agent").Value())
+	assert.Equal(t, sipUserAgent, cancelRequest.GetHeader("User-Agent").Value())
 	failureClass, ok := session.GetMetadata("sip.failure_class")
 	require.True(t, ok)
 	failureReason, ok := session.GetMetadata("sip.failure_reason")
@@ -510,8 +509,8 @@ func TestOutboundCall_AnsweredSDPFailureSendsBYENotCancel(t *testing.T) {
 	assert.Equal(t, OutboundDialogPhaseTerminated, session.GetOutboundDialogPhase())
 	assertOutboundRouteSet(t, requester.ackRequest(), "<sip:p1.example.com;lr>", "<sip:p2.example.com;lr>")
 	assertOutboundRouteSet(t, requester.byeRequest(), "<sip:p1.example.com;lr>", "<sip:p2.example.com;lr>")
-	assert.Equal(t, internal_outbound.SIPUserAgent, requester.ackRequest().GetHeader("User-Agent").Value())
-	assert.Equal(t, internal_outbound.SIPUserAgent, requester.byeRequest().GetHeader("User-Agent").Value())
+	assert.Equal(t, sipUserAgent, requester.ackRequest().GetHeader("User-Agent").Value())
+	assert.Equal(t, sipUserAgent, requester.byeRequest().GetHeader("User-Agent").Value())
 	require.NotNil(t, requester.inviteRequest())
 	assert.Equal(t, requester.inviteRequest().CSeq().SeqNo, requester.ackRequest().CSeq().SeqNo)
 	assert.Equal(t, requester.inviteRequest().CSeq().SeqNo+1, requester.byeRequest().CSeq().SeqNo)

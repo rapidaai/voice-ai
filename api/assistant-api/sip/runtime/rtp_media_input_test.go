@@ -433,8 +433,6 @@ func TestRTPHandler_DeliverInboundAudioForwardsFramesInOrder(t *testing.T) {
 	stats := handler.GetDetailedStats()
 	assert.Equal(t, uint64(2), stats.PacketsDelivered)
 	assert.Zero(t, stats.PacketsDropped)
-	assert.Zero(t, stats.AudioInputDropped)
-	assert.Zero(t, stats.RTPIngressQueueDropped)
 }
 
 func TestRTPHandler_DetailedStatsSeparateTransportAndDeliveryLiveness(t *testing.T) {
@@ -463,9 +461,6 @@ func TestRTPHandler_DeliverInboundAudioCountsMissingSink(t *testing.T) {
 	stats := handler.GetDetailedStats()
 	assert.Zero(t, stats.PacketsDelivered)
 	assert.Equal(t, uint64(1), stats.PacketsDropped)
-	assert.Zero(t, stats.AudioInputDropped)
-	assert.Zero(t, stats.RTPIngressQueueDropped)
-	assert.Zero(t, stats.NetworkPacketsLost)
 }
 
 func TestRTPHandler_DetailedStatsSeparateInboundDropCategories(t *testing.T) {
@@ -489,11 +484,9 @@ func TestRTPHandler_DetailedStatsSeparateInboundDropCategories(t *testing.T) {
 
 	stats := handler.GetDetailedStats()
 	assert.Equal(t, uint64(1), stats.PacketsLost)
-	assert.Equal(t, uint64(1), stats.NetworkPacketsLost)
 	assert.Equal(t, uint64(1), stats.LateOrDuplicatePackets)
 	assert.Equal(t, uint64(1), stats.InvalidPackets)
 	assert.Equal(t, uint64(1), stats.JitterBufferResyncDropped)
-	assert.Zero(t, stats.RTPIngressQueueDropped)
 	assert.Equal(t, uint64(3), stats.SilenceSuppressionFrames)
 	assert.Equal(t, uint64(3), stats.PacketsDropped)
 }
