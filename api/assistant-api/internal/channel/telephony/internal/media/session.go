@@ -98,8 +98,8 @@ func (mediaSession *MediaSession) HandleInterrupt() {
 	if mediaSession == nil || !mediaSession.hasMediaEngine() {
 		return
 	}
-	mediaSession.mediaEngine.ClearOutputBuffer()
 	mediaSession.outputFrameMu.Lock()
+	mediaSession.mediaEngine.ClearOutputBuffer()
 	mediaSession.currentOutputFrame = AssistantOutputFrame{}
 	mediaSession.hasCurrentOutputFrame = false
 	mediaSession.outputFrameMu.Unlock()
@@ -219,11 +219,14 @@ func (mediaSession *MediaSession) NextFrame() []byte {
 	if mediaSession.mediaEngine == nil {
 		return nil
 	}
+	mediaSession.outputFrameMu.Lock()
+	defer mediaSession.outputFrameMu.Unlock()
 	outputFrame, ok := mediaSession.mediaEngine.NextOutputFrame()
 	if !ok || len(outputFrame.ProviderAudio) == 0 {
 		return nil
 	}
-	mediaSession.storeCurrentOutputFrame(outputFrame)
+	mediaSession.currentOutputFrame = outputFrame
+	mediaSession.hasCurrentOutputFrame = true
 	return outputFrame.ProviderAudio
 }
 
@@ -231,37 +234,38 @@ func (mediaSession *MediaSession) IdleFrame() []byte {
 	if mediaSession.mediaEngine == nil {
 		return nil
 	}
+	mediaSession.outputFrameMu.Lock()
+	defer mediaSession.outputFrameMu.Unlock()
 	outputFrame, ok := mediaSession.mediaEngine.IdleOutputFrame()
 	if !ok || len(outputFrame.ProviderAudio) == 0 {
 		return nil
 	}
 	outputFrame.Idle = true
-	mediaSession.storeCurrentOutputFrame(outputFrame)
+	mediaSession.currentOutputFrame = outputFrame
+	mediaSession.hasCurrentOutputFrame = true
 	return outputFrame.ProviderAudio
 }
 
-func (mediaSession *MediaSession) ConsumeFrame(providerAudio []byte) error {
-	mediaSession.outputFrameMu.Lock()
-	outputFrame := mediaSession.currentOutputFrame
-	hasCurrentOutputFrame := mediaSession.hasCurrentOutputFrame
-	mediaSession.currentOutputFrame = AssistantOutputFrame{}
-	mediaSession.hasCurrentOutputFrame = false
-	mediaSession.outputFrameMu.Unlock()
-
-	if !hasCurrentOutputFrame {
-		outputFrame = AssistantOutputFrame{ProviderAudio: providerAudio}
-	}
-	if len(outputFrame.ProviderAudio) == 0 {
-		outputFrame.ProviderAudio = providerAudio
-	}
-
+func (mediaSession *MediaSession) ConsumeFrame(_ []byte) error {
 	mediaSession.sinkMu.RLock()
 	outputSink := mediaSession.outputSink
 	mediaSession.sinkMu.RUnlock()
 	if outputSink == nil {
 		return nil
 	}
-	if err := outputSink(outputFrame); err != nil {
+
+	mediaSession.outputFrameMu.Lock()
+	outputFrame := mediaSession.currentOutputFrame
+	hasCurrentOutputFrame := mediaSession.hasCurrentOutputFrame
+	mediaSession.currentOutputFrame = AssistantOutputFrame{}
+	mediaSession.hasCurrentOutputFrame = false
+	if !hasCurrentOutputFrame {
+		mediaSession.outputFrameMu.Unlock()
+		return nil
+	}
+	err := outputSink(outputFrame)
+	mediaSession.outputFrameMu.Unlock()
+	if err != nil {
 		if mediaSession.record != nil {
 			_ = mediaSession.record(observability.RecordLog{
 				Level:   observability.LevelError,
@@ -316,11 +320,4 @@ func (mediaSession *MediaSession) emitStream(stream internal_type.Stream) {
 		return
 	}
 	streamSink(stream)
-}
-
-func (mediaSession *MediaSession) storeCurrentOutputFrame(outputFrame AssistantOutputFrame) {
-	mediaSession.outputFrameMu.Lock()
-	mediaSession.currentOutputFrame = outputFrame
-	mediaSession.hasCurrentOutputFrame = true
-	mediaSession.outputFrameMu.Unlock()
 }

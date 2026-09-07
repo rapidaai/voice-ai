@@ -8,7 +8,6 @@ package sip_runtime
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -74,9 +73,11 @@ func (s *Server) BridgeTransfer(ctx context.Context, inbound, outbound *Session,
 		return BridgeEndContext, err
 	}
 
-	audioCtx, audioCancel := context.WithCancel(ctx)
-	defer audioCancel()
-	go s.forwardBridgeAudio(audioCtx, outRTP.AudioIn(), inRTP, needsTranscode, outCodec, inCodec, onOperatorAudio)
+	var droppedFrames uint64
+	outRTP.SetInboundAudioSink(func(frame InboundAudioFrame) {
+		s.forwardBridgeAudioFrame(ctx, frame, inRTP, needsTranscode, outCodec, inCodec, onOperatorAudio, &droppedFrames)
+	})
+	defer outRTP.SetInboundAudioSink(nil)
 
 	var reason BridgeEndReason
 	select {
@@ -101,8 +102,6 @@ func (s *Server) BridgeTransfer(ctx context.Context, inbound, outbound *Session,
 		s.logger.Warnw("Bridge: safety timeout reached, tearing down",
 			"inbound_call_id", inCallID, "outbound_call_id", outCallID)
 	}
-
-	audioCancel()
 
 	s.logger.Infow("Audio bridge completed",
 		"inbound_call_id", inCallID, "outbound_call_id", outCallID,
@@ -144,37 +143,27 @@ func (s *Server) beginBridgeLegLifecycle(session *Session, legRole string) error
 	return nil
 }
 
-// forwardBridgeAudio reads audio from src and enqueues it to dst, transcoding if needed.
-func (s *Server) forwardBridgeAudio(ctx context.Context, src <-chan InboundAudioFrame, dst internal_type.SIPRTPBridgeTarget, needsTranscode bool, srcCodec, dstCodec *Codec, onAudio func([]byte)) {
-	var droppedFrames uint64
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case frame, ok := <-src:
-			if !ok {
-				return
-			}
-			data := frame.Audio
-			rawData := data
-			if needsTranscode {
-				data = s.transcodeG711(data, srcCodec, dstCodec)
-			}
-			if err := dst.EnqueueAudio(data); err != nil {
-				droppedFrames++
-				if errors.Is(err, ErrRTPHandlerStopped) {
-					return
-				}
-				if s.logger != nil && errors.Is(err, ErrRTPOutputQueueFull) && (droppedFrames == 1 || droppedFrames%100 == 0) {
-					s.logger.Warnw("Bridge RTP output queue full; dropping frame",
-						"dropped_frames_total", droppedFrames)
-				}
-				continue
-			}
-			if onAudio != nil {
-				onAudio(rawData)
-			}
+// forwardBridgeAudioFrame forwards one operator frame to the caller.
+func (s *Server) forwardBridgeAudioFrame(ctx context.Context, frame InboundAudioFrame, dst internal_type.SIPRTPBridgeTarget, needsTranscode bool, srcCodec, dstCodec *Codec, onAudio func([]byte), droppedFrames *uint64) {
+	if ctx.Err() != nil {
+		return
+	}
+	data := frame.Audio
+	rawData := data
+	if needsTranscode {
+		data = s.transcodeG711(data, srcCodec, dstCodec)
+	}
+	if err := dst.WriteAudio(data); err != nil {
+		*droppedFrames = *droppedFrames + 1
+		if s.logger != nil && (*droppedFrames == 1 || *droppedFrames%100 == 0) {
+			s.logger.Warnw("Bridge RTP audio write failed",
+				"failed_frames_total", *droppedFrames,
+				"error", err)
 		}
+		return
+	}
+	if onAudio != nil {
+		onAudio(rawData)
 	}
 }
 

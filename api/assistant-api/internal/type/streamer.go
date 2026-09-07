@@ -43,9 +43,8 @@ type Streamer interface {
 // SIPRTPBridgeTarget is the minimum RTP behavior needed to connect SIP bridge
 // audio without coupling generic stream contracts to SIP infra packages.
 type SIPRTPBridgeTarget interface {
-	// EnqueueAudio queues one RTP-ready audio frame for non-blocking delivery.
-	// It returns a typed error when the target is stopped or backpressured.
-	EnqueueAudio([]byte) error
+	// WriteAudio writes one complete encoded frame to the RTP transport.
+	WriteAudio([]byte) error
 }
 
 // SIPStreamer extends the generic streamer contract with SIP media behavior

@@ -4,13 +4,19 @@
 // Licensed under GPL-2.0 with Rapida Additional Terms.
 // See LICENSE.md or contact sales@rapida.ai for commercial usage.
 
-package internal_sip
+package internal_sip_telephony
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
+	"math"
+	"net"
 	"testing"
 	"time"
 
+	"github.com/pion/rtp"
+	resampler_soxr "github.com/rapidaai/api/assistant-api/internal/audio/resampler/soxr"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
@@ -18,9 +24,14 @@ import (
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zaf/g711"
 )
 
 func newMediaPortTestSession(t *testing.T) *sip_runtime.Session {
+	return newMediaPortTestSessionWithCodec(t, &sip_runtime.CodecPCMU)
+}
+
+func newMediaPortTestSessionWithCodec(t *testing.T, codec *sip_runtime.Codec) *sip_runtime.Session {
 	t.Helper()
 	session, err := sip_runtime.NewSession(context.Background(),
 		sip_runtime.WithSessionConfig(&sip_runtime.Config{
@@ -31,25 +42,48 @@ func newMediaPortTestSession(t *testing.T) *sip_runtime.Session {
 		}),
 		sip_runtime.WithSessionDirection(sip_runtime.CallDirectionInbound),
 		sip_runtime.WithSessionCallID("media-port-test"),
-		sip_runtime.WithSessionCodec(&sip_runtime.CodecPCMU),
+		sip_runtime.WithSessionCodec(codec),
 	)
 	require.NoError(t, err)
 	return session
 }
 
-func newMediaPortTestRTP(t *testing.T) (*fakeRTPHandler, chan sip_runtime.InboundAudioFrame, chan []byte) {
+func newMediaPortTestRTPHandler(t *testing.T, codec sip_runtime.Codec) *sip_runtime.RTPHandler {
+	t.Helper()
+	reserved, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
+	require.NoError(t, err)
+	port := reserved.LocalAddr().(*net.UDPAddr).Port
+	require.NoError(t, reserved.Close())
+
+	handler, err := sip_runtime.NewRTPHandler(t.Context(), &sip_runtime.RTPConfig{
+		LocalAddress: sip_runtime.RTPAddress{
+			IP:   "127.0.0.1",
+			Port: port,
+		},
+		PayloadType:       codec.PayloadType,
+		ClockRate:         codec.ClockRate,
+		PacketizationTime: ChunkDuration,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, handler.Stop())
+	})
+	return handler
+}
+
+func newMediaPortTestRTP(t *testing.T) (*fakeRTPHandler, func(sip_runtime.InboundAudioFrame), chan []byte) {
 	t.Helper()
 	rtpHandler := newTestRTPHandler(&sip_runtime.CodecPCMU)
-	return rtpHandler, rtpHandler.audioIn, rtpHandler.audioOut
+	return rtpHandler, rtpHandler.emitInboundAudio, rtpHandler.audioOut
 }
 
 func newMediaPortForTest(
 	t *testing.T,
 	streamSink func(internal_type.Stream),
 	recorders ...func(...observability.Record) error,
-) (*MediaPort, chan sip_runtime.InboundAudioFrame, chan []byte) {
+) (*MediaPort, func(sip_runtime.InboundAudioFrame), chan []byte) {
 	t.Helper()
-	rtpHandler, audioIn, audioOut := newMediaPortTestRTP(t)
+	rtpHandler, emitInboundAudio, audioOut := newMediaPortTestRTP(t)
 	var record func(...observability.Record) error
 	if len(recorders) > 0 {
 		record = recorders[0]
@@ -59,15 +93,15 @@ func newMediaPortForTest(
 		Session:    newMediaPortTestSession(t),
 		RTPHandler: rtpHandler,
 		StreamSink: streamSink,
-		Record:     record,
+		RecordSink: record,
 	})
 	require.NoError(t, err)
-	return mediaPort, audioIn, audioOut
+	return mediaPort, emitInboundAudio, audioOut
 }
 
 func TestMediaPort_StartForwardsProviderAudio(t *testing.T) {
 	streams := make(chan internal_type.Stream, 4)
-	mediaPort, audioIn, _ := newMediaPortForTest(t, func(stream internal_type.Stream) {
+	mediaPort, emitInboundAudio, _ := newMediaPortForTest(t, func(stream internal_type.Stream) {
 		streams <- stream
 	})
 
@@ -75,7 +109,7 @@ func TestMediaPort_StartForwardsProviderAudio(t *testing.T) {
 	defer func() { require.NoError(t, mediaPort.Close()) }()
 
 	for i := 0; i < 2; i++ {
-		audioIn <- sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()}
+		emitInboundAudio(sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()})
 	}
 
 	require.Eventually(t, func() bool {
@@ -92,8 +126,224 @@ func TestMediaPort_StartForwardsProviderAudio(t *testing.T) {
 	}, time.Second, 10*time.Millisecond)
 }
 
+func TestMediaPort_RealUDPInputMatchesReferencePCM(t *testing.T) {
+	const frameCount = 10
+
+	for _, codec := range []sip_runtime.Codec{sip_runtime.CodecPCMU, sip_runtime.CodecPCMA} {
+		t.Run(codec.Name, func(t *testing.T) {
+			receiver := newMediaPortTestRTPHandler(t, codec)
+			pipelineAudio := make(chan []byte, frameCount)
+			recordingAudio := make(chan []byte, frameCount)
+			mediaPort, err := NewMediaPort(MediaPortConfig{
+				Context:    t.Context(),
+				Session:    newMediaPortTestSessionWithCodec(t, &codec),
+				RTPHandler: receiver,
+				StreamSink: func(stream internal_type.Stream) {
+					switch message := stream.(type) {
+					case *protos.ConversationUserMessage:
+						pipelineAudio <- append([]byte(nil), message.GetAudio()...)
+					case *protos.ConversationBridgeUserAudio:
+						recordingAudio <- append([]byte(nil), message.GetAudio()...)
+					}
+				},
+			})
+			require.NoError(t, err)
+			mediaPort.StartInput()
+			receiver.Start()
+			t.Cleanup(func() {
+				require.NoError(t, mediaPort.Close())
+			})
+
+			sender := newMediaPortTestRTPHandler(t, codec)
+			sender.Start()
+			sender.SetRemoteAddress(receiver.LocalAddress())
+
+			pcm := make([]byte, frameCount*MulawFrameSize*2)
+			for sampleIndex := 0; sampleIndex < frameCount*MulawFrameSize; sampleIndex++ {
+				sample := int16(12000 * math.Sin(2*math.Pi*440*float64(sampleIndex)/8000))
+				binary.LittleEndian.PutUint16(pcm[sampleIndex*2:], uint16(sample))
+			}
+
+			reference := resampler_soxr.New(resampler_soxr.WithQuickQuality())
+			expectedFrames := make([][]byte, frameCount)
+			for frameIndex := range frameCount {
+				start := frameIndex * MulawFrameSize * 2
+				end := start + MulawFrameSize*2
+				encoded := g711.EncodeUlaw(pcm[start:end])
+				if codec.Name == sip_runtime.CodecPCMA.Name {
+					encoded = g711.EncodeAlaw(pcm[start:end])
+				}
+				expectedFrames[frameIndex], err = reference.Resample(
+					decodeG711ToLinear8k(encoded, codec.Name),
+					Linear8kConfig,
+					Rapida16kConfig,
+				)
+				require.NoError(t, err)
+				require.NoError(t, sender.WriteAudio(encoded))
+			}
+
+			var actualPipeline []byte
+			var actualRecording []byte
+			for frameIndex, expected := range expectedFrames {
+				select {
+				case audio := <-pipelineAudio:
+					require.Equalf(t, expected, audio, "pipeline frame %d", frameIndex)
+					actualPipeline = append(actualPipeline, audio...)
+				case <-time.After(time.Second):
+					t.Fatalf("timed out waiting for pipeline frame %d", frameIndex)
+				}
+				select {
+				case audio := <-recordingAudio:
+					require.Equalf(t, expected, audio, "recording frame %d", frameIndex)
+					actualRecording = append(actualRecording, audio...)
+				case <-time.After(time.Second):
+					t.Fatalf("timed out waiting for recording frame %d", frameIndex)
+				}
+			}
+
+			expectedPCM := bytes.Join(expectedFrames, nil)
+			require.Equal(t, expectedPCM, actualPipeline)
+			require.Equal(t, expectedPCM, actualRecording)
+			stats := receiver.GetDetailedStats()
+			assert.Equal(t, uint64(frameCount), stats.PacketsReceived)
+			assert.Equal(t, uint64(frameCount), stats.PacketsDelivered)
+			assert.Zero(t, stats.PacketsLost)
+			assert.Zero(t, stats.PacketsDropped)
+		})
+	}
+}
+
+func TestMediaPort_RealUDPInputHandlesReorderingAndLoss(t *testing.T) {
+	const samplesPerFrame = MulawFrameSize
+	testCases := []struct {
+		name            string
+		sendOrder       []int
+		expectLoss      bool
+		packetsReceived uint64
+	}{
+		{name: "reordered", sendOrder: []int{0, 2, 1}, packetsReceived: 3},
+		{name: "missing packet", sendOrder: []int{0, 2}, expectLoss: true, packetsReceived: 2},
+	}
+
+	for _, codec := range []sip_runtime.Codec{sip_runtime.CodecPCMU, sip_runtime.CodecPCMA} {
+		for _, testCase := range testCases {
+			t.Run(codec.Name+"/"+testCase.name, func(t *testing.T) {
+				receiver := newMediaPortTestRTPHandler(t, codec)
+				pipelineAudio := make(chan []byte, 3)
+				recordingAudio := make(chan []byte, 3)
+				mediaPort, err := NewMediaPort(MediaPortConfig{
+					Context:    t.Context(),
+					Session:    newMediaPortTestSessionWithCodec(t, &codec),
+					RTPHandler: receiver,
+					StreamSink: func(stream internal_type.Stream) {
+						switch message := stream.(type) {
+						case *protos.ConversationUserMessage:
+							pipelineAudio <- append([]byte(nil), message.GetAudio()...)
+						case *protos.ConversationBridgeUserAudio:
+							recordingAudio <- append([]byte(nil), message.GetAudio()...)
+						}
+					},
+				})
+				require.NoError(t, err)
+				mediaPort.StartInput()
+				receiver.Start()
+				t.Cleanup(func() {
+					require.NoError(t, mediaPort.Close())
+				})
+
+				sender, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
+				require.NoError(t, err)
+				t.Cleanup(func() {
+					require.NoError(t, sender.Close())
+				})
+				destination := &net.UDPAddr{
+					IP:   net.ParseIP(receiver.LocalAddress().IP),
+					Port: receiver.LocalAddress().Port,
+				}
+
+				encodedFrames := make([][]byte, 3)
+				for frameIndex := range encodedFrames {
+					pcm := make([]byte, samplesPerFrame*2)
+					for sampleIndex := range samplesPerFrame {
+						continuousIndex := frameIndex*samplesPerFrame + sampleIndex
+						sample := int16(12000 * math.Sin(2*math.Pi*440*float64(continuousIndex)/8000))
+						binary.LittleEndian.PutUint16(pcm[sampleIndex*2:], uint16(sample))
+					}
+					encodedFrames[frameIndex] = g711.EncodeUlaw(pcm)
+					if codec.Name == sip_runtime.CodecPCMA.Name {
+						encodedFrames[frameIndex] = g711.EncodeAlaw(pcm)
+					}
+				}
+
+				expectedEncoded := append([][]byte(nil), encodedFrames...)
+				if testCase.expectLoss {
+					silenceByte := byte(0xFF)
+					if codec.Name == sip_runtime.CodecPCMA.Name {
+						silenceByte = 0xD5
+					}
+					expectedEncoded[1] = bytes.Repeat([]byte{silenceByte}, samplesPerFrame)
+				}
+
+				reference := resampler_soxr.New(resampler_soxr.WithQuickQuality())
+				expectedPCM := make([][]byte, len(expectedEncoded))
+				for frameIndex, encoded := range expectedEncoded {
+					expectedPCM[frameIndex], err = reference.Resample(
+						decodeG711ToLinear8k(encoded, codec.Name),
+						Linear8kConfig,
+						Rapida16kConfig,
+					)
+					require.NoError(t, err)
+				}
+
+				for _, frameIndex := range testCase.sendOrder {
+					packet := &rtp.Packet{
+						Header: rtp.Header{
+							Version:        2,
+							PayloadType:    codec.PayloadType,
+							SequenceNumber: uint16(100 + frameIndex),
+							Timestamp:      uint32(frameIndex * samplesPerFrame),
+							SSRC:           42,
+						},
+						Payload: encodedFrames[frameIndex],
+					}
+					packetData, marshalErr := packet.Marshal()
+					require.NoError(t, marshalErr)
+					_, writeErr := sender.WriteToUDP(packetData, destination)
+					require.NoError(t, writeErr)
+				}
+
+				for frameIndex, expected := range expectedPCM {
+					select {
+					case audio := <-pipelineAudio:
+						require.Equalf(t, expected, audio, "pipeline frame %d", frameIndex)
+					case <-time.After(time.Second):
+						t.Fatalf("timed out waiting for pipeline frame %d", frameIndex)
+					}
+					select {
+					case audio := <-recordingAudio:
+						require.Equalf(t, expected, audio, "recording frame %d", frameIndex)
+					case <-time.After(time.Second):
+						t.Fatalf("timed out waiting for recording frame %d", frameIndex)
+					}
+				}
+
+				stats := receiver.GetDetailedStats()
+				assert.Equal(t, testCase.packetsReceived, stats.PacketsReceived)
+				assert.Equal(t, uint64(len(expectedPCM)), stats.PacketsDelivered)
+				if testCase.expectLoss {
+					assert.Equal(t, uint64(1), stats.PacketsLost)
+				} else {
+					assert.Zero(t, stats.PacketsLost)
+				}
+				assert.Zero(t, stats.PacketsDropped)
+				assert.Zero(t, stats.InvalidPackets)
+			})
+		}
+	}
+}
+
 func TestMediaPort_SeparatesRecognitionAndRecordingDelivery(tester *testing.T) {
-	rtpHandler, audioIn, _ := newMediaPortTestRTP(tester)
+	rtpHandler, emitInboundAudio, _ := newMediaPortTestRTP(tester)
 	realtime := make(chan internal_type.Stream, 1)
 	recording := make(chan internal_type.Stream, 1)
 	mediaPort, err := NewMediaPort(MediaPortConfig{
@@ -113,7 +363,7 @@ func TestMediaPort_SeparatesRecognitionAndRecordingDelivery(tester *testing.T) {
 	mediaPort.StartInput()
 	tester.Cleanup(func() { require.NoError(tester, mediaPort.Close()) })
 
-	audioIn <- sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()}
+	emitInboundAudio(sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()})
 
 	select {
 	case stream := <-realtime:
@@ -131,17 +381,17 @@ func TestMediaPort_SeparatesRecognitionAndRecordingDelivery(tester *testing.T) {
 
 func TestMediaPort_PreservesRTPFrameReceivedAt(tester *testing.T) {
 	streams := make(chan internal_type.Stream, 4)
-	mediaPort, audioIn, _ := newMediaPortForTest(tester, func(stream internal_type.Stream) {
+	mediaPort, emitInboundAudio, _ := newMediaPortForTest(tester, func(stream internal_type.Stream) {
 		streams <- stream
 	})
 	mediaPort.StartInput()
 	tester.Cleanup(func() { require.NoError(tester, mediaPort.Close()) })
 
 	receivedAt := time.Unix(123, 456)
-	audioIn <- sip_runtime.InboundAudioFrame{
+	emitInboundAudio(sip_runtime.InboundAudioFrame{
 		Audio:      make([]byte, MulawFrameSize),
 		ReceivedAt: receivedAt,
-	}
+	})
 
 	for range 2 {
 		select {
@@ -173,7 +423,7 @@ func TestMediaPort_LocalAddrReturnsRTPAddress(t *testing.T) {
 
 func TestMediaPort_ProviderAudioRecordsBeforePipelineAudio(t *testing.T) {
 	streams := make(chan internal_type.Stream, 4)
-	mediaPort, audioIn, _ := newMediaPortForTest(t, func(stream internal_type.Stream) {
+	mediaPort, emitInboundAudio, _ := newMediaPortForTest(t, func(stream internal_type.Stream) {
 		streams <- stream
 	})
 
@@ -181,7 +431,7 @@ func TestMediaPort_ProviderAudioRecordsBeforePipelineAudio(t *testing.T) {
 	defer func() { require.NoError(t, mediaPort.Close()) }()
 
 	for i := 0; i < 2; i++ {
-		audioIn <- sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()}
+		emitInboundAudio(sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()})
 	}
 
 	var bridgeUserAudioCount int
@@ -318,15 +568,15 @@ func TestMediaPort_TransferModeSuppressesAssistantAudio(t *testing.T) {
 
 func TestMediaPort_InterruptPreservesInputAudio(t *testing.T) {
 	streams := make(chan internal_type.Stream, 8)
-	mediaPort, audioIn, _ := newMediaPortForTest(t, func(stream internal_type.Stream) {
+	mediaPort, emitInboundAudio, _ := newMediaPortForTest(t, func(stream internal_type.Stream) {
 		streams <- stream
 	})
 
 	mediaPort.Start()
 	defer func() { require.NoError(t, mediaPort.Close()) }()
-	audioIn <- sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()}
+	emitInboundAudio(sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()})
 	mediaPort.HandleInterrupt()
-	audioIn <- sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()}
+	emitInboundAudio(sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()})
 
 	receivedAudioCount := 0
 	require.Eventually(t, func() bool {
@@ -349,7 +599,7 @@ func TestMediaPort_InterruptPreservesInputAudio(t *testing.T) {
 
 func TestMediaPort_ConnectTransferMediaForwardsCallerAudio(t *testing.T) {
 	streams := make(chan internal_type.Stream, 1)
-	mediaPort, audioIn, _ := newMediaPortForTest(t, func(stream internal_type.Stream) {
+	mediaPort, emitInboundAudio, _ := newMediaPortForTest(t, func(stream internal_type.Stream) {
 		streams <- stream
 	})
 	bridgeRTP, _, bridgeAudioOut := newMediaPortTestRTP(t)
@@ -357,7 +607,7 @@ func TestMediaPort_ConnectTransferMediaForwardsCallerAudio(t *testing.T) {
 	mediaPort.Start()
 	defer func() { require.NoError(t, mediaPort.Close()) }()
 	mediaPort.ConnectTransferMedia(bridgeRTP, sip_runtime.CodecPCMU.Name)
-	audioIn <- sip_runtime.InboundAudioFrame{Audio: []byte{0x01, 0x02, 0x03}, ReceivedAt: time.Now()}
+	emitInboundAudio(sip_runtime.InboundAudioFrame{Audio: []byte{0x01, 0x02, 0x03}, ReceivedAt: time.Now()})
 
 	select {
 	case frame := <-bridgeAudioOut:

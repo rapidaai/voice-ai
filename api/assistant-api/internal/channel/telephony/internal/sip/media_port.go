@@ -4,11 +4,10 @@
 // Licensed under GPL-2.0 with Rapida Additional Terms.
 // See LICENSE.md or contact sales@rapida.ai for commercial usage.
 
-package internal_sip
+package internal_sip_telephony
 
 import (
 	"context"
-	"errors"
 	"sync/atomic"
 
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
@@ -18,7 +17,6 @@ import (
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type MediaPortConfig struct {
@@ -27,7 +25,7 @@ type MediaPortConfig struct {
 	Session    *sip_runtime.Session
 	RTPHandler rtpHandler
 	StreamSink func(internal_type.Stream)
-	Record     func(...observability.Record) error
+	RecordSink func(...observability.Record) error
 }
 
 type MediaPort struct {
@@ -75,14 +73,14 @@ func NewMediaPort(config MediaPortConfig) (*MediaPort, error) {
 		session:    config.Session,
 		rtpHandler: rtpHandler,
 		streamSink: config.StreamSink,
-		record:     config.Record,
+		record:     config.RecordSink,
 		ctx:        ctx,
 		cancel:     cancel,
 	}
 	mediaPort.audioProcessor = NewAudioProcessor(AudioProcessorConfig{
 		RTPHandler: rtpHandler,
 		Logger:     config.Logger,
-		Record:     config.Record,
+		Record:     config.RecordSink,
 		Ringtone:   DefaultRingtone,
 		Ambient:    resolveAmbientConfig(config.Session),
 	})
@@ -92,7 +90,7 @@ func NewMediaPort(config MediaPortConfig) (*MediaPort, error) {
 		MediaEngine: mediaPort.audioProcessor,
 		StreamSink:  config.StreamSink,
 		OutputSink:  mediaPort.deliverAssistantFrame,
-		Record:      config.Record,
+		Record:      config.RecordSink,
 	})
 	return mediaPort, nil
 }
@@ -131,7 +129,7 @@ func (port *MediaPort) StartInput() {
 	if !port.inputStarted.CompareAndSwap(false, true) {
 		return
 	}
-	go port.forwardIncomingAudio()
+	port.rtpHandler.SetInboundAudioSink(port.handleIncomingAudio)
 }
 
 // StartOutput enables paced assistant audio delivery to RTP.
@@ -163,6 +161,7 @@ func (port *MediaPort) Close() error {
 	if !port.closed.CompareAndSwap(false, true) {
 		return nil
 	}
+	port.rtpHandler.SetInboundAudioSink(nil)
 	port.stopRingback(false)
 	if port.mediaSession != nil {
 		port.mediaSession.Shutdown()
@@ -268,41 +267,30 @@ func (port *MediaPort) CodecName() string {
 	return port.rtpHandler.GetCodec().Name
 }
 
-func (port *MediaPort) forwardIncomingAudio() {
-	if port == nil || port.rtpHandler == nil {
+func (port *MediaPort) handleIncomingAudio(frame sip_runtime.InboundAudioFrame) {
+	if port == nil || port.closed.Load() {
 		return
 	}
-	audioIn := port.rtpHandler.AudioIn()
-	for {
-		select {
-		case <-port.ctx.Done():
-			return
-		case frame, ok := <-audioIn:
-			if !ok {
-				return
-			}
-			if port.audioProcessor.ForwardUserAudio(frame.Audio) {
-				continue
-			}
-			if port.transferActive.Load() {
-				continue
-			}
-			if err := port.mediaSession.HandleProviderAudioFrame(internal_telephony_media.ProviderAudioFrame{
-				Audio:      frame.Audio,
-				ReceivedAt: frame.ReceivedAt,
-			}); err != nil && port.record != nil {
-				_ = port.record(observability.RecordLog{
-					Level:   observability.LevelError,
-					Message: "SIP provider audio processing failed",
-					Attributes: observability.Attributes{
-						"component": observability.ComponentCall.String(),
-						"provider":  Provider,
-						"call_id":   port.session.GetCallID(),
-						"error":     err.Error(),
-					},
-				})
-			}
-		}
+	if port.audioProcessor.ForwardUserAudio(frame.Audio) {
+		return
+	}
+	if port.transferActive.Load() {
+		return
+	}
+	if err := port.mediaSession.HandleProviderAudioFrame(internal_telephony_media.ProviderAudioFrame{
+		Audio:      frame.Audio,
+		ReceivedAt: frame.ReceivedAt,
+	}); err != nil && port.record != nil {
+		_ = port.record(observability.RecordLog{
+			Level:   observability.LevelError,
+			Message: "SIP provider audio processing failed",
+			Attributes: observability.Attributes{
+				"component": observability.ComponentCall.String(),
+				"provider":  Provider,
+				"call_id":   port.session.GetCallID(),
+				"error":     err.Error(),
+			},
+		})
 	}
 }
 
@@ -310,26 +298,10 @@ func (port *MediaPort) deliverAssistantFrame(outputFrame internal_telephony_medi
 	if port == nil || port.closed.Load() {
 		return sip_runtime.ErrSessionClosed
 	}
-	providerAudio, err := port.audioProcessor.encodeAssistantOutputFrame(outputFrame.ProviderAudio)
-	if err != nil {
-		if port.record != nil {
-			_ = port.record(observability.RecordLog{
-				Level:   observability.LevelError,
-				Message: "SIP assistant audio encoding failed",
-				Attributes: observability.Attributes{
-					"component": observability.ComponentCall.String(),
-					"provider":  Provider,
-					"call_id":   port.session.GetCallID(),
-					"error":     err.Error(),
-				},
-			})
-		}
-		return err
-	}
-	if len(providerAudio) == 0 {
+	if len(outputFrame.ProviderAudio) == 0 {
 		return nil
 	}
-	if err := port.rtpHandler.EnqueueAudio(providerAudio); err != nil {
+	if err := port.rtpHandler.WriteAudio(outputFrame.ProviderAudio); err != nil {
 		if port.record != nil {
 			_ = port.record(observability.RecordLog{
 				Level:   observability.LevelError,
@@ -342,27 +314,10 @@ func (port *MediaPort) deliverAssistantFrame(outputFrame internal_telephony_medi
 				},
 			})
 		}
-		if errors.Is(err, sip_runtime.ErrRTPOutputQueueFull) {
-			return port.audioProcessor.rtpOutputQueueFullError()
-		}
 		return err
 	}
-	if outputFrame.Idle || len(outputFrame.ProviderAudio) == 0 {
+	if outputFrame.Idle || port.session.GetInfo().Direction != sip_runtime.CallDirectionInbound {
 		return nil
-	}
-	port.recordDeliveredAssistantAudio(outputFrame.ProviderAudio)
-	return nil
-}
-
-func (port *MediaPort) recordDeliveredAssistantAudio(assistantPCM16k []byte) {
-	if port.streamSink != nil {
-		port.streamSink(&protos.ConversationBridgeOperatorAudio{
-			Audio: assistantPCM16k,
-			Time:  timestamppb.Now(),
-		})
-	}
-	if port.session == nil || port.session.GetInfo().Direction != sip_runtime.CallDirectionInbound {
-		return
 	}
 	if port.session.MarkInboundFirstAssistantAudioSent() && port.record != nil {
 		_ = port.record(observability.RecordEvent{
@@ -376,6 +331,7 @@ func (port *MediaPort) recordDeliveredAssistantAudio(assistantPCM16k []byte) {
 			},
 		})
 	}
+	return nil
 }
 
 func (port *MediaPort) stopRingback(clearOutput bool) {

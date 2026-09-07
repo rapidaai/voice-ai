@@ -52,7 +52,7 @@ func TestInputRoutesBridgeAudioToLowPriority(tester *testing.T) {
 	defer streamer.Cancel()
 	streamer.Input(&protos.ConversationBridgeUserAudio{Audio: []byte{1, 2}})
 	streamer.Input(&protos.ConversationBridgeOperatorAudio{Audio: []byte{3, 4}})
-	require.Empty(tester, streamer.InputCh)
+	require.Zero(tester, streamer.InputCh.Len())
 	require.Len(tester, streamer.LowCh, 2)
 }
 
@@ -74,7 +74,7 @@ func TestNewBaseStreamerInitializesDefaultTransportChannels(t *testing.T) {
 
 	streamer := New(WithLogger(logger))
 
-	assert.Equal(t, defaultInputChannelCapacity, cap(streamer.InputCh))
+	assert.Equal(t, defaultInputChannelCapacity, streamer.InputCh.Capacity())
 	assert.Equal(t, defaultOutputChannelCapacity, cap(streamer.OutputCh))
 }
 
@@ -86,7 +86,7 @@ func TestNewWithChannelCapacityOptionsInitializesTransportChannels(t *testing.T)
 	assert.NotNil(t, streamer.Cancel)
 	assert.False(t, streamer.Closed)
 	assert.Equal(t, criticalChannelCapacity, cap(streamer.CriticalCh))
-	assert.Equal(t, 2, cap(streamer.InputCh))
+	assert.Equal(t, 2, streamer.InputCh.Capacity())
 	assert.Equal(t, lowPriorityChannelCapacity, cap(streamer.LowCh))
 	assert.Equal(t, 2, cap(streamer.OutputCh))
 }
@@ -144,12 +144,9 @@ func TestInputRoutesNormalMessages(t *testing.T) {
 
 	streamer.Input(msg)
 
-	select {
-	case got := <-streamer.InputCh:
-		assert.Same(t, msg, got)
-	default:
-		t.Fatal("expected message on InputCh")
-	}
+	got, err := streamer.InputCh.TryReceive()
+	require.NoError(t, err)
+	assert.Same(t, msg, got)
 }
 
 func TestRecvPrefersRealtimeInputOverLowPriority(t *testing.T) {

@@ -10,6 +10,7 @@ import (
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
+	"github.com/rapidaai/pkg/channel"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
@@ -248,11 +249,8 @@ func TestNew_RoutesBridgeRecordingOutsideRealtimeInput(t *testing.T) {
 		t.Fatal("timed out waiting for bridge recording")
 	}
 
-	select {
-	case message := <-streamer.InputCh:
-		t.Fatalf("recording must not occupy realtime input queue; got %T", message)
-	default:
-	}
+	message, err := streamer.InputCh.TryReceive()
+	require.ErrorIs(t, err, channel.ErrEmpty, "recording must not occupy realtime input queue; got %T", message)
 }
 
 func TestSend_ConversationDisconnection_RecordsEventAndClosesStreamer(t *testing.T) {

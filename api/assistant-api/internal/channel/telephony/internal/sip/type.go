@@ -4,7 +4,7 @@
 // Licensed under GPL-2.0 with Rapida Additional Terms.
 // See LICENSE.md or contact sales@rapida.ai for commercial usage.
 
-package internal_sip
+package internal_sip_telephony
 
 import (
 	"errors"
@@ -57,7 +57,6 @@ var (
 	ErrSIPServerNotRunning            = errors.New("SIP server not running")
 	ErrProviderAudioConversionFailed  = errors.New("audio conversion to 16kHz linear16 failed")
 	ErrAssistantAudioConversionFailed = errors.New("audio conversion to mulaw 8kHz failed")
-	ErrRTPOutputQueueFull             = sip_runtime.ErrRTPOutputQueueFull
 )
 
 type AudioProcessorConfig struct {
@@ -70,10 +69,7 @@ type AudioProcessorConfig struct {
 
 type rtpHandler interface {
 	internal_type.SIPRTPBridgeTarget
-	AudioIn() <-chan sip_runtime.InboundAudioFrame
-	ClearFallbackAudioSource()
-	FlushAudioOut()
 	GetCodec() *sip_runtime.Codec
 	LocalAddress() sip_runtime.RTPAddress
-	SetFallbackAudioSource(sip_runtime.RTPFallbackAudioSource)
+	SetInboundAudioSink(func(sip_runtime.InboundAudioFrame))
 }

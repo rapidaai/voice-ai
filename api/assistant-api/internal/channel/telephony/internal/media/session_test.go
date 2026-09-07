@@ -1,6 +1,7 @@
 package internal_telephony_media
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"sync/atomic"
@@ -476,5 +477,38 @@ func TestMediaSession_HandleInterrupt_ClearsAndSendsProviderClear(t *testing.T) 
 		}
 	case <-time.After(200 * time.Millisecond):
 		t.Fatal("timed out waiting clear record")
+	}
+}
+
+func TestMediaSession_HandleInterruptDropsFetchedOutputFrame(t *testing.T) {
+	mediaEngine := &fakeMediaEngine{outputFrames: make(chan AssistantOutputFrame, 1)}
+	mediaEngine.outputFrames <- AssistantOutputFrame{
+		ProviderAudio: []byte{1, 2},
+		BridgeAudio:   []byte{3, 4},
+	}
+	written := make(chan AssistantOutputFrame, 1)
+	mediaSession := NewMediaSession(MediaSessionConfig{
+		Context:     context.Background(),
+		MediaEngine: mediaEngine,
+		OutputSink: func(frame AssistantOutputFrame) error {
+			written <- frame
+			return nil
+		},
+	})
+
+	providerAudio := mediaSession.NextFrame()
+	if !bytes.Equal(providerAudio, []byte{1, 2}) {
+		t.Fatalf("provider audio=%v want=[1 2]", providerAudio)
+	}
+
+	mediaSession.HandleInterrupt()
+	if err := mediaSession.ConsumeFrame(providerAudio); err != nil {
+		t.Fatalf("consume interrupted frame: %v", err)
+	}
+
+	select {
+	case frame := <-written:
+		t.Fatalf("interrupted frame was written: %+v", frame)
+	default:
 	}
 }

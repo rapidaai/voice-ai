@@ -329,14 +329,11 @@ const (
 	rtpReadBufferSize           = 65536
 	rtpWriteBufferSize          = 65536
 	rtpPacketMaxSize            = 1500
-	rtpPacketInterval           = 20 * time.Millisecond
 	rtpDefaultPacketizationTime = 20 * time.Millisecond
 	rtpMinPacketizationTime     = 5 * time.Millisecond
 	rtpMaxPacketizationTime     = 60 * time.Millisecond
 	rtpMediaTimeoutInitial      = 30 * time.Second
 	rtpMediaTimeout             = 15 * time.Second
-	rtpAudioInBufferSize        = 100
-	rtpAudioOutBufferSize       = 100
 	rtpMediaTimeoutDisabledPark = time.Hour
 )
 
@@ -361,18 +358,6 @@ const (
 	rtpInputMaxLossGap                = 500 * time.Millisecond
 	rtpInputMaxSilenceGap             = 500 * time.Millisecond
 	rtpInputBufferedPacketMapCapacity = 5
-)
-
-// RTP inbound quality constants define rolling quality thresholds and labels.
-const (
-	rtpInboundQualityWindow       = 5 * time.Second
-	rtpInboundQualityGoodLossRate = 0.05
-	rtpInboundQualityPoorLossRate = 0.12
-	rtpInboundQualityUnknown      = "unknown"
-	rtpInboundQualityExcellent    = "excellent"
-	rtpInboundQualityGood         = "good"
-	rtpInboundQualityPoor         = "poor"
-	rtpInboundQualityLost         = "lost"
 )
 
 // RTCP constants define companion port behavior, reporting cadence, and unit conversion.

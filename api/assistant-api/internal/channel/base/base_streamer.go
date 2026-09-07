@@ -10,11 +10,13 @@ package channel_base
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
 
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/channel"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -36,7 +38,7 @@ type BaseStreamer struct {
 	Cancel     context.CancelFunc
 	Closed     bool
 	CriticalCh chan internal_type.Stream
-	InputCh    chan internal_type.Stream
+	InputCh    *channel.Channel[internal_type.Stream]
 	LowCh      chan internal_type.Stream
 	OutputCh   chan internal_type.Stream
 }
@@ -88,12 +90,19 @@ func New(opts ...Option) BaseStreamer {
 		options.outputChannelCapacity = defaultOutputChannelCapacity
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	inputCh, err := channel.New[internal_type.Stream](channel.Config{
+		CapacityPolicy: channel.FixedCapacity(options.inputChannelCapacity),
+		OverflowPolicy: channel.ReplaceOldestWhenFull,
+	})
+	if err != nil {
+		panic(err)
+	}
 	return BaseStreamer{
 		Logger:     options.logger,
 		Ctx:        ctx,
 		Cancel:     cancel,
 		CriticalCh: make(chan internal_type.Stream, criticalChannelCapacity),
-		InputCh:    make(chan internal_type.Stream, options.inputChannelCapacity),
+		InputCh:    inputCh,
 		LowCh:      make(chan internal_type.Stream, lowPriorityChannelCapacity),
 		OutputCh:   make(chan internal_type.Stream, options.outputChannelCapacity),
 	}
@@ -141,25 +150,12 @@ func (s *BaseStreamer) Input(msg internal_type.Stream) {
 		return
 	}
 
-	var dropped internal_type.Stream
-	select {
-	case s.InputCh <- msg:
+	result, err := s.InputCh.Send(s.Ctx, msg)
+	if err != nil {
 		return
-	default:
 	}
-	select {
-	case dropped = <-s.InputCh:
-	default:
-	}
-	select {
-	case s.InputCh <- msg:
-	default:
-		if s.Logger != nil {
-			s.Logger.Warnw("Input channel full, dropping latest audio", "type", fmt.Sprintf("%T", msg))
-		}
-	}
-	if dropped != nil && s.Logger != nil {
-		s.Logger.Warnw("Input channel full, dropping oldest audio", "type", fmt.Sprintf("%T", dropped))
+	if result.Status == channel.ReplacedOldest && s.Logger != nil {
+		s.Logger.Warnw("Input channel full, replacing oldest audio", "type", fmt.Sprintf("%T", result.Discarded))
 	}
 }
 
@@ -201,13 +197,12 @@ func (s *BaseStreamer) Recv() (internal_type.Stream, error) {
 		default:
 		}
 
-		select {
-		case msg, ok := <-s.InputCh:
-			if !ok {
-				return nil, io.EOF
-			}
+		msg, err := s.InputCh.TryReceive()
+		if err == nil {
 			return msg, nil
-		default:
+		}
+		if errors.Is(err, channel.ErrClosed) {
+			return nil, io.EOF
 		}
 
 		select {
@@ -216,11 +211,8 @@ func (s *BaseStreamer) Recv() (internal_type.Stream, error) {
 				return nil, io.EOF
 			}
 			return msg, nil
-		case msg, ok := <-s.InputCh:
-			if !ok {
-				return nil, io.EOF
-			}
-			return msg, nil
+		case <-s.InputCh.Ready():
+			continue
 		case msg, ok := <-s.LowCh:
 			if !ok {
 				return nil, io.EOF

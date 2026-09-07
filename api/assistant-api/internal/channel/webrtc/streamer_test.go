@@ -2229,7 +2229,9 @@ func TestAudioBuffer_InputEmitsBridgeAudioAndFramedUserAudio(t *testing.T) {
 	assert.Equal(t, audio, bridgeAudio.GetAudio())
 	assert.Equal(t, inputAudioReceivedAt, bridgeAudio.GetTime().AsTime())
 
-	userAudio, ok := (<-s.InputCh).(*protos.ConversationUserMessage)
+	stream, err := s.InputCh.Receive(t.Context())
+	require.NoError(t, err)
+	userAudio, ok := stream.(*protos.ConversationUserMessage)
 	require.True(t, ok)
 	assert.Equal(t, audio, userAudio.GetAudio())
 	assert.Equal(t, inputAudioReceivedAt, userAudio.GetTime().AsTime())

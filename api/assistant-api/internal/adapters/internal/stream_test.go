@@ -73,9 +73,9 @@ func TestOnCallCompletionReportsCleanup(tester *testing.T) {
 	}
 	requestor.assistantConversation.Id = 42
 	requestor.OnCallCompletion(time.Now())
-	require.Len(tester, channels.BackgroundChannel(), 2)
-	<-channels.BackgroundChannel()
-	packet, ok := (<-channels.BackgroundChannel()).Pkt.(internal_type.ObservabilityEventRecordPacket)
+	require.Equal(tester, 2, channels.BackgroundChannel().Len())
+	_ = receiveEnvelope(tester, channels.BackgroundChannel())
+	packet, ok := receiveEnvelope(tester, channels.BackgroundChannel()).Pkt.(internal_type.ObservabilityEventRecordPacket)
 	require.True(tester, ok)
 	require.Equal(tester, "0", packet.Record.Attributes["messages"])
 }
@@ -108,7 +108,7 @@ func TestOnCallCompletion_EmitsConversationDurationInMilliseconds(t *testing.T) 
 
 	r.OnCallCompletion(time.Now().Add(-2 * time.Second))
 
-	envelope := <-r.channels.BackgroundChannel()
+	envelope := receiveEnvelope(t, r.channels.BackgroundChannel())
 	packet, ok := envelope.Pkt.(internal_type.ObservabilityMetricRecordPacket)
 	require.True(t, ok)
 
@@ -176,12 +176,12 @@ func TestTalk_BuffersPacketsBeforeInitialization(t *testing.T) {
 
 	err := r.Talk(context.Background(), nil)
 	require.NoError(t, err)
-	assert.Equal(t, 0, len(r.channels.ControlChannel()))
-	assert.Equal(t, 1, len(r.channels.BootstrapChannel()))
-	assert.Equal(t, 1, len(r.channels.IngressChannel()))
-	assert.Equal(t, 0, len(r.channels.EgressChannel()))
-	assert.Equal(t, 0, len(r.channels.DataChannel()))
-	assert.Equal(t, 3, len(r.channels.BackgroundChannel()))
+	assert.Equal(t, 0, r.channels.ControlChannel().Len())
+	assert.Equal(t, 1, r.channels.BootstrapChannel().Len())
+	assert.Equal(t, 1, r.channels.IngressChannel().Len())
+	assert.Equal(t, 0, r.channels.EgressChannel().Len())
+	assert.Equal(t, 0, r.channels.DataChannel().Len())
+	assert.Equal(t, 3, r.channels.BackgroundChannel().Len())
 	assert.Equal(t, 0, len(streamer.modes))
 }
 

@@ -4,7 +4,7 @@
 // Licensed under GPL-2.0 with Rapida Additional Terms.
 // See LICENSE.md or contact sales@rapida.ai for commercial usage.
 
-package internal_sip
+package internal_sip_telephony
 
 import (
 	"bytes"
@@ -20,6 +20,7 @@ import (
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
 	resampler_soxr "github.com/rapidaai/api/assistant-api/internal/audio/resampler/soxr"
+	internal_telephony_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
@@ -90,6 +91,34 @@ type mockAmbientMixer struct {
 	err error
 }
 
+type blockingFrameBuffer struct {
+	buffer  internal_telephony_output.FrameBuffer
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (b *blockingFrameBuffer) Write(data []byte) {
+	close(b.entered)
+	<-b.release
+	b.buffer.Write(data)
+}
+
+func (b *blockingFrameBuffer) Next(frameSize int) ([]byte, bool) {
+	return b.buffer.Next(frameSize)
+}
+
+func (b *blockingFrameBuffer) Complete(frameSize int, padByte byte) {
+	b.buffer.Complete(frameSize, padByte)
+}
+
+func (b *blockingFrameBuffer) Clear() {
+	b.buffer.Clear()
+}
+
+func (b *blockingFrameBuffer) Len() int {
+	return b.buffer.Len()
+}
+
 func (m *mockAmbientMixer) Configure(internal_ambient.Config) error { return nil }
 func (m *mockAmbientMixer) Mix(primary []byte) ([]byte, error) {
 	if m.err != nil {
@@ -128,9 +157,8 @@ func (r *pushRecorder) get() []internal_type.Stream {
 
 type fakeRTPHandler struct {
 	codec        *sip_runtime.Codec
-	audioIn      chan sip_runtime.InboundAudioFrame
+	inboundSink  func(sip_runtime.InboundAudioFrame)
 	audioOut     chan []byte
-	fallback     sip_runtime.RTPFallbackAudioSource
 	localAddress sip_runtime.RTPAddress
 }
 
@@ -140,35 +168,29 @@ func newTestRTPHandler(codec *sip_runtime.Codec) *fakeRTPHandler {
 	}
 	return &fakeRTPHandler{
 		codec:    codec,
-		audioIn:  make(chan sip_runtime.InboundAudioFrame, 100),
 		audioOut: make(chan []byte, 100),
 	}
 }
 
-func (h *fakeRTPHandler) AudioIn() <-chan sip_runtime.InboundAudioFrame { return h.audioIn }
-func (h *fakeRTPHandler) GetCodec() *sip_runtime.Codec                  { return h.codec }
+func (h *fakeRTPHandler) SetInboundAudioSink(sink func(sip_runtime.InboundAudioFrame)) {
+	h.inboundSink = sink
+}
+
+func (h *fakeRTPHandler) emitInboundAudio(frame sip_runtime.InboundAudioFrame) {
+	if h.inboundSink != nil {
+		h.inboundSink(frame)
+	}
+}
+func (h *fakeRTPHandler) GetCodec() *sip_runtime.Codec { return h.codec }
 func (h *fakeRTPHandler) LocalAddress() sip_runtime.RTPAddress {
 	return h.localAddress
 }
-func (h *fakeRTPHandler) SetFallbackAudioSource(source sip_runtime.RTPFallbackAudioSource) {
-	h.fallback = source
-}
-func (h *fakeRTPHandler) ClearFallbackAudioSource() { h.fallback = nil }
-func (h *fakeRTPHandler) FlushAudioOut() {
-	for {
-		select {
-		case <-h.audioOut:
-		default:
-			return
-		}
-	}
-}
-func (h *fakeRTPHandler) EnqueueAudio(audio []byte) error {
+func (h *fakeRTPHandler) WriteAudio(audio []byte) error {
 	select {
 	case h.audioOut <- audio:
 		return nil
 	default:
-		return sip_runtime.ErrRTPOutputQueueFull
+		return errors.New("test RTP audio sink full")
 	}
 }
 
@@ -334,7 +356,11 @@ func TestProcessProviderAudioFrame_ResamplerError(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestProcessAssistantAudio_BuffersAssistantPCM16kFrames(t *testing.T) {
-	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{})
+	providerAudio := make([]byte, MulawFrameSize*2)
+	for index := range providerAudio {
+		providerAudio[index] = byte(index)
+	}
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{out: providerAudio})
 	proc.ambientMixer = nil
 
 	audio := make([]byte, BridgeOutputFrameSize*2)
@@ -346,13 +372,13 @@ func TestProcessAssistantAudio_BuffersAssistantPCM16kFrames(t *testing.T) {
 
 	firstFrame, ok := proc.NextOutputFrame()
 	require.True(t, ok)
-	assert.Equal(t, audio[:BridgeOutputFrameSize], firstFrame.ProviderAudio)
-	assert.Empty(t, firstFrame.BridgeAudio)
+	assert.Equal(t, providerAudio[:MulawFrameSize], firstFrame.ProviderAudio)
+	assert.Equal(t, audio[:BridgeOutputFrameSize], firstFrame.BridgeAudio)
 
 	secondFrame, ok := proc.NextOutputFrame()
 	require.True(t, ok)
-	assert.Equal(t, audio[BridgeOutputFrameSize:], secondFrame.ProviderAudio)
-	assert.Empty(t, secondFrame.BridgeAudio)
+	assert.Equal(t, providerAudio[MulawFrameSize:], secondFrame.ProviderAudio)
+	assert.Equal(t, audio[BridgeOutputFrameSize:], secondFrame.BridgeAudio)
 }
 
 func TestProcessAssistantAudio_BridgeActiveDoesNotRecordNormalOutput(t *testing.T) {
@@ -380,15 +406,6 @@ func TestProcessAssistantAudio_TransferActiveDoesNotRecordNormalOutput(t *testin
 	assert.Empty(t, outputFrame.BridgeAudio)
 }
 
-func TestEncodeAssistantOutputFrame_PCMAConvertsToAlaw(t *testing.T) {
-	resampledAudio := []byte{0xFF, 0x7F}
-	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMA, &mockResampler{out: resampledAudio})
-
-	providerAudio, err := proc.encodeAssistantOutputFrame(make([]byte, BridgeOutputFrameSize))
-	require.NoError(t, err)
-	assert.Equal(t, internal_audio.UlawToAlaw(resampledAudio), providerAudio)
-}
-
 func TestConvertOutputAudio_PCMAConvertsResampledMulaw(t *testing.T) {
 	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMA, &mockResampler{out: []byte{0xFF, 0x7F}})
 
@@ -397,16 +414,20 @@ func TestConvertOutputAudio_PCMAConvertsResampledMulaw(t *testing.T) {
 	assert.Equal(t, internal_audio.UlawToAlaw([]byte{0xFF, 0x7F}), convertedAudio)
 }
 
-func TestEncodeAssistantOutputFrame_ResamplerError(t *testing.T) {
+func TestProcessAssistantAudio_ResamplerError(t *testing.T) {
 	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{err: errors.New("fail")})
 
-	_, err := proc.encodeAssistantOutputFrame(make([]byte, BridgeOutputFrameSize))
+	err := proc.ProcessAssistantAudio(make([]byte, BridgeOutputFrameSize), false)
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, ErrAssistantAudioConversionFailed))
 }
 
 func TestProcessAssistantAudio_NextOutputFrameKeepsPipelineAudio(t *testing.T) {
-	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{})
+	providerAudio := make([]byte, MulawFrameSize)
+	for index := range providerAudio {
+		providerAudio[index] = byte(index)
+	}
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{out: providerAudio})
 	proc.ambientMixer = nil
 
 	assistantAudio := make([]byte, BridgeOutputFrameSize)
@@ -418,9 +439,51 @@ func TestProcessAssistantAudio_NextOutputFrameKeepsPipelineAudio(t *testing.T) {
 	outputFrame, ok := proc.NextOutputFrame()
 	require.True(t, ok)
 
-	assert.Equal(t, assistantAudio, outputFrame.ProviderAudio)
-	assert.Empty(t, outputFrame.BridgeAudio)
+	assert.Equal(t, providerAudio, outputFrame.ProviderAudio)
+	assert.Equal(t, assistantAudio, outputFrame.BridgeAudio)
 	assert.False(t, outputFrame.Idle)
+}
+
+func TestProcessAssistantAudio_NextOutputFrameWaitsForPairedBuffers(t *testing.T) {
+	providerAudio := bytes.Repeat([]byte{0x7F}, MulawFrameSize)
+	assistantAudio := bytes.Repeat([]byte{0x35}, BridgeOutputFrameSize)
+	processor := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{out: providerAudio})
+	processor.ambientMixer = nil
+	blockedBridge := &blockingFrameBuffer{
+		buffer:  internal_telephony_output.NewBytesFrameBuffer(BridgeOutputFrameSize),
+		entered: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+	processor.bridgeOutputBuffer = blockedBridge
+
+	writeDone := make(chan error, 1)
+	go func() {
+		writeDone <- processor.ProcessAssistantAudio(assistantAudio, false)
+	}()
+	<-blockedBridge.entered
+
+	type outputResult struct {
+		frame internal_telephony_media.AssistantOutputFrame
+		ok    bool
+	}
+	outputDone := make(chan outputResult, 1)
+	go func() {
+		frame, ok := processor.NextOutputFrame()
+		outputDone <- outputResult{frame: frame, ok: ok}
+	}()
+
+	select {
+	case result := <-outputDone:
+		t.Fatalf("output returned before paired bridge write completed: %+v", result)
+	case <-time.After(25 * time.Millisecond):
+	}
+
+	close(blockedBridge.release)
+	require.NoError(t, <-writeDone)
+	result := <-outputDone
+	require.True(t, result.ok)
+	assert.Equal(t, providerAudio, result.frame.ProviderAudio)
+	assert.Equal(t, assistantAudio, result.frame.BridgeAudio)
 }
 
 func TestIdleOutputFrame_SilentDuringTransfer(t *testing.T) {
@@ -440,10 +503,13 @@ func TestComplete_PadsPartialFrameWithLinearSilence(t *testing.T) {
 
 	outputFrame, ok := proc.NextOutputFrame()
 	require.True(t, ok)
-	require.Len(t, outputFrame.ProviderAudio, BridgeOutputFrameSize)
+	require.Len(t, outputFrame.ProviderAudio, MulawFrameSize)
 	assert.Equal(t, byte(0x01), outputFrame.ProviderAudio[0])
-	assert.Equal(t, byte(0x00), outputFrame.ProviderAudio[1])
-	assert.Equal(t, byte(0x00), outputFrame.ProviderAudio[len(outputFrame.ProviderAudio)-1])
+	assert.Equal(t, byte(MulawSilenceByte), outputFrame.ProviderAudio[1])
+	assert.Equal(t, byte(MulawSilenceByte), outputFrame.ProviderAudio[len(outputFrame.ProviderAudio)-1])
+	require.Len(t, outputFrame.BridgeAudio, BridgeOutputFrameSize)
+	assert.Equal(t, byte(0x01), outputFrame.BridgeAudio[0])
+	assert.Equal(t, byte(0x00), outputFrame.BridgeAudio[len(outputFrame.BridgeAudio)-1])
 }
 
 // ---------------------------------------------------------------------------
@@ -474,15 +540,6 @@ func TestClearOutputBuffer_DoesNotInterruptInputAudio(t *testing.T) {
 	inputFrame, err = proc.ProcessProviderAudioFrame(internal_telephony_media.ProviderAudioFrame{Audio: make([]byte, MulawFrameSize)})
 	require.NoError(t, err)
 	assert.Len(t, inputFrame.PipelineAudio, BridgeOutputFrameSize)
-}
-
-func TestRTPOutputQueueFullError_ReturnsStructuredError(t *testing.T) {
-	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{})
-
-	err := proc.rtpOutputQueueFullError()
-
-	require.Error(t, err)
-	assert.True(t, errors.Is(err, ErrRTPOutputQueueFull))
 }
 
 // ---------------------------------------------------------------------------
@@ -590,7 +647,7 @@ func TestForwardUserAudio_Backpressure_DropsAudio(t *testing.T) {
 	}
 }
 
-func TestForwardUserAudio_DoesNotRecordWhenBridgeRTPQueueFull(t *testing.T) {
+func TestForwardUserAudio_DoesNotRecordWhenBridgeWriteFails(t *testing.T) {
 	records := make(chan observability.Record, 2)
 	rtp := testRTPHandler(t, &sip_runtime.CodecPCMU)
 	proc := NewAudioProcessor(AudioProcessorConfig{
@@ -609,7 +666,7 @@ func TestForwardUserAudio_DoesNotRecordWhenBridgeRTPQueueFull(t *testing.T) {
 	proc.resamplers.bridgeOperator = resampler
 	bridgeRTP := testRTPHandler(t, &sip_runtime.CodecPCMU)
 	for i := 0; i < 100; i++ {
-		require.NoError(t, bridgeRTP.EnqueueAudio([]byte{byte(i)}))
+		require.NoError(t, bridgeRTP.WriteAudio([]byte{byte(i)}))
 	}
 	proc.ConnectTransferMedia(bridgeRTP, &sip_runtime.CodecPCMU, sip_runtime.CodecPCMU.Name)
 
@@ -624,7 +681,7 @@ func TestForwardUserAudio_DoesNotRecordWhenBridgeRTPQueueFull(t *testing.T) {
 	case record := <-records:
 		log, ok := record.(observability.RecordLog)
 		require.True(t, ok)
-		assert.Equal(t, "bridge_audio_out_full", log.Attributes["reason"])
+		assert.Equal(t, "bridge_audio_write_failed", log.Attributes["reason"])
 	case <-time.After(time.Second):
 		t.Fatal("expected observability record")
 	}
@@ -803,17 +860,22 @@ func TestConnectTransferMedia_PCMA_to_PCMU_Transcode(t *testing.T) {
 // Tests: Ringback
 // ---------------------------------------------------------------------------
 
-func TestRingback_UsesRTPFallbackSourceWithoutQueueProducer(t *testing.T) {
+func TestRingback_IsProducedByOutputPacer(t *testing.T) {
 	rtp := testRTPHandler(t, &sip_runtime.CodecPCMU)
 	proc := NewAudioProcessor(AudioProcessorConfig{
 		RTPHandler: rtp,
 	})
 
 	proc.StartRingback()
-	time.Sleep(60 * time.Millisecond)
-	assert.Equal(t, 0, rtpAudioOutLen(t, rtp))
+	proc.SetTransferActive(true)
+	frame, ok := proc.IdleOutputFrame()
+	require.True(t, ok)
+	assert.Len(t, frame.ProviderAudio, MulawFrameSize)
+	assert.True(t, frame.Idle)
 
 	proc.StopRingback()
+	_, ok = proc.IdleOutputFrame()
+	assert.False(t, ok)
 }
 
 // ---------------------------------------------------------------------------
