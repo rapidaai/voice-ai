@@ -1,0 +1,18 @@
+{
+  "rfc_file": "rfcs/0016-interruption-lifecycle.md",
+  "plan_file": "rfcs/0016-interruption-lifecycle/jsons/amendment-09-plan.json",
+  "rfc_sha256": "d722a3c6af3af7df155e028a84d34ccef3166a2928d3cf8d0fd64394e7d6b6f1",
+  "reviewed_plan_sha256": "b0d38d110a6af0cacb47199cbd9f2ea2f4161209a2ecb4acde9805d0f1835cc5",
+  "reviewed_at": "2026-09-07T02:10:46Z",
+  "reviewer": "independent Codex documentation challenger",
+  "reviewer_agent_id": "01a075b4-7fbf-79c1-879b-33ffaf2d31cf",
+  "decision": "approved",
+  "approved": true,
+  "critical_findings": 0,
+  "major_findings": [],
+  "minor_findings": [
+    "The component sequence labels the decision COMMIT instead of TurnChangePacket, while still clearly separating commitment from context propagation."
+  ],
+  "implementation_authorized": false,
+  "next_action": "Create and approve the exact-digest confirmation gate before committing the documentation amendment."
+}

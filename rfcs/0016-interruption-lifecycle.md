@@ -24,6 +24,134 @@ flush are internal stream values consumed by each concrete streamer's existing `
 output loop. Streamers execute output controls but never classify speech, own timers, or
 change conversation context.
 
+## Flow Diagrams
+
+### Interruption Decision
+
+```text
+ [Assistant output active]
+             |
+             v
+      [VAD speech start]
+             |
+             v
+ [Create one candidate]
+ [PauseOutput]
+ [Start STT boundary]
+ [Start 500 ms timer]
+             |
+             +-- meaningful STT -----------------------> [COMMIT]
+             |
+             +-- empty or filler STT ------------------> [WAIT]
+             |                                             |
+             |                                             +-- keep candidate open
+             |
+             +-- deadline and VAD active --------------> [COMMIT]
+             |
+             +-- deadline and VAD ended ---------------> [CONTINUE]
+
+ [COMMIT]
+     |
+     v
+ [FlushOutput]
+     |
+     v
+ [Discard old buffered audio]
+     |
+     v
+ [Rotate conversation context]
+     |
+     v
+ [Interrupt old EOS, TTS, and LLM work]
+     |
+     v
+ [Propagate the new context]
+     |
+     v
+ [Replay held STT with the new context ID]
+
+ [CONTINUE]
+     |
+     v
+ [ContinueOutput]
+     |
+     v
+ [Resume buffered assistant audio]
+     |
+     v
+ [Close candidate without changing the turn]
+```
+
+### Unclear Input
+
+```text
+ [Interruption committed]
+             |
+             v
+ [Meaningful interim STT received?]
+       |                    |
+      no                   yes
+       |                    |
+       v                    v
+ [Do not start]     [Start unclear-input watchdog]
+                            |
+                            v
+                    [Wait for STT or timeout]
+                            |
+              +-- meaningful interim --> [Extend timeout]
+              |                                  |
+              |                                  +-- return to wait
+              |
+              +-- usable final --------> [Stop watchdog]
+              |                                  |
+              |                                  v
+              |                            [Normal turn]
+              |
+              +-- timeout -------------> [Validate context
+                                           and generation]
+                                                  |
+                                      +-----------+-----------+
+                                      |                       |
+                                   current                  stale
+                                      |                       |
+                                      v                       v
+                              [Rotate context and          [Discard]
+                               speak unclear prompt]
+
+ VAD-only, empty, and filler-only input never starts the watchdog.
+```
+
+### Component Sequence
+
+```text
+                    COMPONENT MESSAGE SEQUENCE
+                    ==========================
+
+ VAD          Dispatch          Streamer          STT        EOS/TTS/LLM
+  |              |                  |              |              |
+  |-- start ---->|                  |              |              |
+  |              |-- PauseOutput -->|              |              |
+  |              |-- STT start ------------------->|              |
+  |              |                  |              |              |
+  |              |        [500 ms decision window]                |
+  |              |                  |              |              |
+  |              |<-- transcript ------------------|              |
+  |              |                  |              |              |
+  |              |  COMMIT: meaningful STT, or VAD active         |
+  |              |          at the 500 ms deadline                |
+  |              |-- FlushOutput -->|                              |
+  |              |-- rotate context                                |
+  |              |-- interrupt ----------------------------------->|
+  |              |-- propagate new context ----------------------->|
+  |              |-- replay held STT ------------------------------>|
+  |              |                                                 |
+  |              |  CONTINUE: VAD ended without meaningful STT     |
+  |              |            at the 500 ms deadline               |
+  |              |-- ContinueOutput -->|   (false interruption)    |
+  |              |                  |                               |
+  |              |                  |-- resume buffered audio       |
+```
+
 ## Context
 
 Today `InterruptionDetectedPacket` can rotate context and interrupt TTS and LLM directly
@@ -370,6 +498,9 @@ On 2026-09-07 the maintainer added the existing unclear-input behavior to the fi
 dispatch slice. Meaningful interim STT starts or extends that watchdog after committing
 the turn; usable final STT stops it; VAD-only, empty, and filler-only activity never starts
 it. This amendment supersedes the prior confirmation gate and requires a new challenge.
+On 2026-09-07 the maintainer requested ASCII diagrams of the accepted interruption,
+unclear-input, and component-sequence flows. This documentation-only amendment changes no
+runtime decision, ownership boundary, timing rule, or implementation scope.
 
 ## Artifact Index
 
@@ -387,6 +518,7 @@ it. This amendment supersedes the prior confirmation gate and requires a new cha
 - `jsons/amendment-07-plan.json`: current implementation plan.
 - `jsons/escalation-resolution-06.json`: unclear-input trigger decision.
 - `jsons/amendment-08-plan.json`: current dispatch-first implementation plan.
+- `jsons/amendment-09-plan.json`: documentation-only ASCII diagram amendment.
 - `jsons/transport-inventory.json`: concrete output ownership inventory.
 - `jsons/understanding.json`: current code evidence.
 - `jsons/reservation.json`: RFC reservation.
@@ -404,3 +536,4 @@ it. This amendment supersedes the prior confirmation gate and requires a new cha
 | 2026-09-06 | Stop after the corrected design still has four blocking findings | Independent challenger | `jsons/challenge-05.json` |
 | 2026-09-06 | Select one serialized transcript gate with filler classification and no utterance IDs | Repository maintainer | `jsons/escalation-resolution-05.json` |
 | 2026-09-07 | Start unclear-input timeout only after meaningful interim commits and no usable final follows | Repository maintainer | `jsons/escalation-resolution-06.json` |
+| 2026-09-07 | Add ASCII decision, unclear-input, and component-sequence diagrams without changing behavior | Repository maintainer | `jsons/amendment-09-plan.json` |
