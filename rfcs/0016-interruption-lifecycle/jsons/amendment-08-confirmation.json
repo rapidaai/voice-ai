@@ -1,0 +1,15 @@
+{
+  "challenge_receipt_sha256": "8276f7306558ba79e5a9722d7cff6a04cc27f228761e1dd3cd9706a230aab97b",
+  "challenge_reviewed_at": "2026-09-07T00:38:04Z",
+  "challenge_reviewer": "independent Orca runtime challenger",
+  "challenge_task_id": "task_06fe9af36642",
+  "confirmed_sha256": "16b02169733f70d12d4b175437f4790dfc3a43708b28695f224f8acae5f8d254",
+  "created_at": "2026-09-07T00:41:14Z",
+  "gate_id": "gate_993f5715141e",
+  "question": "Approve implementation of RFC rfcs/0016-interruption-lifecycle.md with SHA-256 16b02169733f70d12d4b175437f4790dfc3a43708b28695f224f8acae5f8d254 after approved challenge task task_06fe9af36642 with receipt SHA-256 8276f7306558ba79e5a9722d7cff6a04cc27f228761e1dd3cd9706a230aab97b?",
+  "resolution": "approved",
+  "resolved_at": "2026-09-07T00:49:59Z",
+  "rfc_file": "rfcs/0016-interruption-lifecycle.md",
+  "run_id": "run_94aeb7c54726",
+  "task_id": "task_c219c1a23a82"
+}

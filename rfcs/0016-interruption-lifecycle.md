@@ -3,7 +3,7 @@
 - Status: Accepted
 - Owner: Assistant runtime coordinator
 - Created: 2026-09-06
-- Updated: 2026-09-06
+- Updated: 2026-09-07
 - Reviewers: Independent runtime challenger and repository maintainer
 
 ## Summary
@@ -169,6 +169,24 @@ surrounding punctuation is removed. Any other recognized token commits the inter
 Interim text may commit early. Filler-only interim text never continues early because a
 later result may add meaningful words.
 
+### Unclear Input After Confirmed Interruption
+
+The unclear-input watchdog is separate from the 500 millisecond interruption decision.
+It starts only after meaningful interim STT commits `TurnChangePacket`. It does not start
+for VAD-only activity, empty interim text, or filler-only text.
+
+| Event after meaningful interim commit | Watchdog action |
+| --- | --- |
+| Additional meaningful interim | Extend the existing unclear-input deadline |
+| Usable non-empty final STT | Stop the watchdog and continue normal EOS processing |
+| Empty final STT | Keep the watchdog active because no usable final was produced |
+| False interruption or filler-only overlap | Stop or never start the watchdog |
+| Session close | Cancel the watchdog |
+| Deadline expires before usable final STT | Inject the configured unclear-input message |
+
+The old assistant response remains flushed after a confirmed interruption. An unclear
+prompt is a new assistant response and must never resume the old buffered output.
+
 Direct user text and configured word-trigger interruption do not require a VAD candidate.
 They emit `TurnChangePacket` through the existing immediate path. Candidate validation is
 required only when the turn-change source is the VAD/STT overlap decision.
@@ -195,7 +213,7 @@ interruption decisions. Normal STT processing resumes for the current turn.
 ### Implementation Sequence
 
 1. Add internal output-control values and the serialized adapter interruption loop with
-   fake streamer tests that assert pause, continue, and turn-change ordering.
+   fake streamer tests that assert pause, continue, turn-change, and unclear-input ordering.
 2. Add pause, continue, and flush consumption to shared and concrete streamer output paths.
 3. Add conditional lifecycle transition and old model-result rejection.
 4. Run full verification and independent review before enabling the behavior.
@@ -223,6 +241,8 @@ enabled until all steps pass.
 - STT errors after VAD ended continue the paused output at the deadline.
 - Duplicate VAD, deadline, continue, flush, and turn-change events are harmless.
 - Candidate state and the loop-owned timer are released during session finalization.
+- An unclear-input expiry is ignored unless the current context still represents a
+  committed meaningful interim without a usable final transcript.
 
 ## Security and Privacy
 
@@ -273,6 +293,10 @@ Required adapter tests use a fake clock and recording streamer:
 - meaningful STT before the deadline emits one turn change.
 - filler-only STT followed by VAD end continues at the deadline.
 - active VAD at the deadline emits one turn change without STT.
+- meaningful interim starts the unclear-input watchdog only after turn change commits.
+- additional meaningful interim extends the watchdog and usable final STT stops it.
+- VAD-only, empty, and filler-only activity never starts the unclear-input watchdog.
+- unclear-input expiry speaks the configured prompt without resuming old output.
 - late deadline and late STT cannot affect the next turn.
 - a late verdict cannot reopen a closed candidate; timed transcripts before the active overlap are trimmed.
 - direct text and word-trigger interruption commit without a VAD candidate.
@@ -298,6 +322,9 @@ Run `just agent-finalize` with the exact changed paths after formatting.
 - [ ] The adapter chooses continue or turn change within 500 milliseconds.
 - [ ] Meaningful STT commits immediately; filler-only or empty ended speech continues at the deadline.
 - [ ] Active speech at the deadline commits without requiring STT.
+- [ ] The unclear-input watchdog starts only for a committed meaningful interim and stops
+  only after usable final STT or completed user input.
+- [ ] An unclear-input prompt never resumes the flushed assistant response.
 - [ ] `TurnChangePacket` is the only interruption commit.
 - [ ] Confirmed interruption flushes output and interrupts old TTS, LLM, and EOS work.
 - [ ] Held meaningful STT is replayed once into the new context.
@@ -339,6 +366,10 @@ accepted its documented fallback for untimed late provider events. This revision
 utterance identifiers, puts the timer and every candidate transition in one loop, keeps
 local output actions ordered inside that loop, and broadens scope for local EOS/TTS
 invalidation. A fresh exact-byte challenge is required before implementation.
+On 2026-09-07 the maintainer added the existing unclear-input behavior to the first
+dispatch slice. Meaningful interim STT starts or extends that watchdog after committing
+the turn; usable final STT stops it; VAD-only, empty, and filler-only activity never starts
+it. This amendment supersedes the prior confirmation gate and requires a new challenge.
 
 ## Artifact Index
 
@@ -354,6 +385,8 @@ invalidation. A fresh exact-byte challenge is required before implementation.
 - `jsons/amendment-06-plan.json`: superseded utterance-sequence implementation plan.
 - `jsons/escalation-resolution-05.json`: serialized transcript-gate decision and accepted residual risk.
 - `jsons/amendment-07-plan.json`: current implementation plan.
+- `jsons/escalation-resolution-06.json`: unclear-input trigger decision.
+- `jsons/amendment-08-plan.json`: current dispatch-first implementation plan.
 - `jsons/transport-inventory.json`: concrete output ownership inventory.
 - `jsons/understanding.json`: current code evidence.
 - `jsons/reservation.json`: RFC reservation.
@@ -370,3 +403,4 @@ invalidation. A fresh exact-byte challenge is required before implementation.
 | 2026-09-06 | Permit a private STT utterance sequence while keeping output controls identifier-free | Repository maintainer | `jsons/escalation-resolution-04.json` |
 | 2026-09-06 | Stop after the corrected design still has four blocking findings | Independent challenger | `jsons/challenge-05.json` |
 | 2026-09-06 | Select one serialized transcript gate with filler classification and no utterance IDs | Repository maintainer | `jsons/escalation-resolution-05.json` |
+| 2026-09-07 | Start unclear-input timeout only after meaningful interim commits and no usable final follows | Repository maintainer | `jsons/escalation-resolution-06.json` |
