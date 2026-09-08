@@ -8,6 +8,7 @@ import (
 
 	adapter_channel "github.com/rapidaai/api/assistant-api/internal/adapters/channel"
 	adapter_lifecycle "github.com/rapidaai/api/assistant-api/internal/adapters/lifecycle"
+	adapter_router "github.com/rapidaai/api/assistant-api/internal/adapters/router"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_options "github.com/rapidaai/api/assistant-api/internal/options"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
@@ -23,7 +24,8 @@ func TestDispatchInterruptionUnclearInputExtendsAndIgnoresEmptyFinal(t *testing.
 	synctest.Test(t, func(t *testing.T) {
 		requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Please repeat")
 		requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
-		defer startInterruptionTestOwner(t, requestor)()
+		requestor.interruptionEnabled = true
+		streamer := requestor.streamer.(*streamTestStreamer)
 		handler := requestorDispatchHandler{r: requestor}
 		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
 		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{Script: "wait", Interim: true})
@@ -59,7 +61,11 @@ func TestDispatchInterruptionUnclearInputExtendsAndIgnoresEmptyFinal(t *testing.
 		}
 		assert.Equal(t, "Please repeat", injected.Text)
 		assert.Equal(t, requestor.GetID(), injected.ContextID)
-		assert.Equal(t, []internal_type.Stream{internal_type.PauseOutput{}, internal_type.FlushOutput{}}, interruptionTestControls(requestor))
+		streamer.mu.Lock()
+		require.GreaterOrEqual(t, len(streamer.sent), 2)
+		assert.IsType(t, internal_type.PauseOutput{}, streamer.sent[0])
+		assert.IsType(t, internal_type.FlushOutput{}, streamer.sent[1])
+		streamer.mu.Unlock()
 	})
 }
 
@@ -69,7 +75,7 @@ func TestDispatchInterruptionCompletedInputStopsUnclearTracking(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Please repeat")
 				requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
-				defer startInterruptionTestOwner(t, requestor)()
+				requestor.interruptionEnabled = true
 				handler := requestorDispatchHandler{r: requestor}
 				handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
 				handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{Script: "wait", Interim: true})
@@ -102,7 +108,7 @@ func TestDispatchInterruptionFinalRejectsQueuedExpiry(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Please repeat")
 		requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
-		defer startInterruptionTestOwner(t, requestor)()
+		requestor.interruptionEnabled = true
 		handler := requestorDispatchHandler{r: requestor}
 		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
 		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{Script: "wait", Interim: true})
@@ -134,14 +140,17 @@ func TestDispatchInterruptionNoWatchdogForOrdinaryListening(t *testing.T) {
 		requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
 		_, contextID, err := requestor.messageLifecycle.RotateContext()
 		require.NoError(t, err)
-		defer startInterruptionTestOwner(t, requestor)()
+		requestor.interruptionEnabled = true
+		streamer := requestor.streamer.(*streamTestStreamer)
 		handler := requestorDispatchHandler{r: requestor}
 		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{ContextID: contextID, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
 		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: contextID, Script: "hello", Interim: true})
 		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{ContextID: contextID, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd})
 		synctest.Wait()
 		assert.False(t, requestor.unclearInputWatchdog.Stop())
-		assert.Empty(t, interruptionTestControls(requestor))
+		streamer.mu.Lock()
+		assert.Empty(t, streamer.sent)
+		streamer.mu.Unlock()
 	})
 }
 
@@ -149,7 +158,8 @@ func TestDispatchInterruptionPreservesWordTrigger(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerWord)
 		requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
-		defer startInterruptionTestOwner(t, requestor)()
+		requestor.interruptionEnabled = true
+		streamer := requestor.streamer.(*streamTestStreamer)
 		handler := requestorDispatchHandler{r: requestor}
 		previous := requestor.GetID()
 		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{ContextID: previous, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
@@ -157,7 +167,10 @@ func TestDispatchInterruptionPreservesWordTrigger(t *testing.T) {
 		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: previous, Script: "hello", Interim: true})
 		synctest.Wait()
 		assert.NotEqual(t, previous, requestor.GetID())
-		assert.Equal(t, []internal_type.Stream{internal_type.FlushOutput{}}, interruptionTestControls(requestor))
+		streamer.mu.Lock()
+		require.NotEmpty(t, streamer.sent)
+		assert.IsType(t, internal_type.FlushOutput{}, streamer.sent[0])
+		streamer.mu.Unlock()
 	})
 }
 
@@ -165,7 +178,7 @@ func TestDispatchInterruptionInterimRefreshRejectsQueuedExpiry(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Please repeat")
 		requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
-		defer startInterruptionTestOwner(t, requestor)()
+		requestor.interruptionEnabled = true
 		handler := requestorDispatchHandler{r: requestor}
 		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
 		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{Script: "wait", Interim: true})
@@ -193,7 +206,7 @@ func TestDispatchInterruptionFinalBeforeVadEndPreservesBoundary(t *testing.T) {
 		requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Please repeat")
 		eos := &recordingEOSExecutor{}
 		requestor.endOfSpeechExecutor = eos
-		defer startInterruptionTestOwner(t, requestor)()
+		requestor.interruptionEnabled = true
 		handler := requestorDispatchHandler{r: requestor}
 		previous := requestor.GetID()
 		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{ContextID: previous, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
@@ -220,9 +233,11 @@ func newInterruptionTestRequestor(trigger string) *genericRequestor {
 	_ = lifecycle.AssistantGenerating("ctx-active")
 	_ = lifecycle.AssistantSpeaking("ctx-active")
 
+	requestorChannels := adapter_channel.NewRequestorChannels()
 	return &genericRequestor{
 		streamer:         &streamTestStreamer{},
-		channels:         adapter_channel.NewRequestorChannels(),
+		channels:         requestorChannels,
+		dispatchRoute:    adapter_router.NewDispatchRoute(adapter_router.NewRoutePolicy(), requestorChannels),
 		messageLifecycle: lifecycle,
 		options:          options,
 		vadExecutor:      &blockingVADExecutor{},

@@ -189,16 +189,16 @@ not become a media-control API.
 
 - `api/assistant-api/internal/type/packet.go`: adapter packet definitions.
 - `api/assistant-api/internal/type/output_control.go`: internal stream control values.
-- `api/assistant-api/internal/adapters/internal/requestor.go`: candidate state ownership.
+- `api/assistant-api/internal/adapters/internal/requestor.go`: pending candidate state and timer ownership.
 - `api/assistant-api/internal/adapters/internal/stream.go`: internal output-control delivery with returned errors.
 - `api/assistant-api/internal/adapters/internal/stream_test.go`: output-control delivery tests.
 - `api/assistant-api/internal/adapters/internal/dispatch_handler.go`: candidate decisions and committed turn handling.
 - `api/assistant-api/internal/adapters/internal/dispatch_handler_interruption_test.go`: adapter behavior tests.
-- `api/assistant-api/internal/adapters/router/dispatch.go`: dispatch of an internal candidate deadline packet if required.
-- `api/assistant-api/internal/adapters/router/router.go`: route declaration for that packet if required.
+- `api/assistant-api/internal/adapters/router/dispatch.go`: dispatch of the internal candidate deadline packet.
+- `api/assistant-api/internal/adapters/router/router.go`: control-route declaration for the deadline packet.
 - `api/assistant-api/internal/adapters/router/*_test.go`: routing tests if routing changes.
-- `api/assistant-api/internal/adapters/internal/interruption.go`: serialized candidate and transcript gate.
-- `api/assistant-api/internal/adapters/internal/interruption_test.go`: serialized decision tests.
+- `api/assistant-api/internal/adapters/internal/interruption.go`: removed after packet-driven migration.
+- `api/assistant-api/internal/adapters/internal/interruption_test.go`: removed after equivalent dispatch tests exist.
 - `api/assistant-api/internal/end_of_speech/**`: synchronous local invalidation before replay.
 - `api/assistant-api/internal/transformer/**`: local context fencing before replay where required.
 - `api/assistant-api/internal/channel/output/`: shared buffered-output behavior and tests.
@@ -262,15 +262,21 @@ internal flush.
 
 ### Adapter Candidate
 
-The adapter owns one serialized interruption loop. VAD start, VAD end, STT events,
-decision deadlines, turn-change completion, and session close enter this loop in order.
-The loop owns the sole candidate, transcript gate, held STT queue, and timer. No other
-handler reads or writes candidate state.
+The existing packet router is the only dispatch mechanism. The adapter does not create an
+interruption event channel, work queue, synchronous reply channel, or dedicated dispatcher
+goroutine. Existing VAD, STT, EOS, user-input, turn-change, and unclear-input packets keep
+their existing packet types and router handlers.
 
-The timer is selected inside the loop. There is no timer callback, callback wait group, or
-second goroutine that can act after a candidate closes. The loop performs the local pause,
-continue, or flush action before accepting another candidate. Blocking provider shutdown
-and public notifications run outside the loop after the local decision is fixed.
+The requestor owns one pending candidate under a mutex because control and ingress routes
+run independently. The candidate contains only the current context, sequence, speech
+activity, decision state, held evidence, and timer. It has no methods and does not dispatch
+work. Handlers update this state inline and emit ordinary packets for subsequent actions.
+
+The timer callback synchronously dispatches `InterruptionDecisionExpiredPacket` through the
+existing requestor router entry. It does not enqueue into the bounded control channel. The
+packet contains the candidate context and internal sequence. The deadline handler ignores
+packets that do not match the current candidate, so a late timer cannot affect a later
+overlap in the same conversation context.
 
 STT events remain in provider order while the transcript gate is open. When provider
 speech timestamps exist, the loop trims events ending before the current VAD overlap.
@@ -289,7 +295,20 @@ VAD handling for the current turn.
 | VAD end | Mark speech inactive, send STT end, keep waiting until meaningful text or deadline |
 | Deadline while VAD remains active | Commit `TurnChangePacket` |
 | Deadline after VAD ended without meaningful text | Send `ContinueOutput` and close candidate |
-| Session cancellation | Stop the loop timer, discard held evidence, continue locally paused output when possible, and exit |
+| Session cancellation | Stop the candidate timer, discard held evidence, and continue locally paused output when possible |
+
+`TurnChangePacket` remains the only commit packet. VAD/STT decisions set its internal
+`InterruptionSequence`; direct text and word-triggered changes leave that field zero. Its
+control handler validates and claims the matching candidate under the requestor mutex,
+stops the timer, flushes output, rotates context, invalidates old EOS, TTS, and LLM work,
+then clears the candidate.
+
+After local invalidation, the handler detaches held evidence and synchronously sends each
+packet through the existing requestor router entry in recorded order. This avoids
+cross-lane reordering and does not call another handler directly. Held VAD boundaries are
+delivered once to the EOS executor from the turn-change handler because their STT start and
+end packets were already emitted when the boundary arrived. They are not sent through the
+VAD handler a second time.
 
 For the first release, meaningful text is trimmed non-empty text that is not solely one
 of the case-insensitive filler tokens `uh`, `um`, `hmm`, `mm`, `mhm`, `ah`, or `oh` after
@@ -323,25 +342,24 @@ required only when the turn-change source is the VAD/STT overlap decision.
 
 Only `TurnChangePacket` commits interruption. Its handler performs one ordered operation:
 
-1. The serialized loop claims the pending candidate and stops its timer.
-2. The loop sends `FlushOutput` before it can accept another VAD start.
-3. The loop emits one decision containing the previous context and held meaningful STT.
-4. The adapter conditionally rotates the lifecycle context once.
-5. EOS, TTS, and LLM owners synchronously invalidate local old-context state. Remote close
+1. The handler claims the sequence-matched candidate under the requestor mutex and stops
+   its timer.
+2. The handler sends `FlushOutput` before it accepts another VAD start.
+3. The adapter conditionally rotates the lifecycle context once.
+4. EOS, TTS, and LLM owners synchronously invalidate local old-context state. Remote close
    and provider cleanup may continue asynchronously after local invalidation.
-6. STT and TTS receive the new context.
-7. The public conversation interruption notification is sent and cannot clear output.
-8. Held meaningful STT is replayed once after local invalidation completes.
-9. The adapter acknowledges completion to the serialized loop, which may then accept a
-   new candidate.
+5. STT and TTS receive the new context.
+6. The public conversation interruption notification is sent and cannot clear output.
+7. The candidate is cleared and held evidence is detached under the requestor mutex.
+8. Held evidence is synchronously routed once in recorded order with the new context.
 
 An old deadline, VAD end, or STT result arriving after the candidate closes is ignored for
 interruption decisions. Normal STT processing resumes for the current turn.
 
 ### Implementation Sequence
 
-1. Add internal output-control values and the serialized adapter interruption loop with
-   fake streamer tests that assert pause, continue, turn-change, and unclear-input ordering.
+1. Add internal output-control values and requestor-owned candidate state with fake
+   streamer tests that assert pause, continue, turn-change, and unclear-input ordering.
 2. Add pause, continue, and flush consumption to shared and concrete streamer output paths.
 3. Add conditional lifecycle transition and old model-result rejection.
 4. Run full verification and independent review before enabling the behavior.
@@ -362,13 +380,15 @@ enabled until all steps pass.
 
 - A pause error returned by `sendOutputControl` commits interruption once rather than
   risking continued stale output.
-- The timer does not enqueue into a dispatch queue. It resolves only the still-current
-  private utterance sequence and cannot leave a candidate paused behind a full queue.
+- The timer dispatches a typed packet synchronously through the existing router. It
+  resolves only the still-current sequence and cannot be dropped by a full queue.
 - A flush failure is logged and does not undo an accepted turn change.
 - STT errors while VAD remains active commit at the 500 millisecond deadline.
 - STT errors after VAD ended continue the paused output at the deadline.
 - Duplicate VAD, deadline, continue, flush, and turn-change events are harmless.
-- Candidate state and the loop-owned timer are released during session finalization.
+- `HandleFinalizeBehavior` owns candidate cleanup. It stops the timer, increments the
+  sequence fence, discards held evidence, and continues output only for an uncommitted
+  paused candidate. An already-running callback is rejected by the sequence fence.
 - An unclear-input expiry is ignored unless the current context still represents a
   committed meaningful interim without a usable final transcript.
 
@@ -501,6 +521,10 @@ it. This amendment supersedes the prior confirmation gate and requires a new cha
 On 2026-09-07 the maintainer requested ASCII diagrams of the accepted interruption,
 unclear-input, and component-sequence flows. This documentation-only amendment changes no
 runtime decision, ownership boundary, timing rule, or implementation scope.
+On 2026-09-08 the maintainer rejected the parallel interruption owner and required the
+existing packet architecture. The replacement keeps transient candidate state on the
+requestor, emits a sequence-scoped deadline packet, uses `TurnChangePacket` as the only
+commit, and removes all interruption-specific channels and dispatcher goroutines.
 
 ## Artifact Index
 
@@ -519,6 +543,7 @@ runtime decision, ownership boundary, timing rule, or implementation scope.
 - `jsons/escalation-resolution-06.json`: unclear-input trigger decision.
 - `jsons/amendment-08-plan.json`: current dispatch-first implementation plan.
 - `jsons/amendment-09-plan.json`: documentation-only ASCII diagram amendment.
+- `jsons/amendment-10-plan.json`: packet-driven interruption architecture amendment.
 - `jsons/transport-inventory.json`: concrete output ownership inventory.
 - `jsons/understanding.json`: current code evidence.
 - `jsons/reservation.json`: RFC reservation.
@@ -537,3 +562,4 @@ runtime decision, ownership boundary, timing rule, or implementation scope.
 | 2026-09-06 | Select one serialized transcript gate with filler classification and no utterance IDs | Repository maintainer | `jsons/escalation-resolution-05.json` |
 | 2026-09-07 | Start unclear-input timeout only after meaningful interim commits and no usable final follows | Repository maintainer | `jsons/escalation-resolution-06.json` |
 | 2026-09-07 | Add ASCII decision, unclear-input, and component-sequence diagrams without changing behavior | Repository maintainer | `jsons/amendment-09-plan.json` |
+| 2026-09-08 | Replace the parallel interruption owner with the existing packet router and one sequence-scoped deadline packet | Repository maintainer | `jsons/amendment-10-plan.json` |

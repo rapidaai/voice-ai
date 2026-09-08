@@ -8,8 +8,9 @@ import (
 )
 
 type dispatchHandlerStub struct {
-	calledUserText                  bool
-	calledConversationRecordingDone bool
+	calledUserText                    bool
+	calledConversationRecordingDone   bool
+	interruptionDecisionExpiredPacket internal_type.InterruptionDecisionExpiredPacket
 }
 
 func (s *dispatchHandlerStub) HandleUserText(context.Context, internal_type.UserTextReceivedPacket) {
@@ -27,6 +28,9 @@ func (s *dispatchHandlerStub) HandleInterimEndOfSpeech(context.Context, internal
 func (s *dispatchHandlerStub) HandleEndOfSpeech(context.Context, internal_type.EndOfSpeechPacket) {}
 func (s *dispatchHandlerStub) HandleUserInput(context.Context, internal_type.UserInputPacket)     {}
 func (s *dispatchHandlerStub) HandleInterruptionDetected(context.Context, internal_type.InterruptionDetectedPacket) {
+}
+func (s *dispatchHandlerStub) HandleInterruptionDecisionExpired(_ context.Context, packet internal_type.InterruptionDecisionExpiredPacket) {
+	s.interruptionDecisionExpiredPacket = packet
 }
 func (s *dispatchHandlerStub) HandleTextToSpeechInterrupt(context.Context, internal_type.TextToSpeechInterruptPacket) {
 }
@@ -203,6 +207,19 @@ func TestDispatchPacket_DispatchesConversationRecordingCompleted(t *testing.T) {
 	}
 	if !handler.calledConversationRecordingDone {
 		t.Fatalf("expected HandleConversationRecordingCompleted to be called")
+	}
+}
+
+func TestDispatchPacket_DispatchesInterruptionDecisionExpired(t *testing.T) {
+	handler := &dispatchHandlerStub{}
+	packet := internal_type.InterruptionDecisionExpiredPacket{ContextID: "context-1", Sequence: 7}
+
+	err := DispatchPacket(context.Background(), packet, handler)
+	if err != nil {
+		t.Fatalf("expected known packet to not return an error, got: %v", err)
+	}
+	if handler.interruptionDecisionExpiredPacket != packet {
+		t.Fatalf("expected packet %#v, got %#v", packet, handler.interruptionDecisionExpiredPacket)
 	}
 }
 

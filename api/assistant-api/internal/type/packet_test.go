@@ -2,6 +2,28 @@ package internal_type
 
 import "testing"
 
+func TestInterruptionDecisionExpiredPacket(t *testing.T) {
+	packet := InterruptionDecisionExpiredPacket{ContextID: "context-1", Sequence: 7}
+
+	if got := packet.ContextId(); got != "context-1" {
+		t.Fatalf("expected context ID %q, got %q", "context-1", got)
+	}
+	if got := packet.PacketName(); got != PacketNameInterruptionDecisionExpired {
+		t.Fatalf("expected packet name %q, got %q", PacketNameInterruptionDecisionExpired, got)
+	}
+	if packet.Sequence != 7 {
+		t.Fatalf("expected sequence 7, got %d", packet.Sequence)
+	}
+}
+
+func TestTurnChangePacket_InterruptionSequence(t *testing.T) {
+	packet := TurnChangePacket{InterruptionSequence: 11}
+
+	if packet.InterruptionSequence != 11 {
+		t.Fatalf("expected interruption sequence 11, got %d", packet.InterruptionSequence)
+	}
+}
+
 func TestSpeechToTextPacket_GetConcat(t *testing.T) {
 	tests := []struct {
 		name     string

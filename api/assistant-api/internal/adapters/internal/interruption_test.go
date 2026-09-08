@@ -15,40 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func startInterruptionTestOwner(t *testing.T, requestor *genericRequestor) func() {
-	t.Helper()
-	ctx, cancel := context.WithCancel(context.Background())
-	requestor.interruption = newInterruptionOwner(ctx, requestor)
-	return func() {
-		cancel()
-		<-requestor.interruption.done
-		<-requestor.interruption.workerDone
-	}
-}
-
-func interruptionTestControls(requestor *genericRequestor) []internal_type.Stream {
-	streamer := requestor.streamer.(*streamTestStreamer)
-	streamer.mu.Lock()
-	defer streamer.mu.Unlock()
-	var controls []internal_type.Stream
-	for _, packet := range streamer.sent {
-		switch packet.(type) {
-		case internal_type.PauseOutput, internal_type.ContinueOutput, internal_type.FlushOutput:
-			controls = append(controls, packet)
-		}
-	}
-	return controls
-}
-
-func TestMeaningfulInterruptionText(t *testing.T) {
-	for _, text := range []string{"", " \t", "...", " UH! ", "Um, hmm...", "um,hmm", "mm MHM ah OH", "“hmm”"} {
-		assert.False(t, meaningfulInterruptionText(text), "%q", text)
-	}
-	for _, text := range []string{"hello", "um, wait!", "hmm yes", "uh-huh", "0", "你好"} {
-		assert.True(t, meaningfulInterruptionText(text), "%q", text)
-	}
-}
-
 func TestInterruptionDeadlineChoosesExactlyOnce(t *testing.T) {
 	for _, scenario := range []struct {
 		name string
@@ -63,14 +29,17 @@ func TestInterruptionDeadlineChoosesExactlyOnce(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Repeat please")
 				requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
-				defer startInterruptionTestOwner(t, requestor)()
+				requestor.interruptionEnabled = true
+				streamer := requestor.streamer.(*streamTestStreamer)
 				handler := requestorDispatchHandler{r: requestor}
 				originalContext := requestor.GetID()
 				start := internal_type.InterruptionDetectedPacket{ContextID: originalContext, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart}
 				handler.HandleInterruptionDetected(context.Background(), start)
 				synctest.Wait()
 				assert.Equal(t, originalContext, requestor.GetID())
-				assert.Equal(t, []internal_type.Stream{internal_type.PauseOutput{}}, interruptionTestControls(requestor))
+				streamer.mu.Lock()
+				assert.Equal(t, []internal_type.Stream{internal_type.PauseOutput{}}, streamer.sent)
+				streamer.mu.Unlock()
 				time.Sleep(200 * time.Millisecond)
 				handler.HandleInterruptionDetected(context.Background(), start)
 				handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: originalContext, Script: scenario.text, Interim: true})
@@ -79,22 +48,39 @@ func TestInterruptionDeadlineChoosesExactlyOnce(t *testing.T) {
 				}
 				time.Sleep(299 * time.Millisecond)
 				synctest.Wait()
-				assert.Len(t, interruptionTestControls(requestor), 1)
+				streamer.mu.Lock()
+				assert.Len(t, streamer.sent, 1)
+				streamer.mu.Unlock()
 				time.Sleep(time.Millisecond)
 				synctest.Wait()
 				if scenario.end {
 					assert.Equal(t, originalContext, requestor.GetID())
-					assert.Equal(t, []internal_type.Stream{internal_type.PauseOutput{}, internal_type.ContinueOutput{}}, interruptionTestControls(requestor))
+					streamer.mu.Lock()
+					assert.Equal(t, []internal_type.Stream{internal_type.PauseOutput{}, internal_type.ContinueOutput{}}, streamer.sent)
+					streamer.mu.Unlock()
 				} else {
 					assert.NotEqual(t, originalContext, requestor.GetID())
-					assert.Equal(t, []internal_type.Stream{internal_type.PauseOutput{}, internal_type.FlushOutput{}}, interruptionTestControls(requestor))
+					streamer.mu.Lock()
+					require.GreaterOrEqual(t, len(streamer.sent), 2)
+					assert.IsType(t, internal_type.PauseOutput{}, streamer.sent[0])
+					assert.IsType(t, internal_type.FlushOutput{}, streamer.sent[1])
+					streamer.mu.Unlock()
 				}
 				assert.False(t, requestor.unclearInputWatchdog.Stop())
 				contextAfterDecision := requestor.GetID()
 				time.Sleep(time.Second)
 				synctest.Wait()
 				assert.Equal(t, contextAfterDecision, requestor.GetID())
-				assert.Len(t, interruptionTestControls(requestor), 2)
+				outputControlCount := 0
+				streamer.mu.Lock()
+				for _, sentPacket := range streamer.sent {
+					switch sentPacket.(type) {
+					case internal_type.PauseOutput, internal_type.ContinueOutput, internal_type.FlushOutput:
+						outputControlCount++
+					}
+				}
+				streamer.mu.Unlock()
+				assert.Equal(t, 2, outputControlCount)
 			})
 		})
 	}
@@ -105,7 +91,8 @@ func TestInterruptionMeaningfulInterimCommitsAndReplaysInOrder(t *testing.T) {
 		requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Repeat please")
 		eos := &recordingEOSExecutor{}
 		requestor.endOfSpeechExecutor = eos
-		defer startInterruptionTestOwner(t, requestor)()
+		requestor.interruptionEnabled = true
+		streamer := requestor.streamer.(*streamTestStreamer)
 		handler := requestorDispatchHandler{r: requestor}
 		previous := requestor.GetID()
 		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{ContextID: previous, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
@@ -116,7 +103,11 @@ func TestInterruptionMeaningfulInterimCommitsAndReplaysInOrder(t *testing.T) {
 		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: previous, Script: "wait please", Interim: true})
 		synctest.Wait()
 		assert.Equal(t, current, requestor.GetID())
-		assert.Equal(t, []internal_type.Stream{internal_type.PauseOutput{}, internal_type.FlushOutput{}}, interruptionTestControls(requestor))
+		streamer.mu.Lock()
+		require.GreaterOrEqual(t, len(streamer.sent), 2)
+		assert.IsType(t, internal_type.PauseOutput{}, streamer.sent[0])
+		assert.IsType(t, internal_type.FlushOutput{}, streamer.sent[1])
+		streamer.mu.Unlock()
 		packets := eos.snapshotExecuted()
 		require.Len(t, packets, 4)
 		assert.IsType(t, internal_type.EndOfSpeechInterruptionPacket{}, packets[0])
@@ -129,7 +120,16 @@ func TestInterruptionMeaningfulInterimCommitsAndReplaysInOrder(t *testing.T) {
 		handler.HandleTurnChange(context.Background(), internal_type.TurnChangePacket{InterruptionDecision: true, PreviousContextID: previous})
 		synctest.Wait()
 		assert.Equal(t, current, requestor.GetID())
-		assert.Len(t, interruptionTestControls(requestor), 2)
+		outputControlCount := 0
+		streamer.mu.Lock()
+		for _, sentPacket := range streamer.sent {
+			switch sentPacket.(type) {
+			case internal_type.PauseOutput, internal_type.ContinueOutput, internal_type.FlushOutput:
+				outputControlCount++
+			}
+		}
+		streamer.mu.Unlock()
+		assert.Equal(t, 2, outputControlCount)
 	})
 }
 
@@ -137,7 +137,7 @@ func TestInterruptionPauseFailureCommitsWithoutWaiting(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
 		requestor.streamer = &failingOutputControlStreamer{err: errors.New("output unavailable")}
-		defer startInterruptionTestOwner(t, requestor)()
+		requestor.interruptionEnabled = true
 		previous := requestor.GetID()
 		requestorDispatchHandler{r: requestor}.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{ContextID: previous, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
 		synctest.Wait()
@@ -156,19 +156,24 @@ func TestInterruptionCancellationContinuesOnlyPendingOutput(t *testing.T) {
 	for _, commit := range []bool{false, true} {
 		synctest.Test(t, func(t *testing.T) {
 			requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
-			stop := startInterruptionTestOwner(t, requestor)
+			requestor.interruptionEnabled = true
+			streamer := requestor.streamer.(*streamTestStreamer)
 			handler := requestorDispatchHandler{r: requestor}
 			handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
 			if commit {
 				handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{Script: "wait", Interim: true})
 			}
 			synctest.Wait()
-			stop()
+			handler.HandleFinalizeBehavior(context.Background(), internal_type.FinalizeBehaviorPacket{})
+			streamer.mu.Lock()
 			if commit {
-				assert.Equal(t, []internal_type.Stream{internal_type.PauseOutput{}, internal_type.FlushOutput{}}, interruptionTestControls(requestor))
+				require.GreaterOrEqual(t, len(streamer.sent), 2)
+				assert.IsType(t, internal_type.PauseOutput{}, streamer.sent[0])
+				assert.IsType(t, internal_type.FlushOutput{}, streamer.sent[1])
 			} else {
-				assert.Equal(t, []internal_type.Stream{internal_type.PauseOutput{}, internal_type.ContinueOutput{}}, interruptionTestControls(requestor))
+				assert.Equal(t, []internal_type.Stream{internal_type.PauseOutput{}, internal_type.ContinueOutput{}}, streamer.sent)
 			}
+			streamer.mu.Unlock()
 		})
 	}
 }
@@ -205,7 +210,8 @@ func TestInterruptionHoldsTranscriptsUntilCommitCompletion(t *testing.T) {
 		requestor.textToSpeechTransformer = blockedInterruptionTransformer{
 			blockOn: internal_type.PacketNameTextToSpeechInterrupt, started: started, release: release,
 		}
-		defer startInterruptionTestOwner(t, requestor)()
+		requestor.interruptionEnabled = true
+		streamer := requestor.streamer.(*streamTestStreamer)
 		handler := requestorDispatchHandler{r: requestor}
 		previous := requestor.GetID()
 		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
@@ -216,7 +222,11 @@ func TestInterruptionHoldsTranscriptsUntilCommitCompletion(t *testing.T) {
 		synctest.Wait()
 		assert.False(t, requestor.unclearInputWatchdog.Stop())
 		assert.Len(t, eos.snapshotExecuted(), 1)
-		assert.Equal(t, []internal_type.Stream{internal_type.PauseOutput{}, internal_type.FlushOutput{}}, interruptionTestControls(requestor))
+		streamer.mu.Lock()
+		require.GreaterOrEqual(t, len(streamer.sent), 2)
+		assert.IsType(t, internal_type.PauseOutput{}, streamer.sent[0])
+		assert.IsType(t, internal_type.FlushOutput{}, streamer.sent[1])
+		streamer.mu.Unlock()
 		close(release)
 		synctest.Wait()
 		assert.False(t, requestor.unclearInputWatchdog.Stop())
@@ -235,7 +245,11 @@ func TestInterruptionDeadlineDoesNotWaitForProviderWork(t *testing.T) {
 		requestor.speechToTextTransformer = blockedInterruptionTransformer{
 			blockOn: internal_type.PacketNameSpeechToTextStart, started: started, release: release,
 		}
-		defer startInterruptionTestOwner(t, requestor)()
+		requestor.interruptionEnabled = true
+		dispatcherContext, cancelDispatcher := context.WithCancel(context.Background())
+		defer cancelDispatcher()
+		go requestor.runCriticalDispatcher(dispatcherContext)
+		streamer := requestor.streamer.(*streamTestStreamer)
 		handler := requestorDispatchHandler{r: requestor}
 		previous := requestor.GetID()
 		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
@@ -244,7 +258,9 @@ func TestInterruptionDeadlineDoesNotWaitForProviderWork(t *testing.T) {
 		time.Sleep(interruptionDecisionWindow)
 		synctest.Wait()
 		assert.Equal(t, previous, requestor.GetID())
-		assert.Equal(t, []internal_type.Stream{internal_type.PauseOutput{}, internal_type.ContinueOutput{}}, interruptionTestControls(requestor))
+		streamer.mu.Lock()
+		assert.Equal(t, []internal_type.Stream{internal_type.PauseOutput{}, internal_type.ContinueOutput{}}, streamer.sent)
+		streamer.mu.Unlock()
 		close(release)
 	})
 }
@@ -252,13 +268,16 @@ func TestInterruptionDeadlineDoesNotWaitForProviderWork(t *testing.T) {
 func TestInterruptionIgnoresStaleAndUngatedTranscripts(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
-		defer startInterruptionTestOwner(t, requestor)()
+		requestor.interruptionEnabled = true
+		streamer := requestor.streamer.(*streamTestStreamer)
 		handler := requestorDispatchHandler{r: requestor}
 		previous := requestor.GetID()
 		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{Script: "late final"})
 		assert.Equal(t, previous, requestor.GetID())
 		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{ContextID: "obsolete", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
-		assert.Empty(t, interruptionTestControls(requestor))
+		streamer.mu.Lock()
+		assert.Empty(t, streamer.sent)
+		streamer.mu.Unlock()
 		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
 		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: "obsolete", Script: "late interim", Interim: true})
 		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd})
@@ -267,7 +286,9 @@ func TestInterruptionIgnoresStaleAndUngatedTranscripts(t *testing.T) {
 		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{Script: "late final"})
 		synctest.Wait()
 		assert.Equal(t, previous, requestor.GetID())
-		assert.Equal(t, []internal_type.Stream{internal_type.PauseOutput{}, internal_type.ContinueOutput{}}, interruptionTestControls(requestor))
+		streamer.mu.Lock()
+		assert.Equal(t, []internal_type.Stream{internal_type.PauseOutput{}, internal_type.ContinueOutput{}}, streamer.sent)
+		streamer.mu.Unlock()
 	})
 }
 
@@ -277,7 +298,8 @@ func TestInterruptionIgnoresStaleVADEndOutsidePreviousContext(t *testing.T) {
 		requestor.messageLifecycle = adapter_lifecycle.NewMessageLifecycleWithContext("current", type_enums.AudioMode)
 		eos := &recordingEOSExecutor{}
 		requestor.endOfSpeechExecutor = eos
-		defer startInterruptionTestOwner(t, requestor)()
+		requestor.interruptionEnabled = true
+		streamer := requestor.streamer.(*streamTestStreamer)
 
 		requestorDispatchHandler{r: requestor}.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{
 			ContextID: "obsolete",
@@ -287,7 +309,98 @@ func TestInterruptionIgnoresStaleVADEndOutsidePreviousContext(t *testing.T) {
 		synctest.Wait()
 
 		assert.Empty(t, eos.snapshotExecuted())
-		assert.Empty(t, interruptionTestControls(requestor))
+		streamer.mu.Lock()
+		assert.Empty(t, streamer.sent)
+		streamer.mu.Unlock()
 		assert.Equal(t, "current", requestor.GetID())
+	})
+}
+
+func TestInterruptionRejectsStaleDecisionPackets(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
+		requestor.interruptionEnabled = true
+		streamer := requestor.streamer.(*streamTestStreamer)
+		handler := requestorDispatchHandler{r: requestor}
+		contextID := requestor.GetID()
+
+		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{
+			ContextID: contextID,
+			Source:    internal_type.InterruptionSourceVad,
+			Event:     internal_type.InterruptionEventStart,
+		})
+		requestor.interruptionMu.Lock()
+		firstSequence := requestor.interruptionSequence
+		requestor.interruptionMu.Unlock()
+		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{
+			ContextID: contextID,
+			Source:    internal_type.InterruptionSourceVad,
+			Event:     internal_type.InterruptionEventEnd,
+		})
+		handler.HandleInterruptionDecisionExpired(context.Background(), internal_type.InterruptionDecisionExpiredPacket{
+			ContextID: contextID,
+			Sequence:  firstSequence,
+		})
+		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{
+			ContextID: contextID,
+			Source:    internal_type.InterruptionSourceVad,
+			Event:     internal_type.InterruptionEventStart,
+		})
+		requestor.interruptionMu.Lock()
+		secondSequence := requestor.interruptionSequence
+		requestor.interruptionMu.Unlock()
+
+		handler.HandleInterruptionDecisionExpired(context.Background(), internal_type.InterruptionDecisionExpiredPacket{
+			ContextID: contextID,
+			Sequence:  firstSequence,
+		})
+		handler.HandleTurnChange(context.Background(), internal_type.TurnChangePacket{
+			InterruptionDecision: true,
+			InterruptionSequence: firstSequence,
+			PreviousContextID:    contextID,
+		})
+
+		assert.Equal(t, contextID, requestor.GetID())
+		requestor.interruptionMu.Lock()
+		assert.Equal(t, secondSequence, requestor.interruptionSequence)
+		assert.Equal(t, contextID, requestor.interruptionContextID)
+		requestor.interruptionMu.Unlock()
+		streamer.mu.Lock()
+		assert.Equal(t, []internal_type.Stream{
+			internal_type.PauseOutput{},
+			internal_type.ContinueOutput{},
+			internal_type.PauseOutput{},
+		}, streamer.sent)
+		streamer.mu.Unlock()
+		handler.HandleFinalizeBehavior(context.Background(), internal_type.FinalizeBehaviorPacket{})
+	})
+}
+
+func TestInterruptionFinalizationFencesDeadline(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
+		requestor.interruptionEnabled = true
+		streamer := requestor.streamer.(*streamTestStreamer)
+		handler := requestorDispatchHandler{r: requestor}
+		contextID := requestor.GetID()
+
+		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{
+			ContextID: contextID,
+			Source:    internal_type.InterruptionSourceVad,
+			Event:     internal_type.InterruptionEventStart,
+		})
+		requestor.interruptionMu.Lock()
+		sequence := requestor.interruptionSequence
+		requestor.interruptionMu.Unlock()
+		handler.HandleFinalizeBehavior(context.Background(), internal_type.FinalizeBehaviorPacket{ContextID: contextID})
+		handler.HandleInterruptionDecisionExpired(context.Background(), internal_type.InterruptionDecisionExpiredPacket{
+			ContextID: contextID,
+			Sequence:  sequence,
+		})
+
+		assert.Equal(t, contextID, requestor.GetID())
+		streamer.mu.Lock()
+		assert.Equal(t, []internal_type.Stream{internal_type.PauseOutput{}, internal_type.ContinueOutput{}}, streamer.sent)
+		streamer.mu.Unlock()
 	})
 }

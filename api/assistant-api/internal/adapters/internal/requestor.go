@@ -8,6 +8,7 @@ package adapter_internal
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/rapidaai/api/assistant-api/config"
@@ -56,12 +57,11 @@ var (
 )
 
 type genericRequestor struct {
-	interruption *interruptionOwner
-	logger       commons.Logger
-	config       *config.AssistantConfig
-	source       utils.RapidaSource
-	auth         *types.Authentication
-	streamer     internal_type.Streamer
+	logger   commons.Logger
+	config   *config.AssistantConfig
+	source   utils.RapidaSource
+	auth     *types.Authentication
+	streamer internal_type.Streamer
 
 	// service
 	assistantService     internal_services.AssistantService
@@ -84,6 +84,20 @@ type genericRequestor struct {
 	messageLifecycle adapter_lifecycle.MessageLifecycle
 	sessionLifecycle adapter_lifecycle.SessionLifecycle
 	dispatchRoute    *adapter_router.DispatchRoute
+
+	interruptionMu                     sync.Mutex
+	interruptionEnabled                bool
+	interruptionContextID              string
+	interruptionPreviousState          string
+	interruptionSequence               uint64
+	interruptionSpeechActive           bool
+	interruptionDecisionPending        bool
+	interruptionTurnCommitted          bool
+	interruptionHeldPackets            []internal_type.Packet
+	interruptionDecisionTimer          *time.Timer
+	committedInterruptionContextID     string
+	previousInterruptionContextID      string
+	pendingInterruptionVADEndContextID string
 
 	// listening
 	speechToTextTransformer internal_type.SpeechToTextTransformer
@@ -201,9 +215,7 @@ func NewGenericRequestor(
 		watchdog.WithOnPacket(gr.OnPacket),
 		watchdog.WithPacketContext(sessionCtx),
 	)
-	if dispatchInterruptionEnabled {
-		gr.interruption = newInterruptionOwner(sessionCtx, gr)
-	}
+	gr.interruptionEnabled = dispatchInterruptionEnabled
 
 	go gr.runBootstrapDispatcher(sessionCtx)
 	go gr.runCriticalDispatcher(sessionCtx)

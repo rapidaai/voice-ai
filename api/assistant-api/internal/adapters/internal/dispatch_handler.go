@@ -10,11 +10,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	adapter_lifecycle "github.com/rapidaai/api/assistant-api/internal/adapters/lifecycle"
+	adapter_router "github.com/rapidaai/api/assistant-api/internal/adapters/router"
 	internal_analysis "github.com/rapidaai/api/assistant-api/internal/analysis"
 	internal_artifact "github.com/rapidaai/api/assistant-api/internal/artifact"
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
@@ -44,12 +48,30 @@ type requestorDispatchHandler struct {
 	r *genericRequestor
 }
 
+const dispatchInterruptionEnabled = false
+const interruptionDecisionWindow = 500 * time.Millisecond
+
 func (h requestorDispatchHandler) HandleUserText(ctx context.Context, vl internal_type.UserTextReceivedPacket) {
 	if !validator.NotBlank(vl.Text) {
 		return
 	}
-	if h.r.usesInterruptionOwner() {
-		h.r.interruption.submit(ctx, interruptionEvent{packet: vl})
+	if h.r.interruptionEnabled {
+		h.r.interruptionMu.Lock()
+		if h.r.interruptionDecisionTimer != nil {
+			h.r.interruptionDecisionTimer.Stop()
+		}
+		h.r.interruptionSequence++
+		h.r.interruptionContextID = ""
+		h.r.interruptionPreviousState = ""
+		h.r.interruptionSpeechActive = false
+		h.r.interruptionDecisionPending = false
+		h.r.interruptionTurnCommitted = false
+		h.r.interruptionHeldPackets = nil
+		h.r.interruptionDecisionTimer = nil
+		h.r.committedInterruptionContextID = ""
+		h.r.previousInterruptionContextID = ""
+		h.r.pendingInterruptionVADEndContextID = ""
+		h.r.interruptionMu.Unlock()
 	}
 
 	previousState := h.r.messageLifecycle.State()
@@ -198,16 +220,87 @@ func (h requestorDispatchHandler) HandleVadAudio(ctx context.Context, vl interna
 
 }
 func (h requestorDispatchHandler) HandleSpeechToText(ctx context.Context, p internal_type.SpeechToTextPacket) {
-	if h.r.usesInterruptionOwner() {
-		h.r.interruption.submit(ctx, interruptionEvent{packet: p})
-		return
+	adaptiveVADInterruption := h.r.interruptionEnabled && h.r.GetMode().Audio()
+	if options := h.r.GetOptions(); len(options) > 0 {
+		if value, err := options.GetString(internal_options.MicrophoneOptionBargeInTrigger); err == nil {
+			adaptiveVADInterruption = adaptiveVADInterruption && value != internal_options.BargeInTriggerWord
+		} else if value, err := options.GetString(internal_options.MicrophoneLegacyVADOptionBargeInTrigger); err == nil {
+			adaptiveVADInterruption = adaptiveVADInterruption && value != internal_options.BargeInTriggerWord
+		}
 	}
-	h.handleSpeechToText(ctx, p)
-}
+	if adaptiveVADInterruption {
+		isMeaningfulInterruptionText := false
+		for _, token := range strings.FieldsFunc(p.Script, func(character rune) bool {
+			return unicode.IsSpace(character) || unicode.IsPunct(character)
+		}) {
+			switch strings.ToLower(token) {
+			case "", "uh", "um", "hmm", "mm", "mhm", "ah", "oh":
+			default:
+				isMeaningfulInterruptionText = true
+			}
+			if isMeaningfulInterruptionText {
+				break
+			}
+		}
 
-func (h requestorDispatchHandler) handleSpeechToText(ctx context.Context, p internal_type.SpeechToTextPacket) {
-	if h.r.usesInterruptionOwner() && p.ContextID != h.r.GetID() {
-		return
+		h.r.interruptionMu.Lock()
+		if h.r.interruptionContextID != "" {
+			if p.ContextID != "" && p.ContextID != h.r.interruptionContextID && p.ContextID != h.r.GetID() {
+				h.r.interruptionMu.Unlock()
+				return
+			}
+			if isMeaningfulInterruptionText || (h.r.interruptionDecisionPending && !p.Interim && strings.TrimSpace(p.Script) != "") {
+				h.r.interruptionHeldPackets = append(h.r.interruptionHeldPackets, p)
+				if !h.r.interruptionDecisionPending {
+					h.r.interruptionDecisionPending = true
+					if h.r.interruptionDecisionTimer != nil {
+						h.r.interruptionDecisionTimer.Stop()
+						h.r.interruptionDecisionTimer = nil
+					}
+					turnChange := internal_type.TurnChangePacket{
+						InterruptionDecision: true,
+						InterruptionSequence: h.r.interruptionSequence,
+						PreviousContextID:    h.r.interruptionContextID,
+						Reason:               "interrupted",
+						Source:               string(internal_type.InterruptionSourceVad),
+						PreviousState:        h.r.interruptionPreviousState,
+						Trigger:              string(internal_type.PacketNameInterruptionDetected),
+						Text:                 p.Script,
+						Time:                 time.Now(),
+					}
+					h.r.interruptionMu.Unlock()
+					utils.Go(ctx, func() {
+						h.r.dispatch(ctx, turnChange)
+					})
+					return
+				}
+			}
+			h.r.interruptionMu.Unlock()
+			return
+		}
+		if p.ContextID != "" && p.ContextID != h.r.GetID() && p.ContextID != h.r.previousInterruptionContextID {
+			h.r.interruptionMu.Unlock()
+			return
+		}
+		committedInterruptionContextID := h.r.committedInterruptionContextID
+		h.r.interruptionMu.Unlock()
+
+		if p.Interim && isMeaningfulInterruptionText && committedInterruptionContextID == h.r.GetID() && h.r.unclearInputWatchdog != nil {
+			if behavior, err := h.r.deploymentBehavior(); err == nil && behavior.UnclearInputTimeout != nil {
+				timeout := time.Duration(*behavior.UnclearInputTimeout * float64(time.Second))
+				if !h.r.unclearInputWatchdog.Extend(h.r.GetID(), timeout) {
+					h.r.unclearInputWatchdog.Start(h.r.GetID(), timeout)
+				}
+			}
+		} else if !p.Interim && strings.TrimSpace(p.Script) != "" {
+			h.r.interruptionMu.Lock()
+			h.r.committedInterruptionContextID = ""
+			h.r.previousInterruptionContextID = ""
+			h.r.interruptionMu.Unlock()
+			if h.r.unclearInputWatchdog != nil {
+				h.r.unclearInputWatchdog.Stop()
+			}
+		}
 	}
 	if !validator.NotBlank(p.Script) && !p.Interim {
 		return
@@ -217,7 +310,7 @@ func (h requestorDispatchHandler) handleSpeechToText(ctx context.Context, p inte
 	currentContextID := h.r.GetID()
 	p.ContextID = currentContextID
 	messageState := h.r.messageLifecycle.State()
-	if validator.NotBlank(p.Script) && !h.r.usesInterruptionOwner() {
+	if validator.NotBlank(p.Script) && !adaptiveVADInterruption {
 		switch messageState {
 		case adapter_lifecycle.MessageStateUserIdle,
 			adapter_lifecycle.MessageStateUserListening,
@@ -321,7 +414,7 @@ func (h requestorDispatchHandler) handleSpeechToText(ctx context.Context, p inte
 				return
 			}
 		}
-		if h.r.unclearInputWatchdog != nil && !h.r.usesInterruptionOwner() {
+		if h.r.unclearInputWatchdog != nil && !adaptiveVADInterruption {
 			h.r.unclearInputWatchdog.Stop()
 		}
 	}
@@ -349,18 +442,40 @@ func (h requestorDispatchHandler) HandleInterimEndOfSpeech(ctx context.Context, 
 	})
 }
 func (h requestorDispatchHandler) HandleEndOfSpeech(ctx context.Context, p internal_type.EndOfSpeechPacket) {
-	if h.r.usesInterruptionOwner() {
-		h.r.interruption.submit(ctx, interruptionEvent{packet: p})
-		return
+	if h.r.interruptionEnabled {
+		isMeaningfulInterruptionText := false
+		for _, token := range strings.FieldsFunc(p.Speech, func(character rune) bool {
+			return unicode.IsSpace(character) || unicode.IsPunct(character)
+		}) {
+			switch strings.ToLower(token) {
+			case "", "uh", "um", "hmm", "mm", "mhm", "ah", "oh":
+			default:
+				isMeaningfulInterruptionText = true
+			}
+			if isMeaningfulInterruptionText {
+				break
+			}
+		}
+		h.r.interruptionMu.Lock()
+		if h.r.interruptionContextID != "" {
+			if (p.ContextID == h.r.interruptionContextID || p.ContextID == h.r.GetID()) && isMeaningfulInterruptionText {
+				h.r.interruptionHeldPackets = append(h.r.interruptionHeldPackets, p)
+			}
+			h.r.interruptionMu.Unlock()
+			return
+		}
+		h.r.interruptionMu.Unlock()
 	}
-	h.handleEndOfSpeech(ctx, p)
-}
-
-func (h requestorDispatchHandler) handleEndOfSpeech(ctx context.Context, p internal_type.EndOfSpeechPacket) {
 	if p.ContextID != h.r.GetID() {
 		return
 	}
 	if validator.NotBlank(p.Speech) {
+		if h.r.interruptionEnabled {
+			h.r.interruptionMu.Lock()
+			h.r.committedInterruptionContextID = ""
+			h.r.previousInterruptionContextID = ""
+			h.r.interruptionMu.Unlock()
+		}
 		messageState := h.r.messageLifecycle.State()
 		switch messageState {
 		case adapter_lifecycle.MessageStateUserIdle,
@@ -368,7 +483,7 @@ func (h requestorDispatchHandler) handleEndOfSpeech(ctx context.Context, p inter
 			adapter_lifecycle.MessageStateUserSpeaking,
 			adapter_lifecycle.MessageStateUserThinking:
 			_ = h.r.messageLifecycle.UserThinking(p.ContextID)
-			if h.r.unclearInputWatchdog != nil && !h.r.usesInterruptionOwner() {
+			if h.r.unclearInputWatchdog != nil {
 				h.r.unclearInputWatchdog.Stop()
 			}
 		}
@@ -384,24 +499,29 @@ func (h requestorDispatchHandler) handleEndOfSpeech(ctx context.Context, p inter
 	}
 }
 func (h requestorDispatchHandler) HandleUserInput(ctx context.Context, p internal_type.UserInputPacket) {
-	if h.r.usesInterruptionOwner() {
-		h.r.interruption.submit(ctx, interruptionEvent{packet: p})
-		return
-	}
-	h.handleUserInput(ctx, p)
-}
-
-func (h requestorDispatchHandler) handleUserInput(ctx context.Context, p internal_type.UserInputPacket) {
 	if !validator.NotBlank(p.Text) {
 		return
 	}
 	if p.ContextID == "" {
 		p.ContextID = h.r.GetID()
 	}
+	if h.r.interruptionEnabled {
+		h.r.interruptionMu.Lock()
+		if h.r.interruptionContextID != "" {
+			if p.ContextID == h.r.interruptionContextID || p.ContextID == h.r.GetID() {
+				h.r.interruptionHeldPackets = append(h.r.interruptionHeldPackets, p)
+			}
+			h.r.interruptionMu.Unlock()
+			return
+		}
+		h.r.committedInterruptionContextID = ""
+		h.r.previousInterruptionContextID = ""
+		h.r.interruptionMu.Unlock()
+	}
 	if p.ContextID != h.r.GetID() {
 		return
 	}
-	if h.r.unclearInputWatchdog != nil && !h.r.usesInterruptionOwner() {
+	if h.r.unclearInputWatchdog != nil {
 		h.r.unclearInputWatchdog.Stop()
 	}
 	h.r.OnPacket(ctx, internal_type.StopIdleTimeoutPacket{
@@ -465,8 +585,134 @@ func (h requestorDispatchHandler) handleUserInput(ctx context.Context, p interna
 	}
 }
 func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context, p internal_type.InterruptionDetectedPacket) {
-	if h.r.usesInterruptionOwner() && p.Source == internal_type.InterruptionSourceVad {
-		h.r.interruption.submit(ctx, interruptionEvent{packet: p})
+	adaptiveVADInterruption := h.r.interruptionEnabled && h.r.GetMode().Audio() && p.Source == internal_type.InterruptionSourceVad
+	if options := h.r.GetOptions(); len(options) > 0 {
+		if value, err := options.GetString(internal_options.MicrophoneOptionBargeInTrigger); err == nil {
+			adaptiveVADInterruption = adaptiveVADInterruption && value != internal_options.BargeInTriggerWord
+		} else if value, err := options.GetString(internal_options.MicrophoneLegacyVADOptionBargeInTrigger); err == nil {
+			adaptiveVADInterruption = adaptiveVADInterruption && value != internal_options.BargeInTriggerWord
+		}
+	}
+	if adaptiveVADInterruption {
+		currentContextID := h.r.GetID()
+		isCommittedVADEnd := false
+		h.r.interruptionMu.Lock()
+		if h.r.interruptionContextID != "" {
+			if p.ContextID != "" && p.ContextID != h.r.interruptionContextID && p.ContextID != currentContextID {
+				h.r.interruptionMu.Unlock()
+				return
+			}
+			emitSpeechToTextStart := p.Event == internal_type.InterruptionEventStart && !h.r.interruptionSpeechActive
+			emitSpeechToTextEnd := p.Event == internal_type.InterruptionEventEnd && h.r.interruptionSpeechActive
+			if emitSpeechToTextStart || emitSpeechToTextEnd {
+				h.r.interruptionHeldPackets = append(h.r.interruptionHeldPackets, p)
+				h.r.interruptionSpeechActive = emitSpeechToTextStart
+			}
+			h.r.interruptionMu.Unlock()
+			if emitSpeechToTextStart {
+				h.r.OnPacket(ctx, internal_type.SpeechToTextStartPacket{ContextID: currentContextID})
+			} else if emitSpeechToTextEnd {
+				h.r.OnPacket(ctx, internal_type.SpeechToTextEndPacket{ContextID: currentContextID})
+			}
+			return
+		}
+
+		if p.ContextID != "" && p.ContextID != currentContextID {
+			if p.Event != internal_type.InterruptionEventEnd || p.ContextID != h.r.pendingInterruptionVADEndContextID {
+				h.r.interruptionMu.Unlock()
+				return
+			}
+			h.r.pendingInterruptionVADEndContextID = ""
+			p.ContextID = currentContextID
+			isCommittedVADEnd = true
+		}
+
+		messageState := h.r.messageLifecycle.State()
+		outputActive := messageState == adapter_lifecycle.MessageStateAssistantGenerating ||
+			messageState == adapter_lifecycle.MessageStateAssistantGenerated ||
+			messageState == adapter_lifecycle.MessageStateAssistantSpeaking
+		if outputActive {
+			if p.Event != internal_type.InterruptionEventStart {
+				h.r.interruptionMu.Unlock()
+				return
+			}
+			h.r.interruptionSequence++
+			h.r.interruptionContextID = currentContextID
+			h.r.interruptionPreviousState = string(messageState)
+			h.r.interruptionSpeechActive = true
+			h.r.interruptionDecisionPending = false
+			h.r.interruptionTurnCommitted = false
+			h.r.interruptionHeldPackets = []internal_type.Packet{p}
+			h.r.pendingInterruptionVADEndContextID = ""
+			interruptionSequence := h.r.interruptionSequence
+			dispatchContext := h.r.sessionCtx
+			if dispatchContext == nil {
+				dispatchContext = ctx
+			}
+			h.r.interruptionDecisionTimer = time.AfterFunc(interruptionDecisionWindow, func() {
+				h.r.dispatch(dispatchContext, internal_type.InterruptionDecisionExpiredPacket{
+					ContextID: currentContextID,
+					Sequence:  interruptionSequence,
+				})
+			})
+			if outputControlError := h.r.sendOutputControl(internal_type.PauseOutput{}); outputControlError != nil {
+				h.r.OnPacket(ctx, internal_type.ObservabilityLogRecordPacket{
+					ContextID: currentContextID,
+					Scope:     internal_type.ObservabilityRecordScopeConversation,
+					Record: observability.RecordLog{
+						Level:   observability.LevelError,
+						Message: "Interruption output control failed",
+						Attributes: observability.Attributes{
+							"component": observability.ComponentConversation.String(),
+							"error":     outputControlError.Error(),
+						},
+					},
+				})
+				if h.r.interruptionContextID == currentContextID && h.r.interruptionSequence == interruptionSequence && !h.r.interruptionDecisionPending {
+					h.r.interruptionDecisionPending = true
+					if h.r.interruptionDecisionTimer != nil {
+						h.r.interruptionDecisionTimer.Stop()
+						h.r.interruptionDecisionTimer = nil
+					}
+				}
+				h.r.interruptionMu.Unlock()
+				utils.Go(ctx, func() {
+					h.r.dispatch(ctx, internal_type.TurnChangePacket{
+						InterruptionDecision: true,
+						InterruptionSequence: interruptionSequence,
+						PreviousContextID:    currentContextID,
+						Reason:               "interrupted",
+						Source:               string(internal_type.InterruptionSourceVad),
+						PreviousState:        string(messageState),
+						Trigger:              string(p.PacketName()),
+						Time:                 time.Now(),
+					})
+				})
+				return
+			}
+			h.r.interruptionMu.Unlock()
+			h.r.OnPacket(ctx, internal_type.SpeechToTextStartPacket{ContextID: currentContextID})
+			return
+		}
+		h.r.interruptionMu.Unlock()
+		if isCommittedVADEnd {
+			h.r.OnPacket(ctx, internal_type.SpeechToTextEndPacket{ContextID: currentContextID})
+			if h.r.endOfSpeechExecutor != nil {
+				_ = h.r.endOfSpeechExecutor.Execute(ctx, p)
+			}
+			return
+		}
+		p.ContextID = currentContextID
+		if p.Event == internal_type.InterruptionEventStart {
+			_ = h.r.messageLifecycle.UserSpeaking(currentContextID)
+			h.r.dispatch(ctx, internal_type.SpeechToTextStartPacket{ContextID: currentContextID})
+		} else if p.Event == internal_type.InterruptionEventEnd {
+			_ = h.r.messageLifecycle.UserListening(currentContextID)
+			h.r.dispatch(ctx, internal_type.SpeechToTextEndPacket{ContextID: currentContextID})
+		}
+		if h.r.endOfSpeechExecutor != nil {
+			_ = h.r.endOfSpeechExecutor.Execute(ctx, p)
+		}
 		return
 	}
 	if p.ContextID == "" {
@@ -819,6 +1065,55 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 	}
 }
 
+func (h requestorDispatchHandler) HandleInterruptionDecisionExpired(ctx context.Context, p internal_type.InterruptionDecisionExpiredPacket) {
+	if !h.r.interruptionEnabled {
+		return
+	}
+	h.r.interruptionMu.Lock()
+	if h.r.interruptionContextID != p.ContextID || h.r.interruptionSequence != p.Sequence || h.r.interruptionDecisionPending {
+		h.r.interruptionMu.Unlock()
+		return
+	}
+	if h.r.interruptionDecisionTimer != nil {
+		h.r.interruptionDecisionTimer.Stop()
+		h.r.interruptionDecisionTimer = nil
+	}
+	if h.r.interruptionSpeechActive {
+		h.r.interruptionDecisionPending = true
+		previousState := h.r.interruptionPreviousState
+		h.r.interruptionMu.Unlock()
+		h.r.dispatch(ctx, internal_type.TurnChangePacket{
+			InterruptionDecision: true,
+			InterruptionSequence: p.Sequence,
+			PreviousContextID:    p.ContextID,
+			Reason:               "interrupted",
+			Source:               string(internal_type.InterruptionSourceVad),
+			PreviousState:        previousState,
+			Trigger:              string(internal_type.PacketNameInterruptionDetected),
+			Time:                 time.Now(),
+		})
+		return
+	}
+	h.r.interruptionContextID = ""
+	h.r.interruptionPreviousState = ""
+	h.r.interruptionHeldPackets = nil
+	h.r.interruptionMu.Unlock()
+	if outputControlError := h.r.sendOutputControl(internal_type.ContinueOutput{}); outputControlError != nil {
+		h.r.OnPacket(ctx, internal_type.ObservabilityLogRecordPacket{
+			ContextID: p.ContextID,
+			Scope:     internal_type.ObservabilityRecordScopeConversation,
+			Record: observability.RecordLog{
+				Level:   observability.LevelError,
+				Message: "Interruption output control failed",
+				Attributes: observability.Attributes{
+					"component": observability.ComponentConversation.String(),
+					"error":     outputControlError.Error(),
+				},
+			},
+		})
+	}
+}
+
 func (h requestorDispatchHandler) HandleEndOfSpeechInterruption(ctx context.Context, p internal_type.EndOfSpeechInterruptionPacket) {
 	if h.r.endOfSpeechExecutor != nil {
 		if err := h.r.endOfSpeechExecutor.Execute(ctx, p); err != nil {
@@ -944,21 +1239,114 @@ func (h requestorDispatchHandler) HandleSpeechToTextEnd(ctx context.Context, p i
 }
 func (h requestorDispatchHandler) HandleTurnChange(ctx context.Context, p internal_type.TurnChangePacket) {
 	if p.InterruptionDecision {
-		if h.r.interruption == nil {
+		if !h.r.interruptionEnabled || p.InterruptionSequence == 0 {
 			return
 		}
-		reply := h.r.interruption.submit(ctx, interruptionEvent{packet: p})
-		if !reply.accepted {
+		h.r.interruptionMu.Lock()
+		if h.r.interruptionContextID != p.PreviousContextID ||
+			h.r.interruptionSequence != p.InterruptionSequence ||
+			!h.r.interruptionDecisionPending || h.r.interruptionTurnCommitted {
+			h.r.interruptionMu.Unlock()
 			return
 		}
-		p = reply.turn
-		defer func() { h.r.interruption.submit(ctx, interruptionEvent{packet: p, complete: true}) }()
-		h.HandleEndOfSpeechInterruption(ctx, internal_type.EndOfSpeechInterruptionPacket{
-			ContextID: p.PreviousContextID, Source: internal_type.InterruptionSourceVad,
-		})
-		h.HandleTextToSpeechInterrupt(ctx, internal_type.TextToSpeechInterruptPacket{ContextID: p.PreviousContextID})
-		h.HandleLLMInterrupt(ctx, internal_type.LLMInterruptPacket{ContextID: p.PreviousContextID})
-		h.r.OnPacket(ctx, internal_type.StopIdleTimeoutPacket{ContextID: p.PreviousContextID})
+		h.r.interruptionTurnCommitted = true
+		if h.r.interruptionDecisionTimer != nil {
+			h.r.interruptionDecisionTimer.Stop()
+			h.r.interruptionDecisionTimer = nil
+		}
+		h.r.interruptionMu.Unlock()
+
+		if outputControlError := h.r.sendOutputControl(internal_type.FlushOutput{}); outputControlError != nil {
+			h.r.OnPacket(ctx, internal_type.ObservabilityLogRecordPacket{
+				ContextID: p.PreviousContextID,
+				Scope:     internal_type.ObservabilityRecordScopeConversation,
+				Record: observability.RecordLog{
+					Level:   observability.LevelError,
+					Message: "Interruption output control failed",
+					Attributes: observability.Attributes{
+						"component": observability.ComponentConversation.String(),
+						"error":     outputControlError.Error(),
+					},
+				},
+			})
+		}
+		h.r.interruptionMu.Lock()
+		if h.r.interruptionContextID != p.PreviousContextID ||
+			h.r.interruptionSequence != p.InterruptionSequence || !h.r.interruptionTurnCommitted {
+			h.r.interruptionMu.Unlock()
+			return
+		}
+		oldContextID, newContextID, err := h.r.messageLifecycle.RotateContext()
+		if err != nil {
+			h.r.interruptionContextID = ""
+			h.r.interruptionPreviousState = ""
+			h.r.interruptionSpeechActive = false
+			h.r.interruptionDecisionPending = false
+			h.r.interruptionTurnCommitted = false
+			h.r.interruptionHeldPackets = nil
+			h.r.interruptionMu.Unlock()
+			return
+		}
+		h.r.interruptionMu.Unlock()
+		p.ContextID = newContextID
+		p.PreviousContextID = oldContextID
+		if h.r.unclearInputWatchdog != nil {
+			h.r.unclearInputWatchdog.Stop()
+		}
+		_ = h.r.messageLifecycle.UserListening(newContextID)
+		for _, interruptionPacket := range []internal_type.Packet{
+			internal_type.EndOfSpeechInterruptionPacket{ContextID: p.PreviousContextID, Source: internal_type.InterruptionSourceVad},
+			internal_type.TextToSpeechInterruptPacket{ContextID: p.PreviousContextID},
+			internal_type.LLMInterruptPacket{ContextID: p.PreviousContextID},
+		} {
+			h.r.dispatchRoute.Route(ctx, interruptionPacket, func(ctx context.Context, packet internal_type.Packet) {
+				_ = adapter_router.DispatchPacket(ctx, packet, requestorDispatchHandler{r: h.r})
+			})
+		}
+		h.r.dispatch(ctx, internal_type.StopIdleTimeoutPacket{ContextID: p.PreviousContextID})
+		defer func() {
+			h.r.interruptionMu.Lock()
+			if h.r.interruptionSequence != p.InterruptionSequence || h.r.interruptionContextID != p.PreviousContextID {
+				h.r.interruptionMu.Unlock()
+				return
+			}
+			heldPackets := slices.Clone(h.r.interruptionHeldPackets)
+			if h.r.interruptionSpeechActive {
+				h.r.pendingInterruptionVADEndContextID = p.PreviousContextID
+			}
+			h.r.committedInterruptionContextID = p.ContextID
+			h.r.previousInterruptionContextID = p.PreviousContextID
+			h.r.interruptionContextID = ""
+			h.r.interruptionPreviousState = ""
+			h.r.interruptionSpeechActive = false
+			h.r.interruptionDecisionPending = false
+			h.r.interruptionTurnCommitted = false
+			h.r.interruptionHeldPackets = nil
+			h.r.interruptionMu.Unlock()
+
+			for _, heldPacket := range heldPackets {
+				switch held := heldPacket.(type) {
+				case internal_type.InterruptionDetectedPacket:
+					held.ContextID = p.ContextID
+					if h.r.endOfSpeechExecutor != nil {
+						_ = h.r.endOfSpeechExecutor.Execute(ctx, held)
+					}
+				case internal_type.SpeechToTextPacket:
+					held.ContextID = p.ContextID
+					h.r.dispatch(ctx, held)
+				case internal_type.EndOfSpeechPacket:
+					held.ContextID = p.ContextID
+					held.Speechs = slices.Clone(held.Speechs)
+					for index := range held.Speechs {
+						held.Speechs[index].ContextID = p.ContextID
+					}
+					h.r.dispatch(ctx, held)
+				case internal_type.UserInputPacket:
+					held.ContextID = p.ContextID
+					h.r.dispatch(ctx, held)
+				}
+			}
+		}()
 	}
 	if p.ContextID == "" {
 		p.ContextID = h.r.GetID()
@@ -1475,19 +1863,16 @@ func (h requestorDispatchHandler) HandleIdleTimeoutExpired(ctx context.Context, 
 }
 
 func (h requestorDispatchHandler) HandleUnclearInputExpired(ctx context.Context, p internal_type.UnclearInputExpiredPacket) {
-	if h.r.usesInterruptionOwner() {
-		h.r.interruption.submit(ctx, interruptionEvent{packet: p})
-		return
-	}
-	h.handleUnclearInputExpired(ctx, p)
-}
-
-func (h requestorDispatchHandler) handleUnclearInputExpired(ctx context.Context, p internal_type.UnclearInputExpiredPacket) {
-	if h.r.usesInterruptionOwner() && (h.r.unclearInputWatchdog == nil || !h.r.unclearInputWatchdog.AcceptExpiry(p)) {
-		return
-	}
 	if p.ContextID != h.r.GetID() {
 		return
+	}
+	if h.r.interruptionEnabled {
+		h.r.interruptionMu.Lock()
+		isCommittedInterruption := p.ContextID == h.r.committedInterruptionContextID
+		h.r.interruptionMu.Unlock()
+		if !isCommittedInterruption || h.r.unclearInputWatchdog == nil || !h.r.unclearInputWatchdog.AcceptExpiry(p) {
+			return
+		}
 	}
 	messageState := h.r.messageLifecycle.State()
 	if messageState != adapter_lifecycle.MessageStateUserIdle &&
@@ -1521,22 +1906,18 @@ func (h requestorDispatchHandler) handleUnclearInputExpired(ctx context.Context,
 		interruptionSource = internal_type.InterruptionSourceWord
 		interruptionType = protos.ConversationInterruption_INTERRUPTION_TYPE_WORD
 	}
-	interruptionOwnerEnabled := h.r.usesInterruptionOwner()
-	var newContextID string
-	if interruptionOwnerEnabled {
-		reply := h.r.interruption.submit(ctx, interruptionEvent{packet: p, complete: true})
-		if !reply.accepted {
-			return
-		}
-		newContextID = reply.turn.ContextID
-	} else {
-		if err := h.r.messageLifecycle.UserPrompted(oldContextID); err != nil {
-			return
-		}
-		_, newContextID, err = h.r.messageLifecycle.RotateContext()
-		if err != nil {
-			return
-		}
+	if err := h.r.messageLifecycle.UserPrompted(oldContextID); err != nil {
+		return
+	}
+	_, newContextID, err := h.r.messageLifecycle.RotateContext()
+	if err != nil {
+		return
+	}
+	if h.r.interruptionEnabled {
+		h.r.interruptionMu.Lock()
+		h.r.committedInterruptionContextID = ""
+		h.r.previousInterruptionContextID = ""
+		h.r.interruptionMu.Unlock()
 	}
 	h.r.OnPacket(ctx,
 		internal_type.StopIdleTimeoutPacket{ContextID: oldContextID},
@@ -1552,7 +1933,7 @@ func (h requestorDispatchHandler) handleUnclearInputExpired(ctx context.Context,
 		internal_type.LLMInterruptPacket{ContextID: oldContextID},
 	)
 	utils.Go(ctx, func() {
-		if !interruptionOwnerEnabled {
+		if !h.r.interruptionEnabled {
 			if outputControlError := h.r.sendOutputControl(internal_type.FlushOutput{}); outputControlError != nil && h.r.logger != nil {
 				h.r.logger.Errorf("error while flushing interrupted output %v", outputControlError)
 			}
@@ -3611,9 +3992,27 @@ func (h requestorDispatchHandler) HandleFinalizeInboundDispatcher(ctx context.Co
 }
 
 func (h requestorDispatchHandler) HandleFinalizeBehavior(ctx context.Context, p internal_type.FinalizeBehaviorPacket) {
-	if h.r.interruption != nil {
-		h.r.interruption.cancel()
-		<-h.r.interruption.done
+	if h.r.interruptionEnabled {
+		h.r.interruptionMu.Lock()
+		continueOutput := h.r.interruptionContextID != "" && !h.r.interruptionTurnCommitted
+		if h.r.interruptionDecisionTimer != nil {
+			h.r.interruptionDecisionTimer.Stop()
+		}
+		h.r.interruptionSequence++
+		h.r.interruptionContextID = ""
+		h.r.interruptionPreviousState = ""
+		h.r.interruptionSpeechActive = false
+		h.r.interruptionDecisionPending = false
+		h.r.interruptionTurnCommitted = false
+		h.r.interruptionHeldPackets = nil
+		h.r.interruptionDecisionTimer = nil
+		h.r.committedInterruptionContextID = ""
+		h.r.previousInterruptionContextID = ""
+		h.r.pendingInterruptionVADEndContextID = ""
+		h.r.interruptionMu.Unlock()
+		if continueOutput {
+			_ = h.r.sendOutputControl(internal_type.ContinueOutput{})
+		}
 	}
 	if h.r.idleTimeoutWatchdog != nil {
 		h.r.idleTimeoutWatchdog.Cancel()

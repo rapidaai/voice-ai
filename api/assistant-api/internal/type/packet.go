@@ -48,6 +48,7 @@ const (
 	PacketNameInterimEndOfSpeech                         PacketName = "InterimEndOfSpeechPacket"
 	PacketNameUserInput                                  PacketName = "UserInputPacket"
 	PacketNameInterruptionDetected                       PacketName = "InterruptionDetectedPacket"
+	PacketNameInterruptionDecisionExpired                PacketName = "InterruptionDecisionExpiredPacket"
 	PacketNameTextToSpeechInterrupt                      PacketName = "TextToSpeechInterruptPacket"
 	PacketNameSpeechToTextError                          PacketName = "SpeechToTextErrorPacket"
 	PacketNameSpeechToTextEnd                            PacketName = "SpeechToTextEndPacket"
@@ -431,9 +432,21 @@ type LLMInterruptPacket struct {
 func (f LLMInterruptPacket) ContextId() string      { return f.ContextID }
 func (f LLMInterruptPacket) PacketName() PacketName { return PacketNameLLMInterrupt }
 
+// InterruptionDecisionExpiredPacket signals that an interruption decision deadline expired.
+type InterruptionDecisionExpiredPacket struct {
+	ContextID string
+	Sequence  uint64
+}
+
+func (f InterruptionDecisionExpiredPacket) ContextId() string { return f.ContextID }
+func (f InterruptionDecisionExpiredPacket) PacketName() PacketName {
+	return PacketNameInterruptionDecisionExpired
+}
+
 // TurnChangePacket notifies components that active context changed to a new turn.
 type TurnChangePacket struct {
 	InterruptionDecision bool
+	InterruptionSequence uint64
 	ContextID            string
 	PreviousContextID    string
 	Reason               string
