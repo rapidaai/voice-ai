@@ -120,7 +120,7 @@ func TestGetSpeechToTextConnectionString_Default(t *testing.T) {
 	assert.NotContains(t, connStr, "api_key=")
 	assert.NotContains(t, connStr, "cartesia_version=")
 	assert.Contains(t, connStr, "encoding=pcm_s16le")
-	assert.Contains(t, connStr, "model=ink-whisper")
+	assert.Contains(t, connStr, "model=ink-2")
 	assert.Contains(t, connStr, "sample_rate=16000")
 }
 

@@ -110,7 +110,7 @@ func (co *cartesiaOption) GetSpeechToTextConnectionString() string {
 	params.Add("encoding", co.GetEncoding())
 	params.Add("sample_rate", "16000")
 
-	model := "ink-whisper"
+	model := "ink-2"
 	if configuredModel, err := co.mdlOpts.GetString(internal_options.ListenOptionModel); err == nil {
 		model = configuredModel
 	}
