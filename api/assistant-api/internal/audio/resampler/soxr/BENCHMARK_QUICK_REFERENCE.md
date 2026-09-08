@@ -78,21 +78,11 @@ go test -bench=BenchmarkStressTest ./api/assistant-api/internal/audio/resampler/
 | `-v`               | Verbose output          | `go test -bench=. -v`                   |
 | `-race`            | Race detection          | `go test -bench=. -race`                |
 
-## Performance Targets
+## Realtime Target
 
-### Expected Performance Ranges
-
-- **Sequential Resampling**: ~600-800 µs per 100k samples
-- **Parallel 8-Core**: ~300-400 µs per 100k samples (should see 2x improvement)
-- **Float32 Conversion**: ~100-200 µs per 100k samples
-- **MuLaw Encoding**: ~150-250 µs per 100k samples
-
-### Scaling Expectations
-
-- 2 cores: ~1.5-1.8x speedup
-- 4 cores: ~2.5-3.0x speedup
-- 8 cores: ~3.5-4.5x speedup
-- 16 cores: ~4.0-6.0x speedup (depends on CPU)
+`BenchmarkRealtimeResample20ms` should remain below 5 µs and 5 allocations
+per operation on supported development hardware. Treat a regression above
+either threshold as a reason to inspect the hot path before merging.
 
 ## Quick Profiling Workflow
 

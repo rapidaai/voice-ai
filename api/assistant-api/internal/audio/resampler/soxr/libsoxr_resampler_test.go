@@ -32,26 +32,18 @@ func newTestLogger(t testing.TB) commons.Logger {
 	return logger
 }
 
-func newTestResampler(t testing.TB) *libsoxrResampler {
-	r := New(WithLogger(newTestLogger(t)), WithHighQuality())
-	res, ok := r.(*libsoxrResampler)
-	require.True(t, ok)
-	return res
+func newTestResampler(t testing.TB) *Resampler {
+	return New(WithLogger(newTestLogger(t)), WithHighQuality())
 }
 
-// TestNewAudioResampler validates resampler creation
 func TestNewAudioResampler(t *testing.T) {
-	r := New(WithLogger(newTestLogger(t)))
-	assert.NotNil(t, r)
-	resampler, ok := r.(*libsoxrResampler)
-	assert.True(t, ok)
+	resampler := New(WithLogger(newTestLogger(t)))
+	assert.NotNil(t, resampler)
 	assert.Equal(t, resampling.QualityHigh, resampler.quality)
 }
 
 func TestNewAudioResamplerAppliesQuickQuality(t *testing.T) {
-	r := New(WithLogger(newTestLogger(t)), WithQuickQuality())
-	resampler, ok := r.(*libsoxrResampler)
-	require.True(t, ok)
+	resampler := New(WithLogger(newTestLogger(t)), WithQuickQuality())
 	assert.Equal(t, resampling.QualityQuick, resampler.quality)
 }
 
@@ -82,17 +74,31 @@ func TestRealtimeAudioResamplerInstancesKeepIndependentState(tester *testing.T) 
 	firstInput := generateLinear16Data(160)
 	secondInput := make([]byte, len(firstInput))
 
-	first := New(WithLogger(newTestLogger(tester)), WithQuickQuality())
-	second := New(WithLogger(newTestLogger(tester)), WithQuickQuality())
-	reference := New(WithLogger(newTestLogger(tester)), WithQuickQuality())
+	firstResampler := New(WithLogger(newTestLogger(tester)), WithQuickQuality())
+	secondResampler := New(WithLogger(newTestLogger(tester)), WithQuickQuality())
+	referenceResampler := New(WithLogger(newTestLogger(tester)), WithQuickQuality())
 
-	_, err := first.Resample(firstInput, source, target)
+	_, err := firstResampler.Resample(firstInput, source, target)
 	require.NoError(tester, err)
-	got, err := second.Resample(secondInput, source, target)
+	actualOutput, err := secondResampler.Resample(secondInput, source, target)
 	require.NoError(tester, err)
-	want, err := reference.Resample(secondInput, source, target)
+	expectedOutput, err := referenceResampler.Resample(secondInput, source, target)
 	require.NoError(tester, err)
-	require.Equal(tester, want, got)
+	require.Equal(tester, expectedOutput, actualOutput)
+}
+
+func TestRealtimeAudioResamplerRejectsUseAfterClose(t *testing.T) {
+	resampler := New(WithQuickQuality())
+	source := internal_audio.NewLinear8khzMonoAudioConfig()
+	target := internal_audio.NewLinear16khzMonoAudioConfig()
+
+	_, err := resampler.Resample(generateLinear16Data(160), source, target)
+	require.NoError(t, err)
+	resampler.Close()
+	resampler.Close()
+
+	_, err = resampler.Resample(generateLinear16Data(160), source, target)
+	require.ErrorContains(t, err, "resampler is closed")
 }
 
 func TestRealtimeMuLawResamplingMatchesDecodedPCM(t *testing.T) {

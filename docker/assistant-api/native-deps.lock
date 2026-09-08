@@ -36,3 +36,7 @@ TEN_VAD_LIBRARY_SHA256=5abfe6bf6e9a4fcea6b440240f0a9a0f431ab5006e48a4e16465ebe68
 TEN_VAD_PROVENANCE=https://github.com/TEN-framework/ten-vad
 
 GOVULNCHECK_VERSION=v1.1.4
+
+SOXR_VERSION=0.1.3
+SOXR_LICENSE=LGPL-2.1-or-later
+SOXR_PROVENANCE=https://sourceforge.net/projects/soxr/

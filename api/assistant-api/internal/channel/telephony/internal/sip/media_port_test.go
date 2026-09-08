@@ -634,6 +634,12 @@ func TestMediaPort_CloseIsIdempotent(t *testing.T) {
 
 	require.NoError(t, mediaPort.Close())
 	require.NoError(t, mediaPort.Close())
+	_, err := mediaPort.audioProcessor.resamplers.provider.Resample(
+		make([]byte, MulawFrameSize*2),
+		Linear8kConfig,
+		Rapida16kConfig,
+	)
+	require.ErrorContains(t, err, "resampler is closed")
 }
 
 func TestMediaPort_DeliverAssistantFrameAfterCloseReturnsSessionClosed(t *testing.T) {
