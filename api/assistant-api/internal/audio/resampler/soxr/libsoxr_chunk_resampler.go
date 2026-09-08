@@ -16,24 +16,26 @@ import (
 	resampling "github.com/tphakala/go-audio-resampler"
 )
 
-// libsoxrChunkResampler uses the same libsoxr-style engine as the streaming
-// resampler, but treats each call as a bounded audio buffer and flushes before
-// returning. This is for preprocessing stages that must preserve per-call
-// duration.
+// chunkResampler preserves each independent buffer's duration.
 type chunkResampler struct {
 	logger  commons.Logger
 	quality resampling.QualityPreset
 }
 
 // NewChunk creates a stateless resampler for independent audio buffers.
-func NewChunk(options ...Option) internal_type.AudioResampler {
-	config := newOptions(options)
-	return &chunkResampler{logger: config.logger, quality: config.quality}
+func NewChunk(optionFunctions ...Option) internal_type.AudioResampler {
+	configuration := options{quality: defaultQuality}
+	for _, option := range optionFunctions {
+		if option != nil {
+			option(&configuration)
+		}
+	}
+	return &chunkResampler{logger: configuration.logger, quality: configuration.quality}
 }
 
 func (r *chunkResampler) Resample(data []byte, source, target *protos.AudioConfig) ([]byte, error) {
 	if source == nil || target == nil {
-		return nil, fmt.Errorf("source and target configs are required")
+		return nil, ErrAudioConfigRequired
 	}
 	if len(data) == 0 {
 		return []byte{}, nil
@@ -46,7 +48,7 @@ func (r *chunkResampler) Resample(data []byte, source, target *protos.AudioConfi
 
 	expectedBytes := expectedOutputBytes(data, source, target)
 
-	ops := &libsoxrResampler{}
+	ops := &Resampler{}
 	pcm := data
 	if source.AudioFormat != protos.AudioConfig_LINEAR16 {
 		var err error
@@ -64,13 +66,17 @@ func (r *chunkResampler) Resample(data []byte, source, target *protos.AudioConfi
 			r.quality,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("resample failed: %w", err)
+			return nil, fmt.Errorf("%w: %w", ErrResamplingFailed, err)
 		}
 		pcm = float64ToPCM16(out)
 	}
 
 	if source.Channels != target.Channels {
-		pcm = ops.convertChannels(pcm, source.Channels, target.Channels)
+		var err error
+		pcm, err = ops.convertChannels(pcm, source.Channels, target.Channels)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if target.AudioFormat != protos.AudioConfig_LINEAR16 {

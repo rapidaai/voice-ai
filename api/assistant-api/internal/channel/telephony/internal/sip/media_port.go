@@ -8,6 +8,7 @@ package internal_sip_telephony
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
@@ -38,8 +39,9 @@ type MediaPort struct {
 	streamSink     func(internal_type.Stream)
 	record         func(...observability.Record) error
 
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx                     context.Context
+	cancel                  context.CancelFunc
+	bridgeRecorderWaitGroup sync.WaitGroup
 
 	inputStarted          atomic.Bool
 	outputStarted         atomic.Bool
@@ -151,7 +153,11 @@ func (port *MediaPort) StartBridgeRecorder() {
 	if !port.bridgeRecorderStarted.CompareAndSwap(false, true) {
 		return
 	}
-	go port.audioProcessor.RunBridgeRecorder(port.ctx, port.streamSink)
+	port.bridgeRecorderWaitGroup.Add(1)
+	go func() {
+		defer port.bridgeRecorderWaitGroup.Done()
+		port.audioProcessor.RunBridgeRecorder(port.ctx, port.streamSink)
+	}()
 }
 
 func (port *MediaPort) Close() error {
@@ -169,6 +175,8 @@ func (port *MediaPort) Close() error {
 	if port.cancel != nil {
 		port.cancel()
 	}
+	port.bridgeRecorderWaitGroup.Wait()
+	port.audioProcessor.Close()
 	return nil
 }
 

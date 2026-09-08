@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	resampling "github.com/tphakala/go-audio-resampler"
+	"github.com/zaf/g711"
 )
 
 func newTestLogger(t testing.TB) commons.Logger {
@@ -31,26 +32,18 @@ func newTestLogger(t testing.TB) commons.Logger {
 	return logger
 }
 
-func newTestResampler(t testing.TB) *libsoxrResampler {
-	r := New(WithLogger(newTestLogger(t)), WithHighQuality())
-	res, ok := r.(*libsoxrResampler)
-	require.True(t, ok)
-	return res
+func newTestResampler(t testing.TB) *Resampler {
+	return New(WithLogger(newTestLogger(t)), WithHighQuality())
 }
 
-// TestNewAudioResampler validates resampler creation
 func TestNewAudioResampler(t *testing.T) {
-	r := New(WithLogger(newTestLogger(t)))
-	assert.NotNil(t, r)
-	resampler, ok := r.(*libsoxrResampler)
-	assert.True(t, ok)
+	resampler := New(WithLogger(newTestLogger(t)))
+	assert.NotNil(t, resampler)
 	assert.Equal(t, resampling.QualityHigh, resampler.quality)
 }
 
 func TestNewAudioResamplerAppliesQuickQuality(t *testing.T) {
-	r := New(WithLogger(newTestLogger(t)), WithQuickQuality())
-	resampler, ok := r.(*libsoxrResampler)
-	require.True(t, ok)
+	resampler := New(WithLogger(newTestLogger(t)), WithQuickQuality())
 	assert.Equal(t, resampling.QualityQuick, resampler.quality)
 }
 
@@ -81,17 +74,51 @@ func TestRealtimeAudioResamplerInstancesKeepIndependentState(tester *testing.T) 
 	firstInput := generateLinear16Data(160)
 	secondInput := make([]byte, len(firstInput))
 
-	first := New(WithLogger(newTestLogger(tester)), WithQuickQuality())
-	second := New(WithLogger(newTestLogger(tester)), WithQuickQuality())
-	reference := New(WithLogger(newTestLogger(tester)), WithQuickQuality())
+	firstResampler := New(WithLogger(newTestLogger(tester)), WithQuickQuality())
+	secondResampler := New(WithLogger(newTestLogger(tester)), WithQuickQuality())
+	referenceResampler := New(WithLogger(newTestLogger(tester)), WithQuickQuality())
 
-	_, err := first.Resample(firstInput, source, target)
+	_, err := firstResampler.Resample(firstInput, source, target)
 	require.NoError(tester, err)
-	got, err := second.Resample(secondInput, source, target)
+	actualOutput, err := secondResampler.Resample(secondInput, source, target)
 	require.NoError(tester, err)
-	want, err := reference.Resample(secondInput, source, target)
+	expectedOutput, err := referenceResampler.Resample(secondInput, source, target)
 	require.NoError(tester, err)
-	require.Equal(tester, want, got)
+	require.Equal(tester, expectedOutput, actualOutput)
+}
+
+func TestRealtimeAudioResamplerRejectsUseAfterClose(t *testing.T) {
+	resampler := New(WithQuickQuality())
+	source := internal_audio.NewLinear8khzMonoAudioConfig()
+	target := internal_audio.NewLinear16khzMonoAudioConfig()
+
+	_, err := resampler.Resample(generateLinear16Data(160), source, target)
+	require.NoError(t, err)
+	resampler.Close()
+	resampler.Close()
+
+	_, err = resampler.Resample(generateLinear16Data(160), source, target)
+	require.ErrorIs(t, err, ErrResamplerClosed)
+}
+
+func TestAudioResamplerRequiresAudioConfigs(t *testing.T) {
+	_, err := New().Resample([]byte{0, 0}, nil, nil)
+	require.ErrorIs(t, err, ErrAudioConfigRequired)
+}
+
+func TestRealtimeMuLawResamplingMatchesDecodedPCM(t *testing.T) {
+	muLawSource := internal_audio.NewMulaw8khzMonoAudioConfig()
+	linearSource := internal_audio.NewLinear8khzMonoAudioConfig()
+	target := internal_audio.NewLinear16khzMonoAudioConfig()
+	encoded := g711.EncodeUlaw(generateLinear16Data(160))
+
+	encodedResampler := New(WithQuickQuality())
+	linearResampler := New(WithQuickQuality())
+	got, err := encodedResampler.Resample(encoded, muLawSource, target)
+	require.NoError(t, err)
+	want, err := linearResampler.Resample(g711.DecodeUlaw(encoded), linearSource, target)
+	require.NoError(t, err)
+	require.Equal(t, want, got)
 }
 
 // TestResampleNoConversion tests when source and target are identical
@@ -203,6 +230,31 @@ func TestChannelConversion(t *testing.T) {
 			require.NoError(t, err)
 			expectedSize := int(float64(len(data)) * tt.expectedGrowth)
 			assert.Equal(t, expectedSize, len(result), "unexpected result size")
+		})
+	}
+}
+
+func TestChannelConversionRejectsInvalidFrames(t *testing.T) {
+	resampler := newTestResampler(t)
+	tests := []struct {
+		name           string
+		data           []byte
+		sourceChannels uint32
+		targetChannels uint32
+		expectedError  error
+	}{
+		{name: "incomplete mono sample", data: []byte{1}, sourceChannels: 1, targetChannels: 2, expectedError: ErrInvalidPCM16ChannelFrame},
+		{name: "incomplete stereo frame", data: make([]byte, 6), sourceChannels: 2, targetChannels: 1, expectedError: ErrInvalidPCM16ChannelFrame},
+		{name: "unsupported channel count", data: make([]byte, 12), sourceChannels: 3, targetChannels: 1, expectedError: ErrUnsupportedChannelConversion},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			source := &protos.AudioConfig{SampleRate: 16000, AudioFormat: protos.AudioConfig_LINEAR16, Channels: test.sourceChannels}
+			target := &protos.AudioConfig{SampleRate: 16000, AudioFormat: protos.AudioConfig_LINEAR16, Channels: test.targetChannels}
+
+			_, err := resampler.Resample(test.data, source, target)
+			require.ErrorIs(t, err, test.expectedError)
 		})
 	}
 }

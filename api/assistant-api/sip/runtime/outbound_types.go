@@ -89,19 +89,19 @@ type OutboundConfig struct {
 }
 
 type OutboundInviteRequest struct {
-	Config  OutboundConfig
+	Config  *OutboundConfig
 	Address CallAddress
 }
 
-func (c OutboundConfig) EffectiveRingingTimeout() time.Duration {
-	if c.RingingTimeout > 0 {
+func (c *OutboundConfig) EffectiveRingingTimeout() time.Duration {
+	if c != nil && c.RingingTimeout > 0 {
 		return c.RingingTimeout
 	}
 	return defaultOutboundRingingTimeout
 }
 
-func (c OutboundConfig) EffectiveMaxCallDuration() time.Duration {
-	if c.MaxCallDuration > 0 {
+func (c *OutboundConfig) EffectiveMaxCallDuration() time.Duration {
+	if c != nil && c.MaxCallDuration > 0 {
 		return c.MaxCallDuration
 	}
 	return 0

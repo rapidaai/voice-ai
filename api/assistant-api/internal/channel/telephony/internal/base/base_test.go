@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
+	channel_base "github.com/rapidaai/api/assistant-api/internal/channel/base"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
@@ -65,6 +66,19 @@ func TestNewInitializesBaseStreamer(t *testing.T) {
 	require.Same(t, logger, base.Logger)
 	require.NotNil(t, base.InputCh)
 	require.NotNil(t, base.OutputCh)
+}
+
+func TestNewAppliesStreamerOptions(t *testing.T) {
+	base := New(
+		newTestLogger(t),
+		&callcontext.CallContext{},
+		nil,
+		nil,
+		channel_base.WithInputChannelCapacity(25),
+	)
+	t.Cleanup(base.Cancel)
+
+	require.Equal(t, 25, base.InputCh.Capacity())
 }
 
 func TestCreateConnectionRequest_EmitsAllClientKeys(t *testing.T) {

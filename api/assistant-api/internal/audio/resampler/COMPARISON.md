@@ -14,7 +14,13 @@ resampler := soxr.New(
 ```
 
 Use `WithQuickQuality()` for latency-sensitive speech. The constructor uses
-high quality when no quality option is supplied.
+native libsoxr with direct PCM16 buffers for this mode. When CGO or libsoxr is
+unavailable, it falls back to the Go polyphase implementation. The constructor
+uses the higher-quality Go implementation when no quality option is supplied.
+
+Native development requires `libsoxr` and `pkg-config`. Install `libsoxr` with
+Homebrew on macOS or install `libsoxr-dev` on Debian-based systems. The
+assistant API production image installs the build and runtime packages.
 
 ## Linear
 

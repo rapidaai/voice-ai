@@ -9,6 +9,7 @@ package sip_runtime
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
@@ -73,7 +74,7 @@ func (s *Server) BridgeTransfer(ctx context.Context, inbound, outbound *Session,
 		return BridgeEndContext, err
 	}
 
-	var droppedFrames uint64
+	var droppedFrames atomic.Uint64
 	outRTP.SetInboundAudioSink(func(frame InboundAudioFrame) {
 		s.forwardBridgeAudioFrame(ctx, frame, inRTP, needsTranscode, outCodec, inCodec, onOperatorAudio, &droppedFrames)
 	})
@@ -144,7 +145,7 @@ func (s *Server) beginBridgeLegLifecycle(session *Session, legRole string) error
 }
 
 // forwardBridgeAudioFrame forwards one operator frame to the caller.
-func (s *Server) forwardBridgeAudioFrame(ctx context.Context, frame InboundAudioFrame, dst internal_type.SIPRTPBridgeTarget, needsTranscode bool, srcCodec, dstCodec *Codec, onAudio func([]byte), droppedFrames *uint64) {
+func (s *Server) forwardBridgeAudioFrame(ctx context.Context, frame InboundAudioFrame, dst internal_type.SIPRTPBridgeTarget, needsTranscode bool, srcCodec, dstCodec *Codec, onAudio func([]byte), droppedFrames *atomic.Uint64) {
 	if ctx.Err() != nil {
 		return
 	}
@@ -154,10 +155,10 @@ func (s *Server) forwardBridgeAudioFrame(ctx context.Context, frame InboundAudio
 		data = s.transcodeG711(data, srcCodec, dstCodec)
 	}
 	if err := dst.WriteAudio(data); err != nil {
-		*droppedFrames = *droppedFrames + 1
-		if s.logger != nil && (*droppedFrames == 1 || *droppedFrames%100 == 0) {
+		totalDroppedFrames := droppedFrames.Add(1)
+		if s.logger != nil && (totalDroppedFrames == 1 || totalDroppedFrames%100 == 0) {
 			s.logger.Warnw("Bridge RTP audio write failed",
-				"failed_frames_total", *droppedFrames,
+				"failed_frames_total", totalDroppedFrames,
 				"error", err)
 		}
 		return

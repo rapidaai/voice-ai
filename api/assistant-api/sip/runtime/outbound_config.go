@@ -11,13 +11,17 @@ import (
 	"strings"
 )
 
-func (c *Config) ToOutboundConfig() OutboundConfig {
+func (c *Config) ToOutboundConfig() *OutboundConfig {
+	if c == nil {
+		return nil
+	}
+
 	headers := make(map[string]string, len(c.CustomHeaders))
 	for name, value := range c.CustomHeaders {
 		headers[name] = value
 	}
 
-	return OutboundConfig{
+	return &OutboundConfig{
 		Mode:            OutboundModeTrunkTermination,
 		Address:         c.Server,
 		Port:            c.Port,
@@ -55,6 +59,10 @@ func NewOutboundInviteRequest(cfg *Config, toUser string, fromUser string) (Outb
 }
 
 func (r OutboundInviteRequest) Validate() error {
+	if r.Config == nil {
+		return fmt.Errorf("%w: outbound config is required", ErrInvalidConfig)
+	}
+
 	switch r.Config.Mode {
 	case OutboundModeTrunkTermination:
 	default:

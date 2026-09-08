@@ -7,8 +7,8 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 
 mode=${1:-builder}
 case "$mode" in
-  builder) packages='python3 python3-pip libc++-dev libc++abi-dev' ;;
-  runtime) packages='libopus0 libopusfile0 libc++1' ;;
+  builder) packages='python3 python3-pip libc++-dev libc++abi-dev pkg-config libsoxr-dev' ;;
+  runtime) packages='libopus0 libopusfile0 libc++1 libsoxr0' ;;
   *) echo "usage: $0 [builder|runtime]" >&2; exit 2 ;;
 esac
 

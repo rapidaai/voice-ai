@@ -193,10 +193,8 @@ func TestSend_AssistantAudioQueuesUntilOutputActivated(t *testing.T) {
 func TestSend_OutputControlsManagePendingPreAnswerAudio(t *testing.T) {
 	s := newTestSIPStreamer(t)
 	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
-		Id: "response-1",
-		Message: &protos.ConversationAssistantMessage_Audio{
-			Audio: []byte{1, 2, 3},
-		},
+		Id:      "response-1",
+		Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{1, 2, 3}},
 	}))
 
 	require.NoError(t, s.Send(internal_type.PauseOutput{}))
@@ -215,23 +213,16 @@ func TestSend_FlushBlocksLatePreAnswerResponseAudio(t *testing.T) {
 	audio := make([]byte, BridgeOutputFrameSize*4)
 
 	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
-		Id:        "response-1",
-		Message:   &protos.ConversationAssistantMessage_Audio{Audio: audio},
-		Completed: true,
+		Id: "response-1", Message: &protos.ConversationAssistantMessage_Audio{Audio: audio}, Completed: true,
 	}))
 	require.NoError(t, s.Send(internal_type.FlushOutput{}))
 	assert.Empty(t, s.pendingAssistantAudioFrames)
-
 	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
-		Id:        "response-1",
-		Message:   &protos.ConversationAssistantMessage_Audio{Audio: audio},
-		Completed: true,
+		Id: "response-1", Message: &protos.ConversationAssistantMessage_Audio{Audio: audio}, Completed: true,
 	}))
 	assert.Empty(t, s.pendingAssistantAudioFrames)
 	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
-		Id:        "response-2",
-		Message:   &protos.ConversationAssistantMessage_Audio{Audio: audio},
-		Completed: true,
+		Id: "response-2", Message: &protos.ConversationAssistantMessage_Audio{Audio: audio}, Completed: true,
 	}))
 	require.Len(t, s.pendingAssistantAudioFrames, 1)
 	assert.Equal(t, "response-2", s.pendingAssistantAudioFrames[0].responseID)
@@ -268,6 +259,39 @@ func TestShouldEndSessionOnClose_SkipsPreAnswerStates(t *testing.T) {
 	assert.True(t, shouldEndSessionOnClose(sip_runtime.CallStateConnected))
 }
 
+func TestNewRequiresSession(t *testing.T) {
+	_, err := New()
+	require.ErrorIs(t, err, ErrSessionRequired)
+}
+
+func TestNewRequiresLifecycleController(t *testing.T) {
+	_, err := New(WithSession(newTestInboundSIPSession(t, "missing-lifecycle")))
+	require.ErrorIs(t, err, ErrLifecycleControllerRequired)
+}
+
+func TestNewInitializesMediaPortBeforeCancellationWatcher(t *testing.T) {
+	logger, err := commons.NewApplicationLogger()
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	session := newTestInboundSIPSession(t, "cancelled-during-initialization")
+	session.SetRTPHandler(&sip_runtime.RTPHandler{})
+
+	stream, err := New(
+		WithContext(ctx),
+		WithLogger(logger),
+		WithSession(session),
+		WithLifecycle(&fakeSIPLifecycleController{}),
+		WithCallContext(&callcontext.CallContext{}),
+	)
+	require.NoError(t, err)
+	streamer := stream.(*Streamer)
+	require.NotNil(t, streamer.mediaPort)
+	require.Eventually(t, func() bool {
+		return streamer.closed.Load() && streamer.mediaPort.closed.Load()
+	}, time.Second, time.Millisecond)
+}
+
 func TestNew_RoutesBridgeRecordingOutsideRealtimeInput(t *testing.T) {
 	logger, err := commons.NewApplicationLogger()
 	require.NoError(t, err)
@@ -286,6 +310,7 @@ func TestNew_RoutesBridgeRecordingOutsideRealtimeInput(t *testing.T) {
 	require.NoError(t, err)
 	streamer := stream.(*Streamer)
 	t.Cleanup(func() { require.NoError(t, streamer.Close()) })
+	require.Equal(t, RealtimeInputChannelCapacity, streamer.InputCh.Capacity())
 	select {
 	case message := <-streamer.CriticalCh:
 		_, ok := message.(*protos.ConversationInitialization)

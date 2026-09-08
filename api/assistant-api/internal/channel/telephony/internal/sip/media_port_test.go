@@ -277,11 +277,7 @@ func TestMediaPort_RealUDPInputHandlesReorderingAndLoss(t *testing.T) {
 
 				expectedEncoded := append([][]byte(nil), encodedFrames...)
 				if testCase.expectLoss {
-					silenceByte := byte(0xFF)
-					if codec.Name == sip_runtime.CodecPCMA.Name {
-						silenceByte = 0xD5
-					}
-					expectedEncoded[1] = bytes.Repeat([]byte{silenceByte}, samplesPerFrame)
+					expectedEncoded = [][]byte{encodedFrames[0], encodedFrames[2]}
 				}
 
 				reference := resampler_soxr.New(resampler_soxr.WithQuickQuality())
@@ -681,6 +677,12 @@ func TestMediaPort_CloseIsIdempotent(t *testing.T) {
 
 	require.NoError(t, mediaPort.Close())
 	require.NoError(t, mediaPort.Close())
+	_, err := mediaPort.audioProcessor.resamplers.provider.Resample(
+		make([]byte, MulawFrameSize*2),
+		Linear8kConfig,
+		Rapida16kConfig,
+	)
+	require.ErrorIs(t, err, resampler_soxr.ErrResamplerClosed)
 }
 
 func TestMediaPort_DeliverAssistantFrameAfterCloseReturnsSessionClosed(t *testing.T) {

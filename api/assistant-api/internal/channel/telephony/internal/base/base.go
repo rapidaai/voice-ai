@@ -50,9 +50,11 @@ func New(
 	cc *callcontext.CallContext,
 	vaultCred *protos.VaultCredential,
 	observer observability.Recorder,
+	streamerOptions ...channel_base.Option,
 ) BaseTelephonyStreamer {
+	streamerOptions = append([]channel_base.Option{channel_base.WithLogger(logger)}, streamerOptions...)
 	return BaseTelephonyStreamer{
-		BaseStreamer: channel_base.New(channel_base.WithLogger(logger)),
+		BaseStreamer: channel_base.New(streamerOptions...),
 		callCtx:      cc,
 		resampler: resampler_soxr.New(
 			resampler_soxr.WithLogger(logger),

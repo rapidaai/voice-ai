@@ -21,7 +21,6 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
-	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	"github.com/zaf/g711"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -79,42 +78,71 @@ type AudioProcessor struct {
 	transferActive      atomic.Bool
 }
 
-func NewAudioProcessor(cfg AudioProcessorConfig) *AudioProcessor {
-	p := &AudioProcessor{
-		resamplers:           newAudioResamplers(cfg.Logger),
-		rtpHandler:           cfg.RTPHandler,
-		record:               cfg.Record,
+func NewAudioProcessor(config AudioProcessorConfig) *AudioProcessor {
+	processor := &AudioProcessor{
+		resamplers: audioResamplers{
+			provider: resampler_soxr.New(
+				resampler_soxr.WithLogger(config.Logger),
+				resampler_soxr.WithQuickQuality(),
+			),
+			assistant: resampler_soxr.New(
+				resampler_soxr.WithLogger(config.Logger),
+				resampler_soxr.WithQuickQuality(),
+			),
+			bridgeUser: resampler_soxr.New(
+				resampler_soxr.WithLogger(config.Logger),
+				resampler_soxr.WithQuickQuality(),
+			),
+			bridgeOperator: resampler_soxr.New(
+				resampler_soxr.WithLogger(config.Logger),
+				resampler_soxr.WithQuickQuality(),
+			),
+			ambient: resampler_soxr.New(
+				resampler_soxr.WithLogger(config.Logger),
+				resampler_soxr.WithQuickQuality(),
+			),
+		},
+		rtpHandler:           config.RTPHandler,
+		record:               config.Record,
 		providerOutputBuffer: internal_telephony_output.NewBytesFrameBuffer(MulawFrameSize * 8),
 		bridgeOutputBuffer:   internal_telephony_output.NewBytesFrameBuffer(BridgeOutputFrameSize * 8),
-		bridgeUserCh:         make(chan bridgeRecordingFrame, AudioChannelSize),
-		bridgeOperatorCh:     make(chan bridgeRecordingFrame, AudioChannelSize),
+		bridgeUserCh:         make(chan bridgeRecordingFrame, BridgeRecordingChannelCapacity),
+		bridgeOperatorCh:     make(chan bridgeRecordingFrame, BridgeRecordingChannelCapacity),
 	}
-	p.SetRingtone(cfg.Ringtone)
+	processor.SetRingtone(config.Ringtone)
 	ambientMixer, err := internal_ambient.NewLoopMixer(internal_ambient.MixerSpec{
-		Resampler:         p.resamplers.ambient,
+		Resampler:         processor.resamplers.ambient,
 		TargetAudioConfig: Linear8kConfig,
 		FrameBytes:        MulawFrameSize * 2,
 	})
 	if err == nil {
-		p.ambientMixer = ambientMixer
-		if cfg.Ambient != nil {
-			_ = p.ambientMixer.Configure(*cfg.Ambient)
+		processor.ambientMixer = ambientMixer
+		if config.Ambient != nil {
+			_ = processor.ambientMixer.Configure(*config.Ambient)
 		}
 	}
-	return p
+	return processor
 }
 
-func newAudioResamplers(logger commons.Logger) audioResamplers {
-	options := []resampler_soxr.Option{
-		resampler_soxr.WithLogger(logger),
-		resampler_soxr.WithQuickQuality(),
+// Close releases resamplers owned by this audio processor.
+func (processor *AudioProcessor) Close() {
+	if processor == nil {
+		return
 	}
-	return audioResamplers{
-		provider:       resampler_soxr.New(options...),
-		assistant:      resampler_soxr.New(options...),
-		bridgeUser:     resampler_soxr.New(options...),
-		bridgeOperator: resampler_soxr.New(options...),
-		ambient:        resampler_soxr.New(options...),
+	if resampler, ok := processor.resamplers.provider.(*resampler_soxr.Resampler); ok {
+		resampler.Close()
+	}
+	if resampler, ok := processor.resamplers.assistant.(*resampler_soxr.Resampler); ok {
+		resampler.Close()
+	}
+	if resampler, ok := processor.resamplers.bridgeUser.(*resampler_soxr.Resampler); ok {
+		resampler.Close()
+	}
+	if resampler, ok := processor.resamplers.bridgeOperator.(*resampler_soxr.Resampler); ok {
+		resampler.Close()
+	}
+	if resampler, ok := processor.resamplers.ambient.(*resampler_soxr.Resampler); ok {
+		resampler.Close()
 	}
 }
 

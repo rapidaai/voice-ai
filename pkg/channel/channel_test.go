@@ -255,10 +255,11 @@ func TestChannelReceiveHonorsCancellation(t *testing.T) {
 func TestChannelRequiresContext(t *testing.T) {
 	channel, err := New[int](Config{CapacityPolicy: FixedCapacity(1), OverflowPolicy: BlockWhenFull})
 	require.NoError(t, err)
+	var missingContext context.Context
 
-	_, err = channel.Send(nil, 1)
+	_, err = channel.Send(missingContext, 1)
 	assert.Error(t, err)
-	_, err = channel.Receive(nil)
+	_, err = channel.Receive(missingContext)
 	assert.Error(t, err)
 }
 

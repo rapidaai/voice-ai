@@ -50,6 +50,14 @@ func TestNewOutboundCall_OwnsLifecycleDependencies(t *testing.T) {
 	assert.Equal(t, request, outboundCall.request)
 }
 
+func TestOutboundConnectRejectsInvalidRequest(t *testing.T) {
+	outboundCall := NewOutbound(nil, nil, nil, nil, OutboundInviteRequest{})
+
+	_, err := outboundCall.Connect()
+
+	require.ErrorIs(t, err, ErrInvalidConfig)
+}
+
 func TestOutboundDialogInviteRejectsEmptyCallID(t *testing.T) {
 	request, err := NewOutboundInviteRequest(testOutboundConfig(), "+15551234567", "+15557654321")
 	require.NoError(t, err)

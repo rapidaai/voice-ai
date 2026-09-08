@@ -48,7 +48,7 @@ func TestRequestorChannels_CancelledIngressIsNotOverload(tester *testing.T) {
 	}
 }
 
-func TestRequestorChannels_ControlOverflowRejectsNewestPacket(t *testing.T) {
+func TestRequestorChannels_ControlOverflowPreservesNewestPacket(t *testing.T) {
 	channels := newRequestorChannelsWithIngressCapacity(t, 1)
 	channels.OnControl(Envelope{Ctx: context.Background(), Pkt: internal_type.TurnChangePacket{ContextID: "first"}})
 	channels.OnControl(Envelope{Ctx: context.Background(), Pkt: internal_type.TurnChangePacket{ContextID: "second"}})
@@ -56,8 +56,8 @@ func TestRequestorChannels_ControlOverflowRejectsNewestPacket(t *testing.T) {
 	if channels.ControlChannel().Len() != 1 {
 		t.Fatalf("expected bounded control queue, got %d", channels.ControlChannel().Len())
 	}
-	if contextID := recvEnvelope(t, channels.ControlChannel()).Pkt.ContextId(); contextID != "first" {
-		t.Fatalf("expected oldest control packet to be retained, got %s", contextID)
+	if contextID := recvEnvelope(t, channels.ControlChannel()).Pkt.ContextId(); contextID != "second" {
+		t.Fatalf("expected newest control packet to be retained, got %s", contextID)
 	}
 }
 
@@ -94,7 +94,7 @@ func newRequestorChannelsWithIngressCapacity(t *testing.T, capacity int) *Reques
 		t.Fatalf("create ingress test channel: %v", err)
 	}
 	return &RequestorChannels{
-		controlChannel: newTestChannel(t, 1, policychannel.RejectNewestWhenFull),
+		controlChannel: newTestChannel(t, 1, policychannel.ReplaceOldestWhenFull),
 		bootstrapCh:    newTestChannel(t, 1, policychannel.BlockWhenFull),
 		ingressCh:      ingressCh,
 		egressCh:       newTestChannel(t, 1, policychannel.BlockWhenFull),

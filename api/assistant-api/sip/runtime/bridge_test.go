@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -47,6 +48,7 @@ func newTestRTPHandler() *RTPHandler {
 	h := &RTPHandler{
 		inboundAudioSinkReady: make(chan struct{}),
 		codec:                 &CodecPCMU,
+		inputSilenceFiller:    newRTPInputSilenceFiller(&CodecPCMU, rtpDefaultPacketizationTime),
 		ctx:                   ctx,
 		cancel:                cancel,
 	}
@@ -195,7 +197,7 @@ func TestForwardBridgeAudio_PassthroughSameCodec(t *testing.T) {
 	srv := bridgeTestServer()
 
 	dst := newBridgeAudioSink(10)
-	var droppedFrames uint64
+	var droppedFrames atomic.Uint64
 
 	for i := 0; i < 5; i++ {
 		srv.forwardBridgeAudioFrame(context.Background(), InboundAudioFrame{Audio: []byte{byte(i), byte(i + 1)}}, dst, false, &CodecPCMU, &CodecPCMU, nil, &droppedFrames)
@@ -208,7 +210,7 @@ func TestForwardBridgeAudio_PassthroughSameCodec(t *testing.T) {
 			t.Fatalf("timeout waiting for frame %d", i)
 		}
 	}
-	assert.Zero(t, droppedFrames)
+	assert.Zero(t, droppedFrames.Load())
 }
 
 func TestForwardBridgeAudio_TranscodesWhenNeeded(t *testing.T) {
@@ -216,7 +218,7 @@ func TestForwardBridgeAudio_TranscodesWhenNeeded(t *testing.T) {
 	srv := bridgeTestServer()
 
 	dst := newBridgeAudioSink(10)
-	var droppedFrames uint64
+	var droppedFrames atomic.Uint64
 
 	alaw := []byte{0xD5, 0xD5}
 	srv.forwardBridgeAudioFrame(context.Background(), InboundAudioFrame{Audio: alaw}, dst, true, &CodecPCMA, &CodecPCMU, nil, &droppedFrames)
@@ -237,7 +239,7 @@ func TestForwardBridgeAudio_ExitsOnContextCancel(t *testing.T) {
 	dst := newBridgeAudioSink(10)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	var droppedFrames uint64
+	var droppedFrames atomic.Uint64
 
 	srv.forwardBridgeAudioFrame(ctx, InboundAudioFrame{Audio: []byte{0x01}}, dst, false, &CodecPCMU, &CodecPCMU, nil, &droppedFrames)
 	assert.Empty(t, dst.frames)
@@ -248,7 +250,7 @@ func TestForwardBridgeAudio_DropsFrameWhenDstFull(t *testing.T) {
 	srv := bridgeTestServer()
 
 	dst := newBridgeAudioSink(1)
-	var droppedFrames uint64
+	var droppedFrames atomic.Uint64
 
 	srv.forwardBridgeAudioFrame(context.Background(), InboundAudioFrame{Audio: []byte{0x01}}, dst, false, &CodecPCMU, &CodecPCMU, nil, &droppedFrames)
 
@@ -262,7 +264,7 @@ func TestForwardBridgeAudio_DropsFrameWhenDstFull(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("forwardBridgeAudio is blocked")
 	}
-	assert.Equal(t, uint64(5), droppedFrames)
+	assert.Equal(t, uint64(5), droppedFrames.Load())
 }
 
 func TestForwardBridgeAudio_DoesNotRecordDroppedFrame(t *testing.T) {
@@ -271,7 +273,7 @@ func TestForwardBridgeAudio_DoesNotRecordDroppedFrame(t *testing.T) {
 
 	dst := newBridgeAudioSink(1)
 	recorded := make(chan []byte, 1)
-	var droppedFrames uint64
+	var droppedFrames atomic.Uint64
 
 	dst.frames <- []byte{0xff}
 	srv.forwardBridgeAudioFrame(context.Background(), InboundAudioFrame{Audio: []byte{0x01}}, dst, false, &CodecPCMU, &CodecPCMU, func(audio []byte) {
@@ -283,7 +285,7 @@ func TestForwardBridgeAudio_DoesNotRecordDroppedFrame(t *testing.T) {
 		t.Fatalf("dropped bridge RTP frame was recorded: %v", audio)
 	default:
 	}
-	assert.Equal(t, uint64(1), droppedFrames)
+	assert.Equal(t, uint64(1), droppedFrames.Load())
 }
 
 // =============================================================================
@@ -618,7 +620,7 @@ func TestForwardBridgeAudio_Passthrough_10Frames(t *testing.T) {
 	srv := bridgeTestServer()
 
 	dst := newBridgeAudioSink(20)
-	var droppedFrames uint64
+	var droppedFrames atomic.Uint64
 
 	const frameCount = 10
 	for i := 0; i < frameCount; i++ {
@@ -633,7 +635,7 @@ func TestForwardBridgeAudio_Passthrough_10Frames(t *testing.T) {
 			t.Fatalf("timeout waiting for frame %d of %d", i, frameCount)
 		}
 	}
-	assert.Zero(t, droppedFrames)
+	assert.Zero(t, droppedFrames.Load())
 }
 
 func TestForwardBridgeAudio_ContextCancel_NoHang(t *testing.T) {
@@ -643,7 +645,7 @@ func TestForwardBridgeAudio_ContextCancel_NoHang(t *testing.T) {
 	dst := newBridgeAudioSink(10)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	var droppedFrames uint64
+	var droppedFrames atomic.Uint64
 
 	srv.forwardBridgeAudioFrame(ctx, InboundAudioFrame{Audio: []byte{0x01}}, dst, false, &CodecPCMU, &CodecPCMU, nil, &droppedFrames)
 
