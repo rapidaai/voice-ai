@@ -7,6 +7,7 @@
 package sip_runtime
 
 import (
+	"bytes"
 	"testing"
 	"time"
 
@@ -15,368 +16,175 @@ import (
 )
 
 func TestRTPInputJitterBuffer_InOrderPacketsEmitImmediately(t *testing.T) {
-	buffer := newRTPInputJitterBuffer(&CodecPCMU, rtpDefaultPacketizationTime)
-
-	assert.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(1, 0, 0x01)))
-	assert.Equal(t, [][]byte{{0x02}}, buffer.push(testRTPInputPacket(2, 160, 0x02)))
-	assert.Equal(t, [][]byte{{0x03}}, buffer.push(testRTPInputPacket(3, 320, 0x03)))
-}
-
-func TestRTPInputJitterBuffer_ReordersPacketsWithinWindow(t *testing.T) {
-	buffer := newRTPInputJitterBuffer(&CodecPCMU, rtpDefaultPacketizationTime)
-
-	assert.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(1, 0, 0x01)))
-	assert.Empty(t, buffer.push(testRTPInputPacket(3, 320, 0x03)))
-
-	out := buffer.push(testRTPInputPacket(2, 160, 0x02))
-
-	assert.Equal(t, [][]byte{{0x02}, {0x03}}, out)
-}
-
-func TestRTPInputJitterBuffer_DropsDuplicatePackets(t *testing.T) {
-	buffer := newRTPInputJitterBuffer(&CodecPCMU, rtpDefaultPacketizationTime)
-
-	assert.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(1, 0, 0x01)))
-	assert.Empty(t, buffer.push(testRTPInputPacket(1, 0, 0x09)))
-	assert.Equal(t, [][]byte{{0x02}}, buffer.push(testRTPInputPacket(2, 160, 0x02)))
-	assert.Equal(t, uint64(1), buffer.droppedPackets())
-	assert.Equal(t, uint64(1), buffer.lateOrDuplicatePackets())
-	assert.Zero(t, buffer.resyncDroppedPackets())
-}
-
-func TestRTPInputJitterBuffer_FillsMissingPacketAfterWindow(t *testing.T) {
-	buffer := newRTPInputJitterBuffer(&CodecPCMU, rtpDefaultPacketizationTime)
-
-	require.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(1, 0, 0x01)))
-	for sequenceNumber := uint16(3); sequenceNumber <= 6; sequenceNumber++ {
-		assert.Empty(t, buffer.push(testRTPInputPacket(sequenceNumber, uint32(sequenceNumber-1)*160, byte(sequenceNumber))))
+	buffer := newRTPInputJitterBuffer(rtpDefaultPacketizationTime)
+	arrivedAt := time.Unix(1, 0)
+	for sequence := uint16(1); sequence <= 3; sequence++ {
+		packet := testRTPInputPacket(sequence, uint32(sequence-1)*160, byte(sequence))
+		packets := buffer.push(packet, arrivedAt)
+		require.Len(t, packets, 1)
+		require.Equal(t, packet.Payload, packets[0].packet.Payload)
 	}
-
-	out := buffer.push(testRTPInputPacket(7, 960, 0x07))
-
-	require.Len(t, out, 6)
-	assert.Equal(t, byte(0xFF), out[0][0])
-	assert.Equal(t, []byte{0x03}, out[1])
-	assert.Equal(t, []byte{0x04}, out[2])
-	assert.Equal(t, []byte{0x05}, out[3])
-	assert.Equal(t, []byte{0x06}, out[4])
-	assert.Equal(t, []byte{0x07}, out[5])
-	assert.Equal(t, uint64(1), buffer.lostPackets())
+	require.Zero(t, buffer.lostPackets())
+	require.True(t, buffer.nextDeadline().IsZero())
 }
 
-func TestRTPInputJitterBuffer_ReorderWindowUsesDuration(t *testing.T) {
-	buffer := newRTPInputJitterBuffer(&CodecPCMU, 5*time.Millisecond)
+func TestRTPInputJitterBuffer_ReordersUntilPacketAgeDeadline(t *testing.T) {
+	buffer := newRTPInputJitterBuffer(20 * time.Millisecond)
+	arrivedAt := time.Unix(1, 0)
+	buffer.push(testRTPInputPacket(1, 0, 1), arrivedAt)
+	require.Empty(t, buffer.push(testRTPInputPacket(3, 320, 3), arrivedAt))
+	require.Equal(t, arrivedAt.Add(rtpInputReorderWindow), buffer.nextDeadline())
+	require.Empty(t, buffer.flushExpired(arrivedAt.Add(20*time.Millisecond)))
 
-	require.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(1, 0, 0x01)))
-	assert.Empty(t, buffer.push(testRTPInputPacket(18, 17*40, 0x12)))
-
-	out := buffer.push(testRTPInputPacket(19, 18*40, 0x13))
-
-	require.Len(t, out, 1)
-	assert.Equal(t, byte(0xFF), out[0][0])
-	assert.Equal(t, uint64(1), buffer.lostPackets())
+	packets := buffer.push(testRTPInputPacket(2, 160, 2), arrivedAt.Add(rtpInputReorderWindow-time.Nanosecond))
+	require.Len(t, packets, 2)
+	require.Equal(t, bytes.Repeat([]byte{2}, 160), packets[0].packet.Payload)
+	require.Equal(t, bytes.Repeat([]byte{3}, 160), packets[1].packet.Payload)
+	require.Zero(t, buffer.lostPackets())
+	require.True(t, buffer.nextDeadline().IsZero())
 }
 
-func TestRTPInputJitterBuffer_ResyncsLargeSequenceJump(t *testing.T) {
-	buffer := newRTPInputJitterBuffer(&CodecPCMU, rtpDefaultPacketizationTime)
+func TestRTPInputJitterBuffer_LossExpiresWithoutSynthesizingAudio(t *testing.T) {
+	buffer := newRTPInputJitterBuffer(20 * time.Millisecond)
+	arrivedAt := time.Unix(1, 0)
+	buffer.push(testRTPInputPacket(1, 0, 1), arrivedAt)
+	buffer.push(testRTPInputPacket(4, 480, 4), arrivedAt)
 
-	require.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(1, 0, 0x01)))
-	require.Empty(t, buffer.push(testRTPInputPacket(3, 320, 0x03)))
-
-	out := buffer.push(testRTPInputPacket(1000, 999*160, 0x10))
-
-	assert.Equal(t, [][]byte{{0x10}}, out)
-	assert.Equal(t, uint64(0), buffer.lostPackets())
-	assert.Equal(t, uint64(1), buffer.droppedPackets())
-	assert.Zero(t, buffer.lateOrDuplicatePackets())
-	assert.Equal(t, uint64(1), buffer.resyncDroppedPackets())
-	assert.Empty(t, buffer.push(testRTPInputPacket(4, 480, 0x04)))
+	packets := buffer.flushExpired(arrivedAt.Add(rtpInputReorderWindow))
+	require.Len(t, packets, 1)
+	require.Equal(t, bytes.Repeat([]byte{4}, 160), packets[0].packet.Payload)
+	require.Equal(t, uint64(2), buffer.lostPackets())
+	require.Empty(t, buffer.push(testRTPInputPacket(2, 160, 2), arrivedAt.Add(time.Second)))
+	require.Equal(t, uint64(1), buffer.lateOrDuplicatePackets())
 }
 
-func TestRTPInputJitterBuffer_ResyncLimitUsesDuration(t *testing.T) {
-	buffer := newRTPInputJitterBuffer(&CodecPCMU, 60*time.Millisecond)
+func TestRTPInputJitterBuffer_FlushPendingEmitsBufferedTail(t *testing.T) {
+	buffer := newRTPInputJitterBuffer(20 * time.Millisecond)
+	arrivedAt := time.Unix(1, 0)
+	require.Len(t, buffer.push(testRTPInputPacket(1, 0, 1), arrivedAt), 1)
+	require.Empty(t, buffer.push(testRTPInputPacket(3, 320, 3), arrivedAt))
 
-	require.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(1, 0, 0x01)))
-	out := buffer.push(testRTPInputPacket(12, 11*480, 0x12))
-
-	assert.Equal(t, [][]byte{{0x12}}, out)
-	assert.Zero(t, buffer.lostPackets())
-	assert.Zero(t, buffer.droppedPackets())
-	assert.Zero(t, buffer.resyncDroppedPackets())
+	packets := buffer.flushPending()
+	require.Len(t, packets, 1)
+	require.Equal(t, bytes.Repeat([]byte{3}, 160), packets[0].packet.Payload)
+	require.Equal(t, uint64(1), buffer.lostPackets())
+	require.Empty(t, buffer.bufferedPackets)
 }
 
-func TestRTPInputJitterBuffer_FlushOnPlayoutTimeoutReleasesBufferedPacket(t *testing.T) {
-	buffer := newRTPInputJitterBuffer(&CodecPCMU, rtpDefaultPacketizationTime)
-
-	require.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(1, 0, 0x01)))
-	require.Empty(t, buffer.push(testRTPInputPacket(3, 320, 0x03)))
-
-	out := buffer.flushOnPlayoutTimeout()
-
-	require.Len(t, out, 2)
-	assert.Equal(t, byte(0xFF), out[0][0])
-	assert.Equal(t, []byte{0x03}, out[1])
-	assert.Equal(t, uint64(1), buffer.lostPackets())
-}
-
-func TestRTPInputJitterBuffer_FlushOnPlayoutTimeoutWithoutBufferedPackets(t *testing.T) {
-	buffer := newRTPInputJitterBuffer(&CodecPCMU, rtpDefaultPacketizationTime)
-
-	assert.Empty(t, buffer.flushOnPlayoutTimeout())
-	require.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(1, 0, 0x01)))
-	assert.Empty(t, buffer.flushOnPlayoutTimeout())
-}
-
-func TestRTPInputJitterBuffer_FillsTimestampGapForSilenceSuppression(t *testing.T) {
-	buffer := newRTPInputJitterBuffer(&CodecPCMU, rtpDefaultPacketizationTime)
-
-	require.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(1, 0, 0x01)))
-
-	out := buffer.push(testRTPInputPacket(2, 640, 0x02))
-
-	require.Len(t, out, 4)
-	assert.Equal(t, byte(0xFF), out[0][0])
-	assert.Equal(t, byte(0xFF), out[1][0])
-	assert.Equal(t, byte(0xFF), out[2][0])
-	assert.Equal(t, []byte{0x02}, out[3])
-	assert.Zero(t, buffer.lostPackets())
-	assert.Equal(t, uint64(3), buffer.silenceSuppressionFrameCount())
-}
-
-func TestRTPInputJitterBuffer_UsesPCMASilence(t *testing.T) {
-	buffer := newRTPInputJitterBuffer(&CodecPCMA, rtpDefaultPacketizationTime)
-
-	require.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(1, 0, 0x01)))
-	out := buffer.push(testRTPInputPacket(2, 640, 0x02))
-
-	require.Len(t, out, 4)
-	assert.Equal(t, byte(0xD5), out[0][0])
-	assert.Equal(t, []byte{0x02}, out[3])
-}
-
-func TestRTPInputJitterBuffer_UsesConfiguredPacketizationForLossConcealment(t *testing.T) {
-	tests := []struct {
-		name              string
-		packetizationTime time.Duration
-		timestampDelta    uint32
-		silenceLength     int
-		silenceByte       byte
-		codec             *Codec
-	}{
-		{
-			name:              "10 ms pcmu",
-			packetizationTime: 10 * time.Millisecond,
-			timestampDelta:    80,
-			silenceLength:     80,
-			silenceByte:       0xFF,
-			codec:             &CodecPCMU,
-		},
-		{
-			name:              "20 ms pcmu",
-			packetizationTime: 20 * time.Millisecond,
-			timestampDelta:    160,
-			silenceLength:     160,
-			silenceByte:       0xFF,
-			codec:             &CodecPCMU,
-		},
-		{
-			name:              "30 ms pcmu",
-			packetizationTime: 30 * time.Millisecond,
-			timestampDelta:    240,
-			silenceLength:     240,
-			silenceByte:       0xFF,
-			codec:             &CodecPCMU,
-		},
-		{
-			name:              "10 ms pcma",
-			packetizationTime: 10 * time.Millisecond,
-			timestampDelta:    80,
-			silenceLength:     80,
-			silenceByte:       0xD5,
-			codec:             &CodecPCMA,
-		},
-		{
-			name:              "20 ms pcma",
-			packetizationTime: 20 * time.Millisecond,
-			timestampDelta:    160,
-			silenceLength:     160,
-			silenceByte:       0xD5,
-			codec:             &CodecPCMA,
-		},
-		{
-			name:              "30 ms pcma",
-			packetizationTime: 30 * time.Millisecond,
-			timestampDelta:    240,
-			silenceLength:     240,
-			silenceByte:       0xD5,
-			codec:             &CodecPCMA,
-		},
+func TestRTPInputJitterBuffer_NewTrafficDoesNotPostponeExpiry(t *testing.T) {
+	buffer := newRTPInputJitterBuffer(20 * time.Millisecond)
+	arrivedAt := time.Unix(1, 0)
+	buffer.push(testRTPInputPacket(1, 0, 1), arrivedAt)
+	for sequence := uint16(3); sequence <= 10; sequence++ {
+		require.Empty(t, buffer.push(testRTPInputPacket(sequence, uint32(sequence-1)*160, byte(sequence)), arrivedAt.Add(time.Duration(sequence-3)*10*time.Millisecond)))
+		require.Equal(t, arrivedAt.Add(rtpInputReorderWindow), buffer.nextDeadline())
 	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			buffer := newRTPInputJitterBuffer(test.codec, test.packetizationTime)
-
-			require.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(1, 0, 0x01)))
-			assert.Empty(t, buffer.push(testRTPInputPacket(3, test.timestampDelta*2, 0x03)))
-
-			out := buffer.flushOnPlayoutTimeout()
-
-			require.Len(t, out, 2)
-			require.Len(t, out[0], test.silenceLength)
-			assert.Equal(t, test.silenceByte, out[0][0])
-			assert.Equal(t, []byte{0x03}, out[1])
-			assert.Equal(t, uint64(1), buffer.lostPackets())
-		})
+	packets := buffer.push(testRTPInputPacket(11, 1600, 11), arrivedAt.Add(rtpInputReorderWindow))
+	require.Len(t, packets, 9)
+	for index, packet := range packets {
+		require.Equal(t, bytes.Repeat([]byte{byte(index + 3)}, 160), packet.packet.Payload)
 	}
+	require.Equal(t, uint64(1), buffer.lostPackets())
 }
 
-func TestRTPInputJitterBuffer_LearnsStablePacketizationFromTimestamps(t *testing.T) {
-	buffer := newRTPInputJitterBuffer(&CodecPCMU, rtpDefaultPacketizationTime)
-
-	require.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(1, 0, 0x01)))
-	require.Empty(t, buffer.push(testRTPInputPacket(2, 80, 0x02)))
-	require.Equal(t, [][]byte{{0x02}, {0x03}}, buffer.push(testRTPInputPacket(3, 160, 0x03)))
-	assert.Equal(t, 10*time.Millisecond, buffer.playoutTimeout())
-
-	assert.Empty(t, buffer.push(testRTPInputPacket(5, 320, 0x05)))
-	out := buffer.flushOnPlayoutTimeout()
-
-	require.Len(t, out, 2)
-	require.Len(t, out[0], 80)
-	assert.Equal(t, []byte{0x05}, out[1])
+func TestRTPInputJitterBuffer_DropsDuplicatesWithoutChangingDeadline(t *testing.T) {
+	buffer := newRTPInputJitterBuffer(20 * time.Millisecond)
+	arrivedAt := time.Unix(1, 0)
+	buffer.push(testRTPInputPacket(1, 0, 1), arrivedAt)
+	buffer.push(testRTPInputPacket(3, 320, 3), arrivedAt)
+	require.Empty(t, buffer.push(testRTPInputPacket(3, 320, 9), arrivedAt.Add(60*time.Millisecond)))
+	require.Empty(t, buffer.push(testRTPInputPacket(1, 0, 9), arrivedAt.Add(60*time.Millisecond)))
+	require.Equal(t, arrivedAt.Add(rtpInputReorderWindow), buffer.nextDeadline())
+	packets := buffer.push(testRTPInputPacket(2, 160, 2), arrivedAt.Add(70*time.Millisecond))
+	require.Equal(t, bytes.Repeat([]byte{3}, 160), packets[1].packet.Payload)
+	require.Equal(t, uint64(2), buffer.droppedPackets())
+	require.Equal(t, uint64(2), buffer.lateOrDuplicatePackets())
 }
 
-func TestRTPInputJitterBuffer_UpdatesPacketizationAfterStableChange(t *testing.T) {
-	buffer := newRTPInputJitterBuffer(&CodecPCMU, 20*time.Millisecond)
-
-	require.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(1, 0, 0x01)))
-	require.Equal(t, [][]byte{{0x02}}, buffer.push(testRTPInputPacket(2, 160, 0x02)))
-	require.Equal(t, [][]byte{{0x03}}, buffer.push(testRTPInputPacket(3, 320, 0x03)))
-	require.Empty(t, buffer.push(testRTPInputPacket(4, 560, 0x04)))
-	require.Equal(t, [][]byte{{0x04}, {0x05}}, buffer.push(testRTPInputPacket(5, 800, 0x05)))
-	assert.Equal(t, 30*time.Millisecond, buffer.playoutTimeout())
-
-	assert.Empty(t, buffer.push(testRTPInputPacket(7, 1280, 0x07)))
-	out := buffer.flushOnPlayoutTimeout()
-
-	require.Len(t, out, 2)
-	require.Len(t, out[0], 240)
-	assert.Equal(t, []byte{0x07}, out[1])
+func TestRTPInputJitterBuffer_OrdersAudioAndTelephoneEvents(t *testing.T) {
+	buffer := newRTPInputJitterBuffer(20 * time.Millisecond)
+	arrivedAt := time.Unix(1, 0)
+	buffer.push(testRTPInputPacket(1, 0, 1), arrivedAt)
+	require.Empty(t, buffer.push(testRTPInputPacket(4, 1600, 4), arrivedAt))
+	second := &RTPPacket{SequenceNumber: 2, Timestamp: 160, PayloadType: CodecTelephoneEvent.PayloadType, Payload: []byte{1, 0x80, 0, 160}}
+	third := &RTPPacket{SequenceNumber: 3, Timestamp: 160, PayloadType: CodecTelephoneEvent.PayloadType, Payload: []byte{1, 0x80, 0, 160}}
+	require.Len(t, buffer.push(second, arrivedAt.Add(30*time.Millisecond)), 1)
+	packets := buffer.push(third, arrivedAt.Add(30*time.Millisecond))
+	require.Len(t, packets, 2)
+	require.Equal(t, third.Payload, packets[0].packet.Payload)
+	require.Equal(t, bytes.Repeat([]byte{4}, 160), packets[1].packet.Payload)
+	require.Zero(t, buffer.lostPackets())
 }
 
-func TestRTPInputJitterBuffer_PacketizationChangeDoesNotCreateLoss(t *testing.T) {
-	tests := []struct {
-		name               string
-		nextTimestamp      uint32
-		changedTimestamp   uint32
-		expectedPacketTime time.Duration
-	}{
-		{
-			name:               "20 ms to 10 ms",
-			nextTimestamp:      400,
-			changedTimestamp:   480,
-			expectedPacketTime: 10 * time.Millisecond,
-		},
-		{
-			name:               "20 ms to 30 ms",
-			nextTimestamp:      560,
-			changedTimestamp:   800,
-			expectedPacketTime: 30 * time.Millisecond,
-		},
-		{
-			name:               "20 ms to 40 ms",
-			nextTimestamp:      640,
-			changedTimestamp:   960,
-			expectedPacketTime: 40 * time.Millisecond,
-		},
-		{
-			name:               "20 ms to 60 ms",
-			nextTimestamp:      800,
-			changedTimestamp:   1280,
-			expectedPacketTime: 60 * time.Millisecond,
-		},
+func TestRTPInputJitterBuffer_ResyncBoundsBuffer(t *testing.T) {
+	buffer := newRTPInputJitterBuffer(20 * time.Millisecond)
+	arrivedAt := time.Unix(1, 0)
+	buffer.push(testRTPInputPacket(1, 0, 1), arrivedAt)
+	buffer.push(testRTPInputPacket(3, 320, 3), arrivedAt)
+	packet := testRTPInputPacket(1000, 999*160, 10)
+	packets := buffer.push(packet, arrivedAt)
+	require.Len(t, packets, 1)
+	require.Equal(t, packet.Payload, packets[0].packet.Payload)
+	require.Equal(t, uint64(1), buffer.resyncDroppedPackets())
+	require.Zero(t, buffer.lostPackets())
+	require.Empty(t, buffer.bufferedPackets)
+}
+
+func TestRTPInputJitterBuffer_ResetDiscardsPendingStream(t *testing.T) {
+	buffer := newRTPInputJitterBuffer(20 * time.Millisecond)
+	arrivedAt := time.Unix(1, 0)
+	buffer.push(testRTPInputPacket(100, 0, 1), arrivedAt)
+	buffer.push(testRTPInputPacket(102, 320, 3), arrivedAt)
+	buffer.reset(30 * time.Millisecond)
+	packet := testRTPInputPacket(1, 200000, 4)
+	packets := buffer.push(packet, arrivedAt)
+	require.Len(t, packets, 1)
+	require.Equal(t, packet.Payload, packets[0].packet.Payload)
+	require.Equal(t, uint64(1), buffer.resyncDroppedPackets())
+}
+
+func TestRTPInputJitterBuffer_SequenceWrap(t *testing.T) {
+	buffer := newRTPInputJitterBuffer(20 * time.Millisecond)
+	arrivedAt := time.Unix(1, 0)
+	first := testRTPInputPacket(65535, 0, 1)
+	require.Len(t, buffer.push(first, arrivedAt), 1)
+	require.Empty(t, buffer.push(testRTPInputPacket(1, 320, 3), arrivedAt))
+	packets := buffer.push(testRTPInputPacket(0, 160, 2), arrivedAt)
+	require.Len(t, packets, 2)
+	require.Equal(t, bytes.Repeat([]byte{2}, 160), packets[0].packet.Payload)
+	require.Equal(t, bytes.Repeat([]byte{3}, 160), packets[1].packet.Payload)
+	require.Zero(t, buffer.lostPackets())
+}
+
+func TestRTPInputJitterBuffer_OwnsBufferedPayload(t *testing.T) {
+	buffer := newRTPInputJitterBuffer(20 * time.Millisecond)
+	arrivedAt := time.Unix(1, 0)
+	buffer.push(testRTPInputPacket(1, 0, 1), arrivedAt)
+	third := testRTPInputPacket(3, 320, 3)
+	buffer.push(third, arrivedAt)
+	third.Payload[0] = 99
+	packets := buffer.push(testRTPInputPacket(2, 160, 2), arrivedAt)
+	require.Equal(t, bytes.Repeat([]byte{3}, 160), packets[1].packet.Payload)
+}
+
+func TestRTPInputJitterBuffer_PreservesPacketArrivalTime(t *testing.T) {
+	buffer := newRTPInputJitterBuffer(20 * time.Millisecond)
+	arrivedAt := time.Unix(123, 456)
+	packets := buffer.push(testRTPInputPacket(1, 0, 1), arrivedAt)
+	require.Len(t, packets, 1)
+	require.Equal(t, arrivedAt, packets[0].receivedAt)
+}
+
+func TestRTPInputJitterBuffer_InvalidSetupAndEmptyInput(t *testing.T) {
+	for _, duration := range []time.Duration{0, time.Millisecond, 100 * time.Millisecond, 5500 * time.Microsecond} {
+		buffer := newRTPInputJitterBuffer(duration)
+		assert.Equal(t, rtpDefaultPacketizationTime, buffer.packetizationTime)
+		assert.Empty(t, buffer.push(nil, time.Now()))
+		assert.Empty(t, buffer.push(&RTPPacket{}, time.Now()))
+		assert.Empty(t, buffer.flushExpired(time.Now()))
 	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			buffer := newRTPInputJitterBuffer(&CodecPCMU, 20*time.Millisecond)
-
-			require.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(1, 0, 0x01)))
-			require.Equal(t, [][]byte{{0x02}}, buffer.push(testRTPInputPacket(2, 160, 0x02)))
-			require.Equal(t, [][]byte{{0x03}}, buffer.push(testRTPInputPacket(3, 320, 0x03)))
-			require.Empty(t, buffer.push(testRTPInputPacket(4, test.nextTimestamp, 0x04)))
-			require.Equal(t, [][]byte{{0x04}, {0x05}}, buffer.push(testRTPInputPacket(5, test.changedTimestamp, 0x05)))
-
-			assert.Equal(t, test.expectedPacketTime, buffer.playoutTimeout())
-			assert.Zero(t, buffer.lostPackets())
-			assert.Zero(t, buffer.silenceSuppressionFrameCount())
-		})
-	}
-}
-
-func TestRTPInputJitterBuffer_OneTimeTimestampJumpIsSilenceSuppression(t *testing.T) {
-	buffer := newRTPInputJitterBuffer(&CodecPCMU, 20*time.Millisecond)
-
-	require.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(1, 0, 0x01)))
-	require.Empty(t, buffer.push(testRTPInputPacket(2, 480, 0x02)))
-	out := buffer.push(testRTPInputPacket(3, 640, 0x03))
-
-	require.Len(t, out, 4)
-	assert.Equal(t, byte(0xFF), out[0][0])
-	assert.Equal(t, byte(0xFF), out[1][0])
-	assert.Equal(t, []byte{0x02}, out[2])
-	assert.Equal(t, []byte{0x03}, out[3])
-	assert.Equal(t, 20*time.Millisecond, buffer.playoutTimeout())
-	assert.Zero(t, buffer.lostPackets())
-	assert.Equal(t, uint64(2), buffer.silenceSuppressionFrameCount())
-}
-
-func TestRTPInputJitterBuffer_ReorderedPacketsDoNotCorruptPacketizationLearning(t *testing.T) {
-	buffer := newRTPInputJitterBuffer(&CodecPCMU, 20*time.Millisecond)
-
-	require.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(1, 0, 0x01)))
-	assert.Empty(t, buffer.push(testRTPInputPacket(3, 320, 0x03)))
-	require.Equal(t, [][]byte{{0x02}, {0x03}}, buffer.push(testRTPInputPacket(2, 160, 0x02)))
-	assert.Equal(t, 20*time.Millisecond, buffer.playoutTimeout())
-
-	assert.Empty(t, buffer.push(testRTPInputPacket(5, 640, 0x05)))
-	out := buffer.flushOnPlayoutTimeout()
-
-	require.Len(t, out, 2)
-	require.Len(t, out[0], 160)
-	assert.Equal(t, []byte{0x05}, out[1])
-}
-
-func TestRTPInputJitterBuffer_ResyncPreservesActivePacketization(t *testing.T) {
-	buffer := newRTPInputJitterBuffer(&CodecPCMU, 30*time.Millisecond)
-
-	require.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(1, 0, 0x01)))
-	require.Empty(t, buffer.push(testRTPInputPacket(3, 480, 0x03)))
-	require.Equal(t, [][]byte{{0x10}}, buffer.push(testRTPInputPacket(1000, 240000, 0x10)))
-
-	assert.Empty(t, buffer.push(testRTPInputPacket(1002, 240480, 0x12)))
-	out := buffer.flushOnPlayoutTimeout()
-
-	require.Len(t, out, 2)
-	require.Len(t, out[0], 240)
-	assert.Equal(t, []byte{0x12}, out[1])
-}
-
-func TestRTPInputJitterBuffer_HandlesSequenceWrap(t *testing.T) {
-	buffer := newRTPInputJitterBuffer(&CodecPCMU, rtpDefaultPacketizationTime)
-
-	assert.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(65535, 0, 0x01)))
-	assert.Equal(t, [][]byte{{0x02}}, buffer.push(testRTPInputPacket(0, 160, 0x02)))
-	assert.Equal(t, [][]byte{{0x03}}, buffer.push(testRTPInputPacket(1, 320, 0x03)))
 }
 
 func testRTPInputPacket(sequenceNumber uint16, timestamp uint32, payload byte) *RTPPacket {
-	return &RTPPacket{
-		Version:        rtpVersion,
-		PayloadType:    CodecPCMU.PayloadType,
-		SequenceNumber: sequenceNumber,
-		Timestamp:      timestamp,
-		Payload:        []byte{payload},
-	}
+	return &RTPPacket{Version: rtpVersion, PayloadType: CodecPCMU.PayloadType, SequenceNumber: sequenceNumber, Timestamp: timestamp, Payload: bytes.Repeat([]byte{payload}, 160)}
 }

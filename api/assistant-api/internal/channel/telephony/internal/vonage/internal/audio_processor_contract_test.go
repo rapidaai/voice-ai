@@ -14,7 +14,6 @@ func newTestAudioProcessor() *AudioProcessor {
 		inputBuffer:        newInputBufferForTest(),
 		outputBuffer:       newOutputBufferForTest(OutputChunkSize * 8),
 		bridgeOutputBuffer: newOutputBufferForTest(OutputChunkSize * 8),
-		outputHealth:       nil,
 	}
 	audioProcessor.silenceFrame = audioProcessor.createSilenceFrame()
 	return audioProcessor

@@ -16,7 +16,6 @@ var (
 	ErrRTPNotInitialized          = errors.New("RTP handler not initialized")
 	ErrRTPHandlerStopped          = errors.New("RTP handler is stopped")
 	ErrRTPMediaTimeout            = errors.New("RTP media timeout")
-	ErrRTPOutputQueueFull         = errors.New("RTP output queue is full")
 	ErrRTPPortRangeExhausted      = errors.New("no RTP ports available")
 	ErrSDPParseFailed             = errors.New("failed to parse SDP")
 	ErrCodecNotSupported          = errors.New("codec not supported")

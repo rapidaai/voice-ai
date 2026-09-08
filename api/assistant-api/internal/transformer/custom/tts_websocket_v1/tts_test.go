@@ -188,6 +188,9 @@ func TestTextToSpeech_WebsocketFlow_RequestRules(t *testing.T) {
 		opts,
 	)
 	require.NoError(t, err)
+	typedTransformer, ok := transformer.(*textToSpeech)
+	require.True(t, ok)
+	require.NotNil(t, typedTransformer.resampler)
 	require.NoError(t, transformer.Initialize())
 
 	require.NoError(t, transformer.Transform(context.Background(), internal_type.TextToSpeechTextPacket{

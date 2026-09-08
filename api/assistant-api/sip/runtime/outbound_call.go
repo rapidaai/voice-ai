@@ -72,7 +72,10 @@ func (outboundCall *Outbound) HandleCall() {
 // Connect waits for the outbound INVITE answer, prepares media, starts RTP, and sends ACK.
 // It owns setup failure side effects; steady-state call handling remains in HandleCall.
 func (outboundCall *Outbound) Connect() (time.Time, error) {
-	outboundConfig := outboundCall.session.config.ToOutboundConfig()
+	if err := outboundCall.request.Validate(); err != nil {
+		return time.Time{}, err
+	}
+	outboundConfig := outboundCall.request.Config
 	ringingTimeout := outboundConfig.EffectiveRingingTimeout()
 	assistantID := uint64(0)
 	if assistant := outboundCall.session.GetAssistant(); assistant != nil {
@@ -85,8 +88,8 @@ func (outboundCall *Outbound) Connect() (time.Time, error) {
 		"assistant_id", assistantID,
 		"conversation_id", outboundCall.session.GetConversationID(),
 		"mode", outboundCall.request.Config.Mode,
-		"to_user", outboundCall.request.Identity.ToUser,
-		"from_user", outboundCall.request.Identity.FromUser,
+		"to_user", outboundCall.request.Address.To,
+		"from_user", outboundCall.request.Address.From,
 		"trunk_address", outboundCall.request.Config.Address,
 		"ringing_timeout_ms", ringingTimeout.Milliseconds(),
 		"auth_username", outboundConfig.Auth.Username,
@@ -118,7 +121,7 @@ func (outboundCall *Outbound) Connect() (time.Time, error) {
 	return answerTime, nil
 }
 
-func (outboundCall *Outbound) waitForAnswer(outboundConfig OutboundConfig, ringingTimeout time.Duration) error {
+func (outboundCall *Outbound) waitForAnswer(outboundConfig *OutboundConfig, ringingTimeout time.Duration) error {
 	answerParentContext := outboundCall.session.Context()
 	if outboundCall.answerContext != nil {
 		answerParentContext = outboundCall.answerContext
@@ -306,11 +309,11 @@ func (outboundCall *Outbound) callOutboundInviteHandler(answerTime time.Time) er
 		return fmt.Errorf("outbound INVITE request is unavailable")
 	}
 	callAddress := NewCallAddress(inviteRequest)
-	if validator.Phone(outboundCall.request.Identity.FromUser) {
-		callAddress.From = outboundCall.request.Identity.FromUser
+	if validator.Phone(outboundCall.request.Address.From) {
+		callAddress.From = outboundCall.request.Address.From
 	}
-	if validator.Phone(outboundCall.request.Identity.ToUser) {
-		callAddress.To = outboundCall.request.Identity.ToUser
+	if validator.Phone(outboundCall.request.Address.To) {
+		callAddress.To = outboundCall.request.Address.To
 	}
 
 	if callAddress.ToURI == "" {

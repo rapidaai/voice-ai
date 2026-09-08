@@ -12,6 +12,8 @@ import (
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 )
 
+const sipUserAgent = "RapidaVoiceAI"
+
 // Server state constants describe the process-level SIP server lifecycle.
 const (
 	ServerStateCreated ServerState = iota
@@ -329,14 +331,11 @@ const (
 	rtpReadBufferSize           = 65536
 	rtpWriteBufferSize          = 65536
 	rtpPacketMaxSize            = 1500
-	rtpPacketInterval           = 20 * time.Millisecond
 	rtpDefaultPacketizationTime = 20 * time.Millisecond
 	rtpMinPacketizationTime     = 5 * time.Millisecond
 	rtpMaxPacketizationTime     = 60 * time.Millisecond
 	rtpMediaTimeoutInitial      = 30 * time.Second
 	rtpMediaTimeout             = 15 * time.Second
-	rtpAudioInBufferSize        = 100
-	rtpAudioOutBufferSize       = 100
 	rtpMediaTimeoutDisabledPark = time.Hour
 )
 
@@ -355,26 +354,12 @@ const (
 	rtpErrorSizeHeaderFormat = "%w: size=%d header=%d"
 )
 
-// RTP input jitter buffer constants bound reordering and inferred packet duration.
+// RTP input jitter buffer constants bound reordering and missing audio duration.
 const (
-	rtpInputReorderWindow              = 80 * time.Millisecond
-	rtpInputMaxLossGap                 = 500 * time.Millisecond
-	rtpInputMaxSilenceGap              = 500 * time.Millisecond
-	rtpInputBufferedPacketMapCapacity  = 5
-	rtpInputPacketizationStablePackets = 2
-	rtpInputNanosecondsPerSecond       = 1000000000
-)
-
-// RTP inbound quality constants define rolling quality thresholds and labels.
-const (
-	rtpInboundQualityWindow       = 5 * time.Second
-	rtpInboundQualityGoodLossRate = 0.05
-	rtpInboundQualityPoorLossRate = 0.12
-	rtpInboundQualityUnknown      = "unknown"
-	rtpInboundQualityExcellent    = "excellent"
-	rtpInboundQualityGood         = "good"
-	rtpInboundQualityPoor         = "poor"
-	rtpInboundQualityLost         = "lost"
+	rtpInputReorderWindow             = 80 * time.Millisecond
+	rtpInputMaxLossGap                = 500 * time.Millisecond
+	rtpInputMaxSilenceGap             = 500 * time.Millisecond
+	rtpInputBufferedPacketMapCapacity = 5
 )
 
 // RTCP constants define companion port behavior, reporting cadence, and unit conversion.

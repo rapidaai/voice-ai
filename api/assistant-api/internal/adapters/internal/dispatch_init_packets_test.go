@@ -119,8 +119,11 @@ func runFinalizeDataFlow(requestor *genericRequestor, contextID string) []intern
 	handler.HandleFinalizeAuthentication(context.Background(), internal_type.FinalizeAuthenticationPacket{ContextID: contextID})
 
 	packetNames := make([]internal_type.PacketName, 0)
-	for len(requestor.channels.DataChannel()) > 0 {
-		envelope := <-requestor.channels.DataChannel()
+	for requestor.channels.DataChannel().Len() > 0 {
+		envelope, err := requestor.channels.DataChannel().TryReceive()
+		if err != nil {
+			break
+		}
 		packetNames = append(packetNames, envelope.Pkt.PacketName())
 		switch packet := envelope.Pkt.(type) {
 		case internal_type.FinalizeConversationRecordingExecutorPacket:
@@ -180,17 +183,18 @@ func TestInitializationPackets_RouteToBootstrapChannel(t *testing.T) {
 			require.NoError(t, err)
 
 			select {
-			case envelope := <-requestor.channels.BootstrapChannel():
+			case <-requestor.channels.BootstrapChannel().Ready():
+				envelope := receiveEnvelope(t, requestor.channels.BootstrapChannel())
 				assert.Equal(t, initializationPacket.PacketName(), envelope.Pkt.PacketName())
 			default:
 				t.Fatalf("expected %s in bootstrap channel", initializationPacket.PacketName())
 			}
 
-			assert.Empty(t, requestor.channels.ControlChannel())
-			assert.Empty(t, requestor.channels.IngressChannel())
-			assert.Empty(t, requestor.channels.EgressChannel())
-			assert.Empty(t, requestor.channels.DataChannel())
-			assert.Empty(t, requestor.channels.BackgroundChannel())
+			assert.Zero(t, requestor.channels.ControlChannel().Len())
+			assert.Zero(t, requestor.channels.IngressChannel().Len())
+			assert.Zero(t, requestor.channels.EgressChannel().Len())
+			assert.Zero(t, requestor.channels.DataChannel().Len())
+			assert.Zero(t, requestor.channels.BackgroundChannel().Len())
 		})
 	}
 }
@@ -214,7 +218,8 @@ func TestHandleInitializeAuthentication_QueuesAuthenticationExecution(t *testing
 	})
 
 	select {
-	case envelope := <-requestor.channels.BootstrapChannel():
+	case <-requestor.channels.BootstrapChannel().Ready():
+		envelope := receiveEnvelope(t, requestor.channels.BootstrapChannel())
 		packet, ok := envelope.Pkt.(internal_type.ExecuteAuthenticationPacket)
 		require.True(t, ok)
 		assert.Equal(t, "ctx-auth", packet.ContextID)
@@ -264,7 +269,8 @@ func TestHandleExecuteAuthentication_ExecutesAuthenticationSynchronously(t *test
 	assert.NotNil(t, authentication.input.Arguments)
 	assert.Same(t, initialization, authentication.input.Initialization)
 	select {
-	case envelope := <-requestor.channels.BackgroundChannel():
+	case <-requestor.channels.BackgroundChannel().Ready():
+		envelope := receiveEnvelope(t, requestor.channels.BackgroundChannel())
 		packet, ok := envelope.Pkt.(internal_type.ObservabilityEventRecordPacket)
 		require.True(t, ok)
 		assert.Equal(t, observability.ConversationAuthenticationStarted, packet.Record.Event)
@@ -272,7 +278,8 @@ func TestHandleExecuteAuthentication_ExecutesAuthenticationSynchronously(t *test
 		t.Fatalf("expected authentication started event")
 	}
 	select {
-	case envelope := <-requestor.channels.BootstrapChannel():
+	case <-requestor.channels.BootstrapChannel().Ready():
+		envelope := receiveEnvelope(t, requestor.channels.BootstrapChannel())
 		packet, ok := envelope.Pkt.(internal_type.SessionAuthenticationSucceededPacket)
 		require.True(t, ok)
 		assert.True(t, packet.Authenticated)
@@ -307,7 +314,8 @@ func TestHandleExecuteAuthentication_ExecutionErrorEnqueuesFailedPacket(t *testi
 
 	assert.Equal(t, 1, authentication.executeCalls)
 	select {
-	case envelope := <-requestor.channels.BootstrapChannel():
+	case <-requestor.channels.BootstrapChannel().Ready():
+		envelope := receiveEnvelope(t, requestor.channels.BootstrapChannel())
 		packet, ok := envelope.Pkt.(internal_type.SessionAuthenticationFailedPacket)
 		require.True(t, ok)
 		assert.ErrorIs(t, packet.Error, authError)
@@ -334,7 +342,8 @@ func TestHandleFinalizeAuthentication_ClosesExecutorAndQueuesRecordingFinalizati
 	assert.Equal(t, 1, authentication.closeCalls)
 	assert.Nil(t, requestor.authenticationExecutor)
 	select {
-	case envelope := <-requestor.channels.DataChannel():
+	case <-requestor.channels.DataChannel().Ready():
+		envelope := receiveEnvelope(t, requestor.channels.DataChannel())
 		packet, ok := envelope.Pkt.(internal_type.FinalizeConversationRecordingExecutorPacket)
 		require.True(t, ok)
 		assert.Equal(t, "ctx-auth-finalize", packet.ContextID)
@@ -369,8 +378,8 @@ func TestHandleSessionAuthenticationSucceeded_TextMode_EnqueuesTextInitializatio
 	})
 
 	var packetNames []internal_type.PacketName
-	for len(requestor.channels.BootstrapChannel()) > 0 {
-		packetNames = append(packetNames, (<-requestor.channels.BootstrapChannel()).Pkt.PacketName())
+	for requestor.channels.BootstrapChannel().Len() > 0 {
+		packetNames = append(packetNames, receiveEnvelope(t, requestor.channels.BootstrapChannel()).Pkt.PacketName())
 	}
 
 	assert.Equal(t, []internal_type.PacketName{
@@ -407,8 +416,8 @@ func TestHandleSessionAuthenticationSucceeded_AudioMode_EnqueuesAudioInitializat
 	})
 
 	var packetNames []internal_type.PacketName
-	for len(requestor.channels.BootstrapChannel()) > 0 {
-		packetNames = append(packetNames, (<-requestor.channels.BootstrapChannel()).Pkt.PacketName())
+	for requestor.channels.BootstrapChannel().Len() > 0 {
+		packetNames = append(packetNames, receiveEnvelope(t, requestor.channels.BootstrapChannel()).Pkt.PacketName())
 	}
 
 	assert.Equal(t, []internal_type.PacketName{
@@ -471,8 +480,8 @@ func TestHandleInitializationCompleted_EmitsConversationWebhookRecord(t *testing
 
 			var webhookPacket internal_type.ObservabilityWebhookRecordPacket
 			found := false
-			for len(requestor.channels.BackgroundChannel()) > 0 {
-				envelope := <-requestor.channels.BackgroundChannel()
+			for requestor.channels.BackgroundChannel().Len() > 0 {
+				envelope := receiveEnvelope(t, requestor.channels.BackgroundChannel())
 				packet, ok := envelope.Pkt.(internal_type.ObservabilityWebhookRecordPacket)
 				if !ok {
 					continue
@@ -523,14 +532,14 @@ func TestHandleFinalizeSessionRuntime_QueuesConversationFinalization(t *testing.
 	})
 
 	var packetNames []internal_type.PacketName
-	for len(requestor.channels.DataChannel()) > 0 {
-		packetNames = append(packetNames, (<-requestor.channels.DataChannel()).Pkt.PacketName())
+	for requestor.channels.DataChannel().Len() > 0 {
+		packetNames = append(packetNames, receiveEnvelope(t, requestor.channels.DataChannel()).Pkt.PacketName())
 	}
 
 	assert.Equal(t, []internal_type.PacketName{
 		internal_type.PacketNameFinalizeArtifactPushExecutor,
 	}, packetNames)
-	assert.Empty(t, requestor.channels.BackgroundChannel())
+	assert.Zero(t, requestor.channels.BackgroundChannel().Len())
 }
 
 func TestHandleFinalizeConversation_RecordsCompletedWebhookBeforeClosingAnalysis(t *testing.T) {
@@ -582,7 +591,8 @@ func TestHandleFinalizeConversation_RecordsCompletedWebhookBeforeClosingAnalysis
 	})
 
 	select {
-	case envelope := <-requestor.channels.DataChannel():
+	case <-requestor.channels.DataChannel().Ready():
+		envelope := receiveEnvelope(t, requestor.channels.DataChannel())
 		packet, ok := envelope.Pkt.(internal_type.FinalizeConversationPacket)
 		require.True(t, ok)
 		handler.HandleFinalizeConversation(envelope.Ctx, packet)
@@ -590,7 +600,8 @@ func TestHandleFinalizeConversation_RecordsCompletedWebhookBeforeClosingAnalysis
 		t.Fatalf("expected FinalizeConversationPacket")
 	}
 	select {
-	case envelope := <-requestor.channels.DataChannel():
+	case <-requestor.channels.DataChannel().Ready():
+		envelope := receiveEnvelope(t, requestor.channels.DataChannel())
 		packet, ok := envelope.Pkt.(internal_type.FinalizeAnalysisExecutorPacket)
 		require.True(t, ok)
 		handler.HandleFinalizeAnalysisExecutor(envelope.Ctx, packet)
@@ -631,7 +642,8 @@ func TestHandleFinalizeConversation_RecordsCompletedWebhookBeforeClosingAnalysis
 	assert.Equal(t, "2", metricValues["turn_count"])
 	assert.Equal(t, type_enums.CONVERSATION_COMPLETE.String(), metricValues[type_enums.CONVERSATION_STATUS.String()])
 	select {
-	case envelope := <-requestor.channels.DataChannel():
+	case <-requestor.channels.DataChannel().Ready():
+		envelope := receiveEnvelope(t, requestor.channels.DataChannel())
 		assert.Equal(t, internal_type.PacketNameFinalizeAssistant, envelope.Pkt.PacketName())
 	default:
 		t.Fatalf("expected FinalizeAssistantPacket")
@@ -668,7 +680,8 @@ func TestHandleFinalizeConversation_RecordsCompletedWebhookWithoutAnalysis(t *te
 	require.True(t, ok)
 	assert.Equal(t, type_enums.CONVERSATION_COMPLETE.String(), payload.Status)
 	select {
-	case envelope := <-requestor.channels.DataChannel():
+	case <-requestor.channels.DataChannel().Ready():
+		envelope := receiveEnvelope(t, requestor.channels.DataChannel())
 		assert.Equal(t, internal_type.PacketNameFinalizeAnalysisExecutor, envelope.Pkt.PacketName())
 	default:
 		t.Fatalf("expected FinalizeAnalysisExecutorPacket")
@@ -834,8 +847,8 @@ func TestHandleError_NonRecoverable_EmitsConversationErrorWebhookRecord(t *testi
 
 	var webhookPacket internal_type.ObservabilityWebhookRecordPacket
 	found := false
-	for len(requestor.channels.BackgroundChannel()) > 0 {
-		envelope := <-requestor.channels.BackgroundChannel()
+	for requestor.channels.BackgroundChannel().Len() > 0 {
+		envelope := receiveEnvelope(t, requestor.channels.BackgroundChannel())
 		packet, ok := envelope.Pkt.(internal_type.ObservabilityWebhookRecordPacket)
 		if !ok {
 			continue
@@ -872,11 +885,12 @@ func TestHandleInitializeBehavior_RuntimeConfigUnavailable_LogsAndReturns(t *tes
 	})
 
 	select {
-	case envelope := <-requestor.channels.BackgroundChannel():
+	case <-requestor.channels.BackgroundChannel().Ready():
+		envelope := receiveEnvelope(t, requestor.channels.BackgroundChannel())
 		_, ok := envelope.Pkt.(internal_type.ObservabilityLogRecordPacket)
 		require.True(t, ok, "expected ObservabilityLogRecordPacket, got %T", envelope.Pkt)
 	default:
 		t.Fatal("expected session runtime initialization failure log")
 	}
-	assert.Empty(t, requestor.channels.BootstrapChannel())
+	assert.Zero(t, requestor.channels.BootstrapChannel().Len())
 }

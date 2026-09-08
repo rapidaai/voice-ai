@@ -19,7 +19,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
-	internal_audio_resampler "github.com/rapidaai/api/assistant-api/internal/audio/resampler"
+	resampler_soxr "github.com/rapidaai/api/assistant-api/internal/audio/resampler/soxr"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
@@ -85,19 +85,18 @@ func NewSpeechToText(
 		}
 		return nil, err
 	}
-	resampler, err := internal_audio_resampler.GetResampler(logger)
-	if err != nil {
-		return nil, fmt.Errorf("custom-stt websocket_v1: failed to initialize audio resampler: %w", err)
-	}
 	transformerContext, cancel := context.WithCancel(ctx)
 	return &speechToText{
-		config:            config,
-		engine:            config.newEngine(),
-		ctx:               transformerContext,
-		cancel:            cancel,
-		logger:            logger,
-		onPacket:          onPacket,
-		resampler:         resampler,
+		config:   config,
+		engine:   config.newEngine(),
+		ctx:      transformerContext,
+		cancel:   cancel,
+		logger:   logger,
+		onPacket: onPacket,
+		resampler: resampler_soxr.New(
+			resampler_soxr.WithLogger(logger),
+			resampler_soxr.WithHighQuality(),
+		),
 		sourceAudioConfig: internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG,
 		targetAudioConfig: &protos.AudioConfig{
 			SampleRate:  uint32(config.SampleRate),

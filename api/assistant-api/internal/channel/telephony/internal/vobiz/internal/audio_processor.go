@@ -12,7 +12,7 @@ import (
 
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
-	internal_audio_resampler "github.com/rapidaai/api/assistant-api/internal/audio/resampler"
+	resampler_soxr "github.com/rapidaai/api/assistant-api/internal/audio/resampler/soxr"
 	internal_channel_input "github.com/rapidaai/api/assistant-api/internal/channel/input"
 	internal_telephony_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
@@ -38,24 +38,20 @@ type AudioProcessor struct {
 
 	silenceFrame []byte
 	ambientMixer internal_ambient.Mixer
-	outputHealth *internal_telephony_output.HealthStats
 }
 
 func NewAudioProcessor(logger commons.Logger) (*AudioProcessor, error) {
-	resampler, err := internal_audio_resampler.GetResampler(logger)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrResamplerCreateFailed, err)
-	}
-
 	audioProcessor := &AudioProcessor{
-		logger:             logger,
-		resampler:          resampler,
+		logger: logger,
+		resampler: resampler_soxr.New(
+			resampler_soxr.WithLogger(logger),
+			resampler_soxr.WithHighQuality(),
+		),
 		providerConfig:     internal_audio.NewMulaw8khzMonoAudioConfig(),
 		downstreamConfig:   internal_audio.NewLinear16khzMonoAudioConfig(),
 		inputBuffer:        internal_channel_input.NewBytesInputBuffer(InputBufferThreshold * 2),
 		outputBuffer:       internal_telephony_output.NewBytesFrameBuffer(OutputChunkSize * 8),
 		bridgeOutputBuffer: internal_telephony_output.NewBytesFrameBuffer(BridgeOutputFrameSize * 8),
-		outputHealth:       internal_telephony_output.NewHealthStats(),
 	}
 	audioProcessor.silenceFrame = audioProcessor.createSilenceFrame()
 	ambientMixer, err := internal_ambient.NewLoopMixer(internal_ambient.MixerSpec{
@@ -128,19 +124,6 @@ func (audioProcessor *AudioProcessor) createSilenceFrame() []byte {
 
 func (audioProcessor *AudioProcessor) OutputFrameDuration() time.Duration {
 	return ChunkDuration
-}
-
-func (audioProcessor *AudioProcessor) OnTickHealth(event internal_telephony_output.TickHealth) {
-	if audioProcessor.outputHealth != nil {
-		audioProcessor.outputHealth.OnTickHealth(event)
-	}
-}
-
-func (audioProcessor *AudioProcessor) OutputHealthSnapshot() internal_telephony_output.HealthSnapshot {
-	if audioProcessor.outputHealth == nil {
-		return internal_telephony_output.HealthSnapshot{}
-	}
-	return audioProcessor.outputHealth.Snapshot()
 }
 
 func (audioProcessor *AudioProcessor) applyAmbient(chunk []byte) []byte {

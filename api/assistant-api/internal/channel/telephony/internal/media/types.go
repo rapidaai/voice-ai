@@ -13,7 +13,6 @@ import (
 	"time"
 
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
-	internal_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
@@ -28,8 +27,6 @@ type MediaEngine interface {
 	ClearOutputBuffer()
 	ConfigureAmbient(ambientConfig internal_ambient.Config) error
 	OutputFrameDuration() time.Duration
-	OutputHealthSnapshot() internal_output.HealthSnapshot
-	internal_output.HealthObserver
 }
 
 // MediaSessionConfig carries all transport-independent session dependencies.
@@ -74,7 +71,7 @@ type ProviderAudioFrame struct {
 	ReceivedAt time.Time
 }
 
-// InputAudioFrame separates immediate bridge audio from thresholded AI input.
+// InputAudioFrame separates recording audio from realtime AI input.
 type InputAudioFrame struct {
 	BridgeAudio   []byte
 	PipelineAudio []byte

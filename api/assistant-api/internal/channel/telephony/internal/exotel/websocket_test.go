@@ -12,7 +12,6 @@ import (
 
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
-	internal_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	internal_exotel "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/exotel/internal"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
@@ -60,12 +59,6 @@ func (engine *fakeExotelMediaEngine) ConfigureAmbient(_ internal_ambient.Config)
 func (engine *fakeExotelMediaEngine) OutputFrameDuration() time.Duration {
 	return 20 * time.Millisecond
 }
-
-func (engine *fakeExotelMediaEngine) OutputHealthSnapshot() internal_output.HealthSnapshot {
-	return internal_output.HealthSnapshot{}
-}
-
-func (engine *fakeExotelMediaEngine) OnTickHealth(_ internal_output.TickHealth) {}
 
 // newTestExotelStreamer creates an exotelWebsocketStreamer without starting
 // the background WebSocket reader goroutine. The connection is nil so Cancel()
@@ -151,7 +144,7 @@ func TestSend_TransferConversation_PushesFailedResult(t *testing.T) {
 	err := exotel.Send(toolCall)
 	require.NoError(t, err)
 
-	// Transfer not supported for Exotel — should push a failed result.
+	// Transfer is not supported for Exotel, so it should push a failed result.
 	select {
 	case msg := <-exotel.CriticalCh:
 		result, ok := msg.(*protos.ConversationToolCallResult)
@@ -225,7 +218,7 @@ func TestHandleMediaEvent_EmitsBridgeUserAudio(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case stream := <-exotel.InputCh:
+	case stream := <-exotel.LowCh:
 		bridgeAudio, ok := stream.(*protos.ConversationBridgeUserAudio)
 		require.True(t, ok, "expected bridge user audio, got %T", stream)
 		assert.NotEmpty(t, bridgeAudio.GetAudio())

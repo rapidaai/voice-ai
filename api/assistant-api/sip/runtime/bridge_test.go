@@ -9,6 +9,8 @@ package sip_runtime
 import (
 	"context"
 	"errors"
+	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -31,27 +33,63 @@ func newBridgeAudioSink(size int) *bridgeAudioSink {
 	return &bridgeAudioSink{frames: make(chan []byte, size)}
 }
 
-func (s *bridgeAudioSink) EnqueueAudio(audio []byte) error {
+func (s *bridgeAudioSink) WriteAudio(audio []byte) error {
 	select {
 	case s.frames <- audio:
 		return nil
 	default:
-		return ErrRTPOutputQueueFull
+		return errors.New("bridge audio sink full")
 	}
 }
 
-// newTestRTPHandler creates an RTPHandler with pre-made channels and no real UDP socket.
+// newTestRTPHandler creates an RTPHandler without starting network loops.
 func newTestRTPHandler() *RTPHandler {
 	ctx, cancel := context.WithCancel(context.Background())
 	h := &RTPHandler{
-		audioInChan:  make(chan []byte, 100),
-		audioOutChan: make(chan []byte, 100),
-		flushAudioCh: make(chan struct{}, 1),
-		ctx:          ctx,
-		cancel:       cancel,
+		inboundAudioSinkReady: make(chan struct{}),
+		codec:                 &CodecPCMU,
+		inputSilenceFiller:    newRTPInputSilenceFiller(&CodecPCMU, rtpDefaultPacketizationTime),
+		ctx:                   ctx,
+		cancel:                cancel,
 	}
 	h.running.Store(true)
 	return h
+}
+
+func attachRTPOutputReceiver(t testing.TB, handler *RTPHandler) *net.UDPConn {
+	t.Helper()
+	receiver, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
+	require.NoError(t, err)
+	sender, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
+	require.NoError(t, err)
+	handler.conn = sender
+	handler.remoteAddr = receiver.LocalAddr().(*net.UDPAddr)
+	t.Cleanup(func() {
+		_ = sender.Close()
+		_ = receiver.Close()
+	})
+	return receiver
+}
+
+func readRTPPayload(t testing.TB, handler *RTPHandler, receiver *net.UDPConn) []byte {
+	t.Helper()
+	require.NoError(t, receiver.SetReadDeadline(time.Now().Add(time.Second)))
+	packetData := make([]byte, rtpPacketMaxSize)
+	packetSize, _, err := receiver.ReadFromUDP(packetData)
+	require.NoError(t, err)
+	packet, err := handler.parseRTPPacket(packetData[:packetSize])
+	require.NoError(t, err)
+	return packet.Payload
+}
+
+func deliverBridgeAudio(t testing.TB, handler *RTPHandler, frame InboundAudioFrame) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		handler.mu.RLock()
+		defer handler.mu.RUnlock()
+		return handler.inboundAudioSink != nil
+	}, time.Second, time.Millisecond)
+	handler.deliverInboundAudio([]InboundAudioFrame{frame})
 }
 
 func bridgeTestConfig() *Config {
@@ -76,6 +114,7 @@ func newBridgeTestSession(t *testing.T, direction CallDirection, codec *Codec) (
 	require.NoError(t, err)
 	s.SetState(CallStateConnected)
 	rtp := newTestRTPHandler()
+	rtp.codec = codec
 	s.SetRTPHandler(rtp)
 	if codec != nil {
 		s.SetNegotiatedCodec(codec.Name, int(codec.ClockRate))
@@ -88,7 +127,7 @@ func bridgeTestServer() *Server {
 }
 
 // =============================================================================
-// transcodeG711 — codec pairs
+// transcodeG711 codec pairs.
 // =============================================================================
 
 func TestTranscodeG711_SameCodecPassthrough(t *testing.T) {
@@ -157,14 +196,11 @@ func TestForwardBridgeAudio_PassthroughSameCodec(t *testing.T) {
 	t.Parallel()
 	srv := bridgeTestServer()
 
-	src := make(chan []byte, 10)
 	dst := newBridgeAudioSink(10)
-	ctx, cancel := context.WithCancel(context.Background())
-
-	go srv.forwardBridgeAudio(ctx, src, dst, false, &CodecPCMU, &CodecPCMU, nil)
+	var droppedFrames atomic.Uint64
 
 	for i := 0; i < 5; i++ {
-		src <- []byte{byte(i), byte(i + 1)}
+		srv.forwardBridgeAudioFrame(context.Background(), InboundAudioFrame{Audio: []byte{byte(i), byte(i + 1)}}, dst, false, &CodecPCMU, &CodecPCMU, nil, &droppedFrames)
 	}
 	for i := 0; i < 5; i++ {
 		select {
@@ -174,22 +210,18 @@ func TestForwardBridgeAudio_PassthroughSameCodec(t *testing.T) {
 			t.Fatalf("timeout waiting for frame %d", i)
 		}
 	}
-	cancel()
+	assert.Zero(t, droppedFrames.Load())
 }
 
 func TestForwardBridgeAudio_TranscodesWhenNeeded(t *testing.T) {
 	t.Parallel()
 	srv := bridgeTestServer()
 
-	src := make(chan []byte, 10)
 	dst := newBridgeAudioSink(10)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go srv.forwardBridgeAudio(ctx, src, dst, true, &CodecPCMA, &CodecPCMU, nil)
+	var droppedFrames atomic.Uint64
 
 	alaw := []byte{0xD5, 0xD5}
-	src <- alaw
+	srv.forwardBridgeAudioFrame(context.Background(), InboundAudioFrame{Audio: alaw}, dst, true, &CodecPCMA, &CodecPCMU, nil, &droppedFrames)
 
 	select {
 	case frame := <-dst.frames:
@@ -204,67 +236,26 @@ func TestForwardBridgeAudio_ExitsOnContextCancel(t *testing.T) {
 	t.Parallel()
 	srv := bridgeTestServer()
 
-	src := make(chan []byte, 10)
 	dst := newBridgeAudioSink(10)
 	ctx, cancel := context.WithCancel(context.Background())
-
-	done := make(chan struct{})
-	go func() {
-		srv.forwardBridgeAudio(ctx, src, dst, false, &CodecPCMU, &CodecPCMU, nil)
-		close(done)
-	}()
-
 	cancel()
+	var droppedFrames atomic.Uint64
 
-	select {
-	case <-done:
-	case <-time.After(100 * time.Millisecond):
-		t.Fatal("did not exit after context cancel")
-	}
-}
-
-func TestForwardBridgeAudio_ExitsOnSrcClose(t *testing.T) {
-	t.Parallel()
-	srv := bridgeTestServer()
-
-	src := make(chan []byte, 10)
-	dst := newBridgeAudioSink(10)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	done := make(chan struct{})
-	go func() {
-		srv.forwardBridgeAudio(ctx, src, dst, false, &CodecPCMU, &CodecPCMU, nil)
-		close(done)
-	}()
-
-	close(src)
-
-	select {
-	case <-done:
-	case <-time.After(100 * time.Millisecond):
-		t.Fatal("did not exit after src close")
-	}
+	srv.forwardBridgeAudioFrame(ctx, InboundAudioFrame{Audio: []byte{0x01}}, dst, false, &CodecPCMU, &CodecPCMU, nil, &droppedFrames)
+	assert.Empty(t, dst.frames)
 }
 
 func TestForwardBridgeAudio_DropsFrameWhenDstFull(t *testing.T) {
 	t.Parallel()
 	srv := bridgeTestServer()
 
-	src := make(chan []byte, 10)
 	dst := newBridgeAudioSink(1)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	var droppedFrames atomic.Uint64
 
-	go srv.forwardBridgeAudio(ctx, src, dst, false, &CodecPCMU, &CodecPCMU, nil)
+	srv.forwardBridgeAudioFrame(context.Background(), InboundAudioFrame{Audio: []byte{0x01}}, dst, false, &CodecPCMU, &CodecPCMU, nil, &droppedFrames)
 
-	// Fill dst
-	src <- []byte{0x01}
-	time.Sleep(10 * time.Millisecond)
-
-	// Send more — should be dropped, not block
 	for i := 0; i < 5; i++ {
-		src <- []byte{byte(i + 2)}
+		srv.forwardBridgeAudioFrame(context.Background(), InboundAudioFrame{Audio: []byte{byte(i + 2)}}, dst, false, &CodecPCMU, &CodecPCMU, nil, &droppedFrames)
 	}
 
 	select {
@@ -273,33 +264,28 @@ func TestForwardBridgeAudio_DropsFrameWhenDstFull(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("forwardBridgeAudio is blocked")
 	}
+	assert.Equal(t, uint64(5), droppedFrames.Load())
 }
 
 func TestForwardBridgeAudio_DoesNotRecordDroppedFrame(t *testing.T) {
 	t.Parallel()
 	srv := bridgeTestServer()
 
-	src := make(chan []byte, 1)
 	dst := newBridgeAudioSink(1)
 	recorded := make(chan []byte, 1)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	var droppedFrames atomic.Uint64
 
 	dst.frames <- []byte{0xff}
-	go srv.forwardBridgeAudio(ctx, src, dst, false, &CodecPCMU, &CodecPCMU, func(audio []byte) {
+	srv.forwardBridgeAudioFrame(context.Background(), InboundAudioFrame{Audio: []byte{0x01}}, dst, false, &CodecPCMU, &CodecPCMU, func(audio []byte) {
 		recorded <- audio
-	})
-
-	src <- []byte{0x01}
-	require.Eventually(t, func() bool {
-		return len(src) == 0
-	}, 100*time.Millisecond, 5*time.Millisecond)
+	}, &droppedFrames)
 
 	select {
 	case audio := <-recorded:
 		t.Fatalf("dropped bridge RTP frame was recorded: %v", audio)
 	default:
 	}
+	assert.Equal(t, uint64(1), droppedFrames.Load())
 }
 
 // =============================================================================
@@ -371,7 +357,7 @@ func TestBridgeTransfer_ContextCancellation(t *testing.T) {
 		t.Fatal("BridgeTransfer did not exit after context cancel")
 	}
 	assert.False(t, inbound.IsEnded(), "BridgeTransfer must NOT end the inbound session")
-	assert.False(t, outbound.IsEnded(), "BridgeTransfer must NOT end the outbound session — caller owns it")
+	assert.False(t, outbound.IsEnded(), "BridgeTransfer must not end the outbound session because the caller owns it")
 	assert.Equal(t, CallStateBridgeConnected, inbound.GetState())
 	assert.Equal(t, CallStateBridgeConnected, outbound.GetState())
 }
@@ -471,7 +457,7 @@ func TestBridgeTransfer_OutboundByeEndsBridge(t *testing.T) {
 		t.Fatal("BridgeTransfer did not exit after outbound BYE")
 	}
 	assert.False(t, inbound.IsEnded(), "BridgeTransfer must NOT end the inbound session")
-	assert.False(t, outbound.IsEnded(), "BridgeTransfer must NOT end the outbound session — caller owns it")
+	assert.False(t, outbound.IsEnded(), "BridgeTransfer must not end the outbound session because the caller owns it")
 }
 
 func TestBridgeTransfer_SessionEndTerminatesBridge(t *testing.T) {
@@ -506,6 +492,7 @@ func TestBridgeTransfer_AudioForwardsBidirectionally(t *testing.T) {
 
 	inbound, inRTP := newBridgeTestSession(t, CallDirectionInbound, &CodecPCMU)
 	outbound, outRTP := newBridgeTestSession(t, CallDirectionOutbound, &CodecPCMU)
+	inboundReceiver := attachRTPOutputReceiver(t, inRTP)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan bridgeResult, 1)
@@ -515,13 +502,8 @@ func TestBridgeTransfer_AudioForwardsBidirectionally(t *testing.T) {
 	}()
 
 	// outbound → inbound (inbound→outbound is handled by the telephony media port)
-	outRTP.audioInChan <- []byte{0x03, 0x04}
-	select {
-	case frame := <-inRTP.audioOutChan:
-		assert.Equal(t, []byte{0x03, 0x04}, frame)
-	case <-time.After(200 * time.Millisecond):
-		t.Fatal("audio not forwarded outbound→inbound")
-	}
+	deliverBridgeAudio(t, outRTP, InboundAudioFrame{Audio: []byte{0x03, 0x04}})
+	assert.Equal(t, []byte{0x03, 0x04}, readRTPPayload(t, inRTP, inboundReceiver))
 
 	cancel()
 	<-done
@@ -533,6 +515,7 @@ func TestBridgeTransfer_TranscodesAcrossCodecs(t *testing.T) {
 
 	inbound, inRTP := newBridgeTestSession(t, CallDirectionInbound, &CodecPCMA)
 	outbound, outRTP := newBridgeTestSession(t, CallDirectionOutbound, &CodecPCMU)
+	inboundReceiver := attachRTPOutputReceiver(t, inRTP)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan bridgeResult, 1)
@@ -543,14 +526,10 @@ func TestBridgeTransfer_TranscodesAcrossCodecs(t *testing.T) {
 
 	// µ-law from outbound → A-law on inbound
 	ulaw := []byte{0xFF, 0xFF, 0xFF, 0xFF}
-	outRTP.audioInChan <- ulaw
-	select {
-	case frame := <-inRTP.audioOutChan:
-		assert.Len(t, frame, len(ulaw))
-		assert.NotEqual(t, ulaw, frame, "should be transcoded PCMU→PCMA")
-	case <-time.After(200 * time.Millisecond):
-		t.Fatal("transcoded audio not forwarded")
-	}
+	deliverBridgeAudio(t, outRTP, InboundAudioFrame{Audio: ulaw})
+	frame := readRTPPayload(t, inRTP, inboundReceiver)
+	assert.Len(t, frame, len(ulaw))
+	assert.NotEqual(t, ulaw, frame)
 
 	cancel()
 	<-done
@@ -573,7 +552,7 @@ func TestBridgeTransfer_AlreadyEndedSessions(t *testing.T) {
 }
 
 // =============================================================================
-// BridgeTransfer — graceful transfer contract (outbound-only teardown)
+// BridgeTransfer graceful transfer contract with outbound-only teardown.
 // =============================================================================
 
 func TestBridgeTransfer_OnlyEndsOutboundSession(t *testing.T) {
@@ -603,7 +582,7 @@ func TestBridgeTransfer_OnlyEndsOutboundSession(t *testing.T) {
 	}
 
 	assert.True(t, outbound.IsEnded(), "outbound must be ended")
-	assert.False(t, inbound.IsEnded(), "inbound must NOT be ended — caller owns its lifecycle")
+	assert.False(t, inbound.IsEnded(), "inbound must not be ended because the caller owns its lifecycle")
 }
 
 func TestBridgeTransfer_InboundBye_DoesNotEndEitherSession(t *testing.T) {
@@ -633,23 +612,19 @@ func TestBridgeTransfer_InboundBye_DoesNotEndEitherSession(t *testing.T) {
 	// Both session lifecycles are owned by the caller (executeTransfer); BridgeTransfer
 	// no longer ends either side on normal exit.
 	assert.False(t, outbound.IsEnded(), "outbound lifecycle is owned by caller")
-	assert.False(t, inbound.IsEnded(), "inbound must NOT be ended — NotifyBye is not End()")
+	assert.False(t, inbound.IsEnded(), "inbound must not be ended because NotifyBye is not End()")
 }
 
 func TestForwardBridgeAudio_Passthrough_10Frames(t *testing.T) {
 	t.Parallel()
 	srv := bridgeTestServer()
 
-	src := make(chan []byte, 20)
 	dst := newBridgeAudioSink(20)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go srv.forwardBridgeAudio(ctx, src, dst, false, &CodecPCMU, &CodecPCMU, nil)
+	var droppedFrames atomic.Uint64
 
 	const frameCount = 10
 	for i := 0; i < frameCount; i++ {
-		src <- []byte{byte(i), byte(i * 2)}
+		srv.forwardBridgeAudioFrame(context.Background(), InboundAudioFrame{Audio: []byte{byte(i), byte(i * 2)}}, dst, false, &CodecPCMU, &CodecPCMU, nil, &droppedFrames)
 	}
 
 	for i := 0; i < frameCount; i++ {
@@ -660,33 +635,20 @@ func TestForwardBridgeAudio_Passthrough_10Frames(t *testing.T) {
 			t.Fatalf("timeout waiting for frame %d of %d", i, frameCount)
 		}
 	}
+	assert.Zero(t, droppedFrames.Load())
 }
 
 func TestForwardBridgeAudio_ContextCancel_NoHang(t *testing.T) {
 	t.Parallel()
 	srv := bridgeTestServer()
 
-	src := make(chan []byte) // unbuffered — blocks if forwardBridgeAudio tries to read
 	dst := newBridgeAudioSink(10)
 	ctx, cancel := context.WithCancel(context.Background())
-
-	done := make(chan struct{})
-	go func() {
-		srv.forwardBridgeAudio(ctx, src, dst, false, &CodecPCMU, &CodecPCMU, nil)
-		close(done)
-	}()
-
-	// Cancel immediately — forwardBridgeAudio must not block
 	cancel()
+	var droppedFrames atomic.Uint64
 
-	select {
-	case <-done:
-		// success
-	case <-time.After(200 * time.Millisecond):
-		t.Fatal("forwardBridgeAudio did not exit promptly after context cancel")
-	}
+	srv.forwardBridgeAudioFrame(ctx, InboundAudioFrame{Audio: []byte{0x01}}, dst, false, &CodecPCMU, &CodecPCMU, nil, &droppedFrames)
 
-	// dst should be empty — no frames were sent
 	select {
 	case <-dst.frames:
 		t.Fatal("unexpected frame on dst after cancel")

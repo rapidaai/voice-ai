@@ -8,8 +8,8 @@ package sip_runtime
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
@@ -37,11 +37,6 @@ func (s *Server) MakeTransferBridgeCall(ctx context.Context, cfg *Config, toUser
 	if _, err := outboundCall.Connect(); err != nil {
 		return nil, NewSIPError("MakeTransferBridgeCall", outboundCall.session.GetCallID(), "call not answered", err)
 	}
-
-	s.logger.Infow("Transfer bridge call answered",
-		"call_id", outboundCall.session.GetCallID(),
-		"parent_call_id", opts.ParentCallID,
-		"to", toUser)
 	return outboundCall.session, nil
 }
 
@@ -70,10 +65,6 @@ func (s *Server) BridgeTransfer(ctx context.Context, inbound, outbound *Session,
 	outCodec := outbound.GetNegotiatedCodec()
 	needsTranscode := inCodec != nil && outCodec != nil && inCodec.Name != outCodec.Name
 	if err := s.beginBridgeLifecycle(inbound, outbound); err != nil {
-		s.logger.Errorw("Bridge lifecycle setup failed",
-			"inbound_call_id", inCallID,
-			"outbound_call_id", outCallID,
-			"error", err)
 		if !outbound.IsEnded() {
 			_ = s.FailCall(outbound, LifecycleReasonBridgeSetupFailed, err)
 		}
@@ -83,17 +74,11 @@ func (s *Server) BridgeTransfer(ctx context.Context, inbound, outbound *Session,
 		return BridgeEndContext, err
 	}
 
-	s.logger.Infow("Audio bridge started",
-		"inbound_call_id", inCallID,
-		"outbound_call_id", outCallID,
-		"inbound_codec", s.codecName(inCodec),
-		"outbound_codec", s.codecName(outCodec),
-		"transcoding", needsTranscode)
-
-	audioCtx, audioCancel := context.WithCancel(ctx)
-	defer audioCancel()
-
-	go s.forwardBridgeAudio(audioCtx, outRTP.AudioIn(), inRTP, needsTranscode, outCodec, inCodec, onOperatorAudio)
+	var droppedFrames atomic.Uint64
+	outRTP.SetInboundAudioSink(func(frame InboundAudioFrame) {
+		s.forwardBridgeAudioFrame(ctx, frame, inRTP, needsTranscode, outCodec, inCodec, onOperatorAudio, &droppedFrames)
+	})
+	defer outRTP.SetInboundAudioSink(nil)
 
 	var reason BridgeEndReason
 	select {
@@ -118,8 +103,6 @@ func (s *Server) BridgeTransfer(ctx context.Context, inbound, outbound *Session,
 		s.logger.Warnw("Bridge: safety timeout reached, tearing down",
 			"inbound_call_id", inCallID, "outbound_call_id", outCallID)
 	}
-
-	audioCancel()
 
 	s.logger.Infow("Audio bridge completed",
 		"inbound_call_id", inCallID, "outbound_call_id", outCallID,
@@ -161,36 +144,27 @@ func (s *Server) beginBridgeLegLifecycle(session *Session, legRole string) error
 	return nil
 }
 
-// forwardBridgeAudio reads audio from src and enqueues it to dst, transcoding if needed.
-func (s *Server) forwardBridgeAudio(ctx context.Context, src <-chan []byte, dst internal_type.SIPRTPBridgeTarget, needsTranscode bool, srcCodec, dstCodec *Codec, onAudio func([]byte)) {
-	var droppedFrames uint64
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case data, ok := <-src:
-			if !ok {
-				return
-			}
-			rawData := data
-			if needsTranscode {
-				data = s.transcodeG711(data, srcCodec, dstCodec)
-			}
-			if err := dst.EnqueueAudio(data); err != nil {
-				droppedFrames++
-				if errors.Is(err, ErrRTPHandlerStopped) {
-					return
-				}
-				if s.logger != nil && errors.Is(err, ErrRTPOutputQueueFull) && (droppedFrames == 1 || droppedFrames%100 == 0) {
-					s.logger.Warnw("Bridge RTP output queue full; dropping frame",
-						"dropped_frames_total", droppedFrames)
-				}
-				continue
-			}
-			if onAudio != nil {
-				onAudio(rawData)
-			}
+// forwardBridgeAudioFrame forwards one operator frame to the caller.
+func (s *Server) forwardBridgeAudioFrame(ctx context.Context, frame InboundAudioFrame, dst internal_type.SIPRTPBridgeTarget, needsTranscode bool, srcCodec, dstCodec *Codec, onAudio func([]byte), droppedFrames *atomic.Uint64) {
+	if ctx.Err() != nil {
+		return
+	}
+	data := frame.Audio
+	rawData := data
+	if needsTranscode {
+		data = s.transcodeG711(data, srcCodec, dstCodec)
+	}
+	if err := dst.WriteAudio(data); err != nil {
+		totalDroppedFrames := droppedFrames.Add(1)
+		if s.logger != nil && (totalDroppedFrames == 1 || totalDroppedFrames%100 == 0) {
+			s.logger.Warnw("Bridge RTP audio write failed",
+				"failed_frames_total", totalDroppedFrames,
+				"error", err)
 		}
+		return
+	}
+	if onAudio != nil {
+		onAudio(rawData)
 	}
 }
 

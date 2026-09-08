@@ -32,8 +32,8 @@ func TestNewOutboundInviteRequest_TrunkTermination(t *testing.T) {
 
 	assert.Equal(t, OutboundModeTrunkTermination, request.Config.Mode)
 	assert.Equal(t, "trunk.example.com", request.Config.Address)
-	assert.Equal(t, "+15551234567", request.Identity.ToUser)
-	assert.Equal(t, "+15557654321", request.Identity.FromUser)
+	assert.Equal(t, "+15551234567", request.Address.To)
+	assert.Equal(t, "+15557654321", request.Address.From)
 	assert.Equal(t, "auth-user", request.Config.Auth.Username)
 }
 
@@ -53,15 +53,23 @@ func TestOutboundConfig_MapsLifecycleTimeouts(t *testing.T) {
 }
 
 func TestOutboundConfig_EffectiveTimeouts(t *testing.T) {
-	assert.Equal(t, defaultOutboundRingingTimeout, OutboundConfig{}.EffectiveRingingTimeout())
-	assert.Zero(t, OutboundConfig{}.EffectiveMaxCallDuration())
+	assert.Equal(t, defaultOutboundRingingTimeout, (*OutboundConfig)(nil).EffectiveRingingTimeout())
+	assert.Zero(t, (*OutboundConfig)(nil).EffectiveMaxCallDuration())
 
-	outboundConfig := OutboundConfig{
+	outboundConfig := &OutboundConfig{
 		RingingTimeout:  5 * time.Second,
 		MaxCallDuration: 10 * time.Minute,
 	}
 	assert.Equal(t, 5*time.Second, outboundConfig.EffectiveRingingTimeout())
 	assert.Equal(t, 10*time.Minute, outboundConfig.EffectiveMaxCallDuration())
+}
+
+func TestOutboundInviteRequest_RequiresConfig(t *testing.T) {
+	err := (OutboundInviteRequest{}).Validate()
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrInvalidConfig)
+	assert.Contains(t, err.Error(), "outbound config is required")
 }
 
 func TestOutboundDialogPhase_IsPreAnswer(t *testing.T) {

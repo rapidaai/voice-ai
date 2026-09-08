@@ -163,7 +163,6 @@ var (
 	ErrCatchAllChannelUUIDMissing     = errors.New("call uuid not found in catch-all callback")
 	ErrOutboundResponseMissingUUID    = errors.New("vobiz call response missing request_uuid")
 	ErrAudioProcessorInitFailed       = errors.New("failed to initialize vobiz audio processor")
-	ErrResamplerCreateFailed          = errors.New("failed to create resampler")
 	ErrProviderAudioConversionFailed  = errors.New("audio conversion to 16kHz linear16 failed")
 	ErrAssistantAudioConversionFailed = errors.New("audio conversion to mulaw 8kHz failed")
 )

@@ -11,13 +11,17 @@ import (
 	"strings"
 )
 
-func (c *Config) ToOutboundConfig() OutboundConfig {
+func (c *Config) ToOutboundConfig() *OutboundConfig {
+	if c == nil {
+		return nil
+	}
+
 	headers := make(map[string]string, len(c.CustomHeaders))
 	for name, value := range c.CustomHeaders {
 		headers[name] = value
 	}
 
-	return OutboundConfig{
+	return &OutboundConfig{
 		Mode:            OutboundModeTrunkTermination,
 		Address:         c.Server,
 		Port:            c.Port,
@@ -43,9 +47,9 @@ func NewOutboundInviteRequest(cfg *Config, toUser string, fromUser string) (Outb
 
 	request := OutboundInviteRequest{
 		Config: cfg.ToOutboundConfig(),
-		Identity: OutboundCallIdentity{
-			ToUser:   strings.TrimSpace(toUser),
-			FromUser: strings.TrimSpace(fromUser),
+		Address: CallAddress{
+			To:   strings.TrimSpace(toUser),
+			From: strings.TrimSpace(fromUser),
 		},
 	}
 	if err := request.Validate(); err != nil {
@@ -55,6 +59,10 @@ func NewOutboundInviteRequest(cfg *Config, toUser string, fromUser string) (Outb
 }
 
 func (r OutboundInviteRequest) Validate() error {
+	if r.Config == nil {
+		return fmt.Errorf("%w: outbound config is required", ErrInvalidConfig)
+	}
+
 	switch r.Config.Mode {
 	case OutboundModeTrunkTermination:
 	default:
@@ -76,13 +84,13 @@ func (r OutboundInviteRequest) Validate() error {
 	if !r.Config.Transport.IsValid() {
 		return fmt.Errorf("%w: invalid outbound transport: %s", ErrInvalidConfig, r.Config.Transport)
 	}
-	if r.Identity.ToUser == "" {
+	if r.Address.To == "" {
 		return fmt.Errorf("%w: outbound destination user is required", ErrInvalidConfig)
 	}
-	if strings.Contains(r.Identity.ToUser, "@") {
+	if strings.Contains(r.Address.To, "@") {
 		return fmt.Errorf("%w: outbound destination must be a phone number or SIP user, not a full SIP URI", ErrInvalidConfig)
 	}
-	if r.Identity.FromUser == "" {
+	if r.Address.From == "" {
 		return fmt.Errorf("%w: %w", ErrInvalidConfig, ErrOutboundFromUserRequired)
 	}
 	return nil
