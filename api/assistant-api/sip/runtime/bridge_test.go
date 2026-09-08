@@ -47,6 +47,7 @@ func newTestRTPHandler() *RTPHandler {
 	h := &RTPHandler{
 		inboundAudioSinkReady: make(chan struct{}),
 		codec:                 &CodecPCMU,
+		inputSilenceFiller:    newRTPInputSilenceFiller(&CodecPCMU, rtpDefaultPacketizationTime),
 		ctx:                   ctx,
 		cancel:                cancel,
 	}

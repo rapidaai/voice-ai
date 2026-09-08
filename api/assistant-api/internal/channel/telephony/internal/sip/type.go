@@ -24,10 +24,11 @@ const (
 	DefaultOutboundSIPPort = 5060
 	DefaultRingtone        = "ringtone_us"
 
-	AudioChannelSize = 100
-	ChunkDuration    = 20 * time.Millisecond
-	MulawFrameSize   = 160
-	MulawSilenceByte = 0xFF
+	RealtimeInputChannelCapacity   = 100
+	BridgeRecordingChannelCapacity = 100
+	ChunkDuration                  = 20 * time.Millisecond
+	MulawFrameSize                 = 160
+	MulawSilenceByte               = 0xFF
 
 	Linear16BytesPerMs    = 32
 	BridgeOutputFrameSize = Linear16BytesPerMs * 20

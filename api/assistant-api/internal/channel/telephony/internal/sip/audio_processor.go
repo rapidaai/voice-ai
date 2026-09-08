@@ -86,8 +86,8 @@ func NewAudioProcessor(cfg AudioProcessorConfig) *AudioProcessor {
 		record:               cfg.Record,
 		providerOutputBuffer: internal_telephony_output.NewBytesFrameBuffer(MulawFrameSize * 8),
 		bridgeOutputBuffer:   internal_telephony_output.NewBytesFrameBuffer(BridgeOutputFrameSize * 8),
-		bridgeUserCh:         make(chan bridgeRecordingFrame, AudioChannelSize),
-		bridgeOperatorCh:     make(chan bridgeRecordingFrame, AudioChannelSize),
+		bridgeUserCh:         make(chan bridgeRecordingFrame, BridgeRecordingChannelCapacity),
+		bridgeOperatorCh:     make(chan bridgeRecordingFrame, BridgeRecordingChannelCapacity),
 	}
 	p.SetRingtone(cfg.Ringtone)
 	ambientMixer, err := internal_ambient.NewLoopMixer(internal_ambient.MixerSpec{

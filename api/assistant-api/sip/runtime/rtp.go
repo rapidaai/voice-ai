@@ -67,6 +67,7 @@ type RTPHandler struct {
 	inboundAudioSinkReady chan struct{}
 	inboundAudioSinkOnce  sync.Once
 	inputJitter           *rtpInputJitterBuffer
+	inputSilenceFiller    *rtpInputSilenceFiller
 
 	ctx              context.Context
 	cancel           context.CancelFunc
@@ -246,7 +247,8 @@ func NewRTPHandler(ctx context.Context, config *RTPConfig) (*RTPHandler, error) 
 		codec:                  codec,
 		inputPacketizationTime: config.PacketizationTime,
 		inboundAudioSinkReady:  make(chan struct{}),
-		inputJitter:            newRTPInputJitterBuffer(codec, config.PacketizationTime),
+		inputJitter:            newRTPInputJitterBuffer(config.PacketizationTime),
+		inputSilenceFiller:     newRTPInputSilenceFiller(codec, config.PacketizationTime),
 		ctx:                    handlerCtx,
 		cancel:                 cancel,
 		mediaTimeoutCh:         make(chan struct{}),
@@ -362,8 +364,7 @@ func (h *RTPHandler) flushPendingInboundAudio() {
 		return
 	}
 
-	frames := inputJitter.flushPending()
-	h.deliverInboundAudio(frames)
+	h.deliverInboundPackets(inputJitter.flushPending())
 }
 
 func (h *RTPHandler) MediaTimeout() <-chan struct{} {
@@ -671,9 +672,14 @@ func (h *RTPHandler) SetInboundMediaFormat(codec *Codec, packetizationTime time.
 	h.codec = codec
 	h.inputPacketizationTime = packetizationTime
 	if h.inputJitter == nil {
-		h.inputJitter = newRTPInputJitterBuffer(codec, packetizationTime)
+		h.inputJitter = newRTPInputJitterBuffer(packetizationTime)
 	} else {
-		h.inputJitter.reset(codec, packetizationTime)
+		h.inputJitter.reset(packetizationTime)
+	}
+	if h.inputSilenceFiller == nil {
+		h.inputSilenceFiller = newRTPInputSilenceFiller(codec, packetizationTime)
+	} else {
+		h.inputSilenceFiller.reset(codec, packetizationTime)
 	}
 	h.mu.Unlock()
 
@@ -706,8 +712,7 @@ func (h *RTPHandler) receiveLoop() {
 		now := time.Now()
 		deadline := now.Add(rtpDefaultPacketizationTime)
 		if inputJitter != nil {
-			frames := inputJitter.flushExpired(now)
-			h.deliverInboundAudio(frames)
+			h.deliverInboundPackets(inputJitter.flushExpired(now))
 			if pendingDeadline := inputJitter.nextDeadline(); !pendingDeadline.IsZero() {
 				deadline = pendingDeadline
 			}
@@ -721,10 +726,8 @@ func (h *RTPHandler) receiveLoop() {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				continue
 			}
-			if errors.Is(err, net.ErrClosed) {
-				return
-			}
-			continue
+			h.running.Store(false)
+			return
 		}
 
 		if n > rtpPacketMaxSize {
@@ -786,18 +789,39 @@ func (h *RTPHandler) receiveLoop() {
 		}
 		h.markInboundRTPReceived(arrivedAt)
 		previousSSRC := h.remoteSSRC.Swap(packet.SSRC)
-		if hadRTP && previousSSRC != packet.SSRC && inputJitter != nil {
-			inputJitter.reset(codec, inputPacketizationTime)
+		if hadRTP && previousSSRC != packet.SSRC {
+			if inputJitter != nil {
+				inputJitter.reset(inputPacketizationTime)
+			}
+			h.mu.RLock()
+			inputSilenceFiller := h.inputSilenceFiller
+			h.mu.RUnlock()
+			if inputSilenceFiller != nil {
+				inputSilenceFiller.reset(codec, inputPacketizationTime)
+			}
 		}
 		h.rtcpReception.recordRTP(packet, codec.ClockRate, arrivedAt)
-		var frames []InboundAudioFrame
+		var packets []rtpBufferedInputPacket
 		if inputJitter != nil {
-			frames = inputJitter.push(packet, arrivedAt)
-		} else if isAudio {
-			frames = []InboundAudioFrame{{Audio: packet.Payload, ReceivedAt: arrivedAt}}
+			packets = inputJitter.push(packet, arrivedAt)
+		} else {
+			packets = []rtpBufferedInputPacket{{packet: packet, receivedAt: arrivedAt}}
 		}
-		h.deliverInboundAudio(frames)
+		h.deliverInboundPackets(packets)
 	}
+}
+
+func (h *RTPHandler) deliverInboundPackets(packets []rtpBufferedInputPacket) {
+	if len(packets) == 0 {
+		return
+	}
+	h.mu.RLock()
+	inputSilenceFiller := h.inputSilenceFiller
+	h.mu.RUnlock()
+	if inputSilenceFiller == nil {
+		return
+	}
+	h.deliverInboundAudio(inputSilenceFiller.process(packets))
 }
 
 func (h *RTPHandler) deliverInboundAudio(frames []InboundAudioFrame) {
@@ -990,6 +1014,7 @@ func (h *RTPHandler) GetDetailedStats() RTPStats {
 	var silenceSuppressionFrames uint64
 	h.mu.RLock()
 	inputJitter := h.inputJitter
+	inputSilenceFiller := h.inputSilenceFiller
 	remoteRTCPPort := 0
 	if h.remoteRTCPAddr != nil {
 		remoteRTCPPort = h.remoteRTCPAddr.Port
@@ -1000,7 +1025,9 @@ func (h *RTPHandler) GetDetailedStats() RTPStats {
 		jitterDropped = inputJitter.droppedPackets()
 		lateOrDuplicatePackets = inputJitter.lateOrDuplicatePackets()
 		resyncDroppedPackets = inputJitter.resyncDroppedPackets()
-		silenceSuppressionFrames = inputJitter.silenceSuppressionFrameCount()
+	}
+	if inputSilenceFiller != nil {
+		silenceSuppressionFrames = inputSilenceFiller.frameCount()
 	}
 	lastRTPReceivedAt := time.Time{}
 	if receivedAt := h.lastRTPReceivedAt.Load(); receivedAt > 0 {

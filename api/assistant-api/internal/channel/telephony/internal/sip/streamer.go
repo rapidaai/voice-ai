@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
+	channel_base "github.com/rapidaai/api/assistant-api/internal/channel/base"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
@@ -111,7 +112,11 @@ func New(opts ...FuncOption) (internal_type.SIPCallStreamer, error) {
 
 	s := &Streamer{
 		BaseTelephonyStreamer: internal_telephony_base.New(
-			options.Logger, options.CallContext, options.VaultCredential, options.Observer,
+			options.Logger,
+			options.CallContext,
+			options.VaultCredential,
+			options.Observer,
+			channel_base.WithInputChannelCapacity(RealtimeInputChannelCapacity),
 		),
 	}
 

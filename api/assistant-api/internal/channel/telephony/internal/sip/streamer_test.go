@@ -229,6 +229,7 @@ func TestNew_RoutesBridgeRecordingOutsideRealtimeInput(t *testing.T) {
 	require.NoError(t, err)
 	streamer := stream.(*Streamer)
 	t.Cleanup(func() { require.NoError(t, streamer.Close()) })
+	require.Equal(t, RealtimeInputChannelCapacity, streamer.InputCh.Capacity())
 	select {
 	case message := <-streamer.CriticalCh:
 		_, ok := message.(*protos.ConversationInitialization)

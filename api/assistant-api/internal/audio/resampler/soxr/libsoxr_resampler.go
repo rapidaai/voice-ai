@@ -22,8 +22,14 @@ import (
 // corrupted by concurrent callers and carries over between consecutive
 // audio chunks, eliminating per-chunk startup transients.
 type cachedEngine struct {
-	mu sync.Mutex
-	rs resampling.Resampler
+	mu           sync.Mutex
+	rs           resampling.Resampler
+	inputSamples []float64
+}
+
+type ratePair struct {
+	source uint32
+	target uint32
 }
 
 // libsoxrResampler provides high-quality polyphase FIR audio resampling.
@@ -101,6 +107,9 @@ func (r *libsoxrResampler) Resample(
 		source.AudioFormat == target.AudioFormat {
 		return data, nil
 	}
+	if source.SampleRate != target.SampleRate && source.Channels == 1 && target.Channels == 1 {
+		return r.resampleMono(data, source, target)
+	}
 
 	// Convert input to LINEAR16 so the FIR engine always works in PCM.
 	pcm := data
@@ -138,6 +147,26 @@ func (r *libsoxrResampler) Resample(
 	return pcm, nil
 }
 
+func (r *libsoxrResampler) resampleMono(data []byte, source, target *protos.AudioConfig) ([]byte, error) {
+	engine, err := r.getOrCreateEngine(source.SampleRate, target.SampleRate)
+	if err != nil {
+		return nil, err
+	}
+
+	engine.mu.Lock()
+	defer engine.mu.Unlock()
+
+	engine.inputSamples, err = decodeMono(engine.inputSamples, data, source.AudioFormat)
+	if err != nil {
+		return nil, err
+	}
+	output, err := engine.rs.Process(engine.inputSamples)
+	if err != nil {
+		return nil, fmt.Errorf("resample failed: %w", err)
+	}
+	return encodeMono(output, target.AudioFormat)
+}
+
 // =======================
 // Resampling
 // =======================
@@ -166,7 +195,7 @@ func (r *libsoxrResampler) resamplePCM16(pcm []byte, srcRate, dstRate uint32) ([
 // creating it on first access. LoadOrStore ensures only one engine is
 // created even under concurrent first-time calls for the same key.
 func (r *libsoxrResampler) getOrCreateEngine(srcRate, dstRate uint32) (*cachedEngine, error) {
-	key := fmt.Sprintf("%d/%d", srcRate, dstRate)
+	key := ratePair{source: srcRate, target: dstRate}
 
 	if v, ok := r.engines.Load(key); ok {
 		return v.(*cachedEngine), nil
@@ -188,6 +217,52 @@ func (r *libsoxrResampler) getOrCreateEngine(srcRate, dstRate uint32) (*cachedEn
 	return actual.(*cachedEngine), nil
 }
 
+func decodeMono(samples []float64, data []byte, format protos.AudioConfig_AudioFormat) ([]float64, error) {
+	var sampleCount int
+	switch format {
+	case protos.AudioConfig_LINEAR16:
+		sampleCount = len(data) / 2
+	case protos.AudioConfig_MuLaw8:
+		sampleCount = len(data)
+	default:
+		return nil, fmt.Errorf("unsupported input format: %v", format)
+	}
+
+	if cap(samples) < sampleCount {
+		samples = make([]float64, sampleCount)
+	} else {
+		samples = samples[:sampleCount]
+	}
+	switch format {
+	case protos.AudioConfig_LINEAR16:
+		for index := range samples {
+			// #nosec G115, PCM16 decoding preserves the source two's-complement bits.
+			sample := int16(binary.LittleEndian.Uint16(data[index*2:]))
+			samples[index] = float64(sample) / 32768.0
+		}
+	case protos.AudioConfig_MuLaw8:
+		for index := range samples {
+			samples[index] = float64(g711.DecodeUlawFrame(data[index])) / 32768.0
+		}
+	}
+	return samples, nil
+}
+
+func encodeMono(samples []float64, format protos.AudioConfig_AudioFormat) ([]byte, error) {
+	switch format {
+	case protos.AudioConfig_LINEAR16:
+		return float64ToPCM16(samples), nil
+	case protos.AudioConfig_MuLaw8:
+		encoded := make([]byte, len(samples))
+		for index, sample := range samples {
+			encoded[index] = g711.EncodeUlawFrame(float64ToInt16(sample))
+		}
+		return encoded, nil
+	default:
+		return nil, fmt.Errorf("unsupported output format: %v", format)
+	}
+}
+
 // =======================
 // PCM16 ↔ float64
 // =======================
@@ -196,6 +271,7 @@ func pcm16ToFloat64(data []byte) []float64 {
 	n := len(data) &^ 1 // round down to even byte boundary
 	out := make([]float64, n/2)
 	for i := 0; i < n; i += 2 {
+		// #nosec G115, PCM16 decoding preserves the source two's-complement bits.
 		s := int16(binary.LittleEndian.Uint16(data[i : i+2]))
 		out[i/2] = float64(s) / 32768.0
 	}
@@ -205,15 +281,20 @@ func pcm16ToFloat64(data []byte) []float64 {
 func float64ToPCM16(data []float64) []byte {
 	out := make([]byte, len(data)*2)
 	for i, v := range data {
-		if v > 1 {
-			v = 1
-		} else if v < -1 {
-			v = -1
-		}
-		s := int16(v * 32767.0)
+		s := float64ToInt16(v)
+		// #nosec G115, PCM16 encoding preserves the signed sample bits.
 		binary.LittleEndian.PutUint16(out[i*2:i*2+2], uint16(s))
 	}
 	return out
+}
+
+func float64ToInt16(sample float64) int16 {
+	if sample > 1 {
+		sample = 1
+	} else if sample < -1 {
+		sample = -1
+	}
+	return int16(sample * 32767.0)
 }
 
 // =======================
@@ -265,9 +346,13 @@ func (r *libsoxrResampler) convertChannels(data []byte, src, dst uint32) []byte 
 	if src == 2 && dst == 1 {
 		out := make([]byte, len(data)/2)
 		for i := 0; i < len(data); i += 4 {
+			// #nosec G115, PCM16 decoding preserves the source two's-complement bits.
 			l := int16(binary.LittleEndian.Uint16(data[i:]))
+			// #nosec G115, PCM16 decoding preserves the source two's-complement bits.
 			r := int16(binary.LittleEndian.Uint16(data[i+2:]))
+			// #nosec G115, averaging two int16 samples remains within int16 range.
 			m := int16((int32(l) + int32(r)) / 2)
+			// #nosec G115, PCM16 encoding preserves the signed sample bits.
 			binary.LittleEndian.PutUint16(out[i/2:], uint16(m))
 		}
 		return out

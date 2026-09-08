@@ -72,7 +72,7 @@ func (outboundCall *Outbound) HandleCall() {
 // Connect waits for the outbound INVITE answer, prepares media, starts RTP, and sends ACK.
 // It owns setup failure side effects; steady-state call handling remains in HandleCall.
 func (outboundCall *Outbound) Connect() (time.Time, error) {
-	outboundConfig := outboundCall.session.config.ToOutboundConfig()
+	outboundConfig := outboundCall.request.Config
 	ringingTimeout := outboundConfig.EffectiveRingingTimeout()
 	assistantID := uint64(0)
 	if assistant := outboundCall.session.GetAssistant(); assistant != nil {
@@ -118,7 +118,7 @@ func (outboundCall *Outbound) Connect() (time.Time, error) {
 	return answerTime, nil
 }
 
-func (outboundCall *Outbound) waitForAnswer(outboundConfig OutboundConfig, ringingTimeout time.Duration) error {
+func (outboundCall *Outbound) waitForAnswer(outboundConfig *OutboundConfig, ringingTimeout time.Duration) error {
 	answerParentContext := outboundCall.session.Context()
 	if outboundCall.answerContext != nil {
 		answerParentContext = outboundCall.answerContext

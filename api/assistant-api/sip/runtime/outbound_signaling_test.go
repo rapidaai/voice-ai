@@ -106,7 +106,7 @@ func TestNormalizeDialogRouteSet_UsesRecordRoute(t *testing.T) {
 
 func testInviteRequest() OutboundInviteRequest {
 	return OutboundInviteRequest{
-		Config: OutboundConfig{
+		Config: &OutboundConfig{
 			Mode:      OutboundModeTrunkTermination,
 			Address:   "trunk.example.com",
 			Port:      5060,

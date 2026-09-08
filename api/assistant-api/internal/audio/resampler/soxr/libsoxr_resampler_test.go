@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	resampling "github.com/tphakala/go-audio-resampler"
+	"github.com/zaf/g711"
 )
 
 func newTestLogger(t testing.TB) commons.Logger {
@@ -92,6 +93,21 @@ func TestRealtimeAudioResamplerInstancesKeepIndependentState(tester *testing.T) 
 	want, err := reference.Resample(secondInput, source, target)
 	require.NoError(tester, err)
 	require.Equal(tester, want, got)
+}
+
+func TestRealtimeMuLawResamplingMatchesDecodedPCM(t *testing.T) {
+	muLawSource := internal_audio.NewMulaw8khzMonoAudioConfig()
+	linearSource := internal_audio.NewLinear8khzMonoAudioConfig()
+	target := internal_audio.NewLinear16khzMonoAudioConfig()
+	encoded := g711.EncodeUlaw(generateLinear16Data(160))
+
+	encodedResampler := New(WithQuickQuality())
+	linearResampler := New(WithQuickQuality())
+	got, err := encodedResampler.Resample(encoded, muLawSource, target)
+	require.NoError(t, err)
+	want, err := linearResampler.Resample(g711.DecodeUlaw(encoded), linearSource, target)
+	require.NoError(t, err)
+	require.Equal(t, want, got)
 }
 
 // TestResampleNoConversion tests when source and target are identical

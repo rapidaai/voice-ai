@@ -628,7 +628,7 @@ func TestForwardUserAudio_Backpressure_DropsAudio(t *testing.T) {
 	proc.ConnectTransferMedia(bridgeRTP, &sip_runtime.CodecPCMU, sip_runtime.CodecPCMU.Name)
 
 	// Fill bridgeUserCh to capacity
-	for i := 0; i < AudioChannelSize; i++ {
+	for i := 0; i < BridgeRecordingChannelCapacity; i++ {
 		proc.bridgeUserCh <- bridgeRecordingFrame{audio: []byte{byte(i)}, codecName: sip_runtime.CodecPCMU.Name}
 	}
 
@@ -710,7 +710,7 @@ func TestRecordTransferOperatorAudio_Backpressure_DropsAudio(t *testing.T) {
 	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMU, &mockResampler{})
 
 	// Fill channel
-	for i := 0; i < AudioChannelSize; i++ {
+	for i := 0; i < BridgeRecordingChannelCapacity; i++ {
 		proc.bridgeOperatorCh <- bridgeRecordingFrame{audio: []byte{byte(i)}, codecName: sip_runtime.CodecPCMU.Name}
 	}
 
@@ -1035,8 +1035,8 @@ func TestNewAudioProcessor_InitializesChannels(t *testing.T) {
 
 	assert.NotNil(t, proc.bridgeUserCh)
 	assert.NotNil(t, proc.bridgeOperatorCh)
-	assert.Equal(t, AudioChannelSize, cap(proc.bridgeUserCh))
-	assert.Equal(t, AudioChannelSize, cap(proc.bridgeOperatorCh))
+	assert.Equal(t, BridgeRecordingChannelCapacity, cap(proc.bridgeUserCh))
+	assert.Equal(t, BridgeRecordingChannelCapacity, cap(proc.bridgeOperatorCh))
 	assert.Equal(t, ChunkDuration, proc.OutputFrameDuration())
 	assert.False(t, proc.IsBridgeActive())
 }

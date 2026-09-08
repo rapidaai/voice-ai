@@ -277,11 +277,7 @@ func TestMediaPort_RealUDPInputHandlesReorderingAndLoss(t *testing.T) {
 
 				expectedEncoded := append([][]byte(nil), encodedFrames...)
 				if testCase.expectLoss {
-					silenceByte := byte(0xFF)
-					if codec.Name == sip_runtime.CodecPCMA.Name {
-						silenceByte = 0xD5
-					}
-					expectedEncoded[1] = bytes.Repeat([]byte{silenceByte}, samplesPerFrame)
+					expectedEncoded = [][]byte{encodedFrames[0], encodedFrames[2]}
 				}
 
 				reference := resampler_soxr.New(resampler_soxr.WithQuickQuality())

@@ -51,7 +51,8 @@ func startRTPInputReceiver(tester *testing.T) (*RTPHandler, <-chan InboundAudioF
 	handler.conn = connection
 	handler.codec = &CodecPCMU
 	handler.inputPacketizationTime = 20 * time.Millisecond
-	handler.inputJitter = newRTPInputJitterBuffer(&CodecPCMU, 20*time.Millisecond)
+	handler.inputJitter = newRTPInputJitterBuffer(20 * time.Millisecond)
+	handler.inputSilenceFiller = newRTPInputSilenceFiller(&CodecPCMU, 20*time.Millisecond)
 	audio := captureInboundAudio(tester, handler, 32)
 	finished := make(chan struct{})
 	go func() {
@@ -135,11 +136,8 @@ func TestRTPHandler_InvalidTrafficDoesNotPostponeAudioDeadline(tester *testing.T
 		send(&RTPPacket{Version: 2, PayloadType: 96, Payload: []byte{1, 2, 3, 4}})
 		time.Sleep(10 * time.Millisecond)
 	}
-	require.Equal(tester, 2, len(audioIn))
+	require.Equal(tester, 1, len(audioIn))
 	audio, err := receiveInboundAudio(tester, audioIn, time.Second)
-	require.NoError(tester, err)
-	require.Equal(tester, bytes.Repeat([]byte{0xff}, 160), audio.Audio)
-	audio, err = receiveInboundAudio(tester, audioIn, time.Second)
 	require.NoError(tester, err)
 	require.Equal(tester, bytes.Repeat([]byte{3}, 160), audio.Audio)
 	require.Equal(tester, uint64(1), handler.GetDetailedStats().PacketsLost)
@@ -269,9 +267,11 @@ func TestNewRTPHandlerInitializesInputPacketizationTime(t *testing.T) {
 
 	handler.mu.RLock()
 	inputJitter := handler.inputJitter
+	inputSilenceFiller := handler.inputSilenceFiller
 	handler.mu.RUnlock()
 	require.NotNil(t, inputJitter)
-	assert.Len(t, inputJitter.silencePayload, 240)
+	require.NotNil(t, inputSilenceFiller)
+	assert.Len(t, inputSilenceFiller.silencePayload, 240)
 }
 
 func TestRTPHandler_ReceiveLoopDropsNonAudioPayload(t *testing.T) {
@@ -465,15 +465,20 @@ func TestRTPHandler_DeliverInboundAudioCountsMissingSink(t *testing.T) {
 
 func TestRTPHandler_DetailedStatsSeparateInboundDropCategories(t *testing.T) {
 	handler := newTestRTPHandler()
-	buffer := newRTPInputJitterBuffer(&CodecPCMU, rtpDefaultPacketizationTime)
+	buffer := newRTPInputJitterBuffer(rtpDefaultPacketizationTime)
 	handler.inputJitter = buffer
+	handler.inputSilenceFiller = newRTPInputSilenceFiller(&CodecPCMU, rtpDefaultPacketizationTime)
 	captureInboundAudio(t, handler, 1)
 
 	arrivedAt := time.Now()
-	require.Len(t, buffer.push(testRTPInputPacket(1, 0, 0x01), arrivedAt), 1)
-	require.Len(t, buffer.push(testRTPInputPacket(2, 640, 0x02), arrivedAt), 4)
+	first := buffer.push(testRTPInputPacket(1, 0, 0x01), arrivedAt)
+	require.Len(t, first, 1)
+	require.Len(t, handler.inputSilenceFiller.process(first), 1)
+	ordered := buffer.push(testRTPInputPacket(2, 640, 0x02), arrivedAt)
+	require.Len(t, ordered, 1)
+	require.Len(t, handler.inputSilenceFiller.process(ordered), 4)
 	assert.Empty(t, buffer.push(testRTPInputPacket(4, 960, 0x04), arrivedAt))
-	require.Len(t, buffer.flushExpired(arrivedAt.Add(rtpInputReorderWindow)), 2)
+	require.Len(t, buffer.flushExpired(arrivedAt.Add(rtpInputReorderWindow)), 1)
 	assert.Empty(t, buffer.push(testRTPInputPacket(4, 960, 0x09), arrivedAt))
 	assert.Empty(t, buffer.push(testRTPInputPacket(6, 1120, 0x06), arrivedAt))
 	require.Len(t, buffer.push(testRTPInputPacket(1000, 159840, 0x10), arrivedAt), 1)
@@ -517,16 +522,14 @@ func TestRTPHandler_StopFlushesPendingJitterAudio(t *testing.T) {
 	handler := newTestRTPHandler()
 	audioIn := captureInboundAudio(t, handler, 2)
 	arrivedAt := time.Unix(1, 0)
-	handler.inputJitter = newRTPInputJitterBuffer(&CodecPCMU, 20*time.Millisecond)
+	handler.inputJitter = newRTPInputJitterBuffer(20 * time.Millisecond)
+	handler.inputSilenceFiller = newRTPInputSilenceFiller(&CodecPCMU, 20*time.Millisecond)
 	handler.inputJitter.push(testRTPInputPacket(1, 0, 1), arrivedAt)
 	handler.inputJitter.push(testRTPInputPacket(3, 320, 3), arrivedAt)
 
 	require.NoError(t, handler.Stop())
 
 	audio, err := receiveInboundAudio(t, audioIn, time.Second)
-	require.NoError(t, err)
-	require.Equal(t, bytes.Repeat([]byte{0xff}, 160), audio.Audio)
-	audio, err = receiveInboundAudio(t, audioIn, time.Second)
 	require.NoError(t, err)
 	require.Equal(t, bytes.Repeat([]byte{3}, 160), audio.Audio)
 }
