@@ -391,6 +391,11 @@ func (aws *asteriskWebsocketStreamer) handleAudioData(audio []byte) error {
 }
 
 func (aws *asteriskWebsocketStreamer) Send(response internal_type.Stream) error {
+	if aws.mediaSession != nil {
+		if outputControlHandled, outputControlError := aws.mediaSession.HandleOutputControl(response); outputControlHandled {
+			return outputControlError
+		}
+	}
 	switch data := response.(type) {
 	case *protos.ConversationInitialization:
 		if aws.mediaSession != nil {
@@ -402,7 +407,7 @@ func (aws *asteriskWebsocketStreamer) Send(response internal_type.Stream) error 
 			if aws.mediaSession == nil {
 				return nil
 			}
-			if err := aws.mediaSession.HandleAssistantAudio(content.Audio, data.GetCompleted()); err != nil {
+			if _, assistantAudioError := aws.mediaSession.HandleAssistantAudio(data.GetId(), content.Audio, data.GetCompleted()); assistantAudioError != nil {
 				_ = aws.Record(observability.RecordLog{
 					Level:   observability.LevelError,
 					Message: "Failed to process Asterisk output audio",
@@ -411,7 +416,7 @@ func (aws *asteriskWebsocketStreamer) Send(response internal_type.Stream) error 
 						"provider":          "asterisk_ws",
 						"channel_name":      aws.channelName,
 						"conversation_uuid": aws.ChannelUUID,
-						"error":             err.Error(),
+						"error":             assistantAudioError.Error(),
 					},
 				}, observability.RecordMetric{
 					Metrics: []*protos.Metric{{
@@ -420,14 +425,12 @@ func (aws *asteriskWebsocketStreamer) Send(response internal_type.Stream) error 
 						Description: "Failed to process Asterisk output audio",
 					}},
 				})
-				return err
+				return assistantAudioError
 			}
 		}
 
 	case *protos.ConversationInterruption:
-		if aws.mediaSession != nil {
-			aws.mediaSession.HandleInterrupt()
-		}
+		return nil
 
 	case *protos.ConversationDisconnection:
 		// Server-initiated disconnect: the talker already knows the reason

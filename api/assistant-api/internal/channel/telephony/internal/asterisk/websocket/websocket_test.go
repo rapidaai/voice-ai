@@ -18,6 +18,7 @@ import (
 	channel_base "github.com/rapidaai/api/assistant-api/internal/channel/base"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
+	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
@@ -27,6 +28,8 @@ import (
 type fakeAsteriskMediaEngine struct {
 	providerFrame internal_telephony_media.ProviderAudioFrame
 	processError  error
+	outputFrames  []internal_telephony_media.AssistantOutputFrame
+	clearCount    int
 }
 
 func (engine *fakeAsteriskMediaEngine) ProcessProviderAudioFrame(frame internal_telephony_media.ProviderAudioFrame) (internal_telephony_media.InputAudioFrame, error) {
@@ -41,19 +44,30 @@ func (engine *fakeAsteriskMediaEngine) ProcessProviderAudioFrame(frame internal_
 	}, nil
 }
 
-func (engine *fakeAsteriskMediaEngine) ProcessAssistantAudio(_ []byte, _ bool) error {
+func (engine *fakeAsteriskMediaEngine) ProcessAssistantAudio(audio []byte, _ bool) error {
+	engine.outputFrames = append(engine.outputFrames, internal_telephony_media.AssistantOutputFrame{
+		ProviderAudio: append([]byte(nil), audio...),
+	})
 	return nil
 }
 
 func (engine *fakeAsteriskMediaEngine) NextOutputFrame() (internal_telephony_media.AssistantOutputFrame, bool) {
-	return internal_telephony_media.AssistantOutputFrame{}, false
+	if len(engine.outputFrames) == 0 {
+		return internal_telephony_media.AssistantOutputFrame{}, false
+	}
+	frame := engine.outputFrames[0]
+	engine.outputFrames = engine.outputFrames[1:]
+	return frame, true
 }
 
 func (engine *fakeAsteriskMediaEngine) IdleOutputFrame() (internal_telephony_media.AssistantOutputFrame, bool) {
 	return internal_telephony_media.AssistantOutputFrame{}, false
 }
 
-func (engine *fakeAsteriskMediaEngine) ClearOutputBuffer() {}
+func (engine *fakeAsteriskMediaEngine) ClearOutputBuffer() {
+	engine.outputFrames = nil
+	engine.clearCount++
+}
 
 func (engine *fakeAsteriskMediaEngine) ConfigureAmbient(_ internal_ambient.Config) error {
 	return nil
@@ -264,6 +278,41 @@ func TestSend_UnhandledType_NoError(t *testing.T) {
 
 	err := aws.Send(msg)
 	assert.NoError(t, err)
+}
+
+func TestSend_OutputControlsRouteBeforeAssistantAudio(t *testing.T) {
+	aws := newTestStreamer(t)
+	engine := &fakeAsteriskMediaEngine{}
+	aws.mediaSession = internal_telephony_media.NewMediaSession(internal_telephony_media.MediaSessionConfig{
+		MediaEngine: engine,
+	})
+	audio := []byte{1, 2, 3}
+
+	require.NoError(t, aws.Send(&protos.ConversationAssistantMessage{
+		Id:      "response-1",
+		Message: &protos.ConversationAssistantMessage_Audio{Audio: audio},
+	}))
+	require.NoError(t, aws.Send(internal_type.PauseOutput{}))
+	assert.Nil(t, aws.mediaSession.NextFrame())
+	require.NoError(t, aws.Send(internal_type.ContinueOutput{}))
+	assert.Equal(t, audio, aws.mediaSession.NextFrame())
+
+	require.NoError(t, aws.Send(&protos.ConversationAssistantMessage{
+		Id:      "response-2",
+		Message: &protos.ConversationAssistantMessage_Audio{Audio: audio},
+	}))
+	require.NoError(t, aws.Send(internal_type.FlushOutput{}))
+	require.NoError(t, aws.Send(&protos.ConversationAssistantMessage{
+		Id:      "response-2",
+		Message: &protos.ConversationAssistantMessage_Audio{Audio: audio},
+	}))
+	assert.Nil(t, aws.mediaSession.NextFrame())
+	require.NoError(t, aws.Send(&protos.ConversationAssistantMessage{
+		Id:      "response-3",
+		Message: &protos.ConversationAssistantMessage_Audio{Audio: audio},
+	}))
+	assert.Equal(t, audio, aws.mediaSession.NextFrame())
+	assert.Equal(t, 1, engine.clearCount)
 }
 
 func TestDisconnectTypeFromReadError(t *testing.T) {

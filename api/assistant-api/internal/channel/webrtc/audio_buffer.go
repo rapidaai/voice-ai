@@ -8,9 +8,11 @@ package channel_webrtc
 
 import (
 	"bytes"
+	"fmt"
 	"time"
 
 	webrtc_internal "github.com/rapidaai/api/assistant-api/internal/channel/webrtc/internal"
+	"github.com/rapidaai/api/assistant-api/internal/observability"
 	"github.com/rapidaai/protos"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -48,48 +50,117 @@ func (s *webrtcStreamer) bufferAndSendInput(audio []byte, inputAudioReceivedAt t
 	})
 }
 
-func (s *webrtcStreamer) bufferAndSendOutput(audio []byte) {
+func (s *webrtcStreamer) bufferAndSendOutput(contextID string, audio []byte) {
+	s.outputStateMu.Lock()
+	if contextID == "" && s.outputFlushed {
+		s.outputStateMu.Unlock()
+		return
+	}
+	if contextID != "" {
+		if contextID == s.flushedOutputContextID {
+			s.outputStateMu.Unlock()
+			return
+		}
+		if s.outputContextID != contextID {
+			s.audioBufferState.OutputAudioBufferMu.Lock()
+			s.audioBufferState.OutputAudioBuffer.Reset()
+			s.audioBufferState.OutputAudioBufferMu.Unlock()
+			s.outputContextID = contextID
+		}
+		s.outputFlushed = false
+	}
+
 	s.audioBufferState.OutputAudioBufferMu.Lock()
 	s.audioBufferState.OutputAudioBuffer.Write(audio)
 	if s.audioBufferState.OutputAudioBuffer.Len() < webrtc_internal.WebRTCOutputPCM16kFrameBytes {
 		s.audioBufferState.OutputAudioBufferMu.Unlock()
+		s.outputStateMu.Unlock()
 		return
 	}
 
-	var frames [][]byte
+	var audioEnqueueResults []struct {
+		queuedAt      time.Time
+		droppedFrames int
+		queueDepth    int
+	}
 	for s.audioBufferState.OutputAudioBuffer.Len() >= webrtc_internal.WebRTCOutputPCM16kFrameBytes {
 		frame := make([]byte, webrtc_internal.WebRTCOutputPCM16kFrameBytes)
 		s.audioBufferState.OutputAudioBuffer.Read(frame)
-		frames = append(frames, frame)
+		assistantAudioQueuedAt := time.Now()
+		outputFrame := webrtc_internal.OutputAudioFrame{
+			Audio:    frame,
+			QueuedAt: assistantAudioQueuedAt,
+		}
+		droppedFrames := 0
+		s.outputAudioQueueMu.Lock()
+		if webrtc_internal.OutputAudioQueueMaxFrames > 0 && len(s.outputAudioQueue) >= webrtc_internal.OutputAudioQueueMaxFrames {
+			s.outputAudioQueue[0] = webrtc_internal.OutputAudioFrame{}
+			copy(s.outputAudioQueue, s.outputAudioQueue[1:])
+			s.outputAudioQueue[len(s.outputAudioQueue)-1] = outputFrame
+			droppedFrames = webrtc_internal.OutputAudioDropOldestSize
+		} else {
+			s.outputAudioQueue = append(s.outputAudioQueue, outputFrame)
+		}
+		outputQueueDepth := len(s.outputAudioQueue)
+		s.outputAudioQueueMu.Unlock()
+		audioEnqueueResults = append(audioEnqueueResults, struct {
+			queuedAt      time.Time
+			droppedFrames int
+			queueDepth    int
+		}{assistantAudioQueuedAt, droppedFrames, outputQueueDepth})
 	}
 	s.audioBufferState.OutputAudioBufferMu.Unlock()
+	s.outputStateMu.Unlock()
 
-	frameTimestamp := timestamppb.Now()
-	for _, frame := range frames {
-		s.Output(&protos.ConversationAssistantMessage{
-			Message: &protos.ConversationAssistantMessage_Audio{Audio: frame},
-			Time:    frameTimestamp,
+	for _, audioEnqueueResult := range audioEnqueueResults {
+		s.Mu.Lock()
+		s.mediaHealthState.RecordAssistantAudioQueued(audioEnqueueResult.queuedAt)
+		s.Mu.Unlock()
+		if audioEnqueueResult.droppedFrames == 0 {
+			continue
+		}
+		totalDroppedFrames := s.sessionState.AddOutputAudioDroppedFrames(audioEnqueueResult.droppedFrames)
+		_ = s.observer.Record(s.Ctx, s.sessionState.Scope, observability.RecordLog{
+			Level:   observability.LevelInfo,
+			Message: "WebRTC output queue overflow dropped the oldest assistant audio frame; this keeps playback current when audio is produced faster than WebRTC can send it.",
+			Attributes: observability.Attributes{
+				"component":                            observability.ComponentWebRTC.String(),
+				webrtc_internal.DataType:               webrtc_internal.EventOutputQueueOverflow,
+				webrtc_internal.DataSessionID:          s.sessionID,
+				webrtc_internal.DataPolicy:             webrtc_internal.OutputQueuePolicyDropOldest,
+				webrtc_internal.DataDroppedFrames:      fmt.Sprintf("%d", audioEnqueueResult.droppedFrames),
+				webrtc_internal.DataLimitFrames:        fmt.Sprintf("%d", webrtc_internal.OutputAudioQueueMaxFrames),
+				webrtc_internal.DataQueueDepthFrames:   fmt.Sprintf("%d", audioEnqueueResult.queueDepth),
+				webrtc_internal.DataTotalDroppedFrames: fmt.Sprintf("%d", totalDroppedFrames),
+			},
+		}, observability.RecordMetric{
+			Metrics: []*protos.Metric{{
+				Name:        observability.MetricWebRTCOutputQueueDrops,
+				Value:       fmt.Sprintf("%d", audioEnqueueResult.droppedFrames),
+				Description: "WebRTC output queue dropped frames",
+			}},
 		})
 	}
 }
 
 func (s *webrtcStreamer) clearBufferedOutputAudio() {
+	s.outputWriteMu.Lock()
+	defer s.outputWriteMu.Unlock()
+	s.outputStateMu.Lock()
 	s.audioBufferState.OutputAudioBufferMu.Lock()
 	s.audioBufferState.OutputAudioBuffer.Reset()
 	s.audioBufferState.OutputAudioBufferMu.Unlock()
-
-	select {
-	case s.flushAudioCh <- struct{}{}:
-	default:
-	}
-
-	for {
-		select {
-		case <-s.OutputCh:
-		default:
-			return
-		}
-	}
+	s.currentOutputFrame = nil
+	s.currentOutputGeneration = 0
+	s.clearOutputAudio()
+	s.outputPaused = false
+	s.outputFlushed = false
+	s.outputClearPending = false
+	s.outputContextID = ""
+	s.flushedOutputContextID = ""
+	s.outputGeneration++
+	s.pendingClearGeneration = 0
+	s.outputStateMu.Unlock()
 }
 
 func (s *webrtcStreamer) withOutputAudioBuffer(fn func(buf *bytes.Buffer)) {

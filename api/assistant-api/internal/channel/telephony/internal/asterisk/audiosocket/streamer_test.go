@@ -299,7 +299,7 @@ func TestSend_UnknownToolCallAction_NoOp(t *testing.T) {
 	}
 }
 
-func TestSend_Interruption_ClearsOutputBuffer(t *testing.T) {
+func TestSend_InterruptionIsNotificationOnly(t *testing.T) {
 	as, remote := newTestStreamer(t)
 
 	// Drain remote.
@@ -311,9 +311,44 @@ func TestSend_Interruption_ClearsOutputBuffer(t *testing.T) {
 
 	err := as.Send(interruption)
 	require.NoError(t, err)
-	// If we get here without panic, the code path exercised ClearOutputBuffer
-	// on the audio processor. We cannot easily inspect the buffer directly,
-	// but the absence of an error confirms correctness.
+}
+
+func TestSend_OutputControlsRouteBeforeAssistantAudio(t *testing.T) {
+	as, remote := newTestStreamer(t)
+	defer remote.Close()
+	audio := make([]byte, 6400)
+	for i := range audio {
+		audio[i] = byte(i)
+	}
+
+	require.NoError(t, as.Send(&protos.ConversationAssistantMessage{
+		Id:        "response-1",
+		Message:   &protos.ConversationAssistantMessage_Audio{Audio: audio},
+		Completed: true,
+	}))
+	require.NoError(t, as.Send(internal_type.PauseOutput{}))
+	assert.Nil(t, as.mediaSession.NextFrame())
+	require.NoError(t, as.Send(internal_type.ContinueOutput{}))
+	assert.NotEmpty(t, as.mediaSession.NextFrame())
+
+	require.NoError(t, as.Send(&protos.ConversationAssistantMessage{
+		Id:        "response-2",
+		Message:   &protos.ConversationAssistantMessage_Audio{Audio: audio},
+		Completed: true,
+	}))
+	require.NoError(t, as.Send(internal_type.FlushOutput{}))
+	require.NoError(t, as.Send(&protos.ConversationAssistantMessage{
+		Id:        "response-2",
+		Message:   &protos.ConversationAssistantMessage_Audio{Audio: audio},
+		Completed: true,
+	}))
+	assert.Nil(t, as.mediaSession.NextFrame())
+	require.NoError(t, as.Send(&protos.ConversationAssistantMessage{
+		Id:        "response-3",
+		Message:   &protos.ConversationAssistantMessage_Audio{Audio: audio},
+		Completed: true,
+	}))
+	assert.NotEmpty(t, as.mediaSession.NextFrame())
 }
 
 // Compile-time check that Streamer implements internal_type.Streamer.

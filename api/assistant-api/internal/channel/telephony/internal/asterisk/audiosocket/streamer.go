@@ -343,6 +343,11 @@ func (as *Streamer) runFrameReader() {
 }
 
 func (as *Streamer) Send(response internal_type.Stream) error {
+	if as.mediaSession != nil {
+		if outputControlHandled, outputControlError := as.mediaSession.HandleOutputControl(response); outputControlHandled {
+			return outputControlError
+		}
+	}
 	switch data := response.(type) {
 	case *protos.ConversationInitialization:
 		if as.mediaSession != nil {
@@ -354,14 +359,12 @@ func (as *Streamer) Send(response internal_type.Stream) error {
 			if as.mediaSession == nil {
 				return nil
 			}
-			if err := as.mediaSession.HandleAssistantAudio(content.Audio, data.GetCompleted()); err != nil {
-				return err
+			if _, assistantAudioError := as.mediaSession.HandleAssistantAudio(data.GetId(), content.Audio, data.GetCompleted()); assistantAudioError != nil {
+				return assistantAudioError
 			}
 		}
 	case *protos.ConversationInterruption:
-		if as.mediaSession != nil {
-			as.mediaSession.HandleInterrupt()
-		}
+		return nil
 	case *protos.ConversationDisconnection:
 		// Server-initiated disconnect: the talker already knows the reason
 		// (it called Notify with it). No need to round-trip back through

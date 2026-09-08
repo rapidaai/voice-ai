@@ -464,7 +464,8 @@ func TestMediaPort_AssistantAudioReachesRTPOutput(t *testing.T) {
 	mediaPort.Start()
 	defer func() { require.NoError(t, mediaPort.Close()) }()
 	assert.True(t, mediaPort.session.GetInboundSetupTimings().FirstAssistantAudioSentAt.IsZero())
-	require.NoError(t, mediaPort.HandleAssistantAudio(make([]byte, BridgeOutputFrameSize), false))
+	_, err := mediaPort.HandleAssistantAudio("response-1", make([]byte, BridgeOutputFrameSize), false)
+	require.NoError(t, err)
 
 	select {
 	case frame := <-audioOut:
@@ -493,7 +494,9 @@ func TestMediaPort_StartInputDoesNotStartAssistantOutput(t *testing.T) {
 
 	mediaPort.StartInput()
 	defer func() { require.NoError(t, mediaPort.Close()) }()
-	require.NoError(t, mediaPort.HandleAssistantAudio(make([]byte, BridgeOutputFrameSize), false))
+	assistantAudioAccepted, assistantAudioError := mediaPort.HandleAssistantAudio("response-1", make([]byte, BridgeOutputFrameSize), false)
+	require.NoError(t, assistantAudioError)
+	require.True(t, assistantAudioAccepted)
 
 	select {
 	case frame := <-audioOut:
@@ -530,7 +533,9 @@ func TestMediaPort_DroppedAssistantAudioIsNotRecorded(t *testing.T) {
 	mediaPort.Start()
 	defer func() { require.NoError(t, mediaPort.Close()) }()
 
-	require.NoError(t, mediaPort.HandleAssistantAudio(make([]byte, BridgeOutputFrameSize), false))
+	assistantAudioAccepted, assistantAudioError := mediaPort.HandleAssistantAudio("response-1", make([]byte, BridgeOutputFrameSize), false)
+	require.NoError(t, assistantAudioError)
+	require.True(t, assistantAudioAccepted)
 
 	require.Eventually(t, func() bool {
 		for {
@@ -555,7 +560,9 @@ func TestMediaPort_TransferModeSuppressesAssistantAudio(t *testing.T) {
 	mediaPort, _, audioOut := newMediaPortForTest(t, nil)
 
 	require.True(t, mediaPort.EnterTransferMode(DefaultRingtone))
-	require.NoError(t, mediaPort.HandleAssistantAudio(make([]byte, BridgeOutputFrameSize), false))
+	assistantAudioAccepted, assistantAudioError := mediaPort.HandleAssistantAudio("response-1", make([]byte, BridgeOutputFrameSize), false)
+	require.NoError(t, assistantAudioError)
+	require.True(t, assistantAudioAccepted)
 
 	select {
 	case frame := <-audioOut:
@@ -575,7 +582,9 @@ func TestMediaPort_InterruptPreservesInputAudio(t *testing.T) {
 	mediaPort.Start()
 	defer func() { require.NoError(t, mediaPort.Close()) }()
 	emitInboundAudio(sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()})
-	mediaPort.HandleInterrupt()
+	outputControlHandled, outputControlError := mediaPort.HandleOutputControl(internal_type.FlushOutput{})
+	require.NoError(t, outputControlError)
+	require.True(t, outputControlHandled)
 	emitInboundAudio(sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()})
 
 	receivedAudioCount := 0
@@ -595,6 +604,40 @@ func TestMediaPort_InterruptPreservesInputAudio(t *testing.T) {
 			}
 		}
 	}, time.Second, 10*time.Millisecond)
+}
+
+func TestMediaPort_OutputControlsPreservePauseAndDropFlushedResponse(t *testing.T) {
+	mediaPort, _, _ := newMediaPortForTest(t, nil)
+	defer func() { require.NoError(t, mediaPort.Close()) }()
+	audio := make([]byte, BridgeOutputFrameSize)
+
+	assistantAudioAccepted, assistantAudioError := mediaPort.HandleAssistantAudio("response-1", audio, false)
+	require.NoError(t, assistantAudioError)
+	require.True(t, assistantAudioAccepted)
+	outputControlHandled, outputControlError := mediaPort.HandleOutputControl(internal_type.PauseOutput{})
+	require.NoError(t, outputControlError)
+	assert.True(t, outputControlHandled)
+	assert.Nil(t, mediaPort.mediaSession.NextFrame())
+
+	outputControlHandled, outputControlError = mediaPort.HandleOutputControl(internal_type.ContinueOutput{})
+	require.NoError(t, outputControlError)
+	assert.True(t, outputControlHandled)
+	assert.NotEmpty(t, mediaPort.mediaSession.NextFrame())
+
+	assistantAudioAccepted, assistantAudioError = mediaPort.HandleAssistantAudio("response-2", audio, false)
+	require.NoError(t, assistantAudioError)
+	require.True(t, assistantAudioAccepted)
+	outputControlHandled, outputControlError = mediaPort.HandleOutputControl(internal_type.FlushOutput{})
+	require.NoError(t, outputControlError)
+	assert.True(t, outputControlHandled)
+	assistantAudioAccepted, assistantAudioError = mediaPort.HandleAssistantAudio("response-2", audio, false)
+	require.NoError(t, assistantAudioError)
+	assert.False(t, assistantAudioAccepted)
+	assert.Nil(t, mediaPort.mediaSession.NextFrame())
+	assistantAudioAccepted, assistantAudioError = mediaPort.HandleAssistantAudio("response-3", audio, false)
+	require.NoError(t, assistantAudioError)
+	require.True(t, assistantAudioAccepted)
+	assert.NotEmpty(t, mediaPort.mediaSession.NextFrame())
 }
 
 func TestMediaPort_ConnectTransferMediaForwardsCallerAudio(t *testing.T) {

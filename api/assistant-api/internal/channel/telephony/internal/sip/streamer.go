@@ -39,8 +39,9 @@ type Streamer struct {
 }
 
 type assistantAudioFrame struct {
-	audio     []byte
-	completed bool
+	responseID string
+	audio      []byte
+	completed  bool
 }
 
 type StreamerOptions struct {
@@ -266,6 +267,22 @@ func (s *Streamer) Context() context.Context {
 }
 
 func (s *Streamer) Send(response internal_type.Stream) error {
+	switch response.(type) {
+	case internal_type.PauseOutput, internal_type.ContinueOutput, internal_type.FlushOutput:
+		s.outputMu.Lock()
+		defer s.outputMu.Unlock()
+		if s.closed.Load() {
+			return sip_runtime.ErrSessionClosed
+		}
+		if _, isFlushOutput := response.(internal_type.FlushOutput); isFlushOutput {
+			s.pendingAssistantAudioFrames = nil
+		}
+		if s.mediaPort == nil {
+			return nil
+		}
+		_, outputControlError := s.mediaPort.HandleOutputControl(response)
+		return outputControlError
+	}
 	if s.closed.Load() {
 		return sip_runtime.ErrSessionClosed
 	}
@@ -277,20 +294,40 @@ func (s *Streamer) Send(response internal_type.Stream) error {
 	case *protos.ConversationAssistantMessage:
 		switch content := data.Message.(type) {
 		case *protos.ConversationAssistantMessage_Audio:
+			s.outputMu.Lock()
+			defer s.outputMu.Unlock()
+			if s.closed.Load() {
+				return sip_runtime.ErrSessionClosed
+			}
+			if s.assistantOutputActive.Load() {
+				if s.mediaPort == nil {
+					return nil
+				}
+				assistantAudioAccepted, assistantAudioError := s.mediaPort.HandleAssistantAudio(data.GetId(), content.Audio, data.GetCompleted())
+				if assistantAudioAccepted {
+					s.markAssistantAudioReady(content.Audio)
+				}
+				return assistantAudioError
+			}
+			if s.mediaPort != nil {
+				assistantAudioAccepted, assistantAudioError := s.mediaPort.HandleAssistantAudio(data.GetId(), nil, false)
+				if assistantAudioError != nil {
+					return assistantAudioError
+				}
+				if !assistantAudioAccepted {
+					return nil
+				}
+			}
 			s.markAssistantAudioReady(content.Audio)
-			if !s.assistantOutputActive.Load() {
-				s.queueAssistantAudio(content.Audio, data.GetCompleted())
-				return nil
-			}
-			if s.mediaPort == nil {
-				return nil
-			}
-			return s.mediaPort.HandleAssistantAudio(content.Audio, data.GetCompleted())
+			s.pendingAssistantAudioFrames = append(s.pendingAssistantAudioFrames, assistantAudioFrame{
+				responseID: data.GetId(),
+				audio:      append([]byte(nil), content.Audio...),
+				completed:  data.GetCompleted(),
+			})
+			return nil
 		}
 	case *protos.ConversationInterruption:
-		if s.mediaPort != nil {
-			s.mediaPort.HandleInterrupt()
-		}
+		return nil
 	case *protos.ConversationDisconnection:
 		_ = s.Disconnect(data.GetType())
 		_ = s.Record(observability.RecordEvent{
@@ -387,9 +424,19 @@ func (s *Streamer) Send(response internal_type.Stream) error {
 }
 
 func (s *Streamer) StartAssistantOutput() {
-	if !s.assistantOutputActive.CompareAndSwap(false, true) {
+	s.outputMu.Lock()
+	if s.closed.Load() {
+		s.outputMu.Unlock()
 		return
 	}
+	if !s.assistantOutputActive.CompareAndSwap(false, true) {
+		s.outputMu.Unlock()
+		return
+	}
+	pendingAssistantAudioFrames := s.pendingAssistantAudioFrames
+	s.pendingAssistantAudioFrames = nil
+	s.outputMu.Unlock()
+
 	if s.mediaPort != nil {
 		s.mediaPort.StartOutput()
 		s.mediaPort.StartBridgeRecorder()
@@ -410,20 +457,16 @@ func (s *Streamer) StartAssistantOutput() {
 			}},
 		})
 	}
-	s.outputMu.Lock()
-	frames := s.pendingAssistantAudioFrames
-	s.pendingAssistantAudioFrames = nil
-	s.outputMu.Unlock()
-	for _, frame := range frames {
+	for _, pendingAssistantAudioFrame := range pendingAssistantAudioFrames {
 		if s.mediaPort != nil {
-			if err := s.mediaPort.HandleAssistantAudio(frame.audio, frame.completed); err != nil {
+			if _, assistantAudioError := s.mediaPort.HandleAssistantAudio(pendingAssistantAudioFrame.responseID, pendingAssistantAudioFrame.audio, pendingAssistantAudioFrame.completed); assistantAudioError != nil {
 				_ = s.Record(observability.RecordLog{
 					Level:   observability.LevelError,
 					Message: "SIP queued assistant audio delivery failed",
 					Attributes: observability.Attributes{
 						"component": observability.ComponentCall.String(),
 						"provider":  Provider,
-						"error":     err.Error(),
+						"error":     assistantAudioError.Error(),
 					},
 				}, observability.RecordMetric{
 					Metrics: []*protos.Metric{{
@@ -435,17 +478,6 @@ func (s *Streamer) StartAssistantOutput() {
 			}
 		}
 	}
-}
-
-func (s *Streamer) queueAssistantAudio(audio []byte, completed bool) {
-	audioCopy := make([]byte, len(audio))
-	copy(audioCopy, audio)
-	s.outputMu.Lock()
-	s.pendingAssistantAudioFrames = append(s.pendingAssistantAudioFrames, assistantAudioFrame{
-		audio:     audioCopy,
-		completed: completed,
-	})
-	s.outputMu.Unlock()
 }
 
 func (s *Streamer) markAssistantAudioReady(audio []byte) {
@@ -585,6 +617,9 @@ func (s *Streamer) Close() error {
 	if !s.closed.CompareAndSwap(false, true) {
 		return nil
 	}
+	s.outputMu.Lock()
+	s.pendingAssistantAudioFrames = nil
+	s.outputMu.Unlock()
 	_ = s.Record(observability.RecordEvent{
 		Component: observability.ComponentCall,
 		Event:     observability.CallStatus,
@@ -622,9 +657,6 @@ func (s *Streamer) Close() error {
 			})
 		}
 	}
-	s.outputMu.Lock()
-	s.pendingAssistantAudioFrames = nil
-	s.outputMu.Unlock()
 	s.BaseStreamer.Cancel()
 
 	s.mu.RLock()

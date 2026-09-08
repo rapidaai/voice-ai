@@ -56,6 +56,10 @@ type MediaSession struct {
 	outputFrameMu         sync.Mutex
 	currentOutputFrame    AssistantOutputFrame
 	hasCurrentOutputFrame bool
+	outputPaused          bool
+	outputFlushed         bool
+	currentOutputID       string
+	blockedOutputID       string
 
 	started atomic.Bool
 	closed  atomic.Bool

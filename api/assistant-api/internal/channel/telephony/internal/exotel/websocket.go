@@ -296,6 +296,11 @@ func (exotel *exotelWebsocketStreamer) runWebSocketReader(conn *websocket.Conn) 
 }
 
 func (exotel *exotelWebsocketStreamer) Send(response internal_type.Stream) error {
+	if exotel.mediaSession != nil {
+		if outputControlHandled, outputControlError := exotel.mediaSession.HandleOutputControl(response); outputControlHandled {
+			return outputControlError
+		}
+	}
 	switch data := response.(type) {
 	case *protos.ConversationInitialization:
 		if exotel.mediaSession != nil {
@@ -307,15 +312,13 @@ func (exotel *exotelWebsocketStreamer) Send(response internal_type.Stream) error
 			if exotel.mediaSession == nil {
 				return nil
 			}
-			if err := exotel.mediaSession.HandleAssistantAudio(content.Audio, data.GetCompleted()); err != nil {
-				return err
+			if _, assistantAudioError := exotel.mediaSession.HandleAssistantAudio(data.GetId(), content.Audio, data.GetCompleted()); assistantAudioError != nil {
+				return assistantAudioError
 			}
 			return nil
 		}
 	case *protos.ConversationInterruption:
-		if exotel.mediaSession != nil {
-			exotel.mediaSession.HandleInterrupt()
-		}
+		return nil
 	case *protos.ConversationDisconnection:
 		// Server-initiated disconnect: the talker already knows the reason
 		// (it called Notify with it). No need to round-trip back through

@@ -78,9 +78,21 @@ type webrtcStreamer struct {
 
 	outputAudioQueueMu sync.Mutex
 	outputAudioQueue   []webrtc_internal.OutputAudioFrame
+	outputClearCh      chan uint64
+	outputWriteMu      sync.Mutex
+
+	outputStateMu           sync.Mutex
+	outputPaused            bool
+	outputFlushed           bool
+	outputClearPending      bool
+	outputContextID         string
+	flushedOutputContextID  string
+	currentOutputFrame      []byte
+	outputGeneration        uint64
+	currentOutputGeneration uint64
+	pendingClearGeneration  uint64
 
 	audioBufferState webrtc_internal.WebRTCAudioBufferState
-	flushAudioCh     chan struct{}
 
 	observer observability.Recorder
 
@@ -283,8 +295,8 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 		mediaLifecycleCh:     make(chan webrtc_internal.MediaLifecycleEvent, webrtc_internal.MediaLifecycleChannelSize),
 		webrtcOperationCh:    make(chan webrtc_internal.WebRTCOperation, webrtc_internal.WebRTCOperationChannelSize),
 		outputHealth:         internal_output.NewHealthStats(),
+		outputClearCh:        make(chan uint64, webrtc_internal.OutputChannelSize),
 		audioBufferState:     newWebRTCAudioBufferState(),
-		flushAudioCh:         make(chan struct{}, 1),
 		observer:             options.Observer,
 		auth:                 options.Auth,
 		configurationService: options.ConfigurationService,
@@ -949,17 +961,19 @@ func (s *webrtcStreamer) signalReady() {
 }
 
 func (s *webrtcStreamer) signalClear() {
-	s.Mu.Lock()
-	signalingSessionID := s.signalingSessionID
-	s.Mu.Unlock()
-	if signalingSessionID == "" {
-		signalingSessionID = s.sessionID
+	s.outputWriteMu.Lock()
+	s.outputStateMu.Lock()
+	s.outputGeneration++
+	s.outputClearPending = true
+	s.pendingClearGeneration = s.outputGeneration
+	s.currentOutputFrame = nil
+	clearGeneration := s.pendingClearGeneration
+	s.outputStateMu.Unlock()
+	s.outputWriteMu.Unlock()
+	select {
+	case s.outputClearCh <- clearGeneration:
+	case <-s.Ctx.Done():
 	}
-
-	s.Output(&protos.ServerSignaling{
-		SessionId: signalingSessionID,
-		Message:   &protos.ServerSignaling_Clear{Clear: true},
-	})
 }
 
 func (s *webrtcStreamer) applyAmbientConfig(cfg internal_ambient.Config, source string) {
@@ -1026,13 +1040,12 @@ func (s *webrtcStreamer) enqueueOutputAudio(frame []byte) {
 	}
 	queueDepth = len(s.outputAudioQueue)
 	s.outputAudioQueueMu.Unlock()
-
 	s.Mu.Lock()
 	s.mediaHealthState.RecordAssistantAudioQueued(assistantAudioQueuedAt)
 	s.Mu.Unlock()
 
 	if droppedFrames > 0 {
-		totalDropped := s.sessionState.AddOutputAudioDroppedFrames(droppedFrames)
+		totalDroppedFrames := s.sessionState.AddOutputAudioDroppedFrames(droppedFrames)
 		_ = s.observer.Record(s.Ctx, s.sessionState.Scope, observability.RecordLog{
 			Level:   observability.LevelInfo,
 			Message: "WebRTC output queue overflow dropped the oldest assistant audio frame; this keeps playback current when audio is produced faster than WebRTC can send it.",
@@ -1044,7 +1057,7 @@ func (s *webrtcStreamer) enqueueOutputAudio(frame []byte) {
 				webrtc_internal.DataDroppedFrames:      fmt.Sprintf("%d", droppedFrames),
 				webrtc_internal.DataLimitFrames:        fmt.Sprintf("%d", webrtc_internal.OutputAudioQueueMaxFrames),
 				webrtc_internal.DataQueueDepthFrames:   fmt.Sprintf("%d", queueDepth),
-				webrtc_internal.DataTotalDroppedFrames: fmt.Sprintf("%d", totalDropped),
+				webrtc_internal.DataTotalDroppedFrames: fmt.Sprintf("%d", totalDroppedFrames),
 			},
 		}, observability.RecordMetric{
 			Metrics: []*protos.Metric{{
@@ -1087,12 +1100,22 @@ func (s *webrtcStreamer) NextFrame() []byte {
 	if mediaSessionID == 0 {
 		return nil
 	}
+	s.outputStateMu.Lock()
+	defer s.outputStateMu.Unlock()
+	if s.outputPaused || s.outputClearPending {
+		return nil
+	}
+	if len(s.currentOutputFrame) > 0 {
+		return s.currentOutputFrame
+	}
 	frame := s.popOutputAudio()
 	if len(frame) == 0 {
 		return nil
 	}
 	s.sessionState.StampPacedAssistantFrame(mediaSessionID)
-	return s.applyAmbientToFrame(frame)
+	s.currentOutputFrame = s.applyAmbientToFrame(frame)
+	s.currentOutputGeneration = s.outputGeneration
+	return s.currentOutputFrame
 }
 
 func (s *webrtcStreamer) IdleFrame() []byte {
@@ -1103,12 +1126,36 @@ func (s *webrtcStreamer) IdleFrame() []byte {
 	if mediaSessionID == 0 {
 		return nil
 	}
+	s.outputStateMu.Lock()
+	defer s.outputStateMu.Unlock()
+	if s.outputPaused || s.outputClearPending {
+		return nil
+	}
+	if len(s.currentOutputFrame) > 0 {
+		return s.currentOutputFrame
+	}
 	s.sessionState.StampPacedAssistantFrame(mediaSessionID)
-	return s.applyAmbientToFrame(nil)
+	s.currentOutputFrame = s.applyAmbientToFrame(nil)
+	s.currentOutputGeneration = s.outputGeneration
+	return s.currentOutputFrame
 }
 
 func (s *webrtcStreamer) ConsumeFrame(assistantPCM16k []byte) error {
-	if !s.sessionState.CanWritePacedAssistantFrame() {
+	s.outputStateMu.Lock()
+	if s.outputPaused || len(s.currentOutputFrame) == 0 {
+		s.outputStateMu.Unlock()
+		return nil
+	}
+	assistantPCM16k = s.currentOutputFrame
+	outputGeneration := s.currentOutputGeneration
+	s.currentOutputFrame = nil
+	s.outputStateMu.Unlock()
+	s.outputWriteMu.Lock()
+	defer s.outputWriteMu.Unlock()
+	s.outputStateMu.Lock()
+	canWriteOutput := outputGeneration == s.outputGeneration && !s.outputPaused && !s.outputClearPending
+	s.outputStateMu.Unlock()
+	if !canWriteOutput || !s.sessionState.CanWritePacedAssistantFrame() {
 		return nil
 	}
 
@@ -1225,7 +1272,6 @@ func (s *webrtcStreamer) queueClientSignal(signaling *protos.ClientSignaling) {
 
 func (s *webrtcStreamer) stopMediaSessionAndFallbackToText() {
 	s.clearBufferedOutputAudio()
-	s.clearOutputAudio()
 	if s.ambientMixer != nil {
 		s.ambientMixer.Reset()
 	}
@@ -1373,10 +1419,67 @@ func (s *webrtcStreamer) clearNegotiationState(peerConnection *pionwebrtc.PeerCo
 
 func (s *webrtcStreamer) Send(response internal_type.Stream) error {
 	switch data := response.(type) {
+	case internal_type.PauseOutput:
+		s.outputStateMu.Lock()
+		if !s.outputFlushed {
+			s.outputPaused = true
+		}
+		s.outputStateMu.Unlock()
+		return nil
+	case internal_type.ContinueOutput:
+		s.outputStateMu.Lock()
+		if !s.outputFlushed {
+			s.outputPaused = false
+		}
+		s.outputStateMu.Unlock()
+		return nil
+	case internal_type.FlushOutput:
+		s.outputWriteMu.Lock()
+		s.outputStateMu.Lock()
+		if s.outputFlushed {
+			s.outputStateMu.Unlock()
+			s.outputWriteMu.Unlock()
+			return nil
+		}
+		s.outputPaused = false
+		s.outputFlushed = true
+		s.outputClearPending = true
+		s.outputGeneration++
+		s.pendingClearGeneration = s.outputGeneration
+		s.flushedOutputContextID = s.outputContextID
+		s.audioBufferState.OutputAudioBufferMu.Lock()
+		s.audioBufferState.OutputAudioBuffer.Reset()
+		s.audioBufferState.OutputAudioBufferMu.Unlock()
+		s.currentOutputFrame = nil
+		s.currentOutputGeneration = 0
+		clearedFrames := s.clearOutputAudio()
+		clearGeneration := s.pendingClearGeneration
+		s.outputStateMu.Unlock()
+		s.outputWriteMu.Unlock()
+
+		if clearedFrames > 0 {
+			_ = s.observer.Record(s.Ctx, s.sessionState.Scope, observability.RecordLog{
+				Level:   observability.LevelInfo,
+				Message: "WebRTC output queue cleared after a flush request; this drops queued assistant audio so stale audio is not sent after the client asks to flush playback.",
+				Attributes: observability.Attributes{
+					"component":                              observability.ComponentWebRTC.String(),
+					webrtc_internal.DataType:                 webrtc_internal.EventOutputQueueCleared,
+					webrtc_internal.DataSessionID:            s.sessionID,
+					webrtc_internal.DataReason:               webrtc_internal.OutputQueueClearReasonFlush,
+					webrtc_internal.DataClearedFrames:        fmt.Sprintf("%d", clearedFrames),
+					webrtc_internal.DataRemainingQueueFrames: fmt.Sprintf("%d", webrtc_internal.OutputAudioQueueEmptySize),
+				},
+			})
+		}
+		select {
+		case s.outputClearCh <- clearGeneration:
+		case <-s.Ctx.Done():
+		}
+		return nil
 	case *protos.ConversationAssistantMessage:
 		switch content := data.Message.(type) {
 		case *protos.ConversationAssistantMessage_Audio:
-			s.bufferAndSendOutput(content.Audio)
+			s.bufferAndSendOutput(data.GetId(), content.Audio)
 			return nil
 		case *protos.ConversationAssistantMessage_Text:
 			s.Output(data)
@@ -1406,23 +1509,6 @@ func (s *webrtcStreamer) Send(response internal_type.Stream) error {
 	case *protos.ConversationUserMessage:
 		s.Output(data)
 	case *protos.ConversationInterruption:
-		s.clearBufferedOutputAudio()
-		clearedFrames := s.clearOutputAudio()
-		if clearedFrames > 0 {
-			_ = s.observer.Record(s.Ctx, s.sessionState.Scope, observability.RecordLog{
-				Level:   observability.LevelInfo,
-				Message: "WebRTC output queue cleared after user interruption; this drops queued assistant audio so the response stops promptly when the user speaks.",
-				Attributes: observability.Attributes{
-					"component":                              observability.ComponentWebRTC.String(),
-					webrtc_internal.DataType:                 webrtc_internal.EventOutputQueueCleared,
-					webrtc_internal.DataSessionID:            s.sessionID,
-					webrtc_internal.DataReason:               webrtc_internal.OutputQueueClearReasonInterruption,
-					webrtc_internal.DataClearedFrames:        fmt.Sprintf("%d", clearedFrames),
-					webrtc_internal.DataRemainingQueueFrames: fmt.Sprintf("%d", webrtc_internal.OutputAudioQueueEmptySize),
-				},
-			})
-		}
-		s.signalClear()
 		s.Output(data)
 	case *protos.ConversationToolCall:
 		s.Output(data)

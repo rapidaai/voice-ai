@@ -24,6 +24,7 @@ import (
 	webrtc_internal "github.com/rapidaai/api/assistant-api/internal/channel/webrtc/internal"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/webhook"
+	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
@@ -102,8 +103,9 @@ func newTestStreamer(t *testing.T) *webrtcStreamer {
 			channel_base.WithInputChannelCapacity(16),
 			channel_base.WithOutputChannelCapacity(16),
 		),
-		peerConfig: webrtc_internal.DefaultConfig(),
-		sessionID:  "test-session",
+		peerConfig:    webrtc_internal.DefaultConfig(),
+		sessionID:     "test-session",
+		outputClearCh: make(chan uint64, webrtc_internal.OutputChannelSize),
 		resampler: resampler_soxr.New(
 			resampler_soxr.WithLogger(logger),
 			resampler_soxr.WithHighQuality(),
@@ -112,7 +114,6 @@ func newTestStreamer(t *testing.T) *webrtcStreamer {
 		currentMode:      protos.StreamMode_STREAM_MODE_TEXT,
 		sessionState:     webrtc_internal.SessionState{Scope: observability.ProjectScope{}},
 		audioBufferState: newWebRTCAudioBufferState(),
-		flushAudioCh:     make(chan struct{}, 1),
 		observer:         newTestObserver(t),
 	}
 }
@@ -126,6 +127,8 @@ type failingGRPCStream struct {
 	sendErr error
 	recvMsg []*protos.WebTalkRequest
 	recvErr error
+	sentMu  sync.Mutex
+	sent    []*protos.WebTalkResponse
 }
 
 func (f *failingGRPCStream) Recv() (*protos.WebTalkRequest, error) {
@@ -140,8 +143,17 @@ func (f *failingGRPCStream) Recv() (*protos.WebTalkRequest, error) {
 	return nil, io.EOF
 }
 
-func (f *failingGRPCStream) Send(*protos.WebTalkResponse) error {
+func (f *failingGRPCStream) Send(response *protos.WebTalkResponse) error {
+	f.sentMu.Lock()
+	f.sent = append(f.sent, response)
+	f.sentMu.Unlock()
 	return f.sendErr
+}
+
+func (f *failingGRPCStream) sentResponses() []*protos.WebTalkResponse {
+	f.sentMu.Lock()
+	defer f.sentMu.Unlock()
+	return append([]*protos.WebTalkResponse(nil), f.sent...)
 }
 
 func (f *failingGRPCStream) SetHeader(metadata.MD) error {
@@ -540,17 +552,24 @@ func TestServerSignaling_UsesActiveSignalingSessionID(t *testing.T) {
 func TestServerSignaling_FallsBackToStreamerSessionID(t *testing.T) {
 	t.Parallel()
 	s := newTestStreamer(t)
+	grpcStream := &failingGRPCStream{}
+	s.grpcStream = grpcStream
+	outputWriterDone := make(chan struct{})
+	go func() {
+		s.runOutputWriter()
+		close(outputWriterDone)
+	}()
 
 	s.signalClear()
+	require.Eventually(t, func() bool {
+		return len(grpcStream.sentResponses()) == 1
+	}, time.Second, time.Millisecond)
+	s.Cancel()
+	<-outputWriterDone
 
-	select {
-	case msg := <-s.OutputCh:
-		signaling, ok := msg.(*protos.ServerSignaling)
-		require.True(t, ok, "expected ServerSignaling, got %T", msg)
-		assert.Equal(t, s.sessionID, signaling.GetSessionId())
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for server signaling")
-	}
+	sentResponses := grpcStream.sentResponses()
+	require.Len(t, sentResponses, 1)
+	assert.Equal(t, s.sessionID, sentResponses[0].GetSignaling().GetSessionId())
 }
 
 func TestServerSignaling_ConfigIncludesICEServersAndAudioDefaults(t *testing.T) {
@@ -2196,12 +2215,14 @@ func TestResetAudioSession_FlushesPendingOutput(t *testing.T) {
 	t.Parallel()
 	s := newTestStreamer(t)
 
-	s.withOutputAudioBuffer(func(buf *bytes.Buffer) {
-		buf.Write([]byte{0x01, 0x02, 0x03, 0x04})
-	})
-	s.Output(&protos.ConversationAssistantMessage{
-		Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0xAA, 0xBB}},
-	})
+	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
+		Id: "context-a",
+		Message: &protos.ConversationAssistantMessage_Audio{
+			Audio: bytes.Repeat([]byte{0xAA}, webrtc_internal.WebRTCOutputPCM16kFrameBytes+4),
+		},
+	}))
+	metadata := &protos.ConversationMetadata{}
+	s.Output(metadata)
 
 	s.stopMediaSessionAndFallbackToText()
 
@@ -2209,11 +2230,10 @@ func TestResetAudioSession_FlushesPendingOutput(t *testing.T) {
 		assert.Equal(t, 0, buf.Len(), "outputAudioBuffer accumulation buffer should be cleared")
 	})
 
-	select {
-	case <-s.OutputCh:
-		t.Fatal("outputAudioBuffer channel should be drained after reset")
-	default:
-	}
+	s.outputAudioQueueMu.Lock()
+	assert.Empty(t, s.outputAudioQueue, "paced output queue should be cleared")
+	s.outputAudioQueueMu.Unlock()
+	assert.Same(t, metadata, <-s.OutputCh, "non-audio output should be preserved")
 }
 
 func TestAudioBuffer_InputEmitsBridgeAudioAndFramedUserAudio(t *testing.T) {
@@ -2242,14 +2262,13 @@ func TestAudioBuffer_OutputFramesAssistantAudio(t *testing.T) {
 	s := newTestStreamer(t)
 	audio := bytes.Repeat([]byte{0x22}, webrtc_internal.WebRTCOutputPCM16kFrameBytes*2+1)
 
-	s.bufferAndSendOutput(audio)
+	s.bufferAndSendOutput("context-a", audio)
 
-	for i := 0; i < 2; i++ {
-		msg, ok := (<-s.OutputCh).(*protos.ConversationAssistantMessage)
-		require.True(t, ok)
-		assert.Len(t, msg.GetAudio(), webrtc_internal.WebRTCOutputPCM16kFrameBytes)
-		assert.NotNil(t, msg.GetTime())
-	}
+	s.outputAudioQueueMu.Lock()
+	require.Len(t, s.outputAudioQueue, 2)
+	assert.Len(t, s.outputAudioQueue[0].Audio, webrtc_internal.WebRTCOutputPCM16kFrameBytes)
+	assert.Len(t, s.outputAudioQueue[1].Audio, webrtc_internal.WebRTCOutputPCM16kFrameBytes)
+	s.outputAudioQueueMu.Unlock()
 	s.withOutputAudioBuffer(func(buf *bytes.Buffer) {
 		assert.Equal(t, 1, buf.Len())
 	})
@@ -2272,32 +2291,266 @@ func TestSend_AudioBuffersWebRTCOutputPCM16kFrame(t *testing.T) {
 
 	audio := bytes.Repeat([]byte{0x22}, webrtc_internal.WebRTCOutputPCM16kFrameBytes)
 	msg := &protos.ConversationAssistantMessage{
+		Id:      "context-a",
 		Message: &protos.ConversationAssistantMessage_Audio{Audio: audio},
 	}
 
 	err := s.Send(msg)
 	require.NoError(t, err)
 
+	s.outputAudioQueueMu.Lock()
+	require.Len(t, s.outputAudioQueue, 1)
+	assert.Equal(t, audio, s.outputAudioQueue[0].Audio)
+	s.outputAudioQueueMu.Unlock()
+}
+
+func TestSend_OutputPauseContinueRetainsFIFO(t *testing.T) {
+	t.Parallel()
+	s := newTestStreamer(t)
+	s.ambientMixer = &fakeAmbientMixer{ambientOut: []byte{0x7F}}
+	assistantAudioTrack, err := pionwebrtc.NewTrackLocalStaticSample(
+		pionwebrtc.RTPCodecCapability{
+			MimeType:  pionwebrtc.MimeTypeOpus,
+			ClockRate: webrtc_internal.OpusSampleRate,
+			Channels:  webrtc_internal.OpusChannels,
+		},
+		"audio",
+		"rapida-audio",
+	)
+	require.NoError(t, err)
+	s.assistantAudioTrack = assistantAudioTrack
+	s.sessionState.StartMediaSession()
+	s.sessionState.SetPeerConnected(true)
+	frameSize := webrtc_internal.WebRTCOutputPCM16kFrameBytes
+	first := bytes.Repeat([]byte{0x11}, frameSize)
+	partial := bytes.Repeat([]byte{0x22}, frameSize/2)
+	remainder := bytes.Repeat([]byte{0x33}, frameSize/2)
+
+	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
+		Id:      "context-a",
+		Message: &protos.ConversationAssistantMessage_Audio{Audio: append(first, partial...)},
+	}))
+	require.NoError(t, s.Send(internal_type.PauseOutput{}))
+	require.NoError(t, s.Send(internal_type.PauseOutput{}))
+	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
+		Id:      "context-a",
+		Message: &protos.ConversationAssistantMessage_Audio{Audio: remainder},
+	}))
+
+	assert.Nil(t, s.NextFrame())
+	assert.Nil(t, s.IdleFrame())
+	s.outputAudioQueueMu.Lock()
+	require.Len(t, s.outputAudioQueue, 2)
+	s.outputAudioQueueMu.Unlock()
+
+	require.NoError(t, s.Send(internal_type.ContinueOutput{}))
+	require.NoError(t, s.Send(internal_type.ContinueOutput{}))
+	firstFrame := s.NextFrame()
+	assert.Equal(t, first, firstFrame)
+	require.NoError(t, s.ConsumeFrame(firstFrame))
+	assert.Equal(t, append(partial, remainder...), s.NextFrame())
+}
+
+func TestSend_OutputControlsFenceStagedPacerFrame(t *testing.T) {
+	t.Parallel()
+	s := newTestStreamer(t)
+	s.sessionState.StartMediaSession()
+	s.sessionState.SetPeerConnected(true)
+	frame := bytes.Repeat([]byte{0x31}, webrtc_internal.WebRTCOutputPCM16kFrameBytes)
+
+	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
+		Id:      "context-a",
+		Message: &protos.ConversationAssistantMessage_Audio{Audio: frame},
+	}))
+	staged := s.NextFrame()
+	require.Equal(t, frame, staged)
+
+	require.NoError(t, s.Send(internal_type.PauseOutput{}))
+	require.NoError(t, s.ConsumeFrame(staged))
+	assert.Equal(t, frame, s.currentOutputFrame)
+
+	require.NoError(t, s.Send(internal_type.ContinueOutput{}))
+	assert.Equal(t, frame, s.NextFrame())
+	require.NoError(t, s.Send(internal_type.FlushOutput{}))
+	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
+		Id:      "context-b",
+		Message: &protos.ConversationAssistantMessage_Audio{Audio: frame},
+	}))
+	require.NoError(t, s.ConsumeFrame(staged))
+	assert.Nil(t, s.currentOutputFrame)
+	assert.True(t, s.outputClearPending)
+	assert.Nil(t, s.NextFrame())
+	s.outputStateMu.Lock()
+	s.outputClearPending = false
+	s.pendingClearGeneration = 0
+	s.outputStateMu.Unlock()
+	assert.Equal(t, frame, s.NextFrame())
 	select {
-	case out := <-s.OutputCh:
-		assistant, ok := out.(*protos.ConversationAssistantMessage)
-		require.True(t, ok, "expected ConversationAssistantMessage, got %T", out)
-		got := assistant.GetAudio()
-		assert.Len(t, got, webrtc_internal.WebRTCOutputPCM16kFrameBytes)
-		assert.Equal(t, audio, got)
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for assistant audio")
+	case stream := <-s.LowCh:
+		t.Fatalf("staged frame was emitted after pause or flush: %T", stream)
+	default:
 	}
 }
 
-func TestSend_Interruption(t *testing.T) {
+func TestSend_FlushClearsAndFencesOldOutput(t *testing.T) {
 	t.Parallel()
 	s := newTestStreamer(t)
-	collector := &testObservabilityCollector{}
-	s.observer = observability.New(
-		observability.WithGlobalScope(observability.GlobalScope{OrganizationID: 1, ProjectID: 1}),
-		observability.WithCollector(collector),
-	)
+	frameSize := webrtc_internal.WebRTCOutputPCM16kFrameBytes
+	oldAudio := bytes.Repeat([]byte{0x41}, frameSize+1)
+	newAudio := bytes.Repeat([]byte{0x42}, frameSize)
+	metadata := &protos.ConversationMetadata{}
+	s.Output(metadata)
+
+	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
+		Id:      "context-old",
+		Message: &protos.ConversationAssistantMessage_Audio{Audio: oldAudio},
+	}))
+	require.NoError(t, s.Send(internal_type.PauseOutput{}))
+	require.NoError(t, s.Send(internal_type.FlushOutput{}))
+	require.NoError(t, s.Send(internal_type.FlushOutput{}))
+
+	s.outputStateMu.Lock()
+	assert.False(t, s.outputPaused)
+	assert.True(t, s.outputFlushed)
+	s.outputStateMu.Unlock()
+	s.withOutputAudioBuffer(func(buf *bytes.Buffer) {
+		assert.Zero(t, buf.Len())
+	})
+	s.outputAudioQueueMu.Lock()
+	assert.Empty(t, s.outputAudioQueue)
+	s.outputAudioQueueMu.Unlock()
+
+	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
+		Id:      "context-old",
+		Message: &protos.ConversationAssistantMessage_Audio{Audio: bytes.Repeat([]byte{0x43}, frameSize)},
+	}))
+	s.outputAudioQueueMu.Lock()
+	assert.Empty(t, s.outputAudioQueue)
+	s.outputAudioQueueMu.Unlock()
+
+	interruption := &protos.ConversationInterruption{Type: protos.ConversationInterruption_INTERRUPTION_TYPE_VAD}
+	require.NoError(t, s.Send(interruption))
+	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
+		Id:      "context-new",
+		Message: &protos.ConversationAssistantMessage_Audio{Audio: newAudio},
+	}))
+	s.outputAudioQueueMu.Lock()
+	require.Len(t, s.outputAudioQueue, 1)
+	assert.Equal(t, newAudio, s.outputAudioQueue[0].Audio)
+	s.outputAudioQueueMu.Unlock()
+
+	assert.Same(t, metadata, <-s.OutputCh)
+	assert.Same(t, interruption, <-s.OutputCh)
+	select {
+	case clearGeneration := <-s.outputClearCh:
+		assert.NotZero(t, clearGeneration)
+	default:
+		t.Fatal("flush did not queue a clear signal")
+	}
+	select {
+	case extra := <-s.OutputCh:
+		t.Fatalf("unexpected extra output after idempotent flush: %T", extra)
+	default:
+	}
+}
+
+func TestSend_FlushSerializesOldAudioAdmission(t *testing.T) {
+	t.Parallel()
+	s := newTestStreamer(t)
+	frameSize := webrtc_internal.WebRTCOutputPCM16kFrameBytes
+	oldMessage := &protos.ConversationAssistantMessage{
+		Id:      "context-old",
+		Message: &protos.ConversationAssistantMessage_Audio{Audio: bytes.Repeat([]byte{0x55}, frameSize)},
+	}
+	require.NoError(t, s.Send(oldMessage))
+
+	start := make(chan struct{})
+	errCh := make(chan error, 101)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		<-start
+		for range 100 {
+			errCh <- s.Send(oldMessage)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		<-start
+		errCh <- s.Send(internal_type.FlushOutput{})
+	}()
+	close(start)
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		require.NoError(t, err)
+	}
+
+	s.withOutputAudioBuffer(func(buf *bytes.Buffer) {
+		assert.Zero(t, buf.Len())
+	})
+	s.outputAudioQueueMu.Lock()
+	assert.Empty(t, s.outputAudioQueue)
+	s.outputAudioQueueMu.Unlock()
+}
+
+func TestRunOutputWriter_FlushRejectsStagedAudioAndPreservesNonAudio(t *testing.T) {
+	t.Parallel()
+	s := newTestStreamer(t)
+	s.sessionState.StartMediaSession()
+	s.sessionState.SetPeerConnected(true)
+	stream := &failingGRPCStream{}
+	s.grpcStream = stream
+	frameSize := webrtc_internal.WebRTCOutputPCM16kFrameBytes
+	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
+		Id:      "context-old",
+		Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0x01}},
+	}))
+
+	metadata := &protos.ConversationMetadata{}
+	s.Output(metadata)
+	s.Output(&protos.ConversationAssistantMessage{
+		Id:      "context-old",
+		Message: &protos.ConversationAssistantMessage_Audio{Audio: bytes.Repeat([]byte{0x22}, frameSize)},
+	})
+	require.NoError(t, s.Send(internal_type.FlushOutput{}))
+	newAudio := bytes.Repeat([]byte{0x33}, frameSize)
+	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
+		Id:      "context-new",
+		Message: &protos.ConversationAssistantMessage_Audio{Audio: newAudio},
+	}))
+	assert.Nil(t, s.NextFrame())
+
+	done := make(chan struct{})
+	go func() {
+		s.runOutputWriter()
+		close(done)
+	}()
+	require.Eventually(t, func() bool {
+		return len(stream.sentResponses()) == 2
+	}, time.Second, time.Millisecond)
+	s.Cancel()
+	<-done
+
+	responses := stream.sentResponses()
+	require.Len(t, responses, 2)
+	var sawMetadata, sawClear bool
+	for _, response := range responses {
+		sawMetadata = sawMetadata || response.GetMetadata() == metadata
+		sawClear = sawClear || response.GetSignaling().GetClear()
+	}
+	assert.True(t, sawMetadata)
+	assert.True(t, sawClear)
+	assert.Equal(t, newAudio, s.NextFrame())
+	s.outputAudioQueueMu.Lock()
+	assert.Empty(t, s.outputAudioQueue)
+	s.outputAudioQueueMu.Unlock()
+}
+
+func TestSend_InterruptionIsNotificationOnly(t *testing.T) {
+	t.Parallel()
+	s := newTestStreamer(t)
 	s.enqueueOutputAudio([]byte{0x10})
 	s.enqueueOutputAudio([]byte{0x20})
 
@@ -2308,18 +2561,9 @@ func TestSend_Interruption(t *testing.T) {
 	assert.NoError(t, err)
 
 	s.outputAudioQueueMu.Lock()
-	assert.Empty(t, s.outputAudioQueue)
+	assert.Len(t, s.outputAudioQueue, 2)
 	s.outputAudioQueueMu.Unlock()
-
-	log := requireObservabilityLog(t, collector, webrtc_internal.EventOutputQueueCleared)
-	require.NoError(t, s.observer.Close(context.Background()))
-	assert.Equal(t, observability.LevelInfo, log.Level)
-	assert.Contains(t, log.Message, "user interruption")
-	assert.Equal(t, webrtc_internal.EventOutputQueueCleared, log.Attributes[webrtc_internal.DataType])
-	assert.Equal(t, webrtc_internal.OutputQueueClearReasonInterruption, log.Attributes[webrtc_internal.DataReason])
-	assert.Equal(t, "2", log.Attributes[webrtc_internal.DataClearedFrames])
-	assert.Equal(t, fmt.Sprintf("%d", webrtc_internal.OutputAudioQueueEmptySize), log.Attributes[webrtc_internal.DataRemainingQueueFrames])
-	assert.Empty(t, collector.metrics)
+	assert.Same(t, msg, <-s.OutputCh)
 }
 
 func TestSend_EndConversation(t *testing.T) {
@@ -2683,6 +2927,7 @@ func TestConsumeFrame_TracksWriteFailureWithoutRecordingAssistantAudio(t *testin
 	t.Parallel()
 	s := newTestStreamer(t)
 	assistantPCM16k := bytes.Repeat([]byte{0x33}, webrtc_internal.WebRTCOutputPCM16kFrameBytes)
+	s.currentOutputFrame = assistantPCM16k
 
 	err := s.ConsumeFrame(assistantPCM16k)
 	require.Error(t, err)
@@ -2707,6 +2952,7 @@ func TestConsumeFrame_DropsStalePacedMediaSession(t *testing.T) {
 	s.sessionState.StartMediaSession()
 	s.sessionState.SetPeerConnected(true)
 	assistantPCM16k := bytes.Repeat([]byte{0x55}, webrtc_internal.WebRTCOutputPCM16kFrameBytes)
+	s.currentOutputFrame = assistantPCM16k
 
 	err := s.ConsumeFrame(assistantPCM16k)
 
@@ -2737,6 +2983,7 @@ func TestConsumeFrame_TracksLastAssistantFrameSentAt(t *testing.T) {
 	s.assistantAudioTrack = assistantAudioTrack
 
 	assistantPCM16k := bytes.Repeat([]byte{0x44}, webrtc_internal.WebRTCOutputPCM16kFrameBytes)
+	s.currentOutputFrame = assistantPCM16k
 
 	err = s.ConsumeFrame(assistantPCM16k)
 	require.NoError(t, err)

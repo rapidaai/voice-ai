@@ -233,8 +233,8 @@ func TestMediaSession_HandleAssistantAudio_UsesMediaEngine(t *testing.T) {
 		MediaEngine: mediaEngine,
 	})
 
-	if err := mediaSession.HandleAssistantAudio([]byte{1, 2, 3}, true); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if assistantAudioAccepted, assistantAudioError := mediaSession.HandleAssistantAudio("response-1", []byte{1, 2, 3}, true); assistantAudioError != nil || !assistantAudioAccepted {
+		t.Fatalf("unexpected error: %v", assistantAudioError)
 	}
 	if len(mediaEngine.assistantAudio) != 3 || mediaEngine.assistantAudio[0] != 1 {
 		t.Fatalf("assistant audio not passed to media engine: %v", mediaEngine.assistantAudio)
@@ -251,8 +251,155 @@ func TestMediaSession_HandleAssistantAudio_PropagatesError(t *testing.T) {
 		MediaEngine: mediaEngine,
 	})
 
-	if err := mediaSession.HandleAssistantAudio([]byte{1}, false); err == nil {
+	if _, assistantAudioError := mediaSession.HandleAssistantAudio("response-1", []byte{1}, false); assistantAudioError == nil {
 		t.Fatal("expected assistant audio error")
+	}
+}
+
+func TestMediaSession_OutputControlsWithoutMediaEngine(t *testing.T) {
+	mediaSession := NewMediaSession(MediaSessionConfig{Context: context.Background()})
+
+	for _, outputControl := range []internal_type.Stream{
+		internal_type.PauseOutput{},
+		internal_type.ContinueOutput{},
+		internal_type.FlushOutput{},
+	} {
+		outputControlHandled, outputControlError := mediaSession.HandleOutputControl(outputControl)
+		if outputControlError != nil || !outputControlHandled {
+			t.Fatalf("%T handled=%t err=%v", outputControl, outputControlHandled, outputControlError)
+		}
+	}
+}
+
+func TestMediaSession_OutputControlPauseContinueRetainsFetchedFrame(t *testing.T) {
+	mediaEngine := &fakeMediaEngine{outputFrames: make(chan AssistantOutputFrame, 1)}
+	mediaEngine.outputFrames <- AssistantOutputFrame{
+		ProviderAudio: []byte{1, 2},
+		BridgeAudio:   []byte{3, 4},
+	}
+	var providerClearCount atomic.Int32
+	written := make(chan AssistantOutputFrame, 1)
+	mediaSession := NewMediaSession(MediaSessionConfig{
+		Context:     context.Background(),
+		MediaEngine: mediaEngine,
+		SendProviderClear: func() error {
+			providerClearCount.Add(1)
+			return nil
+		},
+		OutputSink: func(frame AssistantOutputFrame) error {
+			written <- frame
+			return nil
+		},
+	})
+
+	providerAudio := mediaSession.NextFrame()
+	if !bytes.Equal(providerAudio, []byte{1, 2}) {
+		t.Fatalf("provider audio=%v want=[1 2]", providerAudio)
+	}
+	outputControlHandled, outputControlError := mediaSession.HandleOutputControl(internal_type.PauseOutput{})
+	if outputControlError != nil || !outputControlHandled {
+		t.Fatalf("pause handled=%t err=%v", outputControlHandled, outputControlError)
+	}
+	if frame := mediaSession.NextFrame(); frame != nil {
+		t.Fatalf("paused next frame=%v want=nil", frame)
+	}
+	if err := mediaSession.ConsumeFrame(providerAudio); err != nil {
+		t.Fatalf("consume paused frame: %v", err)
+	}
+	select {
+	case frame := <-written:
+		t.Fatalf("paused frame was written: %+v", frame)
+	default:
+	}
+	if providerClearCount.Load() != 0 {
+		t.Fatalf("provider clears=%d want=0", providerClearCount.Load())
+	}
+
+	outputControlHandled, outputControlError = mediaSession.HandleOutputControl(internal_type.ContinueOutput{})
+	if outputControlError != nil || !outputControlHandled {
+		t.Fatalf("continue handled=%t err=%v", outputControlHandled, outputControlError)
+	}
+	providerAudio = mediaSession.NextFrame()
+	if !bytes.Equal(providerAudio, []byte{1, 2}) {
+		t.Fatalf("continued provider audio=%v want=[1 2]", providerAudio)
+	}
+	if err := mediaSession.ConsumeFrame(providerAudio); err != nil {
+		t.Fatalf("consume continued frame: %v", err)
+	}
+	select {
+	case frame := <-written:
+		if !bytes.Equal(frame.BridgeAudio, []byte{3, 4}) {
+			t.Fatalf("bridge audio=%v want=[3 4]", frame.BridgeAudio)
+		}
+	default:
+		t.Fatal("continued frame was not written")
+	}
+}
+
+func TestMediaSession_OutputControlFlushRejectsOldResponse(t *testing.T) {
+	mediaEngine := &fakeMediaEngine{outputFrames: make(chan AssistantOutputFrame, 1)}
+	mediaEngine.outputFrames <- AssistantOutputFrame{ProviderAudio: []byte{1, 2}}
+	var providerClearCount atomic.Int32
+	mediaSession := NewMediaSession(MediaSessionConfig{
+		Context:     context.Background(),
+		MediaEngine: mediaEngine,
+		SendProviderClear: func() error {
+			providerClearCount.Add(1)
+			return nil
+		},
+	})
+
+	if assistantAudioAccepted, assistantAudioError := mediaSession.HandleAssistantAudio("response-1", []byte{1}, false); assistantAudioError != nil || !assistantAudioAccepted {
+		t.Fatalf("initial assistant audio: %v", assistantAudioError)
+	}
+	if frame := mediaSession.NextFrame(); frame == nil {
+		t.Fatal("expected fetched output frame")
+	}
+	if outputControlHandled, outputControlError := mediaSession.HandleOutputControl(internal_type.PauseOutput{}); outputControlError != nil || !outputControlHandled {
+		t.Fatalf("pause handled=%t err=%v", outputControlHandled, outputControlError)
+	}
+	if providerClearCount.Load() != 0 {
+		t.Fatalf("pause sent provider clear: %d", providerClearCount.Load())
+	}
+	outputControlHandled, outputControlError := mediaSession.HandleOutputControl(internal_type.FlushOutput{})
+	if outputControlError != nil || !outputControlHandled {
+		t.Fatalf("flush handled=%t err=%v", outputControlHandled, outputControlError)
+	}
+	if frame := mediaSession.NextFrame(); frame != nil {
+		t.Fatalf("frame survived flush: %v", frame)
+	}
+	if mediaEngine.clearCount.Load() != 1 || providerClearCount.Load() != 1 {
+		t.Fatalf("engine clears=%d provider clears=%d want=1,1", mediaEngine.clearCount.Load(), providerClearCount.Load())
+	}
+
+	if assistantAudioAccepted, assistantAudioError := mediaSession.HandleAssistantAudio("response-1", []byte{2}, true); assistantAudioError != nil || assistantAudioAccepted {
+		t.Fatalf("stale assistant audio: %v", assistantAudioError)
+	}
+	if !bytes.Equal(mediaEngine.assistantAudio, []byte{1}) {
+		t.Fatalf("stale audio reached engine: %v", mediaEngine.assistantAudio)
+	}
+	if assistantAudioAccepted, assistantAudioError := mediaSession.HandleAssistantAudio("response-2", []byte{3}, false); assistantAudioError != nil || !assistantAudioAccepted {
+		t.Fatalf("next assistant audio: %v", assistantAudioError)
+	}
+	if !bytes.Equal(mediaEngine.assistantAudio, []byte{3}) {
+		t.Fatalf("next response audio=%v want=[3]", mediaEngine.assistantAudio)
+	}
+
+}
+
+func TestMediaSession_OutputControlReturnsProviderClearError(t *testing.T) {
+	mediaEngine := &fakeMediaEngine{outputFrames: make(chan AssistantOutputFrame, 1)}
+	mediaSession := NewMediaSession(MediaSessionConfig{
+		Context:     context.Background(),
+		MediaEngine: mediaEngine,
+		SendProviderClear: func() error {
+			return errors.New("clear failed")
+		},
+	})
+
+	outputControlHandled, outputControlError := mediaSession.HandleOutputControl(internal_type.FlushOutput{})
+	if !outputControlHandled || outputControlError == nil {
+		t.Fatalf("flush handled=%t err=%v", outputControlHandled, outputControlError)
 	}
 }
 
@@ -451,7 +598,10 @@ func TestMediaSession_HandleInterrupt_ClearsAndSendsProviderClear(t *testing.T) 
 		},
 	})
 
-	mediaSession.HandleInterrupt()
+	outputControlHandled, outputControlError := mediaSession.HandleOutputControl(internal_type.FlushOutput{})
+	if outputControlError != nil || !outputControlHandled {
+		t.Fatalf("flush handled=%t err=%v", outputControlHandled, outputControlError)
+	}
 
 	if mediaEngine.clearCount.Load() != 1 {
 		t.Fatalf("clearCount=%d want=1", mediaEngine.clearCount.Load())
@@ -473,7 +623,7 @@ func TestMediaSession_HandleInterrupt_ClearsAndSendsProviderClear(t *testing.T) 
 	}
 }
 
-func TestMediaSession_HandleInterruptDropsFetchedOutputFrame(t *testing.T) {
+func TestMediaSession_FlushDropsFetchedOutputFrame(t *testing.T) {
 	mediaEngine := &fakeMediaEngine{outputFrames: make(chan AssistantOutputFrame, 1)}
 	mediaEngine.outputFrames <- AssistantOutputFrame{
 		ProviderAudio: []byte{1, 2},
@@ -494,7 +644,10 @@ func TestMediaSession_HandleInterruptDropsFetchedOutputFrame(t *testing.T) {
 		t.Fatalf("provider audio=%v want=[1 2]", providerAudio)
 	}
 
-	mediaSession.HandleInterrupt()
+	outputControlHandled, outputControlError := mediaSession.HandleOutputControl(internal_type.FlushOutput{})
+	if outputControlError != nil || !outputControlHandled {
+		t.Fatalf("flush handled=%t err=%v", outputControlHandled, outputControlError)
+	}
 	if err := mediaSession.ConsumeFrame(providerAudio); err != nil {
 		t.Fatalf("consume interrupted frame: %v", err)
 	}

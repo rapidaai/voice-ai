@@ -118,6 +118,9 @@ func (h requestorDispatchHandler) HandleUserText(ctx context.Context, vl interna
 			internal_type.LLMInterruptPacket{ContextID: oldContextID},
 		)
 		utils.Go(ctx, func() {
+			if outputControlError := h.r.sendOutputControl(internal_type.FlushOutput{}); outputControlError != nil && h.r.logger != nil {
+				h.r.logger.Errorf("error while flushing interrupted output %v", outputControlError)
+			}
 			h.r.Notify(ctx, &protos.ConversationInterruption{
 				Type: protos.ConversationInterruption_INTERRUPTION_TYPE_WORD,
 				Time: timestamppb.Now(),
@@ -298,6 +301,9 @@ func (h requestorDispatchHandler) handleSpeechToText(ctx context.Context, p inte
 				internal_type.LLMInterruptPacket{ContextID: oldContextID},
 			)
 			utils.Go(ctx, func() {
+				if outputControlError := h.r.sendOutputControl(internal_type.FlushOutput{}); outputControlError != nil && h.r.logger != nil {
+					h.r.logger.Errorf("error while flushing interrupted output %v", outputControlError)
+				}
 				h.r.Notify(ctx, &protos.ConversationInterruption{
 					Type: interruptionType,
 					Time: timestamppb.Now(),
@@ -581,6 +587,9 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 					internal_type.LLMInterruptPacket{ContextID: oldContextID},
 				)
 				utils.Go(ctx, func() {
+					if outputControlError := h.r.sendOutputControl(internal_type.FlushOutput{}); outputControlError != nil && h.r.logger != nil {
+						h.r.logger.Errorf("error while flushing interrupted output %v", outputControlError)
+					}
 					h.r.Notify(ctx, &protos.ConversationInterruption{
 						Type: protos.ConversationInterruption_INTERRUPTION_TYPE_VAD,
 						Time: timestamppb.Now(),
@@ -694,6 +703,9 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 					internal_type.LLMInterruptPacket{ContextID: oldContextID},
 				)
 				utils.Go(ctx, func() {
+					if outputControlError := h.r.sendOutputControl(internal_type.FlushOutput{}); outputControlError != nil && h.r.logger != nil {
+						h.r.logger.Errorf("error while flushing interrupted output %v", outputControlError)
+					}
 					h.r.Notify(ctx, &protos.ConversationInterruption{
 						Type: protos.ConversationInterruption_INTERRUPTION_TYPE_WORD,
 						Time: timestamppb.Now(),
@@ -772,6 +784,9 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 				internal_type.LLMInterruptPacket{ContextID: oldContextID},
 			)
 			utils.Go(ctx, func() {
+				if outputControlError := h.r.sendOutputControl(internal_type.FlushOutput{}); outputControlError != nil && h.r.logger != nil {
+					h.r.logger.Errorf("error while flushing interrupted output %v", outputControlError)
+				}
 				h.r.Notify(ctx, &protos.ConversationInterruption{
 					Type: protos.ConversationInterruption_INTERRUPTION_TYPE_WORD,
 					Time: timestamppb.Now(),
@@ -1506,8 +1521,9 @@ func (h requestorDispatchHandler) handleUnclearInputExpired(ctx context.Context,
 		interruptionSource = internal_type.InterruptionSourceWord
 		interruptionType = protos.ConversationInterruption_INTERRUPTION_TYPE_WORD
 	}
+	interruptionOwnerEnabled := h.r.usesInterruptionOwner()
 	var newContextID string
-	if h.r.usesInterruptionOwner() {
+	if interruptionOwnerEnabled {
 		reply := h.r.interruption.submit(ctx, interruptionEvent{packet: p, complete: true})
 		if !reply.accepted {
 			return
@@ -1536,6 +1552,11 @@ func (h requestorDispatchHandler) handleUnclearInputExpired(ctx context.Context,
 		internal_type.LLMInterruptPacket{ContextID: oldContextID},
 	)
 	utils.Go(ctx, func() {
+		if !interruptionOwnerEnabled {
+			if outputControlError := h.r.sendOutputControl(internal_type.FlushOutput{}); outputControlError != nil && h.r.logger != nil {
+				h.r.logger.Errorf("error while flushing interrupted output %v", outputControlError)
+			}
+		}
 		h.r.Notify(ctx, &protos.ConversationInterruption{
 			Type: interruptionType,
 			Time: timestamppb.Now(),

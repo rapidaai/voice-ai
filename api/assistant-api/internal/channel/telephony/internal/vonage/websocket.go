@@ -266,6 +266,11 @@ func (vng *vonageWebsocketStreamer) runWebSocketReader(conn *websocket.Conn) {
 }
 
 func (vng *vonageWebsocketStreamer) Send(response internal_type.Stream) error {
+	if vng.mediaSession != nil {
+		if outputControlHandled, outputControlError := vng.mediaSession.HandleOutputControl(response); outputControlHandled {
+			return outputControlError
+		}
+	}
 	if vng.connection == nil {
 		return nil
 	}
@@ -280,15 +285,13 @@ func (vng *vonageWebsocketStreamer) Send(response internal_type.Stream) error {
 			if vng.mediaSession == nil {
 				return nil
 			}
-			if err := vng.mediaSession.HandleAssistantAudio(content.Audio, data.GetCompleted()); err != nil {
-				return err
+			if _, assistantAudioError := vng.mediaSession.HandleAssistantAudio(data.GetId(), content.Audio, data.GetCompleted()); assistantAudioError != nil {
+				return assistantAudioError
 			}
 			return nil
 		}
 	case *protos.ConversationInterruption:
-		if vng.mediaSession != nil {
-			vng.mediaSession.HandleInterrupt()
-		}
+		return nil
 	case *protos.ConversationDisconnection:
 		_ = vng.Disconnect(data.GetType())
 		conversationUUID := vng.GetConversationUuid()

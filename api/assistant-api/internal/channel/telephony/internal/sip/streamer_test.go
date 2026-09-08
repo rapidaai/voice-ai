@@ -9,6 +9,7 @@ import (
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/channel"
 	"github.com/rapidaai/pkg/commons"
@@ -171,6 +172,7 @@ func TestSend_AssistantAudioQueuesUntilOutputActivated(t *testing.T) {
 	s := newTestSIPStreamer(t)
 
 	err := s.Send(&protos.ConversationAssistantMessage{
+		Id: "response-1",
 		Message: &protos.ConversationAssistantMessage_Audio{
 			Audio: []byte{1, 2, 3},
 		},
@@ -179,12 +181,67 @@ func TestSend_AssistantAudioQueuesUntilOutputActivated(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, s.pendingAssistantAudioFrames, 1)
+	assert.Equal(t, "response-1", s.pendingAssistantAudioFrames[0].responseID)
 	assert.Equal(t, []byte{1, 2, 3}, s.pendingAssistantAudioFrames[0].audio)
 	assert.True(t, s.pendingAssistantAudioFrames[0].completed)
 
 	s.StartAssistantOutput()
 	assert.True(t, s.assistantOutputActive.Load())
 	assert.Empty(t, s.pendingAssistantAudioFrames)
+}
+
+func TestSend_OutputControlsManagePendingPreAnswerAudio(t *testing.T) {
+	s := newTestSIPStreamer(t)
+	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
+		Id: "response-1",
+		Message: &protos.ConversationAssistantMessage_Audio{
+			Audio: []byte{1, 2, 3},
+		},
+	}))
+
+	require.NoError(t, s.Send(internal_type.PauseOutput{}))
+	require.Len(t, s.pendingAssistantAudioFrames, 1)
+	require.NoError(t, s.Send(internal_type.ContinueOutput{}))
+	require.Len(t, s.pendingAssistantAudioFrames, 1)
+	require.NoError(t, s.Send(internal_type.FlushOutput{}))
+	assert.Empty(t, s.pendingAssistantAudioFrames)
+}
+
+func TestSend_FlushBlocksLatePreAnswerResponseAudio(t *testing.T) {
+	s := newTestSIPStreamer(t)
+	mediaPort, _, _ := newMediaPortForTest(t, nil)
+	s.mediaPort = mediaPort
+	defer func() { require.NoError(t, mediaPort.Close()) }()
+	audio := make([]byte, BridgeOutputFrameSize*4)
+
+	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
+		Id:        "response-1",
+		Message:   &protos.ConversationAssistantMessage_Audio{Audio: audio},
+		Completed: true,
+	}))
+	require.NoError(t, s.Send(internal_type.FlushOutput{}))
+	assert.Empty(t, s.pendingAssistantAudioFrames)
+
+	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
+		Id:        "response-1",
+		Message:   &protos.ConversationAssistantMessage_Audio{Audio: audio},
+		Completed: true,
+	}))
+	assert.Empty(t, s.pendingAssistantAudioFrames)
+	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
+		Id:        "response-2",
+		Message:   &protos.ConversationAssistantMessage_Audio{Audio: audio},
+		Completed: true,
+	}))
+	require.Len(t, s.pendingAssistantAudioFrames, 1)
+	assert.Equal(t, "response-2", s.pendingAssistantAudioFrames[0].responseID)
+}
+
+func TestSend_OutputControlAfterCloseReturnsSessionClosed(t *testing.T) {
+	s := newTestSIPStreamer(t)
+	require.NoError(t, s.Close())
+
+	assert.ErrorIs(t, s.Send(internal_type.FlushOutput{}), sip_runtime.ErrSessionClosed)
 }
 
 func TestSend_InboundAssistantAudioMarksReadyBeforeOutputActivated(t *testing.T) {

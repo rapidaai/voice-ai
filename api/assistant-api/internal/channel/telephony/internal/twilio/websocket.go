@@ -283,6 +283,11 @@ func (tws *twilioWebsocketStreamer) runWebSocketReader(conn *websocket.Conn) {
 }
 
 func (tws *twilioWebsocketStreamer) Send(response internal_type.Stream) error {
+	if tws.mediaSession != nil {
+		if outputControlHandled, outputControlError := tws.mediaSession.HandleOutputControl(response); outputControlHandled {
+			return outputControlError
+		}
+	}
 	switch data := response.(type) {
 	case *protos.ConversationInitialization:
 		if tws.mediaSession != nil {
@@ -294,15 +299,13 @@ func (tws *twilioWebsocketStreamer) Send(response internal_type.Stream) error {
 			if tws.mediaSession == nil {
 				return nil
 			}
-			if err := tws.mediaSession.HandleAssistantAudio(content.Audio, data.GetCompleted()); err != nil {
-				return err
+			if _, assistantAudioError := tws.mediaSession.HandleAssistantAudio(data.GetId(), content.Audio, data.GetCompleted()); assistantAudioError != nil {
+				return assistantAudioError
 			}
 			return nil
 		}
 	case *protos.ConversationInterruption:
-		if tws.mediaSession != nil {
-			tws.mediaSession.HandleInterrupt()
-		}
+		return nil
 	case *protos.ConversationDisconnection:
 		// Server-initiated disconnect: the talker already knows the reason
 		// (it called Notify with it). No need to round-trip back through

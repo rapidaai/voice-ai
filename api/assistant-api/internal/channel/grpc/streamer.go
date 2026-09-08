@@ -8,6 +8,7 @@ package channel_grpc
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	observability_collector_requestlog "github.com/rapidaai/api/assistant-api/internal/observability/collectors/requestlog"
@@ -29,6 +30,14 @@ type unidirectionalStreamer struct {
 	logger   commons.Logger
 	server   grpc.BidiStreamingServer[protos.AssistantTalkRequest, protos.AssistantTalkResponse]
 	observer observability.Recorder
+
+	outputMu        sync.Mutex
+	outputSendMu    sync.Mutex
+	outputPaused    bool
+	outputDraining  bool
+	outputID        string
+	blockedOutputID string
+	pendingOutput   []*protos.ConversationAssistantMessage
 
 	auth                 *types.Authentication
 	configurationService internal_services.AssistantConfigurationService
@@ -180,6 +189,66 @@ func (uds *unidirectionalStreamer) Recv() (internal_type.Stream, error) {
 
 func (uds *unidirectionalStreamer) Send(out internal_type.Stream) error {
 	switch out := out.(type) {
+	case internal_type.PauseOutput:
+		uds.outputMu.Lock()
+		uds.outputPaused = true
+		uds.outputMu.Unlock()
+		return nil
+
+	case internal_type.ContinueOutput:
+		uds.outputMu.Lock()
+		uds.outputPaused = false
+		if uds.outputDraining {
+			uds.outputMu.Unlock()
+			return nil
+		}
+		uds.outputDraining = true
+		for {
+			if uds.outputPaused || len(uds.pendingOutput) == 0 {
+				uds.outputDraining = false
+				uds.outputMu.Unlock()
+				return nil
+			}
+			assistantMessage := uds.pendingOutput[0]
+			uds.pendingOutput[0] = nil
+			uds.pendingOutput = uds.pendingOutput[1:]
+			if uds.blockedOutputID != "" && assistantMessage.GetId() == uds.blockedOutputID {
+				continue
+			}
+			uds.outputMu.Unlock()
+
+			uds.outputSendMu.Lock()
+			uds.outputMu.Lock()
+			isBlockedOutput := uds.blockedOutputID != "" && assistantMessage.GetId() == uds.blockedOutputID
+			uds.outputMu.Unlock()
+			var sendError error
+			if !isBlockedOutput {
+				sendError = uds.server.Send(&protos.AssistantTalkResponse{
+					Code:    200,
+					Success: true,
+					Data:    &protos.AssistantTalkResponse_Assistant{Assistant: assistantMessage},
+				})
+			}
+			uds.outputSendMu.Unlock()
+
+			uds.outputMu.Lock()
+			if sendError != nil {
+				uds.outputDraining = false
+				uds.outputMu.Unlock()
+				return sendError
+			}
+		}
+
+	case internal_type.FlushOutput:
+		uds.outputSendMu.Lock()
+		uds.outputMu.Lock()
+		uds.outputPaused = false
+		uds.blockedOutputID = uds.outputID
+		uds.pendingOutput = nil
+		uds.outputMu.Unlock()
+		uds.outputSendMu.Unlock()
+		return nil
+
 	case *protos.ConversationInitialization:
 		return uds.server.Send(&protos.AssistantTalkResponse{
 			Code:    200,
@@ -209,6 +278,31 @@ func (uds *unidirectionalStreamer) Send(out internal_type.Stream) error {
 		})
 
 	case *protos.ConversationAssistantMessage:
+		if _, isAssistantAudio := out.Message.(*protos.ConversationAssistantMessage_Audio); isAssistantAudio {
+			uds.outputMu.Lock()
+			if out.GetId() == uds.blockedOutputID && uds.blockedOutputID != "" {
+				uds.outputMu.Unlock()
+				return nil
+			}
+			if out.GetId() != "" && out.GetId() != uds.outputID {
+				uds.outputID = out.GetId()
+			}
+			if uds.outputPaused || uds.outputDraining {
+				uds.pendingOutput = append(uds.pendingOutput, out)
+				uds.outputMu.Unlock()
+				return nil
+			}
+			uds.outputMu.Unlock()
+		}
+
+		uds.outputSendMu.Lock()
+		defer uds.outputSendMu.Unlock()
+		uds.outputMu.Lock()
+		isBlockedOutput := uds.blockedOutputID != "" && out.GetId() == uds.blockedOutputID
+		uds.outputMu.Unlock()
+		if isBlockedOutput {
+			return nil
+		}
 		return uds.server.Send(&protos.AssistantTalkResponse{
 			Code:    200,
 			Success: true,

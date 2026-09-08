@@ -251,6 +251,11 @@ func (vws *vobizWebsocketStreamer) runWebSocketReader() {
 }
 
 func (vws *vobizWebsocketStreamer) Send(response internal_type.Stream) error {
+	if vws.mediaSession != nil {
+		if outputControlHandled, outputControlError := vws.mediaSession.HandleOutputControl(response); outputControlHandled {
+			return outputControlError
+		}
+	}
 	switch data := response.(type) {
 	case *protos.ConversationInitialization:
 		if vws.mediaSession != nil {
@@ -262,12 +267,11 @@ func (vws *vobizWebsocketStreamer) Send(response internal_type.Stream) error {
 			if vws.mediaSession == nil {
 				return nil
 			}
-			return vws.mediaSession.HandleAssistantAudio(content.Audio, data.GetCompleted())
+			_, assistantAudioError := vws.mediaSession.HandleAssistantAudio(data.GetId(), content.Audio, data.GetCompleted())
+			return assistantAudioError
 		}
 	case *protos.ConversationInterruption:
-		if vws.mediaSession != nil {
-			vws.mediaSession.HandleInterrupt()
-		}
+		return nil
 	case *protos.ConversationDisconnection:
 		_ = vws.Disconnect(data.GetType())
 		_ = vws.Record(observability.RecordEvent{

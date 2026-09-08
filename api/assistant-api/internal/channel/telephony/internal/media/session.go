@@ -70,11 +70,20 @@ func (mediaSession *MediaSession) HandleInitialization(init *protos.Conversation
 	}
 }
 
-func (mediaSession *MediaSession) HandleAssistantAudio(audio []byte, completed bool) error {
+func (mediaSession *MediaSession) HandleAssistantAudio(outputID string, audio []byte, completed bool) (bool, error) {
 	if mediaSession == nil || !mediaSession.hasMediaEngine() {
-		return nil
+		return false, nil
 	}
-	return mediaSession.mediaEngine.ProcessAssistantAudio(audio, completed)
+	mediaSession.outputFrameMu.Lock()
+	defer mediaSession.outputFrameMu.Unlock()
+	if mediaSession.blockedOutputID != "" && (outputID == "" || outputID == mediaSession.blockedOutputID) {
+		return false, nil
+	}
+	if outputID != "" && outputID != mediaSession.currentOutputID {
+		mediaSession.currentOutputID = outputID
+		mediaSession.outputFlushed = false
+	}
+	return true, mediaSession.mediaEngine.ProcessAssistantAudio(audio, completed)
 }
 
 func (mediaSession *MediaSession) HandleProviderAudioFrame(frame ProviderAudioFrame) error {
@@ -92,37 +101,81 @@ func (mediaSession *MediaSession) HandleProviderAudioFrame(frame ProviderAudioFr
 	return nil
 }
 
-func (mediaSession *MediaSession) HandleInterrupt() {
-	if mediaSession == nil || !mediaSession.hasMediaEngine() {
-		return
-	}
-	mediaSession.outputFrameMu.Lock()
-	mediaSession.mediaEngine.ClearOutputBuffer()
-	mediaSession.currentOutputFrame = AssistantOutputFrame{}
-	mediaSession.hasCurrentOutputFrame = false
-	mediaSession.outputFrameMu.Unlock()
-	if mediaSession.sendProviderClear != nil {
-		if err := mediaSession.sendProviderClear(); err != nil && mediaSession.record != nil {
+func (mediaSession *MediaSession) HandleOutputControl(control internal_type.Stream) (bool, error) {
+	switch control.(type) {
+	case internal_type.PauseOutput:
+		if mediaSession == nil || !mediaSession.hasMediaEngine() {
+			return true, nil
+		}
+		mediaSession.outputFrameMu.Lock()
+		if mediaSession.outputPaused {
+			mediaSession.outputFrameMu.Unlock()
+			return true, nil
+		}
+		mediaSession.outputPaused = true
+		mediaSession.outputFrameMu.Unlock()
+		if mediaSession.record != nil {
+			_ = mediaSession.record(observability.RecordEvent{
+				Component: observability.ComponentCall,
+				Event:     observability.CallStatus,
+				Attributes: observability.Attributes{
+					"component": observability.ComponentCall.String(),
+					"status":    "output_paused",
+					"reason":    "pause",
+				},
+			})
+		}
+		return true, nil
+	case internal_type.ContinueOutput:
+		if mediaSession == nil || !mediaSession.hasMediaEngine() {
+			return true, nil
+		}
+		mediaSession.outputFrameMu.Lock()
+		mediaSession.outputPaused = false
+		mediaSession.outputFrameMu.Unlock()
+		return true, nil
+	case internal_type.FlushOutput:
+		if mediaSession == nil || !mediaSession.hasMediaEngine() {
+			return true, nil
+		}
+		mediaSession.outputFrameMu.Lock()
+		var providerClearError error
+		if !mediaSession.outputFlushed {
+			mediaSession.mediaEngine.ClearOutputBuffer()
+			mediaSession.currentOutputFrame = AssistantOutputFrame{}
+			mediaSession.hasCurrentOutputFrame = false
+			mediaSession.outputPaused = false
+			mediaSession.outputFlushed = true
+			mediaSession.blockedOutputID = mediaSession.currentOutputID
+			if mediaSession.sendProviderClear != nil {
+				providerClearError = mediaSession.sendProviderClear()
+			}
+		}
+		mediaSession.outputFrameMu.Unlock()
+		if providerClearError != nil && mediaSession.record != nil {
 			_ = mediaSession.record(observability.RecordLog{
 				Level:   observability.LevelError,
 				Message: "Failed to send telephony clear command",
 				Attributes: observability.Attributes{
 					"component": observability.ComponentCall.String(),
-					"error":     err.Error(),
+					"error":     providerClearError.Error(),
 				},
 			})
 		}
-	}
-	if mediaSession.record != nil {
-		_ = mediaSession.record(observability.RecordEvent{
-			Component: observability.ComponentCall,
-			Event:     observability.CallStatus,
-			Attributes: observability.Attributes{
-				"component": observability.ComponentCall.String(),
-				"status":    "output_queue_cleared",
-				"reason":    "interruption",
-			},
-		})
+		if mediaSession.record != nil {
+			_ = mediaSession.record(observability.RecordEvent{
+				Component: observability.ComponentCall,
+				Event:     observability.CallStatus,
+				Attributes: observability.Attributes{
+					"component": observability.ComponentCall.String(),
+					"status":    "output_queue_cleared",
+					"reason":    "flush",
+				},
+			})
+		}
+		return true, providerClearError
+	default:
+		return false, nil
 	}
 }
 
@@ -161,6 +214,12 @@ func (mediaSession *MediaSession) NextFrame() []byte {
 	}
 	mediaSession.outputFrameMu.Lock()
 	defer mediaSession.outputFrameMu.Unlock()
+	if mediaSession.outputPaused {
+		return nil
+	}
+	if mediaSession.hasCurrentOutputFrame {
+		return mediaSession.currentOutputFrame.ProviderAudio
+	}
 	outputFrame, ok := mediaSession.mediaEngine.NextOutputFrame()
 	if !ok || len(outputFrame.ProviderAudio) == 0 {
 		return nil
@@ -176,6 +235,9 @@ func (mediaSession *MediaSession) IdleFrame() []byte {
 	}
 	mediaSession.outputFrameMu.Lock()
 	defer mediaSession.outputFrameMu.Unlock()
+	if mediaSession.outputPaused {
+		return nil
+	}
 	outputFrame, ok := mediaSession.mediaEngine.IdleOutputFrame()
 	if !ok || len(outputFrame.ProviderAudio) == 0 {
 		return nil
@@ -195,6 +257,10 @@ func (mediaSession *MediaSession) ConsumeFrame(_ []byte) error {
 	}
 
 	mediaSession.outputFrameMu.Lock()
+	if mediaSession.outputPaused {
+		mediaSession.outputFrameMu.Unlock()
+		return nil
+	}
 	outputFrame := mediaSession.currentOutputFrame
 	hasCurrentOutputFrame := mediaSession.hasCurrentOutputFrame
 	mediaSession.currentOutputFrame = AssistantOutputFrame{}

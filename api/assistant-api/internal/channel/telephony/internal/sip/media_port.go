@@ -179,21 +179,18 @@ func (port *MediaPort) HandleInitialization(init *protos.ConversationInitializat
 	port.mediaSession.HandleInitialization(init)
 }
 
-func (port *MediaPort) HandleAssistantAudio(audio []byte, completed bool) error {
+func (port *MediaPort) HandleOutputControl(control internal_type.Stream) (bool, error) {
 	if port == nil || port.mediaSession == nil {
-		return nil
+		return false, nil
 	}
-	if err := port.mediaSession.HandleAssistantAudio(audio, completed); err != nil {
-		return err
-	}
-	return nil
+	return port.mediaSession.HandleOutputControl(control)
 }
 
-func (port *MediaPort) HandleInterrupt() {
+func (port *MediaPort) HandleAssistantAudio(responseID string, audio []byte, completed bool) (bool, error) {
 	if port == nil || port.mediaSession == nil {
-		return
+		return false, nil
 	}
-	port.mediaSession.HandleInterrupt()
+	return port.mediaSession.HandleAssistantAudio(responseID, audio, completed)
 }
 
 func (port *MediaPort) EnterTransferMode(ringtone string) bool {

@@ -157,7 +157,7 @@ func TestDispatchInterruptionPreservesWordTrigger(t *testing.T) {
 		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: previous, Script: "hello", Interim: true})
 		synctest.Wait()
 		assert.NotEqual(t, previous, requestor.GetID())
-		assert.Empty(t, interruptionTestControls(requestor))
+		assert.Equal(t, []internal_type.Stream{internal_type.FlushOutput{}}, interruptionTestControls(requestor))
 	})
 }
 
