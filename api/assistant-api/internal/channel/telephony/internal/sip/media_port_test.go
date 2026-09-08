@@ -204,6 +204,9 @@ func TestMediaPort_RealUDPInputMatchesReferencePCM(t *testing.T) {
 			expectedPCM := bytes.Join(expectedFrames, nil)
 			require.Equal(t, expectedPCM, actualPipeline)
 			require.Equal(t, expectedPCM, actualRecording)
+			require.Eventually(t, func() bool {
+				return receiver.GetDetailedStats().PacketsDelivered == uint64(frameCount)
+			}, time.Second, time.Millisecond)
 			stats := receiver.GetDetailedStats()
 			assert.Equal(t, uint64(frameCount), stats.PacketsReceived)
 			assert.Equal(t, uint64(frameCount), stats.PacketsDelivered)
@@ -323,6 +326,9 @@ func TestMediaPort_RealUDPInputHandlesReorderingAndLoss(t *testing.T) {
 					}
 				}
 
+				require.Eventually(t, func() bool {
+					return receiver.GetDetailedStats().PacketsDelivered == uint64(len(expectedPCM))
+				}, time.Second, time.Millisecond)
 				stats := receiver.GetDetailedStats()
 				assert.Equal(t, testCase.packetsReceived, stats.PacketsReceived)
 				assert.Equal(t, uint64(len(expectedPCM)), stats.PacketsDelivered)

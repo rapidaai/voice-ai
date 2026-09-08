@@ -23,13 +23,14 @@ import (
 )
 
 type nativePCM16Resampler struct {
-	handle            C.soxr_t
-	closed            *atomic.Bool
-	sourceRate        uint32
-	targetRate        uint32
-	inputSamples      []int16
-	outputSamples     []int16
-	hasProcessedFrame bool
+	handle        C.soxr_t
+	closed        *atomic.Bool
+	sourceRate    uint32
+	targetRate    uint32
+	inputSamples  []int16
+	outputSamples []int16
+	pendingOutput []int16
+	hasProcessed  bool
 }
 
 func newNativePCM16Resampler(sourceRate, targetRate uint32) (*nativePCM16Resampler, error) {
@@ -88,17 +89,19 @@ func (resampler *nativePCM16Resampler) Resample(data []byte) ([]byte, error) {
 		resampler.inputSamples[sampleIndex] = int16(binary.LittleEndian.Uint16(data[sampleIndex*pcm16BytesPerSample:]))
 	}
 
-	outputSampleCount := int(
-		(uint64(inputSampleCount)*uint64(resampler.targetRate) + uint64(resampler.sourceRate)/2) /
-			uint64(resampler.sourceRate),
-	)
-	if outputSampleCount < minimumOutputSampleCount {
-		outputSampleCount = minimumOutputSampleCount
+	scaledInputSamples := uint64(inputSampleCount) * uint64(resampler.targetRate)
+	targetSampleCount := int((scaledInputSamples + uint64(resampler.sourceRate)/2) / uint64(resampler.sourceRate))
+	if targetSampleCount < minimumOutputSampleCount {
+		targetSampleCount = minimumOutputSampleCount
 	}
-	if cap(resampler.outputSamples) < outputSampleCount {
-		resampler.outputSamples = make([]int16, outputSampleCount)
+	outputCapacity := targetSampleCount
+	if outputCapacity < len(resampler.pendingOutput)+targetSampleCount {
+		outputCapacity = len(resampler.pendingOutput) + targetSampleCount
+	}
+	if cap(resampler.outputSamples) < outputCapacity {
+		resampler.outputSamples = make([]int16, outputCapacity)
 	} else {
-		resampler.outputSamples = resampler.outputSamples[:outputSampleCount]
+		resampler.outputSamples = resampler.outputSamples[:outputCapacity]
 	}
 
 	var inputSamplesConsumed C.size_t
@@ -127,19 +130,40 @@ func (resampler *nativePCM16Resampler) Resample(data []byte) ([]byte, error) {
 
 	// #nosec G115, the native count cannot exceed the provided output length.
 	producedSampleCount := int(outputSamplesProduced)
-	output := make([]byte, outputSampleCount*pcm16BytesPerSample)
-	outputSampleOffset := 0
-	if !resampler.hasProcessedFrame && producedSampleCount < outputSampleCount {
-		outputSampleOffset = outputSampleCount - producedSampleCount
+	if scaledInputSamples%uint64(resampler.sourceRate) == 0 && len(resampler.pendingOutput) == 0 {
+		output := make([]byte, targetSampleCount*pcm16BytesPerSample)
+		outputSampleOffset := 0
+		if !resampler.hasProcessed && producedSampleCount < targetSampleCount {
+			outputSampleOffset = targetSampleCount - producedSampleCount
+		}
+		for sampleIndex := range producedSampleCount {
+			// #nosec G115, PCM16 encoding preserves the signed sample bits.
+			binary.LittleEndian.PutUint16(
+				output[(sampleIndex+outputSampleOffset)*pcm16BytesPerSample:],
+				uint16(resampler.outputSamples[sampleIndex]),
+			)
+		}
+		resampler.hasProcessed = true
+		return output, nil
 	}
-	for sampleIndex := range producedSampleCount {
+
+	if producedSampleCount > 0 {
+		resampler.pendingOutput = append(resampler.pendingOutput, resampler.outputSamples[:producedSampleCount]...)
+	}
+	if len(resampler.pendingOutput) < targetSampleCount {
+		return []byte{}, nil
+	}
+	outputSamples := resampler.pendingOutput[:targetSampleCount]
+	output := make([]byte, len(outputSamples)*pcm16BytesPerSample)
+	for sampleIndex, sample := range outputSamples {
 		// #nosec G115, PCM16 encoding preserves the signed sample bits.
 		binary.LittleEndian.PutUint16(
-			output[(sampleIndex+outputSampleOffset)*pcm16BytesPerSample:],
-			uint16(resampler.outputSamples[sampleIndex]),
+			output[sampleIndex*pcm16BytesPerSample:],
+			uint16(sample),
 		)
 	}
-	resampler.hasProcessedFrame = true
+	copy(resampler.pendingOutput, resampler.pendingOutput[targetSampleCount:])
+	resampler.pendingOutput = resampler.pendingOutput[:len(resampler.pendingOutput)-targetSampleCount]
 	return output, nil
 }
 

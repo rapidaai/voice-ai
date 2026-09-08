@@ -263,7 +263,9 @@ func (m *SIPEngine) onInvite(session *sip_runtime.Session, requestURI string, ca
 	if stage.Direction == sip_runtime.CallDirectionInbound {
 		return m.dispatcher.StartPreparedSession(m.ctx, stage)
 	}
-	m.dispatcher.OnPipeline(m.ctx, stage)
+	if err := m.dispatcher.StartPreparedSession(m.ctx, stage); err != nil {
+		m.dispatcher.OnPipeline(m.ctx, stage)
+	}
 	return nil
 }
 
