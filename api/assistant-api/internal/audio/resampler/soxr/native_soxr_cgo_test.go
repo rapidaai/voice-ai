@@ -8,6 +8,7 @@
 package resampler_soxr
 
 import (
+	"encoding/binary"
 	"testing"
 
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
@@ -26,4 +27,26 @@ func TestQuickQualityUsesNativeSOXR(t *testing.T) {
 	engine, exists := resampler.engines.Load(ratePair{sourceRate: 8000, targetRate: 16000})
 	require.True(t, exists)
 	require.NotNil(t, engine.(*cachedEngine).soxrResampler)
+}
+
+func TestNativeSOXRDoesNotPadFractionalFramesWithZeroSamples(t *testing.T) {
+	resampler, err := newNativePCM16Resampler(16000, 8000)
+	require.NoError(t, err)
+	t.Cleanup(resampler.Close)
+
+	input := make([]byte, 441*pcm16BytesPerSample)
+	for sampleIndex := range 441 {
+		binary.LittleEndian.PutUint16(input[sampleIndex*pcm16BytesPerSample:], uint16(12000))
+	}
+
+	output, err := resampler.Resample(input)
+	require.NoError(t, err)
+	if len(output) == 0 {
+		output, err = resampler.Resample(input)
+		require.NoError(t, err)
+	}
+
+	require.NotEmpty(t, output)
+	require.NotZero(t, binary.LittleEndian.Uint16(output[:pcm16BytesPerSample]))
+	require.NotZero(t, binary.LittleEndian.Uint16(output[len(output)-pcm16BytesPerSample:]))
 }

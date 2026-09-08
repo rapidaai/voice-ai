@@ -126,6 +126,41 @@ func TestOutboundCallInviteHandlerPreservesPhoneInputs(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestOutboundCallApplicationReadyHandlerPreservesPhoneInputs(t *testing.T) {
+	server := &Server{logger: bridgeTestLogger()}
+	request, err := NewOutboundInviteRequest(testOutboundConfig(), " +15551234567 ", " 07249994778 ")
+	require.NoError(t, err)
+	inviteRequest := sip.NewRequest(sip.INVITE, sip.Uri{
+		Scheme: "sip",
+		User:   request.Address.To,
+		Host:   request.Config.Address,
+		Port:   request.Config.Port,
+	})
+	session := &Session{info: SessionInfo{CallID: "outbound-application-ready"}}
+	dialog := &outboundDialog{dialogSession: &sipgo.DialogClientSession{Dialog: sipgo.Dialog{InviteRequest: inviteRequest}}}
+
+	server.SetOnApplicationReady(func(_ *Session, _ string, callAddress CallAddress) error {
+		assert.Equal(t, "07249994778", callAddress.From)
+		assert.Equal(t, "+15551234567", callAddress.To)
+		return nil
+	})
+
+	err = NewOutbound(server, session, dialog, nil, request).callOutboundApplicationReadyHandler()
+
+	require.NoError(t, err)
+}
+
+func TestOutboundCallPrimaryLegGuardSkipsTransferBridge(t *testing.T) {
+	session := &Session{info: SessionInfo{CallID: "transfer-bridge-leg"}}
+	session.SetMetadata(MetadataOutboundLegPurpose, string(OutboundLegPurposeTransferBridge))
+	request, err := NewOutboundInviteRequest(testOutboundConfig(), "transfer-target", "transfer-assistant")
+	require.NoError(t, err)
+
+	outboundCall := NewOutbound(&Server{}, session, &outboundDialog{}, nil, request)
+
+	assert.False(t, outboundCall.isPrimaryOutboundLeg())
+}
+
 func TestTransferLegCallAddressDoesNotInheritParentIdentity(t *testing.T) {
 	request, err := NewOutboundInviteRequest(testOutboundConfig(), "transfer-target", "transfer-assistant")
 	require.NoError(t, err)
