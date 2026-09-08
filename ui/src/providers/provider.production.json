@@ -670,7 +670,7 @@
         "code": "smallest",
         "name": "Smallest AI",
         "description": "Smallest AI builds ultra-low-latency, cost-efficient speech models — Lightning text-to-speech and Pulse speech-to-text — purpose-built for real-time voice agents.",
-        "image": "https://cdn-01.rapida.ai/providers/smallest-ai.png",
+        "image": "/images/providers/smallest-ai.png",
         "featureList": [
             "stt",
             "tts",
