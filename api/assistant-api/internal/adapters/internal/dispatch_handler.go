@@ -1755,7 +1755,6 @@ func (h requestorDispatchHandler) HandleLLMToolCall(ctx context.Context, p inter
 
 	if msg, ok := p.Arguments["message"]; ok && msg != "" {
 		h.r.OnPacket(ctx,
-			internal_type.TextToSpeechInterruptPacket{ContextID: p.ContextID},
 			internal_type.InjectMessagePacket{ContextID: p.ContextID, Text: msg})
 	}
 
@@ -1904,7 +1903,6 @@ func (h requestorDispatchHandler) HandleLLMToolResult(ctx context.Context, p int
 
 	h.r.OnPacket(
 		ctx,
-		internal_type.TextToSpeechInterruptPacket{ContextID: p.ContextID},
 		internal_type.StartIdleTimeoutPacket{ContextID: p.ContextID},
 		internal_type.ObservabilityEventRecordPacket{
 			ContextID: p.ContextID,
