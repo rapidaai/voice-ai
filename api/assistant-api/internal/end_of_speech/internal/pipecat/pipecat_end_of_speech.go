@@ -20,40 +20,9 @@ import (
 	"github.com/rapidaai/protos"
 )
 
-const (
-	pipecatEndOfSpeechName = "pipecatSmartTurnEndOfSpeech"
-	optPctThreshold        = "microphone.eos.threshold"
-	optPctExtendedTimeout  = "microphone.eos.extended_timeout"
-	optPctQuickTimeout     = "microphone.eos.quick_timeout"
-	optPctFallbackTimeout  = "microphone.eos.fallback_timeout"
-
-	optPctLegacySilenceTimeout = "microphone.eos.silence_timeout"
-	optPctLegacyTimeout        = "microphone.eos.timeout"
-
-	defaultPctThreshold       = 0.5
-	defaultPctQuickTimeout    = 250.0
-	defaultPctExtendedTimeout = 2000.0
-	defaultPctFallbackTimeout = 500.0
-
-	maxAudioSamples = whisperMaxSamples
-)
-
 type vadState uint8
 
-const (
-	vadStateIdle vadState = iota
-	vadStateSpeaking
-	vadStateEnded
-)
-
 type transcriptState uint8
-
-const (
-	transcriptStateIdle transcriptState = iota
-	transcriptStateInterimPending
-	transcriptStateFinalized
-	transcriptStateFinalizedWithPendingInterim
-)
 
 type speechSegment struct {
 	Revision  uint64
@@ -100,7 +69,11 @@ type pipecatEndOfSpeech struct {
 	extendedTimeout time.Duration
 	fallbackTimeout time.Duration
 
-	audioBuffer []float32
+	audioBuffer       []float32
+	audioStartSample  uint64
+	audioNextSample   uint64
+	hasSpeechStart    bool
+	speechStartSample uint64
 
 	audioGeneration      uint64
 	predictedGeneration  uint64
@@ -160,12 +133,12 @@ func New(opts ...Option) (internal_type.EndOfSpeechExecutor, error) {
 		options.ctx = context.Background()
 	}
 	if options.onPacket == nil {
-		return nil, fmt.Errorf("%s: onPacket is required", pipecatEndOfSpeechName)
+		return nil, fmt.Errorf("%s: %w", pipecatEndOfSpeechName, errPipecatOnPacketRequired)
 	}
 	start := time.Now()
 
 	detectorConfig := PipecatDetectorConfig{}
-	if modelPath, err := options.options.GetString("microphone.eos.pipecat.model_path"); err == nil {
+	if modelPath, err := options.options.GetString(optPctModelPath); err == nil {
 		detectorConfig.ModelPath = modelPath
 	}
 
@@ -186,7 +159,7 @@ func New(opts ...Option) (internal_type.EndOfSpeechExecutor, error) {
 				},
 			})
 		}
-		return nil, fmt.Errorf("pipecat_eos: init detector: %w", err)
+		return nil, fmt.Errorf("%w: %w", errPipecatInitDetector, err)
 	}
 
 	endOfSpeech := &pipecatEndOfSpeech{
@@ -268,11 +241,29 @@ func (endOfSpeech *pipecatEndOfSpeech) Arguments() (map[string]string, error) {
 func (endOfSpeech *pipecatEndOfSpeech) Execute(ctx context.Context, packet internal_type.Packet) error {
 	switch packet := packet.(type) {
 	case internal_type.EndOfSpeechAudioPacket:
-		endOfSpeech.handleAudioPacket(packet)
+		endOfSpeech.appendAudio(packet.Audio)
 	case internal_type.UserTextReceivedPacket:
 		return endOfSpeech.handleUserTextPacket(ctx, packet)
 	case internal_type.EndOfSpeechInterruptionPacket:
-		return endOfSpeech.handleInterruptionPacket(ctx)
+		endOfSpeech.mu.RLock()
+		if packet.ContextID != "" &&
+			endOfSpeech.state.segment.ContextID != "" &&
+			packet.ContextID != endOfSpeech.state.segment.ContextID {
+			endOfSpeech.mu.RUnlock()
+			return nil
+		}
+		command := workerCommand{
+			ctx:        ctx,
+			segment:    endOfSpeech.state.segment,
+			confidence: endOfSpeech.state.confidence,
+			timeout:    endOfSpeech.extendedTimeout,
+		}
+		endOfSpeech.mu.RUnlock()
+		if command.segment.Text == "" {
+			return nil
+		}
+		endOfSpeech.enqueueCommand(command)
+		return nil
 	case internal_type.InterruptionDetectedPacket:
 		if packet.Source != internal_type.InterruptionSourceVad {
 			return nil
@@ -280,10 +271,17 @@ func (endOfSpeech *pipecatEndOfSpeech) Execute(ctx context.Context, packet inter
 		endOfSpeech.mu.Lock()
 		switch packet.Event {
 		case internal_type.InterruptionEventStart:
-			// VAD start only marks speech as active. Transcript revision remains
-			// the only token used to reject stale EOS timers.
 			endOfSpeech.state.vadState = vadStateSpeaking
 			endOfSpeech.state.pending = nil
+			// Invalidate armed EOS timers without dropping transcript accumulated so far.
+			endOfSpeech.state.segment.Revision++
+			endOfSpeech.speechStartSample = endOfSpeech.audioNextSample
+			if packet.StartAt > 0 {
+				endOfSpeech.speechStartSample = uint64(packet.StartAt * float64(pipecatAudioSampleRate))
+			}
+			endOfSpeech.hasSpeechStart = true
+			endOfSpeech.audioGeneration++
+			endOfSpeech.hasPredictedResult = false
 			endOfSpeech.mu.Unlock()
 			return nil
 		case internal_type.InterruptionEventEnd:
@@ -292,17 +290,42 @@ func (endOfSpeech *pipecatEndOfSpeech) Execute(ctx context.Context, packet inter
 				!endOfSpeech.state.callbackFired &&
 				(endOfSpeech.state.transcript == transcriptStateFinalized ||
 					endOfSpeech.state.transcript == transcriptStateIdle) {
-				command := workerCommand{
-					ctx:        ctx,
-					segment:    endOfSpeech.state.segment,
-					confidence: endOfSpeech.state.confidence,
-					timeout:    endOfSpeech.quickTimeout,
-				}
+				segment := endOfSpeech.state.segment
 				endOfSpeech.state.pending = nil
 				endOfSpeech.mu.Unlock()
-				// VAD end is not transcript finalization. It only opens the
-				// flush window after STT has acknowledged with a final packet.
-				endOfSpeech.enqueueCommand(command)
+				endOfUtteranceProbability := endOfSpeech.predictEOU()
+				endOfUtteranceConfidence := 0.0
+				if endOfUtteranceProbability >= 0 {
+					endOfUtteranceConfidence = endOfUtteranceProbability
+					endOfSpeech.mu.Lock()
+					if endOfSpeech.state.segment.Revision == segment.Revision {
+						endOfSpeech.state.confidence = endOfUtteranceConfidence
+					}
+					endOfSpeech.mu.Unlock()
+				}
+				switch {
+				case endOfUtteranceProbability < 0:
+					endOfSpeech.enqueueCommand(workerCommand{
+						ctx:        ctx,
+						segment:    segment,
+						confidence: endOfUtteranceConfidence,
+						timeout:    endOfSpeech.fallbackTimeout,
+					})
+				case endOfUtteranceProbability >= endOfSpeech.threshold:
+					endOfSpeech.enqueueCommand(workerCommand{
+						ctx:        ctx,
+						segment:    segment,
+						confidence: endOfUtteranceConfidence,
+						timeout:    endOfSpeech.quickTimeout,
+					})
+				default:
+					endOfSpeech.enqueueCommand(workerCommand{
+						ctx:        ctx,
+						segment:    segment,
+						confidence: endOfUtteranceConfidence,
+						timeout:    endOfSpeech.extendedTimeout,
+					})
+				}
 				return nil
 			}
 			if endOfSpeech.state.segment.Text != "" &&
@@ -329,10 +352,6 @@ func (endOfSpeech *pipecatEndOfSpeech) Execute(ctx context.Context, packet inter
 	}
 
 	return nil
-}
-
-func (endOfSpeech *pipecatEndOfSpeech) handleAudioPacket(packet internal_type.EndOfSpeechAudioPacket) {
-	endOfSpeech.appendAudio(packet.Audio)
 }
 
 func (endOfSpeech *pipecatEndOfSpeech) handleUserTextPacket(ctx context.Context, packet internal_type.UserTextReceivedPacket) error {
@@ -381,10 +400,6 @@ func (endOfSpeech *pipecatEndOfSpeech) handleUserTextPacket(ctx context.Context,
 	endOfSpeech.enqueueCommand(command)
 
 	return nil
-}
-
-func (endOfSpeech *pipecatEndOfSpeech) handleInterruptionPacket(ctx context.Context) error {
-	return endOfSpeech.extendCurrentSegment(ctx, endOfSpeech.extendedTimeout)
 }
 
 func (endOfSpeech *pipecatEndOfSpeech) handleSpeechToTextPacket(ctx context.Context, packet internal_type.SpeechToTextPacket) error {
@@ -544,16 +559,13 @@ func (endOfSpeech *pipecatEndOfSpeech) handleSpeechToTextPacket(ctx context.Cont
 	}
 	endOfSpeech.state.segment = segment
 	endOfSpeech.state.confidence = 0
-	if endOfSpeech.state.vadState == vadStateEnded {
-		timeout := endOfSpeech.quickTimeout
-		if endOfSpeech.state.transcript == transcriptStateFinalizedWithPendingInterim {
-			timeout = endOfSpeech.fallbackTimeout
-		}
+	if endOfSpeech.state.vadState == vadStateEnded &&
+		endOfSpeech.state.transcript == transcriptStateFinalizedWithPendingInterim {
 		command := workerCommand{
 			ctx:        ctx,
 			segment:    segment,
 			confidence: 0,
-			timeout:    timeout,
+			timeout:    endOfSpeech.fallbackTimeout,
 		}
 		endOfSpeech.mu.Unlock()
 
@@ -624,60 +636,40 @@ func (endOfSpeech *pipecatEndOfSpeech) handleSpeechToTextPacket(ctx context.Cont
 		})
 	}
 
-	probability := endOfSpeech.predictEOU()
-	confidence := 0.0
-	if probability >= 0 {
-		confidence = probability
+	endOfUtteranceProbability := endOfSpeech.predictEOU()
+	endOfUtteranceConfidence := 0.0
+	if endOfUtteranceProbability >= 0 {
+		endOfUtteranceConfidence = endOfUtteranceProbability
 		endOfSpeech.mu.Lock()
 		if endOfSpeech.state.segment.Revision == segment.Revision {
-			endOfSpeech.state.confidence = confidence
+			endOfSpeech.state.confidence = endOfUtteranceConfidence
 		}
 		endOfSpeech.mu.Unlock()
 	}
 
 	switch {
-	case probability < 0:
+	case endOfUtteranceProbability < 0:
 		endOfSpeech.enqueueCommand(workerCommand{
 			ctx:        ctx,
 			segment:    segment,
-			confidence: confidence,
+			confidence: endOfUtteranceConfidence,
 			timeout:    endOfSpeech.fallbackTimeout,
 		})
-	case probability >= endOfSpeech.threshold:
+	case endOfUtteranceProbability >= endOfSpeech.threshold:
 		endOfSpeech.enqueueCommand(workerCommand{
 			ctx:        ctx,
 			segment:    segment,
-			confidence: confidence,
+			confidence: endOfUtteranceConfidence,
 			timeout:    endOfSpeech.quickTimeout,
 		})
 	default:
 		endOfSpeech.enqueueCommand(workerCommand{
 			ctx:        ctx,
 			segment:    segment,
-			confidence: confidence,
+			confidence: endOfUtteranceConfidence,
 			timeout:    endOfSpeech.extendedTimeout,
 		})
 	}
-
-	return nil
-}
-
-func (endOfSpeech *pipecatEndOfSpeech) extendCurrentSegment(ctx context.Context, timeout time.Duration) error {
-	endOfSpeech.mu.RLock()
-	command := workerCommand{
-		ctx:        ctx,
-		segment:    endOfSpeech.state.segment,
-		confidence: endOfSpeech.state.confidence,
-		timeout:    timeout,
-	}
-	endOfSpeech.mu.RUnlock()
-
-	if command.segment.Text == "" {
-		return nil
-	}
-
-	endOfSpeech.enqueueCommand(command)
-
 	return nil
 }
 
@@ -686,20 +678,27 @@ func (endOfSpeech *pipecatEndOfSpeech) appendAudio(pcm16 []byte) {
 		return
 	}
 
-	sampleCount := len(pcm16) / 2
-	samples := make([]float32, sampleCount)
-	for i := 0; i < sampleCount; i++ {
-		sample := int16(binary.LittleEndian.Uint16(pcm16[i*2:]))
-		samples[i] = float32(sample) / 32768.0
+	pcmSampleCount := len(pcm16) / 2
+	pcmSamples := make([]float32, pcmSampleCount)
+	for sampleIndex := 0; sampleIndex < pcmSampleCount; sampleIndex++ {
+		linearSample := int16(binary.LittleEndian.Uint16(pcm16[sampleIndex*2:]))
+		pcmSamples[sampleIndex] = float32(linearSample) / 32768.0
 	}
 
 	endOfSpeech.mu.Lock()
-	endOfSpeech.audioBuffer = append(endOfSpeech.audioBuffer, samples...)
+	bufferEnd := endOfSpeech.audioStartSample + uint64(len(endOfSpeech.audioBuffer))
+	if endOfSpeech.audioNextSample < bufferEnd {
+		endOfSpeech.audioNextSample = bufferEnd
+	}
+	endOfSpeech.audioBuffer = append(endOfSpeech.audioBuffer, pcmSamples...)
+	endOfSpeech.audioNextSample += uint64(len(pcmSamples))
 	if len(endOfSpeech.audioBuffer) > maxAudioSamples {
 		excess := len(endOfSpeech.audioBuffer) - maxAudioSamples
 		endOfSpeech.audioBuffer = endOfSpeech.audioBuffer[excess:]
+		endOfSpeech.audioStartSample += uint64(excess)
 	}
 	endOfSpeech.audioGeneration++
+	endOfSpeech.hasPredictedResult = false
 	endOfSpeech.mu.Unlock()
 }
 
@@ -711,8 +710,27 @@ func (endOfSpeech *pipecatEndOfSpeech) predictEOU() float64 {
 		endOfSpeech.mu.RUnlock()
 		return probability
 	}
-	audio := make([]float32, len(endOfSpeech.audioBuffer))
-	copy(audio, endOfSpeech.audioBuffer)
+
+	audioStartSample := endOfSpeech.audioStartSample
+	if endOfSpeech.hasSpeechStart {
+		if endOfSpeech.speechStartSample > preSpeechAudioSamples {
+			audioStartSample = endOfSpeech.speechStartSample - preSpeechAudioSamples
+		} else {
+			audioStartSample = 0
+		}
+		if audioStartSample < endOfSpeech.audioStartSample {
+			audioStartSample = endOfSpeech.audioStartSample
+		}
+	}
+	audioStartIndex := int(audioStartSample - endOfSpeech.audioStartSample)
+	if audioStartIndex < 0 {
+		audioStartIndex = 0
+	}
+	if audioStartIndex > len(endOfSpeech.audioBuffer) {
+		audioStartIndex = len(endOfSpeech.audioBuffer)
+	}
+	audio := make([]float32, len(endOfSpeech.audioBuffer)-audioStartIndex)
+	copy(audio, endOfSpeech.audioBuffer[audioStartIndex:])
 	endOfSpeech.mu.RUnlock()
 
 	if len(audio) == 0 {
@@ -803,6 +821,9 @@ func (endOfSpeech *pipecatEndOfSpeech) worker() {
 		endOfSpeech.state.vadState = vadStateIdle
 		endOfSpeech.state.transcript = transcriptStateIdle
 		endOfSpeech.audioBuffer = endOfSpeech.audioBuffer[:0]
+		endOfSpeech.audioStartSample = endOfSpeech.audioNextSample
+		endOfSpeech.hasSpeechStart = false
+		endOfSpeech.speechStartSample = 0
 		endOfSpeech.audioGeneration++
 		endOfSpeech.predictedGeneration = 0
 		endOfSpeech.predictedProbability = 0
@@ -856,8 +877,11 @@ func (endOfSpeech *pipecatEndOfSpeech) worker() {
 				continue
 			}
 
-			// While VAD says the user is speaking, defer once. The fallback timer
-			// recovers if VAD end is lost because of noise or provider failure.
+			if currentCommand.segment.Revision != endOfSpeech.state.segment.Revision {
+				stopTimer()
+				endOfSpeech.mu.Unlock()
+				continue
+			}
 			if endOfSpeech.state.vadState == vadStateSpeaking {
 				if endOfSpeech.state.pending == nil {
 					command := currentCommand
@@ -891,11 +915,6 @@ func (endOfSpeech *pipecatEndOfSpeech) worker() {
 				endOfSpeech.emitEndOfSpeech(command, armedAt)
 				endOfSpeech.mu.Lock()
 				resetState()
-				endOfSpeech.mu.Unlock()
-				continue
-			}
-			if currentCommand.segment.Revision != endOfSpeech.state.segment.Revision {
-				stopTimer()
 				endOfSpeech.mu.Unlock()
 				continue
 			}

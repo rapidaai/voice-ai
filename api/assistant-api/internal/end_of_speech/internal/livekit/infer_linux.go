@@ -34,7 +34,7 @@ func (td *TurnDetector) infer(inputIDs []int64) (float64, error) {
 		C.ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64, &idsValue)
 	defer C.LktOrtApiReleaseStatus(td.api, status)
 	if status != nil {
-		return 0, fmt.Errorf("turn_detector: create input_ids tensor: %s", C.GoString(C.LktOrtApiGetErrorMessage(td.api, status)))
+		return 0, fmt.Errorf("%w: %s", errTurnDetectorCreateInputIDsTensor, C.GoString(C.LktOrtApiGetErrorMessage(td.api, status)))
 	}
 	defer C.LktOrtApiReleaseValue(td.api, idsValue)
 
@@ -49,7 +49,7 @@ func (td *TurnDetector) infer(inputIDs []int64) (float64, error) {
 		&outputNames[0], C.size_t(len(outputNames)), &outputs[0])
 	defer C.LktOrtApiReleaseStatus(td.api, status)
 	if status != nil {
-		return 0, fmt.Errorf("turn_detector: run inference: %s", C.GoString(C.LktOrtApiGetErrorMessage(td.api, status)))
+		return 0, fmt.Errorf("%w: %s", errTurnDetectorRunInference, C.GoString(C.LktOrtApiGetErrorMessage(td.api, status)))
 	}
 
 	// --- Extract output probability [1] ---
@@ -58,7 +58,7 @@ func (td *TurnDetector) infer(inputIDs []int64) (float64, error) {
 	defer C.LktOrtApiReleaseStatus(td.api, status)
 	if status != nil {
 		C.LktOrtApiReleaseValue(td.api, outputs[0])
-		return 0, fmt.Errorf("turn_detector: get output data: %s", C.GoString(C.LktOrtApiGetErrorMessage(td.api, status)))
+		return 0, fmt.Errorf("%w: %s", errTurnDetectorGetOutputData, C.GoString(C.LktOrtApiGetErrorMessage(td.api, status)))
 	}
 
 	prob := float64(*(*float32)(probPtr))
@@ -79,7 +79,7 @@ func (td *TurnDetector) inferMulti(inputIDs []int64) ([]float64, error) {
 		C.ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64, &idsValue)
 	defer C.LktOrtApiReleaseStatus(td.api, status)
 	if status != nil {
-		return nil, fmt.Errorf("turn_detector: create input_ids tensor: %s", C.GoString(C.LktOrtApiGetErrorMessage(td.api, status)))
+		return nil, fmt.Errorf("%w: %s", errTurnDetectorCreateInputIDsTensor, C.GoString(C.LktOrtApiGetErrorMessage(td.api, status)))
 	}
 	defer C.LktOrtApiReleaseValue(td.api, idsValue)
 
@@ -93,7 +93,7 @@ func (td *TurnDetector) inferMulti(inputIDs []int64) ([]float64, error) {
 		&outputNames[0], C.size_t(len(outputNames)), &outputs[0])
 	defer C.LktOrtApiReleaseStatus(td.api, status)
 	if status != nil {
-		return nil, fmt.Errorf("turn_detector: run inference: %s", C.GoString(C.LktOrtApiGetErrorMessage(td.api, status)))
+		return nil, fmt.Errorf("%w: %s", errTurnDetectorRunInference, C.GoString(C.LktOrtApiGetErrorMessage(td.api, status)))
 	}
 
 	var dataPtr unsafe.Pointer
@@ -101,7 +101,7 @@ func (td *TurnDetector) inferMulti(inputIDs []int64) ([]float64, error) {
 	defer C.LktOrtApiReleaseStatus(td.api, status)
 	if status != nil {
 		C.LktOrtApiReleaseValue(td.api, outputs[0])
-		return nil, fmt.Errorf("turn_detector: get output data: %s", C.GoString(C.LktOrtApiGetErrorMessage(td.api, status)))
+		return nil, fmt.Errorf("%w: %s", errTurnDetectorGetOutputData, C.GoString(C.LktOrtApiGetErrorMessage(td.api, status)))
 	}
 
 	probs := make([]float64, seqLen)

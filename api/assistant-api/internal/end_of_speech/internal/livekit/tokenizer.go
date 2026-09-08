@@ -45,12 +45,12 @@ type tokenizerJSON struct {
 func newTokenizer(path string) (*tokenizer, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("tokenizer: read file: %w", err)
+		return nil, fmt.Errorf("%w: %w", errTokenizerReadFile, err)
 	}
 
 	var raw tokenizerJSON
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, fmt.Errorf("tokenizer: unmarshal: %w", err)
+		return nil, fmt.Errorf("%w: %w", errTokenizerUnmarshal, err)
 	}
 
 	t := &tokenizer{

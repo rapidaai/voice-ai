@@ -7,6 +7,9 @@ package internal_livekit
 
 import (
 	"strings"
+	"unicode"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 // chatMessage represents a single message in the conversation for templating.
@@ -15,55 +18,67 @@ type chatMessage struct {
 	Content string
 }
 
-// formatChatTemplateFromHistory formats internal conversation history into the
-// SmolLM2 chat template.
-//
-// Template format:
-//
-//	<|im_start|>role
-//	content<|im_end|>
-//
-// The last user message (currentText) is left open (no <|im_end|>) so the
-// model can predict whether the user has finished their turn.
+// formatChatTemplateFromHistory formats history for the SmolLM2 chat template.
+// The last user message is left open so the model can predict turn completion.
 func formatChatTemplateFromHistory(history []chatMessage, currentText string, maxTurns int) string {
-	// Collect recent history turns
-	start := 0
-	if maxTurns > 0 && len(history) > maxTurns {
-		start = len(history) - maxTurns
-	}
-	recent := history[start:]
-
-	// Build messages: recent history + current user text
-	messages := make([]chatMessage, 0, len(recent)+1)
-	for _, msg := range recent {
-		if msg.Role == "" || msg.Content == "" {
+	candidateMessages := make([]chatMessage, 0, len(history)+1)
+	for _, historyMessage := range history {
+		if historyMessage.Role == "" || strings.TrimSpace(historyMessage.Content) == "" {
 			continue
 		}
-		messages = append(messages, msg)
+		candidateMessages = append(candidateMessages, historyMessage)
 	}
-	if currentText != "" {
-		messages = append(messages, chatMessage{Role: "user", Content: currentText})
+	if strings.TrimSpace(currentText) != "" {
+		candidateMessages = append(candidateMessages, chatMessage{Role: "user", Content: currentText})
 	}
 
-	if len(messages) == 0 {
+	if maxTurns > 0 && len(candidateMessages) > maxTurns {
+		candidateMessages = candidateMessages[len(candidateMessages)-maxTurns:]
+	}
+
+	formattedMessages := make([]chatMessage, 0, len(candidateMessages))
+	for _, candidateMessage := range candidateMessages {
+		canonicalContent := strings.ToLower(norm.NFKC.String(candidateMessage.Content))
+		var cleanContentBuilder strings.Builder
+		cleanContentBuilder.Grow(len(canonicalContent))
+		for _, contentRune := range canonicalContent {
+			if unicode.IsPunct(contentRune) && contentRune != '\'' && contentRune != '-' {
+				continue
+			}
+			if unicode.IsSpace(contentRune) {
+				cleanContentBuilder.WriteByte(' ')
+				continue
+			}
+			cleanContentBuilder.WriteRune(contentRune)
+		}
+		cleanContent := strings.Join(strings.Fields(cleanContentBuilder.String()), " ")
+		if cleanContent == "" {
+			continue
+		}
+		if len(formattedMessages) > 0 && formattedMessages[len(formattedMessages)-1].Role == candidateMessage.Role {
+			formattedMessages[len(formattedMessages)-1].Content += " " + cleanContent
+			continue
+		}
+		formattedMessages = append(formattedMessages, chatMessage{Role: candidateMessage.Role, Content: cleanContent})
+	}
+
+	if len(formattedMessages) == 0 {
 		return ""
 	}
 
-	var b strings.Builder
-	b.Grow(256)
+	var templateBuilder strings.Builder
+	templateBuilder.Grow(256)
 
-	for i, msg := range messages {
-		isLast := i == len(messages)-1
-		b.WriteString("<|im_start|>")
-		b.WriteString(msg.Role)
-		b.WriteByte('\n')
-		b.WriteString(msg.Content)
-		if !isLast {
-			b.WriteString("<|im_end|>")
-			b.WriteByte('\n')
+	for messageIndex, formattedMessage := range formattedMessages {
+		templateBuilder.WriteString("<|im_start|>")
+		templateBuilder.WriteString(formattedMessage.Role)
+		templateBuilder.WriteByte('\n')
+		templateBuilder.WriteString(formattedMessage.Content)
+		if messageIndex != len(formattedMessages)-1 {
+			templateBuilder.WriteString("<|im_end|>")
+			templateBuilder.WriteByte('\n')
 		}
-		// Last message is left open — no <|im_end|>
 	}
 
-	return b.String()
+	return templateBuilder.String()
 }

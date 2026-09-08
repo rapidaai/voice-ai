@@ -10,27 +10,6 @@ import (
 	"math/cmplx"
 )
 
-// Whisper feature extraction constants
-const (
-	whisperSampleRate = 16000
-	whisperNFFT       = 400
-	whisperHopLength  = 160
-	whisperNMels      = 80
-	whisperChunkSec   = 8
-	whisperMaxSamples = whisperChunkSec * whisperSampleRate  // 128000
-	whisperMaxFrames  = whisperMaxSamples / whisperHopLength // 800
-	whisperNFreqBins  = whisperNFFT/2 + 1                    // 201
-	whisperFFTSize    = 512                                  // next power of 2 >= nFFT
-)
-
-// Slaney mel scale constants (Auditory Toolbox)
-const (
-	melFSP      = 200.0 / 3.0
-	melMinLogHz = 1000.0
-	melMinLogM  = melMinLogHz / melFSP // 15.0
-	melLogStep  = 0.06875177742094912  // ln(6.4) / 27
-)
-
 // whisperFeatures extracts Whisper-compatible mel spectrogram features from
 // raw float32 PCM audio (16kHz mono, normalized to [-1, 1]).
 //
@@ -38,13 +17,15 @@ const (
 type whisperFeatures struct {
 	melFilters [whisperNMels][whisperNFreqBins]float64
 	hannWindow [whisperNFFT]float64
+	dftCos     [whisperNFreqBins][whisperNFFT]float64
+	dftSin     [whisperNFreqBins][whisperNFFT]float64
 }
 
 type whisperFeatureScratch struct {
 	prepared [whisperMaxSamples]float32
 	padded   [whisperMaxSamples + whisperNFFT]float32
+	power    [whisperNFreqBins]float64
 	logMel   [whisperNMels * whisperMaxFrames]float64
-	fftBuf   [whisperFFTSize]complex128
 	output   [whisperNMels * whisperMaxFrames]float32
 }
 
@@ -56,6 +37,7 @@ func newWhisperFeatures() *whisperFeatures {
 	wf := &whisperFeatures{}
 	wf.initHannWindow()
 	wf.initMelFilterbank()
+	wf.initDFT()
 	return wf
 }
 
@@ -73,19 +55,21 @@ func (wf *whisperFeatures) extractInto(audio []float32, output []float32, scratc
 	normalize(samples)
 	padded := reflectPadInto(samples, whisperNFFT/2, scratch.padded[:])
 	logMel := scratch.logMel[:]
-	fftBuf := scratch.fftBuf[:]
 	output = output[:whisperNMels*whisperMaxFrames]
 
 	globalMax := -math.MaxFloat64
 	for frame := 0; frame < whisperMaxFrames; frame++ {
-		start := frame * whisperHopLength
-
-		clear(fftBuf)
-		for k := 0; k < whisperNFFT; k++ {
-			fftBuf[k] = complex(float64(padded[start+k])*wf.hannWindow[k], 0)
+		frameStartSample := frame * whisperHopLength
+		frameSamples := padded[frameStartSample : frameStartSample+whisperNFFT]
+		for frequencyBin := 0; frequencyBin < whisperNFreqBins; frequencyBin++ {
+			var realPart, imaginaryPart float64
+			for sampleIndex := 0; sampleIndex < whisperNFFT; sampleIndex++ {
+				windowedSample := float64(frameSamples[sampleIndex]) * wf.hannWindow[sampleIndex]
+				realPart += windowedSample * wf.dftCos[frequencyBin][sampleIndex]
+				imaginaryPart -= windowedSample * wf.dftSin[frequencyBin][sampleIndex]
+			}
+			scratch.power[frequencyBin] = realPart*realPart + imaginaryPart*imaginaryPart
 		}
-
-		fft(fftBuf)
 
 		for mel := 0; mel < whisperNMels; mel++ {
 			var melValue float64
@@ -93,10 +77,7 @@ func (wf *whisperFeatures) extractInto(audio []float32, output []float32, scratc
 				if wf.melFilters[mel][bin] == 0 {
 					continue
 				}
-				realPart := real(fftBuf[bin])
-				imagPart := imag(fftBuf[bin])
-				power := realPart*realPart + imagPart*imagPart
-				melValue += wf.melFilters[mel][bin] * power
+				melValue += wf.melFilters[mel][bin] * scratch.power[bin]
 			}
 			if melValue < 1e-10 {
 				melValue = 1e-10
@@ -243,6 +224,16 @@ func fft(x []complex128) {
 func (wf *whisperFeatures) initHannWindow() {
 	for i := 0; i < whisperNFFT; i++ {
 		wf.hannWindow[i] = 0.5 * (1.0 - math.Cos(2.0*math.Pi*float64(i)/float64(whisperNFFT)))
+	}
+}
+
+func (wf *whisperFeatures) initDFT() {
+	for bin := 0; bin < whisperNFreqBins; bin++ {
+		for sample := 0; sample < whisperNFFT; sample++ {
+			angle := 2.0 * math.Pi * float64(bin) * float64(sample) / float64(whisperNFFT)
+			wf.dftCos[bin][sample] = math.Cos(angle)
+			wf.dftSin[bin][sample] = math.Sin(angle)
+		}
 	}
 }
 

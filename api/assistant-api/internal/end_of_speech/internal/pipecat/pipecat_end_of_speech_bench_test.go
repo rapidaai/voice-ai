@@ -101,7 +101,7 @@ func BenchmarkMelFeatures_Extract_WhiteNoise(b *testing.B) {
 // FFT BENCHMARKS
 // ============================================================================
 
-// BenchmarkFFT_512 measures a single 512-point FFT (the size used per STFT frame).
+// BenchmarkFFT_512 measures the legacy radix-2 FFT on a 512-point input.
 func BenchmarkFFT_512(b *testing.B) {
 	x := make([]complex128, 512)
 	for i := range x {
@@ -218,7 +218,7 @@ func BenchmarkPrepareAudio_Pad(b *testing.B) {
 }
 
 // ============================================================================
-// EOS INPUT BENCHMARKS (without ONNX model — fallback path)
+// EOS INPUT BENCHMARKS (without ONNX model, fallback path)
 // ============================================================================
 
 // BenchmarkExecute_UserInput measures the fast path (immediate fire).

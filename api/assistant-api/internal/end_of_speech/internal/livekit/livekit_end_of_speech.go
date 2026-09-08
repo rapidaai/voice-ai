@@ -19,53 +19,9 @@ import (
 	"github.com/rapidaai/protos"
 )
 
-const (
-	eosName = "livekitEndOfSpeech"
-
-	optKeyThreshold       = "microphone.eos.threshold"
-	optKeyQuickTimeout    = "microphone.eos.quick_timeout"
-	optKeyExtendedTimeout = "microphone.eos.extended_timeout"
-	optKeyFallbackTimeout = "microphone.eos.fallback_timeout"
-	optKeyMaxHistory      = "microphone.eos.max_history_turns"
-
-	// Backward-compatible aliases.
-	optKeyLegacySilenceTimeout = "microphone.eos.silence_timeout"
-	optKeyLegacyTimeout        = "microphone.eos.timeout"
-
-	// defaultThreshold is the English "unlikely_threshold" from LiveKit's
-	// languages.json. Probabilities below this → user still speaking.
-	defaultThreshold = 0.0289
-
-	// defaultSilenceTimeout (max_endpointing_delay) — used when model predicts
-	// user is still speaking (prob < threshold). LiveKit default: 3.0s.
-	defaultSilenceTimeout = 3000.0
-
-	// defaultQuickTimeout — short buffer after model says YES before firing.
-	defaultQuickTimeout = 250.0
-
-	// defaultMaxHistory matches LiveKit's MAX_HISTORY_TURNS = 6.
-	defaultMaxHistory = 6.0
-
-	// defaultFallbackTimeout is the silence timeout for interim STT and inference failures.
-	defaultFallbackTimeout = 500.0
-)
-
 type vadState uint8
 
-const (
-	vadStateIdle vadState = iota
-	vadStateSpeaking
-	vadStateEnded
-)
-
 type transcriptState uint8
-
-const (
-	transcriptStateIdle transcriptState = iota
-	transcriptStateInterimPending
-	transcriptStateFinalized
-	transcriptStateFinalizedWithPendingInterim
-)
 
 type speechSegment struct {
 	Revision  uint64
@@ -103,7 +59,7 @@ type turnPredictor interface {
 // or extended silence timeout, with fallback to standard silence on failure.
 //
 // Conversation history is built internally from packets flowing through
-// Execute — user turns are recorded when EOS fires, and assistant turns
+// Execute records user turns when EOS fires, and assistant turns
 // are recorded from LLMResponseDonePacket.
 type livekitEndOfSpeech struct {
 	logger   commons.Logger
@@ -179,18 +135,18 @@ func New(opts ...Option) (internal_type.EndOfSpeechExecutor, error) {
 		options.ctx = context.Background()
 	}
 	if options.onPacket == nil {
-		return nil, fmt.Errorf("%s: onPacket is required", eosName)
+		return nil, fmt.Errorf("%s: %w", eosName, errLivekitOnPacketRequired)
 	}
 	start := time.Now()
 
 	cfg := TurnDetectorConfig{ModelType: "en"}
-	if v, err := options.options.GetString("microphone.eos.model"); err == nil && v != "" {
+	if v, err := options.options.GetString(optKeyModel); err == nil && v != "" {
 		cfg.ModelType = v
 	}
-	if v, err := options.options.GetString("microphone.eos.livekit.model_path"); err == nil {
+	if v, err := options.options.GetString(optKeyModelPath); err == nil {
 		cfg.ModelPath = v
 	}
-	if v, err := options.options.GetString("microphone.eos.livekit.tokenizer_path"); err == nil {
+	if v, err := options.options.GetString(optKeyTokenizerPath); err == nil {
 		cfg.TokenizerPath = v
 	}
 
@@ -209,7 +165,7 @@ func New(opts ...Option) (internal_type.EndOfSpeechExecutor, error) {
 				OccurredAt: time.Now(),
 			},
 		})
-		return nil, fmt.Errorf("livekit_eos: init turn detector: %w", err)
+		return nil, fmt.Errorf("%w: %w", errLivekitInitTurnDetector, err)
 	}
 
 	endOfSpeech := &livekitEndOfSpeech{
@@ -340,6 +296,12 @@ func (endOfSpeech *livekitEndOfSpeech) Execute(ctx context.Context, packet inter
 
 	case internal_type.EndOfSpeechInterruptionPacket:
 		endOfSpeech.mu.RLock()
+		if packet.ContextID != "" &&
+			endOfSpeech.state.segment.ContextID != "" &&
+			packet.ContextID != endOfSpeech.state.segment.ContextID {
+			endOfSpeech.mu.RUnlock()
+			return nil
+		}
 		command := workerCommand{
 			ctx:        ctx,
 			segment:    endOfSpeech.state.segment,
@@ -359,10 +321,10 @@ func (endOfSpeech *livekitEndOfSpeech) Execute(ctx context.Context, packet inter
 		endOfSpeech.mu.Lock()
 		switch packet.Event {
 		case internal_type.InterruptionEventStart:
-			// VAD start only marks speech as active. Transcript revision remains
-			// the only token used to reject stale EOS timers.
 			endOfSpeech.state.vadState = vadStateSpeaking
 			endOfSpeech.state.pending = nil
+			// Invalidate armed EOS timers without dropping transcript accumulated so far.
+			endOfSpeech.state.segment.Revision++
 			endOfSpeech.mu.Unlock()
 			return nil
 		case internal_type.InterruptionEventEnd:
@@ -371,17 +333,38 @@ func (endOfSpeech *livekitEndOfSpeech) Execute(ctx context.Context, packet inter
 				!endOfSpeech.state.callbackFired &&
 				(endOfSpeech.state.transcript == transcriptStateFinalized ||
 					endOfSpeech.state.transcript == transcriptStateIdle) {
-				command := workerCommand{
-					ctx:        ctx,
-					segment:    endOfSpeech.state.segment,
-					confidence: endOfSpeech.state.confidence,
-					timeout:    endOfSpeech.quickTimeout,
-				}
+				segment := endOfSpeech.state.segment
 				endOfSpeech.state.pending = nil
 				endOfSpeech.mu.Unlock()
-				// VAD end is not transcript finalization. It only opens the
-				// flush window after STT has acknowledged with a final packet.
-				endOfSpeech.enqueueCommand(command)
+				endOfUtteranceProbability := endOfSpeech.predictEOU(segment.Text)
+				if endOfUtteranceProbability < 0 {
+					endOfSpeech.enqueueCommand(workerCommand{
+						ctx:     ctx,
+						segment: segment,
+						timeout: endOfSpeech.fallbackTimeout,
+					})
+					return nil
+				}
+				endOfSpeech.mu.Lock()
+				if endOfSpeech.state.segment.Revision == segment.Revision {
+					endOfSpeech.state.confidence = endOfUtteranceProbability
+				}
+				endOfSpeech.mu.Unlock()
+				if endOfUtteranceProbability >= endOfSpeech.threshold {
+					endOfSpeech.enqueueCommand(workerCommand{
+						ctx:        ctx,
+						segment:    segment,
+						confidence: endOfUtteranceProbability,
+						timeout:    endOfSpeech.quickTimeout,
+					})
+					return nil
+				}
+				endOfSpeech.enqueueCommand(workerCommand{
+					ctx:        ctx,
+					segment:    segment,
+					confidence: endOfUtteranceProbability,
+					timeout:    endOfSpeech.silenceTimeout,
+				})
 				return nil
 			}
 			if endOfSpeech.state.segment.Text != "" &&
@@ -562,26 +545,22 @@ func (endOfSpeech *livekitEndOfSpeech) Execute(ctx context.Context, packet inter
 		}
 		endOfSpeech.state.segment = segment
 		endOfSpeech.state.confidence = 0
-		fullText := segment.Text
-		if endOfSpeech.state.vadState == vadStateEnded {
-			timeout := endOfSpeech.quickTimeout
-			if endOfSpeech.state.transcript == transcriptStateFinalizedWithPendingInterim {
-				timeout = endOfSpeech.fallbackTimeout
-			}
+		if endOfSpeech.state.vadState == vadStateEnded &&
+			endOfSpeech.state.transcript == transcriptStateFinalizedWithPendingInterim {
 			command := workerCommand{
 				ctx:     ctx,
 				segment: segment,
-				timeout: timeout,
+				timeout: endOfSpeech.fallbackTimeout,
 			}
 			endOfSpeech.mu.Unlock()
 
-			if fullText == "" {
+			if segment.Text == "" {
 				return nil
 			}
 			if emitStarted {
 				_ = endOfSpeech.onPacket(ctx,
 					internal_type.InterimEndOfSpeechPacket{
-						Speech:    fullText,
+						Speech:    segment.Text,
 						ContextID: command.segment.ContextID,
 					},
 					internal_type.ObservabilityEventRecordPacket{
@@ -594,14 +573,14 @@ func (endOfSpeech *livekitEndOfSpeech) Execute(ctx context.Context, packet inter
 							Attributes: observability.Attributes{
 								"provider":   endOfSpeech.Name(),
 								"context_id": command.segment.ContextID,
-								"speech":     fullText,
+								"speech":     segment.Text,
 							},
 						},
 					},
 				)
 			} else {
 				_ = endOfSpeech.onPacket(ctx, internal_type.InterimEndOfSpeechPacket{
-					Speech:    fullText,
+					Speech:    segment.Text,
 					ContextID: command.segment.ContextID,
 				})
 			}
@@ -610,14 +589,14 @@ func (endOfSpeech *livekitEndOfSpeech) Execute(ctx context.Context, packet inter
 		}
 		endOfSpeech.mu.Unlock()
 
-		if fullText == "" {
+		if segment.Text == "" {
 			return nil
 		}
 
 		if emitStarted {
 			_ = endOfSpeech.onPacket(ctx,
 				internal_type.InterimEndOfSpeechPacket{
-					Speech:    fullText,
+					Speech:    segment.Text,
 					ContextID: segment.ContextID,
 				},
 				internal_type.ObservabilityEventRecordPacket{
@@ -630,23 +609,20 @@ func (endOfSpeech *livekitEndOfSpeech) Execute(ctx context.Context, packet inter
 						Attributes: observability.Attributes{
 							"provider":   endOfSpeech.Name(),
 							"context_id": segment.ContextID,
-							"speech":     fullText,
+							"speech":     segment.Text,
 						},
 					},
 				},
 			)
 		} else {
 			_ = endOfSpeech.onPacket(ctx, internal_type.InterimEndOfSpeechPacket{
-				Speech:    fullText,
+				Speech:    segment.Text,
 				ContextID: segment.ContextID,
 			})
 		}
 
-		// Run model inference on accumulated final text.
-		// YES (prob >= threshold) → quick_timeout buffer, then fire.
-		// NO  (prob <  threshold) → keep accumulating, safety timer as fallback.
-		probability := endOfSpeech.predictEOU(fullText)
-		if probability < 0 {
+		endOfUtteranceProbability := endOfSpeech.predictEOU(segment.Text)
+		if endOfUtteranceProbability < 0 {
 			endOfSpeech.enqueueCommand(workerCommand{
 				ctx:     ctx,
 				segment: segment,
@@ -657,15 +633,15 @@ func (endOfSpeech *livekitEndOfSpeech) Execute(ctx context.Context, packet inter
 
 		endOfSpeech.mu.Lock()
 		if endOfSpeech.state.segment.Revision == segment.Revision {
-			endOfSpeech.state.confidence = probability
+			endOfSpeech.state.confidence = endOfUtteranceProbability
 		}
 		endOfSpeech.mu.Unlock()
 
-		if probability >= endOfSpeech.threshold {
+		if endOfUtteranceProbability >= endOfSpeech.threshold {
 			endOfSpeech.enqueueCommand(workerCommand{
 				ctx:        ctx,
 				segment:    segment,
-				confidence: probability,
+				confidence: endOfUtteranceProbability,
 				timeout:    endOfSpeech.quickTimeout,
 			})
 			return nil
@@ -674,7 +650,7 @@ func (endOfSpeech *livekitEndOfSpeech) Execute(ctx context.Context, packet inter
 		endOfSpeech.enqueueCommand(workerCommand{
 			ctx:        ctx,
 			segment:    segment,
-			confidence: probability,
+			confidence: endOfUtteranceProbability,
 			timeout:    endOfSpeech.silenceTimeout,
 		})
 		return nil
@@ -694,11 +670,9 @@ func (endOfSpeech *livekitEndOfSpeech) Execute(ctx context.Context, packet inter
 // probability. Returns -1 on failure (caller should treat as "not done").
 func (endOfSpeech *livekitEndOfSpeech) predictEOU(currentText string) float64 {
 	endOfSpeech.mu.RLock()
-	history := make([]chatMessage, len(endOfSpeech.history))
-	copy(history, endOfSpeech.history)
+	chatText := formatChatTemplateFromHistory(endOfSpeech.history, currentText, endOfSpeech.maxHistory)
 	endOfSpeech.mu.RUnlock()
 
-	chatText := formatChatTemplateFromHistory(history, currentText, endOfSpeech.maxHistory)
 	if chatText == "" {
 		return -1
 	}
@@ -817,8 +791,11 @@ func (endOfSpeech *livekitEndOfSpeech) worker() {
 				continue
 			}
 
-			// While VAD says the user is speaking, defer once. The fallback timer
-			// recovers if VAD end is lost because of noise or provider failure.
+			if currentCommand.segment.Revision != endOfSpeech.state.segment.Revision {
+				stopTimer()
+				endOfSpeech.mu.Unlock()
+				continue
+			}
 			if endOfSpeech.state.vadState == vadStateSpeaking {
 				if endOfSpeech.state.pending == nil {
 					command := currentCommand
@@ -852,11 +829,6 @@ func (endOfSpeech *livekitEndOfSpeech) worker() {
 				endOfSpeech.fire(command, armedAt)
 				endOfSpeech.mu.Lock()
 				resetState()
-				endOfSpeech.mu.Unlock()
-				continue
-			}
-			if currentCommand.segment.Revision != endOfSpeech.state.segment.Revision {
-				stopTimer()
 				endOfSpeech.mu.Unlock()
 				continue
 			}

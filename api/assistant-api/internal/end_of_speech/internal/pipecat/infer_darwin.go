@@ -33,7 +33,7 @@ func (pd *PipecatDetector) infer(features []float32) (float64, error) {
 		C.ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &featValue)
 	defer C.PctOrtApiReleaseStatus(pd.api, status)
 	if status != nil {
-		return 0, fmt.Errorf("pipecat_detector: create input tensor: %s", C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
+		return 0, fmt.Errorf("%w: %s", errPipecatDetectorCreateInputTensor, C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
 	}
 	defer C.PctOrtApiReleaseValue(pd.api, featValue)
 
@@ -48,7 +48,7 @@ func (pd *PipecatDetector) infer(features []float32) (float64, error) {
 		&outputNames[0], C.size_t(len(outputNames)), &outputs[0])
 	defer C.PctOrtApiReleaseStatus(pd.api, status)
 	if status != nil {
-		return 0, fmt.Errorf("pipecat_detector: run inference: %s", C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
+		return 0, fmt.Errorf("%w: %s", errPipecatDetectorRunInference, C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
 	}
 
 	// --- Extract output probability ---
@@ -57,7 +57,7 @@ func (pd *PipecatDetector) infer(features []float32) (float64, error) {
 	defer C.PctOrtApiReleaseStatus(pd.api, status)
 	if status != nil {
 		C.PctOrtApiReleaseValue(pd.api, outputs[0])
-		return 0, fmt.Errorf("pipecat_detector: get output data: %s", C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
+		return 0, fmt.Errorf("%w: %s", errPipecatDetectorGetOutputData, C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
 	}
 
 	prob := float64(*(*float32)(probPtr))
