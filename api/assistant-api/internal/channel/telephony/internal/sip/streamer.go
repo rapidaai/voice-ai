@@ -104,10 +104,10 @@ func New(opts ...FuncOption) (internal_type.SIPCallStreamer, error) {
 		opt(&options)
 	}
 	if options.Session == nil {
-		return nil, fmt.Errorf("SIP session is required; standalone server mode is not supported")
+		return nil, ErrSessionRequired
 	}
 	if options.Lifecycle == nil {
-		return nil, fmt.Errorf("SIP lifecycle controller is required")
+		return nil, ErrLifecycleControllerRequired
 	}
 
 	s := &Streamer{
@@ -118,77 +118,9 @@ func New(opts ...FuncOption) (internal_type.SIPCallStreamer, error) {
 			options.Observer,
 			channel_base.WithInputChannelCapacity(RealtimeInputChannelCapacity),
 		),
+		session:   options.Session,
+		lifecycle: options.Lifecycle,
 	}
-
-	// Peer BYE is reported to Talk; MediaPort owns bridge teardown safety.
-	go func() {
-		select {
-		case <-options.Session.ByeReceived():
-			_ = s.Record(observability.RecordLog{
-				Level:   observability.LevelDebug,
-				Message: "SIP user BYE received",
-				Attributes: observability.Attributes{
-					"component": observability.ComponentCall.String(),
-					"provider":  Provider,
-					"call_id":   options.Session.GetCallID(),
-					"reason":    "bye_received",
-				},
-			}, observability.RecordEvent{
-				Component: observability.ComponentCall,
-				Event:     observability.CallEnded,
-				Attributes: observability.Attributes{
-					"component": observability.ComponentCall.String(),
-					"provider":  Provider,
-					"call_id":   options.Session.GetCallID(),
-					"reason":    "bye_received",
-				},
-			}, observability.RecordMetadata{
-				Metadata: []*protos.Metadata{
-					{Key: observability.MetadataDisconnectReason, Value: "bye_received"},
-				},
-			}, observability.RecordMetric{
-				Metrics: []*protos.Metric{{
-					Name:        observability.MetricCallStatus,
-					Value:       observability.MetricCallStatusComplete,
-					Description: "SIP user BYE received",
-				}},
-			})
-			if msg := s.Disconnect(protos.ConversationDisconnection_DISCONNECTION_TYPE_USER); msg != nil {
-				s.Input(msg)
-			}
-		case <-s.Ctx.Done():
-		}
-	}()
-
-	// Context cancellation is a safety net when Talk cannot drive teardown.
-	go func() {
-		reason := ""
-		select {
-		case <-options.Session.Context().Done():
-			reason = "session_context_cancelled"
-		case <-options.Context.Done():
-			reason = "caller_context_cancelled"
-		case <-s.Ctx.Done():
-			return
-		}
-		_ = s.Record(observability.RecordLog{
-			Level:   observability.LevelDebug,
-			Message: "SIP context cancelled",
-			Attributes: observability.Attributes{
-				"component": observability.ComponentCall.String(),
-				"provider":  Provider,
-				"call_id":   options.Session.GetCallID(),
-				"reason":    reason,
-			},
-		})
-		if msg := s.Disconnect(protos.ConversationDisconnection_DISCONNECTION_TYPE_USER); msg != nil {
-			s.Input(msg)
-		}
-		s.Close()
-	}()
-
-	s.session = options.Session
-	s.lifecycle = options.Lifecycle
 	isInbound := options.Session.GetInfo().Direction == sip_runtime.CallDirectionInbound
 	if !isInbound {
 		s.assistantOutputActive.Store(true)
@@ -262,6 +194,72 @@ func New(opts ...FuncOption) (internal_type.SIPCallStreamer, error) {
 			"local_ip":  localIP,
 		},
 	})
+
+	// Watchers start only after every owned resource has a cleanup path.
+	go func() {
+		select {
+		case <-options.Session.ByeReceived():
+			_ = s.Record(observability.RecordLog{
+				Level:   observability.LevelDebug,
+				Message: "SIP user BYE received",
+				Attributes: observability.Attributes{
+					"component": observability.ComponentCall.String(),
+					"provider":  Provider,
+					"call_id":   options.Session.GetCallID(),
+					"reason":    "bye_received",
+				},
+			}, observability.RecordEvent{
+				Component: observability.ComponentCall,
+				Event:     observability.CallEnded,
+				Attributes: observability.Attributes{
+					"component": observability.ComponentCall.String(),
+					"provider":  Provider,
+					"call_id":   options.Session.GetCallID(),
+					"reason":    "bye_received",
+				},
+			}, observability.RecordMetadata{
+				Metadata: []*protos.Metadata{
+					{Key: observability.MetadataDisconnectReason, Value: "bye_received"},
+				},
+			}, observability.RecordMetric{
+				Metrics: []*protos.Metric{{
+					Name:        observability.MetricCallStatus,
+					Value:       observability.MetricCallStatusComplete,
+					Description: "SIP user BYE received",
+				}},
+			})
+			if msg := s.Disconnect(protos.ConversationDisconnection_DISCONNECTION_TYPE_USER); msg != nil {
+				s.Input(msg)
+			}
+		case <-s.Ctx.Done():
+		}
+	}()
+
+	go func() {
+		reason := ""
+		select {
+		case <-options.Session.Context().Done():
+			reason = "session_context_cancelled"
+		case <-options.Context.Done():
+			reason = "caller_context_cancelled"
+		case <-s.Ctx.Done():
+			return
+		}
+		_ = s.Record(observability.RecordLog{
+			Level:   observability.LevelDebug,
+			Message: "SIP context cancelled",
+			Attributes: observability.Attributes{
+				"component": observability.ComponentCall.String(),
+				"provider":  Provider,
+				"call_id":   options.Session.GetCallID(),
+				"reason":    reason,
+			},
+		})
+		if msg := s.Disconnect(protos.ConversationDisconnection_DISCONNECTION_TYPE_USER); msg != nil {
+			s.Input(msg)
+		}
+		s.Close()
+	}()
 
 	return s, nil
 }

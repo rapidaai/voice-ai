@@ -7,9 +7,6 @@
 package internal_sip_telephony
 
 import (
-	"errors"
-	"time"
-
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
@@ -18,31 +15,7 @@ import (
 	"github.com/rapidaai/pkg/commons"
 )
 
-const (
-	Provider               = "sip"
-	WebhookEvent           = "webhook"
-	DefaultOutboundSIPPort = 5060
-	DefaultRingtone        = "ringtone_us"
-
-	RealtimeInputChannelCapacity   = 100
-	BridgeRecordingChannelCapacity = 100
-	ChunkDuration                  = 20 * time.Millisecond
-	MulawFrameSize                 = 160
-	MulawSilenceByte               = 0xFF
-
-	Linear16BytesPerMs    = 32
-	BridgeOutputFrameSize = Linear16BytesPerMs * 20
-)
-
 type OutboundFailureReason string
-
-const (
-	OutboundFailureReasonInvalidConfiguration OutboundFailureReason = "sip_outbound_invalid_configuration"
-	OutboundFailureReasonServerNotInitialized OutboundFailureReason = "sip_outbound_server_not_initialized"
-	OutboundFailureReasonServerNotRunning     OutboundFailureReason = "sip_outbound_server_not_running"
-	OutboundFailureReasonHealthGateFailed     OutboundFailureReason = "sip_outbound_health_gate_failed"
-	OutboundFailureReasonSetupFailed          OutboundFailureReason = "sip_outbound_setup_failed"
-)
 
 func (r OutboundFailureReason) String() string {
 	return string(r)
@@ -52,12 +25,6 @@ var (
 	Rapida16kConfig = internal_audio.NewLinear16khzMonoAudioConfig()
 	Mulaw8kConfig   = internal_audio.NewMulaw8khzMonoAudioConfig()
 	Linear8kConfig  = internal_audio.NewLinear8khzMonoAudioConfig()
-
-	ErrInboundCallerMissing           = errors.New("missing caller information")
-	ErrSIPServerNotInitialized        = errors.New("SIP server not initialized")
-	ErrSIPServerNotRunning            = errors.New("SIP server not running")
-	ErrProviderAudioConversionFailed  = errors.New("audio conversion to 16kHz linear16 failed")
-	ErrAssistantAudioConversionFailed = errors.New("audio conversion to mulaw 8kHz failed")
 )
 
 type AudioProcessorConfig struct {

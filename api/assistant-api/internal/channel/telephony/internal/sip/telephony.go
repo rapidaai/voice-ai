@@ -184,7 +184,7 @@ func (t *sipTelephony) OutboundCall(
 	if t.outboundHealthGateEnabled(t.appCfg) {
 		healthSnapshot := t.sharedServer.HealthSnapshot()
 		if !healthSnapshot.Ready {
-			err := fmt.Errorf("SIP outbound health gate failed: %s", healthSnapshot.Reason)
+			err := fmt.Errorf("%w: %s", ErrOutboundHealthGateFailed, healthSnapshot.Reason)
 			info.Status = internal_type.TelephonyStatusFailed
 			info.ErrorMessage = err.Error()
 			internal_telephony_base.ReportOutboundFailure(

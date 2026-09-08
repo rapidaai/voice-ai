@@ -24,7 +24,7 @@ type chunkResampler struct {
 
 // NewChunk creates a stateless resampler for independent audio buffers.
 func NewChunk(optionFunctions ...Option) internal_type.AudioResampler {
-	configuration := options{quality: resampling.QualityHigh}
+	configuration := options{quality: defaultQuality}
 	for _, option := range optionFunctions {
 		if option != nil {
 			option(&configuration)
@@ -35,7 +35,7 @@ func NewChunk(optionFunctions ...Option) internal_type.AudioResampler {
 
 func (r *chunkResampler) Resample(data []byte, source, target *protos.AudioConfig) ([]byte, error) {
 	if source == nil || target == nil {
-		return nil, fmt.Errorf("source and target configs are required")
+		return nil, ErrAudioConfigRequired
 	}
 	if len(data) == 0 {
 		return []byte{}, nil
@@ -66,13 +66,17 @@ func (r *chunkResampler) Resample(data []byte, source, target *protos.AudioConfi
 			r.quality,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("resample failed: %w", err)
+			return nil, fmt.Errorf("%w: %w", ErrResamplingFailed, err)
 		}
 		pcm = float64ToPCM16(out)
 	}
 
 	if source.Channels != target.Channels {
-		pcm = ops.convertChannels(pcm, source.Channels, target.Channels)
+		var err error
+		pcm, err = ops.convertChannels(pcm, source.Channels, target.Channels)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if target.AudioFormat != protos.AudioConfig_LINEAR16 {

@@ -105,7 +105,7 @@ type RequestorChannels struct {
 func NewRequestorChannels() *RequestorChannels {
 	controlChannel, err := policychannel.New[Envelope](policychannel.Config{
 		CapacityPolicy: policychannel.FixedCapacity(256),
-		OverflowPolicy: policychannel.RejectNewestWhenFull,
+		OverflowPolicy: policychannel.ReplaceOldestWhenFull,
 	})
 	if err != nil {
 		panic(err)

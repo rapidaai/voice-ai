@@ -7,7 +7,6 @@ package resampler_soxr
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"sync"
 
@@ -68,7 +67,7 @@ func WithQuickQuality() Option {
 
 // New creates a streaming audio resampler with high-quality output by default.
 func New(optionFunctions ...Option) *Resampler {
-	configuration := options{quality: resampling.QualityHigh}
+	configuration := options{quality: defaultQuality}
 	for _, option := range optionFunctions {
 		if option != nil {
 			option(&configuration)
@@ -85,11 +84,11 @@ func (resampler *Resampler) Resample(
 	resampler.lifecycleMu.RLock()
 	defer resampler.lifecycleMu.RUnlock()
 	if resampler.closed {
-		return nil, errors.New("resampler is closed")
+		return nil, ErrResamplerClosed
 	}
 
 	if source == nil || target == nil {
-		return nil, fmt.Errorf("source and target configs are required")
+		return nil, ErrAudioConfigRequired
 	}
 
 	if len(data) == 0 {
@@ -102,7 +101,9 @@ func (resampler *Resampler) Resample(
 		source.AudioFormat == target.AudioFormat {
 		return data, nil
 	}
-	if source.SampleRate != target.SampleRate && source.Channels == 1 && target.Channels == 1 {
+	if source.SampleRate != target.SampleRate &&
+		source.Channels == monoChannelCount &&
+		target.Channels == monoChannelCount {
 		return resampler.resampleMono(data, source, target)
 	}
 
@@ -127,7 +128,11 @@ func (resampler *Resampler) Resample(
 
 	// Channel conversion after rate change (cheaper to convert fewer samples).
 	if source.Channels != target.Channels {
-		pcm = resampler.convertChannels(pcm, source.Channels, target.Channels)
+		var err error
+		pcm, err = resampler.convertChannels(pcm, source.Channels, target.Channels)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Convert to the target encoding if it differs from LINEAR16.
@@ -181,7 +186,7 @@ func (resampler *Resampler) resampleMono(data []byte, source, target *protos.Aud
 		}
 		pcm, err = engine.soxrResampler.Resample(pcm)
 		if err != nil {
-			return nil, fmt.Errorf("resample failed: %w", err)
+			return nil, fmt.Errorf("%w: %w", ErrResamplingFailed, err)
 		}
 		if target.AudioFormat != protos.AudioConfig_LINEAR16 {
 			return resampler.convertFromLinear16(pcm, target)
@@ -195,7 +200,7 @@ func (resampler *Resampler) resampleMono(data []byte, source, target *protos.Aud
 	}
 	output, err := engine.goResampler.Process(engine.inputSamples)
 	if err != nil {
-		return nil, fmt.Errorf("resample failed: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrResamplingFailed, err)
 	}
 	return encodeMono(output, target.AudioFormat)
 }
@@ -211,14 +216,14 @@ func (resampler *Resampler) resamplePCM16(pcm []byte, sourceRate, targetRate uin
 	if engine.soxrResampler != nil {
 		output, err := engine.soxrResampler.Resample(pcm)
 		if err != nil {
-			return nil, fmt.Errorf("resample failed: %w", err)
+			return nil, fmt.Errorf("%w: %w", ErrResamplingFailed, err)
 		}
 		return output, nil
 	}
 
 	output, err := engine.goResampler.Process(pcm16ToFloat64(pcm))
 	if err != nil {
-		return nil, fmt.Errorf("resample failed: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrResamplingFailed, err)
 	}
 
 	return float64ToPCM16(output), nil
@@ -249,12 +254,12 @@ func (resampler *Resampler) getOrCreateEngine(sourceRate, targetRate uint32) (*c
 	goResampler, err := resampling.New(&resampling.Config{
 		InputRate:  float64(sourceRate),
 		OutputRate: float64(targetRate),
-		Channels:   1, // Process() is mono-only; multi-channel needs ProcessMulti
+		Channels:   monoChannelCount,
 		EnableSIMD: true,
 		Quality:    resampling.QualitySpec{Preset: resampler.quality},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("resampler init failed: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrResamplerInitializationFailed, err)
 	}
 
 	newEngine := &cachedEngine{goResampler: goResampler}
@@ -266,11 +271,11 @@ func decodeMono(samples []float64, data []byte, format protos.AudioConfig_AudioF
 	var sampleCount int
 	switch format {
 	case protos.AudioConfig_LINEAR16:
-		sampleCount = len(data) / 2
+		sampleCount = len(data) / pcm16BytesPerSample
 	case protos.AudioConfig_MuLaw8:
 		sampleCount = len(data)
 	default:
-		return nil, fmt.Errorf("unsupported input format: %v", format)
+		return nil, fmt.Errorf("%w: %v", ErrUnsupportedInputFormat, format)
 	}
 
 	if cap(samples) < sampleCount {
@@ -282,12 +287,12 @@ func decodeMono(samples []float64, data []byte, format protos.AudioConfig_AudioF
 	case protos.AudioConfig_LINEAR16:
 		for index := range samples {
 			// #nosec G115, PCM16 decoding preserves the source two's-complement bits.
-			sample := int16(binary.LittleEndian.Uint16(data[index*2:]))
-			samples[index] = float64(sample) / 32768.0
+			sample := int16(binary.LittleEndian.Uint16(data[index*pcm16BytesPerSample:]))
+			samples[index] = float64(sample) / pcm16Scale
 		}
 	case protos.AudioConfig_MuLaw8:
 		for index := range samples {
-			samples[index] = float64(g711.DecodeUlawFrame(data[index])) / 32768.0
+			samples[index] = float64(g711.DecodeUlawFrame(data[index])) / pcm16Scale
 		}
 	}
 	return samples, nil
@@ -304,29 +309,29 @@ func encodeMono(samples []float64, format protos.AudioConfig_AudioFormat) ([]byt
 		}
 		return encoded, nil
 	default:
-		return nil, fmt.Errorf("unsupported output format: %v", format)
+		return nil, fmt.Errorf("%w: %v", ErrUnsupportedOutputFormat, format)
 	}
 }
 
 func pcm16ToFloat64(data []byte) []float64 {
-	n := len(data) &^ 1 // round down to even byte boundary
-	out := make([]float64, n/2)
-	for i := 0; i < n; i += 2 {
+	evenByteCount := len(data) - len(data)%pcm16BytesPerSample
+	output := make([]float64, evenByteCount/pcm16BytesPerSample)
+	for byteIndex := 0; byteIndex < evenByteCount; byteIndex += pcm16BytesPerSample {
 		// #nosec G115, PCM16 decoding preserves the source two's-complement bits.
-		s := int16(binary.LittleEndian.Uint16(data[i : i+2]))
-		out[i/2] = float64(s) / 32768.0
+		sample := int16(binary.LittleEndian.Uint16(data[byteIndex:]))
+		output[byteIndex/pcm16BytesPerSample] = float64(sample) / pcm16Scale
 	}
-	return out
+	return output
 }
 
 func float64ToPCM16(data []float64) []byte {
-	out := make([]byte, len(data)*2)
-	for i, v := range data {
-		s := float64ToInt16(v)
+	output := make([]byte, len(data)*pcm16BytesPerSample)
+	for sampleIndex, sample := range data {
+		pcm16Sample := float64ToInt16(sample)
 		// #nosec G115, PCM16 encoding preserves the signed sample bits.
-		binary.LittleEndian.PutUint16(out[i*2:i*2+2], uint16(s))
+		binary.LittleEndian.PutUint16(output[sampleIndex*pcm16BytesPerSample:], uint16(pcm16Sample))
 	}
-	return out
+	return output
 }
 
 func float64ToInt16(sample float64) int16 {
@@ -335,7 +340,7 @@ func float64ToInt16(sample float64) int16 {
 	} else if sample < -1 {
 		sample = -1
 	}
-	return int16(sample * 32767.0)
+	return int16(sample * pcm16PositiveLimit)
 }
 
 func (resampler *Resampler) convertToLinear16(data []byte, config *protos.AudioConfig) ([]byte, error) {
@@ -345,7 +350,7 @@ func (resampler *Resampler) convertToLinear16(data []byte, config *protos.AudioC
 	case protos.AudioConfig_MuLaw8:
 		return g711.DecodeUlaw(data), nil
 	default:
-		return nil, fmt.Errorf("unsupported input format: %v", config.AudioFormat)
+		return nil, fmt.Errorf("%w: %v", ErrUnsupportedInputFormat, config.AudioFormat)
 	}
 }
 
@@ -356,38 +361,45 @@ func (resampler *Resampler) convertFromLinear16(data []byte, config *protos.Audi
 	case protos.AudioConfig_MuLaw8:
 		return g711.EncodeUlaw(data), nil
 	default:
-		return nil, fmt.Errorf("unsupported output format: %v", config.AudioFormat)
+		return nil, fmt.Errorf("%w: %v", ErrUnsupportedOutputFormat, config.AudioFormat)
 	}
 }
 
-func (resampler *Resampler) convertChannels(data []byte, sourceChannels, targetChannels uint32) []byte {
+func (resampler *Resampler) convertChannels(data []byte, sourceChannels, targetChannels uint32) ([]byte, error) {
 	if sourceChannels == targetChannels {
-		return data
+		return data, nil
 	}
 
-	if sourceChannels == 1 && targetChannels == 2 {
-		output := make([]byte, len(data)*2)
-		for byteIndex := 0; byteIndex < len(data); byteIndex += 2 {
-			copy(output[byteIndex*2:], data[byteIndex:byteIndex+2])
-			copy(output[byteIndex*2+2:], data[byteIndex:byteIndex+2])
+	if sourceChannels == monoChannelCount && targetChannels == stereoChannelCount {
+		if len(data)%pcm16BytesPerSample != 0 {
+			return nil, fmt.Errorf("%w: bytes=%d channels=%d", ErrInvalidPCM16ChannelFrame, len(data), sourceChannels)
 		}
-		return output
+		output := make([]byte, len(data)*stereoChannelCount)
+		for byteIndex := 0; byteIndex < len(data); byteIndex += pcm16BytesPerSample {
+			copy(output[byteIndex*stereoChannelCount:], data[byteIndex:byteIndex+pcm16BytesPerSample])
+			copy(output[byteIndex*stereoChannelCount+pcm16BytesPerSample:], data[byteIndex:byteIndex+pcm16BytesPerSample])
+		}
+		return output, nil
 	}
 
-	if sourceChannels == 2 && targetChannels == 1 {
-		output := make([]byte, len(data)/2)
-		for byteIndex := 0; byteIndex < len(data); byteIndex += 4 {
+	if sourceChannels == stereoChannelCount && targetChannels == monoChannelCount {
+		stereoFrameBytes := pcm16BytesPerSample * stereoChannelCount
+		if len(data)%stereoFrameBytes != 0 {
+			return nil, fmt.Errorf("%w: bytes=%d channels=%d", ErrInvalidPCM16ChannelFrame, len(data), sourceChannels)
+		}
+		output := make([]byte, len(data)/stereoChannelCount)
+		for byteIndex := 0; byteIndex < len(data); byteIndex += stereoFrameBytes {
 			// #nosec G115, PCM16 decoding preserves the source two's-complement bits.
 			leftSample := int16(binary.LittleEndian.Uint16(data[byteIndex:]))
 			// #nosec G115, PCM16 decoding preserves the source two's-complement bits.
-			rightSample := int16(binary.LittleEndian.Uint16(data[byteIndex+2:]))
+			rightSample := int16(binary.LittleEndian.Uint16(data[byteIndex+pcm16BytesPerSample:]))
 			// #nosec G115, averaging two int16 samples remains within int16 range.
 			monoSample := int16((int32(leftSample) + int32(rightSample)) / 2)
 			// #nosec G115, PCM16 encoding preserves the signed sample bits.
-			binary.LittleEndian.PutUint16(output[byteIndex/2:], uint16(monoSample))
+			binary.LittleEndian.PutUint16(output[byteIndex/stereoChannelCount:], uint16(monoSample))
 		}
-		return output
+		return output, nil
 	}
 
-	return data
+	return nil, fmt.Errorf("%w: %d to %d", ErrUnsupportedChannelConversion, sourceChannels, targetChannels)
 }

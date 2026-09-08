@@ -7,16 +7,14 @@
 // See LICENSE.md or contact sales@rapida.ai for commercial usage.
 package resampler_soxr
 
-import "errors"
-
 type nativePCM16Resampler struct{}
 
 func newNativePCM16Resampler(uint32, uint32) (*nativePCM16Resampler, error) {
-	return nil, errors.New("native SOXR requires CGO")
+	return nil, ErrNativeSOXRUnavailable
 }
 
 func (resampler *nativePCM16Resampler) Resample([]byte) ([]byte, error) {
-	return nil, errors.New("native SOXR requires CGO")
+	return nil, ErrNativeSOXRUnavailable
 }
 
 func (resampler *nativePCM16Resampler) Close() {}

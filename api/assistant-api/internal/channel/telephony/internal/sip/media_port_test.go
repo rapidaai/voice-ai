@@ -639,7 +639,7 @@ func TestMediaPort_CloseIsIdempotent(t *testing.T) {
 		Linear8kConfig,
 		Rapida16kConfig,
 	)
-	require.ErrorContains(t, err, "resampler is closed")
+	require.ErrorIs(t, err, resampler_soxr.ErrResamplerClosed)
 }
 
 func TestMediaPort_DeliverAssistantFrameAfterCloseReturnsSessionClosed(t *testing.T) {

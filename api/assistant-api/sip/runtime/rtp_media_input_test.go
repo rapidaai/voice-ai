@@ -134,9 +134,10 @@ func TestRTPHandler_InvalidTrafficDoesNotPostponeAudioDeadline(tester *testing.T
 	send(testRTPInputPacket(3, 320, 3))
 	for index := 0; index < 15; index++ {
 		send(&RTPPacket{Version: 2, PayloadType: 96, Payload: []byte{1, 2, 3, 4}})
-		time.Sleep(10 * time.Millisecond)
 	}
-	require.Equal(tester, 1, len(audioIn))
+	require.Eventually(tester, func() bool {
+		return handler.GetDetailedStats().InvalidPackets == 15
+	}, time.Second, time.Millisecond)
 	audio, err := receiveInboundAudio(tester, audioIn, time.Second)
 	require.NoError(tester, err)
 	require.Equal(tester, bytes.Repeat([]byte{3}, 160), audio.Audio)

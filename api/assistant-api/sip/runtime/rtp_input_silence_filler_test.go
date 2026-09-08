@@ -32,6 +32,19 @@ func TestRTPInputSilenceFiller_FillsOnlyContiguousTimestampGaps(t *testing.T) {
 	require.Equal(t, uint64(2), filler.frameCount())
 }
 
+func TestRTPInputSilenceFiller_IgnoresGapBeyondMaximum(t *testing.T) {
+	filler := newRTPInputSilenceFiller(&CodecPCMU, 20*time.Millisecond)
+	arrivedAt := time.Unix(1, 0)
+	require.Len(t, filler.process(bufferedInputPackets(arrivedAt, testRTPInputPacket(1, 0, 1))), 1)
+
+	maximumGapSamples := uint32(CodecPCMU.ClockRate) * uint32(rtpInputMaxSilenceGap/time.Millisecond) / 1000
+	frames := filler.process(bufferedInputPackets(arrivedAt, testRTPInputPacket(2, 160+maximumGapSamples+160, 2)))
+
+	require.Len(t, frames, 1)
+	require.Equal(t, bytes.Repeat([]byte{2}, 160), frames[0].Audio)
+	require.Zero(t, filler.frameCount())
+}
+
 func TestRTPInputSilenceFiller_UsesCodecSilenceAndPacketDuration(t *testing.T) {
 	for _, testCase := range []struct {
 		name        string

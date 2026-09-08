@@ -16,7 +16,6 @@ import "C"
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"runtime"
 	"sync/atomic"
@@ -38,18 +37,18 @@ func newNativePCM16Resampler(sourceRate, targetRate uint32) (*nativePCM16Resampl
 	ioSpec.flags = C.SOXR_NO_DITHER
 	var nativeError C.soxr_error_t
 	qualitySpec := C.soxr_quality_spec(C.SOXR_QQ, 0)
-	runtimeSpec := C.soxr_runtime_spec(1)
+	runtimeSpec := C.soxr_runtime_spec(nativeSOXRThreadCount)
 	nativeHandle := C.soxr_create(
 		C.double(sourceRate),
 		C.double(targetRate),
-		1,
+		monoChannelCount,
 		&nativeError,
 		&ioSpec,
 		&qualitySpec,
 		&runtimeSpec,
 	)
 	if nativeError != nil {
-		return nil, errors.New(C.GoString(nativeError))
+		return nil, fmt.Errorf("%w: %s", ErrNativeSOXRFailed, C.GoString(nativeError))
 	}
 
 	closed := new(atomic.Bool)
@@ -69,16 +68,16 @@ func newNativePCM16Resampler(sourceRate, targetRate uint32) (*nativePCM16Resampl
 
 func (resampler *nativePCM16Resampler) Resample(data []byte) ([]byte, error) {
 	if resampler == nil || resampler.handle == nil || resampler.closed.Load() {
-		return nil, errors.New("SOXR resampler is closed")
+		return nil, ErrResamplerClosed
 	}
-	if len(data)%2 != 0 {
-		return nil, fmt.Errorf("PCM16 input length must be even: %d", len(data))
+	if len(data)%pcm16BytesPerSample != 0 {
+		return nil, fmt.Errorf("%w: %d", ErrInvalidPCM16InputLength, len(data))
 	}
 	if len(data) == 0 {
 		return []byte{}, nil
 	}
 
-	inputSampleCount := len(data) / 2
+	inputSampleCount := len(data) / pcm16BytesPerSample
 	if cap(resampler.inputSamples) < inputSampleCount {
 		resampler.inputSamples = make([]int16, inputSampleCount)
 	} else {
@@ -86,15 +85,15 @@ func (resampler *nativePCM16Resampler) Resample(data []byte) ([]byte, error) {
 	}
 	for sampleIndex := range resampler.inputSamples {
 		// #nosec G115, PCM16 decoding preserves the source two's-complement bits.
-		resampler.inputSamples[sampleIndex] = int16(binary.LittleEndian.Uint16(data[sampleIndex*2:]))
+		resampler.inputSamples[sampleIndex] = int16(binary.LittleEndian.Uint16(data[sampleIndex*pcm16BytesPerSample:]))
 	}
 
 	outputSampleCount := int(
 		(uint64(inputSampleCount)*uint64(resampler.targetRate) + uint64(resampler.sourceRate)/2) /
 			uint64(resampler.sourceRate),
 	)
-	if outputSampleCount < 1 {
-		outputSampleCount = 1
+	if outputSampleCount < minimumOutputSampleCount {
+		outputSampleCount = minimumOutputSampleCount
 	}
 	if cap(resampler.outputSamples) < outputSampleCount {
 		resampler.outputSamples = make([]int16, outputSampleCount)
@@ -114,12 +113,13 @@ func (resampler *nativePCM16Resampler) Resample(data []byte) ([]byte, error) {
 		&outputSamplesProduced,
 	)
 	if nativeError != nil {
-		return nil, errors.New(C.GoString(nativeError))
+		return nil, fmt.Errorf("%w: %s", ErrNativeSOXRFailed, C.GoString(nativeError))
 	}
 	// #nosec G115, the native count cannot exceed the provided input length.
 	if int(inputSamplesConsumed) != len(resampler.inputSamples) {
 		return nil, fmt.Errorf(
-			"SOXR consumed %d of %d input samples",
+			"%w: consumed %d of %d",
+			ErrIncompleteSOXRInput,
 			inputSamplesConsumed,
 			len(resampler.inputSamples),
 		)
@@ -127,7 +127,7 @@ func (resampler *nativePCM16Resampler) Resample(data []byte) ([]byte, error) {
 
 	// #nosec G115, the native count cannot exceed the provided output length.
 	producedSampleCount := int(outputSamplesProduced)
-	output := make([]byte, outputSampleCount*2)
+	output := make([]byte, outputSampleCount*pcm16BytesPerSample)
 	outputSampleOffset := 0
 	if !resampler.hasProcessedFrame && producedSampleCount < outputSampleCount {
 		outputSampleOffset = outputSampleCount - producedSampleCount
@@ -135,7 +135,7 @@ func (resampler *nativePCM16Resampler) Resample(data []byte) ([]byte, error) {
 	for sampleIndex := range producedSampleCount {
 		// #nosec G115, PCM16 encoding preserves the signed sample bits.
 		binary.LittleEndian.PutUint16(
-			output[(sampleIndex+outputSampleOffset)*2:],
+			output[(sampleIndex+outputSampleOffset)*pcm16BytesPerSample:],
 			uint16(resampler.outputSamples[sampleIndex]),
 		)
 	}

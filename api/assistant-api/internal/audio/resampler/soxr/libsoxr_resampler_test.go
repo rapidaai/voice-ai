@@ -98,7 +98,12 @@ func TestRealtimeAudioResamplerRejectsUseAfterClose(t *testing.T) {
 	resampler.Close()
 
 	_, err = resampler.Resample(generateLinear16Data(160), source, target)
-	require.ErrorContains(t, err, "resampler is closed")
+	require.ErrorIs(t, err, ErrResamplerClosed)
+}
+
+func TestAudioResamplerRequiresAudioConfigs(t *testing.T) {
+	_, err := New().Resample([]byte{0, 0}, nil, nil)
+	require.ErrorIs(t, err, ErrAudioConfigRequired)
 }
 
 func TestRealtimeMuLawResamplingMatchesDecodedPCM(t *testing.T) {
@@ -225,6 +230,31 @@ func TestChannelConversion(t *testing.T) {
 			require.NoError(t, err)
 			expectedSize := int(float64(len(data)) * tt.expectedGrowth)
 			assert.Equal(t, expectedSize, len(result), "unexpected result size")
+		})
+	}
+}
+
+func TestChannelConversionRejectsInvalidFrames(t *testing.T) {
+	resampler := newTestResampler(t)
+	tests := []struct {
+		name           string
+		data           []byte
+		sourceChannels uint32
+		targetChannels uint32
+		expectedError  error
+	}{
+		{name: "incomplete mono sample", data: []byte{1}, sourceChannels: 1, targetChannels: 2, expectedError: ErrInvalidPCM16ChannelFrame},
+		{name: "incomplete stereo frame", data: make([]byte, 6), sourceChannels: 2, targetChannels: 1, expectedError: ErrInvalidPCM16ChannelFrame},
+		{name: "unsupported channel count", data: make([]byte, 12), sourceChannels: 3, targetChannels: 1, expectedError: ErrUnsupportedChannelConversion},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			source := &protos.AudioConfig{SampleRate: 16000, AudioFormat: protos.AudioConfig_LINEAR16, Channels: test.sourceChannels}
+			target := &protos.AudioConfig{SampleRate: 16000, AudioFormat: protos.AudioConfig_LINEAR16, Channels: test.targetChannels}
+
+			_, err := resampler.Resample(test.data, source, target)
+			require.ErrorIs(t, err, test.expectedError)
 		})
 	}
 }

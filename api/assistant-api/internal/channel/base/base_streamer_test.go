@@ -7,6 +7,7 @@
 package channel_base
 
 import (
+	"io"
 	"testing"
 	"time"
 
@@ -166,6 +167,16 @@ func TestRecvPrefersRealtimeInputOverLowPriority(t *testing.T) {
 	message, err = streamer.Recv()
 	require.NoError(t, err)
 	assert.Same(t, lowPriority, message)
+}
+
+func TestRecvReturnsEOFAfterCancel(t *testing.T) {
+	streamer := newTestStreamer(t)
+	streamer.Cancel()
+
+	message, err := streamer.Recv()
+
+	require.ErrorIs(t, err, io.EOF)
+	require.Nil(t, message)
 }
 
 func TestOutputRoutesToOutputChannel(t *testing.T) {

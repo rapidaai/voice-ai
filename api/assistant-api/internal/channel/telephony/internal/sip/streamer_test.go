@@ -211,6 +211,39 @@ func TestShouldEndSessionOnClose_SkipsPreAnswerStates(t *testing.T) {
 	assert.True(t, shouldEndSessionOnClose(sip_runtime.CallStateConnected))
 }
 
+func TestNewRequiresSession(t *testing.T) {
+	_, err := New()
+	require.ErrorIs(t, err, ErrSessionRequired)
+}
+
+func TestNewRequiresLifecycleController(t *testing.T) {
+	_, err := New(WithSession(newTestInboundSIPSession(t, "missing-lifecycle")))
+	require.ErrorIs(t, err, ErrLifecycleControllerRequired)
+}
+
+func TestNewInitializesMediaPortBeforeCancellationWatcher(t *testing.T) {
+	logger, err := commons.NewApplicationLogger()
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	session := newTestInboundSIPSession(t, "cancelled-during-initialization")
+	session.SetRTPHandler(&sip_runtime.RTPHandler{})
+
+	stream, err := New(
+		WithContext(ctx),
+		WithLogger(logger),
+		WithSession(session),
+		WithLifecycle(&fakeSIPLifecycleController{}),
+		WithCallContext(&callcontext.CallContext{}),
+	)
+	require.NoError(t, err)
+	streamer := stream.(*Streamer)
+	require.NotNil(t, streamer.mediaPort)
+	require.Eventually(t, func() bool {
+		return streamer.closed.Load() && streamer.mediaPort.closed.Load()
+	}, time.Second, time.Millisecond)
+}
+
 func TestNew_RoutesBridgeRecordingOutsideRealtimeInput(t *testing.T) {
 	logger, err := commons.NewApplicationLogger()
 	require.NoError(t, err)

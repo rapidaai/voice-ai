@@ -687,10 +687,13 @@ func (h *RTPHandler) SetInboundMediaFormat(codec *Codec, packetizationTime time.
 }
 
 func (h *RTPHandler) receiveLoop() {
+	h.mu.RLock()
+	inboundAudioSinkReady := h.inboundAudioSinkReady
+	h.mu.RUnlock()
 	select {
 	case <-h.ctx.Done():
 		return
-	case <-h.inboundAudioSinkReady:
+	case <-inboundAudioSinkReady:
 	}
 
 	buf := make([]byte, rtpPacketMaxSize+1)
