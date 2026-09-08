@@ -48,6 +48,9 @@ func (h requestorDispatchHandler) HandleUserText(ctx context.Context, vl interna
 	if !validator.NotBlank(vl.Text) {
 		return
 	}
+	if h.r.usesInterruptionOwner() {
+		h.r.interruption.submit(ctx, interruptionEvent{packet: vl})
+	}
 
 	previousState := h.r.messageLifecycle.State()
 	switch previousState {
@@ -192,6 +195,17 @@ func (h requestorDispatchHandler) HandleVadAudio(ctx context.Context, vl interna
 
 }
 func (h requestorDispatchHandler) HandleSpeechToText(ctx context.Context, p internal_type.SpeechToTextPacket) {
+	if h.r.usesInterruptionOwner() {
+		h.r.interruption.submit(ctx, interruptionEvent{packet: p})
+		return
+	}
+	h.handleSpeechToText(ctx, p)
+}
+
+func (h requestorDispatchHandler) handleSpeechToText(ctx context.Context, p internal_type.SpeechToTextPacket) {
+	if h.r.usesInterruptionOwner() && p.ContextID != h.r.GetID() {
+		return
+	}
 	if !validator.NotBlank(p.Script) && !p.Interim {
 		return
 	}
@@ -200,7 +214,7 @@ func (h requestorDispatchHandler) HandleSpeechToText(ctx context.Context, p inte
 	currentContextID := h.r.GetID()
 	p.ContextID = currentContextID
 	messageState := h.r.messageLifecycle.State()
-	if validator.NotBlank(p.Script) {
+	if validator.NotBlank(p.Script) && !h.r.usesInterruptionOwner() {
 		switch messageState {
 		case adapter_lifecycle.MessageStateUserIdle,
 			adapter_lifecycle.MessageStateUserListening,
@@ -301,7 +315,7 @@ func (h requestorDispatchHandler) HandleSpeechToText(ctx context.Context, p inte
 				return
 			}
 		}
-		if h.r.unclearInputWatchdog != nil {
+		if h.r.unclearInputWatchdog != nil && !h.r.usesInterruptionOwner() {
 			h.r.unclearInputWatchdog.Stop()
 		}
 	}
@@ -329,6 +343,14 @@ func (h requestorDispatchHandler) HandleInterimEndOfSpeech(ctx context.Context, 
 	})
 }
 func (h requestorDispatchHandler) HandleEndOfSpeech(ctx context.Context, p internal_type.EndOfSpeechPacket) {
+	if h.r.usesInterruptionOwner() {
+		h.r.interruption.submit(ctx, interruptionEvent{packet: p})
+		return
+	}
+	h.handleEndOfSpeech(ctx, p)
+}
+
+func (h requestorDispatchHandler) handleEndOfSpeech(ctx context.Context, p internal_type.EndOfSpeechPacket) {
 	if p.ContextID != h.r.GetID() {
 		return
 	}
@@ -340,7 +362,7 @@ func (h requestorDispatchHandler) HandleEndOfSpeech(ctx context.Context, p inter
 			adapter_lifecycle.MessageStateUserSpeaking,
 			adapter_lifecycle.MessageStateUserThinking:
 			_ = h.r.messageLifecycle.UserThinking(p.ContextID)
-			if h.r.unclearInputWatchdog != nil {
+			if h.r.unclearInputWatchdog != nil && !h.r.usesInterruptionOwner() {
 				h.r.unclearInputWatchdog.Stop()
 			}
 		}
@@ -356,6 +378,14 @@ func (h requestorDispatchHandler) HandleEndOfSpeech(ctx context.Context, p inter
 	}
 }
 func (h requestorDispatchHandler) HandleUserInput(ctx context.Context, p internal_type.UserInputPacket) {
+	if h.r.usesInterruptionOwner() {
+		h.r.interruption.submit(ctx, interruptionEvent{packet: p})
+		return
+	}
+	h.handleUserInput(ctx, p)
+}
+
+func (h requestorDispatchHandler) handleUserInput(ctx context.Context, p internal_type.UserInputPacket) {
 	if !validator.NotBlank(p.Text) {
 		return
 	}
@@ -365,7 +395,7 @@ func (h requestorDispatchHandler) HandleUserInput(ctx context.Context, p interna
 	if p.ContextID != h.r.GetID() {
 		return
 	}
-	if h.r.unclearInputWatchdog != nil {
+	if h.r.unclearInputWatchdog != nil && !h.r.usesInterruptionOwner() {
 		h.r.unclearInputWatchdog.Stop()
 	}
 	h.r.OnPacket(ctx, internal_type.StopIdleTimeoutPacket{
@@ -429,6 +459,10 @@ func (h requestorDispatchHandler) HandleUserInput(ctx context.Context, p interna
 	}
 }
 func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context, p internal_type.InterruptionDetectedPacket) {
+	if h.r.usesInterruptionOwner() && p.Source == internal_type.InterruptionSourceVad {
+		h.r.interruption.submit(ctx, interruptionEvent{packet: p})
+		return
+	}
 	if p.ContextID == "" {
 		p.ContextID = h.r.GetID()
 	}
@@ -894,6 +928,23 @@ func (h requestorDispatchHandler) HandleSpeechToTextEnd(ctx context.Context, p i
 	}
 }
 func (h requestorDispatchHandler) HandleTurnChange(ctx context.Context, p internal_type.TurnChangePacket) {
+	if p.InterruptionDecision {
+		if h.r.interruption == nil {
+			return
+		}
+		reply := h.r.interruption.submit(ctx, interruptionEvent{packet: p})
+		if !reply.accepted {
+			return
+		}
+		p = reply.turn
+		defer func() { h.r.interruption.submit(ctx, interruptionEvent{packet: p, complete: true}) }()
+		h.HandleEndOfSpeechInterruption(ctx, internal_type.EndOfSpeechInterruptionPacket{
+			ContextID: p.PreviousContextID, Source: internal_type.InterruptionSourceVad,
+		})
+		h.HandleTextToSpeechInterrupt(ctx, internal_type.TextToSpeechInterruptPacket{ContextID: p.PreviousContextID})
+		h.HandleLLMInterrupt(ctx, internal_type.LLMInterruptPacket{ContextID: p.PreviousContextID})
+		h.r.OnPacket(ctx, internal_type.StopIdleTimeoutPacket{ContextID: p.PreviousContextID})
+	}
 	if p.ContextID == "" {
 		p.ContextID = h.r.GetID()
 	}
@@ -942,6 +993,11 @@ func (h requestorDispatchHandler) HandleTurnChange(ctx context.Context, p intern
 		}
 	}
 
+	if p.InterruptionDecision {
+		h.r.Notify(ctx, &protos.ConversationInterruption{
+			Type: protos.ConversationInterruption_INTERRUPTION_TYPE_VAD, Time: timestamppb.Now(),
+		})
+	}
 	h.r.OnPacket(ctx, internal_type.ObservabilityEventRecordPacket{
 		ContextID: p.ContextID,
 		Scope:     internal_type.ObservabilityRecordScopeConversation,
@@ -1404,6 +1460,17 @@ func (h requestorDispatchHandler) HandleIdleTimeoutExpired(ctx context.Context, 
 }
 
 func (h requestorDispatchHandler) HandleUnclearInputExpired(ctx context.Context, p internal_type.UnclearInputExpiredPacket) {
+	if h.r.usesInterruptionOwner() {
+		h.r.interruption.submit(ctx, interruptionEvent{packet: p})
+		return
+	}
+	h.handleUnclearInputExpired(ctx, p)
+}
+
+func (h requestorDispatchHandler) handleUnclearInputExpired(ctx context.Context, p internal_type.UnclearInputExpiredPacket) {
+	if h.r.usesInterruptionOwner() && (h.r.unclearInputWatchdog == nil || !h.r.unclearInputWatchdog.AcceptExpiry(p)) {
+		return
+	}
 	if p.ContextID != h.r.GetID() {
 		return
 	}
@@ -1439,12 +1506,21 @@ func (h requestorDispatchHandler) HandleUnclearInputExpired(ctx context.Context,
 		interruptionSource = internal_type.InterruptionSourceWord
 		interruptionType = protos.ConversationInterruption_INTERRUPTION_TYPE_WORD
 	}
-	if err := h.r.messageLifecycle.UserPrompted(oldContextID); err != nil {
-		return
-	}
-	_, newContextID, err := h.r.messageLifecycle.RotateContext()
-	if err != nil {
-		return
+	var newContextID string
+	if h.r.usesInterruptionOwner() {
+		reply := h.r.interruption.submit(ctx, interruptionEvent{packet: p, complete: true})
+		if !reply.accepted {
+			return
+		}
+		newContextID = reply.turn.ContextID
+	} else {
+		if err := h.r.messageLifecycle.UserPrompted(oldContextID); err != nil {
+			return
+		}
+		_, newContextID, err = h.r.messageLifecycle.RotateContext()
+		if err != nil {
+			return
+		}
 	}
 	h.r.OnPacket(ctx,
 		internal_type.StopIdleTimeoutPacket{ContextID: oldContextID},
@@ -3514,6 +3590,10 @@ func (h requestorDispatchHandler) HandleFinalizeInboundDispatcher(ctx context.Co
 }
 
 func (h requestorDispatchHandler) HandleFinalizeBehavior(ctx context.Context, p internal_type.FinalizeBehaviorPacket) {
+	if h.r.interruption != nil {
+		h.r.interruption.cancel()
+		<-h.r.interruption.done
+	}
 	if h.r.idleTimeoutWatchdog != nil {
 		h.r.idleTimeoutWatchdog.Cancel()
 	}

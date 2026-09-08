@@ -56,11 +56,12 @@ var (
 )
 
 type genericRequestor struct {
-	logger   commons.Logger
-	config   *config.AssistantConfig
-	source   utils.RapidaSource
-	auth     *types.Authentication
-	streamer internal_type.Streamer
+	interruption *interruptionOwner
+	logger       commons.Logger
+	config       *config.AssistantConfig
+	source       utils.RapidaSource
+	auth         *types.Authentication
+	streamer     internal_type.Streamer
 
 	// service
 	assistantService     internal_services.AssistantService
@@ -200,6 +201,9 @@ func NewGenericRequestor(
 		watchdog.WithOnPacket(gr.OnPacket),
 		watchdog.WithPacketContext(sessionCtx),
 	)
+	if dispatchInterruptionEnabled {
+		gr.interruption = newInterruptionOwner(sessionCtx, gr)
+	}
 
 	go gr.runBootstrapDispatcher(sessionCtx)
 	go gr.runCriticalDispatcher(sessionCtx)

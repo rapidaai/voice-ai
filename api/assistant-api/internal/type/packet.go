@@ -433,14 +433,15 @@ func (f LLMInterruptPacket) PacketName() PacketName { return PacketNameLLMInterr
 
 // TurnChangePacket notifies components that active context changed to a new turn.
 type TurnChangePacket struct {
-	ContextID         string
-	PreviousContextID string
-	Reason            string
-	Source            string
-	PreviousState     string
-	Trigger           string
-	Text              string
-	Time              time.Time
+	InterruptionDecision bool
+	ContextID            string
+	PreviousContextID    string
+	Reason               string
+	Source               string
+	PreviousState        string
+	Trigger              string
+	Text                 string
+	Time                 time.Time
 }
 
 func (f TurnChangePacket) ContextId() string      { return f.ContextID }
@@ -1089,7 +1090,8 @@ func (f IdleTimeoutExpiredPacket) PacketName() PacketName { return PacketNameIdl
 
 // UnclearInputExpiredPacket signals that an interrupted turn did not produce accepted user input.
 type UnclearInputExpiredPacket struct {
-	ContextID string
+	Generation uint64
+	ContextID  string
 }
 
 func (f UnclearInputExpiredPacket) ContextId() string      { return f.ContextID }

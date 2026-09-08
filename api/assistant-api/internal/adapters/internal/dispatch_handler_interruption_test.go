@@ -3,6 +3,7 @@ package adapter_internal
 import (
 	"context"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	adapter_channel "github.com/rapidaai/api/assistant-api/internal/adapters/channel"
@@ -17,6 +18,197 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestDispatchInterruptionUnclearInputExtendsAndIgnoresEmptyFinal(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Please repeat")
+		requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
+		defer startInterruptionTestOwner(t, requestor)()
+		handler := requestorDispatchHandler{r: requestor}
+		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
+		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{Script: "wait", Interim: true})
+		synctest.Wait()
+		contextID := requestor.GetID()
+		time.Sleep(600 * time.Millisecond)
+		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: contextID, Script: "wait please", Interim: true})
+		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: contextID, Script: "  ", Interim: false})
+		synctest.Wait()
+		time.Sleep(600 * time.Millisecond)
+		synctest.Wait()
+		for _, packet := range drainEgressPackets(requestor) {
+			_, expired := packet.(internal_type.UnclearInputExpiredPacket)
+			assert.False(t, expired)
+		}
+		time.Sleep(400 * time.Millisecond)
+		synctest.Wait()
+		var expired internal_type.UnclearInputExpiredPacket
+		for _, packet := range drainEgressPackets(requestor) {
+			if value, ok := packet.(internal_type.UnclearInputExpiredPacket); ok {
+				expired = value
+			}
+		}
+		require.Equal(t, contextID, expired.ContextID)
+		handler.HandleUnclearInputExpired(context.Background(), expired)
+		synctest.Wait()
+		assert.NotEqual(t, contextID, requestor.GetID())
+		var injected internal_type.InjectMessagePacket
+		for _, packet := range drainEgressPackets(requestor) {
+			if value, ok := packet.(internal_type.InjectMessagePacket); ok {
+				injected = value
+			}
+		}
+		assert.Equal(t, "Please repeat", injected.Text)
+		assert.Equal(t, requestor.GetID(), injected.ContextID)
+		assert.Equal(t, []internal_type.Stream{internal_type.PauseOutput{}, internal_type.FlushOutput{}}, interruptionTestControls(requestor))
+	})
+}
+
+func TestDispatchInterruptionCompletedInputStopsUnclearTracking(t *testing.T) {
+	for _, completion := range []string{"final", "eos", "input", "text"} {
+		t.Run(completion, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Please repeat")
+				requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
+				defer startInterruptionTestOwner(t, requestor)()
+				handler := requestorDispatchHandler{r: requestor}
+				handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
+				handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{Script: "wait", Interim: true})
+				synctest.Wait()
+				contextID := requestor.GetID()
+				switch completion {
+				case "final":
+					handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: contextID, Script: "Wait please"})
+				case "eos":
+					handler.HandleEndOfSpeech(context.Background(), internal_type.EndOfSpeechPacket{ContextID: contextID, Speech: "Wait please"})
+				case "input":
+					handler.HandleUserInput(context.Background(), internal_type.UserInputPacket{ContextID: contextID, Text: "Wait please"})
+				case "text":
+					handler.HandleUserText(context.Background(), internal_type.UserTextReceivedPacket{ContextID: contextID, Text: "Wait please"})
+				}
+				synctest.Wait()
+				assert.False(t, requestor.unclearInputWatchdog.Stop())
+				time.Sleep(2 * time.Second)
+				synctest.Wait()
+				for _, packet := range drainEgressPackets(requestor) {
+					_, expired := packet.(internal_type.UnclearInputExpiredPacket)
+					assert.False(t, expired)
+				}
+			})
+		})
+	}
+}
+
+func TestDispatchInterruptionFinalRejectsQueuedExpiry(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Please repeat")
+		requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
+		defer startInterruptionTestOwner(t, requestor)()
+		handler := requestorDispatchHandler{r: requestor}
+		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
+		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{Script: "wait", Interim: true})
+		synctest.Wait()
+		contextID := requestor.GetID()
+		time.Sleep(time.Second)
+		synctest.Wait()
+		var expired internal_type.UnclearInputExpiredPacket
+		for _, packet := range drainEgressPackets(requestor) {
+			if value, ok := packet.(internal_type.UnclearInputExpiredPacket); ok {
+				expired = value
+			}
+		}
+		require.Equal(t, contextID, expired.ContextID)
+		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: contextID, Script: "Wait please"})
+		handler.HandleUnclearInputExpired(context.Background(), expired)
+		synctest.Wait()
+		assert.Equal(t, contextID, requestor.GetID())
+		for _, packet := range drainEgressPackets(requestor) {
+			_, injected := packet.(internal_type.InjectMessagePacket)
+			assert.False(t, injected)
+		}
+	})
+}
+
+func TestDispatchInterruptionNoWatchdogForOrdinaryListening(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Please repeat")
+		requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
+		_, contextID, err := requestor.messageLifecycle.RotateContext()
+		require.NoError(t, err)
+		defer startInterruptionTestOwner(t, requestor)()
+		handler := requestorDispatchHandler{r: requestor}
+		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{ContextID: contextID, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
+		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: contextID, Script: "hello", Interim: true})
+		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{ContextID: contextID, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd})
+		synctest.Wait()
+		assert.False(t, requestor.unclearInputWatchdog.Stop())
+		assert.Empty(t, interruptionTestControls(requestor))
+	})
+}
+
+func TestDispatchInterruptionPreservesWordTrigger(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerWord)
+		requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
+		defer startInterruptionTestOwner(t, requestor)()
+		handler := requestorDispatchHandler{r: requestor}
+		previous := requestor.GetID()
+		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{ContextID: previous, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
+		assert.Equal(t, previous, requestor.GetID())
+		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: previous, Script: "hello", Interim: true})
+		synctest.Wait()
+		assert.NotEqual(t, previous, requestor.GetID())
+		assert.Empty(t, interruptionTestControls(requestor))
+	})
+}
+
+func TestDispatchInterruptionInterimRefreshRejectsQueuedExpiry(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Please repeat")
+		requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
+		defer startInterruptionTestOwner(t, requestor)()
+		handler := requestorDispatchHandler{r: requestor}
+		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
+		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{Script: "wait", Interim: true})
+		synctest.Wait()
+		contextID := requestor.GetID()
+		time.Sleep(time.Second)
+		synctest.Wait()
+		var expired internal_type.UnclearInputExpiredPacket
+		for _, packet := range drainEgressPackets(requestor) {
+			if value, ok := packet.(internal_type.UnclearInputExpiredPacket); ok {
+				expired = value
+			}
+		}
+		require.Equal(t, contextID, expired.ContextID)
+		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: contextID, Script: "wait please", Interim: true})
+		handler.HandleUnclearInputExpired(context.Background(), expired)
+		synctest.Wait()
+		assert.Equal(t, contextID, requestor.GetID())
+		assert.True(t, requestor.unclearInputWatchdog.Stop())
+	})
+}
+
+func TestDispatchInterruptionFinalBeforeVadEndPreservesBoundary(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Please repeat")
+		eos := &recordingEOSExecutor{}
+		requestor.endOfSpeechExecutor = eos
+		defer startInterruptionTestOwner(t, requestor)()
+		handler := requestorDispatchHandler{r: requestor}
+		previous := requestor.GetID()
+		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{ContextID: previous, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
+		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: previous, Script: "Wait please"})
+		synctest.Wait()
+		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{ContextID: previous, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd})
+		synctest.Wait()
+		packets := eos.snapshotExecuted()
+		require.Len(t, packets, 4)
+		boundary := packets[3].(internal_type.InterruptionDetectedPacket)
+		assert.Equal(t, requestor.GetID(), boundary.ContextID)
+		assert.Equal(t, internal_type.InterruptionEventEnd, boundary.Event)
+		assert.False(t, requestor.unclearInputWatchdog.Stop())
+	})
+}
 
 func newInterruptionTestRequestor(trigger string) *genericRequestor {
 	options := map[string]interface{}{}

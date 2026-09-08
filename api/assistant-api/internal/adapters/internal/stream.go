@@ -243,6 +243,16 @@ func (t *genericRequestor) Notify(ctx context.Context, actionDatas ...internal_t
 	return nil
 }
 
+func (r *genericRequestor) sendOutputControl(control internal_type.Stream) error {
+	if r.streamer == nil {
+		return fmt.Errorf("output control %T: streamer is unavailable", control)
+	}
+	if err := r.streamer.Send(control); err != nil {
+		return fmt.Errorf("output control %T: %w", control, err)
+	}
+	return nil
+}
+
 // =============================================================================
 // Session Lifecycle
 // =============================================================================

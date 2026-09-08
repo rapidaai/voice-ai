@@ -2,6 +2,7 @@ package adapter_internal
 
 import (
 	"context"
+	"errors"
 	"io"
 	"strconv"
 	"sync"
@@ -78,6 +79,34 @@ func TestOnCallCompletionReportsCleanup(tester *testing.T) {
 	packet, ok := receiveEnvelope(tester, channels.BackgroundChannel()).Pkt.(internal_type.ObservabilityEventRecordPacket)
 	require.True(tester, ok)
 	require.Equal(tester, "0", packet.Record.Attributes["messages"])
+}
+
+type failingOutputControlStreamer struct {
+	streamTestStreamer
+	err error
+}
+
+func (streamer *failingOutputControlStreamer) Send(packet internal_type.Stream) error {
+	switch packet.(type) {
+	case internal_type.PauseOutput, internal_type.ContinueOutput, internal_type.FlushOutput:
+		return streamer.err
+	default:
+		return streamer.streamTestStreamer.Send(packet)
+	}
+}
+
+func TestSendOutputControlUsesExistingSendAndReturnsErrors(t *testing.T) {
+	streamer := &streamTestStreamer{}
+	requestor := &genericRequestor{streamer: streamer}
+	for _, control := range []internal_type.Stream{internal_type.PauseOutput{}, internal_type.ContinueOutput{}, internal_type.FlushOutput{}} {
+		require.NoError(t, requestor.sendOutputControl(control))
+	}
+	assert.Equal(t, []internal_type.Stream{internal_type.PauseOutput{}, internal_type.ContinueOutput{}, internal_type.FlushOutput{}}, streamer.sent)
+	failure := errors.New("local output failed")
+	requestor.streamer = &failingOutputControlStreamer{err: failure}
+	assert.ErrorIs(t, requestor.sendOutputControl(internal_type.PauseOutput{}), failure)
+	requestor.streamer = nil
+	assert.ErrorContains(t, requestor.sendOutputControl(internal_type.PauseOutput{}), "streamer is unavailable")
 }
 
 func TestTalk_RecvErrorBeforeInitialization_ReturnsNil(t *testing.T) {
