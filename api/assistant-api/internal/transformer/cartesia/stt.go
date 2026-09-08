@@ -232,7 +232,49 @@ func (cst *cartesiaSpeechToText) readLoop(conn *websocket.Conn) {
 
 		var resp cartesia_internal.SpeechToTextOutput
 		if err := json.Unmarshal(msg, &resp); err != nil {
-			continue
+			cst.mu.Lock()
+			if cst.connection == conn {
+				cst.connection = nil
+			}
+			ctxID := cst.contextId
+			cst.mu.Unlock()
+
+			cst.logger.Errorf("cartesia-stt: invalid message: %v", err)
+			cst.onPacket(
+				internal_type.ObservabilityMetricRecordPacket{
+					ContextID: ctxID,
+					Scope:     internal_type.ObservabilityRecordScopeConversation,
+					Record: observability.RecordMetric{
+						Metrics: []*protos.Metric{{
+							Name:        observability.MetricSTTError,
+							Value:       "1",
+							Description: "Cartesia STT protocol error",
+						}},
+						Attributes: observability.Attributes{"provider": cst.Name()},
+					},
+				},
+				internal_type.SpeechToTextErrorPacket{
+					ContextID: ctxID,
+					Error:     fmt.Errorf("cartesia-stt: invalid message: %w", err),
+					Type:      internal_type.STTNetworkTimeout,
+				},
+				internal_type.ObservabilityLogRecordPacket{
+					ContextID: ctxID,
+					Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+					Record: observability.RecordLog{
+						Level:   observability.LevelError,
+						Message: "cartesia-stt: invalid message",
+						Attributes: observability.Attributes{
+							"component": observability.ComponentSTT.String(),
+							"provider":  cst.Name(),
+							"error":     observability.AttributeValue(err.Error()),
+						},
+						OccurredAt: time.Now(),
+					},
+				},
+			)
+			_ = conn.Close()
+			return
 		}
 		cst.mu.Lock()
 		ctxID := cst.contextId
@@ -495,9 +537,6 @@ func (cst *cartesiaSpeechToText) Close(ctx context.Context) error {
 	cst.mu.Unlock()
 
 	if conn != nil {
-		cst.writeMu.Lock()
-		_ = conn.WriteMessage(websocket.TextMessage, []byte("close"))
-		cst.writeMu.Unlock()
 		_ = conn.Close()
 	}
 	cst.ctxCancel()
