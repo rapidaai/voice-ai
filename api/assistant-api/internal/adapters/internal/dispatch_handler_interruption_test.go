@@ -1338,13 +1338,11 @@ func TestHandleIdleTimeoutExpired_InjectedPromptSpeaksBeforeIdleRestarts(t *test
 
 	h.HandleTextToSpeechEnd(context.Background(), internal_type.TextToSpeechEndPacket{ContextID: newContextID})
 
-	var startIdleTimeout internal_type.StartIdleTimeoutPacket
 	for _, packet := range drainEgressPackets(r) {
 		if typed, ok := packet.(internal_type.StartIdleTimeoutPacket); ok {
-			startIdleTimeout = typed
+			t.Fatalf("idle prompt should not emit idle timeout packet after TTS end: %+v", typed)
 		}
 	}
-	assert.Equal(t, newContextID, startIdleTimeout.ContextID)
 	assert.Equal(t, adapter_lifecycle.MessageStateAssistantIdle, r.messageLifecycle.State())
 }
 
@@ -1365,7 +1363,7 @@ func TestHandleLLMResponseDone_DoesNotStartIdleTimeout(t *testing.T) {
 	}
 }
 
-func TestHandleTextToSpeechDone_TextModeStartsIdleTimeout(t *testing.T) {
+func TestHandleTextToSpeechDone_TextModeDoesNotEmitIdleTimeout(t *testing.T) {
 	r := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
 	h := requestorDispatchHandler{r: r}
 	contextID := r.GetID()
@@ -1379,17 +1377,15 @@ func TestHandleTextToSpeechDone_TextModeStartsIdleTimeout(t *testing.T) {
 		Text:      "done",
 	})
 
-	var startIdleTimeout internal_type.StartIdleTimeoutPacket
 	for _, packet := range drainEgressPackets(r) {
 		if typed, ok := packet.(internal_type.StartIdleTimeoutPacket); ok {
-			startIdleTimeout = typed
+			t.Fatalf("text mode TTS done should not emit idle timeout packet: %+v", typed)
 		}
 	}
-	assert.Equal(t, contextID, startIdleTimeout.ContextID)
 	assert.Equal(t, adapter_lifecycle.MessageStateAssistantIdle, r.messageLifecycle.State())
 }
 
-func TestHandleTextToSpeechDone_AudioModeWaitsForTextToSpeechEndBeforeIdleTimeout(t *testing.T) {
+func TestHandleTextToSpeechDone_AudioModeDoesNotEmitIdleTimeout(t *testing.T) {
 	r := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
 	r.messageLifecycle.SetMode(type_enums.AudioMode)
 	r.textToSpeechTransformer = noopSpeechToTextTransformer{}
@@ -1414,13 +1410,11 @@ func TestHandleTextToSpeechDone_AudioModeWaitsForTextToSpeechEndBeforeIdleTimeou
 
 	h.HandleTextToSpeechEnd(context.Background(), internal_type.TextToSpeechEndPacket{ContextID: contextID})
 
-	var startIdleTimeout internal_type.StartIdleTimeoutPacket
 	for _, packet := range drainEgressPackets(r) {
 		if typed, ok := packet.(internal_type.StartIdleTimeoutPacket); ok {
-			startIdleTimeout = typed
+			t.Fatalf("audio TTS end should not emit idle timeout packet: %+v", typed)
 		}
 	}
-	assert.Equal(t, contextID, startIdleTimeout.ContextID)
 	assert.Equal(t, adapter_lifecycle.MessageStateAssistantIdle, r.messageLifecycle.State())
 }
 

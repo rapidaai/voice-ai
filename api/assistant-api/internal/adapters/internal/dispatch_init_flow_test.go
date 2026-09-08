@@ -240,7 +240,7 @@ func TestInitializeBehavior_GreetingDoesNotStartIdleTimeoutBeforeCompletion(t *t
 	assert.Equal(t, greeting, injectMessage.Text)
 }
 
-func TestInitializeBehavior_StartsIdleTimeoutWhenNoGreetingIsInjected(t *testing.T) {
+func TestInitializeBehavior_DoesNotEmitIdleTimeoutWhenNoGreetingIsInjected(t *testing.T) {
 	idleTimeout := uint64(10)
 	requestorChannels := adapter_channel.NewRequestorChannels()
 	requestor := &genericRequestor{
@@ -263,13 +263,11 @@ func TestInitializeBehavior_StartsIdleTimeoutWhenNoGreetingIsInjected(t *testing
 		Config:    &protos.ConversationInitialization{StreamMode: protos.StreamMode_STREAM_MODE_TEXT},
 	})
 
-	var startIdleTimeout internal_type.StartIdleTimeoutPacket
 	for requestor.channels.EgressChannel().Len() > 0 {
 		if typed, ok := receiveEnvelope(t, requestor.channels.EgressChannel()).Pkt.(internal_type.StartIdleTimeoutPacket); ok {
-			startIdleTimeout = typed
+			t.Fatalf("initialization should not emit idle timeout packet: %+v", typed)
 		}
 	}
-	assert.Equal(t, "ctx-no-greeting-idle", startIdleTimeout.ContextID)
 }
 
 func TestInitializeBehavior_NonInterruptibleGreeting_BlocksAudioAndAcceptsAfterTextToSpeechEnd(t *testing.T) {
