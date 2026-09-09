@@ -55,5 +55,7 @@ type SpeechToTextOutput struct {
 	Text      string           `json:"text"`
 	Duration  float64          `json:"duration"`
 	Language  string           `json:"language"`
+	Title     string           `json:"title"`
+	Message   string           `json:"message"`
 	Words     []TranscriptWord `json:"words"`
 }

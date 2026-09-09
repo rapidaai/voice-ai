@@ -1,12 +1,20 @@
 package internal_transformer_cartesia
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/gorilla/websocket"
+	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -109,9 +117,10 @@ func TestGetSpeechToTextConnectionString_Default(t *testing.T) {
 	opt, _ := NewCartesiaOption(newTestLogger(), cred, utils.Option{})
 	connStr := opt.GetSpeechToTextConnectionString()
 	assert.Contains(t, connStr, "wss://api.cartesia.ai/stt/websocket?")
-	assert.Contains(t, connStr, "api_key=my-key")
-	assert.Contains(t, connStr, "cartesia_version="+CARTESIA_API_VERSION)
+	assert.NotContains(t, connStr, "api_key=")
+	assert.NotContains(t, connStr, "cartesia_version=")
 	assert.Contains(t, connStr, "encoding=pcm_s16le")
+	assert.Contains(t, connStr, "model=ink-2")
 	assert.Contains(t, connStr, "sample_rate=16000")
 }
 
@@ -127,6 +136,246 @@ func TestGetSpeechToTextConnectionString_WithLanguageAndModel(t *testing.T) {
 	assert.Contains(t, connStr, "model=nova-2")
 	assert.Contains(t, connStr, "encoding=pcm_s16le")
 	assert.Contains(t, connStr, "sample_rate=16000")
+}
+
+func TestGetSpeechToTextHeader(t *testing.T) {
+	cred := newVaultCredential(map[string]interface{}{"key": "my-key"})
+	opt, _ := NewCartesiaOption(newTestLogger(), cred, utils.Option{})
+
+	header := opt.GetSpeechToTextHeader()
+
+	assert.Equal(t, "my-key", header.Get("X-API-Key"))
+	assert.Equal(t, CARTESIA_STT_API_VERSION, header.Get("Cartesia-Version"))
+}
+
+func TestCartesiaSpeechToTextTransform_ContextAndFinalize(t *testing.T) {
+	upgrader := websocket.Upgrader{}
+	messages := make(chan struct {
+		messageType int
+		payload     string
+	}, 2)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			t.Errorf("upgrade websocket: %v", err)
+			return
+		}
+		defer conn.Close()
+		for i := 0; i < 2; i++ {
+			messageType, payload, err := conn.ReadMessage()
+			if err != nil {
+				return
+			}
+			messages <- struct {
+				messageType int
+				payload     string
+			}{messageType: messageType, payload: string(payload)}
+		}
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	stt := &cartesiaSpeechToText{
+		connection: conn,
+		logger:     newTestLogger(),
+		onPacket:   func(pkt ...internal_type.Packet) error { return nil },
+	}
+
+	require.NoError(t, stt.Transform(context.Background(), internal_type.SpeechToTextStartPacket{
+		ContextID: "ctx-start",
+	}))
+	require.NoError(t, stt.Transform(context.Background(), internal_type.SpeechToTextAudioPacket{
+		ContextID: "ctx-audio",
+		Audio:     []byte{1, 2, 3, 4},
+	}))
+	require.NoError(t, stt.Transform(context.Background(), internal_type.SpeechToTextEndPacket{
+		ContextID: "ctx-end",
+	}))
+
+	readMessage := func(label string) struct {
+		messageType int
+		payload     string
+	} {
+		select {
+		case message := <-messages:
+			return message
+		case <-time.After(time.Second):
+			t.Fatalf("timed out waiting for %s message", label)
+			return struct {
+				messageType int
+				payload     string
+			}{}
+		}
+	}
+
+	audioMessage := readMessage("audio")
+	assert.Equal(t, websocket.BinaryMessage, audioMessage.messageType)
+	assert.Equal(t, string([]byte{1, 2, 3, 4}), audioMessage.payload)
+
+	finalizeMessage := readMessage("finalize")
+	assert.Equal(t, websocket.TextMessage, finalizeMessage.messageType)
+	assert.Equal(t, "finalize", finalizeMessage.payload)
+	assert.Equal(t, "ctx-end", stt.contextId)
+}
+
+func TestCartesiaSpeechToTextTransform_FinalizeFailureEmitsError(t *testing.T) {
+	upgrader := websocket.Upgrader{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			t.Errorf("upgrade websocket: %v", err)
+			return
+		}
+		defer conn.Close()
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+	require.NoError(t, conn.Close())
+
+	packets := make(chan internal_type.Packet, 8)
+	stt := &cartesiaSpeechToText{
+		connection: conn,
+		logger:     newTestLogger(),
+		onPacket: func(pkt ...internal_type.Packet) error {
+			for _, p := range pkt {
+				packets <- p
+			}
+			return nil
+		},
+	}
+
+	err = stt.Transform(context.Background(), internal_type.SpeechToTextEndPacket{ContextID: "ctx-end"})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "finalize failed")
+	sttErr := waitForCartesiaSpeechToTextError(t, packets)
+	assert.Equal(t, "ctx-end", sttErr.ContextID)
+	assert.Contains(t, sttErr.Error.Error(), "finalize failed")
+}
+
+func TestCartesiaSpeechToTextReadLoop_InvalidMessageEmitsErrorAndClosesConnection(t *testing.T) {
+	upgrader := websocket.Upgrader{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			t.Errorf("upgrade websocket: %v", err)
+			return
+		}
+		defer conn.Close()
+		_ = conn.WriteMessage(websocket.TextMessage, []byte("{not-json"))
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	packets := make(chan internal_type.Packet, 8)
+	stt := &cartesiaSpeechToText{
+		ctx:        ctx,
+		ctxCancel:  cancel,
+		connection: conn,
+		contextId:  "ctx-json",
+		logger:     newTestLogger(),
+		onPacket: func(pkt ...internal_type.Packet) error {
+			for _, p := range pkt {
+				packets <- p
+			}
+			return nil
+		},
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		stt.readLoop(conn)
+	}()
+
+	sttErr := waitForCartesiaSpeechToTextError(t, packets)
+	assert.Equal(t, "ctx-json", sttErr.ContextID)
+	assert.Contains(t, sttErr.Error.Error(), "invalid message")
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for read loop to stop")
+	}
+
+	stt.mu.Lock()
+	currentConn := stt.connection
+	stt.mu.Unlock()
+	assert.Nil(t, currentConn)
+}
+
+func TestCartesiaSpeechToTextClose_ClosesConnectionAndCancelsContext(t *testing.T) {
+	upgrader := websocket.Upgrader{}
+	serverReadErr := make(chan error, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			t.Errorf("upgrade websocket: %v", err)
+			return
+		}
+		defer conn.Close()
+		_, _, err = conn.ReadMessage()
+		serverReadErr <- err
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	stt := &cartesiaSpeechToText{
+		ctx:            ctx,
+		ctxCancel:      cancel,
+		connection:     conn,
+		contextId:      "ctx-close",
+		sttConnectedAt: time.Now(),
+		logger:         newTestLogger(),
+		onPacket:       func(pkt ...internal_type.Packet) error { return nil },
+	}
+
+	require.NoError(t, stt.Close(context.Background()))
+
+	select {
+	case <-ctx.Done():
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for context cancellation")
+	}
+
+	select {
+	case err := <-serverReadErr:
+		require.Error(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for server read to stop")
+	}
+}
+
+func waitForCartesiaSpeechToTextError(t *testing.T, packets <-chan internal_type.Packet) internal_type.SpeechToTextErrorPacket {
+	t.Helper()
+	timeout := time.After(time.Second)
+	for {
+		select {
+		case packet := <-packets:
+			if sttErr, ok := packet.(internal_type.SpeechToTextErrorPacket); ok {
+				return sttErr
+			}
+		case <-timeout:
+			t.Fatal("timed out waiting for SpeechToTextErrorPacket")
+		}
+	}
 }
 
 func TestGetTextToSpeechConnectionString(t *testing.T) {

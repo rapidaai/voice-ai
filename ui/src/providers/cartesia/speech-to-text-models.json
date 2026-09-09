@@ -1,7 +1,10 @@
 [
   {
-    "name": "ink-whisper",
-    "id": "ink-whisper",
+    "name": "ink-2",
+    "id": "ink-2",
+    "releaseDate": "May 22, 2026",
+    "languages": ["en"],
+    "status": "Stable",
     "config": {
       "parameters": [
         {
@@ -10,7 +13,28 @@
           "type": "dropdown",
           "required": true,
           "default": "en",
-          "data": "languages.json",
+          "data": "languages-ink-2.json",
+          "valueField": "code",
+          "errorMessage": "Please provide valid cartesia language options for speech to text."
+        }
+      ]
+    }
+  },
+  {
+    "name": "ink-preview",
+    "id": "ink-preview",
+    "releaseDate": "September 4, 2026",
+    "languages": ["en", "fr", "hi", "ja", "es"],
+    "status": "Preview",
+    "config": {
+      "parameters": [
+        {
+          "key": "listen.language",
+          "label": "Language",
+          "type": "dropdown",
+          "required": true,
+          "default": "en",
+          "data": "languages-ink-preview.json",
           "valueField": "code",
           "errorMessage": "Please provide valid cartesia language options for speech to text."
         }

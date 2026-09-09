@@ -6,7 +6,7 @@
       "label": "Model",
       "type": "dropdown",
       "required": true,
-      "default": "ink-whisper",
+      "default": "ink-2",
       "data": "speech-to-text-models.json",
       "valueField": "id",
       "errorMessage": "Please provide valid cartesia model for speech to text."
