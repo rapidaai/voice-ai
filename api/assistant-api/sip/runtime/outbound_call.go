@@ -73,6 +73,9 @@ func (outboundCall *Outbound) HandleCall() {
 // It owns setup failure side effects; steady-state call handling remains in HandleCall.
 func (outboundCall *Outbound) Connect() (time.Time, error) {
 	if err := outboundCall.request.Validate(); err != nil {
+		if outboundCall.server != nil && outboundCall.session != nil && outboundCall.dialog != nil {
+			outboundCall.failBeforeAnswer(NewOutboundSetupFailure(err), SIPAuthConfig{})
+		}
 		return time.Time{}, err
 	}
 	outboundConfig := outboundCall.request.Config

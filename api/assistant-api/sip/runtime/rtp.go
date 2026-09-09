@@ -63,11 +63,10 @@ type RTPHandler struct {
 	remoteSSRC             atomic.Uint32
 
 	// Audio delivery
-	inboundAudioSink      func(InboundAudioFrame)
-	inboundAudioSinkReady chan struct{}
-	inboundAudioSinkOnce  sync.Once
-	inputJitter           *rtpInputJitterBuffer
-	inputSilenceFiller    *rtpInputSilenceFiller
+	inboundAudioSinkMu sync.RWMutex
+	inboundAudioSink   func(InboundAudioFrame)
+	inputJitter        *rtpInputJitterBuffer
+	inputSilenceFiller *rtpInputSilenceFiller
 
 	ctx              context.Context
 	cancel           context.CancelFunc
@@ -246,7 +245,6 @@ func NewRTPHandler(ctx context.Context, config *RTPConfig) (*RTPHandler, error) 
 		ssrc:                   ssrc,
 		codec:                  codec,
 		inputPacketizationTime: config.PacketizationTime,
-		inboundAudioSinkReady:  make(chan struct{}),
 		inputJitter:            newRTPInputJitterBuffer(config.PacketizationTime),
 		inputSilenceFiller:     newRTPInputSilenceFiller(codec, config.PacketizationTime),
 		ctx:                    handlerCtx,
@@ -332,6 +330,7 @@ func (h *RTPHandler) Stop() error {
 		return nil
 	}
 	h.running.Store(false)
+	h.SetInboundAudioSink(nil)
 
 	if h.cancel != nil {
 		h.cancel()
@@ -582,24 +581,14 @@ func (h *RTPHandler) LocalRTCPPort() int {
 }
 
 // SetInboundAudioSink sets the sole consumer for ordered inbound RTP audio.
-// The receive loop waits for the first non-nil sink before reading packets.
+// Clearing the sink waits for any active sink callback to finish.
 func (h *RTPHandler) SetInboundAudioSink(sink func(InboundAudioFrame)) {
 	if h == nil {
 		return
 	}
-	h.mu.Lock()
+	h.inboundAudioSinkMu.Lock()
 	h.inboundAudioSink = sink
-	ready := h.inboundAudioSinkReady
-	if sink != nil && ready == nil {
-		ready = make(chan struct{})
-		h.inboundAudioSinkReady = ready
-	}
-	h.mu.Unlock()
-	if sink != nil {
-		h.inboundAudioSinkOnce.Do(func() {
-			close(ready)
-		})
-	}
+	h.inboundAudioSinkMu.Unlock()
 }
 
 // WriteAudio writes one complete encoded audio frame to the RTP transport.
@@ -687,15 +676,6 @@ func (h *RTPHandler) SetInboundMediaFormat(codec *Codec, packetizationTime time.
 }
 
 func (h *RTPHandler) receiveLoop() {
-	h.mu.RLock()
-	inboundAudioSinkReady := h.inboundAudioSinkReady
-	h.mu.RUnlock()
-	select {
-	case <-h.ctx.Done():
-		return
-	case <-inboundAudioSinkReady:
-	}
-
 	buf := make([]byte, rtpPacketMaxSize+1)
 
 	for {
@@ -829,14 +809,15 @@ func (h *RTPHandler) deliverInboundPackets(packets []rtpBufferedInputPacket) {
 
 func (h *RTPHandler) deliverInboundAudio(frames []InboundAudioFrame) {
 	for _, frame := range frames {
-		h.mu.RLock()
+		h.inboundAudioSinkMu.RLock()
 		sink := h.inboundAudioSink
-		h.mu.RUnlock()
 		if sink == nil {
+			h.inboundAudioSinkMu.RUnlock()
 			h.packetsDropped.Add(1)
 			continue
 		}
 		sink(frame)
+		h.inboundAudioSinkMu.RUnlock()
 		h.packetsDelivered.Add(1)
 		deliveredAt := time.Now()
 		h.markInboundAudioDelivered(deliveredAt)

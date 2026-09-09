@@ -394,6 +394,15 @@ describe('Cartesia STT — config vs original', () => {
     expect(validateFromConfig(config, 'stt', 'cartesia', opts)).toBeUndefined();
   });
 
+  it('validates: legacy ink-whisper options remain valid', () => {
+    const opts = [
+      cred(),
+      createMetadata('listen.model', 'ink-whisper'),
+      createMetadata('listen.language', 'en'),
+    ];
+    expect(validateFromConfig(config, 'stt', 'cartesia', opts)).toBeUndefined();
+  });
+
   it('validates: preview model languages return undefined', () => {
     const opts = [
       cred(),

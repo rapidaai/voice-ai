@@ -448,6 +448,7 @@ func (engine *cachedEngine) writeLinear16ToTarget(
 			engine.outputBytes = engine.outputBytes[:sampleCount]
 		}
 		for index := range engine.outputBytes {
+			// #nosec G115, PCM16 decoding preserves the source two's-complement bits.
 			engine.outputBytes[index] = g711.EncodeUlawFrame(int16(binary.LittleEndian.Uint16(pcm[index*pcm16BytesPerSample:])))
 		}
 		return sink(engine.outputBytes)

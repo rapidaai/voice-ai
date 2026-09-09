@@ -8,6 +8,7 @@ import (
 
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	policychannel "github.com/rapidaai/pkg/channel"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRequestorChannels_OverflowEvictsOldestAudioPacket(tester *testing.T) {
@@ -48,7 +49,7 @@ func TestRequestorChannels_CancelledIngressIsNotOverload(tester *testing.T) {
 	}
 }
 
-func TestRequestorChannels_ControlOverflowRejectsNewestPacket(t *testing.T) {
+func TestRequestorChannels_ControlOverflowRetainsNewestPacket(t *testing.T) {
 	channels := newRequestorChannelsWithIngressCapacity(t, 1)
 	channels.OnControl(Envelope{Ctx: context.Background(), Pkt: internal_type.TurnChangePacket{ContextID: "first"}})
 	channels.OnControl(Envelope{Ctx: context.Background(), Pkt: internal_type.TurnChangePacket{ContextID: "second"}})
@@ -56,8 +57,8 @@ func TestRequestorChannels_ControlOverflowRejectsNewestPacket(t *testing.T) {
 	if channels.ControlChannel().Len() != 1 {
 		t.Fatalf("expected bounded control queue, got %d", channels.ControlChannel().Len())
 	}
-	if contextID := recvEnvelope(t, channels.ControlChannel()).Pkt.ContextId(); contextID != "first" {
-		t.Fatalf("expected oldest control packet to be retained, got %s", contextID)
+	if contextID := recvEnvelope(t, channels.ControlChannel()).Pkt.ContextId(); contextID != "second" {
+		t.Fatalf("expected newest control packet to be retained, got %s", contextID)
 	}
 }
 
@@ -94,9 +95,10 @@ func newRequestorChannelsWithIngressCapacity(t *testing.T, capacity int) *Reques
 		t.Fatalf("create ingress test channel: %v", err)
 	}
 	return &RequestorChannels{
-		controlChannel: newTestChannel(t, 1, policychannel.RejectNewestWhenFull),
+		controlChannel: newTestChannel(t, 1, policychannel.ReplaceOldestWhenFull),
 		bootstrapCh:    newTestChannel(t, 1, policychannel.BlockWhenFull),
 		ingressCh:      ingressCh,
+		ingressPauseCh: make(chan struct{}),
 		egressCh:       newTestChannel(t, 1, policychannel.BlockWhenFull),
 		dataCh:         newTestChannel(t, 1, policychannel.BlockWhenFull),
 		backgroundCh:   newTestChannel(t, 1, policychannel.BlockWhenFull),
@@ -398,9 +400,11 @@ func TestRequestorChannels_PauseIngress_CallbackRunsAfterIngressHandlerReturns(t
 		t.Fatalf("timed out waiting for ingress handler")
 	}
 
-	go chs.PauseIngress(ctx, func() {
-		close(paused)
-	})
+	go func() {
+		chs.PauseIngress(ctx, func() {
+			close(paused)
+		})
+	}()
 
 	select {
 	case <-paused:
@@ -425,6 +429,59 @@ func TestRequestorChannels_PauseIngress_CallbackRunsAfterIngressHandlerReturns(t
 	}
 }
 
+func TestRequestorChannels_RunIngressAfterPauseUsesNewPauseChannel(t *testing.T) {
+	chs := NewRequestorChannels()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	firstHandled := make(chan struct{})
+	firstPaused := make(chan struct{})
+	go chs.RunIngress(ctx, func(Envelope) {
+		close(firstHandled)
+	})
+	chs.OnIngress(Envelope{
+		Ctx: context.Background(),
+		Pkt: internal_type.UserTextReceivedPacket{ContextID: "before-pause"},
+	})
+	select {
+	case <-firstHandled:
+	case <-time.After(time.Second):
+		t.Fatalf("timed out waiting for first ingress packet")
+	}
+	chs.PauseIngress(ctx, func() {
+		close(firstPaused)
+	})
+	select {
+	case <-firstPaused:
+	case <-time.After(time.Second):
+		t.Fatalf("timed out waiting for first pause")
+	}
+
+	chs.ingressWriteMu.Lock()
+	pausedIngressCh := chs.ingressPauseCh
+	chs.ingressWriteMu.Unlock()
+	handled := make(chan struct{})
+	go chs.RunIngress(ctx, func(Envelope) {
+		close(handled)
+	})
+	require.Eventually(t, func() bool {
+		chs.ingressWriteMu.Lock()
+		runningIngressCh := chs.ingressPauseCh
+		chs.ingressWriteMu.Unlock()
+		return runningIngressCh != pausedIngressCh
+	}, time.Second, time.Millisecond)
+	chs.OnIngress(Envelope{
+		Ctx: context.Background(),
+		Pkt: internal_type.UserTextReceivedPacket{ContextID: "after-pause"},
+	})
+
+	select {
+	case <-handled:
+	case <-time.After(time.Second):
+		t.Fatalf("restarted ingress did not handle packet")
+	}
+}
+
 func TestRequestorChannels_RunControl_ProcessesAndStopsOnCancel(t *testing.T) {
 	chs := NewRequestorChannels()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -441,22 +498,19 @@ func TestRequestorChannels_RunControl_ProcessesAndStopsOnCancel(t *testing.T) {
 	}()
 
 	chs.OnControl(Envelope{Ctx: context.Background(), Pkt: internal_type.TurnChangePacket{ContextID: "ctrl"}})
-
 	select {
 	case got := <-handled:
 		if got.Pkt.ContextId() != "ctrl" {
-			t.Fatalf("unexpected handled packet context: %s", got.Pkt.ContextId())
+			t.Fatalf("unexpected control packet context: %s", got.Pkt.ContextId())
 		}
 	case <-time.After(time.Second):
 		t.Fatalf("timed out waiting for control packet to be handled")
 	}
 
 	cancel()
-
 	select {
 	case <-finished:
-		// expected
 	case <-time.After(time.Second):
-		t.Fatalf("RunControl did not stop after context cancellation")
+		t.Fatalf("timed out waiting for control runner to stop")
 	}
 }

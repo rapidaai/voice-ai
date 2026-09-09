@@ -51,10 +51,14 @@ func TestInput_AudioOverflowDoesNotEvictInitialization(tester *testing.T) {
 func TestInputRoutesBridgeAudioToLowPriority(tester *testing.T) {
 	streamer := New(WithInputChannelCapacity(2), WithOutputChannelCapacity(1))
 	defer streamer.Cancel()
-	streamer.Input(&protos.ConversationBridgeUserAudio{Audio: []byte{1, 2}})
-	streamer.Input(&protos.ConversationBridgeOperatorAudio{Audio: []byte{3, 4}})
+	userAudio := &protos.ConversationBridgeUserAudio{Audio: []byte{1, 2}}
+	operatorAudio := &protos.ConversationBridgeOperatorAudio{Audio: []byte{3, 4}}
+	streamer.Input(userAudio)
+	streamer.Input(operatorAudio)
 	require.Zero(tester, streamer.InputCh.Len())
 	require.Len(tester, streamer.LowCh, 2)
+	require.Same(tester, userAudio, <-streamer.LowCh)
+	require.Same(tester, operatorAudio, <-streamer.LowCh)
 }
 
 func newTestStreamer(t *testing.T) *BaseStreamer {
