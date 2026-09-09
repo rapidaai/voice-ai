@@ -31,6 +31,8 @@ func (resampler *mockResampler) Resample(data []byte, _, _ *protos.AudioConfig) 
 	return out, nil
 }
 
+func (resampler *mockResampler) Close() {}
+
 func newTestProcessor(t *testing.T, silenceByte byte, frameSize int) *AudioProcessor {
 	t.Helper()
 	audioProcessor := &AudioProcessor{

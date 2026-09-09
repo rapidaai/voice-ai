@@ -46,6 +46,8 @@ func (resampler *fakeTTSResampler) Resample(data []byte, _, _ *protos.AudioConfi
 	return append([]byte(nil), data...), nil
 }
 
+func (resampler *fakeTTSResampler) Close() {}
+
 type packetCollector struct {
 	mu      sync.Mutex
 	packets []internal_type.Packet
@@ -273,7 +275,8 @@ func TestTextToSpeech_NormalizesCustomAudioOutput(t *testing.T) {
 
 	typed, ok := transformer.(*textToSpeech)
 	require.True(t, ok)
-	require.NotNil(t, typed.resampler, "non-internal custom TTS output should initialize a streaming resampler")
+	require.NotNil(t, typed.resampleWriter, "non-internal custom TTS output should initialize a streaming resampler")
+	typed.resampleWriter = nil
 	typed.resampler = &fakeTTSResampler{out: []byte("internal-audio")}
 
 	require.NoError(t, transformer.Initialize())
@@ -336,6 +339,7 @@ func TestTextToSpeech_NormalizeAudioErrorSkipsChunk(t *testing.T) {
 
 	typed, ok := transformer.(*textToSpeech)
 	require.True(t, ok)
+	typed.resampleWriter = nil
 	typed.resampler = &fakeTTSResampler{err: errors.New("resample failed")}
 
 	require.NoError(t, transformer.Initialize())

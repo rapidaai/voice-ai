@@ -9,12 +9,20 @@ package resampler_soxr
 
 type nativePCM16Resampler struct{}
 
-func newNativePCM16Resampler(uint32, uint32) (*nativePCM16Resampler, error) {
+func newNativePCM16Resampler(uint32, uint32, nativeSOXRQuality) (*nativePCM16Resampler, error) {
 	return nil, ErrNativeSOXRUnavailable
 }
 
 func (resampler *nativePCM16Resampler) Resample([]byte) ([]byte, error) {
 	return nil, ErrNativeSOXRUnavailable
+}
+
+func (resampler *nativePCM16Resampler) WriteTo([]byte, func([]byte) error) error {
+	return ErrNativeSOXRUnavailable
+}
+
+func (resampler *nativePCM16Resampler) FlushTo(func([]byte) error) error {
+	return ErrNativeSOXRUnavailable
 }
 
 func (resampler *nativePCM16Resampler) Close() {}

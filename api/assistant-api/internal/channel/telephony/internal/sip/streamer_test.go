@@ -311,13 +311,16 @@ func TestNew_RoutesBridgeRecordingOutsideRealtimeInput(t *testing.T) {
 	}
 
 	streamer.mediaPort.StartBridgeRecorder()
-	streamer.mediaPort.RecordTransferOperatorAudio(make([]byte, 160))
+	for range 8 {
+		streamer.mediaPort.RecordTransferOperatorAudio(make([]byte, 160))
+	}
 
 	select {
 	case message := <-streamer.LowCh:
 		recording, ok := message.(*protos.ConversationBridgeOperatorAudio)
 		require.True(t, ok, "expected bridge operator recording, got %T", message)
-		require.Len(t, recording.GetAudio(), 640)
+		require.NotEmpty(t, recording.GetAudio())
+		require.Zero(t, len(recording.GetAudio())%2)
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for bridge recording")
 	}

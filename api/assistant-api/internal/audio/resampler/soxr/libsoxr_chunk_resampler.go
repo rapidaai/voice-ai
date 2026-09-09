@@ -90,6 +90,8 @@ func (r *chunkResampler) Resample(data []byte, source, target *protos.AudioConfi
 	return fitLength(pcm, expectedBytes), nil
 }
 
+func (r *chunkResampler) Close() {}
+
 func expectedOutputBytes(data []byte, source, target *protos.AudioConfig) int {
 	sourceFrameSize := internal_audio.FrameSize(source)
 	targetFrameSize := internal_audio.FrameSize(target)

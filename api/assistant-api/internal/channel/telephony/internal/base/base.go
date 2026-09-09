@@ -10,11 +10,9 @@ import (
 	"encoding/base64"
 	"strings"
 
-	resampler_soxr "github.com/rapidaai/api/assistant-api/internal/audio/resampler/soxr"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	channel_base "github.com/rapidaai/api/assistant-api/internal/channel/base"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -33,7 +31,6 @@ type BaseTelephonyStreamer struct {
 	// streamer only needs IDs, not full DB entities.
 	callCtx *callcontext.CallContext
 
-	resampler       internal_type.AudioResampler
 	encoder         *base64.Encoding
 	vaultCredential *protos.VaultCredential
 	observer        observability.Recorder
@@ -54,12 +51,8 @@ func New(
 ) BaseTelephonyStreamer {
 	streamerOptions = append([]channel_base.Option{channel_base.WithLogger(logger)}, streamerOptions...)
 	return BaseTelephonyStreamer{
-		BaseStreamer: channel_base.New(streamerOptions...),
-		callCtx:      cc,
-		resampler: resampler_soxr.New(
-			resampler_soxr.WithLogger(logger),
-			resampler_soxr.WithHighQuality(),
-		),
+		BaseStreamer:    channel_base.New(streamerOptions...),
+		callCtx:         cc,
 		encoder:         base64.StdEncoding,
 		vaultCredential: vaultCred,
 		observer:        observer,
@@ -88,11 +81,6 @@ func (base *BaseTelephonyStreamer) Encoder() *base64.Encoding {
 // VaultCredential returns the vault credential associated with the streamer.
 func (base *BaseTelephonyStreamer) VaultCredential() *protos.VaultCredential {
 	return base.vaultCredential
-}
-
-// Resampler returns the audio resampler.
-func (base *BaseTelephonyStreamer) Resampler() internal_type.AudioResampler {
-	return base.resampler
 }
 
 func (base *BaseTelephonyStreamer) Observer() observability.Recorder {

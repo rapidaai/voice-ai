@@ -66,6 +66,7 @@ func TestNewInitializesBaseStreamer(t *testing.T) {
 	require.Same(t, logger, base.Logger)
 	require.NotNil(t, base.InputCh)
 	require.NotNil(t, base.OutputCh)
+	require.NotNil(t, base.Encoder())
 }
 
 func TestNewAppliesStreamerOptions(t *testing.T) {

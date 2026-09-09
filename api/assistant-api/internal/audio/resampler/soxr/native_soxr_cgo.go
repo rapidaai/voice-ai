@@ -23,21 +23,25 @@ import (
 )
 
 type nativePCM16Resampler struct {
-	handle        C.soxr_t
-	closed        *atomic.Bool
-	sourceRate    uint32
-	targetRate    uint32
-	inputSamples  []int16
-	outputSamples []int16
-	pendingOutput []int16
-	hasProcessed  bool
+	handle               C.soxr_t
+	closed               *atomic.Bool
+	sourceRate           uint32
+	targetRate           uint32
+	frameBuffered        bool
+	maxInputSampleCount  int
+	outputSamples        []int16
+	pendingOutputSamples []int16
 }
 
-func newNativePCM16Resampler(sourceRate, targetRate uint32) (*nativePCM16Resampler, error) {
+func newNativePCM16Resampler(sourceRate, targetRate uint32, quality nativeSOXRQuality) (*nativePCM16Resampler, error) {
 	ioSpec := C.soxr_io_spec(C.SOXR_INT16_I, C.SOXR_INT16_I)
 	ioSpec.flags = C.SOXR_NO_DITHER
 	var nativeError C.soxr_error_t
-	qualitySpec := C.soxr_quality_spec(C.SOXR_QQ, 0)
+	qualityRecipe := C.ulong(C.SOXR_QQ)
+	if quality == nativeSOXRQualityLiveKit {
+		qualityRecipe = C.ulong(C.SOXR_LQ)
+	}
+	qualitySpec := C.soxr_quality_spec(qualityRecipe, 0)
 	runtimeSpec := C.soxr_runtime_spec(nativeSOXRThreadCount)
 	nativeHandle := C.soxr_create(
 		C.double(sourceRate),
@@ -49,15 +53,18 @@ func newNativePCM16Resampler(sourceRate, targetRate uint32) (*nativePCM16Resampl
 		&runtimeSpec,
 	)
 	if nativeError != nil {
-		return nil, fmt.Errorf("%w: %s", ErrNativeSOXRFailed, C.GoString(nativeError))
+		message := C.GoString(nativeError)
+		C.free(unsafe.Pointer(nativeError))
+		return nil, fmt.Errorf("%w: %s", ErrNativeSOXRFailed, message)
 	}
 
 	closed := new(atomic.Bool)
 	resampler := &nativePCM16Resampler{
-		handle:     nativeHandle,
-		closed:     closed,
-		sourceRate: sourceRate,
-		targetRate: targetRate,
+		handle:        nativeHandle,
+		closed:        closed,
+		sourceRate:    sourceRate,
+		targetRate:    targetRate,
+		frameBuffered: quality == nativeSOXRQualityLiveKit,
 	}
 	runtime.AddCleanup(resampler, func(handle C.soxr_t) {
 		if closed.CompareAndSwap(false, true) {
@@ -79,92 +86,198 @@ func (resampler *nativePCM16Resampler) Resample(data []byte) ([]byte, error) {
 	}
 
 	inputSampleCount := len(data) / pcm16BytesPerSample
-	if cap(resampler.inputSamples) < inputSampleCount {
-		resampler.inputSamples = make([]int16, inputSampleCount)
+	if inputSampleCount > resampler.maxInputSampleCount {
+		resampler.maxInputSampleCount = inputSampleCount
+	}
+	producedSamples, err := resampler.process(data, false)
+	if err != nil {
+		return nil, err
+	}
+	if !resampler.frameBuffered {
+		return encodePCM16Samples(producedSamples), nil
+	}
+
+	resampler.pendingOutputSamples = append(resampler.pendingOutputSamples, producedSamples...)
+	return resampler.drainCompleteOutputFrames(resampler.outputFrameSampleCount(inputSampleCount)), nil
+}
+
+func (resampler *nativePCM16Resampler) WriteTo(data []byte, sink func([]byte) error) error {
+	if resampler == nil || resampler.handle == nil || resampler.closed.Load() {
+		return ErrResamplerClosed
+	}
+	if sink == nil {
+		return ErrResampleSinkRequired
+	}
+	if len(data)%pcm16BytesPerSample != 0 {
+		return fmt.Errorf("%w: %d", ErrInvalidPCM16InputLength, len(data))
+	}
+	if len(data) == 0 {
+		return nil
+	}
+
+	inputSampleCount := len(data) / pcm16BytesPerSample
+	if inputSampleCount > resampler.maxInputSampleCount {
+		resampler.maxInputSampleCount = inputSampleCount
+	}
+	producedSamples, err := resampler.process(data, false)
+	if err != nil {
+		return err
+	}
+	if !resampler.frameBuffered {
+		return resampler.writePCM16Samples(producedSamples, sink)
+	}
+
+	resampler.pendingOutputSamples = append(resampler.pendingOutputSamples, producedSamples...)
+	return resampler.writeCompleteOutputFrames(resampler.outputFrameSampleCount(inputSampleCount), sink)
+}
+
+func (resampler *nativePCM16Resampler) FlushTo(sink func([]byte) error) error {
+	if resampler == nil || resampler.handle == nil || resampler.closed.Load() {
+		return ErrResamplerClosed
+	}
+	if sink == nil {
+		return ErrResampleSinkRequired
+	}
+	producedSamples, err := resampler.process(nil, true)
+	if err != nil {
+		return err
+	}
+	if !resampler.frameBuffered {
+		return resampler.writePCM16Samples(producedSamples, sink)
+	}
+	resampler.pendingOutputSamples = append(resampler.pendingOutputSamples, producedSamples...)
+	err = resampler.writePCM16Samples(resampler.pendingOutputSamples, sink)
+	resampler.pendingOutputSamples = resampler.pendingOutputSamples[:0]
+	return err
+}
+
+func (resampler *nativePCM16Resampler) process(input []byte, flush bool) ([]int16, error) {
+	outputSampleCount := resampler.outputCapacitySampleCount(len(input)/pcm16BytesPerSample, flush)
+	if outputSampleCount < minimumOutputSampleCount {
+		outputSampleCount = minimumOutputSampleCount
+	}
+	if cap(resampler.outputSamples) < outputSampleCount {
+		resampler.outputSamples = make([]int16, outputSampleCount)
 	} else {
-		resampler.inputSamples = resampler.inputSamples[:inputSampleCount]
-	}
-	for sampleIndex := range resampler.inputSamples {
-		// #nosec G115, PCM16 decoding preserves the source two's-complement bits.
-		resampler.inputSamples[sampleIndex] = int16(binary.LittleEndian.Uint16(data[sampleIndex*pcm16BytesPerSample:]))
+		resampler.outputSamples = resampler.outputSamples[:outputSampleCount]
 	}
 
-	scaledInputSamples := uint64(inputSampleCount) * uint64(resampler.targetRate)
-	targetSampleCount := int((scaledInputSamples + uint64(resampler.sourceRate)/2) / uint64(resampler.sourceRate))
-	if targetSampleCount < minimumOutputSampleCount {
-		targetSampleCount = minimumOutputSampleCount
-	}
-	outputCapacity := targetSampleCount
-	if outputCapacity < len(resampler.pendingOutput)+targetSampleCount {
-		outputCapacity = len(resampler.pendingOutput) + targetSampleCount
-	}
-	if cap(resampler.outputSamples) < outputCapacity {
-		resampler.outputSamples = make([]int16, outputCapacity)
-	} else {
-		resampler.outputSamples = resampler.outputSamples[:outputCapacity]
-	}
-
-	var inputSamplesConsumed C.size_t
-	var outputSamplesProduced C.size_t
-	nativeError := C.soxr_process(
-		resampler.handle,
-		C.soxr_in_t(unsafe.Pointer(unsafe.SliceData(resampler.inputSamples))),
-		C.size_t(len(resampler.inputSamples)),
-		&inputSamplesConsumed,
-		C.soxr_out_t(unsafe.Pointer(unsafe.SliceData(resampler.outputSamples))),
-		C.size_t(len(resampler.outputSamples)),
-		&outputSamplesProduced,
-	)
-	if nativeError != nil {
-		return nil, fmt.Errorf("%w: %s", ErrNativeSOXRFailed, C.GoString(nativeError))
-	}
-	// #nosec G115, the native count cannot exceed the provided input length.
-	if int(inputSamplesConsumed) != len(resampler.inputSamples) {
-		return nil, fmt.Errorf(
-			"%w: consumed %d of %d",
-			ErrIncompleteSOXRInput,
-			inputSamplesConsumed,
-			len(resampler.inputSamples),
-		)
-	}
-
-	// #nosec G115, the native count cannot exceed the provided output length.
-	producedSampleCount := int(outputSamplesProduced)
-	if scaledInputSamples%uint64(resampler.sourceRate) == 0 && len(resampler.pendingOutput) == 0 {
-		output := make([]byte, targetSampleCount*pcm16BytesPerSample)
-		outputSampleOffset := 0
-		if !resampler.hasProcessed && producedSampleCount < targetSampleCount {
-			outputSampleOffset = targetSampleCount - producedSampleCount
+	remainingInput := input
+	producedSampleCount := 0
+	for {
+		if producedSampleCount == len(resampler.outputSamples) {
+			resampler.outputSamples = append(resampler.outputSamples, make([]int16, outputSampleCount)...)
 		}
-		for sampleIndex := range producedSampleCount {
-			// #nosec G115, PCM16 encoding preserves the signed sample bits.
-			binary.LittleEndian.PutUint16(
-				output[(sampleIndex+outputSampleOffset)*pcm16BytesPerSample:],
-				uint16(resampler.outputSamples[sampleIndex]),
+		outputSamples := resampler.outputSamples[producedSampleCount:]
+		var inputSamplesConsumed C.size_t
+		var outputSamplesProduced C.size_t
+		var nativeError C.soxr_error_t
+		if len(remainingInput) > 0 {
+			nativeError = C.soxr_process(
+				resampler.handle,
+				C.soxr_in_t(unsafe.Pointer(unsafe.SliceData(remainingInput))),
+				C.size_t(len(remainingInput)/pcm16BytesPerSample),
+				&inputSamplesConsumed,
+				C.soxr_out_t(unsafe.Pointer(unsafe.SliceData(outputSamples))),
+				C.size_t(len(outputSamples)),
+				&outputSamplesProduced,
 			)
+		} else if flush {
+			nativeError = C.soxr_process(
+				resampler.handle,
+				nil,
+				0,
+				nil,
+				C.soxr_out_t(unsafe.Pointer(unsafe.SliceData(outputSamples))),
+				C.size_t(len(outputSamples)),
+				&outputSamplesProduced,
+			)
+		} else {
+			break
 		}
-		resampler.hasProcessed = true
-		return output, nil
+		if nativeError != nil {
+			message := C.GoString(nativeError)
+			C.free(unsafe.Pointer(nativeError))
+			return nil, fmt.Errorf("%w: %s", ErrNativeSOXRFailed, message)
+		}
+
+		producedSampleCount += int(outputSamplesProduced)
+		if len(remainingInput) == 0 {
+			if !flush || int(outputSamplesProduced) == 0 || int(outputSamplesProduced) < len(outputSamples) {
+				break
+			}
+			continue
+		}
+		if int(inputSamplesConsumed) == 0 && int(outputSamplesProduced) == 0 {
+			return nil, fmt.Errorf("%w: consumed 0 of %d", ErrIncompleteSOXRInput, len(remainingInput)/pcm16BytesPerSample)
+		}
+		remainingInput = remainingInput[int(inputSamplesConsumed)*pcm16BytesPerSample:]
+		if len(remainingInput) == 0 {
+			break
+		}
 	}
 
-	if producedSampleCount > 0 {
-		resampler.pendingOutput = append(resampler.pendingOutput, resampler.outputSamples[:producedSampleCount]...)
+	return resampler.outputSamples[:producedSampleCount], nil
+}
+
+func (resampler *nativePCM16Resampler) outputCapacitySampleCount(inputSampleCount int, flush bool) int {
+	if flush && inputSampleCount == 0 {
+		inputSampleCount = resampler.maxInputSampleCount
 	}
-	if len(resampler.pendingOutput) < targetSampleCount {
-		return []byte{}, nil
+	outputSampleCount := int(
+		(uint64(inputSampleCount)*uint64(resampler.targetRate) + uint64(resampler.sourceRate)/2) /
+			uint64(resampler.sourceRate),
+	)
+	return outputSampleCount + nativeOutputExtraSamples
+}
+
+func (resampler *nativePCM16Resampler) outputFrameSampleCount(inputSampleCount int) int {
+	outputFrameSampleCount := int(uint64(inputSampleCount) * uint64(resampler.targetRate) / uint64(resampler.sourceRate))
+	if outputFrameSampleCount < minimumOutputSampleCount {
+		return minimumOutputSampleCount
 	}
-	outputSamples := resampler.pendingOutput[:targetSampleCount]
-	output := make([]byte, len(outputSamples)*pcm16BytesPerSample)
-	for sampleIndex, sample := range outputSamples {
+	return outputFrameSampleCount
+}
+
+func (resampler *nativePCM16Resampler) drainCompleteOutputFrames(frameSampleCount int) []byte {
+	completeSampleCount := len(resampler.pendingOutputSamples) / frameSampleCount * frameSampleCount
+	if completeSampleCount == 0 {
+		return []byte{}
+	}
+	output := encodePCM16Samples(resampler.pendingOutputSamples[:completeSampleCount])
+	copy(resampler.pendingOutputSamples, resampler.pendingOutputSamples[completeSampleCount:])
+	resampler.pendingOutputSamples = resampler.pendingOutputSamples[:len(resampler.pendingOutputSamples)-completeSampleCount]
+	return output
+}
+
+func (resampler *nativePCM16Resampler) writeCompleteOutputFrames(frameSampleCount int, sink func([]byte) error) error {
+	completeSampleCount := len(resampler.pendingOutputSamples) / frameSampleCount * frameSampleCount
+	if completeSampleCount == 0 {
+		return nil
+	}
+	if err := resampler.writePCM16Samples(resampler.pendingOutputSamples[:completeSampleCount], sink); err != nil {
+		return err
+	}
+	copy(resampler.pendingOutputSamples, resampler.pendingOutputSamples[completeSampleCount:])
+	resampler.pendingOutputSamples = resampler.pendingOutputSamples[:len(resampler.pendingOutputSamples)-completeSampleCount]
+	return nil
+}
+
+func (resampler *nativePCM16Resampler) writePCM16Samples(samples []int16, sink func([]byte) error) error {
+	if len(samples) == 0 {
+		return nil
+	}
+	byteCount := len(samples) * pcm16BytesPerSample
+	return sink(unsafe.Slice((*byte)(unsafe.Pointer(unsafe.SliceData(samples))), byteCount))
+}
+
+func encodePCM16Samples(samples []int16) []byte {
+	output := make([]byte, len(samples)*pcm16BytesPerSample)
+	for sampleIndex, sample := range samples {
 		// #nosec G115, PCM16 encoding preserves the signed sample bits.
-		binary.LittleEndian.PutUint16(
-			output[sampleIndex*pcm16BytesPerSample:],
-			uint16(sample),
-		)
+		binary.LittleEndian.PutUint16(output[sampleIndex*pcm16BytesPerSample:], uint16(sample))
 	}
-	copy(resampler.pendingOutput, resampler.pendingOutput[targetSampleCount:])
-	resampler.pendingOutput = resampler.pendingOutput[:len(resampler.pendingOutput)-targetSampleCount]
-	return output, nil
+	return output
 }
 
 func (resampler *nativePCM16Resampler) Close() {

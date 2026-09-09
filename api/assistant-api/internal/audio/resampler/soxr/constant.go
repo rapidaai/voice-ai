@@ -23,3 +23,10 @@ const (
 	monoChannelCount   = 1
 	stereoChannelCount = 2
 )
+
+type nativeSOXRQuality int
+
+const (
+	nativeSOXRQualityQuick nativeSOXRQuality = iota
+	nativeSOXRQualityLiveKit
+)

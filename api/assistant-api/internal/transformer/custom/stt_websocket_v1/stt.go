@@ -40,6 +40,7 @@ type speechToText struct {
 	mu         sync.Mutex
 	connectMu  sync.Mutex
 	writeMu    sync.Mutex
+	resampleMu sync.Mutex
 	connection *websocket.Conn
 
 	contextID             string
@@ -47,6 +48,8 @@ type speechToText struct {
 	interruptionStartedAt time.Time
 
 	resampler         internal_type.AudioResampler
+	resampleWriter    internal_type.AudioStreamResampler
+	resampleSinkErr   error
 	sourceAudioConfig *protos.AudioConfig
 	targetAudioConfig *protos.AudioConfig
 }
@@ -86,24 +89,42 @@ func NewSpeechToText(
 		return nil, err
 	}
 	transformerContext, cancel := context.WithCancel(ctx)
-	return &speechToText{
-		config:   config,
-		engine:   config.newEngine(),
-		ctx:      transformerContext,
-		cancel:   cancel,
-		logger:   logger,
-		onPacket: onPacket,
-		resampler: resampler_soxr.New(
-			resampler_soxr.WithLogger(logger),
-			resampler_soxr.WithHighQuality(),
-		),
+	audioResampler := resampler_soxr.New(
+		resampler_soxr.WithLogger(logger),
+		resampler_soxr.WithHighQuality(),
+	)
+	transformer := &speechToText{
+		config:            config,
+		engine:            config.newEngine(),
+		ctx:               transformerContext,
+		cancel:            cancel,
+		logger:            logger,
+		onPacket:          onPacket,
+		resampler:         audioResampler,
 		sourceAudioConfig: internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG,
 		targetAudioConfig: &protos.AudioConfig{
 			SampleRate:  uint32(config.SampleRate),
 			AudioFormat: parseAudioEncoding(config.Encoding),
 			Channels:    1,
 		},
-	}, nil
+	}
+	resampleWriter, err := audioResampler.NewWriter(
+		transformer.sourceAudioConfig,
+		transformer.targetAudioConfig,
+		func(chunk []byte) error {
+			err := transformer.handlePacketRequests(requestPacketAudio, transformer.currentContextID(), chunk, true)
+			if err != nil {
+				transformer.resampleSinkErr = err
+			}
+			return err
+		},
+	)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	transformer.resampleWriter = resampleWriter
+	return transformer, nil
 }
 
 func (*speechToText) Name() string {
@@ -174,10 +195,32 @@ func (transformer *speechToText) Transform(_ context.Context, in internal_type.P
 		if input.ContextID != "" {
 			transformer.contextID = input.ContextID
 		}
+		contextID := transformer.contextID
 		transformer.mu.Unlock()
-		if err := transformer.handlePacketRequests(requestPacketInterrupt, input.ContextID, nil, false); err != nil {
+		if transformer.resampleWriter != nil {
+			transformer.resampleMu.Lock()
+			transformer.resampleSinkErr = nil
+			err := transformer.resampleWriter.Flush()
+			requestErr := transformer.resampleSinkErr
+			transformer.resampleSinkErr = nil
+			transformer.resampleMu.Unlock()
+			if requestErr != nil {
+				transformer.onPacket(internal_type.SpeechToTextErrorPacket{
+					ContextID: contextID,
+					Error:     requestErr,
+					Type:      internal_type.STTNetworkTimeout,
+				})
+			} else if err != nil {
+				transformer.onPacket(internal_type.SpeechToTextErrorPacket{
+					ContextID: contextID,
+					Error:     fmt.Errorf("custom-stt websocket_v1: failed to flush resampler: %w", err),
+					Type:      internal_type.STTInvalidInput,
+				})
+			}
+		}
+		if err := transformer.handlePacketRequests(requestPacketInterrupt, contextID, nil, false); err != nil {
 			transformer.onPacket(internal_type.SpeechToTextErrorPacket{
-				ContextID: transformer.currentContextID(),
+				ContextID: contextID,
 				Error:     err,
 				Type:      internal_type.STTNetworkTimeout,
 			})
@@ -210,6 +253,11 @@ func (transformer *speechToText) Close(_ context.Context) error {
 
 	if conn != nil {
 		_ = conn.Close()
+	}
+	if transformer.resampleWriter != nil {
+		transformer.resampleWriter.Close()
+	} else if transformer.resampler != nil {
+		transformer.resampler.Close()
 	}
 
 	if !connectedAt.IsZero() {
@@ -255,6 +303,31 @@ func (transformer *speechToText) handleAudio(contextID string, audio []byte) err
 	effectiveContextID := transformer.contextID
 	transformer.mu.Unlock()
 
+	if transformer.resampleWriter != nil {
+		transformer.resampleMu.Lock()
+		transformer.resampleSinkErr = nil
+		err := transformer.resampleWriter.Write(audio)
+		requestErr := transformer.resampleSinkErr
+		transformer.resampleSinkErr = nil
+		transformer.resampleMu.Unlock()
+		if requestErr != nil {
+			transformer.onPacket(internal_type.SpeechToTextErrorPacket{
+				ContextID: effectiveContextID,
+				Error:     requestErr,
+				Type:      internal_type.STTNetworkTimeout,
+			})
+			return nil
+		}
+		if err != nil {
+			transformer.onPacket(internal_type.SpeechToTextErrorPacket{
+				ContextID: effectiveContextID,
+				Error:     err,
+				Type:      internal_type.STTInvalidInput,
+			})
+		}
+		return nil
+	}
+
 	chunk, err := transformer.prepareAudioChunk(audio)
 	if err != nil {
 		transformer.onPacket(internal_type.SpeechToTextErrorPacket{
@@ -265,8 +338,7 @@ func (transformer *speechToText) handleAudio(contextID string, audio []byte) err
 		return nil
 	}
 
-	err = transformer.handlePacketRequests(requestPacketAudio, effectiveContextID, chunk, true)
-	if err != nil {
+	if err = transformer.handlePacketRequests(requestPacketAudio, effectiveContextID, chunk, true); err != nil {
 		transformer.onPacket(internal_type.SpeechToTextErrorPacket{
 			ContextID: effectiveContextID,
 			Error:     err,

@@ -21,6 +21,8 @@ func (resampler *telnyxFakeResampler) Resample(_ []byte, _, _ *protos.AudioConfi
 	return append([]byte(nil), resampler.out...), nil
 }
 
+func (resampler *telnyxFakeResampler) Close() {}
+
 func newTestAudioProcessor(resamplerOutput []byte, resamplerErr error) *AudioProcessor {
 	resampler := &telnyxFakeResampler{out: resamplerOutput, err: resamplerErr}
 	audioProcessor := &AudioProcessor{

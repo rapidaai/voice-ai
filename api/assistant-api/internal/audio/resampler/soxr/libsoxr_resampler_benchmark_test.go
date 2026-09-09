@@ -52,6 +52,25 @@ func BenchmarkHighQualityResample20ms(b *testing.B) {
 	}
 }
 
+func BenchmarkHighQualityWrite20ms(b *testing.B) {
+	resampler := New(WithLogger(newTestLogger(b)), WithHighQuality())
+	source := internal_audio.NewLinear8khzMonoAudioConfig()
+	target := internal_audio.NewLinear16khzMonoAudioConfig()
+	data := generateLinear16Data(160)
+	writer, err := resampler.NewWriter(source, target, func([]byte) error {
+		return nil
+	})
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for iteration := 0; iteration < b.N; iteration++ {
+		_ = writer.Write(data)
+	}
+}
+
 // Concurrent/parallel scaling benchmarks
 func BenchmarkResampleSequential(b *testing.B) {
 	resampler := newTestResampler(b)

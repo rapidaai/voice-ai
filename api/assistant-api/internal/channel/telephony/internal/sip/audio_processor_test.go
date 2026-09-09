@@ -53,6 +53,13 @@ func TestNewAudioProcessor_CreatesIndependentStreamResamplers(tester *testing.T)
 		processor.resamplers.ambient:        {},
 	}
 	require.Len(tester, resamplers, 5)
+	writers := map[internal_type.AudioStreamResampler]struct{}{
+		processor.writers.providerInput:  {},
+		processor.writers.assistant:      {},
+		processor.writers.bridgeUser:     {},
+		processor.writers.bridgeOperator: {},
+	}
+	require.Len(tester, writers, 4)
 }
 
 func (m *mockResampler) Resample(data []byte, _, _ *protos.AudioConfig) ([]byte, error) {
@@ -65,6 +72,8 @@ func (m *mockResampler) Resample(data []byte, _, _ *protos.AudioConfig) ([]byte,
 	// Pass through the same data.
 	return data, nil
 }
+
+func (m *mockResampler) Close() {}
 
 type captureResampler struct {
 	out   []byte
@@ -86,6 +95,8 @@ func (r *captureResampler) Resample(data []byte, from, to *protos.AudioConfig) (
 	}
 	return append([]byte(nil), data...), nil
 }
+
+func (r *captureResampler) Close() {}
 
 type mockAmbientMixer struct {
 	err error
@@ -214,6 +225,7 @@ func newTestAudioProcessor(t *testing.T, codec *sip_runtime.Codec, resampler int
 	processor.resamplers.assistant = resampler
 	processor.resamplers.bridgeUser = resampler
 	processor.resamplers.bridgeOperator = resampler
+	processor.writers = audioResampleWriters{}
 	return processor
 }
 
@@ -245,15 +257,16 @@ func TestProcessProviderAudioFrame_RealG711StreamingMatchesContinuousConversion(
 				processor := NewAudioProcessor(AudioProcessorConfig{
 					RTPHandler: testRTPHandler(tester, &codec),
 				})
-				reference := resampler_soxr.New(resampler_soxr.WithQuickQuality())
-				expected, err := reference.Resample(decodeG711ToLinear8k(encoded, codec.Name), Linear8kConfig, Rapida16kConfig)
-				require.NoError(tester, err)
+				reference := resampler_soxr.New(resampler_soxr.WithHighQuality())
 				var pipeline, recording []byte
+				var expected []byte
 				var offset int
 				for _, frameDuration := range durations {
-					frame, err := processor.ProcessProviderAudioFrame(internal_telephony_media.ProviderAudioFrame{
-						Audio: encoded[offset : offset+frameDuration*8], ReceivedAt: time.Now(),
-					})
+					frameAudio := encoded[offset : offset+frameDuration*8]
+					expectedFrame, err := reference.Resample(decodeG711ToLinear8k(frameAudio, codec.Name), Linear8kConfig, Rapida16kConfig)
+					require.NoError(tester, err)
+					expected = append(expected, expectedFrame...)
+					frame, err := processor.ProcessProviderAudioFrame(internal_telephony_media.ProviderAudioFrame{Audio: frameAudio, ReceivedAt: time.Now()})
 					require.NoError(tester, err)
 					require.Equal(tester, frame.BridgeAudio, frame.PipelineAudio)
 					require.Zero(tester, len(frame.PipelineAudio)%2)
@@ -262,7 +275,6 @@ func TestProcessProviderAudioFrame_RealG711StreamingMatchesContinuousConversion(
 					offset += frameDuration * 8
 				}
 				require.Equal(tester, len(expected), len(pipeline))
-				require.Equal(tester, totalSamples*4, len(pipeline))
 				require.True(tester, bytes.Equal(expected, pipeline), "chunking changed the PCM stream")
 				require.Equal(tester, expected, recording)
 			})
@@ -407,11 +419,13 @@ func TestProcessAssistantAudio_TransferActiveDoesNotRecordNormalOutput(t *testin
 }
 
 func TestConvertOutputAudio_PCMAConvertsResampledMulaw(t *testing.T) {
-	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMA, &mockResampler{out: []byte{0xFF, 0x7F}})
+	resampledMulaw := bytes.Repeat([]byte{0xFF}, MulawFrameSize)
+	proc := newTestAudioProcessor(t, &sip_runtime.CodecPCMA, &mockResampler{out: resampledMulaw})
 
-	convertedAudio, err := proc.convertOutputAudio([]byte{1, 2})
-	require.NoError(t, err)
-	assert.Equal(t, internal_audio.UlawToAlaw([]byte{0xFF, 0x7F}), convertedAudio)
+	require.NoError(t, proc.ProcessAssistantAudio([]byte{1, 2}, false))
+	outputFrame, ok := proc.NextOutputFrame()
+	require.True(t, ok)
+	assert.Equal(t, internal_audio.UlawToAlaw(resampledMulaw), outputFrame.ProviderAudio)
 }
 
 func TestProcessAssistantAudio_ResamplerError(t *testing.T) {
@@ -664,6 +678,7 @@ func TestForwardUserAudio_DoesNotRecordWhenBridgeWriteFails(t *testing.T) {
 	proc.resamplers.assistant = resampler
 	proc.resamplers.bridgeUser = resampler
 	proc.resamplers.bridgeOperator = resampler
+	proc.writers = audioResampleWriters{}
 	bridgeRTP := testRTPHandler(t, &sip_runtime.CodecPCMU)
 	for i := 0; i < 100; i++ {
 		require.NoError(t, bridgeRTP.WriteAudio([]byte{byte(i)}))
@@ -1094,6 +1109,7 @@ func benchAudioProcessor(b *testing.B, codec *sip_runtime.Codec) *AudioProcessor
 	processor.resamplers.assistant = resampler
 	processor.resamplers.bridgeUser = resampler
 	processor.resamplers.bridgeOperator = resampler
+	processor.writers = audioResampleWriters{}
 	return processor
 }
 

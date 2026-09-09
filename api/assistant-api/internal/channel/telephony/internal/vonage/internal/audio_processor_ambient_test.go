@@ -14,13 +14,14 @@ func TestAudioProcessor_AmbientConfigureAndIdleOutputFrame(t *testing.T) {
 	if audioProcessor.ambientMixer == nil {
 		t.Fatal("expected ambient mixer to be initialized")
 	}
-	if audioProcessor.resampler == nil {
-		t.Fatal("expected resampler")
-	}
 
 	err = audioProcessor.ConfigureAmbient(internal_ambient.NewConfig(internal_ambient.ProfileCafe, 18))
 	if err != nil {
 		t.Fatalf("ConfigureAmbient error: %v", err)
+	}
+	currentAmbientConfig := audioProcessor.ambientMixer.CurrentConfig()
+	if currentAmbientConfig.Profile != internal_ambient.ProfileCafe {
+		t.Fatalf("unexpected ambient profile: got=%s want=%s", currentAmbientConfig.Profile, internal_ambient.ProfileCafe)
 	}
 
 	frame, ok := audioProcessor.IdleOutputFrame()
