@@ -6,6 +6,8 @@
 package parsers
 
 import (
+	"bytes"
+	"encoding/json"
 	"sort"
 	"strings"
 
@@ -39,12 +41,104 @@ func (stp *pongo2StringTemplateParser) Parse(template string, argument map[strin
 		stp.logger.Errorf("error while parsing the template with pongo2: %v", err)
 		return template
 	}
-	formattedTemplate, err := tpl.Execute(pongo2.Context(CanonicalizePromptArguments(utils.NormalizeInterface(argument))))
+	context := CanonicalizePromptArguments(utils.NormalizeInterface(argument))
+	context = EncodeInterpolatedComposites(template, context)
+	formattedTemplate, err := tpl.Execute(pongo2.Context(context))
 	if err != nil {
 		stp.logger.Errorf("error while executing the template with pongo2: %v", err)
 		return template
 	}
 	return formattedTemplate
+}
+
+// EncodeInterpolatedComposites JSON-encodes composite values that the template
+// interpolates directly, for example "{{ messages }}" over a slice of turns.
+// pongo2 has no string form for a composite value and falls back to Go's debug
+// formatting, so such a placeholder renders as "<[]interface {} Value>" and the
+// data never reaches the prompt.
+//
+// Encoding is deliberately narrow, because composites are otherwise load-bearing:
+//
+//   - Templates containing tags are left untouched. "{% for m in messages %}"
+//     iterates the composite itself and needs the original value.
+//   - Only keys used as a standalone "{{ key }}" are encoded. Attribute access
+//     such as "{{ message.language }}" still resolves against the live map.
+func EncodeInterpolatedComposites(template string, in map[string]interface{}) map[string]interface{} {
+	if len(in) == 0 || strings.Contains(template, "{%") {
+		return in
+	}
+
+	keys := bareInterpolationKeys(template)
+	if len(keys) == 0 {
+		return in
+	}
+
+	out := make(map[string]interface{}, len(in))
+	for key, value := range in {
+		out[key] = value
+
+		if _, interpolated := keys[key]; !interpolated {
+			continue
+		}
+
+		switch value.(type) {
+		case []interface{}, map[string]interface{}:
+			encoded, err := encodeCompositeValue(value)
+			if err != nil {
+				continue
+			}
+			// Marked safe so pongo2 autoescaping does not turn the quotes of
+			// the encoded payload into HTML entities.
+			out[key] = pongo2.AsSafeValue(encoded)
+		}
+	}
+
+	return out
+}
+
+// encodeCompositeValue renders value as JSON without escaping "<", ">" and "&".
+// The output is destined for a model prompt rather than a browser, and escaping
+// those characters only makes a transcript harder for the model to read.
+func encodeCompositeValue(value interface{}) (string, error) {
+	var buffer bytes.Buffer
+
+	encoder := json.NewEncoder(&buffer)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(value); err != nil {
+		return "", err
+	}
+
+	// Encode always terminates the payload with a newline.
+	return strings.TrimRight(buffer.String(), "\n"), nil
+}
+
+// bareInterpolationKeys collects identifiers used as a standalone "{{ key }}".
+// Expressions carrying attribute access, filters or calls are skipped, since
+// those resolve against the value's structure rather than its string form.
+func bareInterpolationKeys(template string) map[string]struct{} {
+	keys := make(map[string]struct{})
+
+	for rest := template; ; {
+		open := strings.Index(rest, "{{")
+		if open < 0 {
+			break
+		}
+		rest = rest[open+2:]
+
+		end := strings.Index(rest, "}}")
+		if end < 0 {
+			break
+		}
+
+		expression := strings.TrimSpace(rest[:end])
+		rest = rest[end+2:]
+
+		if expression != "" && !strings.ContainsAny(expression, ".|()[] ") {
+			keys[expression] = struct{}{}
+		}
+	}
+
+	return keys
 }
 
 // canonicalizePromptArguments expands dotted top-level keys (for example
