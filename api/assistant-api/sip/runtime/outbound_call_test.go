@@ -58,6 +58,21 @@ func TestOutboundConnectRejectsInvalidRequest(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidConfig)
 }
 
+func TestOutboundHandleCallInvalidRequestFailsBeforeAnswer(t *testing.T) {
+	server := &Server{logger: bridgeTestLogger()}
+	session := newOutboundSessionForTest(t, testOutboundConfig(), "invalid-outbound-request")
+	statusRecorder := newOutboundStatusRecorder()
+	outboundCall := NewOutbound(server, session, &outboundDialog{}, nil, OutboundInviteRequest{})
+	outboundCall.statusObserver = statusRecorder.Record
+
+	outboundCall.HandleCall()
+
+	assert.Equal(t, CallStateFailed, session.GetState())
+	failedStatus := statusRecorder.LastStatus(t, OutboundCallStatusFailed)
+	assert.Equal(t, string(OutboundFailureSetup), failedStatus.FailureClass)
+	assert.Equal(t, LifecycleReasonOutboundSetupFailure.String(), failedStatus.DisconnectReason)
+}
+
 func TestOutboundDialogInviteRejectsEmptyCallID(t *testing.T) {
 	request, err := NewOutboundInviteRequest(testOutboundConfig(), "+15551234567", "+15557654321")
 	require.NoError(t, err)

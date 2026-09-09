@@ -46,11 +46,10 @@ func (s *bridgeAudioSink) WriteAudio(audio []byte) error {
 func newTestRTPHandler() *RTPHandler {
 	ctx, cancel := context.WithCancel(context.Background())
 	h := &RTPHandler{
-		inboundAudioSinkReady: make(chan struct{}),
-		codec:                 &CodecPCMU,
-		inputSilenceFiller:    newRTPInputSilenceFiller(&CodecPCMU, rtpDefaultPacketizationTime),
-		ctx:                   ctx,
-		cancel:                cancel,
+		codec:              &CodecPCMU,
+		inputSilenceFiller: newRTPInputSilenceFiller(&CodecPCMU, rtpDefaultPacketizationTime),
+		ctx:                ctx,
+		cancel:             cancel,
 	}
 	h.running.Store(true)
 	return h
@@ -85,8 +84,8 @@ func readRTPPayload(t testing.TB, handler *RTPHandler, receiver *net.UDPConn) []
 func deliverBridgeAudio(t testing.TB, handler *RTPHandler, frame InboundAudioFrame) {
 	t.Helper()
 	require.Eventually(t, func() bool {
-		handler.mu.RLock()
-		defer handler.mu.RUnlock()
+		handler.inboundAudioSinkMu.RLock()
+		defer handler.inboundAudioSinkMu.RUnlock()
 		return handler.inboundAudioSink != nil
 	}, time.Second, time.Millisecond)
 	handler.deliverInboundAudio([]InboundAudioFrame{frame})

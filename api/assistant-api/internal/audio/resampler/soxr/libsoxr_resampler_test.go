@@ -77,7 +77,7 @@ func TestRealtimeAudioResamplerInstancesKeepIndependentState(tester *testing.T) 
 	source := internal_audio.NewLinear8khzMonoAudioConfig()
 	target := internal_audio.NewLinear16khzMonoAudioConfig()
 	firstInput := generateLinear16Data(160)
-	secondInput := make([]byte, len(firstInput))
+	secondInput := generateLinear16Data(160)
 
 	firstResampler := New(WithLogger(newTestLogger(tester)), WithQuickQuality())
 	secondResampler := New(WithLogger(newTestLogger(tester)), WithQuickQuality())
@@ -89,6 +89,7 @@ func TestRealtimeAudioResamplerInstancesKeepIndependentState(tester *testing.T) 
 	require.NoError(tester, err)
 	expectedOutput, err := referenceResampler.Resample(secondInput, source, target)
 	require.NoError(tester, err)
+	require.NotEqual(tester, make([]byte, len(expectedOutput)), expectedOutput)
 	require.Equal(tester, expectedOutput, actualOutput)
 }
 
