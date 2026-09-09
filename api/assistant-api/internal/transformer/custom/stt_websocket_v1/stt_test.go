@@ -108,6 +108,8 @@ func (resampler *blockingResampler) Resample(data []byte, _, _ *protos.AudioConf
 	return append([]byte(nil), data...), nil
 }
 
+func (resampler *blockingResampler) Close() {}
+
 func waitForCondition(t *testing.T, timeout time.Duration, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
@@ -193,6 +195,7 @@ func TestSpeechToText_WebsocketFlow_JSONRequestRules(t *testing.T) {
 	typedTransformer, ok := transformer.(*speechToText)
 	require.True(t, ok)
 	require.NotNil(t, typedTransformer.resampler)
+	require.NotNil(t, typedTransformer.resampleWriter)
 	require.NoError(t, transformer.Initialize())
 	require.NoError(t, transformer.Transform(context.Background(), internal_type.TurnChangePacket{ContextID: "ctx-1"}))
 	require.NoError(t, transformer.Transform(context.Background(), internal_type.SpeechToTextEndPacket{ContextID: "ctx-1"}))
@@ -330,13 +333,13 @@ func TestSpeechToText_BinaryAudioResampledWithBinaryRequestRule(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, transformer.Initialize())
 	require.NoError(t, transformer.Transform(context.Background(), internal_type.TurnChangePacket{ContextID: "ctx-2"}))
-	require.NoError(t, transformer.Transform(context.Background(), internal_type.SpeechToTextEndPacket{ContextID: "ctx-2"}))
 
 	audio := transformer_testutil.SineTonePCM(440, 1.0)
 	require.NoError(t, transformer.Transform(context.Background(), internal_type.SpeechToTextAudioPacket{
 		ContextID: "ctx-2",
 		Audio:     audio,
 	}))
+	require.NoError(t, transformer.Transform(context.Background(), internal_type.SpeechToTextEndPacket{ContextID: "ctx-2"}))
 
 	waitForCondition(t, 3*time.Second, func() bool {
 		for _, packet := range collector.all() {
@@ -664,6 +667,7 @@ func TestSpeechToText_AudioRequestContextStaysBoundToAudioPacket(t *testing.T) {
 		release: make(chan struct{}),
 	}
 	typed.resampler = blocker
+	typed.resampleWriter = nil
 
 	audioErrCh := make(chan error, 1)
 	go func() {

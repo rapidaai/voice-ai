@@ -46,23 +46,36 @@ type audioResamplers struct {
 	ambient        internal_type.AudioResampler
 }
 
+type audioResampleWriters struct {
+	providerInput  internal_type.AudioStreamResampler
+	assistant      internal_type.AudioStreamResampler
+	bridgeUser     internal_type.AudioStreamResampler
+	bridgeOperator internal_type.AudioStreamResampler
+}
+
 // AudioProcessor owns SIP RTP codec conversion, buffering, pacing, bridge audio,
 // and ringback generation.
 type AudioProcessor struct {
 	resamplers audioResamplers
+	writers    audioResampleWriters
 	rtpHandler rtpHandler
 	record     func(...observability.Record) error
 
 	providerOutputBuffer internal_telephony_output.FrameBuffer
 	bridgeOutputBuffer   internal_telephony_output.FrameBuffer
 	outputMu             sync.Mutex
+	providerInputMu      sync.Mutex
+	providerInputAudio   []byte
+	providerReceivedAt   time.Time
 
 	// bridgeMu orders ForwardUserAudio with DisconnectTransferMedia so outbound RTP is
 	// not closed while a bridge send is in flight.
-	bridgeMu         sync.Mutex
-	bridge           atomic.Pointer[bridgeState]
-	bridgeUserCh     chan bridgeRecordingFrame
-	bridgeOperatorCh chan bridgeRecordingFrame
+	bridgeMu            sync.Mutex
+	bridge              atomic.Pointer[bridgeState]
+	bridgeUserCh        chan bridgeRecordingFrame
+	bridgeOperatorCh    chan bridgeRecordingFrame
+	bridgeUserAudio     []byte
+	bridgeOperatorAudio []byte
 
 	ringtoneMu sync.RWMutex
 	ringtone   []byte
@@ -79,27 +92,31 @@ type AudioProcessor struct {
 }
 
 func NewAudioProcessor(config AudioProcessorConfig) *AudioProcessor {
+	providerResampler := resampler_soxr.New(
+		resampler_soxr.WithLogger(config.Logger),
+		resampler_soxr.WithHighQuality(),
+	)
+	assistantResampler := resampler_soxr.New(
+		resampler_soxr.WithLogger(config.Logger),
+		resampler_soxr.WithHighQuality(),
+	)
+	bridgeUserResampler := resampler_soxr.New(
+		resampler_soxr.WithLogger(config.Logger),
+		resampler_soxr.WithHighQuality(),
+	)
+	bridgeOperatorResampler := resampler_soxr.New(
+		resampler_soxr.WithLogger(config.Logger),
+		resampler_soxr.WithHighQuality(),
+	)
 	processor := &AudioProcessor{
 		resamplers: audioResamplers{
-			provider: resampler_soxr.New(
+			provider:       providerResampler,
+			assistant:      assistantResampler,
+			bridgeUser:     bridgeUserResampler,
+			bridgeOperator: bridgeOperatorResampler,
+			ambient: resampler_soxr.NewChunk(
 				resampler_soxr.WithLogger(config.Logger),
-				resampler_soxr.WithQuickQuality(),
-			),
-			assistant: resampler_soxr.New(
-				resampler_soxr.WithLogger(config.Logger),
-				resampler_soxr.WithQuickQuality(),
-			),
-			bridgeUser: resampler_soxr.New(
-				resampler_soxr.WithLogger(config.Logger),
-				resampler_soxr.WithQuickQuality(),
-			),
-			bridgeOperator: resampler_soxr.New(
-				resampler_soxr.WithLogger(config.Logger),
-				resampler_soxr.WithQuickQuality(),
-			),
-			ambient: resampler_soxr.New(
-				resampler_soxr.WithLogger(config.Logger),
-				resampler_soxr.WithQuickQuality(),
+				resampler_soxr.WithHighQuality(),
 			),
 		},
 		rtpHandler:           config.RTPHandler,
@@ -108,6 +125,33 @@ func NewAudioProcessor(config AudioProcessorConfig) *AudioProcessor {
 		bridgeOutputBuffer:   internal_telephony_output.NewBytesFrameBuffer(BridgeOutputFrameSize * 8),
 		bridgeUserCh:         make(chan bridgeRecordingFrame, BridgeRecordingChannelCapacity),
 		bridgeOperatorCh:     make(chan bridgeRecordingFrame, BridgeRecordingChannelCapacity),
+	}
+	if writer, err := providerResampler.NewWriter(Linear8kConfig, Rapida16kConfig, func(output []byte) error {
+		processor.providerInputAudio = append(processor.providerInputAudio, output...)
+		return nil
+	}); err == nil {
+		processor.writers.providerInput = writer
+	}
+	if writer, err := assistantResampler.NewWriter(Rapida16kConfig, Mulaw8kConfig, func(providerAudio []byte) error {
+		if processor.currentCodec().Name == sip_runtime.CodecPCMA.Name {
+			providerAudio = internal_audio.UlawToAlaw(providerAudio)
+		}
+		processor.providerOutputBuffer.Write(providerAudio)
+		return nil
+	}); err == nil {
+		processor.writers.assistant = writer
+	}
+	if writer, err := bridgeUserResampler.NewWriter(Linear8kConfig, Rapida16kConfig, func(output []byte) error {
+		processor.bridgeUserAudio = append(processor.bridgeUserAudio, output...)
+		return nil
+	}); err == nil {
+		processor.writers.bridgeUser = writer
+	}
+	if writer, err := bridgeOperatorResampler.NewWriter(Linear8kConfig, Rapida16kConfig, func(output []byte) error {
+		processor.bridgeOperatorAudio = append(processor.bridgeOperatorAudio, output...)
+		return nil
+	}); err == nil {
+		processor.writers.bridgeOperator = writer
 	}
 	processor.SetRingtone(config.Ringtone)
 	ambientMixer, err := internal_ambient.NewLoopMixer(internal_ambient.MixerSpec{
@@ -129,21 +173,23 @@ func (processor *AudioProcessor) Close() {
 	if processor == nil {
 		return
 	}
-	if resampler, ok := processor.resamplers.provider.(*resampler_soxr.Resampler); ok {
-		resampler.Close()
+	if processor.writers.providerInput != nil {
+		processor.writers.providerInput.Close()
 	}
-	if resampler, ok := processor.resamplers.assistant.(*resampler_soxr.Resampler); ok {
-		resampler.Close()
+	if processor.writers.assistant != nil {
+		processor.writers.assistant.Close()
 	}
-	if resampler, ok := processor.resamplers.bridgeUser.(*resampler_soxr.Resampler); ok {
-		resampler.Close()
+	if processor.writers.bridgeUser != nil {
+		processor.writers.bridgeUser.Close()
 	}
-	if resampler, ok := processor.resamplers.bridgeOperator.(*resampler_soxr.Resampler); ok {
-		resampler.Close()
+	if processor.writers.bridgeOperator != nil {
+		processor.writers.bridgeOperator.Close()
 	}
-	if resampler, ok := processor.resamplers.ambient.(*resampler_soxr.Resampler); ok {
-		resampler.Close()
-	}
+	processor.resamplers.provider.Close()
+	processor.resamplers.assistant.Close()
+	processor.resamplers.bridgeUser.Close()
+	processor.resamplers.bridgeOperator.Close()
+	processor.resamplers.ambient.Close()
 }
 
 func (p *AudioProcessor) currentCodec() *sip_runtime.Codec {
@@ -200,17 +246,6 @@ func (p *AudioProcessor) resampleProviderPCMToInternal(linearPCM8k []byte) ([]by
 	return p.resamplers.provider.Resample(linearPCM8k, Linear8kConfig, Rapida16kConfig)
 }
 
-func (p *AudioProcessor) convertOutputAudio(audioData []byte) ([]byte, error) {
-	convertedAudio, err := p.resamplers.assistant.Resample(audioData, Rapida16kConfig, Mulaw8kConfig)
-	if err != nil {
-		return nil, err
-	}
-	if p.currentCodec().Name == sip_runtime.CodecPCMA.Name {
-		convertedAudio = internal_audio.UlawToAlaw(convertedAudio)
-	}
-	return convertedAudio, nil
-}
-
 func (p *AudioProcessor) ProcessProviderAudioFrame(frame internal_telephony_media.ProviderAudioFrame) (internal_telephony_media.InputAudioFrame, error) {
 	inputFrame := internal_telephony_media.InputAudioFrame{
 		ReceivedAt: frame.ReceivedAt,
@@ -219,13 +254,34 @@ func (p *AudioProcessor) ProcessProviderAudioFrame(frame internal_telephony_medi
 		return inputFrame, nil
 	}
 	linearPCM8k := p.decodeProviderAudioToLinear8k(frame.Audio)
-	resampled, err := p.resampleProviderPCMToInternal(linearPCM8k)
-	if err != nil {
-		return inputFrame, fmt.Errorf("%w: %w", ErrProviderAudioConversionFailed, err)
+	p.providerInputMu.Lock()
+	defer p.providerInputMu.Unlock()
+	if p.providerReceivedAt.IsZero() {
+		p.providerReceivedAt = frame.ReceivedAt
+	}
+	receivedAt := p.providerReceivedAt
+
+	var resampled []byte
+	if p.writers.providerInput != nil {
+		p.providerInputAudio = p.providerInputAudio[:0]
+		if err := p.writers.providerInput.Write(linearPCM8k); err != nil {
+			return inputFrame, fmt.Errorf("%w: %w", ErrProviderAudioConversionFailed, err)
+		}
+		resampled = append([]byte(nil), p.providerInputAudio...)
+	} else {
+		var err error
+		resampled, err = p.resampleProviderPCMToInternal(linearPCM8k)
+		if err != nil {
+			return inputFrame, fmt.Errorf("%w: %w", ErrProviderAudioConversionFailed, err)
+		}
 	}
 	if len(resampled) == 0 {
 		return inputFrame, nil
 	}
+	if !receivedAt.IsZero() {
+		inputFrame.ReceivedAt = receivedAt
+	}
+	p.providerReceivedAt = time.Time{}
 	inputFrame.BridgeAudio = resampled
 	inputFrame.PipelineAudio = append([]byte(nil), resampled...)
 	return inputFrame, nil
@@ -236,22 +292,42 @@ func (p *AudioProcessor) ProcessAssistantAudio(audio []byte, completed bool) err
 		return nil
 	}
 
-	var providerAudio []byte
-	if len(audio) > 0 {
-		var err error
-		providerAudio, err = p.convertOutputAudio(audio)
-		if err != nil {
-			return fmt.Errorf("%w: %w", ErrAssistantAudioConversionFailed, err)
-		}
-	}
-
 	p.outputMu.Lock()
 	defer p.outputMu.Unlock()
 	if p.bridge.Load() != nil || p.transferActive.Load() {
 		return nil
 	}
+	if len(audio) > 0 || completed {
+		if p.writers.assistant != nil {
+			if len(audio) > 0 {
+				if err := p.writers.assistant.Write(audio); err != nil {
+					return fmt.Errorf("%w: %w", ErrAssistantAudioConversionFailed, err)
+				}
+			}
+			if completed {
+				if err := p.writers.assistant.Flush(); err != nil {
+					return fmt.Errorf("%w: %w", ErrAssistantAudioConversionFailed, err)
+				}
+			}
+		} else {
+			writeProviderAudio := func(providerAudio []byte) {
+				if p.currentCodec().Name == sip_runtime.CodecPCMA.Name {
+					providerAudio = internal_audio.UlawToAlaw(providerAudio)
+				}
+				p.providerOutputBuffer.Write(providerAudio)
+			}
+			if len(audio) > 0 {
+				providerAudio, err := p.resamplers.assistant.Resample(audio, Rapida16kConfig, Mulaw8kConfig)
+				if err != nil {
+					return fmt.Errorf("%w: %w", ErrAssistantAudioConversionFailed, err)
+				}
+				if len(providerAudio) > 0 {
+					writeProviderAudio(providerAudio)
+				}
+			}
+		}
+	}
 	if len(audio) > 0 {
-		p.providerOutputBuffer.Write(providerAudio)
 		p.bridgeOutputBuffer.Write(audio)
 	}
 	if completed {
@@ -454,14 +530,14 @@ func (p *AudioProcessor) RunBridgeRecorder(ctx context.Context, streamSink func(
 		case <-ctx.Done():
 			return
 		case frame := <-p.bridgeUserCh:
-			if resampled, err := p.resampleBridgeRecordingFrame(frame, p.resamplers.bridgeUser); err == nil && streamSink != nil {
+			if resampled, err := p.resampleBridgeRecordingFrame(frame, p.writers.bridgeUser, &p.bridgeUserAudio, p.resamplers.bridgeUser); err == nil && len(resampled) > 0 && streamSink != nil {
 				streamSink(&protos.ConversationBridgeUserAudio{
 					Audio: resampled,
 					Time:  timestamppb.Now(),
 				})
 			}
 		case frame := <-p.bridgeOperatorCh:
-			if resampled, err := p.resampleBridgeRecordingFrame(frame, p.resamplers.bridgeOperator); err == nil && streamSink != nil {
+			if resampled, err := p.resampleBridgeRecordingFrame(frame, p.writers.bridgeOperator, &p.bridgeOperatorAudio, p.resamplers.bridgeOperator); err == nil && len(resampled) > 0 && streamSink != nil {
 				streamSink(&protos.ConversationBridgeOperatorAudio{
 					Audio: resampled,
 					Time:  timestamppb.Now(),
@@ -471,10 +547,22 @@ func (p *AudioProcessor) RunBridgeRecorder(ctx context.Context, streamSink func(
 	}
 }
 
-func (p *AudioProcessor) resampleBridgeRecordingFrame(frame bridgeRecordingFrame, resampler internal_type.AudioResampler) ([]byte, error) {
+func (p *AudioProcessor) resampleBridgeRecordingFrame(
+	frame bridgeRecordingFrame,
+	writer internal_type.AudioStreamResampler,
+	outputAudio *[]byte,
+	resampler internal_type.AudioResampler,
+) ([]byte, error) {
 	linearPCM8k := decodeG711ToLinear8k(frame.audio, frame.codecName)
 	if len(linearPCM8k) == 0 {
 		return nil, nil
+	}
+	if writer != nil {
+		*outputAudio = (*outputAudio)[:0]
+		if err := writer.Write(linearPCM8k); err != nil {
+			return nil, err
+		}
+		return append([]byte(nil), (*outputAudio)...), nil
 	}
 	return resampler.Resample(linearPCM8k, Linear8kConfig, Rapida16kConfig)
 }

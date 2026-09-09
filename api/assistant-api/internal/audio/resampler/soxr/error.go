@@ -11,6 +11,7 @@ import "errors"
 var (
 	ErrResamplerClosed               = errors.New("resampler is closed")
 	ErrAudioConfigRequired           = errors.New("source and target configs are required")
+	ErrResampleSinkRequired          = errors.New("resample sink is required")
 	ErrResamplingFailed              = errors.New("resample failed")
 	ErrResamplerInitializationFailed = errors.New("resampler init failed")
 	ErrUnsupportedInputFormat        = errors.New("unsupported input format")

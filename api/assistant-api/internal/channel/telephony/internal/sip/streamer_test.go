@@ -112,6 +112,22 @@ func newTestInboundSIPSession(t *testing.T, callID string) *sip_runtime.Session 
 	return session
 }
 
+func newTestOutboundSIPSession(t *testing.T, callID string) *sip_runtime.Session {
+	t.Helper()
+	session, err := sip_runtime.NewSession(context.Background(),
+		sip_runtime.WithSessionConfig(&sip_runtime.Config{
+			Server:            "127.0.0.1",
+			Port:              5060,
+			RTPPortRangeStart: 10000,
+			RTPPortRangeEnd:   10100,
+		}),
+		sip_runtime.WithSessionDirection(sip_runtime.CallDirectionOutbound),
+		sip_runtime.WithSessionCallID(callID),
+	)
+	require.NoError(t, err)
+	return session
+}
+
 type fakeSIPLifecycleController struct {
 	endReasons []sip_runtime.LifecycleReason
 }
@@ -292,6 +308,29 @@ func TestNewInitializesMediaPortBeforeCancellationWatcher(t *testing.T) {
 	}, time.Second, time.Millisecond)
 }
 
+func TestNewOutboundStartsInputOnlyBeforeRuntimeStart(t *testing.T) {
+	logger, err := commons.NewApplicationLogger()
+	require.NoError(t, err)
+	session := newTestOutboundSIPSession(t, "outbound-input-only")
+	session.SetRTPHandler(&sip_runtime.RTPHandler{})
+
+	stream, err := New(
+		WithContext(t.Context()),
+		WithLogger(logger),
+		WithSession(session),
+		WithLifecycle(&fakeSIPLifecycleController{}),
+		WithCallContext(&callcontext.CallContext{}),
+	)
+	require.NoError(t, err)
+	streamer := stream.(*Streamer)
+	t.Cleanup(func() { require.NoError(t, streamer.Close()) })
+
+	require.NotNil(t, streamer.mediaPort)
+	assert.True(t, streamer.mediaPort.inputStarted.Load())
+	assert.False(t, streamer.mediaPort.outputStarted.Load())
+	assert.False(t, streamer.assistantOutputActive.Load())
+}
+
 func TestNew_RoutesBridgeRecordingOutsideRealtimeInput(t *testing.T) {
 	logger, err := commons.NewApplicationLogger()
 	require.NoError(t, err)
@@ -320,13 +359,16 @@ func TestNew_RoutesBridgeRecordingOutsideRealtimeInput(t *testing.T) {
 	}
 
 	streamer.mediaPort.StartBridgeRecorder()
-	streamer.mediaPort.RecordTransferOperatorAudio(make([]byte, 160))
+	for range 8 {
+		streamer.mediaPort.RecordTransferOperatorAudio(make([]byte, 160))
+	}
 
 	select {
 	case message := <-streamer.LowCh:
 		recording, ok := message.(*protos.ConversationBridgeOperatorAudio)
 		require.True(t, ok, "expected bridge operator recording, got %T", message)
-		require.Len(t, recording.GetAudio(), 640)
+		require.NotEmpty(t, recording.GetAudio())
+		require.Zero(t, len(recording.GetAudio())%2)
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for bridge recording")
 	}

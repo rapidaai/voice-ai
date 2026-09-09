@@ -25,6 +25,10 @@ func TestAudioProcessor_AmbientConfigureAndIdleOutputFrame(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ConfigureAmbient error: %v", err)
 	}
+	currentAmbientConfig := audioProcessor.ambientMixer.CurrentConfig()
+	if currentAmbientConfig.Profile != internal_ambient.ProfileCafe {
+		t.Fatalf("unexpected ambient profile: got=%s want=%s", currentAmbientConfig.Profile, internal_ambient.ProfileCafe)
+	}
 
 	frame, ok := audioProcessor.IdleOutputFrame()
 	if !ok {

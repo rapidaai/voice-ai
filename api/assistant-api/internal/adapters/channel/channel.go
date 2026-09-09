@@ -105,7 +105,7 @@ type RequestorChannels struct {
 func NewRequestorChannels() *RequestorChannels {
 	controlChannel, err := policychannel.New[Envelope](policychannel.Config{
 		CapacityPolicy: policychannel.FixedCapacity(256),
-		OverflowPolicy: policychannel.ReplaceOldestWhenFull,
+		OverflowPolicy: policychannel.RejectNewestWhenFull,
 	})
 	if err != nil {
 		panic(err)
@@ -259,16 +259,18 @@ func (c *RequestorChannels) RunBootstrap(ctx context.Context, onEnvelope func(En
 }
 
 func (c *RequestorChannels) RunIngress(ctx context.Context, onEnvelope func(Envelope)) {
-	if c.ingressPausedCh != nil {
-		c.ingressPausedCh = make(chan struct{})
-		defer close(c.ingressPausedCh)
-	}
+	c.ingressWriteMu.Lock()
+	ingressPauseCh := c.ingressPauseCh
+	ingressPausedCh := make(chan struct{})
+	c.ingressPausedCh = ingressPausedCh
+	c.ingressWriteMu.Unlock()
+	defer close(ingressPausedCh)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-c.ingressPauseCh:
+		case <-ingressPauseCh:
 			return
 		case <-c.ingressCh.Ready():
 			e, err := c.ingressCh.TryReceive()
@@ -281,21 +283,23 @@ func (c *RequestorChannels) RunIngress(ctx context.Context, onEnvelope func(Enve
 
 func (c *RequestorChannels) PauseIngress(ctx context.Context, onPaused func()) {
 	c.ingressWriteMu.Lock()
-	if c.ingressPauseCh != nil {
+	ingressPauseCh := c.ingressPauseCh
+	ingressPausedCh := c.ingressPausedCh
+	if ingressPauseCh != nil {
 		select {
-		case <-c.ingressPauseCh:
+		case <-ingressPauseCh:
 		default:
-			close(c.ingressPauseCh)
+			close(ingressPauseCh)
 		}
 	}
 	c.FlushIngress()
 	c.ingressWriteMu.Unlock()
 
-	if c.ingressPausedCh != nil {
+	if ingressPausedCh != nil {
 		select {
 		case <-ctx.Done():
 			return
-		case <-c.ingressPausedCh:
+		case <-ingressPausedCh:
 		}
 	}
 	c.FlushIngress()

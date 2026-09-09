@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"sync"
 
+	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	resampling "github.com/tphakala/go-audio-resampler"
@@ -21,6 +22,7 @@ type cachedEngine struct {
 	goResampler   resampling.Resampler
 	soxrResampler *nativePCM16Resampler
 	inputSamples  []float64
+	outputBytes   []byte
 }
 
 type ratePair struct {
@@ -30,19 +32,33 @@ type ratePair struct {
 
 // Resampler reuses one streaming engine for each sample-rate pair.
 type Resampler struct {
-	logger      commons.Logger
-	quality     resampling.QualityPreset
-	engines     sync.Map
-	lifecycleMu sync.RWMutex
-	closed      bool
+	logger               commons.Logger
+	quality              resampling.QualityPreset
+	useNativeHighQuality bool
+	engines              sync.Map
+	lifecycleMu          sync.RWMutex
+	closed               bool
 }
 
 type options struct {
-	logger  commons.Logger
-	quality resampling.QualityPreset
+	logger               commons.Logger
+	quality              resampling.QualityPreset
+	useNativeHighQuality bool
 }
 
 type Option func(*options)
+
+var (
+	_ internal_type.AudioResampler       = (*Resampler)(nil)
+	_ internal_type.AudioStreamResampler = (*Writer)(nil)
+)
+
+type Writer struct {
+	resampler *Resampler
+	source    protos.AudioConfig
+	target    protos.AudioConfig
+	sink      internal_type.AudioResampleSink
+}
 
 // WithLogger sets the resampler logger.
 func WithLogger(logger commons.Logger) Option {
@@ -55,6 +71,7 @@ func WithLogger(logger commons.Logger) Option {
 func WithHighQuality() Option {
 	return func(configuration *options) {
 		configuration.quality = resampling.QualityHigh
+		configuration.useNativeHighQuality = true
 	}
 }
 
@@ -73,7 +90,58 @@ func New(optionFunctions ...Option) *Resampler {
 			option(&configuration)
 		}
 	}
-	return &Resampler{logger: configuration.logger, quality: configuration.quality}
+	return &Resampler{
+		logger:               configuration.logger,
+		quality:              configuration.quality,
+		useNativeHighQuality: configuration.useNativeHighQuality,
+	}
+}
+
+func NewWriter(
+	source, target *protos.AudioConfig,
+	sink internal_type.AudioResampleSink,
+	optionFunctions ...Option,
+) (*Writer, error) {
+	return New(optionFunctions...).NewWriter(source, target, sink)
+}
+
+func (resampler *Resampler) NewWriter(
+	source, target *protos.AudioConfig,
+	sink internal_type.AudioResampleSink,
+) (*Writer, error) {
+	if source == nil || target == nil {
+		return nil, ErrAudioConfigRequired
+	}
+	if sink == nil {
+		return nil, ErrResampleSinkRequired
+	}
+	return &Writer{
+		resampler: resampler,
+		source:    *source,
+		target:    *target,
+		sink:      sink,
+	}, nil
+}
+
+func (writer *Writer) Write(data []byte) error {
+	if writer == nil || writer.resampler == nil {
+		return ErrResamplerClosed
+	}
+	return writer.resampler.write(data, &writer.source, &writer.target, writer.sink)
+}
+
+func (writer *Writer) Flush() error {
+	if writer == nil || writer.resampler == nil {
+		return ErrResamplerClosed
+	}
+	return writer.resampler.flush(&writer.source, &writer.target, writer.sink)
+}
+
+func (writer *Writer) Close() {
+	if writer == nil || writer.resampler == nil {
+		return
+	}
+	writer.resampler.Close()
 }
 
 // Resample converts audio while preserving streaming filter state.
@@ -95,7 +163,6 @@ func (resampler *Resampler) Resample(
 		return []byte{}, nil
 	}
 
-	// No-op when all parameters already match.
 	if source.SampleRate == target.SampleRate &&
 		source.Channels == target.Channels &&
 		source.AudioFormat == target.AudioFormat {
@@ -107,7 +174,6 @@ func (resampler *Resampler) Resample(
 		return resampler.resampleMono(data, source, target)
 	}
 
-	// Convert input to LINEAR16 so the FIR engine always works in PCM.
 	pcm := data
 	if source.AudioFormat != protos.AudioConfig_LINEAR16 {
 		var err error
@@ -117,7 +183,6 @@ func (resampler *Resampler) Resample(
 		}
 	}
 
-	// Resample the sample rate while still mono / same channel count.
 	if source.SampleRate != target.SampleRate {
 		var err error
 		pcm, err = resampler.resamplePCM16(pcm, source.SampleRate, target.SampleRate)
@@ -126,7 +191,6 @@ func (resampler *Resampler) Resample(
 		}
 	}
 
-	// Channel conversion after rate change (cheaper to convert fewer samples).
 	if source.Channels != target.Channels {
 		var err error
 		pcm, err = resampler.convertChannels(pcm, source.Channels, target.Channels)
@@ -135,7 +199,6 @@ func (resampler *Resampler) Resample(
 		}
 	}
 
-	// Convert to the target encoding if it differs from LINEAR16.
 	if target.AudioFormat != protos.AudioConfig_LINEAR16 {
 		var err error
 		pcm, err = resampler.convertFromLinear16(pcm, target)
@@ -145,6 +208,121 @@ func (resampler *Resampler) Resample(
 	}
 
 	return pcm, nil
+}
+
+func (resampler *Resampler) write(
+	data []byte,
+	source, target *protos.AudioConfig,
+	sink internal_type.AudioResampleSink,
+) error {
+	resampler.lifecycleMu.RLock()
+	defer resampler.lifecycleMu.RUnlock()
+	if resampler.closed {
+		return ErrResamplerClosed
+	}
+	if source == nil || target == nil {
+		return ErrAudioConfigRequired
+	}
+	if sink == nil {
+		return ErrResampleSinkRequired
+	}
+	if len(data) == 0 {
+		return nil
+	}
+	if source.SampleRate == target.SampleRate &&
+		source.Channels == target.Channels &&
+		source.AudioFormat == target.AudioFormat {
+		return sink(data)
+	}
+	if source.SampleRate != target.SampleRate &&
+		source.Channels == monoChannelCount &&
+		target.Channels == monoChannelCount {
+		return resampler.resampleMonoToSink(data, source, target, sink)
+	}
+
+	pcm := data
+	if source.AudioFormat != protos.AudioConfig_LINEAR16 {
+		var err error
+		pcm, err = resampler.convertToLinear16(data, source)
+		if err != nil {
+			return err
+		}
+	}
+
+	if source.SampleRate != target.SampleRate {
+		var err error
+		pcm, err = resampler.resamplePCM16(pcm, source.SampleRate, target.SampleRate)
+		if err != nil {
+			return err
+		}
+	}
+
+	if source.Channels != target.Channels {
+		var err error
+		pcm, err = resampler.convertChannels(pcm, source.Channels, target.Channels)
+		if err != nil {
+			return err
+		}
+	}
+
+	if target.AudioFormat != protos.AudioConfig_LINEAR16 {
+		var err error
+		pcm, err = resampler.convertFromLinear16(pcm, target)
+		if err != nil {
+			return err
+		}
+	}
+
+	return sink(pcm)
+}
+
+func (resampler *Resampler) flush(
+	source, target *protos.AudioConfig,
+	sink internal_type.AudioResampleSink,
+) error {
+	resampler.lifecycleMu.RLock()
+	defer resampler.lifecycleMu.RUnlock()
+	if resampler.closed {
+		return ErrResamplerClosed
+	}
+	if source == nil || target == nil {
+		return ErrAudioConfigRequired
+	}
+	if sink == nil {
+		return ErrResampleSinkRequired
+	}
+	if source.SampleRate == target.SampleRate ||
+		source.Channels != monoChannelCount {
+		return nil
+	}
+
+	ratePair := ratePair{sourceRate: source.SampleRate, targetRate: target.SampleRate}
+	existingEngine, exists := resampler.engines.Load(ratePair)
+	if !exists {
+		return nil
+	}
+	engine := existingEngine.(*cachedEngine)
+	engine.mutex.Lock()
+	defer engine.mutex.Unlock()
+	if engine.soxrResampler == nil {
+		return nil
+	}
+	err := engine.soxrResampler.FlushTo(func(pcm []byte) error {
+		if source.Channels != target.Channels {
+			var err error
+			pcm, err = resampler.convertChannels(pcm, source.Channels, target.Channels)
+			if err != nil {
+				return err
+			}
+		}
+		return engine.writeLinear16ToTarget(pcm, target, sink)
+	})
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrResamplingFailed, err)
+	}
+	engine.soxrResampler.Close()
+	resampler.engines.Delete(ratePair)
+	return nil
 }
 
 // Close releases native resampling state.
@@ -205,6 +383,79 @@ func (resampler *Resampler) resampleMono(data []byte, source, target *protos.Aud
 	return encodeMono(output, target.AudioFormat)
 }
 
+func (resampler *Resampler) resampleMonoToSink(
+	data []byte,
+	source, target *protos.AudioConfig,
+	sink internal_type.AudioResampleSink,
+) error {
+	engine, err := resampler.getOrCreateEngine(source.SampleRate, target.SampleRate)
+	if err != nil {
+		return err
+	}
+
+	engine.mutex.Lock()
+	defer engine.mutex.Unlock()
+	if engine.soxrResampler == nil {
+		engine.inputSamples, err = decodeMono(engine.inputSamples, data, source.AudioFormat)
+		if err != nil {
+			return err
+		}
+		resampled, err := engine.goResampler.Process(engine.inputSamples)
+		if err != nil {
+			return fmt.Errorf("%w: %w", ErrResamplingFailed, err)
+		}
+		output, err := encodeMono(resampled, target.AudioFormat)
+		if err != nil {
+			return err
+		}
+		if len(output) == 0 {
+			return nil
+		}
+		return sink(output)
+	}
+	pcm := data
+	if source.AudioFormat != protos.AudioConfig_LINEAR16 {
+		pcm, err = resampler.convertToLinear16(data, source)
+		if err != nil {
+			return err
+		}
+	}
+	err = engine.soxrResampler.WriteTo(pcm, func(output []byte) error {
+		return engine.writeLinear16ToTarget(output, target, sink)
+	})
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrResamplingFailed, err)
+	}
+	return nil
+}
+
+func (engine *cachedEngine) writeLinear16ToTarget(
+	pcm []byte,
+	target *protos.AudioConfig,
+	sink internal_type.AudioResampleSink,
+) error {
+	if len(pcm) == 0 {
+		return nil
+	}
+	switch target.AudioFormat {
+	case protos.AudioConfig_LINEAR16:
+		return sink(pcm)
+	case protos.AudioConfig_MuLaw8:
+		sampleCount := len(pcm) / pcm16BytesPerSample
+		if cap(engine.outputBytes) < sampleCount {
+			engine.outputBytes = make([]byte, sampleCount)
+		} else {
+			engine.outputBytes = engine.outputBytes[:sampleCount]
+		}
+		for index := range engine.outputBytes {
+			engine.outputBytes[index] = g711.EncodeUlawFrame(int16(binary.LittleEndian.Uint16(pcm[index*pcm16BytesPerSample:])))
+		}
+		return sink(engine.outputBytes)
+	default:
+		return fmt.Errorf("%w: %v", ErrUnsupportedOutputFormat, target.AudioFormat)
+	}
+}
+
 func (resampler *Resampler) resamplePCM16(pcm []byte, sourceRate, targetRate uint32) ([]byte, error) {
 	engine, err := resampler.getOrCreateEngine(sourceRate, targetRate)
 	if err != nil {
@@ -236,8 +487,9 @@ func (resampler *Resampler) getOrCreateEngine(sourceRate, targetRate uint32) (*c
 		return existingEngine.(*cachedEngine), nil
 	}
 
-	if resampler.quality == resampling.QualityQuick {
-		soxrResampler, err := newNativePCM16Resampler(sourceRate, targetRate)
+	nativeQuality, useNative := resampler.nativeQuality()
+	if useNative {
+		soxrResampler, err := newNativePCM16Resampler(sourceRate, targetRate, nativeQuality)
 		if err == nil {
 			newEngine := &cachedEngine{soxrResampler: soxrResampler}
 			cachedValue, alreadyExists := resampler.engines.LoadOrStore(ratePair, newEngine)
@@ -265,6 +517,17 @@ func (resampler *Resampler) getOrCreateEngine(sourceRate, targetRate uint32) (*c
 	newEngine := &cachedEngine{goResampler: goResampler}
 	cachedValue, _ := resampler.engines.LoadOrStore(ratePair, newEngine)
 	return cachedValue.(*cachedEngine), nil
+}
+
+func (resampler *Resampler) nativeQuality() (nativeSOXRQuality, bool) {
+	switch resampler.quality {
+	case resampling.QualityQuick:
+		return nativeSOXRQualityQuick, true
+	case resampling.QualityHigh:
+		return nativeSOXRQualityLiveKit, resampler.useNativeHighQuality
+	default:
+		return nativeSOXRQualityQuick, false
+	}
 }
 
 func decodeMono(samples []float64, data []byte, format protos.AudioConfig_AudioFormat) ([]float64, error) {

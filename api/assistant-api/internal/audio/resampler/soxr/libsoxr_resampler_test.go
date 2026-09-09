@@ -55,7 +55,7 @@ func TestNewChunkAppliesOptions(t *testing.T) {
 	assert.Equal(t, resampling.QualityQuick, chunk.quality)
 }
 
-func TestRealtimeAudioResamplerEmitsEachSpeechFrameImmediately(tester *testing.T) {
+func TestRealtimeAudioResamplerEmitsSpeechWithoutSyntheticPadding(tester *testing.T) {
 	resampler := New(WithLogger(newTestLogger(tester)), WithQuickQuality())
 	source := internal_audio.NewLinear8khzMonoAudioConfig()
 	target := internal_audio.NewLinear16khzMonoAudioConfig()
@@ -64,7 +64,12 @@ func TestRealtimeAudioResamplerEmitsEachSpeechFrameImmediately(tester *testing.T
 		input := generateLinear16Data(160)
 		output, err := resampler.Resample(input, source, target)
 		require.NoError(tester, err)
-		require.Len(tester, output, 640)
+		if frameIndex == 0 && len(output) == 0 {
+			continue
+		}
+		require.NotEmpty(tester, output)
+		require.Zero(tester, len(output)%pcm16BytesPerSample)
+		require.LessOrEqual(tester, len(output), 640)
 	}
 }
 
@@ -119,6 +124,41 @@ func TestRealtimeMuLawResamplingMatchesDecodedPCM(t *testing.T) {
 	want, err := linearResampler.Resample(g711.DecodeUlaw(encoded), linearSource, target)
 	require.NoError(t, err)
 	require.Equal(t, want, got)
+}
+
+func TestWriterMatchesResampleAndFlushesTail(t *testing.T) {
+	source := internal_audio.NewLinear8khzMonoAudioConfig()
+	target := internal_audio.NewLinear16khzMonoAudioConfig()
+	input := generateLinear16Data(160)
+	reference := New(WithHighQuality())
+	writerResampler := New(WithHighQuality())
+	var expected []byte
+	var actual []byte
+	writer, err := writerResampler.NewWriter(source, target, func(output []byte) error {
+		actual = append(actual, output...)
+		return nil
+	})
+	require.NoError(t, err)
+
+	for range 4 {
+		output, err := reference.Resample(input, source, target)
+		require.NoError(t, err)
+		expected = append(expected, output...)
+		require.NoError(t, writer.Write(input))
+	}
+	require.Equal(t, expected, actual)
+	require.NoError(t, writer.Flush())
+	require.GreaterOrEqual(t, len(actual), len(expected))
+	require.Equal(t, expected, actual[:len(expected)])
+}
+
+func TestNewWriterRequiresSink(t *testing.T) {
+	_, err := New().NewWriter(
+		internal_audio.NewLinear8khzMonoAudioConfig(),
+		internal_audio.NewLinear16khzMonoAudioConfig(),
+		nil,
+	)
+	require.ErrorIs(t, err, ErrResampleSinkRequired)
 }
 
 // TestResampleNoConversion tests when source and target are identical
@@ -177,7 +217,6 @@ func TestResampleSampleRateConversion(t *testing.T) {
 
 // TestFormatConversions tests conversions between different audio formats
 func TestFormatConversions(t *testing.T) {
-	resampler := newTestResampler(t)
 	tests := []struct {
 		name       string
 		sourceFunc func() *protos.AudioConfig
@@ -191,6 +230,7 @@ func TestFormatConversions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			resampler := New(WithLogger(newTestLogger(t)), WithQuickQuality())
 			source := tt.sourceFunc()
 			target := tt.targetFunc()
 			var data []byte
@@ -261,7 +301,7 @@ func TestChannelConversionRejectsInvalidFrames(t *testing.T) {
 
 // TestComplexResample tests combining sample rate + format + channel changes
 func TestComplexResample(t *testing.T) {
-	resampler := newTestResampler(t)
+	resampler := New(WithLogger(newTestLogger(t)), WithQuickQuality())
 	source := &protos.AudioConfig{SampleRate: 8000, AudioFormat: protos.AudioConfig_MuLaw8, Channels: 1}
 	target := &protos.AudioConfig{SampleRate: 16000, AudioFormat: protos.AudioConfig_LINEAR16, Channels: 2}
 	data := generateMuLawData(8000)
@@ -278,7 +318,7 @@ func TestConcurrentResampling(t *testing.T) {
 	var wg sync.WaitGroup
 	var errorCount int
 	var mu sync.Mutex
-	resampler := newTestResampler(t)
+	resampler := New(WithLogger(newTestLogger(t)), WithQuickQuality())
 	source := internal_audio.NewLinear16khzMonoAudioConfig()
 	target := internal_audio.NewLinear24khzMonoAudioConfig()
 	data := generateLinear16Data(dataSize)

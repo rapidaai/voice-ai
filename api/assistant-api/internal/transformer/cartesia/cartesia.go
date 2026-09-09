@@ -8,6 +8,7 @@ package internal_transformer_cartesia
 
 import (
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -20,10 +21,11 @@ import (
 )
 
 const (
-	URL                  = "wss://api.cartesia.ai/stt/websocket"
-	CARTESIA_API_VERSION = "2024-06-10"
-	RECONNECT_DELAY      = 5 * time.Second
-	WRITE_TIME_OUT       = 10 * time.Second
+	URL                      = "wss://api.cartesia.ai/stt/websocket"
+	CARTESIA_API_VERSION     = "2024-06-10"
+	CARTESIA_STT_API_VERSION = "2026-03-01"
+	RECONNECT_DELAY          = 5 * time.Second
+	WRITE_TIME_OUT           = 10 * time.Second
 )
 
 func (co *cartesiaOption) GetEncoding() string {
@@ -105,21 +107,29 @@ func (co *cartesiaOption) GetTextToSpeechInput(
 
 func (co *cartesiaOption) GetSpeechToTextConnectionString() string {
 	params := url.Values{}
-	params.Add("api_key", co.key)
-	params.Add("cartesia_version", CARTESIA_API_VERSION)
 	params.Add("encoding", co.GetEncoding())
 	params.Add("sample_rate", "16000")
+
+	model := "ink-2"
+	if configuredModel, err := co.mdlOpts.GetString(internal_options.ListenOptionModel); err == nil {
+		model = configuredModel
+	}
+	params.Add("model", model)
+
 	// Check and add language
 	if language, err := co.mdlOpts.GetString(internal_options.ListenOptionLanguage); err == nil {
 		params.Add("language", language)
 	}
 
-	// Check and add model
-	if model, err := co.mdlOpts.GetString(internal_options.ListenOptionModel); err == nil {
-		params.Add("model", model)
-	}
 	// Construct the final URL
 	return fmt.Sprintf("%s?%s", URL, params.Encode())
+}
+
+func (co *cartesiaOption) GetSpeechToTextHeader() http.Header {
+	header := http.Header{}
+	header.Set("X-API-Key", co.key)
+	header.Set("Cartesia-Version", CARTESIA_STT_API_VERSION)
+	return header
 }
 
 func (co *cartesiaOption) GetTextToSpeechConnectionString() string {

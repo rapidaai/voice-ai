@@ -381,17 +381,37 @@ describe('Cartesia STT — config vs original', () => {
 
   it('produces the same default keys and values', () => {
     const result = getDefaultsFromConfig(config, 'stt', [], 'cartesia');
-    expect(findMeta(result, 'listen.model')).toBe('ink-whisper');
+    expect(findMeta(result, 'listen.model')).toBe('ink-2');
     expect(findMeta(result, 'listen.language')).toBe('en');
   });
 
   it('validates: valid options returns undefined', () => {
     const opts = [
       cred(),
-      createMetadata('listen.model', 'ink-whisper'),
+      createMetadata('listen.model', 'ink-2'),
       createMetadata('listen.language', 'en'),
     ];
     expect(validateFromConfig(config, 'stt', 'cartesia', opts)).toBeUndefined();
+  });
+
+  it('validates: preview model languages return undefined', () => {
+    const opts = [
+      cred(),
+      createMetadata('listen.model', 'ink-preview'),
+      createMetadata('listen.language', 'hi'),
+    ];
+    expect(validateFromConfig(config, 'stt', 'cartesia', opts)).toBeUndefined();
+  });
+
+  it('validates: stable model rejects preview-only languages', () => {
+    const opts = [
+      cred(),
+      createMetadata('listen.model', 'ink-2'),
+      createMetadata('listen.language', 'hi'),
+    ];
+    expect(validateFromConfig(config, 'stt', 'cartesia', opts)).toBe(
+      'Please provide valid cartesia language options for speech to text.',
+    );
   });
 });
 

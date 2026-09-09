@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
+	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
@@ -48,6 +49,12 @@ func TestNewConverterCreatesLinearConverter(t *testing.T) {
 	converter := NewConverter(WithLogger(newTestLogger(t)))
 	_, ok := converter.(*linearResampler)
 	assert.True(t, ok)
+}
+
+func TestNewReturnsAudioResampler(t *testing.T) {
+	var resampler internal_type.AudioResampler = New()
+
+	require.NotNil(t, resampler)
 }
 
 // TestResampleNoConversion tests when source and target are identical

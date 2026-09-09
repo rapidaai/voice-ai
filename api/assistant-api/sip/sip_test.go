@@ -12,6 +12,8 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
+	"strings"
 	"testing"
 
 	assistant_config "github.com/rapidaai/api/assistant-api/config"
@@ -144,6 +146,27 @@ func TestSessionEstablishedStagePreservesCallAddress(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, address, stage.CallAddress)
+}
+
+func TestOnInviteStartsPreparedSessionBeforeOutboundFallback(t *testing.T) {
+	sourceBytes, err := os.ReadFile("sip.go")
+	require.NoError(t, err)
+
+	source := string(sourceBytes)
+	onInviteIndex := strings.Index(source, "func (m *SIPEngine) onInvite")
+	require.NotEqual(t, -1, onInviteIndex)
+	onByeIndex := strings.Index(source[onInviteIndex:], "func (m *SIPEngine) onBye")
+	require.NotEqual(t, -1, onByeIndex)
+
+	onInviteSource := source[onInviteIndex : onInviteIndex+onByeIndex]
+	inboundPreparedIndex := strings.Index(onInviteSource, "if stage.Direction == sip_runtime.CallDirectionInbound")
+	outboundPreparedIndex := strings.Index(onInviteSource, "if err := m.dispatcher.StartPreparedSession")
+	outboundFallbackIndex := strings.Index(onInviteSource, "m.dispatcher.OnPipeline(m.ctx, stage)")
+
+	require.NotEqual(t, -1, inboundPreparedIndex)
+	require.NotEqual(t, -1, outboundPreparedIndex)
+	require.NotEqual(t, -1, outboundFallbackIndex)
+	assert.Less(t, outboundPreparedIndex, outboundFallbackIndex)
 }
 
 func TestPersistRemoteByeCallStatus_UpdatesCompletedDisconnectMetadata(t *testing.T) {

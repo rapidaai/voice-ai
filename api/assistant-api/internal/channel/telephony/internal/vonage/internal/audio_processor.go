@@ -15,7 +15,6 @@ import (
 	internal_channel_input "github.com/rapidaai/api/assistant-api/internal/channel/input"
 	internal_telephony_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
-	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 )
@@ -24,7 +23,6 @@ import (
 type AudioProcessor struct {
 	logger commons.Logger
 
-	resampler   internal_type.AudioResampler
 	audioConfig *protos.AudioConfig
 
 	inputBuffer        internal_channel_input.InputBuffer
@@ -38,11 +36,7 @@ type AudioProcessor struct {
 // NewAudioProcessor creates a new Vonage audio processor
 func NewAudioProcessor(logger commons.Logger) (*AudioProcessor, error) {
 	audioProcessor := &AudioProcessor{
-		logger: logger,
-		resampler: resampler_soxr.New(
-			resampler_soxr.WithLogger(logger),
-			resampler_soxr.WithHighQuality(),
-		),
+		logger:             logger,
 		audioConfig:        internal_audio.NewLinear16khzMonoAudioConfig(),
 		inputBuffer:        internal_channel_input.NewBytesInputBuffer(InputBufferThreshold * 2),
 		outputBuffer:       internal_telephony_output.NewBytesFrameBuffer(OutputChunkSize * 8),
@@ -50,7 +44,7 @@ func NewAudioProcessor(logger commons.Logger) (*AudioProcessor, error) {
 	}
 	audioProcessor.silenceFrame = audioProcessor.createSilenceFrame()
 	ambientMixer, err := internal_ambient.NewLoopMixer(internal_ambient.MixerSpec{
-		Resampler:         audioProcessor.resampler,
+		Resampler:         resampler_soxr.NewChunk(resampler_soxr.WithLogger(logger), resampler_soxr.WithHighQuality()),
 		TargetAudioConfig: audioProcessor.audioConfig,
 		FrameBytes:        OutputChunkSize,
 	})

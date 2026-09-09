@@ -80,6 +80,8 @@ func (r *linearResampler) Resample(data []byte, source, target *protos.AudioConf
 	return result, nil
 }
 
+func (r *linearResampler) Close() {}
+
 // ConvertToFloat32Samples converts byte audio data to float32 samples
 func (r *linearResampler) ConvertToFloat32Samples(data []byte, config *protos.AudioConfig) ([]float32, error) {
 	float64Samples, err := r.decodeToFloat64(data, config)

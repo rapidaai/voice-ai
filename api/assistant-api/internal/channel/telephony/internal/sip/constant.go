@@ -18,7 +18,7 @@ const (
 
 // Realtime media constants preserve 20 ms SIP audio frames and bounded queues.
 const (
-	RealtimeInputChannelCapacity   = 100
+	RealtimeInputChannelCapacity   = 1000
 	BridgeRecordingChannelCapacity = 100
 	ChunkDuration                  = 20 * time.Millisecond
 	MulawFrameSize                 = 160

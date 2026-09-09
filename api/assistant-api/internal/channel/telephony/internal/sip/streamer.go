@@ -122,10 +122,6 @@ func New(opts ...FuncOption) (internal_type.SIPCallStreamer, error) {
 		session:   options.Session,
 		lifecycle: options.Lifecycle,
 	}
-	isInbound := options.Session.GetInfo().Direction == sip_runtime.CallDirectionInbound
-	if !isInbound {
-		s.assistantOutputActive.Store(true)
-	}
 	mediaPort, err := NewMediaPort(MediaPortConfig{
 		Context:    s.Ctx,
 		Logger:     options.Logger,
@@ -137,30 +133,7 @@ func New(opts ...FuncOption) (internal_type.SIPCallStreamer, error) {
 		return nil, err
 	}
 	s.mediaPort = mediaPort
-	if isInbound {
-		s.mediaPort.StartInput()
-	} else {
-		s.mediaPort.Start()
-		_ = s.Record(observability.RecordEvent{
-			Component: observability.ComponentCall,
-			Event:     observability.CallMediaStarted,
-			Attributes: observability.Attributes{
-				"component": observability.ComponentCall.String(),
-				"provider":  Provider,
-				"call_id":   options.Session.GetCallID(),
-			},
-		}, observability.RecordMetadata{
-			Metadata: []*protos.Metadata{
-				{Key: observability.MetadataClientChannel, Value: Provider},
-			},
-		}, observability.RecordMetric{
-			Metrics: []*protos.Metric{{
-				Name:        observability.MetricCallStatus,
-				Value:       observability.MetricCallStatusInProgress,
-				Description: "SIP media started",
-			}},
-		})
-	}
+	s.mediaPort.StartInput()
 	s.Input(s.CreateConnectionRequest())
 	_ = s.Record(observability.RecordEvent{
 		Component: observability.ComponentCall,

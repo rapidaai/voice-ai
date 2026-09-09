@@ -127,7 +127,7 @@ func NewSpeechToText(opts ...Option) (internal_type.SpeechToTextTransformer, err
 
 func (cst *cartesiaSpeechToText) Initialize() error {
 	start := time.Now()
-	conn, _, err := websocket.DefaultDialer.Dial(cst.GetSpeechToTextConnectionString(), nil)
+	conn, _, err := websocket.DefaultDialer.Dial(cst.GetSpeechToTextConnectionString(), cst.GetSpeechToTextHeader())
 	if err != nil {
 		cst.logger.Errorf("cartesia-stt: failed to connect to Cartesia WebSocket: %v", err)
 		cst.onPacket(internal_type.ObservabilityLogRecordPacket{
@@ -231,12 +231,109 @@ func (cst *cartesiaSpeechToText) readLoop(conn *websocket.Conn) {
 		}
 
 		var resp cartesia_internal.SpeechToTextOutput
-		if err := json.Unmarshal(msg, &resp); err != nil || resp.Text == "" {
-			continue
+		if err := json.Unmarshal(msg, &resp); err != nil {
+			cst.mu.Lock()
+			if cst.connection == conn {
+				cst.connection = nil
+			}
+			ctxID := cst.contextId
+			cst.mu.Unlock()
+
+			cst.logger.Errorf("cartesia-stt: invalid message: %v", err)
+			cst.onPacket(
+				internal_type.ObservabilityMetricRecordPacket{
+					ContextID: ctxID,
+					Scope:     internal_type.ObservabilityRecordScopeConversation,
+					Record: observability.RecordMetric{
+						Metrics: []*protos.Metric{{
+							Name:        observability.MetricSTTError,
+							Value:       "1",
+							Description: "Cartesia STT protocol error",
+						}},
+						Attributes: observability.Attributes{"provider": cst.Name()},
+					},
+				},
+				internal_type.SpeechToTextErrorPacket{
+					ContextID: ctxID,
+					Error:     fmt.Errorf("cartesia-stt: invalid message: %w", err),
+					Type:      internal_type.STTNetworkTimeout,
+				},
+				internal_type.ObservabilityLogRecordPacket{
+					ContextID: ctxID,
+					Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+					Record: observability.RecordLog{
+						Level:   observability.LevelError,
+						Message: "cartesia-stt: invalid message",
+						Attributes: observability.Attributes{
+							"component": observability.ComponentSTT.String(),
+							"provider":  cst.Name(),
+							"error":     observability.AttributeValue(err.Error()),
+						},
+						OccurredAt: time.Now(),
+					},
+				},
+			)
+			_ = conn.Close()
+			return
 		}
 		cst.mu.Lock()
 		ctxID := cst.contextId
 		cst.mu.Unlock()
+
+		switch resp.Type {
+		case "transcript":
+		case "flush_done", "done":
+			continue
+		case "error":
+			message := resp.Message
+			if message == "" {
+				message = resp.Title
+			}
+			if message == "" {
+				message = "unknown Cartesia STT error"
+			}
+			cst.onPacket(
+				internal_type.ObservabilityMetricRecordPacket{
+					ContextID: ctxID,
+					Scope:     internal_type.ObservabilityRecordScopeConversation,
+					Record: observability.RecordMetric{
+						Metrics: []*protos.Metric{{
+							Name:        observability.MetricSTTError,
+							Value:       "1",
+							Description: "Cartesia STT server error",
+						}},
+						Attributes: observability.Attributes{"provider": cst.Name()},
+					},
+				},
+				internal_type.SpeechToTextErrorPacket{
+					ContextID: ctxID,
+					Error:     fmt.Errorf("cartesia-stt: %s", message),
+					Type:      internal_type.STTNetworkTimeout,
+				},
+				internal_type.ObservabilityLogRecordPacket{
+					ContextID: ctxID,
+					Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+					Record: observability.RecordLog{
+						Level:   observability.LevelError,
+						Message: "cartesia-stt: server error",
+						Attributes: observability.Attributes{
+							"component": observability.ComponentSTT.String(),
+							"provider":  cst.Name(),
+							"error":     observability.AttributeValue(message),
+						},
+						OccurredAt: time.Now(),
+					},
+				},
+			)
+			continue
+		default:
+			if resp.Text == "" {
+				continue
+			}
+		}
+		if resp.Text == "" {
+			continue
+		}
 
 		if !resp.IsFinal {
 			cst.onPacket(
@@ -317,13 +414,58 @@ func (cst *cartesiaSpeechToText) Transform(ctx context.Context, in internal_type
 		return nil
 	case internal_type.SpeechToTextStartPacket:
 		cst.mu.Lock()
+		if pkt.ContextID != "" {
+			cst.contextId = pkt.ContextID
+		}
 		if cst.startedAt.IsZero() {
 			cst.startedAt = time.Now()
 		}
 		cst.mu.Unlock()
 		return nil
+	case internal_type.SpeechToTextEndPacket:
+		cst.mu.Lock()
+		if pkt.ContextID != "" {
+			cst.contextId = pkt.ContextID
+		}
+		conn := cst.connection
+		contextID := cst.contextId
+		cst.mu.Unlock()
+
+		if conn == nil {
+			return fmt.Errorf("cartesia-stt: connection not initialized")
+		}
+
+		cst.writeMu.Lock()
+		err := conn.WriteMessage(websocket.TextMessage, []byte("finalize"))
+		cst.writeMu.Unlock()
+		if err != nil {
+			cst.logger.Errorf("cartesia-stt: finalize failed: %v", err)
+			cst.onPacket(
+				internal_type.ObservabilityMetricRecordPacket{
+					ContextID: contextID,
+					Scope:     internal_type.ObservabilityRecordScopeConversation,
+					Record: observability.RecordMetric{
+						Metrics: []*protos.Metric{{
+							Name:        observability.MetricSTTError,
+							Value:       "1",
+							Description: "Cartesia STT finalize failure",
+						}},
+						Attributes: observability.Attributes{"provider": cst.Name()},
+					},
+				},
+				internal_type.SpeechToTextErrorPacket{
+					ContextID: contextID,
+					Error:     fmt.Errorf("cartesia-stt: finalize failed: %w", err),
+					Type:      internal_type.STTNetworkTimeout,
+				})
+			return fmt.Errorf("cartesia-stt: finalize failed: %w", err)
+		}
+		return nil
 	case internal_type.SpeechToTextAudioPacket:
 		cst.mu.Lock()
+		if pkt.ContextID != "" {
+			cst.contextId = pkt.ContextID
+		}
 		if cst.startedAt.IsZero() {
 			cst.startedAt = time.Now()
 		}
@@ -341,6 +483,18 @@ func (cst *cartesiaSpeechToText) Transform(ctx context.Context, in internal_type
 		if err != nil {
 			cst.logger.Errorf("cartesia-stt: error sending audio: %v", err)
 			cst.onPacket(
+				internal_type.ObservabilityMetricRecordPacket{
+					ContextID: contextID,
+					Scope:     internal_type.ObservabilityRecordScopeConversation,
+					Record: observability.RecordMetric{
+						Metrics: []*protos.Metric{{
+							Name:        observability.MetricSTTError,
+							Value:       "1",
+							Description: "Cartesia STT send failure",
+						}},
+						Attributes: observability.Attributes{"provider": cst.Name()},
+					},
+				},
 				internal_type.SpeechToTextErrorPacket{
 					ContextID: contextID,
 					Error:     fmt.Errorf("cartesia-stt: send failed: %w", err),
@@ -370,18 +524,22 @@ func (cst *cartesiaSpeechToText) Transform(ctx context.Context, in internal_type
 }
 
 func (cst *cartesiaSpeechToText) Close(ctx context.Context) error {
-	cst.ctxCancel()
 	cst.mu.Lock()
 	ctxID := cst.contextId
 	connectedAt := cst.sttConnectedAt
 	cst.sttConnectedAt = time.Time{}
 
+	var conn *websocket.Conn
 	if cst.connection != nil {
-		conn := cst.connection
-		cst.connection = nil // mark before Close so readLoop sees intentional
-		conn.Close()
+		conn = cst.connection
+		cst.connection = nil
 	}
 	cst.mu.Unlock()
+
+	if conn != nil {
+		_ = conn.Close()
+	}
+	cst.ctxCancel()
 
 	if !connectedAt.IsZero() {
 		duration := time.Since(connectedAt)

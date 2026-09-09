@@ -139,7 +139,8 @@ func (d *Dispatcher) prepareSession(ctx context.Context, stage SessionEstablishe
 		},
 	)
 	var runtime PreparedCallRuntime
-	if stage.Direction == sip_runtime.CallDirectionInbound {
+	switch stage.Direction {
+	case sip_runtime.CallDirectionInbound:
 		var err error
 		preparedRuntime, err := d.prepareSIPCallRuntime(ctx, stage, setup, observer)
 		if err != nil {
@@ -148,6 +149,13 @@ func (d *Dispatcher) prepareSession(ctx context.Context, stage SessionEstablishe
 		}
 		if err := preparedRuntime.StartBeforeAnswer(ctx, inboundRuntimeReadyTimeout(stage.Config)); err != nil {
 			preparedRuntime.Close(ctx)
+			observer.Close(ctx)
+			return nil, newSessionPreparationError(sip_runtime.LifecycleReasonPipelineSetupFailed, err)
+		}
+		runtime = preparedRuntime
+	case sip_runtime.CallDirectionOutbound:
+		preparedRuntime, err := d.prepareSIPCallRuntime(ctx, stage, setup, observer)
+		if err != nil {
 			observer.Close(ctx)
 			return nil, newSessionPreparationError(sip_runtime.LifecycleReasonPipelineSetupFailed, err)
 		}

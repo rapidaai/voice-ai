@@ -44,12 +44,15 @@ type AudioProcessorConfig struct {
 type AudioProcessor struct {
 	logger commons.Logger
 
-	resampler        internal_type.AudioResampler
-	asteriskConfig   *protos.AudioConfig
-	downstreamConfig *protos.AudioConfig
-	silenceByte      byte
-	optimalFrameSize int
-	stateMu          sync.RWMutex
+	resampler          internal_type.AudioResampler
+	inputWriter        internal_type.AudioStreamResampler
+	outputWriter       internal_type.AudioStreamResampler
+	asteriskConfig     *protos.AudioConfig
+	downstreamConfig   *protos.AudioConfig
+	providerInputAudio []byte
+	silenceByte        byte
+	optimalFrameSize   int
+	stateMu            sync.RWMutex
 
 	inputBuffer internal_channel_input.InputBuffer
 
@@ -70,12 +73,17 @@ func NewAudioProcessor(logger commons.Logger, cfg AudioProcessorConfig) (*AudioP
 		frameSize = defaultFrameSize
 	}
 
+	inputResampler := resampler_soxr.New(
+		resampler_soxr.WithLogger(logger),
+		resampler_soxr.WithHighQuality(),
+	)
+	outputResampler := resampler_soxr.New(
+		resampler_soxr.WithLogger(logger),
+		resampler_soxr.WithHighQuality(),
+	)
 	audioProcessor := &AudioProcessor{
-		logger: logger,
-		resampler: resampler_soxr.New(
-			resampler_soxr.WithLogger(logger),
-			resampler_soxr.WithHighQuality(),
-		),
+		logger:             logger,
+		resampler:          inputResampler,
 		asteriskConfig:     cfg.AsteriskConfig,
 		downstreamConfig:   cfg.DownstreamConfig,
 		silenceByte:        cfg.SilenceByte,
@@ -86,11 +94,30 @@ func NewAudioProcessor(logger commons.Logger, cfg AudioProcessorConfig) (*AudioP
 	}
 	audioProcessor.silenceFrame = audioProcessor.createSilenceFrame(frameSize, audioProcessor.silenceByte)
 
+	if cfg.AsteriskConfig != nil && cfg.DownstreamConfig != nil {
+		inputWriter, err := inputResampler.NewWriter(cfg.AsteriskConfig, cfg.DownstreamConfig, func(output []byte) error {
+			audioProcessor.providerInputAudio = append(audioProcessor.providerInputAudio, output...)
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		outputWriter, err := outputResampler.NewWriter(cfg.DownstreamConfig, cfg.AsteriskConfig, func(output []byte) error {
+			audioProcessor.outputBuffer.Write(output)
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		audioProcessor.inputWriter = inputWriter
+		audioProcessor.outputWriter = outputWriter
+	}
+
 	if cfg.AsteriskConfig != nil {
 		switch cfg.AsteriskConfig.GetAudioFormat() {
 		case protos.AudioConfig_MuLaw8:
 			ambientMixer, err := internal_ambient.NewLoopMixer(internal_ambient.MixerSpec{
-				Resampler:         audioProcessor.resampler,
+				Resampler:         resampler_soxr.NewChunk(resampler_soxr.WithLogger(logger), resampler_soxr.WithHighQuality()),
 				TargetAudioConfig: internal_audio.NewLinear8khzMonoAudioConfig(),
 				FrameBytes:        frameSize * 2,
 			})
@@ -99,7 +126,7 @@ func NewAudioProcessor(logger commons.Logger, cfg AudioProcessorConfig) (*AudioP
 			}
 		case protos.AudioConfig_LINEAR16:
 			ambientMixer, err := internal_ambient.NewLoopMixer(internal_ambient.MixerSpec{
-				Resampler:         audioProcessor.resampler,
+				Resampler:         resampler_soxr.NewChunk(resampler_soxr.WithLogger(logger), resampler_soxr.WithHighQuality()),
 				TargetAudioConfig: cfg.AsteriskConfig,
 				FrameBytes:        frameSize,
 			})
@@ -150,9 +177,23 @@ func (audioProcessor *AudioProcessor) ProcessProviderAudioFrame(frame internal_t
 		return inputFrame, nil
 	}
 
-	converted, err := audioProcessor.resampler.Resample(frame.Audio, audioProcessor.asteriskConfig, audioProcessor.downstreamConfig)
-	if err != nil {
-		return inputFrame, fmt.Errorf("audio conversion from asterisk format to downstream failed: %w", err)
+	var converted []byte
+	if audioProcessor.inputWriter != nil {
+		audioProcessor.providerInputAudio = audioProcessor.providerInputAudio[:0]
+		if err := audioProcessor.inputWriter.Write(frame.Audio); err != nil {
+			return inputFrame, fmt.Errorf("audio conversion from asterisk format to downstream failed: %w", err)
+		}
+		converted = append(converted, audioProcessor.providerInputAudio...)
+		audioProcessor.providerInputAudio = audioProcessor.providerInputAudio[:0]
+	} else {
+		var err error
+		converted, err = audioProcessor.resampler.Resample(frame.Audio, audioProcessor.asteriskConfig, audioProcessor.downstreamConfig)
+		if err != nil {
+			return inputFrame, fmt.Errorf("audio conversion from asterisk format to downstream failed: %w", err)
+		}
+	}
+	if len(converted) == 0 {
+		return inputFrame, nil
 	}
 
 	inputFrame.BridgeAudio = converted
@@ -166,14 +207,25 @@ func (audioProcessor *AudioProcessor) ProcessProviderAudioFrame(frame internal_t
 func (audioProcessor *AudioProcessor) ProcessAssistantAudio(audio []byte, completed bool) error {
 	frameSize, _ := audioProcessor.getOutputState()
 	if len(audio) > 0 {
-		converted, err := audioProcessor.convertOutputAudio(audio)
-		if err != nil {
-			return fmt.Errorf("audio conversion from downstream to asterisk format failed: %w", err)
+		if audioProcessor.outputWriter != nil {
+			if err := audioProcessor.outputWriter.Write(audio); err != nil {
+				return fmt.Errorf("audio conversion from downstream to asterisk format failed: %w", err)
+			}
+		} else {
+			converted, err := audioProcessor.convertOutputAudio(audio)
+			if err != nil {
+				return fmt.Errorf("audio conversion from downstream to asterisk format failed: %w", err)
+			}
+			audioProcessor.outputBuffer.Write(converted)
 		}
-		audioProcessor.outputBuffer.Write(converted)
 		audioProcessor.bridgeOutputBuffer.Write(audio)
 	}
 	if completed {
+		if audioProcessor.outputWriter != nil {
+			if err := audioProcessor.outputWriter.Flush(); err != nil {
+				return fmt.Errorf("audio conversion from downstream to asterisk format failed: %w", err)
+			}
+		}
 		audioProcessor.outputBuffer.Complete(frameSize, audioProcessor.silenceByte)
 		audioProcessor.bridgeOutputBuffer.Complete(bridgeOutputFrameSize, 0)
 	}

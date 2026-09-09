@@ -12,4 +12,5 @@ package resampler_soxr
 const (
 	nativeSOXRThreadCount    = 1
 	minimumOutputSampleCount = 1
+	nativeOutputExtraSamples = 1024
 )

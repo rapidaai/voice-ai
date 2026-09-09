@@ -108,7 +108,7 @@ func TestMediaPort_StartForwardsProviderAudio(t *testing.T) {
 	mediaPort.Start()
 	defer func() { require.NoError(t, mediaPort.Close()) }()
 
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 8; i++ {
 		emitInboundAudio(sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()})
 	}
 
@@ -117,7 +117,8 @@ func TestMediaPort_StartForwardsProviderAudio(t *testing.T) {
 			select {
 			case stream := <-streams:
 				if userMessage, ok := stream.(*protos.ConversationUserMessage); ok {
-					return len(userMessage.GetAudio()) == BridgeOutputFrameSize
+					return len(userMessage.GetAudio()) > 0 &&
+						len(userMessage.GetAudio())%2 == 0
 				}
 			default:
 				return false
@@ -164,8 +165,8 @@ func TestMediaPort_RealUDPInputMatchesReferencePCM(t *testing.T) {
 				binary.LittleEndian.PutUint16(pcm[sampleIndex*2:], uint16(sample))
 			}
 
-			reference := resampler_soxr.New(resampler_soxr.WithQuickQuality())
-			expectedFrames := make([][]byte, frameCount)
+			reference := resampler_soxr.New(resampler_soxr.WithHighQuality())
+			var expectedFrames [][]byte
 			for frameIndex := range frameCount {
 				start := frameIndex * MulawFrameSize * 2
 				end := start + MulawFrameSize*2
@@ -173,12 +174,15 @@ func TestMediaPort_RealUDPInputMatchesReferencePCM(t *testing.T) {
 				if codec.Name == sip_runtime.CodecPCMA.Name {
 					encoded = g711.EncodeAlaw(pcm[start:end])
 				}
-				expectedFrames[frameIndex], err = reference.Resample(
+				expectedFrame, err := reference.Resample(
 					decodeG711ToLinear8k(encoded, codec.Name),
 					Linear8kConfig,
 					Rapida16kConfig,
 				)
 				require.NoError(t, err)
+				if len(expectedFrame) > 0 {
+					expectedFrames = append(expectedFrames, expectedFrame)
+				}
 				require.NoError(t, sender.WriteAudio(encoded))
 			}
 
@@ -204,6 +208,9 @@ func TestMediaPort_RealUDPInputMatchesReferencePCM(t *testing.T) {
 			expectedPCM := bytes.Join(expectedFrames, nil)
 			require.Equal(t, expectedPCM, actualPipeline)
 			require.Equal(t, expectedPCM, actualRecording)
+			require.Eventually(t, func() bool {
+				return receiver.GetDetailedStats().PacketsDelivered == uint64(frameCount)
+			}, time.Second, time.Millisecond)
 			stats := receiver.GetDetailedStats()
 			assert.Equal(t, uint64(frameCount), stats.PacketsReceived)
 			assert.Equal(t, uint64(frameCount), stats.PacketsDelivered)
@@ -221,16 +228,16 @@ func TestMediaPort_RealUDPInputHandlesReorderingAndLoss(t *testing.T) {
 		expectLoss      bool
 		packetsReceived uint64
 	}{
-		{name: "reordered", sendOrder: []int{0, 2, 1}, packetsReceived: 3},
-		{name: "missing packet", sendOrder: []int{0, 2}, expectLoss: true, packetsReceived: 2},
+		{name: "reordered", sendOrder: []int{0, 2, 1, 3, 4, 5}, packetsReceived: 6},
+		{name: "missing packet", sendOrder: []int{0, 2, 3, 4, 5}, expectLoss: true, packetsReceived: 5},
 	}
 
 	for _, codec := range []sip_runtime.Codec{sip_runtime.CodecPCMU, sip_runtime.CodecPCMA} {
 		for _, testCase := range testCases {
 			t.Run(codec.Name+"/"+testCase.name, func(t *testing.T) {
 				receiver := newMediaPortTestRTPHandler(t, codec)
-				pipelineAudio := make(chan []byte, 3)
-				recordingAudio := make(chan []byte, 3)
+				pipelineAudio := make(chan []byte, 6)
+				recordingAudio := make(chan []byte, 6)
 				mediaPort, err := NewMediaPort(MediaPortConfig{
 					Context:    t.Context(),
 					Session:    newMediaPortTestSessionWithCodec(t, &codec),
@@ -261,7 +268,7 @@ func TestMediaPort_RealUDPInputHandlesReorderingAndLoss(t *testing.T) {
 					Port: receiver.LocalAddress().Port,
 				}
 
-				encodedFrames := make([][]byte, 3)
+				encodedFrames := make([][]byte, 6)
 				for frameIndex := range encodedFrames {
 					pcm := make([]byte, samplesPerFrame*2)
 					for sampleIndex := range samplesPerFrame {
@@ -277,18 +284,21 @@ func TestMediaPort_RealUDPInputHandlesReorderingAndLoss(t *testing.T) {
 
 				expectedEncoded := append([][]byte(nil), encodedFrames...)
 				if testCase.expectLoss {
-					expectedEncoded = [][]byte{encodedFrames[0], encodedFrames[2]}
+					expectedEncoded = [][]byte{encodedFrames[0], encodedFrames[2], encodedFrames[3], encodedFrames[4], encodedFrames[5]}
 				}
 
-				reference := resampler_soxr.New(resampler_soxr.WithQuickQuality())
-				expectedPCM := make([][]byte, len(expectedEncoded))
-				for frameIndex, encoded := range expectedEncoded {
-					expectedPCM[frameIndex], err = reference.Resample(
+				reference := resampler_soxr.New(resampler_soxr.WithHighQuality())
+				var expectedPCM [][]byte
+				for _, encoded := range expectedEncoded {
+					expectedFrame, err := reference.Resample(
 						decodeG711ToLinear8k(encoded, codec.Name),
 						Linear8kConfig,
 						Rapida16kConfig,
 					)
 					require.NoError(t, err)
+					if len(expectedFrame) > 0 {
+						expectedPCM = append(expectedPCM, expectedFrame)
+					}
 				}
 
 				for _, frameIndex := range testCase.sendOrder {
@@ -323,9 +333,12 @@ func TestMediaPort_RealUDPInputHandlesReorderingAndLoss(t *testing.T) {
 					}
 				}
 
+				require.Eventually(t, func() bool {
+					return receiver.GetDetailedStats().PacketsDelivered == uint64(len(expectedEncoded))
+				}, time.Second, time.Millisecond)
 				stats := receiver.GetDetailedStats()
 				assert.Equal(t, testCase.packetsReceived, stats.PacketsReceived)
-				assert.Equal(t, uint64(len(expectedPCM)), stats.PacketsDelivered)
+				assert.Equal(t, uint64(len(expectedEncoded)), stats.PacketsDelivered)
 				if testCase.expectLoss {
 					assert.Equal(t, uint64(1), stats.PacketsLost)
 				} else {
@@ -359,7 +372,9 @@ func TestMediaPort_SeparatesRecognitionAndRecordingDelivery(tester *testing.T) {
 	mediaPort.StartInput()
 	tester.Cleanup(func() { require.NoError(tester, mediaPort.Close()) })
 
-	emitInboundAudio(sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()})
+	for range 4 {
+		emitInboundAudio(sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()})
+	}
 
 	select {
 	case stream := <-realtime:
@@ -384,10 +399,12 @@ func TestMediaPort_PreservesRTPFrameReceivedAt(tester *testing.T) {
 	tester.Cleanup(func() { require.NoError(tester, mediaPort.Close()) })
 
 	receivedAt := time.Unix(123, 456)
-	emitInboundAudio(sip_runtime.InboundAudioFrame{
-		Audio:      make([]byte, MulawFrameSize),
-		ReceivedAt: receivedAt,
-	})
+	for range 4 {
+		emitInboundAudio(sip_runtime.InboundAudioFrame{
+			Audio:      make([]byte, MulawFrameSize),
+			ReceivedAt: receivedAt,
+		})
+	}
 
 	for range 2 {
 		select {
@@ -426,7 +443,7 @@ func TestMediaPort_ProviderAudioRecordsBeforePipelineAudio(t *testing.T) {
 	mediaPort.Start()
 	defer func() { require.NoError(t, mediaPort.Close()) }()
 
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 8; i++ {
 		emitInboundAudio(sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()})
 	}
 
@@ -438,11 +455,14 @@ func TestMediaPort_ProviderAudioRecordsBeforePipelineAudio(t *testing.T) {
 				switch message := stream.(type) {
 				case *protos.ConversationBridgeUserAudio:
 					bridgeUserAudioCount++
-					if len(message.GetAudio()) != BridgeOutputFrameSize {
-						t.Fatalf("unexpected bridge user audio length: %d", len(message.GetAudio()))
+					if len(message.GetAudio()) == 0 ||
+						len(message.GetAudio())%2 != 0 {
+						return false
 					}
 				case *protos.ConversationUserMessage:
-					return bridgeUserAudioCount == 1 && len(message.GetAudio()) == BridgeOutputFrameSize
+					return bridgeUserAudioCount == 1 &&
+						len(message.GetAudio()) > 0 &&
+						len(message.GetAudio())%2 == 0
 				}
 			default:
 				return false
@@ -460,7 +480,7 @@ func TestMediaPort_AssistantAudioReachesRTPOutput(t *testing.T) {
 	mediaPort.Start()
 	defer func() { require.NoError(t, mediaPort.Close()) }()
 	assert.True(t, mediaPort.session.GetInboundSetupTimings().FirstAssistantAudioSentAt.IsZero())
-	_, err := mediaPort.HandleAssistantAudio("response-1", make([]byte, BridgeOutputFrameSize), false)
+	_, err := mediaPort.HandleAssistantAudio("response-1", make([]byte, BridgeOutputFrameSize), true)
 	require.NoError(t, err)
 
 	select {
@@ -577,11 +597,15 @@ func TestMediaPort_InterruptPreservesInputAudio(t *testing.T) {
 
 	mediaPort.Start()
 	defer func() { require.NoError(t, mediaPort.Close()) }()
-	emitInboundAudio(sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()})
+	for range 4 {
+		emitInboundAudio(sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()})
+	}
 	outputControlHandled, outputControlError := mediaPort.HandleOutputControl(internal_type.FlushOutput{})
 	require.NoError(t, outputControlError)
 	require.True(t, outputControlHandled)
-	emitInboundAudio(sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()})
+	for range 4 {
+		emitInboundAudio(sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()})
+	}
 
 	receivedAudioCount := 0
 	require.Eventually(t, func() bool {
@@ -589,7 +613,8 @@ func TestMediaPort_InterruptPreservesInputAudio(t *testing.T) {
 			select {
 			case stream := <-streams:
 				if userMessage, ok := stream.(*protos.ConversationUserMessage); ok {
-					require.Len(t, userMessage.GetAudio(), BridgeOutputFrameSize)
+					require.NotEmpty(t, userMessage.GetAudio())
+					require.Zero(t, len(userMessage.GetAudio())%2)
 					receivedAudioCount++
 					if receivedAudioCount == 2 {
 						return true
@@ -607,7 +632,7 @@ func TestMediaPort_OutputControlsPreservePauseAndDropFlushedResponse(t *testing.
 	defer func() { require.NoError(t, mediaPort.Close()) }()
 	audio := make([]byte, BridgeOutputFrameSize)
 
-	assistantAudioAccepted, assistantAudioError := mediaPort.HandleAssistantAudio("response-1", audio, false)
+	assistantAudioAccepted, assistantAudioError := mediaPort.HandleAssistantAudio("response-1", audio, true)
 	require.NoError(t, assistantAudioError)
 	require.True(t, assistantAudioAccepted)
 	outputControlHandled, outputControlError := mediaPort.HandleOutputControl(internal_type.PauseOutput{})
@@ -630,7 +655,7 @@ func TestMediaPort_OutputControlsPreservePauseAndDropFlushedResponse(t *testing.
 	require.NoError(t, assistantAudioError)
 	assert.False(t, assistantAudioAccepted)
 	assert.Nil(t, mediaPort.mediaSession.NextFrame())
-	assistantAudioAccepted, assistantAudioError = mediaPort.HandleAssistantAudio("response-3", audio, false)
+	assistantAudioAccepted, assistantAudioError = mediaPort.HandleAssistantAudio("response-3", audio, true)
 	require.NoError(t, assistantAudioError)
 	require.True(t, assistantAudioAccepted)
 	assert.NotEmpty(t, mediaPort.mediaSession.NextFrame())
@@ -647,6 +672,9 @@ func TestMediaPort_ConnectTransferMediaForwardsCallerAudio(t *testing.T) {
 	defer func() { require.NoError(t, mediaPort.Close()) }()
 	mediaPort.ConnectTransferMedia(bridgeRTP, sip_runtime.CodecPCMU.Name)
 	emitInboundAudio(sip_runtime.InboundAudioFrame{Audio: []byte{0x01, 0x02, 0x03}, ReceivedAt: time.Now()})
+	for range 8 {
+		emitInboundAudio(sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()})
+	}
 
 	select {
 	case frame := <-bridgeAudioOut:

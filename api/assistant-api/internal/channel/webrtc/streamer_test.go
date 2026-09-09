@@ -385,6 +385,9 @@ func TestNew_DefaultsToGoogleSTUN(t *testing.T) {
 	assert.Equal(t, []string{"stun:stun.l.google.com:19302"}, s.peerConfig.ICEServers[0].URLs)
 	assert.Equal(t, []string{"stun:stun1.l.google.com:19302"}, s.peerConfig.ICEServers[1].URLs)
 	assert.Equal(t, webrtc_internal.ICETransportPolicyAll, s.peerConfig.ICETransportPolicy)
+	require.NotNil(t, s.ambientMixer)
+	require.NoError(t, s.ambientMixer.Configure(internal_ambient.NewConfig(internal_ambient.ProfileCafe, 18)))
+	assert.Len(t, s.applyAmbientToFrame(nil), webrtc_internal.WebRTCOutputPCM16kFrameBytes)
 }
 
 func TestNew_InvalidICETransportPolicyFallsBackToAll(t *testing.T) {
@@ -2930,6 +2933,9 @@ func TestConsumeFrame_TracksWriteFailureWithoutRecordingAssistantAudio(t *testin
 	s.currentOutputFrame = assistantPCM16k
 
 	err := s.ConsumeFrame(assistantPCM16k)
+	require.NoError(t, err)
+	s.currentOutputFrame = assistantPCM16k
+	err = s.ConsumeFrame(assistantPCM16k)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "assistant audio track is not ready")
 	assert.True(t, s.mediaHealthState.LastAssistantFrameSentAt.IsZero())
@@ -2985,6 +2991,9 @@ func TestConsumeFrame_TracksLastAssistantFrameSentAt(t *testing.T) {
 	assistantPCM16k := bytes.Repeat([]byte{0x44}, webrtc_internal.WebRTCOutputPCM16kFrameBytes)
 	s.currentOutputFrame = assistantPCM16k
 
+	err = s.ConsumeFrame(assistantPCM16k)
+	require.NoError(t, err)
+	s.currentOutputFrame = assistantPCM16k
 	err = s.ConsumeFrame(assistantPCM16k)
 	require.NoError(t, err)
 
