@@ -9,6 +9,7 @@ const EXPECTED_TELEPHONY_CODES = [
   'telnyx',
   'twilio',
   'vobiz',
+  'plivo',
 ];
 
 describe('Telephony providers registry', () => {

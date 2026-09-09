@@ -13,6 +13,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/config"
 	internal_asterisk_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/asterisk"
 	internal_exotel_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/exotel"
+	internal_plivo_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/plivo"
 	internal_sip_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/sip"
 	internal_telnyx_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/telnyx"
 	internal_twilio_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/twilio"
@@ -31,6 +32,7 @@ const (
 	Exotel   Telephony = "exotel"
 	Vonage   Telephony = "vonage"
 	Telnyx   Telephony = "telnyx"
+	Plivo    Telephony = "plivo"
 	Asterisk Telephony = "asterisk"
 	SIP      Telephony = "sip"
 	Vobiz    Telephony = "vobiz"
@@ -64,6 +66,8 @@ func GetTelephony(at Telephony, cfg *config.AssistantConfig, logger commons.Logg
 		return internal_telnyx_telephony.NewTelnyxTelephony(cfg, logger)
 	case Vobiz:
 		return internal_vobiz_telephony.NewVobizTelephony(cfg, logger)
+	case Plivo:
+		return internal_plivo_telephony.NewPlivoTelephony(cfg, logger)
 	case SIP:
 		if opt.SIPServer == nil {
 			return nil, errors.New("SIP server not available — SIP telephony requires a running SIP server")

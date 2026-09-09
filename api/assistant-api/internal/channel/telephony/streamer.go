@@ -17,6 +17,7 @@ import (
 	internal_asterisk_audiosocket "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/asterisk/audiosocket"
 	internal_asterisk_websocket "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/asterisk/websocket"
 	internal_exotel_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/exotel"
+	internal_plivo_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/plivo"
 	internal_sip_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/sip"
 	internal_telnyx_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/telnyx"
 	internal_twilio_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/twilio"
@@ -144,6 +145,14 @@ func (at Telephony) NewStreamer(
 			internal_vobiz_telephony.WithCallContext(callContext),
 			internal_vobiz_telephony.WithVaultCredential(vaultCredential),
 			internal_vobiz_telephony.WithObserver(resolvedOptions.Observer),
+		)
+	case Plivo:
+		return internal_plivo_telephony.New(
+			internal_plivo_telephony.WithLogger(logger),
+			internal_plivo_telephony.WithConnection(resolvedOptions.WebSocketConn),
+			internal_plivo_telephony.WithCallContext(callContext),
+			internal_plivo_telephony.WithVaultCredential(vaultCredential),
+			internal_plivo_telephony.WithObserver(resolvedOptions.Observer),
 		)
 	case SIP:
 		return New(
