@@ -20,10 +20,6 @@ const (
 	optPctFallbackTimeout  = internal_options.MicrophoneEOSOptionFallbackTimeout
 	optPctModelPath        = internal_options.MicrophoneEOSOptionPipecatModelPath
 
-	// Legacy option keys preserve compatibility with older EOS config.
-	optPctLegacySilenceTimeout = internal_options.MicrophoneEOSOptionLegacySilenceTimeout
-	optPctLegacyTimeout        = internal_options.MicrophoneEOSOptionTimeout
-
 	// The transcript safety budget and Smart Turn silence limit run independently after VAD stop.
 	defaultPctThreshold       = 0.5
 	defaultPctExtendedTimeout = 3000.0

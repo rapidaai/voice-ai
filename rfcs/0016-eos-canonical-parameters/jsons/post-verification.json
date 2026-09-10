@@ -1,0 +1,34 @@
+{
+  "status": "fail",
+  "final_decision": "reroute_to_implementer",
+  "issues": [
+    {
+      "code": "TEST_FAIL",
+      "message": "Verification command failed",
+      "command": "bash bin/verify-phase3-migrations.sh"
+    },
+    {
+      "code": "REQUIRED_COMMANDS_MISSING",
+      "message": "Required verification commands were not successfully executed",
+      "missing": [
+        "bash bin/verify-phase3-migrations.sh"
+      ]
+    },
+    {
+      "code": "REQUIRED_CATEGORIES_FAILED",
+      "message": "Missing required test categories",
+      "missing": [
+        "full-migration-history"
+      ]
+    }
+  ],
+  "reroute_payload": {
+    "target_agent": "implementer",
+    "fix_only": true,
+    "todo": [
+      "Verification command failed",
+      "Required verification commands were not successfully executed",
+      "Missing required test categories"
+    ]
+  }
+}

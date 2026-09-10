@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { Metadata } from '@rapidaai/react';
 import { EndOfSpeechProvider } from '..';
-import { GetDefaultEOSConfig } from '../provider';
+import { EOS_MODEL_PATH_KEYS, GetDefaultEOSConfig } from '../provider';
 import { loadProviderConfig } from '@/providers/config-loader';
 
 jest.mock('@/utils', () => ({
@@ -187,14 +187,33 @@ describe('EOS provider runtime parity', () => {
 
   it('switches providers through the dropdown and the existing caller-owned scope cleanup', () => {
     const unrelated = meta('listen.model', 'nova-3');
+    const liveKitModelPath = meta(
+      'microphone.eos.livekit.model_path',
+      '/models/livekit.onnx',
+    );
+    const liveKitTokenizerPath = meta(
+      'microphone.eos.livekit.tokenizer_path',
+      '/models/tokenizer.json',
+    );
+    const pipecatModelPath = meta(
+      'microphone.eos.pipecat.model_path',
+      '/models/pipecat',
+    );
     let provider = 'livekit_eos';
-    let parameters = GetDefaultEOSConfig(provider, [unrelated]);
+    let parameters = GetDefaultEOSConfig(provider, [
+      unrelated,
+      liveKitModelPath,
+      liveKitTokenizerPath,
+      pipecatModelPath,
+    ]);
     const onChangeProvider = jest.fn((selected: string) => {
       provider = selected;
       parameters = GetDefaultEOSConfig(
         selected,
         parameters.filter(
-          parameter => !parameter.getKey().startsWith('microphone.eos.'),
+          parameter =>
+            !parameter.getKey().startsWith('microphone.eos.') ||
+            EOS_MODEL_PATH_KEYS.has(parameter.getKey()),
         ),
       );
     });
@@ -228,6 +247,9 @@ describe('EOS provider runtime parity', () => {
         />,
       );
       expect(parameters).toContain(unrelated);
+      expect(parameters).toContain(liveKitModelPath);
+      expect(parameters).toContain(liveKitTokenizerPath);
+      expect(parameters).toContain(pipecatModelPath);
       expect(
         parameters
           .find(parameter => parameter.getKey() === 'microphone.eos.provider')

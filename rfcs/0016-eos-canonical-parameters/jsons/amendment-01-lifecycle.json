@@ -97,7 +97,108 @@
     }
   },
   "meta": {
-    "triggered_by": "coordinator",
-    "timestamp": "2026-09-10T17:02:32.168738+00:00"
+    "triggered_by": "term_15dc98c8-2ce1-4d6a-a3fc-a02452c15f1a",
+    "timestamp": "2026-09-10T17:10:12Z"
+  },
+  "implementation": {
+    "changed_files": [
+      "api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql",
+      "api/assistant-api/migrations/000061_eos_canonical_parameters.down.sql",
+      "bin/verify-eos-options-migration.sh",
+      "tests/integration/eos-options/seed.sql",
+      "tests/integration/eos-options/test_migration.py"
+    ],
+    "test_files_added": [
+      "tests/integration/eos-options/seed.sql",
+      "tests/integration/eos-options/test_migration.py"
+    ],
+    "tests_covered": [
+      "provider-scope",
+      "canonical-precedence",
+      "exact-value-and-audit-preservation",
+      "idempotent-up",
+      "atomic-failure",
+      "backup-only-down",
+      "no-recovery-tables"
+    ],
+    "summary": "Replace journal migration with 42-line up and 4-line backup-only down. UI/backend files match the original implementation hashes.",
+    "file_sha256": {
+      "api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql": "dbf2a83b8475ac83c2e070dcb805c28b62ef04a9ab1ea95478a1844ebbc13408",
+      "api/assistant-api/migrations/000061_eos_canonical_parameters.down.sql": "4ec5c10117f66ae94bfce814be23d1bec6ec93c051be0a8676c59aa4c699de94",
+      "bin/verify-eos-options-migration.sh": "1d40da0aa071affda67ddc639efa9a8aaa5aac24537ccfff269dc0af1758f86e",
+      "tests/integration/eos-options/seed.sql": "5f68cf5b1e8b2cc1792dfa01200d3725e3562c86834dfdb5db22a5637380283a",
+      "tests/integration/eos-options/test_migration.py": "82a62053703c22f3bdaf7be6bd5b697b2431740cbe245d08190442dc925443d0"
+    }
+  },
+  "verification": {
+    "commands": [
+      {
+        "cmd": "bash bin/verify-eos-options-migration.sh",
+        "exit_code": 0
+      },
+      {
+        "cmd": "bash -n bin/verify-eos-options-migration.sh",
+        "exit_code": 0
+      },
+      {
+        "cmd": "just agent-finalize \"api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql,api/assistant-api/migrations/000061_eos_canonical_parameters.down.sql,bin/verify-eos-options-migration.sh,tests/integration/eos-options/seed.sql,tests/integration/eos-options/test_migration.py\"",
+        "exit_code": 0
+      },
+      {
+        "cmd": "git diff --check",
+        "exit_code": 0
+      }
+    ],
+    "coverage": {
+      "unit_tests_present": true,
+      "required_categories_passed": [
+        "provider-scope",
+        "canonical-precedence",
+        "exact-value-and-audit-preservation",
+        "idempotent-up",
+        "atomic-failure",
+        "backup-only-down",
+        "no-recovery-tables"
+      ]
+    },
+    "migration_result": {
+      "tests_passed": 6,
+      "fixture_renames": 6,
+      "fixture_deletions": 9,
+      "obsolete_target_keys": 0,
+      "schema_version": 61,
+      "dirty": false
+    },
+    "live_database_used": false,
+    "unrelated_ship_blocker": "Previously run full-history harness expects web-api12 but reaches13; no correction authorized and no changes made to that expectation."
+  },
+  "review": {
+    "reviewer": "term_15dc98c8-2ce1-4d6a-a3fc-a02452c15f1a",
+    "decision": "approved",
+    "findings": [
+      {
+        "severity": "note",
+        "status": "open",
+        "message": "The previously identified full-history harness mismatch where web-api expects 12 but reaches 13 still blocks shipping globally, but it is unrelated to this approved Amendment 01 migration implementation and does not require amendment scope expansion."
+      }
+    ],
+    "evidence": {
+      "plan": "rfcs/0016-eos-canonical-parameters/jsons/amendment-01-approved-plan.json",
+      "implementation": "rfcs/0016-eos-canonical-parameters/jsons/amendment-01-implementation.json",
+      "verification": "rfcs/0016-eos-canonical-parameters/jsons/amendment-01-verification.json",
+      "diff": "SHA256 manifest 178f4368a6062840a5e92ca2cef1e4242a72407bd26dfe46b56838dba688c7ba"
+    }
+  },
+  "orchestration": {
+    "run_id": "run_164b9ed811c6",
+    "task_id": "task_92ac9e309115",
+    "dispatch_id": "ctx_0eaf6c2f0303"
+  },
+  "release_status": {
+    "amendment": "verified_and_reviewed",
+    "overall_shipping": "blocked",
+    "reason": "Existing global full-history web-api expectation12 versus actual13 remains outside this amendment.",
+    "live_database_used": false,
+    "pushed": false
   }
 }

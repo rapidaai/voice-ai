@@ -1,0 +1,9 @@
+{
+  "status": "pass",
+  "errors": [],
+  "checks": {
+    "scope_guard": "pass",
+    "required_test_presence": "pass",
+    "provider_file_presence": "pass"
+  }
+}

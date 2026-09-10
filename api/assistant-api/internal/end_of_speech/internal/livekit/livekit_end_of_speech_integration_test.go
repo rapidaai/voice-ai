@@ -49,6 +49,13 @@ func TestLivekitEndOfSpeech_UIOptionDefaults(t *testing.T) {
 func TestLivekitEndOfSpeech_NativeModelFlow(t *testing.T) {
 	for _, modelType := range []string{defaultModelType, multilingualModelType} {
 		t.Run(modelType, func(t *testing.T) {
+			if _, err := os.Stat(resolveModelPath("", modelType == multilingualModelType)); err != nil {
+				t.Skipf("livekit %s model asset unavailable: %v", modelType, err)
+			}
+			if _, err := os.Stat(resolveTokenizerPath("")); err != nil {
+				t.Skipf("livekit tokenizer asset unavailable: %v", err)
+			}
+
 			completed := make(chan internal_type.EndOfSpeechPacket, 4)
 			endOfSpeech, err := New(
 				WithContext(t.Context()),
@@ -111,24 +118,95 @@ func TestLivekitEndOfSpeech_NativeModelFlow(t *testing.T) {
 	}
 }
 
-func TestLivekitEndOfSpeech_EndpointingOptionPrecedence(t *testing.T) {
+func TestLivekitEndOfSpeech_CanonicalConstructorOptions(t *testing.T) {
 	for _, test := range []struct {
-		name     string
-		options  utils.Option
-		expected time.Duration
+		name            string
+		options         utils.Option
+		threshold       float64
+		quickTimeout    time.Duration
+		extendedTimeout time.Duration
+		maxHistory      int
+		modelType       string
 	}{
-		{name: "default", expected: 250 * time.Millisecond},
-		{name: "legacy", options: utils.Option{optKeyLegacyTimeout: 70.0}, expected: 70 * time.Millisecond},
-		{name: "fallback", options: utils.Option{optKeyLegacyTimeout: 70.0, optKeyFallbackTimeout: 80.0}, expected: 80 * time.Millisecond},
-		{name: "quick", options: utils.Option{optKeyLegacyTimeout: 70.0, optKeyFallbackTimeout: 80.0, optKeyQuickTimeout: 90.0}, expected: 90 * time.Millisecond},
-		{name: "stored strings", options: utils.Option{internal_options.MicrophoneEOSOptionQuickTimeout: "900"}, expected: 900 * time.Millisecond},
-		{name: "invalid quick uses fallback", options: utils.Option{internal_options.MicrophoneEOSOptionQuickTimeout: "invalid", internal_options.MicrophoneEOSOptionFallbackTimeout: "800"}, expected: 800 * time.Millisecond},
-		{name: "hex integer uses fallback", options: utils.Option{optKeyQuickTimeout: "0x10", optKeyFallbackTimeout: "800"}, expected: 800 * time.Millisecond},
-		{name: "padded quick uses fallback", options: utils.Option{optKeyQuickTimeout: " 900 ", optKeyFallbackTimeout: "800"}, expected: 800 * time.Millisecond},
-		{name: "invalid first alias uses timeout", options: utils.Option{optKeyFallbackTimeout: "0x10", optKeyLegacyTimeout: "700"}, expected: 700 * time.Millisecond},
-		{name: "exponent", options: utils.Option{optKeyQuickTimeout: ".8e3", optKeyFallbackTimeout: "900"}, expected: 800 * time.Millisecond},
-		{name: "digit separators", options: utils.Option{optKeyQuickTimeout: "1_000", optKeyFallbackTimeout: "900"}, expected: time.Second},
-		{name: "hex float", options: utils.Option{optKeyQuickTimeout: "0x1p8", optKeyFallbackTimeout: "900"}, expected: 256 * time.Millisecond},
+		{
+			name:            "defaults",
+			threshold:       defaultThreshold,
+			quickTimeout:    time.Duration(defaultQuickTimeout) * time.Millisecond,
+			extendedTimeout: time.Duration(defaultSilenceTimeout) * time.Millisecond,
+			maxHistory:      int(defaultMaxHistory),
+			modelType:       defaultModelType,
+		},
+		{
+			name: "custom canonical values",
+			options: utils.Option{
+				optKeyThreshold:       "0.75",
+				optKeyQuickTimeout:    "9e2",
+				optKeyExtendedTimeout: "1_200",
+				optKeyMaxHistory:      "3",
+				optKeyModel:           "manual-livekit",
+			},
+			threshold:       0.75,
+			quickTimeout:    900 * time.Millisecond,
+			extendedTimeout: 1200 * time.Millisecond,
+			maxHistory:      3,
+			modelType:       "manual-livekit",
+		},
+		{
+			name: "zero canonical values",
+			options: utils.Option{
+				optKeyThreshold:       0.0,
+				optKeyQuickTimeout:    0.0,
+				optKeyExtendedTimeout: 0.0,
+			},
+			threshold:       0,
+			quickTimeout:    0,
+			extendedTimeout: 0,
+			maxHistory:      int(defaultMaxHistory),
+			modelType:       defaultModelType,
+		},
+		{
+			name: "invalid canonical values use defaults",
+			options: utils.Option{
+				optKeyThreshold:       "invalid",
+				optKeyQuickTimeout:    "invalid",
+				optKeyExtendedTimeout: "invalid",
+				optKeyMaxHistory:      "invalid",
+				optKeyModel:           "",
+			},
+			threshold:       defaultThreshold,
+			quickTimeout:    time.Duration(defaultQuickTimeout) * time.Millisecond,
+			extendedTimeout: time.Duration(defaultSilenceTimeout) * time.Millisecond,
+			maxHistory:      int(defaultMaxHistory),
+			modelType:       defaultModelType,
+		},
+		{
+			name: "aliases ignored",
+			options: utils.Option{
+				internal_options.MicrophoneEOSOptionFallbackTimeout: 700.0,
+				internal_options.MicrophoneEOSOptionTimeout:         800.0,
+				"microphone.eos.silence_timeout":                    900.0,
+			},
+			threshold:       defaultThreshold,
+			quickTimeout:    time.Duration(defaultQuickTimeout) * time.Millisecond,
+			extendedTimeout: time.Duration(defaultSilenceTimeout) * time.Millisecond,
+			maxHistory:      int(defaultMaxHistory),
+			modelType:       defaultModelType,
+		},
+		{
+			name: "invalid canonical values ignore aliases",
+			options: utils.Option{
+				optKeyQuickTimeout:    "invalid",
+				optKeyExtendedTimeout: "invalid",
+				internal_options.MicrophoneEOSOptionFallbackTimeout: "700",
+				internal_options.MicrophoneEOSOptionTimeout:         "800",
+				"microphone.eos.silence_timeout":                    "900",
+			},
+			threshold:       defaultThreshold,
+			quickTimeout:    time.Duration(defaultQuickTimeout) * time.Millisecond,
+			extendedTimeout: time.Duration(defaultSilenceTimeout) * time.Millisecond,
+			maxHistory:      int(defaultMaxHistory),
+			modelType:       defaultModelType,
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			endOfSpeech, err := New(
@@ -138,7 +216,32 @@ func TestLivekitEndOfSpeech_EndpointingOptionPrecedence(t *testing.T) {
 			)
 			require.NoError(t, err)
 			defer endOfSpeech.Close(context.Background())
-			require.Equal(t, test.expected, endOfSpeech.(*livekitEndOfSpeech).quickTimeout)
+			configured := endOfSpeech.(*livekitEndOfSpeech)
+			require.Equal(t, test.threshold, configured.threshold)
+			require.Equal(t, test.quickTimeout, configured.quickTimeout)
+			require.Equal(t, test.extendedTimeout, configured.silenceTimeout)
+			require.Equal(t, test.maxHistory, configured.maxHistory)
+			require.Equal(t, test.modelType, configured.modelType)
+		})
+	}
+}
+
+func TestLivekitEndOfSpeech_InvalidConfiguredPaths(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		options utils.Option
+	}{
+		{name: "model path", options: utils.Option{optKeyModelPath: "/nonexistent/model.onnx"}},
+		{name: "tokenizer path", options: utils.Option{optKeyTokenizerPath: "/nonexistent/tokenizer.json"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			endOfSpeech, err := New(
+				WithContext(t.Context()),
+				WithOptions(test.options),
+				WithOnPacket(func(context.Context, ...internal_type.Packet) error { return nil }),
+			)
+			require.Error(t, err)
+			require.Nil(t, endOfSpeech)
 		})
 	}
 }
