@@ -61,3 +61,10 @@ func TestSpeechToTextAudioPacket_IsSynchronous(t *testing.T) {
 		t.Fatal("expected SpeechToTextAudioPacket to preserve ingress ordering")
 	}
 }
+
+func TestEndOfSpeechAudioPacket_IsSynchronous(t *testing.T) {
+	var packet any = EndOfSpeechAudioPacket{}
+	if _, ok := packet.(AsyncPacket); ok {
+		t.Fatal("expected EndOfSpeechAudioPacket to preserve ingress ordering")
+	}
+}

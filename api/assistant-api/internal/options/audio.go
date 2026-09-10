@@ -53,6 +53,27 @@ const (
 )
 
 const (
+	// EOS keys retain stored metadata names; timeout meanings are provider-specific.
+	MicrophoneEOSOptionThreshold       = "microphone.eos.threshold"
+	MicrophoneEOSOptionExtendedTimeout = "microphone.eos.extended_timeout"
+	MicrophoneEOSOptionFallbackTimeout = "microphone.eos.fallback_timeout"
+	MicrophoneEOSOptionTimeout         = "microphone.eos.timeout"
+
+	// LiveKit uses quick_timeout for its minimum delay and model/history options for inference.
+	MicrophoneEOSOptionQuickTimeout    = "microphone.eos.quick_timeout"
+	MicrophoneEOSOptionMaxHistoryTurns = "microphone.eos.max_history_turns"
+	MicrophoneEOSOptionModel           = "microphone.eos.model"
+
+	// Model asset overrides remain backend-only configuration, not user-facing controls.
+	MicrophoneEOSOptionLivekitModelPath     = "microphone.eos.livekit.model_path"
+	MicrophoneEOSOptionLivekitTokenizerPath = "microphone.eos.livekit.tokenizer_path" // #nosec G101, configuration key, not a credential.
+	MicrophoneEOSOptionPipecatModelPath     = "microphone.eos.pipecat.model_path"
+
+	// Older assistants use this alias when extended_timeout is absent.
+	MicrophoneEOSOptionLegacySilenceTimeout = "microphone.eos.silence_timeout"
+)
+
+const (
 	SpeakOptionVoiceID         = "speak.voice.id"
 	SpeakOptionLanguage        = "speak.language"
 	SpeakOptionModel           = "speak.model"

@@ -40,22 +40,21 @@ const backendVadDefaults: Record<string, Record<string, string>> = {
   },
 };
 
-const legacyEosDefaults: Record<string, Record<string, string>> = {
+const backendEosDefaults: Record<string, Record<string, string>> = {
   silence_based_eos: {
     'microphone.eos.timeout': '700',
   },
   livekit_eos: {
-    'microphone.eos.fallback_timeout': '500',
     'microphone.eos.threshold': '0.0289',
     'microphone.eos.quick_timeout': '250',
     'microphone.eos.extended_timeout': '3000',
     'microphone.eos.model': 'en',
+    'microphone.eos.max_history_turns': '6',
   },
   pipecat_smart_turn_eos: {
     'microphone.eos.fallback_timeout': '500',
     'microphone.eos.threshold': '0.5',
-    'microphone.eos.quick_timeout': '250',
-    'microphone.eos.extended_timeout': '2000',
+    'microphone.eos.extended_timeout': '3000',
   },
 };
 
@@ -84,9 +83,7 @@ const expectedGetDefaultVADConfig = (
   current: Metadata[],
 ): Metadata[] => {
   const defaults = backendVadDefaults[provider] || {};
-  const nonVad = current.filter(
-    m => !m.getKey().startsWith('microphone.vad.'),
-  );
+  const nonVad = current.filter(m => !m.getKey().startsWith('microphone.vad.'));
 
   const vadParams: Metadata[] = [];
   const providerMeta = new Metadata();
@@ -102,11 +99,11 @@ const expectedGetDefaultVADConfig = (
   return [...nonVad, ...vadParams];
 };
 
-const legacyGetDefaultEosConfig = (
+const expectedGetDefaultEosConfig = (
   provider: string,
   current: Metadata[],
 ): Metadata[] => {
-  const defaults = legacyEosDefaults[provider] || {};
+  const defaults = backendEosDefaults[provider] || {};
   const nonEos = current.filter(m => !m.getKey().startsWith('microphone.eos.'));
 
   const eosParams: Metadata[] = [];
@@ -173,7 +170,7 @@ describe('Audio input advanced defaults parity', () => {
   );
 
   it.each(['silence_based_eos', 'livekit_eos', 'pipecat_smart_turn_eos'])(
-    '%s EOS defaults stay parity with legacy behavior',
+    '%s EOS preserves saved canonical values with backend-aligned options',
     provider => {
       const seed = [
         createMetadata('rapida.credential_id', 'cred'),
@@ -186,9 +183,12 @@ describe('Audio input advanced defaults parity', () => {
         createMetadata('microphone.eos.model', 'custom-model'),
       ];
 
-      const legacy = legacyGetDefaultEosConfig(provider, cloneMetadata(seed));
+      const expected = expectedGetDefaultEosConfig(
+        provider,
+        cloneMetadata(seed),
+      );
       const current = GetDefaultEOSConfig(provider, cloneMetadata(seed));
-      expect(normalizeMetadata(current)).toEqual(normalizeMetadata(legacy));
+      expect(normalizeMetadata(current)).toEqual(normalizeMetadata(expected));
     },
   );
 
@@ -241,11 +241,9 @@ describe('Audio input advanced defaults parity', () => {
       '500',
     );
     expect(getMetadataValue(switched, 'microphone.eos.threshold')).toBe('0.5');
-    expect(getMetadataValue(switched, 'microphone.eos.quick_timeout')).toBe(
-      '250',
-    );
+    expect(getMetadataValue(switched, 'microphone.eos.quick_timeout')).toBe('');
     expect(getMetadataValue(switched, 'microphone.eos.extended_timeout')).toBe(
-      '2000',
+      '3000',
     );
   });
 
@@ -265,11 +263,9 @@ describe('Audio input advanced defaults parity', () => {
       '500',
     );
     expect(getMetadataValue(defaults, 'microphone.eos.threshold')).toBe('0.5');
-    expect(getMetadataValue(defaults, 'microphone.eos.quick_timeout')).toBe(
-      '250',
-    );
+    expect(getMetadataValue(defaults, 'microphone.eos.quick_timeout')).toBe('');
     expect(getMetadataValue(defaults, 'microphone.eos.extended_timeout')).toBe(
-      '2000',
+      '3000',
     );
   });
 
@@ -282,7 +278,7 @@ describe('Audio input advanced defaults parity', () => {
       'livekit_eos',
     );
     expect(getMetadataValue(defaults, 'microphone.eos.fallback_timeout')).toBe(
-      '500',
+      '',
     );
     expect(getMetadataValue(defaults, 'microphone.eos.threshold')).toBe(
       '0.0289',
@@ -294,6 +290,337 @@ describe('Audio input advanced defaults parity', () => {
       '3000',
     );
     expect(getMetadataValue(defaults, 'microphone.eos.model')).toBe('en');
+    expect(getMetadataValue(defaults, 'microphone.eos.max_history_turns')).toBe(
+      '6',
+    );
+  });
+
+  it.each(['livekit_eos', 'pipecat_smart_turn_eos'])(
+    '%s hydrates backend defaults through the config loader',
+    provider => {
+      const defaults = GetDefaultEOSConfig(provider, []);
+      for (const [key, value] of Object.entries(backendEosDefaults[provider])) {
+        expect(getMetadataValue(defaults, key)).toBe(value);
+        const parameter = loadProviderConfig(provider)?.eos?.parameters.find(
+          parameter => parameter.key === key,
+        );
+        expect(String(parameter?.default)).toBe(value);
+      }
+    },
+  );
+
+  it.each([
+    [
+      'livekit_eos',
+      { fallback_timeout: '950', timeout: '700' },
+      'quick_timeout',
+      '950',
+    ],
+    ['livekit_eos', { timeout: '700' }, 'quick_timeout', '700'],
+    [
+      'livekit_eos',
+      { quick_timeout: '0x10', fallback_timeout: '800' },
+      'quick_timeout',
+      '800',
+    ],
+    [
+      'livekit_eos',
+      { quick_timeout: ' 900 ', fallback_timeout: '800' },
+      'quick_timeout',
+      '800',
+    ],
+    [
+      'livekit_eos',
+      { fallback_timeout: '0x10', timeout: '700' },
+      'quick_timeout',
+      '700',
+    ],
+    [
+      'livekit_eos',
+      { fallback_timeout: ' 900 ', timeout: '700' },
+      'quick_timeout',
+      '700',
+    ],
+    [
+      'livekit_eos',
+      { quick_timeout: '.8e3', fallback_timeout: '900' },
+      'quick_timeout',
+      '.8e3',
+    ],
+    [
+      'livekit_eos',
+      { quick_timeout: '1_000', fallback_timeout: '900' },
+      'quick_timeout',
+      '1_000',
+    ],
+    [
+      'livekit_eos',
+      { fallback_timeout: '.8e3', timeout: '900' },
+      'quick_timeout',
+      '.8e3',
+    ],
+    [
+      'livekit_eos',
+      { fallback_timeout: '1_000', timeout: '900' },
+      'quick_timeout',
+      '1_000',
+    ],
+    [
+      'livekit_eos',
+      { quick_timeout: '350', fallback_timeout: '950', timeout: '700' },
+      'quick_timeout',
+      '350',
+    ],
+    [
+      'livekit_eos',
+      { quick_timeout: '0', fallback_timeout: '950' },
+      'quick_timeout',
+      '0',
+    ],
+    [
+      'livekit_eos',
+      { quick_timeout: 'invalid', fallback_timeout: '950', timeout: '700' },
+      'quick_timeout',
+      '950',
+    ],
+    [
+      'livekit_eos',
+      { quick_timeout: '', fallback_timeout: 'invalid', timeout: '700' },
+      'quick_timeout',
+      '700',
+    ],
+    [
+      'livekit_eos',
+      { fallback_timeout: '0', timeout: '700' },
+      'quick_timeout',
+      '0',
+    ],
+    ['pipecat_smart_turn_eos', { timeout: '700' }, 'fallback_timeout', '700'],
+    [
+      'pipecat_smart_turn_eos',
+      { fallback_timeout: '900', timeout: '700' },
+      'fallback_timeout',
+      '900',
+    ],
+    [
+      'pipecat_smart_turn_eos',
+      { fallback_timeout: '0', timeout: '700' },
+      'fallback_timeout',
+      '0',
+    ],
+    [
+      'pipecat_smart_turn_eos',
+      { fallback_timeout: 'invalid', timeout: '700' },
+      'fallback_timeout',
+      '700',
+    ],
+    ['livekit_eos', { silence_timeout: '2200' }, 'extended_timeout', '2200'],
+    [
+      'pipecat_smart_turn_eos',
+      { silence_timeout: '2200' },
+      'extended_timeout',
+      '2200',
+    ],
+    [
+      'livekit_eos',
+      { extended_timeout: '2000', silence_timeout: '2200' },
+      'extended_timeout',
+      '2000',
+    ],
+    [
+      'pipecat_smart_turn_eos',
+      { extended_timeout: '2000', silence_timeout: '2200' },
+      'extended_timeout',
+      '2000',
+    ],
+    [
+      'livekit_eos',
+      { extended_timeout: 'invalid', silence_timeout: '2200' },
+      'extended_timeout',
+      '2200',
+    ],
+    [
+      'pipecat_smart_turn_eos',
+      { extended_timeout: 'invalid', silence_timeout: '2200' },
+      'extended_timeout',
+      '2200',
+    ],
+    [
+      'livekit_eos',
+      { extended_timeout: '0', silence_timeout: '2200' },
+      'extended_timeout',
+      '0',
+    ],
+    [
+      'pipecat_smart_turn_eos',
+      { extended_timeout: '0', silence_timeout: '2200' },
+      'extended_timeout',
+      '0',
+    ],
+  ] as [string, Record<string, string>, string, string][])(
+    '%s migrates %j to %s=%s without mutating input',
+    (provider, options, key, value) => {
+      const seed = [
+        createMetadata('listen.model', 'nova-3'),
+        createMetadata('microphone.vad.provider', 'silero_vad'),
+        createMetadata('rapida.credential_id', 'cred'),
+        createMetadata('microphone.eos.provider', provider),
+        createMetadata('microphone.eos.obsolete', 'unused'),
+        ...Object.entries(options).map(([key, value]) =>
+          createMetadata(`microphone.eos.${key}`, value),
+        ),
+      ];
+      const original = seed.map(metadata => metadata.toObject());
+
+      const defaults = GetDefaultEOSConfig(provider, seed);
+
+      expect(getMetadataValue(defaults, `microphone.eos.${key}`)).toBe(value);
+      expect(seed.map(metadata => metadata.toObject())).toEqual(original);
+      expect(defaults).toEqual(expect.arrayContaining(seed.slice(0, 3)));
+      expect(
+        defaults.some((metadata: Metadata) =>
+          ['timeout', 'silence_timeout', 'obsolete'].some(
+            key => metadata.getKey() === `microphone.eos.${key}`,
+          ),
+        ),
+      ).toBe(false);
+      if (provider === 'livekit_eos') {
+        expect(
+          getMetadataValue(defaults, 'microphone.eos.fallback_timeout'),
+        ).toBe('');
+      }
+      expect(
+        normalizeMetadata(GetDefaultEOSConfig(provider, defaults)),
+      ).toEqual(normalizeMetadata(defaults));
+    },
+  );
+
+  it.each([
+    '900\n',
+    '0b10',
+    '0o10',
+    '1__000',
+    '1e_3',
+    '1e999',
+    '+NaN',
+    '0x1p_8',
+    '0x_.1p8',
+  ])('LiveKit skips Go-invalid canonical and first-alias value %j', value => {
+    const defaults = GetDefaultEOSConfig('livekit_eos', [
+      createMetadata('microphone.eos.quick_timeout', value),
+      createMetadata('microphone.eos.fallback_timeout', value),
+      createMetadata('microphone.eos.timeout', '700'),
+    ]);
+    expect(getMetadataValue(defaults, 'microphone.eos.quick_timeout')).toBe(
+      '700',
+    );
+    expect(getMetadataValue(defaults, 'microphone.eos.fallback_timeout')).toBe(
+      '',
+    );
+    expect(getMetadataValue(defaults, 'microphone.eos.timeout')).toBe('');
+  });
+
+  it.each([
+    '.8e3',
+    '1_000',
+    '1_2.5_0e+1_0',
+    '0',
+    '-0',
+    '0e999',
+    'NaN',
+    '-Inf',
+    '+Infinity',
+  ])('LiveKit preserves Go-accepted canonical spelling %s', value => {
+    const defaults = GetDefaultEOSConfig('livekit_eos', [
+      createMetadata('microphone.eos.quick_timeout', value),
+      createMetadata('microphone.eos.fallback_timeout', '800'),
+    ]);
+    expect(getMetadataValue(defaults, 'microphone.eos.quick_timeout')).toBe(
+      value,
+    );
+    expect(getMetadataValue(defaults, 'microphone.eos.fallback_timeout')).toBe(
+      '',
+    );
+  });
+
+  it.each(['0x1p8', '-0X_1.Fp+8', '0x1_0.8p1_0', '0x.8p10', '0x1p1024'])(
+    'preserves hex float %s and leaves range-dependent precedence to Go',
+    value => {
+      for (const [provider, key, legacyKey] of [
+        ['livekit_eos', 'quick_timeout', 'fallback_timeout'],
+        ['pipecat_smart_turn_eos', 'fallback_timeout', 'timeout'],
+        ['livekit_eos', 'extended_timeout', 'silence_timeout'],
+        ['pipecat_smart_turn_eos', 'extended_timeout', 'silence_timeout'],
+      ]) {
+        for (const sourceKey of [key, legacyKey]) {
+          const seed = [
+            createMetadata(`microphone.eos.${sourceKey}`, value),
+            ...(sourceKey === key
+              ? [createMetadata(`microphone.eos.${legacyKey}`, '800')]
+              : []),
+            ...(provider === 'livekit_eos' && key === 'quick_timeout'
+              ? [createMetadata('microphone.eos.timeout', '700')]
+              : []),
+            createMetadata('listen.model', 'nova-3'),
+            createMetadata('microphone.eos.obsolete', 'unused'),
+          ];
+          const original = seed.map(metadata => metadata.toObject());
+          const defaults = GetDefaultEOSConfig(provider, seed);
+          expect(getMetadataValue(defaults, `microphone.eos.${key}`)).toBe(
+            value,
+          );
+          expect(
+            getMetadataValue(defaults, `microphone.eos.${legacyKey}`),
+          ).toBe(sourceKey === key ? '800' : value);
+          if (provider === 'livekit_eos' && key === 'quick_timeout') {
+            expect(getMetadataValue(defaults, 'microphone.eos.timeout')).toBe(
+              '700',
+            );
+          }
+          expect(getMetadataValue(defaults, 'listen.model')).toBe('nova-3');
+          expect(getMetadataValue(defaults, 'microphone.eos.obsolete')).toBe(
+            '',
+          );
+          expect(seed.map(metadata => metadata.toObject())).toEqual(original);
+          expect(
+            normalizeMetadata(GetDefaultEOSConfig(provider, defaults)),
+          ).toEqual(normalizeMetadata(defaults));
+        }
+      }
+    },
+  );
+
+  it('Pipecat removes quick timeout without assigning it to another budget', () => {
+    const defaults = GetDefaultEOSConfig('pipecat_smart_turn_eos', [
+      createMetadata('microphone.eos.quick_timeout', '800'),
+      createMetadata('microphone.eos.extended_timeout', '2000'),
+    ]);
+
+    expect(getMetadataValue(defaults, 'microphone.eos.quick_timeout')).toBe('');
+    expect(getMetadataValue(defaults, 'microphone.eos.fallback_timeout')).toBe(
+      '500',
+    );
+    expect(getMetadataValue(defaults, 'microphone.eos.extended_timeout')).toBe(
+      '2000',
+    );
+  });
+
+  it('LiveKit preserves saved model and history values without imposing a history cap', () => {
+    const defaults = GetDefaultEOSConfig('livekit_eos', [
+      createMetadata('microphone.eos.quick_timeout', '350'),
+      createMetadata('microphone.eos.model', 'multilingual'),
+      createMetadata('microphone.eos.max_history_turns', '1000'),
+    ]);
+
+    expect(getMetadataValue(defaults, 'microphone.eos.quick_timeout')).toBe(
+      '350',
+    );
+    expect(getMetadataValue(defaults, 'microphone.eos.model')).toBe(
+      'multilingual',
+    );
+    expect(getMetadataValue(defaults, 'microphone.eos.max_history_turns')).toBe(
+      '1000',
+    );
   });
 
   it('microphone defaults migrate legacy VAD barge-in trigger to microphone scope', () => {
@@ -304,9 +631,9 @@ describe('Audio input advanced defaults parity', () => {
     expect(getMetadataValue(defaults, 'microphone.barge_in_trigger')).toBe(
       'word',
     );
-    expect(
-      getMetadataValue(defaults, 'microphone.vad.barge_in_trigger'),
-    ).toBe('');
+    expect(getMetadataValue(defaults, 'microphone.vad.barge_in_trigger')).toBe(
+      '',
+    );
   });
 
   it('noise provider update clears stale denoising params and keeps only provider', () => {

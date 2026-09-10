@@ -7,6 +7,8 @@ package internal_end_of_speech
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,14 +24,23 @@ var mockCallback = func(ctx context.Context, result ...internal_type.Packet) err
 	return nil
 }
 
-func pipecatOptions() utils.Option {
-	return utils.Option{EndOfSpeechOptionsKeyProvider: PipecatSmartTurnEndOfSpeech}
-}
-
 func TestNewEndOfSpeech_ReturnsPipecat(t *testing.T) {
+	modelPath := os.Getenv("PIPECAT_TURN_MODEL_PATH")
+	if modelPath == "" {
+		modelPath = filepath.Join("internal", "pipecat", "models", "smart-turn-v3.2-cpu.onnx")
+	}
+	if _, err := os.Stat(modelPath); err != nil {
+		t.Skipf("pipecat model asset unavailable: %v", err)
+	}
+
 	logger, _ := commons.NewApplicationLogger()
 
-	endOfSpeech, err := newEndOfSpeechForTest(context.Background(), logger, mockCallback, pipecatOptions())
+	endOfSpeech, err := newEndOfSpeechForTest(
+		context.Background(),
+		logger,
+		mockCallback,
+		utils.Option{EndOfSpeechOptionsKeyProvider: PipecatSmartTurnEndOfSpeech},
+	)
 
 	require.NoError(t, err)
 	assert.NotNil(t, endOfSpeech)
@@ -57,7 +68,20 @@ func TestEndOfSpeechIdentifier_Constants(t *testing.T) {
 }
 
 func TestNewEndOfSpeech_WithNilLogger(t *testing.T) {
-	endOfSpeech, err := newEndOfSpeechForTest(t.Context(), nil, mockCallback, pipecatOptions())
+	modelPath := os.Getenv("PIPECAT_TURN_MODEL_PATH")
+	if modelPath == "" {
+		modelPath = filepath.Join("internal", "pipecat", "models", "smart-turn-v3.2-cpu.onnx")
+	}
+	if _, err := os.Stat(modelPath); err != nil {
+		t.Skipf("pipecat model asset unavailable: %v", err)
+	}
+
+	endOfSpeech, err := newEndOfSpeechForTest(
+		t.Context(),
+		nil,
+		mockCallback,
+		utils.Option{EndOfSpeechOptionsKeyProvider: PipecatSmartTurnEndOfSpeech},
+	)
 
 	require.NoError(t, err)
 	assert.NotNil(t, endOfSpeech)
@@ -70,7 +94,7 @@ func TestNewEndOfSpeech_WithNilCallback(t *testing.T) {
 	endOfSpeech, err := New(
 		WithContext(t.Context()),
 		WithLogger(logger),
-		WithOptions(pipecatOptions()),
+		WithOptions(utils.Option{EndOfSpeechOptionsKeyProvider: PipecatSmartTurnEndOfSpeech}),
 	)
 
 	require.Error(t, err)
