@@ -1,0 +1,19 @@
+{
+  "run_id": "run_164b9ed811c6",
+  "task_id": "task_28655395083e",
+  "dispatch_id": "ctx_20fd72909654",
+  "reviewer": "independent-challenger:ctx_20fd72909654",
+  "reviewed_at": "2026-09-10T15:43:09Z",
+  "decision": "approved",
+  "rfc_file": "rfcs/0016-eos-canonical-parameters.md",
+  "rfc_sha256": "c9057651124e9fb2955f5526e62a3f6f2e4d013a44a27b2d5084b6a1904d9062",
+  "plan_sha256": "65064239fb50435c6bfd7ced6a5594059dc7b2bcb0a00ccd6257d100e36c095f",
+  "findings": [],
+  "resolved_findings": [
+    "Provider-switch implementation is now in allowed scope and must preserve backend-only EOS model paths before filtering EOS-prefixed metadata."
+  ],
+  "summary": "No remaining material safety or contract issue in the bounded re-review. Approval applies only to the exact reviewed Accepted-status RFC bytes.",
+  "implementation_allowed": false,
+  "live_database_execution_allowed": false,
+  "model_quality_approved": false
+}
