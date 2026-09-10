@@ -25,10 +25,18 @@ import (
 )
 
 type testPredictor struct {
-	predict func(string) (float64, error)
+	predict        func(string) (float64, error)
+	predictContext func(context.Context, string) (float64, error)
 }
 
 func (predictor testPredictor) Predict(text string) (float64, error) {
+	return predictor.predict(text)
+}
+
+func (predictor testPredictor) PredictContext(ctx context.Context, text string) (float64, error) {
+	if predictor.predictContext != nil {
+		return predictor.predictContext(ctx, text)
+	}
 	return predictor.predict(text)
 }
 
@@ -64,21 +72,27 @@ func TestIsGPT2PrintableByte(t *testing.T) {
 	assert.False(t, isGPT2PrintableByte(0xad)) // between 0xac and 0xae
 }
 
-func TestApplyMerge(t *testing.T) {
-	tok := &tokenizer{}
-
-	symbols := []string{"a", "b", "c", "d"}
-	result := tok.applyMerge(symbols, mergePair{a: "b", b: "c"})
-	assert.Equal(t, []string{"a", "bc", "d"}, result)
-
-	// No match
-	result = tok.applyMerge(symbols, mergePair{a: "x", b: "y"})
-	assert.Equal(t, []string{"a", "b", "c", "d"}, result)
-
-	// Multiple matches
-	symbols = []string{"a", "b", "a", "b"}
-	result = tok.applyMerge(symbols, mergePair{a: "a", b: "b"})
-	assert.Equal(t, []string{"ab", "ab"}, result)
+func TestApplyMerges(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		merges  map[mergePair]int
+		symbols []string
+		want    []string
+	}{
+		{name: "no match", merges: map[mergePair]int{{a: "x", b: "y"}: 0}, symbols: []string{"a", "b", "c"}, want: []string{"a", "b", "c"}},
+		{name: "single pair", merges: map[mergePair]int{{a: "b", b: "c"}: 0}, symbols: []string{"a", "b", "c", "d"}, want: []string{"a", "bc", "d"}},
+		{name: "repeated pairs", merges: map[mergePair]int{{a: "a", b: "b"}: 0}, symbols: []string{"a", "b", "a", "b"}, want: []string{"ab", "ab"}},
+		{name: "rank before position", merges: map[mergePair]int{{a: "a", b: "b"}: 1, {a: "b", b: "c"}: 0}, symbols: []string{"a", "b", "c"}, want: []string{"a", "bc"}},
+		{name: "new adjacent candidate", merges: map[mergePair]int{{a: "a", b: "b"}: 5, {a: "ab", b: "c"}: 0}, symbols: []string{"a", "b", "c"}, want: []string{"abc"}},
+		{name: "leftmost equal rank", merges: map[mergePair]int{{a: "a", b: "a"}: 0}, symbols: []string{"a", "a", "a"}, want: []string{"aa", "a"}},
+		{name: "single symbol", symbols: []string{"a"}, want: []string{"a"}},
+		{name: "empty"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			tokenizer := &tokenizer{merges: test.merges}
+			require.Equal(t, test.want, tokenizer.applyMerges(test.symbols))
+		})
+	}
 }
 
 func TestSplitOnSpecialTokens(t *testing.T) {
@@ -104,13 +118,13 @@ func TestSplitOnSpecialTokens(t *testing.T) {
 // --- chat_template tests ---
 
 func TestFormatChatTemplateFromHistory_Empty(t *testing.T) {
-	result := formatChatTemplateFromHistory(nil, "", 5)
+	result := formatChatTemplateFromHistory(nil, "", 5, defaultModelType)
 	assert.Equal(t, "", result)
 }
 
 func TestFormatChatTemplateFromHistory_CurrentOnly(t *testing.T) {
-	result := formatChatTemplateFromHistory(nil, "hello", 5)
-	assert.Equal(t, "<|im_start|>user\nhello", result)
+	result := formatChatTemplateFromHistory(nil, "hello", 5, defaultModelType)
+	assert.Equal(t, "<|im_start|><|user|>hello", result)
 }
 
 func TestFormatChatTemplateFromHistory_WithHistory(t *testing.T) {
@@ -118,8 +132,8 @@ func TestFormatChatTemplateFromHistory_WithHistory(t *testing.T) {
 		{Role: "user", Content: "hi"},
 		{Role: "assistant", Content: "hello there"},
 	}
-	result := formatChatTemplateFromHistory(history, "how are you", 5)
-	expected := "<|im_start|>user\nhi<|im_end|>\n<|im_start|>assistant\nhello there<|im_end|>\n<|im_start|>user\nhow are you"
+	result := formatChatTemplateFromHistory(history, "how are you", 5, defaultModelType)
+	expected := "<|im_start|><|user|>hi<|im_end|><|im_start|><|assistant|>hello there<|im_end|><|im_start|><|user|>how are you"
 	assert.Equal(t, expected, result)
 }
 
@@ -131,28 +145,41 @@ func TestFormatChatTemplateFromHistory_MaxTurns(t *testing.T) {
 		{Role: "assistant", Content: "recent reply"},
 	}
 
-	result := formatChatTemplateFromHistory(history, "new text", 2)
+	result := formatChatTemplateFromHistory(history, "new text", 2, defaultModelType)
 	assert.NotContains(t, result, "old message")
 	assert.NotContains(t, result, "recent message")
 	assert.Contains(t, result, "recent reply")
 	assert.Contains(t, result, "new text")
 }
 
-func TestFormatChatTemplateFromHistory_CleansAndMergesAdjacentTurns(t *testing.T) {
+func TestFormatChatTemplateFromHistory_EnglishPreservesCaseAndPunctuation(t *testing.T) {
 	history := []chatMessage{
 		{Role: "user", Content: "Hello, THERE!!!"},
 		{Role: "user", Content: "I'm still-talking."},
 		{Role: "assistant", Content: "OK..."},
 	}
 
-	result := formatChatTemplateFromHistory(history, "What now?", 10)
+	result := formatChatTemplateFromHistory(history, "What now?", 10, defaultModelType)
+
+	expected := "<|im_start|><|user|>Hello, THERE!!! I'm still-talking.<|im_end|><|im_start|><|assistant|>OK...<|im_end|><|im_start|><|user|>What now?"
+	assert.Equal(t, expected, result)
+}
+
+func TestFormatChatTemplateFromHistory_MultilingualCleansAndMergesAdjacentTurns(t *testing.T) {
+	history := []chatMessage{
+		{Role: "user", Content: "Hello, THERE!!!"},
+		{Role: "user", Content: "I'm still-talking."},
+		{Role: "assistant", Content: "OK..."},
+	}
+
+	result := formatChatTemplateFromHistory(history, "What now?", 10, multilingualModelType)
 
 	expected := "<|im_start|>user\nhello there i'm still-talking<|im_end|>\n<|im_start|>assistant\nok<|im_end|>\n<|im_start|>user\nwhat now"
 	assert.Equal(t, expected, result)
 }
 
 func TestFormatChatTemplateFromHistory_LastMessageOpen(t *testing.T) {
-	result := formatChatTemplateFromHistory(nil, "yes", 5)
+	result := formatChatTemplateFromHistory(nil, "yes", 5, defaultModelType)
 	// The last message should NOT end with <|im_end|>
 	assert.True(t, len(result) > 0)
 	assert.False(t, result[len(result)-1] == '>')
@@ -166,14 +193,14 @@ func TestFormatChatTemplateFromHistory_SkipsEmptyMessages(t *testing.T) {
 		{Role: "assistant", Content: ""},
 		{Role: "assistant", Content: "real reply"},
 	}
-	result := formatChatTemplateFromHistory(history, "test", 10)
+	result := formatChatTemplateFromHistory(history, "test", 10, defaultModelType)
 	assert.NotContains(t, result, "skip me")
 	assert.Contains(t, result, "real reply")
 }
 
 func TestLivekitEndOfSpeech_AssistantHistoryFromLLMResponseDonePacket(t *testing.T) {
 	endOfSpeech := &livekitEndOfSpeech{
-		commandCh: make(chan workerCommand, 1),
+		commandCh: make(chan struct{}, 1),
 		stopCh:    make(chan struct{}),
 		state:     &endOfSpeechState{segment: speechSegment{}},
 	}
@@ -192,7 +219,7 @@ func TestLivekitEndOfSpeech_AssistantHistoryFromLLMResponseDonePacket(t *testing
 
 func TestLivekitEndOfSpeech_EnqueueAfterClose_DoesNotEnqueueCommand(t *testing.T) {
 	endOfSpeech := &livekitEndOfSpeech{
-		commandCh: make(chan workerCommand, 1),
+		commandCh: make(chan struct{}, 1),
 		stopCh:    make(chan struct{}),
 		state:     &endOfSpeechState{segment: speechSegment{}},
 	}
@@ -205,13 +232,14 @@ func TestLivekitEndOfSpeech_EnqueueAfterClose_DoesNotEnqueueCommand(t *testing.T
 
 func TestLivekitEndOfSpeech_IgnoresInterruptionForDifferentContext(t *testing.T) {
 	endOfSpeech := &livekitEndOfSpeech{
-		commandCh:      make(chan workerCommand, 1),
+		commandCh:      make(chan struct{}, 1),
 		stopCh:         make(chan struct{}),
 		silenceTimeout: 30 * time.Millisecond,
 		state: &endOfSpeechState{segment: speechSegment{
 			Revision:  1,
 			ContextID: "ctx-new",
 			Text:      "new turn",
+			FinalText: "new turn",
 			Timestamp: time.Now(),
 		}},
 	}
@@ -233,8 +261,9 @@ func TestLivekitEndOfSpeech_IgnoresInterruptionForDifferentContext(t *testing.T)
 	}))
 
 	select {
-	case command := <-endOfSpeech.commandCh:
-		assert.Equal(t, "ctx-new", command.segment.ContextID)
+	case <-endOfSpeech.commandCh:
+		require.Len(t, endOfSpeech.commands, 1)
+		assert.Equal(t, "ctx-new", endOfSpeech.commands[0].segment.ContextID)
 	default:
 		t.Fatal("expected command for active context")
 	}
@@ -251,10 +280,11 @@ func TestLivekitEndOfSpeech_UserInputImmediateTriggerUsesQueuedSegmentSnapshot(t
 			}
 			return nil
 		},
-		commandCh: make(chan workerCommand, 4),
+		commandCh: make(chan struct{}, 1),
 		stopCh:    make(chan struct{}),
 		state:     &endOfSpeechState{segment: speechSegment{}},
 	}
+	endOfSpeech.workerDone = make(chan struct{})
 	go endOfSpeech.worker()
 	defer func() { _ = endOfSpeech.Close(context.Background()) }()
 
@@ -284,60 +314,74 @@ func TestLivekitEndOfSpeech_UserInputImmediateTriggerUsesQueuedSegmentSnapshot(t
 	}
 }
 
-func TestLivekitEndOfSpeech_EnqueueCommandBlocksUntilChannelHasSpace(t *testing.T) {
-	endOfSpeech := &livekitEndOfSpeech{
-		commandCh: make(chan workerCommand, 1),
-		stopCh:    make(chan struct{}),
-		state:     &endOfSpeechState{segment: speechSegment{}},
+func TestLivekitEndOfSpeech_CallbackCanSubmitBurst(t *testing.T) {
+	completed := make(chan string, 65)
+	var endOfSpeech *livekitEndOfSpeech
+	endOfSpeech = &livekitEndOfSpeech{
+		onPacket: func(ctx context.Context, packets ...internal_type.Packet) error {
+			for _, packet := range packets {
+				if packet, ok := packet.(internal_type.EndOfSpeechPacket); ok {
+					completed <- packet.Speech
+					if packet.Speech == "start" {
+						for index := range 64 {
+							if err := endOfSpeech.Execute(ctx, internal_type.UserTextReceivedPacket{Text: strconv.Itoa(index)}); err != nil {
+								return err
+							}
+						}
+					}
+				}
+			}
+			return nil
+		},
+		commandCh: make(chan struct{}, 1), stopCh: make(chan struct{}),
+		workerDone: make(chan struct{}), state: &endOfSpeechState{},
 	}
-	endOfSpeech.commandCh <- workerCommand{segment: speechSegment{Text: "first", FinalText: "first"}}
-
-	started := make(chan struct{})
-	done := make(chan struct{})
-	go func() {
-		close(started)
-		endOfSpeech.enqueueCommand(workerCommand{segment: speechSegment{Text: "second", FinalText: "second"}})
-		close(done)
-	}()
-
-	<-started
-	select {
-	case <-done:
-		t.Fatal("enqueueCommand should wait while channel is full")
-	case <-time.After(50 * time.Millisecond):
+	go endOfSpeech.worker()
+	defer endOfSpeech.Close(context.Background())
+	require.NoError(t, endOfSpeech.Execute(t.Context(), internal_type.UserTextReceivedPacket{Text: "start"}))
+	for index := -1; index < 64; index++ {
+		select {
+		case speech := <-completed:
+			if index == -1 {
+				require.Equal(t, "start", speech)
+			} else {
+				require.Equal(t, strconv.Itoa(index), speech)
+			}
+		case <-time.After(time.Second):
+			t.Fatal("reentrant burst blocked its own delivery worker")
+		}
 	}
-
-	first := <-endOfSpeech.commandCh
-	assert.Equal(t, "first", first.segment.Text)
-
-	select {
-	case <-done:
-	case <-time.After(200 * time.Millisecond):
-		t.Fatal("enqueueCommand should resume after channel space is available")
-	}
-
-	second := <-endOfSpeech.commandCh
-	assert.Equal(t, "second", second.segment.Text)
 }
 
-func TestLivekitEndOfSpeech_FinalSTTInferenceFailure_UsesFallbackTimeout(t *testing.T) {
+func TestLivekitEndOfSpeech_FinalSTTInferenceFailure_UsesQuickTimeout(t *testing.T) {
+	completed := make(chan internal_type.EndOfSpeechPacket, 1)
 	endOfSpeech := &livekitEndOfSpeech{
-		onPacket: func(context.Context, ...internal_type.Packet) error { return nil },
+		onPacket: func(ctx context.Context, packets ...internal_type.Packet) error {
+			for _, packet := range packets {
+				if packet, ok := packet.(internal_type.EndOfSpeechPacket); ok {
+					completed <- packet
+				}
+			}
+			return nil
+		},
 		predictor: testPredictor{
 			predict: func(string) (float64, error) {
 				return 0, errors.New("predict failed")
 			},
 		},
-		threshold:       defaultThreshold,
-		quickTimeout:    20 * time.Millisecond,
-		silenceTimeout:  900 * time.Millisecond,
-		fallbackTimeout: 60 * time.Millisecond,
-		maxHistory:      int(defaultMaxHistory),
-		commandCh:       make(chan workerCommand, 1),
-		stopCh:          make(chan struct{}),
-		state:           &endOfSpeechState{segment: speechSegment{}},
+		threshold:      defaultThreshold,
+		quickTimeout:   20 * time.Millisecond,
+		silenceTimeout: 900 * time.Millisecond,
+		maxHistory:     int(defaultMaxHistory),
+		commandCh:      make(chan struct{}, 1),
+		stopCh:         make(chan struct{}),
+		state:          &endOfSpeechState{segment: speechSegment{}},
 	}
+	endOfSpeech.workerDone = make(chan struct{})
+	go endOfSpeech.worker()
+	defer endOfSpeech.Close(context.Background())
 
+	started := time.Now()
 	err := endOfSpeech.Execute(context.Background(), internal_type.SpeechToTextPacket{
 		ContextID: "ctx-fallback",
 		Script:    "fallback path",
@@ -345,12 +389,11 @@ func TestLivekitEndOfSpeech_FinalSTTInferenceFailure_UsesFallbackTimeout(t *test
 	require.NoError(t, err)
 
 	select {
-	case command := <-endOfSpeech.commandCh:
-		assert.Equal(t, 60*time.Millisecond, command.timeout)
-		assert.Equal(t, 0.0, command.confidence)
-		assert.Equal(t, "fallback path", command.segment.Text)
-	case <-time.After(100 * time.Millisecond):
-		t.Fatal("timeout waiting for fallback command")
+	case packet := <-completed:
+		assert.GreaterOrEqual(t, time.Since(started), endOfSpeech.quickTimeout)
+		assert.Equal(t, "fallback path", packet.Speech)
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("inference failure did not use the minimum delay")
 	}
 }
 
@@ -362,7 +405,7 @@ func TestLivekitEndOfSpeech_VADEndFlushesCurrentSegment(t *testing.T) {
 			},
 		},
 		threshold: 0.5,
-		commandCh: make(chan workerCommand, 1),
+		commandCh: make(chan struct{}, 1),
 		stopCh:    make(chan struct{}),
 		state: &endOfSpeechState{
 			segment:    speechSegment{ContextID: "ctx-vad", Text: "hello", FinalText: "hello"},
@@ -391,11 +434,14 @@ func TestLivekitEndOfSpeech_VADEndFlushesCurrentSegment(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case command := <-endOfSpeech.commandCh:
+	case <-endOfSpeech.commandCh:
+		require.Len(t, endOfSpeech.commands, 1)
+		command := endOfSpeech.commands[0]
 		assert.False(t, command.fireImmediately)
-		assert.Equal(t, 20*time.Millisecond, command.timeout)
+		require.False(t, endOfSpeech.state.lastSpeechEnd.IsZero())
+		assert.Equal(t, endOfSpeech.state.lastSpeechEnd, command.deadline)
 		assert.Equal(t, "hello", command.segment.Text)
-		assert.InDelta(t, 0.8, command.confidence, 0.0001)
+		assert.True(t, command.predict)
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("timeout waiting for VAD end command")
 	}
@@ -420,15 +466,15 @@ func TestLivekitEndOfSpeech_VADStartCancelsPendingFinalUntilVADEnd(t *testing.T)
 				return 0.9, nil
 			},
 		},
-		threshold:       0.5,
-		quickTimeout:    30 * time.Millisecond,
-		silenceTimeout:  900 * time.Millisecond,
-		fallbackTimeout: 60 * time.Millisecond,
-		maxHistory:      int(defaultMaxHistory),
-		commandCh:       make(chan workerCommand, 8),
-		stopCh:          make(chan struct{}),
-		state:           &endOfSpeechState{segment: speechSegment{}},
+		threshold:      0.5,
+		quickTimeout:   30 * time.Millisecond,
+		silenceTimeout: 900 * time.Millisecond,
+		maxHistory:     int(defaultMaxHistory),
+		commandCh:      make(chan struct{}, 1),
+		stopCh:         make(chan struct{}),
+		state:          &endOfSpeechState{segment: speechSegment{}},
 	}
+	endOfSpeech.workerDone = make(chan struct{})
 	go endOfSpeech.worker()
 	defer func() { _ = endOfSpeech.Close(context.Background()) }()
 
@@ -469,8 +515,9 @@ func TestLivekitEndOfSpeech_VADStartCancelsPendingFinalUntilVADEnd(t *testing.T)
 	}
 }
 
-func TestLivekitEndOfSpeech_FinalSTTWhileVADSpeakingFallsBack(t *testing.T) {
+func TestLivekitEndOfSpeech_FinalSTTWhileVADSpeakingWaitsForVADEnd(t *testing.T) {
 	called := make(chan internal_type.EndOfSpeechPacket, 1)
+	var predictorCalls atomic.Int32
 	endOfSpeech := &livekitEndOfSpeech{
 		onPacket: func(ctx context.Context, packets ...internal_type.Packet) error {
 			for _, packet := range packets {
@@ -485,18 +532,19 @@ func TestLivekitEndOfSpeech_FinalSTTWhileVADSpeakingFallsBack(t *testing.T) {
 		},
 		predictor: testPredictor{
 			predict: func(string) (float64, error) {
+				predictorCalls.Add(1)
 				return 0.9, nil
 			},
 		},
-		threshold:       0.5,
-		quickTimeout:    20 * time.Millisecond,
-		silenceTimeout:  900 * time.Millisecond,
-		fallbackTimeout: 50 * time.Millisecond,
-		maxHistory:      int(defaultMaxHistory),
-		commandCh:       make(chan workerCommand, 8),
-		stopCh:          make(chan struct{}),
-		state:           &endOfSpeechState{segment: speechSegment{}},
+		threshold:      0.5,
+		quickTimeout:   20 * time.Millisecond,
+		silenceTimeout: 900 * time.Millisecond,
+		maxHistory:     int(defaultMaxHistory),
+		commandCh:      make(chan struct{}, 1),
+		stopCh:         make(chan struct{}),
+		state:          &endOfSpeechState{segment: speechSegment{}},
 	}
+	endOfSpeech.workerDone = make(chan struct{})
 	go endOfSpeech.worker()
 	defer func() { _ = endOfSpeech.Close(context.Background()) }()
 
@@ -510,34 +558,58 @@ func TestLivekitEndOfSpeech_FinalSTTWhileVADSpeakingFallsBack(t *testing.T) {
 		Interim:   false,
 	}))
 
+	assert.Zero(t, predictorCalls.Load())
+	select {
+	case packet := <-called:
+		t.Fatalf("callback fired while VAD remained speaking: %+v", packet)
+	case <-time.After(100 * time.Millisecond):
+	}
+	assert.Zero(t, predictorCalls.Load())
+
+	require.NoError(t, endOfSpeech.Execute(context.Background(), internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventEnd,
+	}))
+	require.Eventually(t, func() bool { return predictorCalls.Load() == 1 }, time.Second, time.Millisecond)
+
 	select {
 	case packet := <-called:
 		assert.Equal(t, "ctx-missing-vad-end", packet.ContextID)
 		assert.Equal(t, "hello", packet.Speech)
 	case <-time.After(300 * time.Millisecond):
-		t.Fatal("timeout waiting for fallback callback while VAD remained speaking")
+		t.Fatal("timeout waiting for callback after VAD end")
 	}
 }
 
 func TestLivekitEndOfSpeech_FinalSTTAfterVADEndUsesModelPrediction(t *testing.T) {
 	var predictorCalls int32
+	completed := make(chan internal_type.EndOfSpeechPacket, 1)
 	endOfSpeech := &livekitEndOfSpeech{
-		onPacket: func(context.Context, ...internal_type.Packet) error { return nil },
+		onPacket: func(ctx context.Context, packets ...internal_type.Packet) error {
+			for _, packet := range packets {
+				if packet, ok := packet.(internal_type.EndOfSpeechPacket); ok {
+					completed <- packet
+				}
+			}
+			return nil
+		},
 		predictor: testPredictor{
 			predict: func(string) (float64, error) {
 				atomic.AddInt32(&predictorCalls, 1)
 				return 0.1, nil
 			},
 		},
-		threshold:       0.5,
-		quickTimeout:    20 * time.Millisecond,
-		silenceTimeout:  250 * time.Millisecond,
-		fallbackTimeout: 60 * time.Millisecond,
-		maxHistory:      int(defaultMaxHistory),
-		commandCh:       make(chan workerCommand, 1),
-		stopCh:          make(chan struct{}),
-		state:           &endOfSpeechState{segment: speechSegment{}},
+		threshold:      0.5,
+		quickTimeout:   20 * time.Millisecond,
+		silenceTimeout: 250 * time.Millisecond,
+		maxHistory:     int(defaultMaxHistory),
+		commandCh:      make(chan struct{}, 1),
+		stopCh:         make(chan struct{}),
+		state:          &endOfSpeechState{segment: speechSegment{}},
 	}
+	endOfSpeech.workerDone = make(chan struct{})
+	go endOfSpeech.worker()
+	defer endOfSpeech.Close(context.Background())
 
 	require.NoError(t, endOfSpeech.Execute(context.Background(), internal_type.InterruptionDetectedPacket{
 		Source: internal_type.InterruptionSourceVad,
@@ -547,6 +619,10 @@ func TestLivekitEndOfSpeech_FinalSTTAfterVADEndUsesModelPrediction(t *testing.T)
 		Source: internal_type.InterruptionSourceVad,
 		Event:  internal_type.InterruptionEventEnd,
 	}))
+	endOfSpeech.mu.RLock()
+	lastSpeechEnd := endOfSpeech.state.lastSpeechEnd
+	endOfSpeech.mu.RUnlock()
+	require.False(t, lastSpeechEnd.IsZero())
 	require.NoError(t, endOfSpeech.Execute(context.Background(), internal_type.SpeechToTextPacket{
 		ContextID: "ctx-final-after-vad",
 		Script:    "not done yet",
@@ -554,12 +630,11 @@ func TestLivekitEndOfSpeech_FinalSTTAfterVADEndUsesModelPrediction(t *testing.T)
 	}))
 
 	select {
-	case command := <-endOfSpeech.commandCh:
-		assert.Equal(t, 250*time.Millisecond, command.timeout)
-		assert.Equal(t, "not done yet", command.segment.Text)
-		assert.InDelta(t, 0.1, command.confidence, 0.0001)
-	case <-time.After(100 * time.Millisecond):
-		t.Fatal("timeout waiting for model-backed command")
+	case packet := <-completed:
+		assert.GreaterOrEqual(t, time.Since(lastSpeechEnd), endOfSpeech.silenceTimeout)
+		assert.Equal(t, "not done yet", packet.Speech)
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for model-backed completion")
 	}
 	assert.Equal(t, int32(1), atomic.LoadInt32(&predictorCalls))
 }
@@ -583,15 +658,15 @@ func TestLivekitEndOfSpeech_VADEndFlushesPendingFinal(t *testing.T) {
 				return 0.9, nil
 			},
 		},
-		threshold:       0.5,
-		quickTimeout:    40 * time.Millisecond,
-		silenceTimeout:  900 * time.Millisecond,
-		fallbackTimeout: 100 * time.Millisecond,
-		maxHistory:      int(defaultMaxHistory),
-		commandCh:       make(chan workerCommand, 8),
-		stopCh:          make(chan struct{}),
-		state:           &endOfSpeechState{segment: speechSegment{}},
+		threshold:      0.5,
+		quickTimeout:   40 * time.Millisecond,
+		silenceTimeout: 900 * time.Millisecond,
+		maxHistory:     int(defaultMaxHistory),
+		commandCh:      make(chan struct{}, 1),
+		stopCh:         make(chan struct{}),
+		state:          &endOfSpeechState{segment: speechSegment{}},
 	}
+	endOfSpeech.workerDone = make(chan struct{})
 	go endOfSpeech.worker()
 	defer func() { _ = endOfSpeech.Close(context.Background()) }()
 
@@ -650,15 +725,15 @@ func TestLivekitEndOfSpeech_VADEndFlushWindowUsesLateFinalSTT(t *testing.T) {
 				return 0, errors.New("predict failed")
 			},
 		},
-		threshold:       defaultThreshold,
-		quickTimeout:    40 * time.Millisecond,
-		silenceTimeout:  900 * time.Millisecond,
-		fallbackTimeout: 200 * time.Millisecond,
-		maxHistory:      int(defaultMaxHistory),
-		commandCh:       make(chan workerCommand, 8),
-		stopCh:          make(chan struct{}),
-		state:           &endOfSpeechState{segment: speechSegment{}},
+		threshold:      defaultThreshold,
+		quickTimeout:   40 * time.Millisecond,
+		silenceTimeout: 900 * time.Millisecond,
+		maxHistory:     int(defaultMaxHistory),
+		commandCh:      make(chan struct{}, 1),
+		stopCh:         make(chan struct{}),
+		state:          &endOfSpeechState{segment: speechSegment{}},
 	}
+	endOfSpeech.workerDone = make(chan struct{})
 	go endOfSpeech.worker()
 	defer func() { _ = endOfSpeech.Close(context.Background()) }()
 
@@ -710,15 +785,15 @@ func TestLivekitEndOfSpeech_VADEndCompleteClearsPendingInterimWhenFinalIsShorter
 				return 0, errors.New("predict failed")
 			},
 		},
-		threshold:       defaultThreshold,
-		quickTimeout:    20 * time.Millisecond,
-		silenceTimeout:  900 * time.Millisecond,
-		fallbackTimeout: 70 * time.Millisecond,
-		maxHistory:      int(defaultMaxHistory),
-		commandCh:       make(chan workerCommand, 8),
-		stopCh:          make(chan struct{}),
-		state:           &endOfSpeechState{segment: speechSegment{}},
+		threshold:      defaultThreshold,
+		quickTimeout:   20 * time.Millisecond,
+		silenceTimeout: 900 * time.Millisecond,
+		maxHistory:     int(defaultMaxHistory),
+		commandCh:      make(chan struct{}, 1),
+		stopCh:         make(chan struct{}),
+		state:          &endOfSpeechState{segment: speechSegment{}},
 	}
+	endOfSpeech.workerDone = make(chan struct{})
 	go endOfSpeech.worker()
 	defer func() { _ = endOfSpeech.Close(context.Background()) }()
 
@@ -764,15 +839,15 @@ func TestLivekitEndOfSpeech_StaleTimerCompletionDoesNotShrinkLatestSegment(t *te
 			}
 			return nil
 		},
-		threshold:       defaultThreshold,
-		quickTimeout:    20 * time.Millisecond,
-		silenceTimeout:  900 * time.Millisecond,
-		fallbackTimeout: 100 * time.Millisecond,
-		maxHistory:      int(defaultMaxHistory),
-		commandCh:       make(chan workerCommand, 8),
-		stopCh:          make(chan struct{}),
-		state:           &endOfSpeechState{segment: speechSegment{}},
+		threshold:      defaultThreshold,
+		quickTimeout:   20 * time.Millisecond,
+		silenceTimeout: 900 * time.Millisecond,
+		maxHistory:     int(defaultMaxHistory),
+		commandCh:      make(chan struct{}, 1),
+		stopCh:         make(chan struct{}),
+		state:          &endOfSpeechState{segment: speechSegment{}},
 	}
+	endOfSpeech.workerDone = make(chan struct{})
 	go endOfSpeech.worker()
 	defer func() { _ = endOfSpeech.Close(context.Background()) }()
 
@@ -785,13 +860,13 @@ func TestLivekitEndOfSpeech_StaleTimerCompletionDoesNotShrinkLatestSegment(t *te
 		Timestamp: time.Now(),
 	}
 	oldSegment := endOfSpeech.state.segment
-	endOfSpeech.mu.Unlock()
 
 	endOfSpeech.enqueueCommand(workerCommand{
 		ctx:     context.Background(),
 		segment: oldSegment,
 		timeout: 30 * time.Millisecond,
 	})
+	endOfSpeech.mu.Unlock()
 
 	time.Sleep(10 * time.Millisecond)
 	latestSegment := speechSegment{
@@ -811,11 +886,13 @@ func TestLivekitEndOfSpeech_StaleTimerCompletionDoesNotShrinkLatestSegment(t *te
 	case <-time.After(80 * time.Millisecond):
 	}
 
+	endOfSpeech.mu.Lock()
 	endOfSpeech.enqueueCommand(workerCommand{
 		ctx:     context.Background(),
 		segment: latestSegment,
 		timeout: 10 * time.Millisecond,
 	})
+	endOfSpeech.mu.Unlock()
 
 	select {
 	case packet := <-called:
@@ -839,15 +916,15 @@ func TestLivekitEndOfSpeech_OnlyInterimWithVADDoesNotComplete(t *testing.T) {
 			}
 			return nil
 		},
-		threshold:       defaultThreshold,
-		quickTimeout:    20 * time.Millisecond,
-		silenceTimeout:  900 * time.Millisecond,
-		fallbackTimeout: 60 * time.Millisecond,
-		maxHistory:      int(defaultMaxHistory),
-		commandCh:       make(chan workerCommand, 8),
-		stopCh:          make(chan struct{}),
-		state:           &endOfSpeechState{segment: speechSegment{}},
+		threshold:      defaultThreshold,
+		quickTimeout:   20 * time.Millisecond,
+		silenceTimeout: 900 * time.Millisecond,
+		maxHistory:     int(defaultMaxHistory),
+		commandCh:      make(chan struct{}, 1),
+		stopCh:         make(chan struct{}),
+		state:          &endOfSpeechState{segment: speechSegment{}},
 	}
+	endOfSpeech.workerDone = make(chan struct{})
 	go endOfSpeech.worker()
 	defer func() { _ = endOfSpeech.Close(context.Background()) }()
 
@@ -892,15 +969,17 @@ func TestLivekitEndOfSpeech_PredictorSerializedUnderConcurrentExecute(t *testing
 				return 0.0, nil
 			},
 		},
-		threshold:       defaultThreshold,
-		quickTimeout:    20 * time.Millisecond,
-		silenceTimeout:  500 * time.Millisecond,
-		fallbackTimeout: 50 * time.Millisecond,
-		maxHistory:      int(defaultMaxHistory),
-		commandCh:       make(chan workerCommand, 16),
-		stopCh:          make(chan struct{}),
-		state:           &endOfSpeechState{segment: speechSegment{}},
+		threshold:      defaultThreshold,
+		quickTimeout:   20 * time.Millisecond,
+		silenceTimeout: 500 * time.Millisecond,
+		maxHistory:     int(defaultMaxHistory),
+		commandCh:      make(chan struct{}, 1),
+		stopCh:         make(chan struct{}),
+		workerDone:     make(chan struct{}),
+		state:          &endOfSpeechState{segment: speechSegment{}},
 	}
+	go endOfSpeech.worker()
+	defer endOfSpeech.Close(context.Background())
 
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {
@@ -915,6 +994,8 @@ func TestLivekitEndOfSpeech_PredictorSerializedUnderConcurrentExecute(t *testing
 	}
 	wg.Wait()
 
+	require.Eventually(t, func() bool { return atomic.LoadInt32(&maxInFlight) > 0 }, time.Second, time.Millisecond)
+	require.NoError(t, endOfSpeech.Close(context.Background()))
 	assert.Equal(t, int32(1), atomic.LoadInt32(&maxInFlight))
 }
 
@@ -940,15 +1021,15 @@ func TestLivekitEndOfSpeech_DetectedEventIncludesModelConfidence(t *testing.T) {
 				return 0.42, nil
 			},
 		},
-		threshold:       0.2,
-		quickTimeout:    10 * time.Millisecond,
-		silenceTimeout:  100 * time.Millisecond,
-		fallbackTimeout: 50 * time.Millisecond,
-		maxHistory:      int(defaultMaxHistory),
-		commandCh:       make(chan workerCommand, 4),
-		stopCh:          make(chan struct{}),
-		state:           &endOfSpeechState{segment: speechSegment{}},
+		threshold:      0.2,
+		quickTimeout:   10 * time.Millisecond,
+		silenceTimeout: 100 * time.Millisecond,
+		maxHistory:     int(defaultMaxHistory),
+		commandCh:      make(chan struct{}, 1),
+		stopCh:         make(chan struct{}),
+		state:          &endOfSpeechState{segment: speechSegment{}},
 	}
+	endOfSpeech.workerDone = make(chan struct{})
 	go endOfSpeech.worker()
 	defer func() { _ = endOfSpeech.Close(context.Background()) }()
 
@@ -1182,9 +1263,12 @@ func TestLivekitEndOfSpeech_ObservabilityStartedForSpeechToText(t *testing.T) {
 			}
 			return nil
 		},
-		stopCh: make(chan struct{}),
-		state:  &endOfSpeechState{segment: speechSegment{}},
+		stopCh:     make(chan struct{}),
+		commandCh:  make(chan struct{}, 1),
+		workerDone: make(chan struct{}),
+		state:      &endOfSpeechState{segment: speechSegment{}},
 	}
+	go endOfSpeech.worker()
 	defer func() { _ = endOfSpeech.Close(context.Background()) }()
 
 	ctx := context.Background()
@@ -1234,15 +1318,15 @@ func TestLivekitEndOfSpeech_KeepsMetrics(t *testing.T) {
 			}
 			return nil
 		},
-		threshold:       defaultThreshold,
-		quickTimeout:    10 * time.Millisecond,
-		silenceTimeout:  100 * time.Millisecond,
-		fallbackTimeout: 50 * time.Millisecond,
-		maxHistory:      int(defaultMaxHistory),
-		commandCh:       make(chan workerCommand, 4),
-		stopCh:          make(chan struct{}),
-		state:           &endOfSpeechState{segment: speechSegment{}},
+		threshold:      defaultThreshold,
+		quickTimeout:   10 * time.Millisecond,
+		silenceTimeout: 100 * time.Millisecond,
+		maxHistory:     int(defaultMaxHistory),
+		commandCh:      make(chan struct{}, 1),
+		stopCh:         make(chan struct{}),
+		state:          &endOfSpeechState{segment: speechSegment{}},
 	}
+	endOfSpeech.workerDone = make(chan struct{})
 	go endOfSpeech.worker()
 	defer func() { _ = endOfSpeech.Close(context.Background()) }()
 
@@ -1261,12 +1345,18 @@ func TestLivekitEndOfSpeech_KeepsMetrics(t *testing.T) {
 }
 
 func TestLivekitEndOfSpeech_MetricUsesLastTimerArm(t *testing.T) {
+	completed := make(chan internal_type.EndOfSpeechPacket, 1)
 	events := make(chan internal_type.ObservabilityEventRecordPacket, 2)
 	metrics := make(chan internal_type.ObservabilityMetricRecordPacket, 1)
 	endOfSpeech := &livekitEndOfSpeech{
 		onPacket: func(ctx context.Context, packets ...internal_type.Packet) error {
 			for _, packet := range packets {
 				switch typed := packet.(type) {
+				case internal_type.EndOfSpeechPacket:
+					select {
+					case completed <- typed:
+					default:
+					}
 				case internal_type.ObservabilityEventRecordPacket:
 					if typed.Record.Event != observability.EOSCompleted {
 						continue
@@ -1289,15 +1379,15 @@ func TestLivekitEndOfSpeech_MetricUsesLastTimerArm(t *testing.T) {
 				return 0, errors.New("predict failed")
 			},
 		},
-		threshold:       defaultThreshold,
-		quickTimeout:    20 * time.Millisecond,
-		silenceTimeout:  900 * time.Millisecond,
-		fallbackTimeout: 120 * time.Millisecond,
-		maxHistory:      int(defaultMaxHistory),
-		commandCh:       make(chan workerCommand, 8),
-		stopCh:          make(chan struct{}),
-		state:           &endOfSpeechState{segment: speechSegment{}},
+		threshold:      defaultThreshold,
+		quickTimeout:   120 * time.Millisecond,
+		silenceTimeout: 900 * time.Millisecond,
+		maxHistory:     int(defaultMaxHistory),
+		commandCh:      make(chan struct{}, 1),
+		stopCh:         make(chan struct{}),
+		state:          &endOfSpeechState{segment: speechSegment{}},
 	}
+	endOfSpeech.workerDone = make(chan struct{})
 	go endOfSpeech.worker()
 	defer func() { _ = endOfSpeech.Close(context.Background()) }()
 
@@ -1336,7 +1426,15 @@ func TestLivekitEndOfSpeech_MetricUsesLastTimerArm(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.InDelta(t, waitMs, metricMs, 30)
-	assert.Greater(t, textMs, waitMs+40)
+	assert.InDelta(t, textMs, waitMs, 30, "interim must not rearm the final transcript timer")
+	assert.GreaterOrEqual(t, waitMs, 90)
+	assert.Equal(t, "hello", detected.Record.Attributes["speech"])
+	select {
+	case packet := <-completed:
+		assert.Equal(t, "hello", packet.Speech)
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("timeout waiting for final-only completion")
+	}
 }
 
 func TestLivekitEndOfSpeech_RespectsExplicitEmptyConcat(t *testing.T) {
@@ -1358,15 +1456,15 @@ func TestLivekitEndOfSpeech_RespectsExplicitEmptyConcat(t *testing.T) {
 				return 0, errors.New("predict failed")
 			},
 		},
-		threshold:       defaultThreshold,
-		quickTimeout:    20 * time.Millisecond,
-		silenceTimeout:  900 * time.Millisecond,
-		fallbackTimeout: 80 * time.Millisecond,
-		maxHistory:      int(defaultMaxHistory),
-		commandCh:       make(chan workerCommand, 8),
-		stopCh:          make(chan struct{}),
-		state:           &endOfSpeechState{segment: speechSegment{}},
+		threshold:      defaultThreshold,
+		quickTimeout:   20 * time.Millisecond,
+		silenceTimeout: 900 * time.Millisecond,
+		maxHistory:     int(defaultMaxHistory),
+		commandCh:      make(chan struct{}, 1),
+		stopCh:         make(chan struct{}),
+		state:          &endOfSpeechState{segment: speechSegment{}},
 	}
+	endOfSpeech.workerDone = make(chan struct{})
 	go endOfSpeech.worker()
 	defer func() { _ = endOfSpeech.Close(context.Background()) }()
 

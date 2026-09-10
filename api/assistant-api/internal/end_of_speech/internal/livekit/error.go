@@ -11,13 +11,16 @@ var (
 	errLivekitOnPacketRequired = errors.New("onPacket is required")
 	errLivekitInitTurnDetector = errors.New("livekit_eos: init turn detector")
 
-	errTokenizerReadFile  = errors.New("tokenizer: read file")
-	errTokenizerUnmarshal = errors.New("tokenizer: unmarshal")
+	errTokenizerReadFile        = errors.New("tokenizer: read file")
+	errTokenizerUnmarshal       = errors.New("tokenizer: unmarshal")
+	errTokenizerPreTokenizer    = errors.New("tokenizer: unsupported pretokenizer")
+	errTokenizerTextPreparation = errors.New("tokenizer: unsupported text preparation")
 
 	errTurnDetectorLoadTokenizer         = errors.New("turn_detector: load tokenizer")
 	errTurnDetectorRuntimeAPIUnavailable = errors.New("turn_detector: failed to get ONNX Runtime API")
 	errTurnDetectorCreateEnv             = errors.New("turn_detector: create env")
 	errTurnDetectorCreateSessionOptions  = errors.New("turn_detector: create session options")
+	errTurnDetectorCreateRunOptions      = errors.New("turn_detector: create run options")
 	errTurnDetectorSetIntraThreads       = errors.New("turn_detector: set intra threads")
 	errTurnDetectorSetInterThreads       = errors.New("turn_detector: set inter threads")
 	errTurnDetectorSetOptimization       = errors.New("turn_detector: set optimization")

@@ -9,6 +9,7 @@
 package internal_livekit
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,7 +27,12 @@ func NewTurnDetector(TurnDetectorConfig) (*TurnDetector, error) {
 	return nil, errTurnDetectorRuntimeAPIUnavailable
 }
 
-func (td *TurnDetector) Predict(string) (float64, error) {
+func (td *TurnDetector) Predict(text string) (float64, error) {
+	return td.PredictContext(context.Background(), text)
+}
+
+// PredictContext reports the unavailable native runtime, as Predict does without CGO.
+func (td *TurnDetector) PredictContext(context.Context, string) (float64, error) {
 	return 0, errTurnDetectorRuntimeAPIUnavailable
 }
 

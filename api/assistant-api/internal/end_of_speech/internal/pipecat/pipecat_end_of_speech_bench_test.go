@@ -12,6 +12,7 @@ import (
 	"math"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 )
@@ -101,42 +102,48 @@ func BenchmarkMelFeatures_Extract_WhiteNoise(b *testing.B) {
 // FFT BENCHMARKS
 // ============================================================================
 
-// BenchmarkFFT_512 measures the legacy radix-2 FFT on a 512-point input.
-func BenchmarkFFT_512(b *testing.B) {
-	x := make([]complex128, 512)
-	for i := range x {
-		x[i] = complex(math.Sin(2.0*math.Pi*float64(i)/512.0), 0)
+func BenchmarkWhisperFFT(b *testing.B) {
+	scratch := newWhisperFeatureScratch()
+	for sampleIndex := range scratch.windowed {
+		scratch.windowed[sampleIndex] = math.Sin(2 * math.Pi * float64(sampleIndex) / float64(whisperNFFT))
 	}
 
-	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		// Reset data
-		for j := range x {
-			x[j] = complex(math.Sin(2.0*math.Pi*float64(j)/512.0), 0)
-		}
-		fft(x)
-	}
-}
-
-// BenchmarkFFT_1024 measures a 1024-point FFT for comparison.
-func BenchmarkFFT_1024(b *testing.B) {
-	n := 1024
-	x := make([]complex128, n)
-
-	b.ResetTimer()
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		for j := range x {
-			x[j] = complex(math.Sin(2.0*math.Pi*float64(j)/float64(n)), 0)
-		}
-		fft(x)
+	for b.Loop() {
+		scratch.transform.Coefficients(scratch.coefficients[:], scratch.windowed[:])
 	}
 }
 
 // ============================================================================
 // AUDIO BUFFER BENCHMARKS
 // ============================================================================
+
+func BenchmarkExecuteAudio(b *testing.B) {
+	for _, benchmarkCase := range []struct {
+		name     string
+		vadState vadState
+	}{
+		{name: "speaking", vadState: vadStateSpeaking},
+		{name: "incomplete silence", vadState: vadStateEnded},
+	} {
+		b.Run(benchmarkCase.name, func(b *testing.B) {
+			endOfSpeech := &pipecatEndOfSpeech{
+				audioBuffer:     make([]float32, 0, maxAudioSamples),
+				hasSpeechStart:  true,
+				extendedTimeout: 24 * time.Hour,
+				state:           &endOfSpeechState{vadState: benchmarkCase.vadState, turnState: turnStateIncomplete},
+			}
+			packet := internal_type.EndOfSpeechAudioPacket{Audio: make([]byte, 640)}
+			b.ReportAllocs()
+			for b.Loop() {
+				endOfSpeech.state.silenceSamples = 0
+				if err := endOfSpeech.Execute(b.Context(), packet); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
 
 // BenchmarkAppendAudio_SmallChunk measures appending a typical audio chunk (20ms at 16kHz).
 func BenchmarkAppendAudio_SmallChunk(b *testing.B) {

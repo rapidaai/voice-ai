@@ -11,6 +11,7 @@ package internal_livekit
 import "C"
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -135,6 +136,15 @@ func NewTurnDetector(cfg TurnDetectorConfig) (*TurnDetector, error) {
 // The text should be pre-formatted using formatChatTemplate with the last user
 // message left open (no closing <|im_end|>).
 func (td *TurnDetector) Predict(text string) (float64, error) {
+	return td.PredictContext(context.Background(), text)
+}
+
+// PredictContext runs inference synchronously and terminates its native run on cancellation.
+// The caller must serialize prediction and Destroy, including cancellation cleanup.
+func (td *TurnDetector) PredictContext(ctx context.Context, text string) (prob float64, err error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
 	if td == nil {
 		return 0, errTurnDetectorNil
 	}
@@ -152,9 +162,39 @@ func (td *TurnDetector) Predict(text string) (float64, error) {
 		inputIDs[i] = int64(id)
 	}
 
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	var runOptions *C.OrtRunOptions
+	status := C.LktOrtApiCreateRunOptions(td.api, &runOptions)
+	defer C.LktOrtApiReleaseStatus(td.api, status)
+	if status != nil {
+		return 0, fmt.Errorf("%w: %s", errTurnDetectorCreateRunOptions, C.GoString(C.LktOrtApiGetErrorMessage(td.api, status)))
+	}
+	defer C.LktOrtApiReleaseRunOptions(td.api, runOptions)
+
+	terminated := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() {
+		defer close(terminated)
+		status := C.LktOrtApiRunOptionsSetTerminate(td.api, runOptions)
+		C.LktOrtApiReleaseStatus(td.api, status)
+	})
+	defer func() {
+		// Join a started callback before releasing the per-run options.
+		if !stop() {
+			<-terminated
+		}
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			prob, err = 0, ctxErr
+		}
+	}()
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+
 	if td.multilingual {
 		// Multilingual model outputs [1, seq_len]. Take last token's prob.
-		probs, err := td.inferMulti(inputIDs)
+		probs, err := td.inferMulti(inputIDs, runOptions)
 		if err != nil {
 			return 0, err
 		}
@@ -165,7 +205,7 @@ func (td *TurnDetector) Predict(text string) (float64, error) {
 	}
 
 	// English model outputs [1]. Direct probability.
-	prob, err := td.infer(inputIDs)
+	prob, err = td.infer(inputIDs, runOptions)
 	if err != nil {
 		return 0, err
 	}

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"unicode"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"golang.org/x/text/unicode/norm"
 )
 
@@ -18,17 +20,20 @@ type chatMessage struct {
 	Content string
 }
 
-// formatChatTemplateFromHistory formats history for the SmolLM2 chat template.
-// The last user message is left open so the model can predict turn completion.
-func formatChatTemplateFromHistory(history []chatMessage, currentText string, maxTurns int) string {
+// formatChatTemplateFromHistory applies the selected LiveKit model's chat template.
+// The last message is left open so the model can predict turn completion.
+func formatChatTemplateFromHistory(history []chatMessage, currentText string, maxTurns int, modelType string) string {
 	candidateMessages := make([]chatMessage, 0, len(history)+1)
 	for _, historyMessage := range history {
-		if historyMessage.Role == "" || strings.TrimSpace(historyMessage.Content) == "" {
+		if historyMessage.Role != "user" && historyMessage.Role != "assistant" {
+			continue
+		}
+		if historyMessage.Content == "" {
 			continue
 		}
 		candidateMessages = append(candidateMessages, historyMessage)
 	}
-	if strings.TrimSpace(currentText) != "" {
+	if currentText != "" {
 		candidateMessages = append(candidateMessages, chatMessage{Role: "user", Content: currentText})
 	}
 
@@ -38,28 +43,29 @@ func formatChatTemplateFromHistory(history []chatMessage, currentText string, ma
 
 	formattedMessages := make([]chatMessage, 0, len(candidateMessages))
 	for _, candidateMessage := range candidateMessages {
-		canonicalContent := strings.ToLower(norm.NFKC.String(candidateMessage.Content))
-		var cleanContentBuilder strings.Builder
-		cleanContentBuilder.Grow(len(canonicalContent))
-		for _, contentRune := range canonicalContent {
-			if unicode.IsPunct(contentRune) && contentRune != '\'' && contentRune != '-' {
-				continue
+		formattedContent := candidateMessage.Content
+		if modelType == multilingualModelType {
+			canonicalContent := norm.NFKC.String(cases.Lower(language.Und).String(candidateMessage.Content))
+			var cleanContentBuilder strings.Builder
+			cleanContentBuilder.Grow(len(canonicalContent))
+			for _, contentRune := range canonicalContent {
+				if unicode.IsPunct(contentRune) && contentRune != '\'' && contentRune != '-' {
+					continue
+				}
+				// Python also treats these four control separators as whitespace.
+				if unicode.IsSpace(contentRune) || contentRune >= '\x1c' && contentRune <= '\x1f' {
+					cleanContentBuilder.WriteByte(' ')
+					continue
+				}
+				cleanContentBuilder.WriteRune(contentRune)
 			}
-			if unicode.IsSpace(contentRune) {
-				cleanContentBuilder.WriteByte(' ')
-				continue
-			}
-			cleanContentBuilder.WriteRune(contentRune)
-		}
-		cleanContent := strings.Join(strings.Fields(cleanContentBuilder.String()), " ")
-		if cleanContent == "" {
-			continue
+			formattedContent = strings.Join(strings.Fields(cleanContentBuilder.String()), " ")
 		}
 		if len(formattedMessages) > 0 && formattedMessages[len(formattedMessages)-1].Role == candidateMessage.Role {
-			formattedMessages[len(formattedMessages)-1].Content += " " + cleanContent
+			formattedMessages[len(formattedMessages)-1].Content += " " + formattedContent
 			continue
 		}
-		formattedMessages = append(formattedMessages, chatMessage{Role: candidateMessage.Role, Content: cleanContent})
+		formattedMessages = append(formattedMessages, chatMessage{Role: candidateMessage.Role, Content: formattedContent})
 	}
 
 	if len(formattedMessages) == 0 {
@@ -71,12 +77,20 @@ func formatChatTemplateFromHistory(history []chatMessage, currentText string, ma
 
 	for messageIndex, formattedMessage := range formattedMessages {
 		templateBuilder.WriteString("<|im_start|>")
-		templateBuilder.WriteString(formattedMessage.Role)
-		templateBuilder.WriteByte('\n')
+		if modelType == multilingualModelType {
+			templateBuilder.WriteString(formattedMessage.Role)
+			templateBuilder.WriteByte('\n')
+		} else {
+			templateBuilder.WriteString("<|")
+			templateBuilder.WriteString(formattedMessage.Role)
+			templateBuilder.WriteString("|>")
+		}
 		templateBuilder.WriteString(formattedMessage.Content)
 		if messageIndex != len(formattedMessages)-1 {
 			templateBuilder.WriteString("<|im_end|>")
-			templateBuilder.WriteByte('\n')
+			if modelType == multilingualModelType {
+				templateBuilder.WriteByte('\n')
+			}
 		}
 	}
 

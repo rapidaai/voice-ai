@@ -2,7 +2,7 @@
     "parameters": [
         {
             "key": "microphone.eos.fallback_timeout",
-            "label": "Fallback Timeout",
+            "label": "Transcript Safety Wait (ms)",
             "type": "slider",
             "default": "500",
             "min": 500,
@@ -19,19 +19,10 @@
             "step": 0.05
         },
         {
-            "key": "microphone.eos.quick_timeout",
-            "label": "Quick Timeout",
-            "type": "slider",
-            "default": "250",
-            "min": 50,
-            "max": 1000,
-            "step": 50
-        },
-        {
             "key": "microphone.eos.extended_timeout",
-            "label": "Extended Timeout",
+            "label": "Received Silence Limit (ms)",
             "type": "slider",
-            "default": "2000",
+            "default": "3000",
             "min": 500,
             "max": 5000,
             "step": 100

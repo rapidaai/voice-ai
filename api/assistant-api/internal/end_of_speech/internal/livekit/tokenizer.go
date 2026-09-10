@@ -6,22 +6,30 @@
 package internal_livekit
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
+	"unicode"
 	"unicode/utf8"
+
+	"github.com/dlclark/regexp2"
 )
 
-// tokenizer implements a BPE tokenizer compatible with HuggingFace tokenizer.json
-// format (GPT-2 style). It loads vocabulary, merges, and special tokens from
-// the JSON config and encodes text into token IDs for ONNX model input.
+// tokenizer encodes LiveKit text with byte-level BPE and supported tokenizer.json stages.
+// Added tokens are extracted before text preparation and pretokenization.
 type tokenizer struct {
 	vocab     map[string]int
-	merges    []mergePair
+	merges    map[mergePair]int
 	special   map[string]int
 	byteToStr [256]string
+
+	individualDigits   *bool
+	addPrefixSpace     bool
+	byteLevelPattern   *regexp2.Regexp
+	hasTextPreparation bool
 }
 
 type mergePair struct {
@@ -30,7 +38,9 @@ type mergePair struct {
 
 // tokenizerJSON matches the HuggingFace tokenizer.json schema.
 type tokenizerJSON struct {
-	Model struct {
+	TextPreparation json.RawMessage `json:"normalizer"`
+	PreTokenizer    json.RawMessage `json:"pre_tokenizer"`
+	Model           struct {
 		Vocab  map[string]int `json:"vocab"`
 		Merges [][2]string    `json:"merges"`
 	} `json:"model"`
@@ -39,6 +49,26 @@ type tokenizerJSON struct {
 		Content string `json:"content"`
 		Special bool   `json:"special"`
 	} `json:"added_tokens"`
+}
+
+type textPreparationJSON struct {
+	Type    string                `json:"type"`
+	Steps   []textPreparationJSON `json:"normalizers"`
+	Pattern *struct {
+		Regex string `json:"Regex"`
+	} `json:"pattern"`
+	Content    *string `json:"content"`
+	StripLeft  *bool   `json:"strip_left"`
+	StripRight *bool   `json:"strip_right"`
+}
+
+type preTokenizerJSON struct {
+	Type             string             `json:"type"`
+	PreTokenizers    []preTokenizerJSON `json:"pretokenizers"`
+	IndividualDigits *bool              `json:"individual_digits"`
+	AddPrefixSpace   *bool              `json:"add_prefix_space"`
+	TrimOffsets      *bool              `json:"trim_offsets"`
+	UseRegex         json.RawMessage    `json:"use_regex"`
 }
 
 // newTokenizer loads a HuggingFace tokenizer.json and returns a ready tokenizer.
@@ -57,11 +87,15 @@ func newTokenizer(path string) (*tokenizer, error) {
 		vocab:   raw.Model.Vocab,
 		special: make(map[string]int),
 	}
-
-	// Parse merge rules (each merge is a [2]string pair: [left, right])
-	t.merges = make([]mergePair, 0, len(raw.Model.Merges))
-	for _, m := range raw.Model.Merges {
-		t.merges = append(t.merges, mergePair{a: m[0], b: m[1]})
+	if err := t.configureTextPreparation(raw.TextPreparation); err != nil {
+		return nil, err
+	}
+	if err := t.configurePreTokenizer(raw.PreTokenizer); err != nil {
+		return nil, err
+	}
+	t.merges = make(map[mergePair]int, len(raw.Model.Merges))
+	for rank, merge := range raw.Model.Merges {
+		t.merges[mergePair{a: merge[0], b: merge[1]}] = rank
 	}
 
 	// Register special tokens (including added_tokens that are marked special)
@@ -81,6 +115,120 @@ func newTokenizer(path string) (*tokenizer, error) {
 	return t, nil
 }
 
+func (t *tokenizer) configureTextPreparation(data json.RawMessage) error {
+	if len(data) == 0 || bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
+		return nil
+	}
+	var config textPreparationJSON
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&config); err != nil {
+		return fmt.Errorf("%w: %w", errTokenizerTextPreparation, err)
+	}
+	if config.Type != "Sequence" || len(config.Steps) != 2 || config.Pattern != nil ||
+		config.Content != nil || config.StripLeft != nil || config.StripRight != nil {
+		return fmt.Errorf("%w: expected whitespace Replace then Strip", errTokenizerTextPreparation)
+	}
+	replace, strip := config.Steps[0], config.Steps[1]
+	if replace.Type != "Replace" || replace.Pattern == nil || replace.Pattern.Regex != `\s+` ||
+		replace.Content == nil || *replace.Content != " " || len(replace.Steps) != 0 ||
+		replace.StripLeft != nil || replace.StripRight != nil {
+		return fmt.Errorf("%w: expected whitespace replacement with one space", errTokenizerTextPreparation)
+	}
+	if strip.Type != "Strip" || strip.StripLeft == nil || !*strip.StripLeft ||
+		strip.StripRight == nil || !*strip.StripRight || len(strip.Steps) != 0 ||
+		strip.Pattern != nil || strip.Content != nil {
+		return fmt.Errorf("%w: expected Strip on both sides", errTokenizerTextPreparation)
+	}
+	t.hasTextPreparation = true
+	return nil
+}
+
+func (t *tokenizer) configurePreTokenizer(data json.RawMessage) error {
+	if len(data) == 0 || bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
+		return nil
+	}
+	var config preTokenizerJSON
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&config); err != nil {
+		return fmt.Errorf("%w: %w", errTokenizerPreTokenizer, err)
+	}
+	if config.Type == "Sequence" {
+		if len(config.PreTokenizers) != 2 || config.IndividualDigits != nil ||
+			config.AddPrefixSpace != nil || config.TrimOffsets != nil || config.UseRegex != nil {
+			return fmt.Errorf("%w: expected Digits then ByteLevel", errTokenizerPreTokenizer)
+		}
+		digits := config.PreTokenizers[0]
+		if digits.Type != "Digits" || digits.IndividualDigits == nil ||
+			len(digits.PreTokenizers) != 0 || digits.AddPrefixSpace != nil ||
+			digits.TrimOffsets != nil || digits.UseRegex != nil {
+			return fmt.Errorf("%w: expected Digits with individual_digits", errTokenizerPreTokenizer)
+		}
+		t.individualDigits = digits.IndividualDigits
+		config = config.PreTokenizers[1]
+	}
+	if config.Type != "ByteLevel" || config.AddPrefixSpace == nil ||
+		len(config.PreTokenizers) != 0 || config.IndividualDigits != nil {
+		return fmt.Errorf("%w: expected ByteLevel with add_prefix_space", errTokenizerPreTokenizer)
+	}
+	t.addPrefixSpace = *config.AddPrefixSpace
+	// Hugging Face defaults an omitted use_regex to true; trim_offsets affects offsets only.
+	useRegex := true
+	if config.UseRegex != nil {
+		var value *bool
+		if err := json.Unmarshal(config.UseRegex, &value); err != nil {
+			return fmt.Errorf("%w: use_regex: %w", errTokenizerPreTokenizer, err)
+		}
+		if value == nil {
+			return fmt.Errorf("%w: use_regex must be a boolean", errTokenizerPreTokenizer)
+		}
+		useRegex = *value
+	}
+	if useRegex {
+		t.byteLevelPattern = regexp2.MustCompile(tokenizerByteLevelPattern, regexp2.None)
+	}
+	return nil
+}
+
+func (t *tokenizer) preTokenize(text string) []string {
+	segments := []string{text}
+	if t.individualDigits != nil {
+		segments = nil
+		start, inNumber := 0, false
+		for offset, r := range text {
+			isNumber := unicode.IsNumber(r)
+			if offset > start && (isNumber != inNumber || isNumber && *t.individualDigits) {
+				segments = append(segments, text[start:offset])
+				start = offset
+			}
+			inNumber = isNumber
+		}
+		if start < len(text) {
+			segments = append(segments, text[start:])
+		}
+	}
+	var pieces []string
+	for _, segment := range segments {
+		if t.addPrefixSpace && !strings.HasPrefix(segment, " ") {
+			segment = " " + segment
+		}
+		if t.byteLevelPattern == nil {
+			pieces = append(pieces, segment)
+			continue
+		}
+		match, err := t.byteLevelPattern.FindStringMatch(segment)
+		for match != nil && err == nil {
+			pieces = append(pieces, match.String())
+			match, err = t.byteLevelPattern.FindNextMatch(match)
+		}
+		if err != nil {
+			return nil
+		}
+	}
+	return pieces
+}
+
 // Encode tokenizes text into a sequence of token IDs.
 // Special tokens in the text are recognized and mapped directly.
 func (t *tokenizer) Encode(text string) []int {
@@ -97,8 +245,20 @@ func (t *tokenizer) Encode(text string) []int {
 			ids = append(ids, id)
 			continue
 		}
-		// BPE encode normal text
-		ids = append(ids, t.bpeEncode(seg)...)
+		if t.hasTextPreparation {
+			// Strip applies to each non-special segment, not across added-token boundaries.
+			seg = strings.Join(strings.Fields(seg), " ")
+			if seg == "" {
+				continue
+			}
+		}
+		pieces := t.preTokenize(seg)
+		if len(pieces) == 0 {
+			return nil
+		}
+		for _, piece := range pieces {
+			ids = append(ids, t.bpeEncode(piece)...)
+		}
 	}
 	return ids
 }
@@ -181,33 +341,24 @@ func (t *tokenizer) bytesToUnicodeSymbols(text string) []string {
 
 // applyMerges iteratively applies BPE merges in priority order.
 func (t *tokenizer) applyMerges(symbols []string) []string {
-	for _, merge := range t.merges {
-		symbols = t.applyMerge(symbols, merge)
-		if len(symbols) <= 1 {
+	for len(symbols) > 1 {
+		mergeIndex, mergeRank := -1, 0
+		// Rank only adjacent candidates; scanning the entire vocabulary dominates long histories.
+		for index := 0; index < len(symbols)-1; index++ {
+			rank, exists := t.merges[mergePair{a: symbols[index], b: symbols[index+1]}]
+			if exists && (mergeIndex < 0 || rank < mergeRank) {
+				mergeIndex, mergeRank = index, rank
+			}
+		}
+		if mergeIndex < 0 {
 			break
 		}
+		symbols[mergeIndex] += symbols[mergeIndex+1]
+		copy(symbols[mergeIndex+1:], symbols[mergeIndex+2:])
+		symbols[len(symbols)-1] = ""
+		symbols = symbols[:len(symbols)-1]
 	}
 	return symbols
-}
-
-// applyMerge applies a single BPE merge rule across the symbol sequence.
-func (t *tokenizer) applyMerge(symbols []string, merge mergePair) []string {
-	if len(symbols) < 2 {
-		return symbols
-	}
-
-	result := make([]string, 0, len(symbols))
-	i := 0
-	for i < len(symbols) {
-		if i < len(symbols)-1 && symbols[i] == merge.a && symbols[i+1] == merge.b {
-			result = append(result, merge.a+merge.b)
-			i += 2
-		} else {
-			result = append(result, symbols[i])
-			i++
-		}
-	}
-	return result
 }
 
 // buildByteEncoder constructs the GPT-2 byte-to-unicode mapping.

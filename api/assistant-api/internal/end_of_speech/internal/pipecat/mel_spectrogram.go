@@ -7,37 +7,39 @@ package internal_pipecat
 
 import (
 	"math"
-	"math/cmplx"
+
+	"gonum.org/v1/gonum/dsp/fourier"
 )
 
 // whisperFeatures extracts Whisper-compatible mel spectrogram features from
-// raw float32 PCM audio (16kHz mono, normalized to [-1, 1]).
+// raw float32 PCM audio (16kHz mono, scaled to [-1, 1]).
 //
 // Pre-computes mel filterbank and Hann window at construction time.
 type whisperFeatures struct {
 	melFilters [whisperNMels][whisperNFreqBins]float64
 	hannWindow [whisperNFFT]float64
-	dftCos     [whisperNFreqBins][whisperNFFT]float64
-	dftSin     [whisperNFreqBins][whisperNFFT]float64
 }
 
 type whisperFeatureScratch struct {
-	prepared [whisperMaxSamples]float32
-	padded   [whisperMaxSamples + whisperNFFT]float32
-	power    [whisperNFreqBins]float64
-	logMel   [whisperNMels * whisperMaxFrames]float64
-	output   [whisperNMels * whisperMaxFrames]float32
+	// The transform mutates its workspace, so each scratch owns a separate instance.
+	transform    *fourier.FFT
+	windowed     [whisperNFFT]float64
+	coefficients [whisperNFreqBins]complex128
+	prepared     [whisperMaxSamples]float32
+	padded       [whisperMaxSamples + whisperNFFT]float32
+	power        [whisperNFreqBins]float64
+	logMel       [whisperNMels * whisperMaxFrames]float64
+	output       [whisperNMels * whisperMaxFrames]float32
 }
 
 func newWhisperFeatureScratch() *whisperFeatureScratch {
-	return &whisperFeatureScratch{}
+	return &whisperFeatureScratch{transform: fourier.NewFFT(whisperNFFT)}
 }
 
 func newWhisperFeatures() *whisperFeatures {
 	wf := &whisperFeatures{}
 	wf.initHannWindow()
 	wf.initMelFilterbank()
-	wf.initDFT()
 	return wf
 }
 
@@ -61,14 +63,12 @@ func (wf *whisperFeatures) extractInto(audio []float32, output []float32, scratc
 	for frame := 0; frame < whisperMaxFrames; frame++ {
 		frameStartSample := frame * whisperHopLength
 		frameSamples := padded[frameStartSample : frameStartSample+whisperNFFT]
-		for frequencyBin := 0; frequencyBin < whisperNFreqBins; frequencyBin++ {
-			var realPart, imaginaryPart float64
-			for sampleIndex := 0; sampleIndex < whisperNFFT; sampleIndex++ {
-				windowedSample := float64(frameSamples[sampleIndex]) * wf.hannWindow[sampleIndex]
-				realPart += windowedSample * wf.dftCos[frequencyBin][sampleIndex]
-				imaginaryPart -= windowedSample * wf.dftSin[frequencyBin][sampleIndex]
-			}
-			scratch.power[frequencyBin] = realPart*realPart + imaginaryPart*imaginaryPart
+		for sampleIndex := range scratch.windowed {
+			scratch.windowed[sampleIndex] = float64(frameSamples[sampleIndex]) * wf.hannWindow[sampleIndex]
+		}
+		scratch.transform.Coefficients(scratch.coefficients[:], scratch.windowed[:])
+		for frequencyBin, coefficient := range scratch.coefficients {
+			scratch.power[frequencyBin] = real(coefficient)*real(coefficient) + imag(coefficient)*imag(coefficient)
 		}
 
 		for mel := 0; mel < whisperNMels; mel++ {
@@ -123,29 +123,80 @@ func prepareAudioInto(audio []float32, padded []float32) []float32 {
 	return samples
 }
 
-// normalize applies zero-mean unit-variance normalization in-place.
+// Match Pipecat's NumPy 1.26 buffered float32 sums and scalar epsilon arithmetic.
+// The bounded tree retains pairwise order without recursion or waveform copies.
 func normalize(samples []float32) {
-	n := float64(len(samples))
-	if n == 0 {
+	if len(samples) == 0 {
 		return
 	}
 
-	var sum float64
-	for _, s := range samples {
-		sum += float64(s)
+	var mean, variance float32
+	var reductionNodes [whisperReductionTreeNodes]struct {
+		offset int
+		count  int
+		sum    float32
 	}
-	mean := sum / n
-
-	var variance float64
-	for _, s := range samples {
-		d := float64(s) - mean
-		variance += d * d
+	for _, computeVariance := range [...]bool{false, true} {
+		var sum float32
+		for chunkOffset := 0; chunkOffset < len(samples); chunkOffset += whisperReductionChunkSamples {
+			clear(reductionNodes[:])
+			reductionNodes[1].offset = chunkOffset
+			reductionNodes[1].count = min(whisperReductionChunkSamples, len(samples)-chunkOffset)
+			for nodeIndex := 1; nodeIndex < len(reductionNodes); nodeIndex++ {
+				node := &reductionNodes[nodeIndex]
+				if node.count == 0 {
+					continue
+				}
+				if node.count > whisperReductionLeafSamples {
+					halfCount := node.count / 2
+					halfCount -= halfCount % whisperReductionLanes
+					reductionNodes[nodeIndex*2].offset = node.offset
+					reductionNodes[nodeIndex*2].count = halfCount
+					reductionNodes[nodeIndex*2+1].offset = node.offset + halfCount
+					reductionNodes[nodeIndex*2+1].count = node.count - halfCount
+					continue
+				}
+				var lanes [whisperReductionLanes]float32
+				alignedCount := node.count - node.count%whisperReductionLanes
+				for sampleOffset := 0; sampleOffset < alignedCount; sampleOffset++ {
+					value := samples[node.offset+sampleOffset]
+					if computeVariance {
+						value -= mean
+						value = float32(value * value)
+					}
+					if sampleOffset < whisperReductionLanes {
+						lanes[sampleOffset] = value
+					} else {
+						lanes[sampleOffset%whisperReductionLanes] += value
+					}
+				}
+				node.sum = ((lanes[0] + lanes[1]) + (lanes[2] + lanes[3])) + ((lanes[4] + lanes[5]) + (lanes[6] + lanes[7]))
+				for sampleOffset := alignedCount; sampleOffset < node.count; sampleOffset++ {
+					value := samples[node.offset+sampleOffset]
+					if computeVariance {
+						value -= mean
+						value = float32(value * value)
+					}
+					node.sum += value
+				}
+			}
+			for nodeIndex := len(reductionNodes)/2 - 1; nodeIndex > 0; nodeIndex-- {
+				if reductionNodes[nodeIndex].count > whisperReductionLeafSamples {
+					reductionNodes[nodeIndex].sum = reductionNodes[nodeIndex*2].sum + reductionNodes[nodeIndex*2+1].sum
+				}
+			}
+			sum += reductionNodes[1].sum
+		}
+		if computeVariance {
+			variance = float32(float64(sum) / float64(len(samples)))
+		} else {
+			mean = float32(float64(sum) / float64(len(samples)))
+		}
 	}
-	variance /= n
 
-	stddev := math.Sqrt(variance + 1e-7)
-	for i, s := range samples {
-		samples[i] = float32((float64(s) - mean) / stddev)
+	divisor := float32(math.Sqrt(float64(variance) + whisperVarianceEpsilon))
+	for index, sample := range samples {
+		samples[index] = (sample - mean) / divisor
 	}
 }
 
@@ -180,60 +231,11 @@ func reflectPadInto(signal []float32, padSize int, padded []float32) []float32 {
 	return output
 }
 
-// fft performs in-place radix-2 Cooley-Tukey FFT.
-// Input length must be a power of 2.
-func fft(x []complex128) {
-	n := len(x)
-	if n <= 1 {
-		return
-	}
-
-	// Bit-reversal permutation
-	j := 0
-	for i := 1; i < n; i++ {
-		bit := n >> 1
-		for j&bit != 0 {
-			j ^= bit
-			bit >>= 1
-		}
-		j ^= bit
-		if i < j {
-			x[i], x[j] = x[j], x[i]
-		}
-	}
-
-	// Butterfly stages
-	for size := 2; size <= n; size <<= 1 {
-		halfSize := size >> 1
-		wBase := -2.0 * math.Pi / float64(size)
-		for start := 0; start < n; start += size {
-			wn := complex(1, 0)
-			wStep := cmplx.Exp(complex(0, wBase))
-			for k := 0; k < halfSize; k++ {
-				t := wn * x[start+k+halfSize]
-				x[start+k+halfSize] = x[start+k] - t
-				x[start+k] = x[start+k] + t
-				wn *= wStep
-			}
-		}
-	}
-}
-
 // initHannWindow pre-computes the Hann window of size nFFT.
 // Matches numpy: hann(n+1)[:-1] i.e. periodic Hann window.
 func (wf *whisperFeatures) initHannWindow() {
 	for i := 0; i < whisperNFFT; i++ {
 		wf.hannWindow[i] = 0.5 * (1.0 - math.Cos(2.0*math.Pi*float64(i)/float64(whisperNFFT)))
-	}
-}
-
-func (wf *whisperFeatures) initDFT() {
-	for bin := 0; bin < whisperNFreqBins; bin++ {
-		for sample := 0; sample < whisperNFFT; sample++ {
-			angle := 2.0 * math.Pi * float64(bin) * float64(sample) / float64(whisperNFFT)
-			wf.dftCos[bin][sample] = math.Cos(angle)
-			wf.dftSin[bin][sample] = math.Sin(angle)
-		}
 	}
 }
 
