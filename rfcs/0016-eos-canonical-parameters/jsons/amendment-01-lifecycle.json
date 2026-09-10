@@ -1,0 +1,103 @@
+{
+  "version": "1.0",
+  "run_id": "run_164b9ed811c6",
+  "repo_root": ".",
+  "task": {
+    "id": "task_2cbddd229c28",
+    "type": "migration",
+    "skill": "end-of-speech-integration",
+    "service": "assistant-api"
+  },
+  "artifacts": {
+    "approved_plan_file": "rfcs/0016-eos-canonical-parameters/jsons/amendment-01-approved-plan.json",
+    "approved_plan_sha256": "1ef7a07a79a0a19a8e0b0b1eb02eae2bbe23c7e3b7ad9a27bf7d52e3806dd141",
+    "approved_plan_hmac": "9803462156bd3a84dceeb67488926c2228ed6b836423978dbe4e08f6408bebc0"
+  },
+  "task_plan": {
+    "classification": "Governed",
+    "amendment": "01 - forward-only key migration",
+    "run_id": "run_164b9ed811c6",
+    "user_direction": "it's fine just simp[lify migration",
+    "objective": "Replace the pending journal-based migration with direct provider-scoped key updates/deletes and explicit backup-only recovery, leaving UI/backend changes untouched.",
+    "allowed_paths": [
+      "api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql",
+      "api/assistant-api/migrations/000061_eos_canonical_parameters.down.sql",
+      "bin/verify-eos-options-migration.sh",
+      "tests/integration/eos-options/",
+      "rfcs/0016-eos-canonical-parameters.md",
+      "rfcs/0016-eos-canonical-parameters/jsons/"
+    ],
+    "out_of_scope_paths": [
+      "ui/",
+      "api/assistant-api/internal/",
+      "api/web-api/",
+      "cmd/",
+      "bin/verify-phase3-migrations.sh"
+    ],
+    "ownership": {
+      "api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql": "coordinator",
+      "api/assistant-api/migrations/000061_eos_canonical_parameters.down.sql": "coordinator",
+      "bin/verify-eos-options-migration.sh": "coordinator",
+      "tests/integration/eos-options/": "coordinator",
+      "rfcs/0016-eos-canonical-parameters.md": "coordinator",
+      "rfcs/0016-eos-canonical-parameters/jsons/": "coordinator; independent challenger/reviewer own their receipts"
+    },
+    "principles": {
+      "kiss": "One transaction, direct UPDATE and DELETE, no journal or temporary tables.",
+      "yagni": "Remove automatic rollback infrastructure and SQL numeric parsing.",
+      "single_source_of_truth": "Existing canonical keys win; absent defaults remain runtime-owned.",
+      "contracts": "Preserve key precedence, exact value text, IDs and audit fields. Down explicitly refuses lossy restoration.",
+      "fail_safe": "Bounded locks and transaction rollback protect failed operations; value auditing is an operator preflight prerequisite.",
+      "security": "Exact EOS provider and input scope, count-only diagnostics, no live database access.",
+      "observability": "Disposable test snapshots supply changed/deleted counts without production recovery state.",
+      "reversibility": "User accepts pre-migration backup restoration instead of automatic down migration. Preserve original design evidence."
+    },
+    "required_tests": [
+      "provider-scope",
+      "canonical-precedence",
+      "exact-value-and-audit-preservation",
+      "idempotent-up",
+      "atomic-failure",
+      "backup-only-down",
+      "no-recovery-tables"
+    ],
+    "required_commands": [
+      "bash bin/verify-eos-options-migration.sh",
+      "bash -n bin/verify-eos-options-migration.sh",
+      "just agent-finalize \"api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql,api/assistant-api/migrations/000061_eos_canonical_parameters.down.sql,bin/verify-eos-options-migration.sh,tests/integration/eos-options/seed.sql,tests/integration/eos-options/test_migration.py\"",
+      "git diff --check"
+    ],
+    "acceptance_criteria": [
+      "Only the selected aliases are renamed; lower-priority/obsolete keys are removed.",
+      "All stored value text remains unchanged, including zero, custom models, numeric separators and malformed values; no implicit fallback or reset occurs.",
+      "Inactive inputs are included; output, missing/unknown providers, silence EOS, backend paths and unrelated fields remain untouched.",
+      "No journal or temporary tables and no application option inserts.",
+      "Repeat up is a no-op; SQL errors and write contention abort atomically; down fails without changing configuration.",
+      "The old implementation has not reached a live database; no compatibility with its journal is added.",
+      "UI/backend changes and existing unrelated full-history blocker are not altered."
+    ],
+    "non_goals": [
+      "No automatic rollback",
+      "No runtime changes",
+      "No live migration",
+      "No push or merge",
+      "No unrelated harness fix"
+    ],
+    "risks": [
+      "Backup restoration is mandatory for recovery after successful deletion.",
+      "Operators must audit selected values before rollout; migration intentionally does not validate numeric content.",
+      "Writers must remain stopped across backup, audit, migration and deployment."
+    ],
+    "discussion": {
+      "planner": "coordinator",
+      "challenger": "task_7eb250159099",
+      "decision": "approved",
+      "approved_by": "user-direction:gate_123d540b4f09",
+      "open_blockers": []
+    }
+  },
+  "meta": {
+    "triggered_by": "coordinator",
+    "timestamp": "2026-09-10T17:02:32.168738+00:00"
+  }
+}

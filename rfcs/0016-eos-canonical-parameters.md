@@ -8,451 +8,180 @@
 
 ## Summary
 
-Use canonical-only LiveKit and Pipecat end-of-speech (EOS) parameters in the UI and
-assistant-api runtime. Existing stored assistant deployment audio options are translated
-once by a reversible migration before alias readers are removed from the UI and backend.
+Use canonical-only LiveKit and Pipecat EOS parameters in the UI and backend.
+Migration 000061 renames stored keys in place and deletes known obsolete keys.
+It is forward-only; recovery requires a pre-migration backup.
 
-This RFC intentionally rejects ongoing legacy support. Legacy keys are handled only by the
-one-time migration; after that, LiveKit and Pipecat read their canonical keys only.
+Amendment 01 replaces the original journal-based migration following the user's
+explicit approval to simplify it. The original RFC and receipts remain historical
+evidence in commit 43a713f3 and the JSON directory. UI/backend behavior is unchanged.
 
 ## Context
 
-EOS provider selection is currently an audio option named `microphone.eos.provider` in
-`assistant_deployment_audio_options`. It is not stored in
-`assistant_deployment_audios.audio_provider`, so migration scope must be discovered by
-joining options to `assistant_deployment_audios` and reading the provider option row.
-
-The UI provider JSON files already expose the intended canonical controls:
-
-- Pipecat: `threshold`, `fallback_timeout`, `extended_timeout`.
-- LiveKit: `threshold`, `quick_timeout`, `extended_timeout`, `max_history_turns`, `model`.
-
-However, `ui/src/app/components/providers/end-of-speech/provider.tsx` still translates
-legacy keys during hydration. LiveKit and Pipecat constructors also still read aliases in
-`api/assistant-api/internal/end_of_speech/internal/livekit/` and
-`api/assistant-api/internal/end_of_speech/internal/pipecat/`.
-
-Migration `000060` removed `created_by` and `updated_by`; current audio option rows use
-`created_actor_type`, `created_actor_id`, `updated_actor_type`, and `updated_actor_id`.
-Audio option IDs are positive application-generated IDs, not SQL-generated IDs.
-
-The application startup path logs migration failures and can force-clear dirty migration
-state. That startup behavior is not a rollout gate for this change. The EOS option
-migration must be applied and verified externally before deploying canonical-only backend
-and UI code.
-
-Prior model-quality and model-asset concerns are not addressed by this parameter migration.
+EOS selection is the `microphone.eos.provider` option, not the audio provider column.
+Options have application-generated IDs and unique (key, deployment audio ID) pairs.
+The pending migration has only run in disposable test databases, not live databases.
+Exact row-image journaling and conflict-aware down migration are unnecessary for the
+requested one-time key conversion once backup-based recovery is accepted.
 
 ## Goals
 
-- Use canonical-only LiveKit and Pipecat EOS settings in the UI and backend.
-- Translate existing stored legacy LiveKit and Pipecat EOS keys once through migration
-  code.
-- Preserve selected EOS provider, manual LiveKit model selection, valid configured
-  values, backend model path overrides, and unrelated metadata.
-- Keep missing canonical values absent in storage and let existing UI/backend defaults
-  supply the value at read time.
-- Remove obsolete provider-specific EOS keys for migrated LiveKit and Pipecat records.
-- Provide reversible, idempotent, concurrent-edit-safe migration behavior.
-- Keep the current audited schema compatible.
-- Verify migration, UI, and backend behavior with provider-scoped tests.
+- Keep existing canonical values and manually selected models.
+- Rename the highest-priority alias only when its canonical key is absent.
+- Preserve option values, IDs, audit fields, backend paths, and unrelated settings.
+- Keep the SQL direct, atomic, and idempotent without a journal or temporary tables.
 
 ## Non-Goals
 
-- No live database rollout or environment-specific execution in this RFC.
-- No VAD, dispatch, STT transport, telephony, OpenAPI, protobuf, or public API changes.
-- No model-asset migration, model download, model regeneration, or model-quality approval.
-- No blanket reset of custom EOS settings.
-- No generic helper packages, shared migration utilities, or permanent compatibility layer.
-- No inference of EOS provider from `assistant_deployment_audios.audio_provider`.
-- No change to silence-based EOS. `microphone.eos.timeout` remains canonical for
-  `silence_based_eos`.
+- No runtime legacy support, new defaults in storage, or automatic model selection.
+- No VAD, dispatch, STT transport, telephony, model-asset, or public API changes.
+- No live migration, push, or resolution of the existing model-quality hold.
 
 ## Scope and Ownership
 
 ### Allowed Paths
 
-- `rfcs/0016-eos-canonical-parameters.md` - coordinator after the RFC author's completed draft.
-- `rfcs/0016-eos-canonical-parameters/jsons/` - coordinator-owned lifecycle artifacts.
-- `api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql` - migration owner.
-- `api/assistant-api/migrations/000061_eos_canonical_parameters.down.sql` - migration owner.
-- `bin/verify-eos-options-migration.sh` - migration verification owner.
-- `tests/integration/eos-options/` - migration verification owner.
-- `bin/verify-phase3-migrations.sh` - migration verification owner, only to advance the
-  assistant-api expected version from 60 to 61.
-- `ui/src/app/components/providers/end-of-speech/provider.tsx` - UI EOS owner.
-- `ui/src/app/components/providers/speech-to-text/provider.tsx` - UI microphone defaults owner.
-- `ui/src/app/components/providers/__tests__/audio-input-advanced-defaults-parity.test.ts` - UI EOS owner.
-- `ui/src/app/components/providers/end-of-speech/__tests__/provider-runtime-parity.test.tsx` - UI EOS owner.
-- `ui/src/app/pages/assistant/actions/create-deployment/commons/configure-audio-input.tsx` - UI provider-switch owner.
-- `ui/src/app/pages/assistant/actions/create-deployment/commons/__tests__/configure-audio-input.design.test.tsx` - UI audio configuration owner.
-- `ui/src/providers/__tests__/provider-eos-config.test.ts` - UI provider config owner.
-- `api/assistant-api/internal/end_of_speech/internal/livekit/constant.go` - backend EOS owner.
-- `api/assistant-api/internal/end_of_speech/internal/livekit/livekit_end_of_speech.go` - backend EOS owner.
-- `api/assistant-api/internal/end_of_speech/internal/livekit/livekit_end_of_speech_integration_test.go` - backend EOS owner.
-- `api/assistant-api/internal/end_of_speech/internal/pipecat/constant.go` - backend EOS owner.
-- `api/assistant-api/internal/end_of_speech/internal/pipecat/pipecat_end_of_speech.go` - backend EOS owner.
-- `api/assistant-api/internal/end_of_speech/internal/pipecat/pipecat_end_of_speech_test.go` - backend EOS owner.
-- `api/assistant-api/internal/end_of_speech/internal/pipecat/pipecat_end_of_speech_integration_test.go` - backend EOS owner.
-- `api/assistant-api/internal/options/audio.go` - option registry owner.
-- `api/assistant-api/internal/options/audio_test.go` - option registry owner.
+The coordinator owns this amendment's changes:
+- `api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql`
+- `api/assistant-api/migrations/000061_eos_canonical_parameters.down.sql`
+- `bin/verify-eos-options-migration.sh`
+- `tests/integration/eos-options/`
+- `rfcs/0016-eos-canonical-parameters.md`
+- `rfcs/0016-eos-canonical-parameters/jsons/`
+
+The UI/backend implementation already present remains under the original plan's
+ownership and is not changed by this amendment.
 
 ### Out-of-Scope Paths
 
-- `api/assistant-api/internal/vad/**`
-- `api/assistant-api/internal/adapters/internal/dispatch_handler.go`
-- `api/assistant-api/internal/adapters/internal/dispatch.go`
-- `api/assistant-api/internal/transformer/**`
-- `api/assistant-api/internal/channel/**`
-- `api/assistant-api/internal/end_of_speech/internal/livekit/models/**`
-- `api/assistant-api/internal/end_of_speech/internal/pipecat/models/**`
-- `api/assistant-api/internal/end_of_speech/internal/livekit/testdata/benchmark/**`
-- `api/assistant-api/internal/end_of_speech/internal/pipecat/testdata/benchmark/**`
-- `openapi/**`
-- `protos/**`
-- `api/integration-api/**`
+- UI, backend runtime, other service migrations, and startup behavior.
+- `bin/verify-phase3-migrations.sh`: retain the existing assistant-api 60-to-61
+  change; no additional web-api expectation change is authorized.
 
 ## Proposed Design
 
-### Parameter Contract
+Use one transaction with bounded lock and statement timeouts. Exclude concurrent
+writes to the deployment and option tables while executing two statements:
 
-All keys below use the `microphone.eos.` prefix.
+1. UPDATE selected aliases in place, only when no canonical or higher-priority
+   alias exists for that input deployment and its selected EOS provider.
+2. DELETE remaining known obsolete keys for those same provider-scoped inputs.
 
-LiveKit canonical keys:
+All matching input records are included, including inactive records. Missing and
+unknown providers, silence-based EOS, and output audio are excluded.
 
-- `threshold`, default `0.0289`.
-- `quick_timeout`, default `250` milliseconds.
-- `extended_timeout`, default `3000` milliseconds.
-- `max_history_turns`, default `6`.
-- `model`, default `en`.
+| Provider | Destination | Presence precedence |
+| --- | --- | --- |
+| LiveKit | quick_timeout | quick_timeout, fallback_timeout, timeout |
+| LiveKit | extended_timeout | extended_timeout, silence_timeout |
+| Pipecat | fallback_timeout | fallback_timeout, timeout |
+| Pipecat | extended_timeout | extended_timeout, silence_timeout |
 
-Pipecat canonical keys:
-
-- `threshold`, default `0.5`.
-- `fallback_timeout`, default `500` milliseconds.
-- `extended_timeout`, default `3000` milliseconds.
-
-Backend-only keys to preserve through UI hydration and migration:
-
-- `microphone.eos.livekit.model_path`
-- `microphone.eos.livekit.tokenizer_path`
-- `microphone.eos.pipecat.model_path`
-
-Manual LiveKit model values remain valid when nonblank, including custom names. The UI must
-not infer a model from language.
-
-### Migration Mapping
-
-LiveKit `quick_timeout` precedence:
-
-1. `quick_timeout`
-2. `fallback_timeout`
-3. `timeout`
-
-LiveKit `extended_timeout` precedence:
-
-1. `extended_timeout`
-2. `silence_timeout`
-
-LiveKit removes after migration:
-
-- `fallback_timeout`
-- `timeout`
-- `silence_timeout`
-
-Pipecat `fallback_timeout` precedence:
-
-1. `fallback_timeout`
-2. `timeout`
-
-Pipecat `extended_timeout` precedence:
-
-1. `extended_timeout`
-2. `silence_timeout`
-
-Pipecat removes after migration:
-
-- `timeout`
-- `silence_timeout`
-- `quick_timeout`
-- `max_history_turns`
-- `model`
-
-Canonical threshold values keep their existing row when present and valid. Missing canonical
-threshold values are not persisted as duplicate default rows; existing defaults continue to
-apply at read time.
-
-### UI Changes
-
-`GetDefaultEOSConfig` becomes canonical-only. It removes alias arrays, custom numeric
-parsing, hex-float preservation, and legacy fallback retention. It uses provider JSON and
-the existing config/default APIs for canonical keys.
-
-EOS hydration must still preserve:
-
-- unrelated non-EOS metadata,
-- selected provider row,
-- existing canonical provider values,
-- manual LiveKit model and history values,
-- backend-only EOS model path overrides.
-
-Provider switching removes stale provider-specific controls for the newly selected provider
-while preserving unrelated metadata and backend model path overrides.
-
-The provider-switch handler in `configure-audio-input.tsx` must retain backend-only EOS
-model paths before filtering EOS-prefixed metadata. Fixing hydration alone cannot recover
-values that this caller has already discarded. Old provider-specific controls still clear
-when the provider changes.
-
-### Backend Changes
-
-LiveKit and Pipecat constructors must read only canonical keys after migration. This means:
-
-- Remove LiveKit reads for `fallback_timeout`, `timeout`, and `silence_timeout`.
-- Remove Pipecat reads for `timeout` and `silence_timeout`.
-- Remove private alias constants in both providers.
-- Remove `MicrophoneEOSOptionLegacySilenceTimeout` from
-  `api/assistant-api/internal/options/audio.go` if no references remain.
-- Keep `MicrophoneEOSOptionTimeout` because it is canonical for silence-based EOS.
-
-This exact removal is required to satisfy canonical-only behavior. Keeping backend alias
-readers would preserve ongoing legacy support and would violate the user requirement.
+All keys use the `microphone.eos.` prefix. Delete LiveKit fallback_timeout, timeout,
+and silence_timeout after promotion. Delete Pipecat timeout, silence_timeout,
+quick_timeout, max_history_turns, and model after promotion.
 
 ## Contracts and Compatibility
 
-- The one-time migration is the only compatibility bridge.
-- Runtime code does not support LiveKit/Pipecat legacy aliases after migration.
-- Missing canonical rows remain valid because existing UI/backend defaults supply absent
-  values.
-- Valid canonical rows are preserved and have priority over aliases.
-- Valid zero timeout or threshold values are preserved because current runtime behavior does
-  not add tuning bounds.
-- Non-target providers and unknown provider values are left unchanged.
-- `audio_provider` remains unrelated to EOS provider selection.
-- Backend model path keys are configuration overrides, not user-facing EOS controls.
+LiveKit retains threshold, quick_timeout, extended_timeout, max_history_turns, and
+model. Pipecat retains threshold, fallback_timeout, and extended_timeout. Existing
+UI/backend defaults and canonical-only readers remain unchanged. Silence-based EOS
+continues to use timeout. All three backend model-path override keys are preserved.
 
-Intentional breaking change:
-
-- A deployment that still stores only LiveKit or Pipecat legacy keys after migration and
-  verification will no longer be configured by backend aliases.
+This migration operates on key presence, not numeric values. It never parses,
+casts, resets, or rewrites stored values, including unusual or malformed text.
+There is no invalid-value fallback to a lower-priority alias. Operators must audit
+selected values before rollout; that manual audit is not enforced by migration SQL.
 
 ## Failure and Recovery
 
-Migration preflight validates candidate values before changing rows. Presence precedence is
-canonical first, then aliases. If a present higher-priority candidate is invalid, the
-migration must report and abort instead of silently choosing a lower-priority value.
-
-Accepted numeric values:
-
-- finite decimal or exponent text,
-- Go-compatible digit separators,
-- no outer whitespace,
-- no PostgreSQL-only numeric coercion.
-
-Rejected numeric values:
-
-- non-finite values such as `NaN` and infinities,
-- malformed values,
-- hex-float values,
-- out-of-range values,
-- values requiring manual review.
-
-`max_history_turns` must be a positive integer. `model` must be nonblank.
-
-The migration runs atomically with bounded lock and statement timeouts. It must block
-concurrent option/deployment writes while reading, journaling, and modifying the target set.
-
-Rollback compares current rows and provider identity with journaled post-migration state
-before changing anything. If any affected row was edited after migration, if provider
-identity changed, if a destination conflict exists, or if parent deployment rows are
-missing, rollback aborts the whole transaction and retains the journal.
+Lock timeout, statement timeout, or statement failure rolls back the transaction.
+Successful repeat up is a no-op. The down file always raises an actionable error
+requiring backup restoration; it does not attempt a lossy reverse rename.
 
 ## Security and Privacy
 
-This change does not add permissions, secrets, credentials, or user data access. Backend
-model path values are treated as stored configuration and are preserved without surfacing
-new UI controls.
-
-The migration must preserve audited actor fields exactly for renamed, deleted, and restored
-rows. It must not invent a user identity. It must not use removed `created_by` or
-`updated_by` columns.
+Only known keys on selected input deployments are changed. Diagnostics contain
+counts and IDs, not configuration contents, credentials, or audio.
 
 ## Observability
 
-No new application runtime metrics are required.
-
-Operator diagnostics are required for migration execution and rollback:
-
-- target row counts by provider,
-- changed row counts,
-- deleted obsolete key counts,
-- invalid candidate report,
-- journal row counts,
-- clean migration version 61,
-- post-migration target alias count zero.
-
-These diagnostics belong in `bin/verify-eos-options-migration.sh` and disposable database
-verification, not in the application hot path.
+The disposable verifier reports target counts by provider, changed and deleted row
+counts from test snapshots, clean schema version 61, and zero target obsolete keys.
+No recovery table is created solely for diagnostics.
 
 ## Data and Migration
 
-Migration files:
-
-- `api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql`
-- `api/assistant-api/migrations/000061_eos_canonical_parameters.down.sql`
-
-Target set:
-
-- All input-audio deployment rows whose stored `microphone.eos.provider` exactly equals
-  `livekit_eos` or `pipecat_smart_turn_eos`.
-- Include inactive target records so later activation does not restore old keys.
-- Do not guess missing or unknown EOS providers.
-- Do not target output audio.
-
-Up migration algorithm:
-
-1. Start a transaction with bounded lock and statement timeouts.
-2. Lock the target audio option/deployment rows against concurrent writes.
-3. Validate candidate values before changing any row.
-4. Store original and resulting row images for changed or deleted rows in a
-   migration-specific journal.
-5. Preserve valid canonical rows.
-6. When canonical is absent, rename the highest-priority valid alias row in place,
-   preserving its ID and audit fields.
-7. Remove lower-priority aliases and known obsolete provider-specific keys only after
-   choosing the canonical survivor.
-8. Keep unknown EOS keys, unrelated metadata, non-target providers, output audio, provider
-   rows, and backend model path overrides unchanged.
-9. Repeated application is a no-op and must not overwrite original journal images.
-
-Down migration algorithm:
-
-1. Start a transaction with the same write exclusion as the up migration.
-2. Compare affected rows and provider identity with the journaled post-migration state.
-3. Abort the whole rollback on later edits, provider switches, unique conflicts, or missing
-   parent deployments.
-4. Restore original row IDs, keys, values, status, and audit fields exactly.
-5. Remove the migration journal only in the successful rollback transaction.
-
-The migration must not contact or alter any live database as part of implementation review.
-Environment-specific execution is a later operational step.
+Update and delete existing option rows only. No new configuration rows or persistent
+tables are created. Tests compare complete row images so audit-field and unrelated
+setting preservation are verified without production recovery infrastructure.
 
 ## Rollout
 
-1. Ship migration files and verification scripts through the reviewed change.
-2. In each environment, stop configuration writers and old application instances.
-3. Run preflight inventory and disposable verification first.
-4. Apply migration version 61 with the approved migration runner.
-5. Verify clean migration version 61 and zero target aliases.
-6. Deploy canonical-only backend and UI.
-7. Stop rollout if migration preflight reports invalid values, dirty state, unexpected target
-   counts, or nonzero target aliases after migration.
+Stop configuration writers and old instances. Back up the relevant deployment and
+option tables, audit selected values and key conflicts, apply 000061 externally,
+verify clean version 61 and zero obsolete target keys, then deploy canonical-only
+UI/backend code. Do not rely on startup to block a failed migration.
 
-Startup migration logging is not a rollout approval signal.
+The known full-history verifier mismatch (web-api expects 12 but reaches 13) still
+blocks shipping until separately authorized and corrected. No live run is approved.
 
 ## Rollback
 
-Rollback before user edits:
-
-1. Stop configuration writers and application instances.
-2. Run the down migration.
-3. Verify restored rows and clean version.
-4. Redeploy the previous backend/UI that still supports aliases.
-
-Rollback after user edits:
-
-- The down migration aborts atomically and retains the journal.
-- Operators must resolve conflicts explicitly instead of silently losing user edits.
-
-Application rollback alone is insufficient after migration if canonical-only data has been
-accepted by users. Database rollback and application rollback must be coordinated.
+Keep writers stopped, restore the pre-migration backup and matching migration
+version metadata, and redeploy compatible application code. Deleted conflicting
+aliases cannot be reconstructed from the surviving canonical values. Do not invoke
+down or force-clear dirty metadata as a substitute for backup restoration.
 
 ## Alternatives Considered
 
-- Keep backend alias readers. Rejected because it preserves ongoing legacy support.
-- Keep UI alias translation only. Rejected because runtime would still accept legacy rows
-  and canonical-only behavior would be incomplete.
-- Infer EOS provider from `audio_provider`. Rejected because EOS provider is stored as
-  `microphone.eos.provider`.
-- Persist defaults for every missing canonical value. Rejected because existing defaults
-  already supply absent values and duplicated default rows add storage churn.
-- Add a generic migration helper. Rejected because this is one focused provider migration.
-- Clean every unknown `microphone.eos.*` key. Rejected because the migration only owns known
-  obsolete LiveKit/Pipecat keys and must preserve unrelated metadata.
+- Exact row-image journal and guarded automatic rollback: rejected as unnecessary
+  complexity for this one-time conversion after the user accepted backup recovery.
+- Reimplement numeric parsing in SQL: rejected because this is a key-only migration.
+- Silent no-op down: rejected because it would falsely report restoration.
 
 ## Testing and Verification
 
-Required test categories:
+- `bash bin/verify-eos-options-migration.sh`: provider scope, all precedence cases,
+  exact values/audit preservation, no persisted defaults, no extra tables, repeat up,
+  concurrent-writer timeout, statement failure atomicity, and explicit down refusal.
+- `bash -n bin/verify-eos-options-migration.sh`
+- `just agent-finalize "api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql,api/assistant-api/migrations/000061_eos_canonical_parameters.down.sql,bin/verify-eos-options-migration.sh,tests/integration/eos-options/seed.sql,tests/integration/eos-options/test_migration.py"`
+- `git diff --check`
 
-- Disposable PostgreSQL migration tests for both providers and every alias priority.
-- Migration tests for valid canonical preservation, invalid candidate abort, missing values,
-  inactive input rows, output audio exclusion, backend path preservation, repeated up, and
-  rollback.
-- Rollback tests for later edits, provider switches, unique conflicts, and transaction
-  atomicity.
-- UI tests for canonical hydration, ignored legacy values, provider switching, model path
-  preservation, manual model/history preservation, and input ownership.
-- Backend tests for canonical success, default/error paths, and ignored legacy aliases in
-  real constructors.
-- Option registry tests that keep provider JSON defaults in parity with backend defaults.
-
-Exact commands:
-
-```bash
-bash bin/verify-eos-options-migration.sh
-bash bin/verify-phase3-migrations.sh
-env GOCACHE=/private/tmp/voice-ai-gocache go test -race -tags=integration -count=1 -timeout=120s ./api/assistant-api/internal/end_of_speech/... ./api/assistant-api/internal/options
-yarn --cwd ui test --watchAll=false --watchman=false --runInBand src/app/components/providers/__tests__/audio-input-advanced-defaults-parity.test.ts src/app/components/providers/end-of-speech/__tests__/provider-runtime-parity.test.tsx src/providers/__tests__/provider-eos-config.test.ts src/app/pages/assistant/actions/create-deployment/commons/__tests__/configure-audio-input.design.test.tsx
-just agent-finalize "$(git diff --name-only --diff-filter=ACMRT HEAD | paste -sd, -),$(git ls-files --others --exclude-standard | paste -sd, -)"
-git diff --check
-```
-
-Environmental limitation:
-
-- Live database execution is not part of this change. Verification must use disposable
-  databases and repository test fixtures only.
+The existing full-change verification requirement remains in force before shipping.
+No live database is used for this amendment's tests.
 
 ## Acceptance Criteria
 
-- [ ] UI and backend contain no active LiveKit/Pipecat alias read paths.
-- [ ] Silence-based EOS behavior is unchanged.
-- [ ] Migration preserves existing canonical values, manual models, custom finite values,
-  zero, backend paths, non-target providers, and unrelated metadata.
-- [ ] Migration tests cover both providers, every alias priority, invalid values, conflicts,
-  missing values, inactive records, output audio, repeated execution, and rollback.
-- [ ] Down migration restores original rows exactly and rejects later edits or conflicts
-  atomically.
-- [ ] UI tests cover canonical happy paths, ignored legacy values, backend model-path
-  preservation, provider switching, and input ownership.
-- [ ] Backend tests cover canonical values, default/error paths, and ignored legacy aliases.
-- [ ] Full migration history reaches clean assistant-api version 61.
-- [ ] No live database is used during implementation or verification.
-- [ ] No model-quality approval is implied.
-- [ ] Detached checkout is preserved through implementation.
+- [ ] One transaction with direct UPDATE and DELETE and no recovery infrastructure.
+- [ ] Canonical precedence, manual model selection, values, IDs, and audits preserved.
+- [ ] Unrelated providers, output audio, unknown keys, and backend paths untouched.
+- [ ] Repeat up makes no changes; failures are atomic; down requires a backup.
+- [ ] Focused verification and independent review completed before shipping.
 
 ## Open Questions
 
-None.
+None for the amendment. The separately identified full-history check remains blocked.
 
 ## Challenge Resolution
 
-The first challenge found that provider-switch model-path preservation required an omitted
-production path, `configure-audio-input.tsx`. The plan and allowed paths now include that
-caller and require preservation before its prefix filter. A second challenge is pending.
-
-One correction cycle has been used; the limit is two.
+Amendment 01 has its own challenge and confirmation evidence. The prior review's
+journal-specific diagnostics and rollback requirements no longer apply to this design.
+The two-cycle limit applies to this user-requested amendment.
 
 ## Artifact Index
 
-- `jsons/plan.json` - coordinator-authored plan artifact, available.
-- `jsons/challenge-01.json` - first challenge scope finding and requested correction.
-- `jsons/challenge.json` - independent challenge receipt, pending.
-- `jsons/confirmation.json` - exact-digest confirmation receipt, pending.
+- `jsons/plan.json`, `jsons/approved-plan.json`, `jsons/challenge.json`, and
+  `jsons/confirmation.json`: original design evidence, superseded for migration design.
+- `jsons/review-implementation.json`: original implementation review.
+- `jsons/amendment-01-plan.json`: forward-only migration plan.
+- `jsons/amendment-01-challenge.json`: amendment's independent challenge.
+- `jsons/amendment-01-confirmation.json`: amendment's exact-digest confirmation.
 
 ## Decision Log
 
 | Date | Decision | Owner | Evidence |
 | --- | --- | --- | --- |
-| 2026-09-10 | Use a one-time migration as the only compatibility bridge. | Voice AI | `jsons/plan.json` |
-| 2026-09-10 | Remove LiveKit and Pipecat backend alias readers after migration. | Voice AI | `jsons/plan.json` |
-| 2026-09-10 | Keep missing canonical values absent and use existing defaults at read time. | Voice AI | `jsons/plan.json` |
+| 2026-09-10 | Canonical-only UI/backend with one-time migration | Voice AI | `jsons/plan.json` |
+| 2026-09-10 | Simplify migration and require backup recovery | User | `jsons/amendment-01-plan.json` |
