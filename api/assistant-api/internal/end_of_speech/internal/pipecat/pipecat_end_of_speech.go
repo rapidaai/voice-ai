@@ -186,12 +186,8 @@ func New(opts ...Option) (internal_type.EndOfSpeechExecutor, error) {
 	}
 	if extendedTimeout, err := options.options.GetFloat64(optPctExtendedTimeout); err == nil {
 		endOfSpeech.extendedTimeout = time.Duration(extendedTimeout) * time.Millisecond
-	} else if extendedTimeout, err := options.options.GetFloat64(optPctLegacySilenceTimeout); err == nil {
-		endOfSpeech.extendedTimeout = time.Duration(extendedTimeout) * time.Millisecond
 	}
 	if fallbackTimeout, err := options.options.GetFloat64(optPctFallbackTimeout); err == nil {
-		endOfSpeech.fallbackTimeout = time.Duration(fallbackTimeout) * time.Millisecond
-	} else if fallbackTimeout, err := options.options.GetFloat64(optPctLegacyTimeout); err == nil {
 		endOfSpeech.fallbackTimeout = time.Duration(fallbackTimeout) * time.Millisecond
 	}
 

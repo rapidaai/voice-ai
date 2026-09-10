@@ -67,13 +67,9 @@ func newTestEOS(onPacket func(context.Context, ...internal_type.Packet) error, o
 	fallbackTimeout := time.Duration(defaultPctFallbackTimeout) * time.Millisecond
 	if v, err := opts.GetFloat64("microphone.eos.fallback_timeout"); err == nil {
 		fallbackTimeout = time.Duration(v) * time.Millisecond
-	} else if v, err := opts.GetFloat64("microphone.eos.timeout"); err == nil {
-		fallbackTimeout = time.Duration(v) * time.Millisecond
 	}
 	extendedTimeout := time.Duration(defaultPctExtendedTimeout) * time.Millisecond
 	if v, err := opts.GetFloat64("microphone.eos.extended_timeout"); err == nil {
-		extendedTimeout = time.Duration(v) * time.Millisecond
-	} else if v, err := opts.GetFloat64("microphone.eos.silence_timeout"); err == nil {
 		extendedTimeout = time.Duration(v) * time.Millisecond
 	}
 	threshold := defaultPctThreshold

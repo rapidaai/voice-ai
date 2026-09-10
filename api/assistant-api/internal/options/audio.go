@@ -68,9 +68,6 @@ const (
 	MicrophoneEOSOptionLivekitModelPath     = "microphone.eos.livekit.model_path"
 	MicrophoneEOSOptionLivekitTokenizerPath = "microphone.eos.livekit.tokenizer_path" // #nosec G101, configuration key, not a credential.
 	MicrophoneEOSOptionPipecatModelPath     = "microphone.eos.pipecat.model_path"
-
-	// Older assistants use this alias when extended_timeout is absent.
-	MicrophoneEOSOptionLegacySilenceTimeout = "microphone.eos.silence_timeout"
 )
 
 const (

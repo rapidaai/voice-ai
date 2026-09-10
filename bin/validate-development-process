@@ -364,6 +364,41 @@ ORCA_CLI_COMMAND="$mock_orca" python3 "$repo_root/bin/orca-confirm-rfc" \
   --rfc rfcs/0042-confirmation-test.md >/dev/null
 grep -q '"resolution": "approved"' "$artifact_dir/confirmation.json"
 
+RFC_FIXTURE="$rfc_fixture_root/rfcs/0042-confirmation-test.md" CHALLENGE_RECEIPT_DIGEST="$challenge_receipt_digest" \
+GATE_CREATED_AT='2026-08-20 10:00:00' GATE_RESOLVED_AT='2026-08-20 10:01:00' \
+ORCA_CLI_COMMAND="$mock_orca" python3 "$repo_root/bin/orca-confirm-rfc" \
+  --repo-root "$rfc_fixture_root" collect --run run_test --task task_confirm \
+  --challenge-task task_challenge --challenge-receipt "$challenge_receipt" --gate gate_confirm \
+  --rfc rfcs/0042-confirmation-test.md --output "$artifact_dir/orca-timestamps.json" >/dev/null
+cmp "$artifact_dir/confirmation.json" "$artifact_dir/orca-timestamps.json"
+
+python3 - "$repo_root/bin/orca-confirm-rfc" <<'PY'
+import importlib.machinery
+import sys
+
+module = importlib.machinery.SourceFileLoader("orca_confirm_rfc_timestamps", sys.argv[1]).load_module()
+for timestamp in ("2026-08-20T10:00:00Z", "2026-08-20T15:30:00+05:30"):
+    assert module.parse_timestamp(timestamp, "reviewed_at") == timestamp
+    assert module.parse_timestamp(timestamp, "created_at", allow_orca_utc=True) == timestamp
+for timestamp in (
+    "2026-08-20", "2026-08-20T10:00:00", "2026-08-20 10:00",
+    "2026-02-30 10:00:00", "2026-08-20 25:00:00", "2026-08-20 10:00:00.123",
+    "2026-8-20 10:00:00", " 2026-08-20 10:00:00", None, "",
+):
+    try:
+        module.parse_timestamp(timestamp, "created_at", allow_orca_utc=True)
+    except SystemExit:
+        pass
+    else:
+        raise AssertionError(f"Accepted invalid gate timestamp: {timestamp!r}")
+try:
+    module.parse_timestamp("2026-08-20 10:00:00", "reviewed_at")
+except SystemExit:
+    pass
+else:
+    raise AssertionError("Challenge timestamp lost timezone validation")
+PY
+
 printf '%s\n' '{"unexpected":"replacement"}' >"$artifact_dir/confirmation.json"
 if RFC_FIXTURE="$rfc_fixture_root/rfcs/0042-confirmation-test.md" CHALLENGE_RECEIPT_DIGEST="$challenge_receipt_digest" \
   ORCA_CLI_COMMAND="$mock_orca" python3 "$repo_root/bin/orca-confirm-rfc" \

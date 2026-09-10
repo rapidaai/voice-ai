@@ -24,13 +24,6 @@ const (
 	optKeyModelPath       = internal_options.MicrophoneEOSOptionLivekitModelPath
 	optKeyTokenizerPath   = internal_options.MicrophoneEOSOptionLivekitTokenizerPath
 
-	// Fallback and timeout remain minimum-delay aliases when quick_timeout is absent.
-	optKeyFallbackTimeout = internal_options.MicrophoneEOSOptionFallbackTimeout
-	optKeyLegacyTimeout   = internal_options.MicrophoneEOSOptionTimeout
-
-	// Older configurations use silence_timeout for the maximum endpointing delay.
-	optKeyLegacySilenceTimeout = internal_options.MicrophoneEOSOptionLegacySilenceTimeout
-
 	// Preserve Rapida's configured endpointing defaults when options are absent.
 	defaultThreshold      = 0.0289
 	defaultSilenceTimeout = 3000.0

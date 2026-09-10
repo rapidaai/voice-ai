@@ -161,6 +161,9 @@ export const GetDefaultMicrophoneConfig = (
     'microphone.eos.quick_timeout'?: string;
     'microphone.eos.extended_timeout'?: string;
     'microphone.eos.model'?: string;
+    'microphone.eos.livekit.model_path'?: string;
+    'microphone.eos.livekit.tokenizer_path'?: string;
+    'microphone.eos.pipecat.model_path'?: string;
     'microphone.eos.provider'?: string;
     'microphone.denoising.provider'?: string;
     'microphone.barge_in_trigger'?: string;
@@ -227,9 +230,9 @@ export const GetDefaultMicrophoneConfig = (
     },
   ];
 
-  const legacyBargeInValue = existing.find(
-    m => m.getKey() === LEGACY_MICROPHONE_VAD_BARGE_IN_TRIGGER_KEY,
-  )?.getValue();
+  const legacyBargeInValue = existing
+    .find(m => m.getKey() === LEGACY_MICROPHONE_VAD_BARGE_IN_TRIGGER_KEY)
+    ?.getValue();
   const existingWithoutLegacyBargeIn = existing.filter(
     m => m.getKey() !== LEGACY_MICROPHONE_VAD_BARGE_IN_TRIGGER_KEY,
   );

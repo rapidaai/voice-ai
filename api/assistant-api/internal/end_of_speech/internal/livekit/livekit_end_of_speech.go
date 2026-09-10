@@ -194,14 +194,8 @@ func New(opts ...Option) (internal_type.EndOfSpeechExecutor, error) {
 	}
 	if v, err := options.options.GetFloat64(optKeyExtendedTimeout); err == nil {
 		endOfSpeech.silenceTimeout = time.Duration(v) * time.Millisecond
-	} else if v, err := options.options.GetFloat64(optKeyLegacySilenceTimeout); err == nil {
-		endOfSpeech.silenceTimeout = time.Duration(v) * time.Millisecond
 	}
 	if v, err := options.options.GetFloat64(optKeyQuickTimeout); err == nil {
-		endOfSpeech.quickTimeout = time.Duration(v) * time.Millisecond
-	} else if v, err := options.options.GetFloat64(optKeyFallbackTimeout); err == nil {
-		endOfSpeech.quickTimeout = time.Duration(v) * time.Millisecond
-	} else if v, err := options.options.GetFloat64(optKeyLegacyTimeout); err == nil {
 		endOfSpeech.quickTimeout = time.Duration(v) * time.Millisecond
 	}
 	if v, err := options.options.GetFloat64(optKeyMaxHistory); err == nil {

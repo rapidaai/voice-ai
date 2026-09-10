@@ -45,6 +45,9 @@ func TestEOSProviderOptionRegistry(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, parameter := range config.Parameters {
+				if parameter.Key == MicrophoneEOSOptionTimeout || parameter.Key == "microphone.eos.silence_timeout" {
+					t.Errorf("provider-specific EOS control uses non-provider timeout key: %s", parameter.Key)
+				}
 				if !provider.keys[parameter.Key] {
 					t.Errorf("unregistered, unsupported, or duplicate EOS control: %s", parameter.Key)
 				}

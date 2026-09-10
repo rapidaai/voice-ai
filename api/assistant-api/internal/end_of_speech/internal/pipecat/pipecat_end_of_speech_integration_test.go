@@ -44,44 +44,64 @@ func TestEOS_UIOptionDefaults(t *testing.T) {
 	require.Equal(t, time.Duration(defaultPctExtendedTimeout)*time.Millisecond, configured.extendedTimeout)
 }
 
-func TestEOS_OptionPrecedence(t *testing.T) {
+func TestEOS_CanonicalConstructorOptions(t *testing.T) {
 	for _, test := range []struct {
 		name            string
 		settings        utils.Option
+		threshold       float64
 		fallbackTimeout time.Duration
 		extendedTimeout time.Duration
 	}{
 		{
-			name:            "defaults",
-			fallbackTimeout: 500 * time.Millisecond, extendedTimeout: 3000 * time.Millisecond,
+			name:            "missing canonical values use defaults",
+			threshold:       defaultPctThreshold,
+			fallbackTimeout: 500 * time.Millisecond,
+			extendedTimeout: 3000 * time.Millisecond,
 		},
 		{
-			name: "legacy",
+			name: "custom canonical values",
 			settings: utils.Option{
-				internal_options.MicrophoneEOSOptionTimeout: "700", internal_options.MicrophoneEOSOptionLegacySilenceTimeout: "1800",
+				internal_options.MicrophoneEOSOptionThreshold:       "0.75",
+				internal_options.MicrophoneEOSOptionFallbackTimeout: "8e2",
+				internal_options.MicrophoneEOSOptionExtendedTimeout: "1_800",
 			},
-			fallbackTimeout: 700 * time.Millisecond, extendedTimeout: 1800 * time.Millisecond,
+			threshold:       0.75,
+			fallbackTimeout: 800 * time.Millisecond,
+			extendedTimeout: 1800 * time.Millisecond,
 		},
 		{
-			name: "canonical values win",
+			name: "zero canonical values",
 			settings: utils.Option{
-				internal_options.MicrophoneEOSOptionFallbackTimeout: "800", internal_options.MicrophoneEOSOptionExtendedTimeout: "2000",
-				internal_options.MicrophoneEOSOptionTimeout: "700", internal_options.MicrophoneEOSOptionLegacySilenceTimeout: "1800",
+				internal_options.MicrophoneEOSOptionThreshold:       0.0,
+				internal_options.MicrophoneEOSOptionFallbackTimeout: 0.0,
+				internal_options.MicrophoneEOSOptionExtendedTimeout: 0.0,
 			},
-			fallbackTimeout: 800 * time.Millisecond, extendedTimeout: 2000 * time.Millisecond,
+			threshold:       0,
+			fallbackTimeout: 0,
+			extendedTimeout: 0,
 		},
 		{
-			name: "invalid canonical values use legacy aliases",
+			name: "invalid canonical values use defaults",
 			settings: utils.Option{
-				internal_options.MicrophoneEOSOptionFallbackTimeout: "invalid", internal_options.MicrophoneEOSOptionExtendedTimeout: "invalid",
-				internal_options.MicrophoneEOSOptionTimeout: "700", internal_options.MicrophoneEOSOptionLegacySilenceTimeout: "1800",
+				internal_options.MicrophoneEOSOptionThreshold:       "invalid",
+				internal_options.MicrophoneEOSOptionFallbackTimeout: "invalid",
+				internal_options.MicrophoneEOSOptionExtendedTimeout: "invalid",
 			},
-			fallbackTimeout: 700 * time.Millisecond, extendedTimeout: 1800 * time.Millisecond,
+			threshold:       defaultPctThreshold,
+			fallbackTimeout: 500 * time.Millisecond,
+			extendedTimeout: 3000 * time.Millisecond,
 		},
 		{
-			name:            "obsolete quick timeout does not set another budget",
-			settings:        utils.Option{internal_options.MicrophoneEOSOptionQuickTimeout: "900"},
-			fallbackTimeout: 500 * time.Millisecond, extendedTimeout: 3000 * time.Millisecond,
+			name: "aliases ignored",
+			settings: utils.Option{
+				internal_options.MicrophoneEOSOptionTimeout:      "700",
+				"microphone.eos.silence_timeout":                 "1800",
+				internal_options.MicrophoneEOSOptionQuickTimeout: "900",
+				internal_options.MicrophoneEOSOptionModel:        "ignored",
+			},
+			threshold:       defaultPctThreshold,
+			fallbackTimeout: 500 * time.Millisecond,
+			extendedTimeout: 3000 * time.Millisecond,
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -92,8 +112,10 @@ func TestEOS_OptionPrecedence(t *testing.T) {
 			)
 			require.NoError(t, err)
 			defer endOfSpeech.Close(context.Background())
-			require.Equal(t, test.fallbackTimeout, endOfSpeech.(*pipecatEndOfSpeech).fallbackTimeout)
-			require.Equal(t, test.extendedTimeout, endOfSpeech.(*pipecatEndOfSpeech).extendedTimeout)
+			configured := endOfSpeech.(*pipecatEndOfSpeech)
+			require.Equal(t, test.threshold, configured.threshold)
+			require.Equal(t, test.fallbackTimeout, configured.fallbackTimeout)
+			require.Equal(t, test.extendedTimeout, configured.extendedTimeout)
 		})
 	}
 }

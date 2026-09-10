@@ -45,10 +45,13 @@ jest.mock('@/app/components/providers/vad', () => ({
   ),
 }));
 
-jest.mock('@/app/components/providers/microphone/barge-in-trigger-control', () => ({
-  MICROPHONE_BARGE_IN_TRIGGER_KEY: 'microphone.barge_in_trigger',
-  BargeInTriggerControl: () => <div>barge-in control</div>,
-}));
+jest.mock(
+  '@/app/components/providers/microphone/barge-in-trigger-control',
+  () => ({
+    MICROPHONE_BARGE_IN_TRIGGER_KEY: 'microphone.barge_in_trigger',
+    BargeInTriggerControl: () => <div>barge-in control</div>,
+  }),
+);
 
 jest.mock('@/app/components/providers/end-of-speech', () => ({
   EndOfSpeechProvider: ({
@@ -89,6 +92,11 @@ jest.mock('@/app/components/providers/vad/provider', () => ({
 }));
 
 jest.mock('@/app/components/providers/end-of-speech/provider', () => ({
+  EOS_MODEL_PATH_KEYS: new Set([
+    'microphone.eos.livekit.model_path',
+    'microphone.eos.livekit.tokenizer_path',
+    'microphone.eos.pipecat.model_path',
+  ]),
   GetDefaultEOSConfig: (...args: any[]) => mockGetDefaultEOSConfig(...args),
 }));
 
@@ -113,6 +121,15 @@ describe('ConfigureAudioInputProvider design integration', () => {
     const inputParameters = [
       createMetadata('listen.model', 'nova-3'),
       createMetadata('microphone.eos.fallback_timeout', '900'),
+      createMetadata(
+        'microphone.eos.livekit.model_path',
+        '/models/livekit.onnx',
+      ),
+      createMetadata(
+        'microphone.eos.livekit.tokenizer_path',
+        '/models/tokenizer.json',
+      ),
+      createMetadata('microphone.eos.pipecat.model_path', '/models/pipecat'),
       createMetadata('microphone.barge_in_trigger', 'word'),
       createMetadata('microphone.vad.confidence', '0.7'),
       createMetadata('microphone.denoising.provider', 'rn_noise'),
@@ -123,7 +140,9 @@ describe('ConfigureAudioInputProvider design integration', () => {
       createMetadata('microphone.vad.confidence', '0.6'),
       createMetadata('microphone.denoising.provider', 'rn_noise'),
     ];
-    const sttDefaults = [createMetadata('listen.model', 'whisper-large-v3-turbo')];
+    const sttDefaults = [
+      createMetadata('listen.model', 'whisper-large-v3-turbo'),
+    ];
 
     mockGetDefaultMicrophoneConfig.mockReturnValue(microphoneDefaults);
     mockGetDefaultSpeechToTextIfInvalid.mockReturnValue(sttDefaults);
@@ -139,10 +158,14 @@ describe('ConfigureAudioInputProvider design integration', () => {
     fireEvent.click(screen.getByRole('button', { name: 'change stt' }));
 
     expect(mockGetDefaultMicrophoneConfig).toHaveBeenCalledTimes(1);
-    const microphoneOnly = mockGetDefaultMicrophoneConfig.mock.calls[0][0] as Metadata[];
+    const microphoneOnly = mockGetDefaultMicrophoneConfig.mock
+      .calls[0][0] as Metadata[];
     expect(microphoneOnly.map(m => m.getKey()).sort()).toEqual(
       [
         'microphone.eos.fallback_timeout',
+        'microphone.eos.livekit.model_path',
+        'microphone.eos.livekit.tokenizer_path',
+        'microphone.eos.pipecat.model_path',
         'microphone.barge_in_trigger',
         'microphone.vad.confidence',
         'microphone.denoising.provider',
@@ -164,11 +187,27 @@ describe('ConfigureAudioInputProvider design integration', () => {
       createMetadata('listen.model', 'nova-3'),
       createMetadata('microphone.vad.provider', 'silero_vad'),
       createMetadata('microphone.eos.provider', 'silence_based_eos'),
+      createMetadata('microphone.eos.timeout', '900'),
+      createMetadata(
+        'microphone.eos.livekit.model_path',
+        '/models/livekit.onnx',
+      ),
+      createMetadata(
+        'microphone.eos.livekit.tokenizer_path',
+        '/models/tokenizer.json',
+      ),
+      createMetadata('microphone.eos.pipecat.model_path', '/models/pipecat'),
       createMetadata('microphone.denoising.provider', 'legacy_noise'),
     ];
-    const vadDefaults = [createMetadata('microphone.vad.provider', 'firered_vad')];
-    const eosDefaults = [createMetadata('microphone.eos.provider', 'livekit_eos')];
-    const noiseDefaults = [createMetadata('microphone.denoising.provider', 'rn_noise')];
+    const vadDefaults = [
+      createMetadata('microphone.vad.provider', 'firered_vad'),
+    ];
+    const eosDefaults = [
+      createMetadata('microphone.eos.provider', 'livekit_eos'),
+    ];
+    const noiseDefaults = [
+      createMetadata('microphone.denoising.provider', 'rn_noise'),
+    ];
 
     mockGetDefaultVADConfig.mockReturnValue(vadDefaults);
     mockGetDefaultEOSConfig.mockReturnValue(eosDefaults);
@@ -197,14 +236,20 @@ describe('ConfigureAudioInputProvider design integration', () => {
       'rn_noise',
       inputParameters,
     );
-    expect(mockGetDefaultEOSConfig).toHaveBeenCalledWith(
-      'livekit_eos',
-      [
-        createMetadata('listen.model', 'nova-3'),
-        createMetadata('microphone.vad.provider', 'silero_vad'),
-        createMetadata('microphone.denoising.provider', 'legacy_noise'),
-      ],
-    );
+    expect(mockGetDefaultEOSConfig).toHaveBeenCalledWith('livekit_eos', [
+      createMetadata('listen.model', 'nova-3'),
+      createMetadata('microphone.vad.provider', 'silero_vad'),
+      createMetadata(
+        'microphone.eos.livekit.model_path',
+        '/models/livekit.onnx',
+      ),
+      createMetadata(
+        'microphone.eos.livekit.tokenizer_path',
+        '/models/tokenizer.json',
+      ),
+      createMetadata('microphone.eos.pipecat.model_path', '/models/pipecat'),
+      createMetadata('microphone.denoising.provider', 'legacy_noise'),
+    ]);
 
     expect(setAudioInputConfig).toHaveBeenCalledWith({
       provider: 'deepgram',
@@ -233,9 +278,15 @@ describe('ConfigureAudioInputProvider design integration', () => {
     fireEvent.click(
       screen.getByRole('button', { name: /show advanced settings/i }),
     );
-    expect(screen.getByRole('button', { name: 'change vad' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'change eos' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'change noise' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'change vad' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'change eos' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'change noise' }),
+    ).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole('button', { name: /hide advanced settings/i }),
