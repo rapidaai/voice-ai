@@ -21,9 +21,9 @@ const (
 	optPctModelPath        = internal_options.MicrophoneEOSOptionPipecatModelPath
 
 	// The transcript safety budget and Smart Turn silence limit run independently after VAD stop.
-	defaultPctThreshold       = 0.5
-	defaultPctExtendedTimeout = 3000.0
-	defaultPctFallbackTimeout = 500.0
+	defaultPctThreshold       = 0.85
+	defaultPctExtendedTimeout = 4000.0
+	defaultPctFallbackTimeout = 1000.0
 
 	maxAudioSamples        = whisperMaxSamples
 	preSpeechAudioSamples  = whisperSampleRate / 2

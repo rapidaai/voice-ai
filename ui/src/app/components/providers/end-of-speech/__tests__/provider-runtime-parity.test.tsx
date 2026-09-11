@@ -264,7 +264,7 @@ describe('EOS provider runtime parity', () => {
             )
             ?.getValue(),
         ),
-      ).toBe('3000');
+      ).toBe(selected === 'pipecat_smart_turn_eos' ? '4000' : '3000');
       expect(
         parameters.some(
           parameter => parameter.getKey() === 'microphone.eos.quick_timeout',

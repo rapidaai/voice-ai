@@ -25,18 +25,18 @@ const backendVadDefaults: Record<string, Record<string, string>> = {
   silero_vad: {
     'microphone.vad.confidence': '0.7',
     'microphone.vad.start_secs': '0.2',
-    'microphone.vad.stop_secs': '0.2',
+    'microphone.vad.stop_secs': '0.5',
     'microphone.vad.min_volume': '0.6',
   },
   ten_vad: {
     'microphone.vad.confidence': '0.7',
     'microphone.vad.start_secs': '0.2',
-    'microphone.vad.stop_secs': '0.2',
+    'microphone.vad.stop_secs': '0.5',
   },
   firered_vad: {
     'microphone.vad.confidence': '0.7',
     'microphone.vad.start_secs': '0.2',
-    'microphone.vad.stop_secs': '0.2',
+    'microphone.vad.stop_secs': '0.5',
   },
 };
 
@@ -52,9 +52,9 @@ const backendEosDefaults: Record<string, Record<string, string>> = {
     'microphone.eos.max_history_turns': '6',
   },
   pipecat_smart_turn_eos: {
-    'microphone.eos.fallback_timeout': '500',
-    'microphone.eos.threshold': '0.5',
-    'microphone.eos.extended_timeout': '3000',
+    'microphone.eos.fallback_timeout': '1000',
+    'microphone.eos.threshold': '0.85',
+    'microphone.eos.extended_timeout': '4000',
   },
 };
 
@@ -238,12 +238,12 @@ describe('Audio input advanced defaults parity', () => {
       'pipecat_smart_turn_eos',
     );
     expect(getMetadataValue(switched, 'microphone.eos.fallback_timeout')).toBe(
-      '500',
+      '1000',
     );
-    expect(getMetadataValue(switched, 'microphone.eos.threshold')).toBe('0.5');
+    expect(getMetadataValue(switched, 'microphone.eos.threshold')).toBe('0.85');
     expect(getMetadataValue(switched, 'microphone.eos.quick_timeout')).toBe('');
     expect(getMetadataValue(switched, 'microphone.eos.extended_timeout')).toBe(
-      '3000',
+      '4000',
     );
   });
 
@@ -254,18 +254,18 @@ describe('Audio input advanced defaults parity', () => {
     );
     expect(getMetadataValue(defaults, 'microphone.vad.confidence')).toBe('0.7');
     expect(getMetadataValue(defaults, 'microphone.vad.start_secs')).toBe('0.2');
-    expect(getMetadataValue(defaults, 'microphone.vad.stop_secs')).toBe('0.2');
+    expect(getMetadataValue(defaults, 'microphone.vad.stop_secs')).toBe('0.5');
     expect(getMetadataValue(defaults, 'microphone.vad.min_volume')).toBe('0.6');
     expect(getMetadataValue(defaults, 'microphone.eos.provider')).toBe(
       'pipecat_smart_turn_eos',
     );
     expect(getMetadataValue(defaults, 'microphone.eos.fallback_timeout')).toBe(
-      '500',
+      '1000',
     );
-    expect(getMetadataValue(defaults, 'microphone.eos.threshold')).toBe('0.5');
+    expect(getMetadataValue(defaults, 'microphone.eos.threshold')).toBe('0.85');
     expect(getMetadataValue(defaults, 'microphone.eos.quick_timeout')).toBe('');
     expect(getMetadataValue(defaults, 'microphone.eos.extended_timeout')).toBe(
-      '3000',
+      '4000',
     );
   });
 
@@ -380,8 +380,8 @@ describe('Audio input advanced defaults parity', () => {
         createMetadata('microphone.eos.max_history_turns', '20'),
       ],
       {
-        'microphone.eos.fallback_timeout': '500',
-        'microphone.eos.extended_timeout': '3000',
+        'microphone.eos.fallback_timeout': '1000',
+        'microphone.eos.extended_timeout': '4000',
       },
     ],
   ] as [string, Metadata[], Record<string, string>][])(
@@ -475,7 +475,7 @@ describe('Audio input advanced defaults parity', () => {
 
     expect(getMetadataValue(defaults, 'microphone.eos.quick_timeout')).toBe('');
     expect(getMetadataValue(defaults, 'microphone.eos.fallback_timeout')).toBe(
-      '500',
+      '1000',
     );
     expect(getMetadataValue(defaults, 'microphone.eos.extended_timeout')).toBe(
       '2000',

@@ -5,9 +5,9 @@ describe('EOS provider config', () => {
     [
       'pipecat_smart_turn_eos',
       {
-        fallback_timeout: '500',
-        threshold: '0.5',
-        extended_timeout: '3000',
+        fallback_timeout: '1000',
+        threshold: '0.85',
+        extended_timeout: '4000',
       },
     ],
     [

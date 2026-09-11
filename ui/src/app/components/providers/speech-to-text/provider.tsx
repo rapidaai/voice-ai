@@ -222,7 +222,7 @@ export const GetDefaultMicrophoneConfig = (
     },
     {
       key: 'microphone.vad.stop_secs',
-      value: defaults?.['microphone.vad.stop_secs'] ?? '0.2',
+      value: defaults?.['microphone.vad.stop_secs'] ?? '0.5',
     },
     {
       key: 'microphone.vad.min_volume',

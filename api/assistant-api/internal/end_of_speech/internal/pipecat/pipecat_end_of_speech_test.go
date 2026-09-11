@@ -2600,7 +2600,7 @@ func TestEOS_FinalSTTInferenceFailure_UsesDefaultFallbackTimeoutWhenUnset(t *tes
 	}
 
 	eos := newTestEOS(callback, newTestOpts(map[string]any{
-		// No microphone.eos.fallback_timeout -> should use default fallback (500ms)
+		// No microphone.eos.fallback_timeout -> should use default fallback (1000ms)
 		"microphone.eos.extended_timeout": 1500.0,
 	}))
 	defer closeTestEndOfSpeech(eos)
