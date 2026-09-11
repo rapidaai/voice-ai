@@ -19,6 +19,7 @@ var (
 	errPipecatDetectorSetOptimization       = errors.New("pipecat_detector: set optimization")
 	errPipecatDetectorCreateSession         = errors.New("pipecat_detector: create session")
 	errPipecatDetectorCreateMemoryInfo      = errors.New("pipecat_detector: create memory info")
+	errPipecatDetectorCreateRunOptions      = errors.New("pipecat_detector: create run options")
 	errPipecatDetectorCreateInputTensor     = errors.New("pipecat_detector: create input tensor")
 	errPipecatDetectorRunInference          = errors.New("pipecat_detector: run inference")
 	errPipecatDetectorGetOutputData         = errors.New("pipecat_detector: get output data")

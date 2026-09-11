@@ -42,6 +42,7 @@ func TestEOS_UIOptionDefaults(t *testing.T) {
 	require.Equal(t, defaultPctThreshold, configured.threshold)
 	require.Equal(t, time.Duration(defaultPctFallbackTimeout)*time.Millisecond, configured.fallbackTimeout)
 	require.Equal(t, time.Duration(defaultPctExtendedTimeout)*time.Millisecond, configured.extendedTimeout)
+	require.Equal(t, 5*time.Second, configured.turnStopTimeout)
 }
 
 func TestEOS_CanonicalConstructorOptions(t *testing.T) {
@@ -55,8 +56,8 @@ func TestEOS_CanonicalConstructorOptions(t *testing.T) {
 		{
 			name:            "missing canonical values use defaults",
 			threshold:       defaultPctThreshold,
-			fallbackTimeout: 500 * time.Millisecond,
-			extendedTimeout: 3000 * time.Millisecond,
+			fallbackTimeout: time.Duration(defaultPctFallbackTimeout) * time.Millisecond,
+			extendedTimeout: time.Duration(defaultPctExtendedTimeout) * time.Millisecond,
 		},
 		{
 			name: "custom canonical values",
@@ -88,8 +89,8 @@ func TestEOS_CanonicalConstructorOptions(t *testing.T) {
 				internal_options.MicrophoneEOSOptionExtendedTimeout: "invalid",
 			},
 			threshold:       defaultPctThreshold,
-			fallbackTimeout: 500 * time.Millisecond,
-			extendedTimeout: 3000 * time.Millisecond,
+			fallbackTimeout: time.Duration(defaultPctFallbackTimeout) * time.Millisecond,
+			extendedTimeout: time.Duration(defaultPctExtendedTimeout) * time.Millisecond,
 		},
 		{
 			name: "aliases ignored",
@@ -100,8 +101,8 @@ func TestEOS_CanonicalConstructorOptions(t *testing.T) {
 				internal_options.MicrophoneEOSOptionModel:        "ignored",
 			},
 			threshold:       defaultPctThreshold,
-			fallbackTimeout: 500 * time.Millisecond,
-			extendedTimeout: 3000 * time.Millisecond,
+			fallbackTimeout: time.Duration(defaultPctFallbackTimeout) * time.Millisecond,
+			extendedTimeout: time.Duration(defaultPctExtendedTimeout) * time.Millisecond,
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -116,6 +117,7 @@ func TestEOS_CanonicalConstructorOptions(t *testing.T) {
 			require.Equal(t, test.threshold, configured.threshold)
 			require.Equal(t, test.fallbackTimeout, configured.fallbackTimeout)
 			require.Equal(t, test.extendedTimeout, configured.extendedTimeout)
+			require.Equal(t, 5*time.Second, configured.turnStopTimeout)
 		})
 	}
 }
@@ -126,7 +128,7 @@ func TestEOS_NativeSmartTurnAudioFlow(t *testing.T) {
 		WithContext(t.Context()),
 		WithOptions(utils.Option{
 			"microphone.eos.fallback_timeout": 50.0,
-			"microphone.eos.extended_timeout": 100.0,
+			"microphone.eos.extended_timeout": 1000.0,
 		}),
 		WithOnPacket(func(ctx context.Context, packets ...internal_type.Packet) error {
 			for _, packet := range packets {
@@ -141,8 +143,8 @@ func TestEOS_NativeSmartTurnAudioFlow(t *testing.T) {
 	nativeEndOfSpeech := endOfSpeech.(*pipecatEndOfSpeech)
 	nativePredictor := nativeEndOfSpeech.predictor
 	var predictionCount int
-	nativeEndOfSpeech.predictor = testPredictor{predict: func(audio []float32) (float64, error) {
-		probability, predictionError := nativePredictor.Predict(audio)
+	nativeEndOfSpeech.predictor = testPredictor{predictContext: func(ctx context.Context, audio []float32) (float64, error) {
+		probability, predictionError := nativePredictor.PredictContext(ctx, audio)
 		require.NoError(t, predictionError)
 		predictionCount++
 		return probability, predictionError
@@ -166,7 +168,7 @@ func TestEOS_NativeSmartTurnAudioFlow(t *testing.T) {
 			Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd,
 		}))
 		require.NoError(t, endOfSpeech.Execute(t.Context(), internal_type.EndOfSpeechAudioPacket{
-			Audio: make([]byte, 3200),
+			Audio: make([]byte, 32000),
 		}))
 		select {
 		case packet := <-completed:
