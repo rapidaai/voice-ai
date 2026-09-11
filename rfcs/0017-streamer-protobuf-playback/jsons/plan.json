@@ -1,0 +1,21 @@
+{
+  "status": "implemented_and_verified",
+  "rfc": "rfcs/0017-streamer-protobuf-playback.md",
+  "user_direction": "Keep the rfc but start implimenation; to generate from proto use bin/generate artifact",
+  "generator": "bash bin/artifacts-generate.sh",
+  "schema_source": "protos/artifacts/talk-api.proto",
+  "shared_contract": "Context, Recv, Send using proto.Message directly; no alias",
+  "messages": ["ConversationPlaybackPause", "ConversationPlaybackContinue", "ConversationPlaybackFlush", "ConversationPlaybackComplete"],
+  "control_id": "Added 2026-09-10 at the maintainer's request: string id = 1, populated with the existing assistant response context ID. No new pause identity or streamer policy.",
+  "lifecycle_policy": "Preserve existing TTS lifecycle fallback; deliver and observe playback completion separately.",
+  "owners": {
+    "coordinator": ["schema and generated artifacts", "shared type/streamer contract", "channel/base", "RFC and integration verification"],
+    "adapter": ["internal/adapters", "internal/type/packet.go"],
+    "telephony": ["channel/telephony/internal", "channel/output if required", "sip/pipeline/transfer_test.go signatures"],
+    "grpc": ["channel/grpc"],
+    "webrtc": ["channel/webrtc"]
+  },
+  "verification": ["protobuf wire round trips", "focused package tests", "race tests", "explicit agent-finalize inventory", "independent implementation review"],
+  "formal_gate_approved": false,
+  "note": "The user explicitly requested implementation now and retention of the RFC. No exact-digest approval is claimed."
+}

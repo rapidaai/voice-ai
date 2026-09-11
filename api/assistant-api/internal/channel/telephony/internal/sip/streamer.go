@@ -21,6 +21,7 @@ import (
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
+	"google.golang.org/protobuf/proto"
 )
 
 type Streamer struct {
@@ -242,15 +243,15 @@ func (s *Streamer) Context() context.Context {
 	return s.Ctx
 }
 
-func (s *Streamer) Send(response internal_type.Stream) error {
+func (s *Streamer) Send(response proto.Message) error {
 	switch response.(type) {
-	case internal_type.PauseOutput, internal_type.ContinueOutput, internal_type.FlushOutput:
+	case *protos.ConversationPlaybackPause, *protos.ConversationPlaybackContinue, *protos.ConversationPlaybackFlush:
 		s.outputMu.Lock()
 		defer s.outputMu.Unlock()
 		if s.closed.Load() {
 			return sip_runtime.ErrSessionClosed
 		}
-		if _, isFlushOutput := response.(internal_type.FlushOutput); isFlushOutput {
+		if _, isFlushOutput := response.(*protos.ConversationPlaybackFlush); isFlushOutput {
 			s.pendingAssistantAudioFrames = nil
 		}
 		if s.mediaPort == nil {
@@ -268,7 +269,7 @@ func (s *Streamer) Send(response internal_type.Stream) error {
 			s.mediaPort.HandleInitialization(data)
 		}
 	case *protos.ConversationAssistantMessage:
-		switch content := data.Message.(type) {
+		switch data.Message.(type) {
 		case *protos.ConversationAssistantMessage_Audio:
 			s.outputMu.Lock()
 			defer s.outputMu.Unlock()
@@ -279,9 +280,9 @@ func (s *Streamer) Send(response internal_type.Stream) error {
 				if s.mediaPort == nil {
 					return nil
 				}
-				assistantAudioAccepted, assistantAudioError := s.mediaPort.HandleAssistantAudio(data.GetId(), content.Audio, data.GetCompleted())
+				assistantAudioAccepted, assistantAudioError := s.mediaPort.HandleAssistantAudio(data.GetId(), data.GetAudio(), data.GetCompleted())
 				if assistantAudioAccepted {
-					s.markAssistantAudioReady(content.Audio)
+					s.markAssistantAudioReady(data.GetAudio())
 				}
 				return assistantAudioError
 			}
@@ -294,10 +295,10 @@ func (s *Streamer) Send(response internal_type.Stream) error {
 					return nil
 				}
 			}
-			s.markAssistantAudioReady(content.Audio)
+			s.markAssistantAudioReady(data.GetAudio())
 			s.pendingAssistantAudioFrames = append(s.pendingAssistantAudioFrames, assistantAudioFrame{
 				responseID: data.GetId(),
-				audio:      append([]byte(nil), content.Audio...),
+				audio:      append([]byte(nil), data.GetAudio()...),
 				completed:  data.GetCompleted(),
 			})
 			return nil
@@ -401,20 +402,16 @@ func (s *Streamer) Send(response internal_type.Stream) error {
 
 func (s *Streamer) StartAssistantOutput() {
 	s.outputMu.Lock()
+	defer s.outputMu.Unlock()
 	if s.closed.Load() {
-		s.outputMu.Unlock()
 		return
 	}
 	if !s.assistantOutputActive.CompareAndSwap(false, true) {
-		s.outputMu.Unlock()
 		return
 	}
 	pendingAssistantAudioFrames := s.pendingAssistantAudioFrames
 	s.pendingAssistantAudioFrames = nil
-	s.outputMu.Unlock()
-
 	if s.mediaPort != nil {
-		s.mediaPort.StartOutput()
 		s.mediaPort.StartBridgeRecorder()
 		_ = s.Record(observability.RecordEvent{
 			Component: observability.ComponentCall,
@@ -454,6 +451,9 @@ func (s *Streamer) StartAssistantOutput() {
 			}
 		}
 	}
+	if s.mediaPort != nil {
+		s.mediaPort.StartOutput()
+	}
 }
 
 func (s *Streamer) markAssistantAudioReady(audio []byte) {
@@ -481,9 +481,13 @@ func (s *Streamer) markAssistantAudioReady(audio []byte) {
 }
 
 func (s *Streamer) EnterTransferMode(targets []string, postTransferAction, ringtoneEnum string) {
+	s.outputMu.Lock()
 	if s.mediaPort != nil && !s.mediaPort.EnterTransferMode(ringtoneEnum) {
+		s.outputMu.Unlock()
 		return
 	}
+	s.pendingAssistantAudioFrames = nil
+	s.outputMu.Unlock()
 
 	s.mu.RLock()
 	session := s.session
@@ -570,7 +574,7 @@ func (s *Streamer) SendTransferToolResult(contextID, toolID, toolName string, ac
 	})
 }
 
-func (s *Streamer) SendTransferEvent(event internal_type.Stream) {
+func (s *Streamer) SendTransferEvent(event proto.Message) {
 	s.Input(event)
 }
 

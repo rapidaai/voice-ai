@@ -17,11 +17,11 @@ import (
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	internal_exotel "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/exotel/internal"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
-	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 type fakeExotelMediaEngine struct {
@@ -49,6 +49,8 @@ func (engine *fakeExotelMediaEngine) ProcessAssistantAudio(_ []byte, _ bool) err
 func (engine *fakeExotelMediaEngine) NextOutputFrame() (internal_telephony_media.AssistantOutputFrame, bool) {
 	return internal_telephony_media.AssistantOutputFrame{}, false
 }
+
+func (engine *fakeExotelMediaEngine) OutputDrained() bool { return true }
 
 func (engine *fakeExotelMediaEngine) IdleOutputFrame() (internal_telephony_media.AssistantOutputFrame, bool) {
 	return internal_telephony_media.AssistantOutputFrame{}, false
@@ -102,7 +104,9 @@ func TestSend_EndConversation_PushesToolCallResult(t *testing.T) {
 	// The ToolCallResult should have been pushed to CriticalCh (since Input
 	// routes ConversationToolCallResult to CriticalCh).
 	select {
-	case msg := <-exotel.CriticalCh:
+	case <-exotel.CriticalCh.Ready():
+		msg, err := exotel.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		result, ok := msg.(*protos.ConversationToolCallResult)
 		require.True(t, ok, "Expected ConversationToolCallResult, got %T", msg)
 		assert.Equal(t, "tool-call-id-123", result.GetId())
@@ -152,7 +156,9 @@ func TestSend_TransferConversation_PushesFailedResult(t *testing.T) {
 
 	// Transfer is not supported for Exotel, so it should push a failed result.
 	select {
-	case msg := <-exotel.CriticalCh:
+	case <-exotel.CriticalCh.Ready():
+		msg, err := exotel.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		result, ok := msg.(*protos.ConversationToolCallResult)
 		require.True(t, ok, "Expected ConversationToolCallResult, got %T", msg)
 		assert.Equal(t, "tc-transfer", result.GetId())
@@ -199,14 +205,14 @@ func TestNewExotelWebsocketStreamer_WiresMediaSession(t *testing.T) {
 func TestSend_ConsumesOutputControls(t *testing.T) {
 	outputControlTestCases := []struct {
 		name               string
-		control            internal_type.Stream
+		control            proto.Message
 		resumeProbe        bool
 		wantLocalClears    int32
 		wantProviderClears int32
 	}{
-		{name: "pause", control: internal_type.PauseOutput{}},
-		{name: "continue", control: internal_type.ContinueOutput{}, resumeProbe: true},
-		{name: "flush", control: internal_type.FlushOutput{}, wantLocalClears: 1, wantProviderClears: 1},
+		{name: "pause", control: &protos.ConversationPlaybackPause{}},
+		{name: "continue", control: &protos.ConversationPlaybackContinue{}, resumeProbe: true},
+		{name: "flush", control: &protos.ConversationPlaybackFlush{}, wantLocalClears: 1, wantProviderClears: 1},
 	}
 
 	for _, testCase := range outputControlTestCases {
@@ -225,19 +231,21 @@ func TestSend_ConsumesOutputControls(t *testing.T) {
 				},
 			})
 			if testCase.resumeProbe {
-				_, outputControlError := streamer.mediaSession.HandleOutputControl(internal_type.PauseOutput{})
+				_, outputControlError := streamer.mediaSession.HandleOutputControl(&protos.ConversationPlaybackPause{})
 				require.NoError(t, outputControlError)
 				providerClearCount.Store(0)
 			}
 
 			require.NoError(t, streamer.Send(testCase.control))
 			if testCase.resumeProbe {
-				require.NoError(t, streamer.Send(internal_type.PauseOutput{}))
+				require.NoError(t, streamer.Send(&protos.ConversationPlaybackPause{}))
 			}
 			assert.Equal(t, testCase.wantLocalClears, mediaEngine.clearCount.Load())
 			assert.Equal(t, testCase.wantProviderClears, providerClearCount.Load())
 			select {
-			case output := <-streamer.OutputCh:
+			case <-streamer.OutputCh.Ready():
+				output, err := streamer.OutputCh.TryReceive()
+				require.NoError(t, err)
 				t.Fatalf("output control was forwarded: %T", output)
 			default:
 			}
@@ -273,7 +281,9 @@ func TestHandleMediaEvent_EmitsBridgeUserAudio(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case stream := <-exotel.LowCh:
+	case <-exotel.LowCh.Ready():
+		stream, err := exotel.LowCh.TryReceive()
+		require.NoError(t, err)
 		bridgeAudio, ok := stream.(*protos.ConversationBridgeUserAudio)
 		require.True(t, ok, "expected bridge user audio, got %T", stream)
 		assert.NotEmpty(t, bridgeAudio.GetAudio())
@@ -334,7 +344,9 @@ func TestSend_TransferConversation_NoToolId_StillPushesFailedResult(t *testing.T
 
 	// Transfer failure should still emit a failed result even when ToolId is empty.
 	select {
-	case msg := <-exotel.CriticalCh:
+	case <-exotel.CriticalCh.Ready():
+		msg, err := exotel.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		result, ok := msg.(*protos.ConversationToolCallResult)
 		require.True(t, ok, "Expected ConversationToolCallResult, got %T", msg)
 		assert.Equal(t, "tc-no-tool", result.GetId())

@@ -47,6 +47,7 @@ type DispatchHandler interface {
 	HandleTextToSpeechDone(context.Context, internal_type.TextToSpeechDonePacket)
 	HandleTextToSpeechAudio(context.Context, internal_type.TextToSpeechAudioPacket)
 	HandleTextToSpeechEnd(context.Context, internal_type.TextToSpeechEndPacket)
+	HandlePlaybackCompleted(context.Context, internal_type.PlaybackCompletedPacket)
 	HandleLLMToolCall(context.Context, internal_type.LLMToolCallPacket)
 	HandleLLMToolResult(context.Context, internal_type.LLMToolResultPacket)
 	HandleRecordUserAudio(context.Context, internal_type.RecordUserAudioPacket)
@@ -170,6 +171,8 @@ func DispatchPacket(ctx context.Context, p internal_type.Packet, handler Dispatc
 		handler.HandleTextToSpeechAudio(ctx, vl)
 	case internal_type.TextToSpeechEndPacket:
 		handler.HandleTextToSpeechEnd(ctx, vl)
+	case internal_type.PlaybackCompletedPacket:
+		handler.HandlePlaybackCompleted(ctx, vl)
 	case internal_type.LLMToolCallPacket:
 		handler.HandleLLMToolCall(ctx, vl)
 	case internal_type.LLMToolResultPacket:

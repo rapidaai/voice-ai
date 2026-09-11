@@ -2,6 +2,8 @@ package internal_vobiz_telephony
 
 import (
 	"context"
+	"github.com/rapidaai/protos"
+	"google.golang.org/protobuf/proto"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -10,7 +12,6 @@ import (
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
-	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,6 +32,8 @@ func (*fakeVobizMediaEngine) NextOutputFrame() (internal_telephony_media.Assista
 	return internal_telephony_media.AssistantOutputFrame{}, false
 }
 
+func (*fakeVobizMediaEngine) OutputDrained() bool { return true }
+
 func (*fakeVobizMediaEngine) IdleOutputFrame() (internal_telephony_media.AssistantOutputFrame, bool) {
 	return internal_telephony_media.AssistantOutputFrame{}, false
 }
@@ -50,14 +53,14 @@ func (*fakeVobizMediaEngine) OutputFrameDuration() time.Duration {
 func TestSend_ConsumesOutputControls(t *testing.T) {
 	outputControlTestCases := []struct {
 		name               string
-		control            internal_type.Stream
+		control            proto.Message
 		resumeProbe        bool
 		wantLocalClears    int32
 		wantProviderClears int32
 	}{
-		{name: "pause", control: internal_type.PauseOutput{}},
-		{name: "continue", control: internal_type.ContinueOutput{}, resumeProbe: true},
-		{name: "flush", control: internal_type.FlushOutput{}, wantLocalClears: 1, wantProviderClears: 1},
+		{name: "pause", control: &protos.ConversationPlaybackPause{}},
+		{name: "continue", control: &protos.ConversationPlaybackContinue{}, resumeProbe: true},
+		{name: "flush", control: &protos.ConversationPlaybackFlush{}, wantLocalClears: 1, wantProviderClears: 1},
 	}
 
 	for _, testCase := range outputControlTestCases {
@@ -76,19 +79,21 @@ func TestSend_ConsumesOutputControls(t *testing.T) {
 				},
 			})
 			if testCase.resumeProbe {
-				_, outputControlError := streamer.mediaSession.HandleOutputControl(internal_type.PauseOutput{})
+				_, outputControlError := streamer.mediaSession.HandleOutputControl(&protos.ConversationPlaybackPause{})
 				require.NoError(t, outputControlError)
 				providerClearCount.Store(0)
 			}
 
 			require.NoError(t, streamer.Send(testCase.control))
 			if testCase.resumeProbe {
-				require.NoError(t, streamer.Send(internal_type.PauseOutput{}))
+				require.NoError(t, streamer.Send(&protos.ConversationPlaybackPause{}))
 			}
 			assert.Equal(t, testCase.wantLocalClears, mediaEngine.clearCount.Load())
 			assert.Equal(t, testCase.wantProviderClears, providerClearCount.Load())
 			select {
-			case output := <-streamer.OutputCh:
+			case <-streamer.OutputCh.Ready():
+				output, err := streamer.OutputCh.TryReceive()
+				require.NoError(t, err)
 				t.Fatalf("output control was forwarded: %T", output)
 			default:
 			}

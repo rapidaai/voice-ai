@@ -119,6 +119,7 @@ const (
 	PacketNameTextToSpeechDone                           PacketName = "TextToSpeechDonePacket"
 	PacketNameTextToSpeechAudio                          PacketName = "TextToSpeechAudioPacket"
 	PacketNameTextToSpeechEnd                            PacketName = "TextToSpeechEndPacket"
+	PacketNamePlaybackCompleted                          PacketName = "PlaybackCompletedPacket"
 	PacketNameRecordUserAudio                            PacketName = "RecordUserAudioPacket"
 	PacketNameRecordAssistantAudio                       PacketName = "RecordAssistantAudioPacket"
 	PacketNameConversationRecordingCompleted             PacketName = "ConversationRecordingCompletedPacket"
@@ -464,6 +465,7 @@ func (f TurnChangePacket) PacketName() PacketName { return PacketNameTurnChange 
 type InjectMessagePacket struct {
 	ContextID string
 	Text      string
+	Interim   bool
 }
 
 func (f InjectMessagePacket) ContextId() string      { return f.ContextID }
@@ -1094,8 +1096,10 @@ func (f StopIdleTimeoutPacket) PacketName() PacketName { return PacketNameStopId
 
 // IdleTimeoutExpiredPacket signals that the idle timeout watchdog expired.
 type IdleTimeoutExpiredPacket struct {
-	ContextID string
-	Count     uint64
+	ContextID  string
+	Count      uint64
+	Generation uint64
+	Deadline   time.Time
 }
 
 func (f IdleTimeoutExpiredPacket) ContextId() string      { return f.ContextID }
@@ -1278,6 +1282,7 @@ const (
 	TTSAuthentication
 	TTSInvalidInput
 	TTSSystemPanic
+	TTSPlaybackTimeout
 )
 
 type TextToSpeechErrorPacket struct {
@@ -1289,7 +1294,7 @@ type TextToSpeechErrorPacket struct {
 func (f TextToSpeechErrorPacket) ContextId() string      { return f.ContextID }
 func (f TextToSpeechErrorPacket) PacketName() PacketName { return PacketNameTextToSpeechError }
 func (f TextToSpeechErrorPacket) IsRecoverable() bool {
-	return f.Type != TTSAuthentication
+	return f.Type != TTSAuthentication && f.Type != TTSPlaybackTimeout
 }
 func (f TextToSpeechErrorPacket) Err() error         { return f.Error }
 func (f TextToSpeechErrorPacket) ErrMessage() string { return fmt.Sprintf("tts: %s", f.Error.Error()) }
@@ -1328,6 +1333,16 @@ type TextToSpeechEndPacket struct {
 
 func (f TextToSpeechEndPacket) ContextId() string      { return f.ContextID }
 func (f TextToSpeechEndPacket) PacketName() PacketName { return PacketNameTextToSpeechEnd }
+
+// PlaybackCompletedPacket carries a streamer's playback receipt and segment identity.
+type PlaybackCompletedPacket struct {
+	ContextID   string
+	CompletedAt time.Time
+	ReceivedAt  time.Time
+}
+
+func (f PlaybackCompletedPacket) ContextId() string      { return f.ContextID }
+func (f PlaybackCompletedPacket) PacketName() PacketName { return PacketNamePlaybackCompleted }
 
 // =============================================================================
 // Recording

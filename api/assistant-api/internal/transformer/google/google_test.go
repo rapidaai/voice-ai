@@ -1,10 +1,13 @@
 package internal_transformer_google
 
 import (
+	"errors"
 	"testing"
 
 	"cloud.google.com/go/speech/apiv2/speechpb"
 	"cloud.google.com/go/texttospeech/apiv1/texttospeechpb"
+	"github.com/rapidaai/api/assistant-api/internal/observability"
+	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -175,6 +178,34 @@ func TestTextToSpeechOptions_Defaults(t *testing.T) {
 	assert.Equal(t, DefaultVoice, ttsOpts.Voice.Name)
 	assert.Equal(t, texttospeechpb.AudioEncoding_PCM, ttsOpts.StreamingAudioConfig.AudioEncoding)
 	assert.Equal(t, int32(16000), ttsOpts.StreamingAudioConfig.SampleRateHertz)
+}
+
+func TestGoogleStreamTimeoutEmitsErrorWithoutEnd(t *testing.T) {
+	var packets []internal_type.Packet
+	tts := &googleTextToSpeech{
+		contextId: "ctx-google",
+		logger:    newTestLogger(),
+		onPacket: func(pkts ...internal_type.Packet) error {
+			packets = append(packets, pkts...)
+			return nil
+		},
+	}
+
+	tts.failStream("fallback", errors.New("google-tts: stream timed out: Stream aborted due to long duration elapsed without input sent"))
+
+	assert.Len(t, packets, 2)
+	errorPacket, ok := packets[0].(internal_type.TextToSpeechErrorPacket)
+	assert.True(t, ok)
+	assert.Equal(t, "ctx-google", errorPacket.ContextID)
+	assert.Equal(t, internal_type.TTSNetworkTimeout, errorPacket.Type)
+	assert.Contains(t, errorPacket.ErrMessage(), "stream timed out")
+	logPacket, ok := packets[1].(internal_type.ObservabilityLogRecordPacket)
+	assert.True(t, ok)
+	assert.Equal(t, observability.LevelError, logPacket.Record.Level)
+	for _, packet := range packets {
+		_, ok := packet.(internal_type.TextToSpeechEndPacket)
+		assert.False(t, ok)
+	}
 }
 
 func TestTextToSpeechOptions_WithEmptyVoiceOverride(t *testing.T) {

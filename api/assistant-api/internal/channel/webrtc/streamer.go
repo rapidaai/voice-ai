@@ -35,8 +35,10 @@ import (
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -91,8 +93,13 @@ type webrtcStreamer struct {
 	outputPaused            bool
 	outputFlushed           bool
 	outputClearPending      bool
-	outputContextID         string
-	flushedOutputContextID  string
+	outputPlayback          *webrtc_internal.OutputPlayback
+	outputPlaybacks         map[string]*webrtc_internal.OutputPlayback
+	flushedOutputIDs        map[string]struct{}
+	currentOutputPlayback   *webrtc_internal.OutputPlayback
+	assistantPlayback       *webrtc_internal.OutputPlayback
+	currentOutputTerminal   bool
+	currentOutputConverted  bool
 	currentOutputFrame      []byte
 	outputGeneration        uint64
 	currentOutputGeneration uint64
@@ -374,6 +381,7 @@ func (s *webrtcStreamer) stopMediaSession() {
 	if peerConnection != nil {
 		peerConnection.Close()
 	}
+	s.clearBufferedOutputAudio()
 	s.mediaWorkers.Wait()
 }
 
@@ -426,10 +434,21 @@ func (s *webrtcStreamer) createPeer(mediaSessionID uint64) error {
 				return fmt.Errorf("failed to set ICE address rewrite rules: %w", err)
 			}
 		}
-		if s.serverConfig.UDPPortRangeStart > 0 && s.serverConfig.UDPPortRangeEnd > 0 {
+		if s.serverConfig.UDPPortRangeStart != 0 || s.serverConfig.UDPPortRangeEnd != 0 {
+			udpPortRangeStart, err := utils.Int64ToUint16(int64(s.serverConfig.UDPPortRangeStart))
+			if err != nil {
+				return fmt.Errorf("invalid UDP port range start: %w", err)
+			}
+			udpPortRangeEnd, err := utils.Int64ToUint16(int64(s.serverConfig.UDPPortRangeEnd))
+			if err != nil {
+				return fmt.Errorf("invalid UDP port range end: %w", err)
+			}
+			if udpPortRangeStart == 0 || udpPortRangeEnd == 0 {
+				return fmt.Errorf("UDP port range must specify both start and end ports")
+			}
 			if err := settingEngine.SetEphemeralUDPPortRange(
-				uint16(s.serverConfig.UDPPortRangeStart),
-				uint16(s.serverConfig.UDPPortRangeEnd),
+				udpPortRangeStart,
+				udpPortRangeEnd,
 			); err != nil {
 				return fmt.Errorf("failed to set UDP port range: %w", err)
 			}
@@ -1110,16 +1129,16 @@ func (s *webrtcStreamer) enqueueOutputAudio(frame []byte) {
 	}
 }
 
-func (s *webrtcStreamer) popOutputAudio() []byte {
+func (s *webrtcStreamer) popOutputAudio() webrtc_internal.OutputAudioFrame {
 	s.outputAudioQueueMu.Lock()
 	defer s.outputAudioQueueMu.Unlock()
 	if len(s.outputAudioQueue) == 0 {
-		return nil
+		return webrtc_internal.OutputAudioFrame{}
 	}
 	outputFrame := s.outputAudioQueue[0]
 	s.outputAudioQueue[0] = webrtc_internal.OutputAudioFrame{}
 	s.outputAudioQueue = s.outputAudioQueue[1:]
-	return outputFrame.Audio
+	return outputFrame
 }
 
 func (s *webrtcStreamer) clearOutputAudio() int {
@@ -1150,11 +1169,18 @@ func (s *webrtcStreamer) NextFrame() []byte {
 		return s.currentOutputFrame
 	}
 	frame := s.popOutputAudio()
-	if len(frame) == 0 {
+	if len(frame.Audio) == 0 && !frame.Terminal {
 		return nil
 	}
 	s.sessionState.StampPacedAssistantFrame(mediaSessionID)
-	s.currentOutputFrame = s.applyAmbientToFrame(frame)
+	s.currentOutputFrame = s.applyAmbientToFrame(frame.Audio)
+	if frame.Terminal {
+		// The terminal marker drives the remaining converter output through the pacer.
+		s.currentOutputFrame = make([]byte, webrtc_internal.WebRTCOutputPCM16kFrameBytes)
+	}
+	s.currentOutputPlayback = frame.Playback
+	s.currentOutputTerminal = frame.Terminal
+	s.currentOutputConverted = false
 	s.currentOutputGeneration = s.outputGeneration
 	return s.currentOutputFrame
 }
@@ -1175,74 +1201,132 @@ func (s *webrtcStreamer) IdleFrame() []byte {
 	if len(s.currentOutputFrame) > 0 {
 		return s.currentOutputFrame
 	}
+	if s.assistantPlayback != nil {
+		// A response gap must not replace the converter's pending assistant audio.
+		return nil
+	}
 	s.sessionState.StampPacedAssistantFrame(mediaSessionID)
 	s.currentOutputFrame = s.applyAmbientToFrame(nil)
+	s.currentOutputPlayback = nil
+	s.currentOutputTerminal = false
+	s.currentOutputConverted = false
 	s.currentOutputGeneration = s.outputGeneration
 	return s.currentOutputFrame
 }
 
-func (s *webrtcStreamer) ConsumeFrame(assistantPCM16k []byte) error {
+func (s *webrtcStreamer) ConsumeFrame(assistantPCM16k []byte) (writeErr error) {
+	s.outputWriteMu.Lock()
 	s.outputStateMu.Lock()
-	if s.outputPaused || len(s.currentOutputFrame) == 0 {
+	var bridgeAudio *protos.ConversationBridgeOperatorAudio
+	var complete *protos.ConversationPlaybackComplete
+	defer func() {
+		if writeErr != nil {
+			if s.currentOutputPlayback != nil {
+				s.currentOutputPlayback.Failed = true
+			}
+			s.currentOutputFrame = nil
+			s.assistantPCM48k = nil
+		}
+		if len(s.currentOutputFrame) == 0 {
+			s.currentOutputConverted = false
+		}
 		s.outputStateMu.Unlock()
+		s.outputWriteMu.Unlock()
+		if bridgeAudio != nil {
+			s.Input(bridgeAudio)
+		}
+		if complete != nil {
+			s.Input(complete)
+		}
+	}()
+	if s.outputPaused || s.outputClearPending || len(s.currentOutputFrame) == 0 {
+		return nil
+	}
+	playback := s.currentOutputPlayback
+	if s.Ctx.Err() != nil || s.currentOutputGeneration != s.outputGeneration || !s.sessionState.CanWritePacedAssistantFrame() ||
+		(playback != nil && !s.sessionState.IsActiveMediaSession(playback.MediaSessionID)) {
+		if playback != nil {
+			playback.Failed = true
+		}
+		s.currentOutputFrame = nil
 		return nil
 	}
 	assistantPCM16k = s.currentOutputFrame
-	outputGeneration := s.currentOutputGeneration
-	s.currentOutputFrame = nil
-	s.outputStateMu.Unlock()
-	s.outputWriteMu.Lock()
-	defer s.outputWriteMu.Unlock()
-	s.outputStateMu.Lock()
-	canWriteOutput := outputGeneration == s.outputGeneration && !s.outputPaused && !s.outputClearPending
-	s.outputStateMu.Unlock()
-	if !canWriteOutput || !s.sessionState.CanWritePacedAssistantFrame() {
-		return nil
+	s.assistantResampleMu.Lock()
+	if s.assistantPlayback != playback {
+		if s.assistantWriter != nil {
+			writeErr = s.assistantWriter.Flush()
+		}
+		s.assistantPCM48k = nil
+		s.assistantPlayback = playback
 	}
-
-	var assistantPCM48k []byte
-	if s.assistantWriter != nil {
-		s.assistantResampleMu.Lock()
-		s.assistantPCM48k = s.assistantPCM48k[:0]
-		err := s.assistantWriter.Write(assistantPCM16k)
-		assistantPCM48k = append(assistantPCM48k, s.assistantPCM48k...)
-		s.assistantPCM48k = s.assistantPCM48k[:0]
-		s.assistantResampleMu.Unlock()
+	if writeErr == nil && !s.currentOutputConverted {
+		if s.assistantWriter != nil {
+			if s.currentOutputTerminal {
+				writeErr = s.assistantWriter.Flush()
+			} else {
+				writeErr = s.assistantWriter.Write(assistantPCM16k)
+			}
+		} else if !s.currentOutputTerminal {
+			var converted []byte
+			converted, writeErr = s.resampler.Resample(assistantPCM16k, internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG, internal_audio.WEBRTC_AUDIO_CONFIG)
+			s.assistantPCM48k = append(s.assistantPCM48k, converted...)
+		} else if playback != nil {
+			// Legacy resamplers do not expose a drain operation.
+			playback.Failed = true
+		}
+		s.currentOutputConverted = true
+	}
+	s.assistantResampleMu.Unlock()
+	if writeErr != nil {
+		return writeErr
+	}
+	frameBytes := webrtc_internal.WebRTCOutputPCM16kFrameBytes * 3
+	if len(s.assistantPCM48k) >= frameBytes || (s.currentOutputTerminal && len(s.assistantPCM48k) > 0) {
+		pcm := make([]byte, frameBytes)
+		consumed := copy(pcm, s.assistantPCM48k)
+		assistantOpus, err := s.opusCodec.Encode(pcm)
 		if err != nil {
 			return err
 		}
-	} else {
-		var err error
-		assistantPCM48k, err = s.resampler.Resample(assistantPCM16k, internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG, internal_audio.WEBRTC_AUDIO_CONFIG)
-		if err != nil {
+		if !s.sessionState.CanWritePacedAssistantFrame() {
+			if playback != nil {
+				playback.Failed = true
+			}
+			s.currentOutputFrame = nil
+			return nil
+		}
+		if err := s.writeAudioFrame(assistantOpus); err != nil {
+			s.Mu.Lock()
+			s.mediaHealthState.RecordAssistantFrameWriteFailure(time.Now())
+			s.Mu.Unlock()
 			return err
 		}
-	}
-	if len(assistantPCM48k) == 0 {
-		return nil
-	}
-	assistantOpus, err := s.opusCodec.Encode(assistantPCM48k)
-	if err != nil {
-		return err
-	}
-
-	if !s.sessionState.CanWritePacedAssistantFrame() {
-		return nil
-	}
-	if err := s.writeAudioFrame(assistantOpus); err != nil {
+		s.assistantPCM48k = s.assistantPCM48k[consumed:]
+		assistantFrameSentAt := time.Now()
+		if playback != nil {
+			playback.Sent = true
+		}
+		if !s.currentOutputTerminal {
+			bridgeAudio = &protos.ConversationBridgeOperatorAudio{Audio: assistantPCM16k, Time: timestamppb.New(assistantFrameSentAt)}
+		}
 		s.Mu.Lock()
-		s.mediaHealthState.RecordAssistantFrameWriteFailure(time.Now())
+		s.mediaHealthState.RecordAssistantFrameSent(assistantFrameSentAt)
 		s.Mu.Unlock()
-		return err
 	}
-	assistantFrameSentAt := time.Now()
-	s.Input(&protos.ConversationBridgeOperatorAudio{
-		Audio: assistantPCM16k,
-		Time:  timestamppb.New(assistantFrameSentAt),
-	})
-	s.Mu.Lock()
-	s.mediaHealthState.RecordAssistantFrameSent(assistantFrameSentAt)
-	s.Mu.Unlock()
+	if s.currentOutputTerminal && len(s.assistantPCM48k) == 0 {
+		if playback != nil && playback.ID != "" && playback.HasAudio && playback.Sent && !playback.Failed &&
+			playback.Generation == s.outputGeneration && s.sessionState.CanWritePacedAssistantFrame() && s.Ctx.Err() == nil {
+			complete = &protos.ConversationPlaybackComplete{
+				Id:   playback.ID,
+				Time: timestamppb.Now(),
+			}
+		}
+		s.currentOutputFrame = nil
+		s.assistantPlayback = nil
+	} else if !s.currentOutputTerminal && len(s.assistantPCM48k) < frameBytes {
+		s.currentOutputFrame = nil
+	}
 	return nil
 }
 
@@ -1266,7 +1350,6 @@ func (s *webrtcStreamer) handleConfigurationMessage(mode protos.StreamMode) {
 			return
 		}
 		s.sessionState.SetMediaState(webrtc_internal.MediaStateAudioNegotiating)
-		s.clearBufferedOutputAudio()
 		s.signalClear()
 		s.sessionState.ResetMediaRestartAttempts()
 		if err := s.startMediaSession(); err != nil {
@@ -1312,9 +1395,8 @@ func (s *webrtcStreamer) handleConfigurationMessage(mode protos.StreamMode) {
 		if currentMode == protos.StreamMode_STREAM_MODE_TEXT && mediaState == webrtc_internal.MediaStateText {
 			return
 		}
-		s.clearBufferedOutputAudio()
-		s.signalClear()
 		s.stopMediaSessionAndFallbackToText()
+		s.signalClear()
 	}
 }
 
@@ -1329,7 +1411,6 @@ func (s *webrtcStreamer) queueClientSignal(signaling *protos.ClientSignaling) {
 }
 
 func (s *webrtcStreamer) stopMediaSessionAndFallbackToText() {
-	s.clearBufferedOutputAudio()
 	if s.ambientMixer != nil {
 		s.ambientMixer.Reset()
 	}
@@ -1475,41 +1556,77 @@ func (s *webrtcStreamer) clearNegotiationState(peerConnection *pionwebrtc.PeerCo
 	s.signalOfferSent = true
 }
 
-func (s *webrtcStreamer) Send(response internal_type.Stream) error {
+func (s *webrtcStreamer) Send(response proto.Message) error {
 	switch data := response.(type) {
-	case internal_type.PauseOutput:
+	case *protos.ConversationPlaybackPause:
+		s.outputWriteMu.Lock()
 		s.outputStateMu.Lock()
 		if !s.outputFlushed {
 			s.outputPaused = true
 		}
 		s.outputStateMu.Unlock()
+		s.outputWriteMu.Unlock()
 		return nil
-	case internal_type.ContinueOutput:
+	case *protos.ConversationPlaybackContinue:
 		s.outputStateMu.Lock()
 		if !s.outputFlushed {
 			s.outputPaused = false
 		}
 		s.outputStateMu.Unlock()
 		return nil
-	case internal_type.FlushOutput:
+	case *protos.ConversationPlaybackFlush:
 		s.outputWriteMu.Lock()
 		s.outputStateMu.Lock()
+		s.outputPaused = false
+		if s.flushedOutputIDs == nil {
+			s.flushedOutputIDs = make(map[string]struct{})
+		}
+		if data.GetId() != "" {
+			s.flushedOutputIDs[data.GetId()] = struct{}{}
+		}
 		if s.outputFlushed {
 			s.outputStateMu.Unlock()
 			s.outputWriteMu.Unlock()
 			return nil
 		}
-		s.outputPaused = false
 		s.outputFlushed = true
 		s.outputClearPending = true
 		s.outputGeneration++
 		s.pendingClearGeneration = s.outputGeneration
-		s.flushedOutputContextID = s.outputContextID
+		for _, playback := range s.outputPlaybacks {
+			if playback.ID != "" {
+				s.flushedOutputIDs[playback.ID] = struct{}{}
+			}
+			playback.Failed = true
+		}
+		for _, playback := range []*webrtc_internal.OutputPlayback{s.outputPlayback, s.currentOutputPlayback, s.assistantPlayback} {
+			if playback != nil && playback.ID != "" {
+				s.flushedOutputIDs[playback.ID] = struct{}{}
+			}
+		}
+		s.outputAudioQueueMu.Lock()
+		for _, frame := range s.outputAudioQueue {
+			if frame.Playback != nil && frame.Playback.ID != "" {
+				s.flushedOutputIDs[frame.Playback.ID] = struct{}{}
+			}
+		}
+		s.outputAudioQueueMu.Unlock()
 		s.audioBufferState.OutputAudioBufferMu.Lock()
 		s.audioBufferState.OutputAudioBuffer.Reset()
 		s.audioBufferState.OutputAudioBufferMu.Unlock()
 		s.currentOutputFrame = nil
+		s.currentOutputPlayback = nil
+		s.currentOutputTerminal = false
+		s.currentOutputConverted = false
 		s.currentOutputGeneration = 0
+		s.assistantResampleMu.Lock()
+		var flushErr error
+		if s.assistantWriter != nil {
+			flushErr = s.assistantWriter.Flush()
+		}
+		s.assistantPCM48k = nil
+		s.assistantPlayback = nil
+		s.assistantResampleMu.Unlock()
 		clearedFrames := s.clearOutputAudio()
 		clearGeneration := s.pendingClearGeneration
 		s.outputStateMu.Unlock()
@@ -1533,13 +1650,15 @@ func (s *webrtcStreamer) Send(response internal_type.Stream) error {
 		case s.outputClearCh <- clearGeneration:
 		case <-s.Ctx.Done():
 		}
-		return nil
+		return flushErr
 	case *protos.ConversationAssistantMessage:
 		switch content := data.Message.(type) {
 		case *protos.ConversationAssistantMessage_Audio:
-			s.bufferAndSendOutput(data.GetId(), content.Audio)
+			s.bufferAndSendOutput(data.GetId(), content.Audio, data.GetCompleted())
 			return nil
 		case *protos.ConversationAssistantMessage_Text:
+			s.Output(data)
+		case nil:
 			s.Output(data)
 		}
 	case *protos.ConversationConfiguration:
@@ -1662,7 +1781,9 @@ func (s *webrtcStreamer) Close() error {
 		s.userWriter.Close()
 	}
 	if s.assistantWriter != nil {
+		s.outputWriteMu.Lock()
 		s.assistantWriter.Close()
+		s.outputWriteMu.Unlock()
 	}
 	if s.userWriter == nil && s.resampler != nil {
 		s.resampler.Close()

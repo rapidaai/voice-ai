@@ -50,29 +50,78 @@ func (s *webrtcStreamer) bufferAndSendInput(audio []byte, inputAudioReceivedAt t
 	})
 }
 
-func (s *webrtcStreamer) bufferAndSendOutput(contextID string, audio []byte) {
+func (s *webrtcStreamer) bufferAndSendOutput(contextID string, audio []byte, terminal bool) {
 	s.outputStateMu.Lock()
+	if contextID != "" {
+		if _, flushed := s.flushedOutputIDs[contextID]; flushed {
+			s.outputStateMu.Unlock()
+			return
+		}
+	}
 	if contextID == "" && s.outputFlushed {
 		s.outputStateMu.Unlock()
 		return
 	}
-	if contextID != "" {
-		if contextID == s.flushedOutputContextID {
+	if contextID == "" {
+		if len(audio) == 0 && (s.outputPlayback == nil || s.outputPlayback.ID != "") {
 			s.outputStateMu.Unlock()
 			return
 		}
-		if s.outputContextID != contextID {
+		if len(audio) > 0 && (s.outputPlayback == nil || s.outputPlayback.ID != "" || s.outputPlayback.TerminalQueued) {
+			if s.outputPlayback != nil && !s.outputPlayback.TerminalQueued {
+				s.outputPlayback.Failed = true
+			}
+			s.outputPlayback = &webrtc_internal.OutputPlayback{
+				MediaSessionID: s.sessionState.ActiveMediaSessionID(),
+				Generation:     s.outputGeneration,
+			}
+		}
+	}
+	if contextID != "" {
+		playback := s.outputPlaybacks[contextID]
+		if playback != nil && (playback.Generation != s.outputGeneration ||
+			!s.sessionState.IsActiveMediaSession(playback.MediaSessionID)) {
+			s.outputStateMu.Unlock()
+			return
+		}
+		if playback != nil && playback.TerminalQueued {
+			playback = nil
+			s.outputStateMu.Unlock()
+			return
+		}
+		if playback == nil {
+			playback = &webrtc_internal.OutputPlayback{
+				ID:             contextID,
+				MediaSessionID: s.sessionState.ActiveMediaSessionID(),
+				Generation:     s.outputGeneration,
+			}
+			if s.outputPlaybacks == nil {
+				s.outputPlaybacks = make(map[string]*webrtc_internal.OutputPlayback)
+			}
+			s.outputPlaybacks[contextID] = playback
+		}
+		if s.outputPlayback != playback {
 			s.audioBufferState.OutputAudioBufferMu.Lock()
+			if s.outputPlayback != nil && !s.outputPlayback.TerminalQueued {
+				s.outputPlayback.Failed = true
+			}
 			s.audioBufferState.OutputAudioBuffer.Reset()
 			s.audioBufferState.OutputAudioBufferMu.Unlock()
-			s.outputContextID = contextID
+			s.outputPlayback = playback
 		}
 		s.outputFlushed = false
+	}
+	if s.outputPlayback != nil {
+		if s.outputPlayback.TerminalQueued {
+			s.outputStateMu.Unlock()
+			return
+		}
+		s.outputPlayback.HasAudio = s.outputPlayback.HasAudio || len(audio) > 0
 	}
 
 	s.audioBufferState.OutputAudioBufferMu.Lock()
 	s.audioBufferState.OutputAudioBuffer.Write(audio)
-	if s.audioBufferState.OutputAudioBuffer.Len() < webrtc_internal.WebRTCOutputPCM16kFrameBytes {
+	if !terminal && s.audioBufferState.OutputAudioBuffer.Len() < webrtc_internal.WebRTCOutputPCM16kFrameBytes {
 		s.audioBufferState.OutputAudioBufferMu.Unlock()
 		s.outputStateMu.Unlock()
 		return
@@ -83,17 +132,21 @@ func (s *webrtcStreamer) bufferAndSendOutput(contextID string, audio []byte) {
 		droppedFrames int
 		queueDepth    int
 	}
-	for s.audioBufferState.OutputAudioBuffer.Len() >= webrtc_internal.WebRTCOutputPCM16kFrameBytes {
+	for s.audioBufferState.OutputAudioBuffer.Len() >= webrtc_internal.WebRTCOutputPCM16kFrameBytes || (terminal && s.audioBufferState.OutputAudioBuffer.Len() > 0) {
 		frame := make([]byte, webrtc_internal.WebRTCOutputPCM16kFrameBytes)
 		s.audioBufferState.OutputAudioBuffer.Read(frame)
 		assistantAudioQueuedAt := time.Now()
 		outputFrame := webrtc_internal.OutputAudioFrame{
 			Audio:    frame,
 			QueuedAt: assistantAudioQueuedAt,
+			Playback: s.outputPlayback,
 		}
 		droppedFrames := 0
 		s.outputAudioQueueMu.Lock()
 		if webrtc_internal.OutputAudioQueueMaxFrames > 0 && len(s.outputAudioQueue) >= webrtc_internal.OutputAudioQueueMaxFrames {
+			if playback := s.outputAudioQueue[0].Playback; playback != nil {
+				playback.Failed = true
+			}
 			s.outputAudioQueue[0] = webrtc_internal.OutputAudioFrame{}
 			copy(s.outputAudioQueue, s.outputAudioQueue[1:])
 			s.outputAudioQueue[len(s.outputAudioQueue)-1] = outputFrame
@@ -108,6 +161,28 @@ func (s *webrtcStreamer) bufferAndSendOutput(contextID string, audio []byte) {
 			droppedFrames int
 			queueDepth    int
 		}{assistantAudioQueuedAt, droppedFrames, outputQueueDepth})
+	}
+	if terminal && s.outputPlayback != nil {
+		s.outputPlayback.TerminalQueued = true
+	}
+	if terminal && s.outputPlayback != nil && s.outputPlayback.HasAudio {
+		s.outputAudioQueueMu.Lock()
+		if webrtc_internal.OutputAudioQueueMaxFrames > 0 && len(s.outputAudioQueue) >= webrtc_internal.OutputAudioQueueMaxFrames {
+			if playback := s.outputAudioQueue[0].Playback; playback != nil {
+				playback.Failed = true
+			}
+			s.outputAudioQueue[0] = webrtc_internal.OutputAudioFrame{}
+			s.outputAudioQueue = s.outputAudioQueue[1:]
+			audioEnqueueResults = append(audioEnqueueResults, struct {
+				queuedAt      time.Time
+				droppedFrames int
+				queueDepth    int
+			}{time.Now(), webrtc_internal.OutputAudioDropOldestSize, len(s.outputAudioQueue) + 1})
+		}
+		s.outputAudioQueue = append(s.outputAudioQueue, webrtc_internal.OutputAudioFrame{
+			Playback: s.outputPlayback, Terminal: true,
+		})
+		s.outputAudioQueueMu.Unlock()
 	}
 	s.audioBufferState.OutputAudioBufferMu.Unlock()
 	s.outputStateMu.Unlock()
@@ -151,13 +226,24 @@ func (s *webrtcStreamer) clearBufferedOutputAudio() {
 	s.audioBufferState.OutputAudioBuffer.Reset()
 	s.audioBufferState.OutputAudioBufferMu.Unlock()
 	s.currentOutputFrame = nil
+	s.currentOutputPlayback = nil
+	s.currentOutputTerminal = false
+	s.currentOutputConverted = false
 	s.currentOutputGeneration = 0
+	s.assistantResampleMu.Lock()
+	if s.assistantWriter != nil {
+		if err := s.assistantWriter.Flush(); err != nil && s.Logger != nil {
+			s.Logger.Warnw("Failed to discard WebRTC output resampler tail", "error", err)
+		}
+	}
+	s.assistantPCM48k = nil
+	s.assistantPlayback = nil
+	s.assistantResampleMu.Unlock()
 	s.clearOutputAudio()
 	s.outputPaused = false
 	s.outputFlushed = false
 	s.outputClearPending = false
-	s.outputContextID = ""
-	s.flushedOutputContextID = ""
+	s.outputPlayback = nil
 	s.outputGeneration++
 	s.pendingClearGeneration = 0
 	s.outputStateMu.Unlock()

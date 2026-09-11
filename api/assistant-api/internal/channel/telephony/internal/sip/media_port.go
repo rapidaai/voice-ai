@@ -18,6 +18,7 @@ import (
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
+	"google.golang.org/protobuf/proto"
 )
 
 type MediaPortConfig struct {
@@ -25,7 +26,7 @@ type MediaPortConfig struct {
 	Logger     commons.Logger
 	Session    *sip_runtime.Session
 	RTPHandler rtpHandler
-	StreamSink func(internal_type.Stream)
+	StreamSink func(proto.Message)
 	RecordSink func(...observability.Record) error
 }
 
@@ -36,7 +37,7 @@ type MediaPort struct {
 	rtpHandler     rtpHandler
 	audioProcessor *AudioProcessor
 	mediaSession   *internal_telephony_media.MediaSession
-	streamSink     func(internal_type.Stream)
+	streamSink     func(proto.Message)
 	record         func(...observability.Record) error
 
 	ctx                     context.Context
@@ -187,7 +188,7 @@ func (port *MediaPort) HandleInitialization(init *protos.ConversationInitializat
 	port.mediaSession.HandleInitialization(init)
 }
 
-func (port *MediaPort) HandleOutputControl(control internal_type.Stream) (bool, error) {
+func (port *MediaPort) HandleOutputControl(control proto.Message) (bool, error) {
 	if port == nil || port.mediaSession == nil {
 		return false, nil
 	}
@@ -195,7 +196,7 @@ func (port *MediaPort) HandleOutputControl(control internal_type.Stream) (bool, 
 }
 
 func (port *MediaPort) HandleAssistantAudio(responseID string, audio []byte, completed bool) (bool, error) {
-	if port == nil || port.mediaSession == nil {
+	if port == nil || port.mediaSession == nil || port.closed.Load() || port.transferActive.Load() {
 		return false, nil
 	}
 	return port.mediaSession.HandleAssistantAudio(responseID, audio, completed)
@@ -208,8 +209,8 @@ func (port *MediaPort) EnterTransferMode(ringtone string) bool {
 	if !port.transferActive.CompareAndSwap(false, true) {
 		return false
 	}
+	port.mediaSession.DiscardForTransfer()
 	port.audioProcessor.SetTransferActive(true)
-	port.audioProcessor.ClearOutputBuffer()
 	port.audioProcessor.SetRingtone(ringtone)
 	port.audioProcessor.StartRingback()
 	return true
@@ -301,6 +302,9 @@ func (port *MediaPort) handleIncomingAudio(frame sip_runtime.InboundAudioFrame) 
 
 func (port *MediaPort) deliverAssistantFrame(outputFrame internal_telephony_media.AssistantOutputFrame) error {
 	if port == nil || port.closed.Load() {
+		return sip_runtime.ErrSessionClosed
+	}
+	if port.transferActive.Load() && !outputFrame.Idle {
 		return sip_runtime.ErrSessionClosed
 	}
 	if len(outputFrame.ProviderAudio) == 0 {

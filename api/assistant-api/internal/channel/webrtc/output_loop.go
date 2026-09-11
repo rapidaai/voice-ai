@@ -7,8 +7,11 @@
 package channel_webrtc
 
 import (
+	"errors"
+
 	internal_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	webrtc_internal "github.com/rapidaai/api/assistant-api/internal/channel/webrtc/internal"
+	"github.com/rapidaai/pkg/channel"
 	"github.com/rapidaai/protos"
 )
 
@@ -33,13 +36,15 @@ func (s *webrtcStreamer) runOutputWriter() {
 			if signalingSessionID == "" {
 				signalingSessionID = s.sessionID
 			}
+			// The pending clear fences audio while signaling runs without teardown locks.
+			s.outputWriteMu.Unlock()
 			if !s.dispatchOutput(s.buildGRPCResponse(&protos.ServerSignaling{
 				SessionId: signalingSessionID,
 				Message:   &protos.ServerSignaling_Clear{Clear: true},
 			})) {
-				s.outputWriteMu.Unlock()
 				return
 			}
+			s.outputWriteMu.Lock()
 			s.outputStateMu.Lock()
 			if s.pendingClearGeneration == clearGeneration {
 				s.outputClearPending = false
@@ -48,10 +53,17 @@ func (s *webrtcStreamer) runOutputWriter() {
 			s.outputStateMu.Unlock()
 			s.outputWriteMu.Unlock()
 
-		case msg := <-s.OutputCh:
+		case <-s.OutputCh.Ready():
+			msg, err := s.OutputCh.TryReceive()
+			if errors.Is(err, channel.ErrClosed) {
+				return
+			}
+			if err != nil {
+				continue
+			}
 			if m, ok := msg.(*protos.ConversationAssistantMessage); ok {
-				if audio, ok := m.Message.(*protos.ConversationAssistantMessage_Audio); ok {
-					s.bufferAndSendOutput(m.GetId(), audio.Audio)
+				if _, ok := m.Message.(*protos.ConversationAssistantMessage_Audio); ok {
+					s.bufferAndSendOutput(m.GetId(), m.GetAudio(), m.GetCompleted())
 					continue
 				}
 			}

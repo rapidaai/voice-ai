@@ -43,12 +43,44 @@ func TestModel_ToolResultResolved_TriggersFollowUp(t *testing.T) {
 
 func TestModel_ToolFollowUp_ValidationFailureBlocksSend(t *testing.T) {
 	e, comm, stream, _ := newModelTestEnv(t)
+	e.currentPacket = &internal_type.UserInputPacket{ContextID: "ctx-1"}
 	e.history.messages = append(e.history.messages,
 		&protos.Message{Role: "assistant", Message: &protos.Message_Assistant{Assistant: &protos.AssistantMessage{ToolCalls: []*protos.ToolCall{{Id: "t1", Type: "function"}}}}},
 	)
 
 	e.Run(context.Background(), comm, ToolFollowUpPipeline{ContextID: "ctx-1"})
 	require.Empty(t, stream.sendCalls)
+	require.Equal(t, "", e.currentContextID())
+	errPkt, ok := findPacket[internal_type.LLMErrorPacket](comm.pkts)
+	require.True(t, ok)
+	require.Equal(t, "ctx-1", errPkt.ContextID)
+}
+
+func TestModel_ToolFollowUpSendFailurePreventsLateDone(t *testing.T) {
+	e, comm, stream, _ := newModelTestEnv(t)
+	e.currentPacket = &internal_type.UserInputPacket{ContextID: "ctx-tool"}
+	e.history.AppendAssistant("ctx-tool", testToolAssistantMessage("t1"))
+	stream.sendErr = errors.New("send failed")
+
+	require.NoError(t, e.Execute(context.Background(), comm, internal_type.LLMToolResultPacket{
+		ContextID: "ctx-tool",
+		ToolID:    "t1",
+		Name:      "weather",
+		Result:    map[string]string{"ok": "1"},
+	}))
+	e.handleResponse(context.Background(), comm, &protos.StreamChatOutput{
+		RequestId: "ctx-tool",
+		Data: &protos.Message{
+			Role:    "assistant",
+			Message: &protos.Message_Assistant{Assistant: &protos.AssistantMessage{Contents: []string{"late success"}}},
+		},
+		Metrics: []*protos.Metric{{Name: "token_count", Value: "1"}},
+	})
+
+	require.Empty(t, findPackets[internal_type.LLMResponseDonePacket](comm.pkts))
+	errPkt, ok := findPacket[internal_type.LLMErrorPacket](comm.pkts)
+	require.True(t, ok)
+	require.Equal(t, "ctx-tool", errPkt.ContextID)
 }
 
 func TestModel_Flow_UserToLLM_Stream_Tool_Done(t *testing.T) {
@@ -111,9 +143,8 @@ func TestModel_Flow_UserToLLM_Stream_Tool_Done(t *testing.T) {
 	})
 
 	dones := findPackets[internal_type.LLMResponseDonePacket](comm.pkts)
-	require.Len(t, dones, 2)
-	require.Equal(t, "Let me check.", dones[0].Text)
-	require.Equal(t, "It is 72F in SF.", dones[1].Text)
+	require.Len(t, dones, 1)
+	require.Equal(t, "It is 72F in SF.", dones[0].Text)
 
 	snap := e.history.Snapshot()
 	require.Len(t, snap, 4)
@@ -252,6 +283,7 @@ func TestModel_InterruptThenLateToolResult_NoFollowUp(t *testing.T) {
 
 func TestModel_ToolFollowUp_SendError_NoPanic(t *testing.T) {
 	e, comm, stream, _ := newModelTestEnv(t)
+	e.currentPacket = &internal_type.UserInputPacket{ContextID: "ctx-senderr"}
 	stream.sendErr = errors.New("send failed")
 	e.history.AppendAssistant("ctx-senderr", testToolAssistantMessage("t1"))
 
@@ -260,6 +292,10 @@ func TestModel_ToolFollowUp_SendError_NoPanic(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, stream.sendCalls, 1)
+	require.Equal(t, "", e.currentContextID())
+	errPkt, ok := findPacket[internal_type.LLMErrorPacket](comm.pkts)
+	require.True(t, ok)
+	require.Equal(t, "ctx-senderr", errPkt.ContextID)
 }
 
 func TestModel_ContextSwitch_OldToolResultIgnored_NewUserContinues(t *testing.T) {

@@ -18,7 +18,7 @@ func TestModel_Interruption_SupersedesPending(t *testing.T) {
 
 	err := e.Execute(context.Background(), comm, internal_type.LLMInterruptPacket{ContextID: "ctx-1"})
 	require.NoError(t, err)
-	require.Equal(t, "ctx-1", e.currentContextID())
+	require.Equal(t, "", e.currentContextID())
 	require.Empty(t, comm.pkts)
 
 	ctx, followUp := e.history.FlushToolBlock()

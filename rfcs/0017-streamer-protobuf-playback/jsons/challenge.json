@@ -1,0 +1,13 @@
+{
+  "review_kind": "initial_draft_challenge_history",
+  "decision": "revise",
+  "reviewed_rfc_sha256": "8af89416243e2ff4a6ffe48f657cf31ab32b97ce5002fee2bc07364cb891822a",
+  "reviewed_plan_sha256": "fa7c5a0a679cf36709bfd1527376ae2a1835f27c07268c7b4a27ada6c0a93531",
+  "current_bytes_approved": false,
+  "findings": [
+    {"id": "D1", "severity": "major", "decision_required": "Define response terminal and completion eligibility, including early completion and pause/flush races."},
+    {"id": "D2", "severity": "major", "decision_required": "Define capability and bounded missing-ack recovery before enabling completion-driven lifecycle.", "implementation_scope_resolution": "New acknowledgement-dependent lifecycle is not enabled; preserve existing fallback."},
+    {"id": "D3", "severity": "major", "decision_required": "Preserve completion delivery at both queue boundaries within explicit ownership."}
+  ],
+  "note": "Historical hashes refer to the initial draft, not the working design updated after the maintainer requested implementation."
+}

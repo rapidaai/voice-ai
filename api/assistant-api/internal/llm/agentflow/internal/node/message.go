@@ -29,14 +29,13 @@ func (handler MessageHandler) Execute(ctx context.Context, request Request) (Res
 	if message != "" {
 		_ = request.Communication.OnPacket(ctx,
 			internal_type.LLMResponseDeltaPacket{ContextID: request.ContextID, Text: message},
-			internal_type.LLMResponseDonePacket{ContextID: request.ContextID, Text: message},
 		)
 		request.RuntimeState.RecordNodeOutputValue(request.Node.ID, "response", message)
 	}
 
 	postDelayMilliseconds := request.Node.IntConfig("post_delay_ms", 0)
 	if postDelayMilliseconds <= 0 {
-		return Result{RouteHandles: []string{"response", "next"}}, nil
+		return Result{RouteHandles: []string{"response", "next"}, ResponseText: message}, nil
 	}
 
 	timer := time.NewTimer(time.Duration(postDelayMilliseconds) * time.Millisecond)
@@ -45,6 +44,6 @@ func (handler MessageHandler) Execute(ctx context.Context, request Request) (Res
 	case <-ctx.Done():
 		return Result{}, ctx.Err()
 	case <-timer.C:
-		return Result{RouteHandles: []string{"response", "next"}}, nil
+		return Result{RouteHandles: []string{"response", "next"}, ResponseText: message}, nil
 	}
 }

@@ -279,7 +279,6 @@ func (s *webrtcStreamer) restartMediaSessionOrFallbackToText(mediaSessionID uint
 			},
 		})
 
-	s.clearBufferedOutputAudio()
 	if s.ambientMixer != nil {
 		s.ambientMixer.Reset()
 	}

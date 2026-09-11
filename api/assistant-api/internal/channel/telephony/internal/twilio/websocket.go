@@ -23,6 +23,7 @@ import (
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	openapi "github.com/twilio/twilio-go/rest/api/v2010"
+	"google.golang.org/protobuf/proto"
 )
 
 type twilioWebsocketStreamer struct {
@@ -282,7 +283,7 @@ func (tws *twilioWebsocketStreamer) runWebSocketReader(conn *websocket.Conn) {
 	}
 }
 
-func (tws *twilioWebsocketStreamer) Send(response internal_type.Stream) error {
+func (tws *twilioWebsocketStreamer) Send(response proto.Message) error {
 	if tws.mediaSession != nil {
 		if outputControlHandled, outputControlError := tws.mediaSession.HandleOutputControl(response); outputControlHandled {
 			return outputControlError
@@ -294,12 +295,12 @@ func (tws *twilioWebsocketStreamer) Send(response internal_type.Stream) error {
 			tws.mediaSession.HandleInitialization(data)
 		}
 	case *protos.ConversationAssistantMessage:
-		switch content := data.Message.(type) {
+		switch data.Message.(type) {
 		case *protos.ConversationAssistantMessage_Audio:
 			if tws.mediaSession == nil {
 				return nil
 			}
-			if _, assistantAudioError := tws.mediaSession.HandleAssistantAudio(data.GetId(), content.Audio, data.GetCompleted()); assistantAudioError != nil {
+			if _, assistantAudioError := tws.mediaSession.HandleAssistantAudio(data.GetId(), data.GetAudio(), data.GetCompleted()); assistantAudioError != nil {
 				return assistantAudioError
 			}
 			return nil
@@ -702,6 +703,9 @@ func (tws *twilioWebsocketStreamer) sendTwilioMessage(
 	mediaData *internal_twilio.TwilioOutboundMedia,
 ) error {
 	if tws.streamID == "" {
+		if mediaData != nil {
+			return fmt.Errorf("Twilio output stream is not connected")
+		}
 		return nil
 	}
 	twilioMessageJSON, err := json.Marshal(internal_twilio.TwilioOutboundMessage{
@@ -734,6 +738,9 @@ func (tws *twilioWebsocketStreamer) sendTwilioMessage(
 	tws.writeMu.Lock()
 	defer tws.writeMu.Unlock()
 	if tws.connection == nil {
+		if mediaData != nil {
+			return fmt.Errorf("Twilio output transport is not connected")
+		}
 		return nil
 	}
 	if err := tws.connection.WriteMessage(websocket.TextMessage, twilioMessageJSON); err != nil {

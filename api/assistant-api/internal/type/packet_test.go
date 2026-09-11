@@ -1,6 +1,23 @@
 package internal_type
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
+
+func TestIdleTimeoutExpiredPacket(t *testing.T) {
+	deadline := time.Unix(100, 0)
+	var packet Packet = IdleTimeoutExpiredPacket{
+		ContextID: "context-1", Count: 2, Generation: 7, Deadline: deadline,
+	}
+	if packet.ContextId() != "context-1" || packet.PacketName() != PacketNameIdleTimeoutExpired {
+		t.Fatalf("unexpected idle expiry routing: %+v", packet)
+	}
+	expiry := packet.(IdleTimeoutExpiredPacket)
+	if expiry.Generation != 7 || expiry.Count != 2 || !expiry.Deadline.Equal(deadline) {
+		t.Fatalf("idle expiry lost countdown identity: %+v", expiry)
+	}
+}
 
 func TestInterruptionDecisionExpiredPacket(t *testing.T) {
 	packet := InterruptionDecisionExpiredPacket{ContextID: "context-1", Sequence: 7}

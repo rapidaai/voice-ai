@@ -22,6 +22,7 @@ import (
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
+	"google.golang.org/protobuf/proto"
 )
 
 type telnyxWebsocketStreamer struct {
@@ -334,7 +335,7 @@ func (tws *telnyxWebsocketStreamer) runWebSocketReader(conn *websocket.Conn) {
 	}
 }
 
-func (tws *telnyxWebsocketStreamer) Send(response internal_type.Stream) error {
+func (tws *telnyxWebsocketStreamer) Send(response proto.Message) error {
 	if tws.mediaSession != nil {
 		if outputControlHandled, outputControlError := tws.mediaSession.HandleOutputControl(response); outputControlHandled {
 			return outputControlError
@@ -349,12 +350,12 @@ func (tws *telnyxWebsocketStreamer) Send(response internal_type.Stream) error {
 			tws.mediaSession.HandleInitialization(data)
 		}
 	case *protos.ConversationAssistantMessage:
-		switch content := data.Message.(type) {
+		switch data.Message.(type) {
 		case *protos.ConversationAssistantMessage_Audio:
 			if tws.mediaSession == nil {
 				return nil
 			}
-			if _, assistantAudioError := tws.mediaSession.HandleAssistantAudio(data.GetId(), content.Audio, data.GetCompleted()); assistantAudioError != nil {
+			if _, assistantAudioError := tws.mediaSession.HandleAssistantAudio(data.GetId(), data.GetAudio(), data.GetCompleted()); assistantAudioError != nil {
 				return assistantAudioError
 			}
 			return nil
@@ -571,7 +572,10 @@ func (tws *telnyxWebsocketStreamer) sendOutputFrame(frame internal_telephony_med
 }
 
 func (tws *telnyxWebsocketStreamer) sendTelnyxMessage(eventType internal_telnyx.EventType, mediaData *internal_telnyx.TelnyxOutboundMedia) error {
-	if tws.connection == nil || tws.streamID == "" {
+	if tws.streamID == "" {
+		if mediaData != nil {
+			return fmt.Errorf("Telnyx output stream is not connected")
+		}
 		return nil
 	}
 	message := internal_telnyx.TelnyxOutboundMessage{
@@ -607,6 +611,9 @@ func (tws *telnyxWebsocketStreamer) sendTelnyxMessage(eventType internal_telnyx.
 	tws.writeMu.Lock()
 	defer tws.writeMu.Unlock()
 	if tws.connection == nil {
+		if mediaData != nil {
+			return fmt.Errorf("Telnyx output transport is not connected")
+		}
 		return nil
 	}
 	if err := tws.connection.WriteMessage(websocket.TextMessage, messageJSON); err != nil {

@@ -13,8 +13,8 @@ import (
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
 	internal_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/protos"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -76,14 +76,58 @@ func (mediaSession *MediaSession) HandleAssistantAudio(outputID string, audio []
 	}
 	mediaSession.outputFrameMu.Lock()
 	defer mediaSession.outputFrameMu.Unlock()
+	if mediaSession.closed.Load() || mediaSession.ctx.Err() != nil {
+		return false, nil
+	}
 	if mediaSession.blockedOutputID != "" && (outputID == "" || outputID == mediaSession.blockedOutputID) {
 		return false, nil
+	}
+	if outputID == "" {
+		outputID = mediaSession.currentOutputID
+	}
+	if outputID != "" {
+		if _, flushed := mediaSession.flushedOutputIDs[outputID]; flushed {
+			return false, nil
+		}
+		if _, closed := mediaSession.closedOutputIDs[outputID]; closed {
+			return false, nil
+		}
 	}
 	if outputID != "" && outputID != mediaSession.currentOutputID {
 		mediaSession.currentOutputID = outputID
 		mediaSession.outputFlushed = false
 	}
-	return true, mediaSession.mediaEngine.ProcessAssistantAudio(audio, completed)
+	_, discarded := mediaSession.discardedOutputIDs[outputID]
+	var response *responsePlayback
+	for index := len(mediaSession.responses) - 1; index >= 0; index-- {
+		queued := mediaSession.responses[index]
+		if queued.id == outputID {
+			if queued.completed {
+				return false, nil
+			}
+			response = queued
+			break
+		}
+	}
+	if response == nil {
+		response = &responsePlayback{id: outputID, failed: discarded}
+		mediaSession.responses = append(mediaSession.responses, response)
+	} else if discarded {
+		response.failed = true
+	}
+	response.completed = completed
+	if response != mediaSession.responses[0] {
+		response.audio = append(response.audio, audio...)
+		return true, nil
+	}
+	if len(response.audio) > 0 {
+		audio = append(response.audio, audio...)
+		response.audio = nil
+	}
+	err := mediaSession.mediaEngine.ProcessAssistantAudio(audio, completed)
+	response.processed = true
+	response.failed = response.failed || err != nil
+	return true, err
 }
 
 func (mediaSession *MediaSession) HandleProviderAudioFrame(frame ProviderAudioFrame) error {
@@ -101,9 +145,9 @@ func (mediaSession *MediaSession) HandleProviderAudioFrame(frame ProviderAudioFr
 	return nil
 }
 
-func (mediaSession *MediaSession) HandleOutputControl(control internal_type.Stream) (bool, error) {
+func (mediaSession *MediaSession) HandleOutputControl(control proto.Message) (bool, error) {
 	switch control.(type) {
-	case internal_type.PauseOutput:
+	case *protos.ConversationPlaybackPause:
 		if mediaSession == nil || !mediaSession.hasMediaEngine() {
 			return true, nil
 		}
@@ -126,7 +170,7 @@ func (mediaSession *MediaSession) HandleOutputControl(control internal_type.Stre
 			})
 		}
 		return true, nil
-	case internal_type.ContinueOutput:
+	case *protos.ConversationPlaybackContinue:
 		if mediaSession == nil || !mediaSession.hasMediaEngine() {
 			return true, nil
 		}
@@ -134,19 +178,38 @@ func (mediaSession *MediaSession) HandleOutputControl(control internal_type.Stre
 		mediaSession.outputPaused = false
 		mediaSession.outputFrameMu.Unlock()
 		return true, nil
-	case internal_type.FlushOutput:
+	case *protos.ConversationPlaybackFlush:
+		flush := control.(*protos.ConversationPlaybackFlush)
 		if mediaSession == nil || !mediaSession.hasMediaEngine() {
 			return true, nil
 		}
 		mediaSession.outputFrameMu.Lock()
 		var providerClearError error
+		mediaSession.outputPaused = false
+		if flush.GetId() != "" {
+			if mediaSession.flushedOutputIDs == nil {
+				mediaSession.flushedOutputIDs = make(map[string]struct{})
+			}
+			mediaSession.flushedOutputIDs[flush.GetId()] = struct{}{}
+		}
 		if !mediaSession.outputFlushed {
 			mediaSession.mediaEngine.ClearOutputBuffer()
 			mediaSession.currentOutputFrame = AssistantOutputFrame{}
 			mediaSession.hasCurrentOutputFrame = false
-			mediaSession.outputPaused = false
 			mediaSession.outputFlushed = true
 			mediaSession.blockedOutputID = mediaSession.currentOutputID
+			if mediaSession.flushedOutputIDs == nil {
+				mediaSession.flushedOutputIDs = make(map[string]struct{})
+			}
+			if mediaSession.currentOutputID != "" {
+				mediaSession.flushedOutputIDs[mediaSession.currentOutputID] = struct{}{}
+			}
+			for _, response := range mediaSession.responses {
+				if response.id != "" {
+					mediaSession.flushedOutputIDs[response.id] = struct{}{}
+				}
+			}
+			mediaSession.responses = nil
 			if mediaSession.sendProviderClear != nil {
 				providerClearError = mediaSession.sendProviderClear()
 			}
@@ -191,6 +254,29 @@ func (mediaSession *MediaSession) Shutdown() {
 	}
 }
 
+// DiscardForTransfer abandons queued output without blocking same-context speech after resume.
+func (mediaSession *MediaSession) DiscardForTransfer() {
+	if mediaSession == nil || !mediaSession.hasMediaEngine() {
+		return
+	}
+	mediaSession.outputFrameMu.Lock()
+	defer mediaSession.outputFrameMu.Unlock()
+	mediaSession.mediaEngine.ClearOutputBuffer()
+	mediaSession.currentOutputFrame = AssistantOutputFrame{}
+	mediaSession.hasCurrentOutputFrame = false
+	for _, response := range mediaSession.responses {
+		if response.id == "" {
+			continue
+		}
+		if mediaSession.discardedOutputIDs == nil {
+			mediaSession.discardedOutputIDs = make(map[string]struct{})
+		}
+		mediaSession.discardedOutputIDs[response.id] = struct{}{}
+	}
+	mediaSession.responses = nil
+	mediaSession.outputPaused = false
+}
+
 func (mediaSession *MediaSession) hasMediaEngine() bool {
 	return mediaSession.mediaEngine != nil
 }
@@ -213,15 +299,65 @@ func (mediaSession *MediaSession) NextFrame() []byte {
 		return nil
 	}
 	mediaSession.outputFrameMu.Lock()
-	defer mediaSession.outputFrameMu.Unlock()
-	if mediaSession.outputPaused {
+	var completion *protos.ConversationPlaybackComplete
+	var conversionError error
+	defer func() {
+		mediaSession.outputFrameMu.Unlock()
+		if conversionError != nil && mediaSession.record != nil {
+			_ = mediaSession.record(observability.RecordLog{
+				Level:   observability.LevelError,
+				Message: "Queued telephony audio conversion failed",
+				Attributes: observability.Attributes{
+					"component": observability.ComponentCall.String(),
+					"error":     conversionError.Error(),
+				},
+			})
+		}
+		if completion != nil {
+			mediaSession.emitStream(completion)
+		}
+	}()
+	if mediaSession.outputPaused || mediaSession.closed.Load() || mediaSession.ctx.Err() != nil {
 		return nil
 	}
 	if mediaSession.hasCurrentOutputFrame {
 		return mediaSession.currentOutputFrame.ProviderAudio
 	}
+	if len(mediaSession.responses) > 0 {
+		response := mediaSession.responses[0]
+		if !response.processed {
+			conversionError = mediaSession.mediaEngine.ProcessAssistantAudio(response.audio, response.completed)
+			response.failed = conversionError != nil
+			response.audio = nil
+			response.processed = true
+		}
+	}
 	outputFrame, ok := mediaSession.mediaEngine.NextOutputFrame()
 	if !ok || len(outputFrame.ProviderAudio) == 0 {
+		if len(mediaSession.responses) == 0 || !mediaSession.responses[0].completed {
+			return nil
+		}
+		if !mediaSession.responses[0].failed && !mediaSession.mediaEngine.OutputDrained() {
+			return nil
+		}
+		response := mediaSession.responses[0]
+		mediaSession.responses[0] = nil
+		mediaSession.responses = mediaSession.responses[1:]
+		if response.failed {
+			mediaSession.mediaEngine.ClearOutputBuffer()
+		}
+		if response.id != "" && !response.failed && response.sent {
+			completion = &protos.ConversationPlaybackComplete{
+				Id:   response.id,
+				Time: timestamppb.Now(),
+			}
+		}
+		if response.id != "" {
+			if mediaSession.closedOutputIDs == nil {
+				mediaSession.closedOutputIDs = make(map[string]struct{})
+			}
+			mediaSession.closedOutputIDs[response.id] = struct{}{}
+		}
 		return nil
 	}
 	mediaSession.currentOutputFrame = outputFrame
@@ -235,7 +371,7 @@ func (mediaSession *MediaSession) IdleFrame() []byte {
 	}
 	mediaSession.outputFrameMu.Lock()
 	defer mediaSession.outputFrameMu.Unlock()
-	if mediaSession.outputPaused {
+	if mediaSession.outputPaused || mediaSession.closed.Load() || mediaSession.ctx.Err() != nil {
 		return nil
 	}
 	outputFrame, ok := mediaSession.mediaEngine.IdleOutputFrame()
@@ -257,7 +393,7 @@ func (mediaSession *MediaSession) ConsumeFrame(_ []byte) error {
 	}
 
 	mediaSession.outputFrameMu.Lock()
-	if mediaSession.outputPaused {
+	if mediaSession.outputPaused || mediaSession.closed.Load() || mediaSession.ctx.Err() != nil {
 		mediaSession.outputFrameMu.Unlock()
 		return nil
 	}
@@ -270,6 +406,11 @@ func (mediaSession *MediaSession) ConsumeFrame(_ []byte) error {
 		return nil
 	}
 	err := outputSink(outputFrame)
+	if !outputFrame.Idle && len(mediaSession.responses) > 0 {
+		response := mediaSession.responses[0]
+		response.failed = response.failed || err != nil
+		response.sent = response.sent || err == nil
+	}
 	mediaSession.outputFrameMu.Unlock()
 	if err != nil {
 		if mediaSession.record != nil {
@@ -318,7 +459,7 @@ func (mediaSession *MediaSession) emitInputAudioFrame(inputFrame InputAudioFrame
 	mediaSession.emitStream(userAudio)
 }
 
-func (mediaSession *MediaSession) emitStream(stream internal_type.Stream) {
+func (mediaSession *MediaSession) emitStream(stream proto.Message) {
 	mediaSession.sinkMu.RLock()
 	streamSink := mediaSession.streamSink
 	mediaSession.sinkMu.RUnlock()

@@ -31,6 +31,7 @@ func ClassifyName(name internal_type.PacketName) Route {
 	switch name {
 	// Critical — interrupts, tool lifecycle
 	case internal_type.PacketNameInterruptionDetected,
+		internal_type.PacketNamePlaybackCompleted,
 		internal_type.PacketNameInterruptionDecisionExpired,
 		internal_type.PacketNameTextToSpeechInterrupt,
 		internal_type.PacketNameLLMInterrupt,

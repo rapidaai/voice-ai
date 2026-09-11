@@ -48,10 +48,12 @@ func TestTTSCompletionWatchdog_StartFromTextUsesMinimumTimeoutAndGracePeriod(t *
 	assert.Equal(t, "tts-completion-watchdog: deadline expired", observabilityLogPacket.Record.Message)
 	assert.Equal(t, "40", observabilityLogPacket.Record.Attributes["estimated_audio_duration_ms"])
 
-	endPacket := <-pushedPackets
-	textToSpeechEndPacket, ok := endPacket.(internal_type.TextToSpeechEndPacket)
+	errorPacket := <-pushedPackets
+	textToSpeechErrorPacket, ok := errorPacket.(internal_type.TextToSpeechErrorPacket)
 	require.True(t, ok)
-	assert.Equal(t, "ctx-greeting", textToSpeechEndPacket.ContextID)
+	assert.Equal(t, "ctx-greeting", textToSpeechErrorPacket.ContextID)
+	assert.Equal(t, internal_type.TTSNetworkTimeout, textToSpeechErrorPacket.Type)
+	assert.Contains(t, textToSpeechErrorPacket.ErrMessage(), "deadline expired")
 }
 
 func TestTTSCompletionWatchdog_ExpiresWhenDeadlinePasses(t *testing.T) {
@@ -81,11 +83,12 @@ func TestTTSCompletionWatchdog_ExpiresWhenDeadlinePasses(t *testing.T) {
 
 	select {
 	case packet := <-pushedPackets:
-		textToSpeechEndPacket, ok := packet.(internal_type.TextToSpeechEndPacket)
+		textToSpeechErrorPacket, ok := packet.(internal_type.TextToSpeechErrorPacket)
 		require.True(t, ok)
-		assert.Equal(t, "ctx-expire", textToSpeechEndPacket.ContextID)
+		assert.Equal(t, "ctx-expire", textToSpeechErrorPacket.ContextID)
+		assert.Equal(t, internal_type.TTSNetworkTimeout, textToSpeechErrorPacket.Type)
 	case <-time.After(250 * time.Millisecond):
-		t.Fatal("tts completion watchdog did not push text to speech end")
+		t.Fatal("tts completion watchdog did not push text to speech error")
 	}
 
 	assert.False(t, ttsCompletionWatchdog.Complete("ctx-expire"))

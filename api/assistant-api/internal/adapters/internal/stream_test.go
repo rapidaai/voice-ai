@@ -17,18 +17,19 @@ import (
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type streamTestStreamer struct {
 	ctx      context.Context
-	recv     []internal_type.Stream
+	recv     []proto.Message
 	recvErr  error
 	recvIdx  int
 	recvCall int
 
 	mu    sync.Mutex
-	sent  []internal_type.Stream
+	sent  []proto.Message
 	modes []protos.StreamMode
 }
 
@@ -39,7 +40,7 @@ func (s *streamTestStreamer) Context() context.Context {
 	return s.ctx
 }
 
-func (s *streamTestStreamer) Recv() (internal_type.Stream, error) {
+func (s *streamTestStreamer) Recv() (proto.Message, error) {
 	s.recvCall++
 	if s.recvIdx < len(s.recv) {
 		msg := s.recv[s.recvIdx]
@@ -52,7 +53,7 @@ func (s *streamTestStreamer) Recv() (internal_type.Stream, error) {
 	return nil, io.EOF
 }
 
-func (s *streamTestStreamer) Send(in internal_type.Stream) error {
+func (s *streamTestStreamer) Send(in proto.Message) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sent = append(s.sent, in)
@@ -86,9 +87,9 @@ type failingOutputControlStreamer struct {
 	err error
 }
 
-func (streamer *failingOutputControlStreamer) Send(packet internal_type.Stream) error {
+func (streamer *failingOutputControlStreamer) Send(packet proto.Message) error {
 	switch packet.(type) {
-	case internal_type.PauseOutput, internal_type.ContinueOutput, internal_type.FlushOutput:
+	case *protos.ConversationPlaybackPause, *protos.ConversationPlaybackContinue, *protos.ConversationPlaybackFlush:
 		return streamer.err
 	default:
 		return streamer.streamTestStreamer.Send(packet)
@@ -97,16 +98,21 @@ func (streamer *failingOutputControlStreamer) Send(packet internal_type.Stream) 
 
 func TestSendOutputControlUsesExistingSendAndReturnsErrors(t *testing.T) {
 	streamer := &streamTestStreamer{}
-	requestor := &genericRequestor{streamer: streamer}
-	for _, control := range []internal_type.Stream{internal_type.PauseOutput{}, internal_type.ContinueOutput{}, internal_type.FlushOutput{}} {
+	requestor := &genericRequestor{streamer: streamer, messageLifecycle: adapter_lifecycle.NewMessageLifecycle()}
+	for _, control := range []proto.Message{&protos.ConversationPlaybackPause{}, &protos.ConversationPlaybackContinue{}, &protos.ConversationPlaybackFlush{}} {
+		_, err := proto.Marshal(control)
+		require.NoError(t, err)
 		require.NoError(t, requestor.sendOutputControl(control))
 	}
-	assert.Equal(t, []internal_type.Stream{internal_type.PauseOutput{}, internal_type.ContinueOutput{}, internal_type.FlushOutput{}}, streamer.sent)
+	require.Len(t, streamer.sent, 3)
+	assert.True(t, proto.Equal(&protos.ConversationPlaybackPause{}, streamer.sent[0]))
+	assert.True(t, proto.Equal(&protos.ConversationPlaybackContinue{}, streamer.sent[1]))
+	assert.True(t, proto.Equal(&protos.ConversationPlaybackFlush{}, streamer.sent[2]))
 	failure := errors.New("local output failed")
 	requestor.streamer = &failingOutputControlStreamer{err: failure}
-	assert.ErrorIs(t, requestor.sendOutputControl(internal_type.PauseOutput{}), failure)
+	assert.ErrorIs(t, requestor.sendOutputControl(&protos.ConversationPlaybackPause{}), failure)
 	requestor.streamer = nil
-	assert.ErrorContains(t, requestor.sendOutputControl(internal_type.PauseOutput{}), "streamer is unavailable")
+	assert.ErrorContains(t, requestor.sendOutputControl(&protos.ConversationPlaybackPause{}), "streamer is unavailable")
 }
 
 func TestTalk_RecvErrorBeforeInitialization_ReturnsNil(t *testing.T) {
@@ -158,7 +164,7 @@ func TestOnCallCompletion_EmitsConversationDurationInMilliseconds(t *testing.T) 
 
 func TestTalk_BuffersPacketsBeforeInitialization(t *testing.T) {
 	streamer := &streamTestStreamer{
-		recv: []internal_type.Stream{
+		recv: []proto.Message{
 			&protos.ConversationUserMessage{
 				Message: &protos.ConversationUserMessage_Text{Text: "hello"},
 			},
@@ -238,6 +244,17 @@ func TestNotify_ForwardsAllActionData(t *testing.T) {
 	require.Len(t, streamer.sent, 2)
 	assert.Same(t, a, streamer.sent[0])
 	assert.Same(t, b, streamer.sent[1])
+}
+
+func TestNotifyReturnsTransportFailure(t *testing.T) {
+	sendAttempts := 0
+	requestor := &genericRequestor{streamer: &terminalReceiptTestStreamer{onSend: func(proto.Message) error {
+		sendAttempts++
+		return io.ErrClosedPipe
+	}}}
+	err := requestor.Notify(context.Background(), &protos.ConversationError{Message: "first"}, &protos.ConversationError{Message: "second"})
+	require.ErrorIs(t, err, io.ErrClosedPipe)
+	require.Equal(t, 1, sendAttempts)
 }
 
 func TestOnNotifyAssistantConfiguration_ForwardsInitializationConfig(t *testing.T) {

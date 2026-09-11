@@ -1,0 +1,109 @@
+{
+  "date": "2026-09-10",
+  "tier": "Governed",
+  "phase": "Segment identity propagation",
+  "status": "phase_complete",
+  "rfc_sha256": "dae79ed71ee7d67db3d4fc2a4bbb338712b9ae35c3e9a13c6fddd8f28f23b8f5",
+  "approval_receipt": "rfcs/0018-message-playback-completion/jsons/confirmation-approved.json",
+  "run_id": "run_cb097ce71b98",
+  "ownership": {
+    "coordinator": [
+      "protos/artifacts/talk-api.proto",
+      "protos/talk-api.pb.go",
+      "api/document-api/app/bridges/artifacts/protos/talk_api_pb2.py",
+      "api/document-api/app/bridges/artifacts/protos/talk_api_pb2.pyi",
+      "api/assistant-api/internal/type/packet.go",
+      "api/assistant-api/internal/type/playback_test.go",
+      "api/assistant-api/internal/adapters/internal/stream.go",
+      "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+      "api/assistant-api/internal/adapters/internal/playback_test.go",
+      "api/assistant-api/internal/channel/grpc/streamer_test.go"
+    ],
+    "task_4547e537e610": ["api/assistant-api/internal/channel/telephony/"],
+    "task_d9453164c646": ["api/assistant-api/internal/channel/webrtc/"]
+  },
+  "dispatches": {
+    "telephony": "ctx_5e6de0c392e7",
+    "webrtc": "ctx_2ad47ef994d5",
+    "review": "ctx_202c39b56e60"
+  },
+  "transport_reports": [
+    "rfcs/0018-message-playback-completion/jsons/transport-telephony-implementation.json",
+    "rfcs/0018-message-playback-completion/jsons/transport-webrtc-implementation.json"
+  ],
+  "worker_cleanup": {
+    "telephony": "released; agent terminal closed by Orca",
+    "webrtc": "retained by Orca due to user_takeover; terminal left untouched",
+    "review": "released; agent terminal closed by Orca"
+  },
+  "acceptance_criteria": [
+    "Assistant audio and completion receipts carry the same uint64 playback_sequence using tags 5 and 3 respectively.",
+    "Native output owners retain sequence with each queued segment rather than consulting mutable current output state.",
+    "Same-ID segments remain distinct through pause, continue, receipt delivery, and flush.",
+    "Sequence-zero legacy messages remain compatible. Pause, Continue, and Flush remain message scoped.",
+    "Adapter receipt packets and diagnostic events preserve the received sequence without activating message completion."
+  ],
+  "non_goals": [
+    "Assign synthesis sequences or introduce producer closure in this transport phase",
+    "Activate playback-driven idle timing or change completion metric timing",
+    "Modify codecs, SIP call setup, rollout defaults, or external clients"
+  ],
+  "verification": [
+    {
+      "command": "bash bin/artifacts-generate.sh",
+      "result": "passed; this checkout has no bin/generate executable. Unrelated clean-before-run billing artifact churn was removed."
+    },
+    {
+      "command": "go test -count=1 -timeout=180s ./api/assistant-api/internal/type ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/channel/grpc",
+      "result": "passed"
+    },
+    {
+      "command": "go test -race -count=1 -timeout=180s ./api/assistant-api/internal/type ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/channel/grpc",
+      "result": "passed"
+    },
+    {
+      "command": "go test -race -count=1 -timeout=180s ./api/assistant-api/internal/channel/... ./api/assistant-api/internal/adapters/... ./api/assistant-api/internal/watchdog ./api/assistant-api/internal/type",
+      "result": "passed; local native-linker warnings did not fail compilation or tests"
+    },
+    {
+      "check": "Isolated generated Python protobuf round trips for sequence 0, 1, 2, and max uint64; field tags; message-scoped controls",
+      "result": "passed; full document-api import unavailable because local fastapi dependency is missing"
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    },
+    {
+      "command": "git -C protos/artifacts diff --check",
+      "result": "passed"
+    },
+    {
+      "command": "go test -run '^$' ./api/assistant-api/...",
+      "result": "failed while linking silero_vad.test: errno 28, no space left on device. Build cleanup freed space; serial retry passed."
+    },
+    {
+      "command": "go test -p 1 -run '^$' ./api/assistant-api/...",
+      "result": "passed"
+    },
+    {
+      "command": "just agent-finalize \"$(jq -sr '[.[0].ownership.coordinator[], .[1].telephonyDirtyInventory[], .[2].changed_files[], \"rfcs/0018-message-playback-completion/jsons/segment-identity-implementation.json\", \"rfcs/0018-message-playback-completion/jsons/lifecycle.json\"] | unique | join(\",\")' rfcs/0018-message-playback-completion/jsons/segment-identity-implementation.json rfcs/0018-message-playback-completion/jsons/transport-telephony-implementation.json rfcs/0018-message-playback-completion/jsons/transport-webrtc-implementation.json)\"",
+      "result": "passed; exact file inventory, no missing backend test directories, failed_count 0"
+    }
+  ],
+  "review": {
+    "status": "passed",
+    "report": "rfcs/0018-message-playback-completion/jsons/segment-identity-review.json",
+    "findings": []
+  },
+  "remaining_work": [
+    "Assign originating synthesis sequences and propagate them through the text and TTS paths.",
+    "Track explicit producer closure and pending synthesis in message lifecycle.",
+    "Authorize completion metrics and session idle timing only after closure and matching playback receipts."
+  ],
+  "risks": [
+    "A sequence is not producer closure and does not alone prove whole-message completion.",
+    "External clients must echo the sequence before callback authority can be enabled for them.",
+    "Native receipts retain their existing local-drain boundary, not proof that the remote listener heard audio."
+  ],
+  "rollback": "Revert transport propagation without removing or reusing the additive protobuf field tags."
+}

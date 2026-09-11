@@ -25,6 +25,7 @@ import (
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
+	"google.golang.org/protobuf/proto"
 )
 
 type asteriskWebsocketStreamer struct {
@@ -123,11 +124,14 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 }
 
 func (aws *asteriskWebsocketStreamer) sendOutputFrame(frame internal_telephony_media.AssistantOutputFrame) error {
-	if aws.connection == nil || len(frame.ProviderAudio) == 0 {
+	if len(frame.ProviderAudio) == 0 {
 		return nil
 	}
 	aws.writeMu.Lock()
 	defer aws.writeMu.Unlock()
+	if aws.connection == nil {
+		return io.ErrClosedPipe
+	}
 	if err := aws.connection.WriteMessage(websocket.BinaryMessage, frame.ProviderAudio); err != nil {
 		_ = aws.Record(observability.RecordLog{
 			Level:   observability.LevelError,
@@ -390,7 +394,7 @@ func (aws *asteriskWebsocketStreamer) handleAudioData(audio []byte) error {
 	return nil
 }
 
-func (aws *asteriskWebsocketStreamer) Send(response internal_type.Stream) error {
+func (aws *asteriskWebsocketStreamer) Send(response proto.Message) error {
 	if aws.mediaSession != nil {
 		if outputControlHandled, outputControlError := aws.mediaSession.HandleOutputControl(response); outputControlHandled {
 			return outputControlError
@@ -402,12 +406,12 @@ func (aws *asteriskWebsocketStreamer) Send(response internal_type.Stream) error 
 			aws.mediaSession.HandleInitialization(data)
 		}
 	case *protos.ConversationAssistantMessage:
-		switch content := data.Message.(type) {
+		switch data.Message.(type) {
 		case *protos.ConversationAssistantMessage_Audio:
 			if aws.mediaSession == nil {
 				return nil
 			}
-			if _, assistantAudioError := aws.mediaSession.HandleAssistantAudio(data.GetId(), content.Audio, data.GetCompleted()); assistantAudioError != nil {
+			if _, assistantAudioError := aws.mediaSession.HandleAssistantAudio(data.GetId(), data.GetAudio(), data.GetCompleted()); assistantAudioError != nil {
 				_ = aws.Record(observability.RecordLog{
 					Level:   observability.LevelError,
 					Message: "Failed to process Asterisk output audio",

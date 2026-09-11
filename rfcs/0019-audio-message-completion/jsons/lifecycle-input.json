@@ -1,0 +1,27 @@
+{
+  "version": "1.0",
+  "run_id": "run_942b61c2cb54",
+  "repo_root": ".",
+  "artifacts": {
+    "approved_plan_file": "rfcs/0019-audio-message-completion/jsons/plan.json",
+    "approved_plan_sha256": "1da09af775b5c5c6bab6ce2c28ddbca03d47b60da96c76c1510b73e6b602cfc7",
+    "approved_plan_hmac": "6b13c8acc6b9c860e0aa8f69580210bb3a7a6a0ea77a6096f51fed2f5dcb2eb5",
+    "confirmation_file": "rfcs/0019-audio-message-completion/jsons/confirmation.json"
+  },
+  "implementation": {
+    "status": "reviewed_security_exception_authorized_activation_pending",
+    "publication_authorization_file": "rfcs/0019-audio-message-completion/jsons/publication-authorization.json",
+    "publication_check_file": "rfcs/0019-audio-message-completion/jsons/publication-check.json",
+    "inventory_file": "rfcs/0019-audio-message-completion/jsons/implementation-inventory.json",
+    "verification_file": "rfcs/0019-audio-message-completion/jsons/verification.json",
+    "activation_scope_approval": "pending",
+    "review_file": "rfcs/0019-audio-message-completion/jsons/review-02.json",
+    "open_findings": [],
+    "ownership": {
+      "coordinator": "adapters, internal packets, talk-api source and generated artifacts, RFC evidence",
+      "producer_worker": "llm/model, llm/agentflow, llm/agentkit, llm/websocket",
+      "synthesis_worker": "TTS transformers, existing output text processor, tts_completion watchdog",
+      "transport_worker": "channel streamers and playback queues"
+    }
+  }
+}

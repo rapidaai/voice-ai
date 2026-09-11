@@ -9,7 +9,6 @@ import (
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/channel"
 	"github.com/rapidaai/pkg/commons"
@@ -167,7 +166,9 @@ func TestSend_EndConversation_PushesToolResult(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case msg := <-s.CriticalCh:
+	case <-s.CriticalCh.Ready():
+		msg, err := s.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		result, ok := msg.(*protos.ConversationToolCallResult)
 		require.True(t, ok, "expected ConversationToolCallResult, got %T", msg)
 		assert.Equal(t, "ctx-1", result.GetId())
@@ -213,11 +214,11 @@ func TestSend_OutputControlsManagePendingPreAnswerAudio(t *testing.T) {
 		Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{1, 2, 3}},
 	}))
 
-	require.NoError(t, s.Send(internal_type.PauseOutput{}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackPause{}))
 	require.Len(t, s.pendingAssistantAudioFrames, 1)
-	require.NoError(t, s.Send(internal_type.ContinueOutput{}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackContinue{}))
 	require.Len(t, s.pendingAssistantAudioFrames, 1)
-	require.NoError(t, s.Send(internal_type.FlushOutput{}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackFlush{}))
 	assert.Empty(t, s.pendingAssistantAudioFrames)
 }
 
@@ -231,7 +232,7 @@ func TestSend_FlushBlocksLatePreAnswerResponseAudio(t *testing.T) {
 	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
 		Id: "response-1", Message: &protos.ConversationAssistantMessage_Audio{Audio: audio}, Completed: true,
 	}))
-	require.NoError(t, s.Send(internal_type.FlushOutput{}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackFlush{}))
 	assert.Empty(t, s.pendingAssistantAudioFrames)
 	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
 		Id: "response-1", Message: &protos.ConversationAssistantMessage_Audio{Audio: audio}, Completed: true,
@@ -248,7 +249,7 @@ func TestSend_OutputControlAfterCloseReturnsSessionClosed(t *testing.T) {
 	s := newTestSIPStreamer(t)
 	require.NoError(t, s.Close())
 
-	assert.ErrorIs(t, s.Send(internal_type.FlushOutput{}), sip_runtime.ErrSessionClosed)
+	assert.ErrorIs(t, s.Send(&protos.ConversationPlaybackFlush{}), sip_runtime.ErrSessionClosed)
 }
 
 func TestSend_InboundAssistantAudioMarksReadyBeforeOutputActivated(t *testing.T) {
@@ -351,7 +352,9 @@ func TestNew_RoutesBridgeRecordingOutsideRealtimeInput(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, streamer.Close()) })
 	require.Equal(t, RealtimeInputChannelCapacity, streamer.InputCh.Capacity())
 	select {
-	case message := <-streamer.CriticalCh:
+	case <-streamer.CriticalCh.Ready():
+		message, err := streamer.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		_, ok := message.(*protos.ConversationInitialization)
 		require.True(t, ok, "expected conversation initialization, got %T", message)
 	case <-time.After(time.Second):
@@ -364,7 +367,9 @@ func TestNew_RoutesBridgeRecordingOutsideRealtimeInput(t *testing.T) {
 	}
 
 	select {
-	case message := <-streamer.LowCh:
+	case <-streamer.LowCh.Ready():
+		message, err := streamer.LowCh.TryReceive()
+		require.NoError(t, err)
 		recording, ok := message.(*protos.ConversationBridgeOperatorAudio)
 		require.True(t, ok, "expected bridge operator recording, got %T", message)
 		require.NotEmpty(t, recording.GetAudio())
@@ -393,7 +398,9 @@ func TestSend_ConversationDisconnection_RecordsEventAndClosesStreamer(t *testing
 	// the server callsite already knows the reason. The talker exits via the
 	// Recv-err path once Close cancels s.Ctx.
 	select {
-	case msg := <-s.CriticalCh:
+	case <-s.CriticalCh.Ready():
+		msg, err := s.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		t.Fatalf("server-initiated Send must not push to CriticalCh; got %T", msg)
 	default:
 	}
@@ -500,7 +507,9 @@ func TestSend_TransferConversation_MissingTransferTarget(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case msg := <-s.CriticalCh:
+	case <-s.CriticalCh.Ready():
+		msg, err := s.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		result, ok := msg.(*protos.ConversationToolCallResult)
 		require.True(t, ok, "expected ConversationToolCallResult, got %T", msg)
 		assert.Equal(t, "ctx-transfer-missing", result.GetId())

@@ -2,9 +2,14 @@ package lifecycle
 
 import (
 	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
 
+	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	type_enums "github.com/rapidaai/pkg/types/enums"
+	"github.com/rapidaai/protos"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestMessageLifecycle_DefaultsMode(t *testing.T) {
@@ -165,5 +170,109 @@ func TestMessageLifecycle_StaleContextRejected(t *testing.T) {
 	l := NewMessageLifecycleWithContext("ctx", type_enums.TextMode)
 	if err := l.AssistantGenerating("old"); !errors.Is(err, ErrStaleContext) {
 		t.Fatalf("expected stale context error, got=%v", err)
+	}
+}
+
+func TestMessageLifecycle_ObservePlaybackCompletion(t *testing.T) {
+	lifecycle := NewMessageLifecycleWithContext("response-1", type_enums.AudioMode)
+	t.Cleanup(func() { lifecycle.FailAssistantMessage(lifecycle.ContextID()) })
+	if err := lifecycle.AssistantGenerating("response-1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := lifecycle.AssistantSpeaking("response-1"); err != nil {
+		t.Fatal(err)
+	}
+	for _, scenario := range []struct {
+		name      string
+		contextID string
+		issued    bool
+		wantError error
+	}{
+		{name: "empty", wantError: ErrEmptyContextID},
+		{name: "stale", contextID: "response-old", wantError: ErrStaleContext},
+		{name: "early", contextID: "response-1", wantError: ErrPlaybackTerminalNotIssued},
+		{name: "accepted", contextID: "response-1", issued: true},
+		{name: "duplicate", contextID: "response-1", wantError: ErrDuplicatePlaybackCompletion},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			if scenario.issued {
+				lifecycle.AssistantTextCompleted(internal_type.LLMResponseDonePacket{ContextID: scenario.contextID, Text: "answer"})
+				if err := lifecycle.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: scenario.contextID, Completed: true, Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}}}, func(proto.Message) error { return nil }); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := lifecycle.ObservePlaybackCompletion(scenario.contextID); !errors.Is(err, scenario.wantError) {
+				t.Fatalf("unexpected receipt result: got %v, want %v", err, scenario.wantError)
+			}
+			if lifecycle.State() != MessageStateAssistantSpeaking {
+				t.Fatalf("receipt changed lifecycle state: %s", lifecycle.State())
+			}
+		})
+	}
+	_, nextContextID, err := lifecycle.RotateContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := lifecycle.ObservePlaybackCompletion("response-1"); !errors.Is(err, ErrStaleContext) {
+		t.Fatalf("old receipt after rotation: %v", err)
+	}
+	if err := lifecycle.ObservePlaybackCompletion(nextContextID); !errors.Is(err, ErrPlaybackTerminalNotIssued) {
+		t.Fatalf("rotation must clear terminal eligibility: %v", err)
+	}
+	lifecycle.AssistantTextCompleted(internal_type.LLMResponseDonePacket{ContextID: nextContextID, Text: "answer"})
+	if err := lifecycle.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: nextContextID, Completed: true, Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}}}, func(proto.Message) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if err := lifecycle.ObservePlaybackCompletion(nextContextID); err != nil {
+		t.Fatalf("new response receipt rejected: %v", err)
+	}
+	if lifecycle.State() != MessageStateAssistantIdle {
+		t.Fatalf("receipt changed idle state: %s", lifecycle.State())
+	}
+}
+
+func TestMessageLifecycle_ConcurrentPlaybackCompletionAcceptsOnce(t *testing.T) {
+	lifecycle := NewMessageLifecycleWithContext("response-1", type_enums.AudioMode)
+	t.Cleanup(func() { lifecycle.FailAssistantMessage("response-1") })
+	lifecycle.AssistantTextCompleted(internal_type.LLMResponseDonePacket{ContextID: "response-1", Text: "answer"})
+	if err := lifecycle.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: "response-1", Completed: true, Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}}}, func(proto.Message) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	var accepted atomic.Int32
+	var workers sync.WaitGroup
+	for range 32 {
+		workers.Go(func() {
+			err := lifecycle.ObservePlaybackCompletion("response-1")
+			if err == nil {
+				accepted.Add(1)
+			} else if !errors.Is(err, ErrDuplicatePlaybackCompletion) {
+				t.Errorf("unexpected receipt failure: %v", err)
+			}
+		})
+	}
+	workers.Wait()
+	if accepted.Load() != 1 {
+		t.Fatalf("expected one accepted receipt, got %d", accepted.Load())
+	}
+}
+
+func TestMessageLifecycle_PlaybackTerminalRevocationIsResponseScoped(t *testing.T) {
+	lifecycle := NewMessageLifecycleWithContext("response-1", type_enums.AudioMode)
+	t.Cleanup(func() { lifecycle.FailAssistantMessage(lifecycle.ContextID()) })
+	lifecycle.FailAssistantMessage("response-1")
+	if err := lifecycle.ObservePlaybackCompletion("response-1"); !errors.Is(err, ErrPlaybackTerminalNotIssued) {
+		t.Fatalf("revoked terminal must reject receipt: %v", err)
+	}
+	_, nextContextID, err := lifecycle.RotateContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+	lifecycle.AssistantTextCompleted(internal_type.LLMResponseDonePacket{ContextID: nextContextID, Text: "answer"})
+	if err := lifecycle.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: nextContextID, Completed: true, Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}}}, func(proto.Message) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	lifecycle.FailAssistantMessage("response-1")
+	if err := lifecycle.ObservePlaybackCompletion(nextContextID); err != nil {
+		t.Fatalf("stale revocation affected current terminal: %v", err)
 	}
 }

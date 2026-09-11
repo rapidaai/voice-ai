@@ -1,0 +1,61 @@
+{
+  "tier": "Standard",
+  "status": "verified_and_reviewed",
+  "scope": "Fix the five numeric-conversion warnings identified in session timeout configuration and WebRTC inputs",
+  "acceptance_criteria": [
+    "Reuse the existing integer utility package; add only one checked uint16 conversion used by all three WebRTC casts",
+    "Reject timeout values that overflow either the signed conversion or seconds-to-nanoseconds multiplication",
+    "Validate timeouts before changing existing timers and report invalid initialization through the existing failure packet before greeting output",
+    "Preserve disabled zero timeouts and valid numeric boundaries",
+    "Ignore and record malformed ICE indices without enqueueing a wrapped candidate",
+    "Reject invalid or incomplete UDP port ranges; preserve the default when both endpoints are zero"
+  ],
+  "allowed_paths": [
+    "pkg/utils/int.go",
+    "pkg/utils/int_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/session_lifecycle.go",
+    "api/assistant-api/internal/adapters/lifecycle/session_lifecycle_test.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_init_flow_test.go",
+    "api/assistant-api/internal/channel/webrtc/peer_loop.go",
+    "api/assistant-api/internal/channel/webrtc/streamer.go",
+    "api/assistant-api/internal/channel/webrtc/streamer_test.go",
+    "rfcs/0019-audio-message-completion/jsons/integer-validation-fixes.json"
+  ],
+  "risks": [
+    "Previously accepted malformed settings now fail explicitly",
+    "ConfigureTimeouts gains an error return on the internal lifecycle contract; its production caller must handle it",
+    "The worktree contains earlier uncommitted interruption changes that must remain intact"
+  ],
+  "verification_commands": [
+    "go test -race -count=1 -timeout=180s -p 2 ./pkg/utils ./api/assistant-api/internal/adapters/lifecycle ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/channel/webrtc",
+    "git diff --name-only --diff-filter=ACMR -- '*.go' ':!protos/**' | xargs -n 1 dirname | sort -u | sed 's|^|./|' | xargs env CGO_ENABLED=1 golangci-lint run --allow-serial-runners --timeout=5m --enable-only gosec",
+    "just agent-finalize with the exact allowed_paths inventory",
+    "git diff --check"
+  ],
+  "non_goals": [
+    "Do not change unrelated scanner findings or disable the security hook",
+    "Do not enable native playback callback authority",
+    "Do not change protobuf or public API schemas"
+  ],
+  "verification_results": {
+    "four_package_race_tests": {"exit_code": 0, "log": "/tmp/rfc0019-integer-validation-tests.log"},
+    "native_security_scan": {
+      "exit_code": 1,
+      "log": "/tmp/rfc0019-integer-validation-security.log",
+      "targeted_warnings_before": 5,
+      "targeted_warnings_after": 0,
+      "unrelated_warnings_remaining": 13,
+      "note": "No global scanner exclusions or hook bypass were added. The checked uint16 converter follows the existing guarded-cast annotation pattern. Remaining warnings match the prior unrelated findings."
+    },
+    "agent_finalize": {"exit_code": 0, "log": "/tmp/rfc0019-integer-validation-finalize.log"},
+    "gofmt_check": {"exit_code": 0, "files_requiring_formatting": 0},
+    "git_diff_check": {"exit_code": 0}
+  },
+  "independent_review": {
+    "agent_id": "01a09097-93e0-74b3-8704-2cbf0271136f",
+    "status": "approved",
+    "findings": [],
+    "summary": "Independent read-only review found no correctness, regression, architecture, or material coverage issue in the scoped numeric fixes. The reviewer verified production error-return handling and reviewed the named boundary tests; test execution was coordinator-owned."
+  }
+}

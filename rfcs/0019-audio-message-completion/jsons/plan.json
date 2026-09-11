@@ -1,0 +1,88 @@
+{
+  "tier": "Governed",
+  "status": "pending_challenge_and_confirmation",
+  "run_id": "run_942b61c2cb54",
+  "objective": "Use one audio completed marker and message-ID receipt, removing playback_sequence from runtime and generated APIs while reserving retired protobuf names and numbers",
+  "acceptance_criteria": [
+    "Only an explicit audio oneof with completed true can close audio playback",
+    "One final marker follows all generation, tool continuations, and synthesis audio",
+    "No receipt from text completion, payload-less completion, queue gaps, flush, or failure",
+    "No late audio can reopen a finalized or flushed message ID",
+    "Message lifecycle emits one successful metric and session idle request after accepted playback",
+    "Text-only completion remains independent from audio playback",
+    "Remove playback_sequence fields and generated accessors; reserve AssistantMessage tag 5 and PlaybackComplete tag 3 and the removed name in both messages",
+    "Preserve separately authorized Standard control fixes and unchanged rollout defaults"
+  ],
+  "allowed_paths": [
+    "api/assistant-api/internal/adapters/",
+    "api/assistant-api/internal/type/packet.go",
+    "api/assistant-api/internal/type/*_test.go",
+    "api/assistant-api/internal/llm/model/",
+    "api/assistant-api/internal/llm/agentflow/",
+    "api/assistant-api/internal/llm/agentkit/",
+    "api/assistant-api/internal/llm/websocket/",
+    "api/assistant-api/internal/transformer/",
+    "api/assistant-api/internal/*/output/",
+    "api/assistant-api/internal/watchdog/",
+    "api/assistant-api/internal/channel/",
+    "protos/artifacts/talk-api.proto",
+    "protos/talk-api.pb.go",
+    "api/document-api/app/bridges/artifacts/protos/talk_api_pb2.py",
+    "api/document-api/app/bridges/artifacts/protos/talk_api_pb2.pyi",
+    "rfcs/0019-audio-message-completion.md",
+    "rfcs/0019-audio-message-completion/jsons/"
+  ],
+  "out_of_scope_paths": [
+    "Unrelated protobuf sources and generated artifacts",
+    "Document-api runtime code outside the listed generated files",
+    "ui/",
+    "api/integration-api/",
+    "rfcs/0018-message-playback-completion.md",
+    "rfcs/0018-message-playback-completion/jsons/plan.json"
+  ],
+  "ownership": {
+    "coordinator": "Message/session lifecycle, adapter routing, packets, and RFC evidence",
+    "producer_worker": "Final generation boundaries in the four assistant executor lanes",
+    "synthesis_worker": "Text/TTS finality and watchdog failure handling, no STT edits",
+    "transport_worker": "Audio-only final marker and single message-ID callback across transports",
+    "protocol_worker": "Only the listed talk-api protobuf source and generated files; generation with bash bin/artifacts-generate.sh",
+    "challenger_and_reviewer": "Read-only independent review with report-only artifact ownership"
+  },
+  "principles": [
+    "No new protobuf messages, fields, stream methods, generic helpers, or third lifecycle",
+    "Reuse the existing ID and audio completed flag",
+    "No sequence or timestamp correlation and no duration-based success",
+    "Preserve unrelated dirty work and accepted RFC0018 bytes",
+    "Remove generated fields only through source changes and the repository generator"
+  ],
+  "risks": [
+    "Some LLM done events are intermediate model or workflow boundaries",
+    "Provider flush completion must not impersonate final message synthesis",
+    "Legacy clients may complete on text or queue gaps",
+    "Final-marker Send can synchronously receive a callback and then fail",
+    "Interruption, mode switch, or timeout can race a queued receipt",
+    "Removing generated sequence accessors breaks consumers that still reference them",
+    "Old binary fields may decode as unknown while old ProtoJSON sequence properties can fail strict parsing",
+    "Generator touches other artifacts; snapshot existing dirty output and exclude unrelated churn"
+  ],
+  "required_tests": [
+    "Audio-only empty/nonempty final marker; text and absent oneof negative cases",
+    "Tool continuation and multiple synthesis requests before one terminal",
+    "Duplicate/stale receipts, late audio, and callback-during-Send outcomes",
+    "Pause/continue/flush, transport failure, timeouts, mode switch, shutdown",
+    "Exactly-once message completion metric and session idle handoff",
+    "Reserved descriptor names/numbers, unchanged other tags, old binary unknown-field decode, and removed ProtoJSON property rejection",
+    "Build all in-repo consumers without sequence fields or accessors"
+  ],
+  "verification_commands": [
+    "go test -race -count=1 -timeout=180s ./api/assistant-api/internal/adapters/... ./api/assistant-api/internal/watchdog/... ./api/assistant-api/internal/channel/...",
+    "go test -count=1 -timeout=180s ./api/assistant-api/internal/llm/... ./api/assistant-api/internal/transformer/...",
+    "go test -p 1 -run '^$' ./api/assistant-api/...",
+    "go test -count=1 ./api/assistant-api/internal/type",
+    "python3 -m compileall -q api/document-api/app/bridges/artifacts/protos",
+    "just agent-finalize with exact changed-file inventory",
+    "git diff --check"
+  ],
+  "rollback": "Disable callback authority first. Full rollback restores matching pre-removal protobuf, generated APIs, and runtime together; never reuse retired tags for different data. Preserve independent control, queue, and idle-expiry fixes.",
+  "implementation_started": false
+}

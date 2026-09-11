@@ -19,6 +19,28 @@ func newTestAudioProcessor() *AudioProcessor {
 	return audioProcessor
 }
 
+func TestOutputDrainedRequiresAllProviderBytes(t *testing.T) {
+	processor := newTestAudioProcessor()
+	if err := processor.ProcessAssistantAudio([]byte{1, 2}, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, available := processor.NextOutputFrame(); available {
+		t.Fatal("partial frame is available")
+	}
+	if processor.OutputDrained() {
+		t.Fatal("partial frame was treated as drained")
+	}
+	if err := processor.ProcessAssistantAudio(nil, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, available := processor.NextOutputFrame(); !available {
+		t.Fatal("terminal frame is unavailable")
+	}
+	if !processor.OutputDrained() {
+		t.Fatal("sent terminal frame remains queued")
+	}
+}
+
 func newInputBufferForTest() *inputBufferForTest {
 	return &inputBufferForTest{data: make([]byte, 0, InputBufferThreshold*2)}
 }

@@ -22,6 +22,7 @@ import (
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
+	"google.golang.org/protobuf/proto"
 )
 
 type vobizWebsocketStreamer struct {
@@ -250,7 +251,7 @@ func (vws *vobizWebsocketStreamer) runWebSocketReader() {
 	}
 }
 
-func (vws *vobizWebsocketStreamer) Send(response internal_type.Stream) error {
+func (vws *vobizWebsocketStreamer) Send(response proto.Message) error {
 	if vws.mediaSession != nil {
 		if outputControlHandled, outputControlError := vws.mediaSession.HandleOutputControl(response); outputControlHandled {
 			return outputControlError
@@ -262,12 +263,12 @@ func (vws *vobizWebsocketStreamer) Send(response internal_type.Stream) error {
 			vws.mediaSession.HandleInitialization(data)
 		}
 	case *protos.ConversationAssistantMessage:
-		switch content := data.Message.(type) {
+		switch data.Message.(type) {
 		case *protos.ConversationAssistantMessage_Audio:
 			if vws.mediaSession == nil {
 				return nil
 			}
-			_, assistantAudioError := vws.mediaSession.HandleAssistantAudio(data.GetId(), content.Audio, data.GetCompleted())
+			_, assistantAudioError := vws.mediaSession.HandleAssistantAudio(data.GetId(), data.GetAudio(), data.GetCompleted())
 			return assistantAudioError
 		}
 	case *protos.ConversationInterruption:
@@ -439,6 +440,9 @@ func (vws *vobizWebsocketStreamer) sendOutputFrame(frame internal_telephony_medi
 
 func (vws *vobizWebsocketStreamer) sendVobizMessage(eventType internal_vobiz.EventType, mediaData *internal_vobiz.VobizOutboundMedia) error {
 	if vws.streamID == "" {
+		if mediaData != nil {
+			return fmt.Errorf("Vobiz output stream is not connected")
+		}
 		return nil
 	}
 	var vobizMessageJSON []byte
@@ -478,6 +482,9 @@ func (vws *vobizWebsocketStreamer) sendVobizMessage(eventType internal_vobiz.Eve
 	vws.writeMu.Lock()
 	defer vws.writeMu.Unlock()
 	if vws.connection == nil {
+		if mediaData != nil {
+			return fmt.Errorf("Vobiz output transport is not connected")
+		}
 		return nil
 	}
 	if err := vws.connection.WriteMessage(websocket.TextMessage, vobizMessageJSON); err != nil {

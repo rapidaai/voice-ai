@@ -13,6 +13,7 @@ import (
 	pionwebrtc "github.com/pion/webrtc/v4"
 	webrtc_internal "github.com/rapidaai/api/assistant-api/internal/channel/webrtc/internal"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 )
 
@@ -56,6 +57,28 @@ func (s *webrtcStreamer) enqueuePeerEvent(event webrtc_internal.PeerEvent) {
 func (s *webrtcStreamer) handlePeerState(mediaSessionID uint64, state pionwebrtc.PeerConnectionState, peerStateChangedAt time.Time) {
 	if !s.sessionState.IsActiveMediaSession(mediaSessionID) {
 		return
+	}
+	if state == pionwebrtc.PeerConnectionStateFailed || state == pionwebrtc.PeerConnectionStateDisconnected || state == pionwebrtc.PeerConnectionStateClosed {
+		s.outputWriteMu.Lock()
+		s.outputStateMu.Lock()
+		s.sessionState.SetPeerConnected(false)
+		for _, playback := range s.outputPlaybacks {
+			playback.Failed = true
+		}
+		for _, playback := range []*webrtc_internal.OutputPlayback{s.currentOutputPlayback, s.assistantPlayback} {
+			if playback != nil {
+				playback.Failed = true
+			}
+		}
+		s.outputAudioQueueMu.Lock()
+		for _, frame := range s.outputAudioQueue {
+			if frame.Playback != nil {
+				frame.Playback.Failed = true
+			}
+		}
+		s.outputAudioQueueMu.Unlock()
+		s.outputStateMu.Unlock()
+		s.outputWriteMu.Unlock()
 	}
 
 	s.Mu.Lock()
@@ -381,13 +404,26 @@ func (s *webrtcStreamer) handleClientSignal(signaling *protos.ClientSignaling) {
 		if ice == nil || ice.GetCandidate() == "" {
 			return
 		}
-		idx := uint16(ice.GetSdpMLineIndex())
+		sdpMLineIndex, err := utils.Int64ToUint16(int64(ice.GetSdpMLineIndex()))
+		if err != nil {
+			_ = s.observer.Record(s.Ctx, s.sessionState.Scope, observability.RecordLog{
+				Level:   observability.LevelDebug,
+				Message: "Ignoring ICE candidate with invalid SDP media line index",
+				Attributes: observability.Attributes{
+					"component":                   observability.ComponentWebRTC.String(),
+					webrtc_internal.DataSessionID: s.sessionID,
+					"sdp_m_line_index":            fmt.Sprintf("%d", ice.GetSdpMLineIndex()),
+					"error":                       err.Error(),
+				},
+			})
+			return
+		}
 		sdpMid := ice.GetSdpMid()
 		usernameFragment := ice.GetUsernameFragment()
 		candidate := pionwebrtc.ICECandidateInit{
 			Candidate:        ice.GetCandidate(),
 			SDPMid:           &sdpMid,
-			SDPMLineIndex:    &idx,
+			SDPMLineIndex:    &sdpMLineIndex,
 			UsernameFragment: &usernameFragment,
 		}
 		s.enqueueWebRTCOperation(webrtc_internal.WebRTCOperation{

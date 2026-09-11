@@ -1,0 +1,26 @@
+{
+  "date": "2026-09-11",
+  "authorization": "User explicitly requested ignoring the remaining security-check blocker and pushing",
+  "user_request": "ignore and pus",
+  "branch": "rfc/interruption-lifecycle",
+  "pr": 270,
+  "exception": {
+    "hook": "go-security-scan",
+    "application": "SKIP=go-security-scan for this publication only",
+    "reason": "The hook forces CGO_ENABLED=0 and cannot type-check native Opus bindings. Native analysis removed all five targeted numeric warnings; 13 previously inspected unrelated warnings remain.",
+    "permanent_hook_changes": false,
+    "other_hooks_enabled": true
+  },
+  "evidence": [
+    "rfcs/0019-audio-message-completion/jsons/verification.json",
+    "rfcs/0019-audio-message-completion/jsons/review-02.json",
+    "rfcs/0019-audio-message-completion/jsons/integer-validation-fixes.json"
+  ],
+  "limitations": [
+    "Native playback callback activation remains pending scope approval",
+    "Neuphonic has no verified final-audio acknowledgment and reports failure instead of successful completion",
+    "No live provider or carrier validation",
+    "Newer parent changes have been fetched but not merged into this reviewed feature snapshot"
+  ],
+  "excluded_local_paths": ["bin/orca-confirm-rfc", "bin/validate-development-process"]
+}

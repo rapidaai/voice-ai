@@ -18,7 +18,6 @@ import (
 	channel_base "github.com/rapidaai/api/assistant-api/internal/channel/base"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
-	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
@@ -59,6 +58,8 @@ func (engine *fakeAsteriskMediaEngine) NextOutputFrame() (internal_telephony_med
 	engine.outputFrames = engine.outputFrames[1:]
 	return frame, true
 }
+
+func (engine *fakeAsteriskMediaEngine) OutputDrained() bool { return true }
 
 func (engine *fakeAsteriskMediaEngine) IdleOutputFrame() (internal_telephony_media.AssistantOutputFrame, bool) {
 	return internal_telephony_media.AssistantOutputFrame{}, false
@@ -140,7 +141,9 @@ func TestHandleAudioData_EmitsBridgeUserAudio(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case stream := <-asteriskStreamer.LowCh:
+	case <-asteriskStreamer.LowCh.Ready():
+		stream, err := asteriskStreamer.LowCh.TryReceive()
+		require.NoError(t, err)
 		bridgeAudio, ok := stream.(*protos.ConversationBridgeUserAudio)
 		require.True(t, ok, "expected bridge user audio, got %T", stream)
 		assert.NotEmpty(t, bridgeAudio.GetAudio())
@@ -190,7 +193,9 @@ func TestSend_EndConversation_PushesToolCallResult(t *testing.T) {
 
 	// The ToolCallResult should be routed to CriticalCh by Input().
 	select {
-	case msg := <-aws.CriticalCh:
+	case <-aws.CriticalCh.Ready():
+		msg, err := aws.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		result, ok := msg.(*protos.ConversationToolCallResult)
 		require.True(t, ok, "expected ConversationToolCallResult, got %T", msg)
 		assert.Equal(t, "tc-123", result.GetId())
@@ -218,7 +223,9 @@ func TestSend_EndConversation_DoesNotCancelStreamer(t *testing.T) {
 
 	// Drain the tool call result.
 	select {
-	case <-aws.CriticalCh:
+	case <-aws.CriticalCh.Ready():
+		_, err := aws.CriticalCh.TryReceive()
+		require.NoError(t, err)
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for ConversationToolCallResult")
 	}
@@ -246,7 +253,9 @@ func TestSend_TransferConversation_MissingTarget(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case msg := <-aws.CriticalCh:
+	case <-aws.CriticalCh.Ready():
+		msg, err := aws.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		result, ok := msg.(*protos.ConversationToolCallResult)
 		require.True(t, ok, "expected ConversationToolCallResult, got %T", msg)
 		assert.Equal(t, "tc-transfer-1", result.GetId())
@@ -292,16 +301,16 @@ func TestSend_OutputControlsRouteBeforeAssistantAudio(t *testing.T) {
 		Id:      "response-1",
 		Message: &protos.ConversationAssistantMessage_Audio{Audio: audio},
 	}))
-	require.NoError(t, aws.Send(internal_type.PauseOutput{}))
+	require.NoError(t, aws.Send(&protos.ConversationPlaybackPause{}))
 	assert.Nil(t, aws.mediaSession.NextFrame())
-	require.NoError(t, aws.Send(internal_type.ContinueOutput{}))
+	require.NoError(t, aws.Send(&protos.ConversationPlaybackContinue{}))
 	assert.Equal(t, audio, aws.mediaSession.NextFrame())
 
 	require.NoError(t, aws.Send(&protos.ConversationAssistantMessage{
 		Id:      "response-2",
 		Message: &protos.ConversationAssistantMessage_Audio{Audio: audio},
 	}))
-	require.NoError(t, aws.Send(internal_type.FlushOutput{}))
+	require.NoError(t, aws.Send(&protos.ConversationPlaybackFlush{}))
 	require.NoError(t, aws.Send(&protos.ConversationAssistantMessage{
 		Id:      "response-2",
 		Message: &protos.ConversationAssistantMessage_Audio{Audio: audio},

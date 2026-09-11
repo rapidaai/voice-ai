@@ -8,7 +8,6 @@ package adapter_internal
 import (
 	"context"
 	"errors"
-	"sync"
 	"time"
 
 	"github.com/rapidaai/api/assistant-api/config"
@@ -85,20 +84,6 @@ type genericRequestor struct {
 	sessionLifecycle adapter_lifecycle.SessionLifecycle
 	dispatchRoute    *adapter_router.DispatchRoute
 
-	interruptionMu                     sync.Mutex
-	interruptionEnabled                bool
-	interruptionContextID              string
-	interruptionPreviousState          string
-	interruptionSequence               uint64
-	interruptionSpeechActive           bool
-	interruptionDecisionPending        bool
-	interruptionTurnCommitted          bool
-	interruptionHeldPackets            []internal_type.Packet
-	interruptionDecisionTimer          *time.Timer
-	committedInterruptionContextID     string
-	previousInterruptionContextID      string
-	pendingInterruptionVADEndContextID string
-
 	// listening
 	speechToTextTransformer internal_type.SpeechToTextTransformer
 	textToSpeechTransformer internal_type.TextToSpeechTransformer
@@ -130,10 +115,7 @@ type genericRequestor struct {
 	options  map[string]interface{}
 
 	// experience
-	idleTimeoutWatchdog   *watchdog.IdleTimeoutWatchdog
-	unclearInputWatchdog  *watchdog.UnclearInputWatchdog
 	ttsCompletionWatchdog *watchdog.TTSCompletionWatchdog
-	maxSessionWatchdog    *watchdog.MaxSessionWatchdog
 
 	// sessionCtx is the adapter-owned lifecycle context. Outlives the gRPC stream.
 	// cancelSession is invoked exactly once, by HandleFinalizationCompleted, after
@@ -152,6 +134,7 @@ func NewGenericRequestor(
 	postgres connectors.PostgresConnector, opensearch connectors.OpenSearchConnector,
 	redis connectors.RedisConnector, storage storages.Storage, streamer internal_type.Streamer,
 	observer observability.Recorder,
+	playbackCompletionAuthoritative ...bool,
 ) *genericRequestor {
 	sessionCtx, cancelSession := context.WithCancel(context.Background())
 	channels := adapter_channel.NewRequestorChannels()
@@ -198,25 +181,14 @@ func NewGenericRequestor(
 		channels:                  channels,
 	}
 
-	gr.idleTimeoutWatchdog = watchdog.NewIdleTimeoutWatchdog(
-		watchdog.WithOnPacket(gr.OnPacket),
-		watchdog.WithPacketContext(sessionCtx),
-	)
-	gr.unclearInputWatchdog = watchdog.NewUnclearInputWatchdog(
-		watchdog.WithOnPacket(gr.OnPacket),
-		watchdog.WithPacketContext(sessionCtx),
-	)
+	gr.messageLifecycle.ConfigurePlaybackCompletion(len(playbackCompletionAuthoritative) > 0 && playbackCompletionAuthoritative[0], func(packets ...internal_type.Packet) error {
+		return gr.OnPacket(sessionCtx, packets...)
+	})
 	gr.ttsCompletionWatchdog = watchdog.NewTTSCompletionWatchdog(
 		watchdog.WithOnPacket(gr.OnPacket),
 		watchdog.WithPacketContext(sessionCtx),
 		watchdog.WithGracePeriod(300*time.Millisecond),
 	)
-	gr.maxSessionWatchdog = watchdog.NewMaxSessionWatchdog(
-		watchdog.WithOnPacket(gr.OnPacket),
-		watchdog.WithPacketContext(sessionCtx),
-	)
-	gr.interruptionEnabled = dispatchInterruptionEnabled
-
 	go gr.runBootstrapDispatcher(sessionCtx)
 	go gr.runCriticalDispatcher(sessionCtx)
 	go gr.runOutputDispatcher(sessionCtx)

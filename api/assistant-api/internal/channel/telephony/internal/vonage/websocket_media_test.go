@@ -11,11 +11,11 @@ import (
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
-	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 type fakeVonageMediaEngine struct {
@@ -43,6 +43,8 @@ func (engine *fakeVonageMediaEngine) ProcessAssistantAudio(_ []byte, _ bool) err
 func (engine *fakeVonageMediaEngine) NextOutputFrame() (internal_telephony_media.AssistantOutputFrame, bool) {
 	return internal_telephony_media.AssistantOutputFrame{}, false
 }
+
+func (engine *fakeVonageMediaEngine) OutputDrained() bool { return true }
 
 func (engine *fakeVonageMediaEngine) IdleOutputFrame() (internal_telephony_media.AssistantOutputFrame, bool) {
 	return internal_telephony_media.AssistantOutputFrame{}, false
@@ -85,14 +87,14 @@ func TestNewVonageWebsocketStreamer_WiresMediaSession(t *testing.T) {
 func TestSend_ConsumesOutputControls(t *testing.T) {
 	outputControlTestCases := []struct {
 		name               string
-		control            internal_type.Stream
+		control            proto.Message
 		resumeProbe        bool
 		wantLocalClears    int32
 		wantProviderClears int32
 	}{
-		{name: "pause", control: internal_type.PauseOutput{}},
-		{name: "continue", control: internal_type.ContinueOutput{}, resumeProbe: true},
-		{name: "flush", control: internal_type.FlushOutput{}, wantLocalClears: 1, wantProviderClears: 1},
+		{name: "pause", control: &protos.ConversationPlaybackPause{}},
+		{name: "continue", control: &protos.ConversationPlaybackContinue{}, resumeProbe: true},
+		{name: "flush", control: &protos.ConversationPlaybackFlush{}, wantLocalClears: 1, wantProviderClears: 1},
 	}
 
 	for _, testCase := range outputControlTestCases {
@@ -111,19 +113,21 @@ func TestSend_ConsumesOutputControls(t *testing.T) {
 				},
 			})
 			if testCase.resumeProbe {
-				_, outputControlError := streamer.mediaSession.HandleOutputControl(internal_type.PauseOutput{})
+				_, outputControlError := streamer.mediaSession.HandleOutputControl(&protos.ConversationPlaybackPause{})
 				require.NoError(t, outputControlError)
 				providerClearCount.Store(0)
 			}
 
 			require.NoError(t, streamer.Send(testCase.control))
 			if testCase.resumeProbe {
-				require.NoError(t, streamer.Send(internal_type.PauseOutput{}))
+				require.NoError(t, streamer.Send(&protos.ConversationPlaybackPause{}))
 			}
 			assert.Equal(t, testCase.wantLocalClears, mediaEngine.clearCount.Load())
 			assert.Equal(t, testCase.wantProviderClears, providerClearCount.Load())
 			select {
-			case output := <-streamer.OutputCh:
+			case <-streamer.OutputCh.Ready():
+				output, err := streamer.OutputCh.TryReceive()
+				require.NoError(t, err)
 				t.Fatalf("output control was forwarded: %T", output)
 			default:
 			}
@@ -154,7 +158,9 @@ func TestHandleMediaEvent_EmitsBridgeUserAudio(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case stream := <-vonageStreamer.LowCh:
+	case <-vonageStreamer.LowCh.Ready():
+		stream, err := vonageStreamer.LowCh.TryReceive()
+		require.NoError(t, err)
 		bridgeAudio, ok := stream.(*protos.ConversationBridgeUserAudio)
 		require.True(t, ok, "expected bridge user audio, got %T", stream)
 		assert.NotEmpty(t, bridgeAudio.GetAudio())

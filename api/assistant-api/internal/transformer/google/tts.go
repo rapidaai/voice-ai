@@ -319,24 +319,11 @@ func (g *googleTextToSpeech) recvLoop(streamClient texttospeechpb.TextToSpeech_S
 			}
 			if strings.Contains(err.Error(), "Stream aborted due to long duration elapsed without input sent") {
 				g.logger.Debugf("google-tts: stream aborted due to timeout, reinitializing")
-				g.mu.Lock()
-				effectiveCtx := g.contextId
-				if effectiveCtx == "" {
-					effectiveCtx = initialContextId
-				}
-				g.mu.Unlock()
-				g.onPacket(internal_type.TextToSpeechEndPacket{ContextID: effectiveCtx})
+				g.failStream(initialContextId, fmt.Errorf("google-tts: stream timed out: %w", err))
 				go g.Initialize()
 				return
 			}
-			g.mu.Lock()
-			effectiveCtx := g.contextId
-			if effectiveCtx == "" {
-				effectiveCtx = initialContextId
-			}
-			g.mu.Unlock()
-			g.onPacket(internal_type.TextToSpeechEndPacket{ContextID: effectiveCtx})
-			g.logger.Errorf("google-tts: error receiving from stream: %v", err)
+			g.failStream(initialContextId, fmt.Errorf("google-tts: error receiving from stream: %w", err))
 			return
 		}
 
@@ -379,6 +366,38 @@ func (g *googleTextToSpeech) recvLoop(streamClient texttospeechpb.TextToSpeech_S
 			g.logger.Errorf("google-tts: failed to send packet: %v", err)
 		}
 	}
+}
+
+func (g *googleTextToSpeech) failStream(initialContextID string, streamErr error) {
+	g.mu.Lock()
+	effectiveCtx := g.contextId
+	if effectiveCtx == "" {
+		effectiveCtx = initialContextID
+	}
+	g.mu.Unlock()
+
+	g.logger.Errorf("%v", streamErr)
+	g.onPacket(
+		internal_type.TextToSpeechErrorPacket{
+			ContextID: effectiveCtx,
+			Error:     streamErr,
+			Type:      internal_type.TTSNetworkTimeout,
+		},
+		internal_type.ObservabilityLogRecordPacket{
+			ContextID: effectiveCtx,
+			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+			Record: observability.RecordLog{
+				Level:   observability.LevelError,
+				Message: "google-tts: stream failed",
+				Attributes: observability.Attributes{
+					"component": observability.ComponentTTS.String(),
+					"provider":  g.Name(),
+					"error":     observability.AttributeValue(streamErr.Error()),
+				},
+				OccurredAt: time.Now(),
+			},
+		},
+	)
 }
 
 // Close safely shuts down the TTS client and streaming client.

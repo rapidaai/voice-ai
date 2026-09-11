@@ -3,6 +3,7 @@ package adapter_internal
 import (
 	"context"
 	"errors"
+	"math"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	adapter_router "github.com/rapidaai/api/assistant-api/internal/adapters/router"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_conversation_entity "github.com/rapidaai/api/assistant-api/internal/entity/conversations"
+	internal_options "github.com/rapidaai/api/assistant-api/internal/options"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
@@ -118,6 +120,50 @@ func TestInitializeTextToSpeechPacket_ConfigError_EmitsNonRecoverableInitializat
 		t.Fatal("expected InitializationFailedPacket in bootstrap channel")
 	}
 	assert.Nil(t, requestor.textToSpeechTransformer)
+}
+
+func TestInitializeBehavior_InvalidTimeoutRejectsGreeting(t *testing.T) {
+	for _, testCase := range []struct {
+		name    string
+		options utils.Option
+	}{
+		{name: "idle timeout multiplication overflow", options: utils.Option{
+			internal_options.ExperienceOptionIdleTimeout: uint64(math.MaxInt64/int64(time.Second)) + 1,
+		}},
+		{name: "maximum session signed overflow", options: utils.Option{
+			internal_options.ExperienceOptionMaxSessionDuration: uint64(math.MaxUint64),
+		}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			greeting := "Welcome!"
+			requestorChannels := adapter_channel.NewRequestorChannels()
+			requestor := &genericRequestor{
+				source:  utils.Debugger,
+				options: testCase.options,
+				assistant: &internal_assistant_entity.Assistant{
+					AssistantDebuggerDeployment: &internal_assistant_entity.AssistantDebuggerDeployment{
+						AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{Greeting: &greeting},
+					},
+				},
+				messageLifecycle: adapter_lifecycle.NewMessageLifecycleWithContext("invalid-timeout", type_enums.TextMode),
+				sessionLifecycle: adapter_lifecycle.NewSessionLifecycleWithState(adapter_lifecycle.StateInitializing),
+				dispatchRoute:    adapter_router.NewDispatchRoute(adapter_router.NewRoutePolicy(), requestorChannels),
+				channels:         requestorChannels,
+			}
+			t.Cleanup(requestor.sessionLifecycle.CloseTimeouts)
+			requestorDispatchHandler{r: requestor}.HandleInitializeBehavior(context.Background(), internal_type.InitializeBehaviorPacket{
+				ContextID: "invalid-timeout",
+			})
+			require.Equal(t, 1, requestorChannels.BootstrapChannel().Len())
+			failure, ok := receiveEnvelope(t, requestorChannels.BootstrapChannel()).Pkt.(internal_type.InitializationFailedPacket)
+			require.True(t, ok)
+			assert.Equal(t, internal_type.InitializationStageBehavior, failure.Stage)
+			assert.Equal(t, "invalid-timeout", failure.ContextID)
+			require.Error(t, failure.Error)
+			assert.False(t, failure.IsRecoverable())
+			assert.Zero(t, requestorChannels.EgressChannel().Len(), "invalid settings must not queue a greeting")
+		})
+	}
 }
 
 func TestInitializeBehavior_GreetingInterruptibleOption_ControlsAudioBlock(t *testing.T) {

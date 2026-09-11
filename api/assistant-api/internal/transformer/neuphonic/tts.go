@@ -128,9 +128,7 @@ func (*neuphonicTTS) Name() string {
 }
 
 // readLoop owns a single WebSocket connection for the duration of one TTS turn.
-// It exits when the connection closes — intentionally (interrupt / done) or
-// unexpectedly (network drop). Neuphonic has no server-side completion ACK so
-// the turn ends when Transform receives TextToSpeechDonePacket.
+// It exits when the connection closes intentionally or unexpectedly.
 func (rt *neuphonicTTS) readLoop(conn *websocket.Conn) {
 	for {
 		select {
@@ -275,31 +273,53 @@ func (t *neuphonicTTS) Transform(ctx context.Context, in internal_type.Packet) e
 		return nil
 
 	case internal_type.TextToSpeechDonePacket:
-		// Interrupted before done arrived — nothing to flush.
+		// Interrupted before done arrived. Nothing to flush.
 		if connection == nil {
 			return nil
 		}
-		// Neuphonic has no server-side completion ACK, so we emit TextToSpeechEndPacket
-		// here and close the per-turn connection ourselves.
-		if err := connection.WriteJSON(map[string]interface{}{
+		stopErr := connection.WriteJSON(map[string]interface{}{
 			"text": "<STOP>",
-		}); err != nil {
-			t.logger.Errorf("neuphonic-tts: unable to send stop signal: %v", err)
-		}
+		})
 		t.mu.Lock()
 		ctxId := t.contextId
 		t.connection = nil // mark before Close so readLoop sees intentional
 		t.mu.Unlock()
 		connection.Close()
+		if stopErr != nil {
+			t.logger.Errorf("neuphonic-tts: unable to send stop signal: %v", stopErr)
+			t.onPacket(
+				internal_type.TextToSpeechErrorPacket{
+					ContextID: input.ContextID,
+					Error:     fmt.Errorf("neuphonic-tts: failed to send stop signal: %w", stopErr),
+					Type:      internal_type.TTSNetworkTimeout,
+				},
+				internal_type.ObservabilityEventRecordPacket{
+					ContextID: input.ContextID,
+					Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+					Record: observability.RecordEvent{
+						Component:  observability.ComponentTTS,
+						Event:      observability.TTSError,
+						Attributes: observability.Attributes{"type": "error", "message": "failed to send stop signal"},
+						OccurredAt: time.Now(),
+					},
+				},
+			)
+			return nil
+		}
+		t.logger.Errorf("neuphonic-tts: provider has no completion acknowledgement")
 		t.onPacket(
-			internal_type.TextToSpeechEndPacket{ContextID: ctxId},
+			internal_type.TextToSpeechErrorPacket{
+				ContextID: ctxId,
+				Error:     fmt.Errorf("neuphonic-tts: provider has no completion acknowledgement"),
+				Type:      internal_type.TTSNetworkTimeout,
+			},
 			internal_type.ObservabilityEventRecordPacket{
 				ContextID: ctxId,
 				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
 				Record: observability.RecordEvent{
 					Component:  observability.ComponentTTS,
-					Event:      observability.TTSCompleted,
-					Attributes: observability.Attributes{"type": "completed"},
+					Event:      observability.TTSError,
+					Attributes: observability.Attributes{"type": "error", "message": "provider has no completion acknowledgement"},
 					OccurredAt: time.Now(),
 				},
 			},

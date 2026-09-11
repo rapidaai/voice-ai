@@ -1,0 +1,73 @@
+{
+  "task_id": "task_09dd62a2efb5",
+  "dispatch_id": "ctx_3ee71a6b27a8",
+  "scope": "api/assistant-api/internal/channel/",
+  "rfc": "rfcs/0019-audio-message-completion.md",
+  "confirmation": "rfcs/0019-audio-message-completion/jsons/confirmation.json",
+  "summary": [
+    "Removed playback-sequence runtime identity from channel transport playback queues, streamers, native media sessions, receipts, and channel tests.",
+    "Changed audio completion admission so only an explicit ConversationAssistantMessage audio oneof with completed=true acts as the terminal marker; text and nil payload completions do not close playback.",
+    "Preserved FIFO tail drain, pause/continue/flush behavior, send-failure suppression of success receipts, SIP transfer/pacing behavior, and ID-only native playback receipts."
+  ],
+  "direct_files_modified": [
+    "api/assistant-api/internal/channel/grpc/streamer.go",
+    "api/assistant-api/internal/channel/grpc/streamer_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/asterisk/audiosocket/streamer.go",
+    "api/assistant-api/internal/channel/telephony/internal/asterisk/internal/audio_processor_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/asterisk/websocket/websocket.go",
+    "api/assistant-api/internal/channel/telephony/internal/exotel/websocket.go",
+    "api/assistant-api/internal/channel/telephony/internal/media/playback_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/media/session.go",
+    "api/assistant-api/internal/channel/telephony/internal/media/session_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/media/types.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/media_port.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/media_port_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/playback_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/streamer.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/streamer_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/telnyx/websocket.go",
+    "api/assistant-api/internal/channel/telephony/internal/twilio/internal/playback_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/twilio/websocket.go",
+    "api/assistant-api/internal/channel/telephony/internal/twilio/websocket_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/vobiz/websocket.go",
+    "api/assistant-api/internal/channel/telephony/internal/vonage/websocket.go",
+    "api/assistant-api/internal/channel/webrtc/audio_buffer.go",
+    "api/assistant-api/internal/channel/webrtc/internal/playback_test.go",
+    "api/assistant-api/internal/channel/webrtc/internal/types.go",
+    "api/assistant-api/internal/channel/webrtc/output_loop.go",
+    "api/assistant-api/internal/channel/webrtc/playback_test.go",
+    "api/assistant-api/internal/channel/webrtc/streamer.go",
+    "api/assistant-api/internal/channel/webrtc/streamer_test.go"
+  ],
+  "verification": [
+    {
+      "command": "rg -n \"PlaybackSequence|playbackSequence|GetPlaybackSequence\" api/assistant-api/internal/channel --glob '*.go'",
+      "result": "passed: no matches"
+    },
+    {
+      "command": "rg -n \"case \\\\*protos\\\\.ConversationAssistantMessage_Audio, nil|Message == nil &&|data\\\\.Message == nil|m\\\\.Message == nil|legacy_terminal\" api/assistant-api/internal/channel --glob '*.go'",
+      "result": "passed: no production matches; remaining matches are negative test names/cases"
+    },
+    {
+      "command": "git diff --check -- api/assistant-api/internal/channel",
+      "result": "passed"
+    },
+    {
+      "command": "go test -count=1 -timeout=180s ./api/assistant-api/internal/channel/...",
+      "result": "passed with existing duplicate -rpath / duplicate library linker warnings"
+    },
+    {
+      "command": "go test -race -count=1 -timeout=180s ./api/assistant-api/internal/channel/...",
+      "result": "passed with existing duplicate -rpath / duplicate library linker warnings and macOS LC_DYSYMTAB linker warnings"
+    },
+    {
+      "command": "just agent-finalize \"<current channel file inventory plus rfcs/0019-audio-message-completion/jsons/transport-implementation.json>\"",
+      "result": "passed; the first finalize attempt used a narrower direct-edit list and failed only the changed-package test-file inventory hook, then the full current channel inventory passed"
+    }
+  ],
+  "limitations": [
+    "Did not edit protobuf source or generated files; the coordinator/protocol worker owns that removal.",
+    "Did not edit producer, synthesis, lifecycle, adapters, watchdog, or type packages except preserving their existing dirty worktree state.",
+    "Did not run real telephony provider calls or external WebRTC clients; verification is local package tests only before agent-finalize."
+  ]
+}

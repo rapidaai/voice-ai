@@ -27,6 +27,15 @@ func MinUint64(a, b uint64) uint64 {
 	return b
 }
 
+// Int64ToUint16 converts an int64 to uint16 when the value is in range.
+func Int64ToUint16(value int64) (uint16, error) {
+	if value < 0 || value > math.MaxUint16 {
+		return 0, fmt.Errorf("int64 value %d exceeds uint16 range", value)
+	}
+	// #nosec G115, value is checked above.
+	return uint16(value), nil
+}
+
 // Int64ToUint32 converts an int64 to uint32 when the value is in range.
 func Int64ToUint32(value int64) (uint32, error) {
 	if value < 0 || value > math.MaxUint32 {

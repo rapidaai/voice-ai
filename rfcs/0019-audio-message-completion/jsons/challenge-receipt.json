@@ -1,0 +1,17 @@
+{
+  "run_id": "run_942b61c2cb54",
+  "task_id": "task_63e312dd85b4",
+  "dispatch_id": "ctx_46c96209a410",
+  "decision": "approved",
+  "rfc_file": "rfcs/0019-audio-message-completion.md",
+  "rfc_sha256": "052a55f717d3134d6c33c0ca9035d0c7f82e98d3e06092c06e6b2fe1aef4f1de",
+  "reviewer": "Codex worker term_1d04feb0-a60f-4d39-8b8a-bf31571f690d",
+  "reviewed_at": "2026-09-10T18:28:59Z",
+  "review_timestamp_basis": "Orca worker_done publication time. The independent source report records the review date only.",
+  "source_report": "rfcs/0019-audio-message-completion/jsons/challenge.json",
+  "source_report_sha256": "6c6790a736d413b2a115aed0e90a759cf3e0692f8e2e9eeab4a682f910f0de5f",
+  "source_message_id": "msg_1a2539f1ddd0",
+  "plan_sha256": "94d3e9d60ae30f88d105ed506b435c8a17a6697e074511c4377a6cdb8164f3ca",
+  "collection_note": "Coordinator mapped the independent report's approval fields into the gate receipt schema without modifying the source report or reviewed artifacts.",
+  "blocking_findings": []
+}

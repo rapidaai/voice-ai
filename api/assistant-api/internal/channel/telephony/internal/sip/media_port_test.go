@@ -19,12 +19,12 @@ import (
 	resampler_soxr "github.com/rapidaai/api/assistant-api/internal/audio/resampler/soxr"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zaf/g711"
+	"google.golang.org/protobuf/proto"
 )
 
 func newMediaPortTestSession(t *testing.T) *sip_runtime.Session {
@@ -79,7 +79,7 @@ func newMediaPortTestRTP(t *testing.T) (*fakeRTPHandler, func(sip_runtime.Inboun
 
 func newMediaPortForTest(
 	t *testing.T,
-	streamSink func(internal_type.Stream),
+	streamSink func(proto.Message),
 	recorders ...func(...observability.Record) error,
 ) (*MediaPort, func(sip_runtime.InboundAudioFrame), chan []byte) {
 	t.Helper()
@@ -100,8 +100,8 @@ func newMediaPortForTest(
 }
 
 func TestMediaPort_StartForwardsProviderAudio(t *testing.T) {
-	streams := make(chan internal_type.Stream, 4)
-	mediaPort, emitInboundAudio, _ := newMediaPortForTest(t, func(stream internal_type.Stream) {
+	streams := make(chan proto.Message, 4)
+	mediaPort, emitInboundAudio, _ := newMediaPortForTest(t, func(stream proto.Message) {
 		streams <- stream
 	})
 
@@ -139,7 +139,7 @@ func TestMediaPort_RealUDPInputMatchesReferencePCM(t *testing.T) {
 				Context:    t.Context(),
 				Session:    newMediaPortTestSessionWithCodec(t, &codec),
 				RTPHandler: receiver,
-				StreamSink: func(stream internal_type.Stream) {
+				StreamSink: func(stream proto.Message) {
 					switch message := stream.(type) {
 					case *protos.ConversationUserMessage:
 						pipelineAudio <- append([]byte(nil), message.GetAudio()...)
@@ -242,7 +242,7 @@ func TestMediaPort_RealUDPInputHandlesReorderingAndLoss(t *testing.T) {
 					Context:    t.Context(),
 					Session:    newMediaPortTestSessionWithCodec(t, &codec),
 					RTPHandler: receiver,
-					StreamSink: func(stream internal_type.Stream) {
+					StreamSink: func(stream proto.Message) {
 						switch message := stream.(type) {
 						case *protos.ConversationUserMessage:
 							pipelineAudio <- append([]byte(nil), message.GetAudio()...)
@@ -353,13 +353,13 @@ func TestMediaPort_RealUDPInputHandlesReorderingAndLoss(t *testing.T) {
 
 func TestMediaPort_SeparatesRecognitionAndRecordingDelivery(tester *testing.T) {
 	rtpHandler, emitInboundAudio, _ := newMediaPortTestRTP(tester)
-	realtime := make(chan internal_type.Stream, 1)
-	recording := make(chan internal_type.Stream, 1)
+	realtime := make(chan proto.Message, 1)
+	recording := make(chan proto.Message, 1)
 	mediaPort, err := NewMediaPort(MediaPortConfig{
 		Context:    context.Background(),
 		Session:    newMediaPortTestSession(tester),
 		RTPHandler: rtpHandler,
-		StreamSink: func(stream internal_type.Stream) {
+		StreamSink: func(stream proto.Message) {
 			switch stream.(type) {
 			case *protos.ConversationBridgeUserAudio:
 				recording <- stream
@@ -391,8 +391,8 @@ func TestMediaPort_SeparatesRecognitionAndRecordingDelivery(tester *testing.T) {
 }
 
 func TestMediaPort_PreservesRTPFrameReceivedAt(tester *testing.T) {
-	streams := make(chan internal_type.Stream, 4)
-	mediaPort, emitInboundAudio, _ := newMediaPortForTest(tester, func(stream internal_type.Stream) {
+	streams := make(chan proto.Message, 4)
+	mediaPort, emitInboundAudio, _ := newMediaPortForTest(tester, func(stream proto.Message) {
 		streams <- stream
 	})
 	mediaPort.StartInput()
@@ -435,8 +435,8 @@ func TestMediaPort_LocalAddrReturnsRTPAddress(t *testing.T) {
 }
 
 func TestMediaPort_ProviderAudioRecordsBeforePipelineAudio(t *testing.T) {
-	streams := make(chan internal_type.Stream, 4)
-	mediaPort, emitInboundAudio, _ := newMediaPortForTest(t, func(stream internal_type.Stream) {
+	streams := make(chan proto.Message, 4)
+	mediaPort, emitInboundAudio, _ := newMediaPortForTest(t, func(stream proto.Message) {
 		streams <- stream
 	})
 
@@ -472,8 +472,8 @@ func TestMediaPort_ProviderAudioRecordsBeforePipelineAudio(t *testing.T) {
 }
 
 func TestMediaPort_AssistantAudioReachesRTPOutput(t *testing.T) {
-	streams := make(chan internal_type.Stream, 4)
-	mediaPort, _, audioOut := newMediaPortForTest(t, func(stream internal_type.Stream) {
+	streams := make(chan proto.Message, 4)
+	mediaPort, _, audioOut := newMediaPortForTest(t, func(stream proto.Message) {
 		streams <- stream
 	})
 
@@ -503,8 +503,8 @@ func TestMediaPort_AssistantAudioReachesRTPOutput(t *testing.T) {
 }
 
 func TestMediaPort_StartInputDoesNotStartAssistantOutput(t *testing.T) {
-	streams := make(chan internal_type.Stream, 4)
-	mediaPort, _, audioOut := newMediaPortForTest(t, func(stream internal_type.Stream) {
+	streams := make(chan proto.Message, 4)
+	mediaPort, _, audioOut := newMediaPortForTest(t, func(stream proto.Message) {
 		streams <- stream
 	})
 
@@ -532,9 +532,9 @@ func TestMediaPort_StartInputDoesNotStartAssistantOutput(t *testing.T) {
 }
 
 func TestMediaPort_DroppedAssistantAudioIsNotRecorded(t *testing.T) {
-	streams := make(chan internal_type.Stream, 4)
+	streams := make(chan proto.Message, 4)
 	records := make(chan observability.Record, 4)
-	mediaPort, _, audioOut := newMediaPortForTest(t, func(stream internal_type.Stream) {
+	mediaPort, _, audioOut := newMediaPortForTest(t, func(stream proto.Message) {
 		streams <- stream
 	}, func(record ...observability.Record) error {
 		for _, item := range record {
@@ -578,7 +578,7 @@ func TestMediaPort_TransferModeSuppressesAssistantAudio(t *testing.T) {
 	require.True(t, mediaPort.EnterTransferMode(DefaultRingtone))
 	assistantAudioAccepted, assistantAudioError := mediaPort.HandleAssistantAudio("response-1", make([]byte, BridgeOutputFrameSize), false)
 	require.NoError(t, assistantAudioError)
-	require.True(t, assistantAudioAccepted)
+	require.False(t, assistantAudioAccepted)
 
 	select {
 	case frame := <-audioOut:
@@ -590,8 +590,8 @@ func TestMediaPort_TransferModeSuppressesAssistantAudio(t *testing.T) {
 }
 
 func TestMediaPort_InterruptPreservesInputAudio(t *testing.T) {
-	streams := make(chan internal_type.Stream, 8)
-	mediaPort, emitInboundAudio, _ := newMediaPortForTest(t, func(stream internal_type.Stream) {
+	streams := make(chan proto.Message, 8)
+	mediaPort, emitInboundAudio, _ := newMediaPortForTest(t, func(stream proto.Message) {
 		streams <- stream
 	})
 
@@ -600,7 +600,7 @@ func TestMediaPort_InterruptPreservesInputAudio(t *testing.T) {
 	for range 4 {
 		emitInboundAudio(sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()})
 	}
-	outputControlHandled, outputControlError := mediaPort.HandleOutputControl(internal_type.FlushOutput{})
+	outputControlHandled, outputControlError := mediaPort.HandleOutputControl(&protos.ConversationPlaybackFlush{})
 	require.NoError(t, outputControlError)
 	require.True(t, outputControlHandled)
 	for range 4 {
@@ -635,12 +635,12 @@ func TestMediaPort_OutputControlsPreservePauseAndDropFlushedResponse(t *testing.
 	assistantAudioAccepted, assistantAudioError := mediaPort.HandleAssistantAudio("response-1", audio, true)
 	require.NoError(t, assistantAudioError)
 	require.True(t, assistantAudioAccepted)
-	outputControlHandled, outputControlError := mediaPort.HandleOutputControl(internal_type.PauseOutput{})
+	outputControlHandled, outputControlError := mediaPort.HandleOutputControl(&protos.ConversationPlaybackPause{})
 	require.NoError(t, outputControlError)
 	assert.True(t, outputControlHandled)
 	assert.Nil(t, mediaPort.mediaSession.NextFrame())
 
-	outputControlHandled, outputControlError = mediaPort.HandleOutputControl(internal_type.ContinueOutput{})
+	outputControlHandled, outputControlError = mediaPort.HandleOutputControl(&protos.ConversationPlaybackContinue{})
 	require.NoError(t, outputControlError)
 	assert.True(t, outputControlHandled)
 	assert.NotEmpty(t, mediaPort.mediaSession.NextFrame())
@@ -648,7 +648,7 @@ func TestMediaPort_OutputControlsPreservePauseAndDropFlushedResponse(t *testing.
 	assistantAudioAccepted, assistantAudioError = mediaPort.HandleAssistantAudio("response-2", audio, false)
 	require.NoError(t, assistantAudioError)
 	require.True(t, assistantAudioAccepted)
-	outputControlHandled, outputControlError = mediaPort.HandleOutputControl(internal_type.FlushOutput{})
+	outputControlHandled, outputControlError = mediaPort.HandleOutputControl(&protos.ConversationPlaybackFlush{})
 	require.NoError(t, outputControlError)
 	assert.True(t, outputControlHandled)
 	assistantAudioAccepted, assistantAudioError = mediaPort.HandleAssistantAudio("response-2", audio, false)
@@ -662,8 +662,8 @@ func TestMediaPort_OutputControlsPreservePauseAndDropFlushedResponse(t *testing.
 }
 
 func TestMediaPort_ConnectTransferMediaForwardsCallerAudio(t *testing.T) {
-	streams := make(chan internal_type.Stream, 1)
-	mediaPort, emitInboundAudio, _ := newMediaPortForTest(t, func(stream internal_type.Stream) {
+	streams := make(chan proto.Message, 1)
+	mediaPort, emitInboundAudio, _ := newMediaPortForTest(t, func(stream proto.Message) {
 		streams <- stream
 	})
 	bridgeRTP, _, bridgeAudioOut := newMediaPortTestRTP(t)

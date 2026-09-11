@@ -1,0 +1,14 @@
+{
+  "status": "approval_receipt_collected",
+  "reason": "The collector now accepts Orca's exact SQLite UTC gate timestamp format. The authoritative approved receipt is stored at approved_receipt_path.",
+  "run_id": "run_cb097ce71b98",
+  "task_id": "task_06285ef7cd4f",
+  "challenge_task_id": "task_06b5c9836d7d",
+  "challenge_receipt_sha256": "1d2d3e96322459d77328f1c7b265395a5ab829351729d68bc77bb1d18e6c6527",
+  "rfc_sha256": "dae79ed71ee7d67db3d4fc2a4bbb338712b9ae35c3e9a13c6fddd8f28f23b8f5",
+  "gate_id": "gate_79620eabbe7a",
+  "approved_sha256": "dae79ed71ee7d67db3d4fc2a4bbb338712b9ae35c3e9a13c6fddd8f28f23b8f5",
+  "gate_resolution_artifact": "rfcs/0018-message-playback-completion/jsons/gate-resolution.json",
+  "approved_receipt_path": "rfcs/0018-message-playback-completion/jsons/confirmation-approved.json",
+  "protocol_implementation_started": false
+}

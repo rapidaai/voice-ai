@@ -16,9 +16,10 @@ import (
 )
 
 type IdleTimeoutEvent struct {
-	ContextID string
-	Deadline  time.Time
-	Count     uint64
+	ContextID  string
+	Deadline   time.Time
+	Count      uint64
+	Generation uint64
 }
 
 type IdleTimeoutOptions = WatchdogOptions
@@ -35,6 +36,7 @@ type IdleTimeoutWatchdog struct {
 	contextID        string
 	deadline         time.Time
 	idleTimeoutCount uint64
+	expired          IdleTimeoutEvent
 }
 
 func NewIdleTimeoutWatchdog(opts ...IdleTimeoutOption) *IdleTimeoutWatchdog {
@@ -91,6 +93,7 @@ func (w *IdleTimeoutWatchdog) Start(contextID string, timeout time.Duration) boo
 		w.timer = nil
 	}
 	w.generation++
+	w.expired = IdleTimeoutEvent{}
 	w.active = true
 	w.contextID = contextID
 	w.deadline = time.Now().Add(timeout)
@@ -107,22 +110,32 @@ func (w *IdleTimeoutWatchdog) Extend(contextID string, duration time.Duration) b
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	if !w.active || w.contextID != contextID || duration <= 0 {
+	if duration <= 0 {
 		return false
 	}
-
-	w.deadline = w.deadline.Add(duration)
-	if remaining := time.Until(w.deadline); remaining > 0 {
-		if w.timer != nil {
-			w.timer.Stop()
-			w.timer = nil
+	if w.active {
+		if w.contextID != contextID {
+			return false
 		}
-		w.generation++
-		generation := w.generation
-		w.timer = time.AfterFunc(remaining, func() {
-			w.expire(generation)
-		})
+	} else {
+		// A queued expiry remains extendable until the session admits it.
+		if w.expired.Generation == 0 || w.expired.ContextID != contextID {
+			return false
+		}
+		w.contextID = w.expired.ContextID
+		w.deadline = w.expired.Deadline
 	}
+	if w.timer != nil {
+		w.timer.Stop()
+	}
+	w.deadline = w.deadline.Add(duration)
+	w.generation++
+	w.expired = IdleTimeoutEvent{}
+	w.active = true
+	generation := w.generation
+	w.timer = time.AfterFunc(time.Until(w.deadline), func() {
+		w.expire(generation)
+	})
 
 	return true
 }
@@ -137,6 +150,7 @@ func (w *IdleTimeoutWatchdog) Stop(resetCount bool) bool {
 		w.timer = nil
 	}
 	w.generation++
+	w.expired = IdleTimeoutEvent{}
 	w.active = false
 	w.contextID = ""
 	w.deadline = time.Time{}
@@ -166,6 +180,22 @@ func (w *IdleTimeoutWatchdog) IncrementCount() uint64 {
 	return w.idleTimeoutCount
 }
 
+// AcceptExpiry consumes only the current countdown's emitted expiry.
+// The deadline also fences replacement watchdogs whose generation starts over.
+func (w *IdleTimeoutWatchdog) AcceptExpiry(packet internal_type.IdleTimeoutExpiredPacket) bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if w.options.PacketContext.Err() != nil || packet.Generation == 0 ||
+		packet.Generation != w.expired.Generation || packet.ContextID != w.expired.ContextID ||
+		!packet.Deadline.Equal(w.expired.Deadline) || packet.Count != w.expired.Count ||
+		packet.Count != w.idleTimeoutCount {
+		return false
+	}
+	w.expired = IdleTimeoutEvent{}
+	return true
+}
+
 func (w *IdleTimeoutWatchdog) expire(generation uint64) {
 	w.mu.Lock()
 	if !w.active || w.generation != generation {
@@ -174,10 +204,12 @@ func (w *IdleTimeoutWatchdog) expire(generation uint64) {
 	}
 
 	event := IdleTimeoutEvent{
-		ContextID: w.contextID,
-		Deadline:  w.deadline,
-		Count:     w.idleTimeoutCount,
+		ContextID:  w.contextID,
+		Deadline:   w.deadline,
+		Count:      w.idleTimeoutCount,
+		Generation: generation,
 	}
+	w.expired = event
 	w.timer = nil
 	w.generation++
 	w.active = false
@@ -202,7 +234,10 @@ func (w *IdleTimeoutWatchdog) expire(generation uint64) {
 					OccurredAt: time.Now(),
 				},
 			},
-			internal_type.IdleTimeoutExpiredPacket{ContextID: event.ContextID, Count: event.Count},
+			internal_type.IdleTimeoutExpiredPacket{
+				ContextID: event.ContextID, Count: event.Count,
+				Generation: event.Generation, Deadline: event.Deadline,
+			},
 		)
 	}
 }

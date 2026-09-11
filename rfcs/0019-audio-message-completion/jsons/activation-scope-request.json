@@ -1,0 +1,24 @@
+{
+  "status": "pending_maintainer_approval",
+  "rfc": "rfcs/0019-audio-message-completion.md",
+  "request": "Allow explicit callback-authority opt-in at verified native streamer construction sites",
+  "reason": "RapidaSource is read from incoming metadata on external gRPC, so PhoneCall alone cannot establish receipt authority. The adapter defaults authority to false and provides WithPlaybackCompletion for explicit caller wiring.",
+  "proposed_paths": [
+    "api/assistant-api/api/talk/talk.go",
+    "api/assistant-api/api/talk/inbound_call.go",
+    "api/assistant-api/socket/socket.go",
+    "api/assistant-api/sip/pipeline/runtime.go",
+    "Corresponding existing *_test.go files in each package"
+  ],
+  "proposed_behavior": [
+    "Opt in only native WebRTC and native telephony/SIP streamers with verified local playback receipts.",
+    "Keep external gRPC callback authority disabled regardless of incoming source metadata.",
+    "Do not change interruption rollout defaults or enable unsupported synthesis finality."
+  ],
+  "proposed_verification": [
+    "go test -race -count=1 -timeout=180s -p 2 ./api/assistant-api/api/talk ./api/assistant-api/socket ./api/assistant-api/sip/pipeline",
+    "Focused constructor tests: native owners opt in, external gRPC remains diagnostic-only",
+    "just agent-finalize with exact additional source and test inventory"
+  ],
+  "implementation_started": false
+}

@@ -1,0 +1,58 @@
+{
+  "tier": "standard",
+  "status": "verified_independent_review_blocked_by_reviewer_availability",
+  "date": "2026-09-10",
+  "scope": "Independent fix for stale countdown admission; no playback/protobuf behavior change.",
+  "acceptance_criteria": [
+    "Only an expiry emitted by the currently eligible countdown can prompt or disconnect.",
+    "Pre-start, generation-free, restarted, extended, reconfigured, canceled, and duplicate expiries are rejected.",
+    "Real expiries preserve existing prompt backoff and disconnect behavior.",
+    "Adapter tests deliver real timer packets instead of forged expiry events."
+  ],
+  "changed_paths": [
+    "api/assistant-api/internal/adapters/lifecycle/session_lifecycle.go",
+    "api/assistant-api/internal/adapters/lifecycle/session_lifecycle_test.go",
+    "api/assistant-api/internal/watchdog/idle_timeout.go",
+    "api/assistant-api/internal/watchdog/idle_timeout_test.go",
+    "api/assistant-api/internal/type/packet.go",
+    "api/assistant-api/internal/type/packet_test.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler_interruption_test.go"
+  ],
+  "ownership": {
+    "timer_worker": "Session/watchdog expiry generation and deadline admission, internal packet fields, and package tests",
+    "coordinator": "Adapter regression migration and integrated verification",
+    "independent_reviewer": "Read-only timer code review, recorded in idle-expiry-review.json"
+  },
+  "risks": [
+    "Replacement watchdog generations restart, so admission also checks the emitted deadline.",
+    "Extending a queued unconsumed expiry must invalidate the old packet without losing backoff state.",
+    "Existing callers forging expiry packets now need actual watchdog-issued events."
+  ],
+  "verification": [
+    {
+      "command": "go test -run '^$' ./api/assistant-api/...",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    },
+    {
+      "command": "go test -race -count=1 -timeout=180s ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/adapters/lifecycle ./api/assistant-api/internal/adapters/router ./api/assistant-api/internal/watchdog ./api/assistant-api/internal/type",
+      "exit_code": 0
+    },
+    {
+      "command": "go test -overlay=/tmp/rapida-lifecycle-review-overlay.json -run '^TestReviewRearmedIdleRejectsQueuedExpiry$' -count=1 ./api/assistant-api/internal/adapters/lifecycle",
+      "exit_code": 0,
+      "note": "Original isolated review reproduction now passes; permanent regression tests also cover this case."
+    },
+    {
+      "command": "just agent-finalize \"api/assistant-api/internal/adapters/lifecycle/session_lifecycle.go,api/assistant-api/internal/adapters/lifecycle/session_lifecycle_test.go,api/assistant-api/internal/watchdog/idle_timeout.go,api/assistant-api/internal/watchdog/idle_timeout_test.go,api/assistant-api/internal/type/packet.go,api/assistant-api/internal/type/packet_test.go,api/assistant-api/internal/adapters/internal/dispatch_handler_interruption_test.go\"",
+      "exit_code": 0,
+      "failed_count": 0
+    }
+  ],
+  "rollback": "Revert only this countdown-admission delta and associated tests, preserving the preexisting lifecycle, streamer, and protobuf work.",
+  "remaining_issues": ["Playback-driven idle startup", "Playback-tail interruption eligibility", "Playback-driven assistant completion metrics"],
+  "commit_push_deploy": "not_requested_not_performed"
+}

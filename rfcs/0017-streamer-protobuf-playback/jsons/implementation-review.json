@@ -1,0 +1,72 @@
+{
+  "status": "verified",
+  "date": "2026-09-09",
+  "control_id_amendment": {
+    "date": "2026-09-10",
+    "change": "Added string id = 1 to pause, continue, and flush. Adapter commands carry the interrupted response context ID; flush retains the previous ID after rotation. Streamer control behavior is unchanged.",
+    "generator": "bash bin/artifacts-generate.sh",
+    "race_command": "env GOCACHE=/private/tmp/voice-ai-gocache go test -race -count=1 -timeout=180s ./api/assistant-api/internal/type ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/channel/grpc",
+    "verification": "Focused race tests, nonempty and empty-ID wire round trips, response-ID assertions, and scoped just agent-finalize passed."
+  },
+  "scope": "Generated stream controls and response-scoped playback completion observation",
+  "reviews": [
+    {
+      "scope": "schema, shared contract, BaseStreamer, gRPC",
+      "reviewer": "adapter worker",
+      "result": "No major findings. Generated tags, direct proto.Message contract, cancellable receipt delivery, and serialized gRPC writes checked."
+    },
+    {
+      "scope": "adapter receipt handling",
+      "reviewer": "telephony worker",
+      "result": "Resolved: failed duplicate terminal sends preserve prior response eligibility. Per-response dedupe and best-effort event storage are intentional."
+    },
+    {
+      "scope": "WebRTC",
+      "reviewer": "gRPC worker",
+      "result": "Resolved: direct close, text fallback, and text-mode switching cancel transport before output-lock cleanup. ID-less audio remains playable after terminal boundaries. Five focused regressions passed five race-test repetitions each."
+    },
+    {
+      "scope": "telephony completion and SIP transfer/resume",
+      "reviewer": "WebRTC worker and coordinator",
+      "result": "Resolved: same-ID segments remain playable, provider flow control does not imply drain, and transfer discard preserves same-context speech after resume. No remaining major finding established."
+    }
+  ],
+  "verification": [
+    {
+      "command": "bash bin/artifacts-generate.sh",
+      "result": "passed"
+    },
+    {
+      "command": "env GOCACHE=/private/tmp/voice-ai-gocache go test -run '^$' -timeout=180s ./api/assistant-api/...",
+      "result": "passed"
+    },
+    {
+      "command": "env GOCACHE=/private/tmp/voice-ai-gocache go test -race -count=20 -timeout=120s ./api/assistant-api/internal/type ./api/assistant-api/internal/channel/base ./api/assistant-api/internal/channel/grpc",
+      "result": "passed"
+    },
+    {
+      "command": "env GOCACHE=/private/tmp/voice-ai-gocache go test -race -count=1 -timeout=180s ./api/assistant-api/internal/type ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/adapters/lifecycle ./api/assistant-api/internal/adapters/router ./api/assistant-api/internal/channel/base ./api/assistant-api/internal/channel/grpc ./api/assistant-api/internal/channel/webrtc/... ./api/assistant-api/internal/channel/telephony/... ./api/assistant-api/sip/pipeline",
+      "result": "passed on final implementation"
+    },
+    {
+      "command": "env GOCACHE=/private/tmp/voice-ai-gocache just agent-finalize \"$(git ls-files --modified --others --exclude-standard | paste -sd, -),protos/artifacts/talk-api.proto\"",
+      "result": "passed on final implementation; no missing-test errors and zero failing packages"
+    },
+    {
+      "command": "python3 -m py_compile api/document-api/app/bridges/artifacts/protos/talk_api_pb2.py",
+      "result": "passed"
+    },
+    {
+      "command": "env GOCACHE=/private/tmp/voice-ai-gocache go test -run '^$' -bench '^BenchmarkOutputDrained$' -benchmem -benchtime=100ms -count=3 ./api/assistant-api/internal/channel/telephony/internal/sip",
+      "result": "passed; empty, buffered, and transfer cases reported zero allocations"
+    }
+  ],
+  "limitations": [
+    "Initial concurrent native fixtures reproduced a soxr_create SIGSEGV. The same binary passed ten cold runs with parallel limit one; serialized fixtures passed ten cold runs with parallel limit 256. WebRTC race tests then passed three repetitions. Native resampler internals are unchanged; concurrent cold initialization remains an external library risk, not a production fix in this change.",
+    "Python application import validation was blocked by missing fastapi; generated Python syntax validation passed.",
+    "No live carrier, device-playout, or external SDK smoke test was run.",
+    "The schema source is modified in the protos/artifacts submodule and must be committed with matching generated artifacts before publishing."
+  ],
+  "formal_gate_approved": false,
+  "committed_or_pushed": false
+}
