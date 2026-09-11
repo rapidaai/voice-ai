@@ -8,7 +8,10 @@ package adapter_internal
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
+
+	"google.golang.org/protobuf/proto"
 
 	"github.com/rapidaai/api/assistant-api/config"
 	adapter_channel "github.com/rapidaai/api/assistant-api/internal/adapters/channel"
@@ -160,7 +163,6 @@ func NewGenericRequestor(
 
 		observabilityRecorder: observer,
 
-		messageLifecycle: adapter_lifecycle.NewMessageLifecycle(),
 		sessionLifecycle: adapter_lifecycle.NewSessionLifecycle(),
 		dispatchRoute:    adapter_router.NewDispatchRoute(adapter_router.NewRoutePolicy(), channels),
 
@@ -180,9 +182,22 @@ func NewGenericRequestor(
 		channels:                  channels,
 	}
 
-	gr.messageLifecycle.ConfigurePlaybackCompletion(func(packets ...internal_type.Packet) error {
-		return gr.OnPacket(sessionCtx, packets...)
-	})
+	gr.messageLifecycle = adapter_lifecycle.NewMessageLifecycle(
+		adapter_lifecycle.WithOnPacket(func(packets ...internal_type.Packet) error {
+			return gr.OnPacket(sessionCtx, packets...)
+		}),
+		adapter_lifecycle.WithSend(func(message proto.Message) error {
+			if gr.streamer == nil {
+				return fmt.Errorf("send %T: streamer is unavailable", message)
+			}
+			return gr.streamer.Send(message)
+		}),
+		adapter_lifecycle.WithDispatch(requestorDispatchHandler{r: gr}.HandleMessageLifecyclePacket),
+		adapter_lifecycle.WithInterruptionExpiry(func(packet internal_type.InterruptionDecisionExpiredPacket) {
+			gr.dispatch(sessionCtx, packet)
+		}),
+		adapter_lifecycle.WithBehavior(gr.deploymentBehavior),
+	)
 	gr.ttsCompletionWatchdog = watchdog.NewTTSCompletionWatchdog(
 		watchdog.WithOnPacket(gr.OnPacket),
 		watchdog.WithPacketContext(sessionCtx),

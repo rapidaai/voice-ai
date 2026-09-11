@@ -8,17 +8,9 @@ import (
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/protos"
-	"google.golang.org/protobuf/proto"
 )
 
-// ConfigurePlaybackCompletion sets the packet sink for completion and timeout events.
-func (l *messageLifecycle) ConfigurePlaybackCompletion(onPacket func(...internal_type.Packet) error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.onPlaybackPacket = onPacket
-}
-
-func (l *messageLifecycle) AcceptInjectedMessage(packet internal_type.InjectMessagePacket) (internal_type.InjectMessagePacket, error) {
+func (l *messageLifecycle) OnMessageInjected(packet internal_type.InjectMessagePacket) (internal_type.InjectMessagePacket, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if err := l.validateContextLocked(packet.ContextID); err != nil {
@@ -37,7 +29,10 @@ func (l *messageLifecycle) AcceptInjectedMessage(packet internal_type.InjectMess
 }
 
 // SendAssistantMessage serializes output with controls and records only successful delivery.
-func (l *messageLifecycle) SendAssistantMessage(message *protos.ConversationAssistantMessage, send func(proto.Message) error) error {
+func (l *messageLifecycle) SendAssistantMessage(message *protos.ConversationAssistantMessage) error {
+	if l.sendOutput == nil {
+		return ErrSenderNotConfigured
+	}
 	l.playbackControlMu.Lock()
 	defer l.playbackControlMu.Unlock()
 	l.mu.Lock()
@@ -68,7 +63,7 @@ func (l *messageLifecycle) SendAssistantMessage(message *protos.ConversationAssi
 		return ErrInvalidTransition
 	}
 	l.mu.Unlock()
-	err := send(message)
+	err := l.sendOutput(message)
 	l.mu.Lock()
 	if message.Id != l.contextID {
 		l.mu.Unlock()
@@ -97,13 +92,13 @@ func (l *messageLifecycle) SendAssistantMessage(message *protos.ConversationAssi
 		l.output.textDelivered = l.output.textDelivered || message.Completed
 	}
 	l.mu.Unlock()
-	l.AwaitPlayback(message.Id)
-	_ = l.CompleteAssistantSpeech(message.Id)
+	l.awaitPlayback(message.Id)
+	_ = l.completeAssistantMessage(message.Id)
 	return nil
 }
 
-// AwaitPlayback bounds missing receipts in active playback time, excluding pauses.
-func (l *messageLifecycle) AwaitPlayback(contextID string) {
+// awaitPlayback bounds missing receipts in active playback time, excluding pauses.
+func (l *messageLifecycle) awaitPlayback(contextID string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if contextID != l.contextID || !l.output.terminalIssued || l.output.paused || l.output.failed || l.output.completed || l.output.receiptTimer != nil {
@@ -119,7 +114,7 @@ func (l *messageLifecycle) AwaitPlayback(contextID string) {
 		}
 		l.output.failed = true
 		l.output.receiptTimer = nil
-		onPacket := l.onPlaybackPacket
+		onPacket := l.onPacket
 		l.mu.Unlock()
 		if onPacket != nil {
 			_ = onPacket(internal_type.TextToSpeechErrorPacket{ContextID: contextID, Error: errors.New("playback completion receipt timed out"), Type: internal_type.TTSPlaybackTimeout})
@@ -127,7 +122,7 @@ func (l *messageLifecycle) AwaitPlayback(contextID string) {
 	})
 }
 
-func (l *messageLifecycle) FailAssistantMessage(contextID string) {
+func (l *messageLifecycle) OnMessageFailed(contextID string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if contextID != l.contextID || l.output.completed {

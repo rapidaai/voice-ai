@@ -12,6 +12,7 @@ import (
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 type recordingEOSExecutor struct {
@@ -149,7 +150,11 @@ func TestHandleEndOfSpeechAudio_ExecutesEOS(t *testing.T) {
 func TestHandleSpeechToText_WithEOSExecutor_ExecutesAndSkipsFallback(t *testing.T) {
 	r := newDispatchHandlerVADTestRequestor(t)
 	r.streamer = &streamTestStreamer{}
-	r.messageLifecycle = adapter_lifecycle.NewMessageLifecycleWithContext("ctx-eos-stt", "")
+	r.messageLifecycle = adapter_lifecycle.NewMessageLifecycle(
+		adapter_lifecycle.WithContextID("ctx-eos-stt"), adapter_lifecycle.WithMode(""),
+		adapter_lifecycle.WithSend(func(message proto.Message) error { return r.streamer.Send(message) }),
+		adapter_lifecycle.WithDispatch(requestorDispatchHandler{r: r}.HandleMessageLifecyclePacket),
+	)
 	executor := &recordingEOSExecutor{}
 	r.endOfSpeechExecutor = executor
 	h := requestorDispatchHandler{r: r}
@@ -176,7 +181,11 @@ func TestHandleSpeechToText_WithEOSExecutor_ExecutesAndSkipsFallback(t *testing.
 func TestHandleSpeechToText_WithoutEOSExecutor_EmitsFallbackOnlyForFinal(t *testing.T) {
 	r := newDispatchHandlerVADTestRequestor(t)
 	r.streamer = &streamTestStreamer{}
-	r.messageLifecycle = adapter_lifecycle.NewMessageLifecycleWithContext("ctx-eos-fallback", "")
+	r.messageLifecycle = adapter_lifecycle.NewMessageLifecycle(
+		adapter_lifecycle.WithContextID("ctx-eos-fallback"), adapter_lifecycle.WithMode(""),
+		adapter_lifecycle.WithSend(func(message proto.Message) error { return r.streamer.Send(message) }),
+		adapter_lifecycle.WithDispatch(requestorDispatchHandler{r: r}.HandleMessageLifecyclePacket),
+	)
 	h := requestorDispatchHandler{r: r}
 
 	h.HandleSpeechToText(t.Context(), internal_type.SpeechToTextPacket{

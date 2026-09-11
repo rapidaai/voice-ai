@@ -98,7 +98,10 @@ func (streamer *failingOutputControlStreamer) Send(packet proto.Message) error {
 
 func TestSendOutputControlUsesExistingSendAndReturnsErrors(t *testing.T) {
 	streamer := &streamTestStreamer{}
-	requestor := &genericRequestor{streamer: streamer, messageLifecycle: adapter_lifecycle.NewMessageLifecycle()}
+	requestor := &genericRequestor{streamer: streamer}
+	requestor.messageLifecycle = adapter_lifecycle.NewMessageLifecycle(adapter_lifecycle.WithSend(func(message proto.Message) error {
+		return requestor.streamer.Send(message)
+	}))
 	for _, control := range []proto.Message{&protos.ConversationPlaybackPause{}, &protos.ConversationPlaybackContinue{}, &protos.ConversationPlaybackFlush{}} {
 		_, err := proto.Marshal(control)
 		require.NoError(t, err)

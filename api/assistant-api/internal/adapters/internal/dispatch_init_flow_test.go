@@ -145,7 +145,7 @@ func TestInitializeBehavior_InvalidTimeoutRejectsGreeting(t *testing.T) {
 						AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{Greeting: &greeting},
 					},
 				},
-				messageLifecycle: adapter_lifecycle.NewMessageLifecycleWithContext("invalid-timeout", type_enums.TextMode),
+				messageLifecycle: adapter_lifecycle.NewMessageLifecycle(adapter_lifecycle.WithContextID("invalid-timeout"), adapter_lifecycle.WithMode(type_enums.TextMode)),
 				sessionLifecycle: adapter_lifecycle.NewSessionLifecycleWithState(adapter_lifecycle.StateInitializing),
 				dispatchRoute:    adapter_router.NewDispatchRoute(adapter_router.NewRoutePolicy(), requestorChannels),
 				channels:         requestorChannels,
@@ -162,6 +162,65 @@ func TestInitializeBehavior_InvalidTimeoutRejectsGreeting(t *testing.T) {
 			require.Error(t, failure.Error)
 			assert.False(t, failure.IsRecoverable())
 			assert.Zero(t, requestorChannels.EgressChannel().Len(), "invalid settings must not queue a greeting")
+		})
+	}
+}
+
+func TestInitializeBehaviorLoadsLifecycleBehaviorBeforeGreeting(t *testing.T) {
+	for _, fails := range []bool{false, true} {
+		name := "success preserves state"
+		if fails {
+			name = "failure rejects greeting"
+		}
+		t.Run(name, func(t *testing.T) {
+			greeting := "Welcome!"
+			requestor := &genericRequestor{
+				source: utils.Debugger,
+				assistant: &internal_assistant_entity.Assistant{
+					AssistantDebuggerDeployment: &internal_assistant_entity.AssistantDebuggerDeployment{
+						AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{Greeting: &greeting},
+					},
+				},
+				channels: adapter_channel.NewRequestorChannels(),
+			}
+			failure := errors.New("lazy behavior load failed")
+			calls := 0
+			requestor.messageLifecycle = adapter_lifecycle.NewMessageLifecycle(
+				adapter_lifecycle.WithContextID("ctx-lazy-behavior"),
+				adapter_lifecycle.WithBehavior(func() (*internal_assistant_entity.AssistantDeploymentBehavior, error) {
+					calls++
+					require.Empty(t, drainEgressPackets(requestor), "greeting must wait for lifecycle initialization")
+					if fails {
+						return nil, failure
+					}
+					return requestor.deploymentBehavior()
+				}),
+			)
+			t.Cleanup(requestor.messageLifecycle.StopUnclearInput)
+			original := requestor.messageLifecycle
+			require.NoError(t, original.OnGenerationStarted(requestor.GetID()))
+			require.Zero(t, calls, "behavior must not load during construction")
+
+			requestorDispatchHandler{r: requestor}.HandleInitializeBehavior(context.Background(), internal_type.InitializeBehaviorPacket{
+				ContextID: requestor.GetID(),
+			})
+
+			require.Equal(t, 1, calls)
+			require.Same(t, original, requestor.messageLifecycle)
+			require.Equal(t, "ctx-lazy-behavior", requestor.GetID())
+			require.Equal(t, adapter_lifecycle.MessageStateAssistantGenerating, original.State())
+			if fails {
+				require.Equal(t, 1, requestor.channels.BootstrapChannel().Len())
+				packet, ok := receiveEnvelope(t, requestor.channels.BootstrapChannel()).Pkt.(internal_type.InitializationFailedPacket)
+				require.True(t, ok)
+				require.Equal(t, internal_type.InitializationStageBehavior, packet.Stage)
+				require.Equal(t, requestor.GetID(), packet.ContextID)
+				require.ErrorIs(t, packet.Error, failure)
+				require.Empty(t, drainEgressPackets(requestor))
+				return
+			}
+			require.Zero(t, requestor.channels.BootstrapChannel().Len())
+			require.Equal(t, []internal_type.Packet{internal_type.InjectMessagePacket{ContextID: requestor.GetID(), Text: greeting}}, drainEgressPackets(requestor))
 		})
 	}
 }
@@ -208,7 +267,7 @@ func TestInitializeBehavior_GreetingInterruptibleOption_ControlsAudioBlock(t *te
 						},
 					},
 				},
-				messageLifecycle: adapter_lifecycle.NewMessageLifecycleWithContext("ctx-greeting-init", type_enums.AudioMode),
+				messageLifecycle: adapter_lifecycle.NewMessageLifecycle(adapter_lifecycle.WithContextID("ctx-greeting-init"), adapter_lifecycle.WithMode(type_enums.AudioMode)),
 				sessionLifecycle: adapter_lifecycle.NewSessionLifecycleWithState(adapter_lifecycle.StateInitializing),
 				dispatchRoute:    adapter_router.NewDispatchRoute(adapter_router.NewRoutePolicy(), requestorChannels),
 				channels:         requestorChannels,
@@ -262,7 +321,7 @@ func TestInitializeBehavior_GreetingDoesNotStartIdleTimeoutBeforeCompletion(t *t
 				},
 			},
 		},
-		messageLifecycle: adapter_lifecycle.NewMessageLifecycleWithContext("ctx-greeting-idle", type_enums.TextMode),
+		messageLifecycle: adapter_lifecycle.NewMessageLifecycle(adapter_lifecycle.WithContextID("ctx-greeting-idle"), adapter_lifecycle.WithMode(type_enums.TextMode)),
 		sessionLifecycle: adapter_lifecycle.NewSessionLifecycleWithState(adapter_lifecycle.StateInitializing),
 		dispatchRoute:    adapter_router.NewDispatchRoute(adapter_router.NewRoutePolicy(), requestorChannels),
 		channels:         requestorChannels,
@@ -298,7 +357,7 @@ func TestInitializeBehavior_DoesNotEmitIdleTimeoutWhenNoGreetingIsInjected(t *te
 				},
 			},
 		},
-		messageLifecycle: adapter_lifecycle.NewMessageLifecycleWithContext("ctx-no-greeting-idle", type_enums.TextMode),
+		messageLifecycle: adapter_lifecycle.NewMessageLifecycle(adapter_lifecycle.WithContextID("ctx-no-greeting-idle"), adapter_lifecycle.WithMode(type_enums.TextMode)),
 		sessionLifecycle: adapter_lifecycle.NewSessionLifecycleWithState(adapter_lifecycle.StateInitializing),
 		dispatchRoute:    adapter_router.NewDispatchRoute(adapter_router.NewRoutePolicy(), requestorChannels),
 		channels:         requestorChannels,
@@ -334,7 +393,7 @@ func TestInitializeBehavior_NonInterruptibleGreeting_BlocksAudioAndAcceptsAfterT
 				},
 			},
 		},
-		messageLifecycle: adapter_lifecycle.NewMessageLifecycleWithContext("ctx-greeting-audio", type_enums.AudioMode),
+		messageLifecycle: adapter_lifecycle.NewMessageLifecycle(adapter_lifecycle.WithContextID("ctx-greeting-audio"), adapter_lifecycle.WithMode(type_enums.AudioMode)),
 		sessionLifecycle: adapter_lifecycle.NewSessionLifecycleWithState(adapter_lifecycle.StateInitializing),
 		dispatchRoute:    adapter_router.NewDispatchRoute(adapter_router.NewRoutePolicy(), requestorChannels),
 		channels:         requestorChannels,
@@ -395,7 +454,7 @@ func TestInitializeBehavior_NonInterruptibleGreeting_TextInputDoesNotKeepAudioBl
 				},
 			},
 		},
-		messageLifecycle: adapter_lifecycle.NewMessageLifecycleWithContext("ctx-greeting-text", type_enums.AudioMode),
+		messageLifecycle: adapter_lifecycle.NewMessageLifecycle(adapter_lifecycle.WithContextID("ctx-greeting-text"), adapter_lifecycle.WithMode(type_enums.AudioMode)),
 		sessionLifecycle: adapter_lifecycle.NewSessionLifecycleWithState(adapter_lifecycle.StateInitializing),
 		dispatchRoute:    adapter_router.NewDispatchRoute(adapter_router.NewRoutePolicy(), requestorChannels),
 		channels:         requestorChannels,

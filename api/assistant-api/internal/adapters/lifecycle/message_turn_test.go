@@ -12,12 +12,12 @@ import (
 )
 
 func TestMessageTurn_UserInputAdmissionOwnsCompletionPackets(t *testing.T) {
-	l := NewMessageLifecycleWithContext("active", type_enums.TextMode)
-	input, packets := l.AcceptUserInput(internal_type.UserInputPacket{ContextID: "stale", Text: "hello"})
+	l := NewMessageLifecycle(WithContextID("active"), WithMode(type_enums.TextMode))
+	input, packets := l.OnUserInput(internal_type.UserInputPacket{ContextID: "stale", Text: "hello"})
 	assert.Empty(t, input.ContextID)
 	assert.Empty(t, packets)
 	assert.Equal(t, MessageStateAssistantIdle, l.State())
-	input, packets = l.AcceptUserInput(internal_type.UserInputPacket{Text: "hello"})
+	input, packets = l.OnUserInput(internal_type.UserInputPacket{Text: "hello"})
 	assert.Equal(t, "active", input.ContextID)
 	assert.Equal(t, MessageStateUserFinished, l.State())
 	require.Len(t, packets, 4)
@@ -29,36 +29,44 @@ func TestMessageTurn_UserInputAdmissionOwnsCompletionPackets(t *testing.T) {
 }
 
 func TestMessageTurn_AssistantCompletionPacketsRejectStaleContext(t *testing.T) {
-	l := NewMessageLifecycleWithContext("active", type_enums.AudioMode)
-	assert.Empty(t, l.AssistantTextCompleted(internal_type.LLMResponseDonePacket{ContextID: "stale", Text: "old"}))
+	l := NewMessageLifecycle(WithContextID("active"), WithMode(type_enums.AudioMode))
+	assert.Empty(t, l.OnGenerationCompleted(internal_type.LLMResponseDonePacket{ContextID: "stale", Text: "old"}))
 	for _, packet := range []internal_type.Packet{
 		internal_type.LLMResponseDonePacket{ContextID: "active", Text: "answer"},
 		internal_type.InjectMessagePacket{ContextID: "active", Text: "answer"},
 	} {
-		l = NewMessageLifecycleWithContext("active", type_enums.AudioMode)
-		packets := l.AssistantTextCompleted(packet)
+		l = NewMessageLifecycle(WithContextID("active"), WithMode(type_enums.AudioMode))
+		packets := l.OnGenerationCompleted(packet)
 		require.Len(t, packets, 1)
 		assert.Equal(t, internal_type.MessageCreatePacket{ContextID: "active", MessageRole: "assistant", Text: "answer"}, packets[0])
-		assert.Empty(t, l.AssistantTextCompleted(packet))
+		assert.Empty(t, l.OnGenerationCompleted(packet))
 	}
 }
 
 func TestMessageTurn_PromptAdmissionOwnsContextAndContent(t *testing.T) {
-	l := NewMessageLifecycleWithContext("active", type_enums.AudioMode)
-	require.NoError(t, l.UserListening("active"))
-	_, _, err := l.Prompt(internal_type.UnclearInputExpiredPacket{ContextID: "active"})
+	var behavior *internal_assistant_entity.AssistantDeploymentBehavior
+	l := NewMessageLifecycle(WithContextID("active"), WithMode(type_enums.AudioMode), WithBehavior(func() (*internal_assistant_entity.AssistantDeploymentBehavior, error) {
+		return behavior, nil
+	}))
+	require.NoError(t, l.Initialize(context.Background()))
+	_, err := l.OnTranscriptReceived("active", "hello")
+	require.NoError(t, err)
+	_, _, err = l.OnPrompt(internal_type.UnclearInputExpiredPacket{ContextID: "active"})
 	require.ErrorIs(t, err, ErrInvalidTransition)
 	assert.Equal(t, "active", l.ContextID())
 	promptText := "Please repeat that."
-	l.ConfigureUnclearInput(context.Background(), &internal_assistant_entity.AssistantDeploymentBehavior{UnclearInputMessage: &promptText}, nil)
+	behavior = &internal_assistant_entity.AssistantDeploymentBehavior{UnclearInputMessage: &promptText}
+	require.NoError(t, l.Initialize(context.Background()))
 	defer l.StopUnclearInput()
-	_, _, err = l.Prompt(internal_type.UnclearInputExpiredPacket{ContextID: "stale"})
+	_, _, err = l.OnPrompt(internal_type.UnclearInputExpiredPacket{ContextID: "stale"})
 	require.ErrorIs(t, err, ErrStaleContext)
-	turn, prompt, err := l.Prompt(internal_type.UnclearInputExpiredPacket{ContextID: "active"})
+	turn, prompt, err := l.OnPrompt(internal_type.UnclearInputExpiredPacket{ContextID: "active"})
 	require.NoError(t, err)
 	assert.Equal(t, "active", turn.PreviousContextID)
 	assert.NotEqual(t, "active", turn.ContextID)
 	assert.Equal(t, l.ContextID(), prompt.ContextID)
 	assert.Equal(t, promptText, prompt.Text)
-	assert.EqualValues(t, 1, l.UserPromptCount())
+	_, _, err = l.OnPrompt(internal_type.UnclearInputExpiredPacket{ContextID: "active"})
+	assert.ErrorIs(t, err, ErrStaleContext)
+	assert.Equal(t, turn.ContextID, l.ContextID())
 }

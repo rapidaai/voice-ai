@@ -15,8 +15,8 @@ import (
 	"github.com/rapidaai/protos"
 )
 
-// AcceptUserTurn preserves a listening turn or atomically allocates its replacement.
-func (l *messageLifecycle) AcceptUserTurn(contextID, trigger, source, text string) (internal_type.TurnChangePacket, error) {
+// OnUserTurnStarted preserves a listening turn or atomically allocates its replacement.
+func (l *messageLifecycle) OnUserTurnStarted(contextID, trigger, source, text string) (internal_type.TurnChangePacket, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	turn := internal_type.TurnChangePacket{ContextID: l.contextID}
@@ -62,7 +62,7 @@ func (l *messageLifecycle) AcceptUserTurn(contextID, trigger, source, text strin
 	return turn, nil
 }
 
-func (l *messageLifecycle) AcceptSpeechContext(contextID, text string) (string, error) {
+func (l *messageLifecycle) OnTranscriptReceived(contextID, text string) (string, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if err := l.validateContextLocked(contextID); err != nil {
@@ -80,7 +80,7 @@ func (l *messageLifecycle) AcceptSpeechContext(contextID, text string) (string, 
 	return l.contextID, nil
 }
 
-func (l *messageLifecycle) CompleteUserSpeech(p internal_type.EndOfSpeechPacket) error {
+func (l *messageLifecycle) OnUserSpeechCompleted(p internal_type.EndOfSpeechPacket) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if err := l.validateContextLocked(p.ContextID); err != nil {
@@ -104,7 +104,7 @@ func (l *messageLifecycle) CompleteUserSpeech(p internal_type.EndOfSpeechPacket)
 	}
 }
 
-func (l *messageLifecycle) CompleteAssistantSpeech(contextID string) error {
+func (l *messageLifecycle) completeAssistantMessage(contextID string) error {
 	l.mu.Lock()
 	if err := l.validateContextLocked(contextID); err != nil {
 		l.mu.Unlock()
@@ -123,7 +123,7 @@ func (l *messageLifecycle) CompleteAssistantSpeech(contextID string) error {
 	if l.output.receiptTimer != nil {
 		l.output.receiptTimer.Stop()
 	}
-	onPacket := l.onPlaybackPacket
+	onPacket := l.onPacket
 	l.mu.Unlock()
 	if onPacket == nil {
 		return nil
@@ -139,7 +139,7 @@ func (l *messageLifecycle) CompleteAssistantSpeech(contextID string) error {
 	)
 }
 
-func (l *messageLifecycle) Prompt(packet internal_type.Packet) (internal_type.TurnChangePacket, internal_type.InjectMessagePacket, error) {
+func (l *messageLifecycle) OnPrompt(packet internal_type.Packet) (internal_type.TurnChangePacket, internal_type.InjectMessagePacket, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	turn := internal_type.TurnChangePacket{}
@@ -152,7 +152,6 @@ func (l *messageLifecycle) Prompt(packet internal_type.Packet) (internal_type.Tu
 		if p.ContextID != l.contextID || l.state != MessageStateAssistantIdle {
 			return turn, prompt, ErrInvalidTransition
 		}
-		l.assistantPrompts++
 	case internal_type.UnclearInputExpiredPacket:
 		if p.ContextID != l.contextID {
 			return turn, prompt, ErrStaleContext
@@ -166,7 +165,6 @@ func (l *messageLifecycle) Prompt(packet internal_type.Packet) (internal_type.Tu
 		default:
 			return turn, prompt, ErrInvalidTransition
 		}
-		l.userPrompts++
 		prompt.Text = l.unclearInputPrompt
 	default:
 		return turn, prompt, ErrInvalidTransition
@@ -191,8 +189,25 @@ func (l *messageLifecycle) Prompt(packet internal_type.Packet) (internal_type.Tu
 	return turn, prompt, nil
 }
 
-func (l *messageLifecycle) ConfigureUnclearInput(ctx context.Context, behavior *internal_assistant_entity.AssistantDeploymentBehavior, onPacket func(context.Context, ...internal_type.Packet) error) {
-	inputWatchdog := watchdog.NewUnclearInputWatchdog(watchdog.WithPacketContext(ctx), watchdog.WithOnPacket(onPacket))
+// Initialize loads behavior after deployment configuration is available.
+func (l *messageLifecycle) Initialize(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	var behavior *internal_assistant_entity.AssistantDeploymentBehavior
+	if l.loadBehavior != nil {
+		var err error
+		behavior, err = l.loadBehavior()
+		if err != nil {
+			return fmt.Errorf("load message lifecycle behavior: %w", err)
+		}
+	}
+	inputWatchdog := watchdog.NewUnclearInputWatchdog(watchdog.WithPacketContext(ctx), watchdog.WithOnPacket(func(_ context.Context, packets ...internal_type.Packet) error {
+		if l.onPacket == nil {
+			return nil
+		}
+		return l.onPacket(packets...)
+	}))
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.unclearInputWatchdog != nil {
@@ -209,6 +224,7 @@ func (l *messageLifecycle) ConfigureUnclearInput(ctx context.Context, behavior *
 			l.unclearInputPrompt = *behavior.UnclearInputMessage
 		}
 	}
+	return nil
 }
 
 func (l *messageLifecycle) StopUnclearInput() {
@@ -219,7 +235,7 @@ func (l *messageLifecycle) StopUnclearInput() {
 	}
 }
 
-func (l *messageLifecycle) AcceptUserInput(p internal_type.UserInputPacket) (internal_type.UserInputPacket, []internal_type.Packet) {
+func (l *messageLifecycle) OnUserInput(p internal_type.UserInputPacket) (internal_type.UserInputPacket, []internal_type.Packet) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if strings.TrimSpace(p.Text) == "" {
@@ -266,7 +282,8 @@ func (l *messageLifecycle) AcceptUserInput(p internal_type.UserInputPacket) (int
 	}
 }
 
-func (l *messageLifecycle) AssistantTextCompleted(packet internal_type.Packet) []internal_type.Packet {
+// OnGenerationCompleted closes generation without completing outstanding delivery.
+func (l *messageLifecycle) OnGenerationCompleted(packet internal_type.Packet) []internal_type.Packet {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	contextID, text := "", ""
@@ -286,6 +303,9 @@ func (l *messageLifecycle) AssistantTextCompleted(packet internal_type.Packet) [
 	}
 	l.output.generationClosed = true
 	l.output.hasText = l.output.hasText || strings.TrimSpace(text) != ""
+	if l.state == MessageStateAssistantGenerating {
+		l.state = MessageStateAssistantGenerated
+	}
 	return []internal_type.Packet{
 		internal_type.MessageCreatePacket{ContextID: contextID, MessageRole: "assistant", Text: text},
 	}

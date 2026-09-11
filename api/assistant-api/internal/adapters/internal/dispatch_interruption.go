@@ -19,13 +19,10 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 			bargeInTrigger = value
 		}
 	}
-	decision := h.r.messageLifecycle.ObserveInterruption(p, bargeInTrigger)
+	decision := h.r.messageLifecycle.OnInterruptionDetected(p, bargeInTrigger)
 	if pause := decision.Pause; pause != nil {
-		dispatchContext := h.r.sessionCtx
-		if dispatchContext == nil {
-			dispatchContext = ctx
-		}
-		if outputControlError := h.r.sendOutputControl(&protos.ConversationPlaybackPause{Id: pause.ContextID}); outputControlError != nil {
+		pauseError := h.r.sendOutputControl(&protos.ConversationPlaybackPause{Id: pause.ContextID})
+		if pauseError != nil {
 			h.r.OnPacket(ctx, internal_type.ObservabilityLogRecordPacket{
 				ContextID: pause.ContextID,
 				Scope:     internal_type.ObservabilityRecordScopeConversation,
@@ -34,18 +31,17 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 					Message: "Interruption output control failed",
 					Attributes: observability.Attributes{
 						"component": observability.ComponentConversation.String(),
-						"error":     outputControlError.Error(),
+						"error":     pauseError.Error(),
 					},
 				},
 			})
-			if turnChange := h.r.messageLifecycle.FailInterruptionPause(*pause); turnChange != nil {
-				utils.Go(ctx, func() { h.r.dispatch(ctx, *turnChange) })
-			}
+		}
+		if turnChange := h.r.messageLifecycle.OnPlaybackPaused(*pause, pauseError); turnChange != nil {
+			utils.Go(ctx, func() { h.r.dispatch(ctx, *turnChange) })
+		}
+		if pauseError != nil {
 			return
 		}
-		h.r.messageLifecycle.ArmInterruption(pause.ContextID, pause.Sequence, func(expired internal_type.InterruptionDecisionExpiredPacket) {
-			h.r.dispatch(dispatchContext, expired)
-		})
 	}
 	h.r.OnPacket(ctx, decision.Packets...)
 	if decision.Flush != nil {

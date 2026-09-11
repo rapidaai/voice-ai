@@ -22,15 +22,15 @@ type InterruptionDecision struct {
 	Notification      *protos.ConversationInterruption
 }
 
-// ObserveInterruption owns VAD and word admission, turn transitions, and countdown eligibility.
-func (l *messageLifecycle) ObserveInterruption(
+// OnInterruptionDetected owns VAD and word admission, turn transitions, and countdown eligibility.
+func (l *messageLifecycle) OnInterruptionDetected(
 	p internal_type.InterruptionDetectedPacket,
 	bargeInTrigger string,
 ) InterruptionDecision {
 	l.mu.Lock()
 	if l.interruptionEnabled && l.mode.Audio() && p.Source == internal_type.InterruptionSourceVad && bargeInTrigger != internal_options.BargeInTriggerWord {
 		l.mu.Unlock()
-		admitted, packets, pause := l.ObserveVAD(p)
+		admitted, packets, pause := l.observeVAD(p)
 		decision := InterruptionDecision{Packets: packets, Pause: pause}
 		if pause != nil {
 			decision.SpeechToTextStart = &internal_type.SpeechToTextStartPacket{ContextID: pause.ContextID}

@@ -22,16 +22,6 @@ import (
 
 type SessionState uint8
 
-const (
-	StateNew SessionState = iota
-	StateInitializing
-	StateReady
-	StateSwitching
-	StateDisconnecting
-	StateDisconnected
-	StateFailed
-)
-
 func (s SessionState) String() string {
 	switch s {
 	case StateNew:
@@ -54,18 +44,6 @@ func (s SessionState) String() string {
 }
 
 type SessionEvent uint8
-
-const (
-	EventConnectRequested SessionEvent = iota + 1
-	EventInitializationCompleted
-	EventInitializationFailed
-	EventSwitchRequested
-	EventSwitchCompleted
-	EventSwitchFailedRecoverable
-	EventSwitchFailedFatal
-	EventDisconnectRequested
-	EventDisconnectCompleted
-)
 
 func (e SessionEvent) String() string {
 	switch e {

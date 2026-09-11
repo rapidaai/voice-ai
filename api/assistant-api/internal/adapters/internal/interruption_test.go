@@ -30,10 +30,9 @@ func TestInterruptionDeadlineChoosesExactlyOnce(t *testing.T) {
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
-				requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Repeat please")
+				requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Repeat please", adapter_lifecycle.WithInterruption(true))
 				t.Cleanup(requestor.messageLifecycle.StopUnclearInput)
 				requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
-				requestor.messageLifecycle.ConfigureInterruption(true)
 				streamer := requestor.streamer.(*streamTestStreamer)
 				handler := requestorDispatchHandler{r: requestor}
 				originalContext := requestor.GetID()
@@ -86,11 +85,10 @@ func TestInterruptionDeadlineChoosesExactlyOnce(t *testing.T) {
 
 func TestInterruptionMeaningfulInterimCommitsAndReplaysInOrder(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Repeat please")
+		requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Repeat please", adapter_lifecycle.WithInterruption(true))
 		t.Cleanup(requestor.messageLifecycle.StopUnclearInput)
 		eos := &recordingEOSExecutor{}
 		requestor.endOfSpeechExecutor = eos
-		requestor.messageLifecycle.ConfigureInterruption(true)
 		streamer := requestor.streamer.(*streamTestStreamer)
 		handler := requestorDispatchHandler{r: requestor}
 		previous := requestor.GetID()
@@ -154,9 +152,8 @@ func TestInterruptionLateConfirmationAfterContinuePreservesUnclearInput(t *testi
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
-				requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Repeat please")
+				requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Repeat please", adapter_lifecycle.WithInterruption(true))
 				t.Cleanup(func() { requestor.messageLifecycle.CancelInterruption() })
-				requestor.messageLifecycle.ConfigureInterruption(true)
 				eos := &recordingEOSExecutor{}
 				requestor.endOfSpeechExecutor = eos
 				streamer := requestor.streamer.(*streamTestStreamer)
@@ -221,9 +218,8 @@ func TestInterruptionLateConfirmationAfterContinuePreservesUnclearInput(t *testi
 
 func TestInterruptionPauseFailureCommitsWithoutWaiting(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
+		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD, adapter_lifecycle.WithInterruption(true))
 		requestor.streamer = &failingOutputControlStreamer{err: errors.New("output unavailable")}
-		requestor.messageLifecycle.ConfigureInterruption(true)
 		previous := requestor.GetID()
 		requestorDispatchHandler{r: requestor}.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{ContextID: previous, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
 		synctest.Wait()
@@ -240,8 +236,7 @@ func TestInterruptionPauseFailureCommitsWithoutWaiting(t *testing.T) {
 
 func TestInterruptionPauseIOCompletesBeforeFlushCommit(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
-		requestor.messageLifecycle.ConfigureInterruption(true)
+		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD, adapter_lifecycle.WithInterruption(true))
 		handler := requestorDispatchHandler{r: requestor}
 		previous := requestor.GetID()
 		pauseStarted, releasePause, pauseDone := make(chan struct{}), make(chan struct{}), make(chan struct{})
@@ -290,13 +285,13 @@ func TestInterruptionPauseIOCompletesBeforeFlushCommit(t *testing.T) {
 
 func TestInterruptionRejectsPauseSentAfterTurnCommit(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
-		requestor.messageLifecycle.ConfigureInterruption(true)
+		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD, adapter_lifecycle.WithInterruption(true))
 		handler := requestorDispatchHandler{r: requestor}
 		previous := requestor.GetID()
-		_, _, pause := requestor.messageLifecycle.ObserveVAD(internal_type.InterruptionDetectedPacket{
+		observation := requestor.messageLifecycle.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
 			ContextID: previous, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
-		})
+		}, internal_options.BargeInTriggerVAD)
+		pause := observation.Pause
 		require.NotNil(t, pause)
 		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{
 			ContextID: previous, Script: "wait", Interim: true,
@@ -317,35 +312,62 @@ func TestInterruptionRejectsPauseSentAfterTurnCommit(t *testing.T) {
 }
 
 func TestInterruptionRejectsPauseBetweenFlushAndCommit(t *testing.T) {
-	requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
-	requestor.messageLifecycle.ConfigureInterruption(true)
-	t.Cleanup(func() { requestor.messageLifecycle.CancelInterruption() })
-	previous := requestor.GetID()
-	_, _, pause := requestor.messageLifecycle.ObserveVAD(internal_type.InterruptionDetectedPacket{
-		ContextID: previous, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
+	synctest.Test(t, func(t *testing.T) {
+		var requestor *genericRequestor
+		var packets []internal_type.Packet
+		pauseResult := make(chan error, 1)
+		requestor = newInterruptionTestRequestor(internal_options.BargeInTriggerVAD,
+			adapter_lifecycle.WithInterruption(true),
+			adapter_lifecycle.WithSend(func(control proto.Message) error {
+				require.NoError(t, requestor.streamer.Send(control))
+				assert.Equal(t, "ctx-active", requestor.GetID())
+				pauseStarted := make(chan struct{})
+				go func() {
+					close(pauseStarted)
+					pauseResult <- requestor.sendOutputControl(&protos.ConversationPlaybackPause{Id: "ctx-active"})
+				}()
+				<-pauseStarted
+				require.Empty(t, pauseResult, "pause must wait for the in-flight flush")
+				return nil
+			}),
+			adapter_lifecycle.WithDispatch(func(_ context.Context, packet internal_type.Packet) {
+				packets = append(packets, packet)
+			}),
+		)
+		t.Cleanup(func() { requestor.messageLifecycle.CancelInterruption() })
+		previous := requestor.GetID()
+		observation := requestor.messageLifecycle.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
+			ContextID: previous, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
+		}, internal_options.BargeInTriggerVAD)
+		pause := observation.Pause
+		require.NotNil(t, pause)
+		decision, _, _ := requestor.messageLifecycle.OnUserSpeech(internal_type.SpeechToTextPacket{
+			ContextID: previous, Script: "wait", Interim: true,
+		}, true)
+		require.NotNil(t, decision)
+		require.NoError(t, requestor.messageLifecycle.OnTurnChange(context.Background(), *decision))
+		require.ErrorIs(t, <-pauseResult, adapter_lifecycle.ErrStaleContext)
+		streamer := requestor.streamer.(*streamTestStreamer)
+		assert.Equal(t, []proto.Message{&protos.ConversationPlaybackFlush{Id: previous}}, streamer.sent,
+			"a reserved candidate must not allow Pause after Flush while context rotation is pending")
+		require.Len(t, packets, 7)
+		committed, ok := packets[4].(internal_type.TurnChangePacket)
+		require.True(t, ok)
+		assert.NotEqual(t, previous, committed.ContextID)
+		assert.Equal(t, requestor.GetID(), committed.ContextID)
+		assert.Equal(t, internal_type.InterruptionDetectedPacket{
+			ContextID: committed.ContextID, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
+		}, packets[5])
+		assert.Equal(t, internal_type.SpeechToTextPacket{
+			ContextID: committed.ContextID, Script: "wait", Interim: true,
+		}, packets[6])
 	})
-	require.NotNil(t, pause)
-	decision, _, _ := requestor.messageLifecycle.ObserveSpeech(internal_type.SpeechToTextPacket{
-		ContextID: previous, Script: "wait", Interim: true,
-	}, true)
-	require.NotNil(t, decision)
-	require.True(t, requestor.messageLifecycle.BeginInterruptedTurn(*decision))
-	require.NoError(t, requestor.sendOutputControl(&protos.ConversationPlaybackFlush{Id: previous}))
-	require.ErrorIs(t, requestor.sendOutputControl(&protos.ConversationPlaybackPause{Id: pause.ContextID}), adapter_lifecycle.ErrStaleContext)
-	streamer := requestor.streamer.(*streamTestStreamer)
-	assert.Equal(t, []proto.Message{&protos.ConversationPlaybackFlush{Id: previous}}, streamer.sent,
-		"a reserved candidate must not allow Pause after Flush while context rotation is pending")
-	committed, ok := requestor.messageLifecycle.CommitInterruptedTurn(*decision)
-	require.True(t, ok)
-	assert.NotEqual(t, previous, committed.ContextID)
-	assert.Len(t, requestor.messageLifecycle.FinishInterruptedTurn(committed), 2)
 }
 
 func TestInterruptionCancellationContinuesOnlyPendingOutput(t *testing.T) {
 	for _, commit := range []bool{false, true} {
 		synctest.Test(t, func(t *testing.T) {
-			requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
-			requestor.messageLifecycle.ConfigureInterruption(true)
+			requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD, adapter_lifecycle.WithInterruption(true))
 			streamer := requestor.streamer.(*streamTestStreamer)
 			handler := requestorDispatchHandler{r: requestor}
 			previousContextID := requestor.GetID()
@@ -393,7 +415,7 @@ func (transformer blockedInterruptionTransformer) Transform(ctx context.Context,
 
 func TestInterruptionHoldsTranscriptsUntilCommitCompletion(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Please repeat")
+		requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Please repeat", adapter_lifecycle.WithInterruption(true))
 		t.Cleanup(requestor.messageLifecycle.StopUnclearInput)
 		eos := &recordingEOSExecutor{}
 		requestor.endOfSpeechExecutor = eos
@@ -401,7 +423,6 @@ func TestInterruptionHoldsTranscriptsUntilCommitCompletion(t *testing.T) {
 		requestor.textToSpeechTransformer = blockedInterruptionTransformer{
 			blockOn: internal_type.PacketNameTextToSpeechInterrupt, started: started, release: release,
 		}
-		requestor.messageLifecycle.ConfigureInterruption(true)
 		streamer := requestor.streamer.(*streamTestStreamer)
 		handler := requestorDispatchHandler{r: requestor}
 		previous := requestor.GetID()
@@ -441,12 +462,11 @@ func TestInterruptionHoldsTranscriptsUntilCommitCompletion(t *testing.T) {
 
 func TestInterruptionDeadlineDoesNotWaitForProviderWork(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
+		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD, adapter_lifecycle.WithInterruption(true))
 		started, release := make(chan struct{}), make(chan struct{})
 		requestor.speechToTextTransformer = blockedInterruptionTransformer{
 			blockOn: internal_type.PacketNameSpeechToTextStart, started: started, release: release,
 		}
-		requestor.messageLifecycle.ConfigureInterruption(true)
 		dispatcherContext, cancelDispatcher := context.WithCancel(context.Background())
 		defer cancelDispatcher()
 		go requestor.runCriticalDispatcher(dispatcherContext)
@@ -468,8 +488,7 @@ func TestInterruptionDeadlineDoesNotWaitForProviderWork(t *testing.T) {
 
 func TestInterruptionIgnoresStaleAndUngatedTranscripts(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
-		requestor.messageLifecycle.ConfigureInterruption(true)
+		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD, adapter_lifecycle.WithInterruption(true))
 		streamer := requestor.streamer.(*streamTestStreamer)
 		handler := requestorDispatchHandler{r: requestor}
 		previous := requestor.GetID()
@@ -496,10 +515,9 @@ func TestInterruptionIgnoresStaleAndUngatedTranscripts(t *testing.T) {
 func TestInterruptionIgnoresStaleVADEndOutsidePreviousContext(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
-		requestor.messageLifecycle = adapter_lifecycle.NewMessageLifecycleWithContext("current", type_enums.AudioMode)
+		requestor.messageLifecycle = adapter_lifecycle.NewMessageLifecycle(adapter_lifecycle.WithContextID("current"), adapter_lifecycle.WithMode(type_enums.AudioMode), adapter_lifecycle.WithInterruption(true))
 		eos := &recordingEOSExecutor{}
 		requestor.endOfSpeechExecutor = eos
-		requestor.messageLifecycle.ConfigureInterruption(true)
 		streamer := requestor.streamer.(*streamTestStreamer)
 
 		requestorDispatchHandler{r: requestor}.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{
@@ -522,8 +540,8 @@ type recordingInterruptionLifecycle struct {
 	pauses []internal_type.InterruptionDecisionExpiredPacket
 }
 
-func (l *recordingInterruptionLifecycle) ObserveInterruption(p internal_type.InterruptionDetectedPacket, bargeInTrigger string) adapter_lifecycle.InterruptionDecision {
-	decision := l.MessageLifecycle.ObserveInterruption(p, bargeInTrigger)
+func (l *recordingInterruptionLifecycle) OnInterruptionDetected(p internal_type.InterruptionDetectedPacket, bargeInTrigger string) adapter_lifecycle.InterruptionDecision {
+	decision := l.MessageLifecycle.OnInterruptionDetected(p, bargeInTrigger)
 	if decision.Pause != nil {
 		l.pauses = append(l.pauses, *decision.Pause)
 	}
@@ -532,8 +550,7 @@ func (l *recordingInterruptionLifecycle) ObserveInterruption(p internal_type.Int
 
 func TestInterruptionRejectsStaleDecisionPackets(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
-		requestor.messageLifecycle.ConfigureInterruption(true)
+		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD, adapter_lifecycle.WithInterruption(true))
 		lifecycle := &recordingInterruptionLifecycle{MessageLifecycle: requestor.messageLifecycle}
 		requestor.messageLifecycle = lifecycle
 		streamer := requestor.streamer.(*streamTestStreamer)
@@ -599,8 +616,7 @@ func TestInterruptionRejectsStaleDecisionPackets(t *testing.T) {
 
 func TestInterruptionFinalizationFencesDeadline(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
-		requestor.messageLifecycle.ConfigureInterruption(true)
+		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD, adapter_lifecycle.WithInterruption(true))
 		lifecycle := &recordingInterruptionLifecycle{MessageLifecycle: requestor.messageLifecycle}
 		requestor.messageLifecycle = lifecycle
 		streamer := requestor.streamer.(*streamTestStreamer)

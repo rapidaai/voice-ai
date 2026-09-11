@@ -35,8 +35,7 @@ func TestTextToSpeechEndRetainsPlaybackInterruption(t *testing.T) {
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
-				requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 0, "")
-				requestor.messageLifecycle.ConfigureInterruption(true)
+				requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 0, "", adapter_lifecycle.WithInterruption(true))
 				t.Cleanup(func() { requestor.messageLifecycle.CancelInterruption() })
 				requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
 				streamer := requestor.streamer.(*streamTestStreamer)
@@ -106,11 +105,10 @@ func TestTextToSpeechEndRetainsPlaybackInterruption(t *testing.T) {
 
 func TestTextToSpeechEndLateReceiptDoesNotDismissLaterPlayback(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
+		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD, adapter_lifecycle.WithInterruption(true))
 		requestor.assistant = &internal_assistant_entity.Assistant{}
 		requestor.assistantConversation = &internal_conversation_entity.AssistantConversation{}
 		requestor.observabilityRecorder = &recordingObservabilityRecorder{}
-		requestor.messageLifecycle.ConfigureInterruption(true)
 		t.Cleanup(func() { requestor.messageLifecycle.CancelInterruption() })
 		handler := requestorDispatchHandler{r: requestor}
 		contextID := requestor.GetID()
@@ -152,9 +150,9 @@ func TestTalk_PlaybackCompletionBypassesFullControlQueue(t *testing.T) {
 			requestor.assistantConversation.Id = 20
 			recorder := &recordingObservabilityRecorder{}
 			requestor.observabilityRecorder = recorder
-			requestor.messageLifecycle.AssistantTextCompleted(internal_type.LLMResponseDonePacket{ContextID: "ctx-active", Text: "answer"})
-			require.NoError(t, requestor.messageLifecycle.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: "ctx-active", Completed: true, Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}}}, func(proto.Message) error { return nil }))
-			t.Cleanup(func() { requestor.messageLifecycle.FailAssistantMessage("ctx-active") })
+			requestor.messageLifecycle.OnGenerationCompleted(internal_type.LLMResponseDonePacket{ContextID: "ctx-active", Text: "answer"})
+			require.NoError(t, requestor.messageLifecycle.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: "ctx-active", Completed: true, Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}}}))
+			t.Cleanup(func() { requestor.messageLifecycle.OnMessageFailed("ctx-active") })
 			requestor.streamer = &streamTestStreamer{recv: []proto.Message{
 				&protos.ConversationPlaybackComplete{},
 				&protos.ConversationPlaybackComplete{Id: "ctx-stale"},
@@ -237,9 +235,9 @@ func TestPlaybackCompletionRequiresTerminalIssuance(t *testing.T) {
 			}
 			requestor.dispatch(context.Background(), completion)
 			require.Empty(t, recorder.records, "early receipt must not be recorded")
-			requestor.messageLifecycle.AssistantTextCompleted(internal_type.LLMResponseDonePacket{ContextID: "ctx-active", Text: "answer"})
-			require.NoError(t, requestor.messageLifecycle.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: "ctx-active", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}}}, func(proto.Message) error { return nil }))
-			t.Cleanup(func() { requestor.messageLifecycle.FailAssistantMessage("ctx-active") })
+			requestor.messageLifecycle.OnGenerationCompleted(internal_type.LLMResponseDonePacket{ContextID: "ctx-active", Text: "answer"})
+			require.NoError(t, requestor.messageLifecycle.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: "ctx-active", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}}}))
+			t.Cleanup(func() { requestor.messageLifecycle.OnMessageFailed("ctx-active") })
 
 			streamer := &terminalReceiptTestStreamer{onSend: func(message proto.Message) error {
 				terminal, ok := message.(*protos.ConversationAssistantMessage)
@@ -264,7 +262,7 @@ func TestPlaybackCompletionRequiresTerminalIssuance(t *testing.T) {
 			}
 
 			if scenario.sendError != nil {
-				require.ErrorIs(t, requestor.messageLifecycle.ObservePlaybackCompletion("ctx-active"), adapter_lifecycle.ErrPlaybackTerminalNotIssued)
+				require.ErrorIs(t, requestor.messageLifecycle.OnPlaybackCompleted("ctx-active"), adapter_lifecycle.ErrPlaybackTerminalNotIssued)
 				requestor.dispatch(context.Background(), completion)
 				if scenario.receiptDuringSend {
 					require.Len(t, recorder.records, 1, "diagnostic observation is not retracted on send failure")
@@ -289,9 +287,9 @@ func TestPlaybackCompletionRejectsDuplicateTerminalBeforeSend(t *testing.T) {
 	requestor.assistantConversation = &internal_conversation_entity.AssistantConversation{}
 	recorder := &recordingObservabilityRecorder{}
 	requestor.observabilityRecorder = recorder
-	requestor.messageLifecycle.AssistantTextCompleted(internal_type.LLMResponseDonePacket{ContextID: "ctx-active", Text: "answer"})
-	require.NoError(t, requestor.messageLifecycle.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: "ctx-active", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}}}, func(proto.Message) error { return nil }))
-	t.Cleanup(func() { requestor.messageLifecycle.FailAssistantMessage("ctx-active") })
+	requestor.messageLifecycle.OnGenerationCompleted(internal_type.LLMResponseDonePacket{ContextID: "ctx-active", Text: "answer"})
+	require.NoError(t, requestor.messageLifecycle.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: "ctx-active", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}}}))
+	t.Cleanup(func() { requestor.messageLifecycle.OnMessageFailed("ctx-active") })
 	sendAttempts := 0
 	streamer := &terminalReceiptTestStreamer{onSend: func(proto.Message) error {
 		sendAttempts++
@@ -375,18 +373,19 @@ func TestPlaybackCompletionPreservesTTSFallbackAndDisabledIdle(t *testing.T) {
 
 func TestTextToSpeechEndSendsTerminalAudioAndRetainsActivePlayback(t *testing.T) {
 	requestor := newInterruptionTestRequestor("")
-	requestor.messageLifecycle.AssistantTextCompleted(internal_type.LLMResponseDonePacket{ContextID: "ctx-active", Text: "answer"})
-	require.NoError(t, requestor.messageLifecycle.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: "ctx-active", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}}}, func(proto.Message) error { return nil }))
-	t.Cleanup(func() { requestor.messageLifecycle.FailAssistantMessage("ctx-active") })
+	requestor.messageLifecycle.OnGenerationCompleted(internal_type.LLMResponseDonePacket{ContextID: "ctx-active", Text: "answer"})
+	require.NoError(t, requestor.messageLifecycle.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: "ctx-active", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}}}))
+	t.Cleanup(func() { requestor.messageLifecycle.OnMessageFailed("ctx-active") })
 	handler := requestorDispatchHandler{r: requestor}
 	streamer := requestor.streamer.(*streamTestStreamer)
 	handler.HandleTextToSpeechEnd(context.Background(), internal_type.TextToSpeechEndPacket{ContextID: "ctx-stale"})
-	assert.Empty(t, streamer.sent)
+	require.Len(t, streamer.sent, 1, "stale TTS end must not append terminal audio")
+	assert.False(t, streamer.sent[0].(*protos.ConversationAssistantMessage).Completed)
 	assert.Equal(t, adapter_lifecycle.MessageStateAssistantSpeaking, requestor.messageLifecycle.State())
 
 	handler.HandleTextToSpeechEnd(context.Background(), internal_type.TextToSpeechEndPacket{ContextID: "ctx-active"})
-	require.Len(t, streamer.sent, 1)
-	message, ok := streamer.sent[0].(*protos.ConversationAssistantMessage)
+	require.Len(t, streamer.sent, 2)
+	message, ok := streamer.sent[1].(*protos.ConversationAssistantMessage)
 	require.True(t, ok)
 	assert.Equal(t, "ctx-active", message.Id)
 	assert.True(t, message.Completed)
@@ -419,16 +418,13 @@ func TestPlaybackCompletionFinishesMessageAndStartsIdleTimeout(t *testing.T) {
 		requestor.assistant.AssistantPhoneDeployment.IdleTimeout = &idleTimeout
 		requestor.sessionLifecycle = adapter_lifecycle.NewSessionLifecycle()
 		requestor.sessionLifecycle.ConfigureTimeouts(context.Background(), requestor.GetID(), &requestor.assistant.AssistantPhoneDeployment.AssistantDeploymentBehavior, requestor.OnPacket)
-		requestor.messageLifecycle.ConfigurePlaybackCompletion(func(packets ...internal_type.Packet) error {
-			return requestor.OnPacket(context.Background(), packets...)
-		})
 		t.Cleanup(func() {
 			requestor.sessionLifecycle.CloseTimeouts()
-			requestor.messageLifecycle.FailAssistantMessage("ctx-active")
+			requestor.messageLifecycle.OnMessageFailed("ctx-active")
 			requestor.messageLifecycle.StopUnclearInput()
 		})
 		handler := requestorDispatchHandler{r: requestor}
-		requestor.messageLifecycle.AssistantTextCompleted(internal_type.LLMResponseDonePacket{ContextID: "ctx-active", Text: "answer"})
+		requestor.messageLifecycle.OnGenerationCompleted(internal_type.LLMResponseDonePacket{ContextID: "ctx-active", Text: "answer"})
 		handler.HandleTextToSpeechDone(context.Background(), internal_type.TextToSpeechDonePacket{ContextID: "ctx-active", Text: "answer"})
 		handler.HandleTextToSpeechAudio(context.Background(), internal_type.TextToSpeechAudioPacket{ContextID: "ctx-active", AudioChunk: []byte{0, 0}})
 		handler.HandleTextToSpeechEnd(context.Background(), internal_type.TextToSpeechEndPacket{ContextID: "ctx-active"})
@@ -461,6 +457,49 @@ func TestPlaybackCompletionFinishesMessageAndStartsIdleTimeout(t *testing.T) {
 		}
 		require.Equal(t, 1, completionMetrics)
 	})
+}
+
+func TestFinalizeBehaviorCancelsPlaybackDeadline(t *testing.T) {
+	for _, scenario := range []struct {
+		name     string
+		finalize bool
+	}{
+		{name: "active playback expires"},
+		{name: "finalization cancels expiry", finalize: true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				packets := make(chan internal_type.Packet, 1)
+				requestor := newInterruptionTestRequestor("", adapter_lifecycle.WithOnPacket(func(emitted ...internal_type.Packet) error {
+					for _, packet := range emitted {
+						packets <- packet
+					}
+					return nil
+				}))
+				contextID := requestor.GetID()
+				t.Cleanup(func() { requestor.messageLifecycle.OnMessageFailed(contextID) })
+				requestor.messageLifecycle.OnGenerationCompleted(internal_type.LLMResponseDonePacket{ContextID: contextID, Text: "answer"})
+				require.NoError(t, requestor.messageLifecycle.SendAssistantMessage(&protos.ConversationAssistantMessage{
+					Id: contextID, Completed: true, Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}},
+				}))
+				require.Empty(t, packets)
+				if scenario.finalize {
+					requestorDispatchHandler{r: requestor}.HandleFinalizeBehavior(context.Background(), internal_type.FinalizeBehaviorPacket{ContextID: contextID})
+				}
+				time.Sleep(6 * time.Second)
+				synctest.Wait()
+				if scenario.finalize {
+					assert.Empty(t, packets, "finalization must prevent playback timeout callbacks")
+					return
+				}
+				require.Len(t, packets, 1)
+				timeout, ok := (<-packets).(internal_type.TextToSpeechErrorPacket)
+				require.True(t, ok)
+				assert.Equal(t, contextID, timeout.ContextID)
+				assert.Equal(t, internal_type.TTSPlaybackTimeout, timeout.Type)
+			})
+		})
+	}
 }
 
 func TestStalePlaybackTimeoutDoesNotCloseNewTurn(t *testing.T) {

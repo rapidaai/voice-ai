@@ -29,7 +29,7 @@ func TestMessageLifecycle_ObserveInterruptionRotatesLegacyTurn(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &messageLifecycle{contextID: "old", mode: tt.mode, state: MessageStateAssistantSpeaking, output: assistantOutputState{terminalIssued: true, receiptReceived: true}}
-			decision := l.ObserveInterruption(internal_type.InterruptionDetectedPacket{
+			decision := l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
 				ContextID: "old", Source: tt.source, Event: internal_type.InterruptionEventStart,
 			}, tt.trigger)
 			current := l.ContextID()
@@ -73,7 +73,7 @@ func TestMessageLifecycle_ObserveInterruptionRotatesLegacyTurn(t *testing.T) {
 			} else if decision.EndOfSpeech != nil || decision.SpeechToTextStart != nil || decision.Notification.Type != protos.ConversationInterruption_INTERRUPTION_TYPE_WORD {
 				t.Fatalf("unexpected word commands: %+v", decision)
 			}
-			if err := l.ObservePlaybackCompletion(current); err != ErrPlaybackTerminalNotIssued {
+			if err := l.OnPlaybackCompleted(current); err != ErrPlaybackTerminalNotIssued {
 				t.Fatalf("rotated turn retained playback eligibility: %v", err)
 			}
 		})
@@ -110,7 +110,7 @@ func TestMessageLifecycle_ObserveInterruptionPreservesLegacyStates(t *testing.T)
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &messageLifecycle{contextID: "ctx", mode: tt.mode, state: tt.state}
-			decision := l.ObserveInterruption(internal_type.InterruptionDetectedPacket{Source: tt.source, Event: tt.event}, tt.trigger)
+			decision := l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{Source: tt.source, Event: tt.event}, tt.trigger)
 			if l.ContextID() != "ctx" || l.State() != tt.wantState || decision.Flush != nil || decision.Notification != nil || decision.Pause != nil {
 				t.Fatalf("unexpected transition: context=%q state=%s decision=%+v", l.ContextID(), l.State(), decision)
 			}
@@ -146,7 +146,7 @@ func TestMessageLifecycle_ObserveInterruptionStaleAdmission(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &messageLifecycle{contextID: "ctx", mode: type_enums.TextMode, state: tt.state}
-			decision := l.ObserveInterruption(internal_type.InterruptionDetectedPacket{ContextID: "old", Source: tt.source, Event: tt.event}, internal_options.BargeInTriggerVAD)
+			decision := l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{ContextID: "old", Source: tt.source, Event: tt.event}, internal_options.BargeInTriggerVAD)
 			if l.ContextID() != "ctx" || decision.Flush != nil {
 				t.Fatalf("stale event rotated turn: %+v", decision)
 			}
@@ -163,7 +163,7 @@ func TestMessageLifecycle_ObserveInterruptionStaleAdmission(t *testing.T) {
 func TestMessageLifecycle_ObserveInterruptionAdaptiveVAD(t *testing.T) {
 	l := &messageLifecycle{contextID: "ctx", mode: type_enums.AudioMode, state: MessageStateAssistantSpeaking, interruptionEnabled: true}
 	t.Cleanup(func() { l.CancelInterruption() })
-	decision := l.ObserveInterruption(internal_type.InterruptionDetectedPacket{
+	decision := l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
 		ContextID: "ctx", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
 	}, internal_options.BargeInTriggerVAD)
 	if decision.Pause == nil || decision.Pause.ContextID != "ctx" || decision.SpeechToTextStart == nil || decision.SpeechToTextStart.ContextID != "ctx" {
@@ -172,7 +172,7 @@ func TestMessageLifecycle_ObserveInterruptionAdaptiveVAD(t *testing.T) {
 	if l.ContextID() != "ctx" || l.State() != MessageStateAssistantSpeaking || decision.Flush != nil || decision.EndOfSpeech != nil || len(decision.Packets) != 0 {
 		t.Fatalf("adaptive start used legacy rotation: %+v", decision)
 	}
-	decision = l.ObserveInterruption(internal_type.InterruptionDetectedPacket{
+	decision = l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
 		ContextID: "ctx", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd,
 	}, internal_options.BargeInTriggerVAD)
 	if decision.Pause != nil || decision.EndOfSpeech != nil || len(decision.Packets) != 1 || decision.Packets[0] != (internal_type.SpeechToTextEndPacket{ContextID: "ctx"}) {
@@ -188,7 +188,7 @@ func TestMessageLifecycle_ObserveInterruptionConcurrentVADStarts(t *testing.T) {
 		calls.Add(1)
 		go func() {
 			defer calls.Done()
-			decisions <- l.ObserveInterruption(internal_type.InterruptionDetectedPacket{
+			decisions <- l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
 				ContextID: "ctx", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
 			}, internal_options.BargeInTriggerVAD)
 		}()
@@ -209,55 +209,63 @@ func TestMessageLifecycle_ObserveInterruptionConcurrentVADStarts(t *testing.T) {
 func TestMessageLifecycle_ObserveInterruptionLegacyTurnInvalidatesAdaptivePause(t *testing.T) {
 	l := &messageLifecycle{contextID: "ctx", mode: type_enums.AudioMode, state: MessageStateAssistantSpeaking, interruptionEnabled: true}
 	t.Cleanup(func() { l.CancelInterruption() })
-	pause := l.ObserveInterruption(internal_type.InterruptionDetectedPacket{
+	pause := l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
 		ContextID: "ctx", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
 	}, internal_options.BargeInTriggerVAD).Pause
 	if pause == nil {
 		t.Fatal("adaptive interruption did not pause")
 	}
-	turn, _, _ := l.ObserveSpeech(internal_type.SpeechToTextPacket{ContextID: "ctx", Script: "stop", Interim: true}, true)
-	if turn == nil || !l.BeginInterruptedTurn(*turn) {
+	turn, _, _ := l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "ctx", Script: "stop", Interim: true}, true)
+	if turn == nil || !l.beginInterruptedTurn(*turn) {
 		t.Fatal("adaptive interruption did not reserve flush")
 	}
-	decision := l.ObserveInterruption(internal_type.InterruptionDetectedPacket{
+	decision := l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
 		ContextID: "ctx", Source: internal_type.InterruptionSourceWord,
 	}, internal_options.BargeInTriggerWord)
 	current := l.ContextID()
 	if current == "ctx" || decision.Flush == nil || l.State() != MessageStateUserListening {
 		t.Fatalf("word trigger did not replace paused turn: %+v", decision)
 	}
-	if _, accepted := l.CommitInterruptedTurn(*turn); accepted {
+	if _, accepted := l.commitInterruptedTurn(*turn); accepted {
 		t.Fatal("stale adaptive flush replaced legacy turn")
 	}
 	if l.HoldInput(internal_type.UserInputPacket{ContextID: current, Text: "new request"}) || l.CanStartIdleTimeout(current) {
 		t.Fatal("legacy turn retained adaptive held input or lost listening state")
 	}
-	if turn, _ := l.ExpireInterruption(*pause); turn != nil || l.ContextID() != current {
+	if resumeContextID := l.OnInterruptionExpired(*pause); resumeContextID != "" || l.ContextID() != current {
 		t.Fatal("stale adaptive pause changed legacy turn")
 	}
 }
 
 func TestMessageLifecycle_ObserveInterruptionVADStartsUnclearAfterEnd(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		l := &messageLifecycle{contextID: "ctx", mode: type_enums.AudioMode, state: MessageStateAssistantSpeaking}
-		t.Cleanup(l.StopUnclearInput)
 		timeout := 0.02
 		expired := make(chan internal_type.UnclearInputExpiredPacket, 2)
-		l.ConfigureUnclearInput(context.Background(), &internal_assistant_entity.AssistantDeploymentBehavior{UnclearInputTimeout: &timeout}, func(_ context.Context, packets ...internal_type.Packet) error {
-			for _, packet := range packets {
-				if packet, ok := packet.(internal_type.UnclearInputExpiredPacket); ok {
-					expired <- packet
+		l := &messageLifecycle{
+			contextID: "ctx", mode: type_enums.AudioMode, state: MessageStateAssistantSpeaking,
+			loadBehavior: func() (*internal_assistant_entity.AssistantDeploymentBehavior, error) {
+				return &internal_assistant_entity.AssistantDeploymentBehavior{UnclearInputTimeout: &timeout}, nil
+			},
+			onPacket: func(packets ...internal_type.Packet) error {
+				for _, packet := range packets {
+					if packet, ok := packet.(internal_type.UnclearInputExpiredPacket); ok {
+						expired <- packet
+					}
 				}
-			}
-			return nil
-		})
-		l.ObserveInterruption(internal_type.InterruptionDetectedPacket{ContextID: "ctx", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart}, internal_options.BargeInTriggerVAD)
+				return nil
+			},
+		}
+		t.Cleanup(l.StopUnclearInput)
+		if err := l.Initialize(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{ContextID: "ctx", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart}, internal_options.BargeInTriggerVAD)
 		select {
 		case packet := <-expired:
 			t.Fatalf("VAD start began unclear countdown: %+v", packet)
 		case <-time.After(50 * time.Millisecond):
 		}
-		l.ObserveInterruption(internal_type.InterruptionDetectedPacket{ContextID: "ctx", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd}, internal_options.BargeInTriggerVAD)
+		l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{ContextID: "ctx", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd}, internal_options.BargeInTriggerVAD)
 		select {
 		case packet := <-expired:
 			if packet.ContextID != l.ContextID() {
@@ -271,21 +279,29 @@ func TestMessageLifecycle_ObserveInterruptionVADStartsUnclearAfterEnd(t *testing
 
 func TestMessageLifecycle_ObserveInterruptionWordExtendsUnclear(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		l := &messageLifecycle{contextID: "ctx", mode: type_enums.AudioMode, state: MessageStateAssistantSpeaking}
-		t.Cleanup(l.StopUnclearInput)
 		timeout := 0.3
 		expired := make(chan internal_type.UnclearInputExpiredPacket, 2)
-		l.ConfigureUnclearInput(context.Background(), &internal_assistant_entity.AssistantDeploymentBehavior{UnclearInputTimeout: &timeout}, func(_ context.Context, packets ...internal_type.Packet) error {
-			for _, packet := range packets {
-				if packet, ok := packet.(internal_type.UnclearInputExpiredPacket); ok {
-					expired <- packet
+		l := &messageLifecycle{
+			contextID: "ctx", mode: type_enums.AudioMode, state: MessageStateAssistantSpeaking,
+			loadBehavior: func() (*internal_assistant_entity.AssistantDeploymentBehavior, error) {
+				return &internal_assistant_entity.AssistantDeploymentBehavior{UnclearInputTimeout: &timeout}, nil
+			},
+			onPacket: func(packets ...internal_type.Packet) error {
+				for _, packet := range packets {
+					if packet, ok := packet.(internal_type.UnclearInputExpiredPacket); ok {
+						expired <- packet
+					}
 				}
-			}
-			return nil
-		})
-		l.ObserveInterruption(internal_type.InterruptionDetectedPacket{ContextID: "ctx", Source: internal_type.InterruptionSourceWord}, internal_options.BargeInTriggerWord)
+				return nil
+			},
+		}
+		t.Cleanup(l.StopUnclearInput)
+		if err := l.Initialize(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{ContextID: "ctx", Source: internal_type.InterruptionSourceWord}, internal_options.BargeInTriggerWord)
 		time.Sleep(150 * time.Millisecond)
-		l.ObserveInterruption(internal_type.InterruptionDetectedPacket{ContextID: "ctx", Source: internal_type.InterruptionSourceWord}, internal_options.BargeInTriggerWord)
+		l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{ContextID: "ctx", Source: internal_type.InterruptionSourceWord}, internal_options.BargeInTriggerWord)
 		select {
 		case packet := <-expired:
 			t.Fatalf("duplicate word did not extend countdown: %+v", packet)
@@ -299,7 +315,7 @@ func TestMessageLifecycle_ObserveInterruptionWordExtendsUnclear(t *testing.T) {
 		case <-time.After(time.Second):
 			t.Fatal("extended unclear countdown did not expire")
 		}
-		l.ObserveInterruption(internal_type.InterruptionDetectedPacket{ContextID: "ctx", Source: internal_type.InterruptionSourceWord}, internal_options.BargeInTriggerWord)
+		l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{ContextID: "ctx", Source: internal_type.InterruptionSourceWord}, internal_options.BargeInTriggerWord)
 		select {
 		case packet := <-expired:
 			t.Fatalf("duplicate word restarted expired countdown: %+v", packet)
@@ -324,18 +340,26 @@ func TestMessageLifecycle_ObserveInterruptionDisabledUnclear(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
-				l := &messageLifecycle{contextID: "ctx", mode: tt.mode, state: tt.state}
-				t.Cleanup(l.StopUnclearInput)
 				expired := make(chan internal_type.UnclearInputExpiredPacket, 2)
-				l.ConfigureUnclearInput(context.Background(), &internal_assistant_entity.AssistantDeploymentBehavior{UnclearInputTimeout: &tt.timeout}, func(_ context.Context, packets ...internal_type.Packet) error {
-					for _, packet := range packets {
-						if packet, ok := packet.(internal_type.UnclearInputExpiredPacket); ok {
-							expired <- packet
+				l := &messageLifecycle{
+					contextID: "ctx", mode: tt.mode, state: tt.state,
+					loadBehavior: func() (*internal_assistant_entity.AssistantDeploymentBehavior, error) {
+						return &internal_assistant_entity.AssistantDeploymentBehavior{UnclearInputTimeout: &tt.timeout}, nil
+					},
+					onPacket: func(packets ...internal_type.Packet) error {
+						for _, packet := range packets {
+							if packet, ok := packet.(internal_type.UnclearInputExpiredPacket); ok {
+								expired <- packet
+							}
 						}
-					}
-					return nil
-				})
-				l.ObserveInterruption(internal_type.InterruptionDetectedPacket{ContextID: "ctx", Source: tt.source, Event: internal_type.InterruptionEventStart}, internal_options.BargeInTriggerWord)
+						return nil
+					},
+				}
+				t.Cleanup(l.StopUnclearInput)
+				if err := l.Initialize(context.Background()); err != nil {
+					t.Fatal(err)
+				}
+				l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{ContextID: "ctx", Source: tt.source, Event: internal_type.InterruptionEventStart}, internal_options.BargeInTriggerWord)
 				select {
 				case packet := <-expired:
 					t.Fatalf("ineligible unclear countdown started: %+v", packet)

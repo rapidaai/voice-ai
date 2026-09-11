@@ -250,7 +250,7 @@ func (t *genericRequestor) OnCallCompletion(startTime time.Time) {
 func (t *genericRequestor) Notify(ctx context.Context, actionDatas ...proto.Message) error {
 	for _, actionData := range actionDatas {
 		if message, ok := actionData.(*protos.ConversationAssistantMessage); ok && t.messageLifecycle != nil {
-			if err := t.messageLifecycle.SendAssistantMessage(message, t.streamer.Send); err != nil {
+			if err := t.messageLifecycle.SendAssistantMessage(message); err != nil {
 				return err
 			}
 		} else if err := t.streamer.Send(actionData); err != nil {
@@ -267,7 +267,7 @@ func (r *genericRequestor) sendOutputControl(control proto.Message) error {
 	if r.messageLifecycle == nil {
 		return fmt.Errorf("output control %T: message lifecycle is unavailable", control)
 	}
-	if err := r.messageLifecycle.SendPlaybackControl(control, r.streamer.Send); err != nil {
+	if err := r.messageLifecycle.SendPlaybackControl(control); err != nil {
 		return fmt.Errorf("output control %T: %w", control, err)
 	}
 	return nil
@@ -364,7 +364,7 @@ func (r *genericRequestor) OnConnect(ctx context.Context, auth *types.Authentica
 // HandleFinalizationCompleted (normal completion) or by the watchdog if the
 // chain exceeds disconnectDeadline.
 func (r *genericRequestor) OnDisconnect(ctx context.Context) {
-	r.messageLifecycle.FailAssistantMessage(r.GetID())
+	r.messageLifecycle.OnMessageFailed(r.GetID())
 	if err := r.sessionLifecycle.Transition(adapter_lifecycle.EventDisconnectRequested); err != nil {
 		r.logger.Tracef(ctx, "disconnect ignored due to session lifecycle transition: %v", err)
 		return

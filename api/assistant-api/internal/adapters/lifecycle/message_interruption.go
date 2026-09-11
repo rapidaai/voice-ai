@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"context"
 	"slices"
 	"strings"
 	"time"
@@ -12,14 +13,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// InterruptionDecisionWindow bounds the pause while speech is being confirmed.
-const InterruptionDecisionWindow = 500 * time.Millisecond
-
-// InterruptionEnabledByDefault preserves the staged interruption rollout.
-const InterruptionEnabledByDefault = false
-
 // Playback controls are ordered independently of the state lock so I/O cannot block admission.
-func (l *messageLifecycle) SendPlaybackControl(control proto.Message, send func(proto.Message) error) error {
+func (l *messageLifecycle) SendPlaybackControl(control proto.Message) error {
+	if l.sendOutput == nil {
+		return ErrSenderNotConfigured
+	}
 	l.playbackControlMu.Lock()
 	defer l.playbackControlMu.Unlock()
 	l.mu.Lock()
@@ -63,8 +61,8 @@ func (l *messageLifecycle) SendPlaybackControl(control proto.Message, send func(
 		}
 	}
 	l.mu.Unlock()
-	if err := send(control); err != nil {
-		l.FailAssistantMessage(contextID)
+	if err := l.sendOutput(control); err != nil {
+		l.OnMessageFailed(contextID)
 		return err
 	}
 	if _, ok := control.(*protos.ConversationPlaybackContinue); ok {
@@ -73,16 +71,10 @@ func (l *messageLifecycle) SendPlaybackControl(control proto.Message, send func(
 			l.output.paused = false
 		}
 		l.mu.Unlock()
-		l.AwaitPlayback(contextID)
-		_ = l.CompleteAssistantSpeech(contextID)
+		l.awaitPlayback(contextID)
+		_ = l.completeAssistantMessage(contextID)
 	}
 	return nil
-}
-
-func (l *messageLifecycle) ConfigureInterruption(enabled bool) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.interruptionEnabled = enabled
 }
 
 func (l *messageLifecycle) InterruptionEnabled() bool {
@@ -126,8 +118,8 @@ func (l *messageLifecycle) CancelInterruption() string {
 	return continueContextID
 }
 
-// ObserveSpeech admits input or retains it until the interrupted turn is committed.
-func (l *messageLifecycle) ObserveSpeech(p internal_type.SpeechToTextPacket, adaptive bool) (*internal_type.TurnChangePacket, bool, bool) {
+// OnUserSpeech admits input or retains it until the interrupted turn is committed.
+func (l *messageLifecycle) OnUserSpeech(p internal_type.SpeechToTextPacket, adaptive bool) (*internal_type.TurnChangePacket, bool, bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if !l.interruptionEnabled || !adaptive {
@@ -241,8 +233,8 @@ func (l *messageLifecycle) HoldInput(packet internal_type.Packet) bool {
 	return true
 }
 
-// ObserveVAD returns provider packets, an admitted EOS event, or a pause candidate.
-func (l *messageLifecycle) ObserveVAD(p internal_type.InterruptionDetectedPacket) (internal_type.InterruptionDetectedPacket, []internal_type.Packet, *internal_type.InterruptionDecisionExpiredPacket) {
+// observeVAD returns provider packets, an admitted EOS event, or a pause candidate.
+func (l *messageLifecycle) observeVAD(p internal_type.InterruptionDetectedPacket) (internal_type.InterruptionDetectedPacket, []internal_type.Packet, *internal_type.InterruptionDecisionExpiredPacket) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.output.completed && p.Event == internal_type.InterruptionEventStart && (p.ContextID == "" || p.ContextID == l.contextID) {
@@ -331,7 +323,16 @@ func (l *messageLifecycle) ObserveVAD(p internal_type.InterruptionDetectedPacket
 	return p, nil, nil
 }
 
-func (l *messageLifecycle) ArmInterruption(contextID string, sequence uint64, onExpired func(internal_type.InterruptionDecisionExpiredPacket)) {
+// OnPlaybackPaused starts confirmation after a successful pause or handles its failure.
+func (l *messageLifecycle) OnPlaybackPaused(packet internal_type.InterruptionDecisionExpiredPacket, pauseError error) *internal_type.TurnChangePacket {
+	if pauseError != nil || l.onInterruptionExpired == nil {
+		return l.failInterruptionPause(packet)
+	}
+	l.armInterruption(packet.ContextID, packet.Sequence, l.onInterruptionExpired)
+	return nil
+}
+
+func (l *messageLifecycle) armInterruption(contextID string, sequence uint64, onExpired func(internal_type.InterruptionDecisionExpiredPacket)) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.interruptionContextID != contextID || l.interruptionSequence != sequence || l.interruptionDecisionPending {
@@ -342,7 +343,7 @@ func (l *messageLifecycle) ArmInterruption(contextID string, sequence uint64, on
 	})
 }
 
-func (l *messageLifecycle) FailInterruptionPause(p internal_type.InterruptionDecisionExpiredPacket) *internal_type.TurnChangePacket {
+func (l *messageLifecycle) failInterruptionPause(p internal_type.InterruptionDecisionExpiredPacket) *internal_type.TurnChangePacket {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.interruptionContextID != p.ContextID || l.interruptionSequence != p.Sequence || l.interruptionDecisionPending {
@@ -360,11 +361,11 @@ func (l *messageLifecycle) FailInterruptionPause(p internal_type.InterruptionDec
 	}
 }
 
-func (l *messageLifecycle) ExpireInterruption(p internal_type.InterruptionDecisionExpiredPacket) (*internal_type.TurnChangePacket, string) {
+func (l *messageLifecycle) OnInterruptionExpired(p internal_type.InterruptionDecisionExpiredPacket) string {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if !l.interruptionEnabled || l.interruptionContextID != p.ContextID || l.interruptionSequence != p.Sequence || l.interruptionDecisionPending {
-		return nil, ""
+		return ""
 	}
 	if l.interruptionDecisionTimer != nil {
 		l.interruptionDecisionTimer.Stop()
@@ -374,10 +375,48 @@ func (l *messageLifecycle) ExpireInterruption(p internal_type.InterruptionDecisi
 	l.interruptionContextID = ""
 	l.interruptionPreviousState = ""
 	l.interruptionResumed = true
-	return nil, p.ContextID
+	return p.ContextID
 }
 
-func (l *messageLifecycle) BeginInterruptedTurn(p internal_type.TurnChangePacket) bool {
+// OnTurnChange keeps held input behind downstream interruption and turn updates.
+// Callbacks run synchronously without holding the lifecycle state lock.
+func (l *messageLifecycle) OnTurnChange(ctx context.Context, packet internal_type.TurnChangePacket) error {
+	if l.dispatchPacket == nil {
+		return ErrDispatcherNotConfigured
+	}
+	var flushError error
+	if packet.InterruptionDecision {
+		if !l.beginInterruptedTurn(packet) {
+			return nil
+		}
+		flushError = l.SendPlaybackControl(&protos.ConversationPlaybackFlush{Id: packet.PreviousContextID})
+		var committed bool
+		packet, committed = l.commitInterruptedTurn(packet)
+		if !committed {
+			return flushError
+		}
+		l.StopUnclearInput()
+		l.dispatchPacket(ctx, internal_type.EndOfSpeechInterruptionPacket{ContextID: packet.PreviousContextID, Source: internal_type.InterruptionSourceVad})
+		l.dispatchPacket(ctx, internal_type.TextToSpeechInterruptPacket{ContextID: packet.PreviousContextID})
+		l.dispatchPacket(ctx, internal_type.LLMInterruptPacket{ContextID: packet.PreviousContextID})
+		l.dispatchPacket(ctx, internal_type.StopIdleTimeoutPacket{ContextID: packet.PreviousContextID})
+		defer func() {
+			for _, heldPacket := range l.finishInterruptedTurn(packet) {
+				l.dispatchPacket(ctx, heldPacket)
+			}
+		}()
+	}
+	if packet.ContextID == "" {
+		packet.ContextID = l.ContextID()
+	}
+	if packet.Time.IsZero() {
+		packet.Time = time.Now()
+	}
+	l.dispatchPacket(ctx, packet)
+	return flushError
+}
+
+func (l *messageLifecycle) beginInterruptedTurn(p internal_type.TurnChangePacket) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if !l.interruptionEnabled || p.InterruptionSequence == 0 || l.contextID != p.PreviousContextID || l.interruptionContextID != p.PreviousContextID ||
@@ -392,7 +431,7 @@ func (l *messageLifecycle) BeginInterruptedTurn(p internal_type.TurnChangePacket
 	return true
 }
 
-func (l *messageLifecycle) CommitInterruptedTurn(p internal_type.TurnChangePacket) (internal_type.TurnChangePacket, bool) {
+func (l *messageLifecycle) commitInterruptedTurn(p internal_type.TurnChangePacket) (internal_type.TurnChangePacket, bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.contextID != p.PreviousContextID || l.interruptionContextID != p.PreviousContextID || l.interruptionSequence != p.InterruptionSequence || !l.interruptionTurnCommitted {
@@ -409,7 +448,7 @@ func (l *messageLifecycle) CommitInterruptedTurn(p internal_type.TurnChangePacke
 	return p, true
 }
 
-func (l *messageLifecycle) FinishInterruptedTurn(p internal_type.TurnChangePacket) []internal_type.Packet {
+func (l *messageLifecycle) finishInterruptedTurn(p internal_type.TurnChangePacket) []internal_type.Packet {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.interruptionSequence != p.InterruptionSequence || l.interruptionContextID != p.PreviousContextID || l.contextID != p.ContextID {
@@ -449,10 +488,4 @@ func (l *messageLifecycle) FinishInterruptedTurn(p internal_type.TurnChangePacke
 		}
 	}
 	return heldPackets
-}
-
-func (l *messageLifecycle) IsCommittedInterruption(contextID string) bool {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
-	return l.interruptionEnabled && contextID == l.contextID && contextID == l.committedInterruptionContextID
 }

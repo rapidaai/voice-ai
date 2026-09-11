@@ -88,7 +88,7 @@ func TestSessionLifecycle_TimeoutDurationBounds(t *testing.T) {
 					t.Fatal(err)
 				}
 				lifecycle.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "current"},
-					NewMessageLifecycleWithContext("current", type_enums.TextMode))
+					NewMessageLifecycle(WithContextID("current"), WithMode(type_enums.TextMode)))
 				if testCase.seconds == 0 {
 					time.Sleep(time.Second)
 					synctest.Wait()
@@ -155,7 +155,7 @@ func TestSessionLifecycle_InvalidTimeoutPreservesActiveTimers(t *testing.T) {
 							t.Fatal(err)
 						}
 						lifecycle.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "current"},
-							NewMessageLifecycleWithContext("current", type_enums.TextMode))
+							NewMessageLifecycle(WithContextID("current"), WithMode(type_enums.TextMode)))
 						behavior := &internal_assistant_entity.AssistantDeploymentBehavior{}
 						if field == "idle timeout" {
 							behavior.IdleTimeout = &testCase.seconds
@@ -226,7 +226,7 @@ func TestSessionLifecycle_StaleStopPreservesCurrentCountdown(t *testing.T) {
 			}
 			return nil
 		})
-		message := NewMessageLifecycleWithContext("current", type_enums.AudioMode)
+		message := NewMessageLifecycle(WithContextID("current"), WithMode(type_enums.AudioMode))
 		l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "current"}, message)
 		l.StopIdleTimeout(internal_type.StopIdleTimeoutPacket{ContextID: "previous", ResetCount: true})
 		time.Sleep(time.Second)
@@ -285,7 +285,7 @@ func TestSessionLifecycle_IdleTimeoutPrompt(t *testing.T) {
 					}
 					return nil
 				})
-				l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, NewMessageLifecycleWithContext("ctx", type_enums.TextMode))
+				l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, NewMessageLifecycle(WithContextID("ctx"), WithMode(type_enums.TextMode)))
 				time.Sleep(time.Second)
 				synctest.Wait()
 				expiry := <-expired
@@ -316,7 +316,7 @@ func TestSessionLifecycle_IdleTimeoutDisabled(t *testing.T) {
 			l := NewSessionLifecycle()
 			t.Cleanup(l.CloseTimeouts)
 			l.ConfigureTimeouts(context.Background(), "ctx", tt.behavior, nil)
-			l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, NewMessageLifecycleWithContext("ctx", type_enums.TextMode))
+			l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, NewMessageLifecycle(WithContextID("ctx"), WithMode(type_enums.TextMode)))
 			packet, disconnect := l.IdleTimeoutExpired(internal_type.IdleTimeoutExpiredPacket{ContextID: "ctx"})
 			if packet.Text != "" || disconnect != nil || l.IdleTimeoutCount() != 0 {
 				t.Fatalf("disabled expiry accepted: packet=%+v disconnect=%v count=%d", packet, disconnect, l.IdleTimeoutCount())
@@ -347,7 +347,7 @@ func TestSessionLifecycle_IdleTimeoutBackoff(t *testing.T) {
 					}
 					return nil
 				})
-				message := NewMessageLifecycleWithContext("ctx", type_enums.TextMode)
+				message := NewMessageLifecycle(WithContextID("ctx"), WithMode(type_enums.TextMode))
 				for count := uint64(0); count < 3; count++ {
 					l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, message)
 					time.Sleep(time.Second)
@@ -380,21 +380,21 @@ func TestSessionLifecycle_IdleTimeoutEligibility(t *testing.T) {
 		{name: "stale start", act: func(_ *testing.T, l SessionLifecycle, message MessageLifecycle) {
 			l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "old"}, message)
 		}},
-		{name: "speaking at start", act: func(t *testing.T, l SessionLifecycle, message MessageLifecycle) {
-			if err := message.UserSpeaking("ctx"); err != nil {
+		{name: "speech received at start", act: func(t *testing.T, l SessionLifecycle, message MessageLifecycle) {
+			if _, err := message.OnTranscriptReceived("ctx", "hello"); err != nil {
 				t.Fatal(err)
 			}
 			l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, message)
 		}},
-		{name: "speaking at expiry", act: func(t *testing.T, l SessionLifecycle, message MessageLifecycle) {
+		{name: "speech received at expiry", act: func(t *testing.T, l SessionLifecycle, message MessageLifecycle) {
 			l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, message)
-			if err := message.UserSpeaking("ctx"); err != nil {
+			if _, err := message.OnTranscriptReceived("ctx", "hello"); err != nil {
 				t.Fatal(err)
 			}
 		}},
 		{name: "rotated before expiry", act: func(t *testing.T, l SessionLifecycle, message MessageLifecycle) {
 			l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, message)
-			if _, _, err := message.RotateContext(); err != nil {
+			if _, err := message.OnUserTurnStarted("ctx", string(internal_type.PacketNameUserTextReceived), "text", "next request"); err != nil {
 				t.Fatal(err)
 			}
 		}},
@@ -412,12 +412,12 @@ func TestSessionLifecycle_IdleTimeoutEligibility(t *testing.T) {
 					}
 					return nil
 				})
-				message := NewMessageLifecycleWithContext("ctx", type_enums.TextMode)
+				message := NewMessageLifecycle(WithContextID("ctx"), WithMode(type_enums.TextMode))
 				tt.act(t, l, message)
 				time.Sleep(time.Second)
 				synctest.Wait()
 				expiry := internal_type.IdleTimeoutExpiredPacket{ContextID: "ctx"}
-				if tt.name == "speaking at expiry" || tt.name == "rotated before expiry" {
+				if tt.name == "speech received at expiry" || tt.name == "rotated before expiry" {
 					expiry = <-expired
 				} else if len(expired) != 0 {
 					t.Fatal("ineligible start produced an expiry")
@@ -446,7 +446,7 @@ func TestSessionLifecycle_StopIdleTimeout(t *testing.T) {
 				}
 				return nil
 			})
-			message := NewMessageLifecycleWithContext("ctx", type_enums.TextMode)
+			message := NewMessageLifecycle(WithContextID("ctx"), WithMode(type_enums.TextMode))
 			l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, message)
 			time.Sleep(time.Second)
 			synctest.Wait()
@@ -490,7 +490,7 @@ func TestSessionLifecycle_TimeoutDurations(t *testing.T) {
 		}
 		return nil
 	})
-	l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, NewMessageLifecycleWithContext("ctx", type_enums.TextMode))
+	l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, NewMessageLifecycle(WithContextID("ctx"), WithMode(type_enums.TextMode)))
 	select {
 	case packet := <-packets:
 		t.Fatalf("timeout fired before configured seconds: %+v", packet)
@@ -534,7 +534,7 @@ func TestSessionLifecycle_ExtendIdleTimeout(t *testing.T) {
 		}
 		return nil
 	})
-	l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, NewMessageLifecycleWithContext("ctx", type_enums.TextMode))
+	l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, NewMessageLifecycle(WithContextID("ctx"), WithMode(type_enums.TextMode)))
 	l.ExtendIdleTimeout("old", time.Hour)
 	l.ExtendIdleTimeout("ctx", -time.Hour)
 	l.ExtendIdleTimeout("ctx", 500*time.Millisecond)
@@ -574,7 +574,7 @@ func TestSessionLifecycle_CloseTimeouts(t *testing.T) {
 				}
 				return nil
 			})
-			message := NewMessageLifecycleWithContext("ctx", type_enums.TextMode)
+			message := NewMessageLifecycle(WithContextID("ctx"), WithMode(type_enums.TextMode))
 			l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, message)
 			switch action {
 			case "close":
@@ -631,7 +631,7 @@ func TestSessionLifecycle_IdleTimeoutRejectsStalePackets(t *testing.T) {
 		if packet.Text != "" || disconnect != nil || l.IdleTimeoutCount() != 0 {
 			t.Fatal("pre-start expiry accepted")
 		}
-		l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, NewMessageLifecycleWithContext("ctx", type_enums.TextMode))
+		l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, NewMessageLifecycle(WithContextID("ctx"), WithMode(type_enums.TextMode)))
 		time.Sleep(time.Second)
 		synctest.Wait()
 		expiry := <-expired
@@ -668,7 +668,7 @@ func TestSessionLifecycle_CanceledContextRejectsExpiryImmediately(t *testing.T) 
 		}
 		l.ConfigureTimeouts(ctx, "ctx", &internal_assistant_entity.AssistantDeploymentBehavior{IdleTimeout: &timeout}, nil)
 		cancel()
-		l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, NewMessageLifecycleWithContext("ctx", type_enums.TextMode))
+		l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, NewMessageLifecycle(WithContextID("ctx"), WithMode(type_enums.TextMode)))
 		packet, disconnect := l.IdleTimeoutExpired(internal_type.IdleTimeoutExpiredPacket{ContextID: "ctx"})
 		if packet.Text != "" || disconnect != nil {
 			t.Fatalf("canceled expiry accepted: beforeConfigure=%v packet=%+v disconnect=%v", cancelBeforeConfigure, packet, disconnect)
@@ -698,7 +698,7 @@ func TestSessionLifecycle_ReconfigureTimeoutsDetachesOldContext(t *testing.T) {
 		})
 		cancel()
 		timeout, backoff, prompt = 0, 0, "Changed."
-		l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, NewMessageLifecycleWithContext("ctx", type_enums.TextMode))
+		l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, NewMessageLifecycle(WithContextID("ctx"), WithMode(type_enums.TextMode)))
 		time.Sleep(time.Second)
 		synctest.Wait()
 		packet, disconnect := l.IdleTimeoutExpired(<-expired)
@@ -728,7 +728,7 @@ func TestSessionLifecycle_IdleTimeoutQueuedExpiryAdmission(t *testing.T) {
 					return nil
 				}
 				l.ConfigureTimeouts(ctx, "ctx", behavior, onPacket)
-				message := NewMessageLifecycleWithContext("ctx", type_enums.TextMode)
+				message := NewMessageLifecycle(WithContextID("ctx"), WithMode(type_enums.TextMode))
 				l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, message)
 				time.Sleep(time.Second)
 				synctest.Wait()
