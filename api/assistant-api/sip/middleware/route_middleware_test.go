@@ -114,6 +114,7 @@ func TestRouteMiddleware_DIDRouteNotFound(t *testing.T) {
 	var sipErr *sip_runtime.SIPError
 	require.ErrorAs(t, err, &sipErr)
 	assert.Equal(t, 404, sipErr.Code)
+	assert.Equal(t, sipMessageAssistantRouteNotFound, sipErr.Message)
 	assert.Empty(t, ctx.CallAddress.To)
 	assert.Nil(t, ctx.Auth)
 }

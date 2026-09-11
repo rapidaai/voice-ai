@@ -80,6 +80,10 @@ func TestVaultMiddleware_ReturnsCredentialIDError(t *testing.T) {
 	err := NewVaultMiddleware(WithRapidaClient(&rapida_client.RapidaClient{Vault: &routeTestVault{}}))(ctx)
 
 	require.Error(t, err)
+	var sipErr *sip_runtime.SIPError
+	require.ErrorAs(t, err, &sipErr)
+	assert.Equal(t, sipStatusServerError, sipErr.Code)
+	assert.Equal(t, sipMessageConfigurationResolution, sipErr.Message)
 	assert.ErrorIs(t, err, sip_runtime.ErrInvalidConfig)
 	assert.ErrorIs(t, err, sip_runtime.ErrCredentialIDRequired)
 }
