@@ -16,25 +16,23 @@ import (
 
 func TestMessagePlaybackCompletesAfterFinalDelivery(t *testing.T) {
 	for _, scenario := range []struct {
-		name          string
-		duringSend    bool
-		sendFails     bool
-		paused        bool
-		flushed       bool
-		authoritative bool
+		name       string
+		duringSend bool
+		sendFails  bool
+		paused     bool
+		flushed    bool
 	}{
-		{name: "receipt after send", authoritative: true},
-		{name: "receipt during send", duringSend: true, authoritative: true},
-		{name: "send fails after receipt", duringSend: true, sendFails: true, authoritative: true},
-		{name: "paused receipt waits for continue", paused: true, authoritative: true},
-		{name: "paused receipt discarded on flush", paused: true, flushed: true, authoritative: true},
-		{name: "unverified receipt diagnostic only"},
+		{name: "receipt after send"},
+		{name: "receipt during send", duringSend: true},
+		{name: "send fails after receipt", duringSend: true, sendFails: true},
+		{name: "paused receipt waits for continue", paused: true},
+		{name: "paused receipt discarded on flush", paused: true, flushed: true},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			l := NewMessageLifecycleWithContext("message", type_enums.AudioMode)
 			t.Cleanup(func() { l.FailAssistantMessage("message") })
 			var packets []internal_type.Packet
-			l.ConfigurePlaybackCompletion(scenario.authoritative, func(emitted ...internal_type.Packet) error { packets = append(packets, emitted...); return nil })
+			l.ConfigurePlaybackCompletion(func(emitted ...internal_type.Packet) error { packets = append(packets, emitted...); return nil })
 			require.NoError(t, l.AssistantGenerating("message"))
 			require.ErrorIs(t, l.ObservePlaybackCompletion("message"), ErrPlaybackTerminalNotIssued)
 			send := func(proto.Message) error { return nil }
@@ -73,7 +71,7 @@ func TestMessagePlaybackCompletesAfterFinalDelivery(t *testing.T) {
 					require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackContinue{Id: "message"}, send))
 				}
 			}
-			if !scenario.sendFails && !scenario.flushed && scenario.authoritative {
+			if !scenario.sendFails && !scenario.flushed {
 				require.Len(t, packets, 2)
 				assert.IsType(t, internal_type.ObservabilityMetricRecordPacket{}, packets[0])
 				assert.Equal(t, internal_type.StartIdleTimeoutPacket{ContextID: "message"}, packets[1])
@@ -86,11 +84,52 @@ func TestMessagePlaybackCompletesAfterFinalDelivery(t *testing.T) {
 	}
 }
 
+func TestMessagePlaybackDoesNotRequireConfiguration(t *testing.T) {
+	for _, scenario := range []struct {
+		name    string
+		receipt bool
+	}{
+		{name: "receipt completes the message", receipt: true},
+		{name: "missing receipt fails the message"},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				l := NewMessageLifecycleWithContext("message", type_enums.AudioMode)
+				defer l.FailAssistantMessage("message")
+				require.NoError(t, l.AssistantGenerating("message"))
+				send := func(proto.Message) error { return nil }
+				require.NoError(t, l.SendAssistantMessage(&protos.ConversationAssistantMessage{
+					Id: "message", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}},
+				}, send))
+				l.AssistantTextCompleted(internal_type.LLMResponseDonePacket{ContextID: "message", Text: "answer"})
+				require.NoError(t, l.SendAssistantMessage(&protos.ConversationAssistantMessage{
+					Id: "message", Completed: true, Message: &protos.ConversationAssistantMessage_Text{Text: "answer"},
+				}, send))
+				require.NoError(t, l.SendAssistantMessage(&protos.ConversationAssistantMessage{
+					Id: "message", Completed: true, Message: &protos.ConversationAssistantMessage_Audio{},
+				}, send))
+				require.False(t, l.CanStartIdleTimeout("message"))
+				if scenario.receipt {
+					require.NoError(t, l.ObservePlaybackCompletion("message"))
+					assert.Equal(t, MessageStateAssistantIdle, l.State())
+					assert.True(t, l.CanStartIdleTimeout("message"))
+					return
+				}
+				time.Sleep(6 * time.Second)
+				synctest.Wait()
+				assert.False(t, l.CanStartIdleTimeout("message"))
+				require.ErrorIs(t, l.ObservePlaybackCompletion("message"), ErrPlaybackTerminalNotIssued)
+				require.Error(t, l.CompleteAssistantSpeech("message"))
+			})
+		})
+	}
+}
+
 func TestMessagePlaybackDeadlineExcludesPause(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		l := NewMessageLifecycleWithContext("message", type_enums.AudioMode)
 		var packets []internal_type.Packet
-		l.ConfigurePlaybackCompletion(true, func(emitted ...internal_type.Packet) error { packets = append(packets, emitted...); return nil })
+		l.ConfigurePlaybackCompletion(func(emitted ...internal_type.Packet) error { packets = append(packets, emitted...); return nil })
 		require.NoError(t, l.AssistantGenerating("message"))
 		send := func(proto.Message) error { return nil }
 		require.NoError(t, l.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: "message", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}}}, send))
@@ -119,7 +158,7 @@ func TestMessagePlaybackEmptyAndTextOnly(t *testing.T) {
 		for _, text := range []string{"", "answer"} {
 			l := NewMessageLifecycleWithContext("message", mode)
 			var packets []internal_type.Packet
-			l.ConfigurePlaybackCompletion(true, func(emitted ...internal_type.Packet) error { packets = append(packets, emitted...); return nil })
+			l.ConfigurePlaybackCompletion(func(emitted ...internal_type.Packet) error { packets = append(packets, emitted...); return nil })
 			require.NoError(t, l.AssistantGenerating("message"))
 			l.AssistantTextCompleted(internal_type.LLMResponseDonePacket{ContextID: "message", Text: text})
 			send := func(proto.Message) error { return nil }

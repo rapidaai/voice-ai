@@ -134,7 +134,6 @@ func NewGenericRequestor(
 	postgres connectors.PostgresConnector, opensearch connectors.OpenSearchConnector,
 	redis connectors.RedisConnector, storage storages.Storage, streamer internal_type.Streamer,
 	observer observability.Recorder,
-	playbackCompletionAuthoritative ...bool,
 ) *genericRequestor {
 	sessionCtx, cancelSession := context.WithCancel(context.Background())
 	channels := adapter_channel.NewRequestorChannels()
@@ -181,7 +180,7 @@ func NewGenericRequestor(
 		channels:                  channels,
 	}
 
-	gr.messageLifecycle.ConfigurePlaybackCompletion(len(playbackCompletionAuthoritative) > 0 && playbackCompletionAuthoritative[0], func(packets ...internal_type.Packet) error {
+	gr.messageLifecycle.ConfigurePlaybackCompletion(func(packets ...internal_type.Packet) error {
 		return gr.OnPacket(sessionCtx, packets...)
 	})
 	gr.ttsCompletionWatchdog = watchdog.NewTTSCompletionWatchdog(

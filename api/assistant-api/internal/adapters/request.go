@@ -21,18 +21,17 @@ import (
 )
 
 type TalkerOptions struct {
-	Source                          utils.RapidaSource
-	Context                         context.Context
-	Config                          *config.AssistantConfig
-	RapidaClient                    *rapida_client.RapidaClient
-	Logger                          commons.Logger
-	Postgres                        connectors.PostgresConnector
-	OpenSearch                      connectors.OpenSearchConnector
-	Redis                           connectors.RedisConnector
-	Storage                         storages.Storage
-	Streamer                        internal_type.Streamer
-	Observer                        observability.Recorder
-	PlaybackCompletionAuthoritative bool
+	Source       utils.RapidaSource
+	Context      context.Context
+	Config       *config.AssistantConfig
+	RapidaClient *rapida_client.RapidaClient
+	Logger       commons.Logger
+	Postgres     connectors.PostgresConnector
+	OpenSearch   connectors.OpenSearchConnector
+	Redis        connectors.RedisConnector
+	Storage      storages.Storage
+	Streamer     internal_type.Streamer
+	Observer     observability.Recorder
 }
 
 type FuncOption func(*TalkerOptions)
@@ -103,13 +102,6 @@ func WithObserver(observer observability.Recorder) FuncOption {
 	}
 }
 
-// WithPlaybackCompletion enables successful receipt admission for a verified playback owner.
-func WithPlaybackCompletion(authoritative bool) FuncOption {
-	return func(options *TalkerOptions) {
-		options.PlaybackCompletionAuthoritative = authoritative
-	}
-}
-
 func New(opts ...FuncOption) (internal_type.Talking, error) {
 	var options TalkerOptions
 	for _, opt := range opts {
@@ -128,6 +120,5 @@ func New(opts ...FuncOption) (internal_type.Talking, error) {
 		options.Storage,
 		options.Streamer,
 		options.Observer,
-		options.PlaybackCompletionAuthoritative,
 	), nil
 }

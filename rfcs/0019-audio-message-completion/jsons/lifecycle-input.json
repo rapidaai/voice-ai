@@ -9,12 +9,13 @@
     "confirmation_file": "rfcs/0019-audio-message-completion/jsons/confirmation.json"
   },
   "implementation": {
-    "status": "reviewed_security_exception_authorized_activation_pending",
+    "status": "uniform_playback_completion_verified_and_reviewed",
+    "playback_completion_followup_file": "rfcs/0019-audio-message-completion/jsons/unified-playback-completion.json",
     "publication_authorization_file": "rfcs/0019-audio-message-completion/jsons/publication-authorization.json",
     "publication_check_file": "rfcs/0019-audio-message-completion/jsons/publication-check.json",
     "inventory_file": "rfcs/0019-audio-message-completion/jsons/implementation-inventory.json",
     "verification_file": "rfcs/0019-audio-message-completion/jsons/verification.json",
-    "activation_scope_approval": "pending",
+    "playback_completion_policy": "uniform_streamer_callback_without_opt_in",
     "review_file": "rfcs/0019-audio-message-completion/jsons/review-02.json",
     "open_findings": [],
     "ownership": {

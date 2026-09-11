@@ -93,7 +93,7 @@ type MessageLifecycle interface {
 	AcceptUserInput(internal_type.UserInputPacket) (internal_type.UserInputPacket, []internal_type.Packet)
 	AssistantTextCompleted(internal_type.Packet) []internal_type.Packet
 	SendPlaybackControl(proto.Message, func(proto.Message) error) error
-	ConfigurePlaybackCompletion(bool, func(...internal_type.Packet) error)
+	ConfigurePlaybackCompletion(func(...internal_type.Packet) error)
 	SendAssistantMessage(*protos.ConversationAssistantMessage, func(proto.Message) error) error
 	AcceptInjectedMessage(internal_type.InjectMessagePacket) (internal_type.InjectMessagePacket, error)
 	FailAssistantMessage(string)
@@ -108,7 +108,6 @@ type messageLifecycle struct {
 	userPrompts                        uint64
 	assistantPrompts                   uint64
 	output                             assistantOutputState
-	playbackCompletionAuthoritative    bool
 	onPlaybackPacket                   func(...internal_type.Packet) error
 	interruptionEnabled                bool
 	interruptionContextID              string

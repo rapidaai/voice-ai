@@ -1647,7 +1647,7 @@ func TestHandleLLMResponseDone_DoesNotStartIdleTimeout(t *testing.T) {
 func TestHandleTextToSpeechDone_TextModeCompletesAfterDelivery(t *testing.T) {
 	r := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
 	r.messageLifecycle = adapter_lifecycle.NewMessageLifecycleWithContext("ctx-active", type_enums.TextMode)
-	r.messageLifecycle.ConfigurePlaybackCompletion(false, func(packets ...internal_type.Packet) error { return r.OnPacket(context.Background(), packets...) })
+	r.messageLifecycle.ConfigurePlaybackCompletion(func(packets ...internal_type.Packet) error { return r.OnPacket(context.Background(), packets...) })
 	h := requestorDispatchHandler{r: r}
 	contextID := r.GetID()
 	require.NoError(t, r.messageLifecycle.AssistantGenerating(contextID))

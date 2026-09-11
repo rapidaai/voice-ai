@@ -419,7 +419,7 @@ func TestPlaybackCompletionFinishesMessageAndStartsIdleTimeout(t *testing.T) {
 		requestor.assistant.AssistantPhoneDeployment.IdleTimeout = &idleTimeout
 		requestor.sessionLifecycle = adapter_lifecycle.NewSessionLifecycle()
 		requestor.sessionLifecycle.ConfigureTimeouts(context.Background(), requestor.GetID(), &requestor.assistant.AssistantPhoneDeployment.AssistantDeploymentBehavior, requestor.OnPacket)
-		requestor.messageLifecycle.ConfigurePlaybackCompletion(true, func(packets ...internal_type.Packet) error {
+		requestor.messageLifecycle.ConfigurePlaybackCompletion(func(packets ...internal_type.Packet) error {
 			return requestor.OnPacket(context.Background(), packets...)
 		})
 		t.Cleanup(func() {

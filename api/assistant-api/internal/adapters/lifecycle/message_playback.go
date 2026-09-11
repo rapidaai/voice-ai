@@ -11,11 +11,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// ConfigurePlaybackCompletion enables receipt authority only for verified output owners.
-func (l *messageLifecycle) ConfigurePlaybackCompletion(authoritative bool, onPacket func(...internal_type.Packet) error) {
+// ConfigurePlaybackCompletion sets the packet sink for completion and timeout events.
+func (l *messageLifecycle) ConfigurePlaybackCompletion(onPacket func(...internal_type.Packet) error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.playbackCompletionAuthoritative = authoritative
 	l.onPlaybackPacket = onPacket
 }
 
@@ -107,7 +106,7 @@ func (l *messageLifecycle) SendAssistantMessage(message *protos.ConversationAssi
 func (l *messageLifecycle) AwaitPlayback(contextID string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if !l.playbackCompletionAuthoritative || contextID != l.contextID || !l.output.terminalIssued || l.output.paused || l.output.failed || l.output.completed || l.output.receiptTimer != nil {
+	if contextID != l.contextID || !l.output.terminalIssued || l.output.paused || l.output.failed || l.output.completed || l.output.receiptTimer != nil {
 		return
 	}
 	l.output.receiptDeadline = time.Now().Add(l.output.receiptRemaining)

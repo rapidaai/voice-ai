@@ -1,5 +1,7 @@
 {
-  "status": "pending_maintainer_approval",
+  "status": "superseded_by_uniform_playback_completion",
+  "resolution": "The user requested removing the authority flag. Valid streamer receipts now use the same lifecycle path without caller opt-in; the four proposed caller changes are no longer needed.",
+  "superseded_by": "rfcs/0019-audio-message-completion/jsons/unified-playback-completion.json",
   "rfc": "rfcs/0019-audio-message-completion.md",
   "request": "Allow explicit callback-authority opt-in at verified native streamer construction sites",
   "reason": "RapidaSource is read from incoming metadata on external gRPC, so PhoneCall alone cannot establish receipt authority. The adapter defaults authority to false and provides WithPlaybackCompletion for explicit caller wiring.",

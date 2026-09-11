@@ -14,16 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPlaybackCompletionRequiresExplicitOptIn(t *testing.T) {
-	var options TalkerOptions
-	WithSource(utils.PhoneCall)(&options)
-	assert.False(t, options.PlaybackCompletionAuthoritative)
-	WithPlaybackCompletion(true)(&options)
-	assert.True(t, options.PlaybackCompletionAuthoritative)
-	WithPlaybackCompletion(false)(&options)
-	assert.False(t, options.PlaybackCompletionAuthoritative)
-}
-
 func TestWithRapidaClient(t *testing.T) {
 	client := &rapida_client.RapidaClient{}
 	var options TalkerOptions

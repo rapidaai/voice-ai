@@ -114,7 +114,7 @@ func (l *messageLifecycle) CompleteAssistantSpeech(contextID string) error {
 		l.mu.Unlock()
 		return ErrInvalidTransition
 	}
-	if l.mode.Audio() && (l.output.hasText || l.output.hasAudio) && (!l.playbackCompletionAuthoritative || !l.output.hasAudio || !l.output.terminalIssued || !l.output.receiptReceived) {
+	if l.mode.Audio() && (l.output.hasText || l.output.hasAudio) && (!l.output.hasAudio || !l.output.terminalIssued || !l.output.receiptReceived) {
 		l.mu.Unlock()
 		return ErrInvalidTransition
 	}
