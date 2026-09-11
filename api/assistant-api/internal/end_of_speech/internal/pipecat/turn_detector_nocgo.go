@@ -9,6 +9,7 @@
 package internal_pipecat
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -24,7 +25,14 @@ func NewPipecatDetector(PipecatDetectorConfig) (*PipecatDetector, error) {
 	return nil, errPipecatDetectorRuntimeAPIUnavailable
 }
 
-func (pd *PipecatDetector) Predict([]float32) (float64, error) {
+func (pd *PipecatDetector) Predict(audio []float32) (float64, error) {
+	return pd.PredictContext(context.Background(), audio)
+}
+
+func (pd *PipecatDetector) PredictContext(ctx context.Context, _ []float32) (float64, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
 	return 0, errPipecatDetectorRuntimeAPIUnavailable
 }
 

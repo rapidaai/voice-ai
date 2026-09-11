@@ -56,11 +56,19 @@ func newTestOpts(m map[string]any) utils.Option {
 }
 
 type testPredictor struct {
-	predict func([]float32) (float64, error)
+	predict        func([]float32) (float64, error)
+	predictContext func(context.Context, []float32) (float64, error)
 }
 
 func (predictor testPredictor) Predict(audio []float32) (float64, error) {
 	return predictor.predict(audio)
+}
+
+func (predictor testPredictor) PredictContext(ctx context.Context, audio []float32) (float64, error) {
+	if predictor.predictContext != nil {
+		return predictor.predictContext(ctx, audio)
+	}
+	return predictor.Predict(audio)
 }
 
 func newTestEOS(onPacket func(context.Context, ...internal_type.Packet) error, opts utils.Option) *pipecatEndOfSpeech {
@@ -83,6 +91,7 @@ func newTestEOS(onPacket func(context.Context, ...internal_type.Packet) error, o
 		threshold:       threshold,
 		extendedTimeout: extendedTimeout,
 		fallbackTimeout: fallbackTimeout,
+		turnStopTimeout: defaultPctTurnStopTimeout,
 		audioBuffer:     make([]float32, 0, maxAudioSamples),
 		commandCh:       make(chan workerCommand, 32),
 		stopCh:          make(chan struct{}),
@@ -569,6 +578,8 @@ func TestExecuteVADEnd_SampleDurationBounds(t *testing.T) {
 			endOfSpeech := &pipecatEndOfSpeech{
 				threshold:       0.5,
 				fallbackTimeout: 500 * time.Millisecond,
+				extendedTimeout: time.Second,
+				turnStopTimeout: defaultPctTurnStopTimeout,
 				audioNextSample: testCase.elapsedSamples + pipecatAudioSampleRate,
 				state:           &endOfSpeechState{},
 			}
@@ -652,7 +663,7 @@ func TestAppendAudio_ConcurrentSafety(t *testing.T) {
 
 func TestPredictEOU_EmptyAudioBufferRemainsIncomplete(t *testing.T) {
 	eos := &pipecatEndOfSpeech{}
-	probability, err := eos.predictEOU()
+	probability, err := eos.predictEOU(t.Context())
 	require.NoError(t, err)
 	assert.Zero(t, probability)
 }
@@ -661,7 +672,7 @@ func TestPredictEOU_DetectorUnavailableReturnsError(t *testing.T) {
 	eos := &pipecatEndOfSpeech{
 		audioBuffer: []float32{0.1, -0.1, 0.05},
 	}
-	probability, err := eos.predictEOU()
+	probability, err := eos.predictEOU(t.Context())
 	require.ErrorIs(t, err, errPipecatDetectorNil)
 	assert.Zero(t, probability)
 }
@@ -673,7 +684,7 @@ func TestPredictEOU_SpeechOffsetBeyondBufferSkipsPrediction(t *testing.T) {
 			hasSpeechStart:    true,
 			speechStartSample: speechStartSample,
 		}
-		probability, err := endOfSpeech.predictEOU()
+		probability, err := endOfSpeech.predictEOU(t.Context())
 		require.NoError(t, err, "speech start: %d", speechStartSample)
 		require.Zero(t, probability)
 	}
@@ -694,7 +705,7 @@ func TestPredictEOU_ReusesCachedProbabilityForSameAudioGeneration(t *testing.T) 
 	require.NoError(t, eos.Execute(context.Background(), audioInput(1600)))
 
 	for range 2 {
-		probability, err := eos.predictEOU()
+		probability, err := eos.predictEOU(t.Context())
 		require.NoError(t, err)
 		assert.Equal(t, 0.75, probability)
 	}
@@ -714,13 +725,13 @@ func TestPredictEOU_InvalidatesCacheWhenAudioChanges(t *testing.T) {
 
 	require.NoError(t, eos.Execute(context.Background(), audioInput(1600)))
 	for range 2 {
-		probability, err := eos.predictEOU()
+		probability, err := eos.predictEOU(t.Context())
 		require.NoError(t, err)
 		assert.Equal(t, 1.0, probability)
 	}
 
 	require.NoError(t, eos.Execute(context.Background(), audioInput(1600)))
-	probability, err := eos.predictEOU()
+	probability, err := eos.predictEOU(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, 2.0, probability)
 	assert.Equal(t, int32(2), atomic.LoadInt32(&predictorCalls))
@@ -750,7 +761,7 @@ func TestPredictEOU_UsesSpeechScopedAudio(t *testing.T) {
 	eos.audioGeneration = 1
 	eos.mu.Unlock()
 
-	probability, err := eos.predictEOU()
+	probability, err := eos.predictEOU(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, 0.7, probability)
 
@@ -778,12 +789,12 @@ func TestPredictEOU_FailedPredictionIsNotCached(t *testing.T) {
 	)
 	defer closeTestEndOfSpeech(endOfSpeech)
 	require.NoError(t, endOfSpeech.Execute(t.Context(), audioInput(1600)))
-	probability, err := endOfSpeech.predictEOU()
+	probability, err := endOfSpeech.predictEOU(t.Context())
 	require.ErrorIs(t, err, errPipecatDetectorRunInference)
 	require.ErrorIs(t, err, errPipecatDetectorCreateInputTensor)
 	assert.Zero(t, probability)
 	for range 2 {
-		probability, err = endOfSpeech.predictEOU()
+		probability, err = endOfSpeech.predictEOU(t.Context())
 		require.NoError(t, err)
 		assert.Equal(t, 0.9, probability)
 	}
@@ -816,6 +827,7 @@ func TestPipecatEndOfSpeech_IgnoresInterruptionForDifferentContext(t *testing.T)
 		commandCh:       make(chan workerCommand, 1),
 		stopCh:          make(chan struct{}),
 		extendedTimeout: 30 * time.Millisecond,
+		turnStopTimeout: defaultPctTurnStopTimeout,
 		state: &endOfSpeechState{segment: speechSegment{
 			Revision:  1,
 			ContextID: "ctx-new",
@@ -1043,6 +1055,7 @@ func TestEOS_FinalSTTDoesNotRunSmartTurnPrediction(t *testing.T) {
 		},
 		threshold:       0.5,
 		extendedTimeout: 260 * time.Millisecond,
+		turnStopTimeout: defaultPctTurnStopTimeout,
 		fallbackTimeout: 80 * time.Millisecond,
 		audioBuffer:     []float32{0.1, 0.2, 0.3},
 		audioGeneration: 1,
@@ -1276,7 +1289,7 @@ func TestEOS_FinalSTTWhileVADSpeakingWaitsForVADEnd(t *testing.T) {
 	}
 }
 
-func TestEOS_FinalSTTAfterIncompleteVADEndWaitsForSilentAudio(t *testing.T) {
+func TestEOS_FinalSTTAfterIncompleteVADEndSchedulesFallback(t *testing.T) {
 	var predictorCalls int32
 	eos := &pipecatEndOfSpeech{
 		onPacket: func(context.Context, ...internal_type.Packet) error { return nil },
@@ -1288,6 +1301,7 @@ func TestEOS_FinalSTTAfterIncompleteVADEndWaitsForSilentAudio(t *testing.T) {
 		},
 		threshold:       0.5,
 		extendedTimeout: 250 * time.Millisecond,
+		turnStopTimeout: defaultPctTurnStopTimeout,
 		fallbackTimeout: 60 * time.Millisecond,
 		audioBuffer:     []float32{0.1, 0.2, 0.3},
 		audioGeneration: 1,
@@ -1305,7 +1319,13 @@ func TestEOS_FinalSTTAfterIncompleteVADEndWaitsForSilentAudio(t *testing.T) {
 		Event:  internal_type.InterruptionEventEnd,
 	}))
 	require.NoError(t, eos.Execute(context.Background(), sttInput("not done yet", true)))
-	assert.Empty(t, eos.commandCh)
+	select {
+	case command := <-eos.commandCh:
+		assert.Equal(t, "not done yet", command.segment.Text)
+		assert.False(t, command.fireImmediately)
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("incomplete turn did not schedule its fallback")
+	}
 	require.NoError(t, eos.Execute(context.Background(), audioInput(4000)))
 
 	select {
@@ -1332,6 +1352,7 @@ func TestEOS_FinalSTTAfterVADEndCompletePredictionWaitsForTranscriptDeadline(t *
 		},
 		threshold:       0.5,
 		extendedTimeout: 250 * time.Millisecond,
+		turnStopTimeout: defaultPctTurnStopTimeout,
 		fallbackTimeout: 60 * time.Millisecond,
 		audioBuffer:     []float32{0.1, 0.2, 0.3},
 		audioGeneration: 1,
@@ -1374,10 +1395,11 @@ func TestEOS_VADEndCompletePredictionWaitsForTranscriptDeadline(t *testing.T) {
 		},
 		threshold:       0.5,
 		extendedTimeout: 300 * time.Millisecond,
+		turnStopTimeout: defaultPctTurnStopTimeout,
 		fallbackTimeout: 60 * time.Millisecond,
 		audioBuffer:     []float32{0.1, 0.2, 0.3},
 		audioGeneration: 1,
-		commandCh:       make(chan workerCommand, 1),
+		commandCh:       make(chan workerCommand, 2),
 		stopCh:          make(chan struct{}),
 		state: &endOfSpeechState{
 			segment: speechSegment{
@@ -1397,6 +1419,13 @@ func TestEOS_VADEndCompletePredictionWaitsForTranscriptDeadline(t *testing.T) {
 		Event:     internal_type.InterruptionEventEnd,
 	}))
 
+	select {
+	case command := <-endOfSpeech.commandCh:
+		assert.Equal(t, 0.0, command.confidence)
+		assert.Equal(t, "I just wanted to talk with you and then", command.segment.Text)
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("VAD end did not arm completion before inference")
+	}
 	select {
 	case command := <-endOfSpeech.commandCh:
 		assert.False(t, command.fireImmediately)
@@ -2656,7 +2685,7 @@ func TestEOS_FinalSTTInferenceFailure_DoesNotUseSilenceTimeout(t *testing.T) {
 // FACTORY TEST
 // ============================================================================
 
-func TestEOS_IncompleteTurnRequiresSilentAudio(t *testing.T) {
+func TestEOS_IncompleteTurnAudioCanCompleteBeforeWallDeadline(t *testing.T) {
 	for _, testCase := range []struct {
 		name              string
 		textBeforeSilence bool
@@ -2675,7 +2704,7 @@ func TestEOS_IncompleteTurnRequiresSilentAudio(t *testing.T) {
 				return nil
 			}, newTestOpts(map[string]any{
 				"microphone.eos.fallback_timeout": 10.0,
-				"microphone.eos.extended_timeout": 100.0,
+				"microphone.eos.extended_timeout": 1000.0,
 			}), func([]float32) (float64, error) { return 0.5, nil })
 			defer closeTestEndOfSpeech(endOfSpeech)
 			require.NoError(t, endOfSpeech.Execute(t.Context(), internal_type.InterruptionDetectedPacket{
@@ -2694,7 +2723,7 @@ func TestEOS_IncompleteTurnRequiresSilentAudio(t *testing.T) {
 				t.Fatalf("incomplete turn released by transcript timeout: %+v", packet)
 			case <-time.After(120 * time.Millisecond):
 			}
-			require.NoError(t, endOfSpeech.Execute(t.Context(), audioInput(1599)))
+			require.NoError(t, endOfSpeech.Execute(t.Context(), audioInput(15999)))
 			select {
 			case packet := <-completed:
 				t.Fatalf("turn released before silent audio limit: %+v", packet)
@@ -2707,7 +2736,7 @@ func TestEOS_IncompleteTurnRequiresSilentAudio(t *testing.T) {
 			select {
 			case packet := <-completed:
 				assert.Equal(t, "committed", packet.Speech)
-			case <-time.After(time.Second):
+			case <-time.After(200 * time.Millisecond):
 				t.Fatal("silence-complete turn did not release committed transcript")
 			}
 		})
@@ -2728,6 +2757,7 @@ func TestEOS_TranscriptDuringInferenceKeepsOriginalDeadline(t *testing.T) {
 		threshold:       0.5,
 		fallbackTimeout: 20 * time.Millisecond,
 		extendedTimeout: time.Second,
+		turnStopTimeout: defaultPctTurnStopTimeout,
 		commandCh:       make(chan workerCommand, 4),
 		stopCh:          make(chan struct{}),
 		state:           &endOfSpeechState{},
@@ -2747,7 +2777,16 @@ func TestEOS_TranscriptDuringInferenceKeepsOriginalDeadline(t *testing.T) {
 	endOfSpeech.mu.RUnlock()
 	require.NoError(t, endOfSpeech.Execute(t.Context(), sttInput("first", true)))
 	require.NoError(t, endOfSpeech.Execute(t.Context(), sttInput("second", true)))
-	assert.Empty(t, endOfSpeech.commandCh)
+	for _, transcript := range []string{"first", "first second"} {
+		select {
+		case command := <-endOfSpeech.commandCh:
+			assert.Equal(t, transcript, command.segment.Text)
+			assert.Equal(t, deadline, command.deadline)
+			assert.Equal(t, 0.0, command.confidence)
+		case <-time.After(time.Second):
+			t.Fatal("transcript did not arm completion during inference")
+		}
+	}
 	time.Sleep(30 * time.Millisecond)
 	close(finishPrediction)
 	require.NoError(t, <-vadStopped)
@@ -2882,7 +2921,8 @@ func TestEOS_VADDeadlineDiscountsBufferedStopSilence(t *testing.T) {
 				predictor:       testPredictor{predict: func([]float32) (float64, error) { return 0.9, nil }},
 				threshold:       0.5,
 				fallbackTimeout: 500 * time.Millisecond,
-				commandCh:       make(chan workerCommand, 1),
+				turnStopTimeout: defaultPctTurnStopTimeout,
+				commandCh:       make(chan workerCommand, 2),
 				stopCh:          make(chan struct{}),
 				state:           &endOfSpeechState{},
 			}
@@ -2896,17 +2936,19 @@ func TestEOS_VADDeadlineDiscountsBufferedStopSilence(t *testing.T) {
 				Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd,
 				EndAt: testCase.endAt,
 			}))
-			select {
-			case command := <-endOfSpeech.commandCh:
-				assert.WithinDuration(t, stoppedAt.Add(testCase.remainingBudget), command.deadline, 20*time.Millisecond)
-			case <-time.After(time.Second):
-				t.Fatal("missing transcript safety deadline")
+			for commandIndex := 0; commandIndex < 2; commandIndex++ {
+				select {
+				case command := <-endOfSpeech.commandCh:
+					assert.WithinDuration(t, stoppedAt.Add(testCase.remainingBudget), command.deadline, 20*time.Millisecond)
+				case <-time.After(time.Second):
+					t.Fatal("missing transcript safety deadline")
+				}
 			}
 		})
 	}
 }
 
-func TestEOS_VADWithoutPredictionWaitsForSilentAudio(t *testing.T) {
+func TestEOS_VADWithoutPredictionAudioCanCompleteBeforeWallDeadline(t *testing.T) {
 	for _, testCase := range []struct {
 		name          string
 		audioSamples  int
@@ -2938,7 +2980,7 @@ func TestEOS_VADWithoutPredictionWaitsForSilentAudio(t *testing.T) {
 				return nil
 			}, newTestOpts(map[string]any{
 				"microphone.eos.fallback_timeout": 10.0,
-				"microphone.eos.extended_timeout": 60.0,
+				"microphone.eos.extended_timeout": 1000.0,
 			}))
 			endOfSpeech.predictor = testCase.predictor
 			defer closeTestEndOfSpeech(endOfSpeech)
@@ -2966,17 +3008,17 @@ func TestEOS_VADWithoutPredictionWaitsForSilentAudio(t *testing.T) {
 				t.Fatalf("missing prediction released text at the transcript deadline: %+v", packet)
 			case <-time.After(80 * time.Millisecond):
 			}
-			require.NoError(t, endOfSpeech.Execute(t.Context(), internal_type.EndOfSpeechAudioPacket{Audio: make([]byte, 960)}))
+			require.NoError(t, endOfSpeech.Execute(t.Context(), internal_type.EndOfSpeechAudioPacket{Audio: make([]byte, 16000)}))
 			select {
 			case packet := <-completed:
 				t.Fatalf("turn completed before the received-silence limit: %+v", packet)
 			case <-time.After(20 * time.Millisecond):
 			}
-			require.NoError(t, endOfSpeech.Execute(t.Context(), internal_type.EndOfSpeechAudioPacket{Audio: make([]byte, 960)}))
+			require.NoError(t, endOfSpeech.Execute(t.Context(), internal_type.EndOfSpeechAudioPacket{Audio: make([]byte, 16000)}))
 			select {
 			case packet := <-completed:
 				assert.Equal(t, "committed tail", packet.Speech)
-			case <-time.After(time.Second):
+			case <-time.After(200 * time.Millisecond):
 				t.Fatal("received-silence limit did not release committed text")
 			}
 			require.NoError(t, endOfSpeech.Execute(t.Context(), internal_type.EndOfSpeechAudioPacket{Audio: make([]byte, 1920)}))
@@ -3060,6 +3102,7 @@ func TestEOS_QueuedUserTextPreservesNewerInput(t *testing.T) {
 					return nil
 				},
 				fallbackTimeout: 10 * time.Millisecond,
+				turnStopTimeout: defaultPctTurnStopTimeout,
 				commandCh:       make(chan workerCommand, 4),
 				stopCh:          make(chan struct{}),
 				state:           &endOfSpeechState{},
