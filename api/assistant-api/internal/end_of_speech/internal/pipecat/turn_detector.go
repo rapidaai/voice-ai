@@ -11,6 +11,7 @@ package internal_pipecat
 import "C"
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -119,6 +120,15 @@ func NewPipecatDetector(cfg PipecatDetectorConfig) (*PipecatDetector, error) {
 //
 // audio must be float32 PCM samples at 16kHz.
 func (pd *PipecatDetector) Predict(audio []float32) (float64, error) {
+	return pd.PredictContext(context.Background(), audio)
+}
+
+// PredictContext computes mel features and synchronously runs cancellable native inference.
+// The caller must serialize prediction and Destroy, including cancellation cleanup.
+func (pd *PipecatDetector) PredictContext(ctx context.Context, audio []float32) (float64, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
 	if pd == nil {
 		return 0, errPipecatDetectorNil
 	}
@@ -129,13 +139,47 @@ func (pd *PipecatDetector) Predict(audio []float32) (float64, error) {
 	// Extract mel spectrogram features [80 * 800]
 	features := pd.features.extractInto(audio, pd.scratch.output[:], pd.scratch)
 
-	// Run ONNX inference
-	prob, err := pd.infer(features)
-	if err != nil {
+	return pd.inferContext(ctx, features)
+}
+
+// infer retains the feature-only entry point used by parity tests and benchmarks.
+func (pd *PipecatDetector) infer(features []float32) (float64, error) {
+	return pd.inferContext(context.Background(), features)
+}
+
+func (pd *PipecatDetector) inferContext(ctx context.Context, features []float32) (prob float64, err error) {
+	if err := ctx.Err(); err != nil {
 		return 0, err
 	}
 
-	return prob, nil
+	var runOptions *C.OrtRunOptions
+	status := C.PctOrtApiCreateRunOptions(pd.api, &runOptions)
+	defer C.PctOrtApiReleaseStatus(pd.api, status)
+	if status != nil {
+		return 0, fmt.Errorf("%w: %s", errPipecatDetectorCreateRunOptions, C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
+	}
+	defer C.PctOrtApiReleaseRunOptions(pd.api, runOptions)
+
+	terminated := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() {
+		defer close(terminated)
+		status := C.PctOrtApiRunOptionsSetTerminate(pd.api, runOptions)
+		C.PctOrtApiReleaseStatus(pd.api, status)
+	})
+	defer func() {
+		// Join a started callback before releasing the per-run options.
+		if !stop() {
+			<-terminated
+		}
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			prob, err = 0, ctxErr
+		}
+	}()
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+
+	return pd.inferWithRunOptions(features, runOptions)
 }
 
 // Destroy releases all ONNX Runtime resources.

@@ -20,10 +20,12 @@ const (
 	optPctFallbackTimeout  = internal_options.MicrophoneEOSOptionFallbackTimeout
 	optPctModelPath        = internal_options.MicrophoneEOSOptionPipecatModelPath
 
-	// The transcript safety budget and Smart Turn silence limit run independently after VAD stop.
+	// The transcript safety budget and received-audio silence limit run independently after VAD stop.
 	defaultPctThreshold       = 0.85
 	defaultPctExtendedTimeout = 4000.0
 	defaultPctFallbackTimeout = 1000.0
+	// Match Pipecat's controller watchdog when stopped turns receive no further transcription activity.
+	defaultPctTurnStopTimeout = 5 * time.Second
 
 	maxAudioSamples        = whisperMaxSamples
 	preSpeechAudioSamples  = whisperSampleRate / 2

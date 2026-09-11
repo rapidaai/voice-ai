@@ -8,6 +8,7 @@ package internal_pipecat
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -54,11 +55,12 @@ type endOfSpeechState struct {
 	turnState          turnState
 	vadRevision        uint64
 	transcriptDeadline time.Time
+	turnStopDeadline   time.Time
 	silenceSamples     uint64
 }
 
 type turnPredictor interface {
-	Predict([]float32) (float64, error)
+	PredictContext(context.Context, []float32) (float64, error)
 }
 
 type pipecatEndOfSpeech struct {
@@ -72,6 +74,7 @@ type pipecatEndOfSpeech struct {
 	threshold       float64
 	extendedTimeout time.Duration
 	fallbackTimeout time.Duration
+	turnStopTimeout time.Duration
 
 	audioBuffer       []float32
 	audioStartSample  uint64
@@ -88,9 +91,10 @@ type pipecatEndOfSpeech struct {
 	stopCh    chan struct{}
 	closeOnce sync.Once
 
-	mu           sync.RWMutex
-	state        *endOfSpeechState
-	eosStartedAt time.Time
+	mu               sync.RWMutex
+	state            *endOfSpeechState
+	eosStartedAt     time.Time
+	cancelPrediction context.CancelFunc
 }
 
 type options struct {
@@ -174,6 +178,7 @@ func New(opts ...Option) (internal_type.EndOfSpeechExecutor, error) {
 		threshold:       defaultPctThreshold,
 		extendedTimeout: time.Duration(defaultPctExtendedTimeout) * time.Millisecond,
 		fallbackTimeout: time.Duration(defaultPctFallbackTimeout) * time.Millisecond,
+		turnStopTimeout: defaultPctTurnStopTimeout,
 		audioBuffer:     make([]float32, 0, maxAudioSamples),
 		commandCh:       make(chan workerCommand, 32),
 		stopCh:          make(chan struct{}),
@@ -301,10 +306,15 @@ func (endOfSpeech *pipecatEndOfSpeech) Execute(ctx context.Context, packet inter
 		endOfSpeech.mu.Lock()
 		switch packet.Event {
 		case internal_type.InterruptionEventStart:
+			if endOfSpeech.cancelPrediction != nil {
+				endOfSpeech.cancelPrediction()
+				endOfSpeech.cancelPrediction = nil
+			}
 			endOfSpeech.state.vadState = vadStateSpeaking
 			endOfSpeech.state.turnState = turnStatePending
 			endOfSpeech.state.confidence = 0
 			endOfSpeech.state.transcriptDeadline = time.Time{}
+			endOfSpeech.state.turnStopDeadline = time.Time{}
 			endOfSpeech.state.silenceSamples = 0
 			endOfSpeech.state.vadRevision++
 			endOfSpeech.state.segment.Revision++
@@ -333,6 +343,7 @@ func (endOfSpeech *pipecatEndOfSpeech) Execute(ctx context.Context, packet inter
 			endOfSpeech.state.vadRevision++
 			endOfSpeech.state.segment.Revision++
 			vadRevision := endOfSpeech.state.vadRevision
+			endOfSpeech.state.turnStopDeadline = time.Now().Add(endOfSpeech.turnStopTimeout)
 			if endOfSpeech.state.transcript == transcriptStateUserText {
 				endOfSpeech.state.segment = speechSegment{Revision: endOfSpeech.state.segment.Revision}
 				endOfSpeech.state.transcript = transcriptStateIdle
@@ -349,9 +360,26 @@ func (endOfSpeech *pipecatEndOfSpeech) Execute(ctx context.Context, packet inter
 					-time.Duration(vadStopSamples) * pipecatAudioSampleDuration,
 				)
 			}
+			// Transcription can extend turn recovery without extending the native inference budget.
+			predictionDeadline := endOfSpeech.state.turnStopDeadline
+			if endOfSpeech.state.transcriptDeadline.After(predictionDeadline) {
+				predictionDeadline = endOfSpeech.state.transcriptDeadline
+			}
+			predictionContext, cancelPrediction := context.WithDeadline(ctx, predictionDeadline)
+			endOfSpeech.cancelPrediction = cancelPrediction
+			command := workerCommand{
+				ctx:      ctx,
+				segment:  endOfSpeech.state.segment,
+				deadline: endOfSpeech.state.transcriptDeadline,
+			}
+			command.segment.Text = command.segment.FinalText
 			endOfSpeech.mu.Unlock()
-			probability, predictionErr := endOfSpeech.predictEOU()
-			if predictionErr != nil {
+			if command.segment.Text != "" {
+				endOfSpeech.enqueueCommand(command)
+			}
+			probability, predictionErr := endOfSpeech.predictEOU(predictionContext)
+			cancelPrediction()
+			if predictionErr != nil && !errors.Is(predictionErr, context.Canceled) && !errors.Is(predictionErr, context.DeadlineExceeded) {
 				// Packet dispatchers may discard Execute errors, so report inference failures here as well.
 				_ = endOfSpeech.onPacket(ctx, internal_type.ObservabilityLogRecordPacket{
 					ContextID: packet.ContextID,
@@ -373,6 +401,7 @@ func (endOfSpeech *pipecatEndOfSpeech) Execute(ctx context.Context, packet inter
 				endOfSpeech.mu.Unlock()
 				return nil
 			}
+			endOfSpeech.cancelPrediction = nil
 			endOfSpeech.state.confidence = probability
 			if endOfSpeech.state.turnState != turnStateComplete {
 				if predictionErr == nil && probability > endOfSpeech.threshold {
@@ -381,10 +410,6 @@ func (endOfSpeech *pipecatEndOfSpeech) Execute(ctx context.Context, packet inter
 					endOfSpeech.state.turnState = turnStateIncomplete
 				}
 			}
-			if endOfSpeech.state.turnState == turnStateIncomplete {
-				endOfSpeech.mu.Unlock()
-				return predictionErr
-			}
 			if endOfSpeech.state.turnState == turnStateComplete {
 				endOfSpeech.audioBuffer = endOfSpeech.audioBuffer[:0]
 				endOfSpeech.audioStartSample = endOfSpeech.audioNextSample
@@ -392,7 +417,7 @@ func (endOfSpeech *pipecatEndOfSpeech) Execute(ctx context.Context, packet inter
 				endOfSpeech.audioGeneration++
 				endOfSpeech.hasPredictedResult = false
 			}
-			command := workerCommand{
+			command = workerCommand{
 				ctx:        ctx,
 				segment:    endOfSpeech.state.segment,
 				confidence: endOfSpeech.state.confidence,
@@ -418,6 +443,10 @@ func (endOfSpeech *pipecatEndOfSpeech) handleUserTextPacket(ctx context.Context,
 	}
 
 	endOfSpeech.mu.Lock()
+	if endOfSpeech.cancelPrediction != nil {
+		endOfSpeech.cancelPrediction()
+		endOfSpeech.cancelPrediction = nil
+	}
 	segment := speechSegment{
 		Revision:  endOfSpeech.state.segment.Revision + 1,
 		ContextID: packet.ContextId(),
@@ -462,10 +491,13 @@ func (endOfSpeech *pipecatEndOfSpeech) handleUserTextPacket(ctx context.Context,
 }
 
 func (endOfSpeech *pipecatEndOfSpeech) handleSpeechToTextPacket(ctx context.Context, packet internal_type.SpeechToTextPacket) error {
-	if packet.Script == "" {
+	if strings.TrimSpace(packet.Script) == "" {
 		return nil
 	}
 	endOfSpeech.mu.Lock()
+	if endOfSpeech.state.vadState == vadStateEnded {
+		endOfSpeech.state.turnStopDeadline = time.Now().Add(endOfSpeech.turnStopTimeout)
+	}
 	if endOfSpeech.state.transcript == transcriptStateUserText {
 		endOfSpeech.state.segment = speechSegment{Revision: endOfSpeech.state.segment.Revision}
 		endOfSpeech.state.started = false
@@ -511,7 +543,7 @@ func (endOfSpeech *pipecatEndOfSpeech) handleSpeechToTextPacket(ctx context.Cont
 			}
 			shouldSchedule = true
 		case vadStateEnded:
-			shouldSchedule = endOfSpeech.state.turnState == turnStateComplete
+			shouldSchedule = true
 		}
 	}
 	command.deadline = endOfSpeech.state.transcriptDeadline
@@ -581,7 +613,10 @@ func (endOfSpeech *pipecatEndOfSpeech) appendAudio(pcm16 []byte) {
 	endOfSpeech.mu.Unlock()
 }
 
-func (endOfSpeech *pipecatEndOfSpeech) predictEOU() (float64, error) {
+func (endOfSpeech *pipecatEndOfSpeech) predictEOU(ctx context.Context) (float64, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
 	endOfSpeech.mu.RLock()
 	generation := endOfSpeech.audioGeneration
 	if endOfSpeech.hasPredictedResult && endOfSpeech.predictedGeneration == generation {
@@ -617,12 +652,15 @@ func (endOfSpeech *pipecatEndOfSpeech) predictEOU() (float64, error) {
 
 	endOfSpeech.predictorMu.Lock()
 	defer endOfSpeech.predictorMu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
 
 	if endOfSpeech.predictor == nil {
 		return 0, errPipecatDetectorNil
 	}
 
-	probability, err := endOfSpeech.predictor.Predict(audio)
+	probability, err := endOfSpeech.predictor.PredictContext(ctx, audio)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errPipecatDetectorRunInference, err)
 	}
@@ -684,6 +722,10 @@ func (endOfSpeech *pipecatEndOfSpeech) worker() {
 		timerArmedAt = time.Time{}
 	}
 	resetState := func() {
+		if endOfSpeech.cancelPrediction != nil {
+			endOfSpeech.cancelPrediction()
+			endOfSpeech.cancelPrediction = nil
+		}
 		endOfSpeech.state.segment = speechSegment{Revision: endOfSpeech.state.segment.Revision + 1}
 		endOfSpeech.state.confidence = 0
 		endOfSpeech.state.started = false
@@ -692,6 +734,7 @@ func (endOfSpeech *pipecatEndOfSpeech) worker() {
 		endOfSpeech.state.turnState = turnStatePending
 		endOfSpeech.state.vadRevision++
 		endOfSpeech.state.transcriptDeadline = time.Time{}
+		endOfSpeech.state.turnStopDeadline = time.Time{}
 		endOfSpeech.state.silenceSamples = 0
 		endOfSpeech.audioBuffer = endOfSpeech.audioBuffer[:0]
 		endOfSpeech.audioStartSample = endOfSpeech.audioNextSample
@@ -723,6 +766,11 @@ func (endOfSpeech *pipecatEndOfSpeech) worker() {
 				endOfSpeech.mu.Unlock()
 				continue
 			}
+			// The inactivity watchdog only recovers turns that model or audio completion has not released.
+			if endOfSpeech.state.vadState == vadStateEnded && endOfSpeech.state.turnState != turnStateComplete &&
+				command.deadline.Before(endOfSpeech.state.turnStopDeadline) {
+				command.deadline = endOfSpeech.state.turnStopDeadline
+			}
 			currentCommand = command
 			stopTimer()
 			timerArmedAt = time.Now()
@@ -742,17 +790,36 @@ func (endOfSpeech *pipecatEndOfSpeech) worker() {
 				endOfSpeech.mu.Unlock()
 				continue
 			}
-			if endOfSpeech.state.vadState == vadStateEnded &&
-				endOfSpeech.state.turnState != turnStateComplete {
+			if endOfSpeech.state.vadState == vadStateEnded && endOfSpeech.state.turnState != turnStateComplete &&
+				(endOfSpeech.state.turnStopDeadline.IsZero() ||
+					time.Now().Before(endOfSpeech.state.turnStopDeadline)) {
 				stopTimer()
 				endOfSpeech.mu.Unlock()
 				continue
 			}
+			turnStopDeadlineExpired := endOfSpeech.state.vadState == vadStateEnded && endOfSpeech.state.turnState != turnStateComplete
 			command := currentCommand
+			command.confidence = endOfSpeech.state.confidence
 			armedAt := timerArmedAt
 			stopTimer()
 			resetState()
 			endOfSpeech.mu.Unlock()
+			if turnStopDeadlineExpired {
+				_ = endOfSpeech.onPacket(command.ctx, internal_type.ObservabilityLogRecordPacket{
+					ContextID: command.segment.ContextID,
+					Scope:     internal_type.ObservabilityRecordScopeUserMessage,
+					Record: observability.RecordLog{
+						Level:      observability.LevelInfo,
+						Message:    "Pipecat inactivity watchdog released committed text without a complete prediction",
+						OccurredAt: time.Now(),
+						Attributes: observability.Attributes{
+							"component":  observability.ComponentEOS.String(),
+							"provider":   endOfSpeech.Name(),
+							"confidence": fmt.Sprintf("%.4f", command.confidence),
+						},
+					},
+				})
+			}
 			endOfSpeech.emitEndOfSpeech(command, armedAt)
 		}
 	}
@@ -827,6 +894,12 @@ func (endOfSpeech *pipecatEndOfSpeech) Close(ctx context.Context) error {
 
 	endOfSpeech.closeOnce.Do(func() {
 		endOfSpeech.mu.Lock()
+		if endOfSpeech.cancelPrediction != nil {
+			endOfSpeech.cancelPrediction()
+			endOfSpeech.cancelPrediction = nil
+		}
+		endOfSpeech.state.vadRevision++
+		endOfSpeech.state.segment.Revision++
 		eosStartedAt := endOfSpeech.eosStartedAt
 		endOfSpeech.eosStartedAt = time.Time{}
 		endOfSpeech.mu.Unlock()

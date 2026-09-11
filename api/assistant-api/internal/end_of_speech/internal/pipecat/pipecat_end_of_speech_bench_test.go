@@ -259,6 +259,37 @@ func BenchmarkExecute_STTInput(b *testing.B) {
 	}
 }
 
+func BenchmarkIncompleteTurnTimer(b *testing.B) {
+	for _, benchmarkCase := range []struct {
+		name      string
+		turnState turnState
+	}{
+		{name: "prediction pending", turnState: turnStatePending},
+		{name: "prediction incomplete", turnState: turnStateIncomplete},
+	} {
+		b.Run(benchmarkCase.name, func(b *testing.B) {
+			endOfSpeech := newTestEOS(func(context.Context, ...internal_type.Packet) error { return nil }, nil)
+			defer closeTestEndOfSpeech(endOfSpeech)
+			endOfSpeech.mu.Lock()
+			endOfSpeech.state.vadState = vadStateEnded
+			endOfSpeech.state.turnState = benchmarkCase.turnState
+			endOfSpeech.state.transcript = transcriptStateFinalized
+			endOfSpeech.state.segment = speechSegment{Revision: 1, FinalText: "committed", Text: "committed"}
+			endOfSpeech.state.turnStopDeadline = time.Now().Add(time.Hour)
+			command := workerCommand{
+				ctx:      context.Background(),
+				segment:  endOfSpeech.state.segment,
+				deadline: time.Now().Add(time.Minute),
+			}
+			endOfSpeech.mu.Unlock()
+			b.ReportAllocs()
+			for b.Loop() {
+				endOfSpeech.enqueueCommand(command)
+			}
+		})
+	}
+}
+
 // BenchmarkExecute_AudioInput measures the audio accumulation path.
 func BenchmarkExecute_AudioInput(b *testing.B) {
 	callback := func(context.Context, ...internal_type.Packet) error { return nil }
