@@ -24,11 +24,13 @@ const (
 	optKeyModelPath       = internal_options.MicrophoneEOSOptionLivekitModelPath
 	optKeyTokenizerPath   = internal_options.MicrophoneEOSOptionLivekitTokenizerPath
 
-	// Preserve Rapida's configured endpointing defaults when options are absent.
-	defaultThreshold      = 0.0289
+	// Predictions at or above this probability use the minimum endpoint delay.
+	defaultThreshold = 0.0289
+	// Endpoint delays are whole milliseconds measured from speech stop, not from inference completion.
 	defaultSilenceTimeout = 3000.0
 	defaultQuickTimeout   = 250.0
-	defaultMaxHistory     = 6.0
+	// History counts user/assistant messages including current text, before adjacent roles are merged.
+	defaultMaxHistory     = 6
 	defaultModelType      = "en"
 	multilingualModelType = "multilingual"
 
@@ -56,6 +58,9 @@ const livekitAudioSampleRate = 16000
 // ByteLevel uses GPT-2 boundaries before BPE when the tokenizer enables use_regex.
 // #nosec G101, this public tokenizer expression is not a credential.
 const tokenizerByteLevelPattern = `'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+`
+
+// The pinned multilingual tokenizer isolates these matches before byte-level encoding.
+const tokenizerMultilingualSplitPattern = `(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+`
 
 const (
 	// Turn detector paths select local model assets unless env overrides exist.

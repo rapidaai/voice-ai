@@ -1,0 +1,1606 @@
+{
+  "provenance": {
+    "asset_sha256": "9c5ae00e602b8860cbd784ba82a8aa14e8feecec692e7076590d014d7b7fdafa",
+    "asset_revision": "87e35fcb1e60a569bea70346191c4886ea92e281",
+    "asset_url": "https://huggingface.co/livekit/turn-detector/resolve/87e35fcb1e60a569bea70346191c4886ea92e281/tokenizer.json",
+    "native_tokenizers_version": "0.22.2",
+    "version_source": "LiveKit agents uv.lock",
+    "native_hf_executed": true,
+    "native_subset_verified": true,
+    "add_special_tokens": false,
+    "limitation": "Native ID equality for the bounded corpus, not exhaustive tokenizer or model-inference equivalence",
+    "subset_sha256": "61c14efd3a19d994bb3a28be2f875c59eba06d15860e755f1b30607b666f5598",
+    "source_vocab_size": 151643,
+    "source_merge_count": 151387,
+    "subset_vocab_size": 825,
+    "subset_merge_count": 555
+  },
+  "cases": [
+    {
+      "name": "empty",
+      "text": "",
+      "tokens": [],
+      "ids": []
+    },
+    {
+      "name": "repeated_space",
+      "text": "foo  bar",
+      "tokens": [
+        "foo",
+        "\u0120",
+        "\u0120bar"
+      ],
+      "ids": [
+        7975,
+        220,
+        3619
+      ]
+    },
+    {
+      "name": "three_spaces",
+      "text": "foo   bar",
+      "tokens": [
+        "foo",
+        "\u0120\u0120",
+        "\u0120bar"
+      ],
+      "ids": [
+        7975,
+        256,
+        3619
+      ]
+    },
+    {
+      "name": "leading_trailing_space",
+      "text": "  foo  bar  ",
+      "tokens": [
+        "\u0120",
+        "\u0120foo",
+        "\u0120",
+        "\u0120bar",
+        "\u0120\u0120"
+      ],
+      "ids": [
+        220,
+        15229,
+        220,
+        3619,
+        256
+      ]
+    },
+    {
+      "name": "spaces_only",
+      "text": "     ",
+      "tokens": [
+        "\u0120\u0120\u0120\u0120\u0120"
+      ],
+      "ids": [
+        414
+      ]
+    },
+    {
+      "name": "repeated_newline",
+      "text": "foo\n\nbar",
+      "tokens": [
+        "foo",
+        "\u010a\u010a",
+        "bar"
+      ],
+      "ids": [
+        7975,
+        271,
+        2257
+      ]
+    },
+    {
+      "name": "newline_spaces",
+      "text": "foo\n \n  bar",
+      "tokens": [
+        "foo",
+        "\u010a\u0120\u010a",
+        "\u0120",
+        "\u0120bar"
+      ],
+      "ids": [
+        7975,
+        26809,
+        220,
+        3619
+      ]
+    },
+    {
+      "name": "trailing_newlines",
+      "text": "foo\n\n",
+      "tokens": [
+        "foo",
+        "\u010a\u010a"
+      ],
+      "ids": [
+        7975,
+        271
+      ]
+    },
+    {
+      "name": "tabs_crlf",
+      "text": "foo\t\tbar\r\nnext",
+      "tokens": [
+        "foo",
+        "\u0109",
+        "\u0109bar",
+        "\u010d\u010a",
+        "next"
+      ],
+      "ids": [
+        7975,
+        197,
+        90709,
+        319,
+        3600
+      ]
+    },
+    {
+      "name": "ascii_digits",
+      "text": "1234567890",
+      "tokens": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "0"
+      ],
+      "ids": [
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        15
+      ]
+    },
+    {
+      "name": "word_digits",
+      "text": "abc123def 42.50",
+      "tokens": [
+        "abc",
+        "1",
+        "2",
+        "3",
+        "def",
+        "\u0120",
+        "4",
+        "2",
+        ".",
+        "5",
+        "0"
+      ],
+      "ids": [
+        13683,
+        16,
+        17,
+        18,
+        750,
+        220,
+        19,
+        17,
+        13,
+        20,
+        15
+      ]
+    },
+    {
+      "name": "space_before_digits",
+      "text": "foo  12 bar",
+      "tokens": [
+        "foo",
+        "\u0120",
+        "\u0120",
+        "1",
+        "2",
+        "\u0120bar"
+      ],
+      "ids": [
+        7975,
+        220,
+        220,
+        16,
+        17,
+        3619
+      ]
+    },
+    {
+      "name": "contractions",
+      "text": "I'm you're we've he'll she'd can't John's",
+      "tokens": [
+        "I",
+        "'m",
+        "\u0120you",
+        "'re",
+        "\u0120we",
+        "'ve",
+        "\u0120he",
+        "'ll",
+        "\u0120she",
+        "'d",
+        "\u0120can",
+        "'t",
+        "\u0120John",
+        "'s"
+      ],
+      "ids": [
+        40,
+        2776,
+        498,
+        2299,
+        582,
+        3003,
+        566,
+        3278,
+        1340,
+        4172,
+        646,
+        944,
+        3757,
+        594
+      ]
+    },
+    {
+      "name": "uppercase_contractions",
+      "text": "I'M YOU'RE CAN'T",
+      "tokens": [
+        "I",
+        "'M",
+        "\u0120YOU",
+        "'RE",
+        "\u0120CAN",
+        "'T"
+      ],
+      "ids": [
+        40,
+        27603,
+        14985,
+        94153,
+        19508,
+        17323
+      ]
+    },
+    {
+      "name": "unicode_letters",
+      "text": "caf\u00e9 na\u00efve \u4f60\u597d \u041f\u0440\u0438\u0432\u0435\u0442",
+      "tokens": [
+        "ca",
+        "f\u00c3\u00a9",
+        "\u0120na\u00c3\u00af",
+        "ve",
+        "\u0120",
+        "\u00e4\u00bd\u0142\u00e5\u00a5\u00bd",
+        "\u0120\u00d0\u0141\u00d1\u0122",
+        "\u00d0\u00b8\u00d0\u00b2",
+        "\u00d0\u00b5\u00d1\u0124"
+      ],
+      "ids": [
+        924,
+        58858,
+        94880,
+        586,
+        220,
+        108386,
+        79484,
+        26991,
+        8178
+      ]
+    },
+    {
+      "name": "unicode_combining",
+      "text": "cafe\u0301",
+      "tokens": [
+        "ca",
+        "f\u00c3\u00a9"
+      ],
+      "ids": [
+        924,
+        58858
+      ]
+    },
+    {
+      "name": "unicode_numbers",
+      "text": "A\u0661\u0662\u00b2\u2167\u00bdB",
+      "tokens": [
+        "A",
+        "\u00d9",
+        "\u00a1",
+        "\u00d9",
+        "\u00a2",
+        "\u00c2\u00b2",
+        "\u00e2\u0127",
+        "\u00a7",
+        "\u00c2\u00bd",
+        "B"
+      ],
+      "ids": [
+        32,
+        149,
+        94,
+        149,
+        95,
+        29456,
+        70467,
+        100,
+        26062,
+        33
+      ]
+    },
+    {
+      "name": "unicode_space",
+      "text": "foo\u00a0\u00a0bar\u2003baz\u2028end",
+      "tokens": [
+        "foo",
+        "\u00c2\u0142",
+        "\u00c2\u0142",
+        "bar",
+        "\u00e2\u0122",
+        "\u0125",
+        "baz",
+        "\u00e2\u0122",
+        "\u00a8",
+        "end"
+      ],
+      "ids": [
+        7975,
+        4102,
+        4102,
+        2257,
+        378,
+        225,
+        42573,
+        378,
+        101,
+        408
+      ]
+    },
+    {
+      "name": "unicode_symbols",
+      "text": "hi \ud83d\ude42\ud83d\ude80!",
+      "tokens": [
+        "hi",
+        "\u0120\u00f0\u0141\u013b\u0124",
+        "\u00f0\u0141\u013c\u0122",
+        "!"
+      ],
+      "ids": [
+        6023,
+        27484,
+        145836,
+        0
+      ]
+    },
+    {
+      "name": "punctuation",
+      "text": "hi... (yes?) -- ok!",
+      "tokens": [
+        "hi",
+        "...",
+        "\u0120(",
+        "yes",
+        "?)",
+        "\u0120--",
+        "\u0120ok",
+        "!"
+      ],
+      "ids": [
+        6023,
+        1112,
+        320,
+        9693,
+        10170,
+        1177,
+        5394,
+        0
+      ]
+    },
+    {
+      "name": "special_only",
+      "text": "<|im_start|><|im_end|><|endoftext|>",
+      "tokens": [
+        "<|im_start|>",
+        "<|im_end|>",
+        "<|endoftext|>"
+      ],
+      "ids": [
+        151644,
+        151645,
+        151643
+      ]
+    },
+    {
+      "name": "special_adjacent",
+      "text": "foo<|im_start|>bar<|im_end|>",
+      "tokens": [
+        "foo",
+        "<|im_start|>",
+        "bar",
+        "<|im_end|>"
+      ],
+      "ids": [
+        7975,
+        151644,
+        2257,
+        151645
+      ]
+    },
+    {
+      "name": "special_digits",
+      "text": "12<|im_end|>34",
+      "tokens": [
+        "1",
+        "2",
+        "<|im_end|>",
+        "3",
+        "4"
+      ],
+      "ids": [
+        16,
+        17,
+        151645,
+        18,
+        19
+      ]
+    },
+    {
+      "name": "chat",
+      "text": "<|im_start|>user\nfoo  bar 123<|im_end|>\n<|im_start|>assistant\nI'm here",
+      "tokens": [
+        "<|im_start|>",
+        "user",
+        "\u010a",
+        "foo",
+        "\u0120",
+        "\u0120bar",
+        "\u0120",
+        "1",
+        "2",
+        "3",
+        "<|im_end|>",
+        "\u010a",
+        "<|im_start|>",
+        "assistant",
+        "\u010a",
+        "I",
+        "'m",
+        "\u0120here"
+      ],
+      "ids": [
+        151644,
+        872,
+        198,
+        7975,
+        220,
+        3619,
+        220,
+        16,
+        17,
+        18,
+        151645,
+        198,
+        151644,
+        77091,
+        198,
+        40,
+        2776,
+        1588
+      ]
+    },
+    {
+      "name": "special_prefix",
+      "text": "<repo_name>x<reponame>y<|user|><|assistant|><|pad|>",
+      "tokens": [
+        "<",
+        "repo",
+        "_name",
+        ">x",
+        "<",
+        "re",
+        "pon",
+        "ame",
+        ">y",
+        "<",
+        "|",
+        "user",
+        "|",
+        "><",
+        "|",
+        "assistant",
+        "|",
+        "><",
+        "|",
+        "pad",
+        "|",
+        ">"
+      ],
+      "ids": [
+        27,
+        23476,
+        1269,
+        28257,
+        27,
+        265,
+        618,
+        373,
+        82244,
+        27,
+        91,
+        872,
+        91,
+        1784,
+        91,
+        77091,
+        91,
+        1784,
+        91,
+        13242,
+        91,
+        29
+      ]
+    },
+    {
+      "name": "special_whitespace",
+      "text": "<|im_start|> \t\n <|im_end|>",
+      "tokens": [
+        "<|im_start|>",
+        "\u0120\u0109\u010a",
+        "\u0120",
+        "<|im_end|>"
+      ],
+      "ids": [
+        151644,
+        17476,
+        220,
+        151645
+      ]
+    },
+    {
+      "name": "special_strip",
+      "text": "  foo <|im_start|>  bar  <|im_end|>  ",
+      "tokens": [
+        "\u0120",
+        "\u0120foo",
+        "\u0120",
+        "<|im_start|>",
+        "\u0120",
+        "\u0120bar",
+        "\u0120\u0120",
+        "<|im_end|>",
+        "\u0120\u0120"
+      ],
+      "ids": [
+        220,
+        15229,
+        220,
+        151644,
+        220,
+        3619,
+        256,
+        151645,
+        256
+      ]
+    },
+    {
+      "name": "all_whitespace",
+      "text": "foo\t\n\u000b\f\r \u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000bar",
+      "tokens": [
+        "foo",
+        "\u0109\u010a",
+        "\u010b",
+        "\u010c",
+        "\u010d",
+        "\u0120\u00c2",
+        "\u0127",
+        "\u00c2\u0142",
+        "\u00e1\u013c",
+        "\u0122",
+        "\u00e2\u0122",
+        "\u0124",
+        "\u00e2\u0122",
+        "\u0125",
+        "\u00e2\u0122",
+        "\u0124",
+        "\u00e2\u0122",
+        "\u0125",
+        "\u00e2\u0122",
+        "\u0126",
+        "\u00e2\u0122",
+        "\u0127",
+        "\u00e2\u0122",
+        "\u0128",
+        "\u00e2\u0122",
+        "\u0129",
+        "\u00e2\u0122",
+        "\u012a",
+        "\u00e2\u0122",
+        "\u012b",
+        "\u00e2\u0122",
+        "\u012c",
+        "\u00e2\u0122",
+        "\u00a8",
+        "\u00e2\u0122",
+        "\u00a9",
+        "\u00e2\u0122",
+        "\u00af",
+        "\u00e2\u0123",
+        "\u0141",
+        "\u00e3\u0122\u0122",
+        "bar"
+      ],
+      "ids": [
+        7975,
+        1572,
+        199,
+        200,
+        201,
+        2139,
+        227,
+        4102,
+        124999,
+        222,
+        378,
+        224,
+        378,
+        225,
+        378,
+        224,
+        378,
+        225,
+        378,
+        226,
+        378,
+        227,
+        378,
+        228,
+        378,
+        229,
+        378,
+        230,
+        378,
+        231,
+        378,
+        232,
+        378,
+        101,
+        378,
+        102,
+        378,
+        107,
+        52133,
+        253,
+        22441,
+        2257
+      ]
+    },
+    {
+      "name": "non_whitespace_controls",
+      "text": "foo\u001c\u001e\u001f\u180e\u200b\ufeffbar",
+      "tokens": [
+        "foo",
+        "\u011c",
+        "\u011e",
+        "\u011f",
+        "\u00e1\u0142",
+        "\u0130",
+        "\u00e2\u0122\u012d",
+        "\u00ef\u00bb\u00bf",
+        "bar"
+      ],
+      "ids": [
+        7975,
+        216,
+        218,
+        219,
+        123970,
+        236,
+        15692,
+        3225,
+        2257
+      ]
+    },
+    {
+      "name": "chinese",
+      "text": "\u4f60\u597d\uff0c\u6211\u60f3\u9884\u8ba2\u660e\u5929\u7684\u673a\u7968\u3002",
+      "tokens": [
+        "\u00e4\u00bd\u0142\u00e5\u00a5\u00bd",
+        "\u00ef\u00bc\u012e",
+        "\u00e6\u012a\u0133\u00e6\u0125\u00b3",
+        "\u00e9\u00a2\u0126\u00e8\u00ae\u00a2",
+        "\u00e6\u013a\u0130\u00e5\u00a4\u00a9",
+        "\u00e7\u013c\u0126",
+        "\u00e6\u013e\u00ba\u00e7\u00a5\u00a8",
+        "\u00e3\u0122\u0124"
+      ],
+      "ids": [
+        108386,
+        3837,
+        104100,
+        109545,
+        104807,
+        9370,
+        111428,
+        1773
+      ]
+    },
+    {
+      "name": "japanese",
+      "text": "\u3059\u307f\u307e\u305b\u3093\u3001\u3082\u3046\u4e00\u5ea6\u304a\u9858\u3044\u3057\u307e\u3059\u3002",
+      "tokens": [
+        "\u00e3\u0123\u013b",
+        "\u00e3\u0123\u00bf",
+        "\u00e3\u0123\u00be\u00e3\u0123\u013d\u00e3\u0124\u0135",
+        "\u00e3\u0122\u0123",
+        "\u00e3\u0124\u0124\u00e3\u0123\u0128",
+        "\u00e4\u00b8\u0122\u00e5\u00ba\u00a6",
+        "\u00e3\u0123\u012c\u00e9\u00a1\u013a\u00e3\u0123\u0126",
+        "\u00e3\u0123\u0139\u00e3\u0123\u00be\u00e3\u0123\u013b",
+        "\u00e3\u0122\u0124"
+      ],
+      "ids": [
+        17219,
+        63021,
+        124266,
+        5373,
+        128778,
+        102738,
+        132002,
+        77334,
+        1773
+      ]
+    },
+    {
+      "name": "korean",
+      "text": "\uc548\ub155\ud558\uc138\uc694, \uc608\uc57d\uc744 \ubcc0\uacbd\ud558\uace0 \uc2f6\uc5b4\uc694.",
+      "tokens": [
+        "\u00ec\u0137\u012a",
+        "\u00eb\u0127\u0137",
+        "\u00ed\u0137\u013a\u00ec\u0126\u00b8\u00ec\u013c\u0136",
+        ",",
+        "\u0120\u00ec\u013a\u012a",
+        "\u00ec\u0137\u00bd",
+        "\u00ec\u013f\u0126",
+        "\u0120\u00eb\u00b3\u0122\u00ea\u00b2\u00bd",
+        "\u00ed\u0137\u013a\u00ea\u00b3\u0142",
+        "\u0120\u00ec\u012d",
+        "\u00b6",
+        "\u00ec\u0138\u00b4\u00ec\u013c\u0136",
+        "."
+      ],
+      "ids": [
+        126246,
+        144370,
+        91145,
+        11,
+        95617,
+        125535,
+        17877,
+        87737,
+        126204,
+        28927,
+        114,
+        131355,
+        13
+      ]
+    },
+    {
+      "name": "hindi",
+      "text": "\u0928\u092e\u0938\u094d\u0924\u0947, \u092e\u0941\u091d\u0947 \u092e\u0926\u0926 \u091a\u093e\u0939\u093f\u090f\u0964",
+      "tokens": [
+        "\u00e0\u00a4\u00a8",
+        "\u00e0\u00a4\u00ae",
+        "\u00e0\u00a4\u00b8",
+        "\u00e0\u00a5\u012f\u00e0\u00a4",
+        "\u00a4",
+        "\u00e0\u00a5\u0129",
+        ",",
+        "\u0120\u00e0\u00a4\u00ae",
+        "\u00e0\u00a5\u0123",
+        "\u00e0\u00a4\u013f",
+        "\u00e0\u00a5\u0129",
+        "\u0120\u00e0\u00a4\u00ae",
+        "\u00e0\u00a4\u00a6",
+        "\u00e0\u00a4\u00a6",
+        "\u0120\u00e0\u00a4",
+        "\u013c",
+        "\u00e0\u00a4\u00be\u00e0\u00a4",
+        "\u00b9",
+        "\u00e0\u00a4\u00bf\u00e0\u00a4",
+        "\u0131",
+        "\u00e0\u00a5\u00a4"
+      ],
+      "ids": [
+        60096,
+        87244,
+        78368,
+        30484,
+        97,
+        34370,
+        11,
+        91217,
+        72653,
+        148971,
+        34370,
+        91217,
+        145256,
+        145256,
+        14925,
+        248,
+        31411,
+        117,
+        42311,
+        237,
+        146031
+      ]
+    },
+    {
+      "name": "arabic",
+      "text": "\u0645\u0631\u062d\u0628\u0627\u064b\u060c \u0623\u0631\u064a\u062f \u062a\u063a\u064a\u064a\u0631 \u0627\u0644\u062d\u062c\u0632.",
+      "tokens": [
+        "\u00d9\u0127\u00d8\u00b1",
+        "\u00d8\u0143",
+        "\u00d8\u00a8\u00d8\u00a7",
+        "\u00d9\u012d",
+        "\u00d8\u012e",
+        "\u0120\u00d8\u00a3",
+        "\u00d8\u00b1\u00d9\u012c\u00d8\u00af",
+        "\u0120\u00d8\u00aa",
+        "\u00d8\u00ba\u00d9\u012c",
+        "\u00d9\u012c\u00d8\u00b1",
+        "\u0120\u00d8\u00a7\u00d9\u0126\u00d8\u0143",
+        "\u00d8\u00ac\u00d8\u00b2",
+        "."
+      ],
+      "ids": [
+        124122,
+        29825,
+        124671,
+        124376,
+        68785,
+        63415,
+        125325,
+        39434,
+        125313,
+        93543,
+        123961,
+        124833,
+        13
+      ]
+    },
+    {
+      "name": "russian",
+      "text": "\u041f\u043e\u0434\u043e\u0436\u0434\u0438\u0442\u0435, \u044f \u0435\u0449\u0451 \u043d\u0435 \u0437\u0430\u043a\u043e\u043d\u0447\u0438\u043b.",
+      "tokens": [
+        "\u00d0\u0141\u00d0\u00be\u00d0\u00b4",
+        "\u00d0\u00be\u00d0\u00b6",
+        "\u00d0\u00b4",
+        "\u00d0\u00b8\u00d1\u0124\u00d0\u00b5",
+        ",",
+        "\u0120\u00d1\u0131",
+        "\u0120\u00d0\u00b5\u00d1\u012b\u00d1\u0133",
+        "\u0120\u00d0\u00bd\u00d0\u00b5",
+        "\u0120\u00d0\u00b7\u00d0\u00b0\u00d0\u00ba\u00d0\u00be\u00d0\u00bd",
+        "\u00d1\u0129",
+        "\u00d0\u00b8\u00d0\u00bb",
+        "."
+      ],
+      "ids": [
+        143822,
+        21259,
+        6949,
+        25965,
+        11,
+        45310,
+        134413,
+        18658,
+        129707,
+        6020,
+        63192,
+        13
+      ]
+    },
+    {
+      "name": "spanish",
+      "text": "\u00bfPuedes repetirlo? A\u00fan no he terminado.",
+      "tokens": [
+        "\u00c2\u00bf",
+        "P",
+        "ued",
+        "es",
+        "\u0120repet",
+        "ir",
+        "lo",
+        "?",
+        "\u0120A",
+        "\u00c3\u00ban",
+        "\u0120no",
+        "\u0120he",
+        "\u0120termin",
+        "ado",
+        "."
+      ],
+      "ids": [
+        30182,
+        47,
+        3260,
+        288,
+        26330,
+        404,
+        385,
+        30,
+        362,
+        24180,
+        902,
+        566,
+        10204,
+        2123,
+        13
+      ]
+    },
+    {
+      "name": "multilingual_chat",
+      "text": "<|im_start|>user\n\u4f60\u597d, necesito ayuda.  \u0927\u0928\u094d\u092f\u0935\u093e\u0926!<|im_end|>\n<|im_start|>assistant\n\u0645\u0631\u062d\u0628\u0627\u064b",
+      "tokens": [
+        "<|im_start|>",
+        "user",
+        "\u010a",
+        "\u00e4\u00bd\u0142\u00e5\u00a5\u00bd",
+        ",",
+        "\u0120neces",
+        "ito",
+        "\u0120ayuda",
+        ".",
+        "\u0120",
+        "\u0120\u00e0\u00a4",
+        "\u00a7",
+        "\u00e0\u00a4\u00a8",
+        "\u00e0\u00a5\u012f\u00e0\u00a4",
+        "\u00af",
+        "\u00e0\u00a4\u00b5",
+        "\u00e0\u00a4\u00be\u00e0\u00a4",
+        "\u00a6",
+        "!",
+        "<|im_end|>",
+        "\u010a",
+        "<|im_start|>",
+        "assistant",
+        "\u010a",
+        "\u00d9\u0127\u00d8\u00b1",
+        "\u00d8\u0143",
+        "\u00d8\u00a8\u00d8\u00a7",
+        "\u00d9\u012d"
+      ],
+      "ids": [
+        151644,
+        872,
+        198,
+        108386,
+        11,
+        24223,
+        6357,
+        73659,
+        13,
+        220,
+        14925,
+        100,
+        60096,
+        30484,
+        107,
+        145535,
+        31411,
+        99,
+        0,
+        151645,
+        198,
+        151644,
+        77091,
+        198,
+        124122,
+        29825,
+        124671,
+        124376
+      ]
+    },
+    {
+      "name": "mixed_case_contractions",
+      "text": "I'M I'd WE'Re we'VE He'LL CAN'T John'S",
+      "tokens": [
+        "I",
+        "'M",
+        "\u0120I",
+        "'d",
+        "\u0120WE",
+        "'Re",
+        "\u0120we",
+        "'",
+        "VE",
+        "\u0120He",
+        "'",
+        "LL",
+        "\u0120CAN",
+        "'T",
+        "\u0120John",
+        "'S"
+      ],
+      "ids": [
+        40,
+        27603,
+        358,
+        4172,
+        19677,
+        49427,
+        582,
+        6,
+        4491,
+        1260,
+        6,
+        4086,
+        19508,
+        17323,
+        3757,
+        13272
+      ]
+    },
+    {
+      "name": "punctuation_newlines",
+      "text": "hi!\r\n\n  next?\n\t\r\n done  ",
+      "tokens": [
+        "hi",
+        "!",
+        "\u010d\u010a\u010a",
+        "\u0120",
+        "\u0120next",
+        "?\u010a",
+        "\u0109\u010d\u010a",
+        "\u0120done",
+        "\u0120\u0120"
+      ],
+      "ids": [
+        6023,
+        0,
+        80823,
+        220,
+        1790,
+        5267,
+        4474,
+        2814,
+        256
+      ]
+    }
+  ],
+  "pretokenizer_cases": [
+    {
+      "name": "empty",
+      "text": "",
+      "boundaries": []
+    },
+    {
+      "name": "repeated_space",
+      "text": "foo  bar",
+      "boundaries": [
+        "foo",
+        " ",
+        " bar"
+      ]
+    },
+    {
+      "name": "three_spaces",
+      "text": "foo   bar",
+      "boundaries": [
+        "foo",
+        "  ",
+        " bar"
+      ]
+    },
+    {
+      "name": "leading_trailing_space",
+      "text": "  foo  bar  ",
+      "boundaries": [
+        " ",
+        " foo",
+        " ",
+        " bar",
+        "  "
+      ]
+    },
+    {
+      "name": "spaces_only",
+      "text": "     ",
+      "boundaries": [
+        "     "
+      ]
+    },
+    {
+      "name": "repeated_newline",
+      "text": "foo\n\nbar",
+      "boundaries": [
+        "foo",
+        "\n\n",
+        "bar"
+      ]
+    },
+    {
+      "name": "newline_spaces",
+      "text": "foo\n \n  bar",
+      "boundaries": [
+        "foo",
+        "\n \n",
+        " ",
+        " bar"
+      ]
+    },
+    {
+      "name": "trailing_newlines",
+      "text": "foo\n\n",
+      "boundaries": [
+        "foo",
+        "\n\n"
+      ]
+    },
+    {
+      "name": "tabs_crlf",
+      "text": "foo\t\tbar\r\nnext",
+      "boundaries": [
+        "foo",
+        "\t",
+        "\tbar",
+        "\r\n",
+        "next"
+      ]
+    },
+    {
+      "name": "ascii_digits",
+      "text": "1234567890",
+      "boundaries": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "0"
+      ]
+    },
+    {
+      "name": "word_digits",
+      "text": "abc123def 42.50",
+      "boundaries": [
+        "abc",
+        "1",
+        "2",
+        "3",
+        "def",
+        " ",
+        "4",
+        "2",
+        ".",
+        "5",
+        "0"
+      ]
+    },
+    {
+      "name": "space_before_digits",
+      "text": "foo  12 bar",
+      "boundaries": [
+        "foo",
+        " ",
+        " ",
+        "1",
+        "2",
+        " bar"
+      ]
+    },
+    {
+      "name": "contractions",
+      "text": "I'm you're we've he'll she'd can't John's",
+      "boundaries": [
+        "I",
+        "'m",
+        " you",
+        "'re",
+        " we",
+        "'ve",
+        " he",
+        "'ll",
+        " she",
+        "'d",
+        " can",
+        "'t",
+        " John",
+        "'s"
+      ]
+    },
+    {
+      "name": "uppercase_contractions",
+      "text": "I'M YOU'RE CAN'T",
+      "boundaries": [
+        "I",
+        "'M",
+        " YOU",
+        "'RE",
+        " CAN",
+        "'T"
+      ]
+    },
+    {
+      "name": "unicode_letters",
+      "text": "caf\u00e9 na\u00efve \u4f60\u597d \u041f\u0440\u0438\u0432\u0435\u0442",
+      "boundaries": [
+        "caf\u00e9",
+        " na\u00efve",
+        " \u4f60\u597d",
+        " \u041f\u0440\u0438\u0432\u0435\u0442"
+      ]
+    },
+    {
+      "name": "unicode_combining",
+      "text": "cafe\u0301",
+      "boundaries": [
+        "cafe",
+        "\u0301"
+      ]
+    },
+    {
+      "name": "unicode_numbers",
+      "text": "A\u0661\u0662\u00b2\u2167\u00bdB",
+      "boundaries": [
+        "A",
+        "\u0661",
+        "\u0662",
+        "\u00b2",
+        "\u2167",
+        "\u00bd",
+        "B"
+      ]
+    },
+    {
+      "name": "unicode_space",
+      "text": "foo\u00a0\u00a0bar\u2003baz\u2028end",
+      "boundaries": [
+        "foo",
+        "\u00a0",
+        "\u00a0bar",
+        "\u2003baz",
+        "\u2028end"
+      ]
+    },
+    {
+      "name": "unicode_symbols",
+      "text": "hi \ud83d\ude42\ud83d\ude80!",
+      "boundaries": [
+        "hi",
+        " \ud83d\ude42\ud83d\ude80!"
+      ]
+    },
+    {
+      "name": "punctuation",
+      "text": "hi... (yes?) -- ok!",
+      "boundaries": [
+        "hi",
+        "...",
+        " (",
+        "yes",
+        "?)",
+        " --",
+        " ok",
+        "!"
+      ]
+    },
+    {
+      "name": "special_only",
+      "text": "<|im_start|><|im_end|><|endoftext|>",
+      "boundaries": [
+        "<|",
+        "im",
+        "_start",
+        "|><|",
+        "im",
+        "_end",
+        "|><|",
+        "endoftext",
+        "|>"
+      ]
+    },
+    {
+      "name": "special_adjacent",
+      "text": "foo<|im_start|>bar<|im_end|>",
+      "boundaries": [
+        "foo",
+        "<|",
+        "im",
+        "_start",
+        "|>",
+        "bar",
+        "<|",
+        "im",
+        "_end",
+        "|>"
+      ]
+    },
+    {
+      "name": "special_digits",
+      "text": "12<|im_end|>34",
+      "boundaries": [
+        "1",
+        "2",
+        "<|",
+        "im",
+        "_end",
+        "|>",
+        "3",
+        "4"
+      ]
+    },
+    {
+      "name": "chat",
+      "text": "<|im_start|>user\nfoo  bar 123<|im_end|>\n<|im_start|>assistant\nI'm here",
+      "boundaries": [
+        "<|",
+        "im",
+        "_start",
+        "|>",
+        "user",
+        "\n",
+        "foo",
+        " ",
+        " bar",
+        " ",
+        "1",
+        "2",
+        "3",
+        "<|",
+        "im",
+        "_end",
+        "|>\n",
+        "<|",
+        "im",
+        "_start",
+        "|>",
+        "assistant",
+        "\n",
+        "I",
+        "'m",
+        " here"
+      ]
+    },
+    {
+      "name": "special_prefix",
+      "text": "<repo_name>x<reponame>y<|user|><|assistant|><|pad|>",
+      "boundaries": [
+        "<repo",
+        "_name",
+        ">x",
+        "<reponame",
+        ">y",
+        "<|",
+        "user",
+        "|><|",
+        "assistant",
+        "|><|",
+        "pad",
+        "|>"
+      ]
+    },
+    {
+      "name": "special_whitespace",
+      "text": "<|im_start|> \t\n <|im_end|>",
+      "boundaries": [
+        "<|",
+        "im",
+        "_start",
+        "|>",
+        " \t\n",
+        " <|",
+        "im",
+        "_end",
+        "|>"
+      ]
+    },
+    {
+      "name": "special_strip",
+      "text": "  foo <|im_start|>  bar  <|im_end|>  ",
+      "boundaries": [
+        " ",
+        " foo",
+        " <|",
+        "im",
+        "_start",
+        "|>",
+        " ",
+        " bar",
+        " ",
+        " <|",
+        "im",
+        "_end",
+        "|>",
+        "  "
+      ]
+    },
+    {
+      "name": "all_whitespace",
+      "text": "foo\t\n\u000b\f\r \u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000bar",
+      "boundaries": [
+        "foo",
+        "\t\n\u000b\f\r",
+        " \u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f",
+        "\u3000bar"
+      ]
+    },
+    {
+      "name": "non_whitespace_controls",
+      "text": "foo\u001c\u001e\u001f\u180e\u200b\ufeffbar",
+      "boundaries": [
+        "foo",
+        "\u001c\u001e\u001f\u180e\u200b\ufeff",
+        "bar"
+      ]
+    },
+    {
+      "name": "chinese",
+      "text": "\u4f60\u597d\uff0c\u6211\u60f3\u9884\u8ba2\u660e\u5929\u7684\u673a\u7968\u3002",
+      "boundaries": [
+        "\u4f60\u597d",
+        "\uff0c\u6211\u60f3\u9884\u8ba2\u660e\u5929\u7684\u673a\u7968",
+        "\u3002"
+      ]
+    },
+    {
+      "name": "japanese",
+      "text": "\u3059\u307f\u307e\u305b\u3093\u3001\u3082\u3046\u4e00\u5ea6\u304a\u9858\u3044\u3057\u307e\u3059\u3002",
+      "boundaries": [
+        "\u3059\u307f\u307e\u305b\u3093",
+        "\u3001\u3082\u3046\u4e00\u5ea6\u304a\u9858\u3044\u3057\u307e\u3059",
+        "\u3002"
+      ]
+    },
+    {
+      "name": "korean",
+      "text": "\uc548\ub155\ud558\uc138\uc694, \uc608\uc57d\uc744 \ubcc0\uacbd\ud558\uace0 \uc2f6\uc5b4\uc694.",
+      "boundaries": [
+        "\uc548\ub155\ud558\uc138\uc694",
+        ",",
+        " \uc608\uc57d\uc744",
+        " \ubcc0\uacbd\ud558\uace0",
+        " \uc2f6\uc5b4\uc694",
+        "."
+      ]
+    },
+    {
+      "name": "hindi",
+      "text": "\u0928\u092e\u0938\u094d\u0924\u0947, \u092e\u0941\u091d\u0947 \u092e\u0926\u0926 \u091a\u093e\u0939\u093f\u090f\u0964",
+      "boundaries": [
+        "\u0928\u092e\u0938",
+        "\u094d\u0924",
+        "\u0947,",
+        " \u092e",
+        "\u0941\u091d",
+        "\u0947",
+        " \u092e\u0926\u0926",
+        " \u091a",
+        "\u093e\u0939",
+        "\u093f\u090f",
+        "\u0964"
+      ]
+    },
+    {
+      "name": "arabic",
+      "text": "\u0645\u0631\u062d\u0628\u0627\u064b\u060c \u0623\u0631\u064a\u062f \u062a\u063a\u064a\u064a\u0631 \u0627\u0644\u062d\u062c\u0632.",
+      "boundaries": [
+        "\u0645\u0631\u062d\u0628\u0627",
+        "\u064b\u060c",
+        " \u0623\u0631\u064a\u062f",
+        " \u062a\u063a\u064a\u064a\u0631",
+        " \u0627\u0644\u062d\u062c\u0632",
+        "."
+      ]
+    },
+    {
+      "name": "russian",
+      "text": "\u041f\u043e\u0434\u043e\u0436\u0434\u0438\u0442\u0435, \u044f \u0435\u0449\u0451 \u043d\u0435 \u0437\u0430\u043a\u043e\u043d\u0447\u0438\u043b.",
+      "boundaries": [
+        "\u041f\u043e\u0434\u043e\u0436\u0434\u0438\u0442\u0435",
+        ",",
+        " \u044f",
+        " \u0435\u0449\u0451",
+        " \u043d\u0435",
+        " \u0437\u0430\u043a\u043e\u043d\u0447\u0438\u043b",
+        "."
+      ]
+    },
+    {
+      "name": "spanish",
+      "text": "\u00bfPuedes repetirlo? A\u00fan no he terminado.",
+      "boundaries": [
+        "\u00bfPuedes",
+        " repetirlo",
+        "?",
+        " A\u00fan",
+        " no",
+        " he",
+        " terminado",
+        "."
+      ]
+    },
+    {
+      "name": "multilingual_chat",
+      "text": "<|im_start|>user\n\u4f60\u597d, necesito ayuda.  \u0927\u0928\u094d\u092f\u0935\u093e\u0926!<|im_end|>\n<|im_start|>assistant\n\u0645\u0631\u062d\u0628\u0627\u064b",
+      "boundaries": [
+        "<|",
+        "im",
+        "_start",
+        "|>",
+        "user",
+        "\n",
+        "\u4f60\u597d",
+        ",",
+        " necesito",
+        " ayuda",
+        ".",
+        " ",
+        " \u0927\u0928",
+        "\u094d\u092f\u0935",
+        "\u093e\u0926",
+        "!<|",
+        "im",
+        "_end",
+        "|>\n",
+        "<|",
+        "im",
+        "_start",
+        "|>",
+        "assistant",
+        "\n",
+        "\u0645\u0631\u062d\u0628\u0627",
+        "\u064b"
+      ]
+    },
+    {
+      "name": "mixed_case_contractions",
+      "text": "I'M I'd WE'Re we'VE He'LL CAN'T John'S",
+      "boundaries": [
+        "I",
+        "'M",
+        " I",
+        "'d",
+        " WE",
+        "'Re",
+        " we",
+        "'VE",
+        " He",
+        "'LL",
+        " CAN",
+        "'T",
+        " John",
+        "'S"
+      ]
+    },
+    {
+      "name": "punctuation_newlines",
+      "text": "hi!\r\n\n  next?\n\t\r\n done  ",
+      "boundaries": [
+        "hi",
+        "!\r\n\n",
+        " ",
+        " next",
+        "?\n",
+        "\t\r\n",
+        " done",
+        "  "
+      ]
+    }
+  ]
+}
