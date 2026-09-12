@@ -14,6 +14,7 @@ import (
 
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 )
 
 const outboundAllowHeaderValue = "INVITE, ACK, CANCEL, BYE, NOTIFY, REFER, MESSAGE, OPTIONS, INFO, SUBSCRIBE"
@@ -64,21 +65,8 @@ func buildFromHeader(request OutboundInviteRequest) (*sip.FromHeader, error) {
 	return fromHeader, nil
 }
 
-func buildContactHeader(config *ListenConfig) sip.ContactHeader {
-	contactURI := sip.Uri{
-		Scheme: sipScheme(config.Transport),
-		Host:   config.GetExternalIP(),
-		Port:   config.Port,
-	}
-	if config.Transport == TransportTCP || config.Transport == TransportTLS {
-		contactURI.UriParams = sip.NewParams()
-		contactURI.UriParams.Add("transport", string(config.Transport))
-	}
-	return sip.ContactHeader{Address: contactURI}
-}
-
-func sipScheme(transport Transport) string {
-	if transport == TransportTLS {
+func sipScheme(transport sip_config.Transport) string {
+	if transport == sip_config.TransportTLS {
 		return "sips"
 	}
 	return "sip"

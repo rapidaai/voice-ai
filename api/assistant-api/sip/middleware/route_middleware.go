@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
@@ -19,12 +20,12 @@ import (
 )
 
 type middlewareOption struct {
-	ctx                    context.Context
-	logger                 commons.Logger
-	assistantService       internal_services.AssistantService
-	rapidaClient           *rapida_client.RapidaClient
-	applySIPConfigDefaults func(*sip_runtime.Config)
-	ServiceID              uint64
+	ctx              context.Context
+	logger           commons.Logger
+	assistantService internal_services.AssistantService
+	rapidaClient     *rapida_client.RapidaClient
+	sipConfig        sip_config.Resolver
+	ServiceID        uint64
 }
 
 func WithContext(ctx context.Context) func(*middlewareOption) {
@@ -51,9 +52,9 @@ func WithRapidaClient(rapidaClient *rapida_client.RapidaClient) func(*middleware
 	}
 }
 
-func WithApplySIPConfigDefaults(applySIPConfigDefaults func(*sip_runtime.Config)) func(*middlewareOption) {
+func WithSIPConfig(sipConfig sip_config.Resolver) func(*middlewareOption) {
 	return func(m *middlewareOption) {
-		m.applySIPConfigDefaults = applySIPConfigDefaults
+		m.sipConfig = sipConfig
 	}
 }
 
@@ -89,7 +90,7 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_runtime.Middlewa
 
 func (m *middlewareOption) resolveAgentCallRoute(ctx *sip_runtime.SIPRequestContext, route sip_runtime.AgentCallRoute) error {
 	if !validator.NonNil(m.assistantService) {
-		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageAssistantResolverUnavailable, Err: sip_runtime.ErrInvalidConfig}
+		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageAssistantResolverUnavailable, Err: sip_config.ErrInvalidConfig}
 	}
 
 	assistant, err := m.assistantService.GetAssistantWithPhoneDeploymentById(m.ctx, route.AssistantID)
@@ -107,11 +108,11 @@ func (m *middlewareOption) resolveAgentCallRoute(ctx *sip_runtime.SIPRequestCont
 		ProjectValue:      &types.ProjectContext{OrganizationID: assistant.OrganizationId, ProjectID: assistant.ProjectId},
 	}
 	if !validator.NonNil(assistant.AssistantPhoneDeployment) {
-		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: sip_runtime.ErrInvalidConfig}
+		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: sip_config.ErrInvalidConfig}
 	}
 	phone, err := assistant.AssistantPhoneDeployment.GetOptions().GetString(phoneOptionKey)
 	if err != nil || !validator.NotBlank(phone) {
-		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: sip_runtime.ErrInvalidConfig}
+		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: sip_config.ErrInvalidConfig}
 	}
 	ctx.CallAddress.To = strings.TrimSpace(phone)
 	ctx.Assistant = assistant
@@ -121,7 +122,7 @@ func (m *middlewareOption) resolveAgentCallRoute(ctx *sip_runtime.SIPRequestCont
 
 func (m *middlewareOption) resolveDIDCallRoute(ctx *sip_runtime.SIPRequestContext, route sip_runtime.DIDCallRoute) error {
 	if !validator.NonNil(m.assistantService) {
-		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageAssistantResolverUnavailable, Err: sip_runtime.ErrInvalidConfig}
+		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageAssistantResolverUnavailable, Err: sip_config.ErrInvalidConfig}
 	}
 
 	assistant, err := m.assistantService.GetAssistantWithPhoneDeploymentByDID(m.ctx, route.DID)
@@ -132,11 +133,11 @@ func (m *middlewareOption) resolveDIDCallRoute(ctx *sip_runtime.SIPRequestContex
 		return &sip_runtime.SIPError{Code: sipStatusNotFound, Message: sipMessageAssistantRouteNotFound, Err: sip_runtime.ErrAuthRequired}
 	}
 	if !validator.NonNil(assistant.AssistantPhoneDeployment) {
-		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: sip_runtime.ErrInvalidConfig}
+		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: sip_config.ErrInvalidConfig}
 	}
 	phone, err := assistant.AssistantPhoneDeployment.GetOptions().GetString(phoneOptionKey)
 	if err != nil {
-		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: sip_runtime.ErrInvalidConfig}
+		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: sip_config.ErrInvalidConfig}
 	}
 	ctx.CallAddress.To = strings.TrimSpace(phone)
 	ctx.Auth = &types.Authentication{

@@ -27,19 +27,6 @@ const (
 	MaxInboundRejectedInvites = 1024
 )
 
-// Transport constants list supported SIP transport protocols.
-const (
-	TransportUDP Transport = "udp"
-	TransportTCP Transport = "tcp"
-	TransportTLS Transport = "tls"
-)
-
-// Inbound answer modes control when an inbound INVITE receives 200 OK.
-const (
-	InboundAnswerModeImmediate            InboundAnswerMode = "answer_immediately"
-	InboundAnswerModeAfterMinRingDuration InboundAnswerMode = "answer_after_min_ring_ms"
-)
-
 // Call states represent the session lifecycle stored on SessionInfo.
 const (
 	CallStateInitializing    CallState = "initializing"

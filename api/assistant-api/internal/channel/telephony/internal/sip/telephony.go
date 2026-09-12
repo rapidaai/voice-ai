@@ -20,6 +20,7 @@ import (
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
@@ -41,43 +42,21 @@ func NewSIPTelephony(cfg *config.AssistantConfig, logger commons.Logger, sipServ
 	}, nil
 }
 
-func (t *sipTelephony) parseConfig(vaultCredential *protos.VaultCredential) (*sip_runtime.Config, error) {
-	cfg, err := sip_runtime.ParseConfigFromVault(vaultCredential)
+func (t *sipTelephony) parseConfig(vaultCredential *protos.VaultCredential) (*sip_config.Config, error) {
+	var sipConfig *config.SIPConfig
+	if t.appCfg != nil {
+		sipConfig = t.appCfg.SIPConfig
+	}
+
+	runtimeConfig, err := sip_config.NewResolver(sipConfig).RuntimeConfig(vaultCredential)
 	if err != nil {
 		return nil, err
 	}
-	if cfg.Port <= 0 {
-		cfg.Port = DefaultOutboundSIPPort
-	}
-	if t.appCfg.SIPConfig != nil {
-		cfg.ApplyOperationalDefaults(
-			t.appCfg.SIPConfig.Port,
-			sip_runtime.Transport(t.appCfg.SIPConfig.Transport),
-			t.appCfg.SIPConfig.RTPPortRangeStart,
-			t.appCfg.SIPConfig.RTPPortRangeEnd,
-		)
-		cfg.ApplyTimeoutDefaults(
-			t.appCfg.SIPConfig.RegisterTimeout,
-			t.appCfg.SIPConfig.InviteTimeout,
-			t.appCfg.SIPConfig.SessionTimeout,
-		)
-		cfg.ApplyMediaTimeoutDefaults(
-			t.appCfg.SIPConfig.MediaTimeoutInitial,
-			t.appCfg.SIPConfig.MediaTimeout,
-		)
-		cfg.ApplyInboundAnswerDefaults(
-			sip_runtime.InboundAnswerMode(t.appCfg.SIPConfig.Inbound.AnswerMode),
-			t.appCfg.SIPConfig.Inbound.MinRingDuration,
-			t.appCfg.SIPConfig.Inbound.MaxRingDuration,
-			t.appCfg.SIPConfig.Inbound.ACKTimeout,
-		)
-	}
-
-	if err := cfg.Validate(); err != nil {
+	if err := runtimeConfig.Validate(); err != nil {
 		return nil, err
 	}
 
-	return cfg, nil
+	return runtimeConfig, nil
 }
 
 func (t *sipTelephony) StatusCallback(

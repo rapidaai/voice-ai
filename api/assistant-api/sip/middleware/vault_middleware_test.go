@@ -10,7 +10,9 @@ import (
 	"context"
 	"testing"
 
+	assistant_config "github.com/rapidaai/api/assistant-api/config"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	gorm_model "github.com/rapidaai/pkg/models/gorm"
@@ -52,9 +54,7 @@ func TestVaultMiddleware_ResolvesSIPConfig(t *testing.T) {
 		WithContext(context.Background()),
 		WithLogger(newRouteTestLogger(t)),
 		WithRapidaClient(&rapida_client.RapidaClient{Vault: vault}),
-		WithApplySIPConfigDefaults(func(config *sip_runtime.Config) {
-			config.Port = 5090
-		}),
+		WithSIPConfig(sip_config.NewResolver(&assistant_config.SIPConfig{Port: 5090})),
 	)
 
 	ctx := &sip_runtime.SIPRequestContext{CallID: "call-vault", Method: "INVITE"}
@@ -84,7 +84,7 @@ func TestVaultMiddleware_ReturnsCredentialIDError(t *testing.T) {
 	require.ErrorAs(t, err, &sipErr)
 	assert.Equal(t, sipStatusServerError, sipErr.Code)
 	assert.Equal(t, sipMessageConfigurationResolution, sipErr.Message)
-	assert.ErrorIs(t, err, sip_runtime.ErrInvalidConfig)
+	assert.ErrorIs(t, err, sip_config.ErrInvalidConfig)
 	assert.ErrorIs(t, err, sip_runtime.ErrCredentialIDRequired)
 }
 
@@ -106,7 +106,7 @@ func TestVaultMiddleware_DoesNotMutateContextWhenVaultConfigIsInvalid(t *testing
 	}))(ctx)
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, sip_runtime.ErrInvalidConfig)
+	assert.ErrorIs(t, err, sip_config.ErrInvalidConfig)
 	assert.ErrorIs(t, err, sip_runtime.ErrVaultConfigInvalid)
 	assert.Nil(t, ctx.VaultCredential)
 	assert.Nil(t, ctx.Config)

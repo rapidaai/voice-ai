@@ -9,6 +9,7 @@ package sip_runtime
 import (
 	"testing"
 
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,12 +26,12 @@ func TestInboundResolveConfigClassifiesMiddlewareErrors(t *testing.T) {
 	}{
 		{
 			name:              "invalid configuration",
-			middlewareError:   &SIPError{Code: 500, Message: "route resolver unavailable", Err: ErrInvalidConfig},
+			middlewareError:   &SIPError{Code: 500, Message: "route resolver unavailable", Err: sip_config.ErrInvalidConfig},
 			wantClass:         inboundFailureConfig,
 			wantResponseClass: inboundFailureConfig,
 			wantResult:        CallTerminationServerError,
 			wantReason:        "inbound_config",
-			wantError:         ErrInvalidConfig,
+			wantError:         sip_config.ErrInvalidConfig,
 		},
 		{
 			name:              "authentication required",
@@ -90,7 +91,7 @@ func TestInboundResolveConfigProtectsCapturedCallAddress(t *testing.T) {
 		ctx.CallAddress.FromURI = "sip:attacker@example.com"
 		ctx.CallAddress.ToURI = "sip:attacker@example.net"
 		ctx.CallAddress.Headers["x-original-called-number"] = "+14155550999"
-		ctx.Config = &Config{Server: "trunk.example.com"}
+		ctx.Config = &sip_config.Config{Server: "trunk.example.com"}
 		return nil
 	}}}
 	identity := inboundInviteIdentity{

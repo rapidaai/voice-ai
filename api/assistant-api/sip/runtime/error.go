@@ -10,7 +10,6 @@ import "errors"
 
 // General SIP runtime errors.
 var (
-	ErrInvalidConfig              = errors.New("invalid SIP configuration")
 	ErrSessionNotFound            = errors.New("SIP session not found")
 	ErrSessionClosed              = errors.New("SIP session is closed")
 	ErrRTPNotInitialized          = errors.New("RTP handler not initialized")

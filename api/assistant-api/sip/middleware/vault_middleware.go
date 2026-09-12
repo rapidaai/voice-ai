@@ -43,19 +43,16 @@ func NewVaultMiddleware(options ...func(*middlewareOption)) sip_runtime.Middlewa
 			return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: errors.Join(errVaultCredentialResolution, err)}
 		}
 
-		config, err := sip_runtime.ParseConfigFromVault(vaultCredential)
+		runtimeConfig, err := m.sipConfig.RuntimeConfig(vaultCredential)
 		if err != nil {
 			return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: errors.Join(errVaultConfigInvalid, err)}
 		}
 
 		if did, err := ctx.Assistant.AssistantPhoneDeployment.GetOptions().GetString(phoneOptionKey); err == nil && validator.NotBlank(did) {
-			config.CallerID = strings.TrimPrefix(did, phoneNumberPrefix)
-		}
-		if validator.NonNil(m.applySIPConfigDefaults) {
-			m.applySIPConfigDefaults(config)
+			runtimeConfig.CallerID = strings.TrimPrefix(did, phoneNumberPrefix)
 		}
 		ctx.VaultCredential = vaultCredential
-		ctx.Config = config
+		ctx.Config = runtimeConfig
 		return nil
 	}
 }

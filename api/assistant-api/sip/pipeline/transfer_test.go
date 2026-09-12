@@ -16,6 +16,7 @@ import (
 
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
@@ -28,7 +29,7 @@ type fakeTransferServer struct {
 	endReasons               []sip_runtime.LifecycleReason
 	failReasons              []sip_runtime.LifecycleReason
 	cancelReasons            []sip_runtime.LifecycleReason
-	makeTransferBridgeCallFn func(ctx context.Context, cfg *sip_runtime.Config, toURI, fromURI string, opts sip_runtime.TransferBridgeCallOptions) (*sip_runtime.Session, error)
+	makeTransferBridgeCallFn func(ctx context.Context, cfg *sip_config.Config, toURI, fromURI string, opts sip_runtime.TransferBridgeCallOptions) (*sip_runtime.Session, error)
 	bridgeTransferFn         func(ctx context.Context, inbound, outbound *sip_runtime.Session, onOperatorAudio func([]byte)) (sip_runtime.BridgeEndReason, error)
 }
 
@@ -37,7 +38,7 @@ type fakeTransferLifecycleTransition struct {
 	reason sip_runtime.LifecycleReason
 }
 
-func (f *fakeTransferServer) MakeTransferBridgeCall(ctx context.Context, cfg *sip_runtime.Config, toURI, fromURI string, opts sip_runtime.TransferBridgeCallOptions) (*sip_runtime.Session, error) {
+func (f *fakeTransferServer) MakeTransferBridgeCall(ctx context.Context, cfg *sip_config.Config, toURI, fromURI string, opts sip_runtime.TransferBridgeCallOptions) (*sip_runtime.Session, error) {
 	if f.makeTransferBridgeCallFn != nil {
 		return f.makeTransferBridgeCallFn(ctx, cfg, toURI, fromURI, opts)
 	}
@@ -110,8 +111,8 @@ func (f *fakeTransferServer) lifecycleCancelReasons() []sip_runtime.LifecycleRea
 	return append([]sip_runtime.LifecycleReason(nil), f.cancelReasons...)
 }
 
-func newTransferTestConfig() *sip_runtime.Config {
-	return &sip_runtime.Config{
+func newTransferTestConfig() *sip_config.Config {
+	return &sip_config.Config{
 		Server:            "127.0.0.1",
 		Port:              5060,
 		Username:          "testuser",
@@ -298,7 +299,7 @@ func TestHandleTransferInitiated_CallerIDResolution(t *testing.T) {
 	d := New(WithLogger(newPipelineTestLogger(t)))
 
 	// Config with empty CallerID and no assistant — should still not panic
-	cfg := &sip_runtime.Config{
+	cfg := &sip_config.Config{
 		Server:            "127.0.0.1",
 		Port:              5060,
 		Username:          "testuser",
@@ -464,7 +465,7 @@ func TestTransferRace_UserHangupCancelsDialAttempt(t *testing.T) {
 	var failedCalled atomic.Bool
 
 	srv := &fakeTransferServer{
-		makeTransferBridgeCallFn: func(ctx context.Context, _ *sip_runtime.Config, _, _ string, _ sip_runtime.TransferBridgeCallOptions) (*sip_runtime.Session, error) {
+		makeTransferBridgeCallFn: func(ctx context.Context, _ *sip_config.Config, _, _ string, _ sip_runtime.TransferBridgeCallOptions) (*sip_runtime.Session, error) {
 			<-ctx.Done()
 			cancelled.Store(true)
 			return nil, ctx.Err()
@@ -512,10 +513,10 @@ func TestExecuteTransfer_NewLegUsesTransferTargetAndConfiguredCallerIdentity(t *
 
 	var capturedTarget string
 	var capturedFrom string
-	var capturedConfig *sip_runtime.Config
+	var capturedConfig *sip_config.Config
 	var capturedOptions sip_runtime.TransferBridgeCallOptions
 	srv := &fakeTransferServer{
-		makeTransferBridgeCallFn: func(_ context.Context, config *sip_runtime.Config, target, from string, opts sip_runtime.TransferBridgeCallOptions) (*sip_runtime.Session, error) {
+		makeTransferBridgeCallFn: func(_ context.Context, config *sip_config.Config, target, from string, opts sip_runtime.TransferBridgeCallOptions) (*sip_runtime.Session, error) {
 			capturedConfig = config
 			capturedTarget = target
 			capturedFrom = from
@@ -564,7 +565,7 @@ func TestExecuteTransfer_DoesNotOwnBridgeConnectedState(t *testing.T) {
 	var bridgeInboundState sip_runtime.CallState
 	var bridgeOutboundState sip_runtime.CallState
 	srv := &fakeTransferServer{
-		makeTransferBridgeCallFn: func(_ context.Context, _ *sip_runtime.Config, _, _ string, _ sip_runtime.TransferBridgeCallOptions) (*sip_runtime.Session, error) {
+		makeTransferBridgeCallFn: func(_ context.Context, _ *sip_config.Config, _, _ string, _ sip_runtime.TransferBridgeCallOptions) (*sip_runtime.Session, error) {
 			return outbound, nil
 		},
 		bridgeTransferFn: func(_ context.Context, inboundSession, outboundSession *sip_runtime.Session, _ func([]byte)) (sip_runtime.BridgeEndReason, error) {
@@ -604,7 +605,7 @@ func TestTransferRace_AIDisconnectContextTeardownAllLegs(t *testing.T) {
 	var resumeCalled atomic.Bool
 
 	srv := &fakeTransferServer{
-		makeTransferBridgeCallFn: func(_ context.Context, _ *sip_runtime.Config, _, _ string, _ sip_runtime.TransferBridgeCallOptions) (*sip_runtime.Session, error) {
+		makeTransferBridgeCallFn: func(_ context.Context, _ *sip_config.Config, _, _ string, _ sip_runtime.TransferBridgeCallOptions) (*sip_runtime.Session, error) {
 			return outbound, nil
 		},
 		bridgeTransferFn: func(ctx context.Context, _ *sip_runtime.Session, out *sip_runtime.Session, _ func([]byte)) (sip_runtime.BridgeEndReason, error) {
@@ -666,7 +667,7 @@ func TestTransferRace_OperatorDisconnectResumesAI(t *testing.T) {
 	var resumeCount atomic.Int32
 
 	srv := &fakeTransferServer{
-		makeTransferBridgeCallFn: func(_ context.Context, _ *sip_runtime.Config, _, _ string, _ sip_runtime.TransferBridgeCallOptions) (*sip_runtime.Session, error) {
+		makeTransferBridgeCallFn: func(_ context.Context, _ *sip_config.Config, _, _ string, _ sip_runtime.TransferBridgeCallOptions) (*sip_runtime.Session, error) {
 			return outbound, nil
 		},
 		bridgeTransferFn: func(_ context.Context, _ *sip_runtime.Session, out *sip_runtime.Session, _ func([]byte)) (sip_runtime.BridgeEndReason, error) {
@@ -712,7 +713,7 @@ func TestTransferRace_ConcurrentCallerEndAndBridgeComplete(t *testing.T) {
 	started := make(chan struct{})
 
 	srv := &fakeTransferServer{
-		makeTransferBridgeCallFn: func(_ context.Context, _ *sip_runtime.Config, _, _ string, _ sip_runtime.TransferBridgeCallOptions) (*sip_runtime.Session, error) {
+		makeTransferBridgeCallFn: func(_ context.Context, _ *sip_config.Config, _, _ string, _ sip_runtime.TransferBridgeCallOptions) (*sip_runtime.Session, error) {
 			return outbound, nil
 		},
 		bridgeTransferFn: func(_ context.Context, _ *sip_runtime.Session, out *sip_runtime.Session, _ func([]byte)) (sip_runtime.BridgeEndReason, error) {

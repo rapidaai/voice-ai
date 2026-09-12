@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	"github.com/rapidaai/pkg/commons"
 )
 
@@ -91,8 +92,8 @@ func deliverBridgeAudio(t testing.TB, handler *RTPHandler, frame InboundAudioFra
 	handler.deliverInboundAudio([]InboundAudioFrame{frame})
 }
 
-func bridgeTestConfig() *Config {
-	return &Config{
+func bridgeTestConfig() *sip_config.Config {
+	return &sip_config.Config{
 		Server:            "127.0.0.1",
 		Port:              5060,
 		Username:          "testuser",

@@ -12,6 +12,7 @@ import (
 	"maps"
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 )
@@ -19,12 +20,12 @@ import (
 // inboundConfig is the resolved tenant config for an inbound SIP call.
 // It owns middleware output and the answer policy derived from that config.
 type inboundConfig struct {
-	config          *Config
+	config          *sip_config.Config
 	auth            *types.Authentication
 	assistant       *internal_assistant_entity.Assistant
 	vaultCredential *protos.VaultCredential
 	callAddress     CallAddress
-	answerPolicy    InboundAnswerPolicy
+	answerPolicy    sip_config.InboundAnswerPolicy
 	setupPhase      InboundSetupPhase
 }
 
@@ -59,7 +60,7 @@ func (inboundCall *Inbound) resolveConfig() *inboundFailure {
 	}
 	for _, middleware := range middlewares {
 		if err := middleware(requestContext); err != nil {
-			if errors.Is(err, ErrInvalidConfig) {
+			if errors.Is(err, sip_config.ErrInvalidConfig) {
 				configErr := fmt.Errorf("SIP middleware failed: %w", err)
 				return &inboundFailure{
 					statusCode:      500,

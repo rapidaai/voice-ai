@@ -17,12 +17,13 @@ import (
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func newOutboundSessionForTest(t *testing.T, config *Config, callID string) *Session {
+func newOutboundSessionForTest(t *testing.T, config *sip_config.Config, callID string) *Session {
 	t.Helper()
 	session, err := NewSession(context.Background(),
 		WithSessionConfig(config),
@@ -55,7 +56,7 @@ func TestOutboundConnectRejectsInvalidRequest(t *testing.T) {
 
 	_, err := outboundCall.Connect()
 
-	require.ErrorIs(t, err, ErrInvalidConfig)
+	require.ErrorIs(t, err, sip_config.ErrInvalidConfig)
 }
 
 func TestOutboundHandleCallInvalidRequestFailsBeforeAnswer(t *testing.T) {
@@ -80,7 +81,7 @@ func TestOutboundDialogInviteRejectsEmptyCallID(t *testing.T) {
 
 	err = dialog.Invite(context.Background(), "test-sdp")
 
-	require.ErrorIs(t, err, ErrInvalidConfig)
+	require.ErrorIs(t, err, sip_config.ErrInvalidConfig)
 	assert.Contains(t, err.Error(), "outbound call ID is required")
 }
 

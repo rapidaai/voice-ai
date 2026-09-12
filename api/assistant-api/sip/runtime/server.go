@@ -16,6 +16,7 @@ import (
 
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	"github.com/rapidaai/pkg/commons"
 )
 
@@ -31,7 +32,7 @@ type Server struct {
 	userAgent    *sipgo.UserAgent
 	server       *sipgo.Server
 	client       *sipgo.Client
-	listenConfig *ListenConfig // Shared server listen config (address, port, transport)
+	listenConfig *sip_config.ListenConfig
 
 	rtpPortRangeStart    int
 	rtpPortRangeEnd      int
@@ -110,112 +111,9 @@ type inboundRejectedInvite struct {
 	expiresAt      time.Time
 }
 
-// ListenConfig holds shared server configuration (not tenant-specific)
-type ListenConfig struct {
-	Address    string `json:"address" mapstructure:"address"`         // Bind address (e.g. 0.0.0.0)
-	ExternalIP string `json:"external_ip" mapstructure:"external_ip"` // Public/reachable IP for SDP and Contact headers
-	// AllowLoopbackExternalIP permits localhost advertised addresses in local test environments.
-	AllowLoopbackExternalIP bool      `json:"allow_loopback_external_ip" mapstructure:"allow_loopback_external_ip"`
-	Port                    int       `json:"port" mapstructure:"port"`
-	Transport               Transport `json:"transport" mapstructure:"transport"`
-}
-
-// GetExternalIP returns the external/advertised IP for SDP and SIP Contact headers.
-// ExternalIP must be explicitly configured (SIP__EXTERNAL_IP) for production use.
-// Falls back to Address only if ExternalIP is not set.
-func (c *ListenConfig) GetExternalIP() string {
-	if c == nil {
-		return ""
-	}
-	if c.ExternalIP != "" {
-		return c.ExternalIP
-	}
-	return c.Address
-}
-
-// GetBindAddress returns the address to bind RTP sockets to.
-// This is the actual local interface address (e.g. 0.0.0.0) — NOT the
-// external/public IP. RTP sockets must bind to a local interface, while
-// the external IP is only advertised in SDP so the remote peer knows
-// where to send its RTP packets.
-func (c *ListenConfig) GetBindAddress() string {
-	if c == nil {
-		return ""
-	}
-	return c.Address
-}
-
-// GetListenAddr returns the address to listen on
-func (c *ListenConfig) GetListenAddr() string {
-	if c == nil {
-		return ""
-	}
-	return fmt.Sprintf("%s:%d", c.Address, c.Port)
-}
-
-func (c *ListenConfig) SIPContactHeader() sip.ContactHeader {
-	return buildContactHeader(c)
-}
-
-// ServerConfig holds configuration for creating a SIP server
-// Multi-tenant: Only holds shared listen config, tenant config resolved per-call
-type ServerConfig struct {
-	ListenConfig         *ListenConfig // Shared server listen configuration
-	Middlewares          []Middleware  // Resolves tenant-specific config per-call
-	Logger               commons.Logger
-	RTPPortRangeStart    int  // Start of RTP port range.
-	RTPPortRangeEnd      int  // End of RTP port range, inclusive.
-	SymmetricRTP         bool // Updates the remote RTP target from received packet sources.
-	IgnoreLocalAddrInSDP bool // Enables symmetric RTP when SDP advertises a private remote address.
-	MaxConcurrentCalls   int  // Zero preserves unlimited call admission.
-	CallAdmissionCPS     int  // Calls per second allowed for new call setup. Zero disables burst admission.
-	CallAdmissionBurst   int  // Maximum burst size for new call setup. Zero disables burst admission.
-}
-
-// Validate validates the server configuration
-func (c *ServerConfig) Validate() error {
-	if c == nil {
-		return fmt.Errorf("server config is required")
-	}
-	if c.ListenConfig == nil {
-		return fmt.Errorf("listen config is required")
-	}
-	if c.ListenConfig.Address == "" {
-		return fmt.Errorf("listen address is required")
-	}
-	if c.ListenConfig.Port <= 0 || c.ListenConfig.Port > 65535 {
-		return fmt.Errorf("invalid listen port: %d", c.ListenConfig.Port)
-	}
-	if c.Logger == nil {
-		return fmt.Errorf("logger is required")
-	}
-	if c.RTPPortRangeStart <= 0 || c.RTPPortRangeEnd <= 0 {
-		return fmt.Errorf("rtp_port_range must be specified")
-	}
-	if c.RTPPortRangeStart > c.RTPPortRangeEnd {
-		return fmt.Errorf("rtp_port_range_start must be less than or equal to rtp_port_range_end")
-	}
-	if c.MaxConcurrentCalls < 0 {
-		return fmt.Errorf("max_concurrent_calls must be greater than or equal to zero")
-	}
-	if c.CallAdmissionCPS < 0 {
-		return fmt.Errorf("call_admission_cps must be greater than or equal to zero")
-	}
-	if c.CallAdmissionBurst < 0 {
-		return fmt.Errorf("call_admission_burst must be greater than or equal to zero")
-	}
-	if c.CallAdmissionCPS > 0 && c.CallAdmissionBurst == 0 {
-		return fmt.Errorf("call_admission_burst is required when call_admission_cps is set")
-	}
-	if c.CallAdmissionBurst > 0 && c.CallAdmissionCPS == 0 {
-		return fmt.Errorf("call_admission_cps is required when call_admission_burst is set")
-	}
-	return nil
-}
-
 // NewServer creates a new shared SIP server instance
 // Multi-tenant: Server listens on shared address, config resolved per-call via middleware.
-func NewServer(ctx context.Context, cfg *ServerConfig) (*Server, error) {
+func NewServer(ctx context.Context, cfg *sip_config.ServerConfig) (*Server, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, NewSIPError("NewServer", "", "configuration validation failed", err)
 	}
@@ -294,7 +192,7 @@ func NewServer(ctx context.Context, cfg *ServerConfig) (*Server, error) {
 		callAdmissionTokens:              float64(cfg.CallAdmissionBurst),
 		dialogClientCache:                dialogClientCache,
 		dialogServerCache:                dialogServerCache,
-		middlewares:                      append([]Middleware(nil), cfg.Middlewares...),
+		middlewares:                      nil,
 		sessions:                         make(map[string]*Session),
 		lifecycles:                       make(map[string]*CallLifecycle),
 		pendingInvites:                   make(map[inboundInviteKey]*pendingInvite),
@@ -326,6 +224,14 @@ func (s *Server) useSymmetricRTPForRemoteIP(remoteIP string) bool {
 	}
 	remoteAddr, err := netip.ParseAddr(remoteIP)
 	return err == nil && remoteAddr.IsPrivate()
+}
+
+func cloneListenConfig(config *sip_config.ListenConfig) *sip_config.ListenConfig {
+	if config == nil {
+		return nil
+	}
+	clone := *config
+	return &clone
 }
 
 func (s *Server) registerHandlers() {
@@ -506,16 +412,8 @@ func (s *Server) Client() *sipgo.Client {
 }
 
 // ListenConfig returns the shared server listen configuration.
-func (s *Server) GetListenConfig() *ListenConfig {
+func (s *Server) GetListenConfig() *sip_config.ListenConfig {
 	return cloneListenConfig(s.listenConfig)
-}
-
-func cloneListenConfig(config *ListenConfig) *ListenConfig {
-	if config == nil {
-		return nil
-	}
-	clone := *config
-	return &clone
 }
 
 // SessionCount returns the number of active sessions
