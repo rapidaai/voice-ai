@@ -10,11 +10,13 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/emiago/sipgo/sip"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
+	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
@@ -23,6 +25,22 @@ import (
 
 // ServerState represents the state of the SIP server.
 type ServerState int32
+
+// CallLifecycle is the single owner of call-state transitions inside the SIP runtime.
+// It validates transitions and emits structured transition logs.
+type CallLifecycle struct {
+	mu     sync.Mutex
+	callID string
+	state  CallState
+	logger commons.Logger
+}
+
+type CallTerminationResult string
+
+type CallTermination struct {
+	Result CallTerminationResult
+	Reason string
+}
 
 // CallAddress contains exact SIP parties, resolved phone values, and non-credential headers.
 // Header names are lowercase and repeated values preserve arrival order.
