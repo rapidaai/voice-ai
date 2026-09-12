@@ -341,7 +341,7 @@ func TestInterruptionRejectsPauseBetweenFlushAndCommit(t *testing.T) {
 		}, internal_options.BargeInTriggerVAD)
 		pause := observation.Pause
 		require.NotNil(t, pause)
-		decision, _, _ := requestor.messageLifecycle.OnUserSpeech(internal_type.SpeechToTextPacket{
+		decision, _ := requestor.messageLifecycle.OnUserSpeech(internal_type.SpeechToTextPacket{
 			ContextID: previous, Script: "wait", Interim: true,
 		}, true)
 		require.NotNil(t, decision)
@@ -458,6 +458,168 @@ func TestInterruptionHoldsTranscriptsUntilCommitCompletion(t *testing.T) {
 		assert.Equal(t, "wait please", packets[3].(internal_type.SpeechToTextPacket).Script)
 		assert.Equal(t, "Wait please", packets[4].(internal_type.SpeechToTextPacket).Script)
 	})
+}
+
+func TestInterruptionHoldsTranscriptsUntilReplayCompletion(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Please repeat", adapter_lifecycle.WithInterruption(true))
+		t.Cleanup(func() { requestor.messageLifecycle.CancelInterruption() })
+		started, release := make(chan struct{}), make(chan struct{})
+		defer close(release)
+		eos := &recordingEOSExecutor{onExecute: func(ctx context.Context, packet internal_type.Packet) error {
+			if vad, ok := packet.(internal_type.InterruptionDetectedPacket); ok && vad.Event == internal_type.InterruptionEventStart {
+				close(started)
+				select {
+				case <-release:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+			return nil
+		}}
+		requestor.endOfSpeechExecutor = eos
+		handler := requestorDispatchHandler{r: requestor}
+		previous := requestor.GetID()
+		handler.HandleInterruptionDetected(t.Context(), internal_type.InterruptionDetectedPacket{
+			ContextID: previous, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
+		})
+		handler.HandleSpeechToText(t.Context(), internal_type.SpeechToTextPacket{ContextID: previous, Script: "wait", Interim: true})
+		<-started
+		current := requestor.GetID()
+		require.NotEqual(t, previous, current)
+		handler.HandleSpeechToText(t.Context(), internal_type.SpeechToTextPacket{ContextID: current, Script: "wait please"})
+		handler.HandleEndOfSpeech(t.Context(), internal_type.EndOfSpeechPacket{ContextID: current, Speech: "wait please"})
+		synctest.Wait()
+		require.Len(t, eos.snapshotExecuted(), 2, "newer transcript must wait behind replayed VAD-start")
+		release <- struct{}{}
+		synctest.Wait()
+		packets := eos.snapshotExecuted()
+		require.Len(t, packets, 4)
+		assert.Equal(t, internal_type.SpeechToTextPacket{ContextID: current, Script: "wait", Interim: true}, packets[2])
+		assert.Equal(t, internal_type.SpeechToTextPacket{ContextID: current, Script: "wait please"}, packets[3])
+		assert.Equal(t, adapter_lifecycle.MessageStateUserFinished, requestor.messageLifecycle.State())
+		assert.Equal(t, []internal_type.Packet{
+			internal_type.UserInputPacket{ContextID: current, Text: "wait please"},
+		}, drainIngressPackets(requestor), "derived input must pass ordinary admission")
+		time.Sleep(2 * time.Second)
+		synctest.Wait()
+		for _, packet := range drainEgressPackets(requestor) {
+			_, expired := packet.(internal_type.UnclearInputExpiredPacket)
+			assert.False(t, expired, "replayed final must stop the unclear-input timer")
+		}
+	})
+}
+
+func TestInterruptionReplayRespectsInputPolicy(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD, adapter_lifecycle.WithInterruption(true))
+		t.Cleanup(func() { requestor.messageLifecycle.CancelInterruption() })
+		eos := &recordingEOSExecutor{}
+		requestor.endOfSpeechExecutor = eos
+		started, release := make(chan struct{}), make(chan struct{})
+		defer close(release)
+		requestor.textToSpeechTransformer = blockedInterruptionTransformer{
+			blockOn: internal_type.PacketNameTextToSpeechInterrupt, started: started, release: release,
+		}
+		handler := requestorDispatchHandler{r: requestor}
+		previous := requestor.GetID()
+		handler.HandleInterruptionDetected(t.Context(), internal_type.InterruptionDetectedPacket{
+			ContextID: previous, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
+		})
+		handler.HandleSpeechToText(t.Context(), internal_type.SpeechToTextPacket{ContextID: previous, Script: "wait", Interim: true})
+		<-started
+		requestor.dispatchRoute.ApplyPolicy(internal_type.DispatchPolicy{
+			Target: internal_type.PacketNameSpeechToText, Action: internal_type.DispatchActionIgnore,
+		})
+		release <- struct{}{}
+		synctest.Wait()
+		for _, packet := range eos.snapshotExecuted() {
+			assert.NotEqual(t, internal_type.PacketNameSpeechToText, packet.PacketName())
+		}
+		requestor.dispatchRoute.ApplyPolicy(internal_type.DispatchPolicy{
+			Target: internal_type.PacketNameSpeechToText, Action: internal_type.DispatchActionPassthrough,
+		})
+		requestor.dispatch(t.Context(), internal_type.SpeechToTextPacket{ContextID: requestor.GetID(), Script: "wait please"})
+		packets := eos.snapshotExecuted()
+		require.Len(t, packets, 3)
+		assert.Equal(t, internal_type.SpeechToTextPacket{ContextID: requestor.GetID(), Script: "wait please"}, packets[2])
+	})
+}
+
+type blockedSpeechAdmission struct {
+	adapter_lifecycle.MessageLifecycle
+	admitted chan struct{}
+	release  chan struct{}
+}
+
+func (l *blockedSpeechAdmission) OnUserSpeech(packet internal_type.SpeechToTextPacket, adaptive bool) (*internal_type.TurnChangePacket, internal_type.SpeechToTextPacket) {
+	turn, admitted := l.MessageLifecycle.OnUserSpeech(packet, adaptive)
+	if admitted.ContextID != "" && !packet.Interim {
+		close(l.admitted)
+		<-l.release
+	}
+	return turn, admitted
+}
+
+func TestInterruptionAdmittedSpeechKeepsItsContext(t *testing.T) {
+	for _, scenario := range []string{"current context", "previous context", "empty context"} {
+		t.Run(scenario, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Please repeat", adapter_lifecycle.WithInterruption(true))
+				t.Cleanup(func() { requestor.messageLifecycle.CancelInterruption() })
+				eos := &recordingEOSExecutor{}
+				requestor.endOfSpeechExecutor = eos
+				handler := requestorDispatchHandler{r: requestor}
+				previous := requestor.GetID()
+				handler.HandleInterruptionDetected(t.Context(), internal_type.InterruptionDetectedPacket{
+					Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
+				})
+				handler.HandleSpeechToText(t.Context(), internal_type.SpeechToTextPacket{Script: "wait", Interim: true})
+				synctest.Wait()
+				current := requestor.GetID()
+				time.Sleep(time.Second)
+				synctest.Wait()
+				var expired internal_type.UnclearInputExpiredPacket
+				for _, packet := range drainEgressPackets(requestor) {
+					if packet, ok := packet.(internal_type.UnclearInputExpiredPacket); ok {
+						expired = packet
+					}
+				}
+				require.Equal(t, current, expired.ContextID)
+				admission := &blockedSpeechAdmission{
+					MessageLifecycle: requestor.messageLifecycle, admitted: make(chan struct{}), release: make(chan struct{}),
+				}
+				defer close(admission.release)
+				requestor.messageLifecycle = admission
+				packet := internal_type.SpeechToTextPacket{ContextID: current, Script: "Wait please"}
+				switch scenario {
+				case "previous context":
+					packet.ContextID = previous
+				case "empty context":
+					packet.ContextID = ""
+				}
+				finished := make(chan struct{})
+				go func() {
+					handler.HandleSpeechToText(t.Context(), packet)
+					close(finished)
+				}()
+				<-admission.admitted
+				handler.HandleUnclearInputExpired(t.Context(), expired)
+				require.NotEqual(t, current, requestor.GetID())
+				admission.release <- struct{}{}
+				<-finished
+				var transcripts []internal_type.SpeechToTextPacket
+				for _, packet := range eos.snapshotExecuted() {
+					if packet, ok := packet.(internal_type.SpeechToTextPacket); ok {
+						transcripts = append(transcripts, packet)
+					}
+				}
+				assert.Equal(t, []internal_type.SpeechToTextPacket{
+					{ContextID: current, Script: "wait", Interim: true},
+				}, transcripts, "a stale admitted final must not be moved into the prompt's context")
+			})
+		})
+	}
 }
 
 func TestInterruptionDeadlineDoesNotWaitForProviderWork(t *testing.T) {

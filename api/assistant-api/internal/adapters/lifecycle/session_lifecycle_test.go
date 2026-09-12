@@ -381,14 +381,14 @@ func TestSessionLifecycle_IdleTimeoutEligibility(t *testing.T) {
 			l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "old"}, message)
 		}},
 		{name: "speech received at start", act: func(t *testing.T, l SessionLifecycle, message MessageLifecycle) {
-			if _, err := message.OnTranscriptReceived("ctx", "hello"); err != nil {
+			if _, err := message.OnTranscriptReceived(internal_type.SpeechToTextPacket{ContextID: "ctx", Script: "hello"}); err != nil {
 				t.Fatal(err)
 			}
 			l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, message)
 		}},
 		{name: "speech received at expiry", act: func(t *testing.T, l SessionLifecycle, message MessageLifecycle) {
 			l.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "ctx"}, message)
-			if _, err := message.OnTranscriptReceived("ctx", "hello"); err != nil {
+			if _, err := message.OnTranscriptReceived(internal_type.SpeechToTextPacket{ContextID: "ctx", Script: "hello"}); err != nil {
 				t.Fatal(err)
 			}
 		}},

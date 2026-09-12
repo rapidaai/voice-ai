@@ -46,6 +46,16 @@ type workerCommand struct {
 	fireImmediately bool
 }
 
+type predictionRequest struct {
+	ctx             context.Context
+	packetContext   context.Context
+	cancel          context.CancelFunc
+	contextID       string
+	vadRevision     uint64
+	audioGeneration uint64
+	audio           []float32
+}
+
 type endOfSpeechState struct {
 	segment            speechSegment
 	confidence         float64
@@ -95,6 +105,9 @@ type pipecatEndOfSpeech struct {
 	state            *endOfSpeechState
 	eosStartedAt     time.Time
 	cancelPrediction context.CancelFunc
+	predictionCh     chan predictionRequest
+	predictionDone   chan struct{}
+	closed           bool
 }
 
 type options struct {
@@ -304,6 +317,10 @@ func (endOfSpeech *pipecatEndOfSpeech) Execute(ctx context.Context, packet inter
 			return nil
 		}
 		endOfSpeech.mu.Lock()
+		if endOfSpeech.closed {
+			endOfSpeech.mu.Unlock()
+			return nil
+		}
 		switch packet.Event {
 		case internal_type.InterruptionEventStart:
 			if endOfSpeech.cancelPrediction != nil {
@@ -342,7 +359,6 @@ func (endOfSpeech *pipecatEndOfSpeech) Execute(ctx context.Context, packet inter
 			endOfSpeech.state.silenceSamples = 0
 			endOfSpeech.state.vadRevision++
 			endOfSpeech.state.segment.Revision++
-			vadRevision := endOfSpeech.state.vadRevision
 			endOfSpeech.state.turnStopDeadline = time.Now().Add(endOfSpeech.turnStopTimeout)
 			if endOfSpeech.state.transcript == transcriptStateUserText {
 				endOfSpeech.state.segment = speechSegment{Revision: endOfSpeech.state.segment.Revision}
@@ -367,6 +383,34 @@ func (endOfSpeech *pipecatEndOfSpeech) Execute(ctx context.Context, packet inter
 			}
 			predictionContext, cancelPrediction := context.WithDeadline(ctx, predictionDeadline)
 			endOfSpeech.cancelPrediction = cancelPrediction
+			// Snapshot stopped speech before later packets can change the audio window.
+			audioStartSample := endOfSpeech.audioStartSample
+			if endOfSpeech.hasSpeechStart {
+				if endOfSpeech.speechStartSample > preSpeechAudioSamples {
+					audioStartSample = endOfSpeech.speechStartSample - preSpeechAudioSamples
+				} else {
+					audioStartSample = 0
+				}
+				if audioStartSample < endOfSpeech.audioStartSample {
+					audioStartSample = endOfSpeech.audioStartSample
+				}
+			}
+			audioStartIndex := len(endOfSpeech.audioBuffer)
+			audioStartOffset, conversionErr := utils.Uint64ToInt64(audioStartSample - endOfSpeech.audioStartSample)
+			if conversionErr == nil && audioStartOffset < int64(len(endOfSpeech.audioBuffer)) {
+				audioStartIndex, _ = utils.Int64ToInt(audioStartOffset)
+			}
+			audio := make([]float32, len(endOfSpeech.audioBuffer)-audioStartIndex)
+			copy(audio, endOfSpeech.audioBuffer[audioStartIndex:])
+			request := predictionRequest{
+				ctx:             predictionContext,
+				packetContext:   ctx,
+				cancel:          cancelPrediction,
+				contextID:       packet.ContextID,
+				vadRevision:     endOfSpeech.state.vadRevision,
+				audioGeneration: endOfSpeech.audioGeneration,
+				audio:           audio,
+			}
 			command := workerCommand{
 				ctx:      ctx,
 				segment:  endOfSpeech.state.segment,
@@ -377,58 +421,26 @@ func (endOfSpeech *pipecatEndOfSpeech) Execute(ctx context.Context, packet inter
 			if command.segment.Text != "" {
 				endOfSpeech.enqueueCommand(command)
 			}
-			probability, predictionErr := endOfSpeech.predictEOU(predictionContext)
-			cancelPrediction()
-			if predictionErr != nil && !errors.Is(predictionErr, context.Canceled) && !errors.Is(predictionErr, context.DeadlineExceeded) {
-				// Packet dispatchers may discard Execute errors, so report inference failures here as well.
-				_ = endOfSpeech.onPacket(ctx, internal_type.ObservabilityLogRecordPacket{
-					ContextID: packet.ContextID,
-					Scope:     internal_type.ObservabilityRecordScopeConversation,
-					Record: observability.RecordLog{
-						Level:      observability.LevelError,
-						Message:    predictionErr.Error(),
-						OccurredAt: time.Now(),
-						Attributes: observability.Attributes{
-							"component": observability.ComponentEOS.String(),
-							"provider":  endOfSpeech.Name(),
-							"operation": "predict_end_of_turn",
-						},
-					},
-				})
-			}
 			endOfSpeech.mu.Lock()
-			if endOfSpeech.state.vadRevision != vadRevision || endOfSpeech.state.vadState != vadStateEnded {
+			if endOfSpeech.closed || endOfSpeech.state.vadRevision != request.vadRevision {
+				request.cancel()
 				endOfSpeech.mu.Unlock()
 				return nil
 			}
-			endOfSpeech.cancelPrediction = nil
-			endOfSpeech.state.confidence = probability
-			if endOfSpeech.state.turnState != turnStateComplete {
-				if predictionErr == nil && probability > endOfSpeech.threshold {
-					endOfSpeech.state.turnState = turnStateComplete
-				} else {
-					endOfSpeech.state.turnState = turnStateIncomplete
-				}
+			if endOfSpeech.predictionCh == nil {
+				endOfSpeech.predictionCh = make(chan predictionRequest, 1)
+				endOfSpeech.predictionDone = make(chan struct{})
+				go endOfSpeech.predictionWorker()
 			}
-			if endOfSpeech.state.turnState == turnStateComplete {
-				endOfSpeech.audioBuffer = endOfSpeech.audioBuffer[:0]
-				endOfSpeech.audioStartSample = endOfSpeech.audioNextSample
-				endOfSpeech.hasSpeechStart = false
-				endOfSpeech.audioGeneration++
-				endOfSpeech.hasPredictedResult = false
+			// Keep only the latest pending stop while one native prediction is active.
+			select {
+			case pending := <-endOfSpeech.predictionCh:
+				pending.cancel()
+			default:
 			}
-			command = workerCommand{
-				ctx:        ctx,
-				segment:    endOfSpeech.state.segment,
-				confidence: endOfSpeech.state.confidence,
-				deadline:   endOfSpeech.state.transcriptDeadline,
-			}
-			command.segment.Text = command.segment.FinalText
+			endOfSpeech.predictionCh <- request
 			endOfSpeech.mu.Unlock()
-			if command.segment.Text != "" {
-				endOfSpeech.enqueueCommand(command)
-			}
-			return predictionErr
+			return nil
 		}
 		endOfSpeech.mu.Unlock()
 	case internal_type.SpeechToTextPacket:
@@ -613,36 +625,16 @@ func (endOfSpeech *pipecatEndOfSpeech) appendAudio(pcm16 []byte) {
 	endOfSpeech.mu.Unlock()
 }
 
-func (endOfSpeech *pipecatEndOfSpeech) predictEOU(ctx context.Context) (float64, error) {
+func (endOfSpeech *pipecatEndOfSpeech) predictEOU(ctx context.Context, audio []float32, generation uint64) (float64, error) {
 	if err := ctx.Err(); err != nil {
 		return 0, err
 	}
 	endOfSpeech.mu.RLock()
-	generation := endOfSpeech.audioGeneration
 	if endOfSpeech.hasPredictedResult && endOfSpeech.predictedGeneration == generation {
 		probability := endOfSpeech.predictedProbability
 		endOfSpeech.mu.RUnlock()
 		return probability, nil
 	}
-
-	audioStartSample := endOfSpeech.audioStartSample
-	if endOfSpeech.hasSpeechStart {
-		if endOfSpeech.speechStartSample > preSpeechAudioSamples {
-			audioStartSample = endOfSpeech.speechStartSample - preSpeechAudioSamples
-		} else {
-			audioStartSample = 0
-		}
-		if audioStartSample < endOfSpeech.audioStartSample {
-			audioStartSample = endOfSpeech.audioStartSample
-		}
-	}
-	audioStartIndex := len(endOfSpeech.audioBuffer)
-	audioStartOffset, conversionErr := utils.Uint64ToInt64(audioStartSample - endOfSpeech.audioStartSample)
-	if conversionErr == nil && audioStartOffset < int64(len(endOfSpeech.audioBuffer)) {
-		audioStartIndex, _ = utils.Int64ToInt(audioStartOffset)
-	}
-	audio := make([]float32, len(endOfSpeech.audioBuffer)-audioStartIndex)
-	copy(audio, endOfSpeech.audioBuffer[audioStartIndex:])
 	endOfSpeech.mu.RUnlock()
 
 	if len(audio) == 0 {
@@ -664,6 +656,9 @@ func (endOfSpeech *pipecatEndOfSpeech) predictEOU(ctx context.Context) (float64,
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errPipecatDetectorRunInference, err)
 	}
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
 
 	endOfSpeech.debugf(
 		"pipecat_eos: P(complete)=%.4f threshold=%.4f audio_samples=%d",
@@ -681,6 +676,67 @@ func (endOfSpeech *pipecatEndOfSpeech) predictEOU(ctx context.Context) (float64,
 	endOfSpeech.mu.Unlock()
 
 	return probability, nil
+}
+
+func (endOfSpeech *pipecatEndOfSpeech) predictionWorker() {
+	defer close(endOfSpeech.predictionDone)
+	for {
+		select {
+		case <-endOfSpeech.stopCh:
+			return
+		case request := <-endOfSpeech.predictionCh:
+			probability, predictionErr := endOfSpeech.predictEOU(request.ctx, request.audio, request.audioGeneration)
+			request.cancel()
+			if predictionErr != nil && !errors.Is(predictionErr, context.Canceled) && !errors.Is(predictionErr, context.DeadlineExceeded) {
+				_ = endOfSpeech.onPacket(request.packetContext, internal_type.ObservabilityLogRecordPacket{
+					ContextID: request.contextID,
+					Scope:     internal_type.ObservabilityRecordScopeConversation,
+					Record: observability.RecordLog{
+						Level:      observability.LevelError,
+						Message:    predictionErr.Error(),
+						OccurredAt: time.Now(),
+						Attributes: observability.Attributes{
+							"component": observability.ComponentEOS.String(),
+							"provider":  endOfSpeech.Name(),
+							"operation": "predict_end_of_turn",
+						},
+					},
+				})
+			}
+			endOfSpeech.mu.Lock()
+			if endOfSpeech.closed || endOfSpeech.state.vadRevision != request.vadRevision || endOfSpeech.state.vadState != vadStateEnded {
+				endOfSpeech.mu.Unlock()
+				continue
+			}
+			endOfSpeech.cancelPrediction = nil
+			endOfSpeech.state.confidence = probability
+			if endOfSpeech.state.turnState != turnStateComplete {
+				if predictionErr == nil && probability > endOfSpeech.threshold {
+					endOfSpeech.state.turnState = turnStateComplete
+				} else {
+					endOfSpeech.state.turnState = turnStateIncomplete
+				}
+			}
+			if endOfSpeech.state.turnState == turnStateComplete {
+				endOfSpeech.audioBuffer = endOfSpeech.audioBuffer[:0]
+				endOfSpeech.audioStartSample = endOfSpeech.audioNextSample
+				endOfSpeech.hasSpeechStart = false
+				endOfSpeech.audioGeneration++
+				endOfSpeech.hasPredictedResult = false
+			}
+			command := workerCommand{
+				ctx:        request.packetContext,
+				segment:    endOfSpeech.state.segment,
+				confidence: endOfSpeech.state.confidence,
+				deadline:   endOfSpeech.state.transcriptDeadline,
+			}
+			command.segment.Text = command.segment.FinalText
+			endOfSpeech.mu.Unlock()
+			if command.segment.Text != "" {
+				endOfSpeech.enqueueCommand(command)
+			}
+		}
+	}
 }
 
 func (endOfSpeech *pipecatEndOfSpeech) debugf(format string, args ...interface{}) {
@@ -894,6 +950,10 @@ func (endOfSpeech *pipecatEndOfSpeech) Close(ctx context.Context) error {
 
 	endOfSpeech.closeOnce.Do(func() {
 		endOfSpeech.mu.Lock()
+		endOfSpeech.closed = true
+		if endOfSpeech.stopCh != nil {
+			close(endOfSpeech.stopCh)
+		}
 		if endOfSpeech.cancelPrediction != nil {
 			endOfSpeech.cancelPrediction()
 			endOfSpeech.cancelPrediction = nil
@@ -902,7 +962,11 @@ func (endOfSpeech *pipecatEndOfSpeech) Close(ctx context.Context) error {
 		endOfSpeech.state.segment.Revision++
 		eosStartedAt := endOfSpeech.eosStartedAt
 		endOfSpeech.eosStartedAt = time.Time{}
+		predictionDone := endOfSpeech.predictionDone
 		endOfSpeech.mu.Unlock()
+		if predictionDone != nil {
+			<-predictionDone
+		}
 
 		if endOfSpeech.onPacket != nil {
 			if !eosStartedAt.IsZero() {
@@ -924,9 +988,6 @@ func (endOfSpeech *pipecatEndOfSpeech) Close(ctx context.Context) error {
 					OccurredAt: time.Now(),
 				},
 			})
-		}
-		if endOfSpeech.stopCh != nil {
-			close(endOfSpeech.stopCh)
 		}
 		endOfSpeech.predictorMu.Lock()
 		if predictor, ok := endOfSpeech.predictor.(interface{ Destroy() }); ok {

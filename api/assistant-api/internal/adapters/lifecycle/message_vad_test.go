@@ -215,7 +215,7 @@ func TestMessageLifecycle_ObserveInterruptionLegacyTurnInvalidatesAdaptivePause(
 	if pause == nil {
 		t.Fatal("adaptive interruption did not pause")
 	}
-	turn, _, _ := l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "ctx", Script: "stop", Interim: true}, true)
+	turn, _ := l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "ctx", Script: "stop", Interim: true}, true)
 	if turn == nil || !l.beginInterruptedTurn(*turn) {
 		t.Fatal("adaptive interruption did not reserve flush")
 	}

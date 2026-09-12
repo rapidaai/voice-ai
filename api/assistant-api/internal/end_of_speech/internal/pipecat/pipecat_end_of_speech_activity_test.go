@@ -206,7 +206,6 @@ func TestEOS_TranscriptActivityDoesNotExtendPredictionCancellation(t *testing.T)
 				at  time.Time
 				err error
 			}, 1)
-			predictionReturned := make(chan error, 1)
 			predictionDone := make(chan struct{})
 			endOfSpeech := newTestEOS(func(_ context.Context, packets ...internal_type.Packet) error {
 				for _, packet := range packets {
@@ -221,6 +220,7 @@ func TestEOS_TranscriptActivityDoesNotExtendPredictionCancellation(t *testing.T)
 			}))
 			endOfSpeech.turnStopTimeout = time.Second
 			endOfSpeech.predictor = testPredictor{predictContext: func(ctx context.Context, _ []float32) (float64, error) {
+				defer close(predictionDone)
 				deadline, _ := ctx.Deadline()
 				predictionStarted <- deadline
 				<-ctx.Done()
@@ -238,12 +238,9 @@ func TestEOS_TranscriptActivityDoesNotExtendPredictionCancellation(t *testing.T)
 			}))
 			require.NoError(t, endOfSpeech.Execute(ctx, audioInput(1600)))
 			require.NoError(t, endOfSpeech.Execute(ctx, sttInput("hello", true)))
-			go func() {
-				defer close(predictionDone)
-				predictionReturned <- endOfSpeech.Execute(ctx, internal_type.InterruptionDetectedPacket{
-					Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd,
-				})
-			}()
+			require.NoError(t, endOfSpeech.Execute(ctx, internal_type.InterruptionDetectedPacket{
+				Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd,
+			}))
 			t.Cleanup(func() {
 				select {
 				case <-predictionDone:
@@ -286,10 +283,9 @@ func TestEOS_TranscriptActivityDoesNotExtendPredictionCancellation(t *testing.T)
 				t.Fatal("prediction did not cancel at its original deadline")
 			}
 			select {
-			case err := <-predictionReturned:
-				require.ErrorIs(t, err, context.DeadlineExceeded)
+			case <-predictionDone:
 			case <-time.After(300 * time.Millisecond):
-				t.Fatal("prediction cancellation did not release Execute")
+				t.Fatal("canceled native prediction did not return")
 			}
 			select {
 			case result := <-completed:

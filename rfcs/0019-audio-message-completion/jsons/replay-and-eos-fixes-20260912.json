@@ -1,0 +1,70 @@
+{
+  "tier": "Standard",
+  "scope": "Fix review findings 1 and 2. Keep finding 3 unchanged.",
+  "allowed_paths": [
+    "api/assistant-api/internal/adapters/lifecycle/",
+    "api/assistant-api/internal/adapters/internal/*test.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+    "api/assistant-api/internal/type/packet.go",
+    "api/assistant-api/internal/type/packet_test.go",
+    "api/assistant-api/internal/end_of_speech/internal/pipecat/",
+    "rfcs/0019-audio-message-completion/jsons/replay-and-eos-fixes-20260912.json"
+  ],
+  "acceptance_criteria": [
+    "Input arriving during interruption replay stays behind held input until replay drains.",
+    "Buffered input goes directly to accepted-input handling without replay metadata or repeated admission.",
+    "Admission fixes the destination context under the lifecycle lock; later prompt replacement cannot relabel admitted input.",
+    "Cancellation or a replacement turn prevents remaining stale replay.",
+    "Unclear-input expiry waits for replay and is cancelled by a usable final transcript.",
+    "A valid playback receipt cannot expire while message completion waits for replay.",
+    "VAD-end inference does not block queued STT-end or resumed VAD-start.",
+    "EOS audio, transcript and VAD state updates remain ordered; stale inference cannot complete a newer turn.",
+    "Prediction cancellation and shutdown retain resource ownership."
+  ],
+  "risks": [
+    "Reentrant replay can deadlock or buffer itself if admission and dispatch are not separated.",
+    "Asynchronous inference can race resumed speech or provider shutdown.",
+    "Existing timer and audio-before-transcript behavior must remain unchanged."
+  ],
+  "cleanup": [
+    "Turn update and replay draining use linear control flow without a deferred callback.",
+    "Input admission and accepted-input delivery are separate. Packets carry no replay marker.",
+    "Transcript and user-input transitions remain lifecycle-owned and run after admission.",
+    "Admission returns the admitted transcript packet rather than a boolean; downstream delivery uses its captured context.",
+    "Unclear-input expiry uses the existing held-packet queue, without separate pending state.",
+    "Audio snapshot logic stays inline at VAD-end; tests observe asynchronous inference behavior."
+  ],
+  "verification_commands": [
+    "go test -race -count=1 -timeout=180s -p 2 ./api/assistant-api/internal/adapters/... ./api/assistant-api/internal/end_of_speech/... ./api/assistant-api/internal/type/...",
+    "go test -p 1 -run '^$' ./api/assistant-api/...",
+    "CI=true just agent-finalize \"$(git diff --name-only -- api/assistant-api/internal/adapters api/assistant-api/internal/end_of_speech/internal/pipecat api/assistant-api/internal/type | paste -sd, -)\"",
+    "go test -race -count=20 -timeout=120s ./api/assistant-api/internal/adapters/lifecycle ./api/assistant-api/internal/adapters/internal -run 'TestMessageInterruption_(HoldsLiveInputUntilReplayDrains|CancelDuringReplayDropsRemainingInput)|TestInterruptionHoldsTranscriptsUntilReplayCompletion'",
+    "go test -race -count=20 -timeout=120s ./api/assistant-api/internal/adapters/internal -run 'TestInterruption(HoldsTranscriptsUntilReplayCompletion|ReplayRespectsInputPolicy|AdmittedSpeechKeepsItsContext)$'",
+    "go test -run '^$' -bench '^BenchmarkExecute_VADEndWhilePredictionBlocked$' -benchmem -count=3 -timeout=180s ./api/assistant-api/internal/end_of_speech/internal/pipecat"
+  ],
+  "admission_refactor": {
+    "status": "completed",
+    "non_goals": "No changes to EOS inference, transport controls, public protobufs, or finding 3.",
+    "risks": [
+      "Buffered input must not re-enter admission or lose context validation.",
+      "Moving timer updates after admission must preserve filler, final-transcript, and unclear-input behavior.",
+      "User input without a context must retain the active context when buffered."
+    ]
+  },
+  "verification": {
+    "status": "passed after admission refactor",
+    "combined_race_log": "/tmp/admitted-input-final-race.log",
+    "assistant_compile_log": "/tmp/admitted-input-final-compile.log",
+    "required_validation_log": "/tmp/admitted-input-final-validation.log",
+    "replay_stress_log": "/tmp/admitted-input-context-stress.log",
+    "review_correction_log": "/tmp/replay-cleanup-corrections.log",
+    "eos_worker_checks": "Provider race suite, 20 focused race repetitions, and blocked-inference benchmark passed.",
+    "limitations": "No live provider or carrier call was exercised. Existing native-linker warnings were nonfatal."
+  },
+  "independent_review": {
+    "replay": "Approved after fixing the admitted-packet context race. No unresolved major findings. Current, previous, and blank context regression cases passed 20 times under the race detector.",
+    "eos": "No findings in the cleaned production and test diff.",
+    "eos_production_blob": "48448e5c672cf0e3e2a6d64711b46e03f47c76fa"
+  },
+  "publication": "Included with the implementation commit on rfc/interruption-lifecycle. Unrelated worktree changes excluded."
+}

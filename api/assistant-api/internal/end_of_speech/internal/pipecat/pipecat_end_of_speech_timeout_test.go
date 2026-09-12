@@ -31,6 +31,7 @@ func TestEOS_IncompleteTurnCompletesWithoutMoreAudio(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			completed := make(chan internal_type.EndOfSpeechPacket, 4)
 			fallbackLogs := make(chan internal_type.ObservabilityLogRecordPacket, 4)
+			predictionErrors := make(chan internal_type.ObservabilityLogRecordPacket, 1)
 			endOfSpeech := newTestEOSWithPredictor(func(ctx context.Context, packets ...internal_type.Packet) error {
 				for _, packet := range packets {
 					if packet, ok := packet.(internal_type.EndOfSpeechPacket); ok {
@@ -38,6 +39,10 @@ func TestEOS_IncompleteTurnCompletesWithoutMoreAudio(t *testing.T) {
 					}
 					if packet, ok := packet.(internal_type.ObservabilityLogRecordPacket); ok && packet.Record.Level == observability.LevelInfo {
 						fallbackLogs <- packet
+					}
+					if packet, ok := packet.(internal_type.ObservabilityLogRecordPacket); ok && packet.Record.Level == observability.LevelError {
+						assert.NoError(t, ctx.Err(), "inference cancellation must not cancel the error callback context")
+						predictionErrors <- packet
 					}
 				}
 				return nil
@@ -56,9 +61,17 @@ func TestEOS_IncompleteTurnCompletesWithoutMoreAudio(t *testing.T) {
 			require.NoError(t, endOfSpeech.Execute(t.Context(), audioInput(testCase.audioSamples)))
 			require.NoError(t, endOfSpeech.Execute(t.Context(), sttInput("committed transcript", true)))
 			stoppedAt := time.Now()
-			require.ErrorIs(t, endOfSpeech.Execute(t.Context(), internal_type.InterruptionDetectedPacket{
+			require.NoError(t, endOfSpeech.Execute(t.Context(), internal_type.InterruptionDetectedPacket{
 				Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd,
-			}), testCase.predictionErr)
+			}))
+			if testCase.predictionErr != nil {
+				select {
+				case packet := <-predictionErrors:
+					assert.Contains(t, packet.Record.Message, testCase.predictionErr.Error())
+				case <-time.After(time.Second):
+					t.Fatal("asynchronous inference failure was not reported")
+				}
+			}
 
 			select {
 			case packet := <-completed:

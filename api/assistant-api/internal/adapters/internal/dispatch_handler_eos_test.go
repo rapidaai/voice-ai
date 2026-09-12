@@ -22,6 +22,7 @@ type recordingEOSExecutor struct {
 	lastCloseCtx context.Context
 	executeErr   error
 	closeErr     error
+	onExecute    func(context.Context, internal_type.Packet) error
 }
 
 func (e *recordingEOSExecutor) Name() string {
@@ -36,10 +37,13 @@ func (e *recordingEOSExecutor) Arguments() (map[string]string, error) {
 	return nil, nil
 }
 
-func (e *recordingEOSExecutor) Execute(_ context.Context, packet internal_type.Packet) error {
+func (e *recordingEOSExecutor) Execute(ctx context.Context, packet internal_type.Packet) error {
 	e.mu.Lock()
 	e.executed = append(e.executed, packet)
 	e.mu.Unlock()
+	if e.onExecute != nil {
+		return e.onExecute(ctx, packet)
+	}
 	return e.executeErr
 }
 

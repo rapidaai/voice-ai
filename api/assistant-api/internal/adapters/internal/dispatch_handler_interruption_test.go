@@ -525,7 +525,7 @@ func TestHandleUserText_TextModeDoesNotRotateWhenUserTurnActive(t *testing.T) {
 		adapter_lifecycle.WithDispatch(requestorDispatchHandler{r: r}.HandleMessageLifecyclePacket),
 	)
 	r.messageLifecycle = lifecycle
-	_, err := lifecycle.OnTranscriptReceived("ctx-listening", "same turn text")
+	_, err := lifecycle.OnTranscriptReceived(internal_type.SpeechToTextPacket{ContextID: "ctx-listening", Script: "same turn text"})
 	require.NoError(t, err)
 
 	h := requestorDispatchHandler{r: r}
@@ -1287,7 +1287,7 @@ func TestHandleUnclearInputExpired_InjectsConfiguredMessage(t *testing.T) {
 	h := requestorDispatchHandler{r: r}
 	turn, err := r.messageLifecycle.OnUserTurnStarted(r.GetID(), "test", "text", "unclear input")
 	require.NoError(t, err)
-	contextID, err := r.messageLifecycle.OnTranscriptReceived(turn.ContextID, "unclear input")
+	contextID, err := r.messageLifecycle.OnTranscriptReceived(internal_type.SpeechToTextPacket{ContextID: turn.ContextID, Script: "unclear input", Interim: true})
 	require.NoError(t, err)
 
 	h.HandleUnclearInputExpired(context.Background(), internal_type.UnclearInputExpiredPacket{ContextID: contextID})
@@ -1806,7 +1806,7 @@ func TestHandleUnclearInputExpired_AudioModeBlocksInputUntilTextToSpeechEnd(t *t
 	h := requestorDispatchHandler{r: r}
 	turn, err := r.messageLifecycle.OnUserTurnStarted(r.GetID(), "test", "text", "unclear input")
 	require.NoError(t, err)
-	contextID, err := r.messageLifecycle.OnTranscriptReceived(turn.ContextID, "unclear input")
+	contextID, err := r.messageLifecycle.OnTranscriptReceived(internal_type.SpeechToTextPacket{ContextID: turn.ContextID, Script: "unclear input", Interim: true})
 	require.NoError(t, err)
 
 	h.HandleUnclearInputExpired(context.Background(), internal_type.UnclearInputExpiredPacket{ContextID: contextID})

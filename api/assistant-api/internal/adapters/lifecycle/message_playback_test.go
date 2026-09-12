@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"testing/synctest"
@@ -14,6 +15,71 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )
+
+func TestMessagePlaybackReceiptDoesNotExpireDuringReplay(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		received, release := make(chan struct{}), make(chan struct{})
+		defer close(release)
+		finished := make(chan error, 1)
+		timeouts := make(chan internal_type.TextToSpeechErrorPacket, 2)
+		idle := make(chan internal_type.StartIdleTimeoutPacket, 2)
+		var message MessageLifecycle
+		message = NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true),
+			WithSend(func(proto.Message) error { return nil }),
+			WithOnPacket(func(packets ...internal_type.Packet) error {
+				for _, packet := range packets {
+					switch packet := packet.(type) {
+					case internal_type.TextToSpeechErrorPacket:
+						timeouts <- packet
+					case internal_type.StartIdleTimeoutPacket:
+						idle <- packet
+					}
+				}
+				return nil
+			}),
+			WithDispatch(func(_ context.Context, packet internal_type.Packet) {
+				switch packet := packet.(type) {
+				case internal_type.SpeechToTextPacket:
+					contextID, err := message.OnTranscriptReceived(packet)
+					assert.NoError(t, err)
+					assert.Equal(t, packet.ContextID, contextID)
+				case internal_type.UserInputPacket:
+					input, _ := message.OnUserInput(packet)
+					assert.NotEmpty(t, input.ContextID)
+					assert.NoError(t, message.OnGenerationStarted(input.ContextID))
+					message.OnGenerationCompleted(internal_type.LLMResponseDonePacket{ContextID: input.ContextID, Text: "answer"})
+					assert.NoError(t, message.SendAssistantMessage(&protos.ConversationAssistantMessage{
+						Id: input.ContextID, Completed: true, Message: &protos.ConversationAssistantMessage_Text{Text: "answer"},
+					}))
+					assert.NoError(t, message.SendAssistantMessage(&protos.ConversationAssistantMessage{
+						Id: input.ContextID, Completed: true, Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}},
+					}))
+					assert.NoError(t, message.OnPlaybackCompleted(input.ContextID))
+					close(received)
+					<-release
+				}
+			}))
+		defer func() { message.Close(message.ContextID()) }()
+		require.NoError(t, message.OnGenerationStarted("assistant"))
+		message.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
+			ContextID: "assistant", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
+		}, "")
+		turn, _ := message.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "wait"}, true)
+		require.NotNil(t, turn)
+		require.True(t, message.HoldInput(internal_type.UserInputPacket{ContextID: "assistant", Text: "wait"}))
+		go func() { finished <- message.OnTurnChange(t.Context(), *turn) }()
+		<-received
+		time.Sleep(6 * time.Second)
+		synctest.Wait()
+		assert.Empty(t, timeouts)
+		assert.Empty(t, idle, "completion must wait until replay releases input")
+		release <- struct{}{}
+		require.NoError(t, <-finished)
+		require.Len(t, idle, 1)
+		assert.Equal(t, message.ContextID(), (<-idle).ContextID)
+		assert.True(t, message.CanStartIdleTimeout(message.ContextID()))
+	})
+}
 
 func TestMessagePlaybackCompletesAfterFinalDelivery(t *testing.T) {
 	for _, scenario := range []struct {
@@ -199,9 +265,10 @@ func TestMessagePlaybackNextSpeechGetsFreshMessageID(t *testing.T) {
 				require.Equal(t, l.ContextID(), decision.EndOfSpeech.ContextID)
 				require.Len(t, decision.Packets, 3)
 			} else {
-				turn, admitted, _ := l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "completed", Script: "next question"}, true)
-				require.True(t, admitted)
+				turn, admitted := l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "completed", Script: "next question"}, true)
+				require.NotEmpty(t, admitted.ContextID)
 				require.NotNil(t, turn)
+				assert.Equal(t, turn.ContextID, admitted.ContextID)
 				require.False(t, turn.InterruptionDecision)
 			}
 			require.NotEqual(t, "completed", l.ContextID())

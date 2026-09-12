@@ -50,3 +50,5 @@ const InterruptionDecisionWindow = 500 * time.Millisecond
 
 // InterruptionEnabledByDefault preserves the staged interruption rollout.
 const InterruptionEnabledByDefault = false
+
+var interruptionFillerWords = [...]string{"uh", "um", "hmm", "mm", "mhm", "ah", "oh"}

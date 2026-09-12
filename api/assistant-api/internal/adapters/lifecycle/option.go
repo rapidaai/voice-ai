@@ -37,7 +37,8 @@ func WithSend(send func(proto.Message) error) MessageOption {
 	return func(message *messageLifecycle) { message.sendOutput = send }
 }
 
-// WithDispatch supplies synchronous routing for turn updates and held input.
+// WithDispatch delivers turn updates and admitted input synchronously.
+// Input callbacks must continue downstream without repeating admission.
 func WithDispatch(dispatch func(context.Context, internal_type.Packet)) MessageOption {
 	return func(message *messageLifecycle) { message.dispatchPacket = dispatch }
 }

@@ -200,7 +200,7 @@ func (h requestorDispatchHandler) HandleSpeechToText(ctx context.Context, p inte
 		}
 	}
 	if adaptiveVADInterruption {
-		turnChange, accepted, _ := h.r.messageLifecycle.OnUserSpeech(p, adaptiveVADInterruption)
+		turnChange, admittedSpeech := h.r.messageLifecycle.OnUserSpeech(p, adaptiveVADInterruption)
 		if turnChange != nil {
 			if turnChange.InterruptionDecision {
 				utils.Go(ctx, func() { h.r.dispatch(ctx, *turnChange) })
@@ -209,17 +209,19 @@ func (h requestorDispatchHandler) HandleSpeechToText(ctx context.Context, p inte
 				h.HandleTurnChange(ctx, *turnChange)
 			}
 		}
-		if !accepted {
+		if admittedSpeech.ContextID == "" {
 			return
 		}
+		p = admittedSpeech
 	}
 	if !validator.NotBlank(p.Script) && !p.Interim {
 		return
 	}
 
 	incomingContextID := p.ContextID
-	currentContextID := h.r.GetID()
-	p.ContextID = currentContextID
+	if !adaptiveVADInterruption {
+		p.ContextID = h.r.GetID()
+	}
 	if validator.NotBlank(p.Script) && !adaptiveVADInterruption {
 		bargeInTrigger := internal_options.BargeInTriggerVAD
 		if opts := h.r.GetOptions(); len(opts) > 0 {
@@ -307,27 +309,7 @@ func (h requestorDispatchHandler) HandleSpeechToText(ctx context.Context, p inte
 			p.ContextID = newContextID
 		}
 	}
-	if validator.NotBlank(p.Script) {
-		var err error
-		p.ContextID, err = h.r.messageLifecycle.OnTranscriptReceived(p.ContextID, p.Script)
-		if err != nil {
-			return
-		}
-	}
-
-	if h.r.endOfSpeechExecutor != nil {
-		_ = h.r.endOfSpeechExecutor.Execute(ctx, p)
-		return
-	}
-	// just a fallback to trigger the end of speech event in case endOfSpeechExecutor is not configured.
-	if !p.Interim {
-		h.r.OnPacket(ctx, internal_type.EndOfSpeechPacket{
-			ContextID: p.ContextID,
-			Speech:    p.Script,
-			Speechs:   []internal_type.SpeechToTextPacket{p},
-		})
-	}
-
+	h.HandleAdmittedInput(ctx, p)
 }
 func (h requestorDispatchHandler) HandleInterimEndOfSpeech(ctx context.Context, p internal_type.InterimEndOfSpeechPacket) {
 	h.r.Notify(ctx, &protos.ConversationUserMessage{
@@ -341,46 +323,13 @@ func (h requestorDispatchHandler) HandleEndOfSpeech(ctx context.Context, p inter
 	if h.r.messageLifecycle.HoldInput(p) {
 		return
 	}
-	if p.ContextID != h.r.GetID() {
-		return
-	}
-	if validator.NotBlank(p.Speech) {
-		if err := h.r.messageLifecycle.OnUserSpeechCompleted(p); err != nil {
-			return
-		}
-	}
-	if err := h.callInputNormalizer(ctx, p); err != nil {
-		h.r.OnPacket(ctx, internal_type.UserInputPacket{
-			ContextID: p.ContextID,
-			Text:      p.Speech,
-		})
-	}
+	h.HandleAdmittedInput(ctx, p)
 }
 func (h requestorDispatchHandler) HandleUserInput(ctx context.Context, p internal_type.UserInputPacket) {
-	var packets []internal_type.Packet
-	p, packets = h.r.messageLifecycle.OnUserInput(p)
-	if p.ContextID == "" {
+	if h.r.messageLifecycle.HoldInput(p) {
 		return
 	}
-	h.r.OnPacket(ctx, packets...)
-	contextID := p.ContextID
-
-	if h.r.assistantExecutor != nil {
-		h.r.messageLifecycle.OnGenerationStarted(contextID)
-		utils.Go(ctx, func() {
-			if err := h.r.assistantExecutor.Execute(ctx, h.r, p); err != nil {
-				h.r.OnPacket(ctx, internal_type.LLMErrorPacket{ContextID: contextID, Error: err})
-			}
-		})
-	}
-	if err := h.r.Notify(ctx, &protos.ConversationUserMessage{
-		Id:        contextID,
-		Message:   &protos.ConversationUserMessage_Text{Text: p.Text},
-		Completed: true,
-		Time:      timestamppb.New(time.Now()),
-	}); err != nil {
-		return
-	}
+	h.HandleAdmittedInput(ctx, p)
 }
 func (h requestorDispatchHandler) HandleInterruptionDecisionExpired(ctx context.Context, p internal_type.InterruptionDecisionExpiredPacket) {
 	continueContextID := h.r.messageLifecycle.OnInterruptionExpired(p)
@@ -544,8 +493,58 @@ func (h requestorDispatchHandler) HandleTurnChange(ctx context.Context, p intern
 	}
 }
 
+// HandleAdmittedInput delivers input that has already passed lifecycle admission.
+func (h requestorDispatchHandler) HandleAdmittedInput(ctx context.Context, packet internal_type.Packet) {
+	switch p := packet.(type) {
+	case internal_type.SpeechToTextPacket:
+		if _, err := h.r.messageLifecycle.OnTranscriptReceived(p); err != nil {
+			return
+		}
+		if h.r.endOfSpeechExecutor != nil {
+			_ = h.r.endOfSpeechExecutor.Execute(ctx, p)
+		} else if !p.Interim && validator.NotBlank(p.Script) {
+			h.r.OnPacket(ctx, internal_type.EndOfSpeechPacket{
+				ContextID: p.ContextID, Speech: p.Script, Speechs: []internal_type.SpeechToTextPacket{p},
+			})
+		}
+	case internal_type.EndOfSpeechPacket:
+		if p.ContextID != h.r.GetID() {
+			return
+		}
+		if validator.NotBlank(p.Speech) {
+			if err := h.r.messageLifecycle.OnUserSpeechCompleted(p); err != nil {
+				return
+			}
+		}
+		if err := h.callInputNormalizer(ctx, p); err != nil {
+			h.r.OnPacket(ctx, internal_type.UserInputPacket{ContextID: p.ContextID, Text: p.Speech})
+		}
+	case internal_type.UserInputPacket:
+		var packets []internal_type.Packet
+		p, packets = h.r.messageLifecycle.OnUserInput(p)
+		if p.ContextID == "" {
+			return
+		}
+		h.r.OnPacket(ctx, packets...)
+		if h.r.assistantExecutor != nil {
+			h.r.messageLifecycle.OnGenerationStarted(p.ContextID)
+			utils.Go(ctx, func() {
+				if err := h.r.assistantExecutor.Execute(ctx, h.r, p); err != nil {
+					h.r.OnPacket(ctx, internal_type.LLMErrorPacket{ContextID: p.ContextID, Error: err})
+				}
+			})
+		}
+		h.r.Notify(ctx, &protos.ConversationUserMessage{
+			Id: p.ContextID, Message: &protos.ConversationUserMessage_Text{Text: p.Text},
+			Completed: true, Time: timestamppb.New(time.Now()),
+		})
+	}
+}
+
 func (h requestorDispatchHandler) HandleMessageLifecyclePacket(ctx context.Context, packet internal_type.Packet) {
 	switch p := packet.(type) {
+	case internal_type.SpeechToTextPacket, internal_type.EndOfSpeechPacket, internal_type.UserInputPacket:
+		h.r.dispatchRoute.Route(ctx, packet, h.HandleAdmittedInput)
 	case internal_type.TurnChangePacket:
 		if h.r.speechToTextTransformer != nil {
 			if err := h.r.speechToTextTransformer.Transform(ctx, p); err != nil {

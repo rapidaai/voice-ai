@@ -83,6 +83,23 @@ func TestSpeechToTextPacket_GetConcat(t *testing.T) {
 	}
 }
 
+func TestInputPacketsRetainSynchronousRouting(t *testing.T) {
+	for _, packet := range []Packet{
+		SpeechToTextPacket{ContextID: "current"},
+		EndOfSpeechPacket{ContextID: "current"},
+		UserInputPacket{ContextID: "current"},
+	} {
+		t.Run(string(packet.PacketName()), func(t *testing.T) {
+			if packet.ContextId() != "current" {
+				t.Fatalf("input lost its turn context: %+v", packet)
+			}
+			if _, async := packet.(AsyncPacket); async {
+				t.Fatal("replayed input must finish before the lifecycle releases later input")
+			}
+		})
+	}
+}
+
 func TestObservabilityMetricRecordPacket_IsAsync(t *testing.T) {
 	var packet any = ObservabilityMetricRecordPacket{}
 	asyncPacket, ok := packet.(AsyncPacket)

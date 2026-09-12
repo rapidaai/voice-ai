@@ -259,6 +259,33 @@ func BenchmarkExecute_STTInput(b *testing.B) {
 	}
 }
 
+func BenchmarkExecute_VADEndWhilePredictionBlocked(b *testing.B) {
+	predictionStarted := make(chan struct{}, 1)
+	releasePrediction := make(chan struct{})
+	endOfSpeech := newTestEOSWithPredictor(func(context.Context, ...internal_type.Packet) error { return nil }, nil,
+		func([]float32) (float64, error) {
+			select {
+			case predictionStarted <- struct{}{}:
+			default:
+			}
+			<-releasePrediction
+			return 0.1, nil
+		})
+	defer closeTestEndOfSpeech(endOfSpeech)
+	defer close(releasePrediction)
+	start := internal_type.InterruptionDetectedPacket{Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart}
+	stop := internal_type.InterruptionDetectedPacket{Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd}
+	_ = endOfSpeech.Execute(b.Context(), start)
+	_ = endOfSpeech.Execute(b.Context(), audioInput(1600))
+	_ = endOfSpeech.Execute(b.Context(), stop)
+	<-predictionStarted
+	b.ReportAllocs()
+	for b.Loop() {
+		_ = endOfSpeech.Execute(b.Context(), start)
+		_ = endOfSpeech.Execute(b.Context(), stop)
+	}
+}
+
 func BenchmarkIncompleteTurnTimer(b *testing.B) {
 	for _, benchmarkCase := range []struct {
 		name      string

@@ -34,7 +34,7 @@ type MessageLifecycle interface {
 	StopUnclearInput()
 
 	OnUserTurnStarted(contextID, trigger, source, text string) (internal_type.TurnChangePacket, error)
-	OnTranscriptReceived(contextID, text string) (string, error)
+	OnTranscriptReceived(packet internal_type.SpeechToTextPacket) (string, error)
 	OnUserInput(packet internal_type.UserInputPacket) (internal_type.UserInputPacket, []internal_type.Packet)
 	OnUserSpeechCompleted(packet internal_type.EndOfSpeechPacket) error
 	OnPrompt(packet internal_type.Packet) (internal_type.TurnChangePacket, internal_type.InjectMessagePacket, error)
@@ -51,7 +51,7 @@ type MessageLifecycle interface {
 
 	InterruptionEnabled() bool
 	CancelInterruption() string
-	OnUserSpeech(packet internal_type.SpeechToTextPacket, adaptive bool) (*internal_type.TurnChangePacket, bool, bool)
+	OnUserSpeech(packet internal_type.SpeechToTextPacket, adaptive bool) (*internal_type.TurnChangePacket, internal_type.SpeechToTextPacket)
 	HoldInput(packet internal_type.Packet) bool
 	OnInterruptionDetected(packet internal_type.InterruptionDetectedPacket, bargeInTrigger string) InterruptionDecision
 	OnPlaybackPaused(packet internal_type.InterruptionDecisionExpiredPacket, pauseError error) *internal_type.TurnChangePacket
@@ -151,6 +151,10 @@ func (l *messageLifecycle) OnPlaybackCompleted(contextID string) error {
 		return ErrDuplicatePlaybackCompletion
 	}
 	l.output.receiptReceived = true
+	if l.output.receiptTimer != nil {
+		l.output.receiptTimer.Stop()
+		l.output.receiptTimer = nil
+	}
 	l.mu.Unlock()
 	_ = l.completeAssistantMessage(contextID)
 	return nil

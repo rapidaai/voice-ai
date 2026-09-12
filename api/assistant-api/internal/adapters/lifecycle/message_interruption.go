@@ -118,23 +118,21 @@ func (l *messageLifecycle) CancelInterruption() string {
 	return continueContextID
 }
 
-// OnUserSpeech admits input or retains it until the interrupted turn is committed.
-func (l *messageLifecycle) OnUserSpeech(p internal_type.SpeechToTextPacket, adaptive bool) (*internal_type.TurnChangePacket, bool, bool) {
+// OnUserSpeech admits input or retains it until the interrupted turn finishes draining.
+// Admitted speech carries the destination context captured under the lifecycle lock.
+func (l *messageLifecycle) OnUserSpeech(p internal_type.SpeechToTextPacket, adaptive bool) (*internal_type.TurnChangePacket, internal_type.SpeechToTextPacket) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if !l.interruptionEnabled || !adaptive {
-		return nil, true, false
+		p.ContextID = l.contextID
+		return nil, p
 	}
 	isMeaningful := false
 	for _, token := range strings.FieldsFunc(p.Script, func(character rune) bool {
 		return unicode.IsSpace(character) || unicode.IsPunct(character)
 	}) {
-		switch strings.ToLower(token) {
-		case "", "uh", "um", "hmm", "mm", "mhm", "ah", "oh":
-		default:
+		if !slices.Contains(interruptionFillerWords[:], strings.ToLower(token)) {
 			isMeaningful = true
-		}
-		if isMeaningful {
 			break
 		}
 	}
@@ -146,12 +144,13 @@ func (l *messageLifecycle) OnUserSpeech(p internal_type.SpeechToTextPacket, adap
 		l.interruptionResumed = false
 		l.interruptionHeldPackets = nil
 		turn.ContextID = l.contextID
-		return turn, true, false
+		p.ContextID = l.contextID
+		return turn, p
 	}
 	if l.interruptionResumed {
 		// Resuming playback does not discard a delayed transcript from the same message.
 		if p.ContextID != l.contextID || !isMeaningful {
-			return nil, false, false
+			return nil, internal_type.SpeechToTextPacket{}
 		}
 		l.interruptionResumed = false
 		switch l.state {
@@ -165,7 +164,7 @@ func (l *messageLifecycle) OnUserSpeech(p internal_type.SpeechToTextPacket, adap
 	}
 	if l.interruptionContextID != "" {
 		if p.ContextID != "" && p.ContextID != l.interruptionContextID && p.ContextID != l.contextID {
-			return nil, false, false
+			return nil, internal_type.SpeechToTextPacket{}
 		}
 		if isMeaningful || (l.interruptionDecisionPending && !p.Interim && strings.TrimSpace(p.Script) != "") {
 			l.interruptionHeldPackets = append(l.interruptionHeldPackets, p)
@@ -180,28 +179,16 @@ func (l *messageLifecycle) OnUserSpeech(p internal_type.SpeechToTextPacket, adap
 					PreviousContextID: l.interruptionContextID, PreviousState: string(l.interruptionPreviousState),
 					Reason: "interrupted", Source: string(internal_type.InterruptionSourceVad),
 					Trigger: string(internal_type.PacketNameInterruptionDetected), Text: p.Script, Time: time.Now(),
-				}, false, false
+				}, internal_type.SpeechToTextPacket{}
 			}
 		}
-		return nil, false, false
+		return nil, internal_type.SpeechToTextPacket{}
 	}
 	if p.ContextID != "" && p.ContextID != l.contextID && p.ContextID != l.previousInterruptionContextID {
-		return nil, false, false
+		return nil, internal_type.SpeechToTextPacket{}
 	}
-	startUnclear := p.Interim && isMeaningful && l.committedInterruptionContextID == l.contextID
-	if startUnclear && l.unclearInputWatchdog != nil {
-		if !l.unclearInputWatchdog.Extend(l.contextID, l.unclearInputTimeout) {
-			l.unclearInputWatchdog.Start(l.contextID, l.unclearInputTimeout)
-		}
-	}
-	if !p.Interim && strings.TrimSpace(p.Script) != "" {
-		l.committedInterruptionContextID = ""
-		l.previousInterruptionContextID = ""
-		if l.unclearInputWatchdog != nil {
-			l.unclearInputWatchdog.Stop()
-		}
-	}
-	return nil, true, startUnclear
+	p.ContextID = l.contextID
+	return nil, p
 }
 
 func (l *messageLifecycle) HoldInput(packet internal_type.Packet) bool {
@@ -218,14 +205,15 @@ func (l *messageLifecycle) HoldInput(packet internal_type.Packet) bool {
 		for _, token := range strings.FieldsFunc(p.Speech, func(character rune) bool {
 			return unicode.IsSpace(character) || unicode.IsPunct(character)
 		}) {
-			switch strings.ToLower(token) {
-			case "", "uh", "um", "hmm", "mm", "mhm", "ah", "oh":
-			default:
+			if !slices.Contains(interruptionFillerWords[:], strings.ToLower(token)) {
 				l.interruptionHeldPackets = append(l.interruptionHeldPackets, p)
 				return true
 			}
 		}
 	case internal_type.UserInputPacket:
+		if p.ContextID == "" {
+			p.ContextID = l.contextID
+		}
 		if p.ContextID == l.interruptionContextID || p.ContextID == l.contextID {
 			l.interruptionHeldPackets = append(l.interruptionHeldPackets, p)
 		}
@@ -400,11 +388,6 @@ func (l *messageLifecycle) OnTurnChange(ctx context.Context, packet internal_typ
 		l.dispatchPacket(ctx, internal_type.TextToSpeechInterruptPacket{ContextID: packet.PreviousContextID})
 		l.dispatchPacket(ctx, internal_type.LLMInterruptPacket{ContextID: packet.PreviousContextID})
 		l.dispatchPacket(ctx, internal_type.StopIdleTimeoutPacket{ContextID: packet.PreviousContextID})
-		defer func() {
-			for _, heldPacket := range l.finishInterruptedTurn(packet) {
-				l.dispatchPacket(ctx, heldPacket)
-			}
-		}()
 	}
 	if packet.ContextID == "" {
 		packet.ContextID = l.ContextID()
@@ -413,7 +396,25 @@ func (l *messageLifecycle) OnTurnChange(ctx context.Context, packet internal_typ
 		packet.Time = time.Now()
 	}
 	l.dispatchPacket(ctx, packet)
-	return flushError
+	if !packet.InterruptionDecision {
+		return flushError
+	}
+	for {
+		heldPackets := l.finishInterruptedTurn(packet)
+		if len(heldPackets) == 0 {
+			_ = l.completeAssistantMessage(packet.ContextID)
+			return flushError
+		}
+		for _, heldPacket := range heldPackets {
+			l.mu.RLock()
+			isCurrent := l.interruptionSequence == packet.InterruptionSequence && l.contextID == packet.ContextID
+			l.mu.RUnlock()
+			if !isCurrent {
+				return flushError
+			}
+			l.dispatchPacket(ctx, heldPacket)
+		}
+	}
 }
 
 func (l *messageLifecycle) beginInterruptedTurn(p internal_type.TurnChangePacket) bool {
@@ -445,6 +446,8 @@ func (l *messageLifecycle) commitInterruptedTurn(p internal_type.TurnChangePacke
 		l.output.receiptTimer.Stop()
 	}
 	l.output = assistantOutputState{}
+	l.committedInterruptionContextID = p.ContextID
+	l.previousInterruptionContextID = p.PreviousContextID
 	return p, true
 }
 
@@ -455,18 +458,32 @@ func (l *messageLifecycle) finishInterruptedTurn(p internal_type.TurnChangePacke
 		return nil
 	}
 	heldPackets := l.interruptionHeldPackets
-	if l.interruptionSpeechActive {
-		l.pendingInterruptionVADEndContextID = p.PreviousContextID
-	}
-	l.committedInterruptionContextID = p.ContextID
-	l.previousInterruptionContextID = p.PreviousContextID
-	l.interruptionContextID = ""
-	l.interruptionPreviousState = ""
-	l.interruptionSpeechActive = false
-	l.interruptionResumed = false
-	l.interruptionDecisionPending = false
-	l.interruptionTurnCommitted = false
 	l.interruptionHeldPackets = nil
+	// Expiry waits behind buffered speech so a final transcript can still cancel the prompt.
+	inputPackets := heldPackets[:0]
+	for _, packet := range heldPackets {
+		if _, expired := packet.(internal_type.UnclearInputExpiredPacket); expired {
+			l.interruptionHeldPackets = append(l.interruptionHeldPackets, packet)
+			continue
+		}
+		inputPackets = append(inputPackets, packet)
+	}
+	heldPackets = inputPackets
+	// Live input joins the next batch until every replay callback has returned.
+	if len(heldPackets) == 0 {
+		heldPackets = l.interruptionHeldPackets
+		l.interruptionHeldPackets = nil
+		if l.interruptionSpeechActive {
+			l.pendingInterruptionVADEndContextID = p.PreviousContextID
+		}
+		l.interruptionContextID = ""
+		l.interruptionPreviousState = ""
+		l.interruptionSpeechActive = false
+		l.interruptionResumed = false
+		l.interruptionDecisionPending = false
+		l.interruptionTurnCommitted = false
+		return heldPackets
+	}
 	for index, packet := range heldPackets {
 		switch held := packet.(type) {
 		case internal_type.InterruptionDetectedPacket:

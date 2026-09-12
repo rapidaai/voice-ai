@@ -88,7 +88,7 @@ func TestMessageLifecycle_UserFlow(t *testing.T) {
 
 func TestMessageLifecycle_CompleteUserSpeechRejectsStaleAndEmptySpeech(t *testing.T) {
 	l := NewMessageLifecycle(WithContextID("ctx"), WithMode(type_enums.TextMode))
-	if _, err := l.OnTranscriptReceived("ctx", "hello"); err != nil {
+	if _, err := l.OnTranscriptReceived(internal_type.SpeechToTextPacket{ContextID: "ctx", Script: "hello"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := l.OnUserSpeechCompleted(internal_type.EndOfSpeechPacket{ContextID: "old", Speech: "hello"}); !errors.Is(err, ErrStaleContext) {
@@ -134,7 +134,7 @@ func TestMessageLifecycle_UnclearPromptRejectsDuplicate(t *testing.T) {
 	}))
 	require.NoError(t, l.Initialize(context.Background()))
 	t.Cleanup(l.StopUnclearInput)
-	if _, err := l.OnTranscriptReceived("ctx", "hello"); err != nil {
+	if _, err := l.OnTranscriptReceived(internal_type.SpeechToTextPacket{ContextID: "ctx", Script: "hello"}); err != nil {
 		t.Fatal(err)
 	}
 	turn, prompt, err := l.OnPrompt(internal_type.UnclearInputExpiredPacket{ContextID: "ctx"})

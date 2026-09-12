@@ -101,14 +101,14 @@ func (l *messageLifecycle) SendAssistantMessage(message *protos.ConversationAssi
 func (l *messageLifecycle) awaitPlayback(contextID string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if contextID != l.contextID || !l.output.terminalIssued || l.output.paused || l.output.failed || l.output.completed || l.output.receiptTimer != nil {
+	if contextID != l.contextID || !l.output.terminalIssued || l.output.receiptReceived || l.output.paused || l.output.failed || l.output.completed || l.output.receiptTimer != nil {
 		return
 	}
 	l.output.receiptDeadline = time.Now().Add(l.output.receiptRemaining)
 	deadline := l.output.receiptDeadline
 	l.output.receiptTimer = time.AfterFunc(l.output.receiptRemaining, func() {
 		l.mu.Lock()
-		if contextID != l.contextID || l.output.paused || l.output.completed || l.output.failed || !l.output.receiptDeadline.Equal(deadline) {
+		if contextID != l.contextID || l.output.receiptReceived || l.output.paused || l.output.completed || l.output.failed || !l.output.receiptDeadline.Equal(deadline) {
 			l.mu.Unlock()
 			return
 		}

@@ -158,7 +158,7 @@ func TestMessageOptionsMissingDispatcherKeepsPendingTurn(t *testing.T) {
 		ContextID: "message", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
 	}, "")
 	require.NotNil(t, decision.Pause)
-	turn, _, _ := message.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "message", Script: "stop"}, true)
+	turn, _ := message.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "message", Script: "stop"}, true)
 	require.NotNil(t, turn)
 	require.ErrorIs(t, message.OnTurnChange(context.Background(), *turn), ErrDispatcherNotConfigured)
 	assert.Equal(t, "message", message.ContextID())
