@@ -9,6 +9,7 @@ import (
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/channel"
 	"github.com/rapidaai/pkg/commons"
@@ -98,7 +99,7 @@ func newTestSIPStreamerWithCollector(t *testing.T) (*Streamer, *testSIPCollector
 func newTestInboundSIPSession(t *testing.T, callID string) *sip_runtime.Session {
 	t.Helper()
 	session, err := sip_runtime.NewSession(context.Background(),
-		sip_runtime.WithSessionConfig(&sip_runtime.Config{
+		sip_runtime.WithSessionConfig(&sip_config.Config{
 			Server:            "127.0.0.1",
 			Port:              5060,
 			RTPPortRangeStart: 10000,
@@ -114,7 +115,7 @@ func newTestInboundSIPSession(t *testing.T, callID string) *sip_runtime.Session 
 func newTestOutboundSIPSession(t *testing.T, callID string) *sip_runtime.Session {
 	t.Helper()
 	session, err := sip_runtime.NewSession(context.Background(),
-		sip_runtime.WithSessionConfig(&sip_runtime.Config{
+		sip_runtime.WithSessionConfig(&sip_config.Config{
 			Server:            "127.0.0.1",
 			Port:              5060,
 			RTPPortRangeStart: 10000,

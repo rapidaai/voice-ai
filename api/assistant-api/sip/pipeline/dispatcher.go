@@ -14,6 +14,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/config"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
@@ -189,7 +190,7 @@ func WithRapidaClient(client *rapida_client.RapidaClient) DispatcherOption {
 // It enables deterministic tests by allowing fake implementations.
 type TransferServer interface {
 	sip_runtime.LifecycleController
-	MakeTransferBridgeCall(ctx context.Context, cfg *sip_runtime.Config, toURI, fromURI string, opts sip_runtime.TransferBridgeCallOptions) (*sip_runtime.Session, error)
+	MakeTransferBridgeCall(ctx context.Context, cfg *sip_config.Config, toURI, fromURI string, opts sip_runtime.TransferBridgeCallOptions) (*sip_runtime.Session, error)
 	BridgeTransfer(ctx context.Context, inbound, outbound *sip_runtime.Session, onOperatorAudio func([]byte)) (sip_runtime.BridgeEndReason, error)
 }
 

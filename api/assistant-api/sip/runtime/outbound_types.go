@@ -11,6 +11,7 @@ import (
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 )
@@ -78,7 +79,7 @@ type OutboundConfig struct {
 	Mode                OutboundMode
 	Address             string
 	Port                int
-	Transport           Transport
+	Transport           sip_config.Transport
 	Domain              string
 	Auth                SIPAuthConfig
 	Headers             map[string]string

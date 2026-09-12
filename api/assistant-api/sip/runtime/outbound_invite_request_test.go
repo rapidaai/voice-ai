@@ -10,15 +10,16 @@ import (
 	"testing"
 	"time"
 
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func testOutboundConfig() *Config {
-	return &Config{
+func testOutboundConfig() *sip_config.Config {
+	return &sip_config.Config{
 		Server:            "trunk.example.com",
 		Port:              5060,
-		Transport:         TransportUDP,
+		Transport:         sip_config.TransportUDP,
 		RTPPortRangeStart: 10000,
 		RTPPortRangeEnd:   10100,
 		Username:          "auth-user",
@@ -44,7 +45,7 @@ func TestOutboundConfig_MapsLifecycleTimeouts(t *testing.T) {
 	cfg.MediaTimeoutInitial = 20 * time.Second
 	cfg.MediaTimeout = 10 * time.Second
 
-	outboundConfig := cfg.ToOutboundConfig()
+	outboundConfig := toOutboundConfig(cfg)
 
 	assert.Equal(t, 30*time.Second, outboundConfig.RingingTimeout)
 	assert.Equal(t, 45*time.Minute, outboundConfig.MaxCallDuration)
@@ -68,7 +69,7 @@ func TestOutboundInviteRequest_RequiresConfig(t *testing.T) {
 	err := (OutboundInviteRequest{}).Validate()
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, ErrInvalidConfig)
+	assert.ErrorIs(t, err, sip_config.ErrInvalidConfig)
 	assert.Contains(t, err.Error(), "outbound config is required")
 }
 

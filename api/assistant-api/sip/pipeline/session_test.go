@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/types"
@@ -78,10 +79,10 @@ func newIdentityTestAuthentication() *types.Authentication {
 func TestEnsureCallContextOutboundFallbackMapsPhoneValues(t *testing.T) {
 	auth := newIdentityTestAuthentication()
 	session, err := sip_runtime.NewSession(context.Background(),
-		sip_runtime.WithSessionConfig(&sip_runtime.Config{
+		sip_runtime.WithSessionConfig(&sip_config.Config{
 			Server:            "sip.example.com",
 			Port:              5060,
-			Transport:         sip_runtime.TransportUDP,
+			Transport:         sip_config.TransportUDP,
 			RTPPortRangeStart: 10000,
 			RTPPortRangeEnd:   10020,
 		}),
@@ -118,10 +119,10 @@ func TestEnsureCallContextOutboundFallbackMapsPhoneValues(t *testing.T) {
 func TestEnsureCallContextOutboundFallbackKeepsAliasPhonesEmpty(t *testing.T) {
 	auth := newIdentityTestAuthentication()
 	session, err := sip_runtime.NewSession(context.Background(),
-		sip_runtime.WithSessionConfig(&sip_runtime.Config{
+		sip_runtime.WithSessionConfig(&sip_config.Config{
 			Server:            "sip.example.com",
 			Port:              5060,
-			Transport:         sip_runtime.TransportUDP,
+			Transport:         sip_config.TransportUDP,
 			RTPPortRangeStart: 10000,
 			RTPPortRangeEnd:   10020,
 		}),
@@ -234,10 +235,10 @@ func TestEnsureCallContextOutboundLoadedContextClearsAliasPhones(t *testing.T) {
 func newOutboundContextTestSession(t *testing.T, auth *types.Authentication, contextID string) *sip_runtime.Session {
 	t.Helper()
 	session, err := sip_runtime.NewSession(context.Background(),
-		sip_runtime.WithSessionConfig(&sip_runtime.Config{
+		sip_runtime.WithSessionConfig(&sip_config.Config{
 			Server:            "sip.example.com",
 			Port:              5060,
-			Transport:         sip_runtime.TransportUDP,
+			Transport:         sip_config.TransportUDP,
 			RTPPortRangeStart: 10000,
 			RTPPortRangeEnd:   10020,
 		}),

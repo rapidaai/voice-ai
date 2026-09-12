@@ -7,6 +7,7 @@
 package sip_pipeline
 
 import (
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
@@ -21,7 +22,7 @@ type Pipeline interface {
 type SessionEstablishedPipeline struct {
 	ID              string
 	Session         *sip_runtime.Session
-	Config          *sip_runtime.Config
+	Config          *sip_config.Config
 	VaultCredential *protos.VaultCredential
 	Direction       sip_runtime.CallDirection
 	AssistantID     uint64
@@ -39,7 +40,7 @@ type TransferInitiatedPipeline struct {
 	Session            *sip_runtime.Session
 	TargetURI          string
 	Targets            []string
-	Config             *sip_runtime.Config
+	Config             *sip_config.Config
 	PostTransferAction string
 	OnAttempt          func(target string, attempt int, total int)
 	OnConnected        func(outboundRTP *sip_runtime.RTPHandler)

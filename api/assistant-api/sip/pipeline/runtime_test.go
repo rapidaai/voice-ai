@@ -16,6 +16,7 @@ import (
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/types"
 	"github.com/stretchr/testify/require"
@@ -73,7 +74,7 @@ func (observer *preparedRuntimeTestObserver) Close(context.Context) error {
 
 func TestStartPreparedSessionConsumesPreparedRuntime(t *testing.T) {
 	session, err := sip_runtime.NewSession(context.Background(),
-		sip_runtime.WithSessionConfig(&sip_runtime.Config{
+		sip_runtime.WithSessionConfig(&sip_config.Config{
 			Server:            "127.0.0.1",
 			Port:              5060,
 			RTPPortRangeStart: 10000,

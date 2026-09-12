@@ -4,11 +4,9 @@
 // Licensed under GPL-2.0 with Rapida Additional Terms.
 // See LICENSE.md or contact sales@rapida.ai for commercial usage.
 
-package sip_runtime
+package config
 
-type CallTerminationResult string
+import "errors"
 
-type CallTermination struct {
-	Result CallTerminationResult
-	Reason string
-}
+// ErrInvalidConfig marks invalid SIP provider or server configuration.
+var ErrInvalidConfig = errors.New("invalid SIP configuration")

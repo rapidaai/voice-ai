@@ -9,46 +9,9 @@ package sip_runtime
 import (
 	"testing"
 
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	"github.com/stretchr/testify/require"
 )
-
-func TestServerConfigValidate_AcceptsSocketOwnedRTPConfig(t *testing.T) {
-	cfg := validServerConfigForValidation()
-
-	require.NoError(t, cfg.Validate())
-}
-
-func TestServerConfigValidate_AcceptsUnlimitedCallAdmission(t *testing.T) {
-	cfg := validServerConfigForValidation()
-	cfg.MaxConcurrentCalls = 0
-
-	require.NoError(t, cfg.Validate())
-}
-
-func TestServerConfigValidate_RejectsNegativeCallAdmission(t *testing.T) {
-	cfg := validServerConfigForValidation()
-	cfg.MaxConcurrentCalls = -1
-
-	require.Error(t, cfg.Validate())
-}
-
-func TestServerConfigValidate_RejectsPartialCallRateAdmission(t *testing.T) {
-	cfg := validServerConfigForValidation()
-	cfg.CallAdmissionCPS = 1
-
-	require.Error(t, cfg.Validate())
-
-	cfg = validServerConfigForValidation()
-	cfg.CallAdmissionBurst = 1
-
-	require.Error(t, cfg.Validate())
-}
-
-func TestServerConfigValidateRejectsNil(t *testing.T) {
-	var config *ServerConfig
-
-	require.Error(t, config.Validate())
-}
 
 func TestNewServerRejectsNilConfig(t *testing.T) {
 	server, err := NewServer(nil, nil)
@@ -58,7 +21,7 @@ func TestNewServerRejectsNilConfig(t *testing.T) {
 }
 
 func TestServerGetListenConfigReturnsCopy(t *testing.T) {
-	server := &Server{listenConfig: &ListenConfig{Address: "127.0.0.1", Port: 5060}}
+	server := &Server{listenConfig: &sip_config.ListenConfig{Address: "127.0.0.1", Port: 5060}}
 
 	config := server.GetListenConfig()
 	config.Address = "0.0.0.0"
@@ -84,17 +47,4 @@ func TestServerSetMiddlewaresSkipsNil(t *testing.T) {
 	server.SetMiddlewares([]Middleware{nil, middleware})
 
 	require.Len(t, server.middlewares, 1)
-}
-
-func validServerConfigForValidation() *ServerConfig {
-	return &ServerConfig{
-		ListenConfig: &ListenConfig{
-			Address:   "0.0.0.0",
-			Port:      5060,
-			Transport: TransportUDP,
-		},
-		Logger:            bridgeTestLogger(),
-		RTPPortRangeStart: 10000,
-		RTPPortRangeEnd:   10010,
-	}
 }
