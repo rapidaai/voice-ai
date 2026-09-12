@@ -139,17 +139,13 @@ const (
 	OutcomeClaimError    = "claim_error"
 )
 
-// ManagerOptions wires the manager's external dependencies. ApplyOpDefaults overlays
-// platform SIP defaults onto the per-DID vault config and is supplied by the
-// SIP engine.
+// ManagerOptions wires the registration manager's external dependencies.
 type ManagerOptions struct {
 	Logger             commons.Logger
 	Postgres           connectors.PostgresConnector
 	Redis              connectors.RedisConnector
 	RegistrationClient *sip_runtime.RegistrationClient
 	AssistantConfig    *config.AssistantConfig
-	Sip                *config.SIPConfig
-	ApplyOpDefaults    func(*sip_runtime.Config)
 	RapidaClient       *rapida_client.RapidaClient
 }
 
@@ -182,18 +178,6 @@ func WithRegistrationClient(registrationClient *sip_runtime.RegistrationClient) 
 func WithAssistantConfig(assistantConfig *config.AssistantConfig) ManagerOption {
 	return func(options *ManagerOptions) {
 		options.AssistantConfig = assistantConfig
-	}
-}
-
-func WithSIPConfig(sipConfig *config.SIPConfig) ManagerOption {
-	return func(options *ManagerOptions) {
-		options.Sip = sipConfig
-	}
-}
-
-func WithApplyOpDefaults(applyOpDefaults func(*sip_runtime.Config)) ManagerOption {
-	return func(options *ManagerOptions) {
-		options.ApplyOpDefaults = applyOpDefaults
 	}
 }
 

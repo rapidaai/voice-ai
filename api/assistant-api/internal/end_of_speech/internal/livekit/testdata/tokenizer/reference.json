@@ -1,0 +1,582 @@
+{
+  "provenance": {
+    "asset_sha256": "6f0dc4b1306b1b17da46b55b696c8f54ba7cb05a1b91dc526fd143f31e882fcb",
+    "asset_revision": "ebcab0c09c2b62d926e92180d364df3aaae68a09",
+    "asset_url": "https://huggingface.co/livekit/turn-detector/resolve/ebcab0c09c2b62d926e92180d364df3aaae68a09/tokenizer.json",
+    "native_tokenizers_version": "0.22.2",
+    "version_source": "LiveKit agents uv.lock",
+    "native_hf_executed": true,
+    "native_subset_verified": true,
+    "add_special_tokens": false,
+    "limitation": "Native ID equality for the bounded corpus, not exhaustive tokenizer or model-inference equivalence",
+    "subset_sha256": "83ef2c627054f9ddbb07b55f78d3a6e75e1e4696c6b8d9d45b664c6a37e53985",
+    "source_vocab_size": 49152,
+    "source_merge_count": 48900,
+    "subset_vocab_size": 459,
+    "subset_merge_count": 204
+  },
+  "cases": [
+    {
+      "name": "empty",
+      "text": "",
+      "tokens": [],
+      "ids": []
+    },
+    {
+      "name": "repeated_space",
+      "text": "foo  bar",
+      "tokens": [
+        "foo",
+        "\u0120bar"
+      ],
+      "ids": [
+        15236,
+        2753
+      ]
+    },
+    {
+      "name": "three_spaces",
+      "text": "foo   bar",
+      "tokens": [
+        "foo",
+        "\u0120bar"
+      ],
+      "ids": [
+        15236,
+        2753
+      ]
+    },
+    {
+      "name": "leading_trailing_space",
+      "text": "  foo  bar  ",
+      "tokens": [
+        "foo",
+        "\u0120bar"
+      ],
+      "ids": [
+        15236,
+        2753
+      ]
+    },
+    {
+      "name": "spaces_only",
+      "text": "     ",
+      "tokens": [],
+      "ids": []
+    },
+    {
+      "name": "repeated_newline",
+      "text": "foo\n\nbar",
+      "tokens": [
+        "foo",
+        "\u0120bar"
+      ],
+      "ids": [
+        15236,
+        2753
+      ]
+    },
+    {
+      "name": "newline_spaces",
+      "text": "foo\n \n  bar",
+      "tokens": [
+        "foo",
+        "\u0120bar"
+      ],
+      "ids": [
+        15236,
+        2753
+      ]
+    },
+    {
+      "name": "trailing_newlines",
+      "text": "foo\n\n",
+      "tokens": [
+        "foo"
+      ],
+      "ids": [
+        15236
+      ]
+    },
+    {
+      "name": "tabs_crlf",
+      "text": "foo\t\tbar\r\nnext",
+      "tokens": [
+        "foo",
+        "\u0120bar",
+        "\u0120next"
+      ],
+      "ids": [
+        15236,
+        2753,
+        1867
+      ]
+    },
+    {
+      "name": "ascii_digits",
+      "text": "1234567890",
+      "tokens": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "0"
+      ],
+      "ids": [
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        32
+      ]
+    },
+    {
+      "name": "word_digits",
+      "text": "abc123def 42.50",
+      "tokens": [
+        "abc",
+        "1",
+        "2",
+        "3",
+        "def",
+        "\u0120",
+        "4",
+        "2",
+        ".",
+        "5",
+        "0"
+      ],
+      "ids": [
+        25276,
+        33,
+        34,
+        35,
+        1604,
+        216,
+        36,
+        34,
+        30,
+        37,
+        32
+      ]
+    },
+    {
+      "name": "space_before_digits",
+      "text": "foo  12 bar",
+      "tokens": [
+        "foo",
+        "\u0120",
+        "1",
+        "2",
+        "\u0120bar"
+      ],
+      "ids": [
+        15236,
+        216,
+        33,
+        34,
+        2753
+      ]
+    },
+    {
+      "name": "contractions",
+      "text": "I'm you're we've he'll she'd can't John's",
+      "tokens": [
+        "I",
+        "'m",
+        "\u0120you",
+        "'re",
+        "\u0120we",
+        "'ve",
+        "\u0120he",
+        "'ll",
+        "\u0120she",
+        "'d",
+        "\u0120can",
+        "'t",
+        "\u0120John",
+        "'s"
+      ],
+      "ids": [
+        57,
+        5248,
+        346,
+        2316,
+        392,
+        3543,
+        384,
+        3060,
+        1041,
+        6737,
+        416,
+        982,
+        2322,
+        506
+      ]
+    },
+    {
+      "name": "uppercase_contractions",
+      "text": "I'M YOU'RE CAN'T",
+      "tokens": [
+        "I",
+        "'",
+        "M",
+        "\u0120YOU",
+        "'",
+        "RE",
+        "\u0120CAN",
+        "'",
+        "T"
+      ],
+      "ids": [
+        57,
+        23,
+        61,
+        12246,
+        23,
+        3256,
+        27190,
+        23,
+        68
+      ]
+    },
+    {
+      "name": "unicode_letters",
+      "text": "caf\u00e9 na\u00efve \u4f60\u597d \u041f\u0440\u0438\u0432\u0435\u0442",
+      "tokens": [
+        "c",
+        "af",
+        "\u00c3\u00a9",
+        "\u0120na",
+        "\u00c3\u00afve",
+        "\u0120",
+        "\u00e4\u00bd",
+        "\u0142",
+        "\u00e5\u00a5",
+        "\u00bd",
+        "\u0120\u00d0",
+        "\u0141",
+        "\u00d1\u0122\u00d0\u00b8",
+        "\u00d0\u00b2",
+        "\u00d0\u00b5\u00d1\u0124"
+      ],
+      "ids": [
+        83,
+        1939,
+        2756,
+        15486,
+        46494,
+        216,
+        18645,
+        250,
+        48392,
+        138,
+        5470,
+        249,
+        46879,
+        16464,
+        32547
+      ]
+    },
+    {
+      "name": "unicode_combining",
+      "text": "cafe\u0301",
+      "tokens": [
+        "c",
+        "afe",
+        "\u00cc",
+        "\u0123"
+      ],
+      "ids": [
+        83,
+        9980,
+        151,
+        219
+      ]
+    },
+    {
+      "name": "unicode_numbers",
+      "text": "A\u0661\u0662\u00b2\u2167\u00bdB",
+      "tokens": [
+        "A",
+        "\u00d9",
+        "\u00a1",
+        "\u00d9",
+        "\u00a2",
+        "\u00c2\u00b2",
+        "\u00e2",
+        "\u0127",
+        "\u00a7",
+        "\u00c2\u00bd",
+        "B"
+      ],
+      "ids": [
+        49,
+        164,
+        111,
+        164,
+        112,
+        19133,
+        173,
+        223,
+        117,
+        16738,
+        50
+      ]
+    },
+    {
+      "name": "unicode_space",
+      "text": "foo\u00a0\u00a0bar\u2003baz\u2028end",
+      "tokens": [
+        "foo",
+        "\u0120bar",
+        "\u0120b",
+        "az",
+        "\u0120end"
+      ],
+      "ids": [
+        15236,
+        2753,
+        278,
+        1437,
+        1112
+      ]
+    },
+    {
+      "name": "unicode_symbols",
+      "text": "hi \ud83d\ude42\ud83d\ude80!",
+      "tokens": [
+        "hi",
+        "\u0120\u00f0\u0141\u013b\u0124",
+        "\u00f0\u0141",
+        "\u013c",
+        "\u0122",
+        "!"
+      ],
+      "ids": [
+        6004,
+        47526,
+        10813,
+        244,
+        218,
+        17
+      ]
+    },
+    {
+      "name": "punctuation",
+      "text": "hi... (yes?) -- ok!",
+      "tokens": [
+        "hi",
+        "...",
+        "\u0120(",
+        "yes",
+        "?)",
+        "\u0120--",
+        "\u0120ok",
+        "!"
+      ],
+      "ids": [
+        6004,
+        2026,
+        365,
+        10407,
+        14199,
+        3009,
+        10907,
+        17
+      ]
+    },
+    {
+      "name": "special_only",
+      "text": "<|im_start|><|im_end|><|endoftext|>",
+      "tokens": [
+        "<|im_start|>",
+        "<|im_end|>",
+        "<|endoftext|>"
+      ],
+      "ids": [
+        1,
+        2,
+        0
+      ]
+    },
+    {
+      "name": "special_adjacent",
+      "text": "foo<|im_start|>bar<|im_end|>",
+      "tokens": [
+        "foo",
+        "<|im_start|>",
+        "bar",
+        "<|im_end|>"
+      ],
+      "ids": [
+        15236,
+        1,
+        6299,
+        2
+      ]
+    },
+    {
+      "name": "special_digits",
+      "text": "12<|im_end|>34",
+      "tokens": [
+        "1",
+        "2",
+        "<|im_end|>",
+        "3",
+        "4"
+      ],
+      "ids": [
+        33,
+        34,
+        2,
+        35,
+        36
+      ]
+    },
+    {
+      "name": "chat",
+      "text": "<|im_start|>user\nfoo  bar 123<|im_end|>\n<|im_start|>assistant\nI'm here",
+      "tokens": [
+        "<|im_start|>",
+        "user",
+        "\u0120foo",
+        "\u0120bar",
+        "\u0120",
+        "1",
+        "2",
+        "3",
+        "<|im_end|>",
+        "<|im_start|>",
+        "ass",
+        "istant",
+        "\u0120I",
+        "'m",
+        "\u0120here"
+      ],
+      "ids": [
+        1,
+        4093,
+        29856,
+        2753,
+        216,
+        33,
+        34,
+        35,
+        2,
+        1,
+        520,
+        9531,
+        339,
+        5248,
+        1535
+      ]
+    },
+    {
+      "name": "special_prefix",
+      "text": "<repo_name>x<reponame>y<|user|><|assistant|><|pad|>",
+      "tokens": [
+        "<repo_name>",
+        "x",
+        "<reponame>",
+        "y",
+        "<|user|>",
+        "<|assistant|>",
+        "<|pad|>"
+      ],
+      "ids": [
+        3,
+        104,
+        4,
+        105,
+        49152,
+        49153,
+        49154
+      ]
+    },
+    {
+      "name": "special_whitespace",
+      "text": "<|im_start|> \t\n <|im_end|>",
+      "tokens": [
+        "<|im_start|>",
+        "<|im_end|>"
+      ],
+      "ids": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "special_strip",
+      "text": "  foo <|im_start|>  bar  <|im_end|>  ",
+      "tokens": [
+        "foo",
+        "<|im_start|>",
+        "bar",
+        "<|im_end|>"
+      ],
+      "ids": [
+        15236,
+        1,
+        6299,
+        2
+      ]
+    },
+    {
+      "name": "all_whitespace",
+      "text": "foo\t\n\u000b\f\r \u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000bar",
+      "tokens": [
+        "foo",
+        "\u0120bar"
+      ],
+      "ids": [
+        15236,
+        2753
+      ]
+    },
+    {
+      "name": "non_whitespace_controls",
+      "text": "foo\u001c\u001e\u001f\u180e\u200b\ufeffbar",
+      "tokens": [
+        "foo",
+        "\u011c",
+        "\u011e",
+        "\u011f",
+        "\u00e1",
+        "\u0142",
+        "\u0130",
+        "\u00e2\u0122",
+        "\u012d",
+        "\u00ef",
+        "\u00bb",
+        "\u00bf",
+        "bar"
+      ],
+      "ids": [
+        15236,
+        213,
+        214,
+        215,
+        172,
+        250,
+        232,
+        321,
+        229,
+        186,
+        136,
+        140,
+        6299
+      ]
+    }
+  ]
+}

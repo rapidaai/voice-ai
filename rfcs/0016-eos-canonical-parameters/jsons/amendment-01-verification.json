@@ -1,0 +1,42 @@
+{
+  "commands": [
+    {
+      "cmd": "bash bin/verify-eos-options-migration.sh",
+      "exit_code": 0
+    },
+    {
+      "cmd": "bash -n bin/verify-eos-options-migration.sh",
+      "exit_code": 0
+    },
+    {
+      "cmd": "just agent-finalize \"api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql,api/assistant-api/migrations/000061_eos_canonical_parameters.down.sql,bin/verify-eos-options-migration.sh,tests/integration/eos-options/seed.sql,tests/integration/eos-options/test_migration.py\"",
+      "exit_code": 0
+    },
+    {
+      "cmd": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "coverage": {
+    "unit_tests_present": true,
+    "required_categories_passed": [
+      "provider-scope",
+      "canonical-precedence",
+      "exact-value-and-audit-preservation",
+      "idempotent-up",
+      "atomic-failure",
+      "backup-only-down",
+      "no-recovery-tables"
+    ]
+  },
+  "migration_result": {
+    "tests_passed": 6,
+    "fixture_renames": 6,
+    "fixture_deletions": 9,
+    "obsolete_target_keys": 0,
+    "schema_version": 61,
+    "dirty": false
+  },
+  "live_database_used": false,
+  "unrelated_ship_blocker": "Previously run full-history harness expects web-api12 but reaches13; no correction authorized and no changes made to that expectation."
+}

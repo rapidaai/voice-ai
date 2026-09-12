@@ -14,10 +14,11 @@ import (
 
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 )
 
 // MakeTransferBridgeCall dials a transfer B-leg and returns after the leg answers.
-func (s *Server) MakeTransferBridgeCall(ctx context.Context, cfg *Config, toUser, fromUser string, opts TransferBridgeCallOptions) (*Session, error) {
+func (s *Server) MakeTransferBridgeCall(ctx context.Context, cfg *sip_config.Config, toUser, fromUser string, opts TransferBridgeCallOptions) (*Session, error) {
 	outboundCall, err := s.prepareOutboundCallLeg(ctx, cfg, toUser, fromUser, outboundCallLegOptions{
 		purpose:         OutboundLegPurposeTransferBridge,
 		makeCallOptions: opts.makeCallOptions(),

@@ -35,7 +35,7 @@ const (
 	// Default configuration values aligned with Pipecat VADParams.
 	defaultConfidence = 0.7
 	defaultStartSecs  = 0.2
-	defaultStopSecs   = 0.2
+	defaultStopSecs   = 0.5
 	defaultMinVolume  = 0.6
 
 	// Environment variable for model path

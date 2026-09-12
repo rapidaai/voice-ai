@@ -63,6 +63,7 @@ require (
 	go.uber.org/zap v1.23.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.21.0
+	golang.org/x/text v0.39.0
 	google.golang.org/api v0.265.0
 	google.golang.org/genai v1.55.0
 	google.golang.org/grpc v1.82.1
@@ -114,7 +115,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
-	github.com/dlclark/regexp2 v1.10.0 // indirect
+	github.com/dlclark/regexp2 v1.10.0
 	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/dvonthenen/websocket v1.5.1-dyv.2 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.37.0 // indirect
@@ -217,9 +218,8 @@ require (
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
 	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
-	golang.org/x/text v0.39.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
-	gonum.org/v1/gonum v0.17.0 // indirect
+	gonum.org/v1/gonum v0.17.0
 	google.golang.org/genproto v0.0.0-20260128011058-8636f8732409 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect

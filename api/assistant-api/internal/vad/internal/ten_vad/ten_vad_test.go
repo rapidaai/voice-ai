@@ -74,6 +74,7 @@ func TestNew_DefaultConfig(t *testing.T) {
 	assert.NotNil(t, vad.detector)
 	assert.Equal(t, float32(defaultConfidence), vad.confidence)
 	assert.Equal(t, defaultStartSecs, vad.startSecs)
+	assert.Equal(t, 0.5, vad.stopSecs)
 	assert.Equal(t, defaultStopSecs, vad.stopSecs)
 }
 

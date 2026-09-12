@@ -297,7 +297,6 @@ type EndOfSpeechAudioPacket struct {
 
 func (f EndOfSpeechAudioPacket) ContextId() string      { return f.ContextID }
 func (f EndOfSpeechAudioPacket) PacketName() PacketName { return PacketNameEndOfSpeechAudio }
-func (f EndOfSpeechAudioPacket) IsAsync() bool          { return true }
 
 type EndOfSpeechInterruptionPacket struct {
 	ContextID string

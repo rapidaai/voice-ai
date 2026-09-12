@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/emiago/sipgo"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,7 +36,7 @@ func TestServerHealthSnapshot_MissingClient(t *testing.T) {
 }
 
 func TestServerHealthSnapshot_RequiresConfiguredExternalIP(t *testing.T) {
-	server := runningHealthTestServer(&ListenConfig{Address: "0.0.0.0", Port: 5060, Transport: TransportUDP})
+	server := runningHealthTestServer(&sip_config.ListenConfig{Address: "0.0.0.0", Port: 5060, Transport: sip_config.TransportUDP})
 
 	snapshot := server.HealthSnapshot()
 
@@ -44,7 +45,7 @@ func TestServerHealthSnapshot_RequiresConfiguredExternalIP(t *testing.T) {
 }
 
 func TestServerHealthSnapshot_RejectsUnspecifiedExternalIP(t *testing.T) {
-	server := runningHealthTestServer(&ListenConfig{Address: "0.0.0.0", ExternalIP: "0.0.0.0", Port: 5060, Transport: TransportUDP})
+	server := runningHealthTestServer(&sip_config.ListenConfig{Address: "0.0.0.0", ExternalIP: "0.0.0.0", Port: 5060, Transport: sip_config.TransportUDP})
 
 	snapshot := server.HealthSnapshot()
 
@@ -53,7 +54,7 @@ func TestServerHealthSnapshot_RejectsUnspecifiedExternalIP(t *testing.T) {
 }
 
 func TestServerHealthSnapshot_RejectsLoopbackExternalIPByDefault(t *testing.T) {
-	server := runningHealthTestServer(&ListenConfig{Address: "127.0.0.1", ExternalIP: "127.0.0.1", Port: 5060, Transport: TransportUDP})
+	server := runningHealthTestServer(&sip_config.ListenConfig{Address: "127.0.0.1", ExternalIP: "127.0.0.1", Port: 5060, Transport: sip_config.TransportUDP})
 
 	snapshot := server.HealthSnapshot()
 
@@ -62,12 +63,12 @@ func TestServerHealthSnapshot_RejectsLoopbackExternalIPByDefault(t *testing.T) {
 }
 
 func TestServerHealthSnapshot_AllowsLoopbackExternalIPWhenExplicitlyEnabled(t *testing.T) {
-	server := runningHealthTestServer(&ListenConfig{
+	server := runningHealthTestServer(&sip_config.ListenConfig{
 		Address:                 "127.0.0.1",
 		ExternalIP:              "127.0.0.1",
 		AllowLoopbackExternalIP: true,
 		Port:                    5060,
-		Transport:               TransportUDP,
+		Transport:               sip_config.TransportUDP,
 	})
 
 	snapshot := server.HealthSnapshot()
@@ -77,12 +78,12 @@ func TestServerHealthSnapshot_AllowsLoopbackExternalIPWhenExplicitlyEnabled(t *t
 }
 
 func TestServerHealthSnapshot_ReportsRTPPortStats(t *testing.T) {
-	server := runningHealthTestServer(&ListenConfig{
+	server := runningHealthTestServer(&sip_config.ListenConfig{
 		Address:                 "127.0.0.1",
 		ExternalIP:              "127.0.0.1",
 		AllowLoopbackExternalIP: true,
 		Port:                    5060,
-		Transport:               TransportUDP,
+		Transport:               sip_config.TransportUDP,
 	})
 	server.rtpPortStats.portsInUse.Store(2)
 	server.rtpPortStats.bindAttempts.Store(5)
@@ -98,7 +99,7 @@ func TestServerHealthSnapshot_ReportsRTPPortStats(t *testing.T) {
 	assert.Equal(t, uint64(1), snapshot.RTPPortRangeExhaustions)
 }
 
-func runningHealthTestServer(listenConfig *ListenConfig) *Server {
+func runningHealthTestServer(listenConfig *sip_config.ListenConfig) *Server {
 	server := &Server{
 		client:            &sipgo.Client{},
 		server:            &sipgo.Server{},

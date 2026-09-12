@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/stretchr/testify/require"
@@ -31,7 +32,7 @@ func newPipelineTestLogger(t *testing.T) commons.Logger {
 func newPipelineTestSession(t *testing.T) *sip_runtime.Session {
 	t.Helper()
 	s, err := sip_runtime.NewSession(context.Background(),
-		sip_runtime.WithSessionConfig(&sip_runtime.Config{
+		sip_runtime.WithSessionConfig(&sip_config.Config{
 			Server:            "127.0.0.1",
 			Port:              5060,
 			RTPPortRangeStart: 10000,

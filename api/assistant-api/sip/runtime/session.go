@@ -16,6 +16,7 @@ import (
 	"github.com/emiago/sipgo"
 	"github.com/google/uuid"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/protos"
 )
@@ -25,7 +26,7 @@ type Session struct {
 	mu sync.RWMutex
 
 	info   SessionInfo
-	config *Config
+	config *sip_config.Config
 	ended  atomic.Bool
 
 	ctx    context.Context
@@ -88,7 +89,7 @@ type Session struct {
 
 type SessionOption func(*Session)
 
-func WithSessionConfig(config *Config) SessionOption {
+func WithSessionConfig(config *sip_config.Config) SessionOption {
 	return func(session *Session) { session.config = config }
 }
 
@@ -156,7 +157,7 @@ func NewSession(ctx context.Context, opts ...SessionOption) (*Session, error) {
 	}
 	if session.config == nil {
 		cancel()
-		return nil, fmt.Errorf("%w: config is required", ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: config is required", sip_config.ErrInvalidConfig)
 	}
 	// Outbound identity/auth is validated before the INVITE is built.
 	if session.info.Direction == CallDirectionOutbound {
@@ -784,7 +785,7 @@ func (s *Session) ByeReceived() <-chan struct{} {
 }
 
 // GetConfig returns the SIP configuration for this session.
-func (s *Session) GetConfig() *Config {
+func (s *Session) GetConfig() *sip_config.Config {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.config

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/emiago/sipgo/sip"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 )
 
 func (s *Server) handleInvite(req *sip.Request, tx sip.ServerTransaction) {
@@ -697,7 +698,7 @@ func (s *Server) shouldRetryInboundFinalResponse() bool {
 	if s.listenConfig == nil || s.listenConfig.Transport == "" {
 		return true
 	}
-	return s.listenConfig.Transport == TransportUDP
+	return s.listenConfig.Transport == sip_config.TransportUDP
 }
 
 func inboundACKAlreadyAccepted(session *Session, reason LifecycleReason) bool {

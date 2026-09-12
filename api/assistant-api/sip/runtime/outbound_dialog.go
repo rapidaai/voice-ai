@@ -13,6 +13,7 @@ import (
 
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 )
 
 // outboundDialog owns SIP dialog signaling for an outbound INVITE.
@@ -42,7 +43,7 @@ func (dialog *outboundDialog) Invite(ctx context.Context, sdpOffer string) error
 	}
 	callID := dialog.session.GetCallID()
 	if callID == "" {
-		return fmt.Errorf("%w: outbound call ID is required", ErrInvalidConfig)
+		return fmt.Errorf("%w: outbound call ID is required", sip_config.ErrInvalidConfig)
 	}
 
 	recipient := sip.Uri{
@@ -51,7 +52,7 @@ func (dialog *outboundDialog) Invite(ctx context.Context, sdpOffer string) error
 		Port:   dialog.request.Config.Port,
 		User:   dialog.request.Address.To,
 	}
-	if dialog.request.Config.Transport == TransportTLS || dialog.request.Config.Transport == TransportTCP {
+	if dialog.request.Config.Transport == sip_config.TransportTLS || dialog.request.Config.Transport == sip_config.TransportTCP {
 		if recipient.UriParams == nil {
 			recipient.UriParams = sip.NewParams()
 		}
@@ -60,7 +61,7 @@ func (dialog *outboundDialog) Invite(ctx context.Context, sdpOffer string) error
 
 	inviteHeaders, err := buildInviteHeaders(dialog.request)
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrInvalidConfig, err)
+		return fmt.Errorf("%w: %w", sip_config.ErrInvalidConfig, err)
 	}
 	callIDHeader := sip.CallIDHeader(callID)
 	inviteHeaders = append(inviteHeaders, &callIDHeader)

@@ -1,15 +1,6 @@
 {
     "parameters": [
         {
-            "key": "microphone.eos.fallback_timeout",
-            "label": "Fallback Timeout",
-            "type": "slider",
-            "default": 500,
-            "min": 300,
-            "max": 2000,
-            "step": 100
-        },
-        {
             "key": "microphone.eos.threshold",
             "label": "Turn Completion Threshold",
             "type": "slider",
@@ -20,7 +11,7 @@
         },
         {
             "key": "microphone.eos.quick_timeout",
-            "label": "Quick Timeout",
+            "label": "Minimum Endpoint Delay (ms)",
             "type": "slider",
             "default": 250,
             "min": 50,
@@ -29,12 +20,20 @@
         },
         {
             "key": "microphone.eos.extended_timeout",
-            "label": "Safety Timeout",
+            "label": "Maximum Endpoint Delay (ms)",
             "type": "slider",
             "default": 3000,
             "min": 500,
             "max": 5000,
             "step": 100
+        },
+        {
+            "key": "microphone.eos.max_history_turns",
+            "label": "Maximum History Turns",
+            "type": "number",
+            "default": 6,
+            "min": 1,
+            "step": 1
         },
         {
             "key": "microphone.eos.model",
