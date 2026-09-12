@@ -10,6 +10,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -47,13 +48,12 @@ type workerCommand struct {
 }
 
 type predictionRequest struct {
-	ctx             context.Context
-	packetContext   context.Context
-	cancel          context.CancelFunc
-	contextID       string
-	vadRevision     uint64
-	audioGeneration uint64
-	audio           []float32
+	ctx           context.Context
+	packetContext context.Context
+	cancel        context.CancelFunc
+	contextID     string
+	vadRevision   uint64
+	audio         []float32
 }
 
 type endOfSpeechState struct {
@@ -92,11 +92,6 @@ type pipecatEndOfSpeech struct {
 	hasSpeechStart    bool
 	speechStartSample uint64
 
-	audioGeneration      uint64
-	predictedGeneration  uint64
-	predictedProbability float64
-	hasPredictedResult   bool
-
 	commandCh chan workerCommand
 	stopCh    chan struct{}
 	closeOnce sync.Once
@@ -110,39 +105,8 @@ type pipecatEndOfSpeech struct {
 	closed           bool
 }
 
-type options struct {
-	ctx      context.Context
-	logger   commons.Logger
-	onPacket func(context.Context, ...internal_type.Packet) error
-	options  utils.Option
-}
-
-type Option func(*options)
-
-func WithContext(ctx context.Context) Option {
-	return func(options *options) {
-		options.ctx = ctx
-	}
-}
-
-func WithLogger(logger commons.Logger) Option {
-	return func(options *options) {
-		options.logger = logger
-	}
-}
-
-func WithOnPacket(onPacket func(context.Context, ...internal_type.Packet) error) Option {
-	return func(options *options) {
-		options.onPacket = onPacket
-	}
-}
-
-func WithOptions(opts utils.Option) Option {
-	return func(options *options) {
-		options.options = opts
-	}
-}
-
+// New validates provider options before loading the model and starting the EOS worker.
+// Initialization failures are returned to the caller, not emitted as packets.
 func New(opts ...Option) (internal_type.EndOfSpeechExecutor, error) {
 	options := &options{ctx: context.Background()}
 	for _, opt := range opts {
@@ -158,36 +122,10 @@ func New(opts ...Option) (internal_type.EndOfSpeechExecutor, error) {
 	}
 	start := time.Now()
 
-	detectorConfig := PipecatDetectorConfig{}
-	if modelPath, err := options.options.GetString(optPctModelPath); err == nil {
-		detectorConfig.ModelPath = modelPath
-	}
-
-	detector, err := NewPipecatDetector(detectorConfig)
-	if err != nil {
-		if options.onPacket != nil {
-			_ = options.onPacket(options.ctx, internal_type.ObservabilityLogRecordPacket{
-				Scope: internal_type.ObservabilityRecordScopeConversation,
-				Record: observability.RecordLog{
-					Level:   observability.LevelError,
-					Message: fmt.Sprintf("%s: error while initialization %s", pipecatEndOfSpeechName, err.Error()),
-					Attributes: observability.Attributes{
-						"component": observability.ComponentEOS.String(),
-						"provider":  pipecatEndOfSpeechName,
-						"options":   observability.AttributeValue(options.options),
-					},
-					OccurredAt: time.Now(),
-				},
-			})
-		}
-		return nil, fmt.Errorf("%w: %w", errPipecatInitDetector, err)
-	}
-
 	endOfSpeech := &pipecatEndOfSpeech{
 		logger:          options.logger,
 		onPacket:        options.onPacket,
 		opts:            options.options,
-		predictor:       detector,
 		threshold:       defaultPctThreshold,
 		extendedTimeout: time.Duration(defaultPctExtendedTimeout) * time.Millisecond,
 		fallbackTimeout: time.Duration(defaultPctFallbackTimeout) * time.Millisecond,
@@ -196,18 +134,46 @@ func New(opts ...Option) (internal_type.EndOfSpeechExecutor, error) {
 		commandCh:       make(chan workerCommand, 32),
 		stopCh:          make(chan struct{}),
 		state:           &endOfSpeechState{segment: speechSegment{}},
-		eosStartedAt:    time.Now(),
 	}
 
-	if threshold, err := options.options.GetFloat64(optPctThreshold); err == nil {
+	if options.options[optPctThreshold] != nil {
+		threshold, err := options.options.GetFloat64(optPctThreshold)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %s: %w", errPipecatInvalidOption, optPctThreshold, err)
+		}
+		if math.IsNaN(threshold) || threshold < 0 || threshold > 1 {
+			return nil, fmt.Errorf("%w: %s must be between 0 and 1", errPipecatInvalidOption, optPctThreshold)
+		}
 		endOfSpeech.threshold = threshold
 	}
-	if extendedTimeout, err := options.options.GetFloat64(optPctExtendedTimeout); err == nil {
-		endOfSpeech.extendedTimeout = time.Duration(extendedTimeout) * time.Millisecond
+	for _, optionKey := range []string{optPctExtendedTimeout, optPctFallbackTimeout} {
+		if options.options[optionKey] == nil {
+			continue
+		}
+		timeoutMillis, err := options.options.GetUint64(optionKey)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %s: %w", errPipecatInvalidOption, optionKey, err)
+		}
+		if timeoutMillis > uint64(math.MaxInt64/int64(time.Millisecond)) {
+			return nil, fmt.Errorf("%w: %s exceeds the supported millisecond duration", errPipecatInvalidOption, optionKey)
+		}
+		switch optionKey {
+		case optPctExtendedTimeout:
+			endOfSpeech.extendedTimeout = time.Duration(timeoutMillis) * time.Millisecond
+		case optPctFallbackTimeout:
+			endOfSpeech.fallbackTimeout = time.Duration(timeoutMillis) * time.Millisecond
+		}
 	}
-	if fallbackTimeout, err := options.options.GetFloat64(optPctFallbackTimeout); err == nil {
-		endOfSpeech.fallbackTimeout = time.Duration(fallbackTimeout) * time.Millisecond
+	detectorConfig := PipecatDetectorConfig{}
+	if modelPath, err := options.options.GetString(optPctModelPath); err == nil {
+		detectorConfig.ModelPath = modelPath
 	}
+	detector, err := NewPipecatDetector(detectorConfig)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errPipecatInitDetector, err)
+	}
+	endOfSpeech.predictor = detector
+	endOfSpeech.eosStartedAt = time.Now()
 
 	go endOfSpeech.worker()
 	_ = endOfSpeech.onPacket(options.ctx,
@@ -252,6 +218,8 @@ func (endOfSpeech *pipecatEndOfSpeech) Arguments() (map[string]string, error) {
 	return map[string]string{}, nil
 }
 
+// Execute applies packet state in order and schedules model inference without waiting for it.
+// Inference failures are reported asynchronously through onPacket; see README.md for fallback behavior.
 func (endOfSpeech *pipecatEndOfSpeech) Execute(ctx context.Context, packet internal_type.Packet) error {
 	switch packet := packet.(type) {
 	case internal_type.EndOfSpeechAudioPacket:
@@ -275,8 +243,6 @@ func (endOfSpeech *pipecatEndOfSpeech) Execute(ctx context.Context, packet inter
 		endOfSpeech.audioBuffer = endOfSpeech.audioBuffer[:0]
 		endOfSpeech.audioStartSample = endOfSpeech.audioNextSample
 		endOfSpeech.hasSpeechStart = false
-		endOfSpeech.audioGeneration++
-		endOfSpeech.hasPredictedResult = false
 		command := workerCommand{
 			ctx:        ctx,
 			segment:    endOfSpeech.state.segment,
@@ -347,8 +313,6 @@ func (endOfSpeech *pipecatEndOfSpeech) Execute(ctx context.Context, packet inter
 				}
 				endOfSpeech.hasSpeechStart = true
 			}
-			endOfSpeech.audioGeneration++
-			endOfSpeech.hasPredictedResult = false
 		case internal_type.InterruptionEventEnd:
 			if endOfSpeech.state.vadState == vadStateEnded {
 				endOfSpeech.mu.Unlock()
@@ -403,13 +367,12 @@ func (endOfSpeech *pipecatEndOfSpeech) Execute(ctx context.Context, packet inter
 			audio := make([]float32, len(endOfSpeech.audioBuffer)-audioStartIndex)
 			copy(audio, endOfSpeech.audioBuffer[audioStartIndex:])
 			request := predictionRequest{
-				ctx:             predictionContext,
-				packetContext:   ctx,
-				cancel:          cancelPrediction,
-				contextID:       packet.ContextID,
-				vadRevision:     endOfSpeech.state.vadRevision,
-				audioGeneration: endOfSpeech.audioGeneration,
-				audio:           audio,
+				ctx:           predictionContext,
+				packetContext: ctx,
+				cancel:        cancelPrediction,
+				contextID:     packet.ContextID,
+				vadRevision:   endOfSpeech.state.vadRevision,
+				audio:         audio,
 			}
 			command := workerCommand{
 				ctx:      ctx,
@@ -620,22 +583,13 @@ func (endOfSpeech *pipecatEndOfSpeech) appendAudio(pcm16 []byte) {
 		evictedSampleCount, _ := utils.IntToUint64(excess)
 		endOfSpeech.audioStartSample += evictedSampleCount
 	}
-	endOfSpeech.audioGeneration++
-	endOfSpeech.hasPredictedResult = false
 	endOfSpeech.mu.Unlock()
 }
 
-func (endOfSpeech *pipecatEndOfSpeech) predictEOU(ctx context.Context, audio []float32, generation uint64) (float64, error) {
+func (endOfSpeech *pipecatEndOfSpeech) predictEOU(ctx context.Context, audio []float32) (float64, error) {
 	if err := ctx.Err(); err != nil {
 		return 0, err
 	}
-	endOfSpeech.mu.RLock()
-	if endOfSpeech.hasPredictedResult && endOfSpeech.predictedGeneration == generation {
-		probability := endOfSpeech.predictedProbability
-		endOfSpeech.mu.RUnlock()
-		return probability, nil
-	}
-	endOfSpeech.mu.RUnlock()
 
 	if len(audio) == 0 {
 		endOfSpeech.debugf("pipecat_eos: inference skipped: empty audio buffer")
@@ -667,14 +621,6 @@ func (endOfSpeech *pipecatEndOfSpeech) predictEOU(ctx context.Context, audio []f
 		len(audio),
 	)
 
-	endOfSpeech.mu.Lock()
-	if endOfSpeech.audioGeneration == generation {
-		endOfSpeech.predictedGeneration = generation
-		endOfSpeech.predictedProbability = probability
-		endOfSpeech.hasPredictedResult = true
-	}
-	endOfSpeech.mu.Unlock()
-
 	return probability, nil
 }
 
@@ -685,7 +631,7 @@ func (endOfSpeech *pipecatEndOfSpeech) predictionWorker() {
 		case <-endOfSpeech.stopCh:
 			return
 		case request := <-endOfSpeech.predictionCh:
-			probability, predictionErr := endOfSpeech.predictEOU(request.ctx, request.audio, request.audioGeneration)
+			probability, predictionErr := endOfSpeech.predictEOU(request.ctx, request.audio)
 			request.cancel()
 			if predictionErr != nil && !errors.Is(predictionErr, context.Canceled) && !errors.Is(predictionErr, context.DeadlineExceeded) {
 				_ = endOfSpeech.onPacket(request.packetContext, internal_type.ObservabilityLogRecordPacket{
@@ -693,12 +639,13 @@ func (endOfSpeech *pipecatEndOfSpeech) predictionWorker() {
 					Scope:     internal_type.ObservabilityRecordScopeConversation,
 					Record: observability.RecordLog{
 						Level:      observability.LevelError,
-						Message:    predictionErr.Error(),
+						Message:    "turn prediction failed",
 						OccurredAt: time.Now(),
 						Attributes: observability.Attributes{
 							"component": observability.ComponentEOS.String(),
 							"provider":  endOfSpeech.Name(),
 							"operation": "predict_end_of_turn",
+							"error":     predictionErr.Error(),
 						},
 					},
 				})
@@ -721,8 +668,6 @@ func (endOfSpeech *pipecatEndOfSpeech) predictionWorker() {
 				endOfSpeech.audioBuffer = endOfSpeech.audioBuffer[:0]
 				endOfSpeech.audioStartSample = endOfSpeech.audioNextSample
 				endOfSpeech.hasSpeechStart = false
-				endOfSpeech.audioGeneration++
-				endOfSpeech.hasPredictedResult = false
 			}
 			command := workerCommand{
 				ctx:        request.packetContext,
@@ -796,10 +741,6 @@ func (endOfSpeech *pipecatEndOfSpeech) worker() {
 		endOfSpeech.audioStartSample = endOfSpeech.audioNextSample
 		endOfSpeech.hasSpeechStart = false
 		endOfSpeech.speechStartSample = 0
-		endOfSpeech.audioGeneration++
-		endOfSpeech.predictedGeneration = 0
-		endOfSpeech.predictedProbability = 0
-		endOfSpeech.hasPredictedResult = false
 	}
 
 	for {
@@ -943,6 +884,8 @@ func (endOfSpeech *pipecatEndOfSpeech) emitEndOfSpeech(command workerCommand, ti
 	)
 }
 
+// Close cancels pending inference and joins the prediction worker before destroying the model.
+// Repeated calls are safe; ctx is used for final telemetry, not to bound the join.
 func (endOfSpeech *pipecatEndOfSpeech) Close(ctx context.Context) error {
 	if endOfSpeech == nil {
 		return nil

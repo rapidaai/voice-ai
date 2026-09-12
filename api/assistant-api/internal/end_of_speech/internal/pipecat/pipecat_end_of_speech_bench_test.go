@@ -259,6 +259,21 @@ func BenchmarkExecute_STTInput(b *testing.B) {
 	}
 }
 
+func BenchmarkExecute_DuplicateVADEnd(b *testing.B) {
+	endOfSpeech := newTestEOSWithPredictor(func(context.Context, ...internal_type.Packet) error { return nil }, nil,
+		func([]float32) (float64, error) { return 0.1, nil })
+	defer closeTestEndOfSpeech(endOfSpeech)
+	stop := internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd,
+	}
+	_ = endOfSpeech.Execute(b.Context(), audioInput(1600))
+	_ = endOfSpeech.Execute(b.Context(), stop)
+	b.ReportAllocs()
+	for b.Loop() {
+		_ = endOfSpeech.Execute(b.Context(), stop)
+	}
+}
+
 func BenchmarkExecute_VADEndWhilePredictionBlocked(b *testing.B) {
 	predictionStarted := make(chan struct{}, 1)
 	releasePrediction := make(chan struct{})

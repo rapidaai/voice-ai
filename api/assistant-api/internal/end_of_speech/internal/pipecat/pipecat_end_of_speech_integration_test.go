@@ -52,6 +52,7 @@ func TestEOS_CanonicalConstructorOptions(t *testing.T) {
 		threshold       float64
 		fallbackTimeout time.Duration
 		extendedTimeout time.Duration
+		expectedError   error
 	}{
 		{
 			name:            "missing canonical values use defaults",
@@ -82,15 +83,13 @@ func TestEOS_CanonicalConstructorOptions(t *testing.T) {
 			extendedTimeout: 0,
 		},
 		{
-			name: "invalid canonical values use defaults",
+			name: "invalid canonical values return an error",
 			settings: utils.Option{
 				internal_options.MicrophoneEOSOptionThreshold:       "invalid",
 				internal_options.MicrophoneEOSOptionFallbackTimeout: "invalid",
 				internal_options.MicrophoneEOSOptionExtendedTimeout: "invalid",
 			},
-			threshold:       defaultPctThreshold,
-			fallbackTimeout: time.Duration(defaultPctFallbackTimeout) * time.Millisecond,
-			extendedTimeout: time.Duration(defaultPctExtendedTimeout) * time.Millisecond,
+			expectedError: errPipecatInvalidOption,
 		},
 		{
 			name: "aliases ignored",
@@ -111,6 +110,11 @@ func TestEOS_CanonicalConstructorOptions(t *testing.T) {
 				WithOptions(test.settings),
 				WithOnPacket(func(context.Context, ...internal_type.Packet) error { return nil }),
 			)
+			if test.expectedError != nil {
+				require.ErrorIs(t, err, test.expectedError)
+				assert.Nil(t, endOfSpeech)
+				return
+			}
 			require.NoError(t, err)
 			defer endOfSpeech.Close(context.Background())
 			configured := endOfSpeech.(*pipecatEndOfSpeech)
@@ -141,16 +145,17 @@ func TestEOS_NativeSmartTurnAudioFlow(t *testing.T) {
 	)
 	require.NoError(t, err)
 	nativeEndOfSpeech := endOfSpeech.(*pipecatEndOfSpeech)
-	nativePredictor := nativeEndOfSpeech.predictor
-	var predictionCount int
-	nativeEndOfSpeech.predictor = testPredictor{predictContext: func(ctx context.Context, audio []float32) (float64, error) {
-		probability, predictionError := nativePredictor.PredictContext(ctx, audio)
-		require.NoError(t, predictionError)
-		predictionCount++
-		return probability, predictionError
-	}}
+	nativePredictor := nativeEndOfSpeech.predictor.(*PipecatDetector)
+	predictionResults := make(chan error, 2)
+	nativeEndOfSpeech.predictor = testPredictor{
+		predictContext: func(ctx context.Context, audio []float32) (float64, error) {
+			probability, predictionError := nativePredictor.PredictContext(ctx, audio)
+			predictionResults <- predictionError
+			return probability, predictionError
+		},
+		destroy: nativePredictor.Destroy,
+	}
 	t.Cleanup(func() {
-		nativeEndOfSpeech.predictor = nativePredictor
 		require.NoError(t, endOfSpeech.Close(context.Background()))
 	})
 	for _, speech := range []string{"first native turn", "second native turn"} {
@@ -167,6 +172,12 @@ func TestEOS_NativeSmartTurnAudioFlow(t *testing.T) {
 		require.NoError(t, endOfSpeech.Execute(t.Context(), internal_type.InterruptionDetectedPacket{
 			Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd,
 		}))
+		select {
+		case err := <-predictionResults:
+			require.NoError(t, err)
+		case <-time.After(5 * time.Second):
+			t.Fatal("native prediction did not finish")
+		}
 		require.NoError(t, endOfSpeech.Execute(t.Context(), internal_type.EndOfSpeechAudioPacket{
 			Audio: make([]byte, 32000),
 		}))
@@ -179,7 +190,6 @@ func TestEOS_NativeSmartTurnAudioFlow(t *testing.T) {
 			t.Fatal("native model flow did not complete")
 		}
 	}
-	assert.Equal(t, 2, predictionCount)
 	select {
 	case packet := <-completed:
 		t.Fatalf("duplicate native completion: %+v", packet)

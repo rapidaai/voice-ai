@@ -672,14 +672,14 @@ func TestAppendAudio_ConcurrentSafety(t *testing.T) {
 
 func TestPredictEOU_EmptyAudioBufferRemainsIncomplete(t *testing.T) {
 	eos := &pipecatEndOfSpeech{}
-	probability, err := eos.predictEOU(t.Context(), nil, 0)
+	probability, err := eos.predictEOU(t.Context(), nil)
 	require.NoError(t, err)
 	assert.Zero(t, probability)
 }
 
 func TestPredictEOU_DetectorUnavailableReturnsError(t *testing.T) {
 	eos := &pipecatEndOfSpeech{}
-	probability, err := eos.predictEOU(t.Context(), []float32{0.1, -0.1, 0.05}, 0)
+	probability, err := eos.predictEOU(t.Context(), []float32{0.1, -0.1, 0.05})
 	require.ErrorIs(t, err, errPipecatDetectorNil)
 	assert.Zero(t, probability)
 }
@@ -712,51 +712,50 @@ func TestExecuteVADEnd_SpeechOffsetBeyondBufferSkipsPrediction(t *testing.T) {
 	}
 }
 
-func TestPredictEOU_ReusesCachedProbabilityForSameAudioGeneration(t *testing.T) {
-	var predictorCalls int32
-	eos := newTestEOSWithPredictor(
-		func(context.Context, ...internal_type.Packet) error { return nil },
-		newTestOpts(map[string]any{}),
-		func([]float32) (float64, error) {
-			atomic.AddInt32(&predictorCalls, 1)
-			return 0.75, nil
-		},
-	)
-	defer closeTestEndOfSpeech(eos)
+func TestExecuteVADEnd_DuplicateStopDoesNotRepeatPrediction(t *testing.T) {
+	for _, appendMoreAudio := range []bool{false, true} {
+		t.Run("append_more_audio="+strconv.FormatBool(appendMoreAudio), func(t *testing.T) {
+			var predictorCalls atomic.Int32
+			endOfSpeech := newTestEOSWithPredictor(
+				func(context.Context, ...internal_type.Packet) error { return nil }, nil,
+				func([]float32) (float64, error) {
+					return float64(predictorCalls.Add(1)) / 10, nil
+				},
+			)
+			defer closeTestEndOfSpeech(endOfSpeech)
+			start := internal_type.InterruptionDetectedPacket{
+				Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
+			}
+			stop := internal_type.InterruptionDetectedPacket{
+				Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd,
+			}
+			require.NoError(t, endOfSpeech.Execute(t.Context(), start))
+			require.NoError(t, endOfSpeech.Execute(t.Context(), audioInput(1600)))
+			require.NoError(t, endOfSpeech.Execute(t.Context(), stop))
+			require.Eventually(t, func() bool {
+				endOfSpeech.mu.RLock()
+				defer endOfSpeech.mu.RUnlock()
+				return endOfSpeech.state.confidence == 0.1
+			}, time.Second, time.Millisecond)
 
-	require.NoError(t, eos.Execute(context.Background(), audioInput(1600)))
+			if appendMoreAudio {
+				require.NoError(t, endOfSpeech.Execute(t.Context(), audioInput(1600)))
+			}
+			for range 3 {
+				require.NoError(t, endOfSpeech.Execute(t.Context(), stop))
+			}
+			require.Never(t, func() bool { return predictorCalls.Load() > 1 }, 20*time.Millisecond, time.Millisecond)
 
-	for range 2 {
-		probability, err := eos.predictEOU(t.Context(), eos.audioBuffer, eos.audioGeneration)
-		require.NoError(t, err)
-		assert.Equal(t, 0.75, probability)
+			require.NoError(t, endOfSpeech.Execute(t.Context(), start))
+			require.NoError(t, endOfSpeech.Execute(t.Context(), stop))
+			require.Eventually(t, func() bool {
+				endOfSpeech.mu.RLock()
+				defer endOfSpeech.mu.RUnlock()
+				return endOfSpeech.state.confidence == 0.2
+			}, time.Second, time.Millisecond)
+			assert.Equal(t, int32(2), predictorCalls.Load())
+		})
 	}
-	assert.Equal(t, int32(1), atomic.LoadInt32(&predictorCalls))
-}
-
-func TestPredictEOU_InvalidatesCacheWhenAudioChanges(t *testing.T) {
-	var predictorCalls int32
-	eos := newTestEOSWithPredictor(
-		func(context.Context, ...internal_type.Packet) error { return nil },
-		newTestOpts(map[string]any{}),
-		func([]float32) (float64, error) {
-			return float64(atomic.AddInt32(&predictorCalls, 1)), nil
-		},
-	)
-	defer closeTestEndOfSpeech(eos)
-
-	require.NoError(t, eos.Execute(context.Background(), audioInput(1600)))
-	for range 2 {
-		probability, err := eos.predictEOU(t.Context(), eos.audioBuffer, eos.audioGeneration)
-		require.NoError(t, err)
-		assert.Equal(t, 1.0, probability)
-	}
-
-	require.NoError(t, eos.Execute(context.Background(), audioInput(1600)))
-	probability, err := eos.predictEOU(t.Context(), eos.audioBuffer, eos.audioGeneration)
-	require.NoError(t, err)
-	assert.Equal(t, 2.0, probability)
-	assert.Equal(t, int32(2), atomic.LoadInt32(&predictorCalls))
 }
 
 func TestExecuteVADEnd_UsesSpeechScopedAudio(t *testing.T) {
@@ -780,7 +779,6 @@ func TestExecuteVADEnd_UsesSpeechScopedAudio(t *testing.T) {
 	eos.audioNextSample = eos.audioStartSample + uint64(len(eos.audioBuffer))
 	eos.hasSpeechStart = true
 	eos.speechStartSample = 12000
-	eos.audioGeneration = 1
 	eos.mu.Unlock()
 
 	require.NoError(t, eos.Execute(t.Context(), internal_type.InterruptionDetectedPacket{
@@ -802,7 +800,7 @@ func TestExecuteVADEnd_UsesSpeechScopedAudio(t *testing.T) {
 	}, time.Second, time.Millisecond)
 }
 
-func TestPredictEOU_FailedPredictionIsNotCached(t *testing.T) {
+func TestPredictEOU_RecoversAfterFailedPrediction(t *testing.T) {
 	var predictionCalls int
 	endOfSpeech := newTestEOSWithPredictor(
 		func(context.Context, ...internal_type.Packet) error { return nil }, nil,
@@ -816,15 +814,13 @@ func TestPredictEOU_FailedPredictionIsNotCached(t *testing.T) {
 	)
 	defer closeTestEndOfSpeech(endOfSpeech)
 	require.NoError(t, endOfSpeech.Execute(t.Context(), audioInput(1600)))
-	probability, err := endOfSpeech.predictEOU(t.Context(), endOfSpeech.audioBuffer, endOfSpeech.audioGeneration)
+	probability, err := endOfSpeech.predictEOU(t.Context(), endOfSpeech.audioBuffer)
 	require.ErrorIs(t, err, errPipecatDetectorRunInference)
 	require.ErrorIs(t, err, errPipecatDetectorCreateInputTensor)
 	assert.Zero(t, probability)
-	for range 2 {
-		probability, err = endOfSpeech.predictEOU(t.Context(), endOfSpeech.audioBuffer, endOfSpeech.audioGeneration)
-		require.NoError(t, err)
-		assert.Equal(t, 0.9, probability)
-	}
+	probability, err = endOfSpeech.predictEOU(t.Context(), endOfSpeech.audioBuffer)
+	require.NoError(t, err)
+	assert.Equal(t, 0.9, probability)
 	assert.Equal(t, 2, predictionCalls)
 }
 
@@ -1085,7 +1081,6 @@ func TestEOS_FinalSTTDoesNotRunSmartTurnPrediction(t *testing.T) {
 		turnStopTimeout: defaultPctTurnStopTimeout,
 		fallbackTimeout: 80 * time.Millisecond,
 		audioBuffer:     []float32{0.1, 0.2, 0.3},
-		audioGeneration: 1,
 		commandCh:       make(chan workerCommand, 1),
 		stopCh:          make(chan struct{}),
 		state:           &endOfSpeechState{segment: speechSegment{}},
@@ -1331,7 +1326,6 @@ func TestEOS_FinalSTTAfterIncompleteVADEndSchedulesFallback(t *testing.T) {
 		turnStopTimeout: defaultPctTurnStopTimeout,
 		fallbackTimeout: 60 * time.Millisecond,
 		audioBuffer:     []float32{0.1, 0.2, 0.3},
-		audioGeneration: 1,
 		commandCh:       make(chan workerCommand, 1),
 		stopCh:          make(chan struct{}),
 		state:           &endOfSpeechState{segment: speechSegment{}},
@@ -1388,7 +1382,6 @@ func TestEOS_FinalSTTAfterVADEndCompletePredictionWaitsForTranscriptDeadline(t *
 		turnStopTimeout: defaultPctTurnStopTimeout,
 		fallbackTimeout: 60 * time.Millisecond,
 		audioBuffer:     []float32{0.1, 0.2, 0.3},
-		audioGeneration: 1,
 		commandCh:       make(chan workerCommand, 1),
 		stopCh:          make(chan struct{}),
 		state:           &endOfSpeechState{segment: speechSegment{}},
@@ -1437,7 +1430,6 @@ func TestEOS_VADEndCompletePredictionWaitsForTranscriptDeadline(t *testing.T) {
 		turnStopTimeout: defaultPctTurnStopTimeout,
 		fallbackTimeout: 60 * time.Millisecond,
 		audioBuffer:     []float32{0.1, 0.2, 0.3},
-		audioGeneration: 1,
 		commandCh:       make(chan workerCommand, 2),
 		stopCh:          make(chan struct{}),
 		state: &endOfSpeechState{
@@ -3065,7 +3057,8 @@ func TestEOS_VADWithoutPredictionAudioCanCompleteBeforeWallDeadline(t *testing.T
 			if testCase.expectedError != nil {
 				select {
 				case record := <-inferenceErrors:
-					assert.Contains(t, record.Record.Message, testCase.expectedError.Error())
+					assert.Equal(t, "turn prediction failed", record.Record.Message)
+					assert.Contains(t, record.Record.Attributes["error"], testCase.expectedError.Error())
 				case <-time.After(time.Second):
 					t.Fatal("inference failure was not reported")
 				}

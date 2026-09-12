@@ -67,7 +67,8 @@ func TestEOS_IncompleteTurnCompletesWithoutMoreAudio(t *testing.T) {
 			if testCase.predictionErr != nil {
 				select {
 				case packet := <-predictionErrors:
-					assert.Contains(t, packet.Record.Message, testCase.predictionErr.Error())
+					assert.Equal(t, "turn prediction failed", packet.Record.Message)
+					assert.Contains(t, packet.Record.Attributes["error"], testCase.predictionErr.Error())
 				case <-time.After(time.Second):
 					t.Fatal("asynchronous inference failure was not reported")
 				}

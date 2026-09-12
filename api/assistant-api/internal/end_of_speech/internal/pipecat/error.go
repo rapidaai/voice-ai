@@ -8,9 +8,12 @@ package internal_pipecat
 import "errors"
 
 var (
-	errPipecatOnPacketRequired = errors.New("onPacket is required")
-	errPipecatInitDetector     = errors.New("pipecat_eos: init detector")
+	// Construction errors preserve their underlying cause for errors.Is and errors.As.
+	errPipecatOnPacketRequired = errors.New("pipecat_eos: packet callback is required")
+	errPipecatInvalidOption    = errors.New("pipecat_eos: invalid option")
+	errPipecatInitDetector     = errors.New("pipecat_eos: initialize detector")
 
+	// Native detector errors identify the failing operation; runtime details are wrapped at the call site.
 	errPipecatDetectorRuntimeAPIUnavailable = errors.New("pipecat_detector: failed to get ONNX Runtime API")
 	errPipecatDetectorCreateEnv             = errors.New("pipecat_detector: create env")
 	errPipecatDetectorCreateSessionOptions  = errors.New("pipecat_detector: create session options")

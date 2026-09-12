@@ -303,7 +303,6 @@ func TestEOS_PredictionDoesNotBlockControlDispatch(t *testing.T) {
 	assert.Equal(t, uint64(3), endOfSpeech.state.vadRevision)
 	assert.Equal(t, turnStatePending, endOfSpeech.state.turnState)
 	assert.Zero(t, endOfSpeech.state.confidence)
-	assert.False(t, endOfSpeech.hasPredictedResult)
 }
 
 func TestEOS_PendingPredictionUsesOrderedAudioSnapshot(t *testing.T) {
@@ -356,7 +355,6 @@ func TestEOS_PendingPredictionUsesOrderedAudioSnapshot(t *testing.T) {
 	endOfSpeech.mu.RLock()
 	assert.Equal(t, turnStatePending, endOfSpeech.state.turnState)
 	assert.Zero(t, endOfSpeech.state.confidence)
-	assert.False(t, endOfSpeech.hasPredictedResult)
 	assert.Len(t, endOfSpeech.audioBuffer, 1600+21*320)
 	endOfSpeech.mu.RUnlock()
 	assert.Equal(t, int32(2), calls.Load())
@@ -446,7 +444,6 @@ func TestEOS_CloseJoinsPredictionBeforeDestroy(t *testing.T) {
 	assert.Equal(t, int32(1), calls.Load())
 	assert.Nil(t, endOfSpeech.predictor)
 	assert.Nil(t, endOfSpeech.cancelPrediction)
-	assert.False(t, endOfSpeech.hasPredictedResult)
 }
 
 func TestEOS_CloseDuringPredictionAdmission(t *testing.T) {
