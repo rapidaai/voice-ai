@@ -1288,6 +1288,7 @@ func (h requestorDispatchHandler) HandleStopIdleTimeout(ctx context.Context, p i
 	}
 }
 
+// TODO(hotfix): Re-enable dispatcher idle-timeout packet emits after timeout behavior is validated.
 func (h requestorDispatchHandler) HandleIdleTimeoutExpired(ctx context.Context, p internal_type.IdleTimeoutExpiredPacket) {
 	if p.ContextID != h.r.GetID() {
 		return
@@ -1650,9 +1651,8 @@ func (h requestorDispatchHandler) HandleTextToSpeechDone(ctx context.Context, p 
 		Message: &protos.ConversationAssistantMessage_Text{Text: p.Text},
 	})
 	if h.r.textToSpeechTransformer == nil || !h.r.GetMode().Audio() {
-		if h.r.messageLifecycle.AssistantFinished(p.ContextID) == nil &&
-			h.r.messageLifecycle.AssistantIdle(p.ContextID) == nil {
-			h.r.OnPacket(ctx, internal_type.StartIdleTimeoutPacket{ContextID: p.ContextID})
+		if h.r.messageLifecycle.AssistantFinished(p.ContextID) == nil {
+			_ = h.r.messageLifecycle.AssistantIdle(p.ContextID)
 		}
 	}
 }
@@ -1701,16 +1701,14 @@ func (h requestorDispatchHandler) HandleTextToSpeechEnd(ctx context.Context, p i
 	if p.ContextID != h.r.GetID() {
 		return
 	}
-	assistantIdle := h.r.messageLifecycle.AssistantFinished(p.ContextID) == nil &&
-		h.r.messageLifecycle.AssistantIdle(p.ContextID) == nil
+	if h.r.messageLifecycle.AssistantFinished(p.ContextID) == nil {
+		_ = h.r.messageLifecycle.AssistantIdle(p.ContextID)
+	}
 	h.r.Notify(ctx, &protos.ConversationAssistantMessage{
 		Time:      timestamppb.Now(),
 		Id:        p.ContextID,
 		Completed: true,
 	})
-	if assistantIdle {
-		h.r.OnPacket(ctx, internal_type.StartIdleTimeoutPacket{ContextID: p.ContextID})
-	}
 	h.r.OnPacket(ctx,
 		internal_type.DispatchPolicyPacket{
 			ContextID: p.ContextID,
@@ -1903,7 +1901,6 @@ func (h requestorDispatchHandler) HandleLLMToolResult(ctx context.Context, p int
 
 	h.r.OnPacket(
 		ctx,
-		internal_type.StartIdleTimeoutPacket{ContextID: p.ContextID},
 		internal_type.ObservabilityEventRecordPacket{
 			ContextID: p.ContextID,
 			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
@@ -2990,8 +2987,6 @@ func (h requestorDispatchHandler) HandleInitializeBehavior(ctx context.Context, 
 				}),
 			},
 		)
-	} else {
-		h.r.OnPacket(ctx, internal_type.StartIdleTimeoutPacket{ContextID: h.r.GetID()})
 	}
 	if validator.NonNil(behavior.MaxSessionDuration) && *behavior.MaxSessionDuration > 0 {
 		timeoutDuration := time.Duration(*behavior.MaxSessionDuration) * time.Second

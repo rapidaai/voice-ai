@@ -15,6 +15,7 @@ import (
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	internal_assistant_service "github.com/rapidaai/api/assistant-api/internal/services/assistant"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_middleware "github.com/rapidaai/api/assistant-api/sip/middleware"
 	sip_pipeline "github.com/rapidaai/api/assistant-api/sip/pipeline"
 	sip_registration "github.com/rapidaai/api/assistant-api/sip/registration"
@@ -54,11 +55,11 @@ type SIPEngine struct {
 	// Registration client for maintaining SIP REGISTER with external providers.
 	registrationClient *sip_runtime.RegistrationClient
 
-	// Distributed registration manager — runs the GetRecord -> ClaimOwner ->
+	// Distributed registration manager runs the GetRecord -> ClaimOwner ->
 	// Register -> UpdateStatus pipeline, sharded across instances by externalIP.
 	regManager sip_registration.Manager
 
-	// Pipeline dispatcher — routes SIP call lifecycle through extensible stages.
+	// Pipeline dispatcher routes SIP call lifecycle through extensible stages.
 	dispatcher *sip_pipeline.Dispatcher
 }
 
@@ -87,57 +88,34 @@ func NewSIPEngine(config *config.AssistantConfig, logger commons.Logger,
 	}
 }
 
-func (m *SIPEngine) listenConfig() *sip_runtime.ListenConfig {
-	transportType := sip_runtime.TransportUDP
-	switch m.cfg.SIPConfig.Transport {
-	case "tcp":
-		transportType = sip_runtime.TransportTCP
-	case "tls":
-		transportType = sip_runtime.TransportTLS
-	}
-	return &sip_runtime.ListenConfig{
-		Address:                 m.cfg.SIPConfig.Server,
-		ExternalIP:              m.cfg.SIPConfig.ExternalIP,
-		AllowLoopbackExternalIP: m.cfg.SIPConfig.AllowLoopbackExternalIP,
-		Port:                    m.cfg.SIPConfig.Port,
-		Transport:               transportType,
-	}
-}
-
 // Connect initializes the SIP server. The middleware chain resolves the
 // assistant from the SIP route user in the To-URI:
 func (m *SIPEngine) Connect(ctx context.Context) error {
 	m.ctx, m.cancel = context.WithCancel(ctx)
-	server, err := sip_runtime.NewServer(m.ctx, &sip_runtime.ServerConfig{
-		ListenConfig:         m.listenConfig(),
-		Logger:               m.logger,
-		RTPPortRangeStart:    m.cfg.SIPConfig.RTPPortRangeStart,
-		RTPPortRangeEnd:      m.cfg.SIPConfig.RTPPortRangeEnd,
-		SymmetricRTP:         m.cfg.SIPConfig.SymmetricRTP,
-		IgnoreLocalAddrInSDP: m.cfg.SIPConfig.IgnoreLocalAddrInSDP,
-		MaxConcurrentCalls:   m.cfg.SIPConfig.MaxConcurrentCalls,
-		CallAdmissionCPS:     m.cfg.SIPConfig.CallAdmissionCPS,
-		CallAdmissionBurst:   m.cfg.SIPConfig.CallAdmissionBurst,
-	})
+	server, err := sip_runtime.NewServer(
+		m.ctx,
+		sip_config.NewServerConfig(
+			m.cfg.SIPConfig,
+			m.logger,
+		),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create SIP server: %w", err)
 	}
-	server.SetMiddlewares(
-		[]sip_runtime.Middleware{
-			sip_middleware.NewRouteMiddleware(
-				sip_middleware.WithContext(m.ctx),
-				sip_middleware.WithLogger(m.logger),
-				sip_middleware.WithAssistantService(m.assistantService),
-				sip_middleware.WithServiceID(m.cfg.ServiceID),
-			),
-			sip_middleware.NewVaultMiddleware(
-				sip_middleware.WithContext(m.ctx),
-				sip_middleware.WithLogger(m.logger),
-				sip_middleware.WithRapidaClient(m.rapidaClient),
-				sip_middleware.WithApplySIPConfigDefaults(m.applySIPConfigDefaults),
-			),
-		},
-	)
+	server.SetMiddlewares([]sip_runtime.Middleware{
+		sip_middleware.NewRouteMiddleware(
+			sip_middleware.WithContext(m.ctx),
+			sip_middleware.WithLogger(m.logger),
+			sip_middleware.WithAssistantService(m.assistantService),
+			sip_middleware.WithServiceID(m.cfg.ServiceID),
+		),
+		sip_middleware.NewVaultMiddleware(
+			sip_middleware.WithContext(m.ctx),
+			sip_middleware.WithLogger(m.logger),
+			sip_middleware.WithRapidaClient(m.rapidaClient),
+			sip_middleware.WithSIPConfig(sip_config.NewResolver(m.cfg.SIPConfig)),
+		),
+	})
 	server.SetOnApplicationReady(m.onApplicationReady)
 	server.SetOnApplicationCleanup(m.onApplicationCleanup)
 	server.SetOnInvite(m.onInvite)
@@ -151,8 +129,6 @@ func (m *SIPEngine) Connect(ctx context.Context) error {
 		sip_registration.WithRedis(m.redis),
 		sip_registration.WithRegistrationClient(m.registrationClient),
 		sip_registration.WithAssistantConfig(m.cfg),
-		sip_registration.WithSIPConfig(m.cfg.SIPConfig),
-		sip_registration.WithApplyOpDefaults(m.applySIPOperationalDefaults),
 		sip_registration.WithRapidaClient(m.rapidaClient),
 	)
 
@@ -174,58 +150,19 @@ func (m *SIPEngine) Connect(ctx context.Context) error {
 	)
 	m.dispatcher.Start(m.ctx)
 
-	// Start server AFTER dispatcher is ready — incoming INVITEs call m.dispatcher.OnPipeline
+	// Start server after dispatcher is ready. Incoming INVITEs call m.dispatcher.OnPipeline.
 	if err := server.Start(); err != nil {
 		return fmt.Errorf("failed to start SIP server: %w", err)
 	}
 	m.server = server
 
-	// Initial registration sync — runs before returning so DIDs are active before calls arrive.
+	// Initial registration sync runs before returning so DIDs are active before calls arrive.
 	m.regManager.Reconcile(m.ctx)
 
-	// Background watcher — polls DB every 5 minutes for new/removed/changed deployments.
+	// Background watcher polls DB every 5 minutes for new/removed/changed deployments.
 	go m.regManager.Start(m.ctx)
 
 	return nil
-}
-
-// applySIPOperationalDefaults overlays the engine-level SIP defaults (port,
-// transport, RTP range, timeouts, inbound answer policy) onto a per-DID vault
-// config. Passed to the registration manager as an injection point so the
-// registration package stays decoupled from the assistant-api config types.
-func (m *SIPEngine) applySIPOperationalDefaults(c *sip_runtime.Config) {
-	if m.cfg == nil || m.cfg.SIPConfig == nil {
-		return
-	}
-	m.applySIPConfigDefaults(c)
-}
-
-func (m *SIPEngine) applySIPConfigDefaults(c *sip_runtime.Config) {
-	if c == nil || m.cfg == nil || m.cfg.SIPConfig == nil {
-		return
-	}
-	c.ApplyOperationalDefaults(
-		m.cfg.SIPConfig.Port,
-		sip_runtime.Transport(m.cfg.SIPConfig.Transport),
-		m.cfg.SIPConfig.RTPPortRangeStart,
-		m.cfg.SIPConfig.RTPPortRangeEnd,
-	)
-	c.ApplyTimeoutDefaults(
-		m.cfg.SIPConfig.RegisterTimeout,
-		m.cfg.SIPConfig.InviteTimeout,
-		m.cfg.SIPConfig.SessionTimeout,
-	)
-	c.ApplyMediaTimeoutDefaults(
-		m.cfg.SIPConfig.MediaTimeoutInitial,
-		m.cfg.SIPConfig.MediaTimeout,
-	)
-	inboundConfig := m.cfg.SIPConfig.Inbound
-	c.ApplyInboundAnswerDefaults(
-		sip_runtime.InboundAnswerMode(inboundConfig.AnswerMode),
-		inboundConfig.MinRingDuration,
-		inboundConfig.MaxRingDuration,
-		inboundConfig.ACKTimeout,
-	)
 }
 
 func (m *SIPEngine) GetServer() *sip_runtime.Server {
@@ -263,7 +200,9 @@ func (m *SIPEngine) onInvite(session *sip_runtime.Session, requestURI string, ca
 	if stage.Direction == sip_runtime.CallDirectionInbound {
 		return m.dispatcher.StartPreparedSession(m.ctx, stage)
 	}
-	m.dispatcher.OnPipeline(m.ctx, stage)
+	if err := m.dispatcher.StartPreparedSession(m.ctx, stage); err != nil {
+		m.dispatcher.OnPipeline(m.ctx, stage)
+	}
 	return nil
 }
 
@@ -403,7 +342,7 @@ func (m *SIPEngine) GetActiveCalls() int {
 }
 
 func (m *SIPEngine) Stop() {
-	// Release Redis ownership keys BEFORE UnregisterAll — UnregisterAll drains
+	// Release Redis ownership keys before UnregisterAll. UnregisterAll drains
 	// the active-DID set, after which ReleaseAll would have nothing to walk.
 	if m.regManager != nil {
 		m.regManager.ReleaseAll(context.Background())

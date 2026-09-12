@@ -9,7 +9,9 @@ import (
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
+	"github.com/rapidaai/pkg/channel"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
@@ -97,13 +99,29 @@ func newTestSIPStreamerWithCollector(t *testing.T) (*Streamer, *testSIPCollector
 func newTestInboundSIPSession(t *testing.T, callID string) *sip_runtime.Session {
 	t.Helper()
 	session, err := sip_runtime.NewSession(context.Background(),
-		sip_runtime.WithSessionConfig(&sip_runtime.Config{
+		sip_runtime.WithSessionConfig(&sip_config.Config{
 			Server:            "127.0.0.1",
 			Port:              5060,
 			RTPPortRangeStart: 10000,
 			RTPPortRangeEnd:   10100,
 		}),
 		sip_runtime.WithSessionDirection(sip_runtime.CallDirectionInbound),
+		sip_runtime.WithSessionCallID(callID),
+	)
+	require.NoError(t, err)
+	return session
+}
+
+func newTestOutboundSIPSession(t *testing.T, callID string) *sip_runtime.Session {
+	t.Helper()
+	session, err := sip_runtime.NewSession(context.Background(),
+		sip_runtime.WithSessionConfig(&sip_config.Config{
+			Server:            "127.0.0.1",
+			Port:              5060,
+			RTPPortRangeStart: 10000,
+			RTPPortRangeEnd:   10100,
+		}),
+		sip_runtime.WithSessionDirection(sip_runtime.CallDirectionOutbound),
 		sip_runtime.WithSessionCallID(callID),
 	)
 	require.NoError(t, err)
@@ -210,6 +228,108 @@ func TestShouldEndSessionOnClose_SkipsPreAnswerStates(t *testing.T) {
 	assert.True(t, shouldEndSessionOnClose(sip_runtime.CallStateConnected))
 }
 
+func TestNewRequiresSession(t *testing.T) {
+	_, err := New()
+	require.ErrorIs(t, err, ErrSessionRequired)
+}
+
+func TestNewRequiresLifecycleController(t *testing.T) {
+	_, err := New(WithSession(newTestInboundSIPSession(t, "missing-lifecycle")))
+	require.ErrorIs(t, err, ErrLifecycleControllerRequired)
+}
+
+func TestNewInitializesMediaPortBeforeCancellationWatcher(t *testing.T) {
+	logger, err := commons.NewApplicationLogger()
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	session := newTestInboundSIPSession(t, "cancelled-during-initialization")
+	session.SetRTPHandler(&sip_runtime.RTPHandler{})
+
+	stream, err := New(
+		WithContext(ctx),
+		WithLogger(logger),
+		WithSession(session),
+		WithLifecycle(&fakeSIPLifecycleController{}),
+		WithCallContext(&callcontext.CallContext{}),
+	)
+	require.NoError(t, err)
+	streamer := stream.(*Streamer)
+	require.NotNil(t, streamer.mediaPort)
+	require.Eventually(t, func() bool {
+		return streamer.closed.Load() && streamer.mediaPort.closed.Load()
+	}, time.Second, time.Millisecond)
+}
+
+func TestNewOutboundStartsInputOnlyBeforeRuntimeStart(t *testing.T) {
+	logger, err := commons.NewApplicationLogger()
+	require.NoError(t, err)
+	session := newTestOutboundSIPSession(t, "outbound-input-only")
+	session.SetRTPHandler(&sip_runtime.RTPHandler{})
+
+	stream, err := New(
+		WithContext(t.Context()),
+		WithLogger(logger),
+		WithSession(session),
+		WithLifecycle(&fakeSIPLifecycleController{}),
+		WithCallContext(&callcontext.CallContext{}),
+	)
+	require.NoError(t, err)
+	streamer := stream.(*Streamer)
+	t.Cleanup(func() { require.NoError(t, streamer.Close()) })
+
+	require.NotNil(t, streamer.mediaPort)
+	assert.True(t, streamer.mediaPort.inputStarted.Load())
+	assert.False(t, streamer.mediaPort.outputStarted.Load())
+	assert.False(t, streamer.assistantOutputActive.Load())
+}
+
+func TestNew_RoutesBridgeRecordingOutsideRealtimeInput(t *testing.T) {
+	logger, err := commons.NewApplicationLogger()
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	session := newTestInboundSIPSession(t, "sip-recording-routing")
+	session.SetRTPHandler(&sip_runtime.RTPHandler{})
+	stream, err := New(
+		WithContext(ctx),
+		WithLogger(logger),
+		WithSession(session),
+		WithLifecycle(&fakeSIPLifecycleController{}),
+		WithCallContext(&callcontext.CallContext{}),
+	)
+	require.NoError(t, err)
+	streamer := stream.(*Streamer)
+	t.Cleanup(func() { require.NoError(t, streamer.Close()) })
+	require.Equal(t, RealtimeInputChannelCapacity, streamer.InputCh.Capacity())
+	select {
+	case message := <-streamer.CriticalCh:
+		_, ok := message.(*protos.ConversationInitialization)
+		require.True(t, ok, "expected conversation initialization, got %T", message)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for conversation initialization")
+	}
+
+	streamer.mediaPort.StartBridgeRecorder()
+	for range 8 {
+		streamer.mediaPort.RecordTransferOperatorAudio(make([]byte, 160))
+	}
+
+	select {
+	case message := <-streamer.LowCh:
+		recording, ok := message.(*protos.ConversationBridgeOperatorAudio)
+		require.True(t, ok, "expected bridge operator recording, got %T", message)
+		require.NotEmpty(t, recording.GetAudio())
+		require.Zero(t, len(recording.GetAudio())%2)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for bridge recording")
+	}
+
+	message, err := streamer.InputCh.TryReceive()
+	require.ErrorIs(t, err, channel.ErrEmpty, "recording must not occupy realtime input queue; got %T", message)
+}
+
 func TestSend_ConversationDisconnection_RecordsEventAndClosesStreamer(t *testing.T) {
 	s, collector := newTestSIPStreamerWithCollector(t)
 	session := newTestInboundSIPSession(t, "sip-streamer-disconnect")
@@ -222,7 +342,7 @@ func TestSend_ConversationDisconnection_RecordsEventAndClosesStreamer(t *testing
 	})
 	require.NoError(t, err)
 
-	// Server-initiated Send no longer requeues the disconnect onto CriticalCh —
+	// Server-initiated Send no longer requeues the disconnect onto CriticalCh.
 	// the server callsite already knows the reason. The talker exits via the
 	// Recv-err path once Close cancels s.Ctx.
 	select {

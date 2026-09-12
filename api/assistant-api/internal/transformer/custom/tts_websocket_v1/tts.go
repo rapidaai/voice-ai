@@ -20,7 +20,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
-	internal_audio_resampler "github.com/rapidaai/api/assistant-api/internal/audio/resampler"
+	resampler_soxr "github.com/rapidaai/api/assistant-api/internal/audio/resampler/soxr"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
@@ -48,6 +48,9 @@ type textToSpeech struct {
 	metricEmitted  bool
 
 	resampler         internal_type.AudioResampler
+	resampleWriter    internal_type.AudioStreamResampler
+	resampleMu        sync.Mutex
+	resampledAudio    []byte
 	sourceAudioConfig *protos.AudioConfig
 	targetAudioConfig *protos.AudioConfig
 }
@@ -87,26 +90,37 @@ func NewTextToSpeech(
 		}
 		return nil, err
 	}
-	resampler, err := internal_audio_resampler.GetResampler(logger)
-	if err != nil {
-		return nil, fmt.Errorf("custom-tts websocket_v1: failed to initialize audio resampler: %w", err)
-	}
 	ctx2, cancel := context.WithCancel(ctx)
-	return &textToSpeech{
+	audioResampler := resampler_soxr.New(
+		resampler_soxr.WithLogger(logger),
+		resampler_soxr.WithHighQuality(),
+	)
+	transformer := &textToSpeech{
 		config:    config,
 		engine:    config.newEngine(),
 		ctx:       ctx2,
 		cancel:    cancel,
 		logger:    logger,
 		onPacket:  onPacket,
-		resampler: resampler,
+		resampler: audioResampler,
 		sourceAudioConfig: &protos.AudioConfig{
 			SampleRate:  uint32(config.SampleRate),
 			AudioFormat: parseAudioEncoding(config.Encoding),
 			Channels:    1,
 		},
 		targetAudioConfig: internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG,
-	}, nil
+	}
+	resampleWriter, err := audioResampler.NewWriter(transformer.sourceAudioConfig, transformer.targetAudioConfig, func(output []byte) error {
+		transformer.resampledAudio = append(transformer.resampledAudio, output...)
+		return nil
+	})
+	if err != nil {
+		cancel()
+		audioResampler.Close()
+		return nil, err
+	}
+	transformer.resampleWriter = resampleWriter
+	return transformer, nil
 }
 
 func (*textToSpeech) Name() string {
@@ -147,6 +161,11 @@ func (transformer *textToSpeech) Close(ctx context.Context) error {
 
 	if conn != nil {
 		_ = conn.Close()
+	}
+	if transformer.resampleWriter != nil {
+		transformer.resampleWriter.Close()
+	} else if transformer.resampler != nil {
+		transformer.resampler.Close()
 	}
 
 	if !connectedAt.IsZero() {
@@ -352,6 +371,13 @@ func (transformer *textToSpeech) handleInterrupt(contextID string) {
 	if conn != nil {
 		_ = conn.Close()
 	}
+	if transformer.resampleWriter != nil {
+		transformer.resampleMu.Lock()
+		transformer.resampledAudio = transformer.resampledAudio[:0]
+		_ = transformer.resampleWriter.Flush()
+		transformer.resampledAudio = transformer.resampledAudio[:0]
+		transformer.resampleMu.Unlock()
+	}
 
 	if err := transformer.onPacket(internal_type.ObservabilityEventRecordPacket{
 		ContextID: contextID,
@@ -386,6 +412,13 @@ func (transformer *textToSpeech) getOrOpenConnection(scope queryScope) (*websock
 
 	if oldConn != nil {
 		_ = oldConn.Close()
+	}
+	if transformer.resampleWriter != nil {
+		transformer.resampleMu.Lock()
+		transformer.resampledAudio = transformer.resampledAudio[:0]
+		_ = transformer.resampleWriter.Flush()
+		transformer.resampledAudio = transformer.resampledAudio[:0]
+		transformer.resampleMu.Unlock()
 	}
 
 	connectionURL, err := transformer.engine.BuildConnectionURL(scope)
@@ -511,6 +544,33 @@ func (transformer *textToSpeech) readLoop(conn *websocket.Conn, contextID string
 			case readErrorIgnore:
 				return
 			case readErrorComplete:
+				if transformer.resampleWriter != nil {
+					transformer.resampleMu.Lock()
+					transformer.resampledAudio = transformer.resampledAudio[:0]
+					err := transformer.resampleWriter.Flush()
+					audio := append([]byte(nil), transformer.resampledAudio...)
+					transformer.resampledAudio = transformer.resampledAudio[:0]
+					transformer.resampleMu.Unlock()
+					if err != nil {
+						if err := transformer.onPacket(internal_type.TextToSpeechErrorPacket{
+							ContextID: contextID,
+							Error:     fmt.Errorf("custom-tts websocket_v1: failed to flush resampler: %w", err),
+							Type:      internal_type.TTSUnknownError,
+						}); err != nil {
+							transformer.logger.Errorf("custom-tts websocket_v1: onPacket failed: %v", err)
+						}
+						return
+					}
+					if len(audio) > 0 {
+						transformer.emitFirstAudioMetric(contextID)
+						if err := transformer.onPacket(internal_type.TextToSpeechAudioPacket{
+							ContextID:  contextID,
+							AudioChunk: audio,
+						}); err != nil {
+							transformer.logger.Errorf("custom-tts websocket_v1: onPacket failed: %v", err)
+						}
+					}
+				}
 				if err := transformer.onPacket(
 					internal_type.TextToSpeechEndPacket{ContextID: contextID},
 					internal_type.ObservabilityEventRecordPacket{
@@ -583,6 +643,9 @@ func (transformer *textToSpeech) readLoop(conn *websocket.Conn, contextID string
 				}
 				continue
 			}
+			if len(audio) == 0 {
+				continue
+			}
 
 			transformer.emitFirstAudioMetric(resolvedContextID)
 			if err := transformer.onPacket(internal_type.TextToSpeechAudioPacket{
@@ -604,6 +667,33 @@ func (transformer *textToSpeech) readLoop(conn *websocket.Conn, contextID string
 		}
 
 		if outcome.Done {
+			if transformer.resampleWriter != nil {
+				transformer.resampleMu.Lock()
+				transformer.resampledAudio = transformer.resampledAudio[:0]
+				err := transformer.resampleWriter.Flush()
+				audio := append([]byte(nil), transformer.resampledAudio...)
+				transformer.resampledAudio = transformer.resampledAudio[:0]
+				transformer.resampleMu.Unlock()
+				if err != nil {
+					if err := transformer.onPacket(internal_type.TextToSpeechErrorPacket{
+						ContextID: resolvedContextID,
+						Error:     fmt.Errorf("custom-tts websocket_v1: failed to flush resampler: %w", err),
+						Type:      internal_type.TTSUnknownError,
+					}); err != nil {
+						transformer.logger.Errorf("custom-tts websocket_v1: onPacket failed: %v", err)
+					}
+					return
+				}
+				if len(audio) > 0 {
+					transformer.emitFirstAudioMetric(resolvedContextID)
+					if err := transformer.onPacket(internal_type.TextToSpeechAudioPacket{
+						ContextID:  resolvedContextID,
+						AudioChunk: audio,
+					}); err != nil {
+						transformer.logger.Errorf("custom-tts websocket_v1: onPacket failed: %v", err)
+					}
+				}
+			}
 			transformer.dropConnection(conn)
 			if err := transformer.onPacket(
 				internal_type.TextToSpeechEndPacket{ContextID: resolvedContextID},
@@ -692,12 +782,24 @@ func (transformer *textToSpeech) emitFirstAudioMetric(contextID string) {
 }
 
 func (transformer *textToSpeech) normalizeAudioChunk(audio []byte) ([]byte, error) {
-	if transformer.resampler == nil {
-		return audio, nil
+	if transformer.resampleWriter != nil {
+		transformer.resampleMu.Lock()
+		transformer.resampledAudio = transformer.resampledAudio[:0]
+		err := transformer.resampleWriter.Write(audio)
+		output := append([]byte(nil), transformer.resampledAudio...)
+		transformer.resampledAudio = transformer.resampledAudio[:0]
+		transformer.resampleMu.Unlock()
+		if err != nil {
+			return nil, fmt.Errorf("custom-tts websocket_v1: failed to resample audio: %w", err)
+		}
+		return output, nil
 	}
-	audio, err := transformer.resampler.Resample(audio, transformer.sourceAudioConfig, transformer.targetAudioConfig)
-	if err != nil {
-		return nil, fmt.Errorf("custom-tts websocket_v1: failed to resample audio: %w", err)
+	if transformer.resampler != nil {
+		output, err := transformer.resampler.Resample(audio, transformer.sourceAudioConfig, transformer.targetAudioConfig)
+		if err != nil {
+			return nil, fmt.Errorf("custom-tts websocket_v1: failed to resample audio: %w", err)
+		}
+		return output, nil
 	}
 	return audio, nil
 }

@@ -35,7 +35,7 @@ const (
 	STTDefaultInterimResults = true
 	STTDefaultFillerWords    = true
 	STTDefaultVADEvents      = false
-	STTDefaultEndpointing    = "5"
+	STTDefaultEndpointing    = "500"
 	STTDefaultPunctuate      = true
 	STTDefaultNoDelay        = true
 	STTDefaultSampleRate     = 16000

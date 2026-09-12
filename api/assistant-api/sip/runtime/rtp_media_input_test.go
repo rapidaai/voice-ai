@@ -7,16 +7,156 @@
 package sip_runtime
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
+	"math"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zaf/g711"
 )
+
+func receiveInboundAudio(t testing.TB, audio <-chan InboundAudioFrame, timeout time.Duration) (InboundAudioFrame, error) {
+	t.Helper()
+	select {
+	case frame := <-audio:
+		return frame, nil
+	case <-time.After(timeout):
+		return InboundAudioFrame{}, context.DeadlineExceeded
+	}
+}
+
+func captureInboundAudio(t testing.TB, handler *RTPHandler, capacity int) chan InboundAudioFrame {
+	t.Helper()
+	audio := make(chan InboundAudioFrame, capacity)
+	handler.SetInboundAudioSink(func(frame InboundAudioFrame) {
+		audio <- frame
+	})
+	return audio
+}
+
+func startRTPInputReceiver(tester *testing.T) (*RTPHandler, <-chan InboundAudioFrame, func(*RTPPacket)) {
+	tester.Helper()
+	connection, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
+	require.NoError(tester, err)
+	sender, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
+	require.NoError(tester, err)
+	handler := newTestRTPHandler()
+	handler.conn = connection
+	handler.codec = &CodecPCMU
+	handler.inputPacketizationTime = 20 * time.Millisecond
+	handler.inputJitter = newRTPInputJitterBuffer(20 * time.Millisecond)
+	handler.inputSilenceFiller = newRTPInputSilenceFiller(&CodecPCMU, 20*time.Millisecond)
+	audio := captureInboundAudio(tester, handler, 32)
+	finished := make(chan struct{})
+	go func() {
+		defer close(finished)
+		handler.receiveLoop()
+	}()
+	tester.Cleanup(func() {
+		sender.Close()
+		handler.cancel()
+		connection.Close()
+		select {
+		case <-finished:
+		case <-time.After(time.Second):
+			tester.Error("receive loop did not stop")
+		}
+	})
+	return handler, audio, func(packet *RTPPacket) {
+		tester.Helper()
+		_, sendErr := sender.WriteToUDP(handler.serializeRTPPacket(packet), connection.LocalAddr().(*net.UDPAddr))
+		require.NoError(tester, sendErr)
+	}
+}
+
+func TestRTPHandler_ReordersAudioWithinDeadline(tester *testing.T) {
+	handler, audioIn, send := startRTPInputReceiver(tester)
+	sendPacket := func(sequence uint16, timestamp uint32, value byte) {
+		send(&RTPPacket{Version: 2, SequenceNumber: sequence, Timestamp: timestamp, SSRC: 42, Payload: bytes.Repeat([]byte{value}, 160)})
+	}
+	sendPacket(1, 0, 1)
+	audio, err := receiveInboundAudio(tester, audioIn, time.Second)
+	require.NoError(tester, err)
+	require.Equal(tester, bytes.Repeat([]byte{1}, 160), audio.Audio)
+	sendPacket(3, 320, 3)
+	_, err = receiveInboundAudio(tester, audioIn, 35*time.Millisecond)
+	require.ErrorIs(tester, err, context.DeadlineExceeded)
+	sendPacket(2, 160, 2)
+	for _, value := range []byte{2, 3} {
+		audio, receiveErr := receiveInboundAudio(tester, audioIn, time.Second)
+		require.NoError(tester, receiveErr)
+		require.Equal(tester, bytes.Repeat([]byte{value}, 160), audio.Audio)
+	}
+	require.Zero(tester, handler.GetDetailedStats().PacketsLost)
+	require.Zero(tester, handler.GetDetailedStats().LateOrDuplicatePackets)
+}
+
+func TestRTPHandler_TelephoneEventsDoNotBecomeAudioLoss(tester *testing.T) {
+	for _, eventSSRC := range []uint32{42, 99} {
+		tester.Run(fmt.Sprint(eventSSRC), func(tester *testing.T) {
+			handler, audioIn, send := startRTPInputReceiver(tester)
+			first := testRTPInputPacket(1, 0, 1)
+			first.SSRC = 42
+			send(first)
+			require.Eventually(tester, func() bool { return len(audioIn) == 1 }, time.Second, time.Millisecond)
+			_, err := receiveInboundAudio(tester, audioIn, time.Second)
+			require.NoError(tester, err)
+			send(&RTPPacket{Version: 2, SequenceNumber: 2, Timestamp: 160, SSRC: eventSSRC, PayloadType: 101, Payload: []byte{1, 0x80, 0, 160}})
+			nextSequence := uint16(3)
+			if eventSSRC != 42 {
+				nextSequence = 2
+			}
+			next := testRTPInputPacket(nextSequence, 160, 3)
+			next.SSRC = 42
+			send(next)
+			audio, err := receiveInboundAudio(tester, audioIn, time.Second)
+			require.NoError(tester, err)
+			require.Equal(tester, next.Payload, audio.Audio)
+			require.Zero(tester, handler.GetDetailedStats().PacketsLost)
+			require.Zero(tester, handler.GetDetailedStats().InvalidPackets)
+		})
+	}
+}
+
+func TestRTPHandler_InvalidTrafficDoesNotPostponeAudioDeadline(tester *testing.T) {
+	handler, audioIn, send := startRTPInputReceiver(tester)
+	send(testRTPInputPacket(1, 0, 1))
+	require.Eventually(tester, func() bool { return len(audioIn) == 1 }, time.Second, time.Millisecond)
+	_, err := receiveInboundAudio(tester, audioIn, time.Second)
+	require.NoError(tester, err)
+	send(testRTPInputPacket(3, 320, 3))
+	for index := 0; index < 15; index++ {
+		send(&RTPPacket{Version: 2, PayloadType: 96, Payload: []byte{1, 2, 3, 4}})
+	}
+	require.Eventually(tester, func() bool {
+		return handler.GetDetailedStats().InvalidPackets == 15
+	}, time.Second, time.Millisecond)
+	audio, err := receiveInboundAudio(tester, audioIn, time.Second)
+	require.NoError(tester, err)
+	require.Equal(tester, bytes.Repeat([]byte{3}, 160), audio.Audio)
+	require.Equal(tester, uint64(1), handler.GetDetailedStats().PacketsLost)
+}
+
+func TestRTPHandler_ZeroSSRCStreamCanRestart(tester *testing.T) {
+	_, audioIn, send := startRTPInputReceiver(tester)
+	send(testRTPInputPacket(100, 0, 1))
+	require.Eventually(tester, func() bool { return len(audioIn) == 1 }, time.Second, time.Millisecond)
+	_, err := receiveInboundAudio(tester, audioIn, time.Second)
+	require.NoError(tester, err)
+	next := testRTPInputPacket(1, 0, 2)
+	next.SSRC = 42
+	send(next)
+	audio, err := receiveInboundAudio(tester, audioIn, time.Second)
+	require.NoError(tester, err)
+	require.Equal(tester, next.Payload, audio.Audio)
+}
 
 func TestRTPHandler_ParseRTPPacketRejectsMalformedHeaders(t *testing.T) {
 	tests := []struct {
@@ -128,9 +268,11 @@ func TestNewRTPHandlerInitializesInputPacketizationTime(t *testing.T) {
 
 	handler.mu.RLock()
 	inputJitter := handler.inputJitter
+	inputSilenceFiller := handler.inputSilenceFiller
 	handler.mu.RUnlock()
 	require.NotNil(t, inputJitter)
-	assert.Equal(t, 30*time.Millisecond, inputJitter.playoutTimeout())
+	require.NotNil(t, inputSilenceFiller)
+	assert.Len(t, inputSilenceFiller.silencePayload, 240)
 }
 
 func TestRTPHandler_ReceiveLoopDropsNonAudioPayload(t *testing.T) {
@@ -148,6 +290,7 @@ func TestRTPHandler_ReceiveLoopDropsNonAudioPayload(t *testing.T) {
 	})
 	require.NoError(t, err)
 	defer handler.Stop()
+	audioIn := captureInboundAudio(t, handler, 1)
 	handler.Start()
 
 	sender, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
@@ -156,7 +299,7 @@ func TestRTPHandler_ReceiveLoopDropsNonAudioPayload(t *testing.T) {
 
 	_, err = sender.WriteToUDP(handler.serializeRTPPacket(&RTPPacket{
 		Version:        rtpVersion,
-		PayloadType:    101,
+		PayloadType:    96,
 		SequenceNumber: 1,
 		Timestamp:      0,
 		Payload:        []byte{0x01},
@@ -172,11 +315,33 @@ func TestRTPHandler_ReceiveLoopDropsNonAudioPayload(t *testing.T) {
 			stats.PacketsDelivered == 0
 	}, time.Second, 10*time.Millisecond)
 
-	select {
-	case audio := <-handler.AudioIn():
-		t.Fatalf("unexpected audio payload: %v", audio)
-	default:
-	}
+	assert.Empty(t, audioIn)
+}
+
+func TestRTPHandler_StartWithoutSinkReadsInboundPackets(t *testing.T) {
+	handler := newBoundRTPHandler(t, CodecPCMU)
+	handler.Start()
+
+	sender, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
+	require.NoError(t, err)
+	defer sender.Close()
+
+	localAddress := handler.LocalAddress()
+	packet := handler.serializeRTPPacket(&RTPPacket{
+		Version:        rtpVersion,
+		PayloadType:    CodecPCMU.PayloadType,
+		SequenceNumber: 1,
+		Timestamp:      160,
+		SSRC:           1234,
+		Payload:        []byte{0xff},
+	})
+	_, err = sender.WriteToUDP(packet, &net.UDPAddr{IP: net.ParseIP(localAddress.IP), Port: localAddress.Port})
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		stats := handler.GetDetailedStats()
+		return stats.PacketsReceived == 1 && !stats.LastRTPReceivedAt.IsZero()
+	}, time.Second, 10*time.Millisecond)
 }
 
 func TestRTPHandler_ReceiveLoopAcceptsNegotiatedAudioPayload(t *testing.T) {
@@ -194,6 +359,7 @@ func TestRTPHandler_ReceiveLoopAcceptsNegotiatedAudioPayload(t *testing.T) {
 	})
 	require.NoError(t, err)
 	defer handler.Stop()
+	audioIn := captureInboundAudio(t, handler, 1)
 	handler.Start()
 
 	sender, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
@@ -209,12 +375,9 @@ func TestRTPHandler_ReceiveLoopAcceptsNegotiatedAudioPayload(t *testing.T) {
 	}), &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
 	require.NoError(t, err)
 
-	select {
-	case audio := <-handler.AudioIn():
-		assert.Equal(t, []byte{0xD5}, audio)
-	case <-time.After(time.Second):
-		t.Fatal("expected negotiated audio payload")
-	}
+	audio, err := receiveInboundAudio(t, audioIn, time.Second)
+	require.NoError(t, err)
+	assert.Equal(t, []byte{0xD5}, audio.Audio)
 
 	stats := handler.GetDetailedStats()
 	assert.Equal(t, uint64(1), stats.PacketsDelivered)
@@ -237,6 +400,7 @@ func TestRTPHandler_ReceiveLoopResetsInputJitterOnSSRCChange(t *testing.T) {
 	})
 	require.NoError(t, err)
 	defer handler.Stop()
+	audioIn := captureInboundAudio(t, handler, 2)
 	handler.Start()
 
 	sender, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
@@ -254,12 +418,9 @@ func TestRTPHandler_ReceiveLoopResetsInputJitterOnSSRCChange(t *testing.T) {
 	_, err = sender.WriteToUDP(first, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
 	require.NoError(t, err)
 
-	select {
-	case audio := <-handler.AudioIn():
-		assert.Equal(t, []byte{0x01}, audio)
-	case <-time.After(time.Second):
-		t.Fatal("expected first SSRC audio")
-	}
+	audio, err := receiveInboundAudio(t, audioIn, time.Second)
+	require.NoError(t, err)
+	assert.Equal(t, []byte{0x01}, audio.Audio)
 
 	second := handler.serializeRTPPacket(&RTPPacket{
 		Version:        rtpVersion,
@@ -272,73 +433,38 @@ func TestRTPHandler_ReceiveLoopResetsInputJitterOnSSRCChange(t *testing.T) {
 	_, err = sender.WriteToUDP(second, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
 	require.NoError(t, err)
 
-	select {
-	case audio := <-handler.AudioIn():
-		assert.Equal(t, []byte{0x02}, audio)
-	case <-time.After(time.Second):
-		t.Fatal("expected second SSRC audio")
-	}
+	audio, err = receiveInboundAudio(t, audioIn, time.Second)
+	require.NoError(t, err)
+	assert.Equal(t, []byte{0x02}, audio.Audio)
 
 	stats := handler.GetDetailedStats()
 	assert.Equal(t, uint64(2), stats.PacketsDelivered)
 	assert.Zero(t, stats.LateOrDuplicatePackets)
 }
 
-func TestRTPHandler_EnqueueInboundAudioCountsInputQueueDrops(t *testing.T) {
+func TestRTPHandler_DeliverInboundAudioForwardsFramesInOrder(t *testing.T) {
 	handler := newTestRTPHandler()
-	handler.codec = &CodecPCMU
-	handler.inputJitter = newRTPInputJitterBuffer(&CodecPCMU, rtpDefaultPacketizationTime)
-	handler.audioInChan = make(chan []byte, 1)
-	handler.audioInChan <- []byte{0x01}
+	audioIn := captureInboundAudio(t, handler, 2)
 
-	stopped, enqueued := handler.enqueueInboundAudio([][]byte{{0x02}})
+	handler.deliverInboundAudio([]InboundAudioFrame{
+		{Audio: []byte{0x01}},
+		{Audio: []byte{0x02}},
+	})
 
-	assert.False(t, stopped)
-	assert.True(t, enqueued)
-	assert.Equal(t, []byte{0x02}, <-handler.audioInChan)
+	first, err := receiveInboundAudio(t, audioIn, time.Second)
+	require.NoError(t, err)
+	second, err := receiveInboundAudio(t, audioIn, time.Second)
+	require.NoError(t, err)
+	assert.Equal(t, []byte{0x01}, first.Audio)
+	assert.Equal(t, []byte{0x02}, second.Audio)
 	stats := handler.GetDetailedStats()
-	assert.Equal(t, uint64(1), stats.PacketsDelivered)
-	assert.Equal(t, uint64(1), stats.PacketsDropped)
-	assert.Equal(t, uint64(1), stats.AudioInputDropped)
-	assert.Equal(t, uint64(1), stats.RTPIngressQueueDropped)
-	assert.Zero(t, stats.PacketsLost)
-	assert.Zero(t, stats.NetworkPacketsLost)
-	assert.True(t, stats.LastRTPReceivedAt.IsZero())
-	assert.False(t, stats.LastAudioDeliveredAt.IsZero())
-}
-
-func TestRTPHandler_EnqueueInboundAudioReportsEnqueueState(t *testing.T) {
-	handler := newTestRTPHandler()
-	handler.audioInChan = make(chan []byte, 1)
-	handler.audioInChan <- []byte{0x01}
-
-	stopped, enqueued := handler.enqueueInboundAudio([][]byte{{0x02}})
-
-	assert.False(t, stopped)
-	assert.True(t, enqueued)
-	assert.Equal(t, []byte{0x02}, <-handler.audioInChan)
-	stats := handler.GetDetailedStats()
-	assert.Equal(t, uint64(1), stats.PacketsDelivered)
-	assert.Equal(t, uint64(1), stats.PacketsDropped)
-	assert.Equal(t, uint64(1), stats.AudioInputDropped)
-	assert.Equal(t, uint64(1), stats.RTPIngressQueueDropped)
-	assert.Zero(t, stats.NetworkPacketsLost)
-
-	stopped, enqueued = handler.enqueueInboundAudio([][]byte{{0x03}})
-
-	assert.False(t, stopped)
-	assert.True(t, enqueued)
-	stats = handler.GetDetailedStats()
 	assert.Equal(t, uint64(2), stats.PacketsDelivered)
-	assert.Equal(t, uint64(1), stats.PacketsDropped)
-	assert.Equal(t, uint64(1), stats.AudioInputDropped)
-	assert.Equal(t, uint64(1), stats.RTPIngressQueueDropped)
-	assert.Zero(t, stats.NetworkPacketsLost)
+	assert.Zero(t, stats.PacketsDropped)
 }
 
 func TestRTPHandler_DetailedStatsSeparateTransportAndDeliveryLiveness(t *testing.T) {
 	handler := newTestRTPHandler()
-	handler.audioInChan = make(chan []byte, 1)
+	audioIn := captureInboundAudio(t, handler, 1)
 
 	handler.markInboundRTPReceived(time.Now())
 
@@ -346,101 +472,138 @@ func TestRTPHandler_DetailedStatsSeparateTransportAndDeliveryLiveness(t *testing
 	assert.False(t, stats.LastRTPReceivedAt.IsZero())
 	assert.True(t, stats.LastAudioDeliveredAt.IsZero())
 
-	stopped, enqueued := handler.enqueueInboundAudio([][]byte{{0x01}})
-
-	require.False(t, stopped)
-	require.True(t, enqueued)
+	handler.deliverInboundAudio([]InboundAudioFrame{{Audio: []byte{0x01}}})
+	_, err := receiveInboundAudio(t, audioIn, time.Second)
+	require.NoError(t, err)
 	stats = handler.GetDetailedStats()
 	assert.False(t, stats.LastRTPReceivedAt.IsZero())
 	assert.False(t, stats.LastAudioDeliveredAt.IsZero())
 }
 
-func TestRTPHandler_EnqueueInboundAudioReportsPartialEnqueue(t *testing.T) {
+func TestRTPHandler_DeliverInboundAudioCountsMissingSink(t *testing.T) {
 	handler := newTestRTPHandler()
-	handler.audioInChan = make(chan []byte, 1)
-	handler.inboundQuality.recordReceived(time.Now(), 2)
 
-	stopped, enqueued := handler.enqueueInboundAudio([][]byte{{0x01}, {0x02}})
+	handler.deliverInboundAudio([]InboundAudioFrame{{Audio: []byte{0x01}}})
 
-	assert.False(t, stopped)
-	assert.True(t, enqueued)
-	assert.Equal(t, []byte{0x02}, <-handler.audioInChan)
 	stats := handler.GetDetailedStats()
-	assert.Equal(t, uint64(2), stats.PacketsDelivered)
+	assert.Zero(t, stats.PacketsDelivered)
 	assert.Equal(t, uint64(1), stats.PacketsDropped)
-	assert.Equal(t, uint64(1), stats.AudioInputDropped)
-	assert.Equal(t, uint64(1), stats.RTPIngressQueueDropped)
-	assert.Zero(t, stats.NetworkPacketsLost)
-	assert.Equal(t, rtpInboundQualityPoor, stats.InboundQuality)
-	assert.Equal(t, uint64(2), stats.InboundWindowPacketsReceived)
-	assert.Equal(t, uint64(2), stats.InboundWindowPacketsDelivered)
-	assert.Equal(t, uint64(1), stats.InboundWindowAudioInputDropped)
-	assert.InDelta(t, 0.5, stats.InboundLossRate, 0.0001)
-	assert.InDelta(t, 1.0/3.0, stats.InboundDropRate, 0.0001)
-	assert.InDelta(t, 2.0/3.0, stats.InboundDeliveryRate, 0.0001)
+}
+
+func TestRTPHandler_ClearInboundAudioSinkWaitsForActiveCallback(t *testing.T) {
+	handler := newTestRTPHandler()
+	sinkEntered := make(chan struct{})
+	releaseSink := make(chan struct{})
+	sinkCleared := make(chan struct{})
+
+	handler.SetInboundAudioSink(func(InboundAudioFrame) {
+		close(sinkEntered)
+		<-releaseSink
+	})
+	go handler.deliverInboundAudio([]InboundAudioFrame{{Audio: []byte{0x01}}})
+
+	select {
+	case <-sinkEntered:
+	case <-time.After(time.Second):
+		t.Fatalf("timed out waiting for sink callback")
+	}
+	go func() {
+		handler.SetInboundAudioSink(nil)
+		close(sinkCleared)
+	}()
+
+	select {
+	case <-sinkCleared:
+		t.Fatalf("sink cleared before active callback returned")
+	default:
+	}
+	close(releaseSink)
+	select {
+	case <-sinkCleared:
+	case <-time.After(time.Second):
+		t.Fatalf("timed out waiting for sink clear")
+	}
 }
 
 func TestRTPHandler_DetailedStatsSeparateInboundDropCategories(t *testing.T) {
 	handler := newTestRTPHandler()
-	buffer := newRTPInputJitterBuffer(&CodecPCMU, rtpDefaultPacketizationTime)
+	buffer := newRTPInputJitterBuffer(rtpDefaultPacketizationTime)
 	handler.inputJitter = buffer
-	handler.audioInChan = make(chan []byte, 1)
-	handler.audioInChan <- []byte{0x01}
+	handler.inputSilenceFiller = newRTPInputSilenceFiller(&CodecPCMU, rtpDefaultPacketizationTime)
+	captureInboundAudio(t, handler, 1)
 
-	require.Equal(t, [][]byte{{0x01}}, buffer.push(testRTPInputPacket(1, 0, 0x01)))
-	require.Len(t, buffer.push(testRTPInputPacket(2, 640, 0x02)), 4)
-	assert.Empty(t, buffer.push(testRTPInputPacket(4, 960, 0x04)))
-	require.Len(t, buffer.flushOnPlayoutTimeout(), 2)
-	assert.Empty(t, buffer.push(testRTPInputPacket(4, 960, 0x09)))
-	assert.Empty(t, buffer.push(testRTPInputPacket(6, 1120, 0x06)))
-	require.Equal(t, [][]byte{{0x10}}, buffer.push(testRTPInputPacket(1000, 159840, 0x10)))
+	arrivedAt := time.Now()
+	first := buffer.push(testRTPInputPacket(1, 0, 0x01), arrivedAt)
+	require.Len(t, first, 1)
+	require.Len(t, handler.inputSilenceFiller.process(first), 1)
+	ordered := buffer.push(testRTPInputPacket(2, 640, 0x02), arrivedAt)
+	require.Len(t, ordered, 1)
+	require.Len(t, handler.inputSilenceFiller.process(ordered), 4)
+	assert.Empty(t, buffer.push(testRTPInputPacket(4, 960, 0x04), arrivedAt))
+	require.Len(t, buffer.flushExpired(arrivedAt.Add(rtpInputReorderWindow)), 1)
+	assert.Empty(t, buffer.push(testRTPInputPacket(4, 960, 0x09), arrivedAt))
+	assert.Empty(t, buffer.push(testRTPInputPacket(6, 1120, 0x06), arrivedAt))
+	require.Len(t, buffer.push(testRTPInputPacket(1000, 159840, 0x10), arrivedAt), 1)
 
 	handler.packetsDropped.Add(1)
 	handler.invalidPackets.Add(1)
-	stopped, enqueued := handler.enqueueInboundAudio([][]byte{{0x02}})
-	require.False(t, stopped)
-	require.True(t, enqueued)
+	handler.deliverInboundAudio([]InboundAudioFrame{{Audio: []byte{0x02}}})
 
 	stats := handler.GetDetailedStats()
 	assert.Equal(t, uint64(1), stats.PacketsLost)
-	assert.Equal(t, uint64(1), stats.NetworkPacketsLost)
 	assert.Equal(t, uint64(1), stats.LateOrDuplicatePackets)
 	assert.Equal(t, uint64(1), stats.InvalidPackets)
 	assert.Equal(t, uint64(1), stats.JitterBufferResyncDropped)
-	assert.Equal(t, uint64(1), stats.RTPIngressQueueDropped)
 	assert.Equal(t, uint64(3), stats.SilenceSuppressionFrames)
-	assert.Equal(t, uint64(4), stats.PacketsDropped)
+	assert.Equal(t, uint64(3), stats.PacketsDropped)
 }
 
-func TestRTPHandler_StopOwnsLoopShutdownBeforeClosingChannels(t *testing.T) {
+func TestRTPHandler_StopWaitsForReceiveLoop(t *testing.T) {
 	handler := newTestRTPHandler()
+	audioIn := captureInboundAudio(t, handler, 1)
 	handler.loops.Add(1)
 	loopStarted := make(chan struct{})
+	loopFinished := make(chan struct{})
 	go func() {
 		defer handler.loops.Done()
+		defer close(loopFinished)
 		close(loopStarted)
 		<-handler.ctx.Done()
-		_, _ = handler.enqueueInboundAudio([][]byte{{0xFF}})
+		handler.deliverInboundAudio([]InboundAudioFrame{{Audio: []byte{0xFF}}})
 	}()
 
 	<-loopStarted
 	require.NoError(t, handler.Stop())
 	require.NoError(t, handler.Stop())
-
-	require.Eventually(t, func() bool {
-		select {
-		case _, ok := <-handler.audioInChan:
-			return !ok
-		default:
-			return false
-		}
-	}, time.Second, 10*time.Millisecond)
-
 	select {
-	case _, ok := <-handler.audioOutChan:
-		require.True(t, ok, "RTP output queue must not be closed by Stop")
+	case <-loopFinished:
+	default:
+		t.Fatalf("stop returned before receive loop finished")
+	}
+	select {
+	case audio := <-audioIn:
+		t.Fatalf("stop delivered audio after clearing sink: %v", audio.Audio)
 	default:
 	}
+}
+
+func TestRTPHandler_StopDropsPendingJitterAudioAfterClearingSink(t *testing.T) {
+	handler := newTestRTPHandler()
+	audioIn := captureInboundAudio(t, handler, 2)
+	arrivedAt := time.Unix(1, 0)
+	handler.inputJitter = newRTPInputJitterBuffer(20 * time.Millisecond)
+	handler.inputSilenceFiller = newRTPInputSilenceFiller(&CodecPCMU, 20*time.Millisecond)
+	handler.inputJitter.push(testRTPInputPacket(1, 0, 1), arrivedAt)
+	handler.inputJitter.push(testRTPInputPacket(3, 320, 3), arrivedAt)
+
+	require.NoError(t, handler.Stop())
+
+	select {
+	case audio := <-audioIn:
+		t.Fatalf("stop delivered pending jitter audio after clearing sink: %v", audio.Audio)
+	default:
+	}
+	assert.NotZero(t, handler.GetDetailedStats().PacketsDropped)
 }
 
 func TestRTPHandler_StopClosesUnstartedSocket(t *testing.T) {
@@ -562,6 +725,7 @@ func TestRTPHandler_SymmetricRTPUpdatesRemoteAddressFromPacketSource(t *testing.
 	defer handler.Stop()
 
 	handler.SetRemoteAddress(RTPAddress{IP: "127.0.0.1", Port: 9})
+	captureInboundAudio(t, handler, 1)
 	handler.Start()
 
 	sender, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
@@ -604,6 +768,7 @@ func TestRTPHandler_RemoteAddressStaysFromSDPWhenSymmetricRTPDisabled(t *testing
 	defer handler.Stop()
 
 	handler.SetRemoteAddress(RTPAddress{IP: "127.0.0.1", Port: 9})
+	captureInboundAudio(t, handler, 1)
 	handler.Start()
 
 	sender, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
@@ -647,6 +812,7 @@ func TestRTPHandler_DropsOversizedDatagramAndContinuesReceiving(t *testing.T) {
 	})
 	require.NoError(t, err)
 	defer handler.Stop()
+	audioIn := captureInboundAudio(t, handler, 1)
 	handler.Start()
 
 	sender, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
@@ -679,12 +845,9 @@ func TestRTPHandler_DropsOversizedDatagramAndContinuesReceiving(t *testing.T) {
 	_, err = sender.WriteToUDP(valid, destination)
 	require.NoError(t, err)
 
-	select {
-	case audio := <-handler.AudioIn():
-		assert.Equal(t, []byte{0xFF}, audio)
-	case <-time.After(time.Second):
-		t.Fatal("expected valid RTP after oversized datagram")
-	}
+	audio, err := receiveInboundAudio(t, audioIn, time.Second)
+	require.NoError(t, err)
+	assert.Equal(t, []byte{0xFF}, audio.Audio)
 }
 
 func TestRTPHandler_MediaTimeoutUsesInitialWindow(t *testing.T) {
@@ -770,18 +933,115 @@ func TestRTPHandler_MediaTimeoutStaysOpenWhileAudioFlows(t *testing.T) {
 	}
 }
 
-func TestRTPHandler_EnqueueAudioReportsBackpressureAndStopped(t *testing.T) {
+func TestRTPHandler_WriteAudioWritesFrameAndReportsStopped(t *testing.T) {
 	handler := newTestRTPHandler()
-	for i := 0; i < cap(handler.audioOutChan); i++ {
-		require.NoError(t, handler.EnqueueAudio([]byte{byte(i)}))
-	}
-
-	err := handler.EnqueueAudio([]byte{0xff})
-	require.Error(t, err)
-	assert.True(t, errors.Is(err, ErrRTPOutputQueueFull))
+	receiver := attachRTPOutputReceiver(t, handler)
+	require.NoError(t, handler.WriteAudio([]byte{0x01, 0xff}))
+	assert.Equal(t, []byte{0x01, 0xff}, readRTPPayload(t, handler, receiver))
 
 	require.NoError(t, handler.Stop())
-	err = handler.EnqueueAudio([]byte{0x01})
+	err := handler.WriteAudio([]byte{0x01})
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, ErrRTPHandlerStopped))
+}
+
+func TestRTPHandler_G711UDPContinuousWaveform(t *testing.T) {
+	const (
+		frameCount      = 10
+		samplesPerFrame = 160
+	)
+
+	for _, codec := range []Codec{CodecPCMU, CodecPCMA} {
+		t.Run(codec.Name, func(t *testing.T) {
+			receiver := newBoundRTPHandler(t, codec)
+			inboundAudio := captureInboundAudio(t, receiver, frameCount)
+			receiver.Start()
+
+			sender := newBoundRTPHandler(t, codec)
+			sender.Start()
+			sender.SetRemoteAddress(receiver.LocalAddress())
+
+			pcm := make([]byte, frameCount*samplesPerFrame*2)
+			for sampleIndex := 0; sampleIndex < frameCount*samplesPerFrame; sampleIndex++ {
+				sample := int16(12000 * math.Sin(2*math.Pi*440*float64(sampleIndex)/8000))
+				binary.LittleEndian.PutUint16(pcm[sampleIndex*2:], uint16(sample))
+			}
+
+			encodedFrames := make([][]byte, frameCount)
+			for frameIndex := range frameCount {
+				start := frameIndex * samplesPerFrame * 2
+				end := start + samplesPerFrame*2
+				encodedFrames[frameIndex] = g711.EncodeUlaw(pcm[start:end])
+				if codec.Name == CodecPCMA.Name {
+					encodedFrames[frameIndex] = g711.EncodeAlaw(pcm[start:end])
+				}
+				require.NoError(t, sender.WriteAudio(encodedFrames[frameIndex]))
+			}
+
+			decoded := make([]byte, 0, len(pcm))
+			var previousReceivedAt time.Time
+			for frameIndex, expected := range encodedFrames {
+				frame, err := receiveInboundAudio(t, inboundAudio, time.Second)
+				require.NoError(t, err)
+				require.Equalf(t, expected, frame.Audio, "frame %d payload", frameIndex)
+				require.False(t, frame.ReceivedAt.IsZero())
+				if !previousReceivedAt.IsZero() {
+					require.False(t, frame.ReceivedAt.Before(previousReceivedAt))
+				}
+				previousReceivedAt = frame.ReceivedAt
+
+				decodedFrame := g711.DecodeUlaw(frame.Audio)
+				if codec.Name == CodecPCMA.Name {
+					decodedFrame = g711.DecodeAlaw(frame.Audio)
+				}
+				decoded = append(decoded, decodedFrame...)
+			}
+			require.Len(t, decoded, len(pcm))
+
+			var totalError int64
+			for sampleIndex := 0; sampleIndex < frameCount*samplesPerFrame; sampleIndex++ {
+				original := int64(int16(binary.LittleEndian.Uint16(pcm[sampleIndex*2:])))
+				roundTrip := int64(int16(binary.LittleEndian.Uint16(decoded[sampleIndex*2:])))
+				sampleError := original - roundTrip
+				if sampleError < 0 {
+					sampleError = -sampleError
+				}
+				totalError += sampleError
+			}
+			assert.Less(t, totalError/(frameCount*samplesPerFrame), int64(500))
+
+			senderStats := sender.GetDetailedStats()
+			assert.Equal(t, uint64(frameCount), senderStats.PacketsSent)
+			assert.Equal(t, uint64(frameCount*samplesPerFrame), senderStats.BytesSent)
+
+			receiverStats := receiver.GetDetailedStats()
+			assert.Equal(t, uint64(frameCount), receiverStats.PacketsReceived)
+			assert.Equal(t, uint64(frameCount), receiverStats.PacketsDelivered)
+			assert.Equal(t, uint64(frameCount*samplesPerFrame), receiverStats.BytesReceived)
+			assert.Zero(t, receiverStats.PacketsLost)
+			assert.Zero(t, receiverStats.PacketsDropped)
+			assert.Zero(t, receiverStats.LateOrDuplicatePackets)
+			assert.Zero(t, receiverStats.InvalidPackets)
+		})
+	}
+}
+
+func newBoundRTPHandler(t *testing.T, codec Codec) *RTPHandler {
+	t.Helper()
+	handler, err := NewRTPHandler(t.Context(), &RTPConfig{
+		LocalAddress: RTPAddress{
+			IP:   "127.0.0.1",
+			Port: 0,
+		},
+		RTPPortRangeStart: 20000,
+		RTPPortRangeEnd:   20999,
+		PayloadType:       codec.PayloadType,
+		ClockRate:         codec.ClockRate,
+		PacketizationTime: 20 * time.Millisecond,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, handler.Stop())
+	})
+	return handler
 }

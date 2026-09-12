@@ -36,7 +36,7 @@ const (
 	// Default configuration values aligned with Pipecat-style VAD options.
 	defaultConfidence = 0.7
 	defaultStartSecs  = 0.2
-	defaultStopSecs   = 0.2
+	defaultStopSecs   = 0.5
 )
 
 // -----------------------------------------------------------------------------

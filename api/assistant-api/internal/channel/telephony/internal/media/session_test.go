@@ -1,6 +1,7 @@
 package internal_telephony_media
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"sync/atomic"
@@ -8,7 +9,6 @@ import (
 	"time"
 
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
-	internal_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/protos"
@@ -77,12 +77,6 @@ func (mediaEngine *fakeMediaEngine) OutputFrameDuration() time.Duration {
 	}
 	return mediaEngine.frameDuration
 }
-
-func (mediaEngine *fakeMediaEngine) OutputHealthSnapshot() internal_output.HealthSnapshot {
-	return internal_output.HealthSnapshot{}
-}
-
-func (mediaEngine *fakeMediaEngine) OnTickHealth(_ internal_output.TickHealth) {}
 
 func mustAnyValue(t *testing.T, value *structpb.Value) *anypb.Any {
 	t.Helper()
@@ -174,6 +168,11 @@ func TestMediaSession_HandleProviderAudioFrame_EmitsBridgeAndPipelineAudio(t *te
 	}
 	if !userAudio.Time.AsTime().Equal(receivedAt) {
 		t.Fatalf("user time=%s want=%s", userAudio.Time.AsTime(), receivedAt)
+	}
+	select {
+	case stream := <-streams:
+		t.Fatalf("unexpected extra stream %T", stream)
+	default:
 	}
 }
 
@@ -471,5 +470,38 @@ func TestMediaSession_HandleInterrupt_ClearsAndSendsProviderClear(t *testing.T) 
 		}
 	case <-time.After(200 * time.Millisecond):
 		t.Fatal("timed out waiting clear record")
+	}
+}
+
+func TestMediaSession_HandleInterruptDropsFetchedOutputFrame(t *testing.T) {
+	mediaEngine := &fakeMediaEngine{outputFrames: make(chan AssistantOutputFrame, 1)}
+	mediaEngine.outputFrames <- AssistantOutputFrame{
+		ProviderAudio: []byte{1, 2},
+		BridgeAudio:   []byte{3, 4},
+	}
+	written := make(chan AssistantOutputFrame, 1)
+	mediaSession := NewMediaSession(MediaSessionConfig{
+		Context:     context.Background(),
+		MediaEngine: mediaEngine,
+		OutputSink: func(frame AssistantOutputFrame) error {
+			written <- frame
+			return nil
+		},
+	})
+
+	providerAudio := mediaSession.NextFrame()
+	if !bytes.Equal(providerAudio, []byte{1, 2}) {
+		t.Fatalf("provider audio=%v want=[1 2]", providerAudio)
+	}
+
+	mediaSession.HandleInterrupt()
+	if err := mediaSession.ConsumeFrame(providerAudio); err != nil {
+		t.Fatalf("consume interrupted frame: %v", err)
+	}
+
+	select {
+	case frame := <-written:
+		t.Fatalf("interrupted frame was written: %+v", frame)
+	default:
 	}
 }

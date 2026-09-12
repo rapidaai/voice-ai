@@ -102,7 +102,7 @@ describe('Deepgram STT — config vs original', () => {
     expect(findMeta(result, 'listen.model')).toBe('nova-3');
     expect(findMeta(result, 'listen.smart_format')).toBe('true');
     expect(findMeta(result, 'listen.filler_words')).toBe('true');
-    expect(findMeta(result, 'listen.endpointing')).toBe('5');
+    expect(findMeta(result, 'listen.endpointing')).toBe('500');
     expect(findMeta(result, 'listen.punctuate')).toBe('true');
     expect(findMeta(result, 'listen.diarize')).toBe('false');
     expect(findMeta(result, 'listen.language')).toBe('multi');
@@ -389,6 +389,15 @@ describe('Cartesia STT — config vs original', () => {
     const opts = [
       cred(),
       createMetadata('listen.model', 'ink-2'),
+      createMetadata('listen.language', 'en'),
+    ];
+    expect(validateFromConfig(config, 'stt', 'cartesia', opts)).toBeUndefined();
+  });
+
+  it('validates: legacy ink-whisper options remain valid', () => {
+    const opts = [
+      cred(),
+      createMetadata('listen.model', 'ink-whisper'),
       createMetadata('listen.language', 'en'),
     ];
     expect(validateFromConfig(config, 'stt', 'cartesia', opts)).toBeUndefined();

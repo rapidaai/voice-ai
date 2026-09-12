@@ -62,7 +62,8 @@ func requireSingleInitializationFailedPacket(t *testing.T, r *genericRequestor) 
 	t.Helper()
 
 	select {
-	case env := <-r.channels.BootstrapChannel():
+	case <-r.channels.BootstrapChannel().Ready():
+		env := receiveEnvelope(t, r.channels.BootstrapChannel())
 		pkt, ok := env.Pkt.(internal_type.InitializationFailedPacket)
 		require.True(t, ok, "expected InitializationFailedPacket, got %T", env.Pkt)
 		return pkt
@@ -76,7 +77,8 @@ func requireSingleModeSwitchErrorFromEgress(t *testing.T, r *genericRequestor) i
 	t.Helper()
 
 	select {
-	case env := <-r.channels.EgressChannel():
+	case <-r.channels.EgressChannel().Ready():
+		env := receiveEnvelope(t, r.channels.EgressChannel())
 		pkt, ok := env.Pkt.(internal_type.ModeSwitchErrorPacket)
 		require.True(t, ok, "expected ModeSwitchErrorPacket, got %T", env.Pkt)
 		return pkt
@@ -165,10 +167,9 @@ func TestHandleSpeechToText_WithEOSExecutor_ExecutesAndSkipsFallback(t *testing.
 	assert.NotEmpty(t, sttPkt.ContextID)
 	assert.NotEqual(t, "ctx-eos-stt", sttPkt.ContextID)
 
-	select {
-	case env := <-r.channels.IngressChannel():
+	if r.channels.IngressChannel().Len() > 0 {
+		env := receiveEnvelope(t, r.channels.IngressChannel())
 		t.Fatalf("unexpected fallback packet when EOS executor exists: %T", env.Pkt)
-	default:
 	}
 }
 
@@ -183,10 +184,9 @@ func TestHandleSpeechToText_WithoutEOSExecutor_EmitsFallbackOnlyForFinal(t *test
 		Interim: true,
 	})
 
-	select {
-	case env := <-r.channels.IngressChannel():
+	if r.channels.IngressChannel().Len() > 0 {
+		env := receiveEnvelope(t, r.channels.IngressChannel())
 		t.Fatalf("unexpected packet for interim STT fallback: %T", env.Pkt)
-	default:
 	}
 
 	h.HandleSpeechToText(t.Context(), internal_type.SpeechToTextPacket{
@@ -195,18 +195,14 @@ func TestHandleSpeechToText_WithoutEOSExecutor_EmitsFallbackOnlyForFinal(t *test
 		Interim:   false,
 	})
 
-	select {
-	case env := <-r.channels.IngressChannel():
-		eosPkt, ok := env.Pkt.(internal_type.EndOfSpeechPacket)
-		require.True(t, ok, "expected EndOfSpeechPacket, got %T", env.Pkt)
-		assert.NotEmpty(t, eosPkt.ContextID)
-		assert.NotEqual(t, "ctx-eos-fallback", eosPkt.ContextID)
-		assert.Equal(t, "final text", eosPkt.Speech)
-		require.Len(t, eosPkt.Speechs, 1)
-		assert.False(t, eosPkt.Speechs[0].Interim)
-	default:
-		t.Fatal("expected EndOfSpeech fallback packet for final STT")
-	}
+	env := receiveEnvelope(t, r.channels.IngressChannel())
+	eosPkt, ok := env.Pkt.(internal_type.EndOfSpeechPacket)
+	require.True(t, ok, "expected EndOfSpeechPacket, got %T", env.Pkt)
+	assert.NotEmpty(t, eosPkt.ContextID)
+	assert.NotEqual(t, "ctx-eos-fallback", eosPkt.ContextID)
+	assert.Equal(t, "final text", eosPkt.Speech)
+	require.Len(t, eosPkt.Speechs, 1)
+	assert.False(t, eosPkt.Speechs[0].Interim)
 }
 
 func TestHandleEndOfSpeechInterruption_ExecutesEOS(t *testing.T) {
@@ -243,7 +239,8 @@ func TestHandleFinalizeEndOfSpeech_ClosesExecutorAndEnqueuesNextFinalize(t *test
 	assert.NotNil(t, executor.lastCloseCtx)
 
 	select {
-	case env := <-r.channels.DataChannel():
+	case <-r.channels.DataChannel().Ready():
+		env := receiveEnvelope(t, r.channels.DataChannel())
 		pkt, ok := env.Pkt.(internal_type.FinalizeVoiceActivityDetectionPacket)
 		require.True(t, ok, "expected FinalizeVoiceActivityDetectionPacket, got %T", env.Pkt)
 		assert.Equal(t, "ctx-eos-finalize", pkt.ContextID)

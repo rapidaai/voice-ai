@@ -1,0 +1,40 @@
+{
+  "request": "commit and create PR",
+  "publication_mode": "draft_pull_request",
+  "merge_ready": false,
+  "base_branch": "chore/sip-input-audio-improvement",
+  "prior_pr": 271,
+  "prior_pr_state": "merged",
+  "fresh_verification": {
+    "native_race_integration": {
+      "command": "go test -p 1 -race -tags=integration -count=1 -timeout=300s ./api/assistant-api/internal/end_of_speech/... ./api/assistant-api/internal/options",
+      "exit_code": 0,
+      "earlier_attempt": "Concurrent run exceeded the 120-second package deadline. The complete suite passed when rerun serially without code or test changes."
+    },
+    "focused_ui": "4 suites and 44 tests passed",
+    "agent_finalize": "Passed for staged files; 24 provider UI suites, 425 tests, and targeted backend package tests passed",
+    "staged_diff_check": "passed",
+    "reviewed_source_hashes": "Staged runtime, UI and SQL bytes match the independent review inventories"
+  },
+  "workspace_changes_since_review": {
+    "absent_files": [
+      "bin/verify-eos-options-migration.sh",
+      "tests/integration/eos-options/seed.sql",
+      "tests/integration/eos-options/test_migration.py"
+    ],
+    "unstaged_deletion_excluded_from_commit": "bin/verify-phase3-migrations.sh",
+    "handling": "Do not restore removed files or commit the unrelated tracked deletion. Earlier migration test evidence is historical; it is not a fresh reproducible check of this publication."
+  },
+  "remaining_merge_requirements": [
+    "Resolve the absent migration test harness and rerun the migration checks.",
+    "Update and rerun full migration history verification. The retained repository script expects assistant-api60 and web-api12, while migration heads are61 and13.",
+    "Complete CI and review for the submitted diff.",
+    "Keep the previously identified model-quality and asset-revision concerns separate from configuration migration correctness."
+  ],
+  "migration": {
+    "version": 61,
+    "direction": "forward_only",
+    "recovery": "Restore a pre-migration backup and matching migration version metadata.",
+    "live_database_used": false
+  }
+}

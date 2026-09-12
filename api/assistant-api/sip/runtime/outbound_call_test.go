@@ -17,13 +17,13 @@ import (
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
-	internal_outbound "github.com/rapidaai/api/assistant-api/sip/internal/outbound"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func newOutboundSessionForTest(t *testing.T, config *Config, callID string) *Session {
+func newOutboundSessionForTest(t *testing.T, config *sip_config.Config, callID string) *Session {
 	t.Helper()
 	session, err := NewSession(context.Background(),
 		WithSessionConfig(config),
@@ -51,6 +51,29 @@ func TestNewOutboundCall_OwnsLifecycleDependencies(t *testing.T) {
 	assert.Equal(t, request, outboundCall.request)
 }
 
+func TestOutboundConnectRejectsInvalidRequest(t *testing.T) {
+	outboundCall := NewOutbound(nil, nil, nil, nil, OutboundInviteRequest{})
+
+	_, err := outboundCall.Connect()
+
+	require.ErrorIs(t, err, sip_config.ErrInvalidConfig)
+}
+
+func TestOutboundHandleCallInvalidRequestFailsBeforeAnswer(t *testing.T) {
+	server := &Server{logger: bridgeTestLogger()}
+	session := newOutboundSessionForTest(t, testOutboundConfig(), "invalid-outbound-request")
+	statusRecorder := newOutboundStatusRecorder()
+	outboundCall := NewOutbound(server, session, &outboundDialog{}, nil, OutboundInviteRequest{})
+	outboundCall.statusObserver = statusRecorder.Record
+
+	outboundCall.HandleCall()
+
+	assert.Equal(t, CallStateFailed, session.GetState())
+	failedStatus := statusRecorder.LastStatus(t, OutboundCallStatusFailed)
+	assert.Equal(t, string(OutboundFailureSetup), failedStatus.FailureClass)
+	assert.Equal(t, LifecycleReasonOutboundSetupFailure.String(), failedStatus.DisconnectReason)
+}
+
 func TestOutboundDialogInviteRejectsEmptyCallID(t *testing.T) {
 	request, err := NewOutboundInviteRequest(testOutboundConfig(), "+15551234567", "+15557654321")
 	require.NoError(t, err)
@@ -58,7 +81,7 @@ func TestOutboundDialogInviteRejectsEmptyCallID(t *testing.T) {
 
 	err = dialog.Invite(context.Background(), "test-sdp")
 
-	require.ErrorIs(t, err, ErrInvalidConfig)
+	require.ErrorIs(t, err, sip_config.ErrInvalidConfig)
 	assert.Contains(t, err.Error(), "outbound call ID is required")
 }
 
@@ -68,7 +91,7 @@ func TestOutboundCallInviteHandlerUsesAuthoritativeRequestIdentity(t *testing.T)
 	require.NoError(t, err)
 	inviteRequest := sip.NewRequest(sip.INVITE, sip.Uri{
 		Scheme: "sip",
-		User:   request.Identity.ToUser,
+		User:   request.Address.To,
 		Host:   request.Config.Address,
 		Port:   request.Config.Port,
 	})
@@ -101,7 +124,7 @@ func TestOutboundCallInviteHandlerPreservesPhoneInputs(t *testing.T) {
 	require.NoError(t, err)
 	inviteRequest := sip.NewRequest(sip.INVITE, sip.Uri{
 		Scheme: "sip",
-		User:   request.Identity.ToUser,
+		User:   request.Address.To,
 		Host:   request.Config.Address,
 		Port:   request.Config.Port,
 	})
@@ -119,22 +142,57 @@ func TestOutboundCallInviteHandlerPreservesPhoneInputs(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestOutboundCallApplicationReadyHandlerPreservesPhoneInputs(t *testing.T) {
+	server := &Server{logger: bridgeTestLogger()}
+	request, err := NewOutboundInviteRequest(testOutboundConfig(), " +15551234567 ", " 07249994778 ")
+	require.NoError(t, err)
+	inviteRequest := sip.NewRequest(sip.INVITE, sip.Uri{
+		Scheme: "sip",
+		User:   request.Address.To,
+		Host:   request.Config.Address,
+		Port:   request.Config.Port,
+	})
+	session := &Session{info: SessionInfo{CallID: "outbound-application-ready"}}
+	dialog := &outboundDialog{dialogSession: &sipgo.DialogClientSession{Dialog: sipgo.Dialog{InviteRequest: inviteRequest}}}
+
+	server.SetOnApplicationReady(func(_ *Session, _ string, callAddress CallAddress) error {
+		assert.Equal(t, "07249994778", callAddress.From)
+		assert.Equal(t, "+15551234567", callAddress.To)
+		return nil
+	})
+
+	err = NewOutbound(server, session, dialog, nil, request).callOutboundApplicationReadyHandler()
+
+	require.NoError(t, err)
+}
+
+func TestOutboundCallPrimaryLegGuardSkipsTransferBridge(t *testing.T) {
+	session := &Session{info: SessionInfo{CallID: "transfer-bridge-leg"}}
+	session.SetMetadata(MetadataOutboundLegPurpose, string(OutboundLegPurposeTransferBridge))
+	request, err := NewOutboundInviteRequest(testOutboundConfig(), "transfer-target", "transfer-assistant")
+	require.NoError(t, err)
+
+	outboundCall := NewOutbound(&Server{}, session, &outboundDialog{}, nil, request)
+
+	assert.False(t, outboundCall.isPrimaryOutboundLeg())
+}
+
 func TestTransferLegCallAddressDoesNotInheritParentIdentity(t *testing.T) {
 	request, err := NewOutboundInviteRequest(testOutboundConfig(), "transfer-target", "transfer-assistant")
 	require.NoError(t, err)
 	inviteRequest := sip.NewRequest(sip.INVITE, sip.Uri{
 		Scheme: "sip",
-		User:   request.Identity.ToUser,
+		User:   request.Address.To,
 		Host:   request.Config.Address,
 		Port:   request.Config.Port,
 	})
 
 	address := NewCallAddress(inviteRequest)
-	if validator.Phone(request.Identity.FromUser) {
-		address.From = request.Identity.FromUser
+	if validator.Phone(request.Address.From) {
+		address.From = request.Address.From
 	}
-	if validator.Phone(request.Identity.ToUser) {
-		address.To = request.Identity.ToUser
+	if validator.Phone(request.Address.To) {
+		address.To = request.Address.To
 	}
 
 	assert.Empty(t, address.From)
@@ -298,7 +356,7 @@ func TestOutboundCall_PreAnswerLifecycleCancelSendsSIPCancel(t *testing.T) {
 	inviteRequest := requester.inviteRequest()
 	require.NotNil(t, cancelRequest)
 	require.NotNil(t, inviteRequest)
-	assert.Equal(t, internal_outbound.SIPUserAgent, cancelRequest.GetHeader("User-Agent").Value())
+	assert.Equal(t, sipUserAgent, cancelRequest.GetHeader("User-Agent").Value())
 	require.NotNil(t, cancelRequest.MaxForwards())
 	require.NotNil(t, cancelRequest.CSeq())
 	assert.Equal(t, sip.CANCEL, cancelRequest.CSeq().MethodName)
@@ -363,7 +421,7 @@ func TestOutboundCall_RingingTimeoutSendsLifecycleCancel(t *testing.T) {
 	}, time.Second, 10*time.Millisecond)
 	cancelRequest := requester.cancelRequest()
 	require.NotNil(t, cancelRequest)
-	assert.Equal(t, internal_outbound.SIPUserAgent, cancelRequest.GetHeader("User-Agent").Value())
+	assert.Equal(t, sipUserAgent, cancelRequest.GetHeader("User-Agent").Value())
 	failureClass, ok := session.GetMetadata("sip.failure_class")
 	require.True(t, ok)
 	failureReason, ok := session.GetMetadata("sip.failure_reason")
@@ -510,8 +568,8 @@ func TestOutboundCall_AnsweredSDPFailureSendsBYENotCancel(t *testing.T) {
 	assert.Equal(t, OutboundDialogPhaseTerminated, session.GetOutboundDialogPhase())
 	assertOutboundRouteSet(t, requester.ackRequest(), "<sip:p1.example.com;lr>", "<sip:p2.example.com;lr>")
 	assertOutboundRouteSet(t, requester.byeRequest(), "<sip:p1.example.com;lr>", "<sip:p2.example.com;lr>")
-	assert.Equal(t, internal_outbound.SIPUserAgent, requester.ackRequest().GetHeader("User-Agent").Value())
-	assert.Equal(t, internal_outbound.SIPUserAgent, requester.byeRequest().GetHeader("User-Agent").Value())
+	assert.Equal(t, sipUserAgent, requester.ackRequest().GetHeader("User-Agent").Value())
+	assert.Equal(t, sipUserAgent, requester.byeRequest().GetHeader("User-Agent").Value())
 	require.NotNil(t, requester.inviteRequest())
 	assert.Equal(t, requester.inviteRequest().CSeq().SeqNo, requester.ackRequest().CSeq().SeqNo)
 	assert.Equal(t, requester.inviteRequest().CSeq().SeqNo+1, requester.byeRequest().CSeq().SeqNo)

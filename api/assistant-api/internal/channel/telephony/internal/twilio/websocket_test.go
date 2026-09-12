@@ -17,7 +17,6 @@ import (
 	"github.com/gorilla/websocket"
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
-	internal_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
 	internal_twilio "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/twilio/internal"
@@ -84,12 +83,6 @@ func (engine *fakeTwilioMediaEngine) OutputFrameDuration() time.Duration {
 	return 20 * time.Millisecond
 }
 
-func (engine *fakeTwilioMediaEngine) OutputHealthSnapshot() internal_output.HealthSnapshot {
-	return internal_output.HealthSnapshot{}
-}
-
-func (engine *fakeTwilioMediaEngine) OnTickHealth(_ internal_output.TickHealth) {}
-
 // testWSPair creates a connected WebSocket client/server pair for unit tests.
 // The server side is discarded; only the client *websocket.Conn is returned.
 // The caller should call cleanup() when done.
@@ -145,7 +138,7 @@ func newTestTwilioStreamer(t *testing.T) (*twilioWebsocketStreamer, func()) {
 		streamID:   "test-stream",
 		connection: conn,
 	}
-	// Note: we do NOT start runWebSocketReader — tests exercise Send only.
+	// Do not start runWebSocketReader because these tests exercise Send only.
 	return tws, cleanup
 }
 
@@ -201,7 +194,7 @@ func TestHandleMediaEvent_EmitsBridgeUserAudio(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case stream := <-tws.InputCh:
+	case stream := <-tws.LowCh:
 		bridgeAudio, ok := stream.(*protos.ConversationBridgeUserAudio)
 		require.True(t, ok, "expected bridge user audio, got %T", stream)
 		assert.NotEmpty(t, bridgeAudio.GetAudio())

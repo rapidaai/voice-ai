@@ -51,7 +51,7 @@ func TestDispatchPolicy_IgnoreDropsMatchingPacketAndPassthroughRestoresDispatch(
 		ContextID: "audio-dropped",
 		Audio:     []byte("audio"),
 	})
-	if got := len(r.channels.IngressChannel()); got != 0 {
+	if got := r.channels.IngressChannel().Len(); got != 0 {
 		t.Fatalf("expected ignored user audio to skip handler execution, ingress len=%d", got)
 	}
 
@@ -63,7 +63,7 @@ func TestDispatchPolicy_IgnoreDropsMatchingPacketAndPassthroughRestoresDispatch(
 		ContextID: "audio-allowed",
 		Audio:     []byte("audio"),
 	})
-	if got := len(r.channels.IngressChannel()); got != 2 {
+	if got := r.channels.IngressChannel().Len(); got != 2 {
 		t.Fatalf("expected passthrough user audio handler to enqueue downstream packets, ingress len=%d", got)
 	}
 }
@@ -82,7 +82,7 @@ func TestDispatchPolicy_IgnoreDoesNotDropUnrelatedPacket(t *testing.T) {
 		Result:    map[string]string{"ok": "true"},
 	})
 
-	if got := len(r.channels.DataChannel()); got != 1 {
+	if got := r.channels.DataChannel().Len(); got != 1 {
 		t.Fatalf("expected unrelated tool result to dispatch normally, data len=%d", got)
 	}
 }
@@ -102,13 +102,13 @@ func TestDispatchPolicy_MultiplePoliciesCanBeApplied(t *testing.T) {
 	r.dispatch(context.Background(), internal_type.UserAudioReceivedPacket{ContextID: "audio-dropped"})
 	r.dispatch(context.Background(), internal_type.InterruptionDetectedPacket{ContextID: "interrupt-dropped"})
 
-	if got := len(r.channels.IngressChannel()); got != 0 {
+	if got := r.channels.IngressChannel().Len(); got != 0 {
 		t.Fatalf("expected ignored user audio to skip downstream ingress packets, got %d", got)
 	}
-	if got := len(r.channels.ControlChannel()); got != 0 {
+	if got := r.channels.ControlChannel().Len(); got != 0 {
 		t.Fatalf("expected ignored interruption to skip control packets, got %d", got)
 	}
-	if got := len(r.channels.EgressChannel()); got != 0 {
+	if got := r.channels.EgressChannel().Len(); got != 0 {
 		t.Fatalf("expected ignored interruption to skip egress packets, got %d", got)
 	}
 }
@@ -122,7 +122,7 @@ func TestDispatchPolicy_IgnoreDrainsQueuedMatchingPackets(t *testing.T) {
 	); err != nil {
 		t.Fatalf("initial packet batch returned error: %v", err)
 	}
-	if got := len(r.channels.IngressChannel()); got != 2 {
+	if got := r.channels.IngressChannel().Len(); got != 2 {
 		t.Fatalf("expected two queued ingress packets before policy, got %d", got)
 	}
 
@@ -130,11 +130,11 @@ func TestDispatchPolicy_IgnoreDrainsQueuedMatchingPackets(t *testing.T) {
 		Target: internal_type.PacketNameUserAudioReceived,
 		Action: internal_type.DispatchActionIgnore,
 	})
-	if got := len(r.channels.IngressChannel()); got != 1 {
+	if got := r.channels.IngressChannel().Len(); got != 1 {
 		t.Fatalf("expected matching queued audio to be drained, ingress len=%d", got)
 	}
 
-	env := <-r.channels.IngressChannel()
+	env := receiveEnvelope(t, r.channels.IngressChannel())
 	if got := env.Pkt.ContextId(); got != "tool-result" {
 		t.Fatalf("expected unrelated queued tool result to remain, got %s", got)
 	}
@@ -157,10 +157,10 @@ func TestDispatchPolicy_IgnoreDrainsOnlyTargetRoute(t *testing.T) {
 		Action: internal_type.DispatchActionIgnore,
 	})
 
-	if got := len(r.channels.IngressChannel()); got != 0 {
+	if got := r.channels.IngressChannel().Len(); got != 0 {
 		t.Fatalf("expected matching ingress packet to be drained, ingress len=%d", got)
 	}
-	if got := len(r.channels.EgressChannel()); got != 1 {
+	if got := r.channels.EgressChannel().Len(); got != 1 {
 		t.Fatalf("expected non-target-route packet to remain, egress len=%d", got)
 	}
 }
@@ -175,7 +175,7 @@ func TestDispatchPolicy_PointerTargetMatchesConcretePacket(t *testing.T) {
 	r.dispatch(context.Background(), internal_type.UserAudioReceivedPacket{
 		ContextID: "audio-dropped",
 	})
-	if got := len(r.channels.IngressChannel()); got != 0 {
+	if got := r.channels.IngressChannel().Len(); got != 0 {
 		t.Fatalf("expected pointer target to ignore concrete user audio, ingress len=%d", got)
 	}
 }
@@ -190,7 +190,7 @@ func TestDispatchPolicy_UnsupportedActionDoesNotInstallPolicy(t *testing.T) {
 	r.dispatch(context.Background(), internal_type.UserAudioReceivedPacket{
 		ContextID: "audio-allowed",
 	})
-	if got := len(r.channels.IngressChannel()); got != 2 {
+	if got := r.channels.IngressChannel().Len(); got != 2 {
 		t.Fatalf("expected unsupported action not to install policy, ingress len=%d", got)
 	}
 }

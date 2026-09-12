@@ -54,33 +54,49 @@ func newUnclearInputTestRequestor(trigger string, timeout float64, message strin
 }
 
 func drainControlPackets(r *genericRequestor) []internal_type.Packet {
-	packets := make([]internal_type.Packet, 0, len(r.channels.ControlChannel()))
-	for len(r.channels.ControlChannel()) > 0 {
-		packets = append(packets, (<-r.channels.ControlChannel()).Pkt)
+	packets := make([]internal_type.Packet, 0, r.channels.ControlChannel().Len())
+	for r.channels.ControlChannel().Len() > 0 {
+		envelope, err := r.channels.ControlChannel().TryReceive()
+		if err != nil {
+			break
+		}
+		packets = append(packets, envelope.Pkt)
 	}
 	return packets
 }
 
 func drainEgressPackets(r *genericRequestor) []internal_type.Packet {
-	packets := make([]internal_type.Packet, 0, len(r.channels.EgressChannel()))
-	for len(r.channels.EgressChannel()) > 0 {
-		packets = append(packets, (<-r.channels.EgressChannel()).Pkt)
+	packets := make([]internal_type.Packet, 0, r.channels.EgressChannel().Len())
+	for r.channels.EgressChannel().Len() > 0 {
+		envelope, err := r.channels.EgressChannel().TryReceive()
+		if err != nil {
+			break
+		}
+		packets = append(packets, envelope.Pkt)
 	}
 	return packets
 }
 
 func drainIngressPackets(r *genericRequestor) []internal_type.Packet {
-	packets := make([]internal_type.Packet, 0, len(r.channels.IngressChannel()))
-	for len(r.channels.IngressChannel()) > 0 {
-		packets = append(packets, (<-r.channels.IngressChannel()).Pkt)
+	packets := make([]internal_type.Packet, 0, r.channels.IngressChannel().Len())
+	for r.channels.IngressChannel().Len() > 0 {
+		envelope, err := r.channels.IngressChannel().TryReceive()
+		if err != nil {
+			break
+		}
+		packets = append(packets, envelope.Pkt)
 	}
 	return packets
 }
 
 func drainBackgroundPackets(r *genericRequestor) []internal_type.Packet {
-	packets := make([]internal_type.Packet, 0, len(r.channels.BackgroundChannel()))
-	for len(r.channels.BackgroundChannel()) > 0 {
-		packets = append(packets, (<-r.channels.BackgroundChannel()).Pkt)
+	packets := make([]internal_type.Packet, 0, r.channels.BackgroundChannel().Len())
+	for r.channels.BackgroundChannel().Len() > 0 {
+		envelope, err := r.channels.BackgroundChannel().TryReceive()
+		if err != nil {
+			break
+		}
+		packets = append(packets, envelope.Pkt)
 	}
 	return packets
 }
@@ -448,8 +464,8 @@ func TestHandleInterruptionDetected_VADTriggerUsesVADOnly(t *testing.T) {
 	})
 
 	assert.Equal(t, "ctx-active", r.GetID())
-	assert.Empty(t, r.channels.ControlChannel())
-	assert.Empty(t, r.channels.EgressChannel())
+	assert.Zero(t, r.channels.ControlChannel().Len())
+	assert.Zero(t, r.channels.EgressChannel().Len())
 
 	h.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{
 		ContextID: "ctx-active",
@@ -522,7 +538,7 @@ func TestHandleInterruptionDetected_WordTriggerUsesWordOnly(t *testing.T) {
 	sttStart, ok := controlPackets[0].(internal_type.SpeechToTextStartPacket)
 	require.True(t, ok, "expected SpeechToTextStartPacket, got %T", controlPackets[0])
 	assert.Equal(t, "ctx-active", sttStart.ContextID)
-	assert.Empty(t, r.channels.EgressChannel())
+	assert.Zero(t, r.channels.EgressChannel().Len())
 
 	h.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{
 		ContextID: "ctx-active",
@@ -615,7 +631,8 @@ func TestHandleInterruptionDetected_WordTriggerStartsUnclearInputWatchdogOnlyAft
 	})
 
 	select {
-	case packet := <-r.channels.EgressChannel():
+	case <-r.channels.EgressChannel().Ready():
+		packet := receiveEnvelope(t, r.channels.EgressChannel())
 		t.Fatalf("unclear input watchdog started before word interruption: %+v", packet.Pkt)
 	case <-time.After(50 * time.Millisecond):
 	}
@@ -647,7 +664,8 @@ func TestHandleInterruptionDetected_WordTriggerDuplicateWordExtendsUnclearInputW
 	})
 
 	select {
-	case packet := <-r.channels.EgressChannel():
+	case <-r.channels.EgressChannel().Ready():
+		packet := receiveEnvelope(t, r.channels.EgressChannel())
 		t.Fatalf("unclear input watchdog expired before duplicate word extended deadline: %+v", packet.Pkt)
 	case <-time.After(35 * time.Millisecond):
 	}
@@ -1320,13 +1338,11 @@ func TestHandleIdleTimeoutExpired_InjectedPromptSpeaksBeforeIdleRestarts(t *test
 
 	h.HandleTextToSpeechEnd(context.Background(), internal_type.TextToSpeechEndPacket{ContextID: newContextID})
 
-	var startIdleTimeout internal_type.StartIdleTimeoutPacket
 	for _, packet := range drainEgressPackets(r) {
 		if typed, ok := packet.(internal_type.StartIdleTimeoutPacket); ok {
-			startIdleTimeout = typed
+			t.Fatalf("idle prompt should not emit idle timeout packet after TTS end: %+v", typed)
 		}
 	}
-	assert.Equal(t, newContextID, startIdleTimeout.ContextID)
 	assert.Equal(t, adapter_lifecycle.MessageStateAssistantIdle, r.messageLifecycle.State())
 }
 
@@ -1347,7 +1363,7 @@ func TestHandleLLMResponseDone_DoesNotStartIdleTimeout(t *testing.T) {
 	}
 }
 
-func TestHandleTextToSpeechDone_TextModeStartsIdleTimeout(t *testing.T) {
+func TestHandleTextToSpeechDone_TextModeDoesNotEmitIdleTimeout(t *testing.T) {
 	r := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
 	h := requestorDispatchHandler{r: r}
 	contextID := r.GetID()
@@ -1361,17 +1377,15 @@ func TestHandleTextToSpeechDone_TextModeStartsIdleTimeout(t *testing.T) {
 		Text:      "done",
 	})
 
-	var startIdleTimeout internal_type.StartIdleTimeoutPacket
 	for _, packet := range drainEgressPackets(r) {
 		if typed, ok := packet.(internal_type.StartIdleTimeoutPacket); ok {
-			startIdleTimeout = typed
+			t.Fatalf("text mode TTS done should not emit idle timeout packet: %+v", typed)
 		}
 	}
-	assert.Equal(t, contextID, startIdleTimeout.ContextID)
 	assert.Equal(t, adapter_lifecycle.MessageStateAssistantIdle, r.messageLifecycle.State())
 }
 
-func TestHandleTextToSpeechDone_AudioModeWaitsForTextToSpeechEndBeforeIdleTimeout(t *testing.T) {
+func TestHandleTextToSpeechDone_AudioModeDoesNotEmitIdleTimeout(t *testing.T) {
 	r := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
 	r.messageLifecycle.SetMode(type_enums.AudioMode)
 	r.textToSpeechTransformer = noopSpeechToTextTransformer{}
@@ -1396,13 +1410,11 @@ func TestHandleTextToSpeechDone_AudioModeWaitsForTextToSpeechEndBeforeIdleTimeou
 
 	h.HandleTextToSpeechEnd(context.Background(), internal_type.TextToSpeechEndPacket{ContextID: contextID})
 
-	var startIdleTimeout internal_type.StartIdleTimeoutPacket
 	for _, packet := range drainEgressPackets(r) {
 		if typed, ok := packet.(internal_type.StartIdleTimeoutPacket); ok {
-			startIdleTimeout = typed
+			t.Fatalf("audio TTS end should not emit idle timeout packet: %+v", typed)
 		}
 	}
-	assert.Equal(t, contextID, startIdleTimeout.ContextID)
 	assert.Equal(t, adapter_lifecycle.MessageStateAssistantIdle, r.messageLifecycle.State())
 }
 

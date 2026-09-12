@@ -12,7 +12,7 @@ import (
 
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
-	internal_audio_resampler "github.com/rapidaai/api/assistant-api/internal/audio/resampler"
+	resampler_soxr "github.com/rapidaai/api/assistant-api/internal/audio/resampler/soxr"
 	internal_channel_input "github.com/rapidaai/api/assistant-api/internal/channel/input"
 	internal_telephony_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
@@ -36,7 +36,10 @@ const (
 type AudioProcessor struct {
 	logger commons.Logger
 
-	resampler internal_type.AudioResampler
+	resampler          internal_type.AudioResampler
+	inputWriter        internal_type.AudioStreamResampler
+	outputWriter       internal_type.AudioStreamResampler
+	providerInputAudio []byte
 
 	telnyxConfig     *protos.AudioConfig
 	downstreamConfig *protos.AudioConfig
@@ -49,30 +52,46 @@ type AudioProcessor struct {
 	silenceFrame []byte
 
 	ambientMixer internal_ambient.Mixer
-
-	outputHealth *internal_telephony_output.HealthStats
 }
 
 func NewAudioProcessor(logger commons.Logger) (*AudioProcessor, error) {
-	resampler, err := internal_audio_resampler.GetResampler(logger)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrResamplerCreateFailed, err)
-	}
-
+	inputResampler := resampler_soxr.New(
+		resampler_soxr.WithLogger(logger),
+		resampler_soxr.WithHighQuality(),
+	)
+	outputResampler := resampler_soxr.New(
+		resampler_soxr.WithLogger(logger),
+		resampler_soxr.WithHighQuality(),
+	)
 	audioProcessor := &AudioProcessor{
 		logger:             logger,
-		resampler:          resampler,
+		resampler:          inputResampler,
 		telnyxConfig:       internal_audio.NewMulaw8khzMonoAudioConfig(),
 		downstreamConfig:   internal_audio.NewLinear16khzMonoAudioConfig(),
 		inputBuffer:        internal_channel_input.NewBytesInputBuffer(InputBufferThreshold * 2),
 		outputBuffer:       internal_telephony_output.NewBytesFrameBuffer(OutputChunkSize * 8),
 		bridgeOutputBuffer: internal_telephony_output.NewBytesFrameBuffer(BridgeOutputFrameSize * 8),
-		outputHealth:       internal_telephony_output.NewHealthStats(),
 	}
+	inputWriter, err := inputResampler.NewWriter(audioProcessor.telnyxConfig, audioProcessor.downstreamConfig, func(output []byte) error {
+		audioProcessor.providerInputAudio = append(audioProcessor.providerInputAudio, output...)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	audioProcessor.inputWriter = inputWriter
+	outputWriter, err := outputResampler.NewWriter(audioProcessor.downstreamConfig, audioProcessor.telnyxConfig, func(output []byte) error {
+		audioProcessor.outputBuffer.Write(output)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	audioProcessor.outputWriter = outputWriter
 	audioProcessor.silenceFrame = audioProcessor.createSilenceFrame()
 
 	ambientMixer, err := internal_ambient.NewLoopMixer(internal_ambient.MixerSpec{
-		Resampler:         audioProcessor.resampler,
+		Resampler:         resampler_soxr.NewChunk(resampler_soxr.WithLogger(logger), resampler_soxr.WithHighQuality()),
 		TargetAudioConfig: internal_audio.NewLinear8khzMonoAudioConfig(),
 		FrameBytes:        OutputChunkSize * 2,
 	})
@@ -98,29 +117,53 @@ func (audioProcessor *AudioProcessor) ProcessProviderAudioFrame(frame internal_t
 		return inputFrame, nil
 	}
 
-	converted, err := audioProcessor.resampler.Resample(frame.Audio, audioProcessor.telnyxConfig, audioProcessor.downstreamConfig)
-	if err != nil {
-		return inputFrame, fmt.Errorf("%w: %w", ErrProviderAudioConversionFailed, err)
+	var converted []byte
+	if audioProcessor.inputWriter != nil {
+		audioProcessor.providerInputAudio = audioProcessor.providerInputAudio[:0]
+		if err := audioProcessor.inputWriter.Write(frame.Audio); err != nil {
+			return inputFrame, fmt.Errorf("%w: %w", ErrProviderAudioConversionFailed, err)
+		}
+		converted = append(converted, audioProcessor.providerInputAudio...)
+		audioProcessor.providerInputAudio = audioProcessor.providerInputAudio[:0]
+	} else {
+		var err error
+		converted, err = audioProcessor.resampler.Resample(frame.Audio, audioProcessor.telnyxConfig, audioProcessor.downstreamConfig)
+		if err != nil {
+			return inputFrame, fmt.Errorf("%w: %w", ErrProviderAudioConversionFailed, err)
+		}
 	}
 
 	inputFrame.BridgeAudio = converted
-	audioProcessor.inputBuffer.Write(converted)
-	if pipelineAudio, ok := audioProcessor.inputBuffer.DrainIfReady(InputBufferThreshold); ok {
-		inputFrame.PipelineAudio = pipelineAudio
+	if len(converted) > 0 {
+		audioProcessor.inputBuffer.Write(converted)
+		if pipelineAudio, ok := audioProcessor.inputBuffer.DrainIfReady(InputBufferThreshold); ok {
+			inputFrame.PipelineAudio = pipelineAudio
+		}
 	}
 	return inputFrame, nil
 }
 
 func (audioProcessor *AudioProcessor) ProcessAssistantAudio(audio []byte, completed bool) error {
 	if len(audio) > 0 {
-		converted, err := audioProcessor.convertOutputAudio(audio)
-		if err != nil {
-			return fmt.Errorf("%w: %w", ErrAssistantAudioConversionFailed, err)
+		if audioProcessor.outputWriter != nil {
+			if err := audioProcessor.outputWriter.Write(audio); err != nil {
+				return fmt.Errorf("%w: %w", ErrAssistantAudioConversionFailed, err)
+			}
+		} else {
+			converted, err := audioProcessor.convertOutputAudio(audio)
+			if err != nil {
+				return fmt.Errorf("%w: %w", ErrAssistantAudioConversionFailed, err)
+			}
+			audioProcessor.outputBuffer.Write(converted)
 		}
-		audioProcessor.outputBuffer.Write(converted)
 		audioProcessor.bridgeOutputBuffer.Write(audio)
 	}
 	if completed {
+		if audioProcessor.outputWriter != nil {
+			if err := audioProcessor.outputWriter.Flush(); err != nil {
+				return fmt.Errorf("%w: %w", ErrAssistantAudioConversionFailed, err)
+			}
+		}
 		audioProcessor.outputBuffer.Complete(OutputChunkSize, MulawSilence)
 		audioProcessor.bridgeOutputBuffer.Complete(BridgeOutputFrameSize, 0)
 	}
@@ -141,19 +184,6 @@ func (audioProcessor *AudioProcessor) createSilenceFrame() []byte {
 
 func (audioProcessor *AudioProcessor) OutputFrameDuration() time.Duration {
 	return ChunkDuration
-}
-
-func (audioProcessor *AudioProcessor) OnTickHealth(event internal_telephony_output.TickHealth) {
-	if audioProcessor.outputHealth != nil {
-		audioProcessor.outputHealth.OnTickHealth(event)
-	}
-}
-
-func (audioProcessor *AudioProcessor) OutputHealthSnapshot() internal_telephony_output.HealthSnapshot {
-	if audioProcessor.outputHealth == nil {
-		return internal_telephony_output.HealthSnapshot{}
-	}
-	return audioProcessor.outputHealth.Snapshot()
 }
 
 func (audioProcessor *AudioProcessor) applyAmbient(frame []byte) []byte {

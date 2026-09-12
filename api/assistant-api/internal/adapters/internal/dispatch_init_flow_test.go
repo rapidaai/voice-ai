@@ -106,7 +106,8 @@ func TestInitializeTextToSpeechPacket_ConfigError_EmitsNonRecoverableInitializat
 	})
 
 	select {
-	case envelope := <-requestor.channels.BootstrapChannel():
+	case <-requestor.channels.BootstrapChannel().Ready():
+		envelope := receiveEnvelope(t, requestor.channels.BootstrapChannel())
 		initializationFailedPacket, ok := envelope.Pkt.(internal_type.InitializationFailedPacket)
 		require.True(t, ok, "expected InitializationFailedPacket, got %T", envelope.Pkt)
 		assert.Equal(t, "ctx-tts-config-error", initializationFailedPacket.ContextID)
@@ -172,8 +173,8 @@ func TestInitializeBehavior_GreetingInterruptibleOption_ControlsAudioBlock(t *te
 				Config:    &protos.ConversationInitialization{StreamMode: protos.StreamMode_STREAM_MODE_AUDIO},
 			})
 
-			for len(requestor.channels.ControlChannel()) > 0 {
-				requestor.dispatch(context.Background(), (<-requestor.channels.ControlChannel()).Pkt)
+			for requestor.channels.ControlChannel().Len() > 0 {
+				requestor.dispatch(context.Background(), receiveEnvelope(t, requestor.channels.ControlChannel()).Pkt)
 			}
 			requestor.dispatch(context.Background(), internal_type.UserAudioReceivedPacket{
 				ContextID: "ctx-greeting-init",
@@ -181,15 +182,16 @@ func TestInitializeBehavior_GreetingInterruptibleOption_ControlsAudioBlock(t *te
 			})
 
 			if testCase.expectAudioBlocked {
-				assert.Empty(t, requestor.channels.IngressChannel())
+				assert.Zero(t, requestor.channels.IngressChannel().Len())
 			} else {
-				require.Len(t, requestor.channels.IngressChannel(), 2)
-				assert.Equal(t, internal_type.PacketNameSpeechToTextAudio, (<-requestor.channels.IngressChannel()).Pkt.PacketName())
-				assert.Equal(t, internal_type.PacketNameEndOfSpeechAudio, (<-requestor.channels.IngressChannel()).Pkt.PacketName())
+				require.Equal(t, 2, requestor.channels.IngressChannel().Len())
+				assert.Equal(t, internal_type.PacketNameSpeechToTextAudio, receiveEnvelope(t, requestor.channels.IngressChannel()).Pkt.PacketName())
+				assert.Equal(t, internal_type.PacketNameEndOfSpeechAudio, receiveEnvelope(t, requestor.channels.IngressChannel()).Pkt.PacketName())
 			}
 
 			select {
-			case envelope := <-requestor.channels.EgressChannel():
+			case <-requestor.channels.EgressChannel().Ready():
+				envelope := receiveEnvelope(t, requestor.channels.EgressChannel())
 				injectMessagePacket, ok := envelope.Pkt.(internal_type.InjectMessagePacket)
 				require.True(t, ok, "expected InjectMessagePacket, got %T", envelope.Pkt)
 				assert.Equal(t, greeting, injectMessagePacket.Text)
@@ -226,8 +228,8 @@ func TestInitializeBehavior_GreetingDoesNotStartIdleTimeoutBeforeCompletion(t *t
 	})
 
 	var injectMessage internal_type.InjectMessagePacket
-	for len(requestor.channels.EgressChannel()) > 0 {
-		packet := (<-requestor.channels.EgressChannel()).Pkt
+	for requestor.channels.EgressChannel().Len() > 0 {
+		packet := receiveEnvelope(t, requestor.channels.EgressChannel()).Pkt
 		switch typed := packet.(type) {
 		case internal_type.InjectMessagePacket:
 			injectMessage = typed
@@ -238,7 +240,7 @@ func TestInitializeBehavior_GreetingDoesNotStartIdleTimeoutBeforeCompletion(t *t
 	assert.Equal(t, greeting, injectMessage.Text)
 }
 
-func TestInitializeBehavior_StartsIdleTimeoutWhenNoGreetingIsInjected(t *testing.T) {
+func TestInitializeBehavior_DoesNotEmitIdleTimeoutWhenNoGreetingIsInjected(t *testing.T) {
 	idleTimeout := uint64(10)
 	requestorChannels := adapter_channel.NewRequestorChannels()
 	requestor := &genericRequestor{
@@ -261,13 +263,11 @@ func TestInitializeBehavior_StartsIdleTimeoutWhenNoGreetingIsInjected(t *testing
 		Config:    &protos.ConversationInitialization{StreamMode: protos.StreamMode_STREAM_MODE_TEXT},
 	})
 
-	var startIdleTimeout internal_type.StartIdleTimeoutPacket
-	for len(requestor.channels.EgressChannel()) > 0 {
-		if typed, ok := (<-requestor.channels.EgressChannel()).Pkt.(internal_type.StartIdleTimeoutPacket); ok {
-			startIdleTimeout = typed
+	for requestor.channels.EgressChannel().Len() > 0 {
+		if typed, ok := receiveEnvelope(t, requestor.channels.EgressChannel()).Pkt.(internal_type.StartIdleTimeoutPacket); ok {
+			t.Fatalf("initialization should not emit idle timeout packet: %+v", typed)
 		}
 	}
-	assert.Equal(t, "ctx-no-greeting-idle", startIdleTimeout.ContextID)
 }
 
 func TestInitializeBehavior_NonInterruptibleGreeting_BlocksAudioAndAcceptsAfterTextToSpeechEnd(t *testing.T) {
@@ -298,11 +298,11 @@ func TestInitializeBehavior_NonInterruptibleGreeting_BlocksAudioAndAcceptsAfterT
 		ContextID: "ctx-greeting-audio",
 		Config:    &protos.ConversationInitialization{StreamMode: protos.StreamMode_STREAM_MODE_AUDIO},
 	})
-	for len(requestor.channels.ControlChannel()) > 0 {
-		requestor.dispatch(context.Background(), (<-requestor.channels.ControlChannel()).Pkt)
+	for requestor.channels.ControlChannel().Len() > 0 {
+		requestor.dispatch(context.Background(), receiveEnvelope(t, requestor.channels.ControlChannel()).Pkt)
 	}
-	for len(requestor.channels.EgressChannel()) > 0 {
-		<-requestor.channels.EgressChannel()
+	for requestor.channels.EgressChannel().Len() > 0 {
+		_ = receiveEnvelope(t, requestor.channels.EgressChannel())
 	}
 
 	requestor.dispatch(context.Background(), internal_type.UserAudioReceivedPacket{
@@ -313,22 +313,22 @@ func TestInitializeBehavior_NonInterruptibleGreeting_BlocksAudioAndAcceptsAfterT
 		ContextID: "ctx-greeting-audio",
 		Source:    internal_type.InterruptionSourceWord,
 	})
-	assert.Empty(t, requestor.channels.IngressChannel())
-	assert.Empty(t, requestor.channels.ControlChannel())
-	assert.Empty(t, requestor.channels.EgressChannel())
+	assert.Zero(t, requestor.channels.IngressChannel().Len())
+	assert.Zero(t, requestor.channels.ControlChannel().Len())
+	assert.Zero(t, requestor.channels.EgressChannel().Len())
 
 	requestor.dispatch(context.Background(), internal_type.TextToSpeechEndPacket{ContextID: "ctx-greeting-audio"})
-	for len(requestor.channels.ControlChannel()) > 0 {
-		requestor.dispatch(context.Background(), (<-requestor.channels.ControlChannel()).Pkt)
+	for requestor.channels.ControlChannel().Len() > 0 {
+		requestor.dispatch(context.Background(), receiveEnvelope(t, requestor.channels.ControlChannel()).Pkt)
 	}
 	requestor.dispatch(context.Background(), internal_type.UserAudioReceivedPacket{
 		ContextID: "ctx-greeting-audio",
 		Audio:     []byte("audio-after-greeting"),
 	})
 
-	require.Len(t, requestor.channels.IngressChannel(), 2)
-	assert.Equal(t, internal_type.PacketNameSpeechToTextAudio, (<-requestor.channels.IngressChannel()).Pkt.PacketName())
-	assert.Equal(t, internal_type.PacketNameEndOfSpeechAudio, (<-requestor.channels.IngressChannel()).Pkt.PacketName())
+	require.Equal(t, 2, requestor.channels.IngressChannel().Len())
+	assert.Equal(t, internal_type.PacketNameSpeechToTextAudio, receiveEnvelope(t, requestor.channels.IngressChannel()).Pkt.PacketName())
+	assert.Equal(t, internal_type.PacketNameEndOfSpeechAudio, receiveEnvelope(t, requestor.channels.IngressChannel()).Pkt.PacketName())
 }
 
 func TestInitializeBehavior_NonInterruptibleGreeting_TextInputDoesNotKeepAudioBlockedAfterTextToSpeechEnd(t *testing.T) {
@@ -359,11 +359,11 @@ func TestInitializeBehavior_NonInterruptibleGreeting_TextInputDoesNotKeepAudioBl
 		ContextID: "ctx-greeting-text",
 		Config:    &protos.ConversationInitialization{StreamMode: protos.StreamMode_STREAM_MODE_AUDIO},
 	})
-	for len(requestor.channels.ControlChannel()) > 0 {
-		requestor.dispatch(context.Background(), (<-requestor.channels.ControlChannel()).Pkt)
+	for requestor.channels.ControlChannel().Len() > 0 {
+		requestor.dispatch(context.Background(), receiveEnvelope(t, requestor.channels.ControlChannel()).Pkt)
 	}
-	for len(requestor.channels.EgressChannel()) > 0 {
-		<-requestor.channels.EgressChannel()
+	for requestor.channels.EgressChannel().Len() > 0 {
+		_ = receiveEnvelope(t, requestor.channels.EgressChannel())
 	}
 
 	requestor.dispatch(context.Background(), internal_type.UserTextReceivedPacket{
@@ -373,15 +373,15 @@ func TestInitializeBehavior_NonInterruptibleGreeting_TextInputDoesNotKeepAudioBl
 	requestor.channels.FlushAll()
 
 	requestor.dispatch(context.Background(), internal_type.TextToSpeechEndPacket{ContextID: "ctx-greeting-text"})
-	for len(requestor.channels.ControlChannel()) > 0 {
-		requestor.dispatch(context.Background(), (<-requestor.channels.ControlChannel()).Pkt)
+	for requestor.channels.ControlChannel().Len() > 0 {
+		requestor.dispatch(context.Background(), receiveEnvelope(t, requestor.channels.ControlChannel()).Pkt)
 	}
 	requestor.dispatch(context.Background(), internal_type.UserAudioReceivedPacket{
 		ContextID: requestor.GetID(),
 		Audio:     []byte("audio-after-greeting"),
 	})
 
-	require.Len(t, requestor.channels.IngressChannel(), 2)
-	assert.Equal(t, internal_type.PacketNameSpeechToTextAudio, (<-requestor.channels.IngressChannel()).Pkt.PacketName())
-	assert.Equal(t, internal_type.PacketNameEndOfSpeechAudio, (<-requestor.channels.IngressChannel()).Pkt.PacketName())
+	require.Equal(t, 2, requestor.channels.IngressChannel().Len())
+	assert.Equal(t, internal_type.PacketNameSpeechToTextAudio, receiveEnvelope(t, requestor.channels.IngressChannel()).Pkt.PacketName())
+	assert.Equal(t, internal_type.PacketNameEndOfSpeechAudio, receiveEnvelope(t, requestor.channels.IngressChannel()).Pkt.PacketName())
 }

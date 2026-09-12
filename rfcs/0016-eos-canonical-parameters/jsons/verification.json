@@ -1,0 +1,53 @@
+{
+  "commands": [
+    {
+      "cmd": "bash bin/verify-eos-options-migration.sh",
+      "exit_code": 0,
+      "result": "Six tests and table-driven cases passed after diagnostics correction. Disposable fixture inventory: LiveKit 5 deployments/49 options; Pipecat 3 deployments/31 options; 15 changed/journal rows, 6 renamed, 9 deleted; zero target obsolete keys; clean schema61."
+    },
+    {
+      "cmd": "bash bin/verify-phase3-migrations.sh",
+      "exit_code": 1,
+      "result": "assistant-api reaches clean61; existing web-api expected12 differs from actual13. Scope expansion requested, not authorized yet."
+    },
+    {
+      "cmd": "env GOCACHE=/private/tmp/voice-ai-gocache go test -race -tags=integration -count=1 -timeout=120s ./api/assistant-api/internal/end_of_speech/... ./api/assistant-api/internal/options",
+      "exit_code": 0,
+      "result": "EOS factory, LiveKit, Pipecat, silence-based and options packages passed native integration/race tests; multilingual model path supplied via environment."
+    },
+    {
+      "cmd": "yarn --cwd ui test --watchAll=false --watchman=false --runInBand src/app/components/providers/__tests__/audio-input-advanced-defaults-parity.test.ts src/app/components/providers/end-of-speech/__tests__/provider-runtime-parity.test.tsx src/providers/__tests__/provider-eos-config.test.ts src/app/pages/assistant/actions/create-deployment/commons/__tests__/configure-audio-input.design.test.tsx",
+      "exit_code": 0,
+      "result": "4 suites, 44 tests passed."
+    },
+    {
+      "cmd": "just agent-finalize \"$(git diff --name-only --diff-filter=ACMRT HEAD | paste -sd, -),$(git ls-files --others --exclude-standard | paste -sd, -)\"",
+      "exit_code": 0,
+      "result": "Changed-test checks, backend package tests, and 24 provider UI suites / 425 tests passed with CI=true."
+    },
+    {
+      "cmd": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "coverage": {
+    "unit_tests_present": true,
+    "required_categories_passed": [
+      "canonical-ui-hydration",
+      "ignored-runtime-aliases",
+      "provider-and-model-path-preservation",
+      "migration-up-down-idempotency",
+      "migration-invalid-input-atomicity",
+      "rollback-concurrent-edit-conflicts"
+    ]
+  },
+  "live_database_used": false,
+  "rollout_allowed": false,
+  "model_quality_hold": "Existing model-quality findings and asset revision concerns remain outside the parameter migration.",
+  "preview": {
+    "url": "http://127.0.0.1:3016",
+    "http_status": 200,
+    "compile": "passed with existing lint warnings"
+  },
+  "review_status": "First independent review found existing full-history check blocker and minor diagnostics gap. Diagnostics corrected and verified; final re-review awaits approval to fix the out-of-scope web-api expectation."
+}

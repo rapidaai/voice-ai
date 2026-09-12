@@ -1,0 +1,30 @@
+{
+  "changed_files": [
+    "api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql",
+    "api/assistant-api/migrations/000061_eos_canonical_parameters.down.sql",
+    "bin/verify-eos-options-migration.sh",
+    "tests/integration/eos-options/seed.sql",
+    "tests/integration/eos-options/test_migration.py"
+  ],
+  "test_files_added": [
+    "tests/integration/eos-options/seed.sql",
+    "tests/integration/eos-options/test_migration.py"
+  ],
+  "tests_covered": [
+    "provider-scope",
+    "canonical-precedence",
+    "exact-value-and-audit-preservation",
+    "idempotent-up",
+    "atomic-failure",
+    "backup-only-down",
+    "no-recovery-tables"
+  ],
+  "summary": "Replace journal migration with 42-line up and 4-line backup-only down. UI/backend files match the original implementation hashes.",
+  "file_sha256": {
+    "api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql": "dbf2a83b8475ac83c2e070dcb805c28b62ef04a9ab1ea95478a1844ebbc13408",
+    "api/assistant-api/migrations/000061_eos_canonical_parameters.down.sql": "4ec5c10117f66ae94bfce814be23d1bec6ec93c051be0a8676c59aa4c699de94",
+    "bin/verify-eos-options-migration.sh": "1d40da0aa071affda67ddc639efa9a8aaa5aac24537ccfff269dc0af1758f86e",
+    "tests/integration/eos-options/seed.sql": "5f68cf5b1e8b2cc1792dfa01200d3725e3562c86834dfdb5db22a5637380283a",
+    "tests/integration/eos-options/test_migration.py": "82a62053703c22f3bdaf7be6bd5b697b2431740cbe245d08190442dc925443d0"
+  }
+}

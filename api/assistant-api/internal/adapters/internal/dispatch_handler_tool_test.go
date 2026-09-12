@@ -113,9 +113,11 @@ func TestHandleLLMToolResult_DoesNotInterruptSpeech(test *testing.T) {
 
 			assert.Empty(test, drainControlPackets(requestor))
 			assert.Equal(test, adapter_lifecycle.MessageStateAssistantSpeaking, requestor.messageLifecycle.State())
-			assert.Equal(test, []internal_type.Packet{
-				internal_type.StartIdleTimeoutPacket{ContextID: packet.ContextID},
-			}, drainEgressPackets(requestor))
+			for _, packet := range drainEgressPackets(requestor) {
+				if typed, ok := packet.(internal_type.StartIdleTimeoutPacket); ok {
+					test.Fatalf("tool result should not emit idle timeout packet: %+v", typed)
+				}
+			}
 			assert.Empty(test, requestor.streamer.(*streamTestStreamer).sent)
 			select {
 			case executed := <-executor.packets:

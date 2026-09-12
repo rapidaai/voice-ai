@@ -87,7 +87,7 @@ func TestSpeechToTextOptions_Defaults(t *testing.T) {
 	assert.True(t, sttOpts.InterimResults)
 	assert.True(t, sttOpts.FillerWords)
 	assert.False(t, sttOpts.VadEvents)
-	assert.Equal(t, "5", sttOpts.Endpointing)
+	assert.Equal(t, "500", sttOpts.Endpointing)
 	assert.True(t, sttOpts.Punctuate)
 	assert.True(t, sttOpts.NoDelay)
 	assert.Equal(t, "linear16", sttOpts.Encoding)

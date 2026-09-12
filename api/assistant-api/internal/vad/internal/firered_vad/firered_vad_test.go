@@ -81,6 +81,7 @@ func TestNew_DefaultConfig(t *testing.T) {
 	assert.NotNil(t, vad.postprocessor)
 	assert.Equal(t, float32(defaultConfidence), vad.postprocessor.cfg.SpeechThreshold)
 	assert.Equal(t, vadDurationFrames(defaultStartSecs), vad.postprocessor.cfg.MinSpeechFrame)
+	assert.Equal(t, vadDurationFrames(0.5), vad.postprocessor.cfg.MinSilenceFrame)
 	assert.Equal(t, vadDurationFrames(defaultStopSecs), vad.postprocessor.cfg.MinSilenceFrame)
 }
 

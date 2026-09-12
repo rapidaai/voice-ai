@@ -72,7 +72,13 @@ func (outboundCall *Outbound) HandleCall() {
 // Connect waits for the outbound INVITE answer, prepares media, starts RTP, and sends ACK.
 // It owns setup failure side effects; steady-state call handling remains in HandleCall.
 func (outboundCall *Outbound) Connect() (time.Time, error) {
-	outboundConfig := outboundCall.session.config.ToOutboundConfig()
+	if err := outboundCall.request.Validate(); err != nil {
+		if outboundCall.server != nil && outboundCall.session != nil && outboundCall.dialog != nil {
+			outboundCall.failBeforeAnswer(NewOutboundSetupFailure(err), SIPAuthConfig{})
+		}
+		return time.Time{}, err
+	}
+	outboundConfig := outboundCall.request.Config
 	ringingTimeout := outboundConfig.EffectiveRingingTimeout()
 	assistantID := uint64(0)
 	if assistant := outboundCall.session.GetAssistant(); assistant != nil {
@@ -85,8 +91,8 @@ func (outboundCall *Outbound) Connect() (time.Time, error) {
 		"assistant_id", assistantID,
 		"conversation_id", outboundCall.session.GetConversationID(),
 		"mode", outboundCall.request.Config.Mode,
-		"to_user", outboundCall.request.Identity.ToUser,
-		"from_user", outboundCall.request.Identity.FromUser,
+		"to_user", outboundCall.request.Address.To,
+		"from_user", outboundCall.request.Address.From,
 		"trunk_address", outboundCall.request.Config.Address,
 		"ringing_timeout_ms", ringingTimeout.Milliseconds(),
 		"auth_username", outboundConfig.Auth.Username,
@@ -118,7 +124,7 @@ func (outboundCall *Outbound) Connect() (time.Time, error) {
 	return answerTime, nil
 }
 
-func (outboundCall *Outbound) waitForAnswer(outboundConfig OutboundConfig, ringingTimeout time.Duration) error {
+func (outboundCall *Outbound) waitForAnswer(outboundConfig *OutboundConfig, ringingTimeout time.Duration) error {
 	answerParentContext := outboundCall.session.Context()
 	if outboundCall.answerContext != nil {
 		answerParentContext = outboundCall.answerContext
@@ -234,6 +240,17 @@ func (outboundCall *Outbound) answerOutboundInvite(answerTime time.Time) *Outbou
 			"payload_type", mediaAnswer.negotiatedCodec.PayloadType,
 			"clock_rate", mediaAnswer.negotiatedCodec.ClockRate)
 	}
+	if outboundCall.isPrimaryOutboundLeg() {
+		if err := outboundCall.callOutboundApplicationReadyHandler(); err != nil {
+			return &OutboundFailure{
+				Class:           OutboundFailureApplication,
+				Reason:          err.Error(),
+				Termination:     CallTermination{Result: CallTerminationServerError, Reason: "outbound_application_ready"},
+				LifecycleReason: LifecycleReasonPipelineSetupFailed,
+				Err:             err,
+			}
+		}
+	}
 
 	if failure := outboundCall.startOutboundMedia(mediaAnswer, answerTime); failure != nil {
 		return failure
@@ -306,11 +323,11 @@ func (outboundCall *Outbound) callOutboundInviteHandler(answerTime time.Time) er
 		return fmt.Errorf("outbound INVITE request is unavailable")
 	}
 	callAddress := NewCallAddress(inviteRequest)
-	if validator.Phone(outboundCall.request.Identity.FromUser) {
-		callAddress.From = outboundCall.request.Identity.FromUser
+	if validator.Phone(outboundCall.request.Address.From) {
+		callAddress.From = outboundCall.request.Address.From
 	}
-	if validator.Phone(outboundCall.request.Identity.ToUser) {
-		callAddress.To = outboundCall.request.Identity.ToUser
+	if validator.Phone(outboundCall.request.Address.To) {
+		callAddress.To = outboundCall.request.Address.To
 	}
 
 	if callAddress.ToURI == "" {
@@ -327,6 +344,47 @@ func (outboundCall *Outbound) callOutboundInviteHandler(answerTime time.Time) er
 		"call_id", outboundCall.session.GetCallID(),
 		"total_elapsed_ms", time.Since(answerTime).Milliseconds())
 	return nil
+}
+
+func (outboundCall *Outbound) callOutboundApplicationReadyHandler() error {
+	outboundCall.server.mu.RLock()
+	applicationReadyHandler := outboundCall.server.onApplicationReady
+	outboundCall.server.mu.RUnlock()
+	if applicationReadyHandler == nil {
+		return nil
+	}
+
+	inviteRequest := outboundCall.dialog.InviteRequest()
+	if inviteRequest == nil {
+		return fmt.Errorf("outbound INVITE request is unavailable")
+	}
+	callAddress := NewCallAddress(inviteRequest)
+	if validator.Phone(outboundCall.request.Address.From) {
+		callAddress.From = outboundCall.request.Address.From
+	}
+	if validator.Phone(outboundCall.request.Address.To) {
+		callAddress.To = outboundCall.request.Address.To
+	}
+	if callAddress.ToURI == "" {
+		callAddress.ToURI = inviteRequest.Recipient.String()
+	}
+	return applicationReadyHandler(
+		outboundCall.session,
+		inviteRequest.Recipient.String(),
+		callAddress,
+	)
+}
+
+func (outboundCall *Outbound) isPrimaryOutboundLeg() bool {
+	if outboundCall == nil || outboundCall.session == nil {
+		return false
+	}
+	value, ok := outboundCall.session.GetMetadata(MetadataOutboundLegPurpose)
+	if !ok {
+		return true
+	}
+	purpose, ok := value.(string)
+	return !ok || purpose == "" || OutboundLegPurpose(purpose) == OutboundLegPurposePrimary
 }
 
 // ReportStatus sends an outbound provider status update for this call.

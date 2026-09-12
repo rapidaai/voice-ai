@@ -1,0 +1,410 @@
+{
+  "version": "1.0",
+  "run_id": "run_164b9ed811c6",
+  "repo_root": ".",
+  "task": {
+    "id": "task_3f91ac0f9e5f",
+    "type": "migration",
+    "skill": "end-of-speech-integration",
+    "service": "assistant-api"
+  },
+  "artifacts": {
+    "approved_plan_file": "rfcs/0016-eos-canonical-parameters/jsons/approved-plan.json",
+    "approved_plan_sha256": "f79dc7a27017765b7af9b5dc13ecc3f39a4a8293ece66dbce0a56b32ced13634",
+    "approved_plan_hmac": "25a738b323fb2da3ab26adaa212d76d95a7404b1f38126f29ff325f8f5e6a3da"
+  },
+  "task_plan": {
+    "classification": "Governed",
+    "status": "approved",
+    "reviewed_plan_sha256": "65064239fb50435c6bfd7ced6a5594059dc7b2bcb0a00ccd6257d100e36c095f",
+    "run_id": "run_164b9ed811c6",
+    "planner_task_id": "task_cca8d53eda96",
+    "planner_dispatch_id": "ctx_695eb46a8a70",
+    "rfc_file": "rfcs/0016-eos-canonical-parameters.md",
+    "objective": "Use canonical-only LiveKit and Pipecat EOS parameters in the UI and backend, with a one-time reversible migration of stored audio options.",
+    "source_revision": "3af1d59b",
+    "verified_context": [
+      "EOS provider selection is microphone.eos.provider in assistant_deployment_audio_options, not assistant_deployment_audios.audio_provider.",
+      "Audio options have unique (key, assistant_deployment_audio_id) pairs and application-generated positive IDs, not SQL-generated IDs.",
+      "Migration 000060 removed created_by and updated_by. Current option rows have created_actor_type/id and updated_actor_type/id.",
+      "The provider JSON files already expose canonical controls. UI hydration and LiveKit/Pipecat constructors still translate legacy keys.",
+      "Current UI scoped replacement can discard backend-only EOS model paths. Canonical-only hydration must preserve these explicit overrides.",
+      "Silence-based EOS uses microphone.eos.timeout as its canonical key and must not be changed.",
+      "cmd/assistant/assistant.go logs migration failures without preventing startup and can force-clear dirty state. This migration must be applied and verified externally before canonical-only code is deployed.",
+      "bin/verify-phase3-migrations.sh runs full migration history and hard-codes assistant-api version 60. It needs a minimal update to 61.",
+      "Local migrate, psql, postgres, initdb and pg_ctl are available for disposable database tests.",
+      "Prior model-quality and model-asset concerns remain unresolved and are not addressed by a parameter migration."
+    ],
+    "parameter_contract": {
+      "prefix": "microphone.eos.",
+      "livekit_eos": {
+        "canonical_keys": [
+          "threshold",
+          "quick_timeout",
+          "extended_timeout",
+          "max_history_turns",
+          "model"
+        ],
+        "existing_defaults": {
+          "threshold": "0.0289",
+          "quick_timeout": "250",
+          "extended_timeout": "3000",
+          "max_history_turns": "6",
+          "model": "en"
+        },
+        "migration_precedence": {
+          "quick_timeout": [
+            "quick_timeout",
+            "fallback_timeout",
+            "timeout"
+          ],
+          "extended_timeout": [
+            "extended_timeout",
+            "silence_timeout"
+          ]
+        },
+        "remove_after_migration": [
+          "fallback_timeout",
+          "timeout",
+          "silence_timeout"
+        ]
+      },
+      "pipecat_smart_turn_eos": {
+        "canonical_keys": [
+          "threshold",
+          "fallback_timeout",
+          "extended_timeout"
+        ],
+        "existing_defaults": {
+          "threshold": "0.5",
+          "fallback_timeout": "500",
+          "extended_timeout": "3000"
+        },
+        "migration_precedence": {
+          "fallback_timeout": [
+            "fallback_timeout",
+            "timeout"
+          ],
+          "extended_timeout": [
+            "extended_timeout",
+            "silence_timeout"
+          ]
+        },
+        "remove_after_migration": [
+          "timeout",
+          "silence_timeout",
+          "quick_timeout",
+          "max_history_turns",
+          "model"
+        ]
+      },
+      "preserved_backend_keys": [
+        "microphone.eos.livekit.model_path",
+        "microphone.eos.livekit.tokenizer_path",
+        "microphone.eos.pipecat.model_path"
+      ],
+      "missing_values": "Do not insert new option rows or persist duplicated defaults. Existing canonical backend/UI defaults supply absent values.",
+      "manual_selection": "Preserve EOS provider and existing nonblank LiveKit model values, including custom model names. Never infer a model from language."
+    },
+    "migration": {
+      "up_file": "api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql",
+      "down_file": "api/assistant-api/migrations/000061_eos_canonical_parameters.down.sql",
+      "target": "All input-audio deployment rows whose stored EOS provider exactly equals livekit_eos or pipecat_smart_turn_eos. Include inactive target records so later activation does not restore old keys. Do not guess missing/unknown providers.",
+      "algorithm": [
+        "Run atomically with bounded lock and statement timeouts; block concurrent option/deployment writes while reading, journaling and updating the target set.",
+        "Validate candidate values before any changes. Presence precedence is canonical first, then the listed aliases; do not silently reset or choose a lower-priority value when a present candidate is invalid.",
+        "Accept finite decimal/exponent numeric text with Go-compatible digit separators and no outer whitespace. Report and abort on non-finite, malformed, hex-float or out-of-range input requiring manual review. Do not silently coerce it with PostgreSQL's broader parser.",
+        "Preserve zero and custom finite numeric values; do not add tuning bounds that differ from existing runtime behavior. Preserve positive integer max_history_turns and nonblank model values; report unsupported history/model values for manual review.",
+        "When canonical exists and is valid, preserve its row/value. Otherwise rename the highest-priority existing valid alias row in place, preserving its ID and audit fields. Remove lower-priority aliases and known obsolete keys only after choosing the canonical survivor.",
+        "Keep unknown EOS keys, unrelated metadata, non-target providers, output audio, provider rows and backend model path overrides unchanged.",
+        "Store original and resulting row images for only changed/deleted rows in a migration-specific journal, plus the target provider/deployment identity needed to guard rollback. Do not invent application IDs or user audit identities.",
+        "Repeat application must not overwrite the journal's original images, resurrect aliases or modify already migrated values. A no-change run is a no-op."
+      ],
+      "rollback": [
+        "Run under the same transaction and write exclusion as up.",
+        "Compare affected rows and provider identity with journaled post-migration state before changing anything. Also detect destination key/ID conflicts and missing/deleted parent deployments.",
+        "If any affected row was subsequently edited or any identity conflicts, abort the entire rollback and retain the journal. Never silently skip conflicts and report complete rollback.",
+        "Otherwise restore original row IDs, keys, values, status and audit fields exactly, then remove the migration journal in the successful transaction."
+      ],
+      "rollout": "Ship migration files first to an operator-controlled migration job. Stop configuration writes/old application instances, run preflight and migration successfully, verify version 61 clean and target alias count zero, then deploy canonical-only backend/UI. Startup's warning-only migration behavior is not an approval or rollout gate.",
+      "live_execution": "Not authorized by this task. No shared database is contacted or changed; later environment selection and rollout approval are separate."
+    },
+    "ui_backend_changes": [
+      "Remove alias arrays, float-spelling parsing and legacy fallback preservation from GetDefaultEOSConfig. Use the existing provider config/default APIs for canonical keys.",
+      "Retain backend-only EOS model paths through EOS hydration and the calling STT configuration flow; preserve unrelated metadata and caller-owned input arrays.",
+      "Update the provider-switch handler in configure-audio-input.tsx so its broad EOS-prefix filter retains backend-only model paths before canonical hydration. Do not restore old provider-specific control values on a provider switch.",
+      "Preserve existing canonical defaults, valid zero values, custom thresholds, timeout values and manual LiveKit model/history selections. Remove known stale provider-specific controls when switching providers.",
+      "Delete LiveKit/Pipecat constructor alias reads and private alias constants. Keep canonical keys and defaults unchanged.",
+      "Remove the global legacy silence_timeout constant only if no remaining references need it. Keep MicrophoneEOSOptionTimeout for silence-based EOS.",
+      "Update existing canonical/legacy parity tests to prove legacy keys no longer configure LiveKit or Pipecat and that migration is the only translation path."
+    ],
+    "ownership": {
+      "rfcs/0016-eos-canonical-parameters.md": "coordinator (bounded challenge correction after RFC author completion)",
+      "rfcs/0016-eos-canonical-parameters/jsons/": "coordinator",
+      "api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql": "coordinator",
+      "api/assistant-api/migrations/000061_eos_canonical_parameters.down.sql": "coordinator",
+      "bin/verify-eos-options-migration.sh": "coordinator",
+      "tests/integration/eos-options/": "coordinator",
+      "bin/verify-phase3-migrations.sh": "coordinator",
+      "ui/src/app/components/providers/end-of-speech/provider.tsx": "ui-worker",
+      "ui/src/app/components/providers/speech-to-text/provider.tsx": "ui-worker",
+      "ui/src/app/components/providers/__tests__/audio-input-advanced-defaults-parity.test.ts": "ui-worker",
+      "ui/src/app/components/providers/end-of-speech/__tests__/provider-runtime-parity.test.tsx": "ui-worker",
+      "ui/src/app/pages/assistant/actions/create-deployment/commons/configure-audio-input.tsx": "ui-worker",
+      "ui/src/app/pages/assistant/actions/create-deployment/commons/__tests__/configure-audio-input.design.test.tsx": "ui-worker",
+      "ui/src/providers/__tests__/provider-eos-config.test.ts": "ui-worker",
+      "api/assistant-api/internal/end_of_speech/internal/livekit/constant.go": "backend-worker",
+      "api/assistant-api/internal/end_of_speech/internal/livekit/livekit_end_of_speech.go": "backend-worker",
+      "api/assistant-api/internal/end_of_speech/internal/livekit/livekit_end_of_speech_integration_test.go": "backend-worker",
+      "api/assistant-api/internal/end_of_speech/internal/pipecat/constant.go": "backend-worker",
+      "api/assistant-api/internal/end_of_speech/internal/pipecat/pipecat_end_of_speech.go": "backend-worker",
+      "api/assistant-api/internal/end_of_speech/internal/pipecat/pipecat_end_of_speech_test.go": "backend-worker",
+      "api/assistant-api/internal/end_of_speech/internal/pipecat/pipecat_end_of_speech_integration_test.go": "backend-worker",
+      "api/assistant-api/internal/options/audio.go": "backend-worker",
+      "api/assistant-api/internal/options/audio_test.go": "backend-worker"
+    },
+    "allowed_paths": [
+      "rfcs/0016-eos-canonical-parameters.md",
+      "rfcs/0016-eos-canonical-parameters/jsons/",
+      "api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql",
+      "api/assistant-api/migrations/000061_eos_canonical_parameters.down.sql",
+      "bin/verify-eos-options-migration.sh",
+      "tests/integration/eos-options/",
+      "bin/verify-phase3-migrations.sh",
+      "ui/src/app/components/providers/end-of-speech/provider.tsx",
+      "ui/src/app/components/providers/speech-to-text/provider.tsx",
+      "ui/src/app/components/providers/__tests__/audio-input-advanced-defaults-parity.test.ts",
+      "ui/src/app/components/providers/end-of-speech/__tests__/provider-runtime-parity.test.tsx",
+      "ui/src/app/pages/assistant/actions/create-deployment/commons/configure-audio-input.tsx",
+      "ui/src/app/pages/assistant/actions/create-deployment/commons/__tests__/configure-audio-input.design.test.tsx",
+      "ui/src/providers/__tests__/provider-eos-config.test.ts",
+      "api/assistant-api/internal/end_of_speech/internal/livekit/constant.go",
+      "api/assistant-api/internal/end_of_speech/internal/livekit/livekit_end_of_speech.go",
+      "api/assistant-api/internal/end_of_speech/internal/livekit/livekit_end_of_speech_integration_test.go",
+      "api/assistant-api/internal/end_of_speech/internal/pipecat/constant.go",
+      "api/assistant-api/internal/end_of_speech/internal/pipecat/pipecat_end_of_speech.go",
+      "api/assistant-api/internal/end_of_speech/internal/pipecat/pipecat_end_of_speech_test.go",
+      "api/assistant-api/internal/end_of_speech/internal/pipecat/pipecat_end_of_speech_integration_test.go",
+      "api/assistant-api/internal/options/audio.go",
+      "api/assistant-api/internal/options/audio_test.go"
+    ],
+    "out_of_scope_paths": [
+      "api/assistant-api/internal/vad/",
+      "api/assistant-api/internal/adapters/",
+      "api/assistant-api/internal/transformer/",
+      "api/assistant-api/internal/channel/",
+      "cmd/assistant/assistant.go",
+      "protos/",
+      "openapi/",
+      "api/integration-api/",
+      "models/"
+    ],
+    "principles": {
+      "kiss": "Rename existing rows once and remove runtime alias branches; do not generate IDs or persist duplicated defaults.",
+      "yagni": "No permanent alias framework, compatibility flag or model-selection automation.",
+      "single_source_of_truth": "Retain canonical provider definitions and runtime defaults; a migration journal is recovery evidence, not live configuration.",
+      "contracts": "Preserve canonical parameter spelling, valid values, manual model selection and packet/API behavior. Legacy reads end after verified migration.",
+      "fail_safe": "Preflight and rollback conflicts abort atomically. Migration failure blocks rollout, regardless of startup behavior.",
+      "security": "Only target EOS rows; retain audit identity without inventing actors. Report IDs/keys/counts, not option contents, credentials or audio.",
+      "observability": "Record migration counts, clean schema version, obsolete-key counts and rollback conflicts in operator verification evidence.",
+      "reversibility": "Journal exact before/after images and restore only when post-state and provider identity still match."
+    },
+    "required_tests": [
+      "canonical-ui-hydration",
+      "ignored-runtime-aliases",
+      "provider-and-model-path-preservation",
+      "migration-up-down-idempotency",
+      "migration-invalid-input-atomicity",
+      "rollback-concurrent-edit-conflicts",
+      "full-migration-history"
+    ],
+    "non_goals": [
+      "No dispatch, VAD, STT transport, telephony, schema-contract or API changes beyond the migration journal",
+      "No model-asset migration or model-quality claim",
+      "No blanket reset of custom settings",
+      "No new helpers/utils or permanent compatibility layer",
+      "No live database rollout",
+      "No commit/push/merge of application changes before required review"
+    ],
+    "risks": [
+      "Configuration writers must be stopped during migration and rollback",
+      "Malformed or non-decimal values block migration for explicit operator review",
+      "Backend aliases cannot be removed before migration verification",
+      "Rollback after user edits intentionally fails instead of erasing edits",
+      "Full-table write exclusion needs a bounded maintenance window; size and timing require the later environment's dry-run inventory"
+    ],
+    "required_commands": [
+      "bash bin/verify-eos-options-migration.sh",
+      "bash bin/verify-phase3-migrations.sh",
+      "env GOCACHE=/private/tmp/voice-ai-gocache go test -race -tags=integration -count=1 -timeout=120s ./api/assistant-api/internal/end_of_speech/... ./api/assistant-api/internal/options",
+      "yarn --cwd ui test --watchAll=false --watchman=false --runInBand src/app/components/providers/__tests__/audio-input-advanced-defaults-parity.test.ts src/app/components/providers/end-of-speech/__tests__/provider-runtime-parity.test.tsx src/providers/__tests__/provider-eos-config.test.ts src/app/pages/assistant/actions/create-deployment/commons/__tests__/configure-audio-input.design.test.tsx",
+      "just agent-finalize \"$(git diff --name-only --diff-filter=ACMRT HEAD | paste -sd, -),$(git ls-files --others --exclude-standard | paste -sd, -)\"",
+      "git diff --check"
+    ],
+    "acceptance_criteria": [
+      "UI/backend contain no active LiveKit/Pipecat alias read paths; silence-based behavior is unchanged.",
+      "Migration preserves existing canonical values, manual models, custom finite values, zero, backend paths, other providers and unrelated metadata.",
+      "Migration tests cover both providers, every alias priority, conflicts, missing values, inactive records, output audio, invalid/non-finite/hex values, separators, overflow, transaction rollback and repeated execution.",
+      "Down restores original rows exactly and rejects later edits/provider switches/unique conflicts atomically without dropping its journal.",
+      "UI tests cover canonical happy paths, ignored legacy values, model-path preservation, provider switching and input ownership.",
+      "Backend tests cover canonical success, default/error paths and ignored legacy aliases using real constructors.",
+      "Full migration history reaches clean version 61 and the focused disposable PostgreSQL suite passes.",
+      "No live database was used, no model-quality approval is implied, and detached checkout is preserved."
+    ],
+    "open_questions": [],
+    "discussion": {
+      "planner": "task_cca8d53eda96",
+      "challenger": "task_28655395083e",
+      "decision": "approved",
+      "approved_by": "user:gate_0f28e93476f2",
+      "open_blockers": []
+    },
+    "challenge": {
+      "decision": "approved",
+      "correction_limit": 2,
+      "correction_cycles_used": 1,
+      "first_receipt": "rfcs/0016-eos-canonical-parameters/jsons/challenge-01.json",
+      "approved_receipt": "rfcs/0016-eos-canonical-parameters/jsons/challenge.json"
+    },
+    "confirmation": {
+      "status": "approved",
+      "implementation_allowed": true,
+      "receipt": "rfcs/0016-eos-canonical-parameters/jsons/confirmation.json"
+    }
+  },
+  "meta": {
+    "triggered_by": "coordinator",
+    "timestamp": "2026-09-10T16:44:03.711205+00:00"
+  },
+  "implementation": {
+    "changed_files": [
+      "api/assistant-api/internal/end_of_speech/internal/livekit/constant.go",
+      "api/assistant-api/internal/end_of_speech/internal/livekit/livekit_end_of_speech.go",
+      "api/assistant-api/internal/end_of_speech/internal/livekit/livekit_end_of_speech_integration_test.go",
+      "api/assistant-api/internal/end_of_speech/internal/pipecat/constant.go",
+      "api/assistant-api/internal/end_of_speech/internal/pipecat/pipecat_end_of_speech.go",
+      "api/assistant-api/internal/end_of_speech/internal/pipecat/pipecat_end_of_speech_integration_test.go",
+      "api/assistant-api/internal/end_of_speech/internal/pipecat/pipecat_end_of_speech_test.go",
+      "api/assistant-api/internal/options/audio.go",
+      "api/assistant-api/internal/options/audio_test.go",
+      "api/assistant-api/migrations/000061_eos_canonical_parameters.down.sql",
+      "api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql",
+      "bin/verify-eos-options-migration.sh",
+      "bin/verify-phase3-migrations.sh",
+      "tests/integration/eos-options/seed.sql",
+      "tests/integration/eos-options/test_migration.py",
+      "ui/src/app/components/providers/__tests__/audio-input-advanced-defaults-parity.test.ts",
+      "ui/src/app/components/providers/end-of-speech/__tests__/provider-runtime-parity.test.tsx",
+      "ui/src/app/components/providers/end-of-speech/provider.tsx",
+      "ui/src/app/components/providers/speech-to-text/provider.tsx",
+      "ui/src/app/pages/assistant/actions/create-deployment/commons/__tests__/configure-audio-input.design.test.tsx",
+      "ui/src/app/pages/assistant/actions/create-deployment/commons/configure-audio-input.tsx",
+      "ui/src/providers/__tests__/provider-eos-config.test.ts"
+    ],
+    "test_files_added": [
+      "api/assistant-api/internal/end_of_speech/internal/livekit/livekit_end_of_speech_integration_test.go",
+      "api/assistant-api/internal/end_of_speech/internal/pipecat/pipecat_end_of_speech_integration_test.go",
+      "api/assistant-api/internal/end_of_speech/internal/pipecat/pipecat_end_of_speech_test.go",
+      "api/assistant-api/internal/options/audio_test.go",
+      "tests/integration/eos-options/seed.sql",
+      "tests/integration/eos-options/test_migration.py",
+      "ui/src/app/components/providers/__tests__/audio-input-advanced-defaults-parity.test.ts",
+      "ui/src/app/components/providers/end-of-speech/__tests__/provider-runtime-parity.test.tsx",
+      "ui/src/app/pages/assistant/actions/create-deployment/commons/__tests__/configure-audio-input.design.test.tsx",
+      "ui/src/providers/__tests__/provider-eos-config.test.ts"
+    ],
+    "tests_covered": [
+      "canonical-ui-hydration",
+      "ignored-runtime-aliases",
+      "provider-and-model-path-preservation",
+      "migration-up-down-idempotency",
+      "migration-invalid-input-atomicity",
+      "rollback-concurrent-edit-conflicts",
+      "full-migration-history"
+    ],
+    "summary": "Canonical-only EOS UI and backend configuration, preserved manual model paths, reversible migration 61 with exact recovery images and atomic rollback conflicts.",
+    "base_ref": "43a713f3",
+    "file_sha256": {
+      "api/assistant-api/internal/end_of_speech/internal/livekit/constant.go": "ae4a0833f6429922fd8573ac3bd23411ab89ce11e49fdef816cd966690aad777",
+      "api/assistant-api/internal/end_of_speech/internal/livekit/livekit_end_of_speech.go": "f22d2553103211b6e32ae7b813df77098ef7d2e60cd9e9b649986ca55c2539e6",
+      "api/assistant-api/internal/end_of_speech/internal/livekit/livekit_end_of_speech_integration_test.go": "30aad6847074058279882e231892e1ccf5d9d0427af9b4b49123c29aa0be649a",
+      "api/assistant-api/internal/end_of_speech/internal/pipecat/constant.go": "3ac842c5b80253511887f772b11872604231b2ec2624f69969a5e975bfd88657",
+      "api/assistant-api/internal/end_of_speech/internal/pipecat/pipecat_end_of_speech.go": "97f0829a64ab099e2ad2767fa75299fc3adc023a79cf13d85fb23a53739b459b",
+      "api/assistant-api/internal/end_of_speech/internal/pipecat/pipecat_end_of_speech_integration_test.go": "94049fd76c35365124d95eeb8544a5e158d1b6bdcb4e663841b71e700543878b",
+      "api/assistant-api/internal/end_of_speech/internal/pipecat/pipecat_end_of_speech_test.go": "cd9f8342f4a0ea5195dd78c25f2742a9ac4566e8c1e316c376aeefed5f842720",
+      "api/assistant-api/internal/options/audio.go": "d6457a5ca43f8d4515a7327e0c13f1dd84d6d2f907189ec24a7bd0451e883d0d",
+      "api/assistant-api/internal/options/audio_test.go": "aedede2e0fdefedb09b0bff35841adc1809a73470cc917e0a5ee2b2e66cfbc7b",
+      "api/assistant-api/migrations/000061_eos_canonical_parameters.down.sql": "432a0877edfe258513259b9ca066d4b6be7f05d4883fa87849a2126a7e945163",
+      "api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql": "1db20664458cbcbe77c1161e9bff3c7b1274c641a5f92c0b95480496eed1f5a9",
+      "bin/verify-eos-options-migration.sh": "ab2ba5a4a456f0ec4ee14059656b9072863a642c2dddc3b51e37dadd573b4e6d",
+      "bin/verify-phase3-migrations.sh": "2231a0b4a2cb6ade0b7fa209da5c748ba8a0deeb1888e10c575a981d3d3a8d69",
+      "tests/integration/eos-options/seed.sql": "4f7a9ad86d7c22c669705610a02c29de087b99d45fed77c341c26679bdc49dd8",
+      "tests/integration/eos-options/test_migration.py": "e1d136760c01d03f8c80325e8bff36784323f57b12f7f4d3515fb00f63c4f01a",
+      "ui/src/app/components/providers/__tests__/audio-input-advanced-defaults-parity.test.ts": "0223df893697c1d5cf3d1d4a6d4ac9c3cc39b682bce8f2ee885cf2e06eadc9e3",
+      "ui/src/app/components/providers/end-of-speech/__tests__/provider-runtime-parity.test.tsx": "c23315671155247dbd78d768a43e054db94b4f4ed3fe23b91c1c612124a1b8e2",
+      "ui/src/app/components/providers/end-of-speech/provider.tsx": "d61318863c7d48558d68ca0c6c044930d9f905940b4c3841e43a254aa709e300",
+      "ui/src/app/components/providers/speech-to-text/provider.tsx": "f435181ef8028926df57845007617516fa4b8286b98582cc9325d1732dd23b4f",
+      "ui/src/app/pages/assistant/actions/create-deployment/commons/__tests__/configure-audio-input.design.test.tsx": "df3e0de96457f2048ef6c3bae6b348b54cf6e8f3701c06afb98c481e00496494",
+      "ui/src/app/pages/assistant/actions/create-deployment/commons/configure-audio-input.tsx": "cfe1afd28ec28ed2ee0ef700342891508305eacce01fb3fce5be61549e46f434",
+      "ui/src/providers/__tests__/provider-eos-config.test.ts": "fd9f2c76728428048085a0466124bf24c785c12a02baf7602e50f3bfc23a7ca7"
+    },
+    "workers": {
+      "ui": "ctx_1d60a301efd4",
+      "backend": "ctx_5e59c5785283",
+      "migration": "coordinator"
+    }
+  },
+  "verification": {
+    "commands": [
+      {
+        "cmd": "bash bin/verify-eos-options-migration.sh",
+        "exit_code": 0,
+        "result": "Six tests and table-driven cases passed after diagnostics correction. Disposable fixture inventory: LiveKit 5 deployments/49 options; Pipecat 3 deployments/31 options; 15 changed/journal rows, 6 renamed, 9 deleted; zero target obsolete keys; clean schema61."
+      },
+      {
+        "cmd": "bash bin/verify-phase3-migrations.sh",
+        "exit_code": 1,
+        "result": "assistant-api reaches clean61; existing web-api expected12 differs from actual13. Scope expansion requested, not authorized yet."
+      },
+      {
+        "cmd": "env GOCACHE=/private/tmp/voice-ai-gocache go test -race -tags=integration -count=1 -timeout=120s ./api/assistant-api/internal/end_of_speech/... ./api/assistant-api/internal/options",
+        "exit_code": 0,
+        "result": "EOS factory, LiveKit, Pipecat, silence-based and options packages passed native integration/race tests; multilingual model path supplied via environment."
+      },
+      {
+        "cmd": "yarn --cwd ui test --watchAll=false --watchman=false --runInBand src/app/components/providers/__tests__/audio-input-advanced-defaults-parity.test.ts src/app/components/providers/end-of-speech/__tests__/provider-runtime-parity.test.tsx src/providers/__tests__/provider-eos-config.test.ts src/app/pages/assistant/actions/create-deployment/commons/__tests__/configure-audio-input.design.test.tsx",
+        "exit_code": 0,
+        "result": "4 suites, 44 tests passed."
+      },
+      {
+        "cmd": "just agent-finalize \"$(git diff --name-only --diff-filter=ACMRT HEAD | paste -sd, -),$(git ls-files --others --exclude-standard | paste -sd, -)\"",
+        "exit_code": 0,
+        "result": "Changed-test checks, backend package tests, and 24 provider UI suites / 425 tests passed with CI=true."
+      },
+      {
+        "cmd": "git diff --check",
+        "exit_code": 0
+      }
+    ],
+    "coverage": {
+      "unit_tests_present": true,
+      "required_categories_passed": [
+        "canonical-ui-hydration",
+        "ignored-runtime-aliases",
+        "provider-and-model-path-preservation",
+        "migration-up-down-idempotency",
+        "migration-invalid-input-atomicity",
+        "rollback-concurrent-edit-conflicts"
+      ]
+    },
+    "live_database_used": false,
+    "rollout_allowed": false,
+    "model_quality_hold": "Existing model-quality findings and asset revision concerns remain outside the parameter migration.",
+    "preview": {
+      "url": "http://127.0.0.1:3016",
+      "http_status": 200,
+      "compile": "passed with existing lint warnings"
+    },
+    "review_status": "First independent review found existing full-history check blocker and minor diagnostics gap. Diagnostics corrected and verified; final re-review awaits approval to fix the out-of-scope web-api expectation."
+  }
+}

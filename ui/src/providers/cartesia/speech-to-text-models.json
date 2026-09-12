@@ -1,5 +1,26 @@
 [
   {
+    "name": "ink-whisper",
+    "id": "ink-whisper",
+    "releaseDate": "Legacy",
+    "languages": ["en"],
+    "status": "Legacy",
+    "config": {
+      "parameters": [
+        {
+          "key": "listen.language",
+          "label": "Language",
+          "type": "dropdown",
+          "required": true,
+          "default": "en",
+          "data": "languages-ink-2.json",
+          "valueField": "code",
+          "errorMessage": "Please provide valid cartesia language options for speech to text."
+        }
+      ]
+    }
+  },
+  {
     "name": "ink-2",
     "id": "ink-2",
     "releaseDate": "May 22, 2026",

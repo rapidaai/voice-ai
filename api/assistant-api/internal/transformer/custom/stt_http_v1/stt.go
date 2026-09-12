@@ -21,7 +21,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
-	internal_audio_resampler "github.com/rapidaai/api/assistant-api/internal/audio/resampler"
+	resampler_soxr "github.com/rapidaai/api/assistant-api/internal/audio/resampler/soxr"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
@@ -47,6 +47,7 @@ type speechToText struct {
 	activeRequestCount int
 
 	resampler         internal_type.AudioResampler
+	resampleWriter    internal_type.AudioStreamResampler
 	sourceAudioConfig *protos.AudioConfig
 	targetAudioConfig *protos.AudioConfig
 }
@@ -62,12 +63,12 @@ func NewSpeechToText(
 	if err != nil {
 		return nil, err
 	}
-	resampler, err := internal_audio_resampler.GetResampler(logger)
-	if err != nil {
-		return nil, fmt.Errorf("custom-stt http_v1: failed to initialize audio resampler: %w", err)
-	}
 	transformerContext, cancel := context.WithCancel(ctx)
-	return &speechToText{
+	audioResampler := resampler_soxr.New(
+		resampler_soxr.WithLogger(logger),
+		resampler_soxr.WithHighQuality(),
+	)
+	transformer := &speechToText{
 		config:            config,
 		engine:            config.newEngine(),
 		ctx:               transformerContext,
@@ -75,14 +76,25 @@ func NewSpeechToText(
 		httpClient:        &http.Client{Timeout: 60 * time.Second},
 		logger:            logger,
 		onPacket:          onPacket,
-		resampler:         resampler,
+		resampler:         audioResampler,
 		sourceAudioConfig: internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG,
 		targetAudioConfig: &protos.AudioConfig{
 			SampleRate:  uint32(config.SampleRate),
 			AudioFormat: protos.AudioConfig_LINEAR16,
 			Channels:    1,
 		},
-	}, nil
+	}
+	resampleWriter, err := audioResampler.NewWriter(transformer.sourceAudioConfig, transformer.targetAudioConfig, func(output []byte) error {
+		_, _ = transformer.speechAudioBuffer.Write(output)
+		return nil
+	})
+	if err != nil {
+		cancel()
+		audioResampler.Close()
+		return nil, err
+	}
+	transformer.resampleWriter = resampleWriter
+	return transformer, nil
 }
 
 func (*speechToText) Name() string {
@@ -149,18 +161,33 @@ func (transformer *speechToText) Transform(_ context.Context, in internal_type.P
 		if len(input.Audio) == 0 {
 			return nil
 		}
+		transformer.mu.Lock()
+		if input.ContextID != "" {
+			transformer.contextID = input.ContextID
+		}
+		if transformer.resampleWriter != nil {
+			err := transformer.resampleWriter.Write(input.Audio)
+			contextID := transformer.contextID
+			transformer.mu.Unlock()
+			if err != nil {
+				transformer.onPacket(internal_type.SpeechToTextErrorPacket{
+					ContextID: contextID,
+					Error:     fmt.Errorf("custom-stt http_v1: failed to resample audio: %w", err),
+					Type:      internal_type.STTInvalidInput,
+				})
+			}
+			return nil
+		}
 		chunk, err := transformer.prepareAudioChunk(input.Audio)
 		if err != nil {
+			contextID := transformer.contextID
+			transformer.mu.Unlock()
 			transformer.onPacket(internal_type.SpeechToTextErrorPacket{
-				ContextID: transformer.currentContextID(),
+				ContextID: contextID,
 				Error:     err,
 				Type:      internal_type.STTInvalidInput,
 			})
 			return nil
-		}
-		transformer.mu.Lock()
-		if input.ContextID != "" {
-			transformer.contextID = input.ContextID
 		}
 		_, _ = transformer.speechAudioBuffer.Write(chunk)
 		transformer.mu.Unlock()
@@ -172,6 +199,11 @@ func (transformer *speechToText) Transform(_ context.Context, in internal_type.P
 
 func (transformer *speechToText) Close(_ context.Context) error {
 	transformer.cancel()
+	if transformer.resampleWriter != nil {
+		transformer.resampleWriter.Close()
+	} else if transformer.resampler != nil {
+		transformer.resampler.Close()
+	}
 
 	transformer.mu.Lock()
 	contextID := transformer.contextID
@@ -218,6 +250,18 @@ func (transformer *speechToText) flushBufferedSpeech(contextID string) {
 	transformer.mu.Lock()
 	if contextID != "" {
 		transformer.contextID = contextID
+	}
+	if transformer.resampleWriter != nil {
+		if err := transformer.resampleWriter.Flush(); err != nil {
+			effectiveContextID := transformer.contextID
+			transformer.mu.Unlock()
+			transformer.onPacket(internal_type.SpeechToTextErrorPacket{
+				ContextID: effectiveContextID,
+				Error:     fmt.Errorf("custom-stt http_v1: failed to flush resampler: %w", err),
+				Type:      internal_type.STTInvalidInput,
+			})
+			return
+		}
 	}
 	effectiveContextID := transformer.contextID
 	startedAt := transformer.speechStartedAt

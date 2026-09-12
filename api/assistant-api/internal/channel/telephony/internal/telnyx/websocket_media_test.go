@@ -7,7 +7,6 @@ import (
 
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
-	internal_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
 	internal_telnyx "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/telnyx/internal"
@@ -55,12 +54,6 @@ func (engine *fakeTelnyxMediaEngine) ConfigureAmbient(_ internal_ambient.Config)
 func (engine *fakeTelnyxMediaEngine) OutputFrameDuration() time.Duration {
 	return 20 * time.Millisecond
 }
-
-func (engine *fakeTelnyxMediaEngine) OutputHealthSnapshot() internal_output.HealthSnapshot {
-	return internal_output.HealthSnapshot{}
-}
-
-func (engine *fakeTelnyxMediaEngine) OnTickHealth(_ internal_output.TickHealth) {}
 
 func TestNewTelnyxWebsocketStreamer_WiresMediaSession(t *testing.T) {
 	logger, _ := commons.NewApplicationLogger()
@@ -112,7 +105,7 @@ func TestHandleMediaEvent_EmitsBridgeUserAudio(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case stream := <-telnyxStreamer.InputCh:
+	case stream := <-telnyxStreamer.LowCh:
 		bridgeAudio, ok := stream.(*protos.ConversationBridgeUserAudio)
 		require.True(t, ok, "expected bridge user audio, got %T", stream)
 		assert.NotEmpty(t, bridgeAudio.GetAudio())

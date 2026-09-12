@@ -16,7 +16,6 @@ import (
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	channel_base "github.com/rapidaai/api/assistant-api/internal/channel/base"
-	internal_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
 	"github.com/rapidaai/pkg/commons"
@@ -64,12 +63,6 @@ func (engine *fakeAsteriskMediaEngine) OutputFrameDuration() time.Duration {
 	return 20 * time.Millisecond
 }
 
-func (engine *fakeAsteriskMediaEngine) OutputHealthSnapshot() internal_output.HealthSnapshot {
-	return internal_output.HealthSnapshot{}
-}
-
-func (engine *fakeAsteriskMediaEngine) OnTickHealth(_ internal_output.TickHealth) {}
-
 // newTestStreamer creates a minimal asteriskWebsocketStreamer for unit testing.
 // It has no real WebSocket connection and no AudioProcessor, so transport-level
 // side effects (sendCommand, audio processing) are safely no-ops.
@@ -79,10 +72,10 @@ func newTestStreamer(t *testing.T) *asteriskWebsocketStreamer {
 	require.NoError(t, err)
 	return &asteriskWebsocketStreamer{
 		BaseTelephonyStreamer: internal_telephony_base.BaseTelephonyStreamer{
-			BaseStreamer: channel_base.NewBaseStreamer(logger),
+			BaseStreamer: channel_base.New(channel_base.WithLogger(logger)),
 		},
-		// connection is nil — sendCommand returns nil, Cancel skips close
-		// audioProcessor is nil — stopAudioProcessing is a no-op (audioCancel is nil)
+		// connection is nil, so sendCommand returns nil and Cancel skips close.
+		// audioProcessor is nil, so stopAudioProcessing is a no-op.
 	}
 }
 
@@ -133,7 +126,7 @@ func TestHandleAudioData_EmitsBridgeUserAudio(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case stream := <-asteriskStreamer.InputCh:
+	case stream := <-asteriskStreamer.LowCh:
 		bridgeAudio, ok := stream.(*protos.ConversationBridgeUserAudio)
 		require.True(t, ok, "expected bridge user audio, got %T", stream)
 		assert.NotEmpty(t, bridgeAudio.GetAudio())

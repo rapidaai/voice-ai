@@ -26,7 +26,7 @@ import (
 	assistant_config "github.com/rapidaai/api/assistant-api/config"
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
-	internal_audio_resampler "github.com/rapidaai/api/assistant-api/internal/audio/resampler"
+	resampler_soxr "github.com/rapidaai/api/assistant-api/internal/audio/resampler/soxr"
 	channel_base "github.com/rapidaai/api/assistant-api/internal/channel/base"
 	internal_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	webrtc_internal "github.com/rapidaai/api/assistant-api/internal/channel/webrtc/internal"
@@ -58,6 +58,12 @@ type webrtcStreamer struct {
 	assistantAudioTrack *pionwebrtc.TrackLocalStaticSample
 	assistantRTPSender  *pionwebrtc.RTPSender
 	resampler           internal_type.AudioResampler
+	userWriter          internal_type.AudioStreamResampler
+	assistantWriter     internal_type.AudioStreamResampler
+	userResampleMu      sync.Mutex
+	assistantResampleMu sync.Mutex
+	userPCM16k          []byte
+	assistantPCM48k     []byte
 	opusCodec           *webrtc_internal.OpusCodec
 
 	mediaCtx     context.Context
@@ -163,29 +169,6 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 	for _, opt := range opts {
 		opt(&options)
 	}
-	resampler, err := internal_audio_resampler.GetResampler(options.Logger)
-	if err != nil {
-		_ = options.Observer.Record(options.Context, observability.ProjectScope{}, observability.RecordLog{
-			Level:   observability.LevelError,
-			Message: "WebRTC streamer initialization failed",
-			Attributes: observability.Attributes{
-				"component": observability.ComponentWebRTC.String(),
-				"stage":     "resampler",
-				"error":     err.Error(),
-			},
-		})
-		_ = options.Observer.Record(options.Context, observability.ProjectScope{}, observability.RecordEvent{
-			Component: observability.ComponentWebRTC,
-			Event:     observability.WebRTCFailed,
-			Attributes: observability.Attributes{
-				"component": observability.ComponentWebRTC.String(),
-				"stage":     "resampler",
-				"error":     err.Error(),
-			},
-		})
-		return nil, fmt.Errorf("failed to create resampler: %w", err)
-	}
-
 	opusCodec, err := webrtc_internal.NewOpusCodec()
 	if err != nil {
 		_ = options.Observer.Record(options.Context, observability.ProjectScope{}, observability.RecordLog{
@@ -256,8 +239,11 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 		}
 	}
 	ambientMixer, err := internal_ambient.NewLoopMixer(internal_ambient.MixerSpec{
-		Logger:            options.Logger,
-		Resampler:         resampler,
+		Logger: options.Logger,
+		Resampler: resampler_soxr.NewChunk(
+			resampler_soxr.WithLogger(options.Logger),
+			resampler_soxr.WithHighQuality(),
+		),
 		TargetAudioConfig: internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG,
 		FrameBytes:        webrtc_internal.WebRTCOutputPCM16kFrameBytes,
 	})
@@ -282,17 +268,25 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 		})
 		return nil, fmt.Errorf("failed to create ambient mixer: %w", err)
 	}
+	userResampler := resampler_soxr.New(
+		resampler_soxr.WithLogger(options.Logger),
+		resampler_soxr.WithHighQuality(),
+	)
+	assistantResampler := resampler_soxr.New(
+		resampler_soxr.WithLogger(options.Logger),
+		resampler_soxr.WithHighQuality(),
+	)
 	s := &webrtcStreamer{
-		BaseStreamer: channel_base.NewBaseStreamerWithChannelCapacity(
-			options.Logger,
-			webrtc_internal.InputChannelSize,
-			webrtc_internal.OutputChannelSize,
+		BaseStreamer: channel_base.New(
+			channel_base.WithLogger(options.Logger),
+			channel_base.WithInputChannelCapacity(webrtc_internal.InputChannelSize),
+			channel_base.WithOutputChannelCapacity(webrtc_internal.OutputChannelSize),
 		),
 		peerConfig:           peerConfig,
 		serverConfig:         options.ServerConfig,
 		grpcStream:           options.GRPCStream,
 		sessionID:            uuid.New().String(),
-		resampler:            resampler,
+		resampler:            userResampler,
 		opusCodec:            opusCodec,
 		currentMode:          protos.StreamMode_STREAM_MODE_TEXT,
 		sessionState:         webrtc_internal.SessionState{Scope: observability.ProjectScope{}},
@@ -309,6 +303,23 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 		assistantToolService: options.AssistantToolService,
 		ambientMixer:         ambientMixer,
 	}
+	userWriter, err := userResampler.NewWriter(internal_audio.WEBRTC_AUDIO_CONFIG, internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG, func(output []byte) error {
+		s.userPCM16k = append(s.userPCM16k, output...)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create WebRTC input resampler: %w", err)
+	}
+	assistantWriter, err := assistantResampler.NewWriter(internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG, internal_audio.WEBRTC_AUDIO_CONFIG, func(output []byte) error {
+		s.assistantPCM48k = append(s.assistantPCM48k, output...)
+		return nil
+	})
+	if err != nil {
+		userWriter.Close()
+		return nil, fmt.Errorf("failed to create WebRTC output resampler: %w", err)
+	}
+	s.userWriter = userWriter
+	s.assistantWriter = assistantWriter
 	_ = options.Observer.Record(options.Context, s.sessionState.Scope, observability.RecordEvent{
 		Component: observability.ComponentWebRTC,
 		Event:     observability.WebRTCConnecting,
@@ -775,7 +786,17 @@ func (s *webrtcStreamer) readRemoteAudio(track *pionwebrtc.TrackRemote, mediaSes
 			})
 			continue
 		}
-		userPCM16k, err := s.resampler.Resample(userPCM48k, internal_audio.WEBRTC_AUDIO_CONFIG, internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG)
+		var userPCM16k []byte
+		if s.userWriter != nil {
+			s.userResampleMu.Lock()
+			s.userPCM16k = s.userPCM16k[:0]
+			err = s.userWriter.Write(userPCM48k)
+			userPCM16k = append(userPCM16k, s.userPCM16k...)
+			s.userPCM16k = s.userPCM16k[:0]
+			s.userResampleMu.Unlock()
+		} else {
+			userPCM16k, err = s.resampler.Resample(userPCM48k, internal_audio.WEBRTC_AUDIO_CONFIG, internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG)
+		}
 		if err != nil {
 			if !s.sessionState.IsActiveMediaSession(mediaSessionID) {
 				return
@@ -793,6 +814,9 @@ func (s *webrtcStreamer) readRemoteAudio(track *pionwebrtc.TrackRemote, mediaSes
 					"error":                            err.Error(),
 				},
 			})
+			continue
+		}
+		if len(userPCM16k) == 0 {
 			continue
 		}
 		userAudioReceivedAt := time.Now()
@@ -1129,9 +1153,26 @@ func (s *webrtcStreamer) ConsumeFrame(assistantPCM16k []byte) error {
 		return nil
 	}
 
-	assistantPCM48k, err := s.resampler.Resample(assistantPCM16k, internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG, internal_audio.WEBRTC_AUDIO_CONFIG)
-	if err != nil {
-		return err
+	var assistantPCM48k []byte
+	if s.assistantWriter != nil {
+		s.assistantResampleMu.Lock()
+		s.assistantPCM48k = s.assistantPCM48k[:0]
+		err := s.assistantWriter.Write(assistantPCM16k)
+		assistantPCM48k = append(assistantPCM48k, s.assistantPCM48k...)
+		s.assistantPCM48k = s.assistantPCM48k[:0]
+		s.assistantResampleMu.Unlock()
+		if err != nil {
+			return err
+		}
+	} else {
+		var err error
+		assistantPCM48k, err = s.resampler.Resample(assistantPCM16k, internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG, internal_audio.WEBRTC_AUDIO_CONFIG)
+		if err != nil {
+			return err
+		}
+	}
+	if len(assistantPCM48k) == 0 {
+		return nil
 	}
 	assistantOpus, err := s.opusCodec.Encode(assistantPCM48k)
 	if err != nil {
@@ -1531,6 +1572,15 @@ func (s *webrtcStreamer) Close() error {
 		}
 	}
 	s.stopMediaSession()
+	if s.userWriter != nil {
+		s.userWriter.Close()
+	}
+	if s.assistantWriter != nil {
+		s.assistantWriter.Close()
+	}
+	if s.userWriter == nil && s.resampler != nil {
+		s.resampler.Close()
+	}
 
 	s.Cancel()
 	return nil

@@ -1,0 +1,353 @@
+// Copyright (c) 2023-2026 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
+//
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
+
+package internal_sip_telephony
+
+import (
+	"context"
+	"sync"
+	"sync/atomic"
+
+	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
+	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
+	"github.com/rapidaai/api/assistant-api/internal/observability"
+	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
+	"github.com/rapidaai/pkg/commons"
+	"github.com/rapidaai/protos"
+)
+
+type MediaPortConfig struct {
+	Context    context.Context
+	Logger     commons.Logger
+	Session    *sip_runtime.Session
+	RTPHandler rtpHandler
+	StreamSink func(internal_type.Stream)
+	RecordSink func(...observability.Record) error
+}
+
+type MediaPort struct {
+	logger commons.Logger
+
+	session        *sip_runtime.Session
+	rtpHandler     rtpHandler
+	audioProcessor *AudioProcessor
+	mediaSession   *internal_telephony_media.MediaSession
+	streamSink     func(internal_type.Stream)
+	record         func(...observability.Record) error
+
+	ctx                     context.Context
+	cancel                  context.CancelFunc
+	bridgeRecorderWaitGroup sync.WaitGroup
+
+	inputStarted          atomic.Bool
+	outputStarted         atomic.Bool
+	bridgeRecorderStarted atomic.Bool
+	closed                atomic.Bool
+	transferActive        atomic.Bool
+}
+
+func NewMediaPort(config MediaPortConfig) (*MediaPort, error) {
+	rtpHandler := config.RTPHandler
+	if rtpHandler == nil && config.Session != nil {
+		rtpHandler = config.Session.GetRTPHandler()
+	}
+	if rtpHandler == nil {
+		callID := ""
+		if config.Session != nil {
+			callID = config.Session.GetCallID()
+		}
+		return nil, sip_runtime.NewSIPError("NewMediaPort", callID, "session has no RTP handler", sip_runtime.ErrRTPNotInitialized)
+	}
+	if config.Session == nil {
+		return nil, sip_runtime.NewSIPError("NewMediaPort", "", "session is required", sip_runtime.ErrRTPNotInitialized)
+	}
+	portContext := config.Context
+	if portContext == nil {
+		portContext = context.Background()
+	}
+	ctx, cancel := context.WithCancel(portContext)
+	mediaPort := &MediaPort{
+		logger:     config.Logger,
+		session:    config.Session,
+		rtpHandler: rtpHandler,
+		streamSink: config.StreamSink,
+		record:     config.RecordSink,
+		ctx:        ctx,
+		cancel:     cancel,
+	}
+	mediaPort.audioProcessor = NewAudioProcessor(AudioProcessorConfig{
+		RTPHandler: rtpHandler,
+		Logger:     config.Logger,
+		Record:     config.RecordSink,
+		Ringtone:   DefaultRingtone,
+		Ambient:    resolveAmbientConfig(config.Session),
+	})
+	mediaPort.mediaSession = internal_telephony_media.NewMediaSession(internal_telephony_media.MediaSessionConfig{
+		Context:     ctx,
+		Logger:      config.Logger,
+		MediaEngine: mediaPort.audioProcessor,
+		StreamSink:  config.StreamSink,
+		OutputSink:  mediaPort.deliverAssistantFrame,
+		Record:      config.RecordSink,
+	})
+	return mediaPort, nil
+}
+
+func resolveAmbientConfig(sipSession *sip_runtime.Session) *internal_ambient.Config {
+	if sipSession == nil {
+		return nil
+	}
+	assistant := sipSession.GetAssistant()
+	if assistant == nil || assistant.AssistantPhoneDeployment == nil || assistant.AssistantPhoneDeployment.OutputAudio == nil {
+		return nil
+	}
+	options := assistant.AssistantPhoneDeployment.OutputAudio.GetOptions()
+	config, ok := internal_ambient.ParseFromOptions(options)
+	if !ok {
+		return nil
+	}
+	return &config
+}
+
+// Start activates the full media path for calls that are already answered.
+func (port *MediaPort) Start() {
+	if port == nil || port.closed.Load() {
+		return
+	}
+	port.StartInput()
+	port.StartOutput()
+	port.StartBridgeRecorder()
+}
+
+// StartInput begins RTP input forwarding without enabling assistant RTP output.
+func (port *MediaPort) StartInput() {
+	if port == nil || port.closed.Load() {
+		return
+	}
+	if !port.inputStarted.CompareAndSwap(false, true) {
+		return
+	}
+	port.rtpHandler.SetInboundAudioSink(port.handleIncomingAudio)
+}
+
+// StartOutput enables paced assistant audio delivery to RTP.
+func (port *MediaPort) StartOutput() {
+	if port == nil || port.closed.Load() {
+		return
+	}
+	if !port.outputStarted.CompareAndSwap(false, true) {
+		return
+	}
+	port.mediaSession.Start()
+}
+
+// StartBridgeRecorder enables transfer bridge recording delivery.
+func (port *MediaPort) StartBridgeRecorder() {
+	if port == nil || port.closed.Load() {
+		return
+	}
+	if !port.bridgeRecorderStarted.CompareAndSwap(false, true) {
+		return
+	}
+	port.bridgeRecorderWaitGroup.Add(1)
+	go func() {
+		defer port.bridgeRecorderWaitGroup.Done()
+		port.audioProcessor.RunBridgeRecorder(port.ctx, port.streamSink)
+	}()
+}
+
+func (port *MediaPort) Close() error {
+	if port == nil {
+		return nil
+	}
+	if !port.closed.CompareAndSwap(false, true) {
+		return nil
+	}
+	port.rtpHandler.SetInboundAudioSink(nil)
+	port.stopRingback(false)
+	if port.mediaSession != nil {
+		port.mediaSession.Shutdown()
+	}
+	if port.cancel != nil {
+		port.cancel()
+	}
+	port.bridgeRecorderWaitGroup.Wait()
+	port.audioProcessor.Close()
+	return nil
+}
+
+func (port *MediaPort) HandleInitialization(init *protos.ConversationInitialization) {
+	if port == nil || port.mediaSession == nil {
+		return
+	}
+	port.mediaSession.HandleInitialization(init)
+}
+
+func (port *MediaPort) HandleAssistantAudio(audio []byte, completed bool) error {
+	if port == nil || port.mediaSession == nil {
+		return nil
+	}
+	if err := port.mediaSession.HandleAssistantAudio(audio, completed); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (port *MediaPort) HandleInterrupt() {
+	if port == nil || port.mediaSession == nil {
+		return
+	}
+	port.mediaSession.HandleInterrupt()
+}
+
+func (port *MediaPort) EnterTransferMode(ringtone string) bool {
+	if port == nil {
+		return true
+	}
+	if !port.transferActive.CompareAndSwap(false, true) {
+		return false
+	}
+	port.audioProcessor.SetTransferActive(true)
+	port.audioProcessor.ClearOutputBuffer()
+	port.audioProcessor.SetRingtone(ringtone)
+	port.audioProcessor.StartRingback()
+	return true
+}
+
+func (port *MediaPort) ResumeAssistant() bool {
+	if port == nil {
+		return true
+	}
+	if !port.transferActive.CompareAndSwap(true, false) {
+		return false
+	}
+	port.stopRingback(false)
+	port.audioProcessor.SetTransferActive(false)
+	port.audioProcessor.DisconnectTransferMedia()
+	return true
+}
+
+func (port *MediaPort) StopTransferRingback() {
+	if port == nil {
+		return
+	}
+	port.stopRingback(true)
+}
+
+func (port *MediaPort) ConnectTransferMedia(target internal_type.SIPRTPBridgeTarget, outputCodecName string) {
+	if port == nil || port.audioProcessor == nil {
+		return
+	}
+	inCodec := port.rtpHandler.GetCodec()
+	port.audioProcessor.ConnectTransferMedia(target, inCodec, outputCodecName)
+}
+
+func (port *MediaPort) DisconnectTransferMedia() {
+	if port == nil || port.audioProcessor == nil {
+		return
+	}
+	port.audioProcessor.DisconnectTransferMedia()
+}
+
+func (port *MediaPort) RecordTransferOperatorAudio(audio []byte) {
+	if port == nil || port.audioProcessor == nil {
+		return
+	}
+	port.audioProcessor.RecordTransferOperatorAudio(audio)
+}
+
+func (port *MediaPort) LocalAddr() (string, int) {
+	if port == nil || port.rtpHandler == nil {
+		return "", 0
+	}
+	address := port.rtpHandler.LocalAddress()
+	return address.IP, address.Port
+}
+
+func (port *MediaPort) CodecName() string {
+	if port == nil || port.rtpHandler == nil || port.rtpHandler.GetCodec() == nil {
+		return "PCMU"
+	}
+	return port.rtpHandler.GetCodec().Name
+}
+
+func (port *MediaPort) handleIncomingAudio(frame sip_runtime.InboundAudioFrame) {
+	if port == nil || port.closed.Load() {
+		return
+	}
+	if port.audioProcessor.ForwardUserAudio(frame.Audio) {
+		return
+	}
+	if port.transferActive.Load() {
+		return
+	}
+	if err := port.mediaSession.HandleProviderAudioFrame(internal_telephony_media.ProviderAudioFrame{
+		Audio:      frame.Audio,
+		ReceivedAt: frame.ReceivedAt,
+	}); err != nil && port.record != nil {
+		_ = port.record(observability.RecordLog{
+			Level:   observability.LevelError,
+			Message: "SIP provider audio processing failed",
+			Attributes: observability.Attributes{
+				"component": observability.ComponentCall.String(),
+				"provider":  Provider,
+				"call_id":   port.session.GetCallID(),
+				"error":     err.Error(),
+			},
+		})
+	}
+}
+
+func (port *MediaPort) deliverAssistantFrame(outputFrame internal_telephony_media.AssistantOutputFrame) error {
+	if port == nil || port.closed.Load() {
+		return sip_runtime.ErrSessionClosed
+	}
+	if len(outputFrame.ProviderAudio) == 0 {
+		return nil
+	}
+	if err := port.rtpHandler.WriteAudio(outputFrame.ProviderAudio); err != nil {
+		if port.record != nil {
+			_ = port.record(observability.RecordLog{
+				Level:   observability.LevelError,
+				Message: "SIP assistant audio output failed",
+				Attributes: observability.Attributes{
+					"component": observability.ComponentCall.String(),
+					"provider":  Provider,
+					"call_id":   port.session.GetCallID(),
+					"error":     err.Error(),
+				},
+			})
+		}
+		return err
+	}
+	if outputFrame.Idle || port.session.GetInfo().Direction != sip_runtime.CallDirectionInbound {
+		return nil
+	}
+	if port.session.MarkInboundFirstAssistantAudioSent() && port.record != nil {
+		_ = port.record(observability.RecordEvent{
+			Component: observability.ComponentCall,
+			Event:     observability.CallStatus,
+			Attributes: observability.Attributes{
+				"component": observability.ComponentCall.String(),
+				"provider":  Provider,
+				"call_id":   port.session.GetCallID(),
+				"status":    "first_assistant_audio_sent",
+			},
+		})
+	}
+	return nil
+}
+
+func (port *MediaPort) stopRingback(clearOutput bool) {
+	if port == nil || port.audioProcessor == nil {
+		return
+	}
+	port.audioProcessor.StopRingback()
+	if clearOutput && port.audioProcessor != nil {
+		port.audioProcessor.ClearOutputBuffer()
+	}
+}
