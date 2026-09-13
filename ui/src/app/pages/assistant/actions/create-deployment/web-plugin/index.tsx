@@ -323,14 +323,14 @@ const ConfigureAssistantWebDeployment: FC<{ assistantId: string }> = ({
       webDeployment.setGreeting(experienceConfig.greeting);
     if (experienceConfig.messageOnError)
       webDeployment.setMistake(experienceConfig.messageOnError);
-    if (experienceConfig.unclearInputTimeout)
-      webDeployment.setUnclearinputtimeout(
-        Number(experienceConfig.unclearInputTimeout),
-      );
-    if (experienceConfig.unclearInputMessage)
-      webDeployment.setUnclearinputmessage(
-        experienceConfig.unclearInputMessage,
-      );
+    webDeployment.setUnclearinputtimeout(
+      Number(
+        experienceConfig.unclearInputTimeout || DEFAULT_UNCLEAR_INPUT_TIMEOUT,
+      ),
+    );
+    webDeployment.setUnclearinputmessage(
+      experienceConfig.unclearInputMessage || DEFAULT_UNCLEAR_INPUT_MESSAGE,
+    );
     if (experienceConfig.idealTimeout)
       webDeployment.setIdealtimeout(experienceConfig.idealTimeout);
     if (experienceConfig.idleTimeoutBackoffTimes)

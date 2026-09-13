@@ -34,7 +34,7 @@ type MessageLifecycle interface {
 	StopUnclearInput()
 
 	OnUserTurnStarted(contextID, trigger, source, text string) (internal_type.TurnChangePacket, error)
-	OnTranscriptReceived(packet internal_type.SpeechToTextPacket) (string, error)
+	OnTranscriptReceived(packet internal_type.SpeechToTextPacket) (internal_type.TurnChangePacket, error)
 	OnUserInput(packet internal_type.UserInputPacket) (internal_type.UserInputPacket, []internal_type.Packet)
 	OnUserSpeechCompleted(packet internal_type.EndOfSpeechPacket) error
 	OnPrompt(packet internal_type.Packet) (internal_type.TurnChangePacket, internal_type.InjectMessagePacket, error)
@@ -49,9 +49,8 @@ type MessageLifecycle interface {
 	OnMessageFailed(contextID string)
 	Close(contextID string) *protos.ConversationPlaybackControl
 
-	InterruptionEnabled() bool
 	CancelInterruption() string
-	OnUserSpeech(packet internal_type.SpeechToTextPacket, adaptive bool) (*internal_type.TurnChangePacket, internal_type.SpeechToTextPacket)
+	OnUserSpeech(packet internal_type.SpeechToTextPacket) (*internal_type.TurnChangePacket, internal_type.SpeechToTextPacket)
 	HoldInput(packet internal_type.Packet) bool
 	OnInterruptionDetected(packet internal_type.InterruptionDetectedPacket, bargeInTrigger string) InterruptionDecision
 	OnPlaybackPaused(packet internal_type.InterruptionDecisionExpiredPacket, pauseError error) *internal_type.TurnChangePacket
@@ -60,47 +59,33 @@ type MessageLifecycle interface {
 }
 
 type messageLifecycle struct {
-	playbackControlMu                  sync.Mutex
-	mu                                 sync.RWMutex
-	contextID                          string
-	mode                               type_enums.MessageMode
-	state                              MessageState
-	output                             assistantOutputState
-	onPacket                           func(...internal_type.Packet) error
-	sendOutput                         func(proto.Message) error
-	dispatchPacket                     func(context.Context, internal_type.Packet)
-	onInterruptionExpired              func(internal_type.InterruptionDecisionExpiredPacket)
-	loadBehavior                       func() (*internal_assistant_entity.AssistantDeploymentBehavior, error)
-	interruptionEnabled                bool
-	interruptionContextID              string
-	interruptionPreviousState          MessageState
-	interruptionSequence               uint64
-	interruptionSpeechActive           bool
-	interruptionResumed                bool
-	interruptionDecisionPending        bool
-	interruptionTurnCommitted          bool
-	interruptionHeldPackets            []internal_type.Packet
-	interruptionDecisionTimer          *time.Timer
-	committedInterruptionContextID     string
-	previousInterruptionContextID      string
-	pendingInterruptionVADEndContextID string
-	unclearInputWatchdog               *watchdog.UnclearInputWatchdog
-	unclearInputTimeout                time.Duration
-	unclearInputPrompt                 string
+	playbackControlMu      sync.Mutex
+	mu                     sync.RWMutex
+	contextID              string
+	mode                   type_enums.MessageMode
+	state                  MessageState
+	output                 assistantOutputState
+	onPacket               func(...internal_type.Packet) error
+	sendOutput             func(proto.Message) error
+	dispatchPacket         func(context.Context, internal_type.Packet)
+	onInterruptionExpired  func(internal_type.InterruptionDecisionExpiredPacket)
+	loadBehavior           func() (*internal_assistant_entity.AssistantDeploymentBehavior, error)
+	interruption           interruptionState
+	previousContextID      string
+	pendingVADEndContextID string
+	unclearInputWatchdog   *watchdog.UnclearInputWatchdog
+	unclearInputTimeout    time.Duration
+	unclearInputPrompt     string
 }
 
 // Output state is reset with its owning message, never shared across message IDs.
 type assistantOutputState struct {
-	started          bool
-	generationClosed bool
+	generation       generationPhase
+	playback         playbackPhase
 	textDelivered    bool
 	hasText          bool
 	hasAudio         bool
-	terminalSending  bool
-	terminalIssued   bool
 	receiptReceived  bool
-	completed        bool
-	failed           bool
 	paused           bool
 	receiptDeadline  time.Time
 	receiptRemaining time.Duration
@@ -108,12 +93,11 @@ type assistantOutputState struct {
 	receiptTimer     *time.Timer
 }
 
-// NewMessageLifecycle defaults to text mode with speech-confirmed interruption disabled.
+// NewMessageLifecycle defaults to text mode and confirms audio interruptions with speech.
 func NewMessageLifecycle(options ...MessageOption) MessageLifecycle {
 	message := &messageLifecycle{
-		mode:                type_enums.TextMode,
-		state:               MessageStateAssistantIdle,
-		interruptionEnabled: InterruptionEnabledByDefault,
+		mode:  type_enums.TextMode,
+		state: MessageStateAssistantIdle,
 	}
 	for _, option := range options {
 		if option != nil {
@@ -142,13 +126,13 @@ func (l *messageLifecycle) OnPlaybackCompleted(contextID string) error {
 		l.mu.Unlock()
 		return err
 	}
-	if l.output.failed || (!l.output.terminalIssued && !l.output.terminalSending) {
-		l.mu.Unlock()
-		return ErrPlaybackTerminalNotIssued
-	}
-	if l.output.receiptReceived {
+	if l.output.receiptReceived && l.output.playback != playbackFailed {
 		l.mu.Unlock()
 		return ErrDuplicatePlaybackCompletion
+	}
+	if !l.mode.Audio() || (l.output.playback != playbackClosing && l.output.playback != playbackAwaitingReceipt) {
+		l.mu.Unlock()
+		return ErrPlaybackTerminalNotIssued
 	}
 	l.output.receiptReceived = true
 	if l.output.receiptTimer != nil {
@@ -169,8 +153,8 @@ func (l *messageLifecycle) Mode() type_enums.MessageMode {
 func (l *messageLifecycle) SetMode(mode type_enums.MessageMode) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if mode != l.mode && l.output.started {
-		l.output.failed = true
+	if mode != l.mode && l.output.generation != generationIdle {
+		l.output.playback = playbackFailed
 		if l.output.receiptTimer != nil {
 			l.output.receiptTimer.Stop()
 		}
@@ -191,16 +175,16 @@ func (l *messageLifecycle) OnGenerationStarted(contextID string) error {
 	if err := l.validateContextLocked(contextID); err != nil {
 		return err
 	}
-	if l.output.generationClosed || l.output.failed || l.output.completed {
+	if l.output.generation == generationCompleted || l.output.playback == playbackFailed || l.output.playback == playbackCompleted {
 		return ErrInvalidTransition
 	}
 	if l.state == MessageStateAssistantSpeaking {
-		l.output.started = true
+		l.output.generation = generationStarted
 		return nil
 	}
 	switch l.state {
 	case MessageStateAssistantIdle, MessageStateAssistantFinished, MessageStateAssistantPrompted, MessageStateUserFinished, MessageStateUserPrompted, MessageStateAssistantGenerating:
-		l.output.started = true
+		l.output.generation = generationStarted
 		l.state = MessageStateAssistantGenerating
 		return nil
 	default:
@@ -227,10 +211,8 @@ func (l *messageLifecycle) OnSpeechStarted(contextID string) error {
 func (l *messageLifecycle) Close(contextID string) *protos.ConversationPlaybackControl {
 	l.OnMessageFailed(contextID)
 	defer l.StopUnclearInput()
-	if l.InterruptionEnabled() {
-		if interruptedContextID := l.CancelInterruption(); interruptedContextID != "" {
-			return &protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE, Id: interruptedContextID}
-		}
+	if interruptedContextID := l.CancelInterruption(); interruptedContextID != "" {
+		return &protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE, Id: interruptedContextID}
 	}
 	return nil
 }

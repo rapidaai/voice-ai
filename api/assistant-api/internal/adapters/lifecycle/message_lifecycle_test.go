@@ -54,10 +54,13 @@ func TestMessageLifecycle_AcceptUserTurnReplacesAssistantMessage(t *testing.T) {
 
 func TestMessageLifecycle_AcceptUserTurnPreservesActiveSpeech(t *testing.T) {
 	l := NewMessageLifecycle(WithContextID("ctx-old"), WithMode(type_enums.TextMode))
+	require.NoError(t, l.OnGenerationStarted("ctx-old"))
 	l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
 		ContextID: "ctx-old", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
 	}, internal_options.BargeInTriggerVAD)
 	contextID := l.ContextID()
+	_, err := l.OnTranscriptReceived(internal_type.SpeechToTextPacket{ContextID: contextID, Script: "hello", Interim: true})
+	require.NoError(t, err)
 	turn, err := l.OnUserTurnStarted(contextID, string(internal_type.PacketNameUserTextReceived), "text", "new request")
 	if err != nil {
 		t.Fatal(err)
@@ -128,22 +131,40 @@ func TestMessageLifecycle_AssistantFlow(t *testing.T) {
 }
 
 func TestMessageLifecycle_UnclearPromptRejectsDuplicate(t *testing.T) {
-	text := "Could you repeat that?"
-	l := NewMessageLifecycle(WithContextID("ctx"), WithMode(type_enums.TextMode), WithBehavior(func() (*internal_assistant_entity.AssistantDeploymentBehavior, error) {
-		return &internal_assistant_entity.AssistantDeploymentBehavior{UnclearInputMessage: &text}, nil
-	}))
-	require.NoError(t, l.Initialize(context.Background()))
-	t.Cleanup(l.StopUnclearInput)
-	if _, err := l.OnTranscriptReceived(internal_type.SpeechToTextPacket{ContextID: "ctx", Script: "hello"}); err != nil {
-		t.Fatal(err)
-	}
-	turn, prompt, err := l.OnPrompt(internal_type.UnclearInputExpiredPacket{ContextID: "ctx"})
-	if err != nil || prompt.Text != text || prompt.ContextID != turn.ContextID || turn.ContextID == "ctx" {
-		t.Fatalf("unexpected prompt: turn=%+v prompt=%+v err=%v", turn, prompt, err)
-	}
-	if _, _, err := l.OnPrompt(internal_type.UnclearInputExpiredPacket{ContextID: "ctx"}); !errors.Is(err, ErrStaleContext) {
-		t.Fatalf("expected duplicate prompt to fail, got=%v", err)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		text := "Could you repeat that?"
+		timeout := 1.0
+		expired := make(chan internal_type.UnclearInputExpiredPacket, 1)
+		l := NewMessageLifecycle(WithContextID("ctx"), WithMode(type_enums.AudioMode), WithBehavior(func() (*internal_assistant_entity.AssistantDeploymentBehavior, error) {
+			return &internal_assistant_entity.AssistantDeploymentBehavior{UnclearInputTimeout: &timeout, UnclearInputMessage: &text}, nil
+		}), WithOnPacket(func(packets ...internal_type.Packet) error {
+			for _, packet := range packets {
+				if packet, ok := packet.(internal_type.UnclearInputExpiredPacket); ok {
+					expired <- packet
+				}
+			}
+			return nil
+		}))
+		require.NoError(t, l.Initialize(context.Background()))
+		t.Cleanup(l.StopUnclearInput)
+		if _, err := l.OnTranscriptReceived(internal_type.SpeechToTextPacket{ContextID: "ctx", Script: "hello", Interim: true}); err != nil {
+			t.Fatal(err)
+		}
+		_, _, err := l.OnPrompt(internal_type.UnclearInputExpiredPacket{ContextID: "ctx"})
+		require.ErrorIs(t, err, ErrInvalidTransition)
+		time.Sleep(time.Second)
+		synctest.Wait()
+		require.Len(t, expired, 1)
+		packet := <-expired
+		require.NotZero(t, packet.Generation)
+		turn, prompt, err := l.OnPrompt(packet)
+		if err != nil || prompt.Text != text || prompt.ContextID != turn.ContextID || turn.ContextID == "ctx" {
+			t.Fatalf("unexpected prompt: turn=%+v prompt=%+v err=%v", turn, prompt, err)
+		}
+		if _, _, err := l.OnPrompt(packet); !errors.Is(err, ErrStaleContext) {
+			t.Fatalf("expected duplicate prompt to fail, got=%v", err)
+		}
+	})
 }
 
 func TestMessageLifecycle_IdlePromptRejectsDuplicate(t *testing.T) {
@@ -311,7 +332,6 @@ func TestMessageLifecycle_CloseStopsPendingWork(t *testing.T) {
 				packets := make(chan internal_type.Packet, 16)
 				timeout := 1.0
 				message := NewMessageLifecycle(WithContextID("message"), WithMode(type_enums.AudioMode),
-					WithInterruption(phase == "pause"),
 					WithSend(func(proto.Message) error { return nil }),
 					WithOnPacket(func(emitted ...internal_type.Packet) error {
 						for _, packet := range emitted {
@@ -330,12 +350,10 @@ func TestMessageLifecycle_CloseStopsPendingWork(t *testing.T) {
 					}))
 				if phase == "unclear input" {
 					require.NoError(t, message.Initialize(context.Background()))
-					message.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
-						ContextID: message.ContextID(), Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
-					}, internal_options.BargeInTriggerVAD)
-					message.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
-						ContextID: message.ContextID(), Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd,
-					}, internal_options.BargeInTriggerVAD)
+					_, err := message.OnTranscriptReceived(internal_type.SpeechToTextPacket{
+						ContextID: message.ContextID(), Script: "hello", Interim: true,
+					})
+					require.NoError(t, err)
 				} else {
 					require.NoError(t, message.OnGenerationStarted("message"))
 					message.OnGenerationCompleted(internal_type.LLMResponseDonePacket{ContextID: "message", Text: "answer"})

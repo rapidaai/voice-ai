@@ -14,6 +14,7 @@ import (
 	internal_conversation_entity "github.com/rapidaai/api/assistant-api/internal/entity/conversations"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -98,25 +99,38 @@ func (streamer *failingOutputControlStreamer) Send(packet proto.Message) error {
 }
 
 func TestSendOutputControlUsesExistingSendAndReturnsErrors(t *testing.T) {
-	streamer := &streamTestStreamer{}
-	requestor := &genericRequestor{streamer: streamer}
-	requestor.messageLifecycle = adapter_lifecycle.NewMessageLifecycle(adapter_lifecycle.WithSend(func(message proto.Message) error {
-		return requestor.streamer.Send(message)
-	}))
-	for _, control := range []proto.Message{&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}, &protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}, &protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}} {
-		_, err := proto.Marshal(control)
-		require.NoError(t, err)
-		require.NoError(t, requestor.sendOutputControl(control))
+	for _, kind := range []protos.ConversationPlaybackControl_Kind{
+		protos.ConversationPlaybackControl_PAUSE,
+		protos.ConversationPlaybackControl_CONTINUE,
+		protos.ConversationPlaybackControl_FLUSH,
+	} {
+		t.Run(kind.String(), func(t *testing.T) {
+			streamer := &streamTestStreamer{}
+			requestor := &genericRequestor{streamer: streamer}
+			requestor.messageLifecycle = adapter_lifecycle.NewMessageLifecycle(
+				adapter_lifecycle.WithMode(type_enums.AudioMode),
+				adapter_lifecycle.WithSend(func(message proto.Message) error { return requestor.streamer.Send(message) }),
+			)
+			require.NoError(t, requestor.messageLifecycle.OnGenerationStarted(requestor.GetID()))
+			if kind == protos.ConversationPlaybackControl_PAUSE {
+				decision := requestor.messageLifecycle.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
+					ContextID: requestor.GetID(), Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
+				}, "")
+				require.NotNil(t, decision.Pause)
+			}
+			control := &protos.ConversationPlaybackControl{Id: requestor.GetID(), Kind: kind}
+			_, err := proto.Marshal(control)
+			require.NoError(t, err)
+			require.NoError(t, requestor.sendOutputControl(control))
+			require.Len(t, streamer.sent, 1)
+			assert.True(t, proto.Equal(control, streamer.sent[0]))
+			failure := errors.New("local output failed")
+			requestor.streamer = &failingOutputControlStreamer{err: failure}
+			assert.ErrorIs(t, requestor.sendOutputControl(control), failure)
+			requestor.streamer = nil
+			assert.ErrorContains(t, requestor.sendOutputControl(control), "streamer is unavailable")
+		})
 	}
-	require.Len(t, streamer.sent, 3)
-	assert.True(t, proto.Equal(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}, streamer.sent[0]))
-	assert.True(t, proto.Equal(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}, streamer.sent[1]))
-	assert.True(t, proto.Equal(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}, streamer.sent[2]))
-	failure := errors.New("local output failed")
-	requestor.streamer = &failingOutputControlStreamer{err: failure}
-	assert.ErrorIs(t, requestor.sendOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}), failure)
-	requestor.streamer = nil
-	assert.ErrorContains(t, requestor.sendOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}), "streamer is unavailable")
 }
 
 func TestTalk_RecvErrorBeforeInitialization_ReturnsNil(t *testing.T) {

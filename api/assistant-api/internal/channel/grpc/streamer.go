@@ -285,6 +285,13 @@ func (uds *unidirectionalStreamer) Send(out proto.Message) error {
 			Data:    &protos.AssistantTalkResponse_Configuration{Configuration: out},
 		})
 
+	case *protos.ConversationDisconnection:
+		return uds.server.Send(&protos.AssistantTalkResponse{
+			Code:    200,
+			Success: true,
+			Data:    &protos.AssistantTalkResponse_Disconnection{Disconnection: out},
+		})
+
 	case *protos.ConversationInterruption:
 		return uds.server.Send(&protos.AssistantTalkResponse{
 			Code:    200,

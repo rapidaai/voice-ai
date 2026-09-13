@@ -352,7 +352,15 @@ const ConfigureAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
     const resolvedExperience =
       isSectionMode && editSection !== 'experience'
         ? existingConfig.experience
-        : experienceConfig;
+        : {
+            ...experienceConfig,
+            unclearInputTimeout:
+              experienceConfig.unclearInputTimeout ||
+              DEFAULT_UNCLEAR_INPUT_TIMEOUT,
+            unclearInputMessage:
+              experienceConfig.unclearInputMessage ||
+              DEFAULT_UNCLEAR_INPUT_MESSAGE,
+          };
     deployment.setGreetinginterruptible(
       resolvedExperience.greetingInterruptible ?? true,
     );

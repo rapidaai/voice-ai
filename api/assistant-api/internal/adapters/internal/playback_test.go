@@ -35,7 +35,7 @@ func TestTextToSpeechEndRetainsPlaybackInterruption(t *testing.T) {
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
-				requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 0, "", adapter_lifecycle.WithInterruption(true))
+				requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 0, "")
 				t.Cleanup(func() { requestor.messageLifecycle.CancelInterruption() })
 				requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
 				streamer := requestor.streamer.(*streamTestStreamer)
@@ -107,7 +107,7 @@ func TestTextToSpeechEndRetainsPlaybackInterruption(t *testing.T) {
 
 func TestTextToSpeechEndLateReceiptDoesNotDismissLaterPlayback(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD, adapter_lifecycle.WithInterruption(true))
+		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
 		requestor.assistant = &internal_assistant_entity.Assistant{}
 		requestor.assistantConversation = &internal_conversation_entity.AssistantConversation{}
 		requestor.observabilityRecorder = &recordingObservabilityRecorder{}

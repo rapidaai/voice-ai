@@ -25,6 +25,8 @@ import { useAllProviderCredentials } from '@/hooks/use-model';
 import { useRapidaStore } from '@/hooks';
 import {
   DEFAULT_IDEAL_TIMEOUT,
+  DEFAULT_UNCLEAR_INPUT_MESSAGE,
+  DEFAULT_UNCLEAR_INPUT_TIMEOUT,
   ExperienceConfig,
 } from '@/app/pages/assistant/actions/create-deployment/commons/configure-experience';
 import {
@@ -338,7 +340,17 @@ export function useDeploymentSectionEdit(
     }
 
     const resolvedExperience =
-      section === 'experience' ? experienceConfig : existingConfig.experience;
+      section === 'experience'
+        ? {
+            ...experienceConfig,
+            unclearInputTimeout:
+              experienceConfig.unclearInputTimeout ||
+              DEFAULT_UNCLEAR_INPUT_TIMEOUT,
+            unclearInputMessage:
+              experienceConfig.unclearInputMessage ||
+              DEFAULT_UNCLEAR_INPUT_MESSAGE,
+          }
+        : existingConfig.experience;
 
     const buildAudioInput = () => {
       if (section === 'voice-input') {

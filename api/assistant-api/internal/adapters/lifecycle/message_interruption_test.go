@@ -22,12 +22,13 @@ func TestMessageInterruption_PlaybackControlOrdersDelayedPauseBeforeFlushCommit(
 	releasePause := make(chan struct{}, 1)
 	defer close(releasePause)
 	var l *messageLifecycle
-	l = NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true),
+	l = NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode),
 		WithSend(func(packet proto.Message) error {
 			if control, ok := packet.(*protos.ConversationPlaybackControl); ok && control.GetKind() == protos.ConversationPlaybackControl_PAUSE {
 				decision, _ := l.OnUserSpeech(internal_type.SpeechToTextPacket{
 					ContextID: "assistant", Script: "wait", Interim: true,
-				}, true)
+				})
+
 				confirmed <- decision
 				<-releasePause
 			}
@@ -93,7 +94,7 @@ func TestMessageInterruption_PlaybackControlRejectsPauseAfterFlush(t *testing.T)
 	for _, phase := range []string{"reserved", "committed", "finished"} {
 		t.Run(phase, func(t *testing.T) {
 			var applied []proto.Message
-			l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true),
+			l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode),
 				WithSend(func(packet proto.Message) error {
 					applied = append(applied, packet)
 					return nil
@@ -105,7 +106,7 @@ func TestMessageInterruption_PlaybackControlRejectsPauseAfterFlush(t *testing.T)
 				ContextID: "assistant", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
 			})
 			require.NotNil(t, pause)
-			decision, _ := l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "wait", Interim: true}, true)
+			decision, _ := l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "wait", Interim: true})
 			require.NotNil(t, decision)
 			require.True(t, l.beginInterruptedTurn(*decision))
 			require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "assistant", Kind: protos.ConversationPlaybackControl_FLUSH}))
@@ -127,9 +128,7 @@ func TestMessageInterruption_PlaybackControlRejectsPauseAfterFlush(t *testing.T)
 }
 
 func TestMessageInterruption_MeaningfulSpeechCommitsAndReplaysOnce(t *testing.T) {
-	assert.False(t, NewMessageLifecycle().InterruptionEnabled())
-	l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true)).(*messageLifecycle)
-	assert.True(t, l.InterruptionEnabled())
+	l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode)).(*messageLifecycle)
 	t.Cleanup(func() { l.CancelInterruption() })
 	require.NoError(t, l.OnGenerationStarted("assistant"))
 	require.NoError(t, l.OnSpeechStarted("assistant"))
@@ -145,7 +144,7 @@ func TestMessageInterruption_MeaningfulSpeechCommitsAndReplaysOnce(t *testing.T)
 	assert.Equal(t, MessageStateAssistantSpeaking, l.State())
 
 	interim := internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "wait please", Interim: true}
-	decision, admitted := l.OnUserSpeech(interim, true)
+	decision, admitted := l.OnUserSpeech(interim)
 	require.NotNil(t, decision)
 	assert.Empty(t, admitted.ContextID)
 	assert.True(t, decision.InterruptionDecision)
@@ -157,7 +156,7 @@ func TestMessageInterruption_MeaningfulSpeechCommitsAndReplaysOnce(t *testing.T)
 	require.True(t, l.beginInterruptedTurn(*decision))
 	assert.Equal(t, "assistant", l.ContextID(), "reserving flush must not rotate the turn")
 	final := internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "wait please stop"}
-	nextDecision, admitted := l.OnUserSpeech(final, true)
+	nextDecision, admitted := l.OnUserSpeech(final)
 	assert.Nil(t, nextDecision)
 	assert.Empty(t, admitted.ContextID, "speech arriving during flush must remain held")
 	eos := internal_type.EndOfSpeechPacket{ContextID: "assistant", Speech: final.Script, Speechs: []internal_type.SpeechToTextPacket{final}}
@@ -179,19 +178,73 @@ func TestMessageInterruption_MeaningfulSpeechCommitsAndReplaysOnce(t *testing.T)
 	final.ContextID = committed.ContextID
 	input.ContextID = committed.ContextID
 	wantEOS := internal_type.EndOfSpeechPacket{ContextID: committed.ContextID, Speech: final.Script, Speechs: []internal_type.SpeechToTextPacket{final}}
-	assert.Equal(t, []internal_type.Packet{start, interim, final, wantEOS, input}, l.finishInterruptedTurn(committed))
+	assert.Equal(t, []internal_type.Packet{start, interim, final, wantEOS}, l.finishInterruptedTurn(committed))
 	assert.Equal(t, "assistant", eos.Speechs[0].ContextID, "replay must not mutate the caller's transcript slice")
+	assert.Equal(t, []internal_type.Packet{input}, l.finishInterruptedTurn(committed))
 	assert.Empty(t, l.finishInterruptedTurn(committed))
 	assert.False(t, l.HoldInput(input))
 
 	nextDecision, admitted = l.OnUserSpeech(internal_type.SpeechToTextPacket{
 		ContextID: "assistant", Script: "another word", Interim: true,
-	}, true)
+	})
+
 	assert.Nil(t, nextDecision)
 	assert.Equal(t, committed.ContextID, admitted.ContextID)
-	nextDecision, admitted = l.OnUserSpeech(final, true)
+	nextDecision, admitted = l.OnUserSpeech(final)
 	assert.Nil(t, nextDecision)
 	assert.Equal(t, committed.ContextID, admitted.ContextID)
+}
+
+func TestMessageInterruption_TranscriptBeforeVADCommitsAndReplaysOnce(t *testing.T) {
+	for _, state := range []MessageState{MessageStateAssistantGenerating, MessageStateAssistantGenerated, MessageStateAssistantSpeaking} {
+		t.Run(string(state), func(t *testing.T) {
+			var sent []proto.Message
+			var replayed []internal_type.SpeechToTextPacket
+			l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode),
+				WithSend(func(packet proto.Message) error { sent = append(sent, packet); return nil }),
+				WithDispatch(func(_ context.Context, packet internal_type.Packet) {
+					if transcript, ok := packet.(internal_type.SpeechToTextPacket); ok {
+						replayed = append(replayed, transcript)
+					}
+				}))
+			t.Cleanup(func() { l.Close(l.ContextID()) })
+			require.NoError(t, l.OnGenerationStarted("assistant"))
+			switch state {
+			case MessageStateAssistantGenerated:
+				l.OnGenerationCompleted(internal_type.LLMResponseDonePacket{ContextID: "assistant", Text: "answer"})
+			case MessageStateAssistantSpeaking:
+				require.NoError(t, l.OnSpeechStarted("assistant"))
+			}
+			for _, transcript := range []internal_type.SpeechToTextPacket{
+				{ContextID: "assistant", Script: " ", Interim: true},
+				{ContextID: "assistant", Script: "um", Interim: true},
+				{ContextID: "stale", Script: "wait", Interim: true},
+			} {
+				decision, _ := l.OnUserSpeech(transcript)
+				require.Nil(t, decision)
+				assert.Equal(t, "assistant", l.ContextID())
+				assert.Equal(t, state, l.State())
+				assert.False(t, l.HoldInput(internal_type.UserInputPacket{ContextID: "assistant", Text: "wait"}))
+			}
+			transcript := internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "wait please", Interim: true}
+			decision, admitted := l.OnUserSpeech(transcript)
+			require.NotNil(t, decision)
+			assert.True(t, decision.InterruptionDecision)
+			assert.NotZero(t, decision.InterruptionSequence)
+			assert.Equal(t, string(state), decision.PreviousState)
+			assert.Empty(t, admitted.ContextID)
+			assert.Equal(t, "assistant", l.ContextID(), "transcript must wait for flush before changing context")
+			require.NoError(t, l.OnTurnChange(t.Context(), *decision))
+			require.NotEqual(t, "assistant", l.ContextID())
+			assert.Equal(t, MessageStateUserListening, l.State())
+			assert.Equal(t, []proto.Message{&protos.ConversationPlaybackControl{Id: "assistant", Kind: protos.ConversationPlaybackControl_FLUSH}}, sent)
+			transcript.ContextID = l.ContextID()
+			assert.Equal(t, []internal_type.SpeechToTextPacket{transcript}, replayed)
+			require.NoError(t, l.OnTurnChange(t.Context(), *decision))
+			assert.Len(t, sent, 1)
+			assert.Len(t, replayed, 1)
+		})
+	}
 }
 
 func TestMessageInterruption_FillerRecovery(t *testing.T) {
@@ -204,7 +257,7 @@ func TestMessageInterruption_FillerRecovery(t *testing.T) {
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
-				l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true)).(*messageLifecycle)
+				l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode)).(*messageLifecycle)
 				t.Cleanup(func() { l.CancelInterruption() })
 				require.NoError(t, l.OnGenerationStarted("assistant"))
 				require.NoError(t, l.OnSpeechStarted("assistant"))
@@ -217,7 +270,8 @@ func TestMessageInterruption_FillerRecovery(t *testing.T) {
 				for _, interim := range []bool{true, false} {
 					decision, admitted := l.OnUserSpeech(internal_type.SpeechToTextPacket{
 						ContextID: "assistant", Script: scenario.text, Interim: interim,
-					}, true)
+					})
+
 					assert.Nil(t, decision)
 					assert.Empty(t, admitted.ContextID)
 				}
@@ -250,7 +304,7 @@ func TestMessageInterruption_FillerRecovery(t *testing.T) {
 
 func TestMessageInterruption_StaleTimerAfterCancelAndNewCandidate(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true)).(*messageLifecycle)
+		l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode)).(*messageLifecycle)
 		t.Cleanup(func() { l.CancelInterruption() })
 		require.NoError(t, l.OnGenerationStarted("assistant"))
 		require.NoError(t, l.OnSpeechStarted("assistant"))
@@ -287,7 +341,8 @@ func TestMessageInterruption_StaleTimerAfterCancelAndNewCandidate(t *testing.T) 
 		assert.Equal(t, "assistant", continueContext)
 		decision, admitted := l.OnUserSpeech(internal_type.SpeechToTextPacket{
 			ContextID: "assistant", Script: "stop", Interim: true,
-		}, true)
+		})
+
 		require.NotNil(t, decision)
 		assert.Empty(t, admitted.ContextID)
 		assert.Greater(t, decision.InterruptionSequence, current.Sequence)
@@ -302,7 +357,7 @@ func TestMessageInterruption_StaleTimerAfterCancelAndNewCandidate(t *testing.T) 
 }
 
 func TestMessageInterruption_DuplicateCommitRejected(t *testing.T) {
-	l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true)).(*messageLifecycle)
+	l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode)).(*messageLifecycle)
 	t.Cleanup(func() { l.CancelInterruption() })
 	require.NoError(t, l.OnGenerationStarted("assistant"))
 	require.NoError(t, l.OnSpeechStarted("assistant"))
@@ -310,7 +365,7 @@ func TestMessageInterruption_DuplicateCommitRejected(t *testing.T) {
 		ContextID: "assistant", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
 	})
 	require.NotNil(t, pause)
-	decision, _ := l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "stop", Interim: true}, true)
+	decision, _ := l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "stop", Interim: true})
 	require.NotNil(t, decision)
 	require.True(t, l.beginInterruptedTurn(*decision))
 	assert.False(t, l.beginInterruptedTurn(*decision), "only one caller may reserve flush")
@@ -328,7 +383,7 @@ func TestMessageInterruption_DuplicateCommitRejected(t *testing.T) {
 }
 
 func TestMessageInterruption_StaleFlushCommitAfterNewTurn(t *testing.T) {
-	l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true)).(*messageLifecycle)
+	l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode)).(*messageLifecycle)
 	t.Cleanup(func() { l.CancelInterruption() })
 	require.NoError(t, l.OnGenerationStarted("assistant"))
 	require.NoError(t, l.OnSpeechStarted("assistant"))
@@ -336,7 +391,7 @@ func TestMessageInterruption_StaleFlushCommitAfterNewTurn(t *testing.T) {
 		ContextID: "assistant", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
 	})
 	require.NotNil(t, pause)
-	decision, _ := l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "stop", Interim: true}, true)
+	decision, _ := l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "stop", Interim: true})
 	require.NotNil(t, decision)
 	require.True(t, l.beginInterruptedTurn(*decision))
 	// A different turn wins while the reserved flush is in flight.
@@ -357,7 +412,7 @@ func TestMessageInterruption_ShutdownCancelsPendingWork(t *testing.T) {
 	for _, phase := range []string{"pause", "flush reserved", "flush committed"} {
 		t.Run(phase, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
-				l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true)).(*messageLifecycle)
+				l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode)).(*messageLifecycle)
 				t.Cleanup(func() { l.CancelInterruption() })
 				require.NoError(t, l.OnGenerationStarted("assistant"))
 				require.NoError(t, l.OnSpeechStarted("assistant"))
@@ -372,7 +427,7 @@ func TestMessageInterruption_ShutdownCancelsPendingWork(t *testing.T) {
 				}
 				committed := decision
 				if phase != "pause" {
-					confirmed, _ := l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "stop", Interim: true}, true)
+					confirmed, _ := l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "stop", Interim: true})
 					require.NotNil(t, confirmed)
 					decision = *confirmed
 					require.True(t, l.beginInterruptedTurn(decision))
@@ -422,7 +477,7 @@ func TestMessageInterruption_SynchronousSpeechDuringPause(t *testing.T) {
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
-				l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true)).(*messageLifecycle)
+				l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode)).(*messageLifecycle)
 				t.Cleanup(func() { l.CancelInterruption() })
 				require.NoError(t, l.OnGenerationStarted("assistant"))
 				require.NoError(t, l.OnSpeechStarted("assistant"))
@@ -433,7 +488,8 @@ func TestMessageInterruption_SynchronousSpeechDuringPause(t *testing.T) {
 				// Pause I/O reenters speech handling before its caller can arm the deadline.
 				decision, admitted := l.OnUserSpeech(internal_type.SpeechToTextPacket{
 					ContextID: "assistant", Script: "stop", Interim: true,
-				}, true)
+				})
+
 				require.NotNil(t, decision)
 				assert.Empty(t, admitted.ContextID)
 				var committed internal_type.TurnChangePacket
@@ -476,7 +532,7 @@ func TestMessageInterruption_ConfirmationAndExpiryOrdering(t *testing.T) {
 			name = "confirmation before expiry"
 		}
 		t.Run(name, func(t *testing.T) {
-			message := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true),
+			message := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode),
 				WithSend(func(proto.Message) error {
 					t.Error("delayed continue must not resume a confirmed interruption")
 					return nil
@@ -493,7 +549,8 @@ func TestMessageInterruption_ConfirmationAndExpiryOrdering(t *testing.T) {
 			}
 			decision, admitted := message.OnUserSpeech(internal_type.SpeechToTextPacket{
 				ContextID: "assistant", Script: "wait", Interim: true,
-			}, true)
+			})
+
 			require.NotNil(t, decision)
 			assert.Empty(t, admitted.ContextID)
 			continueContext := message.OnInterruptionExpired(*pause)
@@ -510,7 +567,7 @@ func TestMessageInterruption_ConfirmationAndExpiryOrdering(t *testing.T) {
 }
 
 func TestMessageInterruption_ResumedSpeechKeepsVADEndAndRejectsStaleText(t *testing.T) {
-	message := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true)).(*messageLifecycle)
+	message := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode)).(*messageLifecycle)
 	t.Cleanup(func() { message.CancelInterruption() })
 	require.NoError(t, message.OnGenerationStarted("assistant"))
 	start := internal_type.InterruptionDetectedPacket{
@@ -533,13 +590,14 @@ func TestMessageInterruption_ResumedSpeechKeepsVADEndAndRejectsStaleText(t *test
 		{Script: "wait"},
 		{ContextID: "assistant", Script: "um, hmm"},
 	} {
-		decision, admitted := message.OnUserSpeech(transcript, true)
+		decision, admitted := message.OnUserSpeech(transcript)
 		assert.Nil(t, decision)
 		assert.Empty(t, admitted.ContextID)
 	}
 	decision, admitted := message.OnUserSpeech(internal_type.SpeechToTextPacket{
 		ContextID: "assistant", Script: "stop", Interim: true,
-	}, true)
+	})
+
 	require.NotNil(t, decision)
 	assert.Empty(t, admitted.ContextID)
 	require.True(t, message.beginInterruptedTurn(*decision))
@@ -552,10 +610,10 @@ func TestMessageInterruption_ResumedSpeechKeepsVADEndAndRejectsStaleText(t *test
 	}}, message.finishInterruptedTurn(committed))
 }
 
-func TestMessageInterruption_ResumedSpeechCannotRotateReplacementContext(t *testing.T) {
+func TestMessageInterruption_ResumedSpeechRequiresCurrentContext(t *testing.T) {
 	for _, replacement := range []string{"cancellation", "user turn", "prompt"} {
 		t.Run(replacement, func(t *testing.T) {
-			message := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true), WithSend(func(proto.Message) error { return nil })).(*messageLifecycle)
+			message := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithSend(func(proto.Message) error { return nil })).(*messageLifecycle)
 			t.Cleanup(func() { message.CancelInterruption() })
 			require.NoError(t, message.OnGenerationStarted("assistant"))
 			_, _, pause := message.observeVAD(internal_type.InterruptionDetectedPacket{
@@ -592,16 +650,27 @@ func TestMessageInterruption_ResumedSpeechCannotRotateReplacementContext(t *test
 			require.NoError(t, message.OnGenerationStarted(currentContext))
 			decision, admitted := message.OnUserSpeech(internal_type.SpeechToTextPacket{
 				ContextID: "assistant", Script: "stale stop", Interim: true,
-			}, true)
-			assert.Nil(t, decision)
-			if replacement != "cancellation" {
+			})
+
+			if replacement == "cancellation" {
+				require.NotNil(t, decision, "cancellation does not reject fresh speech for the same context")
+				assert.Empty(t, admitted.ContextID)
+				message.CancelInterruption()
+			} else {
+				assert.Nil(t, decision)
 				assert.Empty(t, admitted.ContextID)
 			}
 			assert.Equal(t, currentContext, message.ContextID())
-			decision, _ = message.OnUserSpeech(internal_type.SpeechToTextPacket{
-				ContextID: currentContext, Script: "ungated", Interim: true,
-			}, true)
-			assert.Nil(t, decision)
+			assert.Empty(t, message.OnInterruptionExpired(*pause), "a stale pause cannot resume the current turn")
+			decision, admitted = message.OnUserSpeech(internal_type.SpeechToTextPacket{
+				ContextID: currentContext, Script: "wait please", Interim: true,
+			})
+
+			require.NotNil(t, decision)
+			assert.True(t, decision.InterruptionDecision)
+			assert.Equal(t, currentContext, decision.PreviousContextID)
+			assert.Empty(t, admitted.ContextID)
+			assert.Equal(t, currentContext, message.ContextID())
 		})
 	}
 }
@@ -611,7 +680,7 @@ func TestMessageInterruption_OnPlaybackPausedSuccess(t *testing.T) {
 		expired := make(chan internal_type.InterruptionDecisionExpiredPacket, 1)
 		resumed := make(chan string, 1)
 		var l *messageLifecycle
-		l = NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true),
+		l = NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode),
 			WithInterruptionExpiry(func(packet internal_type.InterruptionDecisionExpiredPacket) {
 				resumed <- l.OnInterruptionExpired(packet)
 				expired <- packet
@@ -642,7 +711,7 @@ func TestMessageInterruption_OnPlaybackPausedSuccess(t *testing.T) {
 func TestMessageInterruption_OnPlaybackPausedFailure(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		expired := make(chan internal_type.InterruptionDecisionExpiredPacket, 1)
-		l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true),
+		l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode),
 			WithInterruptionExpiry(func(packet internal_type.InterruptionDecisionExpiredPacket) { expired <- packet })).(*messageLifecycle)
 		defer l.CancelInterruption()
 		require.NoError(t, l.OnGenerationStarted("assistant"))
@@ -676,7 +745,7 @@ func TestMessageInterruption_OnPlaybackPausedStale(t *testing.T) {
 		t.Run(scenario, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				expired := make(chan internal_type.InterruptionDecisionExpiredPacket, 1)
-				l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true),
+				l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode),
 					WithInterruptionExpiry(func(packet internal_type.InterruptionDecisionExpiredPacket) { expired <- packet })).(*messageLifecycle)
 				defer l.CancelInterruption()
 				require.NoError(t, l.OnGenerationStarted("assistant"))
@@ -692,7 +761,7 @@ func TestMessageInterruption_OnPlaybackPausedStale(t *testing.T) {
 				case "cancelled":
 					l.CancelInterruption()
 				case "confirmed":
-					decision, _ := l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "wait"}, true)
+					decision, _ := l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "wait"})
 					require.NotNil(t, decision)
 				}
 				assert.Nil(t, l.OnPlaybackPaused(*pause, nil))
@@ -730,14 +799,14 @@ func TestMessageInterruption_OnTurnChangeOrdersUpdatesBeforeReentrantInput(t *te
 			turnReturned := false
 			var decision *internal_type.TurnChangePacket
 			var l *messageLifecycle
-			l = NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true),
+			l = NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode),
 				WithSend(func(control proto.Message) error {
 					events = append(events, control)
 					assert.Equal(t, "assistant", l.ContextID(), "flush precedes context rotation")
 					require.NoError(t, l.OnTurnChange(t.Context(), *decision), "a reentrant duplicate must be rejected")
 					_, _, repeatedPause := l.observeVAD(end)
 					assert.Nil(t, repeatedPause)
-					next, admitted := l.OnUserSpeech(final, true)
+					next, admitted := l.OnUserSpeech(final)
 					assert.Nil(t, next)
 					assert.Empty(t, admitted.ContextID, "speech during flush stays held")
 					return scenario.flushError
@@ -758,9 +827,9 @@ func TestMessageInterruption_OnTurnChangeOrdersUpdatesBeforeReentrantInput(t *te
 						assert.True(t, turnReturned, "held packets replay after the turn callback")
 					case internal_type.SpeechToTextPacket:
 						assert.True(t, turnReturned, "held packets replay after the turn callback")
-						contextID, err := l.OnTranscriptReceived(packet)
+						turn, err := l.OnTranscriptReceived(packet)
 						assert.NoError(t, err)
-						assert.Equal(t, packet.ContextID, contextID)
+						assert.Equal(t, packet.ContextID, turn.ContextID)
 					case internal_type.EndOfSpeechPacket:
 						assert.True(t, turnReturned, "held packets replay after the turn callback")
 						assert.NoError(t, l.OnUserSpeechCompleted(packet))
@@ -778,7 +847,7 @@ func TestMessageInterruption_OnTurnChangeOrdersUpdatesBeforeReentrantInput(t *te
 			require.NoError(t, l.OnSpeechStarted("assistant"))
 			_, _, pause := l.observeVAD(start)
 			require.NotNil(t, pause)
-			decision, _ = l.OnUserSpeech(interim, true)
+			decision, _ = l.OnUserSpeech(interim)
 			require.NotNil(t, decision)
 			err := l.OnTurnChange(t.Context(), *decision)
 			assert.ErrorIs(t, err, scenario.flushError)
@@ -826,7 +895,6 @@ func TestMessageInterruption_OnTurnChangeOrdinary(t *testing.T) {
 					assert.Equal(t, "current", l.ContextID())
 					packets = append(packets, packet)
 				})).(*messageLifecycle)
-			assert.False(t, l.InterruptionEnabled())
 			packet := scenario.packet
 			packet.PreviousContextID, packet.Reason = "previous", "user_input"
 			before := time.Now()
@@ -854,7 +922,7 @@ func TestMessageInterruption_HoldsLiveInputUntilReplayDrains(t *testing.T) {
 		completed := make(chan error, 1)
 		observed := make(chan internal_type.Packet, 8)
 		var message MessageLifecycle
-		message = NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true),
+		message = NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode),
 			WithSend(func(proto.Message) error { return nil }),
 			WithDispatch(func(_ context.Context, packet internal_type.Packet) {
 				switch packet := packet.(type) {
@@ -865,9 +933,9 @@ func TestMessageInterruption_HoldsLiveInputUntilReplayDrains(t *testing.T) {
 					}
 					observed <- packet
 				case internal_type.SpeechToTextPacket:
-					contextID, err := message.OnTranscriptReceived(packet)
+					turn, err := message.OnTranscriptReceived(packet)
 					assert.NoError(t, err)
-					assert.Equal(t, packet.ContextID, contextID)
+					assert.Equal(t, packet.ContextID, turn.ContextID)
 					observed <- packet
 				case internal_type.EndOfSpeechPacket:
 					assert.NoError(t, message.OnUserSpeechCompleted(packet))
@@ -885,12 +953,12 @@ func TestMessageInterruption_HoldsLiveInputUntilReplayDrains(t *testing.T) {
 		message.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
 			ContextID: "assistant", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
 		}, "")
-		turn, _ := message.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "wait", Interim: true}, true)
+		turn, _ := message.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "wait", Interim: true})
 		require.NotNil(t, turn)
 		go func() { completed <- message.OnTurnChange(t.Context(), *turn) }()
 		<-replayStarted
 		current := message.ContextID()
-		next, admitted := message.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: current, Script: "wait please"}, true)
+		next, admitted := message.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: current, Script: "wait please"})
 		assert.Nil(t, next)
 		assert.Empty(t, admitted.ContextID, "the final must stay behind the held interim")
 		decision := message.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
@@ -920,7 +988,7 @@ func TestMessageInterruption_CancelDuringReplayDropsRemainingInput(t *testing.T)
 		t.Run(scenario, func(t *testing.T) {
 			var message MessageLifecycle
 			var observed []internal_type.Packet
-			message = NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true),
+			message = NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode),
 				WithSend(func(proto.Message) error { return nil }),
 				WithDispatch(func(_ context.Context, packet internal_type.Packet) {
 					switch packet.(type) {
@@ -941,7 +1009,7 @@ func TestMessageInterruption_CancelDuringReplayDropsRemainingInput(t *testing.T)
 			message.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
 				ContextID: "assistant", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
 			}, "")
-			turn, _ := message.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "wait", Interim: true}, true)
+			turn, _ := message.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "wait", Interim: true})
 			require.NotNil(t, turn)
 			require.True(t, message.HoldInput(internal_type.EndOfSpeechPacket{ContextID: "assistant", Speech: "wait"}))
 			require.True(t, message.HoldInput(internal_type.UserInputPacket{ContextID: "assistant", Text: "wait"}))
@@ -955,7 +1023,7 @@ func TestMessageInterruption_CancelDuringReplayDropsRemainingInput(t *testing.T)
 func TestMessageInterruption_HoldsEOSAndUserInputWithoutTranscript(t *testing.T) {
 	for _, inputContext := range []string{"assistant", ""} {
 		t.Run("context="+inputContext, func(t *testing.T) {
-			l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true)).(*messageLifecycle)
+			l := NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode)).(*messageLifecycle)
 			t.Cleanup(func() { l.CancelInterruption() })
 			require.NoError(t, l.OnGenerationStarted("assistant"))
 			start := internal_type.InterruptionDetectedPacket{
@@ -977,8 +1045,8 @@ func TestMessageInterruption_HoldsEOSAndUserInputWithoutTranscript(t *testing.T)
 			assert.Equal(t, []internal_type.Packet{
 				start,
 				internal_type.EndOfSpeechPacket{ContextID: committed.ContextID, Speech: "wait please"},
-				internal_type.UserInputPacket{ContextID: committed.ContextID, Text: "wait please"},
 			}, l.finishInterruptedTurn(committed))
+			assert.Equal(t, []internal_type.Packet{internal_type.UserInputPacket{ContextID: committed.ContextID, Text: "wait please"}}, l.finishInterruptedTurn(committed))
 			assert.Empty(t, l.finishInterruptedTurn(committed))
 		})
 	}
@@ -994,7 +1062,7 @@ func TestMessageInterruption_UnclearExpiryWaitsForReplay(t *testing.T) {
 				prompts := make(chan internal_type.InjectMessagePacket, 2)
 				var message MessageLifecycle
 				timeout, prompt := 1.0, "Please repeat"
-				message = NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true),
+				message = NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode),
 					WithBehavior(func() (*internal_assistant_entity.AssistantDeploymentBehavior, error) {
 						return &internal_assistant_entity.AssistantDeploymentBehavior{UnclearInputTimeout: &timeout, UnclearInputMessage: &prompt}, nil
 					}),
@@ -1011,9 +1079,9 @@ func TestMessageInterruption_UnclearExpiryWaitsForReplay(t *testing.T) {
 					WithDispatch(func(_ context.Context, packet internal_type.Packet) {
 						switch packet := packet.(type) {
 						case internal_type.SpeechToTextPacket:
-							contextID, err := message.OnTranscriptReceived(packet)
+							turn, err := message.OnTranscriptReceived(packet)
 							assert.NoError(t, err)
-							assert.Equal(t, packet.ContextID, contextID)
+							assert.Equal(t, packet.ContextID, turn.ContextID)
 							if packet.Interim {
 								close(started)
 								<-release
@@ -1031,7 +1099,7 @@ func TestMessageInterruption_UnclearExpiryWaitsForReplay(t *testing.T) {
 				message.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
 					ContextID: "assistant", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
 				}, "")
-				turn, _ := message.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "wait", Interim: true}, true)
+				turn, _ := message.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "wait", Interim: true})
 				require.NotNil(t, turn)
 				go func() { finished <- message.OnTurnChange(t.Context(), *turn) }()
 				<-started
@@ -1041,7 +1109,7 @@ func TestMessageInterruption_UnclearExpiryWaitsForReplay(t *testing.T) {
 				assert.Empty(t, prompts)
 				switch scenario {
 				case "final received":
-					_, accepted := message.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: current, Script: "wait please"}, true)
+					_, accepted := message.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: current, Script: "wait please"})
 					assert.Empty(t, accepted.ContextID)
 				case "cancelled":
 					message.CancelInterruption()
@@ -1062,13 +1130,13 @@ func TestMessageInterruption_UnclearExpiryWaitsForReplay(t *testing.T) {
 }
 
 func TestMessageInterruption_OnTurnChangeStale(t *testing.T) {
-	for _, scenario := range []string{"context", "sequence", "missing sequence", "cancelled", "disabled", "replaced during flush"} {
+	for _, scenario := range []string{"context", "sequence", "missing sequence", "cancelled", "no candidate", "replaced during flush"} {
 		t.Run(scenario, func(t *testing.T) {
 			currentContext := "assistant"
 			flushError := errors.New("flush failed after turn replacement")
 			flushCount := 0
 			var l *messageLifecycle
-			l = NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(scenario != "disabled"),
+			l = NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode),
 				WithSend(func(proto.Message) error {
 					flushCount++
 					require.Equal(t, "replaced during flush", scenario)
@@ -1085,12 +1153,12 @@ func TestMessageInterruption_OnTurnChangeStale(t *testing.T) {
 			decision := &internal_type.TurnChangePacket{
 				PreviousContextID: "assistant", InterruptionDecision: true, InterruptionSequence: 1,
 			}
-			if scenario != "disabled" {
+			if scenario != "no candidate" {
 				_, _, pause := l.observeVAD(internal_type.InterruptionDetectedPacket{
 					ContextID: "assistant", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
 				})
 				require.NotNil(t, pause)
-				decision, _ = l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "wait"}, true)
+				decision, _ = l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "wait"})
 				require.NotNil(t, decision)
 			}
 			switch scenario {
@@ -1115,4 +1183,44 @@ func TestMessageInterruption_OnTurnChangeStale(t *testing.T) {
 			assert.Equal(t, currentContext, l.ContextID())
 		})
 	}
+}
+
+func TestMessageInterruption_FinishedUserTurnCannotReplaceReplayContext(t *testing.T) {
+	var message MessageLifecycle
+	var replayed []internal_type.SpeechToTextPacket
+	message = NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode),
+		WithSend(func(proto.Message) error { return nil }),
+		WithDispatch(func(_ context.Context, packet internal_type.Packet) {
+			switch packet := packet.(type) {
+			case internal_type.SpeechToTextPacket:
+				replayed = append(replayed, packet)
+			case internal_type.EndOfSpeechPacket:
+				require.NoError(t, message.OnUserSpeechCompleted(packet))
+				turn, admitted := message.OnUserSpeech(internal_type.SpeechToTextPacket{
+					ContextID: packet.ContextID, Script: "and one more thing", Interim: true,
+				})
+
+				require.Nil(t, turn, "replay owns the context until held input finishes draining")
+				require.Empty(t, admitted.ContextID)
+				require.Equal(t, packet.ContextID, message.ContextID())
+			}
+		}))
+	defer message.CancelInterruption()
+	require.NoError(t, message.OnGenerationStarted("assistant"))
+	turn, _ := message.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "wait"})
+	require.NotNil(t, turn)
+	require.True(t, message.HoldInput(internal_type.EndOfSpeechPacket{ContextID: "assistant", Speech: "wait"}))
+	require.NoError(t, message.OnTurnChange(t.Context(), *turn))
+	require.Equal(t, []internal_type.SpeechToTextPacket{
+		{ContextID: message.ContextID(), Script: "wait"},
+		{ContextID: message.ContextID(), Script: "and one more thing", Interim: true},
+	}, replayed)
+	require.False(t, message.HoldInput(internal_type.EndOfSpeechPacket{ContextID: message.ContextID(), Speech: "next turn"}))
+	previousContextID := message.ContextID()
+	turn, admitted := message.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: previousContextID, Script: "next turn"})
+	require.NotNil(t, turn)
+	admittedTurn, err := message.OnTranscriptReceived(admitted)
+	require.NoError(t, err)
+	require.False(t, admittedTurn.InterruptionDecision)
+	require.NotEqual(t, previousContextID, admittedTurn.ContextID)
 }

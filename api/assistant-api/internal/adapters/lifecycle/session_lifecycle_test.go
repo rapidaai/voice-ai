@@ -368,6 +368,84 @@ func TestSessionLifecycle_IdleTimeoutBackoff(t *testing.T) {
 	}
 }
 
+func TestSessionLifecycle_AdmittedTranscriptResetsIdleRetries(t *testing.T) {
+	for _, scenario := range []struct {
+		name    string
+		text    string
+		interim bool
+		stale   bool
+		resets  bool
+	}{
+		{name: "interim", text: "I need help", interim: true, resets: true},
+		{name: "filler interim", text: "um", interim: true, resets: true},
+		{name: "final", text: "I need help", resets: true},
+		{name: "blank interim", text: " ", interim: true},
+		{name: "stale interim", text: "old input", interim: true, stale: true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				session := NewSessionLifecycle()
+				defer session.CloseTimeouts()
+				timeout, limit := uint64(1), uint64(2)
+				expired := make(chan internal_type.IdleTimeoutExpiredPacket, 1)
+				if err := session.ConfigureTimeouts(t.Context(), "message", &internal_assistant_entity.AssistantDeploymentBehavior{
+					IdleTimeout: &timeout, IdleTimeoutBackoff: &limit,
+				}, func(_ context.Context, packets ...internal_type.Packet) error {
+					for _, packet := range packets {
+						if packet, ok := packet.(internal_type.IdleTimeoutExpiredPacket); ok {
+							expired <- packet
+						}
+					}
+					return nil
+				}); err != nil {
+					t.Fatal(err)
+				}
+				message := NewMessageLifecycle(WithContextID("message"), WithMode(type_enums.AudioMode), WithOnPacket(func(packets ...internal_type.Packet) error {
+					for _, packet := range packets {
+						if packet, ok := packet.(internal_type.StopIdleTimeoutPacket); ok {
+							session.StopIdleTimeout(packet)
+						}
+					}
+					return nil
+				}))
+				for count := uint64(0); count < limit; count++ {
+					session.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "message"}, message)
+					message.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{ContextID: "message", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart}, "")
+					message.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{ContextID: "message", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd}, "")
+					time.Sleep(time.Second)
+					synctest.Wait()
+					if len(expired) != 1 {
+						t.Fatal("VAD-only activity prevented idle expiry")
+					}
+					prompt, disconnect := session.IdleTimeoutExpired(<-expired)
+					if prompt.Text == "" || disconnect != nil || session.IdleTimeoutCount() != count+1 {
+						t.Fatalf("unexpected idle prompt: %+v, disconnect=%v, count=%d", prompt, disconnect, session.IdleTimeoutCount())
+					}
+				}
+				session.StartIdleTimeout(internal_type.StartIdleTimeoutPacket{ContextID: "message"}, message)
+				time.Sleep(time.Second)
+				synctest.Wait()
+				packet := internal_type.SpeechToTextPacket{ContextID: "message", Script: scenario.text, Interim: scenario.interim}
+				if scenario.stale {
+					packet.ContextID = "old"
+				}
+				_, err := message.OnTranscriptReceived(packet)
+				if (err != nil) != scenario.stale {
+					t.Fatalf("unexpected transcript result: %v", err)
+				}
+				prompt, disconnect := session.IdleTimeoutExpired(<-expired)
+				if scenario.resets {
+					if session.IdleTimeoutCount() != 0 || prompt.Text != "" || disconnect != nil {
+						t.Fatalf("transcript did not reset retries and reject queued expiry: count=%d, prompt=%+v, disconnect=%v", session.IdleTimeoutCount(), prompt, disconnect)
+					}
+				} else if session.IdleTimeoutCount() != limit || disconnect == nil {
+					t.Fatalf("unaccepted transcript reset retries: count=%d, disconnect=%v", session.IdleTimeoutCount(), disconnect)
+				}
+			})
+		})
+	}
+}
+
 func TestSessionLifecycle_IdleTimeoutEligibility(t *testing.T) {
 	timeout := uint64(1)
 	for _, tt := range []struct {

@@ -48,7 +48,26 @@ const (
 // InterruptionDecisionWindow bounds the pause while speech is being confirmed.
 const InterruptionDecisionWindow = 500 * time.Millisecond
 
-// InterruptionEnabledByDefault preserves the staged interruption rollout.
-const InterruptionEnabledByDefault = false
+const (
+	interruptionIdle interruptionPhase = iota
+	interruptionWaiting
+	interruptionConfirmed
+	interruptionDraining
+	interruptionResumed
+)
+
+const (
+	generationIdle generationPhase = iota
+	generationStarted
+	generationCompleted
+)
+
+const (
+	playbackOpen playbackPhase = iota
+	playbackClosing
+	playbackAwaitingReceipt
+	playbackCompleted
+	playbackFailed
+)
 
 var interruptionFillerWords = [...]string{"uh", "um", "hmm", "mm", "mhm", "ah", "oh"}

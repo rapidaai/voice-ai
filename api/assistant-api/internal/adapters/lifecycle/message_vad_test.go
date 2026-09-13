@@ -15,7 +15,7 @@ import (
 	"github.com/rapidaai/protos"
 )
 
-func TestMessageLifecycle_ObserveInterruptionRotatesLegacyTurn(t *testing.T) {
+func TestMessageLifecycle_ObserveInterruptionRotatesImmediateTurn(t *testing.T) {
 	for _, tt := range []struct {
 		name    string
 		mode    type_enums.MessageMode
@@ -23,12 +23,12 @@ func TestMessageLifecycle_ObserveInterruptionRotatesLegacyTurn(t *testing.T) {
 		trigger string
 		want    MessageState
 	}{
-		{name: "vad", mode: type_enums.AudioMode, source: internal_type.InterruptionSourceVad, trigger: internal_options.BargeInTriggerVAD, want: MessageStateUserSpeaking},
+		{name: "text vad", mode: type_enums.TextMode, source: internal_type.InterruptionSourceVad, trigger: internal_options.BargeInTriggerVAD, want: MessageStateUserSpeaking},
 		{name: "word", mode: type_enums.AudioMode, source: internal_type.InterruptionSourceWord, trigger: internal_options.BargeInTriggerWord, want: MessageStateUserListening},
 		{name: "text", mode: type_enums.TextMode, source: internal_type.InterruptionSourceWord, trigger: internal_options.BargeInTriggerVAD, want: MessageStateUserListening},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			l := &messageLifecycle{contextID: "old", mode: tt.mode, state: MessageStateAssistantSpeaking, output: assistantOutputState{terminalIssued: true, receiptReceived: true}}
+			l := &messageLifecycle{contextID: "old", mode: tt.mode, state: MessageStateAssistantSpeaking, output: assistantOutputState{playback: playbackAwaitingReceipt, receiptReceived: true}}
 			decision := l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
 				ContextID: "old", Source: tt.source, Event: internal_type.InterruptionEventStart,
 			}, tt.trigger)
@@ -80,7 +80,7 @@ func TestMessageLifecycle_ObserveInterruptionRotatesLegacyTurn(t *testing.T) {
 	}
 }
 
-func TestMessageLifecycle_ObserveInterruptionPreservesLegacyStates(t *testing.T) {
+func TestMessageLifecycle_ObserveInterruptionPreservesIneligibleStates(t *testing.T) {
 	for _, tt := range []struct {
 		name      string
 		mode      type_enums.MessageMode
@@ -97,11 +97,13 @@ func TestMessageLifecycle_ObserveInterruptionPreservesLegacyStates(t *testing.T)
 		{name: "word trigger vad end", mode: type_enums.AudioMode, state: MessageStateAssistantSpeaking, source: internal_type.InterruptionSourceVad, event: internal_type.InterruptionEventEnd, trigger: internal_options.BargeInTriggerWord, wantState: MessageStateAssistantSpeaking, wantEOS: true, wantEnd: true},
 		{name: "vad ignores word", mode: type_enums.AudioMode, state: MessageStateAssistantSpeaking, source: internal_type.InterruptionSourceWord, trigger: internal_options.BargeInTriggerVAD, wantState: MessageStateAssistantSpeaking},
 		{name: "idle vad start", mode: type_enums.AudioMode, state: MessageStateUserIdle, source: internal_type.InterruptionSourceVad, event: internal_type.InterruptionEventStart, trigger: internal_options.BargeInTriggerVAD, wantState: MessageStateUserSpeaking, wantEOS: true, wantStart: true},
-		{name: "listening vad start", mode: type_enums.AudioMode, state: MessageStateUserListening, source: internal_type.InterruptionSourceVad, event: internal_type.InterruptionEventStart, trigger: internal_options.BargeInTriggerVAD, wantState: MessageStateUserListening, wantEOS: true, wantStart: true},
+		{name: "assistant idle vad start", mode: type_enums.AudioMode, state: MessageStateAssistantIdle, source: internal_type.InterruptionSourceVad, event: internal_type.InterruptionEventStart, trigger: internal_options.BargeInTriggerVAD, wantState: MessageStateAssistantIdle, wantEOS: true, wantStart: true},
+		{name: "assistant idle vad end", mode: type_enums.AudioMode, state: MessageStateAssistantIdle, source: internal_type.InterruptionSourceVad, event: internal_type.InterruptionEventEnd, trigger: internal_options.BargeInTriggerVAD, wantState: MessageStateAssistantIdle, wantEOS: true, wantEnd: true},
+		{name: "listening vad start", mode: type_enums.AudioMode, state: MessageStateUserListening, source: internal_type.InterruptionSourceVad, event: internal_type.InterruptionEventStart, trigger: internal_options.BargeInTriggerVAD, wantState: MessageStateUserSpeaking, wantEOS: true, wantStart: true},
 		{name: "thinking vad start", mode: type_enums.AudioMode, state: MessageStateUserThinking, source: internal_type.InterruptionSourceVad, event: internal_type.InterruptionEventStart, trigger: internal_options.BargeInTriggerVAD, wantState: MessageStateUserThinking, wantEOS: true, wantStart: true},
 		{name: "speaking vad end", mode: type_enums.AudioMode, state: MessageStateUserSpeaking, source: internal_type.InterruptionSourceVad, event: internal_type.InterruptionEventEnd, trigger: internal_options.BargeInTriggerVAD, wantState: MessageStateUserListening, wantEOS: true, wantEnd: true},
 		{name: "listening vad end", mode: type_enums.AudioMode, state: MessageStateUserListening, source: internal_type.InterruptionSourceVad, event: internal_type.InterruptionEventEnd, trigger: internal_options.BargeInTriggerVAD, wantState: MessageStateUserListening, wantEOS: true, wantEnd: true},
-		{name: "thinking vad end", mode: type_enums.AudioMode, state: MessageStateUserThinking, source: internal_type.InterruptionSourceVad, event: internal_type.InterruptionEventEnd, trigger: internal_options.BargeInTriggerVAD, wantState: MessageStateUserThinking, wantEnd: true},
+		{name: "thinking vad end", mode: type_enums.AudioMode, state: MessageStateUserThinking, source: internal_type.InterruptionSourceVad, event: internal_type.InterruptionEventEnd, trigger: internal_options.BargeInTriggerVAD, wantState: MessageStateUserThinking, wantEOS: true, wantEnd: true},
 		{name: "speaking text word", mode: type_enums.TextMode, state: MessageStateUserSpeaking, source: internal_type.InterruptionSourceWord, wantState: MessageStateUserListening},
 		{name: "thinking text word", mode: type_enums.TextMode, state: MessageStateUserThinking, source: internal_type.InterruptionSourceWord, wantState: MessageStateUserThinking},
 		{name: "idle audio word", mode: type_enums.AudioMode, state: MessageStateUserIdle, source: internal_type.InterruptionSourceWord, trigger: internal_options.BargeInTriggerWord, wantState: MessageStateUserIdle},
@@ -114,10 +116,15 @@ func TestMessageLifecycle_ObserveInterruptionPreservesLegacyStates(t *testing.T)
 			if l.ContextID() != "ctx" || l.State() != tt.wantState || decision.Flush != nil || decision.Notification != nil || decision.Pause != nil {
 				t.Fatalf("unexpected transition: context=%q state=%s decision=%+v", l.ContextID(), l.State(), decision)
 			}
-			if (decision.EndOfSpeech != nil) != tt.wantEOS || (decision.SpeechToTextStart != nil) != tt.wantStart {
+			startPacket := tt.wantStart && tt.trigger == internal_options.BargeInTriggerVAD
+			if (decision.EndOfSpeech != nil) != tt.wantEOS || (decision.SpeechToTextStart != nil) != (tt.wantStart && !startPacket) {
 				t.Fatalf("unexpected boundaries: %+v", decision)
 			}
-			if tt.wantEnd {
+			if startPacket {
+				if len(decision.Packets) != 1 || decision.Packets[0] != (internal_type.SpeechToTextStartPacket{ContextID: "ctx"}) {
+					t.Fatalf("unexpected start boundary: %+v", decision.Packets)
+				}
+			} else if tt.wantEnd {
 				if len(decision.Packets) != 1 || decision.Packets[0] != (internal_type.SpeechToTextEndPacket{ContextID: "ctx"}) {
 					t.Fatalf("unexpected end boundary: %+v", decision.Packets)
 				}
@@ -161,7 +168,7 @@ func TestMessageLifecycle_ObserveInterruptionStaleAdmission(t *testing.T) {
 }
 
 func TestMessageLifecycle_ObserveInterruptionAdaptiveVAD(t *testing.T) {
-	l := &messageLifecycle{contextID: "ctx", mode: type_enums.AudioMode, state: MessageStateAssistantSpeaking, interruptionEnabled: true}
+	l := &messageLifecycle{contextID: "ctx", mode: type_enums.AudioMode, state: MessageStateAssistantSpeaking}
 	t.Cleanup(func() { l.CancelInterruption() })
 	decision := l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
 		ContextID: "ctx", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
@@ -170,7 +177,7 @@ func TestMessageLifecycle_ObserveInterruptionAdaptiveVAD(t *testing.T) {
 		t.Fatalf("adaptive pause missing: %+v", decision)
 	}
 	if l.ContextID() != "ctx" || l.State() != MessageStateAssistantSpeaking || decision.Flush != nil || decision.EndOfSpeech != nil || len(decision.Packets) != 0 {
-		t.Fatalf("adaptive start used legacy rotation: %+v", decision)
+		t.Fatalf("VAD start rotated before confirmation: %+v", decision)
 	}
 	decision = l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
 		ContextID: "ctx", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd,
@@ -182,6 +189,7 @@ func TestMessageLifecycle_ObserveInterruptionAdaptiveVAD(t *testing.T) {
 
 func TestMessageLifecycle_ObserveInterruptionConcurrentVADStarts(t *testing.T) {
 	l := &messageLifecycle{contextID: "ctx", mode: type_enums.AudioMode, state: MessageStateAssistantSpeaking}
+	t.Cleanup(func() { l.CancelInterruption() })
 	decisions := make(chan InterruptionDecision, 32)
 	var calls sync.WaitGroup
 	for range 32 {
@@ -195,19 +203,22 @@ func TestMessageLifecycle_ObserveInterruptionConcurrentVADStarts(t *testing.T) {
 	}
 	calls.Wait()
 	close(decisions)
-	rotations := 0
+	pauses := 0
 	for decision := range decisions {
 		if decision.Flush != nil {
-			rotations++
+			t.Fatal("VAD start flushed before confirmation")
+		}
+		if decision.Pause != nil {
+			pauses++
 		}
 	}
-	if rotations != 1 || l.ContextID() == "ctx" || l.State() != MessageStateUserSpeaking {
-		t.Fatalf("concurrent starts produced %d rotations, state=%s", rotations, l.State())
+	if pauses != 1 || l.ContextID() != "ctx" || l.State() != MessageStateAssistantSpeaking {
+		t.Fatalf("concurrent starts produced %d pauses, state=%s", pauses, l.State())
 	}
 }
 
-func TestMessageLifecycle_ObserveInterruptionLegacyTurnInvalidatesAdaptivePause(t *testing.T) {
-	l := &messageLifecycle{contextID: "ctx", mode: type_enums.AudioMode, state: MessageStateAssistantSpeaking, interruptionEnabled: true}
+func TestMessageLifecycle_ObserveInterruptionWordTurnInvalidatesAdaptivePause(t *testing.T) {
+	l := &messageLifecycle{contextID: "ctx", mode: type_enums.AudioMode, state: MessageStateAssistantSpeaking}
 	t.Cleanup(func() { l.CancelInterruption() })
 	pause := l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
 		ContextID: "ctx", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
@@ -215,7 +226,7 @@ func TestMessageLifecycle_ObserveInterruptionLegacyTurnInvalidatesAdaptivePause(
 	if pause == nil {
 		t.Fatal("adaptive interruption did not pause")
 	}
-	turn, _ := l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "ctx", Script: "stop", Interim: true}, true)
+	turn, _ := l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "ctx", Script: "stop", Interim: true})
 	if turn == nil || !l.beginInterruptedTurn(*turn) {
 		t.Fatal("adaptive interruption did not reserve flush")
 	}
@@ -227,17 +238,17 @@ func TestMessageLifecycle_ObserveInterruptionLegacyTurnInvalidatesAdaptivePause(
 		t.Fatalf("word trigger did not replace paused turn: %+v", decision)
 	}
 	if _, accepted := l.commitInterruptedTurn(*turn); accepted {
-		t.Fatal("stale adaptive flush replaced legacy turn")
+		t.Fatal("stale adaptive flush replaced word-triggered turn")
 	}
 	if l.HoldInput(internal_type.UserInputPacket{ContextID: current, Text: "new request"}) || l.CanStartIdleTimeout(current) {
-		t.Fatal("legacy turn retained adaptive held input or lost listening state")
+		t.Fatal("word-triggered turn retained adaptive held input or lost listening state")
 	}
 	if resumeContextID := l.OnInterruptionExpired(*pause); resumeContextID != "" || l.ContextID() != current {
-		t.Fatal("stale adaptive pause changed legacy turn")
+		t.Fatal("stale adaptive pause changed word-triggered turn")
 	}
 }
 
-func TestMessageLifecycle_ObserveInterruptionVADStartsUnclearAfterEnd(t *testing.T) {
+func TestMessageLifecycle_ObserveInterruptionVADDoesNotStartUnclear(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		timeout := 0.02
 		expired := make(chan internal_type.UnclearInputExpiredPacket, 2)
@@ -268,16 +279,13 @@ func TestMessageLifecycle_ObserveInterruptionVADStartsUnclearAfterEnd(t *testing
 		l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{ContextID: "ctx", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd}, internal_options.BargeInTriggerVAD)
 		select {
 		case packet := <-expired:
-			if packet.ContextID != l.ContextID() {
-				t.Fatalf("unclear countdown retained previous turn: %+v", packet)
-			}
-		case <-time.After(time.Second):
-			t.Fatal("VAD end did not start unclear countdown")
+			t.Fatalf("VAD end began unclear countdown: %+v", packet)
+		case <-time.After(50 * time.Millisecond):
 		}
 	})
 }
 
-func TestMessageLifecycle_ObserveInterruptionWordExtendsUnclear(t *testing.T) {
+func TestMessageLifecycle_ObserveInterruptionWordDoesNotStartOrExtendUnclear(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		timeout := 0.3
 		expired := make(chan internal_type.UnclearInputExpiredPacket, 2)
@@ -300,20 +308,27 @@ func TestMessageLifecycle_ObserveInterruptionWordExtendsUnclear(t *testing.T) {
 			t.Fatal(err)
 		}
 		l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{ContextID: "ctx", Source: internal_type.InterruptionSourceWord}, internal_options.BargeInTriggerWord)
+		time.Sleep(350 * time.Millisecond)
+		synctest.Wait()
+		select {
+		case packet := <-expired:
+			t.Fatalf("word began unclear countdown: %+v", packet)
+		default:
+		}
+		if _, err := l.OnTranscriptReceived(internal_type.SpeechToTextPacket{ContextID: l.ContextID(), Script: "hello", Interim: true}); err != nil {
+			t.Fatal(err)
+		}
 		time.Sleep(150 * time.Millisecond)
 		l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{ContextID: "ctx", Source: internal_type.InterruptionSourceWord}, internal_options.BargeInTriggerWord)
+		time.Sleep(150 * time.Millisecond)
+		synctest.Wait()
 		select {
 		case packet := <-expired:
-			t.Fatalf("duplicate word did not extend countdown: %+v", packet)
-		case <-time.After(200 * time.Millisecond):
-		}
-		select {
-		case packet := <-expired:
-			if packet.ContextID != l.ContextID() {
-				t.Fatalf("unclear countdown retained previous turn: %+v", packet)
+			if packet.ContextID != l.ContextID() || packet.Generation == 0 {
+				t.Fatalf("invalid unclear countdown expiry: %+v", packet)
 			}
-		case <-time.After(time.Second):
-			t.Fatal("extended unclear countdown did not expire")
+		default:
+			t.Fatal("word extended the STT countdown")
 		}
 		l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{ContextID: "ctx", Source: internal_type.InterruptionSourceWord}, internal_options.BargeInTriggerWord)
 		select {

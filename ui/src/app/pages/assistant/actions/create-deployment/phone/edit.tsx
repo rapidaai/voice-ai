@@ -1,6 +1,8 @@
 import {
   ConfigureExperience,
   DEFAULT_IDEAL_TIMEOUT,
+  DEFAULT_UNCLEAR_INPUT_MESSAGE,
+  DEFAULT_UNCLEAR_INPUT_TIMEOUT,
   ExperienceConfig,
 } from '@/app/pages/assistant/actions/create-deployment/commons/configure-experience';
 import { ConfigureAudioInputProvider } from '@/app/pages/assistant/actions/create-deployment/commons/configure-audio-input';
@@ -293,12 +295,14 @@ const EditAssistantCallDeployment: FC<{ assistantId: string }> = ({
       deployment.setGreeting(experienceConfig.greeting);
     if (experienceConfig.messageOnError)
       deployment.setMistake(experienceConfig.messageOnError);
-    if (experienceConfig.unclearInputTimeout)
-      deployment.setUnclearinputtimeout(
-        Number(experienceConfig.unclearInputTimeout),
-      );
-    if (experienceConfig.unclearInputMessage)
-      deployment.setUnclearinputmessage(experienceConfig.unclearInputMessage);
+    deployment.setUnclearinputtimeout(
+      Number(
+        experienceConfig.unclearInputTimeout || DEFAULT_UNCLEAR_INPUT_TIMEOUT,
+      ),
+    );
+    deployment.setUnclearinputmessage(
+      experienceConfig.unclearInputMessage || DEFAULT_UNCLEAR_INPUT_MESSAGE,
+    );
     if (experienceConfig.idealTimeout)
       deployment.setIdealtimeout(experienceConfig.idealTimeout);
     if (experienceConfig.idleTimeoutBackoffTimes)

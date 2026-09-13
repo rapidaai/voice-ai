@@ -10,18 +10,21 @@ import (
 	"github.com/rapidaai/protos"
 )
 
+type generationPhase uint8
+type playbackPhase uint8
+
 func (l *messageLifecycle) OnMessageInjected(packet internal_type.InjectMessagePacket) (internal_type.InjectMessagePacket, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if err := l.validateContextLocked(packet.ContextID); err != nil {
 		return packet, err
 	}
-	if l.output.generationClosed || l.output.failed || l.output.completed {
+	if l.output.generation == generationCompleted || l.output.playback == playbackFailed || l.output.playback == playbackCompleted {
 		return packet, ErrInvalidTransition
 	}
-	packet.Interim = l.output.started
-	if !l.output.started {
-		l.output.started = true
+	packet.Interim = l.output.generation != generationIdle
+	if l.output.generation == generationIdle {
+		l.output.generation = generationStarted
 		l.state = MessageStateAssistantGenerating
 	}
 	l.output.hasText = l.output.hasText || strings.TrimSpace(packet.Text) != ""
@@ -40,22 +43,24 @@ func (l *messageLifecycle) SendAssistantMessage(message *protos.ConversationAssi
 		l.mu.Unlock()
 		return err
 	}
-	if l.output.failed || l.output.completed {
+	if l.output.playback == playbackFailed || l.output.playback == playbackCompleted {
 		l.mu.Unlock()
 		return ErrInvalidTransition
 	}
 	switch content := message.Message.(type) {
 	case *protos.ConversationAssistantMessage_Audio:
-		if !l.mode.Audio() || l.output.terminalIssued || l.output.terminalSending || (message.Completed && !l.output.generationClosed) {
+		if !l.mode.Audio() || l.output.playback != playbackOpen || (message.Completed && l.output.generation != generationCompleted) {
 			l.mu.Unlock()
 			return ErrInvalidTransition
 		}
 		if message.Completed && !l.output.hasAudio && len(content.Audio) == 0 && l.output.hasText {
-			l.output.failed = true
+			l.output.playback = playbackFailed
 			l.mu.Unlock()
 			return errors.New("synthesis completed without audio for nonempty text")
 		}
-		l.output.terminalSending = message.Completed
+		if message.Completed {
+			l.output.playback = playbackClosing
+		}
 	case *protos.ConversationAssistantMessage_Text:
 		l.output.hasText = l.output.hasText || strings.TrimSpace(content.Text) != ""
 	default:
@@ -70,8 +75,7 @@ func (l *messageLifecycle) SendAssistantMessage(message *protos.ConversationAssi
 		return err
 	}
 	if err != nil {
-		l.output.failed = true
-		l.output.terminalSending = false
+		l.output.playback = playbackFailed
 		l.output.receiptReceived = false
 		if l.output.receiptTimer != nil {
 			l.output.receiptTimer.Stop()
@@ -83,9 +87,10 @@ func (l *messageLifecycle) SendAssistantMessage(message *protos.ConversationAssi
 	case *protos.ConversationAssistantMessage_Audio:
 		l.output.hasAudio = l.output.hasAudio || len(content.Audio) > 0
 		l.output.audioDuration += time.Duration(internal_audio.GetAudioInfo(content.Audio, internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG).DurationMs) * time.Millisecond
-		l.output.terminalSending = false
-		l.output.terminalIssued = message.Completed
 		if message.Completed {
+			if l.output.playback == playbackClosing {
+				l.output.playback = playbackAwaitingReceipt
+			}
 			l.output.receiptRemaining = l.output.audioDuration + 5*time.Second
 		}
 	case *protos.ConversationAssistantMessage_Text:
@@ -101,18 +106,18 @@ func (l *messageLifecycle) SendAssistantMessage(message *protos.ConversationAssi
 func (l *messageLifecycle) awaitPlayback(contextID string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if contextID != l.contextID || !l.output.terminalIssued || l.output.receiptReceived || l.output.paused || l.output.failed || l.output.completed || l.output.receiptTimer != nil {
+	if contextID != l.contextID || l.output.playback != playbackAwaitingReceipt || l.output.receiptReceived || l.output.paused || l.output.receiptTimer != nil {
 		return
 	}
 	l.output.receiptDeadline = time.Now().Add(l.output.receiptRemaining)
 	deadline := l.output.receiptDeadline
 	l.output.receiptTimer = time.AfterFunc(l.output.receiptRemaining, func() {
 		l.mu.Lock()
-		if contextID != l.contextID || l.output.receiptReceived || l.output.paused || l.output.completed || l.output.failed || !l.output.receiptDeadline.Equal(deadline) {
+		if contextID != l.contextID || l.output.playback != playbackAwaitingReceipt || l.output.receiptReceived || l.output.paused || !l.output.receiptDeadline.Equal(deadline) {
 			l.mu.Unlock()
 			return
 		}
-		l.output.failed = true
+		l.output.playback = playbackFailed
 		l.output.receiptTimer = nil
 		onPacket := l.onPacket
 		l.mu.Unlock()
@@ -125,10 +130,10 @@ func (l *messageLifecycle) awaitPlayback(contextID string) {
 func (l *messageLifecycle) OnMessageFailed(contextID string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if contextID != l.contextID || l.output.completed {
+	if contextID != l.contextID || l.output.playback == playbackCompleted {
 		return
 	}
-	l.output.failed = true
+	l.output.playback = playbackFailed
 	l.output.receiptReceived = false
 	if l.output.receiptTimer != nil {
 		l.output.receiptTimer.Stop()

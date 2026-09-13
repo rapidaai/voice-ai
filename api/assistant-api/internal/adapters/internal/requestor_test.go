@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	assistant_config "github.com/rapidaai/api/assistant-api/config"
+	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/config"
 	endpoint_client "github.com/rapidaai/pkg/clients/endpoint"
 	integration_client "github.com/rapidaai/pkg/clients/integration"
@@ -23,7 +24,6 @@ func TestNewGenericRequestorLifecycleUsesCurrentStreamer(t *testing.T) {
 	requestor := NewGenericRequestor(context.Background(), cfg, nil, nil, utils.Debugger,
 		nil, nil, nil, nil, original, nil)
 	defer requestor.cancelSession()
-	require.False(t, requestor.messageLifecycle.InterruptionEnabled())
 	require.Equal(t, type_enums.TextMode, requestor.GetMode())
 	require.NotEmpty(t, requestor.GetID())
 	message := &protos.ConversationAssistantMessage{Id: requestor.GetID(), Message: &protos.ConversationAssistantMessage_Text{Text: "hello"}}
@@ -33,6 +33,13 @@ func TestNewGenericRequestorLifecycleUsesCurrentStreamer(t *testing.T) {
 	current := &streamTestStreamer{}
 	requestor.streamer = current
 	require.NoError(t, requestor.Notify(context.Background(), message))
+	requestor.messageLifecycle.SetMode(type_enums.AudioMode)
+	require.NoError(t, requestor.messageLifecycle.OnGenerationStarted(requestor.GetID()))
+	decision := requestor.messageLifecycle.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
+		ContextID: requestor.GetID(), Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
+	}, "")
+	require.NotNil(t, decision.Pause)
+	require.Nil(t, decision.Flush)
 	require.NoError(t, requestor.sendOutputControl(&protos.ConversationPlaybackControl{Id: requestor.GetID(), Kind: protos.ConversationPlaybackControl_PAUSE}))
 	require.Len(t, original.sent, 1)
 	require.Len(t, current.sent, 2)

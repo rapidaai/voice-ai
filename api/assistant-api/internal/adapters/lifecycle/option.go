@@ -22,11 +22,6 @@ func WithMode(mode type_enums.MessageMode) MessageOption {
 	return func(message *messageLifecycle) { message.mode = mode }
 }
 
-// WithInterruption enables or disables speech-confirmed interruption.
-func WithInterruption(enabled bool) MessageOption {
-	return func(message *messageLifecycle) { message.interruptionEnabled = enabled }
-}
-
 // WithOnPacket receives lifecycle metrics and timeout notifications, including timer callbacks.
 func WithOnPacket(onPacket func(...internal_type.Packet) error) MessageOption {
 	return func(message *messageLifecycle) { message.onPacket = onPacket }

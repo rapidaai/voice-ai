@@ -16,7 +16,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func TestMessagePlaybackReceiptDoesNotExpireDuringReplay(t *testing.T) {
+func TestMessagePlaybackReceiptCompletesAfterReplayReleasesInput(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		received, release := make(chan struct{}), make(chan struct{})
 		defer close(release)
@@ -24,7 +24,7 @@ func TestMessagePlaybackReceiptDoesNotExpireDuringReplay(t *testing.T) {
 		timeouts := make(chan internal_type.TextToSpeechErrorPacket, 2)
 		idle := make(chan internal_type.StartIdleTimeoutPacket, 2)
 		var message MessageLifecycle
-		message = NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true),
+		message = NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode),
 			WithSend(func(proto.Message) error { return nil }),
 			WithOnPacket(func(packets ...internal_type.Packet) error {
 				for _, packet := range packets {
@@ -40,9 +40,9 @@ func TestMessagePlaybackReceiptDoesNotExpireDuringReplay(t *testing.T) {
 			WithDispatch(func(_ context.Context, packet internal_type.Packet) {
 				switch packet := packet.(type) {
 				case internal_type.SpeechToTextPacket:
-					contextID, err := message.OnTranscriptReceived(packet)
+					turn, err := message.OnTranscriptReceived(packet)
 					assert.NoError(t, err)
-					assert.Equal(t, packet.ContextID, contextID)
+					assert.Equal(t, packet.ContextID, turn.ContextID)
 				case internal_type.UserInputPacket:
 					input, _ := message.OnUserInput(packet)
 					assert.NotEmpty(t, input.ContextID)
@@ -64,7 +64,7 @@ func TestMessagePlaybackReceiptDoesNotExpireDuringReplay(t *testing.T) {
 		message.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
 			ContextID: "assistant", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
 		}, "")
-		turn, _ := message.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "wait"}, true)
+		turn, _ := message.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "wait"})
 		require.NotNil(t, turn)
 		require.True(t, message.HoldInput(internal_type.UserInputPacket{ContextID: "assistant", Text: "wait"}))
 		go func() { finished <- message.OnTurnChange(t.Context(), *turn) }()
@@ -72,7 +72,7 @@ func TestMessagePlaybackReceiptDoesNotExpireDuringReplay(t *testing.T) {
 		time.Sleep(6 * time.Second)
 		synctest.Wait()
 		assert.Empty(t, timeouts)
-		assert.Empty(t, idle, "completion must wait until replay releases input")
+		require.Len(t, idle, 1, "generation starts only after replay releases input")
 		release <- struct{}{}
 		require.NoError(t, <-finished)
 		require.Len(t, idle, 1)
@@ -124,7 +124,12 @@ func TestMessagePlaybackCompletesAfterFinalDelivery(t *testing.T) {
 			l.OnGenerationCompleted(internal_type.LLMResponseDonePacket{ContextID: "message", Text: "answer"})
 			require.NoError(t, l.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: "message", Completed: true, Message: &protos.ConversationAssistantMessage_Text{Text: "answer"}}))
 			require.Empty(t, packets, "text completion cannot complete audio")
+			var pause *internal_type.InterruptionDecisionExpiredPacket
 			if scenario.paused {
+				pause = l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
+					ContextID: "message", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
+				}, internal_options.BargeInTriggerVAD).Pause
+				require.NotNil(t, pause)
 				require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_PAUSE}))
 			}
 			err := l.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: "message", Completed: true, Message: &protos.ConversationAssistantMessage_Audio{}})
@@ -143,6 +148,7 @@ func TestMessagePlaybackCompletesAfterFinalDelivery(t *testing.T) {
 				if scenario.flushed {
 					require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_FLUSH}))
 				} else {
+					require.Equal(t, "message", l.OnInterruptionExpired(*pause))
 					require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_CONTINUE}))
 				}
 			}
@@ -186,6 +192,10 @@ func TestMessagePlaybackRejectsInvalidControlWithoutChangingState(t *testing.T) 
 				require.Len(t, sent, 2)
 				require.Empty(t, packets)
 
+				decision := l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
+					ContextID: "message", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
+				}, internal_options.BargeInTriggerVAD)
+				require.NotNil(t, decision.Pause)
 				require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_PAUSE}))
 				require.NoError(t, l.OnPlaybackCompleted("message"))
 				before = l.output
@@ -194,6 +204,7 @@ func TestMessagePlaybackRejectsInvalidControlWithoutChangingState(t *testing.T) 
 				require.Len(t, sent, 3)
 				require.Empty(t, packets, "invalid control must not release a paused completion")
 
+				require.Equal(t, "message", l.OnInterruptionExpired(*decision.Pause))
 				require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_CONTINUE}))
 				require.Len(t, sent, 4)
 				assert.Equal(t, protos.ConversationPlaybackControl_CONTINUE, sent[3].(*protos.ConversationPlaybackControl).GetKind())
@@ -259,10 +270,15 @@ func TestMessagePlaybackDeadlineExcludesPause(t *testing.T) {
 		require.NoError(t, l.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: "message", Completed: true, Message: &protos.ConversationAssistantMessage_Text{Text: "answer"}}))
 		require.NoError(t, l.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: "message", Completed: true, Message: &protos.ConversationAssistantMessage_Audio{}}))
 		time.Sleep(time.Second)
+		decision := l.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
+			ContextID: "message", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
+		}, internal_options.BargeInTriggerVAD)
+		require.NotNil(t, decision.Pause)
 		require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_PAUSE}))
 		time.Sleep(time.Minute)
 		synctest.Wait()
 		require.Empty(t, packets)
+		require.Equal(t, "message", l.OnInterruptionExpired(*decision.Pause))
 		require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_CONTINUE}))
 		time.Sleep(5 * time.Second)
 		synctest.Wait()
@@ -290,15 +306,48 @@ func TestMessagePlaybackEmptyAndTextOnly(t *testing.T) {
 				require.ErrorContains(t, l.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: "message", Completed: true, Message: &protos.ConversationAssistantMessage_Audio{}}), "without audio")
 			} else {
 				require.Len(t, packets, 2)
+				require.ErrorIs(t, l.OnPlaybackCompleted("message"), ErrPlaybackTerminalNotIssued)
+				require.Len(t, packets, 2)
 			}
 		}
 	}
 }
 
+func TestMessagePlaybackFailureDuringTerminalSendRemainsFailed(t *testing.T) {
+	var message MessageLifecycle
+	var packets []internal_type.Packet
+	message = NewMessageLifecycle(WithContextID("message"), WithMode(type_enums.AudioMode),
+		WithSend(func(packet proto.Message) error {
+			if output, ok := packet.(*protos.ConversationAssistantMessage); ok && output.Completed {
+				if _, audio := output.Message.(*protos.ConversationAssistantMessage_Audio); audio {
+					message.OnMessageFailed(output.Id)
+				}
+			}
+			return nil
+		}),
+		WithOnPacket(func(emitted ...internal_type.Packet) error {
+			packets = append(packets, emitted...)
+			return nil
+		}))
+	defer message.Close("message")
+	require.NoError(t, message.OnGenerationStarted("message"))
+	message.OnGenerationCompleted(internal_type.LLMResponseDonePacket{ContextID: "message", Text: "answer"})
+	require.NoError(t, message.SendAssistantMessage(&protos.ConversationAssistantMessage{
+		Id: "message", Completed: true, Message: &protos.ConversationAssistantMessage_Text{Text: "answer"},
+	}))
+	require.NoError(t, message.SendAssistantMessage(&protos.ConversationAssistantMessage{
+		Id: "message", Completed: true, Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}},
+	}))
+	require.ErrorIs(t, message.OnPlaybackCompleted("message"), ErrPlaybackTerminalNotIssued)
+	require.ErrorIs(t, message.OnGenerationStarted("message"), ErrInvalidTransition)
+	require.False(t, message.CanStartIdleTimeout("message"))
+	require.Empty(t, packets)
+}
+
 func TestMessagePlaybackNextSpeechGetsFreshMessageID(t *testing.T) {
 	for _, source := range []string{"vad", "stt"} {
 		t.Run(source, func(t *testing.T) {
-			l := NewMessageLifecycle(WithContextID("completed"), WithMode(type_enums.AudioMode), WithInterruption(true), WithSend(func(proto.Message) error { return nil }))
+			l := NewMessageLifecycle(WithContextID("completed"), WithMode(type_enums.AudioMode), WithSend(func(proto.Message) error { return nil }))
 			l.OnGenerationCompleted(internal_type.LLMResponseDonePacket{ContextID: "completed"})
 			require.NoError(t, l.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: "completed", Completed: true, Message: &protos.ConversationAssistantMessage_Text{}}))
 			require.True(t, l.CanStartIdleTimeout("completed"))
@@ -309,14 +358,17 @@ func TestMessagePlaybackNextSpeechGetsFreshMessageID(t *testing.T) {
 				require.Nil(t, decision.Pause)
 				require.NotNil(t, decision.EndOfSpeech)
 				require.Equal(t, l.ContextID(), decision.EndOfSpeech.ContextID)
-				require.Len(t, decision.Packets, 3)
-			} else {
-				turn, admitted := l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "completed", Script: "next question"}, true)
-				require.NotEmpty(t, admitted.ContextID)
-				require.NotNil(t, turn)
-				assert.Equal(t, turn.ContextID, admitted.ContextID)
-				require.False(t, turn.InterruptionDecision)
+				require.Equal(t, []internal_type.Packet{internal_type.SpeechToTextStartPacket{ContextID: "completed"}}, decision.Packets)
+				require.Equal(t, "completed", l.ContextID())
+				require.True(t, l.CanStartIdleTimeout("completed"))
 			}
+			turn, admitted := l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "completed", Script: "next question"})
+			require.NotEmpty(t, admitted.ContextID)
+			require.NotNil(t, turn)
+			admittedTurn, err := l.OnTranscriptReceived(admitted)
+			require.NoError(t, err)
+			assert.Equal(t, l.ContextID(), admittedTurn.ContextID)
+			require.False(t, admittedTurn.InterruptionDecision)
 			require.NotEqual(t, "completed", l.ContextID())
 			require.ErrorIs(t, l.OnPlaybackCompleted("completed"), ErrStaleContext)
 			require.NoError(t, l.OnUserSpeechCompleted(internal_type.EndOfSpeechPacket{ContextID: l.ContextID(), Speech: "next question"}))

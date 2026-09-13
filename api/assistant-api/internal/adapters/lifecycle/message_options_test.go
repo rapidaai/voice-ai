@@ -21,19 +21,17 @@ func TestMessageOptionsDefaults(t *testing.T) {
 	assert.NotEqual(t, message.ContextID(), NewMessageLifecycle().ContextID())
 	assert.Equal(t, type_enums.TextMode, message.Mode())
 	assert.Equal(t, MessageStateAssistantIdle, message.State())
-	assert.False(t, message.InterruptionEnabled())
 
 	message = NewMessageLifecycle(nil, WithContextID(""), WithMode(""))
 	assert.NotEmpty(t, message.ContextID())
 	assert.Equal(t, type_enums.TextMode, message.Mode())
 
 	message = NewMessageLifecycle(
-		WithContextID("first"), WithMode(type_enums.TextMode), WithInterruption(false),
-		WithContextID("second"), WithMode(type_enums.AudioMode), WithInterruption(true),
+		WithContextID("first"), WithMode(type_enums.TextMode),
+		WithContextID("second"), WithMode(type_enums.AudioMode),
 	)
 	assert.Equal(t, "second", message.ContextID())
 	assert.Equal(t, type_enums.AudioMode, message.Mode())
-	assert.True(t, message.InterruptionEnabled())
 }
 
 func TestMessageOptionsCallbacksWaitForEvents(t *testing.T) {
@@ -49,7 +47,7 @@ func TestMessageOptionsCallbacksWaitForEvents(t *testing.T) {
 			var packets []internal_type.Packet
 			var message MessageLifecycle
 			options := []MessageOption{
-				WithContextID("message"), WithMode(type_enums.TextMode),
+				WithContextID("message"), WithMode(type_enums.AudioMode),
 				WithOnPacket(func(emitted ...internal_type.Packet) error {
 					assert.Equal(t, "message", message.ContextID())
 					packets = append(packets, emitted...)
@@ -71,16 +69,26 @@ func TestMessageOptionsCallbacksWaitForEvents(t *testing.T) {
 			require.Empty(t, packets)
 			require.NoError(t, message.OnGenerationStarted("message"))
 			message.OnGenerationCompleted(internal_type.LLMResponseDonePacket{ContextID: "message", Text: "answer"})
+			decision := message.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
+				ContextID: "message", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
+			}, "")
+			require.NotNil(t, decision.Pause)
 			require.NoError(t, message.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_PAUSE}))
 			require.NoError(t, message.SendAssistantMessage(&protos.ConversationAssistantMessage{
 				Id: "message", Completed: true, Message: &protos.ConversationAssistantMessage_Text{Text: "answer"},
 			}))
+			require.NoError(t, message.SendAssistantMessage(&protos.ConversationAssistantMessage{
+				Id: "message", Completed: true, Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}},
+			}))
+			require.NoError(t, message.OnPlaybackCompleted("message"))
 			require.Empty(t, packets, "paused output cannot complete")
+			require.Equal(t, "message", message.OnInterruptionExpired(*decision.Pause))
 			require.NoError(t, message.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_CONTINUE}))
-			require.Len(t, output, 3)
+			require.Len(t, output, 4)
 			assert.Equal(t, protos.ConversationPlaybackControl_PAUSE, output[0].(*protos.ConversationPlaybackControl).GetKind())
 			assert.IsType(t, &protos.ConversationAssistantMessage{}, output[1])
-			assert.Equal(t, protos.ConversationPlaybackControl_CONTINUE, output[2].(*protos.ConversationPlaybackControl).GetKind())
+			assert.IsType(t, &protos.ConversationAssistantMessage{}, output[2])
+			assert.Equal(t, protos.ConversationPlaybackControl_CONTINUE, output[3].(*protos.ConversationPlaybackControl).GetKind())
 			require.Len(t, packets, 2)
 			assert.Equal(t, internal_type.StartIdleTimeoutPacket{ContextID: "message"}, packets[1])
 		})
@@ -147,18 +155,18 @@ func TestMessageOptionsMissingSenderDoesNotMutateOutput(t *testing.T) {
 	require.ErrorIs(t, message.SendAssistantMessage(&protos.ConversationAssistantMessage{
 		Id: "message", Completed: true, Message: &protos.ConversationAssistantMessage_Audio{},
 	}), ErrSenderNotConfigured)
-	assert.Equal(t, assistantOutputState{started: true}, message.output)
+	assert.Equal(t, assistantOutputState{generation: generationStarted}, message.output)
 	assert.Equal(t, MessageStateAssistantGenerating, message.State())
 }
 
 func TestMessageOptionsMissingDispatcherKeepsPendingTurn(t *testing.T) {
-	message := NewMessageLifecycle(WithContextID("message"), WithMode(type_enums.AudioMode), WithInterruption(true))
+	message := NewMessageLifecycle(WithContextID("message"), WithMode(type_enums.AudioMode))
 	require.NoError(t, message.OnGenerationStarted("message"))
 	decision := message.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
 		ContextID: "message", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
 	}, "")
 	require.NotNil(t, decision.Pause)
-	turn, _ := message.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "message", Script: "stop"}, true)
+	turn, _ := message.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "message", Script: "stop"})
 	require.NotNil(t, turn)
 	require.ErrorIs(t, message.OnTurnChange(context.Background(), *turn), ErrDispatcherNotConfigured)
 	assert.Equal(t, "message", message.ContextID())
@@ -183,7 +191,7 @@ func TestMessageOptionsDispatchReceivesEventContext(t *testing.T) {
 }
 
 func TestMessageOptionsMissingExpiryCallbackDoesNotLeavePauseUnresolved(t *testing.T) {
-	message := NewMessageLifecycle(WithContextID("message"), WithMode(type_enums.AudioMode), WithInterruption(true))
+	message := NewMessageLifecycle(WithContextID("message"), WithMode(type_enums.AudioMode))
 	require.NoError(t, message.OnGenerationStarted("message"))
 	decision := message.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
 		ContextID: "message", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,

@@ -265,6 +265,12 @@ func TestSend_GeneratedWireVariants(t *testing.T) {
 		{"flush", &protos.ConversationPlaybackControl{Id: "response-1", Kind: protos.ConversationPlaybackControl_FLUSH}, "playbackControl", 24},
 		{"initialization", &protos.ConversationInitialization{}, "initialization", 0},
 		{"configuration", &protos.ConversationConfiguration{}, "configuration", 0},
+		{"disconnection unspecified", &protos.ConversationDisconnection{Type: protos.ConversationDisconnection_DISCONNECTION_TYPE_UNSPECIFIED}, "disconnection", 19},
+		{"disconnection tool", &protos.ConversationDisconnection{Type: protos.ConversationDisconnection_DISCONNECTION_TYPE_TOOL}, "disconnection", 19},
+		{"disconnection user", &protos.ConversationDisconnection{Type: protos.ConversationDisconnection_DISCONNECTION_TYPE_USER}, "disconnection", 19},
+		{"disconnection idle timeout", &protos.ConversationDisconnection{Type: protos.ConversationDisconnection_DISCONNECTION_TYPE_IDLE_TIMEOUT}, "disconnection", 19},
+		{"disconnection max duration", &protos.ConversationDisconnection{Type: protos.ConversationDisconnection_DISCONNECTION_TYPE_MAX_DURATION}, "disconnection", 19},
+		{"disconnection error", &protos.ConversationDisconnection{Type: protos.ConversationDisconnection_DISCONNECTION_TYPE_ERROR}, "disconnection", 19},
 		{"interruption", &protos.ConversationInterruption{}, "interruption", 0},
 		{"user", &protos.ConversationUserMessage{}, "user", 0},
 		{"assistant", &protos.ConversationAssistantMessage{Id: "response"}, "assistant", 0},
@@ -305,6 +311,43 @@ func TestSend_GeneratedWireVariants(t *testing.T) {
 			assert.ErrorIs(t, streamer.Send(tt.message), sendErr)
 		})
 	}
+}
+
+func TestSend_DisconnectionBypassesPausedAudio(t *testing.T) {
+	t.Parallel()
+	server := &recordingAssistantTalkServer{}
+	streamer := &unidirectionalStreamer{server: server}
+	audio := &protos.ConversationAssistantMessage{
+		Id: "response", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{1}},
+	}
+	terminal := &protos.ConversationAssistantMessage{
+		Id: "response", Completed: true, Message: &protos.ConversationAssistantMessage_Audio{},
+	}
+	disconnection := &protos.ConversationDisconnection{
+		Type: protos.ConversationDisconnection_DISCONNECTION_TYPE_IDLE_TIMEOUT,
+	}
+
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
+	require.NoError(t, streamer.Send(audio))
+	require.Len(t, server.sentResponses(), 1)
+	require.NoError(t, streamer.Send(disconnection))
+	responses := server.sentResponses()
+	require.Len(t, responses, 2, "disconnection must reach the client while audio is paused")
+	assert.IsType(t, &protos.AssistantTalkResponse_Disconnection{}, responses[1].GetData())
+	assert.True(t, proto.Equal(disconnection, responses[1].GetDisconnection()))
+
+	sendErr := errors.New("send failed")
+	server.sendErr = sendErr
+	assert.ErrorIs(t, streamer.Send(disconnection), sendErr)
+	server.sendErr = nil
+	require.NoError(t, streamer.Send(terminal))
+	require.Len(t, server.sentResponses(), 2, "disconnection must not resume paused output")
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}))
+	responses = server.sentResponses()
+	require.Len(t, responses, 5)
+	assert.Equal(t, protos.ConversationPlaybackControl_CONTINUE, responses[2].GetPlaybackControl().GetKind())
+	assert.True(t, proto.Equal(audio, responses[3].GetAssistant()))
+	assert.True(t, proto.Equal(terminal, responses[4].GetAssistant()))
 }
 
 func TestSend_PausedQueuePreservesAudioOrderAndAllowsText(t *testing.T) {

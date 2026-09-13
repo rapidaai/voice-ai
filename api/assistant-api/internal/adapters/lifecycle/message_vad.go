@@ -22,13 +22,13 @@ type InterruptionDecision struct {
 	Notification      *protos.ConversationInterruption
 }
 
-// OnInterruptionDetected owns VAD and word admission, turn transitions, and countdown eligibility.
+// OnInterruptionDetected owns VAD and word admission and turn transitions.
 func (l *messageLifecycle) OnInterruptionDetected(
 	p internal_type.InterruptionDetectedPacket,
 	bargeInTrigger string,
 ) InterruptionDecision {
 	l.mu.Lock()
-	if l.interruptionEnabled && l.mode.Audio() && p.Source == internal_type.InterruptionSourceVad && bargeInTrigger != internal_options.BargeInTriggerWord {
+	if l.mode.Audio() && p.Source == internal_type.InterruptionSourceVad && bargeInTrigger != internal_options.BargeInTriggerWord {
 		l.mu.Unlock()
 		admitted, packets, pause := l.observeVAD(p)
 		decision := InterruptionDecision{Packets: packets, Pause: pause}
@@ -72,8 +72,6 @@ func (l *messageLifecycle) OnInterruptionDetected(
 
 	previousState := l.state
 	shouldRotate := false
-	shouldStartUnclear := false
-	shouldExtendUnclear := false
 	switch p.Source {
 	case internal_type.InterruptionSourceVad:
 		switch p.Event {
@@ -82,7 +80,7 @@ func (l *messageLifecycle) OnInterruptionDetected(
 				switch l.state {
 				case MessageStateUserIdle:
 					l.state = MessageStateUserSpeaking
-				case MessageStateUserListening, MessageStateUserSpeaking, MessageStateUserThinking:
+				case MessageStateAssistantIdle, MessageStateUserListening, MessageStateUserSpeaking, MessageStateUserThinking:
 				default:
 					shouldRotate = true
 				}
@@ -97,9 +95,8 @@ func (l *messageLifecycle) OnInterruptionDetected(
 			if l.state == MessageStateUserSpeaking {
 				l.state = MessageStateUserListening
 			}
-			if l.state == MessageStateUserListening {
+			if l.state == MessageStateAssistantIdle || l.state == MessageStateUserListening {
 				decision.EndOfSpeech = &p
-				shouldStartUnclear = true
 			}
 		default:
 			return decision
@@ -116,14 +113,10 @@ func (l *messageLifecycle) OnInterruptionDetected(
 		case MessageStateUserListening, MessageStateUserSpeaking:
 			if l.mode.Text() {
 				l.state = MessageStateUserListening
-			} else {
-				shouldExtendUnclear = true
 			}
 		case MessageStateUserThinking:
-			shouldExtendUnclear = !l.mode.Text()
 		default:
 			shouldRotate = true
-			shouldStartUnclear = !l.mode.Text()
 		}
 	default:
 		return decision
@@ -136,21 +129,13 @@ func (l *messageLifecycle) OnInterruptionDetected(
 			l.output.receiptTimer.Stop()
 		}
 		l.output = assistantOutputState{}
-		if l.interruptionDecisionTimer != nil {
-			l.interruptionDecisionTimer.Stop()
-			l.interruptionDecisionTimer = nil
+		if l.interruption.timer != nil {
+			l.interruption.timer.Stop()
+			l.interruption.timer = nil
 		}
-		l.interruptionSequence++
-		l.interruptionContextID = ""
-		l.interruptionPreviousState = ""
-		l.interruptionSpeechActive = false
-		l.interruptionResumed = false
-		l.interruptionDecisionPending = false
-		l.interruptionTurnCommitted = false
-		l.interruptionHeldPackets = nil
-		l.committedInterruptionContextID = ""
-		l.previousInterruptionContextID = ""
-		l.pendingInterruptionVADEndContextID = ""
+		l.interruption = interruptionState{sequence: l.interruption.sequence + 1}
+		l.previousContextID = ""
+		l.pendingVADEndContextID = ""
 		if l.unclearInputWatchdog != nil {
 			l.unclearInputWatchdog.Stop()
 		}
@@ -202,13 +187,6 @@ func (l *messageLifecycle) OnInterruptionDetected(
 	}
 	if p.Source == internal_type.InterruptionSourceVad && p.Event == internal_type.InterruptionEventStart {
 		decision.SpeechToTextStart = &internal_type.SpeechToTextStartPacket{ContextID: p.ContextID}
-	}
-	if l.unclearInputWatchdog != nil && l.unclearInputTimeout > 0 {
-		if shouldStartUnclear {
-			l.unclearInputWatchdog.Start(p.ContextID, l.unclearInputTimeout)
-		} else if shouldExtendUnclear {
-			l.unclearInputWatchdog.Extend(p.ContextID, l.unclearInputTimeout)
-		}
 	}
 	return decision
 }
