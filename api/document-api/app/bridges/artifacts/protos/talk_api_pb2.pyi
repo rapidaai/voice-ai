@@ -255,23 +255,23 @@ class ConversationInterruption(_message.Message):
     time: _timestamp_pb2.Timestamp
     def __init__(self, id: _Optional[str] = ..., type: _Optional[_Union[ConversationInterruption.InterruptionType, str]] = ..., time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
-class ConversationPlaybackPause(_message.Message):
-    __slots__ = ("id",)
+class ConversationPlaybackControl(_message.Message):
+    __slots__ = ("id", "kind")
+    class Kind(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        KIND_UNSPECIFIED: _ClassVar[ConversationPlaybackControl.Kind]
+        PAUSE: _ClassVar[ConversationPlaybackControl.Kind]
+        CONTINUE: _ClassVar[ConversationPlaybackControl.Kind]
+        FLUSH: _ClassVar[ConversationPlaybackControl.Kind]
+    KIND_UNSPECIFIED: ConversationPlaybackControl.Kind
+    PAUSE: ConversationPlaybackControl.Kind
+    CONTINUE: ConversationPlaybackControl.Kind
+    FLUSH: ConversationPlaybackControl.Kind
     ID_FIELD_NUMBER: _ClassVar[int]
+    KIND_FIELD_NUMBER: _ClassVar[int]
     id: str
-    def __init__(self, id: _Optional[str] = ...) -> None: ...
-
-class ConversationPlaybackContinue(_message.Message):
-    __slots__ = ("id",)
-    ID_FIELD_NUMBER: _ClassVar[int]
-    id: str
-    def __init__(self, id: _Optional[str] = ...) -> None: ...
-
-class ConversationPlaybackFlush(_message.Message):
-    __slots__ = ("id",)
-    ID_FIELD_NUMBER: _ClassVar[int]
-    id: str
-    def __init__(self, id: _Optional[str] = ...) -> None: ...
+    kind: ConversationPlaybackControl.Kind
+    def __init__(self, id: _Optional[str] = ..., kind: _Optional[_Union[ConversationPlaybackControl.Kind, str]] = ...) -> None: ...
 
 class ConversationPlaybackComplete(_message.Message):
     __slots__ = ("id", "time")
@@ -372,7 +372,7 @@ class AssistantTalkRequest(_message.Message):
     def __init__(self, initialization: _Optional[_Union[ConversationInitialization, _Mapping]] = ..., configuration: _Optional[_Union[ConversationConfiguration, _Mapping]] = ..., message: _Optional[_Union[ConversationUserMessage, _Mapping]] = ..., metadata: _Optional[_Union[ConversationMetadata, _Mapping]] = ..., metric: _Optional[_Union[ConversationMetric, _Mapping]] = ..., disconnection: _Optional[_Union[ConversationDisconnection, _Mapping]] = ..., toolCallResult: _Optional[_Union[ConversationToolCallResult, _Mapping]] = ..., bridgeOperatorAudio: _Optional[_Union[ConversationBridgeOperatorAudio, _Mapping]] = ..., bridgeUserAudio: _Optional[_Union[ConversationBridgeUserAudio, _Mapping]] = ..., playbackComplete: _Optional[_Union[ConversationPlaybackComplete, _Mapping]] = ...) -> None: ...
 
 class AssistantTalkResponse(_message.Message):
-    __slots__ = ("code", "success", "initialization", "configuration", "interruption", "user", "assistant", "toolCall", "toolCallResult", "metadata", "metric", "disconnection", "event", "playbackPause", "playbackContinue", "playbackFlush", "error")
+    __slots__ = ("code", "success", "initialization", "configuration", "interruption", "user", "assistant", "toolCall", "toolCallResult", "metadata", "metric", "disconnection", "event", "playbackControl", "error")
     CODE_FIELD_NUMBER: _ClassVar[int]
     SUCCESS_FIELD_NUMBER: _ClassVar[int]
     INITIALIZATION_FIELD_NUMBER: _ClassVar[int]
@@ -386,9 +386,7 @@ class AssistantTalkResponse(_message.Message):
     METRIC_FIELD_NUMBER: _ClassVar[int]
     DISCONNECTION_FIELD_NUMBER: _ClassVar[int]
     EVENT_FIELD_NUMBER: _ClassVar[int]
-    PLAYBACKPAUSE_FIELD_NUMBER: _ClassVar[int]
-    PLAYBACKCONTINUE_FIELD_NUMBER: _ClassVar[int]
-    PLAYBACKFLUSH_FIELD_NUMBER: _ClassVar[int]
+    PLAYBACKCONTROL_FIELD_NUMBER: _ClassVar[int]
     ERROR_FIELD_NUMBER: _ClassVar[int]
     code: int
     success: bool
@@ -403,11 +401,9 @@ class AssistantTalkResponse(_message.Message):
     metric: ConversationMetric
     disconnection: ConversationDisconnection
     event: ConversationEvent
-    playbackPause: ConversationPlaybackPause
-    playbackContinue: ConversationPlaybackContinue
-    playbackFlush: ConversationPlaybackFlush
+    playbackControl: ConversationPlaybackControl
     error: ConversationError
-    def __init__(self, code: _Optional[int] = ..., success: bool = ..., initialization: _Optional[_Union[ConversationInitialization, _Mapping]] = ..., configuration: _Optional[_Union[ConversationConfiguration, _Mapping]] = ..., interruption: _Optional[_Union[ConversationInterruption, _Mapping]] = ..., user: _Optional[_Union[ConversationUserMessage, _Mapping]] = ..., assistant: _Optional[_Union[ConversationAssistantMessage, _Mapping]] = ..., toolCall: _Optional[_Union[ConversationToolCall, _Mapping]] = ..., toolCallResult: _Optional[_Union[ConversationToolCallResult, _Mapping]] = ..., metadata: _Optional[_Union[ConversationMetadata, _Mapping]] = ..., metric: _Optional[_Union[ConversationMetric, _Mapping]] = ..., disconnection: _Optional[_Union[ConversationDisconnection, _Mapping]] = ..., event: _Optional[_Union[ConversationEvent, _Mapping]] = ..., playbackPause: _Optional[_Union[ConversationPlaybackPause, _Mapping]] = ..., playbackContinue: _Optional[_Union[ConversationPlaybackContinue, _Mapping]] = ..., playbackFlush: _Optional[_Union[ConversationPlaybackFlush, _Mapping]] = ..., error: _Optional[_Union[ConversationError, _Mapping]] = ...) -> None: ...
+    def __init__(self, code: _Optional[int] = ..., success: bool = ..., initialization: _Optional[_Union[ConversationInitialization, _Mapping]] = ..., configuration: _Optional[_Union[ConversationConfiguration, _Mapping]] = ..., interruption: _Optional[_Union[ConversationInterruption, _Mapping]] = ..., user: _Optional[_Union[ConversationUserMessage, _Mapping]] = ..., assistant: _Optional[_Union[ConversationAssistantMessage, _Mapping]] = ..., toolCall: _Optional[_Union[ConversationToolCall, _Mapping]] = ..., toolCallResult: _Optional[_Union[ConversationToolCallResult, _Mapping]] = ..., metadata: _Optional[_Union[ConversationMetadata, _Mapping]] = ..., metric: _Optional[_Union[ConversationMetric, _Mapping]] = ..., disconnection: _Optional[_Union[ConversationDisconnection, _Mapping]] = ..., event: _Optional[_Union[ConversationEvent, _Mapping]] = ..., playbackControl: _Optional[_Union[ConversationPlaybackControl, _Mapping]] = ..., error: _Optional[_Union[ConversationError, _Mapping]] = ...) -> None: ...
 
 class CreateMessageMetricRequest(_message.Message):
     __slots__ = ("assistantId", "assistantConversationId", "messageId", "metrics")

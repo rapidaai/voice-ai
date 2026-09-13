@@ -342,9 +342,9 @@ func TestSend_OutputControlsRouteBeforeAssistantAudio(t *testing.T) {
 		Message:   &protos.ConversationAssistantMessage_Audio{Audio: audio},
 		Completed: true,
 	}))
-	require.NoError(t, as.Send(&protos.ConversationPlaybackPause{}))
+	require.NoError(t, as.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
 	assert.Nil(t, as.mediaSession.NextFrame())
-	require.NoError(t, as.Send(&protos.ConversationPlaybackContinue{}))
+	require.NoError(t, as.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}))
 	assert.NotEmpty(t, as.mediaSession.NextFrame())
 
 	require.NoError(t, as.Send(&protos.ConversationAssistantMessage{
@@ -352,7 +352,7 @@ func TestSend_OutputControlsRouteBeforeAssistantAudio(t *testing.T) {
 		Message:   &protos.ConversationAssistantMessage_Audio{Audio: audio},
 		Completed: true,
 	}))
-	require.NoError(t, as.Send(&protos.ConversationPlaybackFlush{}))
+	require.NoError(t, as.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}))
 	require.NoError(t, as.Send(&protos.ConversationAssistantMessage{
 		Id:        "response-2",
 		Message:   &protos.ConversationAssistantMessage_Audio{Audio: audio},

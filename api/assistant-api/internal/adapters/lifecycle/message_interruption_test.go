@@ -24,7 +24,7 @@ func TestMessageInterruption_PlaybackControlOrdersDelayedPauseBeforeFlushCommit(
 	var l *messageLifecycle
 	l = NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithInterruption(true),
 		WithSend(func(packet proto.Message) error {
-			if _, pause := packet.(*protos.ConversationPlaybackPause); pause {
+			if control, ok := packet.(*protos.ConversationPlaybackControl); ok && control.GetKind() == protos.ConversationPlaybackControl_PAUSE {
 				decision, _ := l.OnUserSpeech(internal_type.SpeechToTextPacket{
 					ContextID: "assistant", Script: "wait", Interim: true,
 				}, true)
@@ -45,7 +45,7 @@ func TestMessageInterruption_PlaybackControlOrdersDelayedPauseBeforeFlushCommit(
 	flushStarted, flushDone := make(chan struct{}), make(chan struct{})
 	committedTurns := make(chan internal_type.TurnChangePacket, 1)
 	go func() {
-		pauseResult <- l.SendPlaybackControl(&protos.ConversationPlaybackPause{Id: pause.ContextID})
+		pauseResult <- l.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: pause.ContextID, Kind: protos.ConversationPlaybackControl_PAUSE})
 	}()
 	decision := <-confirmed
 	require.NotNil(t, decision, "speech must be able to reenter lifecycle methods during Pause I/O")
@@ -53,7 +53,7 @@ func TestMessageInterruption_PlaybackControlOrdersDelayedPauseBeforeFlushCommit(
 	go func() {
 		defer close(flushDone)
 		close(flushStarted)
-		if err := l.SendPlaybackControl(&protos.ConversationPlaybackFlush{Id: "assistant"}); err != nil {
+		if err := l.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "assistant", Kind: protos.ConversationPlaybackControl_FLUSH}); err != nil {
 			flushResult <- err
 			return
 		}
@@ -79,8 +79,8 @@ func TestMessageInterruption_PlaybackControlOrdersDelayedPauseBeforeFlushCommit(
 	require.NoError(t, <-flushResult)
 	<-flushDone
 	require.Len(t, applied, 2)
-	assert.Equal(t, &protos.ConversationPlaybackPause{Id: "assistant"}, <-applied)
-	assert.Equal(t, &protos.ConversationPlaybackFlush{Id: "assistant"}, <-applied)
+	assert.Equal(t, &protos.ConversationPlaybackControl{Id: "assistant", Kind: protos.ConversationPlaybackControl_PAUSE}, <-applied)
+	assert.Equal(t, &protos.ConversationPlaybackControl{Id: "assistant", Kind: protos.ConversationPlaybackControl_FLUSH}, <-applied)
 	require.Len(t, committedTurns, 1)
 	committed := <-committedTurns
 	assert.Equal(t, committed.ContextID, l.ContextID())
@@ -108,7 +108,7 @@ func TestMessageInterruption_PlaybackControlRejectsPauseAfterFlush(t *testing.T)
 			decision, _ := l.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: "assistant", Script: "wait", Interim: true}, true)
 			require.NotNil(t, decision)
 			require.True(t, l.beginInterruptedTurn(*decision))
-			require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackFlush{Id: "assistant"}))
+			require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "assistant", Kind: protos.ConversationPlaybackControl_FLUSH}))
 			if phase != "reserved" {
 				committed, ok := l.commitInterruptedTurn(*decision)
 				require.True(t, ok)
@@ -117,9 +117,9 @@ func TestMessageInterruption_PlaybackControlRejectsPauseAfterFlush(t *testing.T)
 				}
 			}
 			current, state := l.ContextID(), l.State()
-			err := l.SendPlaybackControl(&protos.ConversationPlaybackPause{Id: pause.ContextID})
+			err := l.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: pause.ContextID, Kind: protos.ConversationPlaybackControl_PAUSE})
 			assert.ErrorIs(t, err, ErrStaleContext)
-			assert.Equal(t, []proto.Message{&protos.ConversationPlaybackFlush{Id: "assistant"}}, applied)
+			assert.Equal(t, []proto.Message{&protos.ConversationPlaybackControl{Id: "assistant", Kind: protos.ConversationPlaybackControl_FLUSH}}, applied)
 			assert.Equal(t, current, l.ContextID())
 			assert.Equal(t, state, l.State())
 		})
@@ -498,7 +498,7 @@ func TestMessageInterruption_ConfirmationAndExpiryOrdering(t *testing.T) {
 			assert.Empty(t, admitted.ContextID)
 			continueContext := message.OnInterruptionExpired(*pause)
 			assert.Empty(t, continueContext)
-			assert.ErrorIs(t, message.SendPlaybackControl(&protos.ConversationPlaybackContinue{Id: "assistant"}), ErrStaleContext)
+			assert.ErrorIs(t, message.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "assistant", Kind: protos.ConversationPlaybackControl_CONTINUE}), ErrStaleContext)
 			require.True(t, message.beginInterruptedTurn(*decision))
 			committed, ok := message.commitInterruptedTurn(*decision)
 			require.True(t, ok)
@@ -791,7 +791,7 @@ func TestMessageInterruption_OnTurnChangeOrdersUpdatesBeforeReentrantInput(t *te
 			final.ContextID = committed.ContextID
 			input.ContextID = committed.ContextID
 			assert.Equal(t, []any{
-				&protos.ConversationPlaybackFlush{Id: "assistant"},
+				&protos.ConversationPlaybackControl{Id: "assistant", Kind: protos.ConversationPlaybackControl_FLUSH},
 				internal_type.EndOfSpeechInterruptionPacket{ContextID: "assistant", Source: internal_type.InterruptionSourceVad},
 				internal_type.TextToSpeechInterruptPacket{ContextID: "assistant"},
 				internal_type.LLMInterruptPacket{ContextID: "assistant"},

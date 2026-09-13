@@ -88,12 +88,13 @@ type failingOutputControlStreamer struct {
 }
 
 func (streamer *failingOutputControlStreamer) Send(packet proto.Message) error {
-	switch packet.(type) {
-	case *protos.ConversationPlaybackPause, *protos.ConversationPlaybackContinue, *protos.ConversationPlaybackFlush:
-		return streamer.err
-	default:
-		return streamer.streamTestStreamer.Send(packet)
+	if control, ok := packet.(*protos.ConversationPlaybackControl); ok {
+		switch control.GetKind() {
+		case protos.ConversationPlaybackControl_PAUSE, protos.ConversationPlaybackControl_CONTINUE, protos.ConversationPlaybackControl_FLUSH:
+			return streamer.err
+		}
 	}
+	return streamer.streamTestStreamer.Send(packet)
 }
 
 func TestSendOutputControlUsesExistingSendAndReturnsErrors(t *testing.T) {
@@ -102,20 +103,20 @@ func TestSendOutputControlUsesExistingSendAndReturnsErrors(t *testing.T) {
 	requestor.messageLifecycle = adapter_lifecycle.NewMessageLifecycle(adapter_lifecycle.WithSend(func(message proto.Message) error {
 		return requestor.streamer.Send(message)
 	}))
-	for _, control := range []proto.Message{&protos.ConversationPlaybackPause{}, &protos.ConversationPlaybackContinue{}, &protos.ConversationPlaybackFlush{}} {
+	for _, control := range []proto.Message{&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}, &protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}, &protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}} {
 		_, err := proto.Marshal(control)
 		require.NoError(t, err)
 		require.NoError(t, requestor.sendOutputControl(control))
 	}
 	require.Len(t, streamer.sent, 3)
-	assert.True(t, proto.Equal(&protos.ConversationPlaybackPause{}, streamer.sent[0]))
-	assert.True(t, proto.Equal(&protos.ConversationPlaybackContinue{}, streamer.sent[1]))
-	assert.True(t, proto.Equal(&protos.ConversationPlaybackFlush{}, streamer.sent[2]))
+	assert.True(t, proto.Equal(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}, streamer.sent[0]))
+	assert.True(t, proto.Equal(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}, streamer.sent[1]))
+	assert.True(t, proto.Equal(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}, streamer.sent[2]))
 	failure := errors.New("local output failed")
 	requestor.streamer = &failingOutputControlStreamer{err: failure}
-	assert.ErrorIs(t, requestor.sendOutputControl(&protos.ConversationPlaybackPause{}), failure)
+	assert.ErrorIs(t, requestor.sendOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}), failure)
 	requestor.streamer = nil
-	assert.ErrorContains(t, requestor.sendOutputControl(&protos.ConversationPlaybackPause{}), "streamer is unavailable")
+	assert.ErrorContains(t, requestor.sendOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}), "streamer is unavailable")
 }
 
 func TestTalk_RecvErrorBeforeInitialization_ReturnsNil(t *testing.T) {

@@ -2518,8 +2518,8 @@ func TestSend_OutputPauseContinueRetainsFIFO(t *testing.T) {
 		Id:      "context-a",
 		Message: &protos.ConversationAssistantMessage_Audio{Audio: append(first, partial...)},
 	}))
-	require.NoError(t, s.Send(&protos.ConversationPlaybackPause{}))
-	require.NoError(t, s.Send(&protos.ConversationPlaybackPause{}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
 	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
 		Id:      "context-a",
 		Message: &protos.ConversationAssistantMessage_Audio{Audio: remainder},
@@ -2531,8 +2531,8 @@ func TestSend_OutputPauseContinueRetainsFIFO(t *testing.T) {
 	require.Len(t, s.outputAudioQueue, 2)
 	s.outputAudioQueueMu.Unlock()
 
-	require.NoError(t, s.Send(&protos.ConversationPlaybackContinue{}))
-	require.NoError(t, s.Send(&protos.ConversationPlaybackContinue{}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}))
 	firstFrame := s.NextFrame()
 	assert.Equal(t, first, firstFrame)
 	require.NoError(t, s.ConsumeFrame(firstFrame))
@@ -2553,13 +2553,13 @@ func TestSend_OutputControlsFenceStagedPacerFrame(t *testing.T) {
 	staged := s.NextFrame()
 	require.Equal(t, frame, staged)
 
-	require.NoError(t, s.Send(&protos.ConversationPlaybackPause{}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
 	require.NoError(t, s.ConsumeFrame(staged))
 	assert.Equal(t, frame, s.currentOutputFrame)
 
-	require.NoError(t, s.Send(&protos.ConversationPlaybackContinue{}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}))
 	assert.Equal(t, frame, s.NextFrame())
-	require.NoError(t, s.Send(&protos.ConversationPlaybackFlush{}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}))
 	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
 		Id:      "context-b",
 		Message: &protos.ConversationAssistantMessage_Audio{Audio: frame},
@@ -2595,9 +2595,9 @@ func TestSend_FlushClearsAndFencesOldOutput(t *testing.T) {
 		Id:      "context-old",
 		Message: &protos.ConversationAssistantMessage_Audio{Audio: oldAudio},
 	}))
-	require.NoError(t, s.Send(&protos.ConversationPlaybackPause{}))
-	require.NoError(t, s.Send(&protos.ConversationPlaybackFlush{}))
-	require.NoError(t, s.Send(&protos.ConversationPlaybackFlush{}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}))
 
 	s.outputStateMu.Lock()
 	assert.False(t, s.outputPaused)
@@ -2655,7 +2655,7 @@ func TestSend_FlushBeforeFirstAudioBlocksID(t *testing.T) {
 	s := newTestStreamer(t)
 	frameSize := webrtc_internal.WebRTCOutputPCM16kFrameBytes
 
-	require.NoError(t, s.Send(&protos.ConversationPlaybackFlush{Id: "context-preaudio"}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Id: "context-preaudio", Kind: protos.ConversationPlaybackControl_FLUSH}))
 	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
 		Id:      "context-preaudio",
 		Message: &protos.ConversationAssistantMessage_Audio{Audio: bytes.Repeat([]byte{0x51}, frameSize)},
@@ -2684,9 +2684,9 @@ func TestSend_RepeatedFlushBlocksNewID(t *testing.T) {
 		Id:      "context-A",
 		Message: &protos.ConversationAssistantMessage_Audio{Audio: bytes.Repeat([]byte{0x61}, frameSize)},
 	}))
-	require.NoError(t, s.Send(&protos.ConversationPlaybackFlush{Id: "context-A"}))
-	require.NoError(t, s.Send(&protos.ConversationPlaybackPause{Id: "context-B"}))
-	require.NoError(t, s.Send(&protos.ConversationPlaybackFlush{Id: "context-B"}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Id: "context-A", Kind: protos.ConversationPlaybackControl_FLUSH}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Id: "context-B", Kind: protos.ConversationPlaybackControl_PAUSE}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Id: "context-B", Kind: protos.ConversationPlaybackControl_FLUSH}))
 	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
 		Id:      "context-B",
 		Message: &protos.ConversationAssistantMessage_Audio{Audio: bytes.Repeat([]byte{0x62}, frameSize)},
@@ -2730,7 +2730,7 @@ func TestSend_FlushSerializesOldAudioAdmission(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		<-start
-		errCh <- s.Send(&protos.ConversationPlaybackFlush{})
+		errCh <- s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH})
 	}()
 	close(start)
 	wg.Wait()
@@ -2857,7 +2857,7 @@ func TestRunOutputWriter_FlushRejectsStagedAudioAndPreservesNonAudio(t *testing.
 		Id:      "context-old",
 		Message: &protos.ConversationAssistantMessage_Audio{Audio: bytes.Repeat([]byte{0x22}, frameSize)},
 	})
-	require.NoError(t, s.Send(&protos.ConversationPlaybackFlush{}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}))
 	newAudio := bytes.Repeat([]byte{0x33}, frameSize)
 	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
 		Id:      "context-new",

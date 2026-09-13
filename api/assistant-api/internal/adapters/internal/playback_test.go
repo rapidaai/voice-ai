@@ -65,14 +65,16 @@ func TestTextToSpeechEndRetainsPlaybackInterruption(t *testing.T) {
 				var controls []proto.Message
 				streamer.mu.Lock()
 				for _, message := range streamer.sent {
-					switch message.(type) {
-					case *protos.ConversationPlaybackPause, *protos.ConversationPlaybackContinue, *protos.ConversationPlaybackFlush:
-						controls = append(controls, message)
+					if control, ok := message.(*protos.ConversationPlaybackControl); ok {
+						switch control.GetKind() {
+						case protos.ConversationPlaybackControl_PAUSE, protos.ConversationPlaybackControl_CONTINUE, protos.ConversationPlaybackControl_FLUSH:
+							controls = append(controls, message)
+						}
 					}
 				}
 				streamer.mu.Unlock()
 				if scenario.confirmSpeech {
-					require.Equal(t, []proto.Message{&protos.ConversationPlaybackPause{Id: contextID}, &protos.ConversationPlaybackFlush{Id: contextID}}, controls)
+					require.Equal(t, []proto.Message{&protos.ConversationPlaybackControl{Id: contextID, Kind: protos.ConversationPlaybackControl_PAUSE}, &protos.ConversationPlaybackControl{Id: contextID, Kind: protos.ConversationPlaybackControl_FLUSH}}, controls)
 					require.NotEqual(t, contextID, requestor.GetID())
 					executor := &toolDispatchTestExecutor{packets: make(chan internal_type.Packet, 1)}
 					requestor.assistantExecutor = executor
@@ -93,7 +95,7 @@ func TestTextToSpeechEndRetainsPlaybackInterruption(t *testing.T) {
 					require.Len(t, executor.packets, 1)
 					require.Equal(t, internal_type.UserInputPacket{ContextID: requestor.GetID(), Text: "wait please"}, <-executor.packets)
 				} else {
-					require.Equal(t, []proto.Message{&protos.ConversationPlaybackPause{Id: contextID}, &protos.ConversationPlaybackContinue{Id: contextID}}, controls)
+					require.Equal(t, []proto.Message{&protos.ConversationPlaybackControl{Id: contextID, Kind: protos.ConversationPlaybackControl_PAUSE}, &protos.ConversationPlaybackControl{Id: contextID, Kind: protos.ConversationPlaybackControl_CONTINUE}}, controls)
 					require.Equal(t, contextID, requestor.GetID())
 					require.Equal(t, adapter_lifecycle.MessageStateAssistantSpeaking, requestor.messageLifecycle.State())
 					require.False(t, requestor.messageLifecycle.CanStartIdleTimeout(contextID))
@@ -126,7 +128,7 @@ func TestTextToSpeechEndLateReceiptDoesNotDismissLaterPlayback(t *testing.T) {
 		streamer := requestor.streamer.(*streamTestStreamer)
 		streamer.mu.Lock()
 		defer streamer.mu.Unlock()
-		require.IsType(t, &protos.ConversationPlaybackPause{}, streamer.sent[len(streamer.sent)-1])
+		require.Equal(t, protos.ConversationPlaybackControl_PAUSE, streamer.sent[len(streamer.sent)-1].(*protos.ConversationPlaybackControl).GetKind())
 	})
 }
 

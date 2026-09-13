@@ -301,16 +301,16 @@ func TestSend_OutputControlsRouteBeforeAssistantAudio(t *testing.T) {
 		Id:      "response-1",
 		Message: &protos.ConversationAssistantMessage_Audio{Audio: audio},
 	}))
-	require.NoError(t, aws.Send(&protos.ConversationPlaybackPause{}))
+	require.NoError(t, aws.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
 	assert.Nil(t, aws.mediaSession.NextFrame())
-	require.NoError(t, aws.Send(&protos.ConversationPlaybackContinue{}))
+	require.NoError(t, aws.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}))
 	assert.Equal(t, audio, aws.mediaSession.NextFrame())
 
 	require.NoError(t, aws.Send(&protos.ConversationAssistantMessage{
 		Id:      "response-2",
 		Message: &protos.ConversationAssistantMessage_Audio{Audio: audio},
 	}))
-	require.NoError(t, aws.Send(&protos.ConversationPlaybackFlush{}))
+	require.NoError(t, aws.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}))
 	require.NoError(t, aws.Send(&protos.ConversationAssistantMessage{
 		Id:      "response-2",
 		Message: &protos.ConversationAssistantMessage_Audio{Audio: audio},

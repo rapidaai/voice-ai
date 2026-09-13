@@ -244,14 +244,19 @@ func (s *Streamer) Context() context.Context {
 }
 
 func (s *Streamer) Send(response proto.Message) error {
-	switch response.(type) {
-	case *protos.ConversationPlaybackPause, *protos.ConversationPlaybackContinue, *protos.ConversationPlaybackFlush:
+	switch control := response.(type) {
+	case *protos.ConversationPlaybackControl:
+		switch control.GetKind() {
+		case protos.ConversationPlaybackControl_PAUSE, protos.ConversationPlaybackControl_CONTINUE, protos.ConversationPlaybackControl_FLUSH:
+		default:
+			return fmt.Errorf("invalid playback control kind: %d", control.GetKind())
+		}
 		s.outputMu.Lock()
 		defer s.outputMu.Unlock()
 		if s.closed.Load() {
 			return sip_runtime.ErrSessionClosed
 		}
-		if _, isFlushOutput := response.(*protos.ConversationPlaybackFlush); isFlushOutput {
+		if control.GetKind() == protos.ConversationPlaybackControl_FLUSH {
 			s.pendingAssistantAudioFrames = nil
 		}
 		if s.mediaPort == nil {

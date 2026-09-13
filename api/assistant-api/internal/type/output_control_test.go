@@ -9,12 +9,12 @@ import (
 
 func TestOutputControlsUseProtobufMessages(t *testing.T) {
 	controls := []proto.Message{
-		&protos.ConversationPlaybackPause{Id: "response-1"},
-		&protos.ConversationPlaybackContinue{Id: "response-1"},
-		&protos.ConversationPlaybackFlush{Id: "response-1"},
-		&protos.ConversationPlaybackPause{},
-		&protos.ConversationPlaybackContinue{},
-		&protos.ConversationPlaybackFlush{},
+		&protos.ConversationPlaybackControl{Id: "response-1", Kind: protos.ConversationPlaybackControl_PAUSE},
+		&protos.ConversationPlaybackControl{Id: "response-1", Kind: protos.ConversationPlaybackControl_CONTINUE},
+		&protos.ConversationPlaybackControl{Id: "response-1", Kind: protos.ConversationPlaybackControl_FLUSH},
+		&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE},
+		&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE},
+		&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH},
 		&protos.ConversationPlaybackComplete{Id: "response-1"},
 	}
 	for _, control := range controls {

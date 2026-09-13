@@ -350,7 +350,7 @@ func TestMessageLifecycle_CloseStopsPendingWork(t *testing.T) {
 							ContextID: "message", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
 						}, internal_options.BargeInTriggerVAD)
 						require.NotNil(t, decision.Pause)
-						require.NoError(t, message.SendPlaybackControl(&protos.ConversationPlaybackPause{Id: "message"}))
+						require.NoError(t, message.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_PAUSE}))
 						assert.Nil(t, message.OnPlaybackPaused(*decision.Pause, nil))
 					}
 				}

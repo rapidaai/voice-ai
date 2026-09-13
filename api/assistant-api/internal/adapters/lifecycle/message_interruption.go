@@ -15,6 +15,15 @@ import (
 
 // Playback controls are ordered independently of the state lock so I/O cannot block admission.
 func (l *messageLifecycle) SendPlaybackControl(control proto.Message) error {
+	playbackControl, ok := control.(*protos.ConversationPlaybackControl)
+	if !ok {
+		return ErrInvalidPlaybackControl
+	}
+	switch playbackControl.GetKind() {
+	case protos.ConversationPlaybackControl_PAUSE, protos.ConversationPlaybackControl_CONTINUE, protos.ConversationPlaybackControl_FLUSH:
+	default:
+		return ErrInvalidPlaybackControl
+	}
 	if l.sendOutput == nil {
 		return ErrSenderNotConfigured
 	}
@@ -22,23 +31,22 @@ func (l *messageLifecycle) SendPlaybackControl(control proto.Message) error {
 	defer l.playbackControlMu.Unlock()
 	l.mu.Lock()
 	if l.interruptionEnabled {
-		switch message := control.(type) {
-		case *protos.ConversationPlaybackPause:
-			if message.Id != l.contextID || message.Id != l.interruptionContextID || l.interruptionTurnCommitted {
+		switch playbackControl.GetKind() {
+		case protos.ConversationPlaybackControl_PAUSE:
+			if playbackControl.Id != l.contextID || playbackControl.Id != l.interruptionContextID || l.interruptionTurnCommitted {
 				l.mu.Unlock()
 				return ErrStaleContext
 			}
-		case *protos.ConversationPlaybackContinue:
-			if message.Id != l.contextID || l.interruptionContextID != "" {
+		case protos.ConversationPlaybackControl_CONTINUE:
+			if playbackControl.Id != l.contextID || l.interruptionContextID != "" {
 				l.mu.Unlock()
 				return ErrStaleContext
 			}
 		}
 	}
-	contextID := ""
-	switch message := control.(type) {
-	case *protos.ConversationPlaybackPause:
-		contextID = message.Id
+	contextID := playbackControl.Id
+	switch playbackControl.GetKind() {
+	case protos.ConversationPlaybackControl_PAUSE:
 		if contextID == l.contextID {
 			l.output.paused = true
 			if l.output.receiptTimer != nil {
@@ -47,10 +55,7 @@ func (l *messageLifecycle) SendPlaybackControl(control proto.Message) error {
 				l.output.receiptTimer = nil
 			}
 		}
-	case *protos.ConversationPlaybackContinue:
-		contextID = message.Id
-	case *protos.ConversationPlaybackFlush:
-		contextID = message.Id
+	case protos.ConversationPlaybackControl_FLUSH:
 		if contextID == l.contextID {
 			l.output.failed = true
 			l.output.receiptReceived = false
@@ -65,7 +70,7 @@ func (l *messageLifecycle) SendPlaybackControl(control proto.Message) error {
 		l.OnMessageFailed(contextID)
 		return err
 	}
-	if _, ok := control.(*protos.ConversationPlaybackContinue); ok {
+	if playbackControl.GetKind() == protos.ConversationPlaybackControl_CONTINUE {
 		l.mu.Lock()
 		if contextID == l.contextID {
 			l.output.paused = false
@@ -377,7 +382,7 @@ func (l *messageLifecycle) OnTurnChange(ctx context.Context, packet internal_typ
 		if !l.beginInterruptedTurn(packet) {
 			return nil
 		}
-		flushError = l.SendPlaybackControl(&protos.ConversationPlaybackFlush{Id: packet.PreviousContextID})
+		flushError = l.SendPlaybackControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH, Id: packet.PreviousContextID})
 		var committed bool
 		packet, committed = l.commitInterruptedTurn(packet)
 		if !committed {

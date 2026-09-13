@@ -215,11 +215,11 @@ func TestSend_OutputControlsManagePendingPreAnswerAudio(t *testing.T) {
 		Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{1, 2, 3}},
 	}))
 
-	require.NoError(t, s.Send(&protos.ConversationPlaybackPause{}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
 	require.Len(t, s.pendingAssistantAudioFrames, 1)
-	require.NoError(t, s.Send(&protos.ConversationPlaybackContinue{}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}))
 	require.Len(t, s.pendingAssistantAudioFrames, 1)
-	require.NoError(t, s.Send(&protos.ConversationPlaybackFlush{}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}))
 	assert.Empty(t, s.pendingAssistantAudioFrames)
 }
 
@@ -233,7 +233,7 @@ func TestSend_FlushBlocksLatePreAnswerResponseAudio(t *testing.T) {
 	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
 		Id: "response-1", Message: &protos.ConversationAssistantMessage_Audio{Audio: audio}, Completed: true,
 	}))
-	require.NoError(t, s.Send(&protos.ConversationPlaybackFlush{}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}))
 	assert.Empty(t, s.pendingAssistantAudioFrames)
 	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
 		Id: "response-1", Message: &protos.ConversationAssistantMessage_Audio{Audio: audio}, Completed: true,
@@ -250,7 +250,7 @@ func TestSend_OutputControlAfterCloseReturnsSessionClosed(t *testing.T) {
 	s := newTestSIPStreamer(t)
 	require.NoError(t, s.Close())
 
-	assert.ErrorIs(t, s.Send(&protos.ConversationPlaybackFlush{}), sip_runtime.ErrSessionClosed)
+	assert.ErrorIs(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}), sip_runtime.ErrSessionClosed)
 }
 
 func TestSend_InboundAssistantAudioMarksReadyBeforeOutputActivated(t *testing.T) {

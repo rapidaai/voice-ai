@@ -8,6 +8,7 @@ package channel_grpc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
@@ -196,74 +197,79 @@ func (uds *unidirectionalStreamer) Send(out proto.Message) error {
 	defer uds.outputSendMu.Unlock()
 
 	switch out := out.(type) {
-	case *protos.ConversationPlaybackPause:
-		uds.outputPaused = true
-		return uds.server.Send(&protos.AssistantTalkResponse{
-			Code:    200,
-			Success: true,
-			Data:    &protos.AssistantTalkResponse_PlaybackPause{PlaybackPause: out},
-		})
+	case *protos.ConversationPlaybackControl:
+		switch out.GetKind() {
+		case protos.ConversationPlaybackControl_PAUSE:
+			uds.outputPaused = true
+			return uds.server.Send(&protos.AssistantTalkResponse{
+				Code:    200,
+				Success: true,
+				Data:    &protos.AssistantTalkResponse_PlaybackControl{PlaybackControl: out},
+			})
 
-	case *protos.ConversationPlaybackContinue:
-		if err := uds.server.Send(&protos.AssistantTalkResponse{
-			Code:    200,
-			Success: true,
-			Data:    &protos.AssistantTalkResponse_PlaybackContinue{PlaybackContinue: out},
-		}); err != nil {
-			return err
-		}
-		uds.outputPaused = false
-		if uds.outputDraining {
-			return nil
-		}
-		uds.outputDraining = true
-		defer func() { uds.outputDraining = false }()
-		for !uds.outputPaused && len(uds.pendingOutput) > 0 {
-			assistantMessage := uds.pendingOutput[0]
-			uds.pendingOutput[0] = nil
-			uds.pendingOutput = uds.pendingOutput[1:]
-			if _, flushed := uds.flushedOutputIDs[assistantMessage.GetId()]; flushed && assistantMessage.GetId() != "" {
-				continue
-			}
-			if uds.blockedOutputID != "" && assistantMessage.GetId() == uds.blockedOutputID {
-				continue
-			}
+		case protos.ConversationPlaybackControl_CONTINUE:
 			if err := uds.server.Send(&protos.AssistantTalkResponse{
 				Code:    200,
 				Success: true,
-				Data:    &protos.AssistantTalkResponse_Assistant{Assistant: assistantMessage},
+				Data:    &protos.AssistantTalkResponse_PlaybackControl{PlaybackControl: out},
 			}); err != nil {
 				return err
 			}
-			// Let pause, flush, and new output run between replayed frames.
-			uds.outputSendMu.Unlock()
-			uds.outputSendMu.Lock()
-		}
-		return nil
-
-	case *protos.ConversationPlaybackFlush:
-		uds.outputPaused = false
-		if uds.flushedOutputIDs == nil {
-			uds.flushedOutputIDs = make(map[string]struct{})
-		}
-		if out.GetId() != "" {
-			uds.flushedOutputIDs[out.GetId()] = struct{}{}
-		}
-		if uds.outputID != "" {
-			uds.flushedOutputIDs[uds.outputID] = struct{}{}
-		}
-		for _, pending := range uds.pendingOutput {
-			if pending.GetId() != "" {
-				uds.flushedOutputIDs[pending.GetId()] = struct{}{}
+			uds.outputPaused = false
+			if uds.outputDraining {
+				return nil
 			}
+			uds.outputDraining = true
+			defer func() { uds.outputDraining = false }()
+			for !uds.outputPaused && len(uds.pendingOutput) > 0 {
+				assistantMessage := uds.pendingOutput[0]
+				uds.pendingOutput[0] = nil
+				uds.pendingOutput = uds.pendingOutput[1:]
+				if _, flushed := uds.flushedOutputIDs[assistantMessage.GetId()]; flushed && assistantMessage.GetId() != "" {
+					continue
+				}
+				if uds.blockedOutputID != "" && assistantMessage.GetId() == uds.blockedOutputID {
+					continue
+				}
+				if err := uds.server.Send(&protos.AssistantTalkResponse{
+					Code:    200,
+					Success: true,
+					Data:    &protos.AssistantTalkResponse_Assistant{Assistant: assistantMessage},
+				}); err != nil {
+					return err
+				}
+				// Let pause, flush, and new output run between replayed frames.
+				uds.outputSendMu.Unlock()
+				uds.outputSendMu.Lock()
+			}
+			return nil
+
+		case protos.ConversationPlaybackControl_FLUSH:
+			uds.outputPaused = false
+			if uds.flushedOutputIDs == nil {
+				uds.flushedOutputIDs = make(map[string]struct{})
+			}
+			if out.GetId() != "" {
+				uds.flushedOutputIDs[out.GetId()] = struct{}{}
+			}
+			if uds.outputID != "" {
+				uds.flushedOutputIDs[uds.outputID] = struct{}{}
+			}
+			for _, pending := range uds.pendingOutput {
+				if pending.GetId() != "" {
+					uds.flushedOutputIDs[pending.GetId()] = struct{}{}
+				}
+			}
+			uds.blockedOutputID = uds.outputID
+			uds.pendingOutput = nil
+			return uds.server.Send(&protos.AssistantTalkResponse{
+				Code:    200,
+				Success: true,
+				Data:    &protos.AssistantTalkResponse_PlaybackControl{PlaybackControl: out},
+			})
+		default:
+			return fmt.Errorf("invalid playback control kind: %d", out.GetKind())
 		}
-		uds.blockedOutputID = uds.outputID
-		uds.pendingOutput = nil
-		return uds.server.Send(&protos.AssistantTalkResponse{
-			Code:    200,
-			Success: true,
-			Data:    &protos.AssistantTalkResponse_PlaybackFlush{PlaybackFlush: out},
-		})
 
 	case *protos.ConversationInitialization:
 		return uds.server.Send(&protos.AssistantTalkResponse{

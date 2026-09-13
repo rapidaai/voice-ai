@@ -264,9 +264,9 @@ func TestMediaSession_OutputControlsWithoutMediaEngine(t *testing.T) {
 	mediaSession := NewMediaSession(MediaSessionConfig{Context: context.Background()})
 
 	for _, outputControl := range []proto.Message{
-		&protos.ConversationPlaybackPause{},
-		&protos.ConversationPlaybackContinue{},
-		&protos.ConversationPlaybackFlush{},
+		&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE},
+		&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE},
+		&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH},
 	} {
 		outputControlHandled, outputControlError := mediaSession.HandleOutputControl(outputControl)
 		if outputControlError != nil || !outputControlHandled {
@@ -290,7 +290,7 @@ func TestMediaSession_OutputControlPauseContinueRetainsFetchedFrame(t *testing.T
 	if !bytes.Equal(providerAudio, []byte{1, 2}) {
 		t.Fatalf("provider audio=%v want=[1 2]", providerAudio)
 	}
-	outputControlHandled, outputControlError := mediaSession.HandleOutputControl(&protos.ConversationPlaybackPause{})
+	outputControlHandled, outputControlError := mediaSession.HandleOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE})
 	if outputControlError != nil || !outputControlHandled {
 		t.Fatalf("pause handled=%t err=%v", outputControlHandled, outputControlError)
 	}
@@ -309,7 +309,7 @@ func TestMediaSession_OutputControlPauseContinueRetainsFetchedFrame(t *testing.T
 		t.Fatalf("provider clears=%d want=0", providerClearCount.Load())
 	}
 
-	outputControlHandled, outputControlError = mediaSession.HandleOutputControl(&protos.ConversationPlaybackContinue{})
+	outputControlHandled, outputControlError = mediaSession.HandleOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE})
 	if outputControlError != nil || !outputControlHandled {
 		t.Fatalf("continue handled=%t err=%v", outputControlHandled, outputControlError)
 	}
@@ -345,10 +345,10 @@ func TestMediaSession_OutputControlFlushRejectsOldResponse(t *testing.T) {
 	if frame := mediaSession.NextFrame(); frame == nil {
 		t.Fatal("expected fetched output frame")
 	}
-	if outputControlHandled, outputControlError := mediaSession.HandleOutputControl(&protos.ConversationPlaybackPause{}); outputControlError != nil || !outputControlHandled {
+	if outputControlHandled, outputControlError := mediaSession.HandleOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}); outputControlError != nil || !outputControlHandled {
 		t.Fatalf("pause handled=%t err=%v", outputControlHandled, outputControlError)
 	}
-	outputControlHandled, outputControlError := mediaSession.HandleOutputControl(&protos.ConversationPlaybackFlush{})
+	outputControlHandled, outputControlError := mediaSession.HandleOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH})
 	if outputControlError != nil || !outputControlHandled {
 		t.Fatalf("flush handled=%t err=%v", outputControlHandled, outputControlError)
 	}
@@ -374,7 +374,7 @@ func TestMediaSession_OutputControlFlushBeforeFirstAudioBlocksID(t *testing.T) {
 		SendProviderClear: func() error { providerClearCount.Add(1); return nil },
 	})
 
-	handled, err := mediaSession.HandleOutputControl(&protos.ConversationPlaybackFlush{Id: "response-preaudio"})
+	handled, err := mediaSession.HandleOutputControl(&protos.ConversationPlaybackControl{Id: "response-preaudio", Kind: protos.ConversationPlaybackControl_FLUSH})
 	if err != nil || !handled {
 		t.Fatalf("flush handled=%t err=%v", handled, err)
 	}
@@ -422,16 +422,16 @@ func TestMediaSession_OutputControlRepeatedFlushReleasesPause(t *testing.T) {
 			if err != nil || !accepted {
 				t.Fatalf("response A accepted=%t err=%v", accepted, err)
 			}
-			handled, err := mediaSession.HandleOutputControl(&protos.ConversationPlaybackFlush{Id: "response-A"})
+			handled, err := mediaSession.HandleOutputControl(&protos.ConversationPlaybackControl{Id: "response-A", Kind: protos.ConversationPlaybackControl_FLUSH})
 			if !handled || !errors.Is(err, testCase.providerClearError) {
 				t.Fatalf("flush A handled=%t err=%v want=%v", handled, err, testCase.providerClearError)
 			}
 
-			handled, err = mediaSession.HandleOutputControl(&protos.ConversationPlaybackPause{Id: "response-B"})
+			handled, err = mediaSession.HandleOutputControl(&protos.ConversationPlaybackControl{Id: "response-B", Kind: protos.ConversationPlaybackControl_PAUSE})
 			if err != nil || !handled {
 				t.Fatalf("pause B handled=%t err=%v", handled, err)
 			}
-			handled, err = mediaSession.HandleOutputControl(&protos.ConversationPlaybackFlush{Id: "response-B"})
+			handled, err = mediaSession.HandleOutputControl(&protos.ConversationPlaybackControl{Id: "response-B", Kind: protos.ConversationPlaybackControl_FLUSH})
 			if err != nil || !handled {
 				t.Fatalf("flush B handled=%t err=%v", handled, err)
 			}
@@ -473,7 +473,7 @@ func TestMediaSession_OutputControlReturnsProviderClearError(t *testing.T) {
 		SendProviderClear: func() error { return errors.New("clear failed") },
 	})
 
-	outputControlHandled, outputControlError := mediaSession.HandleOutputControl(&protos.ConversationPlaybackFlush{})
+	outputControlHandled, outputControlError := mediaSession.HandleOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH})
 	if !outputControlHandled || outputControlError == nil {
 		t.Fatalf("flush handled=%t err=%v", outputControlHandled, outputControlError)
 	}
@@ -674,7 +674,7 @@ func TestMediaSession_HandleInterrupt_ClearsAndSendsProviderClear(t *testing.T) 
 		},
 	})
 
-	outputControlHandled, outputControlError := mediaSession.HandleOutputControl(&protos.ConversationPlaybackFlush{})
+	outputControlHandled, outputControlError := mediaSession.HandleOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH})
 	if outputControlError != nil || !outputControlHandled {
 		t.Fatalf("flush handled=%t err=%v", outputControlHandled, outputControlError)
 	}
@@ -720,7 +720,7 @@ func TestMediaSession_FlushDropsFetchedOutputFrame(t *testing.T) {
 		t.Fatalf("provider audio=%v want=[1 2]", providerAudio)
 	}
 
-	outputControlHandled, outputControlError := mediaSession.HandleOutputControl(&protos.ConversationPlaybackFlush{})
+	outputControlHandled, outputControlError := mediaSession.HandleOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH})
 	if outputControlError != nil || !outputControlHandled {
 		t.Fatalf("flush handled=%t err=%v", outputControlHandled, outputControlError)
 	}

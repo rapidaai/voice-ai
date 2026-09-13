@@ -64,8 +64,8 @@ func TestDispatchInterruptionUnclearInputExtendsAndIgnoresEmptyFinal(t *testing.
 		assert.Equal(t, requestor.GetID(), injected.ContextID)
 		streamer.mu.Lock()
 		require.GreaterOrEqual(t, len(streamer.sent), 2)
-		assert.IsType(t, &protos.ConversationPlaybackPause{}, streamer.sent[0])
-		assert.IsType(t, &protos.ConversationPlaybackFlush{}, streamer.sent[1])
+		assert.Equal(t, protos.ConversationPlaybackControl_PAUSE, streamer.sent[0].(*protos.ConversationPlaybackControl).GetKind())
+		assert.Equal(t, protos.ConversationPlaybackControl_FLUSH, streamer.sent[1].(*protos.ConversationPlaybackControl).GetKind())
 		streamer.mu.Unlock()
 	})
 }
@@ -174,7 +174,7 @@ func TestDispatchInterruptionPreservesWordTrigger(t *testing.T) {
 		assert.NotEqual(t, previous, requestor.GetID())
 		streamer.mu.Lock()
 		require.NotEmpty(t, streamer.sent)
-		assert.IsType(t, &protos.ConversationPlaybackFlush{}, streamer.sent[0])
+		assert.Equal(t, protos.ConversationPlaybackControl_FLUSH, streamer.sent[0].(*protos.ConversationPlaybackControl).GetKind())
 		streamer.mu.Unlock()
 	})
 }

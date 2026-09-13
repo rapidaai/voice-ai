@@ -51,6 +51,49 @@ func (p *playbackTrack) WriteRTP(_ *rtp.Header, payload []byte) (int, error) {
 	return len(payload), nil
 }
 
+func TestPlaybackInvalidControlDoesNotSendOrChangeState(t *testing.T) {
+	for _, kind := range []protos.ConversationPlaybackControl_Kind{
+		protos.ConversationPlaybackControl_KIND_UNSPECIFIED, protos.ConversationPlaybackControl_Kind(99),
+	} {
+		t.Run(kind.String(), func(t *testing.T) {
+			s := newTestStreamer(t)
+			t.Cleanup(s.Cancel)
+			s.sessionState.StartMediaSession()
+			s.sessionState.SetPeerConnected(true)
+			invalid := &protos.ConversationPlaybackControl{Id: "response", Kind: kind}
+			require.Error(t, s.Send(invalid))
+			assert.False(t, s.outputPaused)
+			assert.False(t, s.outputFlushed)
+			assert.False(t, s.outputClearPending)
+			assert.Zero(t, s.CriticalCh.Len())
+			assert.Zero(t, s.LowCh.Len())
+
+			frame := bytes.Repeat([]byte{0x31}, webrtc_internal.WebRTCOutputPCM16kFrameBytes)
+			require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
+				Id: "response", Message: &protos.ConversationAssistantMessage_Audio{Audio: frame},
+			}))
+			staged := s.NextFrame()
+			require.Equal(t, frame, staged)
+			require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Id: "response", Kind: protos.ConversationPlaybackControl_PAUSE}))
+			criticalBefore, lowBefore := s.CriticalCh.Len(), s.LowCh.Len()
+			require.Error(t, s.Send(invalid))
+			assert.True(t, s.outputPaused)
+			assert.False(t, s.outputFlushed)
+			assert.False(t, s.outputClearPending)
+			assert.Equal(t, criticalBefore, s.CriticalCh.Len())
+			assert.Equal(t, lowBefore, s.LowCh.Len())
+			assert.Equal(t, frame, s.currentOutputFrame)
+			assert.Empty(t, s.NextFrame())
+
+			require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Id: "response", Kind: protos.ConversationPlaybackControl_CONTINUE}))
+			assert.Equal(t, frame, s.NextFrame())
+			require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Id: "response", Kind: protos.ConversationPlaybackControl_FLUSH}))
+			assert.Empty(t, s.currentOutputFrame)
+			assert.True(t, s.outputClearPending)
+		})
+	}
+}
+
 func TestPlaybackBufferedOutput(t *testing.T) {
 	type expectedCompletion struct {
 		id string
@@ -171,16 +214,16 @@ func TestPlaybackBufferedOutput(t *testing.T) {
 			case "pause_continue":
 				frame := s.NextFrame()
 				require.NotEmpty(t, frame)
-				require.NoError(t, s.Send(&protos.ConversationPlaybackPause{}))
+				require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
 				before := len(track.packets)
 				require.NoError(t, s.ConsumeFrame(frame))
 				assert.Len(t, track.packets, before)
 				assert.Zero(t, s.CriticalCh.Len())
-				require.NoError(t, s.Send(&protos.ConversationPlaybackContinue{}))
+				require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}))
 				assert.Equal(t, frame, s.NextFrame())
 			case "flush", "flush_then_new":
 				require.NotEmpty(t, s.NextFrame())
-				require.NoError(t, s.Send(&protos.ConversationPlaybackFlush{}))
+				require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}))
 				assert.Empty(t, s.assistantPCM48k)
 				if scenario == "flush_then_new" {
 					s.grpcStream = &failingGRPCStream{}
@@ -361,7 +404,7 @@ func TestPlaybackCompletionWaitsForInflightWriteAndReleasesLocks(t *testing.T) {
 		defer s.outputStateMu.Unlock()
 		return s.currentOutputFrame == nil && s.outputPlayback.Sent && len(s.assistantPCM48k) == 0
 	}, time.Second, time.Millisecond)
-	require.NoError(t, s.Send(&protos.ConversationPlaybackPause{}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
 	select {
 	case <-done:
 		t.Fatal("completion was dropped instead of waiting for input capacity")
@@ -380,7 +423,7 @@ func TestPlaybackClearSendFailureClosesWithoutDeadlock(t *testing.T) {
 	s := newTestStreamer(t)
 	t.Cleanup(s.Cancel)
 	s.grpcStream = &failingGRPCStream{sendErr: errors.New("clear signaling failed")}
-	require.NoError(t, s.Send(&protos.ConversationPlaybackFlush{}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}))
 	done := make(chan struct{})
 	go func() {
 		s.runOutputWriter()

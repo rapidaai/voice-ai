@@ -47,7 +47,7 @@ type MessageLifecycle interface {
 	SendPlaybackControl(control proto.Message) error
 	OnPlaybackCompleted(contextID string) error
 	OnMessageFailed(contextID string)
-	Close(contextID string) *protos.ConversationPlaybackContinue
+	Close(contextID string) *protos.ConversationPlaybackControl
 
 	InterruptionEnabled() bool
 	CancelInterruption() string
@@ -224,12 +224,12 @@ func (l *messageLifecycle) OnSpeechStarted(contextID string) error {
 }
 
 // Close cancels message work; the caller applies any returned playback control.
-func (l *messageLifecycle) Close(contextID string) *protos.ConversationPlaybackContinue {
+func (l *messageLifecycle) Close(contextID string) *protos.ConversationPlaybackControl {
 	l.OnMessageFailed(contextID)
 	defer l.StopUnclearInput()
 	if l.InterruptionEnabled() {
 		if interruptedContextID := l.CancelInterruption(); interruptedContextID != "" {
-			return &protos.ConversationPlaybackContinue{Id: interruptedContextID}
+			return &protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE, Id: interruptedContextID}
 		}
 	}
 	return nil

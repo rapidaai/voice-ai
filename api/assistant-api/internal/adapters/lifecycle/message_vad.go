@@ -18,7 +18,7 @@ type InterruptionDecision struct {
 	EndOfSpeech       *internal_type.InterruptionDetectedPacket
 	SpeechToTextStart *internal_type.SpeechToTextStartPacket
 	Pause             *internal_type.InterruptionDecisionExpiredPacket
-	Flush             *protos.ConversationPlaybackFlush
+	Flush             *protos.ConversationPlaybackControl
 	Notification      *protos.ConversationInterruption
 }
 
@@ -197,7 +197,7 @@ func (l *messageLifecycle) OnInterruptionDetected(
 			internal_type.TextToSpeechInterruptPacket{ContextID: oldContextID},
 			internal_type.LLMInterruptPacket{ContextID: oldContextID},
 		)
-		decision.Flush = &protos.ConversationPlaybackFlush{Id: oldContextID}
+		decision.Flush = &protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH, Id: oldContextID}
 		decision.Notification = &protos.ConversationInterruption{Type: interruptionType, Time: timestamppb.New(now)}
 	}
 	if p.Source == internal_type.InterruptionSourceVad && p.Event == internal_type.InterruptionEventStart {

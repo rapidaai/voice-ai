@@ -8,6 +8,7 @@ package internal_telephony_media
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
@@ -146,8 +147,12 @@ func (mediaSession *MediaSession) HandleProviderAudioFrame(frame ProviderAudioFr
 }
 
 func (mediaSession *MediaSession) HandleOutputControl(control proto.Message) (bool, error) {
-	switch control.(type) {
-	case *protos.ConversationPlaybackPause:
+	playbackControl, ok := control.(*protos.ConversationPlaybackControl)
+	if !ok {
+		return false, nil
+	}
+	switch playbackControl.GetKind() {
+	case protos.ConversationPlaybackControl_PAUSE:
 		if mediaSession == nil || !mediaSession.hasMediaEngine() {
 			return true, nil
 		}
@@ -170,7 +175,7 @@ func (mediaSession *MediaSession) HandleOutputControl(control proto.Message) (bo
 			})
 		}
 		return true, nil
-	case *protos.ConversationPlaybackContinue:
+	case protos.ConversationPlaybackControl_CONTINUE:
 		if mediaSession == nil || !mediaSession.hasMediaEngine() {
 			return true, nil
 		}
@@ -178,19 +183,18 @@ func (mediaSession *MediaSession) HandleOutputControl(control proto.Message) (bo
 		mediaSession.outputPaused = false
 		mediaSession.outputFrameMu.Unlock()
 		return true, nil
-	case *protos.ConversationPlaybackFlush:
-		flush := control.(*protos.ConversationPlaybackFlush)
+	case protos.ConversationPlaybackControl_FLUSH:
 		if mediaSession == nil || !mediaSession.hasMediaEngine() {
 			return true, nil
 		}
 		mediaSession.outputFrameMu.Lock()
 		var providerClearError error
 		mediaSession.outputPaused = false
-		if flush.GetId() != "" {
+		if playbackControl.GetId() != "" {
 			if mediaSession.flushedOutputIDs == nil {
 				mediaSession.flushedOutputIDs = make(map[string]struct{})
 			}
-			mediaSession.flushedOutputIDs[flush.GetId()] = struct{}{}
+			mediaSession.flushedOutputIDs[playbackControl.GetId()] = struct{}{}
 		}
 		if !mediaSession.outputFlushed {
 			mediaSession.mediaEngine.ClearOutputBuffer()
@@ -238,7 +242,7 @@ func (mediaSession *MediaSession) HandleOutputControl(control proto.Message) (bo
 		}
 		return true, providerClearError
 	default:
-		return false, nil
+		return true, fmt.Errorf("invalid playback control kind: %d", playbackControl.GetKind())
 	}
 }
 

@@ -58,9 +58,9 @@ func TestSend_ConsumesOutputControls(t *testing.T) {
 		wantLocalClears    int32
 		wantProviderClears int32
 	}{
-		{name: "pause", control: &protos.ConversationPlaybackPause{}},
-		{name: "continue", control: &protos.ConversationPlaybackContinue{}, resumeProbe: true},
-		{name: "flush", control: &protos.ConversationPlaybackFlush{}, wantLocalClears: 1, wantProviderClears: 1},
+		{name: "pause", control: &protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}},
+		{name: "continue", control: &protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}, resumeProbe: true},
+		{name: "flush", control: &protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}, wantLocalClears: 1, wantProviderClears: 1},
 	}
 
 	for _, testCase := range outputControlTestCases {
@@ -79,14 +79,14 @@ func TestSend_ConsumesOutputControls(t *testing.T) {
 				},
 			})
 			if testCase.resumeProbe {
-				_, outputControlError := streamer.mediaSession.HandleOutputControl(&protos.ConversationPlaybackPause{})
+				_, outputControlError := streamer.mediaSession.HandleOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE})
 				require.NoError(t, outputControlError)
 				providerClearCount.Store(0)
 			}
 
 			require.NoError(t, streamer.Send(testCase.control))
 			if testCase.resumeProbe {
-				require.NoError(t, streamer.Send(&protos.ConversationPlaybackPause{}))
+				require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
 			}
 			assert.Equal(t, testCase.wantLocalClears, mediaEngine.clearCount.Load())
 			assert.Equal(t, testCase.wantProviderClears, providerClearCount.Load())

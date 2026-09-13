@@ -114,7 +114,7 @@ func (h requestorDispatchHandler) HandleUserText(ctx context.Context, vl interna
 			internal_type.TextToSpeechInterruptPacket{ContextID: oldContextID},
 			internal_type.LLMInterruptPacket{ContextID: oldContextID},
 		)
-		if outputControlError := h.r.sendOutputControl(&protos.ConversationPlaybackFlush{Id: oldContextID}); outputControlError != nil && h.r.logger != nil {
+		if outputControlError := h.r.sendOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH, Id: oldContextID}); outputControlError != nil && h.r.logger != nil {
 			h.r.logger.Errorf("error while flushing interrupted output %v", outputControlError)
 		}
 		h.r.Notify(ctx, &protos.ConversationInterruption{
@@ -299,7 +299,7 @@ func (h requestorDispatchHandler) HandleSpeechToText(ctx context.Context, p inte
 				internal_type.TextToSpeechInterruptPacket{ContextID: oldContextID},
 				internal_type.LLMInterruptPacket{ContextID: oldContextID},
 			)
-			if outputControlError := h.r.sendOutputControl(&protos.ConversationPlaybackFlush{Id: oldContextID}); outputControlError != nil && h.r.logger != nil {
+			if outputControlError := h.r.sendOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH, Id: oldContextID}); outputControlError != nil && h.r.logger != nil {
 				h.r.logger.Errorf("error while flushing interrupted output %v", outputControlError)
 			}
 			h.r.Notify(ctx, &protos.ConversationInterruption{
@@ -336,7 +336,7 @@ func (h requestorDispatchHandler) HandleInterruptionDecisionExpired(ctx context.
 	if continueContextID == "" {
 		return
 	}
-	if outputControlError := h.r.sendOutputControl(&protos.ConversationPlaybackContinue{Id: continueContextID}); outputControlError != nil {
+	if outputControlError := h.r.sendOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE, Id: continueContextID}); outputControlError != nil {
 		h.r.OnPacket(ctx, internal_type.ObservabilityLogRecordPacket{
 			ContextID: p.ContextID,
 			Scope:     internal_type.ObservabilityRecordScopeConversation,
@@ -1009,7 +1009,7 @@ func (h requestorDispatchHandler) HandleUnclearInputExpired(ctx context.Context,
 		internal_type.LLMInterruptPacket{ContextID: oldContextID},
 	)
 	if !h.r.messageLifecycle.InterruptionEnabled() {
-		if outputControlError := h.r.sendOutputControl(&protos.ConversationPlaybackFlush{Id: oldContextID}); outputControlError != nil && h.r.logger != nil {
+		if outputControlError := h.r.sendOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH, Id: oldContextID}); outputControlError != nil && h.r.logger != nil {
 			h.r.logger.Errorf("error while flushing interrupted output %v", outputControlError)
 		}
 	}

@@ -1,6 +1,7 @@
 package internal_telephony_media
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -9,6 +10,75 @@ import (
 	"github.com/rapidaai/protos"
 	"google.golang.org/protobuf/proto"
 )
+
+func TestMediaSessionInvalidPlaybackControlPreservesPendingOutput(t *testing.T) {
+	for _, kind := range []protos.ConversationPlaybackControl_Kind{
+		protos.ConversationPlaybackControl_KIND_UNSPECIFIED, protos.ConversationPlaybackControl_Kind(99),
+	} {
+		t.Run(kind.String(), func(t *testing.T) {
+			engine := &fakeMediaEngine{outputFrames: make(chan AssistantOutputFrame, 1)}
+			engine.outputFrames <- AssistantOutputFrame{ProviderAudio: []byte{1, 2}}
+			var sent, providerClears int
+			var completions []*protos.ConversationPlaybackComplete
+			session := NewMediaSession(MediaSessionConfig{
+				MediaEngine:       engine,
+				OutputSink:        func(AssistantOutputFrame) error { sent++; return nil },
+				SendProviderClear: func() error { providerClears++; return nil },
+				StreamSink: func(message proto.Message) {
+					if completion, ok := message.(*protos.ConversationPlaybackComplete); ok {
+						completions = append(completions, completion)
+					}
+				},
+			})
+			defer session.Shutdown()
+			invalid := &protos.ConversationPlaybackControl{Id: "response", Kind: kind}
+			if handled, err := session.HandleOutputControl(invalid); !handled || err == nil {
+				t.Fatalf("invalid control: handled=%v, error=%v", handled, err)
+			}
+			if session.outputPaused || session.outputFlushed || sent != 0 || providerClears != 0 || engine.clearCount.Load() != 0 {
+				t.Fatal("invalid control changed output state or sent output")
+			}
+			if accepted, err := session.HandleAssistantAudio("response", []byte{1, 2}, true); !accepted || err != nil {
+				t.Fatalf("assistant audio: accepted=%v, error=%v", accepted, err)
+			}
+			frame := session.NextFrame()
+			if !bytes.Equal(frame, []byte{1, 2}) {
+				t.Fatalf("unexpected frame: %v", frame)
+			}
+			if handled, err := session.HandleOutputControl(&protos.ConversationPlaybackControl{Id: "response", Kind: protos.ConversationPlaybackControl_PAUSE}); !handled || err != nil {
+				t.Fatalf("pause: handled=%v, error=%v", handled, err)
+			}
+			if handled, err := session.HandleOutputControl(invalid); !handled || err == nil {
+				t.Fatalf("invalid paused control: handled=%v, error=%v", handled, err)
+			}
+			if !session.outputPaused || session.outputFlushed || sent != 0 || providerClears != 0 || engine.clearCount.Load() != 0 || len(completions) != 0 {
+				t.Fatal("invalid control changed paused output or emitted a completion")
+			}
+			if len(session.NextFrame()) != 0 {
+				t.Fatal("invalid control resumed paused output")
+			}
+			if handled, err := session.HandleOutputControl(&protos.ConversationPlaybackControl{Id: "response", Kind: protos.ConversationPlaybackControl_CONTINUE}); !handled || err != nil {
+				t.Fatalf("continue: handled=%v, error=%v", handled, err)
+			}
+			if resumed := session.NextFrame(); !bytes.Equal(resumed, frame) {
+				t.Fatalf("pending frame changed: %v", resumed)
+			}
+			if err := session.ConsumeFrame(frame); err != nil {
+				t.Fatal(err)
+			}
+			_ = session.NextFrame()
+			if sent != 1 || len(completions) != 1 || completions[0].GetId() != "response" || completions[0].GetTime() == nil {
+				t.Fatalf("valid continue failed to complete playback: sent=%d, completions=%v", sent, completions)
+			}
+			if handled, err := session.HandleOutputControl(&protos.ConversationPlaybackControl{Id: "response", Kind: protos.ConversationPlaybackControl_FLUSH}); !handled || err != nil {
+				t.Fatalf("flush: handled=%v, error=%v", handled, err)
+			}
+			if providerClears != 1 || engine.clearCount.Load() != 1 {
+				t.Fatal("valid flush must clear local and provider output exactly once")
+			}
+		})
+	}
+}
 
 func TestMediaSessionPlaybackRequiresTerminalAndSuccessfulSend(t *testing.T) {
 	for _, scenario := range []string{"success", "streaming_gap", "fetched", "paused", "continued", "flushed", "failed", "no_sink", "closed", "cancelled", "conversion_failed"} {
@@ -49,9 +119,9 @@ func TestMediaSessionPlaybackRequiresTerminalAndSuccessfulSend(t *testing.T) {
 			}
 			switch scenario {
 			case "paused", "continued":
-				_, _ = session.HandleOutputControl(&protos.ConversationPlaybackPause{})
+				_, _ = session.HandleOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE})
 			case "flushed":
-				_, _ = session.HandleOutputControl(&protos.ConversationPlaybackFlush{})
+				_, _ = session.HandleOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH})
 			case "closed":
 				session.Shutdown()
 			case "cancelled":
@@ -61,7 +131,7 @@ func TestMediaSessionPlaybackRequiresTerminalAndSuccessfulSend(t *testing.T) {
 				_ = session.ConsumeFrame(frame)
 			}
 			if scenario == "continued" {
-				_, _ = session.HandleOutputControl(&protos.ConversationPlaybackContinue{})
+				_, _ = session.HandleOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE})
 				_ = session.ConsumeFrame(session.NextFrame())
 			}
 			_ = session.NextFrame()
@@ -114,8 +184,8 @@ func TestMediaSessionPlaybackCompletionDoesNotHoldControlLock(t *testing.T) {
 	controlled := make(chan struct{})
 	go func() {
 		defer close(controlled)
-		_, _ = session.HandleOutputControl(&protos.ConversationPlaybackPause{})
-		_, _ = session.HandleOutputControl(&protos.ConversationPlaybackFlush{})
+		_, _ = session.HandleOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE})
+		_, _ = session.HandleOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH})
 	}()
 	select {
 	case <-controlled:

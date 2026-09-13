@@ -601,7 +601,7 @@ func TestMediaPort_InterruptPreservesInputAudio(t *testing.T) {
 	for range 4 {
 		emitInboundAudio(sip_runtime.InboundAudioFrame{Audio: make([]byte, MulawFrameSize), ReceivedAt: time.Now()})
 	}
-	outputControlHandled, outputControlError := mediaPort.HandleOutputControl(&protos.ConversationPlaybackFlush{})
+	outputControlHandled, outputControlError := mediaPort.HandleOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH})
 	require.NoError(t, outputControlError)
 	require.True(t, outputControlHandled)
 	for range 4 {
@@ -636,12 +636,12 @@ func TestMediaPort_OutputControlsPreservePauseAndDropFlushedResponse(t *testing.
 	assistantAudioAccepted, assistantAudioError := mediaPort.HandleAssistantAudio("response-1", audio, true)
 	require.NoError(t, assistantAudioError)
 	require.True(t, assistantAudioAccepted)
-	outputControlHandled, outputControlError := mediaPort.HandleOutputControl(&protos.ConversationPlaybackPause{})
+	outputControlHandled, outputControlError := mediaPort.HandleOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE})
 	require.NoError(t, outputControlError)
 	assert.True(t, outputControlHandled)
 	assert.Nil(t, mediaPort.mediaSession.NextFrame())
 
-	outputControlHandled, outputControlError = mediaPort.HandleOutputControl(&protos.ConversationPlaybackContinue{})
+	outputControlHandled, outputControlError = mediaPort.HandleOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE})
 	require.NoError(t, outputControlError)
 	assert.True(t, outputControlHandled)
 	assert.NotEmpty(t, mediaPort.mediaSession.NextFrame())
@@ -649,7 +649,7 @@ func TestMediaPort_OutputControlsPreservePauseAndDropFlushedResponse(t *testing.
 	assistantAudioAccepted, assistantAudioError = mediaPort.HandleAssistantAudio("response-2", audio, false)
 	require.NoError(t, assistantAudioError)
 	require.True(t, assistantAudioAccepted)
-	outputControlHandled, outputControlError = mediaPort.HandleOutputControl(&protos.ConversationPlaybackFlush{})
+	outputControlHandled, outputControlError = mediaPort.HandleOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH})
 	require.NoError(t, outputControlError)
 	assert.True(t, outputControlHandled)
 	assistantAudioAccepted, assistantAudioError = mediaPort.HandleAssistantAudio("response-2", audio, false)

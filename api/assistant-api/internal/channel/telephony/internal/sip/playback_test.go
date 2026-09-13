@@ -48,6 +48,72 @@ func TestMediaPortPlaybackTransferDiscardsFetchedAndQueuedResponses(t *testing.T
 	require.Empty(t, completions)
 }
 
+func TestMediaPortInvalidPlaybackControlPreservesPausedFrame(t *testing.T) {
+	for _, kind := range []protos.ConversationPlaybackControl_Kind{
+		protos.ConversationPlaybackControl_KIND_UNSPECIFIED, protos.ConversationPlaybackControl_Kind(99),
+	} {
+		t.Run(kind.String(), func(t *testing.T) {
+			var completions []*protos.ConversationPlaybackComplete
+			port, _, audioOut := newMediaPortForTest(t, func(message proto.Message) {
+				if completion, ok := message.(*protos.ConversationPlaybackComplete); ok {
+					completions = append(completions, completion)
+				}
+			})
+			defer func() { require.NoError(t, port.Close()) }()
+			accepted, err := port.HandleAssistantAudio("response", make([]byte, BridgeOutputFrameSize), true)
+			require.NoError(t, err)
+			require.True(t, accepted)
+			frame := port.mediaSession.NextFrame()
+			require.NotEmpty(t, frame)
+			handled, err := port.HandleOutputControl(&protos.ConversationPlaybackControl{Id: "response", Kind: protos.ConversationPlaybackControl_PAUSE})
+			require.NoError(t, err)
+			require.True(t, handled)
+			handled, err = port.HandleOutputControl(&protos.ConversationPlaybackControl{Id: "response", Kind: kind})
+			require.Error(t, err)
+			require.True(t, handled)
+			require.NoError(t, port.mediaSession.ConsumeFrame(frame))
+			require.Empty(t, port.mediaSession.NextFrame())
+			require.Empty(t, audioOut)
+			require.Empty(t, completions)
+
+			handled, err = port.HandleOutputControl(&protos.ConversationPlaybackControl{Id: "response", Kind: protos.ConversationPlaybackControl_CONTINUE})
+			require.NoError(t, err)
+			require.True(t, handled)
+			require.Equal(t, frame, port.mediaSession.NextFrame())
+			for range 4 {
+				if next := port.mediaSession.NextFrame(); len(next) > 0 {
+					require.NoError(t, port.mediaSession.ConsumeFrame(next))
+				}
+			}
+			require.NotEmpty(t, audioOut)
+			require.Len(t, completions, 1)
+			require.Equal(t, "response", completions[0].GetId())
+			require.NotNil(t, completions[0].GetTime())
+		})
+	}
+}
+
+func TestStreamerInvalidPlaybackControlPreservesPreanswerAudio(t *testing.T) {
+	for _, kind := range []protos.ConversationPlaybackControl_Kind{
+		protos.ConversationPlaybackControl_KIND_UNSPECIFIED, protos.ConversationPlaybackControl_Kind(99),
+	} {
+		t.Run(kind.String(), func(t *testing.T) {
+			s := newTestSIPStreamer(t)
+			defer func() { require.NoError(t, s.Close()) }()
+			require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
+				Id: "preanswer", Completed: true, Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{1, 2}},
+			}))
+			require.Len(t, s.pendingAssistantAudioFrames, 1)
+			require.Error(t, s.Send(&protos.ConversationPlaybackControl{Id: "preanswer", Kind: kind}))
+			require.Len(t, s.pendingAssistantAudioFrames, 1)
+			require.Equal(t, []byte{1, 2}, s.pendingAssistantAudioFrames[0].audio)
+			require.False(t, s.assistantOutputActive.Load())
+			require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Id: "preanswer", Kind: protos.ConversationPlaybackControl_FLUSH}))
+			require.Empty(t, s.pendingAssistantAudioFrames)
+		})
+	}
+}
+
 type replayMediaEngine struct {
 	*AudioProcessor
 	entered chan struct{}

@@ -41,7 +41,7 @@ func TestInterruptionDeadlineChoosesExactlyOnce(t *testing.T) {
 				synctest.Wait()
 				assert.Equal(t, originalContext, requestor.GetID())
 				streamer.mu.Lock()
-				assert.Equal(t, []proto.Message{&protos.ConversationPlaybackPause{Id: originalContext}}, streamer.sent)
+				assert.Equal(t, []proto.Message{&protos.ConversationPlaybackControl{Id: originalContext, Kind: protos.ConversationPlaybackControl_PAUSE}}, streamer.sent)
 				streamer.mu.Unlock()
 				time.Sleep(200 * time.Millisecond)
 				handler.HandleInterruptionDetected(context.Background(), start)
@@ -58,7 +58,7 @@ func TestInterruptionDeadlineChoosesExactlyOnce(t *testing.T) {
 				synctest.Wait()
 				assert.Equal(t, originalContext, requestor.GetID())
 				streamer.mu.Lock()
-				assert.Equal(t, []proto.Message{&protos.ConversationPlaybackPause{Id: originalContext}, &protos.ConversationPlaybackContinue{Id: originalContext}}, streamer.sent)
+				assert.Equal(t, []proto.Message{&protos.ConversationPlaybackControl{Id: originalContext, Kind: protos.ConversationPlaybackControl_PAUSE}, &protos.ConversationPlaybackControl{Id: originalContext, Kind: protos.ConversationPlaybackControl_CONTINUE}}, streamer.sent)
 				streamer.mu.Unlock()
 				contextAfterDecision := requestor.GetID()
 				time.Sleep(time.Second)
@@ -71,9 +71,11 @@ func TestInterruptionDeadlineChoosesExactlyOnce(t *testing.T) {
 				outputControlCount := 0
 				streamer.mu.Lock()
 				for _, sentPacket := range streamer.sent {
-					switch sentPacket.(type) {
-					case *protos.ConversationPlaybackPause, *protos.ConversationPlaybackContinue, *protos.ConversationPlaybackFlush:
-						outputControlCount++
+					if control, ok := sentPacket.(*protos.ConversationPlaybackControl); ok {
+						switch control.GetKind() {
+						case protos.ConversationPlaybackControl_PAUSE, protos.ConversationPlaybackControl_CONTINUE, protos.ConversationPlaybackControl_FLUSH:
+							outputControlCount++
+						}
 					}
 				}
 				streamer.mu.Unlock()
@@ -102,8 +104,8 @@ func TestInterruptionMeaningfulInterimCommitsAndReplaysInOrder(t *testing.T) {
 		assert.Equal(t, current, requestor.GetID())
 		streamer.mu.Lock()
 		require.GreaterOrEqual(t, len(streamer.sent), 2)
-		assert.Equal(t, &protos.ConversationPlaybackPause{Id: previous}, streamer.sent[0])
-		assert.Equal(t, &protos.ConversationPlaybackFlush{Id: previous}, streamer.sent[1])
+		assert.Equal(t, &protos.ConversationPlaybackControl{Id: previous, Kind: protos.ConversationPlaybackControl_PAUSE}, streamer.sent[0])
+		assert.Equal(t, &protos.ConversationPlaybackControl{Id: previous, Kind: protos.ConversationPlaybackControl_FLUSH}, streamer.sent[1])
 		streamer.mu.Unlock()
 		packets := eos.snapshotExecuted()
 		require.Len(t, packets, 4)
@@ -128,9 +130,11 @@ func TestInterruptionMeaningfulInterimCommitsAndReplaysInOrder(t *testing.T) {
 		outputControlCount := 0
 		streamer.mu.Lock()
 		for _, sentPacket := range streamer.sent {
-			switch sentPacket.(type) {
-			case *protos.ConversationPlaybackPause, *protos.ConversationPlaybackContinue, *protos.ConversationPlaybackFlush:
-				outputControlCount++
+			if control, ok := sentPacket.(*protos.ConversationPlaybackControl); ok {
+				switch control.GetKind() {
+				case protos.ConversationPlaybackControl_PAUSE, protos.ConversationPlaybackControl_CONTINUE, protos.ConversationPlaybackControl_FLUSH:
+					outputControlCount++
+				}
 			}
 		}
 		streamer.mu.Unlock()
@@ -168,8 +172,8 @@ func TestInterruptionLateConfirmationAfterContinuePreservesUnclearInput(t *testi
 				handler.HandleInterruptionDetected(context.Background(), start)
 				streamer.mu.Lock()
 				assert.Equal(t, []proto.Message{
-					&protos.ConversationPlaybackPause{Id: previousContext},
-					&protos.ConversationPlaybackContinue{Id: previousContext},
+					&protos.ConversationPlaybackControl{Id: previousContext, Kind: protos.ConversationPlaybackControl_PAUSE},
+					&protos.ConversationPlaybackControl{Id: previousContext, Kind: protos.ConversationPlaybackControl_CONTINUE},
 				}, streamer.sent)
 				streamer.mu.Unlock()
 				if scenario.endBeforeText {
@@ -186,7 +190,7 @@ func TestInterruptionLateConfirmationAfterContinuePreservesUnclearInput(t *testi
 				require.NotEqual(t, previousContext, currentContext)
 				streamer.mu.Lock()
 				require.GreaterOrEqual(t, len(streamer.sent), 3)
-				assert.Equal(t, &protos.ConversationPlaybackFlush{Id: previousContext}, streamer.sent[2])
+				assert.Equal(t, &protos.ConversationPlaybackControl{Id: previousContext, Kind: protos.ConversationPlaybackControl_FLUSH}, streamer.sent[2])
 				streamer.mu.Unlock()
 				packets := eos.snapshotExecuted()
 				require.NotEmpty(t, packets)
@@ -241,7 +245,7 @@ func TestInterruptionPauseIOCompletesBeforeFlushCommit(t *testing.T) {
 		previous := requestor.GetID()
 		pauseStarted, releasePause, pauseDone := make(chan struct{}), make(chan struct{}), make(chan struct{})
 		streamer := &terminalReceiptTestStreamer{onSend: func(packet proto.Message) error {
-			if _, ok := packet.(*protos.ConversationPlaybackPause); ok {
+			if control, ok := packet.(*protos.ConversationPlaybackControl); ok && control.GetKind() == protos.ConversationPlaybackControl_PAUSE {
 				// Speech can confirm synchronously while transport application of Pause is delayed.
 				handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{
 					ContextID: previous, Script: "wait", Interim: true,
@@ -270,15 +274,17 @@ func TestInterruptionPauseIOCompletesBeforeFlushCommit(t *testing.T) {
 		var controls []proto.Message
 		streamer.mu.Lock()
 		for _, packet := range streamer.sent {
-			switch packet.(type) {
-			case *protos.ConversationPlaybackPause, *protos.ConversationPlaybackFlush:
-				controls = append(controls, packet)
+			if control, ok := packet.(*protos.ConversationPlaybackControl); ok {
+				switch control.GetKind() {
+				case protos.ConversationPlaybackControl_PAUSE, protos.ConversationPlaybackControl_FLUSH:
+					controls = append(controls, packet)
+				}
 			}
 		}
 		streamer.mu.Unlock()
 		assert.Equal(t, []proto.Message{
-			&protos.ConversationPlaybackPause{Id: previous},
-			&protos.ConversationPlaybackFlush{Id: previous},
+			&protos.ConversationPlaybackControl{Id: previous, Kind: protos.ConversationPlaybackControl_PAUSE},
+			&protos.ConversationPlaybackControl{Id: previous, Kind: protos.ConversationPlaybackControl_FLUSH},
 		}, controls)
 	})
 }
@@ -299,14 +305,14 @@ func TestInterruptionRejectsPauseSentAfterTurnCommit(t *testing.T) {
 		synctest.Wait()
 		current := requestor.GetID()
 		require.NotEqual(t, previous, current)
-		require.ErrorIs(t, requestor.sendOutputControl(&protos.ConversationPlaybackPause{Id: pause.ContextID}), adapter_lifecycle.ErrStaleContext)
+		require.ErrorIs(t, requestor.sendOutputControl(&protos.ConversationPlaybackControl{Id: pause.ContextID, Kind: protos.ConversationPlaybackControl_PAUSE}), adapter_lifecycle.ErrStaleContext)
 		assert.Equal(t, current, requestor.GetID())
 		streamer := requestor.streamer.(*streamTestStreamer)
 		streamer.mu.Lock()
 		defer streamer.mu.Unlock()
 		for _, packet := range streamer.sent {
-			_, isPause := packet.(*protos.ConversationPlaybackPause)
-			assert.False(t, isPause, "a Pause arriving after commit must not reach playback")
+			control, isControl := packet.(*protos.ConversationPlaybackControl)
+			assert.False(t, isControl && control.GetKind() == protos.ConversationPlaybackControl_PAUSE, "a Pause arriving after commit must not reach playback")
 		}
 	})
 }
@@ -324,7 +330,7 @@ func TestInterruptionRejectsPauseBetweenFlushAndCommit(t *testing.T) {
 				pauseStarted := make(chan struct{})
 				go func() {
 					close(pauseStarted)
-					pauseResult <- requestor.sendOutputControl(&protos.ConversationPlaybackPause{Id: "ctx-active"})
+					pauseResult <- requestor.sendOutputControl(&protos.ConversationPlaybackControl{Id: "ctx-active", Kind: protos.ConversationPlaybackControl_PAUSE})
 				}()
 				<-pauseStarted
 				require.Empty(t, pauseResult, "pause must wait for the in-flight flush")
@@ -348,7 +354,7 @@ func TestInterruptionRejectsPauseBetweenFlushAndCommit(t *testing.T) {
 		require.NoError(t, requestor.messageLifecycle.OnTurnChange(context.Background(), *decision))
 		require.ErrorIs(t, <-pauseResult, adapter_lifecycle.ErrStaleContext)
 		streamer := requestor.streamer.(*streamTestStreamer)
-		assert.Equal(t, []proto.Message{&protos.ConversationPlaybackFlush{Id: previous}}, streamer.sent,
+		assert.Equal(t, []proto.Message{&protos.ConversationPlaybackControl{Id: previous, Kind: protos.ConversationPlaybackControl_FLUSH}}, streamer.sent,
 			"a reserved candidate must not allow Pause after Flush while context rotation is pending")
 		require.Len(t, packets, 7)
 		committed, ok := packets[4].(internal_type.TurnChangePacket)
@@ -380,10 +386,10 @@ func TestInterruptionCancellationContinuesOnlyPendingOutput(t *testing.T) {
 			streamer.mu.Lock()
 			if commit {
 				require.GreaterOrEqual(t, len(streamer.sent), 2)
-				assert.Equal(t, &protos.ConversationPlaybackPause{Id: previousContextID}, streamer.sent[0])
-				assert.Equal(t, &protos.ConversationPlaybackFlush{Id: previousContextID}, streamer.sent[1])
+				assert.Equal(t, &protos.ConversationPlaybackControl{Id: previousContextID, Kind: protos.ConversationPlaybackControl_PAUSE}, streamer.sent[0])
+				assert.Equal(t, &protos.ConversationPlaybackControl{Id: previousContextID, Kind: protos.ConversationPlaybackControl_FLUSH}, streamer.sent[1])
 			} else {
-				assert.Equal(t, []proto.Message{&protos.ConversationPlaybackPause{Id: previousContextID}, &protos.ConversationPlaybackContinue{Id: previousContextID}}, streamer.sent)
+				assert.Equal(t, []proto.Message{&protos.ConversationPlaybackControl{Id: previousContextID, Kind: protos.ConversationPlaybackControl_PAUSE}, &protos.ConversationPlaybackControl{Id: previousContextID, Kind: protos.ConversationPlaybackControl_CONTINUE}}, streamer.sent)
 			}
 			streamer.mu.Unlock()
 		})
@@ -441,8 +447,8 @@ func TestInterruptionHoldsTranscriptsUntilCommitCompletion(t *testing.T) {
 		assert.Len(t, eos.snapshotExecuted(), 1)
 		streamer.mu.Lock()
 		require.GreaterOrEqual(t, len(streamer.sent), 2)
-		assert.IsType(t, &protos.ConversationPlaybackPause{}, streamer.sent[0])
-		assert.IsType(t, &protos.ConversationPlaybackFlush{}, streamer.sent[1])
+		assert.Equal(t, protos.ConversationPlaybackControl_PAUSE, streamer.sent[0].(*protos.ConversationPlaybackControl).GetKind())
+		assert.Equal(t, protos.ConversationPlaybackControl_FLUSH, streamer.sent[1].(*protos.ConversationPlaybackControl).GetKind())
 		streamer.mu.Unlock()
 		close(release)
 		synctest.Wait()
@@ -642,7 +648,7 @@ func TestInterruptionDeadlineDoesNotWaitForProviderWork(t *testing.T) {
 		synctest.Wait()
 		assert.Equal(t, previous, requestor.GetID())
 		streamer.mu.Lock()
-		assert.Equal(t, []proto.Message{&protos.ConversationPlaybackPause{Id: previous}, &protos.ConversationPlaybackContinue{Id: previous}}, streamer.sent)
+		assert.Equal(t, []proto.Message{&protos.ConversationPlaybackControl{Id: previous, Kind: protos.ConversationPlaybackControl_PAUSE}, &protos.ConversationPlaybackControl{Id: previous, Kind: protos.ConversationPlaybackControl_CONTINUE}}, streamer.sent)
 		streamer.mu.Unlock()
 		close(release)
 	})
@@ -669,7 +675,7 @@ func TestInterruptionIgnoresStaleAndUngatedTranscripts(t *testing.T) {
 		synctest.Wait()
 		assert.Equal(t, previous, requestor.GetID())
 		streamer.mu.Lock()
-		assert.Equal(t, []proto.Message{&protos.ConversationPlaybackPause{Id: previous}, &protos.ConversationPlaybackContinue{Id: previous}}, streamer.sent)
+		assert.Equal(t, []proto.Message{&protos.ConversationPlaybackControl{Id: previous, Kind: protos.ConversationPlaybackControl_PAUSE}, &protos.ConversationPlaybackControl{Id: previous, Kind: protos.ConversationPlaybackControl_CONTINUE}}, streamer.sent)
 		streamer.mu.Unlock()
 	})
 }
@@ -752,9 +758,9 @@ func TestInterruptionRejectsStaleDecisionPackets(t *testing.T) {
 		assert.Equal(t, adapter_lifecycle.MessageStateAssistantSpeaking, requestor.messageLifecycle.State())
 		streamer.mu.Lock()
 		assert.Equal(t, []proto.Message{
-			&protos.ConversationPlaybackPause{Id: contextID},
-			&protos.ConversationPlaybackContinue{Id: contextID},
-			&protos.ConversationPlaybackPause{Id: contextID},
+			&protos.ConversationPlaybackControl{Id: contextID, Kind: protos.ConversationPlaybackControl_PAUSE},
+			&protos.ConversationPlaybackControl{Id: contextID, Kind: protos.ConversationPlaybackControl_CONTINUE},
+			&protos.ConversationPlaybackControl{Id: contextID, Kind: protos.ConversationPlaybackControl_PAUSE},
 		}, streamer.sent)
 		streamer.mu.Unlock()
 		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{
@@ -766,10 +772,10 @@ func TestInterruptionRejectsStaleDecisionPackets(t *testing.T) {
 		assert.Equal(t, contextID, requestor.GetID())
 		streamer.mu.Lock()
 		assert.Equal(t, []proto.Message{
-			&protos.ConversationPlaybackPause{Id: contextID},
-			&protos.ConversationPlaybackContinue{Id: contextID},
-			&protos.ConversationPlaybackPause{Id: contextID},
-			&protos.ConversationPlaybackContinue{Id: contextID},
+			&protos.ConversationPlaybackControl{Id: contextID, Kind: protos.ConversationPlaybackControl_PAUSE},
+			&protos.ConversationPlaybackControl{Id: contextID, Kind: protos.ConversationPlaybackControl_CONTINUE},
+			&protos.ConversationPlaybackControl{Id: contextID, Kind: protos.ConversationPlaybackControl_PAUSE},
+			&protos.ConversationPlaybackControl{Id: contextID, Kind: protos.ConversationPlaybackControl_CONTINUE},
 		}, streamer.sent)
 		streamer.mu.Unlock()
 		handler.HandleFinalizeBehavior(context.Background(), internal_type.FinalizeBehaviorPacket{})
@@ -796,7 +802,7 @@ func TestInterruptionFinalizationFencesDeadline(t *testing.T) {
 
 		assert.Equal(t, contextID, requestor.GetID())
 		streamer.mu.Lock()
-		assert.Equal(t, []proto.Message{&protos.ConversationPlaybackPause{Id: contextID}, &protos.ConversationPlaybackContinue{Id: contextID}}, streamer.sent)
+		assert.Equal(t, []proto.Message{&protos.ConversationPlaybackControl{Id: contextID, Kind: protos.ConversationPlaybackControl_PAUSE}, &protos.ConversationPlaybackControl{Id: contextID, Kind: protos.ConversationPlaybackControl_CONTINUE}}, streamer.sent)
 		streamer.mu.Unlock()
 	})
 }

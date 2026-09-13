@@ -71,16 +71,16 @@ func TestMessageOptionsCallbacksWaitForEvents(t *testing.T) {
 			require.Empty(t, packets)
 			require.NoError(t, message.OnGenerationStarted("message"))
 			message.OnGenerationCompleted(internal_type.LLMResponseDonePacket{ContextID: "message", Text: "answer"})
-			require.NoError(t, message.SendPlaybackControl(&protos.ConversationPlaybackPause{Id: "message"}))
+			require.NoError(t, message.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_PAUSE}))
 			require.NoError(t, message.SendAssistantMessage(&protos.ConversationAssistantMessage{
 				Id: "message", Completed: true, Message: &protos.ConversationAssistantMessage_Text{Text: "answer"},
 			}))
 			require.Empty(t, packets, "paused output cannot complete")
-			require.NoError(t, message.SendPlaybackControl(&protos.ConversationPlaybackContinue{Id: "message"}))
+			require.NoError(t, message.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_CONTINUE}))
 			require.Len(t, output, 3)
-			assert.IsType(t, &protos.ConversationPlaybackPause{}, output[0])
+			assert.Equal(t, protos.ConversationPlaybackControl_PAUSE, output[0].(*protos.ConversationPlaybackControl).GetKind())
 			assert.IsType(t, &protos.ConversationAssistantMessage{}, output[1])
-			assert.IsType(t, &protos.ConversationPlaybackContinue{}, output[2])
+			assert.Equal(t, protos.ConversationPlaybackControl_CONTINUE, output[2].(*protos.ConversationPlaybackControl).GetKind())
 			require.Len(t, packets, 2)
 			assert.Equal(t, internal_type.StartIdleTimeoutPacket{ContextID: "message"}, packets[1])
 		})
@@ -138,9 +138,9 @@ func TestMessageOptionsMissingSenderDoesNotMutateOutput(t *testing.T) {
 	message := NewMessageLifecycle(WithContextID("message"), WithMode(type_enums.AudioMode)).(*messageLifecycle)
 	require.NoError(t, message.OnGenerationStarted("message"))
 	for _, control := range []proto.Message{
-		&protos.ConversationPlaybackPause{Id: "message"},
-		&protos.ConversationPlaybackContinue{Id: "message"},
-		&protos.ConversationPlaybackFlush{Id: "message"},
+		&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_PAUSE},
+		&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_CONTINUE},
+		&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_FLUSH},
 	} {
 		require.ErrorIs(t, message.SendPlaybackControl(control), ErrSenderNotConfigured)
 	}

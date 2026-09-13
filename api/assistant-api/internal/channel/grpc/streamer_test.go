@@ -101,26 +101,26 @@ func TestSend_OutputControlsPauseContinueAndFlushAssistantAudio(t *testing.T) {
 	streamer := &unidirectionalStreamer{server: server}
 
 	oldMessage := &protos.ConversationAssistantMessage{Id: "response-1", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{1}}}
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackPause{}))
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
 	require.NoError(t, streamer.Send(oldMessage))
 	require.Len(t, server.sentResponses(), 1)
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackContinue{}))
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}))
 	responses := server.sentResponses()
 	require.Len(t, responses, 3)
-	assert.NotNil(t, responses[0].GetPlaybackPause())
-	assert.NotNil(t, responses[1].GetPlaybackContinue())
+	assert.Equal(t, protos.ConversationPlaybackControl_PAUSE, responses[0].GetPlaybackControl().GetKind())
+	assert.Equal(t, protos.ConversationPlaybackControl_CONTINUE, responses[1].GetPlaybackControl().GetKind())
 	assert.True(t, proto.Equal(oldMessage, responses[2].GetAssistant()))
 
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackPause{}))
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
 	require.NoError(t, streamer.Send(oldMessage))
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackFlush{}))
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}))
 	require.NoError(t, streamer.Send(oldMessage))
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackContinue{}))
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}))
 	responses = server.sentResponses()
 	require.Len(t, responses, 6)
-	assert.NotNil(t, responses[3].GetPlaybackPause())
-	assert.NotNil(t, responses[4].GetPlaybackFlush())
-	assert.NotNil(t, responses[5].GetPlaybackContinue())
+	assert.Equal(t, protos.ConversationPlaybackControl_PAUSE, responses[3].GetPlaybackControl().GetKind())
+	assert.Equal(t, protos.ConversationPlaybackControl_FLUSH, responses[4].GetPlaybackControl().GetKind())
+	assert.Equal(t, protos.ConversationPlaybackControl_CONTINUE, responses[5].GetPlaybackControl().GetKind())
 
 	newMessage := &protos.ConversationAssistantMessage{Id: "response-2", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{2}}}
 	require.NoError(t, streamer.Send(newMessage))
@@ -142,7 +142,7 @@ func TestSend_FlushBeforeFirstAudioBlocksID(t *testing.T) {
 	server := &recordingAssistantTalkServer{}
 	streamer := &unidirectionalStreamer{server: server}
 
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackFlush{Id: "response-preaudio"}))
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Id: "response-preaudio", Kind: protos.ConversationPlaybackControl_FLUSH}))
 	require.NoError(t, streamer.Send(&protos.ConversationAssistantMessage{
 		Id: "response-preaudio", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{1}},
 	}))
@@ -153,8 +153,45 @@ func TestSend_FlushBeforeFirstAudioBlocksID(t *testing.T) {
 
 	responses := server.sentResponses()
 	require.Len(t, responses, 2)
-	assert.NotNil(t, responses[0].GetPlaybackFlush())
+	assert.Equal(t, protos.ConversationPlaybackControl_FLUSH, responses[0].GetPlaybackControl().GetKind())
 	assert.True(t, proto.Equal(nextMessage, responses[1].GetAssistant()))
+}
+
+func TestSend_InvalidPlaybackControlDoesNotSendOrChangeState(t *testing.T) {
+	for _, kind := range []protos.ConversationPlaybackControl_Kind{
+		protos.ConversationPlaybackControl_KIND_UNSPECIFIED, protos.ConversationPlaybackControl_Kind(99),
+	} {
+		t.Run(kind.String(), func(t *testing.T) {
+			t.Parallel()
+			server := &recordingAssistantTalkServer{}
+			streamer := &unidirectionalStreamer{server: server}
+			invalid := &protos.ConversationPlaybackControl{Id: "response", Kind: kind}
+			require.Error(t, streamer.Send(invalid))
+			require.Empty(t, server.sentResponses())
+			assert.False(t, streamer.outputPaused)
+
+			require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Id: "response", Kind: protos.ConversationPlaybackControl_PAUSE}))
+			audio := &protos.ConversationAssistantMessage{
+				Id: "response", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{1, 2}},
+			}
+			terminal := &protos.ConversationAssistantMessage{
+				Id: "response", Completed: true, Message: &protos.ConversationAssistantMessage_Audio{},
+			}
+			require.NoError(t, streamer.Send(audio))
+			require.NoError(t, streamer.Send(terminal))
+			require.Error(t, streamer.Send(invalid))
+			require.Len(t, server.sentResponses(), 1)
+			assert.True(t, streamer.outputPaused)
+
+			require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Id: "response", Kind: protos.ConversationPlaybackControl_CONTINUE}))
+			responses := server.sentResponses()
+			require.Len(t, responses, 4)
+			assert.Equal(t, protos.ConversationPlaybackControl_PAUSE, responses[0].GetPlaybackControl().GetKind())
+			assert.Equal(t, protos.ConversationPlaybackControl_CONTINUE, responses[1].GetPlaybackControl().GetKind())
+			assert.True(t, proto.Equal(audio, responses[2].GetAssistant()))
+			assert.True(t, proto.Equal(terminal, responses[3].GetAssistant()))
+		})
+	}
 }
 
 func TestSend_RepeatedFlushBlocksNewID(t *testing.T) {
@@ -166,9 +203,9 @@ func TestSend_RepeatedFlushBlocksNewID(t *testing.T) {
 	}
 
 	require.NoError(t, streamer.Send(oldMessage))
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackFlush{Id: "response-A"}))
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackPause{Id: "response-B"}))
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackFlush{Id: "response-B"}))
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Id: "response-A", Kind: protos.ConversationPlaybackControl_FLUSH}))
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Id: "response-B", Kind: protos.ConversationPlaybackControl_PAUSE}))
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Id: "response-B", Kind: protos.ConversationPlaybackControl_FLUSH}))
 	require.NoError(t, streamer.Send(&protos.ConversationAssistantMessage{
 		Id: "response-B", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{2}},
 	}))
@@ -180,9 +217,9 @@ func TestSend_RepeatedFlushBlocksNewID(t *testing.T) {
 	responses := server.sentResponses()
 	require.Len(t, responses, 5)
 	assert.True(t, proto.Equal(oldMessage, responses[0].GetAssistant()))
-	assert.NotNil(t, responses[1].GetPlaybackFlush())
-	assert.NotNil(t, responses[2].GetPlaybackPause())
-	assert.NotNil(t, responses[3].GetPlaybackFlush())
+	assert.Equal(t, protos.ConversationPlaybackControl_FLUSH, responses[1].GetPlaybackControl().GetKind())
+	assert.Equal(t, protos.ConversationPlaybackControl_PAUSE, responses[2].GetPlaybackControl().GetKind())
+	assert.Equal(t, protos.ConversationPlaybackControl_FLUSH, responses[3].GetPlaybackControl().GetKind())
 	assert.True(t, proto.Equal(nextMessage, responses[4].GetAssistant()))
 }
 
@@ -191,9 +228,9 @@ func TestSend_OutputControlsAreConcurrentSafe(t *testing.T) {
 	server := &recordingAssistantTalkServer{}
 	streamer := &unidirectionalStreamer{server: server}
 	controls := []proto.Message{
-		&protos.ConversationPlaybackPause{},
-		&protos.ConversationPlaybackContinue{},
-		&protos.ConversationPlaybackFlush{},
+		&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE},
+		&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE},
+		&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH},
 	}
 
 	var wg sync.WaitGroup
@@ -223,9 +260,9 @@ func TestSend_GeneratedWireVariants(t *testing.T) {
 		field   protoreflect.Name
 		number  protoreflect.FieldNumber
 	}{
-		{"pause", &protos.ConversationPlaybackPause{Id: "response-1"}, "playbackPause", 21},
-		{"continue", &protos.ConversationPlaybackContinue{Id: "response-1"}, "playbackContinue", 22},
-		{"flush", &protos.ConversationPlaybackFlush{Id: "response-1"}, "playbackFlush", 23},
+		{"pause", &protos.ConversationPlaybackControl{Id: "response-1", Kind: protos.ConversationPlaybackControl_PAUSE}, "playbackControl", 24},
+		{"continue", &protos.ConversationPlaybackControl{Id: "response-1", Kind: protos.ConversationPlaybackControl_CONTINUE}, "playbackControl", 24},
+		{"flush", &protos.ConversationPlaybackControl{Id: "response-1", Kind: protos.ConversationPlaybackControl_FLUSH}, "playbackControl", 24},
 		{"initialization", &protos.ConversationInitialization{}, "initialization", 0},
 		{"configuration", &protos.ConversationConfiguration{}, "configuration", 0},
 		{"interruption", &protos.ConversationInterruption{}, "interruption", 0},
@@ -274,7 +311,7 @@ func TestSend_PausedQueuePreservesAudioOrderAndAllowsText(t *testing.T) {
 	t.Parallel()
 	server := &recordingAssistantTalkServer{}
 	streamer := &unidirectionalStreamer{server: server}
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackPause{}))
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
 	for _, frame := range []byte{1, 2, 3} {
 		require.NoError(t, streamer.Send(&protos.ConversationAssistantMessage{
 			Id: "response", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{frame}},
@@ -286,10 +323,10 @@ func TestSend_PausedQueuePreservesAudioOrderAndAllowsText(t *testing.T) {
 	responses := server.sentResponses()
 	require.Len(t, responses, 2)
 	assert.Equal(t, "text", responses[1].GetAssistant().GetText())
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackContinue{}))
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}))
 	responses = server.sentResponses()
 	require.Len(t, responses, 6)
-	assert.NotNil(t, responses[2].GetPlaybackContinue())
+	assert.Equal(t, protos.ConversationPlaybackControl_CONTINUE, responses[2].GetPlaybackControl().GetKind())
 	for i, frame := range []byte{1, 2, 3} {
 		assert.Equal(t, []byte{frame}, responses[i+3].GetAssistant().GetAudio())
 	}
@@ -322,21 +359,21 @@ func TestSend_ExplicitAudioTerminalRespectsPlaybackControls(t *testing.T) {
 				})
 			}
 			queued = append(queued, terminal)
-			require.NoError(t, streamer.Send(&protos.ConversationPlaybackPause{}))
+			require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
 			for _, message := range queued {
 				require.NoError(t, streamer.Send(message))
 			}
 			require.Len(t, server.sentResponses(), 1, "terminal must wait with paused audio")
 			if tt.flush {
-				require.NoError(t, streamer.Send(&protos.ConversationPlaybackFlush{}))
+				require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}))
 				for _, message := range queued {
 					require.NoError(t, streamer.Send(message))
 				}
-				require.NoError(t, streamer.Send(&protos.ConversationPlaybackContinue{}))
+				require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}))
 				responses := server.sentResponses()
 				require.Len(t, responses, 3, "flush must discard queued and late old terminals")
-				assert.NotNil(t, responses[1].GetPlaybackFlush())
-				assert.NotNil(t, responses[2].GetPlaybackContinue())
+				assert.Equal(t, protos.ConversationPlaybackControl_FLUSH, responses[1].GetPlaybackControl().GetKind())
+				assert.Equal(t, protos.ConversationPlaybackControl_CONTINUE, responses[2].GetPlaybackControl().GetKind())
 				newTerminal := &protos.ConversationAssistantMessage{
 					Id: "new", Completed: true, Message: &protos.ConversationAssistantMessage_Audio{},
 				}
@@ -346,10 +383,10 @@ func TestSend_ExplicitAudioTerminalRespectsPlaybackControls(t *testing.T) {
 				assert.True(t, proto.Equal(newTerminal, responses[3].GetAssistant()))
 				return
 			}
-			require.NoError(t, streamer.Send(&protos.ConversationPlaybackContinue{}))
+			require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}))
 			responses := server.sentResponses()
 			require.Len(t, responses, len(queued)+2)
-			assert.NotNil(t, responses[1].GetPlaybackContinue())
+			assert.Equal(t, protos.ConversationPlaybackControl_CONTINUE, responses[1].GetPlaybackControl().GetKind())
 			for i, message := range queued {
 				assert.True(t, proto.Equal(message, responses[i+2].GetAssistant()))
 			}
@@ -363,11 +400,11 @@ func TestSend_NilPayloadCompletionDoesNotUsePlaybackQueue(t *testing.T) {
 	streamer := &unidirectionalStreamer{server: server}
 	terminal := &protos.ConversationAssistantMessage{Id: "response", Completed: true}
 
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackPause{}))
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
 	require.NoError(t, streamer.Send(terminal))
 	responses := server.sentResponses()
 	require.Len(t, responses, 2)
-	assert.NotNil(t, responses[0].GetPlaybackPause())
+	assert.Equal(t, protos.ConversationPlaybackControl_PAUSE, responses[0].GetPlaybackControl().GetKind())
 	assert.True(t, proto.Equal(terminal, responses[1].GetAssistant()))
 }
 
@@ -378,7 +415,7 @@ func TestSend_FlushPrecedesNewResponseWhileWireSendIsBlocked(t *testing.T) {
 	var releaseOnce sync.Once
 	t.Cleanup(func() { releaseOnce.Do(func() { close(releaseFlush) }) })
 	server := &recordingAssistantTalkServer{onSend: func(response *protos.AssistantTalkResponse) error {
-		if response.GetPlaybackFlush() != nil {
+		if response.GetPlaybackControl().GetKind() == protos.ConversationPlaybackControl_FLUSH {
 			close(flushStarted)
 			<-releaseFlush
 		}
@@ -389,10 +426,12 @@ func TestSend_FlushPrecedesNewResponseWhileWireSendIsBlocked(t *testing.T) {
 		Id: "old", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{1}},
 	}
 	require.NoError(t, streamer.Send(oldMessage))
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackPause{}))
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
 	require.NoError(t, streamer.Send(oldMessage))
 	flushDone := make(chan error, 1)
-	go func() { flushDone <- streamer.Send(&protos.ConversationPlaybackFlush{}) }()
+	go func() {
+		flushDone <- streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH})
+	}()
 	select {
 	case <-flushStarted:
 	case <-time.After(5 * time.Second):
@@ -427,8 +466,8 @@ func TestSend_FlushPrecedesNewResponseWhileWireSendIsBlocked(t *testing.T) {
 	responses := server.sentResponses()
 	require.Len(t, responses, 4)
 	assert.Equal(t, "old", responses[0].GetAssistant().GetId())
-	assert.NotNil(t, responses[1].GetPlaybackPause())
-	assert.NotNil(t, responses[2].GetPlaybackFlush())
+	assert.Equal(t, protos.ConversationPlaybackControl_PAUSE, responses[1].GetPlaybackControl().GetKind())
+	assert.Equal(t, protos.ConversationPlaybackControl_FLUSH, responses[2].GetPlaybackControl().GetKind())
 	assert.Equal(t, "new", responses[3].GetAssistant().GetId())
 }
 
@@ -439,14 +478,14 @@ func TestSend_ConcurrentPauseAndContinueKeepAudioBehindControls(t *testing.T) {
 		return nil
 	}}
 	streamer := &unidirectionalStreamer{server: server}
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackPause{}))
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
 	for range 32 {
 		require.NoError(t, streamer.Send(&protos.ConversationAssistantMessage{
 			Id: "response", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{1}},
 		}))
 	}
 	messages := []proto.Message{
-		&protos.ConversationPlaybackPause{}, &protos.ConversationPlaybackContinue{},
+		&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}, &protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE},
 		&protos.ConversationAssistantMessage{
 			Id: "response", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{2}},
 		},
@@ -467,15 +506,18 @@ func TestSend_ConcurrentPauseAndContinueKeepAudioBehindControls(t *testing.T) {
 	for err := range errs {
 		require.NoError(t, err)
 	}
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackContinue{}))
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}))
 	paused := false
 	var frames int
 	for _, response := range server.sentResponses() {
 		switch response.GetData().(type) {
-		case *protos.AssistantTalkResponse_PlaybackPause:
-			paused = true
-		case *protos.AssistantTalkResponse_PlaybackContinue:
-			paused = false
+		case *protos.AssistantTalkResponse_PlaybackControl:
+			switch response.GetPlaybackControl().GetKind() {
+			case protos.ConversationPlaybackControl_PAUSE:
+				paused = true
+			case protos.ConversationPlaybackControl_CONTINUE:
+				paused = false
+			}
 		case *protos.AssistantTalkResponse_Assistant:
 			assert.False(t, paused, "audio must not reach the wire during a remote pause")
 			frames++
@@ -492,26 +534,26 @@ func TestSend_ControlFailuresPreserveLocalSafety(t *testing.T) {
 	oldMessage := &protos.ConversationAssistantMessage{
 		Id: "old", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{1}},
 	}
-	assert.ErrorIs(t, streamer.Send(&protos.ConversationPlaybackPause{}), sendErr)
+	assert.ErrorIs(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}), sendErr)
 	require.NoError(t, streamer.Send(oldMessage))
-	assert.ErrorIs(t, streamer.Send(&protos.ConversationPlaybackContinue{}), sendErr)
+	assert.ErrorIs(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}), sendErr)
 	require.NoError(t, streamer.Send(oldMessage))
 	assert.Empty(t, server.sentResponses())
 	server.sendErr = nil
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackContinue{}))
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}))
 	responses := server.sentResponses()
 	require.Len(t, responses, 3)
-	assert.NotNil(t, responses[0].GetPlaybackContinue())
+	assert.Equal(t, protos.ConversationPlaybackControl_CONTINUE, responses[0].GetPlaybackControl().GetKind())
 	assert.True(t, proto.Equal(oldMessage, responses[1].GetAssistant()))
 	assert.True(t, proto.Equal(oldMessage, responses[2].GetAssistant()))
 
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackPause{}))
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
 	require.NoError(t, streamer.Send(oldMessage))
 	server.sendErr = sendErr
-	assert.ErrorIs(t, streamer.Send(&protos.ConversationPlaybackFlush{}), sendErr)
+	assert.ErrorIs(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}), sendErr)
 	server.sendErr = nil
 	require.NoError(t, streamer.Send(oldMessage))
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackContinue{}))
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}))
 	assert.Len(t, server.sentResponses(), 5)
 	require.NoError(t, streamer.Send(&protos.ConversationAssistantMessage{
 		Id: "new", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{2}},
@@ -531,14 +573,14 @@ func TestSend_ReplayFailureReturnsErrorAndRetainsRemainingFrames(t *testing.T) {
 		return nil
 	}}
 	streamer := &unidirectionalStreamer{server: server}
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackPause{}))
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
 	for _, frame := range []byte{1, 2} {
 		require.NoError(t, streamer.Send(&protos.ConversationAssistantMessage{
 			Id: "response", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{frame}},
 		}))
 	}
-	assert.ErrorIs(t, streamer.Send(&protos.ConversationPlaybackContinue{}), sendErr)
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackContinue{}))
+	assert.ErrorIs(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}), sendErr)
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}))
 	responses := server.sentResponses()
 	require.Len(t, responses, 4)
 	assert.Equal(t, []byte{2}, responses[3].GetAssistant().GetAudio())
@@ -558,8 +600,8 @@ func TestSend_SerializesAllEnvelopes(t *testing.T) {
 	}}
 	streamer := &unidirectionalStreamer{server: server}
 	messages := []proto.Message{
-		&protos.ConversationPlaybackPause{}, &protos.ConversationPlaybackContinue{},
-		&protos.ConversationPlaybackFlush{}, &protos.ConversationInitialization{},
+		&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}, &protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE},
+		&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}, &protos.ConversationInitialization{},
 		&protos.ConversationConfiguration{}, &protos.ConversationInterruption{},
 		&protos.ConversationUserMessage{}, &protos.ConversationAssistantMessage{},
 		&protos.ConversationToolCall{}, &protos.ConversationToolCallResult{},
@@ -636,7 +678,7 @@ func TestRecv_GeneratedCompletionAndLegacyRequests(t *testing.T) {
 func TestExplicitAudioTerminalSurvivesPauseAndContinue(t *testing.T) {
 	server := &recordingAssistantTalkServer{}
 	streamer := &unidirectionalStreamer{server: server}
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackPause{Id: "response"}))
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Id: "response", Kind: protos.ConversationPlaybackControl_PAUSE}))
 	require.NoError(t, streamer.Send(&protos.ConversationAssistantMessage{
 		Id: "response", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{1, 2}},
 	}))
@@ -644,7 +686,7 @@ func TestExplicitAudioTerminalSurvivesPauseAndContinue(t *testing.T) {
 		Id: "response", Completed: true, Message: &protos.ConversationAssistantMessage_Audio{},
 	}))
 	require.Len(t, server.sentResponses(), 1)
-	require.NoError(t, streamer.Send(&protos.ConversationPlaybackContinue{Id: "response"}))
+	require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Id: "response", Kind: protos.ConversationPlaybackControl_CONTINUE}))
 	var messages []*protos.ConversationAssistantMessage
 	for _, response := range server.sentResponses() {
 		if message := response.GetAssistant(); message != nil {

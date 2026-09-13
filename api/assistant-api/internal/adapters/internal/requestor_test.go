@@ -33,14 +33,14 @@ func TestNewGenericRequestorLifecycleUsesCurrentStreamer(t *testing.T) {
 	current := &streamTestStreamer{}
 	requestor.streamer = current
 	require.NoError(t, requestor.Notify(context.Background(), message))
-	require.NoError(t, requestor.sendOutputControl(&protos.ConversationPlaybackPause{Id: requestor.GetID()}))
+	require.NoError(t, requestor.sendOutputControl(&protos.ConversationPlaybackControl{Id: requestor.GetID(), Kind: protos.ConversationPlaybackControl_PAUSE}))
 	require.Len(t, original.sent, 1)
 	require.Len(t, current.sent, 2)
-	require.IsType(t, &protos.ConversationPlaybackPause{}, current.sent[1])
+	require.Equal(t, protos.ConversationPlaybackControl_PAUSE, current.sent[1].(*protos.ConversationPlaybackControl).GetKind())
 
 	requestor.streamer = nil
 	require.ErrorContains(t, requestor.Notify(context.Background(), message), "streamer is unavailable")
-	require.ErrorContains(t, requestor.messageLifecycle.SendPlaybackControl(&protos.ConversationPlaybackFlush{}), "streamer is unavailable")
+	require.ErrorContains(t, requestor.messageLifecycle.SendPlaybackControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}), "streamer is unavailable")
 }
 
 func TestInternalCallersUseRapidaClient(t *testing.T) {

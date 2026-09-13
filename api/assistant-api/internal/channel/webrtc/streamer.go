@@ -1558,99 +1558,104 @@ func (s *webrtcStreamer) clearNegotiationState(peerConnection *pionwebrtc.PeerCo
 
 func (s *webrtcStreamer) Send(response proto.Message) error {
 	switch data := response.(type) {
-	case *protos.ConversationPlaybackPause:
-		s.outputWriteMu.Lock()
-		s.outputStateMu.Lock()
-		if !s.outputFlushed {
-			s.outputPaused = true
-		}
-		s.outputStateMu.Unlock()
-		s.outputWriteMu.Unlock()
-		return nil
-	case *protos.ConversationPlaybackContinue:
-		s.outputStateMu.Lock()
-		if !s.outputFlushed {
-			s.outputPaused = false
-		}
-		s.outputStateMu.Unlock()
-		return nil
-	case *protos.ConversationPlaybackFlush:
-		s.outputWriteMu.Lock()
-		s.outputStateMu.Lock()
-		s.outputPaused = false
-		if s.flushedOutputIDs == nil {
-			s.flushedOutputIDs = make(map[string]struct{})
-		}
-		if data.GetId() != "" {
-			s.flushedOutputIDs[data.GetId()] = struct{}{}
-		}
-		if s.outputFlushed {
+	case *protos.ConversationPlaybackControl:
+		switch data.GetKind() {
+		case protos.ConversationPlaybackControl_PAUSE:
+			s.outputWriteMu.Lock()
+			s.outputStateMu.Lock()
+			if !s.outputFlushed {
+				s.outputPaused = true
+			}
 			s.outputStateMu.Unlock()
 			s.outputWriteMu.Unlock()
 			return nil
-		}
-		s.outputFlushed = true
-		s.outputClearPending = true
-		s.outputGeneration++
-		s.pendingClearGeneration = s.outputGeneration
-		for _, playback := range s.outputPlaybacks {
-			if playback.ID != "" {
-				s.flushedOutputIDs[playback.ID] = struct{}{}
+		case protos.ConversationPlaybackControl_CONTINUE:
+			s.outputStateMu.Lock()
+			if !s.outputFlushed {
+				s.outputPaused = false
 			}
-			playback.Failed = true
-		}
-		for _, playback := range []*webrtc_internal.OutputPlayback{s.outputPlayback, s.currentOutputPlayback, s.assistantPlayback} {
-			if playback != nil && playback.ID != "" {
-				s.flushedOutputIDs[playback.ID] = struct{}{}
+			s.outputStateMu.Unlock()
+			return nil
+		case protos.ConversationPlaybackControl_FLUSH:
+			s.outputWriteMu.Lock()
+			s.outputStateMu.Lock()
+			s.outputPaused = false
+			if s.flushedOutputIDs == nil {
+				s.flushedOutputIDs = make(map[string]struct{})
 			}
-		}
-		s.outputAudioQueueMu.Lock()
-		for _, frame := range s.outputAudioQueue {
-			if frame.Playback != nil && frame.Playback.ID != "" {
-				s.flushedOutputIDs[frame.Playback.ID] = struct{}{}
+			if data.GetId() != "" {
+				s.flushedOutputIDs[data.GetId()] = struct{}{}
 			}
-		}
-		s.outputAudioQueueMu.Unlock()
-		s.audioBufferState.OutputAudioBufferMu.Lock()
-		s.audioBufferState.OutputAudioBuffer.Reset()
-		s.audioBufferState.OutputAudioBufferMu.Unlock()
-		s.currentOutputFrame = nil
-		s.currentOutputPlayback = nil
-		s.currentOutputTerminal = false
-		s.currentOutputConverted = false
-		s.currentOutputGeneration = 0
-		s.assistantResampleMu.Lock()
-		var flushErr error
-		if s.assistantWriter != nil {
-			flushErr = s.assistantWriter.Flush()
-		}
-		s.assistantPCM48k = nil
-		s.assistantPlayback = nil
-		s.assistantResampleMu.Unlock()
-		clearedFrames := s.clearOutputAudio()
-		clearGeneration := s.pendingClearGeneration
-		s.outputStateMu.Unlock()
-		s.outputWriteMu.Unlock()
+			if s.outputFlushed {
+				s.outputStateMu.Unlock()
+				s.outputWriteMu.Unlock()
+				return nil
+			}
+			s.outputFlushed = true
+			s.outputClearPending = true
+			s.outputGeneration++
+			s.pendingClearGeneration = s.outputGeneration
+			for _, playback := range s.outputPlaybacks {
+				if playback.ID != "" {
+					s.flushedOutputIDs[playback.ID] = struct{}{}
+				}
+				playback.Failed = true
+			}
+			for _, playback := range []*webrtc_internal.OutputPlayback{s.outputPlayback, s.currentOutputPlayback, s.assistantPlayback} {
+				if playback != nil && playback.ID != "" {
+					s.flushedOutputIDs[playback.ID] = struct{}{}
+				}
+			}
+			s.outputAudioQueueMu.Lock()
+			for _, frame := range s.outputAudioQueue {
+				if frame.Playback != nil && frame.Playback.ID != "" {
+					s.flushedOutputIDs[frame.Playback.ID] = struct{}{}
+				}
+			}
+			s.outputAudioQueueMu.Unlock()
+			s.audioBufferState.OutputAudioBufferMu.Lock()
+			s.audioBufferState.OutputAudioBuffer.Reset()
+			s.audioBufferState.OutputAudioBufferMu.Unlock()
+			s.currentOutputFrame = nil
+			s.currentOutputPlayback = nil
+			s.currentOutputTerminal = false
+			s.currentOutputConverted = false
+			s.currentOutputGeneration = 0
+			s.assistantResampleMu.Lock()
+			var flushErr error
+			if s.assistantWriter != nil {
+				flushErr = s.assistantWriter.Flush()
+			}
+			s.assistantPCM48k = nil
+			s.assistantPlayback = nil
+			s.assistantResampleMu.Unlock()
+			clearedFrames := s.clearOutputAudio()
+			clearGeneration := s.pendingClearGeneration
+			s.outputStateMu.Unlock()
+			s.outputWriteMu.Unlock()
 
-		if clearedFrames > 0 {
-			_ = s.observer.Record(s.Ctx, s.sessionState.Scope, observability.RecordLog{
-				Level:   observability.LevelInfo,
-				Message: "WebRTC output queue cleared after a flush request; this drops queued assistant audio so stale audio is not sent after the client asks to flush playback.",
-				Attributes: observability.Attributes{
-					"component":                              observability.ComponentWebRTC.String(),
-					webrtc_internal.DataType:                 webrtc_internal.EventOutputQueueCleared,
-					webrtc_internal.DataSessionID:            s.sessionID,
-					webrtc_internal.DataReason:               webrtc_internal.OutputQueueClearReasonFlush,
-					webrtc_internal.DataClearedFrames:        fmt.Sprintf("%d", clearedFrames),
-					webrtc_internal.DataRemainingQueueFrames: fmt.Sprintf("%d", webrtc_internal.OutputAudioQueueEmptySize),
-				},
-			})
+			if clearedFrames > 0 {
+				_ = s.observer.Record(s.Ctx, s.sessionState.Scope, observability.RecordLog{
+					Level:   observability.LevelInfo,
+					Message: "WebRTC output queue cleared after a flush request; this drops queued assistant audio so stale audio is not sent after the client asks to flush playback.",
+					Attributes: observability.Attributes{
+						"component":                              observability.ComponentWebRTC.String(),
+						webrtc_internal.DataType:                 webrtc_internal.EventOutputQueueCleared,
+						webrtc_internal.DataSessionID:            s.sessionID,
+						webrtc_internal.DataReason:               webrtc_internal.OutputQueueClearReasonFlush,
+						webrtc_internal.DataClearedFrames:        fmt.Sprintf("%d", clearedFrames),
+						webrtc_internal.DataRemainingQueueFrames: fmt.Sprintf("%d", webrtc_internal.OutputAudioQueueEmptySize),
+					},
+				})
+			}
+			select {
+			case s.outputClearCh <- clearGeneration:
+			case <-s.Ctx.Done():
+			}
+			return flushErr
+		default:
+			return fmt.Errorf("invalid playback control kind: %d", data.GetKind())
 		}
-		select {
-		case s.outputClearCh <- clearGeneration:
-		case <-s.Ctx.Done():
-		}
-		return flushErr
 	case *protos.ConversationAssistantMessage:
 		switch content := data.Message.(type) {
 		case *protos.ConversationAssistantMessage_Audio:

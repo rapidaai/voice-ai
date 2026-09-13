@@ -11,6 +11,7 @@ var (
 	ErrEmptyContextID              = errors.New("empty context id")
 	ErrStaleContext                = errors.New("stale context")
 	ErrInvalidTransition           = errors.New("invalid message lifecycle transition")
+	ErrInvalidPlaybackControl      = errors.New("invalid playback control kind")
 	ErrPlaybackTerminalNotIssued   = errors.New("playback terminal not issued")
 	ErrDuplicatePlaybackCompletion = errors.New("duplicate playback completion")
 	ErrSenderNotConfigured         = errors.New("message lifecycle output sender is not configured")

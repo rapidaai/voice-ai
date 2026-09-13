@@ -21,7 +21,7 @@ func (h requestorDispatchHandler) HandleInterruptionDetected(ctx context.Context
 	}
 	decision := h.r.messageLifecycle.OnInterruptionDetected(p, bargeInTrigger)
 	if pause := decision.Pause; pause != nil {
-		pauseError := h.r.sendOutputControl(&protos.ConversationPlaybackPause{Id: pause.ContextID})
+		pauseError := h.r.sendOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE, Id: pause.ContextID})
 		if pauseError != nil {
 			h.r.OnPacket(ctx, internal_type.ObservabilityLogRecordPacket{
 				ContextID: pause.ContextID,

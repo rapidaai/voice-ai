@@ -125,7 +125,7 @@ func TestMessagePlaybackCompletesAfterFinalDelivery(t *testing.T) {
 			require.NoError(t, l.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: "message", Completed: true, Message: &protos.ConversationAssistantMessage_Text{Text: "answer"}}))
 			require.Empty(t, packets, "text completion cannot complete audio")
 			if scenario.paused {
-				require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackPause{Id: "message"}))
+				require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_PAUSE}))
 			}
 			err := l.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: "message", Completed: true, Message: &protos.ConversationAssistantMessage_Audio{}})
 			if scenario.sendFails {
@@ -141,9 +141,9 @@ func TestMessagePlaybackCompletesAfterFinalDelivery(t *testing.T) {
 			if scenario.paused {
 				require.Empty(t, packets)
 				if scenario.flushed {
-					require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackFlush{Id: "message"}))
+					require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_FLUSH}))
 				} else {
-					require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackContinue{Id: "message"}))
+					require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_CONTINUE}))
 				}
 			}
 			if !scenario.sendFails && !scenario.flushed {
@@ -155,6 +155,52 @@ func TestMessagePlaybackCompletesAfterFinalDelivery(t *testing.T) {
 				require.Empty(t, packets)
 			}
 			require.Error(t, l.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: "message", Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{1, 2}}}))
+		})
+	}
+}
+
+func TestMessagePlaybackRejectsInvalidControlWithoutChangingState(t *testing.T) {
+	for _, kind := range []protos.ConversationPlaybackControl_Kind{
+		protos.ConversationPlaybackControl_KIND_UNSPECIFIED, protos.ConversationPlaybackControl_Kind(99),
+	} {
+		t.Run(kind.String(), func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				var sent []proto.Message
+				var packets []internal_type.Packet
+				l := NewMessageLifecycle(WithContextID("message"), WithMode(type_enums.AudioMode),
+					WithSend(func(message proto.Message) error { sent = append(sent, message); return nil }),
+					WithOnPacket(func(emitted ...internal_type.Packet) error { packets = append(packets, emitted...); return nil }),
+				).(*messageLifecycle)
+				defer l.OnMessageFailed("message")
+				require.NoError(t, l.OnGenerationStarted("message"))
+				l.OnGenerationCompleted(internal_type.LLMResponseDonePacket{ContextID: "message", Text: "answer"})
+				require.NoError(t, l.SendAssistantMessage(&protos.ConversationAssistantMessage{
+					Id: "message", Completed: true, Message: &protos.ConversationAssistantMessage_Text{Text: "answer"},
+				}))
+				require.NoError(t, l.SendAssistantMessage(&protos.ConversationAssistantMessage{
+					Id: "message", Completed: true, Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}},
+				}))
+				before := l.output
+				require.ErrorIs(t, l.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "message", Kind: kind}), ErrInvalidPlaybackControl)
+				assert.Equal(t, before, l.output)
+				require.Len(t, sent, 2)
+				require.Empty(t, packets)
+
+				require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_PAUSE}))
+				require.NoError(t, l.OnPlaybackCompleted("message"))
+				before = l.output
+				require.ErrorIs(t, l.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "message", Kind: kind}), ErrInvalidPlaybackControl)
+				assert.Equal(t, before, l.output)
+				require.Len(t, sent, 3)
+				require.Empty(t, packets, "invalid control must not release a paused completion")
+
+				require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_CONTINUE}))
+				require.Len(t, sent, 4)
+				assert.Equal(t, protos.ConversationPlaybackControl_CONTINUE, sent[3].(*protos.ConversationPlaybackControl).GetKind())
+				require.Len(t, packets, 2)
+				assert.Equal(t, internal_type.StartIdleTimeoutPacket{ContextID: "message"}, packets[1])
+				assert.True(t, l.CanStartIdleTimeout("message"))
+			})
 		})
 	}
 }
@@ -213,11 +259,11 @@ func TestMessagePlaybackDeadlineExcludesPause(t *testing.T) {
 		require.NoError(t, l.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: "message", Completed: true, Message: &protos.ConversationAssistantMessage_Text{Text: "answer"}}))
 		require.NoError(t, l.SendAssistantMessage(&protos.ConversationAssistantMessage{Id: "message", Completed: true, Message: &protos.ConversationAssistantMessage_Audio{}}))
 		time.Sleep(time.Second)
-		require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackPause{Id: "message"}))
+		require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_PAUSE}))
 		time.Sleep(time.Minute)
 		synctest.Wait()
 		require.Empty(t, packets)
-		require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackContinue{Id: "message"}))
+		require.NoError(t, l.SendPlaybackControl(&protos.ConversationPlaybackControl{Id: "message", Kind: protos.ConversationPlaybackControl_CONTINUE}))
 		time.Sleep(5 * time.Second)
 		synctest.Wait()
 		require.Len(t, packets, 1)
