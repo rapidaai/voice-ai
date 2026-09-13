@@ -188,6 +188,11 @@ func (elt *elevenlabsTTS) readLoop(conn *websocket.Conn) {
 			if rawAudioData, err := base64.StdEncoding.DecodeString(audioData.Audio); err == nil {
 				var shouldEmitFirstAudioLatencyMetric bool
 				elt.mu.Lock()
+				if elt.connection != conn {
+					elt.mu.Unlock()
+					conn.Close()
+					return
+				}
 				contextId := elt.contextId
 				ttsStartedAt := elt.ttsStartedAt
 				if !elt.ttsMetricSent && !ttsStartedAt.IsZero() {

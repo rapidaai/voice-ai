@@ -294,6 +294,11 @@ func (cst *cartesiaTTS) readLoop(conn *websocket.Conn) {
 
 		var shouldEmitFirstAudioLatencyMetric bool
 		cst.mu.Lock()
+		if cst.connection != conn {
+			cst.mu.Unlock()
+			conn.Close()
+			return
+		}
 		ttsStartedAt := cst.ttsStartedAt
 		contextID := cst.contextId
 		if !cst.ttsMetricSent && !ttsStartedAt.IsZero() {
