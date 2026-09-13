@@ -35,8 +35,13 @@ type resembleaiTTS struct {
 	contextId      string
 	ttsConnectedAt time.Time
 
-	ttsStartedAt  time.Time
-	ttsMetricSent bool
+	ttsStartedAt    time.Time
+	ttsMetricSent   bool
+	textSent        bool
+	textClosed      bool
+	pendingDrains   int
+	synthesisFailed bool
+	endSent         bool
 
 	logger     commons.Logger
 	connection *websocket.Conn
@@ -127,12 +132,47 @@ func (*resembleaiTTS) Name() string {
 	return "resembleai-tts"
 }
 
-// handleFlushComplete is called when ResembleAI signals audio_end. It emits
-// TextToSpeechEndPacket — correctly ordered after the last audio chunk — and
-// closes the per-turn connection.
-func (rt *resembleaiTTS) handleFlushComplete(conn *websocket.Conn) {
+func (rt *resembleaiTTS) resetTurnLocked(contextID string) {
+	rt.contextId = contextID
+	rt.ttsStartedAt = time.Time{}
+	rt.ttsMetricSent = false
+	rt.textSent = false
+	rt.textClosed = false
+	rt.pendingDrains = 0
+	rt.synthesisFailed = false
+	rt.endSent = false
+}
+
+func (rt *resembleaiTTS) recordSynthesisFailure() {
 	rt.mu.Lock()
+	if rt.pendingDrains > 0 {
+		rt.pendingDrains--
+	}
+	rt.synthesisFailed = true
+	rt.mu.Unlock()
+}
+
+// handleFlushComplete is called when ResembleAI signals audio_end. It emits
+// TextToSpeechEndPacket, ordered after the last audio chunk, and
+// closes the per-turn connection.
+func (rt *resembleaiTTS) handleFlushComplete(conn *websocket.Conn) bool {
+	rt.mu.Lock()
+	if rt.connection != conn {
+		rt.mu.Unlock()
+		conn.Close()
+		return true
+	}
+	if rt.pendingDrains == 0 {
+		rt.mu.Unlock()
+		return false
+	}
+	rt.pendingDrains--
+	if !rt.textSent || !rt.textClosed || rt.pendingDrains > 0 || rt.synthesisFailed || rt.endSent {
+		rt.mu.Unlock()
+		return false
+	}
 	ctxId := rt.contextId
+	rt.endSent = true
 	rt.connection = nil // mark before Close so readLoop error handler sees intentional
 	rt.mu.Unlock()
 
@@ -150,10 +190,39 @@ func (rt *resembleaiTTS) handleFlushComplete(conn *websocket.Conn) {
 		},
 	)
 	conn.Close()
+	return true
+}
+
+func (rt *resembleaiTTS) emitEndAfterClosedText(conn *websocket.Conn) bool {
+	rt.mu.Lock()
+	if rt.connection != conn || !rt.textSent || !rt.textClosed || rt.pendingDrains > 0 || rt.synthesisFailed || rt.endSent {
+		rt.mu.Unlock()
+		return false
+	}
+	ctxId := rt.contextId
+	rt.endSent = true
+	rt.connection = nil
+	rt.mu.Unlock()
+
+	rt.onPacket(
+		internal_type.TextToSpeechEndPacket{ContextID: ctxId},
+		internal_type.ObservabilityEventRecordPacket{
+			ContextID: ctxId,
+			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+			Record: observability.RecordEvent{
+				Component:  observability.ComponentTTS,
+				Event:      observability.TTSCompleted,
+				Attributes: observability.Attributes{"type": "completed"},
+				OccurredAt: time.Now(),
+			},
+		},
+	)
+	conn.Close()
+	return true
 }
 
 // readLoop owns a single WebSocket connection for the duration of one TTS turn.
-// It exits when the connection closes — intentionally (interrupt / audio_end)
+// It exits when the connection closes intentionally (interrupt / audio_end)
 // or unexpectedly (network drop).
 func (rt *resembleaiTTS) readLoop(conn *websocket.Conn) {
 	for {
@@ -209,10 +278,23 @@ func (rt *resembleaiTTS) readLoop(conn *websocket.Conn) {
 				rt.logger.Errorf("resembleai-tts: error decoding base64 audio: %v", err)
 			}
 		case "audio_end":
-			rt.handleFlushComplete(conn)
-			return
+			if rt.handleFlushComplete(conn) {
+				return
+			}
 		case "error":
+			rt.mu.Lock()
+			rt.connection = nil
+			rt.synthesisFailed = true
+			ctxId := rt.contextId
+			rt.mu.Unlock()
 			rt.logger.Errorf("resembleai-tts: server error: %s", string(audioChunk))
+			rt.onPacket(internal_type.TextToSpeechErrorPacket{
+				ContextID: ctxId,
+				Error:     fmt.Errorf("resembleai-tts: server error: %s", string(audioChunk)),
+				Type:      internal_type.TTSInvalidInput,
+			})
+			conn.Close()
+			return
 		default:
 			rt.logger.Debugf("resembleai-tts: unhandled message type: %s", audioData.Type)
 		}
@@ -222,9 +304,7 @@ func (rt *resembleaiTTS) readLoop(conn *websocket.Conn) {
 func (t *resembleaiTTS) Transform(ctx context.Context, in internal_type.Packet) error {
 	t.mu.Lock()
 	if in.ContextId() != t.contextId {
-		t.contextId = in.ContextId()
-		t.ttsStartedAt = time.Time{}
-		t.ttsMetricSent = false
+		t.resetTurnLocked(in.ContextId())
 	}
 	connection := t.connection
 	t.mu.Unlock()
@@ -232,9 +312,7 @@ func (t *resembleaiTTS) Transform(ctx context.Context, in internal_type.Packet) 
 	switch input := in.(type) {
 	case internal_type.TextToSpeechInterruptPacket:
 		t.mu.Lock()
-		t.contextId = ""
-		t.ttsStartedAt = time.Time{}
-		t.ttsMetricSent = false
+		t.resetTurnLocked("")
 		conn := t.connection
 		t.connection = nil
 		t.mu.Unlock()
@@ -280,6 +358,9 @@ func (t *resembleaiTTS) Transform(ctx context.Context, in internal_type.Packet) 
 			}
 			t.mu.Unlock()
 		}
+		t.mu.Lock()
+		t.pendingDrains++
+		t.mu.Unlock()
 		if err := connection.WriteJSON(map[string]interface{}{
 			"voice_uuid":      t.GetVoiceUUID(),
 			"data":            input.Text,
@@ -288,6 +369,7 @@ func (t *resembleaiTTS) Transform(ctx context.Context, in internal_type.Packet) 
 			"precision":       "PCM_16",
 			"no_audio_header": true,
 		}); err != nil {
+			t.recordSynthesisFailure()
 			t.logger.Errorf("resembleai-tts: unable to write json for text to speech: %v", err)
 			t.onPacket(internal_type.TextToSpeechErrorPacket{
 				ContextID: input.ContextID,
@@ -296,6 +378,9 @@ func (t *resembleaiTTS) Transform(ctx context.Context, in internal_type.Packet) 
 			})
 			return nil
 		}
+		t.mu.Lock()
+		t.textSent = true
+		t.mu.Unlock()
 		t.onPacket(internal_type.ObservabilityEventRecordPacket{
 			ContextID: input.ContextID,
 			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
@@ -312,7 +397,13 @@ func (t *resembleaiTTS) Transform(ctx context.Context, in internal_type.Packet) 
 		return nil
 
 	case internal_type.TextToSpeechDonePacket:
-		// TextToSpeechEndPacket is emitted by handleFlushComplete once audio_end received.
+		if connection == nil {
+			return nil
+		}
+		t.mu.Lock()
+		t.textClosed = true
+		t.mu.Unlock()
+		t.emitEndAfterClosedText(connection)
 		return nil
 
 	default:

@@ -472,7 +472,9 @@ func TestSend_EndConversation_PushesToolCallResult(t *testing.T) {
 
 	// The Input call routes ConversationToolCallResult to CriticalCh.
 	select {
-	case msg := <-vng.CriticalCh:
+	case <-vng.CriticalCh.Ready():
+		msg, err := vng.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		result, ok := msg.(*protos.ConversationToolCallResult)
 		require.True(t, ok, "expected *protos.ConversationToolCallResult, got %T", msg)
 		assert.Equal(t, "tc-123", result.GetId())
@@ -515,7 +517,9 @@ func TestSend_EndConversation_NilConnection(t *testing.T) {
 
 	// CriticalCh should be empty since Send returned early.
 	select {
-	case msg := <-vng.CriticalCh:
+	case <-vng.CriticalCh.Ready():
+		msg, err := vng.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		t.Fatalf("expected empty CriticalCh, but got %T", msg)
 	default:
 		// expected
@@ -624,7 +628,9 @@ func TestSend_TransferConversation_PushesFailedResult(t *testing.T) {
 	assert.NoError(t, err)
 
 	select {
-	case msg := <-vng.CriticalCh:
+	case <-vng.CriticalCh.Ready():
+		msg, err := vng.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		result, ok := msg.(*protos.ConversationToolCallResult)
 		require.True(t, ok, "expected *protos.ConversationToolCallResult, got %T", msg)
 		assert.Equal(t, "tc-transfer", result.GetId())

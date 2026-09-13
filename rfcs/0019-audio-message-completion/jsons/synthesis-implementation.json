@@ -1,0 +1,74 @@
+{
+  "run_id": "run_942b61c2cb54",
+  "task_id": "task_ff913155e5e4",
+  "dispatch_id": "ctx_9ec3ac9552ce",
+  "role": "synthesis_worker",
+  "status": "implemented",
+  "authorization": {
+    "confirmation_file": "rfcs/0019-audio-message-completion/jsons/confirmation.json",
+    "confirmed_sha256": "63305a8d5d14e3aa9c2bc117b6bd2e281bfcb71040481d61ae9ca436ca6e18e5",
+    "resolution": "approved"
+  },
+  "changed_files": [
+    "api/assistant-api/internal/normalizer/output/normalizer.go",
+    "api/assistant-api/internal/normalizer/output/output_injection_test.go",
+    "api/assistant-api/internal/transformer/azure/tts.go",
+    "api/assistant-api/internal/transformer/azure/azure_test.go",
+    "api/assistant-api/internal/transformer/google/tts.go",
+    "api/assistant-api/internal/transformer/google/google_test.go",
+    "api/assistant-api/internal/watchdog/tts_completion.go",
+    "api/assistant-api/internal/watchdog/tts_completion_test.go",
+    "rfcs/0019-audio-message-completion/jsons/synthesis-implementation.json"
+  ],
+  "behavior": [
+    "Interim injected speech now emits TextToSpeechTextPacket without TextToSpeechDonePacket, keeping the active producer open.",
+    "Standalone injected speech keeps the previous final text output behavior.",
+    "Azure TTS no longer converts each SDK synthesis-complete callback into TextToSpeechEndPacket. It emits one TextToSpeechEndPacket only after text closure, successful synthesis, and no pending synthesis work.",
+    "Google TTS receive failures and stream timeout are now TextToSpeechErrorPacket paths instead of TextToSpeechEndPacket paths.",
+    "TTS completion watchdog expiry now emits TextToSpeechErrorPacket with TTSNetworkTimeout instead of TextToSpeechEndPacket."
+  ],
+  "unchanged_scope": [
+    "No STT files were edited.",
+    "No idle_timeout files were edited.",
+    "api/assistant-api/internal/type/packet.go was not edited by this worker."
+  ],
+  "verification": [
+    {
+      "command": "go test -count=1 ./api/assistant-api/internal/watchdog",
+      "result": "passed"
+    },
+    {
+      "command": "go test -count=1 ./api/assistant-api/internal/normalizer/output",
+      "result": "passed"
+    },
+    {
+      "command": "go test -count=1 ./api/assistant-api/internal/transformer/azure",
+      "result": "passed with existing local linker warnings for duplicate Speech SDK and onnxruntime rpaths"
+    },
+    {
+      "command": "go test -count=1 ./api/assistant-api/internal/transformer/google",
+      "result": "passed with existing local linker warnings for duplicate Speech SDK and onnxruntime rpaths"
+    },
+    {
+      "command": "go test -count=1 ./api/assistant-api/internal/transformer/...",
+      "result": "passed with existing local linker warnings for duplicate Speech SDK and onnxruntime rpaths"
+    },
+    {
+      "command": "go test -count=1 ./api/assistant-api/internal/normalizer/output/... ./api/assistant-api/internal/watchdog/...",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check -- api/assistant-api/internal/normalizer/output/normalizer.go api/assistant-api/internal/normalizer/output/output_injection_test.go api/assistant-api/internal/transformer/azure/tts.go api/assistant-api/internal/transformer/azure/azure_test.go api/assistant-api/internal/transformer/google/tts.go api/assistant-api/internal/transformer/google/google_test.go api/assistant-api/internal/watchdog/tts_completion.go api/assistant-api/internal/watchdog/tts_completion_test.go rfcs/0019-audio-message-completion/jsons/synthesis-implementation.json",
+      "result": "passed"
+    },
+    {
+      "command": "just agent-finalize \"api/assistant-api/internal/normalizer/output/normalizer.go,api/assistant-api/internal/normalizer/output/output_injection_test.go,api/assistant-api/internal/transformer/azure/tts.go,api/assistant-api/internal/transformer/azure/azure_test.go,api/assistant-api/internal/transformer/google/tts.go,api/assistant-api/internal/transformer/google/google_test.go,api/assistant-api/internal/watchdog/tts_completion.go,api/assistant-api/internal/watchdog/tts_completion_test.go,rfcs/0019-audio-message-completion/jsons/synthesis-implementation.json\"",
+      "result": "passed"
+    }
+  ],
+  "provider_constraints": [
+    "Deepgram, Rime, Sarvam, Cartesia, Smallest, Neuphonic, and the request-per-turn HTTP providers already issue final synthesis only from text closure or request drain in the inspected code path.",
+    "ElevenLabs sends flush=true on text chunks but only emits TextToSpeechEndPacket when the provider returns isFinal; this worker did not change provider protocol fields without a failing local test or provider documentation in scope."
+  ],
+  "blockers": []
+}

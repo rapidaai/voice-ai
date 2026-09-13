@@ -241,11 +241,30 @@ func (e *agentkitExecutor) Write(ctx context.Context, comm internal_type.Communi
 			}
 			now := time.Now()
 			if data.Assistant.GetCompleted() {
+				if !e.canCompleteContext(data.Assistant.GetId()) {
+					comm.OnPacket(ctx, internal_type.ObservabilityEventRecordPacket{
+						ContextID: data.Assistant.GetId(),
+						Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+						Record: observability.RecordEvent{
+							Component: observability.ComponentAgent,
+							Event:     observability.AgentDiscarded,
+							Attributes: observability.Attributes{
+								"provider":   e.Name(),
+								"context_id": data.Assistant.GetId(),
+								"reason":     "stale_context",
+								"script":     msg.Text,
+							},
+							OccurredAt: time.Now(),
+						},
+					})
+					return
+				}
 				e.stateMu.Lock()
 				requestStartedAt := e.requestStartedAt
 				publishTTFT := e.waitingForFirstResponse
 				e.waitingForFirstResponse = false
 				e.requestStartedAt = time.Time{}
+				e.activeContextID = ""
 				e.stateMu.Unlock()
 
 				metrics := []*protos.Metric{{
@@ -377,24 +396,30 @@ func (e *agentkitExecutor) Write(ctx context.Context, comm internal_type.Communi
 			})
 
 	case *protos.TalkOutput_Error:
+		activeContextID := e.getActiveContextID()
+		e.stateMu.Lock()
+		e.activeContextID = ""
+		e.requestStartedAt = time.Time{}
+		e.waitingForFirstResponse = false
+		e.stateMu.Unlock()
 		comm.OnPacket(ctx,
 			internal_type.LLMErrorPacket{
-				ContextID: e.getActiveContextID(),
+				ContextID: activeContextID,
 				Error:     fmt.Errorf("%w %d: %s", ErrAgentkitResponse, data.Error.GetErrorCode(), data.Error.GetErrorMessage()),
 				Type:      internal_type.LLMSystemPanic,
 			},
 			internal_type.ObservabilityEventRecordPacket{
-				ContextID: e.getActiveContextID(),
+				ContextID: activeContextID,
 				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.NewMessageRecord(e.getActiveContextID(), observability.ComponentAgent, observability.AgentError, observability.MessageRoleAssistant, observability.Attributes{
+				Record: observability.NewMessageRecord(activeContextID, observability.ComponentAgent, observability.AgentError, observability.MessageRoleAssistant, observability.Attributes{
 					"provider":   e.Name(),
-					"context_id": e.getActiveContextID(),
+					"context_id": activeContextID,
 					"error":      data.Error.GetErrorMessage(),
 					"code":       fmt.Sprintf("%d", data.Error.GetErrorCode()),
 				}),
 			},
 			internal_type.ObservabilityLogRecordPacket{
-				ContextID: e.getActiveContextID(),
+				ContextID: activeContextID,
 				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
 				Record: observability.RecordLog{
 					Level:   observability.LevelError,
@@ -403,7 +428,7 @@ func (e *agentkitExecutor) Write(ctx context.Context, comm internal_type.Communi
 						"component":  observability.ComponentAgent.String(),
 						"operation":  "response",
 						"provider":   e.Name(),
-						"context_id": e.getActiveContextID(),
+						"context_id": activeContextID,
 						"error":      data.Error.GetErrorMessage(),
 						"code":       fmt.Sprintf("%d", data.Error.GetErrorCode()),
 					},
@@ -411,7 +436,7 @@ func (e *agentkitExecutor) Write(ctx context.Context, comm internal_type.Communi
 				},
 			},
 			internal_type.LLMToolCallPacket{
-				ContextID: e.getActiveContextID(),
+				ContextID: activeContextID,
 				Name:      "end_conversation",
 				Action:    protos.ToolCallAction_TOOL_CALL_ACTION_END_CONVERSATION,
 				Arguments: map[string]string{"reason": data.Error.GetErrorMessage()},
@@ -494,6 +519,12 @@ func (e *agentkitExecutor) isCurrentContext(id string) bool {
 		return true
 	}
 	return id == e.activeContextID
+}
+
+func (e *agentkitExecutor) canCompleteContext(id string) bool {
+	e.stateMu.RLock()
+	defer e.stateMu.RUnlock()
+	return validator.NotBlank(e.activeContextID) && validator.NotBlank(id) && id == e.activeContextID
 }
 
 func (e *agentkitExecutor) getActiveContextID() string {

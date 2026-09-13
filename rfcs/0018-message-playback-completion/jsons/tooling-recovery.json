@@ -1,0 +1,65 @@
+{
+  "date": "2026-09-10",
+  "tier": "Standard",
+  "scope_approval": "User approved fixing the receipt collector with tests and provisioning a local coordinator-only signing key.",
+  "allowed_paths": [
+    "bin/orca-confirm-rfc",
+    "bin/validate-development-process",
+    "rfcs/0018-message-playback-completion/jsons/"
+  ],
+  "acceptance_criteria": [
+    "Only authoritative gate timestamps accept the exact SQLite UTC format emitted by Orca.",
+    "Reviewer timestamps, digest binding, gate approval, run identity, task identity, and artifact write protections remain unchanged.",
+    "The existing approved gate can be collected without modifying the reviewed RFC.",
+    "A private local key signs the implementation plan without entering tracked files, logs, or worker environments."
+  ],
+  "timestamp_evidence": {
+    "source": "Installed Orca app.asar, decision_gates schema and gate resolution update",
+    "created_at": "DEFAULT (datetime('now'))",
+    "resolved_at": "resolved_at = datetime('now')",
+    "conversion": "Exact YYYY-MM-DD HH:MM:SS gate values are UTC; receipt output uses RFC3339 with Z."
+  },
+  "verification": [
+    {
+      "command": "bash bin/validate-development-process",
+      "before_fix": "Failed with Gate created_at must be an RFC3339 timestamp with timezone",
+      "after_fix": "passed"
+    },
+    {
+      "command": "just orca-confirm-rfc-collect run_cb097ce71b98 task_06285ef7cd4f task_06b5c9836d7d rfcs/0018-message-playback-completion/jsons/challenge.json gate_79620eabbe7a rfcs/0018-message-playback-completion.md rfcs/0018-message-playback-completion/jsons/confirmation-approved.json",
+      "result": "passed"
+    },
+    {
+      "command": "just sign-approved-plan run_cb097ce71b98 rfcs/0018-message-playback-completion/jsons/plan.json",
+      "result": "passed with the private key scoped to the signer process environment"
+    },
+    {
+      "command": "Exercise load_approved_plan from .codex/orchestrator/scripts/hook-run.py with the generated lifecycle envelope",
+      "result": "passed: valid attestation accepted; changed plan, wrong key, and missing key rejected"
+    }
+  ],
+  "independent_review": {
+    "agent_id": "01a08c2f-10b3-7f22-a32d-beb6ff23bf08",
+    "scope": "Read-only native review of the Standard tooling diff only; not an RFC or protocol implementation review.",
+    "result": "No findings. Reviewer independently checked shell syntax and 26 timestamp assertions."
+  },
+  "key_provisioning": {
+    "location": "Local coordinator state outside the repository",
+    "directory_mode": "0700",
+    "file_mode": "0600",
+    "generated_bits": 256,
+    "overwrite_policy": "Exclusive creation; an existing key is validated and retained, never silently replaced.",
+    "disclosure": "Key value is not printed or included in repository artifacts."
+  },
+  "attestation": {
+    "file": "rfcs/0018-message-playback-completion/jsons/plan-attestation.json",
+    "lifecycle_envelope": "rfcs/0018-message-playback-completion/jsons/lifecycle.json",
+    "signed_plan_policy": "Do not edit the signed plan in place. Later plan changes require a new attestation and matching envelope."
+  },
+  "risks": [
+    "UTC conversion is limited to the verified SQLite gate format; it does not assign UTC to arbitrary naive timestamps.",
+    "The local key must remain available to the coordinator for later signature validation."
+  ],
+  "rollback": "Revert the collector and its tests together. Preserve approval artifacts and the existing key for signature verification.",
+  "protocol_implementation_started": false
+}

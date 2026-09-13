@@ -7,11 +7,11 @@
 package channel_webrtc
 
 import (
-	"fmt"
+	"errors"
 
 	internal_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	webrtc_internal "github.com/rapidaai/api/assistant-api/internal/channel/webrtc/internal"
-	"github.com/rapidaai/api/assistant-api/internal/observability"
+	"github.com/rapidaai/pkg/channel"
 	"github.com/rapidaai/protos"
 )
 
@@ -21,28 +21,49 @@ func (s *webrtcStreamer) runOutputWriter() {
 		select {
 		case <-s.Ctx.Done():
 			return
-
-		case <-s.flushAudioCh:
-			clearedFrames := s.clearOutputAudio()
-			if clearedFrames > 0 {
-				_ = s.observer.Record(s.Ctx, s.sessionState.Scope, observability.RecordLog{
-					Level:   observability.LevelInfo,
-					Message: "WebRTC output queue cleared after a flush request; this drops queued assistant audio so stale audio is not sent after the client asks to flush playback.",
-					Attributes: observability.Attributes{
-						"component":                              observability.ComponentWebRTC.String(),
-						webrtc_internal.DataType:                 webrtc_internal.EventOutputQueueCleared,
-						webrtc_internal.DataSessionID:            s.sessionID,
-						webrtc_internal.DataReason:               webrtc_internal.OutputQueueClearReasonFlush,
-						webrtc_internal.DataClearedFrames:        fmt.Sprintf("%d", clearedFrames),
-						webrtc_internal.DataRemainingQueueFrames: fmt.Sprintf("%d", webrtc_internal.OutputAudioQueueEmptySize),
-					},
-				})
+		case clearGeneration := <-s.outputClearCh:
+			s.outputWriteMu.Lock()
+			s.outputStateMu.Lock()
+			shouldSendOutputClear := s.outputClearPending && s.pendingClearGeneration == clearGeneration
+			s.outputStateMu.Unlock()
+			if !shouldSendOutputClear {
+				s.outputWriteMu.Unlock()
+				continue
 			}
+			s.Mu.Lock()
+			signalingSessionID := s.signalingSessionID
+			s.Mu.Unlock()
+			if signalingSessionID == "" {
+				signalingSessionID = s.sessionID
+			}
+			// The pending clear fences audio while signaling runs without teardown locks.
+			s.outputWriteMu.Unlock()
+			if !s.dispatchOutput(s.buildGRPCResponse(&protos.ServerSignaling{
+				SessionId: signalingSessionID,
+				Message:   &protos.ServerSignaling_Clear{Clear: true},
+			})) {
+				return
+			}
+			s.outputWriteMu.Lock()
+			s.outputStateMu.Lock()
+			if s.pendingClearGeneration == clearGeneration {
+				s.outputClearPending = false
+				s.pendingClearGeneration = 0
+			}
+			s.outputStateMu.Unlock()
+			s.outputWriteMu.Unlock()
 
-		case msg := <-s.OutputCh:
+		case <-s.OutputCh.Ready():
+			msg, err := s.OutputCh.TryReceive()
+			if errors.Is(err, channel.ErrClosed) {
+				return
+			}
+			if err != nil {
+				continue
+			}
 			if m, ok := msg.(*protos.ConversationAssistantMessage); ok {
-				if audio, ok := m.Message.(*protos.ConversationAssistantMessage_Audio); ok {
-					s.enqueueOutputAudio(audio.Audio)
+				if _, ok := m.Message.(*protos.ConversationAssistantMessage_Audio); ok {
+					s.bufferAndSendOutput(m.GetId(), m.GetAudio(), m.GetCompleted())
 					continue
 				}
 			}

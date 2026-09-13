@@ -1,0 +1,60 @@
+{
+  "rfc": "0016-interruption-lifecycle",
+  "status": "proposed_for_exact_byte_challenge",
+  "date": "2026-09-06",
+  "supersedes": "amendment-05-plan.json",
+  "objective": "Implement a bounded adapter interruption candidate with private STT utterance attribution and internal streamer output controls",
+  "decisions": {
+    "streamer_interface": "unchanged",
+    "output_controls": "Internal PauseOutput, ContinueOutput and FlushOutput values delivered through a private error-returning sendOutputControl path",
+    "candidate": "One requestor-owned candidate with one private utterance sequence and one 500 millisecond timer",
+    "commit": "TurnChangePacket is the sole committed VAD/STT interruption signal",
+    "direct_text": "Direct user text and configured word-trigger paths may emit TurnChangePacket without a VAD candidate",
+    "ordering": "Flush and synchronous old-work reset complete before held STT replay",
+    "output_barrier": "Each streamer serializes audio admission with pause and flush; public interruption notification is non-destructive"
+  },
+  "first_implementation_slice": {
+    "owner": "adapter implementer",
+    "allowed_paths": [
+      "api/assistant-api/internal/type/packet.go",
+      "api/assistant-api/internal/type/output_control.go",
+      "api/assistant-api/internal/adapters/internal/requestor.go",
+      "api/assistant-api/internal/adapters/internal/stream.go",
+      "api/assistant-api/internal/adapters/internal/stream_test.go",
+      "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+      "api/assistant-api/internal/adapters/internal/dispatch_handler_interruption_test.go",
+      "api/assistant-api/internal/transformer/deepgram/stt.go",
+      "api/assistant-api/internal/transformer/deepgram/internal/stt_callback.go",
+      "api/assistant-api/internal/transformer/deepgram/*_test.go"
+    ],
+    "acceptance": [
+      "Pause is sent once without rotating context",
+      "Pause errors commit interruption once",
+      "Meaningful STT with the current utterance sequence commits early",
+      "A delayed prior utterance cannot decide the current candidate",
+      "Active speech commits at 500 milliseconds",
+      "Ended filler-only speech continues at 500 milliseconds",
+      "Direct text and word-trigger paths still commit without a candidate",
+      "Session close stops and joins candidate timer callbacks"
+    ]
+  },
+  "later_required_slices": [
+    "Add output admission, pause, continue and flush to all configured streamers",
+    "Make public interruption notification non-destructive",
+    "Add synchronous old EOS, TTS and LLM reset before held STT replay",
+    "Add conditional lifecycle transition and stale model-result rejection"
+  ],
+  "release_gate": "The first slice may be developed separately but cannot be enabled or released until every later required slice passes verification.",
+  "verification": [
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test -count=1 ./api/assistant-api/internal/type ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/transformer/deepgram/...",
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test -race -count=1 ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/transformer/deepgram/...",
+    "just agent-finalize with exact changed paths",
+    "git diff --check"
+  ],
+  "rollback": "Revert the complete interruption change set and restore direct legacy VAD handling.",
+  "review_status": {
+    "challenge_04": "resolved_in_design",
+    "final_challenge": "pending",
+    "exact_digest_confirmation": "pending"
+  }
+}

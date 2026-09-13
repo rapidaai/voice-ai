@@ -26,6 +26,7 @@ import (
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
+	"google.golang.org/protobuf/proto"
 )
 
 // Streamer implements AudioSocket media streaming over TCP.
@@ -147,7 +148,10 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 }
 
 func (as *Streamer) sendOutputFrame(frame internal_telephony_media.AssistantOutputFrame) error {
-	if as.conn == nil || len(frame.ProviderAudio) == 0 {
+	if as.conn == nil {
+		return io.ErrClosedPipe
+	}
+	if len(frame.ProviderAudio) == 0 {
 		return nil
 	}
 	if err := as.writeFrame(FrameTypeAudio, frame.ProviderAudio); err != nil {
@@ -342,26 +346,29 @@ func (as *Streamer) runFrameReader() {
 	}
 }
 
-func (as *Streamer) Send(response internal_type.Stream) error {
+func (as *Streamer) Send(response proto.Message) error {
+	if as.mediaSession != nil {
+		if outputControlHandled, outputControlError := as.mediaSession.HandleOutputControl(response); outputControlHandled {
+			return outputControlError
+		}
+	}
 	switch data := response.(type) {
 	case *protos.ConversationInitialization:
 		if as.mediaSession != nil {
 			as.mediaSession.HandleInitialization(data)
 		}
 	case *protos.ConversationAssistantMessage:
-		switch content := data.GetMessage().(type) {
+		switch data.GetMessage().(type) {
 		case *protos.ConversationAssistantMessage_Audio:
 			if as.mediaSession == nil {
 				return nil
 			}
-			if err := as.mediaSession.HandleAssistantAudio(content.Audio, data.GetCompleted()); err != nil {
-				return err
+			if _, assistantAudioError := as.mediaSession.HandleAssistantAudio(data.GetId(), data.GetAudio(), data.GetCompleted()); assistantAudioError != nil {
+				return assistantAudioError
 			}
 		}
 	case *protos.ConversationInterruption:
-		if as.mediaSession != nil {
-			as.mediaSession.HandleInterrupt()
-		}
+		return nil
 	case *protos.ConversationDisconnection:
 		// Server-initiated disconnect: the talker already knows the reason
 		// (it called Notify with it). No need to round-trip back through

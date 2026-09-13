@@ -154,6 +154,7 @@ func TestRead_ProcessesMultipleMessages(t *testing.T) {
 func TestE2E_ReadProcessesAndExitsGracefullyOnEOF(t *testing.T) {
 	talker := newMockTalker()
 	e := newTestExecutor(talker)
+	e.activeContextID = "r1"
 	comm, collector := newTestComm()
 
 	talker.recvCh <- recvResult{out: &protos.TalkOutput{
@@ -653,6 +654,9 @@ func TestWrite_AllTypes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e := newTestExecutor()
+			if tt.name == "text_completed" {
+				e.activeContextID = "msg-2"
+			}
 			comm, collector := newTestComm()
 			e.Write(context.Background(), comm, tt.resp)
 			tt.wantFunc(t, collector.all())
@@ -662,6 +666,7 @@ func TestWrite_AllTypes(t *testing.T) {
 
 func TestWrite_CompletedTextContextID(t *testing.T) {
 	e := newTestExecutor()
+	e.activeContextID = "unique-ctx"
 	comm, collector := newTestComm()
 
 	resp := &protos.TalkOutput{
@@ -685,8 +690,50 @@ func TestWrite_CompletedTextContextID(t *testing.T) {
 	assert.Equal(t, "unique-ctx", ev.ContextID)
 }
 
+func TestWrite_CompletedTextWithoutActiveContextDoesNotEmitDone(t *testing.T) {
+	e := newTestExecutor()
+	comm, collector := newTestComm()
+
+	e.Write(context.Background(), comm, &protos.TalkOutput{
+		Data: &protos.TalkOutput_Assistant{
+			Assistant: &protos.ConversationAssistantMessage{
+				Id:        "unique-ctx",
+				Completed: true,
+				Message:   &protos.ConversationAssistantMessage_Text{Text: "late"},
+			},
+		},
+	})
+
+	require.Empty(t, findPackets[internal_type.LLMResponseDonePacket](collector.all()))
+}
+
+func TestWrite_ErrorThenCompletedTextDoesNotEmitDone(t *testing.T) {
+	e := newTestExecutor()
+	e.activeContextID = "ctx-error"
+	comm, collector := newTestComm()
+
+	e.Write(context.Background(), comm, &protos.TalkOutput{
+		Data: &protos.TalkOutput_Error{Error: &protos.Error{
+			ErrorCode:    500,
+			ErrorMessage: "failed",
+		}},
+	})
+	e.Write(context.Background(), comm, &protos.TalkOutput{
+		Data: &protos.TalkOutput_Assistant{
+			Assistant: &protos.ConversationAssistantMessage{
+				Id:        "ctx-error",
+				Completed: true,
+				Message:   &protos.ConversationAssistantMessage_Text{Text: "late"},
+			},
+		},
+	})
+
+	require.Empty(t, findPackets[internal_type.LLMResponseDonePacket](collector.all()))
+}
+
 func TestWrite_FirstDeltaAddsTTFTAndCompletedAddsTRT(t *testing.T) {
 	e := newTestExecutor()
+	e.activeContextID = "ctx-latency"
 	e.requestStartedAt = time.Now().Add(-25 * time.Millisecond)
 	e.waitingForFirstResponse = true
 	comm, collector := newTestComm()
@@ -737,6 +784,7 @@ func TestWrite_FirstDeltaAddsTTFTAndCompletedAddsTRT(t *testing.T) {
 
 func TestWrite_CompletedTextFirstPacketAddsTTFTAndTRT(t *testing.T) {
 	e := newTestExecutor()
+	e.activeContextID = "ctx-completed-latency"
 	e.requestStartedAt = time.Now().Add(-25 * time.Millisecond)
 	e.waitingForFirstResponse = true
 	comm, collector := newTestComm()

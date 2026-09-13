@@ -210,6 +210,10 @@ func (audioProcessor *AudioProcessor) NextOutputFrame() (internal_telephony_medi
 	}, true
 }
 
+func (audioProcessor *AudioProcessor) OutputDrained() bool {
+	return audioProcessor.outputBuffer.Len() == 0
+}
+
 func (audioProcessor *AudioProcessor) IdleOutputFrame() (internal_telephony_media.AssistantOutputFrame, bool) {
 	providerAudio := audioProcessor.applyAmbient(nil)
 	if len(providerAudio) == 0 {
@@ -219,6 +223,9 @@ func (audioProcessor *AudioProcessor) IdleOutputFrame() (internal_telephony_medi
 }
 
 func (audioProcessor *AudioProcessor) ClearOutputBuffer() {
+	if audioProcessor.outputWriter != nil {
+		_ = audioProcessor.outputWriter.Flush()
+	}
 	audioProcessor.outputBuffer.Clear()
 	audioProcessor.bridgeOutputBuffer.Clear()
 }

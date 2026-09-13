@@ -16,6 +16,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/dlclark/regexp2"
+	"golang.org/x/text/unicode/norm"
 )
 
 // tokenizer encodes LiveKit text with byte-level BPE and supported tokenizer.json stages.
@@ -26,10 +27,11 @@ type tokenizer struct {
 	special   map[string]int
 	byteToStr [256]string
 
-	individualDigits   *bool
-	addPrefixSpace     bool
-	byteLevelPattern   *regexp2.Regexp
-	hasTextPreparation bool
+	individualDigits *bool
+	splitPattern     *regexp2.Regexp
+	addPrefixSpace   bool
+	byteLevelPattern *regexp2.Regexp
+	textPreparation  string
 }
 
 type mergePair struct {
@@ -69,6 +71,11 @@ type preTokenizerJSON struct {
 	AddPrefixSpace   *bool              `json:"add_prefix_space"`
 	TrimOffsets      *bool              `json:"trim_offsets"`
 	UseRegex         json.RawMessage    `json:"use_regex"`
+	Pattern          *struct {
+		Regex string `json:"Regex"`
+	} `json:"pattern"`
+	Behavior string `json:"behavior"`
+	Invert   *bool  `json:"invert"`
 }
 
 // newTokenizer loads a HuggingFace tokenizer.json and returns a ready tokenizer.
@@ -125,9 +132,17 @@ func (t *tokenizer) configureTextPreparation(data json.RawMessage) error {
 	if err := decoder.Decode(&config); err != nil {
 		return fmt.Errorf("%w: %w", errTokenizerTextPreparation, err)
 	}
+	if config.Type == "NFC" {
+		if len(config.Steps) != 0 || config.Pattern != nil || config.Content != nil ||
+			config.StripLeft != nil || config.StripRight != nil {
+			return fmt.Errorf("%w: NFC does not accept additional settings", errTokenizerTextPreparation)
+		}
+		t.textPreparation = config.Type
+		return nil
+	}
 	if config.Type != "Sequence" || len(config.Steps) != 2 || config.Pattern != nil ||
 		config.Content != nil || config.StripLeft != nil || config.StripRight != nil {
-		return fmt.Errorf("%w: expected whitespace Replace then Strip", errTokenizerTextPreparation)
+		return fmt.Errorf("%w: expected NFC or whitespace Replace then Strip", errTokenizerTextPreparation)
 	}
 	replace, strip := config.Steps[0], config.Steps[1]
 	if replace.Type != "Replace" || replace.Pattern == nil || replace.Pattern.Regex != `\s+` ||
@@ -140,7 +155,7 @@ func (t *tokenizer) configureTextPreparation(data json.RawMessage) error {
 		strip.Pattern != nil || strip.Content != nil {
 		return fmt.Errorf("%w: expected Strip on both sides", errTokenizerTextPreparation)
 	}
-	t.hasTextPreparation = true
+	t.textPreparation = config.Type
 	return nil
 }
 
@@ -156,20 +171,37 @@ func (t *tokenizer) configurePreTokenizer(data json.RawMessage) error {
 	}
 	if config.Type == "Sequence" {
 		if len(config.PreTokenizers) != 2 || config.IndividualDigits != nil ||
-			config.AddPrefixSpace != nil || config.TrimOffsets != nil || config.UseRegex != nil {
-			return fmt.Errorf("%w: expected Digits then ByteLevel", errTokenizerPreTokenizer)
+			config.AddPrefixSpace != nil || config.TrimOffsets != nil || config.UseRegex != nil ||
+			config.Pattern != nil || config.Behavior != "" || config.Invert != nil {
+			return fmt.Errorf("%w: expected Digits or Split then ByteLevel", errTokenizerPreTokenizer)
 		}
-		digits := config.PreTokenizers[0]
-		if digits.Type != "Digits" || digits.IndividualDigits == nil ||
-			len(digits.PreTokenizers) != 0 || digits.AddPrefixSpace != nil ||
-			digits.TrimOffsets != nil || digits.UseRegex != nil {
-			return fmt.Errorf("%w: expected Digits with individual_digits", errTokenizerPreTokenizer)
+		firstStage := config.PreTokenizers[0]
+		if len(firstStage.PreTokenizers) != 0 || firstStage.AddPrefixSpace != nil ||
+			firstStage.TrimOffsets != nil || firstStage.UseRegex != nil {
+			return fmt.Errorf("%w: unexpected settings on %s stage", errTokenizerPreTokenizer, firstStage.Type)
 		}
-		t.individualDigits = digits.IndividualDigits
+		switch firstStage.Type {
+		case "Digits":
+			if firstStage.IndividualDigits == nil || firstStage.Pattern != nil ||
+				firstStage.Behavior != "" || firstStage.Invert != nil {
+				return fmt.Errorf("%w: expected Digits with individual_digits", errTokenizerPreTokenizer)
+			}
+			t.individualDigits = firstStage.IndividualDigits
+		case "Split":
+			if firstStage.IndividualDigits != nil || firstStage.Pattern == nil ||
+				firstStage.Pattern.Regex != tokenizerMultilingualSplitPattern ||
+				firstStage.Behavior != "Isolated" || firstStage.Invert == nil || *firstStage.Invert {
+				return fmt.Errorf("%w: expected pinned multilingual Split pattern with Isolated behavior and invert=false", errTokenizerPreTokenizer)
+			}
+			t.splitPattern = regexp2.MustCompile(tokenizerMultilingualSplitPattern, regexp2.None)
+		default:
+			return fmt.Errorf("%w: expected Digits or Split before ByteLevel", errTokenizerPreTokenizer)
+		}
 		config = config.PreTokenizers[1]
 	}
 	if config.Type != "ByteLevel" || config.AddPrefixSpace == nil ||
-		len(config.PreTokenizers) != 0 || config.IndividualDigits != nil {
+		len(config.PreTokenizers) != 0 || config.IndividualDigits != nil ||
+		config.Pattern != nil || config.Behavior != "" || config.Invert != nil {
 		return fmt.Errorf("%w: expected ByteLevel with add_prefix_space", errTokenizerPreTokenizer)
 	}
 	t.addPrefixSpace = *config.AddPrefixSpace
@@ -193,6 +225,18 @@ func (t *tokenizer) configurePreTokenizer(data json.RawMessage) error {
 
 func (t *tokenizer) preTokenize(text string) []string {
 	segments := []string{text}
+	if t.splitPattern != nil {
+		// The pinned expression covers every character; each match is an isolated piece.
+		segments = nil
+		match, err := t.splitPattern.FindStringMatch(text)
+		for match != nil && err == nil {
+			segments = append(segments, match.String())
+			match, err = t.splitPattern.FindNextMatch(match)
+		}
+		if err != nil {
+			return nil
+		}
+	}
 	if t.individualDigits != nil {
 		segments = nil
 		start, inNumber := 0, false
@@ -245,7 +289,10 @@ func (t *tokenizer) Encode(text string) []int {
 			ids = append(ids, id)
 			continue
 		}
-		if t.hasTextPreparation {
+		switch t.textPreparation {
+		case "NFC":
+			seg = norm.NFC.String(seg)
+		case "Sequence":
 			// Strip applies to each non-special segment, not across added-token boundaries.
 			seg = strings.Join(strings.Fields(seg), " ")
 			if seg == "" {

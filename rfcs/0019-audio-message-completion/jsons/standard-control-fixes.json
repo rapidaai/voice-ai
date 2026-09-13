@@ -1,0 +1,71 @@
+{
+  "tier": "Standard",
+  "date": "2026-09-11",
+  "status": "verified_and_reviewed",
+  "scope_note": "Separately authorized local control fixes. This does not authorize or implement the pending protobuf and playback-finality amendment.",
+  "acceptance_criteria": [
+    "Repeated telephony flush releases pause even when output was already flushed",
+    "No meaningful STT confirmation at 500 ms continues playback even while VAD remains active",
+    "Explicitly scoped meaningful late STT for the same active message can confirm without reusing an expired decision",
+    "Duplicate active VAD start cannot re-pause the same resumed utterance; VAD end still reaches STT",
+    "Stale or unscoped late transcripts cannot rotate a replacement context",
+    "Unclear-input timeout starts for confirmed interim input and stops on final text",
+    "No new streamer interfaces, pause IDs, helpers, or rollout-default changes"
+  ],
+  "changed_paths": [
+    "api/assistant-api/internal/adapters/lifecycle/message_interruption.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_interruption_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_lifecycle.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_turn.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_vad.go",
+    "api/assistant-api/internal/adapters/internal/interruption_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/media/session.go",
+    "api/assistant-api/internal/channel/telephony/internal/media/session_test.go"
+  ],
+  "ownership": {
+    "coordinator": "Lifecycle and adapter test paths",
+    "native_worker_01a08e87-5bc0-7062-b126-7e8a02af1106": "Only media/session.go and media/session_test.go",
+    "native_reviewer_01a08e8e-3e0d-74f2-acee-9587f709a946": "Read-only independent review of this-turn changes"
+  },
+  "risks": [
+    "Expiry and STT confirmation can race a delayed continue",
+    "Late speech must retain its VAD boundary without crossing a message replacement",
+    "Repeated flush must preserve provider-clear idempotency and existing errors"
+  ],
+  "verification": [
+    {
+      "command": "go test -race -count=1 -timeout=120s ./api/assistant-api/internal/channel/telephony/internal/media",
+      "result": "passed; worker also reproduced the new regression before its fix"
+    },
+    {
+      "command": "go test -race -count=1 -timeout=180s -p 2 ./api/assistant-api/internal/adapters/... ./api/assistant-api/internal/channel/telephony/internal/media ./api/assistant-api/internal/channel/telephony/internal/sip ./api/assistant-api/internal/watchdog",
+      "result": "passed"
+    },
+    {
+      "command": "go test -race -count=1 -timeout=120s -p 2 ./api/assistant-api/internal/adapters/lifecycle ./api/assistant-api/internal/adapters/internal",
+      "result": "passed again after final-only and replacement cleanup tests were added"
+    },
+    {
+      "command": "just agent-finalize with the exact changed-path inventory",
+      "result": "passed for the implementation; final artifact validation is recorded by the coordinator tool run"
+    }
+  ],
+  "review": {
+    "coordination": "native subagent, not an Orca governed dispatch",
+    "decision": "approved",
+    "critical_or_major_findings": [],
+    "coverage_notes_addressed": [
+      "Final-only late transcript after continue",
+      "Resumed-state cleanup on cancellation, context rotation, user-turn replacement, and prompt replacement"
+    ],
+    "final_test_addition_review": "Still approved. No findings in the two test additions.",
+    "reviewer_validation": "Reviewer independently passed scoped agent-finalize and uncached race tests before test-only coverage additions; coordinator reran race tests after those additions."
+  },
+  "rollback": "Revert only this-turn Standard changes, preserving inherited dirty work and protobuf state. Interruption confirmation remains default-off.",
+  "limitations": [
+    "Real carrier and browser playback were not exercised",
+    "Playback completion lifecycle and sequence removal remain pending the amended exact-digest approval"
+  ],
+  "committed": false,
+  "pushed": false
+}

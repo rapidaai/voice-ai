@@ -1,0 +1,59 @@
+{
+  "rfc": "0016-interruption-lifecycle",
+  "status": "proposed_for_exact_byte_challenge",
+  "date": "2026-09-07",
+  "supersedes": "amendment-07-plan.json",
+  "objective": "Implement the dispatch-side serialized interruption decision and unclear-input behavior before streamer consumption",
+  "dispatch_flow": [
+    "VAD start during assistant output emits internal pause and opens one 500 millisecond candidate",
+    "Meaningful non-filler interim STT emits TurnChange and starts the unclear-input watchdog after commit",
+    "Filler-only or empty ended speech emits internal continue at the deadline",
+    "Active speech at the deadline emits TurnChange",
+    "Additional meaningful interim extends the unclear-input watchdog",
+    "Usable non-empty final STT stops the unclear-input watchdog",
+    "Unclear-input expiry injects the configured prompt and never resumes old output"
+  ],
+  "first_implementation_slice": {
+    "owner": "adapter dispatch implementer",
+    "allowed_paths": [
+      "api/assistant-api/internal/type/packet.go",
+      "api/assistant-api/internal/type/output_control.go",
+      "api/assistant-api/internal/adapters/internal/interruption.go",
+      "api/assistant-api/internal/adapters/internal/interruption_test.go",
+      "api/assistant-api/internal/adapters/internal/requestor.go",
+      "api/assistant-api/internal/adapters/internal/stream.go",
+      "api/assistant-api/internal/adapters/internal/stream_test.go",
+      "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+      "api/assistant-api/internal/adapters/internal/dispatch_handler_interruption_test.go",
+      "api/assistant-api/internal/watchdog/unclear_input.go",
+      "api/assistant-api/internal/watchdog/unclear_input_test.go"
+    ],
+    "acceptance": [
+      "Pause is emitted once on qualifying VAD start without context rotation",
+      "Meaningful interim commits TurnChange and starts unclear-input tracking",
+      "Filler-only interim does not commit and does not start unclear-input tracking",
+      "Ended unconfirmed overlap continues at 500 milliseconds",
+      "Active overlap commits at 500 milliseconds",
+      "Usable final STT stops unclear-input tracking",
+      "Empty final STT does not suppress the configured unclear-input prompt",
+      "Unclear-input expiry cannot continue flushed output",
+      "The serialized owner closes each candidate once"
+    ]
+  },
+  "streamer_slice": {
+    "status": "next",
+    "rule": "Do not enable or release the dispatch slice until every configured streamer consumes pause, continue and flush"
+  },
+  "verification": [
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test -count=1 ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/watchdog",
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test -race -count=1 ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/watchdog",
+    "just agent-finalize with exact changed paths",
+    "git diff --check"
+  ],
+  "rollback": "Revert the dispatch interruption slice and restore legacy VAD and unclear-input behavior.",
+  "review_status": {
+    "prior_confirmation_gate": "superseded",
+    "final_challenge": "pending",
+    "exact_digest_confirmation": "pending"
+  }
+}

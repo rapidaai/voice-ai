@@ -40,6 +40,12 @@ type azureTextToSpeech struct {
 	ttsStartedAt  time.Time
 	ttsMetricSent bool
 
+	pendingSynthesis int
+	textClosed       bool
+	synthesisStarted bool
+	synthesisFailed  bool
+	synthesisEndSent bool
+
 	logger      commons.Logger
 	stream      *audio.PullAudioOutputStream
 	audioConfig *audio.AudioConfig
@@ -233,6 +239,11 @@ func (azure *azureTextToSpeech) Transform(ctx context.Context, in internal_type.
 		azure.contextId = in.ContextId()
 		azure.ttsStartedAt = time.Time{}
 		azure.ttsMetricSent = false
+		azure.pendingSynthesis = 0
+		azure.textClosed = false
+		azure.synthesisStarted = false
+		azure.synthesisFailed = false
+		azure.synthesisEndSent = false
 	}
 	azure.mu.Unlock()
 	if cl == nil {
@@ -246,6 +257,11 @@ func (azure *azureTextToSpeech) Transform(ctx context.Context, in internal_type.
 			azure.contextId = ""
 			azure.ttsStartedAt = time.Time{}
 			azure.ttsMetricSent = false
+			azure.pendingSynthesis = 0
+			azure.textClosed = false
+			azure.synthesisStarted = false
+			azure.synthesisFailed = false
+			azure.synthesisEndSent = false
 			azure.mu.Unlock()
 			<-cl.StopSpeakingAsync()
 			azure.onPacket(internal_type.ObservabilityEventRecordPacket{
@@ -270,6 +286,7 @@ func (azure *azureTextToSpeech) Transform(ctx context.Context, in internal_type.
 			azure.ttsStartedAt = time.Now()
 		}
 		azure.mu.Unlock()
+		azure.beginSynthesis(input.ContextID)
 		var res speech.SpeechSynthesisOutcome
 		if strings.Contains(normalizedText, "<break ") {
 			language := "en-US"
@@ -289,6 +306,7 @@ func (azure *azureTextToSpeech) Transform(ctx context.Context, in internal_type.
 			res = <-cl.StartSpeakingTextAsync(normalizedText)
 		}
 		if res.Error != nil {
+			azure.finishSynthesis(input.ContextID, true)
 			synthesisErr := fmt.Errorf("azure-tts: synthesis failed: %w", res.Error)
 			azure.onPacket(
 				internal_type.TextToSpeechErrorPacket{
@@ -313,6 +331,7 @@ func (azure *azureTextToSpeech) Transform(ctx context.Context, in internal_type.
 			)
 			return nil
 		}
+		azure.finishSynthesis(input.ContextID, false)
 		azure.onPacket(internal_type.ObservabilityEventRecordPacket{
 			ContextID: input.ContextID,
 			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
@@ -328,6 +347,7 @@ func (azure *azureTextToSpeech) Transform(ctx context.Context, in internal_type.
 		})
 		return nil
 	case internal_type.TextToSpeechDonePacket:
+		azure.closeText(input.ContextID)
 		return nil
 	default:
 		return fmt.Errorf("azure-tts: unsupported input type %T", in)
@@ -366,25 +386,6 @@ func (azCallback *azureTextToSpeech) OnSpeech(event speech.SpeechSynthesisEventA
 
 func (azCallback *azureTextToSpeech) OnComplete(event speech.SpeechSynthesisEventArgs) {
 	defer event.Close()
-	azCallback.mu.Lock()
-	ctxID := azCallback.contextId
-	azCallback.mu.Unlock()
-	if ctxID == "" {
-		return
-	}
-	azCallback.onPacket(
-		internal_type.TextToSpeechEndPacket{ContextID: ctxID},
-		internal_type.ObservabilityEventRecordPacket{
-			ContextID: ctxID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.RecordEvent{
-				Component:  observability.ComponentTTS,
-				Event:      observability.TTSCompleted,
-				Attributes: observability.Attributes{"type": "completed"},
-				OccurredAt: time.Now(),
-			},
-		},
-	)
 }
 
 func (azCallback *azureTextToSpeech) OnCancel(event speech.SpeechSynthesisEventArgs) {
@@ -394,6 +395,9 @@ func (azCallback *azureTextToSpeech) OnCancel(event speech.SpeechSynthesisEventA
 		azCallback.logger.Warnf("azure-tts: synthesis canceled: reason=%v, errorCode=%v, errorDetails=%v", cancellation.Reason, cancellation.ErrorCode, cancellation.ErrorDetails)
 		azCallback.mu.Lock()
 		ctxID := azCallback.contextId
+		if ctxID != "" {
+			azCallback.synthesisFailed = true
+		}
 		azCallback.mu.Unlock()
 		if ctxID == "" {
 			return
@@ -421,4 +425,72 @@ func (azCallback *azureTextToSpeech) OnCancel(event speech.SpeechSynthesisEventA
 			},
 		)
 	}
+}
+
+func (azure *azureTextToSpeech) beginSynthesis(contextID string) {
+	azure.mu.Lock()
+	defer azure.mu.Unlock()
+	if azure.contextId != contextID {
+		return
+	}
+	azure.pendingSynthesis++
+	azure.synthesisStarted = true
+}
+
+func (azure *azureTextToSpeech) finishSynthesis(contextID string, failed bool) {
+	azure.mu.Lock()
+	if azure.contextId != contextID {
+		azure.mu.Unlock()
+		return
+	}
+	if azure.pendingSynthesis > 0 {
+		azure.pendingSynthesis--
+	}
+	if failed {
+		azure.synthesisFailed = true
+	}
+	packets := azure.synthesisEndPacketsLocked()
+	azure.mu.Unlock()
+	azure.emitPackets(packets)
+}
+
+func (azure *azureTextToSpeech) closeText(contextID string) {
+	azure.mu.Lock()
+	if azure.contextId != contextID {
+		azure.mu.Unlock()
+		return
+	}
+	azure.textClosed = true
+	packets := azure.synthesisEndPacketsLocked()
+	azure.mu.Unlock()
+	azure.emitPackets(packets)
+}
+
+func (azure *azureTextToSpeech) synthesisEndPacketsLocked() []internal_type.Packet {
+	if azure.contextId == "" || !azure.textClosed || !azure.synthesisStarted ||
+		azure.pendingSynthesis != 0 || azure.synthesisFailed || azure.synthesisEndSent {
+		return nil
+	}
+	azure.synthesisEndSent = true
+	ctxID := azure.contextId
+	return []internal_type.Packet{
+		internal_type.TextToSpeechEndPacket{ContextID: ctxID},
+		internal_type.ObservabilityEventRecordPacket{
+			ContextID: ctxID,
+			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+			Record: observability.RecordEvent{
+				Component:  observability.ComponentTTS,
+				Event:      observability.TTSCompleted,
+				Attributes: observability.Attributes{"type": "completed"},
+				OccurredAt: time.Now(),
+			},
+		},
+	}
+}
+
+func (azure *azureTextToSpeech) emitPackets(packets []internal_type.Packet) {
+	if len(packets) == 0 || azure.onPacket == nil {
+		return
+	}
+	azure.onPacket(packets...)
 }

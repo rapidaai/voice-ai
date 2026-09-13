@@ -21,6 +21,7 @@ import (
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 type fakeTransferServer struct {
@@ -147,14 +148,14 @@ type fakeSIPTransferStreamer struct {
 	handler            func(targets []string, postTransferAction string)
 	transferDurationMs string
 	disconnectCalls    int
-	events             []internal_type.Stream
+	events             []proto.Message
 }
 
 func (f *fakeSIPTransferStreamer) Context() context.Context { return context.Background() }
 
-func (f *fakeSIPTransferStreamer) Recv() (internal_type.Stream, error) { return nil, nil }
+func (f *fakeSIPTransferStreamer) Recv() (proto.Message, error) { return nil, nil }
 
-func (f *fakeSIPTransferStreamer) Send(internal_type.Stream) error { return nil }
+func (f *fakeSIPTransferStreamer) Send(proto.Message) error { return nil }
 
 func (f *fakeSIPTransferStreamer) SetTransferRequestHandler(handler func(targets []string, postTransferAction string)) {
 	f.handler = handler
@@ -179,7 +180,7 @@ func (f *fakeSIPTransferStreamer) RecordTransferDurationMetric(durationMs string
 func (f *fakeSIPTransferStreamer) SendTransferToolResult(string, string, string, protos.ToolCallAction, map[string]string) {
 }
 
-func (f *fakeSIPTransferStreamer) SendTransferEvent(event internal_type.Stream) {
+func (f *fakeSIPTransferStreamer) SendTransferEvent(event proto.Message) {
 	f.events = append(f.events, event)
 }
 

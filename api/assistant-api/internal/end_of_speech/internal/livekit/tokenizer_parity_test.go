@@ -72,6 +72,7 @@ func TestTokenizerPreTokenizerSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	splitStage := fmt.Sprintf(`{"type":"Split","pattern":{"Regex":%q},"behavior":"Isolated","invert":false}`, tokenizerMultilingualSplitPattern)
 	cases := []struct {
 		name       string
 		config     string
@@ -90,6 +91,9 @@ func TestTokenizerPreTokenizerSettings(t *testing.T) {
 		{"digits_contiguous", `{"type":"Sequence","pretokenizers":[{"type":"Digits","individual_digits":false},{"type":"ByteLevel","add_prefix_space":false}]}`, "a 123b", []string{"a", " ", "123", "b"}},
 		{"prefix_each_digit_piece", `{"type":"Sequence","pretokenizers":[{"type":"Digits","individual_digits":true},{"type":"ByteLevel","add_prefix_space":true}]}`, "a12b", []string{" a", " 1", " 2", " b"}},
 		{"digits_without_regex", `{"type":"Sequence","pretokenizers":[{"type":"Digits","individual_digits":true},{"type":"ByteLevel","add_prefix_space":false,"use_regex":false}]}`, "foo  bar12", []string{"foo  bar", "1", "2"}},
+		{"split_multilingual", `{"type":"Sequence","pretokenizers":[` + splitStage + `,{"type":"ByteLevel","add_prefix_space":false,"use_regex":false}]}`, "I'M 123", []string{"I", "'M", " ", "1", "2", "3"}},
+		{"split_before_prefix", `{"type":"Sequence","pretokenizers":[` + splitStage + `,{"type":"ByteLevel","add_prefix_space":true,"use_regex":false}]}`, "a12b", []string{" a", " 1", " 2", " b"}},
+		{"split_before_byte_regex", `{"type":"Sequence","pretokenizers":[` + splitStage + `,{"type":"ByteLevel","add_prefix_space":false,"use_regex":true}]}`, "I'M", []string{"I", "'", "M"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -178,6 +182,9 @@ func TestTokenizerRejectsUnsupportedTextPreparation(t *testing.T) {
 		config string
 	}{
 		{"unknown_type", `{"type":"Lowercase"}`},
+		{"nfc_strip_setting", `{"type":"NFC","strip_left":true}`},
+		{"nfc_replacement_setting", `{"type":"NFC","content":" "}`},
+		{"nfc_pattern", `{"type":"NFC","pattern":{"Regex":"x"}}`},
 		{"missing_type", `{}`},
 		{"wrong_shape", `[]`},
 		{"empty_sequence", `{"type":"Sequence","normalizers":[]}`},
@@ -210,6 +217,7 @@ func TestTokenizerRejectsUnsupportedTextPreparation(t *testing.T) {
 }
 
 func TestTokenizerRejectsUnsupportedPreTokenizer(t *testing.T) {
+	splitPattern := fmt.Sprintf(`{"Regex":%q}`, tokenizerMultilingualSplitPattern)
 	cases := []struct {
 		name   string
 		config string
@@ -229,6 +237,19 @@ func TestTokenizerRejectsUnsupportedPreTokenizer(t *testing.T) {
 		{"unknown_setting", `{"type":"ByteLevel","add_prefix_space":false,"pattern":"x"}`},
 		{"misplaced_digit_setting", `{"type":"ByteLevel","add_prefix_space":false,"individual_digits":true}`},
 		{"misplaced_sequence_setting", `{"type":"Sequence","add_prefix_space":false,"pretokenizers":[{"type":"Digits","individual_digits":true},{"type":"ByteLevel","add_prefix_space":false}]}`},
+		{"split_without_byte_level", `{"type":"Split","pattern":` + splitPattern + `,"behavior":"Isolated","invert":false}`},
+		{"split_missing_pattern", `{"type":"Sequence","pretokenizers":[{"type":"Split","behavior":"Isolated","invert":false},{"type":"ByteLevel","add_prefix_space":false}]}`},
+		{"split_other_pattern", `{"type":"Sequence","pretokenizers":[{"type":"Split","pattern":{"Regex":".+"},"behavior":"Isolated","invert":false},{"type":"ByteLevel","add_prefix_space":false}]}`},
+		{"split_literal_pattern", `{"type":"Sequence","pretokenizers":[{"type":"Split","pattern":{"String":"x"},"behavior":"Isolated","invert":false},{"type":"ByteLevel","add_prefix_space":false}]}`},
+		{"split_missing_behavior", `{"type":"Sequence","pretokenizers":[{"type":"Split","pattern":` + splitPattern + `,"invert":false},{"type":"ByteLevel","add_prefix_space":false}]}`},
+		{"split_removed", `{"type":"Sequence","pretokenizers":[{"type":"Split","pattern":` + splitPattern + `,"behavior":"Removed","invert":false},{"type":"ByteLevel","add_prefix_space":false}]}`},
+		{"split_inverted", `{"type":"Sequence","pretokenizers":[{"type":"Split","pattern":` + splitPattern + `,"behavior":"Isolated","invert":true},{"type":"ByteLevel","add_prefix_space":false}]}`},
+		{"split_missing_invert", `{"type":"Sequence","pretokenizers":[{"type":"Split","pattern":` + splitPattern + `,"behavior":"Isolated"},{"type":"ByteLevel","add_prefix_space":false}]}`},
+		{"split_null_invert", `{"type":"Sequence","pretokenizers":[{"type":"Split","pattern":` + splitPattern + `,"behavior":"Isolated","invert":null},{"type":"ByteLevel","add_prefix_space":false}]}`},
+		{"split_digit_setting", `{"type":"Sequence","pretokenizers":[{"type":"Split","pattern":` + splitPattern + `,"behavior":"Isolated","invert":false,"individual_digits":true},{"type":"ByteLevel","add_prefix_space":false}]}`},
+		{"split_pattern_on_digits", `{"type":"Sequence","pretokenizers":[{"type":"Digits","individual_digits":true,"pattern":` + splitPattern + `},{"type":"ByteLevel","add_prefix_space":false}]}`},
+		{"split_pattern_on_byte_level", `{"type":"ByteLevel","add_prefix_space":false,"pattern":` + splitPattern + `}`},
+		{"split_behavior_on_sequence", `{"type":"Sequence","behavior":"Isolated","pretokenizers":[{"type":"Digits","individual_digits":true},{"type":"ByteLevel","add_prefix_space":false}]}`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

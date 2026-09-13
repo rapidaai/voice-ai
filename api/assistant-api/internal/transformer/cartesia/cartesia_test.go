@@ -2,6 +2,7 @@ package internal_transformer_cartesia
 
 import (
 	"context"
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -9,6 +10,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	cartesia_internal "github.com/rapidaai/api/assistant-api/internal/transformer/cartesia/internal"
+	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/internal/testutil"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
@@ -110,6 +113,171 @@ func TestGetTextToSpeechInput_WithExperimentalControls(t *testing.T) {
 	input := opt.GetTextToSpeechInput("test", map[string]interface{}{})
 	assert.Equal(t, "fast", input.ExperimentalControls.Speed)
 	assert.Equal(t, []string{"happy", "excited"}, input.ExperimentalControls.Emotion)
+}
+
+func TestCartesiaTextToSpeechWaitsForTextClosureAndFinalDrain(t *testing.T) {
+	upgrader := websocket.Upgrader{}
+	requests := make(chan map[string]interface{}, 4)
+	serverConn := make(chan *websocket.Conn, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			t.Errorf("upgrade websocket: %v", err)
+			return
+		}
+		serverConn <- conn
+		for {
+			var payload map[string]interface{}
+			if err := conn.ReadJSON(&payload); err != nil {
+				return
+			}
+			requests <- payload
+		}
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+	defer conn.Close()
+	remote := waitCartesiaTTSServerConnection(t, serverConn)
+	defer remote.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	collector := testutil.NewPacketCollector()
+	cred := newVaultCredential(map[string]interface{}{"key": "k"})
+	opt, err := NewCartesiaOption(newTestLogger(), cred, utils.Option{})
+	require.NoError(t, err)
+	tts := &cartesiaTTS{
+		cartesiaOption: opt,
+		ctx:            ctx,
+		ctxCancel:      cancel,
+		connection:     conn,
+		contextId:      "ctx-cartesia",
+		logger:         newTestLogger(),
+		onPacket:       collector.OnPacket,
+		normalizer:     cartesia_internal.NewCartesiaNormalizer(newTestLogger(), utils.Option{}),
+	}
+	go tts.readLoop(conn)
+
+	require.NoError(t, tts.Transform(context.Background(), internal_type.TextToSpeechTextPacket{
+		ContextID: "ctx-cartesia",
+		Text:      "first",
+	}))
+	assert.Equal(t, "first", waitCartesiaTTSRequest(t, requests)["transcript"])
+	require.NoError(t, remote.WriteJSON(map[string]interface{}{
+		"type":       "done",
+		"done":       true,
+		"context_id": "ctx-cartesia",
+	}))
+	time.Sleep(50 * time.Millisecond)
+	assert.Empty(t, collector.EndPackets())
+
+	require.NoError(t, tts.Transform(context.Background(), internal_type.TextToSpeechTextPacket{
+		ContextID: "ctx-cartesia",
+		Text:      "second",
+	}))
+	assert.Equal(t, "second", waitCartesiaTTSRequest(t, requests)["transcript"])
+	require.NoError(t, remote.WriteJSON(map[string]interface{}{
+		"type":       "done",
+		"done":       true,
+		"context_id": "ctx-cartesia",
+	}))
+	time.Sleep(50 * time.Millisecond)
+	assert.Empty(t, collector.EndPackets())
+
+	require.NoError(t, tts.Transform(context.Background(), internal_type.TextToSpeechDonePacket{
+		ContextID: "ctx-cartesia",
+	}))
+	finalRequest := waitCartesiaTTSRequest(t, requests)
+	assert.Equal(t, "", finalRequest["transcript"])
+	assert.Equal(t, false, finalRequest["continue"])
+	require.NoError(t, remote.WriteJSON(map[string]interface{}{
+		"type":       "chunk",
+		"data":       base64.StdEncoding.EncodeToString([]byte{3}),
+		"done":       false,
+		"context_id": "ctx-cartesia",
+	}))
+	require.NoError(t, remote.WriteJSON(map[string]interface{}{
+		"type":       "done",
+		"done":       true,
+		"context_id": "ctx-cartesia",
+	}))
+	collector.WaitForTTSEnd(t, time.Second)
+	assert.Len(t, collector.AudioPackets(), 1)
+	assert.Len(t, collector.EndPackets(), 1)
+}
+
+func TestCartesiaTextToSpeechProviderErrorDoesNotEmitEnd(t *testing.T) {
+	upgrader := websocket.Upgrader{}
+	serverConn := make(chan *websocket.Conn, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			t.Errorf("upgrade websocket: %v", err)
+			return
+		}
+		serverConn <- conn
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+	defer conn.Close()
+	remote := waitCartesiaTTSServerConnection(t, serverConn)
+	defer remote.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	collector := testutil.NewPacketCollector()
+	tts := &cartesiaTTS{
+		ctx:        ctx,
+		ctxCancel:  cancel,
+		connection: conn,
+		contextId:  "ctx-cartesia-error",
+		logger:     newTestLogger(),
+		onPacket:   collector.OnPacket,
+	}
+	go tts.readLoop(conn)
+
+	require.NoError(t, remote.WriteJSON(map[string]interface{}{
+		"type":       "error",
+		"message":    "provider rejected request",
+		"context_id": "ctx-cartesia-error",
+	}))
+	collector.WaitFor(t, time.Second, "TTS error packet", func() bool {
+		for _, packet := range collector.GetPackets() {
+			if _, ok := packet.(internal_type.TextToSpeechErrorPacket); ok {
+				return true
+			}
+		}
+		return false
+	})
+	assert.Empty(t, collector.EndPackets())
+}
+
+func waitCartesiaTTSServerConnection(t *testing.T, ch <-chan *websocket.Conn) *websocket.Conn {
+	t.Helper()
+	select {
+	case conn := <-ch:
+		return conn
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for websocket connection")
+		return nil
+	}
+}
+
+func waitCartesiaTTSRequest(t *testing.T, ch <-chan map[string]interface{}) map[string]interface{} {
+	t.Helper()
+	select {
+	case request := <-ch:
+		return request
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for websocket request")
+		return nil
+	}
 }
 
 func TestGetSpeechToTextConnectionString_Default(t *testing.T) {

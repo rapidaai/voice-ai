@@ -1,0 +1,69 @@
+{
+  "rfc": "rfcs/0016-interruption-lifecycle.md",
+  "plan": "rfcs/0016-interruption-lifecycle/jsons/amendment-03-plan.json",
+  "reviewed_rfc_sha256": "ce630b00fa5176c5cdcfbcf0a2717cf08847f7471a704f1e245ceda00ffe917b",
+  "reviewed_plan_sha256": "e3b217be502b747941c0367626a0a36724c5d13098eda37d095bee81c835607e",
+  "date": "2026-09-06",
+  "reviewer": "independent runtime challenger",
+  "agent_id": "01a075b4-7fbf-79c1-879b-33ffaf2d31cf",
+  "decision": "revision_required",
+  "implementation_authorized": false,
+  "critical_findings": [],
+  "major_findings": [
+    {
+      "id": "C2-M1",
+      "finding": "A filler-only partial can be committed as backchannel at VAD end before a later meaningful final transcript arrives.",
+      "required_resolution": "Wait for the attributed final transcript or a bounded post-VAD deadline before committing a negative result. Eligible timeout, error or empty final must fail toward interruption."
+    },
+    {
+      "id": "C2-M2",
+      "finding": "Positive decisions from partial transcripts have no revision, replacement, stability or confidence contract.",
+      "required_resolution": "Define ordered transcript revisions and the exact evidence allowed to commit an irreversible positive decision."
+    },
+    {
+      "id": "C2-M3",
+      "finding": "The design says VAD owns candidate creation but also permits STT-first candidate creation.",
+      "required_resolution": "Keep STT-first packets as bounded pre-candidate evidence or explicitly define STT-created candidate ownership and expiry."
+    },
+    {
+      "id": "C2-M4",
+      "finding": "Usable, empty and low-confidence transcript behavior is undefined.",
+      "required_resolution": "Define finality, confidence, language, empty-result and invalid-confidence handling."
+    },
+    {
+      "id": "C2-M5",
+      "finding": "An English-only filler list is unsafe as the default for multilingual sessions.",
+      "required_resolution": "Define supported languages and fail-toward-input behavior for unknown or unsupported languages."
+    },
+    {
+      "id": "C2-M6",
+      "finding": "Fallback to VAD can be impossible when min_words remains enabled but attributed STT is unavailable.",
+      "required_resolution": "Define the effective fallback thresholds and compatibility behavior."
+    },
+    {
+      "id": "C2-M7",
+      "finding": "Decision, event, byte and retention limits and overflow ownership remain incomplete or inconsistent.",
+      "required_resolution": "Set exact bounds, deadline origin, non-reset rules and preservation behavior for the bound-crossing packet."
+    },
+    {
+      "id": "C2-M8",
+      "finding": "The proposed file scope does not include the STT construction paths needed to preserve segment identity and capture timestamps.",
+      "required_resolution": "Add exact STT provider paths and parity tests or define a reviewed shared attribution boundary."
+    }
+  ],
+  "minor_findings": [
+    {
+      "id": "C2-m1",
+      "finding": "The RFC body still identifies amendment 01 as current."
+    },
+    {
+      "id": "C2-m2",
+      "finding": "The test matrix omits late final, partial retraction, empty final, confidence, language fallback, rejected lifecycle commit and retained-disposition concurrency cases."
+    }
+  ],
+  "cycle_limit": {
+    "completed_cycles": 2,
+    "maximum_cycles": 2,
+    "next_action": "Escalate unresolved decisions to the repository maintainer. Do not start another correction cycle or implementation."
+  }
+}

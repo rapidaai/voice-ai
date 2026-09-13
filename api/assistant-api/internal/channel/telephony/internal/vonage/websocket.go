@@ -23,6 +23,7 @@ import (
 	"github.com/rapidaai/pkg/commons"
 	protos "github.com/rapidaai/protos"
 	"github.com/vonage/vonage-go-sdk"
+	"google.golang.org/protobuf/proto"
 )
 
 type vonageWebsocketStreamer struct {
@@ -265,7 +266,12 @@ func (vng *vonageWebsocketStreamer) runWebSocketReader(conn *websocket.Conn) {
 	}
 }
 
-func (vng *vonageWebsocketStreamer) Send(response internal_type.Stream) error {
+func (vng *vonageWebsocketStreamer) Send(response proto.Message) error {
+	if vng.mediaSession != nil {
+		if outputControlHandled, outputControlError := vng.mediaSession.HandleOutputControl(response); outputControlHandled {
+			return outputControlError
+		}
+	}
 	if vng.connection == nil {
 		return nil
 	}
@@ -275,20 +281,18 @@ func (vng *vonageWebsocketStreamer) Send(response internal_type.Stream) error {
 			vng.mediaSession.HandleInitialization(data)
 		}
 	case *protos.ConversationAssistantMessage:
-		switch content := data.Message.(type) {
+		switch data.Message.(type) {
 		case *protos.ConversationAssistantMessage_Audio:
 			if vng.mediaSession == nil {
 				return nil
 			}
-			if err := vng.mediaSession.HandleAssistantAudio(content.Audio, data.GetCompleted()); err != nil {
-				return err
+			if _, assistantAudioError := vng.mediaSession.HandleAssistantAudio(data.GetId(), data.GetAudio(), data.GetCompleted()); assistantAudioError != nil {
+				return assistantAudioError
 			}
 			return nil
 		}
 	case *protos.ConversationInterruption:
-		if vng.mediaSession != nil {
-			vng.mediaSession.HandleInterrupt()
-		}
+		return nil
 	case *protos.ConversationDisconnection:
 		_ = vng.Disconnect(data.GetType())
 		conversationUUID := vng.GetConversationUuid()
@@ -524,7 +528,7 @@ func (vng *vonageWebsocketStreamer) sendOutputFrame(frame internal_telephony_med
 	vng.writeMu.Lock()
 	defer vng.writeMu.Unlock()
 	if vng.connection == nil {
-		return nil
+		return fmt.Errorf("Vonage output transport is not connected")
 	}
 	if err := vng.connection.WriteMessage(websocket.BinaryMessage, frame.ProviderAudio); err != nil {
 		_ = vng.Record(observability.RecordLog{

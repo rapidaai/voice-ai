@@ -1,0 +1,208 @@
+{
+  "schema": "rfc0019.implementation_review.v1",
+  "review_type": "independent_verifier_code_review",
+  "run_id": "run_942b61c2cb54",
+  "task_id": "task_d66f54a50648",
+  "dispatch_id": "ctx_d2892513d23c",
+  "worker_terminal": "term_04546307-0af6-47f1-9e43-8c3fc18ee3e2",
+  "reviewed_at": "2026-09-11",
+  "decision": "revise",
+  "highest_severity": "major",
+  "scope_reviewed": [
+    "rfcs/0019-audio-message-completion.md",
+    "rfcs/0019-audio-message-completion/jsons/verification.json",
+    "rfcs/0019-audio-message-completion/jsons/coordinator-implementation.json",
+    "rfcs/0019-audio-message-completion/jsons/producer-implementation.json",
+    "rfcs/0019-audio-message-completion/jsons/producer-correction-01.json",
+    "rfcs/0019-audio-message-completion/jsons/synthesis-implementation.json",
+    "rfcs/0019-audio-message-completion/jsons/synthesis-correction-01.json",
+    "rfcs/0019-audio-message-completion/jsons/transport-implementation.json",
+    "rfcs/0019-audio-message-completion/jsons/transport-correction-01.json",
+    "current git diff and untracked files relevant to RFC0019 producer, synthesis, lifecycle, transport, type, proto, and generated artifacts"
+  ],
+  "rollout_assessment": {
+    "callback_authority_default": "WithPlaybackCompletion defaults false",
+    "native_activation": "pending maintainer approval for caller paths outside current allowed scope",
+    "decision_boundary": "This review does not approve end-to-end callback-authoritative rollout activation."
+  },
+  "findings": [
+    {
+      "id": "RFC0019-REVIEW-01",
+      "severity": "major",
+      "decision": "revise",
+      "title": "Rime can treat a late per-batch done as final after eos",
+      "paths": [
+        {
+          "path": "api/assistant-api/internal/transformer/rime/tts.go",
+          "lines": "240-279"
+        },
+        {
+          "path": "api/assistant-api/internal/transformer/rime/tts.go",
+          "lines": "393-413"
+        },
+        {
+          "path": "api/assistant-api/internal/transformer/rime/rime_test.go",
+          "lines": "148-180"
+        }
+      ],
+      "details": "Rime tracks only one pending drain when TextToSpeechDonePacket sends eos. Any provider done that was caused by an earlier text batch but arrives after eos is sent sees textClosed=true and pendingDrains=1, decrements the counter to zero, emits TextToSpeechEndPacket, closes the connection, and can overtake final eos audio. The current package test sends each pre-final done before TextToSpeechDonePacket, so it does not cover the ordering that the RFC explicitly calls out as pending batch done arriving after eos.",
+      "rfc_requirement": "TextToSpeechEndPacket follows final audio after text closure and all pending synthesis work has drained. Rime done is a per-batch drain, not a whole-message completion signal.",
+      "reproduction": {
+        "command": "go test -count=1 -timeout=30s -overlay=/tmp/rfc0019-review-probes.JPsOH3/rime_overlay.json -run TestRimeLatePreFinalDoneAfterEOSProbe ./api/assistant-api/internal/transformer/rime",
+        "exit_code": 1,
+        "output_excerpt": "--- FAIL: TestRimeLatePreFinalDoneAfterEOSProbe: late pre-final done after eos emitted TextToSpeechEndPacket before final eos audio"
+      },
+      "required_correction": "Track outstanding Rime synthesis batches independently from the final eos drain so a stale or earlier batch done cannot satisfy the final message boundary. Add a regression where a pre-final done arrives after eos and before the eos audio or eos done."
+    },
+    {
+      "id": "RFC0019-REVIEW-02",
+      "severity": "major",
+      "decision": "revise",
+      "title": "Neuphonic still fabricates successful synthesis completion on local text closure",
+      "paths": [
+        {
+          "path": "api/assistant-api/internal/transformer/neuphonic/tts.go",
+          "lines": "130-134"
+        },
+        {
+          "path": "api/assistant-api/internal/transformer/neuphonic/tts.go",
+          "lines": "277-306"
+        }
+      ],
+      "details": "The Neuphonic implementation documents that there is no server-side completion acknowledgement, then emits TextToSpeechEndPacket directly when Transform receives TextToSpeechDonePacket. It also logs a failed stop write but still emits the successful End packet and TTSCompleted event. This violates the RFC requirement that no elapsed-time estimate or local close may fabricate successful final synthesis.",
+      "rfc_requirement": "TTS owns pending provider work, TextToSpeechEndPacket follows the final audio callback after all pending synthesis has drained, and timeout or provider failure is failure rather than successful completion.",
+      "reproduction": {
+        "command": "go test -count=1 -timeout=30s -overlay=/tmp/rfc0019-review-probes.Jy8LZk/neuphonic_overlay.json -run TestNeuphonicDoneDoesNotFabricateSuccessProbe ./api/assistant-api/internal/transformer/neuphonic",
+        "exit_code": 1,
+        "output_excerpt": "--- FAIL: TestNeuphonicDoneDoesNotFabricateSuccessProbe: TextToSpeechDonePacket emitted TextToSpeechEndPacket without provider completion acknowledgement"
+      },
+      "required_correction": "Do not emit successful End for Neuphonic from local TextToSpeechDonePacket alone. If the provider cannot attest completion, keep the provider diagnostic-only for callback-authoritative playback or convert the no-ack closure into an error or unsupported-authoritative path with tests."
+    }
+  ],
+  "positive_checks": [
+    {
+      "area": "lifecycle send and receipt races",
+      "evidence": "SendAssistantMessage records terminalIssued only after send returns nil, holds receiptReceived during terminalSending, clears receipt on send failure, and emits one completion metric plus StartIdleTimeout from CompleteAssistantSpeech.",
+      "paths": [
+        "api/assistant-api/internal/adapters/lifecycle/message_playback.go:40",
+        "api/assistant-api/internal/adapters/lifecycle/message_playback.go:72",
+        "api/assistant-api/internal/adapters/lifecycle/message_playback.go:78",
+        "api/assistant-api/internal/adapters/lifecycle/message_turn.go:107"
+      ]
+    },
+    {
+      "area": "pause, continue, flush, timeout, mode, and cancel",
+      "evidence": "Focused lifecycle and adapter race tests passed for paused receipts, flush discard, playback timeout failure, stale timeout rejection, and control ordering.",
+      "paths": [
+        "api/assistant-api/internal/adapters/lifecycle/message_interruption.go:21",
+        "api/assistant-api/internal/adapters/lifecycle/message_playback_test.go:17",
+        "api/assistant-api/internal/adapters/lifecycle/message_playback_test.go:89"
+      ]
+    },
+    {
+      "area": "audio-only final marker queues",
+      "evidence": "gRPC and WebRTC only route explicit assistant audio oneof messages into playback queues; nil payload completion is tested as non-playback. Telephony media closes each message ID once, rejects closed IDs, and emits a receipt only after successful output send and drain.",
+      "paths": [
+        "api/assistant-api/internal/channel/grpc/streamer.go:296",
+        "api/assistant-api/internal/channel/webrtc/output_loop.go:64",
+        "api/assistant-api/internal/channel/telephony/internal/media/session.go:73",
+        "api/assistant-api/internal/channel/telephony/internal/media/session.go:349"
+      ]
+    },
+    {
+      "area": "producer finality and unique next message IDs",
+      "evidence": "Focused model and agentflow race tests passed for tool-call continuation, duplicate completion, cancellation, context switch, and graph boundary finality. Lifecycle tests passed for fresh message ID allocation after completed playback.",
+      "paths": [
+        "api/assistant-api/internal/llm/model/model_execute.go:425",
+        "api/assistant-api/internal/llm/model/model_execute.go:489",
+        "api/assistant-api/internal/llm/model/model_execute.go:511",
+        "api/assistant-api/internal/llm/agentflow/orchestrator.go:31",
+        "api/assistant-api/internal/llm/agentflow/orchestrator.go:206",
+        "api/assistant-api/internal/adapters/lifecycle/message_playback_test.go:137"
+      ]
+    },
+    {
+      "area": "protobuf reserved tags and generated accessors",
+      "evidence": "ConversationPlaybackComplete reserves tag 3 and name playback_sequence, ConversationAssistantMessage reserves tag 5 and name playback_sequence, runtime accessors are absent, and the focused type contract tests passed.",
+      "paths": [
+        "protos/artifacts/talk-api.proto:219",
+        "protos/artifacts/talk-api.proto:243",
+        "api/assistant-api/internal/type/playback_test.go:76"
+      ]
+    }
+  ],
+  "verification_commands": [
+    {
+      "command": "go test -list 'Playback|Completion|Final|Flush|Pause|Continue|Timeout|Cancel|Tool|Rime|Neuphonic|Sequence|Idle|Metric|Send' ./api/assistant-api/internal/adapters/lifecycle ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/channel/grpc ./api/assistant-api/internal/channel/webrtc ./api/assistant-api/internal/channel/telephony/internal/media ./api/assistant-api/internal/channel/telephony/internal/sip ./api/assistant-api/internal/llm/model ./api/assistant-api/internal/llm/agentflow ./api/assistant-api/internal/llm/agentkit ./api/assistant-api/internal/llm/websocket ./api/assistant-api/internal/transformer/rime ./api/assistant-api/internal/transformer/neuphonic ./api/assistant-api/internal/type",
+      "exit_code": 0,
+      "notes": "Listed and built focused packages. Neuphonic reported no test files."
+    },
+    {
+      "command": "go test -race -count=1 -timeout=120s -run 'TestMessagePlaybackCompletesAfterFinalDelivery|TestMessagePlaybackDeadlineExcludesPause|TestMessagePlaybackEmptyAndTextOnly|TestMessagePlaybackNextSpeechGetsFreshMessageID|TestMessageLifecycle_ConcurrentPlaybackCompletionAcceptsOnce|TestMessageInterruption_PlaybackControlOrdersDelayedPauseBeforeFlushCommit|TestMessageInterruption_PlaybackControlRejectsPauseAfterFlush' ./api/assistant-api/internal/adapters/lifecycle",
+      "exit_code": 0
+    },
+    {
+      "command": "go test -race -count=1 -timeout=120s -run 'TestPlaybackCompletionRequiresTerminalIssuance|TestPlaybackCompletionRejectsDuplicateTerminalBeforeSend|TestPlaybackCompletionPreservesTTSFallbackAndDisabledIdle|TestTextToSpeechEndSendsTerminalAudioAndRetainsActivePlayback|TestPlaybackCompletionFinishesMessageAndStartsIdleTimeout|TestTextToSpeechEndLateReceiptDoesNotDismissLaterPlayback|TestToolSpeechPrecedesFinalProducerBoundary|TestHandleLLMResponseDone_DoesNotStartIdleTimeout|TestHandleTextToSpeechDone_AudioModeDoesNotEmitIdleTimeout|TestStalePlaybackTimeoutDoesNotCloseNewTurn' ./api/assistant-api/internal/adapters/internal",
+      "exit_code": 0,
+      "notes": "Passed with existing duplicate rpath and LC_DYSYMTAB linker warnings."
+    },
+    {
+      "command": "go test -race -count=1 -timeout=180s -run 'TestSend_ExplicitAudioTerminalRespectsPlaybackControls|TestSend_NilPayloadCompletionDoesNotUsePlaybackQueue|TestSend_OutputControlsPauseContinueAndFlushAssistantAudio|TestSend_FlushBeforeFirstAudioBlocksID|TestSend_RepeatedFlushBlocksNewID|TestSend_OutputControlsAreConcurrentSafe|TestRecv_PropagatesErrorsAndDoesNotInventPlaybackCompletion|TestExplicitAudioTerminalSurvivesPauseAndContinue' ./api/assistant-api/internal/channel/grpc",
+      "exit_code": 0
+    },
+    {
+      "command": "go test -race -count=1 -timeout=180s -run 'TestPlaybackCompletionWaitsForInflightWriteAndReleasesLocks|TestSend_OutputPauseContinueRetainsFIFO|TestSend_OutputControlsFenceStagedPacerFrame|TestSend_FlushClearsAndFencesOldOutput|TestSend_FlushBeforeFirstAudioBlocksID|TestSend_RepeatedFlushBlocksNewID|TestSend_FlushSerializesOldAudioAdmission|TestRunOutputWriter_FlushRejectsStagedAudioAndPreservesNonAudio|TestSend_TransferConversation_PushesFailedResult' ./api/assistant-api/internal/channel/webrtc",
+      "exit_code": 0,
+      "notes": "Passed with existing duplicate rpath, duplicate onnxruntime, and LC_DYSYMTAB linker warnings."
+    },
+    {
+      "command": "go test -race -count=1 -timeout=180s -run 'TestMediaSessionPlaybackRequiresTerminalAndSuccessfulSend|TestMediaSessionPlaybackCompletionDoesNotHoldControlLock|TestMediaSessionPlaybackCompletionClosesMessageIDOnce|TestMediaSessionDiscardForTransferSuppressesSameIDCompletion|TestMediaSession_OutputControlPauseContinueRetainsFetchedFrame|TestMediaSession_OutputControlFlushRejectsOldResponse|TestMediaSession_OutputControlFlushBeforeFirstAudioBlocksID|TestMediaSession_OutputControlRepeatedFlushReleasesPause' ./api/assistant-api/internal/channel/telephony/internal/media",
+      "exit_code": 0
+    },
+    {
+      "command": "go test -race -count=1 -timeout=180s -run 'TestModel_ResponsePipeline_DoneWithToolCalls_ExecutesToolsAndOpensBlockWithoutDone|TestModel_ResponsePipeline_DoneWithoutToolCalls_AppendsAssistant|TestModel_ResponsePipeline_DuplicateCompletionEmitsDoneOnce|TestModel_CancelledContextDoesNotEmitDone|TestModel_ToolFollowUp_ValidationFailureBlocksSend|TestModel_ToolFollowUpSendFailurePreventsLateDone|TestModel_MultiTurn_ConcurrentToolResultAndInterrupt_NoLock|TestModel_MultiTurn_5Turn_WithContextSwitchDuringPendingTool' ./api/assistant-api/internal/llm/model",
+      "exit_code": 0
+    },
+    {
+      "command": "go test -race -count=1 -timeout=180s -run 'TestExecutorCancelledTurnDoesNotEmitDone|TestExecute_AgentNodeDefersDoneUntilGraphBoundary|TestExecute_MessageNodeDefersDoneUntilGraphBoundary|TestExecute_TransferNodeDefersDoneUntilGraphBoundary|TestExecute_EmptyGraphStillEmitsDone|TestExecute_AccumulatesFinalText' ./api/assistant-api/internal/llm/agentflow",
+      "exit_code": 0
+    },
+    {
+      "command": "go test -race -count=1 -timeout=180s -run 'Test.*WaitsForTextClosureAndFinalDrain|Test.*ProviderErrorDoesNotEmitEnd' ./api/assistant-api/internal/transformer/elevenlabs ./api/assistant-api/internal/transformer/cartesia ./api/assistant-api/internal/transformer/rime ./api/assistant-api/internal/transformer/sarvam ./api/assistant-api/internal/transformer/resembleai",
+      "exit_code": 0
+    },
+    {
+      "command": "go test -count=1 -timeout=60s ./api/assistant-api/internal/transformer/neuphonic && go test -count=1 -timeout=120s -run 'TestRetiredPlaybackFieldWireContract|TestAssistantTalkPlaybackEnvelopeRoundTrip|TestAssistantTalkPlaybackRejectsMalformedEnvelope' ./api/assistant-api/internal/type",
+      "exit_code": 0,
+      "notes": "Neuphonic has no package tests."
+    },
+    {
+      "command": "python3 static protocol and Neuphonic probe",
+      "exit_code": 0,
+      "notes": "Confirmed proto source reservations and confirmed the Neuphonic source contains the no-ack End emission path."
+    },
+    {
+      "command": "go test -count=1 -timeout=30s -overlay=/tmp/rfc0019-review-probes.JPsOH3/rime_overlay.json -run TestRimeLatePreFinalDoneAfterEOSProbe ./api/assistant-api/internal/transformer/rime",
+      "exit_code": 1,
+      "notes": "Intentional failing probe for a missing regression case."
+    },
+    {
+      "command": "go test -count=1 -timeout=30s -overlay=/tmp/rfc0019-review-probes.Jy8LZk/neuphonic_overlay.json -run TestNeuphonicDoneDoesNotFabricateSuccessProbe ./api/assistant-api/internal/transformer/neuphonic",
+      "exit_code": 1,
+      "notes": "Intentional failing probe for a missing regression case."
+    }
+  ],
+  "compatibility_checks": {
+    "removed_proto_runtime_accessors": "rg found no Go runtime GetPlaybackSequence or PlaybackSequence users outside focused playback tests and generated descriptor bytes.",
+    "reserved_proto_tags": "Confirmed in protos/artifacts/talk-api.proto and api/assistant-api/internal/type playback tests.",
+    "protojson_removed_property": "Covered by TestRetiredPlaybackFieldWireContract in api/assistant-api/internal/type."
+  },
+  "limitations": [
+    "No live carrier, browser, WebRTC peer, or live TTS provider credentials were used.",
+    "Full end-to-end activation remains pending because native caller opt-in paths are outside the current allowed scope.",
+    "The current working tree also contains inherited RFC0017 and RFC0018 files plus unrelated modified support scripts. I reviewed them only for relevance to the RFC0019 playback finality contract."
+  ],
+  "files_modified_by_reviewer": [
+    "rfcs/0019-audio-message-completion/jsons/review-01.json"
+  ]
+}

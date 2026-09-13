@@ -14,11 +14,12 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
-	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/channel"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -27,6 +28,7 @@ const (
 	defaultOutputChannelCapacity = 500
 	criticalChannelCapacity      = 16
 	lowPriorityChannelCapacity   = 512
+	disconnectionDeliveryTimeout = time.Second
 )
 
 // BaseStreamer owns common stream channels and lifecycle. Media buffering,
@@ -37,10 +39,10 @@ type BaseStreamer struct {
 	Ctx        context.Context
 	Cancel     context.CancelFunc
 	Closed     bool
-	CriticalCh chan internal_type.Stream
-	InputCh    *channel.Channel[internal_type.Stream]
-	LowCh      chan internal_type.Stream
-	OutputCh   chan internal_type.Stream
+	CriticalCh *channel.Channel[proto.Message]
+	InputCh    *channel.Channel[proto.Message]
+	LowCh      *channel.Channel[proto.Message]
+	OutputCh   *channel.Channel[proto.Message]
 }
 
 type options struct {
@@ -90,9 +92,30 @@ func New(opts ...Option) BaseStreamer {
 		options.outputChannelCapacity = defaultOutputChannelCapacity
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	inputCh, err := channel.New[internal_type.Stream](channel.Config{
+	criticalCh, err := channel.New[proto.Message](channel.Config{
+		CapacityPolicy: channel.FixedCapacity(criticalChannelCapacity),
+		OverflowPolicy: channel.BlockWhenFull,
+	})
+	if err != nil {
+		panic(err)
+	}
+	inputCh, err := channel.New[proto.Message](channel.Config{
 		CapacityPolicy: channel.FixedCapacity(options.inputChannelCapacity),
 		OverflowPolicy: channel.ReplaceOldestWhenFull,
+	})
+	if err != nil {
+		panic(err)
+	}
+	lowCh, err := channel.New[proto.Message](channel.Config{
+		CapacityPolicy: channel.FixedCapacity(lowPriorityChannelCapacity),
+		OverflowPolicy: channel.RejectNewestWhenFull,
+	})
+	if err != nil {
+		panic(err)
+	}
+	outputCh, err := channel.New[proto.Message](channel.Config{
+		CapacityPolicy: channel.FixedCapacity(options.outputChannelCapacity),
+		OverflowPolicy: channel.BlockWhenFull,
 	})
 	if err != nil {
 		panic(err)
@@ -101,38 +124,34 @@ func New(opts ...Option) BaseStreamer {
 		Logger:     options.logger,
 		Ctx:        ctx,
 		Cancel:     cancel,
-		CriticalCh: make(chan internal_type.Stream, criticalChannelCapacity),
+		CriticalCh: criticalCh,
 		InputCh:    inputCh,
-		LowCh:      make(chan internal_type.Stream, lowPriorityChannelCapacity),
-		OutputCh:   make(chan internal_type.Stream, options.outputChannelCapacity),
+		LowCh:      lowCh,
+		OutputCh:   outputCh,
 	}
 }
 
 // Input routes messages into priority channels consumed by Recv.
-func (s *BaseStreamer) Input(msg internal_type.Stream) {
+func (s *BaseStreamer) Input(msg proto.Message) {
 	switch message := msg.(type) {
-	case *protos.ConversationDisconnection,
+	case *protos.ConversationDisconnection:
+		// Transport teardown must not wait indefinitely for its final notification.
+		ctx, cancel := context.WithTimeout(s.Ctx, disconnectionDeliveryTimeout)
+		defer cancel()
+		if _, err := s.CriticalCh.Send(ctx, msg); errors.Is(err, context.DeadlineExceeded) && s.Logger != nil {
+			s.Logger.Warnw("Disconnection input delivery timed out; proceeding with shutdown")
+		}
+		return
+	case *protos.ConversationPlaybackComplete,
 		*protos.ConversationToolCallResult,
 		*protos.ConversationInitialization,
 		*protos.ConversationConfiguration,
 		*protos.ConversationError:
-		select {
-		case s.CriticalCh <- msg:
-		default:
-			if s.Logger != nil {
-				s.Logger.Warnw("Critical input channel full, dropping message", "type", fmt.Sprintf("%T", msg))
-			}
-		}
+		_, _ = s.CriticalCh.Send(s.Ctx, msg)
 		return
 	case *protos.ConversationUserMessage:
 		if _, isAudio := message.Message.(*protos.ConversationUserMessage_Audio); !isAudio {
-			select {
-			case s.CriticalCh <- msg:
-			default:
-				if s.Logger != nil {
-					s.Logger.Warnw("Critical input channel full, dropping message", "type", fmt.Sprintf("%T", msg))
-				}
-			}
+			_, _ = s.CriticalCh.Send(s.Ctx, msg)
 			return
 		}
 	case *protos.ConversationEvent,
@@ -140,12 +159,9 @@ func (s *BaseStreamer) Input(msg internal_type.Stream) {
 		*protos.ConversationMetadata,
 		*protos.ConversationBridgeUserAudio,
 		*protos.ConversationBridgeOperatorAudio:
-		select {
-		case s.LowCh <- msg:
-		default:
-			if s.Logger != nil {
-				s.Logger.Warnw("Low input channel full, dropping message", "type", fmt.Sprintf("%T", msg))
-			}
+		result, err := s.LowCh.Send(s.Ctx, msg)
+		if err == nil && result.Status == channel.Rejected && s.Logger != nil {
+			s.Logger.Warnw("Low input channel full, dropping message", "type", fmt.Sprintf("%T", msg))
 		}
 		return
 	}
@@ -159,14 +175,16 @@ func (s *BaseStreamer) Input(msg internal_type.Stream) {
 	}
 }
 
-func (s *BaseStreamer) Output(msg internal_type.Stream) {
-	select {
-	case s.OutputCh <- msg:
-	default:
-		if s.Logger != nil {
-			s.Logger.Warnw("Output channel full, dropping message", "type", fmt.Sprintf("%T", msg))
+func (s *BaseStreamer) Output(msg proto.Message) {
+	if _, isDisconnection := msg.(*protos.ConversationDisconnection); isDisconnection {
+		ctx, cancel := context.WithTimeout(s.Ctx, disconnectionDeliveryTimeout)
+		defer cancel()
+		if _, err := s.OutputCh.Send(ctx, msg); errors.Is(err, context.DeadlineExceeded) && s.Logger != nil {
+			s.Logger.Warnw("Disconnection output delivery timed out; proceeding with shutdown")
 		}
+		return
 	}
+	_, _ = s.OutputCh.Send(s.Ctx, msg)
 }
 func (s *BaseStreamer) Disconnect(reason protos.ConversationDisconnection_DisconnectionType) *protos.ConversationDisconnection {
 	s.Mu.Lock()
@@ -186,18 +204,17 @@ func (s *BaseStreamer) Context() context.Context {
 	return s.Ctx
 }
 
-func (s *BaseStreamer) Recv() (internal_type.Stream, error) {
+func (s *BaseStreamer) Recv() (proto.Message, error) {
 	for {
-		select {
-		case msg, ok := <-s.CriticalCh:
-			if !ok {
-				return nil, io.EOF
-			}
+		msg, err := s.CriticalCh.TryReceive()
+		if err == nil {
 			return msg, nil
-		default:
+		}
+		if errors.Is(err, channel.ErrClosed) {
+			return nil, io.EOF
 		}
 
-		msg, err := s.InputCh.TryReceive()
+		msg, err = s.InputCh.TryReceive()
 		if err == nil {
 			return msg, nil
 		}
@@ -206,18 +223,18 @@ func (s *BaseStreamer) Recv() (internal_type.Stream, error) {
 		}
 
 		select {
-		case msg, ok := <-s.CriticalCh:
-			if !ok {
-				return nil, io.EOF
-			}
-			return msg, nil
+		case <-s.CriticalCh.Ready():
+			continue
 		case <-s.InputCh.Ready():
 			continue
-		case msg, ok := <-s.LowCh:
-			if !ok {
+		case <-s.LowCh.Ready():
+			msg, err := s.LowCh.TryReceive()
+			if errors.Is(err, channel.ErrClosed) {
 				return nil, io.EOF
 			}
-			return msg, nil
+			if err == nil {
+				return msg, nil
+			}
 		case <-s.Ctx.Done():
 			return nil, io.EOF
 		}

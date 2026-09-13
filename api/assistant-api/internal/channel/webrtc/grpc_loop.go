@@ -16,15 +16,15 @@ import (
 	observability_collector_requestlog "github.com/rapidaai/api/assistant-api/internal/observability/collectors/requestlog"
 	observability_collector_toollog "github.com/rapidaai/api/assistant-api/internal/observability/collectors/toollog"
 	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/webhook"
-	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/validator"
 	"github.com/rapidaai/protos"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 // buildGRPCResponse wraps stream messages for WebTalk gRPC.
-func (s *webrtcStreamer) buildGRPCResponse(msg internal_type.Stream) *protos.WebTalkResponse {
+func (s *webrtcStreamer) buildGRPCResponse(msg proto.Message) *protos.WebTalkResponse {
 	resp := &protos.WebTalkResponse{Code: webrtc_internal.WebTalkSuccessCode, Success: true}
 	switch m := msg.(type) {
 	case *protos.ConversationAssistantMessage:

@@ -1,0 +1,213 @@
+{
+  "rfc": "rfcs/0016-interruption-lifecycle.md",
+  "artifact_path": "rfcs/0016-interruption-lifecycle/jsons/amendment-01-plan.json",
+  "amends": "rfcs/0016-interruption-lifecycle/jsons/plan.json",
+  "status": "superseded_after_challenge_01",
+  "superseded_by": "rfcs/0016-interruption-lifecycle/jsons/amendment-02-plan.json",
+  "tier": "Governed",
+  "implementation_authorized": false,
+  "priority": "Separate speech activity from interruption decisions before model and provider cancellation work",
+  "current_task_allowed_paths": [
+    "rfcs/0016-interruption-lifecycle.md",
+    "rfcs/0016-interruption-lifecycle/jsons/"
+  ],
+  "defaults_proposed": {
+    "microphone.interruption.mode": "vad",
+    "microphone.interruption.min_duration": "0.5",
+    "microphone.interruption.min_words": "0",
+    "microphone.interruption.resume_false_interruption": "true",
+    "microphone.interruption.false_interruption_timeout": "2.0",
+    "microphone.interruption.backchannel_start_secs": "1.0",
+    "microphone.interruption.backchannel_end_secs": "1.0"
+  },
+  "compatibility": {
+    "microphone.barge_in_trigger=vad": "mode=vad and min_words=0 unless explicitly overridden",
+    "microphone.barge_in_trigger=word": "mode=vad and min_words=1 unless explicitly overridden",
+    "write_policy": "New UI writes use microphone.interruption keys; runtime retains legacy reads during migration"
+  },
+  "proposed_owners": [
+    {
+      "owner": "VAD provider",
+      "responsibility": "Emit speech activity evidence and timestamps only"
+    },
+    {
+      "owner": "Interruption coordinator",
+      "responsibility": "Own overlap identity, eligibility, decision, timer and bounded STT gate"
+    },
+    {
+      "owner": "Message lifecycle",
+      "responsibility": "Own authoritative conversation context and conditional committed transition"
+    },
+    {
+      "owner": "Channel output",
+      "responsibility": "Report response-scoped local playout state; no claim of human reception"
+    },
+    {
+      "owner": "Decision provider",
+      "responsibility": "Return interruption, backchannel or inconclusive for one overlap ID"
+    }
+  ],
+  "state_machine": [
+    {
+      "state": "idle",
+      "events": ["speech_start_during_playout"],
+      "next": "observing"
+    },
+    {
+      "state": "observing",
+      "events": ["duration_or_word_eligible", "speech_end"],
+      "next": "pending_or_inconclusive"
+    },
+    {
+      "state": "pending",
+      "events": ["positive", "negative", "timeout", "provider_error", "speech_end"],
+      "next": "interruption_backchannel_or_inconclusive"
+    },
+    {
+      "state": "terminal",
+      "events": ["late_or_duplicate_result"],
+      "next": "ignore"
+    }
+  ],
+  "transcript_gate": {
+    "opens_when": "Adaptive mode has an active overlap for the current context and local playout response",
+    "positive": "Commit interruption, rotate context once, replay held STT in order into the new context",
+    "negative": "Classify backchannel, discard held overlap STT, preserve assistant response",
+    "inconclusive": "After eligibility, fail toward user input and replay held STT",
+    "bounds": ["maximum event count", "maximum encoded bytes", "maximum hold duration"],
+    "overflow": "Commit eligible interruption and release STT; never silently discard user input",
+    "late_result": "Ignore unless context ID, overlap ID and local playout response ID all match"
+  },
+  "proposed_paths_requiring_exact_inventory": [
+    "api/assistant-api/internal/type/packet.go",
+    "api/assistant-api/internal/type/packet_test.go",
+    "api/assistant-api/internal/type/streamer.go",
+    "api/assistant-api/internal/options/audio.go",
+    "api/assistant-api/internal/interruption/",
+    "api/assistant-api/internal/vad/internal/firered_vad/",
+    "api/assistant-api/internal/vad/internal/silero_vad/",
+    "api/assistant-api/internal/vad/internal/ten_vad/",
+    "api/assistant-api/internal/adapters/router/",
+    "api/assistant-api/internal/adapters/internal/requestor.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+    "api/assistant-api/internal/adapters/internal/*interruption*_test.go",
+    "api/assistant-api/internal/adapters/internal/*vad*_test.go",
+    "api/assistant-api/internal/adapters/internal/*eos*_test.go",
+    "api/assistant-api/internal/adapters/internal/*stt*_test.go",
+    "api/assistant-api/internal/channel/webrtc/",
+    "api/assistant-api/internal/channel/telephony/internal/media/",
+    "ui/src/app/components/providers/microphone/",
+    "ui/src/app/components/providers/__tests__/audio-input-advanced-defaults-parity.test.ts",
+    "ui/src/providers/",
+    "ui/src/providers/__tests__/config-defaults.test.ts"
+  ],
+  "implementation_waves": [
+    {
+      "id": "inventory-gate",
+      "owner": "coordinator",
+      "status": "pending",
+      "actions": [
+        "Resolve exact WebRTC and telephony playout ownership files",
+        "Select and review the adaptive decision provider contract",
+        "Replace wildcard paths with an exact disjoint write set",
+        "Obtain independent challenge and exact-digest confirmation"
+      ]
+    },
+    {
+      "id": "activity-contract",
+      "owner": "VAD and packet worker",
+      "depends_on": ["inventory-gate"],
+      "actions": [
+        "Introduce neutral speech activity packets",
+        "Convert all VAD implementations and tests",
+        "Preserve timestamps and report observed speech duration"
+      ]
+    },
+    {
+      "id": "playout-contract",
+      "owner": "channel worker",
+      "depends_on": ["inventory-gate"],
+      "actions": [
+        "Expose response-scoped local playout start/end through a narrow internal capability",
+        "Implement capability only where the sink has trustworthy evidence",
+        "Leave adaptive mode disabled on unsupported channels"
+      ]
+    },
+    {
+      "id": "decision-and-gate",
+      "owner": "interruption worker",
+      "depends_on": ["activity-contract", "playout-contract"],
+      "actions": [
+        "Implement overlap state machine and eligibility",
+        "Implement VAD mode and adaptive provider result contract",
+        "Hold and resolve STT events using context and overlap identity",
+        "Fail toward user input on timeout, overflow and inconclusive results"
+      ]
+    },
+    {
+      "id": "lifecycle-integration",
+      "owner": "coordinator",
+      "depends_on": ["decision-and-gate"],
+      "actions": [
+        "Invoke conditional lifecycle transition only from committed interruption",
+        "Preserve non-overlap STT and EOS behavior",
+        "Add compatibility mapping and UI/runtime parity"
+      ]
+    },
+    {
+      "id": "model-invalidation",
+      "owner": "model worker",
+      "depends_on": ["lifecycle-integration"],
+      "actions": [
+        "Invalidate the targeted model response",
+        "Reject late completion history and tool admission",
+        "Preserve already admitted tool results"
+      ]
+    }
+  ],
+  "required_tests": [
+    "VAD activity never directly emits interruption commands",
+    "Duration below, at and above 0.5 seconds",
+    "Word count below, at and above configured threshold",
+    "Non-overlap transcripts bypass the gate",
+    "Positive decision replays held STT once into the committed turn",
+    "Negative decision discards only the matching overlap STT",
+    "Inconclusive, timeout and overflow fail toward user input",
+    "Late and duplicate decisions cannot affect a newer overlap",
+    "Adaptive mode requires matching local playout response",
+    "Legacy VAD and word settings map to the new options",
+    "UI and runtime defaults remain equal",
+    "Greeting protection and EOS behavior remain compatible"
+  ],
+  "verification_commands": [
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test -count=1 ./api/assistant-api/internal/interruption ./api/assistant-api/internal/vad/... ./api/assistant-api/internal/adapters/lifecycle ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/llm/model ./api/assistant-api/internal/llm/agentkit",
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test -race -count=1 ./api/assistant-api/internal/interruption ./api/assistant-api/internal/adapters/lifecycle ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/llm/model",
+    "yarn --cwd ui test --watchAll=false audio-input-advanced-defaults-parity",
+    "just agent-finalize \"actual,comma,separated,changed,paths\"",
+    "git diff --check"
+  ],
+  "risks": [
+    "No current adapter-visible local playout boundary",
+    "VAD providers may report onset and duration differently",
+    "Cross-lane VAD and STT events can arrive in either order",
+    "A transcript gate can lose user input if bounds and fallback are wrong",
+    "Adaptive provider latency can make interruption slower than VAD",
+    "Remote audio classification changes privacy and credential boundaries",
+    "Changing the default effective delay can regress barge-in latency",
+    "A late decision can corrupt a newer turn without overlap identity checks"
+  ],
+  "rollback": "Disable adaptive mode, restore legacy option writes, and revert the complete activity/decision contract, gate and channel capability change as one unit. No schema migration is required.",
+  "open_decisions": [
+    "Exact adaptive decision provider and privacy contract",
+    "Exact WebRTC and telephony files providing local playout evidence",
+    "Whether 0.5 seconds becomes the effective default immediately or through staged rollout",
+    "Gate event, byte and duration bounds",
+    "Unicode-aware word counting contract",
+    "Initial channels permitted to enable adaptive mode"
+  ],
+  "review_status": {
+    "independent_challenge": "pending",
+    "exact_digest_confirmation": "pending",
+    "maximum_correction_cycles": 2
+  }
+}

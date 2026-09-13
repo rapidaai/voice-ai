@@ -1,0 +1,21 @@
+{
+  "rfc_file": "rfcs/0016-interruption-lifecycle.md",
+  "plan_file": "rfcs/0016-interruption-lifecycle/jsons/amendment-10-plan.json",
+  "rfc_sha256": "79179187f684ab56de2c3d3fe8b1420787ee5e6b3850da2bd0b58310850d1139",
+  "reviewed_plan_sha256": "3e0a00c6ea6ae8515a554be8b4f6742c0c2a73d32ffc659fbee6d64bd2903f37",
+  "reviewed_at": "2026-09-08T12:38:57Z",
+  "reviewer": "independent Codex architecture challenger",
+  "reviewer_agent_id": "01a080ff-2f18-74d3-9478-50dcc84dac84",
+  "decision": "approved",
+  "approved": true,
+  "critical_findings": 0,
+  "major_findings": [],
+  "minor_findings": [],
+  "implementation_authorized": false,
+  "binding_conditions": [
+    "Deadline and held replay packets use the synchronous requestor router entry instead of OnPacket",
+    "TurnChangePacket carries the candidate interruption sequence",
+    "Held VAD boundaries reach EOS once without re-entering the VAD handler"
+  ],
+  "next_action": "Obtain exact-digest confirmation before implementation."
+}

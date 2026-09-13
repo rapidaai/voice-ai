@@ -1,0 +1,8 @@
+{
+  "date": "2026-09-10",
+  "path": "rfcs/0018-message-playback-completion.md",
+  "owner": "coordinator",
+  "tier": "governed",
+  "reason": "Reliable message completion needs a public segment acknowledgment contract. The existing message ID and completion timestamp do not identify a segment.",
+  "implementation_status": "not_started_pending_exact_digest_confirmation"
+}

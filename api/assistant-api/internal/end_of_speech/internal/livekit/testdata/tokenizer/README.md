@@ -1,5 +1,7 @@
 # Native Tokenizer Fixtures
 
+## English
+
 These 29 bounded cases use token IDs and merge rules from the production tokenizer
 pinned in `docker/assistant-api/native-deps.lock`:
 
@@ -36,6 +38,27 @@ python3 verify_native.py /path/to/pinned/tokenizer.json
 Ordinary Go tests require neither the full asset nor Python. These native outputs
 supersede the earlier boundary-only expectations, which omitted preparation.
 For example, `foo  bar` and `foo\n\nbar` both produce `[15236, 2753]`.
+
+## Multilingual
+
+`multilingual/` contains 39 native token-ID and raw pretokenizer boundary cases
+from revision `87e35fcb1e60a569bea70346191c4886ea92e281`. The source asset SHA-256 is
+`9c5ae00e602b8860cbd784ba82a8aa14e8feecec692e7076590d014d7b7fdafa`.
+This asset applies NFC composition, followed by the pinned isolated regex split
+and `ByteLevel(add_prefix_space=false, trim_offsets=false, use_regex=false)`.
+
+The subset retains 825 vocabulary entries and 555 merges. Native verification
+checks both full and reduced assets, including Unicode composition, mixed-case
+contractions, multilingual chat, whitespace, and special-token boundaries.
+
+```sh
+python3 generate.py /path/to/pinned/multilingual/tokenizer.json --variant multilingual
+python3 verify_native.py /path/to/pinned/multilingual/tokenizer.json --variant multilingual
+```
+
+These fixtures do not change the deployed model or tokenizer selection.
+
+## Limits
 
 Evidence is limited to exact native ID equality on the bounded corpus. It does
 not establish exhaustive Unicode/tokenizer equivalence or model-inference parity.

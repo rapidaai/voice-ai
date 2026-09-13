@@ -1,0 +1,176 @@
+{
+  "rfc": "rfcs/0016-interruption-lifecycle.md",
+  "artifact_path": "rfcs/0016-interruption-lifecycle/jsons/amendment-03-plan.json",
+  "amends": "rfcs/0016-interruption-lifecycle/jsons/amendment-02-plan.json",
+  "challenge": "rfcs/0016-interruption-lifecycle/jsons/challenge-01.json",
+  "status": "draft_pending_transport_threshold_and_challenge_decisions",
+  "tier": "Governed",
+  "implementation_authorized": false,
+  "current_task_allowed_paths": [
+    "rfcs/0016-interruption-lifecycle.md",
+    "rfcs/0016-interruption-lifecycle/jsons/"
+  ],
+  "selected_first_decision": {
+    "mode": "transcript",
+    "activity_source": "VAD opens and updates one interruption candidate",
+    "decision_source": "Attributed STT text decides meaningful speech versus completed filler-only speech",
+    "external_inference": false,
+    "future_acoustic_provider": "Deferred to a separate accepted amendment"
+  },
+  "delivery_order": [
+    "Neutral VAD activity and immutable segment attribution",
+    "Response-scoped local playout capability",
+    "Overlap coordinator and bounded STT gate",
+    "Deterministic transcript decision",
+    "Conditional lifecycle commitment",
+    "Targeted model invalidation"
+  ],
+  "mode_table": [
+    {
+      "mode": "vad",
+      "overlap_required": false,
+      "playout_capability_required": false,
+      "decision": "Commit after all enabled duration and word thresholds pass",
+      "negative_result": "Speech ends before eligibility; suppress only if it overlapped assistant output"
+    },
+    {
+      "mode": "transcript",
+      "overlap_required": true,
+      "playout_capability_required": true,
+      "decision": "VAD opens the candidate; attributed STT commits interruption after meaningful-word and duration eligibility",
+      "negative_result": "Only VAD end can commit filler-only or short transcriptless activity as backchannel"
+    },
+    {
+      "mode": "transcript_fallback",
+      "overlap_required": false,
+      "playout_capability_required": false,
+      "decision": "Use VAD mode for the session when playout or STT attribution is unavailable",
+      "negative_result": "None; transcript classification is disabled"
+    }
+  ],
+  "threshold_semantics": {
+    "positive_combination": "All nonzero duration and meaningful-word thresholds must pass",
+    "min_duration": "Voiced audio duration from detector evidence, never wall-clock silence or queue residence",
+    "min_words": "Count of recognized non-filler words over attributed held transcript; zero disables word gating",
+    "transcriptless_safety": "Below min_duration at VAD end is backchannel; at or above min_duration is inconclusive and fails toward interruption",
+    "legacy_vad": "min_duration=0 and min_words=0 unless new values are explicitly configured",
+    "legacy_word": "mode=vad, min_duration=0 and min_words=1 unless new values are explicitly configured",
+    "new_default": "mode=transcript, min_duration=0.5, min_words=1"
+  },
+  "transcript_decision_contract": {
+    "comparison": "Unicode case folding, punctuation removal and whitespace collapsing over attributed STT",
+    "initial_filler_phrases": ["uh", "um", "erm", "hmm", "mhm", "mm hmm", "uh huh"],
+    "meaningful_partial": "May commit interruption after eligibility",
+    "filler_only_partial": "Remains pending because later text may establish intent",
+    "filler_only_final": "Commits backchannel only after matching VAD end",
+    "mixed_example": "um please stop is interruption because it contains non-filler words",
+    "ownership": "Coordinator owns decision and transcript disposition; STT only supplies attributed evidence"
+  },
+  "identity_contract": {
+    "audio_segment": "Assigned before asynchronous VAD/STT provider work and immutable through callbacks",
+    "overlap": "Created by the coordinator for one segment intersecting one response playout epoch",
+    "response": "Carried from assistant audio message through queue, sink handoff and terminal output event",
+    "decision_revision": "Incremented when an overlap closes or is replaced",
+    "late_data": "Resolved only through a bounded closed-segment disposition; never rebound to current context"
+  },
+  "activity_contract": {
+    "events": ["start", "progress", "end"],
+    "fields": ["context_id", "segment_id", "event", "onset", "observed_at", "voiced_duration"],
+    "producer_rule": "One shared tracker wraps all VAD implementations so timing and reset behavior are consistent",
+    "forbidden": "VAD cannot rotate context or emit model, TTS or channel cancellation"
+  },
+  "playout_contract": {
+    "fields": ["response_id", "epoch", "state", "position", "occurred_at"],
+    "states": ["started", "progress", "drained", "cleared", "dropped", "error", "closed"],
+    "completion": "A sealed response reaches one terminal state after all response-owned queued and in-flight work is retired",
+    "underrun": "Temporary empty queue is not terminal",
+    "atomicity": "Snapshot and subscription ordering cannot miss a transition between the two operations",
+    "meaning": "Local sink evidence only, not proof of remote human reception"
+  },
+  "transcript_gate_contract": {
+    "required_fields": ["segment_id", "captured_start", "captured_end", "provider_result_id"],
+    "stt_first": "First attributed STT may open the overlap before VAD delivery when matching playout exists",
+    "positive": "One resolution claim commits lifecycle and directly replays held STT exactly once to the immutable committed context",
+    "negative": "Discard current and late packets for that closed segment until retention expiry",
+    "inconclusive_or_error": "Fail toward user input and replay once",
+    "overflow": "Safety override; fail toward user input including the packet that crossed the bound",
+    "eos": "EOS sees overlap evidence only after coordinator resolution"
+  },
+  "exact_initial_channel_scope": {
+    "supported_after_implementation": [
+      "WebRTC after response identity survives buffering, pacing and final sink write",
+      "Direct socket telephony paths using shared MediaSession after response-aware frame and terminal semantics"
+    ],
+    "unsupported": [
+      "SIP while the downstream RTP queue is unobserved",
+      "Plain gRPC output without a server-owned sink",
+      "Text mode, disconnected output and transfer-owned output"
+    ],
+    "inventory": "rfcs/0016-interruption-lifecycle/jsons/transport-inventory.json"
+  },
+  "proposed_paths_pending_final_inventory": [
+    "api/assistant-api/internal/type/packet.go",
+    "api/assistant-api/internal/type/packet_test.go",
+    "api/assistant-api/internal/type/streamer.go",
+    "api/assistant-api/internal/options/audio.go",
+    "api/assistant-api/internal/interruption/",
+    "api/assistant-api/internal/vad/vad.go",
+    "api/assistant-api/internal/vad/internal/firered_vad/",
+    "api/assistant-api/internal/vad/internal/silero_vad/",
+    "api/assistant-api/internal/vad/internal/ten_vad/",
+    "api/assistant-api/internal/adapters/router/router.go",
+    "api/assistant-api/internal/adapters/router/dispatch.go",
+    "api/assistant-api/internal/adapters/internal/requestor.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_lifecycle.go",
+    "api/assistant-api/internal/llm/model/model_execute.go",
+    "api/assistant-api/internal/channel/webrtc/streamer.go",
+    "api/assistant-api/internal/channel/webrtc/audio_buffer.go",
+    "api/assistant-api/internal/channel/webrtc/output_loop.go",
+    "api/assistant-api/internal/channel/telephony/internal/media/session.go",
+    "api/assistant-api/internal/channel/telephony/internal/media/types.go",
+    "api/assistant-api/internal/channel/output/",
+    "ui/src/app/components/providers/microphone/",
+    "ui/src/app/components/providers/__tests__/audio-input-advanced-defaults-parity.test.ts",
+    "ui/src/providers/",
+    "ui/src/providers/__tests__/config-defaults.test.ts"
+  ],
+  "test_matrix": [
+    "VAD start/progress/end has one immutable segment ID across each provider",
+    "Stream stall and detector reset do not fabricate voiced duration",
+    "Legacy current and older keys have deterministic precedence",
+    "STT-first and VAD-first delivery resolve the same overlap",
+    "Filler-only partial remains pending and can become meaningful interruption",
+    "Case and punctuation variants match the approved filler phrases",
+    "Mixed filler and meaningful words commit interruption",
+    "Short transcriptless activity is backchannel and eligible transcriptless activity fails toward interruption",
+    "Negative resolution suppresses a late final for the same segment but not the next segment",
+    "Positive resolution replays held STT directly and exactly once to its committed context",
+    "Overflow, timeout, STT error and inconclusive result preserve user input",
+    "EOS cannot commit while the overlap coordinator owns pending evidence",
+    "Playback snapshot/subscription cannot miss start or terminal events",
+    "Temporary underrun does not end local playout",
+    "Stale output epoch cannot reactivate or clear a newer response",
+    "Transcript mode is unavailable on SIP and plain gRPC in the initial scope",
+    "Existing greeting protection and uninterrupted conversation behavior remain unchanged"
+  ],
+  "verification_commands": [
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test -count=1 ./api/assistant-api/internal/interruption ./api/assistant-api/internal/vad/... ./api/assistant-api/internal/adapters/lifecycle ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/llm/model ./api/assistant-api/internal/llm/agentkit ./api/assistant-api/internal/channel/output ./api/assistant-api/internal/channel/webrtc/... ./api/assistant-api/internal/channel/telephony/internal/media/...",
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test -race -count=1 ./api/assistant-api/internal/interruption ./api/assistant-api/internal/adapters/lifecycle ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/llm/model ./api/assistant-api/internal/channel/webrtc/... ./api/assistant-api/internal/channel/telephony/internal/media/...",
+    "yarn --cwd ui test --watchAll=false audio-input-advanced-defaults-parity config-defaults",
+    "just agent-finalize \"actual,comma,separated,changed,paths\"",
+    "git diff --check"
+  ],
+  "blocked_on": [
+    "Exact direct-telephony transport paths after coordinator inventory review",
+    "Measured decision deadline and bounded STT gate limits",
+    "Maintainer approval of the initial filler phrase set and new defaults",
+    "Second independent challenge with no unresolved critical or major findings",
+    "Exact-digest confirmation"
+  ],
+  "review_status": {
+    "challenge_cycle_01": "revision_required",
+    "challenge_cycle_02": "not_started",
+    "exact_digest_confirmation": "pending"
+  }
+}

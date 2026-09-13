@@ -1,0 +1,36 @@
+{
+  "date": "2026-09-11",
+  "status": "blocked_required_security_check",
+  "pr": 270,
+  "branch": "rfc/interruption-lifecycle",
+  "parent": "chore/sip-input-audio-improvement",
+  "fetched_parent_commit": "c20ad28f",
+  "parent_merged": false,
+  "feature_committed": false,
+  "pushed": false,
+  "local_proto_commit": "5998505",
+  "verification": [
+    {
+      "command": "git commit -m 'fix: align interruption and audio message completion lifecycles'",
+      "exit_code": 1,
+      "result": "The security hook cannot type-check native Opus bindings with its forced CGO_ENABLED=0. All other pre-commit hooks passed."
+    },
+    {
+      "command": "git diff --cached --name-only --diff-filter=ACMR -- '*.go' ':!protos/**' | xargs -n 1 dirname | sort -u | sed 's|^|./|' | xargs env CGO_ENABLED=1 golangci-lint run --allow-serial-runners --timeout=5m --enable-only gosec",
+      "exit_code": 1,
+      "log": "/tmp/rfc0019-sync-security.log",
+      "findings": {"G115": 13, "G101": 4, "G602": 1},
+      "result": "Analysis completed; findings require triage. Lifecycle timeout conversions existed in HEAD's dispatcher before their move."
+    }
+  ],
+  "preservation": {
+    "local_changes": "Preserved and unstaged after the failed commit attempt",
+    "tooling_changes": "Restored from the dedicated stash",
+    "retained_backup_stash": "bb171cf75fd268bc9c7124149136efb927e384a7"
+  },
+  "remaining": [
+    "Resolve or adjudicate security findings and native-build hook coverage before publication",
+    "Merge and verify the fetched parent, then push and update the changed-file guide",
+    "Native callback activation remains pending scope approval"
+  ]
+}

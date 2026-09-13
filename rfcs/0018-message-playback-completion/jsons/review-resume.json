@@ -1,0 +1,27 @@
+{
+  "date": "2026-09-10",
+  "request": "Fix next issue: playback-driven idle startup, sharing the completion boundary with assistant message metrics.",
+  "tier": "Governed",
+  "run_id": "run_cb097ce71b98",
+  "task_id": "task_80a85b23c538",
+  "dispatch_id": "ctx_3599b97ddd43",
+  "status": "approval_receipt_collected_and_plan_attested",
+  "receipt_task_id": "task_06b5c9836d7d",
+  "receipt_dispatch_id": "ctx_64a67ddde91f",
+  "worker_release": "released: closed_agent_terminal; transcript captured",
+  "rfc_sha256": "dae79ed71ee7d67db3d4fc2a4bbb338712b9ae35c3e9a13c6fddd8f28f23b8f5",
+  "confirmation_task_id": "task_06285ef7cd4f",
+  "gate_id": "gate_79620eabbe7a",
+  "startup": {
+    "first_dispatch_id": "ctx_e00d7a006abf",
+    "first_result": "agent_prompt_stalled",
+    "recovery": "Reused the same ready terminal with a new tracked dispatch; input accepted.",
+    "first_dispatch_release": "retained: ownership_transferred"
+  },
+  "implementation_started": false,
+  "authorization": "Maintainer approved the reviewed digest, receipt collection succeeded, and the approved plan is signed. The tooling blockers are resolved; protocol implementation has not started.",
+  "preserved_fixes": [
+    "Stale idle countdown expiry rejection",
+    "Playback-tail interruption eligibility after TTS end"
+  ]
+}

@@ -34,6 +34,7 @@ type modelAssistantExecutor struct {
 	providerOptions    utils.Option
 
 	currentPacket           *internal_type.UserInputPacket
+	doneContextID           string
 	requestStartedAt        time.Time
 	waitingForFirstResponse bool
 	mu                      sync.RWMutex

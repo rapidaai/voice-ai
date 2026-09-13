@@ -31,12 +31,16 @@ type elevenlabsTTS struct {
 	ctx       context.Context
 	ctxCancel context.CancelFunc
 
-	mu             sync.Mutex
-	connection     *websocket.Conn
-	contextId      string
-	ttsConnectedAt time.Time
-	ttsStartedAt   time.Time
-	ttsMetricSent  bool
+	mu              sync.Mutex
+	connection      *websocket.Conn
+	contextId       string
+	ttsConnectedAt  time.Time
+	ttsStartedAt    time.Time
+	ttsMetricSent   bool
+	textClosed      bool
+	pendingDrains   int
+	synthesisFailed bool
+	endSent         bool
 
 	logger   commons.Logger
 	onPacket func(pkt ...internal_type.Packet) error
@@ -62,6 +66,31 @@ func NewElevenlabsTextToSpeech(ctx context.Context, logger commons.Logger, crede
 
 func (*elevenlabsTTS) Name() string {
 	return "elevenlabs-tts"
+}
+
+func (elt *elevenlabsTTS) resetTurnLocked(contextID string) {
+	elt.contextId = contextID
+	elt.ttsStartedAt = time.Time{}
+	elt.ttsMetricSent = false
+	elt.textClosed = false
+	elt.pendingDrains = 0
+	elt.synthesisFailed = false
+	elt.endSent = false
+}
+
+func (elt *elevenlabsTTS) recordDrainRequest() {
+	elt.mu.Lock()
+	elt.pendingDrains++
+	elt.mu.Unlock()
+}
+
+func (elt *elevenlabsTTS) recordDrainWriteFailure() {
+	elt.mu.Lock()
+	if elt.pendingDrains > 0 {
+		elt.pendingDrains--
+	}
+	elt.synthesisFailed = true
+	elt.mu.Unlock()
 }
 
 // Initialize opens a fresh WebSocket connection to ElevenLabs and starts the
@@ -127,7 +156,7 @@ func (ct *elevenlabsTTS) Initialize() error {
 }
 
 // readLoop owns a single WebSocket connection for the duration of one TTS turn.
-// It exits when the connection closes — intentionally (interrupt / flush complete)
+// It exits when the connection closes intentionally (interrupt / flush complete)
 // or unexpectedly (network drop).
 func (elt *elevenlabsTTS) readLoop(conn *websocket.Conn) {
 	for {
@@ -180,20 +209,40 @@ func (elt *elevenlabsTTS) readLoop(conn *websocket.Conn) {
 		}
 
 		if audioData.IsFinal != nil && *audioData.IsFinal {
-			elt.handleFlushComplete(conn)
-			return
+			if elt.handleFlushComplete(conn) {
+				return
+			}
 		}
 	}
 }
 
 // handleFlushComplete is called when ElevenLabs signals isFinal. It emits
-// TextToSpeechEndPacket — correctly ordered after the last audio chunk — and
+// TextToSpeechEndPacket, ordered after the last audio chunk, and
 // closes the per-turn connection.
-func (elt *elevenlabsTTS) handleFlushComplete(conn *websocket.Conn) {
+func (elt *elevenlabsTTS) handleFlushComplete(conn *websocket.Conn) bool {
 	elt.mu.Lock()
+	if elt.connection != conn {
+		elt.mu.Unlock()
+		conn.Close()
+		return true
+	}
+	if elt.pendingDrains == 0 {
+		elt.mu.Unlock()
+		return false
+	}
+	elt.pendingDrains--
+	if !elt.textClosed || elt.pendingDrains > 0 || elt.synthesisFailed || elt.endSent {
+		elt.mu.Unlock()
+		return false
+	}
 	ctxId := elt.contextId
+	elt.endSent = true
 	elt.connection = nil // mark before Close so readLoop error handler sees intentional
 	elt.mu.Unlock()
+	if ctxId == "" {
+		conn.Close()
+		return true
+	}
 
 	elt.onPacket(
 		internal_type.TextToSpeechEndPacket{ContextID: ctxId},
@@ -209,14 +258,13 @@ func (elt *elevenlabsTTS) handleFlushComplete(conn *websocket.Conn) {
 		},
 	)
 	conn.Close()
+	return true
 }
 
 func (t *elevenlabsTTS) Transform(ctx context.Context, in internal_type.Packet) error {
 	t.mu.Lock()
 	if in.ContextId() != t.contextId {
-		t.contextId = in.ContextId()
-		t.ttsStartedAt = time.Time{}
-		t.ttsMetricSent = false
+		t.resetTurnLocked(in.ContextId())
 	}
 	connection := t.connection
 	t.mu.Unlock()
@@ -224,9 +272,7 @@ func (t *elevenlabsTTS) Transform(ctx context.Context, in internal_type.Packet) 
 	switch input := in.(type) {
 	case internal_type.TextToSpeechInterruptPacket:
 		t.mu.Lock()
-		t.contextId = ""
-		t.ttsStartedAt = time.Time{}
-		t.ttsMetricSent = false
+		t.resetTurnLocked("")
 		conn := t.connection
 		t.connection = nil
 		t.mu.Unlock()
@@ -271,11 +317,13 @@ func (t *elevenlabsTTS) Transform(ctx context.Context, in internal_type.Packet) 
 		t.mu.Lock()
 		ctxId := t.contextId
 		t.mu.Unlock()
+		t.recordDrainRequest()
 		if err := connection.WriteJSON(map[string]interface{}{
 			"text":       input.Text,
 			"context_id": ctxId,
 			"flush":      true,
 		}); err != nil {
+			t.recordDrainWriteFailure()
 			t.logger.Errorf("elevenlabs-tts: write failed: %v", err)
 			t.onPacket(internal_type.TextToSpeechErrorPacket{ContextID: input.ContextID, Error: fmt.Errorf("elevenlabs-tts: send failed: %w", err), Type: internal_type.TTSNetworkTimeout})
 			return nil
@@ -292,12 +340,14 @@ func (t *elevenlabsTTS) Transform(ctx context.Context, in internal_type.Packet) 
 		})
 
 	case internal_type.TextToSpeechDonePacket:
-		// Interrupted before done arrived — nothing to flush.
+		// Interrupted before done arrived. Nothing to flush.
 		if connection == nil {
 			return nil
 		}
 		t.mu.Lock()
 		ctxId := t.contextId
+		t.textClosed = true
+		t.pendingDrains++
 		t.mu.Unlock()
 		// Signal end of text stream; ElevenLabs will respond with isFinal:true.
 		if err := connection.WriteJSON(map[string]interface{}{
@@ -305,6 +355,7 @@ func (t *elevenlabsTTS) Transform(ctx context.Context, in internal_type.Packet) 
 			"context_id": ctxId,
 			"flush":      true,
 		}); err != nil {
+			t.recordDrainWriteFailure()
 			t.logger.Errorf("elevenlabs-tts: flush signal failed: %v", err)
 			t.onPacket(internal_type.TextToSpeechErrorPacket{ContextID: input.ContextID, Error: fmt.Errorf("elevenlabs-tts: flush failed: %w", err), Type: internal_type.TTSNetworkTimeout})
 			return nil

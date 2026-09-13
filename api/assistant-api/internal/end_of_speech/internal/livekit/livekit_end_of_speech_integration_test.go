@@ -75,20 +75,21 @@ func TestLivekitEndOfSpeech_NativeModelFlow(t *testing.T) {
 			)
 			require.NoError(t, err)
 			nativeEndOfSpeech := endOfSpeech.(*livekitEndOfSpeech)
-			nativePredictor := nativeEndOfSpeech.predictor
-			predictionCount := 0
-			nativeEndOfSpeech.predictor = testPredictor{predictContext: func(ctx context.Context, text string) (float64, error) {
-				probability, predictionError := nativePredictor.PredictContext(ctx, text)
-				require.NoError(t, predictionError)
-				require.False(t, math.IsNaN(probability))
-				require.GreaterOrEqual(t, probability, 0.0)
-				require.LessOrEqual(t, probability, 1.0)
-				t.Logf("model=%s probability=%.6f prompt=%q", modelType, probability, text)
-				predictionCount++
-				return probability, predictionError
-			}}
+			nativePredictor := nativeEndOfSpeech.predictor.(*TurnDetector)
+			type predictionResult struct {
+				probability float64
+				err         error
+			}
+			predictionResults := make(chan predictionResult, 2)
+			nativeEndOfSpeech.predictor = testPredictor{
+				predictContext: func(ctx context.Context, text string) (float64, error) {
+					probability, predictionError := nativePredictor.PredictContext(ctx, text)
+					predictionResults <- predictionResult{probability: probability, err: predictionError}
+					return probability, predictionError
+				},
+				destroy: nativePredictor.Destroy,
+			}
 			t.Cleanup(func() {
-				nativeEndOfSpeech.predictor = nativePredictor
 				require.NoError(t, endOfSpeech.Close(context.Background()))
 			})
 			for _, speech := range []string{"I just wanted to talk to you and then", "Thank you. Goodbye."} {
@@ -101,6 +102,15 @@ func TestLivekitEndOfSpeech_NativeModelFlow(t *testing.T) {
 					Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd,
 				}))
 				select {
+				case result := <-predictionResults:
+					require.NoError(t, result.err)
+					require.False(t, math.IsNaN(result.probability))
+					require.GreaterOrEqual(t, result.probability, 0.0)
+					require.LessOrEqual(t, result.probability, 1.0)
+				case <-time.After(5 * time.Second):
+					t.Fatal("native prediction did not finish")
+				}
+				select {
 				case packet := <-completed:
 					require.Equal(t, speech, packet.Speech)
 					require.Len(t, packet.Speechs, 1)
@@ -108,7 +118,8 @@ func TestLivekitEndOfSpeech_NativeModelFlow(t *testing.T) {
 					t.Fatal("native EOS model flow did not complete")
 				}
 			}
-			require.Equal(t, 2, predictionCount)
+			require.NoError(t, endOfSpeech.Close(context.Background()))
+			require.Empty(t, predictionResults, "unexpected extra native predictions")
 			select {
 			case packet := <-completed:
 				t.Fatalf("duplicate native completion: %+v", packet)
@@ -127,6 +138,7 @@ func TestLivekitEndOfSpeech_CanonicalConstructorOptions(t *testing.T) {
 		extendedTimeout time.Duration
 		maxHistory      int
 		modelType       string
+		expectedError   error
 	}{
 		{
 			name:            "defaults",
@@ -165,7 +177,7 @@ func TestLivekitEndOfSpeech_CanonicalConstructorOptions(t *testing.T) {
 			modelType:       defaultModelType,
 		},
 		{
-			name: "invalid canonical values use defaults",
+			name: "invalid canonical values return an error",
 			options: utils.Option{
 				optKeyThreshold:       "invalid",
 				optKeyQuickTimeout:    "invalid",
@@ -173,11 +185,7 @@ func TestLivekitEndOfSpeech_CanonicalConstructorOptions(t *testing.T) {
 				optKeyMaxHistory:      "invalid",
 				optKeyModel:           "",
 			},
-			threshold:       defaultThreshold,
-			quickTimeout:    time.Duration(defaultQuickTimeout) * time.Millisecond,
-			extendedTimeout: time.Duration(defaultSilenceTimeout) * time.Millisecond,
-			maxHistory:      int(defaultMaxHistory),
-			modelType:       defaultModelType,
+			expectedError: errLivekitInvalidOption,
 		},
 		{
 			name: "aliases ignored",
@@ -193,7 +201,7 @@ func TestLivekitEndOfSpeech_CanonicalConstructorOptions(t *testing.T) {
 			modelType:       defaultModelType,
 		},
 		{
-			name: "invalid canonical values ignore aliases",
+			name: "aliases do not rescue invalid canonical values",
 			options: utils.Option{
 				optKeyQuickTimeout:    "invalid",
 				optKeyExtendedTimeout: "invalid",
@@ -201,11 +209,7 @@ func TestLivekitEndOfSpeech_CanonicalConstructorOptions(t *testing.T) {
 				internal_options.MicrophoneEOSOptionTimeout:         "800",
 				"microphone.eos.silence_timeout":                    "900",
 			},
-			threshold:       defaultThreshold,
-			quickTimeout:    time.Duration(defaultQuickTimeout) * time.Millisecond,
-			extendedTimeout: time.Duration(defaultSilenceTimeout) * time.Millisecond,
-			maxHistory:      int(defaultMaxHistory),
-			modelType:       defaultModelType,
+			expectedError: errLivekitInvalidOption,
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -214,6 +218,11 @@ func TestLivekitEndOfSpeech_CanonicalConstructorOptions(t *testing.T) {
 				WithOptions(test.options),
 				WithOnPacket(func(context.Context, ...internal_type.Packet) error { return nil }),
 			)
+			if test.expectedError != nil {
+				require.ErrorIs(t, err, test.expectedError)
+				require.Nil(t, endOfSpeech)
+				return
+			}
 			require.NoError(t, err)
 			defer endOfSpeech.Close(context.Background())
 			configured := endOfSpeech.(*livekitEndOfSpeech)

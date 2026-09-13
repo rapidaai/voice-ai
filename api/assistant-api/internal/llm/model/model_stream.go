@@ -8,6 +8,7 @@ package internal_llm_model
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -55,16 +56,35 @@ func (e *modelAssistantExecutor) handleToolFollowUp(ctx context.Context, communi
 	connection := e.connection
 	e.mu.RUnlock()
 	if !validator.NonNil(connection) {
+		err := errors.New("stream not connected for tool follow-up")
+		e.mu.Lock()
+		e.currentPacket = nil
+		e.requestStartedAt = time.Time{}
+		e.waitingForFirstResponse = false
+		e.mu.Unlock()
+		communication.OnPacket(ctx, internal_type.LLMErrorPacket{ContextID: contextID, Error: err})
 		e.logger.Errorf("stream not connected for tool follow-up")
 		return
 	}
 	if err := e.validateHistorySequence(snapshot); err != nil {
+		e.mu.Lock()
+		e.currentPacket = nil
+		e.requestStartedAt = time.Time{}
+		e.waitingForFirstResponse = false
+		e.mu.Unlock()
+		communication.OnPacket(ctx, internal_type.LLMErrorPacket{ContextID: contextID, Error: err})
 		e.logger.Errorf("history integrity failed, blocking tool follow-up: %v", err)
 		return
 	}
 	promptArgs := e.buildBasePromptArgs(communication)
 	request, err := e.chatStreamRequest(communication, contextID, promptArgs, snapshot...)
 	if err != nil {
+		e.mu.Lock()
+		e.currentPacket = nil
+		e.requestStartedAt = time.Time{}
+		e.waitingForFirstResponse = false
+		e.mu.Unlock()
+		communication.OnPacket(ctx, internal_type.LLMErrorPacket{ContextID: contextID, Error: err})
 		e.logger.Errorf("tool follow-up request build failed: %v", err)
 		return
 	}
@@ -74,9 +94,11 @@ func (e *modelAssistantExecutor) handleToolFollowUp(ctx context.Context, communi
 	e.mu.Unlock()
 	if err := connection.Send(&protos.StreamChatRequest{Request: &protos.StreamChatRequest_Chat{Chat: request}}); err != nil {
 		e.mu.Lock()
+		e.currentPacket = nil
 		e.requestStartedAt = time.Time{}
 		e.waitingForFirstResponse = false
 		e.mu.Unlock()
+		communication.OnPacket(ctx, internal_type.LLMErrorPacket{ContextID: contextID, Error: err})
 		e.logger.Errorf("tool follow-up send failed: %v", err)
 	}
 }

@@ -1,0 +1,35 @@
+{
+  "rfc": "rfcs/0016-interruption-lifecycle.md",
+  "artifact_path": "rfcs/0016-interruption-lifecycle/jsons/transport-inventory.json",
+  "run_id": "run_94aeb7c54726",
+  "task_id": "task_055d2153dc09",
+  "dispatch_id": "ctx_8d90202da56d",
+  "status": "read_only_inventory",
+  "findings": [
+    "Assistant audio enters channels with a response ID, but WebRTC and telephony reframing discard it before final sink handoff",
+    "TTS terminal messages carry a response ID but are ignored by examined channel audio branches",
+    "WebRTC can support local handoff and drain evidence after response identity, seal, epoch and terminal-event changes",
+    "Shared telephony MediaSession is the common lifecycle owner for direct socket transports and can expose local handoff after common fixes",
+    "SIP has an additional RTP queue that the shared media session cannot observe, so adaptive capability must remain disabled until that queue participates",
+    "Plain gRPC output has no server-owned sink playout receipt and cannot advertise adaptive overlap capability",
+    "Successful local writes and provider clear submissions do not prove remote human playback or remote queue drain"
+  ],
+  "required_contract": [
+    "Carry response ID and output epoch through every queued and in-flight frame",
+    "Seal a response on the actual audio completion marker",
+    "Report started, progress, drained, cleared, dropped, error and closed",
+    "Treat temporary underrun as active until sealed terminal state",
+    "Make capability unavailable during text mode, disconnect, transfer ownership or unusable output",
+    "Define atomic snapshot and observer subscription ordering"
+  ],
+  "initial_supported_scope": [
+    "WebRTC after exact file amendment",
+    "Direct telephony transports using shared MediaSession after exact file amendment"
+  ],
+  "initial_unsupported_scope": [
+    "SIP until the RTP queue reports response-scoped state",
+    "Plain gRPC output without a server-owned playback sink",
+    "Any channel that loses response identity or cannot seal and drain a response"
+  ],
+  "approval": false
+}

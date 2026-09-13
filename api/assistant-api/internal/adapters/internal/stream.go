@@ -17,6 +17,7 @@ import (
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
+	"google.golang.org/protobuf/proto"
 )
 
 // =============================================================================
@@ -45,6 +46,18 @@ func (t *genericRequestor) Talk(_ context.Context, auth *types.Authentication) e
 			t.OnStreamModeSwitch(t.streamer.Context(), payload)
 		case *protos.ConversationUserMessage:
 			t.OnStreamUserMessage(t.streamer.Context(), payload)
+		case *protos.ConversationPlaybackComplete:
+			receivedAt := time.Now()
+			completedAt := receivedAt
+			if payload.GetTime() != nil && payload.GetTime().IsValid() {
+				completedAt = payload.GetTime().AsTime()
+			}
+			// Receipts use synchronous dispatch so replace-oldest queues cannot drop them.
+			t.dispatch(t.streamer.Context(), internal_type.PlaybackCompletedPacket{
+				ContextID:   payload.GetId(),
+				CompletedAt: completedAt,
+				ReceivedAt:  receivedAt,
+			})
 		case *protos.ConversationToolCallResult:
 			t.OnPacket(t.streamer.Context(), internal_type.LLMToolResultPacket{
 				ToolID:    payload.GetToolId(),
@@ -234,11 +247,28 @@ func (t *genericRequestor) OnCallCompletion(startTime time.Time) {
 }
 
 // Notify sends notifications to websocket for various events.
-func (t *genericRequestor) Notify(ctx context.Context, actionDatas ...internal_type.Stream) error {
+func (t *genericRequestor) Notify(ctx context.Context, actionDatas ...proto.Message) error {
 	for _, actionData := range actionDatas {
-		if err := t.streamer.Send(actionData); err != nil {
-			t.logger.Errorf("error while notifing client %v", err)
+		if message, ok := actionData.(*protos.ConversationAssistantMessage); ok && t.messageLifecycle != nil {
+			if err := t.messageLifecycle.SendAssistantMessage(message); err != nil {
+				return err
+			}
+		} else if err := t.streamer.Send(actionData); err != nil {
+			return err
 		}
+	}
+	return nil
+}
+
+func (r *genericRequestor) sendOutputControl(control proto.Message) error {
+	if r.streamer == nil {
+		return fmt.Errorf("output control %T: streamer is unavailable", control)
+	}
+	if r.messageLifecycle == nil {
+		return fmt.Errorf("output control %T: message lifecycle is unavailable", control)
+	}
+	if err := r.messageLifecycle.SendPlaybackControl(control); err != nil {
+		return fmt.Errorf("output control %T: %w", control, err)
 	}
 	return nil
 }
@@ -334,6 +364,7 @@ func (r *genericRequestor) OnConnect(ctx context.Context, auth *types.Authentica
 // HandleFinalizationCompleted (normal completion) or by the watchdog if the
 // chain exceeds disconnectDeadline.
 func (r *genericRequestor) OnDisconnect(ctx context.Context) {
+	r.messageLifecycle.OnMessageFailed(r.GetID())
 	if err := r.sessionLifecycle.Transition(adapter_lifecycle.EventDisconnectRequested); err != nil {
 		r.logger.Tracef(ctx, "disconnect ignored due to session lifecycle transition: %v", err)
 		return

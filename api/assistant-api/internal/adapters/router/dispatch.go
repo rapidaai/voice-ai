@@ -25,6 +25,7 @@ type DispatchHandler interface {
 	HandleEndOfSpeech(context.Context, internal_type.EndOfSpeechPacket)
 	HandleUserInput(context.Context, internal_type.UserInputPacket)
 	HandleInterruptionDetected(context.Context, internal_type.InterruptionDetectedPacket)
+	HandleInterruptionDecisionExpired(context.Context, internal_type.InterruptionDecisionExpiredPacket)
 	HandleEndOfSpeechInterruption(context.Context, internal_type.EndOfSpeechInterruptionPacket)
 	HandleEndOfSpeechAudio(context.Context, internal_type.EndOfSpeechAudioPacket)
 	HandleTextToSpeechInterrupt(context.Context, internal_type.TextToSpeechInterruptPacket)
@@ -46,6 +47,7 @@ type DispatchHandler interface {
 	HandleTextToSpeechDone(context.Context, internal_type.TextToSpeechDonePacket)
 	HandleTextToSpeechAudio(context.Context, internal_type.TextToSpeechAudioPacket)
 	HandleTextToSpeechEnd(context.Context, internal_type.TextToSpeechEndPacket)
+	HandlePlaybackCompleted(context.Context, internal_type.PlaybackCompletedPacket)
 	HandleLLMToolCall(context.Context, internal_type.LLMToolCallPacket)
 	HandleLLMToolResult(context.Context, internal_type.LLMToolResultPacket)
 	HandleRecordUserAudio(context.Context, internal_type.RecordUserAudioPacket)
@@ -129,6 +131,8 @@ func DispatchPacket(ctx context.Context, p internal_type.Packet, handler Dispatc
 		handler.HandleUserInput(ctx, vl)
 	case internal_type.InterruptionDetectedPacket:
 		handler.HandleInterruptionDetected(ctx, vl)
+	case internal_type.InterruptionDecisionExpiredPacket:
+		handler.HandleInterruptionDecisionExpired(ctx, vl)
 	case internal_type.TextToSpeechInterruptPacket:
 		handler.HandleTextToSpeechInterrupt(ctx, vl)
 	case internal_type.LLMInterruptPacket:
@@ -167,6 +171,8 @@ func DispatchPacket(ctx context.Context, p internal_type.Packet, handler Dispatc
 		handler.HandleTextToSpeechAudio(ctx, vl)
 	case internal_type.TextToSpeechEndPacket:
 		handler.HandleTextToSpeechEnd(ctx, vl)
+	case internal_type.PlaybackCompletedPacket:
+		handler.HandlePlaybackCompleted(ctx, vl)
 	case internal_type.LLMToolCallPacket:
 		handler.HandleLLMToolCall(ctx, vl)
 	case internal_type.LLMToolResultPacket:

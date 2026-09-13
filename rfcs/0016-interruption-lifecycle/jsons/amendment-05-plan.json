@@ -1,0 +1,80 @@
+{
+  "rfc": "0016-interruption-lifecycle",
+  "status": "proposed_for_exact_byte_challenge",
+  "date": "2026-09-06",
+  "objective": "Pause output on overlapping VAD, decide within 500 milliseconds, and make TurnChangePacket the only committed interruption",
+  "acceptance_criteria": [
+    "VAD start during assistant output sends one internal pause without context rotation or TTS and LLM interruption",
+    "Meaningful STT before the deadline emits one TurnChangePacket",
+    "Speech active at the deadline emits one TurnChangePacket",
+    "Speech ended without meaningful text sends one internal continue at the deadline",
+    "TurnChangePacket flushes output before interrupting old TTS and LLM work",
+    "Held meaningful STT is replayed once into the new context",
+    "Late candidate events cannot affect a later turn",
+    "The Streamer interface remains unchanged",
+    "Every configured streamer consumes pause, continue and flush before rollout"
+  ],
+  "implementation_order": [
+    "Define internal PauseOutput, ContinueOutput and FlushOutput stream values",
+    "Add one requestor-owned candidate and fake-clock deadline handling",
+    "Change VAD and STT adapter handlers to emit pause, continue or TurnChangePacket",
+    "Make TurnChangePacket the ordered commit owner",
+    "Add output-control consumption to every streamer",
+    "Add conditional lifecycle transition and stale model-result rejection",
+    "Verify all packages and obtain independent code review"
+  ],
+  "first_implementation_slice": {
+    "owner": "adapter implementer",
+    "allowed_paths": [
+      "api/assistant-api/internal/type/packet.go",
+      "api/assistant-api/internal/type/output_control.go",
+      "api/assistant-api/internal/adapters/internal/requestor.go",
+      "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+      "api/assistant-api/internal/adapters/internal/dispatch_handler_interruption_test.go",
+      "api/assistant-api/internal/adapters/router/dispatch.go",
+      "api/assistant-api/internal/adapters/router/router.go",
+      "api/assistant-api/internal/adapters/router/dispatch_test.go",
+      "api/assistant-api/internal/adapters/router/router_test.go"
+    ],
+    "excluded_paths": [
+      "api/assistant-api/internal/type/streamer.go",
+      "protos/",
+      "ui/",
+      "api/integration-api/"
+    ],
+    "required_tests": [
+      "pause once on VAD start",
+      "no context rotation during pending candidate",
+      "meaningful STT commits before deadline",
+      "active VAD commits at deadline",
+      "ended filler-only speech continues at deadline",
+      "late STT and deadline are ignored",
+      "turn change orders flush before old-work interruption and held-text replay"
+    ]
+  },
+  "concurrency": {
+    "owner": "genericRequestor",
+    "rule": "One lock owns the sole candidate and its timer",
+    "timer": "The callback enqueues a deadline packet and never mutates candidate state directly",
+    "duplicates": "Repeated activity and late events are idempotent no-ops after the candidate closes"
+  },
+  "failure_behavior": {
+    "pause_failure": "Commit interruption",
+    "stt_error_speech_active": "Commit at deadline",
+    "stt_error_speech_ended": "Continue at deadline",
+    "flush_failure": "Log and keep the accepted turn change",
+    "session_close": "Stop the timer and discard held evidence"
+  },
+  "verification": [
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test -count=1 ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/adapters/router",
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test -race -count=1 ./api/assistant-api/internal/adapters/internal",
+    "just agent-finalize with exact changed paths",
+    "git diff --check"
+  ],
+  "rollback": "Revert the complete interruption change set and restore direct legacy VAD handling. Do not enable the adapter path until all streamer consumers exist.",
+  "review_status": {
+    "prior_challenges": "superseded",
+    "final_challenge": "pending",
+    "exact_digest_confirmation": "pending"
+  }
+}

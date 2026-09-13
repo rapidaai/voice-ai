@@ -1,0 +1,25 @@
+{
+  "rfc": "rfcs/0016-interruption-lifecycle.md",
+  "artifact_path": "rfcs/0016-interruption-lifecycle/jsons/reservation.json",
+  "created": "2026-09-06",
+  "owner": "assistant-runtime-coordinator",
+  "tier": "Governed",
+  "reason": "User explicitly requested an RFC before implementation",
+  "reservation": {
+    "method": "atomic mkdir under Git common metadata",
+    "relative_to_git_common_dir": "orca-rfc-reservations/0016-interruption-lifecycle.lock",
+    "status": "reserved",
+    "cleanup": "Coordinator releases through repository workflow after confirmation task creation or abandonment"
+  },
+  "orchestration": {
+    "run_id": null,
+    "runtime_observation": "unreachable, stale_bootstrap, application not running",
+    "status": "not_started"
+  },
+  "gates": {
+    "independent_plan_challenge": "pending",
+    "independent_rfc_challenge": "pending",
+    "exact_digest_confirmation": "pending",
+    "implementation_authorized": false
+  }
+}

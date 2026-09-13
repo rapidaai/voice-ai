@@ -1,0 +1,103 @@
+{
+  "schema": "rfc0019.implementation_review.v1",
+  "review_type": "independent_final_re_review",
+  "run_id": "run_942b61c2cb54",
+  "task_id": "task_ca85361d41dd",
+  "dispatch_id": "ctx_ed7090fb21d2",
+  "worker_terminal": "term_23639a76-0f2d-4907-8daf-c754a063e186",
+  "coordinator_terminal": "term_3d2d54c8-7d91-451a-b8d7-d7f4903ca709",
+  "reviewed_at": "2026-09-11T11:15:09+05:30",
+  "decision": "approve",
+  "highest_severity": "none",
+  "scope_reviewed": [
+    "rfcs/0019-audio-message-completion/jsons/review-01.json",
+    "rfcs/0019-audio-message-completion/jsons/synthesis-correction-02.json",
+    "api/assistant-api/internal/transformer/rime/tts.go",
+    "api/assistant-api/internal/transformer/rime/rime_test.go",
+    "api/assistant-api/internal/transformer/neuphonic/tts.go",
+    "api/assistant-api/internal/transformer/neuphonic/neuphonic_tts_test.go",
+    "coordinator-stated integration constraints for native playback completion activation"
+  ],
+  "decision_basis": [
+    "The two major findings from review-01 are resolved in the current Rime and Neuphonic correction scope.",
+    "Rime no longer treats provider done messages as successful message completion. The successful boundary is now the active websocket receiving CloseNormalClosure after TextToSpeechDonePacket set textClosed, with ctx.Err() still nil, no synthesis failure, and no prior end emission.",
+    "Rime GoingAway, cancelled context, local close, write failure, and provider error paths do not emit TextToSpeechEndPacket or TTSCompleted in the reviewed implementation and tests.",
+    "Neuphonic no longer emits TextToSpeechEndPacket or TTSCompleted from local TextToSpeechDonePacket. It sends STOP when possible, closes the local websocket, and reports TTSError because this integration has no provider completion acknowledgement.",
+    "A failed Neuphonic STOP write emits TextToSpeechErrorPacket and TTSError only, with no successful completion packet or event."
+  ],
+  "resolved_findings": [
+    {
+      "id": "RFC0019-REVIEW-01",
+      "status": "resolved",
+      "evidence": [
+        "api/assistant-api/internal/transformer/rime/tts.go:156 requires rt.ctx.Err() == nil, rt.textClosed, !rt.synthesisFailed, !rt.endSent, and websocket.CloseNormalClosure before emitting successful completion.",
+        "api/assistant-api/internal/transformer/rime/tts.go:241 keeps Rime done as a per-batch drain hint only.",
+        "api/assistant-api/internal/transformer/rime/rime_test.go:190 covers a late pre-final done after eos and verifies final audio precedes TextToSpeechEndPacket.",
+        "api/assistant-api/internal/transformer/rime/rime_test.go:435 covers GoingAway and cancelled-context shutdown closes without successful completion."
+      ]
+    },
+    {
+      "id": "RFC0019-REVIEW-02",
+      "status": "resolved",
+      "evidence": [
+        "api/assistant-api/internal/transformer/neuphonic/tts.go:275 handles TextToSpeechDonePacket by sending STOP and closing the local websocket without emitting TextToSpeechEndPacket.",
+        "api/assistant-api/internal/transformer/neuphonic/tts.go:288 emits TextToSpeechErrorPacket and TTSError on failed STOP writes.",
+        "api/assistant-api/internal/transformer/neuphonic/tts.go:309 emits TextToSpeechErrorPacket and TTSError for the no-ack completion path.",
+        "api/assistant-api/internal/transformer/neuphonic/neuphonic_tts_test.go:26 verifies audio before final failure is preserved and no successful completion is emitted.",
+        "api/assistant-api/internal/transformer/neuphonic/neuphonic_tts_test.go:92 verifies failed STOP writes do not complete synthesis."
+      ]
+    }
+  ],
+  "findings": [],
+  "verification_commands": [
+    {
+      "command": "go test -count=1 -timeout=30s -overlay=/tmp/rfc0019-review-probes.JPsOH3/rime_overlay.json -run TestRimeLatePreFinalDoneAfterEOSProbe ./api/assistant-api/internal/transformer/rime",
+      "exit_code": 0,
+      "result": "passed"
+    },
+    {
+      "command": "go test -count=1 -timeout=30s -overlay=/tmp/rfc0019-review-probes.Jy8LZk/neuphonic_overlay.json -run TestNeuphonicDoneDoesNotFabricateSuccessProbe ./api/assistant-api/internal/transformer/neuphonic",
+      "exit_code": 0,
+      "result": "passed"
+    },
+    {
+      "command": "go test -race -count=1 -timeout=120s ./api/assistant-api/internal/transformer/rime ./api/assistant-api/internal/transformer/neuphonic",
+      "exit_code": 0,
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check -- api/assistant-api/internal/transformer/rime/tts.go api/assistant-api/internal/transformer/rime/rime_test.go api/assistant-api/internal/transformer/neuphonic/tts.go api/assistant-api/internal/transformer/neuphonic/neuphonic_tts_test.go rfcs/0019-audio-message-completion/jsons/synthesis-correction-02.json",
+      "exit_code": 0,
+      "result": "passed"
+    },
+    {
+      "command": "jq empty rfcs/0019-audio-message-completion/jsons/review-02.json",
+      "exit_code": 0,
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check -- rfcs/0019-audio-message-completion/jsons/review-02.json",
+      "exit_code": 0,
+      "result": "passed"
+    },
+    {
+      "command": "just agent-finalize \"rfcs/0019-audio-message-completion/jsons/review-02.json\"",
+      "exit_code": 0,
+      "result": "passed"
+    }
+  ],
+  "rollout_assessment": {
+    "callback_authority_default": "WithPlaybackCompletion remains false by default unless explicitly opted in.",
+    "native_activation": "pending user scope approval for the four native caller paths.",
+    "review_boundary": "This review does not approve end-to-end activation and does not claim live provider validation."
+  },
+  "limitations": [
+    "Review-01 approved the other lifecycle, transport, producer, proto, and generated-artifact portions, and this re-review did not re-open those areas except to confirm the opt-in default stayed inactive.",
+    "The executed provider checks used local websocket test servers and overlay probes, not live Rime or Neuphonic credentials.",
+    "The coordinator reported the full transformer race suite and focused corrected provider race tests passed before this dispatch; this worker independently reran the focused Rime and Neuphonic race suite plus the two former failing overlay probes."
+  ],
+  "unresolved_blockers": [],
+  "files_modified_by_reviewer": [
+    "rfcs/0019-audio-message-completion/jsons/review-02.json"
+  ]
+}

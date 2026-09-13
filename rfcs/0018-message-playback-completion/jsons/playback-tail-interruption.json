@@ -1,0 +1,61 @@
+{
+  "date": "2026-09-10",
+  "tier": "Standard",
+  "status": "verified_and_reviewed",
+  "scope": "Remove the premature assistant idle transition at audio TTS end, preserving playback interruption eligibility in the existing message lifecycle.",
+  "allowed_paths": [
+    "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+    "api/assistant-api/internal/adapters/internal/playback_test.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler_interruption_test.go",
+    "rfcs/0018-message-playback-completion.md",
+    "rfcs/0018-message-playback-completion/jsons/playback-tail-interruption.json"
+  ],
+  "acceptance_criteria": [
+    "VAD after TTS end still pauses active output; meaningful STT confirms interruption and flushes the prior context.",
+    "Final STT and EOS after confirmed interruption admit user input and start the next assistant generation.",
+    "TTS end during pending interruption does not erase interruption eligibility.",
+    "Filler-only STT resumes the same context after the existing 500 ms decision window.",
+    "Late and duplicate receipts for same-ID segments do not dismiss later active playback.",
+    "Terminal audio delivery, send-error policy fallback, TTS watchdog cleanup, and text-only completion remain intact."
+  ],
+  "risks": [
+    "Active audio state conservatively persists until turn replacement or cancellation; this patch does not identify actual playback drain.",
+    "Direct EOS or user-input packets without prior turn admission no longer inherit the premature idle state. Review found no current EOS producer bypassing speech or typed-text admission.",
+    "Playback-driven idle startup and completion metrics remain pending the separately governed completion contract.",
+    "No protocol, receipt-authority, interruption-default, or lifecycle-owner change is included."
+  ],
+  "verification": [
+    {
+      "command": "go test -run '^TestTextToSpeechEnd(RetainsPlaybackInterruption|LateReceiptDoesNotDismissLaterPlayback)$' -count=1 ./api/assistant-api/internal/adapters/internal",
+      "result": "Failed before production fix as expected: TTS end changed active assistant state to idle and VAD bypassed Pause."
+    },
+    {
+      "command": "go test -count=1 -timeout=180s ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/adapters/lifecycle",
+      "result": "passed"
+    },
+    {
+      "command": "go test -race -count=1 -timeout=180s ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/adapters/lifecycle ./api/assistant-api/internal/adapters/router ./api/assistant-api/internal/watchdog ./api/assistant-api/internal/type",
+      "result": "passed"
+    },
+    {
+      "command": "go test -race -run '^TestTextToSpeechEnd(RetainsPlaybackInterruption|LateReceiptDoesNotDismissLaterPlayback)$' -count=100 -timeout=180s ./api/assistant-api/internal/adapters/internal",
+      "result": "passed"
+    },
+    {
+      "command": "just agent-finalize \"api/assistant-api/internal/adapters/internal/dispatch_handler.go,api/assistant-api/internal/adapters/internal/playback_test.go,api/assistant-api/internal/adapters/internal/dispatch_handler_interruption_test.go\"",
+      "result": "passed: test presence and adapter package tests"
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    }
+  ],
+  "independent_review": {
+    "agent_id": "01a08c0c-6ce6-7123-b75f-771b7980c0f0",
+    "result": "No blocking findings or concrete reachable production regressions in the narrow fix.",
+    "follow_up": "Extended meaningful-speech regression through final STT, EOS, user input admission, and next assistant generation. Reviewer checked the addition; updated tests passed.",
+    "boundary": "Direct EOS or user input requires prior turn admission; no current EOS producer bypass was found.",
+    "scope": "Read-only native subagent review of this Standard patch only. This is not approval of RFC0018 or its protocol proposal."
+  },
+  "rollback": "Revert only this patch's removal of CompleteAssistantSpeech at audio TTS end and its aligned test expectations."
+}

@@ -121,7 +121,7 @@ func (handler *AgentHandler) Execute(ctx context.Context, request Request) (Resu
 		if promptResult.Text != "" {
 			request.RuntimeState.RecordNodeOutputValue(request.Node.ID, "response", promptResult.Text)
 		}
-		return Result{WaitForNextInput: true}, nil
+		return Result{WaitForNextInput: true, ResponseText: promptResult.Text}, nil
 	}
 
 	transitionID := promptResult.TransitionID
@@ -191,7 +191,6 @@ func (handler *AgentHandler) runPrompt(ctx context.Context, communication intern
 			if result.TransitionID != "" || result.TransitionName != "" {
 				return result, nil
 			}
-			_ = communication.OnPacket(ctx, internal_type.LLMResponseDonePacket{ContextID: request.ContextID, Text: result.Text})
 			return result, nil
 		case *protos.StreamChatResponse_Close:
 			_ = handler.connection.Close("")

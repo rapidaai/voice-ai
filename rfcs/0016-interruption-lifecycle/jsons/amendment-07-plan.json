@@ -1,0 +1,59 @@
+{
+  "rfc": "0016-interruption-lifecycle",
+  "status": "proposed_for_exact_byte_challenge",
+  "date": "2026-09-06",
+  "supersedes": "amendment-06-plan.json",
+  "objective": "Implement one serialized filler-aware interruption loop that controls pause, continue and TurnChange",
+  "decisions": {
+    "streamer_interface": "unchanged",
+    "candidate_owner": "One adapter interruption loop owns VAD, STT, timer, held transcripts and decision completion",
+    "output_controls": "Internal PauseOutput, ContinueOutput and FlushOutput values",
+    "timer": "A time.Timer is selected by the owner loop; no timer callback mutates or executes interruption work",
+    "filler": "Filler-only interim text waits; ended filler-only speech continues at the deadline; meaningful text commits immediately",
+    "stt_order": "Hold provider-ordered events, trim timed events before the overlap, and add no utterance ID",
+    "commit": "The loop flushes local output and emits one TurnChange decision, then waits for completion before accepting another candidate",
+    "replay": "Local EOS, TTS and LLM invalidation completes before held meaningful STT is replayed"
+  },
+  "first_implementation_slice": {
+    "owner": "adapter implementer",
+    "allowed_paths": [
+      "api/assistant-api/internal/type/packet.go",
+      "api/assistant-api/internal/type/output_control.go",
+      "api/assistant-api/internal/adapters/internal/interruption.go",
+      "api/assistant-api/internal/adapters/internal/interruption_test.go",
+      "api/assistant-api/internal/adapters/internal/requestor.go",
+      "api/assistant-api/internal/adapters/internal/stream.go",
+      "api/assistant-api/internal/adapters/internal/stream_test.go",
+      "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+      "api/assistant-api/internal/adapters/internal/dispatch_handler_interruption_test.go"
+    ],
+    "acceptance": [
+      "VAD start pauses once without rotating context",
+      "Meaningful gated STT emits one TurnChange decision",
+      "Filler-only ended speech continues at the deadline",
+      "Active speech commits at the deadline",
+      "Candidate output action completes before another candidate starts",
+      "Loop shutdown leaves no paused output or live timer",
+      "Direct text and word-trigger commits remain supported"
+    ]
+  },
+  "later_required_slices": [
+    "Add output admission, pause, continue and flush to every configured streamer",
+    "Make public interruption notification non-destructive",
+    "Add synchronous local EOS, TTS and LLM invalidation before replay",
+    "Add conditional lifecycle transition and stale model-result rejection"
+  ],
+  "release_gate": "Do not enable or release the first slice until every later required slice passes verification.",
+  "verification": [
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test -count=1 ./api/assistant-api/internal/type ./api/assistant-api/internal/adapters/internal",
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test -race -count=1 ./api/assistant-api/internal/adapters/internal",
+    "just agent-finalize with exact changed paths",
+    "git diff --check"
+  ],
+  "rollback": "Revert the complete interruption change set and restore direct legacy VAD handling.",
+  "review_status": {
+    "challenge_05": "resolved_by_maintainer_decision",
+    "final_challenge": "pending",
+    "exact_digest_confirmation": "pending"
+  }
+}

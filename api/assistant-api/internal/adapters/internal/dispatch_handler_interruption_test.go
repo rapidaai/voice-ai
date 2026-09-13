@@ -2,43 +2,295 @@ package adapter_internal
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	adapter_channel "github.com/rapidaai/api/assistant-api/internal/adapters/channel"
 	adapter_lifecycle "github.com/rapidaai/api/assistant-api/internal/adapters/lifecycle"
+	adapter_router "github.com/rapidaai/api/assistant-api/internal/adapters/router"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_options "github.com/rapidaai/api/assistant-api/internal/options"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
-	"github.com/rapidaai/api/assistant-api/internal/watchdog"
 	type_enums "github.com/rapidaai/pkg/types/enums"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
-func newInterruptionTestRequestor(trigger string) *genericRequestor {
+func TestDispatchInterruptionUnclearInputExtendsAndIgnoresEmptyFinal(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Please repeat", adapter_lifecycle.WithInterruption(true))
+		t.Cleanup(requestor.messageLifecycle.StopUnclearInput)
+		requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
+		streamer := requestor.streamer.(*streamTestStreamer)
+		handler := requestorDispatchHandler{r: requestor}
+		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
+		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{Script: "wait", Interim: true})
+		synctest.Wait()
+		contextID := requestor.GetID()
+		time.Sleep(600 * time.Millisecond)
+		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: contextID, Script: "wait please", Interim: true})
+		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: contextID, Script: "  ", Interim: false})
+		synctest.Wait()
+		time.Sleep(600 * time.Millisecond)
+		synctest.Wait()
+		for _, packet := range drainEgressPackets(requestor) {
+			_, expired := packet.(internal_type.UnclearInputExpiredPacket)
+			assert.False(t, expired)
+		}
+		time.Sleep(400 * time.Millisecond)
+		synctest.Wait()
+		var expired internal_type.UnclearInputExpiredPacket
+		for _, packet := range drainEgressPackets(requestor) {
+			if value, ok := packet.(internal_type.UnclearInputExpiredPacket); ok {
+				expired = value
+			}
+		}
+		require.Equal(t, contextID, expired.ContextID)
+		handler.HandleUnclearInputExpired(context.Background(), expired)
+		synctest.Wait()
+		assert.NotEqual(t, contextID, requestor.GetID())
+		var injected internal_type.InjectMessagePacket
+		for _, packet := range drainEgressPackets(requestor) {
+			if value, ok := packet.(internal_type.InjectMessagePacket); ok {
+				injected = value
+			}
+		}
+		assert.Equal(t, "Please repeat", injected.Text)
+		assert.Equal(t, requestor.GetID(), injected.ContextID)
+		streamer.mu.Lock()
+		require.GreaterOrEqual(t, len(streamer.sent), 2)
+		assert.Equal(t, protos.ConversationPlaybackControl_PAUSE, streamer.sent[0].(*protos.ConversationPlaybackControl).GetKind())
+		assert.Equal(t, protos.ConversationPlaybackControl_FLUSH, streamer.sent[1].(*protos.ConversationPlaybackControl).GetKind())
+		streamer.mu.Unlock()
+	})
+}
+
+func TestDispatchInterruptionCompletedInputStopsUnclearTracking(t *testing.T) {
+	for _, completion := range []string{"final", "eos", "input", "text"} {
+		t.Run(completion, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Please repeat", adapter_lifecycle.WithInterruption(true))
+				t.Cleanup(requestor.messageLifecycle.StopUnclearInput)
+				requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
+				handler := requestorDispatchHandler{r: requestor}
+				handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
+				handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{Script: "wait", Interim: true})
+				synctest.Wait()
+				contextID := requestor.GetID()
+				switch completion {
+				case "final":
+					handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: contextID, Script: "Wait please"})
+				case "eos":
+					handler.HandleEndOfSpeech(context.Background(), internal_type.EndOfSpeechPacket{ContextID: contextID, Speech: "Wait please"})
+				case "input":
+					handler.HandleUserInput(context.Background(), internal_type.UserInputPacket{ContextID: contextID, Text: "Wait please"})
+				case "text":
+					handler.HandleUserText(context.Background(), internal_type.UserTextReceivedPacket{ContextID: contextID, Text: "Wait please"})
+				}
+				synctest.Wait()
+				time.Sleep(2 * time.Second)
+				synctest.Wait()
+				for _, packet := range drainEgressPackets(requestor) {
+					_, expired := packet.(internal_type.UnclearInputExpiredPacket)
+					assert.False(t, expired)
+				}
+			})
+		})
+	}
+}
+
+func TestDispatchInterruptionFinalRejectsQueuedExpiry(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Please repeat", adapter_lifecycle.WithInterruption(true))
+		t.Cleanup(requestor.messageLifecycle.StopUnclearInput)
+		requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
+		handler := requestorDispatchHandler{r: requestor}
+		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
+		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{Script: "wait", Interim: true})
+		synctest.Wait()
+		contextID := requestor.GetID()
+		time.Sleep(time.Second)
+		synctest.Wait()
+		var expired internal_type.UnclearInputExpiredPacket
+		for _, packet := range drainEgressPackets(requestor) {
+			if value, ok := packet.(internal_type.UnclearInputExpiredPacket); ok {
+				expired = value
+			}
+		}
+		require.Equal(t, contextID, expired.ContextID)
+		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: contextID, Script: "Wait please"})
+		handler.HandleUnclearInputExpired(context.Background(), expired)
+		synctest.Wait()
+		assert.Equal(t, contextID, requestor.GetID())
+		for _, packet := range drainEgressPackets(requestor) {
+			_, injected := packet.(internal_type.InjectMessagePacket)
+			assert.False(t, injected)
+		}
+	})
+}
+
+func TestDispatchInterruptionNoWatchdogForOrdinaryListening(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Please repeat", adapter_lifecycle.WithInterruption(true))
+		t.Cleanup(requestor.messageLifecycle.StopUnclearInput)
+		requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
+		turn, err := requestor.messageLifecycle.OnUserTurnStarted(requestor.GetID(), "test", "text", "hello")
+		require.NoError(t, err)
+		contextID := turn.ContextID
+		streamer := requestor.streamer.(*streamTestStreamer)
+		handler := requestorDispatchHandler{r: requestor}
+		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{ContextID: contextID, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
+		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: contextID, Script: "hello", Interim: true})
+		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{ContextID: contextID, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd})
+		synctest.Wait()
+		time.Sleep(2 * time.Second)
+		synctest.Wait()
+		for _, packet := range drainEgressPackets(requestor) {
+			_, expired := packet.(internal_type.UnclearInputExpiredPacket)
+			assert.False(t, expired)
+		}
+		streamer.mu.Lock()
+		assert.Empty(t, streamer.sent)
+		streamer.mu.Unlock()
+	})
+}
+
+func TestDispatchInterruptionPreservesWordTrigger(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		requestor := newInterruptionTestRequestor(internal_options.BargeInTriggerWord, adapter_lifecycle.WithInterruption(true))
+		requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
+		streamer := requestor.streamer.(*streamTestStreamer)
+		handler := requestorDispatchHandler{r: requestor}
+		previous := requestor.GetID()
+		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{ContextID: previous, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
+		assert.Equal(t, previous, requestor.GetID())
+		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: previous, Script: "hello", Interim: true})
+		synctest.Wait()
+		assert.NotEqual(t, previous, requestor.GetID())
+		streamer.mu.Lock()
+		require.NotEmpty(t, streamer.sent)
+		assert.Equal(t, protos.ConversationPlaybackControl_FLUSH, streamer.sent[0].(*protos.ConversationPlaybackControl).GetKind())
+		streamer.mu.Unlock()
+	})
+}
+
+func TestDispatchInterruptionInterimRefreshRejectsQueuedExpiry(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Please repeat", adapter_lifecycle.WithInterruption(true))
+		t.Cleanup(requestor.messageLifecycle.StopUnclearInput)
+		requestor.endOfSpeechExecutor = &recordingEOSExecutor{}
+		handler := requestorDispatchHandler{r: requestor}
+		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
+		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{Script: "wait", Interim: true})
+		synctest.Wait()
+		contextID := requestor.GetID()
+		time.Sleep(time.Second)
+		synctest.Wait()
+		var expired internal_type.UnclearInputExpiredPacket
+		for _, packet := range drainEgressPackets(requestor) {
+			if value, ok := packet.(internal_type.UnclearInputExpiredPacket); ok {
+				expired = value
+			}
+		}
+		require.Equal(t, contextID, expired.ContextID)
+		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: contextID, Script: "wait please", Interim: true})
+		handler.HandleUnclearInputExpired(context.Background(), expired)
+		synctest.Wait()
+		assert.Equal(t, contextID, requestor.GetID())
+		time.Sleep(999 * time.Millisecond)
+		synctest.Wait()
+		for _, packet := range drainEgressPackets(requestor) {
+			_, expired := packet.(internal_type.UnclearInputExpiredPacket)
+			assert.False(t, expired)
+		}
+		time.Sleep(time.Millisecond)
+		synctest.Wait()
+		var refreshed internal_type.UnclearInputExpiredPacket
+		for _, packet := range drainEgressPackets(requestor) {
+			if value, ok := packet.(internal_type.UnclearInputExpiredPacket); ok {
+				refreshed = value
+			}
+		}
+		assert.Equal(t, contextID, refreshed.ContextID)
+	})
+}
+
+func TestDispatchInterruptionFinalBeforeVadEndPreservesBoundary(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		requestor := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 1, "Please repeat", adapter_lifecycle.WithInterruption(true))
+		t.Cleanup(requestor.messageLifecycle.StopUnclearInput)
+		eos := &recordingEOSExecutor{}
+		requestor.endOfSpeechExecutor = eos
+		handler := requestorDispatchHandler{r: requestor}
+		previous := requestor.GetID()
+		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{ContextID: previous, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart})
+		handler.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{ContextID: previous, Script: "Wait please"})
+		synctest.Wait()
+		handler.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{ContextID: previous, Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd})
+		synctest.Wait()
+		packets := eos.snapshotExecuted()
+		require.Len(t, packets, 4)
+		boundary := packets[3].(internal_type.InterruptionDetectedPacket)
+		assert.Equal(t, requestor.GetID(), boundary.ContextID)
+		assert.Equal(t, internal_type.InterruptionEventEnd, boundary.Event)
+		time.Sleep(2 * time.Second)
+		synctest.Wait()
+		for _, packet := range drainEgressPackets(requestor) {
+			_, expired := packet.(internal_type.UnclearInputExpiredPacket)
+			assert.False(t, expired)
+		}
+	})
+}
+
+func newInterruptionTestRequestor(trigger string, messageOptions ...adapter_lifecycle.MessageOption) *genericRequestor {
 	options := map[string]interface{}{}
 	if trigger != "" {
 		options[internal_options.MicrophoneOptionBargeInTrigger] = trigger
 	}
 
-	lifecycle := adapter_lifecycle.NewMessageLifecycleWithContext("ctx-active", type_enums.AudioMode)
-	_ = lifecycle.AssistantGenerating("ctx-active")
-	_ = lifecycle.AssistantSpeaking("ctx-active")
-
-	return &genericRequestor{
-		streamer:         &streamTestStreamer{},
-		channels:         adapter_channel.NewRequestorChannels(),
-		messageLifecycle: lifecycle,
-		options:          options,
-		vadExecutor:      &blockingVADExecutor{},
+	requestorChannels := adapter_channel.NewRequestorChannels()
+	r := &genericRequestor{
+		streamer:      &streamTestStreamer{},
+		channels:      requestorChannels,
+		dispatchRoute: adapter_router.NewDispatchRoute(adapter_router.NewRoutePolicy(), requestorChannels),
+		options:       options,
+		vadExecutor:   &blockingVADExecutor{},
 	}
+	lifecycleOptions := []adapter_lifecycle.MessageOption{
+		adapter_lifecycle.WithContextID("ctx-active"),
+		adapter_lifecycle.WithMode(type_enums.AudioMode),
+		adapter_lifecycle.WithOnPacket(func(packets ...internal_type.Packet) error {
+			return r.OnPacket(context.Background(), packets...)
+		}),
+		adapter_lifecycle.WithSend(func(message proto.Message) error {
+			if r.streamer == nil {
+				return fmt.Errorf("send %T: streamer is unavailable", message)
+			}
+			return r.streamer.Send(message)
+		}),
+		adapter_lifecycle.WithDispatch(requestorDispatchHandler{r: r}.HandleMessageLifecyclePacket),
+		adapter_lifecycle.WithInterruptionExpiry(func(packet internal_type.InterruptionDecisionExpiredPacket) {
+			ctx := r.sessionCtx
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			r.dispatch(ctx, packet)
+		}),
+		adapter_lifecycle.WithBehavior(r.deploymentBehavior),
+	}
+	r.messageLifecycle = adapter_lifecycle.NewMessageLifecycle(append(lifecycleOptions, messageOptions...)...)
+	_ = r.messageLifecycle.OnGenerationStarted(r.GetID())
+	_ = r.messageLifecycle.OnSpeechStarted(r.GetID())
+	return r
 }
 
-func newUnclearInputTestRequestor(trigger string, timeout float64, message string) *genericRequestor {
-	r := newInterruptionTestRequestor(trigger)
+func newUnclearInputTestRequestor(trigger string, timeout float64, message string, messageOptions ...adapter_lifecycle.MessageOption) *genericRequestor {
+	r := newInterruptionTestRequestor(trigger, messageOptions...)
 	r.source = utils.PhoneCall
 	r.assistant = &internal_assistant_entity.Assistant{
 		AssistantPhoneDeployment: &internal_assistant_entity.AssistantPhoneDeployment{
@@ -48,7 +300,9 @@ func newUnclearInputTestRequestor(trigger string, timeout float64, message strin
 			},
 		},
 	}
-	r.unclearInputWatchdog = watchdog.NewUnclearInputWatchdog(watchdog.WithOnPacket(r.OnPacket))
+	if err := r.messageLifecycle.Initialize(context.Background()); err != nil {
+		panic(err)
+	}
 	drainBackgroundPackets(r)
 	return r
 }
@@ -117,15 +371,21 @@ func waitForUnclearInputExpired(t *testing.T, r *genericRequestor) internal_type
 }
 
 func TestHandleUserText_TextModeRotatesWordInterruptionBeforeEOS(t *testing.T) {
-	lifecycle := adapter_lifecycle.NewMessageLifecycleWithContext("ctx-active", type_enums.TextMode)
-	require.NoError(t, lifecycle.AssistantGenerating("ctx-active"))
-	require.NoError(t, lifecycle.AssistantSpeaking("ctx-active"))
 	r := &genericRequestor{
-		streamer:         &streamTestStreamer{},
-		channels:         adapter_channel.NewRequestorChannels(),
-		messageLifecycle: lifecycle,
-		vadExecutor:      &blockingVADExecutor{},
+		streamer:    &streamTestStreamer{},
+		channels:    adapter_channel.NewRequestorChannels(),
+		vadExecutor: &blockingVADExecutor{},
 	}
+	lifecycle := adapter_lifecycle.NewMessageLifecycle(
+		adapter_lifecycle.WithContextID("ctx-active"),
+		adapter_lifecycle.WithMode(type_enums.TextMode),
+		adapter_lifecycle.WithSend(func(message proto.Message) error { return r.streamer.Send(message) }),
+		adapter_lifecycle.WithDispatch(requestorDispatchHandler{r: r}.HandleMessageLifecyclePacket),
+	)
+	r.messageLifecycle = lifecycle
+	require.NoError(t, lifecycle.OnGenerationStarted("ctx-active"))
+	require.NoError(t, lifecycle.OnSpeechStarted("ctx-active"))
+
 	h := requestorDispatchHandler{r: r}
 
 	h.HandleUserText(context.Background(), internal_type.UserTextReceivedPacket{
@@ -176,14 +436,20 @@ func TestHandleUserText_TextModeRotatesWordInterruptionBeforeEOS(t *testing.T) {
 }
 
 func TestHandleUserText_TextModeRotatesAfterPreviousUserFinished(t *testing.T) {
-	lifecycle := adapter_lifecycle.NewMessageLifecycleWithContext("ctx-first", type_enums.TextMode)
-	require.NoError(t, lifecycle.UserFinished("ctx-first"))
 	r := &genericRequestor{
-		streamer:         &streamTestStreamer{},
-		channels:         adapter_channel.NewRequestorChannels(),
-		messageLifecycle: lifecycle,
-		vadExecutor:      &blockingVADExecutor{},
+		streamer:    &streamTestStreamer{},
+		channels:    adapter_channel.NewRequestorChannels(),
+		vadExecutor: &blockingVADExecutor{},
 	}
+	lifecycle := adapter_lifecycle.NewMessageLifecycle(
+		adapter_lifecycle.WithContextID("ctx-first"),
+		adapter_lifecycle.WithMode(type_enums.TextMode),
+		adapter_lifecycle.WithSend(func(message proto.Message) error { return r.streamer.Send(message) }),
+		adapter_lifecycle.WithDispatch(requestorDispatchHandler{r: r}.HandleMessageLifecyclePacket),
+	)
+	r.messageLifecycle = lifecycle
+	require.NoError(t, lifecycle.OnUserSpeechCompleted(internal_type.EndOfSpeechPacket{ContextID: "ctx-first", Speech: "first text"}))
+
 	h := requestorDispatchHandler{r: r}
 
 	h.HandleUserText(context.Background(), internal_type.UserTextReceivedPacket{
@@ -207,22 +473,32 @@ func TestHandleUserText_TextModeRotatesAfterPreviousUserFinished(t *testing.T) {
 }
 
 func TestHandleUserText_TextModeDoesNotRotateWhileUserSpeaking(t *testing.T) {
-	lifecycle := adapter_lifecycle.NewMessageLifecycleWithContext("ctx-user-speaking", type_enums.TextMode)
-	require.NoError(t, lifecycle.UserSpeaking("ctx-user-speaking"))
 	r := &genericRequestor{
-		streamer:         &streamTestStreamer{},
-		channels:         adapter_channel.NewRequestorChannels(),
-		messageLifecycle: lifecycle,
-		vadExecutor:      &blockingVADExecutor{},
+		streamer:    &streamTestStreamer{},
+		channels:    adapter_channel.NewRequestorChannels(),
+		vadExecutor: &blockingVADExecutor{},
 	}
+	lifecycle := adapter_lifecycle.NewMessageLifecycle(
+		adapter_lifecycle.WithContextID("ctx-user-speaking"),
+		adapter_lifecycle.WithMode(type_enums.TextMode),
+		adapter_lifecycle.WithSend(func(message proto.Message) error { return r.streamer.Send(message) }),
+		adapter_lifecycle.WithDispatch(requestorDispatchHandler{r: r}.HandleMessageLifecyclePacket),
+	)
+	r.messageLifecycle = lifecycle
+	lifecycle.OnInterruptionDetected(internal_type.InterruptionDetectedPacket{
+		ContextID: "ctx-user-speaking", Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart,
+	}, internal_options.BargeInTriggerVAD)
+	contextID := lifecycle.ContextID()
+	require.Equal(t, adapter_lifecycle.MessageStateUserSpeaking, lifecycle.State())
+
 	h := requestorDispatchHandler{r: r}
 
 	h.HandleUserText(context.Background(), internal_type.UserTextReceivedPacket{
-		ContextID: "ctx-user-speaking",
+		ContextID: contextID,
 		Text:      "same turn text",
 	})
 
-	assert.Equal(t, "ctx-user-speaking", r.GetID())
+	assert.Equal(t, contextID, r.GetID())
 	assert.Empty(t, drainControlPackets(r))
 	assert.Empty(t, drainEgressPackets(r))
 
@@ -230,21 +506,28 @@ func TestHandleUserText_TextModeDoesNotRotateWhileUserSpeaking(t *testing.T) {
 	require.Len(t, ingressPackets, 2)
 	interim, ok := ingressPackets[0].(internal_type.InterimEndOfSpeechPacket)
 	require.True(t, ok, "expected InterimEndOfSpeechPacket, got %T", ingressPackets[0])
-	assert.Equal(t, "ctx-user-speaking", interim.ContextID)
+	assert.Equal(t, contextID, interim.ContextID)
 	eos, ok := ingressPackets[1].(internal_type.EndOfSpeechPacket)
 	require.True(t, ok, "expected EndOfSpeechPacket, got %T", ingressPackets[1])
-	assert.Equal(t, "ctx-user-speaking", eos.ContextID)
+	assert.Equal(t, contextID, eos.ContextID)
 }
 
 func TestHandleUserText_TextModeDoesNotRotateWhenUserTurnActive(t *testing.T) {
-	lifecycle := adapter_lifecycle.NewMessageLifecycleWithContext("ctx-listening", type_enums.TextMode)
-	require.NoError(t, lifecycle.UserListening("ctx-listening"))
 	r := &genericRequestor{
-		streamer:         &streamTestStreamer{},
-		channels:         adapter_channel.NewRequestorChannels(),
-		messageLifecycle: lifecycle,
-		vadExecutor:      &blockingVADExecutor{},
+		streamer:    &streamTestStreamer{},
+		channels:    adapter_channel.NewRequestorChannels(),
+		vadExecutor: &blockingVADExecutor{},
 	}
+	lifecycle := adapter_lifecycle.NewMessageLifecycle(
+		adapter_lifecycle.WithContextID("ctx-listening"),
+		adapter_lifecycle.WithMode(type_enums.TextMode),
+		adapter_lifecycle.WithSend(func(message proto.Message) error { return r.streamer.Send(message) }),
+		adapter_lifecycle.WithDispatch(requestorDispatchHandler{r: r}.HandleMessageLifecyclePacket),
+	)
+	r.messageLifecycle = lifecycle
+	_, err := lifecycle.OnTranscriptReceived(internal_type.SpeechToTextPacket{ContextID: "ctx-listening", Script: "same turn text"})
+	require.NoError(t, err)
+
 	h := requestorDispatchHandler{r: r}
 
 	h.HandleUserText(context.Background(), internal_type.UserTextReceivedPacket{
@@ -267,15 +550,21 @@ func TestHandleUserText_TextModeDoesNotRotateWhenUserTurnActive(t *testing.T) {
 }
 
 func TestHandleInterruptionDetected_TextModeIgnoresStaleWordInterruption(t *testing.T) {
-	lifecycle := adapter_lifecycle.NewMessageLifecycleWithContext("ctx-current", type_enums.TextMode)
-	require.NoError(t, lifecycle.AssistantGenerating("ctx-current"))
-	require.NoError(t, lifecycle.AssistantSpeaking("ctx-current"))
 	r := &genericRequestor{
-		streamer:         &streamTestStreamer{},
-		channels:         adapter_channel.NewRequestorChannels(),
-		messageLifecycle: lifecycle,
-		vadExecutor:      &blockingVADExecutor{},
+		streamer:    &streamTestStreamer{},
+		channels:    adapter_channel.NewRequestorChannels(),
+		vadExecutor: &blockingVADExecutor{},
 	}
+	lifecycle := adapter_lifecycle.NewMessageLifecycle(
+		adapter_lifecycle.WithContextID("ctx-current"),
+		adapter_lifecycle.WithMode(type_enums.TextMode),
+		adapter_lifecycle.WithSend(func(message proto.Message) error { return r.streamer.Send(message) }),
+		adapter_lifecycle.WithDispatch(requestorDispatchHandler{r: r}.HandleMessageLifecyclePacket),
+	)
+	r.messageLifecycle = lifecycle
+	require.NoError(t, lifecycle.OnGenerationStarted("ctx-current"))
+	require.NoError(t, lifecycle.OnSpeechStarted("ctx-current"))
+
 	h := requestorDispatchHandler{r: r}
 
 	h.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{
@@ -290,13 +579,19 @@ func TestHandleInterruptionDetected_TextModeIgnoresStaleWordInterruption(t *test
 }
 
 func TestHandleUserInput_DropsStaleContext(t *testing.T) {
-	lifecycle := adapter_lifecycle.NewMessageLifecycleWithContext("ctx-current", type_enums.TextMode)
 	r := &genericRequestor{
-		streamer:         &streamTestStreamer{},
-		channels:         adapter_channel.NewRequestorChannels(),
-		messageLifecycle: lifecycle,
-		vadExecutor:      &blockingVADExecutor{},
+		streamer:    &streamTestStreamer{},
+		channels:    adapter_channel.NewRequestorChannels(),
+		vadExecutor: &blockingVADExecutor{},
 	}
+	lifecycle := adapter_lifecycle.NewMessageLifecycle(
+		adapter_lifecycle.WithContextID("ctx-current"),
+		adapter_lifecycle.WithMode(type_enums.TextMode),
+		adapter_lifecycle.WithSend(func(message proto.Message) error { return r.streamer.Send(message) }),
+		adapter_lifecycle.WithDispatch(requestorDispatchHandler{r: r}.HandleMessageLifecyclePacket),
+	)
+	r.messageLifecycle = lifecycle
+
 	h := requestorDispatchHandler{r: r}
 
 	h.HandleUserInput(context.Background(), internal_type.UserInputPacket{
@@ -312,14 +607,20 @@ func TestHandleUserInput_DropsStaleContext(t *testing.T) {
 }
 
 func TestHandleSpeechToText_FinalRotatesAfterPreviousUserFinished(t *testing.T) {
-	lifecycle := adapter_lifecycle.NewMessageLifecycleWithContext("ctx-first", type_enums.AudioMode)
-	require.NoError(t, lifecycle.UserFinished("ctx-first"))
 	r := &genericRequestor{
-		streamer:         &streamTestStreamer{},
-		channels:         adapter_channel.NewRequestorChannels(),
-		messageLifecycle: lifecycle,
-		vadExecutor:      &blockingVADExecutor{},
+		streamer:    &streamTestStreamer{},
+		channels:    adapter_channel.NewRequestorChannels(),
+		vadExecutor: &blockingVADExecutor{},
 	}
+	lifecycle := adapter_lifecycle.NewMessageLifecycle(
+		adapter_lifecycle.WithContextID("ctx-first"),
+		adapter_lifecycle.WithMode(type_enums.AudioMode),
+		adapter_lifecycle.WithSend(func(message proto.Message) error { return r.streamer.Send(message) }),
+		adapter_lifecycle.WithDispatch(requestorDispatchHandler{r: r}.HandleMessageLifecyclePacket),
+	)
+	r.messageLifecycle = lifecycle
+	require.NoError(t, lifecycle.OnUserSpeechCompleted(internal_type.EndOfSpeechPacket{ContextID: "ctx-first", Speech: "first turn"}))
+
 	h := requestorDispatchHandler{r: r}
 
 	h.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{
@@ -369,14 +670,20 @@ func TestHandleSpeechToText_FinalRotatesAfterPreviousUserFinished(t *testing.T) 
 }
 
 func TestHandleSpeechToText_DoesNotRotateAgainForSameSpeechSegment(t *testing.T) {
-	lifecycle := adapter_lifecycle.NewMessageLifecycleWithContext("ctx-first", type_enums.AudioMode)
-	require.NoError(t, lifecycle.UserFinished("ctx-first"))
 	r := &genericRequestor{
-		streamer:         &streamTestStreamer{},
-		channels:         adapter_channel.NewRequestorChannels(),
-		messageLifecycle: lifecycle,
-		vadExecutor:      &blockingVADExecutor{},
+		streamer:    &streamTestStreamer{},
+		channels:    adapter_channel.NewRequestorChannels(),
+		vadExecutor: &blockingVADExecutor{},
 	}
+	lifecycle := adapter_lifecycle.NewMessageLifecycle(
+		adapter_lifecycle.WithContextID("ctx-first"),
+		adapter_lifecycle.WithMode(type_enums.AudioMode),
+		adapter_lifecycle.WithSend(func(message proto.Message) error { return r.streamer.Send(message) }),
+		adapter_lifecycle.WithDispatch(requestorDispatchHandler{r: r}.HandleMessageLifecyclePacket),
+	)
+	r.messageLifecycle = lifecycle
+	require.NoError(t, lifecycle.OnUserSpeechCompleted(internal_type.EndOfSpeechPacket{ContextID: "ctx-first", Speech: "first turn"}))
+
 	executor := &recordingEOSExecutor{}
 	r.endOfSpeechExecutor = executor
 	h := requestorDispatchHandler{r: r}
@@ -409,14 +716,20 @@ func TestHandleSpeechToText_DoesNotRotateAgainForSameSpeechSegment(t *testing.T)
 }
 
 func TestHandleSpeechToText_DropsStaleTranscriptAfterUserFinished(t *testing.T) {
-	lifecycle := adapter_lifecycle.NewMessageLifecycleWithContext("ctx-current", type_enums.AudioMode)
-	require.NoError(t, lifecycle.UserFinished("ctx-current"))
 	r := &genericRequestor{
-		streamer:         &streamTestStreamer{},
-		channels:         adapter_channel.NewRequestorChannels(),
-		messageLifecycle: lifecycle,
-		vadExecutor:      &blockingVADExecutor{},
+		streamer:    &streamTestStreamer{},
+		channels:    adapter_channel.NewRequestorChannels(),
+		vadExecutor: &blockingVADExecutor{},
 	}
+	lifecycle := adapter_lifecycle.NewMessageLifecycle(
+		adapter_lifecycle.WithContextID("ctx-current"),
+		adapter_lifecycle.WithMode(type_enums.AudioMode),
+		adapter_lifecycle.WithSend(func(message proto.Message) error { return r.streamer.Send(message) }),
+		adapter_lifecycle.WithDispatch(requestorDispatchHandler{r: r}.HandleMessageLifecyclePacket),
+	)
+	r.messageLifecycle = lifecycle
+	require.NoError(t, lifecycle.OnUserSpeechCompleted(internal_type.EndOfSpeechPacket{ContextID: "ctx-current", Speech: "current turn"}))
+
 	h := requestorDispatchHandler{r: r}
 
 	h.HandleSpeechToText(context.Background(), internal_type.SpeechToTextPacket{
@@ -437,7 +750,7 @@ func TestHandleInterimEndOfSpeech_UsesPacketContextID(t *testing.T) {
 	r := &genericRequestor{
 		streamer:         streamer,
 		channels:         adapter_channel.NewRequestorChannels(),
-		messageLifecycle: adapter_lifecycle.NewMessageLifecycleWithContext("ctx-current", type_enums.AudioMode),
+		messageLifecycle: adapter_lifecycle.NewMessageLifecycle(adapter_lifecycle.WithContextID("ctx-current"), adapter_lifecycle.WithMode(type_enums.AudioMode)),
 		vadExecutor:      &blockingVADExecutor{},
 	}
 	h := requestorDispatchHandler{r: r}
@@ -456,6 +769,7 @@ func TestHandleInterimEndOfSpeech_UsesPacketContextID(t *testing.T) {
 
 func TestHandleInterruptionDetected_VADTriggerUsesVADOnly(t *testing.T) {
 	r := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 0.2, "Please say that again.")
+	t.Cleanup(r.messageLifecycle.StopUnclearInput)
 	h := requestorDispatchHandler{r: r}
 
 	h.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{
@@ -524,6 +838,7 @@ func TestHandleInterruptionDetected_VADTriggerUsesVADOnly(t *testing.T) {
 
 func TestHandleInterruptionDetected_WordTriggerUsesWordOnly(t *testing.T) {
 	r := newUnclearInputTestRequestor(internal_options.BargeInTriggerWord, 0.2, "Please say that again.")
+	t.Cleanup(r.messageLifecycle.StopUnclearInput)
 	h := requestorDispatchHandler{r: r}
 
 	h.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{
@@ -592,6 +907,7 @@ func TestHandleInterruptionDetected_WordTriggerUsesWordOnly(t *testing.T) {
 
 func TestHandleInterruptionDetected_VADTriggerStartsUnclearInputWatchdogAfterVADEnd(t *testing.T) {
 	r := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 0.02, "Please say that again.")
+	t.Cleanup(r.messageLifecycle.StopUnclearInput)
 	h := requestorDispatchHandler{r: r}
 
 	h.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{
@@ -622,6 +938,7 @@ func TestHandleInterruptionDetected_VADTriggerStartsUnclearInputWatchdogAfterVAD
 
 func TestHandleInterruptionDetected_WordTriggerStartsUnclearInputWatchdogOnlyAfterWord(t *testing.T) {
 	r := newUnclearInputTestRequestor(internal_options.BargeInTriggerWord, 0.02, "Please say that again.")
+	t.Cleanup(r.messageLifecycle.StopUnclearInput)
 	h := requestorDispatchHandler{r: r}
 
 	h.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{
@@ -648,6 +965,7 @@ func TestHandleInterruptionDetected_WordTriggerStartsUnclearInputWatchdogOnlyAft
 
 func TestHandleInterruptionDetected_WordTriggerDuplicateWordExtendsUnclearInputWatchdog(t *testing.T) {
 	r := newUnclearInputTestRequestor(internal_options.BargeInTriggerWord, 0.06, "Please say that again.")
+	t.Cleanup(r.messageLifecycle.StopUnclearInput)
 	h := requestorDispatchHandler{r: r}
 	contextID := r.GetID()
 
@@ -676,6 +994,7 @@ func TestHandleInterruptionDetected_WordTriggerDuplicateWordExtendsUnclearInputW
 
 func TestHandleInterruptionDetected_WordTriggerDuplicateAfterFinalDoesNotRestartUnclearInputWatchdog(t *testing.T) {
 	r := newUnclearInputTestRequestor(internal_options.BargeInTriggerWord, 0.03, "Please say that again.")
+	t.Cleanup(r.messageLifecycle.StopUnclearInput)
 	h := requestorDispatchHandler{r: r}
 	oldContextID := r.GetID()
 
@@ -714,6 +1033,7 @@ func TestHandleInterruptionDetected_WordTriggerDuplicateAfterFinalDoesNotRestart
 
 func TestHandleSpeechToText_InterimStopsUnclearInputWatchdog(t *testing.T) {
 	r := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 0.06, "Please say that again.")
+	t.Cleanup(r.messageLifecycle.StopUnclearInput)
 	h := requestorDispatchHandler{r: r}
 	oldContextID := r.GetID()
 
@@ -752,6 +1072,7 @@ func TestHandleSpeechToText_InterimStopsUnclearInputWatchdog(t *testing.T) {
 
 func TestHandleEndOfSpeech_StopsUnclearInputWatchdogForAcceptedSpeech(t *testing.T) {
 	r := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 0.03, "Please say that again.")
+	t.Cleanup(r.messageLifecycle.StopUnclearInput)
 	h := requestorDispatchHandler{r: r}
 
 	h.HandleInterruptionDetected(context.Background(), internal_type.InterruptionDetectedPacket{
@@ -795,6 +1116,7 @@ func TestHandleEndOfSpeech_StopsUnclearInputWatchdogForAcceptedSpeech(t *testing
 
 func TestHandleEndOfSpeech_FinalizesWhenEOSCompletesDuringVADSpeaking(t *testing.T) {
 	r := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 0.03, "Please say that again.")
+	t.Cleanup(r.messageLifecycle.StopUnclearInput)
 	h := requestorDispatchHandler{r: r}
 	oldContextID := r.GetID()
 
@@ -856,6 +1178,7 @@ func TestHandleEndOfSpeech_FinalizesDuringVADSpeakingWithoutWatchdog(t *testing.
 
 func TestHandleSpeechToText_FinalStopsUnclearInputWatchdog(t *testing.T) {
 	r := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 0.03, "Please say that again.")
+	t.Cleanup(r.messageLifecycle.StopUnclearInput)
 	h := requestorDispatchHandler{r: r}
 	oldContextID := r.GetID()
 
@@ -914,6 +1237,7 @@ func TestHandleSpeechToText_FinalStopsUnclearInputWatchdog(t *testing.T) {
 
 func TestHandleSpeechToText_InterimStartsTurnAndFinalKeepsContext(t *testing.T) {
 	r := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 0.06, "Please say that again.")
+	t.Cleanup(r.messageLifecycle.StopUnclearInput)
 	h := requestorDispatchHandler{r: r}
 	oldContextID := r.GetID()
 
@@ -959,10 +1283,12 @@ func TestHandleSpeechToText_InterimStartsTurnAndFinalKeepsContext(t *testing.T) 
 
 func TestHandleUnclearInputExpired_InjectsConfiguredMessage(t *testing.T) {
 	r := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 0.03, "Please say that again.")
+	t.Cleanup(r.messageLifecycle.StopUnclearInput)
 	h := requestorDispatchHandler{r: r}
-	_, contextID, err := r.messageLifecycle.RotateContext()
+	turn, err := r.messageLifecycle.OnUserTurnStarted(r.GetID(), "test", "text", "unclear input")
 	require.NoError(t, err)
-	require.NoError(t, r.messageLifecycle.UserListening(contextID))
+	contextID, err := r.messageLifecycle.OnTranscriptReceived(internal_type.SpeechToTextPacket{ContextID: turn.ContextID, Script: "unclear input", Interim: true})
+	require.NoError(t, err)
 
 	h.HandleUnclearInputExpired(context.Background(), internal_type.UnclearInputExpiredPacket{ContextID: contextID})
 
@@ -993,6 +1319,7 @@ func TestHandleUnclearInputExpired_InjectsConfiguredMessage(t *testing.T) {
 
 func TestHandleUnclearInputExpired_VADTriggerRotatesFromInterruptedContextAndInjectsNewPrompt(t *testing.T) {
 	r := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 0.03, "I didn't catch that.")
+	t.Cleanup(r.messageLifecycle.StopUnclearInput)
 	h := requestorDispatchHandler{r: r}
 	oldContextID := r.GetID()
 
@@ -1038,7 +1365,6 @@ func TestHandleUnclearInputExpired_VADTriggerRotatesFromInterruptedContextAndInj
 	promptContextID := r.GetID()
 	require.NotEqual(t, userTurnContextID, promptContextID)
 	assert.Equal(t, adapter_lifecycle.MessageStateAssistantIdle, r.messageLifecycle.State())
-	assert.Equal(t, uint64(1), r.messageLifecycle.UserPromptCount())
 
 	var eosInterrupt internal_type.EndOfSpeechInterruptionPacket
 	var ttsInterrupt internal_type.TextToSpeechInterruptPacket
@@ -1060,16 +1386,19 @@ func TestHandleUnclearInputExpired_VADTriggerRotatesFromInterruptedContextAndInj
 
 	var stopIdleTimeout internal_type.StopIdleTimeoutPacket
 	var injectMessage internal_type.InjectMessagePacket
+	var prompts []internal_type.InjectMessagePacket
 	for _, packet := range drainEgressPackets(r) {
 		switch typed := packet.(type) {
 		case internal_type.StopIdleTimeoutPacket:
 			stopIdleTimeout = typed
 		case internal_type.InjectMessagePacket:
 			injectMessage = typed
+			prompts = append(prompts, typed)
 		case internal_type.StartIdleTimeoutPacket:
 			t.Fatalf("unclear prompt should not start idle before assistant completion: %+v", typed)
 		}
 	}
+	assert.Len(t, prompts, 1)
 	assert.Equal(t, userTurnContextID, stopIdleTimeout.ContextID)
 	assert.Equal(t, promptContextID, injectMessage.ContextID)
 	assert.Equal(t, "I didn't catch that.", injectMessage.Text)
@@ -1077,6 +1406,7 @@ func TestHandleUnclearInputExpired_VADTriggerRotatesFromInterruptedContextAndInj
 
 func TestHandleUnclearInputExpired_WordTriggerRotatesFromInterruptedContextAndInjectsNewPrompt(t *testing.T) {
 	r := newUnclearInputTestRequestor(internal_options.BargeInTriggerWord, 0.03, "I didn't catch that.")
+	t.Cleanup(r.messageLifecycle.StopUnclearInput)
 	h := requestorDispatchHandler{r: r}
 	oldContextID := r.GetID()
 
@@ -1126,7 +1456,6 @@ func TestHandleUnclearInputExpired_WordTriggerRotatesFromInterruptedContextAndIn
 	promptContextID := r.GetID()
 	require.NotEqual(t, userTurnContextID, promptContextID)
 	assert.Equal(t, adapter_lifecycle.MessageStateAssistantIdle, r.messageLifecycle.State())
-	assert.Equal(t, uint64(1), r.messageLifecycle.UserPromptCount())
 
 	var eosInterrupt internal_type.EndOfSpeechInterruptionPacket
 	var ttsInterrupt internal_type.TextToSpeechInterruptPacket
@@ -1147,14 +1476,17 @@ func TestHandleUnclearInputExpired_WordTriggerRotatesFromInterruptedContextAndIn
 	assert.Equal(t, userTurnContextID, llmInterrupt.ContextID)
 
 	var injectMessage internal_type.InjectMessagePacket
+	var prompts []internal_type.InjectMessagePacket
 	for _, packet := range drainEgressPackets(r) {
 		switch typed := packet.(type) {
 		case internal_type.InjectMessagePacket:
 			injectMessage = typed
+			prompts = append(prompts, typed)
 		case internal_type.StartIdleTimeoutPacket:
 			t.Fatalf("unclear prompt should not start idle before assistant completion: %+v", typed)
 		}
 	}
+	assert.Len(t, prompts, 1)
 	assert.Equal(t, promptContextID, injectMessage.ContextID)
 	assert.Equal(t, "I didn't catch that.", injectMessage.Text)
 }
@@ -1210,140 +1542,194 @@ func TestHandleInterruptionDetected_ForwardsVADEndToEOSWhenLifecycleAlreadyListe
 
 func TestHandleUnclearInputExpired_IgnoresWhenInterruptionIsNotPending(t *testing.T) {
 	r := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 0.03, "Please say that again.")
+	t.Cleanup(r.messageLifecycle.StopUnclearInput)
 	h := requestorDispatchHandler{r: r}
 	contextID := r.GetID()
-	require.NoError(t, r.messageLifecycle.AssistantFinished(contextID))
-	require.NoError(t, r.messageLifecycle.AssistantIdle(contextID))
+	r.messageLifecycle.OnGenerationCompleted(internal_type.LLMResponseDonePacket{ContextID: contextID, Text: "done"})
+	require.NoError(t, r.messageLifecycle.SendAssistantMessage(&protos.ConversationAssistantMessage{
+		Id: contextID, Completed: true, Message: &protos.ConversationAssistantMessage_Text{Text: "done"},
+	}))
+	require.NoError(t, r.messageLifecycle.SendAssistantMessage(&protos.ConversationAssistantMessage{
+		Id: contextID, Completed: true, Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}},
+	}))
+	require.NoError(t, r.messageLifecycle.OnPlaybackCompleted(contextID))
+	require.Equal(t, adapter_lifecycle.MessageStateAssistantIdle, r.messageLifecycle.State())
 
 	h.HandleUnclearInputExpired(context.Background(), internal_type.UnclearInputExpiredPacket{ContextID: contextID})
 
 	assert.Equal(t, contextID, r.GetID())
 	assert.Empty(t, drainControlPackets(r))
-	assert.Empty(t, drainEgressPackets(r))
+	assert.Equal(t, []internal_type.Packet{internal_type.StartIdleTimeoutPacket{ContextID: contextID}}, drainEgressPackets(r))
 }
 
 func TestHandleIdleTimeoutExpired_InterruptsOldContextAndInjectsOnNewContext(t *testing.T) {
-	r := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
-	idleTimeout := uint64(10)
-	message := "Are you still there?"
-	r.source = utils.PhoneCall
-	r.assistant = &internal_assistant_entity.Assistant{
-		AssistantPhoneDeployment: &internal_assistant_entity.AssistantPhoneDeployment{
-			AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
-				IdleTimeout:        &idleTimeout,
-				IdleTimeoutMessage: &message,
+	synctest.Test(t, func(t *testing.T) {
+		r := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
+		idleTimeout := uint64(10)
+		message := "Are you still there?"
+		r.source = utils.PhoneCall
+		r.assistant = &internal_assistant_entity.Assistant{
+			AssistantPhoneDeployment: &internal_assistant_entity.AssistantPhoneDeployment{
+				AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
+					IdleTimeout:        &idleTimeout,
+					IdleTimeoutMessage: &message,
+				},
 			},
-		},
-	}
-	h := requestorDispatchHandler{r: r}
-	oldContextID := r.GetID()
-	require.NoError(t, r.messageLifecycle.AssistantFinished(oldContextID))
-	require.NoError(t, r.messageLifecycle.AssistantIdle(oldContextID))
-
-	h.HandleIdleTimeoutExpired(context.Background(), internal_type.IdleTimeoutExpiredPacket{ContextID: oldContextID})
-
-	newContextID := r.GetID()
-	require.NotEqual(t, oldContextID, newContextID)
-	assert.Equal(t, uint64(1), r.messageLifecycle.AssistantPromptCount())
-
-	var ttsInterrupt internal_type.TextToSpeechInterruptPacket
-	for _, packet := range drainControlPackets(r) {
-		if typed, ok := packet.(internal_type.TextToSpeechInterruptPacket); ok {
-			ttsInterrupt = typed
 		}
-	}
+		r.sessionLifecycle = adapter_lifecycle.NewSessionLifecycle()
+		r.sessionLifecycle.ConfigureTimeouts(context.Background(), r.GetID(), &r.assistant.AssistantPhoneDeployment.AssistantDeploymentBehavior, r.OnPacket)
+		t.Cleanup(r.sessionLifecycle.CloseTimeouts)
+		h := requestorDispatchHandler{r: r}
+		oldContextID := r.GetID()
+		r.messageLifecycle.OnGenerationCompleted(internal_type.LLMResponseDonePacket{ContextID: oldContextID, Text: "done"})
+		require.NoError(t, r.messageLifecycle.SendAssistantMessage(&protos.ConversationAssistantMessage{
+			Id: oldContextID, Completed: true, Message: &protos.ConversationAssistantMessage_Text{Text: "done"},
+		}))
+		require.NoError(t, r.messageLifecycle.SendAssistantMessage(&protos.ConversationAssistantMessage{
+			Id: oldContextID, Completed: true, Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}},
+		}))
+		require.NoError(t, r.messageLifecycle.OnPlaybackCompleted(oldContextID))
+		require.Equal(t, adapter_lifecycle.MessageStateAssistantIdle, r.messageLifecycle.State())
 
-	var injectMessage internal_type.InjectMessagePacket
-	for _, packet := range drainEgressPackets(r) {
-		switch typed := packet.(type) {
-		case internal_type.InjectMessagePacket:
-			injectMessage = typed
-		case internal_type.StartIdleTimeoutPacket:
-			t.Fatalf("idle timeout prompt should not restart idle timer before assistant completion: %+v", typed)
+		h.HandleStartIdleTimeout(context.Background(), internal_type.StartIdleTimeoutPacket{ContextID: oldContextID})
+		time.Sleep(10 * time.Second)
+		synctest.Wait()
+		var idleTimeoutExpired internal_type.IdleTimeoutExpiredPacket
+		for _, packet := range drainEgressPackets(r) {
+			if expired, ok := packet.(internal_type.IdleTimeoutExpiredPacket); ok {
+				idleTimeoutExpired = expired
+			}
 		}
-	}
+		require.NotZero(t, idleTimeoutExpired.Generation)
+		h.HandleIdleTimeoutExpired(context.Background(), idleTimeoutExpired)
 
-	assert.Equal(t, oldContextID, ttsInterrupt.ContextID)
-	assert.Equal(t, newContextID, injectMessage.ContextID)
-	assert.Equal(t, message, injectMessage.Text)
+		newContextID := r.GetID()
+		require.NotEqual(t, oldContextID, newContextID)
+
+		var ttsInterrupt internal_type.TextToSpeechInterruptPacket
+		for _, packet := range drainControlPackets(r) {
+			if typed, ok := packet.(internal_type.TextToSpeechInterruptPacket); ok {
+				ttsInterrupt = typed
+			}
+		}
+
+		var injectMessage internal_type.InjectMessagePacket
+		var prompts []internal_type.InjectMessagePacket
+		for _, packet := range drainEgressPackets(r) {
+			switch typed := packet.(type) {
+			case internal_type.InjectMessagePacket:
+				injectMessage = typed
+				prompts = append(prompts, typed)
+			case internal_type.StartIdleTimeoutPacket:
+				t.Fatalf("idle timeout prompt should not restart idle timer before assistant completion: %+v", typed)
+			}
+		}
+
+		assert.Len(t, prompts, 1)
+		assert.Equal(t, oldContextID, ttsInterrupt.ContextID)
+		assert.Equal(t, newContextID, injectMessage.ContextID)
+		assert.Equal(t, message, injectMessage.Text)
+	})
 }
 
 func TestHandleIdleTimeoutExpired_InjectedPromptSpeaksBeforeIdleRestarts(t *testing.T) {
-	r := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
-	idleTimeout := uint64(10)
-	message := "Are you still there?"
-	r.source = utils.PhoneCall
-	r.assistant = &internal_assistant_entity.Assistant{
-		AssistantPhoneDeployment: &internal_assistant_entity.AssistantPhoneDeployment{
-			AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
-				IdleTimeout:        &idleTimeout,
-				IdleTimeoutMessage: &message,
+	synctest.Test(t, func(t *testing.T) {
+		r := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
+		idleTimeout := uint64(10)
+		message := "Are you still there?"
+		r.source = utils.PhoneCall
+		r.assistant = &internal_assistant_entity.Assistant{
+			AssistantPhoneDeployment: &internal_assistant_entity.AssistantPhoneDeployment{
+				AssistantDeploymentBehavior: internal_assistant_entity.AssistantDeploymentBehavior{
+					IdleTimeout:        &idleTimeout,
+					IdleTimeoutMessage: &message,
+				},
 			},
-		},
-	}
-	r.messageLifecycle.SetMode(type_enums.AudioMode)
-	r.textToSpeechTransformer = noopSpeechToTextTransformer{}
-	h := requestorDispatchHandler{r: r}
-	oldContextID := r.GetID()
-	require.NoError(t, r.messageLifecycle.AssistantFinished(oldContextID))
-	require.NoError(t, r.messageLifecycle.AssistantIdle(oldContextID))
-
-	h.HandleIdleTimeoutExpired(context.Background(), internal_type.IdleTimeoutExpiredPacket{ContextID: oldContextID})
-
-	newContextID := r.GetID()
-	require.NotEqual(t, oldContextID, newContextID)
-	assert.Equal(t, adapter_lifecycle.MessageStateAssistantIdle, r.messageLifecycle.State())
-
-	var injectMessage internal_type.InjectMessagePacket
-	for _, packet := range drainEgressPackets(r) {
-		switch typed := packet.(type) {
-		case internal_type.InjectMessagePacket:
-			injectMessage = typed
-		case internal_type.StartIdleTimeoutPacket:
-			t.Fatalf("idle prompt should not restart idle before assistant completion: %+v", typed)
 		}
-	}
-	require.Equal(t, newContextID, injectMessage.ContextID)
-	require.Equal(t, message, injectMessage.Text)
+		r.sessionLifecycle = adapter_lifecycle.NewSessionLifecycle()
+		r.sessionLifecycle.ConfigureTimeouts(context.Background(), r.GetID(), &r.assistant.AssistantPhoneDeployment.AssistantDeploymentBehavior, r.OnPacket)
+		t.Cleanup(r.sessionLifecycle.CloseTimeouts)
+		r.textToSpeechTransformer = noopSpeechToTextTransformer{}
+		h := requestorDispatchHandler{r: r}
+		oldContextID := r.GetID()
+		r.messageLifecycle.OnGenerationCompleted(internal_type.LLMResponseDonePacket{ContextID: oldContextID, Text: "done"})
+		require.NoError(t, r.messageLifecycle.SendAssistantMessage(&protos.ConversationAssistantMessage{
+			Id: oldContextID, Completed: true, Message: &protos.ConversationAssistantMessage_Text{Text: "done"},
+		}))
+		require.NoError(t, r.messageLifecycle.SendAssistantMessage(&protos.ConversationAssistantMessage{
+			Id: oldContextID, Completed: true, Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{0, 0}},
+		}))
+		require.NoError(t, r.messageLifecycle.OnPlaybackCompleted(oldContextID))
+		require.Equal(t, adapter_lifecycle.MessageStateAssistantIdle, r.messageLifecycle.State())
 
-	h.HandleInjectMessage(context.Background(), injectMessage)
-	assert.Equal(t, adapter_lifecycle.MessageStateAssistantGenerating, r.messageLifecycle.State())
-	for _, packet := range drainEgressPackets(r) {
-		if typed, ok := packet.(internal_type.StartIdleTimeoutPacket); ok {
-			t.Fatalf("injected idle prompt should not start idle while generating: %+v", typed)
+		h.HandleStartIdleTimeout(context.Background(), internal_type.StartIdleTimeoutPacket{ContextID: oldContextID})
+		time.Sleep(10 * time.Second)
+		synctest.Wait()
+		var idleTimeoutExpired internal_type.IdleTimeoutExpiredPacket
+		for _, packet := range drainEgressPackets(r) {
+			if expired, ok := packet.(internal_type.IdleTimeoutExpiredPacket); ok {
+				idleTimeoutExpired = expired
+			}
 		}
-	}
+		require.NotZero(t, idleTimeoutExpired.Generation)
+		h.HandleIdleTimeoutExpired(context.Background(), idleTimeoutExpired)
 
-	h.HandleLLMResponseDone(context.Background(), internal_type.LLMResponseDonePacket{
-		ContextID: newContextID,
-		Text:      message,
+		newContextID := r.GetID()
+		require.NotEqual(t, oldContextID, newContextID)
+		assert.Equal(t, adapter_lifecycle.MessageStateAssistantIdle, r.messageLifecycle.State())
+
+		var injectMessage internal_type.InjectMessagePacket
+		for _, packet := range drainEgressPackets(r) {
+			switch typed := packet.(type) {
+			case internal_type.InjectMessagePacket:
+				injectMessage = typed
+			case internal_type.StartIdleTimeoutPacket:
+				t.Fatalf("idle prompt should not restart idle before assistant completion: %+v", typed)
+			}
+		}
+		require.Equal(t, newContextID, injectMessage.ContextID)
+		require.Equal(t, message, injectMessage.Text)
+
+		h.HandleInjectMessage(context.Background(), injectMessage)
+		assert.Equal(t, adapter_lifecycle.MessageStateAssistantGenerated, r.messageLifecycle.State())
+		for _, packet := range drainEgressPackets(r) {
+			if typed, ok := packet.(internal_type.StartIdleTimeoutPacket); ok {
+				t.Fatalf("injected idle prompt should not start idle before speech delivery: %+v", typed)
+			}
+		}
+
+		h.HandleLLMResponseDone(context.Background(), internal_type.LLMResponseDonePacket{
+			ContextID: newContextID,
+			Text:      message,
+		})
+		assert.Equal(t, adapter_lifecycle.MessageStateAssistantGenerated, r.messageLifecycle.State())
+		for _, packet := range drainEgressPackets(r) {
+			if typed, ok := packet.(internal_type.StartIdleTimeoutPacket); ok {
+				t.Fatalf("idle prompt should not start idle at LLM done before TTS completion: %+v", typed)
+			}
+		}
+
+		h.HandleTextToSpeechDone(context.Background(), internal_type.TextToSpeechDonePacket{
+			ContextID: newContextID,
+			Text:      message,
+		})
+		assert.Equal(t, adapter_lifecycle.MessageStateAssistantSpeaking, r.messageLifecycle.State())
+		for _, packet := range drainEgressPackets(r) {
+			if typed, ok := packet.(internal_type.StartIdleTimeoutPacket); ok {
+				t.Fatalf("audio idle prompt should wait for playback completion before idle restart: %+v", typed)
+			}
+		}
+
+		h.HandleTextToSpeechEnd(context.Background(), internal_type.TextToSpeechEndPacket{ContextID: newContextID})
+
+		for _, packet := range drainEgressPackets(r) {
+			if typed, ok := packet.(internal_type.StartIdleTimeoutPacket); ok {
+				t.Fatalf("idle prompt should not emit idle timeout packet after TTS end: %+v", typed)
+			}
+		}
+		assert.Equal(t, adapter_lifecycle.MessageStateAssistantSpeaking, r.messageLifecycle.State())
+		assert.False(t, r.messageLifecycle.CanStartIdleTimeout(newContextID))
 	})
-	assert.Equal(t, adapter_lifecycle.MessageStateAssistantGenerated, r.messageLifecycle.State())
-	for _, packet := range drainEgressPackets(r) {
-		if typed, ok := packet.(internal_type.StartIdleTimeoutPacket); ok {
-			t.Fatalf("idle prompt should not start idle at LLM done before TTS completion: %+v", typed)
-		}
-	}
-
-	h.HandleTextToSpeechDone(context.Background(), internal_type.TextToSpeechDonePacket{
-		ContextID: newContextID,
-		Text:      message,
-	})
-	assert.Equal(t, adapter_lifecycle.MessageStateAssistantSpeaking, r.messageLifecycle.State())
-	for _, packet := range drainEgressPackets(r) {
-		if typed, ok := packet.(internal_type.StartIdleTimeoutPacket); ok {
-			t.Fatalf("audio idle prompt should wait for TTS end before idle restart: %+v", typed)
-		}
-	}
-
-	h.HandleTextToSpeechEnd(context.Background(), internal_type.TextToSpeechEndPacket{ContextID: newContextID})
-
-	for _, packet := range drainEgressPackets(r) {
-		if typed, ok := packet.(internal_type.StartIdleTimeoutPacket); ok {
-			t.Fatalf("idle prompt should not emit idle timeout packet after TTS end: %+v", typed)
-		}
-	}
-	assert.Equal(t, adapter_lifecycle.MessageStateAssistantIdle, r.messageLifecycle.State())
 }
 
 func TestHandleLLMResponseDone_DoesNotStartIdleTimeout(t *testing.T) {
@@ -1363,38 +1749,33 @@ func TestHandleLLMResponseDone_DoesNotStartIdleTimeout(t *testing.T) {
 	}
 }
 
-func TestHandleTextToSpeechDone_TextModeDoesNotEmitIdleTimeout(t *testing.T) {
+func TestHandleTextToSpeechDone_TextModeCompletesAfterDelivery(t *testing.T) {
 	r := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
+	r.messageLifecycle = adapter_lifecycle.NewMessageLifecycle(
+		adapter_lifecycle.WithContextID("ctx-active"), adapter_lifecycle.WithMode(type_enums.TextMode),
+		adapter_lifecycle.WithOnPacket(func(packets ...internal_type.Packet) error { return r.OnPacket(context.Background(), packets...) }),
+		adapter_lifecycle.WithSend(func(message proto.Message) error { return r.streamer.Send(message) }),
+	)
 	h := requestorDispatchHandler{r: r}
 	contextID := r.GetID()
-	require.NoError(t, r.messageLifecycle.AssistantFinished(contextID))
-	require.NoError(t, r.messageLifecycle.AssistantIdle(contextID))
-	require.NoError(t, r.messageLifecycle.AssistantGenerating(contextID))
-	require.NoError(t, r.messageLifecycle.AssistantGenerated(contextID))
+	require.NoError(t, r.messageLifecycle.OnGenerationStarted(contextID))
+	r.messageLifecycle.OnGenerationCompleted(internal_type.LLMResponseDonePacket{ContextID: contextID, Text: "done"})
 
 	h.HandleTextToSpeechDone(context.Background(), internal_type.TextToSpeechDonePacket{
 		ContextID: contextID,
 		Text:      "done",
 	})
 
-	for _, packet := range drainEgressPackets(r) {
-		if typed, ok := packet.(internal_type.StartIdleTimeoutPacket); ok {
-			t.Fatalf("text mode TTS done should not emit idle timeout packet: %+v", typed)
-		}
-	}
+	assert.Contains(t, drainEgressPackets(r), internal_type.StartIdleTimeoutPacket{ContextID: contextID})
 	assert.Equal(t, adapter_lifecycle.MessageStateAssistantIdle, r.messageLifecycle.State())
 }
 
 func TestHandleTextToSpeechDone_AudioModeDoesNotEmitIdleTimeout(t *testing.T) {
 	r := newInterruptionTestRequestor(internal_options.BargeInTriggerVAD)
-	r.messageLifecycle.SetMode(type_enums.AudioMode)
 	r.textToSpeechTransformer = noopSpeechToTextTransformer{}
 	h := requestorDispatchHandler{r: r}
 	contextID := r.GetID()
-	require.NoError(t, r.messageLifecycle.AssistantFinished(contextID))
-	require.NoError(t, r.messageLifecycle.AssistantIdle(contextID))
-	require.NoError(t, r.messageLifecycle.AssistantGenerating(contextID))
-	require.NoError(t, r.messageLifecycle.AssistantGenerated(contextID))
+	h.HandleLLMResponseDone(context.Background(), internal_type.LLMResponseDonePacket{ContextID: contextID, Text: "done"})
 
 	h.HandleTextToSpeechDone(context.Background(), internal_type.TextToSpeechDonePacket{
 		ContextID: contextID,
@@ -1403,7 +1784,7 @@ func TestHandleTextToSpeechDone_AudioModeDoesNotEmitIdleTimeout(t *testing.T) {
 
 	for _, packet := range drainEgressPackets(r) {
 		if typed, ok := packet.(internal_type.StartIdleTimeoutPacket); ok {
-			t.Fatalf("audio TTS done should wait for TTS end before idle timeout: %+v", typed)
+			t.Fatalf("audio TTS done should wait for playback completion before idle timeout: %+v", typed)
 		}
 	}
 	assert.Equal(t, adapter_lifecycle.MessageStateAssistantSpeaking, r.messageLifecycle.State())
@@ -1415,16 +1796,18 @@ func TestHandleTextToSpeechDone_AudioModeDoesNotEmitIdleTimeout(t *testing.T) {
 			t.Fatalf("audio TTS end should not emit idle timeout packet: %+v", typed)
 		}
 	}
-	assert.Equal(t, adapter_lifecycle.MessageStateAssistantIdle, r.messageLifecycle.State())
+	assert.Equal(t, adapter_lifecycle.MessageStateAssistantSpeaking, r.messageLifecycle.State())
+	assert.False(t, r.messageLifecycle.CanStartIdleTimeout(contextID))
 }
 
 func TestHandleUnclearInputExpired_AudioModeBlocksInputUntilTextToSpeechEnd(t *testing.T) {
 	r := newUnclearInputTestRequestor(internal_options.BargeInTriggerVAD, 0.03, "Please say that again.")
-	r.messageLifecycle.SetMode(type_enums.AudioMode)
+	t.Cleanup(r.messageLifecycle.StopUnclearInput)
 	h := requestorDispatchHandler{r: r}
-	_, contextID, err := r.messageLifecycle.RotateContext()
+	turn, err := r.messageLifecycle.OnUserTurnStarted(r.GetID(), "test", "text", "unclear input")
 	require.NoError(t, err)
-	require.NoError(t, r.messageLifecycle.UserListening(contextID))
+	contextID, err := r.messageLifecycle.OnTranscriptReceived(internal_type.SpeechToTextPacket{ContextID: turn.ContextID, Script: "unclear input", Interim: true})
+	require.NoError(t, err)
 
 	h.HandleUnclearInputExpired(context.Background(), internal_type.UnclearInputExpiredPacket{ContextID: contextID})
 

@@ -1,0 +1,26 @@
+{
+  "date": "2026-09-10",
+  "run_id": "run_cb097ce71b98",
+  "task_id": "task_333557b8d2b5",
+  "review_round": 1,
+  "attempts": [
+    {
+      "dispatch_id": "ctx_8f3a715f72f8",
+      "agent": "codex",
+      "state": "failed",
+      "reason": "agent_prompt_blocked by update prompt before task delivery",
+      "release_result": "retained: user_takeover; no process action authorized"
+    },
+    {
+      "dispatch_id": "ctx_94217de6dcc9",
+      "agent": "claude",
+      "state": "abandoned",
+      "stage": "input_accepted",
+      "reason": "Reviewer reported Credit balance is too low before performing review",
+      "cleanup": "worker-stop returned stop_unknown because terminal is user_owned; worker-abandon retained the terminal with no process action"
+    }
+  ],
+  "protocol_implementation_started": false,
+  "confirmation_gate_created": false,
+  "review_status": "blocked; neither reviewer produced a review or approval"
+}

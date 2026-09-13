@@ -1,0 +1,93 @@
+{
+  "rfc": "rfcs/0016-interruption-lifecycle.md",
+  "artifact_path": "rfcs/0016-interruption-lifecycle/jsons/understanding.json",
+  "status": "draft_evidence",
+  "integration_type": "Existing assistant runtime interruption lifecycle, not a new provider integration",
+  "defaults": {
+    "trigger": "vad",
+    "other_trigger": "word",
+    "compatibility": "Preserve legacy option lookup, transcript behavior, greeting policy and EOS delivery"
+  },
+  "flow": [
+    "VAD/STT evidence enters adapter queues",
+    "Adapter selects policy and changes message lifecycle",
+    "Control and output work proceed through independently scheduled handlers",
+    "Model, TTS and channel own separate resources and stopping boundaries",
+    "Generated assistant text and synthesis completion do not prove receiver playback"
+  ],
+  "evidence": [
+    {
+      "path": "api/assistant-api/internal/type/packet.go",
+      "symbol": "InterruptionDetectedPacket",
+      "finding": "The packet contract labels VAD and word evidence as an already detected interruption, coupling observation to policy"
+    },
+    {
+      "path": "api/assistant-api/internal/vad/internal/firered_vad/firered_vad.go",
+      "symbol": "Execute",
+      "finding": "VAD speech start and end directly emit InterruptionDetectedPacket instead of neutral activity evidence"
+    },
+    {
+      "path": "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+      "symbol": "HandleSpeechToText",
+      "finding": "A nonblank transcript can rotate context immediately; there is no overlap-scoped hold/release gate"
+    },
+    {
+      "path": "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+      "symbol": "HandleTextToSpeechAudio",
+      "finding": "AssistantSpeaking is set when TTS audio is forwarded, not from a local sink playout receipt"
+    },
+    {
+      "path": "api/assistant-api/internal/adapters/lifecycle/message_lifecycle.go",
+      "symbol": "RotateContext",
+      "finding": "Unconditional rotation is individually locked but separate caller reads do not form a conditional atomic transition"
+    },
+    {
+      "path": "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+      "symbol": "HandleInterruptionDetected",
+      "finding": "Repeated turn-rotation paths enqueue activation and interruption independently"
+    },
+    {
+      "path": "api/assistant-api/internal/adapters/internal/dispatch.go",
+      "symbol": "dispatch",
+      "finding": "Asynchronous packets run independently; lane order is not completion order"
+    },
+    {
+      "path": "api/assistant-api/internal/llm/model/model_execute.go",
+      "symbol": "handleInterruption, isStaleResponse, onCompletion",
+      "finding": "Interruption leaves currentPacket active; completion can append history before adapter-level rejection"
+    },
+    {
+      "path": "api/assistant-api/internal/transformer/elevenlabs/tts.go",
+      "symbol": "readLoop, Transform",
+      "finding": "Mutable current context and connection ownership need targeted cancellation review",
+      "verification": "static interleaving analysis, not an executed race reproduction"
+    },
+    {
+      "path": "api/assistant-api/internal/channel/telephony/internal/media/session.go",
+      "symbol": "HandleInterrupt",
+      "finding": "Destructive buffer clearing has no response argument or reversible pause acknowledgment"
+    },
+    {
+      "path": "api/assistant-api/internal/channel/output/frame_buffer.go",
+      "symbol": "FrameBuffer",
+      "finding": "Byte buffer is not a response-aware playback ledger"
+    },
+    {
+      "path": "api/integration-api/api/chat.go",
+      "symbol": "provider.Chat invocation",
+      "finding": "Provider work uses conversation stream context; current protocol does not expose per-request cancellation"
+    }
+  ],
+  "baseline_verification": {
+    "command": "env GOCACHE=/private/tmp/voice-ai-gocache go test -count=1 ./api/assistant-api/internal/adapters/lifecycle ./api/assistant-api/internal/llm/model ./api/assistant-api/internal/channel/output",
+    "result": "passed during preceding review",
+    "proves_new_regressions_fixed": false
+  },
+  "limitations": [
+    "No new regression probe was written or executed",
+    "No live provider or audio trial was performed",
+    "No claim of exact receiver playback position",
+    "No upstream request cancellation through local invalidation",
+    "No independent approval of this design"
+  ]
+}
