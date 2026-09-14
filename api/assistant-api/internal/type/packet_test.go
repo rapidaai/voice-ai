@@ -1,6 +1,45 @@
 package internal_type
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
+
+func TestIdleTimeoutExpiredPacket(t *testing.T) {
+	deadline := time.Unix(100, 0)
+	var packet Packet = IdleTimeoutExpiredPacket{
+		ContextID: "context-1", Count: 2, Generation: 7, Deadline: deadline,
+	}
+	if packet.ContextId() != "context-1" || packet.PacketName() != PacketNameIdleTimeoutExpired {
+		t.Fatalf("unexpected idle expiry routing: %+v", packet)
+	}
+	expiry := packet.(IdleTimeoutExpiredPacket)
+	if expiry.Generation != 7 || expiry.Count != 2 || !expiry.Deadline.Equal(deadline) {
+		t.Fatalf("idle expiry lost countdown identity: %+v", expiry)
+	}
+}
+
+func TestInterruptionDecisionExpiredPacket(t *testing.T) {
+	packet := InterruptionDecisionExpiredPacket{ContextID: "context-1", Sequence: 7}
+
+	if got := packet.ContextId(); got != "context-1" {
+		t.Fatalf("expected context ID %q, got %q", "context-1", got)
+	}
+	if got := packet.PacketName(); got != PacketNameInterruptionDecisionExpired {
+		t.Fatalf("expected packet name %q, got %q", PacketNameInterruptionDecisionExpired, got)
+	}
+	if packet.Sequence != 7 {
+		t.Fatalf("expected sequence 7, got %d", packet.Sequence)
+	}
+}
+
+func TestTurnChangePacket_InterruptionSequence(t *testing.T) {
+	packet := TurnChangePacket{InterruptionSequence: 11}
+
+	if packet.InterruptionSequence != 11 {
+		t.Fatalf("expected interruption sequence 11, got %d", packet.InterruptionSequence)
+	}
+}
 
 func TestSpeechToTextPacket_GetConcat(t *testing.T) {
 	tests := []struct {
@@ -39,6 +78,23 @@ func TestSpeechToTextPacket_GetConcat(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			if got := test.packet.GetConcat(); got != test.expected {
 				t.Fatalf("expected %q, got %q", test.expected, got)
+			}
+		})
+	}
+}
+
+func TestInputPacketsRetainSynchronousRouting(t *testing.T) {
+	for _, packet := range []Packet{
+		SpeechToTextPacket{ContextID: "current"},
+		EndOfSpeechPacket{ContextID: "current"},
+		UserInputPacket{ContextID: "current"},
+	} {
+		t.Run(string(packet.PacketName()), func(t *testing.T) {
+			if packet.ContextId() != "current" {
+				t.Fatalf("input lost its turn context: %+v", packet)
+			}
+			if _, async := packet.(AsyncPacket); async {
+				t.Fatal("replayed input must finish before the lifecycle releases later input")
 			}
 		})
 	}

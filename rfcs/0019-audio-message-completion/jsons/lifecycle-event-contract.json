@@ -1,0 +1,72 @@
+{
+  "date": "2026-09-11",
+  "tier": "Standard",
+  "status": "verified_and_reviewed",
+  "scope": "Make message lifecycle methods describe events and own generation completion, interruption sequencing, and message cleanup",
+  "acceptance_criteria": [
+    "Event handlers use consistent OnEvent naming; I/O commands and configuration retain explicit command names",
+    "One generation-completed event updates generation state and closes text generation without completing undelivered playback",
+    "Lifecycle owns interrupted-turn reservation, flush, commit, provider-update ordering, and held-input release",
+    "Lifecycle handles pause success or failure and owns decision-timer arming",
+    "One Close operation cancels active message timers and returns any required playback continuation",
+    "Dispatcher only routes packets, performs I/O, and reports failures",
+    "Preserve existing stale-event checks, flush-failure policy, staged interruption setting, and once-only completion",
+    "No new protocol, helper package, generic state setter, or lifecycle owner"
+  ],
+  "allowed_paths": [
+    "api/assistant-api/internal/adapters/lifecycle/message_lifecycle.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_lifecycle_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_turn.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_turn_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_playback.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_playback_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_vad.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_vad_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_interruption.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_interruption_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/session_lifecycle_test.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_interruption.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler_interruption_test.go",
+    "api/assistant-api/internal/adapters/internal/interruption_test.go",
+    "api/assistant-api/internal/adapters/internal/playback_test.go",
+    "api/assistant-api/internal/adapters/internal/stream.go",
+    "rfcs/0019-audio-message-completion/jsons/lifecycle-event-contract.json"
+  ],
+  "ownership": {
+    "coordinator": "Interface, generation completion, cleanup, dispatcher integration, remaining lifecycle tests, validation",
+    "interruption_worker": "message_interruption.go and message_interruption_test.go",
+    "adapter_test_worker": "Adapter internal test callers and regressions"
+  },
+  "risks": [
+    "Callbacks must not run under the lifecycle state lock",
+    "Held speech must not replay before provider turn updates finish",
+    "Generation-completed events must not overwrite active playout or imply delivery completion",
+    "Removing duplicate generation state updates can expose tests relying on setter-only setup"
+  ],
+  "verification_commands": [
+    "go test -race -count=1 -timeout=180s -p 2 ./api/assistant-api/internal/adapters/...",
+    "go test -race -count=1 -timeout=180s -p 2 ./api/assistant-api/internal/channel/...",
+    "go test -p 1 -run '^$' ./api/assistant-api/...",
+    "just agent-finalize \"$(jq -r '.allowed_paths | join(\",\")' rfcs/0019-audio-message-completion/jsons/lifecycle-event-contract.json)\"",
+    "git diff --check"
+  ],
+  "baseline": {"exit_code": 0, "log": "/tmp/lifecycle-events-baseline.log"},
+  "verification_results": {
+    "adapter_race_tests": {"exit_code": 0, "log": "/tmp/lifecycle-events-race.log"},
+    "channel_race_tests": {"exit_code": 0, "log": "/tmp/lifecycle-events-channel-race.log"},
+    "assistant_compile": {"exit_code": 0, "log": "/tmp/lifecycle-events-compile.log"},
+    "agent_finalize": {"exit_code": 0, "log": "/tmp/lifecycle-events-finalize.log"},
+    "diff_check": {"exit_code": 0},
+    "removed_method_search": {"matches": 0},
+    "test_race_correction": "New finalization test packet capture changed from an unsynchronized slice to a buffered channel; ten repeated race runs passed"
+  },
+  "independent_review": {
+    "agent_id": "01a09137-eb48-7da0-ad93-42572aa9290d",
+    "status": "approved",
+    "findings": [],
+    "summary": "Verified generation finality, speech-state preservation, interruption callback ordering, pause results, cleanup, and retained playback/idle regression coverage",
+    "nonblocking_coverage_note": "Generation closure before EOS and packet publication after EOS were verified by inspection; this specific ordering has no focused adapter regression test"
+  },
+  "rollback": "Revert only this event-contract change, retaining the earlier API and declaration cleanup"
+}

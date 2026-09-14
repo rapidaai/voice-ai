@@ -1,0 +1,28 @@
+{
+  "rfc": "rfcs/0016-interruption-lifecycle.md",
+  "plan": "rfcs/0016-interruption-lifecycle/jsons/amendment-04-plan.json",
+  "reviewed_rfc_sha256": "d7fef5be47426db99e5b0a66659d578d4ec0b3cf26e4385be59c3066becb4cd2",
+  "reviewed_plan_sha256": "3f7ffa3d8c9c619dba615d6ebebe56b50a16c6e586cf5558c6d2590b00f1fda7",
+  "date": "2026-09-06",
+  "run_id": "run_94aeb7c54726",
+  "task_id": "task_3832f1b3d816",
+  "dispatch_id": "ctx_5d5823f66193",
+  "decision": "revision_required",
+  "approved": false,
+  "critical_findings": 0,
+  "major_findings": [
+    "Exact file ownership, exclusions and executable verification scope remain incomplete",
+    "Below-threshold speech-end handling can still discard a meaningful late final",
+    "Renewed speech and repeated pause incarnations lack an ordering contract",
+    "Lifecycle completion can mark the assistant idle while paused output remains retained",
+    "Unsupported-session VAD fallback does not define effective word and duration thresholds",
+    "The selected STT adapter lacks an explicit local segment-complete aggregation contract",
+    "Target-safe stop still requires exact callback and output identity ownership"
+  ],
+  "minor_findings": [
+    "Disabled resume and backchannel-boundary option precedence is undefined",
+    "Pre-candidate expiry, closed-segment retention origin and paused-buffer loss tests are incomplete"
+  ],
+  "implementation_authorized": false,
+  "next_action": "Maintainer decision is required. Do not create another correction cycle or begin implementation."
+}

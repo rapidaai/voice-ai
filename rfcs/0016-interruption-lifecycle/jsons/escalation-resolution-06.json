@@ -1,0 +1,13 @@
+{
+  "rfc": "0016-interruption-lifecycle",
+  "date": "2026-09-07",
+  "owner": "repository maintainer",
+  "decision": "Add unclear-input handling to the dispatch-first interruption slice",
+  "contract": {
+    "start": "Start only after meaningful interim STT commits TurnChange",
+    "extend": "Extend on additional meaningful interim STT",
+    "stop": "Stop on usable non-empty final STT or completed user input",
+    "ignore": "Do not start for VAD-only, empty interim or filler-only overlap",
+    "expire": "Inject the configured unclear-input message without resuming old assistant output"
+  }
+}

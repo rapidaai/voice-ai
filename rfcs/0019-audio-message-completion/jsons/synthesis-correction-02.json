@@ -1,0 +1,80 @@
+{
+  "run_id": "run_942b61c2cb54",
+  "task_id": "task_a4be6a1df457",
+  "dispatch_id": "ctx_78c6d663bafe",
+  "role": "synthesis_worker",
+  "status": "implemented",
+  "authorization": {
+    "review_file": "rfcs/0019-audio-message-completion/jsons/review-01.json",
+    "correction_round": 2,
+    "findings_addressed": [
+      "RFC0019-REVIEW-01",
+      "RFC0019-REVIEW-02"
+    ]
+  },
+  "changed_files": [
+    "api/assistant-api/internal/transformer/rime/tts.go",
+    "api/assistant-api/internal/transformer/rime/rime_test.go",
+    "api/assistant-api/internal/transformer/neuphonic/tts.go",
+    "api/assistant-api/internal/transformer/neuphonic/neuphonic_tts_test.go",
+    "rfcs/0019-audio-message-completion/jsons/synthesis-correction-02.json"
+  ],
+  "behavior": [
+    "Rime no longer treats websocket done events as message completion. They remain per-batch drain hints, and successful completion is emitted only after TextToSpeechDonePacket sends eos and the same active websocket receives a clean remote close.",
+    "Rime preserves audio FIFO because all chunk messages are forwarded from the read loop before the later close boundary emits TextToSpeechEndPacket. Local close, cancellation, write failure, and provider error paths suppress successful completion.",
+    "Neuphonic no longer emits TextToSpeechEndPacket or TTSCompleted from local TextToSpeechDonePacket. It sends the STOP message when possible, closes the local websocket, and emits TextToSpeechErrorPacket because the provider protocol in this implementation has no completion acknowledgment.",
+    "Neuphonic still forwards ordinary audio chunks before the final failure path, and failed STOP writes emit TextToSpeechErrorPacket without a successful completion event."
+  ],
+  "tests_added": [
+    {
+      "provider": "Rime",
+      "tests": [
+        "TestRimeTextToSpeechLatePreFinalDoneAfterEOSWaitsForRemoteClose",
+        "TestRimeTextToSpeechZeroBufferEOSCompletesOnCleanRemoteClose",
+        "TestRimeTextToSpeechLocalCloseAfterEOSDoesNotEmitEnd"
+      ],
+      "coverage": "Late pre-final done after eos no longer completes the stream, final audio is observed before the end packet, an empty eos buffer completes on clean remote close, and local close after eos does not emit end."
+    },
+    {
+      "provider": "Neuphonic",
+      "tests": [
+        "TestNeuphonicTextToSpeechAudioBeforeDoneFailure",
+        "TestNeuphonicTextToSpeechFailedStopDoesNotComplete",
+        "TestNeuphonicTextToSpeechNoAudioDoneEmitsError",
+        "TestNeuphonicTextToSpeechLocalCloseDoesNotComplete"
+      ],
+      "coverage": "Audio before final failure is preserved, failed STOP writes fail closed, no-audio done fails closed, and local close does not emit end or TTSCompleted."
+    }
+  ],
+  "verification": [
+    {
+      "command": "go test -race -count=1 -timeout=120s ./api/assistant-api/internal/transformer/rime ./api/assistant-api/internal/transformer/neuphonic",
+      "result": "passed"
+    },
+    {
+      "command": "go test -count=1 -timeout=30s -overlay=/tmp/rfc0019-review-probes.JPsOH3/rime_overlay.json -run TestRimeLatePreFinalDoneAfterEOSProbe ./api/assistant-api/internal/transformer/rime",
+      "result": "passed"
+    },
+    {
+      "command": "go test -count=1 -timeout=30s -overlay=/tmp/rfc0019-review-probes.Jy8LZk/neuphonic_overlay.json -run TestNeuphonicDoneDoesNotFabricateSuccessProbe ./api/assistant-api/internal/transformer/neuphonic",
+      "result": "passed"
+    },
+    {
+      "command": "jq empty rfcs/0019-audio-message-completion/jsons/synthesis-correction-02.json",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check -- api/assistant-api/internal/transformer/rime/tts.go api/assistant-api/internal/transformer/rime/rime_test.go api/assistant-api/internal/transformer/neuphonic/tts.go api/assistant-api/internal/transformer/neuphonic/neuphonic_tts_test.go rfcs/0019-audio-message-completion/jsons/synthesis-correction-02.json",
+      "result": "passed"
+    },
+    {
+      "command": "just agent-finalize \"api/assistant-api/internal/transformer/rime/tts.go,api/assistant-api/internal/transformer/rime/rime_test.go,api/assistant-api/internal/transformer/neuphonic/tts.go,api/assistant-api/internal/transformer/neuphonic/neuphonic_tts_test.go,rfcs/0019-audio-message-completion/jsons/synthesis-correction-02.json\"",
+      "result": "passed"
+    }
+  ],
+  "residual_limitations": [
+    "The tests use local websocket servers and do not require live provider credentials.",
+    "Neuphonic remains unable to produce callback-authoritative successful synthesis completion until its integration has a provider completion acknowledgment."
+  ],
+  "blockers": []
+}

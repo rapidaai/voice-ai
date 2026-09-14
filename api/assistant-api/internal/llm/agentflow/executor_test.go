@@ -40,14 +40,11 @@ func (f fakeAgentHandler) Close(context.Context) error {
 
 func (f fakeAgentHandler) Execute(ctx context.Context, request node.Request) (node.Result, error) {
 	if f.result.Text != "" && f.result.TransitionID == "" && f.result.TransitionName == "" {
-		_ = request.Communication.OnPacket(ctx,
-			internal_type.LLMResponseDeltaPacket{ContextID: request.ContextID, Text: f.result.Text},
-			internal_type.LLMResponseDonePacket{ContextID: request.ContextID, Text: f.result.Text},
-		)
+		_ = request.Communication.OnPacket(ctx, internal_type.LLMResponseDeltaPacket{ContextID: request.ContextID, Text: f.result.Text})
 		request.RuntimeState.AppendUserTurn(request.InputText)
 		request.RuntimeState.AppendAssistantTurn(f.result.Text)
 		request.RuntimeState.RecordNodeOutputValue(request.Node.ID, "response", f.result.Text)
-		return node.Result{WaitForNextInput: true}, nil
+		return node.Result{WaitForNextInput: true, ResponseText: f.result.Text}, nil
 	}
 
 	transitions := request.Node.AgentTransitions()
@@ -175,15 +172,105 @@ func TestExecutorStaticMessageThenEnd(t *testing.T) {
 
 	require.Len(t, comm.packets, 4)
 	require.IsType(t, internal_type.LLMResponseDeltaPacket{}, comm.packets[0])
-	require.IsType(t, internal_type.LLMResponseDonePacket{}, comm.packets[1])
-	matchedEvent, ok := comm.packets[2].(internal_type.ObservabilityEventRecordPacket)
+	matchedEvent, ok := comm.packets[1].(internal_type.ObservabilityEventRecordPacket)
 	require.True(t, ok)
 	require.Equal(t, observability.AgentTransitionMatched, matchedEvent.Record.Event)
 	require.Equal(t, "message-1", matchedEvent.Record.Attributes["from_node_id"])
 	require.Equal(t, "end-1", matchedEvent.Record.Attributes["to_node_id"])
-	endCall, ok := comm.packets[3].(internal_type.LLMToolCallPacket)
+	endCall, ok := comm.packets[2].(internal_type.LLMToolCallPacket)
 	require.True(t, ok)
 	require.Equal(t, protos.ToolCallAction_TOOL_CALL_ACTION_END_CONVERSATION, endCall.Action)
+	done, ok := comm.packets[3].(internal_type.LLMResponseDonePacket)
+	require.True(t, ok)
+	require.Equal(t, "ctx-1", done.ContextID)
+	require.Equal(t, "Hello", done.Text)
+}
+
+func TestExecutorMultipleMessageNodesEmitOneDoneAfterGraphStops(t *testing.T) {
+	comm := &fakeCommunication{assistant: testAssistant(map[string]interface{}{
+		"schemaVersion": "2026-07-06",
+		"entryNodeId":   "chat-input-1",
+		"nodes": []map[string]interface{}{
+			{"id": "chat-input-1", "type": NodeTypeChatInput, "label": "Chat Input"},
+			{"id": "message-1", "type": NodeTypeMessage, "label": "Message", "config": map[string]interface{}{"message": "First"}},
+			{"id": "message-2", "type": NodeTypeMessage, "label": "Message", "config": map[string]interface{}{"message": "Second"}},
+		},
+		"edges": []map[string]interface{}{
+			{"id": "edge-1", "source": "chat-input-1", "target": "message-1"},
+			{"id": "edge-2", "source": "message-1", "sourceHandle": "response", "target": "message-2"},
+		},
+	})}
+	executor, err := New(WithCommunication(comm))
+	require.NoError(t, err)
+
+	err = executor.Execute(context.Background(), comm, internal_type.UserInputPacket{ContextID: "ctx-1", Text: "hi"})
+	require.NoError(t, err)
+
+	deltaTexts := make([]string, 0)
+	doneTexts := make([]string, 0)
+	for _, packet := range comm.packets {
+		if delta, ok := packet.(internal_type.LLMResponseDeltaPacket); ok {
+			deltaTexts = append(deltaTexts, delta.Text)
+		}
+		if done, ok := packet.(internal_type.LLMResponseDonePacket); ok {
+			doneTexts = append(doneTexts, done.Text)
+		}
+	}
+	require.Equal(t, []string{"First", "Second"}, deltaTexts)
+	require.Equal(t, []string{"FirstSecond"}, doneTexts)
+}
+
+func TestExecutorEmptyGraphEmitsDone(t *testing.T) {
+	comm := &fakeCommunication{assistant: testAssistant(map[string]interface{}{
+		"schemaVersion": "2026-07-06",
+		"entryNodeId":   "chat-input-1",
+		"nodes": []map[string]interface{}{
+			{"id": "chat-input-1", "type": NodeTypeChatInput, "label": "Chat Input"},
+		},
+	})}
+	executor, err := New(WithCommunication(comm))
+	require.NoError(t, err)
+
+	err = executor.Execute(context.Background(), comm, internal_type.UserInputPacket{ContextID: "ctx-empty", Text: "hi"})
+	require.NoError(t, err)
+
+	require.Len(t, comm.packets, 1)
+	done, ok := comm.packets[0].(internal_type.LLMResponseDonePacket)
+	require.True(t, ok)
+	require.Equal(t, "ctx-empty", done.ContextID)
+	require.Empty(t, done.Text)
+}
+
+func TestExecutorCancelledTurnDoesNotEmitDone(t *testing.T) {
+	comm := &fakeCommunication{assistant: testAssistant(map[string]interface{}{
+		"schemaVersion": "2026-07-06",
+		"entryNodeId":   "chat-input-1",
+		"nodes": []map[string]interface{}{
+			{"id": "chat-input-1", "type": NodeTypeChatInput, "label": "Chat Input"},
+			{"id": "message-1", "type": NodeTypeMessage, "label": "Message", "config": map[string]interface{}{
+				"message":       "Hello",
+				"post_delay_ms": 10,
+			}},
+		},
+		"edges": []map[string]interface{}{
+			{"id": "edge-1", "source": "chat-input-1", "target": "message-1"},
+		},
+	})}
+	executor, err := New(WithCommunication(comm))
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err = executor.Execute(ctx, comm, internal_type.UserInputPacket{ContextID: "ctx-1", Text: "hi"})
+	require.ErrorIs(t, err, context.Canceled)
+
+	doneCount := 0
+	for _, packet := range comm.packets {
+		if _, ok := packet.(internal_type.LLMResponseDonePacket); ok {
+			doneCount++
+		}
+	}
+	require.Zero(t, doneCount)
 }
 
 func TestExecutorAgentTransitionRoutesToTransfer(t *testing.T) {
@@ -213,7 +300,7 @@ func TestExecutorAgentTransitionRoutesToTransfer(t *testing.T) {
 	err = executor.Execute(context.Background(), comm, internal_type.UserInputPacket{ContextID: "ctx-1", Text: "human please"})
 	require.NoError(t, err)
 
-	require.Len(t, comm.packets, 3)
+	require.Len(t, comm.packets, 4)
 	triggeredEvent, ok := comm.packets[0].(internal_type.ObservabilityEventRecordPacket)
 	require.True(t, ok)
 	require.Equal(t, observability.AgentTransitionTriggered, triggeredEvent.Record.Event)
@@ -228,6 +315,10 @@ func TestExecutorAgentTransitionRoutesToTransfer(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, protos.ToolCallAction_TOOL_CALL_ACTION_TRANSFER_CONVERSATION, transferCall.Action)
 	require.Equal(t, "+15551234567", transferCall.Arguments["transfer_to"])
+	done, ok := comm.packets[3].(internal_type.LLMResponseDonePacket)
+	require.True(t, ok)
+	require.Equal(t, "ctx-1", done.ContextID)
+	require.Empty(t, done.Text)
 }
 
 func TestExecutorAgentResponseWaitsOnSameNode(t *testing.T) {
@@ -287,7 +378,7 @@ func TestExecutorAgentTransitionMissingEdgeEmitsEvent(t *testing.T) {
 	err = executor.Execute(context.Background(), comm, internal_type.UserInputPacket{ContextID: "ctx-1", Text: "human please"})
 	require.NoError(t, err)
 
-	require.Len(t, comm.packets, 2)
+	require.Len(t, comm.packets, 3)
 	triggeredEvent, ok := comm.packets[0].(internal_type.ObservabilityEventRecordPacket)
 	require.True(t, ok)
 	require.Equal(t, observability.AgentTransitionTriggered, triggeredEvent.Record.Event)
@@ -296,6 +387,10 @@ func TestExecutorAgentTransitionMissingEdgeEmitsEvent(t *testing.T) {
 	require.Equal(t, observability.AgentTransitionMissingEdge, missingEdgeEvent.Record.Event)
 	require.Equal(t, "agent-1", missingEdgeEvent.Record.Attributes["from_node_id"])
 	require.Equal(t, "transition-transfer,transfer_to_human", missingEdgeEvent.Record.Attributes["route_handles"])
+	done, ok := comm.packets[2].(internal_type.LLMResponseDonePacket)
+	require.True(t, ok)
+	require.Equal(t, "ctx-1", done.ContextID)
+	require.Empty(t, done.Text)
 }
 
 func TestExecutorConditionRoutesByAgentTransitionParameter(t *testing.T) {
@@ -349,7 +444,7 @@ func TestExecutorConditionRoutesByAgentTransitionParameter(t *testing.T) {
 	err = executor.Execute(context.Background(), comm, internal_type.UserInputPacket{ContextID: "ctx-1", Text: "order status"})
 	require.NoError(t, err)
 
-	require.Len(t, comm.packets, 4)
+	require.Len(t, comm.packets, 5)
 	triggeredEvent, ok := comm.packets[0].(internal_type.ObservabilityEventRecordPacket)
 	require.True(t, ok)
 	require.Equal(t, observability.AgentTransitionTriggered, triggeredEvent.Record.Event)
@@ -367,6 +462,10 @@ func TestExecutorConditionRoutesByAgentTransitionParameter(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, protos.ToolCallAction_TOOL_CALL_ACTION_END_CONVERSATION, endCall.Action)
 	require.Equal(t, "matched", endCall.Arguments["reason"])
+	done, ok := comm.packets[4].(internal_type.LLMResponseDonePacket)
+	require.True(t, ok)
+	require.Equal(t, "ctx-1", done.ContextID)
+	require.Empty(t, done.Text)
 }
 
 func testAssistant(definition map[string]interface{}) *internal_assistant_entity.Assistant {

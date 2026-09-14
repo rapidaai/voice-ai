@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/Microsoft/cognitive-services-speech-sdk-go/common"
+	"github.com/rapidaai/api/assistant-api/internal/observability"
+	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -83,4 +85,73 @@ func TestGetAudioStreamFormat(t *testing.T) {
 	opt, _ := NewAzureOption(newTestLogger(), cred, utils.Option{})
 	format := opt.GetAudioStreamFormat()
 	assert.NotNil(t, format)
+}
+
+func TestAzureSynthesisCompletionWaitsForTextClosure(t *testing.T) {
+	var packets []internal_type.Packet
+	tts := &azureTextToSpeech{
+		contextId: "ctx-azure",
+		onPacket: func(pkts ...internal_type.Packet) error {
+			packets = append(packets, pkts...)
+			return nil
+		},
+	}
+
+	tts.beginSynthesis("ctx-azure")
+	tts.finishSynthesis("ctx-azure", false)
+
+	assert.Empty(t, packets)
+
+	tts.closeText("ctx-azure")
+
+	assertAzureSynthesisEnd(t, packets, "ctx-azure")
+}
+
+func TestAzureTextClosureWaitsForPendingSynthesis(t *testing.T) {
+	var packets []internal_type.Packet
+	tts := &azureTextToSpeech{
+		contextId: "ctx-azure",
+		onPacket: func(pkts ...internal_type.Packet) error {
+			packets = append(packets, pkts...)
+			return nil
+		},
+	}
+
+	tts.beginSynthesis("ctx-azure")
+	tts.closeText("ctx-azure")
+
+	assert.Empty(t, packets)
+
+	tts.finishSynthesis("ctx-azure", false)
+
+	assertAzureSynthesisEnd(t, packets, "ctx-azure")
+}
+
+func TestAzureSynthesisFailurePreventsEnd(t *testing.T) {
+	var packets []internal_type.Packet
+	tts := &azureTextToSpeech{
+		contextId: "ctx-azure",
+		onPacket: func(pkts ...internal_type.Packet) error {
+			packets = append(packets, pkts...)
+			return nil
+		},
+	}
+
+	tts.beginSynthesis("ctx-azure")
+	tts.finishSynthesis("ctx-azure", true)
+	tts.closeText("ctx-azure")
+
+	assert.Empty(t, packets)
+}
+
+func assertAzureSynthesisEnd(t *testing.T, packets []internal_type.Packet, contextID string) {
+	t.Helper()
+	assert.Len(t, packets, 2)
+	endPacket, ok := packets[0].(internal_type.TextToSpeechEndPacket)
+	assert.True(t, ok)
+	assert.Equal(t, contextID, endPacket.ContextID)
+	eventPacket, ok := packets[1].(internal_type.ObservabilityEventRecordPacket)
+	assert.True(t, ok)
+	assert.Equal(t, contextID, eventPacket.ContextID)
+	assert.Equal(t, observability.TTSCompleted, eventPacket.Record.Event)
 }

@@ -4,7 +4,13 @@ import {
   ConfigureExperience,
   WebWidgetExperienceConfig,
 } from '@/app/pages/assistant/actions/create-deployment/web-plugin/configure-experience';
-import { DEFAULT_IDEAL_TIMEOUT } from '@/app/pages/assistant/actions/create-deployment/commons/configure-experience';
+import {
+  DEFAULT_IDEAL_TIMEOUT,
+  DEFAULT_IDLE_PROMPT_COUNT,
+  validateIdleTimeoutConfig,
+  DEFAULT_UNCLEAR_INPUT_MESSAGE,
+  DEFAULT_UNCLEAR_INPUT_TIMEOUT,
+} from '@/app/pages/assistant/actions/create-deployment/commons/configure-experience';
 import { useRapidaStore } from '@/hooks';
 import { useAllProviderCredentials } from '@/hooks/use-model';
 import { useCurrentCredential } from '@/hooks/use-credential';
@@ -83,7 +89,7 @@ const EditAssistantWebDeployment: FC<{ assistantId: string }> = ({
       idealTimeout: DEFAULT_IDEAL_TIMEOUT,
       idealMessage: 'Are you there?',
       maxCallDuration: '300',
-      idleTimeoutBackoffTimes: '2',
+      idleTimeoutBackoffTimes: DEFAULT_IDLE_PROMPT_COUNT,
       suggestions: [],
     });
 
@@ -145,7 +151,10 @@ const EditAssistantWebDeployment: FC<{ assistantId: string }> = ({
           unclearInputMessage: deployment.hasUnclearinputmessage?.()
             ? deployment.getUnclearinputmessage()
             : undefined,
-          idealTimeout: deployment.getIdealtimeout(),
+          idealTimeout:
+            deployment.getIdealtimeout() === '0'
+              ? DEFAULT_IDEAL_TIMEOUT
+              : deployment.getIdealtimeout() || DEFAULT_IDEAL_TIMEOUT,
           idealMessage: deployment.getIdealtimeoutmessage(),
           maxCallDuration: deployment.getMaxsessionduration(),
           idleTimeoutBackoffTimes: deployment.getIdealtimeoutbackoff(),
@@ -245,6 +254,12 @@ const EditAssistantWebDeployment: FC<{ assistantId: string }> = ({
       }
     }
 
+    const idleTimeoutError = validateIdleTimeoutConfig(experienceConfig);
+    if (idleTimeoutError) {
+      setIsDeploying(false);
+      setErrorMessage(idleTimeoutError);
+      return;
+    }
     const req = new CreateAssistantDeploymentRequest();
     const webDeployment = new AssistantWebpluginDeployment();
     webDeployment.setAssistantid(assistantId);
@@ -255,20 +270,21 @@ const EditAssistantWebDeployment: FC<{ assistantId: string }> = ({
       webDeployment.setGreeting(experienceConfig.greeting);
     if (experienceConfig.messageOnError)
       webDeployment.setMistake(experienceConfig.messageOnError);
-    if (experienceConfig.unclearInputTimeout)
-      webDeployment.setUnclearinputtimeout(
-        Number(experienceConfig.unclearInputTimeout),
-      );
-    if (experienceConfig.unclearInputMessage)
-      webDeployment.setUnclearinputmessage(
-        experienceConfig.unclearInputMessage,
-      );
-    if (experienceConfig.idealTimeout)
-      webDeployment.setIdealtimeout(experienceConfig.idealTimeout);
-    if (experienceConfig.idleTimeoutBackoffTimes)
-      webDeployment.setIdealtimeoutbackoff(
-        experienceConfig.idleTimeoutBackoffTimes,
-      );
+    webDeployment.setUnclearinputtimeout(
+      Number(
+        experienceConfig.unclearInputTimeout || DEFAULT_UNCLEAR_INPUT_TIMEOUT,
+      ),
+    );
+    webDeployment.setUnclearinputmessage(
+      experienceConfig.unclearInputMessage || DEFAULT_UNCLEAR_INPUT_MESSAGE,
+    );
+    webDeployment.setIdealtimeout(
+      experienceConfig.idealTimeout?.trim() || DEFAULT_IDEAL_TIMEOUT,
+    );
+    webDeployment.setIdealtimeoutbackoff(
+      experienceConfig.idleTimeoutBackoffTimes?.trim() ||
+        DEFAULT_IDLE_PROMPT_COUNT,
+    );
     if (experienceConfig.idealMessage)
       webDeployment.setIdealtimeoutmessage(experienceConfig.idealMessage);
     if (experienceConfig.maxCallDuration)

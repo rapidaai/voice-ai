@@ -3,13 +3,16 @@ package router
 import (
 	"context"
 	"testing"
+	"time"
 
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 )
 
 type dispatchHandlerStub struct {
-	calledUserText                  bool
-	calledConversationRecordingDone bool
+	calledUserText                    bool
+	calledConversationRecordingDone   bool
+	interruptionDecisionExpiredPacket internal_type.InterruptionDecisionExpiredPacket
+	playbackCompletedPacket           internal_type.PlaybackCompletedPacket
 }
 
 func (s *dispatchHandlerStub) HandleUserText(context.Context, internal_type.UserTextReceivedPacket) {
@@ -27,6 +30,9 @@ func (s *dispatchHandlerStub) HandleInterimEndOfSpeech(context.Context, internal
 func (s *dispatchHandlerStub) HandleEndOfSpeech(context.Context, internal_type.EndOfSpeechPacket) {}
 func (s *dispatchHandlerStub) HandleUserInput(context.Context, internal_type.UserInputPacket)     {}
 func (s *dispatchHandlerStub) HandleInterruptionDetected(context.Context, internal_type.InterruptionDetectedPacket) {
+}
+func (s *dispatchHandlerStub) HandleInterruptionDecisionExpired(_ context.Context, packet internal_type.InterruptionDecisionExpiredPacket) {
+	s.interruptionDecisionExpiredPacket = packet
 }
 func (s *dispatchHandlerStub) HandleTextToSpeechInterrupt(context.Context, internal_type.TextToSpeechInterruptPacket) {
 }
@@ -62,6 +68,9 @@ func (s *dispatchHandlerStub) HandleTextToSpeechDone(context.Context, internal_t
 func (s *dispatchHandlerStub) HandleTextToSpeechAudio(context.Context, internal_type.TextToSpeechAudioPacket) {
 }
 func (s *dispatchHandlerStub) HandleTextToSpeechEnd(context.Context, internal_type.TextToSpeechEndPacket) {
+}
+func (s *dispatchHandlerStub) HandlePlaybackCompleted(_ context.Context, packet internal_type.PlaybackCompletedPacket) {
+	s.playbackCompletedPacket = packet
 }
 func (s *dispatchHandlerStub) HandleLLMToolCall(context.Context, internal_type.LLMToolCallPacket) {}
 func (s *dispatchHandlerStub) HandleLLMToolResult(context.Context, internal_type.LLMToolResultPacket) {
@@ -203,6 +212,38 @@ func TestDispatchPacket_DispatchesConversationRecordingCompleted(t *testing.T) {
 	}
 	if !handler.calledConversationRecordingDone {
 		t.Fatalf("expected HandleConversationRecordingCompleted to be called")
+	}
+}
+
+func TestDispatchPacket_DispatchesInterruptionDecisionExpired(t *testing.T) {
+	handler := &dispatchHandlerStub{}
+	packet := internal_type.InterruptionDecisionExpiredPacket{ContextID: "context-1", Sequence: 7}
+
+	err := DispatchPacket(context.Background(), packet, handler)
+	if err != nil {
+		t.Fatalf("expected known packet to not return an error, got: %v", err)
+	}
+	if handler.interruptionDecisionExpiredPacket != packet {
+		t.Fatalf("expected packet %#v, got %#v", packet, handler.interruptionDecisionExpiredPacket)
+	}
+}
+
+func TestDispatchPacket_DispatchesPlaybackCompleted(t *testing.T) {
+	handler := &dispatchHandlerStub{}
+	packet := internal_type.PlaybackCompletedPacket{
+		ContextID: "response-1", CompletedAt: time.Unix(10, 0), ReceivedAt: time.Unix(11, 0),
+	}
+	if packet.ContextId() != "response-1" || packet.PacketName() != internal_type.PacketNamePlaybackCompleted {
+		t.Fatalf("unexpected packet identity: %#v", packet)
+	}
+	if route := Classify(packet); route != RouteControl {
+		t.Fatalf("unexpected route: %v", route)
+	}
+	if err := DispatchPacket(context.Background(), packet, handler); err != nil {
+		t.Fatalf("dispatch failed: %v", err)
+	}
+	if handler.playbackCompletedPacket != packet {
+		t.Fatalf("expected packet %#v, got %#v", packet, handler.playbackCompletedPacket)
 	}
 }
 

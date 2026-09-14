@@ -1,0 +1,44 @@
+{
+  "date": "2026-09-10",
+  "status": "approved",
+  "scope": "Two-owner lifecycle refactor only. Existing streamer/proto changes and callback-authoritative completion are outside this review.",
+  "reviewer": "Independent read-only agent, not an implementation author",
+  "critical_findings": [],
+  "major_findings": [],
+  "checked": [
+    "Session timeout publication, cancellation, reconfiguration, and callback lock ordering",
+    "Maximum-session expiry admission and terminal-tool cancellation",
+    "Message-owned playback control ordering without holding the state lock during I/O",
+    "Stale pause/flush outcomes and pending interruption cancellation",
+    "Held-input replay once in order with context reassignment",
+    "Dispatcher does not read message state or rotate context IDs"
+  ],
+  "verification": [
+    {
+      "command": "env GOCACHE=/private/tmp/voice-ai-gocache go test -race -count=1 -timeout=180s ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/adapters/lifecycle ./api/assistant-api/internal/adapters/router ./api/assistant-api/internal/watchdog",
+      "exit_code": 0,
+      "log": "/private/tmp/voice-ai-lifecycle-refactor-race-final.log"
+    },
+    {
+      "command": "env GOCACHE=/private/tmp/voice-ai-gocache go test -run '^$' ./api/assistant-api/...",
+      "exit_code": 0,
+      "log": "/private/tmp/voice-ai-lifecycle-assistant-compile.log"
+    },
+    {
+      "command": "just agent-finalize with the exact ownership-refactor file inventory",
+      "exit_code": 0,
+      "log": "/private/tmp/voice-ai-lifecycle-refactor-finalize.log"
+    }
+  ],
+  "regressions_covered": [
+    "Delayed pause cannot be overtaken by confirmed flush",
+    "Superseded pause cannot execute after turn commitment",
+    "Replacing a context invalidates old timers and held input",
+    "Duplicate commits and stale callbacks do not replay input",
+    "Unclear-input timeout starts from admitted meaningful interim speech",
+    "Stale idle stop does not cancel the current countdown",
+    "Terminal tool actions cancel maximum-session expiry eligibility"
+  ],
+  "remaining_work": "Playback callbacks remain diagnostic. Generation/TTS completion timing is unchanged. Resolve response-wide versus same-ID segment completion before switching message metrics and idle start to callback authority.",
+  "shipping": "No commit, push, PR update, or deployment performed in this task."
+}

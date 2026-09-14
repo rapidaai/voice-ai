@@ -43,7 +43,7 @@ func TestHandleLLMToolCall_DoesNotInterruptSpeech(test *testing.T) {
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			requestor := newInterruptionTestRequestor("")
-			executor := &toolDispatchTestExecutor{packets: make(chan internal_type.Packet, 1)}
+			executor := &toolDispatchTestExecutor{packets: make(chan internal_type.Packet, 2)}
 			requestor.assistantExecutor = executor
 			handler := requestorDispatchHandler{r: requestor}
 			packet := internal_type.LLMToolCallPacket{
@@ -54,12 +54,13 @@ func TestHandleLLMToolCall_DoesNotInterruptSpeech(test *testing.T) {
 			}
 
 			handler.HandleLLMToolCall(context.Background(), packet)
+			handler.HandlePlaybackCompleted(context.Background(), internal_type.PlaybackCompletedPacket{ContextID: packet.ContextID})
 
 			assert.Empty(test, drainControlPackets(requestor))
 			assert.Equal(test, adapter_lifecycle.MessageStateAssistantSpeaking, requestor.messageLifecycle.State())
 			if message := testCase.arguments["message"]; message != "" {
 				assert.Equal(test, []internal_type.Packet{
-					internal_type.InjectMessagePacket{ContextID: packet.ContextID, Text: message},
+					internal_type.TextToSpeechTextPacket{ContextID: packet.ContextID, Text: message},
 				}, drainEgressPackets(requestor))
 			} else {
 				assert.Empty(test, drainEgressPackets(requestor))
@@ -73,14 +74,33 @@ func TestHandleLLMToolCall_DoesNotInterruptSpeech(test *testing.T) {
 			assert.Equal(test, packet.ToolID, call.ToolId)
 			assert.Equal(test, packet.Name, call.Name)
 			assert.Equal(test, packet.Arguments, call.Args)
-			select {
-			case executed := <-executor.packets:
-				assert.Equal(test, packet, executed)
-			case <-time.After(time.Second):
-				test.Fatal("tool call was not forwarded to the assistant executor")
+			expected := []internal_type.Packet{packet}
+			if message := testCase.arguments["message"]; message != "" {
+				expected = append(expected, internal_type.InjectMessagePacket{ContextID: packet.ContextID, Text: message, Interim: true})
 			}
+			var executed []internal_type.Packet
+			for range expected {
+				select {
+				case received := <-executor.packets:
+					executed = append(executed, received)
+				case <-time.After(time.Second):
+					test.Fatal("tool call was not forwarded to the assistant executor")
+				}
+			}
+			assert.ElementsMatch(test, expected, executed)
 		})
 	}
+}
+
+func TestToolSpeechPrecedesFinalProducerBoundary(t *testing.T) {
+	requestor := newInterruptionTestRequestor("")
+	handler := requestorDispatchHandler{r: requestor}
+	handler.HandleLLMToolCall(context.Background(), internal_type.LLMToolCallPacket{ContextID: "ctx-active", Arguments: map[string]string{"message": "Checking now"}})
+	handler.HandleLLMResponseDone(context.Background(), internal_type.LLMResponseDonePacket{ContextID: "ctx-active", Text: "Done"})
+	assert.Equal(t, []internal_type.Packet{
+		internal_type.TextToSpeechTextPacket{ContextID: "ctx-active", Text: "Checking now"},
+		internal_type.TextToSpeechDonePacket{ContextID: "ctx-active", Text: "Done"},
+	}, drainEgressPackets(requestor))
 }
 
 func TestHandleLLMToolResult_DoesNotInterruptSpeech(test *testing.T) {
@@ -110,6 +130,7 @@ func TestHandleLLMToolResult_DoesNotInterruptSpeech(test *testing.T) {
 			}
 
 			handler.HandleLLMToolResult(context.Background(), packet)
+			handler.HandlePlaybackCompleted(context.Background(), internal_type.PlaybackCompletedPacket{ContextID: packet.ContextID})
 
 			assert.Empty(test, drainControlPackets(requestor))
 			assert.Equal(test, adapter_lifecycle.MessageStateAssistantSpeaking, requestor.messageLifecycle.State())

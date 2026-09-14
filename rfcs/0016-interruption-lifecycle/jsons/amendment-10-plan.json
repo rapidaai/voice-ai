@@ -1,0 +1,81 @@
+{
+  "rfc": "0016-interruption-lifecycle",
+  "status": "proposed_for_exact_byte_challenge",
+  "date": "2026-09-08",
+  "supersedes": "amendment-09-plan.json",
+  "objective": "Replace the parallel interruption owner with the repository packet architecture while preserving the accepted pause, confirm, continue, flush, replay, and unclear-input behavior",
+  "problem": [
+    "The current implementation creates interruption-specific event and work channels beside the packet router",
+    "Synchronous submit replies create a second ordering and request-response contract inside dispatch",
+    "The interruption worker directly calls handler internals and bypasses normal packet routing"
+  ],
+  "design": [
+    "Delete interruptionOwner, interruptionEvent, interruptionReply, its event channel, work queue, and worker goroutines",
+    "Keep one pending interruption candidate as plain requestor-owned state protected by a mutex because control and ingress routes execute independently",
+    "Use existing packets for VAD, STT, EOS, user input, turn change, and unclear-input expiry",
+    "Add only InterruptionDecisionExpiredPacket as a control packet containing ContextID and Sequence",
+    "Have the timer callback synchronously dispatch InterruptionDecisionExpiredPacket through the existing requestor router entry without reading or mutating candidate state",
+    "Add internal InterruptionSequence correlation to TurnChangePacket and have handlers mutate candidate state inline before emitting it",
+    "Have HandleTurnChange atomically claim the candidate sequence, stop its timer, flush output, rotate context, invalidate old work, clear the candidate, and synchronously route held packets in recorded order",
+    "Deliver held VAD boundaries once to the EOS executor after commit instead of routing them through the VAD handler and duplicating STT boundaries",
+    "Have HandleFinalizeBehavior stop the timer, advance the sequence fence, discard held evidence, and continue only uncommitted paused output",
+    "Do not add helper or utility functions for interruption state transitions"
+  ],
+  "acceptance": [
+    "No interruption-specific channel, work queue, reply channel, dispatcher goroutine, or direct handler-to-handler dispatch remains",
+    "VAD start during assistant output pauses once and opens one 500 millisecond candidate",
+    "Meaningful non-filler STT commits through TurnChangePacket",
+    "Filler-only or empty STT does not commit",
+    "An ended unconfirmed candidate continues output at the deadline",
+    "An active candidate commits at the deadline",
+    "Late deadline packets cannot affect a later candidate in the same context",
+    "Held STT, EOS, and user input packets synchronously traverse the existing router in recorded order with the committed context",
+    "Held VAD boundaries reach EOS exactly once and do not duplicate STT start or end packets",
+    "A full control queue cannot drop the deadline decision",
+    "Unclear-input behavior remains unchanged",
+    "The rollout flag remains disabled",
+    "No public protobuf, streamer interface, or output-control contract changes"
+  ],
+  "allowed_paths": [
+    "rfcs/0016-interruption-lifecycle.md",
+    "rfcs/0016-interruption-lifecycle/jsons/amendment-10-plan.json",
+    "rfcs/0016-interruption-lifecycle/jsons/challenge-10.json",
+    "rfcs/0016-interruption-lifecycle/jsons/amendment-10-confirmation.json",
+    "api/assistant-api/internal/type/packet.go",
+    "api/assistant-api/internal/type/packet_test.go",
+    "api/assistant-api/internal/adapters/router/router.go",
+    "api/assistant-api/internal/adapters/router/router_test.go",
+    "api/assistant-api/internal/adapters/router/dispatch.go",
+    "api/assistant-api/internal/adapters/router/dispatch_test.go",
+    "api/assistant-api/internal/adapters/internal/requestor.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler_interruption_test.go",
+    "api/assistant-api/internal/adapters/internal/interruption.go",
+    "api/assistant-api/internal/adapters/internal/interruption_test.go"
+  ],
+  "non_goals": [
+    "Changing streamer pause, continue, or flush behavior",
+    "Changing the 500 millisecond decision window",
+    "Adding public configuration or protobuf fields",
+    "Adding helper packages, utility functions, or a replacement interruption component"
+  ],
+  "risks": [
+    "Control and ingress dispatchers can race unless all candidate fields use the requestor mutex",
+    "A timer packet can arrive after cancellation and must be rejected by sequence",
+    "Synchronous replay can recurse if candidate state is not cleared before packets return through the router",
+    "Cross-lane handler execution can race, so candidate validation and claims must be atomic under the requestor mutex",
+    "TurnChange can commit twice unless the sequence and decision state are validated atomically"
+  ],
+  "verification": [
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test -count=1 ./api/assistant-api/internal/type ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/adapters/router",
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test -race -count=1 ./api/assistant-api/internal/type ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/adapters/router",
+    "just agent-finalize with exact changed paths",
+    "git diff --check"
+  ],
+  "rollback": "Revert amendment 10 and restore the disabled interruption owner implementation. Streamer controls remain compatible and require no rollback.",
+  "review_status": {
+    "prior_confirmation_gate": "superseded_by_architecture_change",
+    "final_challenge": "pending",
+    "exact_digest_confirmation": "pending"
+  }
+}

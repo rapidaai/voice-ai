@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zaf/g711"
+	"google.golang.org/protobuf/proto"
 )
 
 // ---------------------------------------------------------------------------
@@ -145,19 +146,19 @@ func (m *mockAmbientMixer) CurrentConfig() internal_ambient.Config {
 // pushRecorder captures all streams pushed to the recording sink.
 type pushRecorder struct {
 	mu      sync.Mutex
-	streams []internal_type.Stream
+	streams []proto.Message
 }
 
-func (r *pushRecorder) push(s internal_type.Stream) {
+func (r *pushRecorder) push(s proto.Message) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.streams = append(r.streams, s)
 }
 
-func (r *pushRecorder) get() []internal_type.Stream {
+func (r *pushRecorder) get() []proto.Message {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	cp := make([]internal_type.Stream, len(r.streams))
+	cp := make([]proto.Message, len(r.streams))
 	copy(cp, r.streams)
 	return cp
 }
@@ -1152,6 +1153,34 @@ func BenchmarkProcessAssistantAudio(b *testing.B) {
 		if i%1000 == 0 {
 			proc.ClearOutputBuffer()
 		}
+	}
+}
+
+func BenchmarkOutputDrained(b *testing.B) {
+	for _, scenario := range []struct {
+		name        string
+		hasAudio    bool
+		transferred bool
+	}{
+		{name: "empty"},
+		{name: "buffered", hasAudio: true},
+		{name: "transfer", transferred: true},
+	} {
+		b.Run(scenario.name, func(b *testing.B) {
+			processor := benchAudioProcessor(b, &sip_runtime.CodecPCMU)
+			if scenario.hasAudio {
+				if err := processor.ProcessAssistantAudio(make([]byte, BridgeOutputFrameSize), true); err != nil {
+					b.Fatal(err)
+				}
+			}
+			processor.SetTransferActive(scenario.transferred)
+			b.ReportAllocs()
+			for b.Loop() {
+				if processor.OutputDrained() != (!scenario.hasAudio && !scenario.transferred) {
+					b.Fatal("unexpected output drain state")
+				}
+			}
+		})
 	}
 }
 

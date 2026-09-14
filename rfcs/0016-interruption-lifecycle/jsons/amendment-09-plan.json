@@ -1,0 +1,34 @@
+{
+  "rfc": "0016-interruption-lifecycle",
+  "status": "proposed_for_exact_byte_challenge",
+  "date": "2026-09-07",
+  "supersedes": "amendment-08-plan.json",
+  "objective": "Add ASCII diagrams that explain the already accepted interruption lifecycle without changing behavior",
+  "changes": [
+    "Add an interruption decision diagram",
+    "Add an unclear-input watchdog diagram",
+    "Add a component message sequence diagram",
+    "Record the documentation-only amendment in RFC history and the decision log"
+  ],
+  "behavior_change": false,
+  "implementation_scope_change": false,
+  "acceptance": [
+    "The diagrams match the accepted 500 millisecond decision rules",
+    "The diagrams show pause, continue, flush, TurnChange, and held STT replay ordering",
+    "The diagrams show that only meaningful interim STT starts or extends unclear-input tracking",
+    "The diagrams use ASCII text and introduce no external framework name",
+    "The RFC retains exactly one metadata status line with Status: Accepted"
+  ],
+  "verification": [
+    "Inspect all three diagrams against the normative RFC sections",
+    "Confirm no runtime source file is changed by this amendment",
+    "Confirm the prohibited external framework name is absent",
+    "git diff --check"
+  ],
+  "rollback": "Revert the diagram section and amendment-09 artifacts; runtime behavior is unaffected.",
+  "review_status": {
+    "prior_confirmation_gate": "superseded_by_documentation_bytes",
+    "final_challenge": "pending",
+    "exact_digest_confirmation": "pending"
+  }
+}

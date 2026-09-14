@@ -7,7 +7,9 @@ package internal_livekit
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -95,39 +97,8 @@ type livekitEndOfSpeech struct {
 	cancelPrediction context.CancelFunc
 }
 
-type options struct {
-	ctx      context.Context
-	logger   commons.Logger
-	onPacket func(context.Context, ...internal_type.Packet) error
-	options  utils.Option
-}
-
-type Option func(*options)
-
-func WithContext(ctx context.Context) Option {
-	return func(options *options) {
-		options.ctx = ctx
-	}
-}
-
-func WithLogger(logger commons.Logger) Option {
-	return func(options *options) {
-		options.logger = logger
-	}
-}
-
-func WithOnPacket(onPacket func(context.Context, ...internal_type.Packet) error) Option {
-	return func(options *options) {
-		options.onPacket = onPacket
-	}
-}
-
-func WithOptions(opts utils.Option) Option {
-	return func(options *options) {
-		options.options = opts
-	}
-}
-
+// New validates provider options before loading the model and starting the EOS worker.
+// Initialization failures are returned to the caller, not emitted as packets.
 func New(opts ...Option) (internal_type.EndOfSpeechExecutor, error) {
 	options := &options{ctx: context.Background()}
 	for _, opt := range opts {
@@ -143,64 +114,76 @@ func New(opts ...Option) (internal_type.EndOfSpeechExecutor, error) {
 	}
 	start := time.Now()
 
-	cfg := TurnDetectorConfig{ModelType: defaultModelType}
-	if v, err := options.options.GetString(optKeyModel); err == nil && v != "" {
-		cfg.ModelType = v
-	}
-	if v, err := options.options.GetString(optKeyModelPath); err == nil {
-		cfg.ModelPath = v
-	}
-	if v, err := options.options.GetString(optKeyTokenizerPath); err == nil {
-		cfg.TokenizerPath = v
-	}
-
-	detector, err := NewTurnDetector(cfg)
-	if err != nil {
-		_ = options.onPacket(options.ctx, internal_type.ObservabilityLogRecordPacket{
-			Scope: internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.RecordLog{
-				Level:   observability.LevelError,
-				Message: fmt.Sprintf("%s: error while initialization %s", eosName, err.Error()),
-				Attributes: observability.Attributes{
-					"component": observability.ComponentEOS.String(),
-					"provider":  eosName,
-					"options":   observability.AttributeValue(options.options),
-				},
-				OccurredAt: time.Now(),
-			},
-		})
-		return nil, fmt.Errorf("%w: %w", errLivekitInitTurnDetector, err)
-	}
-
 	endOfSpeech := &livekitEndOfSpeech{
 		logger:         options.logger,
 		onPacket:       options.onPacket,
 		opts:           options.options,
-		predictor:      detector,
 		threshold:      defaultThreshold,
 		quickTimeout:   time.Duration(defaultQuickTimeout) * time.Millisecond,
 		silenceTimeout: time.Duration(defaultSilenceTimeout) * time.Millisecond,
 		maxHistory:     int(defaultMaxHistory),
-		modelType:      cfg.ModelType,
+		modelType:      defaultModelType,
 		commandCh:      make(chan struct{}, 1),
 		stopCh:         make(chan struct{}),
 		workerDone:     make(chan struct{}),
 		state:          &endOfSpeechState{segment: speechSegment{}},
-		eosStartedAt:   time.Now(),
 	}
 
-	if v, err := options.options.GetFloat64(optKeyThreshold); err == nil {
-		endOfSpeech.threshold = v
+	if options.options[optKeyThreshold] != nil {
+		threshold, err := options.options.GetFloat64(optKeyThreshold)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %s: %w", errLivekitInvalidOption, optKeyThreshold, err)
+		}
+		if math.IsNaN(threshold) || threshold < 0 || threshold > 1 {
+			return nil, fmt.Errorf("%w: %s must be between 0 and 1", errLivekitInvalidOption, optKeyThreshold)
+		}
+		endOfSpeech.threshold = threshold
 	}
-	if v, err := options.options.GetFloat64(optKeyExtendedTimeout); err == nil {
-		endOfSpeech.silenceTimeout = time.Duration(v) * time.Millisecond
+	for _, optionKey := range []string{optKeyQuickTimeout, optKeyExtendedTimeout} {
+		if options.options[optionKey] == nil {
+			continue
+		}
+		timeoutMillis, err := options.options.GetUint64(optionKey)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %s: %w", errLivekitInvalidOption, optionKey, err)
+		}
+		if timeoutMillis > uint64(math.MaxInt64/int64(time.Millisecond)) {
+			return nil, fmt.Errorf("%w: %s exceeds the supported millisecond duration", errLivekitInvalidOption, optionKey)
+		}
+		switch optionKey {
+		case optKeyQuickTimeout:
+			endOfSpeech.quickTimeout = time.Duration(timeoutMillis) * time.Millisecond
+		case optKeyExtendedTimeout:
+			endOfSpeech.silenceTimeout = time.Duration(timeoutMillis) * time.Millisecond
+		}
 	}
-	if v, err := options.options.GetFloat64(optKeyQuickTimeout); err == nil {
-		endOfSpeech.quickTimeout = time.Duration(v) * time.Millisecond
+	if options.options[optKeyMaxHistory] != nil {
+		maxHistory, err := options.options.GetUint64(optKeyMaxHistory)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %s: %w", errLivekitInvalidOption, optKeyMaxHistory, err)
+		}
+		if maxHistory > uint64(math.MaxInt) {
+			return nil, fmt.Errorf("%w: %s exceeds the supported history count", errLivekitInvalidOption, optKeyMaxHistory)
+		}
+		endOfSpeech.maxHistory = int(maxHistory)
 	}
-	if v, err := options.options.GetFloat64(optKeyMaxHistory); err == nil {
-		endOfSpeech.maxHistory = int(v)
+	detectorConfig := TurnDetectorConfig{ModelType: defaultModelType}
+	if modelType, err := options.options.GetString(optKeyModel); err == nil && modelType != "" {
+		detectorConfig.ModelType = modelType
 	}
+	if modelPath, err := options.options.GetString(optKeyModelPath); err == nil {
+		detectorConfig.ModelPath = modelPath
+	}
+	if tokenizerPath, err := options.options.GetString(optKeyTokenizerPath); err == nil {
+		detectorConfig.TokenizerPath = tokenizerPath
+	}
+	detector, err := NewTurnDetector(detectorConfig)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errLivekitInitTurnDetector, err)
+	}
+	endOfSpeech.predictor = detector
+	endOfSpeech.modelType = detectorConfig.ModelType
+	endOfSpeech.eosStartedAt = time.Now()
 
 	go endOfSpeech.worker()
 	_ = endOfSpeech.onPacket(options.ctx,
@@ -244,6 +227,8 @@ func (endOfSpeech *livekitEndOfSpeech) Arguments() (map[string]string, error) {
 	return map[string]string{}, nil
 }
 
+// Execute applies packet state in order and queues inference and delivery without waiting for them.
+// A canceled caller context is returned immediately; inference failures are reported asynchronously.
 func (endOfSpeech *livekitEndOfSpeech) Execute(ctx context.Context, packet internal_type.Packet) error {
 	endOfSpeech.mu.Lock()
 	defer endOfSpeech.mu.Unlock()
@@ -442,9 +427,7 @@ func (endOfSpeech *livekitEndOfSpeech) Execute(ctx context.Context, packet inter
 	return nil
 }
 
-// predictEOU returns the completion probability, or -1 to use minimum endpointing
-// on inference failure so a broken detector does not hold the pipeline up.
-func (endOfSpeech *livekitEndOfSpeech) predictEOU(ctx context.Context, currentText string) float64 {
+func (endOfSpeech *livekitEndOfSpeech) predictEOU(ctx context.Context, currentText string) (float64, error) {
 	endOfSpeech.mu.RLock()
 	chatText := formatChatTemplateFromHistory(
 		endOfSpeech.history,
@@ -455,29 +438,26 @@ func (endOfSpeech *livekitEndOfSpeech) predictEOU(ctx context.Context, currentTe
 	endOfSpeech.mu.RUnlock()
 
 	if chatText == "" {
-		return -1
+		return 0, errTurnDetectorEmptyTokenSequence
 	}
 
 	endOfSpeech.predictorMu.Lock()
 	defer endOfSpeech.predictorMu.Unlock()
 
 	if endOfSpeech.predictor == nil {
-		return -1
+		return 0, errTurnDetectorNil
 	}
 
 	probability, err := endOfSpeech.predictor.PredictContext(ctx, chatText)
 	if err != nil {
-		if endOfSpeech.logger != nil {
-			endOfSpeech.logger.Debugf("livekit_eos: inference failed: %v", err)
-		}
-		return -1
+		return 0, fmt.Errorf("%w: %w", errTurnDetectorRunInference, err)
 	}
 
 	if endOfSpeech.logger != nil {
 		endOfSpeech.logger.Debugf("livekit_eos: P(eou)=%.4f threshold=%.4f text=%q", probability, endOfSpeech.threshold, currentText)
 	}
 
-	return probability
+	return probability, nil
 }
 
 // enqueueCommand publishes state-ordered work while mu is held; callbacks may reenter Execute.
@@ -613,16 +593,34 @@ func (endOfSpeech *livekitEndOfSpeech) worker() {
 				predictionContext, cancelPrediction := context.WithTimeout(command.ctx, predictionTimeout)
 				endOfSpeech.cancelPrediction = cancelPrediction
 				endOfSpeech.mu.Unlock()
-				command.confidence = endOfSpeech.predictEOU(predictionContext, command.segment.Text)
+				probability, predictionError := endOfSpeech.predictEOU(predictionContext, command.segment.Text)
 				cancelPrediction()
+				if predictionError != nil && !errors.Is(predictionError, context.Canceled) && !errors.Is(predictionError, context.DeadlineExceeded) {
+					_ = endOfSpeech.onPacket(command.ctx, internal_type.ObservabilityLogRecordPacket{
+						ContextID: command.segment.ContextID,
+						Scope:     internal_type.ObservabilityRecordScopeConversation,
+						Record: observability.RecordLog{
+							Level:      observability.LevelError,
+							Message:    "turn prediction failed",
+							OccurredAt: time.Now(),
+							Attributes: observability.Attributes{
+								"component": observability.ComponentEOS.String(),
+								"provider":  endOfSpeech.Name(),
+								"operation": "predict_end_of_turn",
+								"error":     predictionError.Error(),
+							},
+						},
+					})
+				}
 				endOfSpeech.mu.Lock()
 				endOfSpeech.cancelPrediction = nil
 				if endOfSpeech.closed || command.ctx.Err() != nil || command.segment.Revision != endOfSpeech.state.segment.Revision {
 					endOfSpeech.mu.Unlock()
 					continue
 				}
-				endOfSpeech.state.confidence = command.confidence
-				if command.confidence < 0 || command.confidence >= endOfSpeech.threshold {
+				command.confidence = probability
+				endOfSpeech.state.confidence = probability
+				if predictionError != nil || probability >= endOfSpeech.threshold {
 					command.deadline = command.deadline.Add(endOfSpeech.quickTimeout)
 				} else {
 					command.deadline = command.deadline.Add(endOfSpeech.silenceTimeout)
@@ -694,9 +692,6 @@ func (endOfSpeech *livekitEndOfSpeech) fire(command workerCommand, timerArmedAt 
 		return
 	}
 
-	if confidence < 0 {
-		confidence = 0
-	}
 	if ctx.Err() != nil {
 		return
 	}
@@ -754,6 +749,8 @@ func (endOfSpeech *livekitEndOfSpeech) fire(command workerCommand, timerArmedAt 
 		})
 }
 
+// Close cancels pending work and waits for worker shutdown and native resource cleanup.
+// If ctx expires, cleanup continues; a later Close can wait for its completion.
 func (endOfSpeech *livekitEndOfSpeech) Close(ctx context.Context) error {
 	if endOfSpeech == nil {
 		return nil

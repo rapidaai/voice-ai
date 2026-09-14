@@ -1,12 +1,22 @@
 package internal_transformer_elevenlabs
 
 import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/gorilla/websocket"
 	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/internal/testutil"
+	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -103,4 +113,149 @@ func TestGetTextToSpeechConnectionString_AllOptions(t *testing.T) {
 	assert.Contains(t, connStr, "model_id=eleven_multilingual_v2")
 	assert.Contains(t, connStr, "output_format=pcm_16000")
 	assert.Contains(t, connStr, "enable_ssml_parsing=true")
+}
+
+func TestElevenLabsTextToSpeechWaitsForTextClosureAndFinalDrain(t *testing.T) {
+	upgrader := websocket.Upgrader{}
+	requests := make(chan map[string]interface{}, 4)
+	serverConn := make(chan *websocket.Conn, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			t.Errorf("upgrade websocket: %v", err)
+			return
+		}
+		serverConn <- conn
+		for {
+			var payload map[string]interface{}
+			if err := conn.ReadJSON(&payload); err != nil {
+				return
+			}
+			requests <- payload
+		}
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+	defer conn.Close()
+	remote := waitElevenLabsServerConnection(t, serverConn)
+	defer remote.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	collector := testutil.NewPacketCollector()
+	tts := &elevenlabsTTS{
+		ctx:        ctx,
+		ctxCancel:  cancel,
+		connection: conn,
+		contextId:  "ctx-eleven",
+		logger:     testutil.NewTestLogger(),
+		onPacket:   collector.OnPacket,
+	}
+	go tts.readLoop(conn)
+
+	require.NoError(t, tts.Transform(context.Background(), internal_type.TextToSpeechTextPacket{
+		ContextID: "ctx-eleven",
+		Text:      "first",
+	}))
+	assert.Equal(t, "first", waitElevenLabsRequest(t, requests)["text"])
+	writeElevenLabsAudio(t, remote, []byte{1}, true)
+	collector.WaitFor(t, time.Second, "first audio", func() bool {
+		return len(collector.AudioPackets()) == 1
+	})
+	assert.Empty(t, collector.EndPackets())
+
+	require.NoError(t, tts.Transform(context.Background(), internal_type.TextToSpeechTextPacket{
+		ContextID: "ctx-eleven",
+		Text:      "second",
+	}))
+	assert.Equal(t, "second", waitElevenLabsRequest(t, requests)["text"])
+	writeElevenLabsAudio(t, remote, []byte{2}, true)
+	collector.WaitFor(t, time.Second, "second audio", func() bool {
+		return len(collector.AudioPackets()) == 2
+	})
+	assert.Empty(t, collector.EndPackets())
+
+	require.NoError(t, tts.Transform(context.Background(), internal_type.TextToSpeechDonePacket{
+		ContextID: "ctx-eleven",
+	}))
+	assert.Equal(t, " ", waitElevenLabsRequest(t, requests)["text"])
+	writeElevenLabsAudio(t, remote, []byte{3}, true)
+	collector.WaitForTTSEnd(t, time.Second)
+	assert.Len(t, collector.AudioPackets(), 3)
+	assert.Len(t, collector.EndPackets(), 1)
+}
+
+func TestElevenLabsProviderErrorDoesNotEmitEnd(t *testing.T) {
+	upgrader := websocket.Upgrader{}
+	serverConn := make(chan *websocket.Conn, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			t.Errorf("upgrade websocket: %v", err)
+			return
+		}
+		serverConn <- conn
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+	defer conn.Close()
+	remote := waitElevenLabsServerConnection(t, serverConn)
+	defer remote.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	collector := testutil.NewPacketCollector()
+	tts := &elevenlabsTTS{
+		ctx:        ctx,
+		ctxCancel:  cancel,
+		connection: conn,
+		contextId:  "ctx-eleven-error",
+		logger:     testutil.NewTestLogger(),
+		onPacket:   collector.OnPacket,
+	}
+	go tts.readLoop(conn)
+
+	require.NoError(t, remote.WriteJSON(map[string]interface{}{"error": "provider rejected request"}))
+	time.Sleep(50 * time.Millisecond)
+	assert.Empty(t, collector.EndPackets())
+}
+
+func waitElevenLabsServerConnection(t *testing.T, ch <-chan *websocket.Conn) *websocket.Conn {
+	t.Helper()
+	select {
+	case conn := <-ch:
+		return conn
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for websocket connection")
+		return nil
+	}
+}
+
+func waitElevenLabsRequest(t *testing.T, ch <-chan map[string]interface{}) map[string]interface{} {
+	t.Helper()
+	select {
+	case request := <-ch:
+		return request
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for websocket request")
+		return nil
+	}
+}
+
+func writeElevenLabsAudio(t *testing.T, conn *websocket.Conn, audio []byte, final bool) {
+	t.Helper()
+	payload := map[string]interface{}{
+		"audio":     base64.StdEncoding.EncodeToString(audio),
+		"contextId": "ctx-eleven",
+		"isFinal":   final,
+	}
+	data, err := json.Marshal(payload)
+	require.NoError(t, err)
+	require.NoError(t, conn.WriteMessage(websocket.TextMessage, data))
 }

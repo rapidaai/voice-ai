@@ -1,0 +1,10 @@
+{
+  "tier": "Governed",
+  "reason": "Change existing public audio terminal semantics from per-segment to one final marker per message",
+  "rfc": "rfcs/0019-audio-message-completion.md",
+  "run_id": "run_942b61c2cb54",
+  "reserved_before_drafting": true,
+  "supersedes_sequence_contract": "rfcs/0018-message-playback-completion.md",
+  "previous_rfc_sha256": "dae79ed71ee7d67db3d4fc2a4bbb338712b9ae35c3e9a13c6fddd8f28f23b8f5",
+  "implementation_started": false
+}

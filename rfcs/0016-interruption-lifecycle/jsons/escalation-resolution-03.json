@@ -1,0 +1,22 @@
+{
+  "rfc": "0016-interruption-lifecycle",
+  "date": "2026-09-06",
+  "owner": "repository maintainer",
+  "decision": "Keep the Streamer interface unchanged and use simple internal output controls",
+  "adapter_contract": {
+    "vad_start": "Send pause when assistant output is active and open one 500 millisecond candidate",
+    "meaningful_stt": "Emit TurnChangePacket immediately",
+    "deadline_speech_active": "Emit TurnChangePacket",
+    "deadline_speech_ended_without_meaningful_text": "Send continue",
+    "turn_change": "Send flush, rotate context once, interrupt old TTS, LLM and EOS work, then replay held text"
+  },
+  "streamer_contract": {
+    "interface_change": false,
+    "delivery": "Internal stream values use the existing Notify and Send path",
+    "pause": "Retain queued local audio and stop consuming it",
+    "continue": "Resume retained local audio",
+    "flush": "Discard retained local audio and invoke any existing provider clear",
+    "identifiers": "No pause ID, response ID or output epoch is added"
+  },
+  "rollout_constraint": "Do not enable or release the adapter path until every configured streamer consumes all three controls"
+}

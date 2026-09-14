@@ -12,6 +12,7 @@ import (
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 type recordingEOSExecutor struct {
@@ -21,6 +22,7 @@ type recordingEOSExecutor struct {
 	lastCloseCtx context.Context
 	executeErr   error
 	closeErr     error
+	onExecute    func(context.Context, internal_type.Packet) error
 }
 
 func (e *recordingEOSExecutor) Name() string {
@@ -35,10 +37,13 @@ func (e *recordingEOSExecutor) Arguments() (map[string]string, error) {
 	return nil, nil
 }
 
-func (e *recordingEOSExecutor) Execute(_ context.Context, packet internal_type.Packet) error {
+func (e *recordingEOSExecutor) Execute(ctx context.Context, packet internal_type.Packet) error {
 	e.mu.Lock()
 	e.executed = append(e.executed, packet)
 	e.mu.Unlock()
+	if e.onExecute != nil {
+		return e.onExecute(ctx, packet)
+	}
 	return e.executeErr
 }
 
@@ -149,7 +154,11 @@ func TestHandleEndOfSpeechAudio_ExecutesEOS(t *testing.T) {
 func TestHandleSpeechToText_WithEOSExecutor_ExecutesAndSkipsFallback(t *testing.T) {
 	r := newDispatchHandlerVADTestRequestor(t)
 	r.streamer = &streamTestStreamer{}
-	r.messageLifecycle = adapter_lifecycle.NewMessageLifecycleWithContext("ctx-eos-stt", "")
+	r.messageLifecycle = adapter_lifecycle.NewMessageLifecycle(
+		adapter_lifecycle.WithContextID("ctx-eos-stt"), adapter_lifecycle.WithMode(""),
+		adapter_lifecycle.WithSend(func(message proto.Message) error { return r.streamer.Send(message) }),
+		adapter_lifecycle.WithDispatch(requestorDispatchHandler{r: r}.HandleMessageLifecyclePacket),
+	)
 	executor := &recordingEOSExecutor{}
 	r.endOfSpeechExecutor = executor
 	h := requestorDispatchHandler{r: r}
@@ -176,7 +185,11 @@ func TestHandleSpeechToText_WithEOSExecutor_ExecutesAndSkipsFallback(t *testing.
 func TestHandleSpeechToText_WithoutEOSExecutor_EmitsFallbackOnlyForFinal(t *testing.T) {
 	r := newDispatchHandlerVADTestRequestor(t)
 	r.streamer = &streamTestStreamer{}
-	r.messageLifecycle = adapter_lifecycle.NewMessageLifecycleWithContext("ctx-eos-fallback", "")
+	r.messageLifecycle = adapter_lifecycle.NewMessageLifecycle(
+		adapter_lifecycle.WithContextID("ctx-eos-fallback"), adapter_lifecycle.WithMode(""),
+		adapter_lifecycle.WithSend(func(message proto.Message) error { return r.streamer.Send(message) }),
+		adapter_lifecycle.WithDispatch(requestorDispatchHandler{r: r}.HandleMessageLifecyclePacket),
+	)
 	h := requestorDispatchHandler{r: r}
 
 	h.HandleSpeechToText(t.Context(), internal_type.SpeechToTextPacket{

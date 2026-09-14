@@ -1,0 +1,14 @@
+{
+  "rfc": "rfcs/0016-interruption-lifecycle.md",
+  "date": "2026-09-06",
+  "authority": "repository maintainer",
+  "decision": "Every Streamer must support pause, continue and flush",
+  "contract": {
+    "pause": "Stop local output handoff for one response and retain all locally owned remainder in order",
+    "continue": "Resume the same response from the retained remainder",
+    "flush": "Discard only the selected response and reject its stale output",
+    "inactive": "A non-audio or inactive streamer returns a successful not_active receipt",
+    "remote_boundary": "The contract does not retract bytes already accepted by a remote transport or device"
+  },
+  "implementation_authorized": false
+}

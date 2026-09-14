@@ -1,0 +1,89 @@
+{
+  "status": "approved",
+  "decision": "approved",
+  "approved": true,
+  "rfc_path": "rfcs/0018-message-playback-completion.md",
+  "rfc_file": "rfcs/0018-message-playback-completion.md",
+  "approved_sha256": "dae79ed71ee7d67db3d4fc2a4bbb338712b9ae35c3e9a13c6fddd8f28f23b8f5",
+  "rfc_sha256": "dae79ed71ee7d67db3d4fc2a4bbb338712b9ae35c3e9a13c6fddd8f28f23b8f5",
+  "run_id": "run_cb097ce71b98",
+  "task_id": "task_06b5c9836d7d",
+  "dispatch_id": "ctx_64a67ddde91f",
+  "prior_review_task_id": "task_80a85b23c538",
+  "prior_review_dispatch_id": "ctx_3599b97ddd43",
+  "reviewer": "Codex worker term_15301882-d756-42d3-af1d-63f60a042790",
+  "review_round": 1,
+  "reviewed_at": "2026-09-10T16:20:27Z",
+  "reviewed_inputs": [
+    "AGENTS.md",
+    "DEVELOPMENT_PROCESS.md",
+    "rfcs/0018-message-playback-completion.md",
+    "rfcs/0018-message-playback-completion/jsons/plan.json",
+    "api/assistant-api/internal/type/packet.go",
+    "api/assistant-api/internal/type/streamer.go",
+    "api/assistant-api/internal/adapters/internal/stream.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_lifecycle.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_turn.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_interruption.go",
+    "api/assistant-api/internal/adapters/lifecycle/session_lifecycle.go",
+    "api/assistant-api/internal/adapters/router/dispatch.go",
+    "api/assistant-api/internal/llm/model/model_execute.go",
+    "api/assistant-api/internal/llm/agentflow/executor.go",
+    "api/assistant-api/internal/llm/agentflow/orchestrator.go",
+    "api/assistant-api/internal/llm/agentflow/internal/node/message.go",
+    "api/assistant-api/internal/llm/agentflow/internal/node/agent.go",
+    "api/assistant-api/internal/llm/agentkit/agentkit_stream.go",
+    "api/assistant-api/internal/llm/websocket/websocket.go",
+    "api/assistant-api/internal/channel/grpc/streamer.go",
+    "api/assistant-api/internal/channel/webrtc/audio_buffer.go",
+    "api/assistant-api/internal/channel/webrtc/output_loop.go",
+    "api/assistant-api/internal/channel/webrtc/peer_loop.go",
+    "api/assistant-api/internal/channel/webrtc/streamer.go",
+    "api/assistant-api/internal/channel/webrtc/internal/types.go",
+    "api/assistant-api/internal/channel/telephony/internal/media/session.go",
+    "api/assistant-api/internal/channel/telephony/internal/media/types.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/streamer.go",
+    "protos/artifacts/talk-api.proto",
+    "protos/talk-api.pb.go"
+  ],
+  "decision_checks": [
+    {
+      "area": "final_bytes",
+      "result": "approved",
+      "evidence": "The RFC has exactly one metadata status line, '- Status: Accepted', and the approved SHA-256 was computed from the current file bytes."
+    },
+    {
+      "area": "two_owner_lifecycle",
+      "result": "approved",
+      "evidence": "The RFC keeps message lifecycle as owner of active message, admitted work, synthesis segments, receipt admission, metrics, and session handoff, while session lifecycle retains session state and countdown validity. It does not add pause IDs, streamer methods, helper packages, or a third lifecycle owner."
+    },
+    {
+      "area": "producer_and_synthesis_closure",
+      "result": "approved",
+      "evidence": "The current code shows model, agentflow, agentkit, and websocket producers emit LLMResponseDonePacket at different boundaries. The RFC explicitly requires closure only after no remaining continuations in model, whole workflow completion in agentflow, and tracked continuation completion in remote executors, and requires sequence capture from originating synthesis requests."
+    },
+    {
+      "area": "sequence_contract",
+      "result": "approved",
+      "evidence": "Current packets and generated protobufs carry only ContextID or id for TTS and playback receipt state. The RFC adds uint64 playback_sequence to ConversationAssistantMessage tag 5 and ConversationPlaybackComplete tag 3, rejects zero or unissued receipts, and keeps pause, continue, flush, and Streamer unchanged."
+    },
+    {
+      "area": "legacy_clients_and_rollout",
+      "result": "approved",
+      "evidence": "The RFC states that legacy sequence-zero receipts remain diagnostic only, forbids silent fallback to generation-based successful completion, and makes upgraded playback clients a prerequisite for enabling callback authority on external gRPC."
+    },
+    {
+      "area": "failure_and_race_handling",
+      "result": "approved",
+      "evidence": "The RFC makes acknowledgment waiting bounded by unacknowledged audio duration plus five seconds, pauses and resumes the budget with playback controls, treats timeout and watchdog expiry as failure, blocks synchronous receipt success until Send succeeds, invalidates old receipts on confirmed interruption, and requires late packets not to alter a terminal outcome."
+    },
+    {
+      "area": "scope_rollback_and_verification",
+      "result": "approved",
+      "evidence": "The RFC and plan constrain implementation to protocol, packet, lifecycle, producer, synthesis, transport, watchdog, and generated artifact paths, leave UI, schemas, auth, integration-api, deployment, and provider-selection work out of scope, preserve additive proto fields on rollback, and list focused race, package, generation, finalization, and diff validation commands."
+    }
+  ],
+  "findings": [],
+  "summary": "Approved final-byte challenge for RFC 0018. The accepted RFC and plan cover the requested lifecycle ownership, producer and synthesis closure, sequence propagation, protocol tags, legacy-client policy, bounded timeout, send-failure race, interruption, idle and metric race, scope, verification, and rollback checks against the current code. No critical or major gaps were found, and implementation remains unauthorized until exact-digest confirmation is collected."
+}

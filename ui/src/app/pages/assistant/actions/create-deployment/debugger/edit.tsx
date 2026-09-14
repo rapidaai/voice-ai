@@ -1,6 +1,10 @@
 import {
   ConfigureExperience,
   DEFAULT_IDEAL_TIMEOUT,
+  DEFAULT_IDLE_PROMPT_COUNT,
+  validateIdleTimeoutConfig,
+  DEFAULT_UNCLEAR_INPUT_MESSAGE,
+  DEFAULT_UNCLEAR_INPUT_TIMEOUT,
   ExperienceConfig,
 } from '@/app/pages/assistant/actions/create-deployment/commons/configure-experience';
 import { ConfigureAudioOutputProvider } from '@/app/pages/assistant/actions/create-deployment/commons/configure-audio-output';
@@ -96,7 +100,7 @@ const EditAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
     idealTimeout: DEFAULT_IDEAL_TIMEOUT,
     idealMessage: 'Are you there?',
     maxCallDuration: '300',
-    idleTimeoutBackoffTimes: '2',
+    idleTimeoutBackoffTimes: DEFAULT_IDLE_PROMPT_COUNT,
   });
 
   const [audioInputConfig, setAudioInputConfig] = useState<{
@@ -157,7 +161,10 @@ const EditAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
           unclearInputMessage: deployment.hasUnclearinputmessage?.()
             ? deployment.getUnclearinputmessage()
             : undefined,
-          idealTimeout: deployment.getIdealtimeout(),
+          idealTimeout:
+            deployment.getIdealtimeout() === '0'
+              ? DEFAULT_IDEAL_TIMEOUT
+              : deployment.getIdealtimeout() || DEFAULT_IDEAL_TIMEOUT,
           idealMessage: deployment.getIdealtimeoutmessage(),
           maxCallDuration: deployment.getMaxsessionduration(),
           idleTimeoutBackoffTimes: deployment.getIdealtimeoutbackoff(),
@@ -255,6 +262,12 @@ const EditAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
       }
     }
 
+    const idleTimeoutError = validateIdleTimeoutConfig(experienceConfig);
+    if (idleTimeoutError) {
+      setIsDeploying(false);
+      setErrorMessage(idleTimeoutError);
+      return;
+    }
     const deployment = new AssistantDebuggerDeployment();
     deployment.setAssistantid(assistantId);
     deployment.setGreetinginterruptible(
@@ -264,18 +277,21 @@ const EditAssistantDebuggerDeployment: FC<{ assistantId: string }> = ({
       deployment.setGreeting(experienceConfig.greeting);
     if (experienceConfig.messageOnError)
       deployment.setMistake(experienceConfig.messageOnError);
-    if (experienceConfig.unclearInputTimeout)
-      deployment.setUnclearinputtimeout(
-        Number(experienceConfig.unclearInputTimeout),
-      );
-    if (experienceConfig.unclearInputMessage)
-      deployment.setUnclearinputmessage(experienceConfig.unclearInputMessage);
-    if (experienceConfig.idealTimeout)
-      deployment.setIdealtimeout(experienceConfig.idealTimeout);
-    if (experienceConfig.idleTimeoutBackoffTimes)
-      deployment.setIdealtimeoutbackoff(
-        experienceConfig.idleTimeoutBackoffTimes,
-      );
+    deployment.setUnclearinputtimeout(
+      Number(
+        experienceConfig.unclearInputTimeout || DEFAULT_UNCLEAR_INPUT_TIMEOUT,
+      ),
+    );
+    deployment.setUnclearinputmessage(
+      experienceConfig.unclearInputMessage || DEFAULT_UNCLEAR_INPUT_MESSAGE,
+    );
+    deployment.setIdealtimeout(
+      experienceConfig.idealTimeout?.trim() || DEFAULT_IDEAL_TIMEOUT,
+    );
+    deployment.setIdealtimeoutbackoff(
+      experienceConfig.idleTimeoutBackoffTimes?.trim() ||
+        DEFAULT_IDLE_PROMPT_COUNT,
+    );
     if (experienceConfig.idealMessage)
       deployment.setIdealtimeoutmessage(experienceConfig.idealMessage);
     if (experienceConfig.maxCallDuration)

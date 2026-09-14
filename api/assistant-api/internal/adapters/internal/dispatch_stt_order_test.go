@@ -113,6 +113,7 @@ func TestInputDispatcher_PreservesSpeechToTextAudioOrder(t *testing.T) {
 
 func TestInputDispatcher_PreservesEndOfSpeechAudioBeforeTranscript(t *testing.T) {
 	channels := adapter_channel.NewRequestorChannels()
+	streamer := &streamTestStreamer{}
 	executor := orderedEOSExecutor{
 		started:      make(chan string, 2),
 		releaseAudio: make(chan struct{}),
@@ -120,7 +121,8 @@ func TestInputDispatcher_PreservesEndOfSpeechAudioBeforeTranscript(t *testing.T)
 	requestor := &genericRequestor{
 		channels:            channels,
 		dispatchRoute:       adapter_router.NewDispatchRoute(adapter_router.NewRoutePolicy(), channels),
-		messageLifecycle:    adapter_lifecycle.NewMessageLifecycleWithContext("ctx", ""),
+		streamer:            streamer,
+		messageLifecycle:    adapter_lifecycle.NewMessageLifecycle(adapter_lifecycle.WithContextID("ctx"), adapter_lifecycle.WithSend(streamer.Send)),
 		endOfSpeechExecutor: executor,
 	}
 

@@ -30,12 +30,16 @@ type sarvamTextToSpeech struct {
 	ctx       context.Context
 	ctxCancel context.CancelFunc
 
-	mu             sync.Mutex
-	connection     *websocket.Conn
-	contextId      string
-	ttsConnectedAt time.Time
-	ttsStartedAt   time.Time
-	ttsMetricSent  bool
+	mu              sync.Mutex
+	connection      *websocket.Conn
+	contextId       string
+	ttsConnectedAt  time.Time
+	ttsStartedAt    time.Time
+	ttsMetricSent   bool
+	textClosed      bool
+	pendingDrains   int
+	synthesisFailed bool
+	endSent         bool
 
 	logger   commons.Logger
 	onPacket func(pkt ...internal_type.Packet) error
@@ -65,6 +69,25 @@ func NewSarvamTextToSpeech(
 
 func (*sarvamTextToSpeech) Name() string {
 	return "sarvam-tts"
+}
+
+func (rt *sarvamTextToSpeech) resetTurnLocked(contextID string) {
+	rt.contextId = contextID
+	rt.ttsStartedAt = time.Time{}
+	rt.ttsMetricSent = false
+	rt.textClosed = false
+	rt.pendingDrains = 0
+	rt.synthesisFailed = false
+	rt.endSent = false
+}
+
+func (rt *sarvamTextToSpeech) recordSynthesisFailure() {
+	rt.mu.Lock()
+	if rt.pendingDrains > 0 {
+		rt.pendingDrains--
+	}
+	rt.synthesisFailed = true
+	rt.mu.Unlock()
 }
 
 // Initialize opens a fresh WebSocket connection to Sarvam and starts the read
@@ -150,7 +173,7 @@ func (rt *sarvamTextToSpeech) Initialize() error {
 }
 
 // readLoop owns a single WebSocket connection for the duration of one TTS turn.
-// It exits when the connection closes — intentionally (interrupt / flush complete)
+// It exits when the connection closes intentionally (interrupt / flush complete)
 // or unexpectedly (network drop / server error).
 func (rt *sarvamTextToSpeech) readLoop(conn *websocket.Conn) {
 	for {
@@ -186,8 +209,9 @@ func (rt *sarvamTextToSpeech) readLoop(conn *websocket.Conn) {
 		case "event":
 			// Sarvam signals that all audio for the current flush has been sent.
 			// Emit the end packet and close this per-turn connection.
-			rt.handleFlushComplete(conn)
-			return
+			if rt.handleFlushComplete(conn) {
+				return
+			}
 		case "error":
 			rt.handleServerError(conn, response)
 			return
@@ -221,7 +245,7 @@ func (rt *sarvamTextToSpeech) handleAudio(response sarvam_internal.SarvamTextToS
 	rt.mu.Unlock()
 
 	if contextId == "" {
-		rt.logger.Debugf("sarvam-tts: discarding audio — no active context")
+		rt.logger.Debugf("sarvam-tts: discarding audio, no active context")
 		return
 	}
 
@@ -237,11 +261,26 @@ func (rt *sarvamTextToSpeech) handleAudio(response sarvam_internal.SarvamTextToS
 
 // handleFlushComplete is called when Sarvam sends the "event" message confirming
 // that all audio for the current flush has been delivered. It emits
-// TextToSpeechEndPacket — correctly ordered after the last audio chunk — and
+// TextToSpeechEndPacket, ordered after the last audio chunk, and
 // closes the per-turn connection.
-func (rt *sarvamTextToSpeech) handleFlushComplete(conn *websocket.Conn) {
+func (rt *sarvamTextToSpeech) handleFlushComplete(conn *websocket.Conn) bool {
 	rt.mu.Lock()
+	if rt.connection != conn {
+		rt.mu.Unlock()
+		conn.Close()
+		return true
+	}
+	if rt.pendingDrains == 0 {
+		rt.mu.Unlock()
+		return false
+	}
+	rt.pendingDrains--
+	if !rt.textClosed || rt.pendingDrains > 0 || rt.synthesisFailed || rt.endSent {
+		rt.mu.Unlock()
+		return false
+	}
 	contextId := rt.contextId
+	rt.endSent = true
 	rt.connection = nil // mark before Close so readLoop error handler sees intentional
 	rt.mu.Unlock()
 
@@ -259,6 +298,7 @@ func (rt *sarvamTextToSpeech) handleFlushComplete(conn *websocket.Conn) {
 		},
 	)
 	conn.Close()
+	return true
 }
 
 // handleServerError logs the Sarvam error, surfaces it downstream, and closes
@@ -275,6 +315,7 @@ func (rt *sarvamTextToSpeech) handleServerError(conn *websocket.Conn, response s
 	rt.mu.Lock()
 	rt.connection = nil
 	ctxID := rt.contextId
+	rt.synthesisFailed = true
 	rt.mu.Unlock()
 	rt.onPacket(internal_type.TextToSpeechErrorPacket{
 		ContextID: ctxID,
@@ -287,22 +328,18 @@ func (rt *sarvamTextToSpeech) handleServerError(conn *websocket.Conn, response s
 func (rt *sarvamTextToSpeech) Transform(ctx context.Context, in internal_type.Packet) error {
 	rt.mu.Lock()
 	if in.ContextId() != rt.contextId {
-		rt.contextId = in.ContextId()
-		rt.ttsStartedAt = time.Time{}
-		rt.ttsMetricSent = false
+		rt.resetTurnLocked(in.ContextId())
 	}
 	connection := rt.connection
 	rt.mu.Unlock()
 
 	switch input := in.(type) {
 	case internal_type.TextToSpeechInterruptPacket:
-		// Close the current connection immediately — the readLoop goroutine will
+		// Close the current connection immediately. The readLoop goroutine will
 		// exit, discarding any in-flight audio. Reconnect now so the fresh
 		// connection is ready before the next text delta arrives.
 		rt.mu.Lock()
-		rt.contextId = ""
-		rt.ttsStartedAt = time.Time{}
-		rt.ttsMetricSent = false
+		rt.resetTurnLocked("")
 		conn := rt.connection
 		rt.connection = nil
 		rt.mu.Unlock()
@@ -353,6 +390,7 @@ func (rt *sarvamTextToSpeech) Transform(ctx context.Context, in internal_type.Pa
 			"type": "text",
 			"data": map[string]interface{}{"text": input.Text},
 		}); err != nil {
+			rt.recordSynthesisFailure()
 			rt.logger.Errorf("sarvam-tts: write failed: %v", err)
 			rt.onPacket(internal_type.TextToSpeechErrorPacket{
 				ContextID: input.ContextID,
@@ -373,11 +411,16 @@ func (rt *sarvamTextToSpeech) Transform(ctx context.Context, in internal_type.Pa
 		})
 
 	case internal_type.TextToSpeechDonePacket:
-		// Interrupted before done arrived — nothing to flush.
+		// Interrupted before done arrived. Nothing to flush.
 		if connection == nil {
 			return nil
 		}
+		rt.mu.Lock()
+		rt.textClosed = true
+		rt.pendingDrains++
+		rt.mu.Unlock()
 		if err := connection.WriteJSON(map[string]interface{}{"type": "flush"}); err != nil {
+			rt.recordSynthesisFailure()
 			rt.logger.Errorf("sarvam-tts: flush failed: %v", err)
 			rt.onPacket(internal_type.TextToSpeechErrorPacket{
 				ContextID: input.ContextID,

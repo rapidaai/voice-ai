@@ -27,6 +27,7 @@ import (
 type testPredictor struct {
 	predict        func(string) (float64, error)
 	predictContext func(context.Context, string) (float64, error)
+	destroy        func()
 }
 
 func (predictor testPredictor) Predict(text string) (float64, error) {
@@ -40,7 +41,11 @@ func (predictor testPredictor) PredictContext(ctx context.Context, text string) 
 	return predictor.predict(text)
 }
 
-func (predictor testPredictor) Destroy() {}
+func (predictor testPredictor) Destroy() {
+	if predictor.destroy != nil {
+		predictor.destroy()
+	}
+}
 
 // --- tokenizer tests ---
 

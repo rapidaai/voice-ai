@@ -877,6 +877,19 @@ func CompactNTP(t time.Time) uint32 {
 type OutputAudioFrame struct {
 	Audio    []byte
 	QueuedAt time.Time
+	Playback *OutputPlayback
+	Terminal bool
+}
+
+// OutputPlayback is shared by one response's frames, under the streamer's output state lock.
+type OutputPlayback struct {
+	ID             string
+	MediaSessionID uint64
+	Generation     uint64
+	HasAudio       bool
+	TerminalQueued bool
+	Sent           bool
+	Failed         bool
 }
 
 // SelectedICECandidatePair summarizes the active network path without exposing IPs.

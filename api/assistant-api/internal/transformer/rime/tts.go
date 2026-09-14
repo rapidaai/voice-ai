@@ -32,12 +32,15 @@ type rimeTTS struct {
 	ctx       context.Context
 	ctxCancel context.CancelFunc
 
-	mu             sync.Mutex
-	connection     *websocket.Conn
-	contextId      string
-	ttsConnectedAt time.Time
-	ttsStartedAt   time.Time
-	ttsMetricSent  bool
+	mu              sync.Mutex
+	connection      *websocket.Conn
+	contextId       string
+	ttsConnectedAt  time.Time
+	ttsStartedAt    time.Time
+	ttsMetricSent   bool
+	textClosed      bool
+	synthesisFailed bool
+	endSent         bool
 
 	logger   commons.Logger
 	onPacket func(pkt ...internal_type.Packet) error
@@ -133,7 +136,7 @@ func (rt *rimeTTS) Initialize() error {
 }
 
 // readLoop owns a single WebSocket connection for the duration of one TTS turn.
-// It exits when the connection closes — intentionally (interrupt / flush complete)
+// It exits when the connection closes intentionally (interrupt / flush complete)
 // or unexpectedly (network drop / server error).
 func (rt *rimeTTS) readLoop(conn *websocket.Conn) {
 	for {
@@ -150,9 +153,32 @@ func (rt *rimeTTS) readLoop(conn *websocket.Conn) {
 				rt.mu.Unlock()
 				return
 			}
-			// Active connection dropped; next text packet reconnects.
+			canComplete := rt.ctx.Err() == nil && rt.textClosed && !rt.synthesisFailed && !rt.endSent &&
+				websocket.IsCloseError(err, websocket.CloseNormalClosure)
+			contextID := rt.contextId
+			if canComplete {
+				rt.endSent = true
+			}
 			rt.connection = nil
 			rt.mu.Unlock()
+			if canComplete {
+				rt.onPacket(
+					internal_type.TextToSpeechEndPacket{ContextID: contextID},
+					internal_type.ObservabilityEventRecordPacket{
+						ContextID: contextID,
+						Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+						Record: observability.RecordEvent{
+							Component:  observability.ComponentTTS,
+							Event:      observability.TTSCompleted,
+							Attributes: observability.Attributes{"type": "completed"},
+							OccurredAt: time.Now(),
+						},
+					},
+				)
+				conn.Close()
+				return
+			}
+			// Active connection dropped; next text packet reconnects.
 			rt.logger.Errorf("rime-tts: connection lost: %v", err)
 			return
 		}
@@ -167,10 +193,9 @@ func (rt *rimeTTS) readLoop(conn *websocket.Conn) {
 		case "chunk":
 			rt.handleAudio(response)
 		case "done":
-			// Rime signals that all audio for the current flush has been sent.
-			// Emit the end packet and close this per-turn connection.
-			rt.handleFlushComplete(conn)
-			return
+			if rt.handleFlushComplete(conn) {
+				return
+			}
 		case "error":
 			rt.handleServerError(conn, response)
 			return
@@ -199,7 +224,7 @@ func (rt *rimeTTS) handleAudio(response rime_internal.RimeTextToSpeechResponse) 
 	rt.mu.Unlock()
 
 	if contextId == "" {
-		rt.logger.Debugf("rime-tts: discarding audio — no active context")
+		rt.logger.Debugf("rime-tts: discarding audio, no active context")
 		return
 	}
 
@@ -213,30 +238,17 @@ func (rt *rimeTTS) handleAudio(response rime_internal.RimeTextToSpeechResponse) 
 	rt.onPacket(internal_type.TextToSpeechAudioPacket{ContextID: contextId, AudioChunk: raw})
 }
 
-// handleFlushComplete is called when Rime sends the "done" message confirming
-// that all audio for the current flush has been delivered. It emits
-// TextToSpeechEndPacket — correctly ordered after the last audio chunk — and
-// closes the per-turn connection.
-func (rt *rimeTTS) handleFlushComplete(conn *websocket.Conn) {
+// handleFlushComplete keeps Rime done as a per-batch drain hint only.
+// The eos completion boundary is the provider's clean remote close.
+func (rt *rimeTTS) handleFlushComplete(conn *websocket.Conn) bool {
 	rt.mu.Lock()
-	contextId := rt.contextId
-	rt.connection = nil // mark before Close so readLoop error handler sees intentional
+	if rt.connection != conn {
+		rt.mu.Unlock()
+		conn.Close()
+		return true
+	}
 	rt.mu.Unlock()
-
-	rt.onPacket(
-		internal_type.TextToSpeechEndPacket{ContextID: contextId},
-		internal_type.ObservabilityEventRecordPacket{
-			ContextID: contextId,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.RecordEvent{
-				Component:  observability.ComponentTTS,
-				Event:      observability.TTSCompleted,
-				Attributes: observability.Attributes{"type": "completed"},
-				OccurredAt: time.Now(),
-			},
-		},
-	)
-	conn.Close()
+	return false
 }
 
 // handleServerError logs the Rime error, surfaces it downstream, and closes
@@ -245,17 +257,26 @@ func (rt *rimeTTS) handleServerError(conn *websocket.Conn, response rime_interna
 	rt.logger.Errorf("rime-tts: server error: %s", response.Message)
 	rt.mu.Lock()
 	rt.connection = nil
+	rt.synthesisFailed = true
+	ctxID := rt.contextId
 	rt.mu.Unlock()
-	rt.onPacket(internal_type.ObservabilityEventRecordPacket{
-		ContextID: response.ContextId,
-		Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-		Record: observability.RecordEvent{
-			Component:  observability.ComponentTTS,
-			Event:      observability.TTSError,
-			Attributes: observability.Attributes{"type": "error", "message": response.Message},
-			OccurredAt: time.Now(),
+	rt.onPacket(
+		internal_type.TextToSpeechErrorPacket{
+			ContextID: ctxID,
+			Error:     fmt.Errorf("rime-tts: server error: %s", response.Message),
+			Type:      internal_type.TTSInvalidInput,
 		},
-	})
+		internal_type.ObservabilityEventRecordPacket{
+			ContextID: ctxID,
+			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+			Record: observability.RecordEvent{
+				Component:  observability.ComponentTTS,
+				Event:      observability.TTSError,
+				Attributes: observability.Attributes{"type": "error", "message": response.Message},
+				OccurredAt: time.Now(),
+			},
+		},
+	)
 	conn.Close()
 }
 
@@ -265,6 +286,9 @@ func (rt *rimeTTS) Transform(ctx context.Context, in internal_type.Packet) error
 		rt.contextId = in.ContextId()
 		rt.ttsStartedAt = time.Time{}
 		rt.ttsMetricSent = false
+		rt.textClosed = false
+		rt.synthesisFailed = false
+		rt.endSent = false
 	}
 	connection := rt.connection
 	rt.mu.Unlock()
@@ -278,6 +302,9 @@ func (rt *rimeTTS) Transform(ctx context.Context, in internal_type.Packet) error
 		rt.contextId = ""
 		rt.ttsStartedAt = time.Time{}
 		rt.ttsMetricSent = false
+		rt.textClosed = false
+		rt.synthesisFailed = false
+		rt.endSent = false
 		conn := rt.connection
 		rt.connection = nil
 		rt.mu.Unlock()
@@ -325,6 +352,9 @@ func (rt *rimeTTS) Transform(ctx context.Context, in internal_type.Packet) error
 			rt.mu.Unlock()
 		}
 		if err := connection.WriteJSON(map[string]interface{}{"text": input.Text}); err != nil {
+			rt.mu.Lock()
+			rt.synthesisFailed = true
+			rt.mu.Unlock()
 			rt.logger.Errorf("rime-tts: write failed: %v", err)
 			rt.onPacket(internal_type.TextToSpeechErrorPacket{
 				ContextID: input.ContextID,
@@ -345,11 +375,17 @@ func (rt *rimeTTS) Transform(ctx context.Context, in internal_type.Packet) error
 		})
 
 	case internal_type.TextToSpeechDonePacket:
-		// Interrupted before done arrived — nothing to flush.
+		// Interrupted before done arrived. Nothing to flush.
 		if connection == nil {
 			return nil
 		}
+		rt.mu.Lock()
+		rt.textClosed = true
+		rt.mu.Unlock()
 		if err := connection.WriteJSON(map[string]interface{}{"operation": "eos"}); err != nil {
+			rt.mu.Lock()
+			rt.synthesisFailed = true
+			rt.mu.Unlock()
 			rt.logger.Errorf("rime-tts: flush failed: %v", err)
 			rt.onPacket(internal_type.TextToSpeechErrorPacket{
 				ContextID: input.ContextID,
@@ -358,8 +394,7 @@ func (rt *rimeTTS) Transform(ctx context.Context, in internal_type.Packet) error
 			})
 			return nil
 		}
-		// TextToSpeechEndPacket is emitted by handleFlushComplete once Rime
-		// confirms all audio has been delivered via the "done" response.
+		// Rime drains eos and then closes the socket, which is the final boundary.
 
 	default:
 		return fmt.Errorf("rime-tts: unsupported packet type %T", in)
