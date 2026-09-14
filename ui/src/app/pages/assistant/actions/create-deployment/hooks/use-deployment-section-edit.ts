@@ -25,9 +25,11 @@ import { useAllProviderCredentials } from '@/hooks/use-model';
 import { useRapidaStore } from '@/hooks';
 import {
   DEFAULT_IDEAL_TIMEOUT,
+  DEFAULT_IDLE_PROMPT_COUNT,
   DEFAULT_UNCLEAR_INPUT_MESSAGE,
   DEFAULT_UNCLEAR_INPUT_TIMEOUT,
   ExperienceConfig,
+  validateIdleTimeoutConfig,
 } from '@/app/pages/assistant/actions/create-deployment/commons/configure-experience';
 import {
   GetDefaultMicrophoneConfig,
@@ -71,7 +73,7 @@ const DEFAULT_EXPERIENCE: ExperienceConfig = {
   idealTimeout: DEFAULT_IDEAL_TIMEOUT,
   idealMessage: 'Are you there?',
   maxCallDuration: '300',
-  idleTimeoutBackoffTimes: '2',
+  idleTimeoutBackoffTimes: DEFAULT_IDLE_PROMPT_COUNT,
 };
 
 const getDeploymentFetcher = (type: DeploymentType) => {
@@ -190,7 +192,10 @@ export function useDeploymentSectionEdit(
             unclearInputMessage: deployment.hasUnclearinputmessage?.()
               ? deployment.getUnclearinputmessage()
               : undefined,
-            idealTimeout: deployment.getIdealtimeout(),
+            idealTimeout:
+              deployment.getIdealtimeout() === '0'
+                ? DEFAULT_IDEAL_TIMEOUT
+                : deployment.getIdealtimeout() || DEFAULT_IDEAL_TIMEOUT,
             idealMessage: deployment.getIdealtimeoutmessage(),
             maxCallDuration: deployment.getMaxsessionduration(),
             idleTimeoutBackoffTimes: deployment.getIdealtimeoutbackoff(),
@@ -352,6 +357,13 @@ export function useDeploymentSectionEdit(
           }
         : existingConfig.experience;
 
+    const idleTimeoutError = validateIdleTimeoutConfig(resolvedExperience);
+    if (idleTimeoutError) {
+      setIsSaving(false);
+      setEditError(idleTimeoutError);
+      return;
+    }
+
     const buildAudioInput = () => {
       if (section === 'voice-input') {
         if (!voiceInputEnable) return undefined;
@@ -406,12 +418,13 @@ export function useDeploymentSectionEdit(
         deployment.setUnclearinputmessage(
           resolvedExperience.unclearInputMessage,
         );
-      if (resolvedExperience.idealTimeout)
-        deployment.setIdealtimeout(resolvedExperience.idealTimeout);
-      if (resolvedExperience.idleTimeoutBackoffTimes)
-        deployment.setIdealtimeoutbackoff(
-          resolvedExperience.idleTimeoutBackoffTimes,
-        );
+      deployment.setIdealtimeout(
+        resolvedExperience.idealTimeout?.trim() || DEFAULT_IDEAL_TIMEOUT,
+      );
+      deployment.setIdealtimeoutbackoff(
+        resolvedExperience.idleTimeoutBackoffTimes?.trim() ||
+          DEFAULT_IDLE_PROMPT_COUNT,
+      );
       if (resolvedExperience.idealMessage)
         deployment.setIdealtimeoutmessage(resolvedExperience.idealMessage);
       if (resolvedExperience.maxCallDuration)

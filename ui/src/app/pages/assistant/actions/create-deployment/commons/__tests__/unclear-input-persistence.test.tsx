@@ -8,12 +8,15 @@ import {
 } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import {
+  AssistantApiDeployment,
   AssistantDebuggerDeployment,
   AssistantPhoneDeployment,
   AssistantWebpluginDeployment,
+  CreateAssistantApiDeployment,
   CreateAssistantDebuggerDeployment,
   CreateAssistantPhoneDeployment,
   CreateAssistantWebpluginDeployment,
+  GetAssistantApiDeployment,
   GetAssistantDebuggerDeployment,
   GetAssistantPhoneDeployment,
   GetAssistantWebpluginDeployment,
@@ -30,12 +33,25 @@ import { ConfigureAssistantWebDeploymentPage } from '../../web-plugin';
 import { EditAssistantWebDeploymentPage } from '../../web-plugin/edit';
 import { ConfigureAssistantDebuggerDeploymentPage } from '../../debugger';
 import { EditAssistantDebuggerDeploymentPage } from '../../debugger/edit';
+import { ConfigureAssistantApiDeploymentPage } from '../../api';
+import { EditAssistantApiDeploymentPage } from '../../api/edit';
 import { useDeploymentSectionEdit } from '../../hooks/use-deployment-section-edit';
 
 let mockSearchParams = new URLSearchParams();
 
+jest.mock('../configure-experience', () => {
+  const actual = jest.requireActual('../configure-experience');
+  return {
+    ...actual,
+    ConfigureExperience: jest.fn(props => (
+      <actual.ConfigureExperience {...props} />
+    )),
+  };
+});
 jest.mock('@rapidaai/react', () => ({
   ...jest.requireActual('@rapidaai/react'),
+  GetAssistantApiDeployment: jest.fn(),
+  CreateAssistantApiDeployment: jest.fn(),
   GetAssistantPhoneDeployment: jest.fn(),
   GetAssistantWebpluginDeployment: jest.fn(),
   GetAssistantDebuggerDeployment: jest.fn(),
@@ -103,10 +119,11 @@ jest.mock('@/app/components/providers/text-to-speech/provider', () => ({
   ValidateTextToSpeechIfInvalid: () => undefined,
 }));
 jest.mock('@/app/components/form/tab-form', () => ({
-  TabForm: ({ activeTab, form }: any) => {
+  TabForm: ({ activeTab, form, errorMessage }: any) => {
     const active = form.find((item: any) => item.code === activeTab);
     return (
       <>
+        {errorMessage && <div role="alert">{errorMessage}</div>}
         {active.body}
         {active.actions.map((action: React.ReactNode, index: number) => (
           <div key={index}>{action}</div>
@@ -171,7 +188,7 @@ jest.mock('@carbon/react', () => ({
     <input
       aria-label={labelText}
       type="number"
-      value={value}
+      value={Number.isNaN(value) ? '' : value}
       onChange={e => onChange({ value: Number(e.target.value) })}
     />
   ),
@@ -185,7 +202,7 @@ jest.mock('@/app/components/carbon/form/input-checkbox', () => ({
   InputCheckbox: () => null,
 }));
 jest.mock('@/app/components/carbon/notification', () => ({
-  Notification: () => null,
+  Notification: ({ subtitle }: any) => <div role="alert">{subtitle}</div>,
 }));
 
 const deployments = [
@@ -226,7 +243,17 @@ const deployments = [
 
 beforeEach(() => {
   jest.clearAllMocks();
+  (ConfigureExperience as jest.Mock).mockImplementation(props => {
+    const ActualExperience = jest.requireActual(
+      '../configure-experience',
+    ).ConfigureExperience;
+    return <ActualExperience {...props} />;
+  });
   mockSearchParams = new URLSearchParams();
+  (CreateAssistantApiDeployment as jest.Mock).mockResolvedValue({
+    getData: () => ({}),
+    getSuccess: () => true,
+  });
   deployments.forEach(({ save }) =>
     save.mockResolvedValue({
       getData: () => ({}),
@@ -441,3 +468,271 @@ it.each(['experience', 'stt', 'tts'])(
     }
   },
 );
+
+describe.each(deployments)('$type idle timeout section edit', config => {
+  it.each([
+    { name: 'legacy zero timeout', timeout: '0', count: '3', expected: '10' },
+    { name: 'stored settings', timeout: '37', count: '4', expected: '37' },
+    { name: 'unlimited count', timeout: '5', count: '0', expected: '5' },
+    { name: 'upper bounds', timeout: '120', count: '5', expected: '120' },
+  ])('loads and saves $name', async ({ timeout, count, expected }) => {
+    const saved = new config.Deployment();
+    saved.setIdealtimeout(timeout);
+    saved.setIdealtimeoutbackoff(count);
+    config.fetch.mockResolvedValue({ getData: () => saved });
+    const { result } = renderHook(() =>
+      useDeploymentSectionEdit('assistant-1', jest.fn()),
+    );
+    await act(async () => {
+      result.current.openEditModal(config.type, 'experience');
+    });
+    expect(result.current.experienceConfig.idealTimeout).toBe(expected);
+    expect(result.current.experienceConfig.idleTimeoutBackoffTimes).toBe(count);
+    await act(async () => {
+      result.current.saveSection();
+    });
+    expect(config.save).toHaveBeenCalledTimes(1);
+    const sent = config.save.mock.calls[0][1][config.field]();
+    expect(sent.getIdealtimeout()).toBe(expected);
+    expect(sent.getIdealtimeoutbackoff()).toBe(count);
+  });
+
+  it.each([
+    { name: 'omitted', timeout: undefined, count: undefined },
+    { name: 'blank', timeout: '', count: '' },
+    { name: 'whitespace', timeout: '   ', count: '   ' },
+    { name: 'explicit unlimited count', timeout: '', count: '0' },
+  ])('saves defaults for $name values', async ({ timeout, count }) => {
+    config.fetch.mockResolvedValue({ getData: () => new config.Deployment() });
+    const { result } = renderHook(() =>
+      useDeploymentSectionEdit('assistant-1', jest.fn()),
+    );
+    await act(async () => {
+      result.current.openEditModal(config.type, 'experience');
+    });
+    act(() => {
+      result.current.setExperienceConfig({
+        ...result.current.experienceConfig,
+        idealTimeout: timeout,
+        idleTimeoutBackoffTimes: count,
+      });
+    });
+    await act(async () => {
+      result.current.saveSection();
+    });
+    expect(config.save).toHaveBeenCalledTimes(1);
+    const sent = config.save.mock.calls[0][1][config.field]();
+    expect(sent.getIdealtimeout()).toBe('10');
+    expect(sent.getIdealtimeoutbackoff()).toBe(count === '0' ? '0' : '2');
+  });
+
+  it.each([
+    {
+      name: 'timeout below minimum',
+      timeout: '4',
+      count: '2',
+      range: /5.*120/,
+    },
+    {
+      name: 'timeout above maximum',
+      timeout: '121',
+      count: '2',
+      range: /5.*120/,
+    },
+    {
+      name: 'fractional timeout',
+      timeout: '10.5',
+      count: '2',
+      range: /5.*120/,
+    },
+    { name: 'NaN timeout', timeout: 'NaN', count: '2', range: /5.*120/ },
+    { name: 'negative count', timeout: '10', count: '-1', range: /0.*5/ },
+    { name: 'count above maximum', timeout: '10', count: '6', range: /0.*5/ },
+    { name: 'fractional count', timeout: '10', count: '2.5', range: /0.*5/ },
+  ])(
+    'rejects $name before requesting a save',
+    async ({ timeout, count, range }) => {
+      config.fetch.mockResolvedValue({
+        getData: () => new config.Deployment(),
+      });
+      const { result } = renderHook(() =>
+        useDeploymentSectionEdit('assistant-1', jest.fn()),
+      );
+      await act(async () => {
+        result.current.openEditModal(config.type, 'experience');
+      });
+      act(() => {
+        result.current.setExperienceConfig({
+          ...result.current.experienceConfig,
+          idealTimeout: timeout,
+          idleTimeoutBackoffTimes: count,
+        });
+      });
+      await act(async () => {
+        result.current.saveSection();
+      });
+      expect(config.save).not.toHaveBeenCalled();
+      expect(result.current.editError).toMatch(/idle/i);
+      expect(result.current.editError).toMatch(range);
+      expect(result.current.isSaving).toBe(false);
+    },
+  );
+});
+
+describe.each([
+  {
+    name: 'debugger shared creation',
+    Deployment: AssistantDebuggerDeployment,
+    fetch: GetAssistantDebuggerDeployment as jest.Mock,
+    save: CreateAssistantDebuggerDeployment as jest.Mock,
+    field: 'getDebugger' as const,
+    Page: ConfigureAssistantDebuggerDeploymentPage,
+    mode: 'create',
+    saveLabel: 'Deploy Debugger',
+  },
+  {
+    name: 'standalone API creation',
+    Deployment: AssistantApiDeployment,
+    fetch: GetAssistantApiDeployment as jest.Mock,
+    save: CreateAssistantApiDeployment as jest.Mock,
+    field: 'getApi' as const,
+    Page: ConfigureAssistantApiDeploymentPage,
+    mode: 'create',
+    saveLabel: 'Deploy API',
+  },
+  {
+    name: 'standalone API edit',
+    Deployment: AssistantApiDeployment,
+    fetch: GetAssistantApiDeployment as jest.Mock,
+    save: CreateAssistantApiDeployment as jest.Mock,
+    field: 'getApi' as const,
+    Page: EditAssistantApiDeploymentPage,
+    mode: 'edit',
+    saveLabel: 'Save Changes',
+  },
+])('$name idle timeout', config => {
+  it.each([
+    { name: 'legacy zero timeout', timeout: '0', count: '3', expected: '10' },
+    { name: 'stored settings', timeout: '37', count: '4', expected: '37' },
+    { name: 'unlimited count', timeout: '5', count: '0', expected: '5' },
+  ])('loads and saves $name', async ({ timeout, count, expected }) => {
+    const saved = new config.Deployment();
+    saved.setIdealtimeout(timeout);
+    saved.setIdealtimeoutbackoff(count);
+    config.fetch.mockResolvedValue({
+      getData: () => saved,
+    });
+    await act(async () => {
+      render(<config.Page />);
+    });
+    const experience = (ConfigureExperience as jest.Mock).mock.calls.slice(
+      -1,
+    )[0][0];
+    expect(experience.experienceConfig.idealTimeout).toBe(expected);
+    expect(experience.experienceConfig.idleTimeoutBackoffTimes).toBe(count);
+    if (config.mode === 'create') {
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    }
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: config.saveLabel }));
+    });
+    expect(config.save).toHaveBeenCalledTimes(1);
+    const sent = config.save.mock.calls[0][1][config.field]();
+    expect(sent.getIdealtimeout()).toBe(expected);
+    expect(sent.getIdealtimeoutbackoff()).toBe(count);
+  });
+
+  it.each([
+    { name: 'omitted', timeout: undefined, count: undefined },
+    { name: 'blank', timeout: '', count: '' },
+    { name: 'whitespace', timeout: '   ', count: '   ' },
+    { name: 'explicit unlimited count', timeout: '', count: '0' },
+  ])('saves defaults for $name values', async ({ timeout, count }) => {
+    config.fetch.mockResolvedValue({
+      getData: () => new config.Deployment(),
+    });
+    await act(async () => {
+      render(<config.Page />);
+    });
+    const experience = (ConfigureExperience as jest.Mock).mock.calls.slice(
+      -1,
+    )[0][0];
+    act(() => {
+      experience.setExperienceConfig({
+        ...experience.experienceConfig,
+        idealTimeout: timeout,
+        idleTimeoutBackoffTimes: count,
+      });
+    });
+    if (config.mode === 'create') {
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    }
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: config.saveLabel }));
+    });
+    expect(config.save).toHaveBeenCalledTimes(1);
+    const sent = config.save.mock.calls[0][1][config.field]();
+    expect(sent.getIdealtimeout()).toBe('10');
+    expect(sent.getIdealtimeoutbackoff()).toBe(count === '0' ? '0' : '2');
+  });
+
+  it.each([
+    {
+      name: 'timeout below minimum',
+      timeout: '4',
+      count: '2',
+      range: /5.*120/,
+    },
+    {
+      name: 'timeout above maximum',
+      timeout: '121',
+      count: '2',
+      range: /5.*120/,
+    },
+    {
+      name: 'fractional timeout',
+      timeout: '10.5',
+      count: '2',
+      range: /5.*120/,
+    },
+    { name: 'NaN timeout', timeout: 'NaN', count: '2', range: /5.*120/ },
+    { name: 'negative count', timeout: '10', count: '-1', range: /0.*5/ },
+    { name: 'count above maximum', timeout: '10', count: '6', range: /0.*5/ },
+    { name: 'fractional count', timeout: '10', count: '2.5', range: /0.*5/ },
+  ])(
+    'rejects $name before requesting a save',
+    async ({ timeout, count, range }) => {
+      config.fetch.mockResolvedValue({
+        getData: () => new config.Deployment(),
+      });
+      await act(async () => {
+        render(<config.Page />);
+      });
+      const experience = (ConfigureExperience as jest.Mock).mock.calls.slice(
+        -1,
+      )[0][0];
+      act(() => {
+        experience.setExperienceConfig({
+          ...experience.experienceConfig,
+          idealTimeout: timeout,
+          idleTimeoutBackoffTimes: count,
+        });
+      });
+      if (config.mode === 'create') {
+        fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+      }
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: config.saveLabel }));
+      });
+      expect(config.save).not.toHaveBeenCalled();
+      expect(screen.getByRole('alert')).toHaveTextContent(/idle/i);
+      expect(screen.getByRole('alert')).toHaveTextContent(range);
+      expect(
+        screen.getByRole('button', { name: config.saveLabel }),
+      ).toBeEnabled();
+    },
+  );
+});

@@ -6,6 +6,8 @@ import {
 } from '@/app/pages/assistant/actions/create-deployment/web-plugin/configure-experience';
 import {
   DEFAULT_IDEAL_TIMEOUT,
+  DEFAULT_IDLE_PROMPT_COUNT,
+  validateIdleTimeoutConfig,
   DEFAULT_UNCLEAR_INPUT_MESSAGE,
   DEFAULT_UNCLEAR_INPUT_TIMEOUT,
 } from '@/app/pages/assistant/actions/create-deployment/commons/configure-experience';
@@ -108,7 +110,7 @@ const ConfigureAssistantWebDeployment: FC<{ assistantId: string }> = ({
       idealTimeout: DEFAULT_IDEAL_TIMEOUT,
       idealMessage: 'Are you there?',
       maxCallDuration: '300',
-      idleTimeoutBackoffTimes: '2',
+      idleTimeoutBackoffTimes: DEFAULT_IDLE_PROMPT_COUNT,
       suggestions: [],
     });
 
@@ -171,7 +173,10 @@ const ConfigureAssistantWebDeployment: FC<{ assistantId: string }> = ({
           unclearInputMessage: deployment.hasUnclearinputmessage?.()
             ? deployment.getUnclearinputmessage()
             : undefined,
-          idealTimeout: deployment.getIdealtimeout(),
+          idealTimeout:
+            deployment.getIdealtimeout() === '0'
+              ? DEFAULT_IDEAL_TIMEOUT
+              : deployment.getIdealtimeout() || DEFAULT_IDEAL_TIMEOUT,
           idealMessage: deployment.getIdealtimeoutmessage(),
           maxCallDuration: deployment.getMaxsessionduration(),
           idleTimeoutBackoffTimes: deployment.getIdealtimeoutbackoff(),
@@ -313,6 +318,12 @@ const ConfigureAssistantWebDeployment: FC<{ assistantId: string }> = ({
       }
     }
 
+    const idleTimeoutError = validateIdleTimeoutConfig(experienceConfig);
+    if (idleTimeoutError) {
+      setIsDeploying(false);
+      setErrorMessage(idleTimeoutError);
+      return;
+    }
     const req = new CreateAssistantDeploymentRequest();
     const webDeployment = new AssistantWebpluginDeployment();
     webDeployment.setAssistantid(assistantId);
@@ -331,12 +342,13 @@ const ConfigureAssistantWebDeployment: FC<{ assistantId: string }> = ({
     webDeployment.setUnclearinputmessage(
       experienceConfig.unclearInputMessage || DEFAULT_UNCLEAR_INPUT_MESSAGE,
     );
-    if (experienceConfig.idealTimeout)
-      webDeployment.setIdealtimeout(experienceConfig.idealTimeout);
-    if (experienceConfig.idleTimeoutBackoffTimes)
-      webDeployment.setIdealtimeoutbackoff(
-        experienceConfig.idleTimeoutBackoffTimes,
-      );
+    webDeployment.setIdealtimeout(
+      experienceConfig.idealTimeout?.trim() || DEFAULT_IDEAL_TIMEOUT,
+    );
+    webDeployment.setIdealtimeoutbackoff(
+      experienceConfig.idleTimeoutBackoffTimes?.trim() ||
+        DEFAULT_IDLE_PROMPT_COUNT,
+    );
     if (experienceConfig.idealMessage)
       webDeployment.setIdealtimeoutmessage(experienceConfig.idealMessage);
     if (experienceConfig.maxCallDuration)
