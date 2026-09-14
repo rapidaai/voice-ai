@@ -196,8 +196,13 @@ func TestTalk_PlaybackCompletionBypassesFullControlQueue(t *testing.T) {
 			assert.Empty(t, drainEgressPackets(requestor))
 			packets := drainControlPackets(requestor)
 			require.Len(t, packets, 256)
-			for _, packet := range packets {
+			for _, packet := range packets[:253] {
 				assert.IsType(t, internal_type.SpeechToTextStartPacket{}, packet)
+			}
+			for _, packet := range packets[253:] {
+				policy, ok := packet.(internal_type.DispatchPolicyPacket)
+				require.True(t, ok)
+				assert.Equal(t, internal_type.DispatchActionPassthrough, policy.Policy.Action)
 			}
 		})
 	}
@@ -256,7 +261,11 @@ func TestPlaybackCompletionRequiresTerminalIssuance(t *testing.T) {
 			requestor.dispatch(context.Background(), internal_type.TextToSpeechEndPacket{ContextID: "ctx-active"})
 			assert.Equal(t, adapter_lifecycle.MessageStateAssistantSpeaking, requestor.messageLifecycle.State())
 			policies := drainControlPackets(requestor)
-			require.Len(t, policies, 3, "send failure must retain input-policy fallback")
+			if scenario.receiptDuringSend {
+				require.Len(t, policies, 3, "accepted receipt releases input policy")
+			} else {
+				require.Empty(t, policies, "terminal send alone must not release input policy")
+			}
 			for _, packet := range policies {
 				policy, ok := packet.(internal_type.DispatchPolicyPacket)
 				require.True(t, ok)
@@ -271,8 +280,20 @@ func TestPlaybackCompletionRequiresTerminalIssuance(t *testing.T) {
 				} else {
 					require.Empty(t, recorder.records, "failed issuance must reject later receipt")
 				}
+				packets := drainEgressPackets(requestor)
+				require.Len(t, packets, 1)
+				failure, ok := packets[0].(internal_type.TextToSpeechErrorPacket)
+				require.True(t, ok)
 				streamer.onSend = func(proto.Message) error { return nil }
-				requestor.dispatch(context.Background(), internal_type.TextToSpeechEndPacket{ContextID: "ctx-active"})
+				requestorDispatchHandler{r: requestor}.HandleError(context.Background(), failure)
+				policies = drainControlPackets(requestor)
+				require.Len(t, policies, 3, "send failure must retain input-policy fallback")
+				for index, target := range []internal_type.PacketName{internal_type.PacketNameUserAudioReceived, internal_type.PacketNameUserTextReceived, internal_type.PacketNameInterruptionDetected} {
+					assert.Equal(t, internal_type.DispatchPolicyPacket{
+						ContextID: "ctx-active",
+						Policy:    internal_type.DispatchPolicy{Target: target, Action: internal_type.DispatchActionPassthrough},
+					}, policies[index])
+				}
 				return
 			}
 			requestor.dispatch(context.Background(), completion)

@@ -1262,6 +1262,15 @@ func (h requestorDispatchHandler) HandleTextToSpeechEnd(ctx context.Context, p i
 			h.r.OnPacket(ctx, internal_type.TextToSpeechErrorPacket{ContextID: p.ContextID, Error: err, Type: internal_type.TTSNetworkTimeout})
 		}
 	}
+}
+
+func (h requestorDispatchHandler) HandlePlaybackCompleted(ctx context.Context, p internal_type.PlaybackCompletedPacket) {
+	if err := h.r.messageLifecycle.OnPlaybackCompleted(p.ContextID); err != nil {
+		if h.r.logger != nil {
+			h.r.logger.Debugw("playback completion receipt rejected", "context_id", p.ContextID, "error", err)
+		}
+		return
+	}
 	h.r.OnPacket(ctx,
 		internal_type.DispatchPolicyPacket{
 			ContextID: p.ContextID,
@@ -1285,15 +1294,6 @@ func (h requestorDispatchHandler) HandleTextToSpeechEnd(ctx context.Context, p i
 			},
 		},
 	)
-}
-
-func (h requestorDispatchHandler) HandlePlaybackCompleted(ctx context.Context, p internal_type.PlaybackCompletedPacket) {
-	if err := h.r.messageLifecycle.OnPlaybackCompleted(p.ContextID); err != nil {
-		if h.r.logger != nil {
-			h.r.logger.Debugw("playback completion receipt rejected", "context_id", p.ContextID, "error", err)
-		}
-		return
-	}
 	h.HandleObservabilityRecordPacket(ctx, internal_type.ObservabilityEventRecordPacket{
 		ContextID: p.ContextID,
 		Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
