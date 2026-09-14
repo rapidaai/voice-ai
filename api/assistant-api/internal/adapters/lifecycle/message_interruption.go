@@ -122,7 +122,24 @@ func (l *messageLifecycle) CancelInterruption() string {
 // Admitted speech carries the destination context captured under the lifecycle lock.
 func (l *messageLifecycle) OnUserSpeech(p internal_type.SpeechToTextPacket) (*internal_type.TurnChangePacket, internal_type.SpeechToTextPacket) {
 	l.mu.Lock()
-	defer l.mu.Unlock()
+	var speechContextID string
+	defer func() {
+		l.mu.Unlock()
+		if speechContextID != "" && l.onPacket != nil {
+			_ = l.onPacket(internal_type.StopIdleTimeoutPacket{ContextID: speechContextID, ResetCount: true})
+			// A receipt can finish playback while the activity reset is being queued.
+			l.mu.RLock()
+			hasCompletedPlayback := speechContextID == l.contextID && l.output.playback == playbackCompleted
+			l.mu.RUnlock()
+			if hasCompletedPlayback {
+				_ = l.onPacket(internal_type.StartIdleTimeoutPacket{ContextID: speechContextID})
+			}
+		}
+	}()
+	// Speech activity resets idle retries even when it does not interrupt playback.
+	if strings.TrimSpace(p.Script) != "" && (p.ContextID == "" || p.ContextID == l.contextID || p.ContextID == l.interruption.contextID) {
+		speechContextID = l.contextID
+	}
 	isMeaningful := false
 	for _, token := range strings.FieldsFunc(p.Script, func(character rune) bool {
 		return unicode.IsSpace(character) || unicode.IsPunct(character)
@@ -132,7 +149,7 @@ func (l *messageLifecycle) OnUserSpeech(p internal_type.SpeechToTextPacket) (*in
 			break
 		}
 	}
-	if l.interruption.contextID == "" && (l.output.playback == playbackCompleted || l.state == MessageStateUserFinished) && strings.TrimSpace(p.Script) != "" && (p.ContextID == "" || p.ContextID == l.contextID) {
+	if l.interruption.contextID == "" && (l.output.playback == playbackCompleted || l.state == MessageStateUserFinished || l.state == MessageStateAssistantPrompted) && strings.TrimSpace(p.Script) != "" && (p.ContextID == "" || p.ContextID == l.contextID) {
 		turn := l.startSpeechTurnLocked()
 		p.ContextID = turn.ContextID
 		return &turn, p

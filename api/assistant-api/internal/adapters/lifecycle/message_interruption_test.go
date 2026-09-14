@@ -16,6 +16,69 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func TestMessageInterruption_SpeechActivityResetsIdleRetries(t *testing.T) {
+	for _, scenario := range []struct {
+		name      string
+		contextID string
+		text      string
+		interim   bool
+		resets    bool
+	}{
+		{name: "meaningful interim", contextID: "assistant", text: "wait please", interim: true, resets: true},
+		{name: "filler interim", contextID: "assistant", text: "um", interim: true, resets: true},
+		{name: "filler final", contextID: "assistant", text: "hmm", resets: true},
+		{name: "unassigned speech", text: "um", resets: true},
+		{name: "blank interim", contextID: "assistant", text: " ", interim: true},
+		{name: "blank final", contextID: "assistant"},
+		{name: "stale interim", contextID: "previous", text: "wait please", interim: true},
+		{name: "stale filler", contextID: "previous", text: "um"},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			var message MessageLifecycle
+			var resets []internal_type.StopIdleTimeoutPacket
+			message = NewMessageLifecycle(WithContextID("assistant"), WithMode(type_enums.AudioMode), WithOnPacket(func(packets ...internal_type.Packet) error {
+				// Reentry verifies activity is published after releasing the message lock.
+				require.Equal(t, "assistant", message.ContextID())
+				for _, packet := range packets {
+					if reset, ok := packet.(internal_type.StopIdleTimeoutPacket); ok {
+						resets = append(resets, reset)
+					}
+				}
+				return nil
+			}))
+			defer message.CancelInterruption()
+			require.NoError(t, message.OnGenerationStarted("assistant"))
+			require.NoError(t, message.OnSpeechStarted("assistant"))
+			message.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: scenario.contextID, Script: scenario.text, Interim: scenario.interim})
+			if scenario.resets {
+				require.Equal(t, []internal_type.StopIdleTimeoutPacket{{ContextID: "assistant", ResetCount: true}}, resets)
+			} else {
+				require.Empty(t, resets)
+			}
+		})
+	}
+}
+
+func TestMessageInterruption_SpeechAdmissionSupersedesQueuedPrompt(t *testing.T) {
+	for _, text := range []string{"I am here", "um"} {
+		t.Run(text, func(t *testing.T) {
+			message := NewMessageLifecycle(WithContextID("response"), WithMode(type_enums.AudioMode))
+			_, prompt, err := message.OnPrompt(internal_type.IdleTimeoutExpiredPacket{ContextID: "response"})
+			require.NoError(t, err)
+			prompt.Text = "Are you still there?"
+			turn, admitted := message.OnUserSpeech(internal_type.SpeechToTextPacket{ContextID: prompt.ContextID, Script: text, Interim: true})
+			require.NotNil(t, turn)
+			require.Equal(t, prompt.ContextID, turn.PreviousContextID)
+			require.NotEqual(t, prompt.ContextID, admitted.ContextID)
+			_, err = message.OnMessageInjected(prompt)
+			require.ErrorIs(t, err, ErrStaleContext)
+			_, err = message.OnTranscriptReceived(admitted)
+			require.NoError(t, err)
+			require.Equal(t, MessageStateUserListening, message.State())
+		})
+	}
+}
+
 func TestMessageInterruption_PlaybackControlOrdersDelayedPauseBeforeFlushCommit(t *testing.T) {
 	confirmed := make(chan *internal_type.TurnChangePacket, 1)
 	applied := make(chan proto.Message, 2)

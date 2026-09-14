@@ -1489,7 +1489,7 @@ func TestHandleUnclearInputExpired_VADTriggerRotatesFromInterruptedContextAndInj
 
 		promptContextID := r.GetID()
 		require.NotEqual(t, userTurnContextID, promptContextID)
-		assert.Equal(t, adapter_lifecycle.MessageStateAssistantIdle, r.messageLifecycle.State())
+		assert.Equal(t, adapter_lifecycle.MessageStateAssistantPrompted, r.messageLifecycle.State())
 
 		var eosInterrupt internal_type.EndOfSpeechInterruptionPacket
 		var ttsInterrupt internal_type.TextToSpeechInterruptPacket
@@ -1588,7 +1588,7 @@ func TestHandleUnclearInputExpired_WordTriggerRotatesFromInterruptedContextAndIn
 
 		promptContextID := r.GetID()
 		require.NotEqual(t, userTurnContextID, promptContextID)
-		assert.Equal(t, adapter_lifecycle.MessageStateAssistantIdle, r.messageLifecycle.State())
+		assert.Equal(t, adapter_lifecycle.MessageStateAssistantPrompted, r.messageLifecycle.State())
 
 		var eosInterrupt internal_type.EndOfSpeechInterruptionPacket
 		var ttsInterrupt internal_type.TextToSpeechInterruptPacket
@@ -1815,7 +1815,7 @@ func TestHandleIdleTimeoutExpired_InjectedPromptSpeaksBeforeIdleRestarts(t *test
 
 		newContextID := r.GetID()
 		require.NotEqual(t, oldContextID, newContextID)
-		assert.Equal(t, adapter_lifecycle.MessageStateAssistantIdle, r.messageLifecycle.State())
+		assert.Equal(t, adapter_lifecycle.MessageStateAssistantPrompted, r.messageLifecycle.State())
 
 		var injectMessage internal_type.InjectMessagePacket
 		for _, packet := range drainEgressPackets(r) {

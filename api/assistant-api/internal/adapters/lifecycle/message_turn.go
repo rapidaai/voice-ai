@@ -66,7 +66,7 @@ func (l *messageLifecycle) OnTranscriptReceived(packet internal_type.SpeechToTex
 		l.mu.Unlock()
 		return turn, nil
 	}
-	if l.output.playback == playbackCompleted || l.state == MessageStateUserFinished {
+	if l.output.playback == playbackCompleted || l.state == MessageStateUserFinished || l.state == MessageStateAssistantPrompted {
 		turn = l.startSpeechTurnLocked()
 	}
 	switch l.state {
@@ -212,7 +212,7 @@ func (l *messageLifecycle) OnPrompt(packet internal_type.Packet) (internal_type.
 	}
 	turn.PreviousContextID = l.contextID
 	l.contextID = uuid.NewString()
-	l.state = MessageStateAssistantIdle
+	l.state = MessageStateAssistantPrompted
 	if l.output.receiptTimer != nil {
 		l.output.receiptTimer.Stop()
 	}

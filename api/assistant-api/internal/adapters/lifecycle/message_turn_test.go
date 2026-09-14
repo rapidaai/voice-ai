@@ -13,6 +13,65 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestMessageTurn_SpeechSupersedesQueuedPrompt(t *testing.T) {
+	for _, scenario := range []struct {
+		name     string
+		text     string
+		interim  bool
+		stale    bool
+		generate bool
+	}{
+		{name: "interim", text: "I am here", interim: true},
+		{name: "filler", text: "um", interim: true},
+		{name: "final", text: "I am here"},
+		{name: "response started", text: "I am here", generate: true},
+		{name: "blank", text: " "},
+		{name: "stale", text: "old speech", stale: true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			message := NewMessageLifecycle(WithContextID("response"), WithMode(type_enums.AudioMode))
+			_, prompt, err := message.OnPrompt(internal_type.IdleTimeoutExpiredPacket{ContextID: "response"})
+			require.NoError(t, err)
+			prompt.Text = "Are you still there?"
+			require.Equal(t, MessageStateAssistantPrompted, message.State())
+			require.False(t, message.CanStartIdleTimeout(prompt.ContextID))
+			transcript := internal_type.SpeechToTextPacket{ContextID: prompt.ContextID, Script: scenario.text, Interim: scenario.interim}
+			if scenario.stale {
+				transcript.ContextID = "response"
+			}
+			turn, err := message.OnTranscriptReceived(transcript)
+			if scenario.stale || scenario.text == " " {
+				if scenario.stale {
+					require.ErrorIs(t, err, ErrStaleContext)
+				} else {
+					require.NoError(t, err)
+				}
+				require.Equal(t, prompt.ContextID, message.ContextID())
+				injected, err := message.OnMessageInjected(prompt)
+				require.NoError(t, err)
+				require.False(t, injected.Interim)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, prompt.ContextID, turn.PreviousContextID)
+			require.NotEqual(t, prompt.ContextID, turn.ContextID)
+			require.Equal(t, MessageStateUserListening, message.State())
+			if scenario.generate {
+				require.NoError(t, message.OnUserSpeechCompleted(internal_type.EndOfSpeechPacket{ContextID: turn.ContextID, Speech: scenario.text}))
+				require.NoError(t, message.OnGenerationStarted(turn.ContextID))
+			}
+			_, err = message.OnMessageInjected(prompt)
+			require.ErrorIs(t, err, ErrStaleContext)
+			require.Equal(t, turn.ContextID, message.ContextID())
+			if scenario.generate {
+				require.Equal(t, MessageStateAssistantGenerating, message.State())
+			} else {
+				require.Equal(t, MessageStateUserListening, message.State())
+			}
+		})
+	}
+}
+
 func TestMessageTurn_TranscriptDeliveryOwnsUnclearTimer(t *testing.T) {
 	for _, scenario := range []struct {
 		name     string
@@ -165,7 +224,7 @@ func TestMessageTurn_AdmittedTranscriptRetainsContextAfterUnclearPrompt(t *testi
 		assert.ErrorIs(t, err, ErrStaleContext)
 		assert.Empty(t, admittedTurn.ContextID)
 		assert.Equal(t, turn.ContextID, l.ContextID())
-		assert.Equal(t, MessageStateAssistantIdle, l.State(), "stale delivery must not change the prompt turn")
+		assert.Equal(t, MessageStateAssistantPrompted, l.State(), "stale delivery must not change the prompt turn")
 	})
 }
 
