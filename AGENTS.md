@@ -108,6 +108,15 @@ may add domain constraints but must not redefine or weaken this section.
 - Exported Go identifiers have useful doc comments when their contract is not already obvious from an established interface.
 - TODOs state the remaining action and reference an owner, issue, or removal condition.
 
+### Commit messages
+
+- Use Conventional Commit headers: `<type>: <subject>` or `<type>(<scope>): <subject>`.
+- Valid types are `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`, and `security`.
+- Keep the type and subject lower-case. Do not end the subject with a period.
+- Keep the header at 100 characters or fewer. Keep body lines at 200 characters or fewer.
+- Use `security` for vulnerability fixes and other security improvements.
+- Examples: `security: update grpc dependency` and `docs: add commit message rules`.
+
 ### Errors, context, and concurrency
 
 - Return actionable errors with relevant context; preserve causes in Go with `%w` when callers may inspect them.

@@ -57,6 +57,9 @@ cd ui && yarn lint:fix     # Lint and auto-fix UI
 cd ui && yarn checkTs      # TypeScript type check
 ```
 
+Commit messages are checked by `just ci-commitlint`. Follow the Conventional Commit
+style in `AGENTS.md`: `<type>: <subject>`, lower-case subject, no trailing period.
+
 ### Protocol Buffers
 
 Proto sources live in `protos/artifacts/` (git submodule); generated files are in `protos/`. Use `buf` (config in `buf.yaml`) to regenerate after editing `.proto` files.
