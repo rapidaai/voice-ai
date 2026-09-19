@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/internal/testutil"
+	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/tests/testutil"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
@@ -214,12 +214,13 @@ func TestSarvamTextToSpeechWaitsForTextClosureAndFinalDrain(t *testing.T) {
 	defer cancel()
 	collector := testutil.NewPacketCollector()
 	tts := &sarvamTextToSpeech{
-		ctx:        ctx,
-		ctxCancel:  cancel,
-		connection: conn,
-		contextId:  "ctx-sarvam",
-		logger:     newTestLogger(),
-		onPacket:   collector.OnPacket,
+		ctx:              ctx,
+		ctxCancel:        cancel,
+		connection:       conn,
+		contextId:        "ctx-sarvam",
+		synthesisPending: true,
+		logger:           newTestLogger(),
+		onPacket:         collector.OnPacket,
 	}
 	go tts.readLoop(conn)
 
@@ -228,15 +229,14 @@ func TestSarvamTextToSpeechWaitsForTextClosureAndFinalDrain(t *testing.T) {
 		Text:      "first",
 	}))
 	assert.Equal(t, "text", waitSarvamTTSRequest(t, requests)["type"])
-	writeSarvamTTSAudio(t, remote, []byte{1})
 	require.NoError(t, remote.WriteJSON(map[string]interface{}{
 		"type": "event",
-		"data": map[string]interface{}{"message": "complete"},
+		"data": map[string]interface{}{"event_type": "final"},
 	}))
+	writeSarvamTTSAudio(t, remote, []byte{1})
 	collector.WaitFor(t, time.Second, "first audio", func() bool {
 		return len(collector.AudioPackets()) == 1
 	})
-	time.Sleep(50 * time.Millisecond)
 	assert.Empty(t, collector.EndPackets())
 
 	require.NoError(t, tts.Transform(context.Background(), internal_type.TextToSpeechTextPacket{
@@ -244,15 +244,14 @@ func TestSarvamTextToSpeechWaitsForTextClosureAndFinalDrain(t *testing.T) {
 		Text:      "second",
 	}))
 	assert.Equal(t, "text", waitSarvamTTSRequest(t, requests)["type"])
-	writeSarvamTTSAudio(t, remote, []byte{2})
 	require.NoError(t, remote.WriteJSON(map[string]interface{}{
 		"type": "event",
-		"data": map[string]interface{}{"message": "complete"},
+		"data": map[string]interface{}{"event_type": "final"},
 	}))
+	writeSarvamTTSAudio(t, remote, []byte{2})
 	collector.WaitFor(t, time.Second, "second audio", func() bool {
 		return len(collector.AudioPackets()) == 2
 	})
-	time.Sleep(50 * time.Millisecond)
 	assert.Empty(t, collector.EndPackets())
 
 	require.NoError(t, tts.Transform(context.Background(), internal_type.TextToSpeechDonePacket{
@@ -262,7 +261,7 @@ func TestSarvamTextToSpeechWaitsForTextClosureAndFinalDrain(t *testing.T) {
 	writeSarvamTTSAudio(t, remote, []byte{3})
 	require.NoError(t, remote.WriteJSON(map[string]interface{}{
 		"type": "event",
-		"data": map[string]interface{}{"message": "complete"},
+		"data": map[string]interface{}{"event_type": "final"},
 	}))
 	collector.WaitForTTSEnd(t, time.Second)
 	assert.Len(t, collector.AudioPackets(), 3)
@@ -293,12 +292,13 @@ func TestSarvamTextToSpeechProviderErrorDoesNotEmitEnd(t *testing.T) {
 	defer cancel()
 	collector := testutil.NewPacketCollector()
 	tts := &sarvamTextToSpeech{
-		ctx:        ctx,
-		ctxCancel:  cancel,
-		connection: conn,
-		contextId:  "ctx-sarvam-error",
-		logger:     newTestLogger(),
-		onPacket:   collector.OnPacket,
+		ctx:              ctx,
+		ctxCancel:        cancel,
+		connection:       conn,
+		contextId:        "ctx-sarvam-error",
+		synthesisPending: true,
+		logger:           newTestLogger(),
+		onPacket:         collector.OnPacket,
 	}
 	go tts.readLoop(conn)
 

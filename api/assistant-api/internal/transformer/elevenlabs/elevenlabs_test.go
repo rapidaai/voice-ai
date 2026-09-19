@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/internal/testutil"
+	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/tests/testutil"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
@@ -115,7 +115,7 @@ func TestGetTextToSpeechConnectionString_AllOptions(t *testing.T) {
 	assert.Contains(t, connStr, "enable_ssml_parsing=true")
 }
 
-func TestElevenLabsTextToSpeechWaitsForTextClosureAndFinalDrain(t *testing.T) {
+func TestElevenLabsTextToSpeechWaitsForTextClosureAndFinal(t *testing.T) {
 	upgrader := websocket.Upgrader{}
 	requests := make(chan map[string]interface{}, 4)
 	serverConn := make(chan *websocket.Conn, 1)
@@ -147,12 +147,13 @@ func TestElevenLabsTextToSpeechWaitsForTextClosureAndFinalDrain(t *testing.T) {
 	defer cancel()
 	collector := testutil.NewPacketCollector()
 	tts := &elevenlabsTTS{
-		ctx:        ctx,
-		ctxCancel:  cancel,
-		connection: conn,
-		contextId:  "ctx-eleven",
-		logger:     testutil.NewTestLogger(),
-		onPacket:   collector.OnPacket,
+		elevenLabsOption: &elevenLabsOption{mdlOpts: utils.Option{}},
+		ctx:              ctx,
+		ctxCancel:        cancel,
+		connection:       conn,
+		contexts:         make(map[string]*elevenlabsTTSContext),
+		logger:           testutil.NewTestLogger(),
+		onPacket:         collector.OnPacket,
 	}
 	go tts.readLoop(conn)
 
@@ -160,6 +161,7 @@ func TestElevenLabsTextToSpeechWaitsForTextClosureAndFinalDrain(t *testing.T) {
 		ContextID: "ctx-eleven",
 		Text:      "first",
 	}))
+	assert.Contains(t, waitElevenLabsRequest(t, requests), "voice_settings")
 	assert.Equal(t, "first", waitElevenLabsRequest(t, requests)["text"])
 	writeElevenLabsAudio(t, remote, []byte{1}, true)
 	collector.WaitFor(t, time.Second, "first audio", func() bool {
@@ -181,7 +183,8 @@ func TestElevenLabsTextToSpeechWaitsForTextClosureAndFinalDrain(t *testing.T) {
 	require.NoError(t, tts.Transform(context.Background(), internal_type.TextToSpeechDonePacket{
 		ContextID: "ctx-eleven",
 	}))
-	assert.Equal(t, " ", waitElevenLabsRequest(t, requests)["text"])
+	assert.Equal(t, true, waitElevenLabsRequest(t, requests)["flush"])
+	assert.Equal(t, true, waitElevenLabsRequest(t, requests)["close_context"])
 	writeElevenLabsAudio(t, remote, []byte{3}, true)
 	collector.WaitForTTSEnd(t, time.Second)
 	assert.Len(t, collector.AudioPackets(), 3)
@@ -215,7 +218,7 @@ func TestElevenLabsProviderErrorDoesNotEmitEnd(t *testing.T) {
 		ctx:        ctx,
 		ctxCancel:  cancel,
 		connection: conn,
-		contextId:  "ctx-eleven-error",
+		contexts:   map[string]*elevenlabsTTSContext{"ctx-eleven-error": {startedAt: time.Now()}},
 		logger:     testutil.NewTestLogger(),
 		onPacket:   collector.OnPacket,
 	}

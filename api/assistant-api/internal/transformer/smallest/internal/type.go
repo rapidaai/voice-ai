@@ -15,7 +15,7 @@ type TextToSpeechInput struct {
 	Language   string  `json:"language,omitempty"`
 	SampleRate int     `json:"sample_rate,omitempty"`
 	Speed      float64 `json:"speed,omitempty"`
-	SessionID  string  `json:"session_id,omitempty"`
+	ContextID  string  `json:"context_id,omitempty"`
 	Continue   bool    `json:"continue"`
 	Flush      bool    `json:"flush,omitempty"`
 }

@@ -11,7 +11,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	cartesia_internal "github.com/rapidaai/api/assistant-api/internal/transformer/cartesia/internal"
-	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/internal/testutil"
+	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/tests/testutil"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"

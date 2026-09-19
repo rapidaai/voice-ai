@@ -46,14 +46,14 @@ const (
 const (
 	IllegalVaultConfigErrorMessage = "illegal vault config"
 
-	STTCredentialRequiredErrorMessage       = "deepgram-stt: credential is required"
+	STTCredentialRequiredErrorMessage       = "deepgram-stt: credential is required" // #nosec G101 -- Diagnostic text, not a credential.
 	STTOnPacketRequiredErrorMessage         = "deepgram-stt: on packet handler is required"
 	STTConnectionFailedErrorMessage         = "deepgram-stt: connection failed"
 	STTConnectionNotInitializedErrorMessage = "deepgram-stt: connection is not initialized"
 	STTFinalizeErrorMessage                 = "deepgram finalize error: %w"
 	STTStreamErrorMessage                   = "deepgram stream error: %w"
 
-	STTCredentialFailedLogMessage     = "deepgram-stt: Key from credential failed %+v"
+	STTCredentialFailedLogMessage     = "deepgram-stt: Key from credential failed %+v" // #nosec G101 -- Diagnostic format, not a credential.
 	STTInitializationErrorLogMessage  = "deepgram-stt: error while initialization %s"
 	STTConnectErrorLogMessage         = "deepgram-stt: error while performing connect"
 	STTInitializationCompletedMessage = "deepgram-stt: initialization completed"
@@ -66,8 +66,8 @@ const (
 	STTInitializationLatencyMetricDescription = "STT initialization latency in milliseconds"
 	STTFinalizeFailureMetricDescription       = "STT finalize failure count"
 	STTStreamFailureMetricDescription         = "STT stream failure count"
-	STTTimeToFirstTokenMetricDescription      = "STT time to first token from speech start in milliseconds"
-	STTTimeToLastTokenMetricDescription       = "STT time to final token from speech start in milliseconds"
+	STTTimeToFirstTokenMetricDescription      = "STT time to first token from speech start in milliseconds" // #nosec G101 -- Speech token metric, not a credential.
+	STTTimeToLastTokenMetricDescription       = "STT time to final token from speech start in milliseconds" // #nosec G101 -- Speech token metric, not a credential.
 	STTLatencyMetricDescription               = "STT latency from speech end to final transcript in milliseconds"
 	STTProviderErrorMetricDescription         = "STT provider error count"
 )

@@ -11,11 +11,12 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/internal/testutil"
+	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/tests/testutil"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/semaphore"
 )
 
 func neuphonicTestLogger() commons.Logger {
@@ -23,7 +24,7 @@ func neuphonicTestLogger() commons.Logger {
 	return l
 }
 
-func TestNeuphonicTextToSpeechAudioBeforeDoneFailure(t *testing.T) {
+func TestNeuphonicTextToSpeechAudioBeforeAndAfterDone(t *testing.T) {
 	upgrader := websocket.Upgrader{}
 	requests := make(chan map[string]interface{}, 4)
 	serverConn := make(chan *websocket.Conn, 1)
@@ -55,14 +56,17 @@ func TestNeuphonicTextToSpeechAudioBeforeDoneFailure(t *testing.T) {
 	defer cancel()
 	collector := testutil.NewPacketCollector()
 	tts := &neuphonicTTS{
-		ctx:        ctx,
-		ctxCancel:  cancel,
-		connection: conn,
-		contextId:  "ctx-neuphonic-audio",
-		logger:     neuphonicTestLogger(),
-		onPacket:   collector.OnPacket,
+		ctx:              ctx,
+		ctxCancel:        cancel,
+		connection:       conn,
+		contextId:        "ctx-neuphonic-audio",
+		writeLock:        semaphore.NewWeighted(1),
+		synthesisPending: true,
+		logger:           neuphonicTestLogger(),
+		onPacket:         collector.OnPacket,
 	}
-	go tts.readLoop(conn)
+	tts.workers.Go(func() { tts.readLoop(conn) })
+	defer tts.Close(context.Background())
 
 	require.NoError(t, tts.Transform(context.Background(), internal_type.TextToSpeechTextPacket{
 		ContextID: "ctx-neuphonic-audio",
@@ -82,11 +86,16 @@ func TestNeuphonicTextToSpeechAudioBeforeDoneFailure(t *testing.T) {
 		ContextID: "ctx-neuphonic-audio",
 	}))
 	assert.Equal(t, "<STOP>", waitNeuphonicTTSRequest(t, requests)["text"])
-	collector.WaitFor(t, time.Second, "neuphonic final error", func() bool {
-		return len(neuphonicTTSErrors(collector)) == 1
-	})
 	assert.Empty(t, collector.EndPackets())
-	assert.False(t, neuphonicHasTTSCompleted(collector))
+	require.NoError(t, remote.WriteJSON(map[string]interface{}{
+		"data": map[string]interface{}{"audio": base64.StdEncoding.EncodeToString([]byte{4, 5})},
+	}))
+	collector.WaitFor(t, time.Second, "audio after Done", func() bool { return len(collector.AudioPackets()) == 2 })
+	collector.WaitForTTSEnd(t, 4*time.Second)
+	require.Len(t, collector.EndPackets(), 1)
+	assert.Equal(t, "ctx-neuphonic-audio", collector.EndPackets()[0].ContextID)
+	assert.Empty(t, neuphonicTTSErrors(collector))
+	assert.True(t, neuphonicHasTTSCompleted(collector))
 }
 
 func TestNeuphonicTextToSpeechFailedStopDoesNotComplete(t *testing.T) {
@@ -113,12 +122,14 @@ func TestNeuphonicTextToSpeechFailedStopDoesNotComplete(t *testing.T) {
 	defer cancel()
 	collector := testutil.NewPacketCollector()
 	tts := &neuphonicTTS{
-		ctx:        ctx,
-		ctxCancel:  cancel,
-		connection: conn,
-		contextId:  "ctx-neuphonic-stop",
-		logger:     neuphonicTestLogger(),
-		onPacket:   collector.OnPacket,
+		ctx:              ctx,
+		ctxCancel:        cancel,
+		connection:       conn,
+		contextId:        "ctx-neuphonic-stop",
+		writeLock:        semaphore.NewWeighted(1),
+		synthesisPending: true,
+		logger:           neuphonicTestLogger(),
+		onPacket:         collector.OnPacket,
 	}
 
 	require.NoError(t, tts.Transform(context.Background(), internal_type.TextToSpeechDonePacket{
@@ -163,18 +174,23 @@ func TestNeuphonicTextToSpeechNoAudioDoneEmitsError(t *testing.T) {
 	defer cancel()
 	collector := testutil.NewPacketCollector()
 	tts := &neuphonicTTS{
-		ctx:        ctx,
-		ctxCancel:  cancel,
-		connection: conn,
-		contextId:  "ctx-neuphonic-empty",
-		logger:     neuphonicTestLogger(),
-		onPacket:   collector.OnPacket,
+		ctx:              ctx,
+		ctxCancel:        cancel,
+		connection:       conn,
+		contextId:        "ctx-neuphonic-empty",
+		writeLock:        semaphore.NewWeighted(1),
+		synthesisPending: true,
+		logger:           neuphonicTestLogger(),
+		onPacket:         collector.OnPacket,
 	}
+	tts.workers.Go(func() { tts.readLoop(conn) })
+	defer tts.Close(context.Background())
 
 	require.NoError(t, tts.Transform(context.Background(), internal_type.TextToSpeechDonePacket{
 		ContextID: "ctx-neuphonic-empty",
 	}))
 	assert.Equal(t, "<STOP>", waitNeuphonicTTSRequest(t, requests)["text"])
+	collector.WaitFor(t, 4*time.Second, "no-audio timeout", func() bool { return len(neuphonicTTSErrors(collector)) == 1 })
 	errors := neuphonicTTSErrors(collector)
 	require.Len(t, errors, 1)
 	assert.Equal(t, internal_type.TTSNetworkTimeout, errors[0].Type)
@@ -206,12 +222,14 @@ func TestNeuphonicTextToSpeechLocalCloseDoesNotComplete(t *testing.T) {
 	defer cancel()
 	collector := testutil.NewPacketCollector()
 	tts := &neuphonicTTS{
-		ctx:        ctx,
-		ctxCancel:  cancel,
-		connection: conn,
-		contextId:  "ctx-neuphonic-close",
-		logger:     neuphonicTestLogger(),
-		onPacket:   collector.OnPacket,
+		ctx:              ctx,
+		ctxCancel:        cancel,
+		connection:       conn,
+		contextId:        "ctx-neuphonic-close",
+		writeLock:        semaphore.NewWeighted(1),
+		synthesisPending: true,
+		logger:           neuphonicTestLogger(),
+		onPacket:         collector.OnPacket,
 	}
 
 	require.NoError(t, tts.Close(context.Background()))

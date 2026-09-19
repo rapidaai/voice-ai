@@ -1,17 +1,20 @@
 package internal_transformer_google
 
 import (
-	"errors"
+	"context"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/speech/apiv2/speechpb"
 	"cloud.google.com/go/texttospeech/apiv1/texttospeechpb"
-	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -181,31 +184,18 @@ func TestTextToSpeechOptions_Defaults(t *testing.T) {
 }
 
 func TestGoogleStreamTimeoutEmitsErrorWithoutEnd(t *testing.T) {
-	var packets []internal_type.Packet
-	tts := &googleTextToSpeech{
-		contextId: "ctx-google",
-		logger:    newTestLogger(),
-		onPacket: func(pkts ...internal_type.Packet) error {
-			packets = append(packets, pkts...)
-			return nil
-		},
-	}
-
-	tts.failStream("fallback", errors.New("google-tts: stream timed out: Stream aborted due to long duration elapsed without input sent"))
-
-	assert.Len(t, packets, 2)
-	errorPacket, ok := packets[0].(internal_type.TextToSpeechErrorPacket)
-	assert.True(t, ok)
+	f := newGoogleTTSFixture(t)
+	require.NoError(t, f.tts.Transform(context.Background(), internal_type.TextToSpeechTextPacket{ContextID: "ctx-google", Text: "hello"}))
+	call := googleTTSReceive(t, f.calls)
+	googleTTSReceive(t, call.requests)
+	googleTTSReceive(t, call.requests)
+	call.finish <- status.Error(codes.Aborted, "stream timed out: Stream aborted due to long duration elapsed without input sent")
+	f.collector.WaitFor(t, time.Second, "stream timeout", func() bool { return len(googleTTSErrors(f.collector)) == 1 })
+	errorPacket := googleTTSErrors(f.collector)[0]
 	assert.Equal(t, "ctx-google", errorPacket.ContextID)
 	assert.Equal(t, internal_type.TTSNetworkTimeout, errorPacket.Type)
 	assert.Contains(t, errorPacket.ErrMessage(), "stream timed out")
-	logPacket, ok := packets[1].(internal_type.ObservabilityLogRecordPacket)
-	assert.True(t, ok)
-	assert.Equal(t, observability.LevelError, logPacket.Record.Level)
-	for _, packet := range packets {
-		_, ok := packet.(internal_type.TextToSpeechEndPacket)
-		assert.False(t, ok)
-	}
+	assert.Empty(t, f.collector.EndPackets())
 }
 
 func TestTextToSpeechOptions_WithEmptyVoiceOverride(t *testing.T) {

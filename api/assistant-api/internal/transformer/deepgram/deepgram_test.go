@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	deepgram_internal "github.com/rapidaai/api/assistant-api/internal/transformer/deepgram/internal"
-	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/internal/testutil"
+	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/tests/testutil"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"

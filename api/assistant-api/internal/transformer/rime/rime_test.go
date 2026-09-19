@@ -10,13 +10,14 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/internal/testutil"
+	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/tests/testutil"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -136,6 +137,7 @@ func TestRimeTextToSpeechWaitsForTextClosureAndFinalDrain(t *testing.T) {
 	defer cancel()
 	collector := testutil.NewPacketCollector()
 	tts := &rimeTTS{
+		writeLock: semaphore.NewWeighted(1), synthesisPending: true,
 		ctx:        ctx,
 		ctxCancel:  cancel,
 		connection: conn,
@@ -143,7 +145,8 @@ func TestRimeTextToSpeechWaitsForTextClosureAndFinalDrain(t *testing.T) {
 		logger:     newTestLogger(),
 		onPacket:   collector.OnPacket,
 	}
-	go tts.readLoop(conn)
+	tts.workers.Go(func() { tts.readLoop(conn) })
+	defer tts.Close(context.Background())
 
 	require.NoError(t, tts.Transform(context.Background(), internal_type.TextToSpeechTextPacket{
 		ContextID: "ctx-rime",
@@ -219,6 +222,7 @@ func TestRimeTextToSpeechLatePreFinalDoneAfterEOSWaitsForRemoteClose(t *testing.
 	defer cancel()
 	collector := testutil.NewPacketCollector()
 	tts := &rimeTTS{
+		writeLock: semaphore.NewWeighted(1), synthesisPending: true,
 		ctx:        ctx,
 		ctxCancel:  cancel,
 		connection: conn,
@@ -226,7 +230,8 @@ func TestRimeTextToSpeechLatePreFinalDoneAfterEOSWaitsForRemoteClose(t *testing.
 		logger:     newTestLogger(),
 		onPacket:   collector.OnPacket,
 	}
-	go tts.readLoop(conn)
+	tts.workers.Go(func() { tts.readLoop(conn) })
+	defer tts.Close(context.Background())
 
 	require.NoError(t, tts.Transform(context.Background(), internal_type.TextToSpeechTextPacket{
 		ContextID: "ctx-rime-late",
@@ -310,6 +315,7 @@ func TestRimeTextToSpeechZeroBufferEOSCompletesOnCleanRemoteClose(t *testing.T) 
 	defer cancel()
 	collector := testutil.NewPacketCollector()
 	tts := &rimeTTS{
+		writeLock: semaphore.NewWeighted(1), synthesisPending: true,
 		ctx:        ctx,
 		ctxCancel:  cancel,
 		connection: conn,
@@ -317,7 +323,8 @@ func TestRimeTextToSpeechZeroBufferEOSCompletesOnCleanRemoteClose(t *testing.T) 
 		logger:     newTestLogger(),
 		onPacket:   collector.OnPacket,
 	}
-	go tts.readLoop(conn)
+	tts.workers.Go(func() { tts.readLoop(conn) })
+	defer tts.Close(context.Background())
 
 	require.NoError(t, tts.Transform(context.Background(), internal_type.TextToSpeechDonePacket{
 		ContextID: "ctx-rime-empty",
@@ -357,6 +364,7 @@ func TestRimeTextToSpeechProviderErrorDoesNotEmitEnd(t *testing.T) {
 	defer cancel()
 	collector := testutil.NewPacketCollector()
 	tts := &rimeTTS{
+		writeLock: semaphore.NewWeighted(1), synthesisPending: true,
 		ctx:        ctx,
 		ctxCancel:  cancel,
 		connection: conn,
@@ -364,7 +372,8 @@ func TestRimeTextToSpeechProviderErrorDoesNotEmitEnd(t *testing.T) {
 		logger:     newTestLogger(),
 		onPacket:   collector.OnPacket,
 	}
-	go tts.readLoop(conn)
+	tts.workers.Go(func() { tts.readLoop(conn) })
+	defer tts.Close(context.Background())
 
 	require.NoError(t, remote.WriteJSON(map[string]interface{}{
 		"type":      "error",
@@ -414,6 +423,7 @@ func TestRimeTextToSpeechLocalCloseAfterEOSDoesNotEmitEnd(t *testing.T) {
 	defer cancel()
 	collector := testutil.NewPacketCollector()
 	tts := &rimeTTS{
+		writeLock: semaphore.NewWeighted(1), synthesisPending: true,
 		ctx:        ctx,
 		ctxCancel:  cancel,
 		connection: conn,
@@ -421,14 +431,14 @@ func TestRimeTextToSpeechLocalCloseAfterEOSDoesNotEmitEnd(t *testing.T) {
 		logger:     newTestLogger(),
 		onPacket:   collector.OnPacket,
 	}
-	go tts.readLoop(conn)
+	tts.workers.Go(func() { tts.readLoop(conn) })
+	defer tts.Close(context.Background())
 
 	require.NoError(t, tts.Transform(context.Background(), internal_type.TextToSpeechDonePacket{
 		ContextID: "ctx-rime-local-close",
 	}))
 	assert.Equal(t, "eos", waitRimeTTSRequest(t, requests)["operation"])
 	require.NoError(t, tts.Close(context.Background()))
-	time.Sleep(100 * time.Millisecond)
 	assert.Empty(t, collector.EndPackets())
 }
 
@@ -459,13 +469,16 @@ func TestRimeShutdownCloseDoesNotCompleteSynthesis(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			collector := testutil.NewPacketCollector()
-			tts := &rimeTTS{ctx: ctx, connection: connection, contextId: "closing", textClosed: true, logger: newTestLogger(), onPacket: collector.OnPacket}
+			tts := &rimeTTS{ctx: ctx, connection: connection, contextId: "closing", textClosed: true, synthesisPending: true, writeLock: semaphore.NewWeighted(1), logger: newTestLogger(), onPacket: collector.OnPacket}
 			finished := make(chan struct{})
 			go func() { defer close(finished); tts.readLoop(connection) }()
 			if scenario.cancelled {
 				cancel()
 			}
-			require.NoError(t, remote.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(scenario.closeCode, ""), time.Now().Add(time.Second)))
+			err = remote.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(scenario.closeCode, ""), time.Now().Add(time.Second))
+			if !scenario.cancelled {
+				require.NoError(t, err)
+			}
 			select {
 			case <-finished:
 			case <-time.After(time.Second):

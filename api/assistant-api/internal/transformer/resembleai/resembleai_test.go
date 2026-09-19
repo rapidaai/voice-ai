@@ -10,11 +10,12 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/internal/testutil"
+	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/tests/testutil"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/semaphore"
 )
 
 func TestResembleAITextToSpeechWaitsForTextClosureAndFinalDrain(t *testing.T) {
@@ -50,6 +51,8 @@ func TestResembleAITextToSpeechWaitsForTextClosureAndFinalDrain(t *testing.T) {
 	collector := testutil.NewPacketCollector()
 	tts := &resembleaiTTS{
 		resembleaiOption: &resembleaiOption{mdlOpts: utils.Option{}},
+		writeLock:        semaphore.NewWeighted(1),
+		synthesisPending: true,
 		ctx:              ctx,
 		ctxCancel:        cancel,
 		connection:       conn,
@@ -57,7 +60,8 @@ func TestResembleAITextToSpeechWaitsForTextClosureAndFinalDrain(t *testing.T) {
 		logger:           testutil.NewTestLogger(),
 		onPacket:         collector.OnPacket,
 	}
-	go tts.readLoop(conn)
+	tts.workers.Go(func() { tts.readLoop(conn) })
+	defer tts.Close(context.Background())
 
 	require.NoError(t, tts.Transform(context.Background(), internal_type.TextToSpeechTextPacket{
 		ContextID: "ctx-resemble",
@@ -117,14 +121,17 @@ func TestResembleAITextToSpeechProviderErrorDoesNotEmitEnd(t *testing.T) {
 	defer cancel()
 	collector := testutil.NewPacketCollector()
 	tts := &resembleaiTTS{
-		ctx:        ctx,
-		ctxCancel:  cancel,
-		connection: conn,
-		contextId:  "ctx-resemble-error",
-		logger:     testutil.NewTestLogger(),
-		onPacket:   collector.OnPacket,
+		writeLock:        semaphore.NewWeighted(1),
+		synthesisPending: true,
+		ctx:              ctx,
+		ctxCancel:        cancel,
+		connection:       conn,
+		contextId:        "ctx-resemble-error",
+		logger:           testutil.NewTestLogger(),
+		onPacket:         collector.OnPacket,
 	}
-	go tts.readLoop(conn)
+	tts.workers.Go(func() { tts.readLoop(conn) })
+	defer tts.Close(context.Background())
 
 	require.NoError(t, remote.WriteJSON(map[string]interface{}{
 		"type":    "error",

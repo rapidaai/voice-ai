@@ -163,7 +163,7 @@ func (so *smallestOption) GetTextToSpeechInput(
 		opts.Flush = v.(bool)
 	}
 	if contextID, ok := overriddenOpts["context_id"]; ok {
-		opts.SessionID = contextID.(string)
+		opts.ContextID = contextID.(string)
 	}
 
 	return opts

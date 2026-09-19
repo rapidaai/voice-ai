@@ -11,7 +11,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/rapidaai/api/assistant-api/internal/observability"
 	"io"
 	"net/http"
 	"strconv"
@@ -19,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
@@ -30,13 +30,15 @@ type speechmaticsTTS struct {
 	ctx       context.Context
 	ctxCancel context.CancelFunc
 
-	mu             sync.Mutex
-	contextId      string
-	ttsConnectedAt time.Time
-	textBuffer     strings.Builder
+	stateMu         sync.Mutex
+	workers         sync.WaitGroup
+	synthesisCancel context.CancelFunc
+	textClosed      bool
+	contextId       string
+	ttsConnectedAt  time.Time
+	textBuffer      strings.Builder
 
-	ttsStartedAt  time.Time
-	ttsMetricSent bool
+	ttsStartedAt time.Time
 
 	logger   commons.Logger
 	onPacket func(pkt ...internal_type.Packet) error
@@ -45,9 +47,8 @@ type speechmaticsTTS struct {
 func NewSpeechmaticsTextToSpeech(ctx context.Context, logger commons.Logger, credential *protos.VaultCredential,
 	onPacket func(pkt ...internal_type.Packet) error,
 	opts utils.Option) (internal_type.TextToSpeechTransformer, error) {
-	smOpts, err := NewSpeechmaticsOption(logger, credential, opts)
+	speechmaticsOpts, err := NewSpeechmaticsOption(logger, credential, opts)
 	if err != nil {
-		logger.Errorf("speechmatics-tts: initializing speechmatics failed %+v", err)
 		return nil, err
 	}
 	ctx2, contextCancel := context.WithCancel(ctx)
@@ -56,17 +57,21 @@ func NewSpeechmaticsTextToSpeech(ctx context.Context, logger commons.Logger, cre
 		ctxCancel:          contextCancel,
 		onPacket:           onPacket,
 		logger:             logger,
-		speechmaticsOption: smOpts,
+		speechmaticsOption: speechmaticsOpts,
 	}, nil
 }
 
 func (ct *speechmaticsTTS) Initialize() error {
 	start := time.Now()
-	ct.mu.Lock()
+	ct.stateMu.Lock()
+	if err := ct.ctx.Err(); err != nil {
+		ct.stateMu.Unlock()
+		return err
+	}
 	if ct.ttsConnectedAt.IsZero() {
 		ct.ttsConnectedAt = time.Now()
 	}
-	ct.mu.Unlock()
+	ct.stateMu.Unlock()
 
 	ct.onPacket(
 		internal_type.ObservabilityMetricRecordPacket{
@@ -100,202 +105,204 @@ func (*speechmaticsTTS) Name() string {
 	return "speechmatics-tts"
 }
 
-func (t *speechmaticsTTS) flush() {
-	t.mu.Lock()
-	text := t.textBuffer.String()
-	t.textBuffer.Reset()
-	ctxId := t.contextId
-	t.mu.Unlock()
+func (t *speechmaticsTTS) streamHTTPTTS(ctx context.Context, text, contextID string, startedAt time.Time) {
+	var synthesisError error
+	// Response cleanup runs before the message's terminal packet is published.
+	defer func() {
+		t.stateMu.Lock()
+		if t.contextId != contextID {
+			t.stateMu.Unlock()
+			return
+		}
+		// Retire under the lock; later interruption cannot revoke this terminal decision.
+		t.synthesisCancel = nil
+		if ctx.Err() != nil || t.ctx.Err() != nil {
+			t.stateMu.Unlock()
+			return
+		}
+		t.stateMu.Unlock()
+		if synthesisError != nil {
+			t.onPacket(internal_type.TextToSpeechErrorPacket{
+				ContextID: contextID, Error: synthesisError, Type: internal_type.TTSNetworkTimeout,
+			})
+			return
+		}
+		t.onPacket(
+			internal_type.TextToSpeechEndPacket{ContextID: contextID},
+			internal_type.ObservabilityEventRecordPacket{
+				ContextID: contextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentTTS, Event: observability.TTSCompleted,
+					Attributes: observability.Attributes{"type": "completed"}, OccurredAt: time.Now(),
+				},
+			},
+		)
+	}()
 
-	if text == "" || ctxId == "" {
-		return
-	}
-
-	go t.streamHTTPTTS(text, ctxId)
-}
-
-func (t *speechmaticsTTS) streamHTTPTTS(text string, ctxId string) {
-	voice := t.GetVoice()
-	ttsURL := fmt.Sprintf("%s/%s?output_format=pcm_16000", SPEECHMATICS_TTS_URL, voice)
-
-	payload := map[string]interface{}{
+	body, err := json.Marshal(map[string]interface{}{
 		"text": text,
-	}
-	body, err := json.Marshal(payload)
+	})
 	if err != nil {
-		t.logger.Errorf("speechmatics-tts: error marshalling request: %v", err)
-		t.onPacket(internal_type.TextToSpeechErrorPacket{
-			ContextID: ctxId,
-			Error:     fmt.Errorf("speechmatics-tts: error marshalling request: %w", err),
-			Type:      internal_type.TTSNetworkTimeout,
-		})
+		synthesisError = fmt.Errorf("speechmatics-tts: encode request: %w", err)
 		return
 	}
-
-	req, err := http.NewRequestWithContext(t.ctx, "POST", ttsURL, bytes.NewReader(body))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		fmt.Sprintf("%s/%s?output_format=pcm_16000", SPEECHMATICS_TTS_URL, t.GetVoice()), bytes.NewReader(body))
 	if err != nil {
-		t.logger.Errorf("speechmatics-tts: error creating request: %v", err)
-		t.onPacket(internal_type.TextToSpeechErrorPacket{
-			ContextID: ctxId,
-			Error:     fmt.Errorf("speechmatics-tts: error creating request: %w", err),
-			Type:      internal_type.TTSNetworkTimeout,
-		})
+		synthesisError = fmt.Errorf("speechmatics-tts: create request: %w", err)
 		return
 	}
-	req.Header.Set("Authorization", "Bearer "+t.GetKey())
-	req.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+t.GetKey())
+	request.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	response, err := http.DefaultClient.Do(request)
 	if err != nil {
-		t.logger.Errorf("speechmatics-tts: error sending request: %v", err)
-		t.onPacket(internal_type.TextToSpeechErrorPacket{
-			ContextID: ctxId,
-			Error:     fmt.Errorf("speechmatics-tts: error sending request: %w", err),
-			Type:      internal_type.TTSNetworkTimeout,
-		})
+		synthesisError = fmt.Errorf("speechmatics-tts: send request: %w", err)
 		return
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
-		t.logger.Errorf("speechmatics-tts: unexpected status code: %d, body: %s", resp.StatusCode, string(respBody))
-		t.onPacket(internal_type.TextToSpeechErrorPacket{
-			ContextID: ctxId,
-			Error:     fmt.Errorf("speechmatics-tts: unexpected status code: %d", resp.StatusCode),
-			Type:      internal_type.TTSNetworkTimeout,
-		})
+	canceled := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() { _ = response.Body.Close(); close(canceled) })
+	defer func() {
+		if !stop() {
+			<-canceled
+			return
+		}
+		_ = response.Body.Close()
+	}()
+	if response.StatusCode != http.StatusOK {
+		synthesisError = fmt.Errorf("speechmatics-tts: unexpected status code: %d", response.StatusCode)
 		return
 	}
 
-	buf := make([]byte, 4096)
+	buffer := make([]byte, 4096)
 	firstChunk := true
 	for {
-		select {
-		case <-t.ctx.Done():
+		if ctx.Err() != nil || t.ctx.Err() != nil {
 			return
-		default:
 		}
-		n, err := resp.Body.Read(buf)
+		n, err := response.Body.Read(buffer)
+		if ctx.Err() != nil || t.ctx.Err() != nil {
+			return
+		}
 		if n > 0 {
-			audioChunk := make([]byte, n)
-			copy(audioChunk, buf[:n])
-
+			packets := []internal_type.Packet{}
 			if firstChunk {
 				firstChunk = false
-				var shouldEmitFirstAudioLatencyMetric bool
-				t.mu.Lock()
-				ttsStartedAt := t.ttsStartedAt
-				if !t.ttsMetricSent && !ttsStartedAt.IsZero() {
-					t.ttsMetricSent = true
-					shouldEmitFirstAudioLatencyMetric = true
-				}
-				t.mu.Unlock()
-				if shouldEmitFirstAudioLatencyMetric {
-					t.onPacket(internal_type.ObservabilityMetricRecordPacket{
-						ContextID: ctxId,
-						Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-						Record:    observability.NewMetricTTSLatencyMs(time.Since(ttsStartedAt), observability.Attributes{"provider": t.Name()}),
-					})
-				}
-			}
-
-			t.onPacket(internal_type.TextToSpeechAudioPacket{ContextID: ctxId, AudioChunk: audioChunk})
-		}
-		if err != nil {
-			if err != io.EOF {
-				t.logger.Errorf("speechmatics-tts: error reading response body: %v", err)
-				t.onPacket(internal_type.TextToSpeechErrorPacket{
-					ContextID: ctxId,
-					Error:     fmt.Errorf("speechmatics-tts: error reading response body: %w", err),
-					Type:      internal_type.TTSNetworkTimeout,
+				packets = append(packets, internal_type.ObservabilityMetricRecordPacket{
+					ContextID: contextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
+					Record: observability.NewMetricTTSLatencyMs(time.Since(startedAt), observability.Attributes{"provider": t.Name()}),
 				})
 			}
-			break
+			packets = append(packets, internal_type.TextToSpeechAudioPacket{ContextID: contextID, AudioChunk: bytes.Clone(buffer[:n])})
+			t.onPacket(packets...)
+		}
+		if err == io.EOF {
+			return
+		}
+		if err != nil {
+			synthesisError = fmt.Errorf("speechmatics-tts: read response: %w", err)
+			return
 		}
 	}
-
-	t.onPacket(
-		internal_type.TextToSpeechEndPacket{ContextID: ctxId},
-		internal_type.ObservabilityEventRecordPacket{
-			ContextID: ctxId,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.RecordEvent{
-				Component:  observability.ComponentTTS,
-				Event:      observability.TTSCompleted,
-				Attributes: observability.Attributes{"type": "completed"},
-				OccurredAt: time.Now(),
-			},
-		},
-	)
 }
 
 func (t *speechmaticsTTS) Transform(ctx context.Context, in internal_type.Packet) error {
-	t.mu.Lock()
-	currentCtx := t.contextId
-	if in.ContextId() != t.contextId {
-		t.contextId = in.ContextId()
-		t.ttsStartedAt = time.Time{}
-		t.ttsMetricSent = false
-		t.textBuffer.Reset()
+	if err := ctx.Err(); err != nil {
+		return err
 	}
-	t.mu.Unlock()
-
+	t.stateMu.Lock()
+	if err := t.ctx.Err(); err != nil {
+		t.stateMu.Unlock()
+		return err
+	}
 	switch input := in.(type) {
+	case internal_type.TurnChangePacket:
+		t.stateMu.Unlock()
+		return nil
 	case internal_type.TextToSpeechInterruptPacket:
-		if currentCtx != "" {
-			t.mu.Lock()
-			t.ttsStartedAt = time.Time{}
-			t.ttsMetricSent = false
-			t.textBuffer.Reset()
-			t.mu.Unlock()
-			t.onPacket(internal_type.ObservabilityEventRecordPacket{
-				ContextID: input.ContextID,
-				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.RecordEvent{
-					Component:  observability.ComponentTTS,
-					Event:      observability.TTSInterrupted,
-					Attributes: observability.Attributes{"type": "interrupted"},
-					OccurredAt: time.Now(),
-				},
-			})
+		if input.ContextID == "" || input.ContextID != t.contextId || (t.textClosed && t.synthesisCancel == nil) {
+			t.stateMu.Unlock()
+			return nil
 		}
+		if t.synthesisCancel != nil {
+			t.synthesisCancel()
+			t.synthesisCancel = nil
+		}
+		t.textClosed = true
+		t.textBuffer.Reset()
+		t.stateMu.Unlock()
+		t.onPacket(internal_type.ObservabilityEventRecordPacket{
+			ContextID: input.ContextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
+			Record: observability.RecordEvent{
+				Component: observability.ComponentTTS, Event: observability.TTSInterrupted,
+				Attributes: observability.Attributes{"type": "interrupted"}, OccurredAt: time.Now(),
+			},
+		})
 		return nil
 	case internal_type.TextToSpeechTextPacket:
-		t.mu.Lock()
-		if t.ttsStartedAt.IsZero() {
+		if input.ContextID == "" || input.Text == "" || (input.ContextID == t.contextId && t.textClosed) {
+			t.stateMu.Unlock()
+			return nil
+		}
+		if input.ContextID != t.contextId {
+			if t.synthesisCancel != nil {
+				t.synthesisCancel()
+				t.synthesisCancel = nil
+			}
+			t.contextId = input.ContextID
+			t.textClosed = false
+			t.textBuffer.Reset()
 			t.ttsStartedAt = time.Now()
 		}
 		t.textBuffer.WriteString(input.Text)
-		t.mu.Unlock()
+		t.stateMu.Unlock()
 		t.onPacket(internal_type.ObservabilityEventRecordPacket{
-			ContextID: input.ContextID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+			ContextID: input.ContextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
 			Record: observability.RecordEvent{
-				Component: observability.ComponentTTS,
-				Event:     observability.TTSSpeaking,
-				Attributes: observability.Attributes{
-					"type": "speaking",
-					"text": input.Text,
-				},
-				OccurredAt: time.Now(),
+				Component: observability.ComponentTTS, Event: observability.TTSSpeaking,
+				Attributes: observability.Attributes{"type": "speaking", "text": input.Text}, OccurredAt: time.Now(),
 			},
 		})
+		return nil
 	case internal_type.TextToSpeechDonePacket:
-		t.flush()
+		if input.ContextID != t.contextId || t.textClosed || t.textBuffer.Len() == 0 {
+			t.stateMu.Unlock()
+			return nil
+		}
+		requestCtx, cancel := context.WithCancel(ctx)
+		stopSession := context.AfterFunc(t.ctx, cancel)
+		t.synthesisCancel = cancel
+		t.textClosed = true
+		text := t.textBuffer.String()
+		t.textBuffer.Reset()
+		startedAt := t.ttsStartedAt
+		// Register the worker before Close can pass the state lock and wait for shutdown.
+		t.workers.Go(func() {
+			defer cancel()
+			defer stopSession()
+			t.streamHTTPTTS(requestCtx, text, input.ContextID, startedAt)
+		})
+		t.stateMu.Unlock()
 		return nil
 	default:
+		t.stateMu.Unlock()
 		return fmt.Errorf("speechmatics-tts: unsupported input type %T", in)
 	}
-	return nil
 }
 
 func (t *speechmaticsTTS) Close(ctx context.Context) error {
 	t.ctxCancel()
-	t.mu.Lock()
+	t.stateMu.Lock()
+	if t.synthesisCancel != nil {
+		t.synthesisCancel()
+		t.synthesisCancel = nil
+	}
+	t.textClosed = true
+	t.textBuffer.Reset()
 	connectedAt := t.ttsConnectedAt
 	t.ttsConnectedAt = time.Time{}
-	t.mu.Unlock()
+	t.stateMu.Unlock()
+	t.workers.Wait()
 
 	if !connectedAt.IsZero() {
 		duration := time.Since(connectedAt)
