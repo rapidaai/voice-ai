@@ -4,6 +4,10 @@ Run commands from the repository root. The default suite requires no provider
 credentials. Tests that contact a provider are gated by the `integration` build
 tag and an explicitly enabled configuration entry.
 
+The [behavioral testing and reporting contract](BDD_TESTING.md) defines the
+Ginkgo/Gomega pilot. It is additive: existing provider and integration tests
+remain in place until migration parity is established.
+
 ## Layout
 
 ```text
@@ -13,6 +17,8 @@ transformer/
     *_test.go                   Unit tests beside their implementation
   tests/
     README.md                   Test commands and configuration
+    BDD_TESTING.md               Behavioral testing and reporting contract
+    contracts/                  Offline Ginkgo/Gomega pilot and report checks
     run_transformer_integration_tests_test.go  Runner selection and exit behavior
     integration/
       tts_contract_test.go      Local HTTP, WebSocket, and synchronous fixtures
@@ -74,6 +80,61 @@ metrics, and synchronous audio callbacks. They use local fixtures, not real
 provider credentials. Provider-package tests cover additional protocol and error
 paths. Passing these tests is not evidence of live service compatibility or call
 playback behavior.
+
+## Behavioral Contracts and Reports
+
+The `contracts` package uses Ginkgo v2.33.0, Gomega v1.43.1, and the official
+Allure Go model/writer v1.3.1. These are pinned in the root Go module. No separate
+Ginkgo installation is needed. The suite covers factory selection, Cartesia and
+Deepgram TTS recovery, custom TTS response ownership, AWS/Groq/NVIDIA HTTP STT,
+and Deepgram/Speechmatics streaming STT. Tests use local endpoints or injected
+transports and synthetic credentials, not live provider accounts.
+
+Run the contracts plus their reporting regression tests:
+
+```sh
+go test -race -count=1 -timeout=120s ./api/assistant-api/internal/transformer/tests/contracts
+```
+
+Generate reports for the actual contract scenarios in a fresh directory:
+
+```sh
+report_dir="$(mktemp -d)"
+TRANSFORMER_REPORT_DIR="$report_dir" \
+  go test -race -count=1 -timeout=60s \
+  ./api/assistant-api/internal/transformer/tests/contracts \
+  -run '^TestTransformerContracts$' -args -ginkgo.label-filter='offline'
+npx --yes allure@3.18.0 generate "$report_dir/allure-results" --output "$report_dir/html"
+npx --yes allure@3.18.0 open "$report_dir/html"
+```
+
+Only HTML generation needs Node.js/npm. The Go tests and result files do not
+depend on the Allure CLI. The `open` command starts a local report viewer.
+Use `transformer-reports/<unique-run>/` for reports inside the repository; that
+directory is ignored. Pass its absolute path because `go test` runs inside the
+test package directory. Nonempty result directories are rejected to prevent stale
+results being mixed into a new run. Use `-count=1` with report output.
+
+- `ginkgo.json` is the authoritative per-scenario result for agents. Check both
+  `SuiteSucceeded` and spec outcomes; an absent report is not a successful run.
+- `junit.xml` provides CI-compatible results.
+- `allure-results/` contains Allure results, flat execution steps, environment
+  metadata, and sanitized packet attachments. No audio or transcript payloads
+  are attached.
+- Native and Allure reports preserve skipped specs, including filtered specs
+  and specs not attempted after an earlier failure. These are not provider passes.
+- Test failures remain failures even when reports are generated. Report-write
+  failures also return a failing test exit status. In CI, publish artifacts in an
+  always-run step without overriding that exit status.
+
+`TestContractReports` uses subprocess-only fixtures to verify passing, failing,
+timed-out, panicked, skipped, and empty runs; stable identities; attachments;
+cleanup failure attribution; selected-but-unattempted specs; and output errors.
+Intentional failures never run as part of the normal contract suite.
+Use labels such as `stt && http`, `tts && deepgram`, or `factory` for focused
+runs. History persistence, automatic CI publication, and migration of every
+existing provider test remain outside this rollout. See `BDD_TESTING.md` for
+remaining coverage gaps, including the unimplemented RevAI STT constructor.
 
 ## Live Integration
 

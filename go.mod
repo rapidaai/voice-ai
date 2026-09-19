@@ -13,6 +13,7 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/Microsoft/cognitive-services-speech-sdk-go v1.43.0
 	github.com/OpenRouterTeam/go-sdk v0.4.1
+	github.com/allure-framework/allure-go/commons v1.3.1
 	github.com/anthropics/anthropic-sdk-go v1.20.0
 	github.com/aws/aws-sdk-go v1.49.6
 	github.com/aws/aws-sdk-go-v2/config v1.32.0
@@ -36,6 +37,8 @@ require (
 	github.com/improbable-eng/grpc-web v0.15.0
 	github.com/mark3labs/mcp-go v0.43.2
 	github.com/mitchellh/mapstructure v1.5.0
+	github.com/onsi/ginkgo/v2 v2.33.0
+	github.com/onsi/gomega v1.43.1
 	github.com/openai/openai-go v1.12.0
 	github.com/openai/openai-go/v3 v3.34.0
 	github.com/opensearch-project/opensearch-go/v2 v2.3.0
@@ -75,6 +78,15 @@ require (
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.30.0
 	moul.io/number-to-words v0.7.0
+)
+
+require (
+	github.com/Masterminds/semver/v3 v3.4.0 // indirect
+	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
+	github.com/google/pprof v0.0.0-20260402051712-545e8a4df936 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	golang.org/x/mod v0.38.0 // indirect
+	golang.org/x/tools v0.48.0 // indirect
 )
 
 require (
