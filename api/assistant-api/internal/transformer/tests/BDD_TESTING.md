@@ -4,8 +4,8 @@
 
 This is a test-only rollout, not a production lifecycle change or a full test
 migration. The `contracts/` suite covers provider selection, Cartesia and
-Deepgram TTS recovery, custom TTS response ownership, HTTP STT providers, and
-Deepgram and Speechmatics streaming STT.
+Deepgram TTS recovery, custom TTS response ownership, HTTP STT providers,
+streaming STT transports, and selected SDK configuration and lifecycle paths.
 Retain the existing provider, shared-contract, and live-integration tests while
 evaluating the new structure. No provider credentials or external calls are used.
 
@@ -75,6 +75,29 @@ Do not add a generic reporting framework or change the production packet model.
 9. Deepgram TTS covers missing clear acknowledgements and cancellation; custom
    TTS covers configured response IDs and missing-ID fallback.
 
+### Remaining STT Rollout
+
+This test-only phase is limited to `tests/contracts/*_stt_test.go`,
+`tests/contracts/factory_test.go`, and this directory's documentation. Keep
+production providers, dependencies, live configuration, and reporting logic
+unchanged. Retain existing tests until migration parity is established.
+
+Validation also repairs an existing assertion in
+`tests/integration/tts_contract_test.go`: Cartesia interruption can either send
+cancel on an idle socket or close and reconnect when a write is in flight.
+Accept only those paired connection/cancel counts; retain message-output checks.
+
+- Add local transport contracts for Sarvam, Smallest, Cartesia, and custom STT.
+- Check interim and final transcripts, PCM framing, turn ownership, provider
+  failures, and shutdown using the existing public provider APIs.
+- Exercise Azure and Google SDK lifecycle paths only where existing endpoints
+  or client configuration permit offline execution. Record unsupported paths.
+- Verify missing-credential rejection and pre-initialization cleanup without
+  network access. Do not call AssemblyAI `Initialize`: it uses a private dialer
+  with a hard-coded external endpoint and has no public transport injection.
+- Run STT-focused race tests, randomized full contracts, full transformer tests,
+  reporting regression tests, and `just agent-finalize` before completion.
+
 ## Remaining Gaps
 
 RevAI STT is registered but its constructor currently returns `(nil, nil)`.
@@ -87,9 +110,30 @@ one latency metric. The native report records the observed metric contexts as
 `overlapping-request-latency`; the test does not declare missing metrics valid.
 Per-request latency ownership remains a production follow-up.
 
+Sarvam and Smallest STT can initialize a connection after their session context
+has been canceled. Local-server diagnostics reproduced successful WebSocket
+upgrades and a nil initialization error after cancellation. The streaming
+contracts cover explicit shutdown, not rejection of canceled initialization;
+adding that expectation requires a production cancellation fix.
+
+Azure STT ignores the result channels returned by native asynchronous start and
+stop calls. The local handshake-rejection scenario observed one startup and one
+shutdown goroutine blocked on result delivery after Close. A bounded subprocess
+contains those SDK resources; waiter counts are diagnostic, not accepted leak
+behavior. Consuming the SDK results remains a production follow-up. Subprocess
+execution is not merged into the parent Go coverage profile.
+
 These scenarios do not replace live protocol validation or cover every STT SDK
-shutdown and reconnection branch. AssemblyAI, Azure, Google, Sarvam, and Smallest
-still rely on their existing tests rather than a complete new contract suite.
+shutdown and reconnection branch. In particular:
+
+| Provider | New Offline Boundary | Not Established |
+| --- | --- | --- |
+| AssemblyAI | Credentials and pre-initialization cleanup | Streaming, parsing, provider errors; endpoint and dialer are not injectable |
+| Google | Recognition configuration and credential validation | Real streaming lifecycle; public constructor cannot accept a local client |
+| Azure | Native configuration, pre-initialization cleanup, local handshake rejection | Successful recognition and complete native resource cleanup |
+
+Existing Google stream-recreation tests remain in the provider package. They are
+not replaced by configuration assertions in the new suite.
 
 Primary test risks are leaked fake-server connections, process-global transport
 overrides, and assertions that finish before provider callbacks. Transport specs

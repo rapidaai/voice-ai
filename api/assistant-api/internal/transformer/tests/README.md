@@ -5,7 +5,7 @@ credentials. Tests that contact a provider are gated by the `integration` build
 tag and an explicitly enabled configuration entry.
 
 The [behavioral testing and reporting contract](BDD_TESTING.md) defines the
-Ginkgo/Gomega pilot. It is additive: existing provider and integration tests
+Ginkgo/Gomega suite. It is additive: existing provider and integration tests
 remain in place until migration parity is established.
 
 ## Layout
@@ -18,7 +18,7 @@ transformer/
   tests/
     README.md                   Test commands and configuration
     BDD_TESTING.md               Behavioral testing and reporting contract
-    contracts/                  Offline Ginkgo/Gomega pilot and report checks
+    contracts/                  Offline Ginkgo/Gomega contracts and report checks
     run_transformer_integration_tests_test.go  Runner selection and exit behavior
     integration/
       tts_contract_test.go      Local HTTP, WebSocket, and synchronous fixtures
@@ -86,15 +86,33 @@ playback behavior.
 The `contracts` package uses Ginkgo v2.33.0, Gomega v1.43.1, and the official
 Allure Go model/writer v1.3.1. These are pinned in the root Go module. No separate
 Ginkgo installation is needed. The suite covers factory selection, Cartesia and
-Deepgram TTS recovery, custom TTS response ownership, AWS/Groq/NVIDIA HTTP STT,
-and Deepgram/Speechmatics streaming STT. Tests use local endpoints or injected
-transports and synthetic credentials, not live provider accounts.
+Deepgram TTS recovery, and custom TTS response ownership. STT transport tests
+cover AWS, Groq, NVIDIA, Deepgram, Speechmatics, Sarvam, Smallest, Cartesia, and
+custom HTTP and WebSocket integrations. Google, Azure, and AssemblyAI have
+narrower configuration and lifecycle checks described below. Tests use local
+endpoints or injected transports and synthetic credentials, not live accounts.
 
 Run the contracts plus their reporting regression tests:
 
 ```sh
 go test -race -count=1 -timeout=120s ./api/assistant-api/internal/transformer/tests/contracts
 ```
+
+Run only the STT contract scenarios, or select a provider using its label:
+
+```sh
+go test -race -count=1 -timeout=120s \
+  ./api/assistant-api/internal/transformer/tests/contracts \
+  -run '^TestTransformerContracts$' -args -ginkgo.label-filter='offline && stt'
+go test -race -count=1 -timeout=60s \
+  ./api/assistant-api/internal/transformer/tests/contracts \
+  -run '^TestTransformerContracts$' -args -ginkgo.label-filter='stt && sarvamai'
+```
+
+Provider construction and cleanup checks do not establish streaming coverage.
+AssemblyAI uses a private dialer and a fixed external endpoint; its contract
+checks intentionally do not call `Initialize`. See `BDD_TESTING.md` for SDK
+transport limitations and remaining production findings.
 
 Generate reports for the actual contract scenarios in a fresh directory:
 

@@ -116,4 +116,22 @@ var _ = ginkgo.Describe("Transformer factory contract", ginkgo.Label("offline", 
 		gomega.Expect(err).To(gomega.MatchError("revai-tts: text-to-speech is not supported"))
 		gomega.Expect(tts).To(gomega.BeNil())
 	})
+
+	for _, provider := range []string{
+		"deepgram", "azure-speech-service", "cartesia", "sarvamai", "assemblyai",
+		"groq", "nvidia", "aws", "smallest", "speechmatics", "custom-stt",
+	} {
+		ginkgo.It("rejects missing credentials for "+provider+" STT", ginkgo.Label("stt", provider), func(ctx ginkgo.SpecContext) {
+			ginkgo.By("rejecting incomplete configuration before provider initialization")
+			collector := testutil.NewPacketCollector()
+			stt, err := transformer.NewSpeechToText(
+				transformer.WithContext(ctx), transformer.WithLogger(testutil.NewTestLogger()),
+				transformer.WithProvider(provider), transformer.WithCredential(testutil.BuildCredential(nil)),
+				transformer.WithOnPacket(collector.OnPacket))
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(stt).To(gomega.BeNil())
+			gomega.Expect(collector.TranscriptPackets()).To(gomega.BeEmpty())
+			gomega.Expect(collector.InterruptionDetectedPackets()).To(gomega.BeEmpty())
+		})
+	}
 })
