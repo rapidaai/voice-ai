@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -22,392 +21,332 @@ import (
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
+	"golang.org/x/sync/semaphore"
 )
 
-// googleTextToSpeech is the main struct handling Google Text-to-Speech functionality.
 type googleTextToSpeech struct {
 	*googleOption
-	mu sync.Mutex // Ensures thread-safe operations.
-
+	stateMu   sync.Mutex
+	writeLock *semaphore.Weighted
+	workers   sync.WaitGroup
 	ctx       context.Context
 	ctxCancel context.CancelFunc
 
-	contextId      string // Tracks context ID for audio synthesis.
+	synthesis      *googleSynthesis
 	ttsConnectedAt time.Time
-	logger         commons.Logger                                        // Logger for debugging and error reporting.
-	client         *texttospeech.Client                                  // Google TTS client.
-	streamClient   texttospeechpb.TextToSpeech_StreamingSynthesizeClient // Streaming client for real-time TTS.
-	onPacket       func(pkt ...internal_type.Packet) error               // Callback for handling audio packets.
-	normalizer     internal_type.TextNormalizer                          // Text normalizer for preprocessing.
-
-	// TTS latency tracking
-	ttsStartedAt  time.Time
-	ttsMetricSent bool
+	logger         commons.Logger
+	client         *texttospeech.Client
+	onPacket       func(pkt ...internal_type.Packet) error
+	normalizer     internal_type.TextNormalizer
 }
 
-// Name returns the name of this transformer implementation.
-func (*googleTextToSpeech) Name() string {
-	return "google-tts"
+// A retired synthesis retains its ID to reject late input; cancel is nil after retirement.
+type googleSynthesis struct {
+	contextID  string
+	stream     texttospeechpb.TextToSpeech_StreamingSynthesizeClient
+	cancel     context.CancelFunc
+	startedAt  time.Time
+	textClosed bool
 }
 
-// NewGoogleTextToSpeech creates a new instance of googleTextToSpeech.
+func (*googleTextToSpeech) Name() string { return "google-tts" }
+
 func NewGoogleTextToSpeech(ctx context.Context, logger commons.Logger, credential *protos.VaultCredential,
-	onPacket func(pkt ...internal_type.Packet) error,
-	opts utils.Option) (internal_type.TextToSpeechTransformer, error) {
-	// Initialize Google TTS options.
+	onPacket func(pkt ...internal_type.Packet) error, opts utils.Option,
+) (internal_type.TextToSpeechTransformer, error) {
 	googleOption, err := NewGoogleOption(logger, credential, opts)
 	if err != nil {
-		// Log and return error if initialization fails.
-		logger.Errorf("intializing google failed %+v", err)
 		return nil, err
 	}
-
-	// Create Google TTS client with options.
 	client, err := texttospeech.NewClient(ctx, googleOption.GetClientOptions()...)
 	if err != nil {
-		// Log and return error if client creation fails.
-		logger.Errorf("error while creating client for google tts %+v", err)
-		return nil, err
+		return nil, fmt.Errorf("google-tts: create client: %w", err)
 	}
-
-	xctx, contextCancel := context.WithCancel(ctx)
-	// Return configured TTS instance.
+	sessionCtx, cancel := context.WithCancel(ctx)
 	return &googleTextToSpeech{
-		ctx:       xctx,
-		ctxCancel: contextCancel,
-
-		logger:       logger,
-		onPacket:     onPacket,
-		client:       client,
-		googleOption: googleOption,
-		normalizer:   google_internal.NewGoogleNormalizer(logger, opts),
+		ctx: sessionCtx, ctxCancel: cancel, writeLock: semaphore.NewWeighted(1),
+		logger: logger, onPacket: onPacket, client: client, googleOption: googleOption,
+		normalizer: google_internal.NewGoogleNormalizer(logger, opts),
 	}, nil
 }
 
-// Initialize sets up the streaming synthesis functionality.
-func (google *googleTextToSpeech) Initialize() error {
-	start := time.Now()
-	// Start a streaming synthesis session.
-	stream, err := google.client.StreamingSynthesize(google.ctx)
-	if err != nil {
-		google.onPacket(internal_type.ObservabilityLogRecordPacket{
-			Scope: internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.RecordLog{
-				Level:   observability.LevelError,
-				Message: "google-tts: error while performing connect",
-				Attributes: observability.Attributes{
-					"component": observability.ComponentTTS.String(),
-					"provider":  google.Name(),
-					"options":   observability.AttributeValue(google.TextToSpeechOptions()),
-				},
-				OccurredAt: time.Now(),
-			},
-		})
-		return fmt.Errorf("failed to create bidirectional stream: %w", err)
+// Initialize starts session accounting. Synthesis RPCs open only when text arrives.
+func (g *googleTextToSpeech) Initialize() error {
+	g.stateMu.Lock()
+	defer g.stateMu.Unlock()
+	if err := g.ctx.Err(); err != nil {
+		return err
 	}
-
-	req := texttospeechpb.StreamingSynthesizeRequest{
-		StreamingRequest: &texttospeechpb.
-			StreamingSynthesizeRequest_StreamingConfig{
-			StreamingConfig: google.TextToSpeechOptions(),
-		},
+	if g.ttsConnectedAt.IsZero() {
+		g.ttsConnectedAt = time.Now()
 	}
-
-	google.mu.Lock()
-	if google.streamClient != nil {
-		_ = google.streamClient.CloseSend()
-	}
-	google.streamClient = stream
-	currentContextId := google.contextId
-	google.mu.Unlock()
-
-	// Send the initial configuration request.
-	if err = stream.Send(&req); err != nil {
-		google.mu.Lock()
-		if google.streamClient == stream {
-			google.streamClient = nil
-		}
-		google.mu.Unlock()
-		google.onPacket(internal_type.ObservabilityLogRecordPacket{
-			Scope: internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.RecordLog{
-				Level:   observability.LevelError,
-				Message: fmt.Sprintf("google-tts: error while initialization %s", err.Error()),
-				Attributes: observability.Attributes{
-					"component": observability.ComponentTTS.String(),
-					"provider":  google.Name(),
-					"options":   observability.AttributeValue(google.TextToSpeechOptions()),
-				},
-				OccurredAt: time.Now(),
-			},
-		})
-		return fmt.Errorf("failed to send config request: %w", err)
-	}
-
-	google.mu.Lock()
-	if google.ttsConnectedAt.IsZero() {
-		google.ttsConnectedAt = time.Now()
-	}
-	google.mu.Unlock()
-
-	go google.recvLoop(stream, currentContextId)
-	google.onPacket(
-		internal_type.ObservabilityMetricRecordPacket{
-			Scope: internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.RecordMetric{
-				Metrics: []*protos.Metric{{
-					Name:        observability.MetricTTSInitLatencyMs,
-					Value:       strconv.FormatInt(time.Since(start).Milliseconds(), 10),
-					Description: "TTS initialization latency in milliseconds",
-				}},
-				Attributes: observability.Attributes{"provider": google.Name()},
-			},
-		},
-		internal_type.ObservabilityLogRecordPacket{
-			Scope: internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.RecordLog{
-				Level:   observability.LevelInfo,
-				Message: "google-tts: initialization completed",
-				Attributes: observability.Attributes{
-					"component": observability.ComponentTTS.String(),
-					"provider":  google.Name(),
-					"options":   observability.AttributeValue(google.TextToSpeechOptions()),
-				},
-				OccurredAt: time.Now(),
-			},
-		})
 	return nil
 }
 
-// Transform handles streaming synthesis requests for input text.
-func (google *googleTextToSpeech) Transform(ctx context.Context, in internal_type.Packet) error {
-	google.mu.Lock()
-	currentCtx := google.contextId
-	if in.ContextId() != google.contextId {
-		google.contextId = in.ContextId()
-		google.ttsStartedAt = time.Time{}
-		google.ttsMetricSent = false
+func (g *googleTextToSpeech) Transform(ctx context.Context, in internal_type.Packet) error {
+	if err := ctx.Err(); err != nil {
+		return err
 	}
-	sCli := google.streamClient
-	google.mu.Unlock()
-	if sCli == nil {
-		google.onPacket(internal_type.TextToSpeechErrorPacket{
-			ContextID: in.ContextId(),
-			Error:     fmt.Errorf("google-tts: calling transform without initialize"),
-			Type:      internal_type.TTSNetworkTimeout,
+	if err := g.ctx.Err(); err != nil {
+		return err
+	}
+	switch input := in.(type) {
+	case internal_type.TurnChangePacket:
+		return nil
+	case internal_type.TextToSpeechInterruptPacket:
+		g.stateMu.Lock()
+		if g.synthesis == nil || g.synthesis.contextID != input.ContextID || g.synthesis.cancel == nil {
+			g.stateMu.Unlock()
+			return nil
+		}
+		cancel := g.synthesis.cancel
+		g.synthesis.cancel = nil
+		g.stateMu.Unlock()
+		cancel()
+		g.onPacket(internal_type.ObservabilityEventRecordPacket{
+			ContextID: input.ContextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
+			Record: observability.RecordEvent{
+				Component: observability.ComponentTTS, Event: observability.TTSInterrupted,
+				Attributes: observability.Attributes{"type": "interrupted"}, OccurredAt: time.Now(),
+			},
 		})
 		return nil
 	}
 
+	writeCtx, cancelWrite := context.WithCancel(ctx)
+	defer cancelWrite()
+	stopSession := context.AfterFunc(g.ctx, cancelWrite)
+	defer stopSession()
+	if err := g.writeLock.Acquire(writeCtx, 1); err != nil {
+		return err
+	}
+	var packets []internal_type.Packet
+	defer func() {
+		g.writeLock.Release(1)
+		if len(packets) > 0 {
+			g.onPacket(packets...)
+		}
+	}()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := g.ctx.Err(); err != nil {
+		return err
+	}
+
+	g.stateMu.Lock()
+	var streamCtx context.Context
+	var previousCancel context.CancelFunc
+	var request *texttospeechpb.StreamingSynthesizeRequest
 	switch input := in.(type) {
-	case internal_type.TextToSpeechInterruptPacket:
-		if currentCtx != "" {
-			google.mu.Lock()
-			google.ttsStartedAt = time.Time{}
-			google.ttsMetricSent = false
-			google.mu.Unlock()
-			google.onPacket(internal_type.ObservabilityEventRecordPacket{
-				ContextID: input.ContextID,
-				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.RecordEvent{
-					Component:  observability.ComponentTTS,
-					Event:      observability.TTSInterrupted,
-					Attributes: observability.Attributes{"type": "interrupted"},
-					OccurredAt: time.Now(),
-				},
-			})
-			if err := google.Initialize(); err != nil {
-				google.onPacket(internal_type.TextToSpeechErrorPacket{
-					ContextID: input.ContextID,
-					Error:     fmt.Errorf("google-tts: failed to reinitialize stream on context change: %w", err),
-					Type:      internal_type.TTSNetworkTimeout,
-				})
-				return nil
-			}
-			google.mu.Lock()
-			sCli = google.streamClient
-			google.mu.Unlock()
-		}
-		return nil
 	case internal_type.TextToSpeechTextPacket:
-		google.mu.Lock()
-		if google.ttsStartedAt.IsZero() {
-			google.ttsStartedAt = time.Now()
+		if input.ContextID == "" || input.Text == "" {
+			g.stateMu.Unlock()
+			return nil
 		}
-		google.mu.Unlock()
-		normalized := google.normalizer.Normalize(input.Text)
-		if err := sCli.Send(&texttospeechpb.StreamingSynthesizeRequest{
+		if g.synthesis == nil || g.synthesis.contextID != input.ContextID {
+			if g.synthesis != nil {
+				previousCancel = g.synthesis.cancel
+				g.synthesis.cancel = nil
+			}
+			var cancel context.CancelFunc
+			streamCtx, cancel = context.WithCancel(g.ctx)
+			g.synthesis = &googleSynthesis{contextID: input.ContextID, cancel: cancel, startedAt: time.Now()}
+		} else if g.synthesis.cancel == nil || g.synthesis.textClosed {
+			g.stateMu.Unlock()
+			return nil
+		}
+		request = &texttospeechpb.StreamingSynthesizeRequest{
 			StreamingRequest: &texttospeechpb.StreamingSynthesizeRequest_Input{
 				Input: &texttospeechpb.StreamingSynthesisInput{
-					InputSource: &texttospeechpb.StreamingSynthesisInput_Text{Text: normalized},
+					InputSource: &texttospeechpb.StreamingSynthesisInput_Text{Text: g.normalizer.Normalize(input.Text)},
 				},
 			},
-		}); err != nil {
-			google.logger.Errorf("google-tts: failed to synthesize text: %v", err)
-			google.onPacket(internal_type.TextToSpeechErrorPacket{
-				ContextID: input.ContextID,
-				Error:     fmt.Errorf("google-tts: failed to synthesize text: %w", err),
-				Type:      internal_type.TTSNetworkTimeout,
-			})
+		}
+	case internal_type.TextToSpeechDonePacket:
+		if g.synthesis == nil || g.synthesis.contextID != input.ContextID || g.synthesis.cancel == nil || g.synthesis.textClosed {
+			g.stateMu.Unlock()
 			return nil
 		}
-		google.onPacket(internal_type.ObservabilityEventRecordPacket{
-			ContextID: input.ContextID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.RecordEvent{
-				Component: observability.ComponentTTS,
-				Event:     observability.TTSSpeaking,
-				Attributes: observability.Attributes{
-					"type": "speaking",
-					"text": input.Text,
+		g.synthesis.textClosed = true
+	default:
+		g.stateMu.Unlock()
+		return fmt.Errorf("google-tts: unsupported packet type %T", in)
+	}
+	synthesis := g.synthesis
+	cancel := synthesis.cancel
+	g.stateMu.Unlock()
+	if previousCancel != nil {
+		previousCancel()
+	}
+
+	writeCanceled := make(chan struct{})
+	stopWrite := context.AfterFunc(ctx, func() {
+		g.stateMu.Lock()
+		synthesis.cancel = nil
+		g.stateMu.Unlock()
+		cancel()
+		close(writeCanceled)
+	})
+	defer func() {
+		if !stopWrite() {
+			<-writeCanceled
+		}
+	}()
+
+	var err error
+	if streamCtx != nil {
+		start := time.Now()
+		synthesis.stream, err = g.client.StreamingSynthesize(streamCtx)
+		if err == nil {
+			err = synthesis.stream.Send(&texttospeechpb.StreamingSynthesizeRequest{
+				StreamingRequest: &texttospeechpb.StreamingSynthesizeRequest_StreamingConfig{
+					StreamingConfig: g.TextToSpeechOptions(),
 				},
-				OccurredAt: time.Now(),
+			})
+		}
+		if err == nil {
+			g.workers.Go(func() { g.recvLoop(synthesis) })
+			packets = append(packets, internal_type.ObservabilityMetricRecordPacket{
+				Scope: internal_type.ObservabilityRecordScopeConversation,
+				Record: observability.RecordMetric{
+					Metrics: []*protos.Metric{{
+						Name: observability.MetricTTSInitLatencyMs, Value: strconv.FormatInt(time.Since(start).Milliseconds(), 10),
+						Description: "TTS initialization latency in milliseconds",
+					}},
+					Attributes: observability.Attributes{"provider": g.Name()},
+				},
+			})
+		}
+	}
+	if err == nil {
+		if request != nil {
+			err = synthesis.stream.Send(request)
+		} else {
+			err = synthesis.stream.CloseSend()
+		}
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if g.ctx.Err() != nil {
+		return g.ctx.Err()
+	}
+	if err != nil {
+		g.stateMu.Lock()
+		emitError := synthesis.cancel != nil
+		synthesis.cancel = nil
+		g.stateMu.Unlock()
+		cancel()
+		if emitError {
+			packets = append(packets, internal_type.TextToSpeechErrorPacket{
+				ContextID: synthesis.contextID, Error: fmt.Errorf("google-tts: send: %w", err), Type: internal_type.TTSNetworkTimeout,
+			})
+		}
+		return nil
+	}
+	if input, ok := in.(internal_type.TextToSpeechTextPacket); ok {
+		packets = append(packets, internal_type.ObservabilityEventRecordPacket{
+			ContextID: input.ContextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
+			Record: observability.RecordEvent{
+				Component: observability.ComponentTTS, Event: observability.TTSSpeaking,
+				Attributes: observability.Attributes{"type": "speaking", "text": input.Text}, OccurredAt: time.Now(),
 			},
 		})
-		return nil
-	case internal_type.TextToSpeechDonePacket:
-		// Signal to the server that no more input will be sent.
-		// This triggers server-side EOF → recvLoop emits TextToSpeechEndPacket.
-		if err := sCli.CloseSend(); err != nil {
-			google.logger.Errorf("google-tts: failed to close send: %v", err)
-			google.onPacket(internal_type.TextToSpeechErrorPacket{
-				ContextID: input.ContextID,
-				Error:     fmt.Errorf("google-tts: failed to close send: %w", err),
-				Type:      internal_type.TTSNetworkTimeout,
-			})
-			return nil
-		}
-		return nil
-	default:
-		return fmt.Errorf("google-tts: unsupported input type %T", in)
 	}
+	return nil
 }
 
-// recvLoop reads audio from the gRPC stream for the lifetime of the synthesis session.
-// It exits when the stream ends (EOF, cancellation, or error).
-func (g *googleTextToSpeech) recvLoop(streamClient texttospeechpb.TextToSpeech_StreamingSynthesizeClient, initialContextId string) {
+func (g *googleTextToSpeech) recvLoop(synthesis *googleSynthesis) {
 	for {
-		select {
-		case <-g.ctx.Done():
-			return
-		default:
+		response, err := synthesis.stream.Recv()
+		waitForClose := false
+		if err == io.EOF {
+			g.stateMu.Lock()
+			waitForClose = g.synthesis == synthesis && synthesis.cancel != nil && synthesis.textClosed
+			g.stateMu.Unlock()
 		}
-
-		resp, err := streamClient.Recv()
+		if waitForClose {
+			// CloseSend and Send share one writer. Observe their outcome before accepting EOF.
+			if err := g.writeLock.Acquire(g.ctx, 1); err != nil {
+				return
+			}
+		}
+		g.stateMu.Lock()
+		if g.synthesis != synthesis || synthesis.cancel == nil {
+			g.stateMu.Unlock()
+			if waitForClose {
+				g.writeLock.Release(1)
+			}
+			return
+		}
 		if err != nil {
-			if err == io.EOF {
-				g.mu.Lock()
-				effectiveCtx := g.contextId
-				if effectiveCtx == "" {
-					effectiveCtx = initialContextId
-				}
-				g.mu.Unlock()
+			completed := err == io.EOF && waitForClose
+			cancel := synthesis.cancel
+			synthesis.cancel = nil
+			emitTerminal := g.ctx.Err() == nil
+			g.stateMu.Unlock()
+			if waitForClose {
+				g.writeLock.Release(1)
+			}
+			cancel()
+			if !emitTerminal {
+				return
+			}
+			if completed {
 				g.onPacket(
-					internal_type.TextToSpeechEndPacket{ContextID: effectiveCtx},
+					internal_type.TextToSpeechEndPacket{ContextID: synthesis.contextID},
 					internal_type.ObservabilityEventRecordPacket{
-						ContextID: effectiveCtx,
-						Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+						ContextID: synthesis.contextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
 						Record: observability.RecordEvent{
-							Component:  observability.ComponentTTS,
-							Event:      observability.TTSCompleted,
-							Attributes: observability.Attributes{"type": "completed"},
-							OccurredAt: time.Now(),
+							Component: observability.ComponentTTS, Event: observability.TTSCompleted,
+							Attributes: observability.Attributes{"type": "completed"}, OccurredAt: time.Now(),
 						},
 					},
 				)
-				return
+			} else {
+				g.onPacket(internal_type.TextToSpeechErrorPacket{
+					ContextID: synthesis.contextID, Error: fmt.Errorf("google-tts: receive: %w", err), Type: internal_type.TTSNetworkTimeout,
+				})
 			}
-			if strings.Contains(err.Error(), "Stream aborted due to long duration elapsed without input sent") {
-				g.logger.Debugf("google-tts: stream aborted due to timeout, reinitializing")
-				g.mu.Lock()
-				effectiveCtx := g.contextId
-				if effectiveCtx == "" {
-					effectiveCtx = initialContextId
-				}
-				g.mu.Unlock()
-				g.onPacket(internal_type.TextToSpeechEndPacket{ContextID: effectiveCtx})
-				go g.Initialize()
-				return
-			}
-			g.mu.Lock()
-			effectiveCtx := g.contextId
-			if effectiveCtx == "" {
-				effectiveCtx = initialContextId
-			}
-			g.mu.Unlock()
-			g.onPacket(internal_type.TextToSpeechEndPacket{ContextID: effectiveCtx})
-			g.logger.Errorf("google-tts: error receiving from stream: %v", err)
 			return
 		}
-
-		if resp == nil {
+		if g.ctx.Err() != nil || len(response.GetAudioContent()) == 0 {
+			g.stateMu.Unlock()
 			continue
 		}
-
-		g.mu.Lock()
-		currentContextId := g.contextId
-		currentStreamClient := g.streamClient
-		g.mu.Unlock()
-
-		if currentStreamClient != streamClient {
-			g.logger.Debugf("google-tts: interrupted, stream replaced - stopping old callback")
-			return
-		}
-
-		effectiveContextId := currentContextId
-		if effectiveContextId == "" {
-			effectiveContextId = initialContextId
-		}
-
-		audioContent := resp.GetAudioContent()
-		var shouldEmitFirstAudioLatencyMetric bool
-		g.mu.Lock()
-		ttsStartedAt := g.ttsStartedAt
-		if !g.ttsMetricSent && !ttsStartedAt.IsZero() {
-			g.ttsMetricSent = true
-			shouldEmitFirstAudioLatencyMetric = true
-		}
-		g.mu.Unlock()
-		if shouldEmitFirstAudioLatencyMetric {
-			g.onPacket(internal_type.ObservabilityMetricRecordPacket{
-				ContextID: effectiveContextId,
-				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record:    observability.NewMetricTTSLatencyMs(time.Since(ttsStartedAt), observability.Attributes{"provider": g.Name()}),
+		packets := []internal_type.Packet{}
+		if !synthesis.startedAt.IsZero() {
+			packets = append(packets, internal_type.ObservabilityMetricRecordPacket{
+				ContextID: synthesis.contextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
+				Record: observability.NewMetricTTSLatencyMs(time.Since(synthesis.startedAt), observability.Attributes{"provider": g.Name()}),
 			})
+			synthesis.startedAt = time.Time{}
 		}
-		if err := g.onPacket(internal_type.TextToSpeechAudioPacket{ContextID: effectiveContextId, AudioChunk: audioContent}); err != nil {
-			g.logger.Errorf("google-tts: failed to send packet: %v", err)
-		}
+		packets = append(packets, internal_type.TextToSpeechAudioPacket{ContextID: synthesis.contextID, AudioChunk: response.GetAudioContent()})
+		g.stateMu.Unlock()
+		g.onPacket(packets...)
 	}
 }
 
-// Close safely shuts down the TTS client and streaming client.
 func (g *googleTextToSpeech) Close(ctx context.Context) error {
 	g.ctxCancel()
-
-	g.mu.Lock()
+	_ = g.writeLock.Acquire(context.WithoutCancel(ctx), 1)
+	g.stateMu.Lock()
 	connectedAt := g.ttsConnectedAt
 	g.ttsConnectedAt = time.Time{}
-	var combinedErr error
-	if g.streamClient != nil {
-		// Attempt to close the streaming client.
-		if err := g.streamClient.CloseSend(); err != nil {
-			// Log the error if closure fails.
-			combinedErr = fmt.Errorf("error closing StreamClient: %v", err)
-			g.logger.Errorf(combinedErr.Error())
-		}
+	if g.synthesis != nil && g.synthesis.cancel != nil {
+		g.synthesis.cancel()
+		g.synthesis.cancel = nil
 	}
-
+	g.stateMu.Unlock()
+	var err error
 	if g.client != nil {
-		// Attempt to close the client.
-		if err := g.client.Close(); err != nil {
-			// Log the error if closure fails.
-			combinedErr = fmt.Errorf("error closing Client: %v", err)
-			g.logger.Errorf(combinedErr.Error())
-		}
+		err = g.client.Close()
+		g.client = nil
 	}
-	g.mu.Unlock()
-
+	g.writeLock.Release(1)
+	g.workers.Wait()
 	if !connectedAt.IsZero() {
 		duration := time.Since(connectedAt)
 		g.onPacket(
@@ -421,18 +360,15 @@ func (g *googleTextToSpeech) Close(ctx context.Context) error {
 			},
 		)
 	}
-	g.onPacket(
-		internal_type.ObservabilityEventRecordPacket{
-			Scope: internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.RecordEvent{
-				Component: observability.ComponentTTS,
-				Event:     observability.TTSClosed,
-				Attributes: observability.Attributes{
-					"type":     "closed",
-					"provider": g.Name(),
-				},
-				OccurredAt: time.Now(),
-			},
-		})
-	return combinedErr
+	g.onPacket(internal_type.ObservabilityEventRecordPacket{
+		Scope: internal_type.ObservabilityRecordScopeConversation,
+		Record: observability.RecordEvent{
+			Component: observability.ComponentTTS, Event: observability.TTSClosed,
+			Attributes: observability.Attributes{"type": "closed", "provider": g.Name()}, OccurredAt: time.Now(),
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("google-tts: close client: %w", err)
+	}
+	return nil
 }

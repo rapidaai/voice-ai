@@ -88,6 +88,10 @@ func NewSpeechToText(
 		}
 		return nil, err
 	}
+	sampleRate, err := utils.IntToUint32(config.SampleRate)
+	if err != nil {
+		return nil, fmt.Errorf("custom-stt websocket_v1: invalid sample rate: %w", err)
+	}
 	transformerContext, cancel := context.WithCancel(ctx)
 	audioResampler := resampler_soxr.New(
 		resampler_soxr.WithLogger(logger),
@@ -103,7 +107,7 @@ func NewSpeechToText(
 		resampler:         audioResampler,
 		sourceAudioConfig: internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG,
 		targetAudioConfig: &protos.AudioConfig{
-			SampleRate:  uint32(config.SampleRate),
+			SampleRate:  sampleRate,
 			AudioFormat: parseAudioEncoding(config.Encoding),
 			Channels:    1,
 		},
@@ -604,7 +608,10 @@ func (transformer *speechToText) handlePacketRequests(packet string, contextID s
 		}
 	}
 
-	scope := transformer.config.newRequestScope(packet, contextID, audio)
+	scope, err := transformer.config.newRequestScope(packet, contextID, audio)
+	if err != nil {
+		return err
+	}
 	requests, err := transformer.engine.EvaluateRequestRules(packet, scope)
 	if err != nil {
 		return fmt.Errorf("custom-stt websocket_v1: failed to evaluate %s request rules: %w", packet, err)

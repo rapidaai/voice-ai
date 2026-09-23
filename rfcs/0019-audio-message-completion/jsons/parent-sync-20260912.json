@@ -1,0 +1,68 @@
+{
+  "date": "2026-09-12",
+  "tier": "Standard",
+  "status": "verified_and_reviewed",
+  "scope": "Merge the parent SIP audio branch into the interruption lifecycle branch without losing either behavior",
+  "branch": "rfc/interruption-lifecycle",
+  "previous_head": "6e9490d82a9dd9184573147487fe97b41c525879",
+  "parent_ref": "origin/chore/sip-input-audio-improvement",
+  "parent_head": "f72576561b8e8e323a4982e31c64a31970a5f24d",
+  "acceptance_criteria": [
+    "Parent changes are included through a merge without rewriting branch history",
+    "Preserve parent SIP configuration, media ownership, native resampling, and end-of-speech fixes",
+    "Preserve protobuf controls, message ID callback completion, pause/continue/flush behavior, and constructor options",
+    "Resolve test conflicts using the current channel and playback contracts",
+    "Do not include or overwrite local changes from the testing or Orca worktrees",
+    "Move the verified branch to the requested testing checkout"
+  ],
+  "allowed_paths": [
+    "api/assistant-api/internal/adapters/internal/dispatch_stt_order_test.go",
+    "api/assistant-api/internal/channel/base/base_streamer_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/media_port_test.go",
+    "rfcs/0019-audio-message-completion/jsons/parent-sync-20260912.json"
+  ],
+  "parent_import": "All automatically merged tracked changes from the pinned parent commit; allowed_paths lists manual integration edits only",
+  "ownership": {
+    "coordinator": "Merge resolution, compatibility testing, evidence, and testing checkout",
+    "independent_reviewer": "Read-only comparison of the merged SIP behavior with both parents"
+  },
+  "risks": [
+    "Textually clean SIP merges may reintroduce old playback or resampler assumptions",
+    "New parent configuration and end-of-speech behavior must remain compatible with lifecycle callbacks",
+    "Existing dirty files overlap parent changes, so the merge uses an isolated worktree",
+    "Native tests require local audio libraries and may have environment-specific prerequisites"
+  ],
+  "verification_commands": [
+    "go test -race -count=1 -timeout=180s -p 2 ./api/assistant-api/internal/adapters/... ./api/assistant-api/internal/channel/... ./api/assistant-api/internal/audio/... ./api/assistant-api/internal/end_of_speech/... ./api/assistant-api/internal/options/... ./api/assistant-api/sip/... ./api/assistant-api/internal/watchdog/... ./api/assistant-api/internal/type/...",
+    "go test -p 1 -run '^$' ./api/assistant-api/...",
+    "go test -race -count=10 -timeout=180s ./api/assistant-api/internal/adapters/internal -run '^TestInputDispatcher_PreservesEndOfSpeechAudioBeforeTranscript$'",
+    "cd ui && CI=true yarn test --watchAll=false --runInBand --runTestsByPath src/app/components/providers/__tests__/audio-input-advanced-defaults-parity.test.ts src/app/components/providers/end-of-speech/__tests__/provider-runtime-parity.test.tsx src/app/pages/assistant/actions/create-deployment/commons/__tests__/configure-audio-input.design.test.tsx src/providers/__tests__/provider-eos-config.test.ts src/providers/__tests__/provider-stt-comparison.test.ts",
+    "CI=true just agent-finalize \"$(git diff --cached --name-only --diff-filter=ACMR | paste -sd, -)\"",
+    "git diff --check",
+    "git diff --cached --check"
+  ],
+  "verification_results": {
+    "ui_tests": {"exit_code": 0, "suites": 5, "tests": 88, "log": "/tmp/parent-sync-ui.log"},
+    "assistant_compile": {"exit_code": 0, "log": "/tmp/parent-sync-compile.log"},
+    "backend_race_suite": {"exit_code": 0, "log": "/tmp/parent-sync-race-verified.log"},
+    "agent_finalize": {"exit_code": 0, "log": "/tmp/parent-sync-finalize-verified.log"},
+    "diff_check": {"exit_code": 0},
+    "stt_order_regression_ten_race_runs": {"exit_code": 0, "log": "/tmp/parent-sync-stt-order.log"},
+    "parent_parity": "End-of-speech, internal options, UI providers, and SIP runtime production retain the incoming parent bytes",
+    "feature_parity": "Message lifecycle, dispatcher handlers, requestor construction, base streamer, and shared telephony playback production retain the previous feature bytes",
+    "test_corrections": "Migrated the new parent STT-order test to WithContextID and injected the existing test streamer and sender. Earlier attempts exposed the removed constructor and missing notification transport. Ordering assertions are unchanged.",
+    "finalizer_retry": "The first finalizer passed all backend checks and all 24 provider UI suites (428 tests), but the UI process stayed in watch mode and timed out. Rerun with CI=true."
+  },
+  "independent_review": {
+    "agent_id": "01a09137-eb48-7da0-ad93-42572aa9290d",
+    "status": "approved",
+    "findings": [],
+    "summary": "Compared SIP production to both parents and verified all three manual test resolutions. Parent runtime ownership and config changes coexist with response IDs, playback controls, discarded-output suppression, and native resampler lifetime."
+  },
+  "limitations": [
+    "No live provider or carrier call was performed",
+    "Native linker warnings remain non-fatal",
+    "The merge retains the previously authorized go-security-scan exception for the CGO-disabled native dependency check; other commit hooks remain enabled"
+  ],
+  "rollback": "Revert this merge against its first parent; retain separately owned local changes"
+}

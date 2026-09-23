@@ -13,6 +13,7 @@ license-check-and-add.json
 # Integration test credentials (never commit real API keys)
 **/integration_config.yaml
 /smoke-reports/
+/transformer-reports/
 /smoke-diagnostics/
 /coverage.out
 /bin/web-api

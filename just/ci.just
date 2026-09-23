@@ -101,6 +101,7 @@ ci-ui-lint: _ci-ui-install
     cd ui && yarn test:typescript-check
     cd ui && yarn check:public-assets
     cd ui && yarn test:public-assets
+    cd ui && yarn check:dependencies
     cd ui && yarn lint
     cd ui && yarn lint:css
 

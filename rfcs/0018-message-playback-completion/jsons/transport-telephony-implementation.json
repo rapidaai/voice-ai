@@ -1,0 +1,100 @@
+{
+  "taskId": "task_4547e537e610",
+  "dispatchId": "ctx_5e6de0c392e7",
+  "rfc": "rfcs/0018-message-playback-completion.md",
+  "approvedDigest": "dae79ed71ee7d67db3d4fc2a4bbb338712b9ae35c3e9a13c6fddd8f28f23b8f5",
+  "scope": "telephony transport sequence propagation only",
+  "implementationSummary": [
+    "Telephony MediaSession now captures playback_sequence with each queued response segment, keys segment continuation by id plus sequence, and emits ConversationPlaybackComplete with the captured sequence.",
+    "WebSocket, AudioSocket, and SIP Send paths pass ConversationAssistantMessage.playback_sequence into the shared media queue without assigning transport-side sequences.",
+    "SIP pending pre-answer assistant audio now stores playback_sequence and replays it when assistant output starts."
+  ],
+  "workerTouchedFiles": [
+    "api/assistant-api/internal/channel/telephony/internal/asterisk/audiosocket/streamer.go",
+    "api/assistant-api/internal/channel/telephony/internal/asterisk/internal/audio_processor_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/asterisk/websocket/websocket.go",
+    "api/assistant-api/internal/channel/telephony/internal/exotel/websocket.go",
+    "api/assistant-api/internal/channel/telephony/internal/media/playback_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/media/session.go",
+    "api/assistant-api/internal/channel/telephony/internal/media/session_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/media/types.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/media_port.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/media_port_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/playback_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/streamer.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/streamer_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/telnyx/websocket.go",
+    "api/assistant-api/internal/channel/telephony/internal/twilio/internal/playback_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/twilio/websocket.go",
+    "api/assistant-api/internal/channel/telephony/internal/vobiz/websocket.go",
+    "api/assistant-api/internal/channel/telephony/internal/vonage/websocket.go",
+    "rfcs/0018-message-playback-completion/jsons/transport-telephony-implementation.json"
+  ],
+  "telephonyDirtyInventory": [
+    "api/assistant-api/internal/channel/telephony/internal/asterisk/audiosocket/streamer.go",
+    "api/assistant-api/internal/channel/telephony/internal/asterisk/audiosocket/streamer_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/asterisk/internal/audio_processor.go",
+    "api/assistant-api/internal/channel/telephony/internal/asterisk/internal/audio_processor_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/asterisk/websocket/websocket.go",
+    "api/assistant-api/internal/channel/telephony/internal/asterisk/websocket/websocket_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/exotel/internal/audio_processor.go",
+    "api/assistant-api/internal/channel/telephony/internal/exotel/internal/audio_processor_contract_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/exotel/websocket.go",
+    "api/assistant-api/internal/channel/telephony/internal/exotel/websocket_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/media/playback_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/media/session.go",
+    "api/assistant-api/internal/channel/telephony/internal/media/session_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/media/types.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/audio_processor.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/audio_processor_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/media_port.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/media_port_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/playback_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/streamer.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/streamer_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/telnyx/internal/audio_processor.go",
+    "api/assistant-api/internal/channel/telephony/internal/telnyx/internal/audio_processor_contract_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/telnyx/websocket.go",
+    "api/assistant-api/internal/channel/telephony/internal/telnyx/websocket_media_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/twilio/internal/audio_processor.go",
+    "api/assistant-api/internal/channel/telephony/internal/twilio/internal/playback_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/twilio/websocket.go",
+    "api/assistant-api/internal/channel/telephony/internal/twilio/websocket_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/vobiz/internal/audio_processor.go",
+    "api/assistant-api/internal/channel/telephony/internal/vobiz/internal/audio_processor_ambient_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/vobiz/websocket.go",
+    "api/assistant-api/internal/channel/telephony/internal/vobiz/websocket_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/vonage/internal/audio_processor.go",
+    "api/assistant-api/internal/channel/telephony/internal/vonage/internal/audio_processor_contract_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/vonage/websocket.go",
+    "api/assistant-api/internal/channel/telephony/internal/vonage/websocket_media_test.go",
+    "rfcs/0018-message-playback-completion/jsons/transport-telephony-implementation.json"
+  ],
+  "tests": [
+    {
+      "command": "go test -count=1 -timeout=180s ./api/assistant-api/internal/channel/telephony/internal/media ./api/assistant-api/internal/channel/telephony/internal/sip ./api/assistant-api/internal/channel/telephony/internal/twilio/internal",
+      "result": "passed",
+      "notes": "local linker emitted duplicate rpath warnings only"
+    },
+    {
+      "command": "go test -count=1 -timeout=180s ./api/assistant-api/internal/channel/telephony/...",
+      "result": "passed",
+      "notes": "local linker emitted duplicate rpath warnings only"
+    },
+    {
+      "command": "go test -race -count=1 -timeout=180s ./api/assistant-api/internal/channel/telephony/...",
+      "result": "passed",
+      "notes": "local linker emitted duplicate rpath and malformed LC_DYSYMTAB warnings only"
+    },
+    {
+      "command": "git diff --check -- api/assistant-api/internal/channel/telephony rfcs/0018-message-playback-completion/jsons/transport-telephony-implementation.json",
+      "result": "passed"
+    },
+    {
+      "command": "just agent-finalize \"api/assistant-api/internal/channel/telephony/internal/asterisk/audiosocket/streamer.go,api/assistant-api/internal/channel/telephony/internal/asterisk/audiosocket/streamer_test.go,api/assistant-api/internal/channel/telephony/internal/asterisk/internal/audio_processor.go,api/assistant-api/internal/channel/telephony/internal/asterisk/internal/audio_processor_test.go,api/assistant-api/internal/channel/telephony/internal/asterisk/websocket/websocket.go,api/assistant-api/internal/channel/telephony/internal/asterisk/websocket/websocket_test.go,api/assistant-api/internal/channel/telephony/internal/exotel/internal/audio_processor.go,api/assistant-api/internal/channel/telephony/internal/exotel/internal/audio_processor_contract_test.go,api/assistant-api/internal/channel/telephony/internal/exotel/websocket.go,api/assistant-api/internal/channel/telephony/internal/exotel/websocket_test.go,api/assistant-api/internal/channel/telephony/internal/media/playback_test.go,api/assistant-api/internal/channel/telephony/internal/media/session.go,api/assistant-api/internal/channel/telephony/internal/media/session_test.go,api/assistant-api/internal/channel/telephony/internal/media/types.go,api/assistant-api/internal/channel/telephony/internal/sip/audio_processor.go,api/assistant-api/internal/channel/telephony/internal/sip/audio_processor_test.go,api/assistant-api/internal/channel/telephony/internal/sip/media_port.go,api/assistant-api/internal/channel/telephony/internal/sip/media_port_test.go,api/assistant-api/internal/channel/telephony/internal/sip/playback_test.go,api/assistant-api/internal/channel/telephony/internal/sip/streamer.go,api/assistant-api/internal/channel/telephony/internal/sip/streamer_test.go,api/assistant-api/internal/channel/telephony/internal/telnyx/internal/audio_processor.go,api/assistant-api/internal/channel/telephony/internal/telnyx/internal/audio_processor_contract_test.go,api/assistant-api/internal/channel/telephony/internal/telnyx/websocket.go,api/assistant-api/internal/channel/telephony/internal/telnyx/websocket_media_test.go,api/assistant-api/internal/channel/telephony/internal/twilio/internal/audio_processor.go,api/assistant-api/internal/channel/telephony/internal/twilio/internal/playback_test.go,api/assistant-api/internal/channel/telephony/internal/twilio/websocket.go,api/assistant-api/internal/channel/telephony/internal/twilio/websocket_test.go,api/assistant-api/internal/channel/telephony/internal/vobiz/internal/audio_processor.go,api/assistant-api/internal/channel/telephony/internal/vobiz/internal/audio_processor_ambient_test.go,api/assistant-api/internal/channel/telephony/internal/vobiz/websocket.go,api/assistant-api/internal/channel/telephony/internal/vobiz/websocket_test.go,api/assistant-api/internal/channel/telephony/internal/vonage/internal/audio_processor.go,api/assistant-api/internal/channel/telephony/internal/vonage/internal/audio_processor_contract_test.go,api/assistant-api/internal/channel/telephony/internal/vonage/websocket.go,api/assistant-api/internal/channel/telephony/internal/vonage/websocket_media_test.go,rfcs/0018-message-playback-completion/jsons/transport-telephony-implementation.json\"",
+      "result": "passed",
+      "notes": "hook reported failed_count 0; local linker emitted duplicate rpath warnings only"
+    }
+  ],
+  "remainingWork": []
+}

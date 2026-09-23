@@ -1,0 +1,53 @@
+{
+  "task_id": "task_d9453164c646",
+  "dispatch_id": "ctx_2ad47ef994d5",
+  "rfc": "rfcs/0018-message-playback-completion.md",
+  "approved_rfc_sha256": "dae79ed71ee7d67db3d4fc2a4bbb338712b9ae35c3e9a13c6fddd8f28f23b8f5",
+  "scope": "WebRTC transport sequence propagation only",
+  "changed_files": [
+    "api/assistant-api/internal/channel/webrtc/audio_buffer.go",
+    "api/assistant-api/internal/channel/webrtc/output_loop.go",
+    "api/assistant-api/internal/channel/webrtc/streamer.go",
+    "api/assistant-api/internal/channel/webrtc/streamer_test.go",
+    "api/assistant-api/internal/channel/webrtc/playback_test.go",
+    "api/assistant-api/internal/channel/webrtc/internal/types.go",
+    "api/assistant-api/internal/channel/webrtc/internal/playback_test.go",
+    "rfcs/0018-message-playback-completion/jsons/transport-webrtc-implementation.json"
+  ],
+  "implementation": [
+    "ConversationAssistantMessage.playback_sequence is copied into WebRTC OutputPlayback when audio or terminal output is admitted.",
+    "Queued output frames and terminal markers retain their OutputPlayback pointer, so completion uses the drained segment's original sequence rather than a current message lookup.",
+    "ConversationPlaybackComplete echoes the stored playback_sequence after local WebRTC output drain.",
+    "Legacy playback_sequence 0 remains accepted for existing WebRTC playback flow.",
+    "Stale same-ID terminal-only packets with a mismatched noncurrent sequence are ignored before they can disturb the active queued segment."
+  ],
+  "non_goals_observed": [
+    "No protobuf, generated artifact, adapter, lifecycle, base, gRPC, telephony, callback authority, or sequence assignment edits were made by this worker.",
+    "ConversationPlaybackPause, ConversationPlaybackContinue, and ConversationPlaybackFlush were not given sequence fields."
+  ],
+  "verification": [
+    {
+      "command": "gofmt -w api/assistant-api/internal/channel/webrtc/audio_buffer.go api/assistant-api/internal/channel/webrtc/output_loop.go api/assistant-api/internal/channel/webrtc/streamer.go api/assistant-api/internal/channel/webrtc/streamer_test.go api/assistant-api/internal/channel/webrtc/playback_test.go api/assistant-api/internal/channel/webrtc/internal/types.go api/assistant-api/internal/channel/webrtc/internal/playback_test.go",
+      "result": "passed"
+    },
+    {
+      "command": "go test -count=1 -timeout=180s ./api/assistant-api/internal/channel/webrtc/...",
+      "result": "passed with existing linker duplicate-rpath and duplicate-library warnings"
+    },
+    {
+      "command": "go test -race -count=1 -timeout=180s ./api/assistant-api/internal/channel/webrtc/...",
+      "result": "passed with existing linker duplicate-rpath, duplicate-library, and LC_DYSYMTAB warnings"
+    },
+    {
+      "command": "git diff --check -- api/assistant-api/internal/channel/webrtc rfcs/0018-message-playback-completion/jsons/transport-webrtc-implementation.json",
+      "result": "passed"
+    },
+    {
+      "command": "just agent-finalize \"api/assistant-api/internal/channel/webrtc,rfcs/0018-message-playback-completion/jsons/transport-webrtc-implementation.json\"",
+      "result": "passed with validate_changed_tests and run_required_tests reporting no errors"
+    }
+  ],
+  "notes": [
+    "The first targeted test run exposed a stale-terminal packet-count expectation in the new test case; the assertion was corrected to count the first unterminated segment's observed packets while still requiring only the newer sequence to complete."
+  ]
+}

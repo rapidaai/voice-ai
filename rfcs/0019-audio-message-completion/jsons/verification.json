@@ -1,0 +1,25 @@
+{
+  "run_id": "run_942b61c2cb54",
+  "verifier": "coordinator",
+  "commands": [
+    {"command": "bash bin/artifacts-generate.sh", "exit_code": 0},
+    {"command": "go test -race -count=1 -timeout=180s -p 2 ./api/assistant-api/internal/adapters/... ./api/assistant-api/internal/llm/... ./api/assistant-api/internal/transformer/... ./api/assistant-api/internal/watchdog/... ./api/assistant-api/internal/channel/... ./api/assistant-api/internal/type", "exit_code": 0, "log": "/tmp/rfc0019-verification.log"},
+    {"command": "go test -p 1 -run '^$' ./api/assistant-api/...", "exit_code": 0},
+    {"command": "python3 -m compileall -q api/document-api/app/bridges/artifacts/protos", "exit_code": 0},
+    {"command": "go test -race -count=1 -timeout=180s -p 2 ./api/assistant-api/internal/adapters/... ./api/assistant-api/internal/type", "exit_code": 0, "log": "/tmp/rfc0019-adapter-final.log"},
+    {"command": "go test -race -count=1 -timeout=180s -p 2 ./api/assistant-api/internal/transformer/...", "exit_code": 0, "log": "/tmp/rfc0019-synthesis-final.log"},
+    {"command": "go test -race -count=1 -timeout=120s ./api/assistant-api/internal/transformer/rime ./api/assistant-api/internal/transformer/neuphonic", "exit_code": 0, "scope": "After final Rime close-status and cancellation guards"},
+    {"command": "just agent-finalize with coordinator-implementation.json changed_files", "exit_code": 0},
+    {"command": "just agent-finalize with implementation-inventory.json changed_files", "exit_code": 0, "log": "/tmp/rfc0019-finalize.log"},
+    {"command": "git diff --check", "exit_code": 0}
+  ],
+  "limitations": [
+    "No live carrier, browser, or TTS provider credentials were used.",
+    "Native caller activation remains outside the approved scope and awaits maintainer approval.",
+    "Neuphonic fails closed at local Done because the integration has no verified provider completion acknowledgment.",
+    "Existing native linker duplicate-rpath and LC_DYSYMTAB warnings remain."
+  ],
+  "independent_review": "review-02.json approves the final corrections and resolves RFC0019-REVIEW-01 and RFC0019-REVIEW-02; native activation remains pending scope approval",
+  "correction_task": "task_a4be6a1df457",
+  "correction_02_integration": "Coordinator restricted Rime success to CloseNormalClosure with an active context; server GoingAway and cancelled context are covered by TestRimeShutdownCloseDoesNotCompleteSynthesis."
+}

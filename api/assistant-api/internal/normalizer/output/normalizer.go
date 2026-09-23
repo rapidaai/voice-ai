@@ -104,7 +104,9 @@ func (n *outputNormalizer) Normalize(ctx context.Context, packets ...internal_ty
 			n.Run(ctx, AggregatePipeline{ContextID: p.ContextID, Text: p.Text, IsFinal: true})
 		case internal_type.InjectMessagePacket:
 			n.Run(ctx, ArgumentationPipeline{ContextID: p.ContextID, Text: p.Text})
-			n.Run(ctx, ArgumentationPipeline{ContextID: p.ContextID, Text: p.Text, IsFinal: true})
+			if !p.Interim {
+				n.Run(ctx, ArgumentationPipeline{ContextID: p.ContextID, Text: p.Text, IsFinal: true})
+			}
 		case internal_type.InterruptionDetectedPacket:
 			n.Run(ctx, InterruptPipeline{ContextID: p.ContextID})
 		}

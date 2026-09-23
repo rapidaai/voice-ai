@@ -1,0 +1,18 @@
+{
+  "run_id": "run_942b61c2cb54",
+  "challenge_task_id": "task_d61bbed2b6b6",
+  "challenge_receipt_sha256": "6366250cdf7f4fab03433d6db7833a0b14ce9530e6d49b596179cbab61e4f9f3",
+  "confirmation_task_id": "task_e89b9d8a9e0d",
+  "gate_id": "gate_334739a93fec",
+  "rfc_file": "rfcs/0019-audio-message-completion.md",
+  "rfc_sha256": "63305a8d5d14e3aa9c2bc117b6bd2e281bfcb71040481d61ae9ca436ca6e18e5",
+  "plan_sha256": "1da09af775b5c5c6bab6ce2c28ddbca03d47b60da96c76c1510b73e6b602cfc7",
+  "question": "Approve implementation of RFC rfcs/0019-audio-message-completion.md with SHA-256 63305a8d5d14e3aa9c2bc117b6bd2e281bfcb71040481d61ae9ca436ca6e18e5 after approved challenge task task_d61bbed2b6b6 with receipt SHA-256 6366250cdf7f4fab03433d6db7833a0b14ce9530e6d49b596179cbab61e4f9f3?",
+  "status": "pending",
+  "superseded_request": {
+    "gate_id": "gate_4fce325b10be",
+    "rfc_sha256": "052a55f717d3134d6c33c0ca9035d0c7f82e98d3e06092c06e6b2fe1aef4f1de",
+    "reason": "Maintainer requested removal of sequence fields rather than retaining them unused. The prior gate is not authorization for the revised bytes."
+  },
+  "protocol_implementation_started": false
+}

@@ -1,0 +1,69 @@
+{
+  "task_id": "task_91fbca66b402",
+  "dispatch_id": "ctx_2dc3d5a38042",
+  "rfc": "rfcs/0019-audio-message-completion.md",
+  "scope": "producer-correction-01",
+  "outcome": "implemented",
+  "summary": [
+    "Agentflow finality now emits one response done at every successful graph boundary, including empty-output graphs, and preserves complete final text by accumulating forwarded response deltas.",
+    "Model provider errors, interrupted or cancelled completions, and tool follow-up failures clear the active response context inline so late completions are rejected as stale.",
+    "Tool follow-up validation, request build, missing stream, and send failures now emit LLMErrorPacket for the existing context instead of only logging."
+  ],
+  "files_modified": [
+    "api/assistant-api/internal/llm/agentflow/executor_test.go",
+    "api/assistant-api/internal/llm/agentflow/orchestrator.go",
+    "api/assistant-api/internal/llm/model/model_execute.go",
+    "api/assistant-api/internal/llm/model/model_smoke_response_test.go",
+    "api/assistant-api/internal/llm/model/model_smoke_tooling_test.go",
+    "api/assistant-api/internal/llm/model/model_stream.go",
+    "rfcs/0019-audio-message-completion/jsons/producer-correction-01.json"
+  ],
+  "corrections": [
+    {
+      "finding": "agentflow final done was gated on nonempty output",
+      "resolution": "emitResponseDone now emits after successful graph boundaries unless the context is cancelled or failed, so empty successful output closes."
+    },
+    {
+      "finding": "agentflow final text overwrote previous node output",
+      "resolution": "responseFinalityCommunication accumulates LLMResponseDeltaPacket text for the active context and suppresses inner done packets, preserving one final done snapshot."
+    },
+    {
+      "finding": "provider errors reset timing only",
+      "resolution": "provider errors clear currentPacket inline before emitting LLMErrorPacket, so later successful done for the same request is stale."
+    },
+    {
+      "finding": "tool follow-up failures only logged",
+      "resolution": "tool follow-up failures clear currentPacket inline and emit LLMErrorPacket with the affected context ID."
+    },
+    {
+      "finding": "active-context checks could race with interruption or a new response",
+      "resolution": "completion handling rechecks the active context before mutating history, before executing tool calls, and before emitting final done."
+    }
+  ],
+  "tests": [
+    {
+      "command": "go test -count=1 ./api/assistant-api/internal/llm/model ./api/assistant-api/internal/llm/agentflow",
+      "result": "passed"
+    },
+    {
+      "command": "go test -count=1 -timeout=180s ./api/assistant-api/internal/llm/...",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check -- api/assistant-api/internal/llm/agentflow/orchestrator.go api/assistant-api/internal/llm/agentflow/executor_test.go api/assistant-api/internal/llm/model/model_execute.go api/assistant-api/internal/llm/model/model_stream.go api/assistant-api/internal/llm/model/model_smoke_response_test.go api/assistant-api/internal/llm/model/model_smoke_tooling_test.go",
+      "result": "passed"
+    },
+    {
+      "command": "jq . rfcs/0019-audio-message-completion/jsons/producer-correction-01.json >/dev/null",
+      "result": "passed"
+    },
+    {
+      "command": "just agent-finalize \"api/assistant-api/internal/llm/agentflow/executor_test.go,api/assistant-api/internal/llm/agentflow/orchestrator.go,api/assistant-api/internal/llm/model/model_execute.go,api/assistant-api/internal/llm/model/model_smoke_response_test.go,api/assistant-api/internal/llm/model/model_smoke_tooling_test.go,api/assistant-api/internal/llm/model/model_stream.go,rfcs/0019-audio-message-completion/jsons/producer-correction-01.json\"",
+      "result": "passed"
+    }
+  ],
+  "residual_issues": [
+    "No residual critical or major issues are known inside the producer correction scope.",
+    "Existing dirty edits outside this correction scope were preserved and not reviewed."
+  ]
+}

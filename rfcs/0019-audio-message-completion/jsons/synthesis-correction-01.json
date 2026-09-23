@@ -1,0 +1,148 @@
+{
+  "run_id": "run_942b61c2cb54",
+  "task_id": "task_62e75c9a3720",
+  "dispatch_id": "ctx_679446c42a0b",
+  "role": "synthesis_worker",
+  "status": "implemented",
+  "authorization": {
+    "confirmation_file": "rfcs/0019-audio-message-completion/jsons/confirmation.json",
+    "confirmed_sha256": "63305a8d5d14e3aa9c2bc117b6bd2e281bfcb71040481d61ae9ca436ca6e18e5",
+    "correction_round": 1
+  },
+  "changed_files": [
+    "api/assistant-api/internal/transformer/elevenlabs/tts.go",
+    "api/assistant-api/internal/transformer/elevenlabs/elevenlabs_test.go",
+    "api/assistant-api/internal/transformer/cartesia/tts.go",
+    "api/assistant-api/internal/transformer/cartesia/cartesia_test.go",
+    "api/assistant-api/internal/transformer/resembleai/tts.go",
+    "api/assistant-api/internal/transformer/resembleai/resembleai_test.go",
+    "api/assistant-api/internal/transformer/rime/tts.go",
+    "api/assistant-api/internal/transformer/rime/rime_test.go",
+    "api/assistant-api/internal/transformer/sarvam/tts.go",
+    "api/assistant-api/internal/transformer/sarvam/sarvam_test.go",
+    "rfcs/0019-audio-message-completion/jsons/synthesis-correction-01.json"
+  ],
+  "behavior": [
+    "ElevenLabs now tracks every flush-producing text write and the final text-close flush. isFinal drains one pending provider response, but TextToSpeechEndPacket is emitted only after TextToSpeechDonePacket has closed text, all pending provider drains are consumed, no synthesis error has occurred, and the connection is closing for the completed turn.",
+    "Cartesia now treats provider done callbacks as synthesis drains only after the final continue=false flush request is outstanding. Earlier done or flush callbacks are ignored without stopping the read loop, and websocket error responses emit TextToSpeechErrorPacket instead of completion.",
+    "Rime now treats done as a per-batch drain, matching the provider contract, and requires the local eos request from TextToSpeechDonePacket before any done can complete the message. Rime server error responses now emit TextToSpeechErrorPacket and suppress completion.",
+    "Sarvam now gates completion_event responses behind TextToSpeechDonePacket's flush request. Earlier completion events are ignored without stopping the read loop, and server error responses keep suppressing completion.",
+    "ResembleAI now treats audio_end as a per-text request drain. It emits TextToSpeechEndPacket only after TextToSpeechDonePacket arrives and all prior text-request drains have completed.",
+    "All changed websocket read loops continue after ignored pre-final provider completion callbacks and only return when the gated message-level completion or an error/close path terminates the turn."
+  ],
+  "official_provider_contracts_verified": [
+    {
+      "provider": "ElevenLabs",
+      "source": "https://elevenlabs.io/docs/api-reference/text-to-speech/v-1-text-to-speech-voice-id-multi-stream-input",
+      "contract": "The multi-context websocket supports context_id, per-context flush, close_context, close_socket, audio responses, and is_final responses. Flush can be used on a context before the conversation or producer is closed, so is_final is not treated as the assistant message completion boundary by itself."
+    },
+    {
+      "provider": "Cartesia",
+      "source": "https://docs.cartesia.ai/use-the-api/tts-websocket/contexts",
+      "contract": "continue=true means more text can follow for a context, while continue=false finalizes that utterance. The docs state done=true is received after outputs for the entire context have been returned."
+    },
+    {
+      "provider": "Cartesia",
+      "source": "https://docs.cartesia.ai/use-the-api/tts-websocket/context-flushing-and-flush-i-ds",
+      "contract": "Manual flushes create flush_id boundaries and flush_done acknowledgments for transcript submissions. A flush acknowledgement is not enough to close the assistant message without local text closure."
+    },
+    {
+      "provider": "Rime",
+      "source": "https://docs.rime.ai/api-reference/mistv2/websockets-json",
+      "contract": "A done event follows the last audio chunk for a synthesis batch, and more done events can follow if the client sends more text and triggers further synthesis. eos emits a final done for remaining buffered content before close, or closes without done if the buffer is empty."
+    },
+    {
+      "provider": "Sarvam",
+      "source": "https://docs.sarvam.ai/api/api-guides-tutorials/text-to-speech/streaming-api/web-socket.md",
+      "contract": "The streaming websocket accepts text, flush, ping, and close style operations; flush forces buffered text processing, and send_completion_event enables a completion event after flushed audio has been returned."
+    }
+  ],
+  "local_websocket_tests": [
+    {
+      "provider": "ElevenLabs",
+      "tests": [
+        "TestElevenLabsTextToSpeechWaitsForTextClosureAndFinalDrain",
+        "TestElevenLabsProviderErrorDoesNotEmitEnd"
+      ],
+      "coverage": "Two text packets each receive a provider isFinal response before TextToSpeechDonePacket and neither emits TextToSpeechEndPacket. The final TextToSpeechDonePacket flush emits audio and isFinal, then exactly one TextToSpeechEndPacket. A provider error frame emits no TextToSpeechEndPacket."
+    },
+    {
+      "provider": "Cartesia",
+      "tests": [
+        "TestCartesiaTextToSpeechWaitsForTextClosureAndFinalDrain",
+        "TestCartesiaTextToSpeechProviderErrorDoesNotEmitEnd"
+      ],
+      "coverage": "Two pre-closure provider done responses do not emit TextToSpeechEndPacket. The final continue=false flush drains audio and done before one TextToSpeechEndPacket. A websocket error response emits TextToSpeechErrorPacket and no TextToSpeechEndPacket."
+    },
+    {
+      "provider": "Rime",
+      "tests": [
+        "TestRimeTextToSpeechWaitsForTextClosureAndFinalDrain",
+        "TestRimeTextToSpeechProviderErrorDoesNotEmitEnd"
+      ],
+      "coverage": "Two text chunks receive audio and per-batch done responses before TextToSpeechDonePacket and do not emit TextToSpeechEndPacket. The eos request drains final audio and done before one TextToSpeechEndPacket. A server error emits TextToSpeechErrorPacket and no TextToSpeechEndPacket."
+    },
+    {
+      "provider": "Sarvam",
+      "tests": [
+        "TestSarvamTextToSpeechWaitsForTextClosureAndFinalDrain",
+        "TestSarvamTextToSpeechProviderErrorDoesNotEmitEnd"
+      ],
+      "coverage": "Two text chunks receive audio and completion events before TextToSpeechDonePacket and do not emit TextToSpeechEndPacket. The final flush drains audio and completion event before one TextToSpeechEndPacket. A server error emits TextToSpeechErrorPacket and no TextToSpeechEndPacket."
+    },
+    {
+      "provider": "ResembleAI",
+      "tests": [
+        "TestResembleAITextToSpeechWaitsForTextClosureAndFinalDrain",
+        "TestResembleAITextToSpeechProviderErrorDoesNotEmitEnd"
+      ],
+      "coverage": "Two text requests each receive audio and audio_end before TextToSpeechDonePacket and do not emit TextToSpeechEndPacket. Text closure after those drained requests emits exactly one TextToSpeechEndPacket. A server error emits TextToSpeechErrorPacket and no TextToSpeechEndPacket."
+    }
+  ],
+  "other_flush_paths_inspected": [
+    {
+      "provider": "Deepgram",
+      "finding": "Text packets send Speak only; the transformer sends Flush only from TextToSpeechDonePacket and emits End from the Flushed response."
+    },
+    {
+      "provider": "Smallest",
+      "finding": "Text packets use continue=true; the transformer sends continue=false with flush=true only from TextToSpeechDonePacket and emits End from status complete."
+    },
+    {
+      "provider": "Neuphonic",
+      "finding": "The provider has no server-side completion acknowledgment in the current implementation. This correction did not alter that protocol because the task focus was the flush/done callback paths with explicit provider completion responses."
+    },
+    {
+      "provider": "HTTP request-per-turn providers",
+      "finding": "MiniMax, Groq, Nvidia, AWS, and Speechmatics buffer text locally and start one provider request from TextToSpeechDonePacket, so they do not have the pre-TextToSpeechDone provider flush callback risk addressed here."
+    }
+  ],
+  "verification": [
+    {
+      "command": "go test -count=1 ./api/assistant-api/internal/transformer/elevenlabs ./api/assistant-api/internal/transformer/cartesia ./api/assistant-api/internal/transformer/rime ./api/assistant-api/internal/transformer/sarvam",
+      "result": "passed"
+    },
+    {
+      "command": "go test -count=1 ./api/assistant-api/internal/transformer/resembleai ./api/assistant-api/internal/transformer/elevenlabs ./api/assistant-api/internal/transformer/cartesia ./api/assistant-api/internal/transformer/rime ./api/assistant-api/internal/transformer/sarvam",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check -- api/assistant-api/internal/transformer/elevenlabs/tts.go api/assistant-api/internal/transformer/elevenlabs/elevenlabs_test.go api/assistant-api/internal/transformer/cartesia/tts.go api/assistant-api/internal/transformer/cartesia/cartesia_test.go api/assistant-api/internal/transformer/resembleai/tts.go api/assistant-api/internal/transformer/resembleai/resembleai_test.go api/assistant-api/internal/transformer/rime/tts.go api/assistant-api/internal/transformer/rime/rime_test.go api/assistant-api/internal/transformer/sarvam/tts.go api/assistant-api/internal/transformer/sarvam/sarvam_test.go rfcs/0019-audio-message-completion/jsons/synthesis-correction-01.json",
+      "result": "passed"
+    },
+    {
+      "command": "go test -count=1 ./api/assistant-api/internal/transformer/...",
+      "result": "passed with existing local linker warnings for duplicate Speech SDK and onnxruntime rpaths"
+    },
+    {
+      "command": "just agent-finalize \"api/assistant-api/internal/transformer/elevenlabs/tts.go,api/assistant-api/internal/transformer/elevenlabs/elevenlabs_test.go,api/assistant-api/internal/transformer/cartesia/tts.go,api/assistant-api/internal/transformer/cartesia/cartesia_test.go,api/assistant-api/internal/transformer/resembleai/tts.go,api/assistant-api/internal/transformer/resembleai/resembleai_test.go,api/assistant-api/internal/transformer/rime/tts.go,api/assistant-api/internal/transformer/rime/rime_test.go,api/assistant-api/internal/transformer/sarvam/tts.go,api/assistant-api/internal/transformer/sarvam/sarvam_test.go,rfcs/0019-audio-message-completion/jsons/synthesis-correction-01.json\"",
+      "result": "passed"
+    }
+  ],
+  "residual_limitations": [
+    "The new tests use deterministic local websocket servers and do not require live provider credentials.",
+    "This correction does not change Neuphonic's existing no-ack completion behavior, because that provider does not expose an in-band completion callback in the current implementation.",
+    "The HTTP request-per-turn providers were inspected for the specific pre-TextToSpeechDone provider callback risk and were not changed."
+  ],
+  "blockers": []
+}

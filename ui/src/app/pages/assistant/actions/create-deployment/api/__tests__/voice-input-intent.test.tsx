@@ -205,10 +205,10 @@ jest.mock('@/app/components/form/tab-form', () => ({
 jest.mock(
   '@/app/pages/assistant/actions/create-deployment/commons/configure-experience',
   () => ({
+    ...jest.requireActual(
+      '@/app/pages/assistant/actions/create-deployment/commons/configure-experience',
+    ),
     ConfigureExperience: () => <div>experience</div>,
-    DEFAULT_UNCLEAR_INPUT_TIMEOUT: '2',
-    DEFAULT_UNCLEAR_INPUT_MESSAGE:
-      "I didn't catch that. Could you repeat that?",
   }),
 );
 

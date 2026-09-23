@@ -105,7 +105,7 @@ func TestGetTextToSpeechInput_WithContinueFlushAndContextID(t *testing.T) {
 	})
 	assert.True(t, streaming.Continue)
 	assert.False(t, streaming.Flush)
-	assert.Equal(t, "ctx-123", streaming.SessionID)
+	assert.Equal(t, "ctx-123", streaming.ContextID)
 
 	done := opt.GetTextToSpeechInput("", map[string]interface{}{
 		"continue":   false,
@@ -114,7 +114,7 @@ func TestGetTextToSpeechInput_WithContinueFlushAndContextID(t *testing.T) {
 	})
 	assert.False(t, done.Continue)
 	assert.True(t, done.Flush)
-	assert.Equal(t, "ctx-123", done.SessionID)
+	assert.Equal(t, "ctx-123", done.ContextID)
 }
 
 func TestGetSpeechToTextConnectionString_Default(t *testing.T) {

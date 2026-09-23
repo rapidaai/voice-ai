@@ -34,16 +34,15 @@ type awsTTS struct {
 	ctx       context.Context
 	ctxCancel context.CancelFunc
 
-	mu             sync.Mutex
-	contextId      string
-	ttsConnectedAt time.Time
-	textBuffer     strings.Builder
+	stateMu         sync.Mutex
+	workers         sync.WaitGroup
+	synthesisCancel context.CancelFunc
+	textClosed      bool
+	contextId       string
+	ttsConnectedAt  time.Time
+	textBuffer      strings.Builder
 
-	ttsStartedAt  time.Time
-	ttsMetricSent bool
-
-	ttsRequestCancel     context.CancelFunc
-	ttsRequestGeneration int64
+	ttsStartedAt time.Time
 
 	logger     commons.Logger
 	onPacket   func(pkt ...internal_type.Packet) error
@@ -71,12 +70,16 @@ func NewAWSTextToSpeech(ctx context.Context, logger commons.Logger, vaultCredent
 
 func (t *awsTTS) Initialize() error {
 	start := time.Now()
-	t.mu.Lock()
+	t.stateMu.Lock()
+	if err := t.ctx.Err(); err != nil {
+		t.stateMu.Unlock()
+		return err
+	}
 	if t.ttsConnectedAt.IsZero() {
 		t.ttsConnectedAt = time.Now()
 	}
 	ctxID := t.contextId
-	t.mu.Unlock()
+	t.stateMu.Unlock()
 	t.onPacket(
 		internal_type.ObservabilityMetricRecordPacket{
 			ContextID: ctxID,
@@ -112,268 +115,112 @@ func (*awsTTS) Name() string {
 	return "aws-tts"
 }
 
-func (t *awsTTS) flush() {
-	t.mu.Lock()
-	text := t.textBuffer.String()
-	t.textBuffer.Reset()
-	ctxID := t.contextId
-	if text == "" || ctxID == "" {
-		t.mu.Unlock()
-		return
-	}
-	previousRequestCancel := t.ttsRequestCancel
-	requestContext, requestCancel := context.WithCancel(t.ctx)
-	t.ttsRequestGeneration++
-	ttsRequestGeneration := t.ttsRequestGeneration
-	t.ttsRequestCancel = requestCancel
-	t.mu.Unlock()
-
-	if previousRequestCancel != nil {
-		previousRequestCancel()
-	}
-	go t.synthesize(requestContext, requestCancel, text, ctxID, ttsRequestGeneration)
-}
-
-func (t *awsTTS) synthesize(requestContext context.Context, requestCancel context.CancelFunc, text string, ctxID string, ttsRequestGeneration int64) {
+func (t *awsTTS) synthesize(ctx context.Context, text, contextID string, startedAt time.Time) {
+	var synthesisError error
+	// Response cleanup runs before the message's terminal packet is published.
 	defer func() {
-		t.mu.Lock()
-		if t.ttsRequestGeneration == ttsRequestGeneration {
-			t.ttsRequestCancel = nil
+		t.stateMu.Lock()
+		if t.contextId != contextID {
+			t.stateMu.Unlock()
+			return
 		}
-		t.mu.Unlock()
-		requestCancel()
+		// Retire under the lock; later interruption cannot revoke this terminal decision.
+		t.synthesisCancel = nil
+		if ctx.Err() != nil || t.ctx.Err() != nil {
+			t.stateMu.Unlock()
+			return
+		}
+		t.stateMu.Unlock()
+		if synthesisError != nil {
+			t.onPacket(internal_type.TextToSpeechErrorPacket{
+				ContextID: contextID, Error: synthesisError, Type: internal_type.TTSNetworkTimeout,
+			})
+			return
+		}
+		t.onPacket(
+			internal_type.TextToSpeechEndPacket{ContextID: contextID},
+			internal_type.ObservabilityEventRecordPacket{
+				ContextID: contextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentTTS, Event: observability.TTSCompleted,
+					Attributes: observability.Attributes{"type": "completed"}, OccurredAt: time.Now(),
+				},
+			},
+		)
 	}()
 
-	region := t.GetRegion()
-	endpoint := fmt.Sprintf("https://polly.%s.amazonaws.com/v1/speech", region)
 	textType := "text"
-	textForPolly := text
 	if strings.Contains(text, "<break ") {
 		textType = "ssml"
-		textForPolly = fmt.Sprintf("<speak>%s</speak>", text)
+		text = fmt.Sprintf("<speak>%s</speak>", text)
 	}
-
-	payload := map[string]interface{}{
-		"Engine":       t.GetEngine(),
-		"LanguageCode": t.GetLanguage(),
-		"OutputFormat": "pcm",
-		"SampleRate":   "16000",
-		"Text":         textForPolly,
-		"TextType":     textType,
-		"VoiceId":      t.GetVoice(),
-	}
-
-	body, err := json.Marshal(payload)
+	body, err := json.Marshal(map[string]interface{}{
+		"Engine": t.GetEngine(), "LanguageCode": t.GetLanguage(),
+		"OutputFormat": "pcm", "SampleRate": "16000",
+		"Text": text, "TextType": textType, "VoiceId": t.GetVoice(),
+	})
 	if err != nil {
-		t.logger.Errorf("aws-tts: error marshalling request: %v", err)
-		synthesisErr := fmt.Errorf("aws-tts: error marshalling request: %w", err)
-		t.onPacket(
-			internal_type.TextToSpeechErrorPacket{
-				ContextID: ctxID,
-				Error:     synthesisErr,
-				Type:      internal_type.TTSNetworkTimeout,
-			},
-			internal_type.ObservabilityLogRecordPacket{
-				ContextID: ctxID,
-				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.RecordLog{
-					Level:   observability.LevelError,
-					Message: "aws-tts: error while synthesizing",
-					Attributes: observability.Attributes{
-						"component": observability.ComponentTTS.String(),
-						"provider":  t.Name(),
-						"error":     observability.AttributeValue(synthesisErr.Error()),
-					},
-					OccurredAt: time.Now(),
-				},
-			},
-		)
+		synthesisError = fmt.Errorf("aws-tts: encode request: %w", err)
 		return
 	}
-
-	requestTime := time.Now().UTC()
-	req, err := http.NewRequestWithContext(requestContext, "POST", endpoint, bytes.NewReader(body))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		fmt.Sprintf("https://polly.%s.amazonaws.com/v1/speech", t.GetRegion()), bytes.NewReader(body))
 	if err != nil {
-		t.logger.Errorf("aws-tts: error creating request: %v", err)
-		synthesisErr := fmt.Errorf("aws-tts: error creating request: %w", err)
-		t.onPacket(
-			internal_type.TextToSpeechErrorPacket{
-				ContextID: ctxID,
-				Error:     synthesisErr,
-				Type:      internal_type.TTSNetworkTimeout,
-			},
-			internal_type.ObservabilityLogRecordPacket{
-				ContextID: ctxID,
-				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.RecordLog{
-					Level:   observability.LevelError,
-					Message: "aws-tts: error while synthesizing",
-					Attributes: observability.Attributes{
-						"component": observability.ComponentTTS.String(),
-						"provider":  t.Name(),
-						"error":     observability.AttributeValue(synthesisErr.Error()),
-					},
-					OccurredAt: time.Now(),
-				},
-			},
-		)
+		synthesisError = fmt.Errorf("aws-tts: create request: %w", err)
 		return
 	}
-	req.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Content-Type", "application/json")
+	t.signPollyRequest(request, body, time.Now().UTC(), t.GetRegion())
 
-	t.signPollyRequest(req, body, requestTime, region)
-
-	resp, err := http.DefaultClient.Do(req)
+	response, err := http.DefaultClient.Do(request)
 	if err != nil {
-		if requestContext.Err() != nil {
+		synthesisError = fmt.Errorf("aws-tts: send request: %w", err)
+		return
+	}
+	canceled := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() { _ = response.Body.Close(); close(canceled) })
+	defer func() {
+		if !stop() {
+			<-canceled
 			return
 		}
-		t.logger.Errorf("aws-tts: error sending request: %v", err)
-		synthesisErr := fmt.Errorf("aws-tts: error sending request: %w", err)
-		t.onPacket(
-			internal_type.TextToSpeechErrorPacket{
-				ContextID: ctxID,
-				Error:     synthesisErr,
-				Type:      internal_type.TTSNetworkTimeout,
-			},
-			internal_type.ObservabilityLogRecordPacket{
-				ContextID: ctxID,
-				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.RecordLog{
-					Level:   observability.LevelError,
-					Message: "aws-tts: error while synthesizing",
-					Attributes: observability.Attributes{
-						"component": observability.ComponentTTS.String(),
-						"provider":  t.Name(),
-						"error":     observability.AttributeValue(synthesisErr.Error()),
-					},
-					OccurredAt: time.Now(),
-				},
-			},
-		)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
-		t.logger.Errorf("aws-tts: unexpected status code: %d, body: %s", resp.StatusCode, string(respBody))
-		synthesisErr := fmt.Errorf("aws-tts: unexpected status code: %d", resp.StatusCode)
-		t.onPacket(
-			internal_type.TextToSpeechErrorPacket{
-				ContextID: ctxID,
-				Error:     synthesisErr,
-				Type:      internal_type.TTSNetworkTimeout,
-			},
-			internal_type.ObservabilityLogRecordPacket{
-				ContextID: ctxID,
-				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.RecordLog{
-					Level:   observability.LevelError,
-					Message: "aws-tts: error while synthesizing",
-					Attributes: observability.Attributes{
-						"component": observability.ComponentTTS.String(),
-						"provider":  t.Name(),
-						"error":     observability.AttributeValue(synthesisErr.Error()),
-						"response":  observability.AttributeValue(string(respBody)),
-					},
-					OccurredAt: time.Now(),
-				},
-			},
-		)
+		_ = response.Body.Close()
+	}()
+	if response.StatusCode != http.StatusOK {
+		synthesisError = fmt.Errorf("aws-tts: unexpected status code: %d", response.StatusCode)
 		return
 	}
 
-	buf := make([]byte, 4096)
+	buffer := make([]byte, 4096)
 	firstChunk := true
 	for {
-		select {
-		case <-requestContext.Done():
+		if ctx.Err() != nil || t.ctx.Err() != nil {
 			return
-		default:
 		}
-		n, err := resp.Body.Read(buf)
+		n, err := response.Body.Read(buffer)
+		if ctx.Err() != nil || t.ctx.Err() != nil {
+			return
+		}
 		if n > 0 {
-			audioChunk := make([]byte, n)
-			copy(audioChunk, buf[:n])
-
-			var shouldEmitFirstAudioLatencyMetric bool
-			t.mu.Lock()
-			ttsStartedAt := t.ttsStartedAt
-			shouldEmitAudioForRequest := t.ttsRequestGeneration == ttsRequestGeneration && t.contextId == ctxID
+			packets := []internal_type.Packet{}
 			if firstChunk {
 				firstChunk = false
-				if !t.ttsMetricSent && !ttsStartedAt.IsZero() && shouldEmitAudioForRequest {
-					t.ttsMetricSent = true
-					shouldEmitFirstAudioLatencyMetric = true
-				}
-			}
-			t.mu.Unlock()
-			if !shouldEmitAudioForRequest {
-				return
-			}
-			if shouldEmitFirstAudioLatencyMetric {
-				t.onPacket(internal_type.ObservabilityMetricRecordPacket{
-					ContextID: ctxID,
-					Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-					Record:    observability.NewMetricTTSLatencyMs(time.Since(ttsStartedAt), observability.Attributes{"provider": t.Name()}),
+				packets = append(packets, internal_type.ObservabilityMetricRecordPacket{
+					ContextID: contextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
+					Record: observability.NewMetricTTSLatencyMs(time.Since(startedAt), observability.Attributes{"provider": t.Name()}),
 				})
 			}
-
-			t.onPacket(internal_type.TextToSpeechAudioPacket{ContextID: ctxID, AudioChunk: audioChunk})
+			packets = append(packets, internal_type.TextToSpeechAudioPacket{ContextID: contextID, AudioChunk: bytes.Clone(buffer[:n])})
+			t.onPacket(packets...)
+		}
+		if err == io.EOF {
+			return
 		}
 		if err != nil {
-			if err != io.EOF {
-				if requestContext.Err() != nil {
-					return
-				}
-				t.logger.Errorf("aws-tts: error reading response body: %v", err)
-				synthesisErr := fmt.Errorf("aws-tts: error reading response body: %w", err)
-				t.onPacket(
-					internal_type.TextToSpeechErrorPacket{
-						ContextID: ctxID,
-						Error:     synthesisErr,
-						Type:      internal_type.TTSNetworkTimeout,
-					},
-					internal_type.ObservabilityLogRecordPacket{
-						ContextID: ctxID,
-						Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-						Record: observability.RecordLog{
-							Level:   observability.LevelError,
-							Message: "aws-tts: error while synthesizing",
-							Attributes: observability.Attributes{
-								"component": observability.ComponentTTS.String(),
-								"provider":  t.Name(),
-								"error":     observability.AttributeValue(synthesisErr.Error()),
-							},
-							OccurredAt: time.Now(),
-						},
-					},
-				)
-			}
-			break
+			synthesisError = fmt.Errorf("aws-tts: read response: %w", err)
+			return
 		}
 	}
-
-	t.mu.Lock()
-	shouldEmitCompletionForRequest := t.ttsRequestGeneration == ttsRequestGeneration && t.contextId == ctxID
-	t.mu.Unlock()
-	if !shouldEmitCompletionForRequest {
-		return
-	}
-	t.onPacket(
-		internal_type.TextToSpeechEndPacket{ContextID: ctxID},
-		internal_type.ObservabilityEventRecordPacket{
-			ContextID: ctxID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.RecordEvent{
-				Component:  observability.ComponentTTS,
-				Event:      observability.TTSCompleted,
-				Attributes: observability.Attributes{"type": "completed"},
-				OccurredAt: time.Now(),
-			},
-		},
-	)
 }
 
 func (t *awsTTS) signPollyRequest(req *http.Request, payload []byte, now time.Time, region string) {
@@ -423,94 +270,106 @@ func ttsGetSignatureKey(secret, dateStamp, region, service string) []byte {
 }
 
 func (t *awsTTS) Transform(ctx context.Context, in internal_type.Packet) error {
-	incomingContextID := in.ContextId()
-	var requestCancelForPreviousContext context.CancelFunc
-	t.mu.Lock()
-	if incomingContextID != t.contextId {
-		requestCancelForPreviousContext = t.ttsRequestCancel
-		t.ttsRequestCancel = nil
-		t.ttsRequestGeneration++
-		t.contextId = incomingContextID
-		t.ttsStartedAt = time.Time{}
-		t.ttsMetricSent = false
-		t.textBuffer.Reset()
+	if err := ctx.Err(); err != nil {
+		return err
 	}
-	t.mu.Unlock()
-	if requestCancelForPreviousContext != nil {
-		requestCancelForPreviousContext()
+	t.stateMu.Lock()
+	if err := t.ctx.Err(); err != nil {
+		t.stateMu.Unlock()
+		return err
 	}
-
 	switch input := in.(type) {
+	case internal_type.TurnChangePacket:
+		t.stateMu.Unlock()
+		return nil
 	case internal_type.TextToSpeechInterruptPacket:
-		t.mu.Lock()
-		requestCancelForInterrupt := t.ttsRequestCancel
-		t.contextId = ""
-		t.ttsRequestCancel = nil
-		t.ttsRequestGeneration++
-		t.ttsStartedAt = time.Time{}
-		t.ttsMetricSent = false
-		t.textBuffer.Reset()
-		t.mu.Unlock()
-		if requestCancelForInterrupt != nil {
-			requestCancelForInterrupt()
+		if input.ContextID == "" || input.ContextID != t.contextId || (t.textClosed && t.synthesisCancel == nil) {
+			t.stateMu.Unlock()
+			return nil
 		}
+		if t.synthesisCancel != nil {
+			t.synthesisCancel()
+			t.synthesisCancel = nil
+		}
+		t.textClosed = true
+		t.textBuffer.Reset()
+		t.stateMu.Unlock()
 		t.onPacket(internal_type.ObservabilityEventRecordPacket{
-			ContextID: input.ContextID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+			ContextID: input.ContextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
 			Record: observability.RecordEvent{
-				Component:  observability.ComponentTTS,
-				Event:      observability.TTSInterrupted,
-				Attributes: observability.Attributes{"type": "interrupted"},
-				OccurredAt: time.Now(),
+				Component: observability.ComponentTTS, Event: observability.TTSInterrupted,
+				Attributes: observability.Attributes{"type": "interrupted"}, OccurredAt: time.Now(),
 			},
 		})
 		return nil
 	case internal_type.TextToSpeechTextPacket:
-		normalizedText := input.Text
-		if t.normalizer != nil {
-			normalizedText = t.normalizer.Normalize(input.Text)
+		if input.ContextID == "" || input.Text == "" || (input.ContextID == t.contextId && t.textClosed) {
+			t.stateMu.Unlock()
+			return nil
 		}
-		t.mu.Lock()
-		if t.ttsStartedAt.IsZero() {
+		if input.ContextID != t.contextId {
+			if t.synthesisCancel != nil {
+				t.synthesisCancel()
+				t.synthesisCancel = nil
+			}
+			t.contextId = input.ContextID
+			t.textClosed = false
+			t.textBuffer.Reset()
 			t.ttsStartedAt = time.Now()
 		}
-		t.textBuffer.WriteString(normalizedText)
-		t.mu.Unlock()
+		if t.normalizer != nil {
+			input.Text = t.normalizer.Normalize(input.Text)
+		}
+		t.textBuffer.WriteString(input.Text)
+		t.stateMu.Unlock()
 		t.onPacket(internal_type.ObservabilityEventRecordPacket{
-			ContextID: input.ContextID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+			ContextID: input.ContextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
 			Record: observability.RecordEvent{
-				Component: observability.ComponentTTS,
-				Event:     observability.TTSSpeaking,
-				Attributes: observability.Attributes{
-					"type": "speaking",
-					"text": normalizedText,
-				},
-				OccurredAt: time.Now(),
+				Component: observability.ComponentTTS, Event: observability.TTSSpeaking,
+				Attributes: observability.Attributes{"type": "speaking", "text": input.Text}, OccurredAt: time.Now(),
 			},
 		})
+		return nil
 	case internal_type.TextToSpeechDonePacket:
-		t.flush()
+		if input.ContextID != t.contextId || t.textClosed || t.textBuffer.Len() == 0 {
+			t.stateMu.Unlock()
+			return nil
+		}
+		requestCtx, cancel := context.WithCancel(ctx)
+		stopSession := context.AfterFunc(t.ctx, cancel)
+		t.synthesisCancel = cancel
+		t.textClosed = true
+		text := t.textBuffer.String()
+		t.textBuffer.Reset()
+		startedAt := t.ttsStartedAt
+		// Register the worker before Close can pass the state lock and wait for shutdown.
+		t.workers.Go(func() {
+			defer cancel()
+			defer stopSession()
+			t.synthesize(requestCtx, text, input.ContextID, startedAt)
+		})
+		t.stateMu.Unlock()
 		return nil
 	default:
+		t.stateMu.Unlock()
 		return fmt.Errorf("aws-tts: unsupported input type %T", in)
 	}
-	return nil
 }
 
 func (t *awsTTS) Close(ctx context.Context) error {
 	t.ctxCancel()
-	t.mu.Lock()
-	ctxID := t.contextId
-	connectedAt := t.ttsConnectedAt
-	requestCancelForClose := t.ttsRequestCancel
-	t.ttsRequestCancel = nil
-	t.ttsRequestGeneration++
-	t.ttsConnectedAt = time.Time{}
-	t.mu.Unlock()
-	if requestCancelForClose != nil {
-		requestCancelForClose()
+	t.stateMu.Lock()
+	if t.synthesisCancel != nil {
+		t.synthesisCancel()
+		t.synthesisCancel = nil
 	}
+	t.textClosed = true
+	t.textBuffer.Reset()
+	contextID := t.contextId
+	connectedAt := t.ttsConnectedAt
+	t.ttsConnectedAt = time.Time{}
+	t.stateMu.Unlock()
+	t.workers.Wait()
 
 	if !connectedAt.IsZero() {
 		duration := time.Since(connectedAt)
@@ -527,7 +386,7 @@ func (t *awsTTS) Close(ctx context.Context) error {
 	}
 	t.onPacket(
 		internal_type.ObservabilityEventRecordPacket{
-			ContextID: ctxID,
+			ContextID: contextID,
 			Scope:     internal_type.ObservabilityRecordScopeConversation,
 			Record: observability.RecordEvent{
 				Component: observability.ComponentTTS,

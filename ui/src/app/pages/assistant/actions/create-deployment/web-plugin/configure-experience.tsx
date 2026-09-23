@@ -2,6 +2,7 @@ import ConfigSelect from '@/app/components/configuration/config-var/config-selec
 import { TextInput, TextArea, Stack } from '@/app/components/carbon/form';
 import {
   DEFAULT_IDEAL_TIMEOUT,
+  DEFAULT_IDLE_PROMPT_COUNT,
   DEFAULT_UNCLEAR_INPUT_MESSAGE,
   DEFAULT_UNCLEAR_INPUT_TIMEOUT,
   ExperienceConfig,
@@ -105,8 +106,9 @@ export const ConfigureExperience: FC<{
                 min={5}
                 max={120}
                 step={1}
-                value={parseInt(
-                  experienceConfig.idealTimeout || DEFAULT_IDEAL_TIMEOUT,
+                value={Number(
+                  experienceConfig.idealTimeout?.trim() ||
+                    DEFAULT_IDEAL_TIMEOUT,
                 )}
                 onChange={({ value }: { value: number }) =>
                   update('idealTimeout', value.toString())
@@ -115,12 +117,13 @@ export const ConfigureExperience: FC<{
 
               <Slider
                 id="widget-backoff"
-                labelText="Idle Timeout Backoff (Times)"
+                labelText="Idle Prompt Count (0 = Unlimited)"
                 min={0}
                 max={5}
                 step={1}
-                value={parseInt(
-                  experienceConfig.idleTimeoutBackoffTimes || '2',
+                value={Number(
+                  experienceConfig.idleTimeoutBackoffTimes?.trim() ||
+                    DEFAULT_IDLE_PROMPT_COUNT,
                 )}
                 onChange={({ value }: { value: number }) =>
                   update('idleTimeoutBackoffTimes', value.toString())

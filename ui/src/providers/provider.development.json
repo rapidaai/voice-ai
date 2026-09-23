@@ -566,6 +566,10 @@
                     {
                         "label": "Australia",
                         "value": "api.au.deepgram.com"
+                    },
+                    {
+                        "label": "India",
+                        "value": "api.in.deepgram.com"
                     }
                 ]
             }

@@ -6,6 +6,25 @@ import (
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
 )
 
+func TestClearOutputBufferDiscardsStreamingTail(t *testing.T) {
+	processor, err := NewAudioProcessor(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer processor.inputWriter.Close()
+	defer processor.outputWriter.Close()
+	if err := processor.ProcessAssistantAudio(make([]byte, 802), false); err != nil {
+		t.Fatal(err)
+	}
+	processor.ClearOutputBuffer()
+	if err := processor.ProcessAssistantAudio(nil, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := processor.NextOutputFrame(); ok {
+		t.Fatal("discarded filter tail was queued again")
+	}
+}
+
 func TestAudioProcessor_AmbientConfigureAndIdleOutputFrame(t *testing.T) {
 	audioProcessor, err := NewAudioProcessor(nil)
 	if err != nil {

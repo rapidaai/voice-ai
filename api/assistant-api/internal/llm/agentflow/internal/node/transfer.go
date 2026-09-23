@@ -29,7 +29,6 @@ func (handler TransferHandler) Execute(ctx context.Context, request Request) (Re
 	if transferMessage != "" {
 		_ = request.Communication.OnPacket(ctx,
 			internal_type.LLMResponseDeltaPacket{ContextID: request.ContextID, Text: transferMessage},
-			internal_type.LLMResponseDonePacket{ContextID: request.ContextID, Text: transferMessage},
 		)
 	}
 
@@ -44,5 +43,5 @@ func (handler TransferHandler) Execute(ctx context.Context, request Request) (Re
 			"transfer_delay":       request.Node.StringConfig("transfer_delay"),
 		},
 	})
-	return Result{Terminal: true}, err
+	return Result{Terminal: true, ResponseText: transferMessage}, err
 }

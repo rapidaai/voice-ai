@@ -37,6 +37,12 @@ func TestClassify(t *testing.T) {
 			wantOK:    true,
 		},
 		{
+			name:      "interruption-decision-expired-control",
+			pkt:       internal_type.InterruptionDecisionExpiredPacket{ContextID: "c", Sequence: 1},
+			wantRoute: RouteControl,
+			wantOK:    true,
+		},
+		{
 			name:      "speech-to-text-start-control",
 			pkt:       internal_type.SpeechToTextStartPacket{ContextID: "c"},
 			wantRoute: RouteControl,
@@ -116,6 +122,7 @@ func TestClassifyName_DispatchablePacketNamesAreExplicitlyRouted(t *testing.T) {
 		internal_type.PacketNameEndOfSpeech:                                RouteIngress,
 		internal_type.PacketNameUserInput:                                  RouteIngress,
 		internal_type.PacketNameInterruptionDetected:                       RouteControl,
+		internal_type.PacketNameInterruptionDecisionExpired:                RouteControl,
 		internal_type.PacketNameEndOfSpeechInterruption:                    RouteControl,
 		internal_type.PacketNameEndOfSpeechAudio:                           RouteIngress,
 		internal_type.PacketNameTextToSpeechInterrupt:                      RouteControl,

@@ -136,6 +136,18 @@ func TestGetTextToSpeechTransformer(t *testing.T) {
 	}
 }
 
+func TestRevaiTextToSpeechFactoryRejectsUnsupportedProvider(t *testing.T) {
+	value, err := structpb.NewStruct(map[string]interface{}{"key": "test-api-key"})
+	assert.NoError(t, err)
+	transformer, err := GetTextToSpeechTransformer(context.Background(), nil, REVAI.String(),
+		&protos.VaultCredential{Value: value}, func(...internal_type.Packet) error {
+			t.Fatal("unsupported provider must not emit packets")
+			return nil
+		}, utils.Option{})
+	assert.Nil(t, transformer)
+	assert.EqualError(t, err, "revai-tts: text-to-speech is not supported")
+}
+
 func TestNewSpeechToText(t *testing.T) {
 	mockLogger, _ := commons.NewApplicationLogger()
 	ctx := context.Background()

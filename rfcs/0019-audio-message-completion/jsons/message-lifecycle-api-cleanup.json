@@ -1,0 +1,81 @@
+{
+  "date": "2026-09-11",
+  "tier": "Standard",
+  "status": "verified_and_reviewed",
+  "scope": "Simplify the internal message lifecycle contract and use behavior-based method names without changing interruption or delivery policy",
+  "acceptance_criteria": [
+    "Remove test-only state mutators, context rotation, and counters from the production contract",
+    "Use behavior-based names for generation, text completion, speech, and playback receipt operations",
+    "Keep message completion and VAD substeps private to their lifecycle owner",
+    "Remove the impossible turn-change result from interruption expiry",
+    "Preserve playback control ordering, stale-event checks, interruption recovery, prompt admission, and once-only completion",
+    "No new helper, facade, lifecycle owner, protocol, or dependency"
+  ],
+  "allowed_paths": [
+    "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler_interruption_test.go",
+    "api/assistant-api/internal/adapters/internal/interruption_test.go",
+    "api/assistant-api/internal/adapters/internal/playback_test.go",
+    "api/assistant-api/internal/adapters/internal/requestor.go",
+    "api/assistant-api/internal/adapters/lifecycle/constant.go",
+    "api/assistant-api/internal/adapters/lifecycle/error.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_interruption.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_interruption_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_lifecycle.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_lifecycle_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_playback.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_playback_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_turn.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_turn_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_vad.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_vad_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/session_lifecycle.go",
+    "api/assistant-api/internal/adapters/lifecycle/session_lifecycle_test.go",
+    "rfcs/0019-audio-message-completion/jsons/message-lifecycle-api-cleanup.json"
+  ],
+  "ownership": {
+    "coordinator": "Production code, remaining lifecycle tests, verification, and integration",
+    "adapter_test_worker": "Adapter internal package test migration only",
+    "interruption_test_worker": "Lifecycle message_interruption_test.go only"
+  },
+  "risks": [
+    "Tests that directly set state must retain equivalent scenarios through real lifecycle events",
+    "Completion must remain driven by successful output delivery and playback receipts, not generation alone",
+    "Interruption I/O boundaries must retain their existing ordering"
+  ],
+  "verification_commands": [
+    "go test -race -count=1 -timeout=180s -p 2 ./api/assistant-api/internal/adapters/...",
+    "go test -p 1 -run '^$' ./api/assistant-api/...",
+    "just agent-finalize \"$(jq -r '.allowed_paths | join(\",\")' rfcs/0019-audio-message-completion/jsons/message-lifecycle-api-cleanup.json)\"",
+    "git diff --check"
+  ],
+  "baseline": "Race tests passed in adapters/lifecycle and adapters/internal",
+  "implementation": {
+    "interface_methods_before": 49,
+    "interface_methods_after": 34,
+    "behavior": "Staged interruption configuration, playback control ordering, and completion eligibility remain unchanged",
+    "private_operations": ["observeVAD", "awaitPlayback", "completeAssistantMessage"]
+  },
+  "verification_results": {
+    "adapter_race_tests": {"exit_code": 0, "log": "/tmp/message-lifecycle-cleanup-race.log"},
+    "assistant_compile": {"exit_code": 0, "log": "/tmp/message-lifecycle-cleanup-compile.log"},
+    "agent_finalize": {"exit_code": 0, "log": "/tmp/message-lifecycle-cleanup-finalize.log"},
+    "diff_check": {"exit_code": 0},
+    "removed_method_search": {"matches": 0}
+  },
+  "independent_review": {
+    "agent_id": "01a09137-eb48-7da0-ad93-42572aa9290d",
+    "status": "approved",
+    "findings": [],
+    "summary": "Confirmed behavior-preserving API removal and naming, private completion ownership, unchanged metric and idle eligibility guards, and retained interruption and playback regression coverage"
+  },
+  "declaration_organization_follow_up": {
+    "tier": "Fast",
+    "scope": "Move existing sentinel errors to error.go and package constants to constant.go, preserving names, types, values, and behavior",
+    "status": "verified",
+    "adapter_race_tests": {"exit_code": 0, "log": "/tmp/message-lifecycle-declarations-race.log"},
+    "agent_finalize": {"exit_code": 0, "log": "/tmp/message-lifecycle-declarations-finalize.log"},
+    "diff_check": {"exit_code": 0}
+  },
+  "rollback": "Revert only this internal API cleanup diff"
+}

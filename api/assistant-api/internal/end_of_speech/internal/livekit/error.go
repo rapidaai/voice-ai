@@ -8,9 +8,12 @@ package internal_livekit
 import "errors"
 
 var (
-	errLivekitOnPacketRequired = errors.New("onPacket is required")
-	errLivekitInitTurnDetector = errors.New("livekit_eos: init turn detector")
+	// Construction errors preserve their underlying cause for errors.Is and errors.As.
+	errLivekitOnPacketRequired = errors.New("livekit_eos: packet callback is required")
+	errLivekitInvalidOption    = errors.New("livekit_eos: invalid option")
+	errLivekitInitTurnDetector = errors.New("livekit_eos: initialize turn detector")
 
+	// Tokenizer and native errors identify the failing operation; call sites wrap runtime details.
 	errTokenizerReadFile        = errors.New("tokenizer: read file")
 	errTokenizerUnmarshal       = errors.New("tokenizer: unmarshal")
 	errTokenizerPreTokenizer    = errors.New("tokenizer: unsupported pretokenizer")

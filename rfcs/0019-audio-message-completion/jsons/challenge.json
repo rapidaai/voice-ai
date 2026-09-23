@@ -1,0 +1,146 @@
+{
+  "review_type": "independent_challenge",
+  "task_id": "task_63e312dd85b4",
+  "dispatch_id": "ctx_46c96209a410",
+  "reviewed_at": "2026-09-10",
+  "correction_cycle": 1,
+  "verdict": "approve",
+  "approved_rfc_path": "rfcs/0019-audio-message-completion.md",
+  "approved_sha256": "052a55f717d3134d6c33c0ca9035d0c7f82e98d3e06092c06e6b2fe1aef4f1de",
+  "plan_path": "rfcs/0019-audio-message-completion/jsons/plan.json",
+  "plan_sha256": "94d3e9d60ae30f88d105ed506b435c8a17a6697e074511c4377a6cdb8164f3ca",
+  "metadata_status_review": {
+    "status_line": "- Status: Accepted",
+    "status_line_count": 1,
+    "source": "rg -n \"^- Status:\" rfcs/0019-audio-message-completion.md"
+  },
+  "rfc0018_reference_digests": {
+    "note": "Recorded for continuity only. This challenge did not edit RFC0018 or its signed plan.",
+    "rfcs/0018-message-playback-completion.md": "dae79ed71ee7d67db3d4fc2a4bbb338712b9ae35c3e9a13c6fddd8f28f23b8f5",
+    "rfcs/0018-message-playback-completion/jsons/plan.json": "9bfcee09a3283f8b1187eaf2741d5eb83d7b720d752f99aa565992692682ab89",
+    "rfcs/0018-message-playback-completion/jsons/confirmation-approved.json": "8b5cdd0c0dd015e12570b5f0cadce2e6af3f055943b1b17d1d247c8cdcd23c43"
+  },
+  "challenge_summary": "The RFC is the smallest complete design for the maintainer-selected single final audio marker: it reuses the existing audio oneof plus completed flag, keeps playback_sequence wire fields unused for compatibility, and moves success admission to message lifecycle after producer, synthesis, and transport evidence. The local code confirms each high-risk surface called out by the RFC and plan: current lifecycle receipt admission is too weak, streamers still admit payload-less terminals, transports still carry sequence identity, producers can emit intermediate done signals, and TTS/watchdog boundaries can be mistaken for final synthesis. No blocking or major design findings were found; implementation still requires the exact-digest maintainer confirmation gate before code changes.",
+  "findings": [
+    {
+      "severity": "none",
+      "verdict": "approve",
+      "title": "No blocking challenge findings against the final RFC bytes",
+      "details": "The RFC and plan cover the requested audio completed=true marker, producer/tool finality, provider flush versus final synthesis, explicit audio oneof admission, duplicate/stale/late output, pause/flush/error handling, callback-during-Send, text-only behavior, and compatibility of retained unused sequence fields."
+    }
+  ],
+  "code_evidence": [
+    {
+      "path": "rfcs/0019-audio-message-completion.md",
+      "lines": "11-17, 120-164, 202-225",
+      "observation": "The candidate states one final audio marker per message ID, no sequence tracking, explicit audio oneof only, text-only independence, failure handling, retained unused sequence fields, and required tests."
+    },
+    {
+      "path": "rfcs/0019-audio-message-completion/jsons/plan.json",
+      "lines": "5-14, 30-37, 51-70",
+      "observation": "The plan acceptance criteria match the RFC contract, keeps protos and RFC0018 out of scope, and lists the exact risk areas that must be verified."
+    },
+    {
+      "path": "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+      "lines": "1192-1230, 1270-1324",
+      "observation": "Text completion is currently emitted separately, audio end sends an explicit empty audio completed marker, and receipt handling currently records a diagnostic playback event only. This supports the RFC's division between text completion, marker issuance, and lifecycle-owned success."
+    },
+    {
+      "path": "api/assistant-api/internal/adapters/lifecycle/message_lifecycle.go",
+      "lines": "183-210, 425-432",
+      "observation": "Current receipt admission only checks active context, terminal-issued, and duplicate state. The RFC correctly requires expanding lifecycle ownership to generation closure, synthesis end, interruption state, send outcome, and one terminal result."
+    },
+    {
+      "path": "api/assistant-api/internal/adapters/lifecycle/message_turn.go",
+      "lines": "241-264",
+      "observation": "Assistant text completion currently emits assistant_turn=complete. The RFC explicitly prevents generation end alone from completing audio messages while preserving the text-only path."
+    },
+    {
+      "path": "api/assistant-api/internal/adapters/lifecycle/session_lifecycle.go",
+      "lines": "246-260, 297-323",
+      "observation": "Session lifecycle already owns idle timer start and expiry validation through MessageLifecycle.CanStartIdleTimeout, matching the RFC's owner split."
+    },
+    {
+      "path": "api/assistant-api/internal/adapters/internal/stream.go",
+      "lines": "49-61",
+      "observation": "Playback receipts are synchronously dispatched and currently carry id plus playback_sequence. RFC0019 can ignore the sequence field while retaining the wire data."
+    },
+    {
+      "path": "api/assistant-api/internal/channel/grpc/streamer.go",
+      "lines": "278-302",
+      "observation": "Plain gRPC currently treats a completed message with nil oneof as an audio terminal. The RFC and plan explicitly require text and payload-less completion not to close audio playback."
+    },
+    {
+      "path": "api/assistant-api/internal/channel/webrtc/output_loop.go",
+      "lines": "64-68",
+      "observation": "WebRTC output routing currently accepts either audio oneof or nil oneof plus completed as audio. The RFC's audio-oneof-only rule covers this required change."
+    },
+    {
+      "path": "api/assistant-api/internal/channel/webrtc/streamer.go",
+      "lines": "1204-1312, 1621-1632",
+      "observation": "WebRTC drains resampler/codec tail before local playback receipt and currently carries playback_sequence. The RFC keeps the drain behavior but removes sequence identity from completion admission."
+    },
+    {
+      "path": "api/assistant-api/internal/channel/telephony/internal/media/session.go",
+      "lines": "73-125, 300-329, 356-404",
+      "observation": "Telephony media currently keys queued responses by id plus playback_sequence, emits receipts after output drain, and marks failed writes. RFC0019's single message-level marker requires simplifying identity while preserving failure and drain behavior."
+    },
+    {
+      "path": "api/assistant-api/internal/channel/telephony/internal/asterisk/audiosocket/streamer.go",
+      "lines": "349-370",
+      "observation": "Asterisk AudioSocket currently admits nil oneof plus completed. This is explicitly covered by the audio-only final marker requirement."
+    },
+    {
+      "path": "api/assistant-api/internal/llm/model/model_execute.go",
+      "lines": "411-506",
+      "observation": "Model completion currently executes tool calls before emitting LLMResponseDonePacket. The RFC correctly makes the outer response executor responsible for final closure after admitted continuations."
+    },
+    {
+      "path": "api/assistant-api/internal/llm/agentkit/agentkit_stream.go",
+      "lines": "221-290",
+      "observation": "AgentKit has an independent completed-text boundary, so including all producer lanes in the plan is necessary."
+    },
+    {
+      "path": "api/assistant-api/internal/llm/websocket/websocket.go",
+      "lines": "501-525",
+      "observation": "The websocket LLM path has a separate complete response translation, confirming the plan must cover websocket producer finality."
+    },
+    {
+      "path": "api/assistant-api/internal/llm/agentflow/internal/node/agent.go",
+      "lines": "180-195",
+      "observation": "Agentflow can emit done packets at node boundaries, matching the RFC's warning that workflow node completion is not automatically whole-message finality."
+    },
+    {
+      "path": "api/assistant-api/internal/transformer/cartesia/tts.go",
+      "lines": "132-164, 356-391",
+      "observation": "Cartesia emits TextToSpeechEndPacket only after provider flush completion, so the RFC's provider-flush versus final-synthesis distinction is required and code-grounded."
+    },
+    {
+      "path": "api/assistant-api/internal/transformer/rime/tts.go",
+      "lines": "216-227, 347-362",
+      "observation": "Rime has the same provider confirmed flush boundary, which the RFC includes."
+    },
+    {
+      "path": "api/assistant-api/internal/watchdog/tts_completion.go",
+      "lines": "261-303",
+      "observation": "The watchdog can emit TextToSpeechEndPacket on deadline expiry. The RFC explicitly says timeout is failure, not successful completion, so implementation must change this path accordingly."
+    },
+    {
+      "path": "protos/artifacts/talk-api.proto",
+      "lines": "219-252",
+      "observation": "Local protobuf sources already retain playback_sequence fields at their RFC0018 tags. RFC0019 correctly leaves protos out of scope and requires those fields to remain unused and unchanged."
+    }
+  ],
+  "negative_checks": [
+    "Did not request coordinator keys.",
+    "Did not start nested workers.",
+    "Did not implement production code.",
+    "Did not edit RFC0018 or its signed plan.",
+    "Did not remove or reuse playback_sequence wire fields."
+  ],
+  "remaining_work": [
+    "Maintainer must approve the exact digest 052a55f717d3134d6c33c0ca9035d0c7f82e98d3e06092c06e6b2fe1aef4f1de before implementation starts.",
+    "Implementation must update every allowed producer, synthesis, lifecycle, adapter, and transport path together and run the plan's focused tests plus just agent-finalize with the exact changed-file inventory.",
+    "Callback authority should remain disabled or diagnostic-only for unverified clients until native, gRPC, and WebRTC behavior is verified against the audio-only marker contract."
+  ]
+}

@@ -24,10 +24,12 @@ type UnclearInputWatchdog struct {
 
 	timer *time.Timer
 
-	generation uint64
-	active     bool
-	contextID  string
-	deadline   time.Time
+	generation        uint64
+	active            bool
+	contextID         string
+	deadline          time.Time
+	expiredGeneration uint64
+	expiredContextID  string
 }
 
 func NewUnclearInputWatchdog(opts ...UnclearInputOption) *UnclearInputWatchdog {
@@ -109,6 +111,8 @@ func (w *UnclearInputWatchdog) Stop() bool {
 		w.timer = nil
 	}
 	w.generation++
+	w.expiredGeneration = 0
+	w.expiredContextID = ""
 	w.active = false
 	w.contextID = ""
 	w.deadline = time.Time{}
@@ -120,12 +124,20 @@ func (w *UnclearInputWatchdog) Cancel() bool {
 	return w.Stop()
 }
 
+func (w *UnclearInputWatchdog) AcceptExpiry(packet internal_type.UnclearInputExpiredPacket) bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return packet.Generation != 0 && packet.Generation == w.expiredGeneration && packet.ContextID == w.expiredContextID
+}
+
 func (w *UnclearInputWatchdog) startLocked(contextID string, timeout time.Duration) {
 	if w.timer != nil {
 		w.timer.Stop()
 		w.timer = nil
 	}
 	w.generation++
+	w.expiredGeneration = 0
+	w.expiredContextID = ""
 	w.active = true
 	w.contextID = contextID
 	w.deadline = time.Now().Add(timeout)
@@ -144,6 +156,8 @@ func (w *UnclearInputWatchdog) expire(generation uint64) {
 	}
 
 	contextID := w.contextID
+	w.expiredGeneration = generation
+	w.expiredContextID = contextID
 	w.timer = nil
 	w.generation++
 	w.active = false
@@ -167,7 +181,7 @@ func (w *UnclearInputWatchdog) expire(generation uint64) {
 					OccurredAt: time.Now(),
 				},
 			},
-			internal_type.UnclearInputExpiredPacket{ContextID: contextID},
+			internal_type.UnclearInputExpiredPacket{ContextID: contextID, Generation: generation},
 		)
 	}
 }

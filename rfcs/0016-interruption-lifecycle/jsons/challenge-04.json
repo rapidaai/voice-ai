@@ -1,0 +1,69 @@
+{
+  "rfc": "0016-interruption-lifecycle",
+  "date": "2026-09-06",
+  "run_id": "run_94aeb7c54726",
+  "task_id": "task_a4aaa63d8efa",
+  "dispatch_id": "ctx_6c5c176f51e9",
+  "decision": "not_approved",
+  "reviewed_bytes": {
+    "rfc_sha256": "a0fc6d4108c996fe354d5484fef83a2c809424b19fc3729b98c0ce77bb924d7e",
+    "plan_sha256": "a7ed12a52d10d39fe7d9e5aa4fbe0329422252753eb63cf859914174db197f72",
+    "sole_status_line": "- Status: Accepted"
+  },
+  "severity_counts": {
+    "critical": 0,
+    "major": 6,
+    "minor": 1
+  },
+  "major_findings": [
+    {
+      "id": "M1",
+      "title": "Pause failure cannot reach adapter recovery",
+      "detail": "Notify logs Streamer.Send errors and always returns nil, so the adapter cannot apply the proposed commit-on-pause-failure rule.",
+      "required_decision": "Permit error propagation through the existing Notify owner or choose another internal control delivery mechanism."
+    },
+    {
+      "id": "M2",
+      "title": "Deadline delivery and shutdown are not bounded",
+      "detail": "A timer callback can block on the control queue after shutdown or when the queue is full, and stopping the timer does not retire a callback already running.",
+      "required_decision": "Define cancellable deadline delivery and recovery that never leaves output paused."
+    },
+    {
+      "id": "M3",
+      "title": "Same-context late STT cannot be attributed",
+      "detail": "After candidate A continues, candidate B may start in the same context. A delayed transcript from A is indistinguishable from B without STT utterance provenance.",
+      "required_decision": "Either add minimal internal utterance attribution or prohibit transcript-based early commitment in the first implementation."
+    },
+    {
+      "id": "M4",
+      "title": "Candidate-free word and text interruption is unspecified",
+      "detail": "Existing word-triggered and direct text paths can commit interruption without a VAD-created candidate, but the proposed TurnChange validation requires one pending candidate.",
+      "required_decision": "Define a separate direct-text commit path or create a candidate for those triggers."
+    },
+    {
+      "id": "M5",
+      "title": "Reset-before-replay ordering is not guaranteed",
+      "detail": "EOS and TTS interruption handlers are asynchronous, so enqueue order cannot guarantee old reset completion before held STT replay.",
+      "required_decision": "Add a completion barrier or keep replay out of the first implementation."
+    },
+    {
+      "id": "M6",
+      "title": "Flush lacks an output admission barrier",
+      "detail": "Old audio can pass its context check and enqueue after flush, and the later public interruption notification can clear new audio.",
+      "required_decision": "Define one lock or ordered output path covering context admission, internal flush, and public notification."
+    }
+  ],
+  "minor_findings": [
+    {
+      "id": "m1",
+      "title": "Verification and active-output coverage are incomplete",
+      "detail": "The plan needs exact lifecycle, model, type, active-output, blocked-control, punctuation, and streamer coverage."
+    }
+  ],
+  "positive_assessment": [
+    "Keeping Streamer unchanged is sound",
+    "One adapter candidate and a fixed window are appropriately small once freshness and ordering are specified",
+    "All-consumer rollout as one release unit is appropriate"
+  ],
+  "next_action": "Obtain maintainer decisions for the six major findings before another RFC revision or implementation."
+}

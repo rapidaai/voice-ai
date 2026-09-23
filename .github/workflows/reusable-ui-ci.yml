@@ -51,6 +51,10 @@ jobs:
         working-directory: ui
         run: yarn test:public-assets
 
+      - name: Check UI dependencies
+        working-directory: ui
+        run: yarn check:dependencies
+
       - name: Run ESLint
         working-directory: ui
         run: yarn lint

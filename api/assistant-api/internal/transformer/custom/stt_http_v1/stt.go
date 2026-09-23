@@ -63,6 +63,10 @@ func NewSpeechToText(
 	if err != nil {
 		return nil, err
 	}
+	sampleRate, err := utils.IntToUint32(config.SampleRate)
+	if err != nil {
+		return nil, fmt.Errorf("custom-stt http_v1: invalid sample rate: %w", err)
+	}
 	transformerContext, cancel := context.WithCancel(ctx)
 	audioResampler := resampler_soxr.New(
 		resampler_soxr.WithLogger(logger),
@@ -79,7 +83,7 @@ func NewSpeechToText(
 		resampler:         audioResampler,
 		sourceAudioConfig: internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG,
 		targetAudioConfig: &protos.AudioConfig{
-			SampleRate:  uint32(config.SampleRate),
+			SampleRate:  sampleRate,
 			AudioFormat: protos.AudioConfig_LINEAR16,
 			Channels:    1,
 		},
@@ -296,10 +300,16 @@ func (transformer *speechToText) transcribe(contextID string, pcmAudio []byte, s
 		})
 		return
 	}
-	requests, err := transformer.engine.EvaluateRequestRules(
-		requestPacketAudio,
-		transformer.config.newRequestScope(contextID, pcmAudio),
-	)
+	scope, err := transformer.config.newRequestScope(contextID, pcmAudio)
+	if err != nil {
+		transformer.onPacket(internal_type.SpeechToTextErrorPacket{
+			ContextID: contextID,
+			Error:     err,
+			Type:      internal_type.STTInvalidInput,
+		})
+		return
+	}
+	requests, err := transformer.engine.EvaluateRequestRules(requestPacketAudio, scope)
 	if err != nil {
 		transformer.onPacket(internal_type.SpeechToTextErrorPacket{
 			ContextID: contextID,

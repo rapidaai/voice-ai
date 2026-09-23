@@ -97,6 +97,26 @@ describe('Groq STT — config vs original', () => {
 describe('Deepgram STT — config vs original', () => {
   const config = loadProviderConfig('deepgram')!;
 
+  it('exposes India endpoint in development and production credential configs', () => {
+    const developmentProviders = require('../provider.development.json');
+    const productionProviders = require('../provider.production.json');
+
+    const endpointValues = (providers: any[]) => {
+      const provider = providers.find(item => item.code === 'deepgram');
+      const endpoint = provider.configurations.find(
+        (item: any) => item.name === 'endpoint',
+      );
+      return endpoint.choices.map((choice: any) => choice.value);
+    };
+
+    expect(endpointValues(developmentProviders)).toEqual(
+      expect.arrayContaining(['api.in.deepgram.com']),
+    );
+    expect(endpointValues(productionProviders)).toEqual(
+      expect.arrayContaining(['api.in.deepgram.com']),
+    );
+  });
+
   it('produces the same default keys and values', () => {
     const result = getDefaultsFromConfig(config, 'stt', [], 'deepgram');
     expect(findMeta(result, 'listen.model')).toBe('nova-3');

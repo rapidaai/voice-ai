@@ -35,10 +35,12 @@ type deepgramTTS struct {
 	ctxCancel      context.CancelFunc
 	contextId      string
 	ttsConnectedAt time.Time
-	mu             sync.Mutex
+	stateMu        sync.Mutex
+	writeMu        sync.Mutex
+	readers        sync.WaitGroup
 
-	ttsStartedAt  time.Time
-	ttsMetricSent bool
+	ttsStartedAt time.Time
+	clearDone    chan struct{}
 
 	logger     commons.Logger
 	connection *websocket.Conn
@@ -66,16 +68,32 @@ func NewDeepgramTextToSpeech(ctx context.Context, logger commons.Logger, credent
 	}, nil
 }
 
-// Initialize opens a fresh WebSocket connection to Deepgram and starts the
-// read goroutine. Called at session start and after each interruption so the
-// connection is warm before the first text delta arrives.
+// Initialize opens the session connection, reusing it while it remains healthy.
 func (t *deepgramTTS) Initialize() error {
+	t.writeMu.Lock()
+	defer t.writeMu.Unlock()
+	t.stateMu.Lock()
+	defer t.stateMu.Unlock()
+	return t.connect(t.ctx)
+}
+
+// connect requires both locks; the reader cannot replace a socket during setup.
+func (t *deepgramTTS) connect(ctx context.Context) error {
+	if err := t.ctx.Err(); err != nil {
+		return err
+	}
+	if t.connection != nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	stop := context.AfterFunc(t.ctx, cancel)
+	defer stop()
 	start := time.Now()
 	header := http.Header{}
 	header.Set("Authorization", fmt.Sprintf("token %s", t.GetKey()))
-	conn, resp, err := websocket.DefaultDialer.Dial(t.GetTextToSpeechConnectionString(), header)
+	conn, _, err := websocket.DefaultDialer.DialContext(ctx, t.GetTextToSpeechConnectionString(), header)
 	if err != nil {
-		t.logger.Errorf("deepgram-tts: websocket dial failed err=%v resp=%v", err, resp)
 		t.onPacket(
 			internal_type.ObservabilityLogRecordPacket{
 				Scope: internal_type.ObservabilityRecordScopeConversation,
@@ -90,16 +108,18 @@ func (t *deepgramTTS) Initialize() error {
 					OccurredAt: time.Now(),
 				},
 			})
+		return fmt.Errorf("deepgram-tts: connect: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		_ = conn.Close()
 		return err
 	}
 
-	t.mu.Lock()
 	t.connection = conn
 	if t.ttsConnectedAt.IsZero() {
 		t.ttsConnectedAt = time.Now()
 	}
-	t.mu.Unlock()
-	go t.readLoop(conn)
+	t.readers.Go(func() { t.readLoop(conn) })
 	t.onPacket(
 		internal_type.ObservabilityMetricRecordPacket{
 			Scope: internal_type.ObservabilityRecordScopeConversation,
@@ -132,222 +152,330 @@ func (*deepgramTTS) Name() string {
 	return deepgram_internal.TextToSpeechTransformerName
 }
 
-// handleFlushComplete is called when Deepgram signals Flushed. It emits
-// TextToSpeechEndPacket — correctly ordered after the last audio chunk — and
-// closes the per-turn connection.
-func (t *deepgramTTS) handleFlushComplete(conn *websocket.Conn) {
-	t.mu.Lock()
-	ctxId := t.contextId
-	t.connection = nil // mark before Close so readLoop error handler sees intentional
-	t.mu.Unlock()
-	t.onPacket(
-		internal_type.TextToSpeechEndPacket{ContextID: ctxId},
-		internal_type.ObservabilityEventRecordPacket{
-			ContextID: ctxId,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.RecordEvent{
-				Component:  observability.ComponentTTS,
-				Event:      observability.TTSCompleted,
-				Attributes: observability.Attributes{"type": "completed"},
-				OccurredAt: time.Now(),
-			},
-		},
-	)
-	conn.Close()
-}
-
-// readLoop owns a single WebSocket connection for the duration of one TTS turn.
-// It exits when the connection closes — intentionally (interrupt / flush complete)
-// or unexpectedly (network drop).
+// The reader accepts output only from its connection and current synthesis boundary.
 func (t *deepgramTTS) readLoop(conn *websocket.Conn) {
+	stop := context.AfterFunc(t.ctx, func() { _ = conn.Close() })
+	defer stop()
+	defer conn.Close()
 	for {
-		select {
-		case <-t.ctx.Done():
-			return
-		default:
-		}
-
 		msgType, data, err := conn.ReadMessage()
-		if err != nil {
-			t.mu.Lock()
-			if t.connection != conn {
-				t.mu.Unlock()
-				return
+		var envelope deepgram_internal.DeepgramTextToSpeechResponse
+		if err == nil && msgType == websocket.TextMessage {
+			if err := json.Unmarshal(data, &envelope); err != nil {
+				continue
 			}
-			// Active connection dropped; next text packet reconnects.
+			if envelope.Type == "Error" {
+				err = fmt.Errorf("%s: %s", envelope.Code, envelope.Message)
+			}
+		}
+		t.stateMu.Lock()
+		if t.connection != conn {
+			t.stateMu.Unlock()
+			return
+		}
+		if err != nil {
 			t.connection = nil
-			t.mu.Unlock()
-			t.logger.Errorf("deepgram-tts: connection lost: %v", err)
+			contextID := t.contextId
+			if t.clearDone != nil {
+				close(t.clearDone)
+				t.clearDone = nil
+			}
+			t.stateMu.Unlock()
+			_ = conn.Close()
+			if contextID != "" && t.ctx.Err() == nil {
+				t.onPacket(internal_type.TextToSpeechErrorPacket{
+					ContextID: contextID, Error: fmt.Errorf("deepgram-tts: receive: %w", err),
+					Type: internal_type.TTSNetworkTimeout,
+				})
+			}
 			return
 		}
 
 		if msgType == websocket.BinaryMessage {
-			var shouldEmitFirstAudioLatencyMetric bool
-			t.mu.Lock()
-			ttsStartedAt := t.ttsStartedAt
-			contextId := t.contextId
-			if !t.ttsMetricSent && !ttsStartedAt.IsZero() {
-				t.ttsMetricSent = true
-				shouldEmitFirstAudioLatencyMetric = true
+			if t.contextId == "" {
+				t.stateMu.Unlock()
+				continue
 			}
-			t.mu.Unlock()
-			if shouldEmitFirstAudioLatencyMetric {
+			contextID, startedAt := t.contextId, t.ttsStartedAt
+			t.ttsStartedAt = time.Time{}
+			t.stateMu.Unlock()
+			if !startedAt.IsZero() {
 				t.onPacket(internal_type.ObservabilityMetricRecordPacket{
-					ContextID: contextId,
+					ContextID: contextID,
 					Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-					Record:    observability.NewMetricTTSLatencyMs(time.Since(ttsStartedAt), observability.Attributes{"provider": t.Name()}),
+					Record:    observability.NewMetricTTSLatencyMs(time.Since(startedAt), observability.Attributes{"provider": t.Name()}),
 				})
 			}
 			t.onPacket(internal_type.TextToSpeechAudioPacket{
-				ContextID:  contextId,
+				ContextID:  contextID,
 				AudioChunk: data,
 			})
 			continue
 		}
 
-		var envelope *deepgram_internal.DeepgramTextToSpeechResponse
-		if err := json.Unmarshal(data, &envelope); err != nil {
-			continue
-		}
-
 		switch envelope.Type {
 		case "Metadata":
-			continue
 		case "Flushed":
-			t.handleFlushComplete(conn)
-			return
+			if t.contextId != "" {
+				contextID := t.contextId
+				t.contextId = ""
+				t.stateMu.Unlock()
+				t.onPacket(
+					internal_type.TextToSpeechEndPacket{ContextID: contextID},
+					internal_type.ObservabilityEventRecordPacket{
+						ContextID: contextID,
+						Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+						Record: observability.RecordEvent{
+							Component: observability.ComponentTTS, Event: observability.TTSCompleted,
+							Attributes: observability.Attributes{"type": "completed"}, OccurredAt: time.Now(),
+						},
+					},
+				)
+				continue
+			}
 		case "Cleared":
-			continue
+			if t.clearDone != nil {
+				close(t.clearDone)
+				t.clearDone = nil
+			}
 		case "Warning":
 			t.logger.Warnf("deepgram-tts warning code=%s message=%s", envelope.Code, envelope.Message)
 		default:
 			t.logger.Debugf("deepgram-tts: unhandled message type: %s", envelope.Type)
 		}
+		t.stateMu.Unlock()
 	}
 }
 
 // Transform streams text into Deepgram
 func (t *deepgramTTS) Transform(ctx context.Context, in internal_type.Packet) error {
-	t.mu.Lock()
-	if in.ContextId() != t.contextId {
-		t.contextId = in.ContextId()
-		t.ttsStartedAt = time.Time{}
-		t.ttsMetricSent = false
+	if err := ctx.Err(); err != nil {
+		return err
 	}
-	connection := t.connection
-	t.mu.Unlock()
-
-	switch input := in.(type) {
-	case internal_type.TextToSpeechInterruptPacket:
-		t.mu.Lock()
-		t.contextId = ""
-		t.ttsStartedAt = time.Time{}
-		t.ttsMetricSent = false
-		conn := t.connection
-		t.connection = nil
-		t.mu.Unlock()
-		if conn != nil {
-			conn.Close()
+	if err := t.ctx.Err(); err != nil {
+		return err
+	}
+	if input, ok := in.(internal_type.TextToSpeechInterruptPacket); ok {
+		t.stateMu.Lock()
+		if input.ContextID != t.contextId || t.contextId == "" || t.connection == nil {
+			t.stateMu.Unlock()
+			return nil
 		}
-		t.onPacket(internal_type.ObservabilityEventRecordPacket{
-			ContextID: input.ContextID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.RecordEvent{
-				Component:  observability.ComponentTTS,
-				Event:      observability.TTSInterrupted,
-				Attributes: observability.Attributes{"type": "interrupted"},
-				OccurredAt: time.Now(),
-			},
-		})
-		if err := t.Initialize(); err != nil {
-			t.logger.Errorf("deepgram-tts: reconnect after interrupt failed: %v", err)
+		// Interruption cannot wait behind the write it needs to cancel.
+		if !t.writeMu.TryLock() {
+			connection := t.connection
+			t.connection = nil
+			if t.clearDone != nil {
+				close(t.clearDone)
+				t.clearDone = nil
+			}
+			t.stateMu.Unlock()
+			if connection != nil {
+				_ = connection.Close()
+			}
+			t.onPacket(internal_type.ObservabilityEventRecordPacket{
+				ContextID: input.ContextID,
+				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentTTS, Event: observability.TTSInterrupted,
+					Attributes: observability.Attributes{"type": "interrupted"}, OccurredAt: time.Now(),
+				},
+			})
+			return nil
 		}
-		return nil
+		t.stateMu.Unlock()
+	} else {
+		t.writeMu.Lock()
+	}
+	defer t.writeMu.Unlock()
 
-	case internal_type.TextToSpeechTextPacket:
-		if connection == nil {
-			if err := t.Initialize(); err != nil {
-				t.onPacket(internal_type.TextToSpeechErrorPacket{
-					ContextID: input.ContextID,
-					Error:     fmt.Errorf("deepgram-tts: failed to connect: %w", err),
-					Type:      internal_type.TTSNetworkTimeout,
-				})
+	// A replacement clears the old synthesis before sending its text.
+	for {
+		t.stateMu.Lock()
+		if err := ctx.Err(); err != nil {
+			t.stateMu.Unlock()
+			return err
+		}
+		if err := t.ctx.Err(); err != nil {
+			t.stateMu.Unlock()
+			return err
+		}
+		var command map[string]string
+		switch input := in.(type) {
+		case internal_type.TurnChangePacket:
+			t.stateMu.Unlock()
+			return nil
+		case internal_type.TextToSpeechInterruptPacket:
+			if input.ContextID != t.contextId || t.contextId == "" || t.connection == nil {
+				t.stateMu.Unlock()
 				return nil
 			}
-			t.mu.Lock()
-			connection = t.connection
-			t.mu.Unlock()
+			t.contextId = ""
+			t.clearDone = make(chan struct{})
+			command = map[string]string{"type": "Clear"}
+		case internal_type.TextToSpeechTextPacket:
+			if input.ContextID == "" {
+				t.stateMu.Unlock()
+				return fmt.Errorf("deepgram-tts: text requires a context ID")
+			}
+			// A failed socket cannot resume the synthesis that was using it.
+			if t.connection == nil && input.ContextID == t.contextId {
+				t.stateMu.Unlock()
+				return nil
+			}
+			if t.contextId != "" && t.contextId != input.ContextID {
+				t.contextId = ""
+				if t.connection != nil {
+					t.clearDone = make(chan struct{})
+					command = map[string]string{"type": "Clear"}
+					break
+				}
+			}
+			if clearDone := t.clearDone; clearDone != nil {
+				t.stateMu.Unlock()
+				// Untagged audio must reach Clear before a new message starts.
+				timer := time.NewTimer(2 * time.Second)
+				defer timer.Stop()
+				select {
+				case <-clearDone:
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-t.ctx.Done():
+					return t.ctx.Err()
+				case <-timer.C:
+					t.stateMu.Lock()
+					if t.clearDone != nil {
+						_ = t.connection.Close()
+						t.connection = nil
+						close(t.clearDone)
+						t.clearDone = nil
+					}
+					t.stateMu.Unlock()
+				}
+				continue
+			}
+			if err := t.connect(ctx); err != nil {
+				t.contextId = input.ContextID
+				t.stateMu.Unlock()
+				if err := t.ctx.Err(); err != nil {
+					return err
+				}
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+				t.onPacket(internal_type.TextToSpeechErrorPacket{ContextID: input.ContextID, Error: err, Type: internal_type.TTSNetworkTimeout})
+				return nil
+			}
+			if input.ContextID != t.contextId {
+				t.contextId = input.ContextID
+				t.ttsStartedAt = time.Now()
+			}
+			command = map[string]string{"type": "Speak", "text": t.normalizer.Normalize(input.Text)}
+		case internal_type.TextToSpeechDonePacket:
+			if input.ContextID != t.contextId || t.contextId == "" || t.connection == nil {
+				t.stateMu.Unlock()
+				return nil
+			}
+			command = map[string]string{"type": "Flush"}
+		default:
+			t.stateMu.Unlock()
+			return fmt.Errorf("deepgram-tts: unsupported input type %T", in)
 		}
-		t.mu.Lock()
-		if t.ttsStartedAt.IsZero() {
-			t.ttsStartedAt = time.Now()
-		}
-		t.mu.Unlock()
-		normalized := t.normalizer.Normalize(input.Text)
-		if err := connection.WriteJSON(map[string]interface{}{
-			"type": "Speak",
-			"text": normalized,
-		}); err != nil {
-			t.logger.Errorf("deepgram-tts: failed to send Speak message %v", err)
-			t.onPacket(internal_type.TextToSpeechErrorPacket{
-				ContextID: input.ContextID,
-				Error:     fmt.Errorf("deepgram-tts: failed to send Speak message: %w", err),
-				Type:      internal_type.TTSNetworkTimeout,
-			})
-			return nil
-		}
-		t.onPacket(internal_type.ObservabilityEventRecordPacket{
-			ContextID: input.ContextID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.RecordEvent{
-				Component: observability.ComponentTTS,
-				Event:     observability.TTSSpeaking,
-				Attributes: observability.Attributes{
-					"type": "speaking",
-					"text": normalized,
-				},
-				OccurredAt: time.Now(),
-			},
+		connection := t.connection
+		t.stateMu.Unlock()
+
+		writeCancelled := make(chan struct{})
+		stopWriteCancellation := context.AfterFunc(ctx, func() {
+			t.stateMu.Lock()
+			if t.connection == connection {
+				t.connection = nil
+				if t.clearDone != nil {
+					close(t.clearDone)
+					t.clearDone = nil
+				}
+			}
+			t.stateMu.Unlock()
+			_ = connection.Close()
+			close(writeCancelled)
 		})
-		return nil
-
-	case internal_type.TextToSpeechDonePacket:
-		// Interrupted before done arrived — nothing to flush.
-		if connection == nil {
+		err := connection.WriteJSON(command)
+		// A late cancellation must finish before this socket can be reused.
+		if !stopWriteCancellation() {
+			<-writeCancelled
+		}
+		t.stateMu.Lock()
+		if ctx.Err() != nil || t.ctx.Err() != nil {
+			t.stateMu.Unlock()
+			return ctx.Err()
+		}
+		if t.connection != connection && command["type"] != "Clear" {
+			t.stateMu.Unlock()
 			return nil
 		}
-		// Signal end of text stream; Deepgram will respond with Flushed.
-		if err := connection.WriteJSON(map[string]string{"type": "Flush"}); err != nil {
-			t.logger.Errorf("deepgram-tts: failed to send Flush %v", err)
-			t.onPacket(internal_type.TextToSpeechErrorPacket{
-				ContextID: input.ContextID,
-				Error:     fmt.Errorf("deepgram-tts: failed to send Flush: %w", err),
-				Type:      internal_type.TTSNetworkTimeout,
+		if err != nil {
+			_ = connection.Close()
+			t.connection = nil
+			if t.clearDone != nil {
+				close(t.clearDone)
+				t.clearDone = nil
+			}
+		}
+		t.stateMu.Unlock()
+		if command["type"] == "Clear" && in.PacketName() == internal_type.PacketNameTextToSpeechText {
+			continue
+		}
+		if err != nil {
+			err = fmt.Errorf("deepgram-tts: %s: %w", command["type"], err)
+			if in.PacketName() == internal_type.PacketNameTextToSpeechInterrupt {
+				return err
+			}
+			t.onPacket(internal_type.TextToSpeechErrorPacket{ContextID: in.ContextId(), Error: err, Type: internal_type.TTSNetworkTimeout})
+			return nil
+		}
+		switch in.(type) {
+		case internal_type.TextToSpeechInterruptPacket:
+			t.onPacket(internal_type.ObservabilityEventRecordPacket{
+				ContextID: in.ContextId(), Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentTTS, Event: observability.TTSInterrupted,
+					Attributes: observability.Attributes{"type": "interrupted"}, OccurredAt: time.Now(),
+				},
 			})
-			return nil
+		case internal_type.TextToSpeechTextPacket:
+			t.onPacket(internal_type.ObservabilityEventRecordPacket{
+				ContextID: in.ContextId(), Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentTTS, Event: observability.TTSSpeaking,
+					Attributes: observability.Attributes{"type": "speaking", "text": command["text"]}, OccurredAt: time.Now(),
+				},
+			})
 		}
-		// TextToSpeechEndPacket is emitted by handleFlushComplete once Flushed received.
 		return nil
-
-	default:
-		return fmt.Errorf("deepgram-tts: unsupported input type %T", in)
 	}
 }
 
 // Close gracefully closes the Deepgram connection
 func (t *deepgramTTS) Close(ctx context.Context) error {
 	t.ctxCancel()
-	t.mu.Lock()
+	t.writeMu.Lock()
+	t.stateMu.Lock()
 	connectedAt := t.ttsConnectedAt
 	t.ttsConnectedAt = time.Time{}
 
-	if t.connection != nil {
-		conn := t.connection
-		t.connection = nil
-		_ = conn.WriteJSON(map[string]string{"type": "Close"})
-		conn.Close()
+	conn := t.connection
+	t.connection = nil
+	if t.clearDone != nil {
+		close(t.clearDone)
+		t.clearDone = nil
 	}
-	t.mu.Unlock()
+	t.stateMu.Unlock()
+	if conn != nil {
+		_ = conn.SetWriteDeadline(time.Now().Add(time.Second))
+		_ = conn.WriteJSON(map[string]string{"type": "Close"})
+		_ = conn.Close()
+	}
+	t.writeMu.Unlock()
+	t.readers.Wait()
 	if !connectedAt.IsZero() {
 		duration := time.Since(connectedAt)
 		t.onPacket(

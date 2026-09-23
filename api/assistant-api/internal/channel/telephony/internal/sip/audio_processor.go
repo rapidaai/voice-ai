@@ -23,6 +23,7 @@ import (
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/protos"
 	"github.com/zaf/g711"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -354,6 +355,10 @@ func (p *AudioProcessor) completeOutputLocked() {
 func (p *AudioProcessor) ClearOutputBuffer() {
 	p.outputMu.Lock()
 	defer p.outputMu.Unlock()
+	if p.writers.assistant != nil {
+		// Flush filter history before discarding the response, including its tail.
+		_ = p.writers.assistant.Flush()
+	}
 	p.providerOutputBuffer.Clear()
 	p.bridgeOutputBuffer.Clear()
 }
@@ -403,6 +408,12 @@ func (p *AudioProcessor) NextOutputFrame() (internal_telephony_media.AssistantOu
 		ProviderAudio: p.applyAmbient(providerAudio),
 		BridgeAudio:   bridgeAudio,
 	}, true
+}
+
+func (p *AudioProcessor) OutputDrained() bool {
+	p.outputMu.Lock()
+	defer p.outputMu.Unlock()
+	return !p.transferActive.Load() && p.providerOutputBuffer.Len() == 0
 }
 
 func (p *AudioProcessor) IdleOutputFrame() (internal_telephony_media.AssistantOutputFrame, bool) {
@@ -524,7 +535,7 @@ func (p *AudioProcessor) RecordTransferOperatorAudio(audio []byte) {
 }
 
 // RunBridgeRecorder pushes bridge audio into the Talk pipeline.
-func (p *AudioProcessor) RunBridgeRecorder(ctx context.Context, streamSink func(internal_type.Stream)) {
+func (p *AudioProcessor) RunBridgeRecorder(ctx context.Context, streamSink func(proto.Message)) {
 	for {
 		select {
 		case <-ctx.Done():
