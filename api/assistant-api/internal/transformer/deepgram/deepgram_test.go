@@ -54,6 +54,18 @@ func TestNewDeepgramOption_WithEndpoint(t *testing.T) {
 	assert.Equal(t, "api.eu.deepgram.com", opt.ClientOptions().Host)
 }
 
+func TestNewDeepgramOption_WithIndiaEndpoint(t *testing.T) {
+	cred := newVaultCredential(map[string]interface{}{
+		"key":      "test-api-key",
+		"endpoint": "api.in.deepgram.com",
+	})
+	opt, err := deepgram_internal.NewDeepgramOption(testutil.NewTestLogger(), cred, utils.Option{})
+	assert.NoError(t, err)
+	assert.NotNil(t, opt)
+	assert.Equal(t, "api.in.deepgram.com", opt.GetEndpoint())
+	assert.Equal(t, "api.in.deepgram.com", opt.ClientOptions().Host)
+}
+
 func TestNewDeepgramOption_UsesEndpointAsProvided(t *testing.T) {
 	cred := newVaultCredential(map[string]interface{}{
 		"key":      "test-api-key",
@@ -215,6 +227,19 @@ func TestGetTextToSpeechConnectionString_WithEndpoint(t *testing.T) {
 	connStr := opt.GetTextToSpeechConnectionString()
 
 	assert.Contains(t, connStr, "wss://api.eu.deepgram.com/v1/speak?")
+	assert.Contains(t, connStr, "encoding=linear16")
+	assert.Contains(t, connStr, "sample_rate=16000")
+}
+
+func TestGetTextToSpeechConnectionString_WithIndiaEndpoint(t *testing.T) {
+	cred := newVaultCredential(map[string]interface{}{
+		"key":      "k",
+		"endpoint": "api.in.deepgram.com",
+	})
+	opt, _ := deepgram_internal.NewDeepgramOption(testutil.NewTestLogger(), cred, utils.Option{})
+	connStr := opt.GetTextToSpeechConnectionString()
+
+	assert.Contains(t, connStr, "wss://api.in.deepgram.com/v1/speak?")
 	assert.Contains(t, connStr, "encoding=linear16")
 	assert.Contains(t, connStr, "sample_rate=16000")
 }
