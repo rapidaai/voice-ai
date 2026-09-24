@@ -91,10 +91,10 @@ func main() {
 			middlewares.NewRequestLoggerStreamServerMiddleware(appRunner.Cfg.Name, appRunner.Logger),
 			middlewares.NewRecoveryStreamServerMiddleware(appRunner.Logger),
 
-			middlewares.NewAuthenticationStreamServerMiddleware(userAuthenticator, appRunner.Logger),
 			middlewares.NewProjectAuthenticatorStreamServerMiddleware(projectAuthenticator, appRunner.Logger),
 			middlewares.NewOrganizationAuthenticatorStreamServerMiddleware(organizationAuthenticator, appRunner.Logger),
 			middlewares.NewServiceAuthenticatorStreamServerMiddleware(serviceAuthenticator, appRunner.Logger),
+			middlewares.NewAuthenticationStreamServerMiddleware(userAuthenticator, appRunner.Logger),
 
 			middlewares.NewClientInformationStreamServerMiddleware(
 				appRunner.Logger,
@@ -104,10 +104,10 @@ func main() {
 			middlewares.NewRequestLoggerUnaryServerMiddleware(appRunner.Cfg.AppConfig.Name, appRunner.Logger),
 			middlewares.NewRecoveryUnaryServerMiddleware(appRunner.Logger),
 
-			middlewares.NewAuthenticationUnaryServerMiddleware(userAuthenticator, appRunner.Logger),
 			middlewares.NewProjectAuthenticatorUnaryServerMiddleware(projectAuthenticator, appRunner.Logger),
 			middlewares.NewOrganizationAuthenticatorUnaryServerMiddleware(organizationAuthenticator, appRunner.Logger),
 			middlewares.NewServiceAuthenticatorUnaryServerMiddleware(serviceAuthenticator, appRunner.Logger),
+			middlewares.NewAuthenticationUnaryServerMiddleware(userAuthenticator, appRunner.Logger),
 
 			middlewares.NewClientInformationUnaryServerMiddleware(
 				appRunner.Logger,
@@ -348,10 +348,10 @@ func (g *AppRunner) RecoveryMiddleware() {
 }
 
 func (g *AppRunner) AuthenticationMiddleware() {
-	g.E.Use(middlewares.NewAuthenticationMiddleware(authenticators.NewUserAuthenticator(&g.Cfg.AppConfig, g.Logger, g.Clients.Authentication), g.Logger))
 	g.E.Use(middlewares.NewProjectAuthenticatorMiddleware(authenticators.NewProjectAuthenticator(&g.Cfg.AppConfig, g.Logger, g.Clients.Authentication), g.Logger))
 	g.E.Use(middlewares.NewOrganizationAuthenticatorMiddleware(authenticators.NewOrganizationAuthenticator(&g.Cfg.AppConfig, g.Logger, g.Clients.Authentication), g.Logger))
 	g.E.Use(middlewares.NewServiceAuthenticatorMiddleware(authenticators.NewServiceAuthenticator(&g.Cfg.AppConfig, g.Logger), g.Logger))
+	g.E.Use(middlewares.NewAuthenticationMiddleware(authenticators.NewUserAuthenticator(&g.Cfg.AppConfig, g.Logger, g.Clients.Authentication), g.Logger))
 }
 
 func (g *AppRunner) CorsMiddleware() {
