@@ -1,0 +1,62 @@
+{
+  "status": "ownership_implemented_and_verified",
+  "tier": "standard",
+  "date": "2026-09-10",
+  "request": "Exactly two lifecycle owners: conversation/session and message. Keep turn and interruption decisions out of dispatcher. Start idle timeout and mark assistant message complete after accepted playback completion.",
+  "acceptance_criteria": [
+    "Session lifecycle owns connection transitions and idle/max-session countdown configuration, cancellation, and expiry acceptance.",
+    "Message lifecycle owns context rotation, user/assistant transitions, interruption decision state, held packets, decision timer, playback acceptance, and message completion emission decisions.",
+    "Dispatcher routes packets and performs I/O; it does not independently own lifecycle state or reconstruct decisions using getters and setters.",
+    "Move ownership with existing behavior preserved before enabling callback-driven audio completion.",
+    "Accepted audio completion emits the existing assistant_turn=complete metric packet and idle-start packet; TTS end alone does neither.",
+    "New activity cancels idle timing. Delayed start/expiry requests cannot override newer activity.",
+    "Duplicate, stale, missing, and failed completion paths cannot manufacture successful message completion.",
+    "Text-only completion does not require a playback callback. No third lifecycle is introduced."
+  ],
+  "allowed_paths": [
+    "api/assistant-api/internal/adapters/lifecycle/",
+    "api/assistant-api/internal/adapters/internal/",
+    "api/assistant-api/internal/adapters/router/",
+    "rfcs/0017-streamer-protobuf-playback.md",
+    "rfcs/0017-streamer-protobuf-playback/jsons/"
+  ],
+  "out_of_scope": [
+    "Streamer implementations and protocol/schema changes",
+    "Provider implementations and new configuration options",
+    "New controllers, lifecycle owners, or generic helper packages",
+    "Commit, push, and deployment"
+  ],
+  "ownership": {
+    "coordinator": "Message interruption/turn implementation, requestor and dispatch integration, RFC, and validation.",
+    "session_worker": "Session lifecycle/countdown implementation and tests, then disjoint VAD lifecycle and dispatch implementation.",
+    "test_worker": "Adapter fixture migration and message interruption regression tests.",
+    "reviewer": "Independent read-only review of the ownership delta, concurrency, and completion contracts."
+  },
+  "implementation_boundary": {
+    "completed": "Ownership movement, preserving existing generation/TTS completion timing. Message lifecycle admits turns/input/prompts and owns interruption state/control ordering. Session lifecycle owns idle/max-session countdowns and acceptance.",
+    "pending": "Callback-authoritative audio completion metrics and idle start. Resolve whole-message versus same-ID segment receipts before enabling this behavior.",
+    "compatibility": "No proto or streamer contract changes in this ownership refactor. Existing callback observation and metric names are retained."
+  },
+  "sequence": [
+    "Confirm two-owner boundary and map existing state, timer, and effect ordering.",
+    "Move interruption/turn decisions into message lifecycle and countdown decisions into session lifecycle without changing observable behavior.",
+    "Implement callback completion and idle handoff through lifecycle-owned decisions and existing packets.",
+    "Verify focused behavior and races, then independently review before merge."
+  ],
+  "risks": [
+    "Provider/streamer calls must remain outside lifecycle locks; async I/O outcomes must be validated before committing state.",
+    "Timer cancellation does not invalidate callbacks already running; preserve active-message and decision-sequence fences.",
+    "Flush must precede context rotation; held packets must replay once in order after downstream turn changes.",
+    "Several TTS segments may share a message ID. Their delayed completion receipts are indistinguishable with the current protocol. Resolve response-wide completion before enabling whole-message completion for that path.",
+    "No-callback gRPC clients cannot be assumed to have completed playback; do not invent success from Send returning."
+  ],
+  "verification_commands": [
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test -count=1 -timeout=180s ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/adapters/lifecycle ./api/assistant-api/internal/adapters/router ./api/assistant-api/internal/watchdog",
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test -race -count=1 -timeout=180s ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/adapters/lifecycle ./api/assistant-api/internal/adapters/router ./api/assistant-api/internal/watchdog",
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test -run '^$' ./api/assistant-api/...",
+    "just agent-finalize \"api/assistant-api/internal/adapters/internal/requestor.go,api/assistant-api/internal/adapters/internal/dispatch_handler.go,api/assistant-api/internal/adapters/lifecycle/message_lifecycle.go,api/assistant-api/internal/adapters/lifecycle/message_lifecycle_test.go,api/assistant-api/internal/adapters/lifecycle/session_lifecycle.go,api/assistant-api/internal/adapters/lifecycle/session_lifecycle_test.go\""
+  ],
+  "verification_note": "Four-package race tests, full assistant-api compile, and exact-file agent-finalize passed. Independent review found no critical or major findings. See amendment-01-lifecycle-ownership-review.json. Callback-authority behavior remains pending.",
+  "rollback": "Keep the ownership refactor and callback behavior change as separate reviewable deltas. Restore the prior callback-observation behavior without reverting existing streamer/protobuf work if callback authority is not ready.",
+  "review": "User approved the ownership refactor. Independent read-only implementation review found no critical or major issues. Same-ID receipt ambiguity remains a preexisting limit for the future callback-authority change. No exact-digest gate is claimed for this Standard internal refactor."
+}

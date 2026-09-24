@@ -168,9 +168,12 @@ def iter_gates(payload: object):
             yield from iter_gates(value)
 
 
-def parse_timestamp(value: object, field: str) -> str:
+def parse_timestamp(value: object, field: str, *, allow_orca_utc: bool = False) -> str:
     if not isinstance(value, str) or not value:
         fail(f"Gate is missing {field}")
+    # Orca persists gate timestamps as UTC without an offset.
+    if allow_orca_utc and re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}", value):
+        value = value.replace(" ", "T") + "Z"
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
@@ -278,8 +281,8 @@ def collect(args: argparse.Namespace) -> None:
     status = str(gate.get("status") or "").lower()
     if resolution != "approved" or status != "resolved":
         fail("RFC confirmation gate is not approved")
-    created_at = parse_timestamp(gate.get("created_at") or gate.get("createdAt"), "created_at")
-    resolved_at = parse_timestamp(gate.get("resolved_at") or gate.get("resolvedAt"), "resolved_at")
+    created_at = parse_timestamp(gate.get("created_at") or gate.get("createdAt"), "created_at", allow_orca_utc=True)
+    resolved_at = parse_timestamp(gate.get("resolved_at") or gate.get("resolvedAt"), "resolved_at", allow_orca_utc=True)
     receipt = {
         "run_id": args.run,
         "task_id": args.task,

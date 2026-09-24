@@ -1,0 +1,159 @@
+{
+  "rfc": "rfcs/0016-interruption-lifecycle.md",
+  "artifact_path": "rfcs/0016-interruption-lifecycle/jsons/plan.json",
+  "status": "superseded_by_amendment_01",
+  "superseded_by": "rfcs/0016-interruption-lifecycle/jsons/amendment-01-plan.json",
+  "tier": "Governed",
+  "implementation_authorized": false,
+  "current_task_allowed_paths": [
+    "rfcs/0016-interruption-lifecycle.md",
+    "rfcs/0016-interruption-lifecycle/jsons/"
+  ],
+  "principles": [
+    "Extend existing owners and sources of truth",
+    "Keep the first milestone bounded and dependency-free",
+    "Use targeted invalidation and explicit acknowledgment boundaries",
+    "Treat cancellation, stale work and shutdown as intentional paths",
+    "Do not conflate generated, synthesized, locally drained and remotely played output"
+  ],
+  "signal_strategy": "Keep existing VAD and transcript evidence and current hard-stop behavior; add no classifier or timing threshold",
+  "proposed_implementation_allowed_paths": [
+    "api/assistant-api/internal/adapters/lifecycle/message_lifecycle.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_lifecycle_test.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler_interruption_test.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler_vad_test.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler_eos_test.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_stt_order_test.go",
+    "api/assistant-api/internal/llm/model/model_execute.go",
+    "api/assistant-api/internal/llm/model/model_executor_test.go",
+    "api/assistant-api/internal/llm/model/model_stream_test.go",
+    "api/assistant-api/internal/llm/model/model_smoke_tooling_test.go"
+  ],
+  "out_of_scope": [
+    "All files outside the explicit milestone 1 list",
+    "Provider and channel changes pending milestone 2 amendment",
+    "VAD, EOS, UI and provider configuration changes",
+    "Public protocol, SDK, schema, migration and deployment changes",
+    "Remote cancellation and rollback of tool side effects",
+    "Reversible pause, semantic classification and played-text reconstruction"
+  ],
+  "steps": [
+    {
+      "id": "design-gate",
+      "owner": "coordinator and independent challenger",
+      "status": "pending",
+      "actions": [
+        "Resolve RFC open questions and approve exact implementation scope",
+        "Obtain independent plan challenge and coordinator attestation",
+        "Challenge final Accepted RFC bytes and obtain exact-digest confirmation"
+      ]
+    },
+    {
+      "id": "lifecycle",
+      "owner": "lifecycle implementer",
+      "depends_on": ["design-gate"],
+      "write_scope": "Only the two listed lifecycle files",
+      "actions": [
+        "Add conditional expected-context transition under the existing mutex",
+        "Return old/new context, prior state and actual assistant-interruption disposition",
+        "Cover idle entry, active user turns, stale targets and concurrent duplicate signals"
+      ]
+    },
+    {
+      "id": "model-invalidation",
+      "owner": "model executor implementer",
+      "depends_on": ["design-gate"],
+      "write_scope": "Only the four listed model files",
+      "actions": [
+        "Pass interruption ContextID to targeted invalidation",
+        "Serialize active request changes, history mutation and tool admission decisions",
+        "Use executor-before-history lock order without I/O or callbacks under locks",
+        "Reject old completions and follow-ups after invalidation before another user turn",
+        "Preserve valid tool history and distinguish admitted side effects from rejected work"
+      ]
+    },
+    {
+      "id": "adapter-integration",
+      "owner": "adapter implementer/coordinator",
+      "depends_on": ["lifecycle", "model-invalidation"],
+      "write_scope": "Only the five listed adapter files",
+      "actions": [
+        "Use the conditional lifecycle result for barge-in decisions",
+        "Consolidate duplicate interruption orchestration in the existing handler",
+        "Queue targeted model invalidation before new-turn provider activation",
+        "Preserve trigger, transcript, trailing VAD-end, greeting and EOS compatibility",
+        "Record local commitment and invalidation boundaries without claiming remote stop"
+      ]
+    },
+    {
+      "id": "verification-review",
+      "owner": "coordinator and independent production reviewer",
+      "depends_on": ["adapter-integration"],
+      "actions": [
+        "Run deterministic regression tests, race tests and executor compatibility suites",
+        "Run explicit finalization and two-turn audio smoke test",
+        "Require no unresolved critical or major findings before rollout"
+      ]
+    }
+  ],
+  "parallelism": "After design confirmation only, lifecycle and model work may run independently with disjoint write scopes; adapter integration stays with coordinator",
+  "acceptance_criteria": [
+    "One expected context commits at most one interruption transition",
+    "Old or empty interruption targets cannot cancel a newer response",
+    "Matching model invalidation rejects late output before the next user turn",
+    "Rejected completion cannot append model history or admit tool work",
+    "Existing modes, greeting policy, EOS input delivery and other executor tests pass",
+    "All changed packages have success and failure/concurrency coverage",
+    "Required tests, finalization, independent review and gates pass"
+  ],
+  "required_tests": [
+    "Concurrent VAD/STT and duplicate target lifecycle transitions",
+    "Active user turn and assistant idle entry without spurious interruption events",
+    "Word/VAD options, trailing VAD-end, transcript and greeting compatibility",
+    "Late completion after matching invalidation with no new user turn",
+    "Old interruption racing new request activation",
+    "Completion admitted before invalidation versus rejected afterward",
+    "Pending tool result/follow-up and valid call/result history pairs",
+    "Uninterrupted completion and shutdown compatibility"
+  ],
+  "verification_commands": [
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test -count=1 ./api/assistant-api/internal/adapters/lifecycle ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/llm/model ./api/assistant-api/internal/llm/agentkit",
+    "env GOCACHE=/private/tmp/voice-ai-gocache go test -race -count=1 ./api/assistant-api/internal/adapters/lifecycle ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/llm/model",
+    "just agent-finalize \"api/assistant-api/internal/adapters/lifecycle/message_lifecycle.go,api/assistant-api/internal/adapters/lifecycle/message_lifecycle_test.go,api/assistant-api/internal/adapters/internal/dispatch_handler.go,api/assistant-api/internal/adapters/internal/dispatch_handler_interruption_test.go,api/assistant-api/internal/adapters/internal/dispatch_handler_vad_test.go,api/assistant-api/internal/adapters/internal/dispatch_handler_eos_test.go,api/assistant-api/internal/adapters/internal/dispatch_stt_order_test.go,api/assistant-api/internal/llm/model/model_execute.go,api/assistant-api/internal/llm/model/model_executor_test.go,api/assistant-api/internal/llm/model/model_stream_test.go,api/assistant-api/internal/llm/model/model_smoke_tooling_test.go\"",
+    "git diff --check"
+  ],
+  "verification_note": "The finalization command lists proposed scope. At implementation completion supply only actual changed paths. Commands above are planned, not evidence of execution.",
+  "draft_verification_commands": [
+    "jq -e . rfcs/0016-interruption-lifecycle/jsons/plan.json rfcs/0016-interruption-lifecycle/jsons/understanding.json rfcs/0016-interruption-lifecycle/jsons/reservation.json",
+    "just agent-finalize \"rfcs/0016-interruption-lifecycle.md,rfcs/0016-interruption-lifecycle/jsons/plan.json,rfcs/0016-interruption-lifecycle/jsons/understanding.json,rfcs/0016-interruption-lifecycle/jsons/reservation.json\"",
+    "git diff --check"
+  ],
+  "risks": [
+    "Lifecycle commitment and executor invalidation remain separate completion boundaries",
+    "Existing queues can delay interrupt consumption",
+    "Incorrect lock ordering could deadlock model history processing",
+    "Provider callbacks and output clear remain independently scheduled until milestone 2",
+    "Already admitted tools can complete side effects after interruption",
+    "Other lifecycle interface consumers may require a scope amendment",
+    "Existing generated-text persistence does not represent played text"
+  ],
+  "rollback": "Revert the complete milestone 1 patch and deploy the previous assistant service build; no schema or configuration migration. Do not undo unrelated changes. Admitted tool side effects are not reversible.",
+  "future_milestones": [
+    {
+      "name": "Targeted provider/output stop",
+      "gate": "Inventory transports, select exact files and obtain scope amendment confirmation",
+      "requirements": ["Immutable callback context", "Targeted resource cleanup", "Response-aware final queue", "Explicit local acknowledgment"]
+    },
+    {
+      "name": "Reversible pause and intent decisions",
+      "gate": "Separate design and capability review after output ownership is established",
+      "requirements": ["Bounded retained audio", "EOS-aware recovery timer", "Overlap-only transcript filtering", "Explicit uncertainty about receiver playback"]
+    }
+  ],
+  "review_status": {
+    "independent_challenge": "pending",
+    "exact_digest_confirmation": "pending",
+    "maximum_correction_cycles": 2
+  }
+}

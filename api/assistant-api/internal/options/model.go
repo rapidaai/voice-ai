@@ -7,7 +7,7 @@
 package options
 
 const (
-	ModelOptionCredentialID        = "model.credential_id"
+	ModelOptionCredentialID        = "model.credential_id" // #nosec G101, configuration key, not a credential.
 	ModelOptionConnectionTransport = "model.connection.transport"
 	ModelOptionConnectionEndpoint  = "model.connection.endpoint"
 )

@@ -1,14 +1,20 @@
 package internal_transformer_google
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/speech/apiv2/speechpb"
 	"cloud.google.com/go/texttospeech/apiv1/texttospeechpb"
+	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -175,6 +181,21 @@ func TestTextToSpeechOptions_Defaults(t *testing.T) {
 	assert.Equal(t, DefaultVoice, ttsOpts.Voice.Name)
 	assert.Equal(t, texttospeechpb.AudioEncoding_PCM, ttsOpts.StreamingAudioConfig.AudioEncoding)
 	assert.Equal(t, int32(16000), ttsOpts.StreamingAudioConfig.SampleRateHertz)
+}
+
+func TestGoogleStreamTimeoutEmitsErrorWithoutEnd(t *testing.T) {
+	f := newGoogleTTSFixture(t)
+	require.NoError(t, f.tts.Transform(context.Background(), internal_type.TextToSpeechTextPacket{ContextID: "ctx-google", Text: "hello"}))
+	call := googleTTSReceive(t, f.calls)
+	googleTTSReceive(t, call.requests)
+	googleTTSReceive(t, call.requests)
+	call.finish <- status.Error(codes.Aborted, "stream timed out: Stream aborted due to long duration elapsed without input sent")
+	f.collector.WaitFor(t, time.Second, "stream timeout", func() bool { return len(googleTTSErrors(f.collector)) == 1 })
+	errorPacket := googleTTSErrors(f.collector)[0]
+	assert.Equal(t, "ctx-google", errorPacket.ContextID)
+	assert.Equal(t, internal_type.TTSNetworkTimeout, errorPacket.Type)
+	assert.Contains(t, errorPacket.ErrMessage(), "stream timed out")
+	assert.Empty(t, f.collector.EndPackets())
 }
 
 func TestTextToSpeechOptions_WithEmptyVoiceOverride(t *testing.T) {

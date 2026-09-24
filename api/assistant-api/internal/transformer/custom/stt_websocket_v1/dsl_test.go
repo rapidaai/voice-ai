@@ -7,6 +7,8 @@
 package internal_transformer_custom_stt_websocket_v1
 
 import (
+	"encoding/binary"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -66,10 +68,9 @@ func TestDSLEngine_BuildConnectionURLAndEvaluateRequestRules(t *testing.T) {
 	assert.Contains(t, url, "model=model-a")
 	assert.Contains(t, url, "sample_rate=16000")
 
-	turnChangeRequests, err := engine.EvaluateRequestRules(
-		requestPacketTurnChange,
-		config.newRequestScope(requestPacketTurnChange, "ctx_1", nil),
-	)
+	scope, err := config.newRequestScope(requestPacketTurnChange, "ctx_1", nil)
+	require.NoError(t, err)
+	turnChangeRequests, err := engine.EvaluateRequestRules(requestPacketTurnChange, scope)
 	require.NoError(t, err)
 	require.Len(t, turnChangeRequests, 1)
 	assert.Equal(t, frameTypeJSON, turnChangeRequests[0].Frame)
@@ -78,10 +79,9 @@ func TestDSLEngine_BuildConnectionURLAndEvaluateRequestRules(t *testing.T) {
 		"language": "en-US",
 	}, turnChangeRequests[0].Body)
 
-	audioRequests, err := engine.EvaluateRequestRules(
-		requestPacketAudio,
-		config.newRequestScope(requestPacketAudio, "ctx_1", []byte{0x00, 0x01}),
-	)
+	scope, err = config.newRequestScope(requestPacketAudio, "ctx_1", []byte{0x00, 0x01})
+	require.NoError(t, err)
+	audioRequests, err := engine.EvaluateRequestRules(requestPacketAudio, scope)
 	require.NoError(t, err)
 	require.Len(t, audioRequests, 2)
 	assert.Equal(t, frameTypeJSON, audioRequests[0].Frame)
@@ -89,6 +89,22 @@ func TestDSLEngine_BuildConnectionURLAndEvaluateRequestRules(t *testing.T) {
 	assert.Equal(t, "LINEAR16", audioRequests[0].Body.(map[string]any)["encoding"])
 	assert.Equal(t, frameTypeBinary, audioRequests[1].Frame)
 	assert.Equal(t, []byte{0x00, 0x01}, audioRequests[1].Body)
+}
+
+func TestPCM16MonoWAVSampleRate(t *testing.T) {
+	for _, sampleRate := range []int{-1, 0, math.MaxUint32/2 + 1} {
+		config := &Config{SampleRate: sampleRate}
+		scope, err := config.newRequestScope(requestPacketAudio, "ctx-1", []byte{0, 1})
+		require.ErrorContains(t, err, "sample rate")
+		require.Nil(t, scope)
+	}
+	wavAudio, err := makePCM16MonoWAV([]byte{0, 1}, math.MaxUint32/2)
+	require.NoError(t, err)
+	assert.Equal(t, uint32(math.MaxUint32/2), binary.LittleEndian.Uint32(wavAudio[24:28]))
+	assert.Equal(t, uint32(math.MaxUint32-1), binary.LittleEndian.Uint32(wavAudio[28:32]))
+	assert.Equal(t, uint32(38), binary.LittleEndian.Uint32(wavAudio[4:8]))
+	assert.Equal(t, uint32(2), binary.LittleEndian.Uint32(wavAudio[40:44]))
+	assert.Equal(t, []byte{0, 1}, wavAudio[44:])
 }
 
 func TestDSLEngine_ParseAndEvaluateResponse(t *testing.T) {

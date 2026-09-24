@@ -1,0 +1,23 @@
+{
+  "rfc": "0016-interruption-lifecycle",
+  "date": "2026-09-06",
+  "owner": "repository maintainer",
+  "decision": "Use one serialized adapter interruption loop with filler classification and no utterance IDs",
+  "source_review": {
+    "finding": "The inspected implementation uses one overlap flag, a transcript gate, provider-ordered buffering and speech timestamps rather than stable utterance IDs",
+    "adopted_pattern": "Serialize VAD, STT, deadline and decision completion in one owner"
+  },
+  "filler_policy": {
+    "tokens": ["uh", "um", "hmm", "mm", "mhm", "ah", "oh"],
+    "interim": "Hold and wait because meaningful words may follow",
+    "ended_filler_only": "Continue paused output at the decision deadline",
+    "meaningful_text": "Commit TurnChange immediately",
+    "active_at_deadline": "Commit TurnChange"
+  },
+  "accepted_risk": "An untimed provider event delayed into a later overlap may be treated as current. Timed events are trimmed against the active overlap and closed overlaps cannot be reopened.",
+  "constraints": [
+    "Do not add pause IDs, response IDs, output epochs or STT utterance IDs",
+    "Do not change the Streamer interface",
+    "Keep output controls internal"
+  ]
+}

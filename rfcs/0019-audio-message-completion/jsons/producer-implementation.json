@@ -1,0 +1,60 @@
+{
+  "task_id": "task_f4bf85ec1ca1",
+  "dispatch_id": "ctx_b2ea90cdb106",
+  "rfc": "rfcs/0019-audio-message-completion.md",
+  "confirmation_receipt": "rfcs/0019-audio-message-completion/jsons/confirmation.json",
+  "scope": "producer",
+  "outcome": "implemented",
+  "summary": [
+    "Model provider completions with tool calls no longer emit LLMResponseDonePacket before tool follow-up generation.",
+    "Agentflow nodes emit content only; the orchestrator emits one LLMResponseDonePacket after the successful graph boundary.",
+    "AgentKit and websocket completed responses require an active matching context, and provider errors clear active context so late completions cannot become successful done."
+  ],
+  "files_modified": [
+    "api/assistant-api/internal/llm/agentflow/executor_test.go",
+    "api/assistant-api/internal/llm/agentflow/internal/node/agent.go",
+    "api/assistant-api/internal/llm/agentflow/internal/node/message.go",
+    "api/assistant-api/internal/llm/agentflow/internal/node/node.go",
+    "api/assistant-api/internal/llm/agentflow/internal/node/node_test.go",
+    "api/assistant-api/internal/llm/agentflow/internal/node/transfer.go",
+    "api/assistant-api/internal/llm/agentflow/orchestrator.go",
+    "api/assistant-api/internal/llm/agentkit/agentkit_stream.go",
+    "api/assistant-api/internal/llm/agentkit/agentkit_stream_test.go",
+    "api/assistant-api/internal/llm/model/model.go",
+    "api/assistant-api/internal/llm/model/model_execute.go",
+    "api/assistant-api/internal/llm/model/model_executor_test.go",
+    "api/assistant-api/internal/llm/model/model_smoke_multiturn_sequence_test.go",
+    "api/assistant-api/internal/llm/model/model_smoke_response_test.go",
+    "api/assistant-api/internal/llm/model/model_smoke_tooling_test.go",
+    "api/assistant-api/internal/llm/model/model_stream.go",
+    "api/assistant-api/internal/llm/websocket/websocket.go",
+    "api/assistant-api/internal/llm/websocket/websocket_test.go",
+    "rfcs/0019-audio-message-completion/jsons/producer-implementation.json"
+  ],
+  "tests": [
+    {
+      "command": "go test -count=1 ./api/assistant-api/internal/llm/model ./api/assistant-api/internal/llm/agentflow ./api/assistant-api/internal/llm/agentkit ./api/assistant-api/internal/llm/websocket",
+      "result": "passed"
+    },
+    {
+      "command": "go test -count=1 -timeout=180s ./api/assistant-api/internal/llm/...",
+      "result": "passed"
+    },
+    {
+      "command": "go test -race -count=1 -timeout=180s ./api/assistant-api/internal/llm/...",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    },
+    {
+      "command": "just agent-finalize \"api/assistant-api/internal/llm/agentflow/executor_test.go,api/assistant-api/internal/llm/agentflow/internal/node/agent.go,api/assistant-api/internal/llm/agentflow/internal/node/message.go,api/assistant-api/internal/llm/agentflow/internal/node/node.go,api/assistant-api/internal/llm/agentflow/internal/node/node_test.go,api/assistant-api/internal/llm/agentflow/internal/node/transfer.go,api/assistant-api/internal/llm/agentflow/orchestrator.go,api/assistant-api/internal/llm/agentkit/agentkit_stream.go,api/assistant-api/internal/llm/agentkit/agentkit_stream_test.go,api/assistant-api/internal/llm/model/model.go,api/assistant-api/internal/llm/model/model_execute.go,api/assistant-api/internal/llm/model/model_executor_test.go,api/assistant-api/internal/llm/model/model_smoke_multiturn_sequence_test.go,api/assistant-api/internal/llm/model/model_smoke_response_test.go,api/assistant-api/internal/llm/model/model_smoke_tooling_test.go,api/assistant-api/internal/llm/model/model_stream.go,api/assistant-api/internal/llm/websocket/websocket.go,api/assistant-api/internal/llm/websocket/websocket_test.go,rfcs/0019-audio-message-completion/jsons/producer-implementation.json\"",
+      "result": "passed"
+    }
+  ],
+  "limitations": [
+    "Synthesis, transport, lifecycle, packet definition, and protobuf generation work was outside this worker scope.",
+    "Existing dirty edits outside api/assistant-api/internal/llm/{model,agentflow,agentkit,websocket}/ were preserved."
+  ]
+}

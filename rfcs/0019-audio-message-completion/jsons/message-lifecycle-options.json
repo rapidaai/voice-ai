@@ -1,0 +1,82 @@
+{
+  "date": "2026-09-11",
+  "tier": "Standard",
+  "status": "verified_and_reviewed",
+  "scope": "Configure message lifecycle dependencies and initial settings through constructor functional options",
+  "acceptance_criteria": [
+    "One NewMessageLifecycle constructor accepts MessageOption values",
+    "Initial ID, mode, interruption setting, sender, packet sink, dispatcher, expiry routing, and behavior loader are constructor options",
+    "No separate context constructor or post-construction dependency setters remain",
+    "Behavior loading waits until Initialize after deployment configuration becomes available",
+    "Runtime SetMode remains a state transition; event calls no longer accept dependency callbacks",
+    "Preserve text-mode and disabled-interruption defaults, callback ordering, held-input replay, and completion guards",
+    "Missing output and dispatch dependencies return explicit errors without panicking",
+    "No protocol changes, new generic helpers, or lifecycle replacement during initialization"
+  ],
+  "allowed_paths": [
+    "api/assistant-api/internal/adapters/lifecycle/option.go",
+    "api/assistant-api/internal/adapters/lifecycle/error.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_lifecycle.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_playback.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_turn.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_interruption.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_options_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_lifecycle_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_playback_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_turn_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_interruption_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_vad_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/session_lifecycle_test.go",
+    "api/assistant-api/internal/adapters/internal/requestor.go",
+    "api/assistant-api/internal/adapters/internal/requestor_test.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_interruption.go",
+    "api/assistant-api/internal/adapters/internal/stream.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler_eos_test.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler_interruption_test.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_init_flow_test.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_init_packets_test.go",
+    "api/assistant-api/internal/adapters/internal/interruption_test.go",
+    "api/assistant-api/internal/adapters/internal/playback_test.go",
+    "api/assistant-api/internal/adapters/internal/stream_test.go",
+    "rfcs/0019-audio-message-completion/jsons/message-lifecycle-options.json"
+  ],
+  "ownership": {
+    "coordinator": "Lifecycle production, new option tests, verification, and task evidence",
+    "adapter_worker": "Adapter internal production and test migration",
+    "lifecycle_test_worker": "Existing lifecycle test migration"
+  },
+  "risks": [
+    "Options must not invoke callbacks before requestor initialization finishes",
+    "Sender must resolve the current streamer rather than capture a nil or obsolete instance",
+    "Behavior is not available during requestor construction; failed loading must remain observable",
+    "Turn callbacks must remain synchronous and outside the state lock",
+    "Unconfigured expiry routing must not leave playback paused indefinitely",
+    "Existing unrelated worktree and prior lifecycle cleanup must remain intact"
+  ],
+  "verification_commands": [
+    "go test -race -count=1 -timeout=180s -p 2 ./api/assistant-api/internal/adapters/...",
+    "go test -p 1 -run '^$' ./api/assistant-api/...",
+    "just agent-finalize \"$(jq -r '.allowed_paths | join(\",\")' rfcs/0019-audio-message-completion/jsons/message-lifecycle-options.json)\"",
+    "git diff --check"
+  ],
+  "baseline": {"exit_code": 0, "log": "/tmp/lifecycle-options-baseline.log"},
+  "verification_results": {
+    "lifecycle_race_tests": {"exit_code": 0, "log": "/tmp/lifecycle-options-focused.log"},
+    "option_regressions_race_ten_runs": {"exit_code": 0, "log": "/tmp/lifecycle-options-regressions.log"},
+    "assistant_compile": {"exit_code": 0, "log": "/tmp/lifecycle-options-compile.log"},
+    "adapter_race_tests": {"exit_code": 0, "log": "/tmp/lifecycle-options-race-final.log"},
+    "agent_finalize": {"exit_code": 0, "log": "/tmp/lifecycle-options-finalize.log"},
+    "diff_check": {"exit_code": 0},
+    "removed_constructor_and_setter_search": {"matches": 0},
+    "test_migration_correction": "Updated terminal-audio capture assertions to account for the initial audio sent through the injected sender and supplied missing send dependencies in EOS fixtures",
+    "environment_note": "Native linker warnings were non-fatal; no live provider or carrier tests were run"
+  },
+  "independent_review": {
+    "agent_id": "01a09137-eb48-7da0-ad93-42572aa9290d",
+    "status": "approved",
+    "findings": [],
+    "summary": "Verified lazy startup, lifecycle retention, live streamer binding, synchronous turn callback ordering, missing-dependency behavior, and regression coverage relative to the preceding event cleanup"
+  },
+  "rollback": "Revert only constructor-option wiring, retaining the preceding lifecycle event and declaration cleanup"
+}

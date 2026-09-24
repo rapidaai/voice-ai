@@ -8,6 +8,7 @@ package watchdog
 import (
 	"context"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -16,6 +17,157 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 )
+
+func TestIdleTimeoutWatchdog_ExpiryAdmission(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var expired []internal_type.IdleTimeoutExpiredPacket
+		w := NewIdleTimeoutWatchdog(WithOnPacket(func(_ context.Context, packets ...internal_type.Packet) error {
+			for _, packet := range packets {
+				if p, ok := packet.(internal_type.IdleTimeoutExpiredPacket); ok {
+					expired = append(expired, p)
+				}
+			}
+			return nil
+		}))
+		defer w.Cancel()
+		assert.False(t, w.AcceptExpiry(internal_type.IdleTimeoutExpiredPacket{ContextID: "ctx"}))
+		assert.False(t, w.Start("ctx", 0))
+		assert.Equal(t, uint64(1), w.IncrementCount())
+		require.True(t, w.Start("ctx", time.Second))
+		assert.False(t, w.AcceptExpiry(internal_type.IdleTimeoutExpiredPacket{ContextID: "ctx", Count: 1}))
+		time.Sleep(time.Second)
+		synctest.Wait()
+		require.Len(t, expired, 1)
+		expiry := expired[0]
+		assert.NotZero(t, expiry.Generation)
+		assert.Equal(t, uint64(1), expiry.Count)
+		assert.True(t, expiry.Deadline.Equal(time.Now()))
+		invalid := expiry
+		invalid.ContextID = "other"
+		assert.False(t, w.AcceptExpiry(invalid))
+		invalid = expiry
+		invalid.Count++
+		assert.False(t, w.AcceptExpiry(invalid))
+		invalid = expiry
+		invalid.Generation = 0
+		assert.False(t, w.AcceptExpiry(invalid))
+		invalid = expiry
+		invalid.Deadline = time.Time{}
+		assert.False(t, w.AcceptExpiry(invalid))
+		assert.True(t, w.AcceptExpiry(expiry))
+		assert.False(t, w.AcceptExpiry(expiry))
+		assert.False(t, w.Extend("ctx", time.Second))
+		assert.Equal(t, uint64(1), w.Count())
+	})
+}
+
+func TestIdleTimeoutWatchdog_QueuedExpiryReplacement(t *testing.T) {
+	for _, action := range []string{"restart", "extend", "overdue extension", "cancel", "reset count"} {
+		t.Run(action, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				var expired []internal_type.IdleTimeoutExpiredPacket
+				w := NewIdleTimeoutWatchdog(WithOnPacket(func(_ context.Context, packets ...internal_type.Packet) error {
+					for _, packet := range packets {
+						if p, ok := packet.(internal_type.IdleTimeoutExpiredPacket); ok {
+							expired = append(expired, p)
+						}
+					}
+					return nil
+				}))
+				defer w.Cancel()
+				w.IncrementCount()
+				require.True(t, w.Start("ctx", time.Second))
+				time.Sleep(time.Second)
+				synctest.Wait()
+				require.Len(t, expired, 1)
+				stale := expired[0]
+				assert.False(t, w.Extend("other", time.Second))
+				assert.False(t, w.Extend("ctx", 0))
+				switch action {
+				case "restart":
+					w.Stop(false)
+					require.True(t, w.Start("ctx", time.Second))
+				case "extend":
+					require.True(t, w.Extend("ctx", time.Second))
+				case "overdue extension":
+					time.Sleep(2 * time.Second)
+					require.True(t, w.Extend("ctx", time.Second))
+				case "cancel":
+					w.Cancel()
+				case "reset count":
+					w.Stop(true)
+				}
+				assert.False(t, w.AcceptExpiry(stale))
+				time.Sleep(time.Second)
+				synctest.Wait()
+				if action == "cancel" || action == "reset count" {
+					require.Len(t, expired, 1)
+					wantCount := uint64(1)
+					if action == "reset count" {
+						wantCount = 0
+					}
+					assert.Equal(t, wantCount, w.Count())
+					return
+				}
+				require.Len(t, expired, 2)
+				assert.NotEqual(t, stale.Generation, expired[1].Generation)
+				assert.Equal(t, uint64(1), expired[1].Count)
+				assert.False(t, w.AcceptExpiry(stale))
+				assert.True(t, w.AcceptExpiry(expired[1]))
+				assert.False(t, w.AcceptExpiry(expired[1]))
+			})
+		})
+	}
+}
+
+func TestIdleTimeoutWatchdog_ExtendedCountdownAdmission(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var expired []internal_type.IdleTimeoutExpiredPacket
+		w := NewIdleTimeoutWatchdog(WithOnPacket(func(_ context.Context, packets ...internal_type.Packet) error {
+			for _, packet := range packets {
+				if p, ok := packet.(internal_type.IdleTimeoutExpiredPacket); ok {
+					expired = append(expired, p)
+				}
+			}
+			return nil
+		}))
+		defer w.Cancel()
+		require.True(t, w.Start("ctx", time.Second))
+		require.True(t, w.Extend("ctx", time.Second))
+		time.Sleep(time.Second)
+		synctest.Wait()
+		require.Empty(t, expired)
+		assert.False(t, w.AcceptExpiry(internal_type.IdleTimeoutExpiredPacket{ContextID: "ctx"}))
+		time.Sleep(time.Second)
+		synctest.Wait()
+		require.Len(t, expired, 1)
+		assert.True(t, expired[0].Deadline.Equal(time.Now()))
+		assert.True(t, w.AcceptExpiry(expired[0]))
+	})
+}
+
+func TestIdleTimeoutWatchdog_CanceledContextRejectsQueuedExpiry(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		expired := make(chan internal_type.IdleTimeoutExpiredPacket, 1)
+		w := NewIdleTimeoutWatchdog(WithPacketContext(ctx), WithOnPacket(func(_ context.Context, packets ...internal_type.Packet) error {
+			for _, packet := range packets {
+				if p, ok := packet.(internal_type.IdleTimeoutExpiredPacket); ok {
+					expired <- p
+				}
+			}
+			return nil
+		}))
+		defer w.Cancel()
+		require.True(t, w.Start("ctx", time.Second))
+		time.Sleep(time.Second)
+		synctest.Wait()
+		cancel()
+		assert.False(t, w.AcceptExpiry(<-expired))
+		assert.Zero(t, w.Count())
+	})
+}
 
 func TestIdleTimeoutWatchdog_StartExpiresWhenDeadlinePasses(t *testing.T) {
 	pushedPackets := make(chan internal_type.Packet, 4)

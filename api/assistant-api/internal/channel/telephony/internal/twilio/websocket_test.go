@@ -11,13 +11,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/gorilla/websocket"
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
-	internal_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
 	internal_twilio "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/twilio/internal"
@@ -26,11 +26,15 @@ import (
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 type fakeTwilioMediaEngine struct {
-	providerFrame internal_telephony_media.ProviderAudioFrame
-	processError  error
+	providerFrame     internal_telephony_media.ProviderAudioFrame
+	processError      error
+	clearCount        atomic.Int32
+	assistantCalls    int
+	assistantComplete bool
 }
 
 type recordingObserver struct {
@@ -62,19 +66,59 @@ func (engine *fakeTwilioMediaEngine) ProcessProviderAudioFrame(frame internal_te
 	}, nil
 }
 
-func (engine *fakeTwilioMediaEngine) ProcessAssistantAudio(_ []byte, _ bool) error {
+func (engine *fakeTwilioMediaEngine) ProcessAssistantAudio(_ []byte, completed bool) error {
+	engine.assistantCalls++
+	engine.assistantComplete = completed
 	return nil
+}
+
+func TestSendTerminalAudioMarkers(t *testing.T) {
+	for _, scenario := range []struct {
+		name      string
+		message   *protos.ConversationAssistantMessage
+		wantAudio bool
+	}{
+		{"nil_payload_completed", &protos.ConversationAssistantMessage{Completed: true}, false},
+		{"empty_audio_terminal", &protos.ConversationAssistantMessage{Completed: true, Message: &protos.ConversationAssistantMessage_Audio{}}, true},
+		{"completed_text", &protos.ConversationAssistantMessage{Completed: true, Message: &protos.ConversationAssistantMessage_Text{Text: "done"}}, false},
+		{"empty_nonterminal", &protos.ConversationAssistantMessage{}, false},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			engine := &fakeTwilioMediaEngine{}
+			session := internal_telephony_media.NewMediaSession(internal_telephony_media.MediaSessionConfig{MediaEngine: engine})
+			defer session.Shutdown()
+			streamer := &twilioWebsocketStreamer{mediaSession: session}
+			require.NoError(t, streamer.Send(scenario.message))
+			require.Equal(t, scenario.wantAudio, engine.assistantCalls == 1)
+			require.Equal(t, scenario.wantAudio, engine.assistantComplete)
+		})
+	}
+}
+
+func TestOutputFrameRequiresConnectedTransport(t *testing.T) {
+	streamer := &twilioWebsocketStreamer{}
+	frame := internal_telephony_media.AssistantOutputFrame{ProviderAudio: []byte{1}}
+	// Encoding requires the base streamer even when no transport is available.
+	streamer.BaseTelephonyStreamer = internal_telephony_base.New(nil, &callcontext.CallContext{}, nil, nil)
+	defer streamer.BaseStreamer.Cancel()
+	require.Error(t, streamer.sendOutputFrame(frame))
+	streamer.streamID = "stream"
+	require.Error(t, streamer.sendOutputFrame(frame))
 }
 
 func (engine *fakeTwilioMediaEngine) NextOutputFrame() (internal_telephony_media.AssistantOutputFrame, bool) {
 	return internal_telephony_media.AssistantOutputFrame{}, false
 }
 
+func (engine *fakeTwilioMediaEngine) OutputDrained() bool { return true }
+
 func (engine *fakeTwilioMediaEngine) IdleOutputFrame() (internal_telephony_media.AssistantOutputFrame, bool) {
 	return internal_telephony_media.AssistantOutputFrame{}, false
 }
 
-func (engine *fakeTwilioMediaEngine) ClearOutputBuffer() {}
+func (engine *fakeTwilioMediaEngine) ClearOutputBuffer() {
+	engine.clearCount.Add(1)
+}
 
 func (engine *fakeTwilioMediaEngine) ConfigureAmbient(_ internal_ambient.Config) error {
 	return nil
@@ -83,12 +127,6 @@ func (engine *fakeTwilioMediaEngine) ConfigureAmbient(_ internal_ambient.Config)
 func (engine *fakeTwilioMediaEngine) OutputFrameDuration() time.Duration {
 	return 20 * time.Millisecond
 }
-
-func (engine *fakeTwilioMediaEngine) OutputHealthSnapshot() internal_output.HealthSnapshot {
-	return internal_output.HealthSnapshot{}
-}
-
-func (engine *fakeTwilioMediaEngine) OnTickHealth(_ internal_output.TickHealth) {}
 
 // testWSPair creates a connected WebSocket client/server pair for unit tests.
 // The server side is discarded; only the client *websocket.Conn is returned.
@@ -145,7 +183,7 @@ func newTestTwilioStreamer(t *testing.T) (*twilioWebsocketStreamer, func()) {
 		streamID:   "test-stream",
 		connection: conn,
 	}
-	// Note: we do NOT start runWebSocketReader — tests exercise Send only.
+	// Do not start runWebSocketReader because these tests exercise Send only.
 	return tws, cleanup
 }
 
@@ -168,6 +206,57 @@ func TestNewTwilioWebsocketStreamer_WiresMediaSession(t *testing.T) {
 	defer tws.Cancel()
 
 	require.NotNil(t, tws.mediaSession)
+}
+
+func TestSend_ConsumesOutputControls(t *testing.T) {
+	outputControlTestCases := []struct {
+		name               string
+		control            proto.Message
+		resumeProbe        bool
+		wantLocalClears    int32
+		wantProviderClears int32
+	}{
+		{name: "pause", control: &protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}},
+		{name: "continue", control: &protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}, resumeProbe: true},
+		{name: "flush", control: &protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}, wantLocalClears: 1, wantProviderClears: 1},
+	}
+
+	for _, testCase := range outputControlTestCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			mediaEngine := &fakeTwilioMediaEngine{}
+			var providerClearCount atomic.Int32
+			streamer := &twilioWebsocketStreamer{
+				BaseTelephonyStreamer: internal_telephony_base.New(nil, &callcontext.CallContext{}, nil, nil),
+			}
+			streamer.mediaSession = internal_telephony_media.NewMediaSession(internal_telephony_media.MediaSessionConfig{
+				Context:     context.Background(),
+				MediaEngine: mediaEngine,
+				SendProviderClear: func() error {
+					providerClearCount.Add(1)
+					return nil
+				},
+			})
+			if testCase.resumeProbe {
+				_, outputControlError := streamer.mediaSession.HandleOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE})
+				require.NoError(t, outputControlError)
+				providerClearCount.Store(0)
+			}
+
+			require.NoError(t, streamer.Send(testCase.control))
+			if testCase.resumeProbe {
+				require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
+			}
+			assert.Equal(t, testCase.wantLocalClears, mediaEngine.clearCount.Load())
+			assert.Equal(t, testCase.wantProviderClears, providerClearCount.Load())
+			select {
+			case <-streamer.OutputCh.Ready():
+				output, err := streamer.OutputCh.TryReceive()
+				require.NoError(t, err)
+				t.Fatalf("output control was forwarded: %T", output)
+			default:
+			}
+		})
+	}
 }
 
 func TestHandleMediaEvent_EmitsBridgeUserAudio(t *testing.T) {
@@ -201,7 +290,9 @@ func TestHandleMediaEvent_EmitsBridgeUserAudio(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case stream := <-tws.InputCh:
+	case <-tws.LowCh.Ready():
+		stream, err := tws.LowCh.TryReceive()
+		require.NoError(t, err)
 		bridgeAudio, ok := stream.(*protos.ConversationBridgeUserAudio)
 		require.True(t, ok, "expected bridge user audio, got %T", stream)
 		assert.NotEmpty(t, bridgeAudio.GetAudio())
@@ -274,7 +365,9 @@ func TestSend_EndConversation_PushesToolCallResult(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case msg := <-tws.CriticalCh:
+	case <-tws.CriticalCh.Ready():
+		msg, err := tws.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		result, ok := msg.(*protos.ConversationToolCallResult)
 		require.True(t, ok, "Expected ConversationToolCallResult, got %T", msg)
 		assert.Equal(t, "tool-call-id-123", result.GetId())
@@ -313,7 +406,9 @@ func TestSend_EndConversation_NilConnectionStillPushesToolCallResult(t *testing.
 	require.NoError(t, err)
 
 	select {
-	case msg := <-tws.CriticalCh:
+	case <-tws.CriticalCh.Ready():
+		msg, err := tws.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		result, ok := msg.(*protos.ConversationToolCallResult)
 		require.True(t, ok, "Expected ConversationToolCallResult, got %T", msg)
 		assert.Equal(t, "completed", result.GetResult()["status"])
@@ -337,7 +432,9 @@ func TestSend_EndConversation_DoesNotCancelStreamer(t *testing.T) {
 
 	// Drain the tool call result.
 	select {
-	case <-tws.CriticalCh:
+	case <-tws.CriticalCh.Ready():
+		_, err := tws.CriticalCh.TryReceive()
+		require.NoError(t, err)
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for ConversationToolCallResult")
 	}
@@ -410,7 +507,9 @@ func TestSend_TransferConversation_MissingTarget(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case msg := <-tws.CriticalCh:
+	case <-tws.CriticalCh.Ready():
+		msg, err := tws.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		result, ok := msg.(*protos.ConversationToolCallResult)
 		require.True(t, ok, "Expected ConversationToolCallResult, got %T", msg)
 		assert.Equal(t, "tc-transfer-missing", result.GetId())
@@ -438,7 +537,9 @@ func TestSend_TransferConversation_NoCallUUID(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case msg := <-tws.CriticalCh:
+	case <-tws.CriticalCh.Ready():
+		msg, err := tws.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		result, ok := msg.(*protos.ConversationToolCallResult)
 		require.True(t, ok, "Expected ConversationToolCallResult, got %T", msg)
 		assert.Equal(t, "tc-transfer-no-uuid", result.GetId())

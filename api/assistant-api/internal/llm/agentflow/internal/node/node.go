@@ -32,6 +32,7 @@ type Request struct {
 type Result struct {
 	RouteHandles     []string
 	ContinuationText string
+	ResponseText     string
 	WaitForNextInput bool
 	Terminal         bool
 }

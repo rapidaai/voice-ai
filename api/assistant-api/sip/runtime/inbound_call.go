@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/emiago/sipgo/sip"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 )
 
 type inboundInviteIdentity struct {
@@ -350,17 +351,17 @@ func (inboundCall *Inbound) callInboundApplicationReadyHandler() error {
 func (inboundCall *Inbound) waitUntilAnswerReady() error {
 	answerPolicy := inboundCall.resolvedConfig.answerPolicy
 	if answerPolicy.Mode == "" {
-		answerPolicy = DefaultInboundAnswerPolicy()
+		answerPolicy = sip_config.DefaultInboundAnswerPolicy()
 	}
 	if !answerPolicy.Mode.IsValid() {
-		return fmt.Errorf("%w: invalid inbound answer mode %q", ErrInvalidConfig, answerPolicy.Mode)
+		return fmt.Errorf("%w: invalid inbound answer mode %q", sip_config.ErrInvalidConfig, answerPolicy.Mode)
 	}
 
 	switch answerPolicy.Mode {
-	case InboundAnswerModeImmediate:
-	case InboundAnswerModeAfterMinRingDuration:
+	case sip_config.InboundAnswerModeImmediate:
+	case sip_config.InboundAnswerModeAfterMinRingDuration:
 		if answerPolicy.MinRingDuration <= 0 {
-			return fmt.Errorf("%w: min_ring_duration is required for answer_after_min_ring_ms", ErrInvalidConfig)
+			return fmt.Errorf("%w: min_ring_duration is required for answer_after_min_ring_ms", sip_config.ErrInvalidConfig)
 		}
 		if err := inboundCall.waitForMinimumRingDuration(inboundCall.server.ctx, answerPolicy.MinRingDuration); err != nil {
 			return err

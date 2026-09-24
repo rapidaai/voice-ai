@@ -9,8 +9,11 @@ package internal_transformer_custom_stt_websocket_v1
 import (
 	"encoding/base64"
 	"encoding/binary"
+	"fmt"
+	"math"
 
 	internal_transformer_custom_dsl "github.com/rapidaai/api/assistant-api/internal/transformer/custom/internal/dsl"
+	"github.com/rapidaai/pkg/utils"
 )
 
 type queryScope struct {
@@ -58,7 +61,7 @@ func (config *Config) newQueryScope() queryScope {
 	}
 }
 
-func (config *Config) newRequestScope(packet string, contextID string, audio []byte) map[string]any {
+func (config *Config) newRequestScope(packet string, contextID string, audio []byte) (map[string]any, error) {
 	scope := map[string]any{
 		"config": map[string]any{
 			"model":    config.Model,
@@ -75,38 +78,53 @@ func (config *Config) newRequestScope(packet string, contextID string, audio []b
 	}
 
 	if len(audio) > 0 {
+		wavAudio, err := makePCM16MonoWAV(audio, config.SampleRate)
+		if err != nil {
+			return nil, err
+		}
 		audioBase64 := base64.StdEncoding.EncodeToString(audio)
 		scope["packet"].(map[string]any)["audio"] = map[string]any{
 			"bytes":      append([]byte(nil), audio...),
 			"base64":     audioBase64,
 			"pcm_base64": audioBase64,
-			"wav_base64": base64.StdEncoding.EncodeToString(makePCM16MonoWAV(audio, config.SampleRate)),
+			"wav_base64": base64.StdEncoding.EncodeToString(wavAudio),
 		}
 	}
 
-	return scope
+	return scope, nil
 }
 
-func makePCM16MonoWAV(pcmAudio []byte, sampleRate int) []byte {
-	dataSize := len(pcmAudio)
-	byteRate := sampleRate * 2
-	totalSize := 36 + dataSize
+func makePCM16MonoWAV(pcmAudio []byte, sampleRate int) ([]byte, error) {
+	wavSampleRate, err := utils.IntToUint32(sampleRate)
+	if err != nil {
+		return nil, fmt.Errorf("custom-stt websocket_v1: invalid PCM WAV sample rate: %w", err)
+	}
+	if wavSampleRate == 0 || wavSampleRate > math.MaxUint32/2 {
+		return nil, fmt.Errorf("custom-stt websocket_v1: sample rate exceeds PCM WAV range")
+	}
+	dataSize, err := utils.IntToUint32(len(pcmAudio))
+	if err != nil {
+		return nil, fmt.Errorf("custom-stt websocket_v1: invalid PCM WAV size: %w", err)
+	}
+	if dataSize > math.MaxUint32-36 || len(pcmAudio) > math.MaxInt-44 {
+		return nil, fmt.Errorf("custom-stt websocket_v1: audio exceeds PCM WAV size limit")
+	}
 
-	wavAudio := make([]byte, 44, 44+dataSize)
+	wavAudio := make([]byte, 44, 44+len(pcmAudio))
 	copy(wavAudio[0:4], "RIFF")
-	binary.LittleEndian.PutUint32(wavAudio[4:8], uint32(totalSize))
+	binary.LittleEndian.PutUint32(wavAudio[4:8], 36+dataSize)
 	copy(wavAudio[8:12], "WAVE")
 	copy(wavAudio[12:16], "fmt ")
 	binary.LittleEndian.PutUint32(wavAudio[16:20], 16)
 	binary.LittleEndian.PutUint16(wavAudio[20:22], 1)
 	binary.LittleEndian.PutUint16(wavAudio[22:24], 1)
-	binary.LittleEndian.PutUint32(wavAudio[24:28], uint32(sampleRate))
-	binary.LittleEndian.PutUint32(wavAudio[28:32], uint32(byteRate))
+	binary.LittleEndian.PutUint32(wavAudio[24:28], wavSampleRate)
+	binary.LittleEndian.PutUint32(wavAudio[28:32], wavSampleRate*2)
 	binary.LittleEndian.PutUint16(wavAudio[32:34], 2)
 	binary.LittleEndian.PutUint16(wavAudio[34:36], 16)
 	copy(wavAudio[36:40], "data")
-	binary.LittleEndian.PutUint32(wavAudio[40:44], uint32(dataSize))
-	return append(wavAudio, pcmAudio...)
+	binary.LittleEndian.PutUint32(wavAudio[40:44], dataSize)
+	return append(wavAudio, pcmAudio...), nil
 }
 
 func (engine *dslEngine) BuildConnectionURL(scope queryScope) (string, error) {

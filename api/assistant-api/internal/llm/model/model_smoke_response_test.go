@@ -47,6 +47,28 @@ func TestModel_ResponsePipeline_Error_EmitsAgentErrorAndEvent(t *testing.T) {
 	require.Equal(t, observability.AgentError, evt.Record.Event)
 }
 
+func TestModel_ResponsePipeline_ErrorThenDoneDoesNotEmitDone(t *testing.T) {
+	e, comm, _, _ := newModelTestEnv(t)
+	e.currentPacket = &internal_type.UserInputPacket{ContextID: "ctx-1"}
+
+	e.Run(context.Background(), comm, ResponsePipeline{Response: &protos.StreamChatOutput{
+		RequestId: "ctx-1",
+		Error:     &protos.Error{ErrorMessage: "provider down"},
+	}})
+	e.Run(context.Background(), comm, ResponsePipeline{Response: &protos.StreamChatOutput{
+		RequestId:    "ctx-1",
+		FinishReason: "stop",
+		Metrics:      []*protos.Metric{{Name: "token_count", Value: "1"}},
+		Data: &protos.Message{
+			Role:    "assistant",
+			Message: &protos.Message_Assistant{Assistant: &protos.AssistantMessage{Contents: []string{"late success"}}},
+		},
+	}})
+
+	require.Equal(t, "", e.currentContextID())
+	require.Empty(t, findPackets[internal_type.LLMResponseDonePacket](comm.pkts))
+}
+
 func TestModel_ResponsePipeline_Chunk_EmitsDeltaEvenWhenEmpty(t *testing.T) {
 	e, comm, _, _ := newModelTestEnv(t)
 	e.currentPacket = &internal_type.UserInputPacket{ContextID: "ctx-1"}
@@ -62,7 +84,7 @@ func TestModel_ResponsePipeline_Chunk_EmitsDeltaEvenWhenEmpty(t *testing.T) {
 	require.Equal(t, "", delta.Text)
 }
 
-func TestModel_ResponsePipeline_DoneWithToolCalls_ExecutesToolsAndOpensBlock(t *testing.T) {
+func TestModel_ResponsePipeline_DoneWithToolCalls_ExecutesToolsAndOpensBlockWithoutDone(t *testing.T) {
 	e, comm, _, toolExec := newModelTestEnv(t)
 	e.currentPacket = &internal_type.UserInputPacket{ContextID: "ctx-1"}
 
@@ -78,9 +100,7 @@ func TestModel_ResponsePipeline_DoneWithToolCalls_ExecutesToolsAndOpensBlock(t *
 	require.Len(t, toolExec.calls[0].tools, 2)
 	require.Equal(t, "ctx-1", e.history.PendingContextID())
 
-	done, ok := findPacket[internal_type.LLMResponseDonePacket](comm.pkts)
-	require.True(t, ok)
-	require.Equal(t, "ctx-1", done.ContextID)
+	require.Empty(t, findPackets[internal_type.LLMResponseDonePacket](comm.pkts))
 }
 
 func TestModel_ResponsePipeline_DoneWithoutToolCalls_AppendsAssistant(t *testing.T) {
@@ -99,6 +119,24 @@ func TestModel_ResponsePipeline_DoneWithoutToolCalls_AppendsAssistant(t *testing
 	snap := e.history.Snapshot()
 	require.Len(t, snap, 1)
 	require.Equal(t, "final", snap[0].GetAssistant().GetContents()[0])
+}
+
+func TestModel_ResponsePipeline_DuplicateCompletionEmitsDoneOnce(t *testing.T) {
+	e, comm, _, _ := newModelTestEnv(t)
+	e.currentPacket = &internal_type.UserInputPacket{ContextID: "ctx-1"}
+
+	response := &protos.StreamChatOutput{
+		RequestId:    "ctx-1",
+		FinishReason: "stop",
+		Metrics:      []*protos.Metric{{Name: "token_count", Value: "3"}},
+		Data:         &protos.Message{Role: "assistant", Message: &protos.Message_Assistant{Assistant: &protos.AssistantMessage{Contents: []string{"final"}}}},
+	}
+	e.Run(context.Background(), comm, ResponsePipeline{Response: response})
+	e.Run(context.Background(), comm, ResponsePipeline{Response: response})
+
+	dones := findPackets[internal_type.LLMResponseDonePacket](comm.pkts)
+	require.Len(t, dones, 1)
+	require.Equal(t, "ctx-1", dones[0].ContextID)
 }
 
 func TestModel_Flow_UserToLLM_Stream_Done(t *testing.T) {
@@ -140,7 +178,7 @@ func TestModel_Flow_UserToLLM_Stream_Done(t *testing.T) {
 	require.Equal(t, "Hi there", dones[0].Text)
 }
 
-func TestModel_Interrupt_LateResponseStillEmittedForPersistence(t *testing.T) {
+func TestModel_Interrupt_LateResponseDoesNotEmitDone(t *testing.T) {
 	e, comm, _, _ := newModelTestEnv(t)
 	e.currentPacket = &internal_type.UserInputPacket{ContextID: "ctx-int"}
 
@@ -158,7 +196,25 @@ func TestModel_Interrupt_LateResponseStillEmittedForPersistence(t *testing.T) {
 	})
 
 	dones := findPackets[internal_type.LLMResponseDonePacket](comm.pkts)
-	require.Len(t, dones, 1)
-	require.Equal(t, "ctx-int", dones[0].ContextID)
-	require.Equal(t, "late after interrupt", dones[0].Text)
+	require.Empty(t, dones)
+}
+
+func TestModel_CancelledContextDoesNotEmitDone(t *testing.T) {
+	e, comm, _, _ := newModelTestEnv(t)
+	e.currentPacket = &internal_type.UserInputPacket{ContextID: "ctx-cancel"}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	e.handleResponse(ctx, comm, &protos.StreamChatOutput{
+		RequestId: "ctx-cancel",
+		Data: &protos.Message{
+			Role: "assistant",
+			Message: &protos.Message_Assistant{
+				Assistant: &protos.AssistantMessage{Contents: []string{"late after cancel"}},
+			},
+		},
+		Metrics: []*protos.Metric{{Name: "token_count", Value: "1"}},
+	})
+
+	require.Empty(t, findPackets[internal_type.LLMResponseDonePacket](comm.pkts))
 }

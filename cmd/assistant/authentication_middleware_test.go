@@ -78,16 +78,16 @@ func TestGRPCUsesUserFirstAuthenticationMiddlewareOrder(t *testing.T) {
 	file := parseCommandSource(t, "assistant.go")
 
 	assertAuthenticationMiddlewareOrder(t, interceptorChain(t, file, "ChainUnaryInterceptor"), []string{
-		"NewAuthenticationUnaryServerMiddleware",
 		"NewProjectAuthenticatorUnaryServerMiddleware",
 		"NewOrganizationAuthenticatorUnaryServerMiddleware",
 		"NewServiceAuthenticatorUnaryServerMiddleware",
+		"NewAuthenticationUnaryServerMiddleware",
 	})
 	assertAuthenticationMiddlewareOrder(t, interceptorChain(t, file, "ChainStreamInterceptor"), []string{
-		"NewAuthenticationStreamServerMiddleware",
 		"NewProjectAuthenticatorStreamServerMiddleware",
 		"NewOrganizationAuthenticatorStreamServerMiddleware",
 		"NewServiceAuthenticatorStreamServerMiddleware",
+		"NewAuthenticationStreamServerMiddleware",
 	})
 }
 
@@ -116,10 +116,10 @@ func TestGinAuthenticationMiddlewareOrder(t *testing.T) {
 	}
 
 	assertAuthenticationMiddlewareOrder(t, middleware, []string{
-		"NewAuthenticationMiddleware",
 		"NewProjectAuthenticatorMiddleware",
 		"NewOrganizationAuthenticatorMiddleware",
 		"NewServiceAuthenticatorMiddleware",
+		"NewAuthenticationMiddleware",
 	})
 }
 

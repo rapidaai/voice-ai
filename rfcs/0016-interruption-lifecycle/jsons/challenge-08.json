@@ -1,0 +1,23 @@
+{
+  "rfc_file": "rfcs/0016-interruption-lifecycle.md",
+  "plan_file": "rfcs/0016-interruption-lifecycle/jsons/amendment-09-plan.json",
+  "rfc_sha256": "7feaad15add69f5e913b6e29e147e4ec20223693c9e6f006061d8ce89d5867b0",
+  "reviewed_plan_sha256": "b0d38d110a6af0cacb47199cbd9f2ea2f4161209a2ecb4acde9805d0f1835cc5",
+  "reviewed_at": "2026-09-07T02:03:23Z",
+  "reviewer": "independent Orca documentation challenger",
+  "run_id": "run_94aeb7c54726",
+  "task_id": "task_00877a412e2c",
+  "dispatch_id": "ctx_d349671c2d51",
+  "decision": "rejected",
+  "approved": false,
+  "critical_findings": 0,
+  "major_findings": [
+    "The interruption decision diagram connected empty or filler input ambiguously and did not visibly connect the active-deadline decision to FlushOutput."
+  ],
+  "minor_findings": [
+    "The unclear-input extension path did not visibly return to waiting.",
+    "The component sequence used ambiguous TurnChange publication wording."
+  ],
+  "implementation_authorized": false,
+  "next_action": "Correct the diagrams and run one final exact-byte challenge."
+}

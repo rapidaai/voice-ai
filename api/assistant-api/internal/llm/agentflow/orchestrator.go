@@ -28,6 +28,44 @@ type orchestrator struct {
 	turnMu       sync.Mutex
 }
 
+type responseFinalityCommunication struct {
+	internal_type.Communication
+	contextID string
+	text      string
+	hasOutput bool
+	failed    bool
+}
+
+func (communication *responseFinalityCommunication) OnPacket(ctx context.Context, packets ...internal_type.Packet) error {
+	forward := make([]internal_type.Packet, 0, len(packets))
+	for _, packet := range packets {
+		switch typedPacket := packet.(type) {
+		case internal_type.LLMResponseDeltaPacket:
+			if typedPacket.ContextID == communication.contextID {
+				communication.text += typedPacket.Text
+				communication.hasOutput = true
+			}
+		case internal_type.LLMResponseDonePacket:
+			if typedPacket.ContextID == communication.contextID {
+				if !communication.hasOutput {
+					communication.text = typedPacket.Text
+					communication.hasOutput = true
+				}
+				continue
+			}
+		case internal_type.LLMErrorPacket:
+			if typedPacket.ContextID == communication.contextID {
+				communication.failed = true
+			}
+		}
+		forward = append(forward, packet)
+	}
+	if len(forward) == 0 {
+		return nil
+	}
+	return communication.Communication.OnPacket(ctx, forward...)
+}
+
 func newOrchestrator(
 	graph *graph,
 	runtimeState *state.RuntimeState,
@@ -63,6 +101,10 @@ func (orchestrator *orchestrator) runFromNode(
 	currentNodeID := startNodeID
 	currentInputText := inputText
 	currentContinuationText := continuationText
+	finalityCommunication := &responseFinalityCommunication{
+		Communication: communication,
+		contextID:     contextID,
+	}
 
 	for nodeStep := 0; nodeStep < maxNodeStepsPerTurn; nodeStep++ {
 		currentNode, exists := orchestrator.graph.node(currentNodeID)
@@ -82,15 +124,21 @@ func (orchestrator *orchestrator) runFromNode(
 			ContinuationText: currentContinuationText,
 			Node:             currentNode,
 			RuntimeState:     orchestrator.runtimeState,
-			Communication:    communication,
+			Communication:    finalityCommunication,
 		})
 		if err != nil {
 			return err
 		}
+		if result.ResponseText != "" && !finalityCommunication.hasOutput {
+			finalityCommunication.text = result.ResponseText
+			finalityCommunication.hasOutput = true
+		}
 		if result.Terminal {
+			orchestrator.emitResponseDone(ctx, communication, finalityCommunication)
 			return nil
 		}
 		if result.WaitForNextInput {
+			orchestrator.emitResponseDone(ctx, communication, finalityCommunication)
 			return nil
 		}
 
@@ -120,6 +168,7 @@ func (orchestrator *orchestrator) runFromNode(
 					},
 				})
 			}
+			orchestrator.emitResponseDone(ctx, communication, finalityCommunication)
 			return nil
 		}
 		nextNode, _ := orchestrator.graph.node(nextNodeID)
@@ -152,4 +201,20 @@ func (orchestrator *orchestrator) runFromNode(
 	}
 
 	return fmt.Errorf("agentflow: maximum node steps exceeded")
+}
+
+func (orchestrator *orchestrator) emitResponseDone(
+	ctx context.Context,
+	communication internal_type.Communication,
+	finalityCommunication *responseFinalityCommunication,
+) {
+	if ctx.Err() != nil || finalityCommunication.failed {
+		return
+	}
+	_ = communication.OnPacket(ctx, internal_type.LLMResponseDonePacket{
+		ContextID: finalityCommunication.contextID,
+		Text:      finalityCommunication.text,
+	})
+	finalityCommunication.text = ""
+	finalityCommunication.hasOutput = false
 }

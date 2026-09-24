@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
@@ -19,12 +20,12 @@ import (
 )
 
 type middlewareOption struct {
-	ctx                    context.Context
-	logger                 commons.Logger
-	assistantService       internal_services.AssistantService
-	rapidaClient           *rapida_client.RapidaClient
-	applySIPConfigDefaults func(*sip_runtime.Config)
-	ServiceID              uint64
+	ctx              context.Context
+	logger           commons.Logger
+	assistantService internal_services.AssistantService
+	rapidaClient     *rapida_client.RapidaClient
+	sipConfig        sip_config.Resolver
+	ServiceID        uint64
 }
 
 func WithContext(ctx context.Context) func(*middlewareOption) {
@@ -51,9 +52,9 @@ func WithRapidaClient(rapidaClient *rapida_client.RapidaClient) func(*middleware
 	}
 }
 
-func WithApplySIPConfigDefaults(applySIPConfigDefaults func(*sip_runtime.Config)) func(*middlewareOption) {
+func WithSIPConfig(sipConfig sip_config.Resolver) func(*middlewareOption) {
 	return func(m *middlewareOption) {
-		m.applySIPConfigDefaults = applySIPConfigDefaults
+		m.sipConfig = sipConfig
 	}
 }
 
@@ -73,7 +74,7 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_runtime.Middlewa
 	return func(ctx *sip_runtime.SIPRequestContext) error {
 		route, err := ctx.ResolveRoute()
 		if err != nil {
-			return &sip_runtime.SIPError{Code: 404, Message: "Invalid SIP route", Err: err}
+			return &sip_runtime.SIPError{Code: sipStatusNotFound, Message: sipMessageInvalidRoute, Err: err}
 		}
 
 		switch resolvedRoute := route.(type) {
@@ -82,22 +83,22 @@ func NewRouteMiddleware(options ...func(*middlewareOption)) sip_runtime.Middlewa
 		case sip_runtime.DIDCallRoute:
 			return m.resolveDIDCallRoute(ctx, resolvedRoute)
 		default:
-			return &sip_runtime.SIPError{Code: 404, Message: "Unsupported SIP route", Err: sip_runtime.ErrAuthRequired}
+			return &sip_runtime.SIPError{Code: sipStatusNotFound, Message: sipMessageUnsupportedRoute, Err: sip_runtime.ErrAuthRequired}
 		}
 	}
 }
 
 func (m *middlewareOption) resolveAgentCallRoute(ctx *sip_runtime.SIPRequestContext, route sip_runtime.AgentCallRoute) error {
 	if !validator.NonNil(m.assistantService) {
-		return &sip_runtime.SIPError{Code: 500, Message: "SIP assistant resolver not configured", Err: sip_runtime.ErrInvalidConfig}
+		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageAssistantResolverUnavailable, Err: sip_config.ErrInvalidConfig}
 	}
 
 	assistant, err := m.assistantService.GetAssistantWithPhoneDeploymentById(m.ctx, route.AssistantID)
 	if err != nil {
-		return &sip_runtime.SIPError{Code: 404, Message: "No assistant found for this SIP route", Err: sip_runtime.ErrAuthRequired}
+		return &sip_runtime.SIPError{Code: sipStatusNotFound, Message: sipMessageAssistantRouteNotFound, Err: sip_runtime.ErrAuthRequired}
 	}
 	if !validator.AllNonZero(assistant.Id, assistant.ProjectId, assistant.OrganizationId) {
-		return &sip_runtime.SIPError{Code: 404, Message: "No assistant found for this SIP route", Err: sip_runtime.ErrAuthRequired}
+		return &sip_runtime.SIPError{Code: sipStatusNotFound, Message: sipMessageAssistantRouteNotFound, Err: sip_runtime.ErrAuthRequired}
 	}
 
 	ctx.Auth = &types.Authentication{
@@ -107,11 +108,11 @@ func (m *middlewareOption) resolveAgentCallRoute(ctx *sip_runtime.SIPRequestCont
 		ProjectValue:      &types.ProjectContext{OrganizationID: assistant.OrganizationId, ProjectID: assistant.ProjectId},
 	}
 	if !validator.NonNil(assistant.AssistantPhoneDeployment) {
-		return &sip_runtime.SIPError{Code: 500, Message: "Failed to resolve SIP configuration", Err: sip_runtime.ErrInvalidConfig}
+		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: sip_config.ErrInvalidConfig}
 	}
-	phone, err := assistant.AssistantPhoneDeployment.GetOptions().GetString("phone")
+	phone, err := assistant.AssistantPhoneDeployment.GetOptions().GetString(phoneOptionKey)
 	if err != nil || !validator.NotBlank(phone) {
-		return &sip_runtime.SIPError{Code: 500, Message: "Failed to resolve SIP configuration", Err: sip_runtime.ErrInvalidConfig}
+		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: sip_config.ErrInvalidConfig}
 	}
 	ctx.CallAddress.To = strings.TrimSpace(phone)
 	ctx.Assistant = assistant
@@ -121,22 +122,22 @@ func (m *middlewareOption) resolveAgentCallRoute(ctx *sip_runtime.SIPRequestCont
 
 func (m *middlewareOption) resolveDIDCallRoute(ctx *sip_runtime.SIPRequestContext, route sip_runtime.DIDCallRoute) error {
 	if !validator.NonNil(m.assistantService) {
-		return &sip_runtime.SIPError{Code: 500, Message: "SIP assistant resolver not configured", Err: sip_runtime.ErrInvalidConfig}
+		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageAssistantResolverUnavailable, Err: sip_config.ErrInvalidConfig}
 	}
 
 	assistant, err := m.assistantService.GetAssistantWithPhoneDeploymentByDID(m.ctx, route.DID)
 	if err != nil {
-		return &sip_runtime.SIPError{Code: 404, Message: "No assistant found for this SIP route", Err: sip_runtime.ErrAuthRequired}
+		return &sip_runtime.SIPError{Code: sipStatusNotFound, Message: sipMessageAssistantRouteNotFound, Err: sip_runtime.ErrAuthRequired}
 	}
 	if !validator.AllNonZero(assistant.Id, assistant.ProjectId, assistant.OrganizationId) {
-		return &sip_runtime.SIPError{Code: 404, Message: "No assistant found for this SIP route", Err: sip_runtime.ErrAuthRequired}
+		return &sip_runtime.SIPError{Code: sipStatusNotFound, Message: sipMessageAssistantRouteNotFound, Err: sip_runtime.ErrAuthRequired}
 	}
 	if !validator.NonNil(assistant.AssistantPhoneDeployment) {
-		return &sip_runtime.SIPError{Code: 500, Message: "Failed to resolve SIP configuration", Err: sip_runtime.ErrInvalidConfig}
+		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: sip_config.ErrInvalidConfig}
 	}
-	phone, err := assistant.AssistantPhoneDeployment.GetOptions().GetString("phone")
+	phone, err := assistant.AssistantPhoneDeployment.GetOptions().GetString(phoneOptionKey)
 	if err != nil {
-		return &sip_runtime.SIPError{Code: 500, Message: "Failed to resolve SIP configuration", Err: sip_runtime.ErrInvalidConfig}
+		return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: sip_config.ErrInvalidConfig}
 	}
 	ctx.CallAddress.To = strings.TrimSpace(phone)
 	ctx.Auth = &types.Authentication{

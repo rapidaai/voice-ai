@@ -1,0 +1,177 @@
+{
+  "schema": 1,
+  "run_id": "run_164b9ed811c6",
+  "task_id": "task_92ac9e309115",
+  "dispatch_id": "ctx_0eaf6c2f0303",
+  "decision": "approved",
+  "reviewer": "term_15dc98c8-2ce1-4d6a-a3fc-a02452c15f1a",
+  "reviewed_at": "2026-09-10T17:10:12Z",
+  "rfc_file": "rfcs/0016-eos-canonical-parameters.md",
+  "rfc_sha256": "78d291280345600a7f03449e65d5eaee21d3ef818af392ca73fe0404ffbc3461",
+  "plan_file": "rfcs/0016-eos-canonical-parameters/jsons/amendment-01-approved-plan.json",
+  "plan_sha256": "1ef7a07a79a0a19a8e0b0b1eb02eae2bbe23c7e3b7ad9a27bf7d52e3806dd141",
+  "summary": "Approved the user-approved Amendment 01 implementation for the five scoped migration/test files. The current SQL uses one transaction with direct UPDATE then DELETE, no journal/temp tables/parser, exact value/audit preservation, provider/input scoping, and backup-only down refusal. The known web-api full-history mismatch remains a separate shipping blocker outside this amendment review.",
+  "findings": [
+    {
+      "severity": "info",
+      "status": "existing_out_of_scope",
+      "message": "The previously identified full-history harness mismatch where web-api expects 12 but reaches 13 still blocks shipping globally, but it is unrelated to this approved Amendment 01 migration implementation and does not require amendment scope expansion."
+    }
+  ],
+  "evidence": {
+    "plan": {
+      "path": "rfcs/0016-eos-canonical-parameters/jsons/amendment-01-approved-plan.json",
+      "sha256": "1ef7a07a79a0a19a8e0b0b1eb02eae2bbe23c7e3b7ad9a27bf7d52e3806dd141",
+      "notes": [
+        "Plan scope is limited to migration SQL, disposable verifier, focused migration tests, RFC, and RFC JSON artifacts.",
+        "Plan requires direct UPDATE and DELETE, no journal/temp tables, exact text and audit preservation, idempotent up, atomic failures, and backup-only down."
+      ]
+    },
+    "implementation": {
+      "path": "rfcs/0016-eos-canonical-parameters/jsons/amendment-01-implementation.json",
+      "sha256": "7604ee48a953f147f41e503f3c505c4a415b1b0c0ec555013b08eb6b35e357be",
+      "notes": [
+        "Implementation receipt lists exactly five scoped changed files.",
+        "Current scoped file hashes match the implementation receipt."
+      ]
+    },
+    "verification": {
+      "path": "rfcs/0016-eos-canonical-parameters/jsons/amendment-01-verification.json",
+      "sha256": "1087b0507319e6319b85053041604a5f4a811070031db6097c7ece5a09ee8cfc",
+      "recorded_passes": [
+        "bash bin/verify-eos-options-migration.sh exit 0",
+        "bash -n bin/verify-eos-options-migration.sh exit 0",
+        "just agent-finalize scoped five files exit 0",
+        "git diff --check exit 0"
+      ],
+      "recorded_results": {
+        "disposable_postgres_tests": 6,
+        "schema_version": 61,
+        "dirty": false,
+        "obsolete_target_keys": 0,
+        "live_database_used": false
+      },
+      "reviewer_static_checks": [
+        {
+          "cmd": "bash -n bin/verify-eos-options-migration.sh",
+          "exit_code": 0
+        },
+        {
+          "cmd": "git diff --check -- api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql api/assistant-api/migrations/000061_eos_canonical_parameters.down.sql bin/verify-eos-options-migration.sh tests/integration/eos-options/seed.sql tests/integration/eos-options/test_migration.py",
+          "exit_code": 0
+        }
+      ]
+    },
+    "diff": {
+      "scoped_file_manifest_sha256": "178f4368a6062840a5e92ca2cef1e4242a72407bd26dfe46b56838dba688c7ba",
+      "notes": [
+        "Review used exact current file digests rather than stale earlier journal-based bytes.",
+        "No amendment-01-diff.json artifact was present; diff evidence is the scoped file manifest, implementation receipt, and line-level review below."
+      ]
+    },
+    "line_review": [
+      {
+        "contract": "Direct transaction with write exclusion",
+        "status": "pass",
+        "references": [
+          "api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql:1-6"
+        ],
+        "notes": "The migration runs in a transaction with bounded lock and statement timeouts and locks the deployment and option tables."
+      },
+      {
+        "contract": "UPDATE preserves canonical-over-alias precedence",
+        "status": "pass",
+        "references": [
+          "api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql:8-30"
+        ],
+        "notes": "The UPDATE promotes only aliases for selected input providers and skips when the canonical key exists. LiveKit timeout also skips when fallback_timeout exists, preserving fallback over timeout before deletion."
+      },
+      {
+        "contract": "DELETE removes remaining obsolete provider-specific keys",
+        "status": "pass",
+        "references": [
+          "api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql:32-40"
+        ],
+        "notes": "The DELETE is scoped by input deployment and exact `microphone.eos.provider` value, removing LiveKit fallback/timeout/silence aliases and Pipecat timeout/silence/LiveKit-only keys."
+      },
+      {
+        "contract": "No journal, temp tables, parser, or value rewrite",
+        "status": "pass",
+        "references": [
+          "api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql:8-42",
+          "tests/integration/eos-options/test_migration.py:69-77",
+          "tests/integration/eos-options/test_migration.py:87-96"
+        ],
+        "notes": "The SQL does not create tables or parse/cast values. Tests cover exact preservation of ordinary, zero, malformed, non-finite-looking, and custom text values, plus no new persistent tables."
+      },
+      {
+        "contract": "Down refuses backup-only recovery",
+        "status": "pass",
+        "references": [
+          "api/assistant-api/migrations/000061_eos_canonical_parameters.down.sql:1-4",
+          "tests/integration/eos-options/test_migration.py:79-85"
+        ],
+        "notes": "Down raises an actionable forward-only backup restoration error and the test asserts rows are unchanged."
+      },
+      {
+        "contract": "Provider/input exclusions, inactive inputs, backend paths, IDs, audits, and exact row images",
+        "status": "pass",
+        "references": [
+          "tests/integration/eos-options/seed.sql:3-17",
+          "tests/integration/eos-options/seed.sql:19-50",
+          "tests/integration/eos-options/test_migration.py:38-67"
+        ],
+        "notes": "Fixtures include inactive input, output audio, missing/unknown/mismatched providers, backend model paths, unrelated settings, audit fields, canonical rows, and alias conflicts. The test compares complete option and deployment row images after expected key-only changes."
+      },
+      {
+        "contract": "Atomic failure after updates and concurrent writer timeout",
+        "status": "pass",
+        "references": [
+          "tests/integration/eos-options/test_migration.py:98-109",
+          "tests/integration/eos-options/test_migration.py:111-126"
+        ],
+        "notes": "Tests force a delete failure after earlier updates and a lock timeout under a concurrent writer, then assert full snapshot rollback."
+      },
+      {
+        "contract": "UI/backend hashes unchanged",
+        "status": "pass",
+        "references": [
+          "rfcs/0016-eos-canonical-parameters/jsons/implementation.json"
+        ],
+        "notes": "Current UI/backend hashes match the original implementation receipt for the unchanged UI/backend files."
+      }
+    ]
+  },
+  "file_sha256": {
+    "api/assistant-api/migrations/000061_eos_canonical_parameters.up.sql": "dbf2a83b8475ac83c2e070dcb805c28b62ef04a9ab1ea95478a1844ebbc13408",
+    "api/assistant-api/migrations/000061_eos_canonical_parameters.down.sql": "4ec5c10117f66ae94bfce814be23d1bec6ec93c051be0a8676c59aa4c699de94",
+    "bin/verify-eos-options-migration.sh": "1d40da0aa071affda67ddc639efa9a8aaa5aac24537ccfff269dc0af1758f86e",
+    "tests/integration/eos-options/seed.sql": "5f68cf5b1e8b2cc1792dfa01200d3725e3562c86834dfdb5db22a5637380283a",
+    "tests/integration/eos-options/test_migration.py": "82a62053703c22f3bdaf7be6bd5b697b2431740cbe245d08190442dc925443d0"
+  },
+  "unchanged_ui_backend_hashes": {
+    "api/assistant-api/internal/end_of_speech/internal/livekit/constant.go": "ae4a0833f6429922fd8573ac3bd23411ab89ce11e49fdef816cd966690aad777",
+    "api/assistant-api/internal/end_of_speech/internal/livekit/livekit_end_of_speech.go": "f22d2553103211b6e32ae7b813df77098ef7d2e60cd9e9b649986ca55c2539e6",
+    "api/assistant-api/internal/end_of_speech/internal/livekit/livekit_end_of_speech_integration_test.go": "30aad6847074058279882e231892e1ccf5d9d0427af9b4b49123c29aa0be649a",
+    "api/assistant-api/internal/end_of_speech/internal/pipecat/constant.go": "3ac842c5b80253511887f772b11872604231b2ec2624f69969a5e975bfd88657",
+    "api/assistant-api/internal/end_of_speech/internal/pipecat/pipecat_end_of_speech.go": "97f0829a64ab099e2ad2767fa75299fc3adc023a79cf13d85fb23a53739b459b",
+    "api/assistant-api/internal/end_of_speech/internal/pipecat/pipecat_end_of_speech_integration_test.go": "94049fd76c35365124d95eeb8544a5e158d1b6bdcb4e663841b71e700543878b",
+    "api/assistant-api/internal/end_of_speech/internal/pipecat/pipecat_end_of_speech_test.go": "cd9f8342f4a0ea5195dd78c25f2742a9ac4566e8c1e316c376aeefed5f842720",
+    "api/assistant-api/internal/options/audio.go": "d6457a5ca43f8d4515a7327e0c13f1dd84d6d2f907189ec24a7bd0451e883d0d",
+    "api/assistant-api/internal/options/audio_test.go": "aedede2e0fdefedb09b0bff35841adc1809a73470cc917e0a5ee2b2e66cfbc7b",
+    "ui/src/app/components/providers/__tests__/audio-input-advanced-defaults-parity.test.ts": "0223df893697c1d5cf3d1d4a6d4ac9c3cc39b682bce8f2ee885cf2e06eadc9e3",
+    "ui/src/app/components/providers/end-of-speech/__tests__/provider-runtime-parity.test.tsx": "c23315671155247dbd78d768a43e054db94b4f4ed3fe23b91c1c612124a1b8e2",
+    "ui/src/app/components/providers/end-of-speech/provider.tsx": "d61318863c7d48558d68ca0c6c044930d9f905940b4c3841e43a254aa709e300",
+    "ui/src/app/components/providers/speech-to-text/provider.tsx": "f435181ef8028926df57845007617516fa4b8286b98582cc9325d1732dd23b4f",
+    "ui/src/app/pages/assistant/actions/create-deployment/commons/__tests__/configure-audio-input.design.test.tsx": "df3e0de96457f2048ef6c3bae6b348b54cf6e8f3701c06afb98c481e00496494",
+    "ui/src/app/pages/assistant/actions/create-deployment/commons/configure-audio-input.tsx": "cfe1afd28ec28ed2ee0ef700342891508305eacce01fb3fce5be61549e46f434",
+    "ui/src/providers/__tests__/provider-eos-config.test.ts": "fd9f2c76728428048085a0466124bf24c785c12a02baf7602e50f3bfc23a7ca7"
+  },
+  "not_approved_by_this_review": [
+    "Live rollout",
+    "Commit or push",
+    "Model-quality claims",
+    "Unrelated web-api full-history harness correction",
+    "Changes outside the five scoped Amendment 01 implementation files"
+  ]
+}

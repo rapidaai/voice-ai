@@ -13,6 +13,7 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/Microsoft/cognitive-services-speech-sdk-go v1.43.0
 	github.com/OpenRouterTeam/go-sdk v0.4.1
+	github.com/allure-framework/allure-go/commons v1.3.1
 	github.com/anthropics/anthropic-sdk-go v1.20.0
 	github.com/aws/aws-sdk-go v1.49.6
 	github.com/aws/aws-sdk-go-v2/config v1.32.0
@@ -36,6 +37,8 @@ require (
 	github.com/improbable-eng/grpc-web v0.15.0
 	github.com/mark3labs/mcp-go v0.43.2
 	github.com/mitchellh/mapstructure v1.5.0
+	github.com/onsi/ginkgo/v2 v2.33.0
+	github.com/onsi/gomega v1.43.1
 	github.com/openai/openai-go v1.12.0
 	github.com/openai/openai-go/v3 v3.34.0
 	github.com/opensearch-project/opensearch-go/v2 v2.3.0
@@ -63,6 +66,7 @@ require (
 	go.uber.org/zap v1.23.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.22.0
+	golang.org/x/text v0.41.0
 	google.golang.org/api v0.265.0
 	google.golang.org/genai v1.55.0
 	google.golang.org/grpc v1.83.2
@@ -74,6 +78,15 @@ require (
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.30.0
 	moul.io/number-to-words v0.7.0
+)
+
+require (
+	github.com/Masterminds/semver/v3 v3.4.0 // indirect
+	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
+	github.com/google/pprof v0.0.0-20260402051712-545e8a4df936 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	golang.org/x/mod v0.38.0 // indirect
+	golang.org/x/tools v0.48.0 // indirect
 )
 
 require (
@@ -114,7 +127,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
-	github.com/dlclark/regexp2 v1.10.0 // indirect
+	github.com/dlclark/regexp2 v1.10.0
 	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/dvonthenen/websocket v1.5.1-dyv.2 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.37.0 // indirect
@@ -217,9 +230,8 @@ require (
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
-	gonum.org/v1/gonum v0.17.0 // indirect
+	gonum.org/v1/gonum v0.17.0
 	google.golang.org/genproto v0.0.0-20260128011058-8636f8732409 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect

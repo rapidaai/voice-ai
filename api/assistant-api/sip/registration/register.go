@@ -31,13 +31,13 @@ func (m *manager) handleRegister(ctx context.Context, s RegisterPipeline) Pipeli
 	snapshot := m.regClient.Snapshot(rec.DID)
 	if snapshot.Active && snapshot.Healthy {
 		rec.Outcome = OutcomeAlreadyActive
-		m.logger.Debugw("SIP DID already registered — renewal loop active",
+		m.logger.Debugw("SIP DID already registered. Renewal loop active",
 			"did", rec.DID, "assistant_id", rec.AssistantID)
 		return nil
 	}
 	if snapshot.Active && !snapshot.Healthy {
 		rec.Outcome = OutcomeAlreadyActive
-		m.logger.Warnw("SIP DID registered with renewal failure — preserving failure visibility",
+		m.logger.Warnw("SIP DID registered with renewal failure. Preserving failure visibility",
 			"did", rec.DID,
 			"assistant_id", rec.AssistantID,
 			"retry_count", snapshot.RenewalRetryCount,
@@ -115,7 +115,7 @@ func (m *manager) handleRegister(ctx context.Context, s RegisterPipeline) Pipeli
 		return nil
 	}
 
-	sipConfig, err := sip_runtime.ParseConfigFromVault(vaultCred)
+	sipConfig, err := m.sipConfig.RuntimeConfig(vaultCred)
 	if err != nil {
 		rec.Outcome = OutcomeConfigError
 		m.logger.Warnw("Failed to parse SIP config for registration",
@@ -151,9 +151,6 @@ func (m *manager) handleRegister(ctx context.Context, s RegisterPipeline) Pipeli
 			OwnerInstance: m.instanceID,
 		})
 		return nil
-	}
-	if m.opDefaults != nil {
-		m.opDefaults(sipConfig)
 	}
 	attributes["server"] = sipConfig.Server
 	attributes["domain"] = sipConfig.Domain
@@ -232,7 +229,7 @@ func (m *manager) handleRegister(ctx context.Context, s RegisterPipeline) Pipeli
 	switch statusUpdate.FailureClass {
 	case RegistrationFailureClassRejected:
 		rec.Outcome = OutcomeRejected
-		m.logger.Errorw("SIP registration permanently rejected — will not retry",
+		m.logger.Errorw("SIP registration permanently rejected. Will not retry",
 			"did", rec.DID, "assistant_id", rec.AssistantID, "error", regErr)
 		_ = observer.Record(ctx, scope,
 			observability.RecordLog{
@@ -257,7 +254,7 @@ func (m *manager) handleRegister(ctx context.Context, s RegisterPipeline) Pipeli
 		m.writeRegistrationStatus(ctx, rec.DeploymentID, statusUpdate)
 	case RegistrationFailureClassAuth:
 		rec.Outcome = OutcomeAuthFailed
-		m.logger.Errorw("SIP registration auth failed — marking deployment as failed",
+		m.logger.Errorw("SIP registration auth failed. Marking deployment as failed",
 			"did", rec.DID, "assistant_id", rec.AssistantID, "error", regErr)
 		_ = observer.Record(ctx, scope,
 			observability.RecordLog{
@@ -282,7 +279,7 @@ func (m *manager) handleRegister(ctx context.Context, s RegisterPipeline) Pipeli
 		m.writeRegistrationStatus(ctx, rec.DeploymentID, statusUpdate)
 	case RegistrationFailureClassConfig:
 		rec.Outcome = OutcomeConfigError
-		m.logger.Errorw("SIP registration config failed — will not retry",
+		m.logger.Errorw("SIP registration config failed. Will not retry",
 			"did", rec.DID, "assistant_id", rec.AssistantID, "error", regErr)
 		_ = observer.Record(ctx, scope,
 			observability.RecordLog{

@@ -9,6 +9,8 @@ package sip_runtime
 import (
 	"net/netip"
 	"strings"
+
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 )
 
 type ServerHealthSnapshot struct {
@@ -69,7 +71,7 @@ func (s *Server) HealthSnapshot() ServerHealthSnapshot {
 	return snapshot
 }
 
-func outboundAdvertisedAddressHealthReason(listenConfig *ListenConfig) string {
+func outboundAdvertisedAddressHealthReason(listenConfig *sip_config.ListenConfig) string {
 	if listenConfig == nil {
 		return "listen_config_unavailable"
 	}

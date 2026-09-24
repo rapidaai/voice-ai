@@ -88,7 +88,8 @@ func requireSingleModeSwitchErrorPacket(t *testing.T, r *genericRequestor) inter
 	t.Helper()
 
 	select {
-	case env := <-r.channels.EgressChannel():
+	case <-r.channels.EgressChannel().Ready():
+		env := receiveEnvelope(t, r.channels.EgressChannel())
 		pkt, ok := env.Pkt.(internal_type.ModeSwitchErrorPacket)
 		require.True(t, ok, "expected ModeSwitchErrorPacket, got %T", env.Pkt)
 		return pkt
@@ -189,9 +190,9 @@ func TestHandleUserAudio_QueuesSpeechToTextBeforeVAD(t *testing.T) {
 		Audio:     []byte{1, 2},
 	})
 
-	require.Equal(t, internal_type.PacketNameSpeechToTextAudio, (<-r.channels.IngressChannel()).Pkt.PacketName())
-	require.Equal(t, internal_type.PacketNameVadAudio, (<-r.channels.IngressChannel()).Pkt.PacketName())
-	require.Equal(t, internal_type.PacketNameEndOfSpeechAudio, (<-r.channels.IngressChannel()).Pkt.PacketName())
+	require.Equal(t, internal_type.PacketNameSpeechToTextAudio, receiveEnvelope(t, r.channels.IngressChannel()).Pkt.PacketName())
+	require.Equal(t, internal_type.PacketNameVadAudio, receiveEnvelope(t, r.channels.IngressChannel()).Pkt.PacketName())
+	require.Equal(t, internal_type.PacketNameEndOfSpeechAudio, receiveEnvelope(t, r.channels.IngressChannel()).Pkt.PacketName())
 }
 
 func TestHandleDenoisedAudio_QueuesSpeechToTextBeforeVAD(t *testing.T) {
@@ -206,9 +207,9 @@ func TestHandleDenoisedAudio_QueuesSpeechToTextBeforeVAD(t *testing.T) {
 		Audio:     []byte{1, 2},
 	})
 
-	require.Equal(t, internal_type.PacketNameSpeechToTextAudio, (<-r.channels.IngressChannel()).Pkt.PacketName())
-	require.Equal(t, internal_type.PacketNameVadAudio, (<-r.channels.IngressChannel()).Pkt.PacketName())
-	require.Equal(t, internal_type.PacketNameEndOfSpeechAudio, (<-r.channels.IngressChannel()).Pkt.PacketName())
+	require.Equal(t, internal_type.PacketNameSpeechToTextAudio, receiveEnvelope(t, r.channels.IngressChannel()).Pkt.PacketName())
+	require.Equal(t, internal_type.PacketNameVadAudio, receiveEnvelope(t, r.channels.IngressChannel()).Pkt.PacketName())
+	require.Equal(t, internal_type.PacketNameEndOfSpeechAudio, receiveEnvelope(t, r.channels.IngressChannel()).Pkt.PacketName())
 }
 
 func TestHandleUserAudio_WithDenoiserQueuesOnlyDenoise(t *testing.T) {
@@ -224,6 +225,6 @@ func TestHandleUserAudio_WithDenoiserQueuesOnlyDenoise(t *testing.T) {
 		Audio:     []byte{1, 2},
 	})
 
-	require.Equal(t, internal_type.PacketNameDenoiseAudio, (<-r.channels.IngressChannel()).Pkt.PacketName())
-	require.Empty(t, r.channels.IngressChannel())
+	require.Equal(t, internal_type.PacketNameDenoiseAudio, receiveEnvelope(t, r.channels.IngressChannel()).Pkt.PacketName())
+	require.Zero(t, r.channels.IngressChannel().Len())
 }

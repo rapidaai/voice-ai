@@ -1,0 +1,15 @@
+{
+  "challenge_receipt_sha256": "459684302f917e31c1856cb374c6c974db6b4a42382a985dd666380932e13a89",
+  "challenge_reviewed_at": "2026-09-10T16:57:17Z",
+  "challenge_reviewer": "term_15dc98c8-2ce1-4d6a-a3fc-a02452c15f1a",
+  "challenge_task_id": "task_7eb250159099",
+  "confirmed_sha256": "78d291280345600a7f03449e65d5eaee21d3ef818af392ca73fe0404ffbc3461",
+  "created_at": "2026-09-10T17:01:04Z",
+  "gate_id": "gate_123d540b4f09",
+  "question": "Approve implementation of RFC rfcs/0016-eos-canonical-parameters.md with SHA-256 78d291280345600a7f03449e65d5eaee21d3ef818af392ca73fe0404ffbc3461 after approved challenge task task_7eb250159099 with receipt SHA-256 459684302f917e31c1856cb374c6c974db6b4a42382a985dd666380932e13a89?",
+  "resolution": "approved",
+  "resolved_at": "2026-09-10T17:01:18Z",
+  "rfc_file": "rfcs/0016-eos-canonical-parameters.md",
+  "run_id": "run_164b9ed811c6",
+  "task_id": "task_2cbddd229c28"
+}

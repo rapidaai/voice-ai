@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "run_id": "run_164b9ed811c6",
+  "task_id": "task_7eb250159099",
+  "dispatch_id": "ctx_2ea9e1437965",
+  "decision": "approved",
+  "reviewer": "term_15dc98c8-2ce1-4d6a-a3fc-a02452c15f1a",
+  "reviewed_at": "2026-09-10T16:57:17Z",
+  "rfc_file": "rfcs/0016-eos-canonical-parameters.md",
+  "rfc_sha256": "78d291280345600a7f03449e65d5eaee21d3ef818af392ca73fe0404ffbc3461",
+  "plan_file": "rfcs/0016-eos-canonical-parameters/jsons/amendment-01-plan.json",
+  "plan_sha256": "0d3ec86b1fee08e329b9f83ec5b2b79ebf13b9ca38612f32f7c8dbd4f4dd513a",
+  "review_scope": "Read-only challenge of Amendment 01 RFC and plan bytes only. Existing UI/backend changes and current migration implementation files were not approved or changed by this challenge.",
+  "findings": {
+    "critical": [],
+    "major": [],
+    "minor": []
+  },
+  "evidence": [
+    {
+      "contract": "Accepted final bytes and amendment scope",
+      "status": "pass",
+      "references": [
+        "rfcs/0016-eos-canonical-parameters.md:3",
+        "rfcs/0016-eos-canonical-parameters.md:15-17",
+        "rfcs/0016-eos-canonical-parameters.md:40-59",
+        "rfcs/0016-eos-canonical-parameters/jsons/amendment-01-plan.json:1-15"
+      ],
+      "notes": "The RFC is Accepted, identifies Amendment 01 as the replacement for the journal-based migration, keeps UI/backend work unchanged, and scopes only migration SQL, verifier, focused tests, RFC, and RFC JSON artifacts."
+    },
+    {
+      "contract": "Two direct SQL statements are sufficient for canonical precedence",
+      "status": "pass",
+      "references": [
+        "rfcs/0016-eos-canonical-parameters.md:61-82",
+        "rfcs/0016-eos-canonical-parameters/jsons/amendment-01-plan.json:24-28",
+        "rfcs/0016-eos-canonical-parameters/jsons/amendment-01-plan.json:41-48",
+        "api/assistant-api/migrations/000001_initial_schema.up.sql:298-310"
+      ],
+      "notes": "The unique (key, assistant_deployment_audio_id) constraint means one selected alias row can be renamed in place only when its canonical key and higher-priority aliases are absent. The paired delete can then remove lower-priority aliases and obsolete provider-specific rows without rewriting values, IDs, or audit fields."
+    },
+    {
+      "contract": "Provider and input scoping",
+      "status": "pass",
+      "references": [
+        "rfcs/0016-eos-canonical-parameters.md:21-23",
+        "rfcs/0016-eos-canonical-parameters.md:70-71",
+        "rfcs/0016-eos-canonical-parameters/jsons/amendment-01-plan.json:27-30",
+        "api/assistant-api/migrations/000001_initial_schema.up.sql:315-328"
+      ],
+      "notes": "The plan requires matching `microphone.eos.provider` option rows joined to input audio deployments, includes inactive inputs by omitting status filtering, and excludes output audio, missing or unknown providers, and silence-based EOS."
+    },
+    {
+      "contract": "No parser, no SQL value enforcement, exact value preservation",
+      "status": "pass",
+      "references": [
+        "rfcs/0016-eos-canonical-parameters.md:91-94",
+        "rfcs/0016-eos-canonical-parameters.md:115-117",
+        "rfcs/0016-eos-canonical-parameters/jsons/amendment-01-plan.json:25-29",
+        "rfcs/0016-eos-canonical-parameters/jsons/amendment-01-plan.json:42-43"
+      ],
+      "notes": "The amended contract intentionally treats migration as key-only: selected values, including malformed values, are copied exactly and must be audited manually before deployment."
+    },
+    {
+      "contract": "No journal, temp tables, or automatic down recovery",
+      "status": "pass",
+      "references": [
+        "rfcs/0016-eos-canonical-parameters.md:96-100",
+        "rfcs/0016-eos-canonical-parameters.md:129-134",
+        "rfcs/0016-eos-canonical-parameters.md:136-141",
+        "rfcs/0016-eos-canonical-parameters/jsons/amendment-01-plan.json:24-32",
+        "rfcs/0016-eos-canonical-parameters/jsons/amendment-01-plan.json:50-51"
+      ],
+      "notes": "Backup-only recovery is explicit, down must fail actionably rather than perform lossy reverse mapping, and the amendment rejects recovery tables and temporary staging as unnecessary for the approved one-time conversion."
+    },
+    {
+      "contract": "Rollout boundaries and unrelated blockers",
+      "status": "pass",
+      "references": [
+        "rfcs/0016-eos-canonical-parameters.md:119-127",
+        "rfcs/0016-eos-canonical-parameters.md:143-153",
+        "rfcs/0016-eos-canonical-parameters/jsons/amendment-01-plan.json:35-40",
+        "rfcs/0016-eos-canonical-parameters/jsons/amendment-01-plan.json:50-52"
+      ],
+      "notes": "The plan does not authorize live rollout, push, model-quality claims, or the unrelated web-api full-history harness fix; those remain outside this challenge approval."
+    }
+  ],
+  "challenge_notes": [
+    "No concrete safety or contract issue was found in the amended design.",
+    "Approval applies only to the reviewed RFC and amendment plan bytes above and does not authorize implementation rollout.",
+    "Current migration SQL files in the worktree still showed the superseded journal-based implementation during this read-only challenge; that implementation state is outside this amendment plan challenge and requires a later implementation/review pass."
+  ]
+}

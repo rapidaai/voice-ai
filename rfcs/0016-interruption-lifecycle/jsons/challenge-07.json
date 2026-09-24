@@ -1,0 +1,21 @@
+{
+  "rfc_file": "rfcs/0016-interruption-lifecycle.md",
+  "plan_file": "rfcs/0016-interruption-lifecycle/jsons/amendment-08-plan.json",
+  "rfc_sha256": "16b02169733f70d12d4b175437f4790dfc3a43708b28695f224f8acae5f8d254",
+  "reviewed_plan_sha256": "7688ab428fe0deed8f9c4f669e3e0ca630f5f0d21e0167073481b30235df5666",
+  "reviewed_at": "2026-09-07T00:38:04Z",
+  "reviewer": "independent Orca runtime challenger",
+  "run_id": "run_94aeb7c54726",
+  "task_id": "task_06fe9af36642",
+  "dispatch_id": "ctx_be8b0c83cc00",
+  "decision": "approved",
+  "approved": true,
+  "critical_findings": 0,
+  "major_findings": [],
+  "minor_findings": [
+    "Historical private-sequence wording remains only in superseded artifacts",
+    "The amendment-07 current label is superseded by amendment 08"
+  ],
+  "implementation_authorized": false,
+  "next_action": "Create and approve the exact-digest confirmation gate before dispatch implementation."
+}

@@ -12,12 +12,13 @@ import (
 	"testing"
 	"time"
 
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func testSessionConfig() *Config {
-	return &Config{
+func testSessionConfig() *sip_config.Config {
+	return &sip_config.Config{
 		Server:            "127.0.0.1",
 		Port:              5060,
 		RTPPortRangeStart: 10000,

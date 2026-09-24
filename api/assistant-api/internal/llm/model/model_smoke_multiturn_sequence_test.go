@@ -104,7 +104,7 @@ func TestModel_MultiTurn_4Turn_MixedDoneAndToolFlow(t *testing.T) {
 	// Assertions: 4 user sends + 2 tool follow-up sends.
 	require.Len(t, stream.sendCalls, 6)
 	dones := findPackets[internal_type.LLMResponseDonePacket](comm.pkts)
-	require.GreaterOrEqual(t, len(dones), 6) // includes tool-call completion + final completions
+	require.Len(t, dones, 4)
 	require.Equal(t, "t4", dones[len(dones)-1].ContextID)
 	require.Equal(t, "t4 done", dones[len(dones)-1].Text)
 }

@@ -20,6 +20,8 @@ func (resampler *twilioFakeResampler) Resample(_ []byte, _, _ *protos.AudioConfi
 	return append([]byte(nil), resampler.out...), nil
 }
 
+func (resampler *twilioFakeResampler) Close() {}
+
 type twilioFakeMixer struct {
 	err error
 }

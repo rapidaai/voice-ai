@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	transformer_testutil "github.com/rapidaai/api/assistant-api/internal/transformer/internal/testutil"
+	transformer_testutil "github.com/rapidaai/api/assistant-api/internal/transformer/tests/testutil"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/stretchr/testify/assert"
@@ -130,6 +130,8 @@ func TestSpeechToText_HTTPFlow_FlushesBufferedSpeechOnVADEnd(t *testing.T) {
 
 	typedTransformer, ok := transformer.(*speechToText)
 	require.True(t, ok)
+	require.NotNil(t, typedTransformer.resampler)
+	require.NotNil(t, typedTransformer.resampleWriter)
 	typedTransformer.httpClient = server.Client()
 
 	require.NoError(t, transformer.Initialize())

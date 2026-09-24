@@ -15,8 +15,10 @@ import (
 	"testing"
 	"time"
 
+	assistant_config "github.com/rapidaai/api/assistant-api/config"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_middleware "github.com/rapidaai/api/assistant-api/sip/middleware"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
@@ -104,13 +106,13 @@ func TestFreeSWITCHInboundRouteAuthenticationCompleteFlow(t *testing.T) {
 					sip_middleware.WithContext(context.Background()),
 					sip_middleware.WithLogger(harness.logger),
 					sip_middleware.WithRapidaClient(&rapida_client.RapidaClient{Vault: vaultClient}),
-					sip_middleware.WithApplySIPConfigDefaults(func(config *sip_runtime.Config) {
-						config.Transport = sip_runtime.TransportUDP
-						config.RTPPortRangeStart = harness.config.rtpPortFrom
-						config.RTPPortRangeEnd = harness.config.rtpPortTo
-						config.InviteTimeout = callSetupTimeout
-						config.SessionTimeout = callSetupTimeout
-					}),
+					sip_middleware.WithSIPConfig(sip_config.NewResolver(&assistant_config.SIPConfig{
+						Transport:         string(sip_config.TransportUDP),
+						RTPPortRangeStart: harness.config.rtpPortFrom,
+						RTPPortRangeEnd:   harness.config.rtpPortTo,
+						InviteTimeout:     callSetupTimeout,
+						SessionTimeout:    callSetupTimeout,
+					})),
 				),
 				func(ctx *sip_runtime.SIPRequestContext) error {
 					routeContext <- cloneSIPRequestContext(ctx)

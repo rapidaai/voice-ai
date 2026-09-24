@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"sync"
@@ -23,87 +24,131 @@ import (
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
+	"golang.org/x/sync/semaphore"
 )
 
 type smallestTTS struct {
 	*smallestOption
-	mu        sync.Mutex
 	ctx       context.Context
 	ctxCancel context.CancelFunc
 
-	contextId      string
-	ttsConnectedAt time.Time
-
-	ttsStartedAt  time.Time
-	ttsMetricSent bool
+	// writeLock permits cancellation while waiting for a writer; stateMu protects message ownership.
+	writeLock        *semaphore.Weighted
+	stateMu          sync.Mutex
+	workers          sync.WaitGroup
+	connection       *websocket.Conn
+	contextId        string
+	ttsConnectedAt   time.Time
+	ttsStartedAt     time.Time
+	textClosed       bool
+	synthesisPending bool
 
 	logger     commons.Logger
-	connection *websocket.Conn
 	onPacket   func(pkt ...internal_type.Packet) error
 	normalizer internal_type.TextNormalizer
 }
 
-func NewSmallestTextToSpeech(ctx context.Context, logger commons.Logger, credential *protos.VaultCredential,
+func NewSmallestTextToSpeech(
+	ctx context.Context,
+	logger commons.Logger,
+	credential *protos.VaultCredential,
 	onPacket func(pkt ...internal_type.Packet) error,
-	opts utils.Option) (internal_type.TextToSpeechTransformer, error) {
+	opts utils.Option,
+) (internal_type.TextToSpeechTransformer, error) {
 	smallestOpts, err := NewSmallestOption(logger, credential, opts)
 	if err != nil {
-		logger.Errorf("intializing smallest failed %+v", err)
 		return nil, err
 	}
-
 	ct, ctxCancel := context.WithCancel(ctx)
 	return &smallestTTS{
-		smallestOption: smallestOpts,
-		logger:         logger,
-		ctx:            ct,
-		ctxCancel:      ctxCancel,
-		onPacket:       onPacket,
-		normalizer:     smallest_internal.NewSmallestNormalizer(logger, opts),
+		ctx: ct, ctxCancel: ctxCancel,
+		writeLock: semaphore.NewWeighted(1),
+		logger:    logger, smallestOption: smallestOpts, onPacket: onPacket,
+		normalizer: smallest_internal.NewSmallestNormalizer(logger, opts),
 	}, nil
 }
 
-// Initialize opens a fresh WebSocket connection to Smallest's Lightning
-// streaming endpoint and starts the read goroutine. Called at session start
-// and after each interruption so the connection is warm before the first
-// text delta arrives.
-func (ct *smallestTTS) Initialize() error {
-	start := time.Now()
-	connectionString := ct.GetTextToSpeechConnectionString()
-	header := http.Header{}
-	header.Set("Authorization", "Bearer "+ct.GetKey())
-	setSourceHeaders(header)
+func (*smallestTTS) Name() string { return "smallest-tts" }
 
-	conn, _, err := websocket.DefaultDialer.Dial(connectionString, header)
-	if err != nil {
-		err = fmt.Errorf("smallest-tts: dial %s: %w", connectionString, err)
-		ct.logger.Errorf("smallest-tts: unable to dial %v", err)
-		ct.onPacket(internal_type.ObservabilityLogRecordPacket{
-			Scope: internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.RecordLog{
-				Level:   observability.LevelError,
-				Message: "smallest-tts: error while performing connect",
-				Attributes: observability.Attributes{
-					"component": observability.ComponentTTS.String(),
-					"provider":  ct.Name(),
-					"path":      observability.AttributeValue(connectionString),
-					"error":     observability.AttributeValue(err.Error()),
-				},
-				OccurredAt: time.Now(),
-			},
-		})
+func (rt *smallestTTS) Initialize() error {
+	if err := rt.writeLock.Acquire(rt.ctx, 1); err != nil {
 		return err
 	}
+	defer rt.writeLock.Release(1)
+	return rt.connect(rt.ctx)
+}
 
-	ct.mu.Lock()
-	ct.connection = conn
-	if ct.ttsConnectedAt.IsZero() {
-		ct.ttsConnectedAt = time.Now()
+// connect requires writeLock ownership. A failed request is never replayed.
+func (rt *smallestTTS) connect(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
 	}
-	ct.mu.Unlock()
-
-	go ct.readLoop(conn)
-	ct.onPacket(
+	if err := rt.ctx.Err(); err != nil {
+		return err
+	}
+	rt.stateMu.Lock()
+	if rt.connection != nil {
+		rt.stateMu.Unlock()
+		return nil
+	}
+	rt.stateMu.Unlock()
+	start := time.Now()
+	dialCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	stopCancel := context.AfterFunc(rt.ctx, cancel)
+	defer stopCancel()
+	header := http.Header{}
+	header.Set("Authorization", "Bearer "+rt.GetKey())
+	setSourceHeaders(header)
+	dialer := *websocket.DefaultDialer
+	dial := dialer.NetDialContext
+	if dial == nil {
+		dial = (&net.Dialer{}).DialContext
+	}
+	if dialer.NetDialTLSContext != nil {
+		dial = dialer.NetDialTLSContext
+	}
+	// Close the transport on cancellation while Gorilla waits for the HTTP upgrade.
+	var stopDial func() bool
+	dialWithCancel := func(ctx context.Context, network, address string) (net.Conn, error) {
+		conn, err := dial(ctx, network, address)
+		if err == nil {
+			stopDial = context.AfterFunc(dialCtx, func() { _ = conn.Close() })
+		}
+		return conn, err
+	}
+	if dialer.NetDialTLSContext != nil {
+		dialer.NetDialTLSContext = dialWithCancel
+	} else {
+		dialer.NetDialContext = dialWithCancel
+	}
+	conn, resp, err := dialer.DialContext(dialCtx, rt.GetTextToSpeechConnectionString(), header)
+	if stopDial != nil {
+		stopDial()
+	}
+	if err != nil {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+		return fmt.Errorf("smallest-tts: connect failed: %w", err)
+	}
+	if err := dialCtx.Err(); err != nil {
+		_ = conn.Close()
+		return err
+	}
+	rt.stateMu.Lock()
+	if err := rt.ctx.Err(); err != nil {
+		rt.stateMu.Unlock()
+		_ = conn.Close()
+		return err
+	}
+	rt.connection = conn
+	if rt.ttsConnectedAt.IsZero() {
+		rt.ttsConnectedAt = time.Now()
+	}
+	rt.stateMu.Unlock()
+	rt.workers.Go(func() { rt.readLoop(conn) })
+	rt.onPacket(
 		internal_type.ObservabilityMetricRecordPacket{
 			Scope: internal_type.ObservabilityRecordScopeConversation,
 			Record: observability.RecordMetric{
@@ -112,19 +157,14 @@ func (ct *smallestTTS) Initialize() error {
 					Value:       strconv.FormatInt(time.Since(start).Milliseconds(), 10),
 					Description: "TTS initialization latency in milliseconds",
 				}},
-				Attributes: observability.Attributes{"provider": ct.Name()},
+				Attributes: observability.Attributes{"provider": rt.Name()},
 			},
 		},
 		internal_type.ObservabilityLogRecordPacket{
 			Scope: internal_type.ObservabilityRecordScopeConversation,
 			Record: observability.RecordLog{
-				Level:   observability.LevelInfo,
-				Message: "smallest-tts: initialization completed",
-				Attributes: observability.Attributes{
-					"component": observability.ComponentTTS.String(),
-					"provider":  ct.Name(),
-					"path":      observability.AttributeValue(connectionString),
-				},
+				Level: observability.LevelInfo, Message: "smallest-tts: initialization completed",
+				Attributes: observability.Attributes{"component": observability.ComponentTTS.String(), "provider": rt.Name()},
 				OccurredAt: time.Now(),
 			},
 		},
@@ -132,383 +172,347 @@ func (ct *smallestTTS) Initialize() error {
 	return nil
 }
 
-// Name returns the name of this transformer.
-func (*smallestTTS) Name() string {
-	return "smallest-tts"
-}
-
-// handleFlushComplete is called when Smallest signals status:"complete". It
-// emits TextToSpeechEndPacket — correctly ordered after the last audio chunk —
-// and closes the per-turn connection.
-func (cst *smallestTTS) handleFlushComplete(conn *websocket.Conn) {
-	cst.mu.Lock()
-	if cst.connection != conn {
-		cst.mu.Unlock()
-		conn.Close()
-		return
-	}
-	contextID := cst.contextId
-	cst.connection = nil // mark before Close so readLoop error handler sees intentional
-	cst.mu.Unlock()
-	if contextID == "" {
-		conn.Close()
-		return
-	}
-
-	cst.onPacket(
-		internal_type.TextToSpeechEndPacket{ContextID: contextID},
-		internal_type.ObservabilityEventRecordPacket{
-			ContextID: contextID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.RecordEvent{
-				Component:  observability.ComponentTTS,
-				Event:      observability.TTSCompleted,
-				Attributes: observability.Attributes{"type": "completed"},
-				OccurredAt: time.Now(),
-			},
-		},
-	)
-	conn.Close()
-}
-
-// handleServerError is called when Smallest signals status:"error" (e.g. a
-// voice_id/model pairing it rejects, such as a Pro-only voice on
-// lightning_v3.1). The server sends exactly one such frame and then holds
-// the connection open without ever sending "complete", so this must be
-// treated as terminal for the turn — otherwise the turn hangs forever
-// waiting for audio that will never arrive.
-func (cst *smallestTTS) handleServerError(conn *websocket.Conn, payload smallest_internal.TextToSpeechOutput) {
-	cst.mu.Lock()
-	if cst.connection != conn {
-		cst.mu.Unlock()
-		conn.Close()
-		return
-	}
-	contextID := cst.contextId
-	cst.connection = nil // mark before Close so the write-path sees this as intentional
-	cst.mu.Unlock()
-
-	msg := payload.Message
-	if len(payload.Errors) > 0 && payload.Errors[0].Message != "" {
-		msg = payload.Errors[0].Message
-	}
-	if msg == "" {
-		msg = "unknown error"
-	}
-
-	cst.logger.Errorf("smallest-tts: server error: %s", msg)
-	cst.onPacket(
-		internal_type.TextToSpeechErrorPacket{
-			ContextID: contextID,
-			Error:     fmt.Errorf("smallest-tts: server error: %s", msg),
-			Type:      internal_type.TTSInvalidInput,
-		},
-		internal_type.ObservabilityLogRecordPacket{
-			ContextID: contextID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.RecordLog{
-				Level:   observability.LevelError,
-				Message: "smallest-tts: server error",
-				Attributes: observability.Attributes{
-					"component": observability.ComponentTTS.String(),
-					"provider":  cst.Name(),
-					"error":     observability.AttributeValue(msg),
-				},
-				OccurredAt: time.Now(),
-			},
-		},
-	)
-	conn.Close()
-}
-
-// readLoop owns a single WebSocket connection for the duration of one TTS turn.
-// It exits when the connection closes — intentionally (interrupt / flush complete)
-// or unexpectedly (network drop).
-func (cst *smallestTTS) readLoop(conn *websocket.Conn) {
-	for {
-		select {
-		case <-cst.ctx.Done():
-			return
-		default:
+func (rt *smallestTTS) readLoop(conn *websocket.Conn) {
+	canceled := make(chan struct{})
+	stop := context.AfterFunc(rt.ctx, func() { _ = conn.Close(); close(canceled) })
+	defer func() {
+		if !stop() {
+			<-canceled
 		}
-
-		_, msg, err := conn.ReadMessage()
+	}()
+	defer conn.Close()
+	for {
+		_, message, err := conn.ReadMessage()
+		errorType := internal_type.TTSNetworkTimeout
+		var response smallest_internal.TextToSpeechOutput
+		var audio []byte
 		if err != nil {
-			cst.mu.Lock()
-			if cst.connection != conn {
-				cst.mu.Unlock()
+			err = fmt.Errorf("smallest-tts: read: %w", err)
+		} else {
+			errorType = internal_type.TTSUnknownError
+			if err = json.Unmarshal(message, &response); err != nil {
+				err = fmt.Errorf("smallest-tts: response: %w", err)
+			} else {
+				switch response.Status {
+				case "chunk":
+					if audio, err = base64.StdEncoding.DecodeString(response.Data.Audio); err != nil {
+						err = fmt.Errorf("smallest-tts: audio encoding: %w", err)
+					}
+				case "error":
+					errorType = internal_type.TTSInvalidInput
+					if len(response.Errors) > 0 && response.Errors[0].Message != "" {
+						response.Message = response.Errors[0].Message
+					}
+					if response.Message == "" {
+						response.Message = "unknown provider error"
+					}
+					err = fmt.Errorf("smallest-tts: server error: %s", response.Message)
+				}
+			}
+		}
+		rt.stateMu.Lock()
+		if rt.connection != conn {
+			rt.stateMu.Unlock()
+			return
+		}
+		contextID := rt.contextId
+		if err != nil {
+			rt.connection = nil
+			emitError := rt.synthesisPending && rt.ctx.Err() == nil
+			rt.synthesisPending = false
+			rt.stateMu.Unlock()
+			_ = conn.Close()
+			if emitError {
+				rt.onPacket(internal_type.TextToSpeechErrorPacket{ContextID: contextID, Error: err, Type: errorType})
+			}
+			return
+		}
+		if !rt.synthesisPending || rt.ctx.Err() != nil {
+			rt.stateMu.Unlock()
+			continue
+		}
+		switch response.Status {
+		case "chunk":
+			if len(audio) == 0 {
+				rt.stateMu.Unlock()
+				continue
+			}
+			packets := []internal_type.Packet{}
+			if !rt.ttsStartedAt.IsZero() {
+				packets = append(packets, internal_type.ObservabilityMetricRecordPacket{
+					ContextID: contextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
+					Record: observability.NewMetricTTSLatencyMs(time.Since(rt.ttsStartedAt), observability.Attributes{"provider": rt.Name()}),
+				})
+				rt.ttsStartedAt = time.Time{}
+			}
+			packets = append(packets, internal_type.TextToSpeechAudioPacket{ContextID: contextID, AudioChunk: audio})
+			rt.stateMu.Unlock()
+			rt.onPacket(packets...)
+		case "complete":
+			if !rt.textClosed {
+				rt.stateMu.Unlock()
+				continue
+			}
+			rt.stateMu.Unlock()
+			// A completion can arrive before the flush write returns. Wait for its outcome.
+			if err := rt.writeLock.Acquire(rt.ctx, 1); err != nil {
 				return
 			}
-			cst.connection = nil
-			cst.mu.Unlock()
-
-			cst.logger.Errorf("smallest-tts: connection lost: %v", err)
+			rt.stateMu.Lock()
+			if rt.connection != conn || !rt.synthesisPending || rt.ctx.Err() != nil {
+				rt.stateMu.Unlock()
+				rt.writeLock.Release(1)
+				return
+			}
+			rt.connection = nil
+			rt.synthesisPending = false
+			rt.stateMu.Unlock()
+			_ = conn.Close()
+			rt.writeLock.Release(1)
+			rt.onPacket(
+				internal_type.TextToSpeechEndPacket{ContextID: contextID},
+				internal_type.ObservabilityEventRecordPacket{
+					ContextID: contextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
+					Record: observability.RecordEvent{
+						Component: observability.ComponentTTS, Event: observability.TTSCompleted,
+						Attributes: observability.Attributes{"type": "completed"}, OccurredAt: time.Now(),
+					},
+				},
+			)
 			return
-		}
-
-		var payload smallest_internal.TextToSpeechOutput
-		if err := json.Unmarshal(msg, &payload); err != nil {
-			cst.logger.Errorf("smallest-tts: invalid json from smallest error: %v", err)
-			continue
-		}
-
-		switch payload.Status {
-		case "complete":
-			cst.handleFlushComplete(conn)
-			return
-		case "error":
-			cst.handleServerError(conn, payload)
-			return
-		case "word_timestamp":
-			// Word-level timestamps are opt-in (word_timestamps=true) and not
-			// yet consumed by Rapida's TTS pipeline — ignored for now.
-			continue
-		case "chunk":
-			// handled below
 		default:
-			continue
+			rt.stateMu.Unlock()
 		}
-
-		if payload.Data.Audio == "" {
-			continue
-		}
-
-		decoded, err := base64.StdEncoding.DecodeString(payload.Data.Audio)
-		if err != nil {
-			cst.logger.Errorf("smallest-tts: failed to decode audio payload error: %v", err)
-			continue
-		}
-
-		var shouldEmitFirstAudioLatencyMetric bool
-		cst.mu.Lock()
-		ttsStartedAt := cst.ttsStartedAt
-		contextID := cst.contextId
-		if !cst.ttsMetricSent && !ttsStartedAt.IsZero() {
-			cst.ttsMetricSent = true
-			shouldEmitFirstAudioLatencyMetric = true
-		}
-		cst.mu.Unlock()
-		if contextID == "" {
-			continue
-		}
-
-		if shouldEmitFirstAudioLatencyMetric {
-			_ = cst.onPacket(internal_type.ObservabilityMetricRecordPacket{
-				ContextID: contextID,
-				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record:    observability.NewMetricTTSLatencyMs(time.Since(ttsStartedAt), observability.Attributes{"provider": cst.Name()}),
-			})
-		}
-		_ = cst.onPacket(internal_type.TextToSpeechAudioPacket{ContextID: contextID, AudioChunk: decoded})
 	}
 }
 
-func (ct *smallestTTS) Transform(ctx context.Context, in internal_type.Packet) error {
-	ct.mu.Lock()
-	if in.ContextId() != ct.contextId {
-		ct.contextId = in.ContextId()
-		ct.ttsStartedAt = time.Time{}
-		ct.ttsMetricSent = false
+func (rt *smallestTTS) Transform(ctx context.Context, in internal_type.Packet) error {
+	if err := ctx.Err(); err != nil {
+		return err
 	}
-	connection := ct.connection
-	ct.mu.Unlock()
-
+	if err := rt.ctx.Err(); err != nil {
+		return err
+	}
 	switch input := in.(type) {
-	case internal_type.TextToSpeechInterruptPacket:
-		ct.mu.Lock()
-		ct.contextId = ""
-		ct.ttsStartedAt = time.Time{}
-		ct.ttsMetricSent = false
-		conn := ct.connection
-		ct.connection = nil
-		ct.mu.Unlock()
-		if conn != nil {
-			conn.Close()
-		}
-		ct.onPacket(internal_type.ObservabilityEventRecordPacket{
-			ContextID: input.ContextID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.RecordEvent{
-				Component:  observability.ComponentTTS,
-				Event:      observability.TTSInterrupted,
-				Attributes: observability.Attributes{"type": "interrupted"},
-				OccurredAt: time.Now(),
-			},
-		})
-		if err := ct.Initialize(); err != nil {
-			ct.logger.Errorf("smallest-tts: reconnect after interrupt failed: %v", err)
-		}
+	case internal_type.TurnChangePacket:
 		return nil
-
 	case internal_type.TextToSpeechTextPacket:
-		if connection == nil {
-			if err := ct.Initialize(); err != nil {
-				ct.onPacket(
-					internal_type.TextToSpeechErrorPacket{
-						ContextID: input.ContextID,
-						Error:     fmt.Errorf("smallest-tts: failed to connect: %w", err),
-						Type:      internal_type.TTSNetworkTimeout,
-					},
-					internal_type.ObservabilityLogRecordPacket{
-						ContextID: input.ContextID,
-						Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-						Record: observability.RecordLog{
-							Level:   observability.LevelError,
-							Message: "smallest-tts: failed to connect",
-							Attributes: observability.Attributes{
-								"component": observability.ComponentTTS.String(),
-								"provider":  ct.Name(),
-								"error":     observability.AttributeValue(err.Error()),
-							},
-							OccurredAt: time.Now(),
-						},
-					},
-				)
-				return nil
-			}
-			ct.mu.Lock()
-			connection = ct.connection
-			if ct.ttsStartedAt.IsZero() {
-				ct.ttsStartedAt = time.Now()
-			}
-			ct.mu.Unlock()
-		} else {
-			ct.mu.Lock()
-			if ct.ttsStartedAt.IsZero() {
-				ct.ttsStartedAt = time.Now()
-			}
-			ct.mu.Unlock()
-		}
-		ct.mu.Lock()
-		contextID := ct.contextId
-		ct.mu.Unlock()
-		normalized := ct.normalizer.Normalize(input.Text)
-		message := ct.GetTextToSpeechInput(normalized, map[string]interface{}{"continue": true, "context_id": contextID})
-		if err := connection.WriteJSON(message); err != nil {
-			ct.logger.Errorf("smallest-tts: failed to write text: %v", err)
-			ct.onPacket(
-				internal_type.TextToSpeechErrorPacket{
-					ContextID: input.ContextID,
-					Error:     fmt.Errorf("smallest-tts: failed to write text: %w", err),
-					Type:      internal_type.TTSNetworkTimeout,
-				},
-				internal_type.ObservabilityLogRecordPacket{
-					ContextID: input.ContextID,
-					Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-					Record: observability.RecordLog{
-						Level:   observability.LevelError,
-						Message: "smallest-tts: failed to write text",
-						Attributes: observability.Attributes{
-							"component": observability.ComponentTTS.String(),
-							"provider":  ct.Name(),
-							"error":     observability.AttributeValue(err.Error()),
-						},
-						OccurredAt: time.Now(),
-					},
-				},
-			)
+		if input.ContextID == "" || input.Text == "" {
 			return nil
 		}
-		ct.onPacket(internal_type.ObservabilityEventRecordPacket{
-			ContextID: input.ContextID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+		rt.stateMu.Lock()
+		if input.ContextID == rt.contextId && (!rt.synthesisPending || rt.textClosed) {
+			rt.stateMu.Unlock()
+			return nil
+		}
+		var previousConnection *websocket.Conn
+		if input.ContextID != rt.contextId {
+			if rt.synthesisPending {
+				previousConnection = rt.connection
+				rt.connection = nil
+			}
+			rt.contextId = input.ContextID
+			rt.textClosed = false
+			rt.synthesisPending = true
+			rt.ttsStartedAt = time.Now()
+		}
+		rt.stateMu.Unlock()
+		if previousConnection != nil {
+			_ = previousConnection.Close()
+		}
+		defer func() {
+			if ctx.Err() == nil {
+				return
+			}
+			rt.stateMu.Lock()
+			if input.ContextID != rt.contextId {
+				rt.stateMu.Unlock()
+				return
+			}
+			connection := rt.connection
+			rt.connection = nil
+			rt.synthesisPending = false
+			rt.stateMu.Unlock()
+			if connection != nil {
+				_ = connection.Close()
+			}
+		}()
+	case internal_type.TextToSpeechInterruptPacket:
+		rt.stateMu.Lock()
+		if input.ContextID != rt.contextId || !rt.synthesisPending {
+			rt.stateMu.Unlock()
+			return nil
+		}
+		rt.synthesisPending = false
+		connection := rt.connection
+		rt.connection = nil
+		rt.stateMu.Unlock()
+		// Smallest audio is untagged. Closing the socket discards synthesis and unblocks any writer.
+		if connection != nil {
+			_ = connection.Close()
+		}
+		rt.onPacket(internal_type.ObservabilityEventRecordPacket{
+			ContextID: input.ContextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
 			Record: observability.RecordEvent{
-				Component: observability.ComponentTTS,
-				Event:     observability.TTSSpeaking,
-				Attributes: observability.Attributes{
-					"type": "speaking",
-					"text": normalized,
-				},
-				OccurredAt: time.Now(),
+				Component: observability.ComponentTTS, Event: observability.TTSInterrupted,
+				Attributes: observability.Attributes{"type": "interrupted"}, OccurredAt: time.Now(),
 			},
 		})
+		return nil
+	}
 
+	writeCtx, cancelWrite := context.WithCancel(ctx)
+	defer cancelWrite()
+	stopSession := context.AfterFunc(rt.ctx, cancelWrite)
+	defer stopSession()
+	if err := rt.writeLock.Acquire(writeCtx, 1); err != nil {
+		return err
+	}
+	var packets []internal_type.Packet
+	defer func() {
+		rt.writeLock.Release(1)
+		if len(packets) > 0 {
+			rt.onPacket(packets...)
+		}
+	}()
+	rt.stateMu.Lock()
+
+	if err := ctx.Err(); err != nil {
+		rt.stateMu.Unlock()
+		return err
+	}
+	if err := rt.ctx.Err(); err != nil {
+		rt.stateMu.Unlock()
+		return err
+	}
+	var message any
+	switch input := in.(type) {
+	case internal_type.TextToSpeechTextPacket:
+		if input.ContextID != rt.contextId || !rt.synthesisPending || rt.textClosed {
+			rt.stateMu.Unlock()
+			return nil
+		}
+		rt.stateMu.Unlock()
+		if err := rt.connect(ctx); err != nil {
+			rt.stateMu.Lock()
+			emitError := input.ContextID == rt.contextId && rt.synthesisPending && ctx.Err() == nil && rt.ctx.Err() == nil
+			if input.ContextID == rt.contextId {
+				rt.synthesisPending = false
+			}
+			rt.stateMu.Unlock()
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if rt.ctx.Err() != nil {
+				return rt.ctx.Err()
+			}
+			if emitError {
+				packets = append(packets, internal_type.TextToSpeechErrorPacket{ContextID: input.ContextID, Error: err, Type: internal_type.TTSNetworkTimeout})
+			}
+			return nil
+		}
+		rt.stateMu.Lock()
+		if input.ContextID != rt.contextId || rt.connection == nil || !rt.synthesisPending {
+			rt.stateMu.Unlock()
+			return nil
+		}
+		message = rt.GetTextToSpeechInput(rt.normalizer.Normalize(input.Text), map[string]interface{}{"continue": true, "context_id": input.ContextID})
 	case internal_type.TextToSpeechDonePacket:
-		// Interrupted before done arrived — nothing to flush.
-		if connection == nil {
+		if input.ContextID != rt.contextId || rt.connection == nil || !rt.synthesisPending || rt.textClosed {
+			rt.stateMu.Unlock()
 			return nil
 		}
-		ct.mu.Lock()
-		contextID := ct.contextId
-		ct.mu.Unlock()
-		// Signal end of text stream; Smallest responds with status:"complete"
-		// after complete_backoff_ms (server default ~4s) once all audio is flushed.
-		message := ct.GetTextToSpeechInput("", map[string]interface{}{"continue": false, "flush": true, "context_id": contextID})
-		if err := connection.WriteJSON(message); err != nil {
-			ct.logger.Errorf("smallest-tts: flush failed: %v", err)
-			ct.onPacket(
-				internal_type.TextToSpeechErrorPacket{
-					ContextID: input.ContextID,
-					Error:     fmt.Errorf("smallest-tts: flush failed: %w", err),
-					Type:      internal_type.TTSNetworkTimeout,
-				},
-				internal_type.ObservabilityLogRecordPacket{
-					ContextID: input.ContextID,
-					Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-					Record: observability.RecordLog{
-						Level:   observability.LevelError,
-						Message: "smallest-tts: flush failed",
-						Attributes: observability.Attributes{
-							"component": observability.ComponentTTS.String(),
-							"provider":  ct.Name(),
-							"error":     observability.AttributeValue(err.Error()),
-						},
-						OccurredAt: time.Now(),
-					},
-				},
-			)
-			return nil
-		}
-		// TextToSpeechEndPacket is emitted by handleFlushComplete once complete received.
-
+		rt.textClosed = true
+		message = rt.GetTextToSpeechInput("", map[string]interface{}{"continue": false, "flush": true, "context_id": input.ContextID})
 	default:
-		return fmt.Errorf("smallest-tts: unsupported input type %T", in)
+		rt.stateMu.Unlock()
+		return fmt.Errorf("smallest-tts: unsupported packet type %T", in)
+	}
+	connection := rt.connection
+	rt.stateMu.Unlock()
+
+	writeCancelled := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() {
+		rt.stateMu.Lock()
+		if rt.connection == connection {
+			rt.connection = nil
+			rt.synthesisPending = false
+		}
+		rt.stateMu.Unlock()
+		_ = connection.Close()
+		close(writeCancelled)
+	})
+	err := connection.WriteJSON(message)
+	if !stop() {
+		<-writeCancelled
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if rt.ctx.Err() != nil {
+		return rt.ctx.Err()
+	}
+	if err != nil {
+		rt.stateMu.Lock()
+		if rt.connection != connection {
+			rt.stateMu.Unlock()
+			return nil
+		}
+		rt.connection = nil
+		rt.synthesisPending = false
+		rt.stateMu.Unlock()
+		_ = connection.Close()
+		packets = append(packets, internal_type.TextToSpeechErrorPacket{
+			ContextID: in.ContextId(), Error: fmt.Errorf("smallest-tts: send: %w", err), Type: internal_type.TTSNetworkTimeout,
+		})
+		return nil
+	}
+	if input, ok := in.(internal_type.TextToSpeechTextPacket); ok {
+		packets = append(packets, internal_type.ObservabilityEventRecordPacket{
+			ContextID: input.ContextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
+			Record: observability.RecordEvent{
+				Component: observability.ComponentTTS, Event: observability.TTSSpeaking,
+				Attributes: observability.Attributes{"type": "speaking", "text": input.Text}, OccurredAt: time.Now(),
+			},
+		})
 	}
 	return nil
 }
 
-func (ct *smallestTTS) Close(ctx context.Context) error {
-	ct.ctxCancel()
-	ct.mu.Lock()
-	ctxID := ct.contextId
-	connectedAt := ct.ttsConnectedAt
-	ct.ttsConnectedAt = time.Time{}
-
-	if ct.connection != nil {
-		conn := ct.connection
-		ct.connection = nil // mark before Close so readLoop sees intentional
+func (rt *smallestTTS) Close(ctx context.Context) error {
+	rt.ctxCancel()
+	rt.stateMu.Lock()
+	connectedAt := rt.ttsConnectedAt
+	rt.ttsConnectedAt = time.Time{}
+	conn := rt.connection
+	rt.connection = nil
+	rt.synthesisPending = false
+	rt.stateMu.Unlock()
+	if conn != nil {
 		_ = conn.Close()
 	}
-	ct.mu.Unlock()
-
+	_ = rt.writeLock.Acquire(context.WithoutCancel(ctx), 1)
+	rt.writeLock.Release(1)
+	rt.workers.Wait()
 	if !connectedAt.IsZero() {
 		duration := time.Since(connectedAt)
-		ct.onPacket(
+		rt.onPacket(
 			internal_type.ObservabilityMetricRecordPacket{
-				ContextID: ctxID,
-				Scope:     internal_type.ObservabilityRecordScopeConversation,
-				Record:    observability.NewMetricTTSDuration(duration, observability.Attributes{"provider": ct.Name()}),
+				Scope:  internal_type.ObservabilityRecordScopeConversation,
+				Record: observability.NewMetricTTSDuration(duration, observability.Attributes{"provider": rt.Name()}),
 			},
 			internal_type.ObservabilityUsageRecordPacket{
-				ContextID: ctxID,
-				Scope:     internal_type.ObservabilityRecordScopeConversation,
-				Record:    observability.NewTTSDurationUsageRecord(ct.Name(), duration, observability.Attributes{}),
+				Scope:  internal_type.ObservabilityRecordScopeConversation,
+				Record: observability.NewTTSDurationUsageRecord(rt.Name(), duration, observability.Attributes{}),
 			},
 		)
 	}
-	ct.onPacket(
-		internal_type.ObservabilityEventRecordPacket{
-			ContextID: ctxID,
-			Scope:     internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.RecordEvent{
-				Component: observability.ComponentTTS,
-				Event:     observability.TTSClosed,
-				Attributes: observability.Attributes{
-					"type":     "closed",
-					"provider": ct.Name(),
-				},
-				OccurredAt: time.Now(),
-			},
-		})
+	rt.onPacket(internal_type.ObservabilityEventRecordPacket{
+		Scope: internal_type.ObservabilityRecordScopeConversation,
+		Record: observability.RecordEvent{
+			Component: observability.ComponentTTS, Event: observability.TTSClosed,
+			Attributes: observability.Attributes{"type": "closed", "provider": rt.Name()}, OccurredAt: time.Now(),
+		},
+	})
 	return nil
 }

@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/stretchr/testify/require"
@@ -61,7 +62,7 @@ type freeSWITCHHarness struct {
 	config     freeSWITCHIntegrationConfig
 	logger     commons.Logger
 	server     *sip_runtime.Server
-	sipConfig  *sip_runtime.Config
+	sipConfig  *sip_config.Config
 	cancelFunc context.CancelFunc
 }
 
@@ -77,39 +78,39 @@ func newFreeSWITCHHarness(t *testing.T, credentials sipCredentialConfig) *freeSW
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	sipConfig := &sip_runtime.Config{
+	sipConfig := &sip_config.Config{
 		Server:            config.fsSIPHost,
 		Username:          credentials.username,
 		Password:          credentials.password,
 		Realm:             credentials.realm,
 		Domain:            credentials.domain,
 		Port:              config.fsSIPPort,
-		Transport:         sip_runtime.TransportUDP,
+		Transport:         sip_config.TransportUDP,
 		RTPPortRangeStart: config.rtpPortFrom,
 		RTPPortRangeEnd:   config.rtpPortTo,
 		InviteTimeout:     callSetupTimeout,
 		SessionTimeout:    time.Minute,
 	}
 
-	server, err := sip_runtime.NewServer(ctx, &sip_runtime.ServerConfig{
-		ListenConfig: &sip_runtime.ListenConfig{
+	server, err := sip_runtime.NewServer(ctx, &sip_config.ServerConfig{
+		ListenConfig: &sip_config.ListenConfig{
 			Address:                 config.listenHost,
 			ExternalIP:              config.externalIP,
 			AllowLoopbackExternalIP: true,
 			Port:                    config.listenPort,
-			Transport:               sip_runtime.TransportUDP,
-		},
-		Middlewares: []sip_runtime.Middleware{
-			func(ctx *sip_runtime.SIPRequestContext) error {
-				ctx.Config = sipConfig
-				return nil
-			},
+			Transport:               sip_config.TransportUDP,
 		},
 		Logger:            logger,
 		RTPPortRangeStart: config.rtpPortFrom,
 		RTPPortRangeEnd:   config.rtpPortTo,
 	})
 	require.NoError(t, err)
+	server.SetMiddlewares([]sip_runtime.Middleware{
+		func(ctx *sip_runtime.SIPRequestContext) error {
+			ctx.Config = sipConfig
+			return nil
+		},
+	})
 
 	require.NoError(t, server.Start())
 

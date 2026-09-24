@@ -1,0 +1,56 @@
+{
+  "run_id": "run_942b61c2cb54",
+  "owner": "coordinator",
+  "status": "verified_pending_independent_review_and_activation_scope",
+  "changed_files": [
+    "api/assistant-api/internal/adapters/request.go",
+    "api/assistant-api/internal/adapters/request_test.go",
+    "api/assistant-api/internal/adapters/internal/requestor.go",
+    "api/assistant-api/internal/adapters/internal/stream.go",
+    "api/assistant-api/internal/adapters/internal/stream_test.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_interruption.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler_interruption_test.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler_tool_test.go",
+    "api/assistant-api/internal/adapters/internal/playback_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_lifecycle.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_lifecycle_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_playback.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_playback_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_turn.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_turn_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_interruption.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_interruption_test.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_vad.go",
+    "api/assistant-api/internal/adapters/lifecycle/message_vad_test.go",
+    "api/assistant-api/internal/type/packet.go",
+    "api/assistant-api/internal/type/playback_test.go",
+    "protos/artifacts/talk-api.proto",
+    "protos/talk-api.pb.go",
+    "api/document-api/app/bridges/artifacts/protos/talk_api_pb2.py",
+    "api/document-api/app/bridges/artifacts/protos/talk_api_pb2.pyi",
+    "rfcs/0019-audio-message-completion/jsons/coordinator-implementation.json",
+    "rfcs/0019-audio-message-completion/jsons/lifecycle-input.json"
+  ],
+  "behavior": [
+    "Message lifecycle owns final marker delivery, receipt admission, pause outcome, failure, exactly-once completion metric and session idle request.",
+    "Generation completion persists text but does not mark audio messages complete.",
+    "Receipts during Send wait for successful delivery; pause defers success and flush discards it.",
+    "Receipt deadline is total audio duration plus five seconds, excluding pauses; expiry uses the existing fatal error disconnection path.",
+    "Next speech after completed playback allocates a new message ID.",
+    "Tool progress speech is admitted inline before the queued final generation boundary.",
+    "Removed sequence fields and runtime packet plumbing; reserved source tags and names; regenerated with bash bin/artifacts-generate.sh."
+  ],
+  "generator_baseline": "/tmp/rapida-rfc0019-generated.RaGHfD/baseline.tar",
+  "rollout": {
+    "callback_authority_default": false,
+    "opt_in": "WithPlaybackCompletion(true) for verified native playback owners only",
+    "pending_scope_approval": [
+      "api/assistant-api/api/talk/talk.go",
+      "api/assistant-api/api/talk/inbound_call.go",
+      "api/assistant-api/socket/socket.go",
+      "api/assistant-api/sip/pipeline/runtime.go"
+    ],
+    "reason": "Native caller opt-in is outside the approved paths. Client-controlled source headers are not authority. No caller activation was made."
+  }
+}

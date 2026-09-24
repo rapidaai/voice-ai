@@ -24,38 +24,35 @@ func NewVaultMiddleware(options ...func(*middlewareOption)) sip_runtime.Middlewa
 	}
 	return func(ctx *sip_runtime.SIPRequestContext) error {
 		if !validator.NonNil(ctx.Auth) || !validator.NonNil(ctx.Assistant) {
-			return &sip_runtime.SIPError{Code: 500, Message: "Middleware chain incomplete", Err: errors.Join(sip_runtime.ErrInvalidConfig, sip_runtime.ErrMiddlewareChainIncomplete)}
+			return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageMiddlewareChainIncomplete, Err: errMiddlewareChainIncomplete}
 		}
 		if !validator.NonNil(ctx.Assistant.AssistantPhoneDeployment) {
-			return &sip_runtime.SIPError{Code: 500, Message: "Failed to resolve SIP configuration", Err: errors.Join(sip_runtime.ErrInvalidConfig, sip_runtime.ErrPhoneDeploymentRequired)}
+			return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: errPhoneDeploymentRequired}
 		}
 		if !validator.NonNil(m.rapidaClient) || !validator.NonNil(m.rapidaClient.Vault) {
-			return &sip_runtime.SIPError{Code: 500, Message: "SIP vault resolver not configured", Err: errors.Join(sip_runtime.ErrInvalidConfig, sip_runtime.ErrVaultResolverRequired)}
+			return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageVaultResolverUnavailable, Err: errVaultResolverRequired}
 		}
 
-		credentialID, err := ctx.Assistant.AssistantPhoneDeployment.GetOptions().GetUint64("rapida.credential_id")
+		credentialID, err := ctx.Assistant.AssistantPhoneDeployment.GetOptions().GetUint64(credentialIDOptionKey)
 		if err != nil {
-			return &sip_runtime.SIPError{Code: 500, Message: "Failed to resolve SIP configuration", Err: errors.Join(sip_runtime.ErrInvalidConfig, sip_runtime.ErrCredentialIDRequired, err)}
+			return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: errors.Join(errCredentialIDRequired, err)}
 		}
 
 		vaultCredential, err := m.rapidaClient.Vault.GetCredential(m.ctx, ctx.Auth, credentialID)
 		if err != nil {
-			return &sip_runtime.SIPError{Code: 500, Message: "Failed to resolve SIP configuration", Err: errors.Join(sip_runtime.ErrInvalidConfig, sip_runtime.ErrVaultCredentialResolution, err)}
+			return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: errors.Join(errVaultCredentialResolution, err)}
 		}
 
-		config, err := sip_runtime.ParseConfigFromVault(vaultCredential)
+		runtimeConfig, err := m.sipConfig.RuntimeConfig(vaultCredential)
 		if err != nil {
-			return &sip_runtime.SIPError{Code: 500, Message: "Failed to resolve SIP configuration", Err: errors.Join(sip_runtime.ErrInvalidConfig, sip_runtime.ErrVaultConfigInvalid, err)}
+			return &sip_runtime.SIPError{Code: sipStatusServerError, Message: sipMessageConfigurationResolution, Err: errors.Join(errVaultConfigInvalid, err)}
 		}
 
-		if did, err := ctx.Assistant.AssistantPhoneDeployment.GetOptions().GetString("phone"); err == nil && validator.NotBlank(did) {
-			config.CallerID = strings.TrimPrefix(did, "+")
-		}
-		if validator.NonNil(m.applySIPConfigDefaults) {
-			m.applySIPConfigDefaults(config)
+		if did, err := ctx.Assistant.AssistantPhoneDeployment.GetOptions().GetString(phoneOptionKey); err == nil && validator.NotBlank(did) {
+			runtimeConfig.CallerID = strings.TrimPrefix(did, phoneNumberPrefix)
 		}
 		ctx.VaultCredential = vaultCredential
-		ctx.Config = config
+		ctx.Config = runtimeConfig
 		return nil
 	}
 }

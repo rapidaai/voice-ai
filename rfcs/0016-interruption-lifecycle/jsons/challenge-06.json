@@ -1,0 +1,21 @@
+{
+  "rfc_file": "rfcs/0016-interruption-lifecycle.md",
+  "plan": "rfcs/0016-interruption-lifecycle/jsons/amendment-07-plan.json",
+  "rfc_sha256": "2e462c9862d135590f8742be9364a08dbe1978f7f8610c9821e5ca228a158d29",
+  "reviewed_plan_sha256": "33bec243c13d8c7be2bbdf4b370637771f29c4f7ebe0359af5a697fbd1176ff1",
+  "reviewed_at": "2026-09-06T13:32:28Z",
+  "reviewer": "independent Orca runtime challenger",
+  "run_id": "run_94aeb7c54726",
+  "task_id": "task_28c059fa621e",
+  "dispatch_id": "ctx_731ee21b9916",
+  "decision": "approved",
+  "approved": true,
+  "critical_findings": 0,
+  "major_findings": [],
+  "minor_findings": [
+    "Historical private-utterance-sequence wording remains in superseded artifacts",
+    "The accepted untimed late-event risk must remain explicit during implementation review"
+  ],
+  "implementation_authorized": false,
+  "next_action": "Create and resolve the exact-digest confirmation gate before implementation."
+}

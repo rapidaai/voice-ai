@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net"
 	"strconv"
 	"sync"
 	"time"
@@ -26,15 +27,19 @@ import (
 
 type cartesiaTTS struct {
 	*cartesiaOption
-	mu        sync.Mutex
+	stateMu   sync.Mutex
+	writeMu   sync.Mutex
 	ctx       context.Context
 	ctxCancel context.CancelFunc
+	readers   sync.WaitGroup
+	closed    bool
+	retired   map[string]struct{}
 
 	contextId      string
 	ttsConnectedAt time.Time
 
-	ttsStartedAt  time.Time
-	ttsMetricSent bool
+	ttsStartedAt time.Time
+	textClosed   bool
 
 	logger     commons.Logger
 	connection *websocket.Conn
@@ -57,17 +62,70 @@ func NewCartesiaTextToSpeech(ctx context.Context, logger commons.Logger, credent
 		logger:         logger,
 		ctx:            ct,
 		ctxCancel:      ctxCancel,
+		retired:        make(map[string]struct{}),
 		onPacket:       onPacket,
 		normalizer:     cartesia_internal.NewCartesiaNormalizer(logger, opts),
 	}, nil
 }
 
-// Initialize opens a fresh WebSocket connection to Cartesia and starts the
-// read goroutine. Called at session start and after each interruption so the
-// connection is warm before the first text delta arrives.
+// Initialize warms the session socket without replacing an existing connection.
 func (ct *cartesiaTTS) Initialize() error {
+	ct.writeMu.Lock()
+	defer ct.writeMu.Unlock()
+	return ct.connect(ct.ctx)
+}
+
+// connect requires writeMu so initialization and fresh text share one dial owner.
+func (ct *cartesiaTTS) connect(ctx context.Context) error {
+	if err := ct.ctx.Err(); err != nil {
+		return err
+	}
+	ct.stateMu.Lock()
+	connected := ct.connection != nil
+	ct.stateMu.Unlock()
+	if connected {
+		return nil
+	}
+	dialCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	stopSession := context.AfterFunc(ct.ctx, cancel)
+	defer stopSession()
+	dialer := *websocket.DefaultDialer
+	dial := dialer.NetDialContext
+	if dial == nil {
+		dial = (&net.Dialer{}).DialContext
+	}
+	if dialer.NetDialTLSContext != nil {
+		dial = dialer.NetDialTLSContext
+	}
+	// DialContext alone does not cancel a stalled HTTP upgrade in Gorilla 1.5.3.
+	var stopDial func() bool
+	dialWithCancel := func(ctx context.Context, network, address string) (net.Conn, error) {
+		conn, err := dial(ctx, network, address)
+		if err == nil {
+			stopDial = context.AfterFunc(dialCtx, func() { _ = conn.Close() })
+		}
+		return conn, err
+	}
+	if dialer.NetDialTLSContext != nil {
+		dialer.NetDialTLSContext = dialWithCancel
+	} else {
+		dialer.NetDialContext = dialWithCancel
+	}
 	start := time.Now()
-	conn, _, err := websocket.DefaultDialer.Dial(ct.GetTextToSpeechConnectionString(), nil)
+	conn, _, err := dialer.DialContext(dialCtx, ct.GetTextToSpeechConnectionString(), nil)
+	if stopDial != nil {
+		stopDial()
+	}
+	if err == nil {
+		err = dialCtx.Err()
+		if err == nil {
+			err = ct.ctx.Err()
+		}
+		if err != nil {
+			_ = conn.Close()
+		}
+	}
 	if err != nil {
 		ct.logger.Errorf("cartesia-tts: unable to dial %v", err)
 		ct.onPacket(internal_type.ObservabilityLogRecordPacket{
@@ -78,7 +136,6 @@ func (ct *cartesiaTTS) Initialize() error {
 				Attributes: observability.Attributes{
 					"component": observability.ComponentTTS.String(),
 					"provider":  ct.Name(),
-					"path":      observability.AttributeValue(ct.GetTextToSpeechConnectionString()),
 					"error":     observability.AttributeValue(err.Error()),
 				},
 				OccurredAt: time.Now(),
@@ -87,14 +144,13 @@ func (ct *cartesiaTTS) Initialize() error {
 		return err
 	}
 
-	ct.mu.Lock()
+	ct.stateMu.Lock()
 	ct.connection = conn
 	if ct.ttsConnectedAt.IsZero() {
 		ct.ttsConnectedAt = time.Now()
 	}
-	ct.mu.Unlock()
-
-	go ct.readLoop(conn)
+	ct.stateMu.Unlock()
+	ct.readers.Go(func() { ct.readLoop(conn) })
 	ct.onPacket(
 		internal_type.ObservabilityMetricRecordPacket{
 			Scope: internal_type.ObservabilityRecordScopeConversation,
@@ -115,7 +171,6 @@ func (ct *cartesiaTTS) Initialize() error {
 				Attributes: observability.Attributes{
 					"component": observability.ComponentTTS.String(),
 					"provider":  ct.Name(),
-					"path":      observability.AttributeValue(ct.GetTextToSpeechConnectionString()),
 				},
 				OccurredAt: time.Now(),
 			},
@@ -129,276 +184,367 @@ func (*cartesiaTTS) Name() string {
 	return "cartesia-tts"
 }
 
-// handleFlushComplete is called when Cartesia signals done. It emits
-// TextToSpeechEndPacket — correctly ordered after the last audio chunk — and
-// closes the per-turn connection.
-func (cst *cartesiaTTS) handleFlushComplete(conn *websocket.Conn) {
-	cst.mu.Lock()
-	if cst.connection != conn {
-		cst.mu.Unlock()
-		conn.Close()
-		return
+// readLoop owns one session socket; provider completion does not close it.
+func (ct *cartesiaTTS) readLoop(conn *websocket.Conn) {
+	stop := context.AfterFunc(ct.ctx, func() { _ = conn.Close() })
+	defer stop()
+	defer conn.Close()
+	ct.stateMu.Lock()
+	if ct.retired == nil {
+		ct.retired = make(map[string]struct{})
 	}
-	contextID := cst.contextId
-	cst.connection = nil // mark before Close so readLoop error handler sees intentional
-	cst.mu.Unlock()
-	if contextID == "" {
-		conn.Close()
-		return
-	}
-
-	cst.onPacket(
-		internal_type.TextToSpeechEndPacket{ContextID: contextID},
-		internal_type.ObservabilityEventRecordPacket{
-			ContextID: contextID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.RecordEvent{
-				Component:  observability.ComponentTTS,
-				Event:      observability.TTSCompleted,
-				Attributes: observability.Attributes{"type": "completed"},
-				OccurredAt: time.Now(),
-			},
-		},
-	)
-	conn.Close()
-}
-
-// readLoop owns a single WebSocket connection for the duration of one TTS turn.
-// It exits when the connection closes — intentionally (interrupt / flush complete)
-// or unexpectedly (network drop).
-func (cst *cartesiaTTS) readLoop(conn *websocket.Conn) {
+	ct.stateMu.Unlock()
 	for {
-		select {
-		case <-cst.ctx.Done():
-			return
-		default:
-		}
-
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
-			cst.mu.Lock()
-			if cst.connection != conn {
-				cst.mu.Unlock()
+			ct.stateMu.Lock()
+			if ct.connection != conn {
+				ct.stateMu.Unlock()
 				return
 			}
-			cst.connection = nil
-			cst.mu.Unlock()
-
-			cst.logger.Errorf("cartesia-tts: connection lost: %v", err)
+			ct.connection = nil
+			contextID := ct.contextId
+			if contextID != "" {
+				ct.retired[contextID] = struct{}{}
+				ct.contextId = ""
+			}
+			ct.stateMu.Unlock()
+			_ = conn.Close()
+			if contextID != "" && ct.ctx.Err() == nil {
+				ct.onPacket(internal_type.TextToSpeechErrorPacket{
+					ContextID: contextID,
+					Error:     fmt.Errorf("cartesia-tts: connection lost: %w", err),
+					Type:      internal_type.TTSNetworkTimeout,
+				})
+			}
 			return
 		}
 
 		var payload cartesia_internal.TextToSpeechOuput
 		if err := json.Unmarshal(msg, &payload); err != nil {
-			cst.logger.Errorf("cartesia-tts: invalid json from cartesia error : %v", err)
+			ct.logger.Errorf("cartesia-tts: invalid json from cartesia error : %v", err)
 			continue
 		}
 
-		if payload.Done {
-			cst.handleFlushComplete(conn)
+		ct.stateMu.Lock()
+		if ct.connection != conn {
+			ct.stateMu.Unlock()
 			return
 		}
-
-		if payload.Data == "" {
+		_, retired := ct.retired[payload.ContextID]
+		if ct.ctx.Err() != nil || payload.ContextID == "" || payload.ContextID != ct.contextId || retired {
+			ct.stateMu.Unlock()
 			continue
 		}
-
-		decoded, err := base64.StdEncoding.DecodeString(payload.Data)
+		var audio []byte
+		if payload.Type == "chunk" {
+			audio, err = base64.StdEncoding.DecodeString(payload.Data)
+			if err != nil {
+				err = fmt.Errorf("cartesia-tts: invalid audio: %w", err)
+			}
+		} else if payload.Type == "error" {
+			err = fmt.Errorf("cartesia-tts: provider error status %d", payload.StatusCode)
+		}
 		if err != nil {
-			cst.logger.Errorf("cartesia-tts: failed to decode audio payload error: %v", err)
-			continue
-		}
-
-		var shouldEmitFirstAudioLatencyMetric bool
-		cst.mu.Lock()
-		ttsStartedAt := cst.ttsStartedAt
-		contextID := cst.contextId
-		if !cst.ttsMetricSent && !ttsStartedAt.IsZero() {
-			cst.ttsMetricSent = true
-			shouldEmitFirstAudioLatencyMetric = true
-		}
-		cst.mu.Unlock()
-		if contextID == "" {
-			continue
-		}
-
-		if shouldEmitFirstAudioLatencyMetric {
-			_ = cst.onPacket(internal_type.ObservabilityMetricRecordPacket{
-				ContextID: contextID,
-				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record:    observability.NewMetricTTSLatencyMs(time.Since(ttsStartedAt), observability.Attributes{"provider": cst.Name()}),
-			})
-		}
-		_ = cst.onPacket(internal_type.TextToSpeechAudioPacket{ContextID: contextID, AudioChunk: decoded})
-	}
-}
-
-func (ct *cartesiaTTS) Transform(ctx context.Context, in internal_type.Packet) error {
-	ct.mu.Lock()
-	if in.ContextId() != ct.contextId {
-		ct.contextId = in.ContextId()
-		ct.ttsStartedAt = time.Time{}
-		ct.ttsMetricSent = false
-	}
-	connection := ct.connection
-	ct.mu.Unlock()
-
-	switch input := in.(type) {
-	case internal_type.TextToSpeechInterruptPacket:
-		ct.mu.Lock()
-		ct.contextId = ""
-		ct.ttsStartedAt = time.Time{}
-		ct.ttsMetricSent = false
-		conn := ct.connection
-		ct.connection = nil
-		ct.mu.Unlock()
-		if conn != nil {
-			conn.Close()
-		}
-		ct.onPacket(internal_type.ObservabilityEventRecordPacket{
-			ContextID: input.ContextID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.RecordEvent{
-				Component:  observability.ComponentTTS,
-				Event:      observability.TTSInterrupted,
-				Attributes: observability.Attributes{"type": "interrupted"},
-				OccurredAt: time.Now(),
-			},
-		})
-		if err := ct.Initialize(); err != nil {
-			ct.logger.Errorf("cartesia-tts: reconnect after interrupt failed: %v", err)
-		}
-		return nil
-
-	case internal_type.TextToSpeechTextPacket:
-		if connection == nil {
-			if err := ct.Initialize(); err != nil {
-				ct.onPacket(
-					internal_type.TextToSpeechErrorPacket{
-						ContextID: input.ContextID,
-						Error:     fmt.Errorf("cartesia-tts: failed to connect: %w", err),
-						Type:      internal_type.TTSNetworkTimeout,
+			ct.retired[payload.ContextID] = struct{}{}
+			ct.contextId = ""
+			// A blocked error callback must not keep a failed write alive.
+			if ct.writeMu.TryLock() {
+				ct.writeMu.Unlock()
+			} else {
+				ct.connection = nil
+				_ = conn.Close()
+			}
+			ct.stateMu.Unlock()
+			ct.onPacket(
+				internal_type.TextToSpeechErrorPacket{
+					ContextID: payload.ContextID,
+					Error:     err,
+					Type:      internal_type.TTSInvalidInput,
+				},
+				internal_type.ObservabilityLogRecordPacket{
+					ContextID: payload.ContextID,
+					Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+					Record: observability.RecordLog{
+						Level:   observability.LevelError,
+						Message: "cartesia-tts: synthesis failed",
+						Attributes: observability.Attributes{
+							"component": observability.ComponentTTS.String(),
+							"provider":  ct.Name(),
+							"error":     observability.AttributeValue(err.Error()),
+						},
+						OccurredAt: time.Now(),
 					},
-					internal_type.ObservabilityLogRecordPacket{
-						ContextID: input.ContextID,
+				},
+			)
+			continue
+		}
+		switch payload.Type {
+		case "done":
+			if ct.textClosed {
+				ct.retired[payload.ContextID] = struct{}{}
+				ct.contextId = ""
+				ct.stateMu.Unlock()
+				ct.onPacket(
+					internal_type.TextToSpeechEndPacket{ContextID: payload.ContextID},
+					internal_type.ObservabilityEventRecordPacket{
+						ContextID: payload.ContextID,
 						Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-						Record: observability.RecordLog{
-							Level:   observability.LevelError,
-							Message: "cartesia-tts: failed to connect",
-							Attributes: observability.Attributes{
-								"component": observability.ComponentTTS.String(),
-								"provider":  ct.Name(),
-								"error":     observability.AttributeValue(err.Error()),
-							},
+						Record: observability.RecordEvent{
+							Component:  observability.ComponentTTS,
+							Event:      observability.TTSCompleted,
+							Attributes: observability.Attributes{"type": "completed"},
 							OccurredAt: time.Now(),
 						},
 					},
 				)
+				continue
+			}
+		case "chunk":
+			if len(audio) == 0 {
+				break
+			}
+			startedAt := ct.ttsStartedAt
+			ct.ttsStartedAt = time.Time{}
+			ct.stateMu.Unlock()
+			if !startedAt.IsZero() {
+				ct.onPacket(internal_type.ObservabilityMetricRecordPacket{
+					ContextID: payload.ContextID,
+					Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+					Record:    observability.NewMetricTTSLatencyMs(time.Since(startedAt), observability.Attributes{"provider": ct.Name()}),
+				})
+			}
+			ct.onPacket(internal_type.TextToSpeechAudioPacket{ContextID: payload.ContextID, AudioChunk: audio})
+			continue
+		}
+		ct.stateMu.Unlock()
+	}
+}
+
+func (ct *cartesiaTTS) Transform(ctx context.Context, in internal_type.Packet) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := ct.ctx.Err(); err != nil {
+		return err
+	}
+	if input, ok := in.(internal_type.TextToSpeechInterruptPacket); ok {
+		ct.stateMu.Lock()
+		if input.ContextID == "" {
+			ct.stateMu.Unlock()
+			return nil
+		}
+		ct.retired[input.ContextID] = struct{}{}
+		if input.ContextID != ct.contextId || ct.connection == nil {
+			if input.ContextID == ct.contextId {
+				ct.contextId = ""
+			}
+			ct.stateMu.Unlock()
+			return nil
+		}
+		// Interruption cannot wait behind the write it needs to stop.
+		if !ct.writeMu.TryLock() {
+			connection := ct.connection
+			ct.connection = nil
+			ct.contextId = ""
+			ct.stateMu.Unlock()
+			_ = connection.Close()
+			ct.onPacket(internal_type.ObservabilityEventRecordPacket{
+				ContextID: input.ContextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentTTS, Event: observability.TTSInterrupted,
+					Attributes: observability.Attributes{"type": "interrupted"}, OccurredAt: time.Now(),
+				},
+			})
+			return nil
+		}
+		ct.stateMu.Unlock()
+	} else {
+		ct.writeMu.Lock()
+	}
+	defer ct.writeMu.Unlock()
+
+	// Replacement text cancels the old context before starting the new one.
+	for {
+		ct.stateMu.Lock()
+		if err := ctx.Err(); err != nil {
+			ct.stateMu.Unlock()
+			return err
+		}
+		if err := ct.ctx.Err(); err != nil {
+			ct.stateMu.Unlock()
+			return err
+		}
+		contextID := in.ContextId()
+		var message interface{}
+		switch input := in.(type) {
+		case internal_type.TurnChangePacket:
+			ct.stateMu.Unlock()
+			return nil
+		case internal_type.TextToSpeechInterruptPacket:
+			if input.ContextID != ct.contextId || ct.connection == nil {
+				ct.stateMu.Unlock()
 				return nil
 			}
-			ct.mu.Lock()
-			connection = ct.connection
-			if ct.ttsStartedAt.IsZero() {
+			message = map[string]interface{}{"context_id": input.ContextID, "cancel": true}
+		case internal_type.TextToSpeechTextPacket:
+			if input.ContextID == "" || input.Text == "" {
+				ct.stateMu.Unlock()
+				return nil
+			}
+			if _, retired := ct.retired[input.ContextID]; retired || (input.ContextID == ct.contextId && ct.textClosed) {
+				ct.stateMu.Unlock()
+				return nil
+			}
+			if ct.contextId != "" && ct.contextId != input.ContextID {
+				contextID = ct.contextId
+				ct.retired[contextID] = struct{}{}
+				if ct.connection != nil {
+					message = map[string]interface{}{"context_id": contextID, "cancel": true}
+					break
+				}
+			}
+			contextID = input.ContextID
+			if ct.contextId != input.ContextID {
+				ct.contextId = input.ContextID
+				ct.textClosed = false
+				ct.stateMu.Unlock()
+				err := ct.connect(ctx)
+				ct.stateMu.Lock()
+				if err != nil {
+					_, retired := ct.retired[input.ContextID]
+					ct.retired[input.ContextID] = struct{}{}
+					if ct.contextId == input.ContextID {
+						ct.contextId = ""
+					}
+					ct.stateMu.Unlock()
+					if err := ctx.Err(); err != nil {
+						return err
+					}
+					if err := ct.ctx.Err(); err != nil {
+						return err
+					}
+					if !retired {
+						ct.onPacket(internal_type.TextToSpeechErrorPacket{
+							ContextID: input.ContextID, Error: fmt.Errorf("cartesia-tts: connect: %w", err),
+							Type: internal_type.TTSNetworkTimeout,
+						})
+					}
+					return nil
+				}
 				ct.ttsStartedAt = time.Now()
 			}
-			ct.mu.Unlock()
-		} else {
-			ct.mu.Lock()
-			if ct.ttsStartedAt.IsZero() {
-				ct.ttsStartedAt = time.Now()
+			if ct.contextId != input.ContextID || ct.connection == nil {
+				ct.stateMu.Unlock()
+				return nil
 			}
-			ct.mu.Unlock()
+			message = ct.GetTextToSpeechInput(ct.normalizer.Normalize(input.Text), map[string]interface{}{
+				"continue": true, "context_id": input.ContextID,
+			})
+		case internal_type.TextToSpeechDonePacket:
+			if input.ContextID == "" || input.ContextID != ct.contextId || ct.connection == nil || ct.textClosed {
+				ct.stateMu.Unlock()
+				return nil
+			}
+			ct.textClosed = true
+			message = ct.GetTextToSpeechInput("", map[string]interface{}{"continue": false, "context_id": input.ContextID})
+		default:
+			ct.stateMu.Unlock()
+			return fmt.Errorf("cartesia-tts: unsupported input type %T", in)
 		}
-		ct.mu.Lock()
-		contextID := ct.contextId
-		ct.mu.Unlock()
-		normalized := ct.normalizer.Normalize(input.Text)
-		message := ct.GetTextToSpeechInput(normalized, map[string]interface{}{"continue": true, "context_id": contextID, "max_buffer_delay_ms": "0ms"})
-		if err := connection.WriteJSON(message); err != nil {
-			ct.logger.Errorf("cartesia-tts: failed to write text: %v", err)
-			ct.onPacket(
-				internal_type.TextToSpeechErrorPacket{
-					ContextID: input.ContextID,
-					Error:     fmt.Errorf("cartesia-tts: failed to write text: %w", err),
-					Type:      internal_type.TTSNetworkTimeout,
-				},
-				internal_type.ObservabilityLogRecordPacket{
-					ContextID: input.ContextID,
-					Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-					Record: observability.RecordLog{
-						Level:   observability.LevelError,
-						Message: "cartesia-tts: failed to write text",
-						Attributes: observability.Attributes{
-							"component": observability.ComponentTTS.String(),
-							"provider":  ct.Name(),
-							"error":     observability.AttributeValue(err.Error()),
-						},
-						OccurredAt: time.Now(),
-					},
-				},
-			)
-			return nil
-		}
-		ct.onPacket(internal_type.ObservabilityEventRecordPacket{
-			ContextID: input.ContextID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.RecordEvent{
-				Component: observability.ComponentTTS,
-				Event:     observability.TTSSpeaking,
-				Attributes: observability.Attributes{
-					"type": "speaking",
-					"text": normalized,
-				},
-				OccurredAt: time.Now(),
-			},
+		connection := ct.connection
+		ct.stateMu.Unlock()
+
+		writeCancelled := make(chan struct{})
+		stopWriteCancellation := context.AfterFunc(ctx, func() {
+			ct.stateMu.Lock()
+			if ct.connection == connection {
+				ct.connection = nil
+			}
+			ct.retired[contextID] = struct{}{}
+			if ct.contextId == contextID {
+				ct.contextId = ""
+			}
+			ct.stateMu.Unlock()
+			_ = connection.Close()
+			close(writeCancelled)
 		})
-
-	case internal_type.TextToSpeechDonePacket:
-		// Interrupted before done arrived — nothing to flush.
-		if connection == nil {
+		err := connection.WriteJSON(message)
+		// Finish cancellation before this connection can be reused.
+		if !stopWriteCancellation() {
+			<-writeCancelled
+		}
+		ct.stateMu.Lock()
+		if ctx.Err() != nil || ct.ctx.Err() != nil {
+			ct.stateMu.Unlock()
+			return ctx.Err()
+		}
+		if ct.connection != connection {
+			ct.stateMu.Unlock()
+			if contextID != in.ContextId() {
+				continue
+			}
 			return nil
 		}
-		ct.mu.Lock()
-		contextID := ct.contextId
-		ct.mu.Unlock()
-		// Signal end of text stream; Cartesia will respond with done:true.
-		message := ct.GetTextToSpeechInput("", map[string]interface{}{"continue": false, "flush": true, "context_id": contextID})
-		if err := connection.WriteJSON(message); err != nil {
-			ct.logger.Errorf("cartesia-tts: flush failed: %v", err)
-			ct.onPacket(
-				internal_type.TextToSpeechErrorPacket{
-					ContextID: input.ContextID,
-					Error:     fmt.Errorf("cartesia-tts: flush failed: %w", err),
-					Type:      internal_type.TTSNetworkTimeout,
-				},
-				internal_type.ObservabilityLogRecordPacket{
-					ContextID: input.ContextID,
-					Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-					Record: observability.RecordLog{
-						Level:   observability.LevelError,
-						Message: "cartesia-tts: flush failed",
-						Attributes: observability.Attributes{
-							"component": observability.ComponentTTS.String(),
-							"provider":  ct.Name(),
-							"error":     observability.AttributeValue(err.Error()),
-						},
-						OccurredAt: time.Now(),
-					},
-				},
-			)
+		if err != nil {
+			ct.connection = nil
+			ct.retired[contextID] = struct{}{}
+			if ct.contextId == contextID {
+				ct.contextId = ""
+			}
+			ct.stateMu.Unlock()
+			_ = connection.Close()
+			ct.onPacket(internal_type.TextToSpeechErrorPacket{
+				ContextID: contextID, Error: fmt.Errorf("cartesia-tts: send: %w", err),
+				Type: internal_type.TTSNetworkTimeout,
+			})
+			if contextID != in.ContextId() {
+				continue
+			}
 			return nil
 		}
-		// TextToSpeechEndPacket is emitted by handleFlushComplete once done received.
-
-	default:
-		return fmt.Errorf("cartesia-tts: unsupported input type %T", in)
+		// Keep the retired context identifiable until its cancel write finishes.
+		if _, retired := ct.retired[contextID]; retired && ct.contextId == contextID {
+			ct.contextId = ""
+		}
+		ct.stateMu.Unlock()
+		if contextID != in.ContextId() {
+			continue
+		}
+		switch in.(type) {
+		case internal_type.TextToSpeechInterruptPacket:
+			ct.onPacket(internal_type.ObservabilityEventRecordPacket{
+				ContextID: contextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentTTS, Event: observability.TTSInterrupted,
+					Attributes: observability.Attributes{"type": "interrupted"}, OccurredAt: time.Now(),
+				},
+			})
+		case internal_type.TextToSpeechTextPacket:
+			ct.onPacket(internal_type.ObservabilityEventRecordPacket{
+				ContextID: contextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentTTS, Event: observability.TTSSpeaking,
+					Attributes: observability.Attributes{"type": "speaking", "text": message.(cartesia_internal.TextToSpeechInput).Transcript},
+					OccurredAt: time.Now(),
+				},
+			})
+		}
+		return nil
 	}
-	return nil
 }
 
 func (ct *cartesiaTTS) Close(ctx context.Context) error {
 	ct.ctxCancel()
-	ct.mu.Lock()
+	ct.writeMu.Lock()
+	ct.stateMu.Lock()
+	if ct.closed {
+		ct.stateMu.Unlock()
+		ct.writeMu.Unlock()
+		ct.readers.Wait()
+		return nil
+	}
+	ct.closed = true
 	ctxID := ct.contextId
 	connectedAt := ct.ttsConnectedAt
 	ct.ttsConnectedAt = time.Time{}
@@ -408,7 +554,9 @@ func (ct *cartesiaTTS) Close(ctx context.Context) error {
 		ct.connection = nil // mark before Close so readLoop sees intentional
 		_ = conn.Close()
 	}
-	ct.mu.Unlock()
+	ct.stateMu.Unlock()
+	ct.writeMu.Unlock()
+	ct.readers.Wait()
 
 	if !connectedAt.IsZero() {
 		duration := time.Since(connectedAt)

@@ -11,18 +11,12 @@ package internal_pipecat
 import "C"
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"unsafe"
-)
-
-const (
-	pctDetectorName = "pipecat_smart_turn"
-
-	envPctModelPathKey = "PIPECAT_TURN_MODEL_PATH"
-	defaultPctModel    = "models/smart-turn-v3.2-cpu.onnx"
 )
 
 // PipecatDetectorConfig holds configuration for the Pipecat Smart Turn ONNX model.
@@ -61,7 +55,7 @@ func NewPipecatDetector(cfg PipecatDetectorConfig) (*PipecatDetector, error) {
 
 	pd.api = C.PctOrtGetApi()
 	if pd.api == nil {
-		return nil, fmt.Errorf("pipecat_detector: failed to get ONNX Runtime API")
+		return nil, errPipecatDetectorRuntimeAPIUnavailable
 	}
 
 	pd.cStrings["loggerName"] = C.CString(pctDetectorName)
@@ -69,35 +63,35 @@ func NewPipecatDetector(cfg PipecatDetectorConfig) (*PipecatDetector, error) {
 	defer C.PctOrtApiReleaseStatus(pd.api, status)
 	if status != nil {
 		pd.cleanup()
-		return nil, fmt.Errorf("pipecat_detector: create env: %s", C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
+		return nil, fmt.Errorf("%w: %s", errPipecatDetectorCreateEnv, C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
 	}
 
 	status = C.PctOrtApiCreateSessionOptions(pd.api, &pd.sessionOpts)
 	defer C.PctOrtApiReleaseStatus(pd.api, status)
 	if status != nil {
 		pd.cleanup()
-		return nil, fmt.Errorf("pipecat_detector: create session options: %s", C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
+		return nil, fmt.Errorf("%w: %s", errPipecatDetectorCreateSessionOptions, C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
 	}
 
 	status = C.PctOrtApiSetIntraOpNumThreads(pd.api, pd.sessionOpts, 1)
 	defer C.PctOrtApiReleaseStatus(pd.api, status)
 	if status != nil {
 		pd.cleanup()
-		return nil, fmt.Errorf("pipecat_detector: set intra threads: %s", C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
+		return nil, fmt.Errorf("%w: %s", errPipecatDetectorSetIntraThreads, C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
 	}
 
 	status = C.PctOrtApiSetInterOpNumThreads(pd.api, pd.sessionOpts, 1)
 	defer C.PctOrtApiReleaseStatus(pd.api, status)
 	if status != nil {
 		pd.cleanup()
-		return nil, fmt.Errorf("pipecat_detector: set inter threads: %s", C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
+		return nil, fmt.Errorf("%w: %s", errPipecatDetectorSetInterThreads, C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
 	}
 
 	status = C.PctOrtApiSetSessionGraphOptimizationLevel(pd.api, pd.sessionOpts, C.ORT_ENABLE_ALL)
 	defer C.PctOrtApiReleaseStatus(pd.api, status)
 	if status != nil {
 		pd.cleanup()
-		return nil, fmt.Errorf("pipecat_detector: set optimization: %s", C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
+		return nil, fmt.Errorf("%w: %s", errPipecatDetectorSetOptimization, C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
 	}
 
 	pd.cStrings["modelPath"] = C.CString(modelPath)
@@ -105,14 +99,14 @@ func NewPipecatDetector(cfg PipecatDetectorConfig) (*PipecatDetector, error) {
 	defer C.PctOrtApiReleaseStatus(pd.api, status)
 	if status != nil {
 		pd.cleanup()
-		return nil, fmt.Errorf("pipecat_detector: create session: %s", C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
+		return nil, fmt.Errorf("%w: %s", errPipecatDetectorCreateSession, C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
 	}
 
 	status = C.PctOrtApiCreateCpuMemoryInfo(pd.api, C.OrtArenaAllocator, C.OrtMemTypeDefault, &pd.memoryInfo)
 	defer C.PctOrtApiReleaseStatus(pd.api, status)
 	if status != nil {
 		pd.cleanup()
-		return nil, fmt.Errorf("pipecat_detector: create memory info: %s", C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
+		return nil, fmt.Errorf("%w: %s", errPipecatDetectorCreateMemoryInfo, C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
 	}
 
 	pd.cStrings["input_features"] = C.CString("input_features")
@@ -126,23 +120,66 @@ func NewPipecatDetector(cfg PipecatDetectorConfig) (*PipecatDetector, error) {
 //
 // audio must be float32 PCM samples at 16kHz.
 func (pd *PipecatDetector) Predict(audio []float32) (float64, error) {
+	return pd.PredictContext(context.Background(), audio)
+}
+
+// PredictContext computes mel features and synchronously runs cancellable native inference.
+// The caller must serialize prediction and Destroy, including cancellation cleanup.
+func (pd *PipecatDetector) PredictContext(ctx context.Context, audio []float32) (float64, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
 	if pd == nil {
-		return 0, fmt.Errorf("pipecat_detector: nil detector")
+		return 0, errPipecatDetectorNil
 	}
 	if len(audio) == 0 {
-		return 0, fmt.Errorf("pipecat_detector: empty audio")
+		return 0, errPipecatDetectorEmptyAudio
 	}
 
 	// Extract mel spectrogram features [80 * 800]
 	features := pd.features.extractInto(audio, pd.scratch.output[:], pd.scratch)
 
-	// Run ONNX inference
-	prob, err := pd.infer(features)
-	if err != nil {
+	return pd.inferContext(ctx, features)
+}
+
+// infer retains the feature-only entry point used by parity tests and benchmarks.
+func (pd *PipecatDetector) infer(features []float32) (float64, error) {
+	return pd.inferContext(context.Background(), features)
+}
+
+func (pd *PipecatDetector) inferContext(ctx context.Context, features []float32) (prob float64, err error) {
+	if err := ctx.Err(); err != nil {
 		return 0, err
 	}
 
-	return prob, nil
+	var runOptions *C.OrtRunOptions
+	status := C.PctOrtApiCreateRunOptions(pd.api, &runOptions)
+	defer C.PctOrtApiReleaseStatus(pd.api, status)
+	if status != nil {
+		return 0, fmt.Errorf("%w: %s", errPipecatDetectorCreateRunOptions, C.GoString(C.PctOrtApiGetErrorMessage(pd.api, status)))
+	}
+	defer C.PctOrtApiReleaseRunOptions(pd.api, runOptions)
+
+	terminated := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() {
+		defer close(terminated)
+		status := C.PctOrtApiRunOptionsSetTerminate(pd.api, runOptions)
+		C.PctOrtApiReleaseStatus(pd.api, status)
+	})
+	defer func() {
+		// Join a started callback before releasing the per-run options.
+		if !stop() {
+			<-terminated
+		}
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			prob, err = 0, ctxErr
+		}
+	}()
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+
+	return pd.inferWithRunOptions(features, runOptions)
 }
 
 // Destroy releases all ONNX Runtime resources.

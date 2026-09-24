@@ -8,9 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rapidaai/api/assistant-api/config"
-	internal_sip "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/sip/internal"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
-	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -192,8 +191,8 @@ func TestParseConfig_DefaultsOutboundTo5060WhenVaultPortMissing(t *testing.T) {
 		t.Fatalf("parseConfig() error = %v", err)
 	}
 
-	if cfg.Port != internal_sip.DefaultOutboundSIPPort {
-		t.Fatalf("expected default outbound SIP port %d, got %d", internal_sip.DefaultOutboundSIPPort, cfg.Port)
+	if cfg.Port != sip_config.DefaultProviderPort {
+		t.Fatalf("expected default outbound SIP port %d, got %d", sip_config.DefaultProviderPort, cfg.Port)
 	}
 }
 
@@ -247,7 +246,7 @@ func TestParseConfig_AppliesPlatformTimeouts(t *testing.T) {
 func TestParseConfig_AppliesInboundAnswerPolicyDefaults(t *testing.T) {
 	telephony := newSIPTelephonyForTest()
 	telephony.appCfg.SIPConfig.Inbound = config.SIPInboundConfig{
-		AnswerMode:      string(sip_runtime.InboundAnswerModeAfterMinRingDuration),
+		AnswerMode:      string(sip_config.InboundAnswerModeAfterMinRingDuration),
 		MinRingDuration: 50 * time.Millisecond,
 		MaxRingDuration: 5 * time.Second,
 		ACKTimeout:      2 * time.Second,
@@ -261,7 +260,7 @@ func TestParseConfig_AppliesInboundAnswerPolicyDefaults(t *testing.T) {
 		t.Fatalf("parseConfig() error = %v", err)
 	}
 
-	if cfg.InboundAnswerMode != sip_runtime.InboundAnswerModeAfterMinRingDuration {
+	if cfg.InboundAnswerMode != sip_config.InboundAnswerModeAfterMinRingDuration {
 		t.Fatalf("expected inbound answer mode from app config, got %q", cfg.InboundAnswerMode)
 	}
 	if cfg.InboundMinRingDuration != 50*time.Millisecond ||

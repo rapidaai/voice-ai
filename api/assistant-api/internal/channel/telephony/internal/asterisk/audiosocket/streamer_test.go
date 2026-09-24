@@ -9,6 +9,7 @@ package internal_asterisk_audiosocket
 import (
 	"bufio"
 	"context"
+	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"net"
 	"testing"
 	"time"
@@ -18,7 +19,6 @@ import (
 	internal_asterisk "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/asterisk/internal"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
-	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
@@ -108,7 +108,9 @@ func TestSend_EndConversation_PushesToolCallResult(t *testing.T) {
 
 	// 1. Verify the ConversationToolCallResult was pushed to CriticalCh.
 	select {
-	case msg := <-as.CriticalCh:
+	case <-as.CriticalCh.Ready():
+		msg, err := as.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		result, ok := msg.(*protos.ConversationToolCallResult)
 		require.True(t, ok, "expected ConversationToolCallResult, got %T", msg)
 		assert.Equal(t, "call-123", result.GetId())
@@ -143,7 +145,9 @@ func TestSend_EndConversation_SecondCall_StillPushesToolResult(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case msg := <-as.CriticalCh:
+	case <-as.CriticalCh.Ready():
+		msg, err := as.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		result, ok := msg.(*protos.ConversationToolCallResult)
 		require.True(t, ok, "expected ConversationToolCallResult")
 		assert.Equal(t, "call-789", result.GetId())
@@ -156,7 +160,9 @@ func TestSend_EndConversation_SecondCall_StillPushesToolResult(t *testing.T) {
 	err = as.Send(toolCall)
 	require.NoError(t, err)
 	select {
-	case msg := <-as.CriticalCh:
+	case <-as.CriticalCh.Ready():
+		msg, err := as.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		result, ok := msg.(*protos.ConversationToolCallResult)
 		require.True(t, ok, "expected ConversationToolCallResult, got %T", msg)
 		assert.Equal(t, "call-789", result.GetId())
@@ -166,7 +172,9 @@ func TestSend_EndConversation_SecondCall_StillPushesToolResult(t *testing.T) {
 
 	// No extra messages should be present.
 	select {
-	case msg := <-as.CriticalCh:
+	case <-as.CriticalCh.Ready():
+		msg, err := as.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		t.Fatalf("unexpected extra message after second end_conversation: %T", msg)
 	case <-time.After(200 * time.Millisecond):
 		// expected: no extra messages
@@ -186,7 +194,9 @@ func TestSend_ConversationDisconnection_ClosesStreamer(t *testing.T) {
 	// the server callsite already knows the reason. The talker exits via the
 	// Recv-err path once Cancel cancels s.Ctx.
 	select {
-	case msg := <-as.CriticalCh:
+	case <-as.CriticalCh.Ready():
+		msg, err := as.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		t.Fatalf("server-initiated Send must not push to CriticalCh; got %T", msg)
 	default:
 	}
@@ -218,7 +228,9 @@ func TestSend_TransferConversation_Unsupported(t *testing.T) {
 
 	// Should push a failed result because transfer is not supported.
 	select {
-	case msg := <-as.CriticalCh:
+	case <-as.CriticalCh.Ready():
+		msg, err := as.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		result, ok := msg.(*protos.ConversationToolCallResult)
 		require.True(t, ok, "expected ConversationToolCallResult, got %T", msg)
 		assert.Equal(t, "call-abc", result.GetId())
@@ -256,7 +268,9 @@ func TestSend_TransferConversation_EmptyToolId_StillPushesFailedResult(t *testin
 
 	// Transfer failure should still emit a failed result with empty ToolId.
 	select {
-	case msg := <-as.CriticalCh:
+	case <-as.CriticalCh.Ready():
+		msg, err := as.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		result, ok := msg.(*protos.ConversationToolCallResult)
 		require.True(t, ok, "expected ConversationToolCallResult, got %T", msg)
 		assert.Equal(t, "call-xyz", result.GetId())
@@ -286,7 +300,9 @@ func TestSend_UnknownToolCallAction_NoOp(t *testing.T) {
 
 	// No result or frame for an unrecognized action.
 	select {
-	case msg := <-as.CriticalCh:
+	case <-as.CriticalCh.Ready():
+		msg, err := as.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		t.Fatalf("unexpected message on CriticalCh: %T", msg)
 	case <-time.After(200 * time.Millisecond):
 		// Expected: no message.
@@ -299,7 +315,7 @@ func TestSend_UnknownToolCallAction_NoOp(t *testing.T) {
 	}
 }
 
-func TestSend_Interruption_ClearsOutputBuffer(t *testing.T) {
+func TestSend_InterruptionIsNotificationOnly(t *testing.T) {
 	as, remote := newTestStreamer(t)
 
 	// Drain remote.
@@ -311,9 +327,44 @@ func TestSend_Interruption_ClearsOutputBuffer(t *testing.T) {
 
 	err := as.Send(interruption)
 	require.NoError(t, err)
-	// If we get here without panic, the code path exercised ClearOutputBuffer
-	// on the audio processor. We cannot easily inspect the buffer directly,
-	// but the absence of an error confirms correctness.
+}
+
+func TestSend_OutputControlsRouteBeforeAssistantAudio(t *testing.T) {
+	as, remote := newTestStreamer(t)
+	defer remote.Close()
+	audio := make([]byte, 6400)
+	for i := range audio {
+		audio[i] = byte(i)
+	}
+
+	require.NoError(t, as.Send(&protos.ConversationAssistantMessage{
+		Id:        "response-1",
+		Message:   &protos.ConversationAssistantMessage_Audio{Audio: audio},
+		Completed: true,
+	}))
+	require.NoError(t, as.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
+	assert.Nil(t, as.mediaSession.NextFrame())
+	require.NoError(t, as.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}))
+	assert.NotEmpty(t, as.mediaSession.NextFrame())
+
+	require.NoError(t, as.Send(&protos.ConversationAssistantMessage{
+		Id:        "response-2",
+		Message:   &protos.ConversationAssistantMessage_Audio{Audio: audio},
+		Completed: true,
+	}))
+	require.NoError(t, as.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}))
+	require.NoError(t, as.Send(&protos.ConversationAssistantMessage{
+		Id:        "response-2",
+		Message:   &protos.ConversationAssistantMessage_Audio{Audio: audio},
+		Completed: true,
+	}))
+	assert.Nil(t, as.mediaSession.NextFrame())
+	require.NoError(t, as.Send(&protos.ConversationAssistantMessage{
+		Id:        "response-3",
+		Message:   &protos.ConversationAssistantMessage_Audio{Audio: audio},
+		Completed: true,
+	}))
+	assert.NotEmpty(t, as.mediaSession.NextFrame())
 }
 
 // Compile-time check that Streamer implements internal_type.Streamer.

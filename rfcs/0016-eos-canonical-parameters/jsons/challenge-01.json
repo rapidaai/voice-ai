@@ -1,0 +1,19 @@
+{
+  "run_id": "run_164b9ed811c6",
+  "task_id": "task_09fa5bc6a1e5",
+  "dispatch_id": "ctx_43fc732278a7",
+  "reviewer": "independent-challenger:ctx_43fc732278a7",
+  "reviewed_at": "2026-09-10T15:38:30Z",
+  "decision": "revise",
+  "rfc_file": "rfcs/0016-eos-canonical-parameters.md",
+  "rfc_sha256": "c8d37e8ff129cfc681df329b9ff5341af374e3ae7d7555aada776533110b4819",
+  "findings": [{
+    "severity": "major",
+    "file": "ui/src/app/pages/assistant/actions/create-deployment/commons/configure-audio-input.tsx",
+    "line": 150,
+    "issue": "Provider switching filters every microphone.eos.* key before GetDefaultEOSConfig, but this production path is omitted from allowed paths. The stated model-path preservation criterion cannot be met in the approved scope.",
+    "required_resolution": "Include the provider-switch implementation path and preserve backend-only EOS model paths before the broad prefix filter."
+  }],
+  "correction_cycle": 1,
+  "implementation_allowed": false
+}

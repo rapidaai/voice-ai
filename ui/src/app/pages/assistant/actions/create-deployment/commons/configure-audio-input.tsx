@@ -8,7 +8,10 @@ import {
   GetDefaultMicrophoneConfig,
   GetDefaultSpeechToTextIfInvalid,
 } from '@/app/components/providers/speech-to-text/provider';
-import { GetDefaultEOSConfig } from '@/app/components/providers/end-of-speech/provider';
+import {
+  EOS_MODEL_PATH_KEYS,
+  GetDefaultEOSConfig,
+} from '@/app/components/providers/end-of-speech/provider';
 import { GetDefaultVADConfig } from '@/app/components/providers/vad/provider';
 import { VADProvider } from '@/app/components/providers/vad';
 import { ChevronDown } from '@carbon/icons-react';
@@ -150,7 +153,9 @@ export const ConfigureAudioInputProvider: React.FC<
                     GetDefaultEOSConfig(
                       provider,
                       audioInputConfig.parameters.filter(
-                        p => !p.getKey().startsWith('microphone.eos.'),
+                        p =>
+                          !p.getKey().startsWith('microphone.eos.') ||
+                          EOS_MODEL_PATH_KEYS.has(p.getKey()),
                       ),
                     ),
                   )

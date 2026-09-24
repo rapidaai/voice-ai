@@ -5,6 +5,12 @@ import { Metadata } from '@rapidaai/react';
 import { FC } from 'react';
 import { ConfigRenderer } from '@/app/components/providers/config-renderer';
 
+export const EOS_MODEL_PATH_KEYS = new Set<string>([
+  'microphone.eos.livekit.model_path',
+  'microphone.eos.livekit.tokenizer_path',
+  'microphone.eos.pipecat.model_path',
+]);
+
 const upsertScopedProvider = (
   parameters: Metadata[],
   scopePrefix: string,
@@ -29,12 +35,17 @@ export const GetDefaultEOSConfig = (
 ): Metadata[] => {
   const config = loadProviderConfig(provider);
   if (!config?.eos) return current;
+
   const defaults = getDefaultsFromConfig(config, 'eos', current, provider, {
     includeCredential: false,
     replacePrefix: 'microphone.eos.',
   });
+  const backendModelPaths = current.filter(parameter =>
+    EOS_MODEL_PATH_KEYS.has(parameter.getKey()),
+  );
+
   return upsertScopedProvider(
-    defaults,
+    [...defaults, ...backendModelPaths],
     'microphone.eos.',
     'microphone.eos.provider',
     provider,

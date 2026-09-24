@@ -7,14 +7,16 @@
 package internal_transformer_azure
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/Microsoft/cognitive-services-speech-sdk-go/audio"
 	"github.com/Microsoft/cognitive-services-speech-sdk-go/common"
 	"github.com/Microsoft/cognitive-services-speech-sdk-go/speech"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
@@ -24,401 +26,438 @@ import (
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
+	"golang.org/x/sync/semaphore"
 )
 
 type azureTextToSpeech struct {
 	*azureOption
-	mu sync.Mutex
-	// context management
+	stateMu   sync.Mutex
+	writeLock *semaphore.Weighted
 	ctx       context.Context
 	ctxCancel context.CancelFunc
 
-	contextId      string
+	synthesis      *azureSynthesis
 	ttsConnectedAt time.Time
+	client         azureSynthesisClient
+	onPacket       func(pkt ...internal_type.Packet) error
+	normalizer     internal_type.TextNormalizer
+}
 
-	// TTS latency tracking
-	ttsStartedAt  time.Time
-	ttsMetricSent bool
+type azureSynthesis struct {
+	contextID string
+	startedAt time.Time
+	finished  bool
+	cancel    context.CancelFunc
+}
 
-	logger      commons.Logger
-	stream      *audio.PullAudioOutputStream
-	audioConfig *audio.AudioConfig
-	client      *speech.SpeechSynthesizer
-	onPacket    func(pkt ...internal_type.Packet) error
-	normalizer  internal_type.TextNormalizer
+// These contracts isolate native SDK handles from message ownership.
+type azureSynthesisClient interface {
+	StartSpeaking(string, bool) (azureSynthesisStream, error)
+	StopSpeaking() error
+	Close()
+}
+
+type azureSynthesisStream interface {
+	Read([]byte) (int, error)
+	GetStatus() (common.StreamStatus, error)
+	Close()
 }
 
 func NewAzureTextToSpeech(ctx context.Context, logger commons.Logger, credential *protos.VaultCredential,
-	onPacket func(pkt ...internal_type.Packet) error,
-	opts utils.Option) (internal_type.TextToSpeechTransformer, error) {
-
+	onPacket func(pkt ...internal_type.Packet) error, opts utils.Option,
+) (internal_type.TextToSpeechTransformer, error) {
 	azureOption, err := NewAzureOption(logger, credential, opts)
 	if err != nil {
-		logger.Errorf("azure-tts: unable to initialize azure option: %v", err)
 		return nil, err
 	}
-	ct, ctxCancel := context.WithCancel(ctx)
+	sessionCtx, cancel := context.WithCancel(ctx)
 	return &azureTextToSpeech{
-		ctx:       ct,
-		ctxCancel: ctxCancel,
-
-		azureOption: azureOption,
-		logger:      logger,
-		onPacket:    onPacket,
-		normalizer:  azure_internal.NewAzureNormalizer(logger, opts),
+		ctx: sessionCtx, ctxCancel: cancel, writeLock: semaphore.NewWeighted(1),
+		azureOption: azureOption, onPacket: onPacket,
+		normalizer: azure_internal.NewAzureNormalizer(logger, opts),
 	}, nil
 }
 
-func (azure *azureTextToSpeech) Name() string {
-	return "azure-tts"
+func (*azureTextToSpeech) Name() string { return "azure-tts" }
+
+func (azure *azureTextToSpeech) Initialize() error {
+	if err := azure.writeLock.Acquire(azure.ctx, 1); err != nil {
+		return err
+	}
+	var packets []internal_type.Packet
+	defer func() {
+		azure.writeLock.Release(1)
+		if len(packets) > 0 {
+			azure.onPacket(packets...)
+		}
+	}()
+	if err := azure.ctx.Err(); err != nil {
+		return err
+	}
+	if azure.client != nil {
+		return nil
+	}
+	start := time.Now()
+	speechConfig, err := azure.TextToSpeechOption()
+	if err != nil {
+		return fmt.Errorf("azure-tts: speech configuration: %w", err)
+	}
+	defer speechConfig.Close()
+	client, err := speech.NewSpeechSynthesizerFromConfig(speechConfig, nil)
+	if err != nil {
+		return fmt.Errorf("azure-tts: create synthesizer: %w", err)
+	}
+	if err := azure.ctx.Err(); err != nil {
+		client.Close()
+		return err
+	}
+	azure.client = &azureSDKClient{SpeechSynthesizer: client}
+	azure.ttsConnectedAt = time.Now()
+	packets = append(packets, internal_type.ObservabilityMetricRecordPacket{
+		Scope: internal_type.ObservabilityRecordScopeConversation,
+		Record: observability.RecordMetric{
+			Metrics: []*protos.Metric{{
+				Name: observability.MetricTTSInitLatencyMs, Value: strconv.FormatInt(time.Since(start).Milliseconds(), 10),
+				Description: "TTS initialization latency in milliseconds",
+			}},
+			Attributes: observability.Attributes{"provider": azure.Name()},
+		},
+	})
+	return nil
+}
+
+func (azure *azureTextToSpeech) Transform(ctx context.Context, in internal_type.Packet) (returnErr error) {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := azure.ctx.Err(); err != nil {
+		return err
+	}
+	var synthesis *azureSynthesis
+	switch input := in.(type) {
+	case internal_type.TurnChangePacket:
+		return nil
+	case internal_type.TextToSpeechTextPacket:
+		if input.ContextID == "" || input.Text == "" {
+			return nil
+		}
+		azure.stateMu.Lock()
+		var cancel context.CancelFunc
+		if azure.synthesis == nil || azure.synthesis.contextID != input.ContextID {
+			if azure.synthesis != nil {
+				azure.synthesis.finished = true
+				cancel = azure.synthesis.cancel
+			}
+			azure.synthesis = &azureSynthesis{contextID: input.ContextID, startedAt: time.Now()}
+		}
+		synthesis = azure.synthesis
+		azure.stateMu.Unlock()
+		if cancel != nil {
+			cancel()
+		}
+	case internal_type.TextToSpeechInterruptPacket:
+		azure.stateMu.Lock()
+		if azure.synthesis == nil || azure.synthesis.contextID != input.ContextID || azure.synthesis.finished {
+			azure.stateMu.Unlock()
+			return nil
+		}
+		azure.synthesis.finished = true
+		cancel := azure.synthesis.cancel
+		azure.stateMu.Unlock()
+		if cancel != nil {
+			cancel()
+		}
+		azure.onPacket(internal_type.ObservabilityEventRecordPacket{
+			ContextID: input.ContextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
+			Record: observability.RecordEvent{
+				Component: observability.ComponentTTS, Event: observability.TTSInterrupted,
+				Attributes: observability.Attributes{"type": "interrupted"}, OccurredAt: time.Now(),
+			},
+		})
+		return nil
+	}
+
+	writeCtx, cancelWrite := context.WithCancel(ctx)
+	defer cancelWrite()
+	stopSession := context.AfterFunc(azure.ctx, cancelWrite)
+	defer stopSession()
+	if err := azure.writeLock.Acquire(writeCtx, 1); err != nil {
+		if synthesis != nil {
+			azure.stateMu.Lock()
+			synthesis.finished = true
+			cancel := synthesis.cancel
+			azure.stateMu.Unlock()
+			if cancel != nil {
+				cancel()
+			}
+		}
+		return err
+	}
+	var packets []internal_type.Packet
+	defer func() {
+		azure.writeLock.Release(1)
+		if len(packets) > 0 {
+			azure.onPacket(packets...)
+		}
+	}()
+	if err := ctx.Err(); err != nil {
+		if synthesis != nil {
+			azure.stateMu.Lock()
+			synthesis.finished = true
+			azure.stateMu.Unlock()
+		}
+		return err
+	}
+	if err := azure.ctx.Err(); err != nil {
+		return err
+	}
+
+	azure.stateMu.Lock()
+	var text string
+	switch input := in.(type) {
+	case internal_type.TextToSpeechTextPacket:
+		if azure.synthesis != synthesis || synthesis.finished {
+			azure.stateMu.Unlock()
+			return nil
+		}
+		text = input.Text
+		if azure.normalizer != nil {
+			text = azure.normalizer.Normalize(text)
+		}
+	case internal_type.TextToSpeechDonePacket:
+		if azure.synthesis == nil || azure.synthesis.contextID != input.ContextID || azure.synthesis.finished {
+			azure.stateMu.Unlock()
+			return nil
+		}
+		// The writer permit ensures every preceding request has drained successfully.
+		azure.synthesis.finished = true
+		azure.stateMu.Unlock()
+		packets = append(packets,
+			internal_type.TextToSpeechEndPacket{ContextID: input.ContextID},
+			internal_type.ObservabilityEventRecordPacket{
+				ContextID: input.ContextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
+				Record: observability.RecordEvent{
+					Component: observability.ComponentTTS, Event: observability.TTSCompleted,
+					Attributes: observability.Attributes{"type": "completed"}, OccurredAt: time.Now(),
+				},
+			},
+		)
+		return nil
+	default:
+		azure.stateMu.Unlock()
+		return fmt.Errorf("azure-tts: unsupported packet type %T", in)
+	}
+	operationCtx, cancel := context.WithCancel(azure.ctx)
+	synthesis.cancel = cancel
+	azure.stateMu.Unlock()
+	stopCaller := context.AfterFunc(ctx, cancel)
+	defer stopCaller()
+	defer cancel()
+	if azure.client == nil {
+		azure.stateMu.Lock()
+		synthesis.finished = true
+		synthesis.cancel = nil
+		azure.stateMu.Unlock()
+		packets = append(packets, internal_type.TextToSpeechErrorPacket{
+			ContextID: synthesis.contextID, Error: fmt.Errorf("azure-tts: synthesizer is not initialized"), Type: internal_type.TTSNetworkTimeout,
+		})
+		return nil
+	}
+
+	client := azure.client
+	stopDone := make(chan struct{})
+	var stopErr error
+	stopSpeaking := context.AfterFunc(operationCtx, func() {
+		stopErr = client.StopSpeaking()
+		close(stopDone)
+	})
+	var stream azureSynthesisStream
+	defer func() {
+		if operationCtx.Err() != nil || !stopSpeaking() {
+			<-stopDone
+		}
+		if stream != nil {
+			stream.Close()
+		}
+		azure.stateMu.Lock()
+		synthesis.cancel = nil
+		if operationCtx.Err() != nil || stopErr != nil {
+			synthesis.finished = true
+		}
+		azure.stateMu.Unlock()
+		if stopErr != nil {
+			returnErr = errors.Join(returnErr, fmt.Errorf("azure-tts: stop synthesis: %w", stopErr))
+		}
+	}()
+
+	ssml := strings.Contains(text, "<break ")
+	if ssml {
+		language := "en-US"
+		if configuredLanguage, err := azure.mdlOpts.GetString(internal_options.SpeakOptionLanguage); err == nil && configuredLanguage != "" {
+			language = configuredLanguage
+		}
+		if voice, err := azure.mdlOpts.GetString(internal_options.SpeakOptionVoiceID); err == nil && voice != "" {
+			text = fmt.Sprintf(`<voice name="%s">%s</voice>`, voice, text)
+		}
+		text = fmt.Sprintf(`<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="%s">%s</speak>`, language, text)
+	}
+	var err error
+	stream, err = client.StartSpeaking(text, ssml)
+	if operationCtx.Err() != nil {
+		// Stop may have raced the SDK's start acknowledgment. Stop again after start settles.
+		<-stopDone
+		stopErr = errors.Join(stopErr, client.StopSpeaking())
+	} else if err == nil {
+		audio := make([]byte, 2048)
+		for {
+			var count int
+			count, err = stream.Read(audio)
+			azure.stateMu.Lock()
+			if synthesis.finished || operationCtx.Err() != nil {
+				azure.stateMu.Unlock()
+				break
+			}
+			var audioPackets []internal_type.Packet
+			if count > 0 {
+				if !synthesis.startedAt.IsZero() {
+					audioPackets = append(audioPackets, internal_type.ObservabilityMetricRecordPacket{
+						ContextID: synthesis.contextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
+						Record: observability.NewMetricTTSLatencyMs(time.Since(synthesis.startedAt), observability.Attributes{"provider": azure.Name()}),
+					})
+					synthesis.startedAt = time.Time{}
+				}
+				audioPackets = append(audioPackets, internal_type.TextToSpeechAudioPacket{ContextID: synthesis.contextID, AudioChunk: bytes.Clone(audio[:count])})
+			}
+			azure.stateMu.Unlock()
+			if len(audioPackets) > 0 {
+				azure.onPacket(audioPackets...)
+			}
+			if err != nil {
+				break
+			}
+		}
+		if err == io.EOF && operationCtx.Err() == nil {
+			var status common.StreamStatus
+			status, err = stream.GetStatus()
+			if err == nil && status != common.StreamStatusAllData {
+				err = fmt.Errorf("stream ended with status %s", status)
+			}
+		}
+	}
+
+	azure.stateMu.Lock()
+	if synthesis.finished || operationCtx.Err() != nil || err != nil {
+		emitError := !synthesis.finished && operationCtx.Err() == nil
+		synthesis.finished = true
+		azure.stateMu.Unlock()
+		cancel()
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if azure.ctx.Err() != nil {
+			return azure.ctx.Err()
+		}
+		if emitError {
+			packets = append(packets, internal_type.TextToSpeechErrorPacket{
+				ContextID: synthesis.contextID, Error: fmt.Errorf("azure-tts: synthesis: %w", err), Type: internal_type.TTSNetworkTimeout,
+			})
+		}
+		return nil
+	}
+	azure.stateMu.Unlock()
+	packets = append(packets, internal_type.ObservabilityEventRecordPacket{
+		ContextID: synthesis.contextID, Scope: internal_type.ObservabilityRecordScopeAssistantMessage,
+		Record: observability.RecordEvent{
+			Component: observability.ComponentTTS, Event: observability.TTSSpeaking,
+			Attributes: observability.Attributes{"type": "speaking", "text": text}, OccurredAt: time.Now(),
+		},
+	})
+	return nil
 }
 
 func (azure *azureTextToSpeech) Close(ctx context.Context) error {
 	azure.ctxCancel()
-	azure.mu.Lock()
-	ctxID := azure.contextId
+	_ = azure.writeLock.Acquire(context.WithoutCancel(ctx), 1)
 	connectedAt := azure.ttsConnectedAt
 	azure.ttsConnectedAt = time.Time{}
-
+	azure.stateMu.Lock()
+	if azure.synthesis != nil {
+		azure.synthesis.finished = true
+	}
+	azure.stateMu.Unlock()
 	if azure.client != nil {
-		// Stop any ongoing synthesis before closing
-		<-azure.client.StopSpeakingAsync()
 		azure.client.Close()
 		azure.client = nil
 	}
-	if azure.audioConfig != nil {
-		azure.audioConfig.Close()
-		azure.audioConfig = nil
-	}
-	if azure.stream != nil {
-		azure.stream.Close()
-		azure.stream = nil
-	}
-	azure.mu.Unlock()
-
+	azure.writeLock.Release(1)
 	if !connectedAt.IsZero() {
 		duration := time.Since(connectedAt)
 		azure.onPacket(
 			internal_type.ObservabilityMetricRecordPacket{
-				ContextID: ctxID,
-				Scope:     internal_type.ObservabilityRecordScopeConversation,
-				Record:    observability.NewMetricTTSDuration(duration, observability.Attributes{"provider": azure.Name()}),
+				Scope:  internal_type.ObservabilityRecordScopeConversation,
+				Record: observability.NewMetricTTSDuration(duration, observability.Attributes{"provider": azure.Name()}),
 			},
 			internal_type.ObservabilityUsageRecordPacket{
-				ContextID: ctxID,
-				Scope:     internal_type.ObservabilityRecordScopeConversation,
-				Record:    observability.NewTTSDurationUsageRecord(azure.Name(), duration, observability.Attributes{}),
+				Scope:  internal_type.ObservabilityRecordScopeConversation,
+				Record: observability.NewTTSDurationUsageRecord(azure.Name(), duration, observability.Attributes{}),
 			},
 		)
 	}
-	azure.onPacket(
-		internal_type.ObservabilityEventRecordPacket{
-			ContextID: ctxID,
-			Scope:     internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.RecordEvent{
-				Component: observability.ComponentTTS,
-				Event:     observability.TTSClosed,
-				Attributes: observability.Attributes{
-					"type":     "closed",
-					"provider": azure.Name(),
-				},
-				OccurredAt: time.Now(),
-			},
-		})
+	azure.onPacket(internal_type.ObservabilityEventRecordPacket{
+		Scope: internal_type.ObservabilityRecordScopeConversation,
+		Record: observability.RecordEvent{
+			Component: observability.ComponentTTS, Event: observability.TTSClosed,
+			Attributes: observability.Attributes{"type": "closed", "provider": azure.Name()}, OccurredAt: time.Now(),
+		},
+	})
 	return nil
 }
 
-func (azure *azureTextToSpeech) Initialize() (err error) {
-	start := time.Now()
-	emitInitializationErrorLog := func(initializationErr error) {
-		azure.onPacket(internal_type.ObservabilityLogRecordPacket{
-			ContextID: azure.contextId,
-			Scope:     internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.RecordLog{
-				Level:   observability.LevelError,
-				Message: "azure-tts: initialization failed",
-				Attributes: observability.Attributes{
-					"component": observability.ComponentTTS.String(),
-					"provider":  azure.Name(),
-					"error":     observability.AttributeValue(initializationErr.Error()),
-				},
-				OccurredAt: time.Now(),
-			},
-		})
-	}
-	stream, err := audio.CreatePullAudioOutputStream()
-	if err != nil {
-		azure.logger.Errorf("azure-tts: failed to create audio stream: %v", err)
-		initializationErr := fmt.Errorf("azure-tts: failed to create audio stream: %w", err)
-		emitInitializationErrorLog(initializationErr)
-		return initializationErr
-	}
-	audioConfig, err := audio.NewAudioConfigFromStreamOutput(stream)
-	if err != nil {
-		stream.Close()
-		azure.logger.Errorf("azure-tts: failed to create audio config: %v", err)
-		initializationErr := fmt.Errorf("azure-tts: failed to create audio config: %w", err)
-		emitInitializationErrorLog(initializationErr)
-		return initializationErr
-	}
-
-	speechConfig, err := azure.TextToSpeechOption()
-	if err != nil {
-		stream.Close()
-		audioConfig.Close()
-		azure.logger.Errorf("azure-tts: failed to get speech configuration: %v", err)
-		initializationErr := fmt.Errorf("azure-tts: failed to get speech configuration: %w", err)
-		emitInitializationErrorLog(initializationErr)
-		return initializationErr
-	}
-	// Close speechConfig after creating synthesizer as it's no longer needed
-	defer speechConfig.Close()
-
-	client, err := speech.NewSpeechSynthesizerFromConfig(speechConfig, audioConfig)
-	if err != nil {
-		stream.Close()
-		audioConfig.Close()
-		azure.logger.Errorf("azure-tts: failed to initialize speech synthesizer: %v", err)
-		initializationErr := fmt.Errorf("azure-tts: failed to initialize speech synthesizer: %w", err)
-		emitInitializationErrorLog(initializationErr)
-		return initializationErr
-	}
-
-	azure.mu.Lock()
-	azure.stream = stream
-	azure.client = client
-	azure.audioConfig = audioConfig
-	if azure.ttsConnectedAt.IsZero() {
-		azure.ttsConnectedAt = time.Now()
-	}
-	azure.mu.Unlock()
-
-	azure.client.SynthesisStarted(azure.OnStart)
-	azure.client.Synthesizing(azure.OnSpeech)
-	azure.client.SynthesisCompleted(azure.OnComplete)
-	azure.client.SynthesisCanceled(azure.OnCancel)
-	azure.onPacket(
-		internal_type.ObservabilityMetricRecordPacket{
-			Scope: internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.RecordMetric{
-				Metrics: []*protos.Metric{{
-					Name:        observability.MetricTTSInitLatencyMs,
-					Value:       strconv.FormatInt(time.Since(start).Milliseconds(), 10),
-					Description: "TTS initialization latency in milliseconds",
-				}},
-				Attributes: observability.Attributes{"provider": azure.Name()},
-			},
-		},
-		internal_type.ObservabilityLogRecordPacket{
-			Scope: internal_type.ObservabilityRecordScopeConversation,
-			Record: observability.RecordLog{
-				Level:   observability.LevelInfo,
-				Message: "azure-tts: initialization completed",
-				Attributes: observability.Attributes{
-					"component": observability.ComponentTTS.String(),
-					"provider":  azure.Name(),
-				},
-				OccurredAt: time.Now(),
-			},
-		},
-	)
-	return nil
+type azureSDKClient struct {
+	*speech.SpeechSynthesizer
 }
 
-func (azure *azureTextToSpeech) Transform(ctx context.Context, in internal_type.Packet) error {
-	azure.mu.Lock()
-	cl := azure.client
-	previousContextID := azure.contextId
-	if in.ContextId() != azure.contextId {
-		azure.contextId = in.ContextId()
-		azure.ttsStartedAt = time.Time{}
-		azure.ttsMetricSent = false
+func (client *azureSDKClient) StartSpeaking(text string, ssml bool) (azureSynthesisStream, error) {
+	var outcome speech.SpeechSynthesisOutcome
+	if ssml {
+		outcome = <-client.StartSpeakingSsmlAsync(text)
+	} else {
+		outcome = <-client.StartSpeakingTextAsync(text)
 	}
-	azure.mu.Unlock()
-	if cl == nil {
-		return nil
+	if outcome.Error != nil {
+		outcome.Close()
+		return nil, outcome.Error
 	}
-
-	switch input := in.(type) {
-	case internal_type.TextToSpeechInterruptPacket:
-		if previousContextID != "" {
-			azure.mu.Lock()
-			azure.contextId = ""
-			azure.ttsStartedAt = time.Time{}
-			azure.ttsMetricSent = false
-			azure.mu.Unlock()
-			<-cl.StopSpeakingAsync()
-			azure.onPacket(internal_type.ObservabilityEventRecordPacket{
-				ContextID: input.ContextID,
-				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.RecordEvent{
-					Component:  observability.ComponentTTS,
-					Event:      observability.TTSInterrupted,
-					Attributes: observability.Attributes{"type": "interrupted"},
-					OccurredAt: time.Now(),
-				},
-			})
-		}
-		return nil
-	case internal_type.TextToSpeechTextPacket:
-		normalizedText := input.Text
-		if azure.normalizer != nil {
-			normalizedText = azure.normalizer.Normalize(input.Text)
-		}
-		azure.mu.Lock()
-		if azure.ttsStartedAt.IsZero() {
-			azure.ttsStartedAt = time.Now()
-		}
-		azure.mu.Unlock()
-		var res speech.SpeechSynthesisOutcome
-		if strings.Contains(normalizedText, "<break ") {
-			language := "en-US"
-			if configuredLanguage, err := azure.mdlOpts.GetString(internal_options.SpeakOptionLanguage); err == nil && configuredLanguage != "" {
-				language = configuredLanguage
+	if outcome.Result == nil {
+		return nil, fmt.Errorf("SDK returned no synthesis result")
+	}
+	if outcome.Result.Reason != common.SynthesizingAudioStarted && outcome.Result.Reason != common.SynthesizingAudioCompleted {
+		defer outcome.Close()
+		if outcome.Result.Reason == common.Canceled {
+			if details, err := speech.NewCancellationDetailsFromSpeechSynthesisResult(outcome.Result); err == nil {
+				return nil, fmt.Errorf("SDK canceled synthesis: %s (code=%s)", details.ErrorDetails, details.ErrorCode)
 			}
-			voiceName := ""
-			if configuredVoice, err := azure.mdlOpts.GetString(internal_options.SpeakOptionVoiceID); err == nil && configuredVoice != "" {
-				voiceName = configuredVoice
-			}
-			textForAzure := fmt.Sprintf(`<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="%s">%s</speak>`, language, normalizedText)
-			if voiceName != "" {
-				textForAzure = fmt.Sprintf(`<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="%s"><voice name="%s">%s</voice></speak>`, language, voiceName, normalizedText)
-			}
-			res = <-cl.StartSpeakingSsmlAsync(textForAzure)
-		} else {
-			res = <-cl.StartSpeakingTextAsync(normalizedText)
 		}
-		if res.Error != nil {
-			synthesisErr := fmt.Errorf("azure-tts: synthesis failed: %w", res.Error)
-			azure.onPacket(
-				internal_type.TextToSpeechErrorPacket{
-					ContextID: input.ContextID,
-					Error:     synthesisErr,
-					Type:      internal_type.TTSNetworkTimeout,
-				},
-				internal_type.ObservabilityLogRecordPacket{
-					ContextID: input.ContextID,
-					Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-					Record: observability.RecordLog{
-						Level:   observability.LevelError,
-						Message: "azure-tts: synthesis failed",
-						Attributes: observability.Attributes{
-							"component": observability.ComponentTTS.String(),
-							"provider":  azure.Name(),
-							"error":     observability.AttributeValue(synthesisErr.Error()),
-						},
-						OccurredAt: time.Now(),
-					},
-				},
-			)
-			return nil
-		}
-		azure.onPacket(internal_type.ObservabilityEventRecordPacket{
-			ContextID: input.ContextID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.RecordEvent{
-				Component: observability.ComponentTTS,
-				Event:     observability.TTSSpeaking,
-				Attributes: observability.Attributes{
-					"type": "speaking",
-					"text": normalizedText,
-				},
-				OccurredAt: time.Now(),
-			},
-		})
-		return nil
-	case internal_type.TextToSpeechDonePacket:
-		return nil
-	default:
-		return fmt.Errorf("azure-tts: unsupported input type %T", in)
+		return nil, fmt.Errorf("SDK returned synthesis reason %s", outcome.Result.Reason)
 	}
-
+	stream, err := speech.NewAudioDataStreamFromSpeechSynthesisResult(outcome.Result)
+	if err != nil {
+		outcome.Close()
+		return nil, err
+	}
+	return &azureSDKStream{AudioDataStream: stream, result: outcome.Result}, nil
 }
 
-func (azCallback *azureTextToSpeech) OnStart(event speech.SpeechSynthesisEventArgs) {
-	defer event.Close()
+func (client *azureSDKClient) StopSpeaking() error {
+	return <-client.StopSpeakingAsync()
 }
 
-func (azCallback *azureTextToSpeech) OnSpeech(event speech.SpeechSynthesisEventArgs) {
-	defer event.Close()
-	var shouldEmitFirstAudioLatencyMetric bool
-	azCallback.mu.Lock()
-	ctxID := azCallback.contextId
-	startedAt := azCallback.ttsStartedAt
-	if ctxID == "" {
-		azCallback.mu.Unlock()
-		return
-	}
-	if !azCallback.ttsMetricSent && !startedAt.IsZero() {
-		azCallback.ttsMetricSent = true
-		shouldEmitFirstAudioLatencyMetric = true
-	}
-	azCallback.mu.Unlock()
-	if shouldEmitFirstAudioLatencyMetric {
-		azCallback.onPacket(internal_type.ObservabilityMetricRecordPacket{
-			ContextID: ctxID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record:    observability.NewMetricTTSLatencyMs(time.Since(startedAt), observability.Attributes{"provider": azCallback.Name()}),
-		})
-	}
-	azCallback.onPacket(internal_type.TextToSpeechAudioPacket{ContextID: ctxID, AudioChunk: event.Result.AudioData})
+type azureSDKStream struct {
+	*speech.AudioDataStream
+	result *speech.SpeechSynthesisResult
 }
 
-func (azCallback *azureTextToSpeech) OnComplete(event speech.SpeechSynthesisEventArgs) {
-	defer event.Close()
-	azCallback.mu.Lock()
-	ctxID := azCallback.contextId
-	azCallback.mu.Unlock()
-	if ctxID == "" {
-		return
-	}
-	azCallback.onPacket(
-		internal_type.TextToSpeechEndPacket{ContextID: ctxID},
-		internal_type.ObservabilityEventRecordPacket{
-			ContextID: ctxID,
-			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-			Record: observability.RecordEvent{
-				Component:  observability.ComponentTTS,
-				Event:      observability.TTSCompleted,
-				Attributes: observability.Attributes{"type": "completed"},
-				OccurredAt: time.Now(),
-			},
-		},
-	)
-}
-
-func (azCallback *azureTextToSpeech) OnCancel(event speech.SpeechSynthesisEventArgs) {
-	defer event.Close()
-	if event.Result.Reason == common.Canceled {
-		cancellation, _ := speech.NewCancellationDetailsFromSpeechSynthesisResult(&event.Result)
-		azCallback.logger.Warnf("azure-tts: synthesis canceled: reason=%v, errorCode=%v, errorDetails=%v", cancellation.Reason, cancellation.ErrorCode, cancellation.ErrorDetails)
-		azCallback.mu.Lock()
-		ctxID := azCallback.contextId
-		azCallback.mu.Unlock()
-		if ctxID == "" {
-			return
-		}
-		cancelErr := fmt.Errorf("azure-tts: synthesis canceled: %v (code=%v)", cancellation.ErrorDetails, cancellation.ErrorCode)
-		azCallback.onPacket(
-			internal_type.TextToSpeechErrorPacket{
-				ContextID: ctxID,
-				Error:     cancelErr,
-				Type:      internal_type.TTSNetworkTimeout,
-			},
-			internal_type.ObservabilityLogRecordPacket{
-				ContextID: ctxID,
-				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
-				Record: observability.RecordLog{
-					Level:   observability.LevelError,
-					Message: "azure-tts: synthesis canceled",
-					Attributes: observability.Attributes{
-						"component": observability.ComponentTTS.String(),
-						"provider":  azCallback.Name(),
-						"error":     observability.AttributeValue(cancelErr.Error()),
-					},
-					OccurredAt: time.Now(),
-				},
-			},
-		)
-	}
+func (stream *azureSDKStream) Close() {
+	stream.AudioDataStream.Close()
+	stream.result.Close()
 }

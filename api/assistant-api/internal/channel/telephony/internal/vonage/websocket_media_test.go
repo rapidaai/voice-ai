@@ -1,24 +1,27 @@
 package internal_vonage_telephony
 
 import (
+	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
-	internal_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 type fakeVonageMediaEngine struct {
 	providerFrame internal_telephony_media.ProviderAudioFrame
 	processError  error
+	clearCount    atomic.Int32
 }
 
 func (engine *fakeVonageMediaEngine) ProcessProviderAudioFrame(frame internal_telephony_media.ProviderAudioFrame) (internal_telephony_media.InputAudioFrame, error) {
@@ -41,11 +44,15 @@ func (engine *fakeVonageMediaEngine) NextOutputFrame() (internal_telephony_media
 	return internal_telephony_media.AssistantOutputFrame{}, false
 }
 
+func (engine *fakeVonageMediaEngine) OutputDrained() bool { return true }
+
 func (engine *fakeVonageMediaEngine) IdleOutputFrame() (internal_telephony_media.AssistantOutputFrame, bool) {
 	return internal_telephony_media.AssistantOutputFrame{}, false
 }
 
-func (engine *fakeVonageMediaEngine) ClearOutputBuffer() {}
+func (engine *fakeVonageMediaEngine) ClearOutputBuffer() {
+	engine.clearCount.Add(1)
+}
 
 func (engine *fakeVonageMediaEngine) ConfigureAmbient(_ internal_ambient.Config) error {
 	return nil
@@ -54,12 +61,6 @@ func (engine *fakeVonageMediaEngine) ConfigureAmbient(_ internal_ambient.Config)
 func (engine *fakeVonageMediaEngine) OutputFrameDuration() time.Duration {
 	return 20 * time.Millisecond
 }
-
-func (engine *fakeVonageMediaEngine) OutputHealthSnapshot() internal_output.HealthSnapshot {
-	return internal_output.HealthSnapshot{}
-}
-
-func (engine *fakeVonageMediaEngine) OnTickHealth(_ internal_output.TickHealth) {}
 
 func TestNewVonageWebsocketStreamer_WiresMediaSession(t *testing.T) {
 	logger, _ := commons.NewApplicationLogger()
@@ -81,6 +82,57 @@ func TestNewVonageWebsocketStreamer_WiresMediaSession(t *testing.T) {
 	defer vonageStreamer.Cancel()
 
 	require.NotNil(t, vonageStreamer.mediaSession)
+}
+
+func TestSend_ConsumesOutputControls(t *testing.T) {
+	outputControlTestCases := []struct {
+		name               string
+		control            proto.Message
+		resumeProbe        bool
+		wantLocalClears    int32
+		wantProviderClears int32
+	}{
+		{name: "pause", control: &protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}},
+		{name: "continue", control: &protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}, resumeProbe: true},
+		{name: "flush", control: &protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}, wantLocalClears: 1, wantProviderClears: 1},
+	}
+
+	for _, testCase := range outputControlTestCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			mediaEngine := &fakeVonageMediaEngine{}
+			var providerClearCount atomic.Int32
+			streamer := &vonageWebsocketStreamer{
+				BaseTelephonyStreamer: internal_telephony_base.New(nil, &callcontext.CallContext{}, nil, nil),
+			}
+			streamer.mediaSession = internal_telephony_media.NewMediaSession(internal_telephony_media.MediaSessionConfig{
+				Context:     context.Background(),
+				MediaEngine: mediaEngine,
+				SendProviderClear: func() error {
+					providerClearCount.Add(1)
+					return nil
+				},
+			})
+			if testCase.resumeProbe {
+				_, outputControlError := streamer.mediaSession.HandleOutputControl(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE})
+				require.NoError(t, outputControlError)
+				providerClearCount.Store(0)
+			}
+
+			require.NoError(t, streamer.Send(testCase.control))
+			if testCase.resumeProbe {
+				require.NoError(t, streamer.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
+			}
+			assert.Equal(t, testCase.wantLocalClears, mediaEngine.clearCount.Load())
+			assert.Equal(t, testCase.wantProviderClears, providerClearCount.Load())
+			select {
+			case <-streamer.OutputCh.Ready():
+				output, err := streamer.OutputCh.TryReceive()
+				require.NoError(t, err)
+				t.Fatalf("output control was forwarded: %T", output)
+			default:
+			}
+		})
+	}
 }
 
 func TestHandleMediaEvent_EmitsBridgeUserAudio(t *testing.T) {
@@ -106,7 +158,9 @@ func TestHandleMediaEvent_EmitsBridgeUserAudio(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case stream := <-vonageStreamer.InputCh:
+	case <-vonageStreamer.LowCh.Ready():
+		stream, err := vonageStreamer.LowCh.TryReceive()
+		require.NoError(t, err)
 		bridgeAudio, ok := stream.(*protos.ConversationBridgeUserAudio)
 		require.True(t, ok, "expected bridge user audio, got %T", stream)
 		assert.NotEmpty(t, bridgeAudio.GetAudio())

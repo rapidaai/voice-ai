@@ -1,0 +1,19 @@
+{
+  "review_receipt": "rfcs/0016-eos-canonical-parameters/jsons/review-implementation.json",
+  "correction_cycles_used": 1,
+  "OPS-001": {
+    "status": "corrected_pending_re_review",
+    "files": [
+      "bin/verify-eos-options-migration.sh",
+      "tests/integration/eos-options/test_migration.py"
+    ],
+    "verification": "bash bin/verify-eos-options-migration.sh passed; targeted just agent-finalize passed"
+  },
+  "CHK-001": {
+    "status": "blocked_on_scope_approval",
+    "request": "Allow web-api expected migration version12 to13 in bin/verify-phase3-migrations.sh. Current scope only allows assistant-api60 to61."
+  },
+  "application_commit_allowed": false,
+  "push_allowed": false,
+  "live_migration_run": false
+}

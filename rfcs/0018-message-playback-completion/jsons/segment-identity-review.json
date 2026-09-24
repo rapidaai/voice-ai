@@ -1,0 +1,130 @@
+{
+  "date": "2026-09-10",
+  "taskId": "task_eb2d49861552",
+  "dispatchId": "ctx_202c39b56e60",
+  "reviewerRole": "independent implementation reviewer",
+  "phase": "Segment identity propagation",
+  "status": "passed",
+  "scopeReviewed": [
+    "protos/artifacts/talk-api.proto",
+    "protos/talk-api.pb.go",
+    "api/document-api/app/bridges/artifacts/protos/talk_api_pb2.py",
+    "api/document-api/app/bridges/artifacts/protos/talk_api_pb2.pyi",
+    "api/assistant-api/internal/type/packet.go",
+    "api/assistant-api/internal/type/playback_test.go",
+    "api/assistant-api/internal/adapters/internal/stream.go",
+    "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+    "api/assistant-api/internal/adapters/internal/playback_test.go",
+    "api/assistant-api/internal/channel/grpc/streamer.go",
+    "api/assistant-api/internal/channel/grpc/streamer_test.go",
+    "api/assistant-api/internal/channel/webrtc/audio_buffer.go",
+    "api/assistant-api/internal/channel/webrtc/output_loop.go",
+    "api/assistant-api/internal/channel/webrtc/streamer.go",
+    "api/assistant-api/internal/channel/webrtc/internal/types.go",
+    "api/assistant-api/internal/channel/webrtc/playback_test.go",
+    "api/assistant-api/internal/channel/webrtc/internal/playback_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/media/session.go",
+    "api/assistant-api/internal/channel/telephony/internal/media/types.go",
+    "api/assistant-api/internal/channel/telephony/internal/media/playback_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/streamer.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/media_port.go",
+    "api/assistant-api/internal/channel/telephony/internal/sip/playback_test.go",
+    "api/assistant-api/internal/channel/telephony/internal/twilio/internal/playback_test.go"
+  ],
+  "sourceArtifactsRead": [
+    "rfcs/0018-message-playback-completion.md",
+    "rfcs/0018-message-playback-completion/jsons/segment-identity-implementation.json",
+    "rfcs/0018-message-playback-completion/jsons/transport-telephony-implementation.json",
+    "rfcs/0018-message-playback-completion/jsons/transport-webrtc-implementation.json"
+  ],
+  "findings": [],
+  "acceptance": {
+    "result": "pass",
+    "notes": [
+      "AssistantMessage playback_sequence uses tag 5 and PlaybackComplete playback_sequence uses tag 3.",
+      "Adapter receipt packets and playback.completed diagnostics preserve the received playback_sequence while lifecycle acceptance remains diagnostic and message-id scoped for this phase.",
+      "gRPC Recv and Send preserve playback completion and assistant playback_sequence fields, including legacy sequence 0.",
+      "WebRTC queued OutputPlayback keeps the segment id and playback_sequence on queued frames and emits completion from the drained segment after successful local output.",
+      "Telephony MediaSession queues responsePlayback by id plus playback_sequence and emits completions only for sent, nonfailed responses.",
+      "SIP pre-answer replay stores playback_sequence on queued assistant audio and replays it before live post-answer audio.",
+      "Pause, continue, and flush remain message scoped without playback_sequence fields."
+    ]
+  },
+  "lineEvidence": [
+    {
+      "path": "protos/artifacts/talk-api.proto",
+      "lines": "218-222,242-252",
+      "evidence": "ConversationPlaybackComplete includes playback_sequence tag 3 and ConversationAssistantMessage includes playback_sequence tag 5."
+    },
+    {
+      "path": "api/assistant-api/internal/type/packet.go",
+      "lines": "1335-1344",
+      "evidence": "PlaybackCompletedPacket carries PlaybackSequence alongside ContextID and timestamps."
+    },
+    {
+      "path": "api/assistant-api/internal/adapters/internal/stream.go",
+      "lines": "49-61",
+      "evidence": "ConversationPlaybackComplete is received synchronously and mapped to PlaybackCompletedPacket with PlaybackSequence preserved."
+    },
+    {
+      "path": "api/assistant-api/internal/adapters/internal/dispatch_handler.go",
+      "lines": "1320-1341",
+      "evidence": "Playback receipts remain diagnostic and include playback_sequence in the playback.completed event attributes."
+    },
+    {
+      "path": "api/assistant-api/internal/channel/grpc/streamer.go",
+      "lines": "184-185,193-248",
+      "evidence": "gRPC Recv returns ConversationPlaybackComplete and Send wraps playback controls and assistant messages without replacing sequence fields."
+    },
+    {
+      "path": "api/assistant-api/internal/channel/webrtc/audio_buffer.go",
+      "lines": "75-117,150-200",
+      "evidence": "WebRTC allocates OutputPlayback by context and sequence, stores that pointer on queued audio and terminal frames, and fences mismatched stale terminals."
+    },
+    {
+      "path": "api/assistant-api/internal/channel/webrtc/streamer.go",
+      "lines": "1204-1305,1565-1620",
+      "evidence": "WebRTC marks playback failed on write, generation, session, and flush failures and emits completion only when the stored playback was sent and not failed."
+    },
+    {
+      "path": "api/assistant-api/internal/channel/telephony/internal/media/session.go",
+      "lines": "73-125,176-195,300-329,377-382",
+      "evidence": "Telephony queues responses by id plus sequence, flushes pending response state, records failed sends, and emits completion with the stored playback_sequence only after a sent response drains."
+    },
+    {
+      "path": "api/assistant-api/internal/channel/telephony/internal/sip/streamer.go",
+      "lines": "43-48,272-308,408-460",
+      "evidence": "SIP stores playback_sequence with pending pre-answer assistant audio and replays pending frames before live audio can proceed."
+    },
+    {
+      "path": "api/assistant-api/internal/channel/telephony/internal/sip/media_port.go",
+      "lines": "198-202",
+      "evidence": "SIP MediaPort rejects assistant audio during closed or transfer-active states and passes playback_sequence into MediaSession."
+    }
+  ],
+  "verification": [
+    {
+      "command": "git diff --check -- protos/artifacts/talk-api.proto protos/talk-api.pb.go api/document-api/app/bridges/artifacts/protos/talk_api_pb2.py api/document-api/app/bridges/artifacts/protos/talk_api_pb2.pyi api/assistant-api/internal/type api/assistant-api/internal/adapters/internal api/assistant-api/internal/channel/grpc api/assistant-api/internal/channel/webrtc api/assistant-api/internal/channel/telephony/internal/media api/assistant-api/internal/channel/telephony/internal/sip api/assistant-api/internal/channel/telephony/internal/twilio/internal rfcs/0018-message-playback-completion/jsons",
+      "result": "passed"
+    },
+    {
+      "command": "go test -count=1 -timeout=180s ./api/assistant-api/internal/type ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/channel/grpc ./api/assistant-api/internal/channel/webrtc/... ./api/assistant-api/internal/channel/telephony/internal/media ./api/assistant-api/internal/channel/telephony/internal/sip ./api/assistant-api/internal/channel/telephony/internal/twilio/internal",
+      "result": "passed",
+      "notes": "Local linker emitted duplicate rpath and duplicate library warnings."
+    },
+    {
+      "command": "go test -race -count=1 -timeout=180s ./api/assistant-api/internal/channel/webrtc/... ./api/assistant-api/internal/channel/telephony/internal/media ./api/assistant-api/internal/channel/telephony/internal/sip",
+      "result": "passed",
+      "notes": "Local linker emitted duplicate rpath, duplicate library, and malformed LC_DYSYMTAB warnings."
+    },
+    {
+      "command": "go test -race -count=1 -timeout=180s ./api/assistant-api/internal/type ./api/assistant-api/internal/adapters/internal ./api/assistant-api/internal/channel/grpc",
+      "result": "passed",
+      "notes": "Local linker emitted duplicate rpath, duplicate library, and malformed LC_DYSYMTAB warnings."
+    }
+  ],
+  "residualRisk": [
+    "Producer closure, synthesis sequence assignment, playback-driven idle activation, and completion metric timing are deliberately deferred by this phase and were not reviewed as required behavior.",
+    "Parent remains responsible for the full channel and adapter race suite plus exact agent-finalize."
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "en": {
+    "requested_revision": "v1.2.2-en",
+    "commit": "ebcab0c09c2b62d926e92180d364df3aaae68a09",
+    "config_url": "https://huggingface.co/livekit/turn-detector/resolve/ebcab0c09c2b62d926e92180d364df3aaae68a09/tokenizer_config.json",
+    "config_sha256": "d396075fb874a5344ce13dbfcdc0e7fb64605c676b47ff8d982e2be468a75e20",
+    "chat_template": "{% for message in messages %}{{'<|im_start|>' + '<|' + message['role'] + '|>' + message['content'] + '<|im_end|>'}}{% endfor %}",
+    "tokenizer_class": "GPT2Tokenizer",
+    "tokenizer_git_blob": "e5e872187cde5896bbcc1f0bcff0274076b03431",
+    "model_sha256": "fdd695a99bda01155fb0b5ce71d34cb9fd3902c62496db7a6c2c7bdeac310ac7"
+  },
+  "multilingual": {
+    "requested_revision": "v0.4.1-intl",
+    "commit": "87e35fcb1e60a569bea70346191c4886ea92e281",
+    "config_url": "https://huggingface.co/livekit/turn-detector/resolve/87e35fcb1e60a569bea70346191c4886ea92e281/tokenizer_config.json",
+    "config_sha256": "83df6c86106c7f332995b3c456bc6a424cc46ee348bf4e0ae1b5410c63f4393f",
+    "chat_template": "{% for message in messages %}{{'<|im_start|>' + message.role + '\n' + message.content + '<|im_end|>' + '\n' }}{% endfor %}",
+    "tokenizer_class": "Qwen2Tokenizer",
+    "tokenizer_git_blob": "51ebb3ba93988c73bbd83a3c163a14343fbc5b06",
+    "model_sha256": "bd2c30776882138a1d95a07faddc13756fe1a35bef6323505f1124fca349bc9c"
+  }
+}

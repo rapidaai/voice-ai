@@ -13,7 +13,7 @@ import (
 
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
-	internal_outbound "github.com/rapidaai/api/assistant-api/sip/internal/outbound"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 )
 
 // outboundDialog owns SIP dialog signaling for an outbound INVITE.
@@ -43,25 +43,25 @@ func (dialog *outboundDialog) Invite(ctx context.Context, sdpOffer string) error
 	}
 	callID := dialog.session.GetCallID()
 	if callID == "" {
-		return fmt.Errorf("%w: outbound call ID is required", ErrInvalidConfig)
+		return fmt.Errorf("%w: outbound call ID is required", sip_config.ErrInvalidConfig)
 	}
 
 	recipient := sip.Uri{
-		Scheme: internal_outbound.SIPScheme(internal_outbound.Transport(dialog.request.Config.Transport)),
+		Scheme: sipScheme(dialog.request.Config.Transport),
 		Host:   dialog.request.Config.Address,
 		Port:   dialog.request.Config.Port,
-		User:   dialog.request.Identity.ToUser,
+		User:   dialog.request.Address.To,
 	}
-	if dialog.request.Config.Transport == TransportTLS || dialog.request.Config.Transport == TransportTCP {
+	if dialog.request.Config.Transport == sip_config.TransportTLS || dialog.request.Config.Transport == sip_config.TransportTCP {
 		if recipient.UriParams == nil {
 			recipient.UriParams = sip.NewParams()
 		}
 		recipient.UriParams.Add("transport", string(dialog.request.Config.Transport))
 	}
 
-	inviteHeaders, err := internal_outbound.BuildInviteHeaders(outboundDialogRequestToSignaling(dialog.request))
+	inviteHeaders, err := buildInviteHeaders(dialog.request)
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrInvalidConfig, err)
+		return fmt.Errorf("%w: %w", sip_config.ErrInvalidConfig, err)
 	}
 	callIDHeader := sip.CallIDHeader(callID)
 	inviteHeaders = append(inviteHeaders, &callIDHeader)
@@ -129,8 +129,8 @@ func (dialog *outboundDialog) AckAnswer(ctx context.Context) error {
 	if dialog.dialogSession == nil || dialog.dialogSession.InviteRequest == nil || dialog.dialogSession.InviteResponse == nil {
 		return fmt.Errorf("outbound answered dialog is not available")
 	}
-	internal_outbound.NormalizeDialogRouteSet(dialog.dialogSession)
-	ackRequest := internal_outbound.NewAckRequest(dialog.dialogSession.InviteRequest, dialog.dialogSession.InviteResponse)
+	normalizeDialogRouteSet(dialog.dialogSession)
+	ackRequest := newAckRequest(dialog.dialogSession.InviteRequest, dialog.dialogSession.InviteResponse)
 	return dialog.dialogSession.WriteAck(ctx, ackRequest)
 }
 
@@ -138,7 +138,7 @@ func (dialog *outboundDialog) CancelBeforeAnswer(ctx context.Context) error {
 	if dialog.dialogSession == nil || dialog.dialogSession.InviteRequest == nil {
 		return nil
 	}
-	_, err := internal_outbound.SendCancel(ctx, dialog.dialogSession, dialog.dialogSession.InviteRequest)
+	_, err := sendCancel(ctx, dialog.dialogSession, dialog.dialogSession.InviteRequest)
 	return err
 }
 
@@ -149,8 +149,8 @@ func (dialog *outboundDialog) SendBye(ctx context.Context) error {
 	if dialog.dialogSession.InviteRequest == nil || dialog.dialogSession.InviteResponse == nil {
 		return dialog.dialogSession.Bye(ctx)
 	}
-	internal_outbound.NormalizeDialogRouteSet(dialog.dialogSession)
-	byeRequest := internal_outbound.NewByeRequest(dialog.dialogSession.InviteRequest, dialog.dialogSession.InviteResponse)
+	normalizeDialogRouteSet(dialog.dialogSession)
+	byeRequest := newByeRequest(dialog.dialogSession.InviteRequest, dialog.dialogSession.InviteResponse)
 	return dialog.dialogSession.WriteBye(ctx, byeRequest)
 }
 
@@ -196,20 +196,4 @@ func (dialog *outboundDialog) InviteResponse() *sip.Response {
 		return nil
 	}
 	return dialog.dialogSession.InviteResponse
-}
-
-func outboundDialogRequestToSignaling(request OutboundInviteRequest) internal_outbound.InviteRequest {
-	return internal_outbound.InviteRequest{
-		Config: internal_outbound.Config{
-			Address:   request.Config.Address,
-			Port:      request.Config.Port,
-			Transport: internal_outbound.Transport(request.Config.Transport),
-			Domain:    request.Config.Domain,
-			Headers:   request.Config.Headers,
-		},
-		Identity: internal_outbound.Identity{
-			ToUser:   request.Identity.ToUser,
-			FromUser: request.Identity.FromUser,
-		},
-	}
 }
