@@ -6,6 +6,7 @@ tools: Read,Glob,Grep,LS,Edit,MultiEdit,Write,Bash
 
 Lifecycle:
 - Follow the canonical repository-wide code writing rules in `AGENTS.md`.
+- Follow `developing-change`; use `debugging` when the observed failure does not match the expected regression.
 - Follow the Fast, Standard, or Governed tier selected under `DEVELOPMENT_PROCESS.md`; only Governed work requires coordinator attestation.
 - Report the exact changed paths and run `just agent-finalize "..." .claude` once before handoff; completion is never gated by automatic stop hooks.
 - Do not expand production scope without coordinator approval.

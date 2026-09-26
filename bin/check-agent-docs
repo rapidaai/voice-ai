@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+"""Validate agent-document references and skill metadata."""
+
+from __future__ import annotations
+
+import argparse
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+
+MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+JUST_COMMAND = re.compile(r"`just\s+([a-zA-Z0-9][a-zA-Z0-9_-]*)")
+CODE_SPAN = re.compile(r"`([^`]+)`")
+REPOSITORY_PATH_PREFIXES = (
+    ".claude/",
+    ".codex/",
+    ".github/",
+    "api/",
+    "bin/",
+    "cmd/",
+    "docs/",
+    "githooks/",
+    "just/",
+    "pkg/",
+    "rfcs/",
+    "skills/",
+    "tests/",
+    "ui/",
+    "agent-rules.json",
+    "agent-reviewers.example.json",
+    "agent-tooling-manifest.json",
+)
+
+
+def markdown_files(root: Path) -> list[Path]:
+    files = [
+        root / "AGENTS.md",
+        root / "CLAUDE.md",
+        root / "DEVELOPMENT_PROCESS.md",
+        root / "SKILLS_QUICKSTART.md",
+        root / "bin" / "README.md",
+        root / "AGENT_TOOLING.md",
+        root / "AGENT_LESSONS.md",
+        root / "githooks" / "README.md",
+    ]
+    result = subprocess.run(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
+        cwd=root,
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    if result.returncode == 0:
+        files.extend(
+            root / item
+            for item in result.stdout.splitlines()
+            if item.endswith(".md")
+            and (
+                item.startswith((".codex/", ".claude/"))
+                or Path(item).name in {"AGENTS.md", "CLAUDE.md"}
+            )
+        )
+    else:
+        for folder in (root / ".codex", root / ".claude"):
+            if folder.is_dir():
+                files.extend(folder.rglob("*.md"))
+    return sorted({path for path in files if path.is_file()})
+
+
+def target_path(source: Path, raw_target: str) -> Path | None:
+    target = raw_target.strip().strip("<>").split("#", 1)[0]
+    if not target or target.startswith(("#", "http://", "https://", "mailto:")):
+        return None
+    if any(marker in target for marker in ("<", ">", "*", "{")):
+        return None
+    candidate = Path(target)
+    return candidate if candidate.is_absolute() else source.parent / candidate
+
+
+def just_recipes(root: Path) -> set[str]:
+    if not (root / "justfile").is_file():
+        return set()
+    result = subprocess.run(
+        ["just", "--summary"],
+        cwd=root,
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or "just --summary failed")
+    return set(result.stdout.split())
+
+
+def validate(root: Path) -> list[str]:
+    failures: list[str] = []
+    files = markdown_files(root)
+
+    for path in files:
+        text = path.read_text(encoding="utf-8")
+        relative = path.relative_to(root)
+        if path.name == "SKILL.md":
+            match = re.search(r"(?m)^name:\s*([^\s]+)\s*$", text)
+            expected = path.parent.name
+            if match is None:
+                failures.append(f"{relative}: missing skill name")
+            elif match.group(1) != expected:
+                failures.append(f"{relative}: skill name {match.group(1)!r} must match {expected!r}")
+
+        for raw_target in MARKDOWN_LINK.findall(text):
+            candidate = target_path(path, raw_target)
+            if candidate is not None and not candidate.exists():
+                failures.append(f"{relative}: missing link target {raw_target}")
+
+        for value in CODE_SPAN.findall(text):
+            words = value.strip().split(maxsplit=1)
+            if not words:
+                continue
+            command_or_path = words[0].removeprefix("./")
+            repository_path = re.sub(r":\d+$", "", command_or_path.rstrip(".,;:"))
+            if not repository_path.startswith(REPOSITORY_PATH_PREFIXES):
+                continue
+            if any(marker in repository_path for marker in (" ", "<", ">", "*", "{", "$", "NNNN", "acme_", "acme-")):
+                continue
+            if not (root / repository_path).exists():
+                failures.append(f"{relative}: missing repository path {repository_path}")
+
+    try:
+        recipes = just_recipes(root)
+    except (OSError, RuntimeError) as error:
+        failures.append(f"justfile: cannot enumerate recipes: {error}")
+        recipes = set()
+
+    if recipes:
+        for path in files:
+            text = path.read_text(encoding="utf-8")
+            relative = path.relative_to(root)
+            for recipe in JUST_COMMAND.findall(text):
+                if recipe not in recipes:
+                    failures.append(f"{relative}: unknown just recipe {recipe}")
+
+    codex_skills = {path.parent.name for path in (root / ".codex" / "skills").glob("*/SKILL.md")}
+    claude_skills = {path.parent.name for path in (root / ".claude" / "skills").glob("*/SKILL.md")}
+    if codex_skills != claude_skills:
+        failures.append("Codex and Claude skill names differ")
+
+    return failures
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent)
+    args = parser.parse_args()
+    root = args.root.resolve()
+    failures = validate(root)
+    if failures:
+        for failure in failures:
+            print(f"agent docs: {failure}", file=sys.stderr)
+        return 1
+    print(f"agent documentation validation passed ({len(markdown_files(root))} files)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

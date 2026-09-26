@@ -225,10 +225,9 @@ describe('Authentication pages', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: 'Signin' }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Sign-up' })).toHaveAttribute(
-      'href',
-      '/auth/signup',
-    );
+    const signUpLink = screen.getByRole('link', { name: 'Sign-up' });
+    expect(signUpLink).toHaveAttribute('href', '/auth/signup');
+    expect(signUpLink).toHaveClass('!underline');
     expect(
       screen.getByRole('link', { name: "Can't sign in?" }),
     ).toHaveAttribute('href', '/auth/forgot-password');

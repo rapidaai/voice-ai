@@ -1,0 +1,159 @@
+#!/usr/bin/env python3
+"""Validate pull request titles and repository template sections."""
+
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+from pathlib import Path
+
+
+REQUIRED_SECTIONS = (
+    "Summary",
+    "Approved Plan",
+    "RFC Confirmation",
+    "Principles",
+    "Testing",
+    "Independent Code Review",
+    "Checklist",
+)
+VALID_TYPES = (
+    "feat",
+    "fix",
+    "docs",
+    "style",
+    "refactor",
+    "perf",
+    "test",
+    "build",
+    "ci",
+    "chore",
+    "revert",
+    "security",
+)
+
+
+def visible_text(value: str) -> str:
+    return re.sub(r"<!--.*?-->", "", value, flags=re.DOTALL).strip()
+
+
+def sections(body: str) -> tuple[dict[str, str], list[str]]:
+    matches = list(re.finditer(r"(?m)^## ([^\n]+)\s*$", body))
+    found: dict[str, str] = {}
+    order: list[str] = []
+    for index, match in enumerate(matches):
+        name = match.group(1).strip()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(body)
+        found[name] = body[match.end() : end]
+        order.append(name)
+    return found, order
+
+
+def field_value(section: str, label: str) -> str | None:
+    match = re.search(rf"(?m)^- {re.escape(label)}:[ \t]*(.*?)[ \t]*$", visible_text(section))
+    return match.group(1).strip() if match is not None else None
+
+
+def validate_title(title: str) -> list[str]:
+    failures: list[str] = []
+    if not title:
+        return ["title is required"]
+    if len(title) > 100:
+        failures.append("title must be 100 characters or fewer")
+    type_pattern = "|".join(VALID_TYPES)
+    match = re.fullmatch(rf"(?:{type_pattern})(?:\([a-z0-9._/-]+\))?: ([^\n]+)", title)
+    if match is None:
+        failures.append("title must use the repository Conventional Commit format")
+        return failures
+    subject = match.group(1)
+    if subject[:1] != subject[:1].lower():
+        failures.append("title subject must start with a lower-case character")
+    if subject.endswith("."):
+        failures.append("title must not end with a period")
+    return failures
+
+
+def validate_body(body: str) -> list[str]:
+    failures: list[str] = []
+    found, order = sections(body)
+    for name in REQUIRED_SECTIONS:
+        if name not in found:
+            failures.append(f"missing section: {name}")
+    present_required = [name for name in order if name in REQUIRED_SECTIONS]
+    if present_required != [name for name in REQUIRED_SECTIONS if name in found]:
+        failures.append("required sections are out of order")
+    if failures:
+        return failures
+
+    summary = visible_text(found["Summary"])
+    tier_match = re.search(r"(?m)^- Workflow tier:\s*(Fast|Standard|Governed)\s*$", summary)
+    if tier_match is None:
+        failures.append("Summary must select one workflow tier")
+    summary_without_tier = re.sub(r"(?m)^- Workflow tier:.*$", "", summary).strip()
+    if not summary_without_tier:
+        failures.append("Summary must explain what changed and why")
+
+    for name in ("Approved Plan", "Principles", "Testing", "Independent Code Review"):
+        if not visible_text(found[name]):
+            failures.append(f"section has no content: {name}")
+
+    required_fields = {
+        "Approved Plan": ("Acceptance criteria", "In scope", "Out of scope", "Ownership", "Rollback or disablement"),
+        "RFC Confirmation": ("Accepted RFC", "Confirmed SHA-256"),
+        "Principles": (
+            "KISS / smallest complete solution",
+            "YAGNI / rejected speculation",
+            "Single source of truth and ownership",
+            "Contracts and compatibility",
+            "Failure safety and cleanup",
+            "Security and least privilege",
+            "Observability",
+        ),
+        "Independent Code Review": ("Reviewer", "Decision"),
+    }
+    for section_name, labels in required_fields.items():
+        for label in labels:
+            if not field_value(found[section_name], label):
+                failures.append(f"{section_name} must provide {label}")
+
+    checklist = visible_text(found["Checklist"])
+    if "- [" not in checklist:
+        failures.append("Checklist must retain the repository checklist")
+
+    if tier_match is not None and tier_match.group(1) == "Governed":
+        rfc = visible_text(found["RFC Confirmation"])
+        if not re.search(r"(?m)^- Accepted RFC:\s*(?!N/A\s*$)\S+", rfc):
+            failures.append("Governed work must identify the accepted RFC")
+        if not re.search(r"(?m)^- Confirmed SHA-256:\s*(?!N/A\s*$)[0-9a-fA-F]{64}\s*$", rfc):
+            failures.append("Governed work must include the confirmed RFC SHA-256")
+    return failures
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    body_group = parser.add_mutually_exclusive_group(required=True)
+    body_group.add_argument("--body-file", type=Path)
+    body_group.add_argument("--title-only", action="store_true")
+    parser.add_argument("--title", required=True)
+    args = parser.parse_args()
+
+    failures = validate_title(args.title)
+    if args.body_file is not None:
+        try:
+            body = args.body_file.read_text(encoding="utf-8")
+        except OSError as error:
+            failures.append(f"cannot read body file: {error}")
+        else:
+            failures.extend(validate_body(body))
+
+    if failures:
+        for failure in failures:
+            print(f"PR policy: {failure}", file=sys.stderr)
+        return 1
+    print("PR title and body satisfy repository policy")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

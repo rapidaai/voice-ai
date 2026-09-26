@@ -1,0 +1,380 @@
+#!/usr/bin/env python3
+"""Run one or more configured independent reviewers against a filtered diff."""
+
+from __future__ import annotations
+
+import argparse
+import difflib
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+VALID_DECISIONS = {"approve", "revise", "block"}
+VALID_SEVERITIES = {"critical", "major", "minor", "note"}
+ID_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+MAX_REVIEW_BYTES = 2 * 1024 * 1024
+
+
+@dataclass(frozen=True)
+class Reviewer:
+    reviewer_id: str
+    model_family: str
+    transport: str
+    input_mode: str
+    command: tuple[str, ...]
+    timeout_seconds: int
+
+
+def repository_root() -> Path:
+    return Path(__file__).resolve().parent.parent
+
+
+def command_output(root: Path, arguments: list[str]) -> str:
+    result = subprocess.run(arguments, cwd=root, capture_output=True, check=False, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or f"command failed: {' '.join(arguments)}")
+    return result.stdout
+
+
+def load_reviewers(path: Path) -> list[Reviewer]:
+    document = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(document, dict) or document.get("version") != 1:
+        raise ValueError("reviewer configuration must be a version 1 object")
+    entries = document.get("reviewers")
+    if not isinstance(entries, list):
+        raise ValueError("reviewer configuration must contain a reviewers array")
+
+    reviewers: list[Reviewer] = []
+    seen: set[str] = set()
+    for index, entry in enumerate(entries):
+        label = f"reviewers[{index}]"
+        if not isinstance(entry, dict):
+            raise ValueError(f"{label} must be an object")
+        if entry.get("enabled", True) is False:
+            continue
+        reviewer_id = entry.get("id")
+        family = entry.get("model_family")
+        transport = entry.get("transport")
+        input_mode = entry.get("input")
+        command = entry.get("command")
+        timeout = entry.get("timeout_seconds", 600)
+        if not isinstance(reviewer_id, str) or ID_PATTERN.fullmatch(reviewer_id) is None or reviewer_id in seen:
+            raise ValueError(f"{label} has an invalid or duplicate id")
+        if not isinstance(family, str) or ID_PATTERN.fullmatch(family) is None:
+            raise ValueError(f"{label} has an invalid model_family")
+        if transport not in {"local", "external"}:
+            raise ValueError(f"{label} transport must be local or external")
+        if input_mode not in {"stdin", "file"}:
+            raise ValueError(f"{label} input must be stdin or file")
+        if not isinstance(command, list) or not command or not all(isinstance(item, str) and item for item in command):
+            raise ValueError(f"{label} command must be a non-empty string array")
+        if input_mode == "file" and not any("{prompt_file}" in item for item in command):
+            raise ValueError(f"{label} file input requires a prompt_file placeholder")
+        if not isinstance(timeout, int) or not 1 <= timeout <= 1800:
+            raise ValueError(f"{label} timeout_seconds must be between 1 and 1800")
+        reviewers.append(Reviewer(reviewer_id, family, transport, input_mode, tuple(command), timeout))
+        seen.add(reviewer_id)
+    return reviewers
+
+
+def select_reviewers(reviewers: list[Reviewer], risk: str) -> list[Reviewer]:
+    minimum = 2 if risk == "high" else 1
+    if len(reviewers) < minimum:
+        raise ValueError(f"{risk} review requires at least {minimum} enabled reviewer(s)")
+    if risk == "high" and len({reviewer.model_family for reviewer in reviewers}) < 2:
+        raise ValueError("high review requires at least two distinct model families")
+    return reviewers
+
+
+def resolve_base(root: Path, base: str) -> str:
+    candidates = [base] if "/" in base else [f"origin/{base}", base]
+    for candidate in candidates:
+        result = subprocess.run(
+            ["git", "rev-parse", "--verify", "--quiet", f"{candidate}^{{commit}}"],
+            cwd=root,
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+        if result.returncode == 0:
+            return candidate
+    raise ValueError(f"base revision does not exist: {base}")
+
+
+def untracked_diff(root: Path) -> str:
+    names = command_output(root, ["git", "ls-files", "--others", "--exclude-standard", "-z"])
+    sections: list[str] = []
+    for name in names.rstrip("\0").split("\0") if names else []:
+        source = root / name
+        try:
+            content = source.read_text(encoding="utf-8").splitlines(keepends=True)
+        except UnicodeDecodeError:
+            sections.extend(
+                [
+                    f"diff --git a/{name} b/{name}",
+                    f"Binary files /dev/null and b/{name} differ",
+                ]
+            )
+            continue
+        except OSError:
+            continue
+        sections.append(f"diff --git a/{name} b/{name}")
+        sections.extend(difflib.unified_diff([], content, fromfile="/dev/null", tofile=f"b/{name}", lineterm=""))
+    return "\n".join(sections)
+
+
+def candidate_diff(root: Path, base: str, working_tree: bool) -> tuple[str, str]:
+    if working_tree:
+        tracked = command_output(root, ["git", "diff", "--no-ext-diff", "--no-color", "HEAD", "--"])
+        content = tracked + ("\n" if tracked else "") + untracked_diff(root)
+        return "working-tree against HEAD", content
+    selected = resolve_base(root, base)
+    merge_base = command_output(root, ["git", "merge-base", "HEAD", selected]).strip()
+    revision_range = f"{merge_base}...HEAD"
+    return revision_range, command_output(
+        root,
+        ["git", "diff", "--no-ext-diff", "--no-color", revision_range, "--"],
+    )
+
+
+def review_prompt(boundary: str, filtered_diff: str) -> str:
+    return f"""You are an independent, read-only code reviewer.
+Review boundary: {boundary}
+
+Check correctness, ownership, compatibility, security, failure behavior, cleanup, tests, and scope.
+Return only one JSON object with this shape:
+{{
+  "decision": "approve|revise|block",
+  "summary": "concise evidence-based summary",
+  "findings": [
+    {{
+      "severity": "critical|major|minor|note",
+      "location": "path:line",
+      "message": "concrete defect and consequence",
+      "evidence": "supporting evidence",
+      "remedy": "smallest safe remedy"
+    }}
+  ]
+}}
+Do not modify files and do not report speculative defects.
+
+Filtered candidate diff:
+{filtered_diff}
+"""
+
+
+def validate_response(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise ValueError("review response must be a JSON object")
+    decision = value.get("decision")
+    summary = value.get("summary")
+    findings = value.get("findings")
+    if decision not in VALID_DECISIONS:
+        raise ValueError("review decision must be approve, revise, or block")
+    if not isinstance(summary, str) or not summary.strip():
+        raise ValueError("review summary is required")
+    if not isinstance(findings, list):
+        raise ValueError("review findings must be an array")
+    for index, finding in enumerate(findings):
+        if not isinstance(finding, dict):
+            raise ValueError(f"finding {index} must be an object")
+        if finding.get("severity") not in VALID_SEVERITIES:
+            raise ValueError(f"finding {index} has an invalid severity")
+        for field in ("location", "message", "evidence", "remedy"):
+            if not isinstance(finding.get(field), str) or not finding[field].strip():
+                raise ValueError(f"finding {index} must provide {field}")
+    if decision == "approve" and any(finding.get("severity") in {"critical", "major"} for finding in findings):
+        raise ValueError("an approving review cannot contain a critical or major finding")
+    return value
+
+
+def executable_available(root: Path, command: str) -> bool:
+    candidate = Path(command)
+    if candidate.is_absolute():
+        return candidate.is_file() and os.access(candidate, os.X_OK)
+    if "/" in command:
+        target = root / candidate
+        return target.is_file() and os.access(target, os.X_OK)
+    return shutil.which(command) is not None
+
+
+def run_reviewer(root: Path, reviewer: Reviewer, prompt_path: Path, allow_external: bool) -> dict[str, object]:
+    if reviewer.transport == "external" and not allow_external:
+        raise ValueError(f"reviewer {reviewer.reviewer_id} requires --allow-external")
+    if not executable_available(root, reviewer.command[0]):
+        raise ValueError(f"reviewer command is unavailable: {reviewer.command[0]}")
+    command = [item.replace("{prompt_file}", str(prompt_path)) for item in reviewer.command]
+    prompt = prompt_path.read_text(encoding="utf-8") if reviewer.input_mode == "stdin" else None
+    result = subprocess.run(
+        command,
+        cwd=root,
+        input=prompt,
+        capture_output=True,
+        check=False,
+        text=True,
+        timeout=reviewer.timeout_seconds,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"reviewer {reviewer.reviewer_id} failed with {result.returncode}: {result.stderr.strip()[-1000:]}"
+        )
+    try:
+        response = validate_response(json.loads(result.stdout))
+    except (json.JSONDecodeError, ValueError) as error:
+        raise ValueError(f"reviewer {reviewer.reviewer_id} returned an invalid response: {error}") from error
+    return {
+        "id": reviewer.reviewer_id,
+        "model_family": reviewer.model_family,
+        "transport": reviewer.transport,
+        **response,
+    }
+
+
+def panel_decision(reviews: list[dict[str, object]]) -> str:
+    decisions = {str(review["decision"]) for review in reviews}
+    if "block" in decisions:
+        return "block"
+    if "revise" in decisions:
+        return "revise"
+    return "approve"
+
+
+def markdown_panel(report: dict[str, object]) -> str:
+    lines = [
+        "# Independent Review Panel",
+        "",
+        f"- Boundary: `{report['boundary']}`",
+        f"- Risk: {report['risk']}",
+        f"- Decision: {report['decision']}",
+        f"- Diff SHA-256: `{report['diff_sha256']}`",
+        "",
+        "| Reviewer | Model family | Transport | Decision | Summary |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for review in report["reviews"]:
+        assert isinstance(review, dict)
+        values = [
+            review.get("id", ""),
+            review.get("model_family", ""),
+            review.get("transport", ""),
+            review.get("decision", ""),
+            review.get("summary", ""),
+        ]
+        escaped = [str(value).replace("|", "\\|").replace("\n", " ") for value in values]
+        lines.append("| " + " | ".join(escaped) + " |")
+    lines.extend(["", "## Findings", ""])
+    finding_count = 0
+    for review in report["reviews"]:
+        assert isinstance(review, dict)
+        for finding in review.get("findings", []):
+            assert isinstance(finding, dict)
+            finding_count += 1
+            lines.extend(
+                [
+                    f"### {finding.get('severity', 'note').title()}: {finding.get('location', 'unknown')}",
+                    "",
+                    str(finding.get("message", "")),
+                    "",
+                    f"Evidence: {finding.get('evidence', '')}",
+                    "",
+                    f"Remedy: {finding.get('remedy', '')}",
+                    "",
+                ]
+            )
+    if finding_count == 0:
+        lines.append("No findings reported.")
+    return "\n".join(lines) + "\n"
+
+
+def write_report(root: Path, output: Path, report: dict[str, object]) -> None:
+    target = output if output.is_absolute() else root / output
+    if target.is_symlink():
+        raise ValueError("review output must not be a symlink")
+    target = target.resolve()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    target.with_suffix(".md").write_text(markdown_panel(report), encoding="utf-8")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=Path, default=Path(".agent-reviewers.json"))
+    parser.add_argument("--base", default="main")
+    parser.add_argument("--working-tree", action="store_true")
+    parser.add_argument("--risk", choices=("standard", "high"), default="standard")
+    parser.add_argument("--output", type=Path, default=Path(".agent-reviews/review.json"))
+    parser.add_argument("--allow-external", action="store_true")
+    parser.add_argument("--check", action="store_true")
+    args = parser.parse_args()
+    root = repository_root()
+    config = args.config if args.config.is_absolute() else root / args.config
+    try:
+        reviewers = select_reviewers(load_reviewers(config), args.risk)
+        for reviewer in reviewers:
+            if not executable_available(root, reviewer.command[0]):
+                raise ValueError(f"reviewer command is unavailable: {reviewer.command[0]}")
+        if args.check:
+            print(f"review configuration passed ({len(reviewers)} reviewer(s))")
+            return 0
+
+        boundary, raw_diff = candidate_diff(root, args.base, args.working_tree)
+        if not raw_diff.strip():
+            raise ValueError(f"review boundary has no changes: {boundary}")
+        if len(raw_diff.encode("utf-8")) > MAX_REVIEW_BYTES:
+            raise ValueError("review diff exceeds the 2 MiB limit; split the review boundary")
+        initial_status = command_output(root, ["git", "status", "--porcelain=v1", "--untracked-files=all"])
+        with tempfile.TemporaryDirectory(prefix="voice-ai-review-") as directory:
+            temporary = Path(directory)
+            raw_path = temporary / "candidate.diff"
+            filtered_path = temporary / "candidate.filtered.diff"
+            prompt_path = temporary / "review-prompt.txt"
+            raw_path.write_text(raw_diff, encoding="utf-8")
+            filtered = subprocess.run(
+                [str(root / "bin/agent-egress"), "diff", str(raw_path), str(filtered_path)],
+                cwd=root,
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+            if filtered.returncode != 0:
+                raise RuntimeError(filtered.stderr.strip() or "egress filtering failed")
+            safe_diff = filtered_path.read_text(encoding="utf-8")
+            egress_manifest = json.loads(
+                filtered_path.with_name(filtered_path.name + ".manifest.json").read_text(encoding="utf-8")
+            )
+            if egress_manifest.get("redacted_lines") or egress_manifest.get("withheld"):
+                raise ValueError("egress filtering removed candidate content; a complete automated review is not possible")
+            prompt_path.write_text(review_prompt(boundary, safe_diff), encoding="utf-8")
+            reviews = [run_reviewer(root, reviewer, prompt_path, args.allow_external) for reviewer in reviewers]
+        final_status = command_output(root, ["git", "status", "--porcelain=v1", "--untracked-files=all"])
+        if final_status != initial_status:
+            raise RuntimeError("candidate changed while reviewers were running; discard the review and inspect the worktree")
+        report: dict[str, object] = {
+            "version": 1,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "boundary": boundary,
+            "risk": args.risk,
+            "diff_sha256": hashlib.sha256(raw_diff.encode("utf-8")).hexdigest(),
+            "egress": egress_manifest,
+            "decision": panel_decision(reviews),
+            "reviews": reviews,
+        }
+        write_report(root, args.output, report)
+    except (OSError, ValueError, RuntimeError, json.JSONDecodeError, subprocess.TimeoutExpired) as error:
+        print(f"agent review: {error}", file=sys.stderr)
+        return 2
+    print(f"agent review panel: {report['decision']} ({len(reviews)} reviewer(s))")
+    return 0 if report["decision"] == "approve" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

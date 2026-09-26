@@ -1,0 +1,3 @@
+display_name: Change Analysis
+short_description: Trace current behavior, ownership, consumers, and risk before editing.
+default_prompt: Use change-analysis read-only. Ground every material claim in code, tests, history, or a command result. Recommend a lifecycle tier and explicit scope, but do not implement or self-approve the plan.

@@ -26,4 +26,4 @@
 
 - `go test ./api/assistant-api/internal/transformer/... -run TestSTT`
 - `go test ./api/assistant-api/internal/transformer/acme_stt/...`
-- `./skills/stt-integration/scripts/validate.sh --check-diff --provider acme_stt`
+- `./.codex/skills/stt-integration/scripts/validate.sh --check-diff --provider acme_stt`

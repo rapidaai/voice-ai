@@ -1,0 +1,3 @@
+display_name: Debugging
+short_description: Reproduce failures, test one hypothesis at a time, and prove the root cause.
+default_prompt: Use debugging to reproduce and explain the failure before editing. Respect diagnosis-only requests, add a failing regression test before a requested fix, and do not self-approve any Governed scope amendment.

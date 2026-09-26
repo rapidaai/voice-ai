@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+base_ref="${1:-main}"
+if [[ "$base_ref" != */* ]] && git rev-parse --verify --quiet "origin/${base_ref}^{commit}" >/dev/null; then
+  base_ref="origin/$base_ref"
+elif ! git rev-parse --verify --quiet "${base_ref}^{commit}" >/dev/null; then
+  echo "PR gate: base revision does not exist: $base_ref" >&2
+  exit 2
+fi
+
+merge_base="$(git merge-base HEAD "$base_ref")"
+revision_range="${merge_base}...HEAD"
+changed_list="$(git diff --name-only --diff-filter=ACMR "$revision_range")"
+
+if [[ -z "$changed_list" ]]; then
+  echo "PR gate: no committed changes relative to $base_ref" >&2
+  exit 1
+fi
+
+python3 bin/check-agent-style --range "$revision_range"
+just validate-development-toolkit
+
+changed_csv="$(printf '%s\n' "$changed_list" | paste -sd, -)"
+just agent-finalize "$changed_csv" .codex
+just agent-finalize "$changed_csv" .claude
+
+echo "PR readiness checks passed for $revision_range"

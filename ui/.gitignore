@@ -4,6 +4,8 @@ src/styles/generated/tailwindcss.css
 
 .env.local
 coverage
+playwright-report
+test-results
 build
 node_modules
 stats.json

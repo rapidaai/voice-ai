@@ -12,14 +12,16 @@
 
 - Approved plan:
 - Approved plan SHA-256:
-- Diff or commit:
+- Base and merge base:
+- Head or working-tree boundary:
+- Status and changed files:
 - Verification report:
 - Commands reviewed or rerun:
 
 ## Findings
 
-| Severity | Location | Finding | Required action | Status |
-| --- | --- | --- | --- | --- |
+| Severity | Location | Contract and consequence | Evidence | Disposition | Required action |
+| --- | --- | --- | --- | --- | --- |
 
 ## Principle Review
 
@@ -40,4 +42,6 @@
 - Critical open: 0
 - Major open: 0
 - Minor open: 0
+- Candidate unchanged during review: no
+- Residual risks:
 - Notes:

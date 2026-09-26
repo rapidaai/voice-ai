@@ -1,0 +1,146 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "voice-transformers",
+      "title": "Voice transformers",
+      "directories": [
+        "api/assistant-api/internal/transformer"
+      ],
+      "paths": [
+        "api/assistant-api/internal/transformer/**"
+      ],
+      "instructions": [
+        "Activate `system-understanding` and either `stt-integration` or `tts-integration` before changing provider behavior.",
+        "Keep provider implementation under its provider folder and factory selection in `transformer.go`.",
+        "Do not change telephony, VAD, or end-of-speech internals from this path without explicit scope expansion.",
+        "Add package-level success and fallback tests, then run the selected domain validator."
+      ]
+    },
+    {
+      "id": "voice-vad",
+      "title": "Voice activity detection",
+      "directories": [
+        "api/assistant-api/internal/vad"
+      ],
+      "paths": [
+        "api/assistant-api/internal/vad/**"
+      ],
+      "instructions": [
+        "Activate `system-understanding` and `vad-integration` before changing behavior.",
+        "Keep detection and tuning under VAD ownership. Do not move end-of-speech policy into this package.",
+        "Preserve interruption, speech-activity, cancellation, and cleanup contracts.",
+        "Add success, fallback, and provider-selection tests, plus benchmarks when this package already benchmarks the hot path."
+      ]
+    },
+    {
+      "id": "voice-end-of-speech",
+      "title": "End of speech",
+      "directories": [
+        "api/assistant-api/internal/end_of_speech"
+      ],
+      "paths": [
+        "api/assistant-api/internal/end_of_speech/**"
+      ],
+      "instructions": [
+        "Activate `system-understanding` and `end-of-speech-integration` before changing behavior.",
+        "Keep turn-finalization policy under end-of-speech ownership. Do not modify VAD algorithms from this package.",
+        "Preserve deterministic interim and final packet ordering, including exactly-once finalization.",
+        "Add timeout, interruption, fallback, and provider-selection tests."
+      ]
+    },
+    {
+      "id": "voice-denoiser",
+      "title": "Noise reduction",
+      "directories": [
+        "api/assistant-api/internal/denoiser"
+      ],
+      "paths": [
+        "api/assistant-api/internal/denoiser/**"
+      ],
+      "instructions": [
+        "Activate `system-understanding` and `noise-reduction-integration` before changing behavior.",
+        "Keep denoiser lifecycle and packet transformation under this package's ownership.",
+        "Do not modify VAD or end-of-speech algorithms as part of a denoiser change.",
+        "Test provider selection, processing failure fallback, chunk integrity, cancellation, and cleanup."
+      ]
+    },
+    {
+      "id": "voice-telephony",
+      "title": "Telephony",
+      "directories": [
+        "api/assistant-api/internal/channel/telephony"
+      ],
+      "paths": [
+        "api/assistant-api/internal/channel/telephony/**"
+      ],
+      "instructions": [
+        "Activate `system-understanding` and `telephony-integration` before changing behavior.",
+        "Keep transport, webhook, codec, and streamer behavior inside the telephony boundary.",
+        "Do not change transformer, VAD, or end-of-speech internals without explicit scope expansion.",
+        "Test inbound and outbound selection, malformed callbacks, disconnects, codec conversion, and cleanup."
+      ]
+    },
+    {
+      "id": "llm-callers",
+      "title": "LLM callers",
+      "directories": [
+        "api/integration-api/internal/caller"
+      ],
+      "paths": [
+        "api/integration-api/internal/caller/**"
+      ],
+      "instructions": [
+        "Activate `system-understanding` and `llm-integration` before changing provider behavior.",
+        "Keep provider calls under their provider folder and selection policy in the caller factory.",
+        "Preserve streaming completion, cancellation, metric, audit, and error contracts.",
+        "Test success, provider failure, unsupported selection, and streaming completion."
+      ]
+    },
+    {
+      "id": "ui",
+      "title": "User interface",
+      "directories": [
+        "ui/src"
+      ],
+      "paths": [
+        "ui/src/**"
+      ],
+      "instructions": [
+        "Follow nearby component, hook, and test conventions before introducing a new pattern.",
+        "Every behavior change includes a happy-path assertion and a regression or edge assertion.",
+        "Provider configuration changes include config-loader and runtime parity coverage.",
+        "Run focused UI tests, type checks, and applicable lint or contract checks.",
+        "Stable critical route changes run `just ui-browser-test`; update screenshots only after reviewing the rendered difference."
+      ]
+    },
+    {
+      "id": "automation",
+      "title": "Repository automation",
+      "directories": [
+        ".github",
+        "bin",
+        "githooks",
+        "just",
+        "scripts"
+      ],
+      "paths": [
+        ".claude/**",
+        ".codex/**",
+        ".github/**",
+        "AGENT_*.md",
+        "agent-*.json",
+        "bin/**",
+        "githooks/**",
+        "just/**",
+        "scripts/**"
+      ],
+      "instructions": [
+        "Treat automation as an executable supply-chain boundary with least privilege and pinned dependencies.",
+        "Keep commands deterministic, fail closed for release or security decisions, and avoid hidden network access.",
+        "Never add a bypass for required checks. Test both accepted and rejected paths for hooks and guards.",
+        "Update the nearest source of truth, then run agent drift, style, and tooling validation."
+      ]
+    }
+  ]
+}

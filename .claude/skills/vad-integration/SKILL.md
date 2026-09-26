@@ -14,7 +14,7 @@ Implement VAD providers that generate stable interruption/speech-activity signal
 In scope:
 - `api/assistant-api/internal/vad/internal/<provider>/...`
 - `api/assistant-api/internal/vad/vad.go`
-- VAD contract compatibility in `api/assistant-api/internal/type/vad.go` and packet usage as needed
+- VAD contract compatibility in `api/assistant-api/internal/type/executor.go` and packet usage as needed
 - VAD config in `ui/src/providers/<provider>/vad.json`
 
 Out of scope:
@@ -56,6 +56,15 @@ Required outputs:
 - Provider selectable by `microphone.vad.provider`.
 - No edits under EOS provider internals.
 - Interruption and heartbeat semantics proven in tests.
+
+## Lifecycle integration
+
+- `development-lifecycle` owns tier selection and the repository-level change contract.
+- Use `change-analysis` when ownership, consumers, or blast radius is not already proven.
+- This skill owns its domain evidence and boundaries; `developing-change` owns implementation discipline.
+- Use `debugging` for unexplained failures and `writing-documentation` for documentation changes.
+- Use `reviewing-change` for independent review and `responding-to-review` for its findings.
+- Use `preparing-delivery` only when the user explicitly requests a delivery action.
 
 ## Governed lifecycle
 

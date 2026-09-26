@@ -98,7 +98,7 @@ if [[ $check_diff -eq 1 ]]; then
       end-of-speech-integration)
         allowed_patterns+=(
           '^api/assistant-api/internal/end_of_speech/end_of_speech.go$'
-          '^api/assistant-api/internal/type/end_of_speech.go$'
+          '^api/assistant-api/internal/type/executor.go$'
           '^api/assistant-api/internal/type/packet.go$'
           '^api/assistant-api/internal/adapters/internal/dispatch.go$'
           '^api/assistant-api/internal/end_of_speech/internal/'"$provider_re"'/'
@@ -114,7 +114,7 @@ if [[ $check_diff -eq 1 ]]; then
       vad-integration)
         allowed_patterns+=(
           '^api/assistant-api/internal/vad/vad.go$'
-          '^api/assistant-api/internal/type/vad.go$'
+          '^api/assistant-api/internal/type/executor.go$'
           '^api/assistant-api/internal/type/packet.go$'
           '^api/assistant-api/internal/adapters/internal/dispatch.go$'
           '^api/assistant-api/internal/vad/internal/'"$provider_re"'/'

@@ -1,0 +1,3 @@
+display_name: Writing Documentation
+short_description: Write accurate repository documentation from code and runnable evidence.
+default_prompt: Use writing-documentation to verify paths, commands, defaults, and behavior before writing. Update the existing source of truth, distinguish shipped behavior from proposals, and do not self-approve Governed evidence.

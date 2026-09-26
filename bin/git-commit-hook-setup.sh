@@ -8,17 +8,13 @@ echo "> setting up git hooks ..."
 
 git config --local commit.template "$PROJECT_ROOT/githooks/gitmessage.txt"
 git config --local commit.cleanup strip
+git config --local core.hooksPath githooks
 
-if [ -x "$PROJECT_ROOT/bin/pre-commit" ]; then
-  PRE_COMMIT="$PROJECT_ROOT/bin/pre-commit"
-elif command -v pre-commit >/dev/null 2>&1; then
-  PRE_COMMIT="pre-commit"
-else
-  echo "error: pre-commit was not found." >&2
-  echo "Use the checked-in runner at bin/pre-commit or install pre-commit locally." >&2
-  exit 1
-fi
-
-"$PRE_COMMIT" install --install-hooks --hook-type pre-commit --hook-type commit-msg --hook-type pre-push --overwrite
+for hook in pre-commit commit-msg pre-push; do
+  if [[ ! -x "$PROJECT_ROOT/githooks/$hook" ]]; then
+    echo "error: githooks/$hook is missing or not executable." >&2
+    exit 1
+  fi
+done
 
 echo "> git hooks installed successfully"

@@ -1,0 +1,3 @@
+display_name: Developing Change
+short_description: Implement scoped changes with ownership, test-first evidence, and explicit verification.
+default_prompt: Use developing-change only after scope and tier are established. Keep one owner per file, write behavior-focused tests, run scoped finalization, and do not self-approve Governed implementation or delivery.

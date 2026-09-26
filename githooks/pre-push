@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+hook_dir="$(cd "$(dirname "$0")" && pwd)"
+arguments=(hook-impl --config=.pre-commit-config.yaml --hook-type=pre-push --hook-dir "$hook_dir" -- "$@")
+
+cd "$repo_root"
+if [[ -x "$repo_root/bin/pre-commit" ]]; then
+  exec "$repo_root/bin/pre-commit" "${arguments[@]}"
+elif command -v pre-commit >/dev/null 2>&1; then
+  exec pre-commit "${arguments[@]}"
+elif command -v python3 >/dev/null 2>&1 && python3 -c 'import pre_commit' >/dev/null 2>&1; then
+  exec python3 -m pre_commit "${arguments[@]}"
+else
+  echo 'pre-commit is unavailable. Run bin/git-commit-hook-setup.sh from the repository root.' >&2
+  exit 1
+fi

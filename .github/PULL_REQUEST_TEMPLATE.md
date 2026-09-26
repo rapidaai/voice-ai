@@ -60,6 +60,7 @@
 - [ ] I kept the change focused.
 - [ ] I updated tests or docs where needed.
 - [ ] Required validation commands passed.
+- [ ] `just agent-pr-ready <base>` passed for the committed branch.
 - [ ] An independent code reviewer approved the complete diff.
 - [ ] Critical and major review findings are resolved.
 - [ ] Rollback, migration, and operational impact are documented where relevant.

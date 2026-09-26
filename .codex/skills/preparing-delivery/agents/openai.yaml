@@ -1,0 +1,3 @@
+display_name: Preparing Delivery
+short_description: Prepare an explicitly requested commit or PR with complete evidence.
+default_prompt: Use preparing-delivery only for the delivery action the user explicitly requested. Confirm scope, verification, and review evidence; do not bypass hooks, broaden authorization, or self-approve missing Governed evidence.

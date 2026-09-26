@@ -3,6 +3,10 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
+# Git hooks export repository-local variables that must not leak into fixture repositories.
+while IFS= read -r git_variable; do
+  unset "$git_variable"
+done < <(git rev-parse --local-env-vars)
 export DEVELOPMENT_GATE_KEY="development-process-test-key"
 output_dir="$(mktemp -d)"
 trap 'rm -rf "$output_dir"' EXIT
@@ -532,7 +536,9 @@ mkdir -p "$reservation_repo/rfcs"
 git -C "$reservation_repo" init -q
 git -C "$reservation_repo" config user.name validator
 git -C "$reservation_repo" config user.email validator@example.invalid
-git -C "$reservation_repo" commit --allow-empty -qm init
+empty_tree="$(git -C "$reservation_repo" mktree </dev/null)"
+initial_commit="$(printf '%s\n' init | git -C "$reservation_repo" commit-tree "$empty_tree")"
+git -C "$reservation_repo" update-ref HEAD "$initial_commit"
 git -C "$reservation_repo" worktree add -qb reservation-linked "$reservation_linked"
 mkdir -p "$reservation_linked/rfcs"
 (

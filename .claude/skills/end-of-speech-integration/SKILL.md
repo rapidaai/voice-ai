@@ -14,7 +14,7 @@ Implement EOS that finalizes each user turn exactly once, at low latency, withou
 In scope:
 - `api/assistant-api/internal/end_of_speech/internal/<provider>/...`
 - `api/assistant-api/internal/end_of_speech/end_of_speech.go` (factory registration)
-- `api/assistant-api/internal/type/end_of_speech.go` and packet compatibility only if required
+- `api/assistant-api/internal/type/executor.go` and packet compatibility only if required
 - EOS config in `ui/src/providers/<provider>/eos.json` (plus optional `model-options.json`)
 - EOS UI rendering under `ui/src/app/components/providers/end-of-speech/`
 
@@ -63,6 +63,15 @@ Required outputs:
 - No edits under `api/assistant-api/internal/vad/internal/`.
 - Final EOS emitted once per turn in tests.
 - Config loads via `ui/src/providers/config-loader.ts` path resolution.
+
+## Lifecycle integration
+
+- `development-lifecycle` owns tier selection and the repository-level change contract.
+- Use `change-analysis` when ownership, consumers, or blast radius is not already proven.
+- This skill owns its domain evidence and boundaries; `developing-change` owns implementation discipline.
+- Use `debugging` for unexplained failures and `writing-documentation` for documentation changes.
+- Use `reviewing-change` for independent review and `responding-to-review` for its findings.
+- Use `preparing-delivery` only when the user explicitly requests a delivery action.
 
 ## Governed lifecycle
 

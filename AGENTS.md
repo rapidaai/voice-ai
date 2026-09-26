@@ -50,6 +50,40 @@ Sequence: `understand -> plan -> draft RFC -> challenge -> confirm -> implement 
 
 See `DEVELOPMENT_PROCESS.md` for role responsibilities and the Orca workflow.
 
+### Skill routing
+
+- Start feature, fix, and behavior-change work with `development-lifecycle`.
+- Use `change-analysis` to prove current behavior, ownership, consumers, and blast radius before planning uncertain work.
+- Use `designing-change` when meaningful alternatives, ownership changes, or operational tradeoffs require a recorded decision.
+- Use `system-understanding` plus the matching integration skill for voice provider changes.
+- Use `debugging` for unexplained failures and diagnosis requests. Reproduce before fixing.
+- Use `developing-change` for scoped implementation and explicit finalization.
+- Use `reviewing-change` for self-review and required independent review against a fixed candidate boundary.
+- Use `responding-to-review` to verify and disposition review comments before making corrections.
+- Use `writing-documentation` when behavior or developer workflows make existing documentation inaccurate.
+- Use `preparing-delivery` only after the user explicitly requests a commit, push, or pull request.
+
+Lifecycle skills coordinate the work. Integration skills remain authoritative for provider paths,
+packet contracts, transport behavior, and factory boundaries.
+
+### Path rules
+
+- `agent-tooling-manifest.json` is the source of truth for capability phase status, coverage contracts, evidence, and remaining limitations.
+- `agent-rules.json` is the source of truth for path-specific development constraints.
+- Render nested `AGENTS.md` and `CLAUDE.md` files by running `python3 bin/render-agent-rules`.
+- Claude injects matching rules before edits through `.claude/hooks/path_rules.py`.
+- Run `just agent-drift-check` after changing agent rules, skills, hooks, or generated instructions.
+- The first source edit in a Claude session receives a plan reminder. Stop and establish the required change contract if it is absent.
+
+### No shortcuts
+
+- Never bypass required hooks or checks with `--no-verify`, skip variables, alternate hook paths, or equivalent mechanisms.
+- Never weaken, delete, quarantine, or skip a failing test merely to make a gate pass.
+- Never replace a required failure with `|| true`, suppressed output, or a fabricated success result.
+- If a required check cannot run, report the exact limitation and leave the change unapproved.
+- Any repository script that sends source, diffs, prompts, or logs to an external service must validate content with `bin/agent-egress` and require explicit user authorization.
+- Configured independent review uses `bin/agent-review`. High-risk review requires at least two distinct model families and one combined evidence panel.
+
 ## Engineering principles
 
 - KISS: choose the smallest complete solution and minimize moving parts.
@@ -132,6 +166,8 @@ may add domain constraints but must not redefine or weaken this section.
 - Do not hand-edit generated files; update their source and run the repository generator.
 - Run the configured formatter and the narrowest relevant tests before broader validation.
 - Tests assert observable behavior and failure paths rather than internal implementation details.
+- A regression test must fail for the expected reason before the fix when the failure can be reproduced locally.
+- Review findings identify a concrete consequence and supporting evidence. Speculation is recorded as a question, not a defect.
 
 ## UI testing rules
 
@@ -140,6 +176,8 @@ may add domain constraints but must not redefine or weaken this section.
   - happy-path assertion
   - regression/edge assertion tied to the change
 - For provider/config updates, add parity checks against `config-loader` and provider runtime parity test patterns.
+- Stable critical-route changes run `just ui-browser-test` and retain serious accessibility checks.
+- Update a Playwright screenshot only after inspecting and accepting the rendered difference.
 
 ## Backend testing rules
 
@@ -172,3 +210,4 @@ If work needs files outside the selected integration boundary, pause and ask bef
 - Do not edit out-of-scope modules for the selected integration skill.
 - Do not revert unrelated local changes.
 - Keep edits minimal and behavior-focused.
+- Use `.claude/settings.json` and `.claude/hooks/bash_guard.py` as defense-in-depth controls, not as substitutes for careful command review.

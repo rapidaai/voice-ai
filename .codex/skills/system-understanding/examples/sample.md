@@ -21,4 +21,4 @@
 
 - `go test ./api/assistant-api/internal/end_of_speech/...`
 - `go test ./api/assistant-api/internal/adapters/internal/...`
-- `./skills/system-understanding/scripts/validate.sh --check-diff`
+- `./.codex/skills/system-understanding/scripts/validate.sh --check-diff`

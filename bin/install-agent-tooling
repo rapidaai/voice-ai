@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+check_only=false
+skip_git_config=false
+
+usage() {
+  echo "Usage: bin/install-agent-tooling [--check] [--skip-git-config]"
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --check) check_only=true ;;
+    --skip-git-config) skip_git_config=true ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      usage >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
+
+cd "$repo_root"
+for command_name in git python3 just; do
+  command -v "$command_name" >/dev/null 2>&1 || {
+    echo "agent tooling setup: missing required command: $command_name" >&2
+    exit 1
+  }
+done
+
+if [[ ! -x bin/pre-commit ]] && ! command -v pre-commit >/dev/null 2>&1; then
+  python3 -c 'import pre_commit' >/dev/null 2>&1 || {
+    echo "agent tooling setup: pre-commit is unavailable" >&2
+    exit 1
+  }
+fi
+
+if [[ "$check_only" == true ]]; then
+  python3 bin/render-agent-rules --check
+else
+  python3 bin/render-agent-rules
+fi
+just validate-development-toolkit
+
+if [[ "$skip_git_config" == false ]]; then
+  if [[ "$check_only" == true ]]; then
+    [[ "$(git config --local --get core.hooksPath || true)" == "githooks" ]] || {
+      echo "agent tooling setup: core.hooksPath is not githooks" >&2
+      exit 1
+    }
+    [[ "$(git config --local --get commit.template || true)" == "$repo_root/githooks/gitmessage.txt" ]] || {
+      echo "agent tooling setup: commit.template does not point to this worktree" >&2
+      exit 1
+    }
+  else
+    bin/git-commit-hook-setup.sh
+  fi
+fi
+
+echo "agent tooling setup passed"

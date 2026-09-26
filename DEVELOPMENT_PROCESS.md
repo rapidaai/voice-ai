@@ -38,6 +38,38 @@ one self-approved action in the Governed tier.
 If classification is uncertain, use Standard and document the uncertainty. Escalate to
 Governed only when a listed trigger is discovered.
 
+## Skill Routing
+
+The lifecycle skills turn these tiers into repeatable working steps:
+
+1. `development-lifecycle` classifies the request and records the change contract.
+2. `change-analysis` establishes current behavior, ownership, consumers, and risk when those facts are not already proven.
+3. `designing-change` resolves material alternatives before implementation.
+4. `system-understanding` and a matching integration skill add voice-specific packet, factory, transport, and UI boundaries.
+5. `debugging` owns reproduction and root-cause evidence for unexplained failures.
+6. `developing-change` owns implementation discipline and the verification handoff.
+7. `writing-documentation` keeps behavior and developer guidance synchronized.
+8. `reviewing-change` owns fixed-boundary review and the finding ledger.
+9. `responding-to-review` verifies, dispositions, and resolves review feedback.
+10. `preparing-delivery` owns explicitly requested commit and pull-request preparation.
+
+Fast work may skip skills whose evidence is already obvious. Standard work records a concise
+contract before editing. Governed work preserves the existing role separation and gates.
+
+## Repository Policy Gates
+
+- `just agent-style-check` checks added prose, comments, and identifiers against repository style rules.
+- `just agent-manifest-check` verifies honest capability phase status and coverage contracts.
+- `just agent-drift-check` checks generated path rules and paired agent-tooling invariants.
+- `just test-agent-hooks` exercises accepted and rejected hook behavior.
+- `just agent-pr-ready <base>` runs the policy, drift, style, and scoped finalization checks for a branch.
+- `bin/agent-review --working-tree --risk standard` runs a configured independent reviewer; use `--risk high` for the two-family review panel.
+- `just ui-browser-test` runs the stable Chromium accessibility and screenshot contract.
+- The `Agent Policy / Agent Policy` pull request check validates the PR title, body, tooling, generated rules, and changed-line style. Configure it as a required status check with `05 CI Complete` in branch protection.
+
+These gates have no bypass flag. If a check cannot run, report the limitation and leave readiness
+unconfirmed.
+
 ## Roles
 
 ### Coordinator
@@ -79,6 +111,9 @@ Governed only when a listed trigger is discovered.
 - Never fixes findings directly; the implementation owner makes corrections.
 - Reviews correctness, simplicity, ownership, contracts, compatibility, concurrency, resource lifecycle, failure behavior, security, observability, tests, and rollback safety.
 - Blocks shipping for unresolved critical or major findings.
+- Records the base, head or working-tree boundary, status, and changed files before reviewing.
+- Discards stale conclusions if the candidate changes during review.
+- Dispositions findings as valid, invalid, duplicate, or out-of-scope; invalid findings include refuting evidence.
 
 ## Governed Task Contract
 
@@ -204,7 +239,11 @@ Use Orca worktree comments to record decisions and keep each implementation task
 - Minor: maintainability or clarity issue that does not invalidate behavior. May become a tracked follow-up.
 - Note: optional improvement or question. Does not block shipping.
 
-## Required Evidence
+Every finding names `file:line`, the violated contract or invariant, a concrete consequence,
+supporting evidence, and the smallest safe remedy. Critical and major findings are challenged
+against the code and tests before they remain in the final ledger.
+
+## Governed Required Evidence
 
 A completed change retains:
 
@@ -214,4 +253,5 @@ A completed change retains:
 - Verification commands with results.
 - Independent code-review report.
 - Resolution for every critical and major finding.
+- Reviewed base and head or working-tree boundary plus final finding dispositions.
 - PR summary, operational impact, and rollback notes.

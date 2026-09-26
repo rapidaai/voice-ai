@@ -2,6 +2,24 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Development workflow
+
+`AGENTS.md` is the canonical engineering and lifecycle policy. Start feature, fix, and behavior-change
+work with `.claude/skills/development-lifecycle/SKILL.md`, which routes work through analysis,
+debugging, implementation, review, and delivery without weakening the Fast, Standard, or Governed
+tiers in `DEVELOPMENT_PROCESS.md`.
+
+For voice integrations, combine the lifecycle skills with `system-understanding` and the matching
+provider skill. The provider skill remains authoritative for packet, transport, factory, UI, and
+path boundaries. Run `just agent-finalize "comma,separated,changed,paths"` explicitly. Claude hooks
+must not run tests during completion or agent exit.
+
+Before source edits, the plan reminder confirms the required lifecycle contract and the path-rule
+hook injects constraints from `agent-rules.json`. Before shell
+commands, the command guard enforces destructive-operation and outbound-transfer policy, while the
+pull request gate validates publishing commands. Do not bypass these controls. See
+`AGENT_TOOLING.md` for commands and troubleshooting.
+
 ## Project Overview
 
 Rapida is an open-source, Go-based microservices platform for voice AI orchestration (module: `github.com/rapidaai`, Go 1.25). It uses gRPC for inter-service communication and Gin for REST APIs.

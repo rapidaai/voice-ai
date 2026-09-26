@@ -14,7 +14,7 @@ Implement VAD providers that emit stable speech activity and interruption signal
 In scope:
 - `api/assistant-api/internal/vad/internal/<provider>/...`
 - `api/assistant-api/internal/vad/vad.go`
-- `api/assistant-api/internal/type/vad.go` and packet compatibility if needed
+- `api/assistant-api/internal/type/executor.go` and packet compatibility if needed
 - `ui/src/providers/<provider>/vad.json`
 
 Out of scope:
@@ -51,6 +51,15 @@ Required outputs:
 5. Wire VAD UI config.
 6. Add unit/benchmark coverage.
 
+## Lifecycle integration
+
+- `development-lifecycle` owns tier selection and the repository-level change contract.
+- Use `change-analysis` when ownership, consumers, or blast radius is not already proven.
+- This skill owns its domain evidence and boundaries; `developing-change` owns implementation discipline.
+- Use `debugging` for unexplained failures and `writing-documentation` for documentation changes.
+- Use `reviewing-change` for independent review and `responding-to-review` for its findings.
+- Use `preparing-delivery` only when the user explicitly requests a delivery action.
+
 ## Governed lifecycle
 
 - Classify work as Fast, Standard, or Governed using `DEVELOPMENT_PROCESS.md`; use the full gated lifecycle only for Governed work.
@@ -63,7 +72,7 @@ Required outputs:
 - `go test ./api/assistant-api/internal/vad/...`
 - `go test -bench=. ./api/assistant-api/internal/vad/internal/<provider>/...`
 - `cd ui && yarn test providers`
-- `./skills/vad-integration/scripts/validate.sh --check-diff --provider <provider>`
+- `./.codex/skills/vad-integration/scripts/validate.sh --check-diff --provider <provider>`
 
 ## References
 

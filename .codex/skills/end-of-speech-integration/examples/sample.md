@@ -27,4 +27,4 @@ Out of scope confirmed:
 
 - `go test ./api/assistant-api/internal/end_of_speech/...`
 - `go test ./api/assistant-api/internal/adapters/internal/...`
-- `./skills/end-of-speech-integration/scripts/validate.sh --check-diff --provider acme_eos`
+- `./.codex/skills/end-of-speech-integration/scripts/validate.sh --check-diff --provider acme_eos`

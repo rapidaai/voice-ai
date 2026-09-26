@@ -28,4 +28,4 @@ Out of scope confirmed:
 
 - `go test ./api/assistant-api/internal/denoiser/...`
 - `go test -run TestGetDenoiser ./api/assistant-api/internal/denoiser/...`
-- `./skills/noise-reduction-integration/scripts/validate.sh --check-diff --provider acme_denoise`
+- `./.codex/skills/noise-reduction-integration/scripts/validate.sh --check-diff --provider acme_denoise`

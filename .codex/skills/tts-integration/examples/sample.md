@@ -26,4 +26,4 @@
 
 - `go test ./api/assistant-api/internal/transformer/... -run TestTTS`
 - `go test ./api/assistant-api/internal/transformer/acme_tts/...`
-- `./skills/tts-integration/scripts/validate.sh --check-diff --provider acme_tts`
+- `./.codex/skills/tts-integration/scripts/validate.sh --check-diff --provider acme_tts`

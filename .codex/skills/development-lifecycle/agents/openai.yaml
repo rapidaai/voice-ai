@@ -1,0 +1,3 @@
+display_name: Development Lifecycle
+short_description: Route changes through the repository's risk-tiered workflow.
+default_prompt: Use the development-lifecycle skill to classify the work, establish acceptance criteria and scope, route to the required specialist skills, and preserve verification evidence. Do not implement or self-approve Governed work before its required gates.
