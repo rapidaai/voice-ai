@@ -1,0 +1,3 @@
+display_name: Designing Change
+short_description: Compare concrete options and record the smallest safe design before coding.
+default_prompt: Use designing-change only when the implementation choice is materially uncertain. Ground options in change-analysis evidence, choose the smallest safe design, and do not implement or self-approve Governed decisions.

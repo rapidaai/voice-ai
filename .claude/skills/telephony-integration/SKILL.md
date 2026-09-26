@@ -46,6 +46,15 @@ Out of scope:
 - SIP native session: `sip`
 - TCP AudioSocket: `asterisk/audiosocket`
 
+## Lifecycle integration
+
+- `development-lifecycle` owns tier selection and the repository-level change contract.
+- Use `change-analysis` when ownership, consumers, or blast radius is not already proven.
+- This skill owns its domain evidence and boundaries; `developing-change` owns implementation discipline.
+- Use `debugging` for unexplained failures and `writing-documentation` for documentation changes.
+- Use `reviewing-change` for independent review and `responding-to-review` for its findings.
+- Use `preparing-delivery` only when the user explicitly requests a delivery action.
+
 ## Governed lifecycle
 
 - Classify work as Fast, Standard, or Governed using `DEVELOPMENT_PROCESS.md`; use the full gated lifecycle only for Governed work.

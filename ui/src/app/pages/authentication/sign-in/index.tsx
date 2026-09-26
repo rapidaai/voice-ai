@@ -88,7 +88,7 @@ export function SignInPage() {
         {workspace.authentication.signUp.enable && (
           <p className="mt-1.5 text-sm leading-[1.4286] text-(--cds-text-secondary)">
             Don't have an account? &nbsp;
-            <Link href="/auth/signup" className="text-sm">
+            <Link href="/auth/signup" className="text-sm !underline">
               Sign-up
             </Link>
           </p>

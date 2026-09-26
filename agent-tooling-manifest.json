@@ -1,0 +1,164 @@
+{
+  "version": 1,
+  "state_definitions": {
+    "implemented": "The control has repository-owned executable evidence and verification.",
+    "partial": "A useful control exists, but the recorded limitation still applies.",
+    "designed": "The contract is documented but has no complete executable path."
+  },
+  "capabilities": [
+    {
+      "id": "lifecycle-routing",
+      "state": "implemented",
+      "owner": "DEVELOPMENT_PROCESS.md",
+      "evidence": [
+        ".codex/skills/development-lifecycle/SKILL.md",
+        ".claude/skills/development-lifecycle/SKILL.md"
+      ],
+      "verification": ["just validate-development-toolkit"],
+      "limitation": "Fast and Standard evidence remains conversational unless a task or pull request records it."
+    },
+    {
+      "id": "plan-reminder",
+      "state": "implemented",
+      "owner": ".claude/hooks/plan_reminder.py",
+      "evidence": ["tests/agent_tooling/test_plan_reminder.py"],
+      "verification": ["just test-agent-hooks"],
+      "limitation": "The pre-edit reminder is Claude-specific and advisory for Fast and Standard work; Governed work uses the signed pre-implementation gate."
+    },
+    {
+      "id": "permission-and-command-safety",
+      "state": "implemented",
+      "owner": ".claude/settings.json",
+      "evidence": [
+        ".claude/hooks/bash_guard.py",
+        "tests/agent_tooling/test_bash_guard.py"
+      ],
+      "verification": ["just test-agent-hooks"],
+      "limitation": "These controls are defense in depth and do not replace command review."
+    },
+    {
+      "id": "pull-request-gate",
+      "state": "implemented",
+      "owner": ".github/workflows/agent-policy.yml",
+      "evidence": [
+        "bin/check-pr-body",
+        "bin/agent-pr-ready",
+        ".claude/hooks/pr_gate.py"
+      ],
+      "verification": ["just validate-development-toolkit"],
+      "limitation": "Repository administrators must configure the workflow check as required in branch protection."
+    },
+    {
+      "id": "path-rules",
+      "state": "implemented",
+      "owner": "agent-rules.json",
+      "evidence": [
+        "bin/render-agent-rules",
+        ".claude/hooks/path_rules.py"
+      ],
+      "verification": ["just agent-drift-check"],
+      "limitation": "Runtime context injection is Claude-specific; generated nested instructions cover both runtimes."
+    },
+    {
+      "id": "drift-and-style",
+      "state": "implemented",
+      "owner": "bin/check-agent-drift",
+      "evidence": ["bin/check-agent-style"],
+      "verification": [
+        "just agent-drift-check",
+        "just agent-style-check"
+      ],
+      "limitation": "Style checks apply to added lines and intentionally do not rewrite historical content."
+    },
+    {
+      "id": "hook-regression-tests",
+      "state": "implemented",
+      "owner": "tests/agent_tooling",
+      "evidence": ["tests/agent_tooling/test_*.py"],
+      "verification": ["just test-agent-hooks"],
+      "limitation": "Tests cover repository hooks and policy utilities, not host application internals."
+    },
+    {
+      "id": "egress-filter",
+      "state": "implemented",
+      "owner": "bin/agent-egress",
+      "evidence": ["tests/agent_tooling/test_policy_tools.py"],
+      "verification": ["just test-agent-hooks"],
+      "limitation": "The filter covers repository-owned review paths and common transfer commands; it is not an operating-system firewall."
+    },
+    {
+      "id": "portable-setup",
+      "state": "implemented",
+      "owner": "bin/install-agent-tooling",
+      "evidence": ["githooks/pre-commit", "githooks/commit-msg", "githooks/pre-push"],
+      "verification": ["bin/install-agent-tooling --check --skip-git-config"],
+      "limitation": "Required command-line runtimes must already be installed."
+    },
+    {
+      "id": "independent-review-panel",
+      "state": "implemented",
+      "owner": "bin/agent-review",
+      "evidence": [
+        "agent-reviewers.example.json",
+        "tests/agent_tooling/test_agent_review.py"
+      ],
+      "verification": ["just test-agent-hooks"],
+      "limitation": "Reviewer commands are operator-configured; external transports require explicit authorization."
+    },
+    {
+      "id": "ui-browser-quality",
+      "state": "implemented",
+      "owner": "ui/playwright.config.ts",
+      "evidence": [
+        "ui/e2e/sign-in.spec.ts",
+        ".github/workflows/reusable-ui-ci.yml"
+      ],
+      "verification": ["just ui-browser-test"],
+      "limitation": "Browser binaries are installed separately; screenshot coverage is intentionally limited to stable critical surfaces."
+    },
+    {
+      "id": "lessons-ledger",
+      "state": "implemented",
+      "owner": "AGENT_LESSONS.md",
+      "evidence": ["AGENT_TOOLING.md"],
+      "verification": ["just check-agent-docs"],
+      "limitation": "Add only evidence-backed recurring defects, not speculative advice."
+    }
+  ],
+  "coverage_contracts": [
+    {
+      "id": "backend-go",
+      "paths": ["api/**/*.go", "pkg/**/*.go", "cmd/**/*.go"],
+      "contract": "Changed production packages include package-local success and failure coverage.",
+      "checks": ["just agent-finalize"]
+    },
+    {
+      "id": "ui-source",
+      "paths": ["ui/src/**/*.ts", "ui/src/**/*.tsx"],
+      "contract": "Behavior changes include focused tests; stable critical browser flows include accessibility coverage.",
+      "checks": ["just agent-finalize", "just ui-browser-test"]
+    },
+    {
+      "id": "ui-browser",
+      "paths": ["ui/e2e/**/*.ts", "ui/playwright.config.ts"],
+      "contract": "Stable critical browser checks retain accessibility and reviewed screenshot evidence.",
+      "checks": ["just ui-browser-test"]
+    },
+    {
+      "id": "agent-tooling",
+      "paths": [".claude/**", ".codex/**", "agent-*.json", "bin/**", "githooks/**"],
+      "contract": "Agent controls remain synchronized, tested, documented, and free of bypasses.",
+      "checks": ["just validate-development-toolkit"]
+    }
+  ],
+  "review_policy": {
+    "standard": {
+      "minimum_reviewers": 1,
+      "distinct_model_families": false
+    },
+    "high": {
+      "minimum_reviewers": 2,
+      "distinct_model_families": true
+    }
+  }
+}

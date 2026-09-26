@@ -40,6 +40,14 @@ rsync -a .codex/skills/ ~/.codex/skills/voice-ai/
 
 ## Validate a skill
 
+Lifecycle skills are validated centrally:
+
+```bash
+just validate-agent-tooling
+```
+
+Domain skills also provide scoped validators:
+
 ```bash
 ./.codex/skills/<skill>/scripts/validate.sh
 ./.codex/skills/<skill>/scripts/validate.sh --check-diff --provider <provider>
@@ -73,7 +81,10 @@ Parity assets for subagent/hook workflow are available in:
 - `.codex/agents/`
 - `.codex/hooks/`
 
-Use `just validate-development-toolkit` to validate lifecycle gates, skill packaging, agent role contracts, non-blocking Claude settings, hook parity, and scoped validation together.
+Use `just validate-development-toolkit` to validate lifecycle gates, skill packaging, agent role contracts, command safety, documentation references, hook parity, and scoped validation together.
+
+Repository-wide agent controls, PR readiness, path rules, egress filtering, Git hook installation,
+and troubleshooting are documented in `AGENT_TOOLING.md`.
 
 Codex-standard repo guidance is defined in root `AGENTS.md`.
 Custom project subagent profiles are defined in `.codex/agents/*.md`.

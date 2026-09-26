@@ -25,4 +25,4 @@
 
 - `go test ./api/integration-api/internal/caller/...`
 - `go test ./api/integration-api/api/...`
-- `./skills/llm-integration/scripts/validate.sh --check-diff --provider acme_llm`
+- `./.codex/skills/llm-integration/scripts/validate.sh --check-diff --provider acme_llm`

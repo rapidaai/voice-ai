@@ -5,6 +5,13 @@ if (($#)); then
   files=("$@")
 else
   files=(
+    bin/agent-pr-ready
+    bin/install-agent-tooling
+    bin/git-commit-hook-setup.sh
+    bin/validate-agent-tooling
+    githooks/commit-msg
+    githooks/pre-commit
+    githooks/pre-push
     just/ci-assistant-native.sh
     just/ci-commitlint.sh
     just/ci-contracts.sh

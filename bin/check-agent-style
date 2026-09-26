@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+"""Check added repository prose and identifiers against agent writing rules."""
+
+from __future__ import annotations
+
+import argparse
+import re
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+
+PROSE_SUFFIXES = {".md", ".rst", ".txt"}
+COMMENT_LINE = re.compile(r"^\s*(?://|#|/\*|\*|<!--)")
+BANNED_STEM = re.compile("normali" + "z", re.IGNORECASE)
+TOOL_ATTRIBUTION = re.compile(r"co-authored-by|generated with|noreply@anthropic", re.IGNORECASE)
+TODO = re.compile(r"\b(?:TODO|FIXME|HACK)\b")
+TODO_OWNER = re.compile(r"(?:#[0-9]+|https?://|owner\s*:|remove(?:d)?\s+when)", re.IGNORECASE)
+HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+
+
+@dataclass(frozen=True)
+class AddedLine:
+    path: str
+    number: int
+    text: str
+
+
+def run_git(root: Path, arguments: list[str]) -> str:
+    result = subprocess.run(
+        ["git", *arguments],
+        cwd=root,
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or f"git {' '.join(arguments)} failed")
+    return result.stdout
+
+
+def parse_added_lines(diff: str) -> list[AddedLine]:
+    path = ""
+    number = 0
+    lines: list[AddedLine] = []
+    for line in diff.splitlines():
+        if line.startswith("+++ "):
+            path = line[4:]
+            if path.startswith("b/"):
+                path = path[2:]
+            continue
+        match = HUNK.match(line)
+        if match:
+            number = int(match.group(1))
+            continue
+        if not path or line.startswith("diff --git "):
+            continue
+        if line.startswith("+") and not line.startswith("+++"):
+            lines.append(AddedLine(path, number, line[1:]))
+            number += 1
+        elif not line.startswith("-"):
+            number += 1
+    return lines
+
+
+def untracked_lines(root: Path) -> list[AddedLine]:
+    output = run_git(root, ["ls-files", "--others", "--exclude-standard", "-z"])
+    lines: list[AddedLine] = []
+    for name in output.rstrip("\0").split("\0") if output else []:
+        path = root / name
+        try:
+            content = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        lines.extend(AddedLine(name, index, value) for index, value in enumerate(content.splitlines(), 1))
+    return lines
+
+
+def changed_lines(root: Path, mode: str, revision_range: str | None) -> list[AddedLine]:
+    arguments = ["diff", "--no-ext-diff", "--no-color", "--unified=0"]
+    if mode == "staged":
+        arguments.append("--cached")
+    elif mode == "range":
+        assert revision_range is not None
+        arguments.append(revision_range)
+    else:
+        arguments.append("HEAD")
+    arguments.append("--")
+    lines = parse_added_lines(run_git(root, arguments))
+    if mode == "working-tree":
+        lines.extend(untracked_lines(root))
+    return lines
+
+
+def validate(lines: list[AddedLine]) -> list[str]:
+    failures: list[str] = []
+    for line in lines:
+        suffix = Path(line.path).suffix.lower()
+        is_prose = suffix in PROSE_SUFFIXES
+        is_comment = COMMENT_LINE.match(line.text) is not None
+        if BANNED_STEM.search(line.text):
+            failures.append(f"{line.path}:{line.number}: prohibited vague transformation stem")
+        if (is_prose or is_comment) and "—" in line.text:
+            failures.append(f"{line.path}:{line.number}: em dash is not allowed")
+        if (is_prose or is_comment) and TOOL_ATTRIBUTION.search(line.text):
+            failures.append(f"{line.path}:{line.number}: tooling attribution is not allowed")
+        if is_comment and TODO.search(line.text) and TODO_OWNER.search(line.text) is None:
+            failures.append(f"{line.path}:{line.number}: TODO-like comment needs an owner or removal condition")
+    return failures
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--staged", action="store_true")
+    mode.add_argument("--range", dest="revision_range")
+    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent)
+    args = parser.parse_args()
+    selected_mode = "staged" if args.staged else "range" if args.revision_range else "working-tree"
+    try:
+        failures = validate(changed_lines(args.root.resolve(), selected_mode, args.revision_range))
+    except RuntimeError as error:
+        print(f"agent style: {error}", file=sys.stderr)
+        return 2
+    if failures:
+        for failure in failures:
+            print(f"agent style: {failure}", file=sys.stderr)
+        return 1
+    print("agent style validation passed")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

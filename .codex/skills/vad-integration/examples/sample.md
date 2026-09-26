@@ -26,4 +26,4 @@ Out of scope confirmed:
 
 - `go test ./api/assistant-api/internal/vad/...`
 - `go test -bench=. ./api/assistant-api/internal/vad/internal/acme_vad/...`
-- `./skills/vad-integration/scripts/validate.sh --check-diff --provider acme_vad`
+- `./.codex/skills/vad-integration/scripts/validate.sh --check-diff --provider acme_vad`

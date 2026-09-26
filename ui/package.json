@@ -53,7 +53,9 @@
         "lint:fix": "yarn eslint --fix src",
         "lint:css": "stylelint src/**/*.css",
         "prettify": "prettier --write",
-        "test:coverage": "yarn test --watchAll=false --coverage"
+        "test:coverage": "yarn test --watchAll=false --coverage",
+        "test:e2e": "playwright test",
+        "test:e2e:update": "playwright test --update-snapshots"
     },
     "jest": {
         "collectCoverageFrom": [
@@ -181,7 +183,9 @@
         "zustand-utils": "2.1.0"
     },
     "devDependencies": {
+        "@axe-core/playwright": "4.13.0",
         "@babel/plugin-proposal-private-property-in-object": "7.21.11",
+        "@playwright/test": "1.63.0",
         "@testing-library/jest-dom": "5.16.5",
         "@testing-library/react": "13.4.0",
         "@types/chart.js": "2.9.41",

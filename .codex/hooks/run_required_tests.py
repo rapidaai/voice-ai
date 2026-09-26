@@ -6,12 +6,22 @@ import subprocess
 import sys
 from pathlib import Path
 
-def _run(cmd: list[str], cwd: str | None = None) -> tuple[int, str]:
+
+UI_TEST_COMMAND = ["yarn", "test", "providers", "--watch=false", "--runInBand"]
+UI_TEST_ENV = {"CI": "true"}
+
+
+def _run(
+    cmd: list[str], cwd: str | None = None, environment: dict[str, str] | None = None
+) -> tuple[int, str]:
     timeout_seconds = int(os.environ.get("AGENT_TEST_TIMEOUT_SECONDS", "300"))
+    process_environment = os.environ.copy()
+    process_environment.update(environment or {})
     try:
         out = subprocess.run(
             cmd,
             cwd=cwd,
+            env=process_environment,
             check=False,
             capture_output=True,
             text=True,
@@ -115,17 +125,36 @@ def _backend_dirs(changed: list[str]) -> list[str]:
     return sorted(dirs)
 
 
+def _is_ui_source(path: str) -> bool:
+    return path.startswith("ui/src/") and Path(path).suffix in {
+        ".css",
+        ".js",
+        ".json",
+        ".jsx",
+        ".less",
+        ".scss",
+        ".ts",
+        ".tsx",
+    }
+
+
 def main() -> int:
     raw = sys.stdin.read()
     changed = _changed_files(raw)
     results = []
 
-    ui_changed = any(f.startswith("ui/src/") for f in changed)
+    ui_changed = any(_is_ui_source(f) for f in changed)
     backend_dirs = _backend_dirs(changed)
 
     if ui_changed:
-        rc, output = _run(["yarn", "test", "providers"], cwd="ui")
-        results.append({"cmd": "cd ui && yarn test providers", "exit_code": rc, "output_tail": output[-2000:]})
+        rc, output = _run(UI_TEST_COMMAND, cwd="ui", environment=UI_TEST_ENV)
+        results.append(
+            {
+                "cmd": "cd ui && CI=true yarn test providers --watch=false --runInBand",
+                "exit_code": rc,
+                "output_tail": output[-2000:],
+            }
+        )
 
     for d in backend_dirs:
         rc, output = _run(["go", "test", f"./{d}"])

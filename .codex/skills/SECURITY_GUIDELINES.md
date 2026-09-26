@@ -1,6 +1,6 @@
 # Codex Skills Security Guidelines
 
-These rules apply to all files under `skills/`.
+These rules apply to all files under `.codex/skills/`.
 
 ## 1) No secrets in skills
 

@@ -1,0 +1,3 @@
+display_name: Reviewing Change
+short_description: Review a fixed candidate with evidence, severities, and a disposition ledger.
+default_prompt: Use reviewing-change read-only against an exact candidate boundary. Ground findings in file and line evidence, refute Critical and Major claims before retaining them, and do not edit or self-approve authored work.

@@ -1,6 +1,6 @@
 # Claude Skills Index
 
-Project skills live in `.claude/skills/<skill-name>/`.
+Project lifecycle and integration skills live in `.claude/skills/<skill-name>/`.
 
 ## Install
 
@@ -19,7 +19,7 @@ To verify installation:
 find .claude/skills -maxdepth 2 -type d | sort
 ```
 
-Each skill contains:
+Each domain skill contains:
 
 - `SKILL.md` (required instructions + metadata)
 - `template.md` (structured implementation output)
@@ -27,6 +27,8 @@ Each skill contains:
 - `scripts/validate.sh` (local skill self-check)
 
 Claude packaging intentionally uses `template.md` and enterprise policy files. Semantic lifecycle parity with Codex is enforced by `just validate-agent-tooling`, not by requiring identical directory trees.
+
+Lifecycle skill folders contain `SKILL.md`, `template.md`, and `examples/sample.md`. They are validated centrally so lifecycle policy checks have one owner.
 
 ## Enterprise standards
 
@@ -59,6 +61,15 @@ Every skill participates in the governed lifecycle and hands implementation evid
 
 ## Skill list
 
+- development-lifecycle
+- change-analysis
+- designing-change
+- debugging
+- developing-change
+- reviewing-change
+- responding-to-review
+- writing-documentation
+- preparing-delivery
 - system-understanding
 - telephony-integration
 - stt-integration

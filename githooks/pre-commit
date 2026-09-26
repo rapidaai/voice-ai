@@ -12,6 +12,6 @@ elif command -v pre-commit >/dev/null 2>&1; then
 elif command -v python3 >/dev/null 2>&1; then
   exec python3 -mpre_commit "${ARGS[@]}"
 else
-  echo '`pre-commit` not found. Run bin/git-commit-hook-setup.sh from the repository root.' 1>&2
+  echo 'pre-commit is unavailable. Run bin/git-commit-hook-setup.sh from the repository root.' >&2
   exit 1
 fi

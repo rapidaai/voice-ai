@@ -1,0 +1,3 @@
+display_name: Responding To Review
+short_description: Verify, disposition, fix, and answer review comments with evidence.
+default_prompt: Use responding-to-review to verify each comment against the exact candidate, record a disposition, and make only supported corrections. Do not self-approve corrected Governed work.

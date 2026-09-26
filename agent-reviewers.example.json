@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "reviewers": [
+    {
+      "id": "local-primary",
+      "model_family": "local-primary",
+      "transport": "local",
+      "input": "stdin",
+      "command": ["replace-with-local-review-command"],
+      "timeout_seconds": 600,
+      "enabled": false
+    },
+    {
+      "id": "independent-secondary",
+      "model_family": "independent-secondary",
+      "transport": "external",
+      "input": "file",
+      "command": ["replace-with-secondary-review-command", "{prompt_file}"],
+      "timeout_seconds": 600,
+      "enabled": false
+    }
+  ]
+}

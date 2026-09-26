@@ -1,6 +1,6 @@
 # Codex Skills README
 
-This directory contains Codex skills for integration work in this repository.
+This directory contains Codex skills for the repository development lifecycle and voice integration work.
 
 ## Install
 
@@ -33,7 +33,7 @@ find .codex/skills -maxdepth 2 -type d | sort
 
 ## Skill layout
 
-Each skill folder should include:
+Domain skill folders include:
 
 - `SKILL.md`: task instructions and scope
 - `agents/openai.yaml`: agent metadata and default prompt
@@ -43,8 +43,25 @@ Each skill folder should include:
 
 Codex packaging intentionally uses `agents/openai.yaml` and `references/`. Semantic lifecycle parity with Claude is enforced by `just validate-agent-tooling`, not by requiring identical directory trees.
 
+Lifecycle skill folders stay lean and include:
+
+- `SKILL.md`: task instructions and scope
+- `agents/openai.yaml`: discovery metadata and default prompt
+- `examples/sample.md`: expected evidence shape
+
+Lifecycle skills are validated centrally by `just validate-agent-tooling` so their policy checks have one owner.
+
 ## Available skills
 
+- `development-lifecycle`
+- `change-analysis`
+- `designing-change`
+- `debugging`
+- `developing-change`
+- `reviewing-change`
+- `responding-to-review`
+- `writing-documentation`
+- `preparing-delivery`
 - `system-understanding`
 - `telephony-integration`
 - `stt-integration`
@@ -58,14 +75,14 @@ Codex packaging intentionally uses `agents/openai.yaml` and `references/`. Seman
 
 ## How to use
 
-1. Choose the skill folder matching the requested integration.
-2. Read `SKILL.md` first, then the skill-specific `references/` checklist.
-3. Implement changes only within the declared scope.
-4. Validate before sharing results.
+1. Start with `development-lifecycle` for feature, fix, or behavior-change work.
+2. Use the lifecycle skill it selects for analysis, debugging, implementation, review, or delivery.
+3. Add `system-understanding` and the matching domain skill for voice integrations.
+4. Implement changes only within the declared scope and validate before sharing results.
 
 ## Validation
 
-Basic validation:
+Domain skill validation:
 
 ```bash
 ./.codex/skills/<skill>/scripts/validate.sh

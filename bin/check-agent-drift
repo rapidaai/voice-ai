@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+"""Detect drift across generated agent rules and repository agent surfaces."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+
+LIFECYCLE_SKILLS = {
+    "change-analysis",
+    "debugging",
+    "designing-change",
+    "developing-change",
+    "development-lifecycle",
+    "preparing-delivery",
+    "responding-to-review",
+    "reviewing-change",
+    "writing-documentation",
+}
+COMMON_HOOKS = {"run_required_tests.py", "validate_changed_tests.py"}
+REQUIRED_GIT_HOOKS = {"commit-msg", "pre-commit", "pre-push"}
+
+
+def run(root: Path, command: list[str]) -> str | None:
+    result = subprocess.run(command, cwd=root, capture_output=True, check=False, text=True)
+    if result.returncode == 0:
+        return None
+    return (result.stdout + result.stderr).strip() or "command failed"
+
+
+def skill_names(root: Path, agent_root: str) -> set[str]:
+    return {path.parent.name for path in (root / agent_root / "skills").glob("*/SKILL.md")}
+
+
+def validate(root: Path) -> list[str]:
+    failures: list[str] = []
+    rule_error = run(root, [sys.executable, "bin/render-agent-rules", "--check"])
+    if rule_error:
+        failures.append(rule_error)
+    manifest_error = run(root, [sys.executable, "bin/check-agent-manifest"])
+    if manifest_error:
+        failures.append(manifest_error)
+
+    codex_skills = skill_names(root, ".codex")
+    claude_skills = skill_names(root, ".claude")
+    if codex_skills != claude_skills:
+        failures.append("Codex and Claude skill inventories differ")
+    for skill in sorted(LIFECYCLE_SKILLS):
+        codex = root / ".codex" / "skills" / skill / "SKILL.md"
+        claude = root / ".claude" / "skills" / skill / "SKILL.md"
+        if not codex.is_file() or not claude.is_file() or codex.read_bytes() != claude.read_bytes():
+            failures.append(f"lifecycle skill content differs: {skill}")
+
+    for hook in sorted(COMMON_HOOKS):
+        codex = root / ".codex" / "hooks" / hook
+        claude = root / ".claude" / "hooks" / hook
+        if not codex.is_file() or not claude.is_file() or codex.read_bytes() != claude.read_bytes():
+            failures.append(f"shared hook content differs: {hook}")
+
+    settings_path = root / ".claude" / "settings.json"
+    try:
+        settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        failures.append(f"cannot read Claude settings: {error}")
+    else:
+        commands = []
+        for group in settings.get("hooks", {}).get("PreToolUse", []):
+            commands.extend(item.get("command", "") for item in group.get("hooks", []))
+        for command in commands:
+            marker = "$CLAUDE_PROJECT_DIR/"
+            if marker not in command:
+                failures.append(f"Claude hook command is not repository rooted: {command}")
+                continue
+            relative = command.split(marker, 1)[1].split('"', 1)[0]
+            if not (root / relative).is_file():
+                failures.append(f"Claude hook command target is missing: {relative}")
+
+    for hook in sorted(REQUIRED_GIT_HOOKS):
+        path = root / "githooks" / hook
+        if not path.is_file():
+            failures.append(f"missing Git hook: githooks/{hook}")
+        elif path.stat().st_mode & 0o111 == 0:
+            failures.append(f"Git hook is not executable: githooks/{hook}")
+
+    workflow = root / ".github" / "workflows" / "agent-policy.yml"
+    if not workflow.is_file():
+        failures.append("missing pull request agent-policy workflow")
+    return failures
+
+
+def main() -> int:
+    root = Path(__file__).resolve().parent.parent
+    failures = validate(root)
+    if failures:
+        for failure in failures:
+            print(f"agent drift: {failure}", file=sys.stderr)
+        return 1
+    print("agent drift validation passed")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

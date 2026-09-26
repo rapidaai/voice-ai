@@ -45,6 +45,15 @@ Do not implement production changes in this skill run.
 - Test and validation command plan.
 - Risks and rollback path.
 
+## Lifecycle integration
+
+- `development-lifecycle` owns tier selection and the repository-level change contract.
+- Use `change-analysis` when ownership, consumers, or blast radius is not already proven.
+- This skill owns its domain evidence and boundaries; `developing-change` owns implementation discipline.
+- Use `debugging` for unexplained failures and `writing-documentation` for documentation changes.
+- Use `reviewing-change` for independent review and `responding-to-review` for its findings.
+- Use `preparing-delivery` only when the user explicitly requests a delivery action.
+
 ## Governed lifecycle
 
 - This planning skill owns only the `understand` and `plan` phases from `DEVELOPMENT_PROCESS.md`.

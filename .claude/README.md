@@ -35,16 +35,27 @@ mkdir -p /path/to/target-repo/.claude
 rsync -a /path/to/voice-ai/.claude/ /path/to/target-repo/.claude/
 ```
 
-## Required skill structure
+## Skill structure
 
-Each skill should contain:
+Lifecycle skills contain:
 
 - `SKILL.md`
 - `template.md`
 - `examples/sample.md`
+
+Domain skills also contain:
+
 - `scripts/validate.sh`
 
 ## Validate a skill
+
+Lifecycle skills are validated centrally:
+
+```bash
+just validate-agent-tooling
+```
+
+Domain skills also provide scoped validators:
 
 ```bash
 ./.claude/skills/<skill>/scripts/validate.sh
@@ -76,11 +87,14 @@ just orca-panel-open "path/to/lifecycle-input.json"
 
 Claude validation configuration is committed in:
 
-- `.claude/settings.json` (automatic completion hooks intentionally disabled)
-- `.claude/hooks/` (explicit validation commands)
+- `.claude/settings.json` (pre-command safety only; automatic completion tests are disabled)
+- `.claude/hooks/` (command safety plus explicit validation commands)
 - `.claude/agents/` (subagents for UI/backend implementation and tests)
 
-Use `just validate-development-toolkit` to validate lifecycle gates, skill packaging, agent role contracts, non-blocking Claude settings, hook parity, and scoped validation together.
+Use `just validate-development-toolkit` to validate lifecycle gates, skill packaging, agent role contracts, command safety, documentation references, hook parity, and scoped validation together.
+
+Repository-wide agent controls, PR readiness, path rules, egress filtering, Git hook installation,
+and troubleshooting are documented in `AGENT_TOOLING.md`.
 
 ## References
 

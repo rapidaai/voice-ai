@@ -1,0 +1,164 @@
+#!/usr/bin/env python3
+"""Validate the agent capability and coverage manifest."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+
+VALID_STATES = {"implemented", "partial", "designed"}
+ID_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
+def just_recipes(root: Path) -> set[str]:
+    result = subprocess.run(["just", "--summary"], cwd=root, capture_output=True, check=False, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or "just --summary failed")
+    return set(result.stdout.split())
+
+
+def safe_pattern(value: object) -> bool:
+    if not isinstance(value, str) or not value:
+        return False
+    candidate = Path(value)
+    return not candidate.is_absolute() and ".." not in candidate.parts
+
+
+def matched_paths(root: Path, pattern: str) -> list[Path]:
+    return [path for path in root.glob(pattern) if path.exists()]
+
+
+def validate_document(root: Path, document: object, recipes: set[str]) -> list[str]:
+    failures: list[str] = []
+    if not isinstance(document, dict) or document.get("version") != 1:
+        return ["manifest must be a version 1 object"]
+    definitions = document.get("state_definitions")
+    if not isinstance(definitions, dict) or set(definitions) != VALID_STATES:
+        failures.append("state_definitions must define implemented, partial, and designed")
+    elif not all(isinstance(value, str) and value.strip() for value in definitions.values()):
+        failures.append("state_definitions must explain every state")
+
+    capabilities = document.get("capabilities")
+    if not isinstance(capabilities, list) or not capabilities:
+        failures.append("capabilities must be a non-empty array")
+        capabilities = []
+    seen: set[str] = set()
+    for index, capability in enumerate(capabilities):
+        label = f"capabilities[{index}]"
+        if not isinstance(capability, dict):
+            failures.append(f"{label} must be an object")
+            continue
+        capability_id = capability.get("id")
+        if not isinstance(capability_id, str) or ID_PATTERN.fullmatch(capability_id) is None:
+            failures.append(f"{label} has an invalid id")
+        elif capability_id in seen:
+            failures.append(f"duplicate capability id: {capability_id}")
+        else:
+            seen.add(capability_id)
+        state = capability.get("state")
+        if state not in VALID_STATES:
+            failures.append(f"{label} has invalid state: {state!r}")
+        limitation = capability.get("limitation")
+        if not isinstance(limitation, str) or not limitation.strip():
+            failures.append(f"{label} must state its limitation")
+        owner = capability.get("owner")
+        if not safe_pattern(owner) or not matched_paths(root, str(owner)):
+            failures.append(f"{label} owner does not exist: {owner!r}")
+        evidence = capability.get("evidence")
+        if not isinstance(evidence, list) or not evidence:
+            failures.append(f"{label} must list evidence")
+        else:
+            for pattern in evidence:
+                if not safe_pattern(pattern) or not matched_paths(root, str(pattern)):
+                    failures.append(f"{label} evidence matches nothing: {pattern!r}")
+        verification = capability.get("verification")
+        if not isinstance(verification, list) or not verification:
+            failures.append(f"{label} must list verification")
+        else:
+            for command in verification:
+                if not isinstance(command, str) or not command.strip():
+                    failures.append(f"{label} has an invalid verification command")
+                    continue
+                match = re.match(r"^just\s+([a-zA-Z0-9_-]+)", command)
+                if match is not None and match.group(1) not in recipes:
+                    failures.append(f"{label} references unknown Just recipe: {match.group(1)}")
+                first_word = command.split(maxsplit=1)[0].removeprefix("./")
+                if first_word.startswith("bin/") and not (root / first_word).is_file():
+                    failures.append(f"{label} references missing command: {first_word}")
+
+    contracts = document.get("coverage_contracts")
+    if not isinstance(contracts, list) or not contracts:
+        failures.append("coverage_contracts must be a non-empty array")
+        contracts = []
+    contract_ids: set[str] = set()
+    for index, contract in enumerate(contracts):
+        label = f"coverage_contracts[{index}]"
+        if not isinstance(contract, dict):
+            failures.append(f"{label} must be an object")
+            continue
+        contract_id = contract.get("id")
+        if not isinstance(contract_id, str) or ID_PATTERN.fullmatch(contract_id) is None:
+            failures.append(f"{label} has an invalid id")
+        elif contract_id in contract_ids:
+            failures.append(f"duplicate coverage contract id: {contract_id}")
+        else:
+            contract_ids.add(contract_id)
+        patterns = contract.get("paths")
+        if not isinstance(patterns, list) or not patterns:
+            failures.append(f"{label} must list paths")
+        else:
+            for pattern in patterns:
+                if not safe_pattern(pattern) or not matched_paths(root, str(pattern)):
+                    failures.append(f"{label} path matches nothing: {pattern!r}")
+        if not isinstance(contract.get("contract"), str) or not contract["contract"].strip():
+            failures.append(f"{label} must state its contract")
+        checks = contract.get("checks")
+        if not isinstance(checks, list) or not checks:
+            failures.append(f"{label} must list checks")
+        else:
+            for command in checks:
+                match = re.match(r"^just\s+([a-zA-Z0-9_-]+)", str(command))
+                if match is not None and match.group(1) not in recipes:
+                    failures.append(f"{label} references unknown Just recipe: {match.group(1)}")
+
+    policy = document.get("review_policy")
+    if not isinstance(policy, dict):
+        failures.append("review_policy must be an object")
+    else:
+        standard = policy.get("standard") if isinstance(policy.get("standard"), dict) else {}
+        high = policy.get("high") if isinstance(policy.get("high"), dict) else {}
+        if standard.get("minimum_reviewers") != 1:
+            failures.append("standard review must require one reviewer")
+        if high.get("minimum_reviewers", 0) < 2 or high.get("distinct_model_families") is not True:
+            failures.append("high-risk review must require two distinct model families")
+    return failures
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent)
+    parser.add_argument("--manifest", type=Path)
+    args = parser.parse_args()
+    root = args.root.resolve()
+    manifest = args.manifest or root / "agent-tooling-manifest.json"
+    try:
+        document = json.loads(manifest.read_text(encoding="utf-8"))
+        failures = validate_document(root, document, just_recipes(root))
+    except (OSError, json.JSONDecodeError, RuntimeError) as error:
+        print(f"agent manifest: {error}", file=sys.stderr)
+        return 2
+    if failures:
+        for failure in failures:
+            print(f"agent manifest: {failure}", file=sys.stderr)
+        return 1
+    print(f"agent capability manifest passed ({len(document['capabilities'])} capabilities)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

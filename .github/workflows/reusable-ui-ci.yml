@@ -104,6 +104,38 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
+  browser:
+    name: UI Browser Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up UI
+        uses: ./.github/actions/setup-ui
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Install Chromium
+        working-directory: ui
+        run: yarn playwright install --with-deps chromium
+
+      - name: Run browser accessibility and screenshot checks
+        working-directory: ui
+        run: yarn test:e2e
+
+      - name: Upload browser failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ui-browser-failures
+          path: |
+            ui/playwright-report/
+            ui/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
   build:
     name: UI Build
     runs-on: ubuntu-latest

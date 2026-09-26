@@ -23,4 +23,4 @@
 
 - `go test ./api/integration-api/internal/caller/metrics/...`
 - `go test ./api/integration-api/internal/caller/acme_llm/...`
-- `./skills/telemetry-integration/scripts/validate.sh --check-diff --provider acme_llm`
+- `./.codex/skills/telemetry-integration/scripts/validate.sh --check-diff --provider acme_llm`

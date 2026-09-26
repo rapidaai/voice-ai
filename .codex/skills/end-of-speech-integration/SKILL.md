@@ -14,7 +14,7 @@ Implement EOS that finalizes each user turn exactly once, at low latency, withou
 In scope:
 - `api/assistant-api/internal/end_of_speech/internal/<provider>/...`
 - `api/assistant-api/internal/end_of_speech/end_of_speech.go`
-- `api/assistant-api/internal/type/end_of_speech.go` and packet compatibility only if required
+- `api/assistant-api/internal/type/executor.go` and packet compatibility only if required
 - `ui/src/providers/<provider>/eos.json` and optional `model-options.json`
 - `ui/src/app/components/providers/end-of-speech/`
 
@@ -54,6 +54,15 @@ Required outputs:
 5. Wire UI provider config and component mapping.
 6. Add tests for timeout/interruption/dedup-finalization.
 
+## Lifecycle integration
+
+- `development-lifecycle` owns tier selection and the repository-level change contract.
+- Use `change-analysis` when ownership, consumers, or blast radius is not already proven.
+- This skill owns its domain evidence and boundaries; `developing-change` owns implementation discipline.
+- Use `debugging` for unexplained failures and `writing-documentation` for documentation changes.
+- Use `reviewing-change` for independent review and `responding-to-review` for its findings.
+- Use `preparing-delivery` only when the user explicitly requests a delivery action.
+
 ## Governed lifecycle
 
 - Classify work as Fast, Standard, or Governed using `DEVELOPMENT_PROCESS.md`; use the full gated lifecycle only for Governed work.
@@ -66,7 +75,7 @@ Required outputs:
 - `go test ./api/assistant-api/internal/end_of_speech/...`
 - `go test ./api/assistant-api/internal/adapters/internal/...`
 - `cd ui && yarn test providers`
-- `./skills/end-of-speech-integration/scripts/validate.sh --check-diff --provider <provider>`
+- `./.codex/skills/end-of-speech-integration/scripts/validate.sh --check-diff --provider <provider>`
 
 ## References
 

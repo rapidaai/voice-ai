@@ -26,4 +26,4 @@
 
 - `go test ./api/assistant-api/internal/channel/telephony/...`
 - `go test ./api/assistant-api/internal/adapters/internal/...`
-- `./skills/telephony-integration/scripts/validate.sh --check-diff --provider acme_tel`
+- `./.codex/skills/telephony-integration/scripts/validate.sh --check-diff --provider acme_tel`

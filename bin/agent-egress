@@ -1,0 +1,252 @@
+#!/usr/bin/env python3
+"""Validate and redact repository content before an external transfer."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import sys
+from pathlib import Path
+
+
+ALLOWED_DIRECTORIES = (
+    ".claude/",
+    ".codex/",
+    ".github/",
+    "api/",
+    "bin/",
+    "cmd/",
+    "config/",
+    "docker/",
+    "docs/",
+    "examples/",
+    "githooks/",
+    "just/",
+    "openapi/",
+    "pkg/",
+    "protos/",
+    "rfcs/",
+    "scripts/",
+    "sdks/",
+    "tests/",
+    "ui/",
+)
+ALLOWED_ROOT_FILES = re.compile(
+    r"^(AGENTS\.md|CLAUDE\.md|DEVELOPMENT_PROCESS\.md|SKILLS_QUICKSTART\.md|README\.md|[\w.-]+\.md|"
+    r"LICENSE(?:\.md)?|agent-(?:rules|tooling-manifest|reviewers\.example)\.json|docker-compose(?:\.[\w-]+)?\.yml|go\.(?:mod|sum)|"
+    r"justfile|package\.json|yarn\.lock|\.gitignore|\.golangci\.yml|\.pre-commit-config\.yaml)$"
+)
+SENSITIVE_PATHS = (
+    (re.compile(r"(^|/)\.env(?:\.(?!example$)[^/]*)?$"), "environment file"),
+    (re.compile(r"(^|/)\.(?:npmrc|netrc|pgpass)$"), "credential configuration"),
+    (re.compile(r"\.(?:pem|key|p12|pfx|jks|keystore|har)$", re.IGNORECASE), "credential material"),
+    (re.compile(r"(^|/)id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?$"), "SSH identity"),
+    (re.compile(r"(^|/)(?:\.auth|auth-state|credentials?)(?:/|$)"), "authentication state"),
+    (re.compile(r"(^|/)[^/]*(?:secret|credential|token)[^/]*\.(?:json|ya?ml|toml|ini|txt)$", re.IGNORECASE), "secret data"),
+)
+SECRET_PATTERNS = (
+    (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"), "private key"),
+    (re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"), "AWS access key"),
+    (re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}\b|\bgithub_pat_[A-Za-z0-9_]{40,}"), "GitHub token"),
+    (re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}"), "Slack token"),
+    (re.compile(r"\bsk-(?:ant-|proj-)?[A-Za-z0-9_-]{20,}"), "API key"),
+    (re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b"), "Google API key"),
+    (re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"), "JWT"),
+    (re.compile(r"://[^/\s:@]+:[^/\s:@]{3,}@"), "credentials in URL"),
+)
+SECRET_KEY = (
+    r"[\w.-]*(?:secret|token|passw(?:or)?d|pwd|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret)"
+    r"[\w.-]*"
+)
+SECRET_ASSIGNMENTS = (
+    re.compile(rf"(?i)\b{SECRET_KEY}[\"']?\s*[:=]\s*[\"'](?P<value>[^\"'\s]{{8,}})[\"']"),
+    re.compile(rf"(?i)^\s*(?:export\s+)?{SECRET_KEY}\s*=\s*(?P<value>[^\s#\"']{{8,}})\s*(?:#.*)?$"),
+    re.compile(rf"(?i)^\s*[\"']?{SECRET_KEY}[\"']?\s*:\s*(?P<value>[^\s#\"'{{][^\s#]{{7,}})\s*(?:#.*)?$"),
+)
+NON_SECRET_VALUE = re.compile(
+    r"^(?:\$|\{|<|process\.env|env\.|import\.meta|true$|false$|null$|undefined$|test$|example|changeme|x+$|\*+$|your[_-])",
+    re.IGNORECASE,
+)
+DIFF_HEADER = re.compile(r"^diff --git a/(.*?) b/(.*)$")
+MAX_FILE_BYTES = 2 * 1024 * 1024
+
+
+def root_path() -> Path:
+    configured = os.environ.get("AGENT_EGRESS_ROOT")
+    return Path(configured).resolve() if configured else Path(__file__).resolve().parent.parent
+
+
+def relative_path(root: Path, path: str) -> str | None:
+    target = Path(path)
+    if not target.is_absolute():
+        target = root / target
+    try:
+        return target.resolve().relative_to(root).as_posix()
+    except ValueError:
+        return None
+
+
+def path_refusal(root: Path, path: str) -> str | None:
+    relative = relative_path(root, path)
+    if relative is None:
+        return "outside the repository"
+    for pattern, reason in SENSITIVE_PATHS:
+        if pattern.search(relative):
+            return reason
+    if "/" not in relative:
+        if ALLOWED_ROOT_FILES.fullmatch(relative) is None:
+            return "root file is not allowlisted"
+    elif not relative.startswith(ALLOWED_DIRECTORIES):
+        return "directory is not allowlisted"
+
+    target = root / relative
+    if not target.is_file():
+        return "not a regular file"
+    if target.stat().st_size > MAX_FILE_BYTES:
+        return "file is larger than the egress limit"
+    try:
+        sample = target.read_bytes()[:8192]
+    except OSError:
+        return "file cannot be read"
+    if b"\0" in sample:
+        return "binary file"
+    return None
+
+
+def redaction_marker(line: str, reason: str) -> str:
+    prefix = line[0] if line[:1] in {"+", "-", " "} and not line.startswith(("+++", "---")) else ""
+    return f"{prefix}[line redacted by agent egress filter: {reason}]"
+
+
+def redact_line(line: str) -> tuple[str, str | None]:
+    for pattern, reason in SECRET_PATTERNS:
+        if pattern.search(line):
+            return redaction_marker(line, reason), reason
+    for pattern in SECRET_ASSIGNMENTS:
+        match = pattern.search(line)
+        if match is not None and NON_SECRET_VALUE.match(match.group("value")) is None:
+            return redaction_marker(line, "secret-looking assignment"), "secret-looking assignment"
+    return line, None
+
+
+def filter_text(text: str) -> tuple[str, list[str]]:
+    output: list[str] = []
+    reasons: list[str] = []
+    for line in text.split("\n"):
+        filtered, reason = redact_line(line)
+        output.append(filtered)
+        if reason:
+            reasons.append(reason)
+    return "\n".join(output), reasons
+
+
+def filter_diff(root: Path, text: str) -> tuple[str, dict[str, object]]:
+    output: list[str] = []
+    section: list[str] = []
+    section_path: str | None = None
+    kept: list[str] = []
+    withheld: list[dict[str, str]] = []
+    reasons: list[str] = []
+
+    def flush() -> None:
+        if not section:
+            return
+        if section_path is None:
+            output.extend(section)
+            return
+        refusal = path_refusal(root, section_path)
+        if refusal:
+            withheld.append({"path": section_path, "reason": refusal})
+            output.extend(
+                [
+                    f"diff --git a/{section_path} b/{section_path}",
+                    f"[file withheld by agent egress filter: {refusal}]",
+                ]
+            )
+            return
+        kept.append(section_path)
+        filtered, found = filter_text("\n".join(section))
+        reasons.extend(found)
+        output.append(filtered)
+
+    for line in text.split("\n"):
+        match = DIFF_HEADER.match(line)
+        if match:
+            flush()
+            section = [line]
+            section_path = match.group(2) if match.group(2) != "/dev/null" else match.group(1)
+        else:
+            section.append(line)
+    flush()
+    manifest = {
+        "kept": kept,
+        "withheld": withheld,
+        "redacted_lines": len(reasons),
+        "redacted_kinds": sorted(set(reasons)),
+    }
+    return "\n".join(output), manifest
+
+
+def write_result(output_path: Path, text: str, manifest: dict[str, object]) -> None:
+    output_path.write_text(text, encoding="utf-8")
+    output_path.with_name(output_path.name + ".manifest.json").write_text(
+        json.dumps(manifest, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest="mode", required=True)
+    paths_parser = subparsers.add_parser("paths")
+    paths_parser.add_argument("paths", nargs="+")
+    text_parser = subparsers.add_parser("text")
+    text_parser.add_argument("input", type=Path)
+    text_parser.add_argument("output", type=Path)
+    diff_parser = subparsers.add_parser("diff")
+    diff_parser.add_argument("input", type=Path)
+    diff_parser.add_argument("output", type=Path)
+    args = parser.parse_args()
+    root = root_path()
+
+    if args.mode == "paths":
+        failures = [(path, path_refusal(root, path)) for path in args.paths]
+        failures = [(path, reason) for path, reason in failures if reason]
+        for path, reason in failures:
+            print(f"agent egress: refusing {path}: {reason}", file=sys.stderr)
+        return 1 if failures else 0
+
+    if args.input.resolve() == args.output.resolve():
+        print("agent egress: input and output must differ", file=sys.stderr)
+        return 2
+    try:
+        source = args.input.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        print(f"agent egress: cannot read input: {error}", file=sys.stderr)
+        return 2
+    if args.mode == "text":
+        refusal = path_refusal(root, str(args.input))
+        if refusal:
+            print(f"agent egress: refusing {args.input}: {refusal}", file=sys.stderr)
+            return 1
+        filtered, reasons = filter_text(source)
+        manifest = {"source": relative_path(root, str(args.input)), "redacted_lines": len(reasons), "redacted_kinds": sorted(set(reasons))}
+    else:
+        filtered, manifest = filter_diff(root, source)
+    try:
+        write_result(args.output, filtered, manifest)
+    except OSError as error:
+        print(f"agent egress: cannot write output: {error}", file=sys.stderr)
+        return 2
+    print(
+        f"agent egress: {manifest.get('redacted_lines', 0)} line(s) redacted, "
+        f"{len(manifest.get('withheld', []))} file(s) withheld",
+        file=sys.stderr,
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
