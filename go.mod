@@ -21,7 +21,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ses v1.34.11
 	github.com/cohere-ai/cohere-go/v2 v2.16.0
 	github.com/deepgram/deepgram-go-sdk/v3 v3.5.0
-	github.com/emiago/sipgo v1.1.1
+	github.com/emiago/sipgo v1.4.3
 	github.com/flosch/pongo2/v6 v6.0.0
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.10.1

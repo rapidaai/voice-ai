@@ -152,6 +152,7 @@ func newServerForCommandTests(t *testing.T) *Server {
 		}
 		server.mu.RUnlock()
 		for _, session := range sessions {
+			session.SetDialogServerSession(nil)
 			_ = server.EndCallWithReason(session, LifecycleReasonEndCall)
 		}
 	})
@@ -163,7 +164,7 @@ func newSIPRequest(method sip.RequestMethod, callID string) *sip.Request {
 	req := sip.NewRequest(method, recipient)
 
 	params := sip.NewParams()
-	params["branch"] = sip.GenerateBranch()
+	params.Add("branch", sip.GenerateBranch())
 	fromParams := sip.NewParams()
 	fromParams.Add("tag", "fromtag")
 	req.AppendHeader(&sip.ViaHeader{

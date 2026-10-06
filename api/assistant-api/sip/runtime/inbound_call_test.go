@@ -56,7 +56,7 @@ func TestInboundCall_InvalidIdentityRejectsWithoutSession(t *testing.T) {
 			for request.RemoveHeader(tc.removeHeader) {
 			}
 			if tc.removeFromTag && request.From() != nil && request.From().Params != nil {
-				delete(request.From().Params, "tag")
+				request.From().Params.Remove("tag")
 			}
 			if tc.emptyFromAddress {
 				request.From().Address = sip.Uri{Scheme: "sip"}
