@@ -75,6 +75,28 @@ jobs:
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
           echo "CI mode: $mode" >> "$GITHUB_STEP_SUMMARY"
 
+  commit-lint:
+    name: 01 Validate - Repository / Commit Message Lint
+    needs: changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+
+      - name: Install commitlint
+        run: npm install --global @commitlint/cli @commitlint/config-conventional
+
+      - name: Validate PR commits
+        run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
+
   basics-go:
     name: 01 Validate - Go
     needs: changes
@@ -99,7 +121,6 @@ jobs:
     uses: ./.github/workflows/reusable-repository-ci.yml
     with:
       go-version: "1.25.13"
-      node-version: "22"
 
   docker:
     name: 02 Build - Docker Images
@@ -131,6 +152,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - changes
+      - commit-lint
       - basics-go
       - basics-ui
       - basics-repository
@@ -143,6 +165,7 @@ jobs:
         env:
           CI_MODE: ${{ needs.changes.outputs.mode }}
           CHANGES_RESULT: ${{ needs.changes.result }}
+          COMMIT_LINT_RESULT: ${{ needs.commit-lint.result }}
           GO_RESULT: ${{ needs.basics-go.result }}
           UI_RESULT: ${{ needs.basics-ui.result }}
           REPOSITORY_RESULT: ${{ needs.basics-repository.result }}
@@ -152,6 +175,11 @@ jobs:
         run: |
           if [ "$CHANGES_RESULT" != "success" ] || [ "$REPOSITORY_RESULT" != "success" ]; then
             echo "Change classification and repository validation must pass"
+            exit 1
+          fi
+
+          if [ "$COMMIT_LINT_RESULT" != "success" ] && [ "$COMMIT_LINT_RESULT" != "skipped" ]; then
+            echo "Commit message validation must pass"
             exit 1
           fi
 
@@ -188,6 +216,7 @@ jobs:
             echo "| Area | Result |"
             echo "|------|--------|"
             echo "| 00 Changes (${{ needs.changes.outputs.mode }}) | ${{ needs.changes.result }} |"
+            echo "| 01 Validate - Repository / Commit Message Lint | ${{ needs.commit-lint.result }} |"
             echo "| 01 Validate - Go | ${{ needs.basics-go.result }} |"
             echo "| 01 Validate - UI | ${{ needs.basics-ui.result }} |"
             echo "| 01 Validate - Repository | ${{ needs.basics-repository.result }} |"
