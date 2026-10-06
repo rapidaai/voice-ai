@@ -206,6 +206,9 @@ jest.mock('@/app/components/ui/composites/tab-form', () => ({
 jest.mock(
   '@/app/pages/assistant/actions/create-deployment/commons/configure-experience',
   () => ({
+    ...jest.requireActual(
+      '@/app/pages/assistant/actions/create-deployment/commons/configure-experience',
+    ),
     ConfigureExperience: () => <div>experience</div>,
   }),
 );

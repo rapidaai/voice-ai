@@ -12,11 +12,14 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
+	"strings"
 	"testing"
 
 	assistant_config "github.com/rapidaai/api/assistant-api/config"
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_pipeline "github.com/rapidaai/api/assistant-api/sip/pipeline"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	app_config "github.com/rapidaai/config"
@@ -72,43 +75,45 @@ func TestSIPEngineDoesNotPassPostgresToMiddleware(t *testing.T) {
 	})
 }
 
-func TestSIPEnginePassesCallAdmissionConfigToRuntime(t *testing.T) {
+func TestSIPEnginePassesSIPConfigToVaultMiddleware(t *testing.T) {
 	file, err := parser.ParseFile(token.NewFileSet(), "sip.go", nil, 0)
 	require.NoError(t, err)
 
-	expectedFields := map[string]bool{
-		"MaxConcurrentCalls": false,
-		"CallAdmissionCPS":   false,
-		"CallAdmissionBurst": false,
-	}
-
+	found := false
 	ast.Inspect(file, func(node ast.Node) bool {
-		composite, ok := node.(*ast.CompositeLit)
+		selector, ok := node.(*ast.SelectorExpr)
 		if !ok {
 			return true
 		}
-		selector, ok := composite.Type.(*ast.SelectorExpr)
-		if !ok || selector.Sel.Name != "ServerConfig" {
+		if selector.Sel.Name == "WithSIPConfig" {
+			found = true
+			return false
+		}
+		return true
+	})
+
+	assert.True(t, found, "SIP engine should pass config ownership to vault middleware")
+}
+
+func TestSIPEngineUsesSIPServerConfigBuilder(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "sip.go", nil, 0)
+	require.NoError(t, err)
+
+	found := false
+	ast.Inspect(file, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
 			return true
 		}
-		for _, element := range composite.Elts {
-			keyValue, ok := element.(*ast.KeyValueExpr)
-			if !ok {
-				continue
-			}
-			field, ok := keyValue.Key.(*ast.Ident)
-			if ok {
-				if _, exists := expectedFields[field.Name]; exists {
-					expectedFields[field.Name] = true
-				}
-			}
+		selector, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok || selector.Sel.Name != "NewServerConfig" {
+			return true
 		}
+		found = true
 		return false
 	})
 
-	for field, found := range expectedFields {
-		assert.True(t, found, "runtime ServerConfig missing %s", field)
-	}
+	assert.True(t, found, "SIP engine should use sip config server builder")
 }
 
 func TestSIPEngineUsesConfiguredServiceID(t *testing.T) {
@@ -119,7 +124,7 @@ func TestSIPEngineUsesConfiguredServiceID(t *testing.T) {
 func TestSessionEstablishedStagePreservesCallAddress(t *testing.T) {
 	auth := &types.Authentication{}
 	session, err := sip_runtime.NewSession(context.Background(),
-		sip_runtime.WithSessionConfig(&sip_runtime.Config{
+		sip_runtime.WithSessionConfig(&sip_config.Config{
 			Server:            "127.0.0.1",
 			Port:              5060,
 			RTPPortRangeStart: 10000,
@@ -144,6 +149,27 @@ func TestSessionEstablishedStagePreservesCallAddress(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, address, stage.CallAddress)
+}
+
+func TestOnInviteStartsPreparedSessionBeforeOutboundFallback(t *testing.T) {
+	sourceBytes, err := os.ReadFile("sip.go")
+	require.NoError(t, err)
+
+	source := string(sourceBytes)
+	onInviteIndex := strings.Index(source, "func (m *SIPEngine) onInvite")
+	require.NotEqual(t, -1, onInviteIndex)
+	onByeIndex := strings.Index(source[onInviteIndex:], "func (m *SIPEngine) onBye")
+	require.NotEqual(t, -1, onByeIndex)
+
+	onInviteSource := source[onInviteIndex : onInviteIndex+onByeIndex]
+	inboundPreparedIndex := strings.Index(onInviteSource, "if stage.Direction == sip_runtime.CallDirectionInbound")
+	outboundPreparedIndex := strings.Index(onInviteSource, "if err := m.dispatcher.StartPreparedSession")
+	outboundFallbackIndex := strings.Index(onInviteSource, "m.dispatcher.OnPipeline(m.ctx, stage)")
+
+	require.NotEqual(t, -1, inboundPreparedIndex)
+	require.NotEqual(t, -1, outboundPreparedIndex)
+	require.NotEqual(t, -1, outboundFallbackIndex)
+	assert.Less(t, outboundPreparedIndex, outboundFallbackIndex)
 }
 
 func TestPersistRemoteByeCallStatus_UpdatesCompletedDisconnectMetadata(t *testing.T) {
@@ -252,7 +278,7 @@ func (s *sipCallStatusTestStore) UpdateCallStatus(_ context.Context, contextID s
 func newSIPCallStatusTestSession(t *testing.T, contextID string) *sip_runtime.Session {
 	t.Helper()
 	session, err := sip_runtime.NewSession(context.Background(),
-		sip_runtime.WithSessionConfig(&sip_runtime.Config{
+		sip_runtime.WithSessionConfig(&sip_config.Config{
 			Server:            "127.0.0.1",
 			Port:              5060,
 			RTPPortRangeStart: 10000,

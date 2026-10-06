@@ -9,7 +9,7 @@ package deepgram_internal
 import (
 	"testing"
 
-	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/internal/testutil"
+	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/tests/testutil"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/stretchr/testify/assert"
@@ -27,12 +27,12 @@ func newTestLogger(t *testing.T) commons.Logger {
 	return logger
 }
 
-func newTestNormalizer(t *testing.T, opts utils.Option) *deepgramNormalizer {
+func newTestProcessor(t *testing.T, opts utils.Option) *deepgramProcessor {
 	t.Helper()
 	logger := testutil.NewTestLogger()
-	normalizer := NewDeepgramNormalizer(logger, opts)
-	dn, ok := normalizer.(*deepgramNormalizer)
-	require.True(t, ok, "expected *deepgramNormalizer type")
+	processor := NewDeepgramProcessor(logger, opts)
+	dn, ok := processor.(*deepgramProcessor)
+	require.True(t, ok, "expected *deepgramProcessor type")
 	return dn
 }
 
@@ -40,7 +40,7 @@ func newTestNormalizer(t *testing.T, opts utils.Option) *deepgramNormalizer {
 // Constructor Tests
 // =============================================================================
 
-func TestNewDeepgramNormalizer(t *testing.T) {
+func TestNewDeepgramProcessor(t *testing.T) {
 	tests := []struct {
 		name         string
 		opts         utils.Option
@@ -70,12 +70,12 @@ func TestNewDeepgramNormalizer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger := testutil.NewTestLogger()
-			normalizer := NewDeepgramNormalizer(logger, tt.opts)
+			processor := NewDeepgramProcessor(logger, tt.opts)
 
-			require.NotNil(t, normalizer, "normalizer should not be nil")
+			require.NotNil(t, processor, "processor should not be nil")
 
-			dn, ok := normalizer.(*deepgramNormalizer)
-			require.True(t, ok, "should return *deepgramNormalizer")
+			dn, ok := processor.(*deepgramProcessor)
+			require.True(t, ok, "should return *deepgramProcessor")
 
 			assert.Equal(t, tt.expectedLang, dn.language)
 			assert.NotNil(t, dn.logger)
@@ -84,17 +84,17 @@ func TestNewDeepgramNormalizer(t *testing.T) {
 }
 
 // =============================================================================
-// Normalize Method Tests
+// Process Method Tests
 // =============================================================================
 
-func TestNormalize_EmptyString(t *testing.T) {
-	normalizer := newTestNormalizer(t, utils.Option{})
-	result := normalizer.Normalize("")
+func TestProcess_EmptyString(t *testing.T) {
+	processor := newTestProcessor(t, utils.Option{})
+	result := processor.Process("")
 	assert.Equal(t, "", result)
 }
 
-func TestNormalize_Passthrough(t *testing.T) {
-	normalizer := newTestNormalizer(t, utils.Option{})
+func TestProcess_Passthrough(t *testing.T) {
+	processor := newTestProcessor(t, utils.Option{})
 
 	tests := []struct {
 		name  string
@@ -144,14 +144,14 @@ func TestNormalize_Passthrough(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := normalizer.Normalize(tt.input)
-			assert.Equal(t, tt.input, result, "Normalize should return text unchanged")
+			result := processor.Process(tt.input)
+			assert.Equal(t, tt.input, result, "Process should return text unchanged")
 		})
 	}
 }
 
-func TestNormalize_NoSSMLOutput(t *testing.T) {
-	normalizer := newTestNormalizer(t, utils.Option{})
+func TestProcess_NoSSMLOutput(t *testing.T) {
+	processor := newTestProcessor(t, utils.Option{})
 
 	// Deepgram doesn't support SSML, so output should never contain SSML tags
 	tests := []struct {
@@ -170,7 +170,7 @@ func TestNormalize_NoSSMLOutput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := normalizer.Normalize(tt.input)
+			result := processor.Process(tt.input)
 			// Should NOT contain SSML tags like <speak>, <break>, etc.
 			assert.NotContains(t, result, "<speak>")
 			assert.NotContains(t, result, "</speak>")
@@ -187,20 +187,20 @@ func TestNormalize_NoSSMLOutput(t *testing.T) {
 // Benchmark Tests
 // =============================================================================
 
-func BenchmarkNormalize_SimpleText(b *testing.B) {
+func BenchmarkProcess_SimpleText(b *testing.B) {
 	logger, _ := commons.NewApplicationLogger()
-	normalizer := NewDeepgramNormalizer(logger, utils.Option{})
+	processor := NewDeepgramProcessor(logger, utils.Option{})
 	text := "Hello, this is a simple text for TTS processing."
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		normalizer.Normalize(text)
+		processor.Process(text)
 	}
 }
 
-func BenchmarkNormalize_LongText(b *testing.B) {
+func BenchmarkProcess_LongText(b *testing.B) {
 	logger, _ := commons.NewApplicationLogger()
-	normalizer := NewDeepgramNormalizer(logger, utils.Option{})
+	processor := NewDeepgramProcessor(logger, utils.Option{})
 
 	// Generate a longer text
 	text := ""
@@ -210,6 +210,6 @@ func BenchmarkNormalize_LongText(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		normalizer.Normalize(text)
+		processor.Process(text)
 	}
 }

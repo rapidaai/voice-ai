@@ -14,6 +14,7 @@ import (
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/commons"
 	gorm_model "github.com/rapidaai/pkg/models/gorm"
@@ -114,6 +115,7 @@ func TestRouteMiddleware_DIDRouteNotFound(t *testing.T) {
 	var sipErr *sip_runtime.SIPError
 	require.ErrorAs(t, err, &sipErr)
 	assert.Equal(t, 404, sipErr.Code)
+	assert.Equal(t, sipMessageAssistantRouteNotFound, sipErr.Message)
 	assert.Empty(t, ctx.CallAddress.To)
 	assert.Nil(t, ctx.Auth)
 }
@@ -223,7 +225,7 @@ func TestRouteMiddleware_AgentRoutePhoneResolution(t *testing.T) {
 				var sipErr *sip_runtime.SIPError
 				require.ErrorAs(t, err, &sipErr)
 				assert.Equal(t, 500, sipErr.Code)
-				assert.ErrorIs(t, sipErr.Err, sip_runtime.ErrInvalidConfig)
+				assert.ErrorIs(t, sipErr.Err, sip_config.ErrInvalidConfig)
 				return
 			}
 			require.NoError(t, err)

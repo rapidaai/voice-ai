@@ -51,6 +51,7 @@ func (e *modelAssistantExecutor) Execute(ctx context.Context, communication inte
 		}
 		e.mu.Lock()
 		e.currentPacket = &p
+		e.doneContextID = ""
 		e.mu.Unlock()
 		e.Run(ctx, communication, UserTurnPipeline{Packet: p})
 
@@ -94,6 +95,11 @@ func (e *modelAssistantExecutor) Run(ctx context.Context, communication internal
 func (e *modelAssistantExecutor) handleUserTurn(ctx context.Context, communication internal_type.Communication, p internal_type.UserInputPacket) {
 	assistant, err := communication.Assistant()
 	if err != nil {
+		e.mu.Lock()
+		e.currentPacket = nil
+		e.requestStartedAt = time.Time{}
+		e.waitingForFirstResponse = false
+		e.mu.Unlock()
 		communication.OnPacket(ctx, internal_type.LLMErrorPacket{ContextID: p.ContextID, Error: err})
 		return
 	}
@@ -103,6 +109,11 @@ func (e *modelAssistantExecutor) handleUserTurn(ctx context.Context, communicati
 
 	if err := e.validateHistorySequence(snapshot); err != nil {
 		err = fmt.Errorf("history integrity: %w", err)
+		e.mu.Lock()
+		e.currentPacket = nil
+		e.requestStartedAt = time.Time{}
+		e.waitingForFirstResponse = false
+		e.mu.Unlock()
 		communication.OnPacket(ctx,
 			internal_type.LLMErrorPacket{ContextID: p.ContextID, Error: err},
 			internal_type.ObservabilityEventRecordPacket{
@@ -192,6 +203,7 @@ func (e *modelAssistantExecutor) handleUserTurn(ctx context.Context, communicati
 	}
 	if err := e.sendChat(communication, p.ContextID, promptArgs, append(snapshot, userMsg)...); err != nil {
 		e.mu.Lock()
+		e.currentPacket = nil
 		e.requestStartedAt = time.Time{}
 		e.waitingForFirstResponse = false
 		e.mu.Unlock()
@@ -296,6 +308,7 @@ func (e *modelAssistantExecutor) handleToolResult(ctx context.Context, communica
 
 func (e *modelAssistantExecutor) handleInterruption() {
 	e.mu.Lock()
+	e.currentPacket = nil
 	e.requestStartedAt = time.Time{}
 	e.waitingForFirstResponse = false
 	e.mu.Unlock()
@@ -331,6 +344,7 @@ func (e *modelAssistantExecutor) handleResponse(ctx context.Context, communicati
 
 	if resp.GetError() != nil {
 		e.mu.Lock()
+		e.currentPacket = nil
 		e.requestStartedAt = time.Time{}
 		e.waitingForFirstResponse = false
 		e.mu.Unlock()
@@ -410,6 +424,15 @@ func (e *modelAssistantExecutor) onStreamingChunk(ctx context.Context, communica
 
 func (e *modelAssistantExecutor) onCompletion(ctx context.Context, communication internal_type.Communication, contextID, finishReason string, output *protos.Message, providerName string) {
 	now := time.Now()
+	if ctx.Err() != nil {
+		e.mu.Lock()
+		e.currentPacket = nil
+		e.requestStartedAt = time.Time{}
+		e.waitingForFirstResponse = false
+		e.mu.Unlock()
+		return
+	}
+
 	e.mu.Lock()
 	requestStartedAt := e.requestStartedAt
 	publishTTFT := e.waitingForFirstResponse
@@ -420,6 +443,27 @@ func (e *modelAssistantExecutor) onCompletion(ctx context.Context, communication
 	assistant := output.GetAssistant()
 	responseText := strings.Join(assistant.GetContents(), "")
 	toolCalls := assistant.GetToolCalls()
+
+	e.mu.RLock()
+	isCurrent := e.currentPacket != nil && e.currentPacket.ContextId() == contextID
+	e.mu.RUnlock()
+	if !isCurrent {
+		communication.OnPacket(ctx, internal_type.ObservabilityEventRecordPacket{
+			ContextID: contextID,
+			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
+			Record: observability.RecordEvent{
+				Component: observability.ComponentAgent,
+				Event:     observability.AgentDiscarded,
+				Attributes: observability.Attributes{
+					"context_id": contextID,
+					"reason":     "stale_context",
+					"script":     responseText,
+				},
+				OccurredAt: time.Now(),
+			},
+		})
+		return
+	}
 
 	supersededCtx := e.history.AppendAssistant(contextID, output)
 	if supersededCtx != "" {
@@ -443,10 +487,14 @@ func (e *modelAssistantExecutor) onCompletion(ctx context.Context, communication
 		})
 	}
 	if len(toolCalls) > 0 {
-		e.toolExecutor.ExecuteAll(ctx, contextID, toolCalls, communication)
+		e.mu.RLock()
+		isCurrent = e.currentPacket != nil && e.currentPacket.ContextId() == contextID
+		e.mu.RUnlock()
+		if isCurrent {
+			e.toolExecutor.ExecuteAll(ctx, contextID, toolCalls, communication)
+		}
 	}
 	packets := []internal_type.Packet{
-		internal_type.LLMResponseDonePacket{ContextID: contextID, Text: responseText},
 		internal_type.ObservabilityEventRecordPacket{
 			ContextID: contextID,
 			Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
@@ -459,6 +507,21 @@ func (e *modelAssistantExecutor) onCompletion(ctx context.Context, communication
 				"tool_call_count":     fmt.Sprintf("%d", len(toolCalls)),
 			}),
 		},
+	}
+	if len(toolCalls) == 0 {
+		e.mu.Lock()
+		isCurrent := e.currentPacket != nil && e.currentPacket.ContextId() == contextID
+		shouldEmitDone := isCurrent && e.doneContextID != contextID
+		if shouldEmitDone {
+			e.doneContextID = contextID
+			e.currentPacket = nil
+		}
+		e.mu.Unlock()
+		if shouldEmitDone {
+			packets = append([]internal_type.Packet{
+				internal_type.LLMResponseDonePacket{ContextID: contextID, Text: responseText},
+			}, packets...)
+		}
 	}
 	metrics := []*protos.Metric{{
 		Name:        observability.MetricAgentResponseCharCount,

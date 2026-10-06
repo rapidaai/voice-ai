@@ -179,7 +179,7 @@ func (c *Collector) send(ctx context.Context, scope observability.Scope, webhook
 	}
 
 	webhookTimeoutSeconds, err := webhookOptions.GetUint32(WebhookOptionTimeoutSecondsKey)
-	if err != nil || !validator.Between(int(webhookTimeoutSeconds), int(minWebhookTimeoutSeconds), int(defaultWebhookTimeoutSeconds)) {
+	if err != nil || webhookTimeoutSeconds < minWebhookTimeoutSeconds || webhookTimeoutSeconds > defaultWebhookTimeoutSeconds {
 		webhookTimeoutSeconds = defaultWebhookTimeoutSeconds
 	}
 	webhookRetryStatusCodes := webhookOptions.GetStringSlice(WebhookOptionRetryStatusCodesKey)

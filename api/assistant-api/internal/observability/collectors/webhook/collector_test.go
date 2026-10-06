@@ -9,6 +9,7 @@ package webhook
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -171,7 +172,7 @@ func TestCollector_DefaultsTooLargeTimeoutSeconds(t *testing.T) {
 		configurations: []*internal_assistant_entity.AssistantConfiguration{
 			testWebhook(1, []string{observability.CallRinging.String()}, map[string]interface{}{
 				WebhookOptionHTTPURLKey:        server.URL,
-				WebhookOptionTimeoutSecondsKey: uint32(defaultWebhookTimeoutSeconds + 1),
+				WebhookOptionTimeoutSecondsKey: uint32(math.MaxUint32),
 			}),
 		},
 	}

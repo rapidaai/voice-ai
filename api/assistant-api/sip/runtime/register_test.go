@@ -13,10 +13,11 @@ import (
 	"time"
 
 	"github.com/emiago/sipgo/sip"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 )
 
 func TestNewRegistrationClientCopiesListenConfig(t *testing.T) {
-	listenConfig := &ListenConfig{Address: "127.0.0.1", Port: 5060}
+	listenConfig := &sip_config.ListenConfig{Address: "127.0.0.1", Port: 5060}
 	client := NewRegistrationClient(nil, listenConfig, nil)
 
 	listenConfig.Address = "0.0.0.0"
@@ -232,7 +233,7 @@ func TestMarkRenewalFailedBeforeExpiryEmitsFailure(t *testing.T) {
 			DID:          "+15551234567",
 			DeploymentID: 101,
 			AssistantID:  201,
-			Config:       &Config{Server: "registrar.example.com"},
+			Config:       &sip_config.Config{Server: "registrar.example.com"},
 		},
 		expiresAt:            time.Now().Add(time.Minute),
 		grantedExpirySeconds: 120,
@@ -269,7 +270,7 @@ func TestMarkRenewalFailedAfterGraceExpiresRegistration(t *testing.T) {
 			DID:          "+15551234567",
 			DeploymentID: 101,
 			AssistantID:  201,
-			Config:       &Config{Server: "registrar.example.com"},
+			Config:       &sip_config.Config{Server: "registrar.example.com"},
 		},
 		cancel:               func() {},
 		expiresAt:            time.Now().Add(-2 * maxRegistrationExpiryGrace),
@@ -304,7 +305,7 @@ func TestMarkRenewalFailedIgnoresStaleRegistration(t *testing.T) {
 			DID:          "+15551234567",
 			DeploymentID: 101,
 			AssistantID:  201,
-			Config:       &Config{Server: "registrar.example.com"},
+			Config:       &sip_config.Config{Server: "registrar.example.com"},
 		},
 		cancel:               func() {},
 		expiresAt:            time.Now().Add(-2 * maxRegistrationExpiryGrace),
@@ -315,7 +316,7 @@ func TestMarkRenewalFailedIgnoresStaleRegistration(t *testing.T) {
 			DID:          "+15551234567",
 			DeploymentID: 101,
 			AssistantID:  201,
-			Config:       &Config{Server: "registrar.example.com"},
+			Config:       &sip_config.Config{Server: "registrar.example.com"},
 		},
 		cancel:               func() {},
 		expiresAt:            time.Now().Add(time.Minute),
@@ -349,37 +350,37 @@ func TestMarkRenewalFailedIgnoresStaleRegistration(t *testing.T) {
 func TestValidateRegistrationContactAddress(t *testing.T) {
 	tests := []struct {
 		name        string
-		config      *ListenConfig
+		config      *sip_config.ListenConfig
 		address     string
 		expectError bool
 	}{
 		{
 			name:        "empty",
-			config:      &ListenConfig{},
+			config:      &sip_config.ListenConfig{},
 			address:     "",
 			expectError: true,
 		},
 		{
 			name:        "unspecified",
-			config:      &ListenConfig{},
+			config:      &sip_config.ListenConfig{},
 			address:     "0.0.0.0",
 			expectError: true,
 		},
 		{
 			name:        "loopback blocked",
-			config:      &ListenConfig{},
+			config:      &sip_config.ListenConfig{},
 			address:     "127.0.0.1",
 			expectError: true,
 		},
 		{
 			name:        "loopback allowed",
-			config:      &ListenConfig{AllowLoopbackExternalIP: true},
+			config:      &sip_config.ListenConfig{AllowLoopbackExternalIP: true},
 			address:     "127.0.0.1",
 			expectError: false,
 		},
 		{
 			name:        "public ip",
-			config:      &ListenConfig{},
+			config:      &sip_config.ListenConfig{},
 			address:     "203.0.113.10",
 			expectError: false,
 		},

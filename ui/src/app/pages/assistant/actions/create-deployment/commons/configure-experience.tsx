@@ -39,6 +39,20 @@ export const DEFAULT_UNCLEAR_INPUT_TIMEOUT = '2';
 export const DEFAULT_UNCLEAR_INPUT_MESSAGE =
   "I didn't catch that. Could you repeat that?";
 export const DEFAULT_IDEAL_TIMEOUT = '10';
+export const DEFAULT_IDLE_PROMPT_COUNT = '2';
+
+export const validateIdleTimeoutConfig = (config: ExperienceConfig): string => {
+  const timeout = config.idealTimeout?.trim() || DEFAULT_IDEAL_TIMEOUT;
+  if (!/^\d+$/.test(timeout) || Number(timeout) < 5 || Number(timeout) > 120) {
+    return 'Idle silence timeout must be a whole number from 5 to 120 seconds.';
+  }
+  const count =
+    config.idleTimeoutBackoffTimes?.trim() || DEFAULT_IDLE_PROMPT_COUNT;
+  if (!/^\d+$/.test(count) || Number(count) > 5) {
+    return 'Idle prompt count must be a whole number from 0 to 5. Use 0 for unlimited prompts.';
+  }
+  return '';
+};
 
 const UNCLEAR_INPUT_MESSAGE_OPTIONS = [
   DEFAULT_UNCLEAR_INPUT_MESSAGE,
@@ -228,8 +242,8 @@ export const ConfigureExperience: FC<{
             min={5}
             max={120}
             step={1}
-            value={parseInt(
-              experienceConfig.idealTimeout || DEFAULT_IDEAL_TIMEOUT,
+            value={Number(
+              experienceConfig.idealTimeout?.trim() || DEFAULT_IDEAL_TIMEOUT,
             )}
             onChange={({ value }: { value: number }) =>
               update('idealTimeout', value.toString())
@@ -239,17 +253,20 @@ export const ConfigureExperience: FC<{
 
         <Stack gap={3}>
           {labelWithToggletip(
-            'Idle Timeout Backoff (Times)',
-            'Number of idle prompts before the session stops waiting for a response.',
+            'Idle Prompt Count (0 = Unlimited)',
+            'Number of idle prompts before disconnecting on the next idle timeout. Zero keeps prompting without an idle-count limit.',
           )}
           <Slider
             id="experience-backoff"
-            labelText="Idle Timeout Backoff (Times)"
+            labelText="Idle Prompt Count (0 = Unlimited)"
             hideLabel
             min={0}
             max={5}
             step={1}
-            value={parseInt(experienceConfig.idleTimeoutBackoffTimes || '2')}
+            value={Number(
+              experienceConfig.idleTimeoutBackoffTimes?.trim() ||
+                DEFAULT_IDLE_PROMPT_COUNT,
+            )}
             onChange={({ value }: { value: number }) =>
               update('idleTimeoutBackoffTimes', value.toString())
             }

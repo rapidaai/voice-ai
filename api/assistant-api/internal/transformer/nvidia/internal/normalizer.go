@@ -12,21 +12,21 @@ import (
 	"github.com/rapidaai/pkg/utils"
 )
 
-// nvidiaNormalizer handles Nvidia TTS text preprocessing.
+// nvidiaProcessor handles Nvidia TTS text preprocessing.
 // Nvidia does NOT support SSML - only plain text is accepted.
-type nvidiaNormalizer struct {
+type nvidiaProcessor struct {
 	logger commons.Logger
 }
 
-// NewNvidiaNormalizer creates an Nvidia-specific text normalizer.
-func NewNvidiaNormalizer(logger commons.Logger, opts utils.Option) internal_type.TextNormalizer {
-	return &nvidiaNormalizer{
+// NewNvidiaProcessor creates an Nvidia-specific text processor.
+func NewNvidiaProcessor(logger commons.Logger, opts utils.Option) internal_type.TextProcessor {
+	return &nvidiaProcessor{
 		logger: logger,
 	}
 }
 
-// Normalize returns text unchanged. Nvidia does NOT support SSML.
-// Markdown removal and whitespace normalization are handled upstream.
-func (n *nvidiaNormalizer) Normalize(text string) string {
+// Process returns text unchanged. Nvidia does NOT support SSML.
+// Markdown removal and whitespace processing are handled upstream.
+func (n *nvidiaProcessor) Process(text string) string {
 	return text
 }

@@ -12,21 +12,21 @@ import (
 	"github.com/rapidaai/pkg/utils"
 )
 
-// resembleaiNormalizer handles ResembleAI TTS text preprocessing.
+// resembleaiProcessor handles ResembleAI TTS text preprocessing.
 // ResembleAI does NOT support SSML - only plain text is accepted.
-type resembleaiNormalizer struct {
+type resembleaiProcessor struct {
 	logger commons.Logger
 }
 
-// NewResembleAINormalizer creates a ResembleAI-specific text normalizer.
-func NewResembleAINormalizer(logger commons.Logger, opts utils.Option) internal_type.TextNormalizer {
-	return &resembleaiNormalizer{
+// NewResembleAIProcessor creates a ResembleAI-specific text processor.
+func NewResembleAIProcessor(logger commons.Logger, opts utils.Option) internal_type.TextProcessor {
+	return &resembleaiProcessor{
 		logger: logger,
 	}
 }
 
-// Normalize returns text unchanged. ResembleAI does NOT support SSML.
-// Markdown removal and whitespace normalization are handled upstream.
-func (n *resembleaiNormalizer) Normalize(text string) string {
+// Process returns text unchanged. ResembleAI does NOT support SSML.
+// Markdown removal and whitespace processing are handled upstream.
+func (n *resembleaiProcessor) Process(text string) string {
 	return text
 }

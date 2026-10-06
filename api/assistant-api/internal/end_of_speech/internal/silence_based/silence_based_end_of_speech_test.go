@@ -159,6 +159,106 @@ func TestEmptySpeechIgnored(t *testing.T) {
 	}
 }
 
+func TestSilenceBasedEOS_VADStartCancelsPendingFinalUntilVADEnd(t *testing.T) {
+	logger, _ := commons.NewApplicationLogger()
+	called := make(chan internal_type.EndOfSpeechPacket, 1)
+	callback := func(ctx context.Context, res ...internal_type.Packet) error {
+		for _, r := range res {
+			if p, ok := r.(internal_type.EndOfSpeechPacket); ok {
+				select {
+				case called <- p:
+				default:
+				}
+			}
+		}
+		return nil
+	}
+
+	svcIface, err := newSilenceBasedEndOfSpeechForTest(context.Background(), logger, callback, newTestOpts(map[string]any{
+		"microphone.eos.timeout": 60.0,
+	}))
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+	defer svcIface.Close(context.Background())
+
+	if err := svcIface.Execute(context.Background(), sttInput("hello", true)); err != nil {
+		t.Fatalf("execute final stt: %v", err)
+	}
+	time.Sleep(10 * time.Millisecond)
+	if err := svcIface.Execute(context.Background(), internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventStart,
+	}); err != nil {
+		t.Fatalf("execute vad start: %v", err)
+	}
+
+	select {
+	case p := <-called:
+		t.Fatalf("callback fired after speech restarted: %+v", p)
+	case <-time.After(120 * time.Millisecond):
+	}
+
+	if err := svcIface.Execute(context.Background(), internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad,
+		Event:  internal_type.InterruptionEventEnd,
+	}); err != nil {
+		t.Fatalf("execute vad end: %v", err)
+	}
+
+	select {
+	case p := <-called:
+		if p.Speech != "hello" {
+			t.Fatalf("unexpected speech: %q", p.Speech)
+		}
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("timeout waiting for callback after VAD end")
+	}
+}
+
+func TestSilenceBasedEOS_IgnoresInterruptionForDifferentContext(t *testing.T) {
+	endOfSpeech := &silenceBasedEndOfSpeech{
+		commandCh:      make(chan workerCommand, 1),
+		stopCh:         make(chan struct{}),
+		silenceTimeout: 30 * time.Millisecond,
+		state: &endOfSpeechState{segment: speechSegment{
+			Revision:  1,
+			ContextID: "ctx-new",
+			Text:      "new turn",
+			Timestamp: time.Now(),
+		}},
+	}
+
+	if err := endOfSpeech.Execute(context.Background(), internal_type.EndOfSpeechInterruptionPacket{
+		ContextID: "ctx-old",
+		Source:    internal_type.InterruptionSourceVad,
+	}); err != nil {
+		t.Fatalf("execute old interruption: %v", err)
+	}
+
+	select {
+	case command := <-endOfSpeech.commandCh:
+		t.Fatalf("unexpected command for old context: %+v", command)
+	default:
+	}
+
+	if err := endOfSpeech.Execute(context.Background(), internal_type.EndOfSpeechInterruptionPacket{
+		ContextID: "ctx-new",
+		Source:    internal_type.InterruptionSourceVad,
+	}); err != nil {
+		t.Fatalf("execute active interruption: %v", err)
+	}
+
+	select {
+	case command := <-endOfSpeech.commandCh:
+		if command.segment.ContextID != "ctx-new" {
+			t.Fatalf("unexpected command context: %q", command.segment.ContextID)
+		}
+	default:
+		t.Fatal("expected command for active context")
+	}
+}
+
 func TestSilenceBasedEndOfSpeech_ObservabilityEventShape(t *testing.T) {
 	logger, _ := commons.NewApplicationLogger()
 	events := make(chan internal_type.ObservabilityEventRecordPacket, 4)
@@ -2528,9 +2628,9 @@ func TestInterimPacketsOnlyExtendTimer(t *testing.T) {
 	}
 }
 
-func TestFaultyVADRecoversPendingFinal(t *testing.T) {
+func TestFinalSTTWhileVADSpeakingFallsBack(t *testing.T) {
 	logger, _ := commons.NewApplicationLogger()
-	called := make(chan internal_type.EndOfSpeechPacket, 2)
+	called := make(chan internal_type.EndOfSpeechPacket, 1)
 	callback := func(ctx context.Context, res ...internal_type.Packet) error {
 		for _, r := range res {
 			switch packet := r.(type) {
@@ -2560,7 +2660,7 @@ func TestFaultyVADRecoversPendingFinal(t *testing.T) {
 		t.Fatalf("vad start: %v", err)
 	}
 	if err := svcIface.Execute(ctx, internal_type.SpeechToTextPacket{
-		ContextID: "ctx-faulty-vad",
+		ContextID: "ctx-missing-vad-end",
 		Script:    "hello",
 		Interim:   false,
 	}); err != nil {
@@ -2569,25 +2669,19 @@ func TestFaultyVADRecoversPendingFinal(t *testing.T) {
 
 	select {
 	case packet := <-called:
-		t.Fatalf("callback fired before stuck VAD recovery elapsed: %+v", packet)
-	case <-time.After(90 * time.Millisecond):
-	}
-
-	select {
-	case packet := <-called:
-		if packet.ContextID != "ctx-faulty-vad" {
+		if packet.ContextID != "ctx-missing-vad-end" {
 			t.Fatalf("unexpected context id: %q", packet.ContextID)
 		}
 		if packet.Speech != "hello" {
 			t.Fatalf("unexpected speech: %q", packet.Speech)
 		}
-	case <-time.After(500 * time.Millisecond):
-		t.Fatal("timeout waiting for callback after stuck VAD recovery")
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("timeout waiting for fallback callback while VAD remained speaking")
 	}
 
 	select {
 	case packet := <-called:
-		t.Fatalf("unexpected duplicate callback after stuck VAD recovery: %+v", packet)
+		t.Fatalf("unexpected duplicate callback after VAD end: %+v", packet)
 	case <-time.After(150 * time.Millisecond):
 	}
 }
@@ -2697,21 +2791,10 @@ func TestVADEndFlushesPendingFinal(t *testing.T) {
 		t.Fatalf("stt final: %v", err)
 	}
 
-	deadline := time.After(300 * time.Millisecond)
-	for {
-		svc.mu.RLock()
-		pending := svc.state.pending != nil
-		svc.mu.RUnlock()
-		if pending {
-			break
-		}
-		select {
-		case packet := <-called:
-			t.Fatalf("callback fired before VAD end: %+v", packet)
-		case <-deadline:
-			t.Fatal("timeout waiting for pending final")
-		case <-time.After(10 * time.Millisecond):
-		}
+	select {
+	case packet := <-called:
+		t.Fatalf("callback fired before VAD end: %+v", packet)
+	case <-time.After(60 * time.Millisecond):
 	}
 
 	if err := svcIface.Execute(ctx, internal_type.InterruptionDetectedPacket{

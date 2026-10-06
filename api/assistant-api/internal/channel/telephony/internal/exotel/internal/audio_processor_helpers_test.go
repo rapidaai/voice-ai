@@ -20,6 +20,8 @@ func (resampler *exotelFakeResampler) Resample(_ []byte, _, _ *protos.AudioConfi
 	return append([]byte(nil), resampler.out...), nil
 }
 
+func (resampler *exotelFakeResampler) Close() {}
+
 type exotelFakeMixer struct {
 	out []byte
 	err error

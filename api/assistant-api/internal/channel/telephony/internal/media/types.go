@@ -13,10 +13,9 @@ import (
 	"time"
 
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
-	internal_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
-	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
+	"google.golang.org/protobuf/proto"
 )
 
 // MediaEngine defines shared telephony media semantics independent of transport.
@@ -24,12 +23,12 @@ type MediaEngine interface {
 	ProcessProviderAudioFrame(frame ProviderAudioFrame) (InputAudioFrame, error)
 	ProcessAssistantAudio(audio []byte, completed bool) error
 	NextOutputFrame() (AssistantOutputFrame, bool)
+	// OutputDrained excludes partial frames and transport suspension.
+	OutputDrained() bool
 	IdleOutputFrame() (AssistantOutputFrame, bool)
 	ClearOutputBuffer()
 	ConfigureAmbient(ambientConfig internal_ambient.Config) error
 	OutputFrameDuration() time.Duration
-	OutputHealthSnapshot() internal_output.HealthSnapshot
-	internal_output.HealthObserver
 }
 
 // MediaSessionConfig carries all transport-independent session dependencies.
@@ -59,6 +58,14 @@ type MediaSession struct {
 	outputFrameMu         sync.Mutex
 	currentOutputFrame    AssistantOutputFrame
 	hasCurrentOutputFrame bool
+	outputPaused          bool
+	outputFlushed         bool
+	currentOutputID       string
+	blockedOutputID       string
+	responses             []*responsePlayback
+	flushedOutputIDs      map[string]struct{}
+	closedOutputIDs       map[string]struct{}
+	discardedOutputIDs    map[string]struct{}
 
 	started atomic.Bool
 	closed  atomic.Bool
@@ -68,13 +75,22 @@ type MediaSession struct {
 	ctx     context.Context
 }
 
+type responsePlayback struct {
+	id        string
+	audio     []byte
+	completed bool
+	processed bool
+	failed    bool
+	sent      bool
+}
+
 // ProviderAudioFrame carries provider audio at the websocket receive boundary.
 type ProviderAudioFrame struct {
 	Audio      []byte
 	ReceivedAt time.Time
 }
 
-// InputAudioFrame separates immediate bridge audio from thresholded AI input.
+// InputAudioFrame separates recording audio from realtime AI input.
 type InputAudioFrame struct {
 	BridgeAudio   []byte
 	PipelineAudio []byte
@@ -89,7 +105,7 @@ type AssistantOutputFrame struct {
 }
 
 // StreamSink pushes conversation streams back into the channel input path.
-type StreamSink func(internal_type.Stream)
+type StreamSink func(proto.Message)
 
 // OutputSink writes a paced provider frame to the transport.
 type OutputSink func(frame AssistantOutputFrame) error

@@ -9,7 +9,7 @@ package google_internal
 import (
 	"testing"
 
-	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/internal/testutil"
+	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/tests/testutil"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/stretchr/testify/assert"
@@ -20,12 +20,12 @@ import (
 // Test Setup Helpers
 // =============================================================================
 
-func newTestGoogleNormalizer(t *testing.T, opts utils.Option) *googleNormalizer {
+func newTestGoogleProcessor(t *testing.T, opts utils.Option) *googleProcessor {
 	t.Helper()
 	logger := testutil.NewTestLogger() // Use testutil logger for better test output integration
-	normalizer := NewGoogleNormalizer(logger, opts)
-	gn, ok := normalizer.(*googleNormalizer)
-	require.True(t, ok, "expected *googleNormalizer type")
+	processor := NewGoogleProcessor(logger, opts)
+	gn, ok := processor.(*googleProcessor)
+	require.True(t, ok, "expected *googleProcessor type")
 	return gn
 }
 
@@ -33,7 +33,7 @@ func newTestGoogleNormalizer(t *testing.T, opts utils.Option) *googleNormalizer 
 // Constructor Tests
 // =============================================================================
 
-func TestNewGoogleNormalizer(t *testing.T) {
+func TestNewGoogleProcessor(t *testing.T) {
 	tests := []struct {
 		name         string
 		opts         utils.Option
@@ -75,7 +75,7 @@ func TestNewGoogleNormalizer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gn := newTestGoogleNormalizer(t, tt.opts)
+			gn := newTestGoogleProcessor(t, tt.opts)
 			assert.NotNil(t, gn.logger)
 			if tt.hasConj {
 				assert.NotNil(t, gn.conjunctionPattern)
@@ -87,17 +87,17 @@ func TestNewGoogleNormalizer(t *testing.T) {
 }
 
 // =============================================================================
-// Normalize Tests
+// Process Tests
 // =============================================================================
 
-func TestNormalize_EmptyString(t *testing.T) {
-	gn := newTestGoogleNormalizer(t, utils.Option{})
-	result := gn.Normalize("")
+func TestProcess_EmptyString(t *testing.T) {
+	gn := newTestGoogleProcessor(t, utils.Option{})
+	result := gn.Process("")
 	assert.Equal(t, "", result)
 }
 
-func TestNormalize_XMLEscaping(t *testing.T) {
-	gn := newTestGoogleNormalizer(t, utils.Option{})
+func TestProcess_XMLEscaping(t *testing.T) {
+	gn := newTestGoogleProcessor(t, utils.Option{})
 
 	tests := []struct {
 		name     string
@@ -143,49 +143,49 @@ func TestNormalize_XMLEscaping(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := gn.Normalize(tt.input)
+			result := gn.Process(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func TestNormalize_ConjunctionBreaks(t *testing.T) {
+func TestProcess_ConjunctionBreaks(t *testing.T) {
 	opts := utils.Option{
 		"speaker.conjunction.boundaries": "and<|||>but",
 		"speaker.conjunction.break":      uint64(250),
 	}
-	gn := newTestGoogleNormalizer(t, opts)
+	gn := newTestGoogleProcessor(t, opts)
 
-	result := gn.Normalize("cats and dogs but not fish")
+	result := gn.Process("cats and dogs but not fish")
 	assert.Contains(t, result, `and<break time="250ms"/>`)
 	assert.Contains(t, result, `but<break time="250ms"/>`)
 }
 
-func TestNormalize_NoConjunctionBreaksWhenNotConfigured(t *testing.T) {
-	gn := newTestGoogleNormalizer(t, utils.Option{})
+func TestProcess_NoConjunctionBreaksWhenNotConfigured(t *testing.T) {
+	gn := newTestGoogleProcessor(t, utils.Option{})
 
-	result := gn.Normalize("cats and dogs but not fish")
+	result := gn.Process("cats and dogs but not fish")
 	assert.NotContains(t, result, "<break")
 	assert.Equal(t, "cats and dogs but not fish", result)
 }
 
-func TestNormalize_PreNormalizedTextPassthrough(t *testing.T) {
-	gn := newTestGoogleNormalizer(t, utils.Option{})
+func TestProcess_PreProcessdTextPassthrough(t *testing.T) {
+	gn := newTestGoogleProcessor(t, utils.Option{})
 
-	// Pre-normalized text (no markdown, clean whitespace) should pass through
+	// Pre-processd text (no markdown, clean whitespace) should pass through
 	// with only XML escaping applied
-	input := "Hello world. This is pre-normalized text."
-	result := gn.Normalize(input)
+	input := "Hello world. This is preprocessed text."
+	result := gn.Process(input)
 	assert.Equal(t, input, result)
 }
 
-func TestNormalize_MarkdownIsNotStripped(t *testing.T) {
-	gn := newTestGoogleNormalizer(t, utils.Option{})
+func TestProcess_MarkdownIsNotStripped(t *testing.T) {
+	gn := newTestGoogleProcessor(t, utils.Option{})
 
 	// After centralization, markdown removal is done upstream.
-	// The provider normalizer should NOT strip markdown itself.
+	// The provider processor should NOT strip markdown itself.
 	input := "**bold** text"
-	result := gn.Normalize(input)
+	result := gn.Process(input)
 	// The asterisks should still be present (only XML escaping applied)
 	assert.Contains(t, result, "**bold**")
 }
@@ -195,19 +195,19 @@ func TestNormalize_MarkdownIsNotStripped(t *testing.T) {
 // =============================================================================
 
 func TestWrapWithSSML(t *testing.T) {
-	gn := newTestGoogleNormalizer(t, utils.Option{})
+	gn := newTestGoogleProcessor(t, utils.Option{})
 	result := gn.WrapWithSSML("Hello world")
 	assert.Equal(t, "<speak>Hello world</speak>", result)
 }
 
 func TestAddBreak(t *testing.T) {
-	gn := newTestGoogleNormalizer(t, utils.Option{})
+	gn := newTestGoogleProcessor(t, utils.Option{})
 	result := gn.AddBreak(500)
 	assert.Equal(t, `<break time="500ms"/>`, result)
 }
 
 func TestAddProsody(t *testing.T) {
-	gn := newTestGoogleNormalizer(t, utils.Option{})
+	gn := newTestGoogleProcessor(t, utils.Option{})
 
 	result := gn.AddProsody("hello", "fast", "high", "loud")
 	assert.Contains(t, result, `rate="fast"`)
@@ -221,13 +221,13 @@ func TestAddProsody(t *testing.T) {
 }
 
 func TestAddEmphasis(t *testing.T) {
-	gn := newTestGoogleNormalizer(t, utils.Option{})
+	gn := newTestGoogleProcessor(t, utils.Option{})
 	result := gn.AddEmphasis("important", "strong")
 	assert.Equal(t, `<emphasis level="strong">important</emphasis>`, result)
 }
 
 func TestSayAs(t *testing.T) {
-	gn := newTestGoogleNormalizer(t, utils.Option{})
+	gn := newTestGoogleProcessor(t, utils.Option{})
 
 	result := gn.SayAs("123", "cardinal", "")
 	assert.Equal(t, `<say-as interpret-as="cardinal">123</say-as>`, result)
@@ -237,7 +237,7 @@ func TestSayAs(t *testing.T) {
 }
 
 func TestAddAudio(t *testing.T) {
-	gn := newTestGoogleNormalizer(t, utils.Option{})
+	gn := newTestGoogleProcessor(t, utils.Option{})
 
 	result := gn.AddAudio("https://example.com/beep.wav", "beep sound")
 	assert.Equal(t, `<audio src="https://example.com/beep.wav">beep sound</audio>`, result)
@@ -250,39 +250,39 @@ func TestAddAudio(t *testing.T) {
 // Benchmark Tests
 // =============================================================================
 
-func BenchmarkNormalize_SimpleText(b *testing.B) {
+func BenchmarkProcess_SimpleText(b *testing.B) {
 	logger, _ := commons.NewApplicationLogger()
-	normalizer := NewGoogleNormalizer(logger, utils.Option{})
+	processor := NewGoogleProcessor(logger, utils.Option{})
 	text := "Hello, this is a simple text for TTS processing."
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		normalizer.Normalize(text)
+		processor.Process(text)
 	}
 }
 
-func BenchmarkNormalize_WithConjunctions(b *testing.B) {
+func BenchmarkProcess_WithConjunctions(b *testing.B) {
 	logger, _ := commons.NewApplicationLogger()
 	opts := utils.Option{
 		"speaker.conjunction.boundaries": "and<|||>but<|||>or",
 		"speaker.conjunction.break":      uint64(250),
 	}
-	normalizer := NewGoogleNormalizer(logger, opts)
+	processor := NewGoogleProcessor(logger, opts)
 	text := "I like cats and dogs but not fish or snakes and birds"
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		normalizer.Normalize(text)
+		processor.Process(text)
 	}
 }
 
-func BenchmarkNormalize_XMLEscaping(b *testing.B) {
+func BenchmarkProcess_XMLEscaping(b *testing.B) {
 	logger, _ := commons.NewApplicationLogger()
-	normalizer := NewGoogleNormalizer(logger, utils.Option{})
+	processor := NewGoogleProcessor(logger, utils.Option{})
 	text := "Tom & Jerry said a < b > c & d < e"
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		normalizer.Normalize(text)
+		processor.Process(text)
 	}
 }

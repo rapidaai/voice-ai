@@ -12,27 +12,27 @@ import (
 	"github.com/rapidaai/protos"
 )
 
-// TextNormalizer defines the contract for provider-specific TTS text preprocessing.
-type TextNormalizer interface {
-	Normalize(text string) string
+// TextProcessor defines the contract for provider-specific TTS text preprocessing.
+type TextProcessor interface {
+	Process(text string) string
 }
 
-// PacketNormalizer defines the contract for packet-level preprocessors (input/output).
-type PacketNormalizer interface {
+// PacketProcessor defines the contract for packet-level preprocessors (input/output).
+type PacketProcessor interface {
 	Initialize(ctx context.Context, communication Communication, cfg *protos.ConversationInitialization) error
-	Normalize(ctx context.Context, in ...Packet) error
+	Process(ctx context.Context, in ...Packet) error
 	Close(ctx context.Context) error
 }
 
-// NormalizerConfig holds SSML conjunction break configuration for providers
+// ProcessorConfig holds SSML conjunction break configuration for providers
 // that support pauses (Google, Azure, AWS, ElevenLabs, Rime).
-type NormalizerConfig struct {
+type ProcessorConfig struct {
 	Conjunctions    []string
 	PauseDurationMs uint64
 }
 
-func DefaultNormalizerConfig() NormalizerConfig {
-	return NormalizerConfig{
+func DefaultProcessorConfig() ProcessorConfig {
+	return ProcessorConfig{
 		PauseDurationMs: 240,
 	}
 }

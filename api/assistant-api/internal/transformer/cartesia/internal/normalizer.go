@@ -13,31 +13,31 @@ import (
 )
 
 // =============================================================================
-// Cartesia Text Normalizer
+// Cartesia Text Processor
 // =============================================================================
 
-// cartesiaNormalizer handles Cartesia TTS text preprocessing.
+// cartesiaProcessor handles Cartesia TTS text preprocessing.
 // Cartesia does NOT support SSML - only plain text is accepted.
-type cartesiaNormalizer struct {
+type cartesiaProcessor struct {
 	logger   commons.Logger
 	language string
 }
 
-// NewCartesiaNormalizer creates a Cartesia-specific text normalizer.
-func NewCartesiaNormalizer(logger commons.Logger, opts utils.Option) internal_type.TextNormalizer {
+// NewCartesiaProcessor creates a Cartesia-specific text processor.
+func NewCartesiaProcessor(logger commons.Logger, opts utils.Option) internal_type.TextProcessor {
 	language, _ := opts.GetString("speaker.language")
 	if language == "" {
 		language = "en"
 	}
 
-	return &cartesiaNormalizer{
+	return &cartesiaProcessor{
 		logger:   logger,
 		language: language,
 	}
 }
 
-// Normalize returns text unchanged. Cartesia does NOT support SSML.
-// Markdown removal and whitespace normalization are handled upstream.
-func (n *cartesiaNormalizer) Normalize(text string) string {
+// Process returns text unchanged. Cartesia does NOT support SSML.
+// Markdown removal and whitespace processing are handled upstream.
+func (n *cartesiaProcessor) Process(text string) string {
 	return text
 }

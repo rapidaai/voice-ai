@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	deepgram_internal "github.com/rapidaai/api/assistant-api/internal/transformer/deepgram/internal"
-	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/internal/testutil"
+	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/tests/testutil"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
@@ -99,7 +99,7 @@ func TestSpeechToTextOptions_Defaults(t *testing.T) {
 	assert.True(t, sttOpts.InterimResults)
 	assert.True(t, sttOpts.FillerWords)
 	assert.False(t, sttOpts.VadEvents)
-	assert.Equal(t, "5", sttOpts.Endpointing)
+	assert.Equal(t, "500", sttOpts.Endpointing)
 	assert.True(t, sttOpts.Punctuate)
 	assert.True(t, sttOpts.NoDelay)
 	assert.Equal(t, "linear16", sttOpts.Encoding)

@@ -26,7 +26,7 @@ from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__
 import app.bridges.artifacts.protos.common_pb2 as common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11\x62illing-api.proto\x12\x0b\x62illing_api\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x0c\x63ommon.proto\"L\n\x10\x42illingPlanQuota\x12\x0e\n\x02id\x18\x01 \x01(\x04\x42\x02\x30\x01\x12\x14\n\x0cresourceType\x18\x02 \x01(\t\x12\x12\n\nquotaLimit\x18\x03 \x01(\x03\"\x85\x02\n\x0b\x42illingPlan\x12\x0e\n\x02id\x18\x01 \x01(\x04\x42\x02\x30\x01\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x0c\n\x04slug\x18\x03 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\t\x12\x11\n\tisDefault\x18\x05 \x01(\x08\x12\x10\n\x08isActive\x18\x06 \x01(\x08\x12\x11\n\tsortOrder\x18\x07 \x01(\x05\x12\x14\n\x0cpriceMonthly\x18\x08 \x01(\x03\x12\x13\n\x0bpriceYearly\x18\t \x01(\x03\x12\x10\n\x08\x63urrency\x18\n \x01(\t\x12\x11\n\tstripeUrl\x18\x0b \x01(\t\x12-\n\x06quotas\x18\x0c \x03(\x0b\x32\x1d.billing_api.BillingPlanQuota\"\xfd\x02\n\x13\x42illingSubscription\x12\x0e\n\x02id\x18\x01 \x01(\x04\x42\x02\x30\x01\x12\x1a\n\x0eorganizationId\x18\x02 \x01(\x04\x42\x02\x30\x01\x12\x19\n\rbillingPlanId\x18\x03 \x01(\x04\x42\x02\x30\x01\x12\x0e\n\x06status\x18\x04 \x01(\t\x12\x17\n\x0f\x62illingInterval\x18\x05 \x01(\t\x12\x36\n\x12\x63urrentPeriodStart\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x34\n\x10\x63urrentPeriodEnd\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12&\n\x04plan\x18\x08 \x01(\x0b\x32\x18.billing_api.BillingPlan\x12/\n\x0b\x63reatedDate\x18\t \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12/\n\x0bupdatedDate\x18\n \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"\x14\n\x12GetAllPlansRequest\"s\n\x13GetAllPlansResponse\x12\x0c\n\x04\x63ode\x18\x01 \x01(\x05\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12&\n\x04\x64\x61ta\x18\x03 \x03(\x0b\x32\x18.billing_api.BillingPlan\x12\x15\n\x05\x65rror\x18\x04 \x01(\x0b\x32\x06.Error\"\x18\n\x16GetSubscriptionRequest\"\x7f\n\x17GetSubscriptionResponse\x12\x0c\n\x04\x63ode\x18\x01 \x01(\x05\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12.\n\x04\x64\x61ta\x18\x03 \x01(\x0b\x32 .billing_api.BillingSubscription\x12\x15\n\x05\x65rror\x18\x04 \x01(\x0b\x32\x06.Error\"-\n\x19UpdateSubscriptionRequest\x12\x10\n\x08planSlug\x18\x01 \x01(\t\"\x82\x01\n\x1aUpdateSubscriptionResponse\x12\x0c\n\x04\x63ode\x18\x01 \x01(\x05\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12.\n\x04\x64\x61ta\x18\x03 \x01(\x0b\x32 .billing_api.BillingSubscription\x12\x15\n\x05\x65rror\x18\x04 \x01(\x0b\x32\x06.Error2\xa7\x02\n\x0e\x42illingService\x12P\n\x0bGetAllPlans\x12\x1f.billing_api.GetAllPlansRequest\x1a .billing_api.GetAllPlansResponse\x12\\\n\x0fGetSubscription\x12#.billing_api.GetSubscriptionRequest\x1a$.billing_api.GetSubscriptionResponse\x12\x65\n\x12UpdateSubscription\x12&.billing_api.UpdateSubscriptionRequest\x1a\'.billing_api.UpdateSubscriptionResponseB\x1cZ\x1agithub.com/rapidaai/protosb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11\x62illing-api.proto\x12\x0b\x62illing_api\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x0c\x63ommon.proto\"Z\n\x10\x42illingPlanQuota\x12\x0e\n\x02id\x18\x01 \x01(\x04\x42\x02\x30\x01\x12\x14\n\x0cresourceType\x18\x02 \x01(\t\x12\x12\n\nquotaLimit\x18\x03 \x01(\x03\x12\x0c\n\x04unit\x18\x04 \x01(\t\"\x96\x01\n\x0cProductUsage\x12\x0e\n\x02id\x18\x01 \x01(\x04\x42\x02\x30\x01\x12\x15\n\tprojectId\x18\x02 \x01(\x04\x42\x02\x30\x01\x12\x11\n\tusageType\x18\x03 \x01(\t\x12\x0e\n\x06usages\x18\x04 \x01(\x03\x12\x0c\n\x04unit\x18\x05 \x01(\t\x12.\n\noccurredAt\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"|\n\x19\x43reateProductUsageRequest\x12\x11\n\tusageType\x18\x01 \x01(\t\x12\x0e\n\x06usages\x18\x02 \x01(\x03\x12\x0c\n\x04unit\x18\x03 \x01(\t\x12.\n\noccurredAt\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"x\n\x17GetProductUsageResponse\x12\x0c\n\x04\x63ode\x18\x01 \x01(\x05\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\'\n\x04\x64\x61ta\x18\x03 \x01(\x0b\x32\x19.billing_api.ProductUsage\x12\x15\n\x05\x65rror\x18\x04 \x01(\x0b\x32\x06.Error\"g\n\x17GetProductUsagesRequest\x12\x11\n\tusageType\x18\x01 \x01(\t\x12\x1b\n\x08paginate\x18\x02 \x01(\x0b\x32\t.Paginate\x12\x1c\n\tcriterias\x18\x03 \x03(\x0b\x32\t.Criteria\"Y\n\x1cGetOrganizationUsagesRequest\x12\x1b\n\x08paginate\x18\x01 \x01(\x0b\x32\t.Paginate\x12\x1c\n\tcriterias\x18\x02 \x03(\x0b\x32\t.Criteria\"\x91\x01\n\x11GetUsagesResponse\x12\x0c\n\x04\x63ode\x18\x01 \x01(\x05\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\'\n\x04\x64\x61ta\x18\x03 \x03(\x0b\x32\x19.billing_api.ProductUsage\x12\x15\n\x05\x65rror\x18\x04 \x01(\x0b\x32\x06.Error\x12\x1d\n\tpaginated\x18\x05 \x01(\x0b\x32\n.Paginated\"\x85\x02\n\x0b\x42illingPlan\x12\x0e\n\x02id\x18\x01 \x01(\x04\x42\x02\x30\x01\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x0c\n\x04slug\x18\x03 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\t\x12\x11\n\tisDefault\x18\x05 \x01(\x08\x12\x10\n\x08isActive\x18\x06 \x01(\x08\x12\x11\n\tsortOrder\x18\x07 \x01(\x05\x12\x14\n\x0cpriceMonthly\x18\x08 \x01(\x03\x12\x13\n\x0bpriceYearly\x18\t \x01(\x03\x12\x10\n\x08\x63urrency\x18\n \x01(\t\x12\x11\n\tstripeUrl\x18\x0b \x01(\t\x12-\n\x06quotas\x18\x0c \x03(\x0b\x32\x1d.billing_api.BillingPlanQuota\"\xfd\x02\n\x13\x42illingSubscription\x12\x0e\n\x02id\x18\x01 \x01(\x04\x42\x02\x30\x01\x12\x1a\n\x0eorganizationId\x18\x02 \x01(\x04\x42\x02\x30\x01\x12\x19\n\rbillingPlanId\x18\x03 \x01(\x04\x42\x02\x30\x01\x12\x0e\n\x06status\x18\x04 \x01(\t\x12\x17\n\x0f\x62illingInterval\x18\x05 \x01(\t\x12\x36\n\x12\x63urrentPeriodStart\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x34\n\x10\x63urrentPeriodEnd\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12&\n\x04plan\x18\x08 \x01(\x0b\x32\x18.billing_api.BillingPlan\x12/\n\x0b\x63reatedDate\x18\t \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12/\n\x0bupdatedDate\x18\n \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"\x14\n\x12GetAllPlansRequest\"s\n\x13GetAllPlansResponse\x12\x0c\n\x04\x63ode\x18\x01 \x01(\x05\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12&\n\x04\x64\x61ta\x18\x03 \x03(\x0b\x32\x18.billing_api.BillingPlan\x12\x15\n\x05\x65rror\x18\x04 \x01(\x0b\x32\x06.Error\"\x18\n\x16GetSubscriptionRequest\"\x7f\n\x17GetSubscriptionResponse\x12\x0c\n\x04\x63ode\x18\x01 \x01(\x05\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12.\n\x04\x64\x61ta\x18\x03 \x01(\x0b\x32 .billing_api.BillingSubscription\x12\x15\n\x05\x65rror\x18\x04 \x01(\x0b\x32\x06.Error\"-\n\x19UpdateSubscriptionRequest\x12\x10\n\x08planSlug\x18\x01 \x01(\t\"\x82\x01\n\x1aUpdateSubscriptionResponse\x12\x0c\n\x04\x63ode\x18\x01 \x01(\x05\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12.\n\x04\x64\x61ta\x18\x03 \x01(\x0b\x32 .billing_api.BillingSubscription\x12\x15\n\x05\x65rror\x18\x04 \x01(\x0b\x32\x06.Error2\xa7\x02\n\x0e\x42illingService\x12P\n\x0bGetAllPlans\x12\x1f.billing_api.GetAllPlansRequest\x1a .billing_api.GetAllPlansResponse\x12\\\n\x0fGetSubscription\x12#.billing_api.GetSubscriptionRequest\x1a$.billing_api.GetSubscriptionResponse\x12\x65\n\x12UpdateSubscription\x12&.billing_api.UpdateSubscriptionRequest\x1a\'.billing_api.UpdateSubscriptionResponse2\xb7\x02\n\x13ProductUsageService\x12\x62\n\x12\x43reateProductUsage\x12&.billing_api.CreateProductUsageRequest\x1a$.billing_api.GetProductUsageResponse\x12X\n\x10GetProductUsages\x12$.billing_api.GetProductUsagesRequest\x1a\x1e.billing_api.GetUsagesResponse\x12\x62\n\x15GetOrganizationUsages\x12).billing_api.GetOrganizationUsagesRequest\x1a\x1e.billing_api.GetUsagesResponseB\x1cZ\x1agithub.com/rapidaai/protosb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -36,6 +36,10 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._serialized_options = b'Z\032github.com/rapidaai/protos'
   _globals['_BILLINGPLANQUOTA'].fields_by_name['id']._loaded_options = None
   _globals['_BILLINGPLANQUOTA'].fields_by_name['id']._serialized_options = b'0\001'
+  _globals['_PRODUCTUSAGE'].fields_by_name['id']._loaded_options = None
+  _globals['_PRODUCTUSAGE'].fields_by_name['id']._serialized_options = b'0\001'
+  _globals['_PRODUCTUSAGE'].fields_by_name['projectId']._loaded_options = None
+  _globals['_PRODUCTUSAGE'].fields_by_name['projectId']._serialized_options = b'0\001'
   _globals['_BILLINGPLAN'].fields_by_name['id']._loaded_options = None
   _globals['_BILLINGPLAN'].fields_by_name['id']._serialized_options = b'0\001'
   _globals['_BILLINGSUBSCRIPTION'].fields_by_name['id']._loaded_options = None
@@ -45,23 +49,37 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_BILLINGSUBSCRIPTION'].fields_by_name['billingPlanId']._loaded_options = None
   _globals['_BILLINGSUBSCRIPTION'].fields_by_name['billingPlanId']._serialized_options = b'0\001'
   _globals['_BILLINGPLANQUOTA']._serialized_start=81
-  _globals['_BILLINGPLANQUOTA']._serialized_end=157
-  _globals['_BILLINGPLAN']._serialized_start=160
-  _globals['_BILLINGPLAN']._serialized_end=421
-  _globals['_BILLINGSUBSCRIPTION']._serialized_start=424
-  _globals['_BILLINGSUBSCRIPTION']._serialized_end=805
-  _globals['_GETALLPLANSREQUEST']._serialized_start=807
-  _globals['_GETALLPLANSREQUEST']._serialized_end=827
-  _globals['_GETALLPLANSRESPONSE']._serialized_start=829
-  _globals['_GETALLPLANSRESPONSE']._serialized_end=944
-  _globals['_GETSUBSCRIPTIONREQUEST']._serialized_start=946
-  _globals['_GETSUBSCRIPTIONREQUEST']._serialized_end=970
-  _globals['_GETSUBSCRIPTIONRESPONSE']._serialized_start=972
-  _globals['_GETSUBSCRIPTIONRESPONSE']._serialized_end=1099
-  _globals['_UPDATESUBSCRIPTIONREQUEST']._serialized_start=1101
-  _globals['_UPDATESUBSCRIPTIONREQUEST']._serialized_end=1146
-  _globals['_UPDATESUBSCRIPTIONRESPONSE']._serialized_start=1149
-  _globals['_UPDATESUBSCRIPTIONRESPONSE']._serialized_end=1279
-  _globals['_BILLINGSERVICE']._serialized_start=1282
-  _globals['_BILLINGSERVICE']._serialized_end=1577
+  _globals['_BILLINGPLANQUOTA']._serialized_end=171
+  _globals['_PRODUCTUSAGE']._serialized_start=174
+  _globals['_PRODUCTUSAGE']._serialized_end=324
+  _globals['_CREATEPRODUCTUSAGEREQUEST']._serialized_start=326
+  _globals['_CREATEPRODUCTUSAGEREQUEST']._serialized_end=450
+  _globals['_GETPRODUCTUSAGERESPONSE']._serialized_start=452
+  _globals['_GETPRODUCTUSAGERESPONSE']._serialized_end=572
+  _globals['_GETPRODUCTUSAGESREQUEST']._serialized_start=574
+  _globals['_GETPRODUCTUSAGESREQUEST']._serialized_end=677
+  _globals['_GETORGANIZATIONUSAGESREQUEST']._serialized_start=679
+  _globals['_GETORGANIZATIONUSAGESREQUEST']._serialized_end=768
+  _globals['_GETUSAGESRESPONSE']._serialized_start=771
+  _globals['_GETUSAGESRESPONSE']._serialized_end=916
+  _globals['_BILLINGPLAN']._serialized_start=919
+  _globals['_BILLINGPLAN']._serialized_end=1180
+  _globals['_BILLINGSUBSCRIPTION']._serialized_start=1183
+  _globals['_BILLINGSUBSCRIPTION']._serialized_end=1564
+  _globals['_GETALLPLANSREQUEST']._serialized_start=1566
+  _globals['_GETALLPLANSREQUEST']._serialized_end=1586
+  _globals['_GETALLPLANSRESPONSE']._serialized_start=1588
+  _globals['_GETALLPLANSRESPONSE']._serialized_end=1703
+  _globals['_GETSUBSCRIPTIONREQUEST']._serialized_start=1705
+  _globals['_GETSUBSCRIPTIONREQUEST']._serialized_end=1729
+  _globals['_GETSUBSCRIPTIONRESPONSE']._serialized_start=1731
+  _globals['_GETSUBSCRIPTIONRESPONSE']._serialized_end=1858
+  _globals['_UPDATESUBSCRIPTIONREQUEST']._serialized_start=1860
+  _globals['_UPDATESUBSCRIPTIONREQUEST']._serialized_end=1905
+  _globals['_UPDATESUBSCRIPTIONRESPONSE']._serialized_start=1908
+  _globals['_UPDATESUBSCRIPTIONRESPONSE']._serialized_end=2038
+  _globals['_BILLINGSERVICE']._serialized_start=2041
+  _globals['_BILLINGSERVICE']._serialized_end=2336
+  _globals['_PRODUCTUSAGESERVICE']._serialized_start=2339
+  _globals['_PRODUCTUSAGESERVICE']._serialized_end=2650
 # @@protoc_insertion_point(module_scope)

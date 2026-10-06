@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/clients"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
@@ -68,7 +69,7 @@ func TestServiceAuthenticationMintsDelegatedServiceActor(t *testing.T) {
 
 func TestStartRunsImmediateReconcile(t *testing.T) {
 	m, db, _ := newTestManager(t)
-	m.regClient = sip_runtime.NewRegistrationClient(nil, &sip_runtime.ListenConfig{}, m.logger)
+	m.regClient = sip_runtime.NewRegistrationClient(nil, &sip_config.ListenConfig{}, m.logger)
 
 	insertSIPDeploymentWithOptions(t, db, 4001, 801, map[string]string{
 		OptKeyCredentialID: "101",

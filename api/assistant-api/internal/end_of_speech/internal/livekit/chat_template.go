@@ -7,6 +7,11 @@ package internal_livekit
 
 import (
 	"strings"
+	"unicode"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+	"golang.org/x/text/unicode/norm"
 )
 
 // chatMessage represents a single message in the conversation for templating.
@@ -15,55 +20,79 @@ type chatMessage struct {
 	Content string
 }
 
-// formatChatTemplateFromHistory formats internal conversation history into the
-// SmolLM2 chat template.
-//
-// Template format:
-//
-//	<|im_start|>role
-//	content<|im_end|>
-//
-// The last user message (currentText) is left open (no <|im_end|>) so the
-// model can predict whether the user has finished their turn.
-func formatChatTemplateFromHistory(history []chatMessage, currentText string, maxTurns int) string {
-	// Collect recent history turns
-	start := 0
-	if maxTurns > 0 && len(history) > maxTurns {
-		start = len(history) - maxTurns
-	}
-	recent := history[start:]
-
-	// Build messages: recent history + current user text
-	messages := make([]chatMessage, 0, len(recent)+1)
-	for _, msg := range recent {
-		if msg.Role == "" || msg.Content == "" {
+// formatChatTemplateFromHistory applies the selected LiveKit model's chat template.
+// The last message is left open so the model can predict turn completion.
+func formatChatTemplateFromHistory(history []chatMessage, currentText string, maxTurns int, modelType string) string {
+	candidateMessages := make([]chatMessage, 0, len(history)+1)
+	for _, historyMessage := range history {
+		if historyMessage.Role != "user" && historyMessage.Role != "assistant" {
 			continue
 		}
-		messages = append(messages, msg)
+		if historyMessage.Content == "" {
+			continue
+		}
+		candidateMessages = append(candidateMessages, historyMessage)
 	}
 	if currentText != "" {
-		messages = append(messages, chatMessage{Role: "user", Content: currentText})
+		candidateMessages = append(candidateMessages, chatMessage{Role: "user", Content: currentText})
 	}
 
-	if len(messages) == 0 {
+	if maxTurns > 0 && len(candidateMessages) > maxTurns {
+		candidateMessages = candidateMessages[len(candidateMessages)-maxTurns:]
+	}
+
+	formattedMessages := make([]chatMessage, 0, len(candidateMessages))
+	for _, candidateMessage := range candidateMessages {
+		formattedContent := candidateMessage.Content
+		if modelType == multilingualModelType {
+			canonicalContent := norm.NFKC.String(cases.Lower(language.Und).String(candidateMessage.Content))
+			var cleanContentBuilder strings.Builder
+			cleanContentBuilder.Grow(len(canonicalContent))
+			for _, contentRune := range canonicalContent {
+				if unicode.IsPunct(contentRune) && contentRune != '\'' && contentRune != '-' {
+					continue
+				}
+				// Python also treats these four control separators as whitespace.
+				if unicode.IsSpace(contentRune) || contentRune >= '\x1c' && contentRune <= '\x1f' {
+					cleanContentBuilder.WriteByte(' ')
+					continue
+				}
+				cleanContentBuilder.WriteRune(contentRune)
+			}
+			formattedContent = strings.Join(strings.Fields(cleanContentBuilder.String()), " ")
+		}
+		if len(formattedMessages) > 0 && formattedMessages[len(formattedMessages)-1].Role == candidateMessage.Role {
+			formattedMessages[len(formattedMessages)-1].Content += " " + formattedContent
+			continue
+		}
+		formattedMessages = append(formattedMessages, chatMessage{Role: candidateMessage.Role, Content: formattedContent})
+	}
+
+	if len(formattedMessages) == 0 {
 		return ""
 	}
 
-	var b strings.Builder
-	b.Grow(256)
+	var templateBuilder strings.Builder
+	templateBuilder.Grow(256)
 
-	for i, msg := range messages {
-		isLast := i == len(messages)-1
-		b.WriteString("<|im_start|>")
-		b.WriteString(msg.Role)
-		b.WriteByte('\n')
-		b.WriteString(msg.Content)
-		if !isLast {
-			b.WriteString("<|im_end|>")
-			b.WriteByte('\n')
+	for messageIndex, formattedMessage := range formattedMessages {
+		templateBuilder.WriteString("<|im_start|>")
+		if modelType == multilingualModelType {
+			templateBuilder.WriteString(formattedMessage.Role)
+			templateBuilder.WriteByte('\n')
+		} else {
+			templateBuilder.WriteString("<|")
+			templateBuilder.WriteString(formattedMessage.Role)
+			templateBuilder.WriteString("|>")
 		}
-		// Last message is left open — no <|im_end|>
+		templateBuilder.WriteString(formattedMessage.Content)
+		if messageIndex != len(formattedMessages)-1 {
+			templateBuilder.WriteString("<|im_end|>")
+			if modelType == multilingualModelType {
+				templateBuilder.WriteByte('\n')
+			}
+		}
 	}
 
-	return b.String()
+	return templateBuilder.String()
 }

@@ -88,6 +88,11 @@ jest.mock('@/app/components/domain/providers/vad/provider', () => ({
 }));
 
 jest.mock('@/app/components/domain/providers/end-of-speech/provider', () => ({
+  EOS_MODEL_PATH_KEYS: new Set([
+    'microphone.eos.livekit.model_path',
+    'microphone.eos.livekit.tokenizer_path',
+    'microphone.eos.pipecat.model_path',
+  ]),
   GetDefaultEOSConfig: (...args: any[]) => mockGetDefaultEOSConfig(...args),
 }));
 
@@ -112,6 +117,15 @@ describe('ConfigureAudioInputProvider design integration', () => {
     const inputParameters = [
       createMetadata('listen.model', 'nova-3'),
       createMetadata('microphone.eos.fallback_timeout', '900'),
+      createMetadata(
+        'microphone.eos.livekit.model_path',
+        '/models/livekit.onnx',
+      ),
+      createMetadata(
+        'microphone.eos.livekit.tokenizer_path',
+        '/models/tokenizer.json',
+      ),
+      createMetadata('microphone.eos.pipecat.model_path', '/models/pipecat'),
       createMetadata('microphone.barge_in_trigger', 'word'),
       createMetadata('microphone.vad.confidence', '0.7'),
       createMetadata('microphone.denoising.provider', 'rn_noise'),
@@ -145,6 +159,9 @@ describe('ConfigureAudioInputProvider design integration', () => {
     expect(microphoneOnly.map(m => m.getKey()).sort()).toEqual(
       [
         'microphone.eos.fallback_timeout',
+        'microphone.eos.livekit.model_path',
+        'microphone.eos.livekit.tokenizer_path',
+        'microphone.eos.pipecat.model_path',
         'microphone.barge_in_trigger',
         'microphone.vad.confidence',
         'microphone.denoising.provider',
@@ -166,6 +183,16 @@ describe('ConfigureAudioInputProvider design integration', () => {
       createMetadata('listen.model', 'nova-3'),
       createMetadata('microphone.vad.provider', 'silero_vad'),
       createMetadata('microphone.eos.provider', 'silence_based_eos'),
+      createMetadata('microphone.eos.timeout', '900'),
+      createMetadata(
+        'microphone.eos.livekit.model_path',
+        '/models/livekit.onnx',
+      ),
+      createMetadata(
+        'microphone.eos.livekit.tokenizer_path',
+        '/models/tokenizer.json',
+      ),
+      createMetadata('microphone.eos.pipecat.model_path', '/models/pipecat'),
       createMetadata('microphone.denoising.provider', 'legacy_noise'),
     ];
     const vadDefaults = [
@@ -208,6 +235,15 @@ describe('ConfigureAudioInputProvider design integration', () => {
     expect(mockGetDefaultEOSConfig).toHaveBeenCalledWith('livekit_eos', [
       createMetadata('listen.model', 'nova-3'),
       createMetadata('microphone.vad.provider', 'silero_vad'),
+      createMetadata(
+        'microphone.eos.livekit.model_path',
+        '/models/livekit.onnx',
+      ),
+      createMetadata(
+        'microphone.eos.livekit.tokenizer_path',
+        '/models/tokenizer.json',
+      ),
+      createMetadata('microphone.eos.pipecat.model_path', '/models/pipecat'),
       createMetadata('microphone.denoising.provider', 'legacy_noise'),
     ]);
 

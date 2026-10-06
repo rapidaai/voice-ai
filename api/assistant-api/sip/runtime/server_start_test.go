@@ -11,6 +11,7 @@ import (
 	"net"
 	"testing"
 
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,13 +22,13 @@ func TestServerStartWaitsForListenerReadiness(t *testing.T) {
 	port := reserved.LocalAddr().(*net.UDPAddr).Port
 	require.NoError(t, reserved.Close())
 
-	server, err := NewServer(context.Background(), &ServerConfig{
-		ListenConfig: &ListenConfig{
+	server, err := NewServer(context.Background(), &sip_config.ServerConfig{
+		ListenConfig: &sip_config.ListenConfig{
 			Address:                 "127.0.0.1",
 			ExternalIP:              "127.0.0.1",
 			AllowLoopbackExternalIP: true,
 			Port:                    port,
-			Transport:               TransportUDP,
+			Transport:               sip_config.TransportUDP,
 		},
 		Logger:            bridgeTestLogger(),
 		RTPPortRangeStart: 19000,
@@ -56,13 +57,13 @@ func TestServerStartReturnsListenerBindFailure(t *testing.T) {
 	require.NoError(t, err)
 	defer reserved.Close()
 
-	server, err := NewServer(context.Background(), &ServerConfig{
-		ListenConfig: &ListenConfig{
+	server, err := NewServer(context.Background(), &sip_config.ServerConfig{
+		ListenConfig: &sip_config.ListenConfig{
 			Address:                 "127.0.0.1",
 			ExternalIP:              "127.0.0.1",
 			AllowLoopbackExternalIP: true,
 			Port:                    reserved.LocalAddr().(*net.UDPAddr).Port,
-			Transport:               TransportUDP,
+			Transport:               sip_config.TransportUDP,
 		},
 		Logger:            bridgeTestLogger(),
 		RTPPortRangeStart: 19000,

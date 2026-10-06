@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -313,11 +314,11 @@ func (l *applicationLogger) Debug(args ...interface{}) {
 }
 
 func (l *applicationLogger) Debugf(template string, args ...interface{}) {
-	l.sugarLogger.Debugf(template, args...)
+	l.sugarLogger.Debug(escapeLogMessage(template, args...))
 }
 
 func (l *applicationLogger) Debugw(template string, args ...interface{}) {
-	l.sugarLogger.Debugw(template, args...)
+	l.sugarLogger.Debugw(EscapeLogValue(template), escapeLogArguments(args)...)
 }
 
 func (l *applicationLogger) Info(args ...interface{}) {
@@ -325,11 +326,11 @@ func (l *applicationLogger) Info(args ...interface{}) {
 }
 
 func (l *applicationLogger) Infof(template string, args ...interface{}) {
-	l.sugarLogger.Infof(template, args...)
+	l.sugarLogger.Info(escapeLogMessage(template, args...))
 }
 
 func (l *applicationLogger) Infow(template string, args ...interface{}) {
-	l.sugarLogger.Infow(template, args...)
+	l.sugarLogger.Infow(EscapeLogValue(template), escapeLogArguments(args)...)
 }
 
 func (l *applicationLogger) Warn(args ...interface{}) {
@@ -337,10 +338,10 @@ func (l *applicationLogger) Warn(args ...interface{}) {
 }
 
 func (l *applicationLogger) Warnf(template string, args ...interface{}) {
-	l.sugarLogger.Warnf(template, args...)
+	l.sugarLogger.Warn(escapeLogMessage(template, args...))
 }
 func (l *applicationLogger) Warnw(template string, args ...interface{}) {
-	l.sugarLogger.Warnw(template, args...)
+	l.sugarLogger.Warnw(EscapeLogValue(template), escapeLogArguments(args)...)
 }
 
 func (l *applicationLogger) Error(args ...interface{}) {
@@ -348,11 +349,33 @@ func (l *applicationLogger) Error(args ...interface{}) {
 }
 
 func (l *applicationLogger) Errorf(template string, args ...interface{}) {
-	l.sugarLogger.Errorf(template, args...)
+	l.sugarLogger.Error(escapeLogMessage(template, args...))
+}
+
+func escapeLogMessage(template string, args ...interface{}) string {
+	return EscapeLogValue(fmt.Sprintf(template, args...))
+}
+
+// EscapeLogValue prevents a value from creating additional log entries.
+func EscapeLogValue(value string) string {
+	value = strings.ReplaceAll(value, "\r", `\r`)
+	return strings.ReplaceAll(value, "\n", `\n`)
+}
+
+func escapeLogArguments(args []interface{}) []interface{} {
+	escaped := make([]interface{}, len(args))
+	for index, arg := range args {
+		if value, ok := arg.(string); ok {
+			escaped[index] = EscapeLogValue(value)
+			continue
+		}
+		escaped[index] = arg
+	}
+	return escaped
 }
 
 func (l *applicationLogger) Errorw(template string, args ...interface{}) {
-	l.sugarLogger.Errorw(template, args...)
+	l.sugarLogger.Errorw(EscapeLogValue(template), escapeLogArguments(args)...)
 }
 
 // ============================================================================

@@ -25,6 +25,17 @@ type packetCollector struct {
 	pkts []internal_type.Packet
 }
 
+type websocketLogRecorder struct {
+	commons.Logger
+	message string
+	args    []interface{}
+}
+
+func (l *websocketLogRecorder) Errorw(message string, args ...interface{}) {
+	l.message = message
+	l.args = append([]interface{}(nil), args...)
+}
+
 func (c *packetCollector) collect(_ context.Context, pkts ...internal_type.Packet) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -190,6 +201,27 @@ func TestHandleResponse_Complete_StaleContextDropped(t *testing.T) {
 	assert.Equal(t, "ignore", ev.Record.Attributes["script"])
 }
 
+func TestHandleResponse_ErrorThenCompleteDoesNotEmitDone(t *testing.T) {
+	e := newTestExecutor(t)
+	e.currentID = "ctx-error"
+	collected := make([]internal_type.Packet, 0)
+	onPacket := func(_ context.Context, pkts ...internal_type.Packet) error {
+		collected = append(collected, pkts...)
+		return nil
+	}
+
+	e.handleResponse(context.Background(), &Response{
+		Type: TypeError,
+		Data: json.RawMessage(`{"code":500,"message":"failed"}`),
+	}, onPacket)
+	e.handleResponse(context.Background(), &Response{
+		Type: TypeComplete,
+		Data: json.RawMessage(`{"id":"ctx-error","content":"late"}`),
+	}, onPacket)
+
+	require.Empty(t, findPackets[internal_type.LLMResponseDonePacket](collected))
+}
+
 func TestHandleResponse_Complete_EmptyContentNoPacket(t *testing.T) {
 	e := newTestExecutor(t)
 	e.currentID = "ctx-1"
@@ -275,6 +307,8 @@ func TestHandleResponse_Close(t *testing.T) {
 
 func TestHandleResponse_Error(t *testing.T) {
 	e := newTestExecutor(t)
+	logger := &websocketLogRecorder{Logger: e.logger}
+	e.logger = logger
 	e.currentID = "ctx-1"
 	collected := make([]internal_type.Packet, 0)
 	onPacket := func(_ context.Context, pkts ...internal_type.Packet) error {
@@ -284,24 +318,28 @@ func TestHandleResponse_Error(t *testing.T) {
 
 	e.handleResponse(context.Background(), &Response{
 		Type: TypeError,
-		Data: json.RawMessage(`{"code":500,"message":"server error"}`),
+		Data: json.RawMessage(`{"code":500,"message":"server error\r\nforged"}`),
 	}, onPacket)
 
 	require.Len(t, collected, 3)
 	errPkt, ok := collected[0].(internal_type.LLMErrorPacket)
 	require.True(t, ok)
 	assert.Equal(t, "ctx-1", errPkt.ContextID)
+	assert.ErrorContains(t, errPkt.Error, "server error\r\nforged")
 
 	ev, ok := collected[1].(internal_type.ObservabilityEventRecordPacket)
 	require.True(t, ok)
 	assert.Equal(t, observability.AgentError, ev.Record.Event)
 	assert.Equal(t, "websocket", ev.Record.Attributes["provider"])
+	assert.Equal(t, "server error\r\nforged", ev.Record.Attributes["error"])
 
 	log, ok := collected[2].(internal_type.ObservabilityLogRecordPacket)
 	require.True(t, ok)
 	assert.Equal(t, observability.LevelError, log.Record.Level)
 	assert.Equal(t, "response", log.Record.Attributes["operation"])
 	assert.Equal(t, "websocket", log.Record.Attributes["provider"])
+	assert.Equal(t, "websocket error", logger.message)
+	assert.Equal(t, []interface{}{"code", 500, "message", `server error\r\nforged`}, logger.args)
 }
 
 // =============================================================================
@@ -413,6 +451,23 @@ func TestE2E_InterruptDuringStreaming(t *testing.T) {
 
 	deltas := findPackets[internal_type.LLMResponseDeltaPacket](collector.all())
 	assert.Len(t, deltas, 2, "pre-interrupt + post-interrupt(empty current), not the stale one")
+}
+
+func TestE2E_InterruptedCompleteDoesNotEmitDone(t *testing.T) {
+	e := newTestExecutor(t)
+	collector := &packetCollector{}
+	onPacket := func(ctx context.Context, pkts ...internal_type.Packet) error {
+		return collector.collect(ctx, pkts...)
+	}
+
+	e.setCurrentContextID("ctx-1")
+	_ = e.Execute(context.Background(), nil, internal_type.InterruptionDetectedPacket{ContextID: "ctx-1"})
+	e.handleResponse(context.Background(), &Response{
+		Type: TypeComplete,
+		Data: json.RawMessage(`{"id":"ctx-1","content":"late"}`),
+	}, onPacket)
+
+	require.Empty(t, findPackets[internal_type.LLMResponseDonePacket](collector.all()))
 }
 
 func TestE2E_MultiTurn(t *testing.T) {

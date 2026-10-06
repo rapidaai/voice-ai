@@ -13,31 +13,31 @@ import (
 )
 
 // =============================================================================
-// OpenAI Text Normalizer
+// OpenAI Text Processor
 // =============================================================================
 
-// openaiNormalizer handles OpenAI TTS text preprocessing.
+// openaiProcessor handles OpenAI TTS text preprocessing.
 // OpenAI TTS does NOT support SSML - only plain text is accepted.
-type openaiNormalizer struct {
+type openaiProcessor struct {
 	logger   commons.Logger
 	language string
 }
 
-// NewOpenAINormalizer creates an OpenAI-specific text normalizer.
-func NewOpenAINormalizer(logger commons.Logger, opts utils.Option) internal_type.TextNormalizer {
+// NewOpenAIProcessor creates an OpenAI-specific text processor.
+func NewOpenAIProcessor(logger commons.Logger, opts utils.Option) internal_type.TextProcessor {
 	language, _ := opts.GetString("speaker.language")
 	if language == "" {
 		language = "en"
 	}
 
-	return &openaiNormalizer{
+	return &openaiProcessor{
 		logger:   logger,
 		language: language,
 	}
 }
 
-// Normalize returns text unchanged. OpenAI TTS does NOT support SSML.
-// Markdown removal and whitespace normalization are handled upstream.
-func (n *openaiNormalizer) Normalize(text string) string {
+// Process returns text unchanged. OpenAI TTS does NOT support SSML.
+// Markdown removal and whitespace processing are handled upstream.
+func (n *openaiProcessor) Process(text string) string {
 	return text
 }

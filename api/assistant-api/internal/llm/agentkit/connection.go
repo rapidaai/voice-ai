@@ -17,6 +17,7 @@ import (
 	"time"
 
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
+	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -99,6 +100,14 @@ func (o AgentConnectionOption) DialTimeout() time.Duration {
 }
 
 func (o AgentConnectionOption) GetGrpcOptions() ([]grpc.DialOption, error) {
+	maxRecvMessageBytes, err := utils.Uint32ToInt(o.maxRecvMessageBytes)
+	if err != nil {
+		return nil, fmt.Errorf("agentkit max receive message bytes: %w", err)
+	}
+	maxSendMessageBytes, err := utils.Uint32ToInt(o.maxSendMessageBytes)
+	if err != nil {
+		return nil, fmt.Errorf("agentkit max send message bytes: %w", err)
+	}
 	dialTimeout := o.DialTimeout()
 	options := []grpc.DialOption{
 		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
@@ -106,8 +115,8 @@ func (o AgentConnectionOption) GetGrpcOptions() ([]grpc.DialOption, error) {
 			return dialer.DialContext(ctx, "tcp", addr)
 		}),
 		grpc.WithDefaultCallOptions(
-			grpc.MaxCallRecvMsgSize(int(o.maxRecvMessageBytes)),
-			grpc.MaxCallSendMsgSize(int(o.maxSendMessageBytes)),
+			grpc.MaxCallRecvMsgSize(maxRecvMessageBytes),
+			grpc.MaxCallSendMsgSize(maxSendMessageBytes),
 		),
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
 			Time:    time.Duration(o.keepaliveTimeMs) * time.Millisecond,

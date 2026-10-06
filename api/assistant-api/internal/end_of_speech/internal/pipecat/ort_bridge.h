@@ -37,6 +37,10 @@ OrtStatus* PctOrtApiCreateTensorWithDataAsOrtValue(const OrtApi *api, const OrtM
     const int64_t *shape, size_t shape_len, ONNXTensorElementDataType data_type, OrtValue **value);
 void PctOrtApiReleaseValue(const OrtApi *api, OrtValue *value);
 
+OrtStatus* PctOrtApiCreateRunOptions(const OrtApi *api, OrtRunOptions **opts);
+OrtStatus* PctOrtApiRunOptionsSetTerminate(const OrtApi *api, OrtRunOptions *opts);
+void PctOrtApiReleaseRunOptions(const OrtApi *api, OrtRunOptions *opts);
+
 OrtStatus* PctOrtApiRun(const OrtApi *api, OrtSession *session, const OrtRunOptions *run_options,
     const char *const *input_names, const OrtValue *const *inputs, size_t inputs_len,
     const char *const *output_names, size_t output_names_len, OrtValue **outputs);

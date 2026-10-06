@@ -28,6 +28,18 @@ type AudioConverter interface {
 
 type AudioResampler interface {
 	Resample(data []byte, source, target *protos.AudioConfig) ([]byte, error)
+	Close()
+}
+
+// AudioResampleSink consumes writer output before Write or Flush returns.
+// Implementations must copy data retained after the callback returns.
+type AudioResampleSink func([]byte) error
+
+// AudioStreamResampler owns stream state for one source to target conversion.
+type AudioStreamResampler interface {
+	Write(data []byte) error
+	Flush() error
+	Close()
 }
 
 // String returns a formatted string representation of AudioInfo

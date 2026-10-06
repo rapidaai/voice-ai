@@ -16,20 +16,20 @@ import (
 	"github.com/rapidaai/pkg/utils"
 )
 
-// rimeNormalizer handles Rime TTS text preprocessing.
+// rimeProcessor handles Rime TTS text preprocessing.
 // Rime does NOT support SSML. Custom pauses use <ms> syntax (e.g., <500> for 500ms pause).
-type rimeNormalizer struct {
+type rimeProcessor struct {
 	logger   commons.Logger
-	config   internal_type.NormalizerConfig
+	config   internal_type.ProcessorConfig
 	language string
 
 	// conjunctionPattern is instance-level: compiled from user-configured boundaries.
 	conjunctionPattern *regexp.Regexp
 }
 
-// NewRimeNormalizer creates a Rime-specific text normalizer.
-func NewRimeNormalizer(logger commons.Logger, opts utils.Option) internal_type.TextNormalizer {
-	cfg := internal_type.DefaultNormalizerConfig()
+// NewRimeProcessor creates a Rime-specific text processor.
+func NewRimeProcessor(logger commons.Logger, opts utils.Option) internal_type.TextProcessor {
+	cfg := internal_type.DefaultProcessorConfig()
 
 	language, _ := opts.GetString("speaker.language")
 	if language == "" {
@@ -50,7 +50,7 @@ func NewRimeNormalizer(logger commons.Logger, opts utils.Option) internal_type.T
 		cfg.PauseDurationMs = conjunctionBreak
 	}
 
-	return &rimeNormalizer{
+	return &rimeProcessor{
 		logger:             logger,
 		config:             cfg,
 		language:           language,
@@ -58,10 +58,10 @@ func NewRimeNormalizer(logger commons.Logger, opts utils.Option) internal_type.T
 	}
 }
 
-// Normalize applies Rime-specific text transformations.
+// Process applies Rime-specific text transformations.
 // Rime uses <ms> syntax for pauses instead of SSML.
-// Markdown removal and whitespace normalization are handled upstream.
-func (n *rimeNormalizer) Normalize(text string) string {
+// Markdown removal and whitespace processing are handled upstream.
+func (n *rimeProcessor) Process(text string) string {
 	if text == "" {
 		return text
 	}
@@ -78,7 +78,7 @@ func (n *rimeNormalizer) Normalize(text string) string {
 // =============================================================================
 
 // insertConjunctionBreaks adds pauses after conjunctions using Rime's <ms> syntax.
-func (n *rimeNormalizer) insertConjunctionBreaks(text string) string {
+func (n *rimeProcessor) insertConjunctionBreaks(text string) string {
 	pauseTag := fmt.Sprintf(" <%d> ", n.config.PauseDurationMs)
 	return n.conjunctionPattern.ReplaceAllStringFunc(text, func(match string) string {
 		return match + pauseTag

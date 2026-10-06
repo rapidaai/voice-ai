@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -20,7 +21,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
-	internal_audio_resampler "github.com/rapidaai/api/assistant-api/internal/audio/resampler"
+	resampler_soxr "github.com/rapidaai/api/assistant-api/internal/audio/resampler/soxr"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
@@ -41,6 +42,7 @@ type textToSpeech struct {
 	stateMu        sync.Mutex
 	connectMu      sync.Mutex
 	writeMu        sync.Mutex
+	readers        sync.WaitGroup
 	connection     *websocket.Conn
 	currentContext string
 	connectedAt    time.Time
@@ -48,6 +50,9 @@ type textToSpeech struct {
 	metricEmitted  bool
 
 	resampler         internal_type.AudioResampler
+	resampleWriter    internal_type.AudioStreamResampler
+	resampleMu        sync.Mutex
+	resampledAudio    []byte
 	sourceAudioConfig *protos.AudioConfig
 	targetAudioConfig *protos.AudioConfig
 }
@@ -87,26 +92,41 @@ func NewTextToSpeech(
 		}
 		return nil, err
 	}
-	resampler, err := internal_audio_resampler.GetResampler(logger)
+	sampleRate, err := utils.IntToUint32(config.SampleRate)
 	if err != nil {
-		return nil, fmt.Errorf("custom-tts websocket_v1: failed to initialize audio resampler: %w", err)
+		return nil, fmt.Errorf("custom-tts websocket_v1: invalid sample rate: %w", err)
 	}
 	ctx2, cancel := context.WithCancel(ctx)
-	return &textToSpeech{
+	audioResampler := resampler_soxr.New(
+		resampler_soxr.WithLogger(logger),
+		resampler_soxr.WithHighQuality(),
+	)
+	transformer := &textToSpeech{
 		config:    config,
 		engine:    config.newEngine(),
 		ctx:       ctx2,
 		cancel:    cancel,
 		logger:    logger,
 		onPacket:  onPacket,
-		resampler: resampler,
+		resampler: audioResampler,
 		sourceAudioConfig: &protos.AudioConfig{
-			SampleRate:  uint32(config.SampleRate),
+			SampleRate:  sampleRate,
 			AudioFormat: parseAudioEncoding(config.Encoding),
 			Channels:    1,
 		},
 		targetAudioConfig: internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG,
-	}, nil
+	}
+	resampleWriter, err := audioResampler.NewWriter(transformer.sourceAudioConfig, transformer.targetAudioConfig, func(output []byte) error {
+		transformer.resampledAudio = append(transformer.resampledAudio, output...)
+		return nil
+	})
+	if err != nil {
+		cancel()
+		audioResampler.Close()
+		return nil, err
+	}
+	transformer.resampleWriter = resampleWriter
+	return transformer, nil
 }
 
 func (*textToSpeech) Name() string {
@@ -124,7 +144,7 @@ func (transformer *textToSpeech) Transform(ctx context.Context, in internal_type
 	case internal_type.TextToSpeechDonePacket:
 		return transformer.handleDone(input.ContextID, input.Text)
 	case internal_type.TextToSpeechInterruptPacket:
-		transformer.handleInterrupt(input.ContextID)
+		transformer.handleInterrupt(ctx, input.ContextID)
 		return nil
 	default:
 		return fmt.Errorf("custom-tts websocket_v1: unsupported input type %T", in)
@@ -133,8 +153,6 @@ func (transformer *textToSpeech) Transform(ctx context.Context, in internal_type
 
 func (transformer *textToSpeech) Close(ctx context.Context) error {
 	transformer.cancel()
-	transformer.connectMu.Lock()
-	defer transformer.connectMu.Unlock()
 	transformer.stateMu.Lock()
 	conn := transformer.connection
 	contextID := transformer.currentContext
@@ -148,6 +166,19 @@ func (transformer *textToSpeech) Close(ctx context.Context) error {
 	if conn != nil {
 		_ = conn.Close()
 	}
+	// Closing the socket releases writers before shutdown waits for their locks.
+	transformer.connectMu.Lock()
+	transformer.connectMu.Unlock()
+	transformer.writeMu.Lock()
+	transformer.writeMu.Unlock()
+	transformer.readers.Wait()
+	transformer.resampleMu.Lock()
+	if transformer.resampleWriter != nil {
+		transformer.resampleWriter.Close()
+	} else if transformer.resampler != nil {
+		transformer.resampler.Close()
+	}
+	transformer.resampleMu.Unlock()
 
 	if !connectedAt.IsZero() {
 		duration := time.Since(connectedAt)
@@ -227,7 +258,18 @@ func (transformer *textToSpeech) handleText(contextID, text string) error {
 	}
 	transformer.stateMu.Unlock()
 
-	if err := transformer.writeRequests(conn, requests); err != nil {
+	transformer.writeMu.Lock()
+	activeConnection, active := transformer.getActiveConnection(contextID)
+	if !active || activeConnection != conn {
+		transformer.writeMu.Unlock()
+		return nil
+	}
+	err = transformer.writeRequests(conn, requests)
+	transformer.writeMu.Unlock()
+	if err != nil {
+		if !transformer.dropConnection(conn) || transformer.ctx.Err() != nil {
+			return nil
+		}
 		if err := transformer.onPacket(internal_type.TextToSpeechErrorPacket{
 			ContextID: contextID,
 			Error:     fmt.Errorf("custom-tts websocket_v1: failed to write text request: %w", err),
@@ -235,7 +277,6 @@ func (transformer *textToSpeech) handleText(contextID, text string) error {
 		}); err != nil {
 			transformer.logger.Errorf("custom-tts websocket_v1: onPacket failed: %v", err)
 		}
-		transformer.dropConnection(conn)
 		return nil
 	}
 
@@ -286,7 +327,18 @@ func (transformer *textToSpeech) handleDone(contextID, text string) error {
 		return nil
 	}
 
-	if err := transformer.writeRequests(conn, requests); err != nil {
+	transformer.writeMu.Lock()
+	activeConnection, active := transformer.getActiveConnection(contextID)
+	if !active || activeConnection != conn {
+		transformer.writeMu.Unlock()
+		return nil
+	}
+	err = transformer.writeRequests(conn, requests)
+	transformer.writeMu.Unlock()
+	if err != nil {
+		if !transformer.dropConnection(conn) || transformer.ctx.Err() != nil {
+			return nil
+		}
 		if err := transformer.onPacket(internal_type.TextToSpeechErrorPacket{
 			ContextID: contextID,
 			Error:     fmt.Errorf("custom-tts websocket_v1: failed to write done request: %w", err),
@@ -294,30 +346,46 @@ func (transformer *textToSpeech) handleDone(contextID, text string) error {
 		}); err != nil {
 			transformer.logger.Errorf("custom-tts websocket_v1: onPacket failed: %v", err)
 		}
-		transformer.dropConnection(conn)
 	}
 
 	return nil
 }
 
-func (transformer *textToSpeech) handleInterrupt(contextID string) {
-	transformer.connectMu.Lock()
-	defer transformer.connectMu.Unlock()
-
+func (transformer *textToSpeech) handleInterrupt(ctx context.Context, contextID string) {
 	transformer.stateMu.Lock()
 	if transformer.currentContext != contextID {
 		transformer.stateMu.Unlock()
 		return
 	}
 	conn := transformer.connection
+	canWrite := transformer.writeMu.TryLock()
+	transformer.connection = nil
+	transformer.currentContext = ""
+	transformer.turnStartedAt = time.Time{}
+	transformer.metricEmitted = false
 	transformer.stateMu.Unlock()
+	if canWrite {
+		defer transformer.writeMu.Unlock()
+	}
+	if conn != nil {
+		defer conn.Close()
+		canceled := make(chan struct{})
+		stop := context.AfterFunc(ctx, func() { _ = conn.Close(); close(canceled) })
+		defer func() {
+			if !stop() {
+				<-canceled
+			}
+		}()
+	}
 
-	if conn != nil && transformer.engine.HasRequestRules(requestPacketInterrupt) {
+	// Interrupt frames are best effort when a writer is free; otherwise closing aborts the write.
+	if canWrite && conn != nil && transformer.engine.HasRequestRules(requestPacketInterrupt) {
 		requests, err := transformer.engine.EvaluateRequestRules(
 			requestPacketInterrupt,
 			transformer.config.newRequestScope(requestPacketInterrupt, contextID, ""),
 		)
 		if err != nil {
+			_ = conn.Close()
 			if err := transformer.onPacket(internal_type.TextToSpeechErrorPacket{
 				ContextID: contextID,
 				Error:     err,
@@ -326,7 +394,8 @@ func (transformer *textToSpeech) handleInterrupt(contextID string) {
 				transformer.logger.Errorf("custom-tts websocket_v1: onPacket failed: %v", err)
 			}
 		} else if len(requests) > 0 {
-			if err := transformer.writeRequests(conn, requests); err != nil {
+			if err := transformer.writeRequests(conn, requests); err != nil && ctx.Err() == nil && transformer.ctx.Err() == nil {
+				_ = conn.Close()
 				if err := transformer.onPacket(internal_type.TextToSpeechErrorPacket{
 					ContextID: contextID,
 					Error:     fmt.Errorf("custom-tts websocket_v1: failed to write interrupt request: %w", err),
@@ -338,19 +407,19 @@ func (transformer *textToSpeech) handleInterrupt(contextID string) {
 		}
 	}
 
-	transformer.stateMu.Lock()
-	if transformer.currentContext != contextID || transformer.connection != conn {
-		transformer.stateMu.Unlock()
-		return
-	}
-	transformer.connection = nil
-	transformer.currentContext = ""
-	transformer.turnStartedAt = time.Time{}
-	transformer.metricEmitted = false
-	transformer.stateMu.Unlock()
-
 	if conn != nil {
 		_ = conn.Close()
+	}
+	if transformer.resampleWriter != nil {
+		transformer.resampleMu.Lock()
+		transformer.stateMu.Lock()
+		if transformer.currentContext == "" && transformer.ctx.Err() == nil {
+			transformer.resampledAudio = transformer.resampledAudio[:0]
+			_ = transformer.resampleWriter.Flush()
+			transformer.resampledAudio = transformer.resampledAudio[:0]
+		}
+		transformer.stateMu.Unlock()
+		transformer.resampleMu.Unlock()
 	}
 
 	if err := transformer.onPacket(internal_type.ObservabilityEventRecordPacket{
@@ -370,6 +439,9 @@ func (transformer *textToSpeech) handleInterrupt(contextID string) {
 func (transformer *textToSpeech) getOrOpenConnection(scope queryScope) (*websocket.Conn, error) {
 	transformer.connectMu.Lock()
 	defer transformer.connectMu.Unlock()
+	if err := transformer.ctx.Err(); err != nil {
+		return nil, err
+	}
 
 	transformer.stateMu.Lock()
 	if transformer.connection != nil && transformer.currentContext == scope.MessageID {
@@ -379,13 +451,20 @@ func (transformer *textToSpeech) getOrOpenConnection(scope queryScope) (*websock
 	}
 	oldConn := transformer.connection
 	transformer.connection = nil
-	transformer.currentContext = ""
+	transformer.currentContext = scope.MessageID
 	transformer.turnStartedAt = time.Time{}
 	transformer.metricEmitted = false
 	transformer.stateMu.Unlock()
 
 	if oldConn != nil {
 		_ = oldConn.Close()
+	}
+	if transformer.resampleWriter != nil {
+		transformer.resampleMu.Lock()
+		transformer.resampledAudio = transformer.resampledAudio[:0]
+		_ = transformer.resampleWriter.Flush()
+		transformer.resampledAudio = transformer.resampledAudio[:0]
+		transformer.resampleMu.Unlock()
 	}
 
 	connectionURL, err := transformer.engine.BuildConnectionURL(scope)
@@ -399,16 +478,55 @@ func (transformer *textToSpeech) getOrOpenConnection(scope queryScope) (*websock
 	}
 
 	start := time.Now()
-	conn, response, err := websocket.DefaultDialer.DialContext(transformer.ctx, connectionURL, headers)
+	dialer := *websocket.DefaultDialer
+	dial := dialer.NetDialContext
+	if dial == nil {
+		dial = (&net.Dialer{}).DialContext
+	}
+	if dialer.NetDialTLSContext != nil {
+		dial = dialer.NetDialTLSContext
+	}
+	// Close the transport if cancellation occurs while waiting for the HTTP upgrade.
+	var stopDial func() bool
+	dialWithCancel := func(ctx context.Context, network, address string) (net.Conn, error) {
+		conn, err := dial(ctx, network, address)
+		if err == nil {
+			stopDial = context.AfterFunc(transformer.ctx, func() { _ = conn.Close() })
+		}
+		return conn, err
+	}
+	if dialer.NetDialTLSContext != nil {
+		dialer.NetDialTLSContext = dialWithCancel
+	} else {
+		dialer.NetDialContext = dialWithCancel
+	}
+	conn, response, err := dialer.DialContext(transformer.ctx, connectionURL, headers)
+	if stopDial != nil {
+		stopDial()
+	}
 	if response != nil && response.Body != nil {
 		_ = response.Body.Close()
 	}
 	if err != nil {
+		if err := transformer.ctx.Err(); err != nil {
+			return nil, err
+		}
+		transformer.stateMu.Lock()
+		active := transformer.currentContext == scope.MessageID
+		transformer.stateMu.Unlock()
+		if !active {
+			return nil, context.Canceled
+		}
 		return nil, err
 	}
 
 	connectedAt := time.Now()
 	transformer.stateMu.Lock()
+	if transformer.ctx.Err() != nil || transformer.currentContext != scope.MessageID {
+		transformer.stateMu.Unlock()
+		_ = conn.Close()
+		return nil, context.Canceled
+	}
 	transformer.connection = conn
 	transformer.currentContext = scope.MessageID
 	if transformer.connectedAt.IsZero() {
@@ -418,7 +536,7 @@ func (transformer *textToSpeech) getOrOpenConnection(scope queryScope) (*websock
 	transformer.metricEmitted = false
 	transformer.stateMu.Unlock()
 
-	go transformer.readLoop(conn, scope.MessageID)
+	transformer.readers.Go(func() { transformer.readLoop(conn, scope.MessageID) })
 	if err := transformer.onPacket(
 		internal_type.ObservabilityMetricRecordPacket{
 			ContextID: scope.MessageID,
@@ -462,10 +580,8 @@ func (transformer *textToSpeech) getActiveConnection(contextID string) (*websock
 	return transformer.connection, true
 }
 
+// writeRequests requires writeMu ownership for the entire request batch.
 func (transformer *textToSpeech) writeRequests(conn *websocket.Conn, requests []outboundRequest) error {
-	transformer.writeMu.Lock()
-	defer transformer.writeMu.Unlock()
-
 	for _, request := range requests {
 		switch request.Frame {
 		case frameTypeBinary:
@@ -499,6 +615,14 @@ func (transformer *textToSpeech) writeRequests(conn *websocket.Conn, requests []
 }
 
 func (transformer *textToSpeech) readLoop(conn *websocket.Conn, contextID string) {
+	canceled := make(chan struct{})
+	stop := context.AfterFunc(transformer.ctx, func() { _ = conn.Close(); close(canceled) })
+	defer func() {
+		if !stop() {
+			<-canceled
+		}
+	}()
+	defer conn.Close()
 	for {
 		select {
 		case <-transformer.ctx.Done():
@@ -511,6 +635,33 @@ func (transformer *textToSpeech) readLoop(conn *websocket.Conn, contextID string
 			case readErrorIgnore:
 				return
 			case readErrorComplete:
+				if transformer.resampleWriter != nil {
+					transformer.resampleMu.Lock()
+					transformer.resampledAudio = transformer.resampledAudio[:0]
+					err := transformer.resampleWriter.Flush()
+					audio := append([]byte(nil), transformer.resampledAudio...)
+					transformer.resampledAudio = transformer.resampledAudio[:0]
+					transformer.resampleMu.Unlock()
+					if err != nil {
+						if err := transformer.onPacket(internal_type.TextToSpeechErrorPacket{
+							ContextID: contextID,
+							Error:     fmt.Errorf("custom-tts websocket_v1: failed to flush resampler: %w", err),
+							Type:      internal_type.TTSUnknownError,
+						}); err != nil {
+							transformer.logger.Errorf("custom-tts websocket_v1: onPacket failed: %v", err)
+						}
+						return
+					}
+					if len(audio) > 0 {
+						transformer.emitFirstAudioMetric(contextID)
+						if err := transformer.onPacket(internal_type.TextToSpeechAudioPacket{
+							ContextID:  contextID,
+							AudioChunk: audio,
+						}); err != nil {
+							transformer.logger.Errorf("custom-tts websocket_v1: onPacket failed: %v", err)
+						}
+					}
+				}
 				if err := transformer.onPacket(
 					internal_type.TextToSpeechEndPacket{ContextID: contextID},
 					internal_type.ObservabilityEventRecordPacket{
@@ -538,6 +689,11 @@ func (transformer *textToSpeech) readLoop(conn *websocket.Conn, contextID string
 				transformer.logger.Errorf("custom-tts websocket_v1: onPacket failed: %v", err)
 			}
 			return
+		}
+		activeConnection, active := transformer.getActiveConnection(contextID)
+		if !active || activeConnection != conn {
+			// The retiring owner closes the socket after its optional interrupt frames.
+			continue
 		}
 		frame, err := transformer.engine.ParseFrame(messageType, payload)
 		if err != nil {
@@ -583,6 +739,9 @@ func (transformer *textToSpeech) readLoop(conn *websocket.Conn, contextID string
 				}
 				continue
 			}
+			if len(audio) == 0 {
+				continue
+			}
 
 			transformer.emitFirstAudioMetric(resolvedContextID)
 			if err := transformer.onPacket(internal_type.TextToSpeechAudioPacket{
@@ -604,7 +763,36 @@ func (transformer *textToSpeech) readLoop(conn *websocket.Conn, contextID string
 		}
 
 		if outcome.Done {
-			transformer.dropConnection(conn)
+			if transformer.resampleWriter != nil {
+				transformer.resampleMu.Lock()
+				transformer.resampledAudio = transformer.resampledAudio[:0]
+				err := transformer.resampleWriter.Flush()
+				audio := append([]byte(nil), transformer.resampledAudio...)
+				transformer.resampledAudio = transformer.resampledAudio[:0]
+				transformer.resampleMu.Unlock()
+				if err != nil {
+					if err := transformer.onPacket(internal_type.TextToSpeechErrorPacket{
+						ContextID: resolvedContextID,
+						Error:     fmt.Errorf("custom-tts websocket_v1: failed to flush resampler: %w", err),
+						Type:      internal_type.TTSUnknownError,
+					}); err != nil {
+						transformer.logger.Errorf("custom-tts websocket_v1: onPacket failed: %v", err)
+					}
+					return
+				}
+				if len(audio) > 0 {
+					transformer.emitFirstAudioMetric(resolvedContextID)
+					if err := transformer.onPacket(internal_type.TextToSpeechAudioPacket{
+						ContextID:  resolvedContextID,
+						AudioChunk: audio,
+					}); err != nil {
+						transformer.logger.Errorf("custom-tts websocket_v1: onPacket failed: %v", err)
+					}
+				}
+			}
+			if !transformer.dropConnection(conn) || transformer.ctx.Err() != nil {
+				return
+			}
 			if err := transformer.onPacket(
 				internal_type.TextToSpeechEndPacket{ContextID: resolvedContextID},
 				internal_type.ObservabilityEventRecordPacket{
@@ -655,9 +843,10 @@ func (transformer *textToSpeech) classifyReadError(conn *websocket.Conn, err err
 	return readErrorFail
 }
 
-func (transformer *textToSpeech) dropConnection(conn *websocket.Conn) {
+func (transformer *textToSpeech) dropConnection(conn *websocket.Conn) bool {
 	transformer.stateMu.Lock()
-	if transformer.connection == conn {
+	active := transformer.connection == conn
+	if active {
 		transformer.connection = nil
 		transformer.currentContext = ""
 		transformer.turnStartedAt = time.Time{}
@@ -667,6 +856,7 @@ func (transformer *textToSpeech) dropConnection(conn *websocket.Conn) {
 	if conn != nil {
 		_ = conn.Close()
 	}
+	return active
 }
 
 func (transformer *textToSpeech) emitFirstAudioMetric(contextID string) {
@@ -692,12 +882,24 @@ func (transformer *textToSpeech) emitFirstAudioMetric(contextID string) {
 }
 
 func (transformer *textToSpeech) normalizeAudioChunk(audio []byte) ([]byte, error) {
-	if transformer.resampler == nil {
-		return audio, nil
+	if transformer.resampleWriter != nil {
+		transformer.resampleMu.Lock()
+		transformer.resampledAudio = transformer.resampledAudio[:0]
+		err := transformer.resampleWriter.Write(audio)
+		output := append([]byte(nil), transformer.resampledAudio...)
+		transformer.resampledAudio = transformer.resampledAudio[:0]
+		transformer.resampleMu.Unlock()
+		if err != nil {
+			return nil, fmt.Errorf("custom-tts websocket_v1: failed to resample audio: %w", err)
+		}
+		return output, nil
 	}
-	audio, err := transformer.resampler.Resample(audio, transformer.sourceAudioConfig, transformer.targetAudioConfig)
-	if err != nil {
-		return nil, fmt.Errorf("custom-tts websocket_v1: failed to resample audio: %w", err)
+	if transformer.resampler != nil {
+		output, err := transformer.resampler.Resample(audio, transformer.sourceAudioConfig, transformer.targetAudioConfig)
+		if err != nil {
+			return nil, fmt.Errorf("custom-tts websocket_v1: failed to resample audio: %w", err)
+		}
+		return output, nil
 	}
 	return audio, nil
 }

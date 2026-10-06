@@ -27,6 +27,15 @@ func MinUint64(a, b uint64) uint64 {
 	return b
 }
 
+// Int64ToUint16 converts an int64 to uint16 when the value is in range.
+func Int64ToUint16(value int64) (uint16, error) {
+	if value < 0 || value > math.MaxUint16 {
+		return 0, fmt.Errorf("int64 value %d exceeds uint16 range", value)
+	}
+	// #nosec G115, value is checked above.
+	return uint16(value), nil
+}
+
 // Int64ToUint32 converts an int64 to uint32 when the value is in range.
 func Int64ToUint32(value int64) (uint32, error) {
 	if value < 0 || value > math.MaxUint32 {
@@ -63,6 +72,15 @@ func Uint64ToInt64(value uint64) (int64, error) {
 	return int64(value), nil
 }
 
+// Uint64ToInt converts a uint64 to int when the value is in range.
+func Uint64ToInt(value uint64) (int, error) {
+	converted, err := strconv.Atoi(strconv.FormatUint(value, 10))
+	if err != nil {
+		return 0, fmt.Errorf("uint64 value %d exceeds int range: %w", value, err)
+	}
+	return converted, nil
+}
+
 // Uint64ToUint32 converts a uint64 to uint32 when the value is in range.
 func Uint64ToUint32(value uint64) (uint32, error) {
 	if value > math.MaxUint32 {
@@ -74,11 +92,11 @@ func Uint64ToUint32(value uint64) (uint32, error) {
 
 // Uint32ToInt converts a uint32 to int when the value is in range.
 func Uint32ToInt(value uint32) (int, error) {
-	if strconv.IntSize == 32 && value > math.MaxInt32 {
-		return 0, fmt.Errorf("uint32 value %d exceeds int range", value)
+	converted, err := strconv.Atoi(strconv.FormatUint(uint64(value), 10))
+	if err != nil {
+		return 0, fmt.Errorf("uint32 value %d exceeds int range: %w", value, err)
 	}
-	// #nosec G115, value is checked above.
-	return int(value), nil
+	return converted, nil
 }
 
 // Uint32ToInt64 converts a uint32 to int64.

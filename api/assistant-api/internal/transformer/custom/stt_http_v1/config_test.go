@@ -7,6 +7,7 @@
 package internal_transformer_custom_stt_http_v1
 
 import (
+	"math"
 	"testing"
 
 	"github.com/rapidaai/pkg/utils"
@@ -63,6 +64,22 @@ func TestNewConfig_WithOverrides(t *testing.T) {
 	assert.Equal(t, "hi", config.Language)
 	assert.Equal(t, 8000, config.SampleRate)
 	assert.NotEmpty(t, config.QueryParams)
+}
+
+func TestNewConfig_ChecksSampleRateConversion(t *testing.T) {
+	opts := baseOptions()
+	opts[optionKeySampleRate] = uint32(math.MaxUint32)
+
+	config, err := NewConfig(testCredential(t, map[string]any{
+		credentialKeyBaseURLSnake: "https://example.com/predict",
+	}), opts)
+	expected, conversionErr := utils.Uint32ToInt(math.MaxUint32)
+	if conversionErr != nil {
+		require.Error(t, err)
+		return
+	}
+	require.NoError(t, err)
+	assert.Equal(t, expected, config.SampleRate)
 }
 
 func TestNewConfig_OptionalQueryParams(t *testing.T) {

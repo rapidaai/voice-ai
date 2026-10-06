@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math"
 	"net"
 	"testing"
 	"time"
@@ -170,6 +171,19 @@ func TestAgentConnectionOption_GetGrpcOptionsReturnsTypedErrors(t *testing.T) {
 	_, err = invalidCertificate.GetGrpcOptions()
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, ErrAgentkitConnectionInvalidCertificate))
+
+	maximumMessageSize := AgentConnectionOption{
+		transportSecurity:   TransportSecurityPlaintext,
+		maxRecvMessageBytes: math.MaxUint32,
+		maxSendMessageBytes: math.MaxUint32,
+	}
+	_, err = maximumMessageSize.GetGrpcOptions()
+	_, conversionErr := utils.Uint32ToInt(math.MaxUint32)
+	if conversionErr != nil {
+		require.Error(t, err)
+	} else {
+		require.NoError(t, err)
+	}
 }
 
 func TestAgentkitConnection_ReturnsNotConnectedWhenStreamIsMissing(t *testing.T) {

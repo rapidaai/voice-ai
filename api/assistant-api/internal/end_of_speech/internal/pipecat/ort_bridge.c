@@ -28,6 +28,10 @@ OrtStatus* PctOrtApiCreateTensorWithDataAsOrtValue(const OrtApi *api, const OrtM
     const int64_t *s, size_t sl, ONNXTensorElementDataType dt, OrtValue **v) { return api->CreateTensorWithDataAsOrtValue(mi, d, dl, s, sl, dt, v); }
 void PctOrtApiReleaseValue(const OrtApi *api, OrtValue *v) { api->ReleaseValue(v); }
 
+OrtStatus* PctOrtApiCreateRunOptions(const OrtApi *api, OrtRunOptions **opts) { return api->CreateRunOptions(opts); }
+OrtStatus* PctOrtApiRunOptionsSetTerminate(const OrtApi *api, OrtRunOptions *opts) { return api->RunOptionsSetTerminate(opts); }
+void PctOrtApiReleaseRunOptions(const OrtApi *api, OrtRunOptions *opts) { api->ReleaseRunOptions(opts); }
+
 OrtStatus* PctOrtApiRun(const OrtApi *api, OrtSession *s, const OrtRunOptions *ro,
     const char *const *in, const OrtValue *const *iv, size_t il,
     const char *const *on, size_t ol, OrtValue **ov) { return api->Run(s, ro, in, iv, il, on, ol, ov); }

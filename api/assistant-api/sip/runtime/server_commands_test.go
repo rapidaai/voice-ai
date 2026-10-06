@@ -14,6 +14,7 @@ import (
 
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -131,7 +132,7 @@ func newServerForCommandTests(t *testing.T) *Server {
 
 	server := &Server{
 		logger:            bridgeTestLogger(),
-		listenConfig:      &ListenConfig{Address: "127.0.0.1", Port: 5060, ExternalIP: "127.0.0.1"},
+		listenConfig:      &sip_config.ListenConfig{Address: "127.0.0.1", Port: 5060, ExternalIP: "127.0.0.1"},
 		rtpPortRangeStart: 19000,
 		rtpPortRangeEnd:   19999,
 		dialogClientCache: sipgo.NewDialogClientCache(client, contact),
@@ -151,6 +152,7 @@ func newServerForCommandTests(t *testing.T) *Server {
 		}
 		server.mu.RUnlock()
 		for _, session := range sessions {
+			session.SetDialogServerSession(nil)
 			_ = server.EndCallWithReason(session, LifecycleReasonEndCall)
 		}
 	})
@@ -162,7 +164,7 @@ func newSIPRequest(method sip.RequestMethod, callID string) *sip.Request {
 	req := sip.NewRequest(method, recipient)
 
 	params := sip.NewParams()
-	params["branch"] = sip.GenerateBranch()
+	params.Add("branch", sip.GenerateBranch())
 	fromParams := sip.NewParams()
 	fromParams.Add("tag", "fromtag")
 	req.AppendHeader(&sip.ViaHeader{

@@ -37,7 +37,9 @@ amplify.yml
 commitlint.config.js
 
 # Build artifacts
-bin/
+bin/*
+!bin/pre-commit-go
+!bin/run-transformer-integration-tests.sh
 *.exe
 *.dll
 *.so

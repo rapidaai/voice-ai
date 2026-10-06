@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from helpers import ROOT, load_script
 
@@ -145,6 +147,32 @@ class StyleCheckTest(unittest.TestCase):
 
 
 class RequiredTestSelectionTest(unittest.TestCase):
+    def test_compiles_integration_tag_only_go_directories_without_running_tests(self) -> None:
+        with TemporaryDirectory() as root:
+            directory = "api/example"
+            path = Path(root, directory)
+            path.mkdir(parents=True)
+            path.joinpath("provider_test.go").write_text(
+                "//go:build integration\n\npackage example_test\n"
+            )
+
+            self.assertEqual(
+                required_tests._go_test_command(directory, root),
+                ["go", "test", "-tags=integration", "-run", "^$", "./api/example"],
+            )
+
+    def test_runs_normal_go_directories_without_build_tags(self) -> None:
+        with TemporaryDirectory() as root:
+            directory = "api/example"
+            path = Path(root, directory)
+            path.mkdir(parents=True)
+            path.joinpath("provider_test.go").write_text("package example_test\n")
+
+            self.assertEqual(
+                required_tests._go_test_command(directory, root),
+                ["go", "test", "./api/example"],
+            )
+
     def test_ui_tests_run_non_interactively(self) -> None:
         self.assertEqual(
             required_tests._ui_test_command(

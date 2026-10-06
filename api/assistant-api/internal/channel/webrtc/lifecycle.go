@@ -209,7 +209,6 @@ func (s *webrtcStreamer) restartICEOrMediaSessionFallback(mediaSessionID uint64,
 		})
 
 	s.clearBufferedOutputAudio()
-	s.clearOutputAudio()
 
 	s.sessionState.SetMediaState(webrtc_internal.MediaStateAudioNegotiating)
 	s.enqueueWebRTCOperation(webrtc_internal.WebRTCOperation{
@@ -280,8 +279,6 @@ func (s *webrtcStreamer) restartMediaSessionOrFallbackToText(mediaSessionID uint
 			},
 		})
 
-	s.clearBufferedOutputAudio()
-	s.clearOutputAudio()
 	if s.ambientMixer != nil {
 		s.ambientMixer.Reset()
 	}

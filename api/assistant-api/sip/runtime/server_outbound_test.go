@@ -10,6 +10,7 @@ import (
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -199,13 +200,13 @@ func TestPrepareOutboundCallLeg_AppliesTransferBridgeMetadata(t *testing.T) {
 	assertSessionMetadata(t, outboundCall.session, MetadataOutboundTransferTotal, 3)
 }
 
-func outboundTestListenConfig() *ListenConfig {
-	return &ListenConfig{
+func outboundTestListenConfig() *sip_config.ListenConfig {
+	return &sip_config.ListenConfig{
 		Address:                 "127.0.0.1",
 		ExternalIP:              "127.0.0.1",
 		AllowLoopbackExternalIP: true,
 		Port:                    5060,
-		Transport:               TransportUDP,
+		Transport:               sip_config.TransportUDP,
 	}
 }
 

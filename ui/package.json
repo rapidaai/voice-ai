@@ -11,6 +11,7 @@
   "packageManager": "yarn@1.22.22",
   "resolutions": {
     "**/@types/d3-dispatch": "3.0.3",
+    "**/@storybook/builder-webpack5/webpack-dev-middleware": "7.4.6",
     "**/react": "18.2.0",
     "**/react-dom": "18.2.0",
     "**/zustand": "4.5.1"

@@ -13,32 +13,32 @@ import (
 )
 
 // =============================================================================
-// Sarvam Text Normalizer
+// Sarvam Text Processor
 // =============================================================================
 
-// sarvamNormalizer handles Sarvam AI TTS text preprocessing.
+// sarvamProcessor handles Sarvam AI TTS text preprocessing.
 // Sarvam does NOT support SSML - only plain text is accepted.
 // Sarvam specializes in Indian languages (Hindi, Tamil, Telugu, etc.).
-type sarvamNormalizer struct {
+type sarvamProcessor struct {
 	logger   commons.Logger
 	language string
 }
 
-// NewSarvamNormalizer creates a Sarvam-specific text normalizer.
-func NewSarvamNormalizer(logger commons.Logger, opts utils.Option) internal_type.TextNormalizer {
+// NewSarvamProcessor creates a Sarvam-specific text processor.
+func NewSarvamProcessor(logger commons.Logger, opts utils.Option) internal_type.TextProcessor {
 	language, _ := opts.GetString("speaker.language")
 	if language == "" {
 		language = "hi-IN" // Default to Hindi
 	}
 
-	return &sarvamNormalizer{
+	return &sarvamProcessor{
 		logger:   logger,
 		language: language,
 	}
 }
 
-// Normalize returns text unchanged. Sarvam does NOT support SSML.
-// Markdown removal and whitespace normalization are handled upstream.
-func (n *sarvamNormalizer) Normalize(text string) string {
+// Process returns text unchanged. Sarvam does NOT support SSML.
+// Markdown removal and whitespace processing are handled upstream.
+func (n *sarvamProcessor) Process(text string) string {
 	return text
 }

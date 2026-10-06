@@ -9,7 +9,9 @@ import (
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 	internal_telephony_base "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/base"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
+	"github.com/rapidaai/pkg/channel"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
 	"github.com/stretchr/testify/assert"
@@ -97,13 +99,29 @@ func newTestSIPStreamerWithCollector(t *testing.T) (*Streamer, *testSIPCollector
 func newTestInboundSIPSession(t *testing.T, callID string) *sip_runtime.Session {
 	t.Helper()
 	session, err := sip_runtime.NewSession(context.Background(),
-		sip_runtime.WithSessionConfig(&sip_runtime.Config{
+		sip_runtime.WithSessionConfig(&sip_config.Config{
 			Server:            "127.0.0.1",
 			Port:              5060,
 			RTPPortRangeStart: 10000,
 			RTPPortRangeEnd:   10100,
 		}),
 		sip_runtime.WithSessionDirection(sip_runtime.CallDirectionInbound),
+		sip_runtime.WithSessionCallID(callID),
+	)
+	require.NoError(t, err)
+	return session
+}
+
+func newTestOutboundSIPSession(t *testing.T, callID string) *sip_runtime.Session {
+	t.Helper()
+	session, err := sip_runtime.NewSession(context.Background(),
+		sip_runtime.WithSessionConfig(&sip_config.Config{
+			Server:            "127.0.0.1",
+			Port:              5060,
+			RTPPortRangeStart: 10000,
+			RTPPortRangeEnd:   10100,
+		}),
+		sip_runtime.WithSessionDirection(sip_runtime.CallDirectionOutbound),
 		sip_runtime.WithSessionCallID(callID),
 	)
 	require.NoError(t, err)
@@ -149,7 +167,9 @@ func TestSend_EndConversation_PushesToolResult(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case msg := <-s.CriticalCh:
+	case <-s.CriticalCh.Ready():
+		msg, err := s.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		result, ok := msg.(*protos.ConversationToolCallResult)
 		require.True(t, ok, "expected ConversationToolCallResult, got %T", msg)
 		assert.Equal(t, "ctx-1", result.GetId())
@@ -170,6 +190,7 @@ func TestSend_AssistantAudioQueuesUntilOutputActivated(t *testing.T) {
 	s := newTestSIPStreamer(t)
 
 	err := s.Send(&protos.ConversationAssistantMessage{
+		Id: "response-1",
 		Message: &protos.ConversationAssistantMessage_Audio{
 			Audio: []byte{1, 2, 3},
 		},
@@ -178,12 +199,58 @@ func TestSend_AssistantAudioQueuesUntilOutputActivated(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, s.pendingAssistantAudioFrames, 1)
+	assert.Equal(t, "response-1", s.pendingAssistantAudioFrames[0].responseID)
 	assert.Equal(t, []byte{1, 2, 3}, s.pendingAssistantAudioFrames[0].audio)
 	assert.True(t, s.pendingAssistantAudioFrames[0].completed)
 
 	s.StartAssistantOutput()
 	assert.True(t, s.assistantOutputActive.Load())
 	assert.Empty(t, s.pendingAssistantAudioFrames)
+}
+
+func TestSend_OutputControlsManagePendingPreAnswerAudio(t *testing.T) {
+	s := newTestSIPStreamer(t)
+	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
+		Id:      "response-1",
+		Message: &protos.ConversationAssistantMessage_Audio{Audio: []byte{1, 2, 3}},
+	}))
+
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_PAUSE}))
+	require.Len(t, s.pendingAssistantAudioFrames, 1)
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_CONTINUE}))
+	require.Len(t, s.pendingAssistantAudioFrames, 1)
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}))
+	assert.Empty(t, s.pendingAssistantAudioFrames)
+}
+
+func TestSend_FlushBlocksLatePreAnswerResponseAudio(t *testing.T) {
+	s := newTestSIPStreamer(t)
+	mediaPort, _, _ := newMediaPortForTest(t, nil)
+	s.mediaPort = mediaPort
+	defer func() { require.NoError(t, mediaPort.Close()) }()
+	audio := make([]byte, BridgeOutputFrameSize*4)
+
+	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
+		Id: "response-1", Message: &protos.ConversationAssistantMessage_Audio{Audio: audio}, Completed: true,
+	}))
+	require.NoError(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}))
+	assert.Empty(t, s.pendingAssistantAudioFrames)
+	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
+		Id: "response-1", Message: &protos.ConversationAssistantMessage_Audio{Audio: audio}, Completed: true,
+	}))
+	assert.Empty(t, s.pendingAssistantAudioFrames)
+	require.NoError(t, s.Send(&protos.ConversationAssistantMessage{
+		Id: "response-2", Message: &protos.ConversationAssistantMessage_Audio{Audio: audio}, Completed: true,
+	}))
+	require.Len(t, s.pendingAssistantAudioFrames, 1)
+	assert.Equal(t, "response-2", s.pendingAssistantAudioFrames[0].responseID)
+}
+
+func TestSend_OutputControlAfterCloseReturnsSessionClosed(t *testing.T) {
+	s := newTestSIPStreamer(t)
+	require.NoError(t, s.Close())
+
+	assert.ErrorIs(t, s.Send(&protos.ConversationPlaybackControl{Kind: protos.ConversationPlaybackControl_FLUSH}), sip_runtime.ErrSessionClosed)
 }
 
 func TestSend_InboundAssistantAudioMarksReadyBeforeOutputActivated(t *testing.T) {
@@ -210,6 +277,112 @@ func TestShouldEndSessionOnClose_SkipsPreAnswerStates(t *testing.T) {
 	assert.True(t, shouldEndSessionOnClose(sip_runtime.CallStateConnected))
 }
 
+func TestNewRequiresSession(t *testing.T) {
+	_, err := New()
+	require.ErrorIs(t, err, ErrSessionRequired)
+}
+
+func TestNewRequiresLifecycleController(t *testing.T) {
+	_, err := New(WithSession(newTestInboundSIPSession(t, "missing-lifecycle")))
+	require.ErrorIs(t, err, ErrLifecycleControllerRequired)
+}
+
+func TestNewInitializesMediaPortBeforeCancellationWatcher(t *testing.T) {
+	logger, err := commons.NewApplicationLogger()
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	session := newTestInboundSIPSession(t, "cancelled-during-initialization")
+	session.SetRTPHandler(&sip_runtime.RTPHandler{})
+
+	stream, err := New(
+		WithContext(ctx),
+		WithLogger(logger),
+		WithSession(session),
+		WithLifecycle(&fakeSIPLifecycleController{}),
+		WithCallContext(&callcontext.CallContext{}),
+	)
+	require.NoError(t, err)
+	streamer := stream.(*Streamer)
+	require.NotNil(t, streamer.mediaPort)
+	require.Eventually(t, func() bool {
+		return streamer.closed.Load() && streamer.mediaPort.closed.Load()
+	}, time.Second, time.Millisecond)
+}
+
+func TestNewOutboundStartsInputOnlyBeforeRuntimeStart(t *testing.T) {
+	logger, err := commons.NewApplicationLogger()
+	require.NoError(t, err)
+	session := newTestOutboundSIPSession(t, "outbound-input-only")
+	session.SetRTPHandler(&sip_runtime.RTPHandler{})
+
+	stream, err := New(
+		WithContext(t.Context()),
+		WithLogger(logger),
+		WithSession(session),
+		WithLifecycle(&fakeSIPLifecycleController{}),
+		WithCallContext(&callcontext.CallContext{}),
+	)
+	require.NoError(t, err)
+	streamer := stream.(*Streamer)
+	t.Cleanup(func() { require.NoError(t, streamer.Close()) })
+
+	require.NotNil(t, streamer.mediaPort)
+	assert.True(t, streamer.mediaPort.inputStarted.Load())
+	assert.False(t, streamer.mediaPort.outputStarted.Load())
+	assert.False(t, streamer.assistantOutputActive.Load())
+}
+
+func TestNew_RoutesBridgeRecordingOutsideRealtimeInput(t *testing.T) {
+	logger, err := commons.NewApplicationLogger()
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	session := newTestInboundSIPSession(t, "sip-recording-routing")
+	session.SetRTPHandler(&sip_runtime.RTPHandler{})
+	stream, err := New(
+		WithContext(ctx),
+		WithLogger(logger),
+		WithSession(session),
+		WithLifecycle(&fakeSIPLifecycleController{}),
+		WithCallContext(&callcontext.CallContext{}),
+	)
+	require.NoError(t, err)
+	streamer := stream.(*Streamer)
+	t.Cleanup(func() { require.NoError(t, streamer.Close()) })
+	require.Equal(t, RealtimeInputChannelCapacity, streamer.InputCh.Capacity())
+	select {
+	case <-streamer.CriticalCh.Ready():
+		message, err := streamer.CriticalCh.TryReceive()
+		require.NoError(t, err)
+		_, ok := message.(*protos.ConversationInitialization)
+		require.True(t, ok, "expected conversation initialization, got %T", message)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for conversation initialization")
+	}
+
+	streamer.mediaPort.StartBridgeRecorder()
+	for range 8 {
+		streamer.mediaPort.RecordTransferOperatorAudio(make([]byte, 160))
+	}
+
+	select {
+	case <-streamer.LowCh.Ready():
+		message, err := streamer.LowCh.TryReceive()
+		require.NoError(t, err)
+		recording, ok := message.(*protos.ConversationBridgeOperatorAudio)
+		require.True(t, ok, "expected bridge operator recording, got %T", message)
+		require.NotEmpty(t, recording.GetAudio())
+		require.Zero(t, len(recording.GetAudio())%2)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for bridge recording")
+	}
+
+	message, err := streamer.InputCh.TryReceive()
+	require.ErrorIs(t, err, channel.ErrEmpty, "recording must not occupy realtime input queue; got %T", message)
+}
+
 func TestSend_ConversationDisconnection_RecordsEventAndClosesStreamer(t *testing.T) {
 	s, collector := newTestSIPStreamerWithCollector(t)
 	session := newTestInboundSIPSession(t, "sip-streamer-disconnect")
@@ -222,11 +395,13 @@ func TestSend_ConversationDisconnection_RecordsEventAndClosesStreamer(t *testing
 	})
 	require.NoError(t, err)
 
-	// Server-initiated Send no longer requeues the disconnect onto CriticalCh —
+	// Server-initiated Send no longer requeues the disconnect onto CriticalCh.
 	// the server callsite already knows the reason. The talker exits via the
 	// Recv-err path once Close cancels s.Ctx.
 	select {
-	case msg := <-s.CriticalCh:
+	case <-s.CriticalCh.Ready():
+		msg, err := s.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		t.Fatalf("server-initiated Send must not push to CriticalCh; got %T", msg)
 	default:
 	}
@@ -333,7 +508,9 @@ func TestSend_TransferConversation_MissingTransferTarget(t *testing.T) {
 	require.NoError(t, err)
 
 	select {
-	case msg := <-s.CriticalCh:
+	case <-s.CriticalCh.Ready():
+		msg, err := s.CriticalCh.TryReceive()
+		require.NoError(t, err)
 		result, ok := msg.(*protos.ConversationToolCallResult)
 		require.True(t, ok, "expected ConversationToolCallResult, got %T", msg)
 		assert.Equal(t, "ctx-transfer-missing", result.GetId())

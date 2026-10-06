@@ -7,6 +7,7 @@ package watchdog
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 	"time"
@@ -299,7 +300,11 @@ func (w *TTSCompletionWatchdog) expire(generation uint64) {
 					OccurredAt: time.Now(),
 				},
 			},
-			internal_type.TextToSpeechEndPacket{ContextID: event.ContextID},
+			internal_type.TextToSpeechErrorPacket{
+				ContextID: event.ContextID,
+				Error:     errors.New("tts-completion-watchdog: deadline expired"),
+				Type:      internal_type.TTSNetworkTimeout,
+			},
 		)
 	}
 }

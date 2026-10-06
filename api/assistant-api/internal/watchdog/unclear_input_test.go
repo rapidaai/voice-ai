@@ -8,6 +8,7 @@ package watchdog
 import (
 	"context"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -16,6 +17,56 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 )
+
+func TestUnclearInputWatchdogExpiryGenerationRejectsObsoletePackets(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var expired []internal_type.UnclearInputExpiredPacket
+		watchdog := NewUnclearInputWatchdog(WithOnPacket(func(_ context.Context, packets ...internal_type.Packet) error {
+			for _, packet := range packets {
+				if value, ok := packet.(internal_type.UnclearInputExpiredPacket); ok {
+					expired = append(expired, value)
+				}
+			}
+			return nil
+		}))
+		defer watchdog.Cancel()
+		require.True(t, watchdog.Start("current", time.Second))
+		time.Sleep(time.Second)
+		synctest.Wait()
+		require.Len(t, expired, 1)
+		assert.True(t, watchdog.AcceptExpiry(expired[0]))
+		assert.False(t, watchdog.AcceptExpiry(internal_type.UnclearInputExpiredPacket{ContextID: "other", Generation: expired[0].Generation}))
+		assert.False(t, watchdog.AcceptExpiry(internal_type.UnclearInputExpiredPacket{ContextID: "current"}))
+		require.True(t, watchdog.Start("current", time.Second))
+		assert.False(t, watchdog.AcceptExpiry(expired[0]))
+		time.Sleep(time.Second)
+		synctest.Wait()
+		require.Len(t, expired, 2)
+		assert.True(t, watchdog.AcceptExpiry(expired[1]))
+		watchdog.Stop()
+		assert.False(t, watchdog.AcceptExpiry(expired[1]))
+	})
+}
+
+func TestUnclearInputWatchdogStoppedGenerationCannotExpire(t *testing.T) {
+	var expired []internal_type.UnclearInputExpiredPacket
+	watchdog := NewUnclearInputWatchdog(WithOnPacket(func(_ context.Context, packets ...internal_type.Packet) error {
+		for _, packet := range packets {
+			if value, ok := packet.(internal_type.UnclearInputExpiredPacket); ok {
+				expired = append(expired, value)
+			}
+		}
+		return nil
+	}))
+	require.True(t, watchdog.Start("current", time.Hour))
+	generation := watchdog.generation
+	require.True(t, watchdog.Extend("current", time.Hour))
+	watchdog.expire(generation)
+	assert.Empty(t, expired)
+	require.True(t, watchdog.Stop())
+	watchdog.expire(generation + 1)
+	assert.Empty(t, expired)
+}
 
 func TestUnclearInputWatchdog_StartExpiresWhenDeadlinePasses(t *testing.T) {
 	pushedPackets := make(chan internal_type.Packet, 4)

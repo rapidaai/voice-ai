@@ -1,198 +1,111 @@
 #!/usr/bin/env bash
-# Run integration tests for STT/TTS transformer providers.
-#
-# Usage:
-#   bin/run-transformer-integration-tests.sh                      # all providers
-#   bin/run-transformer-integration-tests.sh deepgram rime        # specific providers
-#   bin/run-transformer-integration-tests.sh -v google            # verbose
-#   bin/run-transformer-integration-tests.sh --tts-only deepgram  # TTS tests only
-#   bin/run-transformer-integration-tests.sh --stt-only deepgram  # STT tests only
-#
-# Prerequisites:
-#   Copy api/assistant-api/internal/transformer/testdata/integration_config.yaml.example
-#   → integration_config.yaml and enable the providers you want to test with real API keys.
-
+# Run live transformer suites only for the requested providers and speech direction.
 set -euo pipefail
 
-TRANSFORMER_PKG="./api/assistant-api/internal/transformer"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-
-cd "$ROOT_DIR"
-
-# Provider → package directory mapping
-declare -A PROVIDER_PKG=(
-  [deepgram]="deepgram"
-  [google]="google"
-  [sarvam]="sarvam"
-  [elevenlabs]="elevenlabs"
-  [cartesia]="cartesia"
-  [assemblyai]="assembly-ai"
-  [azure]="azure"
-  [rime]="rime"
-  [resemble]="resemble"
-)
-
-# Provider capabilities: tts, stt, or both
-declare -A PROVIDER_CAP=(
-  [deepgram]="both"
-  [google]="both"
-  [sarvam]="both"
-  [elevenlabs]="tts"
-  [cartesia]="both"
-  [assemblyai]="stt"
-  [azure]="both"
-  [rime]="tts"
-  [resemble]="tts"
-)
-
-ALL_PROVIDERS=(deepgram google sarvam elevenlabs cartesia assemblyai azure rime)
-
-VERBOSE=""
-PROVIDERS=()
-FILTER=""
+cd "$SCRIPT_DIR/.."
+INTEGRATION_PKG="./api/assistant-api/internal/transformer/tests/integration"
 TIMEOUT="${INTEGRATION_TEST_TIMEOUT:-300s}"
+PROVIDERS=()
+MODE="(STT|TTS)"
 
-# Parse args
 for arg in "$@"; do
   case "$arg" in
-    -v|--verbose)
-      VERBOSE="-v"
-      ;;
-    --tts-only)
-      FILTER="TTS"
-      ;;
-    --stt-only)
-      FILTER="STT"
-      ;;
+    -v|--verbose) ;; # Go's verbose output preserves individual skipped-test results.
+    --tts-only) MODE="TTS" ;;
+    --stt-only) MODE="STT" ;;
     -h|--help)
       echo "Usage: $0 [-v] [--tts-only|--stt-only] [provider ...]"
-      echo ""
-      echo "Providers: ${ALL_PROVIDERS[*]}"
-      echo ""
-      echo "Flags:"
-      echo "  -v, --verbose    Verbose test output"
-      echo "  --tts-only       Run only TTS integration tests"
-      echo "  --stt-only       Run only STT integration tests"
-      echo ""
-      echo "Environment variables:"
-      echo "  TRANSFORMER_TEST_CONFIG    Path to config YAML (default: testdata/integration_config.yaml)"
-      echo "  INTEGRATION_TEST_TIMEOUT   Test timeout (default: 300s)"
+      echo "Providers: deepgram google sarvam elevenlabs cartesia assemblyai azure rime"
+      echo "           resemble neuphonic minimax nvidia groq speechmatics aws smallest revai custom-tts"
+      echo "TRANSFORMER_TEST_CONFIG: YAML config (default: transformer/tests/testdata/integration_config.yaml)"
+      echo "INTEGRATION_TEST_TIMEOUT: Go test timeout (default: 300s)"
+      echo "Live tests require explicitly enabled providers and credentials. Skipped tests do not validate a provider."
       exit 0
       ;;
-    *)
-      PROVIDERS+=("$arg")
-      ;;
+    -*) echo "Unknown option: $arg" >&2; exit 2 ;;
+    *) PROVIDERS+=("$arg") ;;
   esac
 done
 
-# Default to all providers if none specified
 if [ ${#PROVIDERS[@]} -eq 0 ]; then
-  PROVIDERS=("${ALL_PROVIDERS[@]}")
+  PROVIDERS=(deepgram google sarvam elevenlabs cartesia assemblyai azure rime
+    resemble neuphonic minimax nvidia groq speechmatics aws smallest revai custom-tts)
 fi
 
-# Build test name filter based on --tts-only / --stt-only
-RUN_FILTER=""
-if [ "$FILTER" = "TTS" ]; then
-  RUN_FILTER="-run TTS"
-elif [ "$FILTER" = "STT" ]; then
-  RUN_FILTER="-run STT"
-fi
-
-PASSED=()
-FAILED=()
-SKIPPED=()
-
-echo "═══════════════════════════════════════════════════════════"
-echo " Transformer Integration Tests (STT/TTS)"
-echo "═══════════════════════════════════════════════════════════"
-echo ""
-
+PACKAGES=("$INTEGRATION_PKG")
+PROVIDER_PATTERN=""
+TEST_PREFIX_PATTERN=""
 for provider in "${PROVIDERS[@]}"; do
-  pkg_dir="${PROVIDER_PKG[$provider]:-}"
-  cap="${PROVIDER_CAP[$provider]:-}"
+  provider_key="$provider"
+  provider_directory="$provider"
+  case "$provider" in
+    deepgram) test_prefix="Deepgram" ;;
+    google|google-speech-service)
+      provider_key="google-speech-service"
+      provider_directory="google"
+      test_prefix="Google"
+      ;;
+    azure|azure-speech-service)
+      provider_key="azure-speech-service"
+      provider_directory="azure"
+      test_prefix="Azure"
+      ;;
+    sarvam|sarvamai)
+      provider_key="sarvamai"
+      provider_directory="sarvam"
+      test_prefix="Sarvam"
+      ;;
+    assemblyai|assembly-ai)
+      provider_key="assemblyai"
+      provider_directory="assembly-ai"
+      test_prefix="Assemblyai"
+      ;;
+    resemble|resembleai)
+      provider_key="resembleai"
+      provider_directory="resembleai"
+      test_prefix="ResembleAI"
+      ;;
+    elevenlabs) test_prefix="ElevenLabs" ;;
+    cartesia) test_prefix="Cartesia" ;;
+    rime) test_prefix="Rime" ;;
+    neuphonic) test_prefix="Neuphonic" ;;
+    minimax) test_prefix="Minimax" ;;
+    nvidia) test_prefix="Nvidia" ;;
+    groq) test_prefix="Groq" ;;
+    speechmatics) test_prefix="Speechmatics" ;;
+    aws) test_prefix="AWS" ;;
+    smallest) test_prefix="Smallest" ;;
+    revai) test_prefix="RevAI" ;;
+    custom-tts) test_prefix="Custom" ;;
+    *) echo "Unknown provider: $provider" >&2; exit 2 ;;
+  esac
 
-  if [ -z "$pkg_dir" ]; then
-    echo "─── ${provider} ──────────────────────────────────────────"
-    echo "  SKIP: unknown provider \"${provider}\""
-    SKIPPED+=("$provider")
-    echo ""
-    continue
-  fi
+  case "$provider_key:$MODE" in
+    assemblyai:TTS|revai:TTS|elevenlabs:STT|rime:STT|resembleai:STT|neuphonic:STT|minimax:STT|custom-tts:STT)
+      echo "SKIP: $provider does not support $MODE"
+      continue
+      ;;
+  esac
 
-  # Skip if filter doesn't match capability
-  if [ "$FILTER" = "TTS" ] && [ "$cap" = "stt" ]; then
-    echo "─── ${provider} ──────────────────────────────────────────"
-    echo "  SKIP: ${provider} is STT-only (--tts-only requested)"
-    SKIPPED+=("$provider")
-    echo ""
-    continue
+  if [ -d "$INTEGRATION_PKG/$provider_directory" ]; then
+    PACKAGES+=("$INTEGRATION_PKG/$provider_directory")
   fi
-  if [ "$FILTER" = "STT" ] && [ "$cap" = "tts" ]; then
-    echo "─── ${provider} ──────────────────────────────────────────"
-    echo "  SKIP: ${provider} is TTS-only (--stt-only requested)"
-    SKIPPED+=("$provider")
-    echo ""
-    continue
-  fi
-
-  pkg="${TRANSFORMER_PKG}/${pkg_dir}/"
-  echo "─── ${provider} ──────────────────────────────────────────"
-
-  # shellcheck disable=SC2086
-  if go test -tags=integration "$pkg" $RUN_FILTER $VERBOSE -count=1 -timeout "$TIMEOUT" 2>&1; then
-    PASSED+=("$provider")
-  else
-    exit_code=$?
-    if [ $exit_code -eq 0 ]; then
-      SKIPPED+=("$provider")
-    else
-      FAILED+=("$provider")
-    fi
-  fi
-  echo ""
+  PROVIDER_PATTERN="${PROVIDER_PATTERN:+$PROVIDER_PATTERN|}$provider_key"
+  TEST_PREFIX_PATTERN="${TEST_PREFIX_PATTERN:+$TEST_PREFIX_PATTERN|}$test_prefix"
 done
 
-# Also run the cross-provider integration tests
-echo "─── cross-provider ─────────────────────────────────────────"
-CROSS_FILTER=""
-if [ "$FILTER" = "TTS" ]; then
-  CROSS_FILTER="-run TestTTS"
-elif [ "$FILTER" = "STT" ]; then
-  CROSS_FILTER="-run TestSTT"
+if [ -z "$PROVIDER_PATTERN" ]; then
+  exit 0
 fi
 
-# shellcheck disable=SC2086
-if go test -tags=integration "${TRANSFORMER_PKG}/" $CROSS_FILTER $VERBOSE -count=1 -timeout "$TIMEOUT" 2>&1; then
-  PASSED+=("cross-provider")
-else
-  exit_code=$?
-  if [ $exit_code -eq 0 ]; then
-    SKIPPED+=("cross-provider")
-  else
-    FAILED+=("cross-provider")
-  fi
-fi
-echo ""
+case "$MODE" in
+  TTS) SHARED_PATTERN="TestTTSIntegration" ;;
+  STT) SHARED_PATTERN="TestSTT.*" ;;
+  *) SHARED_PATTERN="Test(TTSIntegration|STT.*)" ;;
+esac
 
-echo "═══════════════════════════════════════════════════════════"
-echo " Results"
-echo "═══════════════════════════════════════════════════════════"
-echo ""
-
-if [ ${#PASSED[@]} -gt 0 ]; then
-  echo "  PASS: ${PASSED[*]}"
-fi
-if [ ${#SKIPPED[@]} -gt 0 ]; then
-  echo "  SKIP: ${SKIPPED[*]}"
-fi
-if [ ${#FAILED[@]} -gt 0 ]; then
-  echo "  FAIL: ${FAILED[*]}"
-fi
-
-echo ""
-echo "  Total: $((${#PASSED[@]} + ${#FAILED[@]} + ${#SKIPPED[@]}))  Pass: ${#PASSED[@]}  Fail: ${#FAILED[@]}  Skip: ${#SKIPPED[@]}"
-
-if [ ${#FAILED[@]} -gt 0 ]; then
-  exit 1
-fi
+# The second filter component restricts provider subtests in the shared suites.
+exec go test -tags=integration -v -count=1 -timeout "$TIMEOUT" \
+  -run "^(Test($TEST_PREFIX_PATTERN)$MODE.*|$SHARED_PATTERN)$/^($PROVIDER_PATTERN)$" \
+  "${PACKAGES[@]}"

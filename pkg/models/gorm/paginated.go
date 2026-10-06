@@ -8,6 +8,7 @@ package gorm_models
 import (
 	"math"
 
+	"github.com/rapidaai/pkg/utils"
 	"gorm.io/gorm"
 )
 
@@ -35,10 +36,11 @@ func Paginate(r *Paginated) func(db *gorm.DB) *gorm.DB {
 
 		page := 1
 		if r.Page > 0 {
-			if uint64(r.Page) > uint64(math.MaxInt) {
+			convertedPage, err := utils.Uint32ToInt(r.Page)
+			if err != nil {
 				page = math.MaxInt
 			} else {
-				page = int(r.Page)
+				page = convertedPage
 			}
 		}
 

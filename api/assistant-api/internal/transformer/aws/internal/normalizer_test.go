@@ -24,12 +24,12 @@ func newTestLogger() commons.Logger {
 	return l
 }
 
-func newTestNormalizer(t *testing.T, opts utils.Option) *awsNormalizer {
+func newTestProcessor(t *testing.T, opts utils.Option) *awsProcessor {
 	t.Helper()
 	logger := newTestLogger()
-	normalizer := NewAWSNormalizer(logger, opts)
-	an, ok := normalizer.(*awsNormalizer)
-	require.True(t, ok, "expected *awsNormalizer type")
+	processor := NewAWSProcessor(logger, opts)
+	an, ok := processor.(*awsProcessor)
+	require.True(t, ok, "expected *awsProcessor type")
 	return an
 }
 
@@ -37,7 +37,7 @@ func newTestNormalizer(t *testing.T, opts utils.Option) *awsNormalizer {
 // Constructor Tests
 // =============================================================================
 
-func TestNewAWSNormalizer(t *testing.T) {
+func TestNewAWSProcessor(t *testing.T) {
 	tests := []struct {
 		name    string
 		opts    utils.Option
@@ -67,7 +67,7 @@ func TestNewAWSNormalizer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			an := newTestNormalizer(t, tt.opts)
+			an := newTestProcessor(t, tt.opts)
 			assert.NotNil(t, an.logger)
 			assert.NotNil(t, an.config)
 			if tt.hasConj {
@@ -80,17 +80,17 @@ func TestNewAWSNormalizer(t *testing.T) {
 }
 
 // =============================================================================
-// Normalize Tests
+// Process Tests
 // =============================================================================
 
-func TestNormalize_EmptyString(t *testing.T) {
-	an := newTestNormalizer(t, utils.Option{})
-	result := an.Normalize("")
+func TestProcess_EmptyString(t *testing.T) {
+	an := newTestProcessor(t, utils.Option{})
+	result := an.Process("")
 	assert.Equal(t, "", result)
 }
 
-func TestNormalize_XMLEscaping(t *testing.T) {
-	an := newTestNormalizer(t, utils.Option{})
+func TestProcess_XMLEscaping(t *testing.T) {
+	an := newTestProcessor(t, utils.Option{})
 
 	tests := []struct {
 		name     string
@@ -136,36 +136,36 @@ func TestNormalize_XMLEscaping(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := an.Normalize(tt.input)
+			result := an.Process(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func TestNormalize_ConjunctionBreaks(t *testing.T) {
+func TestProcess_ConjunctionBreaks(t *testing.T) {
 	opts := utils.Option{
 		"speaker.conjunction.boundaries": "and<|||>but",
 		"speaker.conjunction.break":      uint64(250),
 	}
-	an := newTestNormalizer(t, opts)
+	an := newTestProcessor(t, opts)
 
-	result := an.Normalize("cats and dogs but not fish")
+	result := an.Process("cats and dogs but not fish")
 	assert.Contains(t, result, `and<break time="250ms"/>`)
 	assert.Contains(t, result, `but<break time="250ms"/>`)
 }
 
-func TestNormalize_NoConjunctionBreaksWhenNotConfigured(t *testing.T) {
-	an := newTestNormalizer(t, utils.Option{})
+func TestProcess_NoConjunctionBreaksWhenNotConfigured(t *testing.T) {
+	an := newTestProcessor(t, utils.Option{})
 
-	result := an.Normalize("cats and dogs but not fish")
+	result := an.Process("cats and dogs but not fish")
 	assert.NotContains(t, result, "<break")
 }
 
-func TestNormalize_MarkdownIsNotStripped(t *testing.T) {
-	an := newTestNormalizer(t, utils.Option{})
+func TestProcess_MarkdownIsNotStripped(t *testing.T) {
+	an := newTestProcessor(t, utils.Option{})
 
 	input := "**bold** text"
-	result := an.Normalize(input)
+	result := an.Process(input)
 	assert.Contains(t, result, "**bold**")
 }
 
@@ -174,25 +174,25 @@ func TestNormalize_MarkdownIsNotStripped(t *testing.T) {
 // =============================================================================
 
 func TestWrapWithSSML(t *testing.T) {
-	an := newTestNormalizer(t, utils.Option{})
+	an := newTestProcessor(t, utils.Option{})
 	result := an.WrapWithSSML("Hello world")
 	assert.Equal(t, "<speak>Hello world</speak>", result)
 }
 
 func TestAddBreak(t *testing.T) {
-	an := newTestNormalizer(t, utils.Option{})
+	an := newTestProcessor(t, utils.Option{})
 	result := an.AddBreak(500)
 	assert.Equal(t, `<break time="500ms"/>`, result)
 }
 
 func TestAddBreakStrength(t *testing.T) {
-	an := newTestNormalizer(t, utils.Option{})
+	an := newTestProcessor(t, utils.Option{})
 	result := an.AddBreakStrength("strong")
 	assert.Equal(t, `<break strength="strong"/>`, result)
 }
 
 func TestAddProsody(t *testing.T) {
-	an := newTestNormalizer(t, utils.Option{})
+	an := newTestProcessor(t, utils.Option{})
 
 	result := an.AddProsody("hello", "fast", "high", "loud")
 	assert.Contains(t, result, `rate="fast"`)
@@ -204,13 +204,13 @@ func TestAddProsody(t *testing.T) {
 }
 
 func TestAddEmphasis(t *testing.T) {
-	an := newTestNormalizer(t, utils.Option{})
+	an := newTestProcessor(t, utils.Option{})
 	result := an.AddEmphasis("important", "strong")
 	assert.Equal(t, `<emphasis level="strong">important</emphasis>`, result)
 }
 
 func TestSayAs(t *testing.T) {
-	an := newTestNormalizer(t, utils.Option{})
+	an := newTestProcessor(t, utils.Option{})
 
 	result := an.SayAs("123", "cardinal", "")
 	assert.Equal(t, `<say-as interpret-as="cardinal">123</say-as>`, result)
@@ -220,31 +220,31 @@ func TestSayAs(t *testing.T) {
 }
 
 func TestAddAmazonEffect(t *testing.T) {
-	an := newTestNormalizer(t, utils.Option{})
+	an := newTestProcessor(t, utils.Option{})
 	result := an.AddAmazonEffect("secret", "whispered")
 	assert.Equal(t, `<amazon:effect name="whispered">secret</amazon:effect>`, result)
 }
 
 func TestAddWhisper(t *testing.T) {
-	an := newTestNormalizer(t, utils.Option{})
+	an := newTestProcessor(t, utils.Option{})
 	result := an.AddWhisper("secret message")
 	assert.Equal(t, `<amazon:effect name="whispered">secret message</amazon:effect>`, result)
 }
 
 func TestAddDomain(t *testing.T) {
-	an := newTestNormalizer(t, utils.Option{})
+	an := newTestProcessor(t, utils.Option{})
 	result := an.AddDomain("Breaking news today.", "news")
 	assert.Equal(t, `<amazon:domain name="news">Breaking news today.</amazon:domain>`, result)
 }
 
 func TestAddPhoneme(t *testing.T) {
-	an := newTestNormalizer(t, utils.Option{})
+	an := newTestProcessor(t, utils.Option{})
 	result := an.AddPhoneme("pecan", "pIkAn", "ipa")
 	assert.Equal(t, `<phoneme alphabet="ipa" ph="pIkAn">pecan</phoneme>`, result)
 }
 
 func TestAddLang(t *testing.T) {
-	an := newTestNormalizer(t, utils.Option{})
+	an := newTestProcessor(t, utils.Option{})
 	result := an.AddLang("Bonjour", "fr-FR")
 	assert.Equal(t, `<lang xml:lang="fr-FR">Bonjour</lang>`, result)
 }
@@ -253,39 +253,39 @@ func TestAddLang(t *testing.T) {
 // Benchmark Tests
 // =============================================================================
 
-func BenchmarkNormalize_SimpleText(b *testing.B) {
+func BenchmarkProcess_SimpleText(b *testing.B) {
 	logger, _ := commons.NewApplicationLogger()
-	normalizer := NewAWSNormalizer(logger, utils.Option{})
+	processor := NewAWSProcessor(logger, utils.Option{})
 	text := "Hello, this is a simple text for TTS processing."
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		normalizer.Normalize(text)
+		processor.Process(text)
 	}
 }
 
-func BenchmarkNormalize_WithConjunctions(b *testing.B) {
+func BenchmarkProcess_WithConjunctions(b *testing.B) {
 	logger, _ := commons.NewApplicationLogger()
 	opts := utils.Option{
 		"speaker.conjunction.boundaries": "and<|||>but<|||>or",
 		"speaker.conjunction.break":      uint64(250),
 	}
-	normalizer := NewAWSNormalizer(logger, opts)
+	processor := NewAWSProcessor(logger, opts)
 	text := "I like cats and dogs but not fish or snakes and birds"
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		normalizer.Normalize(text)
+		processor.Process(text)
 	}
 }
 
-func BenchmarkNormalize_XMLEscaping(b *testing.B) {
+func BenchmarkProcess_XMLEscaping(b *testing.B) {
 	logger, _ := commons.NewApplicationLogger()
-	normalizer := NewAWSNormalizer(logger, utils.Option{})
+	processor := NewAWSProcessor(logger, utils.Option{})
 	text := `Tom & Jerry said "hello" it's a < b > c`
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		normalizer.Normalize(text)
+		processor.Process(text)
 	}
 }

@@ -7,6 +7,7 @@ package utils
 
 import (
 	"math"
+	"strconv"
 	"testing"
 )
 
@@ -54,6 +55,36 @@ func TestMinUint64(t *testing.T) {
 	}
 }
 
+func TestInt64ToUint16(t *testing.T) {
+	for _, testCase := range []struct {
+		name      string
+		value     int64
+		expected  uint16
+		expectErr bool
+	}{
+		{name: "zero", value: 0, expected: 0},
+		{name: "positive", value: 42, expected: 42},
+		{name: "maximum", value: math.MaxUint16, expected: math.MaxUint16},
+		{name: "negative", value: -1, expectErr: true},
+		{name: "overflow", value: math.MaxUint16 + 1, expectErr: true},
+		{name: "minimum int64", value: math.MinInt64, expectErr: true},
+		{name: "maximum int64", value: math.MaxInt64, expectErr: true},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			converted, err := Int64ToUint16(testCase.value)
+			if testCase.expectErr {
+				if err == nil || converted != 0 {
+					t.Fatalf("expected zero and error, got %d, %v", converted, err)
+				}
+				return
+			}
+			if err != nil || converted != testCase.expected {
+				t.Fatalf("expected %d, got %d, %v", testCase.expected, converted, err)
+			}
+		})
+	}
+}
+
 func TestInt64ToUint32(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -88,6 +119,14 @@ func TestInt64ToUint32(t *testing.T) {
 }
 
 func TestCheckedIntegerConversions(t *testing.T) {
+	if value, err := Uint64ToInt(uint64(math.MaxInt)); err != nil || value != math.MaxInt {
+		t.Fatalf("Uint64ToInt() = %d, %v", value, err)
+	}
+	if strconv.IntSize == 64 {
+		if _, err := Uint64ToInt(uint64(math.MaxInt) + 1); err == nil {
+			t.Fatal("expected uint64 to int overflow error")
+		}
+	}
 	if value, err := Uint64ToInt64(math.MaxInt64); err != nil || value != math.MaxInt64 {
 		t.Fatalf("Uint64ToInt64() = %d, %v", value, err)
 	}
@@ -111,6 +150,11 @@ func TestCheckedIntegerConversions(t *testing.T) {
 	}
 	if value, err := Uint32ToInt(42); err != nil || value != 42 {
 		t.Fatalf("Uint32ToInt() = %d, %v", value, err)
+	}
+	if strconv.IntSize == 64 {
+		if value, err := Uint32ToInt(math.MaxUint32); err != nil || uint64(value) != math.MaxUint32 {
+			t.Fatalf("Uint32ToInt() = %d, %v", value, err)
+		}
 	}
 	if value := Uint32ToInt64(math.MaxUint32); value != math.MaxUint32 {
 		t.Fatalf("Uint32ToInt64() = %d", value)
