@@ -151,6 +151,11 @@ func TestCheckedIntegerConversions(t *testing.T) {
 	if value, err := Uint32ToInt(42); err != nil || value != 42 {
 		t.Fatalf("Uint32ToInt() = %d, %v", value, err)
 	}
+	if strconv.IntSize == 64 {
+		if value, err := Uint32ToInt(math.MaxUint32); err != nil || uint64(value) != math.MaxUint32 {
+			t.Fatalf("Uint32ToInt() = %d, %v", value, err)
+		}
+	}
 	if value := Uint32ToInt64(math.MaxUint32); value != math.MaxUint32 {
 		t.Fatalf("Uint32ToInt64() = %d", value)
 	}

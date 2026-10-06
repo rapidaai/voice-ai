@@ -11,7 +11,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"html"
 	"io"
 	"strconv"
 	"strings"
@@ -62,6 +61,14 @@ type azureSynthesisStream interface {
 	Read([]byte) (int, error)
 	GetStatus() (common.StreamStatus, error)
 	Close()
+}
+
+func escapeSSMLAttribute(value string) string {
+	value = strings.ReplaceAll(value, "&", "&amp;")
+	value = strings.ReplaceAll(value, `"`, "&#34;")
+	value = strings.ReplaceAll(value, "'", "&#39;")
+	value = strings.ReplaceAll(value, "<", "&lt;")
+	return strings.ReplaceAll(value, ">", "&gt;")
 }
 
 func NewAzureTextToSpeech(ctx context.Context, logger commons.Logger, credential *protos.VaultCredential,
@@ -298,9 +305,9 @@ func (azure *azureTextToSpeech) Transform(ctx context.Context, in internal_type.
 			language = configuredLanguage
 		}
 		if voice, err := azure.mdlOpts.GetString(internal_options.SpeakOptionVoiceID); err == nil && voice != "" {
-			text = fmt.Sprintf(`<voice name="%s">%s</voice>`, html.EscapeString(voice), text)
+			text = fmt.Sprintf(`<voice name="%s">%s</voice>`, escapeSSMLAttribute(voice), text)
 		}
-		text = fmt.Sprintf(`<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="%s">%s</speak>`, html.EscapeString(language), text)
+		text = fmt.Sprintf(`<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="%s">%s</speak>`, escapeSSMLAttribute(language), text)
 	}
 	var err error
 	stream, err = client.StartSpeaking(text, ssml)

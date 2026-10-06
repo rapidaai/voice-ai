@@ -155,16 +155,16 @@ func TestAzureTTSEscapesSSMLAttributes(t *testing.T) {
 	tts, _ := newAzureTTSFixture(t, client)
 	tts.processor = nil
 	tts.mdlOpts = utils.Option{
-		internal_options.SpeakOptionVoiceID:  `voice" injected="true`,
-		internal_options.SpeakOptionLanguage: `en-US" injected="true`,
+		internal_options.SpeakOptionVoiceID:  `voice&<>"' injected="true`,
+		internal_options.SpeakOptionLanguage: `en-US&<>"' injected="true`,
 	}
 
 	require.NoError(t, tts.Transform(context.Background(), internal_type.TextToSpeechTextPacket{
 		ContextID: "context", Text: `<break time="1s" />hello`,
 	}))
 	require.True(t, spokenAsSSML)
-	require.Contains(t, spokenText, `name="voice&#34; injected=&#34;true"`)
-	require.Contains(t, spokenText, `xml:lang="en-US&#34; injected=&#34;true"`)
+	require.Contains(t, spokenText, `name="voice&amp;&lt;&gt;&#34;&#39; injected=&#34;true"`)
+	require.Contains(t, spokenText, `xml:lang="en-US&amp;&lt;&gt;&#34;&#39; injected=&#34;true"`)
 	require.NotContains(t, spokenText, ` injected="true"`)
 }
 

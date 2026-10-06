@@ -113,6 +113,19 @@ func TestEscapeLogMessage(t *testing.T) {
 	}
 }
 
+func TestEscapeLogArguments(t *testing.T) {
+	got := escapeLogArguments([]interface{}{"code", "first\r\nforged", "count", 42})
+	if got[0] != "code" || got[1] != `first\r\nforged` || got[2] != "count" || got[3] != 42 {
+		t.Fatalf("escapeLogArguments() = %#v", got)
+	}
+}
+
+func TestEscapeLogValue(t *testing.T) {
+	if got := EscapeLogValue("first\r\nforged"); got != `first\r\nforged` {
+		t.Fatalf("EscapeLogValue() = %q", got)
+	}
+}
+
 // TestDPanicLogging tests DPanic level logging (only in development)
 func TestDPanicLogging(t *testing.T) {
 	tmpDir := t.TempDir()

@@ -25,6 +25,17 @@ type packetCollector struct {
 	pkts []internal_type.Packet
 }
 
+type websocketLogRecorder struct {
+	commons.Logger
+	message string
+	args    []interface{}
+}
+
+func (l *websocketLogRecorder) Errorw(message string, args ...interface{}) {
+	l.message = message
+	l.args = append([]interface{}(nil), args...)
+}
+
 func (c *packetCollector) collect(_ context.Context, pkts ...internal_type.Packet) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -296,6 +307,8 @@ func TestHandleResponse_Close(t *testing.T) {
 
 func TestHandleResponse_Error(t *testing.T) {
 	e := newTestExecutor(t)
+	logger := &websocketLogRecorder{Logger: e.logger}
+	e.logger = logger
 	e.currentID = "ctx-1"
 	collected := make([]internal_type.Packet, 0)
 	onPacket := func(_ context.Context, pkts ...internal_type.Packet) error {
@@ -325,6 +338,8 @@ func TestHandleResponse_Error(t *testing.T) {
 	assert.Equal(t, observability.LevelError, log.Record.Level)
 	assert.Equal(t, "response", log.Record.Attributes["operation"])
 	assert.Equal(t, "websocket", log.Record.Attributes["provider"])
+	assert.Equal(t, "websocket error", logger.message)
+	assert.Equal(t, []interface{}{"code", 500, "message", `server error\r\nforged`}, logger.args)
 }
 
 // =============================================================================

@@ -396,7 +396,8 @@ func (e *websocketExecutor) handleResponse(ctx context.Context, resp *Response, 
 	case TypeError:
 		var d ErrorData
 		json.Unmarshal(resp.Data, &d)
-		e.logger.Errorw("websocket error", "code", d.Code, "message", d.Message)
+		message := commons.EscapeLogValue(d.Message)
+		e.logger.Errorw("websocket error", "code", d.Code, "message", message)
 		e.contextMu.Lock()
 		currentID := e.currentID
 		e.currentID = ""

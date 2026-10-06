@@ -15,6 +15,7 @@ import (
 	"github.com/gorilla/websocket"
 	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/tests/testutil"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/stretchr/testify/require"
 )
@@ -26,6 +27,31 @@ type deepgramTTSGatedConn struct {
 	release   chan struct{}
 	closed    chan struct{}
 	closeOnce sync.Once
+}
+
+type deepgramLogRecorder struct {
+	commons.Logger
+	mu          sync.Mutex
+	warningArgs []interface{}
+	debugArgs   []interface{}
+}
+
+func (l *deepgramLogRecorder) Warnw(_ string, args ...interface{}) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.warningArgs = append([]interface{}(nil), args...)
+}
+
+func (l *deepgramLogRecorder) Debugw(_ string, args ...interface{}) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.debugArgs = append([]interface{}(nil), args...)
+}
+
+func (l *deepgramLogRecorder) entries() ([]interface{}, []interface{}) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return append([]interface{}(nil), l.warningArgs...), append([]interface{}(nil), l.debugArgs...)
 }
 
 func (c *deepgramTTSGatedConn) gateNextWrite() (<-chan struct{}, chan<- struct{}) {
@@ -64,6 +90,7 @@ func TestDeepgramTTSStalledWriteCancellation(t *testing.T) {
 				continue
 			}
 			t.Run(operation+"/"+cancellation, func(t *testing.T) {
+				logger := &deepgramLogRecorder{Logger: testutil.NewTestLogger()}
 				peers := make(chan *websocket.Conn, 4)
 				transports := make(chan *deepgramTTSGatedConn, 4)
 				upgrader := websocket.Upgrader{}
@@ -100,7 +127,7 @@ func TestDeepgramTTSStalledWriteCancellation(t *testing.T) {
 				providerErrors := make(chan internal_type.TextToSpeechErrorPacket, 16)
 				releaseErrorCallback := make(chan struct{})
 				var errors atomic.Int32
-				transformer, err := NewDeepgramTextToSpeech(sessionCtx, testutil.NewTestLogger(), newVaultCredential(map[string]interface{}{
+				transformer, err := NewDeepgramTextToSpeech(sessionCtx, logger, newVaultCredential(map[string]interface{}{
 					"key": "test", "endpoint": strings.TrimPrefix(server.URL, "https://"),
 				}), func(emitted ...internal_type.Packet) error {
 					for _, packet := range emitted {
@@ -292,7 +319,7 @@ func TestDeepgramTTSStalledWriteCancellation(t *testing.T) {
 					require.Equal(t, "Flush", request["type"])
 				}
 				require.NoError(t, nextPeer.WriteMessage(websocket.BinaryMessage, []byte{3, 4}))
-				require.NoError(t, nextPeer.WriteJSON(map[string]string{"type": "Warning", "code": "provider\r\ncode", "message": "provider\r\nmessage"}))
+				require.NoError(t, nextPeer.WriteJSON(map[string]string{"type": "Warning", "code": "provider\r\ncode", "description": "provider\r\nmessage"}))
 				require.NoError(t, nextPeer.WriteJSON(map[string]string{"type": "Unknown\r\ntype"}))
 				require.NoError(t, nextPeer.WriteJSON(map[string]string{"type": "Flushed"}))
 				for _, expected := range []internal_type.Packet{
@@ -306,6 +333,9 @@ func TestDeepgramTTSStalledWriteCancellation(t *testing.T) {
 						t.Fatal("new response output missing")
 					}
 				}
+				warningArgs, debugArgs := logger.entries()
+				require.Equal(t, []interface{}{"code", `provider\r\ncode`, "message", `provider\r\nmessage`}, warningArgs)
+				require.Equal(t, []interface{}{"type", `Unknown\r\ntype`}, debugArgs)
 				require.NoError(t, provider.Close(t.Context()))
 				if cancellation == "provider error" {
 					require.EqualValues(t, 1, errors.Load(), "provider failure must emit exactly one error")
