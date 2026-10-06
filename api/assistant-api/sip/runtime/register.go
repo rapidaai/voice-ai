@@ -18,6 +18,7 @@ import (
 
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/pkg/validator"
@@ -25,11 +26,11 @@ import (
 
 // Registration describes a SIP registration to be maintained with an external registrar.
 type Registration struct {
-	DID          string  // Phone number / DID being registered (e.g., "+15551234567")
-	Config       *Config // SIP provider credentials (server, username, password, realm, domain)
-	DeploymentID uint64  // Deployment that owns this registration.
-	AssistantID  uint64  // Assistant that owns this DID
-	ExpiresIn    uint32  // Desired registration duration in seconds (0 = use default)
+	DID          string             // Phone number / DID being registered (e.g., "+15551234567")
+	Config       *sip_config.Config // SIP provider credentials.
+	DeploymentID uint64             // Deployment that owns this registration.
+	AssistantID  uint64             // Assistant that owns this DID
+	ExpiresIn    uint32             // Desired registration duration in seconds (0 = use default)
 }
 
 // Validate checks that the registration has the minimum required fields.
@@ -69,7 +70,7 @@ func (active *activeRegistration) expired(now time.Time) bool {
 // Thread-safe: all methods can be called concurrently.
 type RegistrationClient struct {
 	client       *sipgo.Client
-	listenConfig *ListenConfig
+	listenConfig *sip_config.ListenConfig
 	logger       commons.Logger
 	observer     RegistrationObserver
 
@@ -78,7 +79,7 @@ type RegistrationClient struct {
 }
 
 // NewRegistrationClient creates a registration client using the shared sipgo client.
-func NewRegistrationClient(client *sipgo.Client, listenConfig *ListenConfig, logger commons.Logger) *RegistrationClient {
+func NewRegistrationClient(client *sipgo.Client, listenConfig *sip_config.ListenConfig, logger commons.Logger) *RegistrationClient {
 	return &RegistrationClient{
 		client:        client,
 		listenConfig:  cloneListenConfig(listenConfig),
@@ -258,7 +259,7 @@ func (rc *RegistrationClient) sendRegisterWithMinExpires(
 	}
 
 	scheme := "sip"
-	if cfg.Transport == TransportTLS {
+	if cfg.Transport == sip_config.TransportTLS {
 		scheme = "sips"
 	}
 
@@ -591,7 +592,7 @@ func registrationExpiryGrace(expiresIn uint32) time.Duration {
 	return grace
 }
 
-func validateRegistrationContactAddress(listenConfig *ListenConfig, address string) error {
+func validateRegistrationContactAddress(listenConfig *sip_config.ListenConfig, address string) error {
 	if !validator.NonNil(listenConfig) || !validator.NotBlank(address) {
 		return newRegistrationContactAddressError(address)
 	}

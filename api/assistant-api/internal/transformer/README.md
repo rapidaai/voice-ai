@@ -2,6 +2,9 @@
 
 The transformer package provides a unified abstraction for **Speech-to-Text (STT)** and **Text-to-Speech (TTS)** providers. It allows seamless integration with multiple AI providers while maintaining a consistent interface for developers.
 
+For test layout, local fixtures, live-provider configuration, and verification commands,
+see [Transformer Tests](tests/README.md).
+
 ## Overview
 
 The package supports the following providers:
@@ -700,61 +703,20 @@ func main() {
 
 ---
 
-## Testing Your Implementation
+## Testing
 
-Create `provider_test.go` in your provider directory:
+Unit tests and local transport contracts run without provider credentials:
 
-```go
-package internal_transformer_myprovider
-
-import (
-    "context"
-    "testing"
-
-    internal_type "github.com/rapidaai/api/assistant-api/internal/type"
-    "github.com/rapidaai/pkg/commons"
-    "github.com/rapidaai/protos"
-    "github.com/stretchr/testify/assert"
-    "github.com/stretchr/testify/require"
-)
-
-func TestNewMyProviderSpeechToText(t *testing.T) {
-    logger, _ := commons.NewApplicationLogger()
-    ctx := context.Background()
-
-    credential := &protos.VaultCredential{
-        ApiKey: "test-key",
-    }
-    opts := &internal_type.SpeechToTextInitializeOptions{
-        AudioConfig: &protos.AudioConfig{
-            LanguageCode: "en-US",
-        },
-    }
-
-    stt, err := NewMyProviderSpeechToText(ctx, logger, credential, opts)
-    require.NoError(t, err)
-    assert.NotNil(t, stt)
-    assert.Equal(t, "my-provider-speech-to-text", stt.Name())
-}
-
-func TestInitialize(t *testing.T) {
-    logger, _ := commons.NewApplicationLogger()
-    ctx := context.Background()
-
-    credential := &protos.VaultCredential{
-        ApiKey: "test-key",
-    }
-    opts := &internal_type.SpeechToTextInitializeOptions{}
-
-    stt, _ := NewMyProviderSpeechToText(ctx, logger, credential, opts)
-
-    // Should fail with test credentials
-    err := stt.Initialize()
-    assert.Error(t, err) // Expected with invalid credentials
-
-    defer stt.Close(ctx)
-}
+```sh
+go test -race -count=1 -timeout=180s ./api/assistant-api/internal/transformer/...
 ```
+
+Live provider tests are under `tests/integration/` and require the `integration`
+build tag plus an enabled provider configuration.
+Compilation and skipped tests are not live-provider passes.
+
+See [Transformer Tests](tests/README.md) for the file layout, focused commands, native
+prerequisites, configuration, and test-writing rules.
 
 ---
 

@@ -1,0 +1,50 @@
+// Copyright (c) 2023-2025 RapidaAI
+// Author: Prashant Srivastav <prashant@rapida.ai>
+//
+// Licensed under GPL-2.0 with Rapida Additional Terms.
+// See LICENSE.md or contact sales@rapida.ai for commercial usage.
+package internal_output_processors
+
+import (
+	"regexp"
+	"strconv"
+	"strings"
+
+	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	"github.com/rapidaai/pkg/commons"
+	ntw "moul.io/number-to-words"
+)
+
+type currencyProcessor struct {
+	logger commons.Logger
+	re     *regexp.Regexp
+}
+
+func NewCurrencyProcessor(logger commons.Logger) internal_type.TextProcessor {
+	return &currencyProcessor{
+		logger: logger,
+		re:     regexp.MustCompile(`\$([0-9,]+)\.(\d{2})`),
+	}
+}
+
+func (cn *currencyProcessor) Process(s string) string {
+	return cn.re.ReplaceAllStringFunc(s, func(match string) string {
+		parts := cn.re.FindStringSubmatch(match)
+		dollarStr := strings.ReplaceAll(parts[1], ",", "")
+		dollarAmount, err := strconv.Atoi(dollarStr)
+		if err != nil {
+			cn.logger.Warn("Failed to parse dollar amount", "error", err, "amount", parts[1])
+			return match
+		}
+		centAmount, err := strconv.Atoi(parts[2])
+		if err != nil {
+			cn.logger.Warn("Failed to parse cent amount", "error", err, "amount", parts[2])
+			return match
+		}
+
+		dollars := ntw.IntegerToEnUs(dollarAmount)
+		cents := ntw.IntegerToEnUs(centAmount)
+
+		return dollars + " dollars and " + cents + " cents"
+	})
+}

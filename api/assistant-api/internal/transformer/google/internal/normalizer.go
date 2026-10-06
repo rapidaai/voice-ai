@@ -17,32 +17,32 @@ import (
 )
 
 // =============================================================================
-// Google Text Normalizer
+// Google Text Processor
 // =============================================================================
-// NormalizerConfig holds SSML conjunction break configuration for providers
+// ProcessorConfig holds SSML conjunction break configuration for providers
 // that support pauses (Google, Azure, AWS, ElevenLabs, Rime).
-type NormalizerConfig struct {
+type ProcessorConfig struct {
 	Conjunctions    []string
 	PauseDurationMs uint64
 }
 
-func DefaultNormalizerConfig() NormalizerConfig {
-	return NormalizerConfig{
+func DefaultProcessorConfig() ProcessorConfig {
+	return ProcessorConfig{
 		PauseDurationMs: 240,
 	}
 }
 
-// googleNormalizer handles Google Cloud TTS text preprocessing.
+// googleProcessor handles Google Cloud TTS text preprocessing.
 // Google supports standard W3C SSML with some Google-specific extensions.
-type googleNormalizer struct {
+type googleProcessor struct {
 	logger             commons.Logger
-	config             NormalizerConfig
+	config             ProcessorConfig
 	conjunctionPattern *regexp.Regexp
 }
 
-// NewGoogleNormalizer creates a Google-specific text normalizer.
-func NewGoogleNormalizer(logger commons.Logger, opts utils.Option) internal_type.TextNormalizer {
-	cfg := DefaultNormalizerConfig()
+// NewGoogleProcessor creates a Google-specific text processor.
+func NewGoogleProcessor(logger commons.Logger, opts utils.Option) internal_type.TextProcessor {
+	cfg := DefaultProcessorConfig()
 	var conjunctionPattern *regexp.Regexp
 	if conjunctionBoundaries, err := opts.GetString("speaker.conjunction.boundaries"); err == nil && conjunctionBoundaries != "" {
 		cfg.Conjunctions = strings.Split(conjunctionBoundaries, commons.SEPARATOR)
@@ -57,16 +57,16 @@ func NewGoogleNormalizer(logger commons.Logger, opts utils.Option) internal_type
 	if conjunctionBreak, err := opts.GetUint64("speaker.conjunction.break"); err == nil {
 		cfg.PauseDurationMs = conjunctionBreak
 	}
-	return &googleNormalizer{
+	return &googleProcessor{
 		logger:             logger,
 		config:             cfg,
 		conjunctionPattern: conjunctionPattern,
 	}
 }
 
-// Normalize applies Google-specific text transformations.
-// Markdown removal and whitespace normalization are handled upstream.
-func (n *googleNormalizer) Normalize(text string) string {
+// Process applies Google-specific text transformations.
+// Markdown removal and whitespace processing are handled upstream.
+func (n *googleProcessor) Process(text string) string {
 	if text == "" {
 		return text
 	}
@@ -87,7 +87,7 @@ func (n *googleNormalizer) Normalize(text string) string {
 // =============================================================================
 
 // escapeXML escapes XML special characters for SSML (Google uses fewer escapes).
-func (n *googleNormalizer) escapeXML(text string) string {
+func (n *googleProcessor) escapeXML(text string) string {
 	replacer := strings.NewReplacer(
 		"&", "&amp;",
 		"<", "&lt;",
@@ -96,7 +96,7 @@ func (n *googleNormalizer) escapeXML(text string) string {
 	return replacer.Replace(text)
 }
 
-func (n *googleNormalizer) insertConjunctionBreaks(text string) string {
+func (n *googleProcessor) insertConjunctionBreaks(text string) string {
 	breakTag := fmt.Sprintf(`<break time="%dms"/>`, n.config.PauseDurationMs)
 	return n.conjunctionPattern.ReplaceAllStringFunc(text, func(match string) string {
 		return match + breakTag
@@ -107,15 +107,15 @@ func (n *googleNormalizer) insertConjunctionBreaks(text string) string {
 // Google SSML Helpers
 // =============================================================================
 
-func (n *googleNormalizer) WrapWithSSML(text string) string {
+func (n *googleProcessor) WrapWithSSML(text string) string {
 	return fmt.Sprintf(`<speak>%s</speak>`, text)
 }
 
-func (n *googleNormalizer) AddBreak(durationMs int) string {
+func (n *googleProcessor) AddBreak(durationMs int) string {
 	return fmt.Sprintf(`<break time="%dms"/>`, durationMs)
 }
 
-func (n *googleNormalizer) AddProsody(text string, rate, pitch, volume string) string {
+func (n *googleProcessor) AddProsody(text string, rate, pitch, volume string) string {
 	attrs := ""
 	if rate != "" {
 		attrs += fmt.Sprintf(` rate="%s"`, rate)
@@ -132,18 +132,18 @@ func (n *googleNormalizer) AddProsody(text string, rate, pitch, volume string) s
 	return fmt.Sprintf(`<prosody%s>%s</prosody>`, attrs, text)
 }
 
-func (n *googleNormalizer) AddEmphasis(text, level string) string {
+func (n *googleProcessor) AddEmphasis(text, level string) string {
 	return fmt.Sprintf(`<emphasis level="%s">%s</emphasis>`, level, text)
 }
 
-func (n *googleNormalizer) SayAs(text, interpretAs, format string) string {
+func (n *googleProcessor) SayAs(text, interpretAs, format string) string {
 	if format != "" {
 		return fmt.Sprintf(`<say-as interpret-as="%s" format="%s">%s</say-as>`, interpretAs, format, text)
 	}
 	return fmt.Sprintf(`<say-as interpret-as="%s">%s</say-as>`, interpretAs, text)
 }
 
-func (n *googleNormalizer) AddAudio(src string, altText string) string {
+func (n *googleProcessor) AddAudio(src string, altText string) string {
 	if altText != "" {
 		return fmt.Sprintf(`<audio src="%s">%s</audio>`, src, altText)
 	}

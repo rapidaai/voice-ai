@@ -13,31 +13,31 @@ import (
 )
 
 // =============================================================================
-// Smallest AI Text Normalizer
+// Smallest AI Text Processor
 // =============================================================================
 
-// smallestNormalizer handles Lightning TTS text preprocessing.
+// smallestProcessor handles Lightning TTS text preprocessing.
 // Lightning does NOT support SSML - only plain text is accepted.
-type smallestNormalizer struct {
+type smallestProcessor struct {
 	logger   commons.Logger
 	language string
 }
 
-// NewSmallestNormalizer creates a Smallest-specific text normalizer.
-func NewSmallestNormalizer(logger commons.Logger, opts utils.Option) internal_type.TextNormalizer {
+// NewSmallestProcessor creates a Smallest-specific text processor.
+func NewSmallestProcessor(logger commons.Logger, opts utils.Option) internal_type.TextProcessor {
 	language, _ := opts.GetString("speaker.language")
 	if language == "" {
 		language = "en"
 	}
 
-	return &smallestNormalizer{
+	return &smallestProcessor{
 		logger:   logger,
 		language: language,
 	}
 }
 
-// Normalize returns text unchanged. Lightning does NOT support SSML.
-// Markdown removal and whitespace normalization are handled upstream.
-func (n *smallestNormalizer) Normalize(text string) string {
+// Process returns text unchanged. Lightning does NOT support SSML.
+// Markdown removal and whitespace processing are handled upstream.
+func (n *smallestProcessor) Process(text string) string {
 	return text
 }

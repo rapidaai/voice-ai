@@ -81,7 +81,6 @@ var (
 	ErrOutboundResponseMissingStatusSID = errors.New("twilio response missing status or sid")
 	ErrInboundFromMissing               = errors.New("missing or empty 'from' query parameter")
 	ErrAudioProcessorInitFailed         = errors.New("failed to initialize Twilio audio processor")
-	ErrResamplerCreateFailed            = errors.New("failed to create resampler")
 	ErrProviderAudioConversionFailed    = errors.New("audio conversion to 16kHz linear16 failed")
 	ErrAssistantAudioConversionFailed   = errors.New("audio conversion to mulaw 8kHz failed")
 )

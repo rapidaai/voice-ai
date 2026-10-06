@@ -161,6 +161,9 @@ export const GetDefaultMicrophoneConfig = (
     'microphone.eos.quick_timeout'?: string;
     'microphone.eos.extended_timeout'?: string;
     'microphone.eos.model'?: string;
+    'microphone.eos.livekit.model_path'?: string;
+    'microphone.eos.livekit.tokenizer_path'?: string;
+    'microphone.eos.pipecat.model_path'?: string;
     'microphone.eos.provider'?: string;
     'microphone.denoising.provider'?: string;
     'microphone.barge_in_trigger'?: string;
@@ -219,7 +222,7 @@ export const GetDefaultMicrophoneConfig = (
     },
     {
       key: 'microphone.vad.stop_secs',
-      value: defaults?.['microphone.vad.stop_secs'] ?? '0.2',
+      value: defaults?.['microphone.vad.stop_secs'] ?? '0.5',
     },
     {
       key: 'microphone.vad.min_volume',

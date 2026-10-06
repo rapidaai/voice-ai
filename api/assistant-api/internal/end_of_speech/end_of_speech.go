@@ -19,13 +19,6 @@ import (
 
 type EndOfSpeechIdentifier string
 
-const (
-	SilenceBasedEndOfSpeech       EndOfSpeechIdentifier = "silence_based_eos"
-	LiveKitEndOfSpeech            EndOfSpeechIdentifier = "livekit_eos"
-	PipecatSmartTurnEndOfSpeech   EndOfSpeechIdentifier = "pipecat_smart_turn_eos"
-	EndOfSpeechOptionsKeyProvider                       = "microphone.eos.provider"
-)
-
 type options struct {
 	ctx      context.Context
 	logger   commons.Logger
@@ -94,6 +87,6 @@ func New(opts ...Option) (internal_type.EndOfSpeechExecutor, error) {
 			internal_pipecat.WithOptions(options.options),
 		)
 	default:
-		return nil, fmt.Errorf("end_of_speech: unsupported provider %q", provider)
+		return nil, fmt.Errorf("%w %q", errUnsupportedEndOfSpeechProvider, provider)
 	}
 }

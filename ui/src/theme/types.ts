@@ -14,6 +14,7 @@ export interface ThemeManifest {
   id: string;
   brand: {
     name: string;
+    environmentLabel?: string;
     logos?: {
       full: {
         light: string;

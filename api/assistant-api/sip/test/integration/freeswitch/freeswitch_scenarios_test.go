@@ -12,6 +12,7 @@ import (
 	"context"
 	"testing"
 
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/stretchr/testify/require"
 )
@@ -116,7 +117,7 @@ func registerFreeSWITCHInboundDID(
 	t *testing.T,
 	registrationClient *sip_runtime.RegistrationClient,
 	inboundConfig registrationInboundConfig,
-	sipConfig *sip_runtime.Config,
+	sipConfig *sip_config.Config,
 ) {
 	t.Helper()
 	registerContext, cancelRegister := context.WithTimeout(context.Background(), callSetupTimeout)

@@ -19,29 +19,9 @@ import (
 	"github.com/rapidaai/protos"
 )
 
-const (
-	silenceBasedEndOfSpeechName = "silenceBasedEndOfSpeech"
-	optSilenceTimeout           = "microphone.eos.timeout"
-	defaultSilenceTimeout       = 1000 * time.Millisecond
-	defaultVadEndTimeout        = 250 * time.Millisecond
-)
-
 type vadState uint8
 
-const (
-	vadStateIdle vadState = iota
-	vadStateSpeaking
-	vadStateEnded
-)
-
 type transcriptState uint8
-
-const (
-	transcriptStateIdle transcriptState = iota
-	transcriptStateInterimPending
-	transcriptStateFinalized
-	transcriptStateFinalizedWithPendingInterim
-)
 
 type speechSegment struct {
 	Revision  uint64
@@ -128,7 +108,7 @@ func New(opts ...Option) (internal_type.EndOfSpeechExecutor, error) {
 		options.ctx = context.Background()
 	}
 	if options.onPacket == nil {
-		return nil, fmt.Errorf("%s: onPacket is required", silenceBasedEndOfSpeechName)
+		return nil, fmt.Errorf("%s: %w", silenceBasedEndOfSpeechName, errSilenceBasedOnPacketRequired)
 	}
 	start := time.Now()
 	silenceTimeout := defaultSilenceTimeout
@@ -194,7 +174,24 @@ func (endOfSpeech *silenceBasedEndOfSpeech) Execute(ctx context.Context, packet 
 	case internal_type.UserTextReceivedPacket:
 		return endOfSpeech.handleUserTextPacket(ctx, packet)
 	case internal_type.EndOfSpeechInterruptionPacket:
-		return endOfSpeech.handleInterruptionPacket(ctx)
+		endOfSpeech.mu.RLock()
+		if packet.ContextID != "" &&
+			endOfSpeech.state.segment.ContextID != "" &&
+			packet.ContextID != endOfSpeech.state.segment.ContextID {
+			endOfSpeech.mu.RUnlock()
+			return nil
+		}
+		command := workerCommand{
+			ctx:     ctx,
+			segment: endOfSpeech.state.segment,
+			timeout: endOfSpeech.silenceTimeout,
+		}
+		endOfSpeech.mu.RUnlock()
+		if command.segment.Text == "" {
+			return nil
+		}
+		endOfSpeech.enqueueCommand(command)
+		return nil
 	case internal_type.InterruptionDetectedPacket:
 		if packet.Source != internal_type.InterruptionSourceVad {
 			return nil
@@ -202,10 +199,10 @@ func (endOfSpeech *silenceBasedEndOfSpeech) Execute(ctx context.Context, packet 
 		endOfSpeech.mu.Lock()
 		switch packet.Event {
 		case internal_type.InterruptionEventStart:
-			// VAD start only marks speech as active. Transcript revision remains
-			// the only token used to reject stale EOS timers.
 			endOfSpeech.state.vadState = vadStateSpeaking
 			endOfSpeech.state.pending = nil
+			// Invalidate armed EOS timers without dropping transcript accumulated so far.
+			endOfSpeech.state.segment.Revision++
 			endOfSpeech.mu.Unlock()
 			return nil
 		case internal_type.InterruptionEventEnd:
@@ -299,10 +296,6 @@ func (endOfSpeech *silenceBasedEndOfSpeech) handleUserTextPacket(
 	endOfSpeech.enqueueCommand(command)
 
 	return nil
-}
-
-func (endOfSpeech *silenceBasedEndOfSpeech) handleInterruptionPacket(ctx context.Context) error {
-	return endOfSpeech.extendCurrentSegment(ctx, endOfSpeech.silenceTimeout)
 }
 
 func (endOfSpeech *silenceBasedEndOfSpeech) handleSpeechToTextPacket(
@@ -544,27 +537,6 @@ func (endOfSpeech *silenceBasedEndOfSpeech) handleSpeechToTextPacket(
 	return nil
 }
 
-func (endOfSpeech *silenceBasedEndOfSpeech) extendCurrentSegment(
-	ctx context.Context,
-	timeout time.Duration,
-) error {
-	endOfSpeech.mu.RLock()
-	command := workerCommand{
-		ctx:     ctx,
-		segment: endOfSpeech.state.segment,
-		timeout: timeout,
-	}
-	endOfSpeech.mu.RUnlock()
-
-	if command.segment.Text == "" {
-		return nil
-	}
-
-	endOfSpeech.enqueueCommand(command)
-
-	return nil
-}
-
 func (endOfSpeech *silenceBasedEndOfSpeech) enqueueCommand(command workerCommand) {
 	if endOfSpeech == nil || endOfSpeech.commandCh == nil || endOfSpeech.stopCh == nil {
 		return
@@ -656,8 +628,11 @@ func (endOfSpeech *silenceBasedEndOfSpeech) worker() {
 				continue
 			}
 
-			// While VAD says the user is speaking, defer once. The fallback timer
-			// recovers if VAD end is lost because of noise or provider failure.
+			if currentCommand.segment.Revision != endOfSpeech.state.segment.Revision {
+				stopTimer()
+				endOfSpeech.mu.Unlock()
+				continue
+			}
 			if endOfSpeech.state.vadState == vadStateSpeaking {
 				if endOfSpeech.state.pending == nil {
 					command := currentCommand
@@ -691,11 +666,6 @@ func (endOfSpeech *silenceBasedEndOfSpeech) worker() {
 				endOfSpeech.emitEndOfSpeech(command, armedAt)
 				endOfSpeech.mu.Lock()
 				resetState()
-				endOfSpeech.mu.Unlock()
-				continue
-			}
-			if currentCommand.segment.Revision != endOfSpeech.state.segment.Revision {
-				stopTimer()
 				endOfSpeech.mu.Unlock()
 				continue
 			}

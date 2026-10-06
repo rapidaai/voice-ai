@@ -8,19 +8,9 @@ package sip_runtime
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/rapidaai/pkg/commons"
 )
-
-// CallLifecycle is the single owner of call-state transitions inside the SIP runtime.
-// It validates transitions and emits structured transition logs.
-type CallLifecycle struct {
-	mu     sync.Mutex
-	callID string
-	state  CallState
-	logger commons.Logger
-}
 
 func newCallLifecycle(callID string, initial CallState, logger commons.Logger) *CallLifecycle {
 	return &CallLifecycle{
@@ -43,7 +33,28 @@ func (c *CallLifecycle) Transition(next CallState, reason string) error {
 	if c.state == next {
 		return nil
 	}
-	if !lifecycleTransitionAllowed(c.state, next) {
+	allowed := false
+	switch c.state {
+	case CallStateInitializing:
+		allowed = next == CallStateRinging || next == CallStateConnected || next == CallStateEnding || next == CallStateFailed || next == CallStateCancelled
+	case CallStateRinging:
+		allowed = next == CallStateConnected || next == CallStateEnding || next == CallStateFailed || next == CallStateCancelled
+	case CallStateConnected:
+		allowed = next == CallStateOnHold || next == CallStateTransferring || next == CallStateBridgeConnected || next == CallStateEnding || next == CallStateFailed
+	case CallStateOnHold:
+		allowed = next == CallStateConnected || next == CallStateEnding || next == CallStateFailed
+	case CallStateTransferring:
+		allowed = next == CallStateConnected || next == CallStateBridgeConnected || next == CallStateEnding || next == CallStateFailed
+	case CallStateBridgeConnected:
+		allowed = next == CallStateConnected || next == CallStateEnding || next == CallStateFailed
+	case CallStateEnding:
+		allowed = next == CallStateEnded || next == CallStateFailed
+	case CallStateFailed:
+		allowed = next == CallStateEnding || next == CallStateEnded
+	case CallStateCancelled:
+		allowed = next == CallStateEnded
+	}
+	if !allowed {
 		return fmt.Errorf("invalid lifecycle transition: %s -> %s", c.state, next)
 	}
 
@@ -59,34 +70,6 @@ func (c *CallLifecycle) Transition(next CallState, reason string) error {
 			"reason", reason)
 	}
 	return nil
-}
-
-func lifecycleTransitionAllowed(from, to CallState) bool {
-	if from == to {
-		return true
-	}
-	switch from {
-	case CallStateInitializing:
-		return to == CallStateRinging || to == CallStateConnected || to == CallStateEnding || to == CallStateFailed || to == CallStateCancelled
-	case CallStateRinging:
-		return to == CallStateConnected || to == CallStateEnding || to == CallStateFailed || to == CallStateCancelled
-	case CallStateConnected:
-		return to == CallStateOnHold || to == CallStateTransferring || to == CallStateBridgeConnected || to == CallStateEnding || to == CallStateFailed
-	case CallStateOnHold:
-		return to == CallStateConnected || to == CallStateEnding || to == CallStateFailed
-	case CallStateTransferring:
-		return to == CallStateConnected || to == CallStateBridgeConnected || to == CallStateEnding || to == CallStateFailed
-	case CallStateBridgeConnected:
-		return to == CallStateConnected || to == CallStateEnding || to == CallStateFailed
-	case CallStateEnding:
-		return to == CallStateEnded || to == CallStateFailed
-	case CallStateFailed:
-		return to == CallStateEnding || to == CallStateEnded
-	case CallStateCancelled:
-		return to == CallStateEnded
-	default:
-		return false
-	}
 }
 
 func lifecyclePhase(state CallState) string {

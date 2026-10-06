@@ -22,8 +22,8 @@ Workflow:
 - Do not modify production code unless strictly required for testability.
 
 Reference test patterns (copy style from these):
-- STT integration flow: `api/assistant-api/internal/transformer/stt_integration_test.go`
-- TTS integration flow: `api/assistant-api/internal/transformer/tts_integration_test.go`
+- STT integration flow: `api/assistant-api/internal/transformer/tests/integration/stt_integration_test.go`
+- TTS integration flow: `api/assistant-api/internal/transformer/tests/integration/tts_integration_test.go`
 - Transformer factory tests: `api/assistant-api/internal/transformer/transformer_test.go`
 - Denoiser factory tests + benchmarks: `api/assistant-api/internal/denoiser/denoiser_test.go`
 - VAD provider tests + benchmarks:

@@ -40,6 +40,11 @@ check_sha256 LIVEKIT_INTL_MODEL_SHA256 "$LIVEKIT_INTL_MODEL_SHA256"
 check_sha256 PIPECAT_MODEL_SHA256 "$PIPECAT_MODEL_SHA256"
 check_sha256 TEN_VAD_LIBRARY_SHA256 "$TEN_VAD_LIBRARY_SHA256"
 
+if [ "$SOXR_VERSION" != "0.1.3" ]; then
+  echo "unsupported SOXR version: $SOXR_VERSION" >&2
+  exit 1
+fi
+
 if [ "$DEBIAN_ARCH" != amd64 ] || [ "$TEN_VAD_ARCH" != Linux/x64 ]; then
   echo "assistant native dependencies must be locked to Linux amd64" >&2
   exit 1

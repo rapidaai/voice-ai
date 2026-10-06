@@ -253,6 +253,9 @@ jest.mock('@/app/components/ui/primitives', () => ({
 jest.mock(
   '@/app/pages/assistant/actions/create-deployment/commons/configure-experience',
   () => ({
+    ...jest.requireActual(
+      '@/app/pages/assistant/actions/create-deployment/commons/configure-experience',
+    ),
     ConfigureExperience: () => <div>experience</div>,
   }),
 );

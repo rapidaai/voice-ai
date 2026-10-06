@@ -1,0 +1,58 @@
+{
+  "format": "gzip: little-endian uint32 audio count, uint32 feature count, float32 audio, float32 row-major features",
+  "reference_commit": "1f8a513dd79c31f54bbd5b197fa26aefe242deca",
+  "source_sha256": {
+    "src/pipecat/audio/turn/smart_turn/_whisper_features.py": "c4eb415855fc2c66ea09ad1189a18396ce9b26d060b2b9ced39b9b81a0f60342",
+    "src/pipecat/audio/turn/smart_turn/local_smart_turn_v3.py": "8bd3bc15ed96fd54539ec63400ce64ce86ce82a388d0aa467e641c9a27a2f970"
+  },
+  "source_dirty": false,
+  "python": "3.14.4",
+  "python_executable": "/opt/homebrew/opt/python@3.14/bin/python3.14",
+  "numpy": "2.4.2",
+  "sample_rate": 16000,
+  "feature_shape": [
+    80,
+    800
+  ],
+  "scope": "16 kHz mono float32; actual caller padding and feature function, no resampling or ONNX inference",
+  "comparison": "Go test enforces 2e-5 absolute tolerance on these fixtures, not all possible inputs. Go matches NumPy 1.26 float32 reduction order and scalar promotion; NumPy 2 scalar promotion and FFT rounding can differ. No bit identity claim.",
+  "regenerate": "PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 python3 api/assistant-api/internal/end_of_speech/internal/pipecat/testdata/features/generate.py /path/to/pipecat",
+  "cases": [
+    {
+      "name": "silence",
+      "file": "silence.f32.gz",
+      "audio_samples": 16000,
+      "sha256": "1d62bb0e8057cd6a4fe57c50c740e6496b176233bbd2fe2305b8125803228507"
+    },
+    {
+      "name": "short",
+      "file": "short.f32.gz",
+      "audio_samples": 257,
+      "sha256": "dbdeb255670057f784f12ddb86422e1eb32274b2588cbe1d30a0bcbf1a1bae17"
+    },
+    {
+      "name": "pause",
+      "file": "pause.f32.gz",
+      "audio_samples": 64000,
+      "sha256": "b8f44f813b3945fea2ec580f9ef9098e5d24dc8c10f7886611074a8ba9d36629"
+    },
+    {
+      "name": "long",
+      "file": "long.f32.gz",
+      "audio_samples": 160137,
+      "sha256": "c540e43d7d7e8f7ee29e6399fa9a91fdf09bc247870e41d8988bfaea902b4f96"
+    },
+    {
+      "name": "quiet_dc",
+      "file": "quiet_dc.f32.gz",
+      "audio_samples": 128000,
+      "sha256": "9a975059312ac47fbe99c79949b5e437daa58c78c47379e6918b2c5ead852977"
+    },
+    {
+      "name": "constant",
+      "file": "constant.f32.gz",
+      "audio_samples": 128000,
+      "sha256": "1400687583057a4b545af76504f8a39822f8d3a9c25cc2edc494b00610648fc5"
+    }
+  ]
+}

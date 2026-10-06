@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/emiago/sipgo/sip"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -820,7 +821,7 @@ func TestInboundCall_MinRingPolicyDelaysAnswer(t *testing.T) {
 	server := newServerForCommandTests(t)
 	minRingDuration := 25 * time.Millisecond
 	config := bridgeTestConfig()
-	config.InboundAnswerMode = InboundAnswerModeAfterMinRingDuration
+	config.InboundAnswerMode = sip_config.InboundAnswerModeAfterMinRingDuration
 	config.InboundMinRingDuration = minRingDuration
 	server.SetMiddlewares([]Middleware{func(ctx *SIPRequestContext) error {
 		ctx.Config = config
@@ -840,7 +841,7 @@ func TestInboundCall_MinRingPolicyDelaysAnswer(t *testing.T) {
 func TestInboundCall_MinRingConfigRequiresDuration(t *testing.T) {
 	server := newServerForCommandTests(t)
 	config := bridgeTestConfig()
-	config.InboundAnswerMode = InboundAnswerModeAfterMinRingDuration
+	config.InboundAnswerMode = sip_config.InboundAnswerModeAfterMinRingDuration
 	server.SetMiddlewares([]Middleware{func(ctx *SIPRequestContext) error {
 		ctx.Config = config
 		return nil

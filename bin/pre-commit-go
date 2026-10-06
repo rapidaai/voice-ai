@@ -178,6 +178,13 @@ case "$cmd" in
 
     packages=()
     while IFS= read -r package; do
+      # A tagged test-only directory has no package under the scan's build tags.
+      excluded_by_build_tags="$(CGO_ENABLED=1 go list -e -tags=nocgo \
+        -f '{{and .IgnoredGoFiles (not .GoFiles) (not .CgoFiles) (not .TestGoFiles) (not .XTestGoFiles) (not .InvalidGoFiles)}}' "$package")"
+      if [ "$excluded_by_build_tags" = "true" ]; then
+        echo "Skipping $package: all Go files are excluded by the scan build tags."
+        continue
+      fi
       packages+=("$package")
     done < <(write_go_packages "$@")
 
@@ -185,7 +192,8 @@ case "$cmd" in
       exit 0
     fi
 
-    CGO_ENABLED=0 golangci-lint run --allow-serial-runners --timeout=5m --build-tags=nocgo --enable-only gosec "${packages[@]}"
+    # Native provider SDKs require CGO when type-checking changed assistant packages.
+    CGO_ENABLED=1 golangci-lint run --allow-serial-runners --timeout=5m --build-tags=nocgo --enable-only gosec "${packages[@]}"
     ;;
 
   build)

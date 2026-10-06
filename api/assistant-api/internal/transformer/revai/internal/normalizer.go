@@ -13,32 +13,32 @@ import (
 )
 
 // =============================================================================
-// Rev AI Text Normalizer
+// Rev AI Text Processor
 // =============================================================================
 
-// revaiNormalizer handles Rev AI text preprocessing.
-// Rev AI is primarily an STT service, but this normalizer handles any TTS needs.
+// revaiProcessor handles Rev AI text preprocessing.
+// Rev AI is primarily an STT service, but this processor handles any TTS needs.
 // Rev AI does NOT support SSML - only plain text is accepted.
-type revaiNormalizer struct {
+type revaiProcessor struct {
 	logger   commons.Logger
 	language string
 }
 
-// NewRevAINormalizer creates a Rev AI-specific text normalizer.
-func NewRevAINormalizer(logger commons.Logger, opts utils.Option) internal_type.TextNormalizer {
+// NewRevAIProcessor creates a Rev AI-specific text processor.
+func NewRevAIProcessor(logger commons.Logger, opts utils.Option) internal_type.TextProcessor {
 	language, _ := opts.GetString("speaker.language")
 	if language == "" {
 		language = "en"
 	}
 
-	return &revaiNormalizer{
+	return &revaiProcessor{
 		logger:   logger,
 		language: language,
 	}
 }
 
-// Normalize returns text unchanged. Rev AI does NOT support SSML.
-// Markdown removal and whitespace normalization are handled upstream.
-func (n *revaiNormalizer) Normalize(text string) string {
+// Process returns text unchanged. Rev AI does NOT support SSML.
+// Markdown removal and whitespace processing are handled upstream.
+func (n *revaiProcessor) Process(text string) string {
 	return text
 }

@@ -9,6 +9,25 @@ import (
 	"github.com/rapidaai/protos"
 )
 
+func TestClearOutputBufferDiscardsStreamingTail(t *testing.T) {
+	processor, err := NewAudioProcessor(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer processor.inputWriter.Close()
+	defer processor.outputWriter.Close()
+	if err := processor.ProcessAssistantAudio(make([]byte, 802), false); err != nil {
+		t.Fatal(err)
+	}
+	processor.ClearOutputBuffer()
+	if err := processor.ProcessAssistantAudio(nil, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := processor.NextOutputFrame(); ok {
+		t.Fatal("discarded filter tail was queued again")
+	}
+}
+
 type telnyxFakeResampler struct {
 	out []byte
 	err error
@@ -21,6 +40,8 @@ func (resampler *telnyxFakeResampler) Resample(_ []byte, _, _ *protos.AudioConfi
 	return append([]byte(nil), resampler.out...), nil
 }
 
+func (resampler *telnyxFakeResampler) Close() {}
+
 func newTestAudioProcessor(resamplerOutput []byte, resamplerErr error) *AudioProcessor {
 	resampler := &telnyxFakeResampler{out: resamplerOutput, err: resamplerErr}
 	audioProcessor := &AudioProcessor{
@@ -30,7 +51,6 @@ func newTestAudioProcessor(resamplerOutput []byte, resamplerErr error) *AudioPro
 		inputBuffer:        newInputBufferForTest(),
 		outputBuffer:       newOutputBufferForTest(OutputChunkSize * 8),
 		bridgeOutputBuffer: newOutputBufferForTest(BridgeOutputFrameSize * 8),
-		outputHealth:       nil,
 	}
 	audioProcessor.silenceFrame = audioProcessor.createSilenceFrame()
 	return audioProcessor

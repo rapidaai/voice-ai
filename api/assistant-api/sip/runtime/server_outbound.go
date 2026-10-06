@@ -12,10 +12,11 @@ import (
 
 	"github.com/google/uuid"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 )
 
 // MakeCall initiates an outbound SIP call and registers the dialog for routing.
-func (s *Server) MakeCall(ctx context.Context, cfg *Config, toUser, fromUser string, opts MakeCallOptions) (*Session, error) {
+func (s *Server) MakeCall(ctx context.Context, cfg *sip_config.Config, toUser, fromUser string, opts MakeCallOptions) (*Session, error) {
 	outboundCall, err := s.prepareOutboundCallLeg(ctx, cfg, toUser, fromUser, outboundCallLegOptions{
 		purpose:         OutboundLegPurposePrimary,
 		makeCallOptions: opts,
@@ -41,7 +42,7 @@ type outboundCallLegOptions struct {
 	transferTotal   int
 }
 
-func (s *Server) prepareOutboundCallLeg(ctx context.Context, cfg *Config, toUser, fromUser string, opts outboundCallLegOptions) (*Outbound, error) {
+func (s *Server) prepareOutboundCallLeg(ctx context.Context, cfg *sip_config.Config, toUser, fromUser string, opts outboundCallLegOptions) (*Outbound, error) {
 	if s.state.Load() != int32(ServerStateRunning) {
 		return nil, fmt.Errorf("SIP server is not running")
 	}
@@ -148,7 +149,7 @@ func (s *Server) applyOutboundLegMetadata(session *Session, opts outboundCallLeg
 
 func (s *Server) createAndRegisterOutboundSession(
 	ctx context.Context,
-	cfg *Config,
+	cfg *sip_config.Config,
 	callID string,
 	opts MakeCallOptions,
 	releaseAdmissionOnEnd bool,

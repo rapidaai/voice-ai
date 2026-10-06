@@ -85,7 +85,6 @@ type MakeCallResponse struct {
 
 var (
 	ErrAudioProcessorInitFailed       = errors.New("failed to initialize Exotel audio processor")
-	ErrResamplerCreateFailed          = errors.New("failed to create resampler")
 	ErrProviderAudioConversionFailed  = errors.New("audio conversion to 16kHz failed")
 	ErrAssistantAudioConversionFailed = errors.New("audio conversion to 8kHz failed")
 

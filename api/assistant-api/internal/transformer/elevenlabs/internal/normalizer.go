@@ -17,24 +17,24 @@ import (
 )
 
 // =============================================================================
-// ElevenLabs Text Normalizer
+// ElevenLabs Text Processor
 // =============================================================================
 
-// elevenlabsNormalizer handles ElevenLabs TTS text preprocessing.
+// elevenlabsProcessor handles ElevenLabs TTS text preprocessing.
 // ElevenLabs supports LIMITED SSML: only <break> and <phoneme> tags.
 // Break time is specified in SECONDS (e.g., time="0.5s" not "500ms").
-type elevenlabsNormalizer struct {
+type elevenlabsProcessor struct {
 	logger   commons.Logger
-	config   internal_type.NormalizerConfig
+	config   internal_type.ProcessorConfig
 	language string
 
 	// conjunction handling
 	conjunctionPattern *regexp.Regexp
 }
 
-// NewElevenLabsNormalizer creates an ElevenLabs-specific text normalizer.
-func NewElevenLabsNormalizer(logger commons.Logger, opts utils.Option) internal_type.TextNormalizer {
-	cfg := internal_type.DefaultNormalizerConfig()
+// NewElevenLabsProcessor creates an ElevenLabs-specific text processor.
+func NewElevenLabsProcessor(logger commons.Logger, opts utils.Option) internal_type.TextProcessor {
+	cfg := internal_type.DefaultProcessorConfig()
 
 	language, _ := opts.GetString("speaker.language")
 	if language == "" {
@@ -59,7 +59,7 @@ func NewElevenLabsNormalizer(logger commons.Logger, opts utils.Option) internal_
 		cfg.PauseDurationMs = conjunctionBreak
 	}
 
-	return &elevenlabsNormalizer{
+	return &elevenlabsProcessor{
 		logger:             logger,
 		config:             cfg,
 		language:           language,
@@ -67,10 +67,10 @@ func NewElevenLabsNormalizer(logger commons.Logger, opts utils.Option) internal_
 	}
 }
 
-// Normalize applies ElevenLabs-specific text transformations.
+// Process applies ElevenLabs-specific text transformations.
 // ElevenLabs supports only <break> and <phoneme> SSML tags.
-// Markdown removal and whitespace normalization are handled upstream.
-func (n *elevenlabsNormalizer) Normalize(text string) string {
+// Markdown removal and whitespace processing are handled upstream.
+func (n *elevenlabsProcessor) Process(text string) string {
 	if text == "" {
 		return text
 	}
@@ -92,7 +92,7 @@ func (n *elevenlabsNormalizer) Normalize(text string) string {
 // =============================================================================
 
 // escapeXML escapes XML special characters for limited SSML safety.
-func (n *elevenlabsNormalizer) escapeXML(text string) string {
+func (n *elevenlabsProcessor) escapeXML(text string) string {
 	replacer := strings.NewReplacer(
 		"&", "&amp;",
 		"<", "&lt;",
@@ -103,7 +103,7 @@ func (n *elevenlabsNormalizer) escapeXML(text string) string {
 
 // insertConjunctionBreaks adds breaks after conjunctions.
 // ElevenLabs uses seconds format (e.g., "0.5s" instead of "500ms").
-func (n *elevenlabsNormalizer) insertConjunctionBreaks(text string) string {
+func (n *elevenlabsProcessor) insertConjunctionBreaks(text string) string {
 	// Convert milliseconds to seconds for ElevenLabs
 	seconds := float64(n.config.PauseDurationMs) / 1000.0
 	breakTag := fmt.Sprintf(`<break time="%.2fs"/>`, seconds)
@@ -118,13 +118,13 @@ func (n *elevenlabsNormalizer) insertConjunctionBreaks(text string) string {
 // =============================================================================
 
 // AddBreak adds a pause. ElevenLabs uses seconds format.
-func (n *elevenlabsNormalizer) AddBreak(durationMs int) string {
+func (n *elevenlabsProcessor) AddBreak(durationMs int) string {
 	seconds := float64(durationMs) / 1000.0
 	return fmt.Sprintf(`<break time="%.2fs"/>`, seconds)
 }
 
 // AddPhoneme wraps text with phoneme pronunciation.
 // ElevenLabs supports IPA phoneme alphabet.
-func (n *elevenlabsNormalizer) AddPhoneme(text, ipa string) string {
+func (n *elevenlabsProcessor) AddPhoneme(text, ipa string) string {
 	return fmt.Sprintf(`<phoneme alphabet="ipa" ph="%s">%s</phoneme>`, ipa, text)
 }

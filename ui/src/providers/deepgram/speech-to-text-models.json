@@ -74,7 +74,7 @@
           "label": "Endpointing (ms)",
           "type": "number",
           "required": false,
-          "default": "5",
+          "default": "500",
           "min": 5,
           "max": 500,
           "step": 1
@@ -192,7 +192,7 @@
           "label": "Endpointing (ms)",
           "type": "number",
           "required": false,
-          "default": "5",
+          "default": "500",
           "min": 5,
           "max": 500,
           "step": 1
@@ -310,7 +310,7 @@
           "label": "Endpointing (ms)",
           "type": "number",
           "required": false,
-          "default": "5",
+          "default": "500",
           "min": 5,
           "max": 500,
           "step": 1
@@ -428,7 +428,7 @@
           "label": "Endpointing (ms)",
           "type": "number",
           "required": false,
-          "default": "5",
+          "default": "500",
           "min": 5,
           "max": 500,
           "step": 1
@@ -546,7 +546,7 @@
           "label": "Endpointing (ms)",
           "type": "number",
           "required": false,
-          "default": "5",
+          "default": "500",
           "min": 5,
           "max": 500,
           "step": 1
@@ -664,7 +664,7 @@
           "label": "Endpointing (ms)",
           "type": "number",
           "required": false,
-          "default": "5",
+          "default": "500",
           "min": 5,
           "max": 500,
           "step": 1
@@ -782,7 +782,7 @@
           "label": "Endpointing (ms)",
           "type": "number",
           "required": false,
-          "default": "5",
+          "default": "500",
           "min": 5,
           "max": 500,
           "step": 1
@@ -900,7 +900,7 @@
           "label": "Endpointing (ms)",
           "type": "number",
           "required": false,
-          "default": "5",
+          "default": "500",
           "min": 5,
           "max": 500,
           "step": 1
@@ -1018,7 +1018,7 @@
           "label": "Endpointing (ms)",
           "type": "number",
           "required": false,
-          "default": "5",
+          "default": "500",
           "min": 5,
           "max": 500,
           "step": 1
@@ -1136,7 +1136,7 @@
           "label": "Endpointing (ms)",
           "type": "number",
           "required": false,
-          "default": "5",
+          "default": "500",
           "min": 5,
           "max": 500,
           "step": 1
@@ -1254,7 +1254,7 @@
           "label": "Endpointing (ms)",
           "type": "number",
           "required": false,
-          "default": "5",
+          "default": "500",
           "min": 5,
           "max": 500,
           "step": 1
@@ -1372,7 +1372,7 @@
           "label": "Endpointing (ms)",
           "type": "number",
           "required": false,
-          "default": "5",
+          "default": "500",
           "min": 5,
           "max": 500,
           "step": 1
@@ -1489,7 +1489,7 @@
           "label": "Endpointing (ms)",
           "type": "number",
           "required": false,
-          "default": "5",
+          "default": "500",
           "min": 5,
           "max": 500,
           "step": 1
@@ -1606,7 +1606,7 @@
           "label": "Endpointing (ms)",
           "type": "number",
           "required": false,
-          "default": "5",
+          "default": "500",
           "min": 5,
           "max": 500,
           "step": 1
@@ -1723,7 +1723,7 @@
           "label": "Endpointing (ms)",
           "type": "number",
           "required": false,
-          "default": "5",
+          "default": "500",
           "min": 5,
           "max": 500,
           "step": 1

@@ -12,21 +12,21 @@ import (
 	"github.com/rapidaai/pkg/utils"
 )
 
-// minimaxNormalizer handles MiniMax TTS text preprocessing.
+// minimaxProcessor handles MiniMax TTS text preprocessing.
 // MiniMax does NOT support SSML - only plain text is accepted.
-type minimaxNormalizer struct {
+type minimaxProcessor struct {
 	logger commons.Logger
 }
 
-// NewMiniMaxNormalizer creates a MiniMax-specific text normalizer.
-func NewMiniMaxNormalizer(logger commons.Logger, opts utils.Option) internal_type.TextNormalizer {
-	return &minimaxNormalizer{
+// NewMiniMaxProcessor creates a MiniMax-specific text processor.
+func NewMiniMaxProcessor(logger commons.Logger, opts utils.Option) internal_type.TextProcessor {
+	return &minimaxProcessor{
 		logger: logger,
 	}
 }
 
-// Normalize returns text unchanged. MiniMax does NOT support SSML.
-// Markdown removal and whitespace normalization are handled upstream.
-func (n *minimaxNormalizer) Normalize(text string) string {
+// Process returns text unchanged. MiniMax does NOT support SSML.
+// Markdown removal and whitespace processing are handled upstream.
+func (n *minimaxProcessor) Process(text string) string {
 	return text
 }

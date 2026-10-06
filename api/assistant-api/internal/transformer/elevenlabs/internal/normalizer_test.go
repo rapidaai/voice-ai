@@ -9,7 +9,7 @@ package elevenlabs_internal
 import (
 	"testing"
 
-	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/internal/testutil"
+	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/tests/testutil"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/utils"
 	"github.com/stretchr/testify/assert"
@@ -20,12 +20,12 @@ import (
 // Test Setup Helpers
 // =============================================================================
 
-func newTestElevenLabsNormalizer(t *testing.T, opts utils.Option) *elevenlabsNormalizer {
+func newTestElevenLabsProcessor(t *testing.T, opts utils.Option) *elevenlabsProcessor {
 	t.Helper()
 	logger := testutil.NewTestLogger()
-	normalizer := NewElevenLabsNormalizer(logger, opts)
-	en, ok := normalizer.(*elevenlabsNormalizer)
-	require.True(t, ok, "expected *elevenlabsNormalizer type")
+	processor := NewElevenLabsProcessor(logger, opts)
+	en, ok := processor.(*elevenlabsProcessor)
+	require.True(t, ok, "expected *elevenlabsProcessor type")
 	return en
 }
 
@@ -33,7 +33,7 @@ func newTestElevenLabsNormalizer(t *testing.T, opts utils.Option) *elevenlabsNor
 // Constructor Tests
 // =============================================================================
 
-func TestNewElevenLabsNormalizer(t *testing.T) {
+func TestNewElevenLabsProcessor(t *testing.T) {
 	tests := []struct {
 		name         string
 		opts         utils.Option
@@ -75,7 +75,7 @@ func TestNewElevenLabsNormalizer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			en := newTestElevenLabsNormalizer(t, tt.opts)
+			en := newTestElevenLabsProcessor(t, tt.opts)
 			assert.Equal(t, tt.expectedLang, en.language)
 			assert.NotNil(t, en.logger)
 			if tt.hasConj {
@@ -88,17 +88,17 @@ func TestNewElevenLabsNormalizer(t *testing.T) {
 }
 
 // =============================================================================
-// Normalize Tests
+// Process Tests
 // =============================================================================
 
-func TestNormalize_EmptyString(t *testing.T) {
-	en := newTestElevenLabsNormalizer(t, utils.Option{})
-	result := en.Normalize("")
+func TestProcess_EmptyString(t *testing.T) {
+	en := newTestElevenLabsProcessor(t, utils.Option{})
+	result := en.Process("")
 	assert.Equal(t, "", result)
 }
 
-func TestNormalize_XMLEscaping(t *testing.T) {
-	en := newTestElevenLabsNormalizer(t, utils.Option{})
+func TestProcess_XMLEscaping(t *testing.T) {
+	en := newTestElevenLabsProcessor(t, utils.Option{})
 
 	tests := []struct {
 		name     string
@@ -139,48 +139,48 @@ func TestNormalize_XMLEscaping(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := en.Normalize(tt.input)
+			result := en.Process(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func TestNormalize_ConjunctionBreaks_SecondsFormat(t *testing.T) {
+func TestProcess_ConjunctionBreaks_SecondsFormat(t *testing.T) {
 	opts := utils.Option{
 		"speaker.conjunction.boundaries": "and<|||>but",
 		"speaker.conjunction.break":      uint64(500),
 	}
-	en := newTestElevenLabsNormalizer(t, opts)
+	en := newTestElevenLabsProcessor(t, opts)
 
-	result := en.Normalize("cats and dogs but not fish")
+	result := en.Process("cats and dogs but not fish")
 	// ElevenLabs uses seconds format, not milliseconds
 	assert.Contains(t, result, `and<break time="0.50s"/>`)
 	assert.Contains(t, result, `but<break time="0.50s"/>`)
 }
 
-func TestNormalize_ConjunctionBreaks_SubSecond(t *testing.T) {
+func TestProcess_ConjunctionBreaks_SubSecond(t *testing.T) {
 	opts := utils.Option{
 		"speaker.conjunction.boundaries": "and",
 		"speaker.conjunction.break":      uint64(250),
 	}
-	en := newTestElevenLabsNormalizer(t, opts)
+	en := newTestElevenLabsProcessor(t, opts)
 
-	result := en.Normalize("cats and dogs")
+	result := en.Process("cats and dogs")
 	assert.Contains(t, result, `<break time="0.25s"/>`)
 }
 
-func TestNormalize_NoConjunctionBreaksWhenNotConfigured(t *testing.T) {
-	en := newTestElevenLabsNormalizer(t, utils.Option{})
+func TestProcess_NoConjunctionBreaksWhenNotConfigured(t *testing.T) {
+	en := newTestElevenLabsProcessor(t, utils.Option{})
 
-	result := en.Normalize("cats and dogs but not fish")
+	result := en.Process("cats and dogs but not fish")
 	assert.NotContains(t, result, "<break")
 }
 
-func TestNormalize_MarkdownIsNotStripped(t *testing.T) {
-	en := newTestElevenLabsNormalizer(t, utils.Option{})
+func TestProcess_MarkdownIsNotStripped(t *testing.T) {
+	en := newTestElevenLabsProcessor(t, utils.Option{})
 
 	input := "**bold** text"
-	result := en.Normalize(input)
+	result := en.Process(input)
 	assert.Contains(t, result, "**bold**")
 }
 
@@ -189,7 +189,7 @@ func TestNormalize_MarkdownIsNotStripped(t *testing.T) {
 // =============================================================================
 
 func TestAddBreak_SecondsFormat(t *testing.T) {
-	en := newTestElevenLabsNormalizer(t, utils.Option{})
+	en := newTestElevenLabsProcessor(t, utils.Option{})
 
 	tests := []struct {
 		name       string
@@ -227,7 +227,7 @@ func TestAddBreak_SecondsFormat(t *testing.T) {
 }
 
 func TestAddPhoneme(t *testing.T) {
-	en := newTestElevenLabsNormalizer(t, utils.Option{})
+	en := newTestElevenLabsProcessor(t, utils.Option{})
 	result := en.AddPhoneme("tomato", "t@meItoU")
 	assert.Equal(t, `<phoneme alphabet="ipa" ph="t@meItoU">tomato</phoneme>`, result)
 }
@@ -236,39 +236,39 @@ func TestAddPhoneme(t *testing.T) {
 // Benchmark Tests
 // =============================================================================
 
-func BenchmarkNormalize_SimpleText(b *testing.B) {
+func BenchmarkProcess_SimpleText(b *testing.B) {
 	logger, _ := commons.NewApplicationLogger()
-	normalizer := NewElevenLabsNormalizer(logger, utils.Option{})
+	processor := NewElevenLabsProcessor(logger, utils.Option{})
 	text := "Hello, this is a simple text for TTS processing."
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		normalizer.Normalize(text)
+		processor.Process(text)
 	}
 }
 
-func BenchmarkNormalize_WithConjunctions(b *testing.B) {
+func BenchmarkProcess_WithConjunctions(b *testing.B) {
 	logger, _ := commons.NewApplicationLogger()
 	opts := utils.Option{
 		"speaker.conjunction.boundaries": "and<|||>but<|||>or",
 		"speaker.conjunction.break":      uint64(250),
 	}
-	normalizer := NewElevenLabsNormalizer(logger, opts)
+	processor := NewElevenLabsProcessor(logger, opts)
 	text := "I like cats and dogs but not fish or snakes and birds"
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		normalizer.Normalize(text)
+		processor.Process(text)
 	}
 }
 
-func BenchmarkNormalize_XMLEscaping(b *testing.B) {
+func BenchmarkProcess_XMLEscaping(b *testing.B) {
 	logger, _ := commons.NewApplicationLogger()
-	normalizer := NewElevenLabsNormalizer(logger, utils.Option{})
+	processor := NewElevenLabsProcessor(logger, utils.Option{})
 	text := "Tom & Jerry said a < b > c & d < e"
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		normalizer.Normalize(text)
+		processor.Process(text)
 	}
 }

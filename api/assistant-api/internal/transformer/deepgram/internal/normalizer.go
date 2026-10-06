@@ -13,31 +13,31 @@ import (
 )
 
 // =============================================================================
-// Deepgram Text Normalizer
+// Deepgram Text Processor
 // =============================================================================
 
-// deepgramNormalizer handles Deepgram TTS text preprocessing.
+// deepgramProcessor handles Deepgram TTS text preprocessing.
 // Deepgram does NOT support SSML - only plain text is accepted.
-type deepgramNormalizer struct {
+type deepgramProcessor struct {
 	logger   commons.Logger
 	language string
 }
 
-// NewDeepgramNormalizer creates a Deepgram-specific text normalizer.
-func NewDeepgramNormalizer(logger commons.Logger, opts utils.Option) internal_type.TextNormalizer {
+// NewDeepgramProcessor creates a Deepgram-specific text processor.
+func NewDeepgramProcessor(logger commons.Logger, opts utils.Option) internal_type.TextProcessor {
 	language, _ := opts.GetString("speaker.language")
 	if language == "" {
 		language = "en"
 	}
 
-	return &deepgramNormalizer{
+	return &deepgramProcessor{
 		logger:   logger,
 		language: language,
 	}
 }
 
-// Normalize returns text unchanged. Deepgram does NOT support SSML.
-// Markdown removal and whitespace normalization are handled upstream.
-func (n *deepgramNormalizer) Normalize(text string) string {
+// Process returns text unchanged. Deepgram does NOT support SSML.
+// Markdown removal and whitespace processing are handled upstream.
+func (n *deepgramProcessor) Process(text string) string {
 	return text
 }

@@ -12,21 +12,21 @@ import (
 	"github.com/rapidaai/pkg/utils"
 )
 
-// groqNormalizer handles Groq TTS text preprocessing.
+// groqProcessor handles Groq TTS text preprocessing.
 // Groq does NOT support SSML - only plain text is accepted.
-type groqNormalizer struct {
+type groqProcessor struct {
 	logger commons.Logger
 }
 
-// NewGroqNormalizer creates a Groq-specific text normalizer.
-func NewGroqNormalizer(logger commons.Logger, opts utils.Option) internal_type.TextNormalizer {
-	return &groqNormalizer{
+// NewGroqProcessor creates a Groq-specific text processor.
+func NewGroqProcessor(logger commons.Logger, opts utils.Option) internal_type.TextProcessor {
+	return &groqProcessor{
 		logger: logger,
 	}
 }
 
-// Normalize returns text unchanged. Groq does NOT support SSML.
-// Markdown removal and whitespace normalization are handled upstream.
-func (n *groqNormalizer) Normalize(text string) string {
+// Process returns text unchanged. Groq does NOT support SSML.
+// Markdown removal and whitespace processing are handled upstream.
+func (n *groqProcessor) Process(text string) string {
 	return text
 }

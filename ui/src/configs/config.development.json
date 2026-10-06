@@ -39,6 +39,7 @@
         "id": "rapida",
         "brand": {
             "name": "Rapida AI",
+            "environmentLabel": "(dev)",
             "logos": {
                 "full": {
                     "light": "/logos/rapida-db.svg",

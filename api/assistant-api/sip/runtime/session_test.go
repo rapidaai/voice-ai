@@ -10,6 +10,7 @@ import (
 	"context"
 	"testing"
 
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -39,7 +40,7 @@ func TestNewSessionAppliesOptions(t *testing.T) {
 func TestNewSessionRequiresConfig(t *testing.T) {
 	session, err := NewSession(context.Background())
 
-	require.ErrorIs(t, err, ErrInvalidConfig)
+	require.ErrorIs(t, err, sip_config.ErrInvalidConfig)
 	assert.Nil(t, session)
 }
 

@@ -12,6 +12,7 @@ import (
 	"math"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 )
@@ -101,42 +102,48 @@ func BenchmarkMelFeatures_Extract_WhiteNoise(b *testing.B) {
 // FFT BENCHMARKS
 // ============================================================================
 
-// BenchmarkFFT_512 measures a single 512-point FFT (the size used per STFT frame).
-func BenchmarkFFT_512(b *testing.B) {
-	x := make([]complex128, 512)
-	for i := range x {
-		x[i] = complex(math.Sin(2.0*math.Pi*float64(i)/512.0), 0)
+func BenchmarkWhisperFFT(b *testing.B) {
+	scratch := newWhisperFeatureScratch()
+	for sampleIndex := range scratch.windowed {
+		scratch.windowed[sampleIndex] = math.Sin(2 * math.Pi * float64(sampleIndex) / float64(whisperNFFT))
 	}
 
-	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		// Reset data
-		for j := range x {
-			x[j] = complex(math.Sin(2.0*math.Pi*float64(j)/512.0), 0)
-		}
-		fft(x)
-	}
-}
-
-// BenchmarkFFT_1024 measures a 1024-point FFT for comparison.
-func BenchmarkFFT_1024(b *testing.B) {
-	n := 1024
-	x := make([]complex128, n)
-
-	b.ResetTimer()
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		for j := range x {
-			x[j] = complex(math.Sin(2.0*math.Pi*float64(j)/float64(n)), 0)
-		}
-		fft(x)
+	for b.Loop() {
+		scratch.transform.Coefficients(scratch.coefficients[:], scratch.windowed[:])
 	}
 }
 
 // ============================================================================
 // AUDIO BUFFER BENCHMARKS
 // ============================================================================
+
+func BenchmarkExecuteAudio(b *testing.B) {
+	for _, benchmarkCase := range []struct {
+		name     string
+		vadState vadState
+	}{
+		{name: "speaking", vadState: vadStateSpeaking},
+		{name: "incomplete silence", vadState: vadStateEnded},
+	} {
+		b.Run(benchmarkCase.name, func(b *testing.B) {
+			endOfSpeech := &pipecatEndOfSpeech{
+				audioBuffer:     make([]float32, 0, maxAudioSamples),
+				hasSpeechStart:  true,
+				extendedTimeout: 24 * time.Hour,
+				state:           &endOfSpeechState{vadState: benchmarkCase.vadState, turnState: turnStateIncomplete},
+			}
+			packet := internal_type.EndOfSpeechAudioPacket{Audio: make([]byte, 640)}
+			b.ReportAllocs()
+			for b.Loop() {
+				endOfSpeech.state.silenceSamples = 0
+				if err := endOfSpeech.Execute(b.Context(), packet); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
 
 // BenchmarkAppendAudio_SmallChunk measures appending a typical audio chunk (20ms at 16kHz).
 func BenchmarkAppendAudio_SmallChunk(b *testing.B) {
@@ -174,8 +181,8 @@ func BenchmarkAppendAudio_WithEviction(b *testing.B) {
 // NORMALIZE BENCHMARKS
 // ============================================================================
 
-// BenchmarkNormalize_128k measures normalization of a full 8-second buffer.
-func BenchmarkNormalize_128k(b *testing.B) {
+// BenchmarkStandardizeWaveform_128k measures scaling of a full 8-second buffer.
+func BenchmarkStandardizeWaveform_128k(b *testing.B) {
 	samples := make([]float32, 128000)
 	for i := range samples {
 		samples[i] = float32(math.Sin(2.0 * math.Pi * 440.0 * float64(i) / 16000.0))
@@ -187,7 +194,7 @@ func BenchmarkNormalize_128k(b *testing.B) {
 		// Copy to avoid mutation across iterations
 		buf := make([]float32, len(samples))
 		copy(buf, samples)
-		normalize(buf)
+		standardizeWaveform(buf)
 	}
 }
 
@@ -218,7 +225,7 @@ func BenchmarkPrepareAudio_Pad(b *testing.B) {
 }
 
 // ============================================================================
-// EOS INPUT BENCHMARKS (without ONNX model — fallback path)
+// EOS INPUT BENCHMARKS (without ONNX model, fallback path)
 // ============================================================================
 
 // BenchmarkExecute_UserInput measures the fast path (immediate fire).
@@ -249,6 +256,79 @@ func BenchmarkExecute_STTInput(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		_ = eos.Execute(ctx, sttInput("transcription", i%5 == 0))
+	}
+}
+
+func BenchmarkExecute_DuplicateVADEnd(b *testing.B) {
+	endOfSpeech := newTestEOSWithPredictor(func(context.Context, ...internal_type.Packet) error { return nil }, nil,
+		func([]float32) (float64, error) { return 0.1, nil })
+	defer closeTestEndOfSpeech(endOfSpeech)
+	stop := internal_type.InterruptionDetectedPacket{
+		Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd,
+	}
+	_ = endOfSpeech.Execute(b.Context(), audioInput(1600))
+	_ = endOfSpeech.Execute(b.Context(), stop)
+	b.ReportAllocs()
+	for b.Loop() {
+		_ = endOfSpeech.Execute(b.Context(), stop)
+	}
+}
+
+func BenchmarkExecute_VADEndWhilePredictionBlocked(b *testing.B) {
+	predictionStarted := make(chan struct{}, 1)
+	releasePrediction := make(chan struct{})
+	endOfSpeech := newTestEOSWithPredictor(func(context.Context, ...internal_type.Packet) error { return nil }, nil,
+		func([]float32) (float64, error) {
+			select {
+			case predictionStarted <- struct{}{}:
+			default:
+			}
+			<-releasePrediction
+			return 0.1, nil
+		})
+	defer closeTestEndOfSpeech(endOfSpeech)
+	defer close(releasePrediction)
+	start := internal_type.InterruptionDetectedPacket{Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventStart}
+	stop := internal_type.InterruptionDetectedPacket{Source: internal_type.InterruptionSourceVad, Event: internal_type.InterruptionEventEnd}
+	_ = endOfSpeech.Execute(b.Context(), start)
+	_ = endOfSpeech.Execute(b.Context(), audioInput(1600))
+	_ = endOfSpeech.Execute(b.Context(), stop)
+	<-predictionStarted
+	b.ReportAllocs()
+	for b.Loop() {
+		_ = endOfSpeech.Execute(b.Context(), start)
+		_ = endOfSpeech.Execute(b.Context(), stop)
+	}
+}
+
+func BenchmarkIncompleteTurnTimer(b *testing.B) {
+	for _, benchmarkCase := range []struct {
+		name      string
+		turnState turnState
+	}{
+		{name: "prediction pending", turnState: turnStatePending},
+		{name: "prediction incomplete", turnState: turnStateIncomplete},
+	} {
+		b.Run(benchmarkCase.name, func(b *testing.B) {
+			endOfSpeech := newTestEOS(func(context.Context, ...internal_type.Packet) error { return nil }, nil)
+			defer closeTestEndOfSpeech(endOfSpeech)
+			endOfSpeech.mu.Lock()
+			endOfSpeech.state.vadState = vadStateEnded
+			endOfSpeech.state.turnState = benchmarkCase.turnState
+			endOfSpeech.state.transcript = transcriptStateFinalized
+			endOfSpeech.state.segment = speechSegment{Revision: 1, FinalText: "committed", Text: "committed"}
+			endOfSpeech.state.turnStopDeadline = time.Now().Add(time.Hour)
+			command := workerCommand{
+				ctx:      context.Background(),
+				segment:  endOfSpeech.state.segment,
+				deadline: time.Now().Add(time.Minute),
+			}
+			endOfSpeech.mu.Unlock()
+			b.ReportAllocs()
+			for b.Loop() {
+				endOfSpeech.enqueueCommand(command)
+			}
+		})
 	}
 }
 

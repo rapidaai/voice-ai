@@ -12,11 +12,94 @@ import (
 	"testing"
 	"time"
 
+	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_channel_input "github.com/rapidaai/api/assistant-api/internal/channel/input"
 	internal_channel_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	internal_telephony_media "github.com/rapidaai/api/assistant-api/internal/channel/telephony/internal/media"
 	"github.com/rapidaai/protos"
+	"google.golang.org/protobuf/proto"
 )
+
+func TestPlaybackCompletionWaitsForXONAndBufferedFrames(t *testing.T) {
+	processor, err := NewAudioProcessor(nil, AudioProcessorConfig{
+		AsteriskConfig:   internal_audio.NewMulaw8khzMonoAudioConfig(),
+		DownstreamConfig: internal_audio.NewLinear16khzMonoAudioConfig(), FrameSize: 160,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer processor.inputWriter.Close()
+	defer processor.outputWriter.Close()
+	var completedIDs []string
+	var sentAtCompletion []int
+	sent := 0
+	session := internal_telephony_media.NewMediaSession(internal_telephony_media.MediaSessionConfig{
+		MediaEngine: processor,
+		OutputSink:  func(internal_telephony_media.AssistantOutputFrame) error { sent++; return nil },
+		StreamSink: func(message proto.Message) {
+			if completion, ok := message.(*protos.ConversationPlaybackComplete); ok {
+				completedIDs = append(completedIDs, completion.GetId())
+				sentAtCompletion = append(sentAtCompletion, sent)
+			}
+		},
+	})
+	defer session.Shutdown()
+	if _, err := session.HandleAssistantAudio("first", make([]byte, bridgeOutputFrameSize*2), true); err != nil {
+		t.Fatal(err)
+	}
+	if err := session.ConsumeFrame(session.NextFrame()); err != nil {
+		t.Fatal(err)
+	}
+	processor.SetXOFF()
+	if _, err := session.HandleAssistantAudio("second", make([]byte, bridgeOutputFrameSize), true); err != nil {
+		t.Fatal(err)
+	}
+	for tick := 0; tick < 3; tick++ {
+		if len(session.NextFrame()) != 0 {
+			t.Fatal("output advanced during XOFF")
+		}
+	}
+	if processor.OutputDrained() || len(completedIDs) != 0 {
+		t.Fatal("XOFF was treated as output drain")
+	}
+	processor.SetXON()
+	for tick := 0; tick < 6; tick++ {
+		if frame := session.NextFrame(); len(frame) > 0 {
+			if err := session.ConsumeFrame(frame); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if len(completedIDs) != 2 || completedIDs[0] != "first" || completedIDs[1] != "second" {
+		t.Fatalf("completion IDs = %v", completedIDs)
+	}
+	if sentAtCompletion[0] != 2 || sentAtCompletion[1] != 3 {
+		t.Fatalf("sent at completion = %v", sentAtCompletion)
+	}
+}
+
+func TestClearOutputBufferDiscardsStreamingTail(t *testing.T) {
+	processor, err := NewAudioProcessor(nil, AudioProcessorConfig{
+		AsteriskConfig:   internal_audio.NewMulaw8khzMonoAudioConfig(),
+		DownstreamConfig: internal_audio.NewLinear16khzMonoAudioConfig(),
+		FrameSize:        160,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer processor.inputWriter.Close()
+	defer processor.outputWriter.Close()
+	if err := processor.ProcessAssistantAudio(make([]byte, 802), false); err != nil {
+		t.Fatal(err)
+	}
+	processor.ClearOutputBuffer()
+	if err := processor.ProcessAssistantAudio(nil, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := processor.NextOutputFrame(); ok {
+		t.Fatal("discarded filter tail was queued again")
+	}
+}
 
 type mockResampler struct {
 	err error
@@ -31,6 +114,8 @@ func (resampler *mockResampler) Resample(data []byte, _, _ *protos.AudioConfig) 
 	return out, nil
 }
 
+func (resampler *mockResampler) Close() {}
+
 func newTestProcessor(t *testing.T, silenceByte byte, frameSize int) *AudioProcessor {
 	t.Helper()
 	audioProcessor := &AudioProcessor{
@@ -43,16 +128,22 @@ func newTestProcessor(t *testing.T, silenceByte byte, frameSize int) *AudioProce
 		inputBuffer:        internal_channel_input.NewBytesInputBuffer(inputBufferThreshold * 2),
 		outputBuffer:       internal_channel_output.NewBytesFrameBuffer(frameSize * 8),
 		bridgeOutputBuffer: internal_channel_output.NewBytesFrameBuffer(bridgeOutputFrameSize * 8),
-		outputHealth:       internal_channel_output.NewHealthStats(),
 	}
 	audioProcessor.silenceFrame = audioProcessor.createSilenceFrame(frameSize, silenceByte)
 	return audioProcessor
 }
 
 func TestNewAudioProcessor_HappyPath(t *testing.T) {
-	audioProcessor := newTestProcessor(t, 0x00, 320)
-	if audioProcessor == nil {
-		t.Fatal("expected non-nil processor")
+	audioProcessor, err := NewAudioProcessor(nil, AudioProcessorConfig{
+		AsteriskConfig:   &protos.AudioConfig{},
+		DownstreamConfig: &protos.AudioConfig{},
+		FrameSize:        320,
+	})
+	if err != nil {
+		t.Fatalf("NewAudioProcessor error: %v", err)
+	}
+	if audioProcessor.resampler == nil {
+		t.Fatal("expected resampler")
 	}
 	if audioProcessor.GetOptimalFrameSize() != 320 {
 		t.Errorf("expected frame size 320, got %d", audioProcessor.GetOptimalFrameSize())
@@ -356,25 +447,4 @@ func TestXOFF_ConcurrentAccess(t *testing.T) {
 		}()
 	}
 	waitGroup.Wait()
-}
-
-func TestAudioProcessor_OutputHealthObserverRecordsTicks(t *testing.T) {
-	audioProcessor := newTestProcessor(t, 0xFF, 160)
-
-	audioProcessor.OnTickHealth(internal_channel_output.TickHealth{Active: true})
-	audioProcessor.OnTickHealth(internal_channel_output.TickHealth{Idle: true, SendError: true})
-
-	stats := audioProcessor.OutputHealthSnapshot()
-	if stats.Ticks != 2 {
-		t.Fatalf("ticks=%d want=2", stats.Ticks)
-	}
-	if stats.ActiveTicks != 1 {
-		t.Fatalf("activeTicks=%d want=1", stats.ActiveTicks)
-	}
-	if stats.IdleTicks != 1 {
-		t.Fatalf("idleTicks=%d want=1", stats.IdleTicks)
-	}
-	if stats.SendErrors != 1 {
-		t.Fatalf("sendErrors=%d want=1", stats.SendErrors)
-	}
 }

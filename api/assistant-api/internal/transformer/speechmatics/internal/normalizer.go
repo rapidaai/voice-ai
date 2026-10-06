@@ -13,32 +13,32 @@ import (
 )
 
 // =============================================================================
-// Speechmatics Text Normalizer
+// Speechmatics Text Processor
 // =============================================================================
 
-// speechmaticsNormalizer handles Speechmatics text preprocessing.
-// Speechmatics is primarily an STT service, but this normalizer handles any TTS needs.
+// speechmaticsProcessor handles Speechmatics text preprocessing.
+// Speechmatics is primarily an STT service, but this processor handles any TTS needs.
 // Speechmatics does NOT support SSML - only plain text is accepted.
-type speechmaticsNormalizer struct {
+type speechmaticsProcessor struct {
 	logger   commons.Logger
 	language string
 }
 
-// NewSpeechmaticsNormalizer creates a Speechmatics-specific text normalizer.
-func NewSpeechmaticsNormalizer(logger commons.Logger, opts utils.Option) internal_type.TextNormalizer {
+// NewSpeechmaticsProcessor creates a Speechmatics-specific text processor.
+func NewSpeechmaticsProcessor(logger commons.Logger, opts utils.Option) internal_type.TextProcessor {
 	language, _ := opts.GetString("speaker.language")
 	if language == "" {
 		language = "en"
 	}
 
-	return &speechmaticsNormalizer{
+	return &speechmaticsProcessor{
 		logger:   logger,
 		language: language,
 	}
 }
 
-// Normalize returns text unchanged. Speechmatics does NOT support SSML.
-// Markdown removal and whitespace normalization are handled upstream.
-func (n *speechmaticsNormalizer) Normalize(text string) string {
+// Process returns text unchanged. Speechmatics does NOT support SSML.
+// Markdown removal and whitespace processing are handled upstream.
+func (n *speechmaticsProcessor) Process(text string) string {
 	return text
 }

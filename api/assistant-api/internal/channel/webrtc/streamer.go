@@ -26,7 +26,7 @@ import (
 	assistant_config "github.com/rapidaai/api/assistant-api/config"
 	internal_audio "github.com/rapidaai/api/assistant-api/internal/audio"
 	internal_ambient "github.com/rapidaai/api/assistant-api/internal/audio/ambient"
-	internal_audio_resampler "github.com/rapidaai/api/assistant-api/internal/audio/resampler"
+	resampler_soxr "github.com/rapidaai/api/assistant-api/internal/audio/resampler/soxr"
 	channel_base "github.com/rapidaai/api/assistant-api/internal/channel/base"
 	internal_output "github.com/rapidaai/api/assistant-api/internal/channel/output"
 	webrtc_internal "github.com/rapidaai/api/assistant-api/internal/channel/webrtc/internal"
@@ -35,8 +35,10 @@ import (
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/pkg/types"
+	"github.com/rapidaai/pkg/utils"
 	"github.com/rapidaai/protos"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -58,6 +60,12 @@ type webrtcStreamer struct {
 	assistantAudioTrack *pionwebrtc.TrackLocalStaticSample
 	assistantRTPSender  *pionwebrtc.RTPSender
 	resampler           internal_type.AudioResampler
+	userWriter          internal_type.AudioStreamResampler
+	assistantWriter     internal_type.AudioStreamResampler
+	userResampleMu      sync.Mutex
+	assistantResampleMu sync.Mutex
+	userPCM16k          []byte
+	assistantPCM48k     []byte
 	opusCodec           *webrtc_internal.OpusCodec
 
 	mediaCtx     context.Context
@@ -78,9 +86,26 @@ type webrtcStreamer struct {
 
 	outputAudioQueueMu sync.Mutex
 	outputAudioQueue   []webrtc_internal.OutputAudioFrame
+	outputClearCh      chan uint64
+	outputWriteMu      sync.Mutex
+
+	outputStateMu           sync.Mutex
+	outputPaused            bool
+	outputFlushed           bool
+	outputClearPending      bool
+	outputPlayback          *webrtc_internal.OutputPlayback
+	outputPlaybacks         map[string]*webrtc_internal.OutputPlayback
+	flushedOutputIDs        map[string]struct{}
+	currentOutputPlayback   *webrtc_internal.OutputPlayback
+	assistantPlayback       *webrtc_internal.OutputPlayback
+	currentOutputTerminal   bool
+	currentOutputConverted  bool
+	currentOutputFrame      []byte
+	outputGeneration        uint64
+	currentOutputGeneration uint64
+	pendingClearGeneration  uint64
 
 	audioBufferState webrtc_internal.WebRTCAudioBufferState
-	flushAudioCh     chan struct{}
 
 	observer observability.Recorder
 
@@ -163,29 +188,6 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 	for _, opt := range opts {
 		opt(&options)
 	}
-	resampler, err := internal_audio_resampler.GetResampler(options.Logger)
-	if err != nil {
-		_ = options.Observer.Record(options.Context, observability.ProjectScope{}, observability.RecordLog{
-			Level:   observability.LevelError,
-			Message: "WebRTC streamer initialization failed",
-			Attributes: observability.Attributes{
-				"component": observability.ComponentWebRTC.String(),
-				"stage":     "resampler",
-				"error":     err.Error(),
-			},
-		})
-		_ = options.Observer.Record(options.Context, observability.ProjectScope{}, observability.RecordEvent{
-			Component: observability.ComponentWebRTC,
-			Event:     observability.WebRTCFailed,
-			Attributes: observability.Attributes{
-				"component": observability.ComponentWebRTC.String(),
-				"stage":     "resampler",
-				"error":     err.Error(),
-			},
-		})
-		return nil, fmt.Errorf("failed to create resampler: %w", err)
-	}
-
 	opusCodec, err := webrtc_internal.NewOpusCodec()
 	if err != nil {
 		_ = options.Observer.Record(options.Context, observability.ProjectScope{}, observability.RecordLog{
@@ -256,8 +258,11 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 		}
 	}
 	ambientMixer, err := internal_ambient.NewLoopMixer(internal_ambient.MixerSpec{
-		Logger:            options.Logger,
-		Resampler:         resampler,
+		Logger: options.Logger,
+		Resampler: resampler_soxr.NewChunk(
+			resampler_soxr.WithLogger(options.Logger),
+			resampler_soxr.WithHighQuality(),
+		),
 		TargetAudioConfig: internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG,
 		FrameBytes:        webrtc_internal.WebRTCOutputPCM16kFrameBytes,
 	})
@@ -282,17 +287,25 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 		})
 		return nil, fmt.Errorf("failed to create ambient mixer: %w", err)
 	}
+	userResampler := resampler_soxr.New(
+		resampler_soxr.WithLogger(options.Logger),
+		resampler_soxr.WithHighQuality(),
+	)
+	assistantResampler := resampler_soxr.New(
+		resampler_soxr.WithLogger(options.Logger),
+		resampler_soxr.WithHighQuality(),
+	)
 	s := &webrtcStreamer{
-		BaseStreamer: channel_base.NewBaseStreamerWithChannelCapacity(
-			options.Logger,
-			webrtc_internal.InputChannelSize,
-			webrtc_internal.OutputChannelSize,
+		BaseStreamer: channel_base.New(
+			channel_base.WithLogger(options.Logger),
+			channel_base.WithInputChannelCapacity(webrtc_internal.InputChannelSize),
+			channel_base.WithOutputChannelCapacity(webrtc_internal.OutputChannelSize),
 		),
 		peerConfig:           peerConfig,
 		serverConfig:         options.ServerConfig,
 		grpcStream:           options.GRPCStream,
 		sessionID:            uuid.New().String(),
-		resampler:            resampler,
+		resampler:            userResampler,
 		opusCodec:            opusCodec,
 		currentMode:          protos.StreamMode_STREAM_MODE_TEXT,
 		sessionState:         webrtc_internal.SessionState{Scope: observability.ProjectScope{}},
@@ -300,8 +313,8 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 		mediaLifecycleCh:     make(chan webrtc_internal.MediaLifecycleEvent, webrtc_internal.MediaLifecycleChannelSize),
 		webrtcOperationCh:    make(chan webrtc_internal.WebRTCOperation, webrtc_internal.WebRTCOperationChannelSize),
 		outputHealth:         internal_output.NewHealthStats(),
+		outputClearCh:        make(chan uint64, webrtc_internal.OutputChannelSize),
 		audioBufferState:     newWebRTCAudioBufferState(),
-		flushAudioCh:         make(chan struct{}, 1),
 		observer:             options.Observer,
 		auth:                 options.Auth,
 		configurationService: options.ConfigurationService,
@@ -309,6 +322,23 @@ func New(opts ...FuncOption) (internal_type.Streamer, error) {
 		assistantToolService: options.AssistantToolService,
 		ambientMixer:         ambientMixer,
 	}
+	userWriter, err := userResampler.NewWriter(internal_audio.WEBRTC_AUDIO_CONFIG, internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG, func(output []byte) error {
+		s.userPCM16k = append(s.userPCM16k, output...)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create WebRTC input resampler: %w", err)
+	}
+	assistantWriter, err := assistantResampler.NewWriter(internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG, internal_audio.WEBRTC_AUDIO_CONFIG, func(output []byte) error {
+		s.assistantPCM48k = append(s.assistantPCM48k, output...)
+		return nil
+	})
+	if err != nil {
+		userWriter.Close()
+		return nil, fmt.Errorf("failed to create WebRTC output resampler: %w", err)
+	}
+	s.userWriter = userWriter
+	s.assistantWriter = assistantWriter
 	_ = options.Observer.Record(options.Context, s.sessionState.Scope, observability.RecordEvent{
 		Component: observability.ComponentWebRTC,
 		Event:     observability.WebRTCConnecting,
@@ -351,6 +381,7 @@ func (s *webrtcStreamer) stopMediaSession() {
 	if peerConnection != nil {
 		peerConnection.Close()
 	}
+	s.clearBufferedOutputAudio()
 	s.mediaWorkers.Wait()
 }
 
@@ -403,10 +434,21 @@ func (s *webrtcStreamer) createPeer(mediaSessionID uint64) error {
 				return fmt.Errorf("failed to set ICE address rewrite rules: %w", err)
 			}
 		}
-		if s.serverConfig.UDPPortRangeStart > 0 && s.serverConfig.UDPPortRangeEnd > 0 {
+		if s.serverConfig.UDPPortRangeStart != 0 || s.serverConfig.UDPPortRangeEnd != 0 {
+			udpPortRangeStart, err := utils.Int64ToUint16(int64(s.serverConfig.UDPPortRangeStart))
+			if err != nil {
+				return fmt.Errorf("invalid UDP port range start: %w", err)
+			}
+			udpPortRangeEnd, err := utils.Int64ToUint16(int64(s.serverConfig.UDPPortRangeEnd))
+			if err != nil {
+				return fmt.Errorf("invalid UDP port range end: %w", err)
+			}
+			if udpPortRangeStart == 0 || udpPortRangeEnd == 0 {
+				return fmt.Errorf("UDP port range must specify both start and end ports")
+			}
 			if err := settingEngine.SetEphemeralUDPPortRange(
-				uint16(s.serverConfig.UDPPortRangeStart),
-				uint16(s.serverConfig.UDPPortRangeEnd),
+				udpPortRangeStart,
+				udpPortRangeEnd,
 			); err != nil {
 				return fmt.Errorf("failed to set UDP port range: %w", err)
 			}
@@ -775,7 +817,17 @@ func (s *webrtcStreamer) readRemoteAudio(track *pionwebrtc.TrackRemote, mediaSes
 			})
 			continue
 		}
-		userPCM16k, err := s.resampler.Resample(userPCM48k, internal_audio.WEBRTC_AUDIO_CONFIG, internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG)
+		var userPCM16k []byte
+		if s.userWriter != nil {
+			s.userResampleMu.Lock()
+			s.userPCM16k = s.userPCM16k[:0]
+			err = s.userWriter.Write(userPCM48k)
+			userPCM16k = append(userPCM16k, s.userPCM16k...)
+			s.userPCM16k = s.userPCM16k[:0]
+			s.userResampleMu.Unlock()
+		} else {
+			userPCM16k, err = s.resampler.Resample(userPCM48k, internal_audio.WEBRTC_AUDIO_CONFIG, internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG)
+		}
 		if err != nil {
 			if !s.sessionState.IsActiveMediaSession(mediaSessionID) {
 				return
@@ -793,6 +845,9 @@ func (s *webrtcStreamer) readRemoteAudio(track *pionwebrtc.TrackRemote, mediaSes
 					"error":                            err.Error(),
 				},
 			})
+			continue
+		}
+		if len(userPCM16k) == 0 {
 			continue
 		}
 		userAudioReceivedAt := time.Now()
@@ -966,17 +1021,19 @@ func (s *webrtcStreamer) signalReady() {
 }
 
 func (s *webrtcStreamer) signalClear() {
-	s.Mu.Lock()
-	signalingSessionID := s.signalingSessionID
-	s.Mu.Unlock()
-	if signalingSessionID == "" {
-		signalingSessionID = s.sessionID
+	s.outputWriteMu.Lock()
+	s.outputStateMu.Lock()
+	s.outputGeneration++
+	s.outputClearPending = true
+	s.pendingClearGeneration = s.outputGeneration
+	s.currentOutputFrame = nil
+	clearGeneration := s.pendingClearGeneration
+	s.outputStateMu.Unlock()
+	s.outputWriteMu.Unlock()
+	select {
+	case s.outputClearCh <- clearGeneration:
+	case <-s.Ctx.Done():
 	}
-
-	s.Output(&protos.ServerSignaling{
-		SessionId: signalingSessionID,
-		Message:   &protos.ServerSignaling_Clear{Clear: true},
-	})
 }
 
 func (s *webrtcStreamer) applyAmbientConfig(cfg internal_ambient.Config, source string) {
@@ -1043,13 +1100,12 @@ func (s *webrtcStreamer) enqueueOutputAudio(frame []byte) {
 	}
 	queueDepth = len(s.outputAudioQueue)
 	s.outputAudioQueueMu.Unlock()
-
 	s.Mu.Lock()
 	s.mediaHealthState.RecordAssistantAudioQueued(assistantAudioQueuedAt)
 	s.Mu.Unlock()
 
 	if droppedFrames > 0 {
-		totalDropped := s.sessionState.AddOutputAudioDroppedFrames(droppedFrames)
+		totalDroppedFrames := s.sessionState.AddOutputAudioDroppedFrames(droppedFrames)
 		_ = s.observer.Record(s.Ctx, s.sessionState.Scope, observability.RecordLog{
 			Level:   observability.LevelInfo,
 			Message: "WebRTC output queue overflow dropped the oldest assistant audio frame; this keeps playback current when audio is produced faster than WebRTC can send it.",
@@ -1061,7 +1117,7 @@ func (s *webrtcStreamer) enqueueOutputAudio(frame []byte) {
 				webrtc_internal.DataDroppedFrames:      fmt.Sprintf("%d", droppedFrames),
 				webrtc_internal.DataLimitFrames:        fmt.Sprintf("%d", webrtc_internal.OutputAudioQueueMaxFrames),
 				webrtc_internal.DataQueueDepthFrames:   fmt.Sprintf("%d", queueDepth),
-				webrtc_internal.DataTotalDroppedFrames: fmt.Sprintf("%d", totalDropped),
+				webrtc_internal.DataTotalDroppedFrames: fmt.Sprintf("%d", totalDroppedFrames),
 			},
 		}, observability.RecordMetric{
 			Metrics: []*protos.Metric{{
@@ -1073,16 +1129,16 @@ func (s *webrtcStreamer) enqueueOutputAudio(frame []byte) {
 	}
 }
 
-func (s *webrtcStreamer) popOutputAudio() []byte {
+func (s *webrtcStreamer) popOutputAudio() webrtc_internal.OutputAudioFrame {
 	s.outputAudioQueueMu.Lock()
 	defer s.outputAudioQueueMu.Unlock()
 	if len(s.outputAudioQueue) == 0 {
-		return nil
+		return webrtc_internal.OutputAudioFrame{}
 	}
 	outputFrame := s.outputAudioQueue[0]
 	s.outputAudioQueue[0] = webrtc_internal.OutputAudioFrame{}
 	s.outputAudioQueue = s.outputAudioQueue[1:]
-	return outputFrame.Audio
+	return outputFrame
 }
 
 func (s *webrtcStreamer) clearOutputAudio() int {
@@ -1104,12 +1160,29 @@ func (s *webrtcStreamer) NextFrame() []byte {
 	if mediaSessionID == 0 {
 		return nil
 	}
+	s.outputStateMu.Lock()
+	defer s.outputStateMu.Unlock()
+	if s.outputPaused || s.outputClearPending {
+		return nil
+	}
+	if len(s.currentOutputFrame) > 0 {
+		return s.currentOutputFrame
+	}
 	frame := s.popOutputAudio()
-	if len(frame) == 0 {
+	if len(frame.Audio) == 0 && !frame.Terminal {
 		return nil
 	}
 	s.sessionState.StampPacedAssistantFrame(mediaSessionID)
-	return s.applyAmbientToFrame(frame)
+	s.currentOutputFrame = s.applyAmbientToFrame(frame.Audio)
+	if frame.Terminal {
+		// The terminal marker drives the remaining converter output through the pacer.
+		s.currentOutputFrame = make([]byte, webrtc_internal.WebRTCOutputPCM16kFrameBytes)
+	}
+	s.currentOutputPlayback = frame.Playback
+	s.currentOutputTerminal = frame.Terminal
+	s.currentOutputConverted = false
+	s.currentOutputGeneration = s.outputGeneration
+	return s.currentOutputFrame
 }
 
 func (s *webrtcStreamer) IdleFrame() []byte {
@@ -1120,41 +1193,140 @@ func (s *webrtcStreamer) IdleFrame() []byte {
 	if mediaSessionID == 0 {
 		return nil
 	}
+	s.outputStateMu.Lock()
+	defer s.outputStateMu.Unlock()
+	if s.outputPaused || s.outputClearPending {
+		return nil
+	}
+	if len(s.currentOutputFrame) > 0 {
+		return s.currentOutputFrame
+	}
+	if s.assistantPlayback != nil {
+		// A response gap must not replace the converter's pending assistant audio.
+		return nil
+	}
 	s.sessionState.StampPacedAssistantFrame(mediaSessionID)
-	return s.applyAmbientToFrame(nil)
+	s.currentOutputFrame = s.applyAmbientToFrame(nil)
+	s.currentOutputPlayback = nil
+	s.currentOutputTerminal = false
+	s.currentOutputConverted = false
+	s.currentOutputGeneration = s.outputGeneration
+	return s.currentOutputFrame
 }
 
-func (s *webrtcStreamer) ConsumeFrame(assistantPCM16k []byte) error {
-	if !s.sessionState.CanWritePacedAssistantFrame() {
+func (s *webrtcStreamer) ConsumeFrame(assistantPCM16k []byte) (writeErr error) {
+	s.outputWriteMu.Lock()
+	s.outputStateMu.Lock()
+	var bridgeAudio *protos.ConversationBridgeOperatorAudio
+	var complete *protos.ConversationPlaybackComplete
+	defer func() {
+		if writeErr != nil {
+			if s.currentOutputPlayback != nil {
+				s.currentOutputPlayback.Failed = true
+			}
+			s.currentOutputFrame = nil
+			s.assistantPCM48k = nil
+		}
+		if len(s.currentOutputFrame) == 0 {
+			s.currentOutputConverted = false
+		}
+		s.outputStateMu.Unlock()
+		s.outputWriteMu.Unlock()
+		if bridgeAudio != nil {
+			s.Input(bridgeAudio)
+		}
+		if complete != nil {
+			s.Input(complete)
+		}
+	}()
+	if s.outputPaused || s.outputClearPending || len(s.currentOutputFrame) == 0 {
 		return nil
 	}
-
-	assistantPCM48k, err := s.resampler.Resample(assistantPCM16k, internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG, internal_audio.WEBRTC_AUDIO_CONFIG)
-	if err != nil {
-		return err
-	}
-	assistantOpus, err := s.opusCodec.Encode(assistantPCM48k)
-	if err != nil {
-		return err
-	}
-
-	if !s.sessionState.CanWritePacedAssistantFrame() {
+	playback := s.currentOutputPlayback
+	if s.Ctx.Err() != nil || s.currentOutputGeneration != s.outputGeneration || !s.sessionState.CanWritePacedAssistantFrame() ||
+		(playback != nil && !s.sessionState.IsActiveMediaSession(playback.MediaSessionID)) {
+		if playback != nil {
+			playback.Failed = true
+		}
+		s.currentOutputFrame = nil
 		return nil
 	}
-	if err := s.writeAudioFrame(assistantOpus); err != nil {
+	assistantPCM16k = s.currentOutputFrame
+	s.assistantResampleMu.Lock()
+	if s.assistantPlayback != playback {
+		if s.assistantWriter != nil {
+			writeErr = s.assistantWriter.Flush()
+		}
+		s.assistantPCM48k = nil
+		s.assistantPlayback = playback
+	}
+	if writeErr == nil && !s.currentOutputConverted {
+		if s.assistantWriter != nil {
+			if s.currentOutputTerminal {
+				writeErr = s.assistantWriter.Flush()
+			} else {
+				writeErr = s.assistantWriter.Write(assistantPCM16k)
+			}
+		} else if !s.currentOutputTerminal {
+			var converted []byte
+			converted, writeErr = s.resampler.Resample(assistantPCM16k, internal_audio.RAPIDA_INTERNAL_AUDIO_CONFIG, internal_audio.WEBRTC_AUDIO_CONFIG)
+			s.assistantPCM48k = append(s.assistantPCM48k, converted...)
+		} else if playback != nil {
+			// Legacy resamplers do not expose a drain operation.
+			playback.Failed = true
+		}
+		s.currentOutputConverted = true
+	}
+	s.assistantResampleMu.Unlock()
+	if writeErr != nil {
+		return writeErr
+	}
+	frameBytes := webrtc_internal.WebRTCOutputPCM16kFrameBytes * 3
+	if len(s.assistantPCM48k) >= frameBytes || (s.currentOutputTerminal && len(s.assistantPCM48k) > 0) {
+		pcm := make([]byte, frameBytes)
+		consumed := copy(pcm, s.assistantPCM48k)
+		assistantOpus, err := s.opusCodec.Encode(pcm)
+		if err != nil {
+			return err
+		}
+		if !s.sessionState.CanWritePacedAssistantFrame() {
+			if playback != nil {
+				playback.Failed = true
+			}
+			s.currentOutputFrame = nil
+			return nil
+		}
+		if err := s.writeAudioFrame(assistantOpus); err != nil {
+			s.Mu.Lock()
+			s.mediaHealthState.RecordAssistantFrameWriteFailure(time.Now())
+			s.Mu.Unlock()
+			return err
+		}
+		s.assistantPCM48k = s.assistantPCM48k[consumed:]
+		assistantFrameSentAt := time.Now()
+		if playback != nil {
+			playback.Sent = true
+		}
+		if !s.currentOutputTerminal {
+			bridgeAudio = &protos.ConversationBridgeOperatorAudio{Audio: assistantPCM16k, Time: timestamppb.New(assistantFrameSentAt)}
+		}
 		s.Mu.Lock()
-		s.mediaHealthState.RecordAssistantFrameWriteFailure(time.Now())
+		s.mediaHealthState.RecordAssistantFrameSent(assistantFrameSentAt)
 		s.Mu.Unlock()
-		return err
 	}
-	assistantFrameSentAt := time.Now()
-	s.Input(&protos.ConversationBridgeOperatorAudio{
-		Audio: assistantPCM16k,
-		Time:  timestamppb.New(assistantFrameSentAt),
-	})
-	s.Mu.Lock()
-	s.mediaHealthState.RecordAssistantFrameSent(assistantFrameSentAt)
-	s.Mu.Unlock()
+	if s.currentOutputTerminal && len(s.assistantPCM48k) == 0 {
+		if playback != nil && playback.ID != "" && playback.HasAudio && playback.Sent && !playback.Failed &&
+			playback.Generation == s.outputGeneration && s.sessionState.CanWritePacedAssistantFrame() && s.Ctx.Err() == nil {
+			complete = &protos.ConversationPlaybackComplete{
+				Id:   playback.ID,
+				Time: timestamppb.Now(),
+			}
+		}
+		s.currentOutputFrame = nil
+		s.assistantPlayback = nil
+	} else if !s.currentOutputTerminal && len(s.assistantPCM48k) < frameBytes {
+		s.currentOutputFrame = nil
+	}
 	return nil
 }
 
@@ -1178,7 +1350,6 @@ func (s *webrtcStreamer) handleConfigurationMessage(mode protos.StreamMode) {
 			return
 		}
 		s.sessionState.SetMediaState(webrtc_internal.MediaStateAudioNegotiating)
-		s.clearBufferedOutputAudio()
 		s.signalClear()
 		s.sessionState.ResetMediaRestartAttempts()
 		if err := s.startMediaSession(); err != nil {
@@ -1224,9 +1395,8 @@ func (s *webrtcStreamer) handleConfigurationMessage(mode protos.StreamMode) {
 		if currentMode == protos.StreamMode_STREAM_MODE_TEXT && mediaState == webrtc_internal.MediaStateText {
 			return
 		}
-		s.clearBufferedOutputAudio()
-		s.signalClear()
 		s.stopMediaSessionAndFallbackToText()
+		s.signalClear()
 	}
 }
 
@@ -1241,8 +1411,6 @@ func (s *webrtcStreamer) queueClientSignal(signaling *protos.ClientSignaling) {
 }
 
 func (s *webrtcStreamer) stopMediaSessionAndFallbackToText() {
-	s.clearBufferedOutputAudio()
-	s.clearOutputAudio()
 	if s.ambientMixer != nil {
 		s.ambientMixer.Reset()
 	}
@@ -1388,14 +1556,114 @@ func (s *webrtcStreamer) clearNegotiationState(peerConnection *pionwebrtc.PeerCo
 	s.signalOfferSent = true
 }
 
-func (s *webrtcStreamer) Send(response internal_type.Stream) error {
+func (s *webrtcStreamer) Send(response proto.Message) error {
 	switch data := response.(type) {
+	case *protos.ConversationPlaybackControl:
+		switch data.GetKind() {
+		case protos.ConversationPlaybackControl_PAUSE:
+			s.outputWriteMu.Lock()
+			s.outputStateMu.Lock()
+			if !s.outputFlushed {
+				s.outputPaused = true
+			}
+			s.outputStateMu.Unlock()
+			s.outputWriteMu.Unlock()
+			return nil
+		case protos.ConversationPlaybackControl_CONTINUE:
+			s.outputStateMu.Lock()
+			if !s.outputFlushed {
+				s.outputPaused = false
+			}
+			s.outputStateMu.Unlock()
+			return nil
+		case protos.ConversationPlaybackControl_FLUSH:
+			s.outputWriteMu.Lock()
+			s.outputStateMu.Lock()
+			s.outputPaused = false
+			if s.flushedOutputIDs == nil {
+				s.flushedOutputIDs = make(map[string]struct{})
+			}
+			if data.GetId() != "" {
+				s.flushedOutputIDs[data.GetId()] = struct{}{}
+			}
+			if s.outputFlushed {
+				s.outputStateMu.Unlock()
+				s.outputWriteMu.Unlock()
+				return nil
+			}
+			s.outputFlushed = true
+			s.outputClearPending = true
+			s.outputGeneration++
+			s.pendingClearGeneration = s.outputGeneration
+			for _, playback := range s.outputPlaybacks {
+				if playback.ID != "" {
+					s.flushedOutputIDs[playback.ID] = struct{}{}
+				}
+				playback.Failed = true
+			}
+			for _, playback := range []*webrtc_internal.OutputPlayback{s.outputPlayback, s.currentOutputPlayback, s.assistantPlayback} {
+				if playback != nil && playback.ID != "" {
+					s.flushedOutputIDs[playback.ID] = struct{}{}
+				}
+			}
+			s.outputAudioQueueMu.Lock()
+			for _, frame := range s.outputAudioQueue {
+				if frame.Playback != nil && frame.Playback.ID != "" {
+					s.flushedOutputIDs[frame.Playback.ID] = struct{}{}
+				}
+			}
+			s.outputAudioQueueMu.Unlock()
+			s.audioBufferState.OutputAudioBufferMu.Lock()
+			s.audioBufferState.OutputAudioBuffer.Reset()
+			s.audioBufferState.OutputAudioBufferMu.Unlock()
+			s.currentOutputFrame = nil
+			s.currentOutputPlayback = nil
+			s.currentOutputTerminal = false
+			s.currentOutputConverted = false
+			s.currentOutputGeneration = 0
+			s.assistantResampleMu.Lock()
+			var flushErr error
+			if s.assistantWriter != nil {
+				flushErr = s.assistantWriter.Flush()
+			}
+			s.assistantPCM48k = nil
+			s.assistantPlayback = nil
+			s.assistantResampleMu.Unlock()
+			clearedFrames := s.clearOutputAudio()
+			clearGeneration := s.pendingClearGeneration
+			s.outputStateMu.Unlock()
+			s.outputWriteMu.Unlock()
+
+			if clearedFrames > 0 {
+				_ = s.observer.Record(s.Ctx, s.sessionState.Scope, observability.RecordLog{
+					Level:   observability.LevelInfo,
+					Message: "WebRTC output queue cleared after a flush request; this drops queued assistant audio so stale audio is not sent after the client asks to flush playback.",
+					Attributes: observability.Attributes{
+						"component":                              observability.ComponentWebRTC.String(),
+						webrtc_internal.DataType:                 webrtc_internal.EventOutputQueueCleared,
+						webrtc_internal.DataSessionID:            s.sessionID,
+						webrtc_internal.DataReason:               webrtc_internal.OutputQueueClearReasonFlush,
+						webrtc_internal.DataClearedFrames:        fmt.Sprintf("%d", clearedFrames),
+						webrtc_internal.DataRemainingQueueFrames: fmt.Sprintf("%d", webrtc_internal.OutputAudioQueueEmptySize),
+					},
+				})
+			}
+			select {
+			case s.outputClearCh <- clearGeneration:
+			case <-s.Ctx.Done():
+			}
+			return flushErr
+		default:
+			return fmt.Errorf("invalid playback control kind: %d", data.GetKind())
+		}
 	case *protos.ConversationAssistantMessage:
 		switch content := data.Message.(type) {
 		case *protos.ConversationAssistantMessage_Audio:
-			s.bufferAndSendOutput(content.Audio)
+			s.bufferAndSendOutput(data.GetId(), content.Audio, data.GetCompleted())
 			return nil
 		case *protos.ConversationAssistantMessage_Text:
+			s.Output(data)
+		case nil:
 			s.Output(data)
 		}
 	case *protos.ConversationConfiguration:
@@ -1423,23 +1691,6 @@ func (s *webrtcStreamer) Send(response internal_type.Stream) error {
 	case *protos.ConversationUserMessage:
 		s.Output(data)
 	case *protos.ConversationInterruption:
-		s.clearBufferedOutputAudio()
-		clearedFrames := s.clearOutputAudio()
-		if clearedFrames > 0 {
-			_ = s.observer.Record(s.Ctx, s.sessionState.Scope, observability.RecordLog{
-				Level:   observability.LevelInfo,
-				Message: "WebRTC output queue cleared after user interruption; this drops queued assistant audio so the response stops promptly when the user speaks.",
-				Attributes: observability.Attributes{
-					"component":                              observability.ComponentWebRTC.String(),
-					webrtc_internal.DataType:                 webrtc_internal.EventOutputQueueCleared,
-					webrtc_internal.DataSessionID:            s.sessionID,
-					webrtc_internal.DataReason:               webrtc_internal.OutputQueueClearReasonInterruption,
-					webrtc_internal.DataClearedFrames:        fmt.Sprintf("%d", clearedFrames),
-					webrtc_internal.DataRemainingQueueFrames: fmt.Sprintf("%d", webrtc_internal.OutputAudioQueueEmptySize),
-				},
-			})
-		}
-		s.signalClear()
 		s.Output(data)
 	case *protos.ConversationToolCall:
 		s.Output(data)
@@ -1531,6 +1782,17 @@ func (s *webrtcStreamer) Close() error {
 		}
 	}
 	s.stopMediaSession()
+	if s.userWriter != nil {
+		s.userWriter.Close()
+	}
+	if s.assistantWriter != nil {
+		s.outputWriteMu.Lock()
+		s.assistantWriter.Close()
+		s.outputWriteMu.Unlock()
+	}
+	if s.userWriter == nil && s.resampler != nil {
+		s.resampler.Close()
+	}
 
 	s.Cancel()
 	return nil

@@ -15,18 +15,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewMiniMaxNormalizer(t *testing.T) {
+func TestNewMiniMaxProcessor(t *testing.T) {
 	logger, err := commons.NewApplicationLogger()
 	require.NoError(t, err)
-	normalizer := NewMiniMaxNormalizer(logger, utils.Option{})
-	require.NotNil(t, normalizer)
-	_, ok := normalizer.(*minimaxNormalizer)
+	processor := NewMiniMaxProcessor(logger, utils.Option{})
+	require.NotNil(t, processor)
+	_, ok := processor.(*minimaxProcessor)
 	assert.True(t, ok)
 }
 
-func TestNormalize_Passthrough(t *testing.T) {
+func TestProcess_Passthrough(t *testing.T) {
 	logger, _ := commons.NewApplicationLogger()
-	normalizer := NewMiniMaxNormalizer(logger, utils.Option{})
+	processor := NewMiniMaxProcessor(logger, utils.Option{})
 
 	tests := []struct {
 		name  string
@@ -41,28 +41,28 @@ func TestNormalize_Passthrough(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := normalizer.Normalize(tt.input)
+			result := processor.Process(tt.input)
 			assert.Equal(t, tt.input, result)
 		})
 	}
 }
 
-func TestNormalize_NoSSML(t *testing.T) {
+func TestProcess_NoSSML(t *testing.T) {
 	logger, _ := commons.NewApplicationLogger()
-	normalizer := NewMiniMaxNormalizer(logger, utils.Option{})
+	processor := NewMiniMaxProcessor(logger, utils.Option{})
 
-	result := normalizer.Normalize("Tom & Jerry")
+	result := processor.Process("Tom & Jerry")
 	assert.NotContains(t, result, "&amp;")
 	assert.NotContains(t, result, "<break")
 }
 
-func BenchmarkNormalize(b *testing.B) {
+func BenchmarkProcess(b *testing.B) {
 	logger, _ := commons.NewApplicationLogger()
-	normalizer := NewMiniMaxNormalizer(logger, utils.Option{})
+	processor := NewMiniMaxProcessor(logger, utils.Option{})
 	text := "Hello, this is a simple text for TTS processing."
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		normalizer.Normalize(text)
+		processor.Process(text)
 	}
 }

@@ -17,14 +17,14 @@ import (
 )
 
 // =============================================================================
-// Azure Text Normalizer
+// Azure Text Processor
 // =============================================================================
 
-// azureNormalizer handles Azure Cognitive Services TTS text preprocessing.
+// azureProcessor handles Azure Cognitive Services TTS text preprocessing.
 // Azure supports full SSML with mstts extensions for expressive speech.
-type azureNormalizer struct {
+type azureProcessor struct {
 	logger    commons.Logger
-	config    internal_type.NormalizerConfig
+	config    internal_type.ProcessorConfig
 	voiceName string
 	language  string
 
@@ -32,9 +32,9 @@ type azureNormalizer struct {
 	conjunctionPattern *regexp.Regexp
 }
 
-// NewAzureNormalizer creates an Azure-specific text normalizer.
-func NewAzureNormalizer(logger commons.Logger, opts utils.Option) internal_type.TextNormalizer {
-	cfg := internal_type.DefaultNormalizerConfig()
+// NewAzureProcessor creates an Azure-specific text processor.
+func NewAzureProcessor(logger commons.Logger, opts utils.Option) internal_type.TextProcessor {
+	cfg := internal_type.DefaultProcessorConfig()
 
 	// Get voice name and language
 	voiceName, _ := opts.GetString("speaker.voice.name")
@@ -61,7 +61,7 @@ func NewAzureNormalizer(logger commons.Logger, opts utils.Option) internal_type.
 		cfg.PauseDurationMs = conjunctionBreak
 	}
 
-	return &azureNormalizer{
+	return &azureProcessor{
 		logger:             logger,
 		config:             cfg,
 		voiceName:          voiceName,
@@ -70,9 +70,9 @@ func NewAzureNormalizer(logger commons.Logger, opts utils.Option) internal_type.
 	}
 }
 
-// Normalize applies Azure-specific text transformations.
-// Markdown removal and whitespace normalization are handled upstream.
-func (n *azureNormalizer) Normalize(text string) string {
+// Process applies Azure-specific text transformations.
+// Markdown removal and whitespace processing are handled upstream.
+func (n *azureProcessor) Process(text string) string {
 	if text == "" {
 		return text
 	}
@@ -92,7 +92,7 @@ func (n *azureNormalizer) Normalize(text string) string {
 // Private Helpers
 // =============================================================================
 
-func (n *azureNormalizer) escapeXML(text string) string {
+func (n *azureProcessor) escapeXML(text string) string {
 	replacer := strings.NewReplacer(
 		"&", "&amp;",
 		"<", "&lt;",
@@ -103,7 +103,7 @@ func (n *azureNormalizer) escapeXML(text string) string {
 	return replacer.Replace(text)
 }
 
-func (n *azureNormalizer) insertConjunctionBreaks(text string) string {
+func (n *azureProcessor) insertConjunctionBreaks(text string) string {
 	breakTag := fmt.Sprintf(`<break time="%dms"/>`, n.config.PauseDurationMs)
 	return n.conjunctionPattern.ReplaceAllStringFunc(text, func(match string) string {
 		return match + breakTag
@@ -114,18 +114,18 @@ func (n *azureNormalizer) insertConjunctionBreaks(text string) string {
 // Azure SSML Helpers
 // =============================================================================
 
-func (n *azureNormalizer) WrapWithSSML(text string) string {
+func (n *azureProcessor) WrapWithSSML(text string) string {
 	return fmt.Sprintf(
 		`<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="%s"><voice name="%s">%s</voice></speak>`,
 		n.language, n.voiceName, text,
 	)
 }
 
-func (n *azureNormalizer) AddBreak(durationMs int) string {
+func (n *azureProcessor) AddBreak(durationMs int) string {
 	return fmt.Sprintf(`<break time="%dms"/>`, durationMs)
 }
 
-func (n *azureNormalizer) AddProsody(text string, rate, pitch, volume string) string {
+func (n *azureProcessor) AddProsody(text string, rate, pitch, volume string) string {
 	attrs := ""
 	if rate != "" {
 		attrs += fmt.Sprintf(` rate="%s"`, rate)
@@ -142,15 +142,15 @@ func (n *azureNormalizer) AddProsody(text string, rate, pitch, volume string) st
 	return fmt.Sprintf(`<prosody%s>%s</prosody>`, attrs, text)
 }
 
-func (n *azureNormalizer) AddEmphasis(text, level string) string {
+func (n *azureProcessor) AddEmphasis(text, level string) string {
 	return fmt.Sprintf(`<emphasis level="%s">%s</emphasis>`, level, text)
 }
 
-func (n *azureNormalizer) AddExpressAs(text, style string) string {
+func (n *azureProcessor) AddExpressAs(text, style string) string {
 	return fmt.Sprintf(`<mstts:express-as style="%s">%s</mstts:express-as>`, style, text)
 }
 
-func (n *azureNormalizer) SayAs(text, interpretAs, format string) string {
+func (n *azureProcessor) SayAs(text, interpretAs, format string) string {
 	if format != "" {
 		return fmt.Sprintf(`<say-as interpret-as="%s" format="%s">%s</say-as>`, interpretAs, format, text)
 	}

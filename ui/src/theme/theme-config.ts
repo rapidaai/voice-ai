@@ -95,6 +95,9 @@ export const normalizeThemeManifest = (value: unknown): ThemeManifest => {
     id: asString(manifest.id, 'default'),
     brand: {
       name: asString(brand.name, 'Application'),
+      ...(asOptionalString(brand.environmentLabel)
+        ? { environmentLabel: asOptionalString(brand.environmentLabel) }
+        : {}),
       ...(logos ? { logos } : {}),
       ...(asOptionalString(brand.favicon)
         ? { favicon: asOptionalString(brand.favicon) }

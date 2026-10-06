@@ -8,7 +8,10 @@ package adapter_internal
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
+
+	"google.golang.org/protobuf/proto"
 
 	"github.com/rapidaai/api/assistant-api/config"
 	adapter_channel "github.com/rapidaai/api/assistant-api/internal/adapters/channel"
@@ -23,9 +26,9 @@ import (
 	internal_assistant_entity "github.com/rapidaai/api/assistant-api/internal/entity/assistants"
 	internal_conversation_entity "github.com/rapidaai/api/assistant-api/internal/entity/conversations"
 	internal_knowledge_gorm "github.com/rapidaai/api/assistant-api/internal/entity/knowledges"
-	internal_input_normalizer "github.com/rapidaai/api/assistant-api/internal/normalizer/input"
-	internal_output_normalizer "github.com/rapidaai/api/assistant-api/internal/normalizer/output"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
+	internal_input_processor "github.com/rapidaai/api/assistant-api/internal/processor/input"
+	internal_output_processor "github.com/rapidaai/api/assistant-api/internal/processor/output"
 	internal_services "github.com/rapidaai/api/assistant-api/internal/services"
 	internal_assistant_service "github.com/rapidaai/api/assistant-api/internal/services/assistant"
 	internal_knowledge_service "github.com/rapidaai/api/assistant-api/internal/services/knowledge"
@@ -91,8 +94,8 @@ type genericRequestor struct {
 	// audio intelligence
 
 	// output preprocessor + TTS
-	inputNormalizer  internal_type.PacketNormalizer
-	outputNormalizer internal_type.PacketNormalizer
+	inputProcessor  internal_type.PacketProcessor
+	outputProcessor internal_type.PacketProcessor
 
 	// executor
 	assistantAnalyseExecutors     []internal_type.AnalysisExecutor
@@ -115,10 +118,7 @@ type genericRequestor struct {
 	options  map[string]interface{}
 
 	// experience
-	idleTimeoutWatchdog   *watchdog.IdleTimeoutWatchdog
-	unclearInputWatchdog  *watchdog.UnclearInputWatchdog
 	ttsCompletionWatchdog *watchdog.TTSCompletionWatchdog
-	maxSessionWatchdog    *watchdog.MaxSessionWatchdog
 
 	// sessionCtx is the adapter-owned lifecycle context. Outlives the gRPC stream.
 	// cancelSession is invoked exactly once, by HandleFinalizationCompleted, after
@@ -163,12 +163,11 @@ func NewGenericRequestor(
 
 		observabilityRecorder: observer,
 
-		messageLifecycle: adapter_lifecycle.NewMessageLifecycle(),
 		sessionLifecycle: adapter_lifecycle.NewSessionLifecycle(),
 		dispatchRoute:    adapter_router.NewDispatchRoute(adapter_router.NewRoutePolicy(), channels),
 
-		inputNormalizer:  internal_input_normalizer.NewInputNormalizer(logger),
-		outputNormalizer: internal_output_normalizer.NewOutputNormalizer(logger),
+		inputProcessor:  internal_input_processor.NewInputProcessor(logger),
+		outputProcessor: internal_output_processor.NewOutputProcessor(logger),
 
 		//
 		histories:                 make([]internal_type.MessagePacket, 0),
@@ -183,24 +182,27 @@ func NewGenericRequestor(
 		channels:                  channels,
 	}
 
-	gr.idleTimeoutWatchdog = watchdog.NewIdleTimeoutWatchdog(
-		watchdog.WithOnPacket(gr.OnPacket),
-		watchdog.WithPacketContext(sessionCtx),
-	)
-	gr.unclearInputWatchdog = watchdog.NewUnclearInputWatchdog(
-		watchdog.WithOnPacket(gr.OnPacket),
-		watchdog.WithPacketContext(sessionCtx),
+	gr.messageLifecycle = adapter_lifecycle.NewMessageLifecycle(
+		adapter_lifecycle.WithOnPacket(func(packets ...internal_type.Packet) error {
+			return gr.OnPacket(sessionCtx, packets...)
+		}),
+		adapter_lifecycle.WithSend(func(message proto.Message) error {
+			if gr.streamer == nil {
+				return fmt.Errorf("send %T: streamer is unavailable", message)
+			}
+			return gr.streamer.Send(message)
+		}),
+		adapter_lifecycle.WithDispatch(requestorDispatchHandler{r: gr}.HandleMessageLifecyclePacket),
+		adapter_lifecycle.WithInterruptionExpiry(func(packet internal_type.InterruptionDecisionExpiredPacket) {
+			gr.dispatch(sessionCtx, packet)
+		}),
+		adapter_lifecycle.WithBehavior(gr.deploymentBehavior),
 	)
 	gr.ttsCompletionWatchdog = watchdog.NewTTSCompletionWatchdog(
 		watchdog.WithOnPacket(gr.OnPacket),
 		watchdog.WithPacketContext(sessionCtx),
 		watchdog.WithGracePeriod(300*time.Millisecond),
 	)
-	gr.maxSessionWatchdog = watchdog.NewMaxSessionWatchdog(
-		watchdog.WithOnPacket(gr.OnPacket),
-		watchdog.WithPacketContext(sessionCtx),
-	)
-
 	go gr.runBootstrapDispatcher(sessionCtx)
 	go gr.runCriticalDispatcher(sessionCtx)
 	go gr.runOutputDispatcher(sessionCtx)

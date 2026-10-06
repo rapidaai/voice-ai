@@ -16,6 +16,7 @@ import (
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/billing"
 	"github.com/rapidaai/api/assistant-api/internal/observability/collectors/telemetry"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	rapida_client "github.com/rapidaai/pkg/clients/rapida"
 	"github.com/rapidaai/pkg/commons"
@@ -44,15 +45,15 @@ type manager struct {
 	postgres        connectors.PostgresConnector
 	redis           *redis.Client
 	regClient       *sip_runtime.RegistrationClient
-	opDefaults      func(*sip_runtime.Config)
 	assistantConfig *config.AssistantConfig
+	sipConfig       sip_config.Resolver
 	instanceID      string
 	rapidaClient    *rapida_client.RapidaClient
 }
 
 // New wires the dependencies and resolves a stable instance identity
 // (externalIP@hostname) for the Redis ownership keys. Bare externalIP is not
-// enough — two replicas behind a shared LB or with a "0.0.0.0" bind-address
+// enough. Two replicas behind a shared LB or with a "0.0.0.0" bind-address
 // fallback can collapse to the same value and mistakenly treat each other's
 // DIDs as self-owned. Combining with hostname always distinguishes pods.
 func New(options ...ManagerOption) Manager {
@@ -62,21 +63,26 @@ func New(options ...ManagerOption) Manager {
 			option(&managerOptions)
 		}
 	}
+	var appSIPConfig *config.SIPConfig
+	if managerOptions.AssistantConfig != nil {
+		appSIPConfig = managerOptions.AssistantConfig.SIPConfig
+	}
+	sipConfig := sip_config.NewResolver(appSIPConfig)
 	m := &manager{
 		logger:          managerOptions.Logger,
 		postgres:        managerOptions.Postgres,
 		redis:           managerOptions.Redis.GetConnection(),
 		regClient:       managerOptions.RegistrationClient,
-		instanceID:      managerOptions.Sip.InstanceID,
-		opDefaults:      managerOptions.ApplyOpDefaults,
+		instanceID:      sipConfig.InstanceID(),
 		assistantConfig: managerOptions.AssistantConfig,
+		sipConfig:       sipConfig,
 		rapidaClient:    managerOptions.RapidaClient,
 	}
 	if managerOptions.RegistrationClient != nil {
 		managerOptions.RegistrationClient.SetObserver(m)
 	}
 	managerOptions.Logger.Infow("SIP registration manager initialized",
-		"instance_id", managerOptions.Sip.InstanceID,
+		"instance_id", sipConfig.InstanceID(),
 		"poll_interval", PollInterval,
 		"ownership_ttl", OwnershipTTL,
 		"max_concurrent", MaxConcurrent)
@@ -200,7 +206,7 @@ func (m *manager) Reconcile(ctx context.Context) {
 
 // ReleaseAll drops every Redis ownership key this instance currently holds so
 // peers can claim those DIDs immediately on their next reconcile tick instead
-// of waiting OwnershipTTL. Intended for graceful shutdown — call BEFORE
+// of waiting OwnershipTTL. Intended for graceful shutdown. Call before
 // RegistrationClient.UnregisterAll, since that drains the active-DID set.
 func (m *manager) ReleaseAll(ctx context.Context) {
 	dids := m.regClient.GetRegisteredDIDs()

@@ -12,6 +12,8 @@ import (
 	callcontext "github.com/rapidaai/api/assistant-api/internal/callcontext"
 )
 
+const sipUserAgent = "RapidaVoiceAI"
+
 // Server state constants describe the process-level SIP server lifecycle.
 const (
 	ServerStateCreated ServerState = iota
@@ -23,19 +25,6 @@ const (
 const (
 	InboundRejectedInviteTTL  = time.Minute
 	MaxInboundRejectedInvites = 1024
-)
-
-// Transport constants list supported SIP transport protocols.
-const (
-	TransportUDP Transport = "udp"
-	TransportTCP Transport = "tcp"
-	TransportTLS Transport = "tls"
-)
-
-// Inbound answer modes control when an inbound INVITE receives 200 OK.
-const (
-	InboundAnswerModeImmediate            InboundAnswerMode = "answer_immediately"
-	InboundAnswerModeAfterMinRingDuration InboundAnswerMode = "answer_after_min_ring_ms"
 )
 
 // Call states represent the session lifecycle stored on SessionInfo.
@@ -329,14 +318,11 @@ const (
 	rtpReadBufferSize           = 65536
 	rtpWriteBufferSize          = 65536
 	rtpPacketMaxSize            = 1500
-	rtpPacketInterval           = 20 * time.Millisecond
 	rtpDefaultPacketizationTime = 20 * time.Millisecond
 	rtpMinPacketizationTime     = 5 * time.Millisecond
 	rtpMaxPacketizationTime     = 60 * time.Millisecond
 	rtpMediaTimeoutInitial      = 30 * time.Second
 	rtpMediaTimeout             = 15 * time.Second
-	rtpAudioInBufferSize        = 100
-	rtpAudioOutBufferSize       = 100
 	rtpMediaTimeoutDisabledPark = time.Hour
 )
 
@@ -355,26 +341,12 @@ const (
 	rtpErrorSizeHeaderFormat = "%w: size=%d header=%d"
 )
 
-// RTP input jitter buffer constants bound reordering and inferred packet duration.
+// RTP input jitter buffer constants bound reordering and missing audio duration.
 const (
-	rtpInputReorderWindow              = 80 * time.Millisecond
-	rtpInputMaxLossGap                 = 500 * time.Millisecond
-	rtpInputMaxSilenceGap              = 500 * time.Millisecond
-	rtpInputBufferedPacketMapCapacity  = 5
-	rtpInputPacketizationStablePackets = 2
-	rtpInputNanosecondsPerSecond       = 1000000000
-)
-
-// RTP inbound quality constants define rolling quality thresholds and labels.
-const (
-	rtpInboundQualityWindow       = 5 * time.Second
-	rtpInboundQualityGoodLossRate = 0.05
-	rtpInboundQualityPoorLossRate = 0.12
-	rtpInboundQualityUnknown      = "unknown"
-	rtpInboundQualityExcellent    = "excellent"
-	rtpInboundQualityGood         = "good"
-	rtpInboundQualityPoor         = "poor"
-	rtpInboundQualityLost         = "lost"
+	rtpInputReorderWindow             = 80 * time.Millisecond
+	rtpInputMaxLossGap                = 500 * time.Millisecond
+	rtpInputMaxSilenceGap             = 500 * time.Millisecond
+	rtpInputBufferedPacketMapCapacity = 5
 )
 
 // RTCP constants define companion port behavior, reporting cadence, and unit conversion.

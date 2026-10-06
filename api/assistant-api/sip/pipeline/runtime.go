@@ -17,6 +17,7 @@ import (
 	internal_telephony "github.com/rapidaai/api/assistant-api/internal/channel/telephony"
 	"github.com/rapidaai/api/assistant-api/internal/observability"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
+	sip_config "github.com/rapidaai/api/assistant-api/sip/config"
 	sip_runtime "github.com/rapidaai/api/assistant-api/sip/runtime"
 	"github.com/rapidaai/pkg/types"
 	"github.com/rapidaai/pkg/utils"
@@ -179,7 +180,7 @@ func (runtime *sipPreparedCallRuntime) StartBeforeAnswer(ctx context.Context, ti
 	}
 }
 
-func inboundRuntimeReadyTimeout(config *sip_runtime.Config) time.Duration {
+func inboundRuntimeReadyTimeout(config *sip_config.Config) time.Duration {
 	if config != nil && config.InboundMaxRingDuration > 0 {
 		return config.InboundMaxRingDuration
 	}
@@ -225,7 +226,7 @@ func (d *Dispatcher) resolveSIPCallContext(session *sip_runtime.Session, setup *
 	}
 	return call, nil
 }
-func (d *Dispatcher) configureSIPTransfer(ctx context.Context, session *sip_runtime.Session, sipConfig *sip_runtime.Config, call *callcontext.CallContext, transferStreamer internal_type.SIPTransferStreamer) {
+func (d *Dispatcher) configureSIPTransfer(ctx context.Context, session *sip_runtime.Session, sipConfig *sip_config.Config, call *callcontext.CallContext, transferStreamer internal_type.SIPTransferStreamer) {
 	callID := session.GetCallID()
 	transferStreamer.SetTransferRequestHandler(func(targets []string, postTransferAction string) {
 		toolID, _ := session.GetMetadata("tool_id")

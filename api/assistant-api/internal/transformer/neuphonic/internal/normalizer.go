@@ -12,21 +12,21 @@ import (
 	"github.com/rapidaai/pkg/utils"
 )
 
-// neuphonicNormalizer handles NeuPhonic TTS text preprocessing.
+// neuphonicProcessor handles NeuPhonic TTS text preprocessing.
 // NeuPhonic does NOT support SSML - only plain text is accepted.
-type neuphonicNormalizer struct {
+type neuphonicProcessor struct {
 	logger commons.Logger
 }
 
-// NewNeuPhonicNormalizer creates a NeuPhonic-specific text normalizer.
-func NewNeuPhonicNormalizer(logger commons.Logger, opts utils.Option) internal_type.TextNormalizer {
-	return &neuphonicNormalizer{
+// NewNeuPhonicProcessor creates a NeuPhonic-specific text processor.
+func NewNeuPhonicProcessor(logger commons.Logger, opts utils.Option) internal_type.TextProcessor {
+	return &neuphonicProcessor{
 		logger: logger,
 	}
 }
 
-// Normalize returns text unchanged. NeuPhonic does NOT support SSML.
-// Markdown removal and whitespace normalization are handled upstream.
-func (n *neuphonicNormalizer) Normalize(text string) string {
+// Process returns text unchanged. NeuPhonic does NOT support SSML.
+// Markdown removal and whitespace processing are handled upstream.
+func (n *neuphonicProcessor) Process(text string) string {
 	return text
 }

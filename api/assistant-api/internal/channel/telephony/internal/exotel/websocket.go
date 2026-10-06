@@ -22,6 +22,7 @@ import (
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/commons"
 	"github.com/rapidaai/protos"
+	"google.golang.org/protobuf/proto"
 )
 
 type exotelWebsocketStreamer struct {
@@ -295,27 +296,30 @@ func (exotel *exotelWebsocketStreamer) runWebSocketReader(conn *websocket.Conn) 
 	}
 }
 
-func (exotel *exotelWebsocketStreamer) Send(response internal_type.Stream) error {
+func (exotel *exotelWebsocketStreamer) Send(response proto.Message) error {
+	if exotel.mediaSession != nil {
+		if outputControlHandled, outputControlError := exotel.mediaSession.HandleOutputControl(response); outputControlHandled {
+			return outputControlError
+		}
+	}
 	switch data := response.(type) {
 	case *protos.ConversationInitialization:
 		if exotel.mediaSession != nil {
 			exotel.mediaSession.HandleInitialization(data)
 		}
 	case *protos.ConversationAssistantMessage:
-		switch content := data.Message.(type) {
+		switch data.Message.(type) {
 		case *protos.ConversationAssistantMessage_Audio:
 			if exotel.mediaSession == nil {
 				return nil
 			}
-			if err := exotel.mediaSession.HandleAssistantAudio(content.Audio, data.GetCompleted()); err != nil {
-				return err
+			if _, assistantAudioError := exotel.mediaSession.HandleAssistantAudio(data.GetId(), data.GetAudio(), data.GetCompleted()); assistantAudioError != nil {
+				return assistantAudioError
 			}
 			return nil
 		}
 	case *protos.ConversationInterruption:
-		if exotel.mediaSession != nil {
-			exotel.mediaSession.HandleInterrupt()
-		}
+		return nil
 	case *protos.ConversationDisconnection:
 		// Server-initiated disconnect: the talker already knows the reason
 		// (it called Notify with it). No need to round-trip back through
@@ -480,6 +484,9 @@ func (exotel *exotelWebsocketStreamer) handleMediaEvent(mediaEvent internal_exot
 
 func (exotel *exotelWebsocketStreamer) sendExotelMessage(eventType internal_exotel.EventType, mediaData *internal_exotel.ExotelOutboundMedia) error {
 	if exotel.streamID == "" {
+		if mediaData != nil {
+			return fmt.Errorf("Exotel output stream is not connected")
+		}
 		return nil
 	}
 	message := internal_exotel.ExotelOutboundMessage{
@@ -512,6 +519,9 @@ func (exotel *exotelWebsocketStreamer) sendExotelMessage(eventType internal_exot
 	exotel.writeMu.Lock()
 	defer exotel.writeMu.Unlock()
 	if exotel.connection == nil {
+		if mediaData != nil {
+			return fmt.Errorf("Exotel output transport is not connected")
+		}
 		return nil
 	}
 	if err := exotel.connection.WriteMessage(websocket.TextMessage, exotelMessageJSON); err != nil {

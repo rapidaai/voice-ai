@@ -293,6 +293,14 @@ func (e *websocketExecutor) isCurrentContextID(id string) bool {
 	return clean == current
 }
 
+func (e *websocketExecutor) canCompleteContextID(id string) bool {
+	clean := strings.TrimSpace(id)
+	e.contextMu.RLock()
+	defer e.contextMu.RUnlock()
+	current := strings.TrimSpace(e.currentID)
+	return clean != "" && current != "" && clean == current
+}
+
 func (e *websocketExecutor) sendUserMessage(contextID string, text string) error {
 	if strings.TrimSpace(contextID) == "" {
 		return nil
@@ -391,6 +399,7 @@ func (e *websocketExecutor) handleResponse(ctx context.Context, resp *Response, 
 		e.logger.Errorf("Error: %d - %s", d.Code, d.Message)
 		e.contextMu.Lock()
 		currentID := e.currentID
+		e.currentID = ""
 		e.requestStartedAt = time.Time{}
 		e.waitingForFirstResponse = false
 		e.contextMu.Unlock()
@@ -480,7 +489,7 @@ func (e *websocketExecutor) handleResponse(ctx context.Context, resp *Response, 
 	case TypeComplete:
 		var d CompleteData
 		json.Unmarshal(resp.Data, &d)
-		if !e.isCurrentContextID(d.ID) {
+		if !e.canCompleteContextID(d.ID) {
 			onPacket(ctx, internal_type.ObservabilityEventRecordPacket{
 				ContextID: d.ID,
 				Scope:     internal_type.ObservabilityRecordScopeAssistantMessage,
@@ -503,6 +512,7 @@ func (e *websocketExecutor) handleResponse(ctx context.Context, resp *Response, 
 			e.contextMu.Lock()
 			requestStartedAt := e.requestStartedAt
 			publishTTFT := e.waitingForFirstResponse
+			e.currentID = ""
 			e.requestStartedAt = time.Time{}
 			e.waitingForFirstResponse = false
 			e.contextMu.Unlock()

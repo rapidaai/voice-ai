@@ -33,6 +33,7 @@ describe('Header', () => {
       'aria-label',
       'Rapida AI Platform',
     );
+    expect(screen.getByText('(dev)')).toBeInTheDocument();
   });
 
   it('preserves a caller-provided accessible label', () => {

@@ -124,6 +124,18 @@ def _backend_dirs(changed: list[str]) -> list[str]:
     return sorted(dirs)
 
 
+def _go_test_command(directory: str, repo_root: str | None = None) -> list[str]:
+    root = Path(repo_root or _repo_root())
+    go_files = list((root / directory).glob("*.go"))
+    integration_only = bool(go_files) and all(
+        re.search(r"(?m)^//go:build\s+integration\s*$", path.read_text())
+        for path in go_files
+    )
+    if integration_only:
+        return ["go", "test", "-tags=integration", "-run", "^$", f"./{directory}"]
+    return ["go", "test", f"./{directory}"]
+
+
 def _is_ui_source(path: str) -> bool:
     return path.startswith("ui/src/") and Path(path).suffix in {
         ".css",
@@ -180,8 +192,9 @@ def main() -> int:
             )
 
     for d in backend_dirs:
-        rc, output = _run(["go", "test", f"./{d}"])
-        results.append({"cmd": f"go test ./{d}", "exit_code": rc, "output_tail": output[-2000:]})
+        command = _go_test_command(d)
+        rc, output = _run(command)
+        results.append({"cmd": " ".join(command), "exit_code": rc, "output_tail": output[-2000:]})
 
     failed = [r for r in results if r["exit_code"] != 0]
     print(json.dumps({"hook": "run_required_tests", "results": results, "failed_count": len(failed)}, indent=2))
