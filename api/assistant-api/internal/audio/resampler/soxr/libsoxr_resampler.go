@@ -55,8 +55,8 @@ var (
 
 type Writer struct {
 	resampler *Resampler
-	source    protos.AudioConfig
-	target    protos.AudioConfig
+	source    *protos.AudioConfig
+	target    *protos.AudioConfig
 	sink      internal_type.AudioResampleSink
 }
 
@@ -117,9 +117,17 @@ func (resampler *Resampler) NewWriter(
 	}
 	return &Writer{
 		resampler: resampler,
-		source:    *source,
-		target:    *target,
-		sink:      sink,
+		source: &protos.AudioConfig{
+			SampleRate:  source.GetSampleRate(),
+			AudioFormat: source.GetAudioFormat(),
+			Channels:    source.GetChannels(),
+		},
+		target: &protos.AudioConfig{
+			SampleRate:  target.GetSampleRate(),
+			AudioFormat: target.GetAudioFormat(),
+			Channels:    target.GetChannels(),
+		},
+		sink: sink,
 	}, nil
 }
 
@@ -127,14 +135,14 @@ func (writer *Writer) Write(data []byte) error {
 	if writer == nil || writer.resampler == nil {
 		return ErrResamplerClosed
 	}
-	return writer.resampler.write(data, &writer.source, &writer.target, writer.sink)
+	return writer.resampler.write(data, writer.source, writer.target, writer.sink)
 }
 
 func (writer *Writer) Flush() error {
 	if writer == nil || writer.resampler == nil {
 		return ErrResamplerClosed
 	}
-	return writer.resampler.flush(&writer.source, &writer.target, writer.sink)
+	return writer.resampler.flush(writer.source, writer.target, writer.sink)
 }
 
 func (writer *Writer) Close() {

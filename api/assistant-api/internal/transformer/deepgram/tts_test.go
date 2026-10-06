@@ -436,8 +436,8 @@ func TestDeepgramTTSPersistentConnection(t *testing.T) {
 			for range 8 {
 				require.NoError(t, <-initializationErrors)
 			}
-			require.EqualValues(t, 1, connections.Load())
 			peer := <-peers
+			require.EqualValues(t, 1, connections.Load())
 			defer peer.Close()
 			require.NoError(t, peer.SetReadDeadline(time.Now().Add(5*time.Second)))
 			require.NoError(t, provider.Transform(t.Context(), internal_type.TextToSpeechTextPacket{ContextID: "first", Text: "Hello"}))

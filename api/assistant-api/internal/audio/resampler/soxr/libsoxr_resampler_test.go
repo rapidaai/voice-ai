@@ -153,6 +153,19 @@ func TestWriterMatchesResampleAndFlushesTail(t *testing.T) {
 	require.Equal(t, expected, actual[:len(expected)])
 }
 
+func TestWriterOwnsAudioConfiguration(t *testing.T) {
+	source := internal_audio.NewLinear8khzMonoAudioConfig()
+	target := internal_audio.NewLinear16khzMonoAudioConfig()
+	writer, err := New(WithQuickQuality()).NewWriter(source, target, func([]byte) error { return nil })
+	require.NoError(t, err)
+
+	source.SampleRate = 24000
+	target.SampleRate = 8000
+
+	require.EqualValues(t, 8000, writer.source.SampleRate)
+	require.EqualValues(t, 16000, writer.target.SampleRate)
+}
+
 func TestNewWriterRequiresSink(t *testing.T) {
 	_, err := New().NewWriter(
 		internal_audio.NewLinear8khzMonoAudioConfig(),

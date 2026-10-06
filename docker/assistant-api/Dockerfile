@@ -21,6 +21,9 @@ COPY config/ ./config/
 COPY openapi/ ./openapi/
 COPY protos/ ./protos/
 COPY pkg/ ./pkg/
+COPY bin/pre-commit-go bin/run-transformer-integration-tests.sh ./bin/
+COPY ui/src/providers/livekit_eos/eos.json ./ui/src/providers/livekit_eos/eos.json
+COPY ui/src/providers/pipecat_smart_turn_eos/eos.json ./ui/src/providers/pipecat_smart_turn_eos/eos.json
 COPY api/assistant-api ./api/assistant-api
 COPY cmd/assistant/ ./cmd/assistant/
 
