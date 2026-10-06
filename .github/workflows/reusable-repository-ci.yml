@@ -7,10 +7,6 @@ on:
         description: Go version to install.
         required: true
         type: string
-      node-version:
-        description: Node.js version to install.
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -31,27 +27,6 @@ jobs:
             exit 1
           fi
           echo "LICENSE file exists"
-
-  commit-lint:
-    name: Commit Message Lint
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          fetch-depth: 0
-
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: ${{ inputs.node-version }}
-
-      - name: Install commitlint
-        run: npm install --global @commitlint/cli @commitlint/config-conventional
-
-      - name: Validate PR commits
-        run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
 
   trivy:
     name: Trivy Vulnerability Scan

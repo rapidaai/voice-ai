@@ -105,6 +105,8 @@
     "@floating-ui/react": "0.26.9",
     "@formatjs/intl-localematcher": "0.5.4",
     "@grpc/proto-loader": "0.7.13",
+    "@ibm/plex-mono": "1.1.0",
+    "@ibm/plex-sans": "1.1.0",
     "@improbable-eng/grpc-web": "0.15.0",
     "@monaco-editor/react": "4.6.0",
     "@popperjs/core": "2.11.8",
