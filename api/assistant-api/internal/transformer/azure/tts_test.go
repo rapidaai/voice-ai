@@ -9,6 +9,7 @@ import (
 	"testing/synctest"
 
 	"github.com/Microsoft/cognitive-services-speech-sdk-go/common"
+	internal_options "github.com/rapidaai/api/assistant-api/internal/options"
 	testutil "github.com/rapidaai/api/assistant-api/internal/transformer/tests/testutil"
 	internal_type "github.com/rapidaai/api/assistant-api/internal/type"
 	"github.com/rapidaai/pkg/utils"
@@ -141,6 +142,30 @@ func TestAzureTTSMultipleRequestsReuseClient(t *testing.T) {
 		}
 	}
 	require.Empty(t, azureTTSErrors(collector))
+}
+
+func TestAzureTTSEscapesSSMLAttributes(t *testing.T) {
+	var spokenText string
+	var spokenAsSSML bool
+	client := &azureTTSFakeClient{start: func(text string, ssml bool) (azureSynthesisStream, error) {
+		spokenText = text
+		spokenAsSSML = ssml
+		return newAzureTTSStream(azureTTSRead{err: io.EOF}), nil
+	}}
+	tts, _ := newAzureTTSFixture(t, client)
+	tts.processor = nil
+	tts.mdlOpts = utils.Option{
+		internal_options.SpeakOptionVoiceID:  `voice" injected="true`,
+		internal_options.SpeakOptionLanguage: `en-US" injected="true`,
+	}
+
+	require.NoError(t, tts.Transform(context.Background(), internal_type.TextToSpeechTextPacket{
+		ContextID: "context", Text: `<break time="1s" />hello`,
+	}))
+	require.True(t, spokenAsSSML)
+	require.Contains(t, spokenText, `name="voice&#34; injected=&#34;true"`)
+	require.Contains(t, spokenText, `xml:lang="en-US&#34; injected=&#34;true"`)
+	require.NotContains(t, spokenText, ` injected="true"`)
 }
 
 func TestAzureTTSRequestFailures(t *testing.T) {

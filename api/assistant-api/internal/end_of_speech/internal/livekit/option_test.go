@@ -40,7 +40,7 @@ func TestNew_ProviderParameters(t *testing.T) {
 			threshold: 0.0289, quickTimeout: 250 * time.Millisecond, extendedTimeout: 3 * time.Second, maxHistory: 6},
 		{name: "numeric strings", options: utils.Option{optKeyThreshold: "0.5", optKeyQuickTimeout: "100", optKeyExtendedTimeout: json.Number("1500"), optKeyMaxHistory: "3"},
 			threshold: 0.5, quickTimeout: 100 * time.Millisecond, extendedTimeout: 1500 * time.Millisecond, maxHistory: 3},
-		{name: "unsigned counts", options: utils.Option{optKeyThreshold: 1.0, optKeyQuickTimeout: uint(200), optKeyExtendedTimeout: uint64(500), optKeyMaxHistory: uint32(4)},
+		{name: "unsigned counts", options: utils.Option{optKeyThreshold: 1.0, optKeyQuickTimeout: uint(200), optKeyExtendedTimeout: uint64(500), optKeyMaxHistory: uint64(4)},
 			threshold: 1, quickTimeout: 200 * time.Millisecond, extendedTimeout: 500 * time.Millisecond, maxHistory: 4},
 		{name: "zero waits and unsliced history", options: utils.Option{optKeyThreshold: 0, optKeyQuickTimeout: 0, optKeyExtendedTimeout: 0, optKeyMaxHistory: 0}},
 		{name: "duration bound", options: utils.Option{optKeyExtendedTimeout: math.MaxInt64 / int64(time.Millisecond)},

@@ -258,7 +258,10 @@ func (parser *configParser) loadOptions(config *Config) error {
 		if err != nil {
 			return fmt.Errorf("custom-tts websocket_v1: invalid %s: %w", optionKeySampleRate, err)
 		}
-		config.SampleRate = int(sampleRate)
+		config.SampleRate, err = utils.Uint32ToInt(sampleRate)
+		if err != nil {
+			return fmt.Errorf("custom-tts websocket_v1: invalid %s: %w", optionKeySampleRate, err)
+		}
 	}
 
 	if found, err := parser.decodeJSONObject(optionKeyQueryParams, false, &config.QueryParams); err != nil {

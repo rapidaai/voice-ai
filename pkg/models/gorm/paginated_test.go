@@ -9,6 +9,7 @@ package gorm_models
 
 import (
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -89,6 +90,12 @@ func TestPaginate(t *testing.T) {
 			page:        1,
 			pageSize:    150,
 			expectedLen: 25,
+		},
+		{
+			name:        "maximum page does not overflow",
+			page:        math.MaxUint32,
+			pageSize:    10,
+			expectedLen: 0,
 		},
 	}
 

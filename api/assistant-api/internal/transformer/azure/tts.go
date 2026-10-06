@@ -11,6 +11,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"strconv"
 	"strings"
@@ -297,9 +298,9 @@ func (azure *azureTextToSpeech) Transform(ctx context.Context, in internal_type.
 			language = configuredLanguage
 		}
 		if voice, err := azure.mdlOpts.GetString(internal_options.SpeakOptionVoiceID); err == nil && voice != "" {
-			text = fmt.Sprintf(`<voice name="%s">%s</voice>`, voice, text)
+			text = fmt.Sprintf(`<voice name="%s">%s</voice>`, html.EscapeString(voice), text)
 		}
-		text = fmt.Sprintf(`<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="%s">%s</speak>`, language, text)
+		text = fmt.Sprintf(`<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="%s">%s</speak>`, html.EscapeString(language), text)
 	}
 	var err error
 	stream, err = client.StartSpeaking(text, ssml)

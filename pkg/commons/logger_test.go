@@ -104,6 +104,15 @@ func TestErrorLogging(t *testing.T) {
 	logger.Errorf("Test error message with format: %s", "error detail")
 }
 
+func TestEscapeLogMessage(t *testing.T) {
+	if got := escapeLogMessage("provider response: %s", "first\r\nforged"); got != `provider response: first\r\nforged` {
+		t.Fatalf("escapeLogMessage() = %q", got)
+	}
+	if got := escapeLogMessage("provider response: %d", 42); got != "provider response: 42" {
+		t.Fatalf("escapeLogMessage() = %q", got)
+	}
+}
+
 // TestDPanicLogging tests DPanic level logging (only in development)
 func TestDPanicLogging(t *testing.T) {
 	tmpDir := t.TempDir()

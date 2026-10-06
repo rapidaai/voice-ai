@@ -239,9 +239,9 @@ func (t *deepgramTTS) readLoop(conn *websocket.Conn) {
 				t.clearDone = nil
 			}
 		case "Warning":
-			t.logger.Warnf("deepgram-tts warning code=%s message=%s", envelope.Code, envelope.Message)
+			t.logger.Warnw("deepgram-tts warning", "code", envelope.Code, "message", envelope.Message)
 		default:
-			t.logger.Debugf("deepgram-tts: unhandled message type: %s", envelope.Type)
+			t.logger.Debugw("deepgram-tts unhandled message", "type", envelope.Type)
 		}
 		t.stateMu.Unlock()
 	}

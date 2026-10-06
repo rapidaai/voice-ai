@@ -7,6 +7,7 @@ package utils
 
 import (
 	"math"
+	"strconv"
 	"testing"
 )
 
@@ -118,6 +119,14 @@ func TestInt64ToUint32(t *testing.T) {
 }
 
 func TestCheckedIntegerConversions(t *testing.T) {
+	if value, err := Uint64ToInt(uint64(math.MaxInt)); err != nil || value != math.MaxInt {
+		t.Fatalf("Uint64ToInt() = %d, %v", value, err)
+	}
+	if strconv.IntSize == 64 {
+		if _, err := Uint64ToInt(uint64(math.MaxInt) + 1); err == nil {
+			t.Fatal("expected uint64 to int overflow error")
+		}
+	}
 	if value, err := Uint64ToInt64(math.MaxInt64); err != nil || value != math.MaxInt64 {
 		t.Fatalf("Uint64ToInt64() = %d, %v", value, err)
 	}

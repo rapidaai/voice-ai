@@ -162,10 +162,10 @@ func New(opts ...Option) (internal_type.EndOfSpeechExecutor, error) {
 		if err != nil {
 			return nil, fmt.Errorf("%w: %s: %w", errLivekitInvalidOption, optKeyMaxHistory, err)
 		}
-		if maxHistory > uint64(math.MaxInt) {
-			return nil, fmt.Errorf("%w: %s exceeds the supported history count", errLivekitInvalidOption, optKeyMaxHistory)
+		endOfSpeech.maxHistory, err = utils.Uint64ToInt(maxHistory)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %s: %w", errLivekitInvalidOption, optKeyMaxHistory, err)
 		}
-		endOfSpeech.maxHistory = int(maxHistory)
 	}
 	detectorConfig := TurnDetectorConfig{ModelType: defaultModelType}
 	if modelType, err := options.options.GetString(optKeyModel); err == nil && modelType != "" {

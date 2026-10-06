@@ -305,18 +305,20 @@ func TestHandleResponse_Error(t *testing.T) {
 
 	e.handleResponse(context.Background(), &Response{
 		Type: TypeError,
-		Data: json.RawMessage(`{"code":500,"message":"server error"}`),
+		Data: json.RawMessage(`{"code":500,"message":"server error\r\nforged"}`),
 	}, onPacket)
 
 	require.Len(t, collected, 3)
 	errPkt, ok := collected[0].(internal_type.LLMErrorPacket)
 	require.True(t, ok)
 	assert.Equal(t, "ctx-1", errPkt.ContextID)
+	assert.ErrorContains(t, errPkt.Error, "server error\r\nforged")
 
 	ev, ok := collected[1].(internal_type.ObservabilityEventRecordPacket)
 	require.True(t, ok)
 	assert.Equal(t, observability.AgentError, ev.Record.Event)
 	assert.Equal(t, "websocket", ev.Record.Attributes["provider"])
+	assert.Equal(t, "server error\r\nforged", ev.Record.Attributes["error"])
 
 	log, ok := collected[2].(internal_type.ObservabilityLogRecordPacket)
 	require.True(t, ok)

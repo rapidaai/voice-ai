@@ -72,6 +72,15 @@ func Uint64ToInt64(value uint64) (int64, error) {
 	return int64(value), nil
 }
 
+// Uint64ToInt converts a uint64 to int when the value is in range.
+func Uint64ToInt(value uint64) (int, error) {
+	if value > uint64(math.MaxInt) {
+		return 0, fmt.Errorf("uint64 value %d exceeds int range", value)
+	}
+	// #nosec G115, value is checked above.
+	return int(value), nil
+}
+
 // Uint64ToUint32 converts a uint64 to uint32 when the value is in range.
 func Uint64ToUint32(value uint64) (uint32, error) {
 	if value > math.MaxUint32 {

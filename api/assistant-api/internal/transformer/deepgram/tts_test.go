@@ -292,6 +292,8 @@ func TestDeepgramTTSStalledWriteCancellation(t *testing.T) {
 					require.Equal(t, "Flush", request["type"])
 				}
 				require.NoError(t, nextPeer.WriteMessage(websocket.BinaryMessage, []byte{3, 4}))
+				require.NoError(t, nextPeer.WriteJSON(map[string]string{"type": "Warning", "code": "provider\r\ncode", "message": "provider\r\nmessage"}))
+				require.NoError(t, nextPeer.WriteJSON(map[string]string{"type": "Unknown\r\ntype"}))
 				require.NoError(t, nextPeer.WriteJSON(map[string]string{"type": "Flushed"}))
 				for _, expected := range []internal_type.Packet{
 					internal_type.TextToSpeechAudioPacket{ContextID: "new", AudioChunk: []byte{3, 4}},

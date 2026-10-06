@@ -7,6 +7,7 @@
 package internal_transformer_custom_tts_websocket_v1
 
 import (
+	"math"
 	"testing"
 
 	"github.com/rapidaai/pkg/utils"
@@ -75,6 +76,22 @@ func TestNewConfig_WithOverrides(t *testing.T) {
 	require.Len(t, config.RequestRules, 2)
 	assert.Equal(t, requestPacketText, config.RequestRules[0].When.Packet)
 	assert.Equal(t, requestPacketDone, config.RequestRules[1].When.Packet)
+}
+
+func TestNewConfig_ChecksSampleRateConversion(t *testing.T) {
+	opts := baseOptions()
+	opts[optionKeySampleRate] = uint32(math.MaxUint32)
+
+	config, err := NewConfig(testCredential(t, map[string]any{
+		credentialKeyBaseURLSnake: "wss://example.com/ws",
+	}), opts)
+	expected, conversionErr := utils.Uint32ToInt(math.MaxUint32)
+	if conversionErr != nil {
+		require.Error(t, err)
+		return
+	}
+	require.NoError(t, err)
+	assert.Equal(t, expected, config.SampleRate)
 }
 
 func TestNewConfig_ValidateRequired(t *testing.T) {

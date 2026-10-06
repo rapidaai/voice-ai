@@ -245,10 +245,10 @@ func (parser *configParser) loadOptions(config *Config) error {
 		if err != nil {
 			return fmt.Errorf("custom-stt http_v1: invalid %s: %w", optionKeySampleRate, err)
 		}
-		if uint64(sampleRate) > uint64(math.MaxInt) {
-			return fmt.Errorf("custom-stt http_v1: %s is too large", optionKeySampleRate)
+		config.SampleRate, err = utils.Uint32ToInt(sampleRate)
+		if err != nil {
+			return fmt.Errorf("custom-stt http_v1: invalid %s: %w", optionKeySampleRate, err)
 		}
-		config.SampleRate = int(sampleRate)
 	}
 
 	if found, err := parser.decodeJSONObject(optionKeyQueryParams, false, &config.QueryParams); err != nil {

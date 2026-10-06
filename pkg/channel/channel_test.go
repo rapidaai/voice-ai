@@ -17,6 +17,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type waitSignalLocker struct {
+	sync.Locker
+	entered chan struct{}
+	once    sync.Once
+}
+
+func (locker *waitSignalLocker) Unlock() {
+	locker.once.Do(func() {
+		close(locker.entered)
+	})
+	locker.Locker.Unlock()
+}
+
+func conditionWithWaitSignal(mutex *sync.Mutex) (*sync.Cond, <-chan struct{}) {
+	entered := make(chan struct{})
+	return sync.NewCond(&waitSignalLocker{
+		Locker:  mutex,
+		entered: entered,
+	}), entered
+}
+
 func TestNewRejectsInvalidConfig(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -56,6 +77,8 @@ func TestNewRejectsInvalidConfig(t *testing.T) {
 func TestChannelBlocksWhenFull(t *testing.T) {
 	channel, err := New[int](Config{CapacityPolicy: FixedCapacity(1), OverflowPolicy: BlockWhenFull})
 	require.NoError(t, err)
+	notFull, senderWaiting := conditionWithWaitSignal(&channel.mu)
+	channel.notFull = notFull
 	_, err = channel.Send(t.Context(), 1)
 	require.NoError(t, err)
 
@@ -68,9 +91,9 @@ func TestChannelBlocksWhenFull(t *testing.T) {
 	}()
 
 	select {
-	case <-resultCh:
-		t.Fatal("send completed before space became available")
-	case <-time.After(10 * time.Millisecond):
+	case <-senderWaiting:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for sender to block")
 	}
 
 	value, err := channel.Receive(t.Context())
@@ -218,6 +241,8 @@ func TestChannelCloseRejectsFutureSendsAndDrains(t *testing.T) {
 func TestChannelCloseUnblocksSenderAndReceiver(t *testing.T) {
 	waitingSender, err := New[int](Config{CapacityPolicy: FixedCapacity(1), OverflowPolicy: BlockWhenFull})
 	require.NoError(t, err)
+	notFull, senderWaiting := conditionWithWaitSignal(&waitingSender.mu)
+	waitingSender.notFull = notFull
 	_, err = waitingSender.Send(t.Context(), 1)
 	require.NoError(t, err)
 	sendErrorCh := make(chan error, 1)
@@ -228,11 +253,24 @@ func TestChannelCloseUnblocksSenderAndReceiver(t *testing.T) {
 
 	waitingReceiver, err := New[int](Config{CapacityPolicy: FixedCapacity(1), OverflowPolicy: BlockWhenFull})
 	require.NoError(t, err)
+	notEmpty, receiverWaiting := conditionWithWaitSignal(&waitingReceiver.mu)
+	waitingReceiver.notEmpty = notEmpty
 	receiveErrorCh := make(chan error, 1)
 	go func() {
 		_, receiveErr := waitingReceiver.Receive(t.Context())
 		receiveErrorCh <- receiveErr
 	}()
+
+	select {
+	case <-senderWaiting:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for sender to block")
+	}
+	select {
+	case <-receiverWaiting:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for receiver to block")
+	}
 
 	waitingSender.Close()
 	waitingReceiver.Close()
