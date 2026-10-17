@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ConversationDirectionIndicator } from './conversation-direction';
 import { HttpStatusSpanIndicator } from './http-status';
 import { OrganizationRoleIndicator } from './organization-role';

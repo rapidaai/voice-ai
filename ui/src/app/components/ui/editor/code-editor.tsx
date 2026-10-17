@@ -26,7 +26,6 @@ export function CodeEditor({
 }: CodeEditorProps) {
   const ref = useRef<HTMLDivElement>(null);
   const { isExpand, setIsExpand } = useToggleExpend(ref);
-  const [isFocus, { setTrue: setFocus, setFalse: setBlur }] = useBoolean(false);
   const [isChecked, { setTrue: setChecked, setFalse: setUnCheck }] =
     useBoolean(false);
 
@@ -56,11 +55,7 @@ export function CodeEditor({
       <div
         className={cn(
           'relative group w-full',
-          'bg-[var(--cds-field)] border-b-2',
-          isFocus
-            ? 'border-b-[var(--cds-focus)]'
-            : 'border-b-[var(--cds-border-strong)]',
-          isExpand ? 'flex-1 min-h-0' : 'min-h-[200px]',
+          isExpand && 'flex-1 min-h-0',
         )}
       >
         <div className="flex items-center absolute right-0 top-0 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -86,12 +81,10 @@ export function CodeEditor({
 
         <JsonEditor
           className={cn('w-full h-full', className)}
-          height="100%"
+          height={isExpand ? '100%' : '200px'}
           placeholder={placeholder}
           value={value}
-          onFocus={setFocus}
           onChange={handlePromptChange}
-          onBlur={setBlur}
         />
       </div>
       {helperText && <div className="cds--form__helper-text">{helperText}</div>}

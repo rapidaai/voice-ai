@@ -40,3 +40,9 @@ work inside those phases.
 - The production build and bundle budgets pass.
 - The UI verification summary contains no failed stage.
 - Every changed path is inside `ui/` when the task has an UI-only boundary.
+
+## Build tooling
+
+Vite owns the development and production application builds. Jest remains the unit and component
+test runner, and Storybook uses its Vite framework. The production output stays in `build/` so the
+existing image and deployment contract remains unchanged.

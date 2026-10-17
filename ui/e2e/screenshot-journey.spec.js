@@ -20,6 +20,9 @@ for (const journey of journeysWithCheck('screenshot')) {
         'data-color-mode',
         colorMode,
       );
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+      });
 
       const screenshotPath = screenshotBaselinePath(journey, colorMode);
       if (journey.id === 'dashboard.home') {

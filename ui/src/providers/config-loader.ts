@@ -1,3 +1,5 @@
+import { getProviderAsset } from '@/providers/provider-assets';
+
 export interface ParameterLinkedField {
   key: string;
   sourceField: string;
@@ -142,11 +144,7 @@ function resolveProviderPath(provider: string): string {
 }
 
 function tryLoadProviderJson<T>(provider: string, filename: string): T | null {
-  try {
-    return require(`./${provider}/${filename}`) as T;
-  } catch {
-    return null;
-  }
+  return getProviderAsset<T>(provider, filename);
 }
 
 function loadSplitCategoryConfig(
@@ -266,15 +264,14 @@ export function loadProviderData(provider: string, filename: string): any[] {
   if (cacheKey in dataCache) {
     return dataCache[cacheKey];
   }
-  try {
-    const data = require(`./${resolvedProvider}/${filename}`);
+  const data = getProviderAsset<any[]>(resolvedProvider, filename);
+  if (data) {
     dataCache[cacheKey] = data;
     return data;
-  } catch {
-    warnProviderLoadFailure('data', resolvedProvider, filename);
-    dataCache[cacheKey] = [];
-    return [];
   }
+  warnProviderLoadFailure('data', resolvedProvider, filename);
+  dataCache[cacheKey] = [];
+  return [];
 }
 
 function getMetadataValue(metadata: MetadataLike[], key: string): string {

@@ -8,7 +8,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ReactFlowProvider } from 'reactflow';
 import 'reactflow/dist/style.css';
-import {} from '@/styles/global-styles';
+import '@/styles/global-styles';
 import * as WebRoutes from '@/app/routes';
 import { GA } from '@/app/components/app-shell/ga';
 import React from 'react';

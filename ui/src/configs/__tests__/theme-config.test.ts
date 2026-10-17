@@ -25,6 +25,22 @@ describe('UI theme configuration', () => {
     );
   });
 
+  it('uses the app mode when NODE_ENV stays production', () => {
+    const originalEnv = process.env;
+    try {
+      process.env = {
+        ...originalEnv,
+        MODE: 'development',
+        NODE_ENV: 'production',
+      };
+      delete process.env.VITE_MODE;
+
+      expect(getConfig()).toEqual(developmentConfig);
+    } finally {
+      process.env = originalEnv;
+    }
+  });
+
   it.each(dockerConfigs)('%s contains a normalizable theme', configFile => {
     const config = JSON.parse(
       readFileSync(resolve(process.cwd(), '../docker/ui', configFile), 'utf8'),

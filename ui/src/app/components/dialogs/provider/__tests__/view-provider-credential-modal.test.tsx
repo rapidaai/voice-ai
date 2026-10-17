@@ -255,7 +255,11 @@ describe('ViewProviderCredentialDialog', () => {
       {},
       'credential-openai-123',
       expect.any(Function),
-      undefined,
+      {
+        authorization: 'token-1',
+        projectId: 'project-1',
+        userId: 'user-1',
+      },
     );
     expect(mockHideLoader).toHaveBeenCalledTimes(1);
     expect(mockReloadProviderCredentials).toHaveBeenCalledTimes(1);

@@ -5,10 +5,7 @@ export interface RuntimeEnv {
   gaMeasurementId?: string;
 }
 
-const readProcessEnv = (): NodeJS.ProcessEnv | undefined => {
-  if (typeof process === 'undefined') return undefined;
-  return process.env;
-};
+const readProcessEnv = (): NodeJS.ProcessEnv => process.env;
 
 const readString = (value: RuntimeEnvValue) =>
   typeof value === 'string' && value.trim() ? value.trim() : undefined;

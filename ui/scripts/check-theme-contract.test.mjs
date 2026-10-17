@@ -93,7 +93,7 @@ const createFixtureRepo = context => {
     );
   }
   writeFixtureFile(repoRoot, 'ui/src/index.tsx', 'export {};\n');
-  writeFixtureFile(repoRoot, 'ui/public/index.html', '<div id="root"></div>\n');
+  writeFixtureFile(repoRoot, 'ui/index.html', '<div id="root"></div>\n');
 
   return repoRoot;
 };
@@ -220,19 +220,19 @@ test('CLI exits nonzero and reports diagnostics for an invalid repository', cont
 test('rejects duplicate theme sources and inline bootstrap scripts', context => {
   const repoRoot = createFixtureRepo(context);
   writeFixtureFile(repoRoot, 'ui/public/theme.json', '{}');
-  writeFixtureFile(repoRoot, 'ui/public/index.html', '<script>boot()</script>');
+  writeFixtureFile(repoRoot, 'ui/index.html', '<script>boot()</script>');
 
   assert.deepEqual(validateSingleSourceTheme(repoRoot), [
-    'ui/public/index.html: inline bootstrap scripts are not allowed; use CONFIG.theme',
+    'ui/index.html: inline bootstrap scripts are not allowed; use CONFIG.theme',
     'ui/public/theme.json: standalone theme manifest must not exist; use CONFIG.theme',
   ]);
 });
 
-test('allows external script elements in the public index', context => {
+test('allows external script elements in the application index', context => {
   const repoRoot = createFixtureRepo(context);
   writeFixtureFile(
     repoRoot,
-    'ui/public/index.html',
+    'ui/index.html',
     '<script src="/static/application.js"></script>',
   );
 

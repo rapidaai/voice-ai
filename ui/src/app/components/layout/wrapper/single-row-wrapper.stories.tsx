@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Button, Checkbox } from '@carbon/react';
 import SingleRowWrapper from './single-row-wrapper';
 

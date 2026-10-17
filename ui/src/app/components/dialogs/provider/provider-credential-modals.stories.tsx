@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import type { VaultCredential } from '@rapidaai/react';
 import type { RapidaProvider } from '@/providers';

@@ -45,12 +45,14 @@ ui-doctor:
       '@chromatic-com/storybook',
       '@storybook/addon-a11y',
       '@storybook/addon-docs',
-      '@storybook/preset-create-react-app',
-      '@storybook/react-webpack5',
+      '@storybook/react-vite',
+      '@vitejs/plugin-react',
       'allure-commandline',
       'allure-jest',
       'allure-js-commons',
+      'jest',
       'storybook',
+      'vite',
     ];
     const missing = required.filter(name => !deps[name]);
     if (missing.length) {

@@ -15,7 +15,7 @@ function MessageTypeSelector({ value, onChange }: Props) {
   return (
     <Dropdown
       id="prompt-message-role"
-      className="w-full min-w-[140px] [&_.cds--list-box]:!w-full [&_.cds--list-box]:!border-none"
+      className="w-full min-w-[140px] [&_.cds--list-box]:!w-full"
       titleText="Message role"
       hideLabel
       label="Select a role"

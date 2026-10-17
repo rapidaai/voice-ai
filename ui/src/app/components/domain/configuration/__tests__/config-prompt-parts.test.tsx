@@ -167,6 +167,7 @@ describe('configuration prompt subcomponents', () => {
     });
     expect(selector).toHaveValue(PromptRole.user);
     expect(selector).toHaveClass('w-full');
+    expect(selector).not.toHaveClass('[&_.cds--list-box]:!border-none');
 
     fireEvent.change(selector, { target: { value: PromptRole.assistant } });
     fireEvent.change(selector, { target: { value: '' } });
@@ -250,6 +251,10 @@ describe('configuration prompt subcomponents', () => {
 
     const roleSelector = screen.getByLabelText('Select a role');
     expect(roleSelector.parentElement).toHaveClass('flex-1', 'min-w-0');
+    expect(roleSelector.parentElement?.parentElement).toHaveClass(
+      'h-10',
+      'bg-[var(--cds-field)]',
+    );
     expect(roleSelector.parentElement?.nextElementSibling).toHaveClass(
       'flex',
       'shrink-0',

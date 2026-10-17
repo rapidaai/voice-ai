@@ -9,16 +9,29 @@ import {
   inspectBundleSize,
 } from './check-bundle-size.mjs';
 
-const createBuild = ({ javascript, styles }) => {
+const createBuild = ({ importedJavaScript = '', javascript, styles }) => {
   const directory = mkdtempSync(join(tmpdir(), 'ui-bundle-budget-'));
+  mkdirSync(join(directory, '.vite'), { recursive: true });
   mkdirSync(join(directory, 'static', 'js'), { recursive: true });
   mkdirSync(join(directory, 'static', 'css'), { recursive: true });
   writeFileSync(join(directory, 'static', 'js', 'main.js'), javascript);
+  writeFileSync(
+    join(directory, 'static', 'js', 'imported.js'),
+    importedJavaScript,
+  );
   writeFileSync(join(directory, 'static', 'css', 'main.css'), styles);
   writeFileSync(
-    join(directory, 'asset-manifest.json'),
+    join(directory, '.vite', 'manifest.json'),
     JSON.stringify({
-      entrypoints: ['static/css/main.css', 'static/js/main.js'],
+      'index.html': {
+        file: 'static/js/main.js',
+        css: ['static/css/main.css'],
+        imports: ['src/imported.ts'],
+        isEntry: true,
+      },
+      'src/imported.ts': {
+        file: 'static/js/imported.js',
+      },
     }),
   );
   return directory;
@@ -59,4 +72,27 @@ test('reports the exact metric that exceeds its budget', t => {
     ['initialJavaScriptGzip'],
   );
   assert.match(formatBundleSizeReport(report), /exceeds its budget/i);
+});
+
+test('counts static entry imports in the initial JavaScript budget', t => {
+  const directory = createBuild({
+    importedJavaScript: Array.from(
+      { length: 200 },
+      (_, index) => `${index},`,
+    ).join(''),
+    javascript: 'const value = 1;',
+    styles: 'a{}',
+  });
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+
+  const report = inspectBundleSize(directory, {
+    initialJavaScriptGzip: 20,
+    initialStylesGzip: 100,
+    totalInitialGzip: 1_000,
+  });
+
+  assert.deepEqual(
+    report.violations.map(violation => violation.metric),
+    ['initialJavaScriptGzip'],
+  );
 });

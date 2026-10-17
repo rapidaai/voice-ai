@@ -1,7 +1,13 @@
 import { useRef, useEffect } from 'react';
 import Editor, { OnChange, OnMount } from '@monaco-editor/react';
 import { useTheme } from '@/theme/theme-provider';
+import { cn } from '@/utils';
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
+import '@/monaco';
+import {
+  MONACO_EDITOR_CONTENT_PADDING,
+  MONACO_EDITOR_VERTICAL_PADDING,
+} from './monaco-editor-spacing';
 
 export type JsonEditorDisposable = { dispose(): void };
 
@@ -75,32 +81,41 @@ export function JsonEditor({
   };
 
   return (
-    <Editor
-      width="100%"
-      height={height}
-      language="json"
-      className={className}
-      value={value}
-      onMount={handleEditorDidMount}
-      onChange={handleChange}
-      theme={resolvedMode === 'dark' ? 'vs-dark' : 'vs'}
-      options={{
-        readOnly: !editable,
-        minimap: { enabled: false },
-        wordWrap: 'on',
-        lineNumbersMinChars: 0,
-        lineNumbers: 'off',
-        tabSize: 2,
-        fontSize: 15,
-        glyphMargin: false,
-        folding: false,
-        lineDecorationsWidth: 0,
-        scrollbar: {
-          vertical: 'hidden',
-          horizontal: 'hidden',
-        },
-      }}
-    />
+    <div
+      className="json-editor-surface relative w-full bg-[var(--cds-field)] border-b-2 border-b-[var(--cds-border-strong)]"
+      style={{ height }}
+    >
+      <Editor
+        width="100%"
+        height="100%"
+        language="json"
+        className={cn('json-editor h-full w-full', className)}
+        value={value}
+        onMount={handleEditorDidMount}
+        onChange={handleChange}
+        theme={resolvedMode === 'dark' ? 'vs-dark' : 'vs'}
+        options={{
+          readOnly: !editable,
+          minimap: { enabled: false },
+          wordWrap: 'on',
+          lineNumbersMinChars: 0,
+          lineNumbers: 'off',
+          tabSize: 2,
+          fontSize: 15,
+          fontFamily: 'IBM Plex Mono',
+          glyphMargin: false,
+          folding: false,
+          lineDecorationsWidth: MONACO_EDITOR_CONTENT_PADDING,
+          padding: MONACO_EDITOR_VERTICAL_PADDING,
+          automaticLayout: true,
+          scrollBeyondLastLine: false,
+          scrollbar: {
+            vertical: 'hidden',
+            horizontal: 'hidden',
+          },
+        }}
+      />
+    </div>
   );
 }
 
@@ -133,8 +148,7 @@ class PlaceholderContentWidget implements monaco.editor.IContentWidget {
     if (!this.domNode) {
       this.domNode = document.createElement('div');
       this.domNode.innerText = this.placeholder;
-      this.domNode.className = 'relative!';
-      this.domNode.style.color = 'var(--cds-text-secondary)';
+      this.domNode.className = 'json-editor-placeholder relative!';
       this.domNode.style.pointerEvents = 'auto';
       this.domNode.style.cursor = 'text';
       this.domNode.onclick = () => {

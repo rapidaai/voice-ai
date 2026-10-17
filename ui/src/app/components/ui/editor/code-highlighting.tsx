@@ -3,7 +3,12 @@ import { cn } from '@/utils';
 import type { HTMLAttributes } from 'react';
 import { memo } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
+import '@/monaco';
 import { CopyButton } from '@/app/components/ui/primitives/buttons/copy-button';
+import {
+  MONACO_EDITOR_CONTENT_PADDING,
+  MONACO_EDITOR_VERTICAL_PADDING,
+} from './monaco-editor-spacing';
 
 export interface CodeHighlightingProps extends HTMLAttributes<HTMLDivElement> {
   code: string;
@@ -32,13 +37,13 @@ function CodeHighlightingComponent({
   return (
     <div
       className={cn(
-        'prose-base! relative bg-light-background dark:bg-gray-950 border',
+        'code-highlighting relative bg-[var(--cds-field)] border border-[var(--cds-border-subtle-01)]',
         'p-0 m-0 flex flex-1',
         className,
       )}
     >
       <Editor
-        className={cn('flex flex-1 ', className)}
+        className={cn('code-highlighting-editor flex flex-1', className)}
         language={language}
         value={code}
         theme={resolvedMode === 'dark' ? 'vs-dark' : 'vs'}
@@ -48,11 +53,12 @@ function CodeHighlightingComponent({
           readOnly: true,
           lineNumbers: 'off',
           folding: false,
-          lineDecorationsWidth: 0,
+          lineDecorationsWidth: MONACO_EDITOR_CONTENT_PADDING,
+          padding: MONACO_EDITOR_VERTICAL_PADDING,
           lineNumbersMinChars: 0,
           wordWrap: 'on',
           fontSize: 15,
-          fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace',
+          fontFamily: 'IBM Plex Mono',
           automaticLayout: true,
           tabSize: language === 'html' ? 2 : 4,
           insertSpaces: true,

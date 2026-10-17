@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Stack, Tag } from '@carbon/react';
 import { AssistantTag } from './assistant-tags';
 import { EndpointTag } from './endpoint-tags';
