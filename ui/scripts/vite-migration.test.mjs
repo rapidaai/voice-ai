@@ -62,6 +62,51 @@ test('keeps the deployment output contract in the Vite build', () => {
   assert.match(viteConfig, /static\/js/);
 });
 
+test('preserves the selected app mode for direct NODE_ENV reads', async () => {
+  const { resolveConfig } = await import('vite');
+  const configFile = resolve(uiRoot, 'vite.config.ts');
+  const developmentConfig = await resolveConfig(
+    { configFile, mode: 'development' },
+    'build',
+    'development',
+  );
+  const productionConfig = await resolveConfig(
+    { configFile, mode: 'production' },
+    'build',
+    'production',
+  );
+
+  assert.equal(
+    developmentConfig.define['process.env.NODE_ENV'],
+    JSON.stringify('development'),
+  );
+  assert.equal(
+    productionConfig.define['process.env.NODE_ENV'],
+    JSON.stringify('production'),
+  );
+});
+
+test('registers every language used by the Monaco editors', () => {
+  const monacoSetup = readFileSync(
+    resolve(uiRoot, 'src', 'monaco.ts'),
+    'utf8',
+  );
+
+  assert.match(monacoSetup, /language\/json\/monaco\.contribution/);
+  assert.match(monacoSetup, /language\/typescript\/monaco\.contribution/);
+  assert.match(
+    monacoSetup,
+    /basic-languages\/javascript\/javascript\.contribution/,
+  );
+  assert.match(
+    monacoSetup,
+    /basic-languages\/typescript\/typescript\.contribution/,
+  );
+  assert.match(monacoSetup, /language\/html\/monaco\.contribution/);
+  assert.match(monacoSetup, /basic-languages\/html\/html\.contribution/);
+  assert.match(monacoSetup, /basic-languages\/twig\/twig\.contribution/);
+});
+
 test('loads the global style entry for its CSS side effects', () => {
   const appEntry = readFileSync(
     resolve(uiRoot, 'src', 'app', 'index.tsx'),

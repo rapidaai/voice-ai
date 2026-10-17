@@ -1,5 +1,12 @@
 import { loader } from '@monaco-editor/react';
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
+import 'monaco-editor/esm/vs/basic-languages/html/html.contribution';
+import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution';
+import 'monaco-editor/esm/vs/basic-languages/twig/twig.contribution';
+import 'monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution';
+import 'monaco-editor/esm/vs/language/html/monaco.contribution';
+import 'monaco-editor/esm/vs/language/json/monaco.contribution';
+import 'monaco-editor/esm/vs/language/typescript/monaco.contribution';
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
 import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
